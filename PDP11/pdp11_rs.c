@@ -1,6 +1,6 @@
 /* pdp11_rs.c - RS03/RS04 Massbus disk controller
 
-   Copyright (c) 2013, Robert M Supnik
+   Copyright (c) 2013-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rs           RS03/RS04 fixed head disks
 
+   13-Mar-17    RMS     Annotated intentional fall through in switch
    23-Oct-13    RMS     Revised for new boot setup routine
 */
 
@@ -145,7 +146,7 @@
 
 #define RS_LA_OF        7
 
-/* This controller supports many two disk drive types:
+/* This controller supports two disk drive types:
 
    type         #words/        #sectors/      #tracks/
                  sector         track          drive
@@ -353,7 +354,7 @@ switch (ofs) {                                          /* decode PA<5:1> */
         break;  
 
     case RS_DA_OF:                                      /* RSDA */
-        rsda[drv] = (uint16)data;
+        rsda[drv] = (uint16) data;
         break;
 
     case RS_AS_OF:                                      /* RSAS */
@@ -361,7 +362,7 @@ switch (ofs) {                                          /* decode PA<5:1> */
         break;
 
     case RS_MR_OF:                                      /* RSMR */
-        rsmr[drv] = (uint16)data;
+        rsmr[drv] = (uint16) data;
         break;
 
     case RS_ER_OF:                                      /* RSER */
@@ -482,10 +483,11 @@ switch (fnc) {                                          /* case on function */
             rs_update_ds (DS_ATA, drv);                 /* set attn */
             return SCPE_OK;
             }
+        /* fall through */
     case FNC_WCHK:                                      /* write check */
     case FNC_READ:                                      /* read */
         if (rsda[drv] & DA_INV) {                       /* bad addr? */
-            rs_set_er (ER_IAE, drv);                   /* set error */
+            rs_set_er (ER_IAE, drv);                    /* set error */
             mba_set_exc (rs_dib.ba);                    /* set exception */
             rs_update_ds (DS_ATA, drv);                 /* set attn */
             break;

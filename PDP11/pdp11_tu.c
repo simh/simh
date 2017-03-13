@@ -1,6 +1,6 @@
 /* pdp11_tu.c - PDP-11 TM02/TU16 TM03/TU45/TU77 Massbus magnetic tape controller
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tu           TM02/TM03 magtape
 
+   13-Mar-17    RMS     Annotated fall through in switch
    23-Oct-13    RMS     Revised for new boot setup routine
    18-Apr-11    MP      Fixed t_addr printouts for 64b big-endian systems
    17-May-07    RMS     CS1 DVA resides in device, not MBA
@@ -501,6 +502,7 @@ switch (fnc) {                                          /* case on function */
         tufs = tufs & ~(FS_SAT | FS_SSC | FS_ID | FS_ERR);
         sim_cancel (uptr);                              /* reset drive */
         uptr->USTAT = 0;
+        /* fall through */
     case FNC_NOP:
         tucs1 = tucs1 & ~CS1_GO;                        /* no operation */
         return SCPE_OK;

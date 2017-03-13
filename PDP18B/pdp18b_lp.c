@@ -1,6 +1,6 @@
 /* pdp18b_lp.c: 18b PDP's line printer simulator
 
-   Copyright (c) 1993-2016, Robert M Supnik
+   Copyright (c) 1993-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    lp09         (PDP-9,15) LP09 line printer
    lp15         (PDP-15)   LP15 line printer
 
+   13-Mar-17    RMS     Annotated fall throughs in switch
    10-Mar-16    RMS     Added 3-cycle databreak set/show entry
    07-Mar-16    RMS     Revised for dynamically allocated memory
    13-Sep-15    RMS     Added APIVEC register
@@ -356,13 +357,13 @@ if (pulse & 004) {                                      /* LPDI */
             lp647_buf[lp647_bp] = lp647_buf[lp647_bp] | ((dat >> 12) & 077);
             lp647_bp = lp647_bp + 1;
             }
-
+        /* fall through */
     case 020:                                           /* LPB2 */
         if (lp647_bp < LP647_BSIZE) {
             lp647_buf[lp647_bp] = lp647_buf[lp647_bp] | ((dat >> 6) & 077);
             lp647_bp = lp647_bp + 1;
             }
-
+        /* fall through */
     case 060:                                           /* LPB1 */
         if (lp647_bp < LP647_BSIZE) {
             lp647_buf[lp647_bp] = lp647_buf[lp647_bp] | (dat & 077);

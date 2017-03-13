@@ -1,6 +1,6 @@
 /* pdp11_rp.c - RP04/05/06/07 RM02/03/05/80 Massbus disk controller
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rp           RH/RP/RM moving head disks
 
+   13-Mar-17    RMS     Annotated intentional fall through in switch
    23-Oct-13    RMS     Revised for new boot setup routine
    06-Mar-11    MP      Converted to using sim_disk library and refactored 
                         for Asynch I/O.
@@ -1171,7 +1172,8 @@ if (!uptr->io_complete) { /* Top End (I/O Initiation) Processing */
                 mba_set_exc (dibp->ba);                 /* set exception */
                 rp_update_ds (DS_ATA, drv);             /* set attn */
                 return SCPE_OK;
-                }
+            }
+            /* fall through */
         case FNC_WCHK:                                  /* write check */
         case FNC_READ:                                  /* read */
         case FNC_READH:                                 /* read headers */
