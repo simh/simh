@@ -84,7 +84,8 @@ if (((ipaddrstr = strchr(gbuf, ':')) == NULL) || (*(ipaddrstr+1) == 0)) {
     }
 *ipaddrstr++ = 0;
 
-if (((portstr = strchr (ipaddrstr, ':')) == NULL) || (*(portstr+1) == 0)) {
+if ((ipaddrstr) && 
+    (((portstr = strchr (ipaddrstr, ':')) == NULL) || (*(portstr+1) == 0))) {
     sim_printf ("redir %s syntax error\n", tcpudp[is_udp]);
     return -1;
     }
@@ -314,7 +315,7 @@ if (err) {
     return NULL;
     }
 
-slirp->vnetmask.s_addr = htonl(~((1 << (32-slirp->maskbits)) - 1));
+slirp->vnetmask.s_addr = slirp->maskbits ? htonl(~((1 << (32-slirp->maskbits)) - 1)) : 0xFFFFFFFF;
 slirp->vnetwork.s_addr = slirp->vgateway.s_addr & slirp->vnetmask.s_addr;
 if ((slirp->vgateway.s_addr & ~slirp->vnetmask.s_addr) == 0)
     slirp->vgateway.s_addr = htonl(ntohl(slirp->vnetwork.s_addr) | 2);
