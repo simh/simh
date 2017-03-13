@@ -1,6 +1,6 @@
 /* pdp11_rp.c - RP04/05/06/07 RM02/03/05/80 Massbus disk controller
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rp           RH/RP/RM moving head disks
 
+   13-Mar-17    RMS     Annotated intentional fall through in switch
    23-Oct-13    RMS     Revised for new boot setup routine
    08-Dec-12    RMS     UNLOAD shouldn't set ATTN (Mark Pizzolato)
    17-May-07    RMS     CS1 DVA resides in device, not MBA
@@ -827,7 +828,7 @@ switch (fnc) {                                          /* case on function */
             mba_set_exc (rp_dib.ba);                    /* set exception */
             rp_update_ds (DS_ATA, drv);                 /* set attn */
             return SCPE_OK;
-            }
+            }                                           /* fall through */
     case FNC_WCHK:                                      /* write check */
     case FNC_READ:                                      /* read */
     case FNC_READH:                                     /* read headers */

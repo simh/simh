@@ -1,6 +1,6 @@
 /* pdp10_rp.c - RH11/RP04/05/06/07 RM02/03/05/80 "Massbus" disk controller
 
-   Copyright (c) 1993-2012, Robert M Supnik
+   Copyright (c) 1993-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rp           RH/RP/RM moving head disks
 
+   13-Mar-17    RMS     Annotated fall through in switch
    17-Mar-13    RMS     Fixed incorrect copy/paste from pdp11_rp.c
    08-Dec-12    RMS     UNLOAD does not set ATTN (Mark Pizzolato)
    12-Nov-05    RMS     Fixed DCLR not to clear drive address
@@ -937,7 +938,7 @@ switch (uptr->FUNC) {                                   /* case on function */
             set_rper (ER1_WLE, drv);                    /* set drive error */
             update_rpcs (CS1_DONE | CS1_TRE, drv);      /* set done, err */
             break;
-            }
+            }                                           /* fall through */
     case FNC_WCHK:                                      /* write check */
     case FNC_READ:                                      /* read */
     case FNC_READH:                                     /* read headers */
