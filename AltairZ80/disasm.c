@@ -1180,7 +1180,7 @@ long disasm (unsigned char *data, char *output, int segsize, long offset)
     int rep, lock, asize, osize, i, slen, colon;
     unsigned char *origdata;
     int works;
-    insn tmp_ins, ins;
+    insn tmp_ins = { NULL }, ins;
     unsigned long goodness, best;
 
     /*
