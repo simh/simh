@@ -827,7 +827,7 @@ if (rtc_currd[tmr])
     time = rtc_currd[tmr];
 if (!uptr)
     uptr = sim_clock_unit[tmr];
-sim_debug (DBG_CAL, &sim_timer_dev, "sim_rtcn_init_unit(unit=%s, time=%d, tmr=%d)\n", sim_uname(uptr), time, tmr);
+sim_debug (DBG_CAL, &sim_timer_dev, "sim_rtcn_init_unit(unit=%s, time=%d, tmr=%d)\n", uptr ? sim_uname(uptr) : "", time, tmr);
 if (uptr) {
     if (!sim_clock_unit[tmr])
         sim_register_clock_unit_tmr (uptr, tmr);
@@ -2093,7 +2093,8 @@ int32 tmr;
 sim_int_clk_tps = MIN(CLK_TPS, sim_os_tick_hz);
 for (tmr=0; tmr<SIM_NTIMERS; tmr++) {
     if ((rtc_hz[tmr]) &&
-        (rtc_hz[tmr] <= (uint32)sim_os_tick_hz))
+        (rtc_hz[tmr] <= (uint32)sim_os_tick_hz) &&
+        (sim_clock_unit[tmr]))
         break;
     }
 if (tmr == SIM_NTIMERS) {                   /* None found? */
