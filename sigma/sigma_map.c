@@ -1,6 +1,6 @@
 /* sigma_map.c: XDS Sigma memory access routines
 
-   Copyright (c) 2007, Robert M Supnik
+   Copyright (c) 2007-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -22,6 +22,8 @@
    Except as contained in this notice, the name of Robert M Supnik shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   13-Mar-17    RMS     Annotated fall through in switch
 */
 
 #include "sigma_defs.h"
@@ -527,7 +529,7 @@ if (QCPU_S89)
             ((R[rn] & S89_SR1_MARG) >> S89_SR1_MAROFF);
         break;
     case 0xB:                                           /* read sr0, clr */
-        mem_sr0[memu] = mem_sr1[memu] = 0;
+        mem_sr0[memu] = mem_sr1[memu] = 0;              /* fall through */
     case 0x8:                                           /* read sr0 */
         R[rn] = (wd & S89_SR0_RD) |
             (((1u << (chan_num + 1)) - 1) << (S89_SR0_V_PORTS - (chan_num + 1)));
@@ -556,7 +558,7 @@ else switch (CC) {                                      /* 5X0 */
         mmc_wlk[ppag | 1] = R[rn] & 0xF;
         break;
     case 0xC:                                           /* read sr0, clr */
-        mem_sr0[memu] = 0;
+        mem_sr0[memu] = 0;                              /* clr, fall through */
     case 0x8:                                           /* read sr0 */
         R[rn] = S5X0_SR0_FIXED | (wd & S5X0_SR0_RD) |
             (((1u << (chan_num + 1)) - 1) << (S5X0_SR0_V_PORTS - (chan_num + 1)));

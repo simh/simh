@@ -1,6 +1,6 @@
 /* sigma_mt.c: Sigma 732X 9-track magnetic tape
 
-   Copyright (c) 2007-2008, Robert M. Supnik
+   Copyright (c) 2007-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    mt           7320 and 7322/7323 magnetic tape
+
+   13-Mar-17    RMS     Annotated fall through in switch
 
    Magnetic tapes are represented as a series of variable records
    of the form:
@@ -475,7 +477,7 @@ switch (st) {
     case MTSE_FMT:                                      /* illegal fmt */
     case MTSE_UNATT:                                    /* not attached */
     case MTSE_WRP:                                      /* write protect */
-        chan_set_chf (mt_dib.dva, CHF_XMME);
+        chan_set_chf (mt_dib.dva, CHF_XMME);            /* set err, fall through */
     case MTSE_OK:                                       /* no error */
         chan_uen (mt_dib.dva);                          /* uend */
         return SCPE_IERR;
