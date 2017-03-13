@@ -1317,11 +1317,13 @@ static MSC *rq_ctxmap[RQ_NUMCT] = {
 t_stat rq_rd (int32 *data, int32 PA, int32 access)
 {
 int32 cidx = rq_map_pa ((uint32) PA);
-MSC *cp = rq_ctxmap[cidx];
-DEVICE *dptr = rq_devmap[cidx];
+MSC *cp;
+DEVICE *dptr;
 
 if (cidx < 0)
     return SCPE_IERR;
+cp = rq_ctxmap[cidx];
+dptr = rq_devmap[cidx];
 
 sim_debug(DBG_REG, dptr, "rq_rd(PA=0x%08X [%s], access=%d)=0x%04X\n", PA, ((PA >> 1) & 01) ? "SA" : "IP", access, ((PA >> 1) & 01) ? cp->sa : 0);
 
@@ -1348,11 +1350,13 @@ return SCPE_OK;
 t_stat rq_wr (int32 data, int32 PA, int32 access)
 {
 int32 cidx = rq_map_pa ((uint32) PA);
-MSC *cp = rq_ctxmap[cidx];
-DEVICE *dptr = rq_devmap[cidx];
+MSC *cp;
+DEVICE *dptr;
 
 if (cidx < 0)
     return SCPE_IERR;
+cp = rq_ctxmap[cidx];
+dptr = rq_devmap[cidx];
 
 sim_debug(DBG_REG, dptr, "rq_wr(PA=0x%08X [%s], access=%d, data=0x%04X)\n", PA, ((PA >> 1) & 01) ? "SA" : "IP", access, data);
 
@@ -2126,14 +2130,15 @@ MSC *cp = rq_ctxmap[uptr->cnum];
 uint32 i, t, tbc, abc, wwc;
 uint32 err = 0;
 int32 pkt = uptr->cpkt;                                 /* get packet */
-uint32 cmd = GETP (pkt, CMD_OPC, OPC);                  /* get cmd */
-uint32 ba = GETP32 (pkt, RW_WBAL);                      /* buf addr */
-uint32 bc = GETP32 (pkt, RW_WBCL);                      /* byte count */
-uint32 bl = GETP32 (pkt, RW_WBLL);                      /* block addr */
-uint32 ma = GETP32 (pkt, RW_WMPL);                      /* block addr */
+uint32 cmd, ba, bc, bl, ma;
 
 if ((cp == NULL) || (pkt == 0))                         /* what??? */
     return STOP_RQ;
+cmd = GETP (pkt, CMD_OPC, OPC);                         /* get cmd */
+ba = GETP32 (pkt, RW_WBAL);                             /* buf addr */
+bc = GETP32 (pkt, RW_WBCL);                             /* byte count */
+bl = GETP32 (pkt, RW_WBLL);                             /* block addr */
+ma = GETP32 (pkt, RW_WMPL);                             /* block addr */
 
 sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_svc(unit=%d, pkt=%d, cmd=%s, lbn=%0X, bc=%0x, phase=%s)\n",
            (int)(uptr-rq_devmap[cp->cnum]->units), pkt, rq_cmdname[cp->pak[pkt].d[CMD_OPC]&0x3f], bl, bc,
