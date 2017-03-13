@@ -312,6 +312,9 @@ void put_rword(uint32 reg, uint32 val);
 uint32 get_ea(uint32 mrr);
 void set_segreg(uint32 reg);
 void get_mrr_dec(uint32 mrr, uint32 *mod, uint32 *reg, uint32 *rm);
+void rm_byte_dec(uint32 rm);
+void rm_word_dec(uint32 rm);
+void rm_seg_dec(uint32 rm);
 
 /* emulator primitives function prototypes */
 uint8 aad_word(uint16 d);
@@ -463,8 +466,9 @@ DEVICE i8088_dev = {
     NULL,               //ctxt
     DEV_DEBUG,          //flags 
 //    0,                  //dctrl 
-//    DEBUG_reg+DEBUG_asm,                  //dctrl 
-    DEBUG_asm,                  //dctrl 
+    DEBUG_asm+DEBUG_level1,                  //dctrl 
+//    DEBUG_reg+DEBUG_asm+DEBUG_level1,                  //dctrl 
+//    DEBUG_asm,                  //dctrl 
     i8088_debug,        //debflags
     NULL,               //msize
     NULL                //lname
@@ -475,89 +479,98 @@ uint8 xor_3_tab[] = { 0, 1, 1, 0 };
 int32 IP;
 
 static const char *opcode[] = {
-"ADD ", "ADD ", "ADD ", "ADD ",                 /* 0x00 */
-"ADD AL,", "ADD AX,", "PUSH ES", "POP ES",
-"OR ", "OR ", "OR ", "OR ", 
-"OR AL,", "OR AX,", "PUSH CS", "???", 
-"ADC ", "ADC ", "ADC ", "ADC ",                 /* 0x10 */
-"ADC AL,", "ADC AX,", "PUSH SS", "RPOP SS",
-"SBB ", "SBB ", "SBB ", "SBB ", 
-"SBB AL,", "SBB AX,", "PUSH DS", "POP DS",
-"AND ", "AND ", "AND ", "AND ",                 /* 0x20 */
-"AND AL,", "AND AX,", "ES:", "DAA",
-"SUB ", "SUB ", "SUB ", "SUB ", 
-"SUB AL,", "SUB AX,", "CS:", "DAS",
-"XOR ", "XOR ", "XOR ", "XOR ",                 /* 0x30 */
-"XOR AL,", "XOR AX,", "SS:", "AAA",
-"CMP ", "CMP ", "CMP ", "CMP ", 
-"CMP AL,", "CMP AX,", "DS:", "AAS",
-"INC AX", "INC CX", "INC DX", "INC BX",         /* 0x40 */
-"INC SP", "INC BP", "INC SI", "INC DI",
-"DEC AX", "DEC CX", "DEC DX", "DEC BX",
-"DEC SP", "DEC BP", "DEC SI", "DEC DI",
-"PUSH AX", "PUSH CX", "PUSH DX", "PUSH BX",     /* 0x50 */
-"PUSH SP", "PUSH BP", "PUSH SI", "PUSH DI",
-"POP AX", "POP CX", "POP DX", "POP BX",
-"POP SP", "POP BP", "POP SI", "POP DI",
-"60 ", "61 ", "62 ", "63 ",                 /* 0x60 */
-"64 ", "65 ", "66 ", "67 ",
-"PUSH ", "IMUL ", "PUSH ", "IMUL ",
-"INSB", "INSW", "OUTSB", "OUTSW",
-"JO ", "JNO ", "JC ", "JNC",                    /* 0x70 */
-"JZ ", "JNZ ", "JNA ", "JA",
-"JS ", "JNS ", "JP ", "JNP ",
-"JL ", "JNL ", "JLE ", "JNLE",
-"80 ", "81 ", "82 ", "83 ",                 /* 0x80 */
-"TEST ", "TEST ", "XCHG ", "XCHG ",
-"MOV ", "MOV ", "MOV ", "MOV ",
-"MOV ", "LEA ", "MOV ", "POP ",
-"NOP", "XCHG AX,CX", "XCHG AX,DX", "XCHG AX,BX",/* 0x90 */
-"XCHG AX,SP", "XCHG AX,BP", "XCHG AX,SI", "XCHG AX,DI",
-"CBW", "CWD", "CALL ", "WAIT",
+"ADD\t", "ADD\t", "ADD\t", "ADD\t",                 /* 0x00 */
+"ADD\tAL,", "ADD\tAX,", "PUSH\tES", "POP\tES",
+"OR\t", "OR\t", "OR\t", "OR\t", 
+"OR\tAL,", "OR\tAX,", "PUSH\tCS", "0F\t", 
+"ADC\t", "ADC\t", "ADC\t", "ADC\t",                 /* 0x10 */
+"ADC\tAL,", "ADC\tAX,", "PUSH\tSS", "POP\tSS",
+"SBB\t", "SBB\t", "SBB\t", "SBB\t", 
+"SBB\tAL,", "SBB\tAX,", "PUSH\tDS", "POP\tDS",
+"AND\t", "AND\t", "AND\t", "AND\t",                 /* 0x20 */
+"AND\tAL,", "AND\tAX,", "ES:", "DAA",
+"SUB\t", "SUB\t", "SUB\t", "SUB\t", 
+"SUB\tAL,", "SUB\tAX,", "CS:", "DAS",
+"XOR\t", "XOR\t", "XOR\t", "XOR\t",                 /* 0x30 */
+"XOR\tAL,", "XOR\tAX,", "SS:", "AAA",
+"CMP\t", "CMP\t", "CMP\t", "CMP\t", 
+"CMP\tAL,", "CMP\tAX,", "DS:", "AAS",
+"INC\tAX", "INC\tCX", "INC\tDX", "INC\tBX",         /* 0x40 */
+"INC\tSP", "INC\tBP", "INC\tSI", "INC\tDI",
+"DEC\tAX", "DEC\tCX", "DEC\tDX", "DEC\tBX",
+"DEC\tSP", "DEC\tBP", "DEC\tSI", "DEC\tDI",
+"PUSH\tAX", "PUSH\tCX", "PUSH\tDX", "PUSH\tBX",     /* 0x50 */
+"PUSH\tSP", "PUSH\tBP", "PUSH\tSI", "PUSH\tDI",
+"POP\tAX", "POP\tCX", "POP\tDX", "POP\tBX",
+"POP\tSP", "POP\tBP", "POP\tSI", "POP\tDI",
+"60\t", "61\t", "62\t", "63\t",                 /* 0x60 */
+"64\t", "65\t", "66\t", "67\t",
+"68\t", "69\t", "6A\t", "6B\t",
+"6C\t", "6D\t", "6E\t", "6F\t",
+"JO\t", "JNO\t", "JC\t", "JNC\t",                    /* 0x70 */
+"JZ\t", "JNZ\t", "JNA\t", "JA\t",
+"JS\t", "JNS\t", "JP\t", "JNP\t",
+"JL\t", "JNL\t", "JLE\t", "JNLE\t",
+"80\t", "81\t", "82\t", "83\t",                 /* 0x80 */
+"TEST\t", "TEST\t", "XCHG\t", "XCHG\t",
+"MOV\t", "MOV\t", "MOV\t", "MOV\t",
+"MOV\t", "LEA\t", "MOV\t", "POP\t",
+"NOP", "XCHG\tAX,CX", "XCHG\tAX,DX", "XCHG\tAX,BX",/* 0x90 */
+"XCHG\tAX,SP", "XCHG\tAX,BP", "XCHG\tAX,SI", "XCHG\tAX,DI",
+"CBW", "CWD", "CALL\t", "WAIT",
 "PUSHF", "POPF", "SAHF", "LAHF",
-"MOV AL,", "MOV AX,", "MOV ", "MOV ",           /* 0xA0 */
+"MOV\tAL,", "MOV\tAX,", "MOV\t", "MOV\t",           /* 0xA0 */
 "MOVSB", "MOVSW", "CMPSB", "CMPSW",
-"TEST AL,", "TEST AX,", "STOSB", "STOSW",
+"TEST\tAL,", "TEST\tAX,", "STOSB", "STOSW",
 "LODSB", "LODSW", "SCASB", "SCASW",
-"MOV AL,", "MOV CL,", "MOV DL,", "MOV BL,",     /* 0xB0 */
-"MOV AH,", "MOV CH,", "MOV DH,", "MOV BH,",
-"MOV AX,", "MOV CX,", "MOV DX,", "MOV BX,",
-"MOV SP,", "MOV BP,", "MOV SI,", "MOV DI,"
-"C0 ", "C1 ", "RET ", "RET ",                 /* 0xC0 */
-"LES ", "LDS ", "MOV ", "MOV ",
-"C8 ", "C9 ", "RET ", "RET",
-"INT 3", "INT ", "INTO", "IRET",
-"SHL ", "D1 ", "SHR ", "D3 ",                 /* 0xD0 */
-"AAM", "AAD", "D6 ", "XLATB",
-"ESC ", "ESC ", "ESC ", "ESC ", 
-"ESC ", "ESC ", "ESC ", "ESC ", 
-"LOOPNZ ", "LOOPZ ", "LOOP", "JCXZ",            /* 0xE0 */
-"IN AL,", "IN AX,", "OUT ", "OUT ",
-"CALL ", "JMP ", "JMP ", "JMP ",
-"IN AL,DX", "IN AX,DX", "OUT DX,AL", "OUT DX,AX",
-"LOCK", "F1 ", "REPNZ", "REPZ",                /* 0xF0 */
-"HLT", "CMC", "F6 ", "F7 ",
+"MOV\tAL,", "MOV\tCL,", "MOV\tDL,", "MOV\tBL,",     /* 0xB0 */
+"MOV\tAH,", "MOV\tCH,", "MOV\tDH,", "MOV\tBH,",
+"MOV\tAX,", "MOV\tCX,", "MOV\tDX,", "MOV\tBX,",
+"MOV\tSP,", "MOV\tBP,", "MOV\tSI,", "MOV\tDI,"
+"C0\t", "C1\t", "RET ", "RET ",                 /* 0xC0 */
+"LES\t", "LDS\t", "MOV\t", "MOV\t",
+"C8\t", "C9\t", "RET ", "RET",
+"INT\t3", "INT\t", "INTO", "IRET",
+"SHL\t", "D1\t", "SHR\t", "D3\t",                 /* 0xD0 */
+"AAM", "AAD", "D6\t", "XLATB",
+"ESC\t", "ESC\t", "ESC\t", "ESC\t", 
+"ESC\t", "ESC\t", "ESC\t", "ESC\t", 
+"LOOPNZ\t", "LOOPZ\t", "LOOP\t", "JCXZ\t",            /* 0xE0 */
+"IN\tAL,", "IN\tAX,", "OUT\t", "OUT\t",
+"CALL\t", "JMP\t", "JMP\t", "JMP\t",
+"IN\tAL,DX", "IN\tAX,DX", "OUT\tDX,AL", "OUT\tDX,AX",
+"LOCK", "F1\t", "REPNZ", "REPZ",                /* 0xF0 */
+"HLT", "CMC", "F6\t", "F7\t",
 "CLC", "STC", "CLI", "STI",
-"CLD", "STD", "FE ", "FF "
- };
+"CLD", "STD", "FE\t", "FF\t"
+};
+
+/*
+0 = 1 byte opcaode
+1 = DATA8
+2 = DATA16
+3 = IP-INC8
+4 = IP-INC16
+20 = I haven't figured it out yet!
+*/
 
 int32 oplen[256] = {
-1,3,1,1,1,1,2,1,0,1,1,1,1,1,2,1,
-0,3,1,1,1,1,2,1,0,1,1,1,1,1,2,1,
-0,3,3,1,1,1,2,1,0,1,3,1,1,1,2,1,
-0,3,3,1,1,1,2,1,0,1,3,1,1,1,2,1,
-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-1,1,3,3,3,1,2,1,1,1,3,0,3,3,2,1,
-1,1,3,2,3,1,2,1,1,0,3,2,3,0,2,1,
-1,1,3,1,3,1,2,1,1,1,3,1,3,0,2,1,
-1,1,3,1,3,1,2,1,1,1,3,1,3,0,2,1
+20,20,20,20, 1, 2, 0, 0,  20,20,20,20, 1, 2, 0, 0, //0x00
+20,20,20,20, 1, 2, 0, 0,  20,20,20,20, 1, 2, 0, 0, //0x10
+20,20,20,20, 1, 2, 0, 0,  20,20,20,20, 1, 2, 0, 0, //0x20
+20,20,20,20, 1, 2, 0, 0,  20,20,20,20, 1, 2, 0, 0, //0x30
+ 0, 0, 0, 0, 0, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0, //0x40
+ 0, 0, 0, 0, 0, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0, //0x50
+20,20,20,20,20,20,20,20,  20,20,20,20,20,20,20,20, //0x60
+ 3, 3, 3, 3, 3, 3, 3, 3,   3, 3, 3, 3, 3, 3, 3, 3, //0x70
+20,20,20,20,20,20,20,20,  20,20,20,20,20,20,20,20, //0x80
+ 0, 0, 0, 0, 0, 0, 0, 0,   0,20, 0, 0, 0, 0, 0, 0, //0x90
+20,20,20,20, 0, 0, 0, 0,   1, 2, 0, 0, 0, 0, 0, 0, //0xA0
+ 1, 1, 1, 1, 1, 1, 1, 1,   2, 2, 2, 2, 2, 2, 2, 2, //0xB0
+ 0, 0, 2, 0,20,20,20,20,   0, 0, 2, 0, 0, 1, 0, 0, //0xC0
+20,20,20,20, 0, 0, 0, 0,  20,20,20,20,20,20,20,20, //0xD0
+ 3, 3, 3, 3, 1, 1, 1, 1,   4, 4,20, 3, 0, 0, 0, 0, //0xE0
+ 0, 0, 0, 0, 0, 0,20,20,   0, 0, 0, 0, 0, 0,20,20, //0xF0
 };
 
 void set_cpuint(int32 int_num)
@@ -650,10 +663,10 @@ int32 sim_instr (void)
                 if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
                     EA = get_ea(MRR);   /* get effective address */
                     VAL = adc_word(get_rword(REG), get_smword(seg_reg, EA));  /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result *** */
+                    put_smword(seg_reg, EA, VAL); /* store result */
                 } else {                /* RM is second register */
                     VAL = adc_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result *** */
+                    put_rword(REG, VAL); /* store result */
                 }
                 break;
 
@@ -722,10 +735,10 @@ int32 sim_instr (void)
                 if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
                     EA = get_ea(MRR);   /* get effective address */
                     VAL = or_word(get_rword(REG), get_smword(seg_reg, EA));  /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result *** */
+                    put_smword(seg_reg, EA, VAL); /* store result */
                 } else {                /* RM is second register */
                     VAL = or_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result *** */
+                    put_rword(REG, VAL); /* store result */
                 }
                 break;
 
@@ -769,7 +782,7 @@ int32 sim_instr (void)
                     put_smword(seg_reg, EA, VAL); /* store result */
                 } else {                /* RM is second register */
                     VAL = adc_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result *** */
+                    put_rword(REG, VAL); /* store result */
                 }
                 break;
 
@@ -792,10 +805,10 @@ int32 sim_instr (void)
                 if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
                     EA = get_ea(MRR);   /* get effective address */
                     VAL = adc_word(get_rword(REG), get_smword(seg_reg, EA));  /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result *** */
+                    put_smword(seg_reg, EA, VAL); /* store result */
                 } else {                /* RM is second register */
                     VAL = adc_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result *** */
+                    put_rword(REG, VAL); /* store result */
                 }
                 break;
 
@@ -841,7 +854,7 @@ int32 sim_instr (void)
                     put_smword(seg_reg, EA, VAL); /* store result */
                 } else {                /* RM is second register */
                     VAL = sbb_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result *** */
+                    put_rword(REG, VAL); /* store result */
                 }
                 break;
 
@@ -864,10 +877,10 @@ int32 sim_instr (void)
                 if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
                     EA = get_ea(MRR);   /* get effective address */
                     VAL = sbb_word(get_rword(REG), get_smword(seg_reg, EA));  /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result *** */
+                    put_smword(seg_reg, EA, VAL); /* store result */
                 } else {                /* RM is second register */
                     VAL = sbb_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result *** */
+                    put_rword(REG, VAL); /* store result */
                 }
                 break;
 
@@ -913,7 +926,7 @@ int32 sim_instr (void)
                     put_smword(seg_reg, EA, VAL); /* store result */
                 } else {                /* RM is second register */
                     VAL = and_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result *** */
+                    put_rword(REG, VAL); /* store result */
                 }
                 break;
 
@@ -936,10 +949,10 @@ int32 sim_instr (void)
                 if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
                     EA = get_ea(MRR);   /* get effective address */
                     VAL = and_word(get_rword(REG), get_smword(seg_reg, EA));  /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result *** */
+                    put_smword(seg_reg, EA, VAL); /* store result */
                 } else {                /* RM is second register */
                     VAL = and_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result *** */
+                    put_rword(REG, VAL); /* store result */
                 }
                 break;
 
@@ -993,7 +1006,7 @@ int32 sim_instr (void)
                     put_smword(seg_reg, EA, VAL); /* store result */
                 } else {                /* RM is second register */
                     VAL = sub_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result *** */
+                    put_rword(REG, VAL); /* store result */
                 }
                 break;
 
@@ -1016,10 +1029,10 @@ int32 sim_instr (void)
                 if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
                     EA = get_ea(MRR);   /* get effective address */
                     VAL = sub_word(get_rword(REG), get_smword(seg_reg, EA));  /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result *** */
+                    put_smword(seg_reg, EA, VAL); /* store result */
                 } else {                /* RM is second register */
                     VAL = sub_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result *** */
+                    put_rword(REG, VAL); /* store result */
                 }
                 break;
 
@@ -1073,7 +1086,7 @@ int32 sim_instr (void)
                     put_smword(seg_reg, EA, VAL); /* store result */
                 } else {                /* RM is second register */
                     VAL = xor_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result *** */
+                    put_rword(REG, VAL); /* store result */
                 }
                 break;
 
@@ -1096,10 +1109,10 @@ int32 sim_instr (void)
                 if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
                     EA = get_ea(MRR);   /* get effective address */
                     VAL = xor_word(get_rword(REG), get_smword(seg_reg, EA));  /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result *** */
+                    put_smword(seg_reg, EA, VAL); /* store result */
                 } else {                /* RM is second register */
                     VAL = xor_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result *** */
+                    put_rword(REG, VAL); /* store result */
                 }
                 break;
 
@@ -1152,7 +1165,7 @@ int32 sim_instr (void)
                     put_smword(seg_reg, EA, VAL); /* store result */
                 } else {                /* RM is second register */
                     VAL = xor_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result *** */
+                    put_rword(REG, VAL); /* store result */
                 }
                 break;
 
@@ -1175,10 +1188,10 @@ int32 sim_instr (void)
                 if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
                     EA = get_ea(MRR);   /* get effective address */
                     VAL = xor_word(get_rword(REG), get_smword(seg_reg, EA));  /* do operation */
-                    put_smword(seg_reg, EA, VAL); /* store result *** */
+                    put_smword(seg_reg, EA, VAL); /* store result */
                 } else {                /* RM is second register */
                     VAL = xor_word(get_rword(REG), get_rword(RM)); /* do operation */
-                    put_rword(REG, VAL); /* store result *** */
+                    put_rword(REG, VAL); /* store result */
                 }
                 break;
 
@@ -1471,7 +1484,7 @@ int32 sim_instr (void)
                     IP = EA;
                 break;
 
-            case 0x80:                  /* byte operands */
+            case 0x80:                  /* ADD/OR/ADC/SBB/AND/SUB/XOR/CMP byte operands */
                 MRR = fetch_byte(1);
                 get_mrr_dec(MRR, &MOD, &REG, &RM);
                 if (MOD != 0x3) {       /* based, indexed, or based indexed addressing */
@@ -1482,7 +1495,7 @@ int32 sim_instr (void)
                             VAL = add_byte(get_smbyte(seg_reg, EA), DATA);  /* ADD mem8, immed8 */
                             break;
                         case 1:
-                            VAL = or_byte(get_smbyte(seg_reg, EA), DATA);  /* OR mem8, immed8 */
+                            VAL = or_byte(get_smbyte(seg_reg, EA), DATA);   /* OR  mem8, immed8 */
                             break;
                         case 2:
                             VAL = adc_byte(get_smbyte(seg_reg, EA), DATA);  /* ADC mem8, immed8 */
@@ -1510,7 +1523,7 @@ int32 sim_instr (void)
                             VAL = add_byte(get_rbyte(RM), DATA);  /* ADD REG8, immed8 */
                             break;
                         case 1:
-                            VAL = or_byte(get_rbyte(RM), DATA);  /* OR REG8, immed8 */
+                            VAL = or_byte(get_rbyte(RM), DATA);   /* OR  REG8, immed8 */
                             break;
                         case 2:
                             VAL = adc_byte(get_rbyte(RM), DATA);  /* ADC REG8, immed8 */
@@ -1547,7 +1560,7 @@ int32 sim_instr (void)
                             VAL = add_word(get_smword(seg_reg, EA), DATA);  /* ADD mem16, immed16 */
                             break;
                         case 1:
-                            VAL = or_word(get_smword(seg_reg, EA), DATA);  /* OR mem16, immed16 */
+                            VAL = or_word(get_smword(seg_reg, EA), DATA);   /* OR  mem16, immed16 */
                             break;
                         case 2:
                             VAL = adc_word(get_smword(seg_reg, EA), DATA);  /* ADC mem16, immed16 */
@@ -1575,7 +1588,7 @@ int32 sim_instr (void)
                             VAL = add_word(get_rword(RM), DATA);  /* ADD reg16, immed16 */
                             break;
                         case 1:
-                            VAL = or_word(get_rword(RM), DATA);  /* OR reg16, immed16 */
+                            VAL = or_word(get_rword(RM), DATA);   /* OR  reg16, immed16 */
                             break;
                         case 2:
                             VAL = adc_word(get_rword(RM), DATA);  /* ADC reg16, immed16 */
@@ -2748,30 +2761,30 @@ int32 sim_instr (void)
                 break;
 
             case 0xE4:                  /* IN AL, port8 */
-                OFF = fetch_byte(1);
-                port = OFF;
-                AL = dev_table[OFF].routine(0, 0);
+                DATA = fetch_byte(1);
+                port = DATA;
+                AL = dev_table[DATA].routine(0, 0);
                 break;
 
-            case 0xE5:                  /* IN AX, port8 */
-                OFF = fetch_byte(1);
-                port = OFF;
-                AH = dev_table[OFF].routine(0, 0);
-                AL = dev_table[OFF+1].routine(0, 0);
+            case 0xE5:                  /* IN AX, port16 */
+                DATA = fetch_byte(1);
+                port = DATA;
+                AH = dev_table[DATA].routine(0, 0);
+                AL = dev_table[DATA+1].routine(0, 0);
                 break;
 
             case 0xE6:                  /* OUT AL, port8 */
-                OFF = fetch_byte(1);
-                port = OFF;
-                dev_table[OFF].routine(1, AL);
-                //sim_printf("OUT AL: OFF=%04X\n", OFF);
+                DATA = fetch_byte(1);
+                port = DATA;
+                dev_table[DATA].routine(1, AL);
+                //sim_printf("OUT AL: DATA=%04X\n", DATA);
                 break;
 
-            case 0xE7:                  /* OUT AX, port8 */
-                OFF = fetch_byte(1);
-                port = OFF;
-                dev_table[OFF].routine(1, AH);
-                dev_table[OFF+1].routine(1, AL);
+            case 0xE7:                  /* OUT AX, port16 */
+                DATA = fetch_byte(1);
+                port = DATA;
+                dev_table[DATA].routine(1, AH);
+                dev_table[DATA+1].routine(1, AL);
                 break;
 
             case 0xE8:                  /* CALL NEAR proc */
@@ -3126,6 +3139,27 @@ int32 sim_instr (void)
             sysmode &= 0x0000001E;      /* clear flags */
             sysmode |= 0x00000001;
             }
+            if (i8088_dev.dctrl & DEBUG_asm) {
+                sim_printf("%04X:%04X   %s", CS, IP, opcode[IR]);
+                switch (oplen[IR]) {
+                    case 0:             //one byte opcode
+                        break;
+                    case 1:             //IMMED8
+                        sim_printf(" 0%02XH", DATA);
+                        break;
+                    case 2:             //IMMED16
+                        sim_printf(" 0%04XH", DATA);
+                        break;
+                    case 3:             //IP-INC8
+                        sim_printf(" 0%02XH", EA);
+                        break;
+                    case 4:             //IP-INC16
+                        sim_printf(" 0%04XH", EA);
+                        break;
+                    default:
+                        break;
+                }
+            }
             if (i8088_dev.dctrl & DEBUG_reg) {
                 sim_printf("\nRegs: AX=%04X BX=%04X CX=%04X DX=%04X SP=%04X BP=%04X SI=%04X DI=%04X IP=%04X\n",
                     AX, BX, CX, DX, SP, BP, SI, DI, IP);
@@ -3158,13 +3192,12 @@ int32 fetch_byte(int32 flag)
     if (i8088_dev.dctrl & DEBUG_asm) {  /* display source code */
         switch (flag) {
             case 0:                     /* opcode fetch */
-//                sim_printf("%04X:%04X %02X", CS, IP, val);
-                if (i8088_dev.dctrl & DEBUG_asm) 
-                    sim_printf("%04X:%04X %s", CS, IP, opcode[val]);
+//                if (i8088_dev.dctrl & DEBUG_asm) 
+//                    sim_printf("%04X:%04X %02X  %s ", CS, IP, val, opcode[val]);
                 break;
             case 1:                     /* byte operand fetch */
-                if (i8088_dev.dctrl & DEBUG_asm) 
-                    sim_printf(" %02X", val);
+//                if (i8088_dev.dctrl & DEBUG_asm) 
+//                    sim_printf("0%02XH", val);
                 break;
         }
     }
@@ -3178,8 +3211,8 @@ int32 fetch_word(void)
 
     val = get_smbyte(SEG_CS, IP) & 0xFF; /* fetch low byte */
     val |= get_smbyte(SEG_CS, IP + 1) << 8; /* fetch high byte */
-    if (i8088_dev.dctrl & DEBUG_asm)
-        sim_printf(" %04X", val);
+//    if (i8088_dev.dctrl & DEBUG_asm)
+//        sim_printf("0%04XH", val);
     IP = INC_IP2;                       /* increment IP */
     return val;
 }
@@ -3297,7 +3330,7 @@ void set_segreg(uint32 reg)
     if (seg_ovr)
         seg_reg = seg_ovr;
     else
-        seg_ovr = reg;
+        seg_reg = seg_ovr = reg;
 }
 
 /* return effective address from mrr - also set seg_reg */
@@ -3423,9 +3456,9 @@ uint32 get_ea(uint32 mrr)
         case 3:             /* RM is register field */
             break;
     }
-    if (i8088_dev.dctrl & DEBUG_level1) 
-        sim_printf("get_ea: MRR=%02X MOD=%02X REG=%02X R/M=%02X DISP=%04X EA=%04X\n",
-            mrr, MOD, REG, RM, DISP, EA);
+//    if (i8088_dev.dctrl & DEBUG_level1) 
+//        sim_printf("get_ea: DISP=%04X EA=%04X\n",
+//            DISP, EA);
     return EA;
 }
 /*  return mod, reg and rm field from mrr */
@@ -3435,6 +3468,92 @@ void get_mrr_dec(uint32 mrr, uint32 *mod, uint32 *reg, uint32 *rm)
     *mod = (mrr >> 6) & 0x3;
     *reg = (mrr >> 3) & 0x7;
     *rm = mrr & 0x7;
+//    if (i8088_dev.dctrl & DEBUG_level1) 
+//        sim_printf("get_mrr_dec: MRR=%02X MOD=%02X REG=%02X R/M=%02X\n",
+//            mrr, *mod, *reg, *rm);
+}
+
+/* decode byte register for disassembly */
+
+void rm_byte_dec(uint32 rm)
+{
+    switch (rm) {
+        case 0:
+            sim_printf("AL");
+            break;
+        case 1:
+            sim_printf("CL");
+            break;
+        case 2:
+            sim_printf("DL");
+            break;
+        case 3:
+            sim_printf("BL");
+            break;
+        case 4:
+            sim_printf("AH");
+            break;
+        case 5:
+            sim_printf("CH");
+            break;
+        case 6:
+            sim_printf("DH");
+            break;
+        case 7:
+            sim_printf("CH");
+            break;
+    }
+}
+/* decode word register for disassembly */
+
+void rm_word_dec(uint32 rm)
+{
+    switch (rm) {
+        case 0:
+            sim_printf("AX");
+            break;
+        case 1:
+            sim_printf("CX");
+            break;
+        case 2:
+            sim_printf("DX");
+            break;
+        case 3:
+            sim_printf("BX");
+            break;
+        case 4:
+            sim_printf("SP");
+            break;
+        case 5:
+            sim_printf("BP");
+            break;
+        case 6:
+            sim_printf("SI");
+            break;
+        case 7:
+            sim_printf("DI");
+            break;
+    }
+}
+
+/* decode segment register for disassembly */
+
+void rm_seg_dec(uint32 rm)
+{
+    switch (rm) {
+        case 0:
+            sim_printf("ES");
+            break;
+        case 1:
+            sim_printf("CS");
+            break;
+        case 2:
+            sim_printf("SS");
+            break;
+        case 3:
+            sim_printf("DS");
+            break;
+    }
 }
 
 /* 
@@ -4509,8 +4628,9 @@ int32 get_smbyte(int32 segreg, int32 addr)
 
     abs_addr = addr + (get_rword(segreg) << 4);
     val = get_mbyte(abs_addr);
-    //sim_printf("get_smbyte: seg=%04X addr=%04X abs_addr=%05X val=%02X\n",
-        //get_rword(segreg), addr, abs_addr, val);
+//     if (i8088_dev.dctrl & DEBUG_level1) 
+//        sim_printf("get_smbyte: seg=%04X addr=%04X abs_addr=%05X val=%02X\n",
+//            get_rword(segreg), addr, abs_addr, val);
     return val;
 }
 
@@ -4533,8 +4653,9 @@ void put_smbyte(int32 segreg, int32 addr, int32 val)
 
     abs_addr = addr + (get_rword(segreg) << 4);
     put_mbyte(abs_addr, val);
-    //sim_printf("put_smbyte: seg=%04X addr=%04X abs_addr=%08X val=%02X\n",
-        //get_rword(segreg), addr, abs_addr, val);
+//    if (i8088_dev.dctrl & DEBUG_level1) 
+//        sim_printf("put_smbyte: seg=%04X addr=%04X abs_addr=%08X val=%02X\n",
+//            get_rword(segreg), addr, abs_addr, val);
 }
 
 /*  put a word to memory using addr and segment register */

@@ -118,17 +118,13 @@ uint8 RAM_get_mbyte(uint32 addr)
 {
     uint8 val;
 
-    if (i8255_unit[0].u5 & 0x02) {         /* enable RAM */
-        sim_debug (DEBUG_read, &RAM_dev, "RAM_get_mbyte: addr=%04X\n", addr);
-        if ((addr >= RAM_unit.u3) && ((uint32) addr < (RAM_unit.u3 + RAM_unit.capac))) {
-            val = *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3));
-            sim_debug (DEBUG_read, &RAM_dev, " val=%04X\n", val); 
-            return (val & 0xFF);
-        }
-        sim_debug (DEBUG_read, &RAM_dev, " Out of range\n");
-        return 0xFF;
+    sim_debug (DEBUG_read, &RAM_dev, "RAM_get_mbyte: addr=%04X\n", addr);
+    if ((addr >= RAM_unit.u3) && ((uint32) addr < (RAM_unit.u3 + RAM_unit.capac))) {
+        val = *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3));
+        sim_debug (DEBUG_read, &RAM_dev, " val=%04X\n", val); 
+        return (val & 0xFF);
     }
-    sim_debug (DEBUG_read, &RAM_dev, " RAM disabled\n");
+    sim_debug (DEBUG_read, &RAM_dev, " Out of range\n");
     return 0xFF;
 }
 
@@ -136,17 +132,14 @@ uint8 RAM_get_mbyte(uint32 addr)
 
 void RAM_put_mbyte(uint32 addr, uint8 val)
 {
-    if (i8255_unit[0].u5 & 0x02) {         /* enable RAM */
-        sim_debug (DEBUG_write, &RAM_dev, "RAM_put_mbyte: addr=%04X, val=%02X\n", addr, val);
-        if ((addr >= RAM_unit.u3) && ((uint32)addr < RAM_unit.u3 + RAM_unit.capac)) {
-            *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3)) = val & 0xFF;
-            sim_debug (DEBUG_write, &RAM_dev, "\n");
-            return;
-        }
-        sim_debug (DEBUG_write, &RAM_dev, " Out of range\n");
+    sim_debug (DEBUG_write, &RAM_dev, "RAM_put_mbyte: addr=%04X, val=%02X\n", addr, val);
+    if ((addr >= RAM_unit.u3) && ((uint32)addr < RAM_unit.u3 + RAM_unit.capac)) {
+        *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3)) = val & 0xFF;
+        sim_debug (DEBUG_write, &RAM_dev, "\n");
         return;
     }
-    sim_debug (DEBUG_write, &RAM_dev, " RAM disabled\n");
+    sim_debug (DEBUG_write, &RAM_dev, " Out of range\n");
+    return;
 }
 
 /* end of pcram8.c */

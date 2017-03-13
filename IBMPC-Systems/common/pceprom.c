@@ -74,7 +74,7 @@ DEVICE EPROM_dev = {
     NULL,               //examine
     NULL,               //deposit
 //    &EPROM_reset,       //reset
-    NULL,				//reset
+    NULL,               //reset
     NULL,               //boot
     &EPROM_attach,      //attach
     NULL,               //detach

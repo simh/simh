@@ -52,7 +52,8 @@ uint8 xtbus_get_mbyte(uint32 addr);
 void xtbus_put_mbyte(uint32 addr, uint8 val);
 
 /* external function prototypes */
-
+extern uint8 RAM_get_mbyte(uint32 addr);
+extern void RAM_put_mbyte(uint32 addr, uint8 val);
 extern t_stat SBC_reset(DEVICE *dptr);      /* reset the PC XT simulator */
 extern void set_cpuint(int32 int_num);
 
@@ -451,14 +452,14 @@ void dump_dev_table(void)
 
 uint8 xtbus_get_mbyte(uint32 addr)
 {
-    return 0xFF;
+    return RAM_get_mbyte(addr);
 }
 
 /*  put a byte to bus */
 
 void xtbus_put_mbyte(uint32 addr, uint8 val)
 {
-    ;
+    RAM_put_mbyte(addr, val);
 }
 
 /* end of pcbus.c */
