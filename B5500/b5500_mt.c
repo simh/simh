@@ -159,7 +159,7 @@ mt_cmd(uint16 cmd, uint16 dev, uint8 chan, uint16 *wc)
     int         unit = dev >> 1;
 
     /* Make sure valid drive number */
-    if (unit > NUM_DEVS_MT || unit < 0)
+    if (unit > (NUM_DEVS_MT - 1) || unit < 0)
         return SCPE_NODEV;
 
     uptr = &mt_unit[unit];
@@ -199,7 +199,7 @@ mt_cmd(uint16 cmd, uint16 dev, uint8 chan, uint16 *wc)
 
     *wc = 0;    /* So no overide occurs */
 
-    /* Convert command to correct type */ 
+    /* Convert command to correct type */
     if (cmd & URCSTA_DIRECT)
         uptr->u5 |= MT_BACK;
     uptr->u6 = 0;
@@ -257,7 +257,7 @@ t_stat mt_error(UNIT * uptr, int chan, t_stat r, DEVICE * dptr)
         sim_debug(DEBUG_EXP, dptr, "BOT ");
         break;
     case MTSE_UNATT:            /* unattached */
-    default: 
+    default:
         sim_debug(DEBUG_EXP, dptr, "%d ", r);
     }
     uptr->u5 &= ~(MT_CMD|MT_BIN);
@@ -309,8 +309,8 @@ t_stat mt_srv(UNIT * uptr)
 
     switch (cmd) {
     /* Handle interrogate */
-    case MT_INT: 
-         if (sim_tape_wrp(uptr)) 
+    case MT_INT:
+         if (sim_tape_wrp(uptr))
             chan_set_wrp(chan);
          uptr->u5 &= ~(MT_CMD|MT_BIN);
          uptr->u5 |= MT_RDY;
@@ -334,7 +334,7 @@ t_stat mt_srv(UNIT * uptr)
                     ch = 017;
                     (void)chan_write_char(chan, &ch, 1);
                     sim_activate(uptr, 4000);
-                } else { 
+                } else {
                     sim_debug(DEBUG_DETAIL, dptr, "r=%d\n", r);
                     sim_activate(uptr, 5000);
                 }
@@ -369,7 +369,7 @@ t_stat mt_srv(UNIT * uptr)
               }
         }
 
-        if (chan_write_char(chan, &ch, 
+        if (chan_write_char(chan, &ch,
                              (((uint32)uptr->u6) >= uptr->hwmark) ? 1 : 0)) {
                 sim_debug(DEBUG_DATA, dptr, "Read unit=%d %d EOR\n", unit,
                          uptr->hwmark-uptr->u6);
@@ -398,7 +398,7 @@ t_stat mt_srv(UNIT * uptr)
                     ch = 017;
                     (void)chan_write_char(chan, &ch, 1);
                     sim_activate(uptr, 4000);
-                } else { 
+                } else {
                     uptr->u5 |= MT_BSY;
                     sim_debug(DEBUG_DETAIL, dptr, "r=%d\n", r);
                     sim_activate(uptr, 100);
@@ -465,7 +465,7 @@ t_stat mt_srv(UNIT * uptr)
                  sim_debug(DEBUG_DETAIL, dptr, "Write Mark unit=%d\n", unit);
                  r = sim_tape_wrtmk(uptr);
             } else {
-                sim_debug(DEBUG_DETAIL, dptr, 
+                sim_debug(DEBUG_DETAIL, dptr,
                         "Write unit=%d Block %d %s chars\n", unit, reclen,
                                 (uptr->u5 & MT_BIN)? "bin": "bcd");
                 r = sim_tape_wrrecf(uptr, &mt_buffer[chan][0], reclen);
@@ -477,10 +477,10 @@ t_stat mt_srv(UNIT * uptr)
             /* Copy data to buffer */
             ch &= 077;
             ch |= parity_table[ch];
-            if ((uptr->u5 & MT_BIN)) 
+            if ((uptr->u5 & MT_BIN))
                 ch ^= 0100;
             /* Don't write out even parity zeros */
-            if (ch != 0) 
+            if (ch != 0)
                 mt_buffer[chan][uptr->u6++] = ch;
             sim_debug(DEBUG_DATA, dptr, "Write data unit=%d %d %03o\n",
                       unit, uptr->u6, ch);
@@ -505,7 +505,7 @@ t_stat mt_srv(UNIT * uptr)
                     sim_debug(DEBUG_DETAIL, dptr, "TM ");
                     reclen = 1;
                     chan_set_eof(chan);
-                } else { 
+                } else {
                     sim_debug(DEBUG_DETAIL, dptr, "r=%d ", r);
                     reclen = 10;
                 }
@@ -534,7 +534,7 @@ t_stat mt_srv(UNIT * uptr)
                     sim_debug(DEBUG_DETAIL, dptr, "TM ");
                     reclen = 1;
                     chan_set_eof(chan);
-                } else { 
+                } else {
                     reclen = 10;
                     sim_debug(DEBUG_DETAIL, dptr, "r=%d ", r);
                 }
@@ -572,7 +572,7 @@ mt_attach(UNIT * uptr, CONST char *file)
 
     if ((r = sim_tape_attach(uptr, file)) != SCPE_OK)
         return r;
-    uptr->u5 |= MT_LOADED|MT_BOT; 
+    uptr->u5 |= MT_LOADED|MT_BOT;
     sim_activate(uptr, 50000);
     return SCPE_OK;
 }
@@ -590,8 +590,8 @@ mt_reset(DEVICE *dptr)
 {
     int i;
 
-    /* Scan all devices and enable those that 
-       are loaded. This is to allow tapes that 
+    /* Scan all devices and enable those that
+       are loaded. This is to allow tapes that
        are mounted prior to boot to be recognized
        at later. Also disconnect all devices no
        longer connected. */

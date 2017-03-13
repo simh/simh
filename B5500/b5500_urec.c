@@ -234,7 +234,7 @@ DEVICE              con_dev = {
 t_stat card_cmd(uint16 cmd, uint16 dev, uint8 chan, uint16 *wc)
 {
     UNIT        *uptr;
-    int                 u;
+    int          u;
 
     if (dev == CARD1_DEV)
         u = 0;
@@ -355,7 +355,7 @@ cdr_srv(UNIT *uptr) {
 
     /* Copy next column over */
     if (uptr->u5 & URCSTA_CARD &&
-        uptr->u4 <= ((uptr->u5 & URCSTA_BIN) ? 160 : 80)) {
+        uptr->u4 < ((uptr->u5 & URCSTA_BIN) ? 160 : 80)) {
         struct _card_data   *data;
         uint8                ch = 0;
         int                  u = (uptr - cdr_unit);
@@ -384,6 +384,8 @@ cdr_srv(UNIT *uptr) {
                         break;  /* Translate ? to error*/
             }
         }
+        sim_debug(DEBUG_DATA, &cdr_dev, "cdr %d: Char > %03o '%c' %d\n", u, ch,
+                        sim_six_to_ascii[ch & 077], uptr->u4);
         if(chan_write_char(chan, &ch, 0)) {
             uptr->u5 &= ~(URCSTA_ACTIVE|URCSTA_CARD);
             chan_set_end(chan);
@@ -396,8 +398,18 @@ cdr_srv(UNIT *uptr) {
             uptr->u4++;
             sim_activate(uptr, 100);
         }
-        sim_debug(DEBUG_DATA, &cdr_dev, "cdr %d: Char > %03o '%c' %d\n", u, ch,
-                        sim_six_to_ascii[ch & 077], uptr->u4);
+    }
+
+    /* Check if last column */
+    if (uptr->u5 & URCSTA_CARD &&
+        uptr->u4 == ((uptr->u5 & URCSTA_BIN) ? 160 : 80)) {
+
+        uptr->u5 &= ~(URCSTA_ACTIVE|URCSTA_CARD);
+        chan_set_end(chan);
+        /* Drop ready a bit after the last card is read */
+        if (sim_card_eof(uptr)) {
+            uptr->u5 |= URCSTA_EOF;
+        }
     }
     return SCPE_OK;
 }
@@ -502,7 +514,7 @@ cdp_srv(UNIT *uptr) {
     }
 
     /* Copy next column over */
-    if (uptr->u5 & URCSTA_ACTIVE && uptr->u4 <= 80) {
+    if (uptr->u5 & URCSTA_ACTIVE && uptr->u4 < 80) {
         struct _card_data   *data;
         uint8               ch = 0;
 
@@ -517,6 +529,12 @@ cdp_srv(UNIT *uptr) {
             data->image[uptr->u4++] = sim_bcd_to_hol(ch & 077);
         }
         sim_activate(uptr, 10);
+    }
+
+    /* Check if last column */
+    if (uptr->u5 & URCSTA_ACTIVE && uptr->u4 == 80) {
+        uptr->u5 |= URCSTA_BUSY|URCSTA_FULL;
+        uptr->u5 &= ~URCSTA_ACTIVE;
     }
     return SCPE_OK;
 }
@@ -945,6 +963,7 @@ con_srv(UNIT *uptr) {
            switch (ch) {
            case 033:
                 con_data[0].inptr = 0;
+                /* Fall through */
            case '\r':
            case '\n':
                 uptr->u5 &= ~URCSTA_INPUT;
