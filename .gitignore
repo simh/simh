@@ -1,8 +1,12 @@
 .git-commit-id
 #ignore thumbnails created by windows
 Thumbs.db
+#ignore Desktop Services Store created by OSX
+.DS_Store
 #Ignore files built by Visual Studio
 *.obj
+# VAX/vmb.exe is not a generated file and should be in the repository
+!VAX/vmb.exe
 *.exe
 *.pdb
 *.user
@@ -24,10 +28,22 @@ Thumbs.db
 *.lib
 *.sbr
 *.bak
+*.save
 obj/
 [Rr]elease*/
 _ReSharper*/
 [Tt]est[Rr]esult*
 *.o
+*~
+*#
 BIN/
 ipch/
+# We only care about specific files in the Visual Studio Projects 
+# folder.  Things which are there on the fly to support debugging 
+# or other things we don't want git to manage.
+!Visual Studio Projects/*.vcproj
+!Visual Studio Projects/*.sln
+!Visual Studio Projects/0ReadMe_Projects.txt
+Visual Studio Projects/*
+
+
