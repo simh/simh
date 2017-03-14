@@ -3544,7 +3544,7 @@ else {
         result = test_search (&val, &sim_stabr);        /* test condition */
         }
     else {                                              /* Handle memory case */
-        if (!get_asearch (gbuf, sim_dfdev->dradix, &sim_staba) ||  /* parse condition */
+        if (!get_asearch (gbuf, sim_dfdev ? sim_dfdev->dradix : sim_dflt_dev->dradix, &sim_staba) ||  /* parse condition */
             (sim_staba.boolop == -1))                    /* relational op reqd */
             return SCPE_MISVAL;
         reason = get_aval (addr, sim_dfdev, sim_dfunit);/* get data */
