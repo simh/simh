@@ -1,6 +1,6 @@
 /*
 
-   Copyright (c) 2015-2016, John Forecast
+   Copyright (c) 2015-2017, John Forecast
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -312,7 +312,7 @@ t_stat dc_svc(UNIT *uptr)
 {
   DEVICE *dptr;
   enum IOstatus status;
-  uint16 temp;
+  uint16 temp = 0;
 
   if ((dptr = find_dev_from_unit(uptr)) != NULL) {
     IO_DEVICE *iod = (IO_DEVICE *)dptr->ctxt;

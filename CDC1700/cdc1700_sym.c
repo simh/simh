@@ -80,7 +80,7 @@ static const char *opcode[] = {
   "CAQ", "CAB", "INA", "ENA",
   "NOP", "ENQ", "INQ", "EXI",
   "QRS", "ARS", "LRS", "QLS", 
-  "ALS", "LLS",
+  "ALS", "LLS", "ECA", "DCA",
   NULL
 };
 
@@ -103,7 +103,7 @@ static const int32 opc_val[] = {
   OPC_CAQ + I_INTER, OPC_CAB + I_INTER, OPC_INA + I_REG + I_SIGNED, OPC_ENA + I_REG + I_SIGNED,
   OPC_NOP + I_NOARG, OPC_ENQ + I_REG + I_SIGNED, OPC_INQ + I_REG + I_SIGNED, OPC_EXI + I_REG + I_ABS,
   OPC_QRS + I_SHIFT, OPC_ARS + I_SHIFT, OPC_LRS + I_SHIFT, OPC_QLS + I_SHIFT,
-  OPC_ALS + I_SHIFT, OPC_LLS + I_SHIFT,
+  OPC_ALS + I_SHIFT, OPC_LLS + I_SHIFT, OPC_ECA + I_NOARG, OPC_DCA + I_NOARG
 };
 
 /*

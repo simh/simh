@@ -1,6 +1,6 @@
 /*
 
-   Copyright (c) 2015-2016, John Forecast
+   Copyright (c) 2015-2017, John Forecast
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -96,7 +96,7 @@ t_stat cd_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 #define CD856_4_SIZE    (CD_SURF * CD_856_4CY * CD_NUMSC * CD_NUMBY)
 
 #define CDLBA(i) \
-  ((i->surface * i->maxcylinder * CD_NUMSC) + (i->cylinder * CD_NUMSC) + i->sector)
+  ((((i->cylinder * CD_SURF) + i->surface) * CD_NUMSC) + i->sector)
 
 /*
  * Disk address fields
@@ -362,7 +362,7 @@ REG cd_reg[] = {
 MTAB cd_mod[] = {
   { MTAB_XTD|MTAB_VDV, 0, "1733-2 Cartridge Disk Drive Controller" },
   { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", "EQUIPMENT=hexAddress",
-    &set_equipment, &show_addr, NULL, "Display equipment address" },
+    &set_equipment, &show_addr, NULL, "Set/Display equipment address" },
   { MTAB_XTD|MTAB_VUN, 0, "DRIVE", NULL,
     NULL, &show_drive, NULL, "Display type of drive (856-2 or 856-4)" },
   { MTAB_XTD|MTAB_VUN, 0, NULL, "856-2",
@@ -383,7 +383,7 @@ MTAB cd_mod[] = {
   { MTAB_XTD|MTAB_VDV, 0, NULL, "CARTFIRST",
     &set_cartfirst, NULL, NULL, "Set cartridge as logical disk 0" },
   { MTAB_XTD|MTAB_VDV, 0, NULL, "FIXEDFIRST",
-    &set_fixedfirst, NULL, NULL, "Set fixec disk as logical disk 0" },
+    &set_fixedfirst, NULL, NULL, "Set fixed disk as logical disk 0" },
   { 0 }
 };
 
@@ -663,10 +663,32 @@ static void StartCDDiskIO(UNIT *uptr, struct cdio_unit *iou, uint16 state)
 
   fw_IOunderwayEOP2(&CDdev, 0);
 
-  if ((cd_dev.dctrl & DBG_DTRACE) != 0)
+  if ((cd_dev.dctrl & DBG_DTRACE) != 0) {
+    const char *active = "None";
+
+    if (iou != NULL) {
+      if (iou->active != NULL) {
+        if (iou->active == iou->ondrive[0])
+          active = "0";
+        if (iou->active == iou->ondrive[1])
+          active = "1";
+      }
+    }
     fprintf(DBGOUT,
-            "%sCD - Start I/O, cur: %04X, len: %04X, state: %s\r\n",
-            INTprefix, CDdev.CWA, CDdev.BUFLEN, CDstateStr[state]);
+            "%sCD - Start I/O, drive: %s, disk: %s, cur: %04X, len: %04X, state: %s\r\n",
+            INTprefix, iou != NULL ? iou->name : "None", active,
+            CDdev.CWA, CDdev.BUFLEN, CDstateStr[state]);
+
+    if (iou != NULL) {
+      uint16 sector;
+
+      sector = (((2 * iou->cylinder) + iou->surface) * CD_NUMSC) + iou->sector;
+      fprintf(DBGOUT,
+              "%sCD - Disk Address: c:%u,s:%c,d:%c,s:%u (0x%04X), Log. Sector %u (0x%04X)\r\n",
+              INTprefix, iou->cylinder, '0' + iou->surface, '0' + iou->disk,
+              iou->sector, iou->sectorAddr, sector, sector);
+    }
+  }
 
   CDdev.DCYLSTATUS &= ~iou->seekComplete;
 
@@ -709,8 +731,13 @@ static enum cdio_status CDDiskIORead(UNIT *uptr)
   CDdev.DCYLSTATUS &= ~CD_CYL_MASK;
   CDdev.DCYLSTATUS |= (iou->cylinder << CD_CYL_SHIFT);
 
-  sim_fseeko(uptr->fileref, lba * CD_NUMBY, SEEK_SET);
-  sim_fread(iou->buf, sizeof(uint16), CD_NUMWD, uptr->fileref);
+  /*
+   * Report any error in the underlying container infrastructure as an
+   * address error.
+   */
+  if (sim_fseeko(uptr->fileref, lba * CD_NUMBY, SEEK_SET) ||
+      (sim_fread(iou->buf, sizeof(uint16), CD_NUMWD, uptr->fileref) != CD_NUMWD))
+    return CDIO_ADDRERR;
 
   for (i = 0; i < CD_NUMWD; i++) {
     /*** TODO: fix protect check ***/
@@ -752,8 +779,14 @@ static enum cdio_status CDDiskIOWrite(UNIT *uptr)
   CDdev.DCYLSTATUS &= ~CD_CYL_MASK;
   CDdev.DCYLSTATUS |= (iou->cylinder << CD_CYL_SHIFT);
 
-  sim_fseeko(uptr->fileref, lba * CD_NUMBY, SEEK_SET);
-  sim_fwrite(iou->buf, sizeof(uint16), CD_NUMWD, uptr->fileref);
+  /*
+   * Report any error in the underlying container infrastructure as an
+   * address error.
+   */
+  if (sim_fseeko(uptr->fileref, lba * CD_NUMBY, SEEK_SET) ||
+      (sim_fwrite(iou->buf, sizeof(uint16), CD_NUMWD, uptr->fileref) != CD_NUMWD))
+    return CDIO_ADDRERR;
+
   CDDiskIOIncSector(iou);
   return fill ? CDIO_DONE : CDIO_MORE;
 }
@@ -773,8 +806,13 @@ static enum cdio_status CDDiskIOCompare(UNIT *uptr)
   CDdev.DCYLSTATUS &= ~CD_CYL_MASK;
   CDdev.DCYLSTATUS |= (iou->cylinder << CD_CYL_SHIFT);
 
-  sim_fseeko(uptr->fileref, lba * CD_NUMBY, SEEK_SET);
-  sim_fread(iou->buf, sizeof(uint16), CD_NUMWD, uptr->fileref);
+  /*
+   * Report any error in the underlying container infrastructure as an
+   * address error.
+   */
+  if (sim_fseeko(uptr->fileref, lba * CD_NUMBY, SEEK_SET) ||
+      (sim_fread(iou->buf, sizeof(uint16), CD_NUMWD, uptr->fileref) != CD_NUMWD))
+    return CDIO_ADDRERR;
 
   for (i = 0; i < CD_NUMWD; i++) {
     if (iou->buf[i] != LoadFromMem(CDdev.CWA))
@@ -798,7 +836,7 @@ void CDDiskIO(UNIT *uptr, uint16 iotype)
 {
   struct cdio_unit *iou = (struct cdio_unit *)uptr->up7;
   const char *error = "Unknown";
-  enum cdio_status status;
+  enum cdio_status status = CDIO_ADDRERR;
 
   switch (iotype) {
     case CD_WRITE:
@@ -1023,7 +1061,7 @@ static t_stat CDreset(DEVICE *dptr)
 
 t_stat cd_reset(DEVICE *dptr)
 {
-  t_stat r;
+  t_stat r = SCPE_OK;
 
   if (IOFWinitialized)
     if ((dptr->flags & DEV_DIS) == 0)
@@ -1326,8 +1364,8 @@ t_stat CDautoload(void)
       t_offset offset = i * CD_NUMBY;
       void * buf = &M[i * CD_NUMWD];
 
-      sim_fseeko(uptr->fileref, offset, SEEK_SET);
-      if (sim_fread(buf, sizeof(uint16), CD_NUMWD, uptr->fileref) != CD_NUMWD)
+      if (sim_fseeko(uptr->fileref, offset, SEEK_SET) ||
+          (sim_fread(buf, sizeof(uint16), CD_NUMWD, uptr->fileref) != CD_NUMWD))
         return SCPE_IOERR;
     }
     return SCPE_OK;

@@ -99,21 +99,20 @@ int disassem(char *buf, uint16 addr, t_bool dbg, t_bool targ, t_bool exec)
 {
   int consumed = 1;
   char prot = ISPROTECTED(addr) ? 'P' : ' ';
-  char mode[8], optional[8], temp[8], decoded[64];
-  const char *spc, *shift, *inter, *dest;
+  char optional[8], temp[8], decoded[64];
+  const char *mode, *spc, *shift, *inter, *dest;
   uint16 instr = LoadFromMem(addr);
   uint16 delta = instr & OPC_ADDRMASK;
+  uint8 more = 0, isconst = 0;
   uint16 t;
 
   strcpy(optional, "    ");
   strcpy(decoded, "UNDEF");
 
   if ((instr & OPC_MASK) != 0) {
-    strcpy(decoded, opName[(instr & OPC_MASK) >> 12]);
-
     if ((instr & MOD_RE) == 0)
-      strcpy(mode, delta == 0 ? "+    " : "-    ");
-    else strcpy(mode, "*    ");
+      mode = delta == 0 ? "+    " : "-    ";
+    else mode = "*    ";
 
     switch (instr & OPC_MASK) {
       case OPC_ADQ:
@@ -126,7 +125,7 @@ int disassem(char *buf, uint16 addr, t_bool dbg, t_bool targ, t_bool exec)
       case OPC_DVI:
       case OPC_MUI:
         if (ISCONSTANT(instr))
-          strcat(mode, "=");
+          isconst = 1;
         break;
     }
 
@@ -136,28 +135,77 @@ int disassem(char *buf, uint16 addr, t_bool dbg, t_bool targ, t_bool exec)
       sprintf(temp, "$%04X", LoadFromMem(addr + 1));
     } else sprintf(temp, "$%02X", delta);
 
-    strcat(decoded, mode);
-    if ((instr & MOD_IN) != 0)
-      strcat(decoded, "(");
-    strcat(decoded, temp);
-    if ((instr & MOD_IN) != 0)
-      strcat(decoded, ")");
-
-    strcat(decoded, idxName[(instr & (MOD_I1 | MOD_I2)) >> 8]);
+    sprintf(decoded, "%s%s%s%s%s%s%s",
+            opName[(instr & OPC_MASK) >> 12],
+            mode,
+            isconst ? "=" : "",
+            (instr & MOD_IN) != 0 ? "(" : "",
+            temp,
+            (instr & MOD_IN) != 0 ? ")" : "",
+            idxName[(instr & (MOD_I1 | MOD_I2)) >> 8]);
   } else {
     spc = spcName[(instr & OPC_SPECIALMASK) >> 8];
 
     switch (instr & OPC_SPECIALMASK) {
-      case OPC_EIN:
       case OPC_IIN:
+      case OPC_EIN:
       case OPC_SPB:
       case OPC_CPB:
+        switch (INSTR_SET) {
+          case INSTR_ORIGINAL:
+            /*
+             * Character addressing enable/disable is only available as
+             * an extension to the original set.
+             */
+            switch (instr) {
+              case OPC_ECA:
+                sprintf(decoded, "%s", "ECA");
+                break;
+
+              case OPC_DCA:
+                sprintf(decoded, "%s", "DCA");
+                break;
+
+              default:
+                sprintf(decoded, "%s", spc);
+                break;
+            }
+            break;
+
+          case INSTR_BASIC:
+            if (delta == 0) {
+              sprintf(decoded, "%s", spc);
+            } else {
+              sprintf(decoded, "%s", "NOP  [ Possible enhanced instruction");
+            }
+            break;
+
+          case INSTR_ENHANCED:
+            sprintf(decoded, "%s", delta != 0 ? "Enhanced" : spc);
+            break;
+        }
+        break;
+
       case OPC_NOP:
-        sprintf(decoded, "%s", spc);
+        switch (INSTR_SET) {
+          case INSTR_ORIGINAL:
+            sprintf(decoded, "%s", spc);
+            break;
+
+          case INSTR_BASIC:
+            if (delta != 0) {
+              sprintf(decoded, "%s", "NOP  [ Possible enhanced instruction");
+            } else sprintf(decoded, "%s", spc);
+            break;
+
+          case INSTR_ENHANCED:
+            sprintf(decoded, "%s", delta != 0 ? "Enhanced" : spc);
+            break;
+        }
         break;
 
       case OPC_EXI:
-        sprintf(decoded, "%s     $%02X", spc, instr & OPC_MODMASK);
+        sprintf(decoded, "%s     $%02X", spc, delta);
         break;
 
       case OPC_SKIPS:
@@ -166,6 +214,23 @@ int disassem(char *buf, uint16 addr, t_bool dbg, t_bool targ, t_bool exec)
         break;
 
       case OPC_SLS:
+        if (delta != 0) {
+          switch (INSTR_SET) {
+            case INSTR_BASIC:
+              sprintf(decoded, "%s", "NOP  [ Possible enhanced instruction");
+              break;
+
+            case INSTR_ORIGINAL:
+              sprintf(decoded, "%s     $%02X", spc, delta);
+              break;
+
+            case INSTR_ENHANCED:
+              sprintf(decoded, "%s", "Enhanced");
+              break;
+          }
+          break;
+        }
+
       case OPC_INP:
       case OPC_OUT:
       case OPC_INA:
@@ -198,10 +263,10 @@ int disassem(char *buf, uint16 addr, t_bool dbg, t_bool targ, t_bool exec)
     sprintf(buf, "%c %04X %s               %s",
             prot, instr, optional, decoded);
   }
+
   if (targ) {
     const char *rel = "";
     t_bool indJmp = FALSE;
-    uint8 more = 0;
     uint16 taddr, taddr2,  base;
 
     switch (instr & OPC_MASK) {
@@ -310,14 +375,20 @@ int disassem(char *buf, uint16 addr, t_bool dbg, t_bool targ, t_bool exec)
       if (indJmp) {
         sprintf(buf, "[ => (%04X%s)", taddr2, rel);
       } else {
-        if (more == 1)
-          sprintf(buf, "[ => %04X%s %s {%04X}", taddr2, rel,
-                  P[MEMADDR(taddr)] ? "(P)" : "",
-                  LoadFromMem(taddr));
-        else sprintf(buf, "[ => %04X%s (B:%04X%s) %s {%04X}", 
-                     taddr2, rel, base, rel,
-                     P[MEMADDR(taddr)] ? "(P)" : "",
-                     LoadFromMem(taddr));
+        switch (more) {
+          case 1:
+            sprintf(buf, "[ => %04X%s %s {%04X}", taddr2, rel,
+                    P[MEMADDR(taddr)] ? "(P)" : "",
+                    LoadFromMem(taddr));
+            break;
+
+          case 2:
+            sprintf(buf, "[ => %04X%s (B:%04X%s) %s {%04X}", 
+                    taddr2, rel, base, rel,
+                    P[MEMADDR(taddr)] ? "(P)" : "",
+                    LoadFromMem(taddr));
+            break;
+        }
       }
     }
   }

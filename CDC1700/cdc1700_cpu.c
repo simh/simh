@@ -1,6 +1,6 @@
 /*
 
-   Copyright (c) 2015-2016, John Forecast
+   Copyright (c) 2015-2017, John Forecast
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -74,6 +74,46 @@
  * 6. For the 1706-A buffered data channel, what interrupt is used to signal
  *    "End of Operation"? A channel-specific interrupt or a pass-through
  *    interrupt from the device being controlled or some other?
+ *
+ * Instruction set evolution
+ *
+ * Over time the instruction set for the CDC 1700/Cyber 18 was extended in,
+ * sometime incompatible, ways. The emulator will attempt to implement the
+ * various discreet instructions sets that were available within the
+ * constraints of the emulator environment:
+ *
+ * 1. Original
+ *
+ *      This was the original instruction set defined when the 1700 series
+ *      was first released. The instruction set encoding wasted a number of
+ *      bits (e.g. IIN, EIN, SPB and CPB each had 8 unused bits which were
+ *      ignored during execution).
+ *
+ *      Character addressing was an optional extension to the 1774 (and maybe
+ *      the 1714) which was enabled/disabled by new instructions which made
+ *      use of the used bits of the IIN instruction. Note that the encoding
+ *      of these instructions is incompatible with the enhanced instruction
+ *      set (see below).
+ *
+ * 2. Basic
+ *
+ *      The basic instruction set is identical to the original instruction set
+ *      but limits the encoding of the unused bits in some instructions. For
+ *      example, IIN will only execute the IIN functionality if the low-order
+ *      8 bits are encoded as zero, any other value will cause the instruction
+ *      to execute as a NOP.
+ *
+ * 3. Enhanced (Unimplemented)
+ *
+ *      The enhanced instruction set makes use of the unused bits of the basic
+ *      instruction set to add new functionality:
+ *
+ *              - Additional 4 registers
+ *              - Character addressing mode
+ *              - Field references
+ *              - Multi-register save/restore
+ *              - etc
+ *
  */
 
 #include "cdc1700_defs.h"
@@ -97,6 +137,13 @@ uint32 CountRejects = 0;
 
 t_bool FirstAddr = TRUE;
 
+/*
+ * Memory location holding MSOS5 system request routine address
+ */
+#define NMON    0x00F4
+
+extern void MSOS5request(uint16, uint16);
+
 extern int disassem(char *, uint16, t_bool, t_bool, t_bool);
 
 extern enum IOstatus doIO(t_bool, DEVICE **);
@@ -104,6 +151,9 @@ extern void fw_init(void);
 extern void rebuildPending(void);
 
 extern void dev1Interrupts(char *);
+
+t_stat cpu_set_instr(UNIT *, int32, CONST char *, void *);
+t_stat cpu_show_instr(FILE *, UNIT *, int32, CONST void *);
 
 t_stat cpu_reset(DEVICE *);
 t_stat cpu_set_size(UNIT *, int32, CONST char *, void *);
@@ -120,7 +170,7 @@ t_stat cpu_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 #define UNIT_MODE65K    (1 << UNIT_V_MODE65K)
 #define UNIT_V_CHAR     (UNIT_V_UF + 4)         /* Character addressing */
 #define UNIT_CHAR       (1 << UNIT_V_CHAR)
-#define UNIT_V_PROT     (UNIT_V_UF + 5)
+#define UNIT_V_PROT     (UNIT_V_UF + 5)         /* Protect mode */
 #define UNIT_PROT       (1 << UNIT_V_PROT)
 #define UNIT_V_MSIZE    (UNIT_V_UF + 6)         /* Memory size */
 #define UNIT_MSIZE      (1 << UNIT_V_MSIZE)
@@ -154,6 +204,8 @@ REG cpu_reg[] = {
 
 MTAB cpu_mod[] = {
   { MTAB_XTD|MTAB_VDV, 0, "1714 CDC 1700 series CPU", NULL, NULL, NULL },
+  { MTAB_XTD|MTAB_VDV, 0, "INSTR", "INSTR={ORIGINAL|BASIC|ENHANCED}",
+    &cpu_set_instr, &cpu_show_instr, NULL, "Set CPU instruction set" },
   { UNIT_STOPSW, UNIT_STOPSW, "Selective Stop", "SSTOP",
     NULL, NULL, NULL, "Enable Selective Stop" },
   { UNIT_STOPSW, 0, "No Selective Stop", "NOSSTOP",
@@ -166,10 +218,10 @@ MTAB cpu_mod[] = {
     NULL, NULL, NULL, "Enable 65K Indirect Addressing Mode" },
   { UNIT_MODE65K, 0, "32K Addressing Mode", "MODE32K",
     NULL, NULL, NULL, "Enable 32K Indirect Addressing Mode" },
-  { UNIT_CHAR, UNIT_CHAR, "Character Addressing", "CHAR",
-    NULL, NULL, NULL, "Enable Character Addressing Mode" },
-  { UNIT_CHAR, 0, "No Character Addressing", "NOCHAR",
-    NULL, NULL, NULL, "Disable Character Addressing Mode" },
+  { UNIT_CHAR, UNIT_CHAR, NULL, "CHAR",
+    NULL, NULL, NULL, "Enable Character Addressing Extensions" },
+  { UNIT_CHAR, 0, NULL, "NOCHAR",
+    NULL, NULL, NULL, "Disable Character Addressing Extensions" },
   { UNIT_PROT, UNIT_PROT, "Program Protect", "PROTECT",
     NULL, NULL, NULL, "Enable Protect Mode Operation" },
   { UNIT_PROT, 0, "", "NOPROTECT",
@@ -205,7 +257,9 @@ DEBTAB cpu_deb[] = {
   { "INTLVL",       DBG_INTLVL,    "Add interrupt level to all displays" },
   { "PROTECT",      DBG_PROTECT,   "Display protect faults" },
   { "MISSING",      DBG_MISSING,   "Display info about missing devices" },
-  { "FULL", DBG_ALL },
+  { "ENHANCED",     DBG_ENH,       "Display enh. instructions in basic mode" },
+  { "MSOS5",        DBG_MSOS5,     "Display MSOS5 requests" },
+  { "FULL",         DBG_ALL },
   { NULL }
 };
 
@@ -258,6 +312,45 @@ static uint16 interruptBit[] = {
   0x0001, 0x0002, 0x0004, 0x0008, 0x0010, 0x0020, 0x0040, 0x0080,
   0x0100, 0x0200, 0x0400, 0x0800, 0x1000, 0x2000, 0x4000, 0x8000
 };
+
+t_stat cpu_set_instr(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+  if (!cptr)
+    return SCPE_IERR;
+
+  if (!strcmp(cptr, "ORIGINAL")) {
+    INSTR_SET = INSTR_ORIGINAL;
+  } else if (!strcmp(cptr, "BASIC")) {
+    INSTR_SET = INSTR_BASIC;
+  } else if (!strcmp(cptr, "ENHANCED")) {
+    INSTR_SET = INSTR_ENHANCED;
+  } else return SCPE_ARG;
+
+  return SCPE_OK;
+}
+
+t_stat cpu_show_instr(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+  switch (INSTR_SET) {
+    case INSTR_ORIGINAL:
+      fprintf(st, "\n\tOriginal instruction set");
+      if ((cpu_unit.flags & UNIT_CHAR) != 0)
+        fprintf(st, " + character addressing");
+      break;
+
+    case INSTR_BASIC:
+      fprintf(st, "\n\tBasic instruction set");
+      break;
+
+    case INSTR_ENHANCED:
+      fprintf(st, "\n\tEnhanced instruction set (Unimplemented)");
+      break;
+
+    default:
+      return SCPE_IERR;
+  }
+  return SCPE_OK;
+}
 
 /*
  * Reset routine
@@ -421,7 +514,7 @@ uint16 LoadFromMem(uint16 addr)
  */
 t_bool StoreToMem(uint16 addr, uint16 value)
 {
-  if ((cpu_unit.flags & UNIT_PROT) != 0) {
+  if (inProtectedMode()) {
     if (!Protected) {
       if (P[MEMADDR(addr)]) {
         if ((cpu_dev.dctrl & DBG_PROTECT) != 0) {
@@ -448,7 +541,7 @@ t_bool StoreToMem(uint16 addr, uint16 value)
  */
 t_bool IOStoreToMem(uint16 addr, uint16 value, t_bool prot)
 {
-  if ((cpu_unit.flags & UNIT_PROT) != 0) {
+  if (inProtectedMode()) {
     if (!prot) {
       if (P[MEMADDR(addr)]) {
         return FALSE;
@@ -550,13 +643,26 @@ void doDIV(uint16 a)
     sign++;
 
   /*
-   * The documentation does not specify the result of a divide by zero.
-   * Hopefully, the diagnostics will provide some insight. Until then we
-   * just set the overflow flag and return saturated positive values.
+   * Handle divide by 0 (plus or minus) as documented in the 1784 reference
+   * manual.
    */
   if (divisor == 0) {
     Oflag = 1;
-    Areg = Qreg = MAXPOS;
+    Qreg = Areg;
+    Areg = (sign & 1) != 0 ? 0 : ~0;
+    return;
+  }
+
+  /*
+   * Special case check for zero dividend.
+   */
+  if (remainder == 0) {
+    Areg = Qreg = 0;
+
+    if ((sign & 1) != 0)
+      Areg = ~Areg;
+    if (rsign)
+      Qreg = ~Qreg;
     return;
   }
 
@@ -581,12 +687,11 @@ void doDIV(uint16 a)
   if ((result & 0xFFFF8000) != 0)
     Oflag = 1;
 
-  if ((result & 0x7FFF) != 0)
-    if ((sign & 1) != 0)
-      result = ~result;
-  if ((remainder & 0x7FFF) != 0)
-    if (rsign != 0)
-      remainder = ~remainder;
+  if ((sign & 1) != 0)
+    result = ~result;
+
+  if (rsign != 0)
+    remainder = ~remainder;
 
   Areg = TRUNC16(result);
   Qreg = TRUNC16(remainder);
@@ -879,26 +984,30 @@ t_stat executeAnInstruction(void)
    * Check for protected mode operation where we are about to execute a
    * protected instruction and the previous instruction was unprotected.
    */
-  if ((cpu_unit.flags & UNIT_PROT) != 0) {
+  if (inProtectedMode()) {
     if (!lastP && Protected) {
       if ((cpu_dev.dctrl & DBG_PROTECT) != 0) {
         fprintf(DBGOUT,
-                "%sProtect fault, unprotected after protected at %04X\r\n",
+                "%sProtect fault, protected after unprotected at %04X\r\n",
                 INTprefix, OrigPreg);
       }
       Pfault = TRUE;
       RaiseInternalInterrupt();
-      /*
-       * Make sure we skip over the failing instruction.
-       */
-      if ((instr & OPC_MASK) != 0) {
-        if ((instr & OPC_ADDRMASK) == 0) {
-          INCP;
-        }
-      }
 
       /*
-       * Execute this instructionas an unprotected Selective Stop.
+       * The exact semantics of a protected fault are not documented in any
+       * the hardware references. The code in this simulator was created
+       * by examining the source code of MSOS 5.0. In the case of a 2 word
+       * instruction causing the trap, P is left pointing at the second word
+       * of the instruction. Note that the SMM diagnostics do not check for
+       * this case.
+       */
+
+      /* 
+       * Execute this instruction as an unprotected Selective Stop. If a
+       * stop occurs, P may not point to a valid instruction (see above).
+       * A subsequent "continue" command will cause a trap to the protect
+       * fault processor.
        */
       if ((cpu_unit.flags & UNIT_STOPSW) != 0) {
         dumpRegisters();
@@ -1052,9 +1161,32 @@ t_stat executeAnInstruction(void)
     case OPC_SPECIAL:
       switch (instr & OPC_SPECIALMASK) {
         case OPC_SLS:
-          if ((cpu_unit.flags & UNIT_STOPSW) != 0) {
-            dumpRegisters();
-            return SCPE_SSTOP;
+          switch (INSTR_SET) {
+            case INSTR_BASIC:
+              if ((instr & OPC_MODMASK) != 0) {
+                if ((cpu_dev.dctrl & DBG_ENH) != 0)
+                  fprintf(DBGOUT, "%s Possible Enh. Instruction (%04X) at %04x\r\n",
+                          INTprefix, instr, OrigPreg);
+              }
+              /* FALLTHROUGH */
+
+            case INSTR_ORIGINAL:
+              if ((cpu_unit.flags & UNIT_STOPSW) != 0) {
+                dumpRegisters();
+                return SCPE_SSTOP;
+              }
+              break;
+
+            case INSTR_ENHANCED:
+              if ((instr & OPC_MODMASK) == 0) {
+                if ((cpu_unit.flags & UNIT_STOPSW) != 0) {
+                  dumpRegisters();
+                  return SCPE_SSTOP;
+                }
+                break;
+              }
+              /*** TODO: Enhanced skip instructions ***/
+              break;
           }
           break;
 
@@ -1143,6 +1275,8 @@ t_stat executeAnInstruction(void)
             case OPC_SNF:
               if (!Pfault)
                 Preg = doADDinternal(Preg, instr & OPC_SKIPCOUNT);
+              Pfault = FALSE;
+              rebuildPending();
               break;
           }
           break;
@@ -1252,35 +1386,63 @@ t_stat executeAnInstruction(void)
           break;
 
           /*
+           * EIN, IIN, SPB and CPB operate differently depending on the
+           * currently selected instruction set.
+           */
+        case OPC_IIN:
+        case OPC_EIN:
+        case OPC_SPB:
+        case OPC_CPB:
+          switch (INSTR_SET) {
+            case INSTR_ORIGINAL:
+              /*
+               * Character addressing enable/disable is only available as
+               * an extension to the original instruction set.
+               */
+              if ((instr & OPC_SPECIALMASK) == OPC_IIN) {
+                if ((cpu_unit.flags & UNIT_CHAR) != 0) {
+                  if ((instr & OPC_MODMASK) != 0) {
+                    switch (instr) {
+                      case OPC_ECA:
+                        CAenable = 1;
+                        break;
+
+                      case OPC_DCA:
+                        CAenable = 0;
+                        break;
+                    }
+                    goto done;
+                  }
+                }
+              }
+              break;
+
+            case INSTR_BASIC:
+              if ((instr & OPC_MODMASK) != 0) {
+                if ((cpu_dev.dctrl & DBG_ENH) != 0)
+                  fprintf(DBGOUT, "%s Possible Enh. Instruction (%04X) at %04x\r\n",
+                          INTprefix, instr, OrigPreg);
+              }
+              break;
+
+            case INSTR_ENHANCED:
+              if ((instr & OPC_MODMASK) != 0) {
+                /*** TODO: Enhanced instructions ***/
+                goto done;
+              }
+              break;
+          }
+          /* FALLTHROUGH */
+
+          /*
            * The following instructions (EIN, IIN, SPB, CPB and EXI)
            * generate a protect fault if the protect switch is set and
            * the instruction is not protected. If the system is unable
            * to handle the interrupt (interrupts disabled or interrupt 0
-           * masked), the instruction executes as a "Selective Stop". Note
-           * that the character addressing instructions are a subset
-           * of IIN and have to be checked separately.
+           * masked), the instruction executes as a "Selective Stop".
            */
-        case OPC_IIN:
-          if ((cpu_unit.flags & UNIT_CHAR) != 0) {
-            if ((instr & 0xFF) != 0) {
-              switch (instr) {
-                case OPC_ECA:
-                  CAenable = 1;
-                  break;
-
-                case OPC_DCA:
-                  CAenable = 0;
-                  break;
-              }
-              break;
-            }
-          }
-
-        case OPC_EIN:
-        case OPC_SPB:
-        case OPC_CPB:
         case OPC_EXI:
-          if ((cpu_unit.flags & UNIT_PROT) != 0) {
+          if (inProtectedMode()) {
             if (!Protected) {
               if ((cpu_dev.dctrl & DBG_PROTECT) != 0) {
                 fprintf(DBGOUT,
@@ -1322,7 +1484,20 @@ t_stat executeAnInstruction(void)
                       INTprefix, Areg, Qreg, Mreg, Oflag, INTflag, DEFERflag);
             }
 
+            /*
+             * Check for MSOS5 system requests. If we are executing the first
+             * instruction of the MSOS5 request processor (which is also an
+             * IIN instruction), dump information about the current request.
+             * This test will work correctly independent of whether a 1 or 2
+             * word RTJ is used to call the request processor.
+             */
+            if ((cpu_dev.dctrl & DBG_MSOS5) != 0) {
+              if (OrigPreg == (M[NMON] + 1))
+                MSOS5request(M[M[NMON]], 0);
+            }
+
             INTflag = 0;
+          done:
             break;
 
           case OPC_SPB:
@@ -1366,7 +1541,7 @@ t_stat executeAnInstruction(void)
            * Protection fault if the instruction is not protected and 
            * modifies M
            */
-          if ((cpu_unit.flags & UNIT_PROT) != 0) {
+          if (inProtectedMode()) {
             if ((instr & MOD_D_M) != 0) {
               if (!Protected) {
                 if ((cpu_dev.dctrl & DBG_PROTECT) != 0) {
@@ -1446,6 +1621,24 @@ t_stat executeAnInstruction(void)
           break;
 
         case OPC_NOP:
+          switch (INSTR_SET) {
+            case INSTR_ORIGINAL:
+              break;
+
+            case INSTR_BASIC:
+              if ((instr & OPC_MODMASK) != 0) {
+                if ((cpu_dev.dctrl & DBG_ENH) != 0)
+                  fprintf(DBGOUT, "%s Possible Enh. Instruction (%04X) at %04x\r\n",
+                          INTprefix, instr, OrigPreg);
+              }
+              break;
+
+            case INSTR_ENHANCED:
+              if ((instr & OPC_MODMASK) != 0) {
+                /*** TODO: Enhanced miscellaneous instructions ***/
+              }
+              break;
+          }
           break;
 
         case OPC_ENQ:
@@ -1573,12 +1766,13 @@ t_stat cpu_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr
     " storage access bus and 3 1706-A buffered data channels are included.\n\n"
     " The amount of memory available to the system can be changed with:\n\n"
     "+sim> SET CPU nK\n\n"
-    " The original 1700 series CPU (the 1704) only allowed up to 32KW to be\n"
-    " attached to the CPU and indirect memory references would continue to\n"
-    " loop through memory if bit 15 of the target address was set. When 64KW\n"
-    " support was added indirect addressing was limited to a single level\n"
-    " so that the entire 16-bits of address could be used. The indirect\n"
-    " addressing mode may be changed by:\n\n"
+    " The original 1700 series CPU (the 1704) only allowed up to 32KW of\n"
+    "to be attached to the CPU and indirect memory references would continue\n"
+    "to loop through memory if bit 15 of the target address was set. When 64KW\n"
+    " support was added, indirect addressing was limited to a single level\n"
+    " so that the entire 16-bits of address could be used. Systems which\n"
+    " supported 64KW of memory had a front-panel switch to allow software\n"
+    " to run in either mode. The indirect addressing mode may be changed by:\n\n"
     "+sim> SET CPU MODE32K\n"
     "+sim> SET CPU MODE65K\n\n"
     " In 32KW addressing mode, the number of indirect address chaining\n"
@@ -1588,6 +1782,33 @@ t_stat cpu_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr
     " reserve interrupt 0  (and therefore equipment address 0) for parity\n"
     " errors (never detected by the simulator), protect faults and power fail\n"
     " (not supported by the simulator).\n"
+    "2 Instruction Set\n"
+    " The instruction set implemented by the CDC 1700 series, and later\n"
+    " Cyber-18 models changed as new features were added. When originally\n"
+    " released, the 1704 had a number of instruction bits which were ignored\n"
+    " by the CPU (e.g. the IIN and EIN instructions each had 8 unused bits).\n"
+    " Later the instruction set was refined into Basic and Enhanced. The\n"
+    " Basic instruction set reserved these unsed bits (e.g. IIN and EIN\n"
+    " instructions were only recognised if the previously unused bits were\n"
+    " all set to zero). The MP17 microprocessor implementation of the\n"
+    " architecture made use of these newly available bits to implement\n"
+    " the Enhanced instruction set. The supported instruction set may be\n"
+    " changed by:\n\n"
+    "+sim> SET CPU INSTR=ORIGINAL\n"
+    "+sim> SET CPU INSTR=BASIC\n"
+    "+sim> SET CPU INSTR=ENHANCED\n\n"
+    " The Enhanced instruction set is not currently implemented by the\n"
+    " simulator. Note that disassembly will always be done with respect to\n"
+    " the currently selected instruction set. If the instruction set is set\n"
+    " to BASIC, enhanced instructions will be displayed as:\n\n"
+    "+ NOP  [ Possible enhanced instruction\n"
+    "2 Character Addressing Mode\n"
+    " The ORIGINAL instruction set could be enhanced with character (8-bit)\n"
+    " addressing mode which added 2 new instructions; enable/disable\n"
+    " character addressing mode (ECA/DCA). These new instructions and the\n"
+    " ability to perform character addressing may be controlled by:\n\n"
+    "+sim> SET CPU CHAR\n"
+    "+sim> SET CPU NOCHAR\n"
     "2 $Registers\n"
     "2 Front Panel Switches\n"
     " The 1714 front panel includes a number of switches which control the\n"

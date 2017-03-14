@@ -1,6 +1,6 @@
 /*
 
-   Copyright (c) 2015-2016, John Forecast
+   Copyright (c) 2015-2017, John Forecast
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -81,6 +81,9 @@
 #define DBG_V_INTLVL    9               /* Prefix with interrupt level */
 #define DBG_V_PROTECT   10              /* Display protect fault information */
 #define DBG_V_MISSING   11              /* Display access to missing devices */
+#define DBG_V_ENH       12              /* Display enh. instructions ignored */
+                                        /*   in basic instruction mode */
+#define DBG_V_MSOS5     13              /* Trace MSOS5 system requests */
 
 #define DBG_DISASS      (1 << DBG_V_DISASS)
 #define DBG_IDISASS     (1 << DBG_V_IDISASS)
@@ -94,6 +97,8 @@
 #define DBG_INTLVL      (1 << DBG_V_INTLVL)
 #define DBG_PROTECT     (1 << DBG_V_PROTECT)
 #define DBG_MISSING     (1 << DBG_V_MISSING)
+#define DBG_ENH         (1 << DBG_V_ENH)
+#define DBG_MSOS5       (1 << DBG_V_MSOS5)
 
 /*
  * Default device radix
@@ -117,6 +122,14 @@
 /*
  * CPU
  */
+
+/* The currently supported instruction set is held in u3. */
+#define INSTR_ORIGINAL  0                       /* Original instruction set */
+#define INSTR_BASIC     1                       /* Basic instruction set */
+#define INSTR_ENHANCED  2                       /* Enhanced instruction set */
+
+#define INSTR_SET       (cpu_unit.u3)
+
 #define MAXMEMSIZE      65536
 #define DEFAULTMEMSIZE  32768
 
@@ -201,8 +214,6 @@ enum IOstatus {
 #define MOD_IN          0x400
 #define MOD_I1          0x200
 #define MOD_I2          0x100
-
-#define ISCONSTANT(i)   ((i & (MOD_RE | MOD_IN | 0xFF)) == 0)
 
 #define OPC_MASK        0xF000
 #define OPC_ADQ         0xF000
@@ -296,9 +307,9 @@ enum IOstatus {
 #define OPC_EXI         0x0E00
 
 #define OPC_MODMASK     0x00FF
-#define EXTEND16(v)     ((v) & 0x8000) ? (v) | 0xFFFF0000 : (v)
-#define EXTEND8(v)      ((v) & 0x80) ? (v) | 0xFF00 : (v)
-#define EXTEND4(v)      ((v) & 0x8) ? (v) | 0xFFF0 : (v)
+#define EXTEND16(v)     (((v) & 0x8000) ? (v) | 0xFFFF0000 : (v))
+#define EXTEND8(v)      (((v) & 0x80) ? (v) | 0xFF00 : (v))
+#define EXTEND4(v)      (((v) & 0x8) ? (v) | 0xFFF0 : (v))
 #define TRUNC16(v)      ((v) & 0xFFFF)
 #define CANEXTEND8(v)   (((v) & 0xFF80) == 0xFF80)
 
@@ -308,7 +319,6 @@ enum IOstatus {
 #define MOD_S_A         0x40
 #define MOD_S_Q         0x20
 #define OPC_SHIFTCOUNT  0x001F
-#define OPC_ADDRMASK    0x00FF
 
 #define OPC_QRS         (OPC_SHIFTS | MOD_S_Q)
 #define OPC_ARS         (OPC_SHIFTS | MOD_S_A)
@@ -316,6 +326,131 @@ enum IOstatus {
 #define OPC_QLS         (OPC_SHIFTS | MOD_LR | MOD_S_Q)
 #define OPC_ALS         (OPC_SHIFTS | MOD_LR | MOD_S_A)
 #define OPC_LLS         (OPC_SHIFTS | MOD_LR | MOD_S_A | MOD_S_Q)
+
+#define OPC_ADDRMASK    0x00FF
+#define ISCONSTANT(i)   ((i & (MOD_RE | MOD_IN | OPC_ADDRMASK)) == 0)
+
+/*
+ * Enhanced instruction layout.
+ *
+ * Enhanced storage reference instructions:
+ *
+ *  15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+ * +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ * |   F = 0   |   F1 = 4  |r |i |   Ra   |   Rb   |
+ * +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ * |    F4     |    F5     |        delta          |
+ * +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ * |   16-bit address, only present if delta = 0   |
+ * +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ *
+ * Field reference instructions:
+ *
+ *  15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+ * +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ * |   F = 0   |   F1 = 5  |r |i |   Ra   |   Rb   |
+ * +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ * |   FLDSTR  |  FLDLTH-1 |        delta          |
+ * +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ * |   16-bit address, only present if delta = 0   |
+ * +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ *
+ * Enhanced inter-register instructions:
+ *
+ *  15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+ * +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ * |   F = 0   |   F1 = 7  |   Ra   | F2a |   Rb   |
+ * +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ *
+ * Enhanced skip instructions:
+ *
+ *  15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+ * +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ * |   F = 0   |   F1 = 0  |     F2    |     SK    |
+ * +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ *
+ * Decrement and repeat instructions:
+ *
+ *  15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+ * +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ * |   F = 0   |   F1 = 6  |   Ra   |0 |     SK    |
+ * +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ *
+ * Miscellaneous instructions:
+ *
+ *  15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+ * +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ * |   F = 0   |   F1 = B  |   Ra   |0 |     F3    |
+ * +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ *
+ */
+#define MOD_ENHRE       0x0080
+#define MOD_ENHIN       0x0040
+
+//#define REG_NONE        0x0
+#define REG_R1          0x1
+#define REG_R2          0x2
+#define REG_R3          0x3
+#define REG_R4          0x4
+#define REG_Q           0x5
+#define REG_A           0x6
+#define REG_I           0x7
+
+#define WORD_REG        0x0
+#define WORD_MEM        0x1
+#define CHAR_REG        0x2
+#define CHAR_MEM        0x3
+
+#define OPC_ENHSUBJX    0x5000
+#define OPC_ENHADDR     0x8000
+#define OPC_ENHSUBR     0x9000
+#define OPC_ENHANDR     0xA000
+#define OPC_ENHANDM     0xA100
+#define OPC_ENHLOAD     0xC000
+#define OPC_ENHSTORE    0xC100
+#define OPC_ENHLOADC    0xC200
+#define OPC_ENHSTOREC   0xC300
+#define OPC_ENHORR      0xD000
+#define OPC_ENHORM      0xD100
+#define OPC_CMPREQ      0xE000
+#define OPC_CMPCEQ      0xE200
+
+#define OPC_FLDSFZ      0x2
+#define OPC_FLDSFN      0x3
+#define OPC_FLDLOAD     0x4
+#define OPC_FLDSTORE    0x5
+#define OPC_FLDCLEAR    0x6
+#define OPC_FLDSET      0x7
+
+#define OPC_ENHSKIPZ    0x0
+#define OPC_ENHSKIPNZ   0x1
+#define OPC_ENHSKIPPOS  0x2
+#define OPC_ENHSKIPNEG  0x3
+#define OPC_ENHSKIPR1   0x4
+#define OPC_ENHSKIPR2   0x8
+#define OPC_ENHSKIPR3   0xC
+#define OPC_ENHSKIPR4   0x0
+
+#define OPC_ENHLMM      0x1
+#define OPC_ENHLRG      0x2
+#define OPC_ENHSRG      0x3
+#define OPC_ENHSIO      0x4
+#define OPC_ENHSPS      0x5
+#define OPC_ENHDMI      0x6
+#define OPC_ENHCBP      0x7
+#define OPC_ENHGPE      0x8
+#define OPC_ENHGPO      0x9
+#define OPC_ENHASC      0xA
+#define OPC_ENHAPM      0xB
+#define OPC_ENHPM0      0xC
+#define OPC_ENHPM1      0xD
+
+#define OPC_ENHLUB      0x0
+#define OPC_ENHLLB      0x1
+#define OPC_ENHEMS      0x2
+#define OPC_ENHWPR      0x3
+#define OPC_ENHRPR      0x4
+#define OPC_ENHECC      0x5
 
 /*
  * Interrupt vector definitions
