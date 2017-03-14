@@ -1,6 +1,6 @@
 /* pdp11_tc.c: PDP-11 DECtape simulator
 
-   Copyright (c) 1993-2016, Robert M Supnik
+   Copyright (c) 1993-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,8 @@
 
    tc           TC11/TU56 DECtape
 
-   04-Dec-13    RMS     Revised to model TCCM correctly (Josh Dersch)
+   14-Mar-17    RMS     Fixed spurious interrupt when setting GO (Paul Koning)
+   04-Dec-16    RMS     Revised to model TCCM correctly (Josh Dersch)
    23-Oct-13    RMS     Revised for new boot setup routine
    23-Jun-06    RMS     Fixed switch conflict in ATTACH
    10-Feb-06    RMS     READ sets extended data bits in TCST (Alan Frisbie)
@@ -504,7 +505,8 @@ switch (j) {
             data = (PA & 1)? ((tccm & 0377) | (data << 8)): ((tccm & ~0377) | data);
         if ((data & CSR_IE) == 0)                       /* clearing IE? */
             CLR_INT (DTA);                              /* clear intr */
-        else if ((tccm & (CSR_DONE|CSR_IE)) == CSR_DONE) /* setting, DON'IE = DON? */
+        else if (((tccm & (CSR_DONE|CSR_IE)) == CSR_DONE) && /* set IE, DON'IE = DON? */
+            ((data & CSR_GO) == 0))                     /* and not setting GO? */
             SET_INT (DTA);                              /* set intr */
         tccm = (tccm & ~CSR_RW) | (data & CSR_RW);      /* merge data */
         if ((data & CSR_GO) != 0) {                     /* GO (DO) set? */
