@@ -243,6 +243,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "isys8024", "isys8024.vcproj
 		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "imds-225", "imds-225.vcproj", "{A66F0D85-174F-4AFE-A44E-7FAE3D3727BC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -445,6 +447,10 @@ Global
 		{ACCC3A24-56CD-4543-81F3-5F6A5E24F338}.Debug|Win32.Build.0 = Debug|Win32
 		{ACCC3A24-56CD-4543-81F3-5F6A5E24F338}.Release|Win32.ActiveCfg = Release|Win32
 		{ACCC3A24-56CD-4543-81F3-5F6A5E24F338}.Release|Win32.Build.0 = Release|Win32
+		{A66F0D85-174F-4AFE-A44E-7FAE3D3727BC}.Debug|Win32.ActiveCfg = Debug|Win32
+		{A66F0D85-174F-4AFE-A44E-7FAE3D3727BC}.Debug|Win32.Build.0 = Debug|Win32
+		{A66F0D85-174F-4AFE-A44E-7FAE3D3727BC}.Release|Win32.ActiveCfg = Release|Win32
+		{A66F0D85-174F-4AFE-A44E-7FAE3D3727BC}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
