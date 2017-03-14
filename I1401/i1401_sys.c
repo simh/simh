@@ -1,6 +1,6 @@
 /* i1401_sys.c: IBM 1401 simulator interface
 
-   Copyright (c) 1993-2014, Robert M. Supnik
+   Copyright (c) 1993-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   13-Mar-17    RMS     Fixed possible dull dereference (COVERITY)
    25-Mar-14    RMS     Fixed d character printout (Van Snyder)
    25-Mar-12    RMS     Fixed && -> & in test (Peter Schorn)
    20-Sep-05    RMS     Revised for new code tables
@@ -367,8 +368,11 @@ int32 wmch = conv_old? '~': '`';
 extern int32 op_table[64], len_table[9];
 char gbuf[CBUFSIZE];
 
-cflag = (uptr == NULL) || (uptr == &cpu_unit);
-while (isspace (*cptr)) cptr++;                         /* absorb spaces */
+if (uptr == NULL)
+    uptr = &cpu_unit;
+cflag = (uptr == &cpu_unit);                            /* CPU flag */
+while (isspace (*cptr))                                 /* absorb spaces */
+    cptr++;
 if ((sw & SWMASK ('C')) || (sw & SWMASK ('S')) || (*cptr == wmch) ||
     ((*cptr == '\'') && cptr++) || ((*cptr == '"') && cptr++)) {
         wm_seen = 0;
