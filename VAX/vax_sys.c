@@ -24,6 +24,7 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    13-Mar-17    RMS     Annotated intentional fall throughs in switch
+                        Fixed certain indirect cases in parse (COVERITY)
    21-Mar-11    RMS     Modified string for STOP_BOOT message
    19-Nov-08    RMS     Moved bad block routine to I/O library
    03-Nov-05    RMS     Added 780 stop codes
@@ -1379,7 +1380,7 @@ switch (fl) {                                           /* case on state */
                 dispsize = 4;
                 }
             }
-        val[vp++] = mode | nPC | ((fl & SP_IND)? 1: 0);
+        val[vp++] = mode | nPC | ((fl & SP_IND)? 0x10: 0);
         PUTNUM (num, dispsize);
         break;
 
@@ -1388,7 +1389,7 @@ switch (fl) {                                           /* case on state */
         num = lit[0] - (addr + vp + 2);
         if ((litsize > 0) || (num > 127) || (num < -128))
             PARSE_LOSE;
-        val[vp++] = nPC | BDP | ((fl & SP_IND)? 1: 0);
+        val[vp++] = nPC | BDP | ((fl & SP_IND)? 0x10: 0);
         PUTNUM (num, 1);
         break;
 
@@ -1397,7 +1398,7 @@ switch (fl) {                                           /* case on state */
         num = lit[0] - (addr + vp + 3);
         if ((litsize > 0) || (num > 32767) || (num < -32768))
             PARSE_LOSE;
-        val[vp++] = nPC | WDP | ((fl & SP_IND)? 1: 0);
+        val[vp++] = nPC | WDP | ((fl & SP_IND)? 0x10: 0);
         PUTNUM (num, 2);
         break;
 
@@ -1406,7 +1407,7 @@ switch (fl) {                                           /* case on state */
         num = lit[0] - (addr + vp + 5);
         if (litsize > 0)
             PARSE_LOSE;
-        val[vp++] = nPC | LDP | ((fl & SP_IND)? 1: 0);
+        val[vp++] = nPC | LDP | ((fl & SP_IND)? 0x10: 0);
         PUTNUM (num, 4);
         break;
 
