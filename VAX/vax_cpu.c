@@ -1,6 +1,6 @@
 /* vax_cpu.c: VAX CPU
 
-   Copyright (c) 1998-2015, Robert M Supnik
+   Copyright (c) 1998-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    cpu          VAX central processor
 
+   13-Mar-17    RMS     Fixed dangling else in show_opnd (COVERITY)
+   29-Dec-16    RMS     Removed delay in invoking sim_idle (Mark Pizzolato)
    29-Mar-15    RMS     Moved in-exception test to model-specific machine checks
    20-Sep-11    MP      Fixed idle conditions for various versions of Ultrix, 
                         Quasijarus-4.3BSD, NetBSD and OpenBSD.
@@ -395,7 +397,6 @@ int32 cpu_get_vsw (int32 sw);
 SIM_INLINE int32 get_istr (int32 lnt, int32 acc);
 int32 ReadOcta (int32 va, int32 *opnd, int32 j, int32 acc);
 t_bool cpu_show_opnd (FILE *st, InstHistory *h, int32 line);
-t_stat cpu_idle_svc (UNIT *uptr);
 void cpu_idle (void);
 
 /* CPU data structures
@@ -407,7 +408,7 @@ void cpu_idle (void);
 */
 
 UNIT cpu_unit = {
-    UDATA (&cpu_idle_svc, UNIT_FIX|UNIT_BINK, INITMEMSIZE)
+    UDATA (NULL, UNIT_FIX|UNIT_BINK, INITMEMSIZE)
     };
 
 REG cpu_reg[] = {
@@ -3114,20 +3115,12 @@ opnd[j++] = Read (va + 12, L_LONG, acc);
 return j;
 }
 
-/* Schedule idle before the next instruction */
+/* Idle during the current instruction */
 
 void cpu_idle (void)
 {
-sim_activate_abs (&cpu_unit, 0);
-return;
-}
-
-/* Idle service */
-
-t_stat cpu_idle_svc (UNIT *uptr)
-{
 sim_idle (TMR_CLK, TRUE);
-return SCPE_OK;
+return;
 }
 
 /* Reset */
@@ -3376,9 +3369,9 @@ for (i = 1, j = 0, more = FALSE; i <= numspec; i++) {   /* loop thru specs */
     disp = drom[h->opc][i];                             /* specifier type */
     if (disp == RG)                                     /* fix specials */
         disp = RQ;
-    else if (disp >= BB)
-        break;                         /* ignore branches */
-    else switch (disp & (DR_LNMASK|DR_ACMASK)) {
+    if (disp >= BB)                                     /* ignore branches */
+        break;
+    switch (disp & (DR_LNMASK|DR_ACMASK)) {
 
     case RB: case RW: case RL:                          /* read */
     case AB: case AW: case AL: case AQ: case AO:        /* address */
@@ -3425,7 +3418,6 @@ static struct os_idle os_tab[] = {
     { "OPENBSD", VAX_IDLE_QUAD },
     { "QUASIJARUS", VAX_IDLE_QUAD },
     { "32V", VAX_IDLE_QUAD },
-    { "ALL", VAX_IDLE_VMS|VAX_IDLE_ULTOLD|VAX_IDLE_ULT|VAX_IDLE_QUAD },
     { NULL, 0 }
     };
 
