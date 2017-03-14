@@ -1,6 +1,6 @@
 /* vax780_uba.c: VAX 11/780 Unibus adapter
 
-   Copyright (c) 2004-2012, Robert M Supnik
+   Copyright (c) 2004-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    uba                  DW780 Unibus adapter
 
+   13-Mar-17    RMS     Fixed bad test for UBA intr level (COVERITY)
    25-Mar-12    RMS     Added parameter to int_ack prototype (Mark Pizzolata)
    19-Nov-08    RMS     Moved I/O support routines to I/O library
    28-May-08    RMS     Inlined physical memory routines
@@ -582,7 +583,7 @@ int32 uba_get_ubvector (int32 lvl)
 int32 i, vec;
 
 vec = 0;
-if ((lvl == (IPL_UBA - IPL_HMIN)) && uba_int) {         /* UBA lvl, int? */
+if ((lvl == IPL_UBA) && uba_int) {                      /* UBA lvl, int? */
     vec = UBA_UVEC;                                     /* set flag */
     uba_int = 0;                                        /* clear int */
     }
