@@ -1,6 +1,6 @@
 /* i1620_tty.c: IBM 1620 typewriter
 
-   Copyright (c) 2002-2015, Robert M. Supnik
+   Copyright (c) 2002-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tty          console typewriter
 
+   13-Mar-17    RMS     Fixed tab stop array overrun at right margin (COVERITY)
    21-Feb-15    TFM     Option to provide single digit numeric output
    05-Feb-15    TFM     Changes to translate tables and valid input char.
    02-Jan-14    RMS     Added variable tab stops
@@ -420,7 +421,7 @@ int32 rpt;
 
 if (c == '\t') {                                        /* tab? */
     for (rpt = tto_col + 1;                             /* find tab stop */
-        (tto_tabs[rpt] == 0) && (rpt <= TTO_COLMAX);
+        (rpt <= TTO_COLMAX) && (tto_tabs[rpt] == 0);
         rpt++) ;
     for ( ; tto_col < rpt; tto_col++)
         sim_putchar (' ');                              /* use spaces */
