@@ -528,7 +528,10 @@ static t_stat hdsk_detach(UNIT *uptr) {
         if (unitIndex == -1)
             return SCPE_IERR;
         assert((0 <= unitIndex) && (unitIndex < HDSK_NUMBER));
-        diskClose(&hdsk_imd[unitIndex]);
+        result = diskClose(&hdsk_imd[unitIndex]);
+        if (result != SCPE_OK) {
+            return result;
+        }
     }
     result = detach_unit(uptr);
     uptr -> capac = HDSK_CAPACITY;
