@@ -6435,6 +6435,8 @@ for (j=0, r = SCPE_OK; j<attcnt; j++) {
     free (attnames[j]);
     }
 Cleanup_Return:
+for (j=0; j < attcnt; j++)
+    free (attnames[j]);
 free (attnames);
 free (attunits);
 free (attswitches);
