@@ -48,7 +48,7 @@ uint8 EPROM_get_mbyte(uint16 addr);
 
 /* external function prototypes */
 
-extern uint8 xack;						/* XACK signal */
+extern uint8 xack;                                              /* XACK signal */
 extern UNIT ipc_cont_unit[];
 
 /* SIMH EPROM Standard I/O Data Structures */
@@ -82,7 +82,7 @@ DEVICE EPROM_dev = {
     NULL,               //examine
     NULL,               //deposit
 //    &EPROM_reset,       //reset
-    NULL,				//reset
+    NULL,                               //reset
     NULL,               //boot
     &EPROM_attach,      //attach
     NULL,               //detach

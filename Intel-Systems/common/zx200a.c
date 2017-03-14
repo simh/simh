@@ -520,7 +520,7 @@ uint8 zx200a0(t_bool io, uint8 data)
         if (io == 0) {                  /* read ststus*/
             if (DEBUG)
                 sim_printf("\n   zx-200a0-%d: 0x78/88 returned status=%02X PCX=%04X", 
-					fdcnum, zx200a[fdcnum].stat, PCX);
+                                        fdcnum, zx200a[fdcnum].stat, PCX);
             return zx200a[fdcnum].stat;
         }
     }
@@ -560,7 +560,7 @@ uint8 zx200a2(t_bool io, uint8 data)
             zx200a[fdcnum].iopb |= (data << 8);
             if (DEBUG)
                 sim_printf("\n   zx-200a2-%d: 0x7A/8A IOPB=%04X PCX=%04X", 
-		    fdcnum, zx200a[fdcnum].iopb, PCX);
+                    fdcnum, zx200a[fdcnum].iopb, PCX);
             zx200a_diskio(fdcnum);
             if (zx200a[fdcnum].intff)
                 zx200a[fdcnum].stat |= FDCINT;
@@ -575,12 +575,12 @@ uint8 zx200a3(t_bool io, uint8 data)
 
     if ((fdcnum = zx200_get_dn()) != 0xFF) {
         if (io == 0) {                  /* read data port */
-	    if (zx200a[fdcnum].rtype == 0) {
+            if (zx200a[fdcnum].rtype == 0) {
                 if (DEBUG)
                     sim_printf("\n   zx200a3-%d: 0x7B/8B returned rbyte0=%02X PCX=%04X",
                         fdcnum, zx200a[fdcnum].rbyte0, PCX);
                 return zx200a[fdcnum].rbyte0;
-	    } else {
+            } else {
                 if (zx200a[fdcnum].rdychg) {
                     if (DEBUG)
                         sim_printf("\n   zx200a3-%d: 0x7B/8B returned rbyte1=%02X PCX=%04X",
@@ -592,7 +592,7 @@ uint8 zx200a3(t_bool io, uint8 data)
                             fdcnum, 0, PCX);
                     return 0;
                 }
-	    }
+            }
         } else {                        /* write data port */
             ; //stop diskette operation
         }

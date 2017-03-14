@@ -185,8 +185,8 @@
 
 /* external globals */
 
-extern uint16	port;					//port called in dev_table[port]
-extern int32	PCX;
+extern uint16   port;                                   //port called in dev_table[port]
+extern int32    PCX;
 
 /* external function prototypes */
 
@@ -472,7 +472,7 @@ uint8 isbc2010(t_bool io, uint8 data)
         if (io == 0) {                  /* read ststus*/
             if (DEBUG)
                 sim_printf("\n   isbc201-%d: 0x78 returned status=%02X PCX=%04X",
-					fdcnum, fdc201[fdcnum].stat, PCX);
+                                        fdcnum, fdc201[fdcnum].stat, PCX);
             return fdc201[fdcnum].stat;
         }
     }
@@ -495,7 +495,7 @@ uint8 isbc2011(t_bool io, uint8 data)
             fdc201[fdcnum].iopb = data;
             if (DEBUG)
                 sim_printf("\n   isbc201-%d: 0x79 IOPB low=%02X PCX=%04X", 
-		    fdcnum, data, PCX);
+                    fdcnum, data, PCX);
         }
     }
     return 0;
@@ -527,12 +527,12 @@ uint8 isbc2013(t_bool io, uint8 data)
 
     if ((fdcnum = isbc201_get_dn()) != 0xFF) {
         if (io == 0) {                  /* read data port */
-	    if (fdc201[fdcnum].rtype == 0) {
+            if (fdc201[fdcnum].rtype == 0) {
                 if (DEBUG)
                     sim_printf("\n   isbc201-%d: 0x7B returned rbyte0=%02X PCX=%04X",
                         fdcnum, fdc201[fdcnum].rbyte0, PCX);
                 return fdc201[fdcnum].rbyte0;
-	    } else {
+            } else {
                 if (fdc201[fdcnum].rdychg) {
                     if (DEBUG)
                         sim_printf("\n   isbc201-%d: 0x7B returned rbyte1=%02X PCX=%04X",

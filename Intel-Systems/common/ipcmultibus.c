@@ -264,7 +264,7 @@ uint16 reg_dev(uint8 (*routine)(t_bool io, uint8 data), uint16 port, uint8 devnu
         dev_table[port].routine = routine;
         dev_table[port].devnum = devnum;
     }
-	return 0;
+    return 0;
 }
 
 /*  get a byte from memory */

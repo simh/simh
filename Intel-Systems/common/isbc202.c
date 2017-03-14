@@ -495,7 +495,7 @@ uint8 isbc2020(t_bool io, uint8 data)
         if (io == 0) {                  /* read ststus*/
             if (DEBUG)
                 sim_printf("\n   isbc202-%d: 0x78 returned status=%02X PCX=%04X", 
-					fdcnum, fdc202[fdcnum].stat, PCX);
+                                        fdcnum, fdc202[fdcnum].stat, PCX);
             return fdc202[fdcnum].stat;
         }
     }
@@ -535,7 +535,7 @@ uint8 isbc2022(t_bool io, uint8 data)
             fdc202[fdcnum].iopb |= (data << 8);
             if (DEBUG)
                 sim_printf("\n   isbc202-%d: 0x7A IOPB=%04X PCX=%04X", 
-		    fdcnum, fdc202[fdcnum].iopb, PCX);
+                    fdcnum, fdc202[fdcnum].iopb, PCX);
             isbc202_diskio(fdcnum);
             if (fdc202[fdcnum].intff)
                 fdc202[fdcnum].stat |= FDCINT;
@@ -550,12 +550,12 @@ uint8 isbc2023(t_bool io, uint8 data)
 
     if ((fdcnum = isbc202_get_dn()) != 0xFF) {
         if (io == 0) {                  /* read data port */
-	    if (fdc202[fdcnum].rtype == 0) {
+            if (fdc202[fdcnum].rtype == 0) {
                 if (DEBUG)
                     sim_printf("\n   isbc202-%d: 0x7B returned rbyte0=%02X PCX=%04X",
                         fdcnum, fdc202[fdcnum].rbyte0, PCX);
                 return fdc202[fdcnum].rbyte0;
-	    } else {
+            } else {
                 if (fdc202[fdcnum].rdychg) {
                     if (DEBUG)
                         sim_printf("\n   isbc202-%d: 0x7B returned rbyte1=%02X PCX=%04X",
@@ -567,7 +567,7 @@ uint8 isbc2023(t_bool io, uint8 data)
                             fdcnum, 0, PCX);
                     return 0;
                 }
-	    }
+            }
         } else {                        /* write data port */
             ; //stop diskette operation
         }
