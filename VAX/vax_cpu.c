@@ -1,6 +1,6 @@
 /* vax_cpu.c: VAX CPU
 
-   Copyright (c) 1998-2012, Robert M Supnik
+   Copyright (c) 1998-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          VAX central processor
 
+   13-Mar-17    RMS     Fixed dangling else in show_opnd (COVERITY)
    20-Sep-11    MP      Fixed idle conditions for various versions of Ultrix, 
                         Quasijarus-4.3BSD, NetBSD and OpenBSD.
                         Note: Since NetBSD and OpenBSD are still actively 
@@ -3182,7 +3183,7 @@ return j;
 
 void cpu_idle (void)
 {
-sim_idle (TMR_CLK, 1);
+sim_idle (TMR_CLK, TRUE);
 }
 
 /* Reset */
@@ -3520,9 +3521,9 @@ for (i = 1, j = 0, more = FALSE; i <= numspec; i++) {   /* loop thru specs */
     disp = drom[h->opc][i];                             /* specifier type */
     if (disp == RG)                                     /* fix specials */
         disp = RQ;
-    else if (disp >= BB)
-        break;                         /* ignore branches */
-    else switch (disp & (DR_LNMASK|DR_ACMASK)) {
+    if (disp >= BB)                                     /* ignore branches */
+        break;
+    switch (disp & (DR_LNMASK|DR_ACMASK)) {
 
     case RB: case RW: case RL:                          /* read */
     case AB: case AW: case AL: case AQ: case AO:        /* address */
