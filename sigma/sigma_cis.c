@@ -203,8 +203,10 @@ switch (op) {                                           /* case on opcode */
         dst = Dstr_zero;                                /* clear result */
         kint = 0;                                       /* assume no int */
         if (!QCPU_5X0 &&                                /* S5-9? */
-            (cis_test_int (&src1, &kint)))              /* interrupted? */
-            cis_dm_int (&src1, &dst, kint);             /* restore */
+            (cis_test_int (&src1, &kint))) {            /* interrupted? */
+                src1.sign = 0;
+                cis_dm_int (&src1, &dst, kint);         /* restore */
+                }
         else if ((tr = TestDstrValid (&src1)) != 0)     /* mpyr valid? */ 
              return tr;
         if (LntDstr (&src1) && LntDstr (&src2)) {       /* both opnds != 0? */
@@ -266,9 +268,10 @@ switch (op) {                                           /* case on opcode */
         kint = 0;                                       /* no interrupt */
         if (!QCPU_5X0 &&                                /* S5-9? */
             (cis_test_int (&src1, &t))) {               /* interrupted? */
-            cis_dd_int (&src1, &dst, t, &kint);         /* restore */
-            t = t - 1;
-            }
+                src1.sign = 0;
+                cis_dd_int (&src1, &dst, t, &kint);     /* restore */
+                t = t - 1;
+                }
         else {                                          /* normal start? */
             if ((tr = TestDstrValid (&src1)) != 0)      /* divd valid? */ 
                 return tr;
