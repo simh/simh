@@ -1,6 +1,6 @@
 /* i1620_dp.c: IBM 1311 disk simulator
 
-   Copyright (c) 2002-2015, Robert M. Supnik
+   Copyright (c) 2002-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -35,6 +35,7 @@
    to mean the implied sector number that would be in place if the disk pack
    had been formatted with sequential sector numbers.
 
+   13-Mar-17    RMS     Fixed bug in write check function test (COVERITY)
    18-Oct-02    RMS     Fixed bug in error testing (Hans Pufal)
 */
 
@@ -190,7 +191,7 @@ if (f1 >= FNC_WRI)                                      /* invalid func? */
 if (op == OP_RN)                                        /* read? set wch */
     qwc = f1 & FNC_WCH;
 else if (op == OP_WN) {                                 /* write? */
-    if (op & FNC_WCH)                                   /* cant check */
+    if (f1 & FNC_WCH)                                   /* cant check */
         return STOP_INVFNC;
     f1 = f1 + FNC_WRI;                                  /* offset fnc */
     }
@@ -224,7 +225,7 @@ switch (f1 & ~(FNC_WCH | FNC_NRL)) {                    /* case on function */
             }
         break;                                          /* done, clean up */        
 
-    case FNC_SEC + FNC_WRI:                             /* write */
+    case FNC_SEC + FNC_WRI:                             /* write sectors */
         if (cnt <= 0)                                   /* bad count? */
             return STOP_INVDCN;
         psec = dp_fndsec (uptr, sec, FALSE);            /* find sector */
