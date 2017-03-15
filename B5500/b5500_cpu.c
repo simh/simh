@@ -3981,11 +3981,11 @@ cpu_show_hist(FILE * st, UNIT * uptr, int32 val, CONST void *desc)
             int i;
             fprintf(st, "%o %05o%o ", h->cpu, h->c & 077777, h->l);
             sim_eval = (t_value)h->a_reg;
-            fprint_sym(st, 0, &sim_eval, &cpu_unit[0], SWMASK('B'));
+            (void)fprint_sym(st, 0, &sim_eval, &cpu_unit[0], SWMASK('B'));
             fputc((h->flags & F_AROF) ? '^': ' ', st);
             fputc(' ', st);
             sim_eval = (t_value)h->b_reg;
-            fprint_sym(st, 0, &sim_eval, &cpu_unit[0], SWMASK('B'));
+            (void)fprint_sym(st, 0, &sim_eval, &cpu_unit[0], SWMASK('B'));
             fputc((h->flags & F_BROF) ? '^': ' ', st);
             fputc(' ', st);
             fprint_val(st, (t_value)h->x_reg, 8, 39, PV_RZRO);
