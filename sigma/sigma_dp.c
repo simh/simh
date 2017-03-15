@@ -1269,7 +1269,7 @@ return SCPE_OK;
 
 /* Set unit autosize validation routine */
 
-t_stat dp_set_auto (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dp_set_auto (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 cidx = uptr->UCTX;
 
