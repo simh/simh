@@ -633,6 +633,8 @@ DEVICE *dptr;
 UNIT *uptr;
 t_stat r;
 
+if (!ptr || !*ptr)
+    return SCPE_2FARG;
 if (ptr && (*ptr == '/')) {                             /* handle "BOOT /R5:n DEV" format */
     ptr = get_glyph (ptr, rbuf, 0);                     /* get glyph */
     regptr = rbuf;
