@@ -365,7 +365,7 @@ if (ir & HW_LD_V) {                                     /* virtual? */
         res = SEXT_L_Q (res);
         }
     }
-else if (ir & HW_LD_Q) R[ra] = ReadPQ (ea);             /* physical, quad? */
+else if (ir & HW_LD_Q) res = ReadPQ (ea);               /* physical, quad? */
 else {
     res = ReadPL (ea);                                  /* long, sext */
     res = SEXT_L_Q (res);
