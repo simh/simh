@@ -657,6 +657,8 @@ static t_bool LoadDiskAddress(UNIT *uptr, struct cdio_unit *iou, uint16 state)
  */
 static void StartCDDiskIO(UNIT *uptr, struct cdio_unit *iou, uint16 state)
 {
+  uint16 sector;
+
   CDdev.CWA = IOAreg;
 
   CDdev.STATUS &= IO_ST_READY | IO_1733_ONCYL | IO_ST_PROT | IO_1733_SINGLE;
@@ -666,28 +668,22 @@ static void StartCDDiskIO(UNIT *uptr, struct cdio_unit *iou, uint16 state)
   if ((cd_dev.dctrl & DBG_DTRACE) != 0) {
     const char *active = "None";
 
-    if (iou != NULL) {
-      if (iou->active != NULL) {
-        if (iou->active == iou->ondrive[0])
-          active = "0";
-        if (iou->active == iou->ondrive[1])
-          active = "1";
-      }
+    if (iou->active != NULL) {
+      if (iou->active == iou->ondrive[0])
+        active = "0";
+      if (iou->active == iou->ondrive[1])
+        active = "1";
     }
     fprintf(DBGOUT,
             "%sCD - Start I/O, drive: %s, disk: %s, cur: %04X, len: %04X, state: %s\r\n",
             INTprefix, iou != NULL ? iou->name : "None", active,
             CDdev.CWA, CDdev.BUFLEN, CDstateStr[state]);
 
-    if (iou != NULL) {
-      uint16 sector;
-
-      sector = (((2 * iou->cylinder) + iou->surface) * CD_NUMSC) + iou->sector;
-      fprintf(DBGOUT,
-              "%sCD - Disk Address: c:%u,s:%c,d:%c,s:%u (0x%04X), Log. Sector %u (0x%04X)\r\n",
-              INTprefix, iou->cylinder, '0' + iou->surface, '0' + iou->disk,
-              iou->sector, iou->sectorAddr, sector, sector);
-    }
+    sector = (((2 * iou->cylinder) + iou->surface) * CD_NUMSC) + iou->sector;
+    fprintf(DBGOUT,
+            "%sCD - Disk Address: c:%u,s:%c,d:%c,s:%u (0x%04X), Log. Sector %u (0x%04X)\r\n",
+            INTprefix, iou->cylinder, '0' + iou->surface, '0' + iou->disk,
+            iou->sector, iou->sectorAddr, sector, sector);
   }
 
   CDdev.DCYLSTATUS &= ~iou->seekComplete;

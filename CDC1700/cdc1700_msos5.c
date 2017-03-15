@@ -225,7 +225,7 @@ static uint16 luabs(uint16 param, uint16 lu, uint16 a)
 static uint16 spabs(uint16 param)
 {
   uint16 sa = M[param + 5];
-  uint16 l, sl = param + 5;
+  uint16 sl = param + 5;
 
   /*
    * If the D bit is set, the starting address must be absolute.
@@ -326,7 +326,7 @@ static void motion(uint16 param, char *d)
     }
   } else {
     sprintf(END(d), "    Repeat   = %s, %u times\r\n",
-            action[(commands & 0x7) >> 12], commands & 0xFFF);
+            action[(commands & 0x7000) >> 12], commands & 0xFFF);
   }
 }
 
@@ -343,7 +343,7 @@ char *textRep(uint16 start, uint16 len)
 
   text[0] = '\0';
 
-  for (i = 0; i < (2 * len); i++) {
+  for (i = 0; (i < (2 * len)) && (strlen(text) < MAXTEXT); i++) {
     uint16 ch = M[start];
 
     if ((i & 1) == 0)
@@ -352,9 +352,6 @@ char *textRep(uint16 start, uint16 len)
     ch &= 0x7F;
 
     strcat(text, charRep[ch]);
-
-    if (strlen(text) > MAXTEXT)
-      break;
   }
   return text;
 }
@@ -618,12 +615,13 @@ void MSOS5request(uint16 param, uint16 depth)
           strcpy(parameters, "Invalid directory scheduling code");
           break;
       }
+      break;
+
     default:
       request = "*Unknown*";
       sprintf(parameters, "Request code: %d", (M[param] & 0x3E00) >> 9);
       break;
   }
- done:
   fprintf(DBGOUT, "%sMSOS5(%06u): [RQ: $%04X]%s%s  %s\r\n",
           INTprefix, seqno++, param, indent[depth & 0x7], request, parameters);
   if (details[0] != '\0')
