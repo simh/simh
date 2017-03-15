@@ -27,6 +27,7 @@
                 (PDP-9) TC02/TU55 DECtape
                 (PDP-15) TC15/TU56 DECtape
 
+   15-Mar-17    RMS     Fixed dt_seterr to clear successor states
    09-Mar-17    RMS     Fixed dt_seterr to handle nx unit select (COVERITY)
    10-Mar-16    RMS     Added 3-cycle databreak set/show entries
    07-Mar-16    RMS     Revised for dynamically allocated memory
@@ -1283,6 +1284,7 @@ if (uptr != NULL) {                                     /* valid select? */
         sim_activate (uptr, dt_dctime);                 /* sched decel */
         DTS_SETSTA (DTS_DECF | (mot & DTS_DIR), 0);     /* state = decel */
         }
+    else DTS_SETSTA (mot, 0);                           /* clear 2nd, 3rd */
     }
 DT_UPDINT;
 return;

@@ -25,6 +25,7 @@
 
    dt           Type 550/555 DECtape
 
+   15-Mar-17    RMS     Fixed dt_seterr to clear successor states
    09-Mar-17    RMS     Fixed dt_seterr to handle nx unit select (COVERITY)
    28-Mar-15    RMS     Revised to use sim_printf
    21-Dec-06    RMS     Added 16-channel SBS support
@@ -868,6 +869,7 @@ if (uptr != NULL) {                                     /* valid unit? */
         sim_activate (uptr, dt_dctime);                 /* sched decel */
         DTS_SETSTA (DTS_DECF | (mot & DTS_DIR), 0);     /* state = decel */
         }
+    else DTS_SETSTA (mot, 0);                           /* clear 2nd, 3rd */
     }
 DT_UPDINT;
 return;

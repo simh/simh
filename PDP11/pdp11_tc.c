@@ -25,6 +25,7 @@
 
    tc           TC11/TU56 DECtape
 
+   15-Mar-17    RMS     Fixed to defer error interrupts (Paul Koning)
    14-Mar-17    RMS     Fixed spurious interrupt when setting GO (Paul Koning)
    04-Dec-16    RMS     Revised to model TCCM correctly (Josh Dersch)
    23-Oct-13    RMS     Revised for new boot setup routine
@@ -1049,7 +1050,9 @@ return SCPE_OK;
 
 /* Utility routines */
 
-/* Set error flag */
+/* Set error flag
+   Done must be deferred to allow time for interrupt setup (RSTS V4)
+*/
 
 void dt_seterr (UNIT *uptr, int32 e)
 {
@@ -1058,7 +1061,7 @@ int32 mot = DTS_GETMOT (uptr->STATE);
 tcst = tcst | e;                                        /* set error flag */
 tccm = tccm | CSR_ERR;
 if (!(tccm & CSR_DONE)) {                               /* not done? */
-    DT_SETDONE;
+    sim_activate (&dt_dev.units[DT_TIMER], dt_ctime);   /* sched done */
     }
 if (mot >= DTS_ACCF) {                                  /* ~stopped or stopping? */
     sim_cancel (uptr);                                  /* cancel activity */
@@ -1067,6 +1070,7 @@ if (mot >= DTS_ACCF) {                                  /* ~stopped or stopping?
     sim_activate (uptr, dt_dctime);                     /* sched decel */
     DTS_SETSTA (DTS_DECF | (mot & DTS_DIR), 0);         /* state = decel */
     }
+else DTS_SETSTA (mot, 0);                               /* clear 2nd, 3rd */
 return;
 }
 
