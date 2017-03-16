@@ -235,7 +235,7 @@ return p;
 #endif
 
 static void __panel_debug (PANEL *p, int dbits, const char *fmt, const char *buf, int bufsize, ...) GCC_FMT_ATTR(3, 6);
-#define _panel_debug(p, dbits, fmt, buf, bufsize, ...) do { if (p && p->Debug && (dbits & p->debug)) __panel_debug (p, dbits, fmt, buf, bufsize, ##__VA_ARGS__);} while (0)
+#define _panel_debug(p, dbits, fmt, buf, bufsize, ...) do { if (p && p->Debug && ((dbits) & p->debug)) __panel_debug (p, dbits, fmt, buf, bufsize, ##__VA_ARGS__);} while (0)
 
 static void __panel_debug (PANEL *p, int dbits, const char *fmt, const char *buf, int bufsize, ...)
 {
@@ -714,6 +714,7 @@ if (debug_file) {
     free (buf);
     buf = NULL;
     fclose (fIn);
+    fIn = NULL;
     }
 if (!simulator_panel) {
 #if defined(_WIN32)
