@@ -527,13 +527,14 @@ return SCPE_OK;
 t_stat sim_tape_detach (UNIT *uptr)
 {
 struct tape_context *ctx;
-uint32 f = MT_GET_FMT (uptr);
+uint32 f;
 t_stat r;
 t_bool auto_format = FALSE;
 
 if (uptr == NULL)
     return SCPE_IERR;
 ctx = (struct tape_context *)uptr->tape_ctx;
+f = MT_GET_FMT (uptr);
 if ((ctx == NULL) || !(uptr->flags & UNIT_ATT))
     return SCPE_IERR;
 
