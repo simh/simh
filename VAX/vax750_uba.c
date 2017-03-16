@@ -422,7 +422,7 @@ int32 uba_get_ubvector (int32 lvl)
 {
 int32 i;
 
-if ((lvl == (IPL_UBA - IPL_HMIN)) && uba_int) {         /* UBA lvl, int? */
+if ((lvl == IPL_UBA) && uba_int) {                      /* UBA lvl, int? */
     uba_int = 0;                                        /* clear int */
     }
 for (i = 0; int_req[lvl] && (i < 32); i++) {
