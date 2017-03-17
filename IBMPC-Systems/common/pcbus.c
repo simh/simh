@@ -423,6 +423,7 @@ uint8 nulldev(t_bool flag, uint8 data)
         port, flag, data);
     if (flag == 0)                      /* if we got here, no valid I/O device */
         return 0xFF;
+    return 0;
 }
 
 uint16 reg_dev(uint8 (*routine)(t_bool io, uint8 data), uint16 port)

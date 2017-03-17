@@ -252,10 +252,6 @@ union   {
 #define CX              (C.w)
 #define DX              (D.w)
 
-/* macros for handling IP and SP */
-#define INC_IP1         (++IP & ADDRMASK16) /* increment IP one byte */
-#define INC_IP2         ((IP += 2) & ADDRMASK16) /* increment IP two bytes */
-
 /* storage for the rest of the registers */
 int32 DI;                               /* Source Index Register */
 int32 SI;                               /* Destination Index Register */
@@ -3201,7 +3197,8 @@ int32 fetch_byte(int32 flag)
                 break;
         }
     }
-    IP = INC_IP1;                       /* increment IP */
+    IP++;                           /* increment IP */
+    IP &= ADDRMASK16;
     return val;
 }
 
@@ -3213,7 +3210,8 @@ int32 fetch_word(void)
     val |= get_smbyte(SEG_CS, IP + 1) << 8; /* fetch high byte */
 //    if (i8088_dev.dctrl & DEBUG_asm)
 //        sim_printf("0%04XH", val);
-    IP = INC_IP2;                       /* increment IP */
+    IP += 2;;                           /* increment IP */
+    IP &= ADDRMASK16;
     return val;
 }
 
@@ -3251,7 +3249,7 @@ void i86_intr_raise(uint8 num)
 
 uint32 get_rbyte(uint32 reg)
 {
-    uint32 val;
+    uint32 val = 0;
 
     switch(reg) {
         case 0: val = AL; break;
@@ -3270,7 +3268,7 @@ uint32 get_rbyte(uint32 reg)
 
 uint32 get_rword(uint32 reg)
 {
-    uint32 val;
+    uint32 val = 0;
 
     switch(reg) {
         case 0: val = AX; break;
@@ -3337,7 +3335,7 @@ void set_segreg(uint32 reg)
 
 uint32 get_ea(uint32 mrr)
 {
-    uint32 MOD, REG, RM, DISP, EA;
+    uint32 MOD, REG, RM, DISP, EA = 0;
 
     get_mrr_dec(mrr, &MOD, &REG, &RM);
     switch(MOD) {
@@ -4759,7 +4757,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
         if (strchr(opcode[inst], ' ') != NULL)
             fprintf (of, ",");
         else fprintf (of, " ");
-        fprintf (of, "%h", val[1]);
+        fprintf (of, "%x", val[1]);
     }
     if (oplen[inst] == 3) {
         adr = val[1] & 0xFF;
@@ -4767,7 +4765,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
         if (strchr(opcode[inst], ' ') != NULL)
             fprintf (of, ",");
         else fprintf (of, " ");
-        fprintf (of, "%h", adr);
+        fprintf (of, "%x", adr);
     }
     return -(oplen[inst] - 1);
 }

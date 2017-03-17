@@ -391,12 +391,14 @@ t_stat isbc201_attach (UNIT *uptr, CONST char *cptr)
         fseek(fp, 0, SEEK_SET);
         if (flen == -1) {
             sim_printf("   isbc201_attach: File error\n");
+            fclose(fp);
             return SCPE_IOERR;
         } 
         if (fdc201[fdcnum].fdd[fddnum].buf == NULL) { /* no buffer allocated */
             fdc201[fdcnum].fdd[fddnum].buf = (uint8 *)malloc(flen);
             if (fdc201[fdcnum].fdd[fddnum].buf == NULL) {
                 sim_printf("   isbc201_attach: Malloc error\n");
+                fclose(fp);
                 return SCPE_MEM;
             }
         }
@@ -450,8 +452,7 @@ uint8 isbc201_get_dn(void)
 {
     int i;
 
-//    for (i=0; i<SBC201_NUM; i++)
-    for (i=0; i<=SBC201_NUM; i++)
+    for (i=0; i<SBC201_NUM; i++)
         if (port >= fdc201[i].baseport && port <= fdc201[i].baseport + 7)
             return i;
     sim_printf("isbc201_get_dn: port %04X not in isbc202 device table\n", port);

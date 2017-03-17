@@ -1071,12 +1071,14 @@ t_stat isbc208_attach (UNIT *uptr, CONST char *cptr)
         fseek(fp, 0, SEEK_SET);
         if (flen == -1) {
             sim_printf("   isbc208_attach: File error\n");
+            fclose(fp);
             return SCPE_IOERR;
         } 
         if (isbc208_buf[uptr->u6] == NULL) { /* no buffer allocated */
             isbc208_buf[uptr->u6] = (uint8 *)malloc(flen);
             if (isbc208_buf[uptr->u6] == NULL) {
                 sim_printf("   iSBC208_attach: Malloc error\n");
+                fclose(fp);
                 return SCPE_MEM;
             }
         }
