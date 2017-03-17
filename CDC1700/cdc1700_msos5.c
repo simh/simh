@@ -340,10 +340,11 @@ char *textRep(uint16 start, uint16 len)
 {
   int i;
   static char text[64];
+  size_t text_space = sizeof (text) - 1;
 
   text[0] = '\0';
 
-  for (i = 0; (i < (2 * len)) && (strlen(text) < MAXTEXT); i++) {
+  for (i = 0; (i < (2 * len)) && (text_space >= MAXTEXT); i++) {
     uint16 ch = M[start];
 
     if ((i & 1) == 0)
@@ -351,7 +352,8 @@ char *textRep(uint16 start, uint16 len)
     else start++;
     ch &= 0x7F;
 
-    strcat(text, charRep[ch]);
+    strncpy(&text[strlen(text)], charRep[ch], text_space);
+    text_space -= strlen(charRep[ch]);
   }
   return text;
 }
