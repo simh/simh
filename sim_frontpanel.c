@@ -1943,9 +1943,9 @@ while ((p->sock != INVALID_SOCKET) &&
 
                     data = strtoull (e, NULL, 16);
                     if (little_endian)
-                        memcpy (p->regs[i].addr, &data, p->regs[i].size);
+                        memcpy (r->addr, &data, r->size);
                     else
-                        memcpy (p->regs[i].addr, ((char *)&data) + sizeof(data)-p->regs[i].size, p->regs[i].size);
+                        memcpy (r->addr, ((char *)&data) + sizeof(data)-r->size, r->size);
                     r = NULL;
                     }
                 s = eol;
@@ -2138,7 +2138,8 @@ while ((p->sock != INVALID_SOCKET) &&
             for (c = strchr (repeat, '\r'); c != NULL; c = strchr (c, '\r'))
                 *c = ';';                               /* replace carriage returns with semicolons */
             c = strstr (repeat, register_get_echo);     /* remove register_done_echo string and */
-            strcpy (c, register_repeat_echo);           /* replace it with the register_repeat_echo string */
+            if (c)                                      /* always true */
+                strcpy (c, register_repeat_echo);       /* replace it with the register_repeat_echo string */
             if (_panel_sendf (p, &cmd_stat, NULL, "%s", repeat)) {
                 pthread_mutex_lock (&p->io_lock);
                 free (repeat);
