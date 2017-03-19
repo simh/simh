@@ -25,7 +25,7 @@
 
    cpu          PDP-1 central processor
 
-   27-Mar-15    RMS     Backported changed from GitHub master
+   27-Mar-15    RMS     Backported changes from GitHub master
    21-Mar-12    RMS     Fixed & vs && in Ea_ch (Michael Bloom)
    30-May-07    RMS     Fixed typo in SBS clear (Norm Lastovica)
    28-Dec-06    RMS     Added 16-channel SBS support, PDP-1D support

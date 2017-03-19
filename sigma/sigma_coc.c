@@ -24,7 +24,6 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    coc          7611 communications multiplexor
-
 */
 
 #include "sigma_io_defs.h"
