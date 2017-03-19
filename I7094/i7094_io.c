@@ -1,6 +1,6 @@
 /* i7094_io.c: IBM 7094 I/O subsystem (channels)
 
-   Copyright (c) 2003-2012, Robert M. Supnik
+   Copyright (c) 2003-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    chana..chanh         I/O channels
 
+   13-Mar-17    RMS     Annotated fall through in switch
    19-Mar-12    RMS     Fixed declaration of breakpoint variables (Mark Pizzolato)
 
    Notes on channels and CTSS.
@@ -1300,7 +1301,7 @@ switch (op) {                                           /* case on opcode */
 
     case CH6_IOST:                                      /* IOST */
         if (ch_flags[ch] & CHF_EOR)                     /* EOR set? immed ch req */
-            ch_req |= REQ_CH (ch);
+            ch_req |= REQ_CH (ch);                      /* fall through */
     case CH6_IOCT:                                      /* IOCT */
         if (ch_wc[ch] == 0) {                           /* wc 0? */
             if (ch_ld)                                  /* load? end now */
@@ -1311,7 +1312,7 @@ switch (op) {                                           /* case on opcode */
 
     case CH6_IOSP:                                      /* IOSP */
         if (ch_flags[ch] & CHF_EOR)                     /* EOR set? immed ch req */
-            ch_req |= REQ_CH (ch);
+            ch_req |= REQ_CH (ch);                      /* fall through */
     case CH6_IOCP:                                      /* IOCP */
         if (ch_wc[ch] == 0)                             /* wc 0? immed ch req */
             ch_req |= REQ_CH (ch);
