@@ -1,6 +1,6 @@
 /* altair_dsk.c: MITS Altair 88-DISK Simulator
 
-   Copyright (c) 1997-2010, Charles E. Owen
+   Copyright (c) 1997-2017, Charles E. Owen
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -104,6 +104,7 @@
     T = Sector True, is a 1 when the sector is positioned to read or
         write.
 
+    12-Mar-17   MP      Extend data buffer to avoid overrun (COVERITY)
 */
 
 #include <stdio.h>
@@ -134,7 +135,7 @@ int32 cur_sect[9] = {0, 0, 0, 0, 0, 0, 0, 0, 377};
 int32 cur_byte[9] = {0, 0, 0, 0, 0, 0, 0, 0, 377};
 int32 cur_flags[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-char dskbuf[137];                                       /* Data Buffer */
+char dskbuf[138];                                       /* Data Buffer */
 int32 dirty = 0;                                        /* 1 when buffer has unwritten data in it */
 UNIT *dptr;                                             /* fileref to write dirty buffer to */
 
