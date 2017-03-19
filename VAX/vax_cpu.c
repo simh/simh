@@ -477,10 +477,15 @@ t_stat sim_instr (void)
 volatile int32 opc = 0, cc;                             /* used by setjmp */
 volatile int32 acc;                                     /* set by setjmp */
 int abortval;
-t_stat r;
+t_stat ret;
+int32 r = 0, rh = 0, temp = 0;
+int32 spec = 0, disp = 0, rn = 0, index = 0, numspec = 0;
+int32 vfldrp1 = 0, brdisp = 0, flg = 0, mstat = 0;
+uint32 va = 0, iad = 0;
+int32 opnd[OPND_SIZE];                                  /* operand queue */
 
-if ((r = build_dib_tab ()) != SCPE_OK)                  /* build, chk dib_tab */
-    return r;
+if ((ret = build_dib_tab ()) != SCPE_OK)                /* build, chk dib_tab */
+    return ret;
 if ((PSL & PSL_MBZ) ||                                  /* validate PSL<mbz> */
     ((PSL & PSL_CM) && BadCmPSL (PSL)) ||               /* validate PSL<cm> */
     ((PSL_GETCUR (PSL) != KERN) &&                      /* esu => is, ipl = 0 */
@@ -580,12 +585,7 @@ else if (abortval < 0) {                                /* mm or rsrv or int */
 /* Main instruction loop */
 
 for ( ;; ) {
-
-    int32 spec, disp, rn, index, numspec;
-    int32 vfldrp1, brdisp, flg, mstat;
-    int32 i, j, r, rh, temp;
-    uint32 va, iad;
-    int32 opnd[OPND_SIZE];                              /* operand queue */
+    int32 i, j;
 
 /* Optionally record instruction history results from prior instruction */
 
