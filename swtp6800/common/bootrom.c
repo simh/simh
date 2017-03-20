@@ -218,6 +218,7 @@ t_stat BOOTROM_reset (DEVICE *dptr)
     if (fp == NULL) {
         printf("\tUnable to open ROM file %s\n",BOOTROM_unit.filename);
         printf("\tNo ROM image loaded!!!\n");
+        fclose(fp);
         return SCPE_OK;
     }
     j = 0;                              /* load EPROM file */
