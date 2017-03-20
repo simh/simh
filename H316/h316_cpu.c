@@ -919,8 +919,8 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
             t2 = GETDBL_S (SEXT (AR), BR);              /* get A'B */
             t3 = t2 << t1;                              /* "arith" left */
             PUTDBL_S (t3);                              /* store A'B */
-            if ((t2 >> (31 - t1)) !=                    /* shf out = sgn? */
-                ((AR & SIGN)? -1: 0)) C = 1;
+            if ((t2 >> (31 - t1)) != ((AR & SIGN)? -1: 0)) /* shf out = sgn? */
+                C = 1;
             break;
 
         case 012:                                       /* LLR */

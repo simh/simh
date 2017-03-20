@@ -1,6 +1,6 @@
 /* i1401_cpu.c: IBM 1401 CPU simulator
 
-   Copyright (c) 1993-2015, Robert M. Supnik
+   Copyright (c) 1993-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   13-Mar-17    RMS     Fixed MTF length checking (COVERITY)
    30-Jan-15    RMS     Fixed treatment of overflow (Ken Shirriff)
    08-Oct-12    RMS     Clear storage and branch preserves B register (Van Snyder)
    19-Mar-11    RMS     Reverted multiple tape indicator implementation
@@ -720,7 +721,7 @@ CHECK_LENGTH:
    1            chained A and B
    2,3          invalid A-address
    4            chained B address
-   5,6          invalid B-address
+   5,6          invalid B-address - checked in fetch
    7            normal
    8+           normal + modifier
 */
@@ -772,9 +773,9 @@ CHECK_LENGTH:
    Instruction lengths:
 
    1            chained
-   2,3          invalid A-address
+   2,3          invalid A-address - checked in fetch
    4            self (B-address = A-address)
-   5,6          invalid B-address
+   5,6          invalid B-address - checked in fetch
    7            normal
    8+           normal + ignored modifier
 */
@@ -1009,7 +1010,7 @@ CHECK_LENGTH:
                 ind[IN_HGH] = col_table[b & CHAR] > col_table [a & CHAR];
                 ind[IN_LOW] = ind[IN_HGH] ^ 1;
                 }
-            MM (AS);                                /* decr pointers */
+            MM (AS);                                    /* decr pointers */
             MM (BS);
             } while ((wm & WM) == 0);                   /* stop on A, B WM */
         if ((a & WM) && !(b & WM)) {                    /* short A field? */
@@ -1027,7 +1028,7 @@ CHECK_LENGTH:
    WR           write and read                          if branch
    P            punch a card                            if branch
    RP           read and punch                          if branch
-   WP   :       write and punch                         if branch
+   WP           write and punch                         if branch
    WRP          write read and punch                    if branch
    RF           read feed (nop)
    PF           punch feed (nop)
@@ -1148,19 +1149,24 @@ CHECK_LENGTH:
 
    Instruction lengths:
 
-   1-3          invalid I/O address
+   1-3          invalid I/O address - checked here
    4            normal, d-character is unit
-   5            normal
+   5            normal, d-character is last character
    6+           normal, d-character is last character
 */
 
     case OP_MTF:                                        /* magtape function */
-        if (ilnt < 4)                                   /* too short? */
+        if (ilnt < 4) {                                 /* too short? */
             reason = STOP_INVL;
-        else if (ioind != BCD_PERCNT)                   /* valid dev addr? */
-            reason = STOP_INVA;
-        else if ((reason = iomod (ilnt, D, mtf_mod)))   /* valid modifier? */
             break;
+            }
+      if (ioind != BCD_PERCNT) {                        /* valid dev addr? */
+            reason = STOP_INVA;
+            break;
+            }
+        if (reason = iomod (ilnt, D, mtf_mod))          /* valid modifier? */
+            break;
+
         if (dev == IO_MT)                               /* BCD? */
             reason = mt_func (unit, 0, D);
         else if (dev == IO_MTB)                         /* binary? */
@@ -1196,9 +1202,9 @@ CHECK_LENGTH:
    Instruction lengths:
 
    1            chained
-   2,3          invalid A-address
+   2,3          invalid A-address - checked in fetch
    4            self (B-address = A-address)
-   5,6          invalid B-address
+   5,6          invalid B-address - checked in fetch
    7            normal
    8+           normal + ignored modifier
 */
@@ -1372,9 +1378,9 @@ CHECK_LENGTH:
    Instruction lengths:
 
    1            chained
-   2,3          invalid A-address
+   2,3          invalid A-address - checked in fetch
    4            self (B-address = A-address)
-   5,6          invalid B-address
+   5,6          invalid B-address - checked in fetch
    7            normal
    8+           normal + ignored modifier
 */
@@ -1449,9 +1455,9 @@ CHECK_LENGTH:
    Instruction lengths:
 
    1            chained
-   2,3          invalid A-address
+   2,3          invalid A-address - checked in fetch
    4            self (B-address = A-address)
-   5,6          invalid B-address
+   5,6          invalid B-address - checked in fetch
    7            normal
    8+           normal + ignored modifier
 */
