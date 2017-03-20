@@ -68,7 +68,7 @@ extern DIB *dib_tab[];
 #define kaf_unit        fe_unit[2]
 
 UNIT fe_unit[] = {
-    { UDATA (&fei_svc, UNIT_IDLE, 0), 0 },
+    { UDATA (&fei_svc, UNIT_IDLE, 0), KBD_POLL_WAIT },
     { UDATA (&feo_svc, 0, 0), SERIAL_OUT_WAIT },
     { UDATA (&kaf_svc, 0, 0), (1*1000*1000) }
     };
@@ -173,8 +173,7 @@ if (M[FE_CTYOUT] & FE_CVALID) {                         /* char to print? */
     sim_activate (&feo_unit, feo_unit.wait);            /* sched completion */
     }
 else if ((M[FE_CTYIN] & FE_CVALID) == 0) {              /* input char taken? */
-    sim_cancel (&fei_unit);                             /* sched immediate */
-    sim_activate (&fei_unit, 0);                        /* keyboard poll */
+    sim_activate_abs (&fei_unit, 0);                    /* sched immed kbd poll */
     }
 return;
 }
@@ -196,8 +195,7 @@ t_stat fei_svc (UNIT *uptr)
 {
 int32 temp;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, clk_cosched (tmxr_poll)));  
-                                                        /* continue poll */
+sim_activate (uptr, clk_cosched (tmxr_poll));           /* continue poll */
 if ((temp = sim_poll_kbd ()) < SCPE_KFLAG)              /* no char or error? */
     return temp;
 if (temp & SCPE_BREAK)                                  /* ignore break */
@@ -304,7 +302,7 @@ M[FE_KEEPA] = INT64_C(0003740000000);                  /* PARITY STOP, CRM, DP P
 kaf_unit.u3 = 0;
 kaf_unit.u4 = 0;
 apr_flg = apr_flg & ~(APRF_ITC | APRF_CON);
-sim_activate (&fei_unit, KBD_WAIT (fei_unit.wait, tmxr_poll));
+sim_activate (&fei_unit, tmxr_poll);
 sim_activate_after (&kaf_unit, kaf_unit.wait);
 return SCPE_OK;
 }

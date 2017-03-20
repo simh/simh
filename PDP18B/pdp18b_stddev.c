@@ -319,7 +319,7 @@ DEVICE ptp_dev = {
 
 DIB tti_dib = { DEV_TTI, 1, &tti_iors, { &tti } };
 
-UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE+TT_MODE_KSR+TTUF_HDX, 0), 0 };
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE+TT_MODE_KSR+TTUF_HDX, 0), KBD_POLL_WAIT };
 
 REG tti_reg[] = {
     { ORDATA (BUF, tti_unit.buf, TTI_WIDTH) },
@@ -332,7 +332,7 @@ REG tti_reg[] = {
     { FLDATA (FDPX, tti_fdpx, 0) },
 #endif
     { DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tti_unit.wait, 24), PV_LEFT },
+    { DRDATA (TIME, tti_unit.wait, 24), PV_LEFT+REG_NZ },
     { NULL }
     };
 
@@ -667,7 +667,7 @@ ptr_err = 0;                                             /* attach clrs error */
 ptr_unit.flags = ptr_unit.flags & ~(UNIT_RASCII|UNIT_KASCII);
 if (sim_switches & SWMASK ('A'))
     ptr_unit.flags = ptr_unit.flags | UNIT_RASCII;
-if (sim_switches & SWMASK ('K'))
+else if (sim_switches & SWMASK ('K'))
     ptr_unit.flags = ptr_unit.flags | UNIT_KASCII;
 return SCPE_OK;
 }
@@ -1027,8 +1027,7 @@ t_stat tti_svc (UNIT *uptr)
 #if defined (KSR28)                                     /* Baudot... */
 int32 in, c, out;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, clk_cosched (tmxr_poll)));
-                                                        /* continue poll */
+sim_activate (uptr, clk_cosched (tmxr_poll));           /* continue poll */
 if (tti_2nd) {                                          /* char waiting? */
     uptr->buf = tti_2nd;                                /* return char */
     tti_2nd = 0;                                        /* not waiting */
@@ -1063,8 +1062,7 @@ else {
 #else                                                   /* ASCII... */
 int32 c, out;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, clk_cosched (tmxr_poll)));
-                                                        /* continue poll */
+sim_activate (uptr, clk_cosched (tmxr_poll));           /* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
 out = c & 0177;                                         /* mask echo to 7b */
@@ -1110,7 +1108,7 @@ if (!sim_is_running) {                                  /* RESET (not CAF)? */
     tty_shift = 0;                                      /* clear state */
     tti_fdpx = 0;                                       /* clear dpx mode */
     }
-sim_activate (&tti_unit, KBD_WAIT (tti_unit.wait, tmxr_poll));
+sim_activate (&tti_unit, tmxr_poll);
 return SCPE_OK;
 }
 

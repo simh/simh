@@ -102,7 +102,7 @@ REG tti_reg[] = {
     { FLDATA (DONE, tti_csr, CSR_V_DONE) },
     { FLDATA (IE, tti_csr, CSR_V_IE) },
     { DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tti_unit.wait, 24), PV_LEFT },
+    { DRDATA (TIME, tti_unit.wait, 24), PV_LEFT + REG_NZ },
     { NULL }
     };
 
@@ -294,8 +294,7 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, clk_cosched (tmr_poll)));
-                                                        /* continue poll */
+sim_activate (uptr, clk_cosched (tmr_poll));            /* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
 if (c & SCPE_BREAK) {                                   /* break? */
@@ -316,7 +315,7 @@ t_stat tti_reset (DEVICE *dptr)
 tti_unit.buf = 0;
 tti_csr = 0;
 CLR_INT (TTI);
-sim_activate (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
+sim_activate (&tti_unit, tmr_poll);
 return SCPE_OK;
 }
 
