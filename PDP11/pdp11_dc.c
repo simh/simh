@@ -1,6 +1,6 @@
 /* pdp11_dc.c: PDP-11 DC11 multiple terminal interface simulator
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dci,dco    DC11 terminal input/output
 
+   03-Jan-2016  RMS     Changed output default to 7B
    11-Oct-2013  RMS     Poll DCI immediately after attach to pick up connect
    18-Apr-2012  RMS     Modified to use clock coscheduling
    17-Aug-2011  RMS     Added AUTOCONFIGURE modifier
@@ -203,22 +204,22 @@ DEVICE dci_dev = {
 */
 
 UNIT dco_unit[] = {
-    { UDATA (&dco_svc, TT_MODE_7P+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
-    { UDATA (&dco_svc, TT_MODE_7P+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
-    { UDATA (&dco_svc, TT_MODE_7P+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
-    { UDATA (&dco_svc, TT_MODE_7P+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
-    { UDATA (&dco_svc, TT_MODE_7P+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
-    { UDATA (&dco_svc, TT_MODE_7P+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
-    { UDATA (&dco_svc, TT_MODE_7P+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
-    { UDATA (&dco_svc, TT_MODE_7P+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
-    { UDATA (&dco_svc, TT_MODE_7P+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
-    { UDATA (&dco_svc, TT_MODE_7P+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
-    { UDATA (&dco_svc, TT_MODE_7P+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
-    { UDATA (&dco_svc, TT_MODE_7P+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
-    { UDATA (&dco_svc, TT_MODE_7P+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
-    { UDATA (&dco_svc, TT_MODE_7P+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
-    { UDATA (&dco_svc, TT_MODE_7P+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
-    { UDATA (&dco_svc, TT_MODE_7P+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT }
+    { UDATA (&dco_svc, TT_MODE_7B+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dco_svc, TT_MODE_7B+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dco_svc, TT_MODE_7B+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dco_svc, TT_MODE_7B+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dco_svc, TT_MODE_7B+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dco_svc, TT_MODE_7B+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dco_svc, TT_MODE_7B+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dco_svc, TT_MODE_7B+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dco_svc, TT_MODE_7B+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dco_svc, TT_MODE_7B+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dco_svc, TT_MODE_7B+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dco_svc, TT_MODE_7B+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dco_svc, TT_MODE_7B+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dco_svc, TT_MODE_7B+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dco_svc, TT_MODE_7B+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT },
+    { UDATA (&dco_svc, TT_MODE_7B+DCX_EPAR+DCX_MDM, 0), SERIAL_OUT_WAIT }
     };
 
 REG dco_reg[] = {

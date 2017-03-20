@@ -1,6 +1,6 @@
 /* pdp11_stddev.c: PDP-11 standard I/O devices simulator
 
-   Copyright (c) 1993-2015, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    tti,tto      DL11 terminal input/output
    clk          KW11L (and other) line frequency clock
 
+   25-Sep-16    RMS     Added Dave Gesswein's fix to prevent data loss
+   02-Jan-16    RMS     Changed TTO default to 7B
    30-Dec-15    RMS     Added NOBEVENT support
    18-Apr-12    RMS     Modified to use clock coscheduling
    20-May-08    RMS     Standardized clock delay at 1mips
@@ -113,7 +115,7 @@ DIB tti_dib = {
     1, IVCL (TTI), VEC_TTI, { NULL }
     };
 
-UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE, 0), 0 };
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE, 0), KBD_POLL_WAIT };
 
 REG tti_reg[] = {
     { ORDATA (BUF, tti_unit.buf, 8) },
@@ -123,7 +125,7 @@ REG tti_reg[] = {
     { FLDATA (DONE, tti_csr, CSR_V_DONE) },
     { FLDATA (IE, tti_csr, CSR_V_IE) },
     { DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tti_unit.wait, 24), PV_LEFT },
+    { DRDATA (TIME, tti_unit.wait, 24), PV_LEFT+REG_NZ },
     { NULL }
     };
 
@@ -159,7 +161,7 @@ DIB tto_dib = {
     1, IVCL (TTO), VEC_TTO, { NULL }
     };
 
-UNIT tto_unit = { UDATA (&tto_svc, TT_MODE_7P, 0), SERIAL_OUT_WAIT };
+UNIT tto_unit = { UDATA (&tto_svc, TT_MODE_7B, 0), SERIAL_OUT_WAIT };
 
 REG tto_reg[] = {
     { ORDATA (BUF, tto_unit.buf, 8) },
@@ -256,7 +258,7 @@ switch ((PA >> 1) & 01) {                               /* decode PA<1> */
         tti_csr = tti_csr & ~CSR_DONE;
         CLR_INT (TTI);
         *data = tti_unit.buf & 0377;
-        sim_activate_abs (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll)); /* check soon for more input */
+        sim_activate_abs (&tti_unit, tti_unit.wait);    /* check soon for more input */
         return SCPE_OK;
         }                                               /* end switch PA */
 
@@ -290,8 +292,7 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, clk_cosched (tmr_poll)));
-                                                        /* continue poll */
+sim_activate (uptr, clk_cosched (tmr_poll));            /* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
 if (c & SCPE_BREAK)                                     /* break? */
@@ -311,7 +312,7 @@ t_stat tti_reset (DEVICE *dptr)
 tti_unit.buf = 0;
 tti_csr = 0;
 CLR_INT (TTI);
-sim_activate (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
+sim_activate (&tti_unit, tmr_poll);
 return SCPE_OK;
 }
 
