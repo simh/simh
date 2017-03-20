@@ -291,7 +291,7 @@ uint32 sysmode = 0;                     /* prefix flags */
 #define SYSMODE_SEGOVR_ES   0x08
 #define SYSMODE_SEGOVR_SS   0x10
 #define SYSMODE_SEGMASK  (SYSMODE_SEG_DS_SS | SYSMODE_SEGOVR_CS |   \
-    SYSMODE_SEGOVR_DS | SYSMODE_SEGOVR_ES | SYSMODE_SEGOVR_SS)
+        SYSMODE_SEGOVR_DS | SYSMODE_SEGOVR_ES | SYSMODE_SEGOVR_SS)
 #define SYSMODE_PREFIX_REPE     0x20
 #define SYSMODE_PREFIX_REPNE    0x40
 
@@ -474,7 +474,7 @@ uint8 xor_3_tab[] = { 0, 1, 1, 0 };
 
 int32 IP;
 
-static const char *opcode[] = {
+static const char *opcode[256] = {
 "ADD\t", "ADD\t", "ADD\t", "ADD\t",                 /* 0x00 */
 "ADD\tAL,", "ADD\tAX,", "PUSH\tES", "POP\tES",
 "OR\t", "OR\t", "OR\t", "OR\t", 
@@ -542,7 +542,7 @@ static const char *opcode[] = {
 };
 
 /*
-0 = 1 byte opcaode
+0 = 1 byte opcode
 1 = DATA8
 2 = DATA16
 3 = IP-INC8
@@ -579,7 +579,7 @@ int32 sim_instr (void)
 {
     extern int32 sim_interval;
     int32 IR, OP, DAR, reason, hi, lo, carry, i, adr;
-    int32 MRR, REG, EA, MOD, RM, DISP, VAL, DATA, OFF, SEG, INC, VAL1;
+    int32 MRR, REG, EA, MOD, RM, DISP, VAL, DATA, OFF, SEG, INC, VAL1, MAR;
 
     IP = saved_PC & ADDRMASK16;         /* load local IP */
     reason = 0;                         /* clear stop reason */
@@ -3152,6 +3152,9 @@ int32 sim_instr (void)
                     case 4:             //IP-INC16
                         sim_printf(" 0%04XH", EA);
                         break;
+                    case 5:             //MAR
+                        sim_printf(" 0%02XH", MAR);
+                        break;
                     default:
                         break;
                 }
@@ -4784,7 +4787,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
 
 t_stat parse_sym (const char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
-    int32 cflag, i = 0, j, r;
+    int32 cflag, i = 0, j, r, fflag = 1;
     char gbuf[CBUFSIZE];
 
     cflag = (uptr == NULL) || (uptr == &i8088_unit);
@@ -4845,9 +4848,9 @@ t_stat parse_sym (const char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32
 /* find opcode in table */
     for (j = 0; j < 256; j++) {
         if (strcmp(gbuf, opcode[j]) == 0)
-            break;
+            fflag = 0;
     }
-    if (j > 255)                                            /* not found */
+    if (fflag)                                              /* not found */
         return SCPE_ARG;
 
     val[0] = j;                                             /* store opcode */

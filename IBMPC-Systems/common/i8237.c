@@ -375,7 +375,6 @@ DEVICE i8237_dev = {
 
 t_stat i8237_svc(UNIT *uptr)
 {
-    sim_printf("uptr=%08X\n", (long) uptr);
     sim_activate (&i8237_unit[uptr->u6], i8237_unit[uptr->u6].wait);
     return SCPE_OK;
 }

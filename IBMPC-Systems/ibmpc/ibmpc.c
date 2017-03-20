@@ -100,6 +100,7 @@ uint8 dmapag0(t_bool io, uint8 data)
         dmapagreg0 = data;
         //sim_printf("dmapag0: dmapagreg0=%04X\n", data);
     }
+    return 0;
 }
 
 uint8 dmapag1(t_bool io, uint8 data)
@@ -110,6 +111,7 @@ uint8 dmapag1(t_bool io, uint8 data)
         dmapagreg1 = data;
         //sim_printf("dmapag1: dmapagreg1=%04X\n", data);
     }
+    return 0;
 }
 
 uint8 dmapag2(t_bool io, uint8 data)
@@ -120,6 +122,7 @@ uint8 dmapag2(t_bool io, uint8 data)
         dmapagreg2 = data;
         //sim_printf("dmapag2: dmapagreg2=%04X\n", data);
     }
+    return 0;
 }
 
 uint8 dmapag3(t_bool io, uint8 data)
@@ -131,6 +134,7 @@ uint8 dmapag3(t_bool io, uint8 data)
         dmapagreg3 = data;
         //sim_printf("dmapag3: dmapagreg3=%04X\n", data);
     }
+    return 0;
 }
 
 uint8 enbnmi(t_bool io, uint8 data)
@@ -146,6 +150,7 @@ uint8 enbnmi(t_bool io, uint8 data)
             //sim_printf("enbnmi: NMI disabled\n");
         }
     }
+    return 0;
 }
 
 /*  get a byte from memory - handle RAM, ROM, I/O, and pcbus memory */
