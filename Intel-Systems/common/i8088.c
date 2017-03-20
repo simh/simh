@@ -4660,8 +4660,8 @@ int32 fprint_sym (FILE *of, int32 addr, uint32 *val,
 
 int32 parse_sym (char *cptr, int32 addr, UNIT *uptr, uint32 *val, int32 sw)
 {
-    int32 cflag, i = 0, j, r;
-    char gbuf[CBUFSIZE];
+    int32 cflag, i = 0, j, r, fflag = 1;
+    char gbuf[256];
 
     cflag = (uptr == NULL) || (uptr == &i8088_unit);
     while (isspace (*cptr)) cptr++;                         /* absorb spaces */
@@ -4721,9 +4721,9 @@ int32 parse_sym (char *cptr, int32 addr, UNIT *uptr, uint32 *val, int32 sw)
 /* find opcode in table */
     for (j = 0; j < 256; j++) {
         if (strcmp(gbuf, opcode[j]) == 0)
-            break;
+            fflag =  0;
     }
-    if (j > 255)                                            /* not found */
+    if (fflag)                                            /* not found */
         return SCPE_ARG;
 
     val[0] = j;                                             /* store opcode */
