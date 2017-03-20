@@ -119,7 +119,7 @@
 #define SIZE_2302       (DSK_WDSPT_2302*DSK_TRKPA_2302*DSK_ACCPM_2302)
 #define DSK_BUFSIZ      (DSK_WDSPT_2302)
 #define DSK_DA(a,t,d)   (((((a) * dsk_tab[d].trkpa) + (t)) * dsk_tab[d].wdspt) *\
-                    sizeof (t_uint64))
+                        sizeof (t_uint64))
 
 /* Unit flags */
 
