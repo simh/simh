@@ -79,7 +79,7 @@ t_stat tt_set_enbdis (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 DIB tt_dib = { d_TT, -1, v_TT, NULL, &tt, NULL };
 
 UNIT tt_unit[] = {
-    { UDATA (&tti_svc, TT_MODE_KSR|UNIT_IDLE, 0), 0 },
+    { UDATA (&tti_svc, TT_MODE_KSR|UNIT_IDLE, 0), KBD_POLL_WAIT },
     { UDATA (&tto_svc, TT_MODE_KSR, 0), SERIAL_OUT_WAIT }
     };
 
@@ -87,7 +87,7 @@ REG tt_reg[] = {
     { HRDATA (STA, tt_sta, 8) },
     { HRDATA (KBUF, tt_unit[TTI].buf, 8) },
     { DRDATA (KPOS, tt_unit[TTI].pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (KTIME, tt_unit[TTI].wait, 24), PV_LEFT },
+    { DRDATA (KTIME, tt_unit[TTI].wait, 24), PV_LEFT + REG_NZ },
     { HRDATA (TBUF, tt_unit[TTO].buf, 8) },
     { DRDATA (TPOS, tt_unit[TTO].pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TTIME, tt_unit[TTO].wait, 24), REG_NZ + PV_LEFT },
@@ -159,6 +159,7 @@ switch (op) {                                           /* case IO op */
         tt_chp = 0;                                     /* clear pend */
         if (tt_rd)
             tt_sta = (tt_sta | STA_BSY) & ~STA_OVR;
+        sim_activate_abs (&tt_unit[TTI], tt_unit[TTI].wait);
         return (tt_unit[TTI].buf & 0xFF);
 
     case IO_WD:                                         /* write */
@@ -184,8 +185,7 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 out, temp;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, lfc_cosched (lfc_poll)));
-                                                        /* continue poll */
+sim_activate (uptr, lfc_cosched (lfc_poll));            /* continue poll */
 tt_sta = tt_sta & ~STA_BRK;                             /* clear break */
 if ((temp = sim_poll_kbd ()) < SCPE_KFLAG)              /* no char or error? */
     return temp;
@@ -241,7 +241,7 @@ t_stat tt_reset (DEVICE *dptr)
 {
 if (dptr->flags & DEV_DIS)                              /* dis? cancel poll */
     sim_cancel (&tt_unit[TTI]);
-else sim_activate (&tt_unit[TTI], KBD_WAIT (tt_unit[TTI].wait, lfc_poll));
+else sim_activate (&tt_unit[TTI],lfc_poll);
 sim_cancel (&tt_unit[TTO]);                             /* cancel output */
 tt_rd = tt_fdpx = 1;                                    /* read, full duplex */
 tt_chp = 0;                                             /* no char */
