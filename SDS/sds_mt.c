@@ -1,6 +1,6 @@
 /* sds_mt.c: SDS 940 magnetic tape simulator
 
-   Copyright (c) 2001-2012, Robert M. Supnik
+   Copyright (c) 2001-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt           7 track magnetic tape
 
+   09-Oct-16    RMS     Added precise gap erase
    19-Mar-12    RMS     Fixed bug in scan function decode (Peter Schorn)
    16-Feb-06    RMS     Added tape capacity checking
    07-Dec-04    RMS     Added read-only file support
@@ -205,7 +206,9 @@ switch (fnc) {                                          /* case function */
         mt_eof = 0;                                     /* clr eof flag */
         mt_skip = 0;                                    /* clr skp flag */
         mt_bptr = mt_blnt = 0;                          /* init buffer */
-        if ((inst & DEV_MTS)? (CHC_GETCPW (inst) < 2):  /* scn & cpw<3? */
+        if ((inst & DEV_MTS)?                           /* scan or erase? */
+            ((inst & CHC_REV) && (!(inst & DEV_OUT)) && /* scan reverse and */
+                (CHC_GETCPW (inst) < 3)):               /* not 4 char/wd? */
             (inst & CHC_REV))                           /* rw & rev? */
             return STOP_INVIOP;
         mt_inst = inst;                                 /* save inst */
@@ -259,22 +262,28 @@ switch (fnc) {                                          /* case function */
                 break;
             case 002:                                   /* sks 1041n */
                 if (!(uptr->flags & UNIT_ATT) ||        /* not ready */
-                    sim_is_active (uptr)) *dat = 1;
+                    sim_is_active (uptr))
+                    *dat = 1;
                 break;
             case 004:                                   /* sks 1101n */
-                if (!uptr->eotf) *dat = 1;              /* not EOT */
+                if (!uptr->eotf)                        /* not EOT */
+                    *dat = 1;
                 break;
             case 010:                                   /* sks 1201n */
-                if (!uptr->botf) *dat = 1;              /* not BOT */
+                if (!uptr->botf)                        /* not BOT */
+                    *dat = 1;
                 break;
             case 013:                                   /* sks 12610 */
-                if (!mt_gap) *dat = 1;                  /* not in gap */
+                if (!mt_gap)                            /* not in gap */
+                    *dat = 1;
                 break;
             case 017:                                   /* sks 13610 */
-                if (!mt_eof) *dat = 1;                  /* not EOF */
+                if (!mt_eof)                            /* not EOF */
+                    *dat = 1;
                 break;
             case 020:                                   /* sks 1401n */
-                if (!sim_tape_wrp (uptr)) *dat = 1;     /* not wrp */
+                if (!sim_tape_wrp (uptr))               /* not wrp */
+                    *dat = 1;
                 break;
             case 031:                                   /* sks 1621n */
             case 033:                                   /* sks 1661n */
@@ -310,7 +319,8 @@ switch (fnc) {                                          /* case function */
         xfr_req = xfr_req & ~XFR_MT0;                   /* clr xfr flag */
         if (!(mt_inst & CHC_BIN))                       /* bcd? */
             chr = sds_to_bcd[chr];
-        if (mt_bptr < MT_MAXFR) mtxb[mt_bptr++] = chr;  /* insert in buf */
+        if (mt_bptr < MT_MAXFR)                         /* insert in buf */
+            mtxb[mt_bptr++] = chr;
         break;
 
     default:
@@ -397,8 +407,8 @@ return;
 t_stat mt_wrend (uint32 dev)
 {
 UNIT *uptr = mt_dev.units + (dev & MT_UNIT);
-t_mtrlnt tbc;
 t_stat st;
+t_bool passed_eot;
 
 sim_cancel (uptr);                                      /* no more xfr's */
 if (mt_bptr == 0)                                       /* buf empty? */
@@ -411,20 +421,20 @@ if (sim_tape_wrp (uptr)) {                              /* write lock? */
     mt_set_err (uptr);                                  /* yes, err, disc */
     return SCPE_OK;
     }
+passed_eot = sim_tape_eot (uptr);                       /* passed EOT? */
 if (dev & DEV_MTS) {                                    /* erase? */
     if (mt_inst & CHC_REV)                              /* reverse? */
-        sim_tape_sprecr (uptr, &tbc);                   /* backspace */
-    st = sim_tape_wreom (uptr);                         /* write eom */
+        st = sim_tape_errecr (uptr, mt_bptr);
+    else st = sim_tape_errecf (uptr, mt_bptr);          /* no, forward */
     }
 else {
-    t_bool passed_eot = sim_tape_eot (uptr);            /* passed EOT? */
     if ((mt_bptr == 1) && (mtxb[0] == 017) &&           /* wr eof? */
         ((mt_inst & 01670) == 00050))
         st = sim_tape_wrtmk (uptr);                     /* write tape mark */
     else st = sim_tape_wrrecf (uptr, mtxb, mt_bptr);    /* write record */
-    if (!passed_eot && sim_tape_eot (uptr))             /* just passed EOT? */
-        uptr->eotf = 1;
     }
+if (!passed_eot && sim_tape_eot (uptr))                 /* just passed EOT? */
+    uptr->eotf = 1;
 mt_bptr = 0;
 if (st != MTSE_OK)                                      /* error? */
     mt_set_err (uptr);
