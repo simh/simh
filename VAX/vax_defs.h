@@ -377,7 +377,7 @@
 #define DR_F            0x80                            /* FPD ok flag */
 #define DR_NSPMASK      0x07                            /* #specifiers */
 #define DR_V_USPMASK    4
-#define DR_M_USPMASK    0x70                            /* #spec, sym_ */
+#define DR_M_USPMASK    0x7                             /* #spec, sym_ */
 #define DR_GETNSP(x)    ((x) & DR_NSPMASK)
 #define DR_GETUSP(x)    (((x) >> DR_V_USPMASK) & DR_M_USPMASK)
 
