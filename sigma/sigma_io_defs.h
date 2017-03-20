@@ -194,7 +194,7 @@ typedef struct {
 #define DVA_CP          0x004
 #define DVA_PT          0x005
 #define DVA_MUX         0x006
-#define DIO_MUX         0x3
+#define DIO_MUX         0x003
 #define DVA_MT          0x080
 #define DVA_RAD         0x180
 #define DVA_DK          0x190

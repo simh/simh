@@ -193,7 +193,7 @@ return SCPE_OK;
 t_stat tti_reset (DEVICE *dptr)
 {
 tmxr_set_console_units (&tti_unit, &tto_unit);
-tti_unit.buf = 0;                                       /* <not DG compatible>  */
+tti_unit.buf = 0;                                       /* <not DG compatible> */
 DEV_CLR_BUSY( INT_TTI ) ;
 DEV_CLR_DONE( INT_TTI ) ;
 DEV_UPDATE_INTR ;
