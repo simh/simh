@@ -1,6 +1,6 @@
 /* scp.c: simulator control program
 
-   Copyright (c) 1993-2016, Robert M Supnik
+   Copyright (c) 1993-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   10-Mar-17    MP      Fixed "noise" bugs (COVERITY)
    08-Mar-16    RMS     Added shutdown flag for detach_all
    28-Mar-15    RMS     Added sim_printf from GitHub master (Mark Pizzolato)
    28-Dec-14    JDB     [4.0] Moved sim_load and sim_emax declarations to scp.h
@@ -1785,15 +1786,19 @@ t_stat ssh_break (FILE *st, char *cptr, int32 flg)
 {
 char gbuf[CBUFSIZE], *tptr, *t1ptr, *aptr;
 DEVICE *dptr = sim_dflt_dev;
-UNIT *uptr = dptr->units;
+UNIT *uptr;
 t_stat r;
-t_addr lo, hi, max = uptr->capac - 1;
+t_addr lo, hi, max;
 int32 cnt;
 
 if (sim_brk_types == 0) 
     return SCPE_NOFNC;
-if ((dptr == NULL) || (uptr == NULL))
+if (dptr == NULL)                                       /* sanity checks */
     return SCPE_IERR;
+uptr = dptr->units;
+if (uptr == NULL)
+    return SCPE_IERR;
+max = uptr->capac - 1;
 if (aptr = strchr (cptr, ';')) {                        /* ;action? */
     if (flg != SSH_ST)                                  /* only on SET */
         return SCPE_ARG;
@@ -2172,7 +2177,7 @@ if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return SCPE_OK;
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return SCPE_OK;
-if (uptr->flags & UNIT_BUF) {
+if ((uptr->flags & UNIT_BUF) && (uptr->filebuf)) {      /* buffered? */
     uint32 cap = (uptr->hwmark + dptr->aincr - 1) / dptr->aincr;
     if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {
         if (!sim_quiet)

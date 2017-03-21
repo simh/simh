@@ -205,7 +205,8 @@ t_stat r;
 
 if ((cptr == NULL) || (*cptr == 0))
     return SCPE_2FARG;
-if (dptr->dradix == 16) rdx = 16;
+if (dptr->dradix == 16)
+    rdx = 16;
 else rdx = 8;
 val = (int32) get_uint (cptr, rdx, 0177, &r);
 if ((r != SCPE_OK) ||
@@ -526,7 +527,7 @@ if (md != TTUF_MODE_8B) {
             c |= ((~((nibble_even_parity >> ((c & 0xF) + 1)) ^ (nibble_even_parity >> (((c >> 4) & 0xF) + 1)))) & 0x80);
             break;
         case TTUF_PAR_MARK:
-            c = c | 0x80;
+            c = c | 0200;
             break;
         }
     }
