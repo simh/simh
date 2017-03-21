@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   23-Nov-15    RMS     Fixed calibration lost path to reinitialize timer
    28-Mar-15    RMS     Revised to use sim_printf
    29-Dec-10    MP      Fixed clock resolution determination for Unix platforms
    22-Sep-08    RMS     Added "stability threshold" for idle routine
@@ -367,7 +368,7 @@ if ((tmr < 0) || (tmr >= SIM_NTIMERS))
     return time;
 rtc_rtime[tmr] = sim_os_msec ();
 rtc_vtime[tmr] = rtc_rtime[tmr];
-rtc_gtime[tmr] = 0.0;
+rtc_gtime[tmr] = sim_gtime ();
 rtc_nxintv[tmr] = 1000;
 rtc_ticks[tmr] = 0;
 rtc_hz[tmr] = 0;
@@ -405,8 +406,8 @@ rtc_rtime[tmr] = new_rtime;                             /* adv wall time */
 rtc_vtime[tmr] = rtc_vtime[tmr] + 1000;                 /* adv sim time */
 rtc_gtime[tmr] = sim_gtime ();                          /* save inst time */
 if (delta_rtime > 30000) {                              /* gap too big? */
-    rtc_currd[tmr] = rtc_initd[tmr];
-    return rtc_initd[tmr];                              /* can't calibr */
+    sim_rtcn_init (rtc_initd[tmr], tmr);                /* start over */
+    return rtc_currd[tmr];                              /* can't calibr */
     }
 if (delta_rtime == 0)                                   /* gap too small? */
     rtc_based[tmr] = rtc_based[tmr] * ticksper;         /* slew wide */
