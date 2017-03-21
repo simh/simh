@@ -129,6 +129,8 @@ static t_stat sim_tape_simh_check (UNIT *uptr);
 static t_stat sim_tape_e11_check (UNIT *uptr);
 static t_addr sim_tape_tpc_fnd (UNIT *uptr, t_addr *map);
 static void sim_tape_data_trace (UNIT *uptr, const uint8 *data, size_t len, const char* txt, int detail, uint32 reason);
+static t_stat tape_erase_fwd (UNIT *uptr, t_mtrlnt gap_size);
+static t_stat tape_erase_rev (UNIT *uptr, t_mtrlnt gap_size);
 
 
 struct tape_context {
@@ -1619,6 +1621,44 @@ AIO_CALLSETUP
     r = sim_tape_wrgap (uptr, gaplen);
 AIO_CALL(TOP_RDRR, NULL, NULL, NULL, 0, 0, gaplen, 0, NULL, callback);
 return r;
+}
+
+/* Erase a record forward.
+
+   An erase gap is written in the forward direction on the tape unit specified
+   by "uptr" for a length corresponding to a record containing the number of
+   bytes specified by "bc", and the status of the operation is returned.  The
+   resulting gap will occupy "bc" bytes plus the size of the record length
+   metadata.  This function may be used to erase a record of length "n" in place
+   by requesting a gap of length "n".  After erasure, the tape will be
+   positioned at the end of the gap.
+*/
+
+t_stat sim_tape_errecf (UNIT *uptr, t_mtrlnt bc)
+{
+const t_mtrlnt meta_size = sizeof (t_mtrlnt);           /* the number of bytes per metadatum */
+const t_mtrlnt gap_size = bc + 2 * meta_size;           /* the requested gap size in bytes */
+
+return MTSE_IOERR;                 /* stub return */
+}
+
+/* Erase a record reverse.
+
+   An erase gap is written in the reverse direction on the tape unit specified
+   by "uptr" for a length corresponding to a record containing the number of
+   bytes specified by "bc", and the status of the operation is returned.  The
+   resulting gap will occupy "bc" bytes plus the size of the record length
+   metadata.  This function may be used to erase a record of length "n" in place
+   by requesting a gap of length "n".  After erasure, the tape will be
+   positioned at the start of the gap.
+*/
+
+t_stat sim_tape_errecr (UNIT *uptr, t_mtrlnt bc)
+{
+const t_mtrlnt meta_size = sizeof (t_mtrlnt);           /* the number of bytes per metadatum */
+const t_mtrlnt gap_size = bc + 2 * meta_size;           /* the requested gap size in bytes */
+
+return MTSE_IOERR;                 /* stub return */
 }
 
 /* Space record forward
