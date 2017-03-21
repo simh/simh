@@ -571,7 +571,7 @@ tmxr_set_console_units (&tti_unit, &tto_unit);
 tti_buf = 0;
 tti_csr = 0;
 tti_int = 0;
-sim_activate (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
+sim_activate (&tti_unit, tmr_poll);
 return SCPE_OK;
 }
 

@@ -1100,7 +1100,7 @@ if (!sim_is_running) {                                  /* RESET (not CAF)? */
     tty_shift = 0;                                      /* clear state */
     tti_fdpx = 0;                                       /* clear dpx mode */
     }
-sim_activate (&tti_unit, KBD_WAIT (tti_unit.wait, tmxr_poll));
+sim_activate (&tti_unit, tmxr_poll);
 return SCPE_OK;
 }
 
