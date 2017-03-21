@@ -1,6 +1,6 @@
 /* sim_tape.h: simulator tape support library definitions
 
-   Copyright (c) 1993-2014, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Jul-16    JDB     Added sim_tape_errecf, sim_tape_errecr functions
    15-Dec-14    JDB     Added tape density validity flags
    04-Nov-14    JDB     Added tape density flags
    11-Oct-14    JDB     Added reverse read half gap, set/show density
@@ -137,6 +138,8 @@ t_stat sim_tape_wrrecf (UNIT *uptr, uint8 *buf, t_mtrlnt bc);
 t_stat sim_tape_wrtmk (UNIT *uptr);
 t_stat sim_tape_wreom (UNIT *uptr);
 t_stat sim_tape_wrgap (UNIT *uptr, uint32 gaplen);
+t_stat sim_tape_errecf (UNIT *uptr, t_mtrlnt bc);
+t_stat sim_tape_errecr (UNIT *uptr, t_mtrlnt bc);
 t_stat sim_tape_sprecf (UNIT *uptr, t_mtrlnt *bc);
 t_stat sim_tape_sprecr (UNIT *uptr, t_mtrlnt *bc);
 t_stat sim_tape_rewind (UNIT *uptr);

@@ -1,6 +1,6 @@
 /* sim_tape.c: simulator tape support library
 
-   Copyright (c) 1993-2014, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    Ultimately, this will be a place to hide processing of various tape formats,
    as well as OS-specific direct hardware access.
 
+   18-Jul-16    JDB     Added sim_tape_errecf, sim_tape_errecr functions
+   12-Oct-15    JDB     Fixed bug in sim_tape_rdlntf if gap buffer read ends at EOM
    15-Dec-14    JDB     Changed sim_tape_set_dens to check validity of density change
    04-Nov-14    JDB     Restrict sim_tape_set_fmt to unit unattached
    31-Oct-14    JDB     Fixed gap skip on reverse read
@@ -61,6 +63,8 @@
    sim_tape_wrtmk       write tape mark
    sim_tape_wreom       erase remainder of tape
    sim_tape_wrgap       write erase gap
+   sim_tape_errecf      erase record forward
+   sim_tape_errecr      erase record reverse
    sim_tape_rewind      rewind
    sim_tape_reset       reset unit
    sim_tape_bot         TRUE if at beginning of tape
@@ -109,6 +113,9 @@ t_stat sim_tape_ioerr (UNIT *uptr);
 t_stat sim_tape_wrdata (UNIT *uptr, uint32 dat);
 uint32 sim_tape_tpc_map (UNIT *uptr, t_addr *map);
 t_addr sim_tape_tpc_fnd (UNIT *uptr, t_addr *map);
+
+static t_stat tape_erase_fwd (UNIT *uptr, t_mtrlnt gap_size);
+static t_stat tape_erase_rev (UNIT *uptr, t_mtrlnt gap_size);
 
 
 /* Attach tape unit */
@@ -190,10 +197,10 @@ return SCPE_OK;
         status  =       operation status
 
    exit condition       tape position
-   ------------------   -------------------------------------------
+   ------------------   -----------------------------------------------------
    unit unattached      unchanged
    read error           unchanged, PNU set
-   end of file/medium   unchanged, PNU set
+   end of file/medium   updated if a gap precedes, else unchanged and PNU set
    tape mark            updated
    tape runaway         updated
    data record          updated, sim_fread will read record forward
@@ -204,7 +211,7 @@ return SCPE_OK;
    giving the reason that the operation did not succeed and the tape position is
    as indicated above.
 
-   The ANSI standards for magnetic tape recording (X3.32, X3.39, and X3.54) and
+   The ANSI standards for magnetic tape recording (X3.22, X3.39, and X3.54) and
    the equivalent ECMA standard (ECMA-62) specify a maximum erase gap length of
    25 feet (7.6 meters).  While gaps of any length may be written, gaps longer
    than this are non-standard and may indicate that an unrecorded or erased tape
@@ -214,7 +221,8 @@ return SCPE_OK;
    then the length is monitored when skipping over erase gaps.  If the length
    reaches 25 feet, motion is terminated, and MTSE_RUNAWAY status is returned.
    Runaway status is also returned if an end-of-medium marker or the physical
-   end of file is encountered while spacing over a gap.
+   end of file is encountered while spacing over a gap; however, MTSE_EOM is
+   returned if the tape is positioned at the EOM or EOF on entry.
 
    If the density has not been set, then a gap of any length is skipped, and
    MTSE_RUNAWAY status is never returned.  In effect, erase gaps present in the
@@ -229,13 +237,13 @@ return SCPE_OK;
    read is of a single metadatum marker.  If that is a gap marker, then
    additional buffered reads are performed.
 
-   See the notes at "sim_tape_wrgap" regarding the erase gap implementation.
+   See the notes at "tape_erase_fwd" regarding the erase gap implementation.
 
    Implementation notes:
 
     1. For programming convenience, erase gap processing is performed for both
        SIMH standard and E11 tape formats, although the latter will never
-       contain erase gaps, as the "sim_tape_wrgap" call takes no action for the
+       contain erase gaps, as the "tape_erase_fwd" call takes no action for the
        E11 format.
 
     2. The "feof" call cannot return a non-zero value on the first pass through
@@ -256,6 +264,13 @@ return SCPE_OK;
              256              203
              512              186
             1024              171
+
+    4. Because an erase gap may precede the logical end-of-medium, represented
+       either by the physical end-of-file or by an EOM marker, the "position not
+       updated" flag is set only if the tape is positioned at the EOM when the
+       routine is entered.  If at least one gap marker precedes the EOM, then
+       the PNU flag is not set.  This ensures that a backspace-and-retry
+       sequence will work correctly in both cases.
 */
 
 t_stat sim_tape_rdlntf (UNIT *uptr, t_mtrlnt *bc)
@@ -292,9 +307,9 @@ switch (f) {                                            /* the read method depen
         bufcntr = 0;                                    /* force an initial read */
         bufcap = 0;                                     /*   but of just one metadata marker */
 
-        do {                                            /* loop until a record, gap, or error seen */
+        do {                                            /* loop until a record, gap, or error is seen */
             if (bufcntr == bufcap) {                    /* if the buffer is empty then refill it */
-                if (feof (uptr->fileref))               /* if we hit the EOF while reading gaps */
+                if (feof (uptr->fileref))               /* if we hit the EOF while reading a gap */
                     if (sizeof_gap > 0)                 /*   then if detection is enabled */
                         return MTSE_RUNAWAY;            /*     then report a tape runaway */
                     else                                /*   otherwise report the physical EOF */
@@ -313,14 +328,24 @@ switch (f) {                                            /* the read method depen
                                     uptr->fileref);
 
                 if (ferror (uptr->fileref)) {           /* if a file I/O error occurred */
-                    MT_SET_PNU (uptr);                  /*   then set position not updated */
-                    return sim_tape_ioerr (uptr);       /*     report the error and quit */
+                    if (bufcntr == 0)                   /*   then if this is the initial read */
+                        MT_SET_PNU (uptr);              /*     then set position not updated */
+
+                    return sim_tape_ioerr (uptr);       /* report the error and quit */
                     }
 
-                else if (bufcap == 0) {                 /* otherwise if nothing was read */
-                    MT_SET_PNU (uptr);                  /*   then set position not updated */
-                    return MTSE_EOM;                    /*     report the end of medium and quit */
-                    }
+                else if (bufcap == 0                    /* otherwise if positioned at the physical EOF */
+                  || buffer [0] == MTR_EOM)             /*   or at the logical EOM */
+                    if (bufcntr == 0) {                 /*     then if this is the initial read */
+                        MT_SET_PNU (uptr);              /*       then set position not updated */
+                        return MTSE_EOM;                /*         and report the end-of-medium and quit */
+                        }
+
+                    else if (sizeof_gap > 0)            /*     otherwise if detection is enabled */
+                        return MTSE_RUNAWAY;            /*       then report a tape runaway */
+
+                    else                                /*     otherwise report the physical EOF */
+                        return MTSE_EOM;                /*       as the end-of-medium */
 
                 else                                    /* otherwise reset the index */
                     bufcntr = 0;                        /*   to the start of the buffer */
@@ -328,10 +353,11 @@ switch (f) {                                            /* the read method depen
 
             *bc = buffer [bufcntr++];                   /* store the metadata marker value */
 
-            if (*bc == MTR_EOM) {                       /* if an end-of-medium marker is seen */
-                MT_SET_PNU (uptr);                      /*   then set position not updated */
-                return MTSE_EOM;                        /*     report the end of medium and quit */
-                }
+            if (*bc == MTR_EOM)                         /* if an end-of-medium marker is seen */
+                if (sizeof_gap > 0)                     /*   then if detection is enabled */
+                    return MTSE_RUNAWAY;                /*     then report a tape runaway */
+                else                                    /*   otherwise report the physical EOF */
+                    return MTSE_EOM;                    /*     as the end-of-medium */
 
             uptr->pos = uptr->pos + sizeof (t_mtrlnt);  /* space over the marker */
 
@@ -439,7 +465,7 @@ return MTSE_OK;
    giving the reason that the operation did not succeed and the tape position is
    as indicated above.
 
-   See the notes at "sim_tape_rdlntf" and "sim_tape_wrgap" regarding tape
+   See the notes at "sim_tape_rdlntf" and "tape_erase_fwd" regarding tape
    runaway and the erase gap implementation, respectively.
 */
 
@@ -783,31 +809,26 @@ MT_SET_PNU (uptr);                                      /* indicate that positio
 return result;
 }
 
-/* Write erase gap
+/* Erase a gap in the forward direction (internal routine).
 
-   Inputs:
-        uptr    = pointer to tape unit
-        gaplen  = length of gap in tenths of an inch
+   An erase gap is written in the forward direction on the tape unit specified
+   by "uptr" for the number of bytes specified by "bc".  The status of the
+   operation is returned, and the file position is altered as follows:
 
-   Outputs:
-        status  = operation status
-
-   exit condition       position
-   ------------------   ------------------
-   unit unattached      unchanged
-   unsupported format   unchanged
-   write protected      unchanged
-   read error           unchanged, PNU set
-   write error          unchanged, PNU set
-   gap written          updated
-
+     Exit Condition       File Position
+     ------------------   ------------------
+     unit unattached      unchanged
+     unsupported format   unchanged
+     write protected      unchanged
+     read error           unchanged, PNU set
+     write error          unchanged, PNU set
+     gap written          updated
 
    An erase gap is represented in the tape image file by a special metadata
-   value.  This value is chosen so that it is still recognizable even if it has
-   been "cut in half" by a subsequent data overwrite that does not end on a
-   metadatum-sized boundary.  In addition, a range of metadata values are
-   reserved for detection in the reverse direction.  Erase gaps are currently
-   supported only in SIMH (MTUF_F_STD) tape format.
+   value repeated throughout the gap.  The value is chosen so that it is still
+   recognizable even if it has been "cut in half" by a subsequent data overwrite
+   that does not end on a metadatum-sized boundary.  In addition, a range of
+   metadata values are reserved for detection in the reverse direction.
 
    This implementation supports erasing gaps in the middle of a populated tape
    image and will always produce a valid image.  It also produces valid images
@@ -816,14 +837,6 @@ return result;
    This limitation is deemed acceptable, as it is analogous to the existing
    limitation that data records cannot overwrite other data records without
    producing an invalid tape.
-
-   Because SIMH tape images do not carry physical parameters (e.g., recording
-   density), overwriting a tape image file containing gap metadata is
-   problematic if the density setting is not the same as that used during
-   recording.  There is no way to establish a gap of a certain length
-   unequivocally in an image file, so this implementation establishes a gap of a
-   certain number of bytes that reflect the desired gap length at the tape
-   density in bits per inch used during writing.
 
    To write an erase gap, the implementation uses one of two approaches,
    depending on whether or not the current tape position is at EOM.  Erasing at
@@ -838,8 +851,7 @@ return result;
    Because the smallest legal tape record requires space for two metadata
    markers plus two data bytes, an erasure that would leave less than that
    is increased to consume the entire record.  Otherwise, the final record is
-   truncated appropriately by rewriting the leading and trailing length words
-   appropriately.
+   truncated by rewriting the leading and trailing length words appropriately.
 
    When reading in either direction, gap metadata markers are ignored (skipped)
    until a record length header, EOF marker, EOM marker, or physical EOF is
@@ -872,29 +884,29 @@ return result;
      0xFFFF0000:0xFFFF00FF - reserved (indicates half-gap in reverse reads)
      0xFFFF8000:0xFFFF80FF - reserved (indicates half-gap in reverse reads)
 
-   If the tape density has been set via a previous sim_tape_set_dens call, and
-   the tape format is set to SIMH format, then this routine will write a gap of
-   the appropriate size.  If the density has not been set, then no action will
-   be taken, and either MTSE_IOERR or MTSE_OK status will be returned, depending
-   on whether SIMH or another format is selected, respectively.  A simulator
-   that calls this routine must set the density beforehand; failure to do so is
-   an error.  However, calling while another format is enabled is OK and is
-   treated as a no-operation.  This allows a device simulator that supports
-   writing erase gaps to use the same code without worrying about the tape
-   format currently selected by the user.
+   If the current tape format supports erase gaps, then this routine will write
+   a gap of the requested size.  If the format does not, then no action will be
+   taken, and MTSE_OK status will be returned.  This allows a device simulator
+   that supports writing erase gaps to use the same code without worrying about
+   the tape format currently selected by the user.
+
+
+   Implementation notes:
+
+    1. Erase gaps are currently supported only in SIMH (MTUF_F_STD) tape format.
 */
 
-t_stat sim_tape_wrgap (UNIT *uptr, uint32 gaplen)
+static t_stat tape_erase_fwd (UNIT *uptr, t_mtrlnt gap_size)
 {
 t_stat st;
 t_mtrlnt meta, sbc, new_len, rec_size;
-t_addr gap_pos = uptr->pos;
-uint32 file_size, marker_count, tape_density;
-int32 gap_needed;
-uint32 gap_alloc = 0;                                   /* gap currently allocated from the tape */
-const uint32 format = MT_GET_FMT (uptr);                /* tape format */
-const uint32 meta_size = sizeof (t_mtrlnt);             /* bytes per metadatum */
-const uint32 min_rec_size = 2 + sizeof (t_mtrlnt) * 2;  /* smallest data record size */
+uint32 file_size, marker_count;
+int32 gap_needed = (int32) gap_size;                    /* the gap remaining to be allocated from the tape */
+uint32 gap_alloc = 0;                                   /* the gap currently allocated from the tape */
+const t_addr gap_pos = uptr->pos;                       /* the file position where the gap will start */
+const uint32 format = MT_GET_FMT (uptr);                /* the tape format */
+const uint32 meta_size = sizeof (t_mtrlnt);             /* the number of bytes per metadatum */
+const uint32 min_rec_size = 2 + sizeof (t_mtrlnt) * 2;  /* the smallest data record size */
 
 MT_CLR_PNU (uptr);
 
@@ -904,14 +916,8 @@ if ((uptr->flags & UNIT_ATT) == 0)                      /* if the unit is not at
 else if (sim_tape_wrp (uptr))                           /* otherwise if the unit is write protected */
     return MTSE_WRP;                                    /*   then we cannot write */
 
-tape_density = bpi [MT_DENS (uptr->dynflags)];          /* get the density of the tape */
-
-if (format != MTUF_F_STD)                               /* if erase gaps aren't supported by the format */
+else if (format != MTUF_F_STD)                          /* if erase gaps aren't supported by the format */
     return MTSE_OK;                                     /*   then take no action */
-else if (tape_density == 0)                             /* otherwise if the density is not set */
-    return MTSE_IOERR;                                  /*   then report an I/O error */
-else                                                    /* otherwise */
-    gap_needed = (gaplen * tape_density) / 10;          /*   determine the gap size needed in bytes */
 
 file_size = sim_fsize (uptr->fileref);                  /* get file size */
 sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);         /* position tape */
@@ -935,6 +941,7 @@ do {
         MT_SET_PNU (uptr);                              /* position not updated */
         return sim_tape_ioerr (uptr);                   /* translate error */
         }
+
     else
         uptr->pos = uptr->pos + meta_size;              /* move tape over datum */
 
@@ -1007,10 +1014,12 @@ uptr->pos = gap_pos;                                    /* reposition to gap sta
 
 if (gap_alloc & (meta_size - 1)) {                      /* gap size "odd?" */
     st = sim_tape_wrdata (uptr, MTR_FHGAP);             /* write half gap marker */
+
     if (st != MTSE_OK) {                                /* write OK? */
         uptr->pos = gap_pos;                            /* restore orig pos */
         return st;                                      /* PNU was set by wrdata */
         }
+
     uptr->pos = uptr->pos - meta_size / 2;              /* realign position */
     gap_alloc = gap_alloc - 2;                          /* decrease gap to write */
     }
@@ -1019,6 +1028,7 @@ marker_count = gap_alloc / meta_size;                   /* count of gap markers 
 
 do {
     st = sim_tape_wrdata (uptr, MTR_GAP);               /* write gap markers */
+
     if (st != MTSE_OK) {                                /* write OK? */
         uptr->pos = gap_pos;                            /* restore orig pos */
         return st;                                      /* PNU was set by wrdata */
@@ -1027,6 +1037,145 @@ do {
 while (--marker_count > 0);
 
 return MTSE_OK;
+}
+
+/* Erase a gap in the reverse direction (internal routine).
+
+   An erase gap is written in the reverse direction on the tape unit specified
+   by "uptr" for the number of bytes specified by "bc".  The status of the
+   operation is returned, and the file position is altered as follows:
+
+     Exit Condition       File Position
+     ------------------   ------------------
+     unit unattached      unchanged
+     unsupported format   unchanged
+     write protected      unchanged
+     read error           unchanged, PNU set
+     write error          unchanged, PNU set
+     gap written          updated
+
+
+   Implementation notes:
+
+    1. Erase gaps are currently supported only in SIMH (MTUF_F_STD) tape format.
+
+    2. Erasing in the reverse direction currently succeeds only if the gap
+       requested occupies the same space as the record located immediately
+       before the current file position.  This limitation may be lifted in a
+       future update.
+*/
+
+static t_stat tape_erase_rev (UNIT *uptr, t_mtrlnt gap_size)
+{
+const uint32 format = MT_GET_FMT (uptr);                /* the tape format */
+const uint32 meta_size = sizeof (t_mtrlnt);             /* the number of bytes per metadatum */
+t_stat   status;
+t_mtrlnt rec_size;
+t_addr   gap_pos;
+
+MT_CLR_PNU (uptr);
+
+if (sim_tape_wrp (uptr))                                /* if the unit is write protected */
+    return MTSE_WRP;                                    /*   then we cannot write */
+
+else if (format != MTUF_F_STD)                          /* otherwise if erase gaps aren't supported by the format */
+    return MTSE_OK;                                     /*   then take no action */
+
+gap_pos = uptr->pos;                                    /* save the starting position */
+
+status = sim_tape_rdlntr (uptr, &rec_size);             /* get the length of the preceding record */
+
+if (status == MTSE_OK                                   /* if the read succeeded */
+  && gap_size == rec_size + 2 * meta_size) {            /*   and the gap will exactly overlay the record */
+    gap_pos = uptr->pos;                                /*     then save the gap start position */
+
+    status = tape_erase_fwd (uptr, gap_size);           /* erase the record */
+
+    if (status == MTSE_OK)                              /* if the gap write succeeded */
+        uptr->pos = gap_pos;                            /*   the reposition back to the start of the gap */
+    }
+
+else {                                                  /* otherwise the read failed or is the wrong size */
+    uptr->pos = gap_pos;                                /*   so restore the starting position */
+
+    if (status != MTSE_OK)                              /* if the record was not found */
+        return status;                                  /*   then return the failure reason */
+    else                                                /* otherwise the record is the wrong size */
+        return MTSE_INVRL;                              /*   so report an invalid record length */
+    }
+
+return status;                                          /* return the status of the erase operation */
+}
+
+/* Write an erase gap.
+
+   An erase gap is written in on the tape unit specified by "uptr" for the
+   length specified by "gap_size" in tenths of an inch, and the status of the
+   operation is returned.  The tape density must have been set via a previous
+   sim_tape_set_dens call; if it has not, then no action is taken, and
+   MTSE_IOERR is returned.
+
+   If the tape format currently selected does not support erase gaps, the call
+   succeeds with no action taken.  This allows a device simulator that supports
+   writing erase gaps to use the same code without worrying about the tape
+   format currently selected by the user.
+
+   Because SIMH tape images do not carry physical parameters (e.g., recording
+   density), overwriting a tape image file containing a gap is problematic if
+   the density setting is not the same as that used during recording.  There is
+   no way to establish a gap of a certain length unequivocally in an image file,
+   so this implementation establishes a gap of a certain number of bytes that
+   reflect the desired gap length at the tape density in bits per inch used
+   during writing.
+*/
+
+t_stat sim_tape_wrgap (UNIT *uptr, uint32 gaplen)
+{
+const uint32 density = bpi [MT_DENS (uptr->dynflags)];  /* the tape density in bits per inch */
+const uint32 byte_length = (gaplen * density) / 10;     /* the size of the requested gap in bytes */
+
+if (density == 0)                                       /* if the density has not been set */
+    return MTSE_IOERR;                                  /*   then report an I/O error */
+else                                                    /* otherwise */
+    return tape_erase_fwd (uptr, byte_length);          /*   erase the requested gap size in bytes */
+}
+
+/* Erase a record forward.
+
+   An erase gap is written in the forward direction on the tape unit specified
+   by "uptr" for a length corresponding to a record containing the number of
+   bytes specified by "bc", and the status of the operation is returned.  The
+   resulting gap will occupy "bc" bytes plus the size of the record length
+   metadata.  This function may be used to erase a record of length "n" in place
+   by requesting a gap of length "n".  After erasure, the tape will be
+   positioned at the end of the gap.
+*/
+
+t_stat sim_tape_errecf (UNIT *uptr, t_mtrlnt bc)
+{
+const t_mtrlnt meta_size = sizeof (t_mtrlnt);           /* the number of bytes per metadatum */
+const t_mtrlnt gap_size = bc + 2 * meta_size;           /* the requested gap size in bytes */
+
+return tape_erase_fwd (uptr, gap_size);                 /* erase the requested gap */
+}
+
+/* Erase a record reverse.
+
+   An erase gap is written in the reverse direction on the tape unit specified
+   by "uptr" for a length corresponding to a record containing the number of
+   bytes specified by "bc", and the status of the operation is returned.  The
+   resulting gap will occupy "bc" bytes plus the size of the record length
+   metadata.  This function may be used to erase a record of length "n" in place
+   by requesting a gap of length "n".  After erasure, the tape will be
+   positioned at the start of the gap.
+*/
+
+t_stat sim_tape_errecr (UNIT *uptr, t_mtrlnt bc)
+{
+const t_mtrlnt meta_size = sizeof (t_mtrlnt);           /* the number of bytes per metadatum */
+const t_mtrlnt gap_size = bc + 2 * meta_size;           /* the requested gap size in bytes */
+
+return tape_erase_rev (uptr, gap_size);                 /* erase the requested gap */
 }
 
 /* Space record forward */
@@ -1223,7 +1372,7 @@ return SCPE_OK;
 
    Set the density of the specified tape unit either to the value supplied or to
    the value represented by the supplied character string.
-   
+
    If "desc" is NULL, then "val" must be set to one of the MT_DENS_* constants
    in sim_tape.h other than MT_DENS_NONE; the supplied value is used as the tape
    density, and the character string is ignored.  Otherwise, "desc" must point
