@@ -2003,6 +2003,7 @@ while ((p->sock != INVALID_SOCKET) &&
             if (p->callback) {
                 pthread_mutex_unlock (&p->io_lock);
                 p->callback (p, p->simulation_time, p->callback_context);
+                pthread_mutex_lock (&p->io_lock);
                 }
             }
         if (!strcmp (s + strlen (sim_prompt), register_get_echo)) {
