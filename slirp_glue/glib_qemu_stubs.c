@@ -151,8 +151,10 @@ unsigned long non_block = 1;
 void qemu_set_nonblock(int fd)
 {
     int f;
+
     f = fcntl(fd, F_GETFL);
-    fcntl(fd, F_SETFL, f | O_NONBLOCK);
+    if (f!= -1)
+        fcntl(fd, F_SETFL, f | O_NONBLOCK);
 }
 #endif
 
