@@ -117,12 +117,12 @@
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* hwre write lock */
-#define UNIT_V_RL02     (DKUF_V_UF + 0)                 /* RL01 vs RL02 */
-#define UNIT_V_AUTO     (DKUF_V_UF + 1)                 /* autosize enable */
-#define UNIT_V_DUMMY    (DKUF_V_UF + 2)                 /* dummy flag, for SET BADBLOCK */
-#define UNIT_V_OFFL     (DKUF_V_UF + 3)                 /* unit off line */
-#define UNIT_V_BRUSH    (DKUF_V_UF + 4)                 /* unit has brushes */
+#define UNIT_V_WLK      (DKUF_V_UF + 0)                 /* hwre write lock */
+#define UNIT_V_RL02     (DKUF_V_UF + 1)                 /* RL01 vs RL02 */
+#define UNIT_V_AUTO     (DKUF_V_UF + 2)                 /* autosize enable */
+#define UNIT_V_DUMMY    (DKUF_V_UF + 3)                 /* dummy flag, for SET BADBLOCK */
+#define UNIT_V_OFFL     (DKUF_V_UF + 4)                 /* unit off line */
+#define UNIT_V_BRUSH    (DKUF_V_UF + 5)                 /* unit has brushes */
 #define UNIT_BRUSH      (1u << UNIT_V_BRUSH)
 #define UNIT_OFFL       (1u << UNIT_V_OFFL)
 #define UNIT_DUMMY      (1u << UNIT_V_DUMMY)
@@ -904,7 +904,7 @@ if (wc > maxwc)                                         /* track overrun? */
 sim_debug (RLDEB_OPS, &rl_dev, ">>RL svc: cyl %d, sect %d, wc %d, maxwc %d\n", GET_CYL (rlda), GET_SECT (rlda), wc, maxwc);
 
 if (uptr->FNC >= RLCS_READ) {                           /* read (no hdr)? */
-    err = sim_disk_rdsect (uptr, da/RL_NUMWD, (uint8 *)rlxb, &sectsread, wc/RL_NUMWD);
+    err = sim_disk_rdsect (uptr, da/RL_NUMWD, (uint8 *)rlxb, &sectsread, (wc + RL_NUMWD - 1)/RL_NUMWD);
     sim_disk_data_trace (uptr, (uint8 *)rlxb, da/RL_NUMWD, sectsread*RL_NUMWD*sizeof(*rlxb), "sim_disk_rdsect", RLDEB_DAT & dptr->dctrl, RLDEB_OPS);
     if ((t = Map_WriteW (ma, wc << 1, rlxb))) {         /* store buffer */
         rlcs = rlcs | RLCS_ERR | RLCS_NXM;              /* nxm */
@@ -929,7 +929,7 @@ if (uptr->FNC == RLCS_WRITE) {                          /* write? */
 
 else
 if (uptr->FNC == RLCS_WCHK) {                           /* write check? */
-    err = sim_disk_rdsect (uptr, da/RL_NUMWD, (uint8 *)rlxb, &sectsread, wc/RL_NUMWD);
+    err = sim_disk_rdsect (uptr, da/RL_NUMWD, (uint8 *)rlxb, &sectsread, (wc + RL_NUMWD - 1)/RL_NUMWD);
     sim_disk_data_trace (uptr, (uint8 *)rlxb, da/RL_NUMWD, sectsread*RL_NUMWD*sizeof(*rlxb), "sim_disk_rdsect", RLDEB_DAT & dptr->dctrl, RLDEB_OPS);
     awc = wc;                                           /* save wc */
     for (wc = 0; (err == 0) && (wc < awc); wc++)  {     /* loop thru buf */
