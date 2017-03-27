@@ -2027,7 +2027,7 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
             return 0;
             }
         if (*cbuf)                                      /* concat args */
-            strcat (cbuf, " "); 
+            sim_strlcat (cbuf, " ", sizeof(cbuf)); 
         sprintf(&cbuf[strlen(cbuf)], "%s%s%s", strchr(argv[i], ' ') ? "\"" : "", argv[i], strchr(argv[i], ' ') ? "\"" : "");
         lookswitch = FALSE;                             /* no more switches */
         }
@@ -2113,7 +2113,7 @@ else if (*argv[0]) {                                    /* sim name arg? */
     strncpy (nbuf + 1, argv[0], PATH_MAX + 1);          /* copy sim name */
     if ((np = (char *)match_ext (nbuf, "EXE")))         /* remove .exe */
         *np = 0;
-    strcat (nbuf, ".ini\"");                            /* add .ini" */
+    sim_strlcat (nbuf, ".ini\"", sizeof(nbuf));         /* add .ini" */
     stat = do_cmd (-1, nbuf) & ~SCPE_NOMESSAGE;         /* proc default cmd file */
     if (stat == SCPE_OPENERR) {                         /* didn't exist/can't open? */
         np = strrchr (nbuf, '/');                       /* stript path and try again in cwd */
@@ -2906,7 +2906,7 @@ for (nargs = 0; nargs < 10; ) {                         /* extract arguments */
 if (do_arg [0] == NULL)                                 /* need at least 1 */
     return SCPE_2FARG;
 if ((fpin = fopen (do_arg[0], "r")) == NULL) {          /* file failed to open? */
-    strcat (strcpy (cbuf, do_arg[0]), ".sim");          /* try again with .sim extension */
+    sim_strlcat (strcpy (cbuf, do_arg[0]), ".sim", sizeof(cbuf));/* try again with .sim extension */
     if ((fpin = fopen (cbuf, "r")) == NULL) {           /* failed a second time? */
         if (flag == 0)                                  /* cmd line file? */
              fprintf (stderr, "Can't open file %s\n", do_arg[0]);
@@ -5076,19 +5076,19 @@ strcpy (WildName, cptr);
 cptr = WildName;
 sim_trim_endspc (WildName);
 if ((!stat (WildName, &filestat)) && (filestat.st_mode & S_IFDIR))
-    strcat (WildName, "/*");
+    sim_strlcat (WildName, "/*", sizeof(WildName));
 if ((*cptr != '/') || (0 == memcmp (cptr, "./", 2)) || (0 == memcmp (cptr, "../", 3))) {
 #if defined (VMS)
     getcwd (WholeName, PATH_MAX, 0);
 #else
     getcwd (WholeName, PATH_MAX);
 #endif
-    strcat (WholeName, "/");
-    strcat (WholeName, cptr);
+    sim_strlcat (WholeName, "/", sizeof(WholeName));
+    sim_strlcat (WholeName, cptr, sizeof(WholeName));
     sim_trim_endspc (WholeName);
     }
 else
-    strcpy (WholeName, cptr);
+    sim_strlcpy (WholeName, cptr, sizeof(WholeName));
 while ((c = strstr (WholeName, "/./")))
     memmove (c + 1, c + 3, 1 + strlen (c + 3));
 while ((c = strstr (WholeName, "//")))

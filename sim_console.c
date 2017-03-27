@@ -3598,8 +3598,8 @@ static t_stat sim_os_ttinit (void) {
     SIOUXSettings.toppixel = 42;
     SIOUXSettings.leftpixel     = 6;
     iBeamCursorH = GetCursor(iBeamCursor);
-    strcat(title, sim_name);
-    strcat(title, " Simulator");
+    sim_strlcat(title, sim_name, sizeof(title));
+    sim_strlcat(title, " Simulator", sizeof(title));
     title[0] = strlen(title) - 1;                       /* Pascal string done */
     for (i = 0; i <= title[0]; i++) {                   /* copy to unsigned char */
         ptitle[i] = title[i];

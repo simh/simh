@@ -1144,7 +1144,7 @@ int load_pcap(void) {
           char npcap_path[512] = "";
 
           if (p_GetSystemDirectory (npcap_path, sizeof(npcap_path) - 7))
-            strcat (npcap_path, "\\Npcap");
+            sim_strlcat (npcap_path, "\\Npcap", sizeof(npcap_path));
           if (p_SetDllDirectory(npcap_path))
             hLib = LoadLibraryA(lib_name);
           p_SetDllDirectory (NULL);
