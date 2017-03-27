@@ -115,6 +115,7 @@ static t_stat sioterm_svc(UNIT* uptr)
         chip->crlf = chip->crlf==1 ? 2 : 0; break;
     case 0:
         if (chip->crlf==2) goto set_stat;
+        chip->crlf = 0; break;
     default:
         chip->crlf = 0;
     }
@@ -390,6 +391,7 @@ static t_stat consterm_svc(UNIT* uptr)
         chip->crlf = (chip->crlf==1) ? 2 : 0; break;
     case 0:
         if (chip->crlf==2) goto set_stat;
+        chip->crlf = 0; break;
     default:
         chip->crlf = 0;
     }

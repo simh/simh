@@ -134,7 +134,7 @@ t_stat i8259_write(I8259* chip,int addr,uint32 value)
                         if (chip->isr & bit) break;
                         bit = bit << 1; if (bit==0x100) bit = 1;
                     }
-                    chip->isr &= ~bit; break;
+                    chip->isr &= ~bit;
                     if ((value & I8259_OCW2_MODE) == 0xa0) { 
                         chip->prio = 7 - i + chip->prio; if (chip->prio>7) chip->prio -= 8;
                     }

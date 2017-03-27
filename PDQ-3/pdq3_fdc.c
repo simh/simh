@@ -780,7 +780,8 @@ t_stat fdc_reset (DEVICE *dptr) {
   else
     add_ioh(ctxt->ioi);
 
-  for (i=0; i<4; i++) {
+  /* allow for 2 drives */
+  for (i=0; i<2; i++) {
     DRVDATA *cur = &fdc_drv[i];
     cur->dr_unit = &fdc_unit[i];
     cur->dr_trk = 0;
@@ -797,8 +798,8 @@ static DRVDATA *fdc_select() {
 
   if (isbitset(reg_fdc_drvsel,FDC_SEL_UNIT0)) fdc_selected = 0;
   else if (isbitset(reg_fdc_drvsel,FDC_SEL_UNIT1)) fdc_selected = 1;
-  else if (isbitset(reg_fdc_drvsel,FDC_SEL_UNIT2)) fdc_selected = 2;
-  else if (isbitset(reg_fdc_drvsel,FDC_SEL_UNIT3)) fdc_selected = 3;
+  else if (isbitset(reg_fdc_drvsel,FDC_SEL_UNIT2)) fdc_selected = 0;
+  else if (isbitset(reg_fdc_drvsel,FDC_SEL_UNIT3)) fdc_selected = 1;
   else fdc_selected = -1;
  
   if (fdc_selected >= 0)  {
@@ -968,21 +969,29 @@ t_stat fdc_write(t_addr ioaddr, uint16 data) {
   switch (io) {
   case 4: /* cmd + drvsel */
     reg_fdc_drvsel = (data >> 8) & 0xff;
+    fdc_docmd(data);
+    break;
   case 0: /* cmd writeonly */
     fdc_docmd(data);
     break;
   case 5: /* track + drvsel */
     reg_fdc_drvsel = (data >> 8) & 0xff;
+    reg_fdc_track = data & 0xff;
+    break;
   case 1: /* track */
     reg_fdc_track = data & 0xff;
     break;
   case 6: /* sector + drvsel */
     reg_fdc_drvsel = (data >> 8) & 0xff;
+    reg_fdc_sector = data & 0xff;
+    break;
   case 2: /* sector */
     reg_fdc_sector = data & 0xff;
     break;
   case 7: /* data + drvsel */
     reg_fdc_drvsel = (data >> 8) & 0xff;
+    reg_fdc_data = data & 0xff;
+    break;
   case 3: /* data */
     reg_fdc_data = data & 0xff;
     break;
@@ -1080,8 +1089,9 @@ t_stat pdq3_diskCreate(FILE *fileref, const char *ctlr_comment) {
     DISK_INFO *myDisk = NULL;
     char *comment;
     char *curptr;
-    uint8 answer;
+    int answer;
     int32 len, remaining;
+    long fsize;
 
     if(fileref == NULL) {
         return (SCPE_OPENERR);
@@ -1125,7 +1135,8 @@ t_stat pdq3_diskCreate(FILE *fileref, const char *ctlr_comment) {
     rewind(fileref);
 
     /* Erase the contents of the IMD file in case we are overwriting an existing image. */
-    sim_set_fsize(fileref, ftell (fileref));
+    fsize = ftell(fileref);
+    sim_set_fsize(fileref, fsize<0 ? 0 : fsize);
 
     fprintf(fileref, "IMD SIMH %s %s\n", __DATE__, __TIME__);
     fputs(comment, fileref);

@@ -264,7 +264,7 @@ t_stat con_pollsvc(UNIT *uptr) {
 
     if (isbitset(con_ctrl1, CONC1_ECHO)) { /* echo? XXX handle in telnet handler? */
       /* XXX use direct send here, not sending via con_termsvc */
-      sim_putchar_s(ch);
+      return sim_putchar_s(ch);
     }
   }
   return SCPE_OK;

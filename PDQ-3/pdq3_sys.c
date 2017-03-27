@@ -266,7 +266,7 @@ static t_stat pdq3_cmd_namealias(int32 arg, CONST char *buf) {
   strncpy (gbuf, buf, sizeof(gbuf)-1);
   name = strtok(gbuf, " \t");
   alias = strtok(NULL, " \t\n");
-  return dbg_enteralias(name,alias);
+  return name == NULL || alias == NULL ? SCPE_ARG : dbg_enteralias(name, alias);
 }
 
 /**************************************************************************************

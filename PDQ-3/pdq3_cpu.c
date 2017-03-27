@@ -798,6 +798,7 @@ static t_stat taskswitch6() {
       sim_debug(DBG_CPU_CONC3, &cpu_dev, DBG_PCFORMAT0 "Taskswitch6: reg_intpending=%08x\n",DBG_PC, reg_intpending);
       reg_ctp = NIL; /* set no active task */
       level = getIntLevel(); /* obtain highest pending interupt */
+      ASSURE(level >= 0); /* won't happen, as reg_intpending is known to be true */
       vector = int_vectors[level];
       sem = Get(vector);
       sim_debug(DBG_CPU_CONC3, &cpu_dev, DBG_PCFORMAT0 "Taskswitch6: SIGNAL sem=$%04x\n",DBG_PC, sem);
