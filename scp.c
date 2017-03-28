@@ -3740,6 +3740,8 @@ if (NULL == sim_gotofile) return SCPE_UNK;              /* only valid inside of 
 get_glyph (fcptr, gbuf1, 0);
 if ('\0' == gbuf1[0]) return SCPE_ARG;                  /* unspecified goto target */
 fpos = ftell(sim_gotofile);                             /* Save start position */
+if (fpos < 0)
+    return SCPE_IERR;
 rewind(sim_gotofile);                                   /* start search for label */
 sim_goto_line[sim_do_depth] = 0;                        /* reset line number */
 sim_do_echo = 0;                                        /* Don't echo while searching for label */
@@ -3761,7 +3763,8 @@ while (1) {
         }
     }
 sim_do_echo = saved_do_echo;                            /* restore echo mode */
-fseek(sim_gotofile, fpos, SEEK_SET);                    /* restore start position */
+if (fseek(sim_gotofile, fpos, SEEK_SET))                /* restore start position */
+    return SCPE_IERR;
 sim_goto_line[sim_do_depth] = saved_goto_line;          /* restore start line number */
 return SCPE_ARG;
 }
@@ -6603,7 +6606,8 @@ for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* reposition all */
     for (j = 0; j < dptr->numunits; j++) {              /* seq devices */
         uptr = dptr->units + j;
         if ((uptr->flags & (UNIT_ATT + UNIT_SEQ)) == (UNIT_ATT + UNIT_SEQ))
-            sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);
+            if (sim_fseek (uptr->fileref, uptr->pos, SEEK_SET))
+                return sim_messagef (SCPE_IERR, "Can't seek to %u in %s for %s\n", (unsigned)uptr->pos, uptr->filename, sim_uname (uptr));
         }
     }
 stop_cpu = 0;
@@ -7407,7 +7411,11 @@ for (i = 0, j = addr; i < sim_emax; i++, j = j + dptr->aincr) {
             SZ_LOAD (sz, sim_eval[i], uptr->filebuf, loc);
             }
         else {
-            sim_fseek (uptr->fileref, (t_addr)(sz * loc), SEEK_SET);
+            if (sim_fseek (uptr->fileref, (t_addr)(sz * loc), SEEK_SET)) {
+                clearerr (uptr->fileref);
+                reason = SCPE_IOERR;
+                break;
+                }
             sim_fread (&sim_eval[i], sz, 1, uptr->fileref);
             if ((feof (uptr->fileref)) &&
                !(uptr->flags & UNIT_FIX)) {
@@ -7498,7 +7506,10 @@ for (i = 0, j = addr; i < count; i++, j = j + dptr->aincr) {
                 uptr->hwmark = (uint32) loc + 1;
             }
         else {
-            sim_fseek (uptr->fileref, (t_addr)(sz * loc), SEEK_SET);
+            if (sim_fseek (uptr->fileref, (t_addr)(sz * loc), SEEK_SET)) {
+                clearerr (uptr->fileref);
+                return SCPE_IOERR;
+                }
             sim_fwrite (&sim_eval[i], sz, 1, uptr->fileref);
             if (ferror (uptr->fileref)) {
                 clearerr (uptr->fileref);
