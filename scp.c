@@ -6153,7 +6153,10 @@ sim_switches &= ~(SWMASK ('F') | SWMASK ('D') | SWMASK ('Q'));  /* remove digest
     goto Cleanup_Return;                                                \
     }
 
-fstat (fileno (rfile), &rstat);
+if (fstat (fileno (rfile), &rstat)) {
+    r = SCPE_IOERR;
+    goto Cleanup_Return;
+    }
 READ_S (buf);                                           /* [V2.5+] read version */
 v40 = v35 = v32 = FALSE;
 if (strcmp (buf, save_ver40) == 0)                      /* version 4.0? */
@@ -8250,6 +8253,7 @@ while (size--) {
         case '\'':
             if (quote == *iptr)
                 *tptr++ = '\\';
+            /* fall through */
         default:
             if (sim_isprint (*iptr))
                 *tptr++ = *iptr;
