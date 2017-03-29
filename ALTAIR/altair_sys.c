@@ -252,9 +252,9 @@ if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* ASCII string? */
    or numeric (including spaces).
 */
 
-while (i < sizeof (gbuf)) {
+while (i < sizeof (gbuf) - 3) {
     if (*cptr == ',' || *cptr == '\0' ||
-         isdigit(*cptr))
+         sim_isdigit(*cptr))
             break;
     gbuf[i] = toupper(*cptr);
     cptr++;
@@ -294,7 +294,7 @@ for (j = 0; j < 256; j++) {
         break;
 }
 if (j > 255)                                            /* not found */
-    return SCPE_ARG;
+    return sim_messagef (SCPE_ARG, "No such opcode: %s\n", gbuf);
 
 val[0] = j;                                             /* store opcode */
 if (oplen[j] < 2)                                       /* if 1-byter we are done */
