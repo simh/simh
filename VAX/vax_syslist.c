@@ -30,7 +30,7 @@
 
 #include "vax_defs.h"
 
-char sim_name[64] = "MicroVAX 3900";
+char sim_name[] = "MicroVAX 3900";
 
 void vax_init(void)
 {
