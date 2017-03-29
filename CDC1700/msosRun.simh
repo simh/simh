@@ -1,0 +1,28 @@
+# Script to start up MSOS 5.0 previously installed via msosInstall.simh
+# Requires:
+#       MSOS5-A.dsk and MSOS5-B.dsk     installation boot disks
+# Creates:
+#       %DATETIME%.lpt                  unique LPT output file for this run
+#
+# MSOS 5.0 date/time will be set to the current time, month and day. The
+# year will be set to a 19XX year with the same calendar as the current year.
+#
+set env CDD0=MSOS5-A.dsk
+set env CDD1=MSOS5-B.dsk
+set cpu instr=basic
+set cpu mode65k,64k
+set throttle 30%
+set mt type=1732-3
+set lp type=1742
+att lp %DATETIME%.lpt
+att cdd0 %CDD0%
+att cdd1 %CDD1%
+set env DATEANDTIME=%DATE_MM%%DATE_DD%%DATE_19XX_YY%%TIME_HH%%TIME_MM%
+#
+# The following command will patch out unimplemented devices (1728 card
+# reader/punch and 1752 drum)
+#
+expect "SET PROGRAM PROTECT" set cpu protect; d 056D 0649; d 057E 0649; d 0589 0649; d 057C 0649; c
+expect "DATE/TIME  MMDDYYHHMM \n\r\n" send "%DATEANDTIME%\r"; c
+autoload cdd
+run 0

@@ -39,6 +39,68 @@ converters/cosy
 
 3. Installation
 
+3.1 Quick Installation Using Scripts
+
+        There are 2 scripts provided as part of the distribution for quickly
+installing and running MSOS 5.0:
+
+        - msosInstall.simh
+
+          This script can be used to install MSOS 5.0 on a 1733-2 disk unit
+          (2 logical drives) from the standard installation tape as described
+          above. To perform an installation change to the directory you want
+          the install the install to occur in and copy MSOS5_SL136.tap to this
+          directory. If you want to install from a different tape, its name
+          can be passed on the command line:
+
+              cdc1700 msosInstall.simh install.tap
+
+          Start up the CDC1700 simulator using msosInstall.simh as the
+          configuration. The script will automatically supply the date of
+          installation for the initializer and the date/time for MSOS 5.0
+          when requested. The time, month and day will be set to their
+          current values from the host system. The year will be set to a
+          20th century year which has the same calendar as the current year
+          (MSOS 5.0 is not Y2K compliant).
+
+          While running this script the O/S will reboot twice and a log of
+          installation will be left in MSOSinstall.lpt. The final section of
+          the installation will be to run the installation verification
+          procedure. This will generate 3 errors:
+
+             1. Partition set up error
+
+                The verification procedure checks that partition 0 starts
+                below 0x8000. All of the installation tapes on bitsaver.org
+                that I've checked have partition 0 starting above 0x8000.
+
+             2. File Manager sequential file error
+
+                The installation procedure only creates disk images for a
+                single disk unit. The O/S is configured with 4 disk units
+                and a drum. This procedure will attempt to write to all
+                direct-access configured in the system and so will fail.
+
+             3. Fortran formatted I/O error
+
+                This error has not been investigated.
+
+        - msosRun.simh
+
+          Once installation is complete, this script may be used to run the
+          resulting system. It will use the same disk images created by
+          msosInstall.simh and will create a unique file for line printer
+          output based on the current date and time. Like the installation
+          script it will set the date/time for MSOS 5.0 to the current values
+          from the host system with the year set to a 20th century year with
+          the same calendar as the current year. As part of the start up
+          sequence it will patch MSOS so that the 1728 Card Reader/Punch and
+          1752 Drum are not accessible to programs since the simulator has
+          no support for these devices.
+
+
+3.2 Full Installation By Hand
+
         Installation of MSOS 5 occurs in 2 phases:
 
         - Phase 1
