@@ -1027,6 +1027,7 @@ switch (uptr->FUNC) {                                   /* case on function */
             clearerr (uptr->fileref);
             return SCPE_IOERR;
             }
+        /* fall through */
 
     case FNC_WRITEH:                                    /* write headers stub */
         update_rpcs (CS1_DONE, drv);                    /* set done */
