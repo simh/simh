@@ -6802,8 +6802,10 @@ fputc ('\n', st);                                       /* start on a new line *
 if (v >= SCPE_BASE)                                     /* SCP error? */
     fputs (sim_error_text (v), st);                     /* print it from the SCP list */
 else {                                                  /* VM error */
-    fputs (sim_stop_messages [v], st);                  /* print the VM-specific message */
-
+    if (sim_stop_messages [v])
+        fputs (sim_stop_messages [v], st);              /* print the VM-specific message */
+    else
+        fprintf (st, "Unknown %s simulator stop code %d", sim_name, v);
     if ((sim_vm_fprint_stopped != NULL) &&              /* if a VM-specific stop handler is defined */
         (!sim_vm_fprint_stopped (st, v)))               /*   call it; if it returned FALSE, */
         return;                                         /*     we're done */
@@ -6831,7 +6833,6 @@ if ((dptr != NULL) && (dptr->examine != NULL)) {
         }
     }
 fprintf (st, "\n");
-return;
 }
 
 void fprint_stopped (FILE *st, t_stat v)
