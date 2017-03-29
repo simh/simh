@@ -2937,7 +2937,8 @@ if (flag >= 0) {                                        /* Only bump nesting fro
         }
     }
 
-strcpy( sim_do_filename[sim_do_depth], do_arg[0]);      /* stash away do file name for possible use by 'call' command */
+sim_strlcpy( sim_do_filename[sim_do_depth], do_arg[0], 
+             sizeof (sim_do_filename[sim_do_depth]));   /* stash away do file name for possible use by 'call' command */
 sim_do_label[sim_do_depth] = label;                     /* stash away do label for possible use in messages */
 sim_goto_line[sim_do_depth] = 0;
 if (label) {
@@ -5075,16 +5076,18 @@ struct stat filestat;
 char *c;
 char DirName[PATH_MAX + 1], WholeName[PATH_MAX + 1], WildName[PATH_MAX + 1];
 
-strcpy (WildName, cptr);
+memset (DirName, 0, sizeof(DirName));
+memset (WholeName, 0, sizeof(WholeName));
+sim_strlcpy (WildName, cptr, sizeof(WildName));
 cptr = WildName;
 sim_trim_endspc (WildName);
 if ((!stat (WildName, &filestat)) && (filestat.st_mode & S_IFDIR))
     sim_strlcat (WildName, "/*", sizeof(WildName));
 if ((*cptr != '/') || (0 == memcmp (cptr, "./", 2)) || (0 == memcmp (cptr, "../", 3))) {
 #if defined (VMS)
-    getcwd (WholeName, PATH_MAX, 0);
+    getcwd (WholeName, sizeof(WholeName)-1, 0);
 #else
-    getcwd (WholeName, PATH_MAX);
+    getcwd (WholeName, sizeof(WholeName)-1);
 #endif
     sim_strlcat (WholeName, "/", sizeof(WholeName));
     sim_strlcat (WholeName, cptr, sizeof(WholeName));
@@ -5112,9 +5115,9 @@ if (c) {
     }
 else {
 #if defined (VMS)
-    getcwd (WholeName, PATH_MAX, 0);
+    getcwd (WholeName, sizeof(WholeName)-1, 0);
 #else
-    getcwd (WholeName, PATH_MAX);
+    getcwd (WholeName, sizeof(WholeName)-1);
 #endif
     }
 cptr = WholeName;
