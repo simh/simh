@@ -815,7 +815,7 @@ CTAB *cmdp = NULL;
 t_stat stat_nomessage = stat & SCPE_NOMESSAGE;  /* extract possible message supression flag */
 
 cmdp = find_cmd (cmd);
-stat = SCPE_BARE_STATUS(stat);              /* remove possible flag */
+stat = SCPE_BARE_STATUS(stat);                  /* remove possible flag */
 if (!stat_nomessage) {
     if (cmdp && (cmdp->message))                /* special message handler? */
         cmdp->message (NULL, stat);             /* let it deal with display */
@@ -861,7 +861,7 @@ CONST char *cptr;
 int32 saved_switches = sim_switches;
 t_stat stat;
 
-strcpy (cbuf, sim_rem_command_buf);
+sim_strlcpy (cbuf, sim_rem_command_buf, sizeof (cbuf));
 while (isspace(cbuf[0]))
     memmove (cbuf, cbuf+1, strlen(cbuf+1)+1);   /* skip leading whitespace */
 sim_sub_args (cbuf, sizeof(cbuf), argv);
@@ -1666,7 +1666,7 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
                 sim_quiet = 1;
                 sim_set_logoff (0, NULL);
                 sim_quiet = save_quiet;
-                remove (sim_rem_con_temp_name);
+                (void)remove (sim_rem_con_temp_name);
                 sim_log_temp = FALSE;
                 }
             else {
@@ -1936,7 +1936,7 @@ if (sim_rem_master_mode) {
         sim_quiet = 1;
         sim_set_logoff (0, NULL);
         sim_quiet = save_quiet;
-        remove (sim_rem_con_temp_name);
+        (void)remove (sim_rem_con_temp_name);
         sim_log_temp = FALSE;
         }
     stat |= stat_nomessage;

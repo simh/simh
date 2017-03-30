@@ -3234,8 +3234,7 @@ int Return = 0;
 VHD_Footer sHeader;
 struct stat statb;
 
-if (sFooter)
-    memset(sFooter, '\0', sizeof(*sFooter));
+memset(sFooter, '\0', sizeof(*sFooter));
 if (sDynamic)
     memset(sDynamic, '\0', sizeof(*sDynamic));
 if (aBAT)
