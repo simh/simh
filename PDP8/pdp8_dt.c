@@ -798,11 +798,12 @@ switch (fnc) {                                          /* at speed, check fnc *
                 return SCPE_OK;
                 }
             if (DEBUG_PRI (dt_dev, LOG_RW) ||
-               (DEBUG_PRI (dt_dev, LOG_BL) && (blk == dt_logblk)))
+           (DEBUG_PRI (dt_dev, LOG_BL) && (blk == dt_logblk)))
                 fprintf (sim_deb, ">>DT%d: reading block %d %s%s\n",
                     unum, blk, (dir? "backward": "forward"),
                     ((dtsa & DTA_MODE)? " continuous": " "));
-            dt_substate = 0;                            /* fall through */
+            dt_substate = 0;
+            /* fall through */
         case 0:                                         /* normal read */
             M[DT_WC] = (M[DT_WC] + 1) & 07777;          /* incr WC, CA */
             M[DT_CA] = (M[DT_CA] + 1) & 07777;
@@ -815,6 +816,7 @@ switch (fnc) {                                          /* at speed, check fnc *
                 M[ma] = dat;
             if (M[DT_WC] == 0)                          /* wc ovf? */
                 dt_substate = DTO_WCO;
+            /* fall through */
         case DTO_WCO:                                   /* wc ovf, not sob */
             if (wrd != (dir? 0: DTU_BSIZE (uptr) - 1))  /* not last? */
                 sim_activate (uptr, DT_WSIZE * dt_ltime);
@@ -861,10 +863,12 @@ switch (fnc) {                                          /* at speed, check fnc *
                 fprintf (sim_deb, ">>DT%d: writing block %d %s%s\n", unum, blk,
                     (dir? "backward": "forward"),
                     ((dtsa & DTA_MODE)? " continuous": " "));
-            dt_substate = 0;                            /* fall through */
+            dt_substate = 0;
+            /* fall through */
         case 0:                                         /* normal write */
             M[DT_WC] = (M[DT_WC] + 1) & 07777;          /* incr WC, CA */
             M[DT_CA] = (M[DT_CA] + 1) & 07777;
+            /* fall through */
         case DTO_WCO:                                   /* wc ovflo */
             ma = DTB_GETMEX (dtsb) | M[DT_CA];          /* get mem addr */
             ba = (blk * DTU_BSIZE (uptr)) + wrd;        /* buffer ptr */
