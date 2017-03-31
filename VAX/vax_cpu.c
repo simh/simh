@@ -25,6 +25,7 @@
 
    cpu          VAX central processor
 
+   31-Mar-17    RMS     Fixed uninitialized variable on FPD path (COVERITY)
    13-Mar-17    RMS     Fixed dangling else in show_opnd (COVERITY)
    20-Sep-11    MP      Fixed idle conditions for various versions of Ultrix, 
                         Quasijarus-4.3BSD, NetBSD and OpenBSD.
@@ -713,9 +714,9 @@ for ( ;; ) {
         }
     numspec = drom[opc][0];                             /* get # specs */
     if (PSL & PSL_FPD) {
-        j = 0;
         if ((numspec & DR_F) == 0)
             RSVD_INST_FAULT;
+        j = 0;                                          /* no operands */
         }
     else {
         numspec = numspec & DR_NSPMASK;                 /* get # specifiers */
