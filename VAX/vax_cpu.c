@@ -25,6 +25,7 @@
 
    cpu          VAX central processor
 
+   31-Mar-17    RMS     Fixed uninitialized variable on FPD path (COVERITY)
    13-Mar-17    RMS     Fixed dangling else in show_opnd (COVERITY)
    29-Dec-16    RMS     Removed delay in invoking sim_idle (Mark Pizzolato)
    29-Mar-15    RMS     Moved in-exception test to model-specific machine checks
@@ -699,6 +700,7 @@ for ( ;; ) {
     if (PSL & PSL_FPD) {
         if ((numspec & DR_F) == 0)
             RSVD_INST_FAULT;
+        j = 0;                                          /* no operands */
         }
     else {
         numspec = numspec & DR_NSPMASK;                 /* get # specifiers */
