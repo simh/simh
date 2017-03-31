@@ -2,7 +2,7 @@
  *                                                                       *
  * $Id: tx0_cpu.c 2066 2009-02-27 15:57:22Z hharte $                     *
  *                                                                       *
- * Copyright (c) 2009-2012 Howard M. Harte.                              *
+ * Copyright (c) 2009-2017 Howard M. Harte.                              *
  * Based on pdp1_cpu.c, Copyright (c) 1993-2007, Robert M. Supnik        *
  *                                                                       *
  * Permission is hereby granted, free of charge, to any person obtaining *
@@ -651,9 +651,9 @@ t_stat sim_instr (void)
                         TRACE_PRINT(ADD_MSG, ("[%06o] AUX: y=%05o, XR=%05o = ", PC-1, newY, XR));
                         XR = XR + newY;
                         TRACE_PRINT(ADD_MSG, ("%05o\n", XR));
+                        inst_ctr.aux++;
                         break;
                     }
-                    inst_ctr.aux++;
                 case 4:     /* llr (Load Live Register) */
                     Read();
                     LR = MBR;
