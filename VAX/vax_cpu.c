@@ -713,6 +713,7 @@ for ( ;; ) {
         }
     numspec = drom[opc][0];                             /* get # specs */
     if (PSL & PSL_FPD) {
+        j = 0;
         if ((numspec & DR_F) == 0)
             RSVD_INST_FAULT;
         }
