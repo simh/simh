@@ -1086,7 +1086,7 @@ ODS2_FileHeader Header;
 ODS2_Retreval *Retr;
 ODS2_SCB Scb;
 uint16 CheckSum1, CheckSum2;
-uint32 ScbLbn;
+uint32 ScbLbn = 0;
 t_offset ret_val = (t_offset)-1;
 
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
@@ -2605,7 +2605,8 @@ t_offset pos, size;
 
 pos = (t_offset)lseek ((int)((long)f), (off_t)0, SEEK_CUR);
 size = (t_offset)lseek ((int)((long)f), (off_t)0, SEEK_END);
-lseek ((int)((long)f), (off_t)pos, SEEK_SET);
+if (pos != (t_offset)-1)
+    (void)lseek ((int)((long)f), (off_t)pos, SEEK_SET);
 return size;
 }
 
@@ -3651,7 +3652,7 @@ static FILE *sim_vhd_disk_merge (const char *szVHDPath, char **ParentVHD)
             continue;
         ++NeededBlock;
         BlockOffset = SectorSize*((uint64)(NtoHl (hVHD->BAT[BlockNumber]) + BitMapSectors));
-        if ((BlockNumber*SectorsPerBlock + BlockSectors) > ((uint64)NtoHll (hVHD->Footer.CurrentSize))/SectorSize)
+        if (((uint64)BlockNumber*SectorsPerBlock + BlockSectors) > ((uint64)NtoHll (hVHD->Footer.CurrentSize))/SectorSize)
             BlockSectors = (uint32)(((uint64)NtoHll (hVHD->Footer.CurrentSize))/SectorSize - (BlockNumber*SectorsPerBlock));
         if (ReadFilePosition(hVHD->File,
                              BlockData,
