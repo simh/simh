@@ -613,7 +613,7 @@ if (select_ret) {
     if (FD_ISSET (slirp->db_chime, &rfds)) {
         char buf[32];
         /* consume the doorbell wakeup ring */
-        recv (slirp->db_chime, buf, sizeof (buf), 0);
+        (void)recv (slirp->db_chime, buf, sizeof (buf), 0);
         }
     sim_debug (slirp->dbit, slirp->dptr, "Select returned %d\r\n", select_ret);
     for (i=0; i<nfds+1; i++) {
