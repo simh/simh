@@ -11023,7 +11023,8 @@ while (1) {                                         /* format passed string, arg
     break;
     }
 
-if (sim_do_ocptr[sim_do_depth]) {
+if ((sim_do_ocptr[sim_do_depth]) &&
+    ((stat & ~SCPE_NOMESSAGE) != SCPE_OK)) {
     if (!sim_do_echo && !sim_quiet && !inhibit_message)
         sim_printf("%s> %s\n", do_position(), sim_do_ocptr[sim_do_depth]);
     else {
