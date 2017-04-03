@@ -1029,16 +1029,24 @@ static const char simh_help[] =
       "2Displaying Files\n"
 #define HLP_TYPE         "*Commands Displaying_Files TYPE"
       "3TYPE\n"
-      "++TYPE {file}               display a file contents\n"
+      "++TYPE file                 display a file contents\n"
 #define HLP_CAT          "*Commands Displaying_Files CAT"
       "3CAT\n"
-      "++CAT {file}                display a file contents\n"
+      "++CAT file                  display a file contents\n"
+      "2Removing Files\n"
 #define HLP_DELETE       "*Commands Removing_Files DEL"
       "3DELETE\n"
-      "++DEL{ete} {file}           deletes a file\n"
+      "++DEL{ete} file             deletes a file\n"
 #define HLP_RM          "*Commands Removing_Files RM"
       "3RM\n"
-      "++RM {file}                 deletes a file\n"
+      "++RM file                   deletes a file\n"
+      "2Copying Files\n"
+#define HLP_COPY        "*Commands Copying_Files COPY"
+      "3COPY\n"
+      "++COPY sfile dfile          copies a file\n"
+#define HLP_CP          "*Commands Copying_Files CP"
+      "3CP\n"
+      "++CP sfile dfile            copies a file\n"
 #define HLP_SET         "*Commands SET"
       "2SET\n"
        /***************** 80 character line width template *************************/
@@ -1839,6 +1847,8 @@ static CTAB cmd_table[] = {
     { "CAT",        &type_cmd,      0,          HLP_CAT },
     { "DELETE",     &delete_cmd,    0,          HLP_DELETE },
     { "RM",         &delete_cmd,    0,          HLP_RM },
+    { "COPY",       &copy_cmd,      0,          HLP_COPY },
+    { "CP",         &copy_cmd,      0,          HLP_CP },
     { "SET",        &set_cmd,       0,          HLP_SET },
     { "SHOW",       &show_cmd,      0,          HLP_SHOW },
     { "DO",         &do_cmd,        1,          HLP_DO },
@@ -5340,6 +5350,43 @@ stat = sim_dir_scan (cptr, sim_delete_entry, &del_state);
 if (stat == SCPE_OK)
     return del_state.stat;
 return sim_messagef (SCPE_ARG, "No such file or directory: %s\n", cptr);
+}
+
+t_stat copy_cmd (int32 flg, CONST char *cptr)
+{
+char sname[CBUFSIZE], dname[CBUFSIZE];
+FILE *fIn = NULL, *fOut = NULL;
+t_stat stat = SCPE_OK;
+char *buf = NULL;
+size_t bytes;
+
+if ((!cptr) || (*cptr == 0))
+    return SCPE_2FARG;
+cptr = get_glyph_quoted (cptr, sname, 0);
+if ((!cptr) || (*cptr == 0))
+    return SCPE_2FARG;
+cptr = get_glyph_quoted (cptr, dname, 0);
+fIn = sim_fopen (sname, "rb");
+if (!fIn) {
+    stat = sim_messagef (SCPE_ARG, "Can't open '%s' for input: %s\n", sname, strerror (errno));
+    goto Cleanup_Return;
+    }
+fOut = sim_fopen (dname, "wb");
+if (!fOut) {
+    stat = sim_messagef (SCPE_ARG, "Can't open '%s' for output: %s\n", dname, strerror (errno));
+    goto Cleanup_Return;
+    }
+buf = malloc (BUFSIZ);
+while (bytes = fread (buf, 1, BUFSIZ, fIn))
+    fwrite (buf, 1, bytes, fOut);
+stat = sim_messagef (SCPE_OK, "        1 file copied\n");
+Cleanup_Return:
+free (buf);
+if (fIn)
+    fclose (fIn);
+if (fOut)
+    fclose (fOut);
+return stat;
 }
 
 /* Breakpoint commands */
