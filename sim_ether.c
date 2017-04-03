@@ -907,7 +907,7 @@ void ethq_insert_data(ETH_QUE* que, int32 type, const uint8 *data, int used, siz
   item->packet.len = len;
   item->packet.used = used;
   item->packet.crc_len = crc_len;
-  if (MAX (len, crc_len) <= sizeof (item->packet.msg) - ETH_CRC_SIZE) {
+  if (MAX (len, crc_len) <= sizeof (item->packet.msg)) {
     memcpy(item->packet.msg, data, ((len > crc_len) ? len : crc_len));
     if (crc_data && (crc_len > len))
       memcpy(&item->packet.msg[len], crc_data, ETH_CRC_SIZE);
