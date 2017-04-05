@@ -578,8 +578,8 @@ void set_cpuint(int32 int_num)
 int32 sim_instr (void)
 {
     extern int32 sim_interval;
-    int32 IR, OP, DAR, reason, hi, lo, carry, i, adr;
-    int32 MRR, REG, EA, MOD, RM, DISP, VAL, DATA, OFF, SEG, INC, VAL1, MAR;
+    int32 IR, OP, reason;
+    int32 MRR, REG, EA, MOD, RM, VAL, DATA, OFF, SEG, INC, VAL1;
 
     IP = saved_PC & ADDRMASK16;         /* load local IP */
     reason = 0;                         /* clear stop reason */
@@ -3152,9 +3152,11 @@ int32 sim_instr (void)
                     case 4:             //IP-INC16
                         sim_printf(" 0%04XH", EA);
                         break;
+                        /*
                     case 5:             //MAR
                         sim_printf(" 0%02XH", MAR);
                         break;
+                        */
                     default:
                         break;
                 }
@@ -4787,9 +4789,10 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
 
 t_stat parse_sym (const char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
-    int32 cflag, i = 0, j, r, fflag = 1;
+    int32 cflag, i = 0, j, r;
     char gbuf[CBUFSIZE];
 
+    memset (gbuf, 0, sizeof (gbuf));
     cflag = (uptr == NULL) || (uptr == &i8088_unit);
     while (isspace (*cptr)) cptr++;                         /* absorb spaces */
     if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
@@ -4807,7 +4810,7 @@ t_stat parse_sym (const char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32
    or numeric (including spaces).
 */
 
-    while (1) {
+    while (i < sizeof (gbuf) - 4) {
         if (*cptr == ',' || *cptr == '\0' ||
              isdigit(*cptr))
                 break;
@@ -4848,9 +4851,9 @@ t_stat parse_sym (const char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32
 /* find opcode in table */
     for (j = 0; j < 256; j++) {
         if (strcmp(gbuf, opcode[j]) == 0)
-            fflag = 0;
+            break;
     }
-    if (fflag)                                              /* not found */
+    if (j > 255)                                            /* not found */
         return SCPE_ARG;
 
     val[0] = j;                                             /* store opcode */
