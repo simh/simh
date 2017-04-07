@@ -34,7 +34,7 @@
 /* Unibus adapter */
 
 #define UBA_NDPATH      4                               /* number of data paths */
-#define UBA_NMAPR       496                             /* number of map reg */
+#define UBA_NMAPR       512                             /* number of map reg */
 
 /* Unibus adapter configuration register */
 
@@ -73,7 +73,7 @@
 #define UBAMAP_LWAE     0x04000000                      /* LW access enb - ni */
 #define UBAMAP_ODD      0x02000000                      /* odd byte */
 #define UBAMAP_V_DP     21                              /* data path */
-#define UBAMAP_M_DP     0xF
+#define UBAMAP_M_DP     0x3
 #define UBAMAP_DP       (UBAMAP_M_DP << UBAMAP_V_DP)
 #define UBAMAP_GETDP(x) (((x) >> UBAMAP_V_DP) & UBAMAP_M_DP)
 #define UBAMAP_PAG      0x001FFFFF
@@ -235,12 +235,6 @@ switch (ofs) {                                          /* case on offset */
 
     case UBADPR_OF + 1:
     case UBADPR_OF + 2:  case UBADPR_OF + 3:
-    case UBADPR_OF + 4:  case UBADPR_OF + 5:
-    case UBADPR_OF + 6:  case UBADPR_OF + 7:
-    case UBADPR_OF + 8:  case UBADPR_OF + 9:
-    case UBADPR_OF + 10: case UBADPR_OF + 11:
-    case UBADPR_OF + 12: case UBADPR_OF + 13:
-    case UBADPR_OF + 14: case UBADPR_OF + 15:
         idx = ofs - UBADPR_OF;
         *val = uba_dpr[idx] & UBADPR_RD;
         break;
