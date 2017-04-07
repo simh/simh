@@ -454,6 +454,9 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       endif
     endif
   endif
+  ifneq (,$(call find_include,utime))
+    OS_CCDEFS += -DHAVE_UTIME
+  endif
   ifneq (,$(call find_include,png))
     ifneq (,$(call find_lib,png))
       OS_CCDEFS += -DHAVE_LIBPNG
