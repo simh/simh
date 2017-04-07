@@ -5352,41 +5352,60 @@ if (stat == SCPE_OK)
 return sim_messagef (SCPE_ARG, "No such file or directory: %s\n", cptr);
 }
 
+typedef struct {
+    t_stat stat;
+    int count;
+    char destname[CBUFSIZE];
+    } COPY_CTX;
+
+static void sim_copy_entry (const char *directory, 
+                            const char *filename,
+                            t_offset FileSize,
+                            const struct stat *filestat,
+                            void *context)
+{
+COPY_CTX *ctx = (COPY_CTX *)context;
+struct stat deststat;
+char FullPath[PATH_MAX + 1];
+char dname[CBUFSIZE];\
+t_stat st;
+
+sim_strlcpy (dname, ctx->destname, sizeof (dname));
+
+sprintf (FullPath, "%s%s", directory, filename);
+
+if ((dname[strlen (dname) - 1] == '/') || (dname[strlen (dname) - 1] == '\\'))
+    dname[strlen (dname) - 1] = '\0';
+if ((!stat (dname, &deststat)) && (deststat.st_mode & S_IFDIR)) {
+    char *dslash = (strrchr (dname, '/') ? "/" : (strrchr (dname, '\\') ? "\\" : "/"));
+
+    dname[sizeof (dname) - 1] = '\0';
+    snprintf (&dname[strlen (dname)], sizeof (dname) - strlen (dname), "%s%s", dslash, filename);
+    }
+st = sim_copyfile (FullPath, dname, TRUE);
+if (SCPE_OK == st)
+    ++ctx->count;
+else
+    ctx->stat = st;
+}
+
 t_stat copy_cmd (int32 flg, CONST char *cptr)
 {
-char sname[CBUFSIZE], dname[CBUFSIZE];
-FILE *fIn = NULL, *fOut = NULL;
-t_stat stat = SCPE_OK;
-char *buf = NULL;
-size_t bytes;
+char sname[CBUFSIZE];
+COPY_CTX copy_state;
+t_stat stat;
 
+memset (&copy_state, 0, sizeof (copy_state));
 if ((!cptr) || (*cptr == 0))
     return SCPE_2FARG;
 cptr = get_glyph_quoted (cptr, sname, 0);
 if ((!cptr) || (*cptr == 0))
     return SCPE_2FARG;
-cptr = get_glyph_quoted (cptr, dname, 0);
-fIn = sim_fopen (sname, "rb");
-if (!fIn) {
-    stat = sim_messagef (SCPE_ARG, "Can't open '%s' for input: %s\n", sname, strerror (errno));
-    goto Cleanup_Return;
-    }
-fOut = sim_fopen (dname, "wb");
-if (!fOut) {
-    stat = sim_messagef (SCPE_ARG, "Can't open '%s' for output: %s\n", dname, strerror (errno));
-    goto Cleanup_Return;
-    }
-buf = malloc (BUFSIZ);
-while (bytes = fread (buf, 1, BUFSIZ, fIn))
-    fwrite (buf, 1, bytes, fOut);
-stat = sim_messagef (SCPE_OK, "        1 file copied\n");
-Cleanup_Return:
-free (buf);
-if (fIn)
-    fclose (fIn);
-if (fOut)
-    fclose (fOut);
-return stat;
+cptr = get_glyph_quoted (cptr, copy_state.destname, 0);
+stat = sim_dir_scan (sname, sim_copy_entry, &copy_state);
+if ((stat == SCPE_OK) && (copy_state.count))
+    return sim_messagef (SCPE_OK, "      %3d file(s) copied\n", copy_state.count);
+return copy_state.stat;
 }
 
 /* Breakpoint commands */
