@@ -158,11 +158,11 @@ uint8 enbnmi(t_bool io, uint8 data)
 uint8 get_mbyte(uint32 addr)
 {
     /* if local EPROM handle it */
-    if ((addr >= EPROM_unit.u3) && ((uint32)addr < (EPROM_unit.u3 + EPROM_unit.capac))) {
+    if ((addr >= (uint32)EPROM_unit.u3) && (addr < (uint32)(EPROM_unit.u3 + EPROM_unit.capac))) {
         return EPROM_get_mbyte(addr);
     }
     /* if local RAM handle it */
-    if ((addr >= RAM_unit.u3) && ((uint16)addr < (RAM_unit.u3 + RAM_unit.capac))) {
+    if ((addr >= (uint32)RAM_unit.u3) && (addr < (uint32)(RAM_unit.u3 + RAM_unit.capac))) {
         return RAM_get_mbyte(addr);
     }
     /* otherwise, try the multibus */
@@ -185,11 +185,11 @@ uint16 get_mword(uint32 addr)
 void put_mbyte(uint32 addr, uint8 val)
 {
     /* if local EPROM handle it */
-    if ((addr >= EPROM_unit.u3) && ((uint32)addr <= (EPROM_unit.u3 + EPROM_unit.capac))) {
+    if ((addr >= (uint32)EPROM_unit.u3) && (addr <= (uint32)(EPROM_unit.u3 + EPROM_unit.capac))) {
         sim_printf("Write to R/O memory address %05X - ignored\n", addr);
         return;
     } /* if local RAM handle it */
-    if ((i8255_unit[0].u5 & 0x02) && (addr >= RAM_unit.u3) && ((uint16)addr <= (RAM_unit.u3 + RAM_unit.capac))) {
+    if ((i8255_unit[0].u5 & 0x02) && (addr >= (uint32)RAM_unit.u3) && (addr <= (uint32)(RAM_unit.u3 + RAM_unit.capac))) {
         RAM_put_mbyte(addr, val);
         return;
     } /* otherwise, try the multibus */

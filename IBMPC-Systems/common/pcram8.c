@@ -119,7 +119,7 @@ uint8 RAM_get_mbyte(uint32 addr)
     uint8 val;
 
     sim_debug (DEBUG_read, &RAM_dev, "RAM_get_mbyte: addr=%04X\n", addr);
-    if ((addr >= RAM_unit.u3) && ((uint32) addr < (RAM_unit.u3 + RAM_unit.capac))) {
+    if ((addr >= (uint32)RAM_unit.u3) && ( addr < (uint32)(RAM_unit.u3 + RAM_unit.capac))) {
         val = *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3));
         sim_debug (DEBUG_read, &RAM_dev, " val=%04X\n", val); 
         return (val & 0xFF);
@@ -133,7 +133,7 @@ uint8 RAM_get_mbyte(uint32 addr)
 void RAM_put_mbyte(uint32 addr, uint8 val)
 {
     sim_debug (DEBUG_write, &RAM_dev, "RAM_put_mbyte: addr=%04X, val=%02X\n", addr, val);
-    if ((addr >= RAM_unit.u3) && ((uint32)addr < RAM_unit.u3 + RAM_unit.capac)) {
+    if ((addr >= (uint32)RAM_unit.u3) && (addr < (uint32)(RAM_unit.u3 + RAM_unit.capac))) {
         *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3)) = val & 0xFF;
         sim_debug (DEBUG_write, &RAM_dev, "\n");
         return;

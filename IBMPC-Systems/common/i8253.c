@@ -128,8 +128,6 @@ DEVICE i8253_dev = {
 
 t_stat i8253_svc (UNIT *uptr)
 {
-    int32 temp;
-
     sim_activate (&i8253_unit[0], i8253_unit[0].wait); /* continue poll */
     return SCPE_OK;
 }
