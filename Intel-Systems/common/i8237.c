@@ -41,10 +41,6 @@
                 Read        Read DMAC Channel 0 Current Address Register
         01      Write       Load DMAC Channel 0 Base and Current Word Count Registers
                 Read        Read DMAC Channel 0 Current Word Count Register
-        02      Write       Load DMAC Channel 1 Base and Current Address Regsiters
-                Read        Read DMAC Channel 1 Current Address Register
-        03      Write       Load DMAC Channel 1 Base and Current Word Count Registers
-                Read        Read DMAC Channel 1 Current Word Count Register
         04      Write       Load DMAC Channel 2 Base and Current Address Regsiters
                 Read        Read DMAC Channel 2 Current Address Register
         05      Write       Load DMAC Channel 2 Base and Current Word Count Registers
@@ -248,11 +244,11 @@ extern uint16 port;                     //port called in dev_table[port]
 int32 i8237_devnum = 0;                 //actual number of 8253 instances + 1
 uint16 i8237_port[4];                   //base port registered to each instance
 
-/* function prototypes */
+/* internal function prototypes */
 
-t_stat i8237_svc(UNIT *uptr);
-t_stat i8237_reset(DEVICE *dptr, uint16 base);
-void i8237_reset1(int32 devnum);
+t_stat i8237_svc (UNIT *uptr);
+t_stat i8237_reset (DEVICE *dptr, uint16 base);
+void i8237_reset1 (void);
 t_stat i8237_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 uint8 i8237_r0x(t_bool io, uint8 data);
 uint8 i8237_r1x(t_bool io, uint8 data);
@@ -277,28 +273,28 @@ extern uint16 reg_dev(uint8 (*routine)(t_bool, uint8), uint16);
 
 /* 8237 physical register definitions */
 
-uint16 i8237_r0[4];                     // 8237 ch 0 address register
-uint16 i8237_r1[4];                     // 8237 ch 0 count register
-uint16 i8237_r2[4];                     // 8237 ch 1 address register
-uint16 i8237_r3[4];                     // 8237 ch 1 count register
-uint16 i8237_r4[4];                     // 8237 ch 2 address register
-uint16 i8237_r5[4];                     // 8237 ch 2 count register
-uint16 i8237_r6[4];                     // 8237 ch 3 address register
-uint16 i8237_r7[4];                     // 8237 ch 3 count register
-uint8 i8237_r8[4];                      // 8237 status register
-uint8 i8237_r9[4];                      // 8237 command register
-uint8 i8237_rA[4];                      // 8237 mode register
-uint8 i8237_rB[4];                      // 8237 mask register
-uint8 i8237_rC[4];                      // 8237 request register
-uint8 i8237_rD[4];                      // 8237 first/last ff
-uint8 i8237_rE[4];                      // 8237 
-uint8 i8237_rF[4];                      // 8237 
+uint16 i8237_r0;                        // 8237 ch 0 address register
+uint16 i8237_r1;                        // 8237 ch 0 count register
+uint16 i8237_r2;                        // 8237 ch 1 address register
+uint16 i8237_r3;                        // 8237 ch 1 count register
+uint16 i8237_r4;                        // 8237 ch 2 address register
+uint16 i8237_r5;                        // 8237 ch 2 count register
+uint16 i8237_r6;                        // 8237 ch 3 address register
+uint16 i8237_r7;                        // 8237 ch 3 count register
+uint8 i8237_r8;                         // 8237 status register
+uint8 i8237_r9;                         // 8237 command register
+uint8 i8237_rA;                         // 8237 mode register
+uint8 i8237_rB;                         // 8237 mask register
+uint8 i8237_rC;                         // 8237 request register
+uint8 i8237_rD;                         // 8237 first/last ff
+uint8 i8237_rE;                         // 8237 
+uint8 i8237_rF;                         // 8237 
 
 /* i8237 physical register definitions */
 
-uint16 i8237_sr[4];                      // isbc-208 segment register
-uint8 i8237_i[4];                        // iSBC-208 interrupt register
-uint8 i8237_a[4];                        // iSBC-208 auxillary port register
+uint16 i8237_sr;                      // isbc-208 segment register
+uint8 i8237_i;                        // iSBC-208 interrupt register
+uint8 i8237_a;                        // iSBC-208 auxillary port register
 
 /* i8237 Standard SIMH Device Data Structures - 1 unit */
 
@@ -311,9 +307,9 @@ UNIT i8237_unit[] = {
 
 
 REG i8237_reg[] = {
-    { HRDATA (CH0ADR, i8237_r0[devnum], 16) },
-    { HRDATA (CH0CNT, i8237_r1[devnum], 16) },
-    { HRDATA (CH1ADR, i8237_r2[devnum], 16) },
+    { HRDATA (CH0ADR, i8237_r0, 16) },
+    { HRDATA (CH0CNT, i8237_r1, 16) },
+    { HRDATA (CH1ADR, i8237_r2, 16) },
     { HRDATA (CH1CNT, i8237_r3, 16) },
     { HRDATA (CH2ADR, i8237_r4, 16) },
     { HRDATA (CH2CNT, i8237_r5, 16) },
@@ -347,7 +343,7 @@ DEBTAB i8237_debug[] = {
 };
 
 DEVICE i8237_dev = {
-    "I8237",                   //name 
+    "8237",                   //name 
     i8237_unit,               //units 
     i8237_reg,                //registers 
     i8237_mod,                //modifiers
@@ -391,8 +387,6 @@ t_stat i8237_reset(DEVICE *dptr, uint16 base)
         sim_printf("i8237_reset: too many devices!\n");
         return SCPE_MEM;
     }
-    sim_printf("   8237 Reset\n");
-    sim_printf("   8237: Registered at %03X\n", base);
     i8237_port[i8237_devnum] = reg_dev(i8237_r0x, base); 
     reg_dev(i8237_r1x, base + 1); 
     reg_dev(i8237_r2x, base + 2); 
@@ -413,7 +407,7 @@ t_stat i8237_reset(DEVICE *dptr, uint16 base)
     sim_printf("   8237: Registered at %03X\n", base);
     sim_activate (&i8237_unit[i8237_devnum], i8237_unit[i8237_devnum].wait); /* activate unit */
     if ((i8237_dev.flags & DEV_DIS) == 0) 
-        i8237_reset1(i8237_devnum);
+        i8237_reset1();
     i8237_devnum++;
     return SCPE_OK;
 }
@@ -429,25 +423,36 @@ uint8 i8237_get_dn(void)
     return 0xFF;
 }
 
-void i8237_reset1(int32 devnum)
+void i8237_reset1(void)
 {
     int32 i;
     UNIT *uptr;
+    static int flag = 1;
 
-    uptr = i8237_dev[devnum].units;
-    if (uptr->capac == 0) {         /* if not configured */
-        uptr->capac = 0;            /* initialize unit */
-        uptr->u3 = 0; 
-        uptr->u4 = 0;
-        uptr->u5 = 0;
-        uptr->u6 = i;               /* unit number - only set here! */
-        sim_activate (&i8237_unit[devnum], i8237_unit[devnum].wait);
+    for (i = 0; i < 1; i++) {     /* handle all units */
+        uptr = i8237_dev.units + i;
+        if (uptr->capac == 0) {         /* if not configured */
+//            sim_printf("   SBC208%d: Not configured\n", i);
+//            if (flag) {
+//                sim_printf("      ALL: \"set isbc208 en\"\n");
+//                sim_printf("      EPROM: \"att isbc2080 <filename>\"\n");
+//                flag = 0;
+//            }
+            uptr->capac = 0;            /* initialize unit */
+            uptr->u3 = 0; 
+            uptr->u4 = 0;
+            uptr->u5 = 0;
+            uptr->u6 = i;               /* unit number - only set here! */
+            sim_activate (&i8237_unit[uptr->u6], i8237_unit[uptr->u6].wait);
+        } else {
+//            sim_printf("   SBC208%d: Configured, Attached to %s\n", i, uptr->filename);
+        }
     }
-    i8237_r8[devnum] = 0;           /* status */
-    i8237_r9[devnum] = 0;           /* command */
-    i8237_rB[devnum] = 0x0F;        /* mask */
-    i8237_rC[devnum] = 0;           /* request */
-    i8237_rD[devnum] = 0;           /* first/last FF */
+    i8237_r8 = 0;                       /* status */
+    i8237_r9 = 0;                       /* command */
+    i8237_rB = 0x0F;                    /* mask */
+    i8237_rC = 0;                       /* request */
+    i8237_rD = 0;                       /* first/last FF */
 }
 
 
@@ -478,26 +483,27 @@ uint8 i8237_r0x(t_bool io, uint8 data)
         if (io == 0) {                      /* read current address CH 0 */
             if (i8237_rD) {                 /* high byte */
                 i8237_rD = 0;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r0[%d](H) read as %04X\n", devnum, i8237_r0[devnum]);
-                return (i8237_r0[devnum] >> 8);
+                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r0(H) read as %04X\n", i8237_r0);
+                return (i8237_r0 >> 8);
             } else {                        /* low byte */
                 i8237_rD++;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r0[%d](L) read as %04X\n", devnum, i8237_r0[devnum]);
-                return (i8237_r0[devnum] & 0xFF);
+                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r0(L) read as %04X\n", i8237_r0);
+                return (i8237_r0 & 0xFF);
             }
         } else {                            /* write base & current address CH 0 */
             if (i8237_rD) {                 /* high byte */
                 i8237_rD = 0;
-                i8237_r0[devnum] |= (data << 8);
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r0[%d](H) set to %04X\n", devnum, i8237_r0[devnum]);
+                i8237_r0 |= (data << 8);
+                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r0(H) set to %04X\n", i8237_r0);
             } else {                        /* low byte */
                 i8237_rD++;
-                i8237_r0[devnum] = data & 0xFF;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r0[%d](L) set to %04X\n"devnum, , i8237_r0[devnum]);
+                i8237_r0 = data & 0xFF;
+                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r0(L) set to %04X\n", i8237_r0);
             }
             return 0;
         }
     }
+    return 0;
 }
 
 uint8 i8237_r1x(t_bool io, uint8 data)
@@ -508,26 +514,27 @@ uint8 i8237_r1x(t_bool io, uint8 data)
         if (io == 0) {                      /* read current word count CH 0 */
             if (i8237_rD) {                 /* high byte */
                 i8237_rD = 0;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r1[%d](H) read as %04X\n", devnum, i8237_r1[devnum]);
-                return (i8237_r1[devnum][devnum] >> 8);
+                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r1(H) read as %04X\n", i8237_r1);
+                return (i8237_r1 >> 8);
             } else {                        /* low byte */
                 i8237_rD++;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r1[%d](L) read as %04X\n", devnum, i8237_r1[devnum]);
-                return (i8237_r1[devnum] & 0xFF);
+                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r1(L) read as %04X\n", i8237_r1);
+                return (i8237_r1 & 0xFF);
             }
         } else {                            /* write base & current address CH 0 */
             if (i8237_rD) {                 /* high byte */
                 i8237_rD = 0;
-                i8237_r1[devnum] |= (data << 8);
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r1[%d](H) set to %04X\n", devnum, i8237_r1[devnum]);
+                i8237_r1 |= (data << 8);
+                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r1(H) set to %04X\n", i8237_r1);
             } else {                        /* low byte */
                 i8237_rD++;
-                i8237_r1[devnum] = data & 0xFF;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r1[%d](L) set to %04X\n", devnum, i8237_r1[devnum]);
+                i8237_r1 = data & 0xFF;
+                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r1(L) set to %04X\n", i8237_r1);
             }
             return 0;
         }
     }
+    return 0;
 }
 
 uint8 i8237_r2x(t_bool io, uint8 data)
@@ -538,26 +545,27 @@ uint8 i8237_r2x(t_bool io, uint8 data)
         if (io == 0) {                      /* read current address CH 1 */
             if (i8237_rD) {                 /* high byte */
                 i8237_rD = 0;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r2[%d](H) read as %04X\n", devnum, i8237_r2[devnum]);
-                return (i8237_r2[devnum] >> 8);
+                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r2(H) read as %04X\n", i8237_r2);
+                return (i8237_r2 >> 8);
             } else {                        /* low byte */
                 i8237_rD++;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r2[%d](L) read as %04X\n", devnum, i8237_r2[devnum]);
-                return (i8237_r2[devnum] & 0xFF);
+                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r2(L) read as %04X\n", i8237_r2);
+                return (i8237_r2 & 0xFF);
             }
         } else {                            /* write base & current address CH 1 */
             if (i8237_rD) {                 /* high byte */
                 i8237_rD = 0;
-                i8237_r2[devnum] |= (data << 8);
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r2[%d](H) set to %04X\n", devnum, i8237_r2[devnum]);
+                i8237_r2 |= (data << 8);
+                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r2(H) set to %04X\n", i8237_r2);
             } else {                        /* low byte */
                 i8237_rD++;
-                i8237_r2[devnum] = data & 0xFF;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r2[%d](L) set to %04X\n", devnum, i8237_r2[devnum]);
+                i8237_r2 = data & 0xFF;
+                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r2(L) set to %04X\n", i8237_r2);
             }
             return 0;
         }
     }
+    return 0;
 }
 
 uint8 i8237_r3x(t_bool io, uint8 data)
@@ -588,6 +596,7 @@ uint8 i8237_r3x(t_bool io, uint8 data)
             return 0;
         }
     }
+    return 0;
 }
 
 uint8 i8237_r4x(t_bool io, uint8 data)
@@ -618,6 +627,7 @@ uint8 i8237_r4x(t_bool io, uint8 data)
             return 0;
         }
     }
+    return 0;
 }
 
 uint8 i8237_r5x(t_bool io, uint8 data)
@@ -648,6 +658,7 @@ uint8 i8237_r5x(t_bool io, uint8 data)
             return 0;
         }
     }
+    return 0;
 }
 
 uint8 i8237_r6x(t_bool io, uint8 data)
@@ -678,6 +689,7 @@ uint8 i8237_r6x(t_bool io, uint8 data)
             return 0;
         }
     }
+    return 0;
 }
 
 uint8 i8237_r7x(t_bool io, uint8 data)
@@ -708,6 +720,7 @@ uint8 i8237_r7x(t_bool io, uint8 data)
             return 0;
         }
     }
+    return 0;
 }
 
 uint8 i8237_r8x(t_bool io, uint8 data)
@@ -724,6 +737,7 @@ uint8 i8237_r8x(t_bool io, uint8 data)
             return 0;
         }
     }
+    return 0;
 }
 
 uint8 i8237_r9x(t_bool io, uint8 data)
@@ -740,6 +754,7 @@ uint8 i8237_r9x(t_bool io, uint8 data)
             return 0;
         }
     }
+    return 0;
 }
 
 uint8 i8237_rAx(t_bool io, uint8 data)
@@ -781,6 +796,7 @@ uint8 i8237_rAx(t_bool io, uint8 data)
             return 0;
         }
     }
+    return 0;
 }
 
 uint8 i8237_rBx(t_bool io, uint8 data)
@@ -797,6 +813,7 @@ uint8 i8237_rBx(t_bool io, uint8 data)
             return 0;
         }
     }
+    return 0;
 }
 
 uint8 i8237_rCx(t_bool io, uint8 data)
@@ -813,6 +830,7 @@ uint8 i8237_rCx(t_bool io, uint8 data)
             return 0;
         }
     }
+    return 0;
 }
 
 uint8 i8237_rDx(t_bool io, uint8 data)
@@ -829,6 +847,7 @@ uint8 i8237_rDx(t_bool io, uint8 data)
             return 0;
         }
     }
+    return 0;
 }
 
 uint8 i8237_rEx(t_bool io, uint8 data)
@@ -845,6 +864,7 @@ uint8 i8237_rEx(t_bool io, uint8 data)
             return 0;
         }
     }
+    return 0;
 }
 
 uint8 i8237_rFx(t_bool io, uint8 data)
@@ -861,6 +881,7 @@ uint8 i8237_rFx(t_bool io, uint8 data)
             return 0;
         }
     }
+    return 0;
 }
 
 /* end of i8237.c */

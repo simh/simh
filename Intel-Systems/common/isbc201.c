@@ -183,6 +183,9 @@
 #define RB1RD0          0x40            //drive 0 ready
 #define RB1RD1          0x80            //drive 1 ready
 
+#define MDSSD           256256          //single density FDD size
+#define MDSDD           512512          //double density FDD size
+
 /* external globals */
 
 extern uint16   port;                                   //port called in dev_table[port]
@@ -512,7 +515,7 @@ uint8 isbc2012(t_bool io, uint8 data)
         } else {                        /* write data port */
             fdc201[fdcnum].iopb |= (data << 8);
             if (DEBUG)
-                sim_printf("\n   isbc202-%d: 0x7A IOPB=%04X PCX=%04X", 
+                sim_printf("\n   isbc201-%d: 0x7A IOPB=%04X PCX=%04X", 
                     fdcnum, fdc201[fdcnum].iopb, PCX);
             isbc201_diskio(fdcnum);
             if (fdc201[fdcnum].intff)

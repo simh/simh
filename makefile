@@ -1408,8 +1408,8 @@ IMDS-225 = ${IMDS-225C}/i8080.c ${IMDS-225D}/imds-225_sys.c \
 IMDS-225_OPT = -I ${IMDS-225D}
 
 
-IBMPCD = IBMPC-Systems/ibmpc
-IBMPCC = IBMPC-Systems/common
+IBMPCD = Intel-Systems/ibmpc
+IBMPCC = Intel-Systems/common
 IBMPC =	${IBMPCC}/i8255.c ${IBMPCD}/ibmpc.c \
 	${IBMPCC}/i8088.c ${IBMPCD}/ibmpc_sys.c \
 	${IBMPCC}/i8253.c ${IBMPCC}/i8259.c \
@@ -1418,8 +1418,8 @@ IBMPC =	${IBMPCC}/i8255.c ${IBMPCD}/ibmpc.c \
 IBMPC_OPT = -I ${IBMPCD}
 
 
-IBMPCXTD = IBMPC-Systems/ibmpcxt
-IBMPCXTC = IBMPC-Systems/common
+IBMPCXTD = Intel-Systems/ibmpcxt
+IBMPCXTC = Intel-Systems/common
 IBMPCXT = ${IBMPCXTC}/i8088.c ${IBMPCXTD}/ibmpcxt_sys.c \
 	${IBMPCXTC}/i8253.c ${IBMPCXTC}/i8259.c \
 	${IBMPCXTC}/i8255.c ${IBMPCXTD}/ibmpcxt.c \
@@ -1848,22 +1848,14 @@ ${BIN}imds-225${EXE} : ${IMDS-225} ${SIM} ${BUILD_ROMS}
 ibmpc: ${BIN}ibmpc${EXE}
 
 ${BIN}ibmpc${EXE} : ${IBMPC} ${SIM} ${BUILD_ROMS}
-ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
 	${MKDIRBIN}
 	${CC} ${IBMPC} ${SIM} ${IBMPC_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-else
-	$(info ibmpc can't be built using C++)
-endif
 
 ibmpcxt: ${BIN}ibmpcxt${EXE}
 
 ${BIN}ibmpcxt${EXE} : ${IBMPCXT} ${SIM} ${BUILD_ROMS}
-ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
 	${MKDIRBIN}
 	${CC} ${IBMPCXT} ${SIM} ${IBMPCXT_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-else
-	$(info ibmpcxt can't be built using C++)
-endif
 
 tx-0 : ${BIN}tx-0${EXE}
 

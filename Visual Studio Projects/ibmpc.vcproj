@@ -41,7 +41,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="./;../;../IBMPC-Systems/ibmpc/;&quot;../../windows-build/PCRE/include/&quot;"
+				AdditionalIncludeDirectories="./;../;../Intel-Systems/ibmpc/;&quot;../../windows-build/PCRE/include/&quot;"
 				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC"
 				KeepComments="false"
 				MinimalRebuild="true"
@@ -124,7 +124,7 @@
 				Optimization="2"
 				InlineFunctionExpansion="1"
 				OmitFramePointers="true"
-				AdditionalIncludeDirectories="./;../;../IBMPC-Systems/ibmpc/;&quot;../../windows-build/PCRE/include/&quot;"
+				AdditionalIncludeDirectories="./;../;../Intel-Systems/ibmpc/;&quot;../../windows-build/PCRE/include/&quot;"
 				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC"
 				StringPooling="true"
 				RuntimeLibrary="0"
@@ -189,43 +189,43 @@
 			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm"
 			>
 			<File
-				RelativePath="..\IBMPC-Systems\common\i8088.c"
+				RelativePath="..\Intel-Systems\common\i8088.c"
 				>
 			</File>
 			<File
-				RelativePath="..\IBMPC-Systems\common\i8237.c"
+				RelativePath="..\Intel-Systems\common\i8237.c"
 				>
 			</File>
 			<File
-				RelativePath="..\IBMPC-Systems\common\i8253.c"
+				RelativePath="..\Intel-Systems\common\i8253.c"
 				>
 			</File>
 			<File
-				RelativePath="..\IBMPC-Systems\common\i8255.c"
+				RelativePath="..\Intel-Systems\common\i8255.c"
 				>
 			</File>
 			<File
-				RelativePath="..\IBMPC-Systems\common\i8259.c"
+				RelativePath="..\Intel-Systems\common\i8259.c"
 				>
 			</File>
 			<File
-				RelativePath="..\IBMPC-Systems\ibmpc\ibmpc.c"
+				RelativePath="..\Intel-Systems\ibmpc\ibmpc.c"
 				>
 			</File>
 			<File
-				RelativePath="..\IBMPC-Systems\ibmpc\ibmpc_sys.c"
+				RelativePath="..\Intel-Systems\ibmpc\ibmpc_sys.c"
 				>
 			</File>
 			<File
-				RelativePath="..\IBMPC-Systems\common\pcbus.c"
+				RelativePath="..\Intel-Systems\common\pcbus.c"
 				>
 			</File>
 			<File
-				RelativePath="..\IBMPC-Systems\common\pceprom.c"
+				RelativePath="..\Intel-Systems\common\pceprom.c"
 				>
 			</File>
 			<File
-				RelativePath="..\IBMPC-Systems\common\pcram8.c"
+				RelativePath="..\Intel-Systems\common\pcram8.c"
 				>
 			</File>
 			<File
@@ -330,7 +330,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\IBMPC-Systems\ibmpc\system_defs.h"
+				RelativePath="..\Intel-Systems\ibmpc\system_defs.h"
 				>
 			</File>
 		</Filter>
