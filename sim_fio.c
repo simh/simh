@@ -488,7 +488,7 @@ if (!fOut) {
     st = sim_messagef (SCPE_ARG, "Can't open '%s' for output: %s\n", dest_file, strerror (errno));
     goto Cleanup_Return;
     }
-buf = malloc (BUFSIZ);
+buf = (char *)malloc (BUFSIZ);
 while ((bytes = fread (buf, 1, BUFSIZ, fIn)))
     fwrite (buf, 1, bytes, fOut);
 Cleanup_Return:

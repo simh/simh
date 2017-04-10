@@ -5377,7 +5377,7 @@ sprintf (FullPath, "%s%s", directory, filename);
 if ((dname[strlen (dname) - 1] == '/') || (dname[strlen (dname) - 1] == '\\'))
     dname[strlen (dname) - 1] = '\0';
 if ((!stat (dname, &deststat)) && (deststat.st_mode & S_IFDIR)) {
-    char *dslash = (strrchr (dname, '/') ? "/" : (strrchr (dname, '\\') ? "\\" : "/"));
+    const char *dslash = (strrchr (dname, '/') ? "/" : (strrchr (dname, '\\') ? "\\" : "/"));
 
     dname[sizeof (dname) - 1] = '\0';
     snprintf (&dname[strlen (dname)], sizeof (dname) - strlen (dname), "%s%s", dslash, filename);
