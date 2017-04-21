@@ -1,0 +1,17 @@
+The attached program will make an ISO compatible CD Image on both Intel
+Linux and Windows XP systems.
+
+It works with the VMS Hobbyist CD, and the result is bootable.  It works
+with all the other data CD's that I tried as well.
+
+The same exe works on Windows 2000, with one odd exception.  It will
+simply copy a CD image from any CD which has an ISO9660 file system on it,
+but it fails to recognize a non-zero size for the \\.\CdRom0 device on these
+systems when the Hobbist CD is installed.
+
+Meanwhile, this raw data copy operation is the "right" thing for this problem.
+The raw copy result provides a disk image that the simulator can access.
+On many platforms, the simulator could access the device directly just as
+this program does.
+
+- Mark Pizzolato

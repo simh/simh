@@ -1,0 +1,930 @@
+                                   PUTR V2.01
+                             FILE TRANSFER PROGRAM
+                     Copyright (C) 1995-2001 by John Wilson
+                              All rights reserved
+                           Release date:  05-Sep-2001
+        
+             PUTR is a copyrighted but freely distributable utility for
+        transferring files between various file systems and various
+        media.  It is named after PUTR.SAV (Peripheral Utility Transfer
+        Routines), the utility which performs the same function under
+        the DEC TSS/8.24 operating system for the PDP-8.
+        
+             This program is a companion to the D Bit "Ersatz-11" PDP-11
+        emulation package, which emulates a broad range of PDP-11 CPU
+        and peripheral models at greatly increased speed.  A demo
+        version (with reduced features) is available for free download,
+        it may be used for 30-day commercial evaluation or unlimited
+        hobby use.  See www.dbit.com for information.  PUTR is generally
+        compatible with other emulators and coprocessors as well, and
+        can transfer files between PCs and real PDP-11s and PDP-8s using
+        a variety of media.  Multiple foreign volumes can be mounted at
+        once, and files can be copied directly between them (or within a
+        single foreign volume) in one step without having to do separate
+        extract and insert operations using the PC disk as intermediate
+        storage.
+        
+             The file systems currently fully supported are RT-11,
+        RSTS/E, DOS/BATCH, XXDP+, OS/8 (and OS/78 etc.), PUTR (TSS/8
+        DECtape utility), and PC-DOS.  PUTR can also read Files-11 ODS-1
+        file systems (i.e. disks from RSX-11M, RSX-11M-PLUS, IAS, and
+        P/OS) and TSS/8.24 file systems.  COS-310 disks have the same
+        structure as OS/8 disks, however the text file format is
+        different and is currently not supported by PUTR.  COS-310
+        binary files may be transferred the same as OS/8 binary files.
+        
+             All file systems other than PC-DOS must be logically
+        mounted and assigned a logical device name before use.  This is
+        done with the MOUNT command.  PUTR is mainly intended to work on
+        logical devices contained in disk image files (normally a
+        block-by-block copy of the foreign disk), but it also supports
+        raw SCSI disks (through an ASPI driver), DEC TU58 tape drives
+        (plugged into a COM port), RX50 (including a double-sided
+        variant) and RX33 floppy disks or RX01/02/03 26-sector workalike
+        disks mounted on a 1.2 MB drive, and RX24, RX23, and RX26 720
+        KB/1.44 MB/2.88 MB disks on an appropriate 3.5" drive (even
+        though none of these was supported by standard DEC controllers
+        on machines using these file systems).
+        
+             PUTR can format any of these types of floppy disks.  Note
+        that most PC floppy controllers don't work correctly in single
+        density mode, but some chips made by SMC, WD, Goldstar, Intel
+        (but not the 82078), and National Semiconductor are known to
+        work.  On a controller with a working single density mode, the
+        RX01 format is exactly compatible with genuine RX01 disks
+        (i.e. IBM 3740 format) mounted in an 8" drive connected in place
+        of a 1.2 MB one, using an adapter such as D Bit's "FDADAP" board
+        (see http://www.dbit.com/fdadap.html for information).  The
+        "RX02" format used by PUTR is actually IBM System 34 format,
+        since DEC's 8" DD disks use a strange combination of SD headers
+        with non-standard ID marks, and DD data fields, that can't be
+        accessed with a standard PC FDC regardless of the software used.
+        The 26-sector 5.25" disk formats are compatible with those used
+        by Ersatz-11.
+
+
+        FILENAMES
+        =========
+
+        [ldevu:][dir][filename]
+
+        As much as possible, the filename syntax is intended to look
+        similar to that of the host operating system for the volume on
+        which the file is located.
+
+        The ldevu: parameter is the logical device and unit number where
+        the file is located.  The device name is one or two letters with
+        an optional unit number in the range 0-255, so that DOS-style
+        drive names like "X:" or DEC-style drive names like "SY:" or
+        "DL0:" are possible.  Logical devices are mounted using the
+        MOUNT command, or they may be PC-DOS drives (which are all
+        implicitly mounted under the native file system (i.e. PC-DOS)).
+        The device name syntax is intended to mimic that of the DEC
+        PDP-11 OSes for convenience only, at the moment no significance
+        is attached to the device name (different units of the same
+        device name have nothing to do with each other, and for example
+        DL0: need not be an RL01/02 image).  This may change.  If the
+        ldevu: parameter is omitted, the current logged-in logical
+        device is assumed (you log into a device by typing the device
+        name and a colon at the prompt, just like in PC-DOS).
+
+        The dir parameter is the directory in which the file is located
+        (by default, the current working directory on that logical
+        device).  With PC-DOS drives this is the usual sequence of
+        directory names separated by \ (or / if that isn't your
+        SWITCHAR).  RT-11 drives use the same syntax as PC-DOS, to refer
+        to nested logical disk files (LD:);  the default extension is
+        ".DSK".  "." and ".." are fake directory names and have the same
+        meanings as under PC-DOS.  Note that PUTR doesn't assume that it
+        can tell the difference between a directory and an ordinary file
+        (because under RT-11 there is no difference), so all pathname
+        elements must end in \ (except the final one in a CD command).
+        So if you want to list the parent directory, type "DIR ..\"
+        instead of "DIR ..".
+
+        RSTS drives use directory names of the form [proj,prog], with
+        the project and programmer numbers in decimal.  The
+        one-character logical names !, #, $, %, and & also work.
+        DOS/BATCH uses "[proj,prog]" directory names too but the numbers
+        are octal instead of decimal, and the directory name comes after
+        the filename instead of before it.
+
+        Files-11 drives (RSX etc.) use either numeric directory names of
+        the form [proj,prog], with the project and programmer numbers in
+        octal, or named directories with names like [USER].  PUTR
+        supports tree-structured directories, with names like
+        [USER.FILES.OLD].  P/OS is currently the only DEC PDP-11
+        operating system which implements tree-structured Files-11 ODS-1
+        disks.
+
+        The filename syntax depends on the file structure of the drive;
+        under all supported file structures it is of the form
+        "filename.ext", where the length of the filename and extension
+        have fixed limits for each OS.  Note that the parsing and
+        wildcard matching routines make no assumptions about filename
+        syntax (except for adding default "*"s depending on whether they
+        see a "." anywhere in the filespec), so it is possible to fool
+        them.  For example, typing "DIR ????????A.*" on a PC-DOS disk
+        will not give an error message, but it's impossible for anything
+        to match this spec.  The wildcard parser is smarter than the one
+        in PC-DOS -- '*' and '?' really work the way they should (in
+        PC-DOS a '*' is equivalent to filling out the rest of the field
+        with '?'s instead of really matching 0 or more characters, and
+        in PC-DOS '?' will match a blank, which isn't true of most other
+        systems).
+
+        Note that each filename on an ODS-1 disk contains a version
+        number, which PUTR interprets as a decimal number.  Some systems
+        use octal but that's a function of the operating system and not
+        the disk structure itself, so there's no way for PUTR to
+        auto-detect this.  PUTR's wildcard lookup code is currently
+        operating system independent and does not give special treatment
+        to version numbers, they are regarded as simply being part of
+        the filename string.  So in order to access a file on an ODS-1
+        disk, you must either use a wildcard that matches the ";n" on
+        the end of the filename, or explicitly specify a version number
+        (preceded by a semicolon).  Otherwise PUTR's file search code
+        will not recognize it as a match against the file on the ODS-1
+        disk.
+
+        This also may cause trouble in output filenames.  If X: is an
+        ODS-1 disk and C: is a DOS disk, the command "copy
+        x:[200,200]foo.txt;1 c:" will attempt to create a file named
+        "FOO.TXT;1" on the DOS C: drive.  Most versions of DOS will
+        ignore everything after the first three letters of the filename
+        extension, however DR-DOS treats the semicolon character
+        specially, and considers everything after the semicolon to be a
+        password, which is used to lock the file.  So on DR-DOS, the
+        above command will create a file which appears as "FOO.TXT" in a
+        directory listing, but you must use the name "FOO.TXT;1" to
+        access that file (or delete it).  This can be worked around by
+        specifying the output filename explicitly, as in "copy
+        x:[200,200]foo.txt;1 c:foo.txt".
+
+
+        COMMANDS
+        ========
+
+        PUTR is an interactive program with a simple command line
+        interface.  Many of the basic file-related commands which work
+        at a DOS command prompt, such as DIR or TYPE or COPY, will also
+        work when typed at PUTR's command prompt.  PUTR extends these
+        commands by allowing any mixture of real DOS drive letters, and
+        PUTR's own logical device names, to be used in file
+        specifications.  There are also additional commands which allow
+        special file operations to be performed, which have no
+        equivalent in the DOS command language.  In many cases, the
+        syntax follows that of the equivalent commands in DEC operating
+        systems.
+
+        A typical PUTR session starts with a MOUNT command for each
+        foreign volume which will be accessed, possibly preceded by
+        FORMAT and/or INITIALIZE commands to create these volumes if
+        they do not already exist.  Then the user can use the familiar
+        CD, DIR, TYPE, COPY, COPY/B, and DELETE commands to manipulate
+        files.  Finally, QUIT exits to DOS.
+
+        When PUTR is run, it looks for an indirect command file named
+        "PUTR.INI", first in the current directory, then in the
+        directory where the executable is located (for PC-DOS 3.0 and
+        later only).  If found, this file is opened as an indirect
+        command file before the first command prompt.  This is a
+        convenient place to put SET commands, and MOUNT commands for the
+        disk image file(s) that you usually use.
+
+
+        ------------------------------------------------------------
+
+        ldevu:
+
+        Simply typing a logical device name (with the colon) on a line
+        by itself, switches the "logged-in" drive to that device, just
+        as in PC-DOS or CP/M.  This drive (and its current working
+        directory) will now appear in PUTR's prompt, and it will be used
+        as the default for all file specifications which do not include
+        an explicit drive name.
+
+
+        ------------------------------------------------------------
+
+        @ filename[.CMD]
+
+        Redirects input so that commands come from the specified
+        indirect command file (with default extension ".CMD").  Indirect
+        files chain rather than nesting, so if an "@" command appears
+        inside an indirect file the file is closed and new input comes
+        from the specified file.  At end of file input reverts to the
+        keyboard.
+
+
+        ------------------------------------------------------------
+
+        BOOT ldevu:
+
+        On RT-11 volumes only, makes a volume bootable.  The volume must
+        contain the needed .SYS files (monitor, system device handler,
+        TT: device handler), there are prompts that let you choose which
+        monitor to boot and which device handler the bootstrap should be
+        for.  At each prompt you may enter a blank line to display a
+        list of all .SYS files on the volume, or a filename (default
+        extension ".SYS") to use.  The action performed is exactly
+        equivalent to COPY/BOOT under RT-11.
+
+
+        ------------------------------------------------------------
+
+        CD ldevu:dir
+
+        Changes the current working directory on the specified drive
+        (default is the current logged-in drive).  If no directory is
+        given the current working directory is displayed.  For RT-11
+        drives, logical disks (*.DSK) are made to look like
+        subdirectories so you can CD into them too (and use CD .. to get
+        out).
+
+
+        ------------------------------------------------------------
+
+        CLS
+
+        Clears the screen.
+
+
+        ------------------------------------------------------------
+
+        COPY[/BINARY][/OVERRIDE] ldevu:inspec ldevu:outspec
+
+        Copies the specified file(s), converting between file systems if
+        necessary.  Files are assumed to be ASCII (NULs are squeezed
+        out, two 12-bit words are unpacked to three 8-bit characters,
+        etc.)  unless the /BINARY switch is given;  this default may be
+        changed with the SET COPY command.  If an output file has the
+        same name as an existing file in the same directory, then the
+        existing file is deleted, unless it is protected;  the /OVERRIDE
+        switch overrides this protection.  Not all file systems support
+        protection.  In a binary copy between 12- and 16-bit media, the
+        12-bit words are considered to be right-justified in 16-bit
+        words (PDP-11 byte order);  the remaining four bits are ignored
+        on input and written as 0 on output.
+
+        Additional COPY switches are useful when writing into a RSTS/E
+        file system.  /CLUSTERSIZE:n writes the output file with the
+        specified cluster size, instead of the pack cluster size.  This
+        value is ignored unless it is a power of two, between the pack
+        cluster size and 256, inclusive.  Also the /CONTIGUOUS switch
+        writes the output file as a contiguous file.  Ideally this
+        switch would work with DOS/BATCH volumes too, but it is not yet
+        implemented.
+
+        Note that unlike the COPY commands in DOS or RT-11, this command
+        cannot concatenate multiple input files into one output file.
+
+
+        ------------------------------------------------------------
+
+        COPY/DEVICE[/FILES][/BINARY] ldevu:[inspec] ldevu:[outspec]
+
+        Does an image copy from one device to another, or between a
+        device and a file.  By default the copy is done in logical block
+        order, which is to say the 512-byte blocks are copied in order
+        starting at block 0.  If you're copying a floppy disk (or an
+        image of one) then adding a /BINARY switch tells PUTR to copy in
+        physical sector order, starting with cylinder 0 head 0 sector 1,
+        and proceeding in sequential sector order, copying both surfaces
+        of each cylinder (if double sided) before proceeding to the next
+        cylinder.  This copies all sectors of the disk, even those not
+        used by the DEC interleave schemes (on RX01, RX02, and RX03
+        disks, DEC leaves out track 0), and the resulting image files
+        are more likely to be in the right order if they aren't really
+        DEC disks.  This use of /BINARY is not affected by the SET COPY
+        command.
+
+
+        ------------------------------------------------------------
+
+        DELETE[/NOQUERY][/OVERRIDE] ldevu:filespec
+
+        Deletes the specified file(s), prompting before each unless
+        /NOQUERY is specified.  If a file is protected, it is not
+        deleted unless the /OVERRIDE switch is given.
+
+
+        ------------------------------------------------------------
+
+        DIRECTORY ldevu:wildcard [/FULL]
+
+        Displays a directory of the indicated file(s).  /FULL gives the
+        starting block numbers of files as well on OS/8 or RT-11
+        volumes.
+
+
+        ------------------------------------------------------------
+
+        DISMOUNT ldevu: [/UNLOAD]
+
+        Undoes the effect of a MOUNT command (q.v.).  Closes any image
+        file associated with the logical device, or releases the COM
+        port or floppy drive or SCSI device, and deletes the logical
+        name definition.  /UNLOAD ejects the disk on SCSI drives that
+        support this.
+
+
+        ------------------------------------------------------------
+
+        EXIT
+
+        Returns to PC-DOS.
+
+
+        ------------------------------------------------------------
+
+        FORMAT d: /devtype /ostype
+
+        Formats the disk in PC-DOS floppy drive d: to the type specified
+        by /devtype (/RX01, /RX02, /RX03, /RX23, /RX24, /RX26, /RX33,
+        /RX50, /RX52 -- default depends on drive type and is /RX50 for
+        1.2 MB drives or if the drive type is unknown).  The /ostype
+        switch is optional and tells PUTR to write a blank directory
+        structure for the specified OS (see the INITIALIZE command).  It
+        may also affect the interleave and skew used for formating, if
+        appropriate for that OS.
+
+        Note that for RX50 format, double density disks (e.g. PC 360 KB
+        disks) should be used rather than the PC high density 1.2 MB
+        disks.  Opinion is divided as to whether the hub rings should be
+        peeled off before use -- as they age they may slide slightly out
+        of place so that the disk doesn't center properly, but then
+        again they're there to protect the disk and without them it's
+        more likely to get damaged.  In any case the 1.2 MB disks don't
+        erase/rewrite properly in double density mode (RX50s are double
+        density disks), even if they appear to format OK (which might
+        happen if they were bulk erased first) they can't be trusted as
+        RX50s.
+
+
+        ------------------------------------------------------------
+
+        FORMAT dev:filename /devtype /ostype
+
+        Creates an image file of the specified device type.  The file is
+        initialized to zeros and an empty bad sector file is written if
+        appropriate (you will be prompted for a pack serial number for
+        device types that have them).  As above, if /ostype is specified
+        then a blank directory is written.
+
+        If no device type is given then PUTR assumes nothing and just
+        prompts for the file size and creates a zeroed file of that
+        size.  The value entered for the size should be a decimal
+        integer, optionally followed by the units the size represents;
+        if no unit is specified then the number is assumed to be the
+        number of bytes.  Examples of the possibilities are, "100" means
+        100 bytes, "100 BLOCKS" means 100 blocks (512 bytes each), "100
+        KB" means 100 KB, "100 MB" means 100 MB (1 MB = 2**20 bytes),
+        and "100 GB" would mean 100 GB (1 GB = 2**30 bytes) except that
+        that exceeds the 2 GB limit on the size of a single DOS file.
+        Note that only integers may be used, so you can't say "1.44 MB"
+        or "2.1 GB".  Those might not mean what you intend anyway, note
+        that 2.1 GB is not equal to 2100 MB (unless you're talking about
+        "marketing" numbers where MB/GB mean 10**6/10**9 instead of the
+        usual 2**20/2**30), so it's probably better to spell it out in
+        smaller units.
+
+
+        ------------------------------------------------------------
+
+        INITIALIZE vol /devtype /ostype
+
+        Writes a blank directory on the specified volume or image file
+        (only /OS8, /PUTR, and /RT11 are allowed as /ostype switches at
+        this time).  Prompts for any needed information.  "vol" is a
+        file, floppy drive, SCSI device, or COM port name the same as in
+        FORMAT and MOUNT.  For initializing RT-11 volumes, there is a
+        "/SEGMENTS:n" switch which overrides the default number of
+        directory segments created.  The default depends on size of
+        volume, using the same rules as with RT-11's own DUP.SAV (which
+        implements its INITIALIZE command).
+
+
+        ------------------------------------------------------------
+
+        MOUNT ldevu: image /devtype /ostype
+
+        Mounts a disk image, and attaches it to logical device name for
+        later use in other PUTR commands.  "ldevu:" is a logical device
+        name (1 or 2 letters) and optional unit number.  The device name
+        is arbitrary, but future versions of PUTR may change so that the
+        device name dictates the emulation (i.e. "DL1:" must be an RL01
+        or RL02) since that will make it possible to have useful
+        defaults for /devtype in case file size alone isn't enough to
+        tell.
+
+        "image" is the location of the disk image.  Possibilities are as
+        follows:
+
+        [d:][path\]filename[.DSK] (name of a PC file)
+
+             The specified file contains a raw image of the disk.
+             This is known as an "image file" or "container file",
+             and is commonly obtained by downloading a disk from a
+             live machine over a serial or network connection, or
+             taking a snapshot of a SCSI disk, although PUTR can
+             also create image files from scratch itself (see
+             FORMAT).
+
+        d: (name of a PC floppy drive)
+
+             The raw floppy disk is used to hold the volume.  This
+             should not be confused with an image file on a DOS
+             diskette, the disk uses the foreign file system and in
+             most cases will interchange with the foreign machine.
+             In a MOUNT command, if the "ldevu:" logical device
+             name is omitted, the floppy name will be used.  For
+             example you may "MOUNT B: /RT11 /RX50" and then "DIR
+             B:".
+
+        SCSIhtl: (SCSI disk)
+
+             This form allows a raw SCSI disk to be mounted using a
+             foreign file system.  The "SCSIhtl:" device name
+             specifies a SCSI disk (accessed through an ASPI
+             manager) at host adapter "h" (A=0, B=1, etc.), target
+             "t", and LUN "l", where h, t, and l (as well as the
+             underscore character) are all optional (the defaults
+             are "SCSIA00:").  On most systems there will be only
+             one SCSI host adapter, and most disks have only one
+             logical unit, so in most cases the device name may be
+             something like "SCSI5:", which specifies SCSI target
+             #5.
+
+             Note that some DOS ASPI drivers exist which make
+             non-SCSI devices look like SCSI drives.  These should
+             work fine with PUTR, just pretend it's a SCSI drive.
+             An example is the ASPIATAP.SYS used with IDE/ATAPI
+             versions of the Iomega Zip drive, which makes the
+             drive look as if it's SCSI target 1, so
+             "SCSI1:" refers to the raw Zip drive in this case.
+
+        CDROMx: (raw CD-ROM drive)
+
+             This name can be used to open a raw CD-ROM, using the
+             usual MSCDEX.EXE interface (or NWCDEX.EXE under
+             DR-DOS).  "x" is the CD-ROM drive's DOS drive letter.
+             Note that the MSCDEX emulation provided in Windows 95
+             and Windows 98 does not allow access to the first
+             sixteen sectors of the disk, which will not allow
+             PDP-11 format disks to work, except for non-zero RT-11
+             partitions.  The workaround is to use plain DOS, or
+             else use a SCSI CD-ROM drive with the SCSI: device
+             type.
+
+        COMn:bbbbb/DRIVE:u (TU58 tape drive)
+
+             This specifies an actual DEC TU58 drive connected to
+             COM port "n", at baud rate "bbbbb" (default is 38400),
+             unit u (0 or 1, default is 0).
+
+        The /devtype switch specifies the device type of the image;  the
+        defaults are auto-sensed except for TU58 drives where obviously
+        the default is always /TU58.  With image files the default
+        device type depends on the file size, and is the largest defined
+        device less than or equal to the file in length.  With floppies
+        various reads are attempted to detect the disk type.  Raw
+        CD-ROMs and SCSI disks always default to /MSCP since their size
+        probably has more to do with the physical drive than with
+        whatever DEC drive it's supposed to replace.
+
+        Possible switches are as follows:
+
+             /RX01 = RX01 disk, 5.25" RX01 workalike
+             /RX02 = 5.25" RX02 workalike
+             /RX03 = DS 5.25" RX02 workalike
+
+                  NOTE:  for image files of the above devices, the file
+                  size is used to determine which disk type it is and
+                  whether the file is a block-by-block image (as
+                  obtained by a "COPY/DEVICE/FILES DY0: FLOPPY.IMG"
+                  command under RT-11, for example) which has had
+                  interleave and skew applied to it by the PDP-11 device
+                  driver that read it, or a sector-by-sector image (as
+                  might be obtained by any simple program that reads the
+                  sectors off sequentially and puts them in order into a
+                  file).  Block-by-block image files of 8" disks are
+                  slightly smaller because the DEC interleave/skew
+                  scheme skips track 0.
+
+             /RX23 = 1.44 MB 3.5" disk
+             /RX24 = 720 KB 3.5" disk
+             /RX26 = 2.88 MB 3.5" disk
+             /RX33 = 1.2 MB 5.25" disk
+             /RX50 = 400 KB 5.25" disk
+
+                  NOTE:  RX50 image files are the same size whether they
+                  have interleave or not, so PUTR tries it both ways
+                  while trying to guess the OS type.
+
+             /RX52 = DS RX50, 800 KB 5.25" disk (PUTR's own name)
+
+        The following switches are also supported:  /MSCP, /RA60, /RA70,
+        /RA71, /RA72, /RA73, /RA80, /RA81, /RA82, /RA90, /RA92, /RD32,
+        /RD51, /RD52, /RD53, /RD54, /RK02, /RK05, /RK06, /RK07, /RL01,
+        /RL02, /RM02, /RM03, /RM05, /RM80, /RP02, /RP03, /RP04, /RP05,
+        /RP06, /RP07, /RS03, /RS04, /RS08, /TU56, /TU58.  These switches
+        set the device type to the indicated DEC drive model.  Since
+        there is no way to connect most of these devices directly to a
+        PC (unlike floppies), the effect of these switches is to specify
+        the exact size of the volume.  Also, for the FORMAT command,
+        there is special handling of RL01, RL02, RK06, and RK07 drives
+        for building a blank bad sector track and (in the case of RT-11)
+        deducting the correct amount from the volume size to allow for
+        driver-implemented replacement blocks.  The /MSCP switch means
+        that the image is a generic disk device whose actual size should
+        be used, instead of assuming the size matches some particular
+        model of DEC disk drive.
+
+        The /ostype switch specifies the file structure on the device;
+        one of the switches below may be given.  If none is specified
+        then PUTR performs tests to guess the disk format.  If the
+        volume appears to have no known directory, or seems to be valid
+        for more than one of the supported file structures, then a
+        message is displayed and the volume is not mounted.  Mounting a
+        disk with /FOREIGN would seem pointless (since no directory
+        operations are allowed), except that it makes it usable with the
+        COPY/DEVICE command so it can be used to transfer an image of
+        the disk to or from a file (or another identical disk).
+
+        File structure switches:
+
+             /FILES11 = Files-11 ODS-1, used by RSX-11M, RSX-11M-PLUS,
+                  IAS, and P/OS.  Support is currently read-only.
+
+             /RSTSE = RSTS/E disk structure (RDS 0.0, 1.1, or 1.2).
+
+             /RT11 = RT-11 disk structure (/PARTITION:n switch selects
+                  MSCP partition number, default is 0).
+
+             /OS8 = OS/8, OS/78, OS/278, COS-310 disk structure
+                  (/PARTITION:n switch selects RK05 partition number,
+                  default is 0).
+
+             /PUTR = TSS/8 PUTR.SAV DECtape format, similar to OS/8
+                  format but with software 11:1 block interleave,
+                  encoded 3-letter filename extensions, and a different
+                  way of packing 7-bit ASCII characters into 12-bit
+                  words.
+
+                  Note:  even though the regular OS/8 format uses 128
+                  words of each 129-word DECtape block, the PUTR.SAV
+                  format needs all 129 words (so a full 1474-block
+                  DECtape image is 190,146 words or 380,292 bytes)
+                  because some of the blocks are recorded in reverse, so
+                  that the last 128 words of those blocks are used
+                  rather than the first.
+
+             /TSS8 = TSS/8.24 system disk format (DS32 or RS08).
+                  Currently read-only.  Works only with disks built with
+                  256-word segments, which is the most common size.
+                  Probably not compatible with disks written by older
+                  versions of the TSS/8 monitor, but nothing else was
+                  available for testing.  Filename extensions (chosen
+                  from a fixed list of eleven) were a late addition, and
+                  the base year for file dates was changed from 1964 to
+                  1974 somewhere along the way (the new format ran out
+                  in 1984).
+
+                  The location of the MFD depends on the value of the
+                  JOBMAX build parameter.  This value may be specified
+                  using the "/PARTITION:n" switch (where n is between 1
+                  and 25 decimal).  If this switch is omitted, PUTR will
+                  search every 4 K words until it finds what looks like
+                  a valid MFD.
+
+             /DOSBATCH = DOS/BATCH file structure.
+
+             /XXDP = XXDP+ file structure, a variant of DOS/BATCH format
+                  used in late versions of the XXDP+ diagnostic package
+                  (earlier versions of XXDP used exactly the DOS/BATCH
+                  format, so they should be mounted with /DOSBATCH).
+
+             /FOREIGN = some other file structure, device is accessed in
+                  16-bit mode and the only possible operations are COPY
+                  /DEV and COPY /FILE /DEV.
+
+        There are a few miscellaneous MOUNT switches.  /INTERLEAVE and
+        /NOINTERLEAVE tell whether an image file is interleaved (i.e. a
+        block-by-block copy of a floppy disk so the data are in block
+        order, not sector order) or non-interleaved (i.e. a
+        sector-by-sector copy so the data are in sector order).  The
+        default is to guess based on the image file size (or prompt in
+        the case of FORMAT, which takes the same switches).
+        /PARTITION:n specifies the partition number for RT-11 MSCP disks
+        or OS/8 RK05 disks (default is 0).  /RONLY and /RW tell whether
+        the device should be mounted for read-only or read/write access.
+        The default is read/write.
+
+        All of the above switches may be given in any order.
+
+
+        ------------------------------------------------------------
+
+        QUIT
+
+        Returns to PC-DOS.
+
+
+        ------------------------------------------------------------
+
+        SET x: type
+
+        Sets the drive type for one of the four possible PC floppy
+        drives A:-D: (note that actual PCs rarely have more than one or
+        two floppy drives).  The type must be RX01, RX02, RX03, RX50,
+        RX33, RX24, RX23, or RX26.  The default value for each drive is
+        whatever was stored in CMOS memory by the ROM BIOS setup
+        utility.
+
+        This command may be useful when the drive types stored in CMOS
+        RAM are incorrect for some reason.  It's also helpful when an 8"
+        drive, or a real DEC RX50 drive, has been attached to the PC
+        using a D Bit "FDADAP" adapter, or something equivalent.  There
+        is no standard for representing these drive types in CMOS RAM.
+        Using real RX50 drives (or other 300 RPM quad-density drives
+        such as the Tandon TM100-3 and TM100-4) is different from RX33s
+        (which is what PUTR calls regular PC 1.2 MB drives) because the
+        motor speed is slower, so the FDC chip must be programmed for a
+        lower data rate to match.
+
+
+        ------------------------------------------------------------
+
+        SET COPY {ASCII | BINARY}
+
+        Sets the default transfer mode for the COPY command (initially
+        ASCII).  Intended mainly for use in the PUTR.INI command file.
+
+
+        ------------------------------------------------------------
+
+        SET DISMOUNT {NOUNLOAD | UNLOAD}
+
+        Sets the default unload action of DISMOUNTs, both explicit, and
+        implied by QUITting, or reMOUNTing the pseudo-device as
+        something else.  Default is NOUNLOAD.  Intended for use in
+        PUTR.INI with drive models where the disk shouldn't be left in
+        the drive when it's powered off.
+
+
+        ------------------------------------------------------------
+
+        SET FDC {COMPATICARD | GENERIC}
+
+        Tells PUTR whether your floppy disk controller is a Micro
+        Solutions CompatiCard IV, or just a generic PC floppy
+        controller.  If it is a CompatiCard, PUTR maintains the TG43
+        signal (for 8" drives) by writing to port 3F0h;  normal FDCs
+        have no writable port at that address and don't do anything when
+        it gets written so the default is COMPATICARD to cover
+        everything, but if your FDC does strange things when that port
+        is written you should SET FDC GENERIC to disable the writes.
+
+        This setting doesn't matter if you're using the D Bit "FDADAP"
+        floppy disk adapter board (see http://www.dbit.com/fdadap.html)
+        to connect to an 8" drive.  The board has an on-board
+        microcontroller which transparently monitors the drive bus and
+        drives the TG43 signal correctly for each drive without any
+        software help.
+
+
+        ------------------------------------------------------------
+
+        SET MORE {OFF | ON}
+
+        Turns **MORE** processing on or off;  the default is on, so
+        output pauses at the end of every screen.  As above, intended
+        mainly for use in PUTR.INI.
+
+
+        ------------------------------------------------------------
+
+        SHOW ldevu:
+
+        Shows the medium and file system types for the specified logical
+        device.
+
+
+        ------------------------------------------------------------
+
+        TYPE ldevu:wildcard
+
+        Types the specified file(s) on the terminal, printing the
+        filename(s) first.
+
+
+        ------------------------------------------------------------
+
+        WIPEOUT ldevu:dir
+
+        Writes zeros over all "< UNUSED >" areas so that disk image
+        files will compress smaller with GZIP (etc.) and/or transfer
+        faster with Kermit (etc.).  Supported only for OS/8, PUTR, and
+        RT-11 volumes.
+        Example Operations
+        ======= ==========
+
+
+        This section gives sample commands to accomplish common
+        operations.  In these examples the PUTR prompt is shown as
+        "(C:\)>", whereas on your system it will show the actual
+        logged-in drive and current working directory.
+
+
+        ------------------------------------------------------------
+
+        Formating RX50 disks (assuming B: is a 1.2 MB drive):
+
+        (C:\)>format b: /rx50
+        Press ENTER when ready...
+          (status is displayed during the format operation)
+        Format more disks (Y/N)? N
+          (or type Y to format more RX50s)
+        (C:\)>quit
+
+
+        ------------------------------------------------------------
+
+        Copying PDP-11 image files to RX50s (B: is the 1.2 MB drive):
+
+        (C:\)>mount b: /rx50 /foreign
+        (C:\)>copy/file/dev disk1.dsk b:
+          (if you have more than one disk to copy, you may swap disks
+          and issue more COPY commands without having to repeat the
+          MOUNT command)
+        (C:\)>quit
+
+
+        ------------------------------------------------------------
+
+        Creating blank container files:
+
+        Example  1 -- MSCP disk (user-selected size):
+
+        (C:\)>format du0.dsk /mscp
+        Are you sure (Y/N)? Y
+        File size (bytes): 10000 blocks
+        (C:\)>quit
+
+
+        Example  2 -- RL02 (size known by PUTR, has pack serial number):
+
+        (C:\)>format dl0.dsk /rl02
+        Are you sure (Y/N)? Y
+        Serial # [1234512345]: 666
+        (C:\)>quit
+
+
+        ------------------------------------------------------------
+
+        Create a bootable RT-11 disk image from its component files:
+
+        All of the RT-11 files have been downloaded in binary mode, from
+        the PDP-11 into a PC directory named "C:\RT11".
+
+        (C:\)>format du0.dsk /mscp /rt11
+        Are you sure (Y/N)? Y
+        File size (bytes): 32 mb
+        Volume ID <RT11A>:
+        Owner name:
+        (C:\)>mount x: du0 /mscp
+        (C:\)>set more off
+          (avoids having to press space bar during the copy)
+        (C:\)>copy/b c:\rt11\*.* x:
+          (... lists all files being copied ...)
+        (C:\)>boot x:
+        Writing bootstrap on X:\
+
+        Monitor file [.SYS]: rt11xm
+        Device handler file [.SYS]: dlx
+          (substitute actual monitor and device handler filenames,
+          being careful to append "X" to the handler name when using
+          an XM monitor)
+        (C:\)>quit
+        File Formats
+        ==== =======
+
+
+        Generally, the disk image files used by PUTR (typically with a
+        ".DSK" extension) simply contain a byte-by-byte snapshot of the
+        entire disk, in physical sector order.  For 12-bit images
+        (PDP-8, DECmate series), each 12-bit word is stored
+        right-justified in a 16-bit word in PDP-11 byte order.
+
+        There are several exceptions:
+
+             RX01, RX02, "RX03":
+
+                  These may be accessed either as "block" images or as
+                  "sector" images.  Block images contain a snapshot of
+                  the disk as seen through a PDP-8/PDP-11 device driver,
+                  so there's no interleave, and track 0 does not appear
+                  in the image file.  Block images generally work the
+                  same as images of any other type of drive, since DEC
+                  used most styles of disks directly, without any kind
+                  of soft interleave.  Sector images are a snapshot of
+                  the disk in raw sector order, including track 0, and
+                  the data are in physical order, so soft interleave is
+                  required to sort out the "cooked" blocks seen through
+                  the host operating system.
+
+                  Note that these disks have the same low-level format,
+                  and thus the same sector image file format, in both
+                  PDP-8 and PDP-11 systems.  PDP-11s simply treat the
+                  bytes as bytes, while PDP-8s perform packing and
+                  unpacking of the 12-bit words so that (typically) 64
+                  or 128 words are packed into the first 3/4 of the
+                  sector, with the remainder ignored.
+
+             RX50, "RX52":
+
+                  These disks have similar issues to the 8" disks, but
+                  the details are different.  The interleave schemes
+                  wrap around the end of the disk to track 0, so track 0
+                  is used in both the "block" and "sector" image file
+                  formats, and the image file size is the same either
+                  way.  On 12-bit systems, the words are not packed
+                  together in the first 3/4 of the sector, they're
+                  individually right-justified in a PDP-11 word, so four
+                  bits of each word are wasted but the data go all the
+                  way to the end of the sector.
+
+             RK05 disk packs:
+
+                  RK05 drives were used on both 12- and 16-bit systems.
+                  The same drives work with both formats, but the packs
+                  are different.  12-bit packs have 16 sectors per track
+                  (1.6 MW total), and 16-bit packs have 12 sectors per
+                  track (1.2 MW total).  In both cases the sectors are
+                  256 words each.  Because of the 4 bits of padding for
+                  every word in a 12-bit image, PUTR uses 3,276,800
+                  bytes to store a 12-bit RK05 image, vs. only 2,457,600
+                  bytes for a 16-bit RK05 image.
+
+             555, TU55, TU56 DECtape:
+
+                  DECtapes were used on a wide variety of machines with
+                  different word sizes.  PUTR stores DECtape image files
+                  in three different formats.
+
+                  PDP-11s use DECtapes formatted in 18-bit mode (the
+                  high 2 bits are ignored), giving 578 blocks of 256
+                  words each.  PUTR stores those as byte-for-byte images
+                  with an image file size of 295,936 bytes.
+
+                  PDP-8 DECtapes have 1474 blocks of 129 words each.
+                  Most file systems actually use only 128 words per
+                  block, but the DECtape hardware doesn't allow that
+                  block size because it uses 6-bit mark codes which are
+                  recorded in a single track alongside three data
+                  tracks, so a block's data field must be a multiple of
+                  18 bits.  OS/8 always uses only the first 128 words of
+                  each sector, so the 129th word can be safely omitted
+                  from an image file.  With PUTR's usual packing (each
+                  12-bit word is right-justified in a 16-bit PDP-11
+                  word), this gives an image file size of 377,344 bytes.
+
+                  However, you may wish to include the 129th word just
+                  to be safe.  This is definitely required for TSS/8
+                  PUTR.SAV format tapes.  Even though they use only 128
+                  words per block, they are recorded using an interleave
+                  scheme in which 45% of the blocks are recorded
+                  backwards, so the first 128 words of the block become
+                  the last 128 words of the block when read forwards.
+                  Therefore all 129 words must be preserved, because the
+                  image file is considered to be accessed in the forward
+                  direction (i.e.  that's what you should do when taking
+                  a snapshot of a tape).  This gives a file size of
+                  380,292 bytes.
+
+                  PUTR tests the file size when opening an existing
+                  image, and chooses the most appropriate size when
+                  creating a new image file with the FORMAT command, so
+                  generally it will do the right thing with all three
+                  file sizes.
+
+
+
+        Note:
+
+        "D Bit", "Ersatz", and "E11" are trademarks of Digby's Bitpile,
+        Inc.  All other trademarks are used for identification purposes
+        only and are the property of their respective owners.
+
+
+
+        John Wilson
+        Digby's Bitpile, Inc. DBA D Bit
+        11 Bank Street
+        Troy, NY  12180
+        USA
+        +1 (518) 271-6824
+        +1 (518) 272-3853 fax (call above number first)
+        <wilson@dbit.com>
+        www.dbit.com

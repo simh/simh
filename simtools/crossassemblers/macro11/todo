@@ -1,0 +1,57 @@
+I was not able to locate a Macro-11 language reference manual any more
+recent than for RT11 version *3*, so I used that plus my recollection
+of more modern features.  It was enough to get the RT11 V5.4 kernel
+built, plus a significant chunk of our own code.
+
+The biggest missing feature is full featured listings.  The .LIST and
+.NLIST directives are ignored, as is .SBTTL.  No table of contents is
+accumulated or printed.  No symbol cross referencing is done (most
+likely I'll just write a CTAGS file, not a cross reference listing).
+
+Many errors still go unchecked.  Off the top of my head, I recall that
+object and listing file output errors are ignored.
+
+.FLT4 format may be inaccurate in the low bits.  This is because IEEE
+64 bit format has two fewer mantissa bits than 64 bit PDP-11 format.
+Without writing soft-float routines, there's not much I can do abbout
+it.
+
+Expression math is done in native width, almost certainly 32 bits.
+Truncation to 16 bits is done only for listing and output.  This may
+make some output differ in the presence of 16-bit overflows and
+underflows.  I don't think this needs fixing.
+
+.REM blocks containing code can screw up .MACRO, .REPT, .IRP, .IRPC.
+read_body in macro11.c would need to be able to parse and ignore .REM
+blocks.
+
+Need to search a path for the .INCLUDE directive.  Right now it only
+takes a complete file name.  And most likely, existing code will have
+RT-11 style file names; I don't know what to do about that, except put
+in a device name parser.
+
+Possible enhancements:
+
+It would be very simple to make macro11 resolve internal symbols with
+more that 6 significant characters.  Even so, only the first 6 would
+be used for external symbols, and you have to be wary of existing code
+that used (for example) .LOOKU rather than .LOOKUP, since these two
+would become distinct.
+
+SYM = 0
+MOV SYM(R0),R0	; macro11 could optimize SYM(R0) into just (R0)
+
+I dream of automatically fixing branches out of range.  Easy when the
+destination is backwards, difficult when it's forwards.  I have this
+idea: during the first assembly pass, all branches generate a long
+branch if the target symbol is undefined, otherwise an "optimized"
+branch (short or long) if the target is defined.  Then keep a
+128-instruction FIFO of generated instructions.  Each FIFO entry is
+tagged with context and symbol definition as they are pushed to the
+FIFO.  When an instruction gets pulled from the FIFO because it's more
+than 128 words away, the FIFO is searched for long branches that point
+to this location; any such are shortened, and any symbols defined
+following their location in the stream are adjusted.  In the second
+assembly pass, the FIFOs aren't used because all jump distances are
+known, and the right sized branch (JMP or Bcc) can be generated.
+

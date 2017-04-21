@@ -1,0 +1,91 @@
+Note:	This program has no attribution for authorship.  I modified it
+	to deal with binary files.
+
+	Bob Supnik
+	
+Description:
+
+	backup is a program that can list the contents of, and extract
+	files from a TOPS-10 backup tape.  The command syntax is some-
+	what resembling that of tar.  The command
+
+		backup -t[v][f tape]
+
+	lists the contents of 'tape'.  The command
+
+		backup -x[cdimv8][f tape] file1 file2 ...
+
+	extracts all files that match either of the file arguments given.
+	
+	The names used for the created files will be the canonical names
+	from the tape, unless -d or -i are in effect.  The canonical name
+	is a string of the format: device.p_pn.sfd1.sfd2..file.ext
+
+Arguments:
+
+	'tape' is the name of a tape drive, the name of a file or the
+	single character '-', meaning stdin.  If omitted, the environment
+	variable TAPE will be consulted.
+
+
+	If the "tape" argument is actually a file, which was captured
+	from a tape (say, on a different machine).  The "known good" way 
+	to capture the contents of the tape is to use the unix utility
+	"dd", and a command line something like this:
+
+	   dd if=/dev/rmt0 of=data ibs=2720 obs=2720 conv=block
+
+	the key thing is that this program expects a fixed block size of
+	2720 bytes.  If the tape actually has some other format, this 
+	program probably won't succeed.  You can use the unix utility "tcopy"
+	to inspect the contents of the tape.
+
+	   Here's the tcopy output from a good tape:
+
+	   tcopy /dev/rmt0 
+	   file 0: block size 2720: 9917 records
+	   file 0: eof after 9917 records: 26974240 bytes
+	   eot
+	   total length: 26974240 bytes
+
+
+	File arguments are either any substring of the canonical name
+	printed with 'backup -t ...', or a hash mark, and the number
+	of the file on the tape, or "*" to simply extract all the files.
+
+Options:
+
+   -b   Extract files in binary format.  The files on tape have one
+	36b word stored in five 8b frames, as specified in PDP-10
+	"core dump" mode.  The extracted files have one 36b word
+	stored, right justified, on one little-endian 64b word, as
+	expected by the simh simulators.
+
+   -c	The 'tape' is a disk file, in copytape format.
+
+   -d	Create a directory structure when restoring, giving files named
+	device:p_pn/sfd1/sfd2/file.ext, instead of the flat name space
+	resulting from using the canonical names.
+
+   -f	The disk image file is the next argument.
+
+   -i	Ignore device and directory info when building output file names.
+
+   -m	The disk image file has a 4 byte header specifying density, which
+	must be ignored.
+
+   -v	Verbose.  Does the obvious.  -vv does even more.
+
+   -8	Tops-10 file was in eight-bit mode.
+
+
+Bugs:
+
+	We don't handle multiple tape savesets any good.
+
+	We don't check for bad format of input.
+
+	We don't handle checksums, or repeated blocks any good.
+
+
+
