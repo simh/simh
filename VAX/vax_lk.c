@@ -1,6 +1,6 @@
 /* vax_lk.c: DEC Keyboard (LK201)
 
-   Copyright (c) 2011-2013, Matt Burke
+   Copyright (c) 2013-2017, Matt Burke
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,12 +26,15 @@
    lk           LK201 keyboard
 
    11-Jun-2013  MB      First version
+
+   Related documents:
+
+        EK-104AA-TM-001 - VCB02 Technical Manual (chapter B.5)
 */
 
 #if !defined(VAX_620)
 
-#include "vax_defs.h"
-#include "sim_video.h"
+#include "vax_lk.h"
 
 /* States */
 
@@ -46,9 +49,20 @@
 #define LK_MODE_NONE      2
 #define LK_MODE_DOWNUP    3
 
+#define LK_BUF_LEN        100
+
+#define LK_SEND_CHAR(c)   lk_put_fifo (&lk_sndf, c)
+
 static const char *lk_modes[] = {"DOWN", "AUTODOWN", "NONE", "DOWNUP"};
 
 static const char *lk_states[] = {"DOWN", "UP", "REPEAT"};
+
+typedef struct {
+    int32 head;
+    int32 tail;
+    int32 count;
+    uint8 buf[LK_BUF_LEN];
+} LK_FIFO;
 
 /* Scan codes */
 
@@ -57,107 +71,102 @@ typedef struct {
     uint8 code;
 } LK_KEYDATA;
 
-LK_KEYDATA LK_KEY_UNKNOWN    = { 0, 0 };
-LK_KEYDATA LK_KEY_TR_0       = { 1, 0xEF };
-LK_KEYDATA LK_KEY_TR_1       = { 1, 0xC0 };
-LK_KEYDATA LK_KEY_TR_2       = { 1, 0xC5 };
-LK_KEYDATA LK_KEY_TR_3       = { 1, 0xCB };
-LK_KEYDATA LK_KEY_TR_4       = { 1, 0xD0 };
-LK_KEYDATA LK_KEY_TR_5       = { 1, 0xD6 };
-LK_KEYDATA LK_KEY_TR_6       = { 1, 0xDB };
-LK_KEYDATA LK_KEY_TR_7       = { 1, 0xE0 };
-LK_KEYDATA LK_KEY_TR_8       = { 1, 0xE5 };
-LK_KEYDATA LK_KEY_TR_9       = { 1, 0xEA };
-LK_KEYDATA LK_KEY_A          = { 1, 0xC2 };
-LK_KEYDATA LK_KEY_B          = { 1, 0xD9 };
-LK_KEYDATA LK_KEY_C          = { 1, 0xCE };
-LK_KEYDATA LK_KEY_D          = { 1, 0xCD };
-LK_KEYDATA LK_KEY_E          = { 1, 0xCC };
-LK_KEYDATA LK_KEY_F          = { 1, 0xD2 };
-LK_KEYDATA LK_KEY_G          = { 1, 0xD8 };
-LK_KEYDATA LK_KEY_H          = { 1, 0xDD };
-LK_KEYDATA LK_KEY_I          = { 1, 0xE6 };
-LK_KEYDATA LK_KEY_J          = { 1, 0xE2 };
-LK_KEYDATA LK_KEY_K          = { 1, 0xE7 };
-LK_KEYDATA LK_KEY_L          = { 1, 0xEC };
-LK_KEYDATA LK_KEY_M          = { 1, 0xE3 };
-LK_KEYDATA LK_KEY_N          = { 1, 0xDE };
-LK_KEYDATA LK_KEY_O          = { 1, 0xEB };
-LK_KEYDATA LK_KEY_P          = { 1, 0xF0 };
-LK_KEYDATA LK_KEY_Q          = { 1, 0xC1 };
-LK_KEYDATA LK_KEY_R          = { 1, 0xD1 };
-LK_KEYDATA LK_KEY_S          = { 1, 0xC7 };
-LK_KEYDATA LK_KEY_T          = { 1, 0xD7 };
-LK_KEYDATA LK_KEY_U          = { 1, 0xE1 };
-LK_KEYDATA LK_KEY_V          = { 1, 0xD3 };
-LK_KEYDATA LK_KEY_W          = { 1, 0xC6 };
-LK_KEYDATA LK_KEY_X          = { 1, 0xC8 };
-LK_KEYDATA LK_KEY_Y          = { 1, 0xDC };
-LK_KEYDATA LK_KEY_Z          = { 1, 0xC3 };
-LK_KEYDATA LK_KEY_SPACE      = { 1, 0xD4 };
-LK_KEYDATA LK_KEY_SEMICOLON  = { 1, 0xF2 };
-LK_KEYDATA LK_KEY_PLUS       = { 1, 0xF5 };
-LK_KEYDATA LK_KEY_COMMA      = { 1, 0xE8 };
-LK_KEYDATA LK_KEY_UBAR       = { 1, 0xF9 };
-LK_KEYDATA LK_KEY_PERIOD     = { 1, 0xED };
-LK_KEYDATA LK_KEY_QMARK      = { 1, 0xF3 };
-LK_KEYDATA LK_KEY_QUOTE      = { 1, 0xFB };
-LK_KEYDATA LK_KEY_LBRACE     = { 1, 0xFA };
-LK_KEYDATA LK_KEY_RBRACE     = { 1, 0xF6 };
-LK_KEYDATA LK_KEY_VBAR       = { 1, 0xF7 };
-LK_KEYDATA LK_KEY_TILDE      = { 1, 0xBF };
-LK_KEYDATA LK_KEY_KP_0       = { 2, 0x92 };
-LK_KEYDATA LK_KEY_KP_1       = { 2, 0x96 };
-LK_KEYDATA LK_KEY_KP_2       = { 2, 0x97 };
-LK_KEYDATA LK_KEY_KP_3       = { 2, 0x98 };
-LK_KEYDATA LK_KEY_KP_4       = { 2, 0x99 };
-LK_KEYDATA LK_KEY_KP_5       = { 2, 0x9A };
-LK_KEYDATA LK_KEY_KP_6       = { 2, 0x9B };
-LK_KEYDATA LK_KEY_KP_7       = { 2, 0x9D };
-LK_KEYDATA LK_KEY_KP_8       = { 2, 0x9E };
-LK_KEYDATA LK_KEY_KP_9       = { 2, 0x9F };
-LK_KEYDATA LK_KEY_KP_PF1     = { 2, 0xA1 };
-LK_KEYDATA LK_KEY_KP_PF2     = { 2, 0xA2 };
-LK_KEYDATA LK_KEY_KP_PF3     = { 2, 0xA3 };
-LK_KEYDATA LK_KEY_KP_PF4     = { 2, 0xA4 };
-LK_KEYDATA LK_KEY_KP_HYPHEN  = { 2, 0xA0 };
-LK_KEYDATA LK_KEY_KP_COMMA   = { 2, 0x9C };
-LK_KEYDATA LK_KEY_KP_PERIOD  = { 2, 0x94 };
-LK_KEYDATA LK_KEY_KP_ENTER   = { 2, 0x95 };
-LK_KEYDATA LK_KEY_DELETE     = { 3, 0xBC };
-LK_KEYDATA LK_KEY_TAB        = { 3, 0xBE };
-LK_KEYDATA LK_KEY_RETURN     = { 4, 0xBD };
-LK_KEYDATA LK_KEY_META       = { 5, 0xB1 };
-LK_KEYDATA LK_KEY_LOCK       = { 5, 0xB0 };
-LK_KEYDATA LK_KEY_SHIFT      = { 6, 0xAE };
-LK_KEYDATA LK_KEY_CTRL       = { 6, 0xAF };
-LK_KEYDATA LK_KEY_LEFT       = { 7, 0xA7 };
-LK_KEYDATA LK_KEY_RIGHT      = { 7, 0xA8 };
-LK_KEYDATA LK_KEY_UP         = { 8, 0xAA };
-LK_KEYDATA LK_KEY_DOWN       = { 8, 0xA9 };
-LK_KEYDATA LK_KEY_REMOVE     = { 9, 0x8C };
-LK_KEYDATA LK_KEY_NEXT_SCREEN= { 9, 0x8F };
-LK_KEYDATA LK_KEY_PREV_SCREEN= { 9, 0x8E };
-LK_KEYDATA LK_KEY_INSERT_HERE= { 9, 0x8B };
-LK_KEYDATA LK_KEY_FIND       = { 9, 0x8A };
-LK_KEYDATA LK_KEY_SELECT     = { 9, 0x8D };
-LK_KEYDATA LK_KEY_F1         = { 10, 0x56 };
-LK_KEYDATA LK_KEY_F2         = { 10, 0x57 };
-LK_KEYDATA LK_KEY_F3         = { 10, 0x58 };
-LK_KEYDATA LK_KEY_F4         = { 10, 0x59 };
-LK_KEYDATA LK_KEY_F5         = { 10, 0x5A };
-LK_KEYDATA LK_KEY_F6         = { 11, 0x64 };
-LK_KEYDATA LK_KEY_F7         = { 11, 0x65 };
-LK_KEYDATA LK_KEY_F8         = { 11, 0x66 };
-LK_KEYDATA LK_KEY_F9         = { 11, 0x67 };
-LK_KEYDATA LK_KEY_F10        = { 11, 0x68 };
-LK_KEYDATA LK_KEY_F11        = { 12, 0x71 };
-LK_KEYDATA LK_KEY_F12        = { 12, 0x72 };
-
-#define LK_BUF_LEN        100
-
-#define LK_SEND_CHAR(c)   lk_sbuf[lk_stptr++] = c; \
-                          if (lk_stptr == LK_BUF_LEN) lk_stptr = 0
+LK_KEYDATA LK_KEY_UNKNOWN    = { 0, LK_UNKNOWN };
+LK_KEYDATA LK_KEY_TR_0       = { 1, LK_TR_0 };
+LK_KEYDATA LK_KEY_TR_1       = { 1, LK_TR_1 };
+LK_KEYDATA LK_KEY_TR_2       = { 1, LK_TR_2 };
+LK_KEYDATA LK_KEY_TR_3       = { 1, LK_TR_3 };
+LK_KEYDATA LK_KEY_TR_4       = { 1, LK_TR_4 };
+LK_KEYDATA LK_KEY_TR_5       = { 1, LK_TR_5 };
+LK_KEYDATA LK_KEY_TR_6       = { 1, LK_TR_6 };
+LK_KEYDATA LK_KEY_TR_7       = { 1, LK_TR_7 };
+LK_KEYDATA LK_KEY_TR_8       = { 1, LK_TR_8 };
+LK_KEYDATA LK_KEY_TR_9       = { 1, LK_TR_9 };
+LK_KEYDATA LK_KEY_A          = { 1, LK_A };
+LK_KEYDATA LK_KEY_B          = { 1, LK_B };
+LK_KEYDATA LK_KEY_C          = { 1, LK_C };
+LK_KEYDATA LK_KEY_D          = { 1, LK_D };
+LK_KEYDATA LK_KEY_E          = { 1, LK_E };
+LK_KEYDATA LK_KEY_F          = { 1, LK_F };
+LK_KEYDATA LK_KEY_G          = { 1, LK_G };
+LK_KEYDATA LK_KEY_H          = { 1, LK_H };
+LK_KEYDATA LK_KEY_I          = { 1, LK_I };
+LK_KEYDATA LK_KEY_J          = { 1, LK_J };
+LK_KEYDATA LK_KEY_K          = { 1, LK_K };
+LK_KEYDATA LK_KEY_L          = { 1, LK_L };
+LK_KEYDATA LK_KEY_M          = { 1, LK_M };
+LK_KEYDATA LK_KEY_N          = { 1, LK_N };
+LK_KEYDATA LK_KEY_O          = { 1, LK_O };
+LK_KEYDATA LK_KEY_P          = { 1, LK_P };
+LK_KEYDATA LK_KEY_Q          = { 1, LK_Q };
+LK_KEYDATA LK_KEY_R          = { 1, LK_R };
+LK_KEYDATA LK_KEY_S          = { 1, LK_S };
+LK_KEYDATA LK_KEY_T          = { 1, LK_T };
+LK_KEYDATA LK_KEY_U          = { 1, LK_U };
+LK_KEYDATA LK_KEY_V          = { 1, LK_V };
+LK_KEYDATA LK_KEY_W          = { 1, LK_W };
+LK_KEYDATA LK_KEY_X          = { 1, LK_X };
+LK_KEYDATA LK_KEY_Y          = { 1, LK_Y };
+LK_KEYDATA LK_KEY_Z          = { 1, LK_Z };
+LK_KEYDATA LK_KEY_SPACE      = { 1, LK_SPACE };
+LK_KEYDATA LK_KEY_SEMICOLON  = { 1, LK_SEMICOLON };
+LK_KEYDATA LK_KEY_PLUS       = { 1, LK_PLUS };
+LK_KEYDATA LK_KEY_COMMA      = { 1, LK_COMMA };
+LK_KEYDATA LK_KEY_UBAR       = { 1, LK_UBAR };
+LK_KEYDATA LK_KEY_PERIOD     = { 1, LK_PERIOD };
+LK_KEYDATA LK_KEY_QMARK      = { 1, LK_QMARK };
+LK_KEYDATA LK_KEY_QUOTE      = { 1, LK_QUOTE };
+LK_KEYDATA LK_KEY_LBRACE     = { 1, LK_LBRACE };
+LK_KEYDATA LK_KEY_RBRACE     = { 1, LK_RBRACE };
+LK_KEYDATA LK_KEY_VBAR       = { 1, LK_VBAR };
+LK_KEYDATA LK_KEY_TILDE      = { 1, LK_TILDE };
+LK_KEYDATA LK_KEY_KP_0       = { 2, LK_KP_0 };
+LK_KEYDATA LK_KEY_KP_1       = { 2, LK_KP_1 };
+LK_KEYDATA LK_KEY_KP_2       = { 2, LK_KP_2 };
+LK_KEYDATA LK_KEY_KP_3       = { 2, LK_KP_3 };
+LK_KEYDATA LK_KEY_KP_4       = { 2, LK_KP_4 };
+LK_KEYDATA LK_KEY_KP_5       = { 2, LK_KP_5 };
+LK_KEYDATA LK_KEY_KP_6       = { 2, LK_KP_6 };
+LK_KEYDATA LK_KEY_KP_7       = { 2, LK_KP_7 };
+LK_KEYDATA LK_KEY_KP_8       = { 2, LK_KP_8 };
+LK_KEYDATA LK_KEY_KP_9       = { 2, LK_KP_9 };
+LK_KEYDATA LK_KEY_KP_PF1     = { 2, LK_KP_PF1 };
+LK_KEYDATA LK_KEY_KP_PF2     = { 2, LK_KP_PF2 };
+LK_KEYDATA LK_KEY_KP_PF3     = { 2, LK_KP_PF3 };
+LK_KEYDATA LK_KEY_KP_PF4     = { 2, LK_KP_PF4 };
+LK_KEYDATA LK_KEY_KP_HYPHEN  = { 2, LK_KP_HYPHEN };
+LK_KEYDATA LK_KEY_KP_COMMA   = { 2, LK_KP_COMMA };
+LK_KEYDATA LK_KEY_KP_PERIOD  = { 2, LK_KP_PERIOD };
+LK_KEYDATA LK_KEY_KP_ENTER   = { 2, LK_KP_ENTER };
+LK_KEYDATA LK_KEY_DELETE     = { 3, LK_DELETE };
+LK_KEYDATA LK_KEY_TAB        = { 3, LK_TAB };
+LK_KEYDATA LK_KEY_RETURN     = { 4, LK_RETURN };
+LK_KEYDATA LK_KEY_META       = { 5, LK_META };
+LK_KEYDATA LK_KEY_LOCK       = { 5, LK_LOCK };
+LK_KEYDATA LK_KEY_SHIFT      = { 6, LK_SHIFT };
+LK_KEYDATA LK_KEY_CTRL       = { 6, LK_CTRL };
+LK_KEYDATA LK_KEY_LEFT       = { 7, LK_LEFT };
+LK_KEYDATA LK_KEY_RIGHT      = { 7, LK_RIGHT };
+LK_KEYDATA LK_KEY_UP         = { 8, LK_UP };
+LK_KEYDATA LK_KEY_DOWN       = { 8, LK_DOWN };
+LK_KEYDATA LK_KEY_REMOVE     = { 9, LK_REMOVE };
+LK_KEYDATA LK_KEY_NEXT_SCREEN= { 9, LK_NEXT_SCREEN };
+LK_KEYDATA LK_KEY_PREV_SCREEN= { 9, LK_PREV_SCREEN };
+LK_KEYDATA LK_KEY_INSERT_HERE= { 9, LK_INSERT_HERE };
+LK_KEYDATA LK_KEY_FIND       = { 9, LK_FIND };
+LK_KEYDATA LK_KEY_SELECT     = { 9, LK_SELECT };
+LK_KEYDATA LK_KEY_F1         = { 10, LK_F1 };
+LK_KEYDATA LK_KEY_F2         = { 10, LK_F2 };
+LK_KEYDATA LK_KEY_F3         = { 10, LK_F3 };
+LK_KEYDATA LK_KEY_F4         = { 10, LK_F4 };
+LK_KEYDATA LK_KEY_F5         = { 10, LK_F5 };
+LK_KEYDATA LK_KEY_F6         = { 11, LK_F6 };
+LK_KEYDATA LK_KEY_F7         = { 11, LK_F7 };
+LK_KEYDATA LK_KEY_F8         = { 11, LK_F8 };
+LK_KEYDATA LK_KEY_F9         = { 11, LK_F9 };
+LK_KEYDATA LK_KEY_F10        = { 11, LK_F10 };
+LK_KEYDATA LK_KEY_F11        = { 12, LK_F11 };
+LK_KEYDATA LK_KEY_F12        = { 12, LK_F12 };
 
 /* Debugging Bitmaps */
 
@@ -167,11 +176,8 @@ LK_KEYDATA LK_KEY_F12        = { 12, 0x72 };
 t_bool lk_repeat = TRUE;                                /* autorepeat flag */
 t_bool lk_trpti = FALSE;                                /* temp repeat inhibit */
 int32 lk_keysdown = 0;                                  /* no of keys held down */
-uint8 lk_sbuf[LK_BUF_LEN];                              /* send buffer */
-int32 lk_shptr = 0;                                     /* send buf head ptr */
-int32 lk_stptr = 0;                                     /* send buf tail ptr */
-uint8 lk_rbuf[10];                                      /* receive buffer */
-int32 lk_rbuf_p = 0;                                    /* receive buffer ptr */
+LK_FIFO lk_sndf;                                        /* send FIFO */
+LK_FIFO lk_rcvf;                                        /* receive FIFO */
 int32 lk_mode[16];                                      /* mode of each key group */
 
 t_stat lk_wr (uint8 c);
@@ -179,8 +185,10 @@ t_stat lk_rd (uint8 *c);
 t_stat lk_reset (DEVICE *dptr);
 void lk_reset_mode (void);
 void lk_cmd (void);
-void lk_poll (void);
 const char *lk_description (DEVICE *dptr);
+t_stat lk_put_fifo (LK_FIFO *fifo, uint8 data);
+t_stat lk_get_fifo (LK_FIFO *fifo, uint8 *data);
+void lk_clear_fifo (LK_FIFO *fifo);
 
 /* LK data structures
 
@@ -213,7 +221,7 @@ DEVICE lk_dev = {
     NULL, NULL, &lk_reset,
     NULL, NULL, NULL,
     NULL, DEV_DIS | DEV_DEBUG, 0,
-    lk_debug, NULL, NULL, NULL, NULL, NULL, 
+    lk_debug, NULL, NULL, NULL, NULL, NULL,
     &lk_description
     };
 
@@ -224,10 +232,9 @@ t_stat lk_wr (uint8 c)
 sim_debug (DBG_SERIAL, &lk_dev, "vax -> lk: %02X\n", c);
 if (c == 0)
     return SCPE_OK;
-lk_rbuf[lk_rbuf_p++] = c;
-if (lk_rbuf_p == sizeof(lk_rbuf)) {                     /* too long? */
-    lk_rbuf_p = 0;
-    LK_SEND_CHAR(0xB6);                                 /* input error */
+if (lk_put_fifo (&lk_rcvf, c) != SCPE_OK) {             /* too long? */
+    lk_clear_fifo (&lk_rcvf);
+    LK_SEND_CHAR(LK_INERR);                             /* input error */
     return SCPE_OK;
     }
 if (c & 0x80)                                           /* cmd terminator? */
@@ -239,28 +246,57 @@ return SCPE_OK;
 
 t_stat lk_rd (uint8 *c)
 {
-if (lk_shptr == lk_stptr)
-    lk_poll ();
-if (lk_shptr == lk_stptr) {
-    *c = 0;
-    return SCPE_EOF;
-    }
-else {
-    *c = lk_sbuf[lk_shptr++];
-    if (lk_shptr == LK_BUF_LEN)
-        lk_shptr = 0;                                   /* ring buffer wrap */
+t_stat r;
+
+r = lk_get_fifo (&lk_sndf, c);
+if (r == SCPE_OK)
     sim_debug (DBG_SERIAL, &lk_dev, "lk -> vax: %02X (%s)\n", *c,
-        (lk_shptr != lk_stptr) ? "more" : "end");
+        (lk_sndf.count > 0) ? "more" : "end");
+return r;
+}
+
+t_stat lk_put_fifo (LK_FIFO *fifo, uint8 data)
+{
+if (fifo->count < LK_BUF_LEN) {
+    fifo->buf[fifo->head++] = data;
+    if (fifo->head == LK_BUF_LEN)
+        fifo->head = 0;
+    fifo->count++;
     return SCPE_OK;
     }
+else
+    return SCPE_EOF;
+}
+
+t_stat lk_get_fifo (LK_FIFO *fifo, uint8 *data)
+{
+if (fifo->count > 0) {
+    *data = fifo->buf[fifo->tail++];
+    if (fifo->tail == LK_BUF_LEN)
+        fifo->tail = 0;
+    fifo->count--;
+    return SCPE_OK;
+    }
+else
+    return SCPE_EOF;
+}
+
+void lk_clear_fifo (LK_FIFO *fifo)
+{
+fifo->head = 0;
+fifo->tail = 0;
+fifo->count = 0;
 }
 
 void lk_cmd ()
 {
 int32 i, group, mode;
+uint8 data;
 
-if (lk_rbuf[0] & 1) {                                   /* peripheral command */
-    switch (lk_rbuf[0]) {
+lk_get_fifo (&lk_rcvf, &data);
+
+if (data & 1) {                                         /* peripheral command */
+    switch (data) {
 
         case 0x11:
             sim_debug (DBG_CMD, &lk_dev, "LED on\n");
@@ -276,7 +312,7 @@ if (lk_rbuf[0] & 1) {                                   /* peripheral command */
 
         case 0x8B:
             sim_debug (DBG_CMD, &lk_dev, "resume keyboard transmission\n");
-            lk_shptr = lk_stptr = 0;
+            lk_clear_fifo (&lk_sndf);
             break;
 
         case 0x99:
@@ -358,26 +394,26 @@ if (lk_rbuf[0] & 1) {                                   /* peripheral command */
             lk_reset_mode ();
             lk_repeat = TRUE;
             lk_trpti = FALSE;
-            LK_SEND_CHAR (0xBA);                        /* Mode change ACK */
+            LK_SEND_CHAR (LK_MODEACK);                  /* Mode change ACK */
             break;
 
         default:
-            sim_printf ("lk: unknown cmd %02X\n", lk_rbuf[0]);
+            sim_printf ("lk: unknown cmd %02X\n", data);
             break;
-        }
-    }
-    else {
-        group = (lk_rbuf[0] >> 3) & 0xF;
-        if (group < 15) {
-            mode = (lk_rbuf[0] >> 1) & 0x3;
-            sim_debug (DBG_CMD, &lk_dev, "set group %d, mode = %s\n", group, lk_modes[mode]);
-            lk_mode[group] = mode;
-            LK_SEND_CHAR (0xBA);                        /* Mode change ACK */
             }
-         else
-             sim_debug (DBG_CMD, &lk_dev, "set auto-repeat timing\n");
+    }
+else {
+    group = (data >> 3) & 0xF;
+    if (group < 15) {
+        mode = (data >> 1) & 0x3;
+        sim_debug (DBG_CMD, &lk_dev, "set group %d, mode = %s\n", group, lk_modes[mode]);
+        lk_mode[group] = mode;
+        LK_SEND_CHAR (LK_MODEACK);                      /* Mode change ACK */
         }
-    lk_rbuf_p = 0;
+    else
+        sim_debug (DBG_CMD, &lk_dev, "set auto-repeat timing\n");
+    }
+lk_clear_fifo (&lk_rcvf);
 }
 
 LK_KEYDATA lk_map_key (int key)
@@ -609,7 +645,7 @@ switch (key) {
     case SIM_KEY_BACKSLASH:
         lk_key = LK_KEY_VBAR;
         break;
-    
+
     case SIM_KEY_LEFT_BACKSLASH:
     case SIM_KEY_COMMA:
         lk_key = LK_KEY_COMMA;
@@ -626,7 +662,7 @@ switch (key) {
     /* case SIM_KEY_PRINT: */
     /* case SIM_KEY_PAUSE: */
     /* case SIM_KEY_ESC: */
-    
+
     case SIM_KEY_BACKSPACE:
         lk_key = LK_KEY_DELETE;
         break;
@@ -762,66 +798,61 @@ lk_mode[14] = LK_MODE_AUTODOWN;                         /* 14 = function keys: f
 
 t_stat lk_reset (DEVICE *dptr)
 {
-lk_rbuf_p = 0;
+lk_clear_fifo (&lk_sndf);
+lk_clear_fifo (&lk_rcvf);
 lk_keysdown = 0;
 lk_repeat = TRUE;
 lk_trpti = FALSE;
-lk_shptr = 0;
-lk_stptr = 0;
 lk_reset_mode ();
 return SCPE_OK;
 }
 
-void lk_poll (void)
+void lk_event (SIM_KEY_EVENT *ev)
 {
-SIM_KEY_EVENT ev;
 LK_KEYDATA lk_key;
 int32 mode;
 
-if (vid_poll_kb (&ev) != SCPE_OK)
-    return;
-
-lk_key = lk_map_key (ev.key);
+lk_key = lk_map_key (ev->key);
 mode  = lk_mode[lk_key.group];
 
-sim_debug (DBG_SERIAL, &lk_dev, "lk_poll() Event - Key: (group=%d, code=%02X), Mode: %s - auto-repeat inhibit: %s - state: %s\n", lk_key.group, lk_key.code, lk_modes[mode], lk_trpti ? "TRUE" : "FALSE", lk_states[ev.state]);
+sim_debug (DBG_SERIAL, &lk_dev, "lk_poll() Event - Key: (group=%d, code=%02X), Mode: %s - auto-repeat inhibit: %s - state: %s\n", lk_key.group, lk_key.code, lk_modes[mode], lk_trpti ? "TRUE" : "FALSE", lk_states[ev->state]);
 
-if (lk_trpti && (ev.state != SIM_KEYPRESS_REPEAT))
+if (lk_trpti && (ev->state != SIM_KEYPRESS_REPEAT))
     lk_trpti = FALSE;
 
 switch (mode) {
 
     case LK_MODE_DOWN:
-        if (ev.state == SIM_KEYPRESS_DOWN) {
+        if (ev->state == SIM_KEYPRESS_DOWN) {
             LK_SEND_CHAR (lk_key.code);
             }
         break;
 
     case LK_MODE_AUTODOWN:
-        if (ev.state == SIM_KEYPRESS_DOWN) {
+        if (ev->state == SIM_KEYPRESS_DOWN) {
             LK_SEND_CHAR (lk_key.code);
             }
-        else if ((ev.state == SIM_KEYPRESS_REPEAT) && lk_repeat && !lk_trpti) {
-            LK_SEND_CHAR (0xB4);
+        else if ((ev->state == SIM_KEYPRESS_REPEAT) && lk_repeat && !lk_trpti) {
+            LK_SEND_CHAR (LK_METRONOME);
             }
         break;
-        
+
     case LK_MODE_DOWNUP:
-        if (ev.state == SIM_KEYPRESS_DOWN) {
+        if (ev->state == SIM_KEYPRESS_DOWN) {
             lk_keysdown++;
             LK_SEND_CHAR (lk_key.code);
             }
-        else {
+        else if (ev->state == SIM_KEYPRESS_UP) {
             lk_keysdown--;
             if (lk_keysdown > 0) {
                 LK_SEND_CHAR (lk_key.code);
                 }
             else {
-                LK_SEND_CHAR (0xB3);                    /* LK_ALLUP */
+                LK_SEND_CHAR (LK_ALLUP);
                 }
             }
         break;
-    }            
+    }
 }
 
 const char *lk_description (DEVICE *dptr)
