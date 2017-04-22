@@ -390,7 +390,7 @@ dwStatus = FormatMessageA (FORMAT_MESSAGE_FROM_SYSTEM|
                            sizeof (szMsgBuffer) -1,           //  __in      DWORD nSize,
                            NULL);                             //  __in_opt  va_list *Arguments
 if (0 == dwStatus)
-    snprintf(szMsgBuffer, sizeof(szMsgBuffer) - 1, "Error Code: %d", dwError);
+    snprintf(szMsgBuffer, sizeof(szMsgBuffer) - 1, "Error Code: 0x%X", dwError);
 while (sim_isspace (szMsgBuffer[strlen (szMsgBuffer)-1]))
     szMsgBuffer[strlen (szMsgBuffer) - 1] = '\0';
 return szMsgBuffer;
