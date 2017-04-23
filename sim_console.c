@@ -861,7 +861,7 @@ CONST char *cptr;
 int32 saved_switches = sim_switches;
 t_stat stat;
 
-sim_strlcpy (cbuf, sim_rem_command_buf, sizeof (cbuf));
+strlcpy (cbuf, sim_rem_command_buf, sizeof (cbuf));
 while (isspace(cbuf[0]))
     memmove (cbuf, cbuf+1, strlen(cbuf+1)+1);   /* skip leading whitespace */
 sim_sub_args (cbuf, sizeof(cbuf), argv);
@@ -3598,8 +3598,8 @@ static t_stat sim_os_ttinit (void) {
     SIOUXSettings.toppixel = 42;
     SIOUXSettings.leftpixel     = 6;
     iBeamCursorH = GetCursor(iBeamCursor);
-    sim_strlcat(title, sim_name, sizeof(title));
-    sim_strlcat(title, " Simulator", sizeof(title));
+    strlcat(title, sim_name, sizeof(title));
+    strlcat(title, " Simulator", sizeof(title));
     title[0] = strlen(title) - 1;                       /* Pascal string done */
     for (i = 0; i <= title[0]; i++) {                   /* copy to unsigned char */
         ptitle[i] = title[i];

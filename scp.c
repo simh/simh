@@ -2123,7 +2123,7 @@ else if (*argv[0]) {                                    /* sim name arg? */
     strncpy (nbuf + 1, argv[0], PATH_MAX + 1);          /* copy sim name */
     if ((np = (char *)match_ext (nbuf, "EXE")))         /* remove .exe */
         *np = 0;
-    sim_strlcat (nbuf, ".ini\"", sizeof(nbuf));         /* add .ini" */
+    strlcat (nbuf, ".ini\"", sizeof(nbuf));         /* add .ini" */
     stat = do_cmd (-1, nbuf) & ~SCPE_NOMESSAGE;         /* proc default cmd file */
     if (stat == SCPE_OPENERR) {                         /* didn't exist/can't open? */
         np = strrchr (nbuf, '/');                       /* stript path and try again in cwd */
@@ -2916,8 +2916,8 @@ for (nargs = 0; nargs < 10; ) {                         /* extract arguments */
 if (do_arg [0] == NULL)                                 /* need at least 1 */
     return SCPE_2FARG;
 if ((fpin = fopen (do_arg[0], "r")) == NULL) {          /* file failed to open? */
-    sim_strlcpy (cbuf, do_arg[0], sizeof (cbuf));       /* try again with .sim extension */
-    sim_strlcat (cbuf, ".sim", sizeof (cbuf));
+    strlcpy (cbuf, do_arg[0], sizeof (cbuf));           /* try again with .sim extension */
+    strlcat (cbuf, ".sim", sizeof (cbuf));
     if ((fpin = fopen (cbuf, "r")) == NULL) {           /* failed a second time? */
         if (flag == 0)                                  /* cmd line file? */
              fprintf (stderr, "Can't open file %s\n", do_arg[0]);
@@ -5094,15 +5094,15 @@ sim_strlcpy (WildName, cptr, sizeof(WildName));
 cptr = WildName;
 sim_trim_endspc (WildName);
 if ((!stat (WildName, &filestat)) && (filestat.st_mode & S_IFDIR))
-    sim_strlcat (WildName, "/*", sizeof(WildName));
+    strlcat (WildName, "/*", sizeof(WildName));
 if ((*cptr != '/') || (0 == memcmp (cptr, "./", 2)) || (0 == memcmp (cptr, "../", 3))) {
 #if defined (VMS)
     getcwd (WholeName, sizeof(WholeName)-1, 0);
 #else
     getcwd (WholeName, sizeof(WholeName)-1);
 #endif
-    sim_strlcat (WholeName, "/", sizeof(WholeName));
-    sim_strlcat (WholeName, cptr, sizeof(WholeName));
+    strlcat (WholeName, "/", sizeof(WholeName));
+    strlcat (WholeName, cptr, sizeof(WholeName));
     sim_trim_endspc (WholeName);
     }
 else

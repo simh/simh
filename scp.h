@@ -160,6 +160,10 @@ int sim_strncasecmp (const char *string1, const char *string2, size_t len);
 int sim_strcasecmp (const char *string1, const char *string2);
 size_t sim_strlcat (char *dst, const char *src, size_t size);
 size_t sim_strlcpy (char *dst, const char *src, size_t size);
+#define strlcpy(dst, src, size) sim_strlcpy((dst), (src), (size))
+#define strlcat(dst, src, size) sim_strlcat((dst), (src), (size))
+#define strncasecmp(str1, str2, len) sim_strncasecmp((str1), (str2), (len))
+#define strcasecmp(str1, str2) sim_strcasecmp ((str1), (str2))
 CONST char *get_sim_opt (int32 opt, CONST char *cptr, t_stat *st);
 const char *put_switches (char *buf, size_t bufsize, uint32 sw);
 CONST char *get_glyph (const char *iptr, char *optr, char mchar);
