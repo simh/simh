@@ -637,7 +637,15 @@
 				>
 			</File>
 			<File
+				RelativePath="..\VAX\vax_lk.h"
+				>
+			</File>
+			<File
 				RelativePath="..\VAX\vax_mmu.h"
+				>
+			</File>
+			<File
+				RelativePath="..\VAX\vax_vs.h"
 				>
 			</File>
 			<File
