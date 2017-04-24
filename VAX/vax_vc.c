@@ -628,9 +628,9 @@ switch (rg) {
                 break;
 
             case 10:                                    /* Control mode bits */
-                vc_intc.mode &= ~0x60 | ((data << 3) & 0x60); /* mode<06:05> = data<03:02> */
+                vc_intc.mode &= ~ICM_M_RP | ((data << 3) & ICM_M_RP); /* mode<06:05> = data<03:02> */
                 if (((data & 0x3) == 0x1) || ((data & 0x3) == 2))
-                    vc_intc.mode &= ~0x80 | ((data << 7) & 0x80);
+                    vc_intc.mode &= ~ICM_MM | ((data << 7) & ICM_MM);
                 break;
 
             case 11:                                    /* Preselect IMR */
@@ -800,7 +800,7 @@ uint32 i;
 uint32 msk = (vc_intc.irr & ~vc_intc.imr);              /* unmasked interrutps */
 vc_icsr &= ~(ICSR_GRI|ICSR_M_IRRVEC);                   /* clear GRI & vector */
 
-if ((vc_intc.mode & 0x80) && ~(vc_intc.mode & 0x4)) {   /* group int MM & not polled */
+if ((vc_intc.mode & (ICM_MM | ICM_IM)) == ICM_MM) {     /* group int MM & not polled */
     for (i = 0; i < 8; i++) {
         if (msk & (1u << i)) {
             vc_icsr |= (ICSR_GRI | i);
@@ -1003,7 +1003,7 @@ vc_intc.irr = 0;
 vc_intc.imr = 0xFF;
 vc_intc.isr = 0;
 vc_intc.acr = 0;
-vc_intc.mode = 0x80;
+vc_intc.mode = ICM_MM;
 vc_icsr = 0;
 
 vc_csr = (((QVMBASE >> QVMAWIDTH) & ((1<<CSR_S_MA)-1)) << CSR_V_MA) | CSR_MOD;
