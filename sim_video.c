@@ -94,7 +94,7 @@ static char tmp_key_name[40];
  * via SDL_GetError().
  */
 #define SDL_SavePNG(surface, file) \
-	SDL_SavePNG_RW(surface, SDL_RWFromFile(file, "wb"), 1)
+        SDL_SavePNG_RW(surface, SDL_RWFromFile(file, "wb"), 1)
 
 /*
  * SDL_SavePNG -- libpng-based SDL_Surface writer.
