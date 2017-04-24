@@ -29,6 +29,10 @@
    06-Nov-2013  MB      Increased the speed of v-sync interrupts, which
                         was too slow for some O/S drivers.
    11-Jun-2013  MB      First version
+
+   Related documents:
+
+        AZ-GLFAB-MN - VAXstation II Technical Manual, BA23 Enclosure (Appendix C)
 */
 
 #if !defined(VAX_620)
@@ -36,6 +40,8 @@
 #include "vax_defs.h"
 #include "sim_video.h"
 #include "vax_2681.h"
+#include "vax_lk.h"
+#include "vax_vs.h"
 
 /* CSR - control/status register */
 
@@ -194,11 +200,6 @@ BITFIELD vc_ic_mode_bits[] = {
 #define IOLN_QVSS       0100
 
 extern int32 tmxr_poll;                                 /* calibrated delay */
-
-extern t_stat lk_wr (uint8 c);
-extern t_stat lk_rd (uint8 *c);
-extern t_stat vs_wr (uint8 c);
-extern t_stat vs_rd (uint8 *c);
 
 struct vc_int_t {
     uint32 ptr;
@@ -875,6 +876,8 @@ return 0;                                               /* no intr req */
 
 t_stat vc_svc (UNIT *uptr)
 {
+SIM_MOUSE_EVENT mev;
+SIM_KEY_EVENT kev;
 t_bool updated = FALSE;                                 /* flag for refresh */
 uint32 lines;
 uint32 ln, col, off;
@@ -914,31 +917,35 @@ vc_cur_v = CUR_V;
 vc_cur_f = CUR_F;
 vc_cur_new_data = FALSE;
 
-xpos = vc_mpos & 0xFF;                                  /* get current mouse position */
-ypos = (vc_mpos >> 8) & 0xFF;
-dx = vid_mouse_xrel;                                    /* get relative movement */
-dy = -vid_mouse_yrel;
-if (dx > VC_MOVE_MAX)                                   /* limit movement */
-    dx = VC_MOVE_MAX;
-else if (dx < -VC_MOVE_MAX)
-    dx = -VC_MOVE_MAX;
-if (dy > VC_MOVE_MAX)
-    dy = VC_MOVE_MAX;
-else if (dy < -VC_MOVE_MAX)
-    dy = -VC_MOVE_MAX;
-xpos += dx;                                             /* add to counters */
-ypos += dy;
-vc_mpos = ((ypos & 0xFF) << 8) | (xpos & 0xFF);         /* update register */
-vid_mouse_xrel -= dx;                                   /* reset counters for next poll */
-vid_mouse_yrel += dy;
+if (vid_poll_kb (&kev) == SCPE_OK)                      /* poll keyboard */
+    lk_event (&kev);                                    /* push event */
+if (vid_poll_mouse (&mev) == SCPE_OK) {                 /* poll mouse */
+    xpos = vc_mpos & 0xFF;                              /* get current mouse position */
+    ypos = (vc_mpos >> 8) & 0xFF;
+    dx = mev.x_rel;                                     /* get relative movement */
+    dy = -mev.y_rel;
+    if (dx > VC_MOVE_MAX)                               /* limit movement */
+        dx = VC_MOVE_MAX;
+    else if (dx < -VC_MOVE_MAX)
+        dx = -VC_MOVE_MAX;
+    if (dy > VC_MOVE_MAX)
+        dy = VC_MOVE_MAX;
+    else if (dy < -VC_MOVE_MAX)
+        dy = -VC_MOVE_MAX;
+    xpos += dx;                                         /* add to counters */
+    ypos += dy;
+    vc_mpos = ((ypos & 0xFF) << 8) | (xpos & 0xFF);     /* update register */
 
-vc_csr |= (CSR_MSA | CSR_MSB | CSR_MSC);                /* reset button states */
-if (vid_mouse_b3)                                       /* set new button states */
-    vc_csr &= ~CSR_MSA;
-if (vid_mouse_b2)
-    vc_csr &= ~CSR_MSB;
-if (vid_mouse_b1)
-    vc_csr &= ~CSR_MSC;
+    vc_csr |= (CSR_MSA | CSR_MSB | CSR_MSC);            /* reset button states */
+    if (mev.b3_state)                                   /* set new button states */
+        vc_csr &= ~CSR_MSA;
+    if (mev.b2_state)
+        vc_csr &= ~CSR_MSB;
+    if (mev.b1_state)
+        vc_csr &= ~CSR_MSC;
+    
+    vs_event (&mev);                                    /* push event */
+    }
 
 lines = 0;
 for (ln = 0; ln < VC_YSIZE; ln++) {

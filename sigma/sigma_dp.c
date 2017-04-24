@@ -1,6 +1,6 @@
-/* sigma_dp.c: 7270/T3281 disk pack controller
+/* sigma_dp.c: moving head disk pack controller
 
-   Copyright (c) 2008, Robert M Supnik
+   Copyright (c) 2008-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,9 +23,23 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   dp           7270/T3281 disk pack controller
+   dp           moving head disk pack controller
+
+   13-Mar-17    RMS     Fixed bug in selecting 3281 unit F (COVERITY)
 
    Transfers are always done a sector at a time.
+
+   This module simulates five Sigma controller/disk pack pairs (7240, 7270;
+   7260, 7265, 7275) and one Telefile controller that supported different
+   disk models on the same controller (T3281/3282/3283/3286/3288). Due to
+   ambiguities in the documentation, the T3286 disk is not implemented.
+
+   Broadly speaking, the controllers fall into two families: the 7240/7270,
+   which returned 10 bytes for sense status; and the others, which returned
+   16 bytes. Each disk has two units: one for timing channel operations, and
+   one for timing asynchronous seek completions. The controller will not
+   start a new operation is it is busy (any of the main units active) or if
+   the target device is busy (its seek unit is active).
 */
 
 #include "sigma_io_defs.h"
@@ -37,7 +51,7 @@
 #define UNIT_V_AUTO     (UNIT_V_UF + 1)                 /* autosize */
 #define UNIT_AUTO       (1u << UNIT_V_AUTO)
 #define UNIT_V_DTYPE    (UNIT_V_UF + 2)                 /* drive type */
-#define UNIT_M_DTYPE    0x7
+#define UNIT_M_DTYPE    0xF
 #define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
 #define UDA             u3                              /* disk addr */
 #define UCMD            u4                              /* current command */
@@ -47,15 +61,21 @@
 /* Constants */
 
 #define DP_NUMCTL       2                               /* number of controllers */
-#define DP_C7270        0                               /* 7270 ctrl */
-#define DP_C3281        1                               /* 3281 ctrl */
-#define DP_NUMDR_7270   8                               /* drives/ctrl */
-#define DP_NUMDR_3281   15
-#define DP_CONT         DP_NUMDR_3281                   /* ctrl's drive # */
+#define DP_CTYPE        6                               /* total ctrl types */
+#define DP_C7240        0                               /* 7240 ctrl */
+#define DP_C7270        1                               /* 7270 ctrl */
+#define DP_C7260        2                               /* 7260 ctrl */
+#define DP_C7265        3                               /* 7265 ctrl */
+#define DP_C7275        4                               /* 7275 ctrl */
+#define DP_C3281        5                               /* T3281 ctrl */
+#define DP_Q10B(x)      ((x) <= DP_C7270)               /* 10B or 16B? */
+#define DP_NUMDR_10B    8                               /* drives/ctrl */
+#define DP_NUMDR_16B    15
+#define DP_CONT         0xF                             /* ctrl's drive # */
 #define DP_WDSC         256                             /* words/sector */
 #define DP_BYHD         8                               /* byte/header */
-#define DP_NUMDR        ((uint32) ((ctx->dp_ctype == DP_C7270)? DP_NUMDR_7270: DP_NUMDR_3281))
-#define DP_SEEK         (DP_CONT + 1)
+#define DP_NUMDR        ((uint32) ((DP_Q10B (ctx->dp_ctype))? DP_NUMDR_10B: DP_NUMDR_16B))
+#define DP_SEEK         (DP_CONT)                       /* offset to seek units */
 
 /* Address bytes */
 
@@ -71,15 +91,15 @@
 
 /* Sense order */
 
-#define DPS_NBY_7270    10
-#define DPS_NBY_3281    16
-#define DPS_NBY         ((uint32) ((ctx->dp_ctype == DP_C7270)? DPS_NBY_7270: DPS_NBY_3281))
+#define DPS_NBY_10B     10
+#define DPS_NBY_16B     16
+#define DPS_NBY         ((uint32) (DP_Q10B (ctx->dp_ctype)? DPS_NBY_10B: DPS_NBY_16B))
 
 /* Test mode */
 
-#define DPT_NBY_7270    1                               /* bytes/test mode spec */
-#define DPT_NBY_3281    2
-#define DPT_NBY         ((uint32) ((ctx->dp_ctype == DP_C7270)? DPT_NBY_7270: DPT_NBY_3281))
+#define DPT_NBY_10B     1                               /* bytes/test mode spec */
+#define DPT_NBY_16B     2
+#define DPT_NBY         ((uint32) (DP_Q10B (ctx->dp_ctype)? DPT_NBY_10B: DPT_NBY_16B))
 
 /* Commands */
 
@@ -121,7 +141,7 @@
 #define DPF_V_AIM       7
 #define DPF_WCHK        (1u << DPF_V_WCHK)              /* wrt chk error */
 #define DPF_DPE         (1u << DPF_V_DPE)               /* data error */
-#define DPF_SNZ         (1u << DPF_V_SNZ)               /* sec# != 0 */
+#define DPF_SNZ         (1u << DPF_V_SNZ)               /* sec# != 0 @ whdr */
 #define DPF_EOC         (1u << DPF_V_EOC)               /* end cylinder */
 #define DPF_IVA         (1u << DPF_V_IVA)               /* invalid addr */
 #define DPF_PGE         (1u << DPF_V_PGE)               /* prog error */
@@ -138,62 +158,77 @@
    type         #sectors/       #surfaces/      #cylinders/
                  surface         cylinder        drive
 
-   7242         6               20              204
-   7261         11              20              204
-   7271         6               20              408
-   3288         17              5               823             =67MB
-   7275         11              19              411             =88MB
-   7276         11              19              815             =176MB
-   3283         17              18              815
+   7242         6               20              203		    =24MB
+   7261         11              20              203		    =45MB
+   7271         6               20              406		    =48MB
+   3288         17              5               822         =67MB
+   7276         11              19              411         =86MB
+   7266         11              20              411         =90MB
+   3282         11              19              815		    =170MB
+   3283         17              19              815		    =263MB
 
-   In theory, each drive can be a different type.  The size field in
-   each unit selects the drive capacity for each drive and thus the
-   drive type.  DISKS MUST BE DECLARED IN ASCENDING SIZE.
+   On the T3281, each drive can be a different type.  The size field
+   in each unit selects the drive capacity for each drive and thus
+   the drive type.  DISKS MUST BE DECLARED IN ASCENDING SIZE.
 */
 
 #define DP_SZ(x)        ((DPCY_##x) * (DPHD_##x) * (DPSC_##x) * DP_WDSC)
-#define DP_ENT(x,y)     (DP_##x), (DPCY_##x), (DPHD_##x), (DPSC_##x), (DP_C##y), (DPSZ_##x)
+#define DP_ENT(x,y)     (DP_##x), (DPCY_##x), (DPHD_##x), (DPSC_##x), (DP_C##y), (DPSZ_##x), (DPID_##x)
 
 #define DP_7242         0
-#define DPCY_7242       204
+#define DPCY_7242       203
 #define DPHD_7242       20
 #define DPSC_7242       6
+#define DPID_7242       0
 #define DPSZ_7242       DP_SZ(7242)
 
 #define DP_7261         1
-#define DPCY_7261       204
+#define DPCY_7261       203
 #define DPHD_7261       20
 #define DPSC_7261       11
+#define DPID_7261       (5u << 5)
 #define DPSZ_7261       DP_SZ(7261)
 
 #define DP_7271         2
-#define DPCY_7271       408
+#define DPCY_7271       406
 #define DPHD_7271       20
 #define DPSC_7271       6
+#define DPID_7271       0
 #define DPSZ_7271       DP_SZ(7271)
 
 #define DP_3288         3
 #define DPCY_3288       822
 #define DPHD_3288       5
 #define DPSC_3288       17
+#define DPID_3288       0
 #define DPSZ_3288       DP_SZ(3288)
 
-#define DP_7275         4
-#define DPCY_7275       411
-#define DPHD_7275       19
-#define DPSC_7275       11
-#define DPSZ_7275       DP_SZ(7275)
-
-#define DP_7276         5
-#define DPCY_7276       815
+#define DP_7276         4
+#define DPCY_7276       411
 #define DPHD_7276       19
 #define DPSC_7276       11
+#define DPID_7276       (7 << 5)
 #define DPSZ_7276       DP_SZ(7276)
 
-#define DP_3283         6
+#define DP_7266         5
+#define DPCY_7266       411
+#define DPHD_7266       20
+#define DPSC_7266       11
+#define DPID_7266       (6 << 5)
+#define DPSZ_7266       DP_SZ(7276)
+
+#define DP_3282         6
+#define DPCY_3282       815
+#define DPHD_3282       19
+#define DPSC_3282       11
+#define DPID_3282       0
+#define DPSZ_3282       DP_SZ(3282)
+
+#define DP_3283         7
 #define DPCY_3283       815
 #define DPHD_3283       19
 #define DPSC_3283       17
+#define DPID_3283       0
 #define DPSZ_3283       DP_SZ(3283)
 
 #define GET_PSC(x,s)    ((int32) fmod (sim_gtime() / ((double) (x * DP_WDSC)), \
@@ -201,10 +236,10 @@
 
 typedef struct {
     uint32 dp_ctype;                                    /* controller type */
-    uint32 dp_flags;                                    /* status flags */
-    uint32 dp_ski;                                      /* seek interrupts */
     uint32 dp_time;                                     /* inter-word time */
     uint32 dp_stime;                                    /* inter-track time */
+    uint32 dp_flags;                                    /* status flags */
+    uint32 dp_ski;                                      /* seek interrupts */
     uint32 dp_stopioe;                                  /* stop on I/O error */
     uint32 dp_test;                                     /* test mode */
     } DP_CTX;
@@ -216,6 +251,7 @@ typedef struct {
     uint32 sc;                                          /* sectors */
     uint32 ctype;                                       /* controller */
     uint32 capac;                                       /* capacity */
+    uint32 id;                                          /* ID */
     } DP_TYPE;
 
 typedef struct {
@@ -224,6 +260,10 @@ typedef struct {
     uint32 fpos;                                        /* from position */
     uint32 tpos;                                        /* to position */
     } DP_SNSTAB;
+
+static char *dp_cname[] = {
+    "7240", "7270", "7260", "7275", "7265", "T3281"
+    };
 
 static uint32 dp_buf[DP_WDSC];
 
@@ -252,28 +292,31 @@ void dp_set_ski (uint32 cidx, uint32 un);
 void dp_clr_ski (uint32 cidx, uint32 un);
 t_stat dp_attach (UNIT *uptr, CONST char *cptr);
 t_stat dp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat dp_set_auto (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat dp_set_ctl (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat dp_show_ctl (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 static DP_TYPE dp_tab[] = {
-    { DP_ENT (7242, 7270) },
-    { DP_ENT (7261, 3281) },
+    { DP_ENT (7242, 7240) },
+    { DP_ENT (7261, 7260) },
     { DP_ENT (7271, 7270) },
     { DP_ENT (3288, 3281) },
-    { DP_ENT (7275, 3281) },
-    { DP_ENT (7276, 3281) },
+    { DP_ENT (7276, 7275) },
+    { DP_ENT (7266, 7265) },
+    { DP_ENT (3282, 3281) },
     { DP_ENT (3283, 3281) },
     { 0, 0, 0, 0, 0, 0 },
     };
 
-static DP_SNSTAB dp_sense_7270[] = {
+static DP_SNSTAB dp_sense_10B[] = {
+    { 7, 0x00FF0000, 16, 0 },
     { 8, DPF_WCHK, DPF_V_WCHK, 6 },
     { 8, DPF_SNZ, DPF_V_SNZ, 2 },
     { 9, 0x01000000, 24, 0 },
     { 0, 0, 0, 0 }
     };
 
-static DP_SNSTAB dp_sense_3281[] = {
+static DP_SNSTAB dp_sense_16B[] = {
     { 8, DPF_WCHK, DPF_V_WCHK, 7 },
     { 8, DPF_EOC, DPF_V_EOC, 3},
     { 8, DPF_AIM, DPF_V_AIM, 2},
@@ -284,22 +327,21 @@ static DP_SNSTAB dp_sense_3281[] = {
 
 /* Command table, indexed by command */
 
-#define C_7270          (1u << DP_C7270)
-#define C_3281          (1u << DP_C3281)
-#define C_B             (C_7270|C_3281)
-#define C_F             (1u << 2)                       /* fast */
-#define C_C             (1u << 3)                       /* ctrl cmd */
+#define C_10B           (1u << DP_C7240) | (1u << DP_C7270)
+#define C_16B           (1u << DP_C7260) | (1u << DP_C7275) | \
+                        (1u << DP_C7265) | (1u << DP_C3281)
+#define C_A             (C_10B|C_16B)                   /* all */
+#define C_F             (1u << (DP_CTYPE))              /* fast */
+#define C_C             (1u << (DP_CTYPE + 1))          /* ctrl cmd */
 
-static uint8 dp_cmd[256] = {
-   0, C_B, C_B, C_B, C_B|C_F, C_B, 0, C_3281|C_F,
-   0, C_B, C_B, 0, 0, 0, 0, C_3281|C_F|C_C,
-   0, 0, C_B, C_B|C_F, 0, 0, 0, C_3281|C_F,
-   0, 0, 0, 0, 0, 0, 0, C_3281|C_F|C_C,
-   0, 0, 0, C_7270|C_F, 0, 0, 0, 0,
+static uint16 dp_cmd[256] = {
+   0, C_A, C_A, C_A, C_A|C_F, C_A, 0, C_16B|C_F,
+   0, C_A, C_A, 0, 0, 0, 0, C_16B|C_F|C_C,
+   0, 0, C_A, C_A|C_F, 0, 0, 0, C_16B|C_F,
+   0, 0, 0, 0, 0, 0, 0, C_16B|C_F|C_C,
+   0, 0, 0, C_10B|C_F, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
-   0, 0, 0, C_B, 0, 0, 0, 0,
-   0, 0, 0, 0, 0, 0, 0, 0,
-   0, 0, 0, 0, 0, 0, 0, 0,
+   0, 0, 0, C_A, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
@@ -307,13 +349,15 @@ static uint8 dp_cmd[256] = {
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
-   0, 0, 0, C_B, 0, 0, 0, 0,
+   0, 0, 0, 0, 0, 0, 0, 0,
+   0, 0, 0, 0, 0, 0, 0, 0,
+   0, 0, 0, C_A, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
-   0, 0, 0, C_3281, 0, 0, 0, 0,
+   0, 0, 0, C_16B, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
    0, 0, 0, 0, 0, 0, 0, 0,
@@ -338,8 +382,8 @@ dib_t dp_dib[] = {
     };
 
 DP_CTX dp_ctx[] = {
-    { DP_C7270 },
-    { DP_C3281 }
+    { DP_C7270, 1, 20 },
+    { DP_C7275, 1, 20 }
     };
 
 UNIT dpa_unit[] = {
@@ -416,8 +460,8 @@ REG dpa_reg[] = {
     { GRDATA (DIFF, dp_ctx[0].dp_flags, 16, 16, 16) },
     { HRDATA (SKI, dp_ctx[0].dp_ski, 16) },
     { HRDATA (TEST, dp_ctx[0].dp_test, 16) },
-    { URDATA (ADDR, dpa_unit[0].UDA, 16, 32, 0, DP_NUMDR_3281, 0) },
-    { URDATA (CMD, dpa_unit[0].UCMD, 16, 10, 0, DP_NUMDR_3281, 0) },
+    { URDATA (ADDR, dpa_unit[0].UDA, 16, 32, 0, DP_NUMDR_16B, 0) },
+    { URDATA (CMD, dpa_unit[0].UCMD, 16, 10, 0, DP_NUMDR_16B, 0) },
     { DRDATA (TIME, dp_ctx[0].dp_time, 24), PV_LEFT+REG_NZ },
     { DRDATA (STIME, dp_ctx[0].dp_stime, 24), PV_LEFT+REG_NZ },
     { FLDATA (STOP_IOE, dp_ctx[0].dp_stopioe, 0) },
@@ -431,8 +475,8 @@ REG dpb_reg[] = {
     { GRDATA (DIFF, dp_ctx[1].dp_flags, 16, 16, 16) },
     { HRDATA (SKI, dp_ctx[1].dp_ski, 16) },
     { HRDATA (TEST, dp_ctx[1].dp_test, 16) },
-    { URDATA (ADDR, dpa_unit[1].UDA, 16, 32, 0, DP_NUMDR_3281, 0) },
-    { URDATA (CMD, dpa_unit[1].UCMD, 16, 10, 0, DP_NUMDR_3281, 0) },
+    { URDATA (ADDR, dpa_unit[1].UDA, 16, 32, 0, DP_NUMDR_16B, 0) },
+    { URDATA (CMD, dpa_unit[1].UCMD, 16, 10, 0, DP_NUMDR_16B, 0) },
     { DRDATA (TIME, dp_ctx[1].dp_time, 24), PV_LEFT+REG_NZ },
     { DRDATA (STIME, dp_ctx[1].dp_stime, 24), PV_LEFT+REG_NZ },
     { FLDATA (STOP_IOE, dp_ctx[1].dp_stopioe, 0) },
@@ -441,53 +485,35 @@ REG dpb_reg[] = {
     };
 
 MTAB dp_mod[] = {
-    { MTAB_XTD|MTAB_VDV, DP_C7270, "C7270", "C7270",
-      &dp_set_ctl, &dp_show_ctl, NULL },
-    { MTAB_XTD|MTAB_VDV, DP_C3281, "C3281", "C3281",
-      &dp_set_ctl, &dp_show_ctl, NULL },
-    { (UNIT_DTYPE+UNIT_ATT), (DP_7242 << UNIT_V_DTYPE) + UNIT_ATT,
-      "7242", NULL, NULL },
-    { (UNIT_DTYPE+UNIT_ATT), (DP_7261 << UNIT_V_DTYPE) + UNIT_ATT,
-      "7261", NULL, NULL },
-    { (UNIT_DTYPE+UNIT_ATT), (DP_7271 << UNIT_V_DTYPE) + UNIT_ATT,
-      "7271", NULL, NULL },
+    { MTAB_XTD|MTAB_VDV, DP_C7240, NULL, "7240", &dp_set_ctl, NULL, NULL },
+    { MTAB_XTD|MTAB_VDV, DP_C7270, NULL, "7270", &dp_set_ctl, NULL, NULL },
+    { MTAB_XTD|MTAB_VDV, DP_C7260, NULL, "7260", &dp_set_ctl, NULL, NULL },
+    { MTAB_XTD|MTAB_VDV, DP_C7275, NULL, "7275", &dp_set_ctl, NULL, NULL },
+    { MTAB_XTD|MTAB_VDV, DP_C7265, NULL, "7265", &dp_set_ctl, NULL, NULL },
+    { MTAB_XTD|MTAB_VDV, DP_C3281, NULL, "T3281", &dp_set_ctl, NULL, NULL },
+    { MTAB_XTD|MTAB_VDV, 0, "controller", NULL, NULL, &dp_show_ctl },
+    { UNIT_DTYPE, (DP_7242 << UNIT_V_DTYPE), "7242", NULL, NULL },
+    { UNIT_DTYPE, (DP_7261 << UNIT_V_DTYPE), "7261", NULL, NULL },
+    { UNIT_DTYPE, (DP_7271 << UNIT_V_DTYPE), "7271", NULL, NULL },
+    { UNIT_DTYPE, (DP_7276 << UNIT_V_DTYPE), "7276", NULL, NULL },
+    { UNIT_DTYPE, (DP_7266 << UNIT_V_DTYPE), "7266", NULL, NULL },
     { (UNIT_DTYPE+UNIT_ATT), (DP_3288 << UNIT_V_DTYPE) + UNIT_ATT,
       "3288", NULL, NULL },
-    { (UNIT_DTYPE+UNIT_ATT), (DP_7275 << UNIT_V_DTYPE) + UNIT_ATT,
-      "7275", NULL, NULL },
-    { (UNIT_DTYPE+UNIT_ATT), (DP_7276 << UNIT_V_DTYPE) + UNIT_ATT,
-      "7276", NULL, NULL },
-    { (UNIT_DTYPE+UNIT_ATT), (DP_3283 << UNIT_V_DTYPE) + UNIT_ATT,
-      "3283", NULL, NULL },
-    { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (DP_7242 << UNIT_V_DTYPE),
-      "7242", NULL, NULL },
-    { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (DP_7261 << UNIT_V_DTYPE),
-      "7261", NULL, NULL },
-    { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (DP_7271 << UNIT_V_DTYPE),
-      "7271", NULL, NULL },
+    { (UNIT_DTYPE+UNIT_ATT), (DP_3282 << UNIT_V_DTYPE) + UNIT_ATT,
+      "3282", NULL, NULL },
+    { (UNIT_DTYPE+UNIT_ATT), (DP_3282 << UNIT_V_DTYPE) + UNIT_ATT,
+      "3282", NULL, NULL },
     { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (DP_3288 << UNIT_V_DTYPE),
       "3288", NULL, NULL },
-    { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (DP_7275 << UNIT_V_DTYPE),
-      "7275", NULL, NULL },
-    { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (DP_7276 << UNIT_V_DTYPE),
-      "7276", NULL, NULL },
+    { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (DP_3282 << UNIT_V_DTYPE),
+      "3282", NULL, NULL },
     { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (DP_3283 << UNIT_V_DTYPE),
       "3283", NULL, NULL },
     { (UNIT_AUTO+UNIT_ATT), UNIT_AUTO, "autosize", NULL, NULL },
-    { UNIT_AUTO, UNIT_AUTO, NULL, "AUTOSIZE", NULL },
-    { (UNIT_AUTO+UNIT_DTYPE), (DP_7242 << UNIT_V_DTYPE),
-      NULL, "7242", &dp_set_size },
-    { (UNIT_AUTO+UNIT_DTYPE), (DP_7261 << UNIT_V_DTYPE),
-      NULL, "7261", &dp_set_size }, 
-    { (UNIT_AUTO+UNIT_DTYPE), (DP_7271 << UNIT_V_DTYPE),
-      NULL, "7271", &dp_set_size },
+    { UNIT_AUTO, UNIT_AUTO, NULL, "AUTOSIZE", &dp_set_auto, NULL },
     { (UNIT_AUTO+UNIT_DTYPE), (DP_3288 << UNIT_V_DTYPE),
       NULL, "3288", &dp_set_size },
-    { (UNIT_AUTO+UNIT_DTYPE), (DP_7275 << UNIT_V_DTYPE),
-      NULL, "7275", &dp_set_size },
-    { (UNIT_AUTO+UNIT_DTYPE), (DP_7276 << UNIT_V_DTYPE),
-      NULL, "7276", &dp_set_size },
-    { (UNIT_AUTO+UNIT_DTYPE), (DP_7276 << UNIT_V_DTYPE),
+    { (UNIT_AUTO+UNIT_DTYPE), (DP_3282 << UNIT_V_DTYPE),
       NULL, "3282", &dp_set_size },
     { (UNIT_AUTO+UNIT_DTYPE), (DP_3283 << UNIT_V_DTYPE),
       NULL, "3283", &dp_set_size },
@@ -505,14 +531,14 @@ MTAB dp_mod[] = {
 DEVICE dp_dev[] = {
     {
     "DPA", dpa_unit, dpa_reg, dp_mod,
-    (2 * DP_NUMDR_3281) + 1, 16, 28, 1, 16, 32,
+    (2 * DP_NUMDR_16B) + 1, 16, 28, 1, 16, 32,
     NULL, NULL, &dp_reset,
     &io_boot, &dp_attach, NULL,
     &dp_dib[0], DEV_DISABLE
     },
     {
     "DPB", dpb_unit, dpb_reg, dp_mod,
-    (2 * DP_NUMDR_3281) + 1, 16, 28, 1, 16, 32,
+    (2 * DP_NUMDR_16B) + 1, 16, 28, 1, 16, 32,
     NULL, NULL, &dp_reset,
     &io_boot, &dp_attach, NULL,
     &dp_dib[1], DEV_DISABLE
@@ -535,7 +561,7 @@ uint32 dp_disp (uint32 cidx, uint32 op, uint32 dva, uint32 *dvst)
 {
 uint32 un = DVA_GETUNIT (dva);
 UNIT *dp_unit = dp_dev[cidx].units;
-UNIT *uptr = dp_unit + un;
+UNIT *uptr;
 int32 iu;
 uint32 i;
 DP_CTX *ctx;
@@ -543,10 +569,11 @@ DP_CTX *ctx;
 if (cidx >= DP_NUMCTL)                                  /* inv ctrl num? */
     return DVT_NODEV;
 ctx = &dp_ctx[cidx];
-if ((un >= DP_NUMDR) ||                                 /* inv unit num? */
-    ((uptr->flags & UNIT_DIS) &&                        /* disabled unit? */
-     ((un != 0xF) || (ctx->dp_ctype != C_3281))))       /* not 3281 unit F? */
-    return DVT_NODEV;
+if (((un < DP_NUMDR) &&                                 /* un valid and */
+    ((dp_unit[un].flags & UNIT_DIS) == 0)) ||           /* not disabled OR */
+    ((un == 0xF) && (ctx->dp_ctype == DP_C3281)))       /* 3281 unit F? */
+    uptr = dp_unit + un;                                /* un exists */
+else return DVT_NODEV;
 
 switch (op) {                                           /* case on op */
 
@@ -609,7 +636,7 @@ return 0;
 
 t_stat dp_svc (UNIT *uptr)
 {
-uint32 i, da, wd, wd1, c[DPS_NBY_3281];
+uint32 i, da, wd, wd1, c[DPS_NBY_16B];
 uint32 cidx = uptr->UCTX;
 uint32 dva = dp_dib[cidx].dva;
 uint32 dtype = GET_DTYPE (uptr->flags);
@@ -688,12 +715,11 @@ switch (uptr->UCMD) {
         dc = DPA_GETCY (da);                            /* desired cyl */
     case DPS_RECAL:
     case DPS_RECALI:
-        t = DPA_GETCY (uptr->UDA) - dc;                 /* get cyl diff */
+        t = abs (DPA_GETCY (uptr->UDA) - dc);           /* get cyl diff */
         ctx->dp_flags = (ctx->dp_flags & ~DPF_DIFF) |
             ((t & DPF_M_DIFF) << DPF_V_DIFF);           /* save difference */
         if (t == 0)
             t = 1;
-        else t = abs (t);
         uptr->UDA = da;                                 /* save addr */
         sim_activate (uptr + DP_SEEK, t * ctx->dp_stime);
         dp_unit[un + DP_SEEK].UCMD =                    /* sched seek */
@@ -701,20 +727,22 @@ switch (uptr->UCMD) {
         break;                                          /* sched end */
 
     case DPS_SENSE:                                     /* sense */
-        for (i = 0; i < DPS_NBY_3281; i++)
+        for (i = 0; i < DPS_NBY_16B; i++)
             c[i] = 0;
-        c[0] = (uptr->UDA >> 24) & 0xFF;
+        c[0] = (uptr->UDA >> 24) & 0xFF;                /* 0-3 = disk addr */
         c[1] = (uptr->UDA >> 16) & 0xFF;
         c[2] = (uptr->UDA >> 8) & 0xFF;
         c[3] = uptr->UDA & 0xFF;
         c[4] = GET_PSC (ctx->dp_time, dp_tab[dtype].sc) | /* curr sector */
             ((sim_is_active (uptr) && ((uptr->UCMD & 0x7F) == DPS_SEEK))? 0x80: 0);
-        if (ctx->dp_ctype == DP_C3281) {
-            c[5] = c[7] = un;
-            c[10] = (ctx->dp_ski >> 8) & 0xFF;
+        if (!DP_Q10B (ctx->dp_ctype)) {                 /* 16B only */
+            c[5] = un | dp_tab[dtype].id;               /* unit # + id */
+            if (ctx->dp_ctype == DP_C3281)              /* 3281 only */
+                c[7] = un;                              /* unique id */
+            c[10] = (ctx->dp_ski >> 8) & 0xFF;          /* seek intr */
             c[11] = ctx->dp_ski & 0xFF;
             }
-        dp_set_sense (uptr, &c[0]);
+        dp_set_sense (uptr, &c[0]);                     /* other bytes */
         for (i = 0, st = 0; (i < DPS_NBY) && (st != CHS_ZBC); i++) {
             st = chan_WrMemB (dva, c[i]);               /* store char */
             if (CHS_IFERR (st))                         /* channel error? */
@@ -766,7 +794,7 @@ switch (uptr->UCMD) {
             chan_uen (dva);                             /* uend */
             return SCPE_OK;
             }
-        if (DPA_GETSC (uptr->UDA) != 0) {
+        if (DPA_GETSC (uptr->UDA) != 0) {               /* must start at sec 0 */
             ctx->dp_flags |= DPF_SNZ;
             chan_uen (dva);
             return SCPE_OK;
@@ -798,7 +826,7 @@ switch (uptr->UCMD) {
                 dp_inc_ad (uptr);                       /* da increments */
                 return dp_chan_err (dva, st);
                 }
-            wd1 = (dp_buf[i >> 2] >> (24 - ((i % 4) * 8))) & 0xFF; /* byte */
+            wd1 = (dp_buf[i >> 2] >> (24 - ((i & 0x3) * 8))) & 0xFF; /* byte */
             if (wd != wd1) {                            /* check error? */
                 dp_inc_ad (uptr);                       /* da increments */
                 ctx->dp_flags |= DPF_WCHK;              /* set status */
@@ -923,23 +951,27 @@ if (lnt != exp) {                                       /* length error at end? 
 return FALSE;                                           /* cmd done */
 }
 
-/* DP status routine */
+/* DP status routines */
+
+/* The ctrl is busy if any drive is busy.
+   The device is busy if either the main unit or the seek unit is busy */
 
 uint32 dp_tio_status (uint32 cidx, uint32 un)
 {
 uint32 i;
 DP_CTX *ctx = &dp_ctx[cidx];
 UNIT *dp_unit = dp_dev[cidx].units;
+uint32 stat = DVS_AUTO;
 
 for (i = 0; i < DP_NUMDR; i++) {
-    if (sim_is_active (&dp_unit[i]))
-        return (DVS_AUTO|DVS_CBUSY|DVS_DBUSY|(CC2 << DVT_V_CC));
+    if (sim_is_active (&dp_unit[i])) {
+        stat |= (DVS_CBUSY|(CC2 << DVT_V_CC));
+        break;
+        }
     }
-for (i = 0; i < DP_NUMDR; i++) {
-    if (sim_is_active (&dp_unit[i + DP_SEEK]) &&
-        (dp_unit[i + DP_SEEK].UCMD != DSC_SEEKW))
-    return (DVS_AUTO|DVS_DBUSY|(CC2 << DVT_V_CC));
-    }
+if (sim_is_active (&dp_unit[un]) ||
+    sim_is_active (&dp_unit[un + DP_SEEK]))
+    stat |= (DVS_DBUSY|(CC2 << DVT_V_CC));
 return DVS_AUTO;
 }
 
@@ -953,7 +985,7 @@ t_bool on_cyl;
 st = 0;
 on_cyl = !sim_is_active (&dp_unit[un + DP_SEEK]) ||
     (dp_unit[un + DP_SEEK].UCMD == DSC_SEEKW);
-if (dp_ctx[cidx].dp_ctype == DP_C7270)
+if (DP_Q10B (dp_ctx[cidx].dp_ctype))
     st = ((dp_ctx[cidx].dp_flags & DPF_IVA)? 0x20: 0) |
         (on_cyl? 0x04: 0);
 else st = ((dp_ctx[cidx].dp_flags & DPF_PGE)? 0x20: 0) |
@@ -971,7 +1003,7 @@ t_bool on_cyl;
 st = 0;
 on_cyl = !sim_is_active (&dp_unit[un + DP_SEEK]) ||
     (dp_unit[un + DP_SEEK].UCMD == DSC_SEEKW);
-if ((dp_ctx[cidx].dp_ctype == DP_C7270) && on_cyl)
+if ((DP_Q10B (dp_ctx[cidx].dp_ctype)) && on_cyl)
     st |= 0x04;
 if (chan_chk_chi (dp_dib[cidx].dva) < 0)
     st |= 0x08;
@@ -992,9 +1024,9 @@ if (sim_is_active (sptr) &&
     (sptr->UCMD != DSC_SEEKW))
     ctx->dp_flags |= DPF_AIM;
 else ctx->dp_flags &= ~DPF_AIM;
-if (ctx->dp_ctype == DP_C7270)
-    tptr = dp_sense_7270;
-else tptr = dp_sense_3281;
+if (DP_Q10B (ctx->dp_ctype))
+    tptr = dp_sense_10B;
+else tptr = dp_sense_16B;
 while (tptr->byte != 0) {
     if (ctx->dp_flags & tptr->mask) {
         data = (uint8) ((ctx->dp_flags & tptr->mask) >> tptr->fpos);
@@ -1117,7 +1149,8 @@ return TRUE;
 t_stat dp_chan_err (uint32 dva, uint32 st)
 {
 chan_uen (dva);                                         /* uend */
-if (st < CHS_ERR) return st;
+if (st < CHS_ERR)
+    return st;
 return SCPE_OK;
 }
 
@@ -1176,8 +1209,9 @@ if (cidx >= DP_NUMCTL)
     return SCPE_IERR;
 dp_unit = dptr->units;
 ctx = &dp_ctx[cidx];
-for (i = 0; i < DP_NUMDR; i++) {
-    sim_cancel (&dp_unit[i]);                          /* stop dev thread */
+for (i = 0; i < DP_NUMDR_16B; i++) {
+    sim_cancel (&dp_unit[i]);                           /* stop dev thread */
+    sim_cancel (&dp_unit[i + DP_SEEK]);                 /* stop seek thread */
     dp_unit[i].UDA = 0;
     dp_unit[i].UCMD = 0;
     dp_unit[i].UCTX = cidx;
@@ -1185,7 +1219,7 @@ for (i = 0; i < DP_NUMDR; i++) {
 ctx->dp_flags = 0;
 ctx->dp_ski = 0;
 ctx->dp_test = 0;
-chan_reset_dev (dp_dib[cidx].dva);                     /* clr int, active */
+chan_reset_dev (dp_dib[cidx].dva);                      /* clr int, active */
 return SCPE_OK;
 }
 
@@ -1203,8 +1237,11 @@ if (r != SCPE_OK)                                       /* error? */
 if ((uptr->flags & UNIT_AUTO) == 0)                     /* autosize? */
     return SCPE_OK;
 p = sim_fsize (uptr->fileref);
+if (p == 0)                                             /* new file? */
+    return SCPE_OK;
 for (i = 0; dp_tab[i].sc != 0; i++) {
-    if (p <= (dp_tab[i].capac * (uint32) sizeof (int32))) {
+    if ((dp_tab[i].ctype == DP_C3281) &&                /* only on 3281 */
+        (p <= (dp_tab[i].capac * (uint32) sizeof (int32)))) {
         uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (i << UNIT_V_DTYPE);
         uptr->capac = dp_tab[i].capac;
         return SCPE_OK;
@@ -1224,9 +1261,24 @@ if (cidx >= DP_NUMCTL)                                  /* valid ctrl idx? */
     return SCPE_IERR;
 if (uptr->flags & UNIT_ATT)                             /* unattached? */
     return SCPE_ALATT;
-if (dp_tab[dtype].ctype != dp_ctx[cidx].dp_ctype)       /* valid for curr ctrl? */
+if (dp_ctx[cidx].dp_ctype != DP_C3281)                  /* only on 3281 */
     return SCPE_NOFNC;
 uptr->capac = dp_tab[dtype].capac;
+return SCPE_OK;
+}
+
+/* Set unit autosize validation routine */
+
+t_stat dp_set_auto (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+uint32 cidx = uptr->UCTX;
+
+if (cidx >= DP_NUMCTL)                                  /* valid ctrl idx? */
+    return SCPE_IERR;
+if (uptr->flags & UNIT_ATT)                             /* unattached? */
+    return SCPE_ALATT;
+if (dp_ctx[cidx].dp_ctype != DP_C3281)                  /* only on 3281 */
+    return SCPE_NOFNC;
 return SCPE_OK;
 }
 
@@ -1234,33 +1286,36 @@ return SCPE_OK;
 
 t_stat dp_set_ctl (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-uint32 i, cidx = uptr->UCTX;
+uint32 i, new_dtyp, cidx = uptr->UCTX;
 DP_CTX *ctx = &dp_ctx[cidx];
 UNIT *dp_unit = dp_dev[cidx].units;
 
-if ((cidx >= DP_NUMCTL) || (val >= DP_NUMCTL))          /* valid ctrl idx? */
+if ((cidx >= DP_NUMCTL) || (val >= DP_CTYPE))           /* valid ctrl idx? */
     return SCPE_IERR;
-if (val == dp_ctx[cidx].dp_ctype)
+if (val == dp_ctx[cidx].dp_ctype)                       /* no change? */
     return SCPE_OK;
 for (i = 0; i < DP_NUMDR; i++) {                        /* all units detached? */
-    if (dp_unit[i].flags & UNIT_ATT)
+    if ((dp_unit[i].flags & UNIT_ATT) != 0)
         return SCPE_ALATT;
     }
-for (i = 0; i < DP_NUMDR; i++) {
-    if (val == DP_C7270) {                              /* changing to 7270? */
-        dp_unit[i].flags = (dp_unit[i].flags & ~UNIT_DTYPE) |
-           (DP_7271 << UNIT_V_DTYPE);
-        dp_unit[i].capac = DPSZ_7271;
-        if (i >= DP_NUMDR_7270)
-            dp_unit[i].flags = (dp_unit[i].flags | UNIT_DIS) & ~UNIT_DISABLE;
+for (i = new_dtyp = 0; dp_tab[i].sc != 0; i++) {        /* find default capac */
+    if (dp_tab[i].ctype == val) {
+        new_dtyp = i;
+        break;
         }
-    else {
-        dp_unit[i].flags = (dp_unit[i].flags & ~UNIT_DTYPE) |
-           (DP_7275 << UNIT_V_DTYPE);
-        dp_unit[i].capac = DPSZ_7275;
-        if (i >= DP_NUMDR_7270)
-            dp_unit[i].flags = dp_unit[i].flags | UNIT_DISABLE;
-        }
+    }
+if (dp_tab[new_dtyp].sc == 0)
+    return SCPE_IERR;
+ctx->dp_ctype = val;                                    /* new ctrl type */
+for (i = 0; i < DP_NUMDR_16B; i++) {
+    if (i >= DP_NUMDR)
+        dp_unit[i].flags = (dp_unit[i].flags & ~UNIT_DISABLE) | UNIT_DIS;
+    else dp_unit[i].flags = (dp_unit[i].flags | UNIT_DISABLE) & ~UNIT_DIS;
+    if (val != DP_C3281)
+        dp_unit[i].flags &= ~UNIT_AUTO;
+    dp_unit[i].flags = (dp_unit[i].flags & ~UNIT_DTYPE) |
+           (new_dtyp << UNIT_V_DTYPE);
+    dp_unit[i].capac = dp_tab[new_dtyp].capac;
     }
 return SCPE_OK;
 }
@@ -1271,8 +1326,9 @@ uint32 cidx = uptr->UCTX;
 
 if (cidx >= DP_NUMCTL)                                 /* valid ctrl idx? */
     return SCPE_IERR;
-if (dp_ctx[cidx].dp_ctype == DP_C7270)
-    fprintf (st, "7270 controller");
-else fprintf (st, "3281 controller");
+if (dp_ctx[cidx].dp_ctype >= DP_CTYPE)
+    return SCPE_IERR;
+fprintf (st, "%s controller", dp_cname[dp_ctx[cidx].dp_ctype]);
 return SCPE_OK;
 }
+

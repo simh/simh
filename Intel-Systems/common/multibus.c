@@ -150,8 +150,7 @@ t_stat multibus_reset(DEVICE *dptr)
     isbc202_fdcnum = 0;
     isbc202_reset(NULL, SBC202_BASE); 
     zx200a_fdcnum = 0;
-    zx200a_reset(NULL, ZX200A_BASE_DD);
-    zx200a_reset(NULL, ZX200A_BASE_SD);
+    zx200a_reset(NULL, ZX200A_BASE);
     sim_activate (&multibus_unit, multibus_unit.wait); /* activate unit */
     return SCPE_OK;
 }

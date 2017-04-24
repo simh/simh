@@ -95,14 +95,14 @@ uint8 get_mbyte(uint16 addr)
 {
     /* if local EPROM handle it */
     if ((ROM_DISABLE && (i8255_C[0] & 0x20)) || (ROM_DISABLE == 0)) { /* EPROM enabled */
-	if ((addr >= EPROM_unit.u3) && ((uint16)addr < (EPROM_unit.u3 + EPROM_unit.capac))) {
-	    return EPROM_get_mbyte(addr);
-	}
+        if ((addr >= EPROM_unit.u3) && ((uint16)addr < (EPROM_unit.u3 + EPROM_unit.capac))) {
+            return EPROM_get_mbyte(addr);
+        }
     } /* if local RAM handle it */
     if ((RAM_DISABLE && (i8255_C[0] & 0x10)) || (RAM_DISABLE == 0)) {            /* RAM enabled */
-	if ((addr >= RAM_unit.u3) && ((uint16)addr < (RAM_unit.u3 + RAM_unit.capac))) {
-	    return RAM_get_mbyte(addr);
-	}
+        if ((addr >= RAM_unit.u3) && ((uint16)addr < (RAM_unit.u3 + RAM_unit.capac))) {
+            return RAM_get_mbyte(addr);
+        }
     } /* otherwise, try the multibus */
     return multibus_get_mbyte(addr);
 }

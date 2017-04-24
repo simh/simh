@@ -187,38 +187,38 @@ int32 MB_get_mbyte(int32 addr)
         case 0x1000:
             if (MB_unit.flags & UNIT_RAM_0000) {
                 val = mp_8m_get_mbyte(addr) & 0xFF;
-    sim_debug (DEBUG_read, &MB_dev, "MB_get_mbyte: addr=%04X\n", addr);
+                sim_debug (DEBUG_read, &MB_dev, "MB_get_mbyte: addr=%04X\n", addr);
                 if (MB_dev.dctrl & DEBUG_read)
                     printf("MB_get_mbyte: mp_8m val=%02X\n", val);
-                return val;
             } else
-                return 0xFF;
+                val = 0xFF;
+            break;
         case 0x2000:
         case 0x3000:
             if (MB_unit.flags & UNIT_RAM_2000) {
                 val = mp_8m_get_mbyte(addr) & 0xFF;
                 sim_debug (DEBUG_read, &MB_dev, "MB_get_mbyte: mp_8m val=%02X\n", val);
-                return val;
             } else
-                return 0xFF;
+                val = 0xFF;
+            break;
         case 0x4000:
         case 0x5000:
             if (MB_unit.flags & UNIT_RAM_4000) {
                 val = mp_8m_get_mbyte(addr) & 0xFF;
-    sim_debug (DEBUG_read, &MB_dev, "MB_get_mbyte: addr=%04X\n", addr);
+                sim_debug (DEBUG_read, &MB_dev, "MB_get_mbyte: addr=%04X\n", addr);
                 if (MB_dev.dctrl & DEBUG_read)
                     printf("MB_get_mbyte: mp_8m val=%02X\n", val);
-                return val;
             } else
-                return 0xFF;
+                val = 0xFF;
+            break;
         case 0x6000:
         case 0x7000:
             if (MB_unit.flags & UNIT_RAM_6000) {
                 val = mp_8m_get_mbyte(addr) & 0xFF;
                 sim_debug (DEBUG_read, &MB_dev, "MB_get_mbyte: mp_8m val=%02X\n", val);
-                return val;
             } else
-                return 0xFF;
+                val = 0xFF;
+            break;
         case 0x8000:
             if (addr < 0x8020)
                 val = (dev_table[addr - 0x8000].routine(0, 0)) & 0xFF;
@@ -226,26 +226,27 @@ int32 MB_get_mbyte(int32 addr)
                 val = 0xFF;
             sim_debug (DEBUG_read, &MB_dev, "MB_get_mbyte: I/O addr=%04X val=%02X\n",
                 addr, val);
-            return val;
+            break;
         case 0xA000:
         case 0xB000:
             if (MB_unit.flags & UNIT_RAM_A000) {
                 val = mp_8m_get_mbyte(addr) & 0xFF;
                 sim_debug (DEBUG_read, &MB_dev, "MB_get_mbyte: mp_8m val=%02X\n", val);
-                return val;
             } else
-                return 0xFF;
+                val = 0xFF;
+            break;
         case 0xC000:
         case 0xD000:
             if (MB_unit.flags & UNIT_RAM_C000) {
                 val = mp_8m_get_mbyte(addr) & 0xFF;
                 sim_debug (DEBUG_read, &MB_dev, "MB_get_mbyte: mp_8m val=%02X\n", val);
-                return val;
             } else
-                return 0xFF;
+                val = 0xFF;
+            break;
         default:
-            return 0xFF;
+            val = 0xFF;
     }
+    return val;
 }
 
 /*  get a word from memory */
@@ -273,44 +274,45 @@ void MB_put_mbyte(int32 addr, int32 val)
         case 0x1000:
             if (MB_unit.flags & UNIT_RAM_0000) {
                 mp_8m_put_mbyte(addr, val);
-                return;
             }
+            break;
         case 0x2000:
         case 0x3000:
             if (MB_unit.flags & UNIT_RAM_2000) {
                 mp_8m_put_mbyte(addr, val);
-                return;
             }
+            break;
         case 0x4000:
         case 0x5000:
             if (MB_unit.flags & UNIT_RAM_4000) {
                 mp_8m_put_mbyte(addr, val);
-                return;
             }
+            break;
         case 0x6000:
         case 0x7000:
             if (MB_unit.flags & UNIT_RAM_6000) {
                 mp_8m_put_mbyte(addr, val);
-                return;
             }
+            break;
         case 0x8000:
-            if (addr < 0x8020)
+            if (addr < 0x8020) {
                 dev_table[addr - 0x8000].routine(1, val);
-            return;
+            }
+            break;
         case 0xA000:
         case 0xB000:
             if (MB_unit.flags & UNIT_RAM_A000) {
                 mp_8m_put_mbyte(addr, val);
-                return;
             }
+            break;
         case 0xC000:
         case 0xD000:
             if (MB_unit.flags & UNIT_RAM_C000) {
                 mp_8m_put_mbyte(addr, val);
-                return;
             }
+            break;
         default:
-            return;
+            ;
     }
 }
 

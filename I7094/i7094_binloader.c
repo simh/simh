@@ -22,6 +22,8 @@
    Except as contained in this notice, the name of the author shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the author.
+
+   13-Mar-17    RMS     Annotated fall through in switch
 */
 /***********************************************************************
 *
@@ -165,7 +167,7 @@ binloader (FILE *fd, const char *file, int loadpt)
 
         case RELADDR_TAG:
             ldata = ldata + loadaddr;
-
+            /* fall through */
         case ABSDATA_TAG:
         STORE:
 #ifdef DEBUGLOADER
@@ -177,6 +179,7 @@ binloader (FILE *fd, const char *file, int loadpt)
 
         case ABSXFER_TAG:
             transfer = TRUE;
+            /* fall through */
         case ABSENTRY_TAG:
             PC = (uint32) ldata & AMASK;
 #ifdef DEBUGLOADER
@@ -188,6 +191,7 @@ binloader (FILE *fd, const char *file, int loadpt)
 
         case RELXFER_TAG:
             transfer = TRUE;
+            /* fall through */
         case RELENTRY_TAG:
             ldata = (ldata + loadaddr) & AMASK;
             PC = (uint32) ldata & AMASK;

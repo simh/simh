@@ -1,6 +1,6 @@
 /* nova_mta.c: NOVA magnetic tape simulator
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mta          magnetic tape
 
+   13-Mar-17    RMS     Annotated fall through in switch
    04-Jul-07    BKR     fixed boot code to properly boot self-boot tapes;
                         boot routine now uses standard DG APL boot code;
                         device name changed to DG's MTA from DEC's MT.
@@ -510,8 +511,10 @@ switch (st) {
 
     case MTSE_FMT:                                      /* illegal fmt */
         mta_upddsta (uptr, uptr->USTAT | STA_WLK | STA_RDY);
+        /* fall through */
     case MTSE_UNATT:                                    /* unattached */
         mta_sta = mta_sta | STA_ILL;
+        /* fall through */
     case MTSE_OK:                                       /* no error */
         return SCPE_IERR;                               /* never get here! */
 

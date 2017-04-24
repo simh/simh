@@ -1,6 +1,6 @@
 /* i1620_cpu.c: IBM 1620 CPU simulator
 
-   Copyright (c) 2002-2015, Robert M. Supnik
+   Copyright (c) 2002-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    This CPU module incorporates code and comments from the 1620 simulator by
    Geoff Kuenning, with his permission.
 
+   13-Mar-17    RMS     Added error test on device addr (COVERITY)
    07-May-15    RMS     Added missing TFL instruction (Tom McBride)
    28-Mar-15    RMS     Revised to use sim_printf
    26-Mar-15    RMS     Separated compare from add/sub flows (Tom McBride)
@@ -753,7 +754,9 @@ while (reason == 0) {                                   /* loop until halted */
 
     case OP_K:
         dev = get_2d (ADDR_A (saved_PC, I_IO));         /* get IO dev */
-        if (k_valid_p[dev]) {                          /* validate P? */
+        if (dev < 0)                                    /* invalid digits? */
+            return STOP_INVDIG;
+        if (k_valid_p[dev]) {                           /* validate P? */
             reason = get_addr (pla, 5, TRUE, &PAR);     /* get P addr */
             if (reason != SCPE_OK)                      /* stop if error */
                  break;
@@ -761,7 +764,7 @@ while (reason == 0) {                                   /* loop until halted */
         else PAR = 0;
         f0 = M[ADDR_A (saved_PC, I_CTL)] & DIGIT;       /* get function */
         f1 = M[ADDR_A (saved_PC, I_CTL + 1)] & DIGIT;
-        if ((dev < 0) || (iodisp[dev] == NULL))         /* undefined dev? */
+        if (iodisp[dev] == NULL)                        /* undefined dev? */
             reason = STOP_INVIO;                        /* stop */
         else reason = iodisp[dev] (op, PAR, f0, f1);    /* call device */
         break;

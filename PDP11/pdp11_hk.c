@@ -1176,7 +1176,10 @@ switch (fnc) {                                          /* case on function */
                 }
             }                                           /* end if wr */
         else if (uptr->FNC == FNC_READ) {               /* read? */
-            err = sim_disk_rdsect (uptr, da/HK_NUMWD, (uint8 *)hkxb, &sectsread, wc/HK_NUMWD);
+            err = sim_disk_rdsect (uptr, da/HK_NUMWD, (uint8 *)hkxb, &sectsread, ((wc + (HK_NUMWD - 1)) & ~(HK_NUMWD - 1))/HK_NUMWD);
+            if ((err == SCPE_OK) &&
+                (sectsread != (((wc + (HK_NUMWD - 1)) & ~(HK_NUMWD - 1))/HK_NUMWD)))
+                err = -1;
             sim_disk_data_trace (uptr, (uint8 *)hkxb, da/HK_NUMWD, sectsread*HK_NUMWD*sizeof(*hkxb), "sim_disk_rdsect", HKDEB_DAT & dptr->dctrl, HKDEB_OPS);
             if (hkcs2 & CS2_UAI) {                      /* no addr inc? */
                 if ((t = Map_WriteW (ba, 2, &hkxb[wc - 1]))) {
@@ -1193,7 +1196,10 @@ switch (fnc) {                                          /* case on function */
                 }
             }                                           /* end if read */
         else {                                          /* wchk */                  
-            err = sim_disk_rdsect (uptr, da/HK_NUMWD, (uint8 *)hkxb, &sectsread, wc/HK_NUMWD);
+            err = sim_disk_rdsect (uptr, da/HK_NUMWD, (uint8 *)hkxb, &sectsread, ((wc + (HK_NUMWD - 1)) & ~(HK_NUMWD - 1))/HK_NUMWD);
+            if ((err == SCPE_OK) &&
+                (sectsread != (((wc + (HK_NUMWD - 1)) & ~(HK_NUMWD - 1))/HK_NUMWD)))
+                err = -1;
             sim_disk_data_trace (uptr, (uint8 *)hkxb, da/HK_NUMWD, sectsread*HK_NUMWD*sizeof(*hkxb), "sim_disk_rdsect", HKDEB_DAT & dptr->dctrl, HKDEB_OPS);
             awc = wc;
             for (wc = 0; wc < awc; wc++) {              /* loop thru buf */

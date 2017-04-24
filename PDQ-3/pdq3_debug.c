@@ -69,6 +69,7 @@ static void dbg_opdbginit() {
   while (!feof(fd)) {
     fgets(line,100,fd);
     sscanf(line,"%x %d", &i, &f);
+    ASSURE(i >= DEBUG_MINOPCODE && i < DEBUG_MAXOPCODE);
     opdebug[i-DEBUG_MINOPCODE] = f;
   }
   fclose(fd);
@@ -371,12 +372,12 @@ static PROCINFO* new_procinfo(uint16 segbase, uint16 procno, uint16 mscw, uint16
   p->seg = find_seginfo(segbase, &dummy);
   p->segb = osegb;
   p->instipc = ADDR_OFF(PCX);
-  ReadEx(mscw,OFF_MSIPC, &p->ipc);
-  ReadEx(segbase, 0, &procbase);
-  ReadEx(segbase+procbase-procno, 0, &procaddr);
-  ReadEx(segbase+procaddr, 0, &p->localsz);
-  ReadEx(segbase+procaddr-1, 0, &exitic);
-  ReadBEx(segbase, exitic, &sz1);
+  ASSURE(ReadEx(mscw,OFF_MSIPC, &p->ipc) == SCPE_OK);
+  ASSURE(ReadEx(segbase, 0, &procbase)  == SCPE_OK);
+  ASSURE(ReadEx(segbase+procbase-procno, 0, &procaddr) == SCPE_OK);
+  ASSURE(ReadEx(segbase+procaddr, 0, &p->localsz) == SCPE_OK);
+  ASSURE(ReadEx(segbase+procaddr-1, 0, &exitic)  == SCPE_OK);
+  ASSURE(ReadBEx(segbase, exitic, &sz1) == SCPE_OK);
   if (sz1==0x96) {
     ReadBEx(segbase, exitic+1, &sz1);
     if (sz1 & 0x80) {

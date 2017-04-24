@@ -243,6 +243,12 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "isys8024", "isys8024.vcproj
 		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "imds-225", "imds-225.vcproj", "{A66F0D85-174F-4AFE-A44E-7FAE3D3727BC}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ibmpc", "ibmpc.vcproj", "{76EF8599-7AB0-4C8D-997B-AAEEE724A5D0}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ibmpcxt", "ibmpcxt.vcproj", "{0026A4C2-655A-4C03-B6CA-B1EAF79FA4D1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -445,6 +451,18 @@ Global
 		{ACCC3A24-56CD-4543-81F3-5F6A5E24F338}.Debug|Win32.Build.0 = Debug|Win32
 		{ACCC3A24-56CD-4543-81F3-5F6A5E24F338}.Release|Win32.ActiveCfg = Release|Win32
 		{ACCC3A24-56CD-4543-81F3-5F6A5E24F338}.Release|Win32.Build.0 = Release|Win32
+		{A66F0D85-174F-4AFE-A44E-7FAE3D3727BC}.Debug|Win32.ActiveCfg = Debug|Win32
+		{A66F0D85-174F-4AFE-A44E-7FAE3D3727BC}.Debug|Win32.Build.0 = Debug|Win32
+		{A66F0D85-174F-4AFE-A44E-7FAE3D3727BC}.Release|Win32.ActiveCfg = Release|Win32
+		{A66F0D85-174F-4AFE-A44E-7FAE3D3727BC}.Release|Win32.Build.0 = Release|Win32
+		{76EF8599-7AB0-4C8D-997B-AAEEE724A5D0}.Debug|Win32.ActiveCfg = Debug|Win32
+		{76EF8599-7AB0-4C8D-997B-AAEEE724A5D0}.Debug|Win32.Build.0 = Debug|Win32
+		{76EF8599-7AB0-4C8D-997B-AAEEE724A5D0}.Release|Win32.ActiveCfg = Release|Win32
+		{76EF8599-7AB0-4C8D-997B-AAEEE724A5D0}.Release|Win32.Build.0 = Release|Win32
+		{0026A4C2-655A-4C03-B6CA-B1EAF79FA4D1}.Debug|Win32.ActiveCfg = Debug|Win32
+		{0026A4C2-655A-4C03-B6CA-B1EAF79FA4D1}.Debug|Win32.Build.0 = Debug|Win32
+		{0026A4C2-655A-4C03-B6CA-B1EAF79FA4D1}.Release|Win32.ActiveCfg = Release|Win32
+		{0026A4C2-655A-4C03-B6CA-B1EAF79FA4D1}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

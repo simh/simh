@@ -733,6 +733,7 @@ uint8 rcr_byte(PC_ENV *m, uint8 d, uint8 s)
         in case the object came in and was treated
         as a negative number.  Needed???*/
         mask = (1<<(8-cnt))-1;
+        /* coverity[BAD_SHIFT] */
         res = (d >> cnt) & mask;
         /* now the high stuff which rotated around
            into the positions B_cnt-2 .. B_0 */
@@ -804,6 +805,7 @@ uint16 rcr_word(PC_ENV *m, uint16 d, uint16 s)
            in case the object came in and was treated
            as a negative number.  Needed???*/
         mask = (1<<(16-cnt))-1;
+        /* coverity[BAD_SHIFT] */
         res = (d >> cnt) & mask;
         /* now the high stuff which rotated around
            into the positions B_cnt-2 .. B_0 */

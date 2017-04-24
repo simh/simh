@@ -665,6 +665,7 @@ else
     ba = dibp->ba;
 unitno = (int32) (uptr - dptr->units);
 r5v = 0;
+/* coverity[NULL_RETURNS] */ 
 if ((strncmp (regptr, "/R5:", 4) == 0) ||
     (strncmp (regptr, "/R5=", 4) == 0) ||
     (strncmp (regptr, "/r5:", 4) == 0) ||

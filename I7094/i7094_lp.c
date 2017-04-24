@@ -1,6 +1,6 @@
 /* i7094_lp.c: IBM 716 line printer simulator
 
-   Copyright (c) 2003-2012, Robert M. Supnik
+   Copyright (c) 2003-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          716 line printer
 
+   13-Mar-17    RMS     Fixed GET_PCHAIN macro (COVERITY)
    19-Jan-07    RMS     Added UNIT_TEXT flag
 
    Internally, the 7094 works only with column binary and is limited to
@@ -55,7 +56,7 @@
 #define UNIT_V_48               (UNIT_V_UF + 2)
 #define UNIT_BZ                 (1 << UNIT_V_BZ)
 #define UNIT_48                 (1 << UNIT_V_48)
-#define GET_PCHAIN(x)           (((x) >> UNIT_V_BZ) & (UNIT_BZ|UNIT_48))
+#define GET_PCHAIN(x)           (((x) >> UNIT_V_BZ) & 03)
 
 #define LPT_BINLNT              24                      /* bin buffer length */
 #define LPT_ECHLNT              22                      /* echo buffer length */
@@ -94,7 +95,6 @@ t_uint64 lpt_chob = 0;
 uint32 lpt_chob_v = 0;
 t_uint64 lpt_bbuf[LPT_BINLNT];                          /* binary buffer */
 t_uint64 lpt_ebuf[LPT_ECHLNT];                          /* echo buffer */
-
 
 /* Echo ordering map */
 

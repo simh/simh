@@ -1258,7 +1258,7 @@ int32 sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 
 /* Symbolic output - working
    Inputs:
-        *of   = output stream
+        *of     =       output stream
         addr    =       current PC
         *val    =       pointer to values
         *uptr   =       pointer to unit
@@ -1320,6 +1320,7 @@ t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32
     int32 cflag, i = 0, j, r;
     char gbuf[CBUFSIZE];
 
+    memset (gbuf, 0, sizeof (gbuf));
     cflag = (uptr == NULL) || (uptr == &i8080_unit);
     while (isspace (*cptr)) cptr++;                         /* absorb spaces */
     if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
@@ -1337,7 +1338,7 @@ t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32
    or numeric (including spaces).
 */
 
-    while (1) {
+    while (i < sizeof (gbuf) - 4) {
         if (*cptr == ',' || *cptr == '\0' ||
              isdigit(*cptr))
                 break;

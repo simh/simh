@@ -633,6 +633,8 @@ DEVICE *dptr;
 UNIT *uptr;
 t_stat r;
 
+if (!ptr || !*ptr)
+    return SCPE_2FARG;
 if (ptr && (*ptr == '/')) {                             /* handle "BOOT /R5:n DEV" format */
     ptr = get_glyph (ptr, rbuf, 0);                     /* get glyph */
     regptr = rbuf;
@@ -647,6 +649,7 @@ else {                                                  /* handle "BOOT DEV /R5:
     }
 /* parse R5 parameter value */
 r5v = 0;
+/* coverity[NULL_RETURNS] */ 
 if ((strncmp (regptr, "/R5:", 4) == 0) ||
     (strncmp (regptr, "/R5=", 4) == 0) ||
     (strncmp (regptr, "/r5:", 4) == 0) ||

@@ -298,7 +298,7 @@ M[FE_KEEPA] = INT64_C(0003740000000);                  /* PARITY STOP, CRM, DP P
 kaf_unit.u3 = 0;
 kaf_unit.u4 = 0;
 apr_flg = apr_flg & ~(APRF_ITC | APRF_CON);
-sim_activate (&fei_unit, KBD_WAIT (fei_unit.wait, tmxr_poll));
+sim_activate (&fei_unit, tmxr_poll);
 sim_activate_after (&kaf_unit, kaf_unit.wait);
 return SCPE_OK;
 }

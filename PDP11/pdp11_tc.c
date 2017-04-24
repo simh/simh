@@ -1,6 +1,6 @@
 /* pdp11_tc.c: PDP-11 DECtape simulator
 
-   Copyright (c) 1993-2016, Robert M Supnik
+   Copyright (c) 1993-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,9 @@
 
    tc           TC11/TU56 DECtape
 
-   04-Dec-13    RMS     Revised to model TCCM correctly (Josh Dersch)
+   15-Mar-17    RMS     Fixed to defer error interrupts (Paul Koning)
+   14-Mar-17    RMS     Fixed spurious interrupt when setting GO (Paul Koning)
+   04-Dec-16    RMS     Revised to model TCCM correctly (Josh Dersch)
    23-Oct-13    RMS     Revised for new boot setup routine
    23-Jun-06    RMS     Fixed switch conflict in ATTACH
    10-Feb-06    RMS     READ sets extended data bits in TCST (Alan Frisbie)
@@ -504,7 +506,8 @@ switch (j) {
             data = (PA & 1)? ((tccm & 0377) | (data << 8)): ((tccm & ~0377) | data);
         if ((data & CSR_IE) == 0)                       /* clearing IE? */
             CLR_INT (DTA);                              /* clear intr */
-        else if ((tccm & (CSR_DONE|CSR_IE)) == CSR_DONE) /* setting, DON'IE = DON? */
+        else if (((tccm & (CSR_DONE|CSR_IE)) == CSR_DONE) && /* set IE, DON'IE = DON? */
+            ((data & CSR_GO) == 0))                     /* and not setting GO? */
             SET_INT (DTA);                              /* set intr */
         tccm = (tccm & ~CSR_RW) | (data & CSR_RW);      /* merge data */
         if ((data & CSR_GO) != 0) {                     /* GO (DO) set? */
@@ -1047,7 +1050,9 @@ return SCPE_OK;
 
 /* Utility routines */
 
-/* Set error flag */
+/* Set error flag
+   Done must be deferred to allow time for interrupt setup (RSTS V4)
+*/
 
 void dt_seterr (UNIT *uptr, int32 e)
 {
@@ -1056,7 +1061,7 @@ int32 mot = DTS_GETMOT (uptr->STATE);
 tcst = tcst | e;                                        /* set error flag */
 tccm = tccm | CSR_ERR;
 if (!(tccm & CSR_DONE)) {                               /* not done? */
-    DT_SETDONE;
+    sim_activate (&dt_dev.units[DT_TIMER], dt_ctime);   /* sched done */
     }
 if (mot >= DTS_ACCF) {                                  /* ~stopped or stopping? */
     sim_cancel (uptr);                                  /* cancel activity */
@@ -1065,6 +1070,7 @@ if (mot >= DTS_ACCF) {                                  /* ~stopped or stopping?
     sim_activate (uptr, dt_dctime);                     /* sched decel */
     DTS_SETSTA (DTS_DECF | (mot & DTS_DIR), 0);         /* state = decel */
     }
+else DTS_SETSTA (mot, 0);                               /* clear 2nd, 3rd */
 return;
 }
 

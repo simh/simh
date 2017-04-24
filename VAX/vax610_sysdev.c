@@ -403,6 +403,7 @@ else {                                                  /* handle "BOOT DEV /R5:
     }
 /* parse R5 parameter value */
 r5v = 0;
+/* coverity[NULL_RETURNS] */ 
 if ((strncmp (regptr, "/R5:", 4) == 0) ||
     (strncmp (regptr, "/R5=", 4) == 0) ||
     (strncmp (regptr, "/r5:", 4) == 0) ||

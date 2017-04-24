@@ -101,7 +101,7 @@
 #define UNIT_MSIZE      (7 << UNIT_V_MSIZE)
 #define MEMAMOUNT(x)    (x << UNIT_V_MSIZE)
 
-#define TMR_RTC         1
+#define TMR_RTC         0
 
 #define HIST_MAX        5000
 #define HIST_MIN        64
@@ -699,10 +699,6 @@ int mkint() {
                     return 1;
                 B <<= 3;
                 exp_b--;
-            }
-            if (exp_b != 0) {
-                B = 0;
-                return 1;
             }
         }
         if (f && B != 0)
@@ -3855,8 +3851,7 @@ cpu_reset(DEVICE * dptr)
     sim_brk_types = sim_brk_dflt = SWMASK('E') | SWMASK('A') | SWMASK('B');
     hst_p = 0;
 
-    sim_register_clock_unit (&cpu_unit[0]);
-    sim_rtcn_init (cpu_unit[0].wait, TMR_RTC);
+    sim_rtcn_init_unit (&cpu_unit[0], cpu_unit[0].wait, TMR_RTC);
     sim_activate(&cpu_unit[0], cpu_unit[0].wait) ;
 
     return SCPE_OK;
@@ -3986,11 +3981,11 @@ cpu_show_hist(FILE * st, UNIT * uptr, int32 val, CONST void *desc)
             int i;
             fprintf(st, "%o %05o%o ", h->cpu, h->c & 077777, h->l);
             sim_eval = (t_value)h->a_reg;
-            fprint_sym(st, 0, &sim_eval, &cpu_unit[0], SWMASK('B'));
+            (void)fprint_sym(st, 0, &sim_eval, &cpu_unit[0], SWMASK('B'));
             fputc((h->flags & F_AROF) ? '^': ' ', st);
             fputc(' ', st);
             sim_eval = (t_value)h->b_reg;
-            fprint_sym(st, 0, &sim_eval, &cpu_unit[0], SWMASK('B'));
+            (void)fprint_sym(st, 0, &sim_eval, &cpu_unit[0], SWMASK('B'));
             fputc((h->flags & F_BROF) ? '^': ' ', st);
             fputc(' ', st);
             fprint_val(st, (t_value)h->x_reg, 8, 39, PV_RZRO);

@@ -30,14 +30,14 @@
 #include "vax_defs.h"
 
 #if defined(VAX_620)
-char sim_name[32] = "rtVAX1000 (KA620)";
+char sim_name[] = "rtVAX1000 (KA620)";
 
 void vax_init(void)
 {
 sim_savename = "rtVAX1000 (KA620)";
 }
 #else
-char sim_name[32] = "MicroVAX II (KA630)";
+char sim_name[] = "MicroVAX II (KA630)";
 
 void vax_init(void)
 {

@@ -1,6 +1,6 @@
 /* alpha_defs.h: Alpha architecture definitions file
 
-   Copyright (c) 2003-2006, Robert M Supnik
+   Copyright (c) 2003-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    Respectfully dedicated to the great people of the Alpha chip, systems, and
    software development projects; and to the memory of Peter Conklin, of the
    Alpha Program Office.
+
+   17-Mar-2017  RMS     Fixed function field widths (Maurice Marks)
 */
 
 #ifndef _ALPHA_DEFS_H_
@@ -113,13 +115,13 @@
 #define I_FSRC          (I_M_FSRC << I_V_FSRC)
 #define  I_FSRC_X       0x0200                          /* data type X */
 #define I_V_FFNC        5                               /* floating function */
-#define I_M_FFNC        0x3F
+#define I_M_FFNC        0x7F
 #define I_V_LIT8        13                              /* integer 8b literal */
 #define I_M_LIT8        0xFF
 #define I_V_ILIT        12                              /* literal flag */
 #define I_ILIT          (1u << I_V_ILIT)
 #define I_V_IFNC        5                               /* integer function */
-#define I_M_IFNC        0x3F
+#define I_M_IFNC        0x7F
 #define I_V_RC          0                               /* Rc */
 #define I_M_RC          0x1F
 #define I_V_MDSP        0                               /* memory displacement */

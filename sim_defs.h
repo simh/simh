@@ -1,6 +1,6 @@
 /* sim_defs.h: simulator definitions
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   25-Sep-16    RMS     Removed KBD_WAIT and friends
+   08-Mar-16    RMS     Added shutdown invisible switch
+   24-Dec-14    JDB     Added T_ADDR_FMT
    05-Jan-11    MP      Added Asynch I/O support
    18-Jan-11    MP      Added log file reference count support
    21-Jul-08    RMS     Removed inlining support
@@ -396,12 +399,9 @@ typedef uint32          t_addr;
 /* Default timing parameters */
 
 #define KBD_POLL_WAIT   5000                            /* keyboard poll */
-#define KBD_MAX_WAIT    500000
 #define SERIAL_IN_WAIT  100                             /* serial in time */
 #define SERIAL_OUT_WAIT 100                             /* serial output */
 #define NOQUEUE_WAIT    1000000                         /* min check time */
-#define KBD_LIM_WAIT(x) (((x) > KBD_MAX_WAIT)? KBD_MAX_WAIT: (x))
-#define KBD_WAIT(w,s)   ((w)? w: KBD_LIM_WAIT (s))
 
 /* Convert switch letter to bit mask */
 
@@ -552,6 +552,8 @@ struct UNIT {
     int32               u6;                             /* device specific */
     void                *up7;                           /* device specific */
     void                *up8;                           /* device specific */
+    uint16              us9;                            /* device specific */
+    uint16              us10;                           /* device specific */
     void                *tmxr;                          /* TMXR linkage */
     t_bool              (*cancel)(UNIT *);
     double              usecs_remaining;                /* time balance for long delays */

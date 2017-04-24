@@ -28,7 +28,7 @@
 
 #include <stdio.h>
 #include <ctype.h>
-#include "sim_defs.h"		        /* simulator defns */
+#include "sim_defs.h"                   /* simulator defns */
 
 #define IPC     0
 #define SET_XACK(VAL)       (xack = VAL)
@@ -69,17 +69,17 @@
 
 //board definitions for the multibus
 /* set the base I/O address for the iSBC 201 */
-#define	SBC201_BASE	0x88
+#define SBC201_BASE     0x88
 #define SBC201_INT      INT_1
 #define SBC201_NUM      0
 
 /* set the base I/O address for the iSBC 202 */
-#define	SBC202_BASE	0x78
+#define SBC202_BASE     0x78
 #define SBC202_INT      INT_1
 #define SBC202_NUM      1
 
 /* set the base I/O address for the iSBC 208 */
-#define	SBC208_BASE	0x40
+#define SBC208_BASE     0x40
 #define SBC208_INT      INT_1
 #define SBC208_NUM      0
 
@@ -111,10 +111,10 @@
 
 /* Memory */
 
-#define MAXMEMSIZE	    0x10000	        /* 8080 max memory size */
-#define MEMSIZE		    (i8080_unit.capac)  /* 8080 actual memory size */
-#define ADDRMASK	    (MAXMEMSIZE - 1)    /* 8080 address mask */
-#define MEM_ADDR_OK(x)	    (((uint32) (x)) < MEMSIZE)
+#define MAXMEMSIZE          0x10000             /* 8080 max memory size */
+#define MEMSIZE             (i8080_unit.capac)  /* 8080 actual memory size */
+#define ADDRMASK            (MAXMEMSIZE - 1)    /* 8080 address mask */
+#define MEM_ADDR_OK(x)      (((uint32) (x)) < MEMSIZE)
 
 /* debug definitions */
 
@@ -130,11 +130,11 @@
 
 /* Simulator stop codes */
 
-#define STOP_RSRV	1			    /* must be 1 */
-#define STOP_HALT	2			    /* HALT */
-#define STOP_IBKPT	3		            /* breakpoint */
-#define STOP_OPCODE	4                           /* Invalid Opcode */
-#define STOP_IO 	5                           /* I/O error */
-#define STOP_MEM 	6                           /* Memory error */
-#define STOP_XACK 	7                           /* XACK error */
+#define STOP_RSRV       1                           /* must be 1 */
+#define STOP_HALT       2                           /* HALT */
+#define STOP_IBKPT      3                           /* breakpoint */
+#define STOP_OPCODE     4                           /* Invalid Opcode */
+#define STOP_IO         5                           /* I/O error */
+#define STOP_MEM        6                           /* Memory error */
+#define STOP_XACK       7                           /* XACK error */
 

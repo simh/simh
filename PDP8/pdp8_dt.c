@@ -1,6 +1,6 @@
 /* pdp8_dt.c: PDP-8 DECtape simulator
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dt           TC08/TU56 DECtape
 
+   15-Mar-17    RMS     Fixed dt_seterr to clear successor states
    17-Sep-13    RMS     Changed to use central set_bootpc routine
    23-Jun-06    RMS     Fixed switch conflict in ATTACH
    07-Jan-06    RMS     Fixed unaligned register access bug (Doug Carman)
@@ -797,11 +798,12 @@ switch (fnc) {                                          /* at speed, check fnc *
                 return SCPE_OK;
                 }
             if (DEBUG_PRI (dt_dev, LOG_RW) ||
-               (DEBUG_PRI (dt_dev, LOG_BL) && (blk == dt_logblk)))
+           (DEBUG_PRI (dt_dev, LOG_BL) && (blk == dt_logblk)))
                 fprintf (sim_deb, ">>DT%d: reading block %d %s%s\n",
                     unum, blk, (dir? "backward": "forward"),
                     ((dtsa & DTA_MODE)? " continuous": " "));
-            dt_substate = 0;                            /* fall through */
+            dt_substate = 0;
+            /* fall through */
         case 0:                                         /* normal read */
             M[DT_WC] = (M[DT_WC] + 1) & 07777;          /* incr WC, CA */
             M[DT_CA] = (M[DT_CA] + 1) & 07777;
@@ -814,6 +816,7 @@ switch (fnc) {                                          /* at speed, check fnc *
                 M[ma] = dat;
             if (M[DT_WC] == 0)                          /* wc ovf? */
                 dt_substate = DTO_WCO;
+            /* fall through */
         case DTO_WCO:                                   /* wc ovf, not sob */
             if (wrd != (dir? 0: DTU_BSIZE (uptr) - 1))  /* not last? */
                 sim_activate (uptr, DT_WSIZE * dt_ltime);
@@ -860,10 +863,12 @@ switch (fnc) {                                          /* at speed, check fnc *
                 fprintf (sim_deb, ">>DT%d: writing block %d %s%s\n", unum, blk,
                     (dir? "backward": "forward"),
                     ((dtsa & DTA_MODE)? " continuous": " "));
-            dt_substate = 0;                            /* fall through */
+            dt_substate = 0;
+            /* fall through */
         case 0:                                         /* normal write */
             M[DT_WC] = (M[DT_WC] + 1) & 07777;          /* incr WC, CA */
             M[DT_CA] = (M[DT_CA] + 1) & 07777;
+            /* fall through */
         case DTO_WCO:                                   /* wc ovflo */
             ma = DTB_GETMEX (dtsb) | M[DT_CA];          /* get mem addr */
             ba = (blk * DTU_BSIZE (uptr)) + wrd;        /* buffer ptr */
@@ -1073,6 +1078,7 @@ if (mot >= DTS_ACCF) {                                  /* ~stopped or stopping?
     sim_activate (uptr, dt_dctime);                     /* sched decel */
     DTS_SETSTA (DTS_DECF | (mot & DTS_DIR), 0);         /* state = decel */
     }
+else DTS_SETSTA (mot, 0);                               /* clear 2nd, 3rd */
 DT_UPDINT;
 return;
 }

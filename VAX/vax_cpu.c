@@ -1,6 +1,6 @@
 /* vax_cpu.c: VAX CPU
 
-   Copyright (c) 1998-2012, Robert M Supnik
+   Copyright (c) 1998-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    cpu          VAX central processor
 
+   31-Mar-17    RMS     Fixed uninitialized variable on FPD path (COVERITY)
+   13-Mar-17    RMS     Fixed dangling else in show_opnd (COVERITY)
    20-Sep-11    MP      Fixed idle conditions for various versions of Ultrix, 
                         Quasijarus-4.3BSD, NetBSD and OpenBSD.
                         Note: Since NetBSD and OpenBSD are still actively 
@@ -476,10 +478,15 @@ t_stat sim_instr (void)
 volatile int32 opc = 0, cc;                             /* used by setjmp */
 volatile int32 acc;                                     /* set by setjmp */
 int abortval;
-t_stat r;
+t_stat ret;
+int32 r = 0, rh = 0, temp = 0;
+int32 spec = 0, disp = 0, rn = 0, index = 0, numspec = 0;
+int32 vfldrp1 = 0, brdisp = 0, flg = 0, mstat = 0;
+uint32 va = 0, iad = 0;
+int32 opnd[OPND_SIZE];                                  /* operand queue */
 
-if ((r = build_dib_tab ()) != SCPE_OK)                  /* build, chk dib_tab */
-    return r;
+if ((ret = build_dib_tab ()) != SCPE_OK)                /* build, chk dib_tab */
+    return ret;
 if ((PSL & PSL_MBZ) ||                                  /* validate PSL<mbz> */
     ((PSL & PSL_CM) && BadCmPSL (PSL)) ||               /* validate PSL<cm> */
     ((PSL_GETCUR (PSL) != KERN) &&                      /* esu => is, ipl = 0 */
@@ -579,12 +586,7 @@ else if (abortval < 0) {                                /* mm or rsrv or int */
 /* Main instruction loop */
 
 for ( ;; ) {
-
-    int32 spec, disp, rn, index, numspec;
-    int32 vfldrp1, brdisp, flg, mstat;
-    int32 i, j, r, rh, temp;
-    uint32 va, iad;
-    int32 opnd[OPND_SIZE];                              /* operand queue */
+    int32 i, j;
 
 /* Optionally record instruction history results from prior instruction */
 
@@ -714,6 +716,7 @@ for ( ;; ) {
     if (PSL & PSL_FPD) {
         if ((numspec & DR_F) == 0)
             RSVD_INST_FAULT;
+        j = 0;                                          /* no operands */
         }
     else {
         numspec = numspec & DR_NSPMASK;                 /* get # specifiers */
@@ -3182,7 +3185,7 @@ return j;
 
 void cpu_idle (void)
 {
-sim_idle (TMR_CLK, 1);
+sim_idle (TMR_CLK, TRUE);
 }
 
 /* Reset */
@@ -3520,9 +3523,9 @@ for (i = 1, j = 0, more = FALSE; i <= numspec; i++) {   /* loop thru specs */
     disp = drom[h->opc][i];                             /* specifier type */
     if (disp == RG)                                     /* fix specials */
         disp = RQ;
-    else if (disp >= BB)
-        break;                         /* ignore branches */
-    else switch (disp & (DR_LNMASK|DR_ACMASK)) {
+    if (disp >= BB)                                     /* ignore branches */
+        break;
+    switch (disp & (DR_LNMASK|DR_ACMASK)) {
 
     case RB: case RW: case RL:                          /* read */
     case AB: case AW: case AL: case AQ: case AO:        /* address */

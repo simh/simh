@@ -1,6 +1,6 @@
 /* id_ttp.c: Interdata PASLA console interface
 
-   Copyright (c) 2000-2012, Robert M. Supnik
+   Copyright (c) 2000-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    ttp          console (on PAS)
 
+   09-Mar-17    RMS     Fixed testing of 8b mode (COVERITY)
+                        Fixed testing of echoed character (COVERITY)
    18-Apr-12    RMS     Revised to use clock coscheduling
    18-Jun-07    RMS     Added UNIT_IDLE flag to console input
    18-Oct-06    RMS     Sync keyboard to LFC clock
@@ -78,7 +80,7 @@ t_stat ttp_set_enbdis (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 DIB ttp_dib = { d_TTP, -1, v_TTP, ttp_tplte, &ttp, NULL };
 
 UNIT ttp_unit[] = {
-    { UDATA (&ttpi_svc, UNIT_IDLE, 0), 0 },
+    { UDATA (&ttpi_svc, UNIT_IDLE, 0), KBD_POLL_WAIT },
     { UDATA (&ttpo_svc, 0, 0), SERIAL_OUT_WAIT }
     };
 
@@ -140,6 +142,7 @@ switch (op) {                                           /* case IO op */
     case IO_RD:                                         /* read */
         ttp_kchp = 0;                                   /* clr chr pend */
         ttp_sta = ttp_sta & ~STA_OVR;                   /* clr overrun */
+        sim_activate_abs (&ttp_unit[TTI], ttp_unit[TTI].wait);
         return ttp_unit[TTI].buf;                       /* return buf */
 
     case IO_WD:                                         /* write */
@@ -179,8 +182,7 @@ t_stat ttpi_svc (UNIT *uptr)
 {
 int32 c, out;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, lfc_cosched (lfc_poll)));
-                                                        /* continue poll */
+sim_activate (uptr, lfc_cosched (lfc_poll));            /* continue poll */
 ttp_sta = ttp_sta & ~STA_FR;                            /* clear break */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
@@ -196,14 +198,14 @@ if (c & SCPE_BREAK) {                                   /* break? */
 else {
     out = c & 0x7F;                                     /* echo is 7b */
     c = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags));
-    if (TT_GET_MODE (uptr->flags) != TT_MODE_8B)        /* not 8b mode? */
+    if (TT_GET_MODE (uptr->flags) != TTUF_MODE_8B)      /* not 8b mode? */
         c = pas_par (ttp_cmd, c);                       /* apply parity */
     uptr->buf = c;                                      /* save char */
     uptr->pos = uptr->pos + 1;                          /* incr count */
     ttp_kchp = 1;                                       /* char pending */
     if (ttp_cmd & CMD_ECHO) {
         out = sim_tt_outcvt (out, TT_GET_MODE (uptr->flags));
-        if (c >= 0)
+        if (out >= 0)
             sim_putchar (out);
         ttp_unit[TTO].pos = ttp_unit[TTO].pos + 1;
         }
@@ -216,7 +218,7 @@ t_stat ttpo_svc (UNIT *uptr)
 int32 c;
 t_stat r;
 
-if (TT_GET_MODE (uptr->flags) == TT_MODE_8B)            /* 8b? */
+if (TT_GET_MODE (uptr->flags) == TTUF_MODE_8B)          /* 8b? */
     c = pas_par (ttp_cmd, uptr->buf);                   /* apply parity */
 else c = sim_tt_outcvt (uptr->buf, TT_GET_MODE (uptr->flags));
 if (c >= 0) {
@@ -238,7 +240,7 @@ t_stat ttp_reset (DEVICE *dptr)
 {
 if (dptr->flags & DEV_DIS)
     sim_cancel (&ttp_unit[TTI]);
-else sim_activate (&ttp_unit[TTI], KBD_WAIT (ttp_unit[TTI].wait, lfc_poll));
+else sim_activate (&ttp_unit[TTI], lfc_poll);
 sim_cancel (&ttp_unit[TTO]);
 CLR_INT (v_TTP);                                        /* clear int */
 CLR_ENB (v_TTP);

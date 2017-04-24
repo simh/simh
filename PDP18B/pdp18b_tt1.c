@@ -1,6 +1,6 @@
 /* pdp18b_ttx.c: PDP-9/15 additional terminals simulator
 
-   Copyright (c) 1993-2015, Robert M Supnik
+   Copyright (c) 1993-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ttix,ttox    LT15/LT19 terminal input/output
 
+   19-Sep-16    RMS     Limit connection poll to configured lines
    13-Sep-15    RMS     Added APIVEC register
    11-Oct-13    RMS     Poll TTIX immediately to pick up initial connect
    18-Apr-12    RMS     Revised to use clock coscheduling
@@ -107,6 +108,7 @@ REG ttix_reg[] = {
     { FLDATAD (INT, int_hwre[API_TTI1], INT_V_TTI1, "interrupt pending flag") },
     { DRDATAD (TIME, ttix_unit.wait, 24, "keyboard polling interval"), REG_NZ + PV_LEFT },
     { ORDATA (DEVNUM, ttix_dib.dev, 6), REG_HRO },
+    { DRDATA (LINES, ttx_desc.lines, 6), REG_HRO },
 #if defined (PDP15)
     { ORDATA (APIVEC, api_vec[API_TTI1][INT_V_TTI1], 6), REG_HRO },
 #endif
@@ -229,7 +231,7 @@ ln = tmxr_poll_conn (&ttx_desc);                        /* look for connect */
 if (ln >= 0)                                            /* got one? rcv enab */
     ttx_ldsc[ln].rcve = 1;
 tmxr_poll_rx (&ttx_desc);                               /* poll for input */
-for (ln = 0; ln < TTX_MAXL; ln++) {                     /* loop thru lines */
+for (ln = 0; ln < ttx_lines; ln++) {                    /* loop thru lines */
     if (ttx_ldsc[ln].conn) {                            /* connected? */
         if ((temp = tmxr_getc_ln (&ttx_ldsc[ln]))) {    /* get char */
             if (temp & SCPE_BREAK)                      /* break? */

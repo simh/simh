@@ -158,13 +158,13 @@ uint8 ioc_cont0(t_bool io, uint8 data)
 {
     if (io == 0) {                      /* read data port */
         if (DEBUG)
-            sim_printf("   ioc_cont0: read data returned %02X PCX=%04X\n", dbb_out, PCX);
+            sim_printf("\n   ioc_cont0: read data returned %02X PCX=%04X", dbb_out, PCX);
         return dbb_out;
     } else {                            /* write data port */
         dbb_in = data;
         dbb_stat |= IBF;
         if (DEBUG)
-            sim_printf("   ioc_cont0: write data=%02X port=%02X PCX=%04X\n", dbb_in, port, PCX);
+            sim_printf("\n   ioc_cont0: write data=%02X port=%02X PCX=%04X", dbb_in, port, PCX);
         return 0;
     }
 }
@@ -177,21 +177,21 @@ uint8 ioc_cont1(t_bool io, uint8 data)
         if ((dbb_stat & F0) && (dbb_stat & IBF)) {
             temp = dbb_stat;
             if (DEBUG)
-                sim_printf("   ioc_cont1: DBB status read 1 data=%02X PCX=%04X\n", dbb_stat, PCX);
+                sim_printf("\n   ioc_cont1: DBB status read 1 data=%02X PCX=%04X", dbb_stat, PCX);
             dbb_stat &= ~IBF;           //reset IBF flag
             return temp;
         } 
         if ((dbb_stat & F0) && (dbb_stat & OBF)) {
             temp = dbb_stat;
             if (DEBUG)
-                sim_printf("   ioc_cont1: DBB status read 2 data=%02X PCX=%04X\n", dbb_stat, PCX);
+                sim_printf("\n   ioc_cont1: DBB status read 2 data=%02X PCX=%04X", dbb_stat, PCX);
             dbb_stat &= ~OBF;           //reset OBF flag
             return temp;
         } 
         if (dbb_stat & F0) {
             temp = dbb_stat;
             if (DEBUG)
-                sim_printf("   ioc_cont1: DBB status read 3 data=%02X PCX=%04X\n", dbb_stat, PCX);
+                sim_printf("\n   ioc_cont1: DBB status read 3 data=%02X PCX=%04X", dbb_stat, PCX);
             dbb_stat &= ~F0;            //reset F0 flag
             return temp;
         }
@@ -222,10 +222,10 @@ uint8 ioc_cont1(t_bool io, uint8 data)
                 dbb_stat |= (F0 | IBF);
                 break;
             default:
-                sim_printf("   ioc_cont1: Unknown command %02X PCX=%04X\n", dbb_cmd, PCX);
+                sim_printf("\n   ioc_cont1: Unknown command %02X PCX=%04X", dbb_cmd, PCX);
         }
         if (DEBUG)
-            sim_printf("   ioc_cont1: DBB command write data=%02X PCX=%04X\n", dbb_cmd, PCX);
+            sim_printf("\n   ioc_cont1: DBB command write data=%02X PCX=%04X", dbb_cmd, PCX);
         return 0;
     }
 }

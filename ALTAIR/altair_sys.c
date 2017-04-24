@@ -234,6 +234,7 @@ t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32
 int32 cflag, i = 0, j, r;
 char gbuf[CBUFSIZE];
 
+memset (gbuf, 0, sizeof (gbuf));
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
 while (isspace (*cptr)) cptr++;                         /* absorb spaces */
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
@@ -251,9 +252,9 @@ if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* ASCII string? */
    or numeric (including spaces).
 */
 
-while (1) {
+while (i < sizeof (gbuf) - 4) {
     if (*cptr == ',' || *cptr == '\0' ||
-         isdigit(*cptr))
+         sim_isdigit(*cptr))
             break;
     gbuf[i] = toupper(*cptr);
     cptr++;
@@ -285,9 +286,7 @@ if (toupper(gbuf[0]) == 'M' &&
 
 /* kill trailing spaces if any */
 gbuf[i] = '\0';
-for (j = i - 1; gbuf[j] == ' '; j--) {
-    gbuf[j] = '\0';
-}
+sim_trim_endspc (gbuf);
 
 /* find opcode in table */
 for (j = 0; j < 256; j++) {
@@ -295,7 +294,7 @@ for (j = 0; j < 256; j++) {
         break;
 }
 if (j > 255)                                            /* not found */
-    return SCPE_ARG;
+    return sim_messagef (SCPE_ARG, "No such opcode: %s\n", gbuf);
 
 val[0] = j;                                             /* store opcode */
 if (oplen[j] < 2)                                       /* if 1-byter we are done */

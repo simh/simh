@@ -31,8 +31,6 @@
 #include "scp.h"
 
 t_bool vid_active = FALSE;
-int32 vid_mouse_xrel;
-int32 vid_mouse_yrel;
 int32 vid_cursor_x;
 int32 vid_cursor_y;
 t_bool vid_mouse_b1 = FALSE;
@@ -96,7 +94,7 @@ static char tmp_key_name[40];
  * via SDL_GetError().
  */
 #define SDL_SavePNG(surface, file) \
-	SDL_SavePNG_RW(surface, SDL_RWFromFile(file, "wb"), 1)
+        SDL_SavePNG_RW(surface, SDL_RWFromFile(file, "wb"), 1)
 
 /*
  * SDL_SavePNG -- libpng-based SDL_Surface writer.
@@ -523,8 +521,6 @@ if (!vid_active) {
     vid_height = height;
     vid_mouse_captured = FALSE;
     vid_cursor_visible = (vid_flags & SIM_VID_INPUTCAPTURED);
-    vid_mouse_xrel = 0;
-    vid_mouse_yrel = 0;
 
     vid_key_events.head = 0;
     vid_key_events.tail = 0;
@@ -717,6 +713,9 @@ void vid_set_cursor_position (int32 x, int32 y)
 int32 x_delta = vid_cursor_x - x;
 int32 y_delta = vid_cursor_y - y;
 
+if (vid_flags & SIM_VID_INPUTCAPTURED)
+    return;
+
 if ((x_delta) || (y_delta)) {
     sim_debug (SIM_VID_DBG_CURSOR, vid_dev, "vid_set_cursor_position(%d, %d) - Cursor position changed\n", x, y);
     /* Any queued mouse motion events need to have their relative 
@@ -728,12 +727,8 @@ if ((x_delta) || (y_delta)) {
         for (i=0; i<vid_mouse_events.count; i++) {
             ev = &vid_mouse_events.events[(vid_mouse_events.head + i)%MAX_EVENTS];
             sim_debug (SIM_VID_DBG_CURSOR, vid_dev, "Pending Mouse Motion Event Adjusted from: (%d, %d) to (%d, %d)\n", ev->x_rel, ev->y_rel, ev->x_rel + x_delta, ev->y_rel + y_delta);
-            vid_mouse_xrel -= ev->x_rel;                            /* remove previously accumulated relative position */
-            vid_mouse_yrel -= ev->y_rel;
             ev->x_rel += x_delta;
             ev->y_rel += y_delta;
-            vid_mouse_xrel += ev->x_rel;                            /* update cumulative x & y rel */
-            vid_mouse_yrel += ev->y_rel;
             }
         if (SDL_SemPost (vid_mouse_events.sem))
             sim_printf ("%s: vid_set_cursor_position(): SDL_SemPost error: %s\n", vid_dev ? sim_dname(vid_dev) : "Video Device", SDL_GetError());
@@ -1250,13 +1245,11 @@ if (SDL_SemWait (vid_mouse_events.sem) == 0) {
         event->xrel = (event->x - vid_cursor_x);
         event->yrel = (event->y - vid_cursor_y);
         }
-    vid_mouse_xrel += event->xrel;                          /* update cumulative x rel */
-    vid_mouse_yrel += event->yrel;                          /* update cumulative y rel */
     vid_mouse_b1 = (event->state & SDL_BUTTON(SDL_BUTTON_LEFT)) ? TRUE : FALSE;
     vid_mouse_b2 = (event->state & SDL_BUTTON(SDL_BUTTON_MIDDLE)) ? TRUE : FALSE;
     vid_mouse_b3 = (event->state & SDL_BUTTON(SDL_BUTTON_RIGHT)) ? TRUE : FALSE;
-    sim_debug (SIM_VID_DBG_MOUSE, vid_dev, "Mouse Move Event: pos:(%d,%d) rel:(%d,%d) buttons:(%d,%d,%d) - Count: %d vid_mouse_rel:(%d,%d), vid_cursor:(%d,%d)\n", 
-                                            event->x, event->y, event->xrel, event->yrel, (event->state & SDL_BUTTON(SDL_BUTTON_LEFT)) ? 1 : 0, (event->state & SDL_BUTTON(SDL_BUTTON_MIDDLE)) ? 1 : 0, (event->state & SDL_BUTTON(SDL_BUTTON_RIGHT)) ? 1 : 0, vid_mouse_events.count, vid_mouse_xrel, vid_mouse_yrel, vid_cursor_x, vid_cursor_y);
+    sim_debug (SIM_VID_DBG_MOUSE, vid_dev, "Mouse Move Event: pos:(%d,%d) rel:(%d,%d) buttons:(%d,%d,%d) - Count: %d vid_cursor:(%d,%d)\n", 
+                                            event->x, event->y, event->xrel, event->yrel, (event->state & SDL_BUTTON(SDL_BUTTON_LEFT)) ? 1 : 0, (event->state & SDL_BUTTON(SDL_BUTTON_MIDDLE)) ? 1 : 0, (event->state & SDL_BUTTON(SDL_BUTTON_RIGHT)) ? 1 : 0, vid_mouse_events.count, vid_cursor_x, vid_cursor_y);
     if (vid_mouse_events.count < MAX_EVENTS) {
         SIM_MOUSE_EVENT *tail = &vid_mouse_events.events[(vid_mouse_events.tail+MAX_EVENTS-1)%MAX_EVENTS];
 
@@ -1275,8 +1268,8 @@ if (SDL_SemWait (vid_mouse_events.sem) == 0) {
             tail->y_rel += ev.y_rel;
             tail->x_pos = ev.x_pos;
             tail->y_pos = ev.y_pos;
-            sim_debug (SIM_VID_DBG_MOUSE, vid_dev, "Mouse Move Event: Coalesced into pending event: (%d,%d) vid_mouse_rel:(%d,%d)\n", 
-                tail->x_rel, tail->y_rel, vid_mouse_xrel, vid_mouse_yrel);
+            sim_debug (SIM_VID_DBG_MOUSE, vid_dev, "Mouse Move Event: Coalesced into pending event: (%d,%d)\n", 
+                tail->x_rel, tail->y_rel);
             }
         else {                                          /* Add a new event */
             vid_mouse_events.events[vid_mouse_events.tail++] = ev;
@@ -1704,6 +1697,9 @@ while (vid_active) {
                         case SDL_WINDOWEVENT_ENTER:
                              if (vid_flags & SIM_VID_INPUTCAPTURED)
                                  SDL_WarpMouseInWindow (NULL, vid_width/2, vid_height/2);   /* center position */
+                            break;
+                        case SDL_WINDOWEVENT_EXPOSED:
+                            vid_update ();
                             break;
                         }
                     }

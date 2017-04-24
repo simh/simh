@@ -225,6 +225,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\CDC1700\cdc1700_msos5.c"
+				>
+			</File>
+			<File
 				RelativePath="..\CDC1700\cdc1700_mt.c"
 				>
 			</File>

@@ -1127,9 +1127,9 @@ FD_ZERO (er_p);
 FD_SET (sock, rw_p);
 FD_SET (sock, er_p);
 if (rd)
-    select ((int) sock + 1, rw_p, NULL, er_p, &zero);
+    (void)select ((int) sock + 1, rw_p, NULL, er_p, &zero);
 else
-    select ((int) sock + 1, NULL, rw_p, er_p, &zero);
+    (void)select ((int) sock + 1, NULL, rw_p, er_p, &zero);
 if (FD_ISSET (sock, er_p))
     return -1;
 if (FD_ISSET (sock, rw_p)) {
@@ -1200,8 +1200,8 @@ if (socknamebuf)
     *socknamebuf = (char *)calloc(1, NI_MAXHOST+NI_MAXSERV+4);
 if (peernamebuf)
     *peernamebuf = (char *)calloc(1, NI_MAXHOST+NI_MAXSERV+4);
-getsockname (sock, (struct sockaddr *)&sockname, &socknamesize);
-getpeername (sock, (struct sockaddr *)&peername, &peernamesize);
+(void)getsockname (sock, (struct sockaddr *)&sockname, &socknamesize);
+(void)getpeername (sock, (struct sockaddr *)&peername, &peernamesize);
 if (socknamebuf != NULL) {
     _sim_getaddrname ((struct sockaddr *)&sockname, (size_t)socknamesize, hostbuf, portbuf);
     sprintf(*socknamebuf, "[%s]:%s", hostbuf, portbuf);

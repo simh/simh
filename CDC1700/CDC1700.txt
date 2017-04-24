@@ -45,8 +45,8 @@ mostly from the early period of its release:
 
         MT              1732-A or 1732-3 Magtape controller, 3 9-track drives
                         (MT0 - MT2) and 1 7-track drive (MT3). The type of
-                        the controller may be chaged using the command
-                        "set mt type={1732-a|1732-3}". The 1732-A controller
+                        the controller may be changed using the command
+                        "set mt type={1732-A|1732-3}". The 1732-A controller
                         supports 200, 556 and 800 BPI on the 9 track drives
                         and allows DMA access via a 1706 Buffered Data
                         Channel (device DCA). The 1733-3 controller supports

@@ -49,7 +49,7 @@ uint8 EPROM_get_mbyte(uint16 addr);
 /* external function prototypes */
 
 extern uint8 i8255_C[4];                    //port c byte I/O
-extern uint8 xack;			    /* XACK signal */
+extern uint8 xack;                          /* XACK signal */
 
 /* SIMH EPROM Standard I/O Data Structures */
 
@@ -82,7 +82,7 @@ DEVICE EPROM_dev = {
     NULL,               //examine
     NULL,               //deposit
 //    &EPROM_reset,       //reset
-    NULL,				//reset
+    NULL,                               //reset
     NULL,               //boot
     &EPROM_attach,      //attach
     NULL,               //detach

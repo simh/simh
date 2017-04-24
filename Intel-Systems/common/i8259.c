@@ -28,7 +28,7 @@
         This software was written by Bill Beech, 24 Jan 13, to allow emulation of 
         more complex Multibus Computer Systems.
 
-        This program simulates up to 2 i8259 devices.  It handles 1 i8259 
+        This program simulates up to 4 i8259 devices.  It handles 1 i8259 
         device on the iSBC 80/20 and iSBC 80/30 SBCs.  Other devices could be on 
         other multibus boards in the simulated system.
 */
@@ -69,7 +69,7 @@ uint8 i8259_ocw3[I8259_NUM];
 uint8 icw_num0 = 1, icw_num1 = 1;
 
 /* i8259 Standard I/O Data Structures */
-/* up to 2 i8259 devices */
+/* up to 4 i8259 devices */
 
 UNIT i8259_unit[] = {
     { UDATA (0, 0, 0) },                /* i8259 0 */
@@ -99,7 +99,6 @@ DEBTAB i8259_debug[] = {
     { "FLOW", DEBUG_flow },
     { "READ", DEBUG_read },
     { "WRITE", DEBUG_write },
-    { "XACK", DEBUG_xack },
     { "LEV1", DEBUG_level1 },
     { "LEV2", DEBUG_level2 },
     { NULL }

@@ -91,6 +91,7 @@ t_stat pwd_cmd (int32 flg, CONST char *cptr);
 t_stat dir_cmd (int32 flg, CONST char *cptr);
 t_stat type_cmd (int32 flg, CONST char *cptr);
 t_stat delete_cmd (int32 flg, CONST char *cptr);
+t_stat copy_cmd (int32 flg, CONST char *cptr);
 t_stat brk_cmd (int32 flag, CONST char *ptr);
 t_stat do_cmd (int32 flag, CONST char *ptr);
 t_stat goto_cmd (int32 flag, CONST char *ptr);
@@ -147,6 +148,7 @@ const char *sim_dname (DEVICE *dptr);
 const char *sim_uname (UNIT *dptr);
 const char *sim_set_uname (UNIT *uptr, const char *uname);
 t_stat get_yn (const char *ques, t_stat deflt);
+char *sim_trim_endspc (char *cptr);
 int sim_isspace (char c);
 int sim_islower (char c);
 int sim_isalpha (char c);
@@ -156,6 +158,12 @@ int sim_isgraph (char c);
 int sim_isalnum (char c);
 int sim_strncasecmp (const char *string1, const char *string2, size_t len);
 int sim_strcasecmp (const char *string1, const char *string2);
+size_t sim_strlcat (char *dst, const char *src, size_t size);
+size_t sim_strlcpy (char *dst, const char *src, size_t size);
+#define strlcpy(dst, src, size) sim_strlcpy((dst), (src), (size))
+#define strlcat(dst, src, size) sim_strlcat((dst), (src), (size))
+#define strncasecmp(str1, str2, len) sim_strncasecmp((str1), (str2), (len))
+#define strcasecmp(str1, str2) sim_strcasecmp ((str1), (str2))
 CONST char *get_sim_opt (int32 opt, CONST char *cptr, t_stat *st);
 const char *put_switches (char *buf, size_t bufsize, uint32 sw);
 CONST char *get_glyph (const char *iptr, char *optr, char mchar);
@@ -304,10 +312,10 @@ void sim_aio_activate (ACTIVATE_API caller, UNIT *uptr, int32 event_time);
 
 /* VM interface */
 
-extern char sim_name[];
+extern char sim_name[64];
 extern DEVICE *sim_devices[];
 extern REG *sim_PC;
-extern const char *sim_stop_messages[];
+extern const char *sim_stop_messages[SCPE_BASE];
 extern t_stat sim_instr (void);
 extern t_stat sim_load (FILE *ptr, CONST char *cptr, CONST char *fnam, int flag);
 extern int32 sim_emax;

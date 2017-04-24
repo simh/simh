@@ -1,0 +1,59 @@
+# Script to install MSOS5 onto cartridge disks
+# Requires:
+#       Installtion tape                Default is MSOS5_SL136.tap which can
+#                                       be copied from bitsavers.org. This
+#                                       can be overridden by specifying the
+#                                       installation tape on the command line:
+#
+#                                         cdc1700 msosInstall.simh install.tap
+#
+# Creates:
+#       MSOS5-A.dsk and MSOS5-B.dsk     installation disks
+#       MSOSinstall.lpt                 installation log
+#
+set env CDD0=MSOS5-A.dsk
+set env CDD1=MSOS5-B.dsk
+set env MT0=%2
+if "%MT0%"=="" set env MT0=MSOS5_SL136.tap
+set env LPT=MSOSinstall.lpt
+set cpu instr=basic
+set cpu mode65k,64k
+set throttle 50%
+set mt type=1732-3
+set lp type=1742
+att lp %LPT%
+att cdd0 %CDD0%
+att cdd1 %CDD1%
+att -r mt0 %MT0%
+set env DATE1=%DATE_MM%/%DATE_DD%/%DATE_19XX_YY%
+set env DATE2=%DATE_MM%%DATE_DD%%DATE_19XX_YY%
+echo MSOS 5.0 Installation
+echo
+echo Requires %MT0% in the current directory.
+echo Creates %CDD0%, %CDD1% and %LPT% in the current directory.
+echo
+echo This script will set the installation date to %DATE1%
+echo (This has the same calendar as %DATE_YYYY%).
+echo
+echo This script will start the installation and eventually boot MSOS 5.0. 
+echo The date/time will be set to the current time on %DATE1% and the batch
+echo system will be initiated to complete the installation. Following
+echo installation, MSOS 5.0 will be rebooted, the date/time will be set and
+echo the installation verification procedure will be run. It will detect
+echo 3 errors:
+echo
+echo 1. Partition setup error
+echo 2. File Manager sequential file error
+echo 3. Fortran Formatted I/O error
+echo
+expect "DATE MM/DD/YY \r\r\r\r\n" send "%DATE1%\r"; c
+expect -p "DATE/TIME  MMDDYYHHMM \n\r\n" send "%DATE2%%TIME_HH%%TIME_MM%\r"; c
+expect "Q\r\r\r\r\n" send "*i,3\r"; c
+expect "Q\r\r\r\r\n" send "*V\r"; c
+expect -p "YOU MAY AUTOLOAD" step 100000; autoload cdd; go 0
+expect "SET PROGRAM PROTECT  \r\n" set cpu protect; c
+expect -p ":00 " send after=100000,"\007"; c
+expect "MI\r\n" send "*BATCH\r"; c
+expect "MI\r\n" send "VERIFY\r"; c
+expect "TESTS COMPLETE." step 100000
+boot mt0

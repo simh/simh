@@ -1,6 +1,6 @@
 /* pdp10_tu.c - PDP-10 RH11/TM03/TU45 magnetic tape simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,9 @@
 
    tu           RH11/TM03/TU45 magtape
 
-   29-Apr-07    RMS     Fixed bug in setting FCE on TMK (found by Naoki Hamada)
+   28-Mar-17    RMS     Documented switch fall through case (COVERITY)
+   17-Mar-13    RMS     Fixed bug in read/write check reverse (Dave Bryan)
+   29-Apr-07    RMS     Fixed bug in setting FCE on TMK (Naoki Hamada)
    16-Feb-06    RMS     Added tape capacity checking
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Jul-05    RMS     Removed extraneous externs
@@ -669,6 +671,7 @@ switch (fnc) {                                          /* case on function */
         if (!(uptr->TU_STATEFLAGS & TUS_ATTPENDING))
             sim_cancel (uptr);                          /* stop motion, not on-line delay */
         uptr->USTAT = 0;
+        /* fall through */
     case FNC_NOP:
         tucs1 = tucs1 & ~CS1_GO;                        /* no operation */
         return;
@@ -1162,9 +1165,10 @@ for (u = 0; u < TU_NUMDR; u++) {                        /* loop thru units */
     sim_tape_reset (uptr);                              /* clear pos flag */
     if (!uptr->TU_STATEFLAGS & TUS_ATTPENDING)          /* Delayed on-line must survive massbus clear */
         sim_cancel (uptr);                              /* cancel activity */
-    else if (!sim_is_active(uptr) )
-        sim_activate_after(uptr, SPINUPDLY);
-
+    else {
+        if (!sim_is_active(uptr) )
+            sim_activate_after(uptr, SPINUPDLY);
+        }
     uptr->USTAT = 0;
     }
 if (xbuf == NULL)

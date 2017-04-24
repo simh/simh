@@ -144,15 +144,17 @@ void qemu_set_nonblock(int fd)
 {
 unsigned long non_block = 1;
 
-    ioctlsocket ((SOCKET)fd, FIONBIO, &non_block);         /* set nonblocking */
+    (void)ioctlsocket ((SOCKET)fd, FIONBIO, &non_block);   /* set nonblocking */
 }
 #else
 #include <fcntl.h>
 void qemu_set_nonblock(int fd)
 {
     int f;
+
     f = fcntl(fd, F_GETFL);
-    fcntl(fd, F_SETFL, f | O_NONBLOCK);
+    if (f != -1)
+        (void)fcntl(fd, F_SETFL, f | O_NONBLOCK);
 }
 #endif
 

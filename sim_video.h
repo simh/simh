@@ -197,11 +197,6 @@ t_stat vid_screenshot (const char *filename);
 
 extern t_bool vid_active;
 extern uint32 vid_mono_palette[2];
-extern int32 vid_mouse_xrel;                            /* mouse cumulative x rel */
-extern int32 vid_mouse_yrel;                            /* mouse cumulative y rel */
-extern t_bool vid_mouse_b1;                             /* mouse button 1 state */
-extern t_bool vid_mouse_b2;                             /* mouse button 2 state */
-extern t_bool vid_mouse_b3;                             /* mouse button 3 state */
 void vid_set_cursor_position (int32 x, int32 y);        /* cursor position (set by calling code) */
 
 #define SIM_VID_DBG_MOUSE   0x01000000

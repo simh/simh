@@ -1,6 +1,6 @@
 /* vax_sys.c: VAX simulator interface
 
-   Copyright (c) 1998-2011, Robert M Supnik
+   Copyright (c) 1998-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   13-Mar-17    RMS     Annotated intentional fall throughs in switch
+                        Fixed certain indirect cases in parse (COVERITY)
    21-Mar-11    RMS     Modified string for STOP_BOOT message
    19-Nov-08    RMS     Moved bad block routine to I/O library
    03-Nov-05    RMS     Added 780 stop codes
@@ -107,7 +109,7 @@ const char *sim_stop_messages[] = {
 
    The first entry contains:
         - FPD legal flag (DR_F)
-        - number of specifiers for decode bits 2:0>
+        - number of specifiers for decode bits <2:0>
         - number of specifiers for unimplemented instructions bits<6:4>
         - ONLY for simulator instruction history bits 11:8 reflect where 
           results are recorded from
@@ -876,7 +878,8 @@ for (i = 0; i < numspec; i++) {                         /* loop thru spec */
             break;
 
         case BDD:                                       /* @b^d(r),@b^n */
-            fputc ('@', of);
+            fputc ('@', of);                            
+            /* fall through */
         case BDP:                                       /* b^d(r), b^n */
             GETNUM (num, 1);
             if (rn == nPC)
@@ -888,6 +891,7 @@ for (i = 0; i < numspec; i++) {                         /* loop thru spec */
 
         case WDD:                                       /* @w^d(r),@w^n */
             fputc ('@', of);
+            /* fall through */
         case WDP:                                       /* w^d(r), w^n */
             GETNUM (num, 2);
             if (rn == nPC)
@@ -898,7 +902,8 @@ for (i = 0; i < numspec; i++) {                         /* loop thru spec */
             break;
 
         case LDD:                                       /* @l^d(r),@l^n */
-            fputc ('@', of);
+            fputc ('@', of);                            
+            /* fall through */
         case LDP:                                       /* l^d(r),l^n */
             GETNUM (num, 4);
             if (rn == nPC)
@@ -1380,7 +1385,7 @@ switch (fl) {                                           /* case on state */
                 dispsize = 4;
                 }
             }
-        val[vp++] = mode | nPC | ((fl & SP_IND)? 1: 0);
+        val[vp++] = mode | nPC | ((fl & SP_IND)? 0x10: 0);
         PUTNUM (num, dispsize);
         break;
 
@@ -1389,7 +1394,7 @@ switch (fl) {                                           /* case on state */
         num = lit[0] - (addr + vp + 2);
         if ((litsize > 0) || (num > 127) || (num < -128))
             PARSE_LOSE;
-        val[vp++] = nPC | BDP | ((fl & SP_IND)? 1: 0);
+        val[vp++] = nPC | BDP | ((fl & SP_IND)? 0x10: 0);
         PUTNUM (num, 1);
         break;
 
@@ -1398,7 +1403,7 @@ switch (fl) {                                           /* case on state */
         num = lit[0] - (addr + vp + 3);
         if ((litsize > 0) || (num > 32767) || (num < -32768))
             PARSE_LOSE;
-        val[vp++] = nPC | WDP | ((fl & SP_IND)? 1: 0);
+        val[vp++] = nPC | WDP | ((fl & SP_IND)? 0x10: 0);
         PUTNUM (num, 2);
         break;
 
@@ -1407,7 +1412,7 @@ switch (fl) {                                           /* case on state */
         num = lit[0] - (addr + vp + 5);
         if (litsize > 0)
             PARSE_LOSE;
-        val[vp++] = nPC | LDP | ((fl & SP_IND)? 1: 0);
+        val[vp++] = nPC | LDP | ((fl & SP_IND)? 0x10: 0);
         PUTNUM (num, 4);
         break;
 

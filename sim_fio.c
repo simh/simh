@@ -375,6 +375,34 @@ return sim_fseeko (st, (t_offset)offset, whence);
 }
 
 #if defined(_WIN32)
+static const char *
+GetErrorText(DWORD dwError)
+{
+static char szMsgBuffer[2048];
+DWORD dwStatus;
+
+dwStatus = FormatMessageA (FORMAT_MESSAGE_FROM_SYSTEM|
+                           FORMAT_MESSAGE_IGNORE_INSERTS,     //  __in      DWORD dwFlags,
+                           NULL,                              //  __in_opt  LPCVOID lpSource,
+                           dwError,                           //  __in      DWORD dwMessageId,
+                           0,                                 //  __in      DWORD dwLanguageId,
+                           szMsgBuffer,                       //  __out     LPTSTR lpBuffer,
+                           sizeof (szMsgBuffer) -1,           //  __in      DWORD nSize,
+                           NULL);                             //  __in_opt  va_list *Arguments
+if (0 == dwStatus)
+    snprintf(szMsgBuffer, sizeof(szMsgBuffer) - 1, "Error Code: 0x%lX", dwError);
+while (sim_isspace (szMsgBuffer[strlen (szMsgBuffer)-1]))
+    szMsgBuffer[strlen (szMsgBuffer) - 1] = '\0';
+return szMsgBuffer;
+}
+
+t_stat sim_copyfile (const char *source_file, const char *dest_file, t_bool overwrite_existing)
+{
+if (CopyFileA (source_file, dest_file, !overwrite_existing))
+    return SCPE_OK;
+return sim_messagef (SCPE_ARG, "Error Copying '%s' to '%s': %s\n", source_file, dest_file, GetErrorText (GetLastError ()));
+}
+
 #include <io.h>
 int sim_set_fsize (FILE *fptr, t_addr size)
 {
@@ -439,6 +467,54 @@ return ftruncate(fileno(fptr), (off_t)size);
 
 #include <sys/stat.h>
 #include <fcntl.h>
+#if HAVE_UTIME
+#include <utime.h>
+#endif
+
+t_stat sim_copyfile (const char *source_file, const char *dest_file, t_bool overwrite_existing)
+{
+FILE *fIn = NULL, *fOut = NULL;
+t_stat st = SCPE_OK;
+char *buf = NULL;
+size_t bytes;
+
+fIn = sim_fopen (source_file, "rb");
+if (!fIn) {
+    st = sim_messagef (SCPE_ARG, "Can't open '%s' for input: %s\n", source_file, strerror (errno));
+    goto Cleanup_Return;
+    }
+fOut = sim_fopen (dest_file, "wb");
+if (!fOut) {
+    st = sim_messagef (SCPE_ARG, "Can't open '%s' for output: %s\n", dest_file, strerror (errno));
+    goto Cleanup_Return;
+    }
+buf = (char *)malloc (BUFSIZ);
+while ((bytes = fread (buf, 1, BUFSIZ, fIn)))
+    fwrite (buf, 1, bytes, fOut);
+Cleanup_Return:
+free (buf);
+if (fIn)
+    fclose (fIn);
+if (fOut)
+    fclose (fOut);
+#if defined(HAVE_UTIME)
+if (st == SCPE_OK) {
+    struct stat statb;
+
+    if (!stat (source_file, &statb)) {
+        struct utimbuf utim;
+
+        utim.actime = statb.st_atime;
+        utim.modtime = statb.st_mtime;
+        if (utime (dest_file, &utim))
+            st = SCPE_IOERR;
+        }
+    else
+        st = SCPE_IOERR;
+    }
+#endif
+return st;
+}
 
 int sim_set_fifo_nonblock (FILE *fptr)
 {

@@ -206,7 +206,7 @@ dev_done = dev_done & ~INT_TTI;                         /* clear done, int */
 int_req = int_req & ~INT_TTI;
 int_enable = int_enable | INT_TTI;                      /* set enable */
 if (!sim_is_running)                                    /* RESET (not CAF)? */
-    sim_activate (&tti_unit, KBD_WAIT (tti_unit.wait, tmxr_poll));
+    sim_activate (&tti_unit, tmxr_poll);
 return SCPE_OK;
 }
 

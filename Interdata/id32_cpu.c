@@ -652,7 +652,7 @@ if (abortval != 0) {                                    /* mem mgt abort? */
 while (reason == 0) {                                   /* loop until halted */
 
     uint32 dev, drom, opnd, inc, lim, bufa;
-    uint32 op, r1, r1p1, r2, rx2, ea;
+    uint32 op, r1, r1p1, r2, rx2, ea = 0;
     uint32 mpy, mpc, dvr;
     uint32 i, rslt, rlo, t;
     uint32 ir1, ir2, ir3, ityp;

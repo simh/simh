@@ -1,6 +1,6 @@
 /*
 
-   Copyright (c) 2015-2016, John Forecast
+   Copyright (c) 2015-2017, John Forecast
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -718,7 +718,7 @@ void mt_dump(void)
   char msg[80], text[16];
 
   if (MTremain > 0) {
-    printf("Dump of MTbuf:\r\n");
+    fprintf(DBGOUT, "Dump of MTbuf:\r\n");
 
     while (count > 0) {
       t_mtrlnt remain = count >= 10 ? 10 : count;
@@ -738,7 +738,7 @@ void mt_dump(void)
       }
       text[remain] = '\0';
 
-      printf("%-55s%s\r\n", msg, text);
+      fprintf(DBGOUT, "%-55s%s\r\n", msg, text);
 
       count -= remain;
     }
@@ -849,7 +849,7 @@ t_stat mt_show_transport(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
  */
 int32 mt_densityTimeout(t_bool loose)
 {
-  int32 result;
+  int32 result = MT_200_WAIT;
 
   switch (MTdev.STATUS2 & (IO_ST2_556 | IO_ST2_800)) {
     case 0:

@@ -1,6 +1,6 @@
 /* i7094_cd.c: IBM 711/721 card reader/punch
 
-   Copyright (c) 2003-2012, Robert M. Supnik
+   Copyright (c) 2003-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    cdr          711 card reader
    cdp          721 card punch
 
+   13-Mar-17    RMS     Annotated fall through in switch
    19-Mar-12    RMS     Fixed declaration of sim_switches (Mark Pizzolato)
    19-Jan-07    RMS     Added UNIT_TEXT
    13-Jul-06    RMS     Fixed problem with 80 column full cards
@@ -238,7 +239,7 @@ switch (cdr_sta) {                                      /* case on state */
                     cdr_bbuf[bufw] |= dat;
                 }
             }
-
+        /* fall through */
     case CDS_DATA:                                      /* data state */
         dat = cdr_bbuf[cdr_bptr++];                     /* get next word */
         if (cdr_bptr >= CD_BINLNT) {                    /* last word? */

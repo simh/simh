@@ -1086,7 +1086,7 @@ ODS2_FileHeader Header;
 ODS2_Retreval *Retr;
 ODS2_SCB Scb;
 uint16 CheckSum1, CheckSum2;
-uint32 ScbLbn;
+uint32 ScbLbn = 0;
 t_offset ret_val = (t_offset)-1;
 
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
@@ -1379,7 +1379,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
 
         if (!copy_buf) {
             sim_vhd_disk_close(vhd);
-            remove (gbuf);
+            (void)remove (gbuf);
             return SCPE_MEM;
             }
         for (lba = 0; (lba < total_sectors) && (r == SCPE_OK); lba += sects) {
@@ -1411,7 +1411,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
 
             if (!verify_buf) {
                 sim_vhd_disk_close(vhd);
-                remove (gbuf);
+                (void)remove (gbuf);
                 free (copy_buf);
                 return SCPE_MEM;
                 }
@@ -1623,7 +1623,7 @@ if ((created) && (!copied)) {
     free (secbuf);
     if (r != SCPE_OK) {
         sim_disk_detach (uptr);                         /* report error now */
-        remove (cptr);                                  /* remove the create file */
+        (void)remove (cptr);                            /* remove the created file */
         return SCPE_OPENERR;
         }
     if (sim_switches & SWMASK ('I')) {                  /* Initialize To Sector Address */
@@ -1636,7 +1636,7 @@ if ((created) && (!copied)) {
 
         if (!init_buf) {
             sim_disk_detach (uptr);                         /* report error now */
-            remove (cptr);
+            (void)remove (cptr);
             return SCPE_MEM;
             }
         for (lba = 0; (lba < total_sectors) && (r == SCPE_OK); lba += sects) {
@@ -1652,7 +1652,7 @@ if ((created) && (!copied)) {
             if (r != SCPE_OK) {
                 free (init_buf);
                 sim_disk_detach (uptr);                         /* report error now */
-                remove (cptr);                                  /* remove the create file */
+                (void)remove (cptr);                            /* remove the created file */
                 return SCPE_OPENERR;
                 }
             if (!sim_quiet)
@@ -2605,7 +2605,8 @@ t_offset pos, size;
 
 pos = (t_offset)lseek ((int)((long)f), (off_t)0, SEEK_CUR);
 size = (t_offset)lseek ((int)((long)f), (off_t)0, SEEK_END);
-lseek ((int)((long)f), (off_t)pos, SEEK_SET);
+if (pos != (t_offset)-1)
+    (void)lseek ((int)((long)f), (off_t)pos, SEEK_SET);
 return size;
 }
 
@@ -3169,15 +3170,15 @@ static uint32
 NtoHl(uint32 value)
 {
 uint8 *l = (uint8 *)&value;
-return l[3] | (l[2]<<8) | (l[1]<<16) | (l[0]<<24);
+return (uint32)l[3] | ((uint32)l[2]<<8) | ((uint32)l[1]<<16) | ((uint32)l[0]<<24);
 }
 
 static uint64
 NtoHll(uint64 value)
 {
 uint8 *l = (uint8 *)&value;
-uint64 highresult = l[3] | (l[2]<<8) | (l[1]<<16) | (l[0]<<24);
-uint32 lowresult = l[7] | (l[6]<<8) | (l[5]<<16) | (l[4]<<24);
+uint64 highresult = (uint64)l[3] | ((uint64)l[2]<<8) | ((uint64)l[1]<<16) | ((uint64)l[0]<<24);
+uint32 lowresult = (uint64)l[7] | ((uint64)l[6]<<8) | ((uint64)l[5]<<16) | ((uint64)l[4]<<24);
 return (highresult << 32) | lowresult;
 }
 #elif  __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
@@ -3234,8 +3235,7 @@ int Return = 0;
 VHD_Footer sHeader;
 struct stat statb;
 
-if (sFooter)
-    memset(sFooter, '\0', sizeof(*sFooter));
+memset(sFooter, '\0', sizeof(*sFooter));
 if (sDynamic)
     memset(sDynamic, '\0', sizeof(*sDynamic));
 if (aBAT)
@@ -3652,7 +3652,7 @@ static FILE *sim_vhd_disk_merge (const char *szVHDPath, char **ParentVHD)
             continue;
         ++NeededBlock;
         BlockOffset = SectorSize*((uint64)(NtoHl (hVHD->BAT[BlockNumber]) + BitMapSectors));
-        if ((BlockNumber*SectorsPerBlock + BlockSectors) > ((uint64)NtoHll (hVHD->Footer.CurrentSize))/SectorSize)
+        if (((uint64)BlockNumber*SectorsPerBlock + BlockSectors) > ((uint64)NtoHll (hVHD->Footer.CurrentSize))/SectorSize)
             BlockSectors = (uint32)(((uint64)NtoHll (hVHD->Footer.CurrentSize))/SectorSize - (BlockNumber*SectorsPerBlock));
         if (ReadFilePosition(hVHD->File,
                              BlockData,
@@ -3680,7 +3680,7 @@ static FILE *sim_vhd_disk_merge (const char *szVHDPath, char **ParentVHD)
             sim_printf ("Merged %dMB.  100%% complete.\n", (int)((((float)NeededBlock)*SectorsPerBlock)*SectorSize/1000000));
         fclose (hVHD->File);
         hVHD->File = NULL;
-        remove (szVHDPath);
+        (void)remove (szVHDPath);
         *ParentVHD = (char*) malloc (strlen (hVHD->ParentVHDPath)+1);
         strcpy (*ParentVHD, hVHD->ParentVHDPath);
         }
@@ -3958,7 +3958,7 @@ if (File)
     fclose (File);
 if (Status) {
     if (Status != EEXIST)
-        remove (szVHDPath);
+        (void)remove (szVHDPath);
     }
 else {
     hVHD = (VHDHANDLE)sim_vhd_disk_open (szVHDPath, "rb+");
@@ -4225,7 +4225,7 @@ sim_vhd_disk_close ((FILE *)hVHD);
 hVHD = NULL;
 if (Status) {
     if ((EEXIST != Status) && (ENOENT != Status))
-        remove (szVHDPath);
+        (void)remove (szVHDPath);
     }
 else {
     hVHD = (VHDHANDLE)sim_vhd_disk_open (szVHDPath, "rb+");

@@ -64,7 +64,7 @@
 #define BIT15           0x8000
 #define BIT16           0x10000
 #define BIT31           0x80000000
-#define BIT32           0x100000000L
+#define BIT32           0x100000000LL
 
 #define MASK_0(x)       ((x) & 1)
 #define MASK_8U(x)      ((x) & 0xffffff00)
@@ -78,7 +78,7 @@
 #define MASK_32U(x)     (0)
 #define MASK_32L(x)     ((x) & 0xffffffff)
 #define MASK_32SGN(x)   ((x) & BIT31)
-#define MASK_33(x)      ((x) & BIT32)
+#define MASK_33(x64)    ((x64) & BIT32)
 
 #define COMBINE8(tgt,src)  (MASK_8U(tgt) | MASK_8L(src))
 #define COMBINE16(tgt,src) (MASK_16U(tgt) | MASK_16L(src))
@@ -245,7 +245,6 @@ t_stat m68kcpu_peripheral_reset()
     t_stat rc;
     DEVICE** devs = sim_devices;
     DEVICE* dptr;
-    if (!devs) return SCPE_IERR;
     
     while ((dptr = *devs) != NULL) {
         if (dptr != cpudev_self) { 
@@ -1804,7 +1803,7 @@ do_bclr8:       SETZ8(res & src1);
             case 000600: case 001600: case 002600: case 003600:
             case 004600: case 005600: case 006600: case 007600: /*chk*/
                 src1 = DRX;
-                SETF(src1 < 0,FLAG_N);
+                SETF((src1 & BIT31) != 0,FLAG_N);
                 ASSERT_OK(ea_src_w(IR_EAMOD,IR_EAREG,&res,&PC));
                 rc = CCR_N || src1 > res ? m68k_gen_exception(6,&PC) : SCPE_OK;
                 break;
@@ -2534,7 +2533,6 @@ do_neg32:       res = m68k_sub32(0,srcx1,0,TRUE);
                 CLRF(FLAG_C|FLAG_V);
                 rc = ea_dst_w(EA_DDIR,IR_REGX,res,&PC);
                 break;
-                rc = STOP_IMPL; break;
             case 0000200: case 00000220: case 0000230: case 0000240:
             case 0000250: case 00000260: case 0000270: /* and.l -> d*/
                 ASSERT_OK(ea_src_l(IR_EAMOD,IR_EAREG,&src1,&PC));
@@ -3054,7 +3052,7 @@ do_roxr32:      reg = DR+IR_REGY;
                     if (CCR_X) resx |= BIT32;
                     resx = (resx>>cnt) | (resx<<(33-cnt));
                     *reg = MASK_32L(resx);
-                    SETF(MASK_33(res),FLAG_X|FLAG_C);
+                    SETF(MASK_33(resx),FLAG_X|FLAG_C);
                 } else SETF(CCR_X,FLAG_C);
                 SETNZ32(resx);
                 CLRF(FLAG_V);
@@ -3186,7 +3184,7 @@ do_ror32:       reg = DR+IR_REGY;
                 if (cnt) {
                     cnt &= 31;
                     resx = (resx>>cnt) | (resx<<(32-cnt));
-                    SETF(MASK_33(res),FLAG_C);
+                    SETF(MASK_33(resx),FLAG_C);
                     *reg = (int32)resx;
                 } else {
                     CLRF(FLAG_C);
