@@ -559,30 +559,31 @@ cso_csr = (cso_csr & ~STXCS_WR) | (data & STXCS_WR);
 cso_csr = cso_csr & ~STXCS_STS;
 
 switch (fnc) {
-    case RLFC_NOP:
+    case RLFC_NOP:                                      /* no operation */
         break;
 
-    case RLFC_CONT:
-        rlcs_bcnt = 0;
-    case RLFC_STS:
+    case RLFC_CONT:                                     /* request status with reset */
+        rlcs_bcnt = 0;                                  /* clear byte counter */
+                                                        /* fall through */
+    case RLFC_STS:                                      /* request status */
         rlcs_state = RL_STATUS;
         cso_csr = cso_csr & ~CSR_DONE;                  /* clear done */
         sim_activate (&rlcs_unit, rlcs_swait);
         break;
 
-    case RLFC_ABORT:
+    case RLFC_ABORT:                                    /* abort transfer */
         rlcs_state = RL_ABORT;
         cso_csr = cso_csr & ~CSR_DONE;                  /* clear done */
         sim_activate (&rlcs_unit, rlcs_swait);
         break;
 
-    case RLFC_WRITE:
+    case RLFC_WRITE:                                    /* write block */
         rlcs_state = RL_WRITE;
         cso_csr = cso_csr & ~CSR_DONE;                  /* clear done */
         sim_activate (&rlcs_unit, rlcs_swait);
         break;
 
-    case RLFC_READ:
+    case RLFC_READ:                                     /* read block */
         rlcs_state = RL_READ;
         cso_csr = cso_csr & ~CSR_DONE;                  /* clear done */
         sim_activate (&rlcs_unit, rlcs_swait);
