@@ -1,6 +1,6 @@
 /* vax750_uba.c: VAX 11/750 Unibus adapter
 
-   Copyright (c) 2010-2011, Matt Burke
+   Copyright (c) 2012-2017, Matt Burke
    This module incorporates code from SimH, Copyright (c) 2004-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -33,36 +33,20 @@
 
 /* Unibus adapter */
 
-#define UBA_NDPATH      4                               /* number of data paths */
 #define UBA_NMAPR       512                             /* number of map reg */
-
-/* Unibus adapter configuration register */
-
-#define UBACNF_OF       0x00
-#define UBACNF_CODE     0x00000028                      /* adapter code */
 
 /* Control/Status registers */
 
-#define UBACSR1_OF        0x01
-#define UBACSR2_OF        0x02
-#define UBACSR3_OF        0x03
-#define UBACSR_PUR       0x00000001                     /* Purge request */
-#define UBACSR_UCE       0x20000000                     /* Uncorrectable err */
-#define UBACSR_NXM       0x40000000                     /* NXM */
-#define UBACSR_ERR       0x80000000                     /* Error flag */
-#define UBACSR_RD        (UBACSR_PUR | UBACSR_UCE | UBACSR_NXM | \
-                          UBACSR_ERR)
-#define UBACSR_WR        0
-
-/* Data path registers */
-
-#define UBADPR_OF       0x010
-#define UBADPR_ERR      0x80000000                      /* buf not empty - ni */
-#define UBADPR_NXM      0x40000000                      /* nonexistent memory */
-#define UBADPR_UCE      0x20000000                      /* uncorrectable error */
-#define UBADPR_PUR      0x00000001                      /* purge request */
-#define UBADPR_RD       0xE0000000
-#define UBADPR_W1C      0xC0000000
+#define UBACSR1_OF      0x01
+#define UBACSR2_OF      0x02
+#define UBACSR3_OF      0x03
+#define UBACSR_PUR      0x00000001                      /* Purge request */
+#define UBACSR_UCE      0x20000000                      /* Uncorrectable err */
+#define UBACSR_NXM      0x40000000                      /* NXM */
+#define UBACSR_ERR      0x80000000                      /* Error flag */
+#define UBACSR_RD       (UBACSR_PUR | UBACSR_UCE | UBACSR_NXM | \
+                         UBACSR_ERR)
+#define UBACSR_W1C      (UBACSR_UCE | UBACSR_NXM)
 
 #define UBA_VEC_MASK    0x1FC                           /* Vector value mask */
 
@@ -70,14 +54,13 @@
 
 #define UBAMAP_OF       0x200
 #define UBAMAP_VLD      0x80000000                      /* valid */
-#define UBAMAP_LWAE     0x04000000                      /* LW access enb - ni */
 #define UBAMAP_ODD      0x02000000                      /* odd byte */
 #define UBAMAP_V_DP     21                              /* data path */
 #define UBAMAP_M_DP     0x3
 #define UBAMAP_DP       (UBAMAP_M_DP << UBAMAP_V_DP)
 #define UBAMAP_GETDP(x) (((x) >> UBAMAP_V_DP) & UBAMAP_M_DP)
-#define UBAMAP_PAG      0x001FFFFF
-#define UBAMAP_RD       (0x86000000 | UBAMAP_DP | UBAMAP_PAG)
+#define UBAMAP_PAG      0x00007FFF
+#define UBAMAP_RD       (0x82000000 | UBAMAP_DP | UBAMAP_PAG)
 #define UBAMAP_WR       (UBAMAP_RD)
 
 /* Debug switches */
@@ -94,7 +77,6 @@ uint32 uba_csr1 = 0;                                    /* csr reg 1 */
 uint32 uba_csr2 = 0;                                    /* csr reg 2 */
 uint32 uba_csr3 = 0;                                    /* csr reg 3 */
 uint32 uba_int = 0;                                     /* UBA interrupt */
-uint32 uba_dpr[UBA_NDPATH] = { 0 };                     /* number data paths */
 uint32 uba_map[UBA_NMAPR] = { 0 };                      /* map registers */
 int32 autcon_enb = 1;                                   /* autoconfig enable */
 
@@ -199,11 +181,6 @@ t_stat uba_rdreg (int32 *val, int32 pa, int32 lnt)
 {
 int32 idx, ofs;
 
-if ((pa & 3) || (lnt < L_WORD)) {                       /* unaligned or not at least word? */
-    sim_printf (">>UBA: invalid adapter read mask, pa = %X, lnt = %d\r\n", pa, lnt);
-    /* FIXME: set appropriate error bits */
-    return SCPE_OK;
-    }
 ofs = NEXUS_GETOFS (pa);                                /* get offset */
 if (ofs >= UBAMAP_OF) {                                 /* map? */
     idx = ofs - UBAMAP_OF;
@@ -217,10 +194,6 @@ if (ofs >= UBAMAP_OF) {                                 /* map? */
 
 switch (ofs) {                                          /* case on offset */
 
-    case UBACNF_OF:                                     /* Config Reg */
-        *val = UBACNF_CODE;
-        break;
-        
     case UBACSR1_OF:                                    /* CSR1 */
         *val = (uba_csr1 & UBACSR_RD);
         break;
@@ -233,14 +206,9 @@ switch (ofs) {                                          /* case on offset */
         *val = (uba_csr3 & UBACSR_RD);
         break;
 
-    case UBADPR_OF + 1:
-    case UBADPR_OF + 2:  case UBADPR_OF + 3:
-        idx = ofs - UBADPR_OF;
-        *val = uba_dpr[idx] & UBADPR_RD;
-        break;
-
     default:
-        return SCPE_NXM;
+        *val = 0;
+        break;
         }
 
 if (DEBUG_PRI (uba_dev, UBA_DEB_RRD))
@@ -254,11 +222,6 @@ t_stat uba_wrreg (int32 val, int32 pa, int32 lnt)
 {
 int32 idx, ofs;
 
-if ((pa & 3) || (lnt != L_LONG)) {                      /* unaligned or not lw? */
-    sim_printf (">>UBA: invalid adapter write mask, pa = %X, lnt = %d\r\n", pa, lnt);
-    /* FIXME: set appropriate error bits */
-    return SCPE_OK;
-    }
 ofs = NEXUS_GETOFS (pa);                                /* get offset */
 if (ofs >= UBAMAP_OF) {                                 /* map? */
     idx = ofs - UBAMAP_OF;
@@ -272,32 +235,19 @@ if (ofs >= UBAMAP_OF) {                                 /* map? */
 
 switch (ofs) {                                          /* case on offset */
 
-    case UBACNF_OF:                                     /* Config Reg */
-        break;
-
     case UBACSR1_OF:                                    /* CSR1 */
-        uba_csr1 = (val & UBACSR_WR);
+        uba_csr1 = uba_csr1 & ~(val & UBACSR_W1C);
         break;
 
     case UBACSR2_OF:                                    /* CSR2 */
-        uba_csr2 = (val & UBACSR_WR);
+        uba_csr2 = uba_csr2 & ~(val & UBACSR_W1C);
         break;
 
     case UBACSR3_OF:                                    /* CSR3 */
-        uba_csr3 = (val & UBACSR_WR);
-        break;
-
-    case UBADPR_OF + 0:                                 /* DPR */
-        break;                                          /* direct */
-
-    case UBADPR_OF + 1:
-    case UBADPR_OF + 2:  case UBADPR_OF + 3:
-        idx = ofs - UBADPR_OF;
-        uba_dpr[idx] = uba_dpr[idx] & ~(val & UBADPR_W1C);
+        uba_csr3 = uba_csr3 & ~(val & UBACSR_W1C);
         break;
 
     default:
-        return SCPE_NXM;
         break;
     }
 
@@ -362,7 +312,6 @@ if ((lnt == L_BYTE) ||                                  /* byte? */
     }
 else {
     sim_printf (">>UBA: invalid read mask, pa = %x, lnt = %d\n", pa, lnt);
-    /* FIXME: set appropriate error bits */
     iod = 0;
     }
 SET_IRQL;
@@ -385,10 +334,8 @@ if (lnt == L_BYTE)                                      /* byte? DATOB */
     WriteUb (pa, val, WRITEB);
 else if (((lnt == L_WORD) || (lnt == L_LONG)) && ((pa & 1) == 0))/* aligned word? */
      WriteUb (pa, val, WRITE);                          /* DATO */
-else {
+else
     sim_printf (">>UBA: invalid write mask, pa = %x, lnt = %d, val = 0x%x\n", pa, lnt, val);
-    /* FIXME: set appropriate error bits */
-    }
 SET_IRQL;                                               /* update ints */
 return;
 }
