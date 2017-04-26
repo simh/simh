@@ -114,6 +114,7 @@
 BITFIELD dz_csr_bits[] = {
   BITNCF(3),                                /* not used */
   BIT(MAINT),                               /* Maint */
+  BIT(CLR),                                 /* clear */
   BIT(MSE),                                 /* naster scan enable */
   BIT(RIE),                                 /* receive interrupt enable */
   BIT(RDONE),                               /* receive done */
@@ -211,8 +212,8 @@ BITFIELD dz_msr_bits[] = {
 #define TDR_V_TBR       8                               /* xmit break - NI */
 
 BITFIELD dz_tdr_bits[] = {
-  BITFFMT(CHAR,8,%02X),                     /* ring indicators */
-  BITFFMT(TBR, 8,%02X),                     /* carrier detects */
+  BITFFMT(CHAR,8,%02X),                     /* xmit char */
+  BITFFMT(TBR, 8,%02X),                     /* xmit break - NI */
   ENDBITS
 };
 
@@ -751,6 +752,7 @@ sim_debug(DBG_TRC, &dz_dev, "dz_clear(dz=%d,flag=%d)\n", dz, flag);
 
 dz_csr[dz] = 0;                                         /* clear CSR */
 dz_rbuf[dz] = 0;                                        /* silo empty */
+dz_scnt[dz] = 0;
 dz_lpr[dz] = 0;                                         /* no params */
 if (flag)                                               /* INIT? clr all */
     dz_tcr[dz] = 0;
