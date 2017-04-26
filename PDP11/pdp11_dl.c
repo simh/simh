@@ -164,18 +164,18 @@ MTAB dli_mod[] = {
 #define DBG_TRC  TMXR_DBG_TRC                           /* routine calls */
 
 DEBTAB dl_debug[] = {
-	{ "REG",       DBG_REG,   "Register Activities" },
-	{ "INT",       DBG_INT,   "Interrupt Activities" },
-	{ "XMT",  TMXR_DBG_XMT,   "Transmit Data" },
-	{ "RCV",  TMXR_DBG_RCV,   "Received Data" },
-	{ "RET",  TMXR_DBG_RET,   "Returned Received Data" },
-	{ "MDM",  TMXR_DBG_MDM,   "Modem Signals" },
-	{ "CON",  TMXR_DBG_CON,   "Connection Activities" },
-	{ "ASY",  TMXR_DBG_ASY,   "Asynchronous Activities" },
-	{ "TRC",       DBG_TRC,   "trace routine calls" },
-	{ "EXP",  TMXR_DBG_EXP,   "Expect Activities" },
-	{ "SEND", TMXR_DBG_SEND,  "Send Activities" },
-	{ 0 }
+    { "REG",       DBG_REG,   "Register Activities" },
+    { "INT",       DBG_INT,   "Interrupt Activities" },
+    { "XMT",  TMXR_DBG_XMT,   "Transmit Data" },
+    { "RCV",  TMXR_DBG_RCV,   "Received Data" },
+    { "RET",  TMXR_DBG_RET,   "Returned Received Data" },
+    { "MDM",  TMXR_DBG_MDM,   "Modem Signals" },
+    { "CON",  TMXR_DBG_CON,   "Connection Activities" },
+    { "ASY",  TMXR_DBG_ASY,   "Asynchronous Activities" },
+    { "TRC",       DBG_TRC,   "trace routine calls" },
+    { "EXP",  TMXR_DBG_EXP,   "Expect Activities" },
+    { "SEND", TMXR_DBG_SEND,  "Send Activities" },
+    { 0 }
 };
 
 
