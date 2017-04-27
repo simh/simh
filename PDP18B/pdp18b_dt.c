@@ -1053,7 +1053,8 @@ switch (fnc) {                                          /* at speed, check fnc *
                 fprintf (sim_deb, ">>DT%d: writing block %d %s%s\n", unum, blk,
                          (dir? "backward": "forward"),
                          ((dtsa & DTA_MODE)? " continuous": " "));
-            dt_substate = 0;                            /* fall through */
+            dt_substate = 0;
+            /* fall through */
         case 0:                                         /* normal write */
             M[DT_WC] = (M[DT_WC] + 1) & DMASK;          /* incr WC, CA */
             M[DT_CA] = (M[DT_CA] + 1) & DMASK;
