@@ -126,7 +126,7 @@
 
         u3 -
         u4 -
-        u5 - fdc number.
+        u5 - fdc number (board instance number).
         u6 - fdd number.
 
 */
@@ -178,6 +178,13 @@
 #define RB1RD0          0x40            //drive 0 ready
 #define RB1RD1          0x80            //drive 1 ready
 
+//disk geometry values
+#define MDSSD           256256          //single density FDD size
+#define MDSDD           512512          //double density FDD size
+#define MAXSECSD        26              //single density last sector
+#define MAXSECDD        52              //double density last sector
+#define MAXTRK          76              //last track
+
 /* external globals */
 
 extern uint16   port;                   //port called in dev_table[port]
@@ -210,13 +217,10 @@ void isbc202_diskio(uint8 fdcnum);         //do actual disk i/o
 int32 isbc202_fdcnum = 0;               //actual number of SBC-202 instances + 1
 
 typedef    struct    {                  //FDD definition
-    uint8   *buf;
     int     t0;
     int     rdy;
     uint8   sec;
     uint8   cyl;
-    uint8   maxsec;
-    uint8   maxcyl;
     }    FDDDEF;
 
 typedef    struct    {                  //FDC definition
@@ -234,10 +238,10 @@ typedef    struct    {                  //FDC definition
 FDCDEF    fdc202[4];                    //indexed by the isbc-202 instance number
 
 UNIT isbc202_unit[] = {
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE, 0), 20 }, 
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE, 0), 20 }, 
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE, 0), 20 }, 
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE, 0), 20 } 
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF, MDSDD), 20 }, 
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF, MDSDD), 20 }, 
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF, MDSDD), 20 }, 
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF, MDSDD), 20 } 
 };
 
 REG isbc202_reg[] = {
@@ -254,13 +258,13 @@ REG isbc202_reg[] = {
     { HRDATA (STAT2, fdc202[2].stat, 8) },      /* isbc202 2 status */
     { HRDATA (RTYP2, fdc202[2].rtype, 8) },     /* isbc202 2 result type */
     { HRDATA (RBYT2A, fdc202[2].rbyte0, 8) },   /* isbc202 2 result byte 0 */
-    { HRDATA (RBYT2B, fdc202[0].rbyte1, 8) },   /* isbc202 2 result byte 1 */
+    { HRDATA (RBYT2B, fdc202[2].rbyte1, 8) },   /* isbc202 2 result byte 1 */
     { HRDATA (INTFF2, fdc202[2].intff, 8) },    /* isbc202 2 interrupt f/f */
     { HRDATA (STAT3, fdc202[3].stat, 8) },      /* isbc202 3 status */
     { HRDATA (RTYP3, fdc202[3].rtype, 8) },     /* isbc202 3 result type */
     { HRDATA (RBYT3A, fdc202[3].rbyte0, 8) },   /* isbc202 3 result byte 0 */
     { HRDATA (RBYT3B, fdc202[3].rbyte1, 8) },   /* isbc202 3 result byte 1 */
-    { HRDATA (INTFF3, fdc202[0].intff, 8) },    /* isbc202 3 interrupt f/f */
+    { HRDATA (INTFF3, fdc202[3].intff, 8) },    /* isbc202 3 interrupt f/f */
     { NULL }
 };
 
@@ -312,17 +316,30 @@ DEVICE isbc202_dev = {
 
 t_stat isbc202_reset(DEVICE *dptr, uint16 base)
 {
+    int32 i;
+    UNIT *uptr;
+
     sim_printf("      iSBC-202 FDC Board");
     if (SBC202_NUM) {
         sim_printf(" - Found\n");
         sim_printf("         isbc202-%d: Hardware Reset\n", isbc202_fdcnum);
         sim_printf("         isbc202-%d: Registered at %04X\n", isbc202_fdcnum, base);
+        //register base port address for this FDC instance
         fdc202[isbc202_fdcnum].baseport = base;
+        //register I/O port addresses for each function
         reg_dev(isbc2020, base, isbc202_fdcnum);         //read status
         reg_dev(isbc2021, base + 1, isbc202_fdcnum);     //read rslt type/write IOPB addr-l
         reg_dev(isbc2022, base + 2, isbc202_fdcnum);     //write IOPB addr-h and start 
         reg_dev(isbc2023, base + 3, isbc202_fdcnum);     //read rstl byte 
         reg_dev(isbc2027, base + 7, isbc202_fdcnum);     //write reset isbc202
+        // one-time initialization for all FDDs for this FDC instance
+        for (i = 0; i < FDD_NUM; i++) { 
+            uptr = isbc202_dev.units + i;
+            uptr->u5 = isbc202_fdcnum;  //fdc device number
+            uptr->u6 = i;               //fdd unit number
+            uptr->flags |= UNIT_WPMODE; //set WP in unit flags
+        }
+        isbc202_reset1(isbc202_fdcnum); //software reset
         isbc202_reset1(isbc202_fdcnum);
         isbc202_fdcnum++;
     } else
@@ -344,33 +361,27 @@ void isbc202_reset1(uint8 fdcnum)
         fdc202[fdcnum].stat |= FDCPRE | FDCDD; //set the FDC status
         fdc202[fdcnum].rtype = ROK;
         if (uptr->capac == 0) {         /* if not configured */
-            uptr->u5 = fdcnum;          //fdc device number
-            uptr->u6 = i;               //fdd unit number
-            uptr->flags |= UNIT_WPMODE; /* set WP in unit flags */
             sim_printf("         SBC202%d: Configured, Status=%02X Not attached\n", i, fdc202[fdcnum].stat);
         } else {
             switch(i){
                 case 0:
                     fdc202[fdcnum].stat |= RDY0; //set FDD 0 ready
                     fdc202[fdcnum].rbyte1 |= RB1RD0;
-                    fdc202[fdcnum].rdychg = 0;
                     break;
                 case 1:
                     fdc202[fdcnum].stat |= RDY1; //set FDD 1 ready
                     fdc202[fdcnum].rbyte1 |= RB1RD1;
-                    fdc202[fdcnum].rdychg = 0;
                     break;
                 case 2:
                     fdc202[fdcnum].stat |= RDY2; //set FDD 2 ready
                     fdc202[fdcnum].rbyte1 |= RB1RD2;
-                    fdc202[fdcnum].rdychg = 0;
                     break;
                 case 3:
                     fdc202[fdcnum].stat |= RDY3; //set FDD 3 ready
                     fdc202[fdcnum].rbyte1 |= RB1RD3;
-                    fdc202[fdcnum].rdychg = 0;
                     break;
             }
+            fdc202[fdcnum].rdychg = 0;
             sim_printf("         SBC202%d: Configured, Status=%02X Attached to %s\n",
                 i, fdc202[fdcnum].stat, uptr->filename);
         }
@@ -382,80 +393,37 @@ void isbc202_reset1(uint8 fdcnum)
 t_stat isbc202_attach (UNIT *uptr, CONST char *cptr)
 {
     t_stat r;
-    FILE *fp;
-    int32 i, c = 0;
-    long flen;
     uint8 fdcnum, fddnum;
 
     sim_debug (DEBUG_flow, &isbc202_dev, "   isbc202_attach: Entered with cptr=%s\n", cptr);
+//    sim_printf("   isbc202_attach: Entered with cptr=%s\n", cptr);
     if ((r = attach_unit (uptr, cptr)) != SCPE_OK) { 
         sim_printf("   isbc202_attach: Attach error\n");
         return r;
     }
     fdcnum = uptr->u5;
     fddnum = uptr->u6;
-    fp = fopen(uptr->filename, "rb");
-    if (fp == NULL) {
-        sim_printf("   Unable to open disk image file %s\n", uptr->filename);
-        sim_printf("   No disk image loaded!!!\n");
-    } else {
-        sim_printf("isbc202: Attach\n");
-        fseek(fp, 0, SEEK_END);         /* size disk image */
-        flen = ftell(fp);
-        fseek(fp, 0, SEEK_SET);
-        if (flen == -1) {
-            sim_printf("   isbc202_attach: File error\n");
-            fclose(fp);
-            return SCPE_IOERR;
-        } 
-        if (fdc202[fdcnum].fdd[fddnum].buf == NULL) { /* no buffer allocated */
-            fdc202[fdcnum].fdd[fddnum].buf = (uint8 *)malloc(flen);
-            if (fdc202[fdcnum].fdd[fddnum].buf == NULL) {
-                sim_printf("   isbc202_attach: Malloc error\n");
-                fclose(fp);
-                return SCPE_MEM;
-            }
-        }
-        uptr->capac = flen;
-        i = 0;
-        c = fgetc(fp);                  // copy disk image into buffer
-        while (c != EOF) {
-            *(fdc202[fdcnum].fdd[fddnum].buf + i++) = c & 0xFF;
-            c = fgetc(fp);
-        }
-        fclose(fp);
-        switch(fddnum){
-            case 0:
-                fdc202[fdcnum].stat |= RDY0; //set FDD 0 ready
-                fdc202[fdcnum].rtype = ROK;
-                fdc202[fdcnum].rbyte1 |= RB1RD0;
-                break;
-            case 1:
-                fdc202[fdcnum].stat |= RDY1; //set FDD 1 ready
-                fdc202[fdcnum].rtype = ROK;
-                fdc202[fdcnum].rbyte1 |= RB1RD1;
-                break;
-            case 2:
-                fdc202[fdcnum].stat |= RDY2; //set FDD 2 ready
-                fdc202[fdcnum].rtype = ROK;
-                fdc202[fdcnum].rbyte1 |= RB1RD2;
-                break;
-            case 3:
-                fdc202[fdcnum].stat |= RDY3; //set FDD 3 ready
-                fdc202[fdcnum].rtype = ROK;
-                fdc202[fdcnum].rbyte1 |= RB1RD3;
-                break;
-        }
-        if (flen == 512512) {           /* 8" 512K SSDD */
-            fdc202[fdcnum].fdd[fddnum].maxcyl = 77;
-            fdc202[fdcnum].fdd[fddnum].maxsec = 52;
-            fdc202[fdcnum].fdd[fddnum].sec = 1;
-            fdc202[fdcnum].fdd[fddnum].cyl = 0;
-        } else
-            sim_printf("   iSBC-202-%d: Not a DD disk image\n", fdcnum);
-        sim_printf("   iSBC-202%d: Configured %d bytes, Attached to %s\n",
-            fdcnum, uptr->capac, uptr->filename);
+    switch(fddnum){
+        case 0:
+            fdc202[fdcnum].stat |= RDY0; //set FDD 0 ready
+            fdc202[fdcnum].rbyte1 |= RB1RD0;
+            break;
+        case 1:
+            fdc202[fdcnum].stat |= RDY1; //set FDD 1 ready
+            fdc202[fdcnum].rbyte1 |= RB1RD1;
+            break;
+        case 2:
+            fdc202[fdcnum].stat |= RDY2; //set FDD 2 ready
+            fdc202[fdcnum].rbyte1 |= RB1RD2;
+            break;
+        case 3:
+            fdc202[fdcnum].stat |= RDY3; //set FDD 3 ready
+            fdc202[fdcnum].rbyte1 |= RB1RD3;
+            break;
     }
+    fdc202[fdcnum].rtype = ROK;
+    sim_printf("   iSBC-202%d: FDD %d Configured %d bytes, Attached to %s\n",
+        fdcnum, fddnum, uptr->capac, uptr->filename);
     sim_debug (DEBUG_flow, &isbc202_dev, "   isbc202_attach: Done\n");
     return SCPE_OK;
 }
@@ -594,13 +562,14 @@ uint8 isbc2027(t_bool io, uint8 data)
 
 void isbc202_diskio(uint8 fdcnum)
 {
-    uint8 cw, di, nr, ta, sa, data, nrptr, c;
+    uint8 cw, di, nr, ta, sa, data, nrptr;
     uint16 ba;
     uint32 dskoff;
     uint8 fddnum, fmtb;
     uint32 i;
     UNIT *uptr;
-    FILE *fp;
+    uint8 *fbuf;
+
     //parse the IOPB 
     cw = multibus_get_mbyte(fdc202[fdcnum].iopb);
     di = multibus_get_mbyte(fdc202[fdcnum].iopb + 1);
@@ -610,13 +579,12 @@ void isbc202_diskio(uint8 fdcnum)
     ba = multibus_get_mword(fdc202[fdcnum].iopb + 5);
     fddnum = (di & 0x30) >> 4;
     uptr = isbc202_dev.units + fddnum;
+    fbuf = (uint8 *) (isbc202_dev.units + fddnum)->filebuf;
     if (DEBUG) {
         sim_printf("\n   isbc202-%d: isbc202_diskio IOPB=%04X FDD=%02X STAT=%02X",
             fdcnum, fdc202[fdcnum].iopb, fddnum, fdc202[fdcnum].stat);
         sim_printf("\n   isbc202-%d: cw=%02X di=%02X nr=%02X ta=%02X sa=%02X ba=%04X",
             fdcnum, cw, di, nr, ta, sa, ba);
-//        sim_printf("\n   isbc202-%d: maxsec=%02X maxcyl=%02X",
-//            fdcnum, fdc202[fdcnum].fdd[fddnum].maxsec, fdc202[fdcnum].fdd[fddnum].maxcyl);
     }
     //check for not ready
     switch(fddnum) {
@@ -659,20 +627,17 @@ void isbc202_diskio(uint8 fdcnum)
     }
     //check for address error
     if (
-        ((di & 0x07) != 0x03) && (
-        (sa > fdc202[fdcnum].fdd[fddnum].maxsec) ||
-        ((sa + nr) > (fdc202[fdcnum].fdd[fddnum].maxsec + 1)) ||
+        ((di & 0x07) != DHOME) && (
+        (sa > MAXSECDD) ||
+        ((sa + nr) > (MAXSECDD + 1)) ||
         (sa == 0) ||
-        (ta > fdc202[fdcnum].fdd[fddnum].maxcyl)
+        (ta > MAXTRK)
         )) {
-            if (DEBUG)
-                sim_printf("\n   isbc202-%d: maxsec=%02X maxcyl=%02X",
-                    fdcnum, fdc202[fdcnum].fdd[fddnum].maxsec, fdc202[fdcnum].fdd[fddnum].maxcyl);
-            fdc202[fdcnum].rtype = RERR;
-            fdc202[fdcnum].rbyte0 = RB0ADR;
-            fdc202[fdcnum].intff = 1;      //set interrupt FF
-            sim_printf("\n   isbc202-%d: Address error on drive %d", fdcnum, fddnum);
-            return;
+        fdc202[fdcnum].rtype = RERR;
+        fdc202[fdcnum].rbyte0 = RB0ADR;
+        fdc202[fdcnum].intff = 1;      //set interrupt FF
+        sim_printf("\n   isbc202-%d: Address error on drive %d", fdcnum, fddnum);
+        return;
     }
     switch (di & 0x07) {
         case DNOP:
@@ -706,17 +671,10 @@ void isbc202_diskio(uint8 fdcnum)
             }
             fmtb = multibus_get_mbyte(ba); //get the format byte
             //calculate offset into disk image
-            dskoff = ((ta * (uint32)(fdc202[fdcnum].fdd[fddnum].maxsec)) + (sa - 1)) * 128;
-            for(i=0; i<=((uint32)(fdc202[fdcnum].fdd[fddnum].maxsec) * 128); i++) {
-                *(fdc202[fdcnum].fdd[fddnum].buf + (dskoff + i)) = fmtb;
+            dskoff = ((ta * MAXSECDD) + (sa - 1)) * 128;
+            for(i=0; i<=((uint32)(MAXSECDD) * 128); i++) {
+                *(fbuf + (dskoff + i)) = fmtb;
             }
-            //*** quick fix. Needs more thought!
-            fp = fopen(uptr->filename, "wb"); // write out modified image
-            for (i=0; i<uptr->capac; i++) {
-                c = *(fdc202[fdcnum].fdd[fddnum].buf + i);
-                fputc(c, fp);
-            }
-            fclose(fp);
             fdc202[fdcnum].rtype = ROK;
             fdc202[fdcnum].intff = 1;      //set interrupt FF
             break;
@@ -724,11 +682,13 @@ void isbc202_diskio(uint8 fdcnum)
             nrptr = 0;
             while(nrptr < nr) {
                 //calculate offset into disk image
-                dskoff = ((ta * fdc202[fdcnum].fdd[fddnum].maxsec) + (sa - 1)) * 128;
-//                sim_printf("\n   isbc202-%d: cw=%02X di=%02X nr=%02X ta=%02X sa=%02X ba=%04X dskoff=%06X",
-//                    fdcnum, cw, di, nr, ta, sa, ba, dskoff);
-                for (i=0; i<128; i++) {     //copy sector from image to RAM
-                    data = *(fdc202[fdcnum].fdd[fddnum].buf + (dskoff + i));
+                dskoff = ((ta * MAXSECDD) + (sa - 1)) * 128;
+                if (DEBUG)
+                    sim_printf("\n   isbc202-%d: cw=%02X di=%02X nr=%02X ta=%02X sa=%02X ba=%04X dskoff=%06X",
+                        fdcnum, cw, di, nr, ta, sa, ba, dskoff);
+                //copy sector from image to RAM
+                for (i=0; i<128; i++) { 
+                    data = *(fbuf + (dskoff + i));
                     multibus_put_mbyte(ba + i, data);
                 }
                 sa++;
@@ -750,24 +710,18 @@ void isbc202_diskio(uint8 fdcnum)
             nrptr = 0;
             while(nrptr < nr) {
                 //calculate offset into disk image
-                dskoff = ((ta * fdc202[fdcnum].fdd[fddnum].maxsec) + (sa - 1)) * 128;
- //               sim_printf("\n   isbc202-%d: cw=%02X di=%02X nr=%02X ta=%02X sa=%02X ba=%04X dskoff=%06X",
- //                   fdcnum, cw, di, nr, ta, sa, ba, dskoff);
-                for (i=0; i<128; i++) {     //copy sector from image to RAM
+                dskoff = ((ta * MAXSECDD) + (sa - 1)) * 128;
+                if (DEBUG)
+                    sim_printf("\n   isbc202-%d: cw=%02X di=%02X nr=%02X ta=%02X sa=%02X ba=%04X dskoff=%06X",
+                        fdcnum, cw, di, nr, ta, sa, ba, dskoff);
+                for (i=0; i<128; i++) { //copy sector from image to RAM
                     data = multibus_get_mbyte(ba + i);
-                    *(fdc202[fdcnum].fdd[fddnum].buf + (dskoff + i)) = data;
+                    *(fbuf + (dskoff + i)) = data;
                 }
                 sa++;
                 ba+=0x80;
                 nrptr++;
             }
-            //*** quick fix. Needs more thought!
-            fp = fopen(uptr->filename, "wb"); // write out modified image
-            for (i=0; i<uptr->capac; i++) {
-                c = *(fdc202[fdcnum].fdd[fddnum].buf + i);
-                fputc(c, fp);
-            }
-            fclose(fp);
             fdc202[fdcnum].rtype = ROK;
             fdc202[fdcnum].intff = 1;      //set interrupt FF
             break;

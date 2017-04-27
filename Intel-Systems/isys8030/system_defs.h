@@ -37,7 +37,7 @@
 #define I8041_BASE      0xDC
 #define I8041_NUM       1
 
-/* set the base I/O address and device count  for the 8251s */
+/* set the base I/O address and device count for the 8251s */
 #define I8251_BASE      0xEC
 #define I8251_NUM       1
 

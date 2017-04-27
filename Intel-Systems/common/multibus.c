@@ -143,7 +143,7 @@ t_stat multibus_svc(UNIT *uptr)
 t_stat multibus_reset(DEVICE *dptr)
 {
     SBC_reset(NULL); 
-    sim_printf("Initializing The Multibus\n   Multibus Boards:\n");
+    sim_printf("   Multibus: Reset\n");
     isbc064_reset(NULL);
     isbc201_fdcnum = 0;
     isbc201_reset(NULL, SBC201_BASE); 

@@ -1400,7 +1400,7 @@ IMDS-225C = Intel-Systems/common
 IMDS-225 = ${IMDS-225C}/i8080.c ${IMDS-225D}/imds-225_sys.c \
 	${IMDS-225C}/i8251.c ${IMDS-225C}/i8255.c \
 	${IMDS-225C}/i8259.c ${IMDS-225C}/i8253.c \
-	${IMDS-225C}/ipceprom.c ${IMDS-225C}/ipcram8.c \
+	${IMDS-225C}/ieprom.c ${IMDS-225C}/iram8.c \
 	${IMDS-225C}/ipcmultibus.c ${IMDS-225D}/ipc.c \
 	${IMDS-225C}/ipc-cont.c ${IMDS-225C}/ioc-cont.c \
 	${IMDS-225C}/isbc202.c ${IMDS-225C}/isbc201.c \

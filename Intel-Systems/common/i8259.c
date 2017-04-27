@@ -58,6 +58,12 @@ extern uint16 reg_dev(uint8 (*routine)(t_bool, uint8), uint16, uint8);
 int32 i8259_devnum = 0;                 //actual number of 8259 instances + 1
 uint16 i8259_port[4];                   //baseport port registered to each instance
 
+/* these bytes represent the input and output to/from a port instance */
+
+uint8 i8259_IR[4];                      //interrupt inputs (bits 0-7)
+uint8 i8259_CAS[4];                     //interrupt cascade I/O (bits 0-2) 
+uint8 i8259_INT[4];                     //interrupt output (bit 0)
+
 uint8 i8259_base[I8259_NUM];
 uint8 i8259_icw1[I8259_NUM];
 uint8 i8259_icw2[I8259_NUM];
@@ -144,8 +150,8 @@ t_stat i8259_reset (DEVICE *dptr, uint16 baseport)
         sim_printf("i8255_reset: too many devices!\n");
         return SCPE_MEM;
     }
-    sim_printf("   8259-%d: Reset\n", i8259_devnum);
-    sim_printf("   8259-%d: Registered at %04X\n", i8259_devnum, baseport);
+    sim_printf("      8259-%d: Reset\n", i8259_devnum);
+    sim_printf("      8259-%d: Registered at %04X\n", i8259_devnum, baseport);
     i8259_port[i8259_devnum] = baseport;
     reg_dev(i8259a, baseport, i8259_devnum); 
     reg_dev(i8259b, baseport + 1, i8259_devnum); 

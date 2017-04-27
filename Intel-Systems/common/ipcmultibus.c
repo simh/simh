@@ -60,7 +60,6 @@ void multibus_put_mword(uint16 addr, uint16 val);
 
 extern t_stat SBC_reset(DEVICE *dptr);      /* reset the IPC simulator */
 extern void set_cpuint(int32 int_num);
-extern UNIT zx200a_unit;
 extern t_stat zx200a_reset(DEVICE *dptr, uint16 base);
 extern t_stat isbc201_reset (DEVICE *dptr, uint16);
 extern t_stat isbc202_reset (DEVICE *dptr, uint16);
@@ -150,8 +149,7 @@ t_stat multibus_reset(DEVICE *dptr)
     SBC_reset(NULL); 
     sim_printf("   Multibus: Reset\n");
     zx200a_fdcnum = 0;
-    zx200a_reset(NULL, ZX200A_BASE_DD);
-//    zx200a_reset(NULL, ZX200A_BASE_SD);
+    zx200a_reset(NULL, ZX200A_BASE);
     isbc201_fdcnum = 0;
     isbc201_reset(NULL, SBC201_BASE); 
     isbc202_fdcnum = 0;
@@ -258,9 +256,9 @@ uint8 nulldev(t_bool flag, uint8 data)
 uint16 reg_dev(uint8 (*routine)(t_bool io, uint8 data), uint16 port, uint8 devnum)
 {
     if (dev_table[port].routine != &nulldev) {  /* port already assigned */
-        sim_printf("Multibus: I/O Port %04X is already assigned\n", port);
+        sim_printf("         Multibus: I/O Port %04X is already assigned\n", port);
     } else {
-        sim_printf("Port %04X is assigned\n", port);
+        sim_printf("         Port %04X is assigned\n", port);
         dev_table[port].routine = routine;
         dev_table[port].devnum = devnum;
     }

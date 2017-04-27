@@ -140,8 +140,8 @@ DEVICE ioc_cont_dev = {
 
 t_stat ioc_cont_reset(DEVICE *dptr, uint16 baseport)
 {
-    sim_printf("   ioc_cont[%d]: Reset\n", 0);
-    sim_printf("   ioc_cont[%d]: Registered at %04X\n", 0, baseport);
+    sim_printf("      ioc_cont[%d]: Reset\n", 0);
+    sim_printf("      ioc_cont[%d]: Registered at %04X\n", 0, baseport);
     reg_dev(ioc_cont0, baseport, 0); 
     reg_dev(ioc_cont1, baseport + 1, 0); 
     dbb_stat = 0x00;                /* clear DBB status */
