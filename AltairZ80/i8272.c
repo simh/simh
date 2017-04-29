@@ -781,12 +781,18 @@ uint8 I8272_Write(const uint32 Addr, uint8 cData)
 
                 if(i8272_info->fdc_phase == EXEC_PHASE) {
                     switch(i8272_info->cmd[0] & 0x1F) {
-                        case I8272_READ_TRACK:          /* intentional fallthrough */
+                        case I8272_READ_TRACK:
                             sim_printf("I8272: " ADDRESS_FORMAT " Read a track (untested.)" NLP, PCX);
                             i8272_info->fdc_sector = 1; /* Read entire track from sector 1...eot */
-                        case I8272_READ_DATA:           /* intentional fallthrough */
-                        case I8272_READ_DELETED_DATA:   /* intentional fallthrough */
+                            /* fall through */
+
+                        case I8272_READ_DATA:
+                            /* fall through */
+                            
+                        case I8272_READ_DELETED_DATA:
                             disk_read = 1;
+                            /* fall through */
+
                         case I8272_WRITE_DATA:
                         case I8272_WRITE_DELETED_DATA:
                             for(;i8272_info->fdc_sector<=i8272_info->fdc_eot;i8272_info->fdc_sector++) {
