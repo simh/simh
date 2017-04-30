@@ -260,52 +260,53 @@ The EXPECT command now exists to provide a means of reacting to simulator output
 
 #### New SCP Commands:
 
-    SCREENSHOT filename.bmp         Save video window to the specified file
-    SET ENVIRONMENT Name=Value      Set Environment variable
-    SET ASYNCH                      Enable Asynchronous I/O
-    SET NOASYNCH                    Disable Asynchronous I/O
-    SET VERIFY                      Enable commang display while processing DO command files
-    SET NOVERIFY                    Enable commang display while processing DO command files
-    SET MESSAGE                     Enable error message output when commands complete (default)
-    SET NOMESSAGE                   Disable error message output when commands complete
-    SET QUIET                       Set minimal output mode for command execution
-    SET NOQUIET                     Set normal output mode for command execution
-    SET PROMPT                      Change the prompt used by the simulator (defaulr sim>)
-    SET THROTTLE x/t                Throttle t ms every x cycles
-    SET REMOTE TELNET=port          Specify remote console telnet port
-    SET REMOTE NOTELNET             Disables remote console
-    SET REMOTE CONNECTIONS=n        Specify the number of concurrent remote console sessions
-    SHOW FEATURES                   Displays the devices descriptions and features
-    SHOW ASYNCH                     Display the current Asynchronous I/O status
-    SHOW SERIAL                     Display the available and/or open serial ports
-    SHOW ETHERNET                   Display the available and/or open ethernet connections
-    SHOW MULTIPLEXER                Display the details about open multiplexer devices
-    SHOW CLOCKS                     Display the details about calibrated timers
-    SHOW REMOTE                     Display the remote console configuration
-    SHOW ON                         Display ON condition dispatch actions
-    SET ON                          Enable ON condition error dispatching
-    SET NOON                        Disable ON condition error dispatching
-    GOTO                            Transfer to lable in the current DO command file
-    CALL                            Call subroutine at indicated label
-    RETURN                          Return from subroutine call
-    SHIFT                           Slide argument parameters %1 thru %9 left 1
-    NOOP                            A no-op command
-    ON                              Establish or cancel an ON condition dispatch
-    IF                              Test some simulator state and conditionally execute commands
-    CD                              Change working directory
-    SET DEFAULT                     Change working directory
-    PWD                             Show working directory
-    SHOW DEFAULT                    Show working directory
-    DIR {path|file}                 Display file listing
-    LS {path|file}                  Display file listing
-    NEXT                            Step across a subroutine call or step a single instruction.
-    EXPECT                          React to output produced by a simulated system
-    SEND                            Inject input to a simulated system's console
-    SCREENSHOT                      Snapshot the current video display window
-    RUN UNTIL breakpoint            Establish the breakpoiunt specified and run until it is encountered
-    RUN UNTIL "output-string" ...   Establish the specified "output-string" as an EXPECT and run until it is encountered.
-    GO UNTIL breakpoint             Establish the breakpoiunt specified and go until it is encountered
-    GO UNTILE "output-string" ...   Establish the specified "output-string" as an EXPECT and go until it is encountered.
+    SCREENSHOT filename.bmp          Save video window to the specified file
+    SET ENV Name=Value               Set Environment variable
+    SET ENV -p "Prompt" Name=Default Gather User input into an Environment Variable
+    SET ASYNCH                       Enable Asynchronous I/O
+    SET NOASYNCH                     Disable Asynchronous I/O
+    SET VERIFY                       Enable commang display while processing DO command files
+    SET NOVERIFY                     Enable commang display while processing DO command files
+    SET MESSAGE                      Enable error message output when commands complete (default)
+    SET NOMESSAGE                    Disable error message output when commands complete
+    SET QUIET                        Set minimal output mode for command execution
+    SET NOQUIET                      Set normal output mode for command execution
+    SET PROMPT                       Change the prompt used by the simulator (defaulr sim>)
+    SET THROTTLE x/t                 Throttle t ms every x cycles
+    SET REMOTE TELNET=port           Specify remote console telnet port
+    SET REMOTE NOTELNET              Disables remote console
+    SET REMOTE CONNECTIONS=n         Specify the number of concurrent remote console sessions
+    SHOW FEATURES                    Displays the devices descriptions and features
+    SHOW ASYNCH                      Display the current Asynchronous I/O status
+    SHOW SERIAL                      Display the available and/or open serial ports
+    SHOW ETHERNET                    Display the available and/or open ethernet connections
+    SHOW MULTIPLEXER                 Display the details about open multiplexer devices
+    SHOW CLOCKS                      Display the details about calibrated timers
+    SHOW REMOTE                      Display the remote console configuration
+    SHOW ON                          Display ON condition dispatch actions
+    SET ON                           Enable ON condition error dispatching
+    SET NOON                         Disable ON condition error dispatching
+    GOTO                             Transfer to lable in the current DO command file
+    CALL                             Call subroutine at indicated label
+    RETURN                           Return from subroutine call
+    SHIFT                            Slide argument parameters %1 thru %9 left 1
+    NOOP                             A no-op command
+    ON                               Establish or cancel an ON condition dispatch
+    IF                               Test some simulator state and conditionally execute commands
+    CD                               Change working directory
+    SET DEFAULT                      Change working directory
+    PWD                              Show working directory
+    SHOW DEFAULT                     Show working directory
+    DIR {path|file}                  Display file listing
+    LS {path|file}                   Display file listing
+    NEXT                             Step across a subroutine call or step a single instruction.
+    EXPECT                           React to output produced by a simulated system
+    SEND                             Inject input to a simulated system's console
+    SCREENSHOT                       Snapshot the current video display window
+    RUN UNTIL breakpoint             Establish the breakpoiunt specified and run until it is encountered
+    RUN UNTIL "output-string" ...    Establish the specified "output-string" as an EXPECT and run until it is encountered.
+    GO UNTIL breakpoint              Establish the breakpoiunt specified and go until it is encountered
+    GO UNTILE "output-string" ...    Establish the specified "output-string" as an EXPECT and go until it is encountered.
 
 #### Command Processing Enhancements
 
