@@ -1,6 +1,6 @@
 /* hp3000_cpu_cis.c: HP 32234A COBOL II Instruction Set simulator
 
-   Copyright (c) 2016, J. David Bryan
+   Copyright (c) 2016-2017, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -23,6 +23,7 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   22-Apr-17    JDB     Corrected the significance flag setting in "edit"
    29-Dec-16    JDB     Disabled interrupt checks pending test generation
    19-Oct-16    JDB     Passes the COBOL-II firmware "A" diagnostic (D441A)
    06-Oct-16    JDB     Passes the COBOL-II firmware "B" diagnostic (D442A)
@@ -1331,9 +1332,9 @@ return trap;                                            /* return the trap condi
 
    If an interrupt is detected between operations, two words are pushed onto the
    stack before the interrupt handler is called.  These words hold the current
-   significance trigger (a flag indicating whether a significant digit has been
-   seen or zero filling should occur), loop count, float character, and fill
-   character, in this format:
+   significance trigger (a flag indicating that a significant digit has been
+   seen or that zero filling should occur), loop count, float character, and
+   fill character, in this format:
 
        0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
@@ -1389,6 +1390,12 @@ return trap;                                            /* return the trap condi
        the address of the displacement byte.  After reading the displacement
        byte, the address is incremented to the next location, so the operation
        subtracts 1 before adding the displacement value.
+
+    3. The significance trigger is represented by the "filling" flag; its value
+       is the opposite of the trigger, i.e., FALSE if a significant digit has
+       been seen, TRUE if all leading digits have been zeros, because that more
+       clearly indicates that it controls leading zero suppression and
+       replacement.
 */
 
 static t_bool edit (t_stat *status, uint32 *trap)
@@ -1406,7 +1413,7 @@ t_bool       terminate = FALSE;                         /* TRUE if the operation
 *trap   = trap_None;                                    /*   and trap condition */
 
 if (RA != 0) {                                          /* if this is a reentry after an interrupt */
-    filling    = ((RB & D16_SIGN) != 0);                /*   then reset the zero-filling flag */
+    filling    = ((RB & D16_SIGN) == 0);                /*   then reset the zero-filling flag */
     loop_count = LOWER_BYTE (RB);                       /*     and the loop counter */
     fill_char  = UPPER_BYTE (RC);                       /* reset the fill */
     float_char = LOWER_BYTE (RC);                       /*   and float characters */
@@ -1773,8 +1780,8 @@ do {                                                    /* process operations wh
 
         RA = D16_UMAX;                                  /* set the resumption flag */
 
-        RB = TO_WORD ((filling ? D16_SIGN : 0), loop_count);    /* save the significance trigger and loop count */
-        RC = TO_WORD (fill_char, float_char);                   /* save the fill and float characters */
+        RB = (filling ? 0 : D16_SIGN) | loop_count;     /* save the significance trigger and loop count */
+        RC = TO_WORD (fill_char, float_char);           /* save the fill and float characters */
 
         mem_update_byte (&target);                      /* update the last word written */
         return FALSE;                                   /*   and return with an interrupt set up or a status error */

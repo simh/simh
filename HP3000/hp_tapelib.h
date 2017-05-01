@@ -1,4 +1,4 @@
-/* hp_tapelib.h: HP magnetic tape controller simulator library definitions
+/* hp_tapelib.h: HP magnetic tape controller simulator library declarations
 
    Copyright (c) 2013-2016, J. David Bryan
    Copyright (c) 2004-2011, Robert M. Supnik

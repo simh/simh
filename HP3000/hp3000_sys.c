@@ -1,6 +1,6 @@
 /* hp3000_sys.c: HP 3000 system common interface
 
-   Copyright (c) 2016, J. David Bryan
+   Copyright (c) 2016-2017, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -23,6 +23,8 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   28-Apr-17    JDB     Added void cast to "fprint_instruction" call for left stackop
+   03-Mar-17    JDB     Added an implementation note to the "parse_sym" routine
    29-Dec-16    JDB     Changed the switch for STA format from -S to -T;
                         changed the status mnemonic flag from REG_S to REG_T
    28-Nov-16    JDB     hp_device_conflict accumulates names of active traces only
@@ -964,7 +966,7 @@ static t_stat parse_cpu          (CONST char *cptr, t_addr address, UNIT *uptr, 
 static size_t device_size = 0;                  /* maximum device name size */
 static size_t flag_size   = 0;                  /* maximum debug flag name size */
 
-static APC_FLAGS parse_config = apcNone;        /* address parser configuration  */
+static APC_FLAGS parse_config = apcNone;        /* address parser configuration */
 
 
 /* System interface global data structures */
@@ -1085,7 +1087,7 @@ const char *sim_stop_messages [] = {            /* an array of pointers to the s
 /* Local command table.
 
    This table defines commands and command behaviors that are specific to this
-   simulator.  No new commands are defined, but several commands are repurposed
+   simulator.  One new command is defined, and several commands are repurposed
    or extended.  Specifically:
 
      * EXAMINE, DEPOSIT, IEXAMINE, and IDEPOSIT accept bank/offset form, implied
@@ -1099,6 +1101,8 @@ const char *sim_stop_messages [] = {            /* an array of pointers to the s
 
      * LOAD and DUMP invoke the CPU cold load/cold dump facility, rather than
        loading or dumping binary files.
+
+     * POWER adds the ability to fail or restore power to the CPU.
 
    The table is initialized with only those fields that differ from the standard
    command table.  During one-time simulator initialization, the empty fields
@@ -1370,6 +1374,11 @@ else {                                                      /* otherwise display
        settings are used, even if the unit is a peripheral.  For example,
        entering disc sector data as CPU instructions uses the CPU's address and
        data radix values, rather than the disc's values.
+
+    2. The "cptr" post-increments are logically ANDed with the tests for ' and "
+       so that the increments are performed only if the tests succeed.  The
+       intent is to skip over the leading ' or " character.  The increments
+       themselves always succeed, so they don't affect the outcome of the tests.
 */
 
 t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
@@ -1394,7 +1403,6 @@ else if (sw & SWMASK ('C') || *cptr == '"' && cptr++)       /* otherwise if a ch
 
     else                                                    /* otherwise */
         return SCPE_ARG;                                    /*   report that the line cannot be parsed */
-
 
 else                                                    /* otherwise */
     return parse_cpu (cptr, addr, uptr, val, sw);       /*   attempt a mnemonic instruction parse */
@@ -1607,6 +1615,10 @@ return SCPE_OK;                                         /* return the display re
        status word is set, and the request is for a simulation stop, the
        left-hand opcode will print as dashes to indicate that it has already
        been executed.
+
+    2. The status return from "fprint_instruction" is always SCPE_OK for the
+       stack_ops table, which is fully decoded, so the return value from
+       printing the left stack opcode is not used.
 */
 
 t_stat fprint_cpu (FILE *ofile, t_value *val, uint32 radix, int32 switches)
@@ -1622,9 +1634,9 @@ switch (SUBOP (val [0])) {                                  /* dispatch based on
                - strlen (stack_ops [STACKOP_A (val [0])].mnemonic), ofile);
 
         else {                                              /* otherwise */
-            status = fprint_instruction (ofile, stack_ops,  /*   print the left operation */
-                                         val, STACKOP_A_MASK,
-                                         STACKOP_A_SHIFT, radix);
+            (void) fprint_instruction (ofile, stack_ops,    /*   print the left operation */
+                                       val, STACKOP_A_MASK, /*     while discarding the status */
+                                       STACKOP_A_SHIFT, radix);
             fputc (',', ofile);                             /* add a separator */
             }
 
@@ -3172,7 +3184,8 @@ return -(t_stat) (total_bytes_used / 2 - 1);            /* return the (biased) n
    if the print consumed a single-word value, or the negative number of extra
    words (beyond the first) consumed by printing the instruction is returned.
    For example, printing a symbol that resulted in two words being consumed
-   (from val [0] and val [1]) would return SCPE_OK_2_WORDS (= -1).
+   (from val [0] and val [1]) would return SCPE_OK_2_WORDS (= -1).  If the
+   supplied instruction is not in the table, SCPE_ARG is returned.
 
    The classification table consists of a set of entries that are indexed by
    opcode, followed optionally by a set of entries that are searched linearly.

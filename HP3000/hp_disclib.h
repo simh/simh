@@ -1,4 +1,4 @@
-/* hp_disclib.h: HP MAC/ICD disc controller simulator library definitions
+/* hp_disclib.h: HP MAC/ICD disc controller simulator library declarations
 
    Copyright (c) 2011-2016, J. David Bryan
    Copyright (c) 2004-2011, Robert M. Supnik
