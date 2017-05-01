@@ -4005,12 +4005,11 @@ return SCPE_OK;
 
 t_stat sim_set_environment (int32 flag, CONST char *cptr)
 {
-char varname[CBUFSIZE], prompt[CBUFSIZE];
+char varname[CBUFSIZE], prompt[CBUFSIZE], cbuf[CBUFSIZE];
 
 if ((!cptr) || (*cptr == 0))                            /* now eol? */
     return SCPE_2FARG;
 if (sim_switches & SWMASK ('P')) {
-    char cbuf[CBUFSIZE];
     CONST char *deflt = NULL;
 
     cptr = get_glyph_quoted (cptr, prompt, 0);          /* get prompt */
