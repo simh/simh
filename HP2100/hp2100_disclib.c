@@ -1,6 +1,6 @@
 /* hp2100_disclib.c: HP MAC/ICD disc controller simulator library
 
-   Copyright (c) 2011-2016, J. David Bryan
+   Copyright (c) 2011-2017, J. David Bryan
    Copyright (c) 2004-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -24,6 +24,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   22-Apr-17    JDB     A failed sim_fseek call now causes a drive fault
+   09-Mar-17    JDB     Added the simulator name to the "perror" message.
+   17-Jan-17    JDB     Moved "hp2100_defs.h" inclusion to "hp2100_disclib.c"
    13-May-16    JDB     Modified for revised SCP API function parameter types
    04-Mar-16    JDB     Name changed to "hp2100_disclib" until HP 3000 integration
    24-Dec-14    JDB     Added casts for explicit downward conversions
@@ -256,6 +259,7 @@
 
 #include <math.h>
 
+#include "hp2100_defs.h"                                /* this must reflect the machine used */
 #include "hp2100_disclib.h"
 
 
@@ -552,7 +556,7 @@ static void   start_write     (CVPTR cvptr, UNIT *uptr);
 static t_stat end_write       (CVPTR cvptr, UNIT *uptr);
 static t_bool position_sector (CVPTR cvptr, UNIT *uptr, t_bool verify);
 static void   next_sector     (CVPTR cvptr, UNIT *uptr);
-static t_stat io_error        (CVPTR cvptr, UNIT *uptr);
+static t_stat io_error        (CVPTR cvptr, UNIT *uptr, CNTLR_STATUS status);
 
 /* Disc library local utility routines */
 
@@ -1808,8 +1812,8 @@ count = sim_fread (cvptr->buffer + offset,              /* read the sector from 
 for (count = count + offset; count < cvptr->length; count++)    /* pad the sector as needed */
     cvptr->buffer [count] = 0;                                  /*   e.g., if reading from a new file */
 
-if (ferror (uptr->fileref))                             /* did a host file system error occur? */
-    return io_error (cvptr, uptr);                      /* set up the data error status and stop the simulation */
+if (ferror (uptr->fileref))                                     /* did a host file system error occur? */
+    return io_error (cvptr, uptr, uncorrectable_data_error);    /* set up the data error status and stop the simulation */
 
 next_sector (cvptr, uptr);                              /* address the next sector */
 
@@ -1985,8 +1989,8 @@ if (cvptr->index < DL_WPSEC + offset) {                 /* was a partial sector 
 sim_fwrite (cvptr->buffer + offset, sizeof (uint16),    /* write the sector to the file */
             DL_WPSEC, uptr->fileref);
 
-if (ferror (uptr->fileref))                             /* did a host file system error occur? */
-    return io_error (cvptr, uptr);                      /* set up the data error status and stop the simulation */
+if (ferror (uptr->fileref))                                     /* did a host file system error occur? */
+    return io_error (cvptr, uptr, uncorrectable_data_error);    /* set up the data error status and stop the simulation */
 
 next_sector (cvptr, uptr);                              /* address the next sector */
 
@@ -2036,10 +2040,13 @@ return SCPE_OK;
    error.
 
    If the addresses are valid, the drive is checked to ensure that it is ready
-   for positioning.  If it is, the the byte offset in the image file is
-   calculated from the CHS address, and the file is positioned.  The disc
-   service is scheduled to begin the data transfer, and the routine returns TRUE
-   to indicate that the file position was set.
+   for positioning.  If it is, the file is positioned to a byte offset in the
+   image file that is calculated from the CHS address.  If positioning succeeds,
+   the disc service is scheduled to begin the data transfer, and the routine
+   returns TRUE to indicate that the file position is set.  If positioning fails
+   with a host file system error, it is reported to the simulation console, and
+   the routine returns FALSE to indicate that an AGC (drive positioner) fault
+   occurred.
 
 
    Implementation notes:
@@ -2100,10 +2107,18 @@ else {                                                  /* we are ready to posit
                       cvptr->sector, model);            /*   (for inspection only) */
     uptr->pos = TO_OFFSET (block);                      /*     and then convert to a byte offset */
 
-    sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);     /* set the image file position */
+    if (sim_fseek (uptr->fileref, uptr->pos, SEEK_SET)) {   /* set the image file position; if it failed */
+        io_error (cvptr, uptr, status_2_error);             /*   then report it to the simulation console */
 
-    uptr->wait = cvptr->data_time;                      /* delay for the data access time */
-    return TRUE;                                        /*   and report that positioning was accomplished */
+        dl_load_unload (cvptr, uptr, FALSE);                /* unload the heads */
+        uptr->STAT |= DL_S2FAULT;                           /*   and set Fault status */
+        }
+
+    else {                                              /* otherwise the seek succeeded */
+        uptr->wait = cvptr->data_time;                  /*   so delay for the data access time */
+
+        return TRUE;                                    /* report that positioning was accomplished */
+        }
     }
 
 return FALSE;                                           /* report that positioning failed or was deferred */
@@ -2252,19 +2267,19 @@ return TRUE;                                            /*     and report that t
 }
 
 
-/* Report an I/O error.
+/* Report a stream I/O error.
 
    Errors indicated by the host file system are reported to the console, and
    simulation is stopped with an "I/O error" message.  If the simulation is
-   continued, the CPU will receive an Uncorrectable Data Error indication from
-   the controller.
+   continued, the CPU will receive the supplied status indication from the
+   controller.
 */
 
-static t_stat io_error (CVPTR cvptr, UNIT *uptr)
+static t_stat io_error (CVPTR cvptr, UNIT *uptr, CNTLR_STATUS status)
 {
-dl_end_command (cvptr, uncorrectable_data_error);       /* terminate the command with an error */
+dl_end_command (cvptr, status);                         /* terminate the command with an error */
 
-perror ("DiscLib I/O error");                           /* report the error to the console */
+perror ("HP 2100 simulator disc library I/O error");    /* report the error to the console */
 clearerr (uptr->fileref);                               /*   and clear the error in case we resume */
 
 return SCPE_IOERR;                                      /* return an I/O error to stop the simulator */

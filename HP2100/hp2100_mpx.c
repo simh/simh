@@ -1,6 +1,6 @@
 /* hp2100_mpx.c: HP 12792C eight-channel asynchronous multiplexer simulator
 
-   Copyright (c) 2008-2016, J. David Bryan
+   Copyright (c) 2008-2017, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    MPX          12792C 8-channel multiplexer card
 
+   22-Apr-17    JDB     Corrected missing compound statements
    02-Aug-16    JDB     Burst-fill only the first receive buffer in fast mode
    28-Jul-16    JDB     Fixed buffer ready check at read completion
                         Fixed terminate on character counts > 254
@@ -1136,7 +1137,7 @@ switch (mpx_cmd) {
     case CMD_CANCEL:                                    /* cancel first read buffer */
         port = key_to_port (mpx_portkey);               /* get port */
 
-        if (port >= 0)                                  /* port defined? */
+        if (port >= 0) {                                /* port defined? */
             buf_cancel (ioread, port, get);             /* cancel get buffer */
 
             if (buf_avail (ioread, port) == 2)          /* if all buffers are now clear */
@@ -1144,6 +1145,7 @@ switch (mpx_cmd) {
 
             else if (!(mpx_flags [port] & FL_RDFILL))   /* otherwise if the other buffer is not filling */
                 mpx_flags [port] |= FL_HAVEBUF;         /*   then indicate buffer availability */
+            }
         break;
 
 
@@ -1233,11 +1235,12 @@ switch (mpx_cmd) {
     case CMD_SET_FLOW:                                      /* set flow control */
         port = key_to_port (mpx_portkey);                   /* get port */
 
-        if (port >= 0)                                      /* port defined? */
+        if (port >= 0) {                                    /* port defined? */
             mpx_flowcntl [port] = mpx_param & FC_XONXOFF;   /* save port flow control */
 
             if (mpx_param & FC_FORCE_XON)                   /* force XON? */
                 mpx_flags [port] &= ~FL_XOFF;               /* resume transmission if suspended */
+            }
         break;
 
 

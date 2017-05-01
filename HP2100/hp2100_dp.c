@@ -1,6 +1,7 @@
 /* hp2100_dp.c: HP 2100 12557A/13210A disk simulator
 
    Copyright (c) 1993-2016, Robert M. Supnik
+   Copyright (c) 2017       J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +27,7 @@
    DP           12557A 2870 disk subsystem
                 13210A 7900 disk subsystem
 
+   22-Apr-17    JDB     Added fall-through comment for FNC_STA case in dpcio
    09-Nov-16    JDB     Corrected disk subsystem model number from 2871 to 2870
    13-May-16    JDB     Modified for revised SCP API function parameter types
    30-Dec-14    JDB     Added S-register parameters to ibl_copy
@@ -646,6 +648,8 @@ while (working_set) {
                     case FNC_STA:                       /* rd sta */
                         if (dp_ctype == A13210)         /* 13210? clr dch flag */
                             dpdio (&dpd_dib, ioCLF, 0);
+
+                    /* fall into FNC_CHK and FNC_AR cases */
 
                     case FNC_CHK:                       /* check */
                     case FNC_AR:                        /* addr rec */

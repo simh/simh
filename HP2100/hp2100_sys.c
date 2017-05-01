@@ -24,6 +24,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-Jan-17    JDB     Corrected HLT decoding to add the 1060xx and 1070xx ranges
+                        Corrected SFB decoding
    14-Jan-17    JDB     Removed use of Fprintf functions for version 4.x and on
    30-Dec-16    JDB     Corrected parsing of memory reference instructions
    13-May-16    JDB     Modified for revised SCP API function parameter types
@@ -294,7 +296,7 @@ static const char *opcode[] = {
  "FAD", "FSB", "FMP", "FDV",
  "FIX", "FLT",
  "STO", "CLO", "SOC", "SOS",
- "HLT", "STF", "CLF",
+ "HLT", "HLT", "STF", "CLF",                    /* 2nd HLT is 1060xx and 1070xx ranges */
  "SFC", "SFS", "MIA", "MIB",
  "LIA", "LIB", "OTA", "OTB",
  "STC", "CLC",
@@ -319,7 +321,7 @@ static const char *opcode[] = {
  "CYA", "CYB", "LDY",
  "ADY", "XAY", "XBY",
  "ISX", "DSX", "JLY", "LBT",
- "SBT", "MBT", "CBT", "SBT",
+ "SBT", "MBT", "CBT", "SFB",
  "ISY", "DSY", "JPY", "SBS",
  "CBS", "TBS", "CMW", "MVW",
  NULL,                                                  /* decode only */
@@ -353,7 +355,7 @@ static const int32 opc_val[] = {
  0105000+I_EMR, 0105020+I_EMR, 0105040+I_EMR, 0105060+I_EMR,
  0105100+I_NPN, 0105120+I_NPN,
  0102101+I_NPN, 0103101+I_NPN, 0102201+I_NPC, 0102301+I_NPC,
- 0102000+I_IO1, 0102100+I_IO2, 0103100+I_IO2,
+ 0102000+I_IO1, 0106000+I_IO1, 0102100+I_IO2, 0103100+I_IO2,
  0102200+I_IO1, 0102300+I_IO1, 0102400+I_IO1, 0106400+I_IO1,
  0102500+I_IO1, 0106500+I_IO1, 0102600+I_IO1, 0106600+I_IO1,
  0102700+I_IO1, 0106700+I_IO1,

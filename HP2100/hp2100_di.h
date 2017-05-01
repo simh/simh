@@ -1,6 +1,6 @@
-/* hp2100_di.h: HP 12821A HP-IB Disc Interface simulator definitions
+/* hp2100_di.h: HP 12821A HP-IB Disc Interface simulator declarations
 
-   Copyright (c) 2010-2016, J. David Bryan
+   Copyright (c) 2010-2017, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    DI           12821A Disc Interface
 
+   10-Jan-17    JDB     Moved byte accessors to hp2100_defs.h
    13-May-16    JDB     Modified for revised SCP API function parameter types
    14-Feb-12    JDB     First release
    16-Nov-10    JDB     Created DI common definitions file
@@ -136,36 +137,17 @@ typedef enum {
 #define PPR(a)          (uint8) (1 << (7 - (a)))        /* parallel poll response */
 
 
-/* Byte accessors */
-
-#define BYTE_SHIFT      8                               /* byte shift count */
-#define UPPER_BYTE      0177400                         /* high-order byte mask */
-#define LOWER_BYTE      0000377                         /* low-order byte mask */
-
-#define GET_UPPER(w)    (uint8) (((w) & UPPER_BYTE) >> BYTE_SHIFT)
-#define GET_LOWER(w)    (uint8) ((w) & LOWER_BYTE)
-
-#define SET_UPPER(b)    (uint16) ((b) << BYTE_SHIFT)
-#define SET_LOWER(b)    (uint16) (b)
-#define SET_BOTH(b)     (SET_UPPER (b) | SET_LOWER (b))
-
-typedef enum {
-    upper,                                              /* upper byte selected */
-    lower                                               /* lower byte selected */
-    } SELECTOR;
-
-
 /* Per-card state variables */
 
 typedef struct {
-    FLIP_FLOP control;                                  /* control flip-flop */
-    FLIP_FLOP flag;                                     /* flag flip-flop */
-    FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
-    FLIP_FLOP srq;                                      /* SRQ flip-flop */
-    FLIP_FLOP edt;                                      /* EDT flip-flop */
-    FLIP_FLOP eor;                                      /* EOR flip-flop */
-    SELECTOR  ibp;                                      /* input byte pointer selector */
-    SELECTOR  obp;                                      /* output byte pointer selector */
+    FLIP_FLOP      control;                             /* control flip-flop */
+    FLIP_FLOP      flag;                                /* flag flip-flop */
+    FLIP_FLOP      flagbuf;                             /* flag buffer flip-flop */
+    FLIP_FLOP      srq;                                 /* SRQ flip-flop */
+    FLIP_FLOP      edt;                                 /* EDT flip-flop */
+    FLIP_FLOP      eor;                                 /* EOR flip-flop */
+    BYTE_SELECTOR  ibp;                                 /* input byte pointer selector */
+    BYTE_SELECTOR  obp;                                 /* output byte pointer selector */
 
     uint16    cntl_register;                            /* control word register */
     uint16    status_register;                          /* status word register */

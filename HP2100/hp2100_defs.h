@@ -1,6 +1,7 @@
-/* hp2100_defs.h: HP 2100 simulator definitions
+/* hp2100_defs.h: HP 2100 System architectural declarations
 
    Copyright (c) 1993-2016, Robert M. Supnik
+   Copyright (c) 2017       J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +24,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   10-Jan-17    JDB     Added architectural constants
    05-Aug-16    JDB     Removed PC_Global renaming; P register is now "PR"
    13-May-16    JDB     Modified for revised SCP API function parameter types
    19-Jun-15    JDB     Conditionally use PC_Global for PC for version 4.0 and on
@@ -71,9 +73,80 @@
    15-Oct-00    RMS     Added dynamic device numbers
    14-Apr-99    RMS     Changed t_addr to unsigned
 
-   The author gratefully acknowledges the help of Jeff Moffat in answering
-   questions about the HP2100; and of Dave Bryan in adding features and
-   correcting errors throughout the simulator.
+   The [original] author gratefully acknowledges the help of Jeff Moffat in
+   answering questions about the HP2100; and of Dave Bryan in adding features
+   and correcting errors throughout the simulator.
+
+
+   This file provides the general declarations used throughout the HP 2100
+   simulator.  It is required by all modules.
+
+
+   -----------------------------------------------------
+   Implementation Note -- Compiling the Simulator as C++
+   -----------------------------------------------------
+
+   Although simulators are written in C, the SIMH project encourages developers
+   to compile them with a C++ compiler to obtain the more careful type checking
+   provided.  To obtain successful compilations, the simulator must be written
+   in the subset of C that is also valid C++.  Using valid C features beyond
+   that subset, as the HP 2100 simulator does, will produce C++ compiler errors.
+
+   The standard C features used by the simulator that prevent error-free C++
+   compilation are:
+
+    1. Incomplete types.
+
+       In C, mutually recursive type definitions are allowed by the use of
+       incomplete type declarations, such as "DEVICE ms_dev;" followed later by
+       "DEVICE ms_dev {...};".  Several HP device simulators use this feature to
+       place a pointer to the device structure in the "desc" field of an MTAB
+       array element, typically when the associated validation or display
+       routine handles multiple devices.  As the DEVICE contains a pointer to
+       the MTAB array, and an MTAB array element contains a pointer to the
+       DEVICE, the definitions are mutually recursive, and incomplete types are
+       employed.  C++ does not permit incomplete types.
+
+    2. Implicit conversion of ints to enums.
+
+       In C, enumeration types are compatible with integer types, and its
+       members are constants having type "int".  As such, they are semantically
+       equivalent to and may be used interchangeably with integers.  For the
+       developer, though, C enumerations have some advantages.  In particular,
+       the compiler may check a "switch" statement to ensure that all of the
+       enumeration cases are covered.  Also, a mathematical set may be modeled
+       by an enumeration type with disjoint enumerator values, with the bitwise
+       integer OR and AND operators modeling the set union and intersection
+       operations.  The latter has direct support in the "gdb" debugger, which
+       will display an enumerated type value as a union of the various
+       enumerators.  The HP simulator makes extensive use of both features to
+       model hardware signal buses (e.g., INBOUND_SET, OUTBOUND_SET) and so
+       performs bitwise integer operations on the enumerations to model signal
+       assertion and denial.  In C++, implicit conversion from enumerations to
+       integers is allowed, but conversion from integers to enumerations is
+       illegal without explicit casts.  Therefore, the idiom employed by the
+       simulator to assert a signal (e.g., "outbound_signals |= INTREQ") is
+       rejected by the C++ compiler.
+
+    3. Implicit increment operations on enums.
+
+       Because enums are compatible with integers in C, no special enumerator
+       increment operator is provided.  To cycle through the range of an
+       enumeration type, e.g. in a "for" statement, the standard integer
+       increment operator, "++", is used.  In C++, the "++" operator must be
+       overloaded with a version specific to the enumeration type; applying the
+       integer "++" to an enumeration is illegal.
+
+    4. Use of C++ keywords as variable names.
+
+       C++ reserves a number of additional keywords beyond those reserved by C.
+       Use of any of these keywords as a variable or type name is legal C but
+       illegal C++.  The HP simulator uses variables named "class" and
+       "operator", which are keywords in C++.
+
+   The HP simulator is written in ISO standard C and will compile cleanly with a
+   compiler implementing the 1999 C standard.  Compilation as C++ is not a goal
+   of the simulator and cannot work, given the incompatibilities listed above.
 */
 
 
@@ -86,18 +159,32 @@
 
 
 
-/* The following pragmas quell clang warnings that are on by default but should
-   not be, in my opinion.  They warn about the use of perfectly valid code and
-   require the addition of redundant parentheses and braces to silence them.
-   Rather than clutter up the code with scores of extra symbols that, in my
-   view, make the code harder to read and maintain, I elect to suppress these
-   warnings.
+/* The following pragmas quell clang and Microsoft Visual C++ warnings that are
+   on by default but should not be, in my opinion.  They warn about the use of
+   perfectly valid code and require the addition of redundant parentheses and
+   braces to silence them.  Rather than clutter up the code with scores of extra
+   symbols that, in my view, make the code harder to read and maintain, I elect
+   to suppress these warnings.
+
+   VC++ 2008 warning descriptions:
+
+    - 4114: "same type qualifier used more than once" [legal per C99]
+
+    - 4554: "check operator precedence for possible error; use parentheses to
+            clarify precedence"
+
+    - 4996: "function was declared deprecated"
 */
 
 #if defined (__clang__)
-#pragma clang diagnostic ignored "-Wlogical-op-parentheses"
-#pragma clang diagnostic ignored "-Wbitwise-op-parentheses"
-#pragma clang diagnostic ignored "-Wdangling-else"
+  #pragma clang diagnostic ignored "-Wlogical-op-parentheses"
+  #pragma clang diagnostic ignored "-Wbitwise-op-parentheses"
+  #pragma clang diagnostic ignored "-Wshift-op-parentheses"
+  #pragma clang diagnostic ignored "-Wdangling-else"
+
+#elif defined (_MSC_VER)
+  #pragma warning (disable: 4114 4554 4996)
+
 #endif
 
 
@@ -113,6 +200,181 @@
 #define STOP_OFFLINE    8                               /* device offline */
 #define STOP_PWROFF     9                               /* device powered off */
 #define NOTE_IOG        10                              /* I/O instr executed */
+
+
+/* Modifier validation identifiers */
+
+#define MTAB_XDV            (MTAB_XTD | MTAB_VDV)
+#define MTAB_XUN            (MTAB_XTD | MTAB_VUN)
+
+
+/* Architectural constants.
+
+   These macros specify the width, sign location, value mask, and minimum and
+   maximum signed and unsigned values for the data sizes supported by the
+   simulator.  In addition, masks for 16-bit and 32-bit overflow are defined (an
+   overflow is indicated if the masked bits are not all ones or all zeros).
+
+   The HP_WORD type is used to declare variables that represent 16-bit registers
+   or buses in hardware.
+*/
+
+typedef uint16              HP_WORD;                    /* HP 16-bit data word representation */
+
+#define R_MASK              0177777u                    /* 16-bit register mask */
+
+#define D4_WIDTH            4                           /* 4-bit data bit width */
+#define D4_MASK             0017u                       /* 4-bit data mask */
+
+#define D8_WIDTH            8                           /* 8-bit data bit width */
+#define D8_MASK             0377u                       /* 8-bit data mask */
+#define D8_UMAX             0377u                       /* 8-bit unsigned maximum value */
+#define D8_SMAX             0177u                       /* 8-bit signed maximum value */
+#define D8_SMIN             0200u                       /* 8-bit signed minimum value */
+#define D8_SIGN             0200u                       /* 8-bit sign */
+
+#define D16_WIDTH           16                          /* 16-bit data bit width */
+#define D16_MASK            0177777u                    /* 16-bit data mask */
+#define D16_UMAX            0177777u                    /* 16-bit unsigned maximum value */
+#define D16_SMAX            0077777u                    /* 16-bit signed maximum value */
+#define D16_SMIN            0100000u                    /* 16-bit signed minimum value */
+#define D16_SIGN            0100000u                    /* 16-bit sign */
+
+#define D32_WIDTH           32                          /* 32-bit data bit width */
+#define D32_MASK            037777777777u               /* 32-bit data mask */
+#define D32_UMAX            037777777777u               /* 32-bit unsigned maximum value */
+#define D32_SMAX            017777777777u               /* 32-bit signed maximum value */
+#define D32_SMIN            020000000000u               /* 32-bit signed minimum value */
+#define D32_SIGN            020000000000u               /* 32-bit sign */
+
+#define D48_WIDTH           48                          /* 48-bit data bit width */
+#define D48_MASK            07777777777777777uL         /* 48-bit data mask */
+#define D48_UMAX            07777777777777777uL         /* 48-bit unsigned maximum value */
+#define D48_SMAX            03777777777777777uL         /* 48-bit signed maximum value */
+#define D48_SMIN            04000000000000000uL         /* 48-bit signed minimum value */
+#define D48_SIGN            04000000000000000uL         /* 48-bit sign */
+
+#define D64_WIDTH           64                          /* 64-bit data bit width */
+#define D64_MASK            01777777777777777777777uL   /* 64-bit data mask */
+#define D64_UMAX            01777777777777777777777uL   /* 64-bit unsigned maximum value */
+#define D64_SMAX            00777777777777777777777uL   /* 64-bit signed maximum value */
+#define D64_SMIN            01000000000000000000000uL   /* 64-bit signed minimum value */
+#define D64_SIGN            01000000000000000000000uL   /* 64-bit sign */
+
+#define S16_OVFL_MASK       ((uint32) D16_UMAX << D16_WIDTH | \
+                              D16_SIGN)                 /* 16-bit signed overflow mask */
+
+#define S32_OVFL_MASK       ((t_uint64) D32_UMAX << D32_WIDTH | \
+                              D32_SIGN)                 /* 32-bit signed overflow mask */
+
+
+/* Memory constants */
+
+#define OF_WIDTH            10                              /* offset bit width */
+#define OF_MASK             ((1u << OF_WIDTH) - 1)          /* offset mask (2 ** 10 - 1) */
+#define OF_MAX              ((1u << OF_WIDTH) - 1)          /* offset maximum (2 ** 10 - 1) */
+
+#define PG_WIDTH            10                              /* page bit width */
+#define PG_MASK             ((1u << PG_WIDTH) - 1)          /* page mask (2 ** 10 - 1) */
+#define PG_MAX              ((1u << PG_WIDTH) - 1)          /* page maximum (2 ** 10 - 1) */
+
+#define LA_WIDTH            15                              /* logical address bit width */
+#define LA_MASK             ((1u << LA_WIDTH) - 1)          /* logical address mask (2 ** 15 - 1) */
+#define LA_MAX              ((1u << LA_WIDTH) - 1)          /* logical address maximum (2 ** 15 - 1) */
+
+#define PA_WIDTH            20                              /* physical address bit width */
+#define PA_MASK             ((1u << PA_WIDTH) - 1)          /* physical address mask (2 ** 20 - 1) */
+#define PA_MAX              ((1u << PA_WIDTH) - 1)          /* physical address maximum (2 ** 20 - 1) */
+
+#define DV_WIDTH            16                              /* data value bit width */
+#define DV_MASK             ((1u << DV_WIDTH) - 1)          /* data value mask (2 ** 16 - 1) */
+#define DV_SIGN             ( 1u << (DV_WIDTH - 1))         /* data value sign (2 ** 15) */
+#define DV_UMAX             ((1u << DV_WIDTH) - 1)          /* data value unsigned maximum (2 ** 16 - 1) */
+#define DV_SMAX             ((1u << (DV_WIDTH - 1)) - 1)    /* data value signed maximum  (2 ** 15 - 1) */
+
+
+/* Portable conversions.
+
+   SIMH is written with the assumption that the defined-size types (e.g.,
+   uint16) are at least the required number of bits but may be larger.
+   Conversions that otherwise would make inherent size assumptions must instead
+   be coded explicitly.  For example, doing:
+
+     negative_value_32 = (int32) negative_value_16;
+
+   ...will not guarantee that bits 0-15 of "negative_value_32" are ones, whereas
+   the supplied sign-extension macro will.
+
+   The conversions available are:
+
+     - SEXT8  -- int8 sign-extended to int32
+     - SEXT16 -- int16 sign-extended to int32
+     - NEG16  -- int8 negated
+     - NEG16  -- int16 negated
+     - NEG32  -- int32 negated
+     - INT16  -- uint16 to int16
+     - INT32  -- uint32 to int32
+
+
+   Implementation notes:
+
+    1. The routines assume that 16-bit values are masked to exactly 16 bits
+       before invoking.
+*/
+
+#define SEXT8(x)        (int32) ((x) & D8_SIGN  ? (x) | ~D8_MASK  : (x))
+#define SEXT16(x)       (int32) ((x) & D16_SIGN ? (x) | ~D16_MASK : (x))
+
+#define NEG8(x)         ((~(x) + 1) & D8_MASK)
+#define NEG16(x)        ((~(x) + 1) & D16_MASK)
+#define NEG32(x)        ((~(x) + 1) & D32_MASK)
+
+#define INT16(u)        ((u) > D16_SMAX ? (-(int16) (D16_UMAX - (u)) - 1) : (int16) (u))
+#define INT32(u)        ((u) > D32_SMAX ? (-(int32) (D32_UMAX - (u)) - 1) : (int32) (u))
+
+
+/* Byte accessors.
+
+   These macros extract the upper and lower bytes from a word and form a word
+   from upper and lower bytes.  Replacement of a byte within a word is also
+   provided, as is an enumeration type that defines byte selection.
+
+   The accessors are:
+
+     - UPPER_BYTE     -- return the byte from the upper position of a word value
+     - LOWER_BYTE     -- return the byte from the lower position of a word value
+     - TO_WORD        -- return a word with the specified upper and lower bytes
+
+     - REPLACE_UPPER  -- replace the upper byte of the word value
+     - REPLACE_LOWER  -- replace the lower byte of the word value
+
+*/
+
+typedef enum {
+    upper,                                      /* upper byte selected */
+    lower                                       /* lower byte selected */
+    } BYTE_SELECTOR;
+
+#define UPPER_BYTE(w)       (uint8)   ((w) >> D8_WIDTH & D8_MASK)
+#define LOWER_BYTE(w)       (uint8)   ((w) &  D8_MASK)
+#define TO_WORD(u,l)        (HP_WORD) (((u) & D8_MASK) << D8_WIDTH | (l) & D8_MASK)
+
+#define REPLACE_UPPER(w,b)  ((w) & D8_MASK | ((b) & D8_MASK) << D8_WIDTH)
+#define REPLACE_LOWER(w,b)  ((w) & D8_MASK << D8_WIDTH | (b) & D8_MASK)
+
+
+/* Double-word accessors */
+
+#define UPPER_WORD(d)       (HP_WORD) ((d) >> D16_WIDTH & D16_MASK)
+#define LOWER_WORD(d)       (HP_WORD) ((d) &  D16_MASK)
+
+#define TO_DWORD(u,l)       ((uint32) (u) << D16_WIDTH | (l))
+
+
+/* Portable conversions (sign-extension, unsigned-to-signed) */
+
+#define SEXT(x)         ((int32) (((x) & SIGN)? ((x) | ~DMASK): ((x) & DMASK)))
+
 
 /* Memory */
 
@@ -133,13 +395,6 @@
 #define DMASK           0177777                         /* 16b data mask/maximum value */
 #define DMAX            0077777                         /* 16b maximum signed value */
 #define DMASK8          0377                            /* 8b data mask/maximum value */
-
-/* Portable conversions (sign-extension, unsigned-to-signed) */
-
-#define SEXT(x)         ((int32) (((x) & SIGN)? ((x) | ~DMASK): ((x) & DMASK)))
-
-#define INT16(u)        ((u) > DMAX   ? (-(int16) (DMASK   - (u)) - 1) : (int16) (u))
-#define INT32(u)        ((u) > DMAX32 ? (-(int32) (DMASK32 - (u)) - 1) : (int32) (u))
 
 /* Timers */
 
@@ -332,9 +587,19 @@ typedef uint32 IOCYCLE;                                 /* a set of signals form
                          ioCRS | ioPOPIO | ioPON)       /* signals that may affect interrupt state */
 
 
-/* I/O structures */
+/* Flip-flops */
 
-typedef enum { CLEAR, SET } FLIP_FLOP;                  /* flip-flop type and values */
+typedef enum {
+    CLEAR = 0,                                  /* the flip-flop is clear */
+    SET   = 1                                   /* the flip-flop is set */
+    } FLIP_FLOP;
+
+#define TOGGLE(ff)          ff = (FLIP_FLOP) (ff ^ 1)   /* toggle a flip-flop variable */
+
+#define D_FF(b)             (FLIP_FLOP) ((b) != 0)      /* use a Boolean expression for a D flip-flop */
+
+
+/* I/O structures */
 
 typedef struct dib DIB;                                 /* incomplete definition */
 

@@ -1,6 +1,6 @@
                            SIMH/HP 2100 RELEASE NOTES
                            ==========================
-                             Last update: 2017-01-11
+                             Last update: 2017-05-01
 
 
 This file documents the release history of the simulator for the Hewlett-Packard
@@ -12,13 +12,32 @@ simulator code base is available at:
   https://github.com/simh/simh
 
 ...and may be downloaded at any time.  A code snapshot is identified by the "git
-commit ID" that is displayed by the simulator welcome banner.
+commit ID" that is displayed in the simulator welcome banner.
 
 Therefore, HP 2100 releases are simply documentation checkpoints that describe
 the changes that have occurred since the last checkpoint.  Generally, a release
 is written when one or more major changes have been incorporated.  Minor bug
 fixes will be available immediately from the repository but only noted as part
 of the next release document.
+
+
+
+===============================
+Reporting Bugs in the Simulator
+===============================
+
+If you find a bug in the HP 2100 simulator, please report it either to the SIMH
+issue tracker on github at:
+
+  https://github.com/simh/simh/issues
+
+...or to the SIMH mailing list; see:
+
+  http://mailman.trailing-edge.com/mailman/listinfo/simh
+
+...for subscribing information.  In either case, please include a console log
+that contains a reproducible test case that illustrates the problem.  See the
+"Recording Simulator Activities" section of the "SIMH User's Guide" for details.
 
 
 
@@ -35,11 +54,13 @@ diagnostic tests.  See the accompanying "hp2100_diag.txt" file for details.
 
 The simulator has been tested with the following operating systems:
 
+ - SIO, BCS, and MTS.
+
  - 2000E, 2000F, and 2000/Access Time-Shared BASIC.
 
  - DOS, DOS-M, and DOS-III.
 
- - RTE-II, RTE-III, RTE-IVB, and RTE-6/VM.
+ - RTE, RTE-B, RTE-C, RTE-II, RTE-III, RTE-IV, RTE-IVB, and RTE-6/VM.
 
 The user's manual for the simulator is provided in Microsoft Word format in the
 "doc" subdirectory of the code base snapshot downloaded from the github site.  A
@@ -137,6 +158,148 @@ Revision 5010:
 
 
 ======================
+Release 26, 2017-05-01
+======================
+
+This release of the HP 2100 simulator does not add any new features.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - Starting with the next release, the LOAD command will be rewritten to load
+   files containing absolute binary loaders into the protected address space of
+   the 21xx machines and configure the I/O instructions.  The LOAD command is
+   not designed for general loading of absolute binary files, as it does not
+   initialize the A and B registers as some HP software expects.  It is intended
+   only to install bootstrap loaders.  The BOOT PTR command is the proper
+   simulation of the hardware absolute paper tape loader.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  The RWCS debug option shown in the user's guide does not exist.
+
+     VERSION:  Release 25.
+
+     OBSERVATION:  The "HP2100 Simulator User's Guide" says that the RWCS debug
+     option may be specified for the DS and DA devices to trace "disk read/
+     write/control/status commands."  However, entering a SET DS DEBUG=RWCS
+     command gives an "Invalid argument" error.
+
+     CAUSE:  The option name is misspelled; the correct option is RWSC.
+
+     RESOLUTION:  Modify "hp2100_doc.doc" to list the correct option name.
+
+     STATUS:  Fixed in Release 26.
+
+
+  2. PROBLEM:  Halt opcodes 1060xx and 1070xx do not display in mnemonic form.
+
+     VERSION:  Release 25.
+
+     OBSERVATION:  Halt instructions 106000-106077 and 107000-107077 are not
+     displayed in mnemonic form, either directly with an EXAMINE -M command
+     or in the message displayed for a programmed halt.  These instruction
+     ranges are displayed in octal only.
+
+     CAUSE:  Section 3.20, "Input/Output Instructions," of the "HP 1000
+     M/E/F-Series Computers Technical Reference Handbook" (HP 5955-0282, March
+     1980) says, in part, "Bit 11, where relevant, specifies the A- or
+     B-register or distinguishes between set control and clear control;
+     otherwise, bit 11 may be a logic 0 or a logic 1 without affecting the
+     instruction (although the assembler will assign zeros in this case)."  The
+     HLT instruction does not specify the A/B register, so the valid opcodes are
+     102000-102077, 103000-103777, 106000-106077, and 107000-107077.  However,
+     the latter two ranges are omitted from the "opcode" and "opc_val" tables
+     used for decoding.
+
+     RESOLUTION:  Add the 1060xx/107xx range to the "opc_val" table and a second
+     "HLT" string to the "opcode" table (hp2100_sys.c) to permit mnemonic
+     display of this instruction range.
+
+     STATUS:  Fixed in Release 26.
+
+
+  3. PROBLEM:  The SFB (scan for byte) opcode displays as SBT (store byte).
+
+     VERSION:  Release 25.
+
+     OBSERVATION:  Entering the "EVAL -M 105767" command should display the
+     "SFB" mnemonic.  Instead, it displays "SBT".
+
+     CAUSE:  The entry in the opcode mnemonic table corresponding to the 105767
+     value is "SBT", which is incorrect.  It should be "SFB" (SBT is 105764).
+
+     RESOLUTION:  Modify the "opcode" table (hp2100_sys.c) to use the correct
+     mnemonic for the SFB instruction.
+
+     STATUS:  Fixed in Release 26.
+
+
+  4. PROBLEM:  Host file system seek errors are not caught.
+
+     VERSION:  Release 25.
+
+     OBSERVATION:  The MAC/ICD disc library checks for host file system read or
+     write errors and returns Uncorrectable Data Error status if an error is
+     indicated.  However, host file system seeks are simply assumed to succeed;
+     no indication of an error is given if a call fails.  A failed seek should
+     be detected, and a Drive Fault (positioner error) should be returned.
+
+     CAUSE:  Oversight.
+
+     RESOLUTION:  Modify "position_sector" (hp2100_disclib.c) to test the
+     "sim_fseek" call for error status and to simulate a Drive Fault (AGC error)
+     if the call fails.
+
+     STATUS:  Fixed in Release 26.
+
+
+  5. PROBLEM:  Set Flow Control and Cancel commands fail if port key is not set.
+
+     VERSION:  Release 25.
+
+     OBSERVATION:  HP 8-channel multiplexer commands that refer to ports do so
+     indirectly by passing a port key, rather than a port number.  The
+     key-to-port translation is established by the "Set Port Key" command, which
+     must be executed before any port-specific commands.  If a port key has not
+     been established, then all port-specific commands should be ignored.
+     However, the "Cancel first receive buffer" and "Set flow control" commands
+     cause program corruption if the key has not been set.
+
+     CAUSE:  The test for key validity is improperly applied for these commands.
+
+     RESOLUTION:  Modify "exec_command" (hp2100_mpx.c) to ignore these commands
+     if the port key has not been set.
+
+     STATUS:  Fixed in Release 26.
+
+
+  6. ENHANCEMENT:  Improve the EAU shift and rotate instruction simulations.
+
+     VERSION:  Release 25.
+
+     OBSERVATION:  The shift and rotate instructions (ASL, ASR, LSL, LSR, RRL,
+     and RRR) perform 32-bit operations on the combined B and A registers.  The
+     original implementation treated the 16-bit registers independently.
+     However, it is faster and smaller to form a 32-bit operand, apply the
+     operation, and then split the operand back into the B and A registers.
+     Modern compilers, such as gcc, recognize the shifting and masking patterns
+     necessary for a rotation and generate a single rotate-left or rotate-right
+     machine instruction.
+
+     RESOLUTION:  Modify "cpu_eau" (hp2100_cpu1.c) to reimplement the shift and
+     rotate instructions as 32-bit operations.
+
+     STATUS:  Fixed in Release 26.
+
+
+
+======================
 Release 25, 2017-01-11
 ======================
 
@@ -144,42 +307,42 @@ This is the initial checkpoint release of the HP 2100 simulator, corresponding
 to the 25th set of changes to the 4.0 code base.  The following devices are
 currently simulated:
 
-  - 2114C CPU with up to 16 KW of memory
-  - 2115A CPU with up to 8 KW of memory
-  - 2116C CPU with up to 32 KW of memory
-  - 2100A CPU with up to 32 KW of memory
-  - 1000 M/E/F-Series CPU with up to 1024 KW of memory
-  - EAU, FP, IOP, DMS, FFP, DBI, VIS, and SIGNAL microcode extensions
-  - RTE-IV EMA or RTE-6/VM OS and VMA microcode extensions
-  - 12531C Buffered Teleprinter Interface with one 2752 Teleprinter
-  - 12539C Time Base Generator
-  - 12557A Disc Controller with four 2870 drives
-  - 12559C Magnetic Tape Controller with one 3030 drive
-  - 12565A Disc Controller with two 2883 drives
-  - 12566B Microcircuit Interface with a loopback connector
-  - 12578A Direct Memory Access Controller
-  - 12581A Memory Protect
-  - 12597A Duplex Register Interface with one 2748 Paper Tape Reader
-  - 12597A Duplex Register Interface with one 2895 Paper Tape Punch
-  - 12606B Fixed Head Disc Controller with one 2770/2771 drive
-  - 12607B Direct Memory Access Controller
-  - 12610B Drum Controller with one 2773/2774/2775 drive
-  - 12620A Privileged Interrupt Fence
-  - 12653A Printer Controller with one 2767 Line Printer
-  - 12792C 8-Channel Asynchronous Multiplexer
-  - 12821A Disc Interface with four 7906H/7920H/7925H drives
-  - 12845B Printer Controller with one 2607 Line Printer
-  - 12875A Interprocessor Link
-  - 12892B Memory Protect
-  - 12895A Direct Memory Access Controller
-  - 12897B Dual-Channel Port Controller
-  - 12920A 16-Channel Terminal Multiplexer
-  - 12936A Privileged Interrupt Fence
-  - 12966A Buffered Asynchronous Communications Interface
-  - 13037D Disc Controller with eight 7905/7906/7920/7925 drives
-  - 13181A Magnetic Tape Controller with four 7970B drives
-  - 13183A Magnetic Tape Controller with four 7970E drives
-  - 13210A Disc Controller with four 7900 drives
+ - 2114C CPU with up to 16 KW of memory
+ - 2115A CPU with up to 8 KW of memory
+ - 2116C CPU with up to 32 KW of memory
+ - 2100A CPU with up to 32 KW of memory
+ - 1000 M/E/F-Series CPU with up to 1024 KW of memory
+ - EAU, FP, IOP, DMS, FFP, DBI, VIS, and SIGNAL microcode extensions
+ - RTE-IV EMA or RTE-6/VM OS and VMA microcode extensions
+ - 12531C Buffered Teleprinter Interface with one 2752 Teleprinter
+ - 12539C Time Base Generator
+ - 12557A Disc Controller with four 2870 drives
+ - 12559C Magnetic Tape Controller with one 3030 drive
+ - 12565A Disc Controller with two 2883 drives
+ - 12566B Microcircuit Interface with a loopback connector
+ - 12578A Direct Memory Access Controller
+ - 12581A Memory Protect
+ - 12597A Duplex Register Interface with one 2748 Paper Tape Reader
+ - 12597A Duplex Register Interface with one 2895 Paper Tape Punch
+ - 12606B Fixed Head Disc Controller with one 2770/2771 drive
+ - 12607B Direct Memory Access Controller
+ - 12610B Drum Controller with one 2773/2774/2775 drive
+ - 12620A Privileged Interrupt Fence
+ - 12653A Printer Controller with one 2767 Line Printer
+ - 12792C 8-Channel Asynchronous Multiplexer
+ - 12821A Disc Interface with four 7906H/7920H/7925H drives
+ - 12845B Printer Controller with one 2607 Line Printer
+ - 12875A Interprocessor Link
+ - 12892B Memory Protect
+ - 12895A Direct Memory Access Controller
+ - 12897B Dual-Channel Port Controller
+ - 12920A 16-Channel Terminal Multiplexer
+ - 12936A Privileged Interrupt Fence
+ - 12966A Buffered Asynchronous Communications Interface
+ - 13037D Disc Controller with eight 7905/7906/7920/7925 drives
+ - 13181A Magnetic Tape Controller with four 7970B drives
+ - 13183A Magnetic Tape Controller with four 7970E drives
+ - 13210A Disc Controller with four 7900 drives
 
 The "HP 2100 Simulator User's Guide" manual describes the configuration and
 operation of each of these devices in detail.
@@ -194,12 +357,11 @@ Implementation Notes
 
  - Starting with the next release, the LOAD command will restrict its operation
    to the addresses occupied by the bootstrap loaders, i.e., the last 64
-   locations in memory (up to 32K), unless forced by the addition of the "-F"
-   switch.  The LOAD command is not designed for general loading of absolute
-   binary files, as it does not initialize the A and B registers as some HP
-   software expects.  It is intended only to install bootstrap loaders.  The
-   BOOT PTR command is the proper simulation of the hardware absolute paper tape
-   loader.
+   locations in memory (up to 32K).  The LOAD command is not designed for
+   general loading of absolute binary files, as it does not initialize the A and
+   B registers as some HP software expects.  It is intended only to install
+   bootstrap loaders.  The BOOT PTR command is the proper simulation of the
+   hardware absolute paper tape loader.
 
 
 ----------
