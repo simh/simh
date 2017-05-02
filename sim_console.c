@@ -3229,7 +3229,8 @@ if ((std_input) &&                                      /* If Not Background pro
 if ((std_output) &&                                     /* If Not Background process? */
     (std_output != INVALID_HANDLE_VALUE)) {
     if (GetConsoleMode(std_output, &saved_output_mode))
-        SetConsoleMode(std_output, ENABLE_VIRTUAL_TERMINAL_PROCESSING|ENABLE_PROCESSED_OUTPUT);
+        if (!SetConsoleMode(std_output, ENABLE_VIRTUAL_TERMINAL_PROCESSING|ENABLE_PROCESSED_OUTPUT))
+            SetConsoleMode(std_output, ENABLE_PROCESSED_OUTPUT);
     }
 if (sim_log) {
     fflush (sim_log);
