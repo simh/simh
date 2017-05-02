@@ -384,9 +384,6 @@ static t_stat hdsk_reset(DEVICE *dptr)  {
     return SCPE_OK;
 }
 
-#ifdef _WIN32
-#define strcasecmp _stricmp
-#endif
 static uint32 is_imd(const UNIT *uptr) {
     return ((uptr != NULL) && (uptr -> filename != NULL) && (strlen(uptr -> filename) > 3) &&
             (strcasecmp(".IMD", uptr -> filename + strlen(uptr -> filename) - 4) == 0));
