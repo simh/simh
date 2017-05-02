@@ -3411,6 +3411,7 @@ unsigned int m68k_is_valid_instruction(unsigned int instruction, unsigned int cp
                 return 0;
             if(g_instruction_table[instruction] == d68020_unpk_mm)
                 return 0;
+            /* fall through */
         case M68K_CPU_TYPE_68EC020:
         case M68K_CPU_TYPE_68020:
         case M68K_CPU_TYPE_68030:
