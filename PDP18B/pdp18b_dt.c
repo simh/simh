@@ -1009,6 +1009,7 @@ switch (fnc) {                                          /* at speed, check fnc *
                 M[ma] = dtdb;
             if (M[DT_WC] == 0)                          /* wc ovf? */
                 dt_substate = DTO_WCO;
+            /* fall through */
         case DTO_WCO:                                   /* wc ovf, not sob */
             if (wrd != (dir? 0: DTU_BSIZE (uptr) - 1))  /* not last? */
                 sim_activate (uptr, DT_WSIZE * dt_ltime);
