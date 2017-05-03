@@ -509,7 +509,6 @@ REMOTE *sim_rem_consoles = NULL;
 
 static TMXR sim_rem_con_tmxr = { 0, 0, 0, NULL, NULL, &sim_remote_console };/* remote console line mux */
 static uint32 sim_rem_read_timeout = 30;    /* seconds before automatic continue */
-static uint32 *sim_rem_read_timeouts = NULL;/* per line read timeout (default from sim_rem_read_timeout) */
 static int32 sim_rem_active_number = -1;    /* -1 - not active, >= 0 is index of active console */
 int32 sim_rem_cmd_active_line = -1;         /* step in progress on line # */
 static CTAB *sim_rem_active_command = NULL; /* active command */
@@ -1349,7 +1348,7 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
                     if (!master_session)
                         tmxr_linemsg (lp, "\r\nSimulator paused.\r\n");
                     if (!master_session && rem->read_timeout) {
-                        tmxr_linemsgf (lp, "Simulation will resume automatically if input is not received in %d seconds\n", sim_rem_read_timeouts[i]);
+                        tmxr_linemsgf (lp, "Simulation will resume automatically if input is not received in %d seconds\n", rem->read_timeout);
                         tmxr_linemsgf (lp, "\r\n");
                         tmxr_send_buffered_data (lp);   /* flush any buffered data */
                         }
