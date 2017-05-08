@@ -478,6 +478,23 @@ static const char *xio_funcs[] = {
     "func0?",  "write", "read",  "sense_irq",
     "control", "initw", "initr", "sense"
 };
+static int32 ibm1130_qcount ()
+{
+    int32 i, cnt;
+    UNIT *uptr;
+    DEVICE *dptr;
+
+    cnt = 0;
+    for (uptr = sim_clock_queue; uptr != QUEUE_LIST_END; uptr = uptr->next) {
+        dptr = find_dev_from_unit (uptr);
+        for (i=0; sim_devices[i]; i++)
+            if (dptr == sim_devices[i]) {
+                cnt++;
+                break;
+            }
+    }
+    return cnt;
+}
 
 t_stat sim_instr (void)
 {
@@ -586,8 +603,8 @@ t_stat sim_instr (void)
         if (wait_state) {                   /* waiting? */
             sim_interval = 0;               /* run the clock out */
 
-            if (sim_qcount() <= (cgi ? 0 : 1)) {        /* one routine queued? we're waiting for keyboard only */
-                if (keyboard_is_busy()) {                       /* we are actually waiting for a keystroke */
+            if (ibm1130_qcount() <= (cgi ? 0 : 1)) {    /* one routine queued? we're waiting for keyboard only */
+                if (keyboard_is_busy()) {               /* we are actually waiting for a keystroke */
                     if ((status = sim_process_event()) != SCPE_OK)  /* get it with wait_state still set */
                         reason = simh_status_to_stopcode(status);
                 }
