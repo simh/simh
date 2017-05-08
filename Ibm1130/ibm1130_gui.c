@@ -1523,20 +1523,53 @@ static HANDLE hCmdReadEvent  = NULL;
 static HANDLE hCmdReadyEvent = NULL;
 static BOOL   scp_stuffed = FALSE, scp_reading = FALSE;
 static char   cmdbuffer[256];
+static BOOL   read_exiting = FALSE;
 
 /* CmdThread - separate thread to read commands from stdin upon request */
 
 static DWORD WINAPI CmdThread (LPVOID arg)
 {
+HANDLE hStdIn = GetStdHandle(STD_INPUT_HANDLE);
+DWORD dwBytesRead;
+
     for (;;) {
-        WaitForSingleObject(hCmdReadEvent, INFINITE);       /* wait for request */
-        read_line(cmdbuffer, sizeof(cmdbuffer), stdin);     /* read one line */
-        scp_stuffed = FALSE;                                /* say how we got it */
-        scp_reading = FALSE;
-        SetEvent(hCmdReadyEvent);                           /* notify main thread a line is ready */
+        if (WAIT_TIMEOUT == WaitForSingleObject(hCmdReadEvent, 2000))   /* wait for request */
+            continue;                                           /* put breakpoint here to debug */
+        if (read_exiting)
+            break;
+        scp_reading = TRUE;
+        if (ReadFile(hStdIn, cmdbuffer, sizeof(cmdbuffer)-1, &dwBytesRead, NULL)) {
+            cmdbuffer[dwBytesRead] = '\0';
+            scp_stuffed = FALSE;                                /* say how we got it */
+            scp_reading = FALSE;
+            SetEvent(hCmdReadyEvent);                           /* notify main thread a line is ready */
+        } else {
+            DWORD dwError = GetLastError();
+            scp_reading = FALSE;
+        }
     }
     return 0;
 }                                   
+
+static void read_atexit (void)
+{
+    typedef BOOL (WINAPI *_func)(HANDLE, LPOVERLAPPED);
+    _func pCancelIoEx;
+
+    read_exiting = TRUE;
+    pCancelIoEx = (_func)GetProcAddress(GetModuleHandleA("kernel32.dll"), "CancelIoEx");
+    if (pCancelIoEx) {
+        pCancelIoEx(GetStdHandle(STD_INPUT_HANDLE), NULL);
+        SetEvent(hCmdReadEvent);                            /* wake read thread */
+        WaitForSingleObject(hCmdThread, INFINITE);
+    }
+    CloseHandle(hCmdReadyEvent);
+    hCmdReadyEvent = NULL;
+    CloseHandle(hCmdReadEvent);
+    hCmdReadEvent = NULL;
+    CloseHandle(hCmdThread);
+    hCmdThread = NULL;
+}
 
 char *read_cmdline (char *ptr, int size, FILE *stream)
 {
@@ -1551,9 +1584,8 @@ char *read_cmdline (char *ptr, int size, FILE *stream)
                                                                 /* start up the command thread */
         if ((hCmdThread = CreateThread(NULL, 0, CmdThread, NULL, 0, &iCmdThreadID)) == NULL)
             scp_panic("Unable to create command line reading thread");
+        atexit(read_atexit);
     }
-
-    scp_reading = TRUE;
 
     SetEvent(hCmdReadEvent);                                /* let read thread get one line */
     WaitForSingleObject(hCmdReadyEvent, INFINITE);          /* wait for read thread or GUI to respond */
@@ -1564,6 +1596,7 @@ char *read_cmdline (char *ptr, int size, FILE *stream)
 
     if (scp_stuffed) {                                      /* stuffed command needs to be echoed */
         sim_printf("%s\n", cptr);
+        scp_stuffed = FALSE;
     }
 
     return cptr;
@@ -1575,8 +1608,6 @@ void stuff_cmd (char *cmd)
 {
     strcpy(cmdbuffer, cmd);                                 /* save the string */
     scp_stuffed = TRUE;                                     /* note where it came from */
-    scp_reading = FALSE;
-    ResetEvent(hCmdReadEvent);                              /* clear read request event */
     SetEvent(hCmdReadyEvent);                               /* notify main thread a line is ready */
 }
 
@@ -1602,8 +1633,6 @@ static void my_yield (void)
 
 t_bool stuff_and_wait (char *cmd, int timeout, int delay)
 {
-    scp_reading = FALSE;
-
     stuff_cmd(cmd);
 
     while (! scp_reading) {
@@ -1635,10 +1664,8 @@ t_bool stuff_and_wait (char *cmd, int timeout, int delay)
 
 void remark_cmd (char *remark)
 {
-    if (scp_reading) {
-        putchar('\n');
-        if (sim_log) putc('\n', sim_log);
-    }
+    if (scp_reading)
+        sim_printf("\n");
 
     sim_printf("%s\n", remark);
 
