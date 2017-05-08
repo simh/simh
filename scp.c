@@ -2046,7 +2046,7 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
             return 0;
             }
         if (*cbuf)                                      /* concat args */
-            sim_strlcat (cbuf, " ", sizeof(cbuf)); 
+            strlcat (cbuf, " ", sizeof(cbuf)); 
         sprintf(&cbuf[strlen(cbuf)], "%s%s%s", strchr(argv[i], ' ') ? "\"" : "", argv[i], strchr(argv[i], ' ') ? "\"" : "");
         lookswitch = FALSE;                             /* no more switches */
         }
@@ -2957,8 +2957,8 @@ if (flag >= 0) {                                        /* Only bump nesting fro
         }
     }
 
-sim_strlcpy( sim_do_filename[sim_do_depth], do_arg[0], 
-             sizeof (sim_do_filename[sim_do_depth]));   /* stash away do file name for possible use by 'call' command */
+strlcpy( sim_do_filename[sim_do_depth], do_arg[0], 
+         sizeof (sim_do_filename[sim_do_depth]));       /* stash away do file name for possible use by 'call' command */
 sim_do_label[sim_do_depth] = label;                     /* stash away do label for possible use in messages */
 sim_goto_line[sim_do_depth] = 0;
 if (label) {
@@ -5130,7 +5130,7 @@ char DirName[PATH_MAX + 1], WholeName[PATH_MAX + 1], WildName[PATH_MAX + 1];
 
 memset (DirName, 0, sizeof(DirName));
 memset (WholeName, 0, sizeof(WholeName));
-sim_strlcpy (WildName, cptr, sizeof(WildName));
+strlcpy (WildName, cptr, sizeof(WildName));
 cptr = WildName;
 sim_trim_endspc (WildName);
 if ((!stat (WildName, &filestat)) && (filestat.st_mode & S_IFDIR))
@@ -5146,7 +5146,7 @@ if ((*cptr != '/') || (0 == memcmp (cptr, "./", 2)) || (0 == memcmp (cptr, "../"
     sim_trim_endspc (WholeName);
     }
 else
-    sim_strlcpy (WholeName, cptr, sizeof(WholeName));
+    strlcpy (WholeName, cptr, sizeof(WholeName));
 while ((c = strstr (WholeName, "/./")))
     memmove (c + 1, c + 3, 1 + strlen (c + 3));
 while ((c = strstr (WholeName, "//")))
@@ -5410,7 +5410,7 @@ char FullPath[PATH_MAX + 1];
 char dname[CBUFSIZE];\
 t_stat st;
 
-sim_strlcpy (dname, ctx->destname, sizeof (dname));
+strlcpy (dname, ctx->destname, sizeof (dname));
 
 sprintf (FullPath, "%s%s", directory, filename);
 

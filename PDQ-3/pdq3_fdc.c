@@ -824,43 +824,43 @@ static void debug_fdccmd(uint16 cmd) {
 
   buf[0] = 0;
   if (cmd & 0xff00) {
-    sim_strlcat(buf,"DSR=[",sizeof(buf));
-    sim_strlcat(buf,dsel & FDC_SEL_SIDE ? "SIDE1" : "SIDE0",sizeof(buf));
-    if (dsel & FDC_SEL_SDEN) sim_strlcat(buf,",SDEN",sizeof(buf));
-    sim_strlcat(buf,",UNIT",sizeof(buf));
-    if (dsel & FDC_SEL_UNIT3) sim_strlcat(buf,"3",sizeof(buf));
-    else if (dsel & FDC_SEL_UNIT2) sim_strlcat(buf,"2",sizeof(buf));
-    else if (dsel & FDC_SEL_UNIT1) sim_strlcat(buf,"1",sizeof(buf));
-    else if (dsel & FDC_SEL_UNIT0) sim_strlcat(buf,"0",sizeof(buf));
-    sim_strlcat(buf,"] ",sizeof(buf));
+    strlcat(buf,"DSR=[",sizeof(buf));
+    strlcat(buf,dsel & FDC_SEL_SIDE ? "SIDE1" : "SIDE0",sizeof(buf));
+    if (dsel & FDC_SEL_SDEN) strlcat(buf,",SDEN",sizeof(buf));
+    strlcat(buf,",UNIT",sizeof(buf));
+    if (dsel & FDC_SEL_UNIT3) strlcat(buf,"3",sizeof(buf));
+    else if (dsel & FDC_SEL_UNIT2) strlcat(buf,"2",sizeof(buf));
+    else if (dsel & FDC_SEL_UNIT1) strlcat(buf,"1",sizeof(buf));
+    else if (dsel & FDC_SEL_UNIT0) strlcat(buf,"0",sizeof(buf));
+    strlcat(buf,"] ",sizeof(buf));
   }
-  sim_strlcat(buf,"CR=[",sizeof(buf));
-  sim_strlcat(buf,cmdlist[cr],sizeof(buf));
+  strlcat(buf,"CR=[",sizeof(buf));
+  strlcat(buf,cmdlist[cr],sizeof(buf));
   if (cr < 8) {
-    if (cmd & FDC_BIT_HEADLOAD) sim_strlcat(buf,"+Load",sizeof(buf));
-    if (cmd & FDC_BIT_VERIFY) sim_strlcat(buf,"+Vrfy",sizeof(buf));
+    if (cmd & FDC_BIT_HEADLOAD) strlcat(buf,"+Load",sizeof(buf));
+    if (cmd & FDC_BIT_VERIFY) strlcat(buf,"+Vrfy",sizeof(buf));
     cmd &= FDC_BIT_STEP15;
-    if (cmd == FDC_BIT_STEP3) sim_strlcat(buf,"+Step3",sizeof(buf));
-    else if (cmd == FDC_BIT_STEP6) sim_strlcat(buf,"+Step6",sizeof(buf));
-    else if (cmd == FDC_BIT_STEP10) sim_strlcat(buf,"+Step10",sizeof(buf));
-    else if (cmd == FDC_BIT_STEP15) sim_strlcat(buf,"+Step15",sizeof(buf));
+    if (cmd == FDC_BIT_STEP3) strlcat(buf,"+Step3",sizeof(buf));
+    else if (cmd == FDC_BIT_STEP6) strlcat(buf,"+Step6",sizeof(buf));
+    else if (cmd == FDC_BIT_STEP10) strlcat(buf,"+Step10",sizeof(buf));
+    else if (cmd == FDC_BIT_STEP15) strlcat(buf,"+Step15",sizeof(buf));
   } else
     switch (cr) {
     case 8: case 9:
     case 0xa: case 0xb:
-      sim_strlcat(buf, cmd & FDC_BIT_SIDESEL ? "+SideSel1" : "+SideSel0",sizeof(buf));
-      sim_strlcat(buf, cmd & FDC_BIT_SIDECMP ? "+SideCmp1" : "+SideCmp0",sizeof(buf));
+      strlcat(buf, cmd & FDC_BIT_SIDESEL ? "+SideSel1" : "+SideSel0",sizeof(buf));
+      strlcat(buf, cmd & FDC_BIT_SIDECMP ? "+SideCmp1" : "+SideCmp0",sizeof(buf));
       if (cr > 9)
-        sim_strlcat(buf, cmd & FDC_BIT_DATAMARK ? "+DelMark" : "+DataMark",sizeof(buf));
+        strlcat(buf, cmd & FDC_BIT_DATAMARK ? "+DelMark" : "+DataMark",sizeof(buf));
     default:
       break;
     case 0x0f:
-      if (cmd & FDC_BIT_INTIMM) sim_strlcat(buf,"+IMM",sizeof(buf));
-      if (cmd & FDC_BIT_INTIDX) sim_strlcat(buf,"+IDX",sizeof(buf));
-      if (cmd & FDC_BIT_INTN2R) sim_strlcat(buf,"+N2R",sizeof(buf));
-      if (cmd & FDC_BIT_INTR2N) sim_strlcat(buf,"+R2N",sizeof(buf));
+      if (cmd & FDC_BIT_INTIMM) strlcat(buf,"+IMM",sizeof(buf));
+      if (cmd & FDC_BIT_INTIDX) strlcat(buf,"+IDX",sizeof(buf));
+      if (cmd & FDC_BIT_INTN2R) strlcat(buf,"+N2R",sizeof(buf));
+      if (cmd & FDC_BIT_INTR2N) strlcat(buf,"+R2N",sizeof(buf));
     }
-  sim_strlcat(buf,"]",sizeof(buf));
+  strlcat(buf,"]",sizeof(buf));
   sim_debug(DBG_FD_CMD, &fdc_dev, DBG_PCFORMAT2 "Command: %s\n", DBG_PC,buf);  
 }
 

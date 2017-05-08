@@ -302,7 +302,7 @@ found = 0;
 n = strlen(name);
 for (i=0; i<count && !found; i++) {
     if ((n == strlen(list[i].name)) &&
-        (sim_strncasecmp(name, list[i].name, n) == 0)) {
+        (strncasecmp(name, list[i].name, n) == 0)) {
         found = 1;
         strcpy(temp, list[i].name); /* only case might be different */
         }
@@ -321,7 +321,7 @@ found = 0;
 n = strlen(name);
 for (i=0; i<count && !found; i++) {
     if ((n == strlen(list[i].name)) &&
-        (sim_strncasecmp(name, list[i].name, n) == 0)) {
+        (strncasecmp(name, list[i].name, n) == 0)) {
         found = 1;
         strcpy(temp, list[i].desc);
         }
