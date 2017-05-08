@@ -21,7 +21,8 @@ IOLIB_SRC = util_io.c
 #
 
 all : 	${BIN}asm1130 ${BIN}bindump ${BIN}checkdisk \
-	${BIN}diskview ${BIN}mkboot ${BIN}viewdeck 
+	${BIN}diskview ${BIN}mkboot ${BIN}viewdeck \
+        ${BIN}disklist ${BIN}punches
 
 #
 # Individual builds
@@ -36,6 +37,9 @@ ${BIN}bindump   : bindump.c   ${IOLIB_DEP}
 ${BIN}checkdisk : checkdisk.c ${IOLIB_DEP}
 	${CC}     checkdisk.c ${IOLIB_SRC} -o $@
 
+${BIN}disklist  : disklist.c  ${IOLIB_DEP}
+	${CC}     disklist.c  ${IOLIB_SRC} -o $@
+
 ${BIN}diskview  : diskview.c  ${IOLIB_DEP}
 	${CC}     diskview.c  ${IOLIB_SRC} -o $@
 
@@ -45,3 +49,5 @@ ${BIN}mkboot    : mkboot.c    ${IOLIB_DEP}
 ${BIN}viewdeck  : viewdeck.c  ${IOLIB_DEP}
 	${CC}     viewdeck.c  ${IOLIB_SRC} -o $@
 
+${BIN}punches  : punches.c  ${IOLIB_DEP}
+	${CC}     punches.c  ${IOLIB_SRC} -o $@
