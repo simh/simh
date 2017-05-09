@@ -1714,6 +1714,8 @@ ASSERT      failure have several different actions:
       " CPU's \"A\" register for the expected value:\n\n"
       "++; OS bootstrap command file\n"
       "++;\n"
+      "++IF EXIST \"os.disk\" echo os.disk exists\n"
+      "++IF NOT EXIST os.disk echo os.disk not existing\n"
       "++ATTACH DS0 os.disk\n"
       "++BOOT DS\n"
       "++; A register contains error code; 0 = good boot\n"
@@ -1729,7 +1731,7 @@ ASSERT      failure have several different actions:
       "4IF\n"
       " The IF command tests a simulator state condition and executes additional\n"
       " commands if the condition is true:\n\n"
-      "++IF <Simulator State Expressions> commandtoprocess{; additionalcommandtoprocess}...\n\n"
+      "++IF <Conditional Expressions> commandtoprocess{; additionalcommandtoprocess}...\n\n"
       "5Examples:\n"
       " A command file might be used to bootstrap an operating system that\n"
       " halts after the initial load from disk.  The ASSERT command is then\n"
@@ -1737,6 +1739,8 @@ ASSERT      failure have several different actions:
       " CPU's \"A\" register for the expected value:\n\n"
       "++; OS bootstrap command file\n"
       "++;\n"
+      "++IF EXIST \"os.disk\" echo os.disk exists\n"
+      "++IF NOT EXIST os.disk echo os.disk not existing\n"
       "++ATTACH DS0 os.disk\n"
       "++BOOT DS\n"
       "++; A register contains error code; 0 = good boot\n"
@@ -1751,7 +1755,7 @@ ASSERT      failure have several different actions:
       " failed\" message.  Otherwise, the command file will continue to bring up\n"
       " the operating system.\n"
       "4Conditional Expressions\n"
-      " The IF and ASSERT commands evaluate two different forms of conditional\n"
+      " The IF and ASSERT commands evaluate three different forms of conditional\n"
       " expressions.:\n\n"
       "5Simulator State Expressions\n"
       " The values of simulator registers can be evaluated with:\n\n"
@@ -1792,6 +1796,11 @@ ASSERT      failure have several different actions:
       " comprised of all numeric digits, then the strings are converted to numbers\n"
       " and a numeric comparison is performed. For example: \"+1\" EQU \"1\" will be\n"
       " true.\n"
+      "5File Existence Expressions\n"
+      " File existence can be determined with:\n"
+      "++{NOT} EXIST \"<filespec>\"\n\n"
+      "++{NOT} EXIST <filespec>\n\n"
+      " Specifies a true (false {NOT}) condition if the file exists.\n"
        /***************** 80 character line width template *************************/
 #define HLP_EXIT        "*Commands Exiting_The_Simulator"
       "2Exiting The Simulator\n"
@@ -3450,6 +3459,7 @@ uint32 idx;
 t_value val;
 t_stat r;
 t_bool Not = FALSE;
+t_bool Exist = FALSE;
 t_bool result;
 t_addr addr;
 t_stat reason;
@@ -3463,8 +3473,13 @@ tptr = get_glyph (cptr, gbuf, 0);                       /* get token */
 if (!strcmp (gbuf, "NOT")) {                            /* Conditional Inversion? */
     Not = TRUE;                                         /* remember that, and */
     cptr = (CONST char *)tptr;
+    tptr = get_glyph (cptr, gbuf, 0);                   /* get next token */
     }
-if (*cptr == '"') {                                     /* quoted string comparison? */
+if (!strcmp (gbuf, "EXIST")) {                          /* File Exist Test? */
+    Exist = TRUE;                                       /* remember that, and */
+    cptr = (CONST char *)tptr;
+    }
+if (Exist || (*cptr == '"')) {                          /* quoted string comparison? */
     char op[CBUFSIZE];
     static struct {
         const char *op;
@@ -3494,29 +3509,37 @@ if (*cptr == '"') {                                     /* quoted string compari
     cptr += strlen (gbuf);
     while (sim_isspace (*cptr))                         /* skip spaces */
         ++cptr;
-    get_glyph (cptr, op, '"');
-    for (optr = compare_ops; optr->op; optr++)
-        if (0 == strcmp (op, optr->op))
-            break;
-    if (!optr->op)
-        return sim_messagef (SCPE_ARG, "Invalid operator: %s\n", op);
-    cptr += strlen (op);
-    while (sim_isspace (*cptr))                         /* skip spaces */
-        ++cptr;
-    cptr = (CONST char *)get_glyph_gen (cptr, gbuf2, 0, (sim_switches & SWMASK ('I')), TRUE, '\\');
-                                                        /* get second string */
-    if (*cptr) {                                        /* more? */
-        if (flag)                                       /* ASSERT has no more args */
-            return SCPE_2MARG;
+    if (!Exist) {
+        get_glyph (cptr, op, '"');
+        for (optr = compare_ops; optr->op; optr++)
+            if (0 == strcmp (op, optr->op))
+                break;
+        if (!optr->op)
+            return sim_messagef (SCPE_ARG, "Invalid operator: %s\n", op);
+        cptr += strlen (op);
+        while (sim_isspace (*cptr))                         /* skip spaces */
+            ++cptr;
+        cptr = (CONST char *)get_glyph_gen (cptr, gbuf2, 0, (sim_switches & SWMASK ('I')), TRUE, '\\');
+                                                            /* get second string */
+        if (*cptr) {                                        /* more? */
+            if (flag)                                       /* ASSERT has no more args */
+                return SCPE_2MARG;
+            }
+        else {
+            if (!flag)                                      
+                return SCPE_2FARG;                          /* IF needs actions! */
+            }
+        result = sim_cmp_string (gbuf, gbuf2);
+        result = ((result == optr->aval) || (result == optr->bval));
+        if (optr->invert)
+            result = !result;
         }
     else {
-        if (!flag)                                      
-            return SCPE_2FARG;                          /* IF needs actions! */
+        FILE *f = fopen (gbuf, "r");
+        if (f)
+            fclose (f);
+        result = (f != NULL);
         }
-    result = sim_cmp_string (gbuf, gbuf2);
-    result = ((result == optr->aval) || (result == optr->bval));
-    if (optr->invert)
-        result = !result;
     }
 else {
     cptr = get_glyph (cptr, gbuf, 0);                   /* get register */
