@@ -1480,7 +1480,7 @@ static void tear_printer (void)
 
     remove(filename);                                   /* delete the file */
 
-    sprintf(cmd, "attach prt \"%s\"", filename);        /* reattach */
+    sprintf(cmd, "attach prt %s", filename);            /* reattach */
     stuff_cmd(cmd);
 }
 
@@ -1521,7 +1521,7 @@ static HANDLE hCmdThread     = NULL;
 static DWORD  iCmdThreadID   = 0;
 static HANDLE hCmdReadEvent  = NULL;
 static HANDLE hCmdReadyEvent = NULL;
-static BOOL   scp_stuffed = FALSE, scp_reading = FALSE;
+static BOOL   scp_reading = FALSE;
 static char   cmdbuffer[256];
 static BOOL   read_exiting = FALSE;
 
@@ -1529,8 +1529,8 @@ static BOOL   read_exiting = FALSE;
 
 static DWORD WINAPI CmdThread (LPVOID arg)
 {
-HANDLE hStdIn = GetStdHandle(STD_INPUT_HANDLE);
-DWORD dwBytesRead;
+    HANDLE hStdIn = GetStdHandle(STD_INPUT_HANDLE);
+    DWORD dwBytesRead;
 
     for (;;) {
         if (WAIT_TIMEOUT == WaitForSingleObject(hCmdReadEvent, 2000))   /* wait for request */
@@ -1540,7 +1540,6 @@ DWORD dwBytesRead;
         scp_reading = TRUE;
         if (ReadFile(hStdIn, cmdbuffer, sizeof(cmdbuffer)-1, &dwBytesRead, NULL)) {
             cmdbuffer[dwBytesRead] = '\0';
-            scp_stuffed = FALSE;                                /* say how we got it */
             scp_reading = FALSE;
             SetEvent(hCmdReadyEvent);                           /* notify main thread a line is ready */
         } else {
@@ -1594,11 +1593,6 @@ char *read_cmdline (char *ptr, int size, FILE *stream)
     for (cptr = ptr; isspace(*cptr); cptr++)                /* absorb spaces */
         ;
 
-    if (scp_stuffed) {                                      /* stuffed command needs to be echoed */
-        sim_printf("%s\n", cptr);
-        scp_stuffed = FALSE;
-    }
-
     return cptr;
 }
 
@@ -1606,9 +1600,28 @@ char *read_cmdline (char *ptr, int size, FILE *stream)
 
 void stuff_cmd (char *cmd)
 {
-    strcpy(cmdbuffer, cmd);                                 /* save the string */
-    scp_stuffed = TRUE;                                     /* note where it came from */
-    SetEvent(hCmdReadyEvent);                               /* notify main thread a line is ready */
+    INPUT_RECORD *ip;
+    size_t i, j, cmdsize = strlen(cmd);
+
+    ip = (INPUT_RECORD *)calloc(2+2*cmdsize, sizeof(*ip));
+    for (i=j=0; i<cmdsize; i++, j++) {
+        ip[j].EventType = KEY_EVENT;
+        ip[j].Event.KeyEvent.bKeyDown = TRUE;
+        ip[j].Event.KeyEvent.wRepeatCount = 1;
+        ip[j].Event.KeyEvent.uChar.AsciiChar = cmd[i];
+        j++;
+        ip[j] = ip[j-1];
+        ip[j].Event.KeyEvent.bKeyDown = FALSE;
+    }
+    ip[j].EventType = KEY_EVENT;
+    ip[j].Event.KeyEvent.bKeyDown = TRUE;
+    ip[j].Event.KeyEvent.wRepeatCount = 1;
+    ip[j].Event.KeyEvent.uChar.AsciiChar = '\r';
+    j++;
+    ip[j] = ip[j-1];
+    ip[j].Event.KeyEvent.bKeyDown = FALSE;
+    WriteConsoleInput(GetStdHandle(STD_INPUT_HANDLE), ip, 2+j, &i);
+    free(ip);
 }
 
 /* my_yield - process GUI messages. It's not apparent why stuff_and_wait would block,
