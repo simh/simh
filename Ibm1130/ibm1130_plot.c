@@ -134,7 +134,7 @@ static t_stat plot_reset  (DEVICE *dptr);           /* reset of 1130 */
 static t_stat plot_attach (UNIT *uptr, CONST char *cptr);   /* attach, loads plotter */
 static t_stat plot_detach (UNIT *uptr);             /* detach and save image */
 static t_stat plot_examine (UNIT *uptr);            /* update file with current canvas */
-static t_stat plot_set_length (UNIT *uptr, int32 val, char * ptr, void *desc);  /* set paper length */
+static t_stat plot_set_length (UNIT *uptr, int32 val, CONST char * ptr, void *desc);  /* set paper length */
 static t_stat plot_set_pos (UNIT *uptr, int32 val, CONST char * ptr, void *desc);       /* reset current X/Y position */
 static t_stat plot_show_vals(FILE *fp, UNIT *uptr, int32 val, CONST void *descrip); /* print x, y and length */
 static t_stat plot_show_nl(FILE *fp, UNIT *uptr, int32 val, CONST void *descrip);   /* overcome wacky simh behavior */
