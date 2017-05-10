@@ -1684,7 +1684,7 @@ if (sim_throt_type == SIM_THROT_SPC) {                  /* Non dynamic? */
 switch (sim_throt_state) {
 
     case SIM_THROT_STATE_INIT:                          /* take initial reading */
-        sim_idle_ms_sleep (sim_idle_rate_ms);           /* start on a tick boundart to calibrate */
+        sim_idle_ms_sleep (sim_idle_rate_ms);           /* start on a tick boundary to calibrate */
         sim_throt_ms_start = sim_os_msec ();
         sim_throt_inst_start = sim_gtime();
         sim_throt_wait = SIM_THROT_WST;
