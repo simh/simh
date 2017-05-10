@@ -160,8 +160,12 @@ int sim_strncasecmp (const char *string1, const char *string2, size_t len);
 int sim_strcasecmp (const char *string1, const char *string2);
 size_t sim_strlcat (char *dst, const char *src, size_t size);
 size_t sim_strlcpy (char *dst, const char *src, size_t size);
+#ifndef strlcpy
 #define strlcpy(dst, src, size) sim_strlcpy((dst), (src), (size))
+#endif
+#ifndef strlcat
 #define strlcat(dst, src, size) sim_strlcat((dst), (src), (size))
+#endif
 #ifndef strncasecmp
 #define strncasecmp(str1, str2, len) sim_strncasecmp((str1), (str2), (len))
 #endif
