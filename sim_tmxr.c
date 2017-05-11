@@ -2056,6 +2056,11 @@ if ((lp->txbfd && !lp->notelnet) || (TXBUF_AVAIL(lp) > 1)) {/* room for char (+ 
         sim_oline = save_oline;                         /* resture output socket */
         }
     sim_exp_check (&lp->expect, chr);                   /* process expect rules as needed */
+    if ((sim_interval > 0) &&                           /* not called within sim_process_event? */
+        (lp->txbps) && (lp->txdelta > 1000)) {          /* and rate limiting output slower than 1000 cps */
+        tmxr_send_buffered_data (lp);                   /* put data on wire */
+        sim_os_ms_sleep((lp->txdelta - 1000) / 1000);   /* wait an approximate character delay */
+        }
     return SCPE_OK;                                     /* char sent */
     }
 ++lp->txdrp; lp->xmte = 0;                              /* no room, dsbl line */
