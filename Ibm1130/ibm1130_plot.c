@@ -246,11 +246,11 @@ MTAB plot_mod[] = {
      * then they will print the value twice for a 'show plot' command
      * therefore they are set to not display unless explicity requested
      * and the special dummy NOOP entry will cause the print of these values */
-    { MTAB_XTD | MTAB_VAL | MTAB_VUN | MTAB_VDV | MTAB_NMO,    2,
+    { MTAB_XTD | MTAB_VALR | MTAB_VUN | MTAB_VDV | MTAB_NMO,   2,
              "length",  "LENGTH", &plot_set_length, &plot_show_nl, &plot_reg[5]},
-    { MTAB_XTD | MTAB_VAL | MTAB_VDV | MTAB_VUN | MTAB_NMO,     0,
+    { MTAB_XTD | MTAB_VALR | MTAB_VDV | MTAB_VUN | MTAB_NMO,   0,
              "Xpos",    "XPOS", &plot_set_pos, &plot_show_nl, &plot_reg[2]},
-    { MTAB_XTD | MTAB_VAL | MTAB_VDV | MTAB_VUN | MTAB_NMO,     1,
+    { MTAB_XTD | MTAB_VALR | MTAB_VDV | MTAB_VUN | MTAB_NMO,   1,
              "Ypos",    "YPOS", &plot_set_pos, &plot_show_nl, &plot_reg[3]},
     { 0 }  };
 
@@ -713,7 +713,7 @@ static void process_cmd (void)
 
 static t_stat plot_set_length (UNIT *uptr, int32 set, CONST char *ptr, void *desc)
 {
-    char *cptr;
+    CONST char *cptr;
     int32 val;
 
 #define LONGEST_ROLL 1440000                    /* longest is 120', 14400", 1,440,000 .01"s */
@@ -739,7 +739,7 @@ static t_stat plot_set_length (UNIT *uptr, int32 set, CONST char *ptr, void *des
 
 static t_stat plot_set_pos (UNIT *uptr, int32 set, CONST char *ptr, void *desc)
 {
-    char *cptr;
+    CONST char *cptr;
     int32 val;
     int32 max;
 
