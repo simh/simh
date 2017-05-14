@@ -1475,7 +1475,7 @@ static void tear_printer (void)
         return;
 
     sprintf(cmd, "view \"%s\"", filename);              /* spawn notepad to view it */
-    if (! stuff_and_wait(cmd, 3000, 500))
+    if (! stuff_and_wait(cmd, 3000, 2000))
         return;
 
     remove(filename);                                   /* delete the file */
@@ -1522,8 +1522,12 @@ static DWORD  iCmdThreadID   = 0;
 static HANDLE hCmdReadEvent  = NULL;
 static HANDLE hCmdReadyEvent = NULL;
 static BOOL   scp_reading = FALSE;
+static LONG   scp_command = 0;
 static char   cmdbuffer[256];
 static BOOL   read_exiting = FALSE;
+
+#define SCP_COMMAND InterlockedExchangeAdd(&scp_command, 0L)
+#define NEXT_SCP_COMMAND InterlockedIncrement(&scp_command)
 
 /* CmdThread - separate thread to read commands from stdin upon request */
 
@@ -1537,14 +1541,17 @@ static DWORD WINAPI CmdThread (LPVOID arg)
             continue;                                           /* put breakpoint here to debug */
         if (read_exiting)
             break;
-        scp_reading = TRUE;
+        scp_reading = FALSE;
         if (ReadFile(hStdIn, cmdbuffer, sizeof(cmdbuffer)-1, &dwBytesRead, NULL)) {
             cmdbuffer[dwBytesRead] = '\0';
             scp_reading = FALSE;
+            NEXT_SCP_COMMAND;
             SetEvent(hCmdReadyEvent);                           /* notify main thread a line is ready */
         } else {
             DWORD dwError = GetLastError();
+
             scp_reading = FALSE;
+            NEXT_SCP_COMMAND;
         }
     }
     return 0;
@@ -1598,10 +1605,12 @@ char *read_cmdline (char *ptr, int size, FILE *stream)
 
 /* stuff_cmd - force a command into the read_cmdline output buffer. Called asynchronously by GUI */
 
-void stuff_cmd (char *cmd)
+LONG stuff_cmd (char *cmd)
 {
     INPUT_RECORD *ip;
     size_t i, j, cmdsize = strlen(cmd);
+    DWORD dwEventsWritten;
+    LONG scp_cmd = SCP_COMMAND;
 
     ip = (INPUT_RECORD *)calloc(2+2*cmdsize, sizeof(*ip));
     for (i=j=0; i<cmdsize; i++, j++) {
@@ -1620,8 +1629,9 @@ void stuff_cmd (char *cmd)
     j++;
     ip[j] = ip[j-1];
     ip[j].Event.KeyEvent.bKeyDown = FALSE;
-    WriteConsoleInput(GetStdHandle(STD_INPUT_HANDLE), ip, 2+j, &i);
+    WriteConsoleInput(GetStdHandle(STD_INPUT_HANDLE), ip, 2+j, &dwEventsWritten);
     free(ip);
+    return scp_cmd;
 }
 
 /* my_yield - process GUI messages. It's not apparent why stuff_and_wait would block,
@@ -1646,14 +1656,14 @@ static void my_yield (void)
 
 t_bool stuff_and_wait (char *cmd, int timeout, int delay)
 {
-    stuff_cmd(cmd);
+    LONG scp_cmd = stuff_cmd(cmd);
 
-    while (! scp_reading) {
+    while (scp_cmd == SCP_COMMAND) {
         if (timeout < 0)
             return FALSE;
 
         my_yield();
-        if (scp_reading)
+        if (scp_cmd != SCP_COMMAND)
             break;
 
         Sleep(50);

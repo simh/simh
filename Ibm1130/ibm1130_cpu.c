@@ -1941,7 +1941,6 @@ static t_stat view_cmd (int32 flag, CONST char *cptr)
 
     sprintf(cmdline, "notepad %s", cptr);
     WinExec(cmdline, SW_SHOWNORMAL);
-    Sleep(1000);                        /* wait a bit to allow notepad to open the file */
 #endif
     return SCPE_OK;
 }
