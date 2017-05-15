@@ -109,7 +109,7 @@ extern UNIT prt_unit;
     static void destroy_console_window (void) {}
 
     t_stat console_reset (DEVICE *dptr)                         {return SCPE_OK;}
-    void   stuff_cmd (char *cmd)                                {}
+    LONG   stuff_cmd (char *cmd)                                {return 0}
     t_bool stuff_and_wait (char *cmd, int timeout, int delay)   {return FALSE;}
     char  *read_cmdline (char *ptr, int size, FILE *stream)     {return read_line(ptr, size, stream);}
     void   remark_cmd (char *remark)                            {sim_printf("%s\n", remark);}
@@ -1468,6 +1468,11 @@ static void tear_printer (void)
 
     if ((prt_unit.flags & UNIT_ATT) == 0)
         return;
+
+    if (running) {                                      /* can only accept a drop while processor is stopped */
+        MessageBeep(0);
+        return;
+    }
 
     strcpy(filename, prt_unit.filename);                /* save current attached filename */
 
