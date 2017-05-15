@@ -281,7 +281,7 @@ void   break_simulation (t_stat reason);            /* let a device halt the sim
 char   hollerith_to_ascii (uint16 hol);             /* for debugging use only */
 t_bool gdu_active (void);
 void   remark_cmd (char *remark);
-LONG   stuff_cmd (char *cmd);
+long   stuff_cmd (char *cmd);
 t_bool stuff_and_wait (char *cmd, int timeout, int delay);
 void   update_gui (t_bool force);
 void   sim_init (void);

@@ -109,7 +109,7 @@ extern UNIT prt_unit;
     static void destroy_console_window (void) {}
 
     t_stat console_reset (DEVICE *dptr)                         {return SCPE_OK;}
-    LONG   stuff_cmd (char *cmd)                                {return 0}
+    long   stuff_cmd (char *cmd)                                {return 0}
     t_bool stuff_and_wait (char *cmd, int timeout, int delay)   {return FALSE;}
     char  *read_cmdline (char *ptr, int size, FILE *stream)     {return read_line(ptr, size, stream);}
     void   remark_cmd (char *remark)                            {sim_printf("%s\n", remark);}
@@ -1535,7 +1535,7 @@ static DWORD  iCmdThreadID   = 0;
 static HANDLE hCmdReadEvent  = NULL;
 static HANDLE hCmdReadyEvent = NULL;
 static BOOL   scp_reading = FALSE;
-static LONG   scp_command = 0;
+static long   scp_command = 0;
 static char   cmdbuffer[256];
 static BOOL   read_exiting = FALSE;
 
@@ -1618,12 +1618,12 @@ char *read_cmdline (char *ptr, int size, FILE *stream)
 
 /* stuff_cmd - force a command into the read_cmdline output buffer. Called asynchronously by GUI */
 
-LONG stuff_cmd (char *cmd)
+long stuff_cmd (char *cmd)
 {
     INPUT_RECORD *ip;
     size_t i, j, cmdsize = strlen(cmd);
     DWORD dwEventsWritten;
-    LONG scp_cmd = SCP_COMMAND;
+    long scp_cmd = SCP_COMMAND;
 
     ip = (INPUT_RECORD *)calloc(2+2*cmdsize, sizeof(*ip));
     for (i=j=0; i<cmdsize; i++, j++) {
@@ -1669,7 +1669,7 @@ static void my_yield (void)
 
 t_bool stuff_and_wait (char *cmd, int timeout, int delay)
 {
-    LONG scp_cmd = stuff_cmd(cmd);
+    long scp_cmd = stuff_cmd(cmd);
 
     while (scp_cmd == SCP_COMMAND) {
         if (timeout < 0)
