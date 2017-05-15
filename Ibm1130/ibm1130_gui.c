@@ -115,12 +115,17 @@ extern UNIT prt_unit;
     void   remark_cmd (char *remark)                            {sim_printf("%s\n", remark);}
 #else
 
+static HWND hConsoleWindow = NULL;
+
 t_stat console_reset (DEVICE *dptr)
 {
     if (! sim_gui) {
         SETBIT(console_unit.flags, UNIT_DIS);           /* disable the GUI */
         CLRBIT(console_unit.flags, UNIT_DISPLAY);       /* turn the GUI off */
-    }
+    } else {
+        if (!hConsoleWindow)
+            hConsoleWindow = GetConsoleWindow();
+        }
 
     update_gui(FALSE);
     return SCPE_OK;
@@ -1223,6 +1228,7 @@ void HandleCommand (HWND hWnd, WORD wNotify, WORD idCtl, HWND hwCtl)
  *              while (running)
  *                  Sleep(10);              
  */
+                SetForegroundWindow(hConsoleWindow);
             }
             break;
 
@@ -1400,6 +1406,8 @@ void keyboard_selected (int select)
 {
     btn[IDC_KEYBOARD_SELECT].state = select;
 
+    if (select)
+        SetForegroundWindow(hConsoleWindow);
     if (btn[IDC_KEYBOARD_SELECT].hBtn != NULL)
         EnableWindow(btn[IDC_KEYBOARD_SELECT].hBtn, select);
 }
