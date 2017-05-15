@@ -109,7 +109,7 @@ extern UNIT prt_unit;
     static void destroy_console_window (void) {}
 
     t_stat console_reset (DEVICE *dptr)                         {return SCPE_OK;}
-    long   stuff_cmd (char *cmd)                                {return 0}
+    long   stuff_cmd (char *cmd)                                {return 0;}
     t_bool stuff_and_wait (char *cmd, int timeout, int delay)   {return FALSE;}
     char  *read_cmdline (char *ptr, int size, FILE *stream)     {return read_line(ptr, size, stream);}
     void   remark_cmd (char *remark)                            {sim_printf("%s\n", remark);}
@@ -1228,7 +1228,6 @@ void HandleCommand (HWND hWnd, WORD wNotify, WORD idCtl, HWND hwCtl)
  *              while (running)
  *                  Sleep(10);              
  */
-                SetForegroundWindow(hConsoleWindow);
             }
             break;
 
@@ -1268,6 +1267,7 @@ void HandleCommand (HWND hWnd, WORD wNotify, WORD idCtl, HWND hwCtl)
             break;
     }
     
+    SetForegroundWindow(hConsoleWindow);
     update_gui(FALSE);
 }
 
