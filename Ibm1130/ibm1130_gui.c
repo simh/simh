@@ -1258,9 +1258,12 @@ void HandleCommand (HWND hWnd, WORD wNotify, WORD idCtl, HWND hwCtl)
             break;
 
         case IDC_1442:
-            if (btn[IDC_1442].state == STATE_1442_FULL || wNotify == STN_DBLCLK)
-                stuff_cmd("detach cr");
-            else if (btn[IDC_1442].state != STATE_1442_EMPTY && wNotify == STN_CLICKED) {
+            if (btn[IDC_1442].state == STATE_1442_FULL || wNotify == STN_DBLCLK) {
+                if (running)
+                    MessageBeep(0);
+                else
+                    stuff_cmd("detach cr");
+            } else if (btn[IDC_1442].state != STATE_1442_EMPTY && wNotify == STN_CLICKED) {
                 cr_rewind();
                 update_gui(TRUE);
             }
