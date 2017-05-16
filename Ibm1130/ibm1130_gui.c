@@ -265,11 +265,11 @@ static struct tag_txtbox {
 } txtbox[] = {
     TXTBOX_X, TXTBOX_Y,     "Card Reader",  "CR",       -1,
     TXTBOX_X, TXTBOX_Y+ 25, "Printer",      "PRT",      IDC_1132,
-    TXTBOX_X, TXTBOX_Y+ 50, "Disk 1",       "DSK0",     -1,
-    TXTBOX_X, TXTBOX_Y+ 75, "Disk 2",       "DSK1",     -1,
-    TXTBOX_X, TXTBOX_Y+100, "Disk 3",       "DSK2",     -1,
-    TXTBOX_X, TXTBOX_Y+125, "Disk 4",       "DSK3",     -1,
-    TXTBOX_X, TXTBOX_Y+150, "Disk 5",       "DSK4",     -1,
+    TXTBOX_X, TXTBOX_Y+ 50, "Disk 0",       "DSK0",     -1,
+    TXTBOX_X, TXTBOX_Y+ 75, "Disk 1",       "DSK1",     -1,
+    TXTBOX_X, TXTBOX_Y+100, "Disk 2",       "DSK2",     -1,
+    TXTBOX_X, TXTBOX_Y+125, "Disk 3",       "DSK3",     -1,
+    TXTBOX_X, TXTBOX_Y+150, "Disk 4",       "DSK4",     -1,
 };
 #define NTXTBOXES (sizeof(txtbox) / sizeof(txtbox[0]))
 
