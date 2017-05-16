@@ -1431,14 +1431,56 @@ void disk_unlocked (int unlocked)
         EnableWindow(btn[IDC_DISK_UNLOCK].hBtn, unlocked);
 }
 
+static BOOL is_scp_file(const char *filename)
+{
+    char cbuf[4*CBUFSIZE], gbuf[CBUFSIZE];
+    char *argv[1] = {NULL};
+    FILE *f = fopen(filename, "r");
+    int lines = 0, comment_lines = 0;
+    BOOL result = TRUE;
+
+    if (!f)
+        return FALSE;
+    while (1) {
+        CONST char *cptr;
+
+        cptr = fgets(cbuf, sizeof(cbuf), f);
+        if (cptr == NULL)
+            break;
+        cptr = sim_trim_endspc(cbuf);
+        while (sim_isspace (*cptr))                     /* trim leading space */
+            cptr++;
+        ++lines;
+        if ((*cptr == ';') || (*cptr == '#')) {         /* ignore comments */
+            ++comment_lines;
+            continue;
+        }
+        if (*cptr == 0)                                 /* ignore blank */
+            continue;
+        sim_sub_args (cbuf, sizeof(cbuf), argv);
+        cptr = get_glyph_cmd (cptr, gbuf);              /* get command glyph */
+        if (!find_cmd (gbuf)) {                         /* lookup command */
+            result = FALSE;
+            break;
+        }
+    }
+    fclose(f);
+    if (lines == 0)                                     /* Empty file isn't SCP */
+        result = FALSE;
+    return result;
+}
+
 static void accept_dropped_file (HANDLE hDrop)
 {
     int nfiles;
     char fname[MAX_PATH], cmd[MAX_PATH+50], *deckfile;
     BOOL cardreader;
+    BOOL scp_file;
     POINT pt;
     HWND hWndDrop;
+    char msg[512];
 
+    msg[sizeof(msg)-1] = '\0';
     nfiles = DragQueryFile(hDrop, 0xFFFFFFFF, NULL, 0);     /* get file count, */
     DragQueryFile(hDrop, 0, fname, sizeof(fname));          /* get first filename */
     DragQueryPoint(hDrop, &pt);                             /* get location of drop */
@@ -1466,6 +1508,21 @@ static void accept_dropped_file (HANDLE hDrop)
         return;
     }
 
+    scp_file = is_scp_file(fname);
+    if (cardreader) {
+        if (scp_file) {
+            snprintf(msg, sizeof(msg)-1, "Process \"%s\" as SCP commands?", fname); 
+            if (IDCANCEL == MessageBox(hConsoleWnd, msg, "", MB_OKCANCEL))
+                return;
+            cardreader = FALSE;                 /* Process as SCP commands */
+        }
+    } else {
+        if (!scp_file) {
+            snprintf(msg, sizeof(msg)-1, "Ignoring Invalid SCP command file \"%s\"", fname);
+            MessageBox(hConsoleWnd, msg, "", MB_OK);
+            return;
+        }
+    }
                                                 /* if shift key is down, prepend @ to name (make it a deck file) */
     deckfile = ((GetKeyState(VK_SHIFT) & 0x8000) && cardreader) ? "@" : "";
 
