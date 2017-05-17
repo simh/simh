@@ -1438,19 +1438,30 @@ static BOOL is_scp_file(const char *filename)
     FILE *f = fopen(filename, "r");
     int lines = 0, comment_lines = 0;
     BOOL result = TRUE;
+    size_t i;
 
     if (!f)
         return FALSE;
-    while (1) {
+    while (result) {
         CONST char *cptr;
 
         cptr = fgets(cbuf, sizeof(cbuf), f);
         if (cptr == NULL)
             break;
+        if (strlen(cptr) == sizeof(cbuf)-1)             /* VERY long lines are not SCP commands */
+            result = FALSE;
+        if (!strchr(cptr, '\n'))                        /* lines without newlines are not SCP commands */
+            result = FALSE;
+        if (!memcmp(cptr,"!// ", 4))                    /* indirect deck file literals are not SCP commands */
+            result = FALSE;
         cptr = sim_trim_endspc(cbuf);
         while (sim_isspace (*cptr))                     /* trim leading space */
             cptr++;
         ++lines;
+        for (i = 0; i < strlen(cptr); i++)
+            if ((cptr[i] & 0x80) || 
+                ((!isprint(cptr[i])) && (!isspace(cptr[i])))) 
+                result = FALSE;                         /* SCP files only have printable ASCII */
         if ((*cptr == ';') || (*cptr == '#')) {         /* ignore comments */
             ++comment_lines;
             continue;
