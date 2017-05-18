@@ -1526,8 +1526,7 @@ switch (prn) {                                          /* case on reg # */
         break;
 
     case MT_ASTLVL:                                     /* ASTLVL */
-        if (val > AST_MAX)                              /* > 4? fault */
-            RSVD_OPND_FAULT;
+        MT_AST_TEST (val);                              /* trim, test val */
         ASTLVL = val;
         break;
 
