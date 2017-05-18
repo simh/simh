@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-May-17    RMS     Added model-specific AST validation test
    19-Jan-17    RMS     Moved CR to BR6 (Mark Pizzolato)
    29-Mar-15    RMS     Added model specific IPR max
    16-Dec-14    RMS     Removed TQ boot code (780 VMB doesn't support tape boot)
@@ -153,6 +154,9 @@
 #define LP_AST_TEST(r)  if ((r) > AST_MAX) RSVD_OPND_FAULT
 #define LP_MBZ84_TEST(r) if ((((uint32)(r)) & 0xF8C00000) != 0) RSVD_OPND_FAULT
 #define LP_MBZ92_TEST(r) if ((((uint32)(r)) & 0x7FC00000) != 0) RSVD_OPND_FAULT
+
+#define MT_AST_TEST(r)  r = (r) & 07; \
+                        if ((r) > AST_MAX) RSVD_OPND_FAULT
 
 /* Memory */
 

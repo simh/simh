@@ -116,6 +116,9 @@
 #define LP_MBZ84_TEST(r) if ((((uint32)(r)) & 0xF8C00000) != 0) RSVD_OPND_FAULT
 #define LP_MBZ92_TEST(r) if ((((uint32)(r)) & 0x7FC00000) != 0) RSVD_OPND_FAULT
 
+#define MT_AST_TEST(r)  r = (r) & 07; \
+                        if ((r) > AST_MAX) RSVD_OPND_FAULT
+
 /* Memory */
 
 #define MAXMEMWIDTH     21                              /* max mem, 16k chips */

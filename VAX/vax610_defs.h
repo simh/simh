@@ -132,7 +132,7 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc
 #define ADDR_IS_ROM(x)  (0)
 #define ADDR_IS_NVR(x)  (0)
 
-/* Machine specific reserved operand tests (all NOPs) */
+/* Machine specific reserved operand tests (mostly NOPs) */
 
 #define ML_PA_TEST(r)
 #define ML_LR_TEST(r)
@@ -141,6 +141,8 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc
 #define LP_AST_TEST(r)
 #define LP_MBZ84_TEST(r)
 #define LP_MBZ92_TEST(r)
+
+#define MT_AST_TEST(r)  if ((r) > AST_MAX) RSVD_OPND_FAULT
 
 /* Qbus I/O modes */
 
