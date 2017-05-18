@@ -1522,16 +1522,17 @@ static void accept_dropped_file (HANDLE hDrop)
     scp_file = is_scp_file(fname);
     if (cardreader) {
         if (scp_file) {
-            snprintf(msg, sizeof(msg)-1, "Process \"%s\" as SCP commands?", fname); 
-            if (IDCANCEL == MessageBox(hConsoleWnd, msg, "", MB_OKCANCEL))
+            snprintf(msg, sizeof(msg)-1, "\"%s\"\r\n\r\nContains SCP commands (not card reader input).\r\n\r\nProcess as SCP commands?", fname); 
+            if (IDYES != MessageBox(hConsoleWnd, msg, "", MB_YESNO))
                 return;
             cardreader = FALSE;                 /* Process as SCP commands */
         }
     } else {
         if (!scp_file) {
-            snprintf(msg, sizeof(msg)-1, "Ignoring Invalid SCP command file \"%s\"", fname);
-            MessageBox(hConsoleWnd, msg, "", MB_OK);
-            return;
+            snprintf(msg, sizeof(msg)-1, "Invalid SCP command file:\r\n\r\n\"%s\"\r\n\r\nProcess as Card Reader Input?", fname);
+            if (IDYES != MessageBox(hConsoleWnd, msg, "", MB_YESNO))
+                return;
+            cardreader = TRUE;                  /* Process as Card Input */
         }
     }
                                                 /* if shift key is down, prepend @ to name (make it a deck file) */
