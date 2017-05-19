@@ -147,14 +147,14 @@ void scp_panic (const char *msg)
 #define BUTTON_WIDTH  90
 #define BUTTON_HEIGHT 50
 
-#define IDC_KEYBOARD_SELECT     0
+#define IDC_UNUSED              0
 #define IDC_DISK_UNLOCK         1
 #define IDC_RUN                 2
-#define IDC_PARITY_CHECK        3
-#define IDC_UNUSED              4
+#define IDC_KEYBOARD_SELECT     3
+#define IDC_POWER_ON            4
 #define IDC_FILE_READY          5
-#define IDC_FORMS_CHECK         6
-#define IDC_POWER_ON            7
+#define IDC_PARITY_CHECK        6
+#define IDC_FORMS_CHECK         7
 #define IDC_POWER               8
 #define IDC_PROGRAM_START       9
 #define IDC_PROGRAM_STOP        10
@@ -221,15 +221,15 @@ static struct tag_btn {
     BOOL   subclassed;
 
 } btn[] = {
-    0, 0, BUTTON_WIDTH, BUTTON_HEIGHT,  "KEYBOARD\nSELECT",     FALSE,  FALSE,  RGB(255,255,180),   NULL, NULL, NULL,   TRUE,
+    0, 0, BUTTON_WIDTH, BUTTON_HEIGHT,  "",                     FALSE,  FALSE,  RGB(255,255,180),   NULL, NULL, NULL,   TRUE,
     0, 1, BUTTON_WIDTH, BUTTON_HEIGHT,  "DISK\nUNLOCK",         FALSE,  TRUE,   RGB(255,255,180),   NULL, NULL, NULL,   TRUE,
     0, 2, BUTTON_WIDTH, BUTTON_HEIGHT,  "RUN",                  FALSE,  FALSE,  RGB(0,255,0),       NULL, NULL, NULL,   TRUE,
-    0, 3, BUTTON_WIDTH, BUTTON_HEIGHT,  "PARITY\nCHECK",        FALSE,  FALSE,  RGB(255,0,0),       NULL, NULL, NULL,   TRUE,
+    0, 3, BUTTON_WIDTH, BUTTON_HEIGHT,  "K B\nSELECT",          FALSE,  FALSE,  RGB(255,255,180),   NULL, NULL, NULL,   TRUE,
 
-    1, 0, BUTTON_WIDTH, BUTTON_HEIGHT,  "",                     FALSE,  FALSE,  RGB(255,255,180),   NULL, NULL, NULL,   TRUE,
+    1, 0, BUTTON_WIDTH, BUTTON_HEIGHT,  "POWER\nON",            FALSE,  TRUE,   RGB(255,255,180),   NULL, NULL, NULL,   TRUE,
     1, 1, BUTTON_WIDTH, BUTTON_HEIGHT,  "FILE\nREADY",          FALSE,  FALSE,  RGB(0,255,0),       NULL, NULL, NULL,   TRUE,
-    1, 2, BUTTON_WIDTH, BUTTON_HEIGHT,  "FORMS\nCHECK",         FALSE,  FALSE,  RGB(255,255,0),     NULL, NULL, NULL,   TRUE,
-    1, 3, BUTTON_WIDTH, BUTTON_HEIGHT,  "POWER\nON",            FALSE,  TRUE,   RGB(255,255,180),   NULL, NULL, NULL,   TRUE,
+    1, 2, BUTTON_WIDTH, BUTTON_HEIGHT,  "PARITY\nCHECK",        FALSE,  FALSE,  RGB(255,0,0),       NULL, NULL, NULL,   TRUE,
+    1, 3, BUTTON_WIDTH, BUTTON_HEIGHT,  "FORMS\nCHECK",         FALSE,  FALSE,  RGB(255,255,0),     NULL, NULL, NULL,   TRUE,
 
     2, 0, BUTTON_WIDTH, BUTTON_HEIGHT,  "POWER",                TRUE,   FALSE,  RGB(255,255,180),   NULL, NULL, NULL,   TRUE,
     2, 1, BUTTON_WIDTH, BUTTON_HEIGHT,  "PROGRAM\nSTART",       TRUE,   FALSE,  RGB(0,255,0),       NULL, NULL, NULL,   TRUE,
@@ -238,9 +238,9 @@ static struct tag_btn {
 
     3, 0, BUTTON_WIDTH, BUTTON_HEIGHT,  "KEYBOARD",             TRUE,   FALSE,  RGB(255,255,180),   NULL, NULL, NULL,   TRUE,
     3, 1, BUTTON_WIDTH, BUTTON_HEIGHT,  "IMM\nSTOP",            TRUE,   FALSE,  RGB(255,0,0),       NULL, NULL, NULL,   TRUE,
-    3, 2, BUTTON_WIDTH, BUTTON_HEIGHT,  "CHECK\nRESET",         TRUE,   FALSE,  RGB(0,0,255),       NULL, NULL, NULL,   TRUE,
+    3, 2, BUTTON_WIDTH, BUTTON_HEIGHT,  "RESET",                TRUE,   FALSE,  RGB(0,0,255),       NULL, NULL, NULL,   TRUE,
     3, 3, BUTTON_WIDTH, BUTTON_HEIGHT,  "PROGRAM\nLOAD",        TRUE,   FALSE,  RGB(0,0,255),       NULL, NULL, NULL,   TRUE,
-                            
+
     TXTBOX_X+40, TXTBOX_Y+25, 35, 12,   "Tear",                 TRUE,   FALSE,  0,                  NULL, NULL, NULL,   FALSE,
     635, 238, 110, 110,                 "EMPTY_1442",           TRUE,   FALSE,  0,                  NULL, NULL, NULL,   FALSE,
     635, 366, 110, 110,                 "EMPTY_1132",           TRUE,   FALSE,  0,                  NULL, NULL, NULL,   FALSE,
