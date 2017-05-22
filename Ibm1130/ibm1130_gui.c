@@ -565,7 +565,7 @@ LRESULT CALLBACK ButtonProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     int i;
 
-    i = GetWindowLong(hWnd, GWL_ID);
+    i = GetWindowLongPtr(hWnd, GWLP_ID);
 
     if (! btn[i].pushable) {
         if (uMsg == WM_LBUTTONDOWN || uMsg == WM_LBUTTONUP || uMsg == WM_LBUTTONDBLCLK)
@@ -699,7 +699,7 @@ void PaintButton (LPDRAWITEMSTRUCT dis)
 /* ------------------------------------------------------------------------ 
  * ------------------------------------------------------------------------ */
 
-HWND CreateSubclassedButton (HWND hwParent, int i)
+HWND CreateSubclassedButton (HWND hwParent, UINT_PTR i)
 {
     HWND hBtn;
     int x, y;
@@ -715,7 +715,7 @@ HWND CreateSubclassedButton (HWND hwParent, int i)
     btn[i].hBtn = hBtn;
 
     if (oldButtonProc == NULL)
-        oldButtonProc = (WNDPROC) GetWindowLong(hBtn, GWL_WNDPROC);
+        oldButtonProc = (WNDPROC) GetWindowLongPtr(hBtn, GWLP_WNDPROC);
 
     btn[i].hbrLit = CreateSolidBrush(btn[i].clr);
 
@@ -728,7 +728,7 @@ HWND CreateSubclassedButton (HWND hwParent, int i)
         EnableWindow(hBtn, FALSE);
     }
 
-    SetWindowLong(hBtn, GWL_WNDPROC, (LONG) ButtonProc);
+    SetWindowLongPtr(hBtn, GWLP_WNDPROC, (UINT_PTR) ButtonProc);
     return hBtn;
 }
 
@@ -1338,7 +1338,7 @@ LRESULT CALLBACK ConsoleWndProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
             break;
 
         case WM_CTLCOLORBTN:
-            i = GetWindowLong((HWND) lParam, GWL_ID);
+            i = GetWindowLongPtr((HWND) lParam, GWLP_ID);
             if (BETWEEN(i, 0, NBUTTONS-1))
                 return (LRESULT) (power && IsWindowEnabled((HWND) lParam) ? btn[i].hbrLit : btn[i].hbrDark);
 
