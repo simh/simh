@@ -741,7 +741,8 @@ HWND CreateSubclassedButton (HWND hwParent, UINT_PTR i)
 static DWORD WINAPI Pump (LPVOID arg)
 {
     MSG msg;
-    int wx, wy, i;
+    int wx, wy;
+    UINT_PTR i;
     RECT r, ra;
     BITMAP bm;
     WNDCLASS cd;
