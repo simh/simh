@@ -1156,7 +1156,6 @@ void HandleCommand (HWND hWnd, WORD wNotify, WORD idCtl, HWND hwCtl)
     switch (idCtl) {
         case IDC_POWER:                     /* toggle system power */
             power = ! power;
-            reset_all(0);
             if (running && ! power) {       /* turning off */
                 reason = STOP_POWER_OFF;
                 /* wait for execution thread to exit */
@@ -1166,6 +1165,7 @@ void HandleCommand (HWND hWnd, WORD wNotify, WORD idCtl, HWND hwCtl)
  *                  Sleep(10);
  */             
             }
+            stuff_and_wait("reset", 0, 500);
 
             btn[IDC_POWER_ON].state = power;
             EnableWindow(btn[IDC_POWER_ON].hBtn, power);
@@ -1234,7 +1234,7 @@ void HandleCommand (HWND hWnd, WORD wNotify, WORD idCtl, HWND hwCtl)
 
         case IDC_RESET:
             if (! running) {                /* check-reset is disabled while running */
-                reset_all(0);
+                stuff_and_wait("reset", 0, 500);
                 forms_check(0);             /* clear forms-check status */
                 print_check(0);
             }
