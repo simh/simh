@@ -1,6 +1,6 @@
 /* i1620_sys.c: IBM 1620 simulator interface
 
-   Copyright (c) 2002-2015, Robert M. Supnik
+   Copyright (c) 2002-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-May-17    RMS     Changed fprint_val to handle undefined opcodes on stops
    19-Mar-12    RMS     Fixed declaration of CCT (Mark Pizzolato)
 */
 
@@ -388,8 +389,13 @@ for (i = 0; opcode[i].str != NULL; i++) {               /* find opcode */
         ((opfl != I_1E) && (opfl != I_0E))))
         break;
     }
-if (opcode[i].str == NULL)
+if (opcode[i].str == NULL) {                            /* invalid opcode */
+    if ((sw & SIM_SW_STOP) != 0) {                      /* stop message? */
+        fprintf (of, "%02d", op);                       /* print numeric opcode */
+        return -(INST_LEN - 1);                         /* report success */
+        }
     return SCPE_ARG;
+    }
 if (I_GETQP (opfl) == I_M_QNP)                          /* Q no print? */
     qmp = 0;
 
