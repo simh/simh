@@ -1,6 +1,6 @@
 /* i1620_pt.c: IBM 1621/1624 paper tape reader/punch simulator
 
-   Copyright (c) 2002-2015, Robert M Supnik
+   Copyright (c) 2002-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    ptr          1621 paper tape reader
    ptp          1624 paper tape punch
 
+   18-May-17    RMS     Separated EOF error from other IO errors (Dave Wise)
    23-Feb-15    TFM     Fixed RA, RBPT to preserve flags on RM at end (Tom McBride)
    09-Feb-15    TFM     Fixed numerous translation problems (Tom McBride)
    09-Feb-15    TFM     Fixed pack/unpack errors in binary r/w (Tom McBride)
@@ -331,10 +332,13 @@ if ((ptr_unit.flags & UNIT_ATT) == 0) {                 /* attached? */
 do {
     if ((temp = getc (ptr_unit.fileref)) == EOF) {      /* read char */
         ind[IN_RDCHK] = 1;                              /* err, rd chk */
-        if (feof (ptr_unit.fileref))
+        if (feof (ptr_unit.fileref)) {                  /* EOF? */
             sim_printf ("PTR end of file\n");
+            clearerr (ptr_unit.fileref);
+            return SCPE_EOF;
+            }
         else
-            sim_perror ("PTR I/O error");;
+            sim_perror ("PTR I/O error");               /* no, io err */
         clearerr (ptr_unit.fileref);
         return SCPE_IOERR;
         }
