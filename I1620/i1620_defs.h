@@ -1,6 +1,6 @@
 /* i1620_defs.h: IBM 1620 simulator definitions
 
-   Copyright (c) 2002-2015, Robert M. Supnik
+   Copyright (c) 2002-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,7 @@
    I am grateful to Al Kossow, the Computer History Museum, and the IBM Corporate
    Archives for their help in gathering documentation about the IBM 1620.
 
+   19-May-17    RMS     Added option for Model I diagnostic mode (Dave Wise)
    05-Feb-15    TFM     Added definitions for flagged RM, GM, NB
    22-May-10    RMS     Added check for 64b definitions
    18-Oct-02    RMS     Fixed bug in ADDR_S macro (found by Hans Pufal)
@@ -120,6 +121,7 @@
 #define IN_EXPCHK       15                              /* floating exponent check */
 #define IN_MBREVEN      16                              /* even parity check */
 #define IN_MBRODD       17                              /* odd parity check */
+#define IN_MARCHK       18                              /* MAR check - diag only */
 #define IN_ANYCHK       19                              /* any of read, write, even/odd */
 #define IN_PRCHK        25                              /* printer check */
 #define IN_IXN          30                              /* IX neither */
@@ -197,12 +199,13 @@
 #define IF_4QA          (1 << (UNIT_V_UF + 9))          /* 4 char Q addr */
 #define IF_NQX          (1 << (UNIT_V_UF + 10))         /* no Q indexing */
 #define IF_IMM          (1 << (UNIT_V_UF + 11))         /* immediate */
-#define UNIT_BCD        (1 << (UNIT_V_UF + 12))         /* BCD coded */
-#define UNIT_MSIZE      (1 << (UNIT_V_UF + 13))         /* fake flag */
-#define ALLOPT          (IF_DIV + IF_IA + IF_EDT + IF_FP + IF_BIN + IF_IDX)
-#define MI_OPT          (IF_DIV + IF_IA + IF_EDT + IF_FP)
+#define IF_RMOK         (1 << (UNIT_V_UF + 12))         /* diag mode - force rm to 0 */
+#define UNIT_BCD        (1 << (UNIT_V_UF + 13))         /* BCD coded */
+#define UNIT_MSIZE      (1 << (UNIT_V_UF + 14))         /* fake flag */
+#define ALLOPT          (IF_DIV + IF_IA + IF_EDT + IF_FP + IF_BIN + IF_IDX + IF_RMOK)
+#define MI_OPT          (IF_DIV + IF_IA + IF_EDT + IF_FP + IF_RMOK)
 #define MI_STD          (IF_DIV + IF_IA + IF_EDT)
-#define MII_OPT         (ALLOPT)
+#define MII_OPT         (IF_DIV + IF_IA + IF_EDT + IF_FP + IF_BIN + IF_IDX)
 #define MII_STD         (IF_DIV + IF_IA + IF_EDT + IF_BIN + IF_IDX)
 
 /* Add status codes */
