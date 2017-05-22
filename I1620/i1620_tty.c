@@ -25,6 +25,9 @@
 
    tty          console typewriter
 
+   18-May-17    RMS     Fixed keyboard interrupt problem for Linux
+                        Added input backspace for Model II
+   04-May-17    DW      Revised tab calculation algorithm
    13-Mar-17    RMS     Fixed tab stop array overrun at right margin (COVERITY)
    21-Feb-15    TFM     Option to provide single digit numeric output
    05-Feb-15    TFM     Changes to translate tables and valid input char.
@@ -36,14 +39,16 @@
 
 #include "i1620_defs.h"
 
-#define NUM_1_DIGIT TRUE /* Indicate numeric output will use single digit format  (tfm) */
+#define NUM_1_DIGIT TRUE /* indicate numeric output will use single digit format (tfm) */
+
+/* Maximum number of characters per line, or one-based column number of last char cell */
 
 #define TTO_COLMAX      80
 #define UF_V_1DIG       (UNIT_V_UF)
 #define UF_1DIG         (1 << UF_V_1DIG)
 
-int32 tto_col = 0;
-uint8 tto_tabs[TTO_COLMAX + 1] = {
+int32 tto_col = 1;                  /* One-based, char cell we will print to next */
+uint8 tto_tabs[TTO_COLMAX + 1] = {  /* Zero-based access, one-based UI */
  0,0,0,0,0,0,0,0,
  1,0,0,0,0,0,0,0,
  1,0,0,0,0,0,0,0,
@@ -61,6 +66,7 @@ extern uint8 M[MAXMEMSIZE];
 extern uint8 ind[NUM_IND];
 extern UNIT cpu_unit;
 extern uint32 io_stop;
+extern volatile int32 stop_cpu;
 
 void tti_unlock (void);
 t_stat tti_rnum (int8 *c);
@@ -275,8 +281,13 @@ switch (op) {                                           /* case on op */
                 return r;
             if (ttc == 0x7F)                            /* end record? */
                 return SCPE_OK;
-            M[pa] = ttc & (FLAG | DIGIT);               /* store char */
-            PP (pa);                                    /* incr mem addr */
+            if (ttc == 0x7E) {                          /* backspace? */
+                MM (pa);                                /* decr mem addr */
+                }
+            else {                                      /* normal char */
+                M[pa] = ttc & (FLAG | DIGIT);           /* store char */
+                PP (pa);                                /* incr mem addr */
+                }
             }
         break;
 
@@ -288,9 +299,14 @@ switch (op) {                                           /* case on op */
                 return r;
             if (ttc == 0x7F)                            /* end record? */
                 return SCPE_OK;
-            M[pa] = (M[pa] & FLAG) | (ttc & DIGIT);     /* store 2 digits */
-            M[pa - 1] = (M[pa - 1] & FLAG) | ((ttc >> 4) & DIGIT);
-            pa = ADDR_A (pa, 2);                        /* incr mem addr */
+            if (ttc == 0x7E) {                          /* backspace? */
+                pa = ADDR_A (pa, -2);                   /* decr mem addr*/
+                }
+            else {                                      /* normal char */
+                M[pa] = (M[pa] & FLAG) | (ttc & DIGIT); /* store 2 digits */
+                M[pa - 1] = (M[pa - 1] & FLAG) | ((ttc >> 4) & DIGIT);
+                pa = ADDR_A (pa, 2);                    /* incr mem addr */
+                }
             }
         break;  
 
@@ -339,6 +355,11 @@ do {
         return r;
     if (raw == '\r')                                    /* return? mark */
         *c = 0x7F;
+    else if (((raw == '\b') || (raw == 0x7F)) &&        /* backspace or del? */
+        ((cpu_unit.flags & IF_MII) != 0)) {             /* on model 2? */
+        *c = 0x7E;                                      /* mark */
+        raw = '-';                                      /* print minus */
+        }
     else if ((raw == '~') || (raw == '`'))              /* flag? mark */
         flg = FLAG;
     else if ((cp = strchr (tti_to_num, raw)) != 0)      /* legal? */
@@ -363,6 +384,11 @@ do {
         return r;
     if (raw == '\r')                                    /* return? mark */
         *c = 0x7F;
+    else if (((raw == '\b') || (raw == 0x7F)) &&        /* backspace or del? */
+        ((cpu_unit.flags & IF_MII) != 0)) {             /* on model 2? */
+        *c = 0x7E;                                      /* mark */
+        raw = '-';                                      /* print minus */
+        }
     else if (tti_to_alp[raw] >= 0)                      /* legal char? */
         *c = tti_to_alp[raw];                           /* xlate */
     else raw = 007;                                     /* beep! */
@@ -378,6 +404,8 @@ t_stat tti_read (int8 *c)
 int32 t;
 
 do {
+    if (stop_cpu != 0)                                  /* stop? */
+        return SCPE_STOP;
     t = sim_poll_kbd ();                                /* get character */
     } while ((t == SCPE_OK) || (t & SCPE_BREAK));       /* ignore break */
 if (t < SCPE_KFLAG)                                     /* error? */
@@ -413,39 +441,47 @@ for (i = 0; i < MEMSIZE; i++) {                         /* (stop runaway) */
 return STOP_RWRAP;
 }
 
+/* Wrap line, if needed, prior to character output */
+
+void tto_wrap(void)
+{
+if (tto_col > TTO_COLMAX) {                             /* line wrap? */
+    sim_putchar('\r');
+    sim_putchar('\n');
+    tto_col = 1;
+    }
+}
+
 /* Write, maintaining position */
 
 t_stat tto_write (uint32 c)
 {
-int32 rpt;
-
 if (c == '\t') {                                        /* tab? */
-    for (rpt = tto_col + 1;                             /* find tab stop */
-        (rpt <= TTO_COLMAX) && (tto_tabs[rpt] == 0);
-        rpt++) ;
-    for ( ; tto_col < rpt; tto_col++)
-        sim_putchar (' ');                              /* use spaces */
+    tto_wrap();
+    do {
+        sim_putchar(' ');                              /* use spaces */
+        tto_col++;
+        } while (!(tto_col > TTO_COLMAX || tto_tabs[tto_col-1] == 1));
     }
 else if (c == '\r') {                                   /* return? */
     sim_putchar ('\r');                                 /* crlf */
     sim_putchar ('\n');
-    tto_col = 0;                                        /* clear colcnt */
-    return SCPE_OK;
+    tto_col = 1;                                        /* back to LMargin */
     }
 else if ((c == '\n') || (c == 007)) {                   /* non-spacing? */
     sim_putchar (c);
-    return SCPE_OK;
     }
-else if (c == '\b')                                     /* backspace? */
-    tto_col = tto_col? tto_col - 1: 0;
-else tto_col++;                                         /* normal */
-if (tto_col > TTO_COLMAX) {                             /* line wrap? */
-    sim_putchar ('\r');
-    sim_putchar ('\n');
-    tto_col = 0;
+else if (c == '\b') {                                   /* backspace? */
+    if (tto_col > 1) {
+        sim_putchar(c);
+        tto_col--;
+        }
     }
-if (c != '\t')
-    sim_putchar (c);
+else {                                                  /* normal */
+    tto_wrap();
+    sim_putchar(c);
+    tto_col++;
+    }
 return SCPE_OK;
 }
 
@@ -466,8 +502,7 @@ return SCPE_OK;
 t_stat tty_reset (DEVICE *dptr)
 {
 sim_activate (&tty_unit, tty_unit.wait);                /* activate poll */
-tto_col = 0;
-tto_tabs[TTO_COLMAX] = 1;                               /* tab stop at limit */
+tto_col = 1;
 return SCPE_OK;
 }
 
