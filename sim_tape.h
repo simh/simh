@@ -1,6 +1,7 @@
 /* sim_tape.h: simulator tape support library definitions
 
    Copyright (c) 1993-2016, Robert M Supnik
+   Copyright (c) 2017       J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Apr-17    JDB     Added MTSE_LEOT value for 4.x compatibility
    18-Jul-16    JDB     Added sim_tape_errecf, sim_tape_errecr functions
    15-Dec-14    JDB     Added tape density validity flags
    04-Nov-14    JDB     Added tape density flags
@@ -126,7 +128,8 @@ typedef uint16          t_tpclnt;                       /* magtape rec lnt */
 #define MTSE_EOM        7                               /* end of medium */
 #define MTSE_RECE       8                               /* error in record */
 #define MTSE_WRP        9                               /* write protected */
-#define MTSE_RUNAWAY    10                              /* tape runaway */
+#define MTSE_LEOT       10                              /* Logical End Of Tape (4.x) */
+#define MTSE_RUNAWAY    11                              /* tape runaway */
 
 /* Prototypes */
 
