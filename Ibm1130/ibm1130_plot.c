@@ -27,7 +27,8 @@
         "PLOT", NULL, NULL, NULL,
         0, 16, 16, 1, 16, 16,
         NULL, NULL, NULL,
-        NULL, NULL, NULL};
+        NULL, NULL, NULL, NULL,
+        DEV_DIS};
 
     void xio_1627_plotter   (int32 addr, int32 func, int32 modify)
     {
