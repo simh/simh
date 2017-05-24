@@ -1,12 +1,6 @@
-/*******************************************************************************
- *                                                                             *
- *  WARNING: THE 4.0 VERSION OF THIS FILE IS DIFFERENT (SOCKET API CHANGED)!!! *
- *                                                                             *
- *******************************************************************************/
-
 /* hp2100_ipl.c: HP 2000 interprocessor link simulator
 
-   Copyright (c) 2002-2014, Robert M Supnik
+   Copyright (c) 2002-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -31,7 +25,14 @@
 
    IPLI, IPLO   12875A interprocessor link
 
+   05-Aug-16    JDB     Renamed the P register from "PC" to "PR"
+   13-May-16    JDB     Modified for revised SCP API function parameter types
+   14-Sep-15    JDB     Exposed "ipl_edtdelay" via a REG_HIDDEN to allow user tuning
+                        Corrected typos in comments and strings
+   05-Jun-15    JDB     Merged 3.x and 4.x versions using conditionals
+   11-Feb-15    MP      Revised ipl_detach and ipl_dscln for new sim_close_sock API
    30-Dec-14    JDB     Added S-register parameters to ibl_copy
+   12-Dec-12    MP      Revised ipl_attach for new socket API
    25-Oct-12    JDB     Removed DEV_NET to allow restoration of listening ports
    09-May-12    JDB     Separated assignments from conditional expressions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
@@ -77,6 +78,13 @@
 #include "hp2100_cpu.h"
 #include "sim_sock.h"
 #include "sim_tmxr.h"
+#include "sim_rev.h"
+
+
+#if (SIM_MAJOR >= 4)
+  #define sim_close_sock(socket,master)     sim_close_sock (socket)
+#endif
+
 
 typedef enum { ipli, iplo } CARD_INDEX;                 /* card index number */
 
@@ -120,11 +128,11 @@ IOHANDLER iplio;
 
 t_stat ipl_svc (UNIT *uptr);
 t_stat ipl_reset (DEVICE *dptr);
-t_stat ipl_attach (UNIT *uptr, char *cptr);
+t_stat ipl_attach (UNIT *uptr, CONST char *cptr);
 t_stat ipl_detach (UNIT *uptr);
 t_stat ipl_boot (int32 unitno, DEVICE *dptr);
-t_stat ipl_dscln (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat ipl_setdiag (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat ipl_dscln (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat ipl_setdiag (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_bool ipl_check_conn (UNIT *uptr);
 
 /* Debug flags table */
@@ -177,6 +185,7 @@ REG ipli_reg [] = {
     { ORDATA (HOLD, ipl [ipli].hold, 8) },
     { DRDATA (TIME, ipl_ptime, 24), PV_LEFT },
     { FLDATA (STOP_IOE, ipl_stopioe, 0) },
+    { DRDATA (EDTDELAY, ipl_edtdelay, 32), REG_HIDDEN | PV_LEFT },
     { ORDATA (SC, ipli_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, ipli_dib.select_code, 6), REG_HRO },
     { NULL }
@@ -261,7 +270,7 @@ DEVICE iplo_dev = {
        The STC/CLC normally would cause a second "request device table" command
        to be recognized by the IOP, except that the IOP DMA setup routine
        "DMAXF" (in D61.asm) has specified an end-of-block CLC that holds off the
-       IPL interrupt, and the completion interrupt routine "DMACP" ends with a
+       IPL interrupt, and the completion interrupt routine "DMCMP" ends with a
        STC,C that clears the IPL flag.
 
        In hardware, the two CPUs are essentially interlocked by the DMA
@@ -271,7 +280,7 @@ DEVICE iplo_dev = {
        that guarantee does not hold.  If the STC/CLC occurs after the STC,C,
        then the IOP starts a second device table DMA transfer, which the SP is
        not expecting.  The IOP never processes the subsequent "start
-       timesharing" command, and the muxtiplexer is non-reponsive.
+       timesharing" command, and the multiplexer is non-responsive.
 
        We employ a workaround that decreases the incidence of the problem: DMA
        output completion interrupts are delayed to allow the other SIMH instance
@@ -281,7 +290,9 @@ DEVICE iplo_dev = {
        a data response to the SP.  This improves the race condition by delaying
        the IOP until the SP has a chance to receive the last word, recognize its
        own DMA input completion, drop out of the SFS loop, and execute the
-       STC/CLC.
+       STC/CLC.  The delay, "ipl_edtdelay", is initialized to one millisecond
+       but is exposed via a hidden IPLI register, "EDTDELAY", that allows the
+       user to lengthen the delay if necessary.
 
        The condition is only improved, and not solved, because "sleep"ing the
        IOP doesn't guarantee that the SP will actually execute.  It's possible
@@ -576,12 +587,79 @@ return SCPE_OK;
    attach -c - connect to ip address and port
 */
 
-t_stat ipl_attach (UNIT *uptr, char *cptr)
+t_stat ipl_attach (UNIT *uptr, CONST char *cptr)
 {
 SOCKET newsock;
-uint32 i, t, ipa, ipp, oldf;
-char *tptr;
+char *tptr = NULL;
 t_stat r;
+
+#if (SIM_MAJOR >= 4)
+
+uint32 i, t;
+char host [CBUFSIZE], port [CBUFSIZE], hostport [2 * CBUFSIZE + 3];
+
+t_bool is_active;
+
+is_active = (uptr->flags & UNIT_ACTV) == UNIT_ACTV;     /* is the connection active? */
+
+if (uptr->flags & UNIT_ATT)                             /* if IPL is currently attached, */
+    ipl_detach (uptr);                                  /*   detach it first */
+
+if ((sim_switches & SWMASK ('C')) ||                    /* connecting? */
+  ((sim_switches & SIM_SW_REST) && is_active)) {        /*   or restoring an active connection? */
+    r = sim_parse_addr (cptr, host,                     /* parse the host and port */
+                        sizeof (host), "localhost",     /*   from the parameter string */
+                        port, sizeof (port),
+                        NULL, NULL);
+
+    if ((r != SCPE_OK) || (port [0] == '\0'))           /* parse error or missing port number? */
+        return SCPE_ARG;                                /* complain to the user */
+
+    sprintf(hostport, "%s%s%s%s%s", strchr(host, ':') ? "[" : "", host, strchr(host, ':') ? "]" : "", host [0] ? ":" : "", port);
+
+    newsock = sim_connect_sock (hostport, NULL, NULL);
+
+    if (newsock == INVALID_SOCKET)
+        return SCPE_IOERR;
+
+    printf ("Connecting to %s\n", hostport);
+
+    if (sim_log)
+        fprintf (sim_log, "Connecting to %s\n", hostport);
+
+    uptr->flags = uptr->flags | UNIT_ACTV;
+    uptr->LSOCKET = 0;
+    uptr->DSOCKET = newsock;
+    }
+
+else {
+    if (sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), NULL, NULL))
+        return SCPE_ARG;
+    sprintf(hostport, "%s%s%s%s%s", strchr(host, ':') ? "[" : "", host, strchr(host, ':') ? "]" : "", host [0] ? ":" : "", port);
+    newsock = sim_master_sock (hostport, &r);
+    if (r != SCPE_OK)
+        return r;
+    if (newsock == INVALID_SOCKET)
+        return SCPE_IOERR;
+    printf ("Listening on port %s\n", hostport);
+    if (sim_log)
+        fprintf (sim_log, "Listening on port %s\n", hostport);
+    uptr->flags = uptr->flags & ~UNIT_ACTV;
+    uptr->LSOCKET = newsock;
+    uptr->DSOCKET = 0;
+    }
+uptr->IBUF = uptr->OBUF = 0;
+uptr->flags = (uptr->flags | UNIT_ATT) & ~(UNIT_ESTB | UNIT_HOLD);
+tptr = (char *) malloc (strlen (hostport) + 1);         /* get string buf */
+if (tptr == NULL) {                                     /* no memory? */
+    ipl_detach (uptr);                                  /* close sockets */
+    return SCPE_MEM;
+    }
+strcpy (tptr, hostport);                                /* copy ipaddr:port */
+
+#else
+
+uint32 i, t, ipa, ipp, oldf;
 
 r = get_ipaddr (cptr, &ipa, &ipp);
 if ((r != SCPE_OK) || (ipp == 0))
@@ -629,6 +707,9 @@ if (tptr == NULL) {                                     /* no memory? */
     return SCPE_MEM;
     }
 strcpy (tptr, cptr);                                    /* copy ipaddr:port */
+
+#endif
+
 uptr->filename = tptr;                                  /* save */
 sim_activate (uptr, POLL_FIRST);                        /* activate first poll "immediately" */
 if (sim_switches & SWMASK ('W')) {                      /* wait? */
@@ -637,7 +718,7 @@ if (sim_switches & SWMASK ('W')) {                      /* wait? */
         if (t)                                          /* established? */
             break;
         if ((i % 10) == 0)                              /* status every 10 sec */
-            printf ("Waiting for connnection\n");
+            printf ("Waiting for connection\n");
         sim_os_sleep (1);                               /* sleep 1 sec */
         }
     if (t)                                              /* if connected (set by "ipl_check_conn" above) */
@@ -673,7 +754,7 @@ return SCPE_OK;
 
 /* Disconnect routine */
 
-t_stat ipl_dscln (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ipl_dscln (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr)
     return SCPE_ARG;
@@ -689,7 +770,7 @@ return SCPE_OK;
 
 /* Diagnostic/normal mode routine */
 
-t_stat ipl_setdiag (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat ipl_setdiag (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (val) {
     ipli_unit.flags = ipli_unit.flags | UNIT_DIAG;
@@ -783,13 +864,13 @@ const int32 devi = ipli_dib.select_code;
 const int32 devp = ptr_dib.select_code;
 
 if (ibl_copy (ipl_rom, devi, IBL_S_CLR,                 /* copy the boot ROM to memory and configure */
-              IBL_SET_SC (devi) | devp))                /*   the S register accordingly */   
+              IBL_SET_SC (devi) | devp))                /*   the S register accordingly */
     return SCPE_IERR;                                   /* return an internal error if the copy failed */
 
-WritePW (PC + MAX_BASE, (~PC + 1) & DMASK);             /* fix ups */
-WritePW (PC + IPL_PNTR, ipl_rom [IPL_PNTR] | PC);
-WritePW (PC + PTR_PNTR, ipl_rom [PTR_PNTR] | PC);
-WritePW (PC + IPL_DEVA, devi);
-WritePW (PC + PTR_DEVA, devp);
+WritePW (PR + MAX_BASE, (~PR + 1) & DMASK);             /* fix ups */
+WritePW (PR + IPL_PNTR, ipl_rom [IPL_PNTR] | PR);
+WritePW (PR + PTR_PNTR, ipl_rom [PTR_PNTR] | PR);
+WritePW (PR + IPL_DEVA, devi);
+WritePW (PR + PTR_DEVA, devp);
 return SCPE_OK;
 }

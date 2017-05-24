@@ -1,6 +1,6 @@
 /* hp2100_di.c: HP 12821A HP-IB Disc Interface simulator
 
-   Copyright (c) 2010-2014, J. David Bryan
+   Copyright (c) 2010-2017, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    DI           12821A Disc Interface
 
+   17-Jan-17    JDB     Changed to use new byte accessors in hp2100_defs.h
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    24-Dec-14    JDB     Added casts for explicit downward conversions
                         Removed redundant global declarations
    13-Feb-12    JDB     First release
@@ -32,10 +34,10 @@
    09-Oct-10    JDB     Created DI simulation
 
    References:
-   - HP 12821A Disc Interface Installation and Service Manual (12821-90006,
-        Feb-1985)
-   - IEEE Standard Digital Interface for Programmable Instrumentation
-       (IEEE-488A-1980, Sep-1979)
+     - HP 12821A Disc Interface Installation and Service Manual
+         (12821-90006, February 1985)
+     - IEEE Standard Digital Interface for Programmable Instrumentation
+         (IEEE-488A-1980, September 1979)
 
 
    The 12821A was a high-speed implementation of the Hewlett-Packard Interface
@@ -805,7 +807,7 @@ return SCPE_OK;
        at power-up.
 */
 
-t_stat di_set_address (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat di_set_address (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 t_stat status;
 uint32 index, new_address;
@@ -849,9 +851,9 @@ return status;                                              /* return the result
    address (0) or a card's bus address (1).
 */
 
-t_stat di_show_address (FILE *st, UNIT *uptr, int32 value, void *desc)
+t_stat di_show_address (FILE *st, UNIT *uptr, int32 value, CONST void *desc)
 {
-DEVICE *dptr = (DEVICE *) desc;
+const DEVICE *dptr = (const DEVICE *) desc;
 
 if (value)                                                  /* do we want the card address? */
     fprintf (st, "address=%d", GET_DIADR (dptr->flags));    /* get it from the device flags */
@@ -880,15 +882,17 @@ return SCPE_OK;
        will no longer be necessary.
 */
 
-t_stat di_set_cable (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat di_set_cable (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
+DEVICE *dptr = (DEVICE *) desc;
+
 if (value) {                                            /* is the diagnostic cable selected? */
-    ((DEVICE *) desc)->flags |= DEV_DIAG;               /* set the diagnostic flag */
+    dptr->flags |= DEV_DIAG;                            /* set the diagnostic flag */
     dc_dev.flags &= ~DEV_DIS;                           /* enable the dummy device */
     dc_dev.flags |= DEV_DIAG;                           /*   and set its flag as well */
     }
 else {                                                  /* the peripheral cable is selected */
-    ((DEVICE *) desc)->flags &= ~DEV_DIAG;              /* clear the diagnostic flag */
+    dptr->flags &= ~DEV_DIAG;                           /* clear the diagnostic flag */
     dc_dev.flags |= DEV_DIS;                            /* disable the dummy device */
     dc_dev.flags &= ~DEV_DIAG;                          /*  and clear its flag */
     }
@@ -903,9 +907,11 @@ return SCPE_OK;
    normal use (0) or to another card for diagnostics (1).
 */
 
-t_stat di_show_cable (FILE *st, UNIT *uptr, int32 value, void *desc)
+t_stat di_show_cable (FILE *st, UNIT *uptr, int32 value, CONST void *desc)
 {
-if (((DEVICE *) desc)->flags & DEV_DIAG)                /* is the cable connected for diagnostics? */
+const DEVICE *dptr = (const DEVICE *) desc;
+
+if (dptr->flags & DEV_DIAG)                             /* is the cable connected for diagnostics? */
     fputs ("diagnostic cable", st);                     /* report it */
 else                                                    /* the cable is connected for device use */
     fputs ("HP-IB cable", st);                          /* report the condition */
@@ -1604,7 +1610,7 @@ if (di_card->cntl_register & CNTL_LSTN) {               /* is the card receiving
     if ((di_card->cntl_register & CNTL_EOI              /* EOI detection is enabled, */
       && di_card->bus_cntl & BUS_EOI)                   /*   and data was tagged with EOI? */
       || (di_card->cntl_register & CNTL_LF              /* or LF detection is enabled, */
-      && GET_LOWER (data) == LF)) {                     /*   and the byte is a line feed? */
+      && LOWER_BYTE (data) == LF)) {                    /*   and the byte is a line feed? */
         tag = tag | TAG_LBR;                            /* tag as the last byte received */
         di_card->status_register |= STAT_LBI;           /* set the last byte in status */
         }
@@ -1628,10 +1634,10 @@ if (access == bus_access) {                             /* is this a bus access 
 
         if (tag & TAG_LBR)                              /* is this the last byte? */
             di_card->fifo [index] =                     /* copy to both bytes of the FIFO */
-              tag | SET_BOTH (data);                    /*   and store with the tag */
+              tag | TO_WORD (data, data);               /*   and store with the tag */
         else {                                          /* more bytes are expected */
             di_card->fifo [index] =                     /*   so position this byte */
-              tag | SET_UPPER (data);                   /*   and store it with the tag */
+              tag | TO_WORD (data, 0);                  /*   and store it with the tag */
             add_word = FALSE;                           /* wait for the second byte before adding */
             }
         }
@@ -1641,18 +1647,18 @@ if (access == bus_access) {                             /* is this a bus access 
             di_card->ibp = upper;                       /* set the upper byte as next */
 
             di_card->fifo [index] =                     /* merge the data and tag values */
-              tag | di_card->fifo [index] | SET_LOWER (data);
+              tag | di_card->fifo [index] | TO_WORD (0, data);
             }
         else                                            /* the card is in unpacked mode */
             di_card->fifo [index] =                     /* position this byte */
-              tag | SET_LOWER (data);                   /*   and store with the tag */
+              tag | TO_WORD (0, data);                  /*   and store with the tag */
     }
 
 else if (access == cpu_access)                          /* is this a cpu access? */
     di_card->fifo [index] = tag | data;                 /* store the tag and full word in the FIFO */
 
 else {                                                  /* must be diagnostic access */
-    data = SET_BOTH (GET_LOWER (data));                 /* copy the lower byte to the upper byte */
+    data = TO_WORD (data, data);                        /* copy the lower byte to the upper byte */
     di_card->fifo [index] = tag | data;                 /*   and store the tag and full word in the FIFO */
     }
 
@@ -1809,19 +1815,19 @@ if (access == cpu_access) {                             /* is this a cpu access?
 else if (access == bus_access)                          /* is this a bus access? */
     if (di_card->obp == upper) {                        /* is this the upper byte? */
         di_card->obp = lower;                           /* set the lower byte as next */
-        data = GET_UPPER (data);                        /* mask and position the upper byte in the data word */
+        data = UPPER_BYTE (data);                       /* mask and position the upper byte in the data word */
         remove_word = FALSE;                            /* do not unload the FIFO until the next byte */
         }
 
     else {                                              /* this is the lower byte */
-        data = GET_LOWER (data);                        /* mask and position it in the data word */
+        data = LOWER_BYTE (data);                       /* mask and position it in the data word */
 
         if (di_card->cntl_register & CNTL_PACK)         /* is the card in the packed mode? */
             di_card->obp = upper;                       /* set the upper byte as next */
         }
 
 else                                                    /* must be a diagnostic access */
-    data = GET_LOWER (data);                            /* access is to the lower byte only */
+    data = LOWER_BYTE (data);                           /* access is to the lower byte only */
 
 
 if (remove_word) {                                      /* remove the word from the FIFO? */

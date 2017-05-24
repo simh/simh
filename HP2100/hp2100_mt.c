@@ -1,6 +1,6 @@
 /* hp2100_mt.c: HP 2100 12559A magnetic tape simulator
 
-   Copyright (c) 1993-2014, Robert M. Supnik
+   Copyright (c) 1993-2016, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    MT           12559A 3030 nine track magnetic tape
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    24-Dec-14    JDB     Added casts for explicit downward conversions
    10-Jan-13    MP      Added DEV_TAPE to DEVICE flags
    09-May-12    JDB     Separated assignments from conditional expressions
@@ -145,7 +146,7 @@ IOHANDLER mtcio;
 
 t_stat mtc_svc (UNIT *uptr);
 t_stat mt_reset (DEVICE *dptr);
-t_stat mtc_attach (UNIT *uptr, char *cptr);
+t_stat mtc_attach (UNIT *uptr, CONST char *cptr);
 t_stat mtc_detach (UNIT *uptr);
 t_stat mt_map_err (UNIT *uptr, t_stat st);
 t_stat mt_clear (void);
@@ -678,7 +679,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat mtc_attach (UNIT *uptr, char *cptr)
+t_stat mtc_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 

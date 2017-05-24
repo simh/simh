@@ -1,6 +1,6 @@
 /* hp2100_mux.c: HP 2100 12920A terminal multiplexor simulator
 
-   Copyright (c) 2002-2014, Robert M Supnik
+   Copyright (c) 2002-2016, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    MUX,MUXL,MUXM        12920A terminal multiplexor
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
+   29-Jun-15    JDB     Corrected typo in RTS macro definition
    24-Dec-14    JDB     Added casts for explicit downward conversions
    10-Jan-13    MP      Added DEV_MUX and additional DEVICE field values
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
@@ -221,7 +223,7 @@
 #define OTC_SS2         0000002                         /* SSn flops */
 #define OTC_SS1         0000001
 #define OTC_RW          (OTC_ES2|OTC_ES1|OTC_SS2|OTC_SS1)
-#define RTS             OCT_C2                          /* C2 = rts */
+#define RTS             OTC_C2                          /* C2 = rts */
 #define DTR             OTC_C1                          /* C1 = dtr */
 
 /* LIA, control */
@@ -327,9 +329,9 @@ IOHANDLER muxcio;
 t_stat muxi_svc (UNIT *uptr);
 t_stat muxo_svc (UNIT *uptr);
 t_stat muxc_reset (DEVICE *dptr);
-t_stat mux_attach (UNIT *uptr, char *cptr);
+t_stat mux_attach (UNIT *uptr, CONST char *cptr);
 t_stat mux_detach (UNIT *uptr);
-t_stat mux_setdiag (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat mux_setdiag (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 
 /* MUXL/MUXU device information block.
@@ -1338,7 +1340,7 @@ return SCPE_OK;
 
 /* Attach master unit */
 
-t_stat mux_attach (UNIT *uptr, char *cptr)
+t_stat mux_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat status = SCPE_OK;
 
@@ -1389,7 +1391,7 @@ return r;
    here.)
 */
 
-t_stat mux_setdiag (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat mux_setdiag (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 ln;
 

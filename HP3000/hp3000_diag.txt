@@ -1,0 +1,2142 @@
+                      SIMH/HP 3000 DIAGNOSTICS PERFORMANCE
+                      ====================================
+                             Last update: 2016-12-01
+
+
+The HP 32230 diagnostic suite has been run against the SIMH HP 3000 simulation.
+Diagnostic programs were obtained from two magnetic tapes: HP 30000-11016 Rev.
+1244 (CPU) and 30000-11017 Rev. 2640 (non-CPU).  For each diagnostic, the
+recommended standard tests were selected, plus any available optional tests that
+broadened the test coverage.
+
+Except where noted in the individual diagnostic reports, the test system
+configuration is the default SIMH configuration with these changes:
+
+ * All I/O devices are enabled.
+ * The CPU is configured as a Series III with 512KW of memory.
+
+Detailed diagnostic configuration, operation, and results are given after the
+summary table.  These may be used to duplicate the diagnostic results.
+
+
+The results of the diagnostic runs are summarized below:
+
+                                                     Diag.
+  File      Diagnostic Name                          Vers.  Result
+  --------  ---------------------------------------  -----  -------------
+  PD420A    CPU Diagnostic Section 1                 01.00  Passed
+  PD420A1   CPU Diagnostic Section 2                 01.00  Passed
+  PD420A2   CPU Diagnostic Section 3                 01.01  Passed
+  PD420A3   CPU Diagnostic Section 4                 01.24  Passed
+  PD420A4   CPU Diagnostic Section 5                 01.00  Passed
+  PD420A5   CPU Diagnostic Section 6                 01.00  Passed
+  PD420A6   CPU Diagnostic Section 7                 01.00  Passed
+  PD420A7   CPU Diagnostic Section 8                 01.00  Passed
+  PD420A8   CPU Diagnostic Section 9                 01.00  Passed
+  PD420A9   CPU Diagnostic Section 10                01.00  Passed
+  PD420A10  CPU Diagnostic Section 11                01.00  Passed
+  PD420A11  CPU Diagnostic Section 12                01.00  Passed
+  PD420A12  CPU Diagnostic Section 13                01.00  Passed
+  PD420A13  CPU Diagnostic Section 14                01.00  Passed
+
+  PD419A    7905A Disc Cartridge                     01.04  Partial
+  PD421A    Memory Pattern                           01.00  Passed
+  PD422A    Multiplexer Channel                      01.02  Passed
+  PD423A    2888A Disc File                          01.00  No simulation
+  PD424A    7900A Cartridge Disc                     01.00  No simulation
+  PD425A    System Clock/Console                     01.00  No simulation
+  PD426A    System Clock/Fault Logging Interface     00.00  Passed
+  PD427A    Terminal Data Interface                  01.01  Passed
+  PD428A    2660A Fixed Head Disc                    01.00  No simulation
+  PD429A    Selector Channel                         01.01  Passed
+  PD429A    Selector Channel Maintenance Board       01.01  Passed
+  PD430A    Error Correction Memory Series II        01.01  No simulation
+  PD430B    Error Correction Memory Series III       00.00  No simulation
+  PD431A    Extended Instruction Set                 01.00  No simulation
+  PD432A    Hardwired Serial Interface               01.00  No simulation
+  PD433A    7970B/E Nine-Track Magnetic Tape         01.04  Partial
+  PD434A    Synchronous Line Controller              01.03  No simulation
+  PD434B    Asynchronous Line Controller             01.04  No simulation
+  PD435A    Universal Interface                      01.01  Passed
+  PD438A    Terminal Control Interface               01.00  Passed
+  PD439A    CALCOMP Plotter Interface                01.01  No simulation
+  PD441A    COBOL-II A Firmware                      00.00  Passed
+  PD442A    COBOL-II B Firmware                      00.00  Passed
+  PD466A    Online Line Printer Verifier             01.06  Passed
+
+The "Result" column indicates the level of success in passing the given
+diagnostic:
+
+  Term           Meaning
+  -------------  ---------------------------------------------------------------
+  Passed         All of the standard tests relevant to the hardware device
+                 passed without error.  Optional "utility" tests, where present,
+                 were not run unless they broadened the test coverage.
+
+  Partial        One or more of the standard tests relevant to the hardware
+                 device were either excluded or failed as expected, due to known
+                 limitations in the simulation, e.g., the lack of "defective
+                 cylinder" flags in a disc simulation.
+
+  No simulation  A simulation of the hardware device does not exist.
+
+See the "Test Notes" associated with each diagnostic report below for details on
+subsets, limitations, or errors encountered.
+
+
+
+=====================================================
+32230 DIAGNOSTIC SUITE DETAILED EXECUTION AND RESULTS
+=====================================================
+
+Each configuration below presumes that the target diagnostic has been cold
+loaded from the appropriate magnetic tape.
+
+
+---------------------
+D420A - CPU Section 1
+---------------------
+
+TESTED DEVICE:  CPU (hp3000_cpu.c)
+
+CONFIGURATION:  sim> deposit 2000 000001
+                sim> deposit 2001 170000
+                sim> set cpu stop=pause
+                sim> go
+
+TEST REPORT:    CPU paused, P: 010000 (PAUS 0)
+
+                sim> go -b
+
+                Programmed halt, CIR: 030366 (HALT 6), P: 010415 (LDI 2)
+
+                sim> assert CNTR=0
+                sim> go
+
+                Programmed halt, CIR: 030367 (HALT 7), P: 010422 (SETR)
+
+                sim> assert CNTR=2
+                sim> go
+
+                Programmed halt, CIR: 030370 (HALT 10), P: 010424 (LOAD DB+1)
+
+                sim> assert CNTR=4
+                sim> go
+
+                Programmed halt, CIR: 030371 (HALT 11), P: 010017 (LOAD DB+1)
+
+                sim> assert PB=010004
+                sim> assert P=010017
+                sim> assert PL=010023
+                sim> go
+
+                Programmed halt, CIR: 030363 (HALT 3), P: 026170 (RSW)
+
+                sim> deposit SWCH 125252
+                sim> go
+
+                Programmed halt, CIR: 030364 (HALT 4), P: 026201 (RSW)
+
+                sim> deposit SWCH 052525
+                sim> go
+
+                Programmed halt, CIR: 030365 (HALT 5), P: 026212 (RSW)
+
+                sim> deposit SWCH 000001
+                sim> go
+
+                Programmed halt, CIR: 030375 (HALT 15), P: 016250 (ZERO,NOP)
+
+TEST RESULT:    Passed.
+
+TEST NOTES:     The Internal Switch Register (2000) and Section Select Register
+                (2001) settings are preconfigured because the SR test seems to
+                be scheduled before the SSR can be set externally.
+
+
+
+----------------------
+D420A1 - CPU Section 2
+----------------------
+
+TESTED DEVICE:  CPU (hp3000_cpu.c)
+
+CONFIGURATION:  sim> deposit 2000 000001
+                sim> deposit 2001 010000
+                sim> go
+
+TEST REPORT:    Programmed halt, CIR: 030375 (HALT 15), P: 010141 (LOAD DB+0)
+
+TEST RESULT:    Passed.
+
+TEST NOTES:     The Internal Switch Register (2000) and Section Select Register
+                (2001) settings are preconfigured to simplify execution.
+
+
+
+----------------------
+D420A2 - CPU Section 3
+----------------------
+
+TESTED DEVICE:  CPU (hp3000_cpu.c)
+
+CONFIGURATION:  sim> deposit 2000 000001
+                sim> deposit 2001 030000
+                sim> go
+
+TEST REPORT:    Programmed halt, CIR: 030375 (HALT 15), P: 010163 (ZERO,NOP)
+
+TEST RESULT:    Passed.
+
+TEST NOTES:     The Internal Switch Register (2000) and Section Select Register
+                (2001) settings are preconfigured to simplify execution.
+
+                Diagnostic tape 30000-11016 Rev. 1244 has a bug in step 2 (SMSK
+                and RMSK tests).  There is a missing INCM DB+5 at the end of the
+                step.  Consequently, the step number in DB+5 is incorrect from
+                there on, i.e., "step 2" consists of steps 2 and 3, "step 3" is
+                really step 4, etc., through the end of the diagnostic.  There
+                is no place in the code to insert the missing instruction.
+
+                The bug does not affect diagnostic execution.
+
+
+
+----------------------
+D420A3 - CPU Section 4
+----------------------
+
+TESTED DEVICE:  CPU (hp3000_cpu.c)
+
+CONFIGURATION:  sim> deposit 2000 000001
+                sim> deposit 2001 034170
+                sim> deposit 015761 051007
+                sim> set scmb enable
+                sim> set scmb mx
+                sim> set cpu stop=PAUSE
+                sim> go
+
+TEST REPORT:    CPU paused, P: 021376 (PAUS 12)
+
+                sim> set cpu nostop=PAUSE
+                sim> power fail
+
+                Programmed halt, CIR: 030374 (HALT 14), P: 011130 (EXIT 0)
+
+                sim> power restore
+
+                Programmed halt, CIR: 030375 (HALT 15), P: 010630 (ZERO,NOP)
+
+TEST RESULT:    Passed.
+
+TEST NOTES:     The Internal Switch Register (2000) and Section Select Register
+                (2001) settings are preconfigured to simplify execution.
+
+                The "Stand-Alone HP 30003A/B CPU Diagnostic" manual
+                (30003-90001, April 1979) says that step 31 has been "eliminated
+                from diagnostic" (the February 1976 manual lists this step as
+                "Special Bank Test using special E.T.").  However, the
+                subsequent steps in the manual were not renumbered, although the
+                code for step 31 and its associated step number increment were
+                removed.  Therefore, all step numbers from hereon are one higher
+                in the manual than in the diagnostic.
+
+                Diagnostic tape 30000-11016 Rev. 1244 has a bug in step 36 (MABS
+                test).  The unpatched diagnostic always skips step 36, as it
+                thinks that there is only a single memory bank present.
+
+                The problem is that the maximum bank number is extracted from
+                the SSR and written to DB+6 in the test prelude.  In previous
+                tests, there is a LOAD DB+6 and a STOR DB+7 to copy the bank
+                number to a working variable, and then that variable is used in
+                a loop to set the bank number to use for the test.  In test 36,
+                however, there is no LOAD/STOR, so the previous value of DB+7 is
+                used.  However, that value is zero, because it was the terminal
+                count-down value from an earlier test, so the test thinks that
+                there is only a single bank present.
+
+                The fix is to change STOR DB+6 to STOR DB+7 at location 015761.
+
+
+
+----------------------
+D420A4 - CPU Section 5
+----------------------
+
+TESTED DEVICE:  CPU (hp3000_cpu.c)
+
+CONFIGURATION:  sim> deposit 2000 000001
+                sim> deposit 2001 010000
+                sim> go
+
+TEST REPORT:    Programmed halt, CIR: 030375 (HALT 15), P: 010607 (ZERO,NOP)
+
+TEST RESULT:    Passed.
+
+TEST NOTES:     The Internal Switch Register (2000) and Section Select Register
+                (2001) settings are preconfigured to simplify execution.
+
+
+
+----------------------
+D420A5 - CPU Section 6
+----------------------
+
+TESTED DEVICE:  CPU (hp3000_cpu.c)
+
+CONFIGURATION:  sim> go
+
+TEST REPORT:    System halt 3, P: 010011 (SETR STATUS)
+
+TEST RESULT:    Passed.
+
+
+
+----------------------
+D420A6 - CPU Section 7
+----------------------
+
+TESTED DEVICE:  CPU (hp3000_cpu.c)
+
+CONFIGURATION:  sim> go
+
+TEST REPORT:    System halt 33, P: 010011 (SETR STATUS)
+
+TEST RESULT:    Passed.
+
+
+
+----------------------
+D420A7 - CPU Section 8
+----------------------
+
+TESTED DEVICE:  CPU (hp3000_cpu.c)
+
+CONFIGURATION:  sim> go
+
+TEST REPORT:    System halt 13, P: 010014 (PCAL 0)
+
+TEST RESULT:    Passed.
+
+
+
+----------------------
+D420A8 - CPU Section 9
+----------------------
+
+TESTED DEVICE:  CPU (hp3000_cpu.c)
+
+CONFIGURATION:  sim> go
+
+TEST REPORT:    System halt 2, P: 010016 (PCAL 0)
+
+TEST RESULT:    Passed.
+
+
+
+-----------------------
+D420A9 - CPU Section 10
+-----------------------
+
+TESTED DEVICE:  CPU (hp3000_cpu.c)
+
+CONFIGURATION:  sim> go
+
+TEST REPORT:    System halt 6, P: 010052 (IXIT)
+
+TEST RESULT:    Passed.
+
+
+
+------------------------
+D420A10 - CPU Section 11
+------------------------
+
+TESTED DEVICE:  CPU (hp3000_cpu.c)
+
+CONFIGURATION:  sim> go
+
+TEST REPORT:    System halt 9, P: 010011 (PSEB)
+
+TEST RESULT:    Passed.
+
+
+
+------------------------
+D420A11 - CPU Section 12
+------------------------
+
+TESTED DEVICE:  CPU (hp3000_cpu.c)
+
+CONFIGURATION:  sim> go
+
+TEST REPORT:    System halt 1, P: 010005 (SETR STATUS)
+
+TEST RESULT:    Passed.
+
+
+
+------------------------
+D420A12 - CPU Section 13
+------------------------
+
+TESTED DEVICE:  CPU (hp3000_cpu.c)
+
+CONFIGURATION:  sim> go
+
+TEST REPORT:    System halt 4, P: 010010 (ADDS 0)
+
+TEST RESULT:    Passed.
+
+
+
+-----------------------------------
+D420A13 - CPU Diagnostic Section 14
+-----------------------------------
+
+TESTED DEVICE:  CPU (hp3000_cpu.c)
+
+CONFIGURATION:  sim> go
+
+TEST REPORT:    System halt 4, P: 010003 (LDI 0)
+
+TEST RESULT:    Passed.
+
+
+
+-----------------------------------------
+D419A - Cartridge Disc (user interaction)
+-----------------------------------------
+
+TESTED DEVICE:  DS (hp3000_ds.c)
+
+CONFIGURATION:  sim> set DS diag=1;0;0;010;D;021
+                sim> set DS diag=1;0;0;005;D;021
+                sim> set DS diag=1;0;0;010;S;000
+                sim> set DS diag=1;0;0;005;S;000
+                sim> set DS diag=1;0;0;010;P;000
+                sim> set DS diag=1;0;0;005;P;000
+                sim> set DS diag=398;1;47;011;;000
+                sim> set DS diag=398;1;47;005;;017
+                sim> set DS diag=398;1;47;015;;017;0;0;0;0
+                sim> set DS diag=398;1;30;011;;000
+                sim> set DS diag=398;1;30;005;;017
+                sim> set DS diag=398;1;30;015;;017;0;0;0;0
+                sim> set DS diag=398;1;25;011;;000
+                sim> set DS diag=398;1;25;005;;017
+                sim> set DS diag=398;1;25;015;;010;0;0;0;0
+                sim> set DS diag=4;1;32;005;;017
+                sim> set DS diag=4;1;32;005;;017
+                sim> set DS diag=4;1;32;005;;017
+                sim> set DS diag=1;1;0;013;S;000
+                sim> set DS diag=1;1;42;005;S;000
+                sim> set DS diag=1;1;43;005;P;000
+                sim> set DS diag=1;1;44;005;D;021
+                sim> set DS diag=1;1;42;005;;017
+                sim> set DS diag=1;1;42;005;;017
+                sim> set DS diag=1;1;42;005;;017
+                sim> set DS diag=1;1;42;005;;017
+                sim> set DS diag=1;1;42;005;;017
+                sim> set DS diag=1;1;42;005;;017
+                sim> set DS diag=1;1;42;005;;017
+                sim> set DS diag=1;1;42;005;;017
+                sim> set DS diag=4;0;37;005;;017
+                sim> set CLK realtime
+                sim> set DS0 7905,format
+                sim> attach -n DS0 scratch.0.disc
+                sim> go
+
+TEST REPORT:    [CR entered]
+
+                D99 01 CARTRIDGE DISC (HP 30129A) DIAGNOSTIC CONFIGURATION (D419A.01.4)
+                (C)COPYRIGHT HEWLETT PACKARD COMPANY 1976.
+                Q99 02 DECIMAL DEVICE NUMBER?
+                4
+                Q99 03 MAXIMUM ERROR PRINT COUNT?
+                999
+                P99 55 UPDATE SWITCH REGISTER
+
+                sim> deposit SWCH 140000
+                sim> go
+
+                Q99 61 RESTART?(YES/NO)
+                NO
+                Q99 06 PRESENT SECTION REGISTER: %177000 DO YOU WISH TO CHANGE?(YES/NO)
+                YES
+                Q99 06 UPDATE  SECTION REGISTER: %
+                177002
+                Q99 06 PRESENT SECTION REGISTER: %177002 DO YOU WISH TO CHANGE?(YES/NO)
+                NO
+                P99 51 RESET SWITCH 1 (CHANGE)
+
+                sim> deposit SWCH 100001
+                sim> go
+
+                P99 05 RESET BOTH PROT.DATA SWITCHES,SET SWITCH FORMAT AND SET UNIT TO 0
+
+                Q99 42 WISH TO EXECUTE INTERACTIVE PORTION IN SECTION 1 (YES/NO)
+                YES
+
+                D99 07 CARTRIDGE DISC (HP 30129A) DIAGNOSTIC OFF-LINE (D419A.01.4)
+                Q18 68 DO YOU WISH FORMAT DISC? (YES/NO)
+                NO
+                P19 19 SET UPPER DATA PROTECT SWITCH
+
+                sim> set DS0 protect=upper
+                sim> go
+
+                P19 27 RESET SWITCH FORMAT
+
+                sim> set DS0 noformat
+                sim> go
+
+                P19 19 RESET UPPER DATA PROTECT SWITCH
+
+                sim> set DS0 unprotect=upper
+                sim> go
+
+                P19 20 SET LOWER DATA PROTECT SWITCH
+
+                sim> set DS0 protect=lower
+                sim> go
+
+                P19 26 SET SWITCH FORMAT
+
+                sim> set DS0 format
+                sim> go
+
+                P19 19 SET UPPER DATA PROTECT SWITCH
+
+                sim> set DS0 protect=upper
+                sim> go
+
+                P19 27 RESET SWITCH FORMAT
+
+                sim> set DS0 noformat
+                sim> go
+
+                P19 05 RESET BOTH PROT.DATA SWITCHES,SET SWITCH FORMAT
+
+                sim> set DS0 unprotect
+                sim> set DS0 format
+                sim> go
+
+                P20 58 RESET RUN SWITCH AT UNIT 0
+
+                sim> set DS0 unload
+                sim> step 1500000
+
+                Step expired, P: 041076 (CMPI 0)
+
+                sim> go
+
+                P20 58 SET RUN SWITCH AND WAIT UNTIL READY
+
+                sim> set DS0 load
+                sim> step 1000000
+
+                Step expired, P: 041076 (CMPI 0)
+
+                sim> go
+
+                D92 57 SHORT PASS 0001
+
+                    CYL:  HEAD0% HEAD1% HEAD2%    (ERROR TABLES)
+
+                    UNIT0 UNIT1 UNIT2 UNIT3 UNIT4 UNIT5 UNIT6 UNIT7
+                    0000  0000  0000  0000  0000  0000  0000  0000
+
+                P92 47 PAUSE AT PASS  000001
+
+TEST RESULT:    Partially passed.
+
+TEST NOTES:     The diagnostic overrides supply the expected status returns for
+                the following steps, which test features (defective, spare,
+                and protected tracks, and error correction) that are not
+                currently simulated:
+
+                  * 07 Write to a sector of a defective track
+                  * 08 Read of a sector of a defective track
+                  * 11 Write to a sector of a spare track
+                  * 12 Read of a sector of a spare track
+                  * 15 Write to a sector of a protected track
+                  * 16 Read of a sector of a protected track
+                  * 24 Read of a sector with a correctable data error
+                  * 27 Read of a sector with a correctable data error
+                  * 31 Read of a sector with a correctable data error
+                  * 48 Read of a sector with a correctable data error
+                  * 50 Read of a sector with a correctable data error
+                  * 52 Read of a sector with a correctable data error
+                  * 62 Read of a sector on a spare, protected, and defective
+                       track
+                  * 66 Multiple retries for a read of a sector with a
+                       correctable data error
+                  * 77 An SIO program conditional jump on a correctable data
+                       error
+
+                The step commands impose delays that are required by the
+                diagnostic when testing head unload and load, which assumes that
+                the user intervention will take longer than the 1.8 second
+                controller timeout.  The status returned should be Drive
+                Attention after a head load, but the diagnostic expects Normal
+                Completion, as the status is cleared whenever the controller
+                times out.
+
+
+
+--------------------------------------------------
+D419A - Cartridge Disc (multiple unit, short pass)
+--------------------------------------------------
+
+TESTED DEVICE:  DS (hp3000_ds.c)
+
+CONFIGURATION:  sim> set CLK realtime
+                sim> set DS0 7905,format
+                sim> set DS1 7905,format
+                sim> set DS2 7905,format
+                sim> set DS3 7905,format
+                sim> set DS4 7905,format
+                sim> set DS5 7905,format
+                sim> set DS6 7905,format
+                sim> set DS7 7905,format
+                sim> attach -n DS0 scratch.0.disc
+                sim> attach -n DS1 scratch.1.disc
+                sim> attach -n DS2 scratch.2.disc
+                sim> attach -n DS3 scratch.3.disc
+                sim> attach -n DS4 scratch.4.disc
+                sim> attach -n DS5 scratch.5.disc
+                sim> attach -n DS6 scratch.6.disc
+                sim> attach -n DS7 scratch.7.disc
+                sim> go
+
+TEST REPORT:    [CR entered]
+
+                D99 01 CARTRIDGE DISC (HP 30129A) DIAGNOSTIC CONFIGURATION (D419A.01.4)
+                (C)COPYRIGHT HEWLETT PACKARD COMPANY 1976.
+                Q99 02 DECIMAL DEVICE NUMBER?
+                4
+                Q99 03 MAXIMUM ERROR PRINT COUNT?
+                999
+                P99 55 UPDATE SWITCH REGISTER
+
+                sim> deposit SWCH 140000
+                sim> go
+
+                Q99 61 RESTART?(YES/NO)
+                NO
+                Q99 06 PRESENT SECTION REGISTER: %177000 DO YOU WISH TO CHANGE?(YES/NO)
+                YES
+                Q99 06 UPDATE  SECTION REGISTER: %
+                137402
+                Q99 06 PRESENT SECTION REGISTER: %137402 DO YOU WISH TO CHANGE?(YES/NO)
+                NO
+                P99 08 UNIT NUMBER TABLE
+                01 DRIVE(S);00
+                Q99 09 WISH TO ALTER TABLE?
+                YES
+                Q99 10 ENTER UNIT NUMBERS SEPARATED BY COMMAS
+                0,1,2,3,4,5,6,7
+                P99 08 UNIT NUMBER TABLE
+                08 DRIVE(S);00  01  02  03  04  05  06  07
+                Q99 09 WISH TO ALTER TABLE?
+                NO
+                P99 51 RESET SWITCH 1 (CHANGE)
+
+                sim> deposit SWCH 100001
+                sim> go
+
+                P99 05 RESET BOTH PROT.DATA SWITCHES,SET SWITCH FORMAT AND SET UNIT TO 0
+
+                Q99 42 WISH TO EXECUTE INTERACTIVE PORTION IN SECTION 1 (YES/NO)
+                NO
+
+                D99 07 CARTRIDGE DISC (HP 30129A) DIAGNOSTIC OFF-LINE (D419A.01.4)
+                D92 57 SHORT PASS 0001
+
+                    CYL:  HEAD0% HEAD1% HEAD2%    (ERROR TABLES)
+
+                    UNIT0 UNIT1 UNIT2 UNIT3 UNIT4 UNIT5 UNIT6 UNIT7
+                    0000  0000  0000  0000  0000  0000  0000  0000
+
+                P92 47 PAUSE AT PASS  000001
+
+TEST RESULT:    Partially passed.
+
+TEST NOTES:     Section 1 is not selected to avoid specifying diagnostic
+                overrides for features that are not currently simulated.
+
+
+
+--------------------------
+D421 - Memory Pattern Test
+--------------------------
+
+TESTED DEVICE:  CPU (hp3000_cpu.c)
+
+CONFIGURATION:  sim> go
+
+                Programmed halt, CIR: 030376 (HALT 16), P: 015056 (RSW)
+
+                sim> deposit SWCH 100011
+                sim> go
+
+TEST REPORT:    [CR entered]
+
+                HP 3000 SERIES II MEMORY PATERN TEST D421A.01.0
+                (C)COPYRIGHT HEWLETT PACKARD COMPANY 1976.
+
+                LOW BANK?0
+                LOW ADDRESS?020000
+                HIGH BANK?3
+                HIGH ADDRESS?177777
+                PASS # 000000
+
+                Programmed halt, CIR: 030375 (HALT 15), P: 010255 (BR P-154)
+
+TEST RESULT:    Passed.
+
+TEST NOTES:     The diagnostic is only applicable to the Series II, so the
+                highest memory bank that can be tested is bank 3.  The Series
+                III implemented its memory pattern test in microcode.
+
+
+
+---------------------------
+D422A - Multiplexer Channel
+---------------------------
+
+TESTED DEVICE:  MPX (hp3000_chan.c)
+
+CONFIGURATION:  sim> set scmb1 enable
+                sim> set scmb2 enable
+                sim> set scmb1 mx
+                sim> set scmb2 mx
+                sim> set clk realtime
+                sim> go
+
+TEST REPORT:    [CR entered]
+
+                DO1 30036A/B MPX CHANNEL TEST (HP D422A.01.2)
+                (C)COPYRIGHT HEWLETT-PACKARD COMPANY 1978.
+                Q01 SELECT SWITCH REGISTER OPTIONS
+
+                Programmed halt, CIR: 030360 (HALT 0), P: 042614 (RSW)
+
+                sim> deposit SWCH 140000
+                sim> go
+
+                Q02 SELECT SECTION OPTIONS
+
+                Programmed halt, CIR: 030361 (HALT 1), P: 042660 (LDI 1)
+
+                sim> deposit SWCH 177777
+                sim> go
+
+                Q03 RESTORE REGISTER OPTIONS
+
+                Programmed halt, CIR: 030362 (HALT 2), P: 042667 (RSW)
+
+                sim> deposit SWCH 100001
+                sim> go
+
+                Q04 ENTER MPX DEVICE #= 127
+                Q05 ENTER MAXIMUM ERROR COUNT# = 999
+                P02 END SECTION IORES
+                P02 END SECTION ARADDR
+                P02 END SECTION ARDATA
+                P02 END SECTION ARCPP
+                P02 END SECTION ORADDR
+                P02 END SECTION ORDATA
+                P02 END SECTION ORCP
+                P02 END SECTION AREG
+                P02 END SECTION OREG
+                P02 END SECTION NSGP1
+                P02 END SECTION NSGP2
+                P02 END SECTION NSGP3
+                P02 END SECTION NSGP4
+                P02 END SECTION STPAR
+                P11 IF SEL. CHAN. MAINTENANCE BOARD ALREADY IN THEN HIT * CR*
+                P11 OTHERWISE INSERT BOARD,CONNECT POLLS,AND RE-COLD LOAD
+
+                Q06 ENTER SEL. CHAN. MAINTENANCE BOARD DRT# =65
+                Q07 ENTER 2ND SCMB DRT# = 66
+                Q08 ENTER CLOCK/CONSOLE DRT# = 3
+
+                Q09 ENTER UPPER BANK # (DECIMAL) = 7
+                P15 END SIO TEST CONFIGURATION
+
+                P16 FAST SR READ MODE(2K XFER); TIME = 4    MSEC.; BANK 00; STEP 63
+                P16 FAST SR READ MODE(2K XFER); TIME = 4    MSEC.; BANK 01; STEP 63
+                P16 FAST SR READ MODE(2K XFER); TIME = 4    MSEC.; BANK 02; STEP 63
+                P16 FAST SR READ MODE(2K XFER); TIME = 4    MSEC.; BANK 03; STEP 63
+                P16 FAST SR READ MODE(2K XFER); TIME = 4    MSEC.; BANK 04; STEP 63
+                P16 FAST SR READ MODE(2K XFER); TIME = 4    MSEC.; BANK 05; STEP 63
+                P16 FAST SR READ MODE(2K XFER); TIME = 4    MSEC.; BANK 06; STEP 63
+                P16 FAST SR READ MODE(2K XFER); TIME = 4    MSEC.; BANK 07; STEP 63
+                P17 FAST SR WRITE MODE(2K XFER); TIME=4   MSEC.; BANK 00; STEP 68
+                P17 FAST SR WRITE MODE(2K XFER); TIME=4   MSEC.; BANK 01; STEP 68
+                P17 FAST SR WRITE MODE(2K XFER); TIME=4   MSEC.; BANK 02; STEP 68
+                P17 FAST SR WRITE MODE(2K XFER); TIME=4   MSEC.; BANK 03; STEP 68
+                P17 FAST SR WRITE MODE(2K XFER); TIME=4   MSEC.; BANK 04; STEP 68
+                P17 FAST SR WRITE MODE(2K XFER); TIME=4   MSEC.; BANK 05; STEP 68
+                P17 FAST SR WRITE MODE(2K XFER); TIME=4   MSEC.; BANK 06; STEP 68
+                P17 FAST SR WRITE MODE(2K XFER); TIME=4   MSEC.; BANK 07; STEP 68
+                P02 END SECTION SIOTST
+                D02 END MPX CHAN TEST
+                D03 END: PROGRAM CYCLE: PASS = 1
+
+                Programmed halt, CIR: 030375 (HALT 15), P: 010175 (ZERO,NOP)
+
+TEST RESULT:    Passed.
+
+
+
+--------------------------------------------
+D426A - System Clock/Fault Logging Interface
+--------------------------------------------
+
+TESTED DEVICE:  CLK (hp3000_clk.c)
+
+CONFIGURATION:  sim> set clk realtime
+                sim> go
+
+TEST REPORT:    [CR entered]
+
+                D01 HP        SYSTEM CLOCK DIAGNOSTIC  (D426A.00.00)
+                (C)COPYRIGHT HEWLETT-PACKARD COMPANY 1978.
+                Q02 SELECT SWREG OPTIONS
+
+                Programmed halt, CIR: 030360 (HALT 0), P: 010022 (RSW)
+
+                sim> deposit SWCH 140000
+                sim> go
+
+                Q03 SELECT SECTION SWREG. OPTIONS
+
+                Programmed halt, CIR: 030361 (HALT 1), P: 010066 (RSW)
+
+                sim> deposit SWCH 074000
+                sim> go
+
+                Q05 RESTORE SWREG OPTIONS
+
+                Programmed halt, CIR: 030362 (HALT 2), P: 010075 (RSW)
+
+                sim> deposit SWCH 100011
+                sim> go
+
+                P01 SECTION  1
+                P03 END STEP  101
+                P03 END STEP  103
+                P03 END STEP  105
+                P02 END SECTION  1
+
+                P01 SECTION  2
+                P03 END STEP  202
+                P03 END STEP  203
+                P03 END STEP  204
+                P03 END STEP  205
+                P03 END STEP  206
+                P03 END STEP  207
+                P03 END STEP  210
+                P02 END SECTION  2
+
+                P01 SECTION  3
+                P03 END STEP  302
+                P03 END STEP  304
+                P03 END STEP  306
+                P03 END STEP  310
+                P03 END STEP  312
+                P03 END STEP  314
+                P03 END STEP  316
+                P02 END SECTION  3
+
+                P01 SECTION  4
+                P03 END STEP  402
+                P03 END STEP  404
+                P03 END STEP  406
+                P03 END STEP  407
+                P03 END STEP  410
+                P03 END STEP  411
+                P03 END STEP  412
+                P03 END STEP  413
+                P03 END STEP  414
+                P03 END STEP  415
+                P03 END STEP  422
+                P03 END STEP  424
+                P03 END STEP  426
+                P02 END SECTION  4
+                D02 END: PROGRAM CYCLE: PASS = 1
+
+                D03 HALT: COMPLETE PROGRAM CYCLE
+
+                Programmed halt, CIR: 030375 (HALT 15), P: 010300 (BR P-230)
+
+TEST RESULT:    Passed.
+
+TEST NOTES:     This diagnostic does not test the Fault Logging Interface.
+
+
+
+-------------------------------
+D427A - Terminal Data Interface
+-------------------------------
+
+TESTED DEVICE:  ATCD (hp3000_atc.c)
+
+CONFIGURATION:  sim> set atcd diag
+                sim> set clk realtime
+                sim> go
+
+TEST REPORT:    Programmed halt, CIR: 030366 (HALT 6), P: 010764 (LRA P+4)
+
+                sim> deposit SWCH 140000
+                sim> go
+
+                Programmed halt, CIR: 030365 (HALT 5), P: 010215 (RSW)
+
+                sim> deposit SWCH 077400
+                sim> go
+
+                Programmed halt, CIR: 030366 (HALT 6), P: 010231 (BR P-47)
+
+                sim> deposit SWCH 100011
+                sim> go
+
+                Programmed halt, CIR: 030375 (HALT 15), P: 010331 (BR P+7)
+
+TEST RESULT:    Passed.
+
+
+
+------------------------
+D429A - Selector Channel
+------------------------
+
+TESTED DEVICE:  SEL (hp3000_sel.c)
+
+CONFIGURATION:  sim> set clk realtime
+                sim> set scmb enable
+                sim> set scmb sc
+                sim> go
+
+TEST REPORT:    [CR entered]
+
+                D100 HP30030B/C SELECTOR CHANNEL DIAG (D429A.01.01)
+                (C)COPYRIGHT HEWLETT-PACKARD COMPANY 1978.
+                Q104 SELECT OPTIONS
+
+                Programmed halt, CIR: 030360 (HALT 0), P: 010033 (RSW)
+
+                sim> deposit SWCH 140000
+                sim> go
+
+                Q110 SELECT SECTION OPTIONS
+
+                Programmed halt, CIR: 030361 (HALT 1), P: 010073 (RSW)
+
+                sim> deposit SWCH 177400
+                sim> go
+
+                Q111 RESTORE SELECT OPTIONS
+
+                Programmed halt, CIR: 030362 (HALT 2), P: 010102 (RSW)
+
+                sim> deposit SWCH 100011
+                sim> go
+
+                Q101 SET MAINT CARD DEV NUM? 65
+                Q102 SET TIMER/CONSOLE DEV NUM? 3
+
+                Q108 ENTER UPPER BANK # (DECIMAL) = 7
+                Q105 ERR PRINT LIMIT? 999
+                D110 DIRECT I/O TEST
+                D127 DIRECT I/O TEST COMPLETED
+                D130 CONTROL ORDER TEST
+                D217 CONTROL ORDER TEST COMPLETE
+                D220 READ TEST
+                D244 2K READ 1 MILLISEC; BANK00
+                D244 2K READ 1 MILLISEC; BANK01
+                D244 2K READ 1 MILLISEC; BANK02
+                D244 2K READ 1 MILLISEC; BANK03
+                D244 2K READ 1 MILLISEC; BANK04
+                D244 2K READ 1 MILLISEC; BANK05
+                D244 2K READ 1 MILLISEC; BANK06
+                D244 2K READ 1 MILLISEC; BANK07
+                D247 READ TEST COMPLETED
+                D250 WRITE TEST
+                D274 2K WRITE 1 MILLISEC; BANK00
+                D274 2K WRITE 1 MILLISEC; BANK01
+                D274 2K WRITE 1 MILLISEC; BANK02
+                D274 2K WRITE 1 MILLISEC; BANK03
+                D274 2K WRITE 1 MILLISEC; BANK04
+                D274 2K WRITE 1 MILLISEC; BANK05
+                D274 2K WRITE 1 MILLISEC; BANK06
+                D274 2K WRITE 1 MILLISEC; BANK07
+                D275 WRITE TEST COMPLETED
+                D300 CHAINED READ TEST
+                D317 CHAINED READ TEST COMPLETED
+                D320 CHAINED WRITE TEST
+                D337 CHAINED WRITE TEST COMPLETE
+                D340 ERROR RESPONSE TEST
+                D367 ERROR RESPONSE TEST COMPLETED
+                D600 SELECTOR CHANNEL DIAG COMPLETE
+                D601 END OF PASS 1
+
+                Programmed halt, CIR: 030375 (HALT 15), P: 010427 (SED 0)
+
+TEST RESULT:    Passed.
+
+
+
+------------------------------------------
+D429A - Selector Channel Maintenance Board
+------------------------------------------
+
+TESTED DEVICE:  SCMB (hp3000_scmb.c)
+
+CONFIGURATION:  sim> set clk realtime
+                sim> set scmb1 enable
+                sim> set scmb1 mx
+                sim> set scmb2 enable
+                sim> set scmb2 mx
+                sim> go
+
+TEST REPORT:    [CR entered]
+
+                D100 HP30030B/C SELECTOR CHANNEL DIAG (D429A.01.01)
+                (C)COPYRIGHT HEWLETT-PACKARD COMPANY 1978.
+                Q104 SELECT OPTIONS
+
+                Programmed halt, CIR: 030360 (HALT 0), P: 010033 (RSW)
+
+                sim> deposit SWCH 140000
+                sim> go
+
+                Q110 SELECT SECTION OPTIONS
+
+                Programmed halt, CIR: 030361 (HALT 1), P: 010073 (RSW)
+
+                sim> deposit SWCH 177400
+                sim> go
+
+                Q111 RESTORE SELECT OPTIONS
+
+                Programmed halt, CIR: 030362 (HALT 2), P: 010102 (RSW)
+
+                sim> deposit SWCH 101011
+                sim> go
+
+                Q101 SET MAINT CARD DEV NUM? 65
+                Q102 SET TIMER/CONSOLE DEV NUM? 3
+
+                Q108 ENTER UPPER BANK # (DECIMAL) = 7
+                Q105 ERR PRINT LIMIT? 999
+                D110 DIRECT I/O TEST
+                D127 DIRECT I/O TEST COMPLETED
+                D130 CONTROL ORDER TEST
+                D217 CONTROL ORDER TEST COMPLETE
+                D220 READ TEST
+                D244 2K READ 4 MILLISEC; BANK00
+                D244 2K READ 4 MILLISEC; BANK01
+                D244 2K READ 4 MILLISEC; BANK02
+                D244 2K READ 4 MILLISEC; BANK03
+                D244 2K READ 4 MILLISEC; BANK04
+                D244 2K READ 4 MILLISEC; BANK05
+                D244 2K READ 4 MILLISEC; BANK06
+                D244 2K READ 4 MILLISEC; BANK07
+                D247 READ TEST COMPLETED
+                D250 WRITE TEST
+                D274 2K WRITE 4 MILLISEC; BANK00
+                D274 2K WRITE 4 MILLISEC; BANK01
+                D274 2K WRITE 4 MILLISEC; BANK02
+                D274 2K WRITE 4 MILLISEC; BANK03
+                D274 2K WRITE 4 MILLISEC; BANK04
+                D274 2K WRITE 4 MILLISEC; BANK05
+                D274 2K WRITE 4 MILLISEC; BANK06
+                D274 2K WRITE 4 MILLISEC; BANK07
+                D275 WRITE TEST COMPLETED
+                D300 CHAINED READ TEST
+                D317 CHAINED READ TEST COMPLETED
+                D320 CHAINED WRITE TEST
+                D337 CHAINED WRITE TEST COMPLETE
+                D340 ERROR RESPONSE TEST
+                D367 ERROR RESPONSE TEST COMPLETED
+                D600 SELECTOR CHANNEL DIAG COMPLETE
+                D601 END OF PASS 1
+
+                Programmed halt, CIR: 030375 (HALT 15), P: 010427 (SED 0)
+
+                sim> deposit SWCH 140000
+                sim> go
+
+                D600 SELECTOR CHANNEL DIAG COMPLETE
+                D601 END OF PASS 2
+                Q110 SELECT SECTION OPTIONS
+
+                Programmed halt, CIR: 030361 (HALT 1), P: 010073 (RSW)
+
+                sim> deposit SWCH 177400
+                sim> go
+
+                Q111 RESTORE SELECT OPTIONS
+
+                Programmed halt, CIR: 030362 (HALT 2), P: 010102 (RSW)
+
+                sim> deposit SWCH 101011
+                sim> go
+
+                Q101 SET MAINT CARD DEV NUM? 66
+                Q102 SET TIMER/CONSOLE DEV NUM? 3
+
+                Q108 ENTER UPPER BANK # (DECIMAL) = 7
+                Q105 ERR PRINT LIMIT? 999
+                D110 DIRECT I/O TEST
+                D127 DIRECT I/O TEST COMPLETED
+                D130 CONTROL ORDER TEST
+                D217 CONTROL ORDER TEST COMPLETE
+                D220 READ TEST
+                D244 2K READ 4 MILLISEC; BANK00
+                D244 2K READ 4 MILLISEC; BANK01
+                D244 2K READ 4 MILLISEC; BANK02
+                D244 2K READ 4 MILLISEC; BANK03
+                D244 2K READ 4 MILLISEC; BANK04
+                D244 2K READ 4 MILLISEC; BANK05
+                D244 2K READ 4 MILLISEC; BANK06
+                D244 2K READ 4 MILLISEC; BANK07
+                D247 READ TEST COMPLETED
+                D250 WRITE TEST
+                D274 2K WRITE 4 MILLISEC; BANK00
+                D274 2K WRITE 4 MILLISEC; BANK01
+                D274 2K WRITE 4 MILLISEC; BANK02
+                D274 2K WRITE 4 MILLISEC; BANK03
+                D274 2K WRITE 4 MILLISEC; BANK04
+                D274 2K WRITE 4 MILLISEC; BANK05
+                D274 2K WRITE 4 MILLISEC; BANK06
+                D274 2K WRITE 4 MILLISEC; BANK07
+                D275 WRITE TEST COMPLETED
+                D300 CHAINED READ TEST
+                D317 CHAINED READ TEST COMPLETED
+                D320 CHAINED WRITE TEST
+                D337 CHAINED WRITE TEST COMPLETE
+                D340 ERROR RESPONSE TEST
+                D367 ERROR RESPONSE TEST COMPLETED
+                D600 SELECTOR CHANNEL DIAG COMPLETE
+                D601 END OF PASS 1
+
+                Programmed halt, CIR: 030375 (HALT 15), P: 010427 (SED 0)
+
+TEST RESULT:    Passed.
+
+
+
+----------------------------------------------------
+D433A - 7970B Nine-Track Magnetic Tape (single unit)
+----------------------------------------------------
+
+TESTED DEVICE:  MS (hp3000_ms.c)
+
+CONFIGURATION:  sim> set clk realtime
+                sim> set ms0 7970B,reel=600
+                sim> go
+
+TEST REPORT:    [CR entered]
+
+                HP 30115A 9-TRACK MAGNETIC TAPE (D433A.01.4)
+                       (STAND-ALONE DIAGNOSTIC PROGRAM)
+
+                (C) COPYRIGHT  HEWLETT-PACKARD COMPANY 1976.
+
+
+                Q010 TAPE DEVICE NUMBER?  6
+                Q011 TIMER DEVICE NUMBER? 3
+                Q012 MAXIMUM ERROR PRINT COUNT? 100
+                P005 TYPE FOLLOWING CONTROL
+                      A'CR'-AUTO,  R'CR'-RESTART,
+                      M'CR'-MANU,  'CR'-RESUME,   YOUR CODE? A
+                D015 PRESENT SECTION REGISTER:%077414 DO YOU WISH TO CHANGE?(YES/NO)YES
+                D015 UPDATE  SECTION REGISTER:%067400
+                D015 PRESENT SECTION REGISTER:%067400 DO YOU WISH TO CHANGE?(YES/NO)NO
+
+                Q019 AUTO-PROCESS:  ENTER TAPE UNIT(B,E,NO) AT
+                Q020 DRIVE 0? B
+                Q020 DRIVE 1? NO
+                Q020 DRIVE 2? NO
+                Q020 DRIVE 3? NO
+                P003 UNLOAD PROGRAM TAPE - LOAD TEST TAPE(S)
+                Q030 ALL DEFINITIONS CORRECT(YES/NO)? YES
+                P011 UPDATE SWITCH REGISTER    (CR)
+
+
+                 NEW INT.SW.REG 1 000 000 000 000 001
+                D031  TEST  SECTION A01 COMPL.
+                D031  TEST  SECTION A02 COMPL.
+                E274 STEP-0434 COMP. AND READ CRCC ARE DIFFER.
+                E116 STEP-0434  EXPECT.- OBTAIN. CRCC
+                                120200   032400
+                E274 STEP-0437 COMP. AND READ CRCC ARE DIFFER.
+                E116 STEP-0437  EXPECT.- OBTAIN. CRCC
+                                000310   032400
+                D065 000004 ERRORS IN SECTION 04
+                D066 000004 TOTAL ERRORS
+                D031  TEST  SECTION A04 COMPL.
+                D031  TEST  SECTION A05 COMPL.
+                D031  TEST  SECTION A06 COMPL.
+                D031  TEST  SECTION A07 COMPL.
+                P060 01 PASS   000004 TOTAL ERRORS
+                P010 PAUSE AT PASS 01
+
+TEST RESULT:    Partially passed.
+
+TEST NOTES:     Section 3 (tape mark tests) is not selected, as the simulation
+                does not provide the capability to write arbitrary data in each
+                of the tape tracks and so cannot write or read bad tape marks.
+
+                Steps 434 and 437 (read-after-write tests) fail, as the simulation
+                does not provide the capability to write or ready arbitrary
+                cyclic redundancy check characters (CRCCs).
+
+
+
+------------------------------------------------------
+D433A - 7970E Nine-Track Magnetic Tape (multiple unit)
+------------------------------------------------------
+
+TESTED DEVICE:  MS (hp3000_ms.c)
+
+CONFIGURATION:  sim> set clk realtime
+                sim> set ms0 7970E,reel=600
+                sim> set ms1 7970E,reel=600
+                sim> set ms2 7970E,reel=600
+                sim> set ms3 7970E,reel=600
+                sim> go
+
+TEST REPORT:    [CR entered]
+
+                HP 30115A 9-TRACK MAGNETIC TAPE (D433A.01.4)
+                       (STAND-ALONE DIAGNOSTIC PROGRAM)
+
+                (C) COPYRIGHT  HEWLETT-PACKARD COMPANY 1976.
+
+
+                Q010 TAPE DEVICE NUMBER?  6
+                Q011 TIMER DEVICE NUMBER? 3
+                Q012 MAXIMUM ERROR PRINT COUNT? 100
+                P005 TYPE FOLLOWING CONTROL
+                      A'CR'-AUTO,  R'CR'-RESTART,
+                      M'CR'-MANU,  'CR'-RESUME,   YOUR CODE? A
+                D015 PRESENT SECTION REGISTER:%077414 DO YOU WISH TO CHANGE?(YES/NO)YES
+                D015 UPDATE  SECTION REGISTER:%077400
+                D015 PRESENT SECTION REGISTER:%077400 DO YOU WISH TO CHANGE?(YES/NO)NO
+
+                Q019 AUTO-PROCESS:  ENTER TAPE UNIT(B,E,NO) AT
+                Q020 DRIVE 0? E
+                Q020 DRIVE 1? E
+                Q020 DRIVE 2? E
+                Q020 DRIVE 3? E
+                P003 UNLOAD PROGRAM TAPE - LOAD TEST TAPE(S)
+
+                [CTRL+E]
+
+                sim> attach -n ms0 scratch.0.tape
+                sim> attach -n ms1 scratch.1.tape
+                sim> attach -n ms2 scratch.2.tape
+                sim> attach -n ms3 scratch.3.tape
+                sim> go
+
+                Q030 ALL DEFINITIONS CORRECT(YES/NO)? YES
+                P011 UPDATE SWITCH REGISTER    (CR)
+
+                [CTRL+E]
+
+                sim> deposit SWCH 100011
+                sim> set ms realtime
+                sim> go
+
+                 NEW INT.SW.REG 1 000 000 000 001 001
+                D031  TEST  SECTION A01 COMPL.
+                D031  TEST  SECTION A02 COMPL.
+                D031  TEST  SECTION A03 COMPL.
+                D031  TEST  SECTION A04 COMPL.
+                D031  TEST  SECTION A05 COMPL.
+                D031  TEST  SECTION A06 COMPL.
+                D031  TEST  SECTION A07 COMPL.
+                P060 01 PASS   000000 TOTAL ERRORS
+                P010 PAUSE AT PASS 01
+
+TEST RESULT:    Passed.
+
+
+
+---------------------------------------------------------
+D433A - 7970E Nine-Track Magnetic Tape (user interaction)
+---------------------------------------------------------
+
+TESTED DEVICE:  MS (hp3000_ms.c)
+
+CONFIGURATION:  sim> set clk realtime
+                sim> set ms0 7970E,reel=600
+                sim> go
+
+TEST REPORT:    [CR entered]
+
+                HP 30115A 9-TRACK MAGNETIC TAPE (D433A.01.4)
+                       (STAND-ALONE DIAGNOSTIC PROGRAM)
+
+                (C) COPYRIGHT  HEWLETT-PACKARD COMPANY 1976.
+
+
+                Q010 TAPE DEVICE NUMBER?  6
+                Q011 TIMER DEVICE NUMBER? 3
+                Q012 MAXIMUM ERROR PRINT COUNT? 100
+                P005 TYPE FOLLOWING CONTROL
+                      A'CR'-AUTO,  R'CR'-RESTART,
+                      M'CR'-MANU,  'CR'-RESUME,   YOUR CODE? M
+                D015 PRESENT SECTION REGISTER:%077414 DO YOU WISH TO CHANGE?(YES/NO)YES
+                D015 UPDATE  SECTION REGISTER:%000014
+                D015 PRESENT SECTION REGISTER:%000014 DO YOU WISH TO CHANGE?(YES/NO)NO
+                P015 MANU PROCES:  UPDATE SWITCH REGISTER (CR)
+
+                 NEW INT.SW.REG 1 000 000 000 001 001
+                P019 ON-LINE/RESET TEST
+                P026 LOAD TAPE(RING),  PUSH RESET, OFF AND TYPE RESPONSE 'CR'
+
+                sim> attach -n ms0 scratch.tape
+                sim> set ms0 offline
+                sim> go
+
+                P027 PUSH DRIVE 0, ON-LINE AND TYPE RESPONSE 'CR'
+
+                sim> set ms0 online
+                sim> go
+
+                P028 PUSH RESET, OFF AND TYPE RESPONSE 'CR'
+
+                sim> set ms0 offline
+                sim> go
+
+                P027 PUSH DRIVE 1, ON-LINE AND TYPE RESPONSE 'CR'
+
+                sim> detach ms0
+                sim> attach ms1 scratch.tape
+                sim> go
+
+                P028 PUSH RESET, OFF AND TYPE RESPONSE 'CR'
+
+                sim> set ms1 offline
+                sim> go
+
+                P027 PUSH DRIVE 2, ON-LINE AND TYPE RESPONSE 'CR'
+
+                sim> detach ms1
+                sim> attach ms2 scratch.tape
+                sim> go
+
+                P028 PUSH RESET, OFF AND TYPE RESPONSE 'CR'
+
+                sim> set ms2 offline
+                sim> go
+
+                P027 PUSH DRIVE 3, ON-LINE AND TYPE RESPONSE 'CR'
+
+                sim> detach ms2
+                sim> attach ms3 scratch.tape
+                sim> go
+
+                P028 PUSH RESET, OFF AND TYPE RESPONSE 'CR'
+
+                sim> set ms3 offline
+                sim> go
+
+                P029 LOAD TAPE(RING), PUSH OFF,RESET, ON-LINE AND
+                P056 TYPE SELECTED DRIVE ?
+
+                sim> detach ms3
+                sim> attach ms0 scratch.tape
+                sim> set ms0 offline
+                sim> go
+                0
+                P038 PUSH  DRIVE 0 BUTTON & TYPE RESPONSE 'CR'
+
+                sim> set ms0 online
+                sim> go
+
+                P039 CHECK LIGHT RESET, PUSH ON-LINE AND RESPOND
+
+                sim> set ms0 online
+                sim> go
+
+                P029 LOAD TAPE(RING), PUSH OFF,RESET, ON-LINE AND TYPE RESPONSE 'CR'
+
+                sim> set ms0 offline
+                sim> go
+
+                P030 CHECK LIGHT WRITE-ENABLE, PUSH DRIVE 0 AND TYPE RESPONSE 'CR'
+
+                sim> set ms0 online
+                sim> go
+
+                P030 CHECK LIGHT WRITE-ENABLE, PUSH DRIVE 1 AND TYPE RESPONSE 'CR'
+
+                sim> detach ms0
+                sim> attach ms1 scratch.tape
+                sim> go
+
+                P030 CHECK LIGHT WRITE-ENABLE, PUSH DRIVE 2 AND TYPE RESPONSE 'CR'
+
+                sim> detach ms1
+                sim> attach ms2 scratch.tape
+                sim> go
+
+                P030 CHECK LIGHT WRITE-ENABLE, PUSH DRIVE 3 AND TYPE RESPONSE 'CR'
+
+                sim> detach ms2
+                sim> attach ms3 scratch.tape
+                sim> go
+
+                P029 LOAD TAPE(RING), PUSH OFF,RESET, ON-LINE AND TYPE RESPONSE 'CR'
+
+                sim> detach ms3
+                sim> attach ms0 scratch.tape
+                sim> set ms0 offline
+                sim> go
+
+                P032 PUSH DRIVE 0 AND TYPE RESPONSE 'CR'
+
+                sim> set ms0 online
+                sim> go
+
+                P033 PUSH RESET, ON-LINE AND TYPE RESPONSE 'CR'
+
+                sim> set ms0 offline
+                sim> set ms0 online
+                sim> go
+
+                P032 PUSH DRIVE 1 AND TYPE RESPONSE 'CR'
+
+                sim> detach ms0
+                sim> attach ms1 scratch.tape
+                sim> go
+
+                P033 PUSH RESET, ON-LINE AND TYPE RESPONSE 'CR'
+
+                sim> set ms1 offline
+                sim> set ms1 online
+                sim> go
+
+                P032 PUSH DRIVE 2 AND TYPE RESPONSE 'CR'
+
+                sim> detach ms1
+                sim> attach ms2 scratch.tape
+                sim> go
+
+                P033 PUSH RESET, ON-LINE AND TYPE RESPONSE 'CR'
+
+                sim> set ms2 offline
+                sim> set ms2 online
+                sim> go
+
+                P032 PUSH DRIVE 3 AND TYPE RESPONSE 'CR'
+
+                sim> detach ms2
+                sim> attach ms3 scratch.tape
+                sim> go
+
+                P033 PUSH RESET, ON-LINE AND TYPE RESPONSE 'CR'
+
+                sim> set ms3 offline
+                sim> set ms3 online
+                sim> go
+
+                P034 PUT TAPE(RING), PUSH OFF, RESET AND RESPOND  'CR'
+
+                sim> detach ms3
+                sim> attach ms0 scratch.tape
+                sim> set ms0 offline
+                sim> go
+
+                P035 PUSH ON-LINE, DRIVE 0 AND TAPE RESPONSE 'CR'
+
+                sim> set ms0 online
+                sim> go
+
+                P036 PUSH RESET AND TYPE RESPONSE 'CR'
+
+                sim> set ms0 offline
+                sim> go
+
+                P035 PUSH ON-LINE, DRIVE 1 AND TAPE RESPONSE 'CR'
+
+                sim> detach ms0
+                sim> attach ms1 scratch.tape
+                sim> go
+
+                P036 PUSH RESET AND TYPE RESPONSE 'CR'
+
+                sim> set ms1 offline
+                sim> go
+
+                P035 PUSH ON-LINE, DRIVE 2 AND TAPE RESPONSE 'CR'
+
+                sim> detach ms1
+                sim> attach ms2 scratch.tape
+                sim> go
+
+                P036 PUSH RESET AND TYPE RESPONSE 'CR'
+
+                sim> set ms2 offline
+                sim> go
+
+                P035 PUSH ON-LINE, DRIVE 3 AND TAPE RESPONSE 'CR'
+
+                sim> detach ms2
+                sim> attach ms3 scratch.tape
+                sim> go
+
+                P036 PUSH RESET AND TYPE RESPONSE 'CR'
+
+                sim> set ms3 offline
+                sim> go
+
+                P037 FSR/BSR-TEST: TYPE DRIVE NUMBER AND 'CR'(EXECUTE) OR 'CR'(EXIT)0
+                P029 LOAD TAPE(RING), PUSH OFF,RESET, ON-LINE AND TYPE RESPONSE 'CR'
+
+                sim> detach ms3
+                sim> attach ms0 scratch.tape
+                sim> set ms0 offline
+                sim> go
+
+                P035 PUSH ON-LINE, DRIVE 0 AND TAPE RESPONSE 'CR'
+
+                sim> set ms0 online
+                sim> go
+
+                D031  TEST  SECTION M12 COMPL.
+                P056 TYPE SELECTED DRIVE ?  0
+                P041 LOAD TAPE(RING), PUSH DRIVE 0 AND TYPE RESPONSE 'CR
+
+                sim> attach -n ms0 scratch.tape
+                sim> go
+
+                P042 REMOVE RING FROM REEL, PUT IT BACK  AND TYPE RESPONSE 'CR'
+
+                sim> detach ms0
+                sim> attach -r ms0 scratch.tape
+                sim> go
+
+                P043 PUT RING BACK TO REEL, LOAD IT AND TYPE 'CR'(RESPONSE)
+
+                sim> detach ms0
+                sim> attach ms0 scratch.tape
+                sim> go
+
+                D031  TEST  SECTION M13 COMPL.
+                P060 01 PASS   000000 TOTAL ERRORS
+                P010 PAUSE AT PASS 01
+
+TEST RESULT:    Passed.
+
+
+
+---------------------------
+D435A - Universal Interface
+---------------------------
+
+TESTED DEVICE:  LP (hp3000_lp.c)
+
+CONFIGURATION:  sim> set lp diagnostic,intmask=8
+                sim> set clk realtime
+                sim> go
+
+TEST REPORT:    [CR entered]
+
+                D100  UNIV. INTERFACE TEST (HP D435A.01.01)
+                (C)COPYRIGHT HEWLETT PACKARD COMPANY 1976.
+                ****************** WARNING ******************
+                this diagnostic has tests which will produce error
+                conditions on interface boards which have datecodes
+                PRIOR TO 1504.
+
+                Q110  DEVICE NUMBER? 14
+                Q112  INTERRUPT MASK? 8
+                Q113  NEGATIVE TRUE? NO
+                Q114  CHANGE INTERNAL SWITCH REGISTER? ? YES
+                P114  INTERNAL SWITCH REGISTER
+
+                Programmed halt, CIR: 030366 (HALT 6), P: 026015 (DDEL,DDEL)
+
+                sim> deposit SWCH 100111
+                sim> go
+
+                Q115  SECTION LIST?
+                Q116  READER-PUNCH INTERFACE ? NO
+                D102  END SECTION 0
+
+                D100  UNIV. INTERFACE TEST (HP D435A.01.01)
+                (C)COPYRIGHT HEWLETT PACKARD COMPANY 1976.
+                ****************** WARNING ******************
+                this diagnostic has tests which will produce error
+                conditions on interface boards which have datecodes
+                PRIOR TO 1504.
+                P120  CONT6 ON, REST OFF
+
+                Programmed halt, CIR: 030367 (HALT 7), P: 022145 (DDEL,DDEL)
+
+                sim> assert LP CONT=10000
+                sim> go
+
+                P120  CONT7 ON, REST OFF
+
+                Programmed halt, CIR: 030367 (HALT 7), P: 022145 (DDEL,DDEL)
+
+                sim> assert LP CONT=01000
+                sim> go
+
+                P120  CONT8 ON, REST OFF
+
+                Programmed halt, CIR: 030367 (HALT 7), P: 022145 (DDEL,DDEL)
+
+                sim> assert LP CONT=00100
+                sim> go
+
+                P120  CONT9 ON, REST OFF
+
+                Programmed halt, CIR: 030367 (HALT 7), P: 022145 (DDEL,DDEL)
+
+                sim> assert LP CONT=00010
+                sim> go
+
+                P120  CONT10 ON, REST OFF
+
+                Programmed halt, CIR: 030367 (HALT 7), P: 022145 (DDEL,DDEL)
+
+                sim> assert LP CONT=00001
+                sim> go
+
+                P121  JUMPER J2W1 LOW, REST HIGH
+
+                Programmed halt, CIR: 030370 (HALT 10), P: 022056 (DDEL,DDEL)
+
+                sim> assert LP J2WX=0000000001
+                sim> go
+
+                P121  JUMPER J2W2 LOW, REST HIGH
+
+                Programmed halt, CIR: 030370 (HALT 10), P: 022056 (DDEL,DDEL)
+
+                sim> assert LP J2WX=0000000010
+                sim> go
+
+                P121  JUMPER J2W3 LOW, REST HIGH
+
+                Programmed halt, CIR: 030370 (HALT 10), P: 022056 (DDEL,DDEL)
+
+                sim> assert LP J2WX=0000000100
+                sim> go
+
+                P121  JUMPER J2W4 LOW, REST HIGH
+
+                Programmed halt, CIR: 030370 (HALT 10), P: 022056 (DDEL,DDEL)
+
+                sim> assert LP J2WX=0000001000
+                sim> go
+
+                P121  JUMPER J2W5 LOW, REST HIGH
+
+                Programmed halt, CIR: 030370 (HALT 10), P: 022056 (DDEL,DDEL)
+
+                sim> assert LP J2WX=0000010000
+                sim> go
+
+                P121  JUMPER J2W6 LOW, REST HIGH
+
+                Programmed halt, CIR: 030370 (HALT 10), P: 022056 (DDEL,DDEL)
+
+                sim> assert LP J2WX=0000100000
+                sim> go
+
+                P121  JUMPER J2W7 LOW, REST HIGH
+
+                Programmed halt, CIR: 030370 (HALT 10), P: 022056 (DDEL,DDEL)
+
+                sim> assert LP J2WX=0001000000
+                sim> go
+
+                P121  JUMPER J2W8 LOW, REST HIGH
+
+                Programmed halt, CIR: 030370 (HALT 10), P: 022056 (DDEL,DDEL)
+
+                sim> assert LP J2WX=0010000000
+                sim> go
+
+                P121  JUMPER J2W9 LOW, REST HIGH
+
+                Programmed halt, CIR: 030370 (HALT 10), P: 022056 (DDEL,DDEL)
+
+                sim> assert LP J2WX=0100000000
+                sim> go
+
+                P121  JUMPER J2W10 LOW, REST HIGH
+
+                Programmed halt, CIR: 030370 (HALT 10), P: 022056 (DDEL,DDEL)
+
+                sim> assert LP J2WX=1000000000
+                sim> go
+
+                P122  DEVICE END ASSERTED
+
+                Programmed halt, CIR: 030371 (HALT 11), P: 021505 (DDEL,DDEL)
+
+                sim> assert LP DEVEND=1
+                sim> go
+
+                P124  BIT 0 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=100000
+                sim> go
+
+                P124  BIT 1 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=040000
+                sim> go
+
+                P124  BIT 2 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=020000
+                sim> go
+
+                P124  BIT 3 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=010000
+                sim> go
+
+                P124  BIT 4 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=004000
+                sim> go
+
+                P124  BIT 5 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=002000
+                sim> go
+
+                P124  BIT 6 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=001000
+                sim> go
+
+                P124  BIT 7 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=000400
+                sim> go
+
+                P124  BIT 8 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=000200
+                sim> go
+
+                P124  BIT 9 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=000100
+                sim> go
+
+                P124  BIT 10 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=000040
+                sim> go
+
+                P124  BIT 11 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=000020
+                sim> go
+
+                P124  BIT 12 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=000010
+                sim> go
+
+                P124  BIT 13 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=000004
+                sim> go
+
+                P124  BIT 14 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=000002
+                sim> go
+
+                P124  BIT 15 HIGH, REST LOW
+
+                Programmed halt, CIR: 030373 (HALT 13), P: 021407 (DDEL,DDEL)
+
+                sim> assert LP READ=000001
+                sim> go
+
+                D102  END SECTION 1
+                D102  END SECTION 2
+                D102  END SECTION 3
+                D102  END SECTION 4
+                D102  END SECTION 5
+                D102  END SECTION 6
+                D102  END SECTION 7
+                D102  END SECTION 8
+                D102  END SECTION 9
+                D102  END SECTION 10
+                P103  PASS 1
+
+                Programmed halt, CIR: 030375 (HALT 15), P: 010265 (DDEL,DDEL)
+
+TEST RESULT:    Passed.
+
+TEST NOTES:     The interrupt mask number is changed from "E" (always enabled) to
+                a numeric value to allow the mask circuits to be tested.
+
+
+
+----------------------------------
+D438A - Terminal Control Interface
+----------------------------------
+
+TESTED DEVICE:  ATCC (hp3000_atc.c)
+
+CONFIGURATION:  sim> set atcc diag
+                sim> set clk realtime
+                sim> go
+
+TEST REPORT:    Programmed halt, CIR: 030366 (HALT 6), P: 010670 (LRA P+4)
+
+                sim> deposit SWCH 140000
+                sim> go
+
+                Programmed halt, CIR: 030365 (HALT 5), P: 010073 (RSW)
+
+                sim> deposit SWCH 074000
+                sim> go
+
+                Programmed halt, CIR: 030366 (HALT 6), P: 010107 (BR P-47)
+
+                sim> deposit SWCH 100011
+                sim> go
+
+                Programmed halt, CIR: 030375 (HALT 15), P: 010225 (BR P+7)
+
+TEST RESULT:    Passed.
+
+
+
+---------------------------
+D441A - COBOL-II A Firmware
+---------------------------
+
+TESTED DEVICE:  CPU (hp3000_cpu.c)
+
+CONFIGURATION:  sim> set cpu cis
+                sim> go
+
+TEST REPORT:    [CTRL+E]
+
+                sim> deposit SWCH 100011
+                sim> go
+
+                [CR entered]
+
+                COBOLIIA F/W DIAG. (D441A.00.00)
+
+
+                TESTING MFL OF EDIT
+                PB'DB'MODE=           0
+                PB'DB'MODE=           1
+                MFL OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING MC'N OF EDIT
+                PB'DB'MODE=           0
+                PB'DB'MODE=           1
+                MCN OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING IC AND SUFT OF EDIT
+                PB'DB'MODE=           0
+                PB'DB'MODE=           1
+                 IC OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                 SUFT OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING MA'N OF EDIT
+                PB'DB'MODE=           0
+                PB'DB'MODE=           1
+                 MA OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING  ICS AND SST0 AND SST1 OF EDIT
+                PB'DB'MODE=           0
+                PB'DB'MODE=           1
+                 ICS OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                 SST0 OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                 SST1 OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING ICI OF EDIT
+                PB'DB'MODE=           0
+                PB'DB'MODE=           1
+                 ICI OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                 BRIS OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+                TESTING MN'N OF EDIT
+                PB'DB'MODE=           0
+                PB'DB'MODE=           1
+                MN OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING SFC AND ICSI OF EDIT
+                PB'DB'MODE=           0
+                PB'DB'MODE=           1
+                  SFC OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                 ICSI OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING MNS OF EDIT
+                PB'DB'MODE= 0
+                PB'DB'MODE= 1
+                MNS OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING DBNZ AND SETC OF EDIT
+                PB'DB'MODE=           0
+                PB'DB'MODE=           1
+                 DBNZ OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                 SETC OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING MDWO AND SUFS OF EDIT
+                PB'DB'MODE= 0
+                PB'DB'MODE= 1
+                MDWO OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                SUFS OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING ICP OF EDIT
+                PB'DB'MODE= 0
+                PB'DB'MODE= 1
+                ICP OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING ICPS OF EDIT
+                PB'DB'MODE= 0
+                PB'DB'MODE= 1
+                ICPS OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING "IS" OF EDIT
+                PB'DB'MODE= 0
+                PB'DB'MODE= 1
+                "IS" OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+
+                TESTING "ENDF" OF EDIT
+
+                TESTING "SFLC" OF EDIT
+
+                TESTING "DFLC" OF EDIT
+
+                PB'DB'MODE= 0
+                PB'DB'MODE= 1
+                "ENDF" OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                "SFLC" OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                "DFLC" OF EDIT PASSED ALL TESTS WITHOUT ERROR
+                ********************************************************************************
+                END OF PASS 0
+
+                Programmed halt, CIR: 030375 (HALT 15), P: 010330 (RSW)
+
+TEST RESULT:    Passed.
+
+
+
+---------------------------
+D442A - COBOL-II B Firmware
+---------------------------
+
+TESTED DEVICE:  CPU (hp3000_cpu.c)
+
+CONFIGURATION:  sim> set cpu cis
+                sim> go
+
+TEST REPORT:    [CTRL+E]
+
+                sim> deposit SWCH 100011
+                sim> go
+
+                [CR entered]
+
+                COBOLIIB FIRMWARE DIAGNOSTIC (D442A.00.00)
+
+
+                TESTING ABSD
+                ABSD PASSED ALL TESTS WITHOUT ERROR
+
+                TESTING ABSN
+                ABSN PASSED ALL TESTS WITHOUT ERROR
+
+
+                TESTING XBR
+
+                XBR PASSED ALL TESTS WITHOUT ERROR
+
+
+                TESTING NEGD
+                SDEC= 0
+
+                SDEC= 1
+
+                NEGD PASSED ALL TESTS WITHOUT ERROR
+
+
+                TESTING PARC AND ENDP
+
+                I AM IN OUTER'BLOCK OF PARC
+                I AM IN PAR6
+                I AM IN OUTER'BLOCK OF PARC
+                PARC AND ENDP PASSED ALL TESTS WITHOUT ERROR
+
+
+
+                TESTING TR
+                TESTING DB TABLE ACCESS
+                TESTING PB TABLE ACCESS
+                TR PASSED ALL TESTS WITHOUT ERROR
+
+
+                TESTING CVND
+                SDEC = 0
+
+                SDEC = 1
+
+                CVND PASSED ALL TESTS WITHOUT ERROR
+
+
+
+                TESTING CMPS
+                TESTING DB-TARGET ACCESS
+
+                TESTING PB-TARGET ACCESS
+
+                CMPS PASSED ALL TESTS WITHOUT ERROR
+
+
+                TESTING CMPT
+                TESTING TRANSLATION TABLE IN PB
+
+                TESTING DB-TARGET ACCESS
+
+                TESTING PB-TARGET ACCESS
+
+                CMPT PASSED ALL TESTS WITHOUT ERRORS
+
+
+                TESTING TCCS
+                TCCS PASSED ALL TESTS WITHOUT ERROR
+
+
+                TESTING LDW
+                SDEC=0
+                SDEC=1
+                TESTING LDDW
+                SDEC=0
+                SDEC=1
+                LDW AND LDWW PASSED ALL TESTS WITHOUT ERROR
+
+                TESTING ALGN
+                ALGN PASSED ALL TESTS WITHOUT ERROR
+
+                END OF PASS 0
+
+                Programmed halt, CIR: 030375 (HALT 15), P: 010315 (RSW)
+
+TEST RESULT:    Passed.
+
+
+
+------------------------------------
+D466A - Online Line Printer Verifier
+------------------------------------
+
+TESTED DEVICE:  LP (hp3000_lp.c)
+
+CONFIGURATION:  :STOPSPOOL 6
+                :RUN PD466A.HP32230.SUPPORT
+
+TEST REPORT:    D1 ONLINE LINE PRINTER VERIFIER (HP D466A.01.06)
+                (C) COPYRIGHT HEWLETT-PACKARD COMPANY 1978.
+                PRINTER MUST BE SET TO 6 LINES PER INCH
+                Q1 WHICH MODEL? 2607/08/10/13/14/17/18/19: 2617
+                Q2 64/96 CHARACTER SET?96
+                Q3 LOGICAL DEVICE ?6
+                Q4 FLAGS?
+                PRESS 'ON/OFF' LINE SWITCH 'ON' THEN 'OFF'
+                D7 PRESS 'CR' TO CONTINUE
+
+                [CTRL+E]
+
+                Simulation stopped, P: 071144 (PAUS 0)
+
+                sim> set lp offline
+                sim> go
+
+                19:44/3/LDEV #6 NOT READY
+                COMPUTER CONSOLE SHOULD PRINT 'IO/X:XX/LDEV# XXX NOT READY'
+                PRESS 'ON/OFF' SWITCH 'ON'
+                D7 PRESS 'CR' TO CONTINUE
+
+                [CTRL+E]
+
+                Simulation stopped, P: 071144 (PAUS 0)
+
+                sim> set lp online
+                sim> go
+
+                D6 END OF SECTION 1
+                D6 END OF SECTION 2
+                D6 END OF SECTION 3
+                D6 END OF SECTION 4
+                D6 END OF SECTION 5
+                D6 END OF SECTION 6
+                D6 END OF SECTION 7
+                LINE PRINTER VERIFIER TEST TERMINATED
+
+                END OF PROGRAM
+
+TEST RESULT:    Passed.
+
+TEST NOTES:     The test was run from the OPERATOR.SYS account on MPE-V/R
+                release E.01.00.

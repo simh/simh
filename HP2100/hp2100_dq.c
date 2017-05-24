@@ -1,7 +1,7 @@
 /* hp2100_dq.c: HP 2100 12565A disk simulator
 
    Copyright (c) 1993-2006, Bill McDermith
-   Copyright (c) 2004-2014 J. David Bryan
+   Copyright (c) 2004-2016 J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
 
    DQ           12565A 2883 disk system
 
+   13-May-16    JDB     Modified for revised SCP API function parameter types
    30-Dec-14    JDB     Added S-register parameters to ibl_copy
    24-Dec-14    JDB     Added casts for explicit downward conversions
    18-Dec-12    MP      Now calls sim_activate_time to get remaining seek time
@@ -193,9 +194,9 @@ IOHANDLER dqcio;
 t_stat dqc_svc (UNIT *uptr);
 t_stat dqd_svc (UNIT *uptr);
 t_stat dqc_reset (DEVICE *dptr);
-t_stat dqc_attach (UNIT *uptr, char *cptr);
+t_stat dqc_attach (UNIT *uptr, CONST char *cptr);
 t_stat dqc_detach (UNIT* uptr);
-t_stat dqc_load_unload (UNIT *uptr, int32 value, char *cptr, void *desc);
+t_stat dqc_load_unload (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 t_stat dqc_boot (int32 unitno, DEVICE *dptr);
 void dq_god (int32 fnc, int32 drv, int32 time);
 void dq_goc (int32 fnc, int32 drv, int32 time);
@@ -865,7 +866,7 @@ return SCPE_OK;
 
 /* Attach routine */
 
-t_stat dqc_attach (UNIT *uptr, char *cptr)
+t_stat dqc_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
@@ -884,7 +885,7 @@ return detach_unit (uptr);                              /* detach unit */
 
 /* Load and unload heads */
 
-t_stat dqc_load_unload (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat dqc_load_unload (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;   /* must be attached to load */
 if (value == UNIT_UNLOAD)                               /* unload heads? */

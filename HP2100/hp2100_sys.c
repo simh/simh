@@ -1,6 +1,7 @@
 /* hp2100_sys.c: HP 2100 simulator interface
 
-   Copyright (c) 1993-2014, Robert M. Supnik
+   Copyright (c) 1993-2016, Robert M. Supnik
+   Copyright (c) 2017       J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +24,13 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-Jan-17    JDB     Corrected HLT decoding to add the 1060xx and 1070xx ranges
+                        Corrected SFB decoding
+   14-Jan-17    JDB     Removed use of Fprintf functions for version 4.x and on
+   30-Dec-16    JDB     Corrected parsing of memory reference instructions
+   13-May-16    JDB     Modified for revised SCP API function parameter types
+   19-Jun-15    JDB     Conditionally use Fprintf function for version 4.x and on
+   18-Jun-15    JDB     Added cast to int for isspace parameter
    24-Dec-14    JDB     Added casts to t_addr and t_value for 64-bit compatibility
                         Made local routines static
    05-Feb-13    JDB     Added hp_fprint_stopped to handle HLT instruction message
@@ -61,9 +69,10 @@
    27-Oct-98    RMS     V2.4 load interface
 */
 
+
+#include <ctype.h>
 #include "hp2100_defs.h"
 #include "hp2100_cpu.h"
-#include <ctype.h>
 
 
 extern DEVICE mp_dev;
@@ -197,7 +206,7 @@ if ((c2 = fgetc (fileref)) == EOF) return -1;
 return ((c1 & 0377) << 8) | (c2 & 0377);
 }
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 int32 origin, csum, zerocnt, count, word, i;
 
@@ -287,7 +296,7 @@ static const char *opcode[] = {
  "FAD", "FSB", "FMP", "FDV",
  "FIX", "FLT",
  "STO", "CLO", "SOC", "SOS",
- "HLT", "STF", "CLF",
+ "HLT", "HLT", "STF", "CLF",                    /* 2nd HLT is 1060xx and 1070xx ranges */
  "SFC", "SFS", "MIA", "MIB",
  "LIA", "LIB", "OTA", "OTB",
  "STC", "CLC",
@@ -312,7 +321,7 @@ static const char *opcode[] = {
  "CYA", "CYB", "LDY",
  "ADY", "XAY", "XBY",
  "ISX", "DSX", "JLY", "LBT",
- "SBT", "MBT", "CBT", "SBT",
+ "SBT", "MBT", "CBT", "SFB",
  "ISY", "DSY", "JPY", "SBS",
  "CBS", "TBS", "CMW", "MVW",
  NULL,                                                  /* decode only */
@@ -346,7 +355,7 @@ static const int32 opc_val[] = {
  0105000+I_EMR, 0105020+I_EMR, 0105040+I_EMR, 0105060+I_EMR,
  0105100+I_NPN, 0105120+I_NPN,
  0102101+I_NPN, 0103101+I_NPN, 0102201+I_NPC, 0102301+I_NPC,
- 0102000+I_IO1, 0102100+I_IO2, 0103100+I_IO2,
+ 0102000+I_IO1, 0106000+I_IO1, 0102100+I_IO2, 0103100+I_IO2,
  0102200+I_IO1, 0102300+I_IO1, 0102400+I_IO1, 0106400+I_IO1,
  0102500+I_IO1, 0106500+I_IO1, 0102600+I_IO1, 0106600+I_IO1,
  0102700+I_IO1, 0106700+I_IO1,
@@ -573,7 +582,7 @@ return SCPE_ARG;
                         -1 if error
 */
 
-static int32 get_addr (char *cptr)
+static int32 get_addr (CONST char *cptr)
 {
 int32 d;
 t_stat r;
@@ -603,14 +612,15 @@ return d;
         status  =       error status
 */
 
-t_stat parse_sym (char *iptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *iptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 cflag, d, i, j, k, clef, tbits;
 t_stat r, ret;
-char *cptr, gbuf[CBUFSIZE];
+CONST char *cptr;
+char gbuf[CBUFSIZE];
 
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
-while (isspace (*iptr)) iptr++;                         /* absorb spaces */
+while (isspace ((int) *iptr)) iptr++;                   /* absorb spaces */
 if ((sw & SWMASK ('A')) || ((*iptr == '\'') && iptr++)) { /* ASCII char? */
     if (iptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
     val[0] = (t_value) iptr[0] & 0177;
@@ -644,21 +654,35 @@ if (opcode[i]) {                                        /* found opcode? */
 
     case I_V_MRF:                                       /* mem ref */
         cptr = get_glyph (cptr, gbuf, 0);               /* get next field */
-        k = strcmp (gbuf, "C");
-        if (k == 0) {                                   /* C specified? */
-            val[0] = val[0] | I_CP;
-            cptr = get_glyph (cptr, gbuf, 0);
+
+        if (gbuf [0] == 'C' && gbuf [1] == '\0') {      /* if the C modifier was specified */
+            val[0] = val[0] | I_CP;                     /*   then add the current-page flag */
+            cptr = get_glyph (cptr, gbuf, 0);           /*     and get the address */
+            k = 0;                                      /* clear the implicit-page flag */
             }
-        else {
-            k = strcmp (gbuf, "Z");
-            if (k == 0)                                 /* Z specified? */
-                cptr = get_glyph (cptr, gbuf, ',');
+
+        else if (gbuf [0] == 'Z' && gbuf [1] == '\0') { /* otherwise if the Z modifier was specified */
+            cptr = get_glyph (cptr, gbuf, 0);           /*   then get the address */
+            k = 0;                                      /*     and clear the implicit-page flag */
             }
-        if ((d = get_addr (gbuf)) < 0) return SCPE_ARG;
-        if ((d & VAMASK) <= I_DISP) val[0] = val[0] | d;
-        else if (cflag && !k && (((addr ^ d) & I_PAGENO) == 0))
-            val[0] = val[0] | (d & (I_IA | I_DISP)) | I_CP;
-        else return SCPE_ARG;
+
+        else                                            /* otherwise neither modifier is present */
+            k = 1;                                      /*   so set the flag to allow implicit-page addressing */
+
+        d = get_addr (gbuf);                            /* parse the address and optional indirection indicator */
+
+        if (d < 0)                                      /* if a parse error occurred */
+            return SCPE_ARG;                            /*   then return an invalid argument error */
+
+        if ((d & VAMASK) <= I_DISP)                     /* if a base-page address was given */
+            val[0] = val[0] | d;                        /*   then merge the offset into the instruction */
+
+        else if (cflag && k                                 /* otherwise if an implicit-page address is allowed */
+          && ((addr ^ d) & I_PAGENO) == 0)                  /*   and the target is in the current page */
+            val[0] = val[0] | d & (I_IA | I_DISP) | I_CP;   /*     then merge the offset with the current-page flag */
+
+        else                                            /* otherwise the address cannot be reached */
+            return SCPE_ARG;                            /*   from the current instruction's location */
         break;
 
     case I_V_ESH:                                       /* extended shift */
@@ -814,7 +838,7 @@ else {                                                  /* printable character *
 
 /* Set select code */
 
-t_stat hp_setsc (UNIT *uptr, int32 num, char *cptr, void *desc)
+t_stat hp_setsc (UNIT *uptr, int32 num, CONST char *cptr, void *desc)
 {
 DEVICE *dptr = (DEVICE *) desc;
 DIB *dibptr;
@@ -849,9 +873,9 @@ return SCPE_OK;
 
 /* Show select code */
 
-t_stat hp_showsc (FILE *st, UNIT *uptr, int32 num, void *desc)
+t_stat hp_showsc (FILE *st, UNIT *uptr, int32 num, CONST void *desc)
 {
-DEVICE *dptr = (DEVICE *) desc;
+const DEVICE *dptr = (const DEVICE *) desc;
 DIB *dibptr;
 int32 i;
 
@@ -874,7 +898,7 @@ return SCPE_OK;
 
 /* Set device number */
 
-t_stat hp_setdev (UNIT *uptr, int32 num, char *cptr, void *desc)
+t_stat hp_setdev (UNIT *uptr, int32 num, CONST char *cptr, void *desc)
 {
 return hp_setsc (uptr, num, cptr, desc);
 }
@@ -882,7 +906,7 @@ return hp_setsc (uptr, num, cptr, desc);
 
 /* Show device number */
 
-t_stat hp_showdev (FILE *st, UNIT *uptr, int32 num, void *desc)
+t_stat hp_showdev (FILE *st, UNIT *uptr, int32 num, CONST void *desc)
 {
 t_stat result;
 

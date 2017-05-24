@@ -1,6 +1,6 @@
 /* hp2100_di_da.c: HP 12821A HP-IB Disc Interface simulator for Amigo disc drives
 
-   Copyright (c) 2011-2014, J. David Bryan
+   Copyright (c) 2011-2017, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    DA           12821A Disc Interface with Amigo disc drives
 
+   17-Jan-17    JDB     Changed to use new byte accessors in hp2100_defs.h
+   13-May-16    JDB     Modified for revised SCP API function parameter types
+   04-Mar-16    JDB     Name changed to "hp2100_disclib" until HP 3000 integration
    30-Dec-14    JDB     Added S-register parameters to ibl_copy
    24-Dec-14    JDB     Use T_ADDR_FMT with t_addr values for 64-bit compatibility
                         Removed redundant global declarations
@@ -34,16 +37,20 @@
    04-Nov-11    JDB     Created DA device
 
    References:
-   - HP 13365 Integrated Controller Programming Guide (13365-90901, Feb-1980)
-   - HP 7910 Disc Drive Service Manual (07910-90903, Apr-1981)
-   - 12745D Disc Controller (13037) to HP-IB Adapter Kit Installation and
-       Service Manual (12745-90911, Sep-1983)
-   - HP's 5 1/4-Inch Winchester Disc Drive Service Documentation
-       (09134-90032, Aug-1983)
-   - HP 12992 Loader ROMs Installation Manual (12992-90001, Apr-1986)
-   - RTE Driver DVA32 Source (92084-18708, revision 2540)
-   - IEEE Standard Digital Interface for Programmable Instrumentation
-       (IEEE-488A-1980, Sep-1979)
+     - HP 13365 Integrated Controller Programming Guide
+         (13365-90901, February 1980)
+     - HP 7910 Disc Drive Service Manual
+         (07910-90903, April 1981)
+     - 12745D Disc Controller (13037) to HP-IB Adapter Kit Installation and Service Manual
+         (12745-90911, September 1983)
+     - HP's 5 1/4-Inch Winchester Disc Drive Service Documentation
+         (09134-90032, August 1983)
+     - HP 12992 Loader ROMs Installation Manual
+         (12992-90001, April 1986)
+     - RTE Driver DVA32 Source
+         (92084-18708, revision 2540)
+     - IEEE Standard Digital Interface for Programmable Instrumentation
+         (IEEE-488A-1980, September 1979)
 
 
    The HP 7906H, 7920H, and 7925H Integrated Controller Disc (ICD) drives were
@@ -339,7 +346,7 @@
 
 #include "hp2100_defs.h"
 #include "hp2100_di.h"
-#include "hp_disclib.h"
+#include "hp2100_disclib.h"
 
 
 
@@ -466,12 +473,12 @@ static CNTLR_VARS icd_cntlr [DA_UNITS] =                /* ICD controllers: */
 /* Amigo disc global VM routines */
 
 t_stat da_reset   (DEVICE *dptr);
-t_stat da_attach  (UNIT   *uptr, char *cptr);
+t_stat da_attach  (UNIT   *uptr, CONST char *cptr);
 t_stat da_detach  (UNIT   *uptr);
 
 /* Amigo disc global SCP routines */
 
-t_stat da_load_unload (UNIT *uptr, int32 value, char *cptr, void *desc);
+t_stat da_load_unload (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 
 /* Amigo disc local utility routines */
 
@@ -1082,7 +1089,7 @@ return status;
        validation routine.
 */
 
-t_stat da_attach (UNIT *uptr, char *cptr)
+t_stat da_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat result;
 const int32 unit = uptr - da_unit;                      /* calculate the unit number */
@@ -1252,7 +1259,7 @@ else
        we match the diagnostic expectation below.
 */
 
-t_stat da_load_unload (UNIT *uptr, int32 value, char *cptr, void *desc)
+t_stat da_load_unload (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 const int32 unit = uptr - da_unit;                          /* calculate the unit number */
 const t_bool load = (value != UNIT_UNLOAD);                 /* true if the heads are loading */
@@ -1711,7 +1718,7 @@ else {                                                      /* it is bus data (A
             if (DEBUG_PRI (da_dev, DEB_XFER))
                 sprintf (action, "opcode %02XH", data & DL_OPCODE_MASK);
 
-            buffer [0] = SET_UPPER (data);                  /* set the opcode into the buffer */
+            buffer [0] = TO_WORD (data, 0);                 /* set the opcode into the buffer */
 
             if (dl_prepare_command (&icd_cntlr [unit],      /* is the command valid? */
                                     da_unit, unit)) {
@@ -2079,9 +2086,9 @@ static uint8 get_buffer_byte (CVPTR cvptr)
 cvptr->length = cvptr->length - 1;                      /* count the byte */
 
 if (cvptr->length & 1)                                  /* is the upper byte next? */
-    return GET_UPPER (buffer [cvptr->index]);           /* return the byte */
+    return UPPER_BYTE (buffer [cvptr->index]);          /* return the byte */
 else                                                    /* the lower byte is next */
-    return GET_LOWER (buffer [cvptr->index++]);         /* return the byte and bump the word index */
+    return LOWER_BYTE (buffer [cvptr->index++]);        /* return the byte and bump the word index */
 }
 
 
@@ -2101,9 +2108,9 @@ static void put_buffer_byte (CVPTR cvptr, uint8 data)
 cvptr->length = cvptr->length - 1;                      /* count the byte */
 
 if (cvptr->length & 1)                                  /* is the upper byte next? */
-    buffer [cvptr->index] = SET_UPPER (data);           /* save the byte */
+    buffer [cvptr->index] = TO_WORD (data, 0);          /* save the byte */
 else                                                    /* the lower byte is next */
-    buffer [cvptr->index++] |= SET_LOWER (data);        /* merge the byte and bump the word index */
+    buffer [cvptr->index++] |= TO_WORD (0, data);       /* merge the byte and bump the word index */
 return;
 }
 

@@ -1,6 +1,9 @@
-                       HP 2100 SIMULATOR BUG FIX WRITEUPS
-                       ==================================
-                             Last update: 2015-01-03
+                          HP 2100 SIMULATOR FIX ARCHIVE
+                          =============================
+                            Final update: 2016-08-05
+
+See the "SIMH/HP 2100 Release Notes" file for bug fixes implemented after the
+date above.
 
 
   1. PROBLEM:  Booting from magnetic tape reports "HALT instruction, P: 77756
@@ -6746,8 +6749,8 @@
 
 
 
-265. PROBLEM:  Compiling the HP simulator for 64-bit addressing generates
-     warnings.
+265. PROBLEM:  Compiling the HP simulator for 64-bit addressing produces many
+     conversion warnings.
 
      VERSION:  3.9-0
 
@@ -6787,5 +6790,332 @@
      behalf of the caller.  Modify the boot routines for the CPU, DA, DP, DQ,
      DR, DS, IPL, MS, and PTR devices to use the new parameters instead of
      modifying the S register directly.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+267. ENHANCEMENT:  Add a register to the IPLI device to configure the DMA delay.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  Occasionally, the 2000 Access terminal multiplexer does not
+     initialize properly; the problem is more prevalent on multiprocessor
+     systems.
+
+     There is a race condition between the system processor (SP) and the I/O
+     processor (IOP) during initialization.  The problem occurs if the IOP DMA
+     completion interrupt routine finishes before the SP DMA completion
+     interrupt routine.  As a workaround, the simulator suspends the IOP process
+     for one millisecond before signaling a DMA completion (EDT) interrupt.
+     Depending on system loading, this time may be insufficient.
+
+     RESOLUTION:  Modify "ipli_reg" (hp2100_ipl.c) to add a hidden register,
+     EDTDELAY, that allows the user to configure the completion delay.  The
+     register value is expressed in milliseconds and defaults to one
+     millisecond.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+268. ENHANCEMENT:  Provide "fprint_sym" and "parse_sym" with register-specific
+     information when a register is being examined or deposited.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  When EXAMINE or DEPOSIT specifies a register that has the
+     REG_VMIO flag, "fprint_sym" or "parse_sym", respectively, is called in lieu
+     of "fprint_val" or "get_uint".  This allows VM-specific interpretations,
+     such as symbolic display of a status or current instruction register value,
+     by specifying a switch with the command:
+
+       sim> examine STAT-CIR
+       STAT:   060001
+       CIR:    030020
+
+       sim> examine -s STAT
+       STAT:   mITroc CCG 001
+
+       sim> examine -m CIR
+       CIR:    PAUS 0
+
+     The REG definition contains a radix field that allows a register to have a
+     default radix that is different than that of the device.  This is
+     particularly helpful in connection with the EXAMINE STATE command, as
+     different registers may have different preferred radices:
+
+       sim> examine state
+       P:      012077       (defaults to octal)
+       CNTR:   9            (defaults to decimal)
+       MASK:   FFF0         (defaults to hex)
+
+     However, there is no way to specify that the preferred display or input is
+     symbolic.  So a CPU state that contains such registers would have to be
+     displayed multiple times -- once to get most of the values in their default
+     forms, and again to display those registers whose preferred form is
+     symbolic:
+
+       sim> examine state
+       PB:     000100
+       P:      012077
+       PL:     023000
+       STAT:   060001
+       CIR:    030020
+
+       sim> examine -s STAT
+       STAT:   mITroc CCG 001
+
+       sim> examine -m CIR
+       CIR:    PAUS 0
+
+     It would be useful if a default symbolic interpretation could be specified
+     in the REG structure and passed to "fprint_sym" and "parse_sym" to be used
+     in the absence of overriding command-line switches.  Currently, no
+     information is provided to these routines to indicate which register is
+     being manipulated, so there is no way to provide register-specific default
+     interpretations within the routines.
+
+     RESOLUTION:  Reserve space for register-specific flags in the "flags" field
+     of the REG structure (sim_defs.h) starting at REG_V_UF.  Modify "ex_reg"
+     and "dep_reg" (scp.c) to merge the register-specific flags into the radix
+     value passed as the "addr" parameter to "fprint_sym" and "parse_sym".
+
+     A VM that defines register-specific flags will know to separate them from
+     the passed radix value by the presence of the SIM_SW_REG value in the
+     "switch" parameter.  VMs that do not define register-specific flags are not
+     affected by this change.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+269. PROBLEM:  Tape read reports "end of medium" even if a gap precedes it.
+
+     VERSION:  4.0-0
+
+     OBSERVATION:  Calling "sim_tape_rdrecf" to read a tape record sometimes
+     returns MTSE_EOM and sets the "position not updated" (PNU) flag, even when
+     an erase gap precedes the EOM.  The correct response should be to return
+     MTSE_RUNAWAY to indicate that spacing over a gap did not end with a data
+     record or tape mark.  Moreover, PNU should not be set, as the position has
+     been updated.
+
+     CAUSE:  The routine attempts to handle this case by returning MTSE_RUNAWAY
+     if the EOF was detected while reading a buffer of gap markers.  However, if
+     a buffer read ends immediately before an EOM marker or the physical EOF,
+     the next read attempt will return a zero buffer length.  The routine
+     misinterprets this to mean that no gap was present and returns MTSE_EOM and
+     sets the PNU flag.
+
+     RESOLUTION:  Modify "sim_tape_rdlntf" (sim_tape.c) to determine whether the
+     EOM marker or physical EOF was seen on the first or a subsequent buffer
+     read, and to return MTSE_EOM with PNU or MTSE_RUNAWAY without PNU,
+     respectively.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+270. PROBLEM:  The disc libraries in the HP2100 and HP3000 directories differ.
+
+     VERSION:  4.0-0
+
+     OBSERVATION:  The "hp_disclib.c" and "hp_disclib.h" files appear in both
+     the HP2100 and HP3000 subdirectories.  However, the contents of the files
+     are different.  If both source sets are compiled to a common object
+     subdirectory, one of the two executables will not link, due to unresolved
+     externals.
+
+     CAUSE:  The disc library in the HP3000 subdirectory is an extension of the
+     one in the HP2100 subdirectory.  It is intended as an eventual replacement
+     for the HP2100 version, so that both simulators can share the library.
+     Until then, however, they are not interchangeable, as they export different
+     routines, leading to link errors if one is accidentally substituted for the
+     other.
+
+     RESOLUTION:  Rename "hp_disclib.c/h" in the HP2100 subdirectory to
+     "hp2100_disclib.c/h" to indicate that it is HP2100-specific.  Alter
+     "hp2100_ds.c" and "hp2100_di_da.c" to use the new include file name.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+271. PROBLEM:  The MPX device incorrectly reports a currently filling read
+     buffer as complete.
+
+     VERSION:  4.0-0
+
+     OBSERVATION:  Using Kermit to upload a file to RTE and specifying a packet
+     size larger than 254 bytes fails with transmission errors.  Uploads with
+     packet sizes under 254 bytes work properly.
+
+     CAUSE:  The 12792 multiplexer provides two 254-byte receive buffers per
+     line.  A single reception larger than 254 bytes returns "partial buffer"
+     status when the initial read terminates because of the buffer full
+     condition.  This informs RTE that the reception is incomplete and that it
+     should issue additional reads to obtain the remainder of the data.
+     Complete reception is indicated by the final read not returning "partial
+     buffer" status.
+
+     When Kermit sends a large packet, the multiplexer fills the first 254-byte
+     buffer, terminating on the buffer-full condition, and sends an unsolicited
+     interrupt to the CPU with "read buffer available" status.  In response, RTE
+     sends an "acknowledge" command to the multiplexer, which returns the
+     "partial buffer" status and the buffer length.  RTE then follows with a
+     "read buffer" command and prepares to receive the first buffer data.
+     Concurrently, the multiplexer begins filling the second 254-byte buffer.
+
+     RTE uses DCPC to transfer the data from the multiplexer, which is faster
+     than the incoming data rate.  Therefore, the transfer completes while the
+     second buffer is still filling.  On DCPC completion, the multiplexer checks
+     to see if the other receive buffer is complete, and if it is, issues
+     another unsolicited interrupt with "read buffer available" status.
+
+     The buffer completion check incorrectly returns TRUE if the buffer contains
+     received data.  It should return TRUE only if the buffer contains data and
+     it is not currently being filled.
+
+     For short reads, such as EDIT screen reads, the second buffer fill
+     completes before the first buffer DCPC transfer, and the returned "read
+     buffer available" status is appropriate.  For long reads, such as Kermit
+     transfers, the incorrect buffer check causes RTE to transfer data from the
+     second buffer while it is incomplete.  This leads to corrupted data and
+     Kermit transmission errors.
+
+     RESOLUTION:  Modify "mpx_cntl_svc" (hp2100_mpx.c) to indicate read buffer
+     availability only when filling is complete.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+272. PROBLEM:  An MPX binary read larger than 254 bytes never completes.
+
+     VERSION:  4.0-0.
+
+     OBSERVATION:  The MPX device may be configured to terminate a read on
+     reception of either a special character (e.g., CR) or a certain character
+     count.  Counts up to 64K bytes are permitted, and such reads will succeed
+     if the alternating buffers are concurrently transferred to the CPU before
+     filling completely.  However, while reads that specify character counts of
+     254 or less complete as expected, reads of more than 254 bytes never
+     complete.
+
+     CAUSE:  As each character is received, the current character count is
+     compared to the termination count, and the read completes if the counts are
+     equal.  However, the current character count is determined by the number of
+     characters in the current buffer and not the accumulated count of all
+     characters received.  As the read buffers are 254 bytes long, the current
+     count will never exceed 254.  Therefore, any read terminating on a count
+     greater than that will never complete.
+
+     RESOLUTION:  Define a new "mpx_termcnt" array to hold the termination
+     counts for the eight lines, and reassign the "mpx_charcnt" array to hold
+     the current character counts.  Modify "exec_command" and "mpx_line_svc"
+     (hp2100_mpx.c) to set the termination count, compare it against the current
+     character count as characters are received, and terminate reception if
+     enabled and the values are equal.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+273. ENHANCEMENT:  Burst-fill only the first of two MPX receive buffers in
+     FASTTIME mode.
+
+     VERSION:  4.0-0.
+
+     OBSERVATION:  When the 8-channel multiplexer is set for "optimized timing"
+     mode, buffered characters are transferred in blocks to and from the Telnet
+     connection.  That is, the line service routine will send or receive
+     characters as long as they are available.  This is more efficient than the
+     "realistic timing" mode, which sends or receives one character per service
+     invocation.  Effectively, this means that up to 508 characters (two buffers
+     of 254 bytes each) may be sent or received between one CPU instruction or
+     DCPC cycle and the next.  This works well for sending, but it can cause
+     buffer overflows when receiving.
+
+     Consider an application (such as Kermit) that receives large blocks of data
+     at high speed from a client.  The multiplexer is designed to handle this
+     condition by interrupting the CPU when the first buffer is filled and
+     filling the second buffer while the CPU is unloading data from the first.
+     In realistic mode at 19,200 baud, the CPU has approximately 800
+     instructions or DCPC cycles available per character received.  With a
+     second buffer of 254 bytes, the CPU has approximately 203,000 instructions
+     available to unload the first buffer after receiving the interrupt
+     notification.  Once started, the DCPC transfer takes no more than 508
+     instruction times, so the CPU can easily keep up with data arriving at the
+     maximum baud rate.
+
+     In fast timing mode, however, the first buffer burst-fills in a single CPU
+     instruction time, and, if available from the Telnet connection, the second
+     buffer fills in the next instruction time.  At that point, any additional
+     characters received will result in a buffer overflow condition.  The
+     problem is that the CPU has no time between the first burst and the second
+     to empty the first buffer.
+
+     RESOLUTION:  Modify "mpx_line_svc" (hp2100_mpx.c) to shift from burst
+     transfers to character-at-a-time transfers when a receive buffer is full
+     and awaiting unloading by the CPU.  This allows the CPU and DCPC time to
+     read the buffer contents into memory before the second multiplexer buffer
+     is full.  Once the completed buffer is freed, the service routine returns
+     to burst mode to fill the remainder of the other buffer, permitting the
+     efficiency of block transfers while avoiding buffer overruns with large
+     data transfers.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+274. PROBLEM:  A second connection to the BACI device leaves the client
+     unresponsive.
+
+     VERSION:  4.0-0.
+
+     OBSERVATION:  The BACI device supports a single terminal client connection.
+     If a second connection is attempted, the client connects but is otherwise
+     unresponsive.  It would be better if the client received the "All
+     connections busy" message that is reported by the terminal multiplexers
+     (MPX and MUX devices) when the number of connections is exceeded.
+
+     CAUSE:  The "baci_poll_svc" is calling the "tmxr_poll_conn" routine only if
+     the port is not connected.  The routine should be called unilaterally, so
+     that it will report an error and disconnect the client when all lines are
+     in use and another connection is attempted.
+
+     RESOLUTION:  Modify "baci_poll_svc" (hp2100_baci.c) to call
+     "tmxr_poll_conn" unilaterally, so that a second concurrent connection
+     attempt will be rejected with "All connections busy".
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+275. PROBLEM:  The exported program counter name (PC) clashes with other libraries.
+
+     VERSION:  4.0-0.
+
+     OBSERVATION:  In HP 21xx/1000 systems, the P register is the program
+     counter.  In keeping with the naming of the other register variables (e.g.,
+     for A register, B register, etc.) in the simulator, the variable used
+     should be named "PR".  However, for traditional reasons, the program
+     counter in SIMH is named "PC".
+
+     The main CPU module declares its hardware register variables as global, so
+     that they may be accessed by other CPU helper modules.  Unfortunately, the
+     "curses" library also declares the symbol "PC" as global, leading to
+     conflicts when it is loaded by SCP.  A workaround had been implemented that
+     renamed "PC" to "PC_Global" in the HP2100 simulator, but that meant that
+     the new name had to be used when debugging, which was awkward.
+
+     CAUSE:  A poor choice of global symbol names from the "termcap" library,
+     which was inherited by the "curses" library.
+
+     RESOLUTION:  Change the program counter variable name from "PC" to "PR"
+     (hp2100_cpu.c, hp2100_cpu1.c, hp2100_cpu2.c, hp2100_cpu3.c, hp2100_cpu4.c,
+     hp2100_cpu5.c, hp2100_cpu6.c, hp2100_cpu7.c, hp2100_dr.c, and hp2100_ipl.c)
+     to avoid a name clash and for register naming consistency.
 
      STATUS:  Fixed in version 4.0-0.

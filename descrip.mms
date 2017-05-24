@@ -21,6 +21,7 @@
 #            LGP             Just Build The Royal-McBee LGP-30.
 #            H316            Just Build The Honewell 316/516.
 #            HP2100          Just Build The Hewlett-Packard HP-2100. 
+#            HP3000          Just Build The Hewlett-Packard HP-3000. 
 #            I1401           Just Build The IBM 1401.
 #            I1620           Just Build The IBM 1620.
 #            I7094           Just Build The IBM 7094.
@@ -379,14 +380,36 @@ HP2100_SOURCE1 = $(HP2100_DIR)HP2100_STDDEV.C,$(HP2100_DIR)HP2100_DP.C,\
                  $(HP2100_DIR)HP2100_CPU6.C,$(HP2100_DIR)HP2100_CPU7.C
 HP2100_LIB2 = $(LIB_DIR)HP2100L2-$(ARCH).OLB
 HP2100_SOURCE2 = $(HP2100_DIR)HP2100_FP1.C,$(HP2100_DIR)HP2100_BACI.C,\
-                 $(HP2100_DIR)HP2100_MPX.C,$(HP2100_DIR)HP2100_PIF.C, \
+                 $(HP2100_DIR)HP2100_MPX.C,$(HP2100_DIR)HP2100_PIF.C,\
                  $(HP2100_DIR)HP2100_DI.C,$(HP2100_DIR)HP2100_DI_DA.C,\
-                 $(HP2100_DIR)HP_DISCLIB.C
+                 $(HP2100_DIR)HP2100_DISCLIB.C
 .IFDEF ALPHA_OR_IA64
 HP2100_OPTIONS = /INCL=($(SIMH_DIR),$(HP2100_DIR))\
                     /DEF=($(CC_DEFS),"HAVE_INT64=1")
 .ELSE
 HP2100_OPTIONS = /INCL=($(SIMH_DIR),$(HP2100_DIR))/DEF=($(CC_DEFS))
+.ENDIF
+
+#
+# Hewlett-Packard HP-3000 Simulator Definitions.
+#
+HP3000_DIR = SYS$DISK:[.HP3000]
+HP3000_LIB1 = $(LIB_DIR)HP3000L1-$(ARCH).OLB
+HP3000_SOURCE1 = $(HP3000_DIR)HP3000_ATC.C,$(HP3000_DIR)HP3000_CLK.C,\
+                 $(HP3000_DIR)HP3000_CPU.C,$(HP3000_DIR)HP3000_CPU_BASE.C,\
+                 $(HP3000_DIR)HP3000_CPU_CIS.C,$(HP3000_DIR)HP3000_CPU_FP.C,\
+                 $(HP3000_DIR)HP3000_DS.C,$(HP3000_DIR)HP3000_LP.C,\
+                 $(HP3000_DIR)HP3000_IOP.C,$(HP3000_DIR)HP3000_MEM.C,\
+                 $(HP3000_DIR)HP3000_MPX.C,\
+                 $(HP3000_DIR)HP3000_MS.C,$(HP3000_DIR)HP3000_SCMB.C,\
+                 $(HP3000_DIR)HP3000_SEL.C,$(HP3000_DIR)HP3000_SYS.C
+HP3000_LIB2 = $(LIB_DIR)HP3000L2-$(ARCH).OLB
+HP3000_SOURCE2 = $(HP3000_DIR)HP_TAPELIB.C,$(HP3000_DIR)HP_DISCLIB.C
+.IFDEF ALPHA_OR_IA64
+HP3000_OPTIONS = /INCL=($(SIMH_DIR),$(HP3000_DIR))\
+                    /DEF=($(CC_DEFS),"HAVE_INT64=1")
+.ELSE
+HP3000_OPTIONS = /INCL=($(SIMH_DIR),$(HP3000_DIR))/DEF=($(CC_DEFS))
 .ENDIF
 
 #
