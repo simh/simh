@@ -96,6 +96,10 @@ DEVICE console_dev = {
 extern UNIT cr_unit;                                    /* pointers to 1442 and 1132 (1403) printers */
 extern UNIT prt_unit;
 
+extern UNIT dsk_unit[];
+extern int boot_drive;
+extern t_bool program_is_loaded;
+
 #ifndef GUI_SUPPORT
     void update_gui (int force)               {}        /* stubs for non-GUI builds */
     void forms_check (int set)                {}
@@ -432,6 +436,20 @@ void update_gui (BOOL force)
         CND |= 2;
     if (V)
         CND |= 1;
+
+    if ((boot_drive<0) || (!program_is_loaded)) {
+        boot_drive = CES & 7;
+        if (boot_drive > 4)
+            boot_drive = -1;
+    }
+    if ((boot_drive>=0) && (dsk_unit[boot_drive].flags&UNIT_ATT)) {
+        disk_ready(TRUE);
+        disk_unlocked(FALSE);
+    }
+    else {
+        disk_ready(FALSE);
+        disk_unlocked(TRUE);
+    }
 
     int_lamps |= int_req;
     if (ipl >= 0)
@@ -1173,7 +1191,12 @@ void HandleCommand (HWND hWnd, WORD wNotify, WORD idCtl, HWND hwCtl)
             for (i = 0; i < NBUTTONS; i++)  /* repaint all of the lamps */
                 if (! btn[i].pushable)
                     InvalidateRect(btn[i].hBtn, NULL, TRUE);
-
+            if ((cr_unit.flags & UNIT_ATT) && 
+                (btn[IDC_1442].state!=STATE_1442_FULL)) {
+                stuff_and_wait("detach cr", 0, 500);
+                update_gui(TRUE);
+            }
+            program_is_loaded = FALSE;
             break;
 
         case IDC_PROGRAM_START:             /* begin execution */
@@ -1238,13 +1261,33 @@ void HandleCommand (HWND hWnd, WORD wNotify, WORD idCtl, HWND hwCtl)
                 forms_check(0);             /* clear forms-check status */
                 print_check(0);
             }
+            if ((cr_unit.flags & UNIT_ATT) && 
+                (btn[IDC_1442].state!=STATE_1442_FULL)) {
+                stuff_and_wait("detach cr", 0, 500);
+                update_gui(TRUE);
+            }
+            program_is_loaded = FALSE;
             break;
 
         case IDC_PROGRAM_LOAD:
             if (! running) {                /* if card reader is attached to a file, do cold start read of one card */
                 IAR = 0;                    /* reset IAR */
 #ifdef PROGRAM_LOAD_STARTS_CPU
-                stuff_cmd("boot cr");
+                if (cr_unit.flags & UNIT_ATT)
+                    stuff_cmd("boot cr");
+                else {
+                    if (((CES & 7) <= 4) &&
+                        (dsk_unit[(CES & 7)].flags&UNIT_ATT))
+                        boot_drive = CES & 7;
+                    else
+                        boot_drive = -1;
+                    if (boot_drive >= 0) {
+                        char cmd[50];
+
+                        sprintf(cmd, "boot dsk%d", boot_drive);
+                        stuff_cmd(cmd);
+                    }
+                }
 #else
                 if (cr_boot(0, NULL) != SCPE_OK)    /* load boot card */
                     remark_cmd("IPL failed");

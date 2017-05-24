@@ -541,10 +541,8 @@ t_stat sim_instr (void)
     reason = 0;
     wait_lamp = 0;                          /* release lock on wait lamp */
 
-#ifdef GUI_SUPPORT
     update_gui(TRUE);
     gui_run(TRUE);
-#endif
 
     while (reason == 0)  {
         IAR &= mem_mask;
@@ -1186,9 +1184,7 @@ t_stat sim_instr (void)
         }
     }                                       /* end main loop */
 
-#ifdef GUI_SUPPORT
     gui_run(FALSE);
-#endif
 
     running   = FALSE;
     int_lamps = 0;                          /* display only currently active interrupts while halted */
@@ -1204,6 +1200,16 @@ t_stat sim_instr (void)
 
     if (cgi)                                /* give CGI hook function a chance to do something */
         cgi_stop(reason);
+
+    if (reason == STOP_WAIT) {
+        if (((sim_switches & SWMASK('Q')) == 0) && ! cgi) {
+            if (IAR==0x2a) {
+                IR = ReadW(IAR);
+                if (IR==0x4c80)
+                    remark_cmd("\nEntered DMS V2M12\n");
+                }
+            }
+        }
 
     return reason;
 }

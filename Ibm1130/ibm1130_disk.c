@@ -182,6 +182,8 @@ static struct tag_dsk_action {              /* stores data needed for pending IO
 
 extern void void_backtrace (int afrom, int ato);
 
+extern int boot_drive;
+
 void xio_disk (int32 iocc_addr, int32 func, int32 modify, int drv)
 {
     int i, rev, nsteps, newcyl, sec, nwords;
@@ -531,7 +533,7 @@ static t_stat dsk_attach (UNIT *uptr, CONST char *cptr)
         return rval;
     }
 
-    if (drv == 0) {
+    if ((boot_drive>=0) && (dsk_unit[boot_drive].flags&UNIT_ATT)) {
         disk_ready(TRUE);
         disk_unlocked(FALSE);
     }
@@ -560,7 +562,7 @@ static t_stat dsk_detach (UNIT *uptr)
     uptr->FUNC   = DSK_FUNC_IDLE;
     dsk_dsw[drv] = DSK_DSW_NOT_READY;
 
-    if (drv == 0) {
+    if ((boot_drive>=0) && (!dsk_unit[boot_drive].flags&UNIT_ATT)) {
         disk_unlocked(TRUE);
         disk_ready(FALSE);
     }

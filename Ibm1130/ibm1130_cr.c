@@ -754,6 +754,9 @@ static void   pcr_xio_feedcycle(void);
 static void   pcr_xio_startread(void);
 static void   pcr_reset(void);
 
+int boot_drive = -1;
+t_bool program_is_loaded = FALSE;
+
 /* lookup_codetable - use code flag setting to get code table pointer and length */
 
 static t_bool lookup_codetable (int32 match, CPCODE **pcode, int *pncode)
@@ -963,12 +966,11 @@ t_stat load_cr_boot (int32 drvno, int switches)
     if (((switches & SWMASK('Q')) == 0) && ! cgi) {                 /* 3.0-3, parenthesized & operation, per lint check */
         sprintf(msg, "Loaded %s cold start card", name);
 
-#ifdef GUI_SUPPORT
         remark_cmd(msg);
-#else
-        printf("%s\n", msg);
-#endif
     }
+
+    boot_drive = drvno;
+    program_is_loaded = TRUE;
 
     return SCPE_OK;
 }
@@ -1008,6 +1010,9 @@ t_stat cr_boot (int32 unitno, DEVICE *dptr)
         WriteW(i, (readstation[i] & 0xF800) | ((readstation[i] & 0x0400) ? 0x00C0 : 0x0000) | ((readstation[i] & 0x03F0) >> 4));
 
     readstate = STATION_READ;                   /* the current card has been consumed */
+
+    program_is_loaded = TRUE;
+
     return SCPE_OK;
 }
 
