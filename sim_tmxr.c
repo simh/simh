@@ -26,6 +26,7 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   06-Aug-15    JDB     [4.0] Added modem control functions
    28-Mar-15    RMS     Revised to use sim_printf
    16-Jan-11    MP      Made option negotiation more reliable
    20-Nov-08    RMS     Added three new standardized SHOW routines
@@ -61,6 +62,8 @@
    tmxr_poll_rx -       poll receive
    tmxr_putc_ln -       put character for line
    tmxr_poll_tx -       poll transmit
+   tmxr_set_modem_control_passthru -    enable modem control on a multiplexer
+   tmxr_set_get_modem_bits -            set and/or get a line modem bits
    tmxr_open_master -   open master connection
    tmxr_close_master -  close master connection
    tmxr_attach  -       attach terminal multiplexor
@@ -236,6 +239,83 @@ lp->txbpr = lp->txbpi = 0;
 lp->xmte = 1;
 lp->dstb = 0;
 return;
+}
+
+/* Enable modem control pass thru
+
+   Inputs:
+        none
+
+   Output:
+        none
+
+   Implementation note:
+
+    1  Calling this API disables any actions on the part of this
+       library to directly manipulate DTR (&RTS) on serial ports.
+
+    2  Calling this API enables the tmxr_set_get_modem_bits and
+       tmxr_set_config_line APIs.
+
+*/
+static t_stat tmxr_clear_modem_control_passthru_state (TMXR *mp, t_bool state)
+{
+if (mp->master)
+    return SCPE_ALATT;
+else
+    return SCPE_OK;
+}
+
+t_stat tmxr_set_modem_control_passthru (TMXR *mp)
+{
+return tmxr_clear_modem_control_passthru_state (mp, TRUE);
+}
+
+/* Manipulate the modem control bits of a specific line
+
+   Inputs:
+        *lp     =       pointer to terminal line descriptor
+        bits_to_set     TMXR_MDM_DTR and/or TMXR_MDM_RTS as desired
+        bits_to_clear   TMXR_MDM_DTR and/or TMXR_MDM_RTS as desired
+
+   Output:
+        incoming_bits   if non NULL, returns the current stat of DCD,
+                        RNG, CTS and DSR along with the current state
+                        of DTR and RTS
+
+   Implementation note:
+
+       If a line is connected to a serial port, then these values affect
+       and reflect the state of the serial port.  If the line is connected
+       to a network socket (or could be) then the network session state is
+       set, cleared and/or returned.
+*/
+t_stat tmxr_set_get_modem_bits (TMLN *lp, int32 bits_to_set, int32 bits_to_clear, int32 *incoming_bits)
+{
+int32 incoming_state;
+
+if ((bits_to_set & ~(TMXR_MDM_OUTGOING)) ||         /* Assure only settable bits */
+    (bits_to_clear & ~(TMXR_MDM_OUTGOING)) ||
+    (bits_to_set & bits_to_clear))                  /* and can't set and clear the same bits */
+    return SCPE_ARG;
+
+if (lp->conn)
+    incoming_state = TMXR_MDM_DCD | TMXR_MDM_DSR;
+else
+    incoming_state = 0;
+
+if (incoming_bits)
+    *incoming_bits = incoming_state;
+
+if (lp->conn && (bits_to_clear & TMXR_MDM_DTR)) {           /* drop DTR? */
+    tmxr_linemsg (lp, "\r\nDisconnected from the ");
+    tmxr_linemsg (lp, sim_name);
+    tmxr_linemsg (lp, " simulator\r\n\n");
+
+    tmxr_reset_ln (lp);
+    }
+
+return SCPE_OK;
 }
 
 /* Get character from specific line

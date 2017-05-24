@@ -1,6 +1,6 @@
 /* sim_tmxr.h: terminal multiplexor definitions
 
-   Copyright (c) 2001-2014, Robert M Supnik
+   Copyright (c) 2001-2015, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   06-Aug-15    JDB     [4.0] Added modem control bits and functions
    14-Dec-14    JDB     [4.0] Added include of "sim_sock.h" for SOCKET, etc.
    20-Nov-08    RMS     Added three new standardized SHOW routines
    27-May-08    JDB     Added lnorder to TMXR structure,
@@ -50,6 +51,17 @@
 #define TMXR_VALID      (1 << TMXR_V_VALID)
 #define TMXR_MAXBUF     256                             /* buffer size */
 #define TMXR_GUARD      12                              /* buffer guard */
+
+/* Modem Control Bits */
+
+#define TMXR_MDM_DTR        0x01    /* Data Terminal Ready */
+#define TMXR_MDM_RTS        0x02    /* Request To Send     */
+#define TMXR_MDM_DCD        0x04    /* Data Carrier Detect */
+#define TMXR_MDM_RNG        0x08    /* Ring Indicator      */
+#define TMXR_MDM_CTS        0x10    /* Clear To Send       */
+#define TMXR_MDM_DSR        0x20    /* Data Set Ready      */
+#define TMXR_MDM_INCOMING   (TMXR_MDM_DCD|TMXR_MDM_RNG|TMXR_MDM_CTS|TMXR_MDM_DSR)  /* Settable Modem Bits */
+#define TMXR_MDM_OUTGOING   (TMXR_MDM_DTR|TMXR_MDM_RTS)  /* Settable Modem Bits */
 
 struct tmln {
     SOCKET              conn;                           /* line conn */
@@ -95,6 +107,8 @@ t_stat tmxr_open_master (TMXR *mp, char *cptr);
 t_stat tmxr_close_master (TMXR *mp);
 t_stat tmxr_attach (TMXR *mp, UNIT *uptr, char *cptr);
 t_stat tmxr_detach (TMXR *mp, UNIT *uptr);
+t_stat tmxr_set_modem_control_passthru (TMXR *mp);
+t_stat tmxr_set_get_modem_bits (TMLN *lp, int32 bits_to_set, int32 bits_to_clear, int32 *incoming_bits);
 t_stat tmxr_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat tmxr_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 void tmxr_msg (SOCKET sock, char *msg);

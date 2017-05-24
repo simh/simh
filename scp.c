@@ -38,6 +38,7 @@
    24-Feb-13    JDB     Added REG_VMAD check in fprint_stopped_gen for VM address call
                         Added SIM_SW_STOP to examine call in fprint_stopped_gen
    05-Feb-13    JDB     Added sim_vm_fprint_stopped for VM-specific stop messages
+                        Modified ex_reg and dep_reg to pass VM-specific register flags
    08-May-12    RMS     Fixed memory leaks in save/restore (Peter Schorn)
    20-Mar-12    MP      Fixes to "SHOW <x> SHOW" commands
    06-Jan-12    JDB     Fixed "SHOW DEVICE" with only one enabled unit (Dave Bryan)  
@@ -3051,8 +3052,9 @@ if (!(flag & EX_E))
 GET_RADIX (rdx, rptr->radix);
 if ((rptr->flags & REG_VMAD) && sim_vm_fprint_addr)
     sim_vm_fprint_addr (ofile, sim_dflt_dev, (t_addr) val);
-else if (!(rptr->flags & REG_VMIO) ||
-    (fprint_sym (ofile, rdx, &val, NULL, sim_switches | SIM_SW_REG) > 0))
+else if (!(rptr->flags & REG_VMFLAGS) ||
+    (fprint_sym (ofile, (rptr->flags & REG_UFMASK) | rdx, &val,
+                 NULL, sim_switches | SIM_SW_REG) > 0))
         fprint_val (ofile, val, rdx, rptr->width, rptr->flags & REG_FMT);
 if (flag & EX_I)
     fprintf (ofile, "\t");
@@ -3145,8 +3147,9 @@ if ((rptr->flags & REG_VMAD) && sim_vm_parse_addr) {    /* address form? */
     if ((tptr == cptr) || (*tptr != 0) || (val > mask))
         return SCPE_ARG;
     }
-else if (!(rptr->flags & REG_VMIO) ||                   /* dont use sym? */
-    (parse_sym (cptr, rdx, NULL, &val, sim_switches | SIM_SW_REG) > SCPE_OK)) {
+else if (!(rptr->flags & REG_VMFLAGS) ||                /* dont use sym? */
+    (parse_sym (cptr, (rptr->flags & REG_UFMASK) | rdx, NULL,
+                &val, sim_switches | SIM_SW_REG) > SCPE_OK)) {
     val = get_uint (cptr, rdx, mask, &r);
     if (r != SCPE_OK)
         return SCPE_ARG;

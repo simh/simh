@@ -25,9 +25,11 @@
 
    25-Sep-16    RMS     Removed KBD_WAIT and friends
    08-Mar-16    RMS     Added shutdown invisible switch
+   03-Feb-16    JDB     [4.0] Added "help_base" and "message" fields to sim_ctab
    24-Dec-14    JDB     Added T_ADDR_FMT
    14-Dec-14    JDB     Extended sim_device for compatibility
    04-Nov-14    JDB     Added UNIT.dynflags field for tape density support
+   05-Feb-13    JDB     Added REG_V_UF and REG_UFMASK for VM-specific register flags
    21-Jul-08    RMS     Removed inlining support
    28-May-08    RMS     Added inlining support
    28-Jun-07    RMS     Added IA64 VMS support (from Norm Lastovica)
@@ -425,6 +427,8 @@ struct sim_reg {
     uint32              qptr;                           /* circ q ptr */
     };
 
+/* Register flags */
+
 #define REG_FMT         00003                           /* see PV_x */
 #define REG_RO          00004                           /* read only */
 #define REG_HIDDEN      00010                           /* hidden */
@@ -436,6 +440,10 @@ struct sim_reg {
 #define REG_FIT         01000                           /* fit access to size */
 #define REG_HRO         (REG_RO | REG_HIDDEN)           /* hidden, read only */
 
+#define REG_V_UF        16                              /* device specific */
+#define REG_UFMASK      (~((1u << REG_V_UF) - 1))       /* user flags mask */
+#define REG_VMFLAGS     (REG_VMIO | REG_UFMASK)         /* call VM routine if any of these are set */
+
 /* Command tables, base and alternate formats */
 
 struct sim_ctab {
@@ -444,6 +452,9 @@ struct sim_ctab {
                                                         /* action routine */
     int32               arg;                            /* argument */
     char                *help;                          /* help string */
+    const char          *help_base;                     /* [4.0] structured help base*/
+    void                (*message)(const char *unechoed_cmdline, t_stat stat);
+                                                        /* [4.0] message printing routine */
     };
 
 struct sim_c1tab {
@@ -600,5 +611,20 @@ typedef struct sim_debtab DEBTAB;
 #endif
 
 #define INT64_C(x)  (x)
+
+/* SCP API shim.
+
+   The SCP API for version 4.0 introduces a number of "pointer-to-const"
+   parameter qualifiers that were not present in the 3.x versions.  To maintain
+   compatibility with the earlier versions, the new qualifiers are expressed as
+   "CONST" rather than "const".  This allows macro removal of the qualifiers
+   when compiling for SIMH 3.x.
+*/
+
+#include "sim_sock.h"
+#ifdef CONST
+#undef CONST
+#define CONST
+#endif /* CONST */
 
 #endif
