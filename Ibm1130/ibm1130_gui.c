@@ -1720,6 +1720,7 @@ char *read_cmdline (char *ptr, int size, FILE *stream)
         if ((hCmdThread = CreateThread(NULL, 0, CmdThread, NULL, 0, &iCmdThreadID)) == NULL)
             scp_panic("Unable to create command line reading thread");
         atexit(read_atexit);
+        Sleep(500);                                         /* Let GUI threads startup and start to process messages */
     }
 
     update_gui(TRUE);
