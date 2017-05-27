@@ -33,6 +33,7 @@
 
 #include "ibm1130_defs.h"
 #include "ibm1130res.h"
+#include "sim_tmxr.h"
 
 #define UPDATE_BY_TIMER
 
@@ -1451,9 +1452,13 @@ void print_check (int set)
 
 void keyboard_selected (int select)
 {
-    btn[IDC_KEYBOARD_SELECT].state = select;
+    extern TMLN sim_con_ldsc;
+    extern TMXR sim_con_tmxr;
 
-    if (select)
+    btn[IDC_KEYBOARD_SELECT].state = select;
+    if (select &&                                           /* selected */
+        (sim_con_tmxr.master != 0) &&                       /* not Telnet? */
+        (sim_con_ldsc.serport != 0))                       /* and not serial? */
         SetForegroundWindow(hConsoleWindow);
     if (btn[IDC_KEYBOARD_SELECT].hBtn != NULL)
         EnableWindow(btn[IDC_KEYBOARD_SELECT].hBtn, select);
