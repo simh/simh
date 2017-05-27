@@ -1,6 +1,6 @@
 /* alpha_cpu.c: Alpha CPU simulator
 
-   Copyright (c) 2003-2006, Robert M Supnik
+   Copyright (c) 2003-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,10 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   27-May-2017  RMS     Fixed MIN/MAXx4 iteration counts (Mark Pizzolato)
+   26-May-2017  RMS     Fixed other reversed definitions in opcode 12
+   28-Apr-2017  RMS     Fixed reversed definitions of INSQH, EXTQH (Maurice Marks)
+  	
    Alpha architecturally-defined CPU state:
 
    PC<63:0>                     program counter
@@ -41,7 +45,7 @@
    operating system to operating system.  Alpha provides an intermediate layer
    of software (called PALcode) that implements the privileged state as well
    as a library of complex instruction functions.  PALcode implementations
-   are chip specific and system specific, as well as OS specific.
+   are chip specific and system specific, as well as OS specific.14
 
    Alpha memory management is also "soft" and supported a variety of mapping
    schemes.  VMS and Unix use a three level page table and directly expose
@@ -216,8 +220,8 @@ extern t_uint64 op_lds (t_uint64 op);
 extern t_uint64 op_stf (t_uint64 op);
 extern t_uint64 op_stg (t_uint64 op);
 extern t_uint64 op_sts (t_uint64 op);
-extern t_uint64 vax_sqrt (uint32 ir, t_bool dp);
-extern t_uint64 ieee_sqrt (uint32 ir, t_bool dp);
+extern t_uint64 vax_sqrt (uint32 ir, uint32 dp);
+extern t_uint64 ieee_sqrt (uint32 ir, uint32 dp);
 extern void vax_fop (uint32 ir);
 extern void ieee_fop (uint32 ir);
 extern t_stat pal_19 (uint32 ir);
@@ -227,7 +231,7 @@ extern t_stat pal_1e (uint32 ir);
 extern t_stat pal_1f (uint32 ir);
 extern t_uint64 trans_c (t_uint64 va);
 extern t_stat cpu_show_tlb (FILE *of, UNIT *uptr, int32 val, void *desc);
-extern t_stat pal_eval_intr (uint32 flag);
+extern uint32 pal_eval_intr (uint32 flag);
 extern t_stat pal_proc_excp (uint32 type);
 extern t_stat pal_proc_trap (uint32 type);
 extern t_stat pal_proc_intr (uint32 type);
@@ -1074,14 +1078,14 @@ while (reason == 0) {
             res = byte_zap (R[ra], 0x3 >> sc);
             break;
 
-        case 0x57:                                      /* EXTWH */
-            sc = (64 - (((uint32) rbv) << 3)) & 0x3F;
-            res = (R[ra] << sc) & M16;
-            break;
-
-        case 0x5A:                                      /* INSWH */
+        case 0x57:                                      /* INSWH */
             sc = (64 - (((uint32) rbv) << 3)) & 0x3F;
             res = (R[ra] & M16) >> sc;
+            break;
+
+        case 0x5A:                                      /* EXTWH */
+            sc = (64 - (((uint32) rbv) << 3)) & 0x3F;
+            res = (R[ra] << sc) & M16;
             break;
 
         case 0x62:                                      /* MSKLH */
@@ -1089,14 +1093,14 @@ while (reason == 0) {
             res = byte_zap (R[ra], 0xF >> sc);
             break;
 
-        case 0x67:                                      /* EXTLH */
-            sc = (64 - (((uint32) rbv) << 3)) & 0x3F;
-            res = (R[ra] << sc) & M32;
-            break;
-
-        case 0x6A:                                      /* INSLH */
+        case 0x67:                                      /* INSLH */
             sc = (64 - (((uint32) rbv) << 3)) & 0x3F;
             res = (R[ra] & M32) >> sc;
+            break;
+
+        case 0x6A:                                      /* EXTLH */
+            sc = (64 - (((uint32) rbv) << 3)) & 0x3F;
+            res = (R[ra] << sc) & M32;
             break;
 
         case 0x72:                                      /* MSKQH */
@@ -1104,14 +1108,14 @@ while (reason == 0) {
             res = byte_zap (R[ra], 0xFF >> sc);
             break;
 
-        case 0x77:                                      /* EXTQH */
-            sc = (64 - (((uint32) rbv) << 3)) & 0x3F;
-            res = R[ra] << sc;
-            break;
-
-        case 0x7A:                                      /* INSQH */
+        case 0x77:                                      /* INSQH */
             sc = (64 - (((uint32) rbv) << 3)) & 0x3F;
             res = R[ra] >> sc;
+            break;
+
+        case 0x7A:                                      /* EXTQH */
+            sc = (64 - (((uint32) rbv) << 3)) & 0x3F;
+            res = R[ra] << sc;
             break;
 
         default:
@@ -1438,7 +1442,7 @@ while (reason == 0) {
 
         case 0x39:                                      /* MINSW4 */
             if (!(arch_mask & AMASK_MVI)) ABORT (EXC_RSVI);
-            for (i = 0, res = 0; i < 8; i = i++) {
+            for (i = 0, res = 0; i < 4; i++) {
                 s1 = SEXT_W_Q (R[ra] >> (i << 4));
                 s2 = SEXT_W_Q (rbv >> (i << 4));
                 res = res | (((s1 <= s2)? R[ra]: rbv) & word_mask[i]);
@@ -1456,7 +1460,7 @@ while (reason == 0) {
 
         case 0x3B:                                      /* MINUW4 */
             if (!(arch_mask & AMASK_MVI)) ABORT (EXC_RSVI);
-            for (i = 0, res = 0; i < 8; i = i++) {
+            for (i = 0, res = 0; i < 4; i++) {
                 s64 = R[ra] & word_mask[i];
                 t64 = rbv & word_mask[i];
                 res = res | ((s64 <= t64)? s64: t64);
@@ -1474,7 +1478,7 @@ while (reason == 0) {
 
         case 0x3D:                                      /* MAXUW4 */
             if (!(arch_mask & AMASK_MVI)) ABORT (EXC_RSVI);
-            for (i = 0, res = 0; i < 8; i = i++) {
+            for (i = 0, res = 0; i < 4; i++) {
                 s64 = R[ra] & word_mask[i];
                 t64 = rbv & word_mask[i];
                 res = res | ((s64 >= t64)? s64: t64);
@@ -1492,7 +1496,7 @@ while (reason == 0) {
 
         case 0x3F:                                      /* MAXSW4 */
             if (!(arch_mask & AMASK_MVI)) ABORT (EXC_RSVI);
-            for (i = 0, res = 0; i < 8; i = i++) {
+            for (i = 0, res = 0; i < 4; i++) {
                 s1 = SEXT_W_Q (R[ra] >> (i << 4));
                 s2 = SEXT_W_Q (rbv >> (i << 4));
                 res = res | (((s1 >= s2)? R[ra]: rbv) & word_mask[i]);
@@ -1841,7 +1845,7 @@ return SCPE_OK;
 
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-uint32 k, di, lnt;
+int32 k, di, lnt;
 char *cptr = (char *) desc;
 t_stat r;
 InstHistory *h;
