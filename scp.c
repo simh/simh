@@ -10504,7 +10504,7 @@ t_stat sim_exp_show_tab (FILE *st, const EXPECT *exp, const EXPTAB *ep)
 {
 if (!ep)
     return SCPE_OK;
-fprintf (st, "EXPECT");
+fprintf (st, "    EXPECT");
 if (ep->switches & EXP_TYP_PERSIST)
     fprintf (st, " -p");
 if (ep->switches & EXP_TYP_CLEARALL)
@@ -10529,20 +10529,20 @@ CONST EXPTAB *ep = (CONST EXPTAB *)sim_exp_fnd (exp, match, 0);
 if (exp->buf_size) {
     char *bstr = sim_encode_quoted_string (exp->buf, exp->buf_ins);
 
-    fprintf (st, "Match Buffer Size: %d\n", exp->buf_size);
-    fprintf (st, "Buffer Insert Offset: %d\n", exp->buf_ins);
-    fprintf (st, "Buffer Contents: %s\n", bstr);
+    fprintf (st, "  Match Buffer Size: %d\n", exp->buf_size);
+    fprintf (st, "  Buffer Insert Offset: %d\n", exp->buf_ins);
+    fprintf (st, "  Buffer Contents: %s\n", bstr);
     free (bstr);
     }
 if (exp->after)
-    fprintf (st, "Halt After: %d instructions\n", exp->after);
-if (exp->dptr && exp->dbit)
-    fprintf (st, "Debugging via: SET %s DEBUG%s%s\n", sim_dname(exp->dptr), exp->dptr->debflags ? "=" : "", exp->dptr->debflags ? get_dbg_verb (exp->dbit, exp->dptr) : "");
-fprintf (st, "Match Rules:\n");
+    fprintf (st, "  Halt After: %d instructions\n", exp->after);
+if (exp->dptr && (exp->dbit & exp->dptr->dctrl))
+    fprintf (st, "  Expect Debugging via: SET %s DEBUG%s%s\n", sim_dname(exp->dptr), exp->dptr->debflags ? "=" : "", exp->dptr->debflags ? get_dbg_verb (exp->dbit, exp->dptr) : "");
+fprintf (st, "  Match Rules:\n");
 if (!*match)
     return sim_exp_showall (st, exp);
 if (!ep) {
-    fprintf (st, "No Rules match '%s'\n", match);
+    fprintf (st, "  No Rules match '%s'\n", match);
     return SCPE_ARG;
     }
 do {
@@ -10771,25 +10771,25 @@ return SCPE_OK;
 t_stat sim_show_send_input (FILE *st, const SEND *snd)
 {
 if (snd->extoff < snd->insoff) {
-    fprintf (st, "%d bytes of pending input Data:\n    ", snd->insoff-snd->extoff);
+    fprintf (st, "  %d bytes of pending input Data:\n    ", snd->insoff-snd->extoff);
     fprint_buffer_string (st, snd->buffer+snd->extoff, snd->insoff-snd->extoff);
     fprintf (st, "\n");
     }
 else
-    fprintf (st, "No Pending Input Data\n");
+    fprintf (st, "  No Pending Input Data\n");
 if ((snd->next_time - sim_gtime()) > 0) {
-    if ((snd->next_time - sim_gtime()) > (sim_timer_inst_per_sec()/1000000.0))
-        fprintf (st, "Minimum of %d instructions (%d microseconds) before sending first character\n", (int)(snd->next_time - sim_gtime()),
+    if (((snd->next_time - sim_gtime()) > (sim_timer_inst_per_sec()/1000000.0)) && ((sim_timer_inst_per_sec()/1000000.0) > 0.0))
+        fprintf (st, "  Minimum of %d instructions (%d microseconds) before sending first character\n", (int)(snd->next_time - sim_gtime()),
                                                         (int)((snd->next_time - sim_gtime())/(sim_timer_inst_per_sec()/1000000.0)));
     else
-        fprintf (st, "Minimum of %d instructions before sending first character\n", (int)(snd->next_time - sim_gtime()));
+        fprintf (st, "  Minimum of %d instructions before sending first character\n", (int)(snd->next_time - sim_gtime()));
     }
-if (snd->delay > (sim_timer_inst_per_sec()/1000000.0))
-    fprintf (st, "Minimum of %d instructions (%d microseconds) between characters\n", (int)snd->delay, (int)(snd->delay/(sim_timer_inst_per_sec()/1000000.0)));
+if ((snd->delay > (sim_timer_inst_per_sec()/1000000.0)) && ((sim_timer_inst_per_sec()/1000000.0) > 0.0))
+    fprintf (st, "  Minimum of %d instructions (%d microseconds) between characters\n", (int)snd->delay, (int)(snd->delay/(sim_timer_inst_per_sec()/1000000.0)));
 else
-    fprintf (st, "Minimum of %d instructions between characters\n", (int)snd->delay);
-if (snd->dptr && snd->dbit)
-    fprintf (st, "Debugging via: SET %s DEBUG%s%s\n", sim_dname(snd->dptr), snd->dptr->debflags ? "=" : "", snd->dptr->debflags ? get_dbg_verb (snd->dbit, snd->dptr) : "");
+    fprintf (st, "  Minimum of %d instructions between characters\n", (int)snd->delay);
+if (snd->dptr && (snd->dbit & snd->dptr->dctrl))
+    fprintf (st, "  Send Debugging via: SET %s DEBUG%s%s\n", sim_dname(snd->dptr), snd->dptr->debflags ? "=" : "", snd->dptr->debflags ? get_dbg_verb (snd->dbit, snd->dptr) : "");
 return SCPE_OK;
 }
 

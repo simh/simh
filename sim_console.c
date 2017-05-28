@@ -340,10 +340,10 @@ static SHTAB show_con_tab[] = {
     { "DEBUG", &sim_show_cons_debug, 0 },
     { "BUFFERED", &sim_show_cons_buff, 0 },
     { "EXPECT", &sim_show_cons_expect, 0 },
-    { "HALT", &sim_show_cons_expect, 0 },
+    { "HALT", &sim_show_cons_expect, -1 },
     { "INPUT", &sim_show_cons_send_input, 0 },
-    { "RESPONSE", &sim_show_cons_send_input, 0 },
-    { "DELAY", &sim_show_cons_expect, 0 },
+    { "RESPONSE", &sim_show_cons_send_input, -1 },
+    { "DELAY", &sim_show_cons_expect, -1 },
     { NULL, NULL, 0 }
     };
 
@@ -411,7 +411,8 @@ int32 i;
 
 if (*cptr == 0) {                                       /* show all */
     for (i = 0; show_con_tab[i].name; i++)
-        show_con_tab[i].action (st, dptr, uptr, show_con_tab[i].arg, cptr);
+        if (show_con_tab[i].arg != -1)
+            show_con_tab[i].action (st, dptr, uptr, show_con_tab[i].arg, cptr);
     return SCPE_OK;
     }
 while (*cptr != 0) {
@@ -2432,6 +2433,7 @@ return tmxr_close_master (&sim_con_tmxr);               /* close master socket *
 
 t_stat sim_show_cons_expect (FILE *st, DEVICE *dunused, UNIT *uunused, int32 flag, CONST char *cptr)
 {
+fprintf (st, "Console Expect processing:\n");
 return sim_exp_show (st, &sim_con_expect, cptr);
 }
 
@@ -2627,6 +2629,7 @@ return &sim_con_expect;
 
 t_stat sim_show_cons_send_input (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr)
 {
+fprintf (st, "Console Send processing:\n");
 return sim_show_send_input (st, &sim_con_send);
 }
 
