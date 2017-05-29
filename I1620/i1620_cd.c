@@ -433,7 +433,7 @@ switch (op) {                                           /* decode op */
     case OP_DN:
 
         /* DN punches all characters the same as WN except that a flagged
-           zero is punched as a hypehen (-) instead of a flagged
+           zero is punched as a hyphen (-) instead of a flagged
            zero ([). Punching begins at the P address and continues until
            the last digit of the storage module containing the P address
            has been punched. If the amount of data to be punched is an 

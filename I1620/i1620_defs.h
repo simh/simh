@@ -27,6 +27,7 @@
    I am grateful to Al Kossow, the Computer History Museum, and the IBM Corporate
    Archives for their help in gathering documentation about the IBM 1620.
 
+   23-May-17    RMS     MARCHK is indicator 8, not 18 (Dave Wise)
    19-May-17    RMS     Added option for Model I diagnostic mode (Dave Wise)
    05-Feb-15    TFM     Added definitions for flagged RM, GM, NB
    22-May-10    RMS     Added check for 64b definitions
@@ -113,6 +114,7 @@
 #define IN_SW4          4                               /* sense switch 4 */
 #define IN_RDCHK        6                               /* read check (I/O error) */
 #define IN_WRCHK        7                               /* write check (I/O error) */
+#define IN_MARCHK       8                               /* MAR check - diag only */
 #define IN_LAST         9                               /* last card was just read */
 #define IN_HP           11                              /* high or positive result */
 #define IN_EZ           12                              /* equal or zero result */
@@ -121,7 +123,6 @@
 #define IN_EXPCHK       15                              /* floating exponent check */
 #define IN_MBREVEN      16                              /* even parity check */
 #define IN_MBRODD       17                              /* odd parity check */
-#define IN_MARCHK       18                              /* MAR check - diag only */
 #define IN_ANYCHK       19                              /* any of read, write, even/odd */
 #define IN_PRCHK        25                              /* printer check */
 #define IN_IXN          30                              /* IX neither */
@@ -234,6 +235,15 @@ enum opcodes {
                                                         /* 80 - 89 */
     OP_BBT = 90, OP_BMK, OP_ORF, OP_ANDF, OP_CPLF,      /* 90 - 99 */
     OP_EORF, OP_OTD, OP_DTO };
+
+/* Device flags */
+
+#define DEV_DEFIO       (1 << (DEV_V_UF + 0))
+
+/* Function declarations */
+
+t_stat cpuio_set_inp (uint32 op, UNIT *uptr);
+t_stat cpuio_clr_inp (UNIT *uptr);
 
 extern const int8 cdr_to_alp[128];
 extern const int8 alp_to_cdp[256];

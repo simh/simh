@@ -26,6 +26,7 @@
    This CPU module incorporates code and comments from the 1620 simulator by
    Geoff Kuenning, with his permission.
 
+   26-May-17    RMS     Added deferred IO mode for slow devices
    20-May-17    RMS     Changed to commit PC on certain stops
                         Added SET CPU RELEASE command
                         Undefined indicators don't throw an error (Dave Wise)
@@ -82,6 +83,20 @@
    it was nicknamed CADET (Can't Add, Doesn't Even Try).  The Model 2 does
    adds in hardware and uses the add table memory for index registers.
 
+   The 1620 has no concept of overlapped IO. When an IO instruction is
+   issued, instruction execution is suspended until the IO is complete.
+   For "fast" devices, like the disk, IO is done in an instantaneous burst.
+   "Slow" devices have the option of going character-by-character, with
+   delays in between. This allows for operator intervention, such as
+   ^E or changing paper tapes.
+
+   The simulated IO state for character-by-character IO is:
+
+   cpuio_mode           set if IO in progress
+   cpuio_opc            saved IO opcode
+   cpuio_cnt            character counter; increments
+   PAR                  P address; increments
+
    This routine is the instruction decode routine for the IBM 1620.
    It is called from the simulator control program to execute
    instructions in simulated memory, starting at the simulated PC.
@@ -135,6 +150,9 @@ uint32 idxe = 0;                                        /* index enable */
 uint32 idxb = 0;                                        /* index band */
 uint32 io_stop = 1;                                     /* I/O stop */
 uint32 ar_stop = 1;                                     /* arith stop */
+uint32 cpuio_inp = 0;                                   /* IO in progress */
+uint32 cpuio_opc = 0;
+uint32 cpuio_cnt = 0;
 int32 ind_max = 16;                                     /* iadr nest limit */
 uint16 pcq[PCQ_SIZE] = { 0 };                           /* PC queue */
 int32 pcq_p = 0;                                        /* PC queue ptr */
@@ -227,6 +245,9 @@ REG cpu_reg[] = {
     { FLDATA (WRCHK, ind[IN_WRCHK], 0) },
     { FLDATA (ARSTOP, ar_stop, 0) },
     { FLDATA (IOSTOP, io_stop, 0) },
+    { FLDATA (IOINP, cpuio_inp, 0), REG_RO },
+    { DRDATA (IOOPC, cpuio_opc, 6), REG_RO },
+    { DRDATA (IOCNT, cpuio_cnt, 16), REG_RO },
     { BRDATA (IND, ind, 10, 1, NUM_IND) },
     { FLDATA (IAE, iae, 0) },
     { FLDATA (IDXE, idxe, 0) },
@@ -349,7 +370,7 @@ const int32 op_table[100] = {
     0,
     IF_IDX + IF_VPA + IF_VQA,                           /* 70: MA */
     IF_EDT + IF_VPA + IF_VQA,                           /* MF */
-    IF_EDT + IF_VPA + IF_VQA,                           /* MF */
+    IF_EDT + IF_VPA + IF_VQA,                           /* TNS */
     IF_EDT + IF_VPA + IF_VQA,                           /* TNF */
     0,
     0,
@@ -516,6 +537,10 @@ while (reason == SCPE_OK) {                             /* loop until halted */
     if (sim_interval <= 0) {                            /* check clock queue */
         if ((reason = sim_process_event ()))
             break;
+        }
+    if (cpuio_inp != 0) {                               /* IO in progress? */
+        sim_interval = sim_interval - 1;                /* tick & continue */
+        continue;
         }
 
     if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) { /* breakpoint? */
@@ -1082,6 +1107,8 @@ for (i = 0; commit_pc[i] != 0; i++) {                   /* check stop code */
 actual_PC = PC;                                         /* save cur PC for RLS */
 pcq_r->qptr = pcq_p;                                    /* update pc q ptr */
 upd_ind ();
+if (cpuio_inp != 0)                                     /* flag IO in progress */
+    sim_printf ("\r\nIO in progress");
 return reason;
 }
 
@@ -2131,6 +2158,28 @@ M[d] = M[d] | sign;                                     /* set result sign */
 return SCPE_OK;
 }
 
+/* Set and clear IO in progress */
+
+t_stat cpuio_set_inp (uint32 op, UNIT *uptr)
+{
+cpuio_inp = 1;
+cpuio_opc = op;
+cpuio_cnt = 0;
+if (uptr != NULL)
+    sim_activate_abs (uptr, uptr->wait);
+return SCPE_OK;
+}
+
+t_stat cpuio_clr_inp (UNIT *uptr)
+{
+cpuio_inp = 0;
+cpuio_opc = 0;
+cpuio_cnt = 0;
+if (uptr != NULL)
+    sim_cancel (uptr);
+return SCPE_OK;
+}
+
 /* Reset routine */
 
 t_stat cpu_reset (DEVICE *dptr)
@@ -2142,6 +2191,8 @@ PR1 = IR2 = 1;                                          /* invalidate PR1,IR2 */
 ind[0] = 0;
 for (i = IN_SW4 + 1; i < NUM_IND; i++)                  /* init indicators */
     ind[i] = 0;
+if (cpuio_inp != 0)                                     /* IO in progress? */
+    cpu_set_release (NULL, 0, NULL, NULL);              /* clear IO */
 if (cpu_unit.flags & IF_IA)                             /* indirect enabled? */
     iae = 1;
 else iae = 0;
@@ -2164,8 +2215,21 @@ return SCPE_OK;
 
 t_stat cpu_set_release (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-if (actual_PC == ADDR_A (saved_PC, INST_LEN)) {         /* one instr ahead? */
-    saved_PC = actual_PC;                               /* return */
+uint32 i;
+DEVICE *dptr;
+
+if (cpuio_inp != 0) {                                   /* IO in progress? */
+    cpuio_inp = 0;
+    cpuio_opc = 0;
+    cpuio_cnt = 0;
+    for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+        if (((dptr->flags & DEV_DEFIO) != 0) && (dptr->reset != NULL))
+            dptr->reset (dptr);
+        }
+    sim_printf ("IO operation canceled\n");
+    }
+else if (actual_PC == ADDR_A (saved_PC, INST_LEN)) {    /* one instr ahead? */
+    saved_PC = actual_PC;
     sim_printf ("New PC = %05d\n", saved_PC);
     }
 else sim_printf ("PC unchanged\n");
