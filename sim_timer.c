@@ -2224,8 +2224,8 @@ for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
         if (clock_time < 0)
             clock_time = 0;
         /* Stop clock assist unit and make sure the clock unit has a tick queued */
-        sim_cancel (&sim_timer_units[tmr]);
-        if (rtc_hz[tmr]) {
+        if (sim_is_active (&sim_timer_units[tmr])) {
+            sim_cancel (&sim_timer_units[tmr]);
             sim_debug (DBG_QUE, &sim_timer_dev, "sim_stop_timer_services() - tmr=%d scheduling %s after %d\n", tmr, sim_uname (sim_clock_unit[tmr]), clock_time);
             _sim_activate (sim_clock_unit[tmr], clock_time);
             }
