@@ -80,6 +80,7 @@ t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tty_reset (DEVICE *dptr);
 t_stat tty_set_fixtabs (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat tty_set_12digit (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 /* TTY data structures
 
@@ -111,8 +112,8 @@ MTAB tty_mod[] = {
       &tty_set_fixtabs, NULL, NULL },
     { MTAB_XTD|MTAB_VDV, 8, NULL, "DEFAULTTABS",
       &tty_set_fixtabs, NULL, NULL },
-    { UF_1DIG, UF_1DIG, "combined digits and flags", "1DIGIT", NULL },
-    { UF_1DIG, 0      , "separate digits and flags", "2DIGIT", NULL },
+    { UF_1DIG, UF_1DIG, "combined digits and flags", "1DIGIT", &tty_set_12digit },
+    { UF_1DIG, 0      , "separate digits and flags", "2DIGIT", &tty_set_12digit },
     { 0 }
     };
 
@@ -514,5 +515,14 @@ for (i = 0; i < TTO_COLMAX; i++) {
         tto_tabs[i] = 1;
     else tto_tabs[i] = 0;
     }
+return SCPE_OK;
+}
+
+/* Assure consistency of 1DIG/2DIG setting */
+
+t_stat tty_set_12digit (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+tty_unit[UTTI].flags = (tty_unit[UTTI].flags & ~UF_1DIG) | val;
+tty_unit[UTTO].flags = (tty_unit[UTTO].flags & ~UF_1DIG) | val;
 return SCPE_OK;
 }
