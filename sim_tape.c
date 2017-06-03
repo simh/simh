@@ -322,9 +322,18 @@ sim_debug (ctx->dbit, ctx->dptr, "_tape_completion_dispatch(unit=%d, top=%d, cal
 if (ctx->io_top != TOP_DONE)
     abort();                                            /* horribly wrong, stop */
 
-if (ctx->callback && ctx->io_top == TOP_DONE) {
+if (ctx->asynch_io)
+    pthread_mutex_lock (&ctx->io_lock);
+
+if (ctx->callback) {
     ctx->callback = NULL;
+    if (ctx->asynch_io)
+        pthread_mutex_unlock (&ctx->io_lock);
     callback (uptr, ctx->io_status);
+    }
+else {
+    if (ctx->asynch_io)
+        pthread_mutex_unlock (&ctx->io_lock);
     }
 }
 
