@@ -356,7 +356,8 @@ else {                                                  /* RA */
         PAR = ADDR_A (PAR, -2);                         /* decr mem addr*/
         return SCPE_OK;
         }
-    else if (tti_to_alp[raw] < 0) {                     /* illegal char? */
+    else if ((raw >= sizeof(tti_to_alp)) ||             /* illegal char? */
+             (tti_to_alp[raw] < 0)) {
         tto_write ('\a');                               /* beep! */
         return SCPE_OK;
         }
