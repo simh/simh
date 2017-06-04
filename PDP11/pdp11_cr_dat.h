@@ -4,7 +4,7 @@
  * give corresponding 12-bit card codes using the indicated
  * collating sequence.
  *
- * ERROR should be externally defined, either as an illegal
+ * CR_ER should be externally defined, either as an illegal
  * card code (on conversion from ASCII to card codes) or as
  * a code with a bit set outside the least significant 12.
  *
@@ -28,10 +28,10 @@
    translate lower case to upper case.  As a result of this modification,
    inversion of this table should be done with care! */
 static const int o29_code[] = {
-        ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR, /* control */
-        ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR, /* chars   */
-        ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR, /* control */
-        ERROR,ERROR,07417,ERROR,ERROR,ERROR,ERROR,ERROR, /* chars   */
+        CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER, /* control */
+        CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER, /* chars   */
+        CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER, /* control */
+        CR_ER,CR_ER,07417,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER, /* chars   */
         00000,04006,00006,00102,02102,01042,04000,00022, /*  !"#$%&' */
         04022,02022,02042,04012,01102,02000,04102,01400, /* ()*+,-./ */
         01000,00400,00200,00100,00040,00020,00010,00004, /* 01234567 */
@@ -40,58 +40,58 @@ static const int o29_code[] = {
         04002,04001,02400,02200,02100,02040,02020,02010, /* HIJKLMNO */
         02004,02002,02001,01200,01100,01040,01020,01010, /* PQRSTUVW */
         01004,01002,01001,04202,02006,02202,04006,01022, /* XYZ[\]^_ */
-        ERROR,04400,04200,04100,04040,04020,04010,04004, /* `abcdefg */
+        CR_ER,04400,04200,04100,04040,04020,04010,04004, /* `abcdefg */
         04002,04001,02400,02200,02100,02040,02020,02010, /* hijklmno */
         02004,02002,02001,01200,01100,01040,01020,01010, /* pqrstuvw */
-        01004,01002,01001,04000,ERROR,02000,ERROR,ERROR  /* xyz{|}~  */
+        01004,01002,01001,04000,CR_ER,02000,CR_ER,CR_ER  /* xyz{|}~  */
     };
 
 /* Bare bones 026 kepunch encodings */
 static const int o26_ftn_code[] = {
-        ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR, /* control */
-        ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR, /* chars   */
-        ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR, /* control */
-        ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR, /* chars   */
-        00000,ERROR,ERROR,ERROR,02102,ERROR,ERROR,00042, /*  !"#$%&' */
+        CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER, /* control */
+        CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER, /* chars   */
+        CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER, /* control */
+        CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER, /* chars   */
+        00000,CR_ER,CR_ER,CR_ER,02102,CR_ER,CR_ER,00042, /*  !"#$%&' */
         01042,04042,02042,04000,01102,02000,04102,01400, /* ()*+,-./ */
         01000,00400,00200,00100,00040,00020,00010,00004, /* 01234567 */
-        00002,00001,ERROR,ERROR,ERROR,00102,ERROR,ERROR, /* 89:;<=>? */
-        ERROR,04400,04200,04100,04040,04020,04010,04004, /* @ABCDEFG */
+        00002,00001,CR_ER,CR_ER,CR_ER,00102,CR_ER,CR_ER, /* 89:;<=>? */
+        CR_ER,04400,04200,04100,04040,04020,04010,04004, /* @ABCDEFG */
         04002,04001,02400,02200,02100,02040,02020,02010, /* HIJKLMNO */
         02004,02002,02001,01200,01100,01040,01020,01010, /* PQRSTUVW */
-        01004,01002,01001,ERROR,ERROR,ERROR,ERROR,ERROR, /* XYZ[\]^_ */
-        ERROR,04400,04200,04100,04040,04020,04010,04004, /* `abcdefg */
+        01004,01002,01001,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER, /* XYZ[\]^_ */
+        CR_ER,04400,04200,04100,04040,04020,04010,04004, /* `abcdefg */
         04002,04001,02400,02200,02100,02040,02020,02010, /* hijklmno */
         02004,02002,02001,01200,01100,01040,01020,01010, /* pqrstuvw */
-        01004,01002,01001,ERROR,ERROR,ERROR,ERROR,ERROR  /* xyz{|}~  */
+        01004,01002,01001,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER  /* xyz{|}~  */
     };
 
 static const int o26_comm_code[] = {
-        ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR, /* control */
-        ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR, /* chars   */
-        ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR, /* control */
-        ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR, /* chars   */
-        00000,ERROR,ERROR,00102,02102,01042,04000,ERROR, /*  !"#$%&' */
-        ERROR,ERROR,02042,ERROR,01102,02000,04102,01400, /* ()*+,-./ */
+        CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER, /* control */
+        CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER, /* chars   */
+        CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER, /* control */
+        CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER, /* chars   */
+        00000,CR_ER,CR_ER,00102,02102,01042,04000,CR_ER, /*  !"#$%&' */
+        CR_ER,CR_ER,02042,CR_ER,01102,02000,04102,01400, /* ()*+,-./ */
         01000,00400,00200,00100,00040,00020,00010,00004, /* 01234567 */
-        00002,00001,ERROR,ERROR,04042,ERROR,ERROR,ERROR, /* 89:;<=>? */
+        00002,00001,CR_ER,CR_ER,04042,CR_ER,CR_ER,CR_ER, /* 89:;<=>? */
         00042,04400,04200,04100,04040,04020,04010,04004, /* @ABCDEFG */
         04002,04001,02400,02200,02100,02040,02020,02010, /* HIJKLMNO */
         02004,02002,02001,01200,01100,01040,01020,01010, /* PQRSTUVW */
-        01004,01002,01001,ERROR,ERROR,ERROR,ERROR,ERROR, /* XYZ[\]^_ */
-        ERROR,04400,04200,04100,04040,04020,04010,04004, /* `abcdefg */
+        01004,01002,01001,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER, /* XYZ[\]^_ */
+        CR_ER,04400,04200,04100,04040,04020,04010,04004, /* `abcdefg */
         04002,04001,02400,02200,02100,02040,02020,02010, /* hijklmno */
         02004,02002,02001,01200,01100,01040,01020,01010, /* pqrstuvw */
-        01004,01002,01001,ERROR,ERROR,ERROR,ERROR,ERROR  /* xyz{|}~  */
+        01004,01002,01001,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER  /* xyz{|}~  */
     };
 
 /* 026DEC translation, according to RSX-11M-PLUS and Micro/RSX */
 /* I/O Drivers Reference manual - AA-JS11A-TC                  */
 static const int o26_dec_code[] = {
-        ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR, /* control  */
-        ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR, /* chars    */
-        ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR, /* control  */
-        ERROR,ERROR,07417,ERROR,ERROR,ERROR,ERROR,ERROR, /* chars    */
+        CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER, /* control  */
+        CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER, /* chars    */
+        CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER, /* control  */
+        CR_ER,CR_ER,07417,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER, /* chars    */
         00000,04006,01022,01102,02102,01006,02006,00012, /*  !"#$%&' */
         01042,04042,02042,04000,01102,02000,04102,01400, /* ()*+,-./ */
         01000,00400,00200,00100,00040,00020,00010,00004, /* 01234567 */
@@ -100,10 +100,10 @@ static const int o26_dec_code[] = {
         04002,04001,02400,02200,02100,02040,02020,02010, /* HIJKLMNO */
         02004,02002,02001,01200,01100,01040,01020,01010, /* PQRSTUVW */
         01004,01002,01001,02022,00006,04022,00022,00202, /* XYZ[\]^_ */
-        ERROR,04400,04200,04100,04040,04020,04010,04004, /* `abcdefg */
+        CR_ER,04400,04200,04100,04040,04020,04010,04004, /* `abcdefg */
         04002,04001,02400,02200,02100,02040,02020,02010, /* hijklmno */
         02004,02002,02001,01200,01100,01040,01020,01010, /* pqrstuvw */
-        01004,01002,01001,04000,ERROR,02000,ERROR,ERROR  /* xyz{|}~  */
+        01004,01002,01001,04000,CR_ER,02000,CR_ER,CR_ER  /* xyz{|}~  */
     };
 
 /* FULL EBCDIC, from Appendix C of System 360 Programming by Alex Thomas,
@@ -111,10 +111,10 @@ static const int o26_dec_code[] = {
    left compatable with DEC's 029 table.  Some control codes have been
    left out */
 static const int EBCDIC_code[] = {
-        05403,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR, /* control */
-        02011,04021,01021,ERROR,04041,02021,ERROR,ERROR, /* chars   */
-        ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR,ERROR, /* control */
-        ERROR,ERROR,ERROR,ERROR,01201,ERROR,ERROR,ERROR, /* chars   */
+        05403,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER, /* control */
+        02011,04021,01021,CR_ER,04041,02021,CR_ER,CR_ER, /* chars   */
+        CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER, /* control */
+        CR_ER,CR_ER,CR_ER,CR_ER,01201,CR_ER,CR_ER,CR_ER, /* chars   */
         00000,02202,00006,00102,02102,01042,04000,00022, /*  !"#$%&' */
         04022,02022,02042,04012,01102,02000,04102,01400, /* ()*+,-./ */
         01000,00400,00200,00100,00040,00020,00010,00004, /* 01234567 */
@@ -123,10 +123,10 @@ static const int EBCDIC_code[] = {
         04002,04001,02400,02200,02100,02040,02020,02010, /* HIJKLMNO */
         02004,02002,02001,01200,01100,01040,01020,01010, /* PQRSTUVW */
         01004,01002,01001,04202,02006,01202,04006,01022, /* XYZ[\]^_ */
-        ERROR,05400,05200,05100,05040,05020,05010,05004, /* `abcdefg */
+        CR_ER,05400,05200,05100,05040,05020,05010,05004, /* `abcdefg */
         05002,05001,06400,06200,06100,06040,06020,06010, /* hijklmno */
         06004,06002,06001,03200,03100,03040,03020,03010, /* pqrstuvw */
-        03004,03002,03001,ERROR,ERROR,ERROR,ERROR,ERROR  /* xyz{|}~  */
+        03004,03002,03001,CR_ER,CR_ER,CR_ER,CR_ER,CR_ER  /* xyz{|}~  */
     };
 /* DEC's 026 code extended to full 7-bit ASCII, as used in the DECsystem-10. */
 static const int o26_decascii_code[] = {
