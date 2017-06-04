@@ -1703,8 +1703,6 @@ _eth_callback((u_char *)opaque, &header, buf);
 #endif
 
 #if defined (USE_READER_THREAD)
-#include <pthread.h>
-
 static void *
 _eth_reader(void *arg)
 {
@@ -3617,7 +3615,6 @@ t_stat eth_filter_hash(ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
 {
 int i;
 char buf[116+66*ETH_FILTER_MAX];
-char errbuf[PCAP_ERRBUF_SIZE];
 char mac[20];
 char* buf2;
 t_stat status;
@@ -3762,6 +3759,7 @@ sim_debug(dev->dbit, dev->dptr, "BPF string is: |%s|\n", buf);
 
 #ifdef USE_BPF
 if (dev->eth_api == ETH_API_PCAP) {
+  char errbuf[PCAP_ERRBUF_SIZE];
   bpf_u_int32  bpf_subnet, bpf_netmask;
 
   if (pcap_lookupnet(dev->name, &bpf_subnet, &bpf_netmask, errbuf)<0)
@@ -3824,11 +3822,12 @@ int eth_host_devices(int used, int max, ETH_LIST* list)
 {
 pcap_t* conn = NULL;
 int i, j, datalink = 0;
-char errbuf[PCAP_ERRBUF_SIZE];
 
 for (i=0; i<used; ++i) {
   /* Cull any non-ethernet interface types */
 #if defined(HAVE_PCAP_NETWORK)
+  char errbuf[PCAP_ERRBUF_SIZE];
+
   conn = pcap_open_live(list[i].name, ETH_MAX_PACKET, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
   if (NULL != conn)
     datalink = pcap_datalink(conn), pcap_close(conn);
@@ -3925,7 +3924,7 @@ return used;
 int eth_devices(int max, ETH_LIST* list)
 {
 int i = 0;
-char errbuf[PCAP_ERRBUF_SIZE];
+char errbuf[PCAP_ERRBUF_SIZE] = "";
 #ifndef DONT_USE_PCAP_FINDALLDEVS
 pcap_if_t* alldevs;
 pcap_if_t* dev;
