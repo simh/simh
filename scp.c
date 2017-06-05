@@ -7094,7 +7094,7 @@ for (gptr = gbuf, reason = SCPE_OK;
             return SCPE_ARG;
         reason = exdep_reg_loop (ofile, sim_schrptr, flag, cptr,
             lowr, highr, (uint32) low, (uint32) high);
-        if ((!sim_oline) && (sim_log && (ofile == stdout)))
+        if ((flag & EX_E) && (!sim_oline) && (sim_log && (ofile == stdout)))
             exdep_reg_loop (sim_log, sim_schrptr, EX_E, cptr,
                 lowr, highr, (uint32) low, (uint32) high);
         continue;
@@ -7109,7 +7109,7 @@ for (gptr = gbuf, reason = SCPE_OK;
         return SCPE_ARG;
     reason = exdep_addr_loop (ofile, sim_schaptr, flag, cptr, low, high,
         sim_dfdev, sim_dfunit);
-    if ((!sim_oline) && (sim_log && (ofile == stdout)))
+    if ((flag & EX_E) && (!sim_oline) && (sim_log && (ofile == stdout)))
         exdep_addr_loop (sim_log, sim_schaptr, EX_E, cptr, low, high,
             sim_dfdev, sim_dfunit);
     }                                                   /* end for */
