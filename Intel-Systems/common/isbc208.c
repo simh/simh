@@ -800,11 +800,13 @@ t_stat isbc208_svc (UNIT *uptr)
                 }
                 //*** quick fix. Needs more thought!
                 fp = fopen(uptr->filename, "wb"); // write out modified image
-                for (i=0; i<uptr->capac; i++) {
-                    c = *(isbc208_buf[uptr->u6] + i) & 0xFF;
-                    fputc(c, fp);
+                if (fp) {
+                    for (i=0; i<uptr->capac; i++) {
+                        c = *(isbc208_buf[uptr->u6] + i) & 0xFF;
+                        fputc(c, fp);
+                    }
+                    fclose(fp);
                 }
-                fclose(fp);
 //*** need to step return results IAW table 3-11 in 143078-001
                 i8272_w2 = cyl;     /* generate a current address mark */
                 i8272_w3 = hed >> 2;

@@ -65,12 +65,12 @@
 
 //board definitions for the multibus
 /* set the base I/O address for the iSBC 201 */
-#define SBC201_BASE 0x78
+#define SBC201_BASE     0x78
 #define SBC201_INT      INT_1
 #define SBC201_NUM      0
 
 /* set the base I/O address for the iSBC 202 */
-#define SBC202_BASE 0x78
+#define SBC202_BASE     0x78
 #define SBC202_INT      INT_1
 #define SBC202_NUM      1
 

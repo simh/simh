@@ -261,9 +261,9 @@ int32 CS;                               /* Code Segment Register */
 int32 DS;                               /* Data Segment Register */
 int32 SS;                               /* Stack Segment Register */
 int32 ES;                               /* Extra Segment Register */
-int32 IP;                               /* Program Counter */
+uint32 IP;                              /* Program Counter */
 int32 PSW;                              /* Program Status Word (Flags) */
-int32 saved_PC = 0;                     /* saved program counter */
+uint32 saved_PC = 0;                    /* saved program counter */
 int32 int_req = 0;                      /* Interrupt request 0x01 = int, 0x02 = NMI*/
 uint16 port;                            //port called in dev_table[port]
 int32 chip = 0;                         /* 0 = 8088 chip, 1 = 8086 chip */
@@ -472,8 +472,6 @@ DEVICE i8088_dev = {
 
 uint8 xor_3_tab[] = { 0, 1, 1, 0 };
 
-int32 IP;
-
 static const char *opcode[256] = {
 "ADD\t", "ADD\t", "ADD\t", "ADD\t",                 /* 0x00 */
 "ADD\tAL,", "ADD\tAX,", "PUSH\tES", "POP\tES",
@@ -543,30 +541,34 @@ static const char *opcode[256] = {
 
 /*
 0 = 1 byte opcode
-1 = DATA8
-2 = DATA16
-3 = IP-INC8
-4 = IP-INC16
+1 = d8
+2 = d16
+3 = rel8
+4 = rel16
+5 = r/m8,r8
+6 = r/m16,r16
+7 = r/m8
+8 = r/m16
 20 = I haven't figured it out yet!
 */
 
 int32 oplen[256] = {
-20,20,20,20, 1, 2, 0, 0,  20,20,20,20, 1, 2, 0, 0, //0x00
-20,20,20,20, 1, 2, 0, 0,  20,20,20,20, 1, 2, 0, 0, //0x10
-20,20,20,20, 1, 2, 0, 0,  20,20,20,20, 1, 2, 0, 0, //0x20
-20,20,20,20, 1, 2, 0, 0,  20,20,20,20, 1, 2, 0, 0, //0x30
+ 5, 6, 5, 6, 1, 2, 0, 0,   5, 6, 5, 6, 1, 2, 0, 0, //0x00
+ 5, 6, 5, 6, 1, 2, 0, 0,   5, 6, 5, 6, 1, 2, 0, 0, //0x10
+ 5, 6, 5, 6, 1, 2, 0, 0,   5, 6, 5, 6, 1, 2, 0, 0, //0x20
+ 5, 6, 5, 6, 1, 2, 0, 0,   5, 6, 5, 6, 1, 2, 0, 0, //0x30
  0, 0, 0, 0, 0, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0, //0x40
  0, 0, 0, 0, 0, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0, //0x50
 20,20,20,20,20,20,20,20,  20,20,20,20,20,20,20,20, //0x60
  3, 3, 3, 3, 3, 3, 3, 3,   3, 3, 3, 3, 3, 3, 3, 3, //0x70
-20,20,20,20,20,20,20,20,  20,20,20,20,20,20,20,20, //0x80
+ 5, 6, 5, 6, 5, 6, 5, 6,   5, 6, 5, 6, 5, 6, 5, 6, //0x80
  0, 0, 0, 0, 0, 0, 0, 0,   0,20, 0, 0, 0, 0, 0, 0, //0x90
 20,20,20,20, 0, 0, 0, 0,   1, 2, 0, 0, 0, 0, 0, 0, //0xA0
  1, 1, 1, 1, 1, 1, 1, 1,   2, 2, 2, 2, 2, 2, 2, 2, //0xB0
  0, 0, 2, 0,20,20,20,20,   0, 0, 2, 0, 0, 1, 0, 0, //0xC0
 20,20,20,20, 0, 0, 0, 0,  20,20,20,20,20,20,20,20, //0xD0
  3, 3, 3, 3, 1, 1, 1, 1,   4, 4,20, 3, 0, 0, 0, 0, //0xE0
- 0, 0, 0, 0, 0, 0,20,20,   0, 0, 0, 0, 0, 0,20,20, //0xF0
+ 0, 0, 0, 0, 0, 0, 5, 6,   0, 0, 0, 0, 0, 0, 7, 8 //0xF0
 };
 
 void set_cpuint(int32 int_num)
@@ -578,8 +580,8 @@ void set_cpuint(int32 int_num)
 int32 sim_instr (void)
 {
     extern int32 sim_interval;
-    int32 IR, OP, reason;
-    int32 MRR, REG, EA, MOD, RM, VAL, DATA, OFF, SEG, INC, VAL1;
+    uint32 IR, OP, reason;
+    uint32 MRR, REG, EA, MOD, RM, VAL, DATA, OFF, SEG, INC, VAL1;
 
     IP = saved_PC & ADDRMASK16;         /* load local IP */
     reason = 0;                         /* clear stop reason */
@@ -591,7 +593,7 @@ int32 sim_instr (void)
             sim_printf("\n");
 
         if (sim_interval <= 0) {        /* check clock queue */
-            if (reason = sim_process_event ()) break;
+            if ((reason = sim_process_event())) break;
         }
 
         if (int_req > 0) {              /* interrupt? */

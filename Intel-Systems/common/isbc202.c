@@ -454,7 +454,7 @@ uint8 isbc202_get_dn(void)
     return 0xFF;
 }
 
-/* ISBC202 control port functions */
+/* iSBC202 control port functions */
 
 uint8 isbc2020(t_bool io, uint8 data)
 {
