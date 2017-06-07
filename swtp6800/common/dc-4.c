@@ -398,7 +398,11 @@ int32 fdcdrv(int32 io, int32 data)
             sim_printf("\nfdccmd: File error\n");
             return SCPE_IOERR;
         } 
-        sim_fread(dsk_unit[cur_dsk].filebuf, SECSIZ, 1, dsk_unit[cur_dsk].fileref); /* read in buffer */
+        err = sim_fread(dsk_unit[cur_dsk].filebuf, SECSIZ, 1, dsk_unit[cur_dsk].fileref); /* read in buffer */
+        if (err) {
+            sim_printf("\nfdccmd: File error\n");
+            return SCPE_IOERR;
+        } 
         dsk_unit[cur_dsk].u3 |= BUSY | DRQ; /* set DRQ & BUSY */
         dsk_unit[cur_dsk].pos = 0;      /* clear counter */
         spt = *((uint8 *)(dsk_unit[cur_dsk].filebuf) + MAXSEC) & 0xFF;
@@ -445,7 +449,11 @@ int32 fdccmd(int32 io, int32 data)
                     sim_printf("\nfdccmd: File error\n");
                     return SCPE_IOERR;
                 } 
-                sim_fread(dsk_unit[cur_dsk].filebuf, SECSIZ, 1, dsk_unit[cur_dsk].fileref); /* read in buffer */
+                err = sim_fread(dsk_unit[cur_dsk].filebuf, SECSIZ, 1, dsk_unit[cur_dsk].fileref); /* read in buffer */
+                if (err) {
+                    sim_printf("\nfdccmd: File error\n");
+                    return SCPE_IOERR;
+                } 
                 dsk_unit[cur_dsk].u3 |= BUSY | DRQ; /* set DRQ & BUSY */
                 dsk_unit[cur_dsk].pos = 0; /* clear counter */
                 break;
