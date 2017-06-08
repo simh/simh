@@ -27,7 +27,7 @@
 			<Tool
 				Name="VCPreBuildEventTool"
 				Description="Check for required build dependencies &amp; git commit id"
-				CommandLine="Pre-Build-Event.cmd BUILD"
+				CommandLine="Pre-Build-Event.cmd LIBPCRE ROM BUILD LIBSDL"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -108,7 +108,7 @@
 			<Tool
 				Name="VCPreBuildEventTool"
 				Description="Check for required build dependencies &amp; git commit id"
-				CommandLine="Pre-Build-Event.cmd BUILD"
+				CommandLine="Pre-Build-Event.cmd LIBPCRE ROM BUILD LIBSDL"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
