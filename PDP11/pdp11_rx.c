@@ -50,6 +50,7 @@
 */
 
 #include "pdp11_defs.h"
+#include "sim_disk.h"
 
 #define RX_NUMTR        77                              /* tracks/disk */
 #define RX_M_TRACK      0377
@@ -96,7 +97,7 @@
 #define RXCS_ERR        (1u << RXCS_V_ERR)
 #define RXCS_ROUT       (RXCS_ERR+RXCS_TR+RXCS_IE+RXCS_DONE)
 #define RXCS_IMP        (RXCS_ROUT+RXCS_DRV+RXCS_FUNC)
-#define RXCS_RW         (RXCS_IE)                       /* read/write */
+#define RXCS_RW         (CSR_GO+RXCS_FUNC+RXCS_DRV+RXCS_IE+RXCS_INIT) /* read/write */
 #define RXCS_GETFNC(x)  (((x) >> RXCS_V_FUNC) & RXCS_M_FUNC)
 
 #define RXES_CRC        0001                            /* CRC error */
@@ -105,6 +106,24 @@
 #define RXES_WLK        0010                            /* write protect */
 #define RXES_DD         0100                            /* deleted data */
 #define RXES_DRDY       0200                            /* drive ready */
+
+#define RXEC_0HOME      0010    /* Drive 0 failed to see home on Initialize. */
+#define RXEC_1HOME      0020    /* Drive 1 failed to see home on Initialize. */
+#define RXEC_HOMEOUT    0030    /* Found home when stepping out 10 tracks for INIT. */
+#define RXEC_TRACK77    0040    /* Tried to access a track greater than 77. */
+#define RXEC_SEEKERR    0050    /* Home was found before desired track was reached. */
+#define RXEC_SELFDIAG   0060    /* Self-diagnostic error. */
+#define RXEC_SECTERR    0070    /* Desired sector could not be found after looking at 52 headers (2 revolutions). */
+#define RXEC_WP         0100    /* Write protect error. */
+#define RXEC_SEPCLOCK   0110    /* More than 40us and no SEP clock seen. */
+#define RXEC_PREAMBLE   0120    /* A preamble could not be found. */
+#define RXEC_IOMARK     0130    /* Preamble found but no I/O mark foudn within allowable time span. */
+#define RXEC_CRCHEAD    0140    /* CRC error on what we thought was a header. */
+#define RXEC_TRACKADR   0150    /* The header track address of a good header does not compare with the desired track. */
+#define RXEC_IDAM       0160    /* Too many tries for an IDAM (identifies header). */
+#define RXEC_DAM        0170    /* Data AM not found in allotted time. */
+#define RXEC_CRCDATA    0200    /* CRC error on reading the sector from the disk. No code appears in the ERREG. */
+#define RXEC_PARITY     0210    /* All parity errors. */
 
 #define TRACK u3                                        /* current track */
 #define CALC_DA(t,s) (((t) * RX_NUMSC) + ((s) - 1)) * RX_NUMBY
@@ -121,8 +140,12 @@ int32 rx_cwait = 100;                                   /* command time */
 int32 rx_swait = 10;                                    /* seek, per track */
 int32 rx_xwait = 1;                                     /* tr set time */
 uint8 rx_buf[RX_NUMBY] = { 0 };                         /* sector buffer */
-int32 rx_bptr = 0;                                      /* buffer pointer */
+int32 rx_bptr_r = 0;                                    /* buffer pointer */
+int32 rx_bptr_w = 0;                                    /* buffer pointer */
 int32 rx_enb = 1;                                       /* device enable */
+int32 rx_ddam[RX_NUMSC * RX_NUMTR * 2] = { 0 };         /* deleted data marks */
+int32 rx_unitsel = 0;
+int32 rx_command = 0;
 
 t_stat rx_rd (int32 *data, int32 PA, int32 access);
 t_stat rx_wr (int32 data, int32 PA, int32 access);
@@ -161,7 +184,10 @@ REG rx_reg[] = {
     { ORDATA (RXTA, rx_track, 8) },
     { ORDATA (RXSA, rx_sector, 8) },
     { DRDATA (STAPTR, rx_state, 3), REG_RO },
-    { DRDATA (BUFPTR, rx_bptr, 7)  },
+    { DRDATA (UNITPTR, rx_unitsel, 3), REG_RO },
+    { DRDATA (COMPTR, rx_command, 3), REG_RO },
+    { DRDATA (BUFPTRR, rx_bptr_r, 7) },
+    { DRDATA (BUFPTRW, rx_bptr_w, 7) },
     { FLDATA (INT, IREQ (RX), INT_V_RX) },
     { FLDATA (ERR, rx_csr, RXCS_V_ERR) },
     { FLDATA (TR, rx_csr, RXCS_V_TR) },
@@ -196,12 +222,31 @@ MTAB rx_mod[] = {
     { 0 }
     };
 
+/* debugging bitmaps */
+#define DBG_TRC  0x0001                                 /* trace routine calls */
+#define DBG_INI  0x0002                                 /* display setup/init sequence info */
+#define DBG_REG  0x0004                                 /* trace read/write registers */
+#define DBG_REQ  0x0008                                 /* display transfer requests */
+#define DBG_DSK  0x0010                                 /* display sim_disk activities */
+#define DBG_DAT  0x0020                                 /* display transfer data */
+
+DEBTAB rx_debug[] = {
+  {"TRACE",  DBG_TRC, "trace routine calls"},
+  {"INIT",   DBG_INI, "display setup/init sequence info"},
+  {"REG",    DBG_REG, "trace read/write registers"},
+  {"REQ",    DBG_REQ, "display transfer requests"},
+  {"DISK",   DBG_DSK, "display sim_disk activities"},
+  {"DATA",   DBG_DAT, "display transfer data"},
+  {0}
+};
+
 DEVICE rx_dev = {
     "RX", rx_unit, rx_reg, rx_mod,
     RX_NUMDR, 8, 20, 1, 8, 8,
     NULL, NULL, &rx_reset,
     &rx_boot, NULL, NULL,
-    &rx_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS
+    &rx_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
+    0, rx_debug
     };
 
 /* I/O dispatch routine, I/O addresses 17777170 - 17777172
@@ -221,19 +266,27 @@ switch ((PA >> 1) & 1) {                                /* decode PA<1> */
 
     case 1:                                             /* RXDB */
         if ((rx_state == EMPTY) && (rx_csr & RXCS_TR)) {/* empty? */
-            sim_activate (&rx_unit[0], rx_xwait);
+            sim_activate (&rx_unit[rx_unitsel], rx_xwait);
             rx_csr = rx_csr & ~RXCS_TR;                 /* clear xfer */
+            *data = rx_dbr;                             /* return data */
             }
-        *data = rx_dbr;                                 /* return data */
+        else if ((rx_csr & RXCS_TR) || rx_bptr_w == 0)
+            *data = rx_dbr;                             /* return data */
+        else
+            *data = 0;
         break;
         }                                               /* end switch PA */
+
+sim_debug(DBG_REG, &rx_dev, "R @ PA=%06o, access=%d == %06o (csr %06o dbr %06o esr %06o)\n", 
+    PA, access, *data, rx_csr, rx_dbr, rx_esr);
 
 return SCPE_OK;
 }
 
 t_stat rx_wr (int32 data, int32 PA, int32 access)
 {
-int32 drv;
+sim_debug(DBG_REG, &rx_dev, "W @ PA=%06o, access=%d <- %06o (csr %06o dbr %06o esr %06o)\n", 
+    PA, access, data, rx_csr, rx_dbr, rx_esr);
 
 switch ((PA >> 1) & 1) {                                /* decode PA<1> */
 
@@ -255,9 +308,13 @@ switch ((PA >> 1) & 1) {                                /* decode PA<1> */
             return SCPE_OK;                             /* end if init */
             }
         if ((data & CSR_GO) && (rx_state == IDLE)) {    /* new function? */
+            CLR_INT (RX);
             rx_csr = data & (RXCS_IE + RXCS_DRV + RXCS_FUNC);
-            drv = ((rx_csr & RXCS_DRV)? 1: 0);          /* reselect drive */
-            rx_bptr = 0;                                /* clear buf pointer */
+            rx_esr = rx_esr & ~RXES_ID;                 /* clear power-on state */
+            rx_unitsel = (rx_csr & RXCS_DRV)? 1: 0;     /* reselect drive */
+            rx_bptr_r = rx_bptr_w = 0;                  /* clear buf pointer */
+            rx_command = RXCS_GETFNC (data);
+            sim_debug(DBG_REQ, &rx_dev, "command %d on unit %d\n", rx_command, rx_unitsel);
             switch (RXCS_GETFNC (data)) {               /* case on func */
 
             case RXCS_FILL:
@@ -267,7 +324,7 @@ switch ((PA >> 1) & 1) {                                /* decode PA<1> */
 
             case RXCS_EMPTY:
                 rx_state = EMPTY;                       /* state = empty */
-                sim_activate (&rx_unit[drv], rx_xwait);
+                sim_activate (&rx_unit[rx_unitsel], rx_xwait);
                 break;
 
             case RXCS_READ: case RXCS_WRITE: case RXCS_WRDEL:
@@ -278,11 +335,13 @@ switch ((PA >> 1) & 1) {                                /* decode PA<1> */
 
             default:
                 rx_state = CMD_COMPLETE;                /* state = cmd compl */
-                sim_activate (&rx_unit[drv], rx_cwait);
+                sim_activate (&rx_unit[rx_unitsel], rx_cwait);
                 break;
                 }                                       /* end switch func */
             return SCPE_OK;
             }                                           /* end if GO */
+        else if (data == 0)
+            rx_dbr = 0;                                 /* per ZRXBF0 line 918 */
         if ((data & RXCS_IE) == 0)
             CLR_INT (RX);
         else if ((rx_csr & (RXCS_DONE + RXCS_IE)) == RXCS_DONE)
@@ -300,8 +359,7 @@ switch ((PA >> 1) & 1) {                                /* decode PA<1> */
             return SCPE_OK;                             /* if ~IDLE, need tr */
         rx_dbr = data & 0377;                           /* save data */
         if ((rx_state != IDLE) && (rx_state != EMPTY)) {
-            drv = ((rx_csr & RXCS_DRV)? 1: 0);          /* select drive */
-            sim_activate (&rx_unit[drv], rx_xwait);     /* sched event */
+            sim_activate (&rx_unit[rx_unitsel], rx_xwait); /* sched event */
             rx_csr = rx_csr & ~RXCS_TR;                 /* clear xfer */
             }
         break;                                          /* end case RXDB */
@@ -333,26 +391,28 @@ int32 i, func;
 uint32 da;
 int8 *fbuf = (int8 *) uptr->filebuf;
 
-func = RXCS_GETFNC (rx_csr);                            /* get function */
+sim_debug(DBG_TRC, &rx_dev, "rx_svc: drv %d func %d state %d dbr %06o csr %06o bptr %d:%d track %03o sector %03o\n", 
+    rx_unitsel, rx_command, rx_state, rx_dbr, rx_csr, rx_bptr_r, rx_bptr_w, rx_track, rx_sector);
+
 switch (rx_state) {                                     /* case on state */
 
     case IDLE:                                          /* idle */
         return SCPE_IERR;                               /* done */
 
     case EMPTY:                                         /* empty buffer */
-        if (rx_bptr >= RX_NUMBY)                        /* done all? */
+        if (rx_bptr_r >= RX_NUMBY)                      /* done all? */
             rx_done (0, 0);
         else {
-            rx_dbr = rx_buf[rx_bptr];                   /* get next */
-            rx_bptr = rx_bptr + 1;
+            rx_dbr = rx_buf[rx_bptr_r];                 /* get next */
+            rx_bptr_r = rx_bptr_r + 1;
             rx_csr = rx_csr | RXCS_TR;                  /* set xfer */
             }
         break;
 
     case FILL:                                          /* fill buffer */
-        rx_buf[rx_bptr] = (uint8)rx_dbr;                /* write next */
-        rx_bptr = rx_bptr + 1;
-        if (rx_bptr < RX_NUMBY)                         /* more? set xfer */
+        rx_buf[rx_bptr_w] = (uint8)rx_dbr;              /* write next */
+        rx_bptr_w = rx_bptr_w + 1;
+        if (rx_bptr_w < RX_NUMBY)                       /* more? set xfer */
             rx_csr = rx_csr | RXCS_TR;
         else rx_done (0, 0);                            /* else done */
         break;
@@ -371,45 +431,53 @@ switch (rx_state) {                                     /* case on state */
         return SCPE_OK;
 
     case RWXFR:
+        if (rx_command == RXCS_WRDEL)                   /* del data? */
+            rx_esr = rx_esr | RXES_DD;
         if ((uptr->flags & UNIT_BUF) == 0) {            /* not buffered? */
-            rx_done (0, 0110);                          /* done, error */
+            rx_done (0, RXEC_SEPCLOCK);                 /* done, error */
             return IORETURN (rx_stopioe, SCPE_UNATT);
             }
         if (rx_track >= RX_NUMTR) {                     /* bad track? */
-            rx_done (0, 0040);                          /* done, error */
+            rx_done (0, RXEC_TRACK77);                  /* done, error */
             break;
             }
         uptr->TRACK = rx_track;                         /* now on track */
         if ((rx_sector == 0) || (rx_sector > RX_NUMSC)) { /* bad sect? */
-            rx_done (0, 0070);                          /* done, error */
+            rx_done (0, RXEC_SECTERR);                  /* done, error */
             break;
             }
         da = CALC_DA (rx_track, rx_sector);             /* get disk address */
-        if (func == RXCS_WRDEL)                         /* del data? */
-            rx_esr = rx_esr | RXES_DD;
-        if (func == RXCS_READ) {                        /* read? */
+        if (rx_command == RXCS_READ) {                  /* read? */
             for (i = 0; i < RX_NUMBY; i++)
                 rx_buf[i] = fbuf[da + i];
+            sim_disk_data_trace(uptr, rx_buf, da / 128, 128, "rx_read", 1, DBG_DAT);
+            if (rx_ddam[rx_unitsel * RX_NUMTR * RX_NUMSC + rx_track * RX_NUMSC + rx_sector - 1])
+                rx_esr = rx_esr | RXES_DD;
             }
         else {
             if (uptr->flags & UNIT_WPRT) {              /* write and locked? */
-                rx_done (RXES_WLK, 0100);               /* done, error */
+                rx_done (RXES_WLK, RXEC_WP);            /* done, error */
                 break;
                 }
+            sim_disk_data_trace(uptr, rx_buf, da / 128, 128, "rx_write", 1, DBG_DAT);
             for (i = 0; i < RX_NUMBY; i++)              /* write */
                 fbuf[da + i] = rx_buf[i];
             da = da + RX_NUMBY;
             if (da > uptr->hwmark)
                 uptr->hwmark = da;
+            rx_ddam[rx_unitsel * RX_NUMTR * RX_NUMSC + rx_track * RX_NUMSC + rx_sector - 1] = (rx_command == RXCS_WRDEL) ? 1 : 0;
             }
-        rx_done (0, 0);                                 /* done */
+        rx_state = CMD_COMPLETE;                /* state = cmd compl */
+        sim_activate (uptr, rx_cwait);
         break;
 
     case CMD_COMPLETE:                                  /* command complete */
-        if (func == RXCS_ECODE) {                       /* read ecode? */
+        if (rx_command == RXCS_ECODE) {                 /* read ecode? */
             rx_dbr = rx_ecode;                          /* set dbr */
             rx_done (0, -1);                            /* don't update */
             }
+        else if (rx_command == RXCS_RXES)
+            rx_done (RXES_DRDY, 0);
         else rx_done (0, 0);
         break;
 
@@ -417,15 +485,15 @@ switch (rx_state) {                                     /* case on state */
         rx_unit[0].TRACK = 1;                           /* drive 0 to trk 1 */
         rx_unit[1].TRACK = 0;                           /* drive 1 to trk 0 */
         if ((rx_unit[0].flags & UNIT_BUF) == 0) {       /* not buffered? */
-            rx_done (RXES_ID, 0010);                    /* init done, error */
+            rx_done (RXES_ID|RXES_DRDY, RXEC_0HOME);    /* init done, error */
             break;
             }
         da = CALC_DA (1, 1);                            /* track 1, sector 1 */
         for (i = 0; i < RX_NUMBY; i++)                  /* read sector */
             rx_buf[i] = fbuf[da + i];
-        rx_done (RXES_ID, 0);                           /* set done */
+        rx_done (RXES_ID|RXES_DRDY, 0);                 /* set done */
         if ((rx_unit[1].flags & UNIT_ATT) == 0)
-            rx_ecode = 0020;
+            rx_ecode = RXEC_1HOME;
         break;
         }                                               /* end case state */
 
@@ -438,20 +506,23 @@ return SCPE_OK;
 
 void rx_done (int32 esr_flags, int32 new_ecode)
 {
-int32 drv = (rx_csr & RXCS_DRV)? 1: 0;
+sim_debug(DBG_TRC, &rx_dev, "rx_done: esr %06o ecode %03o state %d dbr %06o csr %06o bptr %d:%d track %03o sector %03o\n", 
+    esr_flags, new_ecode, rx_state, rx_dbr, rx_csr, rx_bptr_r, rx_bptr_w, rx_track, rx_sector);
 
 rx_state = IDLE;                                        /* now idle */
+rx_command = -1;
+rx_csr = rx_csr & ~RXCS_TR;
 rx_csr = rx_csr | RXCS_DONE;                            /* set done */
-if (rx_csr & RXCS_IE) SET_INT (RX);                     /* if ie, intr */
 rx_esr = (rx_esr | esr_flags) & ~RXES_DRDY;
-if (rx_unit[drv].flags & UNIT_ATT)
+if ((rx_unit[rx_unitsel].flags & UNIT_ATT) && (esr_flags & RXES_DRDY))
     rx_esr = rx_esr | RXES_DRDY;
 if (new_ecode > 0)                                      /* test for error */
     rx_csr = rx_csr | RXCS_ERR;
-if (new_ecode < 0)                                      /* don't update? */
-    return;
-rx_ecode = new_ecode;                                   /* update ecode */
-rx_dbr = rx_esr;                                        /* update RXDB */
+if (new_ecode >= 0) {                                   /* don't update? */
+    rx_ecode = new_ecode;                               /* update ecode */
+    rx_dbr = rx_esr;                                    /* update RXDB */
+    }
+if (rx_csr & RXCS_IE) SET_INT (RX);                     /* if ie, intr */
 return;
 }
 
@@ -465,6 +536,9 @@ rx_csr = rx_dbr = 0;                                    /* clear regs */
 rx_esr = rx_ecode = 0;                                  /* clear error */
 rx_track = rx_sector = 0;                               /* clear addr */
 rx_state = IDLE;                                        /* ctrl idle */
+rx_unitsel = 0;
+rx_command = -1;
+memset(rx_ddam, 0, sizeof(rx_ddam));
 CLR_INT (RX);                                           /* clear int req */
 sim_cancel (&rx_unit[1]);                               /* cancel drive 1 */
 if (dptr->flags & DEV_DIS)                              /* disabled? */
@@ -473,7 +547,7 @@ else if (rx_unit[0].flags & UNIT_BUF)  {                /* attached? */
     rx_state = INIT_COMPLETE;                           /* yes, sched init */
     sim_activate (&rx_unit[0], rx_swait * abs (1 - rx_unit[0].TRACK));
     }
-else rx_done (0, 0010);                                 /* no, error */
+else rx_done (0, RXEC_0HOME);                           /* no, error */
 return auto_config (0, 0);                              /* run autoconfig */
 }
 
