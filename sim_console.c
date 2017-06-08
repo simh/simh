@@ -2206,7 +2206,7 @@ if (sim_deb) {
         fprintf (st, "   Debug messages display time of day as seconds.msec%s\n", sim_deb_switches & SWMASK ('R') ? " relative to the start of debugging" : "");
     for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
         if (!(dptr->flags & DEV_DIS) &&
-            (dptr->flags & DEV_DEBUG) &&
+            ((dptr->flags & DEV_DEBUG) || (dptr->debflags)) &&
             (dptr->dctrl)) {
             fprintf (st, "Device: %-6s ", dptr->name);
             show_dev_debug (st, dptr, NULL, 0, NULL);
@@ -2214,7 +2214,7 @@ if (sim_deb) {
         }
     for (i = 0; sim_internal_device_count && (dptr = sim_internal_devices[i]); ++i) {
         if (!(dptr->flags & DEV_DIS) &&
-            (dptr->flags & DEV_DEBUG) &&
+            ((dptr->flags & DEV_DEBUG) || (dptr->debflags)) &&
             (dptr->dctrl)) {
             fprintf (st, "Device: %-6s ", dptr->name);
             show_dev_debug (st, dptr, NULL, 0, NULL);
