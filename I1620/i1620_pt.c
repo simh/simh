@@ -26,6 +26,7 @@
    ptr          1621 paper tape reader
    ptp          1624 paper tape punch
 
+   10-Jun-17    RMS     Fixed typo in PTP unit (Dave Wise)
    26-May-17    RMS     Added deferred IO
    25-May-17    RMS     Fixed treatment of X0C82 on RN (Tom McBride)
    18-May-17    RMS     Separated EOF error from other IO errors (Dave Wise)
@@ -99,7 +100,7 @@ DEVICE ptr_dev = {
 */
 
 UNIT ptp_unit = {
-    UDATA (&ptp_svc, UNIT_SEQ+UNIT_ATTABLE, SERIAL_OUT_WAIT)
+    UDATA (&ptp_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT
     };
 
 REG ptp_reg[] = {
