@@ -2376,7 +2376,7 @@ if ((sim_calb_tmr != -1) && (rtc_hz[sim_calb_tmr])) {       /* Calibrated Timer 
     uint32 usecs_til_calib = (uint32)ceil(inst_til_calib / inst_per_usec);
 
     if (uptr != &sim_timer_units[sim_calb_tmr]) {           /* Not scheduling calibrated timer? */
-        if (inst_delay_d >= (double)inst_til_calib) {       /* long wait? */
+        if (inst_delay_d > (double)inst_til_calib) {        /* long wait? */
             stat = sim_clock_coschedule_tmr (uptr, sim_calb_tmr, ticks_til_calib - 1);
             uptr->usecs_remaining = (stat == SCPE_OK) ? usec_delay - usecs_til_calib : 0.0;
             sim_debug (DBG_TIM, &sim_timer_dev, "sim_timer_activate_after(%s, %.0f usecs) - coscheduling with with calibrated timer(%d), ticks=%d, usecs_remaining=%.0f usecs, inst_til_tick=%d\n", 
