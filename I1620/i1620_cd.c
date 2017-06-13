@@ -367,7 +367,7 @@ if ((i = strlen (cdr_buf)) > 0) {                       /* anything at all? */
         }
     else {                                              /* line too long */
         ind[IN_RDCHK] = 1;
-        sim_printf ("CDR line too long");
+        sim_perror ("CDR line too long");
         return SCPE_IOERR;
         }
     }
