@@ -1784,7 +1784,7 @@ switch (sim_throt_state) {
                 }
             else {                                      /* record instruction rate */
                 sim_throt_cps = (int32)a_cps;
-                sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc() Recalibrating Special %d/%d Cycles Per Second of %d\n", 
+                sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc() Recalibrating Special %d/%u Cycles Per Second of %f\n", 
                                                     sim_throt_wait, sim_throt_sleep_time, sim_throt_cps);
                 }
             sim_throt_ms_start = sim_os_msec ();
