@@ -47,8 +47,8 @@
 #define TTO_COLMAX      80
 #define UF_V_1DIG       (UNIT_V_UF)
 #define UF_1DIG         (1 << UF_V_1DIG)
-#define UTTI            0
-#define UTTO            1
+#define UTTI            1
+#define UTTO            0
 
 uint32 tti_unlock = 0;                                  /* expecting input */
 uint32 tti_flag = 0;                                    /* flag typed */
@@ -90,8 +90,8 @@ t_stat tty_set_12digit (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 */
 
 UNIT tty_unit[] = {
-    { UDATA (&tti_svc, 0, 0), KBD_POLL_WAIT },
-    { UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT }
+    { UDATA (&tto_svc, 0, 0), DEFIO_CPS },
+    { UDATA (&tti_svc, 0, 0), KBD_POLL_WAIT }
     };
 
 REG tty_reg[] = {
@@ -99,7 +99,7 @@ REG tty_reg[] = {
     { FLDATA (FLAG, tti_flag, 0), REG_HRO },
     { DRDATA (COL, tto_col, 7) },
     { DRDATA (KTIME, tty_unit[UTTI].wait, 24), REG_NZ + PV_LEFT },
-    { DRDATA (TTIME, tty_unit[UTTO].wait, 24), REG_NZ + PV_LEFT },
+    { DRDATA (CPS, tty_unit[UTTO].wait, 24), REG_NZ + PV_LEFT },
     { NULL }
     };
 
@@ -389,7 +389,7 @@ if ((cpuio_opc != OP_DN) && (cpuio_cnt >= MEMSIZE)) {   /* wrap, ~dump? */
     cpuio_clr_inp (uptr);                               /* done */
     return STOP_RWRAP;
     }
-sim_activate (uptr, uptr->wait);                        /* sched another xfer */
+sim_activate_after (uptr, 1000000/uptr->wait);          /* sched another xfer */
 
 switch (cpuio_opc) {                                    /* decode op */
 

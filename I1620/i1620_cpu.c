@@ -174,6 +174,8 @@ t_stat cpu_set_table (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat cpu_set_release (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat cpu_set_cps (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_cps (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 int32 get_2d (uint32 ad);
 t_stat get_addr (uint32 alast, int32 lnt, t_bool indexok, uint32 *addr);
@@ -285,6 +287,8 @@ MTAB cpu_mod[] = {
       &cpu_set_hist, &cpu_show_hist },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, NULL, "RELEASE",
       &cpu_set_release, NULL },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_VALR, 0, "CPS", "CPS",
+      &cpu_set_cps, &cpu_show_cps },
     { 0 }
     };
 
@@ -2166,7 +2170,7 @@ cpuio_inp = 1;
 cpuio_opc = op;
 cpuio_cnt = 0;
 if (uptr != NULL)
-    sim_activate_abs (uptr, uptr->wait);
+    sim_activate_after_abs (uptr, 1000000/uptr->wait);
 return SCPE_OK;
 }
 
@@ -2233,6 +2237,41 @@ else if (actual_PC == ADDR_A (saved_PC, INST_LEN)) {    /* one instr ahead? */
     sim_printf ("New PC = %05d\n", saved_PC);
     }
 else sim_printf ("PC unchanged\n");
+return SCPE_OK;
+}
+
+/* Character rate */
+
+t_stat cpu_set_cps (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+uint32 i, cps;
+DEVICE *dptr;
+t_stat r;
+
+if (cptr == NULL)
+    return SCPE_ARG;
+cps = get_uint (cptr, 10, 1000000, &r);
+if (r != SCPE_OK)
+    return SCPE_ARG;
+
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+    if ((dptr->flags & DEV_DEFIO) != 0)
+        dptr->units->wait = cps;
+    }
+return SCPE_OK;
+}
+
+/* Show CPS */
+
+t_stat cpu_show_cps (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+uint32 i;
+DEVICE *dptr;
+
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+    if ((dptr->flags & DEV_DEFIO) != 0)
+        fprintf (st, "%s CPS: %d\n", dptr->name, dptr->units->wait);
+    }
 return SCPE_OK;
 }
 

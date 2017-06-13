@@ -240,6 +240,8 @@ enum opcodes {
 
 #define DEV_DEFIO       (1 << (DEV_V_UF + 0))
 
+#define DEFIO_CPS       50                  /* Default Characters per Second */
+
 /* Function declarations */
 
 t_stat cpuio_set_inp (uint32 op, UNIT *uptr);
