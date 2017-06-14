@@ -90,7 +90,7 @@ t_stat tty_set_12digit (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 */
 
 UNIT tty_unit[] = {
-    { UDATA (&tto_svc, 0, 0), DEFIO_CPS },
+    { UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT },
     { UDATA (&tti_svc, 0, 0), KBD_POLL_WAIT }
     };
 
@@ -99,7 +99,8 @@ REG tty_reg[] = {
     { FLDATA (FLAG, tti_flag, 0), REG_HRO },
     { DRDATA (COL, tto_col, 7) },
     { DRDATA (KTIME, tty_unit[UTTI].wait, 24), REG_NZ + PV_LEFT },
-    { DRDATA (CPS, tty_unit[UTTO].wait, 24), REG_NZ + PV_LEFT },
+    { DRDATA (TTIME, tty_unit[UTTO].wait, 24), REG_NZ + PV_LEFT },
+    { DRDATA (CPS, tty_unit[UTTO].DEFIO_CPS, 24), REG_NZ + PV_LEFT },
     { NULL }
     };
 
@@ -389,7 +390,7 @@ if ((cpuio_opc != OP_DN) && (cpuio_cnt >= MEMSIZE)) {   /* wrap, ~dump? */
     cpuio_clr_inp (uptr);                               /* done */
     return STOP_RWRAP;
     }
-sim_activate_after (uptr, 1000000/uptr->wait);          /* sched another xfer */
+DEFIO_ACTIVATE (uptr);                                  /* sched another xfer */
 
 switch (cpuio_opc) {                                    /* decode op */
 

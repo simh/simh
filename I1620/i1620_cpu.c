@@ -2170,7 +2170,7 @@ cpuio_inp = 1;
 cpuio_opc = op;
 cpuio_cnt = 0;
 if (uptr != NULL)
-    sim_activate_after_abs (uptr, 1000000/uptr->wait);
+    DEFIO_ACTIVATE_ABS (uptr);
 return SCPE_OK;
 }
 

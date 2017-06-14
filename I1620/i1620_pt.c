@@ -74,13 +74,14 @@ t_stat ptp_num (void);
 */
 
 UNIT ptr_unit = {
-    UDATA (&ptr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0), DEFIO_CPS
+    UDATA (&ptr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0), SERIAL_OUT_WAIT
     };
 
 REG ptr_reg[] = {
     { FLDATA (BIN, ptr_mode, 0) },
     { DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (CPS, ptr_unit.wait, 24), PV_LEFT },
+    { DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
+    { DRDATA (CPS, ptr_unit.DEFIO_CPS, 24), PV_LEFT },
     { NULL }
     };
 
@@ -100,13 +101,14 @@ DEVICE ptr_dev = {
 */
 
 UNIT ptp_unit = {
-    UDATA (&ptp_svc, UNIT_SEQ+UNIT_ATTABLE, 0), DEFIO_CPS
+    UDATA (&ptp_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT
     };
 
 REG ptp_reg[] = {
     { FLDATA (BIN, ptp_mode, 0) },
     { DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (CPS, ptp_unit.wait, 24), PV_LEFT },
+    { DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
+    { DRDATA (CPS, ptr_unit.DEFIO_CPS, 24), PV_LEFT },
     { NULL }
     };
 
@@ -268,7 +270,7 @@ if (cpuio_cnt >= MEMSIZE) {                             /* over the limit? */
     cpuio_clr_inp (uptr);                               /* done */
     return STOP_RWRAP;
     }
-sim_activate_after (uptr, 1000000/uptr->wait);          /* sched another xfer */
+DEFIO_ACTIVATE (uptr);                                  /* sched another xfer */
 if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
     return SCPE_UNATT;
 
@@ -425,7 +427,7 @@ if ((cpuio_opc != OP_DN) && (cpuio_cnt >= MEMSIZE)) {   /* wrap, ~dump? */
     cpuio_clr_inp (uptr);                               /* done */
     return STOP_RWRAP;
     }
-sim_activate_after (uptr, 1000000/uptr->wait);          /* sched another xfer */
+DEFIO_ACTIVATE (uptr);                                  /* sched another xfer */
 if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
     return SCPE_UNATT;
 
