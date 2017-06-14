@@ -61,6 +61,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sigma", "sigma.vcproj", "{7
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "alpha", "alpha.vcproj", "{14C5D369-E4A1-4DA2-B23C-B49367874F7B}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HP3000", "HP3000.vcproj", "{B3E35063-CB41-4F77-BFCA-49BB316B0EDB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -185,6 +187,10 @@ Global
 		{14C5D369-E4A1-4DA2-B23C-B49367874F7B}.Debug|Win32.Build.0 = Debug|Win32
 		{14C5D369-E4A1-4DA2-B23C-B49367874F7B}.Release|Win32.ActiveCfg = Release|Win32
 		{14C5D369-E4A1-4DA2-B23C-B49367874F7B}.Release|Win32.Build.0 = Release|Win32
+		{B3E35063-CB41-4F77-BFCA-49BB316B0EDB}.Debug|Win32.ActiveCfg = Debug|Win32
+		{B3E35063-CB41-4F77-BFCA-49BB316B0EDB}.Debug|Win32.Build.0 = Debug|Win32
+		{B3E35063-CB41-4F77-BFCA-49BB316B0EDB}.Release|Win32.ActiveCfg = Release|Win32
+		{B3E35063-CB41-4F77-BFCA-49BB316B0EDB}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
