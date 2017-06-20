@@ -106,16 +106,18 @@ REG tty_reg[] = {
     };
 
 MTAB tty_mod[] = {
-    { MTAB_XTD|MTAB_VDV, TTO_COLMAX, NULL, "TABS",
-      &sim_tt_settabs, NULL, (void *) tto_tabs },
+    { MTAB_XTD|MTAB_VDV, TTO_COLMAX, NULL, "TABS=col;col;col...",
+      &sim_tt_settabs, NULL, (void *) tto_tabs, "set tab stops at the specified columns" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, TTO_COLMAX, "TABS", NULL,
-      NULL, &sim_tt_showtabs, (void *) tto_tabs },
+      NULL, &sim_tt_showtabs, (void *) tto_tabs, "display current tab stops" },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOTABS",
-      &tty_set_fixtabs, NULL, NULL },
+      &tty_set_fixtabs, NULL, NULL, "remove all tab stops" },
     { MTAB_XTD|MTAB_VDV, 8, NULL, "DEFAULTTABS",
-      &tty_set_fixtabs, NULL, NULL },
-    { UF_1DIG, UF_1DIG, "combined digits and flags", "1DIGIT", &tty_set_12digit },
-    { UF_1DIG, 0      , "separate digits and flags", "2DIGIT", &tty_set_12digit },
+      &tty_set_fixtabs, NULL, NULL, "set tab stops every eight columns" },
+    { UF_1DIG, UF_1DIG, "combined digits and flags", "1DIGIT", 
+      &tty_set_12digit, NULL, NULL, "type flagged digits as letters" },
+    { UF_1DIG, 0      , "separate digits and flags", "2DIGIT", 
+      &tty_set_12digit, NULL, NULL, "type flagged digits as ~digit" },
     { 0 }
     };
 
