@@ -231,64 +231,64 @@ UNIT cpu_unit = { UDATA (NULL, UNIT_FIX+UNIT_BCD+MI_STD, MAXMEMSIZE) };
 REG cpu_reg[] = {
     { DRDATA (PC, saved_PC, 16), PV_LEFT },
     { DRDATA (APC, actual_PC, 16), PV_LEFT + REG_HRO },
-    { DRDATA (IR2, IR2, 16), PV_LEFT },
-    { DRDATA (PR1, PR1, 16), PV_LEFT },
-    { DRDATA (PAR, PAR, 16), PV_LEFT + REG_RO },
-    { DRDATA (QAR, QAR, 16), PV_LEFT + REG_RO },
-    { FLDATA (SW1, ind[IN_SW1], 0) },
-    { FLDATA (SW2, ind[IN_SW2], 0) },
-    { FLDATA (SW3, ind[IN_SW3], 0) },
-    { FLDATA (SW4, ind[IN_SW4], 0) },
-    { FLDATA (HP, ind[IN_HP], 0) },
-    { FLDATA (EZ, ind[IN_EZ], 0) },
+    { DRDATAD (IR2, IR2, 16, "instruction storage address register (PC)"), PV_LEFT },
+    { DRDATAD (PR1, PR1, 16, "processor register 1"), PV_LEFT },
+    { DRDATAD (PAR, PAR, 16, "P address register (OR2)"), PV_LEFT + REG_RO },
+    { DRDATAD (QAR, QAR, 16, "Q address register (OR1)"), PV_LEFT + REG_RO },
+    { FLDATAD (SW1, ind[IN_SW1], 0, "sense switch 1" ) },
+    { FLDATAD (SW2, ind[IN_SW2], 0, "sense switch 2" ) },
+    { FLDATAD (SW3, ind[IN_SW3], 0, "sense switch 3" ) },
+    { FLDATAD (SW4, ind[IN_SW4], 0, "sense switch 4" ) },
+    { FLDATAD (HP, ind[IN_HP], 0, "high/positive indicator") },
+    { FLDATAD (EZ, ind[IN_EZ], 0, "equal/zero indicator") },
     { FLDATA (OVF, ind[IN_OVF], 0) },
     { FLDATA (EXPCHK, ind[IN_EXPCHK], 0) },
     { FLDATA (RDCHK, ind[IN_RDCHK], 0) },
     { FLDATA (WRCHK, ind[IN_WRCHK], 0) },
-    { FLDATA (ARSTOP, ar_stop, 0) },
-    { FLDATA (IOSTOP, io_stop, 0) },
-    { FLDATA (IOINP, cpuio_inp, 0), REG_RO },
-    { DRDATA (IOOPC, cpuio_opc, 6), REG_RO },
+    { FLDATAD (ARSTOP, ar_stop, 0, "arith stop") },
+    { FLDATAD (IOSTOP, io_stop, 0, "I/O stop") },
+    { FLDATAD (IOINP, cpuio_inp, 0, "IO in progress"), REG_RO },
+    { DRDATAD (IOOPC, cpuio_opc, 6, "IO opcode"), REG_RO },
     { DRDATA (IOCNT, cpuio_cnt, 16), REG_RO },
     { BRDATA (IND, ind, 10, 1, NUM_IND) },
-    { FLDATA (IAE, iae, 0) },
-    { FLDATA (IDXE, idxe, 0) },
-    { FLDATA (IDXB, idxb, 0) },
+    { FLDATAD (IAE, iae, 0, "indirect address enable (Model 2 only)") },
+    { FLDATAD (IDXE, idxe, 0, "indexing enable (Model 2 only)") },
+    { FLDATAD (IDXB, idxb, 0, "indexing band select (Model 2 only)") },
     { DRDATA (INDMAX, ind_max, 16), REG_NZ + PV_LEFT },
     { BRDATA (PCQ, pcq, 10, 14, PCQ_SIZE), REG_RO+REG_CIRC },
     { ORDATA (PCQP, pcq_p, 6), REG_HRO },
-    { ORDATA (WRU, sim_int_char, 8) },
+    { ORDATAD (WRU, sim_int_char, 8, "interrupt character") },
     { NULL }
     };
 
 MTAB cpu_mod[] = {
-    { IF_IA, IF_IA, "IA", "IA", &cpu_set_opt1 },
-    { IF_IA, 0, "no IA", "NOIA", &cpu_set_opt1 },
-    { IF_EDT, IF_EDT, "EDT", "EDT", &cpu_set_opt1 },
-    { IF_EDT, 0, "no EDT", "NOEDT", &cpu_set_opt1 },
-    { IF_DIV, IF_DIV, "DIV", "DIV", &cpu_set_opt1 },
-    { IF_DIV, 0, "no DIV", "NODIV", &cpu_set_opt1 },
-    { IF_RMOK, IF_RMOK, "RM allowed", "RMOK", &cpu_set_opt1 },
-    { IF_RMOK, 0, "RM disallowed", "NORMOK", &cpu_set_opt1 },
-    { IF_FP, IF_FP, "FP", "FP", NULL },
-    { IF_FP, 0, "no FP", "NOFP", NULL },
-    { IF_BIN, IF_BIN, "BIN", "BIN", &cpu_set_opt2 },
-    { IF_BIN, 0, "no BIN", "NOBIN", &cpu_set_opt2 },
-    { IF_IDX, IF_IDX, "IDX", "IDX", &cpu_set_opt2 },
-    { IF_IDX, 0, "no IDX", "NOIDX", &cpu_set_opt2 },
-    { IF_MII, IF_MII, "Model 2", "MOD2", &cpu_set_model },
-    { IF_MII, 0, "Model 1", "MOD1", &cpu_set_model },
-    { UNIT_MSIZE, 20000, NULL, "20K", &cpu_set_size },
-    { UNIT_MSIZE, 40000, NULL, "40K", &cpu_set_size },
-    { UNIT_MSIZE, 60000, NULL, "60K", &cpu_set_size },
+    { IF_IA, IF_IA, "IA", "IA", &cpu_set_opt1, NULL, NULL, "enable indirect addressing" },
+    { IF_IA, 0, "no IA", "NOIA", &cpu_set_opt1, NULL, NULL, "disable indirect addressing" },
+    { IF_EDT, IF_EDT, "EDT", "EDT", &cpu_set_opt1, NULL, NULL, "enable extra editing instructions" },
+    { IF_EDT, 0, "no EDT", "NOEDT", &cpu_set_opt1, NULL, NULL, "disable extra editing instructions" },
+    { IF_DIV, IF_DIV, "DIV", "DIV", &cpu_set_opt1, NULL, NULL, "enable divide instructions" },
+    { IF_DIV, 0, "no DIV", "NODIV", &cpu_set_opt1, NULL, NULL, "disable divide instructions" },
+    { IF_IDX, IF_IDX, "IDX", "IDX", &cpu_set_opt2, NULL, NULL, "enable indexing" },
+    { IF_IDX, 0, "no IDX", "NOIDX", &cpu_set_opt2, NULL, NULL, "disable indexing" },
+    { IF_BIN, IF_BIN, "BIN", "BIN", &cpu_set_opt2, NULL, NULL, "enable binary instructions" },
+    { IF_BIN, 0, "no BIN", "NOBIN", &cpu_set_opt2, NULL, NULL, "disable binary instructions" },
+    { IF_FP, IF_FP, "FP", "FP", NULL, NULL, NULL, "disable record marks in add/sub/compare" },
+    { IF_FP, 0, "no FP", "NOFP", NULL, NULL, NULL, "disable record marks in add/sub/compare" },
+    { IF_RMOK, IF_RMOK, "RM allowed", "RMOK", &cpu_set_opt1, NULL, NULL, "enable record marks in add/sub/compare" },
+    { IF_RMOK, 0, "RM disallowed", "NORMOK", &cpu_set_opt1, NULL, NULL, "disable record marks in add/sub/compare" },
+    { IF_MII, 0, "Model 1", "MOD1", &cpu_set_model, NULL, NULL, "set Model 1" },
+    { IF_MII, IF_MII, "Model 2", "MOD2", &cpu_set_model, NULL, NULL, "set Model 2" },
+    { UNIT_MSIZE, 20000, NULL, "20K", &cpu_set_size, NULL, NULL, "set memory size = 20K" },
+    { UNIT_MSIZE, 40000, NULL, "40K", &cpu_set_size, NULL, NULL, "set memory size = 40K" },
+    { UNIT_MSIZE, 60000, NULL, "60K", &cpu_set_size, NULL, NULL, "set memory size = 60K" },
     { UNIT_MSIZE, 0, NULL, "SAVE", &cpu_set_save },
     { UNIT_MSIZE, 0, NULL, "TABLE", &cpu_set_table },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
-      &cpu_set_hist, &cpu_show_hist },
+      &cpu_set_hist, &cpu_show_hist, NULL, "Displays instruction history" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, NULL, "RELEASE",
-      &cpu_set_release, NULL },
+      &cpu_set_release, NULL, NULL, "Release/Complete pending I/O" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_VALR, 0, "CPS", "CPS",
-      &cpu_set_cps, &cpu_show_cps },
+      &cpu_set_cps, &cpu_show_cps, NULL, "set characters per second" },
     { 0 }
     };
 
@@ -2244,7 +2244,7 @@ return SCPE_OK;
 
 t_stat cpu_set_cps (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-uint32 i, cps;
+uint32 i, j, cps;
 DEVICE *dptr;
 t_stat r;
 
@@ -2255,8 +2255,10 @@ if (r != SCPE_OK)
     return SCPE_ARG;
 
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
-    if ((dptr->flags & DEV_DEFIO) != 0)
-        dptr->units->wait = cps;
+    if ((dptr->flags & DEV_DEFIO) != 0) {
+        for (j = 0; j < dptr->numunits; j++)
+            dptr->units[j].DEFIO_CPS = cps;
+        }
     }
 return SCPE_OK;
 }
@@ -2270,7 +2272,7 @@ DEVICE *dptr;
 
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
     if ((dptr->flags & DEV_DEFIO) != 0)
-        fprintf (st, "%s CPS: %d\n", dptr->name, dptr->units->wait);
+        fprintf (st, "%s CPS: %d\n", dptr->name, dptr->units[0].DEFIO_CPS);
     }
 return SCPE_OK;
 }
