@@ -78,10 +78,10 @@ UNIT ptr_unit = {
     };
 
 REG ptr_reg[] = {
-    { FLDATA (BIN, ptr_mode, 0) },
-    { DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
-    { DRDATA (CPS, ptr_unit.DEFIO_CPS, 24), PV_LEFT },
+    { FLDATAD (BIN, ptr_mode, 0, "binary mode flag") },
+    { DRDATAD (POS, ptr_unit.pos, T_ADDR_W, "position in the input file"), PV_LEFT },
+    { DRDATAD (TIME, ptr_unit.wait, 24, "reader character delay"), PV_LEFT },
+    { DRDATAD (CPS, ptr_unit.DEFIO_CPS, 24, "Character Input Rate"), PV_LEFT },
     { NULL }
     };
 
@@ -105,10 +105,10 @@ UNIT ptp_unit = {
     };
 
 REG ptp_reg[] = {
-    { FLDATA (BIN, ptp_mode, 0) },
-    { DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
-    { DRDATA (CPS, ptr_unit.DEFIO_CPS, 24), PV_LEFT },
+    { FLDATAD (BIN, ptp_mode, 0, "binary mode flag") },
+    { DRDATAD (POS, ptp_unit.pos, T_ADDR_W, "position in the output file"), PV_LEFT },
+    { DRDATAD (TIME, ptp_unit.wait, 24, "punch character delay"), PV_LEFT },
+    { DRDATAD (CPS, ptp_unit.DEFIO_CPS, 24, "Character output rate"), PV_LEFT },
     { NULL }
     };
 
