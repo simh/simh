@@ -73,8 +73,8 @@ UNIT cdr_unit = {
     };
 
 REG cdr_reg[] = {
-    { FLDATA (LAST, ind[IN_LAST], 0) },
-    { DRDATA (POS, cdr_unit.pos, T_ADDR_W), PV_LEFT },
+    { FLDATAD (LAST, ind[IN_LAST], 0, "last card indicator") },
+    { DRDATAD (POS, cdr_unit.pos, T_ADDR_W, "position in the reader input file"), PV_LEFT },
     { NULL }
     };
 
