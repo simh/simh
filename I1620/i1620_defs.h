@@ -241,9 +241,13 @@ enum opcodes {
 #define DEV_DEFIO       (1 << (DEV_V_UF + 0))
 
 #define DEFIO_CPS       u4                  /* Characters per Second field */
+#if (SIM_MAJOR >= 4)
 #define DEFIO_ACTIVATE(uptr) ((uptr)->DEFIO_CPS) ? sim_activate_after (uptr, 1000000/(uptr)->DEFIO_CPS) : sim_activate (uptr, (uptr)->wait)
 #define DEFIO_ACTIVATE_ABS(uptr) ((uptr)->DEFIO_CPS) ? sim_activate_after_abs (uptr, 1000000/(uptr)->DEFIO_CPS) : sim_activate_abs (uptr, (uptr)->wait)
-
+#else
+#define DEFIO_ACTIVATE(uptr) sim_activate (uptr, (uptr)->wait)
+#define DEFIO_ACTIVATE_ABS(uptr) sim_activate_abs (uptr, (uptr)->wait)
+#endif
 /* Function declarations */
 
 t_stat cpuio_set_inp (uint32 op, UNIT *uptr);
