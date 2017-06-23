@@ -847,6 +847,9 @@ struct MEMFILE {
    new macro will be provided that populates the new register structure */
 #define REGDATA(nm,loc,rdx,wd,off,dep,desc,flds,fl,qptr,siz) \
     #nm, &(loc), (rdx), (wd), (off), (dep), (desc), (flds), (fl), (qptr), (siz)
+/* Internal use ONLY (see below) Generic Register declaration for all fields */
+#define _REGDATA(nm,loc,rdx,wd,off,dep,desc,flds,fl,qptr,siz) \
+    nm, &(loc), (rdx), (wd), (off), (dep), (desc), (flds), (fl), (qptr), (siz)
 /* Right Justified Octal Register Data */
 #define ORDATA(nm,loc,wd) #nm, &(loc), 8, (wd), 0, 1, NULL, NULL
 /* Right Justified Decimal Register Data */
@@ -883,9 +886,27 @@ struct MEMFILE {
 #define BITNCF(sz)           {"",  0xffffffff, sz}            /* Don't care Bit Field definition */
 #define BITFFMT(nm,sz,fmt)   {#nm, 0xffffffff, sz, NULL, #fmt}/* Bit Field definition with Output format */
 #define BITFNAM(nm,sz,names) {#nm, 0xffffffff, sz, names}     /* Bit Field definition with value->name map */
+/* Arrayed register whose data is part of the UNIT structure */
+#define URDATA(nm,loc,rdx,wd,off,dep,fl) \
+    _REGDATA(#nm,(loc),(rdx),(wd),(off),(dep),NULL,NULL,((fl) | REG_UNIT),0,0)
+/* Arrayed register whose data is part of an arbitrary structure */
+#define STRDATA(nm,loc,rdx,wd,off,dep,siz,fl) \
+    _REGDATA(#nm,(loc),(rdx),(wd),(off),(dep),NULL,NULL,((fl) | REG_STRUCT),0,(siz))
+/* Same as above, but with additional description initializer */
+#define URDATAD(nm,loc,rdx,wd,off,dep,fl,desc) \
+    _REGDATA(#nm,(loc),(rdx),(wd),(off),(dep),(desc),NULL,((fl) | REG_UNIT),0,0)
+#define STRDATAD(nm,loc,rdx,wd,off,dep,siz,fl,desc) \
+    _REGDATA(#nm,(loc),(rdx),(wd),(off),(dep),(desc),NULL,((fl) | REG_STRUCT),0,(siz))
+/* Same as above, but with additional description initializer, and bitfields */
+#define URDATADF(nm,loc,rdx,wd,off,dep,fl,desc,flds) \
+    _REGDATA(#nm,(loc),(rdx),(wd),(off),(dep),(desc),(flds),((fl) | REG_UNIT),0,0)
+#define STRDATADF(nm,loc,rdx,wd,off,dep,siz,fl,desc,flds) \
+    _REGDATA(#nm,(loc),(rdx),(wd),(off),(dep),(desc),(flds),((fl) | REG_STRUCT),0,(siz))
 #else /* For non-STD-C compiler which can't stringify macro arguments with # */
 #define REGDATA(nm,loc,rdx,wd,off,dep,desc,flds,fl,qptr,siz) \
     "nm", &(loc), (rdx), (wd), (off), (dep), (desc), (flds), (fl), (qptr), (siz)
+#define _REGDATA(nm,loc,rdx,wd,off,dep,desc,flds,fl,qptr,siz) \
+    nm, &(loc), (rdx), (wd), (off), (dep), (desc), (flds), (fl), (qptr), (siz)
 #define ORDATA(nm,loc,wd) "nm", &(loc), 8, (wd), 0, 1, NULL, NULL
 #define DRDATA(nm,loc,wd) "nm", &(loc), 10, (wd), 0, 1, NULL, NULL
 #define HRDATA(nm,loc,wd) "nm", &(loc), 16, (wd), 0, 1, NULL, NULL
@@ -913,25 +934,21 @@ struct MEMFILE {
 #define BITNCF(sz)           {"",   0xffffffff, sz}             /* Don't care Bit Field definition */
 #define BITFFMT(nm,sz,fmt)   {"nm", 0xffffffff, sz, NULL, "fmt"}/* Bit Field definition with Output format */
 #define BITFNAM(nm,sz,names) {"nm", 0xffffffff, sz, names}      /* Bit Field definition with value->name map */
+#define URDATA(nm,loc,rdx,wd,off,dep,fl) \
+    _REGDATA("nm",(loc),(rdx),(wd),(off),(dep),NULL,NULL,((fl) | REG_UNIT),0,0)
+#define STRDATA(nm,loc,rdx,wd,off,dep,siz,fl) \
+    _REGDATA("nm",(loc),(rdx),(wd),(off),(dep),NULL,NULL,((fl) | REG_STRUCT),0,(siz))
+#define URDATAD(nm,loc,rdx,wd,off,dep,fl,desc) \
+    _REGDATA("nm",(loc),(rdx),(wd),(off),(dep),(desc),NULL,((fl) | REG_UNIT),0,0)
+#define STRDATAD(nm,loc,rdx,wd,off,dep,siz,fl,desc) \
+    _REGDATA("nm",(loc),(rdx),(wd),(off),(dep),(desc),NULL,((fl) | REG_STRUCT),0,(siz))
+#define URDATADF(nm,loc,rdx,wd,off,dep,fl,desc,flds) \
+    _REGDATA("nm",(loc),(rdx),(wd),(off),(dep),(desc),(flds),((fl) | REG_UNIT),0,0)
+#define STRDATADF(nm,loc,rdx,wd,off,dep,siz,fl,desc,flds) \
+    _REGDATA("nm",(loc),(rdx),(wd),(off),(dep),(desc),(flds),((fl) | REG_STRUCT),0,(siz))
 #endif
 #define ENDBITS {NULL}  /* end of bitfield list */
 
-/* Arrayed register whose data is part of the UNIT structure */
-#define URDATA(nm,loc,rdx,wd,off,dep,fl) \
-    REGDATA(nm,(loc),(rdx),(wd),(off),(dep),NULL,NULL,((fl) | REG_UNIT),0,0)
-/* Arrayed register whose data is part of an arbitrary structure */
-#define STRDATA(nm,loc,rdx,wd,off,dep,siz,fl) \
-    REGDATA(nm,(loc),(rdx),(wd),(off),(dep),NULL,NULL,((fl) | REG_STRUCT),0,(siz))
-/* Same as above, but with additional description initializer */
-#define URDATAD(nm,loc,rdx,wd,off,dep,fl,desc) \
-    REGDATA(nm,(loc),(rdx),(wd),(off),(dep),(desc),NULL,((fl) | REG_UNIT),0,0)
-#define STRDATAD(nm,loc,rdx,wd,off,dep,siz,fl,desc) \
-    REGDATA(nm,(loc),(rdx),(wd),(off),(dep),(desc),NULL,((fl) | REG_STRUCT),0,(siz))
-/* Same as above, but with additional description initializer, and bitfields */
-#define URDATADF(nm,loc,rdx,wd,off,dep,fl,desc,flds) \
-    REGDATA(nm,(loc),(rdx),(wd),(off),(dep),(desc),(flds),((fl) | REG_UNIT),0,0)
-#define STRDATADF(nm,loc,rdx,wd,off,dep,siz,fl,desc,flds) \
-    REGDATA(nm,(loc),(rdx),(wd),(off),(dep),(desc),(flds),((fl) | REG_STRUCT),0,(siz))
 
 /* Function prototypes */
 
