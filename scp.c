@@ -1326,6 +1326,7 @@ static const char simh_help[] =
       " The DO command allows command files to contain substitutable arguments.\n"
       " The string %%n, where n is between 1 and 9, is replaced with argument n\n"
       " from the DO command line. The string %%0 is replaced with <filename>.\n"
+      " The string %%* is replaced by the whole set of arguments (%%1 ... %%9).\n"
       " The sequences \\%% and \\\\ are replaced with the literal characters %% and \\,\n"
       " respectively.  Arguments with spaces can be enclosed in matching single\n"
       " or double quotation marks.\n\n"
@@ -1344,6 +1345,58 @@ static const char simh_help[] =
       " for the called command file, otherwise quiet mode is inherited from the\n"
       " calling context.\n"
        /***************** 80 character line width template *************************/
+      "3Variable_Insertion\n"
+      " Built In variables %%DATE%%, %%TIME%%, %%DATETIME%%, %%LDATE%%, %%LTIME%%,\n"
+      " %%CTIME%%, %%DATE_YYYY%%, %%DATE_YY%%, %%DATE_YC%%, %%DATE_MM%%, %%DATE_MMM%%,\n"
+      " %%DATE_MONTH%%, %%DATE_DD%%, %%DATE_D%%, %%DATE_WYYYY%%, %%DATE_WW%%,\n"
+      " %%TIME_HH%%, %%TIME_MM%%, %%TIME_SS%%, %%STATUS%%, %%TSTATUS%%, %%SIM_VERIFY%%,\n"
+      " %%SIM_QUIET%%, %%SIM_MESSAGE%%\n\n"
+      "+Token %%0 expands to the command file name.\n"
+      "+Token %%n (n being a single digit) expands to the n'th argument\n"
+      "+Token %%* expands to the whole set of arguments (%%1 ... %%9)\n\n"
+      "+The input sequence \"%%%%\" represents a literal \"%%\", and \"\\\\\" represents a\n"
+      "+literal \"\\\".  All other character combinations are rendered literally.\n\n"
+      "+Omitted parameters result in null-string substitutions.\n\n"
+      "+Tokens preceeded and followed by %% characters are expanded as environment\n"
+      "+variables, and if an environment variable isn't found then it can be one of\n"
+      "+several special variables:\n\n"
+      "++%%DATE%%              yyyy-mm-dd\n"
+      "++%%TIME%%              hh:mm:ss\n"
+      "++%%DATETIME%%          yyyy-mm-ddThh:mm:ss\n"
+      "++%%LDATE%%             mm/dd/yy (Locale Formatted)\n"
+      "++%%LTIME%%             hh:mm:ss am/pm (Locale Formatted)\n"
+      "++%%CTIME%%             Www Mmm dd hh:mm:ss yyyy (Locale Formatted)\n"
+      "++%%DATE_YYYY%%         yyyy        (0000-9999)\n"
+      "++%%DATE_YY%%           yy          (00-99)\n"
+      "++%%DATE_MM%%           mm          (01-12)\n"
+      "++%%DATE_MMM%%          mmm         (JAN-DEC)\n"
+      "++%%DATE_MONTH%%        month       (January-December)\n"
+      "++%%DATE_DD%%           dd          (01-31)\n"
+      "++%%DATE_WW%%           ww          (01-53)     ISO 8601 week number\n"
+      "++%%DATE_WYYYY%%        yyyy        (0000-9999) ISO 8601 week year number\n"
+      "++%%DATE_D%%            d           (1-7)       ISO 8601 day of week\n"
+      "++%%DATE_JJJ%%          jjj         (001-366) day of year\n"
+      "++%%DATE_19XX_YY%%      yy          A year prior to 2000 with the same\n"
+      "++++++++++   calendar days as the current year\n"
+      "++%%DATE_19XX_YYYY%%    yyyy        A year prior to 2000 with the same\n"
+      "++++++++++   calendar days as the current year\n"
+      "++%%TIME_HH%%           hh          (00-23)\n"
+      "++%%TIME_MM%%           mm          (00-59)\n"
+      "++%%TIME_SS%%           ss          (00-59)\n"
+      "++%%STATUS%%            Status value from the last command executed\n"
+      "++%%TSTATUS%%           The text form of the last status value\n"
+      "++%%SIM_VERIFY%%        The Verify/Verbose mode of the current Do command file\n"
+      "++%%SIM_VERBOSE%%       The Verify/Verbose mode of the current Do command file\n"
+      "++%%SIM_QUIET%%         The Quiet mode of the current Do command file\n"
+      "++%%SIM_MESSAGE%%       The message display status of the current Do command file\n\n"
+      "+Environment variable lookups are done first with the precise name between\n"
+      "+the %% characters and if that fails, then the name between the %% characters\n"
+      "+is upcased and a lookup of that valus is attempted.\n\n"
+      "+The first Space delimited token on the line is extracted in uppercase and\n"
+      "+then looked up as an environment variable.  If found it the value is\n"
+      "+supstituted for the original string before expanding everything else.  If\n"
+      "+it is not found, then the original beginning token on the line is left\n"
+      "+untouched.\n"
 #define HLP_GOTO        "*Commands Executing_Command_Files GOTO"
       "3GOTO\n"
       " Commands in a command file execute in sequence until either an error\n"
@@ -3111,7 +3164,7 @@ return stat | SCPE_NOMESSAGE;                           /* suppress message sinc
    instr_size   =       sizeof input string buffer
    do_arg[10]   =       arguments
 
-   Token "%0" expands to the command file name. 
+   Token %0 expands to the command file name. 
    Token %n (n being a single digit) expands to the n'th argument
    Tonen %* expands to the whole set of arguments (%1 ... %9)
 
@@ -3120,7 +3173,7 @@ return stat | SCPE_NOMESSAGE;                           /* suppress message sinc
 
    Omitted parameters result in null-string substitutions.
 
-   A Tokens preceeded and followed by % characters are expanded as environment
+   Tokens preceeded and followed by % characters are expanded as environment
    variables, and if one isn't found then can be one of several special 
    variables: 
           %DATE%              yyyy-mm-dd
