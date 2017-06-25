@@ -581,6 +581,13 @@ t_stat sim_last_cmd_stat;                               /* Command Status */
 static SCHTAB sim_stabr;                                /* Register search specifier */
 static SCHTAB sim_staba;                                /* Memory search specifier */
 
+static DEBTAB sim_dflt_debug[] = {
+    {"EVENT",       SIM_DBG_EVENT,      "Event Dispatching"},
+    {"ACTIVATE",    SIM_DBG_ACTIVATE,   "Event Scheduling"},
+    {"AIO_QUEUE",   SIM_DBG_AIO_QUEUE,  "Asynchronous Event Queueing"},
+  {0}
+};
+
 static UNIT sim_step_unit = { UDATA (&step_svc, 0, 0)  };
 static UNIT sim_expect_unit = { UDATA (&expect_svc, 0, 0)  };
 #if defined USE_INT64
@@ -2116,6 +2123,7 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
 sim_quiet = sim_switches & SWMASK ('Q');                /* -q means quiet */
 sim_on_inherit = sim_switches & SWMASK ('O');           /* -o means inherit on state */
 
+
 sim_init_sock ();                                       /* init socket capabilities */
 AIO_INIT;                                               /* init Asynch I/O */
 if (sim_vm_init != NULL)                                /* call once only */
@@ -2158,6 +2166,11 @@ if (!sim_quiet) {
     }
 if (sim_dflt_dev == NULL)                               /* if no default */
     sim_dflt_dev = sim_devices[0];
+if (((sim_dflt_dev->flags & DEV_DEBUG) == 0) &&         /* default device without debug? */
+    (sim_dflt_dev->debflags == NULL)) {
+    sim_dflt_dev->flags |= DEV_DEBUG;                   /* connect default event debugging */
+    sim_dflt_dev->debflags = sim_dflt_debug;
+    }
 if (*argv[0]) {                                         /* sim name arg? */
     char *np;                                           /* "path.ini" */
 
