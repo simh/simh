@@ -1373,6 +1373,7 @@ static const char simh_help[] =
       "++%%LDATE%%             mm/dd/yy (Locale Formatted)\n"
       "++%%LTIME%%             hh:mm:ss am/pm (Locale Formatted)\n"
       "++%%CTIME%%             Www Mmm dd hh:mm:ss yyyy (Locale Formatted)\n"
+      "++%%UTIME%%             nnnn (Unix time - seconds since 1/1/1970)\n"
       "++%%DATE_YYYY%%         yyyy        (0000-9999)\n"
       "++%%DATE_YY%%           yy          (00-99)\n"
       "++%%DATE_MM%%           mm          (01-12)\n"
@@ -3191,8 +3192,10 @@ return stat | SCPE_NOMESSAGE;                           /* suppress message sinc
    variables: 
           %DATE%              yyyy-mm-dd
           %TIME%              hh:mm:ss
+          %DATETIME%          yyyy-mm-ddThh:mm:ss
           %STIME%             hh_mm_ss
           %CTIME%             Www Mmm dd hh:mm:ss yyyy
+          %UTIME%             nnn (Unix time - seconds since 1/1/1970)
           %STATUS%            Status value from the last command executed
           %TSTATUS%           The text form of the last status value
           %SIM_VERIFY%        The Verify/Verbose mode of the current Do command file
@@ -3292,7 +3295,7 @@ for (; *ip && (op < oend); ) {
                         ap = rbuf;
                         }
                     /* Locale oriented formatted date/time info */
-                    if (!strcmp ("LDATE", gbuf)) {
+                    else if (!strcmp ("LDATE", gbuf)) {
                         strftime (rbuf, sizeof(rbuf), "%x", tmnow);
                         ap = rbuf;
                         }
@@ -3315,6 +3318,10 @@ for (; *ip && (op < oend); ) {
                         strcpy (rbuf, ctime(&now));
                         rbuf[strlen (rbuf)-1] = '\0';    /* remove trailing \n */
 #endif
+                        ap = rbuf;
+                        }
+                    else if (!strcmp ("UTIME", gbuf)) {
+                        sprintf (rbuf, "%" LL_FMT "d", (LL_TYPE)now);
                         ap = rbuf;
                         }
                     /* Separate Date/Time info */

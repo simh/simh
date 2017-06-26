@@ -332,6 +332,7 @@ Built In variables %DATE%, %TIME%, %DATETIME%, %LDATE%, %LTIME%, %CTIME%, %DATE_
           %LDATE%             mm/dd/yy (Locale Formatted)
           %LTIME%             hh:mm:ss am/pm (Locale Formatted)
           %CTIME%             Www Mmm dd hh:mm:ss yyyy (Locale Formatted)
+          %UTIME%             nnnn (Unix time - seconds since 1/1/1970)
           %DATE_YYYY%         yyyy        (0000-9999)
           %DATE_YY%           yy          (00-99)
           %DATE_MM%           mm          (01-12)
