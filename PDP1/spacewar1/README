@@ -38,6 +38,9 @@ spacewar.rim
 
 	controls compatible with MIT Java simulation, see README.LCS
 	or display/README from your SIMH distribution
+	
+	in order for "set dpy enable" to be successful, you must have
+	compiled the pdp1 binary with libSDL or libSDL2 installed
 
 munch.mac
 	"munching squares" display hack, reconstructed
@@ -59,6 +62,9 @@ munch.rim
 	sim> set dpy enable
 	sim> load munch.rim
 	sim> run
+
+	in order for "set dpy enable" to be successful, you must have
+	compiled the pdp1 binary with libSDL or libSDL2 installed
 
 macro1.c
 	Phil Budne's version of the MACRO cross-assembler
