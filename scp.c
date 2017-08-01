@@ -8176,7 +8176,7 @@ CONST char *tptr;
 
 *status = SCPE_OK;
 val = strtotv ((CONST char *)cptr, &tptr, radix);
-if ((cptr == tptr) || (val > max))
+if ((cptr == tptr) || ((max > 0) && (val > max)))
     *status = SCPE_ARG;
 else {
     while (sim_isspace (*tptr)) tptr++;
