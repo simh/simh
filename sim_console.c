@@ -2645,7 +2645,10 @@ if (!sim_rem_master_mode) {
     if ((sim_con_ldsc.rxbps) &&                             /* rate limiting && */
         (sim_gtime () < sim_con_ldsc.rxnexttime))           /* too soon? */
         return SCPE_OK;                                     /* not yet */
-    c = sim_os_poll_kbd ();                                 /* get character */
+    if (sim_ttisatty ())
+        c = sim_os_poll_kbd ();                             /* get character */
+    else
+        c = SCPE_OK;
     if (c == SCPE_STOP) {                                   /* ^E */
         stop_cpu = 1;                                       /* Force a stop (which is picked up by sim_process_event */
         return SCPE_OK;
@@ -2984,7 +2987,11 @@ return r2;
 
 t_bool sim_ttisatty (void)
 {
-return sim_os_ttisatty ();
+static int answer = -1;
+
+if (answer == -1)
+    answer = sim_os_ttisatty ();
+return (t_bool)answer;
 }
 
 
@@ -3220,13 +3227,14 @@ return SCPE_OK;
 
 static t_stat sim_os_ttrun (void)
 {
-if ((std_input) &&                                      /* If Not Background process? */
+if ((sim_ttisatty ()) &&
+    (std_input) &&                                      /* If Not Background process? */
     (std_input != INVALID_HANDLE_VALUE)) {
     if (!GetConsoleMode(std_input, &saved_input_mode))
-        return SCPE_TTYERR;
+        return sim_messagef (SCPE_TTYERR, "GetConsoleMode() error: 0x%X\n", GetLastError ());
     if ((!SetConsoleMode(std_input, ENABLE_VIRTUAL_TERMINAL_INPUT)) &&
         (!SetConsoleMode(std_input, RAW_MODE)))
-        return SCPE_TTYERR;
+        return sim_messagef (SCPE_TTYERR, "SetConsoleMode() error: 0x%X\n", GetLastError ());
     }
 if ((std_output) &&                                     /* If Not Background process? */
     (std_output != INVALID_HANDLE_VALUE)) {
@@ -3249,7 +3257,8 @@ if (sim_log) {
     _setmode (_fileno (sim_log), _O_TEXT);
     }
 sim_os_set_thread_priority (PRIORITY_NORMAL);
-if ((std_input) &&                                      /* If Not Background process? */
+if ((sim_ttisatty ()) &&
+    (std_input) &&                                      /* If Not Background process? */
     (std_input != INVALID_HANDLE_VALUE) &&
     (!SetConsoleMode(std_input, saved_input_mode)))     /* Restore Normal mode */
     return SCPE_TTYERR;
@@ -3886,7 +3895,7 @@ static t_bool sim_os_poll_kbd_ready (int ms_timeout)
 fd_set readfds;
 struct timeval timeout;
 
-if (!sim_os_ttisatty()) {                   /* skip if !tty */
+if (!sim_ttisatty()) {                      /* skip if !tty */
     sim_os_ms_sleep (ms_timeout);
     return FALSE;
     }
