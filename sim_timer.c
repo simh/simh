@@ -1870,6 +1870,9 @@ if (sim_clock_cosched_queue[tmr] != QUEUE_LIST_END)
 if ((stat == SCPE_OK)                               && 
     (sim_cosched_interval[tmr] <= 0)                &&
     (sim_clock_cosched_queue[tmr] != QUEUE_LIST_END)) {
+    UNIT *sptr = sim_clock_cosched_queue[tmr];
+    UNIT *cptr = QUEUE_LIST_END;
+
     if (rtc_clock_catchup_eligible[tmr]) {      /* calibration started? */
         struct timespec now;
         double skew;
@@ -1880,30 +1883,36 @@ if ((stat == SCPE_OK)                               &&
         if (fabs(skew) > fabs(rtc_clock_skew_max[tmr]))
             rtc_clock_skew_max[tmr] = skew;
         }
+    /* First gather the queued events that are scheduled for now */
     do {
-        UNIT *cptr = sim_clock_cosched_queue[tmr];
+        cptr = sim_clock_cosched_queue[tmr];
         sim_clock_cosched_queue[tmr] = cptr->next;
-        cptr->next = NULL;
-        cptr->cancel = NULL;
-        cptr->time = 0;
         if (sim_clock_cosched_queue[tmr] != QUEUE_LIST_END) {
             sim_clock_cosched_queue[tmr]->time += sim_cosched_interval[tmr];
             sim_cosched_interval[tmr] = sim_clock_cosched_queue[tmr]->time;
             }
         else
             sim_cosched_interval[tmr]  = 0;
+        } while ((sim_cosched_interval[tmr] <= 0) &&
+                 (sim_clock_cosched_queue[tmr] != QUEUE_LIST_END));
+    if (cptr != QUEUE_LIST_END)
+        cptr->next = QUEUE_LIST_END;
+    /* Now dispatch that list (in order). */
+    while (sptr != QUEUE_LIST_END) {
+        cptr = sptr;
+        sptr = sptr->next;
+        cptr->next = NULL;
+        cptr->cancel = NULL;
         cptr->time = 0;
-        sim_debug (DBG_QUE, &sim_timer_dev, "sim_timer_tick_svc(tmr=%d) - coactivating %s", tmr, sim_uname (cptr));
         if (cptr->usecs_remaining) {
-            sim_debug (DBG_QUE, &sim_timer_dev, " remnant: %.0f - next %s after cosched interval: %d ticks\n", cptr->usecs_remaining, (sim_clock_cosched_queue[tmr] != QUEUE_LIST_END) ? sim_uname (sim_clock_cosched_queue[tmr]) : "", sim_cosched_interval[tmr]);
+            sim_debug (DBG_QUE, &sim_timer_dev, " remnant: %.0f - next %s after cosched interval: %d ticks\n", cptr->usecs_remaining, (sptr != QUEUE_LIST_END) ? sim_uname (sptr) : "", sim_cosched_interval[tmr]);
             sim_timer_activate_after (cptr, cptr->usecs_remaining);
             }
         else {
-            sim_debug (DBG_QUE, &sim_timer_dev, " - next %s after cosched interval: %d ticks\n", (sim_clock_cosched_queue[tmr] != QUEUE_LIST_END) ? sim_uname (sim_clock_cosched_queue[tmr]) : "", sim_cosched_interval[tmr]);
+            sim_debug (DBG_QUE, &sim_timer_dev, " - next %s after cosched interval: %d ticks\n", (sptr != QUEUE_LIST_END) ? sim_uname (sptr) : "", sim_cosched_interval[tmr]);
             _sim_activate (cptr, 0);
             }
-        } while ((sim_cosched_interval[tmr] <= 0) &&
-             (sim_clock_cosched_queue[tmr] != QUEUE_LIST_END));
+        }
     }
 return stat;
 }
