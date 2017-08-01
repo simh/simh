@@ -161,6 +161,7 @@ static uint32 sim_os_clock_resoluton_ms = 0;
 static uint32 sim_os_tick_hz = 0;
 static uint32 sim_idle_stable = SIM_IDLE_STDFLT;
 static uint32 sim_idle_calib_pct = 0;
+static double sim_timer_stop_time = 0;
 static uint32 sim_rom_delay = 0;
 static uint32 sim_throt_ms_start = 0;
 static uint32 sim_throt_ms_stop = 0;
@@ -760,11 +761,13 @@ static uint32 sim_idle_cyc_ms = 0;                      /* Cycles per millisecon
 UNIT sim_timer_units[SIM_NTIMERS+1];                    /* Clock assist units                         */
                                                         /* one for each timer and one for an internal */
                                                         /* clock if no clocks are registered.         */
+UNIT sim_stop_unit;                                     /* Stop unit                         */
 UNIT sim_internal_timer_unit;                           /* Internal calibration timer */
 UNIT sim_throttle_unit;                                 /* one for throttle */
 
 t_stat sim_throt_svc (UNIT *uptr);
 t_stat sim_timer_tick_svc (UNIT *uptr);
+t_stat sim_timer_stop_svc (UNIT *uptr);
 
 #define DBG_IDL       TIMER_DBG_IDLE        /* idling */
 #define DBG_QUE       TIMER_DBG_QUEUE       /* queue activities */
@@ -793,6 +796,7 @@ DEBTAB sim_timer_debug[] = {
 /* Forward device declarations */
 extern DEVICE sim_timer_dev;
 extern DEVICE sim_throttle_dev;
+extern DEVICE sim_stop_dev;
 
 
 void sim_rtcn_init_all (void)
@@ -1034,6 +1038,7 @@ for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
     sim_timer_units[tmr].flags = UNIT_DIS | UNIT_IDLE;
     sim_clock_cosched_queue[tmr] = QUEUE_LIST_END;
     }
+sim_stop_unit.action = &sim_timer_stop_svc;
 SIM_INTERNAL_UNIT.flags = UNIT_IDLE;
 sim_register_internal_device (&sim_timer_dev);          /* Register Clock Assist device */
 sim_throttle_unit.action = &sim_throt_svc;
@@ -1309,6 +1314,26 @@ sim_idle_calib_pct = (uint32)newpct;
 return SCPE_OK;
 }
 
+/* Set stop time */
+
+t_stat sim_timer_set_stop (int32 flag, CONST char *cptr)
+{
+t_stat r;
+t_value stop_time;
+
+if (cptr == NULL)
+    return SCPE_ARG;
+stop_time = get_uint (cptr, 10, 0, &r);
+if (r != SCPE_OK)
+    return r;
+if (stop_time <= (t_value)sim_gtime())
+    return SCPE_ARG;
+sim_register_internal_device (&sim_stop_dev);           /* Register Stop Device */
+sim_timer_stop_time = (double)stop_time;
+sim_activate_abs (&sim_stop_unit, (int32)(sim_timer_stop_time - sim_gtime()));
+return SCPE_OK;
+}
+
 /* Set/Clear asynch */
 
 t_stat sim_timer_set_async (int32 flag, CONST char *cptr)
@@ -1336,6 +1361,7 @@ static CTAB set_timer_tab[] = {
     { "CATCHUP",    &sim_timer_set_catchup,  1 },
     { "NOCATCHUP",  &sim_timer_set_catchup,  0 },
     { "CALIB",      &sim_timer_set_idle_pct, 0 },
+    { "STOP",       &sim_timer_set_stop, 0 },
     { NULL, NULL, 0 }
     };
 
@@ -1355,6 +1381,11 @@ static const char *sim_int_timer_description (DEVICE *dptr)
 return "Internal Timer";
 }
 
+static const char *sim_int_stop_description (DEVICE *dptr)
+{
+return "Stop facility";
+}
+
 static const char *sim_throttle_description (DEVICE *dptr)
 {
 return "Throttle facility";
@@ -1364,16 +1395,33 @@ DEVICE sim_timer_dev = {
     "INT-CLOCK", sim_timer_units, sim_timer_reg, sim_timer_mod, 
     SIM_NTIMERS+1, 0, 0, 0, 0, 0, 
     NULL, NULL, &sim_timer_clock_reset, NULL, NULL, NULL, 
-    NULL, DEV_DEBUG | DEV_NOSAVE, 0, sim_timer_debug};
+    NULL, DEV_DEBUG | DEV_NOSAVE, 0, 
+    sim_timer_debug, NULL, NULL, NULL, NULL, NULL,
+    sim_timer_description};
 
 DEVICE sim_int_timer_dev = {
     "INT-TIMER", &sim_internal_timer_unit, NULL, NULL, 
     1, 0, 0, 0, 0, 0, 
     NULL, NULL, NULL, NULL, NULL, NULL, 
-    NULL, DEV_NOSAVE};
+    NULL, DEV_NOSAVE, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    sim_int_timer_description};
+
+DEVICE sim_stop_dev = {
+    "INT-STOP", &sim_stop_unit, NULL, NULL, 
+    1, 0, 0, 0, 0, 0, 
+    NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, DEV_NOSAVE, 0, 
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    sim_int_stop_description};
 
 DEVICE sim_throttle_dev = {
-    "INT-THROTTLE", &sim_throttle_unit, sim_throttle_reg, NULL, 1};
+    "INT-THROTTLE", &sim_throttle_unit, sim_throttle_reg, NULL, 1,
+    0, 0, 0, 0, 0, 
+    NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, 0, 0, 
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    sim_throttle_description};
 
 
 /* SET CLOCK command */
@@ -1860,6 +1908,11 @@ if ((stat == SCPE_OK)                               &&
 return stat;
 }
 
+t_stat sim_timer_stop_svc (UNIT *uptr)
+{
+return SCPE_STOP;
+}
+
 void sim_rtcn_get_time (struct timespec *now, int tmr)
 {
 sim_debug (DBG_CAL, &sim_timer_dev, "sim_rtcn_get_time(tmr=%d)\n", tmr);
@@ -2206,6 +2259,8 @@ void sim_start_timer_services (void)
 {
 sim_debug (DBG_TRC, &sim_timer_dev, "sim_start_timer_services()\n");
 _rtcn_configure_calibrated_clock (sim_calb_tmr);
+if (sim_timer_stop_time > sim_gtime())
+    sim_activate_abs (&sim_stop_unit, (int32)(sim_timer_stop_time - sim_gtime()));
 #if defined(SIM_ASYNCH_CLOCKS)
 pthread_mutex_lock (&sim_timer_lock);
 if (sim_asynch_timer) {
