@@ -214,7 +214,7 @@ static BITFIELD tmr_csr_bits[] = {
 
 /* SSC timer intervals */
 
-#define TMR_INC         10000                           /* usec/interval */
+#define TMR_INC         10000U                          /* usec/interval */
 
 /* SSC timer vector */
 
@@ -1485,14 +1485,19 @@ int32 tmr_tir_rd (int32 tmr)
 {
 if (tmr_csr[tmr] & TMR_CSR_RUN) {           /* running? then interpolate */
     uint32 usecs_remaining, cur_tir;
+    const char *tmr_units = NULL;
 
     if ((ADDR_IS_ROM(fault_PC)) &&                  /* running from ROM and */
-        (tmr_inst[tmr]))                            /* waiting instructions? */
+        (tmr_inst[tmr])) {                          /* waiting instructions? */
         usecs_remaining = sim_activate_time (&sysd_dev.units[tmr]) - 1;
-    else
-        usecs_remaining = (uint32)sim_activate_time_usecs (&sysd_dev.units[tmr]);
+        tmr_units = "Instructions";
+        }
+    else {
+        usecs_remaining = (uint32)(0xFFFFFFFFLL & (t_uint64)sim_activate_time_usecs (&sysd_dev.units[tmr]));
+        tmr_units = "Microseconds";
+        }
     cur_tir = ~usecs_remaining + 1;
-    sim_debug (DBG_REGR, &sysd_dev, "tmr_tir_rd(tmr=%d) - 0x%X, Interpolated while running\n", tmr, cur_tir);
+    sim_debug (DBG_REGR, &sysd_dev, "tmr_tir_rd(tmr=%d) - 0x%X %s - %u usecs, Interpolated while running\n", tmr, cur_tir, tmr_units, usecs_remaining);
     return cur_tir;
     }
 
