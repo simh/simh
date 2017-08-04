@@ -888,10 +888,7 @@ if (rtc_hz[tmr] != ticksper) {                          /* changing tick rate? *
     _rtcn_configure_calibrated_clock (tmr);
     if (ticksper != 0) {
         rtc_clock_tick_size[tmr] = 1.0 / ticksper;
-        if (sim_throt_type != SIM_THROT_NONE)
-            rtc_currd[tmr] = (int32)(sim_throt_cps / ticksper);
-        else
-            rtc_currd[tmr] = (int32)(sim_timer_inst_per_sec () / ticksper);
+        rtc_currd[tmr] = (int32)(sim_timer_inst_per_sec () / ticksper);
         }
     }
 if (ticksper == 0)                                      /* running? */
@@ -909,18 +906,11 @@ if (rtc_ticks[tmr] < ticksper)                          /* 1 sec yet? */
     return rtc_currd[tmr];
 rtc_ticks[tmr] = 0;                                     /* reset ticks */
 rtc_elapsed[tmr] = rtc_elapsed[tmr] + 1;                /* count sec */
-if (sim_throt_type != SIM_THROT_NONE) {
-    rtc_gtime[tmr] = sim_gtime();                       /* save instruction time */
-    rtc_currd[tmr] = (int32)(sim_throt_cps / ticksper); /* use throttle calibration */
-    ++rtc_calibrations[tmr];                            /* count calibrations */
-    sim_debug (DBG_CAL, &sim_timer_dev, "using throttle calibrated value - result: %d\n", rtc_currd[tmr]);
-    return rtc_currd[tmr];
-    }
 if (!rtc_avail)                                         /* no timer? */
     return rtc_currd[tmr];
 if (sim_calb_tmr != tmr) {
     rtc_currd[tmr] = (int32)(sim_timer_inst_per_sec()/ticksper);
-    sim_debug (DBG_CAL, &sim_timer_dev, "calibrated calibrated tmr=%d against system tmr=%d, tickper=%d (result: %d)\n", tmr, sim_calb_tmr, ticksper, rtc_currd[tmr]);
+    sim_debug (DBG_CAL, &sim_timer_dev, "calibrated calibrated tmr=%d against internal system tmr=%d, tickper=%d (result: %d)\n", tmr, sim_calb_tmr, ticksper, rtc_currd[tmr]);
     return rtc_currd[tmr];
     }
 new_rtime = sim_os_msec ();                             /* wall time */
@@ -1396,16 +1386,13 @@ DEVICE sim_timer_dev = {
     SIM_NTIMERS+1, 0, 0, 0, 0, 0, 
     NULL, NULL, &sim_timer_clock_reset, NULL, NULL, NULL, 
     NULL, DEV_DEBUG | DEV_NOSAVE, 0, 
-    sim_timer_debug, NULL, NULL, NULL, NULL, NULL,
-    sim_timer_description};
+    sim_timer_debug};
 
 DEVICE sim_int_timer_dev = {
     "INT-TIMER", &sim_internal_timer_unit, NULL, NULL, 
     1, 0, 0, 0, 0, 0, 
     NULL, NULL, NULL, NULL, NULL, NULL, 
-    NULL, DEV_NOSAVE, 0,
-    NULL, NULL, NULL, NULL, NULL, NULL,
-    sim_int_timer_description};
+    NULL, DEV_NOSAVE};
 
 DEVICE sim_stop_dev = {
     "INT-STOP", &sim_stop_unit, NULL, NULL, 
@@ -1416,12 +1403,7 @@ DEVICE sim_stop_dev = {
     sim_int_stop_description};
 
 DEVICE sim_throttle_dev = {
-    "INT-THROTTLE", &sim_throttle_unit, sim_throttle_reg, NULL, 1,
-    0, 0, 0, 0, 0, 
-    NULL, NULL, NULL, NULL, NULL, NULL, 
-    NULL, 0, 0, 
-    NULL, NULL, NULL, NULL, NULL, NULL,
-    sim_throttle_description};
+    "INT-THROTTLE", &sim_throttle_unit, sim_throttle_reg, NULL, 1};
 
 
 /* SET CLOCK command */
@@ -2257,6 +2239,7 @@ _rtcn_configure_calibrated_clock (sim_calb_tmr);
 sim_timer_dev.description = &sim_timer_description;
 sim_throttle_dev.description = &sim_throttle_description;
 sim_int_timer_dev.description = &sim_int_timer_description;
+sim_stop_dev.description = &sim_int_stop_description;
 if (sim_switches & SWMASK ('P')) {
     sim_cancel (&SIM_INTERNAL_UNIT);
     sim_calb_tmr = -1;
