@@ -3231,10 +3231,10 @@ if ((sim_ttisatty ()) &&
     (std_input) &&                                      /* If Not Background process? */
     (std_input != INVALID_HANDLE_VALUE)) {
     if (!GetConsoleMode(std_input, &saved_input_mode))
-        return sim_messagef (SCPE_TTYERR, "GetConsoleMode() error: 0x%X\n", GetLastError ());
+        return sim_messagef (SCPE_TTYERR, "GetConsoleMode() error: 0x%X\n", (unsigned int)GetLastError ());
     if ((!SetConsoleMode(std_input, ENABLE_VIRTUAL_TERMINAL_INPUT)) &&
         (!SetConsoleMode(std_input, RAW_MODE)))
-        return sim_messagef (SCPE_TTYERR, "SetConsoleMode() error: 0x%X\n", GetLastError ());
+        return sim_messagef (SCPE_TTYERR, "SetConsoleMode() error: 0x%X\n", (unsigned int)GetLastError ());
     }
 if ((std_output) &&                                     /* If Not Background process? */
     (std_output != INVALID_HANDLE_VALUE)) {
