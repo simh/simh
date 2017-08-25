@@ -325,6 +325,7 @@ typedef uint32          t_addr;
 #define SIM_SW_REG      (1u << 28)                      /* register value */
 #define SIM_SW_STOP     (1u << 29)                      /* stop message */
 #define SIM_SW_SHUT     (1u << 30)                      /* shutdown */
+#define SIM_SW_NUM      (1u << 31)                      /* Numeric Switch */
 
 /* Simulator status codes
 

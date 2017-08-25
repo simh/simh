@@ -314,6 +314,7 @@
     if (sim_switches & SWMASK ('O')) val = 8; \
     else if (sim_switches & SWMASK ('D')) val = 10; \
     else if (sim_switches & SWMASK ('H')) val = 16; \
+    else if (sim_sw_radix) val = sim_sw_radix; \
     else val = dft;
 
 /* Asynch I/O support */
@@ -522,6 +523,7 @@ DEVICE *sim_dflt_dev = NULL;
 UNIT *sim_clock_queue = QUEUE_LIST_END;
 int32 sim_interval = 0;
 int32 sim_switches = 0;
+int32 sim_sw_radix = 0;
 FILE *sim_ofile = NULL;
 TMLN *sim_oline = NULL;
 MEMFILE *sim_mfile = NULL;
@@ -779,9 +781,10 @@ static const char simh_help[] =
       "++-a                 display as ASCII\n"
       "++-c                 display as character string\n"
       "++-m                 display as instruction mnemonics\n"
-      "++-o                 display as octal\n"
-      "++-d                 display as decimal\n"
-      "++-h                 display as hexadecimal\n\n"
+      "++-o or -8           display as octal\n"
+      "++-d or -10          display as decimal\n"
+      "++-h or -16          display as hexadecimal\n"
+      "++-2                 display as binary\n\n"
       " The simulators typically accept symbolic input (see documentation with each\n"
       " simulator).\n\n"
       "3Examples\n"
@@ -8739,6 +8742,14 @@ int32 sw;
 if (*cptr != '-')
     return 0;
 sw = 0;
+if (sim_isdigit(cptr[1])) {
+    char *end;
+    long val = strtol (1+cptr, &end, 10);
+
+    if (*end != 0)
+        return -1;
+    return (int32)(SIM_SW_NUM | (val));
+    }
 for (cptr++; (sim_isspace (*cptr) == 0) && (*cptr != 0); cptr++) {
     if (sim_isalpha (*cptr) == 0)
         return -1;
@@ -8764,8 +8775,11 @@ char gbuf[CBUFSIZE];
 while (*cptr == '-') {                                  /* while switches */
     cptr = get_glyph (cptr, gbuf, 0);                   /* get switch glyph */
     lsw = get_switches (gbuf);                          /* parse */
-    if (lsw <= 0)                                       /* invalid? */
-        return NULL;
+    if (lsw <= 0) {                                     /* invalid or numeric? */
+        if ((lsw == -1) || (lsw == 0))
+            return NULL;
+        sim_sw_radix = lsw & ~SIM_SW_NUM;               /* set radix */
+        }
     sim_switches = sim_switches | lsw;                  /* accumulate */
     }
 return cptr;
@@ -8790,6 +8804,7 @@ DEVICE *tdptr;
 UNIT *tuptr;
 
 sim_switches = 0;                                       /* no switches */
+sim_sw_radix = 0;                                       /* no radix override */
 sim_ofile = NULL;                                       /* no output file */
 sim_schrptr = NULL;                                     /* no search */
 sim_schaptr = NULL;                                     /* no search */
@@ -8828,11 +8843,15 @@ while (*cptr) {                                         /* loop through modifier
         }
     cptr = get_glyph (cptr, gbuf, 0);
     if ((t = get_switches (gbuf)) != 0) {               /* try for switches */
-        if (t < 0) {                                    /* err if bad switch */
-            *st = SCPE_INVSW;
-            return NULL;
+        if (t < 0) {                                    /* if bad switch or numeric */
+            if (t == -1) {                              /* err if bad switch */
+                *st = SCPE_INVSW;
+                return NULL;
+                }
+            sim_sw_radix = t & ~SIM_SW_NUM;             /* set radix */
             }
-        sim_switches = sim_switches | t;                /* or in new switches */
+        else
+            sim_switches = sim_switches | t;            /* or in new switches */
         }
     else if ((opt & CMD_OPT_SCH) &&                     /* if allowed, */
         get_rsearch (gbuf, sim_dfdev->dradix, &sim_stabr)) { /* try for search */
