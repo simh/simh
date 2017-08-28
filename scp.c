@@ -11253,11 +11253,7 @@ return stat | SCPE_NOMESSAGE;
    Callers should be calling sim_debug() which is a macro
    defined in scp.h which evaluates the action condition before 
    incurring call overhead. */
-#if defined(__cplusplus)
-void _sim_debug (uint32 dbits, void* vdptr, const char* fmt, ...)
-#else
 void _sim_debug (uint32 dbits, DEVICE* vdptr, const char* fmt, ...)
-#endif
 {
 DEVICE *dptr = (DEVICE *)vdptr;
 if (sim_deb && dptr && (dptr->dctrl & dbits)) {

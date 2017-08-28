@@ -250,22 +250,12 @@ void sim_debug_bits (uint32 dbits, DEVICE* dptr, BITFIELD* bitdefs,
 #if defined (__DECC) && defined (__VMS) && (defined (__VAX) || (__DECC_VER < 60590001))
 #define CANT_USE_MACRO_VA_ARGS 1
 #endif
-#if defined(__cplusplus)
-#ifdef CANT_USE_MACRO_VA_ARGS
-#define _sim_debug sim_debug
-void sim_debug (uint32 dbits, void* dptr, const char *fmt, ...) GCC_FMT_ATTR(3, 4);
-#else
-void _sim_debug (uint32 dbits, void* dptr, const char *fmt, ...) GCC_FMT_ATTR(3, 4);
-#define sim_debug(dbits, dptr, ...) do { if (sim_deb && dptr && ((dptr)->dctrl & (dbits))) _sim_debug (dbits, dptr, __VA_ARGS__);} while (0)
-#endif
-#else
 #ifdef CANT_USE_MACRO_VA_ARGS
 #define _sim_debug sim_debug
 void sim_debug (uint32 dbits, DEVICE* dptr, const char *fmt, ...) GCC_FMT_ATTR(3, 4);
 #else
 void _sim_debug (uint32 dbits, DEVICE* dptr, const char *fmt, ...) GCC_FMT_ATTR(3, 4);
 #define sim_debug(dbits, dptr, ...) do { if (sim_deb && dptr && ((dptr)->dctrl & dbits)) _sim_debug (dbits, dptr, __VA_ARGS__);} while (0)
-#endif
 #endif
 void fprint_stopped_gen (FILE *st, t_stat v, REG *pc, DEVICE *dptr);
 #define SCP_HELP_FLAT   (1u << 31)       /* Force flat help when prompting is not possible */
