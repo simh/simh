@@ -1221,7 +1221,7 @@ static const char simh_help[] =
       "3Command Prompt\n"
       "+set prompt \"string\"        sets an alternate simulator prompt string\n"
       "3Device and Unit\n"
-      "+set <dev> OCT|DEC|HEX       set device display radix\n"
+      "+set <dev> OCT|DEC|HEX|BIN   set device display radix\n"
       "+set <dev> ENABLED           enable device\n"
       "+set <dev> DISABLED          disable device\n"
       "+set <dev> DEBUG{=arg}       set device debug flags\n"
@@ -1991,6 +1991,7 @@ static C1TAB set_dev_tab[] = {
     { "OCTAL",      &set_dev_radix,     8 },
     { "DECIMAL",    &set_dev_radix,     10 },
     { "HEX",        &set_dev_radix,     16 },
+    { "BINARY",     &set_dev_radix,     2 },
     { "ENABLED",    &set_dev_enbdis,    1 },
     { "DISABLED",   &set_dev_enbdis,    0 },
     { "DEBUG",      &set_dev_debug,     1 },
