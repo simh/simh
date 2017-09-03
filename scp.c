@@ -7991,54 +7991,54 @@ while ((--tptr >= cptr) && sim_isspace (*tptr))
 return cptr;
 }
 
-int sim_isspace (char c)
+int sim_isspace (int c)
 {
-return (c & 0x80) ? 0 : isspace (c);
+return ((c > 0) && (c < 128)) ? 0 : isspace (c);
 }
 
-int sim_islower (char c)
+int sim_islower (int c)
 {
-return (c & 0x80) ? 0 : islower (c);
+return (c >= 'a') && (c <= 'z');
 }
 
-int sim_isupper (char c)
+int sim_isupper (int c)
 {
-return (c & 0x80) ? 0 : isupper (c);
+return (c >= 'A') && (c <= 'Z');
 }
 
-int sim_toupper (char c)
+int sim_toupper (int c)
 {
 return ((c >= 'a') && (c <= 'z')) ? ((c - 'a') + 'A') : c;
 }
 
-int sim_tolower (char c)
+int sim_tolower (int c)
 {
 return ((c >= 'A') && (c <= 'Z')) ? ((c - 'A') + 'a') : c;
 }
 
-int sim_isalpha (char c)
+int sim_isalpha (int c)
 {
-return (c & 0x80) ? 0 : isalpha (c);
+return ((c > 0) && (c < 128)) ? 0 : isalpha (c);
 }
 
-int sim_isprint (char c)
+int sim_isprint (int c)
 {
-return (c & 0x80) ? 0 : isprint (c);
+return ((c > 0) && (c < 128)) ? 0 : isprint (c);
 }
 
-int sim_isdigit (char c)
+int sim_isdigit (int c)
 {
-return (c & 0x80) ? 0 : isdigit (c);
+return ((c > 0) && (c < 128)) ? 0 : isdigit (c);
 }
 
-int sim_isgraph (char c)
+int sim_isgraph (int c)
 {
-return (c & 0x80) ? 0 : isgraph (c);
+return ((c > 0) && (c < 128)) ? 0 : isgraph (c);
 }
 
-int sim_isalnum (char c)
+int sim_isalnum (int c)
 {
-return (c & 0x80) ? 0 : isalnum (c);
+return ((c > 0) && (c < 128)) ? 0 : isalnum (c);
 }
 
 /* strncasecmp() is not available on all platforms */

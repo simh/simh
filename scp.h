@@ -149,21 +149,23 @@ const char *sim_uname (UNIT *dptr);
 const char *sim_set_uname (UNIT *uptr, const char *uname);
 t_stat get_yn (const char *ques, t_stat deflt);
 char *sim_trim_endspc (char *cptr);
-int sim_isspace (char c);
-int sim_islower (char c);
-int sim_isalpha (char c);
-int sim_isprint (char c);
-int sim_isdigit (char c);
-int sim_isgraph (char c);
-int sim_isalnum (char c);
-int sim_toupper (char c);
-int sim_tolower (char c);
-#ifndef toupper
+int sim_isspace (int c);
+int sim_islower (int c);
+int sim_isalpha (int c);
+int sim_isprint (int c);
+int sim_isdigit (int c);
+int sim_isgraph (int c);
+int sim_isalnum (int c);
+int sim_toupper (int c);
+int sim_tolower (int c);
+#ifdef toupper
+#undef toupper
+#endif
 #define toupper(chr) sim_toupper(chr)
+#ifdef tolower
+#undef tolower
 #endif
-#ifndef tolower
 #define tolower(chr) sim_tolower(chr)
-#endif
 int sim_strncasecmp (const char *string1, const char *string2, size_t len);
 int sim_strcasecmp (const char *string1, const char *string2);
 size_t sim_strlcat (char *dst, const char *src, size_t size);
