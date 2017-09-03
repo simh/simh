@@ -314,7 +314,7 @@
     if (sim_switches & SWMASK ('O')) val = 8; \
     else if (sim_switches & SWMASK ('D')) val = 10; \
     else if (sim_switches & SWMASK ('H')) val = 16; \
-    else if (sim_sw_radix) val = sim_sw_radix; \
+    else if ((sim_switch_number >= 2) && (sim_switch_number <= 36)) val = sim_switch_number; \
     else val = dft;
 
 /* Asynch I/O support */
@@ -466,7 +466,12 @@ SCHTAB *get_rsearch (CONST char *cptr, int32 radix, SCHTAB *schptr);
 SCHTAB *get_asearch (CONST char *cptr, int32 radix, SCHTAB *schptr);
 int32 test_search (t_value *val, SCHTAB *schptr);
 static const char *get_glyph_gen (const char *iptr, char *optr, char mchar, t_bool uc, t_bool quote, char escape_char);
-int32 get_switches (const char *cptr);
+typedef enum {
+    SW_ERROR,           /* Parse Error */
+    SW_BITMASK,         /* Bitmask Value or Not a switch */
+    SW_NUMBER           /* Numeric Value */
+    } SWITCH_PARSE;
+SWITCH_PARSE get_switches (const char *cptr, int32 *sw_val, int32 *sw_number);
 CONST char *get_sim_sw (CONST char *cptr);
 t_stat get_aval (t_addr addr, DEVICE *dptr, UNIT *uptr);
 t_value get_rval (REG *rptr, uint32 idx);
@@ -523,7 +528,7 @@ DEVICE *sim_dflt_dev = NULL;
 UNIT *sim_clock_queue = QUEUE_LIST_END;
 int32 sim_interval = 0;
 int32 sim_switches = 0;
-int32 sim_sw_radix = 0;
+int32 sim_switch_number = 0;
 FILE *sim_ofile = NULL;
 TMLN *sim_oline = NULL;
 MEMFILE *sim_mfile = NULL;
@@ -2108,7 +2113,7 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
     if (argv[i] == NULL)                                /* paranoia */
         continue;
     if ((*argv[i] == '-') && lookswitch) {              /* switch? */
-        if ((sw = get_switches (argv[i])) < 0) {
+        if (get_switches (argv[i], &sw, NULL) == SW_ERROR) {
             fprintf (stderr, "Invalid switch %s\n", argv[i]);
             return 0;
             }
@@ -7996,6 +8001,21 @@ int sim_islower (char c)
 return (c & 0x80) ? 0 : islower (c);
 }
 
+int sim_isupper (char c)
+{
+return (c & 0x80) ? 0 : isupper (c);
+}
+
+int sim_toupper (char c)
+{
+return ((c >= 'a') && (c <= 'z')) ? ((c - 'a') + 'A') : c;
+}
+
+int sim_tolower (char c)
+{
+return ((c >= 'A') && (c <= 'Z')) ? ((c - 'A') + 'a') : c;
+}
+
 int sim_isalpha (char c)
 {
 return (c & 0x80) ? 0 : isalpha (c);
@@ -8732,31 +8752,35 @@ return NULL;
    Inputs:
         cptr    =       pointer to input string
    Outputs:
-        sw      =       switch bit mask
-                        0 if no switches, -1 if error
+        *sw      =       switch bit mask
+        *mumber  =       numeric value
+   Return value:        SW_ERROR     if error
+                        SW_BITMASK   if switch bitmask or not a switch
+                        SW_NUMBER    if numeric
 */
 
-int32 get_switches (const char *cptr)
+SWITCH_PARSE get_switches (const char *cptr, int32 *sw, int32 *number)
 {
-int32 sw;
-
+*sw = 0;
 if (*cptr != '-')
-    return 0;
-sw = 0;
+    return SW_BITMASK;
+if (number)
+    *number = 0;
 if (sim_isdigit(cptr[1])) {
     char *end;
     long val = strtol (1+cptr, &end, 10);
 
-    if (*end != 0)
-        return -1;
-    return (int32)(SIM_SW_NUM | (val));
+    if ((*end != 0) || (number == NULL))
+        return SW_ERROR;
+    *number = (int32)val;
+    return SW_NUMBER;
     }
 for (cptr++; (sim_isspace (*cptr) == 0) && (*cptr != 0); cptr++) {
     if (sim_isalpha (*cptr) == 0)
-        return -1;
-    sw = sw | SWMASK (toupper (*cptr));
+        return SW_ERROR;
+    *sw = *sw | SWMASK (toupper (*cptr));
     }
-return sw;
+return SW_BITMASK;
 }
 
 /* get_sim_sw           accumulate sim_switches
@@ -8770,18 +8794,21 @@ return sw;
 
 CONST char *get_sim_sw (CONST char *cptr)
 {
-int32 lsw;
+int32 lsw, lnum;
 char gbuf[CBUFSIZE];
 
 while (*cptr == '-') {                                  /* while switches */
     cptr = get_glyph (cptr, gbuf, 0);                   /* get switch glyph */
-    lsw = get_switches (gbuf);                          /* parse */
-    if (lsw <= 0) {                                     /* invalid or numeric? */
-        if ((lsw == -1) || (lsw == 0))
+    switch (get_switches (gbuf, &lsw, &lnum)) {         /* parse */
+        case SW_ERROR:
             return NULL;
-        sim_sw_radix = lsw & ~SIM_SW_NUM;               /* set radix */
+        case SW_BITMASK:
+            sim_switches = sim_switches | lsw;          /* accumulate */
+            break;
+        case SW_NUMBER:
+            sim_switch_number = lnum;                   /* set number */
+            break;
         }
-    sim_switches = sim_switches | lsw;                  /* accumulate */
     }
 return cptr;
 }
@@ -8798,14 +8825,14 @@ return cptr;
 
 CONST char *get_sim_opt (int32 opt, CONST char *cptr, t_stat *st)
 {
-int32 t;
+int32 t, n;
 char gbuf[CBUFSIZE];
 CONST char *svptr;
 DEVICE *tdptr;
 UNIT *tuptr;
 
 sim_switches = 0;                                       /* no switches */
-sim_sw_radix = 0;                                       /* no radix override */
+sim_switch_number = 0;                                  /* no numberuc switch */
 sim_ofile = NULL;                                       /* no output file */
 sim_schrptr = NULL;                                     /* no search */
 sim_schaptr = NULL;                                     /* no search */
@@ -8843,18 +8870,21 @@ while (*cptr) {                                         /* loop through modifier
         continue;
         }
     cptr = get_glyph (cptr, gbuf, 0);
-    if ((t = get_switches (gbuf)) != 0) {               /* try for switches */
-        if (t < 0) {                                    /* if bad switch or numeric */
-            if (t == -1) {                              /* err if bad switch */
-                *st = SCPE_INVSW;
-                return NULL;
+    switch (get_switches (gbuf, &t, &n)) {      /* try for switches */
+        case SW_ERROR:                          /* err if bad switch */
+            *st = SCPE_INVSW;
+            return NULL;
+        case SW_NUMBER:
+            sim_switch_number = n;              /* set number */
+            continue;
+        case SW_BITMASK:
+            if (t != 0) {
+                sim_switches = sim_switches | t;/* or in new switches */
+                continue;
                 }
-            sim_sw_radix = t & ~SIM_SW_NUM;             /* set radix */
-            }
-        else
-            sim_switches = sim_switches | t;            /* or in new switches */
+            break;
         }
-    else if ((opt & CMD_OPT_SCH) &&                     /* if allowed, */
+    if ((opt & CMD_OPT_SCH) &&                     /* if allowed, */
         get_rsearch (gbuf, sim_dfdev->dradix, &sim_stabr)) { /* try for search */
         sim_schrptr = &sim_stabr;                       /* set search */
         sim_schaptr = get_asearch (gbuf, sim_dfdev->dradix, &sim_staba);/* populate memory version of the same expression */

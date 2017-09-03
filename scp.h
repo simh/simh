@@ -156,6 +156,14 @@ int sim_isprint (char c);
 int sim_isdigit (char c);
 int sim_isgraph (char c);
 int sim_isalnum (char c);
+int sim_toupper (char c);
+int sim_tolower (char c);
+#ifndef toupper
+#define toupper(chr) sim_toupper(chr)
+#endif
+#ifndef tolower
+#define tolower(chr) sim_tolower(chr)
+#endif
 int sim_strncasecmp (const char *string1, const char *string2, size_t len);
 int sim_strcasecmp (const char *string1, const char *string2);
 size_t sim_strlcat (char *dst, const char *src, size_t size);
@@ -277,6 +285,7 @@ extern DEVICE *sim_dfdev;
 extern UNIT *sim_dfunit;
 extern int32 sim_interval;
 extern int32 sim_switches;
+extern int32 sim_switch_number;
 extern int32 sim_quiet;
 extern int32 sim_step;
 extern t_stat sim_last_cmd_stat;                        /* Command Status */
