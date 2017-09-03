@@ -10413,7 +10413,7 @@ if ((!strncmp(gbuf, "HALTAFTER=", 10)) && (gbuf[10])) {
     after_set = TRUE;
     cptr = tptr;
     }
-if ((*cptr != '"') && (*cptr != '\''))
+if ((*cptr != '\0') && (*cptr != '"') && (*cptr != '\''))
     return sim_messagef (SCPE_ARG, "String must be quote delimited\n");
 cptr = get_glyph_quoted (cptr, gbuf, 0);
 
@@ -10516,6 +10516,11 @@ uint8 *match_buf;
 uint32 match_size;
 int i;
 
+/* Hsndle a bare HALTAFTER=nnn command */
+if ((*match == '\0') && (*act == '\0') && after) {
+    exp->after = after;
+    return SCPE_OK;
+    }
 /* Validate the match string */
 match_buf = (uint8 *)calloc (strlen (match) + 1, 1);
 if (!match_buf)
