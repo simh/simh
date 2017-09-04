@@ -119,6 +119,7 @@
 #include <string.h>
 #include <errno.h>
 #include <limits.h>
+#include <ctype.h>
 
 #ifdef _WIN32
 #include <winsock2.h>

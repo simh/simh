@@ -150,12 +150,40 @@ const char *sim_set_uname (UNIT *uptr, const char *uname);
 t_stat get_yn (const char *ques, t_stat deflt);
 char *sim_trim_endspc (char *cptr);
 int sim_isspace (int c);
+#ifdef isspace
+#undef isspace
+#endif
+#define isspace(chr) sim_isspace (chr)
 int sim_islower (int c);
+#ifdef islower
+#undef islower
+#endif
+#define islower(chr) sim_islower (chr)
 int sim_isalpha (int c);
+#ifdef isalpha
+#undef isalpha
+#endif
+#define isalpha(chr) sim_isalpha (chr)
 int sim_isprint (int c);
+#ifdef isprint
+#undef isprint
+#endif
+#define isprint(chr) sim_isprint (chr)
 int sim_isdigit (int c);
+#ifdef isdigit
+#undef isdigit
+#endif
+#define isdigit(chr) sim_isdigit (chr)
 int sim_isgraph (int c);
+#ifdef isgraph
+#undef isgraph
+#endif
+#define isgraph(chr) sim_isgraph (chr)
 int sim_isalnum (int c);
+#ifdef isalnum
+#undef isalnum
+#endif
+#define isalnum(chr) sim_isalnum (chr)
 int sim_toupper (int c);
 int sim_tolower (int c);
 #ifdef toupper
