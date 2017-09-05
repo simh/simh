@@ -153,37 +153,51 @@ int sim_isspace (int c);
 #ifdef isspace
 #undef isspace
 #endif
+#ifndef IN_SCP_C
 #define isspace(chr) sim_isspace (chr)
+#endif
 int sim_islower (int c);
 #ifdef islower
 #undef islower
 #endif
+#ifndef IN_SCP_C
 #define islower(chr) sim_islower (chr)
+#endif
 int sim_isalpha (int c);
 #ifdef isalpha
 #undef isalpha
 #endif
+#ifndef IN_SCP_C
 #define isalpha(chr) sim_isalpha (chr)
+#endif
 int sim_isprint (int c);
 #ifdef isprint
 #undef isprint
 #endif
+#ifndef IN_SCP_C
 #define isprint(chr) sim_isprint (chr)
+#endif
 int sim_isdigit (int c);
 #ifdef isdigit
 #undef isdigit
 #endif
+#ifndef IN_SCP_C
 #define isdigit(chr) sim_isdigit (chr)
+#endif
 int sim_isgraph (int c);
 #ifdef isgraph
 #undef isgraph
 #endif
+#ifndef IN_SCP_C
 #define isgraph(chr) sim_isgraph (chr)
+#endif
 int sim_isalnum (int c);
 #ifdef isalnum
 #undef isalnum
 #endif
+#ifndef IN_SCP_C
 #define isalnum(chr) sim_isalnum (chr)
+#endif
 int sim_toupper (int c);
 int sim_tolower (int c);
 #ifdef toupper

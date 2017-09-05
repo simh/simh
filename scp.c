@@ -214,7 +214,9 @@
 
 /* Macros and data structures */
 
-#define NOT_MUX_USING_CODE /* sim_tmxr library provider or agnostic */
+#define NOT_MUX_USING_CODE  /* sim_tmxr library provider or agnostic */
+
+#define IN_SCP_C 1          /* Include from scp.c */
 
 #include "sim_defs.h"
 #include "sim_rev.h"
@@ -7936,7 +7938,7 @@ while ((*iptr != 0) &&
             }
         }
     if (sim_islower (*iptr) && uc)
-        *optr = (char)toupper (*iptr);
+        *optr = (char)sim_toupper (*iptr);
     else *optr = *iptr;
     iptr++; optr++;
     }
@@ -7993,7 +7995,7 @@ return cptr;
 
 int sim_isspace (int c)
 {
-return ((c > 0) && (c < 128)) ? 0 : isspace (c);
+return ((c < 0) || (c >= 128)) ? 0 : isspace (c);
 }
 
 int sim_islower (int c)
@@ -8018,27 +8020,27 @@ return ((c >= 'A') && (c <= 'Z')) ? ((c - 'A') + 'a') : c;
 
 int sim_isalpha (int c)
 {
-return ((c > 0) && (c < 128)) ? 0 : isalpha (c);
+return ((c < 0) || (c >= 128)) ? 0 : isalpha (c);
 }
 
 int sim_isprint (int c)
 {
-return ((c > 0) && (c < 128)) ? 0 : isprint (c);
+return ((c < 0) || (c >= 128)) ? 0 : isprint (c);
 }
 
 int sim_isdigit (int c)
 {
-return ((c > 0) && (c < 128)) ? 0 : isdigit (c);
+return ((c < 0) || (c >= 128)) ? 0 : isdigit (c);
 }
 
 int sim_isgraph (int c)
 {
-return ((c > 0) && (c < 128)) ? 0 : isgraph (c);
+return ((c < 0) || (c >= 128)) ? 0 : isgraph (c);
 }
 
 int sim_isalnum (int c)
 {
-return ((c > 0) && (c < 128)) ? 0 : isalnum (c);
+return ((c < 0) || (c >= 128)) ? 0 : isalnum (c);
 }
 
 /* strncasecmp() is not available on all platforms */
@@ -8050,10 +8052,8 @@ unsigned char s1, s2;
 for (i=0; i<len; i++) {
     s1 = (unsigned char)string1[i];
     s2 = (unsigned char)string2[i];
-    if (sim_islower (s1))
-        s1 = (unsigned char)toupper (s1);
-    if (sim_islower (s2))
-        s2 = (unsigned char)toupper (s2);
+    s1 = (unsigned char)sim_toupper (s1);
+    s2 = (unsigned char)sim_toupper (s2);
     if (s1 < s2)
         return -1;
     if (s1 > s2)
@@ -8073,10 +8073,8 @@ unsigned char s1, s2;
 while (1) {
     s1 = (unsigned char)string1[i];
     s2 = (unsigned char)string2[i];
-    if (sim_islower (s1))
-        s1 = (unsigned char)toupper (s1);
-    if (sim_islower (s2))
-        s2 = (unsigned char)toupper (s2);
+    s1 = (unsigned char)sim_toupper (s1);
+    s2 = (unsigned char)sim_toupper (s2);
     if (s1 == s2) {
         if (s1 == 0)
             return 0;
@@ -8389,12 +8387,12 @@ while (iptr[1]) {               /* Skip trailing quote */
 
                 ++iptr;
                 *optr = 0;
-                c = strchr (hex_digits, toupper(*iptr));
+                c = strchr (hex_digits, sim_toupper(*iptr));
                 if (c) {
                     *optr = ((*optr)<<4) + (uint8)(c-hex_digits);
                     ++iptr;
                     }
-                c = strchr (hex_digits, toupper(*iptr));
+                c = strchr (hex_digits, sim_toupper(*iptr));
                 if (c) {
                     *optr = ((*optr)<<4) + (uint8)(c-hex_digits);
                     ++iptr;
@@ -8778,7 +8776,7 @@ if (sim_isdigit(cptr[1])) {
 for (cptr++; (sim_isspace (*cptr) == 0) && (*cptr != 0); cptr++) {
     if (sim_isalpha (*cptr) == 0)
         return SW_ERROR;
-    *sw = *sw | SWMASK (toupper (*cptr));
+    *sw = *sw | SWMASK (sim_toupper (*cptr));
     }
 return SW_BITMASK;
 }
@@ -8956,7 +8954,7 @@ if (pptr) {                                             /* any? */
     *fptr != 0;                                         /* others: stop at null */
 #endif
     fptr++, eptr++) {
-        if (toupper (*fptr) != toupper (*eptr))
+        if (sim_toupper (*fptr) != sim_toupper (*eptr))
             return NULL;
         }
     if (*eptr != 0)                                     /* ext exhausted? */
@@ -9221,8 +9219,7 @@ while (sim_isspace (*inptr))                            /* bypass white space */
 val = 0;
 nodigit = 1;
 for (c = *inptr; sim_isalnum(c); c = *++inptr) {        /* loop through char */
-    if (sim_islower (c))
-        c = toupper (c);
+    c = sim_toupper (c);
     if (sim_isdigit (c))                                /* digit? */
         digit = c - (uint32) '0';
     else if (radix <= 10)                               /* stop if not expected */
@@ -11787,7 +11784,7 @@ for (hblock = astrings; (htext = *hblock) != NULL; hblock++) {
                 while (n > vsnum)               /* Get arg pointer if not cached */
                     vstrings[vsnum++] = va_arg (ap, char *);
                 end = vstrings[n-1];            /* Check for True */
-                if (!end || !(toupper (*end) == 'T' || *end == '1')) {
+                if (!end || !(sim_toupper (*end) == 'T' || *end == '1')) {
                     excluded = TRUE;            /* False, skip topic this time */
                     if (*htext)
                         htext++;
@@ -12016,7 +12013,7 @@ for (i = 0; i < topic->kids; i++) {
             *cptr++ = '_';
             } 
         else {
-            *cptr = (char)toupper (*cptr);
+            *cptr = (char)sim_toupper (*cptr);
             cptr++;
             }
         }
@@ -12088,7 +12085,7 @@ else
     p = sim_name;
 top.title = (char *) malloc (strlen (p) + ((flag & SCP_HELP_ATTACH)? sizeof (attach_help)-1: 0) +1);
 for (i = 0; p[i]; i++ )
-    top.title[i] = (char)toupper (p[i]);
+    top.title[i] = (char)sim_toupper (p[i]);
 top.title[i] = '\0';
 if (flag & SCP_HELP_ATTACH)
     strcpy (top.title+i, attach_help);
