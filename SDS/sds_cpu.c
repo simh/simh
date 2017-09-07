@@ -26,6 +26,7 @@
    cpu          central processor
    rtc          real time clock
 
+   07-Sep-17    RMS     Fixed sim_eval declaration in history routine (COVERITY)
    09-Mar-17    RMS     trap_P not set if mem mgt trap during fetch (COVERITY)
    28-Apr-07    RMS     Removed clock initialization
    29-Dec-06    RMS     Fixed breakpoint variable declarations
@@ -1865,7 +1866,6 @@ t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 int32 ov, k, di, lnt;
 const char *cptr = (const char *) desc;
 t_stat r;
-t_value sim_eval;
 InstHistory *h;
 static const char *cyc[] = { "   ", "   ", "INT", "TRP" };
 static const char *modes = "NMU?";
@@ -1891,8 +1891,8 @@ for (k = 0; k < lnt; k++) {                             /* print specified */
         if (h->ea & HIST_NOEA)
             fprintf (st, "      ");
         else fprintf (st, "%05o ", h->ea);
-        sim_eval = h->ir;
-        if ((fprint_sym (st, h->pc, &sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
+        sim_eval[0] = h->ir;
+        if ((fprint_sym (st, h->pc, sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
             fprintf (st, "(undefined) %08o", h->ir);
         fputc ('\n', st);                               /* end line */
         }                                               /* end else instruction */

@@ -1,6 +1,6 @@
 /* i7094_cpu.c: IBM 7094 CPU simulator
 
-   Copyright (c) 2003-2011, Robert M. Supnik
+   Copyright (c) 2003-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          7094 central processor
 
+   07-Sep-17    RMS     Fixed sim_eval declaration in history routine (COVERITY)
    31-Dec-11    RMS     Select traps have priority over protect traps
                         Added SRI, SPI
                         Fixed user mode and relocation from CTSS RPQ documentation
@@ -2400,9 +2401,8 @@ t_stat cpu_fprint_one_inst (FILE *st, uint32 pc, uint32 rpt, uint32 ea,
     t_uint64 ir, t_uint64 ac, t_uint64 mq, t_uint64 si, t_uint64 opnd)
 {
 int32 ch;
-t_value sim_eval;
 
-sim_eval = ir;
+sim_eval[0] = ir;
 if (pc & HIST_PC) {                                     /* instruction? */
     fputs ("CPU ", st);
     fprintf (st, "%05o ", (int)(pc & AMASK));
@@ -2420,7 +2420,7 @@ if (pc & HIST_PC) {                                     /* instruction? */
     if (ir & INST_T_DEC)
         fprintf (st, "       ");
     else fprintf (st, "%05o  ", ea);
-    if (fprint_sym (st, pc & AMASK, &sim_eval, &cpu_unit, SWMASK ('M')) > 0) {
+    if (fprint_sym (st, pc & AMASK, sim_eval, &cpu_unit, SWMASK ('M')) > 0) {
         fputs ("(undefined) ", st);
         fprint_val (st, ir, 8, 36, PV_RZRO);
         }
@@ -2436,7 +2436,7 @@ else if ((ch = HIST_CH (pc))) {                         /* channel? */
     fprintf (st, "%05o  ", (int)(pc & AMASK));
     fputs ("                                              ", st);
     fprintf (st, "%05o  ", (int)(ea & AMASK));
-    if (fprint_sym (st, pc & AMASK, &sim_eval, &cpu_unit,
+    if (fprint_sym (st, pc & AMASK, sim_eval, &cpu_unit,
         (ch_dev[ch - 1].flags & DEV_7909)? SWMASK ('N'): SWMASK ('I')) > 0) {
         fputs ("(undefined) ", st);
         fprint_val (st, ir, 8, 36, PV_RZRO);
