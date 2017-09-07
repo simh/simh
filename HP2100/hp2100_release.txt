@@ -1,6 +1,6 @@
                            SIMH/HP 2100 RELEASE NOTES
                            ==========================
-                             Last update: 2017-05-01
+                             Last update: 2017-09-06
 
 
 This file documents the release history of the simulator for the Hewlett-Packard
@@ -154,6 +154,282 @@ Revision 5010:
 
    A corrected version of $BALC is present on cartridge GF of the disc image
    supplied with the RTE-IVB software kit at the HP Computer Museum.
+
+
+
+======================
+Release 27, 2017-09-06
+======================
+
+This release of the HP 2100 simulator adds the following features:
+
+ - Support for the HP 2613, 2617, and 2618 line printers has been added to the
+   LPT device.  The default printer remains the HP 2607.
+
+ - The LPT device simulation has been rewritten to support realistic and
+   optimized timing, compact and expanded output modes, custom VFU tape images,
+   and tracing of internal operations.
+
+ - The LOAD command has been rewritten to load files containing absolute binary
+   loaders into the protected address space of the 21xx machines and configure
+   the I/O instructions.  For the 1000, LOAD can also be used to load boot
+   loader ROM images other than those provided directly by the simulator.
+
+ - The DUMP command has been added to write the binary loader currently resident
+   in memory to an absolute binary file.
+
+ - The TTY punch unit and the LPS, LPT, and PTP devices now position a newly
+   attached file at the end of the file rather than at the start.  As a result,
+   output will append to, rather than overwrite, the existing content.
+
+ - The DA, DP, DQ, and DS disc devices add the PROTECT and UNPROTECT options.
+   These replace the now-deprecated LOCKED and WRITEENABLED options and more
+   accurately reflect the labelling of the data protection switches on the disc
+   drives.
+
+ - The simulator message that is displayed when a programmed halt occurs has
+   been changed to indicate that the halt code comes from the T-register value.
+
+ - The Basic Binary Loader (BBL) is now installed by default in the 21xx
+   machines.  It is automatically configured to the select code of the paper
+   tape reader.  It may be overwritten with a different loader (e.g., the Basic
+   Binary Disc Loader or Basic Moving-head Disc Loader) using the LOAD command.
+   Performing a power-on reset of the CPU reinstalls the BBL.
+
+ - Symbolic display and entry has been rewritten to improve efficiency and
+   expanded to cover the full instruction set including optional microcode
+   extensions that are currently enabled.
+
+ - CPU instruction execution and data accesses may be selectively traced.  The
+   resulting trace listing is similar to the output of a logic analyzer
+   connected to the CPU and I/O buses.
+
+ - DMA/DCPC commands, status, and data accesses may be selectively traced.
+
+ - TBG commands, status, and service entries may be selectively traced.
+
+ - The DIAG option of the TBG device has been replaced with the REALTIME, W1A,
+   W1B, W2A, and W2B options.  Configuring the TBG to run its diagnostic now
+   uses the REALTIME and W2B options, and restoring the normal configuration
+   uses the CALTIME and W2A options.  The W1A and W1B options extend the
+   software compatibility of the TBG.
+
+ - The MUXM device has been renamed MUXC to reflect that it is the multiplexer
+   control card.  The previous MUXM name is deprecated but will still work in
+   existing simulation command files.
+
+ - The multiplexer control card (MUXC) may be enabled and disabled independently
+   of the upper and lower data cards (MUX and MUXL), reflecting its optional
+   status in hardware configurations.
+
+ - Memory address parsing for commands has been changed to add <page>.<offset>
+   format for physical addresses, where both the page and the offset range from
+   0 to 1777 octal.  Linear addressing is now restricted to the 32K logical
+   address space (0 to 77777 octal).  Memory display uses linear addressing for
+   locations within the logical address space; locations above 32K use the
+   physical address format.
+
+ - The previously separate STOP_INST, STOP_DEV, STOP_IOE, and INDMAX
+   pseudo-registers used to stop the simulator under certain conditions have
+   been replaced by the SET CPU STOP=<stopname>[,<stopname>...] and the SET CPU
+   INDIR=<limit> commands.  Stops may be temporarily bypassed by adding the -B
+   switch to the command that resumes execution.
+
+ - The HP 2100 Simulator User's Guide has been rewritten and significantly
+   expanded.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - The simulator passes the HP 2613/17/18 line printer diagnostic as described
+   in the "hp2100_diag.txt" file.
+
+ - The line printer terminates each print line with the HP-standard CR/LF pair.
+   If the output file is to be retained as a text file on a Unix system, removal
+   of the carriage returns, e.g., via the "dos2unix" utility, may be desirable.
+
+ - The LOAD command can no longer be used to read general absolute binary paper
+   tape images into memory.  The ATTACH PTR and BOOT PTR commands must now be
+   used to read paper tapes.
+
+ - The OS, OSTBG, VMA, EMA, VIS, and SIGNAL CPU debug flags have been removed.
+   Tracing of these firmware instructions is now performed by specifying SET CPU
+   DEBUG=EXEC and SET CPU EXEC with the appropriate opcode range and mask, as
+   follows:
+
+     * SET CPU DEBUG=OS     => SET CPU EXEC=105340;177760
+     * SET CPU DEBUG=VMA    => SET CPU EXEC=105240;177760
+     * SET CPU DEBUG=EMA    => SET CPU EXEC=105240;177760
+     * SET CPU DEBUG=VIS    => SET CPU EXEC=101460;173760
+     * SET CPU DEBUG=SIGNAL => SET CPU EXEC=105600;177760
+
+ - The separate tracing of time-base generator interrupt instructions provided
+   by the OS and OSTBG CPU debug flags is no longer supported.  Entering the
+   replacement command above traces all OS instructions, including the TBG
+   interrupt instructions.
+
+ - The TIMER, RRR 16, .FLUN, and the OS/VMA, VIS, and SIGNAL self-test
+   instructions are no longer exempt from the undefined/unimplemented
+   instruction stop tests.  Attempted execution of these instructions without
+   the appropriate firmware options installed will cause simulation stops if the
+   UNDEF (TIMER and RRR) or UNIMPL (.FLUN and self-tests) option is enabled.
+   Because of this change, the default state of the unimplemented instruction
+   stop has been reversed from "on" to "off".
+
+ - The "stop on I/O error" features controlled by the STOP_IOE register values
+   have been removed from the DR, LPS, LPT, MSC, MTC, and PTP devices, as all of
+   these report I/O error status to the CPU via their interface input registers.
+   STOP_IOE has been removed from the PTR device and replaced with SET CPU
+   STOP=IOERR, as this device does not report I/O error status to the CPU
+   through its interface.
+
+ - The LOCKED and WRITEENABLED options for the MSC and MTC devices are
+   deprecated.  The supported method of write-protecting a tape drive is to
+   attach the tape image with the -R (read-only) switch or by setting the host
+   operating system's read-only attribute on the tape image file.  This
+   simulates removing the write ring from the tape reel before mounting it on
+   the drive.  There is no hardware method of write-protecting a mounted and
+   positioned tape reel.
+
+ - If the previous ATTACH behavior (overwriting rather than appending) is
+   desired for the TTY punch unit and the LPS, LPT, and PTP devices, set the
+   device's (P)POS register to 0 after attaching.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  EXAMINE -M for addresses > 32K displays misleading operands.
+
+     VERSION:  Release 26.
+
+     OBSERVATION:  Current-page memory references of instructions residing above
+     the 32K logical address space are printed as though they reside at their
+     locations modulo 32K.  For example, DEPOSIT 170001 026020 and EXAMINE -M
+     170001 displays JMP 70020, and DEPOSIT 200001 026020 displays JMP 20.
+
+     CAUSE:  The printed addresses assume that the instructions will be executed
+     from their respective pages (modulo 32).  However, instructions can be
+     executed only when they are mapped into the logical address space, and any
+     given physical page may be mapped to any arbitrary logical page.
+     Therefore, the address printed may not represent the actual logical address
+     after mapping.
+
+     RESOLUTION:  Modify "fprint_cpu" (hp2100_sys.c) to use Z/C address notation
+     for memory references in instructions residing in physical memory above
+     32K.
+
+     STATUS:  Fixed in Release 27.
+
+
+  2. PROBLEM:  Enabling IOP firmware should not be allowed on the 1000 F-Series.
+
+     VERSION:  Release 26.
+
+     OBSERVATION:  The command "SET CPU 1000-F,IOP" is allowed, but it should
+     not be, as the IOP firmware is not supported on this machine.
+
+     CAUSE:  The F-Series does not provide the firmware mapping table entries
+     that permit operation of the 2000/Access I/O Processor firmware.  IOP
+     instruction opcodes 10x400-17 and 10x420-37 are marked as "HP Reserved" in
+     the F-Series mapping table, and opcodes 10x460-77 are dedicated to the VIS
+     microcode.
+
+     RESOLUTION:  Modify the "cpu_features" array (hp2100_cpu.c) to remove the
+     IOP option from the 1000 F-Series entry.
+
+     STATUS:  Fixed in Release 27.
+
+
+  3. PROBLEM:  A rejected model change still changes the CPU options.
+
+     VERSION:  Release 26.
+
+     OBSERVATION:  Changing to a CPU model that does not support the current
+     memory size will reduce memory to the maximum supported by the new model.
+     If the truncated portion contains non-zero values, the simulator will ask
+     for confirmation before proceeding.  If the truncation is rejected, the CPU
+     options are still set to those of the new model, even though the old model
+     is retained.  For example:
+
+       sim> SET CPU 1000-F,128K
+       sim> SHOW CPU
+       CPU     idle disabled
+               128KW, 1000-F, EAU
+               FP, no IOP, DMS
+               FFP, DBI, no EMA/VMA
+               no VIS, no SIGNAL
+       sim> DEPOSIT 100000 1
+       sim> SET CPU 2116
+       Really truncate memory [N]?NO
+       Command not completed
+       sim> SHOW CPU
+       CPU     idle disabled
+               128KW, 1000-F, no EAU
+               no FP, no IOP, no DMS
+               no FFP, no DBI, no EMA/VMA
+               no VIS, no SIGNAL
+
+     CAUSE:  The CPU options are set before the memory size is changed, so when
+     the size change is rejected, the new CPU options are retained.
+
+     RESOLUTION:  Modify "cpu_set_model" (hp2100_cpu.c) to perform the memory
+     size change first, so that if it is rejected, the CPU options have not been
+     changed.
+
+     STATUS:  Fixed in Release 27.
+
+
+  4. PROBLEM:  Virtual memory mapping fails for accesses above 126 MB.
+
+     VERSION:  Release 26.
+
+     OBSERVATION:  A program using virtual memory provided by the RTE-6/VM
+     operating system may access up to 128 MB of data, although VMA programs
+     default to a 16 MB limit.  Accesses to data in virtual memory are mapped
+     through the last two DMS user map registers.  Normally, each VMA access
+     maps in the memory page corresponding to the virtual address plus the
+     following memory page.  This allows access to single items up to 1024 words
+     in size starting at any offset within the (first) page.
+
+     If a data item resides in the last 2 MB of virtual memory, access to an
+     item that crosses the page boundary is incorrect.  Instead of accessing
+     words in the second page, the accesses wrap around within the first page.
+
+     CAUSE:  The suit number part of the virtual address is not restored before
+     checking the allocation status of the page table entry corresponding to the
+     second (spillover) page.  As a result, an unallocated second page in the
+     last 2 MB of virtual memory is seen as beyond the VM area limit, and
+     instead of generating a page fault to allocate the second page, the map
+     registers are set up to prevent access to the second page by setting the
+     first page address into both map registers.
+
+     RESOLUTION:  Modify "cpu_vma_lbp" (hp2100_cpu5.c) to check for spill page
+     allocation correctly.
+
+     STATUS:  Fixed in Release 27.
+
+
+  5. PROBLEM:  Memory expansion is not disabled when DMS is disabled.
+
+     VERSION:  Release 26.
+
+     OBSERVATION:  If the Memory Expansion Module in a 1000-Series CPU has been
+     enabled, and then the DMS firmware option is disabled or the CPU is changed
+     to a model that does not support memory expansion (e.g., a 2100), memory
+     expansion remains enabled.  In this case, memory accesses should revert to
+     physical addressing, but instead logical-to-physical address translation
+     through the currently enabled map remains in effect.
+
+     CAUSE:  Disabling DMS should set the "dms_enb" flag to 0, but it does not.
+
+     RESOLUTION:  Modify "set_model" and "set_option" (hp2100_cpu.c) to clear
+     the "dms_enb" flag if DMS is not enabled after the model or option change.
+
+     STATUS:  Fixed in Release 27.
 
 
 

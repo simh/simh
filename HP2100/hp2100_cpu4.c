@@ -252,7 +252,8 @@ t_stat cpu_fpp (uint32 IR, uint32 intrq)
 OP fpop;
 OPS op;
 OPSIZE op1_prec, op2_prec, rslt_prec, cvt_prec;
-uint16 opcode, rtn_addr, stk_ptr;
+HP_WORD rtn_addr, stk_ptr;
+uint16 opcode;
 uint32 entry;
 t_stat reason = SCPE_OK;
 
@@ -428,8 +429,8 @@ switch (entry) {                                        /* decode IR<6:0> */
     case 0134:                                          /* .DDIR 105134 (OP_N) */
         return cpu_dbi (0105326, intrq);                /* remap to double int handler */
 
-    default:                                            /* others undefined */
-        reason = stop_inst;
+    default:                                            /* others unimplemented */
+        reason = STOP (cpu_ss_unimpl);
         }
 
 return reason;
@@ -1117,8 +1118,8 @@ switch (entry) {                                        /* decode IR<3:0> */
         return reason;
 
 
-    default:                                            /* others undefined */
-        return stop_inst;
+    default:                                            /* others unimplemented */
+        return STOP (cpu_ss_unimpl);
         }
 
 AR = op[0].fpk[0];                                      /* save result */

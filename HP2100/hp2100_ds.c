@@ -1,7 +1,7 @@
 /* hp2100_ds.c: HP 13037D/13175D disc controller/interface simulator
 
    Copyright (c) 2004-2012, Robert M. Supnik
-   Copyright (c) 2012-2016  J. David Bryan
+   Copyright (c) 2012-2017  J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,11 @@
 
    DS           13037D/13175D disc controller/interface
 
+   11-Jul-17    JDB     Renamed "ibl_copy" to "cpu_ibl"
+   15-Mar-17    JDB     Trace flags are now global
+                        Changed DEBUG_PRI calls to tprintfs
+   10-Mar-17    JDB     Added IOBUS to the debug table
+   09-Mar-17    JDB     Deprecated LOCKED/WRITEENABLED for PROTECT/UNPROTECT
    13-May-16    JDB     Modified for revised SCP API function parameter types
    04-Mar-16    JDB     Name changed to "hp2100_disclib" until HP 3000 integration
    30-Dec-14    JDB     Added S-register parameters to ibl_copy
@@ -122,6 +127,7 @@
 
 
 #include "hp2100_defs.h"
+#include "hp2100_cpu.h"
 #include "hp2100_disclib.h"
 
 
@@ -140,16 +146,6 @@
 #define FIFO_FULL       (ds.fifo_count == FIFO_SIZE)    /* FIFO full test */
 
 #define PRESET_ENABLE   TRUE                            /* Preset Jumper (W4) is enabled */
-
-
-/* Debug flags */
-
-#define DEB_CPU         (1 << 0)                        /* words received from and sent to the CPU */
-#define DEB_CMDS        (1 << 1)                        /* interface commands received from the CPU */
-#define DEB_BUF         (1 << 2)                        /* data read from and written to the card FIFO */
-#define DEB_RWSC        (1 << 3)                        /* device read/write/status/control commands */
-#define DEB_SERV        (1 << 4)                        /* unit service scheduling calls */
-
 
 
 /* Per-card state variables */
@@ -305,17 +301,23 @@ static REG ds_reg [] = {
     };
 
 static MTAB ds_mod [] = {
-/*    mask         match        pstring            mstring         valid            disp  desc */
-    { UNIT_UNLOAD, UNIT_UNLOAD, "heads unloaded",  "UNLOADED",     &ds_load_unload, NULL, NULL },
-    { UNIT_UNLOAD, 0,           "heads loaded",    "LOADED",       &ds_load_unload, NULL, NULL },
+/*    Mask Value    Match Value   Print String       Match String     Validation        Display  Descriptor */
+/*    ------------  ------------  -----------------  ---------------  ----------------  -------  ---------- */
+    { UNIT_UNLOAD,  UNIT_UNLOAD,  "heads unloaded",  "UNLOADED",      &ds_load_unload,  NULL,    NULL       },
+    { UNIT_UNLOAD,  0,            "heads loaded",    "LOADED",        &ds_load_unload,  NULL,    NULL       },
 
-    { UNIT_WLK,    UNIT_WLK,    "write locked",    "LOCKED",       NULL,            NULL, NULL },
-    { UNIT_WLK,    0,           "write enabled",   "WRITEENABLED", NULL,            NULL, NULL },
+    { UNIT_WLK,     UNIT_WLK,     "protected",       "PROTECT",       NULL,             NULL,    NULL       },
+    { UNIT_WLK,     0,            "unprotected",     "UNPROTECT",     NULL,             NULL,    NULL       },
 
-    { UNIT_FMT,    UNIT_FMT,    "format enabled",  "FORMAT",       NULL,            NULL, NULL },
-    { UNIT_FMT,    0,           "format disabled", "NOFORMAT",     NULL,            NULL, NULL },
+    { UNIT_WLK,     UNIT_WLK,     NULL,              "LOCKED",        NULL,             NULL,    NULL       },
+    { UNIT_WLK,     0,            NULL,              "WRITEENABLED",  NULL,             NULL,    NULL       },
 
-/*    mask                               match                  pstring     mstring     valid          disp  desc */
+    { UNIT_FMT,     UNIT_FMT,     "format enabled",  "FORMAT",        NULL,             NULL,    NULL       },
+    { UNIT_FMT,     0,            "format disabled", "NOFORMAT",      NULL,             NULL,    NULL       },
+
+/*                                                              Print       Match                                 */
+/*    Mask Value                         Match Value            String      String      Validation     Disp  Desc */
+/*    ---------------------------------  ---------------------  ----------  ----------  -------------  ----  ---- */
     { UNIT_AUTO | UNIT_ATT,              UNIT_AUTO,             "autosize", "AUTOSIZE", &dl_set_model, NULL, NULL },
     { UNIT_AUTO | UNIT_ATT | UNIT_MODEL, MODEL_7905,            "7905",     "7905",     &dl_set_model, NULL, NULL },
     { UNIT_AUTO | UNIT_ATT | UNIT_MODEL, MODEL_7906,            "7906",     "7906",     &dl_set_model, NULL, NULL },
@@ -326,18 +328,21 @@ static MTAB ds_mod [] = {
     { UNIT_ATT | UNIT_MODEL,             UNIT_ATT | MODEL_7920, "7920",     NULL,       NULL,          NULL, NULL },
     { UNIT_ATT | UNIT_MODEL,             UNIT_ATT | MODEL_7925, "7925",     NULL,       NULL,          NULL, NULL },
 
-    { MTAB_XTD | MTAB_VDV,            0, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &ds_dev },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &ds_dev },
+/*    Entry Flags          Value  Print String  Match String  Validation    Display        Descriptor       */
+/*    -------------------  -----  ------------  ------------  ------------  -------------  ---------------- */
+    { MTAB_XDV,              1u,  "SC",         "SC",         &hp_set_dib,  &hp_show_dib,  (void *) &ds_dib },
+    { MTAB_XDV | MTAB_NMO,  ~1u,  "DEVNO",      "DEVNO",      &hp_set_dib,  &hp_show_dib,  (void *) &ds_dib },
     { 0 }
     };
 
 static DEBTAB ds_deb [] = {
-    { "CPU",  DEB_CPU  },
-    { "CMDS", DEB_CMDS },
-    { "BUF",  DEB_BUF  },
-    { "RWSC", DEB_RWSC },
-    { "SERV", DEB_SERV },
-    { NULL,   0 }
+    { "RWSC",  DEB_RWSC    },
+    { "CMDS",  DEB_CMDS    },
+    { "CPU",   DEB_CPU     },
+    { "BUF",   DEB_BUF     },
+    { "SERV",  DEB_SERV    },
+    { "IOBUS", TRACE_IOBUS },
+    { NULL,    0           }
     };
 
 DEVICE ds_dev = {
@@ -446,8 +451,7 @@ while (working_set) {
             ds.flag = CLEAR;                            /* clear the flag */
             ds.flagbuf = CLEAR;                         /*   and flag buffer */
 
-            if (DEBUG_PRI (ds_dev, DEB_CMDS))
-                fputs (">>DS cmds: [CLF] Flag cleared\n", sim_deb);
+            tprintf (ds_dev, DEB_CMDS, "[CLF] Flag cleared\n");
             break;
 
 
@@ -456,8 +460,7 @@ while (working_set) {
             ds.flag = SET;                              /* set the flag */
             ds.flagbuf = SET;                           /*   and flag buffer */
 
-            if (DEBUG_PRI (ds_dev, DEB_CMDS))
-                fputs (">>DS cmds: [STF] Flag set\n", sim_deb);
+            tprintf (ds_dev, DEB_CMDS, "[STF] Flag set\n");
             break;
 
 
@@ -475,12 +478,11 @@ while (working_set) {
             data = fifo_unload ();                          /* unload the next word from the FIFO */
             stat_data = IORETURN (SCPE_OK, data);           /* merge in the return status */
 
-            if (DEBUG_PRI (ds_dev, DEB_CPU))
-                fprintf (sim_deb, ">>DS cpu:  [LIx%s] Data = %06o\n", hold_or_clear, data);
+            tprintf (ds_dev, DEB_CPU, "[LIx%s] Data = %06o\n", hold_or_clear, data);
 
             if (FIFO_EMPTY) {                               /* is the FIFO now empty? */
-                if (ds.srq == SET && DEBUG_PRI (ds_dev, DEB_CMDS))
-                    fprintf (sim_deb, ">>DS cmds: [LIx%s] SRQ cleared\n", hold_or_clear);
+                if (ds.srq == SET)
+                    tprintf (ds_dev, DEB_CMDS, "[LIx%s] SRQ cleared\n", hold_or_clear);
 
                 ds.srq = CLEAR;                             /* clear SRQ */
 
@@ -495,9 +497,8 @@ while (working_set) {
         case ioIOO:                                         /* I/O data output */
             data = IODATA (stat_data);                      /* mask to just the data word */
 
-            if (DEBUG_PRI (ds_dev, DEB_CPU))
-                fprintf (sim_deb, ">>DS cpu:  [OTx%s] %s = %06o\n",
-                         hold_or_clear, output_state [ds.cmfol], data);
+            tprintf (ds_dev, DEB_CPU, "[OTx%s] %s = %06o\n",
+                     hold_or_clear, output_state [ds.cmfol], data);
 
             fifo_load (data);                               /* load the word into the FIFO */
 
@@ -514,8 +515,8 @@ while (working_set) {
                     }
 
                 if (FIFO_STOP) {                            /* is the FIFO now full enough? */
-                    if (ds.srq == SET && DEBUG_PRI (ds_dev, DEB_CMDS))
-                        fprintf (sim_deb, ">>DS cmds: [OTx%s] SRQ cleared\n", hold_or_clear);
+                    if (ds.srq == SET)
+                        tprintf (ds_dev, DEB_CMDS, "[OTx%s] SRQ cleared\n", hold_or_clear);
 
                     ds.srq = CLEAR;                         /* clear SRQ to stop filling */
                     }
@@ -528,14 +529,12 @@ while (working_set) {
             ds.flagbuf = SET;                           /*   and flag buffer */
             ds.cmrdy = CLEAR;                           /* clear the command ready flip-flop */
 
-            if (DEBUG_PRI (ds_dev, DEB_CMDS))
-                fputs (">>DS cmds: [POPIO] Flag set\n", sim_deb);
+            tprintf (ds_dev, DEB_CMDS, "[POPIO] Flag set\n");
             break;
 
 
         case ioCRS:                                         /* control reset */
-            if (DEBUG_PRI (ds_dev, DEB_CMDS))
-                fputs (">>DS cmds: [CRS] Master reset\n", sim_deb);
+            tprintf (ds_dev, DEB_CMDS, "[CRS] Master reset\n");
 
             ds.control = CLEAR;                             /* clear the control */
             ds.cmfol = CLEAR;                               /*   and command follows flip-flops */
@@ -552,8 +551,7 @@ while (working_set) {
 
 
         case ioCLC:                                     /* clear control flip-flop */
-            if (DEBUG_PRI (ds_dev, DEB_CMDS))
-                fprintf (sim_deb, ">>DS cmds: [CLC%s] Control cleared\n", hold_or_clear);
+            tprintf (ds_dev, DEB_CMDS, "[CLC%s] Control cleared\n", hold_or_clear);
 
             ds.control = CLEAR;                         /* clear the control */
             ds.edt = CLEAR;                             /*   and EDT flip-flops */
@@ -569,16 +567,14 @@ while (working_set) {
 
             interrupt_enabled = TRUE;                   /* check for drive attention */
 
-            if (DEBUG_PRI (ds_dev, DEB_CMDS))
-                fprintf (sim_deb, ">>DS cmds: [STC%s] Control set\n", hold_or_clear);
+            tprintf (ds_dev, DEB_CMDS, "[STC%s] Control set\n", hold_or_clear);
             break;
 
 
         case ioEDT:                                     /* end data transfer */
             ds.edt = SET;                               /* set the EDT flip-flop */
 
-            if (DEBUG_PRI (ds_dev, DEB_CPU))
-                fputs (">>DS cpu:  [EDT] DCPC transfer ended\n", sim_deb);
+            tprintf (ds_dev, DEB_CPU, "[EDT] DCPC transfer ended\n");
             break;
 
 
@@ -698,10 +694,8 @@ return stat_data;
 
 t_stat ds_service_drive (UNIT *uptr)
 {
-static const char completion_message [] = ">>DS rwsc: Unit %d %s command completed\n";
 t_stat result;
 t_bool seek_completion;
-int32 unit;
 FLIP_FLOP entry_srq = ds.srq;                           /* get the SRQ state on entry */
 CNTLR_PHASE entry_phase = (CNTLR_PHASE) uptr->PHASE;    /* get the operation phase on entry */
 uint32 entry_status = uptr->STAT;                       /* get the drive status on entry */
@@ -777,9 +771,8 @@ if ((CNTLR_PHASE) uptr->PHASE == data_phase)            /* is the drive in the d
         }                                               /* end of data phase operation dispatch */
 
 
-if (DEBUG_PRI (ds_dev, DEB_CMDS) && entry_srq != ds.srq)
-    fprintf (sim_deb, ">>DS cmds: SRQ %s\n", ds.srq == SET ? "set" : "cleared");
-
+if (entry_srq != ds.srq)
+    tprintf (ds_dev, DEB_CMDS, "SRQ %s\n", ds.srq == SET ? "set" : "cleared");
 
 if (uptr->wait)                                             /* was service requested? */
     activate_unit (uptr);                                   /* schedule the next event */
@@ -795,22 +788,18 @@ if (mac_cntlr.state != cntlr_busy) {                        /* is the command co
     }
 
 
-if (DEBUG_PRI (ds_dev, DEB_RWSC)) {
-    unit = uptr - ds_unit;                                  /* get the unit number */
+if (result == SCPE_IERR)                                    /* did an internal error occur? */
+    tprintf (ds_dev, DEB_RWSC, "Unit %d %s command %s phase service not handled\n",
+             uptr - ds_unit, dl_opcode_name (MAC, (CNTLR_OPCODE) uptr->OP),
+             dl_phase_name ((CNTLR_PHASE) uptr->PHASE));
 
-    if (result == SCPE_IERR)                                /* did an internal error occur? */
-        fprintf (sim_deb, ">>DS rwsc: Unit %d %s command %s phase service not handled\n",
-                 unit, dl_opcode_name (MAC, (CNTLR_OPCODE) uptr->OP),
-                 dl_phase_name ((CNTLR_PHASE) uptr->PHASE));
+else if (seek_completion)                                           /* if a seek has completed */
+    tprintf (ds_dev, DEB_RWSC, "Unit %d %s command completed\n",    /*   report the unit command */
+             uptr - ds_unit, dl_opcode_name (MAC, (CNTLR_OPCODE) uptr->OP));
 
-    else if (seek_completion)                               /* if a seek has completed */
-        fprintf (sim_deb, completion_message,               /*   report the unit command */
-                 unit, dl_opcode_name (MAC, (CNTLR_OPCODE) uptr->OP));
-
-    else if (mac_cntlr.state == cntlr_wait)                 /* if the controller has stopped */
-        fprintf (sim_deb, completion_message,               /*   report the controller command */
-                 unit, dl_opcode_name (MAC, mac_cntlr.opcode));
-    }
+else if (mac_cntlr.state == cntlr_wait)                             /* if the controller has stopped */
+    tprintf (ds_dev, DEB_RWSC, "Unit %d %s command completed\n",    /*   report the controller command */
+             uptr - ds_unit, dl_opcode_name (MAC, mac_cntlr.opcode));
 
 return result;                                              /* return the result of the service */
 }
@@ -932,8 +921,8 @@ switch ((CNTLR_PHASE) uptr->PHASE) {                    /* dispatch the current 
     }                                                   /* end of phase dispatch */
 
 
-if (result == SCPE_IERR && DEBUG_PRI (ds_dev, DEB_RWSC))    /* did an internal error occur? */
-    fprintf (sim_deb, ">>DS rwsc: Controller %s command %s phase service not handled\n",
+if (result == SCPE_IERR)                                /* did an internal error occur? */
+    tprintf (ds_dev, DEB_RWSC, "Controller %s command %s phase service not handled\n",
              dl_opcode_name (MAC, opcode), dl_phase_name ((CNTLR_PHASE) uptr->PHASE));
 
 
@@ -941,9 +930,8 @@ if (mac_cntlr.state != cntlr_busy) {                    /* has the controller st
     poll_interface ();                                  /* poll the interface for the next command */
     poll_drives ();                                     /* poll the drives for Attention status */
 
-    if (DEBUG_PRI (ds_dev, DEB_RWSC))
-        fprintf (sim_deb, ">>DS rwsc: Controller %s command completed\n",
-                 dl_opcode_name (MAC, opcode));
+    tprintf (ds_dev, DEB_RWSC, "Controller %s command completed\n",
+             dl_opcode_name (MAC, opcode));
     }
 
 return result;                                          /* return the result of the service */
@@ -1172,12 +1160,11 @@ t_stat ds_boot (int32 unitno, DEVICE *dptr)
 if (unitno != 0)                                        /* boot supported on drive unit 0 only */
     return SCPE_NOFNC;                                  /* report "Command not allowed" if attempted */
 
-if (ibl_copy (ds_rom, ds_dib.select_code,               /* copy the boot ROM to memory and configure */
-              IBL_OPT | IBL_DS_HEAD,                    /*   the S register accordingly */
-              IBL_DS | IBL_MAN | IBL_SET_SC (ds_dib.select_code)))
-    return SCPE_IERR;                                   /* return an internal error if the copy failed */
-else
-    return SCPE_OK;
+cpu_ibl (ds_rom, ds_dib.select_code,                    /* copy the boot ROM to memory and configure */
+         IBL_OPT | IBL_DS_HEAD,                         /*   the S register accordingly */
+         IBL_DS | IBL_MAN | IBL_SET_SC (ds_dib.select_code));
+
+return SCPE_OK;
 }
 
 
@@ -1273,23 +1260,16 @@ if (uptr) {                                             /* did the command start
     if (time)                                           /* was the unit scheduled? */
         activate_unit (uptr);                           /* activate it (and clear the "wait" field) */
 
-    if (DEBUG_PRI (ds_dev, DEB_RWSC)) {
-        unit = uptr - ds_unit;                          /* get the unit number */
+    if (time == 0)                                  /* was the unit busy? */
+        tprintf (ds_dev, DEB_RWSC, "Unit %d %s in progress\n",
+                 uptr - ds_unit, dl_opcode_name (MAC, drive_command));
 
-        if (time == 0)                                  /* was the unit busy? */
-            fprintf (sim_deb, ">>DS rwsc: Unit %d %s in progress\n",
-                     unit, dl_opcode_name (MAC, drive_command));
-
-        fputs (">>DS rwsc: ", sim_deb);
-
-        if (unit > DL_MAXDRIVE)
-            fputs ("Controller ", sim_deb);
-        else
-            fprintf (sim_deb, "Unit %d position %" T_ADDR_FMT "d ", unit, uptr->pos);
-
-        fprintf (sim_deb, "%s command initiated\n",
+    if (uptr - ds_unit > DL_MAXDRIVE)
+        tprintf (ds_dev, DEB_RWSC, "Controller %s command initiated\n",
                  dl_opcode_name (MAC, mac_cntlr.opcode));
-        }
+    else
+        tprintf (ds_dev, DEB_RWSC, "Unit %d position %" T_ADDR_FMT "d %s command initiated\n",
+                 uptr - ds_unit, uptr->pos, dl_opcode_name (MAC, mac_cntlr.opcode));
     }
 
 else                                                    /* the command failed to start */
@@ -1380,8 +1360,7 @@ static void fifo_load (uint16 data)
 uint32 index;
 
 if (FIFO_FULL) {                                            /* is the FIFO already full? */
-    if (DEBUG_PRI (ds_dev, DEB_BUF))
-        fprintf (sim_deb, ">>DS buf:  Attempted load to full FIFO, data %06o\n", data);
+    tprintf (ds_dev, DEB_BUF, "Attempted load to full FIFO, data %06o\n", data);
 
     return;                                                 /* return with the load ignored */
     }
@@ -1391,9 +1370,8 @@ index = (ds.fifo_reg->qptr + ds.fifo_count) % FIFO_SIZE;    /* calculate the ind
 ds.fifo [index] = data;                                     /* store the word in the FIFO */
 ds.fifo_count = ds.fifo_count + 1;                          /* increment the count of words stored */
 
-if (DEBUG_PRI (ds_dev, DEB_BUF))
-    fprintf (sim_deb, ">>DS buf:  Data %06o loaded into FIFO (%d)\n",
-             data, ds.fifo_count);
+tprintf (ds_dev, DEB_BUF, "Data %06o loaded into FIFO (%d)\n",
+         data, ds.fifo_count);
 
 return;
 }
@@ -1418,9 +1396,7 @@ static uint16 fifo_unload (void)
 uint16 data;
 
 if (FIFO_EMPTY) {                                           /* is the FIFO already empty? */
-    if (DEBUG_PRI (ds_dev, DEB_BUF))
-        fputs (">>DS buf:  Attempted unload from empty FIFO\n", sim_deb);
-
+    tprintf (ds_dev, DEB_BUF, "Attempted unload from empty FIFO\n");
     return 0;                                               /* return with no data */
     }
 
@@ -1429,9 +1405,8 @@ data = ds.fifo [ds.fifo_reg->qptr];                         /* get the word from
 ds.fifo_reg->qptr = (ds.fifo_reg->qptr + 1) % FIFO_SIZE;    /* update the FIFO queue pointer */
 ds.fifo_count = ds.fifo_count - 1;                          /* decrement the count of words stored */
 
-if (DEBUG_PRI (ds_dev, DEB_BUF))
-    fprintf (sim_deb, ">>DS buf:  Data %06o unloaded from FIFO (%d)\n",
-             data, ds.fifo_count);
+tprintf (ds_dev, DEB_BUF, "Data %06o unloaded from FIFO (%d)\n",
+         data, ds.fifo_count);
 
 return data;
 }
@@ -1446,8 +1421,7 @@ static void fifo_clear (void)
 {
 ds.fifo_count = 0;                                      /* clear the FIFO */
 
-if (DEBUG_PRI (ds_dev, DEB_BUF))
-    fputs (">>DS buf:  FIFO cleared\n", sim_deb);
+tprintf (ds_dev, DEB_BUF, "FIFO cleared\n");
 
 return;
 }
@@ -1461,19 +1435,14 @@ return;
 
 static t_stat activate_unit (UNIT *uptr)
 {
-int32 unit;
 t_stat result;
 
-if (DEBUG_PRI (ds_dev, DEB_SERV)) {
-    unit = uptr - ds_unit;                              /* calculate the unit number */
-
-    if (uptr == &ds_cntlr)
-        fprintf (sim_deb, ">>DS serv: Controller delay %d service scheduled\n",
-                 uptr->wait);
-    else
-        fprintf (sim_deb, ">>DS serv: Unit %d delay %d service scheduled\n",
-                 unit, uptr->wait);
-    }
+if (uptr == &ds_cntlr)
+    tprintf (ds_dev, DEB_SERV, "Controller delay %d service scheduled\n",
+             uptr->wait);
+else
+    tprintf (ds_dev, DEB_SERV, "Unit %d delay %d service scheduled\n",
+             uptr - ds_unit, uptr->wait);
 
 result = sim_activate (uptr, uptr->wait);               /* activate the unit */
 uptr->wait = 0;                                         /* reset the activation time */

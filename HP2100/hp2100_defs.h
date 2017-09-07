@@ -3,27 +3,38 @@
    Copyright (c) 1993-2016, Robert M. Supnik
    Copyright (c) 2017       J. David Bryan
 
-   Permission is hereby granted, free of charge, to any person obtaining a
-   copy of this software and associated documentation files (the "Software"),
-   to deal in the Software without restriction, including without limitation
-   the rights to use, copy, modify, merge, publish, distribute, sublicense,
-   and/or sell copies of the Software, and to permit persons to whom the
-   Software is furnished to do so, subject to the following conditions:
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
 
    The above copyright notice and this permission notice shall be included in
    all copies or substantial portions of the Software.
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+   AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not
-   be used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from Robert M Supnik.
+   Except as contained in this notice, the names of the authors shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
+   in this Software without prior written authorization from the authors.
 
+   30-Aug-17    JDB     Replaced POLL_WAIT with POLL_PERIOD
+   07-Aug-17    JDB     Added "hp_attach"
+   20-Jul-17    JDB     Removed STOP_OFFLINE, STOP_PWROFF stop codes
+   11-Jul-17    JDB     Moved "ibl_copy" to hp2100_cpu.h
+   26-Jun-17    JDB     Moved I/O instruction subopcode constants to hp2100_cpu.c
+   14-Jun-17    JDB     Renamed STOP_RSRV to STOP_UNIMPL (unimplemented instruction)
+   15-Mar-17    JDB     Added global trace flags
+   27-Feb-17    JDB     ibl_copy no longer returns a status code
+   15-Feb-17    JDB     Deleted unneeded guard macro definition
+   16-Jan-17    JDB     Added tracing and console output macros
+   13-Jan-17    JDB     Added fprint_cpu
    10-Jan-17    JDB     Added architectural constants
    05-Aug-16    JDB     Removed PC_Global renaming; P register is now "PR"
    13-May-16    JDB     Modified for revised SCP API function parameter types
@@ -150,9 +161,6 @@
 */
 
 
-#ifndef HP2100_DEFS_H_
-#define HP2100_DEFS_H_ 0
-
 
 #include "sim_rev.h"
 #include "sim_defs.h"
@@ -188,24 +196,197 @@
 #endif
 
 
-/* Simulator stop and notification codes */
+/* Device register display mode flags */
 
-#define STOP_RSRV       1                               /* must be 1 */
-#define STOP_IODV       2                               /* must be 2 */
-#define STOP_HALT       3                               /* HALT */
-#define STOP_IBKPT      4                               /* breakpoint */
-#define STOP_IND        5                               /* indirect loop */
-#define NOTE_INDINT     6                               /* indirect intr */
-#define STOP_NOCONN     7                               /* no connection */
-#define STOP_OFFLINE    8                               /* device offline */
-#define STOP_PWROFF     9                               /* device powered off */
-#define NOTE_IOG        10                              /* I/O instr executed */
+#define REG_X               REG_VMIO                    /* permit symbolic display overrides */
+
+#define REG_A               (1u << REG_V_UF + 0)        /* default format is -A (one ASCII character) */
+#define REG_C               (1u << REG_V_UF + 1)        /* default format is -C (two ASCII characters) */
+#define REG_M               (1u << REG_V_UF + 2)        /* default format is -M (mnemonic) */
+
+
+/* Global tracing flags.
+
+   Global tracing flags are allocated in descending order, as they may be used
+   by modules that allocate their own private flags in ascending order.  No
+   check is made for overlapping values.
+*/
+
+#define TRACE_CMD           (1u << 31)          /* trace interface or controller commands */
+#define TRACE_INCO          (1u << 30)          /* trace interface or controller command initiations and completions */
+#define TRACE_CSRW          (1u << 29)          /* trace interface control, status, read, and write actions */
+#define TRACE_STATE         (1u << 28)          /* trace state changes */
+#define TRACE_SERV          (1u << 27)          /* trace unit service scheduling calls and entries */
+#define TRACE_PSERV         (1u << 26)          /* trace periodic unit service scheduling calls and entries */
+#define TRACE_XFER          (1u << 25)          /* trace data receptions and transmissions */
+#define TRACE_IOBUS         (1u << 24)          /* trace I/O bus signals and data words received and returned */
+
+#define DEB_CMDS            (1u << 23)          /* (old) trace command initiations and completions */
+#define DEB_CPU             (1u << 22)          /* (old) trace words received from and sent to the CPU */
+#define DEB_BUF             (1u << 21)          /* (old) trace data read from and written to the FIFO */
+#define DEB_XFER            (1u << 20)          /* (old) trace data receptions and transmissions */
+#define DEB_RWS             (1u << 19)          /* (old) trace tape reads, writes, and status returns */
+#define DEB_RWSC            (1u << 18)          /* (old) trace disc read/write/status/control commands */
+#define DEB_SERV            (1u << 17)          /* (old) trace unit service scheduling calls and entries */
+
+
+/* Tracing and console output.
+
+   "tprintf" is used to write tracing messages.  It does an "fprintf" to the
+   debug output stream if the stream is open and the trace "flag" is currently
+   enabled in device "dev".  Otherwise, it's a NOP.  "..." is the format string
+   and associated values.
+
+   "tpprintf" is identical to "tprintf", except that a device pointer is passed
+   instead of a device structure.
+
+   "TRACING" and "TRACINGP" implement the test conditions for device and device
+   pointer tracing, respectively.  They are used explicitly only when several
+   trace statements employing the same flag are required, and it is desirable to
+   avoid repeating the stream and flag test for each one.
+
+   "cprintf", "cputs", and "cputc" are used to write messages to the console
+   and, if console logging is enabled, to the log output stream.  They do
+   "(f)printf", "fputs", or "(f)putc", respectively.  "..." is the format string
+   and associated values, "str" is the string to write, and "ch" is the
+   character to write.
+
+
+   Implementation notes:
+
+    1. The "cputs" macro uses "fputs" for both console and log file output
+       because "puts" appends a newline, whereas "fputs" does not.
+*/
+
+#define TRACING(d,f)        (sim_deb != NULL && ((d).dctrl & (f)))
+
+#define TRACINGP(d,f)       (sim_deb != NULL && ((d)->dctrl & (f)))
+
+#define tprintf(dev, flag, ...) \
+          if (TRACING (dev, flag)) \
+              hp_trace (&(dev), (flag), __VA_ARGS__); \
+          else \
+              (void) 0
+
+#define tpprintf(dptr, flag, ...) \
+          if (TRACINGP (dptr, flag)) \
+              hp_trace ((dptr), (flag), __VA_ARGS__); \
+          else \
+              (void) 0
+
+#define cprintf(...) \
+          do { \
+              printf (__VA_ARGS__); \
+              if (sim_log) \
+                  fprintf (sim_log, __VA_ARGS__); \
+              } \
+          while (0)
+
+#define cputs(str) \
+          do { \
+              fputs (str, stdout); \
+              if (sim_log) \
+                  fputs (str, sim_log); \
+              } \
+          while (0)
+
+#define cputc(ch) \
+          do { \
+              putc (ch); \
+              if (sim_log) \
+                  fputc (ch, sim_log); \
+              } \
+          while (0)
+
+
+/* Simulation stop and notification codes.
+
+   The STOP_* status codes stop the simulator.  The "sim_stop_messages" array in
+   "hp2100_sys.c" contains the message strings that correspond one-for-one with
+   the stop codes.
+
+   The NOTE_* status codes do not stop the simulator.  Instead, they inform the
+   instruction execution loop of special situations that occurred while
+   processing the current machine instruction..
+
+
+   Implementation notes:
+
+    1. Codes before STOP_RERUN cause the instruction to be rerun, so P is backed
+       up twice.  For codes after, P points to the next instruction to be
+       executed (which is the current instruction for an infinite loop stop).
+*/
+
+#define STOP_UNIMPL         1                   /* unimplemented instruction stop */
+#define STOP_UNSC           2                   /* stop on I/O to an unassigned select code */
+#define STOP_UNDEF          3                   /* undefined instruction stop */
+#define STOP_INDIR          4                   /* stop on an indirect loop */
+
+#define STOP_RERUN          4                   /* stops above here cause the instruction to be re-run */
+
+#define STOP_HALT           5                   /* programmed halt */
+#define STOP_BRKPNT         6                   /* breakpoint */
+#define STOP_NOCONN         7                   /* no connection */
+#define STOP_NOTAPE         8                   /* no tape */
+#define STOP_EOT            9                   /* end of tape */
+
+#define NOTE_IOG            10                  /* I/O instr executed */
+#define NOTE_INDINT         11                  /* indirect intr */
+
 
 
 /* Modifier validation identifiers */
 
 #define MTAB_XDV            (MTAB_XTD | MTAB_VDV)
 #define MTAB_XUN            (MTAB_XTD | MTAB_VUN)
+
+
+/* I/O event timing.
+
+   I/O events are scheduled for future service by specifying the desired delay
+   in units of event ticks.  Typically, one event tick represents the execution
+   of one CPU instruction, and this is the way event ticks are defined in the
+   current simulator implementation.  However, the various CPUs themselves not
+   only vary in speed, but the actual instruction times vary greatly, due to the
+   presence of block move, compare, and scan instructions.  Variations of an
+   order of magnitude are common, and two orders or more are possible for longer
+   blocks.
+
+   The 24296-90001 Diagnostic Configurator provides a one millisecond timer for
+   use by the diagnostic programs.  The timer is a two-instruction software
+   loop, plus four instructions of entry/exit overhead, based on the processor
+   type.  The values provided are:
+
+             Loop     Instr
+     CPU     Count    /msec
+     ------  -----    -----
+     2114      246      496
+     2115      246      496
+     2116      309      622
+     2100      252      508
+     1000-M    203      410
+     1000-E   1573 *   1577
+
+     * The E-Series TIMER instruction is used instead of a software loop.  TIMER
+       re-executes an internal decrement until the supplied value reaches zero.
+
+   To pass diagnostics that time peripheral operations, the simulator assumes
+   the E-Series execution rate for all devices (0.634 microseconds per event
+   tick), although this results in needlessly long delays for normal operation.
+   A correct implementation would change the timing base depending on the
+   currently selected CPU.
+
+   To accommodate possible future variable instruction timing, I/O service
+   activation times must not assume a constant 0.634 microseconds per event
+   tick.  Delays should be defined in terms of the "uS" (microseconds), "mS"
+   (milliseconds), and "S" (seconds) macros below.
+*/
+
+#define USEC_PER_EVENT      0.634               /* average CPU instruction time in microseconds */
+
+#define uS(t)               (uint32) ((t) > USEC_PER_EVENT ? (t) / USEC_PER_EVENT + 0.5 : 1)
+#define mS(t)               (uint32) (((t) * 1000.0)    / USEC_PER_EVENT + 0.5)
+#define S(t)                (uint32) (((t) * 1000000.0) / USEC_PER_EVENT + 0.5)
 
 
 /* Architectural constants.
@@ -217,11 +398,52 @@
 
    The HP_WORD type is used to declare variables that represent 16-bit registers
    or buses in hardware.
+
+
+   Implementation notes:
+
+    1. The HP_WORD type is a 32-bit unsigned type, instead of the more logical
+       16-bit unsigned type.  There are two reasons for this.  First, SCP
+       requires that scalars referenced by REG (register) entries be 32 bits in
+       size.  Second, IA-32 processors execute instructions with 32-bit operands
+       much faster than those with 16-bit operands.
+
+       Using 16-bit operands omits the masking required for 32-bit values.  For
+       example, the code generated for the following operations is as follows:
+
+         uint16 a, b, c;
+         a = b + c & 0xFFFF;
+
+            movzwl  _b, %eax
+            addw    _c, %ax
+            movw    %ax, _a
+
+         uint32 x, y, z;
+         x = y + z & 0xFFFF;
+
+            movl    _z, %eax
+            addl    _y, %eax
+            andl    $65535, %eax
+            movl    %eax, _x
+
+       However, the first case uses operand override prefixes, which require
+       substantially more time to decode (6 clock cycles vs. 1 clock cycle).
+       This time outweighs the additional 32-bit AND instruction, which executes
+       in 1 clock cycle.
+
+    2. The MEMORY_WORD type is a 16-bit unsigned type, corresponding with the
+       16-bit main memory in the HP 21xx/1000.  Unlike the general data type,
+       which is a 32-bit type for speed, main memory does not benefit from the
+       faster 32-bit execution on IA-32 processors, as only one instruction in
+       the mem_read and mem_write routines has an operand override that invokes
+       the slower instruction fetch path.  There is a negligible difference in
+       the Memory Pattern Test diagnostic execution speeds for the uint32 vs.
+       uint16 definition, whereas the VM requirements are doubled for the
+       former.
 */
 
-typedef uint16              HP_WORD;                    /* HP 16-bit data word representation */
-
-#define R_MASK              0177777u                    /* 16-bit register mask */
+typedef uint32              HP_WORD;                    /* HP 16-bit data word representation */
+typedef uint16              MEMORY_WORD;                /* HP 16-bit memory word representation */
 
 #define D4_WIDTH            4                           /* 4-bit data bit width */
 #define D4_MASK             0017u                       /* 4-bit data mask */
@@ -267,6 +489,11 @@ typedef uint16              HP_WORD;                    /* HP 16-bit data word r
 #define S32_OVFL_MASK       ((t_uint64) D32_UMAX << D32_WIDTH | \
                               D32_SIGN)                 /* 32-bit signed overflow mask */
 
+#define LSB                 1u                          /* least-significant bit */
+#define D16_SIGN_LSB        (D16_SIGN | LSB)            /* bit 15 and bit 0 */
+
+#define R_MASK              0177777u                    /* 16-bit register mask */
+
 
 /* Memory constants */
 
@@ -293,6 +520,40 @@ typedef uint16              HP_WORD;                    /* HP 16-bit data word r
 #define DV_SMAX             ((1u << (DV_WIDTH - 1)) - 1)    /* data value signed maximum  (2 ** 15 - 1) */
 
 
+/* Memory address macros.
+
+   These macros convert between logical and physical addresses.  The functions
+   provided are:
+
+     - PAGE   -- extract the page number part of a physical address
+     - OFFSET -- extract the offset part of a physical address
+     - TO_PA  -- merge a page number and offset into a physical address
+*/
+
+#define PAGE(p)             ((p) >> PG_WIDTH & PG_MASK)
+#define OFFSET(p)           ((p) & OF_MASK)
+#define TO_PA(b,o)          (((uint32) (b) & PG_MASK) << PG_WIDTH | (uint32) (o) & OF_MASK)
+
+
+/* Memory access classifications.
+
+   The access classification determines the DMS map set and protections to use
+   when reading or writing memory words.  The classification also is used to
+   label each data access when tracing is enabled.  When DMS is disabled, or
+   when the CPU is one of the 21xx models, the classification is irrelevant.
+*/
+
+typedef enum {
+    Fetch,                                      /* instruction fetch, current map */
+    Data,                                       /* data access, current map */
+    Data_Alternate,                             /* data access, alternate map */
+    Data_System,                                /* data access, system map */
+    Data_User,                                  /* data access, user map */
+    DMA_Channel_1,                              /* DMA channel 1, port A map */
+    DMA_Channel_2                               /* DMA channel 2, port B map */
+    } ACCESS_CLASS;
+
+
 /* Portable conversions.
 
    SIMH is written with the assumption that the defined-size types (e.g.,
@@ -302,28 +563,28 @@ typedef uint16              HP_WORD;                    /* HP 16-bit data word r
 
      negative_value_32 = (int32) negative_value_16;
 
-   ...will not guarantee that bits 0-15 of "negative_value_32" are ones, whereas
-   the supplied sign-extension macro will.
+   ...will not guarantee that the upper 16 bits of "negative_value_32" are all
+   ones, whereas the supplied sign-extension macro will.
 
    The conversions available are:
 
-     - SEXT8  -- int8 sign-extended to int32
-     - SEXT16 -- int16 sign-extended to int32
-     - NEG16  -- int8 negated
-     - NEG16  -- int16 negated
-     - NEG32  -- int32 negated
+     - SEXT8  -- signed 8-bit value sign-extended to int32
+     - SEXT16 -- signed 16-bit value sign-extended to int32
+     - NEG8   -- signed 8-bit value negated
+     - NEG16  -- signed 16-bit value negated
+     - NEG32  -- signed 32-bit value negated
      - INT16  -- uint16 to int16
      - INT32  -- uint32 to int32
 
 
    Implementation notes:
 
-    1. The routines assume that 16-bit values are masked to exactly 16 bits
-       before invoking.
+    1. The SEXTn and INTn routines assume that their values are masked to
+       exactly n bits before invoking.
 */
 
-#define SEXT8(x)        (int32) ((x) & D8_SIGN  ? (x) | ~D8_MASK  : (x))
-#define SEXT16(x)       (int32) ((x) & D16_SIGN ? (x) | ~D16_MASK : (x))
+#define SEXT8(x)        ((int32) ((x) & D8_SIGN  ? (x) | ~D8_MASK  : (x)))
+#define SEXT16(x)       ((int32) ((x) & D16_SIGN ? (x) | ~D16_MASK : (x)))
 
 #define NEG8(x)         ((~(x) + 1) & D8_MASK)
 #define NEG16(x)        ((~(x) + 1) & D16_MASK)
@@ -371,12 +632,43 @@ typedef enum {
 #define TO_DWORD(u,l)       ((uint32) (u) << D16_WIDTH | (l))
 
 
-/* Portable conversions (sign-extension, unsigned-to-signed) */
+/* CPU instruction symbolic source.
 
-#define SEXT(x)         ((int32) (((x) & SIGN)? ((x) | ~DMASK): ((x) & DMASK)))
+   The memory-reference group (MRG) instructions do not specify full logical
+   addresses of their targets.  Instead, they specify offsets from either the
+   base page or the current page.  Instructions specifying base-page offsets are
+   always displayed with target addresses between 0000-1777.  The display and
+   parsing of instructions specifying current-page offsets depends on the source
+   of the instructions.
+
+   If the current-page CPU instruction is contained in main memory, the current
+   page is taken from the address of the word containing the instruction, and
+   the full target address between 00000-77777 is displayed or parsed.  However,
+   if the instruction is contained in a device buffer, e.g., a disc drive sector
+   buffer, the destination memory address is unknown until the instruction is
+   transferred to memory.  In this case, the target address is displayed or
+   parsed as the offset prefixed with the letter "C" (e.g., "LDA C 1200").  In
+   order to present the proper symbolic behavior, the mnemonic formatter and
+   parser must know the source of the request.
+
+   Additionally, display requests from the EXAMINE command have preloaded a
+   value array with the maximum number of words required to encode the longest
+   instruction.  This is inefficient, as only a fraction of the instruction set
+   requires more than one word.  For EXAMINE commands entered by the user at the
+   SCP prompt, this is unimportant.  However, for calls from the CPU instruction
+   trace routine, the overhead is significant.  In the latter case, the array is
+   loaded only with a single word, and the mnemonic formatter loads additional
+   words if the specific instruction to be displayed requires them.
+*/
+
+typedef enum {
+    Device_Symbol,                              /* called for an EXAMINE <device> or DEPOSIT <device> command */
+    CPU_Symbol,                                 /* called for an EXAMINE CPU or DEPOSIT CPU command */
+    CPU_Trace                                   /* called for a CPU trace command */
+    } SYMBOL_SOURCE;
 
 
-/* Memory */
+/* Memory constants (deprecated) */
 
 #define MEMSIZE         (cpu_unit.capac)                /* actual memory size */
 #define VA_N_SIZE       15                              /* virtual addr size */
@@ -386,7 +678,7 @@ typedef enum {
 #define PASIZE          (1 << PA_N_SIZE)
 #define PAMASK          (PASIZE - 1)                    /* phys addr mask */
 
-/* Architectural constants */
+/* Architectural constants (deprecated) */
 
 #define SIGN32          020000000000                    /* 32b sign */
 #define DMASK32         037777777777                    /* 32b data mask/maximum value */
@@ -403,20 +695,10 @@ typedef enum {
 
 #define POLL_RATE       100                             /* poll 100 times per second */
 #define POLL_FIRST      1                               /* first poll is "immediate" */
-#define POLL_WAIT       15800                           /* initial poll ~ 10 msec. */
+#define POLL_PERIOD     mS (10)                         /* 10 millisecond poll period */
 
 typedef enum { INITIAL, SERVICE } POLLMODE;             /* poll synchronization modes */
 
-/* I/O instruction sub-opcodes */
-
-#define soHLT           0                               /* halt */
-#define soFLG           1                               /* set/clear flag */
-#define soSFC           2                               /* skip on flag clear */
-#define soSFS           3                               /* skip on flag set */
-#define soMIX           4                               /* merge into A/B */
-#define soLIX           5                               /* load into A/B */
-#define soOTX           6                               /* output from A/B */
-#define soCTL           7                               /* set/clear control */
 
 /* I/O devices - fixed select code assignments */
 
@@ -463,33 +745,6 @@ typedef enum { INITIAL, SERVICE } POLLMODE;             /* poll synchronization 
 #define CRSDEV          006                             /* start of devices that receive CRS */
 #define VARDEV          010                             /* start of variable assignments */
 #define MAXDEV          077                             /* end of select code range */
-
-/* IBL assignments */
-
-#define IBL_V_SEL       14                              /* ROM select <15:14> */
-#define IBL_M_SEL       03
-#define IBL_PTR         0000000                         /* ROM 0: 12992K paper tape reader (PTR) */
-#define IBL_DP          0040000                         /* ROM 1: 12992A 7900 disc (DP) */
-#define IBL_DQ          0060000                         /* ROM 1: 12992A 2883 disc (DQ) */
-#define IBL_MS          0100000                         /* ROM 2: 12992D 7970 tape (MS) */
-#define IBL_DS          0140000                         /* ROM 3: 12992B 7905/06/20/25 disc (DS) */
-#define IBL_MAN         0010000                         /* RPL/manual boot <13:12> */
-#define IBL_V_DEV       6                               /* select code <11:6> */
-#define IBL_OPT         0000070                         /* options in <5:3> */
-#define IBL_DP_REM      0000001                         /* DP removable <0:0> */
-#define IBL_DS_HEAD     0000003                         /* DS head number <1:0> */
-#define IBL_LNT         64                              /* boot ROM length in words */
-#define IBL_MASK        (IBL_LNT - 1)                   /* boot length mask */
-#define IBL_DPC         (IBL_LNT - 2)                   /* DMA ctrl word */
-#define IBL_END         (IBL_LNT - 1)                   /* last location */
-
-#define IBL_S_CLR       0000000                         /* ibl_copy mask to clear the S register */
-#define IBL_S_NOCLR     0177777                         /* ibl_copy mask to preserve the S register */
-#define IBL_S_NOSET     0000000                         /* ibl_copy mask to preserve the S register */
-
-#define IBL_SET_SC(s)   ((s) << IBL_V_DEV)              /* position the select code in the S register */
-
-typedef uint16 BOOT_ROM [IBL_LNT];                      /* boot ROM data */
 
 
 /* I/O backplane signals.
@@ -599,19 +854,49 @@ typedef enum {
 #define D_FF(b)             (FLIP_FLOP) ((b) != 0)      /* use a Boolean expression for a D flip-flop */
 
 
-/* I/O structures */
+/* I/O structures.
 
-typedef struct dib DIB;                                 /* incomplete definition */
+   The Device Information Block (DIB) allows devices to be relocated in the
+   machine's I/O space.  Each DIB contains a pointer to the device interface
+   routine, a value corresponding to the location of the interface card in the
+   CPU's I/O card cage (which determines the card's select code), and a card
+   index if the interface routine services multiple cards.
 
-typedef uint32 IOHANDLER (DIB     *dibptr,              /* I/O signal handler prototype */
-                          IOCYCLE signal_set,
-                          uint32  stat_data);
 
-struct dib {                                            /* Device information block */
-    IOHANDLER  *io_handler;                             /* pointer to device's I/O signal handler */
-    uint32     select_code;                             /* device's select code */
-    uint32     card_index;                              /* device's card index for state variables */
+   Implementation notes:
+
+    1. The select_code and card_index fields could be smaller than the defined
+       32-bit sizes, but IA-32 processors execute instructions with 32-bit
+       operands much faster than those with 16- or 8-bit operands.
+
+    2. The DIB_REGS macro provides hidden register entries needed to save and
+       restore the state of a DIB.  Only the potentially variable fields are
+       referenced.  In particular, the "io_interface" field must not be saved,
+       as the address of the device's interface routine may change from version
+       to version of the simulator.
+*/
+
+#define SC_MAX              077                 /* the maximum select code */
+#define SC_MASK             077u                /* the mask for the select code */
+#define SC_BASE             8                   /* the radix for the select code */
+
+typedef struct dib DIB;                         /* an incomplete definition */
+
+typedef uint32 IOHANDLER                        /* the I/O device interface function prototype */
+    (DIB     *dibptr,                           /*   a pointer to the device information block */
+     IOCYCLE signal_set,                        /*   a set of inbound signals */
+     uint32  stat_data);                        /*   a 32-bit inbound value */
+
+struct dib {                                    /* the Device Information Block */
+    IOHANDLER *io_handler;                      /*   the device's I/O interface function pointer */
+    uint32    select_code;                      /*   the device's select code (02-77) */
+    uint32    card_index;                       /*   the card index if multiple interfaces are supported */
     };
+
+#define DIB_REGS(dib) \
+/*    Macro   Name     Location                    Width  Flags              */ \
+/*    ------  -------  --------------------------  -----  -----------------  */ \
+    { ORDATA (DIBSC,   dib.select_code,             32),  PV_LEFT | REG_HRO }
 
 
 /* I/O signal and status macros.
@@ -654,12 +939,12 @@ struct dib {                                            /* Device information bl
        if the Boolean test B is true.
 */
 
-#define IONEXT(I)       (IOSIGNAL) ((I) & (IOCYCLE) (- (int32) (I)))        /* extract next I/O signal to handle */
+#define IONEXT(I)       (IOSIGNAL) ((I) & ~(I) + 1)                         /* extract next I/O signal to handle */
 #define IOADDSIR(I)     ((I) & IOIRQSET ? (I) | ioSIR : (I))                /* add SIR if IRQ state might change */
 
-#define IORETURN(E,D)   ((uint32) ((E) << 16 | (D) & DMASK))                /* form I/O handler return value */
-#define IOSTATUS(C)     ((t_stat) ((C) >> 16) & DMASK)                      /* extract I/O status from combined value */
-#define IODATA(C)       ((uint16) ((C) & DMASK))                            /* extract data from combined value */
+#define IORETURN(E,D)   ((uint32) ((E) << D16_WIDTH | (D) & D16_MASK))      /* form I/O handler return value */
+#define IOSTATUS(C)     ((t_stat) ((C) >> D16_WIDTH) & D16_MASK)            /* extract I/O status from combined value */
+#define IODATA(C)       ((uint16) ((C) & D16_MASK))                         /* extract data from combined value */
 
 #define IOPOWERON(P)    (P)->io_handler ((P), ioPON | ioPOPIO | ioCRS, 0)   /* send power-on signals to handler */
 #define IOPRESET(P)     (P)->io_handler ((P), ioPOPIO | ioCRS, 0)           /* send PRESET signals to handler */
@@ -736,26 +1021,81 @@ struct dib {                                            /* Device information bl
 #define setstdSRQ(N)    setSRQ (dibptr->select_code, N.flag);
 
 
-/* CPU state */
+/* Bitset formatting.
+
+   See the comments at the "fmt_bitset" function (hp3000_sys.c) for details of
+   the specification of bitset names and format structures.
+*/
+
+typedef enum {                                  /* direction of interpretation */
+    msb_first,                                  /*   left-to-right */
+    lsb_first                                   /*   right-to-left */
+    } BITSET_DIRECTION;
+
+typedef enum {                                  /* alternate names */
+    no_alt,                                     /*   no alternates are present in the name array */
+    has_alt                                     /*   the name array contains alternates */
+    } BITSET_ALTERNATE;
+
+typedef enum {                                  /* trailing separator */
+    no_bar,                                     /*   omit a trailing separator */
+    append_bar                                  /*   append a trailing separator */
+    } BITSET_BAR;
+
+typedef const char *const BITSET_NAME;          /* a bit name string pointer */
+
+typedef struct {                                /* bit set format descriptor */
+    uint32            name_count;               /*   count of bit names */
+    BITSET_NAME       *names;                   /*   pointer to an array of bit names */
+    uint32            offset;                   /*   offset from LSB to first bit */
+    BITSET_DIRECTION  direction;                /*   direction of interpretation */
+    BITSET_ALTERNATE  alternate;                /*   alternate interpretations presence */
+    BITSET_BAR        bar;                      /*   trailing separator choice */
+    } BITSET_FORMAT;
+
+/* Bitset format specifier initialization */
+
+#define FMT_INIT(names,offset,dir,alt,bar) \
+          sizeof (names) / sizeof (names) [0], \
+          (names), (offset), (dir), (alt), (bar)
+
+
+/* System interface global data structures */
+
+extern const HP_WORD odd_parity [256];          /* a table of parity bits for odd parity */
+
+
+/* System interface global SCP support routines declared in scp.h
+
+extern t_stat sim_load   (FILE *fptr, CONST char *cptr, CONST char *fnam, int flag);
+extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val, UNIT *uptr, int32 sw);
+extern t_stat parse_sym  (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw);
+*/
+
+/* System interface global SCP support routines */
+
+extern t_stat hp_attach   (UNIT *uptr, CONST char *cptr);
+extern t_stat hp_set_dib  (UNIT *uptr, int32 count, CONST char *cptr, void *desc);
+extern t_stat hp_show_dib (FILE *st, UNIT *uptr, int32 count, CONST void *desc);
+
+
+/* System interface global utility routines */
+
+extern t_stat fprint_cpu (FILE *ofile, t_addr addr, t_value *val, uint32 radix, SYMBOL_SOURCE source);
+
+extern const char *fmt_char   (uint32 charval);
+extern const char *fmt_bitset (uint32 bitset, const BITSET_FORMAT bitfmt);
+
+extern void   hp_trace           (DEVICE *dptr, uint32 flag, ...);
+extern t_bool hp_device_conflict (void);
+extern void   hp_enbdis_pair     (DEVICE *ccptr, DEVICE *dcptr);
+
+
+/* I/O state */
 
 extern uint32 dev_prl [2], dev_irq [2], dev_srq [2];    /* I/O signal vectors */
 
-/* CPU functions */
-
-extern t_stat ibl_copy       (const BOOT_ROM rom, int32 dev, uint32 sr_clear, uint32 sr_set);
-extern void   hp_enbdis_pair (DEVICE *ccp, DEVICE *dcp);
-
-/* System functions */
-
-extern const char *fmt_char   (uint8 ch);
-extern t_stat      hp_setsc   (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-extern t_stat      hp_setdev  (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-extern t_stat      hp_showsc  (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
-extern t_stat      hp_showdev (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
-extern t_bool      hp_fprint_stopped (FILE *st, t_stat reason);
 
 /* Device-specific functions */
 
 extern int32 sync_poll (POLLMODE poll_mode);
-
-#endif

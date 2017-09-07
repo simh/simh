@@ -1,31 +1,35 @@
-/* hp2100_dq.c: HP 2100 12565A disk simulator
+/* hp2100_dq.c: HP 2100 12565A Disc Interface and 2883 disc drive simulator
 
    Copyright (c) 1993-2006, Bill McDermith
-   Copyright (c) 2004-2016 J. David Bryan
+   Copyright (c) 2004-2017, J. David Bryan
 
-   Permission is hereby granted, free of charge, to any person obtaining a
-   copy of this software and associated documentation files (the "Software"),
-   to deal in the Software without restriction, including without limitation
-   the rights to use, copy, modify, merge, publish, distribute, sublicense,
-   and/or sell copies of the Software, and to permit persons to whom the
-   Software is furnished to do so, subject to the following conditions:
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
 
    The above copyright notice and this permission notice shall be included in
    all copies or substantial portions of the Software.
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+   AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
    Except as contained in this notice, the names of the authors shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
-   DQ           12565A 2883 disk system
+   DQ           12565A Disc Interface and 2883 disc drive
 
+   03-Aug-17    JDB     Changed perror call for I/O errors to cprintf
+   11-Jul-17    JDB     Renamed "ibl_copy" to "cpu_ibl"
+   09-Mar-17    JDB     Deprecated LOCKED/WRITEENABLED for PROTECT/UNPROTECT
+   27-Feb-17    JDB     ibl_copy no longer returns a status code
    13-May-16    JDB     Modified for revised SCP API function parameter types
    30-Dec-14    JDB     Added S-register parameters to ibl_copy
    24-Dec-14    JDB     Added casts for explicit downward conversions
@@ -52,10 +56,11 @@
    09-Jan-02    WOM     Copied dp driver and mods for 2883
 
    Reference:
-   - 12565A Disc Interface Kit Operating and Service Manual (12565-90003, Aug-1973)
+     - 12565A Disc Interface Kit Operating and Service Manual
+         (12565-90003, August 1973)
 
 
-   Differences between 12559/13210 and 12565 controllers
+   Differences between 12559/13210 and 12565 controllers:
    - 12565 stops transfers on address miscompares; 12559/13210 only stops writes
    - 12565 does not set error on positioner busy
    - 12565 does not set positioner busy if already on cylinder
@@ -82,7 +87,12 @@
      1. Read Address command starts at the sector number in the RAR.
 */
 
+
+
 #include "hp2100_defs.h"
+#include "hp2100_cpu.h"
+
+
 
 #define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
 #define UNIT_V_UNLOAD   (UNIT_V_UF + 1)                 /* heads unloaded */
@@ -234,9 +244,11 @@ REG dqd_reg[] = {
     { NULL }
     };
 
-MTAB dqd_mod[] = {
-    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &dqd_dev },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &dqd_dev },
+MTAB dqd_mod [] = {
+/*    Entry Flags          Value  Print String  Match String  Validation    Display        Descriptor       */
+/*    -------------------  -----  ------------  ------------  ------------  -------------  ---------------- */
+    { MTAB_XDV,              2u,  "SC",         "SC",         &hp_set_dib,  &hp_show_dib,  (void *) &dq_dib },
+    { MTAB_XDV | MTAB_NMO,  ~2u,  "DEVNO",      "DEVNO",      &hp_set_dib,  &hp_show_dib,  (void *) &dq_dib },
     { 0 }
     };
 
@@ -288,13 +300,20 @@ REG dqc_reg[] = {
     { NULL }
     };
 
-MTAB dqc_mod[] = {
-    { UNIT_UNLOAD, UNIT_UNLOAD, "heads unloaded", "UNLOADED", dqc_load_unload },
-    { UNIT_UNLOAD, 0, "heads loaded", "LOADED", dqc_load_unload },
-    { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
-    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &dqd_dev },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &dqd_dev },
+MTAB dqc_mod [] = {
+/*    Mask Value    Match Value   Print String       Match String     Validation         Display  Descriptor */
+/*    ------------  ------------  -----------------  ---------------  -----------------  -------  ---------- */
+    { UNIT_UNLOAD,  UNIT_UNLOAD,  "heads unloaded",  "UNLOADED",      &dqc_load_unload,  NULL,    NULL       },
+    { UNIT_UNLOAD,  0,            "heads loaded",    "LOADED",        &dqc_load_unload,  NULL,    NULL       },
+    { UNIT_WLK,     UNIT_WLK,     "protected",       "PROTECT",       NULL,              NULL,    NULL       },
+    { UNIT_WLK,     0,            "unprotected",     "UNPROTECT",     NULL,              NULL,    NULL       },
+    { UNIT_WLK,     UNIT_WLK,     NULL,              "LOCKED",        NULL,              NULL,    NULL       },
+    { UNIT_WLK,     0,            NULL,              "WRITEENABLED",  NULL,              NULL,    NULL       },
+
+/*    Entry Flags          Value  Print String  Match String  Validation    Display        Descriptor       */
+/*    -------------------  -----  ------------  ------------  ------------  -------------  ---------------- */
+    { MTAB_XDV,              2u,  "SC",         "SC",         &hp_set_dib,  &hp_show_dib,  (void *) &dq_dib },
+    { MTAB_XDV | MTAB_NMO,  ~2u,  "DEVNO",      "DEVNO",      &hp_set_dib,  &hp_show_dib,  (void *) &dq_dib },
     { 0 }
     };
 
@@ -821,8 +840,10 @@ dqcio (&dqc_dib, ioENF, 0);                             /* set cch flg */
 dqc_busy = 0;                                           /* ctlr is free */
 dqd_xfer = dqd_wval = 0;
 if (err != 0) {                                         /* error? */
-    perror ("DQ I/O error");
-    clearerr (uptr->fileref);
+    cprintf ("%s simulator DQ disc I/O error: %s\n",    /*   then report the error to the console */
+             sim_name, strerror (errno));
+
+    clearerr (uptr->fileref);                           /* clear the error */
     return SCPE_IOERR;
     }
 return SCPE_OK;
@@ -970,9 +991,8 @@ const int32 dev = dqd_dib.select_code;                  /* data chan select code
 if (unitno != 0)                                        /* boot supported on drive unit 0 only */
     return SCPE_NOFNC;                                  /* report "Command not allowed" if attempted */
 
-if (ibl_copy (dq_rom, dev, IBL_OPT,                     /* copy the boot ROM to memory and configure */
-              IBL_DQ | IBL_SET_SC (dev)))               /*   the S register accordingly */
-    return SCPE_IERR;                                   /* return an internal error if the copy failed */
-else
-    return SCPE_OK;
+cpu_ibl (dq_rom, dev, IBL_OPT,                          /* copy the boot ROM to memory and configure */
+         IBL_DQ | IBL_SET_SC (dev));                    /*   the S register accordingly */
+
+return SCPE_OK;
 }

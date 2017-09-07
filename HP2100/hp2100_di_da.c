@@ -25,6 +25,10 @@
 
    DA           12821A Disc Interface with Amigo disc drives
 
+   11-Jul-17    JDB     Renamed "ibl_copy" to "cpu_ibl"
+   15-Mar-17    JDB     Changed DEBUG_PRI calls to tprintfs
+   09-Mar-17    JDB     Deprecated LOCKED/WRITEENABLED for PROTECT/UNPROTECT
+   27-Feb-17    JDB     ibl_copy no longer returns a status code
    17-Jan-17    JDB     Changed to use new byte accessors in hp2100_defs.h
    13-May-16    JDB     Modified for revised SCP API function parameter types
    04-Mar-16    JDB     Name changed to "hp2100_disclib" until HP 3000 integration
@@ -345,6 +349,7 @@
 
 
 #include "hp2100_defs.h"
+#include "hp2100_cpu.h"
 #include "hp2100_di.h"
 #include "hp2100_disclib.h"
 
@@ -553,20 +558,25 @@ REG da_reg [] = {
     };
 
 MTAB da_mod [] = {
-    DI_MODS (da_dev),
+    DI_MODS (da_dev, da_dib),
 
-    { UNIT_UNLOAD, UNIT_UNLOAD, "heads unloaded",  "UNLOADED",     &da_load_unload, NULL, NULL },
-    { UNIT_UNLOAD, 0,           "heads loaded",    "LOADED",       &da_load_unload, NULL, NULL },
+/*    Mask Value    Match Value   Print String       Match String     Validation        Display  Descriptor */
+/*    ------------  ------------  -----------------  ---------------  ----------------  -------  ---------- */
+    { UNIT_UNLOAD,  UNIT_UNLOAD,  "heads unloaded",  "UNLOADED",      &da_load_unload,  NULL,    NULL       },
+    { UNIT_UNLOAD,  0,            "heads loaded",    "LOADED",        &da_load_unload,  NULL,    NULL       },
 
-    { UNIT_WLK,    UNIT_WLK,    "write locked",    "LOCKED",       NULL,            NULL, NULL },
-    { UNIT_WLK,    0,           "write enabled",   "WRITEENABLED", NULL,            NULL, NULL },
+    { UNIT_WLK,     UNIT_WLK,     "protected",       "PROTECT",       NULL,             NULL,    NULL       },
+    { UNIT_WLK,     0,            "unprotected",     "UNPROTECT",     NULL,             NULL,    NULL       },
 
-    { UNIT_FMT,    UNIT_FMT,    "format enabled",  "FORMAT",       NULL,            NULL, NULL },
-    { UNIT_FMT,    0,           "format disabled", "NOFORMAT",     NULL,            NULL, NULL },
+    { UNIT_WLK,     UNIT_WLK,     NULL,              "LOCKED",        NULL,             NULL,    NULL       },
+    { UNIT_WLK,     0,            NULL,              "WRITEENABLED",  NULL,             NULL,    NULL       },
 
-    { UNIT_MODEL,  MODEL_7906,  "7906H",           "7906H",        &dl_set_model,   NULL, NULL },
-    { UNIT_MODEL,  MODEL_7920,  "7920H",           "7920H",        &dl_set_model,   NULL, NULL },
-    { UNIT_MODEL,  MODEL_7925,  "7925H",           "7925H",        &dl_set_model,   NULL, NULL },
+    { UNIT_FMT,     UNIT_FMT,     "format enabled",  "FORMAT",        NULL,             NULL,    NULL       },
+    { UNIT_FMT,     0,            "format disabled", "NOFORMAT",      NULL,             NULL,    NULL       },
+
+    { UNIT_MODEL,   MODEL_7906,   "7906H",           "7906H",         &dl_set_model,    NULL,    NULL       },
+    { UNIT_MODEL,   MODEL_7920,   "7920H",           "7920H",         &dl_set_model,    NULL,    NULL       },
+    { UNIT_MODEL,   MODEL_7925,   "7925H",           "7925H",         &dl_set_model,    NULL,    NULL       },
 
     { 0 }
     };
@@ -807,9 +817,8 @@ switch (if_state [unit]) {                                  /* dispatch the inte
                 if_state [unit] = read_xfer;                /* we are ready to transfer the data */
                 uptr->wait = cvptr->cmd_time;               /* schedule the transfer */
 
-                if (DEBUG_PRI (da_dev, DEB_RWSC))
-                    fprintf (sim_deb, ">>DA rwsc: Unit %d Amigo identify response %04XH\n",
-                             unit, buffer [0]);
+                tprintf (da_dev, DEB_RWSC, "Unit %d Amigo identify response %04XH\n",
+                         unit, buffer [0]);
                 break;
 
 
@@ -967,36 +976,31 @@ switch (if_state [unit]) {                                  /* dispatch the inte
 if (uptr->wait)                                             /* is service requested? */
     activate_unit (uptr);                                   /* schedule the next event */
 
-if (result == SCPE_IERR && DEBUG_PRI (da_dev, DEB_RWSC)) {  /* did an internal error occur? */
-    fprintf (sim_deb, ">>DA rwsc: Unit %d ", unit);         /* report it if debugging */
-
+if (result == SCPE_IERR)                                    /* did an internal error occur? */
     if (if_state [unit] == command_exec
       && if_command [unit] == disc_command)
-        fprintf (sim_deb, "%s command %s phase ",
+        tprintf (da_dev, DEB_RWSC, "Unit %d %s command %s phase service not handled\n",
+                 unit,
                  dl_opcode_name (ICD, (CNTLR_OPCODE) uptr->OP),
                  dl_phase_name ((CNTLR_PHASE) uptr->PHASE));
     else
-        fprintf (sim_deb, "%s state %s ",
+        tprintf (da_dev, DEB_RWSC, "Unit %d %s state %s service not handled\n",
+                 unit,
                  if_command_name [if_command [unit]],
                  if_state_name [if_state [unit]]);
-
-    fputs ("service not handled\n", sim_deb);
-    }
 
 if (if_state [unit] == idle) {                              /* is the command now complete? */
     if (if_command [unit] == disc_command) {                /* did a disc command complete? */
         if (cvptr->opcode != End)                           /* yes; if the command was not End, */
             di_poll_response (da, unit, SET);               /*   then enable PPR */
 
-        if (DEBUG_PRI (da_dev, DEB_RWSC))
-            fprintf (sim_deb, ">>DA rwsc: Unit %d %s disc command completed\n",
-                     unit, dl_opcode_name (ICD, cvptr->opcode));
+        tprintf (da_dev, DEB_RWSC, "Unit %d %s disc command completed\n",
+                 unit, dl_opcode_name (ICD, cvptr->opcode));
         }
 
     else                                                    /* an interface command completed */
-        if (DEBUG_PRI (da_dev, DEB_RWSC))
-            fprintf (sim_deb, ">>DA rwsc: Unit %d %s command completed\n",
-                     unit, if_command_name [if_command [unit]]);
+        tprintf (da_dev, DEB_RWSC, "Unit %d %s command completed\n",
+                 unit, if_command_name [if_command [unit]]);
 
     if (release_interface)                                  /* if the next command is already pending */
         di_bus_control (da, unit, 0, BUS_NRFD);             /*   deny NRFD to allow the card to resume */
@@ -1214,15 +1218,14 @@ static const BOOT_ROM da_rom = {
 
 t_stat da_boot (int32 unitno, DEVICE *dptr)
 {
-if (GET_BUSADR (da_unit [unitno].flags) != 0)               /* booting is supported on bus address 0 only */
-    return SCPE_NOFNC;                                      /* report "Command not allowed" if attempted */
+if (GET_BUSADR (da_unit [unitno].flags) != 0)           /* booting is supported on bus address 0 only */
+    return SCPE_NOFNC;                                  /* report "Command not allowed" if attempted */
 
-if (ibl_copy (da_rom, da_dib.select_code,               /* copy the boot ROM to memory and configure */
-              IBL_OPT | IBL_DS_HEAD,                    /*   the S register accordingly */
-              IBL_DS | IBL_MAN | IBL_SET_SC (da_dib.select_code)))
-    return SCPE_IERR;                                   /* return an internal error if the copy failed */
-else
-    return SCPE_OK;
+cpu_ibl (da_rom, da_dib.select_code,                    /* copy the boot ROM to memory and configure */
+         IBL_OPT | IBL_DS_HEAD,                         /*   the S register accordingly */
+         IBL_DS | IBL_MAN | IBL_SET_SC (da_dib.select_code));
+
+return SCPE_OK;
 }
 
 
@@ -1451,8 +1454,7 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
                 case 0x04:                                  /* selected device clear */
                 case 0x05:                                  /* SDC with parity freeze */
                 case 0x14:                                  /* universal clear */
-                    if (DEBUG_PRI (da_dev, DEB_RWSC))
-                        fprintf (sim_deb, ">>DA rwsc: Unit %d device cleared\n", unit);
+                    tprintf (da_dev, DEB_RWSC, "Unit %d device cleared\n", unit);
 
                     sim_cancel (&da_unit [unit]);           /* cancel any in-progress command */
                     dl_idle_controller (&icd_cntlr [unit]); /* idle the controller */
@@ -1460,7 +1462,7 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
                     if_state [unit] = idle;                 /* idle the interface */
                     di_poll_response (da, unit, SET);       /* enable PPR */
 
-                    if (DEBUG_PRI (da_dev, DEB_XFER))
+                    if (TRACING (da_dev, DEB_XFER))
                         strcpy (action, "device clear");
                     break;
 
@@ -1482,7 +1484,7 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
                 addressed = TRUE;                           /* unit is now addressed */
                 stopped_talking = TRUE;                     /* MLA stops the unit from talking */
 
-                if (DEBUG_PRI (da_dev, DEB_XFER))
+                if (TRACING (da_dev, DEB_XFER))
                     sprintf (action, "listen %d", message_address);
                 }
 
@@ -1491,7 +1493,7 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
 
                 stopped_listening = TRUE;                   /* UNL stops the unit from listening */
 
-                if (DEBUG_PRI (da_dev, DEB_XFER))
+                if (TRACING (da_dev, DEB_XFER))
                     strcpy (action, "unlisten");
                 }
 
@@ -1511,7 +1513,7 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
                 addressed = TRUE;                           /* the unit is now addressed */
                 stopped_listening = TRUE;                   /* MTA stops the unit from listening */
 
-                if (DEBUG_PRI (da_dev, DEB_XFER))
+                if (TRACING (da_dev, DEB_XFER))
                     sprintf (action, "talk %d", message_address);
                 }
 
@@ -1524,7 +1526,7 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
                     accepted = FALSE;                       /*   are not accepted */
 
                 else                                        /* it's an Untalk */
-                    if (DEBUG_PRI (da_dev, DEB_XFER))
+                    if (TRACING (da_dev, DEB_XFER))
                         strcpy (action, "untalk");
                 }
 
@@ -1670,7 +1672,7 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
 
 
             if (accepted) {                                 /* was the command accepted? */
-                if (DEBUG_PRI (da_dev, DEB_XFER))
+                if (TRACING (da_dev, DEB_XFER))
                     sprintf (action, "secondary %02XH", message_address);
 
                 if (if_command [unit] != amigo_identify)    /* disable PPR for all commands */
@@ -1685,8 +1687,7 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
         if_state [unit] = command_wait;                     /* change the interface state to wait */
         di_bus_control (da, unit, BUS_NRFD, 0);             /*   and assert NRFD to hold off the card */
 
-        if (DEBUG_PRI (da_dev, DEB_RWSC))
-            fprintf (sim_deb, ">>DA rwsc: Unit %d addressed while controller is busy\n", unit);
+        tprintf (da_dev, DEB_RWSC, "Unit %d addressed while controller is busy\n", unit);
         }
 
     if (stopped_listening) {                                /* was the unit Unlistened? */
@@ -1715,7 +1716,7 @@ else {                                                      /* it is bus data (A
     switch (if_state [unit]) {                              /* dispatch the interface state */
 
         case opcode_wait:                                   /* waiting for an opcode */
-            if (DEBUG_PRI (da_dev, DEB_XFER))
+            if (TRACING (da_dev, DEB_XFER))
                 sprintf (action, "opcode %02XH", data & DL_OPCODE_MASK);
 
             buffer [0] = TO_WORD (data, 0);                 /* set the opcode into the buffer */
@@ -1737,7 +1738,7 @@ else {                                                      /* it is bus data (A
 
 
         case parameter_wait:                                /* waiting for a parameter */
-            if (DEBUG_PRI (da_dev, DEB_XFER))
+            if (TRACING (da_dev, DEB_XFER))
                 sprintf (action, "parameter %02XH", data);
 
             put_buffer_byte (&icd_cntlr [unit], data);      /* add the byte to the buffer */
@@ -1761,7 +1762,7 @@ else {                                                      /* it is bus data (A
             /* fall into error_sink handler */
 
         case error_sink:                                        /* sinking data after an error */
-            if (DEBUG_PRI (da_dev, DEB_XFER))
+            if (TRACING (da_dev, DEB_XFER))
                 sprintf (action, "data %03o", data);
 
             if (di [da].bus_cntl & BUS_EOI)                     /* is this the last byte from the bus? */
@@ -1777,26 +1778,26 @@ else {                                                      /* it is bus data (A
             abort_command (unit, io_program_error,          /* report the error */
                            error_sink);                     /*   and sink any data that follows */
 
-            if (DEBUG_PRI (da_dev, DEB_XFER))
+            if (TRACING (da_dev, DEB_XFER))
                 sprintf (action, "unhandled data %03o", data);
             break;
         }
     }
 
 
-if (accepted && DEBUG_PRI (da_dev, DEB_XFER))
-    fprintf (sim_deb, ">>DA xfer: HP-IB address %d accepted %s\n",
+if (accepted)
+    tprintf (da_dev, DEB_XFER, "HP-IB address %d accepted %s\n",
              GET_BUSADR (da_unit [unit].flags), action);
 
 if (da_unit [unit].wait > 0)                            /* was service requested? */
     activate_unit (&da_unit [unit]);                    /* schedule the unit */
 
-if (initiated && DEBUG_PRI (da_dev, DEB_RWSC))
+if (initiated)
     if (if_command [unit] == disc_command)
-        fprintf (sim_deb, ">>DA rwsc: Unit %d position %" T_ADDR_FMT "d %s disc command initiated\n",
+        tprintf (da_dev, DEB_RWSC, "Unit %d position %" T_ADDR_FMT "d %s disc command initiated\n",
                  unit, da_unit [unit].pos, dl_opcode_name (ICD, icd_cntlr [unit].opcode));
     else
-        fprintf (sim_deb, ">>DA rwsc: Unit %d %s command initiated\n",
+        tprintf (da_dev, DEB_RWSC, "Unit %d %s command initiated\n",
                  unit, if_command_name [if_command [unit]]);
 
 return accepted;                                        /* indicate the acceptance condition */
@@ -2123,15 +2124,10 @@ return;
 
 static t_stat activate_unit (UNIT *uptr)
 {
-int32 unit;
 t_stat result;
 
-if (DEBUG_PRI (da_dev, DEB_SERV)) {
-    unit = uptr - da_unit;
-
-    fprintf (sim_deb, ">>DA serv: Unit %d state %s delay %d service scheduled\n",
-             unit, if_state_name [if_state [unit]], uptr->wait);
-    }
+tprintf (da_dev, DEB_SERV, "Unit %d state %s delay %d service scheduled\n",
+         uptr - da_unit, if_state_name [if_state [uptr - da_unit]], uptr->wait);
 
 result = sim_activate (uptr, uptr->wait);               /* activate the unit */
 uptr->wait = 0;                                         /* reset the activation time */

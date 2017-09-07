@@ -1,4 +1,4 @@
-/* hp2100_mpx.c: HP 12792C eight-channel asynchronous multiplexer simulator
+/* hp2100_mpx.c: HP 2100 12792C 8-Channel Asynchronous Multiplexer
 
    Copyright (c) 2008-2017, J. David Bryan
 
@@ -23,9 +23,14 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the author.
 
-   MPX          12792C 8-channel multiplexer card
+   MPX          12792C 8-Channel Asynchronous Multiplexer
 
+   26-Jul-17    JDB     Changed BITFIELD macros to field constructors
    22-Apr-17    JDB     Corrected missing compound statements
+   15-Mar-17    JDB     Trace flags are now global
+                        Changed DEBUG_PRI calls to tprintfs
+   10-Mar-17    JDB     Added IOBUS to the debug table
+   17_Jan_17    JDB     Changed "hp_---sc" and "hp_---dev" to "hp_---_dib"
    02-Aug-16    JDB     Burst-fill only the first receive buffer in fast mode
    28-Jul-16    JDB     Fixed buffer ready check at read completion
                         Fixed terminate on character counts > 254
@@ -46,16 +51,18 @@
    26-May-08    JDB     Created MPX device
 
    References:
-   - HP 12792B 8-Channel Asynchronous Multiplexer Subsystem Installation and
-        Reference Manual (12792-90020, Jul-1984)
-   - HP 12792B/C 8-Channel Asynchronous Multiplexer Subsystem User's Manual
-        (5955-8867, Jun-1993)
-   - HP 12792B/C 8-Channel Asynchronous Multiplexer Subsystem Configuration Guide
-        (5955-8868, Jun-1993)
-   - HP 1000 series 8-channel Multiplexer Firmware External Reference Specification
-        (October 19, 1982)
-   - HP 12792/12040 Multiplexer Firmware Source (24999-18312, revision C)
-   - Zilog Components Data Book (00-2034-04, 1985)
+     - HP 12792B 8-Channel Asynchronous Multiplexer Subsystem Installation and Reference Manual
+          (12792-90020, July 1984)
+     - HP 12792B/C 8-Channel Asynchronous Multiplexer Subsystem User's Manual
+          (5955-8867, Jun e1993)
+     - HP 12792B/C 8-Channel Asynchronous Multiplexer Subsystem Configuration Guide
+          (5955-8868, June 1993)
+     - HP 1000 series 8-channel Multiplexer Firmware External Reference Specification
+          (October 19, 1982)
+     - HP 12792/12040 Multiplexer Firmware Source
+          (24999-18312, revision C)
+     - Zilog Components Data Book
+          (00-2034-04, 1985)
 
 
    The 12792A/B/C/D was an eight-line asynchronous serial multiplexer that
@@ -146,136 +153,155 @@
 */
 
 
+
 #include <ctype.h>
 
 #include "hp2100_defs.h"
+
 #include "sim_tmxr.h"
 
 
-/* Bitfield constructor.
 
-   Given a bitfield starting bit number and width in bits, declare two
-   constants: one for the starting bit number, and one for the positioned field
-   mask.  That is, given a definition such as:
+/* Bitfield constructors.
 
-     BITFIELD(SMALLFIELD,5,2)
+   Most of the control and status words used by the multiplexer are encoded into
+   fields of varying lengths.  Traditionally, field accessors have been defined
+   as macro definitions of numeric values.  For example, a flag in bit 15 and a
+   two-bit field occupying bits 12-11 would be defined as:
 
-   ...this macro produces:
+     #define CHAR_ECHO      0100000u
+     #define CHAR_SIZE      0014000u
+     #define SIZE_A         0004000u
+     #define SIZE_B         0010000u
 
-     static const uint32 SMALLFIELD_V = 5;
-     static const uint32 SMALLFIELD = ((1 << (2)) - 1) << (5);
+     #define CHAR_SHIFT     11
+     #define GET_SIZE(v)    (((v) & CHAR_SIZE) >> CHAR_SHIFT)
 
-   The latter reduces to 3 << 5, or 0x00000060.
+   A drawback is that mental conversion is necessary to determine the affected
+   bits for, e.g., CHAR_SIZE.  It would be better if the bit numbers were
+   explicit.  This is what the bitfield constructors attempt to do.
 
-   Note: C requires constant expressions in initializers for objects with static
-   storage duration, so initializing a static object with a BITFIELD value is
-   illegal (a "static const" object is not a constant!).
+   Four constructors are provided:
+
+     BIT(n)     -- a value corresponding to bit number "n".
+     FIELD(h,l) -- a mask corresponding to bits "h" through "l" inclusive.
+
+     FIELD_TO(h,l,v) -- a value extracted from field "h" through "l" of word "v".
+     TO_FIELD(h,l,v) -- a value "v" aligned to a field in bits "h" through "l".
+
+   With these constructors, the above definitions would be rewritten as follows:
+
+     #define CHAR_ECHO      BIT (15)
+     #define CHAR_SIZE      FIELD (12, 11)
+     #define SIZE_A         TO_FIELD (12, 11, 1)
+     #define SIZE_B         TO_FIELD (12, 11, 2)
+
+     #define GET_SIZE(v)    FIELD_TO (12, 11, v)
+
+   With optimization, the above macro expanstions reduce to the equivalent
+   numeric values.  Hopefully, these will be easier to maintain than octal
+   literals.
 */
 
-#define BITFIELD(NAME,STARTBIT,BITWIDTH) \
-    static const uint32 NAME ## _V = STARTBIT; \
-    static const uint32 NAME = ((1 << (BITWIDTH)) - 1) << (STARTBIT);
+#undef BIT                                      /* undefine any prior sim_defs.h usage */
+#undef FIELD                                    /* undefine any prior sim_defs.h usage */
+#undef FIELD_TO                                 /* undefine any prior sim_defs.h usage */
+#undef TO_FIELD                                 /* undefine any prior sim_defs.h usage */
+
+#define BIT(b)              (1u << (b))
+#define FIELD(h,l)          (BIT ((h) - (l) + 1) - 1 << (l))
+
+#define FIELD_TO(h,l,v)     (((unsigned) (v) & FIELD (h, l)) >> (l))
+#define TO_FIELD(h,l,v)     ((unsigned) (v) << (l) & FIELD (h, l))
 
 
 /* Program constants */
 
-#define MPX_DATE_CODE   2416                            /* date code for C firmware */
+#define MPX_DATE_CODE       2416                /* date code for C firmware */
 
-#define RD_BUF_SIZE     514                             /* read buffer size */
-#define WR_BUF_SIZE     514                             /* write buffer size */
+#define RD_BUF_SIZE         514                 /* read buffer size */
+#define WR_BUF_SIZE         514                 /* write buffer size */
 
-#define RD_BUF_LIMIT    254                             /* read buffer limit */
-#define WR_BUF_LIMIT    254                             /* write buffer limit */
+#define RD_BUF_LIMIT        254                 /* read buffer limit */
+#define WR_BUF_LIMIT        254                 /* write buffer limit */
 
-#define KEY_DEFAULT     255                             /* default port key */
+#define KEY_DEFAULT         255                 /* default port key */
 
 
 /* Service times:
 
-     DATA_DELAY  = 1.25 us (Z80 DMA data word transfer time)
-     PARAM_DELAY =  25 us (STC to STF for first word of two-word command)
-     CMD_DELAY   = 400 us (STC to STF for one or two-word command execution)
+     DATA_DELAY  = Z80 DMA data word transfer time
+     PARAM_DELAY = STC to STF for first word of two-word command
+     CMD_DELAY   = STC to STF for one or two-word command execution
 */
 
-#define DATA_DELAY        2                             /* data transfer time */
-#define PARAM_DELAY      40                             /* parameter request time */
-#define CMD_DELAY       630                             /* command completion time */
+#define DATA_DELAY          uS (1.25)           /* data transfer time */
+#define PARAM_DELAY         uS (25)             /* parameter request time */
+#define CMD_DELAY           uS (400)            /* command completion time */
 
 
 /* Unit references */
 
-#define MPX_PORTS       8                               /* number of visible units */
-#define MPX_CNTLS       2                               /* number of control units */
+#define MPX_PORTS           8                  /* number of visible units */
+#define MPX_CNTLS           2                  /* number of control units */
 
-#define mpx_cntl        (mpx_unit [MPX_PORTS + 0])      /* controller unit */
-#define mpx_poll        (mpx_unit [MPX_PORTS + 1])      /* Telnet polling unit */
+#define mpx_cntl            (mpx_unit [MPX_PORTS + 0])      /* controller unit */
+#define mpx_poll            (mpx_unit [MPX_PORTS + 1])      /* Telnet polling unit */
 
 
 /* Character constants */
 
-#define EOT             '\004'
-#define ENQ             '\005'
-#define ACK             '\006'
-#define BS              '\010'
-#define LF              '\012'
-#define CR              '\015'
-#define DC1             '\021'
-#define DC2             '\022'
-#define DC3             '\023'
-#define ESC             '\033'
-#define RS              '\036'
-#define DEL             '\177'
+#define EOT                 '\004'
+#define ENQ                 '\005'
+#define ACK                 '\006'
+#define BS                  '\010'
+#define LF                  '\012'
+#define CR                  '\015'
+#define DC1                 '\021'
+#define DC2                 '\022'
+#define DC3                 '\023'
+#define ESC                 '\033'
+#define RS                  '\036'
+#define DEL                 '\177'
 
-#define XON             DC1
-#define XOFF            DC3
+#define XON                 DC1
+#define XOFF                DC3
 
 
 /* Device flags */
 
-#define DEV_V_REV_D     (DEV_V_UF + 0)                  /* firmware revision D (not implemented) */
-
-#define DEV_REV_D       (1 << DEV_V_REV_D)
+#define DEV_REV_D           BIT (DEV_V_UF + 0)  /* firmware revision D (not implemented) */
 
 
 /* Unit flags */
 
-#define UNIT_V_FASTTIME (UNIT_V_UF + 0)                 /* fast timing mode */
-#define UNIT_V_CAPSLOCK (UNIT_V_UF + 1)                 /* caps lock mode */
-
-#define UNIT_FASTTIME   (1 << UNIT_V_FASTTIME)
-#define UNIT_CAPSLOCK   (1 << UNIT_V_CAPSLOCK)
-
-
-/* Debug flags */
-
-#define DEB_CMDS        (1 << 0)                        /* commands and status */
-#define DEB_CPU         (1 << 1)                        /* CPU I/O */
-#define DEB_BUF         (1 << 2)                        /* buffer gets and puts */
-#define DEB_XFER        (1 << 3)                        /* character reads and writes */
+#define UNIT_FASTTIME       BIT (UNIT_V_UF + 0) /* fast timing mode */
+#define UNIT_CAPSLOCK       BIT (UNIT_V_UF + 1) /* caps lock mode */
 
 
 /* Multiplexer commands for revisions A/B/C.
 
+   The CPU outputs commands to the interface with the OTA and OTB instructions.
    Commands are either one or two words in length.  The one-word format is:
 
-     +-------------------------------+-------------------------------+
-     | 0 . 1 |    command opcode     |       command parameter       |
-     +-------------------------------+-------------------------------+
-                  15 - 8                           7 - 0
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | 0 | 1 |    command opcode     |       command parameter       |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
    The two-word format is:
 
-     +-------------------------------+-------------------------------+
-     | 1 . 1 |    command opcode     |        command value          |
-     +-------------------------------+-------------------------------+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | 1 | 1 |    command opcode     |        command value          |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      |                       command parameter                       |
-     +---------------------------------------------------------------+
-                  15 - 8                           7 - 0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
    Commands implemented by firmware revision:
 
-     Rev  Cmd  Value  Operation                        Status Value(s) Returned
-     ---  ---  -----  -------------------------------  -------------------------------
+     Rev  Cmd  Param  Operation                        Status Value(s) Returned
+     ---  ---  -----  -------------------------------  ------------------------
      ABC  100    -    No operation                     000000
      ABC  101    -    Reset to power-on defaults       100000
      ABC  102    -    Enable unsolicited input         None, unless UI pending
@@ -293,6 +319,8 @@
      -BC  144    -    Exit VCP mode                    000000
      -BC  157    -    Enter VCP mode                   000000
 
+     Rev  Cmd  Value  Operation                        Status Value(s) Returned
+     ---  ---  -----  -------------------------------  ----------------------------------
      ABC  300    -    No operation                     000000
      ABC  301   key   Request write buffer             000000 or 000376
      ABC  302   key   Write data to buffer             (none)
@@ -308,278 +336,572 @@
      -BC  315   key   Get modem/port status            modem status or 000200 if no modem
      -BC  316   key   Enable/disable modem loopback    000000 or 140000 if no modem
      -BC  320   key   Terminate active receive buffer  000000
+
+   Simple parameter words for commands 301-320 are:
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |                            unused                             | 300
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |                requested buffer size in bytes                 | 301
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |                   character count in bytes                    | 305
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |                     read length in bytes                      | 307
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |                   size of download in bytes                   | 307
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |                            unused                             | 315
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |                            unused                             | 320
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   The remaining commands have parameter words containing bit fields.  These are
+   described below.
 */
+
+#define CN_OPCODE(w)        FIELD_TO (15, 8, w)
+#define CN_KEY(w)           FIELD_TO ( 7, 0, w)
 
 
 /* One-word command codes */
 
-#define CMD_NOP         0100                            /* No operation */
-#define CMD_RESET       0101                            /* Reset firmware to power-on defaults */
-#define CMD_ENABLE_UI   0102                            /* Enable unsolicited input */
-#define CMD_DISABLE     0103                            /* Disable interrupts / Abort DMA Transfer */
-#define CMD_ACK         0104                            /* Acknowledge */
-#define CMD_CANCEL      0105                            /* Cancel first receive buffer */
-#define CMD_CANCEL_ALL  0106                            /* Cancel all received buffers */
-#define CMD_BINARY_READ 0107                            /* Fast binary read */
+#define CMD_NOP             0100u               /* No operation */
+#define CMD_RESET           0101u               /* Reset firmware to power-on defaults */
+#define CMD_ENABLE_UI       0102u               /* Enable unsolicited input */
+#define CMD_DISABLE         0103u               /* Disable interrupts / Abort DMA Transfer */
+#define CMD_ACK             0104u               /* Acknowledge */
+#define CMD_CANCEL          0105u               /* Cancel first receive buffer */
+#define CMD_CANCEL_ALL      0106u               /* Cancel all received buffers */
+#define CMD_BINARY_READ     0107u               /* Fast binary read */
 
-#define CMD_VCP_PUT     0140                            /* VCP put byte */
-#define CMD_VCP_PUT_BUF 0141                            /* VCP put buffer */
-#define CMD_VCP_GET     0142                            /* VCP get byte */
-#define CMD_VCP_GET_BUF 0143                            /* VCP get buffer */
-#define CMD_VCP_EXIT    0144                            /* Exit VCP mode */
-#define CMD_VCP_ENTER   0157                            /* Enter VCP mode */
-
+#define CMD_VCP_PUT         0140u               /* VCP put byte */
+#define CMD_VCP_PUT_BUF     0141u               /* VCP put buffer */
+#define CMD_VCP_GET         0142u               /* VCP get byte */
+#define CMD_VCP_GET_BUF     0143u               /* VCP get buffer */
+#define CMD_VCP_EXIT        0144u               /* Exit VCP mode */
+#define CMD_VCP_ENTER       0157u               /* Enter VCP mode */
 
 /* Two-word command codes */
 
-#define CMD_REQ_WRITE   0301                            /* Request write buffer */
-#define CMD_WRITE       0302                            /* Write data to buffer */
-#define CMD_SET_KEY     0303                            /* Set port key */
-#define CMD_SET_RCV     0304                            /* Set receive type */
-#define CMD_SET_COUNT   0305                            /* Set character count */
-#define CMD_SET_FLOW    0306                            /* Set flow control */
-#define CMD_READ        0307                            /* Read data from buffer */
-#define CMD_DL_EXEC     0310                            /* Download executable */
+#define CMD_REQ_WRITE       0301u               /* Request write buffer */
+#define CMD_WRITE           0302u               /* Write data to buffer */
+#define CMD_SET_KEY         0303u               /* Set port key */
+#define CMD_SET_RCV         0304u               /* Set receive type */
+#define CMD_SET_COUNT       0305u               /* Set character count */
+#define CMD_SET_FLOW        0306u               /* Set flow control */
+#define CMD_READ            0307u               /* Read data from buffer */
+#define CMD_DL_EXEC         0310u               /* Download executable */
 
-#define CMD_CN_LINE     0311                            /* Connect line */
-#define CMD_DC_LINE     0312                            /* Disconnect line */
-#define CMD_GET_STATUS  0315                            /* Get modem/port status */
-#define CMD_LOOPBACK    0316                            /* Enable/disable modem loopback */
-#define CMD_TERM_BUF    0320                            /* Terminate active receive buffer */
-
+#define CMD_CN_LINE         0311u               /* Connect line */
+#define CMD_DC_LINE         0312u               /* Disconnect line */
+#define CMD_GET_STATUS      0315u               /* Get modem/port status */
+#define CMD_LOOPBACK        0316u               /* Enable/disable modem loopback */
+#define CMD_TERM_BUF        0320u               /* Terminate active receive buffer */
 
 /* Sub-command codes */
 
-#define SUBCMD_UI       1                               /* Disable unsolicited interrupts */
-#define SUBCMD_DMA      2                               /* Abort DMA transfer */
+#define SUBCMD_UI           1                   /* Disable unsolicited interrupts */
+#define SUBCMD_DMA          2                   /* Abort DMA transfer */
 
-#define CMD_TWO_WORDS   0200                            /* two-word command flag */
-
-
-/* Unsolicited interrupt reasons */
-
-#define UI_REASON_V     8                                   /* interrupt reason */
-#define UI_REASON       (((1 << 8) - 1) << (UI_REASON_V))   /* (UI_REASON_V must be a constant!) */
-
-BITFIELD (UI_PORT, 0, 3)                                /* interrupt port number */
-
-#define UI_WRBUF_AVAIL  (1 << UI_REASON_V)              /* Write buffer available */
-#define UI_LINE_CONN    (2 << UI_REASON_V)              /* Modem line connected */
-#define UI_LINE_DISC    (3 << UI_REASON_V)              /* Modem line disconnected */
-#define UI_BRK_RECD     (4 << UI_REASON_V)              /* Break received */
-#define UI_RDBUF_AVAIL  (5 << UI_REASON_V)              /* Read buffer available */
+#define CMD_TWO_WORDS       0200u               /* two-word commands have the high bit set */
 
 
-/* Return status to CPU */
+/* Input status.
 
-#define ST_OK           0000000                         /* Command OK */
-#define ST_DIAG_OK      0000015                         /* Diagnostic passes */
-#define ST_VCP_SIZE     0000120                         /* VCP buffer size = 80 chars */
-#define ST_NO_SYSMDM    0000200                         /* No systems modem card */
-#define ST_TEST_OK      0100000                         /* Self test OK */
-#define ST_NO_MODEM     0140000                         /* No modem card on port */
-#define ST_BAD_KEY      0135320                         /* Bad port key = 0xBAD0 */
+   The CPU inputs status from the interface with the LIA, LIB, MIA, and MIB
+   instructions.  The format is not encoded but is instead dependent on the
+   command executed.  Commands that complete normally return 0.
+*/
 
-
-/* Bit flags */
-
-#define RS_OVERFLOW     0040000                         /* Receive status: buffer overflow occurred */
-#define RS_PARTIAL      0020000                         /* Receive status: buffer is partial */
-#define RS_ETC_RS       0014000                         /* Receive status: terminated by RS */
-#define RS_ETC_DC2      0010000                         /* Receive status: terminated by DC2 */
-#define RS_ETC_CR       0004000                         /* Receive status: terminated by CR */
-#define RS_ETC_EOT      0000000                         /* Receive status: terminated by EOT */
-#define RS_CHAR_COUNT   0003777                         /* Receive status: character count */
-
-#define WR_NO_ENQACK    0020000                         /* Write: no ENQ/ACK this xfer */
-#define WR_ADD_CRLF     0010000                         /* Write: add CR/LF if not '_' */
-#define WR_PARTIAL      0004000                         /* Write: write is partial */
-#define WR_LENGTH       0003777                         /* Write: write length in bytes */
-
-#define RT_END_ON_CR    0000200                         /* Receive type: end xfer on CR */
-#define RT_END_ON_RS    0000100                         /* Receive type: end xfer on RS */
-#define RT_END_ON_EOT   0000040                         /* Receive type: end xfer on EOT */
-#define RT_END_ON_DC2   0000020                         /* Receive type: end xfer on DC2 */
-#define RT_END_ON_CNT   0000010                         /* Receive type: end xfer on count */
-#define RT_END_ON_CHAR  0000004                         /* Receive type: end xfer on character */
-#define RT_ENAB_EDIT    0000002                         /* Receive type: enable input editing */
-#define RT_ENAB_ECHO    0000001                         /* Receive type: enable input echoing */
-
-#define FC_FORCE_XON    0000002                         /* Flow control: force XON */
-#define FC_XONXOFF      0000001                         /* Flow control: enable XON/XOFF */
-
-#define CL_GUARD        0000040                         /* Connect line: guard tone off or on */
-#define CL_STANDARD     0000020                         /* Connect line: standard 212 or V.22 */
-#define CL_BITS         0000010                         /* Connect line: bits 10 or 9 */
-#define CL_MODE         0000004                         /* Connect line: mode originate or answer */
-#define CL_DIAL         0000002                         /* Connect line: dial manual or automatic */
-#define CL_SPEED        0000001                         /* Connect line: speed low or high */
-
-#define DL_AUTO_ANSWER  0000001                         /* Disconnect line: auto-answer enable or disable */
-
-#define LB_SPEED        0000004                         /* Loopback test: speed low or high */
-#define LB_MODE         0000002                         /* Loopback test: mode analog or digital */
-#define LB_TEST         0000001                         /* Loopback test: test disable or enable */
-
-#define GS_NO_SYSMDM    0000200                         /* Get status: systems modem present or absent */
-#define GS_SYSMDM_TO    0000100                         /* Get status: systems modem OK or timed out */
-#define GS_NO_MODEM     0000040                         /* Get status: modem present or absent */
-#define GS_SPEED        0000020                         /* Get status: speed low or high */
-#define GS_LINE         0000001                         /* Get status: line disconnected or connected */
+#define ST_OK               0000000u            /* Command OK */
+#define ST_DIAG_OK          0000015u            /* Diagnostic passes */
+#define ST_VCP_SIZE         0000120u            /* VCP buffer size = 80 chars */
+#define ST_NO_SYSMDM        0000200u            /* No systems modem card */
+#define ST_TEST_OK          0100000u            /* Self test OK */
+#define ST_NO_MODEM         0140000u            /* No modem card on port */
+#define ST_BAD_KEY          0135320u            /* Bad port key = 0xBAD0 */
 
 
-/* Bit fields (name, starting bit, bit width) */
+/* Write data to buffer (302).
 
-BITFIELD (CMD_OPCODE,    8,  8)                         /* Command: opcode */
-BITFIELD (CMD_KEY,       0,  8)                         /* Command: key */
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | -   - | E | C | P |               write length                | 302
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
-BITFIELD (SK_BPC,       14,  2)                         /* Set key: bits per character */
-BITFIELD (SK_MODEM,     13,  1)                         /* Set key: hardwired or modem */
-BITFIELD (SK_BRG,       12,  1)                         /* Set key: baud rate generator 0/1 */
-BITFIELD (SK_STOPBITS,  10,  2)                         /* Set key: stop bits */
-BITFIELD (SK_PARITY,     8,  2)                         /* Set key: parity select */
-BITFIELD (SK_ENQACK,     7,  1)                         /* Set key: disable or enable ENQ/ACK */
-BITFIELD (SK_BAUDRATE,   3,  4)                         /* Set key: port baud rate */
-BITFIELD (SK_PORT,       0,  3)                         /* Set key: port number */
+   Where:
 
-BITFIELD (FL_ALERT,     11,  1)                         /* Port flags: alert for terminate recv buffer */
-BITFIELD (FL_XOFF,      10,  1)                         /* Port flags: XOFF stopped transmission */
-BITFIELD (FL_BREAK,      9,  1)                         /* Port flags: UI / break detected */
-BITFIELD (FL_HAVEBUF,    8,  1)                         /* Port flags: UI / read buffer available */
-BITFIELD (FL_WANTBUF,    7,  1)                         /* Port flags: UI / write buffer available */
-BITFIELD (FL_RDOVFLOW,   6,  1)                         /* Port flags: read buffers overflowed */
-BITFIELD (FL_RDFILL,     5,  1)                         /* Port flags: read buffer is filling */
-BITFIELD (FL_RDEMPT,     4,  1)                         /* Port flags: read buffer is emptying */
-BITFIELD (FL_WRFILL,     3,  1)                         /* Port flags: write buffer is filling */
-BITFIELD (FL_WREMPT,     2,  1)                         /* Port flags: write buffer is emptying */
-BITFIELD (FL_WAITACK,    1,  1)                         /* Port flags: ENQ sent, waiting for ACK */
-BITFIELD (FL_DO_ENQACK,  0,  1)                         /* Port flags: do ENQ/ACK handshake */
+     E = disable ENQ/ACK for this write only
+     C = add CR/LF if last char not '_'
+     P = write is partial transfer (no CR/LF at end)
+*/
 
-#define SK_BRG_1        SK_BRG
-#define SK_BRG_0        0
+#define WR_NO_ENQACK        BIT (13)            /* Write: no ENQ/ACK this xfer */
+#define WR_ADD_CRLF         BIT (12)            /* Write: add CR/LF if not '_' */
+#define WR_PARTIAL          BIT (11)            /* Write: write is partial */
 
-#define FL_RDFLAGS      (FL_RDEMPT | FL_RDFILL | FL_RDOVFLOW)
-#define FL_WRFLAGS      (FL_WREMPT | FL_WRFILL)
-#define FL_UI_PENDING   (FL_WANTBUF | FL_HAVEBUF | FL_BREAK)
-
-#define ACK_LIMIT       1000                            /* poll timeout for ACK response */
-#define ENQ_LIMIT         80                            /* output chars before ENQ */
+#define WR_LENGTH(w)        FIELD_TO (10, 0, w) /* Write: write length in bytes */
 
 
-/* Packed field values */
+/* Set port key (303).
 
-#define SK_BPC_5        (0 << SK_BPC_V)
-#define SK_BPC_6        (1 << SK_BPC_V)
-#define SK_BPC_7        (2 << SK_BPC_V)
-#define SK_BPC_8        (3 << SK_BPC_V)
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | bits  | M | G | stop  |  par  | E |   baud rate   |   port    |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
-#define SK_STOP_1       (1 << SK_STOPBITS_V)
-#define SK_STOP_15      (2 << SK_STOPBITS_V)
-#define SK_STOP_2       (3 << SK_STOPBITS_V)
+   Where:
 
-#define SK_BAUD_NOCHG   (0 << SK_BAUDRATE_V)
-#define SK_BAUD_50      (1 << SK_BAUDRATE_V)
-#define SK_BAUD_75      (2 << SK_BAUDRATE_V)
-#define SK_BAUD_110     (3 << SK_BAUDRATE_V)
-#define SK_BAUD_1345    (4 << SK_BAUDRATE_V)
-#define SK_BAUD_150     (5 << SK_BAUDRATE_V)
-#define SK_BAUD_300     (6 << SK_BAUDRATE_V)
-#define SK_BAUD_1200    (7 << SK_BAUDRATE_V)
-#define SK_BAUD_1800    (8 << SK_BAUDRATE_V)
-#define SK_BAUD_2400    (9 << SK_BAUDRATE_V)
-#define SK_BAUD_4800    (10 << SK_BAUDRATE_V)
-#define SK_BAUD_9600    (11 << SK_BAUDRATE_V)
-#define SK_BAUD_19200   (12 << SK_BAUDRATE_V)
+     M = hardwired or modem (0/1)
+     G = baud rate generator 0/1
+     E = disable or enable ENQ/ACK (0/1)
+
+   Bits per Character:
+
+     00 = 5 bits
+     01 = 7 bits
+     10 = 6 bits
+     11 = 8 bits
+
+   Stop Bits:
+
+     00 = reserved
+     01 = 1 stop bit
+     10 = 1.5 stop bits
+     11 = 2 stop bits
+
+   Parity:
+
+     00 = no parity
+     01 = odd parity
+     10 = no parity
+     11 = even parity
+
+   Baud Rate:
+
+     0000 = no change
+     0001 = 50 baud
+     0010 = 75 baud
+     0011 = 110  baud
+     0100 = 134.5 baud
+     0101 = 150 baud
+     0110 = 300 baud
+     0111 = 1200 baud
+     1000 = 1800 baud
+     1001 = 2400 baud
+     1010 = 4800 baud
+     1011 = 9600 baud
+     1100 = 19200 baud
+     1101 = reserved
+     1110 = reserved
+     1111 = reserved
+*/
+
+#define SK_BPC_MASK         FIELD (15, 14)              /* Set key: bits per character */
+#define   SK_BPC_5          TO_FIELD (15, 14, 0)        /*   5 bits per character */
+#define   SK_BPC_7          TO_FIELD (15, 14, 1)        /*   7 bits per character */
+#define   SK_BPC_6          TO_FIELD (15, 14, 2)        /*   6 bits per character */
+#define   SK_BPC_8          TO_FIELD (15, 14, 3)        /*   8 bits per character */
+#define SK_MODEM            BIT (13)                    /* Set key: hardwired or modem */
+#define SK_BRG              BIT (12)                    /* Set key: baud rate generator 0/1 */
+#define SK_STOPBITS_MASK    FIELD (11, 10)              /* Set key: stop bits */
+#define   SK_STOP_1         TO_FIELD (11, 10, 1)        /*   1 stop bit */
+#define   SK_STOP_15        TO_FIELD (11, 10, 2)        /*   1.5 stop bits */
+#define   SK_STOP_2         TO_FIELD (11, 10, 3)        /*   2 stop bits */
+#define SK_PARITY_MASK      FIELD (9, 8)                /* Set key: parity select */
+#define   SK_PARITY_NONE    TO_FIELD (9, 8, 0)          /*   no parity */
+#define   SK_PARITY_ODD     TO_FIELD (9, 8, 1)          /*   odd parity */
+#define   SK_PARITY_EVEN    TO_FIELD (9, 8, 3)          /*   even parity */
+#define SK_ENQACK           BIT (7)                     /* Set key: disable or enable ENQ/ACK */
+#define SK_BAUDRATE_MASK    FIELD (6, 3)                /* Set key: port baud rate */
+#define   SK_BAUD_NOCHG     TO_FIELD (6, 3,  0)         /*   no change */
+#define   SK_BAUD_50        TO_FIELD (6, 3,  1)         /*   50 port baud rate */
+#define   SK_BAUD_75        TO_FIELD (6, 3,  2)         /*   75 port baud rate */
+#define   SK_BAUD_110       TO_FIELD (6, 3,  3)         /*   110 port baud rate */
+#define   SK_BAUD_1345      TO_FIELD (6, 3,  4)         /*   134.5 port baud rate */
+#define   SK_BAUD_150       TO_FIELD (6, 3,  5)         /*   150 port baud rate */
+#define   SK_BAUD_300       TO_FIELD (6, 3,  6)         /*   300 port baud rate */
+#define   SK_BAUD_1200      TO_FIELD (6, 3,  7)         /*   1200 port baud rate */
+#define   SK_BAUD_1800      TO_FIELD (6, 3,  8)         /*   1800 port baud rate */
+#define   SK_BAUD_2400      TO_FIELD (6, 3,  9)         /*   2400 port baud rate */
+#define   SK_BAUD_4800      TO_FIELD (6, 3, 10)         /*   4800 port baud rate */
+#define   SK_BAUD_9600      TO_FIELD (6, 3, 11)         /*   9600 port baud rate */
+#define   SK_BAUD_19200     TO_FIELD (6, 3, 12)         /*   19200 port baud rate */
+#define SK_PORT_MASK        FIELD (2, 0)                /* Set key: port number */
+
+#define GET_BPC(w)          FIELD_TO (15, 14, w)
+#define GET_BAUDRATE(w)     FIELD_TO ( 6,  3, w)
+#define GET_PORT(w)         FIELD_TO ( 2,  0, w)
+
+#define SK_BRG_1            SK_BRG
+#define SK_BRG_0            0
+
+#define SK_PWRUP_0          (SK_BPC_8 | SK_BRG_0 | SK_STOP_1 | SK_BAUD_9600)
+#define SK_PWRUP_1          (SK_BPC_8 | SK_BRG_1 | SK_STOP_1 | SK_BAUD_9600)
 
 
-/* Default values */
+/* Set receive type (304).
 
-#define SK_PWRUP_0      (SK_BPC_8 | SK_BRG_0 | SK_STOP_1 | SK_BAUD_9600)
-#define SK_PWRUP_1      (SK_BPC_8 | SK_BRG_1 | SK_STOP_1 | SK_BAUD_9600)
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | -   -   -   -   -   -   -   - | C | R | T | D | N | K | E | H |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
-#define RT_PWRUP        (RT_END_ON_CR | RT_END_ON_CHAR | RT_ENAB_EDIT | RT_ENAB_ECHO)
+   Where:
+
+     C = end transfer on CR
+     R = end transfer on RS
+     T = end transfer on EOT
+     D = end transfer on DC2
+     N = end transfer on count
+     K = end transfer on character
+     E = enable input editing (BS and DEL)
+     H = enable input echo
+*/
+
+#define RT_END_ON_CR        BIT (7)             /* Receive type: end xfer on CR */
+#define RT_END_ON_RS        BIT (6)             /* Receive type: end xfer on RS */
+#define RT_END_ON_EOT       BIT (5)             /* Receive type: end xfer on EOT */
+#define RT_END_ON_DC2       BIT (4)             /* Receive type: end xfer on DC2 */
+#define RT_END_ON_CNT       BIT (3)             /* Receive type: end xfer on count */
+#define RT_END_ON_CHAR      BIT (2)             /* Receive type: end xfer on character */
+#define RT_ENAB_EDIT        BIT (1)             /* Receive type: enable input editing */
+#define RT_ENAB_ECHO        BIT (0)             /* Receive type: enable input echoing */
+
+#define RT_PWRUP            (RT_END_ON_CR | RT_END_ON_CHAR | RT_ENAB_EDIT | RT_ENAB_ECHO)
 
 
-/* Command helpers */
+/* Set flow control (306).
 
-#define GET_OPCODE(w)   (((w) & CMD_OPCODE)  >> CMD_OPCODE_V)
-#define GET_KEY(w)      (((w) & CMD_KEY)     >> CMD_KEY_V)
-#define GET_BPC(w)      (((w) & SK_BPC)      >> SK_BPC_V)
-#define GET_BAUDRATE(w) (((w) & SK_BAUDRATE) >> SK_BAUDRATE_V)
-#define GET_PORT(w)     (((w) & SK_PORT)     >> SK_PORT_V)
-#define GET_UIREASON(w) (((w) & UI_REASON)   >> UI_REASON_V)
-#define GET_UIPORT(w)   (((w) & UI_PORT)     >> UI_PORT_V)
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | -   -   -   -   -   -   -   -   -   -   -   -   -   - | F | X |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     F = force an XON if currently XOFF
+     X = enable XON/XOFF handshaking
+*/
+
+#define FC_FORCE_XON        BIT (1)             /* Flow control: force XON */
+#define FC_XONXOFF          BIT (0)             /* Flow control: enable XON/XOFF */
 
 
-/* Multiplexer controller state variables */
+/* Connect line (311).
 
-typedef enum {                                          /* execution state */
-    idle,
-    cmd,
-    param,
-    exec
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | -   -   -   -   -   -   -   -   -   - | G | M | B | D | I | S |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     G = guard tone off/on (0/1)
+     M = 212/V.22 mode (0/1)
+     B = 10/9 bits (0/1)
+     D = originate/answer (0/1)
+     I = manual/automatic dial (0/1)
+     S = low/high speed (0/1)
+*/
+
+#define CL_GUARD            BIT (5)             /* Connect line: guard tone off or on */
+#define CL_STANDARD         BIT (4)             /* Connect line: standard 212 or V.22 */
+#define CL_BITS             BIT (3)             /* Connect line: bits 10 or 9 */
+#define CL_MODE             BIT (2)             /* Connect line: mode originate or answer */
+#define CL_DIAL             BIT (1)             /* Connect line: dial manual or automatic */
+#define CL_SPEED            BIT (0)             /* Connect line: speed low or high */
+
+
+/* Disconnect line (312).
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | -   -   -   -   -   -   -   -   -   -   -   -   -   -   - | A |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     A = enable/disable auto-answer (0/1)
+*/
+
+#define DL_AUTO_ANSWER      BIT (0)             /* Disconnect line: auto-answer enable or disable */
+
+
+/* Enable/disable modem loopback (316).
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | -   -   -   -   -   -   -   -   -   -   -   -   - | S | T | E |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     S = low/high speed (0/1)
+     T = analog/remote digital (0/1)
+     E = disable/enable loop test (0/1)
+*/
+
+#define LB_SPEED            BIT (2)             /* Loopback test: speed low or high */
+#define LB_MODE             BIT (1)             /* Loopback test: mode analog or digital */
+#define LB_TEST             BIT (0)             /* Loopback test: test disable or enable */
+
+
+/* Unsolicited interrupts.
+
+   Upon detecting certain conditions, and if enabled by command 102, the card
+   can send unsolicited inputs to the host.  The card notifies the host that an
+   unsolicited input is available by presenting the first status word and
+   setting the flag.  After sending the unsolicited input, the mux disables
+   unsolicited inputs to the host until they are enabled again.  The host reads
+   the status with an LIA/B and acknowledges the unsolicited input with an
+   Acknowledge command.  In response, the card outputs the second word of status
+   and sets the flag again. The host reads the second word with an LIA/B.
+
+   The format of the unsolicited input is:
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | -   - |        reason         |           port key            |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |                     additional parameter                      |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   The unsolicited inputs by firmware revision are:
+
+     Rev  Reason  Description              Additional Parameter
+     ---  ------  -----------------------  ---------------------
+     ABC   001    Write buffer available   Buffer size in bytes
+     -BC   002    Modem line connected     000000
+     -BC   003    Modem line disconnected  000000
+     ABC   004    Break received           000000
+     ABC   005    Read buffer available    Reception status
+*/
+
+#define UI_REASON_MASK      FIELD (13, 8)       /* Unsolicited interrupt reason */
+#define   UI_WRBUF_AVAIL    TO_FIELD (13, 8, 1) /*   Write buffer available */
+#define   UI_LINE_CONN      TO_FIELD (13, 8, 2) /*   Modem line connected */
+#define   UI_LINE_DISC      TO_FIELD (13, 8, 3) /*   Modem line disconnected */
+#define   UI_BRK_RECD       TO_FIELD (13, 8, 4) /*   Break received */
+#define   UI_RDBUF_AVAIL    TO_FIELD (13, 8, 5) /*   Read buffer available */
+#define UI_PORT_KEY_MASK    FIELD (7, 0)        /* Unsolicited interrupt port key */
+
+#define UI_REASON_SHIFT     8                   /* Unsolicited interrupt reason alignment shift */
+
+#define GET_UIREASON(w)     FIELD_TO (13, 8, w)
+#define GET_UIPORT(w)       FIELD_TO ( 7, 0, w)
+
+
+/* Read buffer available reception status.
+
+   The reception status for Reason 005 is in this format:
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | - | P | F |  ETC  |       count of characters received        |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     P = parity error or buffer overflow occurred
+     F = buffer full before end of text character seen
+
+   End of Text Character:
+
+     00 = EOT
+     01 = CR
+     10 = DC2
+     11 = RS
+
+   A parity error detected during reception sets the P and F bits and
+   immediately terminates the buffer, generating a "read buffer available"
+   interrupt.  A buffer full condition (characters received with both read
+   buffers terminated) sets the P bit for the next interrupt return.  Receiving
+   the 254th character will set the F bit and terminate the read buffer.
+*/
+
+#define RS_OVERFLOW         BIT (14)                    /* Reception status: buffer overflow occurred */
+#define RS_PARTIAL          BIT (13)                    /* Reception status: buffer is partial */
+#define RS_ETC_RS           TO_FIELD (12, 11, 3)        /* Reception status: terminated by RS */
+#define RS_ETC_DC2          TO_FIELD (12, 11, 2)        /* Reception status: terminated by DC2 */
+#define RS_ETC_CR           TO_FIELD (12, 11, 1)        /* Reception status: terminated by CR */
+#define RS_ETC_EOT          TO_FIELD (12, 11, 0)        /* Reception status: terminated by EOT */
+#define RS_CHAR_COUNT_MASK  FIELD (10, 0)               /* Reception status: character count mask */
+
+
+/* Get modem/port status (315).
+
+   The status return value has the modem status in the lower byte and a zero in
+   the upper byte, as follows:
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | -   -   -   -   -   -   -   - | M | T | P | -   -   - | S | C |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     M = systems modem present/absent (0/1)
+     T = systems modem OK/timed out (0/1)
+     P = modem present/absent (0/1)
+     S = low/high speed (0/1)
+     C = line disconnected/connected (0/1)
+
+   If the systems modem card cage is not present, the return status value is
+   000200B.
+*/
+
+#define GS_NO_SYSMDM        BIT (7)             /* Get status: systems modem present or absent */
+#define GS_SYSMDM_TO        BIT (6)             /* Get status: systems modem OK or timed out */
+#define GS_NO_MODEM         BIT (5)             /* Get status: modem present or absent */
+#define GS_SPEED            BIT (1)             /* Get status: speed low or high */
+#define GS_LINE             BIT (0)             /* Get status: line disconnected or connected */
+
+
+/* Port flags.
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | -   -   -   - | A | X | B | H | W | O | F | E | f | e | K | D |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     A = a Terminate Receive Buffer command has reset the termination count
+     X = an incoming XOFF character has stopped the transmission
+     B = an incoming BREAK was detected
+     H = a read buffer is now available
+     W = a write buffer has been requested but is not available
+     O = a read buffer has overflowed
+     F = a read buffer is currently filling
+     E = a read buffer is currently emptying
+     f = a write buffer is currently filling
+     e = a write buffer is currently emptying
+     K = waiting for an ACK in response to ENQ
+     D = do an ENQ/ACK handshake after the output limit has been reached
+*/
+
+#define FL_ALERT            BIT (11)            /* Port flags: alert for terminate recv buffer */
+#define FL_XOFF             BIT (10)            /* Port flags: XOFF stopped transmission */
+#define FL_BREAK            BIT ( 9)            /* Port flags: UI / break detected */
+#define FL_HAVEBUF          BIT ( 8)            /* Port flags: UI / read buffer available */
+#define FL_WANTBUF          BIT ( 7)            /* Port flags: UI / write buffer available */
+#define FL_RDOVFLOW         BIT ( 6)            /* Port flags: read buffers overflowed */
+#define FL_RDFILL           BIT ( 5)            /* Port flags: read buffer is filling */
+#define FL_RDEMPT           BIT ( 4)            /* Port flags: read buffer is emptying */
+#define FL_WRFILL           BIT ( 3)            /* Port flags: write buffer is filling */
+#define FL_WREMPT           BIT ( 2)            /* Port flags: write buffer is emptying */
+#define FL_WAITACK          BIT ( 1)            /* Port flags: ENQ sent, waiting for ACK */
+#define FL_DO_ENQACK        BIT ( 0)            /* Port flags: do ENQ/ACK handshake */
+
+#define FL_RDFLAGS          (FL_RDEMPT | FL_RDFILL | FL_RDOVFLOW)
+#define FL_WRFLAGS          (FL_WREMPT | FL_WRFILL)
+#define FL_UI_PENDING       (FL_WANTBUF | FL_HAVEBUF | FL_BREAK)
+
+#define ACK_LIMIT           1000                /* poll timeout for ACK response */
+#define ENQ_LIMIT             80                /* output chars before ENQ */
+
+
+/* Multiplexer interface state */
+
+typedef enum {                                  /* controller execution states */
+    idle,                                       /*   idle */
+    cmd,                                        /*   waiting for a command word */
+    param,                                      /*   waiting for a parameter word */
+    exec                                        /*   executing a command */
     } STATE;
 
-STATE  mpx_state = idle;                                /* controller state */
+static STATE  mpx_state = idle;                 /* current controller state */
 
-uint16 mpx_ibuf = 0;                                    /* status/data in */
-uint16 mpx_obuf = 0;                                    /* command/data out */
+static uint16 mpx_ibuf = 0;                     /* status/data in */
+static uint16 mpx_obuf = 0;                     /* command/data out */
 
-uint32 mpx_cmd = 0;                                     /* current command */
-uint32 mpx_param = 0;                                   /* current parameter */
-uint32 mpx_port = 0;                                    /* current port number for R/W */
-uint32 mpx_portkey = 0;                                 /* current port's key */
- int32 mpx_iolen = 0;                                   /* length of current I/O xfer */
+static uint32 mpx_cmd     = 0;                  /* current command */
+static uint32 mpx_param   = 0;                  /* current parameter */
+static uint32 mpx_port    = 0;                  /* current port number for R/W */
+static uint32 mpx_portkey = 0;                  /* current port's key */
+static  int32 mpx_iolen   = 0;                  /* length of current I/O xfer */
 
-t_bool mpx_uien = FALSE;                                /* unsolicited interrupts enabled */
-uint32 mpx_uicode = 0;                                  /* unsolicited interrupt reason and port */
+static t_bool mpx_uien   = FALSE;               /* unsolicited interrupts enabled */
+static uint32 mpx_uicode = 0;                   /* unsolicited interrupt reason and port */
 
 struct {
-    FLIP_FLOP control;                                  /* control flip-flop */
-    FLIP_FLOP flag;                                     /* flag flip-flop */
-    FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
+    FLIP_FLOP control;                          /* control flip-flop */
+    FLIP_FLOP flag;                             /* flag flip-flop */
+    FLIP_FLOP flagbuf;                          /* flag buffer flip-flop */
     } mpx = { CLEAR, CLEAR, CLEAR };
 
-/* Multiplexer per-line state variables */
 
-uint8  mpx_key      [MPX_PORTS];                        /* port keys */
-uint16 mpx_config   [MPX_PORTS];                        /* port configuration */
-uint16 mpx_rcvtype  [MPX_PORTS];                        /* receive type */
-uint16 mpx_charcnt  [MPX_PORTS];                        /* current character count */
-uint16 mpx_termcnt  [MPX_PORTS];                        /* termination character count */
-uint16 mpx_flowcntl [MPX_PORTS];                        /* flow control */
-uint8  mpx_enq_cntr [MPX_PORTS];                        /* ENQ character counter */
-uint16 mpx_ack_wait [MPX_PORTS];                        /* ACK wait timer */
-uint16 mpx_flags    [MPX_PORTS];                        /* line state flags */
+/* Multiplexer per-line state */
+
+static uint8  mpx_key      [MPX_PORTS];         /* port keys */
+static uint16 mpx_config   [MPX_PORTS];         /* port configuration */
+static uint16 mpx_rcvtype  [MPX_PORTS];         /* receive type */
+static uint16 mpx_charcnt  [MPX_PORTS];         /* current character count */
+static uint16 mpx_termcnt  [MPX_PORTS];         /* termination character count */
+static uint16 mpx_flowcntl [MPX_PORTS];         /* flow control */
+static uint8  mpx_enq_cntr [MPX_PORTS];         /* ENQ character counter */
+static uint16 mpx_ack_wait [MPX_PORTS];         /* ACK wait timer */
+static uint16 mpx_flags    [MPX_PORTS];         /* line state flags */
+
 
 /* Multiplexer buffer selectors */
 
-typedef enum { ioread, iowrite } IO_OPER;               /* I/O operation */
-typedef enum { get, put } BUF_SELECT;                   /* buffer selector */
+typedef enum {                                  /* I/O operations */
+    ioread,
+    iowrite
+    } IO_OPER;
 
-static const char *const io_op [] = { "read",           /* operation names */
-                                      "write" };
+typedef enum {                                  /* buffer selectors */
+    get,
+    put
+    } BUF_SELECT;
 
-static const uint16 buf_size [] = { RD_BUF_SIZE,        /* buffer sizes */
-                                    WR_BUF_SIZE };
+static const char *const io_op [] = {           /* operation names, indexed by IO_OPER */
+    "read",
+    "write"
+    };
 
-static uint32 emptying_flags [2];                       /* buffer emptying flags [IO_OPER] */
-static uint32 filling_flags  [2];                       /* buffer filling  flags [IO_OPER] */
+static const uint16 buf_size [] = {             /* buffer sizes, indexed by IO_OPER */
+    RD_BUF_SIZE,
+    WR_BUF_SIZE
+    };
+
+static uint32 emptying_flags [2];               /* buffer emptying flags [IO_OPER] */
+static uint32 filling_flags  [2];               /* buffer filling  flags [IO_OPER] */
 
 
-/* Multiplexer per-line buffer variables */
+/* Multiplexer per-line buffers */
 
 typedef uint16 BUF_INDEX [MPX_PORTS] [2];               /* buffer index (read and write) */
 
-BUF_INDEX mpx_put;                                      /* read/write buffer add index */
-BUF_INDEX mpx_sep;                                      /* read/write buffer separator index */
-BUF_INDEX mpx_get;                                      /* read/write buffer remove index */
+static BUF_INDEX mpx_put;                               /* read/write buffer add index */
+static BUF_INDEX mpx_sep;                               /* read/write buffer separator index */
+static BUF_INDEX mpx_get;                               /* read/write buffer remove index */
 
-uint8 mpx_rbuf [MPX_PORTS] [RD_BUF_SIZE];               /* read buffer */
-uint8 mpx_wbuf [MPX_PORTS] [WR_BUF_SIZE];               /* write buffer */
+static uint8 mpx_rbuf [MPX_PORTS] [RD_BUF_SIZE];        /* read buffer */
+static uint8 mpx_wbuf [MPX_PORTS] [WR_BUF_SIZE];        /* write buffer */
 
 
-/* Multiplexer local routines */
+/* Multiplexer local SCP support routines */
+
+static IOHANDLER mpx_io;
+
+static t_stat cntl_service  (UNIT   *uptr);
+static t_stat line_service  (UNIT   *uptr);
+static t_stat poll_service  (UNIT   *uptr);
+
+static t_stat mpx_reset     (DEVICE *dptr);
+static t_stat mpx_attach    (UNIT   *uptr, CONST char *cptr);
+static t_stat mpx_detach    (UNIT   *uptr);
+
+static t_stat set_revision  (UNIT   *uptr, int32  val,  CONST char *cptr, void *desc);
+static t_stat show_revision (FILE   *st,   UNIT  *uptr, int32 val,        CONST void *desc);
+static t_stat show_status   (FILE   *st,   UNIT  *uptr, int32 val,        CONST void *desc);
+
+
+/* Multiplexer local utility routines */
 
 static t_bool exec_command     (void);
 static void   poll_connection  (void);
@@ -598,32 +920,39 @@ static uint16 buf_len    (IO_OPER rw, uint32 port, BUF_SELECT which);
 static uint32 buf_avail  (IO_OPER rw, uint32 port);
 
 
-/* Multiplexer global routines */
-
-IOHANDLER mpx_io;
-
-t_stat mpx_line_svc  (UNIT   *uptr);
-t_stat mpx_cntl_svc  (UNIT   *uptr);
-t_stat mpx_poll_svc  (UNIT   *uptr);
-t_stat mpx_reset     (DEVICE *dptr);
-t_stat mpx_attach    (UNIT   *uptr, CONST char *cptr);
-t_stat mpx_detach    (UNIT   *uptr);
-t_stat mpx_status    (FILE   *st,   UNIT  *uptr, int32 val,        CONST void *desc);
-t_stat mpx_set_frev  (UNIT   *uptr, int32  val,  CONST char *cptr, void *desc);
-t_stat mpx_show_frev (FILE   *st,   UNIT  *uptr, int32 val,        CONST void *desc);
+/* Multiplexer SCP data structures */
 
 
-/* MPX data structures.
+/* Terminal multiplexer library structures */
 
-   mpx_order    MPX line connection order table
-   mpx_ldsc     MPX terminal multiplexer line descriptors
-   mpx_desc     MPX terminal multiplexer device descriptor
-   mpx_dib      MPX device information block
-   mpx_unit     MPX unit list
-   mpx_reg      MPX register list
-   mpx_mod      MPX modifier list
-   mpx_deb      MPX debug list
-   mpx_dev      MPX device descriptor
+static int32 mpx_order [MPX_PORTS] = {          /* line connection order */
+    -1
+    };
+
+static TMLN mpx_ldsc [MPX_PORTS] = {            /* line descriptors */
+    { 0 }
+    };
+
+static TMXR mpx_desc = {                        /* multiplexer descriptor */
+    MPX_PORTS,                                  /* number of terminal lines */
+    0,                                          /* listening port (reserved) */
+    0,                                          /* master socket  (reserved) */
+    mpx_ldsc,                                   /* line descriptors */
+    mpx_order,                                  /* line connection order */
+    NULL                                        /* multiplexer device (derived internally) */
+    };
+
+
+/* Device information block */
+
+static DIB mpx_dib = {
+    &mpx_io,                                    /* device interface */
+    MPX,                                        /* select code */
+    0                                           /* card index */
+    };
+
+
+/* Unit list.
 
    The first eight units correspond to the eight multiplexer line ports.  These
    handle character I/O via the Telnet library.  A ninth unit acts as the card
@@ -645,132 +974,151 @@ t_stat mpx_show_frev (FILE   *st,   UNIT  *uptr, int32 val,        CONST void *d
    a logical picture of the multiplexer to the user.
 */
 
-DEVICE mpx_dev;
+#define POLL_FLAGS          (UNIT_ATTABLE | UNIT_DIS)
 
-int32 mpx_order [MPX_PORTS] = { -1 };                       /* connection order */
-TMLN  mpx_ldsc [MPX_PORTS] = { { 0 } };                     /* line descriptors */
-TMXR  mpx_desc = { MPX_PORTS, 0, 0, mpx_ldsc, mpx_order };  /* device descriptor */
-
-DIB mpx_dib = { &mpx_io, MPX };
-
-UNIT mpx_unit [] = {
-    { UDATA (&mpx_line_svc, UNIT_FASTTIME, 0) },                    /* terminal I/O line 0 */
-    { UDATA (&mpx_line_svc, UNIT_FASTTIME, 0) },                    /* terminal I/O line 1 */
-    { UDATA (&mpx_line_svc, UNIT_FASTTIME, 0) },                    /* terminal I/O line 2 */
-    { UDATA (&mpx_line_svc, UNIT_FASTTIME, 0) },                    /* terminal I/O line 3 */
-    { UDATA (&mpx_line_svc, UNIT_FASTTIME, 0) },                    /* terminal I/O line 4 */
-    { UDATA (&mpx_line_svc, UNIT_FASTTIME, 0) },                    /* terminal I/O line 5 */
-    { UDATA (&mpx_line_svc, UNIT_FASTTIME, 0) },                    /* terminal I/O line 6 */
-    { UDATA (&mpx_line_svc, UNIT_FASTTIME, 0) },                    /* terminal I/O line 7 */
-    { UDATA (&mpx_cntl_svc, UNIT_DIS, 0) },                         /* controller unit */
-    { UDATA (&mpx_poll_svc, UNIT_ATTABLE | UNIT_DIS, POLL_FIRST) }  /* Telnet poll unit */
+static UNIT mpx_unit [] = {
+    { UDATA (&line_service, UNIT_FASTTIME, 0)             },    /* terminal I/O line 0 */
+    { UDATA (&line_service, UNIT_FASTTIME, 0)             },    /* terminal I/O line 1 */
+    { UDATA (&line_service, UNIT_FASTTIME, 0)             },    /* terminal I/O line 2 */
+    { UDATA (&line_service, UNIT_FASTTIME, 0)             },    /* terminal I/O line 3 */
+    { UDATA (&line_service, UNIT_FASTTIME, 0)             },    /* terminal I/O line 4 */
+    { UDATA (&line_service, UNIT_FASTTIME, 0)             },    /* terminal I/O line 5 */
+    { UDATA (&line_service, UNIT_FASTTIME, 0)             },    /* terminal I/O line 6 */
+    { UDATA (&line_service, UNIT_FASTTIME, 0)             },    /* terminal I/O line 7 */
+    { UDATA (&cntl_service, UNIT_DIS,      0)             },    /* controller unit */
+    { UDATA (&poll_service, POLL_FLAGS,    0), POLL_FIRST }     /* Telnet poll unit */
     };
 
-REG mpx_reg [] = {
-    { DRDATA (STATE,   mpx_state,    3) },
-    { ORDATA (IBUF,    mpx_ibuf,    16), REG_FIT },
-    { ORDATA (OBUF,    mpx_obuf,    16), REG_FIT },
 
-    { ORDATA (CMD,     mpx_cmd,      8) },
-    { ORDATA (PARAM,   mpx_param,   16) },
+/* Register list */
 
-    { DRDATA (PORT,    mpx_port,     8), PV_LEFT },
-    { DRDATA (PORTKEY, mpx_portkey,  8), PV_LEFT },
-    { DRDATA (IOLEN,   mpx_iolen,   16), PV_LEFT },
+static REG mpx_reg [] = {
+/*    Macro   Name      Location             Radix  Width      Offset                Depth                 Flags      */
+/*    ------  --------  -------------------  -----  -----  ---------------  ------------------------  --------------- */
+    { DRDATA (STATE,    mpx_state,                    3)                                                              },
+    { ORDATA (IBUF,     mpx_ibuf,                    16),                                             REG_FIT | REG_X },
+    { ORDATA (OBUF,     mpx_obuf,                    16),                                             REG_FIT | REG_X },
 
-    { FLDATA (UIEN,    mpx_uien,     0) },
-    { GRDATA (UIPORT,  mpx_uicode,  10, 3, 0)  },
-    { GRDATA (UICODE,  mpx_uicode,  10, 3, UI_REASON_V) },
+    { ORDATA (CMD,      mpx_cmd,                      8)                                                              },
+    { ORDATA (PARAM,    mpx_param,                   16)                                                              },
 
-    { BRDATA (KEYS,     mpx_key,      10,  8, MPX_PORTS) },
-    { BRDATA (PCONFIG,  mpx_config,    8, 16, MPX_PORTS) },
-    { BRDATA (RCVTYPE,  mpx_rcvtype,   8, 16, MPX_PORTS) },
-    { BRDATA (CHARCNT,  mpx_charcnt,   8, 16, MPX_PORTS) },
-    { BRDATA (TERMCNT,  mpx_termcnt,   8, 16, MPX_PORTS) },
-    { BRDATA (FLOWCNTL, mpx_flowcntl,  8, 16, MPX_PORTS) },
+    { DRDATA (PORT,     mpx_port,                     8),                                             PV_LEFT         },
+    { DRDATA (PORTKEY,  mpx_portkey,                  8),                                             PV_LEFT         },
+    { DRDATA (IOLEN,    mpx_iolen,                   16),                                             PV_LEFT         },
 
-    { BRDATA (ENQCNTR, mpx_enq_cntr, 10,  7, MPX_PORTS) },
-    { BRDATA (ACKWAIT, mpx_ack_wait, 10, 10, MPX_PORTS) },
-    { BRDATA (PFLAGS,  mpx_flags,     2, 12, MPX_PORTS) },
+    { FLDATA (UIEN,     mpx_uien,                                 0)                                                  },
+    { GRDATA (UIPORT,   mpx_uicode,           10,     3,          0)                                                  },
+    { GRDATA (UICODE,   mpx_uicode,           10,     3,   UI_REASON_SHIFT)                                           },
 
-    { BRDATA (RBUF, mpx_rbuf,  8,  8, MPX_PORTS * RD_BUF_SIZE) },
-    { BRDATA (WBUF, mpx_wbuf,  8,  8, MPX_PORTS * WR_BUF_SIZE) },
+    { BRDATA (KEYS,     mpx_key,              10,     8,                    MPX_PORTS)                                },
+    { BRDATA (PCONFIG,  mpx_config,            8,    16,                    MPX_PORTS)                                },
+    { BRDATA (RCVTYPE,  mpx_rcvtype,           2,    16,                    MPX_PORTS)                                },
+    { BRDATA (CHARCNT,  mpx_charcnt,           8,    16,                    MPX_PORTS)                                },
+    { BRDATA (TERMCNT,  mpx_termcnt,           8,    16,                    MPX_PORTS)                                },
+    { BRDATA (FLOWCNTL, mpx_flowcntl,          8,    16,                    MPX_PORTS)                                },
 
-    { BRDATA (GET, mpx_get,   10, 10, MPX_PORTS * 2) },
-    { BRDATA (SEP, mpx_sep,   10, 10, MPX_PORTS * 2) },
-    { BRDATA (PUT, mpx_put,   10, 10, MPX_PORTS * 2) },
+    { BRDATA (ENQCNTR,  mpx_enq_cntr,         10,     7,                    MPX_PORTS)                                },
+    { BRDATA (ACKWAIT,  mpx_ack_wait,         10,    10,                    MPX_PORTS)                                },
+    { BRDATA (PFLAGS,   mpx_flags,             2,    12,                    MPX_PORTS)                                },
 
-    { FLDATA (CTL,   mpx.control,         0)  },
-    { FLDATA (FLG,   mpx.flag,            0)  },
-    { FLDATA (FBF,   mpx.flagbuf,         0)  },
-    { ORDATA (SC,    mpx_dib.select_code, 6), REG_HRO },
-    { ORDATA (DEVNO, mpx_dib.select_code, 6), REG_HRO },
+    { BRDATA (RBUF,     mpx_rbuf,              8,     8,                    MPX_PORTS * RD_BUF_SIZE), REG_A           },
+    { BRDATA (WBUF,     mpx_wbuf,              8,     8,                    MPX_PORTS * WR_BUF_SIZE), REG_A           },
 
-    { BRDATA (CONNORD, mpx_order, 10, 32, MPX_PORTS), REG_HRO },
+    { BRDATA (GET,      mpx_get,              10,    10,                    MPX_PORTS * 2)                            },
+    { BRDATA (SEP,      mpx_sep,              10,    10,                    MPX_PORTS * 2)                            },
+    { BRDATA (PUT,      mpx_put,              10,    10,                    MPX_PORTS * 2)                            },
+
+    { FLDATA (CTL,      mpx.control,                              0)                                                  },
+    { FLDATA (FLG,      mpx.flag,                                 0)                                                  },
+    { FLDATA (FBF,      mpx.flagbuf,                              0)                                                  },
+    { ORDATA (SC,       mpx_dib.select_code,          6),                                             REG_HRO         },
+    { ORDATA (DEVNO,    mpx_dib.select_code,          6),                                             REG_HRO         },
+
+    { BRDATA (CONNORD,  mpx_order,            10,    32,                    MPX_PORTS),               REG_HRO         },
     { NULL }
     };
 
-MTAB mpx_mod [] = {
-    { UNIT_FASTTIME, UNIT_FASTTIME, "fast timing",      "FASTTIME",   NULL, NULL, NULL },
-    { UNIT_FASTTIME,             0, "realistic timing", "REALTIME",   NULL, NULL, NULL },
 
-    { UNIT_CAPSLOCK, UNIT_CAPSLOCK, "CAPS LOCK down",   "CAPSLOCK",   NULL, NULL, NULL },
-    { UNIT_CAPSLOCK,             0, "CAPS LOCK up",     "NOCAPSLOCK", NULL, NULL, NULL },
+/* Modifier list */
 
-    { MTAB_XTD | MTAB_VDV,            0, "REV",       NULL,        &mpx_set_frev,     &mpx_show_frev,     NULL },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "LINEORDER", "LINEORDER", &tmxr_set_lnorder, &tmxr_show_lnorder, &mpx_desc },
+static MTAB mpx_mod [] = {
+/*    Mask Value     Match Value    Print String        Match String  Validation  Display  Descriptor */
+/*    -------------  -------------  ------------------  ------------  ----------  -------  ---------- */
+    { UNIT_FASTTIME, UNIT_FASTTIME, "fast timing",      "FASTTIME",   NULL,       NULL,    NULL       },
+    { UNIT_FASTTIME,             0, "realistic timing", "REALTIME",   NULL,       NULL,    NULL       },
 
-    { MTAB_XTD | MTAB_VUN | MTAB_NC,  0, "LOG", "LOG",   &tmxr_set_log,   &tmxr_show_log, &mpx_desc },
-    { MTAB_XTD | MTAB_VUN | MTAB_NC,  0, NULL,  "NOLOG", &tmxr_set_nolog, NULL,           &mpx_desc },
+    { UNIT_CAPSLOCK, UNIT_CAPSLOCK, "CAPS LOCK down",   "CAPSLOCK",   NULL,       NULL,    NULL       },
+    { UNIT_CAPSLOCK,             0, "CAPS LOCK up",     "NOCAPSLOCK", NULL,       NULL,    NULL       },
 
-    { MTAB_XTD | MTAB_VDV,            0, "",            NULL,         NULL,        &mpx_status,      &mpx_desc },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,         NULL,        &tmxr_show_cstat, &mpx_desc },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS",  NULL,         NULL,        &tmxr_show_cstat, &mpx_desc },
-    { MTAB_XTD | MTAB_VDV,            1, NULL,          "DISCONNECT", &tmxr_dscln, NULL,             &mpx_desc },
-    { MTAB_XTD | MTAB_VDV,            0, "SC",          "SC",         &hp_setsc,   &hp_showsc,       &mpx_dev  },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEVNO",       "DEVNO",      &hp_setdev,  &hp_showdev,      &mpx_dev  },
+/*    Entry Flags          Value  Print String  Match String   Validation         Display             Descriptor         */
+/*    -------------------  -----  ------------  -------------  -----------------  ------------------  ------------------ */
+    { MTAB_XUN | MTAB_NC,    0,   "LOG",        "LOG",         &tmxr_set_log,     &tmxr_show_log,     (void *) &mpx_desc },
+    { MTAB_XUN | MTAB_NC,    0,   NULL,         "NOLOG",       &tmxr_set_nolog,   NULL,               (void *) &mpx_desc },
+
+    { MTAB_XDV,              0,   "REV",        NULL,          &set_revision,     &show_revision,     NULL },
+    { MTAB_XDV | MTAB_NMO,   0,   "LINEORDER",  "LINEORDER",   &tmxr_set_lnorder, &tmxr_show_lnorder, (void *) &mpx_desc },
+
+    { MTAB_XDV,              0,   "",            NULL,         NULL,              &show_status,       (void *) &mpx_desc },
+    { MTAB_XDV | MTAB_NMO,   1,   "CONNECTIONS", NULL,         NULL,              &tmxr_show_cstat,   (void *) &mpx_desc },
+    { MTAB_XDV | MTAB_NMO,   0,   "STATISTICS",  NULL,         NULL,              &tmxr_show_cstat,   (void *) &mpx_desc },
+    { MTAB_XDV,              1,   NULL,          "DISCONNECT", &tmxr_dscln,       NULL,               (void *) &mpx_desc },
+
+    { MTAB_XDV,              1u,  "SC",          "SC",         &hp_set_dib,       &hp_show_dib,       (void *) &mpx_dib  },
+    { MTAB_XDV | MTAB_NMO,  ~1u,  "DEVNO",       "DEVNO",      &hp_set_dib,       &hp_show_dib,       (void *) &mpx_dib  },
 
     { 0 }
     };
 
-DEBTAB mpx_deb [] = {
-    { "CMDS", DEB_CMDS },
-    { "CPU",  DEB_CPU },
-    { "BUF",  DEB_BUF },
-    { "XFER", DEB_XFER },
-    { NULL,   0 }
+
+/* Debugging trace list */
+
+static DEBTAB mpx_deb [] = {
+    { "CMDS",  DEB_CMDS    },
+    { "CPU",   DEB_CPU     },
+    { "BUF",   DEB_BUF     },
+    { "XFER",  DEB_XFER    },
+    { "IOBUS", TRACE_IOBUS },                   /* interface I/O bus signals and data words */
+    { NULL,    0           }
     };
+
+
+/* Device descriptor */
 
 DEVICE mpx_dev = {
-    "MPX",                                  /* device name */
-    mpx_unit,                               /* unit array */
-    mpx_reg,                                /* register array */
-    mpx_mod,                                /* modifier array */
-    MPX_PORTS + MPX_CNTLS,                  /* number of units */
-    10,                                     /* address radix */
-    31,                                     /* address width */
-    1,                                      /* address increment */
-    8,                                      /* data radix */
-    8,                                      /* data width */
-    &tmxr_ex,                               /* examine routine */
-    &tmxr_dep,                              /* deposit routine */
-    &mpx_reset,                             /* reset routine */
-    NULL,                                   /* boot routine */
-    &mpx_attach,                            /* attach routine */
-    &mpx_detach,                            /* detach routine */
-    &mpx_dib,                               /* device information block */
-    DEV_DEBUG | DEV_DISABLE | DEV_MUX,      /* device flags */
-    0,                                      /* debug control flags */
-    mpx_deb,                                /* debug flag name table */
-    NULL,                                   /* memory size change routine */
-    NULL,                                   /* logical device name */
-    NULL,                                   /* help routine */
-    NULL,                                   /* help attach routine*/
-    (void *) &mpx_desc                      /* help context */
+    "MPX",                                      /* device name */
+    mpx_unit,                                   /* unit array */
+    mpx_reg,                                    /* register array */
+    mpx_mod,                                    /* modifier array */
+    MPX_PORTS + MPX_CNTLS,                      /* number of units */
+    10,                                         /* address radix */
+    31,                                         /* address width */
+    1,                                          /* address increment */
+    8,                                          /* data radix */
+    8,                                          /* data width */
+    &tmxr_ex,                                   /* examine routine */
+    &tmxr_dep,                                  /* deposit routine */
+    &mpx_reset,                                 /* reset routine */
+    NULL,                                       /* boot routine */
+    &mpx_attach,                                /* attach routine */
+    &mpx_detach,                                /* detach routine */
+    &mpx_dib,                                   /* device information block */
+    DEV_DEBUG | DEV_DISABLE | DEV_MUX,          /* device flags */
+    0,                                          /* debug control flags */
+    mpx_deb,                                    /* debug flag name table */
+    NULL,                                       /* memory size change routine */
+    NULL,                                       /* logical device name */
+    NULL,                                       /* help routine */
+    NULL,                                       /* help attach routine*/
+    (void *) &mpx_desc                          /* help context */
     };
 
 
-/* I/O signal handler.
+
+/* Interface local SCP support routines */
+
+
+
+/* Multiplexer interface.
 
    Commands are sent to the card via an OTA/B.  Issuing an STC SC,C causes the
    mux to accept the word (STC causes a NMI on the card).  If the command uses
@@ -806,6 +1154,7 @@ DEVICE mpx_dev = {
    flip-flops, while CRS clears the control flip-flop.  For this card, the
    control and flags are cleared together by CRS, and POPIO is not used.
 
+
    Implementation notes:
 
     1. "Enable unsolicited input" is the only command that does not set the
@@ -823,12 +1172,12 @@ DEVICE mpx_dev = {
        is reset.
 */
 
-uint32 mpx_io (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
+static uint32 mpx_io (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
 static const char *output_state [] = { "Command", "Command override", "Parameter", "Data" };
 static const char *input_state  [] = { "Status",  "Invalid status",   "Parameter", "Data" };
 const char *hold_or_clear = (signal_set & ioCLF ? ",C" : "");
-int32 delay;
+int32    delay;
 IOSIGNAL signal;
 IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
@@ -840,14 +1189,12 @@ while (working_set) {
         case ioCLF:                                     /* clear flag flip-flop */
             mpx.flag = mpx.flagbuf = CLEAR;             /* clear flag and flag buffer */
 
-            if (DEBUG_PRI (mpx_dev, DEB_CMDS))
-                fputs (">>MPX cmds: [CLF] Flag cleared\n", sim_deb);
+            tprintf (mpx_dev, DEB_CMDS, "[CLF] Flag cleared\n");
             break;
 
 
         case ioSTF:                                     /* set flag flip-flop */
-            if (DEBUG_PRI (mpx_dev, DEB_CMDS))
-                fputs (">>MPX cmds: [STF] Flag set\n", sim_deb);
+            tprintf (mpx_dev, DEB_CMDS, "[STF] Flag set\n");
                                                         /* fall into ENF */
 
         case ioENF:                                     /* enable flag */
@@ -868,9 +1215,8 @@ while (working_set) {
         case ioIOI:                                     /* I/O data input */
             stat_data = IORETURN (SCPE_OK, mpx_ibuf);   /* return info */
 
-            if (DEBUG_PRI (mpx_dev, DEB_CPU))
-                fprintf (sim_deb, ">>MPX cpu:  [LIx%s] %s = %06o\n",
-                                  hold_or_clear, input_state [mpx_state], mpx_ibuf);
+            tprintf (mpx_dev, DEB_CPU, "[LIx%s] %s = %06o\n",
+                     hold_or_clear, input_state [mpx_state], mpx_ibuf);
 
             if (mpx_state == exec)                      /* if this is input data word */
                 sim_activate (&mpx_cntl, DATA_DELAY);   /*   continue transmission */
@@ -880,16 +1226,14 @@ while (working_set) {
         case ioIOO:                                     /* I/O data output */
             mpx_obuf = IODATA (stat_data);              /* save word */
 
-            if (DEBUG_PRI (mpx_dev, DEB_CPU))
-                fprintf (sim_deb, ">>MPX cpu:  [OTx%s] %s = %06o\n",
-                                  hold_or_clear, output_state [mpx_state], mpx_obuf);
+            tprintf (mpx_dev, DEB_CPU, "[OTx%s] %s = %06o\n",
+                     hold_or_clear, output_state [mpx_state], mpx_obuf);
 
             if (mpx_state == param) {                   /* if this is parameter word */
                 sim_activate (&mpx_cntl, CMD_DELAY);    /*   do command now */
 
-                if (DEBUG_PRI (mpx_dev, DEB_CMDS))
-                    fprintf (sim_deb, ">>MPX cmds: [OTx%s] Command %03o parameter %06o scheduled, "
-                                      "time = %d\n", hold_or_clear, mpx_cmd, mpx_obuf, CMD_DELAY);
+                tprintf (mpx_dev, DEB_CMDS, "[OTx%s] Command %03o parameter %06o scheduled, time = %d\n",
+                         hold_or_clear, mpx_cmd, mpx_obuf, CMD_DELAY);
                 }
 
             else if (mpx_state == exec)                 /* else if this is output data word */
@@ -905,16 +1249,14 @@ while (working_set) {
             mpx.flagbuf = CLEAR;                        /* clear flag buffer */
             mpx.flag    = CLEAR;                        /* clear flag */
 
-            if (DEBUG_PRI (mpx_dev, DEB_CMDS))
-                fputs (">>MPX cmds: [CRS] Controller reset\n", sim_deb);
+            tprintf (mpx_dev, DEB_CMDS, "[CRS] Controller reset\n");
             break;
 
 
         case ioCLC:                                     /* clear control flip-flop */
             mpx.control = CLEAR;                        /* clear control */
 
-            if (DEBUG_PRI (mpx_dev, DEB_CMDS))
-                fprintf (sim_deb, ">>MPX cmds: [CLC%s] Control cleared\n", hold_or_clear);
+            tprintf (mpx_dev, DEB_CMDS, "[CLC%s] Control cleared\n", hold_or_clear);
             break;
 
 
@@ -924,8 +1266,8 @@ while (working_set) {
             if (mpx_cmd == CMD_BINARY_READ)             /* executing fast binary read? */
                 break;                                  /* further command execution inhibited */
 
-            mpx_cmd = GET_OPCODE (mpx_obuf);            /* get command opcode */
-            mpx_portkey = GET_KEY (mpx_obuf);           /* get port key */
+            mpx_cmd = CN_OPCODE (mpx_obuf);             /* get command opcode */
+            mpx_portkey = CN_KEY (mpx_obuf);            /* get port key */
 
             if (mpx_state == cmd)                       /* already scheduled? */
                 sim_cancel (&mpx_cntl);                 /* cancel to get full delay */
@@ -939,15 +1281,13 @@ while (working_set) {
 
             sim_activate (&mpx_cntl, delay);            /* schedule command */
 
-            if (DEBUG_PRI (mpx_dev, DEB_CMDS))
-                fprintf (sim_deb, ">>MPX cmds: [STC%s] Command %03o key %d scheduled, "
-                                  "time = %d\n", hold_or_clear, mpx_cmd, mpx_portkey, delay);
+            tprintf (mpx_dev, DEB_CMDS, "[STC%s] Command %03o key %d scheduled, time = %d\n",
+                     hold_or_clear, mpx_cmd, mpx_portkey, delay);
             break;
 
 
         case ioEDT:                                     /* end data transfer */
-            if (DEBUG_PRI (mpx_dev, DEB_CPU))
-                fputs (">>MPX cpu:  [EDT] DCPC transfer ended\n", sim_deb);
+            tprintf (mpx_dev, DEB_CPU, "[EDT] DCPC transfer ended\n");
             break;
 
 
@@ -974,6 +1314,913 @@ return stat_data;
 }
 
 
+/* Multiplexer controller service.
+
+   The controller service handles commands and data transfers to and from the
+   CPU.  The delay in scheduling the controller service represents the firmware
+   command or data execution time.  The controller may be in one of four states
+   upon entry: idle, first word of command received (cmd), command parameter
+   received (param), or data transfer (exec).
+
+   Entry in the command state causes execution of one-word commands and
+   solicitation of command parameters for two-word commands, which are executed
+   when entering in the parameter state.
+
+   Entry in the data transfer state moves one word between the CPU and a read or
+   write buffer.  For writes, the write buffer is filled with words from the
+   CPU.  Once the indicated number of words have been transferred, the
+   appropriate line service is scheduled to send the characters.  For reads,
+   characters are unloaded from the read buffer to the CPU; an odd-length
+   transfer is padded with a blank.  A read of fewer characters than are present
+   in the buffer will return the remaining characters when the next read is
+   performed.
+
+   Each read or write is terminated by the CPU sending one additional word (the
+   RTE drivers send -1).  The command completes when this word is acknowledged
+   by the card setting the device flag.  For zero-length writes, this additional
+   word will be the only word sent.
+
+   Data transfer is also used by the "Download executable" command to absorb the
+   downloaded program.  The firmware jumps to location 5100 hex in the
+   downloaded program upon completion of reception.  It is the responsibility of
+   the program to return to the multiplexer firmware and to return to the CPU
+   whatever status is appropriate when it is done.  Under simulation, we simply
+   "sink" the program and return status compatible with the multiplexer
+   diagnostic program to simulate a passing test.
+
+   Entry in the idle state checks for unsolicited interrupts.  UIs are sent to
+   the host when the controller is idle, UIs have been enabled, and a UI
+   condition exists.  If a UI is not acknowledged, it will remain pending and
+   will be reissued the next time the controller is idle and UIs have been
+   enabled.
+
+   UI conditions are kept in the per-port flags.  The UI conditions are write
+   buffer available, read buffer available, break received, modem line
+   connected, and modem line disconnected.  The latter two conditions are not
+   implemented in this simulation.  If a break condition occurs at the same time
+   as a read buffer completion, the break has priority; the buffer UI will occur
+   after the break UI is acknowledged.
+
+   The firmware checks for UI condition flags as part of the scheduler polling
+   loop.  Under simulation, though, UIs can occur only in two places: the point
+   of origin (e.g., termination of a read buffer), or the "Enable unsolicited
+   input" command executor.  UIs will be generated at the point of origin only
+   if the simulator is idle.  If the simulator is not idle, it is assumed that
+   UIs have been disabled to execute the current command and will be reenabled
+   when the command sequence is complete.
+
+   When the multiplexer is reset, and before the port keys are set, all ports
+   enter "echoplex" mode.  In this mode, characters received are echoed back as
+   a functional test.  Each port terminates buffers on CR reception.  We detect
+   this condition, cancel the buffer, and discard the buffer termination UI.
+
+
+   Implementation notes:
+
+    1. The firmware transfers the full amount requested by the CPU, even if the
+       transfer is longer than the buffer.  Also, zero-length transfers program
+       the card DMA chip to transfer 0 bytes; this results in a transfer of 217
+       bytes, per the Zilog databook.  Under simulation, writes beyond the
+       buffer are accepted from the CPU but discarded, and reads beyond the
+       buffer return blanks.
+
+    2. We should never return from this routine in the "cmd" state, so debugging
+       will report "internal error!" if we do.
+*/
+
+static t_stat cntl_service (UNIT *uptr)
+{
+uint8 ch;
+uint32 i;
+t_bool add_crlf;
+t_bool set_flag = TRUE;
+STATE last_state = mpx_state;
+
+static const char *cmd_state [] = { "complete", "internal error!", "waiting for parameter", "executing" };
+
+
+switch (mpx_state) {                                                /* dispatch on current state */
+
+    case idle:                                                      /* controller idle */
+        set_flag = FALSE;                                           /* assume no UI */
+
+        if (mpx_uicode) {                                                   /* unacknowledged UI? */
+            if (mpx_uien == TRUE) {                                         /* interrupts enabled? */
+                mpx_port = GET_UIPORT (mpx_uicode);                         /* get port number */
+                mpx_portkey = mpx_key [mpx_port];                           /* get port key */
+                mpx_ibuf = (uint16) (mpx_uicode & UI_REASON_MASK | mpx_portkey); /* report UI reason and port key */
+                set_flag = TRUE;                                            /* reissue host interrupt */
+                mpx_uien = FALSE;                                           /* disable UI */
+
+                tprintf (mpx_dev, DEB_CMDS, "Port %d key %d unsolicited interrupt reissued, reason = %d\n",
+                         mpx_port, mpx_portkey, GET_UIREASON (mpx_uicode));
+                }
+            }
+
+        else {                                                      /* no unacknowledged UI */
+            for (i = 0; i < MPX_PORTS; i++) {                       /* check all ports for UIs */
+                if (mpx_flags [i] & FL_UI_PENDING) {                /* pending UI? */
+                    mpx_portkey = mpx_key [i];                      /* get port key */
+
+                    if (mpx_portkey == KEY_DEFAULT) {               /* key defined? */
+                        if (mpx_flags [i] & FL_HAVEBUF)             /* no, is this read buffer avail? */
+                            buf_cancel (ioread, i, get);            /* cancel buffer */
+
+                        mpx_flags [i] &= ~FL_UI_PENDING;            /* cancel pending UI */
+                        }
+
+                    else if (mpx_uien == TRUE) {                    /* interrupts enabled? */
+                        if ((mpx_flags [i] & FL_WANTBUF) &&         /* port wants a write buffer? */
+                            (buf_avail (iowrite, i) > 0))           /*   and one is available? */
+                            mpx_uicode = UI_WRBUF_AVAIL;            /* set UI reason */
+
+                        else if (mpx_flags [i] & FL_BREAK)          /* received a line BREAK? */
+                            mpx_uicode = UI_BRK_RECD;               /* set UI reason */
+
+                        else if (mpx_flags [i] & FL_HAVEBUF)        /* have a read buffer ready? */
+                            mpx_uicode = UI_RDBUF_AVAIL;            /* set UI reason */
+
+                        if (mpx_uicode) {                                   /* UI to send? */
+                            mpx_port = i;                                   /* set port number for Acknowledge */
+                            mpx_ibuf = (uint16) (mpx_uicode | mpx_portkey); /* merge UI reason and port key */
+                            mpx_uicode = mpx_uicode | mpx_port;             /* save UI reason and port */
+                            set_flag = TRUE;                                /* interrupt host */
+                            mpx_uien = FALSE;                               /* disable UI */
+
+                            tprintf (mpx_dev, DEB_CMDS, "Port %d key %d unsolicited interrupt generated, reason = %d\n",
+                                     i, mpx_portkey, GET_UIREASON (mpx_uicode));
+
+                            break;                                  /* quit after first UI */
+                            }
+                        }
+                    }
+                }
+            }
+        break;
+
+
+    case cmd:                                           /* command state */
+        if (mpx_cmd & CMD_TWO_WORDS)                    /* two-word command? */
+            mpx_state = param;                          /* look for parameter before executing */
+        else
+            set_flag = exec_command ();                 /* execute one-word command */
+        break;
+
+
+    case param:                                         /* parameter get state */
+        mpx_param = mpx_obuf;                           /* save parameter */
+        set_flag = exec_command ();                     /* execute two-word command */
+        break;
+
+
+    case exec:                                          /* execution state */
+        switch (mpx_cmd) {
+
+            case CMD_BINARY_READ:                       /* fast binary read */
+                mpx_flags [0] &= ~FL_HAVEBUF;           /* data word was picked up by CPU */
+                set_flag = FALSE;                       /* suppress device flag */
+                break;
+
+
+            case CMD_WRITE:                                 /* transfer data to buffer */
+                if (mpx_iolen <= 0) {                       /* last (or only) entry? */
+                    mpx_state = idle;                       /* idle controller */
+
+                    if (mpx_iolen < 0)                      /* tie-off for buffer complete? */
+                        break;                              /* we're done */
+                    }
+
+                add_crlf = ((mpx_param &                    /* CRLF should be added */
+                             (WR_ADD_CRLF | WR_PARTIAL)) == WR_ADD_CRLF);
+
+                for (i = 0; i < 2; i++)                     /* output one or two chars */
+                    if (mpx_iolen > 0) {                    /* more to do? */
+                        if (i)                              /* high or low byte? */
+                            ch = (uint8) (mpx_obuf & 0377); /* low byte */
+                        else
+                            ch = mpx_obuf >> 8;             /* high byte */
+
+                        if ((mpx_iolen == 1) &&             /* final char? */
+                            (ch == '_') && add_crlf) {      /* underscore and asking for CRLF? */
+
+                            add_crlf = FALSE;               /* suppress CRLF */
+
+                            tprintf (mpx_dev, DEB_BUF, "Port %d character '_' suppressed CR/LF\n", mpx_port);
+                            }
+
+                        else if (buf_len (iowrite, mpx_port, put) < WR_BUF_LIMIT)
+                            buf_put (iowrite, mpx_port, ch);    /* add char to buffer if space avail */
+
+                        mpx_iolen = mpx_iolen - 1;              /* drop remaining count */
+                        }
+
+                if (mpx_iolen == 0)  {                              /* buffer done? */
+                    if (add_crlf) {                                 /* want CRLF? */
+                        buf_put (iowrite, mpx_port, CR);            /* add CR to buffer */
+                        buf_put (iowrite, mpx_port, LF);            /* add LF to buffer */
+                        }
+
+                    buf_term (iowrite, mpx_port, (uint8) (mpx_param  >> 8));    /* terminate buffer */
+                    mpx_iolen = -1;                                             /* mark as done */
+                    }
+
+                if (sim_is_active (&mpx_unit [mpx_port]) == 0)
+                    tprintf (mpx_dev, DEB_CMDS, "Port %d service scheduled, time = %d\n",
+                             mpx_port, mpx_unit [mpx_port].wait);
+
+                sim_activate (&mpx_unit [mpx_port],                 /* start line service */
+                              mpx_unit [mpx_port].wait);
+                break;
+
+
+            case CMD_READ:                                          /* transfer data from buffer */
+                if (mpx_iolen < 0) {                                /* input complete? */
+                    if (mpx_obuf == 0177777) {                      /* "tie-off" word received? */
+                        if (buf_len (ioread, mpx_port, get) == 0) { /* buffer now empty? */
+                            buf_free (ioread, mpx_port);            /* free buffer */
+
+                            if ((buf_avail (ioread, mpx_port) == 1) &&  /* one buffer remaining? */
+                                !(mpx_flags [mpx_port] & FL_RDFILL))    /*   and not filling it? */
+                                mpx_flags [mpx_port] |= FL_HAVEBUF;     /* indicate buffer availability */
+                            }
+
+                        mpx_state = idle;                           /* idle controller */
+                        }
+
+                    else
+                        set_flag = FALSE;                           /* ignore word */
+
+                    break;
+                    }
+
+                for (i = 0; i < 2; i++)                             /* input one or two chars */
+                    if (mpx_iolen > 0) {                            /* more to transfer? */
+                        if (buf_len (ioread, mpx_port, get) > 0)    /* more chars available? */
+                            ch = buf_get (ioread, mpx_port);        /* get char from buffer */
+                        else                                        /* buffer exhausted */
+                            ch = ' ';                               /* pad with blank */
+
+                        if (i)                                      /* high or low byte? */
+                            mpx_ibuf = mpx_ibuf | ch;               /* low byte */
+                        else
+                            mpx_ibuf = (uint16) (ch << 8);          /* high byte */
+
+                        mpx_iolen = mpx_iolen - 1;                  /* drop count */
+                        }
+
+                    else                                            /* odd number of chars */
+                        mpx_ibuf = mpx_ibuf | ' ';                  /* pad last with blank */
+
+                if (mpx_iolen == 0)                                 /* end of host xfer? */
+                    mpx_iolen = -1;                                 /* mark as done */
+
+                break;
+
+
+            case CMD_DL_EXEC:                                   /* sink data from host */
+                if (mpx_iolen <= 0) {                           /* final entry? */
+                    mpx_state = idle;                           /* idle controller */
+                    mpx_ibuf = ST_DIAG_OK;                      /* return diag passed status */
+                    }
+
+                else {
+                    if (mpx_iolen > 0)                          /* more from host? */
+                        mpx_iolen = mpx_iolen - 2;              /* sink two bytes */
+
+                    if (mpx_iolen <= 0)                         /* finished download? */
+                        sim_activate (&mpx_cntl, CMD_DELAY);    /* schedule completion */
+
+                    tprintf (mpx_dev, DEB_CMDS, "Download completion scheduled, time = %d\n", CMD_DELAY);
+                    }
+
+                break;
+
+
+            default:                                            /* no other entries allowed */
+                return SCPE_IERR;                               /* simulator error! */
+            }
+        break;
+    }
+
+
+
+if (TRACING (mpx_dev, DEB_CMDS)                             /* debug print? */
+  && last_state != mpx_state)                               /*   and state change? */
+    if ((mpx_cmd & CMD_TWO_WORDS) && (mpx_state != param))
+        tprintf (mpx_dev, DEB_CMDS, "Command %03o parameter %06o %s",
+                 mpx_cmd, mpx_param, cmd_state [mpx_state]);
+    else
+        tprintf (mpx_dev, DEB_CMDS, "Command %03o %s",
+                 mpx_cmd, cmd_state [mpx_state]);
+
+if (set_flag) {
+    mpx_io (&mpx_dib, ioENF, 0);                        /* set device flag */
+
+    tprintf (mpx_dev, DEB_CMDS, "Flag set\n");
+    }
+
+return SCPE_OK;
+}
+
+
+/* Multiplexer line service.
+
+   The line service routine is used to transmit and receive characters.  It is
+   started when a buffer is ready for output or when the Telnet poll routine
+   determines that there are characters ready for input, and it is stopped when
+   there are no more characters to output or input.  When a line is quiescent,
+   this routine does not run.  Service times are selected to approximate the
+   baud rate setting of the multiplexer port.
+
+   "Fast timing" mode enables three optimizations.  First, buffered characters
+   are transferred via Telnet in blocks, rather than a character at a time; this
+   reduces network traffic and decreases simulator overhead (there is only one
+   service routine entry per block, rather than one per character).  Second,
+   ENQ/ACK handshaking is done locally, without involving the Telnet client.
+   Third, when editing and echo is enabled, entering BS echoes a backspace, a
+   space, and a backspace, and entering DEL echoes a backslash, a carriage
+   return, and a line feed, providing better compatibility with prior RTE
+   terminal drivers.
+
+   Each read and write buffer begins with a reserved header byte that stores
+   per-buffer information, such as whether handshaking should be suppressed
+   during output, or the specific cause of termination for input.  Buffer
+   termination sets the header byte with the appropriate flags.
+
+   For output, a character counter is maintained and is incremented if ENQ/ACK
+   handshaking is enabled for the current port and request.  If the counter
+   limit is reached, an ENQ is sent, and a flag is set to suspend transmission
+   until an ACK is received.  If the last character of the buffer is sent, the
+   write buffer is freed, and a UI check is made if the controller is idle, in
+   case a write buffer request is pending.
+
+   For input, the character is retrieved from the Telnet buffer.  If a BREAK was
+   received, break status is set, and the character is discarded (the current
+   multiplexer library implementation always returns a NUL with a BREAK
+   indication).  If the character is an XOFF, and XON/XOFF pacing is enabled, a
+   flag is set, and transmission is suspended until a corresponding XON is
+   received.  If the character is an ACK and is in response to a previously sent
+   ENQ, it is discarded, and transmission is reenabled.
+
+   If editing is enabled, a BS will delete the last character in the read
+   buffer, and a DEL will delete the entire buffer.  Otherwise, buffer
+   termination conditions are checked (end on character, end on count, or
+   buffer full), and if observed, the read buffer is terminated, and a read
+   buffer available UI condition is signalled.
+
+
+   Implementation notes:
+
+    1. The firmware echoes an entered BS before checking the buffer count to see
+       if there are any characters to delete.  Under simulation, we only echo if
+       the buffer is not empty.
+
+    2. The "Fast binary read" command inhibits the normal transmit and receive
+       processing.  Instead, a pair of characters are sought on line 0 to fill
+       the input buffer.  When they are received, the device flag is set.  The
+       CPU will do a LIx sc,C to retrieve the data and reset the flag.
+
+    3. In fast timing mode, burst transfers are used only to fill the first of
+       the two receive buffers; the second is filled with one character per
+       service entry.  This allows the CPU time to unload the first buffer
+       before the second fills up.  Once the first buffer is freed, the routine
+       shifts back to burst mode to fill the remainder of the second buffer.
+*/
+
+static t_stat line_service (UNIT *uptr)
+{
+const  int32 port = uptr - mpx_unit;                            /* port number */
+const uint16 rt = mpx_rcvtype [port];                           /* receive type for port */
+const uint32 data_bits = 5 + GET_BPC (mpx_config [port]);       /* number of data bits */
+const uint32 data_mask = (1 << data_bits) - 1;                  /* mask for data bits */
+const t_bool fast_timing = (uptr->flags & UNIT_FASTTIME) != 0;  /* port is set for fast timing */
+const t_bool fast_binary_read = (mpx_cmd == CMD_BINARY_READ);   /* fast binary read in progress */
+uint8 ch;
+int32 chx;
+uint32 buffer_count, write_count;
+t_stat status = SCPE_OK;
+t_bool recv_loop = !fast_binary_read;                           /* bypass if fast binary read */
+t_bool xmit_loop = !(fast_binary_read ||                        /* bypass if fast read or output suspended */
+                     (mpx_flags [port] & (FL_WAITACK | FL_XOFF)));
+
+
+tprintf (mpx_dev, DEB_CMDS, "Port %d service entered\n", port);
+
+/* Transmission service */
+
+write_count = buf_len (iowrite, port, get);             /* get the output buffer length */
+
+while (xmit_loop && write_count > 0) {                  /* character available to output? */
+    if ((mpx_flags [port] & FL_WREMPT) == 0) {          /* if the buffer has not started emptying */
+        chx = buf_get (iowrite, port) << 8;             /*   then get the header value and position it */
+
+        if (fast_timing || (chx & WR_NO_ENQACK) ||      /* do we want handshake? */
+            !(mpx_config [port] & SK_ENQACK))           /*   and configured for handshake? */
+            mpx_flags [port] &= ~FL_DO_ENQACK;          /* no, so clear flag */
+        else
+            mpx_flags [port] |= FL_DO_ENQACK;           /* yes, so set flag */
+
+        continue;                                       /* continue with the first output character */
+        }
+
+    if (mpx_flags [port] & FL_DO_ENQACK)                /* do handshake for this buffer? */
+        mpx_enq_cntr [port] = mpx_enq_cntr [port] + 1;  /* bump character counter */
+
+    if (mpx_enq_cntr [port] > ENQ_LIMIT) {              /* ready for ENQ? */
+        mpx_enq_cntr [port] = 0;                        /* clear ENQ counter */
+        mpx_ack_wait [port] = 0;                        /* clear ACK wait timer */
+
+        mpx_flags [port] |= FL_WAITACK;                 /* set wait for ACK */
+        ch = ENQ;
+        status = tmxr_putc_ln (&mpx_ldsc [port], ch);   /* transmit ENQ */
+        xmit_loop = FALSE;                              /* stop further transmission */
+        }
+
+    else {                                              /* not ready for ENQ */
+        ch = buf_get (iowrite, port) & data_mask;       /* get char and mask to bit width */
+        status = tmxr_putc_ln (&mpx_ldsc [port], ch);   /* transmit the character */
+
+        write_count = write_count - 1;                  /* count the character */
+        xmit_loop = (status == SCPE_OK) && fast_timing; /*   and continue transmission if enabled */
+        }
+
+    if (status != SCPE_OK)                              /* if the transmission failed */
+        xmit_loop = FALSE;                              /*   then exit the loop */
+
+    else
+        tprintf (mpx_dev, DEB_XFER, "Port %d character %s transmitted\n",
+                 port, fmt_char (ch));
+
+    if (write_count == 0) {                             /* buffer complete? */
+        buf_free (iowrite, port);                       /* free buffer */
+
+        write_count = buf_len (iowrite, port, get);     /* get the next output buffer length */
+
+        if (mpx_state == idle)                          /* controller idle? */
+            cntl_service (&mpx_cntl);                   /* check for UI */
+        }
+    }
+
+
+/* Reception service */
+
+buffer_count = buf_avail (ioread, port);                /* get the number of available read buffers */
+
+if (mpx_flags [port] & FL_RDFILL)                       /* if filling the current buffer */
+    buffer_count = buffer_count + 1;                    /*   then include it in the count */
+
+while (recv_loop) {                                     /* OK to process? */
+    chx = tmxr_getc_ln (&mpx_ldsc [port]);              /* get a new character */
+
+    if (chx == 0)                                       /* if there are no more characters available */
+        break;                                          /*   then quit the reception loop */
+
+    if (chx & SCPE_BREAK) {                             /* break detected? */
+        mpx_flags [port] |= FL_BREAK;                   /* set break status */
+
+        tprintf (mpx_dev, DEB_XFER, "Break detected\n");
+
+        if (mpx_state == idle)                          /* controller idle? */
+            cntl_service (&mpx_cntl);                   /* check for UI */
+
+        continue;                                       /* discard NUL that accompanied BREAK */
+        }
+
+    ch = (uint8) (chx & data_mask);                     /* mask to bits per char */
+
+    if ((ch == XOFF) &&                                 /* XOFF? */
+        (mpx_flowcntl [port] & FC_XONXOFF)) {           /*   and handshaking enabled? */
+        mpx_flags [port] |= FL_XOFF;                    /* suspend transmission */
+
+        tprintf (mpx_dev, DEB_XFER, "Port %d character XOFF suspends transmission\n", port);
+
+        recv_loop = fast_timing;                        /* set to loop if fast mode */
+        continue;
+        }
+
+    else if ((ch == XON) &&                             /* XON? */
+             (mpx_flags [port] & FL_XOFF)) {            /*   and currently suspended? */
+        mpx_flags [port] &= ~FL_XOFF;                   /* resume transmission */
+
+        tprintf (mpx_dev, DEB_XFER, "Port %d character XON resumes transmission\n", port);
+
+        recv_loop = fast_timing;                        /* set to loop if fast mode */
+        continue;
+        }
+
+    tprintf (mpx_dev, DEB_XFER, "Port %d character %s received\n",
+             port, fmt_char (ch));
+
+    if ((ch == ACK) && (mpx_flags [port] & FL_WAITACK)) {   /* ACK and waiting for it? */
+        mpx_flags [port] = mpx_flags [port] & ~FL_WAITACK;  /* clear wait flag */
+        recv_loop = FALSE;                                  /* absorb character */
+        }
+
+    else if (buffer_count == 0 &&                           /* no free buffer available for char? */
+             !(mpx_flags [port] & FL_RDFILL)) {             /*   and not filling last buffer? */
+        mpx_flags [port] |= FL_RDOVFLOW;                    /* set buffer overflow flag */
+        recv_loop = fast_timing;                            /* continue loop if fast mode */
+        }
+
+    else {                                                      /* buffer is available */
+        if (rt & RT_ENAB_EDIT)                                  /* editing enabled? */
+            if (ch == BS) {                                     /* backspace? */
+                if (buf_len (ioread, port, put) > 0)            /* at least one character in buffer? */
+                    buf_remove (ioread, port);                  /* remove last char */
+
+                if (rt & RT_ENAB_ECHO) {                        /* echo enabled? */
+                    tmxr_putc_ln (&mpx_ldsc [port], BS);        /* echo BS */
+
+                    if (fast_timing) {                          /* fast timing mode? */
+                        tmxr_putc_ln (&mpx_ldsc [port], ' ');   /* echo space */
+                        tmxr_putc_ln (&mpx_ldsc [port], BS);    /* echo BS */
+                        }
+                    }
+
+                continue;
+                }
+
+            else if (ch == DEL) {                               /* delete line? */
+                buf_cancel (ioread, port, put);                 /* cancel put buffer */
+
+                if (rt & RT_ENAB_ECHO) {                        /* echo enabled? */
+                    if (fast_timing)                            /* fast timing mode? */
+                        tmxr_putc_ln (&mpx_ldsc [port], '\\');  /* echo backslash */
+
+                    tmxr_putc_ln (&mpx_ldsc [port], CR);        /* echo CR */
+                    tmxr_putc_ln (&mpx_ldsc [port], LF);        /*   and LF */
+                    }
+
+                continue;
+                }
+
+        if (uptr->flags & UNIT_CAPSLOCK)                    /* caps lock mode? */
+            ch = (uint8) toupper (ch);                      /* convert to upper case if lower */
+
+        if (rt & RT_ENAB_ECHO)                              /* echo enabled? */
+            tmxr_putc_ln (&mpx_ldsc [port], ch);            /* echo the char */
+
+        if (rt & RT_END_ON_CHAR) {                          /* end on character? */
+            recv_loop = FALSE;                              /* assume termination */
+
+            if ((ch == CR) && (rt & RT_END_ON_CR)) {
+                if (rt & RT_ENAB_ECHO)                      /* echo enabled? */
+                    tmxr_putc_ln (&mpx_ldsc [port], LF);    /* send LF */
+                mpx_param = RS_ETC_CR;                      /* set termination condition */
+                }
+
+            else if ((ch == RS)  && (rt & RT_END_ON_RS))
+                mpx_param = RS_ETC_RS;                      /* set termination condition */
+
+            else if ((ch == EOT) && (rt & RT_END_ON_EOT))
+                mpx_param = RS_ETC_EOT;                     /* set termination condition */
+
+            else if ((ch == DC2) && (rt & RT_END_ON_DC2))
+                mpx_param = RS_ETC_DC2;                     /* set termination condition */
+
+            else
+                recv_loop = TRUE;                           /* no termination */
+            }
+
+        if (recv_loop) {                                    /* no termination condition? */
+            buf_put (ioread, port, ch);                     /* put character in buffer */
+            mpx_charcnt [port]++;                           /*   and count it */
+            }
+
+        if ((rt & RT_END_ON_CNT) &&                         /* end on count */
+            (mpx_charcnt [port] == mpx_termcnt [port])) {   /*   and termination count reached? */
+            recv_loop = FALSE;                              /* set termination */
+            mpx_param = 0;                                  /* no extra termination info */
+            mpx_charcnt [port] = 0;                         /* clear the current character count */
+
+            if (mpx_flags [port] & FL_ALERT) {              /* was this alert for term rcv buffer? */
+                mpx_flags [port] &= ~FL_ALERT;              /* clear alert flag */
+                mpx_termcnt [port] = RD_BUF_LIMIT;          /* reset termination character count */
+                }
+            }
+
+        else if (buf_len (ioread, port, put) == RD_BUF_LIMIT) { /* buffer now full? */
+            recv_loop = FALSE;                                  /* set termination */
+            mpx_param = mpx_param | RS_PARTIAL;                 /*   and partial buffer flag */
+            }
+
+        if (recv_loop)                                      /* if there is no termination condition */
+            if (buffer_count == 2)                          /*   then if we're filling the first buffer */
+                recv_loop = fast_timing;                    /*     then set to loop if in fast mode */
+            else                                            /*   otherwise we're filling the second */
+                recv_loop = FALSE;                          /*     so give the CPU a chance to read the first */
+
+        else {                                              /* otherwise a termination condition exists */
+            if (mpx_param & RS_PARTIAL)
+                tprintf (mpx_dev, DEB_XFER, "Port %d read terminated on buffer full\n",
+                         port);
+
+            else if (rt & RT_END_ON_CHAR)
+                tprintf (mpx_dev, DEB_XFER, "Port %d read terminated on character %s\n",
+                         port, fmt_char (ch));
+
+            else
+                tprintf (mpx_dev, DEB_XFER, "Port %d read terminated on count = %d\n",
+                         port, mpx_termcnt [port]);
+
+            if (buf_len (ioread, port, put) == 0) {         /* zero-length read? */
+                buf_put (ioread, port, 0);                  /* dummy put to reserve header */
+                buf_remove (ioread, port);                  /* back out dummy char leaving header */
+                }
+
+            buf_term (ioread, port, (uint8) (mpx_param >> 8));  /* terminate buffer and set header */
+
+            if (buf_avail (ioread, port) == 1)              /* first read buffer? */
+                mpx_flags [port] |= FL_HAVEBUF;             /* indicate availability */
+
+            if (mpx_state == idle)                          /* controller idle? */
+                cntl_service (&mpx_cntl);                   /* check for UI */
+            }
+        }
+    }
+
+
+/* Housekeeping */
+
+if (fast_binary_read) {                                     /* fast binary read in progress? */
+    if (port == 0) {                                        /* on port 0? */
+        chx = tmxr_getc_ln (&mpx_ldsc [0]);                 /* see if a character is ready */
+
+        if (chx && !(mpx_flags [0] & FL_HAVEBUF)) {         /* character ready and buffer empty? */
+            if (mpx_flags [0] & FL_WANTBUF) {               /* second character? */
+                mpx_ibuf = mpx_ibuf | (chx & DMASK8);       /* merge it into word */
+                mpx_flags [0] |= FL_HAVEBUF;                /* mark buffer as ready */
+
+                mpx_io (&mpx_dib, ioENF, 0);                /* set device flag */
+
+                tprintf (mpx_dev, DEB_CMDS, "Flag and SRQ set\n");
+                }
+
+            else                                            /* first character */
+                mpx_ibuf = (uint16) ((chx & DMASK8) << 8);  /* put in top half of word */
+
+            mpx_flags [0] ^= FL_WANTBUF;                    /* toggle byte flag */
+            }
+
+        sim_activate (uptr, uptr->wait);                    /* reschedule service for fast response */
+        }
+    }
+
+else {                                                      /* normal service */
+    tmxr_poll_tx (&mpx_desc);                               /* output any accumulated characters */
+
+    if (write_count > 0                                     /* if there are more characters to transmit */
+      && !(mpx_flags [port] & (FL_WAITACK | FL_XOFF))       /*   and transmission is not suspended */
+      || tmxr_rqln (&mpx_ldsc [port])) {                    /*   or there are more characters to receive */
+        sim_activate (uptr, uptr->wait);                    /*     then reschedule the service */
+
+        tprintf (mpx_dev, DEB_CMDS, "Port %d delay %d service rescheduled\n", port, uptr->wait);
+        }
+
+    else
+        tprintf (mpx_dev, DEB_CMDS, "Port %d service stopped\n", port);
+    }
+
+return SCPE_OK;
+}
+
+
+/* Telnet poll service.
+
+   This service routine is used to poll for Telnet connections and incoming
+   characters.  It starts when the socket is attached and stops when the socket
+   is detached.
+
+   Each line is then checked for a pending ENQ/ACK handshake.  If one is
+   pending, the ACK counter is incremented, and if it times out, another ENQ is
+   sent to avoid stalls.  Lines are also checked for available characters, and
+   the corresponding line I/O service routine is scheduled if needed.
+*/
+
+static t_stat poll_service (UNIT *uptr)
+{
+uint32 i;
+t_stat status = SCPE_OK;
+
+poll_connection ();                                         /* check for new connection */
+
+tmxr_poll_rx (&mpx_desc);                                   /* poll for input */
+
+for (i = 0; i < MPX_PORTS; i++) {                           /* check lines */
+    if (mpx_flags [i] & FL_WAITACK) {                       /* waiting for ACK? */
+        mpx_ack_wait [i] = mpx_ack_wait [i] + 1;            /* increment ACK wait timer */
+
+        if (mpx_ack_wait [i] > ACK_LIMIT) {                 /* has wait timed out? */
+            mpx_ack_wait [i] = 0;                           /* reset counter */
+            status = tmxr_putc_ln (&mpx_ldsc [i], ENQ);     /* send ENQ again */
+            tmxr_poll_tx (&mpx_desc);                       /* transmit it */
+
+            if (status == SCPE_OK)                          /* transmitted OK? */
+                tprintf (mpx_dev, DEB_XFER, "Port %d character ENQ retransmitted\n", i);
+            }
+        }
+
+    if (tmxr_rqln (&mpx_ldsc [i]))                          /* chars available? */
+        sim_activate (&mpx_unit [i], mpx_unit [i].wait);    /* activate I/O service */
+    }
+
+if (uptr->wait == POLL_FIRST)                               /* first poll? */
+    uptr->wait = sync_poll (INITIAL);                       /* initial synchronization */
+else                                                        /* not first */
+    uptr->wait = sync_poll (SERVICE);                       /* continue synchronization */
+
+sim_activate (uptr, uptr->wait);                            /* continue polling */
+
+return SCPE_OK;
+}
+
+
+/* Device reset routine.
+
+   The hardware CRS signal generates a reset signal to the Z80 and its
+   peripherals.  This causes execution of the power up initialization code.
+
+   The CRS signal also has these hardware effects:
+
+    - clears control
+    - clears flag
+    - clears flag buffer
+    - clears backplane ready
+    - clears the output buffer register
+
+
+   Implementation notes:
+
+    1. Under simulation, we also clear the input buffer register, even though
+       the hardware doesn't.
+
+    2. We set up the first poll for Telnet connections to occur "immediately"
+       upon execution, so that clients will be connected before execution
+       begins.  Otherwise, a fast program may access the multiplexer before the
+       poll service routine activates.
+
+    3. We must set the "emptying_flags" and "filling_flags" values here, because
+       they cannot be initialized statically, even though the values are
+       constant.
+*/
+
+static t_stat mpx_reset (DEVICE *dptr)
+{
+if (sim_switches & SWMASK ('P')) {                      /* power-on reset? */
+    emptying_flags [ioread]  = FL_RDEMPT;               /* initialize buffer flags constants */
+    emptying_flags [iowrite] = FL_WREMPT;
+    filling_flags  [ioread]  = FL_RDFILL;
+    filling_flags  [iowrite] = FL_WRFILL;
+    }
+
+IOPRESET (&mpx_dib);                                    /* PRESET device (does not use PON) */
+
+mpx_ibuf = 0;                                           /* clear input buffer */
+
+if (mpx_poll.flags & UNIT_ATT) {                        /* network attached? */
+    mpx_poll.wait = POLL_FIRST;                         /* set up poll */
+    sim_activate (&mpx_poll, mpx_poll.wait);            /* start Telnet poll immediately */
+    }
+else
+    sim_cancel (&mpx_poll);                             /* else stop Telnet poll */
+
+return SCPE_OK;
+}
+
+
+/* Attach the multiplexer to a Telnet port.
+
+   We are called by the ATTACH MPX <port> command to attach the multiplexer to
+   the listening port indicated by <port>.  Logically, it is the multiplexer
+   device that is attached; however, SIMH only allows units to be attached.
+   This makes sense for devices such as tape drives, where the attached media is
+   a property of a specific drive.  In our case, though, the listening port is a
+   property of the multiplexer card, not of any given serial line.  As ATTACH
+   MPX is equivalent to ATTACH MPX0, the port would, by default, be attached to
+   the first serial line and be reported there in a SHOW MPX command.
+
+   To preserve the logical picture, we attach the port to the Telnet poll unit,
+   which is normally disabled to inhibit its display.  Attaching to a disabled
+   unit is not allowed, so we first enable the unit, then attach it, then
+   disable it again.  Attachment is reported by the "show_status" routine below.
+
+   A direct attach to the poll unit is only allowed when restoring a previously
+   saved session.
+
+   The Telnet poll service routine is synchronized with the other input polling
+   devices in the simulator to facilitate idling.
+*/
+
+static t_stat mpx_attach (UNIT *uptr, CONST char *cptr)
+{
+t_stat status = SCPE_OK;
+
+if (uptr != mpx_unit                                        /* not unit 0? */
+  && (uptr != &mpx_poll || !(sim_switches & SIM_SW_REST)))  /*   and not restoring the poll unit? */
+    return SCPE_NOATT;                                      /* can't attach */
+
+mpx_poll.flags = mpx_poll.flags & ~UNIT_DIS;                /* enable unit */
+status = tmxr_attach (&mpx_desc, &mpx_poll, cptr);          /* attach to socket */
+mpx_poll.flags = mpx_poll.flags | UNIT_DIS;                 /* disable unit */
+
+if (status == SCPE_OK) {
+    mpx_poll.wait = POLL_FIRST;                             /* set up poll */
+    sim_activate (&mpx_poll, mpx_poll.wait);                /* start poll immediately */
+    }
+return status;
+}
+
+
+/* Detach the multiplexer.
+
+   Normally, we are called by the DETACH MPX command, which is equivalent to
+   DETACH MPX0.  However, we may be called with other units in two cases.
+
+   A DETACH ALL command will call us for unit 9 (the poll unit) if it is
+   attached.  Also, during simulator shutdown, we will be called for units 0-8
+   (detach_all in scp.c calls the detach routines of all units that do NOT have
+   UNIT_ATTABLE), as well as for unit 9 if it is attached.  In both cases, it is
+   imperative that we return SCPE_OK, otherwise any remaining device detaches
+   will not be performed.
+*/
+
+static t_stat mpx_detach (UNIT *uptr)
+{
+t_stat status = SCPE_OK;
+int32 i;
+
+if ((uptr == mpx_unit) || (uptr == &mpx_poll)) {        /* base unit or poll unit? */
+    status = tmxr_detach (&mpx_desc, &mpx_poll);        /* detach socket */
+
+    for (i = 0; i < MPX_PORTS; i++) {
+        mpx_ldsc [i].rcve = 0;                          /* disable line reception */
+        sim_cancel (&mpx_unit [i]);                     /* cancel any scheduled I/O */
+        }
+
+    sim_cancel (&mpx_poll);                             /* stop Telnet poll */
+    }
+
+return status;
+}
+
+
+/* Set firmware revision.
+
+   Currently, we support only revision C, so the MTAB entry does not have an
+   "mstring" entry.  When we add revision D support, an "mstring" entry of "REV"
+   will enable changing the firmware revision.
+*/
+
+static t_stat set_revision (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+if ((cptr == NULL) ||                                   /* no parameter? */
+    (*cptr < 'C') || (*cptr > 'D') ||                   /*   or not C or D? */
+    (*(cptr + 1) != '\0'))                              /*   or not just one character? */
+    return SCPE_ARG;                                    /* bad argument */
+
+else {
+    if (*cptr == 'C')                                   /* setting revision C? */
+        mpx_dev.flags = mpx_dev.flags & ~DEV_REV_D;     /* clear 'D' flag */
+    else if (*cptr == 'D')                              /* setting revision D? */
+        mpx_dev.flags = mpx_dev.flags | DEV_REV_D;      /* set 'D' flag */
+
+    return SCPE_OK;
+    }
+}
+
+
+/* Show firmware revision */
+
+static t_stat show_revision (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+if (mpx_dev.flags & DEV_REV_D)
+    fputs ("12792D", st);
+else
+    fputs ("12792C", st);
+
+return SCPE_OK;
+}
+
+
+/* Show multiplexer status */
+
+static t_stat show_status (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+if (mpx_poll.flags & UNIT_ATT)                          /* attached to socket? */
+    fprintf (st, "attached to port %s, ", mpx_poll.filename);
+else
+    fprintf (st, "not attached, ");
+
+tmxr_show_summ (st, uptr, val, desc);                   /* report connection count */
+
+return SCPE_OK;
+}
+
+
+
+/* Multiplexer local utility routines */
+
+
 /* Command executor.
 
    We are called by the controller service routine to process one- and two-word
@@ -997,6 +2244,7 @@ return stat_data;
    than a port number.  The key-to-port translation is established by the "Set
    port key" command.  If a key is not found in the table, the command is not
    executed, and the status return is ST_BAD_KEY, which in hex is "BAD0".
+
 
    Implementation notes:
 
@@ -1080,9 +2328,7 @@ switch (mpx_cmd) {
         mpx_uien = TRUE;                                /* enable unsolicited interrupts */
         sim_activate (&mpx_cntl, CMD_DELAY);            /*   and schedule controller for UI check */
 
-        if (DEBUG_PRI (mpx_dev, DEB_CMDS))
-            fprintf (sim_deb, ">>MPX cmds: Controller status check scheduled, "
-                              "time = %d\n", CMD_DELAY);
+        tprintf (mpx_dev, DEB_CMDS, "Controller status check scheduled, time = %d\n", CMD_DELAY);
 
         set_flag = FALSE;                               /* do not set the flag at completion */
         break;
@@ -1105,7 +2351,7 @@ switch (mpx_cmd) {
 
 
     case CMD_ACK:                                               /* acknowledge unsolicited interrupt */
-        switch (mpx_uicode & UI_REASON) {
+        switch (mpx_uicode & UI_REASON_MASK) {
 
             case UI_WRBUF_AVAIL:                                /* write buffer notification */
                 mpx_flags [mpx_port] &= ~FL_WANTBUF;            /* clear flag */
@@ -1194,7 +2440,7 @@ switch (mpx_cmd) {
 
         if (port >= 0) {                                /* port defined? */
             mpx_port = port;                            /* save port number */
-            mpx_iolen = mpx_param & WR_LENGTH;          /* save request length */
+            mpx_iolen = WR_LENGTH (mpx_param);          /* save request length */
             next_state = exec;                          /* set execution state */
             }
         break;
@@ -1303,933 +2549,12 @@ switch (mpx_cmd) {
     case CMD_VCP_ENTER:                                 /* Enter VCP mode */
 
     default:                                            /* unknown command */
-        if (DEBUG_PRI (mpx_dev, DEB_CMDS))
-            fprintf (sim_deb, ">>MPX cmds: Unknown command %03o ignored\n", mpx_cmd);
+        tprintf (mpx_dev, DEB_CMDS, "Unknown command %03o ignored\n", mpx_cmd);
     }
 
 mpx_state = next_state;
 return set_flag;
 }
-
-
-/* Multiplexer controller service.
-
-   The controller service handles commands and data transfers to and from the
-   CPU.  The delay in scheduling the controller service represents the firmware
-   command or data execution time.  The controller may be in one of four states
-   upon entry: idle, first word of command received (cmd), command parameter
-   received (param), or data transfer (exec).
-
-   Entry in the command state causes execution of one-word commands and
-   solicitation of command parameters for two-word commands, which are executed
-   when entering in the parameter state.
-
-   Entry in the data transfer state moves one word between the CPU and a read or
-   write buffer.  For writes, the write buffer is filled with words from the
-   CPU.  Once the indicated number of words have been transferred, the
-   appropriate line service is scheduled to send the characters.  For reads,
-   characters are unloaded from the read buffer to the CPU; an odd-length
-   transfer is padded with a blank.  A read of fewer characters than are present
-   in the buffer will return the remaining characters when the next read is
-   performed.
-
-   Each read or write is terminated by the CPU sending one additional word (the
-   RTE drivers send -1).  The command completes when this word is acknowledged
-   by the card setting the device flag.  For zero-length writes, this additional
-   word will be the only word sent.
-
-   Data transfer is also used by the "Download executable" command to absorb the
-   downloaded program.  The firmware jumps to location 5100 hex in the
-   downloaded program upon completion of reception.  It is the responsibility of
-   the program to return to the multiplexer firmware and to return to the CPU
-   whatever status is appropriate when it is done.  Under simulation, we simply
-   "sink" the program and return status compatible with the multiplexer
-   diagnostic program to simulate a passing test.
-
-   Entry in the idle state checks for unsolicited interrupts.  UIs are sent to
-   the host when the controller is idle, UIs have been enabled, and a UI
-   condition exists.  If a UI is not acknowledged, it will remain pending and
-   will be reissued the next time the controller is idle and UIs have been
-   enabled.
-
-   UI conditions are kept in the per-port flags.  The UI conditions are write
-   buffer available, read buffer available, break received, modem line
-   connected, and modem line disconnected.  The latter two conditions are not
-   implemented in this simulation.  If a break condition occurs at the same time
-   as a read buffer completion, the break has priority; the buffer UI will occur
-   after the break UI is acknowledged.
-
-   The firmware checks for UI condition flags as part of the scheduler polling
-   loop.  Under simulation, though, UIs can occur only in two places: the point
-   of origin (e.g., termination of a read buffer), or the "Enable unsolicited
-   input" command executor.  UIs will be generated at the point of origin only
-   if the simulator is idle.  If the simulator is not idle, it is assumed that
-   UIs have been disabled to execute the current command and will be reenabled
-   when the command sequence is complete.
-
-   When the multiplexer is reset, and before the port keys are set, all ports
-   enter "echoplex" mode.  In this mode, characters received are echoed back as
-   a functional test.  Each port terminates buffers on CR reception.  We detect
-   this condition, cancel the buffer, and discard the buffer termination UI.
-
-   Implementation notes:
-
-    1. The firmware transfers the full amount requested by the CPU, even if the
-       transfer is longer than the buffer.  Also, zero-length transfers program
-       the card DMA chip to transfer 0 bytes; this results in a transfer of 217
-       bytes, per the Zilog databook.  Under simulation, writes beyond the
-       buffer are accepted from the CPU but discarded, and reads beyond the
-       buffer return blanks.
-
-    2. We should never return from this routine in the "cmd" state, so debugging
-       will report "internal error!" if we do.
-*/
-
-t_stat mpx_cntl_svc (UNIT *uptr)
-{
-uint8 ch;
-uint32 i;
-t_bool add_crlf;
-t_bool set_flag = TRUE;
-STATE last_state = mpx_state;
-
-static const char *cmd_state [] = { "complete", "internal error!", "waiting for parameter", "executing" };
-
-
-switch (mpx_state) {                                                /* dispatch on current state */
-
-    case idle:                                                      /* controller idle */
-        set_flag = FALSE;                                           /* assume no UI */
-
-        if (mpx_uicode) {                                                   /* unacknowledged UI? */
-            if (mpx_uien == TRUE) {                                         /* interrupts enabled? */
-                mpx_port = GET_UIPORT (mpx_uicode);                         /* get port number */
-                mpx_portkey = mpx_key [mpx_port];                           /* get port key */
-                mpx_ibuf = (uint16) (mpx_uicode & UI_REASON | mpx_portkey); /* report UI reason and port key */
-                set_flag = TRUE;                                            /* reissue host interrupt */
-                mpx_uien = FALSE;                                           /* disable UI */
-
-                if (DEBUG_PRI (mpx_dev, DEB_CMDS))
-                    fprintf (sim_deb, ">>MPX cmds: Port %d key %d unsolicited interrupt reissued, "
-                                      "reason = %d\n", mpx_port, mpx_portkey, GET_UIREASON (mpx_uicode));
-                }
-            }
-
-        else {                                                      /* no unacknowledged UI */
-            for (i = 0; i < MPX_PORTS; i++) {                       /* check all ports for UIs */
-                if (mpx_flags [i] & FL_UI_PENDING) {                /* pending UI? */
-                    mpx_portkey = mpx_key [i];                      /* get port key */
-
-                    if (mpx_portkey == KEY_DEFAULT) {               /* key defined? */
-                        if (mpx_flags [i] & FL_HAVEBUF)             /* no, is this read buffer avail? */
-                            buf_cancel (ioread, i, get);            /* cancel buffer */
-
-                        mpx_flags [i] &= ~FL_UI_PENDING;            /* cancel pending UI */
-                        }
-
-                    else if (mpx_uien == TRUE) {                    /* interrupts enabled? */
-                        if ((mpx_flags [i] & FL_WANTBUF) &&         /* port wants a write buffer? */
-                            (buf_avail (iowrite, i) > 0))           /*   and one is available? */
-                            mpx_uicode = UI_WRBUF_AVAIL;            /* set UI reason */
-
-                        else if (mpx_flags [i] & FL_BREAK)          /* received a line BREAK? */
-                            mpx_uicode = UI_BRK_RECD;               /* set UI reason */
-
-                        else if (mpx_flags [i] & FL_HAVEBUF)        /* have a read buffer ready? */
-                            mpx_uicode = UI_RDBUF_AVAIL;            /* set UI reason */
-
-                        if (mpx_uicode) {                                   /* UI to send? */
-                            mpx_port = i;                                   /* set port number for Acknowledge */
-                            mpx_ibuf = (uint16) (mpx_uicode | mpx_portkey); /* merge UI reason and port key */
-                            mpx_uicode = mpx_uicode | mpx_port;             /* save UI reason and port */
-                            set_flag = TRUE;                                /* interrupt host */
-                            mpx_uien = FALSE;                               /* disable UI */
-
-                            if (DEBUG_PRI (mpx_dev, DEB_CMDS))
-                                fprintf (sim_deb, ">>MPX cmds: Port %d key %d unsolicited interrupt generated, "
-                                                  "reason = %d\n", i, mpx_portkey, GET_UIREASON (mpx_uicode));
-
-                            break;                                  /* quit after first UI */
-                            }
-                        }
-                    }
-                }
-            }
-        break;
-
-
-    case cmd:                                           /* command state */
-        if (mpx_cmd & CMD_TWO_WORDS)                    /* two-word command? */
-            mpx_state = param;                          /* look for parameter before executing */
-        else
-            set_flag = exec_command ();                 /* execute one-word command */
-        break;
-
-
-    case param:                                         /* parameter get state */
-        mpx_param = mpx_obuf;                           /* save parameter */
-        set_flag = exec_command ();                     /* execute two-word command */
-        break;
-
-
-    case exec:                                          /* execution state */
-        switch (mpx_cmd) {
-
-            case CMD_BINARY_READ:                       /* fast binary read */
-                mpx_flags [0] &= ~FL_HAVEBUF;           /* data word was picked up by CPU */
-                set_flag = FALSE;                       /* suppress device flag */
-                break;
-
-
-            case CMD_WRITE:                                 /* transfer data to buffer */
-                if (mpx_iolen <= 0) {                       /* last (or only) entry? */
-                    mpx_state = idle;                       /* idle controller */
-
-                    if (mpx_iolen < 0)                      /* tie-off for buffer complete? */
-                        break;                              /* we're done */
-                    }
-
-                add_crlf = ((mpx_param &                    /* CRLF should be added */
-                             (WR_ADD_CRLF | WR_PARTIAL)) == WR_ADD_CRLF);
-
-                for (i = 0; i < 2; i++)                     /* output one or two chars */
-                    if (mpx_iolen > 0) {                    /* more to do? */
-                        if (i)                              /* high or low byte? */
-                            ch = (uint8) (mpx_obuf & 0377); /* low byte */
-                        else
-                            ch = mpx_obuf >> 8;             /* high byte */
-
-                        if ((mpx_iolen == 1) &&             /* final char? */
-                            (ch == '_') && add_crlf) {      /* underscore and asking for CRLF? */
-
-                            add_crlf = FALSE;               /* suppress CRLF */
-
-                            if (DEBUG_PRI (mpx_dev, DEB_BUF))
-                                fprintf (sim_deb, ">>MPX buf:  Port %d character '_' "
-                                                  "suppressed CR/LF\n", mpx_port);
-                            }
-
-                        else if (buf_len (iowrite, mpx_port, put) < WR_BUF_LIMIT)
-                            buf_put (iowrite, mpx_port, ch);    /* add char to buffer if space avail */
-
-                        mpx_iolen = mpx_iolen - 1;              /* drop remaining count */
-                        }
-
-                if (mpx_iolen == 0)  {                              /* buffer done? */
-                    if (add_crlf) {                                 /* want CRLF? */
-                        buf_put (iowrite, mpx_port, CR);            /* add CR to buffer */
-                        buf_put (iowrite, mpx_port, LF);            /* add LF to buffer */
-                        }
-
-                    buf_term (iowrite, mpx_port, (uint8) (mpx_param  >> 8));    /* terminate buffer */
-                    mpx_iolen = -1;                                             /* mark as done */
-                    }
-
-                if (DEBUG_PRI (mpx_dev, DEB_CMDS) &&
-                    (sim_is_active (&mpx_unit [mpx_port]) == 0))
-                    fprintf (sim_deb, ">>MPX cmds: Port %d service scheduled, "
-                                      "time = %d\n", mpx_port, mpx_unit [mpx_port].wait);
-
-                sim_activate (&mpx_unit [mpx_port],                 /* start line service */
-                              mpx_unit [mpx_port].wait);
-                break;
-
-
-            case CMD_READ:                                          /* transfer data from buffer */
-                if (mpx_iolen < 0) {                                /* input complete? */
-                    if (mpx_obuf == 0177777) {                      /* "tie-off" word received? */
-                        if (buf_len (ioread, mpx_port, get) == 0) { /* buffer now empty? */
-                            buf_free (ioread, mpx_port);            /* free buffer */
-
-                            if ((buf_avail (ioread, mpx_port) == 1) &&  /* one buffer remaining? */
-                                !(mpx_flags [mpx_port] & FL_RDFILL))    /*   and not filling it? */
-                                mpx_flags [mpx_port] |= FL_HAVEBUF;     /* indicate buffer availability */
-                            }
-
-                        mpx_state = idle;                           /* idle controller */
-                        }
-
-                    else
-                        set_flag = FALSE;                           /* ignore word */
-
-                    break;
-                    }
-
-                for (i = 0; i < 2; i++)                             /* input one or two chars */
-                    if (mpx_iolen > 0) {                            /* more to transfer? */
-                        if (buf_len (ioread, mpx_port, get) > 0)    /* more chars available? */
-                            ch = buf_get (ioread, mpx_port);        /* get char from buffer */
-                        else                                        /* buffer exhausted */
-                            ch = ' ';                               /* pad with blank */
-
-                        if (i)                                      /* high or low byte? */
-                            mpx_ibuf = mpx_ibuf | ch;               /* low byte */
-                        else
-                            mpx_ibuf = (uint16) (ch << 8);          /* high byte */
-
-                        mpx_iolen = mpx_iolen - 1;                  /* drop count */
-                        }
-
-                    else                                            /* odd number of chars */
-                        mpx_ibuf = mpx_ibuf | ' ';                  /* pad last with blank */
-
-                if (mpx_iolen == 0)                                 /* end of host xfer? */
-                    mpx_iolen = -1;                                 /* mark as done */
-
-                break;
-
-
-            case CMD_DL_EXEC:                                   /* sink data from host */
-                if (mpx_iolen <= 0) {                           /* final entry? */
-                    mpx_state = idle;                           /* idle controller */
-                    mpx_ibuf = ST_DIAG_OK;                      /* return diag passed status */
-                    }
-
-                else {
-                    if (mpx_iolen > 0)                          /* more from host? */
-                        mpx_iolen = mpx_iolen - 2;              /* sink two bytes */
-
-                    if (mpx_iolen <= 0)                         /* finished download? */
-                        sim_activate (&mpx_cntl, CMD_DELAY);    /* schedule completion */
-
-                    if (DEBUG_PRI (mpx_dev, DEB_CMDS))
-                        fprintf (sim_deb, ">>MPX cmds: Download completion scheduled, "
-                                          "time = %d\n", CMD_DELAY);
-                    }
-
-                break;
-
-
-            default:                                            /* no other entries allowed */
-                return SCPE_IERR;                               /* simulator error! */
-            }
-        break;
-    }
-
-
-if (DEBUG_PRI (mpx_dev, DEB_CMDS) &&                    /* debug print? */
-    (last_state != mpx_state)) {                        /*   and state change? */
-    fprintf (sim_deb, ">>MPX cmds: Command %03o ", mpx_cmd);
-
-    if ((mpx_cmd & CMD_TWO_WORDS) && (mpx_state != param))
-        fprintf (sim_deb, "parameter %06o ", mpx_param);
-
-    fputs (cmd_state [mpx_state], sim_deb);
-    fputc ('\n', sim_deb);
-    }
-
-if (set_flag) {
-    mpx_io (&mpx_dib, ioENF, 0);                        /* set device flag */
-
-    if (DEBUG_PRI (mpx_dev, DEB_CMDS))
-        fputs (">>MPX cmds: Flag set\n", sim_deb);
-    }
-
-return SCPE_OK;
-}
-
-
-/* Multiplexer line service.
-
-   The line service routine is used to transmit and receive characters.  It is
-   started when a buffer is ready for output or when the Telnet poll routine
-   determines that there are characters ready for input, and it is stopped when
-   there are no more characters to output or input.  When a line is quiescent,
-   this routine does not run.  Service times are selected to approximate the
-   baud rate setting of the multiplexer port.
-
-   "Fast timing" mode enables three optimizations.  First, buffered characters
-   are transferred via Telnet in blocks, rather than a character at a time; this
-   reduces network traffic and decreases simulator overhead (there is only one
-   service routine entry per block, rather than one per character).  Second,
-   ENQ/ACK handshaking is done locally, without involving the Telnet client.
-   Third, when editing and echo is enabled, entering BS echoes a backspace, a
-   space, and a backspace, and entering DEL echoes a backslash, a carriage
-   return, and a line feed, providing better compatibility with prior RTE
-   terminal drivers.
-
-   Each read and write buffer begins with a reserved header byte that stores
-   per-buffer information, such as whether handshaking should be suppressed
-   during output, or the specific cause of termination for input.  Buffer
-   termination sets the header byte with the appropriate flags.
-
-   For output, a character counter is maintained and is incremented if ENQ/ACK
-   handshaking is enabled for the current port and request.  If the counter
-   limit is reached, an ENQ is sent, and a flag is set to suspend transmission
-   until an ACK is received.  If the last character of the buffer is sent, the
-   write buffer is freed, and a UI check is made if the controller is idle, in
-   case a write buffer request is pending.
-
-   For input, the character is retrieved from the Telnet buffer.  If a BREAK was
-   received, break status is set, and the character is discarded (the current
-   multiplexer library implementation always returns a NUL with a BREAK
-   indication).  If the character is an XOFF, and XON/XOFF pacing is enabled, a
-   flag is set, and transmission is suspended until a corresponding XON is
-   received.  If the character is an ACK and is in response to a previously sent
-   ENQ, it is discarded, and transmission is reenabled.
-
-   If editing is enabled, a BS will delete the last character in the read
-   buffer, and a DEL will delete the entire buffer.  Otherwise, buffer
-   termination conditions are checked (end on character, end on count, or
-   buffer full), and if observed, the read buffer is terminated, and a read
-   buffer available UI condition is signalled.
-
-
-   Implementation notes:
-
-    1. The firmware echoes an entered BS before checking the buffer count to see
-       if there are any characters to delete.  Under simulation, we only echo if
-       the buffer is not empty.
-
-    2. The "Fast binary read" command inhibits the normal transmit and receive
-       processing.  Instead, a pair of characters are sought on line 0 to fill
-       the input buffer.  When they are received, the device flag is set.  The
-       CPU will do a LIx sc,C to retrieve the data and reset the flag.
-
-    3. In fast timing mode, burst transfers are used only to fill the first of
-       the two receive buffers; the second is filled with one character per
-       service entry.  This allows the CPU time to unload the first buffer
-       before the second fills up.  Once the first buffer is freed, the routine
-       shifts back to burst mode to fill the remainder of the second buffer.
-*/
-
-t_stat mpx_line_svc (UNIT *uptr)
-{
-const  int32 port = uptr - mpx_unit;                            /* port number */
-const uint16 rt = mpx_rcvtype [port];                           /* receive type for port */
-const uint32 data_bits = 5 + GET_BPC (mpx_config [port]);       /* number of data bits */
-const uint32 data_mask = (1 << data_bits) - 1;                  /* mask for data bits */
-const t_bool fast_timing = (uptr->flags & UNIT_FASTTIME) != 0;  /* port is set for fast timing */
-const t_bool fast_binary_read = (mpx_cmd == CMD_BINARY_READ);   /* fast binary read in progress */
-uint8 ch;
-int32 chx;
-uint32 buffer_count, write_count;
-t_stat status = SCPE_OK;
-t_bool recv_loop = !fast_binary_read;                           /* bypass if fast binary read */
-t_bool xmit_loop = !(fast_binary_read ||                        /* bypass if fast read or output suspended */
-                     (mpx_flags [port] & (FL_WAITACK | FL_XOFF)));
-
-
-if (DEBUG_PRI (mpx_dev, DEB_CMDS))
-    fprintf (sim_deb, ">>MPX cmds: Port %d service entered\n", port);
-
-/* Transmission service */
-
-write_count = buf_len (iowrite, port, get);             /* get the output buffer length */
-
-while (xmit_loop && write_count > 0) {                  /* character available to output? */
-    if ((mpx_flags [port] & FL_WREMPT) == 0) {          /* if the buffer has not started emptying */
-        chx = buf_get (iowrite, port) << 8;             /*   then get the header value and position it */
-
-        if (fast_timing || (chx & WR_NO_ENQACK) ||      /* do we want handshake? */
-            !(mpx_config [port] & SK_ENQACK))           /*   and configured for handshake? */
-            mpx_flags [port] &= ~FL_DO_ENQACK;          /* no, so clear flag */
-        else
-            mpx_flags [port] |= FL_DO_ENQACK;           /* yes, so set flag */
-
-        continue;                                       /* continue with the first output character */
-        }
-
-    if (mpx_flags [port] & FL_DO_ENQACK)                /* do handshake for this buffer? */
-        mpx_enq_cntr [port] = mpx_enq_cntr [port] + 1;  /* bump character counter */
-
-    if (mpx_enq_cntr [port] > ENQ_LIMIT) {              /* ready for ENQ? */
-        mpx_enq_cntr [port] = 0;                        /* clear ENQ counter */
-        mpx_ack_wait [port] = 0;                        /* clear ACK wait timer */
-
-        mpx_flags [port] |= FL_WAITACK;                 /* set wait for ACK */
-        ch = ENQ;
-        status = tmxr_putc_ln (&mpx_ldsc [port], ch);   /* transmit ENQ */
-        xmit_loop = FALSE;                              /* stop further transmission */
-        }
-
-    else {                                              /* not ready for ENQ */
-        ch = buf_get (iowrite, port) & data_mask;       /* get char and mask to bit width */
-        status = tmxr_putc_ln (&mpx_ldsc [port], ch);   /* transmit the character */
-
-        write_count = write_count - 1;                  /* count the character */
-        xmit_loop = (status == SCPE_OK) && fast_timing; /*   and continue transmission if enabled */
-        }
-
-    if (status != SCPE_OK)                              /* if the transmission failed */
-        xmit_loop = FALSE;                              /*   then exit the loop */
-
-    else if (DEBUG_PRI (mpx_dev, DEB_XFER))
-        fprintf (sim_deb, ">>MPX xfer: Port %d character %s transmitted\n",
-                          port, fmt_char (ch));
-
-    if (write_count == 0) {                             /* buffer complete? */
-        buf_free (iowrite, port);                       /* free buffer */
-
-        write_count = buf_len (iowrite, port, get);     /* get the next output buffer length */
-
-        if (mpx_state == idle)                          /* controller idle? */
-            mpx_cntl_svc (&mpx_cntl);                   /* check for UI */
-        }
-    }
-
-
-/* Reception service */
-
-buffer_count = buf_avail (ioread, port);                /* get the number of available read buffers */
-
-if (mpx_flags [port] & FL_RDFILL)                       /* if filling the current buffer */
-    buffer_count = buffer_count + 1;                    /*   then include it in the count */
-
-while (recv_loop) {                                     /* OK to process? */
-    chx = tmxr_getc_ln (&mpx_ldsc [port]);              /* get a new character */
-
-    if (chx == 0)                                       /* if there are no more characters available */
-        break;                                          /*   then quit the reception loop */
-
-    if (chx & SCPE_BREAK) {                             /* break detected? */
-        mpx_flags [port] |= FL_BREAK;                   /* set break status */
-
-        if (DEBUG_PRI (mpx_dev, DEB_XFER))
-            fputs (">>MPX xfer: Break detected\n", sim_deb);
-
-        if (mpx_state == idle)                          /* controller idle? */
-            mpx_cntl_svc (&mpx_cntl);                   /* check for UI */
-
-        continue;                                       /* discard NUL that accompanied BREAK */
-        }
-
-    ch = (uint8) (chx & data_mask);                     /* mask to bits per char */
-
-    if ((ch == XOFF) &&                                 /* XOFF? */
-        (mpx_flowcntl [port] & FC_XONXOFF)) {           /*   and handshaking enabled? */
-        mpx_flags [port] |= FL_XOFF;                    /* suspend transmission */
-
-        if (DEBUG_PRI (mpx_dev, DEB_XFER))
-            fprintf (sim_deb, ">>MPX xfer: Port %d character XOFF "
-                              "suspends transmission\n", port);
-
-        recv_loop = fast_timing;                        /* set to loop if fast mode */
-        continue;
-        }
-
-    else if ((ch == XON) &&                             /* XON? */
-             (mpx_flags [port] & FL_XOFF)) {            /*   and currently suspended? */
-        mpx_flags [port] &= ~FL_XOFF;                   /* resume transmission */
-
-        if (DEBUG_PRI (mpx_dev, DEB_XFER))
-            fprintf (sim_deb, ">>MPX xfer: Port %d character XON "
-                              "resumes transmission\n", port);
-
-        recv_loop = fast_timing;                        /* set to loop if fast mode */
-        continue;
-        }
-
-    if (DEBUG_PRI (mpx_dev, DEB_XFER))
-        fprintf (sim_deb, ">>MPX xfer: Port %d character %s received\n",
-                          port, fmt_char (ch));
-
-    if ((ch == ACK) && (mpx_flags [port] & FL_WAITACK)) {   /* ACK and waiting for it? */
-        mpx_flags [port] = mpx_flags [port] & ~FL_WAITACK;  /* clear wait flag */
-        recv_loop = FALSE;                                  /* absorb character */
-        }
-
-    else if (buffer_count == 0 &&                           /* no free buffer available for char? */
-             !(mpx_flags [port] & FL_RDFILL)) {             /*   and not filling last buffer? */
-        mpx_flags [port] |= FL_RDOVFLOW;                    /* set buffer overflow flag */
-        recv_loop = fast_timing;                            /* continue loop if fast mode */
-        }
-
-    else {                                                      /* buffer is available */
-        if (rt & RT_ENAB_EDIT)                                  /* editing enabled? */
-            if (ch == BS) {                                     /* backspace? */
-                if (buf_len (ioread, port, put) > 0)            /* at least one character in buffer? */
-                    buf_remove (ioread, port);                  /* remove last char */
-
-                if (rt & RT_ENAB_ECHO) {                        /* echo enabled? */
-                    tmxr_putc_ln (&mpx_ldsc [port], BS);        /* echo BS */
-
-                    if (fast_timing) {                          /* fast timing mode? */
-                        tmxr_putc_ln (&mpx_ldsc [port], ' ');   /* echo space */
-                        tmxr_putc_ln (&mpx_ldsc [port], BS);    /* echo BS */
-                        }
-                    }
-
-                continue;
-                }
-
-            else if (ch == DEL) {                               /* delete line? */
-                buf_cancel (ioread, port, put);                 /* cancel put buffer */
-
-                if (rt & RT_ENAB_ECHO) {                        /* echo enabled? */
-                    if (fast_timing)                            /* fast timing mode? */
-                        tmxr_putc_ln (&mpx_ldsc [port], '\\');  /* echo backslash */
-
-                    tmxr_putc_ln (&mpx_ldsc [port], CR);        /* echo CR */
-                    tmxr_putc_ln (&mpx_ldsc [port], LF);        /*   and LF */
-                    }
-
-                continue;
-                }
-
-        if (uptr->flags & UNIT_CAPSLOCK)                    /* caps lock mode? */
-            ch = (uint8) toupper (ch);                      /* convert to upper case if lower */
-
-        if (rt & RT_ENAB_ECHO)                              /* echo enabled? */
-            tmxr_putc_ln (&mpx_ldsc [port], ch);            /* echo the char */
-
-        if (rt & RT_END_ON_CHAR) {                          /* end on character? */
-            recv_loop = FALSE;                              /* assume termination */
-
-            if ((ch == CR) && (rt & RT_END_ON_CR)) {
-                if (rt & RT_ENAB_ECHO)                      /* echo enabled? */
-                    tmxr_putc_ln (&mpx_ldsc [port], LF);    /* send LF */
-                mpx_param = RS_ETC_CR;                      /* set termination condition */
-                }
-
-            else if ((ch == RS)  && (rt & RT_END_ON_RS))
-                mpx_param = RS_ETC_RS;                      /* set termination condition */
-
-            else if ((ch == EOT) && (rt & RT_END_ON_EOT))
-                mpx_param = RS_ETC_EOT;                     /* set termination condition */
-
-            else if ((ch == DC2) && (rt & RT_END_ON_DC2))
-                mpx_param = RS_ETC_DC2;                     /* set termination condition */
-
-            else
-                recv_loop = TRUE;                           /* no termination */
-            }
-
-        if (recv_loop) {                                    /* no termination condition? */
-            buf_put (ioread, port, ch);                     /* put character in buffer */
-            mpx_charcnt [port]++;                           /*   and count it */
-            }
-
-        if ((rt & RT_END_ON_CNT) &&                         /* end on count */
-            (mpx_charcnt [port] == mpx_termcnt [port])) {   /*   and termination count reached? */
-            recv_loop = FALSE;                              /* set termination */
-            mpx_param = 0;                                  /* no extra termination info */
-            mpx_charcnt [port] = 0;                         /* clear the current character count */
-
-            if (mpx_flags [port] & FL_ALERT) {              /* was this alert for term rcv buffer? */
-                mpx_flags [port] &= ~FL_ALERT;              /* clear alert flag */
-                mpx_termcnt [port] = RD_BUF_LIMIT;          /* reset termination character count */
-                }
-            }
-
-        else if (buf_len (ioread, port, put) == RD_BUF_LIMIT) { /* buffer now full? */
-            recv_loop = FALSE;                                  /* set termination */
-            mpx_param = mpx_param | RS_PARTIAL;                 /*   and partial buffer flag */
-            }
-
-        if (recv_loop)                                      /* if there is no termination condition */
-            if (buffer_count == 2)                          /*   then if we're filling the first buffer */
-                recv_loop = fast_timing;                    /*     then set to loop if in fast mode */
-            else                                            /*   otherwise we're filling the second */
-                recv_loop = FALSE;                          /*     so give the CPU a chance to read the first */
-
-        else {                                              /* otherwise a termination condition exists */
-            if (DEBUG_PRI (mpx_dev, DEB_XFER)) {
-                fprintf (sim_deb, ">>MPX xfer: Port %d read terminated on ", port);
-
-                if (mpx_param & RS_PARTIAL)
-                    fputs ("buffer full\n", sim_deb);
-                else if (rt & RT_END_ON_CHAR)
-                    fprintf (sim_deb, "character %s\n", fmt_char (ch));
-                else
-                    fprintf (sim_deb, "count = %d\n", mpx_termcnt [port]);
-                }
-
-            if (buf_len (ioread, port, put) == 0) {         /* zero-length read? */
-                buf_put (ioread, port, 0);                  /* dummy put to reserve header */
-                buf_remove (ioread, port);                  /* back out dummy char leaving header */
-                }
-
-            buf_term (ioread, port, (uint8) (mpx_param >> 8));  /* terminate buffer and set header */
-
-            if (buf_avail (ioread, port) == 1)              /* first read buffer? */
-                mpx_flags [port] |= FL_HAVEBUF;             /* indicate availability */
-
-            if (mpx_state == idle)                          /* controller idle? */
-                mpx_cntl_svc (&mpx_cntl);                   /* check for UI */
-            }
-        }
-    }
-
-
-/* Housekeeping */
-
-if (fast_binary_read) {                                     /* fast binary read in progress? */
-    if (port == 0) {                                        /* on port 0? */
-        chx = tmxr_getc_ln (&mpx_ldsc [0]);                 /* see if a character is ready */
-
-        if (chx && !(mpx_flags [0] & FL_HAVEBUF)) {         /* character ready and buffer empty? */
-            if (mpx_flags [0] & FL_WANTBUF) {               /* second character? */
-                mpx_ibuf = mpx_ibuf | (chx & DMASK8);       /* merge it into word */
-                mpx_flags [0] |= FL_HAVEBUF;                /* mark buffer as ready */
-
-                mpx_io (&mpx_dib, ioENF, 0);                /* set device flag */
-
-                if (DEBUG_PRI (mpx_dev, DEB_CMDS))
-                    fputs (">>MPX cmds: Flag and SRQ set\n", sim_deb);
-                }
-
-            else                                            /* first character */
-                mpx_ibuf = (uint16) ((chx & DMASK8) << 8);  /* put in top half of word */
-
-            mpx_flags [0] ^= FL_WANTBUF;                    /* toggle byte flag */
-            }
-
-        sim_activate (uptr, uptr->wait);                    /* reschedule service for fast response */
-        }
-    }
-
-else {                                                      /* normal service */
-    tmxr_poll_tx (&mpx_desc);                               /* output any accumulated characters */
-
-    if (write_count > 0                                     /* if there are more characters to transmit */
-      && !(mpx_flags [port] & (FL_WAITACK | FL_XOFF))       /*   and transmission is not suspended */
-      || tmxr_rqln (&mpx_ldsc [port])) {                    /*   or there are more characters to receive */
-        sim_activate (uptr, uptr->wait);                    /*     then reschedule the service */
-
-        if (DEBUG_PRI (mpx_dev, DEB_CMDS))
-            fprintf (sim_deb, ">>MPX cmds: Port %d delay %d service rescheduled\n", port, uptr->wait);
-        }
-
-    else
-        if (DEBUG_PRI (mpx_dev, DEB_CMDS))
-            fprintf (sim_deb, ">>MPX cmds: Port %d service stopped\n", port);
-    }
-
-return SCPE_OK;
-}
-
-
-/* Telnet poll service.
-
-   This service routine is used to poll for Telnet connections and incoming
-   characters.  It starts when the socket is attached and stops when the socket
-   is detached.
-
-   Each line is then checked for a pending ENQ/ACK handshake.  If one is
-   pending, the ACK counter is incremented, and if it times out, another ENQ is
-   sent to avoid stalls.  Lines are also checked for available characters, and
-   the corresponding line I/O service routine is scheduled if needed.
-*/
-
-t_stat mpx_poll_svc (UNIT *uptr)
-{
-uint32 i;
-t_stat status = SCPE_OK;
-
-poll_connection ();                                         /* check for new connection */
-
-tmxr_poll_rx (&mpx_desc);                                   /* poll for input */
-
-for (i = 0; i < MPX_PORTS; i++) {                           /* check lines */
-    if (mpx_flags [i] & FL_WAITACK) {                       /* waiting for ACK? */
-        mpx_ack_wait [i] = mpx_ack_wait [i] + 1;            /* increment ACK wait timer */
-
-        if (mpx_ack_wait [i] > ACK_LIMIT) {                 /* has wait timed out? */
-            mpx_ack_wait [i] = 0;                           /* reset counter */
-            status = tmxr_putc_ln (&mpx_ldsc [i], ENQ);     /* send ENQ again */
-            tmxr_poll_tx (&mpx_desc);                       /* transmit it */
-
-            if ((status == SCPE_OK) &&                      /* transmitted OK? */
-                DEBUG_PRI (mpx_dev, DEB_XFER))
-                fprintf (sim_deb, ">>MPX xfer: Port %d character ENQ retransmitted\n", i);
-            }
-        }
-
-    if (tmxr_rqln (&mpx_ldsc [i]))                          /* chars available? */
-        sim_activate (&mpx_unit [i], mpx_unit [i].wait);    /* activate I/O service */
-    }
-
-if (uptr->wait == POLL_FIRST)                               /* first poll? */
-    uptr->wait = sync_poll (INITIAL);                       /* initial synchronization */
-else                                                        /* not first */
-    uptr->wait = sync_poll (SERVICE);                       /* continue synchronization */
-
-sim_activate (uptr, uptr->wait);                            /* continue polling */
-
-return SCPE_OK;
-}
-
-
-/* Simulator reset routine.
-
-   The hardware CRS signal generates a reset signal to the Z80 and its
-   peripherals.  This causes execution of the power up initialization code.
-
-   The CRS signal also has these hardware effects:
-    - clears control
-    - clears flag
-    - clears flag buffer
-    - clears backplane ready
-    - clears the output buffer register
-
-   Implementation notes:
-
-    1. Under simulation, we also clear the input buffer register, even though
-       the hardware doesn't.
-
-    2. We set up the first poll for Telnet connections to occur "immediately"
-       upon execution, so that clients will be connected before execution
-       begins.  Otherwise, a fast program may access the multiplexer before the
-       poll service routine activates.
-
-    3. We must set the "emptying_flags" and "filling_flags" values here, because
-       they cannot be initialized statically, even though the values are
-       constant.
-*/
-
-t_stat mpx_reset (DEVICE *dptr)
-{
-if (sim_switches & SWMASK ('P')) {                      /* power-on reset? */
-    emptying_flags [ioread]  = FL_RDEMPT;               /* initialize buffer flags constants */
-    emptying_flags [iowrite] = FL_WREMPT;
-    filling_flags  [ioread]  = FL_RDFILL;
-    filling_flags  [iowrite] = FL_WRFILL;
-    }
-
-IOPRESET (&mpx_dib);                                    /* PRESET device (does not use PON) */
-
-mpx_ibuf = 0;                                           /* clear input buffer */
-
-if (mpx_poll.flags & UNIT_ATT) {                        /* network attached? */
-    mpx_poll.wait = POLL_FIRST;                         /* set up poll */
-    sim_activate (&mpx_poll, mpx_poll.wait);            /* start Telnet poll immediately */
-    }
-else
-    sim_cancel (&mpx_poll);                             /* else stop Telnet poll */
-
-return SCPE_OK;
-}
-
-
-/* Attach the multiplexer to a Telnet port.
-
-   We are called by the ATTACH MPX <port> command to attach the multiplexer to
-   the listening port indicated by <port>.  Logically, it is the multiplexer
-   device that is attached; however, SIMH only allows units to be attached.
-   This makes sense for devices such as tape drives, where the attached media is
-   a property of a specific drive.  In our case, though, the listening port is a
-   property of the multiplexer card, not of any given serial line.  As ATTACH
-   MPX is equivalent to ATTACH MPX0, the port would, by default, be attached to
-   the first serial line and be reported there in a SHOW MPX command.
-
-   To preserve the logical picture, we attach the port to the Telnet poll unit,
-   which is normally disabled to inhibit its display.  Attaching to a disabled
-   unit is not allowed, so we first enable the unit, then attach it, then
-   disable it again.  Attachment is reported by the "mpx_status" routine below.
-
-   A direct attach to the poll unit is only allowed when restoring a previously
-   saved session.
-
-   The Telnet poll service routine is synchronized with the other input polling
-   devices in the simulator to facilitate idling.
-*/
-
-t_stat mpx_attach (UNIT *uptr, CONST char *cptr)
-{
-t_stat status = SCPE_OK;
-
-if (uptr != mpx_unit                                        /* not unit 0? */
-  && (uptr != &mpx_poll || !(sim_switches & SIM_SW_REST)))  /*   and not restoring the poll unit? */
-    return SCPE_NOATT;                                      /* can't attach */
-
-mpx_poll.flags = mpx_poll.flags & ~UNIT_DIS;                /* enable unit */
-status = tmxr_attach (&mpx_desc, &mpx_poll, cptr);          /* attach to socket */
-mpx_poll.flags = mpx_poll.flags | UNIT_DIS;                 /* disable unit */
-
-if (status == SCPE_OK) {
-    mpx_poll.wait = POLL_FIRST;                             /* set up poll */
-    sim_activate (&mpx_poll, mpx_poll.wait);                /* start poll immediately */
-    }
-return status;
-}
-
-
-/* Detach the multiplexer.
-
-   Normally, we are called by the DETACH MPX command, which is equivalent to
-   DETACH MPX0.  However, we may be called with other units in two cases.
-
-   A DETACH ALL command will call us for unit 9 (the poll unit) if it is
-   attached.  Also, during simulator shutdown, we will be called for units 0-8
-   (detach_all in scp.c calls the detach routines of all units that do NOT have
-   UNIT_ATTABLE), as well as for unit 9 if it is attached.  In both cases, it is
-   imperative that we return SCPE_OK, otherwise any remaining device detaches
-   will not be performed.
-*/
-
-t_stat mpx_detach (UNIT *uptr)
-{
-t_stat status = SCPE_OK;
-int32 i;
-
-if ((uptr == mpx_unit) || (uptr == &mpx_poll)) {        /* base unit or poll unit? */
-    status = tmxr_detach (&mpx_desc, &mpx_poll);        /* detach socket */
-
-    for (i = 0; i < MPX_PORTS; i++) {
-        mpx_ldsc [i].rcve = 0;                          /* disable line reception */
-        sim_cancel (&mpx_unit [i]);                     /* cancel any scheduled I/O */
-        }
-
-    sim_cancel (&mpx_poll);                             /* stop Telnet poll */
-    }
-
-return status;
-}
-
-
-/* Show multiplexer status */
-
-t_stat mpx_status (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
-{
-if (mpx_poll.flags & UNIT_ATT)                          /* attached to socket? */
-    fprintf (st, "attached to port %s, ", mpx_poll.filename);
-else
-    fprintf (st, "not attached, ");
-
-tmxr_show_summ (st, uptr, val, desc);                   /* report connection count */
-return SCPE_OK;
-}
-
-
-/* Set firmware revision.
-
-   Currently, we support only revision C, so the MTAB entry does not have an
-   "mstring" entry.  When we add revision D support, an "mstring" entry of "REV"
-   will enable changing the firmware revision.
-*/
-
-t_stat mpx_set_frev (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
-{
-if ((cptr == NULL) ||                                   /* no parameter? */
-    (*cptr < 'C') || (*cptr > 'D') ||                   /*   or not C or D? */
-    (*(cptr + 1) != '\0'))                              /*   or not just one character? */
-    return SCPE_ARG;                                    /* bad argument */
-
-else {
-    if (*cptr == 'C')                                   /* setting revision C? */
-        mpx_dev.flags = mpx_dev.flags & ~DEV_REV_D;     /* clear 'D' flag */
-    else if (*cptr == 'D')                              /* setting revision D? */
-        mpx_dev.flags = mpx_dev.flags | DEV_REV_D;      /* set 'D' flag */
-
-    return SCPE_OK;
-    }
-}
-
-
-/* Show firmware revision */
-
-t_stat mpx_show_frev (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
-{
-if (mpx_dev.flags & DEV_REV_D)
-    fputs ("12792D", st);
-else
-    fputs ("12792C", st);
-return SCPE_OK;
-}
-
-
-/* Local routines */
 
 
 /* Poll for new Telnet connections */
@@ -2366,7 +2691,7 @@ return -1;                                              /* return failure code *
    the two.
 
    With this configuration, two one-character writes or reads will allocate both
-   available buffers, even though each was essentially empty.
+   available buffers, even though each will be essentially empty.
 
    The D revision allocates one 1024-byte FIFO read buffer and one 892-byte
    write buffer per port.  As with the A/B/C revisions, the first write to a
@@ -2539,13 +2864,12 @@ else
 
 buf_incr (mpx_get, port, rw, +1);                       /* increment circular get index */
 
-if (DEBUG_PRI (mpx_dev, DEB_BUF))
-    if (mpx_flags [port] & emptying_flags [rw])
-        fprintf (sim_deb, ">>MPX buf:  Port %d character %s get from %s buffer "
-                          "[%d]\n", port, fmt_char (ch), io_op [rw], index);
-    else
-        fprintf (sim_deb, ">>MPX buf:  Port %d header %03o get from %s buffer "
-                          "[%d]\n", port, ch, io_op [rw], index);
+if (mpx_flags [port] & emptying_flags [rw])
+    tprintf (mpx_dev, DEB_BUF, "Port %d character %s get from %s buffer [%d]\n",
+             port, fmt_char (ch), io_op [rw], index);
+else
+    tprintf (mpx_dev, DEB_BUF, "Port %d header %03o get from %s buffer [%d]\n",
+             port, ch, io_op [rw], index);
 
 if (mpx_get [port] [rw] == mpx_sep [port] [rw])         /* buffer now empty? */
     mpx_flags [port] &= ~emptying_flags [rw];           /* clear "buffer emptying" flag */
@@ -2573,9 +2897,8 @@ if ((mpx_flags [port] & filling_flags [rw]) == 0) {     /* first put to this buf
     index = mpx_put [port] [rw];                        /* get current put index */
     buf_incr (mpx_put, port, rw, +1);                   /* reserve space for header */
 
-    if (DEBUG_PRI (mpx_dev, DEB_BUF))
-        fprintf (sim_deb, ">>MPX buf:  Port %d reserved header "
-                          "for %s buffer [%d]\n", port, io_op [rw], index);
+    tprintf (mpx_dev, DEB_BUF, "Port %d reserved header for %s buffer [%d]\n",
+             port, io_op [rw], index);
     }
 
 index = mpx_put [port] [rw];                            /* get current put index */
@@ -2587,9 +2910,8 @@ else
 
 buf_incr (mpx_put, port, rw, +1);                       /* increment circular put index */
 
-if (DEBUG_PRI (mpx_dev, DEB_BUF))
-    fprintf (sim_deb, ">>MPX buf:  Port %d character %s put to %s buffer "
-                      "[%d]\n", port, fmt_char (ch), io_op [rw], index);
+tprintf (mpx_dev, DEB_BUF, "Port %d character %s put to %s buffer [%d]\n",
+         port, fmt_char (ch), io_op [rw], index);
 return;
 }
 
@@ -2602,20 +2924,14 @@ return;
 
 static void buf_remove (IO_OPER rw, uint32 port)
 {
-uint8 ch;
 uint32 index;
 
 index = buf_incr (mpx_put, port, rw, -1);               /* decrement circular put index */
 
-if (DEBUG_PRI (mpx_dev, DEB_BUF)) {
-    if (rw == ioread)
-        ch = mpx_rbuf [port] [index];                   /* pick up char from read buffer */
-    else
-        ch = mpx_wbuf [port] [index];                   /* pick up char from write buffer */
-
-    fprintf (sim_deb, ">>MPX buf:  Port %d character %s removed from %s buffer "
-                      "[%d]\n", port, fmt_char (ch), io_op [rw], index);
-    }
+tprintf (mpx_dev, DEB_BUF, "Port %d character %s removed from %s buffer [%d]\n",
+         port, (rw == ioread ? fmt_char (mpx_rbuf [port] [index])
+                             : fmt_char (mpx_wbuf [port] [index])),
+         io_op [rw], index);
 return;
 }
 
@@ -2642,9 +2958,8 @@ mpx_flags [port] = mpx_flags [port] & ~filling_flags [rw];  /* clear filling fla
 if (mpx_get [port] [rw] == index)                           /* reached separator? */
     mpx_sep [port] [rw] = mpx_put [port] [rw];              /* move sep to end of next buffer */
 
-if (DEBUG_PRI (mpx_dev, DEB_BUF))
-    fprintf (sim_deb, ">>MPX buf:  Port %d header %03o terminated %s buffer\n",
-                      port, header, io_op [rw]);
+tprintf (mpx_dev, DEB_BUF, "Port %d header %03o terminated %s buffer\n",
+         port, header, io_op [rw]);
 return;
 }
 
@@ -2662,8 +2977,7 @@ if ((mpx_flags [port] & filling_flags [rw]) == 0)           /* not filling next 
                                                             /* else it will be moved when terminated */
 mpx_flags [port] = mpx_flags [port] & ~emptying_flags [rw]; /* clear emptying flag */
 
-if (DEBUG_PRI (mpx_dev, DEB_BUF))
-    fprintf (sim_deb, ">>MPX buf:  Port %d released %s buffer\n", port, io_op [rw]);
+tprintf (mpx_dev, DEB_BUF, "Port %d released %s buffer\n", port, io_op [rw]);
 return;
 }
 
@@ -2697,8 +3011,7 @@ else {                                                  /* cancel get buffer */
     mpx_flags [port] &= ~emptying_flags [rw];           /* clear emptying flag */
     }
 
-if (DEBUG_PRI (mpx_dev, DEB_BUF))
-    fprintf (sim_deb, ">>MPX buf:  Port %d cancelled %s buffer\n", port, io_op [rw]);
+tprintf (mpx_dev, DEB_BUF, "Port %d cancelled %s buffer\n", port, io_op [rw]);
 return;
 }
 

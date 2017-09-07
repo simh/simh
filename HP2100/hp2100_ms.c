@@ -1,31 +1,40 @@
-/* hp2100_ms.c: HP 2100 13181A/13183A magnetic tape simulator
+/* hp2100_ms.c: HP 2100 13181B/13183B Digital Magnetic Tape Unit Interface simulator
 
    Copyright (c) 1993-2016, Robert M. Supnik
+   Copyright (c) 2017,      J. David Bryan
 
-   Permission is hereby granted, free of charge, to any person obtaining a
-   copy of this software and associated documentation files (the "Software"),
-   to deal in the Software without restriction, including without limitation
-   the rights to use, copy, modify, merge, publish, distribute, sublicense,
-   and/or sell copies of the Software, and to permit persons to whom the
-   Software is furnished to do so, subject to the following conditions:
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
 
    The above copyright notice and this permission notice shall be included in
    all copies or substantial portions of the Software.
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+   AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not be
+   Except as contained in this notice, the names of the authors shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from Robert M Supnik.
+   in this Software without prior written authorization from the authors.
 
-   MS           13181A 7970B 800bpi nine track magnetic tape
-                13183A 7970E 1600bpi nine track magnetic tape
+   MS           13181B Digital Magnetic Tape Unit Interface
+                13183B Digital Magnetic Tape Unit Interface
 
+   20-Jul-17    JDB     Removed "msc_stopioe" variable and register
+   11-Jul-17    JDB     Renamed "ibl_copy" to "cpu_ibl"
+   15-Mar-17    JDB     Trace flags are now global
+                        Changed DEBUG_PRI calls to tprintfs
+   13-Mar-17    JDB     Deprecated LOCKED/WRITEENABLED for ATTACH -R
+   10-Mar-17    JDB     Added IOBUS to the debug table
+   27-Feb-17    JDB     ibl_copy no longer returns a status code
+   17-Jan-17    JDB     Modified to use "odd_parity" array in hp2100_sys.c
    13-May-16    JDB     Modified for revised SCP API function parameter types
    30-Dec-14    JDB     Added S-register parameters to ibl_copy
    24-Dec-14    JDB     Use T_ADDR_FMT with t_addr values for 64-bit compatibility
@@ -75,17 +84,21 @@
    22-Apr-02    RMS     Added maximum record length test
 
    References:
-   - 13181B Digital Magnetic Tape Unit Interface Kit Operating and Service Manual
-            (13181-90901, Nov-1982)
-   - 13183B Digital Magnetic Tape Unit Interface Kit Operating and Service Manual
-            (13183-90901, Nov-1983)
-   - SIMH Magtape Representation and Handling (Bob Supnik, 30-Aug-2006)
+     - 13181B Digital Magnetic Tape Unit Interface Kit Operating and Service Manual
+         (13181-90901, November 1982)
+     - 13183B Digital Magnetic Tape Unit Interface Kit Operating and Service Manual
+         (13183-90901, November 1983)
+     - SIMH Magtape Representation and Handling
+         (Bob Supnik, 30-Aug-2006)
 */
+
 
 
 #include "hp2100_defs.h"
 #include "hp2100_cpu.h"
 #include "sim_tape.h"
+
+
 
 #define UNIT_V_OFFLINE  (MTUF_V_UF + 0)                 /* unit offline */
 #define UNIT_OFFLINE    (1 << UNIT_V_OFFLINE)
@@ -102,12 +115,6 @@
 #define GAP_13181       48                              /* gap is 4.8 inches for 13181 cntlr */
 #define GAP_13183       30                              /* gap is 3.0 inches for 13183 cntlr */
 #define TCAP            (300 * 12 * 800)                /* 300 ft capacity at 800 bpi */
-
-/* Debug flags */
-
-#define DEB_CMDS        (1 << 0)                        /* command init and compl */
-#define DEB_CPU         (1 << 1)                        /* CPU I/O */
-#define DEB_RWS         (1 << 2)                        /* tape reads, writes, status */
 
 /* Command - msc_fnc */
 
@@ -180,7 +187,6 @@ int32 msc_sta = 0;                                      /* status */
 int32 msc_buf = 0;                                      /* buffer */
 int32 msc_usl = 0;                                      /* unit select */
 int32 msc_1st = 0;                                      /* first service */
-int32 msc_stopioe = 1;                                  /* stop on error */
 
 struct {
     FLIP_FLOP control;                                  /* control flip-flop */
@@ -220,12 +226,12 @@ int32 msc_xtime = 0;                                    /* data xfer time / word
 
 typedef int32 TIMESET[6];                               /* set of controller times */
 
-int32 *const timers[] = { &msc_btime, &msc_ctime, &msc_gtime,
-                          &msc_itime, &msc_rtime, &msc_xtime };
+int32 *const timers [] = { &msc_btime, &msc_ctime, &msc_gtime,
+                           &msc_itime, &msc_rtime, &msc_xtime };
 
-const TIMESET msc_times[3] = {
-    { 161512, 14044, 175553, 24885, 878,  88 },         /* 13181A */
-    { 252800, 17556, 105333, 27387, 878,  44 },         /* 13183A */
+const TIMESET msc_times [3] = {
+    { 161512, 14044, 175553, 24885, 878,  88 },         /* 13181B */
+    { 252800, 17556, 105333, 27387, 878,  44 },         /* 13183B */
     {      1,  1000,      1,     1, 100,  10 }          /* FAST */
     };
 
@@ -284,9 +290,11 @@ REG msd_reg[] = {
     { NULL }
     };
 
-MTAB msd_mod[] = {
-    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &msd_dev },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &msd_dev },
+MTAB msd_mod [] = {
+/*    Entry Flags          Value  Print String  Match String  Validation    Display        Descriptor       */
+/*    -------------------  -----  ------------  ------------  ------------  -------------  ---------------- */
+    { MTAB_XDV,              2u,  "SC",         "SC",         &hp_set_dib,  &hp_show_dib,  (void *) &ms_dib },
+    { MTAB_XDV | MTAB_NMO,  ~2u,  "DEVNO",      "DEVNO",      &hp_set_dib,  &hp_show_dib,  (void *) &ms_dib },
     { 0 }
     };
 
@@ -337,46 +345,67 @@ REG msc_reg[] = {
     { DRDATA (RTIME, msc_rtime, 24), REG_NZ + PV_LEFT },
     { DRDATA (XTIME, msc_xtime, 24), REG_NZ + PV_LEFT },
     { FLDATA (TIMING, ms_timing, 0), REG_HRO },
-    { FLDATA (STOP_IOE, msc_stopioe, 0) },
     { FLDATA (CTYPE, ms_ctype, 0), REG_HRO },
     { ORDATA (SC, msc_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, msc_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
-MTAB msc_mod[] = {
-    { UNIT_OFFLINE, UNIT_OFFLINE, "offline", "OFFLINE", NULL },
-    { UNIT_OFFLINE, 0, "online", "ONLINE", msc_online },
-    { MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL },
-    { MTAB_XTD | MTAB_VUN, 0, "CAPACITY", "CAPACITY",
-       &ms_set_reelsize, &ms_show_reelsize, NULL },
-    { MTAB_XTD | MTAB_VUN | MTAB_NMO, 1, "REEL", "REEL",
-      &ms_set_reelsize, &ms_show_reelsize, NULL },
-    { MTAB_XTD | MTAB_VUN, 0, "FORMAT", "FORMAT",
-      &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
-    { MTAB_XTD | MTAB_VDV, 0, NULL, "13181A",
-      &ms_settype, NULL, NULL },
-    { MTAB_XTD | MTAB_VDV, 1, NULL, "13183A",
-      &ms_settype, NULL, NULL },
-    { MTAB_XTD | MTAB_VDV, 0, "TYPE", NULL,
-      NULL, &ms_showtype, NULL },
-    { MTAB_XTD | MTAB_VDV, 0, NULL, "REALTIME",
-      &ms_set_timing, NULL, NULL },
-    { MTAB_XTD | MTAB_VDV, 1, NULL, "FASTTIME",
-      &ms_set_timing, NULL, NULL },
-    { MTAB_XTD | MTAB_VDV, 0, "TIMING", NULL,
-      NULL, &ms_show_timing, NULL },
-    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &msd_dev },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &msd_dev },
+/* Modifier list.
+
+   The LOCKED and WRITEENABLED modifiers are deprecated.  The supported method
+   of write-protecting a tape drive is to attach the tape image with the -R
+   (read-only) switch or by setting the host operating system's read-only
+   attribute on the tape image file.  This simulates removing the write ring
+   from the tape reel before mounting it on the drive.  There is no hardware
+   method of write-protecting a mounted and positioned tape reel.
+
+
+   Implementation notes:
+
+    1. The UNIT_RO modifier displays "write ring" if the flag is not set.  There
+       is no corresponding entry for the opposite condition because "read only"
+       is automatically printed after the attached filename.
+*/
+
+MTAB msc_mod [] = {
+/*    Mask Value     Match Value    Print String      Match String     Validation    Display  Descriptor */
+/*    -------------  -------------  ----------------  ---------------  ------------  -------  ---------- */
+    { UNIT_RO,       0,             "write ring",     NULL,            NULL,         NULL,    NULL       },
+
+    { UNIT_OFFLINE,  UNIT_OFFLINE,  "offline",        "OFFLINE",       NULL,         NULL,    NULL       },
+    { UNIT_OFFLINE,  0,             "online",         "ONLINE",        &msc_online,  NULL,    NULL       },
+
+    { MTUF_WLK,      0,             NULL,             "WRITEENABLED",  NULL,         NULL,    NULL       },
+    { MTUF_WLK,      MTUF_WLK,      NULL,             "LOCKED",        NULL,         NULL,    NULL       },
+
+
+/*    Entry Flags          Value  Print String  Match String  Validation         Display             Descriptor       */
+/*    -------------------  -----  ------------  ------------  -----------------  ------------------  ---------------- */
+    { MTAB_XUN,              0,   "CAPACITY",   "CAPACITY",   &ms_set_reelsize,  &ms_show_reelsize,  NULL             },
+    { MTAB_XUN | MTAB_NMO,   1,   "REEL",       "REEL",       &ms_set_reelsize,  &ms_show_reelsize,  NULL             },
+    { MTAB_XUN,              0,   "FORMAT",     "FORMAT",     &sim_tape_set_fmt, &sim_tape_show_fmt, NULL             },
+
+    { MTAB_XDV,              0,   NULL,         "13181A/B",   &ms_settype,       NULL,               NULL             },
+    { MTAB_XDV,              1,   NULL,         "13183A/B",   &ms_settype,       NULL,               NULL             },
+    { MTAB_XDV,              0,   "TYPE",       NULL,         NULL,              &ms_showtype,       NULL             },
+
+    { MTAB_XDV,              0,   NULL,         "REALTIME",   &ms_set_timing,    NULL,               NULL             },
+    { MTAB_XDV,              1,   NULL,         "FASTTIME",   &ms_set_timing,    NULL,               NULL             },
+    { MTAB_XDV,              0,   "TIMING",     NULL,         NULL,              &ms_show_timing,    NULL             },
+
+    { MTAB_XDV,              2u,  "SC",         "SC",         &hp_set_dib,       &hp_show_dib,       (void *) &ms_dib },
+    { MTAB_XDV | MTAB_NMO,  ~2u,  "DEVNO",      "DEVNO",      &hp_set_dib,       &hp_show_dib,       (void *) &ms_dib },
+
     { 0 }
     };
 
 DEBTAB msc_deb[] = {
-    { "CMDS", DEB_CMDS },
-    { "CPU", DEB_CPU },
-    { "RWS", DEB_RWS },
-    { NULL, 0 }
+    { "CMDS",  DEB_CMDS    },
+    { "RWS",   DEB_RWS     },
+    { "CPU",   DEB_CPU     },
+    { "IOBUS", TRACE_IOBUS },                   /* interface I/O bus signals and data words */
+    { NULL,    0           }
     };
 
 DEVICE msc_dev = {
@@ -554,11 +583,10 @@ while (working_set) {
             else
                 data = data | STA_TBSY | STA_LOCAL;
 
-            if (ms_ctype == A13183)                     /* 13183A? */
+            if (ms_ctype == A13183)                     /* 13183? */
                 data = data | STA_PE | (uint16) (msc_usl << STA_V_SEL);
 
-            if (DEBUG_PRI (msc_dev, DEB_CPU))
-                fprintf (sim_deb, ">>MSC LIx: Status = %06o\n", data);
+            tprintf (msc_dev, DEB_CPU, "Status = %06o\n", data);
 
             stat_data = IORETURN (SCPE_OK, data);       /* merge in return status */
             break;
@@ -567,8 +595,7 @@ while (working_set) {
         case ioIOO:                                         /* I/O data output */
             msc_buf = IODATA (stat_data);                   /* clear supplied status */
 
-            if (DEBUG_PRI (msc_dev, DEB_CPU))
-                fprintf (sim_deb, ">>MSC OTx: Command = %06o\n", msc_buf);
+            tprintf (msc_dev, DEB_CPU, "Command = %06o\n", msc_buf);
 
             msc_sta = msc_sta & ~STA_REJ;                   /* clear reject */
 
@@ -583,8 +610,7 @@ while (working_set) {
             if (msc_buf & FNF_CHS) {                        /* select change */
                 msc_usl = map_sel[FNC_GETSEL (msc_buf)];    /* is immediate */
                 uptr = msc_dev.units + msc_usl;
-                if (DEBUG_PRI (msc_dev, DEB_CMDS))
-                    fprintf (sim_deb, ">>MSC OTx: Unit %d selected\n", msc_usl);
+                tprintf (msc_dev, DEB_CMDS, "Unit %d selected\n", msc_usl);
                 }
 
             if (((msc_buf & FNF_MOT) && sim_is_active (uptr)) ||
@@ -614,8 +640,7 @@ while (working_set) {
 
                     working_set = working_set & ~ioCLF; /* eliminate possible CLF */
 
-                    if (DEBUG_PRI (msc_dev, DEB_CMDS))
-                        fputs (">>MSC STC: Controller cleared\n", sim_deb);
+                    tprintf (msc_dev, DEB_CMDS, "Controller cleared\n");
 
                     break;                              /* command completes immediately */
                     }
@@ -645,16 +670,14 @@ while (working_set) {
                 if (msc_buf & ~FNC_SEL) {               /* NOP for unit sel alone */
                     sim_activate (uptr, sched_time);    /* else schedule op */
 
-                    if (DEBUG_PRI (msc_dev, DEB_CMDS))
-                        fprintf (sim_deb,
-                            ">>MSC STC: Unit %d command %03o (%s) scheduled, "
-                            "pos = %" T_ADDR_FMT "d, time = %d\n",
-                            msc_usl, uptr->FNC, ms_cmd_name (uptr->FNC),
-                            uptr->pos, sched_time);
+                    tprintf (msc_dev, DEB_CMDS, "Unit %d command %03o (%s) scheduled, "
+                                                "pos = %" T_ADDR_FMT "d, time = %d\n",
+                             msc_usl, uptr->FNC, ms_cmd_name (uptr->FNC),
+                             uptr->pos, sched_time);
                     }
 
-                else if (DEBUG_PRI (msc_dev, DEB_CMDS))
-                    fputs (">>MSC STC: Unit select (NOP)\n", sim_deb);
+                else
+                    tprintf (msc_dev, DEB_CMDS, "Unit select (NOP)\n");
 
                 msc_sta = STA_BUSY;                     /* ctrl is busy */
                 msc_1st = 1;
@@ -713,7 +736,7 @@ unum = uptr - msc_unit;                                 /* get unit number */
 if ((uptr->FNC != FNC_RWS) && (uptr->flags & UNIT_OFFLINE)) {  /* offline? */
     msc_sta = (msc_sta | STA_REJ) & ~STA_BUSY;          /* reject */
     mscio (&msc_dib, ioENF, 0);                         /* set flag */
-    return IOERROR (msc_stopioe, SCPE_UNATT);
+    return SCPE_OK;
     }
 
 switch (uptr->FNC) {                                    /* case on function */
@@ -741,10 +764,8 @@ switch (uptr->FNC) {                                    /* case on function */
             goto DO_WFM;                                /* do plain file mark */
                                                         /* else fall into GAP */
     case FNC_GAP:                                       /* erase gap */
-        if (DEBUG_PRI (msc_dev, DEB_RWS))
-            fprintf (sim_deb,
-                ">>MSC svc: Unit %d wrote gap\n",
-                unum);
+        tprintf (msc_dev, DEB_RWS, "Unit %d wrote gap\n", unum);
+
         r = ms_write_gap (uptr);                        /* write tape gap*/
 
         if (r || (uptr->FNC != FNC_GFM))                /* if error or not GFM */
@@ -752,10 +773,8 @@ switch (uptr->FNC) {                                    /* case on function */
                                                         /* else drop into WFM */
     case FNC_WFM:                                       /* write file mark */
         if ((ms_timing == 0) && sim_tape_bot (uptr)) {  /* realistic timing + BOT? */
-            if (DEBUG_PRI (msc_dev, DEB_RWS))
-                fprintf (sim_deb,
-                    ">>MSC svc: Unit %d wrote initial gap\n",
-                    unum);
+            tprintf (msc_dev, DEB_RWS, "Unit %d wrote initial gap\n", unum);
+
             st = ms_write_gap (uptr);                   /* write initial gap*/
             if (st != MTSE_OK) {                        /* error? */
                 r = ms_map_err (uptr, st);              /* map error */
@@ -763,10 +782,8 @@ switch (uptr->FNC) {                                    /* case on function */
                 }
             }
     DO_WFM:
-        if (DEBUG_PRI (msc_dev, DEB_RWS))
-            fprintf (sim_deb,
-                ">>MSC svc: Unit %d wrote file mark\n",
-                unum);
+        tprintf (msc_dev, DEB_RWS, "Unit %d wrote file mark\n", unum);
+
         st = sim_tape_wrtmk (uptr);                     /* write tmk */
         if (st != MTSE_OK)                              /* error? */
             r = ms_map_err (uptr, st);                  /* map error */
@@ -808,10 +825,8 @@ switch (uptr->FNC) {                                    /* case on function */
         if (msc_1st) {                                  /* first svc? */
             msc_1st = ms_ptr = ms_max = 0;              /* clr 1st flop */
             st = sim_tape_rdrecf (uptr, msxb, &ms_max, DBSIZE); /* read rec */
-            if (DEBUG_PRI (msc_dev, DEB_RWS))
-                fprintf (sim_deb,
-                    ">>MSC svc: Unit %d read %d word record\n",
-                    unum, ms_max / 2);
+            tprintf (msc_dev, DEB_RWS, "Unit %d read %d word record\n",
+                     unum, ms_max / 2);
             if (st == MTSE_RECE) msc_sta = msc_sta | STA_PAR;   /* rec in err? */
             else if (st != MTSE_OK) {                   /* other error? */
                 r = ms_map_err (uptr, st);              /* map error */
@@ -823,7 +838,7 @@ switch (uptr->FNC) {                                    /* case on function */
                 break;                                  /* err, done */
                 }
             if (ms_ctype == A13183)
-                msc_sta = msc_sta | STA_ODD;            /* set ODD for 13183A */
+                msc_sta = msc_sta | STA_ODD;            /* set ODD for 13183 */
             }
         if (msd.control && (ms_ptr < ms_max)) {         /* DCH on, more data? */
             if (msd.flag) msc_sta = msc_sta | STA_TIM | STA_PAR;
@@ -854,10 +869,8 @@ switch (uptr->FNC) {                                    /* case on function */
         if (msc_1st) {                                  /* first service? */
             msc_1st = ms_ptr = 0;                       /* no data xfer on first svc */
             if ((ms_timing == 0) && sim_tape_bot (uptr)) {  /* realistic timing + BOT? */
-                if (DEBUG_PRI (msc_dev, DEB_RWS))
-                    fprintf (sim_deb,
-                        ">>MSC svc: Unit %d wrote initial gap\n",
-                        unum);
+                tprintf (msc_dev, DEB_RWS, "Unit %d wrote initial gap\n", unum);
+
                 st = ms_write_gap (uptr);               /* write initial gap */
                 if (st != MTSE_OK) {                    /* error? */
                     r = ms_map_err (uptr, st);          /* map error */
@@ -879,10 +892,8 @@ switch (uptr->FNC) {                                    /* case on function */
             return SCPE_OK;
             }
         if (ms_ptr) {                                   /* any data? write */
-            if (DEBUG_PRI (msc_dev, DEB_RWS))
-                fprintf (sim_deb,
-                    ">>MSC svc: Unit %d wrote %d word record\n",
-                    unum, ms_ptr / 2);
+            tprintf (msc_dev, DEB_RWS, "Unit %d wrote %d word record\n",
+                     unum, ms_ptr / 2);
             st = sim_tape_wrrecf (uptr, msxb, ms_ptr);  /* write */
             if (st != MTSE_OK) {
                 r = ms_map_err (uptr, st);              /* map error */
@@ -900,19 +911,16 @@ switch (uptr->FNC) {                                    /* case on function */
 
     case FNC_RRR:                                       /* not supported */
     default:                                            /* unknown command */
-        if (DEBUG_PRI (msc_dev, DEB_CMDS))
-            fprintf (sim_deb,
-                ">>MSC svc: Unit %d command %03o is unknown (NOP)\n",
-                unum, uptr->FNC);
+        tprintf (msc_dev, DEB_CMDS, "Unit %d command %03o is unknown (NOP)\n",
+                 unum, uptr->FNC);
         break;
         }
 
 mscio (&msc_dib, ioENF, 0);                             /* set flag */
 msc_sta = msc_sta & ~STA_BUSY;                          /* update status */
-if (DEBUG_PRI (msc_dev, DEB_CMDS))
-     fprintf (sim_deb,
-        ">>MSC svc: Unit %d command %03o (%s) complete\n",
-        unum, uptr->FNC & 0377, ms_cmd_name (uptr->FNC));
+
+tprintf (msc_dev, DEB_CMDS, "Unit %d command %03o (%s) complete\n",
+         unum, uptr->FNC & 0377, ms_cmd_name (uptr->FNC));
 return r;
 }
 
@@ -939,10 +947,7 @@ t_stat ms_map_err (UNIT *uptr, t_stat st)
 {
 int32 unum = uptr - msc_unit;                           /* get unit number */
 
-if (DEBUG_PRI (msc_dev, DEB_RWS))
-    fprintf (sim_deb,
-        ">>MSC err: Unit %d tape library status = %d\n",
-        unum, st);
+tprintf (msc_dev, DEB_RWS, "Unit %d tape library status = %d\n", unum, st);
 
 switch (st) {
 
@@ -963,7 +968,7 @@ switch (st) {
         msc_sta = msc_sta | STA_EOF;
 
         if (ms_ctype == A13181)
-            msc_sta = msc_sta | STA_ODD;                /* EOF also sets ODD for 13181A */
+            msc_sta = msc_sta | STA_ODD;                /* EOF also sets ODD for 13181B */
         break;
 
     case MTSE_INVRL:                                    /* invalid rec lnt */
@@ -972,8 +977,7 @@ switch (st) {
 
     case MTSE_IOERR:                                    /* IO error */
         msc_sta = msc_sta | STA_PAR;                    /* error */
-        if (msc_stopioe) return SCPE_IOERR;
-        break;
+        return SCPE_IOERR;
 
     case MTSE_RECE:                                     /* record in error */
         msc_sta = msc_sta | STA_PAR;                    /* error */
@@ -1002,9 +1006,7 @@ for (i = 0; i < MS_NUMDR; i++) {                        /* look for write in pro
     if (sim_is_active (uptr) &&                         /* unit active? */
         (uptr->FNC == FNC_WC) &&                        /*   and last cmd write? */
         (ms_ptr > 0)) {                                 /*   and partial buffer? */
-        if (DEBUG_PRI (msc_dev, DEB_RWS))
-            fprintf (sim_deb,
-                ">>MSC rws: Unit %d wrote %d word partial record\n", i, ms_ptr / 2);
+        tprintf (msc_dev, DEB_RWS, "Unit %d wrote %d word partial record\n", i, ms_ptr / 2);
 
         st = sim_tape_wrrecf (uptr, msxb, ms_ptr | MTR_ERF);
 
@@ -1143,9 +1145,9 @@ return SCPE_OK;
 t_stat ms_showtype (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (ms_ctype == A13183)
-    fprintf (st, "13183A");
+    fprintf (st, "13183B");
 else
-    fprintf (st, "13181A");
+    fprintf (st, "13181B");
 return SCPE_OK;
 }
 
@@ -1313,9 +1315,8 @@ const int32 dev = msd_dib.select_code;                  /* get data chan device 
 if (unitno != 0)                                        /* boot supported on drive unit 0 only */
     return SCPE_NOFNC;                                  /* report "Command not allowed" if attempted */
 
-if (ibl_copy (ms_rom, dev, IBL_OPT,                     /* copy the boot ROM to memory and configure */
-              IBL_MS | IBL_SET_SC (dev)))               /*   the S register accordingly */
-    return SCPE_IERR;                                   /* return an internal error if the copy failed */
+cpu_ibl (ms_rom, dev, IBL_OPT,                          /* copy the boot ROM to memory and configure */
+         IBL_MS | IBL_SET_SC (dev));                    /*   the S register accordingly */
 
 if ((sim_switches & SWMASK ('S')) && AR)                /* if -S is specified and the A register is non-zero */
     SR = SR | 1;                                        /*   then set to skip to the file number in A */
@@ -1325,32 +1326,10 @@ return SCPE_OK;
 
 /* Calculate tape record CRC and LRC characters */
 
-#define E               0400                            /* parity bit for odd parity */
-#define O               0000                            /* parity bit for odd parity */
-
-static const uint16 odd_parity [256] = {                /* parity table */
-    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /* 000-017 */
-    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 020-037 */
-    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 040-067 */
-    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /* 060-077 */
-    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 100-117 */
-    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /* 120-137 */
-    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /* 140-157 */
-    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 160-177 */
-    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 200-217 */
-    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /* 220-237 */
-    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /* 240-267 */
-    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 260-277 */
-    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E,     /* 300-317 */
-    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 320-337 */
-    O, E, E, O, E, O, O, E, E, O, O, E, O, E, E, O,     /* 340-357 */
-    E, O, O, E, O, E, E, O, O, E, E, O, E, O, O, E      /* 360-377 */
-    };
-
 static uint32 calc_crc_lrc (uint8 *buffer, t_mtrlnt length)
 {
 uint32 i;
-uint16 byte, crc, lrc;
+HP_WORD byte, crc, lrc;
 
 lrc = crc = 0;
 

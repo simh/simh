@@ -1,30 +1,38 @@
-/* hp2100_ipl.c: HP 2000 interprocessor link simulator
+/* hp2100_ipl.c: HP 12875A Processor Interconnect simulator
 
-   Copyright (c) 2002-2016, Robert M Supnik
+   Copyright (c) 2002-2016, Robert M. Supnik
+   Copyright (c) 2017,      J. David Bryan
 
-   Permission is hereby granted, free of charge, to any person obtaining a
-   copy of this software and associated documentation files (the "Software"),
-   to deal in the Software without restriction, including without limitation
-   the rights to use, copy, modify, merge, publish, distribute, sublicense,
-   and/or sell copies of the Software, and to permit persons to whom the
-   Software is furnished to do so, subject to the following conditions:
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
 
    The above copyright notice and this permission notice shall be included in
    all copies or substantial portions of the Software.
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+   AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not be
+   Except as contained in this notice, the names of the authors shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from Robert M Supnik.
+   in this Software without prior written authorization from the authors.
 
-   IPLI, IPLO   12875A interprocessor link
+   IPLI, IPLO   12875A Processor Interconnect
 
+   13-Aug-17    JDB     Revised so that only IPLI boots
+   19-Jul-17    JDB     Removed unused "ipl_stopioe" variable and register
+   11-Jul-17    JDB     Renamed "ibl_copy" to "cpu_ibl"
+   15-Mar-17    JDB     Trace flags are now global
+                        Changed DEBUG_PRJ calls to tpprintfs
+   10-Mar-17    JDB     Added IOBUS to the debug table
+   27-Feb-17    JDB     ibl_copy no longer returns a status code
    05-Aug-16    JDB     Renamed the P register from "PC" to "PR"
    13-May-16    JDB     Modified for revised SCP API function parameter types
    14-Sep-15    JDB     Exposed "ipl_edtdelay" via a REG_HIDDEN to allow user tuning
@@ -58,8 +66,8 @@
    31-Jan-03    RMS     Links are full duplex (found by Mike Gemeny)
 
    Reference:
-   - 12875A Processor Interconnect Kit Operating and Service Manual
-            (12875-90002, Jan-1974)
+     - 12875A Processor Interconnect Kit Operating and Service Manual
+         (12875-90002, January 1974)
 
 
    The 12875A Processor Interconnect Kit consists four 12566A Microcircuit
@@ -76,6 +84,7 @@
 
 #include "hp2100_defs.h"
 #include "hp2100_cpu.h"
+
 #include "sim_sock.h"
 #include "sim_tmxr.h"
 #include "sim_rev.h"
@@ -103,17 +112,11 @@ typedef enum { ipli, iplo } CARD_INDEX;                 /* card index number */
 #define DSOCKET         u3                              /* data socket */
 #define LSOCKET         u4                              /* listening socket */
 
-/* Debug flags */
-
-#define DEB_CMDS        (1 << 0)                        /* Command initiation and completion */
-#define DEB_CPU         (1 << 1)                        /* CPU I/O */
-#define DEB_XFER        (1 << 2)                        /* Socket receive and transmit */
 
 extern DIB ptr_dib;                                     /* need PTR select code for boot */
 
 int32 ipl_edtdelay = 1;                                 /* EDT delay (msec) */
 int32 ipl_ptime = 31;                                   /* polling interval */
-int32 ipl_stopioe = 0;                                  /* stop on error */
 
 typedef struct {
     FLIP_FLOP control;                                  /* control flip-flop */
@@ -138,10 +141,11 @@ t_bool ipl_check_conn (UNIT *uptr);
 /* Debug flags table */
 
 DEBTAB ipl_deb [] = {
-    { "CMDS", DEB_CMDS },
-    { "CPU",  DEB_CPU },
-    { "XFER", DEB_XFER },
-    { NULL, 0 }
+    { "CMDS",  DEB_CMDS    },
+    { "CPU",   DEB_CPU     },
+    { "XFER",  DEB_XFER    },
+    { "IOBUS", TRACE_IOBUS },                   /* interface I/O bus signals and data words */
+    { NULL,    0           }
     };
 
 /* Common structures */
@@ -184,7 +188,6 @@ REG ipli_reg [] = {
     { FLDATA (FBF, ipl [ipli].flagbuf, 0) },
     { ORDATA (HOLD, ipl [ipli].hold, 8) },
     { DRDATA (TIME, ipl_ptime, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, ipl_stopioe, 0) },
     { DRDATA (EDTDELAY, ipl_edtdelay, 32), REG_HIDDEN | PV_LEFT },
     { ORDATA (SC, ipli_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, ipli_dib.select_code, 6), REG_HRO },
@@ -192,22 +195,42 @@ REG ipli_reg [] = {
     };
 
 MTAB ipl_mod [] = {
-    { UNIT_DIAG, UNIT_DIAG, "diagnostic mode", "DIAG", &ipl_setdiag },
-    { UNIT_DIAG, 0, "link mode", "LINK", &ipl_setdiag },
-    { MTAB_XTD | MTAB_VDV, 0, NULL, "DISCONNECT",
-      &ipl_dscln, NULL, NULL },
-    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &ipli_dev },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &ipli_dev },
+/*    Mask Value  Match Value  Print String       Match String  Validation     Display  Descriptor */
+/*    ----------  -----------  -----------------  ------------  -------------  -------  ---------- */
+    { UNIT_DIAG,  UNIT_DIAG,  "diagnostic mode",  "DIAGNOSTIC", &ipl_setdiag,  NULL,    NULL       },
+    { UNIT_DIAG,  0,          "link mode",        "LINK",       &ipl_setdiag,  NULL,    NULL       },
+
+/*    Entry Flags           Value  Print String  Match String  Validation    Display        Descriptor        */
+/*    --------------------  -----  ------------  ------------  ------------  -------------  ----------------- */
+    { MTAB_XDV,               0u,  NULL,         "DISCONNECT", &ipl_dscln,   NULL,          NULL              },
+    { MTAB_XDV,               2u,  "SC",         "SC",         &hp_set_dib,  &hp_show_dib,  (void *) &ipl_dib },
+    { MTAB_XDV | MTAB_NMO,   ~2u,  "DEVNO",      "DEVNO",      &hp_set_dib,  &hp_show_dib,  (void *) &ipl_dib },
     { 0 }
     };
 
 DEVICE ipli_dev = {
-    "IPLI", &ipli_unit, ipli_reg, ipl_mod,
-    1, 10, 31, 1, 16, 16,
-    &tmxr_ex, &tmxr_dep, &ipl_reset,
-    &ipl_boot, &ipl_attach, &ipl_detach,
-    &ipli_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG,
-    0, ipl_deb, NULL, NULL
+    "IPLI",                                     /* device name */
+    &ipli_unit,                                 /* unit array */
+    ipli_reg,                                   /* register array */
+    ipl_mod,                                    /* modifier array */
+    1,                                          /* number of units */
+    10,                                         /* address radix */
+    31,                                         /* address width */
+    1,                                          /* address increment */
+    16,                                         /* data radix */
+    16,                                         /* data width */
+    &tmxr_ex,                                   /* examine routine */
+    &tmxr_dep,                                  /* deposit routine */
+    &ipl_reset,                                 /* reset routine */
+    &ipl_boot,                                  /* boot routine */
+    &ipl_attach,                                /* attach routine */
+    &ipl_detach,                                /* detach routine */
+    &ipli_dib,                                  /* device information block pointer */
+    DEV_DISABLE | DEV_DIS | DEV_DEBUG,          /* device flags */
+    0,                                          /* debug control flags */
+    ipl_deb,                                    /* debug flag name table */
+    NULL,                                       /* memory size change routine */
+    NULL                                        /* logical device name */
     };
 
 /* IPLO data structures
@@ -231,12 +254,28 @@ REG iplo_reg [] = {
     };
 
 DEVICE iplo_dev = {
-    "IPLO", &iplo_unit, iplo_reg, ipl_mod,
-    1, 10, 31, 1, 16, 16,
-    &tmxr_ex, &tmxr_dep, &ipl_reset,
-    &ipl_boot, &ipl_attach, &ipl_detach,
-    &iplo_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG,
-    0, ipl_deb, NULL, NULL
+    "IPLO",                                     /* device name */
+    &iplo_unit,                                 /* unit array */
+    iplo_reg,                                   /* register array */
+    ipl_mod,                                    /* modifier array */
+    1,                                          /* number of units */
+    10,                                         /* address radix */
+    31,                                         /* address width */
+    1,                                          /* address increment */
+    16,                                         /* data radix */
+    16,                                         /* data width */
+    &tmxr_ex,                                   /* examine routine */
+    &tmxr_dep,                                  /* deposit routine */
+    &ipl_reset,                                 /* reset routine */
+    NULL,                                       /* boot routine */
+    &ipl_attach,                                /* attach routine */
+    &ipl_detach,                                /* detach routine */
+    &iplo_dib,                                  /* device information block pointer */
+    DEV_DISABLE | DEV_DIS | DEV_DEBUG,          /* device flags */
+    0,                                          /* debug control flags */
+    ipl_deb,                                    /* debug flag name table */
+    NULL,                                       /* memory size change routine */
+    NULL                                        /* logical device name */
     };
 
 
@@ -326,9 +365,8 @@ IOSIGNAL signal;
 IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
 if (crs_count [card] && !(signal_set & ioCRS)) {        /* counting CRSes and not present? */
-    if (DEBUG_PRJ (dptrs [card], DEB_CMDS))             /* report reset count */
-        fprintf (sim_deb, ">>%s cmds: [CRS] Control cleared %d times\n",
-                 dptrs [card]->name, crs_count [card]);
+    tpprintf (dptrs [card], DEB_CMDS, "[CRS] Control cleared %d times\n",
+              crs_count [card]);
 
     crs_count [card] = 0;                               /* clear counter */
     }
@@ -362,16 +400,14 @@ while (working_set) {
         case ioIOI:                                     /* I/O data input */
             stat_data = IORETURN (SCPE_OK, uptr->IBUF); /* get return data */
 
-            if (DEBUG_PRJ (dptrs [card], DEB_CPU))
-                fprintf (sim_deb, ">>%s cpu:  [LIx] %s = %06o\n", dptrs [card]->name, iotype [card ^ 1], uptr->IBUF);
+            tpprintf (dptrs [card], DEB_CPU, "[LIx] %s = %06o\n", iotype [card ^ 1], uptr->IBUF);
             break;
 
 
         case ioIOO:                                     /* I/O data output */
             uptr->OBUF = IODATA (stat_data);            /* clear supplied status */
 
-            if (DEBUG_PRJ (dptrs [card], DEB_CPU))
-                fprintf (sim_deb, ">>%s cpu:  [OTx] %s = %06o\n", dptrs [card]->name, iotype [card], uptr->OBUF);
+            tpprintf (dptrs [card], DEB_CPU, "[OTx] %s = %06o\n", iotype [card], uptr->OBUF);
             break;
 
 
@@ -392,36 +428,35 @@ while (working_set) {
         case ioCLC:                                     /* clear control flip-flop */
             ipl [card].control = CLEAR;                 /* clear ctl */
 
-            if (DEBUG_PRJ (dptrs [card], DEB_CMDS))
-                fprintf (sim_deb, ">>%s cmds: [CLC] Control cleared\n", dptrs [card]->name);
+            tpprintf (dptrs [card], DEB_CMDS, "[CLC] Control cleared\n");
             break;
 
 
-        case ioSTC:                                                 /* set control flip-flop */
-            if (DEBUG_PRJ (dptrs [card], DEB_CMDS))
-                fprintf (sim_deb, ">>%s cmds: [STC] Control set\n", dptrs [card]->name);
+        case ioSTC:                                     /* set control flip-flop */
+            tpprintf (dptrs [card], DEB_CMDS, "[STC] Control set\n");
 
-            if (uptr->flags & UNIT_ATT) {                           /* attached? */
-                if (!ipl_check_conn (uptr))                         /* not established? */
-                    return IORETURN (STOP_NOCONN, 0);               /* lose */
-
-                msg [0] = (uptr->OBUF >> 8) & 0377;
-                msg [1] = uptr->OBUF & 0377;
-                sta = sim_write_sock (uptr->DSOCKET, msg, 2);
-
-                if (DEBUG_PRJ (dptrs [card], DEB_XFER))
-                    fprintf (sim_deb,
-                        ">>%s xfer: [STC] Socket write = %06o, status = %d\n",
-                        dptrs [card]->name, uptr->OBUF, sta);
-
-                if (sta == SOCKET_ERROR) {
-                    printf ("IPL socket write error\n");
-                    return IORETURN (SCPE_IOERR, 0);
+            if (uptr->flags & UNIT_ATT) {               /* attached? */
+                if (!ipl_check_conn (uptr)) {           /* not established? */
+                    cpu_ioerr_uptr = uptr;              /* save the failing unit */
+                    return IORETURN (STOP_NOCONN, 0);   /* lose */
                     }
 
-                ipl [card].control = SET;                           /* set ctl */
+                msg [0] = UPPER_BYTE (uptr->OBUF);
+                msg [1] = LOWER_BYTE (uptr->OBUF);
+                sta = sim_write_sock (uptr->DSOCKET, msg, 2);
 
-                sim_os_sleep (0);
+                tpprintf (dptrs [card], DEB_XFER, "[STC] Socket write = %06o, status = %d\n",
+                          uptr->OBUF, sta);
+
+                if (sta == SOCKET_ERROR) {              /* if the write fails, report it to the console */
+                    cprintf ("%s simulator processor interconnect socket write error\n",
+                             sim_name);
+                    return IORETURN (SCPE_IOERR, 0);    /*   and stop the simulator with an I/O error */
+                    }
+
+                ipl [card].control = SET;               /* set ctl */
+
+                sim_os_sleep (0);                       /* yield */
                 }
 
             else if (uptr->flags & UNIT_DIAG) {                     /* diagnostic mode? */
@@ -440,10 +475,8 @@ while (working_set) {
                 (signal_set & ioIOO) &&                 /*   and doing output? */
                 (card == ipli)) {                       /*   on the input card? */
 
-                if (DEBUG_PRJ (dptrs [card], DEB_CMDS))
-                    fprintf (sim_deb,
-                        ">>%s cmds: [EDT] Delaying DMA completion interrupt for %d msec\n",
-                        dptrs [card]->name, ipl_edtdelay);
+                tpprintf (dptrs [card], DEB_CMDS, "[EDT] Delaying DMA completion interrupt for %d msec\n",
+                          ipl_edtdelay);
 
                 sim_os_ms_sleep (ipl_edtdelay);         /* delay completion */
                 }
@@ -492,7 +525,8 @@ if (!ipl_check_conn (uptr))                             /* check for conn */
 nb = sim_read_sock (uptr->DSOCKET, msg, ((uptr->flags & UNIT_HOLD)? 1: 2));
 
 if (nb < 0) {                                           /* connection closed? */
-    printf ("IPL socket read error\n");
+    cprintf ("%s simulator processor interconnect socket read error\n",
+             sim_name);
     return SCPE_IOERR;
     }
 
@@ -514,9 +548,8 @@ else
 
 iplio ((DIB *) dptrs [card]->ctxt, ioENF, 0);           /* set flag */
 
-if (DEBUG_PRJ (dptrs [card], DEB_XFER))
-    fprintf (sim_deb, ">>%s xfer: Socket read = %06o, status = %d\n",
-        dptrs [card]->name, uptr->IBUF, nb);
+tpprintf (dptrs [card], DEB_XFER, "Socket read = %06o, status = %d\n",
+          uptr->IBUF, nb);
 
 return SCPE_OK;
 }
@@ -622,10 +655,7 @@ if ((sim_switches & SWMASK ('C')) ||                    /* connecting? */
     if (newsock == INVALID_SOCKET)
         return SCPE_IOERR;
 
-    printf ("Connecting to %s\n", hostport);
-
-    if (sim_log)
-        fprintf (sim_log, "Connecting to %s\n", hostport);
+    cprintf ("Connecting to %s\n", hostport);
 
     uptr->flags = uptr->flags | UNIT_ACTV;
     uptr->LSOCKET = 0;
@@ -641,9 +671,7 @@ else {
         return r;
     if (newsock == INVALID_SOCKET)
         return SCPE_IOERR;
-    printf ("Listening on port %s\n", hostport);
-    if (sim_log)
-        fprintf (sim_log, "Listening on port %s\n", hostport);
+    cprintf ("Listening on port %s\n", hostport);
     uptr->flags = uptr->flags & ~UNIT_ACTV;
     uptr->LSOCKET = newsock;
     uptr->DSOCKET = 0;
@@ -674,14 +702,9 @@ if ((sim_switches & SWMASK ('C')) ||
         newsock = sim_connect_sock (ipa, ipp);
         if (newsock == INVALID_SOCKET)
             return SCPE_IOERR;
-        printf ("Connecting to IP address %d.%d.%d.%d, port %d\n",
-            (ipa >> 24) & 0xff, (ipa >> 16) & 0xff,
-            (ipa >> 8) & 0xff, ipa & 0xff, ipp);
-        if (sim_log)
-            fprintf (sim_log,
-                "Connecting to IP address %d.%d.%d.%d, port %d\n",
-                (ipa >> 24) & 0xff, (ipa >> 16) & 0xff,
-                (ipa >> 8) & 0xff, ipa & 0xff, ipp);
+        cprintf ("Connecting to IP address %d.%d.%d.%d, port %d\n",
+                 (ipa >> 24) & 0xff, (ipa >> 16) & 0xff,
+                 (ipa >> 8) & 0xff, ipa & 0xff, ipp);
         uptr->flags = uptr->flags | UNIT_ACTV;
         uptr->LSOCKET = 0;
         uptr->DSOCKET = newsock;
@@ -692,9 +715,7 @@ else {
     newsock = sim_master_sock (ipp);
     if (newsock == INVALID_SOCKET)
         return SCPE_IOERR;
-    printf ("Listening on port %d\n", ipp);
-    if (sim_log)
-        fprintf (sim_log, "Listening on port %d\n", ipp);
+    cprintf ("Listening on port %d\n", ipp);
     uptr->flags = uptr->flags & ~UNIT_ACTV;
     uptr->LSOCKET = newsock;
     uptr->DSOCKET = 0;
@@ -718,11 +739,11 @@ if (sim_switches & SWMASK ('W')) {                      /* wait? */
         if (t)                                          /* established? */
             break;
         if ((i % 10) == 0)                              /* status every 10 sec */
-            printf ("Waiting for connection\n");
+            cprintf ("Waiting for connection\n");
         sim_os_sleep (1);                               /* sleep 1 sec */
         }
     if (t)                                              /* if connected (set by "ipl_check_conn" above) */
-        printf ("Connection established\n");            /*   then report */
+        cprintf ("Connection established\n");           /*   then report */
     }
 return SCPE_OK;
 }
@@ -860,17 +881,16 @@ static const BOOT_ROM ipl_rom = {
 
 t_stat ipl_boot (int32 unitno, DEVICE *dptr)
 {
-const int32 devi = ipli_dib.select_code;
-const int32 devp = ptr_dib.select_code;
+const HP_WORD devi = (HP_WORD) ipli_dib.select_code;
+const HP_WORD devp = (HP_WORD) ptr_dib.select_code;
 
-if (ibl_copy (ipl_rom, devi, IBL_S_CLR,                 /* copy the boot ROM to memory and configure */
-              IBL_SET_SC (devi) | devp))                /*   the S register accordingly */
-    return SCPE_IERR;                                   /* return an internal error if the copy failed */
+cpu_ibl (ipl_rom, devi, IBL_S_CLR,                      /* copy the boot ROM to memory and configure */
+         IBL_SET_SC (devi) | devp);                     /*   the S register accordingly */
 
-WritePW (PR + MAX_BASE, (~PR + 1) & DMASK);             /* fix ups */
-WritePW (PR + IPL_PNTR, ipl_rom [IPL_PNTR] | PR);
-WritePW (PR + PTR_PNTR, ipl_rom [PTR_PNTR] | PR);
-WritePW (PR + IPL_DEVA, devi);
-WritePW (PR + PTR_DEVA, devp);
+mem_deposit (PR + MAX_BASE, (~PR + 1) & DMASK);         /* fix ups */
+mem_deposit (PR + IPL_PNTR, (HP_WORD) ipl_rom [IPL_PNTR] | PR);
+mem_deposit (PR + PTR_PNTR, (HP_WORD) ipl_rom [PTR_PNTR] | PR);
+mem_deposit (PR + IPL_DEVA, devi);
+mem_deposit (PR + PTR_DEVA, devp);
 return SCPE_OK;
 }

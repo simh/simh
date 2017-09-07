@@ -1,31 +1,35 @@
-/* hp2100_lps.c: HP 2100 12653A/2767 line printer simulator
+/* hp2100_lps.c: HP 2100 12653A Line Printer Interface simulator
 
    Copyright (c) 1993-2016, Robert M. Supnik
+   Copyright (c) 2017,      J. David Bryan
 
-   Permission is hereby granted, free of charge, to any person obtaining a
-   copy of this software and associated documentation files (the "Software"),
-   to deal in the Software without restriction, including without limitation
-   the rights to use, copy, modify, merge, publish, distribute, sublicense,
-   and/or sell copies of the Software, and to permit persons to whom the
-   Software is furnished to do so, subject to the following conditions:
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
 
    The above copyright notice and this permission notice shall be included in
    all copies or substantial portions of the Software.
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+   AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not be
+   Except as contained in this notice, the names of the authors shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from Robert M Supnik.
+   in this Software without prior written authorization from the authors.
 
-   LPS          12653A 2767 line printer
-                12566B microcircuit interface with loopback diagnostic connector
+   LPS          HP 12653A Line Printer Interface
 
+   03-Aug-17    JDB     Changed perror call for I/O errors to cprintf
+   20-Jul-17    JDB     Removed "lps_stopioe" variable and register
+   17-Mar-17    JDB     Added "-N" handling to the attach routine
+   15-Mar-17    JDB     Changed DEBUG_PRS calls to tprintfs
    13-May-16    JDB     Modified for revised SCP API function parameter types
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
    28-Mar-11    JDB     Tidied up signal handling
@@ -58,30 +62,17 @@
    15-Oct-00    RMS     Added variable device number support
 
    References:
-   - 2767A Line Printer Operating and Service Manual (02767-90002, Oct-1973)
-   - 12566B, 12566B-001, 12566B-002, 12566B-003 Microcircuit Interface Kits
-     Operating and Service Manual (12566-90015, Apr-1976)
+     - 2767A Line Printer Operating and Service Manual
+         (02767-90002, October 1973)
+     - General Purpose Register Diagnostic Reference Manual
+         (24391-90001, April 1982)
 
-
-   This module simulates two different devices.  In "diagnostic mode," it
-   simulates a 12566B microcircuit interface card with a loopback connector.  In
-   non-diagnostic mode, it simulates a 12653A line printer interface card and a
-   2767 line printer.
-
-   In diagnostic mode, the 12566B interface has a loopback connector that ties
-   the output data lines to the input data lines and the device command output
-   to the device flag input.  In addition, card configuration jumpers are set as
-   needed for the diagnostic programs.
-
-   Jumper settings depend on the CPU model.  For the 2114/15/16 CPUs, jumper W1
-   is installed in position B and jumper W2 in position C.  In these positions,
-   the card flag sets two instructions after the STC, allowing DMA to steal
-   every third cycle.  For the 2100 and 1000 CPUs, jumper W1 is installed in
-   position C and jumper W2 in position B.  In these positions, the card flag
-   sets one instruction after the STC, allowing DMA to steal every other cycle.
-   For all CPUs, jumpers W3 and W4 are installed in position B, W5-W8 are
-   installed, and W9 is installed in position A.
-
+   The HP 12653A Line Printer Interface Kit connects the 2767A printer to the HP
+   1000 family.  The subsystem consists of an interface card employing TTL-level
+   line drivers and receivers, an interconnecting cable, and an HP 2767A (from
+   356 to 1110 lines per minute) line printer.  The interface is supported by
+   RTE and DOS drivers DVR12.  The interface supports DMA transfers, but the OS
+   drivers do not use them.
 
    The 2767 impact printer has a rotating drum with 80 columns of 64 raised
    characters.  ASCII codes 32 through 95 (SPACE through "_") form the print
@@ -131,45 +122,75 @@
      2. Print operation in progress sets BUSY instead of NOT READY.
      3. Characters not in the print repertoire are replaced with blanks.
      4. The 81st and succeeding characters overprint the current line.
-*/
+
+   The "General Purpose Register Diagnostic Reference Manual" states that the
+   12653A is a "special microcircuit interface," suggesting that it is a
+   derivative of the 12566B Microcircuit Interface Kit.  No specific manual for
+   this interface kit has been found.
+
+   A diagnostic mode is provided to simulate the installation of the 1251-0332
+   loopback connecctor, modified to connect pins Z/22 to pins AA/23 as required
+   by the diagnostic.  This ties the output data lines to the input data lines
+   and the device command output to the device flag input.
+
+   Jumper settings depend on the CPU model.  For the 2114/15/16 CPUs, jumper W1
+   is installed in position B and jumper W2 in position C.  In these positions,
+   the card flag sets two instructions after the STC, allowing DMA to steal
+   every third cycle.  For the 2100 and 1000 CPUs, jumper W1 is installed in
+   position C and jumper W2 in position B.  In these positions, the card flag
+   sets one instruction after the STC, allowing DMA to steal every other cycle.
+   For all CPUs, jumpers W3 and W4 are installed in position B, W5-W8 are
+   installed, and W9 is installed in position A.
+ */
+
+
 
 #include "hp2100_defs.h"
 #include "hp2100_cpu.h"
 
-#define LPS_ZONECNT     20                              /* zone char count */
-#define LPS_PAGECNT     80                              /* page char count */
-#define LPS_PAGELNT     60                              /* page line length */
-#define LPS_FORMLNT     66                              /* form line length */
+
+
+/* Printer program constants */
+
+#define CR                  '\r'                /* carriage return */
+#define LF                  '\n'                /* line feed */
+#define FF                  '\f'                /* form feed */
+
+#define DATA_MASK           0177u               /* printer uses only 7 bits for data */
+
+#define LPS_ZONECNT     20                      /* zone char count */
+#define LPS_PAGECNT     80                      /* page char count */
+#define LPS_PAGELNT     60                      /* page line length */
+#define LPS_FORMLNT     66                      /* form line length */
 
 /* Printer power states */
 
-#define LPS_ON          0                               /* power is on */
-#define LPS_OFF         1                               /* power is off */
-#define LPS_TURNING_ON  2                               /* power is turning on */
+#define LPS_ON          0                       /* power is on */
+#define LPS_OFF         1                       /* power is off */
+#define LPS_TURNING_ON  2                       /* power is turning on */
 
-#define LPS_BUSY        0000001                         /* busy status */
-#define LPS_NRDY        0100000                         /* not ready status */
-#define LPS_PWROFF      LPS_BUSY | LPS_NRDY             /* power-off status */
+#define LPS_BUSY        0000001                 /* busy status */
+#define LPS_NRDY        0100000                 /* not ready status */
+#define LPS_PWROFF      LPS_BUSY | LPS_NRDY     /* power-off status */
 
-#define UNIT_V_DIAG     (UNIT_V_UF + 0)                 /* diagnostic mode */
-#define UNIT_V_POWEROFF (UNIT_V_UF + 1)                 /* unit powered off */
-#define UNIT_V_OFFLINE  (UNIT_V_UF + 2)                 /* unit offline */
+#define UNIT_V_DIAG     (UNIT_V_UF + 0)         /* diagnostic mode */
+#define UNIT_V_POWEROFF (UNIT_V_UF + 1)         /* unit powered off */
+#define UNIT_V_OFFLINE  (UNIT_V_UF + 2)         /* unit offline */
 #define UNIT_DIAG       (1 << UNIT_V_DIAG)
 #define UNIT_POWEROFF   (1 << UNIT_V_POWEROFF)
 #define UNIT_OFFLINE    (1 << UNIT_V_OFFLINE)
 
-struct {
-    FLIP_FLOP control;                                  /* control flip-flop */
-    FLIP_FLOP flag;                                     /* flag flip-flop */
-    FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
+static struct {
+    FLIP_FLOP control;                          /* control flip-flop */
+    FLIP_FLOP flag;                             /* flag flip-flop */
+    FLIP_FLOP flagbuf;                          /* flag buffer flip-flop */
     } lps = { CLEAR, CLEAR, CLEAR };
 
-int32 lps_ccnt = 0;                                     /* character count */
-int32 lps_lcnt = 0;                                     /* line count */
-int32 lps_stopioe = 0;                                  /* stop on error */
-int32 lps_sta = 0;                                      /* printer status */
-int32 lps_timing = 1;                                   /* timing type */
-uint32 lps_power = LPS_ON;                              /* power state */
+static int32 lps_ccnt = 0;                      /* character count */
+static int32 lps_lcnt = 0;                      /* line count */
+static int32 lps_sta = 0;                       /* printer status */
+static int32 lps_timing = 1;                    /* timing type */
+static uint32 lps_power = LPS_ON;               /* power state */
 
 /* Hardware timing:
    (based on 1580 instr/msec)             instr   msec   calc msec
@@ -191,32 +212,32 @@ uint32 lps_power = LPS_ON;                              /* power state */
   three-fourths when not executing on an E/F.
 */
 
-int32 lps_ctime = 0;                                    /* char xfer time */
-int32 lps_ptime = 0;                                    /* zone printing time */
-int32 lps_stime = 0;                                    /* paper slew time */
-int32 lps_rtime = 0;                                    /* power-on ready time */
+static int32 lps_ctime = 0;                     /* char xfer time */
+static int32 lps_ptime = 0;                     /* zone printing time */
+static int32 lps_stime = 0;                     /* paper slew time */
+static int32 lps_rtime = 0;                     /* power-on ready time */
 
-typedef int32 TIMESET[4];                               /* set of controller times */
+typedef int32 TIMESET[4];                       /* set of controller times */
 
-int32 *const lps_timers[] = { &lps_ctime, &lps_ptime, &lps_stime, &lps_rtime };
+static int32 *const lps_timers[] = { &lps_ctime, &lps_ptime, &lps_stime, &lps_rtime };
 
-const TIMESET lps_times[2] = {
-    { 2, 55300, 17380, 158000 },                        /* REALTIME */
-    { 2,  1000,   1000,  1000 }                         /* FASTTIME */
+static const TIMESET lps_times[2] = {
+    { 2, 55300, 17380, 158000 },                /* REALTIME */
+    { 2,  1000,   1000,  1000 }                 /* FASTTIME */
     };
 
 DEVICE lps_dev;
 
-IOHANDLER lpsio;
+static IOHANDLER lpsio;
 
-t_stat lps_svc (UNIT *uptr);
-t_stat lps_reset (DEVICE *dptr);
-t_stat lps_restart (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
-t_stat lps_poweroff (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
-t_stat lps_poweron (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
-t_stat lps_attach (UNIT *uptr, CONST char *cptr);
-t_stat lps_set_timing (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-t_stat lps_show_timing (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat lps_svc (UNIT *uptr);
+static t_stat lps_reset (DEVICE *dptr);
+static t_stat lps_restart (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat lps_poweroff (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat lps_poweron (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat lps_attach (UNIT *uptr, CONST char *cptr);
+static t_stat lps_set_timing (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat lps_show_timing (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 /* LPS data structures
 
@@ -225,57 +246,89 @@ t_stat lps_show_timing (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
    lps_reg      LPS register list
 */
 
-DIB lps_dib = { &lpsio, LPS };
+static DIB lps_dib = { &lpsio, LPS };
 
-UNIT lps_unit = {
+static UNIT lps_unit = {
     UDATA (&lps_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_DISABLE+UNIT_TEXT, 0)
     };
 
-REG lps_reg[] = {
-    { ORDATA (BUF, lps_unit.buf, 16) },
-    { ORDATA (STA, lps_sta, 16) },
-    { ORDATA (POWER, lps_power, 2), REG_RO },
-    { FLDATA (CTL, lps.control, 0) },
-    { FLDATA (FLG, lps.flag, 0) },
-    { FLDATA (FBF, lps.flagbuf, 0) },
-    { DRDATA (CCNT, lps_ccnt, 7), PV_LEFT },
-    { DRDATA (LCNT, lps_lcnt, 7), PV_LEFT },
-    { DRDATA (POS, lps_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (CTIME, lps_ctime, 24), PV_LEFT },
-    { DRDATA (PTIME, lps_ptime, 24), PV_LEFT },
-    { DRDATA (STIME, lps_stime, 24), PV_LEFT },
-    { DRDATA (RTIME, lps_rtime, 24), PV_LEFT },
-    { FLDATA (TIMING, lps_timing, 0), REG_HRO },
-    { FLDATA (STOP_IOE, lps_stopioe, 0) },
-    { ORDATA (SC, lps_dib.select_code, 6), REG_HRO },
-    { ORDATA (DEVNO, lps_dib.select_code, 6), REG_HRO },
+static REG lps_reg[] = {
+/*    Macro   Name    Location               Width    Offset   Flags  */
+/*    ------  ------  -------------------  ---------  ------  ------- */
+    { ORDATA (BUF,    lps_unit.buf,           16),            REG_X   },
+    { ORDATA (STA,    lps_sta,                16)                     },
+    { ORDATA (POWER,  lps_power,               2),            REG_RO  },
+    { FLDATA (CTL,    lps.control,                      0)            },
+    { FLDATA (FLG,    lps.flag,                         0)            },
+    { FLDATA (FBF,    lps.flagbuf,                      0)            },
+    { DRDATA (CCNT,   lps_ccnt,                7),            PV_LEFT },
+    { DRDATA (LCNT,   lps_lcnt,                7),            PV_LEFT },
+    { DRDATA (POS,    lps_unit.pos,        T_ADDR_W),         PV_LEFT },
+    { DRDATA (CTIME,  lps_ctime,              24),            PV_LEFT },
+    { DRDATA (PTIME,  lps_ptime,              24),            PV_LEFT },
+    { DRDATA (STIME,  lps_stime,              24),            PV_LEFT },
+    { DRDATA (RTIME,  lps_rtime,              24),            PV_LEFT },
+    { FLDATA (TIMING, lps_timing,                       0),   REG_HRO },
+    { ORDATA (SC,     lps_dib.select_code,     6),            REG_HRO },
+    { ORDATA (DEVNO,  lps_dib.select_code,     6),            REG_HRO },
     { NULL }
     };
 
-MTAB lps_mod[] = {
-    { UNIT_DIAG, UNIT_DIAG, "diagnostic mode", "DIAG", NULL },
-    { UNIT_DIAG, 0, "printer mode", "PRINTER", NULL },
-    { UNIT_POWEROFF, UNIT_POWEROFF, "power off", "POWEROFF", lps_poweroff },
-    { UNIT_POWEROFF, 0, "power on", "POWERON", lps_poweron },
-    { UNIT_OFFLINE, UNIT_OFFLINE, "offline", "OFFLINE", NULL },
-    { UNIT_OFFLINE, 0, "online", "ONLINE", lps_restart },
-    { MTAB_XTD | MTAB_VDV, 0, NULL, "REALTIME",
-      &lps_set_timing, NULL, NULL },
-    { MTAB_XTD | MTAB_VDV, 1, NULL, "FASTTIME",
-      &lps_set_timing, NULL, NULL },
-    { MTAB_XTD | MTAB_VDV, 0, "TIMING", NULL,
-      NULL, &lps_show_timing, NULL },
-    { MTAB_XTD | MTAB_VDV,            0, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &lps_dev },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &lps_dev },
+static MTAB lps_mod[] = {
+/*    Mask Value     Match Value    Print String       Match String   Validation          Display  Descriptor */
+/*    -------------  -------------  -----------------  -------------  ------------------  -------  ---------- */
+    { UNIT_DIAG,     UNIT_DIAG,     "diagnostic mode", "DIAGNOSTIC",  NULL,               NULL,    NULL       },
+    { UNIT_DIAG,     0,             "printer mode",    "PRINTER",     NULL,               NULL,    NULL       },
+
+    { UNIT_OFFLINE,  UNIT_OFFLINE,  "offline",         "OFFLINE",     NULL,               NULL,    NULL       },
+    { UNIT_OFFLINE,  0,             "online",          "ONLINE",      &lps_restart,       NULL,    NULL       },
+
+    { UNIT_POWEROFF, UNIT_POWEROFF, "power off",       "POWEROFF",    &lps_poweroff,      NULL,    NULL       },
+    { UNIT_POWEROFF, 0,             "power on",        "POWERON",     &lps_poweron,       NULL,    NULL       },
+
+/*    Entry Flags          Value  Print String  Match String  Validation        Display            Descriptor        */
+/*    -------------------  -----  ------------  ------------  ----------------  -----------------  ----------------- */
+    { MTAB_XDV,              1,   NULL,         "FASTTIME",   &lps_set_timing,  NULL,              NULL              },
+    { MTAB_XDV,              0,   NULL,         "REALTIME",   &lps_set_timing,  NULL,              NULL              },
+    { MTAB_XDV,              0,   "TIMING",     NULL,         NULL,             &lps_show_timing,  NULL              },
+
+    { MTAB_XDV,              1u,  "SC",         "SC",         &hp_set_dib,      &hp_show_dib,      (void *) &lps_dib },
+    { MTAB_XDV | MTAB_NMO,  ~1u,  "DEVNO",      "DEVNO",      &hp_set_dib,      &hp_show_dib,      (void *) &lps_dib },
     { 0 }
     };
 
+static DEBTAB lps_deb [] = {
+    { "CMDS",  DEB_CMDS    },
+    { "CPU",   DEB_CPU     },
+    { "XFER",  DEB_XFER    },
+    { "STATE", TRACE_STATE },
+    { "IOBUS", TRACE_IOBUS },                   /* interface I/O bus signals and data words */
+    { NULL,    0           }
+    };
+
 DEVICE lps_dev = {
-    "LPS", &lps_unit, lps_reg, lps_mod,
-    1, 10, 31, 1, 8, 8,
-    NULL, NULL, &lps_reset,
-    NULL, &lps_attach, NULL,
-    &lps_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG
+    "LPS",                                      /* device name */
+    &lps_unit,                                  /* unit array */
+    lps_reg,                                    /* register array */
+    lps_mod,                                    /* modifier array */
+    1,                                          /* number of units */
+    10,                                         /* address radix */
+    31,                                         /* address width */
+    1,                                          /* address increment */
+    8,                                          /* data radix */
+    8,                                          /* data width */
+    NULL,                                       /* examine routine */
+    NULL,                                       /* deposit routine */
+    &lps_reset,                                 /* reset routine */
+    NULL,                                       /* boot routine */
+    &lps_attach,                                /* attach routine */
+    NULL,                                       /* detach routine */
+    &lps_dib,                                   /* device information block */
+    DEV_DISABLE | DEV_DIS | DEV_DEBUG,          /* device flags */
+    0,                                          /* debug control flags */
+    lps_deb,                                    /* debug flag name table */
+    NULL,                                       /* memory size change routine */
+    NULL                                        /* logical device name */
     };
 
 
@@ -288,9 +341,9 @@ DEVICE lps_dev = {
        assertion of STC and CLC simultaneously will not.
 */
 
-uint32 lpsio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
+static uint32 lpsio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-int32 sched;
+int32 current_line, current_char;
 IOSIGNAL signal;
 IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
@@ -335,18 +388,17 @@ while (working_set) {
                     lps_sta = LPS_PWROFF;
                 }
 
-            stat_data = IORETURN (SCPE_OK, lps_sta);            /* diag, rtn status */
+            stat_data = IORETURN (SCPE_OK, lps_sta);    /* diag, rtn status */
 
-            if (DEBUG_PRS (lps_dev))
-                fprintf (sim_deb, ">>LPS LIx: Status %06o returned\n", lps_sta);
+            tprintf (lps_dev, DEB_CPU, "Status %06o returned\n", lps_sta);
             break;
 
 
         case ioIOO:                                     /* I/O data output */
             lps_unit.buf = IODATA (stat_data);
 
-            if (DEBUG_PRS (lps_dev))
-                fprintf (sim_deb, ">>LPS OTx: Character %06o output\n", lps_unit.buf);
+            tprintf (lps_dev, DEB_CPU, "Control %06o (%s) output\n",
+                     lps_unit.buf, fmt_char (lps_unit.buf & DATA_MASK));
             break;
 
 
@@ -381,48 +433,47 @@ while (working_set) {
                 }
 
             else {                                      /* real lpt, sched */
-                if (DEBUG_PRS (lps_dev)) fprintf (sim_deb,
-                    ">>LPS STC: Character %06o scheduled for line %d, column %d, ",
-                    lps_unit.buf, lps_lcnt + 1, lps_ccnt + 1);
+                current_char = lps_ccnt + 1;
+                current_line = lps_lcnt + 1;
 
-                if ((lps_unit.buf != '\f') &&
-                    (lps_unit.buf != '\n') &&
-                    (lps_unit.buf != '\r')) {           /* normal char */
+                if ((lps_unit.buf != FF) &&
+                    (lps_unit.buf != LF) &&
+                    (lps_unit.buf != CR)) {             /* normal char */
                     lps_ccnt = lps_ccnt + 1;            /* incr char counter */
                     if (lps_ccnt % LPS_ZONECNT == 0)    /* end of zone? */
-                        sched = lps_ptime;              /* print zone */
+                        lps_unit.wait = lps_ptime;      /* print zone */
                     else
-                        sched = lps_ctime;              /* xfer char */
+                        lps_unit.wait = lps_ctime;      /* xfer char */
                     }
 
                 else {                                  /* print cmd */
                     if (lps_ccnt % LPS_ZONECNT == 0)    /* last zone printed? */
-                        sched = lps_ctime;              /* yes, so just char time */
+                        lps_unit.wait = lps_ctime;      /* yes, so just char time */
                     else
-                        sched = lps_ptime;              /* no, so print needed */
+                        lps_unit.wait = lps_ptime;      /* no, so print needed */
 
                     lps_ccnt = 0;                       /* reset char counter */
 
-                    if (lps_unit.buf == '\n') {         /* line advance */
+                    if (lps_unit.buf == LF) {           /* line advance */
                         lps_lcnt = (lps_lcnt + 1) % LPS_PAGELNT;
 
                         if (lps_lcnt > 0)
-                            sched = sched + lps_stime;
+                            lps_unit.wait += lps_stime;
                         else
-                            sched = sched +             /* allow for perf skip */
-                            lps_stime * (LPS_FORMLNT - LPS_PAGELNT);
+                            lps_unit.wait +=            /* allow for perf skip */
+                              lps_stime * (LPS_FORMLNT - LPS_PAGELNT);
                         }
 
-                    else if (lps_unit.buf == '\f') {    /* form advance */
-                        sched = sched + lps_stime * (LPS_FORMLNT - lps_lcnt);
+                    else if (lps_unit.buf == FF) {      /* form advance */
+                        lps_unit.wait += lps_stime * (LPS_FORMLNT - lps_lcnt);
                         lps_lcnt = 0;
                         }
                     }
 
-                sim_activate (&lps_unit, sched);
+                sim_activate (&lps_unit, lps_unit.wait);
 
-                if (DEBUG_PRS (lps_dev))
-                    fprintf (sim_deb, "time = %d\n", sched);
+                tprintf (lps_dev, DEB_CMDS, "Character %s scheduled for line %d, column %d, time = %d\n",
+                         fmt_char (lps_unit.buf & DATA_MASK), current_line, current_char, lps_unit.wait);
                 }
             break;
 
@@ -450,66 +501,78 @@ return stat_data;
 }
 
 
-/* Unit service */
+/* Unit service.
 
-t_stat lps_svc (UNIT *uptr)
+   As a convenience to the user, the printer output file is flushed when a TOF
+   operation is performed.
+*/
+
+static t_stat lps_svc (UNIT *uptr)
 {
-int32 c = uptr->buf & 0177;
+int32 c = uptr->buf & DATA_MASK;
 
 if (lps_power == LPS_TURNING_ON) {                      /* printer warmed up? */
     lps_power = LPS_ON;                                 /* change state */
     lps_restart (uptr, 0, NULL, NULL);                  /* restart I/O if hung */
-    if (DEBUG_PRS (lps_dev))
-        fputs (">>LPS svc: Power state is ON\n", sim_deb);
+    tprintf (lps_dev, TRACE_STATE, "Power state is ON\n");
     return SCPE_OK;                                     /* done */
     }
+
 if (uptr->flags & UNIT_DIAG) {                          /* diagnostic? */
     lpsio (&lps_dib, ioENF, 0);                         /* set flag */
     return SCPE_OK;                                     /* done */
     }
-if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
-    return IOERROR (lps_stopioe, SCPE_UNATT);
-else if (uptr->flags & UNIT_OFFLINE)                    /* offline? */
-    return IOERROR (lps_stopioe, STOP_OFFLINE);
-else if (uptr->flags & UNIT_POWEROFF)                   /* powered off? */
-    return IOERROR (lps_stopioe, STOP_PWROFF);
+
+if ((uptr->flags & (UNIT_ATT | UNIT_OFFLINE | UNIT_POWEROFF)) != UNIT_ATT)  /* not ready? */
+    return SCPE_OK;
 
 lpsio (&lps_dib, ioENF, 0);                             /* set flag */
 
 if (((c < ' ') || (c > '_')) &&                         /* non-printing char? */
-    (c != '\f') && (c != '\n') && (c != '\r')) {
-        if (DEBUG_PRS (lps_dev))
-            fprintf (sim_deb, ">>LPS svc: Character %06o erased\n", c);
+    (c != FF) && (c != LF) && (c != CR)) {
+        tprintf (lps_dev, DEB_XFER, "Character %s erased\n", fmt_char (c));
         c = ' ';                                        /* replace with blank */
         }
+
 if (lps_ccnt > LPS_PAGECNT) {                           /* 81st character? */
-    fputc ('\r', uptr->fileref);                        /* return to line start */
+    fputc (CR, uptr->fileref);                          /* return to line start */
     uptr->pos = uptr->pos + 1;                          /* update pos */
     lps_ccnt = 1;                                       /* reset char counter */
-    if (DEBUG_PRS (lps_dev))
-        fputs (">>LPS svc: Line wraparound to column 1\n", sim_deb);
+    tprintf (lps_dev, DEB_XFER, "Line wraparound to column 1\n");
     }
+
 fputc (c, uptr->fileref);                               /* "print" char */
 uptr->pos = uptr->pos + 1;                              /* update pos */
-if (DEBUG_PRS (lps_dev))
-    fprintf (sim_deb, ">>LPS svc: Character %06o printed\n", c);
-if ((lps_lcnt == 0) && (c == '\n')) {                   /* LF did TOF? */
-    fputc ('\f', uptr->fileref);                        /* do perf skip */
-    uptr->pos = uptr->pos + 1;                          /* update pos */
-    if (DEBUG_PRS (lps_dev))
-        fputs (">>LPS svc: Perforation skip to TOF\n", sim_deb);
+
+tprintf (lps_dev, DEB_XFER, "Character %s printed\n", fmt_char (c));
+
+if (lps_lcnt == 0) {                                    /* if the printer is at the TOF */
+    fflush (uptr->fileref);                             /*   then flush the file buffer for inspection */
+
+    if (c == LF) {                                      /* LF did TOF? */
+        fputc (FF, uptr->fileref);                      /* do perf skip */
+        uptr->pos = uptr->pos + 1;                      /* update pos */
+        tprintf (lps_dev, DEB_XFER, "Perforation skip to TOF\n");
+        }
     }
-if (ferror (uptr->fileref)) {
-    perror ("LPS I/O error");
-    clearerr (uptr->fileref);
+
+if (ferror (uptr->fileref)) {                           /* if a host file I/O error occurred */
+    cprintf ("%s simulator printer I/O error: %s\n",    /*   then report the error to the console */
+             sim_name, strerror (errno));
+
+    clearerr (uptr->fileref);                           /* clear the error */
+
+    lps_unit.flags |= UNIT_OFFLINE;                     /* set offline */
     return SCPE_IOERR;
     }
+
 return SCPE_OK;
 }
 
+
 /* Reset routine */
 
-t_stat lps_reset (DEVICE *dptr)
+static t_stat lps_reset (DEVICE *dptr)
 {
 if (sim_switches & SWMASK ('P')) {                      /* power-on reset? */
     lps_power = LPS_ON;                                 /* power is on */
@@ -538,7 +601,7 @@ return SCPE_OK;
    original I/O request.
  */
 
-t_stat lps_restart (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+static t_stat lps_restart (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 if (lps.control && !sim_is_active (uptr))
     sim_activate (uptr, 0);                             /* reschedule I/O */
@@ -547,40 +610,68 @@ return SCPE_OK;
 
 /* Printer power off */
 
-t_stat lps_poweroff (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+static t_stat lps_poweroff (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 lps_power = LPS_OFF;                                    /* change state */
-if (DEBUG_PRS (lps_dev)) fputs (">>LPS set: Power state is OFF\n", sim_deb);
+tprintf (lps_dev, TRACE_STATE, "Power state is OFF\n");
 return SCPE_OK;
 }
 
 /* Printer power on */
 
-t_stat lps_poweron (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+static t_stat lps_poweron (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 if (lps_unit.flags & UNIT_DIAG) {                       /* diag mode? */
     lps_power = LPS_ON;                                 /* no delay */
-    if (DEBUG_PRS (lps_dev))
-        fputs (">>LPS set: Power state is ON\n", sim_deb);
+    tprintf (lps_dev, TRACE_STATE, "Power state is ON\n");
     }
 else {
     lps_power = LPS_TURNING_ON;                         /* change state */
     lps_unit.flags |= UNIT_OFFLINE;                     /* set offline */
     sim_activate (&lps_unit, lps_rtime);                /* schedule ready */
-    if (DEBUG_PRS (lps_dev)) fprintf (sim_deb,
-        ">>LPS set: Power state is TURNING ON, scheduled time = %d\n",
-        lps_rtime );
+    tprintf (lps_dev, TRACE_STATE, "Power state is TURNING ON, scheduled time = %d\n",
+             lps_rtime);
     }
 return SCPE_OK;
 }
 
-/* Attach routine */
+/* Attach the printer image file.
 
-t_stat lps_attach (UNIT *uptr, CONST char *cptr)
+   The specified file is attached to the indicated unit.  This is the simulation
+   equivalent of loading paper into the printer and pressing the ONLINE button.
+   The transition from offline to online typically generates an interrupt.
+
+   A new image file may be requested by giving the "-N" switch to the ATTACH
+   command.  If an existing file is specified with "-N", it will be cleared; if
+   specified without "-N", printer output will be appended to the end of the
+   existing file content.  In all cases, the paper is positioned at the top of
+   the form.
+
+
+   Implementation notes:
+
+    1. If we are called during a RESTORE command to reattach a file previously
+       attached when the simulation was SAVEd, the device status and file
+       position are not altered.  This is because SIMH 4.x restores the register
+       contents before reattaching, while 3.x reattaches before restoring the
+       registers.
+*/
+
+static t_stat lps_attach (UNIT *uptr, CONST char *cptr)
 {
-lps_ccnt = lps_lcnt = 0;                                /* top of form */
-lps_restart (uptr, 0, NULL, NULL);                      /* restart I/O if hung */
-return attach_unit (uptr, cptr);
+t_stat result;
+
+result = hp_attach (uptr, cptr);                        /* attach the specified printer image file for appending */
+
+if (result == SCPE_OK                                   /* if the attach was successful */
+  && (sim_switches & SIM_SW_REST) == 0) {               /*   and we are not being called during a RESTORE command */
+    lps_ccnt = 0;                                       /*     then clear the character counter */
+    lps_lcnt = 0;                                       /*       and set top of form */
+
+    lps_restart (uptr, 0, NULL, NULL);                  /* restart I/O if hung */
+    }
+
+return result;
 }
 
 /* Set printer timing
@@ -588,7 +679,7 @@ return attach_unit (uptr, cptr);
    Realistic timing is factored, depending on CPU model, to account for the
    timing method employed by the diagnostic. */
 
-t_stat lps_set_timing (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+static t_stat lps_set_timing (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 i, factor = 1;
 
@@ -604,7 +695,7 @@ return SCPE_OK;
 
 /* Show printer timing */
 
-t_stat lps_show_timing (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+static t_stat lps_show_timing (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (lps_timing) fputs ("fast timing", st);
 else fputs ("realistic timing", st);
