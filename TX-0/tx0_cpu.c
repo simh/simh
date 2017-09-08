@@ -1160,7 +1160,6 @@ t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 int32 ov, pf, op, k, di, lnt;
 const char *cptr = (const char *) desc;
 t_stat r;
-t_value sim_eval;
 InstHistory *h;
 
 if (hst_lnt == 0) return SCPE_NOFNC;                    /* enabled? */
@@ -1183,8 +1182,8 @@ for (k = 0; k < lnt; k++) {                             /* print specified */
         if ((op < 032) && (op != 007))                  /* mem ref instr */
             fprintf (st, "%06o  ", h->ea);
         else fprintf (st, "        ");
-        sim_eval = h->ir;
-        if ((fprint_sym (st, h->pc & AMASK, &sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
+        sim_eval[0] = h->ir;
+        if ((fprint_sym (st, h->pc & AMASK, sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
             fprintf (st, "(undefined) %06o", h->ir);
         else if (op < 030)                              /* mem ref instr */
             fprintf (st, " [%06o]", h->opnd);
