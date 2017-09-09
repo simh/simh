@@ -3540,7 +3540,6 @@ char gbuf[CBUFSIZE], gbuf2[CBUFSIZE];
 CONST char *tptr, *gptr;
 REG *rptr;
 uint32 idx;
-t_value val;
 t_stat r;
 t_bool Not = FALSE;
 t_bool Exist = FALSE;
@@ -3668,8 +3667,8 @@ else {
         if (!get_rsearch (gbuf, rptr->radix, &sim_stabr) ||  /* parse condition */
             (sim_stabr.boolop == -1))                   /* relational op reqd */
             return SCPE_MISVAL;
-        val = get_rval (rptr, idx);                     /* get register value */
-        result = test_search (&val, &sim_stabr);        /* test condition */
+        sim_eval[0] = get_rval (rptr, idx);             /* get register value */
+        result = test_search (sim_eval, &sim_stabr);    /* test condition */
         }
     else {                                              /* Handle memory case */
         if (!get_asearch (gbuf, sim_dfdev ? sim_dfdev->dradix : sim_dflt_dev->dradix, &sim_staba) ||  /* parse condition */
@@ -7229,9 +7228,9 @@ for (rptr = lowr; rptr <= highr; rptr++) {
     for (idx = lows; idx <= highs; idx++) {
         if (idx >= rptr->depth)
             return SCPE_SUB;
-        val = get_rval (rptr, idx);
+        sim_eval[0] = get_rval (rptr, idx);
         sim_switches = saved_switches;
-        if (schptr && !test_search (&val, schptr))
+        if (schptr && !test_search (sim_eval, schptr))
             continue;
         if (flag == EX_E) {
             if ((idx > lows) && (val == last_val))
@@ -7346,11 +7345,12 @@ else
     fprintf (ofile, "%s:\t", rptr->name);
 if (!(flag & EX_E))
     return SCPE_OK;
+sim_eval[0] = val;
 GET_RADIX (rdx, rptr->radix);
 if ((rptr->flags & REG_VMAD) && sim_vm_fprint_addr)
     sim_vm_fprint_addr (ofile, sim_dflt_dev, (t_addr) val);
 else if (!(rptr->flags & REG_VMFLAGS) ||
-    (fprint_sym (ofile, (rptr->flags & REG_UFMASK) | rdx, &val,
+    (fprint_sym (ofile, (rptr->flags & REG_UFMASK) | rdx, sim_eval,
                  NULL, sim_switches | SIM_SW_REG) > 0)) {
         fprint_val (ofile, val, rdx, rptr->width, rptr->flags & REG_FMT);
         if (rptr->fields) {
