@@ -1,6 +1,6 @@
 /* hp3000_atc.c: HP 3000 30032B Asynchronous Terminal Controller simulator
 
-   Copyright (c) 2014-2016, J. David Bryan
+   Copyright (c) 2014-2017, J. David Bryan
    Copyright (c) 2002-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -26,6 +26,7 @@
 
    ATCD,ATCC    HP 30032B Asynchronous Terminal Controller
 
+   05-Sep-17    JDB     Changed REG_A (permit any symbolic override) to REG_X
    16-Sep-16    JDB     Fixed atcd_detach to skip channel cancel if SIM_SW_REST
    12-Sep-16    JDB     Changed DIB register macro usage from SRDATA to DIB_REG
    20-Jul-16    JDB     Corrected poll_unit "wait" field initializer.
@@ -926,17 +927,17 @@ static REG atcd_reg [] = {
 /*    ------  ------  -------------------  -----  -----  ------  ----------------  --------------- */
     { ORDATA (CNTL,   tdi_control_word,            16),                                    REG_FIT },
     { ORDATA (STAT,   tdi_status_word,             16),                                    REG_FIT },
-    { ORDATA (READ,   tdi_read_word,               16),                            REG_A | REG_FIT },
-    { ORDATA (WRITE,  tdi_write_word,              16),                            REG_A | REG_FIT },
+    { ORDATA (READ,   tdi_read_word,               16),                            REG_X | REG_FIT },
+    { ORDATA (WRITE,  tdi_write_word,              16),                            REG_X | REG_FIT },
     { FLDATA (FLAG,   tdi_data_flag,                        0)                                     },
     { FLDATA (MASK,   tdi_interrupt_mask,                   0)                                     },
     { DRDATA (FTIME,  fast_data_time,              24),                            PV_LEFT         },
     { BRDATA (RSTAT,  recv_status,           8,    16,           RECV_CHAN_COUNT)                  },
     { BRDATA (RPARM,  recv_param,            8,    16,           RECV_CHAN_COUNT)                  },
-    { BRDATA (RBUFR,  recv_buffer,           8,    16,           RECV_CHAN_COUNT), REG_A           },
+    { BRDATA (RBUFR,  recv_buffer,           8,    16,           RECV_CHAN_COUNT), REG_X           },
     { BRDATA (SSTAT,  send_status,           8,    16,           SEND_CHAN_COUNT)                  },
     { BRDATA (SPARM,  send_param,            8,    16,           SEND_CHAN_COUNT)                  },
-    { BRDATA (SBUFR,  send_buffer,           8,    16,           SEND_CHAN_COUNT), REG_A           },
+    { BRDATA (SBUFR,  send_buffer,           8,    16,           SEND_CHAN_COUNT), REG_X           },
     { FLDATA (POLL,   atc_is_polling,                       0),                    REG_HRO         },
 
       DIB_REGS (atcd_dib),

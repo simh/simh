@@ -1,6 +1,6 @@
 /* hp3000_sel.c: HP 3000 30030C Selector Channel simulator
 
-   Copyright (c) 2016, J. David Bryan
+   Copyright (c) 2016-2017, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +25,7 @@
 
    SEL          HP 3000 Series III Selector Channel
 
+   05-Sep-17    JDB     Changed REG_A (permit any symbolic override) to REG_X
    10-Oct-16    JDB     Renumbered debug flags to start at 0
                         Added port_read_memory, port_write_memory macros
    11-Jul-16    JDB     Change "sel_unit" from a UNIT to an array of one UNIT
@@ -458,8 +459,8 @@ static REG sel_reg [] = {
     { ORDATA (CNBUF,  control_buffer,   16),                  REG_FIT   },
     { ORDATA (ADDR,   address_word,     16),                  REG_FIT   },
     { ORDATA (ADBUF,  address_buffer,   16),                  REG_FIT   },
-    { ORDATA (INBUF,  input_buffer,     16),          REG_A | REG_FIT   },
-    { ORDATA (OUTBUF, output_buffer,    16),          REG_A | REG_FIT   },
+    { ORDATA (INBUF,  input_buffer,     16),          REG_X | REG_FIT   },
+    { ORDATA (OUTBUF, output_buffer,    16),          REG_X | REG_FIT   },
 
     { NULL }
     };

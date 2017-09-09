@@ -147,10 +147,12 @@
 
 /* Device register display mode flags */
 
-#define REG_A               (1u << REG_V_UF + 0)        /* permit any display */
-#define REG_B               (1u << REG_V_UF + 1)        /* permit binary display */
-#define REG_M               (1u << REG_V_UF + 2)        /* default to instruction mnemonic display */
-#define REG_T               (1u << REG_V_UF + 3)        /* default to status mnemonic display */
+#define REG_X               REG_VMIO                    /* permit symbolic display overrides */
+
+#define REG_A               (1u << REG_V_UF + 0)        /* default format is -A (one ASCII character) */
+#define REG_C               (1u << REG_V_UF + 1)        /* default format is -C (two ASCII characters) */
+#define REG_M               (1u << REG_V_UF + 2)        /* default format is -M (mnemonic) */
+#define REG_T               (1u << REG_V_UF + 3)        /* default format is -T (status mnemonic) */
 
 
 /* Register macros.

@@ -1,6 +1,6 @@
 /* hp3000_ms.c: HP 3000 30215A Magnetic Tape Controller Interface simulator
 
-   Copyright (c) 2016, J. David Bryan
+   Copyright (c) 2016-2017, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +25,7 @@
 
    MS           HP 30215A Magnetic Tape Controller Interface
 
+   05-Sep-17    JDB     Changed REG_A (permit any symbolic override) to REG_X
    12-Sep-16    JDB     Changed DIB register macro usage from SRDATA to DIB_REG
    09-Jun-16    JDB     Added casts for ptrdiff_t to int32 values
    08-Jun-16    JDB     Corrected %d format to %u for unsigned values
@@ -514,7 +515,7 @@ static REG ms_reg [] = {
     { FLDATA (UINTRP, unit_interrupt,          0)                               },
     { FLDATA (DEVEND, device_end,              0)                               },
     { FLDATA (XFRERR, xfer_error,              0)                               },
-    { ORDATA (BUFWRD, buffer_word,     16),          REG_A | REG_FIT | PV_RZRO  },
+    { ORDATA (BUFWRD, buffer_word,     16),          REG_X | REG_FIT | PV_RZRO  },
     { DRDATA (ATUNIT, attention_unit,  16),                  REG_FIT | PV_LEFT  },
     { DRDATA (CLASS,  command_class,    4),                            PV_LEFT  },
     { YRDATA (FLAGS,  flags,            8,                             PV_RZRO) },
