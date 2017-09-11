@@ -127,10 +127,11 @@ static t_stat ptr_svc (UNIT *uptr)
 
     if (IS_ONLINE(uptr)) {                                  /* fetch character from file */
         ptr_char = getc(uptr->fileref);
-        uptr->pos++;
 
-        if (! feof(uptr->fileref))                          /* there's more left */
+        if (! feof(uptr->fileref)) {                        /* there's more left */
             CLRBIT(ptr_dsw, PTR1134_DSW_READER_NOT_READY);
+            uptr->pos++;
+        }
     }
 
     SETBIT(ptr_dsw, PTR1134_DSW_READER_RESPONSE);           /* indicate read complete */
