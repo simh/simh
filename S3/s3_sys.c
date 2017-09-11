@@ -926,11 +926,11 @@ return (-(oplen-1));
 CONST char *parse_addr(CONST char *cptr,  char *gbuf, t_addr *addr, int32 *addrtype)
 {
 int32 nybble = 0;
-char temp[32];
+char temp[CBUFSIZE];
 
 cptr = get_glyph(cptr, gbuf, ',');
 if (gbuf[0] == '(') {                                   /* XR relative */
-    strcpy(temp, gbuf+1);
+    strlcpy(temp, gbuf+1, sizeof(temp));
     sscanf(temp, "%x", addr);
     if (*cptr == ',') cptr++;
     cptr = get_glyph(cptr, gbuf, ',');
