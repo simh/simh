@@ -989,12 +989,13 @@ void xio_sca (int32 iocc_addr, int32 func, int32 modify)
 #endif
                 msec_now = sim_os_msec();
 
-                if (in_bsc_mode())
+                if (in_bsc_mode()) {
                     sca_timer_trigger = ! sca_timer_trigger;    /* toggle the timer trigger */
                     if (sca_timer_trigger)                      /* if we've just set it, we're stopping the other timers and  */
                         sca_start_timer(TIMER_035S, msec_now);  /* starting the 0.35 sec timer */
                     else
                         sca_halt_timer(TIMER_035S);
+                }
 
                 sca_toggle_timer(TIMER_3S, msec_now);           /* toggle the 3 sec and 1.35 sec timers accordingly */
                 sca_toggle_timer(TIMER_125S, msec_now);
