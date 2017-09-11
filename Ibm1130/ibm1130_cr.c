@@ -734,7 +734,7 @@ static int any_punched = 0;
 
 #define MAXARGLEN 80                    /* max length of a saved attach command argument */
 #define MAXARGS   10                    /* max number of arguments to save */
-static char list_save[MAXARGS][MAXARGLEN], *list_arg[MAXARGLEN+1];
+static char list_save[MAXARGS][MAXARGLEN+1], *list_arg[MAXARGLEN+1];
 static int list_nargs = 0;
 static const char* (*tab_proc)(char* str, int width) = NULL;        /* tab reformatting routine */
 static int tab_width = 8;
@@ -870,7 +870,8 @@ static int32 guess_cr_code (void)
             }
         }
 
-        fseek(cr_unit.fileref, filepos, SEEK_SET);      /* return to original position */
+        if (filepos != -1)
+            fseek(cr_unit.fileref, filepos, SEEK_SET);  /* return to original position */
     }
 
     return guess;
@@ -1329,28 +1330,36 @@ static t_bool nextdeck (void)
 #if defined  (__GNUC__) && !defined (_WIN32)                /* GCC complains about mktemp & always provides mkstemp */
 
             if (*tempfile == '\0') {                        /* first time, open guaranteed-unique file */
-                int fh;                 
+                int fh;
+                mode_t prev_mode = umask(0177);
 
                 strcpy(tempfile, "tempXXXXXX");             /* get modifiable copy of name template */
 
                 if ((fh = mkstemp(tempfile)) == -1) {       /* open file. Actual name is set by side effect */
                     printf("Cannot create temporary deck file\n");
                     break_simulation(STOP_DECK_BREAK);
+                    umask(prev_mode);
                     return 0;
                 }
                                                             /* get FILE * from the file handle */
                 if ((cr_unit.fileref = fdopen(fh, "w+b")) == NULL) {
                     printf("Cannot use temporary deck file %s\n", tempfile);
                     break_simulation(STOP_DECK_BREAK);
+                    umask(prev_mode);
                     return 0;
                 }
+                umask(prev_mode);
             }
             else {                                          /* on later opens, just reuse the old name */
+                mode_t prev_mode = umask(0177);
+
                 if ((cr_unit.fileref = fopen(tempfile, "w+b")) == NULL) {
                     printf("Cannot create temporary file %s\n", tempfile);
                     break_simulation(STOP_DECK_BREAK);
+                    umask(prev_mode);
                     return 0;
                 }
+                umask(prev_mode);
             }
 #else                   /* ANSI standard C always provides mktemp */
 
@@ -1389,7 +1398,8 @@ static t_bool nextdeck (void)
                     break;
                 alltrim(buf);
             }
-            fseek(deckfile, fpos, SEEK_SET);        /* restore deck file to just before non-literal card */
+            if (fpos != -1)
+                fseek(deckfile, fpos, SEEK_SET);    /* restore deck file to just before non-literal card */
 
             fseek(cr_unit.fileref, 0, SEEK_SET);    /* rewind scratch file for reading */
             code = CODE_029;                        /* assume literal cards use keycode 029 */
