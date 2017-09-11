@@ -188,6 +188,13 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       ifneq (,$(strip $(GIT_HOOKS)))
         $(info *** Warning - Error installing git hooks *** $(GIT_HOOKS))
       endif
+    else
+      ifneq (commit-id-exists,$(shell if $(TEST) -e .git-commit-id; then echo commit-id-exists; fi))
+        GIT_HOOKS = $(shell ./.git/hooks/post-checkout)
+        ifneq (,$(strip $(GIT_HOOKS)))
+          $(info *** Warning - Error executing git hooks *** $(GIT_HOOKS))
+        endif
+      endif
     endif
   endif
   LTO_EXCLUDE_VERSIONS = 
