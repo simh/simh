@@ -108,15 +108,16 @@ t_stat sim_load (FILE *fi, CONST char *cptr, CONST char *fnam, int flag)
    * as the first word, so it will load at word address 0xf400, and 0xfc68
    * will be preset to 0xf401
    */
-  c1 = fgetc(fi);
-  c2 = fgetc(fi);
+  if ((c1 = fgetc(fi))==EOF) return SCPE_EOF;
+  if ((c2 = fgetc(fi))==EOF) return SCPE_EOF;
   rombase = c1 + c2 * 256;
+  if (rombase > (MAXMEMSIZE-512)) return SCPE_ARG; 
   rom_write(rombase & 0xfffe, rombase);
   reg_fc68 = rombase;
   i = 0;
   while (!feof(fi) && i<0x1ff) {
-    c1 = fgetc(fi);
-    c2 = fgetc(fi);
+    if ((c1 = fgetc(fi))==EOF) return SCPE_EOF;
+    if ((c2 = fgetc(fi))==EOF) return SCPE_EOF;
     rom_write(rombase+i, (uint16)(c1 + c2*256));
     i++;
   }
