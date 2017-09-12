@@ -7228,7 +7228,7 @@ for (rptr = lowr; rptr <= highr; rptr++) {
     for (idx = lows; idx <= highs; idx++) {
         if (idx >= rptr->depth)
             return SCPE_SUB;
-        sim_eval[0] = get_rval (rptr, idx);
+        sim_eval[0] = val = get_rval (rptr, idx);
         sim_switches = saved_switches;
         if (schptr && !test_search (sim_eval, schptr))
             continue;
