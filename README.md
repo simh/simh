@@ -35,6 +35,8 @@
 
 #### CDC 1700 simulator from John Forecast
 
+#### Hans-Åke Lund has implemented an SCELBI (SCientic-ELectronics-BIology) simulator.
+
 ### New Host Platform support - HP-UX and AIX
 
 ### Simulator Front Panel API

@@ -1435,6 +1435,12 @@ IBMPCXT = ${IBMPCXTC}/i8088.c ${IBMPCXTD}/ibmpcxt_sys.c \
 IBMPCXT_OPT = -I ${IBMPCXTD}
 
 
+SCELBID = Intel-Systems/scelbi
+SCELBIC = Intel-Systems/common
+SCELBI = ${SCELBIC}/i8008.c ${SCELBID}/scelbi_sys.c ${SCELBID}/scelbi_io.c
+SCELBI_OPT = -I ${SCELBID}
+
+
 TX0D = TX-0
 TX0 = ${TX0D}/tx0_cpu.c ${TX0D}/tx0_dpy.c ${TX0D}/tx0_stddev.c \
 	${TX0D}/tx0_sys.c ${TX0D}/tx0_sys_orig.c ${DISPLAYL}
@@ -1550,7 +1556,7 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 cdc1700 \
 	swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 isys8010 isys8020 \
-	isys8030 isys8024 imds-225
+	isys8030 isys8024 imds-225 scelbi
 
 all : ${ALL}
 
@@ -1863,6 +1869,12 @@ ibmpcxt: ${BIN}ibmpcxt${EXE}
 ${BIN}ibmpcxt${EXE} : ${IBMPCXT} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${IBMPCXT} ${SIM} ${IBMPCXT_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+scelbi: ${BIN}scelbi${EXE}
+
+${BIN}scelbi${EXE} : ${SCELBI} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${SCELBI} ${SIM} ${SCELBI_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
 tx-0 : ${BIN}tx-0${EXE}
 
