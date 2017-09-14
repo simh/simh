@@ -1872,7 +1872,7 @@ ${BIN}ibmpcxt${EXE} : ${IBMPCXT} ${SIM} ${BUILD_ROMS}
 
 scelbi: ${BIN}scelbi${EXE}
 
-${BIN}scelbi${EXE} : ${SCELBI} ${SIM} ${BUILD_ROMS}
+${BIN}scelbi${EXE} : ${SCELBI} ${SIM}
 	${MKDIRBIN}
 	${CC} ${SCELBI} ${SIM} ${SCELBI_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 

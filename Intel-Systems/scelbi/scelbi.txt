@@ -24,20 +24,20 @@ configuration:
         device          simulates
         name(s)
 
-        CPU             SCELBI-8B with Intel 8008 CPU, 16KB of RAM.
+        I8008           SCELBI-8B with Intel 8008 CPU, 16KB of RAM.
         TTY             Serial "bit banger" interface (commonly to an
                         ASR-33), is assumed to be connected to a serial
                         "glass TTY" that is your terminal running the Simulator.
-        PTR             Paper Tape Reader, but not implemented yet.
+        PTR             Paper Tape Reader, not implemented yet.
 
 2.1 CPU
 
 	You may select different memory sizes, the default size is 16K. 
 
-        SET CPU 4K
-        SET CPU 8K
-        SET CPU 12K
-        SET CPU 16K
+        SET I8008 4K
+        SET I8008 8K
+        SET I8008 12K
+        SET I8008 16K
 
 CPU Registers include the following:
 
