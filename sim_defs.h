@@ -796,6 +796,7 @@ struct EXPECT {
     uint8               *buf;                           /* buffer of output data which has produced */
     uint32              buf_ins;                        /* buffer insertion point for the next output data */
     uint32              buf_size;                       /* buffer size */
+    uint32              buf_data;                       /* count of data in buffer */
     };
 
 /* Send Context */

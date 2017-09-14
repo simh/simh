@@ -10500,7 +10500,7 @@ exp->size = 0;
 free (exp->buf);
 exp->buf = NULL;
 exp->buf_size = 0;
-exp->buf_ins = 0;
+exp->buf_data = exp->buf_ins = 0;
 return SCPE_OK;
 }
 
@@ -10704,6 +10704,8 @@ if ((!exp) || (!exp->rules))                            /* Anying to check? */
 
 exp->buf[exp->buf_ins++] = data;                        /* Save new data */
 exp->buf[exp->buf_ins] = '\0';                          /* Nul terminate for RegEx match */
+if (exp->buf_data < exp->buf_size)
+    ++exp->buf_data;                                    /* Record amount of data in buffer */
 
 for (i=0; i < exp->size; i++) {
     ep = &exp->rules[i];
@@ -10718,8 +10720,8 @@ for (i=0; i < exp->size; i++) {
         else {
             if (strlen ((char *)exp->buf) != exp->buf_ins) { /* Nul characters in buffer? */
                 size_t off;
-                tstr = (char *)malloc (exp->buf_ins + 1);
 
+                tstr = (char *)malloc (exp->buf_ins + 1);
                 tstr[0] = '\0';
                 for (off=0; off < exp->buf_ins; off += 1 + strlen ((char *)&exp->buf[off]))
                     strcpy (&tstr[strlen (tstr)], (char *)&exp->buf[off]);
@@ -10762,7 +10764,9 @@ for (i=0; i < exp->size; i++) {
 #endif
         }
     else {
-        if (exp->buf_ins < ep->size) {                          /* Match stradle end of buffer */
+        if (exp->buf_data < ep->size)                           /* Too little data to match yet? */
+            continue;                                           /* Yes, Try next one. */
+        if (exp->buf_ins < ep->size) {                          /* Match might stradle end of buffer */
             /* 
              * First compare the newly deposited data at the beginning 
              * of buffer with the end of the match string
@@ -10777,8 +10781,8 @@ for (i=0; i < exp->size; i++) {
                     free (estr);
                     free (mstr);
                     }
-                if (memcmp (exp->buf, &ep->match[ep->size-exp->buf_ins], exp->buf_ins))
-                    continue;
+                if (memcmp (exp->buf, &ep->match[ep->size-exp->buf_ins], exp->buf_ins)) /* Tail Match? */
+                    continue;                                   /* Nope, Try next one. */
                 }
             if (sim_deb && exp->dptr && (exp->dptr->dctrl & exp->dbit)) {
                 char *estr = sim_encode_quoted_string (&exp->buf[exp->buf_size-(ep->size-exp->buf_ins)], ep->size-exp->buf_ins);
@@ -10789,8 +10793,8 @@ for (i=0; i < exp->size; i++) {
                 free (estr);
                 free (mstr);
                 }
-            if (memcmp (&exp->buf[exp->buf_size-(ep->size-exp->buf_ins)], ep->match, ep->size-exp->buf_ins))
-                continue;
+            if (memcmp (&exp->buf[exp->buf_size-(ep->size-exp->buf_ins)], ep->match, ep->size-exp->buf_ins)) /* Front Match? */
+                continue;                                       /* Nope, Try next one. */
             break;
             }
         else {
@@ -10803,8 +10807,8 @@ for (i=0; i < exp->size; i++) {
                 free (estr);
                 free (mstr);
                 }
-            if (memcmp (&exp->buf[exp->buf_ins-ep->size], ep->match, ep->size))
-                continue;
+            if (memcmp (&exp->buf[exp->buf_ins-ep->size], ep->match, ep->size)) /* Whole string match? */
+                continue;                                       /* Nope, Try next one. */
             break;
             }
         }
@@ -10818,6 +10822,7 @@ if (exp->buf_ins == exp->buf_size) {                    /* At end of match buffe
            used when no regular expression rules are in effect */
         memmove (exp->buf, &exp->buf[exp->buf_size/2], exp->buf_size-(exp->buf_size/2));
         exp->buf_ins -= exp->buf_size/2;
+        exp->buf_data = exp->buf_ins;
         sim_debug (exp->dbit, exp->dptr, "Buffer Full - sliding the last %d bytes to start of buffer new insert at: %d\n", (exp->buf_size/2), exp->buf_ins);
         }
     else {
@@ -10853,7 +10858,7 @@ if (i != exp->size) {                                   /* Found? */
                             exp->after);
         }
     /* Matched data is no longer available for future matching */
-    exp->buf_ins = 0;
+    exp->buf_data = exp->buf_ins = 0;
     }
 free (tstr);
 return SCPE_OK;
