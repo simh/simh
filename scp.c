@@ -557,6 +557,10 @@ int32 sim_brk_lnt = 0;
 int32 sim_brk_ins = 0;
 int32 sim_quiet = 0;
 int32 sim_step = 0;
+char *sim_sub_instr = NULL;
+char *sim_sub_instr_buf = NULL;
+size_t sim_sub_instr_size = 0;
+size_t *sim_sub_instr_off = NULL;
 static double sim_time;
 static uint32 sim_rtime;
 static int32 noqueue_time;
@@ -1371,8 +1375,8 @@ static const char simh_help[] =
       "+Token %%0 expands to the command file name.\n"
       "+Token %%n (n being a single digit) expands to the n'th argument\n"
       "+Token %%* expands to the whole set of arguments (%%1 ... %%9)\n\n"
-      "+The input sequence \"%%%%\" represents a literal \"%%\", and \"\\\\\" represents a\n"
-      "+literal \"\\\".  All other character combinations are rendered literally.\n\n"
+      "+The input sequence \"%%%%\" represents a literal \"%%\".  All other\n"
+      "+character combinations are rendered literally.\n\n"
       "+Omitted parameters result in null-string substitutions.\n\n"
       "+Tokens preceeded and followed by %% characters are expanded as environment\n"
       "+variables, and if an environment variable isn't found then it can be one of\n"
@@ -3193,8 +3197,8 @@ return stat | SCPE_NOMESSAGE;                           /* suppress message sinc
    Token %n (n being a single digit) expands to the n'th argument
    Tonen %* expands to the whole set of arguments (%1 ... %9)
 
-   The input sequence "\%" represents a literal "%", and "\\" represents a
-   literal "\".  All other character combinations are rendered literally.
+   The input sequence "%%" represents a literal "%".  All other 
+   character combinations are rendered literally.
 
    Omitted parameters result in null-string substitutions.
 
@@ -3231,6 +3235,8 @@ char *ip = instr, *op, *oend, *istart, *tmpbuf;
 const char *ap;
 char rbuf[CBUFSIZE];
 int i;
+size_t instr_off = 0;
+size_t outstr_off = 0;
 time_t now;
 struct tm *tmnow;
 
@@ -3239,14 +3245,23 @@ tmnow = localtime(&now);
 tmpbuf = (char *)malloc(instr_size);
 op = tmpbuf;
 oend = tmpbuf + instr_size - 2;
-while (sim_isspace (*ip))                                   /* skip leading spaces */
+if (instr_size > sim_sub_instr_size) {
+    sim_sub_instr = (char *)realloc (sim_sub_instr, instr_size*sizeof(*sim_sub_instr));
+    sim_sub_instr_off = (size_t *)realloc (sim_sub_instr_off, instr_size*sizeof(*sim_sub_instr_off));
+    sim_sub_instr_size = instr_size;
+    }
+sim_sub_instr_buf = instr;
+strlcpy (sim_sub_instr, instr, instr_size*sizeof(*sim_sub_instr));
+while (sim_isspace (*ip)) {                                 /* skip leading spaces */
+    sim_sub_instr_off[outstr_off++] = ip - instr;
     *op++ = *ip++;
+    }
 istart = ip;
 for (; *ip && (op < oend); ) {
-    if ((ip [0] == '\\') &&                             /* literal escape? */
-        ((ip [1] == '%') || (ip [1] == '\\'))) {        /*   and followed by '%' or '\'? */
-        ip++;                                           /* skip '\' */
-        *op++ = *ip++;                                  /* copy escaped char */
+    if ((ip [0] == '%') && (ip [1] == '%')) {           /* literal % insert? */
+        sim_sub_instr_off[outstr_off++] = ip - instr;
+        ip++;                                           /* skip one */
+        *op++ = *ip++;                                  /* copy insert % */
         }
     else 
         if ((*ip == '%') && 
@@ -3449,8 +3464,10 @@ for (; *ip && (op < oend); ) {
                     }
                 }
             if (ap) {                                   /* non-null arg? */
-                while (*ap && (op < oend))              /* copy the argument */
+                while (*ap && (op < oend)) {            /* copy the argument */
+                    sim_sub_instr_off[outstr_off++] = ip - instr;
                     *op++ = *ap++;
+                    }
                 }
             }
         else
@@ -3458,17 +3475,23 @@ for (; *ip && (op < oend); ) {
                 get_glyph (istart, gbuf, 0);            /* substitute initial token */
                 ap = getenv(gbuf);                      /* if it is an environment variable name */
                 if (!ap) {                              /* nope? */
+                    sim_sub_instr_off[outstr_off++] = ip - instr;
                     *op++ = *ip++;                      /* press on with literal character */
                     continue;
                     }
-                while (*ap && (op < oend))              /* copy the translation */
+                while (*ap && (op < oend)) {            /* copy the translation */
+                    sim_sub_instr_off[outstr_off++] = ip - instr;
                     *op++ = *ap++;
+                    }
                 ip += strlen(gbuf);
                 }
-            else
+            else {
+                sim_sub_instr_off[outstr_off++] = ip - instr;
                 *op++ = *ip++;                          /* literal character */
+                }
     }
 *op = 0;                                                /* term buffer */
+sim_sub_instr_off[outstr_off] = 0;
 strcpy (instr, tmpbuf);
 free (tmpbuf);
 return;
@@ -5582,12 +5605,15 @@ if (uptr == NULL)
 max = uptr->capac - 1;
 abuf[sizeof(abuf)-1] = '\0';
 strncpy (abuf, cptr, sizeof(abuf)-1);
-cptr = abuf;
 if ((aptr = strchr (abuf, ';'))) {                      /* ;action? */
+    cptr += aptr - abuf + 1;
     if (flg != SSH_ST)                                  /* only on SET */
-        return sim_messagef (SCPE_ARG, "Invalid argument: %s\n", aptr);
+        return sim_messagef (SCPE_ARG, "Invalid argument: %s\n", cptr);
     *aptr++ = 0;                                        /* separate strings */
+    if ((cptr > sim_sub_instr_buf) && ((size_t)(cptr - sim_sub_instr_buf) < sim_sub_instr_size))
+        aptr = &sim_sub_instr[sim_sub_instr_off[cptr - sim_sub_instr_buf]]; /* get un-substituted string */
     }
+cptr = abuf;
 if (*cptr == 0) {                                       /* no argument? */
     lo = (t_addr) get_rval (sim_PC, 0);                 /* use PC */
     return ssh_break_one (st, flg, lo, 0, aptr);
@@ -10608,7 +10634,11 @@ if (ep->act) {                                          /* replace old action? *
 if (act)
     while (sim_isspace(*act)) ++act;                    /* skip leading spaces in action string */
 if ((act != NULL) && (*act != 0)) {                     /* new action? */
-    char *newp = (char *) calloc (strlen (act)+1, sizeof (*act)); /* alloc buf */
+    char *newp;
+
+    if ((act > sim_sub_instr_buf) && ((size_t)(act - sim_sub_instr_buf) < sim_sub_instr_size))
+        act = &sim_sub_instr[sim_sub_instr_off[act - sim_sub_instr_buf]]; /* get un-substituted string */
+    newp = (char *) calloc (strlen (act)+1, sizeof (*act)); /* alloc buf */
     if (newp == NULL)                                   /* mem err? */
         return SCPE_MEM;
     strcpy (newp, act);                                 /* copy action */
