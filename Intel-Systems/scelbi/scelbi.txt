@@ -1,4 +1,4 @@
-SCELBI Sumulator with Intel 8008 CPU
+SCELBI Simulator with Intel 8008 CPU
 ====================================
 
 1. Background.
@@ -125,7 +125,7 @@ A + B = 8.0
 
 READY
 
-
+<exit simulation by pressing Ctrl-E>
 Simulation stopped, PC: 000103 (INP 5)
 sim> exit
 
