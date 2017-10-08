@@ -1403,8 +1403,10 @@ DEVICE sim_stop_dev = {
     sim_int_stop_description};
 
 DEVICE sim_throttle_dev = {
-    "INT-THROTTLE", &sim_throttle_unit, sim_throttle_reg, NULL, 1};
-
+    "INT-THROTTLE", &sim_throttle_unit, sim_throttle_reg, NULL,
+    1, 0, 0, 0, 0, 0, 
+    NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, DEV_NOSAVE};
 
 /* SET CLOCK command */
 
