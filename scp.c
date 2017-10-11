@@ -6683,6 +6683,7 @@ for (j=0, r = SCPE_OK; j<attcnt; j++) {
             }
         }
     free (attnames[j]);
+    attnames[j] = NULL;
     }
 Cleanup_Return:
 for (j=0; j < attcnt; j++)
