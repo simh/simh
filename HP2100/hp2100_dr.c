@@ -1,31 +1,35 @@
 /* hp2100_dr.c: HP 2100 12606B/12610B fixed head disk/drum simulator
 
    Copyright (c) 1993-2016, Robert M. Supnik
+   Copyright (c) 2017       J. David Bryan
 
-   Permission is hereby granted, free of charge, to any person obtaining a
-   copy of this software and associated documentation files (the "Software"),
-   to deal in the Software without restriction, including without limitation
-   the rights to use, copy, modify, merge, publish, distribute, sublicense,
-   and/or sell copies of the Software, and to permit persons to whom the
-   Software is furnished to do so, subject to the following conditions:
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
 
    The above copyright notice and this permission notice shall be included in
    all copies or substantial portions of the Software.
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+   AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not be
+   Except as contained in this notice, the names of the authors shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from Robert M Supnik.
+   in this Software without prior written authorization from the authors.
 
    DR           12606B 2770/2771 fixed head disk
                 12610B 2773/2774/2775 drum
 
+   19-Jul-17    JDB     Removed "dr_stopioe" variable and register
+   11-Jul-17    JDB     Renamed "ibl_copy" to "cpu_ibl"
+   27-Feb-17    JDB     ibl_copy no longer returns a status code
    10-Nov-16    JDB     Modified the drc_boot routine to use the BBDL
    05-Aug-16    JDB     Renamed the P register from "PC" to "PR"
    13-May-16    JDB     Modified for revised SCP API function parameter types
@@ -109,9 +113,13 @@
    - inst timing = 6 inst/word, 12288 inst/revolution
 */
 
+
+
 #include "hp2100_defs.h"
 #include "hp2100_cpu.h"
 #include <math.h>
+
+
 
 /* Constants */
 
@@ -195,7 +203,6 @@ int32 drd_ibuf = 0;                                     /* input buffer */
 int32 drd_obuf = 0;                                     /* output buffer */
 int32 drd_ptr = 0;                                      /* sector pointer */
 int32 drc_pcount = 1;                                   /* number of prot tracks */
-int32 dr_stopioe = 1;                                   /* stop on error */
 int32 dr_time = DR_DTIME;                               /* time per word */
 
 static int32 sz_tab[16] = {
@@ -252,8 +259,8 @@ REG drd_reg[] = {
     };
 
 MTAB drd_mod[] = {
-    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &drd_dev },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &drd_dev },
+    { MTAB_XTD | MTAB_VDV,             2u, "SC",    "SC",    &hp_set_dib, &hp_show_dib, (void *) &dr_dib },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, ~2u, "DEVNO", "DEVNO", &hp_set_dib, &hp_show_dib, (void *) &dr_dib },
     { 0 }
     };
 
@@ -284,7 +291,6 @@ REG drc_reg[] = {
     { ORDATA (STA, drc_sta, 16) },
     { FLDATA (RUN, drc_run, 0) },
     { DRDATA (TIME, dr_time, 24), REG_NZ + PV_LEFT },
-    { FLDATA (STOP_IOE, dr_stopioe, 0) },
     { ORDATA (SC, drc_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, drc_dib.select_code, 6), REG_HRO },
     { DRDATA (CAPAC, drc_unit.capac, 24), REG_HRO },
@@ -308,8 +314,8 @@ MTAB drc_mod[] = {
     { UNIT_PROT, 0, "unprotected", "UNPROTECTED", NULL },
     { MTAB_XTD | MTAB_VDV, 0, "TRACKPROT", "TRACKPROT",
       &dr_set_prot, &dr_show_prot, NULL },
-    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &drd_dev },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &drd_dev },
+    { MTAB_XTD | MTAB_VDV,             2u, "SC",    "SC",    &hp_set_dib, &hp_show_dib, (void *) &dr_dib },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, ~2u, "DEVNO", "DEVNO", &hp_set_dib, &hp_show_dib, (void *) &dr_dib },
     { 0 }
     };
 
@@ -522,7 +528,7 @@ uint16 *bptr = (uint16 *) uptr->filebuf;
 
 if ((uptr->flags & UNIT_ATT) == 0) {
     drc_sta = DRS_ABO;
-    return IOERROR (dr_stopioe, SCPE_UNATT);
+    return SCPE_OK;
     }
 
 trk = CW_GETTRK (drc_cw);
@@ -723,7 +729,7 @@ return SCPE_OK;
    In hardware, the BBDL was hand-configured for the disc and paper tape reader
    select codes when it was installed on a given system.  Under simulation, we
    treat it as a standard HP 1000 loader, even though it is not structured that
-   way, and so the ibl_copy mechanism used to load and configure it must be
+   way, and so the cpu_ibl mechanism used to load and configure it must be
    augmented to account for the differences.
 
 
@@ -732,7 +738,7 @@ return SCPE_OK;
     1. The full BBDL is loaded into memory, even though only the disc portion
        will be used.
 
-    2. For compatibility with the ibl_copy routine, the loader has been changed
+    2. For compatibility with the cpu_ibl routine, the loader has been changed
        from the standard HP version.  The device I/O instructions are modified
        to address locations 10 and 11.
 */
@@ -811,19 +817,18 @@ static const BOOT_ROM dr_rom = {
 
 t_stat drc_boot (int32 unitno, DEVICE *dptr)
 {
-const int32 dev = drd_dib.select_code;                  /* data chan select code */
+const HP_WORD dev = (HP_WORD) drd_dib.select_code;      /* data chan select code */
 
 if (unitno != 0)                                        /* boot supported on drive unit 0 only */
     return SCPE_NOFNC;                                  /* report "Command not allowed" if attempted */
 
-if (ibl_copy (dr_rom, dev, IBL_S_NOCLR, IBL_S_NOSET))   /* copy the boot ROM to memory and configure */
-    return SCPE_IERR;                                   /* return an internal error if the copy failed */
+cpu_ibl (dr_rom, dev, IBL_S_NOCLR, IBL_S_NOSET);        /* copy the boot ROM to memory and configure */
 
-WritePW (PR + BBDL_MAX_ADDR, ReadPW (PR + IBL_END));        /* move the maximum address word */
-WritePW (PR + BBDL_DMA_CNTL, dr_rom [BBDL_DMA_CNTL] + dev); /* set up the DMA control word */
+mem_deposit (PR + BBDL_MAX_ADDR, mem_examine (PR + IBL_END));               /* move the maximum address word */
+mem_deposit (PR + BBDL_DMA_CNTL, (HP_WORD) dr_rom [BBDL_DMA_CNTL] + dev);   /* set up the DMA control word */
 
-WritePW (PR + IBL_DPC, dr_rom [IBL_DPC]);               /* restore the overwritten word */
-WritePW (PR + IBL_END, dr_rom [IBL_END]);               /* restore the overwritten word */
+mem_deposit (PR + IBL_DPC, (HP_WORD) dr_rom [IBL_DPC]); /* restore the overwritten word */
+mem_deposit (PR + IBL_END, (HP_WORD) dr_rom [IBL_END]); /* restore the overwritten word */
 
 PR = PR + BBDL_DISC_START;                              /* select the starting address */
 

@@ -25,6 +25,10 @@
 
    tty          console typewriter
 
+   26-May-17    RMS     Added deferred IO
+   18-May-17    RMS     Fixed keyboard interrupt problem for Linux
+                        Added input backspace for Model II
+   04-May-17    DW      Revised tab calculation algorithm
    13-Mar-17    RMS     Fixed tab stop array overrun at right margin (COVERITY)
    21-Feb-15    TFM     Option to provide single digit numeric output
    05-Feb-15    TFM     Changes to translate tables and valid input char.
@@ -36,14 +40,21 @@
 
 #include "i1620_defs.h"
 
-#define NUM_1_DIGIT TRUE /* Indicate numeric output will use single digit format  (tfm) */
+#define NUM_1_DIGIT TRUE /* indicate numeric output will use single digit format (tfm) */
+
+/* Maximum number of characters per line, or one-based column number of last char cell */
 
 #define TTO_COLMAX      80
 #define UF_V_1DIG       (UNIT_V_UF)
 #define UF_1DIG         (1 << UF_V_1DIG)
+#define UTTI            1
+#define UTTO            0
 
-int32 tto_col = 0;
-uint8 tto_tabs[TTO_COLMAX + 1] = {
+uint32 tti_unlock = 0;                                  /* expecting input */
+uint32 tti_flag = 0;                                    /* flag typed */
+int32 tto_col = 1;                                      /* one-based, char loc to print next */
+
+uint8 tto_tabs[TTO_COLMAX + 1] = {  /* Zero-based access, one-based UI */
  0,0,0,0,0,0,0,0,
  1,0,0,0,0,0,0,0,
  1,0,0,0,0,0,0,0,
@@ -61,16 +72,15 @@ extern uint8 M[MAXMEMSIZE];
 extern uint8 ind[NUM_IND];
 extern UNIT cpu_unit;
 extern uint32 io_stop;
+extern uint32 cpuio_inp, cpuio_opc, cpuio_cnt, PAR;
 
-void tti_unlock (void);
-t_stat tti_rnum (int8 *c);
-t_stat tti_ralp (int8 *c);
-t_stat tti_read (int8 *c);
-t_stat tto_num (uint32 pa, uint32 len, t_bool dump);
+t_stat tto_num (void);
 t_stat tto_write (uint32 c);
-t_stat tty_svc (UNIT *uptr);
+t_stat tti_svc (UNIT *uptr);
+t_stat tto_svc (UNIT *uptr);
 t_stat tty_reset (DEVICE *dptr);
 t_stat tty_set_fixtabs (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat tty_set_12digit (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 /* TTY data structures
 
@@ -79,33 +89,44 @@ t_stat tty_set_fixtabs (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
    tty_reg      TTY register list
 */
 
-UNIT tty_unit = { UDATA (&tty_svc, 0, 0), KBD_POLL_WAIT };
+UNIT tty_unit[] = {
+    { UDATA (&tto_svc, 0, 0), SERIAL_OUT_WAIT },
+    { UDATA (&tti_svc, 0, 0), KBD_POLL_WAIT }
+    };
 
 REG tty_reg[] = {
-    { DRDATA (COL, tto_col, 7) },
-    { DRDATA (TIME, tty_unit.wait, 24), REG_NZ + PV_LEFT },
+    { FLDATAD (UNLOCK, tti_unlock, 0, "keyboard unlocked flag") },
+    { FLDATAD (FLAG, tti_flag, 0, "set flag on next input digit"), REG_HRO },
+    { DRDATAD (COL, tto_col, 7, "current column") },
+    { DRDATAD (KTIME, tty_unit[UTTI].wait, 24, "keyboard polling interval"), REG_NZ + PV_LEFT },
+    { DRDATAD (TTIME, tty_unit[UTTO].wait, 24, "typewriter character delay"), REG_NZ + PV_LEFT },
+    { DRDATAD (CPS, tty_unit[UTTO].DEFIO_CPS, 24, "Character Output Rate"), PV_LEFT },
+    { DRDATAD (ICPS, tty_unit[UTTI].DEFIO_CPS, 24, "Character Input Rate"), PV_LEFT },
     { NULL }
     };
 
 MTAB tty_mod[] = {
-    { MTAB_XTD|MTAB_VDV, TTO_COLMAX, NULL, "TABS",
-      &sim_tt_settabs, NULL, (void *) tto_tabs },
+    { MTAB_XTD|MTAB_VDV, TTO_COLMAX, NULL, "TABS=col;col;col...",
+      &sim_tt_settabs, NULL, (void *) tto_tabs, "set tab stops at the specified columns" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, TTO_COLMAX, "TABS", NULL,
-      NULL, &sim_tt_showtabs, (void *) tto_tabs },
+      NULL, &sim_tt_showtabs, (void *) tto_tabs, "display current tab stops" },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOTABS",
-      &tty_set_fixtabs, NULL, NULL },
+      &tty_set_fixtabs, NULL, NULL, "remove all tab stops" },
     { MTAB_XTD|MTAB_VDV, 8, NULL, "DEFAULTTABS",
-      &tty_set_fixtabs, NULL, NULL },
-    { UF_1DIG, UF_1DIG, "combined digits and flags", "1DIGIT", NULL },
-    { UF_1DIG, 0      , "separate digits and flags", "2DIGIT", NULL },
+      &tty_set_fixtabs, NULL, NULL, "set tab stops every eight columns" },
+    { UF_1DIG, UF_1DIG, "combined digits and flags", "1DIGIT", 
+      &tty_set_12digit, NULL, NULL, "type flagged digits as letters" },
+    { UF_1DIG, 0      , "separate digits and flags", "2DIGIT", 
+      &tty_set_12digit, NULL, NULL, "type flagged digits as ~digit" },
     { 0 }
     };
 
 DEVICE tty_dev = {
-    "TTY", &tty_unit, tty_reg, tty_mod,
-    1, 10, 31, 1, 8, 7,
+    "TTY", tty_unit, tty_reg, tty_mod,
+    2, 10, 31, 1, 8, 7,
     NULL, NULL, &tty_reset,
-    NULL, NULL, NULL
+    NULL, NULL, NULL,
+    NULL, DEV_DEFIO
     };
 
 /* Data tables */
@@ -233,12 +254,6 @@ const char alp_to_tto[256] = {
 
 t_stat tty (uint32 op, uint32 pa, uint32 f0, uint32 f1)
 {
-t_addr i;
-uint8 d;
-int8 ttc;
-t_stat r, sta;
-
-sta = SCPE_OK;
 switch (op) {                                           /* case on op */
 
     case OP_K:                                          /* control */
@@ -265,199 +280,221 @@ switch (op) {                                           /* case on op */
         default:
             return STOP_INVFNC;
             }
-        return SCPE_OK;
-
-    case OP_RN:                                         /* read numeric */
-        tti_unlock ();                                  /* unlock keyboard */
-        for (i = 0; i < MEMSIZE; i++) {                 /* (stop runaway) */
-            r = tti_rnum (&ttc);                        /* read char */
-            if (r != SCPE_OK)                           /* error? */
-                return r;
-            if (ttc == 0x7F)                            /* end record? */
-                return SCPE_OK;
-            M[pa] = ttc & (FLAG | DIGIT);               /* store char */
-            PP (pa);                                    /* incr mem addr */
-            }
         break;
 
-    case OP_RA:                                         /* read alphameric */
-        tti_unlock ();
-        for (i = 0; i < MEMSIZE; i = i + 2) {           /* (stop runaway) */
-            r = tti_ralp (&ttc);                        /* read char */
-            if (r != SCPE_OK)                           /* error? */
-                return r;
-            if (ttc == 0x7F)                            /* end record? */
-                return SCPE_OK;
-            M[pa] = (M[pa] & FLAG) | (ttc & DIGIT);     /* store 2 digits */
-            M[pa - 1] = (M[pa - 1] & FLAG) | ((ttc >> 4) & DIGIT);
-            pa = ADDR_A (pa, 2);                        /* incr mem addr */
-            }
-        break;  
-
-    case OP_DN:
-        return tto_num (pa, 20000 - (pa % 20000), TRUE);/* dump numeric */
-
     case OP_WN:
-        return tto_num (pa, 0, FALSE);                  /* type numeric */
-
+    case OP_DN:
     case OP_WA:
-        for (i = 0; i < MEMSIZE; i = i + 2) {           /* stop runaway */
-            d = M[pa] & DIGIT;                          /* get digit */
-            if ((d & REC_MARK) == REC_MARK)             /* 8-2 char? done */
-                return sta;
-            d = ((M[pa - 1] & DIGIT) << 4) | d;         /* get digit pair */
-            ttc = alp_to_tto[d];                        /* translate */
-            if (ttc < 0) {                              /* bad char? */
-                ind[IN_WRCHK] = 1;                      /* set write check */
-                if (io_stop)                            /* set return status */
-                    sta = STOP_INVCHR;
-                }
-            tto_write (ttc & 0x7F);                     /* write */
-            pa = ADDR_A (pa, 2);                        /* incr mem addr */
-            }
-        break;          
+        cpuio_set_inp (op, &tty_unit[UTTO]);            /* set IO in progress */
+        break;
+
+    case OP_RN:
+    case OP_RA:
+        tti_unlock = 1;                                 /* unlock keyboard */
+        tti_flag = 0;                                   /* init flag */
+        tto_write ('>');                                /* prompt user */
+        cpuio_set_inp (op, NULL);                       /* set IO in progress */
+        break;
 
     default:                                            /* invalid function */
         return STOP_INVFNC;
         }
 
-return STOP_RWRAP;
+return SCPE_OK;
 }
 
-/* Read numerically - cannot generate parity errors */
+/* Input unit service - OP can be RA or RN */
 
-t_stat tti_rnum (int8 *c)
+t_stat tti_svc (UNIT *uptr)
 {
-int8 raw, flg = 0;
+int32 temp;
+int8 raw, c;
 const char *cp;
-t_stat r;
 
-*c = -1;                                                /* no char yet */
-do {
-    r = tti_read (&raw);                                /* get char */
-    if (r != SCPE_OK)                                   /* error? */
-        return r;
-    if (raw == '\r')                                    /* return? mark */
-        *c = 0x7F;
-    else if ((raw == '~') || (raw == '`'))              /* flag? mark */
-        flg = FLAG;
-    else if ((cp = strchr (tti_to_num, raw)) != 0)      /* legal? */
-        *c = tti_position_to_internal[(cp - tti_to_num)] | flg; /* assemble char */
-    else raw = 007;                                     /* beep! */
+DEFIO_ACTIVATE (uptr);                                  /* continue poll */
+if ((temp = sim_poll_kbd ()) < SCPE_KFLAG)              /* no char or error? */
+    return temp;
+if (tti_unlock == 0)                                    /* expecting input? */
+    return SCPE_OK;                                     /* no, ignore */
+raw = (int8) temp;
+
+if (raw == '\r') {                                      /* return? */
     tto_write (raw);                                    /* echo */
-    } while (*c == -1);
+    tti_unlock = 0;                                     /* no more input */
+    cpuio_clr_inp (NULL);
+    return SCPE_OK;
+    }
+if (cpuio_opc == OP_RN) {                               /* RN? */
+    if (((raw == '\b') || (raw == 0x7F)) &&             /* backspace or del? */
+        ((cpu_unit.flags & IF_MII) != 0)) {             /* on model 2? */
+        tto_write ('-');                                /* print minus */
+        MM (PAR);                                       /* decr mem addr */
+        return SCPE_OK;
+        }
+    else if ((raw == '~') || (raw == '`')) {            /* flag? mark */
+        tto_write (raw);
+        tti_flag = FLAG;
+        return SCPE_OK;
+        }
+    else if ((cp = strchr (tti_to_num, raw)) == 0) {    /* invalid? */
+        tto_write ('\a');                               /* beep! */
+        return SCPE_OK;
+        }
+    tto_write (raw);                                    /* echo */
+    if (cpuio_cnt >= MEMSIZE) {                         /* wrap around? */
+        tti_unlock = 0;                                 /* no more input */
+        cpuio_clr_inp (NULL);
+        return STOP_RWRAP;
+        }
+    c = tti_position_to_internal[(cp - tti_to_num)] | tti_flag; /* assemble char */
+    M[PAR] = c & (FLAG | DIGIT);                        /* store char */
+    tti_flag = 0;                                       /* re-init flag */
+    PP (PAR);                                           /* incr mem addr */
+    cpuio_cnt++;
+    }
+
+else {                                                  /* RA */
+    if (((raw == '\b') || (raw == 0x7F)) &&             /* backspace or del? */
+        ((cpu_unit.flags & IF_MII) != 0)) {             /* on model 2? */
+        tto_write ('-');                                /* print minus */
+        PAR = ADDR_A (PAR, -2);                         /* decr mem addr*/
+        return SCPE_OK;
+        }
+    else if ((raw >= sizeof(tti_to_alp)) ||             /* illegal char? */
+             (tti_to_alp[raw] < 0)) {
+        tto_write ('\a');                               /* beep! */
+        return SCPE_OK;
+        }
+    tto_write (raw);                                    /* echo */
+    if (cpuio_cnt >= MEMSIZE) {                         /* wrap around? */
+        tti_unlock = 0;                                 /* no more input */
+        cpuio_clr_inp (NULL);
+        return STOP_RWRAP;
+        }
+    c = tti_to_alp[raw];                                /* xlate */
+    M[PAR] = (M[PAR] & FLAG) | (c & DIGIT);             /* store 2 digits */
+    M[PAR - 1] = (M[PAR - 1] & FLAG) | ((c >> 4) & DIGIT);
+    PAR = ADDR_A (PAR, 2);                              /* incr mem addr */
+    cpuio_cnt = cpuio_cnt + 2;
+    }
+
 return SCPE_OK;
 }
 
-/* Read alphamerically - cannot generate parity errors */
+/* Output unit service */
 
-t_stat tti_ralp (int8 *c)
-{
-int8 raw;
-t_stat r;
+t_stat tto_svc (UNIT *uptr) {
 
-*c = -1;                                                /* no char yet */
-do {
-    r = tti_read (&raw);                                /* get char */
-    if (r != SCPE_OK)                                   /* error? */
-        return r;
-    if (raw == '\r')                                    /* return? mark */
-        *c = 0x7F;
-    else if (tti_to_alp[raw] >= 0)                      /* legal char? */
-        *c = tti_to_alp[raw];                           /* xlate */
-    else raw = 007;                                     /* beep! */
-    tto_write (raw);                                    /* echo */
-    } while (*c == -1);
-return SCPE_OK;
-}
+uint8 d;
+int8 ttc;
+t_stat sta = SCPE_OK;
 
-/* Read from keyboard */
+if ((cpuio_opc != OP_DN) && (cpuio_cnt >= MEMSIZE)) {   /* wrap, ~dump? */
+    cpuio_clr_inp (uptr);                               /* done */
+    return STOP_RWRAP;
+    }
+DEFIO_ACTIVATE (uptr);                                  /* sched another xfer */
 
-t_stat tti_read (int8 *c)
-{
-int32 t;
+switch (cpuio_opc) {                                    /* decode op */
 
-do {
-    t = sim_poll_kbd ();                                /* get character */
-    } while ((t == SCPE_OK) || (t & SCPE_BREAK));       /* ignore break */
-if (t < SCPE_KFLAG)                                     /* error? */
-    return t;
-*c = t & 0177;                                          /* store character */
-return SCPE_OK;
+    case OP_DN:
+        if ((cpuio_cnt != 0) && ((PAR % 20000) == 0))   /* done? */
+            break;
+        return tto_num ();                              /* write numeric */
+
+    case OP_WN:
+        if ((M[PAR] & REC_MARK) == REC_MARK)            /* end record? */
+            break;
+        return tto_num ();                              /* write numeric */
+
+    case OP_WA:
+        d = M[PAR] & DIGIT;                             /* get digit */
+        if ((d & REC_MARK) == REC_MARK)                 /* 8-2 char? done */
+            break;
+        d = ((M[PAR - 1] & DIGIT) << 4) | d;            /* get digit pair */
+        ttc = alp_to_tto[d];                            /* translate */
+        if (ttc < 0) {                                  /* bad char? */
+            ind[IN_WRCHK] = 1;                          /* set write check */
+            if (io_stop)                                /* set return status */
+                sta = STOP_INVCHR;
+                break;
+                }
+        tto_write (ttc & 0x7F);                         /* write */
+        PAR = ADDR_A (PAR, 2);                          /* incr mem addr */
+        cpuio_cnt = cpuio_cnt + 2;
+        return SCPE_OK;
+
+    default:
+        return SCPE_IERR;
+    }        
+
+cpuio_clr_inp (uptr);                                   /* clear IO in progress */
+return sta;
 }
 
 /* Write numerically - cannot generate parity errors */
 
-t_stat tto_num (uint32 pa, uint32 len, t_bool dump)
+t_stat tto_num (void)
 {
 t_stat r;
 uint8 d;
-uint32 i;
 
-for (i = 0; i < MEMSIZE; i++) {                         /* (stop runaway) */
-    d = M[pa];                                          /* get char */
-    if (dump? (len-- == 0):                             /* dump: end reached? */
-       ((d & REC_MARK) == REC_MARK))                    /* write: rec mark? */
-        return SCPE_OK;                                 /* end operation */
-    if (tty_unit.flags & UF_1DIG)                       /* how display flagged digits? */
-        r = tto_write (num_to_tto[d]);                  /* single digit display */
-    else {
-        if (d & FLAG)                                   /* flag? */
-            tto_write ('`');                            /* write flag indicator */
-        r = tto_write (num_to_tto[d & DIGIT]);          /* write the digit */
-        }                                                      
-    if (r != SCPE_OK)                                   /* write error? */
-        return r;
-    PP (pa);                                            /* incr mem addr */
+d = M[PAR];                                             /* get char */
+if (tty_unit[UTTO].flags & UF_1DIG)                     /* how display flagged digits? */
+    r = tto_write (num_to_tto[d & (DIGIT|FLAG)]);       /* single digit display */
+else {
+    if (d & FLAG)                                       /* flag? */
+        tto_write ('`');                                /* write flag indicator */
+    r = tto_write (num_to_tto[d & DIGIT]);              /* write the digit */
+    }                                                      
+if (r != SCPE_OK)                                       /* write error? */
+    return r;
+PP (PAR);                                               /* incr mem addr */
+cpuio_cnt++;
+return SCPE_OK;
+}
+
+/* Wrap line, if needed, prior to character output */
+
+void tto_wrap(void)
+{
+if (tto_col > TTO_COLMAX) {                             /* line wrap? */
+    sim_putchar('\r');
+    sim_putchar('\n');
+    tto_col = 1;
     }
-return STOP_RWRAP;
 }
 
 /* Write, maintaining position */
 
 t_stat tto_write (uint32 c)
 {
-int32 rpt;
-
 if (c == '\t') {                                        /* tab? */
-    for (rpt = tto_col + 1;                             /* find tab stop */
-        (rpt <= TTO_COLMAX) && (tto_tabs[rpt] == 0);
-        rpt++) ;
-    for ( ; tto_col < rpt; tto_col++)
-        sim_putchar (' ');                              /* use spaces */
+    tto_wrap();
+    do {
+        sim_putchar(' ');                               /* use spaces */
+        tto_col++;
+        } while (!(tto_col > TTO_COLMAX || tto_tabs[tto_col-1] == 1));
     }
 else if (c == '\r') {                                   /* return? */
     sim_putchar ('\r');                                 /* crlf */
     sim_putchar ('\n');
-    tto_col = 0;                                        /* clear colcnt */
-    return SCPE_OK;
+    tto_col = 1;                                        /* back to LMargin */
     }
-else if ((c == '\n') || (c == 007)) {                   /* non-spacing? */
+else if ((c == '\n') || (c == '\a')) {                  /* non-spacing? */
     sim_putchar (c);
-    return SCPE_OK;
     }
-else if (c == '\b')                                     /* backspace? */
-    tto_col = tto_col? tto_col - 1: 0;
-else tto_col++;                                         /* normal */
-if (tto_col > TTO_COLMAX) {                             /* line wrap? */
-    sim_putchar ('\r');
-    sim_putchar ('\n');
-    tto_col = 0;
+else if (c == '\b') {                                   /* backspace? */
+    if (tto_col > 1) {
+        sim_putchar(c);
+        tto_col--;
+        }
     }
-if (c != '\t')
-    sim_putchar (c);
-return SCPE_OK;
-}
-
-/* Unit service - polls for WRU */
-
-t_stat tty_svc (UNIT *uptr)
-{
-int32 temp;
-
-sim_activate (&tty_unit, tty_unit.wait);                /* continue poll */
-if ((temp = sim_poll_kbd ()) < SCPE_KFLAG)              /* no char or error? */
-    return temp;
+else {                                                  /* normal */
+    tto_wrap();
+    sim_putchar(c);
+    tto_col++;
+    }
 return SCPE_OK;
 }
 
@@ -465,18 +502,11 @@ return SCPE_OK;
 
 t_stat tty_reset (DEVICE *dptr)
 {
-sim_activate (&tty_unit, tty_unit.wait);                /* activate poll */
-tto_col = 0;
-tto_tabs[TTO_COLMAX] = 1;                               /* tab stop at limit */
+sim_activate (&tty_unit[UTTI], tty_unit[UTTI].wait);    /* activate poll */
+sim_cancel (&tty_unit[UTTO]);                           /* cancel output */
+tti_unlock = tti_flag = 0;                              /* tty locked */
+tto_col = 1;
 return SCPE_OK;
-}
-
-/* TTI unlock - signals that we are ready for keyboard input */
-
-void tti_unlock (void)
-{
-tto_write ('>');
-return;
 }
 
 /* Set tab stops at fixed modulus */
@@ -490,5 +520,14 @@ for (i = 0; i < TTO_COLMAX; i++) {
         tto_tabs[i] = 1;
     else tto_tabs[i] = 0;
     }
+return SCPE_OK;
+}
+
+/* Assure consistency of 1DIG/2DIG setting */
+
+t_stat tty_set_12digit (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+tty_unit[UTTI].flags = (tty_unit[UTTI].flags & ~UF_1DIG) | val;
+tty_unit[UTTO].flags = (tty_unit[UTTO].flags & ~UF_1DIG) | val;
 return SCPE_OK;
 }

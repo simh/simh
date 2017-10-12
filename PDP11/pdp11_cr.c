@@ -291,7 +291,7 @@
 #endif
 
 #include <assert.h>
-#define    ERROR            (00404)
+#define    CR_ER            (00404)
 #include "pdp11_cr_dat.h"
 #define    PUNCH_EOD        (07417)
 #define    PUNCH_SPACE      (0)                          /* same for all encodings */
@@ -830,7 +830,7 @@ static t_bool readCardASCII (   UNIT    *uptr,
         default:
             hcard[col] = (uint16)codeTbl[c & 0177];
             /* check for unrepresentable ASCII characters */
-            if (hcard[col] == ERROR) {
+            if (hcard[col] == CR_ER) {
                 cdst |= CDCSR_DATAERR;
                 if (DEBUG_PRS (cr_dev))
                     fprintf (sim_deb,

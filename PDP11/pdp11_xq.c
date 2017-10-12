@@ -262,6 +262,7 @@ t_stat xq_svc(UNIT * uptr);
 t_stat xq_tmrsvc(UNIT * uptr);
 t_stat xq_startsvc(UNIT * uptr);
 t_stat xq_receivesvc(UNIT * uptr);
+t_stat xq_srqrsvc(UNIT * uptr);
 t_stat xq_reset (DEVICE * dptr);
 t_stat xq_attach (UNIT * uptr, CONST char * cptr);
 t_stat xq_detach (UNIT * uptr);
@@ -350,6 +351,7 @@ UNIT xqa_unit[] = {
  { UDATA (&xq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
  { UDATA (&xq_startsvc, UNIT_DIS, 0) },
  { UDATA (&xq_receivesvc, UNIT_DIS, 0) },
+ { UDATA (&xq_srqrsvc, UNIT_DIS, 0) },
 };
 
 BITFIELD xq_csr_bits[] = {
@@ -431,6 +433,7 @@ UNIT xqb_unit[] = {
  { UDATA (&xq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
  { UDATA (&xq_startsvc, UNIT_DIS, 0) },
  { UDATA (&xq_receivesvc, UNIT_DIS, 0) },
+ { UDATA (&xq_srqrsvc, UNIT_DIS, 0) },
 };
 
 REG xqb_reg[] = {
@@ -537,7 +540,7 @@ DEBTAB xq_debug[] = {
 
 DEVICE xq_dev = {
   "XQ", xqa_unit, xqa_reg, xq_mod,
-  4, XQ_RDX, 11, 1, XQ_RDX, 16,
+  5, XQ_RDX, 11, 1, XQ_RDX, 16,
   &xq_ex, &xq_dep, &xq_reset,
   &xq_boot, &xq_attach, &xq_detach,
   &xqa_dib, DEV_DISABLE | DEV_QBUS | DEV_DEBUG | DEV_ETHER,
@@ -547,7 +550,7 @@ DEVICE xq_dev = {
 
 DEVICE xqb_dev = {
   "XQB", xqb_unit, xqb_reg, xq_mod,
-  4, XQ_RDX, 11, 1, XQ_RDX, 16,
+  5, XQ_RDX, 11, 1, XQ_RDX, 16,
   &xq_ex, &xq_dep, &xq_reset,
   &xq_boot, &xq_attach, &xq_detach,
   &xqb_dib, DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_DEBUG | DEV_ETHER,
@@ -2355,7 +2358,7 @@ void xq_stop_receiver(CTLR* xq)
     eth_clr_async(xq->var->etherface);
 }
 
-t_stat xq_wr_srqr(CTLR* xq, int32 data)
+t_stat xq_wr_srqr_set(CTLR* xq, int32 data)
 {
   uint16 set_bits = data & XQ_SRQR_RW;                     /* set RW set bits */
 
@@ -2363,7 +2366,14 @@ t_stat xq_wr_srqr(CTLR* xq, int32 data)
 
   xq->var->srr = set_bits;
 
-  switch (set_bits) {
+  return sim_activate (&xq->unit[4], xq->var->startup_delay);
+}
+
+t_stat xq_wr_srqr_action(CTLR* xq)
+{
+  sim_debug(DBG_REG, xq->dev, "xq_wr_srqr_action(data=0x%04X)\n", xq->var->srr);
+
+  switch (xq->var->srr) {
     case XQ_SRQR_STRT: {
       t_stat status;
 
@@ -2477,7 +2487,7 @@ t_stat xq_wr(int32 ldata, int32 PA, int32 access)
         case 3:
           break;
         case 4:   /* SRQR */
-          xq_wr_srqr(xq, data);
+          xq_wr_srqr_set (xq, data);
           break;
         case 5:
           break;
@@ -2813,6 +2823,17 @@ t_stat xq_receivesvc(UNIT* uptr)
 
   /* read setup or loopback packet */
   xq_process_rbdl(xq);
+
+  return SCPE_OK;
+}
+
+t_stat xq_srqrsvc(UNIT * uptr)
+{
+  CTLR* xq = xq_unit2ctlr(uptr);
+
+  sim_debug(DBG_TRC, xq->dev, "xq_srqrsvc()\n");
+
+  xq_wr_srqr_action(xq);
 
   return SCPE_OK;
 }

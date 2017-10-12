@@ -3288,7 +3288,8 @@ unsigned int m68k_is_valid_instruction(unsigned int instruction, unsigned int cp
             if(g_instruction_table[instruction] == d68010_moves_32)
                 return 0;
             if(g_instruction_table[instruction] == d68010_rtd)
-                return 0;   /* intentional fallthrough, older models have more invalid instructions */
+                return 0;   /* older models have more invalid instructions */
+            /* fall through */
         case M68K_CPU_TYPE_68010:
             if(g_instruction_table[instruction] == d68020_bcc_32)
                 return 0;
@@ -3410,6 +3411,7 @@ unsigned int m68k_is_valid_instruction(unsigned int instruction, unsigned int cp
                 return 0;
             if(g_instruction_table[instruction] == d68020_unpk_mm)
                 return 0;
+            /* fall through */
         case M68K_CPU_TYPE_68EC020:
         case M68K_CPU_TYPE_68020:
         case M68K_CPU_TYPE_68030:

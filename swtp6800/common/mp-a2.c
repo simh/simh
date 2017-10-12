@@ -173,7 +173,7 @@ int32 get_base(void)
 
 int32 CPU_BD_get_mbyte(int32 addr)
 {
-    int32 val;
+    int32 val = 0;
 
     sim_debug (DEBUG_read, &CPU_BD_dev, "CPU_BD_get_mbyte: addr=%04X\n", addr);
     switch(addr & 0xF000) {

@@ -1,30 +1,38 @@
 /* hp2100_cpu1.c: HP 2100/1000 EAU simulator and UIG dispatcher
 
    Copyright (c) 2005-2016, Robert M. Supnik
+   Copyright (c) 2017       J. David Bryan
 
-   Permission is hereby granted, free of charge, to any person obtaining a
-   copy of this software and associated documentation files (the "Software"),
-   to deal in the Software without restriction, including without limitation
-   the rights to use, copy, modify, merge, publish, distribute, sublicense,
-   and/or sell copies of the Software, and to permit persons to whom the
-   Software is furnished to do so, subject to the following conditions:
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
 
    The above copyright notice and this permission notice shall be included in
    all copies or substantial portions of the Software.
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+   AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not be
+   Except as contained in this notice, the names of the authors shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from Robert M Supnik.
+   in this Software without prior written authorization from the authors.
 
    CPU1         Extended arithmetic and optional microcode dispatchers
 
+   01-Aug-17    JDB     Changed TIMER and RRR 16 to test for undefined stops
+   07-Jul-17    JDB     Changed "iotrap" from uint32 to t_bool
+   26-Jun-17    JDB     Replaced SEXT with SEXT16
+   22-Apr-17    JDB     Improved the EAU shift/rotate instructions
+   21-Mar-17    JDB     Fixed UIG 1 comment regarding 2000 IOP and F-Series
+   31-Jan-17    JDB     Added fmt_ab to print A/B-register error codes
+   30-Jan-17    JDB     Removed fprint_ops, fprint_regs (now redundant)
    05-Aug-16    JDB     Renamed the P register from "PC" to "PR"
    24-Dec-14    JDB     Added casts for explicit downward conversions
    05-Apr-14    JDB     Corrected typo in comments for cpu_ops
@@ -118,14 +126,16 @@
    The design of the 1000 microinstruction set was such that executing an
    instruction for which no microcode was present (e.g., executing a FFP
    instruction when the FFP firmware was not installed) resulted in a NOP.
-   Under simulation, such execution causes an undefined instruction stop if
-   "stop_inst" is non-zero and a NOP otherwise.
+   Under simulation, such execution causes an unimplemented instruction stop if
+   "STOP (cpu_ss_unimpl)" is non-zero and a no-operation otherwise.
 */
+
 
 
 #include "hp2100_defs.h"
 #include "hp2100_cpu.h"
 #include "hp2100_cpu1.h"
+
 
 
 /* EAU
@@ -172,172 +182,253 @@
    EXECUTE (100120), is also described but was never implemented, and the
    E/F-series microcode execute a NOP for this instruction code.
 
-   Notes:
+   If the EAU is not installed in a 2115 or 2116, EAU instructions execute as
+   NOPs or cause unimplemented instruction stops if enabled.
 
-     1. Under simulation, TIMER, DIAG, and EXECUTE cause undefined instruction
-        stops if the CPU is set to 21xx.  DIAG and EXECUTE also cause stops on
-        the 1000-M.  TIMER does not, because it is used by several HP programs
-        to differentiate between M- and E/F-series machines.
 
-     2. DIAG is not implemented under simulation.  On the E/F, it performs a
-        destructive test of all installed memory.  Because of this, it is only
-        functional if the machine is halted, i.e., if the instruction is
-        executed with the INSTR STEP button.  If it is executed in a program,
-        the result is NOP.
+   Implementation notes:
 
-     3. RRR is permitted and executed as NOP if the CPU is a 2114, as the
-        presence of the EAU is tested by the diagnostic configurator to
-        differentiate between 2114 and 2100/1000 CPUs.
+    1. Under simulation, TIMER and DIAG cause undefined instruction stops if the
+       CPU is not an E/F-Series.  Note that TIMER is intentionally executed by
+       several HP programs to differentiate between M- and E/F-series machines.
+
+    2. DIAG is not implemented under simulation.  On the E/F, it performs a
+       destructive test of all installed memory.  Because of this, it is only
+       functional if the machine is halted, i.e., if the instruction is
+       executed with the INSTR STEP button.  If it is executed in a program,
+       the result is NOP.
+
+    3. The RRR 16 instruction is intentionally executed by the diagnostic
+       configurator on the 2114, which does not have an EAU, to differentiate
+       between 2114 and 2100/1000 CPUs.
+
+    4. The shift count is calculated unconditionally, as six of the ten
+       instructions will be using the value.
+
+    5. An arithmetic left shift must be handled as a special case because the
+       shifted operand bits "skip over" the sign bit.  That is, the bits are
+       lost from the next-most-significant bit while preserving the MSB.  For
+       all other shifts, including the arithmetic right shift, the operand may
+       be shifted and then merged with the appropriate fill bits.
+
+    6. The C standard specifies that the results of bitwise shifts with negative
+       signed operands are undefined (for left shifts) or implementation-defined
+       (for right shifts).  Therefore, we must use unsigned operands and handle
+       arithmetic shifts explicitly.
 */
 
 t_stat cpu_eau (uint32 IR, uint32 intrq)
 {
 t_stat reason = SCPE_OK;
 OPS op;
-uint32 rs, qs, sc, v1, v2, t;
+uint32 rs, qs, v1, v2, operand, fill, mask, shift;
 int32 sop1, sop2;
 
-if ((cpu_unit.flags & UNIT_EAU) == 0)                   /* option installed? */
-    if ((UNIT_CPU_MODEL == UNIT_2114) && (IR == 0101100))   /* 2114 and RRR 16? */
-        return SCPE_OK;                                 /* allowed as NOP */
-    else
-        return stop_inst;                               /* fail */
+if ((cpu_unit.flags & UNIT_EAU) == 0)                   /* if the EAU is not installed */
+    return STOP (cpu_ss_unimpl);                        /*   then the instructions execute as NOPs */
+
+if (IR & 017)                                           /* if the shift count is 1-15 */
+    shift = IR & 017;                                   /*   then use it verbatim */
+else                                                    /* otherwise the count iz zero */
+    shift = 16;                                         /*   so use a shift count of 16 */
 
 switch ((IR >> 8) & 0377) {                             /* decode IR<15:8> */
 
     case 0200:                                          /* EAU group 0 */
         switch ((IR >> 4) & 017) {                      /* decode IR<7:4> */
 
-        case 000:                                       /* DIAG 100000 */
-            if ((UNIT_CPU_MODEL != UNIT_1000_E) &&      /* must be 1000 E-series */
-                (UNIT_CPU_MODEL != UNIT_1000_F))        /* or 1000 F-series */
-                return stop_inst;                       /* trap if not */
-            break;                                      /* DIAG is NOP unless halted */
+            case 000:                                   /* DIAG 100000 */
+                if (UNIT_CPU_MODEL != UNIT_1000_E       /* if the CPU is not an E-series */
+                  && UNIT_CPU_MODEL != UNIT_1000_F)     /*   or an F-series */
+                    return STOP (cpu_ss_undef);         /*     then the instruction is undefined */
+                break;                                  /*       and executes as NOP */
 
-        case 001:                                       /* ASL 100020-100037 */
-            sc = (IR & 017)? (IR & 017): 16;            /* get sc */
-            O = 0;                                      /* clear ovflo */
-            while (sc-- != 0) {                         /* bit by bit */
-                t = BR << 1;                            /* shift B */
-                BR = (BR & SIGN) | (t & 077777) | (AR >> 15);
-                AR = (AR << 1) & DMASK;
-                if ((BR ^ t) & SIGN) O = 1;
-                }
-            break;
 
-        case 002:                                       /* LSL 100040-100057 */
-            sc = (IR & 017)? (IR & 017): 16;            /* get sc */
-            BR = ((BR << sc) | (AR >> (16 - sc))) & DMASK;
-            AR = (AR << sc) & DMASK;                    /* BR'AR lsh left */
-            break;
+            case 001:                                   /* ASL 100020-100037 */
+                operand = TO_DWORD (BR, AR);            /* form the double-word operand */
 
-        case 003:                                       /* TIMER 100060 */
-            if (UNIT_CPU_TYPE != UNIT_TYPE_1000)        /* must be 1000 */
-                return stop_inst;                       /* trap if not */
-            if (UNIT_CPU_MODEL == UNIT_1000_M)          /* 1000 M-series? */
-                goto MPY;                               /* decode as MPY */
-            BR = (BR + 1) & DMASK;                      /* increment B */
-            if (BR) PR = err_PC;                        /* if !=0, repeat */
-            break;
+                mask = D32_UMAX << 31 - shift;          /* form a mask for the bits that will be lost */
 
-        case 004:                                       /* RRL 100100-100117 */
-            sc = (IR & 017)? (IR & 017): 16;            /* get sc */
-            t = BR;                                     /* BR'AR rot left */
-            BR = ((BR << sc) | (AR >> (16 - sc))) & DMASK;
-            AR = ((AR << sc) | (t >> (16 - sc))) & DMASK;
-            break;
+                if (operand & D32_SIGN)                     /* if the operand is negative */
+                    O = (~operand & mask & D32_MASK) != 0;  /*   then set overflow if any of the lost bits are zeros */
+                else                                        /* otherwise it's positive */
+                    O = (operand & mask & D32_MASK) != 0;   /*   so set overflow if any of the lost bits are ones */
 
-        case 010:                                       /* MPY 100200 (OP_K) */
-        MPY:
-            reason = cpu_ops (OP_K, op, intrq);         /* get operand */
-            if (reason == SCPE_OK) {                    /* successful eval? */
-                sop1 = SEXT (AR);                       /* sext AR */
-                sop2 = SEXT (op[0].word);               /* sext mem */
-                sop1 = sop1 * sop2;                     /* signed mpy */
-                BR = (sop1 >> 16) & DMASK;              /* to BR'AR */
-                AR = sop1 & DMASK;
-                O = 0;                                  /* no overflow */
-                }
-            break;
+                operand = operand << shift & D32_SMAX   /* shift the operand left */
+                            | operand & D32_SIGN;       /*   while keeping the original sign bit */
 
-        default:                                        /* others undefined */
-            return stop_inst;
+                BR = UPPER_WORD (operand);              /* split the operand */
+                AR = LOWER_WORD (operand);              /*   into its constituent parts */
+                break;
+
+
+            case 002:                                   /* LSL 100040-100057 */
+                operand = TO_DWORD (BR, AR) << shift;   /* shift the double-word operand left */
+
+                BR = UPPER_WORD (operand);              /* split the operand */
+                AR = LOWER_WORD (operand);              /*   into its constituent parts */
+                break;
+
+
+            case 004:                                   /* RRL 100100-100117 */
+                operand = TO_DWORD (BR, AR);            /* form the double-word operand */
+                fill = operand;                         /*   and fill with operand bits */
+
+                operand = operand << shift              /* rotate the operand left */
+                            | fill >> 32 - shift;       /*   while filling in on the right */
+
+                BR = UPPER_WORD (operand);              /* split the operand */
+                AR = LOWER_WORD (operand);              /*   into its constituent parts */
+                break;
+
+
+            case 003:                                   /* TIMER 100060 */
+                if (UNIT_CPU_MODEL == UNIT_1000_E       /* if the CPU is an E-series */
+                  || UNIT_CPU_MODEL == UNIT_1000_F) {   /*   or an F-series */
+                    BR = BR + 1 & R_MASK;               /*     then increment B */
+
+                    if (BR != 0)                        /* if B did not roll over */
+                        PR = err_PC;                    /*   then repeat the instruction */
+                    break;
+                    }
+
+                else {                                  /* otherwise it's a 21xx or 1000 M-Series */
+                    reason = STOP (cpu_ss_undef);       /*   and the instruction is undefined */
+
+                    if (reason != SCPE_OK               /* if a stop is indicated */
+                      || UNIT_CPU_MODEL != UNIT_1000_M) /*   or the CPU is a 21xx */
+                        break;                          /*     then the instruction executes as NOP */
+                    }
+
+            /* fall into the MPY case if 1000 M-Series */
+
+            case 010:                                   /* MPY 100200 (OP_K) */
+                reason = cpu_ops (OP_K, op, intrq);     /* get operand */
+
+                if (reason == SCPE_OK) {                /* successful eval? */
+                    sop1 = SEXT16 (AR);                 /* sext AR */
+                    sop2 = SEXT16 (op[0].word);         /* sext mem */
+                    sop1 = sop1 * sop2;                 /* signed mpy */
+                    BR = UPPER_WORD (sop1);             /* to BR'AR */
+                    AR = LOWER_WORD (sop1);
+                    O = 0;                              /* no overflow */
+                    }
+                break;
+
+
+            default:                                    /* others undefined */
+                return STOP (cpu_ss_unimpl);
             }
 
         break;
 
+
     case 0201:                                          /* DIV 100400 (OP_K) */
         reason = cpu_ops (OP_K, op, intrq);             /* get operand */
+
         if (reason != SCPE_OK)                          /* eval failed? */
             break;
+
         rs = qs = BR & SIGN;                            /* save divd sign */
+
         if (rs) {                                       /* neg? */
             AR = (~AR + 1) & DMASK;                     /* make B'A pos */
             BR = (~BR + (AR == 0)) & DMASK;             /* make divd pos */
             }
+
         v2 = op[0].word;                                /* divr = mem */
+
         if (v2 & SIGN) {                                /* neg? */
             v2 = (~v2 + 1) & DMASK;                     /* make divr pos */
             qs = qs ^ SIGN;                             /* sign of quotient */
             }
-        if (BR >= v2) O = 1;                            /* divide work? */
+
+        if (BR >= v2)                                   /* if the divisor is too small */
+            O = 1;                                      /*   then set overflow */
+
         else {                                          /* maybe... */
             O = 0;                                      /* assume ok */
             v1 = (BR << 16) | AR;                       /* 32b divd */
             AR = (v1 / v2) & DMASK;                     /* quotient */
             BR = (v1 % v2) & DMASK;                     /* remainder */
+
             if (AR) {                                   /* quotient > 0? */
-                if (qs) AR = (~AR + 1) & DMASK;         /* apply quo sign */
-                if ((AR ^ qs) & SIGN) O = 1;            /* still wrong? ovflo */
+                if (qs)                                 /* apply quo sign */
+                    AR = NEG16 (AR);
+
+                if ((AR ^ qs) & SIGN)                   /* still wrong? ovflo */
+                    O = 1;
                 }
-            if (rs) BR = (~BR + 1) & DMASK;             /* apply rem sign */
+
+            if (rs)
+                BR = NEG16 (BR);                        /* apply rem sign */
             }
         break;
+
 
     case 0202:                                          /* EAU group 2 */
         switch ((IR >> 4) & 017) {                      /* decode IR<7:4> */
 
-        case 001:                                       /* ASR 101020-101037 */
-            sc = (IR & 017)? (IR & 017): 16;            /* get sc */
-            AR = ((BR << (16 - sc)) | (AR >> sc)) & DMASK;
-            BR = (SEXT (BR) >> sc) & DMASK;             /* BR'AR ash right */
-            O = 0;
-            break;
+            case 001:                                   /* ASR 101020-101037 */
+                O = 0;                                  /* clear ovflo */
 
-        case 002:                                       /* LSR 101040-101057 */
-            sc = (IR & 017)? (IR & 017): 16;            /* get sc */
-            AR = ((BR << (16 - sc)) | (AR >> sc)) & DMASK;
-            BR = BR >> sc;                              /* BR'AR log right */
-            break;
+                operand = TO_DWORD (BR, AR);            /* form the double-word operand */
+                fill = (operand & D32_SIGN ? ~0 : 0);   /*   and fill with copies of the sign bit */
 
-        case 004:                                       /* RRR 101100-101117 */
-            sc = (IR & 017)? (IR & 017): 16;            /* get sc */
-            t = AR;                                     /* BR'AR rot right */
-            AR = ((AR >> sc) | (BR << (16 - sc))) & DMASK;
-            BR = ((BR >> sc) | (t << (16 - sc))) & DMASK;
-            break;
+                operand = operand >> shift              /* shift the operand right */
+                            | fill << 32 - shift;       /*   while filling in with sign bits */
 
-        default:                                        /* others undefined */
-            return stop_inst;
+                BR = UPPER_WORD (operand);              /* split the operand */
+                AR = LOWER_WORD (operand);              /*   into its constituent parts */
+                break;
+
+
+            case 002:                                   /* LSR 101040-101057 */
+                operand = TO_DWORD (BR, AR) >> shift;   /* shift the double-word operand right */
+
+                BR = UPPER_WORD (operand);              /* split the operand */
+                AR = LOWER_WORD (operand);              /*   into its constituent parts */
+                break;
+
+
+            case 004:                                   /* RRR 101100-101117 */
+                operand = TO_DWORD (BR, AR);            /* form the double-word operand */
+                fill = operand;                         /*   and fill with operand bits */
+
+                operand = operand >> shift              /* rotate the operand right */
+                            | fill << 32 - shift;       /*   while filling in on the left */
+
+                BR = UPPER_WORD (operand);              /* split the operand */
+                AR = LOWER_WORD (operand);              /*   into its constituent parts */
+                break;
+
+
+            default:                                    /* others undefined */
+                return STOP (cpu_ss_undef);
             }
 
         break;
+
 
     case 0210:                                          /* DLD 104200 (OP_D) */
         reason = cpu_ops (OP_D, op, intrq);             /* get operand */
+
         if (reason == SCPE_OK) {                        /* successful eval? */
-            AR = (op[0].dword >> 16) & DMASK;           /* load AR */
-            BR = op[0].dword & DMASK;                   /* load BR */
+            AR = UPPER_WORD (op[0].dword);              /* load AR */
+            BR = LOWER_WORD (op[0].dword);              /* load BR */
             }
         break;
 
+
     case 0211:                                          /* DST 104400 (OP_A) */
         reason = cpu_ops (OP_A, op, intrq);             /* get operand */
+
         if (reason == SCPE_OK) {                        /* successful eval? */
             WriteW (op[0].word, AR);                    /* store AR */
             WriteW ((op[0].word + 1) & VAMASK, BR);     /* store BR */
             }
         break;
+
 
     default:                                            /* should never get here */
         return SCPE_IERR;                               /* bad call from cpu_instr */
@@ -401,7 +492,7 @@ return reason;
        user microcode dispatcher.
 */
 
-t_stat cpu_uig_0 (uint32 IR, uint32 intrq, uint32 iotrap)
+t_stat cpu_uig_0 (uint32 IR, uint32 intrq, t_bool iotrap)
 {
 if ((cpu_unit.flags & UNIT_IOP) &&                      /* I/O Processor? */
     (UNIT_CPU_TYPE == UNIT_TYPE_2100))                  /*   and 2100 CPU? */
@@ -521,8 +612,8 @@ return cpu_user (IR, intrq);                            /* try user microcode */
 
      Instructions   Option Name                   1000-M  1000-E  1000-F
      -------------  ----------------------------  ------  ------  ------
-     10x400-10x437  2000 IOP                       opt     opt     opt
-     10x460-10x477  2000 IOP                       opt     opt     opt
+     10x400-10x437  2000 IOP                       opt     opt      -
+     10x460-10x477  2000 IOP                       opt     opt      -
      10x460-10x477  Vector Instruction Set          -       -      opt
      10x520-10x537  Distributed System             opt      -       -
      10x600-10x617  SIGNAL/1000 Instruction Set     -       -      opt
@@ -542,10 +633,10 @@ return cpu_user (IR, intrq);                            /* try user microcode */
        user microcode dispatcher.
 */
 
-t_stat cpu_uig_1 (uint32 IR, uint32 intrq, uint32 iotrap)
+t_stat cpu_uig_1 (uint32 IR, uint32 intrq, t_bool iotrap)
 {
-if (UNIT_CPU_TYPE != UNIT_TYPE_1000)                    /* 1000 execution? */
-    return stop_inst;                                   /* no, so trap */
+if (UNIT_CPU_TYPE != UNIT_TYPE_1000)                    /* if the CPU is not a 1000 */
+    return STOP (cpu_ss_unimpl);                        /*   the the instruction is unimplemented */
 
 switch ((IR >> 4) & 017) {                              /* decode IR<7:4> */
 
@@ -601,7 +692,7 @@ return cpu_user (IR, intrq);                            /* try user microcode */
 
 /* Read a multiple-precision operand value. */
 
-OP ReadOp (uint32 va, OPSIZE precision)
+OP ReadOp (HP_WORD va, OPSIZE precision)
 {
 OP operand;
 uint32 i;
@@ -623,7 +714,7 @@ return operand;
 
 /* Write a multiple-precision operand value. */
 
-void WriteOp (uint32 va, OP operand, OPSIZE precision)
+void WriteOp (HP_WORD va, OP operand, OPSIZE precision)
 {
 uint32 i;
 
@@ -731,19 +822,29 @@ return;
    An operand pattern consists of one or more operand encodings, corresponding
    to the operands required by a given instruction.  Values are returned in
    sequence to the operand array.
+
+
+   Implementation notes:
+
+    1. The reads of address operand words that follow an instruction (e.g., the
+       DEFs above) are classified as instruction fetches.  The reads of the
+       operands themselves are classified as data accesses.
 */
 
 t_stat cpu_ops (OP_PAT pattern, OPS op, uint32 irq)
 {
-t_stat reason = SCPE_OK;
-OP_PAT flags;
-uint32 i, MA;
+OP_PAT  flags;
+uint32  i;
+HP_WORD MA, address;
+t_stat  reason = SCPE_OK;
 
 for (i = 0; i < OP_N_F; i++) {
     flags = pattern & OP_M_FLAGS;                       /* get operand pattern */
 
     if (flags >= OP_ADR) {                              /* address operand? */
-        reason = resolve (ReadW (PR), &MA, irq);        /* resolve indirects */
+        address = ReadF (PR);                           /* get the pointer */
+
+        reason = resolve (address, &MA, irq);           /* resolve indirects */
         if (reason != SCPE_OK)                          /* resolution failed? */
             return reason;
         }
@@ -813,117 +914,33 @@ return reason;
 }
 
 
-/* Print operands to the debug device.
+/* Format an error code in the A and B registers.
 
-   The values of an operand array are printed to the debug device.  The types of
-   the operands are specified by an operand pattern.  Typically, the operand
-   pattern is the same one that was used to fill the array originally.
+   This routine conditionally formats the contents of the A and B registers into
+   an error message.  If the supplied "success" flag is 0, the A and B registers
+   contain a four-character error code (e.g., "EM82"), with the leading
+   characters in the B register.  The characters are moved into the error
+   message, and a pointer to the message is returned.  If "success" is non-zero,
+   then a pointer to the message reporting normal execution is returned.
+
+   The routine is typically called from an instructio executor during operand
+   tracing.
 */
 
-void fprint_ops (OP_PAT pattern, OPS op)
+const char *fmt_ab (t_bool success)
 {
-OP_PAT flags;
-uint32 i;
+static const char good  [] = "normal";
+static       char error [] = "error ....";
 
-for (i = 0; i < OP_N_F; i++) {
-    flags = pattern & OP_M_FLAGS;                       /* get operand pattern */
+if (success)                                            /* if the instruction succeeded */
+    return good;                                        /*   then report a normal completion */
 
-    switch (flags) {
-        case OP_NUL:                                    /* null operand */
-            return;                                     /* no more, so quit */
+else {                                                  /* otherwise */
+    error [6] = UPPER_BYTE (BR);                        /*   format the */
+    error [7] = LOWER_BYTE (BR);                        /*     error code */
+    error [8] = UPPER_BYTE (AR);                        /*       into the */
+    error [9] = LOWER_BYTE (AR);                        /*         error message */
 
-        case OP_IAR:                                    /* int in A */
-        case OP_CON:                                    /* inline constant operand */
-        case OP_VAR:                                    /* inline variable operand */
-        case OP_ADR:                                    /* inline address operand */
-        case OP_ADK:                                    /* address of int constant */
-            fprintf (sim_deb,
-                     ", op[%d] = %06o",
-                     i, op[i].word);
-            break;
-
-        case OP_JAB:                                    /* dbl-int in A/B */
-        case OP_ADD:                                    /* address of dbl-int constant */
-            fprintf (sim_deb,
-                     ", op[%d] = %011o",
-                     i, op[i].dword);
-            break;
-
-        case OP_FAB:                                    /* 2-word FP in A/B */
-        case OP_ADF:                                    /* address of 2-word FP const */
-            fprintf (sim_deb,
-                     ", op[%d] = (%06o, %06o)",
-                     i, op[i].fpk[0], op[i].fpk[1]);
-            break;
-
-        case OP_ADX:                                    /* address of 3-word FP const */
-            fprintf (sim_deb,
-                     ", op[%d] = (%06o, %06o, %06o)",
-                     i, op[i].fpk[0], op[i].fpk[1],
-                     op[i].fpk[2]);
-            break;
-
-        case OP_ADT:                                    /* address of 4-word FP const */
-            fprintf (sim_deb,
-                     ", op[%d] = (%06o, %06o, %06o, %06o)",
-                     i, op[i].fpk[0], op[i].fpk[1],
-                     op[i].fpk[2], op[i].fpk[3]);
-            break;
-
-        case OP_ADE:                                    /* address of 5-word FP const */
-            fprintf (sim_deb,
-                     ", op[%d] = (%06o, %06o, %06o, %06o, %06o)",
-                     i, op[i].fpk[0], op[i].fpk[1],
-                     op[i].fpk[2], op[i].fpk[3], op[i].fpk[4]);
-            break;
-
-        default:
-            fprintf (sim_deb, "UNKNOWN OPERAND TYPE");  /* not implemented */
-        }
-
-    pattern = pattern >> OP_N_FLAGS;                    /* move next pattern into place */
+    return error;                                       /* report an abnormal completion */
     }
-}
-
-
-/* Print CPU registers to the debug device.
-
-   One or more CPU registers may be printed to the debug output device, which
-   must be valid before calling.
-*/
-
-void fprint_regs (char *caption, uint32 regs, uint32 base)
-{
-static uint32 ARX, BRX, PRL;                            /* static so addresses are constant */
-
-static const char *reg_names[] = { "CIR", "A", "B", "E", "X", "Y", "O", "P", "return" };
-static const uint32 *reg_ptrs[] = { &intaddr, &ARX, &BRX, &E, &XR, &YR, &O, &PR, &PRL };
-static const char *formats[] = { "%02o", "%06o", "%06o", "%01o", "%06o", "%06o", "%01o", "%06o", "P+%d" };
-
-static char format[20] = " %s = ";                      /* base format string */
-static const int eos = 6;                               /* length of base format string */
-
-uint32 i;
-t_bool first = TRUE;                                    /* first-time through flag */
-
-ARX = AR;                                               /* copy 16-bit value to static variable */
-BRX = BR;                                               /* copy 16-bit value to static variable */
-PRL = PR - base;                                        /* compute value in static variable */
-
-for (i = 0; i < REG_COUNT; i++) {
-    if (regs & 1) {                                     /* register requested? */
-        if (first)                                      /* first time? */
-            fputs (caption, sim_deb);                   /* print caption */
-        else
-            fputc (',', sim_deb);                       /* print separator */
-
-        strcpy (&format[eos], formats[i]);              /* copy format specifier */
-        fprintf (sim_deb, format, reg_names[i], *reg_ptrs[i]);
-
-        first = FALSE;
-        }
-
-    regs = regs >> 1;                                   /* align next register flag */
-    }
-return;
 }

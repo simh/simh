@@ -188,6 +188,13 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       ifneq (,$(strip $(GIT_HOOKS)))
         $(info *** Warning - Error installing git hooks *** $(GIT_HOOKS))
       endif
+    else
+      ifneq (commit-id-exists,$(shell if $(TEST) -e .git-commit-id; then echo commit-id-exists; fi))
+        GIT_HOOKS = $(shell ./.git/hooks/post-checkout)
+        ifneq (,$(strip $(GIT_HOOKS)))
+          $(info *** Warning - Error executing git hooks *** $(GIT_HOOKS))
+        endif
+      endif
     endif
   endif
   LTO_EXCLUDE_VERSIONS = 
@@ -1400,7 +1407,7 @@ IMDS-225C = Intel-Systems/common
 IMDS-225 = ${IMDS-225C}/i8080.c ${IMDS-225D}/imds-225_sys.c \
 	${IMDS-225C}/i8251.c ${IMDS-225C}/i8255.c \
 	${IMDS-225C}/i8259.c ${IMDS-225C}/i8253.c \
-	${IMDS-225C}/ipceprom.c ${IMDS-225C}/ipcram8.c \
+	${IMDS-225C}/ieprom.c ${IMDS-225C}/iram8.c \
 	${IMDS-225C}/ipcmultibus.c ${IMDS-225D}/ipc.c \
 	${IMDS-225C}/ipc-cont.c ${IMDS-225C}/ioc-cont.c \
 	${IMDS-225C}/isbc202.c ${IMDS-225C}/isbc201.c \
@@ -1426,6 +1433,12 @@ IBMPCXT = ${IBMPCXTC}/i8088.c ${IBMPCXTD}/ibmpcxt_sys.c \
 	${IBMPCXTC}/pceprom.c ${IBMPCXTC}/pcram8.c \
 	${IBMPCXTC}/pcbus.c ${IBMPCXTC}/i8237.c 
 IBMPCXT_OPT = -I ${IBMPCXTD}
+
+
+SCELBID = Intel-Systems/scelbi
+SCELBIC = Intel-Systems/common
+SCELBI = ${SCELBIC}/i8008.c ${SCELBID}/scelbi_sys.c ${SCELBID}/scelbi_io.c
+SCELBI_OPT = -I ${SCELBID}
 
 
 TX0D = TX-0
@@ -1543,7 +1556,7 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 cdc1700 \
 	swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 isys8010 isys8020 \
-	isys8030 isys8024 imds-225
+	isys8030 isys8024 imds-225 scelbi
 
 all : ${ALL}
 
@@ -1856,6 +1869,12 @@ ibmpcxt: ${BIN}ibmpcxt${EXE}
 ${BIN}ibmpcxt${EXE} : ${IBMPCXT} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${IBMPCXT} ${SIM} ${IBMPCXT_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+scelbi: ${BIN}scelbi${EXE}
+
+${BIN}scelbi${EXE} : ${SCELBI} ${SIM}
+	${MKDIRBIN}
+	${CC} ${SCELBI} ${SIM} ${SCELBI_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
 tx-0 : ${BIN}tx-0${EXE}
 

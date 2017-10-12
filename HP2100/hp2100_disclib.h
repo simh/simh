@@ -1,6 +1,6 @@
-/* hp_disclib.h: HP MAC/ICD disc controller simulator library definitions
+/* hp_disclib.h: HP MAC/ICD disc controller simulator library declarations
 
-   Copyright (c) 2011-2016, J. David Bryan
+   Copyright (c) 2011-2017, J. David Bryan
    Copyright (c) 2004-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -24,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   17-Jan-17    JDB     Moved "hp2100_defs.h" inclusion to "hp2100_disclib.c"
    13-May-16    JDB     Modified for revised SCP API function parameter types
    24-Oct-12    JDB     Changed CNTLR_OPCODE to title case to avoid name clash
    07-May-12    JDB     Added end-of-track delay time as a controller variable
@@ -35,10 +36,6 @@
    simulation library for the HP 13037 and 13365 disc controllers.  It must be
    included by the interface-specific modules (DA, DS, etc.).
 */
-
-
-
-#include "hp2100_defs.h"
 
 
 

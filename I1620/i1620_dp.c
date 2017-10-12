@@ -120,19 +120,19 @@ UNIT dp_unit[] = {
     };
 
 REG dp_reg[] = {
-    { FLDATA (ADCHK, ind[IN_DACH], 0) },
-    { FLDATA (WLRC, ind[IN_DWLR], 0) },
-    { FLDATA (CYLO, ind[IN_DCYO], 0) },
-    { FLDATA (ERR, ind[IN_DERR], 0) },
-    { FLDATA (DPSTOP, dp_stop, 0) },
-    { URDATA (CYL, dp_unit[0].CYL, 10, 8, 0,
-              DP_NUMDR, PV_LEFT + REG_RO) },
+    { FLDATAD (ADCHK, ind[IN_DACH], 0, "address check (compare error) indicator") },
+    { FLDATAD (WLRC, ind[IN_DWLR], 0, "wrong length record check indicator") },
+    { FLDATAD (CYLO, ind[IN_DCYO], 0, "cylinder overflow check indicator") },
+    { FLDATAD (ERR, ind[IN_DERR], 0, "disk error indicator") },
+    { FLDATAD (DPSTOP, dp_stop, 0, "disk check stop") },
+    { URDATAD (CYL, dp_unit[0].CYL, 10, 8, 0,
+              DP_NUMDR, PV_LEFT + REG_RO, "Cylinder") },
     { NULL }
     };
 
 MTAB dp_mod[] = {
-    { UNIT_WAE, 0, "write address disabled", "ADDROFF", NULL },
-    { UNIT_WAE, UNIT_WAE, "write address enabled", "ADDRON", NULL }, 
+    { UNIT_WAE, 0, "write address disabled", "ADDROFF", NULL, NULL, NULL, "set unit n address enable off" },
+    { UNIT_WAE, UNIT_WAE, "write address enabled", "ADDRON", NULL, NULL, NULL, "set unit n address enable on" }, 
     { 0 }
     };
 

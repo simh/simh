@@ -762,6 +762,7 @@ else if (sw & SWMASK ('O'))
     rdx = 8;
 else if (sw & SWMASK ('H'))
     rdx = 16;
+else if ((sim_switch_number >= 2) && (sim_switch_number <= 36)) rdx = sim_switch_number;
 else rdx = dptr->dradix;
 if ((sw & SWMASK ('A')) || (sw & SWMASK ('C'))) {       /* char format? */
     for (vp = lnt - 1; vp >= 0; vp--) {

@@ -1,6 +1,6 @@
 /* i1620_defs.h: IBM 1620 simulator definitions
 
-   Copyright (c) 2002-2015, Robert M. Supnik
+   Copyright (c) 2002-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,8 @@
    I am grateful to Al Kossow, the Computer History Museum, and the IBM Corporate
    Archives for their help in gathering documentation about the IBM 1620.
 
+   23-May-17    RMS     MARCHK is indicator 8, not 18 (Dave Wise)
+   19-May-17    RMS     Added option for Model I diagnostic mode (Dave Wise)
    05-Feb-15    TFM     Added definitions for flagged RM, GM, NB
    22-May-10    RMS     Added check for 64b definitions
    18-Oct-02    RMS     Fixed bug in ADDR_S macro (found by Hans Pufal)
@@ -112,6 +114,7 @@
 #define IN_SW4          4                               /* sense switch 4 */
 #define IN_RDCHK        6                               /* read check (I/O error) */
 #define IN_WRCHK        7                               /* write check (I/O error) */
+#define IN_MARCHK       8                               /* MAR check - diag only */
 #define IN_LAST         9                               /* last card was just read */
 #define IN_HP           11                              /* high or positive result */
 #define IN_EZ           12                              /* equal or zero result */
@@ -197,12 +200,13 @@
 #define IF_4QA          (1 << (UNIT_V_UF + 9))          /* 4 char Q addr */
 #define IF_NQX          (1 << (UNIT_V_UF + 10))         /* no Q indexing */
 #define IF_IMM          (1 << (UNIT_V_UF + 11))         /* immediate */
-#define UNIT_BCD        (1 << (UNIT_V_UF + 12))         /* BCD coded */
-#define UNIT_MSIZE      (1 << (UNIT_V_UF + 13))         /* fake flag */
-#define ALLOPT          (IF_DIV + IF_IA + IF_EDT + IF_FP + IF_BIN + IF_IDX)
-#define MI_OPT          (IF_DIV + IF_IA + IF_EDT + IF_FP)
+#define IF_RMOK         (1 << (UNIT_V_UF + 12))         /* diag mode - force rm to 0 */
+#define UNIT_BCD        (1 << (UNIT_V_UF + 13))         /* BCD coded */
+#define UNIT_MSIZE      (1 << (UNIT_V_UF + 14))         /* fake flag */
+#define ALLOPT          (IF_DIV + IF_IA + IF_EDT + IF_FP + IF_BIN + IF_IDX + IF_RMOK)
+#define MI_OPT          (IF_DIV + IF_IA + IF_EDT + IF_FP + IF_RMOK)
 #define MI_STD          (IF_DIV + IF_IA + IF_EDT)
-#define MII_OPT         (ALLOPT)
+#define MII_OPT         (IF_DIV + IF_IA + IF_EDT + IF_FP + IF_BIN + IF_IDX)
 #define MII_STD         (IF_DIV + IF_IA + IF_EDT + IF_BIN + IF_IDX)
 
 /* Add status codes */
@@ -231,6 +235,23 @@ enum opcodes {
                                                         /* 80 - 89 */
     OP_BBT = 90, OP_BMK, OP_ORF, OP_ANDF, OP_CPLF,      /* 90 - 99 */
     OP_EORF, OP_OTD, OP_DTO };
+
+/* Device flags */
+
+#define DEV_DEFIO       (1 << (DEV_V_UF + 0))
+
+#define DEFIO_CPS       u4                  /* Characters per Second field */
+#if (SIM_MAJOR >= 4)
+#define DEFIO_ACTIVATE(uptr) ((uptr)->DEFIO_CPS) ? sim_activate_after (uptr, 1000000/(uptr)->DEFIO_CPS) : sim_activate (uptr, (uptr)->wait)
+#define DEFIO_ACTIVATE_ABS(uptr) ((uptr)->DEFIO_CPS) ? sim_activate_after_abs (uptr, 1000000/(uptr)->DEFIO_CPS) : sim_activate_abs (uptr, (uptr)->wait)
+#else
+#define DEFIO_ACTIVATE(uptr) sim_activate (uptr, (uptr)->wait)
+#define DEFIO_ACTIVATE_ABS(uptr) sim_activate_abs (uptr, (uptr)->wait)
+#endif
+/* Function declarations */
+
+t_stat cpuio_set_inp (uint32 op, UNIT *uptr);
+t_stat cpuio_clr_inp (UNIT *uptr);
 
 extern const int8 cdr_to_alp[128];
 extern const int8 alp_to_cdp[256];

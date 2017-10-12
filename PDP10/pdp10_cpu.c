@@ -25,6 +25,7 @@
 
    cpu          KS10 central processor
 
+   07-Sep-17    RMS     Fixed sim_eval declaration in history routine (COVERITY)
    14-Jan-17    RMS     Fixed bugs in 1-proceed
    09-Feb-16    RMS     Fixed nested indirects and executes (Tim Litt)
    25-Mar-12    RMS     Added missing parameters to prototypes (Mark Pizzolato)
@@ -2528,7 +2529,6 @@ t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 int32 k, di, lnt;
 const char *cptr = (const char *) desc;
 t_stat r;
-t_value sim_eval;
 InstHistory *h;
 
 if (hst_lnt == 0)                                       /* enabled? */
@@ -2550,8 +2550,8 @@ for (k = 0; k < lnt; k++) {                             /* print specified */
         fprint_val (st, h->ac, 8, 36, PV_RZRO);
         fputs ("  ", st);
         fprintf (st, "%06o  ", h->ea);
-        sim_eval = h->ir;
-        if ((fprint_sym (st, h->pc & AMASK, &sim_eval, &cpu_unit, SWMASK ('M'))) > 0) {
+        sim_eval[0] = h->ir;
+        if ((fprint_sym (st, h->pc & AMASK, sim_eval, &cpu_unit, SWMASK ('M'))) > 0) {
             fputs ("(undefined) ", st);
             fprint_val (st, h->ir, 8, 36, PV_RZRO);
             }

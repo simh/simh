@@ -1,33 +1,43 @@
 /* hp2100_stddev.c: HP2100 standard devices simulator
 
    Copyright (c) 1993-2016, Robert M. Supnik
+   Copyright (c) 2017       J. David Bryan
 
-   Permission is hereby granted, free of charge, to any person obtaining a
-   copy of this software and associated documentation files (the "Software"),
-   to deal in the Software without restriction, including without limitation
-   the rights to use, copy, modify, merge, publish, distribute, sublicense,
-   and/or sell copies of the Software, and to permit persons to whom the
-   Software is furnished to do so, subject to the following conditions:
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
 
    The above copyright notice and this permission notice shall be included in
    all copies or substantial portions of the Software.
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+   AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not be
+   Except as contained in this notice, the names of the authors shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from Robert M Supnik.
+   in this Software without prior written authorization from the authors.
 
    PTR          12597A-002 paper tape reader interface
    PTP          12597A-005 paper tape punch interface
    TTY          12531C buffered teleprinter interface
    TBG          12539C time base generator
 
+   03-Aug-17    JDB     PTP and TTY now append to existing file data
+   18-Jul-17    JDB     The PTR device now handles the IOERR simulation stop
+   11-Jul-17    JDB     Renamed "ibl_copy" to "cpu_ibl"
+   01-May-17    JDB     Deleted ttp_stopioe, as a detached punch is no longer an error
+   08-Mar-17    JDB     Added REALTIME, W1A, W1B, W2A, and W2B options to the TBG
+                        Replaced IPTICK with a CPU speed calculation
+   27-Feb-17    JDB     ibl_copy no longer returns a status code
+   23-Feb-17    JDB     Modified ptr_boot to use IBL_S_CLR to clear the S register
+   17-Jan-17    JDB     Changed "hp_---sc" and "hp_---dev" to "hp_---_dib"
    30-Dec-16    JDB     Modified the TTY to print if the punch is not attached
    13-May-16    JDB     Modified for revised SCP API function parameter types
    30-Dec-14    JDB     Added S-register parameters to ibl_copy
@@ -80,21 +90,123 @@
    15-Oct-00    RMS     Added dynamic device number support
 
    References:
-   - 2748B Tape Reader Operating and Service Manual (02748-90041, Oct-1977)
-   - 12597A 8-Bit Duplex Register Interface Kit Operating and Service Manual
-            (12597-9002, Sep-1974)
-   - 12531C Buffered Teleprinter Interface Kit Operating and Service Manual
-            (12531-90033, Nov-1972)
-   - 12539C Time Base Generator Interface Kit Operating and Service Manual
-            (12539-90008, Jan-1975)
+     - 2748B Tape Reader Operating and Service Manual
+         (02748-90041, October 1977)
+     - 12597A 8-Bit Duplex Register Interface Kit Operating and Service Manual
+         (12597-9002, September 1974)
+     - 12531C Buffered Teleprinter Interface Kit Operating and Service Manual
+         (12531-90033, November 1972)
+     - 12539C Time Base Generator Interface Kit Operating and Service Manual
+         (12539-90008, January 1975)
 
 
-   The reader and punch, like most HP devices, have a command flop.  The
-   teleprinter and clock do not.
+   The HP 2748B Paper Tape Reader connects to the CPU via the 12597A 8-Bit
+   Duplex Register.  The interface responds to I/O instructions as follows:
+
+   Output Data Word format (OTA and OTB):
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   - |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   An IOO signal clocks the lower eight bits into the output register, but the
+   output lines are not connected to the tape reader.
+
+
+   Input Data Word format (LIA and LIB):
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | -   -   -   -   -   -   -   - |           tape data           |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   The presence of a feed hole clocks the data byte into the input register.  An
+   IOI signal enables the input register to the I/O Data Bus.
+
+
+   Boot Loader ROM S-Register format (12992K):
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | ROM # | 0   0 |      select code      | 0   0   0   0   0   0 |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   The tape format must be absolute binary.  Loader execution ends with one of
+   the following instructions:
+
+     HLT 11B - checksum error (A = calculated, B = expected)
+     HLT 55B - load address >= ROM loader address
+     HLT 77B - end of tape with successful read
 
    Reader diagnostic mode simulates a tape loop by rewinding the tape image file
    upon EOF.  Normal mode EOF action is to supply TRLLIM nulls and then either
    return SCPE_IOERR or SCPE_OK without setting the device flag.
+
+
+
+   The HP 2895B Paper Tape Punch connects to the CPU via the 12597A 8-Bit Duplex
+   Register.  The interface responds to I/O instructions as follows:
+
+   Output Data Word format (OTA and OTB):
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | -   -   -   -   -   -   -   - |           tape data           |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   An IOO signal clocks the lower eight bits into the output register.  The data
+   is punched when the STC signal sets the command flip-flop, which asserts the
+   PUNCH signal to the tape punch.
+
+
+   Input Data Word format (LIA and LIB):
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | -   -   -   -   -   -   -   -   -   - | L | -   -   -   -   - |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     L = Tape Supply is Low
+
+   Pin 21 of the interface connector is grounded, so the input register is
+   transparent, and bit 5 reflects the current state of the the tape low signal.
+   An IOI signal enables the input register to the I/O Data Bus.
+
+
+
+   The HP 2752A and 2754A Teleprinters are connected to the CPU via the HP
+   12531C Teleprinter interface.  The interface responds to I/O instructions as
+   follows:
+
+   Output Data Word format (OTA and OTB):
+
+      15 |14  13  12 |11  10   9 | 8   7   6 | 5   4   3 | 2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | 1 | I | P | N | -   -   -   -   -   -   -   -   -   -   -   - | control
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | 0 | -   -   -   -   -   -   - |       output character        | data
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     I = set the interface to output/input mode (0/1)
+     P = enable the printer for output
+     N = enable the punch for output
+
+
+   Input Data Word format (LIA and LIB):
+
+      15 |14  13  12 |11  10   9 | 8   7   6 | 5   4   3 | 2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | B | -   -   -   -   -   -   - |        input character        |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     B = interface is idle/busy (0/1)
 
    To support CPU idling, the teleprinter interface (which doubles as the
    simulator console) polls for input using a calibrated timer with a ten
@@ -103,22 +215,69 @@
    idle time.  The console poll is guaranteed to run, as the TTY device cannot
    be disabled.
 
-   The clock (time base generator) autocalibrates.  If the TBG is set to a ten
+
+
+   The time base generator interface responds to I/O instructions as follows:
+
+   Output Data Word format (OTA and OTB):
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | -   -   -   -   -   -   -   -   -   -   -   -   - | tick rate |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Tick Rate Selection:
+
+     000 = 100 microseconds
+     001 = 1 millisecond
+     010 = 10 milliseconds
+     011 = 100 milliseconds
+     100 = 1 second
+     101 = 10 seconds
+     110 = 100 seconds
+     111 = 1000 seconds
+
+   If jumper W2 is in position B, the last four rates are divided by 1000,
+   producing rates of 1, 10, 100, and 1000 milliseconds, respectively.
+
+
+   Input Data Word format (LIA, LIB, MIA, and MIB):
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | -   -   -   -   -   -   -   -   -   -   - | E | -   -   -   - |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     E = At least one tick has been lost
+
+   If jumper W1 is in position B, bit 5 also indicates a lost tick.
+
+
+   In hardware, the two configuration jumpers perform these functions:
+
+     Jumper  Interpretation in position A  Interpretation in position B
+     ------  ----------------------------  ---------------------------------
+       W1    Input bit 5 is always zero    Input bit 5 indicates a lost tick
+
+       W2    Last four rates are seconds   Last four rates are milliseconds
+
+   The time base generator autocalibrates.  If the TBG is set to a ten
    millisecond period (e.g., as under RTE), it is synchronized to the console
    poll.  Otherwise (e.g., as under DOS or TSB, which use 100 millisecond
    periods), it runs asynchronously.  If the specified clock frequency is below
    10Hz, the clock service routine runs at 10Hz and counts down a repeat counter
    before generating an interrupt.  Autocalibration will not work if the clock
    is running at 1Hz or less.
-
-   Clock diagnostic mode corresponds to inserting jumper W2 on the 12539C.
-   This turns off autocalibration and divides the longest time intervals down
-   by 10**3.  The clk_time values were chosen to allow the diagnostic to
-   pass its clock calibration test.
 */
 
 
+
 #include "hp2100_defs.h"
+#include "hp2100_cpu.h"
+
+
 
 #define TTY_OUT_WAIT    200                             /* TTY output wait */
 
@@ -134,16 +293,12 @@
 #define TM_PUN          0010000                         /* enable punch */
 #define TP_BUSY         0100000                         /* busy */
 
-#define CLK_V_ERROR     4                               /* clock overrun */
-#define CLK_ERROR       (1 << CLK_V_ERROR)
-
 struct {
     FLIP_FLOP control;                                  /* control flip-flop */
     FLIP_FLOP flag;                                     /* flag flip-flop */
     FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
     } ptr = { CLEAR, CLEAR, CLEAR };
 
-int32 ptr_stopioe = 0;                                  /* stop on error */
 int32 ptr_trlcnt = 0;                                   /* trailer counter */
 int32 ptr_trllim = 40;                                  /* trailer to add */
 
@@ -153,39 +308,16 @@ struct {
     FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
     } ptp = { CLEAR, CLEAR, CLEAR };
 
-int32 ptp_stopioe = 0;
-
 struct {
     FLIP_FLOP control;                                  /* control flip-flop */
     FLIP_FLOP flag;                                     /* flag flip-flop */
     FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
     } tty = { CLEAR, CLEAR, CLEAR };
 
-int32 ttp_stopioe = 0;
 int32 tty_buf = 0;                                      /* tty buffer */
 int32 tty_mode = 0;                                     /* tty mode */
 int32 tty_shin = 0377;                                  /* tty shift in */
 int32 tty_lf = 0;                                       /* lf flag */
-
-struct {
-    FLIP_FLOP control;                                  /* control flip-flop */
-    FLIP_FLOP flag;                                     /* flag flip-flop */
-    FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
-    } clk = { CLEAR, CLEAR, CLEAR };
-
-int32 clk_select = 0;                                   /* clock time select */
-int32 clk_error = 0;                                    /* clock error */
-int32 clk_ctr = 0;                                      /* clock counter */
-int32 clk_time[8] = {                                   /* clock intervals */
-    155, 1550, 15500, 155000, 155000, 155000, 155000, 155000
-    };
-int32 clk_tps[8] = {                                    /* clock tps */
-    10000, 1000, 100, 10, 10, 10, 10, 10
-    };
-int32 clk_rpt[8] = {                                    /* number of repeats */
-    1, 1, 1, 1, 10, 100, 1000, 10000
-    };
-uint32 clk_tick = 0;                                    /* instructions per tick */
 
 DEVICE ptr_dev, ptp_dev, tty_dev, clk_dev;
 
@@ -207,10 +339,6 @@ t_stat tty_set_opt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat tty_set_alf (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat tto_out (int32 c);
 
-IOHANDLER clkio;
-t_stat clk_svc (UNIT *uptr);
-t_stat clk_reset (DEVICE *dptr);
-int32 clk_delay (int32 flg);
 
 /* PTR data structures
 
@@ -236,7 +364,6 @@ REG ptr_reg[] = {
     { DRDATA (TRLLIM, ptr_trllim, 8), PV_LEFT },
     { DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, ptr_stopioe, 0) },
     { ORDATA (SC, ptr_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, ptr_dib.select_code, 6), REG_HRO },
     { NULL }
@@ -245,18 +372,36 @@ REG ptr_reg[] = {
 MTAB ptr_mod[] = {
     { UNIT_DIAG, UNIT_DIAG, "diagnostic mode", "DIAG", NULL },
     { UNIT_DIAG, 0, "reader mode", "READER", NULL },
-    { MTAB_XTD | MTAB_VDV,            0, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &ptr_dev },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &ptr_dev },
+    { MTAB_XTD | MTAB_VDV,             1u, "SC",    "SC",    &hp_set_dib, &hp_show_dib, (void *) &ptr_dib },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, ~1u, "DEVNO", "DEVNO", &hp_set_dib, &hp_show_dib, (void *) &ptr_dib },
     { 0 }
     };
 
 DEVICE ptr_dev = {
-    "PTR", &ptr_unit, ptr_reg, ptr_mod,
-    1, 10, 31, 1, 8, 8,
-    NULL, NULL, &ptr_reset,
-    &ptr_boot, &ptr_attach, NULL,
-    &ptr_dib, DEV_DISABLE
+    "PTR",                                      /* device name */
+    &ptr_unit,                                  /* unit array */
+    ptr_reg,                                    /* register array */
+    ptr_mod,                                    /* modifier array */
+    1,                                          /* number of units */
+    10,                                         /* address radix */
+    31,                                         /* address width */
+    1,                                          /* address increment */
+    8,                                          /* data radix */
+    8,                                          /* data width */
+    NULL,                                       /* examine routine */
+    NULL,                                       /* deposit routine */
+    &ptr_reset,                                 /* reset routine */
+    &ptr_boot,                                  /* boot routine */
+    &ptr_attach,                                /* attach routine */
+    NULL,                                       /* detach routine */
+    &ptr_dib,                                   /* device information block pointer */
+    DEV_DISABLE,                                /* device flags */
+    0,                                          /* debug control flags */
+    NULL,                                       /* debug flag name array */
+    NULL,                                       /* memory size change routine */
+    NULL                                        /* logical device name */
     };
+
 
 /* PTP data structures
 
@@ -279,25 +424,42 @@ REG ptp_reg[] = {
     { FLDATA (FBF, ptp.flagbuf, 0) },
     { DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, ptp_stopioe, 0) },
     { ORDATA (SC, ptp_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, ptp_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
 MTAB ptp_mod[] = {
-    { MTAB_XTD | MTAB_VDV,            0, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &ptp_dev },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &ptp_dev },
+    { MTAB_XTD | MTAB_VDV,             1u, "SC",    "SC",    &hp_set_dib, &hp_show_dib, (void *) &ptp_dib },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, ~1u, "DEVNO", "DEVNO", &hp_set_dib, &hp_show_dib, (void *) &ptp_dib },
     { 0 }
     };
 
 DEVICE ptp_dev = {
-    "PTP", &ptp_unit, ptp_reg, ptp_mod,
-    1, 10, 31, 1, 8, 8,
-    NULL, NULL, &ptp_reset,
-    NULL, NULL, NULL,
-    &ptp_dib, DEV_DISABLE
+    "PTP",                                      /* device name */
+    &ptp_unit,                                  /* unit array */
+    ptp_reg,                                    /* register array */
+    ptp_mod,                                    /* modifier array */
+    1,                                          /* number of units */
+    10,                                         /* address radix */
+    31,                                         /* address width */
+    1,                                          /* address increment */
+    8,                                          /* data radix */
+    8,                                          /* data width */
+    NULL,                                       /* examine routine */
+    NULL,                                       /* deposit routine */
+    &ptp_reset,                                 /* reset routine */
+    NULL,                                       /* boot routine */
+    &hp_attach,                                 /* attach routine */
+    NULL,                                       /* detach routine */
+    &ptp_dib,                                   /* device information block pointer */
+    DEV_DISABLE,                                /* device flags */
+    0,                                          /* debug control flags */
+    NULL,                                       /* debug flag name array */
+    NULL,                                       /* memory size change routine */
+    NULL                                        /* logical device name */
     };
+
 
 /* TTY data structures
 
@@ -314,7 +476,7 @@ DEVICE ptp_dev = {
 DIB tty_dib = { &ttyio, TTY };
 
 UNIT tty_unit[] = {
-    { UDATA (&tti_svc, UNIT_IDLE | TT_MODE_UC, 0), POLL_WAIT },
+    { UDATA (&tti_svc, UNIT_IDLE | TT_MODE_UC, 0), POLL_PERIOD },
     { UDATA (&tto_svc, TT_MODE_UC, 0), TTY_OUT_WAIT },
     { UDATA (&tto_svc, UNIT_SEQ | UNIT_ATTABLE | TT_MODE_8B, 0), SERIAL_OUT_WAIT }
     };
@@ -332,7 +494,6 @@ REG tty_reg[] = {
     { DRDATA (TPOS, tty_unit[TTO].pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TTIME, tty_unit[TTO].wait, 24), REG_NZ + PV_LEFT },
     { DRDATA (PPOS, tty_unit[TTP].pos, T_ADDR_W), PV_LEFT },
-    { FLDATA (STOP_IOE, ttp_stopioe, 0) },
     { ORDATA (SC, tty_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, tty_dib.select_code, 6), REG_HRO },
     { NULL }
@@ -345,60 +506,34 @@ MTAB tty_mod[] = {
     { TT_MODE, TT_MODE_7P, "7p", "7P", &tty_set_opt },
     { UNIT_AUTOLF, UNIT_AUTOLF, "autolf", "AUTOLF", &tty_set_alf },
     { UNIT_AUTOLF, 0          , NULL, "NOAUTOLF", &tty_set_alf },
-    { MTAB_XTD | MTAB_VDV,            0, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &tty_dev },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &tty_dev },
+    { MTAB_XTD | MTAB_VDV,             1u, "SC",    "SC",    &hp_set_dib, &hp_show_dib, (void *) &tty_dib },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, ~1u, "DEVNO", "DEVNO", &hp_set_dib, &hp_show_dib, (void *) &tty_dib },
     { 0 }
     };
 
 DEVICE tty_dev = {
-    "TTY", tty_unit, tty_reg, tty_mod,
-    3, 10, 31, 1, 8, 8,
-    NULL, NULL, &tty_reset,
-    NULL, NULL, NULL,
-    &tty_dib, 0
-    };
-
-/* CLK data structures
-
-   clk_dev      CLK device descriptor
-   clk_unit     CLK unit descriptor
-   clk_mod      CLK modifiers
-   clk_reg      CLK register list
-*/
-
-DIB clk_dib = { &clkio, CLK };
-
-UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE, 0) };
-
-REG clk_reg[] = {
-    { ORDATA (SEL, clk_select, 3) },
-    { DRDATA (CTR, clk_ctr, 14) },
-    { FLDATA (CTL, clk.control, 0) },
-    { FLDATA (FLG, clk.flag, 0) },
-    { FLDATA (FBF, clk.flagbuf, 0) },
-    { FLDATA (ERR, clk_error, CLK_V_ERROR) },
-    { BRDATA (TIME, clk_time, 10, 24, 8) },
-    { DRDATA (IPTICK, clk_tick, 24), PV_RSPC | REG_RO },
-    { ORDATA (SC, clk_dib.select_code, 6), REG_HRO },
-    { ORDATA (DEVNO, clk_dib.select_code, 6), REG_HRO },
-    { NULL }
-    };
-
-MTAB clk_mod[] = {
-    { UNIT_DIAG, UNIT_DIAG, "diagnostic mode", "DIAG", NULL },
-    { UNIT_DIAG, 0, "calibrated", "CALIBRATED", NULL },
-    { MTAB_XTD | MTAB_VDV,            0, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &clk_dev },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &clk_dev },
-    { 0 }
-    };
-
-DEVICE clk_dev = {
-    "CLK", &clk_unit, clk_reg, clk_mod,
-    1, 0, 0, 0, 0, 0,
-    NULL, NULL, &clk_reset,
-    NULL, NULL, NULL,
-    &clk_dib, DEV_DISABLE,
-    0, NULL, NULL, NULL
+    "TTY",                                      /* device name */
+    tty_unit,                                   /* unit array */
+    tty_reg,                                    /* register array */
+    tty_mod,                                    /* modifier array */
+    3,                                          /* number of units */
+    10,                                         /* address radix */
+    31,                                         /* address width */
+    1,                                          /* address increment */
+    8,                                          /* data radix */
+    8,                                          /* data width */
+    NULL,                                       /* examine routine */
+    NULL,                                       /* deposit routine */
+    &tty_reset,                                 /* reset routine */
+    NULL,                                       /* boot routine */
+    &hp_attach,                                 /* attach routine */
+    NULL,                                       /* detach routine */
+    &tty_dib,                                   /* device information block pointer */
+    0,                                          /* device flags */
+    0,                                          /* debug control flags */
+    NULL,                                       /* debug flag name array */
+    NULL,                                       /* memory size change routine */
+    NULL                                        /* logical device name */
     };
 
 
@@ -496,45 +631,63 @@ return stat_data;
 
 t_stat ptr_svc (UNIT *uptr)
 {
-int32 temp;
+int byte;
 
-if ((ptr_unit.flags & UNIT_ATT) == 0)                   /* attached? */
-    return IOERROR (ptr_stopioe, SCPE_UNATT);
-while ((temp = getc (ptr_unit.fileref)) == EOF) {       /* read byte, error? */
-    if (feof (ptr_unit.fileref)) {                      /* end of file? */
-        if ((ptr_unit.flags & UNIT_DIAG) && (ptr_unit.pos > 0)) {
-            rewind (ptr_unit.fileref);                  /* rewind if loop mode */
-            ptr_unit.pos = 0;
-            }
-        else {
-            if (ptr_trlcnt >= ptr_trllim) {             /* added all trailer? */
-                if (ptr_stopioe) {                      /* stop on error? */
-                    printf ("PTR end of file\n");
-                    return SCPE_IOERR;
-                    }
-                else return SCPE_OK;                    /* no, just hang */
-                }
-            ptr_trlcnt++;                               /* count trailer */
-            temp = 0;                                   /* read a zero */
-            break;
-            }
+if ((ptr_unit.flags & UNIT_ATT) == 0)                   /* if the reader is not attached */
+    if (cpu_ss_ioerr != SCPE_OK) {                      /*   then if the I/O error stop is enabled */
+        sim_activate (uptr, uptr->wait);                /*     then reschedule the operation */
+
+        cpu_ioerr_uptr = uptr;                          /* save the failing unit */
+        return STOP_NOTAPE;                             /*   and report that the tape isn't loaded */
         }
-    else {                                              /* no, real error */
-        perror ("PTR I/O error");
-        clearerr (ptr_unit.fileref);
-        return SCPE_IOERR;
+
+    else                                                /* otherwise no tape in the reader */
+        return SCPE_OK;                                 /*   just hangs the input operation */
+
+byte = fgetc (uptr->fileref);                           /* get the next byte from the paper tape file */
+
+if (feof (uptr->fileref))                               /* if the file is positioned at the EOF */
+    if (uptr->flags & UNIT_DIAG && uptr->pos > 0) {     /*   then if DIAG mode is enabled and the tape isn't empty */
+        rewind (uptr->fileref);                         /*     then rewind the tape */
+        uptr->pos = 0;                                  /*       to simulate loop mode */
+
+        byte = fgetc (uptr->fileref);                   /* get the first byte from the tape */
         }
+
+    else                                                /* otherwise READER mode is enabled or the tape is empty */
+        if (ptr_trlcnt < ptr_trllim) {                  /*   so if trailer remains to be added */
+            ptr_trlcnt++;                               /*     then count the trailer byte */
+            byte = 0;                                   /*       and return a NUL */
+            }
+
+        else if (cpu_ss_ioerr != SCPE_OK) {             /* otherwise trailer is complete; if the I/O stop is enabled */
+            sim_activate (uptr, uptr->wait);            /*   then reschedule the operation */
+
+            cpu_ioerr_uptr = uptr;                      /* save the failing unit */
+            return STOP_EOT;                            /*   and report that the tape is at EOF */
+            }
+
+        else                                            /* otherwise tape exhaustion */
+            return SCPE_OK;                             /*   just hangs the input operation */
+
+if (ferror (uptr->fileref)) {                                   /* if a host file I/O error occurred */
+    cprintf ("%s simulator paper tape reader I/O error: %s\n",  /*   then report the error to the console */
+             sim_name, strerror (errno));
+
+    clearerr (uptr->fileref);                           /* clear the error */
+    return SCPE_IOERR;                                  /*   and stop the simulator */
     }
 
-ptrio (&ptr_dib, ioENF, 0);                             /* set flag */
+else {                                                  /* otherwise the read was successful */
+    uptr->buf = LOWER_BYTE (byte);                      /*   so put the byte in the buffer */
+    uptr->pos = ftell (uptr->fileref);                  /*     and update the file position */
 
-ptr_unit.buf = temp & 0377;                             /* put byte in buf */
-ptr_unit.pos = ftell (ptr_unit.fileref);
+    if (byte != 0)                                      /* if the byte is not a NUL */
+        ptr_trlcnt = 0;                                 /*   then clear the trailing NUL counter */
 
-if (temp)                                               /* character non-null? */
-    ptr_trlcnt = 0;                                     /* clear trailing null counter */
-
-return SCPE_OK;
+    ptrio (&ptr_dib, ioENF, 0);                         /* set the device flag */
+    return SCPE_OK;                                     /*   and return success */
+    }
 }
 
 
@@ -616,11 +769,10 @@ t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
 const int32 dev = ptr_dib.select_code;                  /* get device no */
 
-if (ibl_copy (ptr_rom, dev, IBL_OPT,                    /* copy the boot ROM to memory and configure */
-              IBL_PTR | IBL_SET_SC (dev)))              /*   the S register accordingly */
-    return SCPE_IERR;                                   /* return an internal error if the copy failed */
-else
-    return SCPE_OK;
+cpu_ibl (ptr_rom, dev, IBL_S_CLR,                       /* copy the boot ROM to memory and configure */
+         IBL_PTR | IBL_SET_SC (dev));                   /*   the S register accordingly */
+
+return SCPE_OK;
 }
 
 
@@ -723,16 +875,20 @@ return stat_data;
 
 t_stat ptp_svc (UNIT *uptr)
 {
-ptpio (&ptp_dib, ioENF, 0);                             /* set flag */
+if (uptr->flags & UNIT_ATT)                                         /* if the punch is attached */
+    if (fputc (uptr->buf, uptr->fileref) == EOF) {                  /*   then write the byte; if the write fails */
+        cprintf ("%s simulator paper tape punch I/O error: %s\n",   /*     then report the error to the console */
+                 sim_name, strerror (errno));
 
-if ((ptp_unit.flags & UNIT_ATT) == 0)                   /* attached? */
-    return IOERROR (ptp_stopioe, SCPE_UNATT);
-if (putc (ptp_unit.buf, ptp_unit.fileref) == EOF) {     /* output byte */
-    perror ("PTP I/O error");
-    clearerr (ptp_unit.fileref);
-    return SCPE_IOERR;
-    }
-ptp_unit.pos = ftell (ptp_unit.fileref);                /* update position */
+        clearerr (uptr->fileref);                       /* clear the error */
+        return SCPE_IOERR;                              /*   and stop the simulator */
+        }
+
+    else {                                              /* otherwise the write succeeds */
+        uptr->pos = ftell (uptr->fileref);              /*   so update the file position */
+        ptpio (&ptp_dib, ioENF, 0);                     /*     and set the device flag */
+        }
+
 return SCPE_OK;
 }
 
@@ -915,6 +1071,14 @@ return stat_data;
    register value doesn't equal 377, the driver sets the system "operator
    attention" flag, which will cause DOS or RTE to output an asterisk prompt and
    initiate a terminal read when the current output line is completed.
+
+
+   Implementation notes:
+
+    1. The current CPU speed, expressed as a multiple of the hardware speed, is
+       calculated for each service entry.  It may be displayed at the SCP prompt
+       with the SHOW CPU SPEED command.  The speed is only representative when
+       the CPU is not idling.
 */
 
 t_stat tti_svc (UNIT *uptr)
@@ -923,6 +1087,8 @@ int32 c;
 
 uptr->wait = sim_rtcn_calb (POLL_RATE, TMR_POLL);       /* calibrate poll timer */
 sim_activate (uptr, uptr->wait);                        /* continue poll */
+
+cpu_speed = uptr->wait / POLL_PERIOD;                   /* calculate the current CPU speed multiplier */
 
 tty_shin = 0377;                                        /* assume inactive */
 
@@ -1027,19 +1193,21 @@ t_stat tto_out (int32 c)
 {
 t_stat r = SCPE_OK;
 
-if ((tty_mode & TM_PUN)                                 /* if punching is enabled */
-  && tty_unit [TTP].flags & UNIT_ATT)                   /*   and the punch is attached */
-    if (putc (c, tty_unit [TTP].fileref) == EOF) {      /*     then output the character; if it fails */
-        perror ("TTP I/O error");                       /*       then report an error */
-        clearerr (tty_unit [TTP].fileref);              /* clear the error */
-        r = SCPE_IOERR;                                 /*   and stop the simulator */
+if (tty_mode & TM_PUN                                               /* if punching is enabled */
+  && tty_unit [TTP].flags & UNIT_ATT)                               /*   and the punch is attached */
+    if (fputc (c, tty_unit [TTP].fileref) == EOF) {                 /*     then write the byte; if the write fails */
+        cprintf ("%s simulator teleprinter punch I/O error: %s\n",  /*       then report the error to the console */
+                 sim_name, strerror (errno));
+
+        clearerr (tty_unit [TTP].fileref);                      /* clear the error */
+        r = SCPE_IOERR;                                         /*   and stop the simulator */
         }
 
     else                                                        /* otherwise the output succeeded */
         tty_unit [TTP].pos = ftell (tty_unit [TTP].fileref);    /*   so update the file position */
 
-if ((tty_mode & TM_PRI)                                         /* if printing is enabled */
-  || (tty_mode & TM_PUN)                                        /*   or punching is enabled */
+if (tty_mode & TM_PRI                                           /* if printing is enabled */
+  || tty_mode & TM_PUN                                          /*   or punching is enabled */
   && (tty_unit [TTP].flags & UNIT_ATT) == 0) {                  /*     and the punch is not attached */
     c = sim_tt_outcvt (c, TT_GET_MODE (tty_unit [TTO].flags));  /*       then convert the character */
 
@@ -1064,7 +1232,7 @@ if (sim_switches & SWMASK ('P'))                        /* initialization reset?
 
 IOPRESET (&tty_dib);                                    /* PRESET device (does not use PON) */
 
-tty_unit[TTI].wait = POLL_WAIT;                         /* reset initial poll */
+tty_unit[TTI].wait = POLL_PERIOD;                       /* reset initial poll */
 sim_rtcn_init (tty_unit[TTI].wait, TMR_POLL);           /* init poll timer */
 sim_activate (&tty_unit[TTI], tty_unit[TTI].wait);      /* activate poll */
 sim_cancel (&tty_unit[TTO]);                            /* cancel output */
@@ -1112,14 +1280,229 @@ int32 poll_time;
         if (poll_time)
             return poll_time;
         else
-            return POLL_WAIT;
+            return POLL_PERIOD;
         }
     else
         return tty_unit[TTI].wait;
 }
 
 
-/* Clock I/O signal handler.
+
+/* 12539C Time Base Generator *************************************************/
+
+
+/* Program constants */
+
+static const int32 delay [8] = {                /* clock delays, in event ticks per interval */
+    uS (100),                                   /*   000 = 100 microseconds */
+    mS (1),                                     /*   001 = 1 millisecond */
+    mS (10),                                    /*   010 = 10 milliseconds */
+    mS (100),                                   /*   011 = 100 milliseconds */
+    S (1),                                      /*   100 = 1 second */
+    S (10),                                     /*   101 = 10 seconds */
+    S (100),                                    /*   110 = 100 seconds */
+    S (1000)                                    /*   111 = 1000 seconds */
+    };
+
+static const int32 ticks [8] = {                /* clock ticks per second */
+    10000,                                      /*   000 = 100 microseconds */
+    1000,                                       /*   001 = 1 millisecond */
+    100,                                        /*   010 = 10 milliseconds */
+    10,                                         /*   011 = 100 milliseconds */
+    10,                                         /*   100 = 1 second */
+    10,                                         /*   101 = 10 seconds */
+    10,                                         /*   110 = 100 seconds */
+    10                                          /*   111 = 1000 seconds */
+    };
+
+static const int32 scale [8] = {                /* prescaler counts per clock tick */
+    1,                                          /*   000 = 100 microseconds */
+    1,                                          /*   001 = 1 millisecond */
+    1,                                          /*   010 = 10 milliseconds */
+    1,                                          /*   011 = 100 milliseconds */
+    10,                                         /*   100 = 1 second */
+    100,                                        /*   101 = 10 seconds */
+    1000,                                       /*   110 = 100 seconds */
+    10000                                       /*   111 = 1000 seconds */
+    };
+
+
+/* Unit flags */
+
+#define UNIT_CALTIME_SHIFT  (UNIT_V_UF + 0)     /* calibrated timing mode */
+#define UNIT_W1B_SHIFT      (UNIT_V_UF + 1)     /* jumper W1 in position B */
+#define UNIT_W2B_SHIFT      (UNIT_V_UF + 2)     /* jumper W2 in position B */
+
+#define UNIT_CALTIME        (1u << UNIT_CALTIME_SHIFT)
+#define UNIT_W1B            (1u << UNIT_W1B_SHIFT)
+#define UNIT_W2B            (1u << UNIT_W2B_SHIFT)
+
+
+/* Control word.
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | -   -   -   -   -   -   -   -   -   -   -   -   - | tick rate |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+*/
+
+#define CN_RATE_MASK        0000007u            /* clock rate selector mask */
+
+#define CN_RATE_SHIFT       0                   /* clock rate alignment shift */
+
+#define CN_RATE(c)          (((c) & CN_RATE_MASK) >> CN_RATE_SHIFT)
+
+static const char *const rate_name [8] = {      /* clock rate selector names */
+    "100 microsecond",                          /*   000 = 100 microseconds */
+    "1 millisecond",                            /*   001 = 1 millisecond */
+    "10 millisecond",                           /*   010 = 10 milliseconds */
+    "100 millisecond",                          /*   011 = 100 milliseconds */
+    "1 second",                                 /*   100 = 1 second */
+    "10 second",                                /*   101 = 10 seconds */
+    "100 second",                               /*   110 = 100 seconds */
+    "1000 second"                               /*   111 = 1000 seconds */
+    };
+
+
+/* Status word.
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | -   -   -   -   -   -   -   -   -   -   - | E | -   -   -   - |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+*/
+
+#define ST_ERROR            0000020u            /* lost tick error */
+#define ST_ERROR_W1B        0000040u            /* lost tick error if W1 in position B */
+
+static const BITSET_NAME status_names [] = {    /* Status word names */
+    "lost tick"                                 /*   bit  4 */
+    };
+
+static const BITSET_FORMAT status_format =      /* names, offset, direction, alternates, bar */
+    { FMT_INIT (status_names, 4, msb_first, no_alt, no_bar) };
+
+
+/* Time Base Generator state */
+
+static struct {
+    FLIP_FLOP control;                          /* control flip-flop */
+    FLIP_FLOP flag;                             /* flag flip-flop */
+    FLIP_FLOP flagbuf;                          /* flag buffer flip-flop */
+    } clk = { CLEAR, CLEAR, CLEAR };
+
+static int32     clk_select = 0;                /* clock time select */
+static int32     clk_ctr    = 0;                /* clock counter */
+static FLIP_FLOP lost_tick  = CLEAR;            /* lost tick error flip-flop */
+
+
+/* Time Base Generator local SCP support routines */
+
+static IOHANDLER clk_interface;
+static t_stat    clk_service (UNIT *uptr);
+static t_stat    clk_reset   (DEVICE *dptr);
+
+
+/* Time Base Generator local utility routines */
+
+static int32 clk_delay (int32 flg);
+
+
+/* Time Base Generator SCP interface data structures */
+
+
+/* Device information block */
+
+DIB clk_dib = {
+    &clk_interface,                             /* device interface */
+    CLK,                                        /* select code */
+    0                                           /* card index */
+    };
+
+/* Unit list */
+
+static UNIT clk_unit [] = {
+    { UDATA (&clk_service, UNIT_IDLE | UNIT_CALTIME, 0) }
+    };
+
+/* Register list */
+
+static REG clk_reg [] = {
+/*    Macro   Name    Location             Width  Offset  Flags   */
+/*    ------  ------  -------------------  -----  ------  ------- */
+    { ORDATA (SEL,    clk_select,            3)                   },
+    { DRDATA (CTR,    clk_ctr,              14)                   },
+    { FLDATA (CTL,    clk.control,                  0)            },
+    { FLDATA (FLG,    clk.flag,                     0)            },
+    { FLDATA (FBF,    clk.flagbuf,                  0)            },
+    { FLDATA (ERR,    lost_tick,                    0)            },
+    { ORDATA (SC,     clk_dib.select_code,   6),          REG_HRO },
+    { ORDATA (DEVNO,  clk_dib.select_code,   6),          REG_HRO },
+    { NULL }
+    };
+
+/* Modifier list */
+
+static MTAB clk_mod [] = {
+/*    Mask Value    Match Value   Print String         Match String  Validation  Display  Descriptor */
+/*    ------------  ------------  -------------------  ------------  ----------  -------  ---------- */
+    { UNIT_CALTIME, UNIT_CALTIME, "calibrated timing", "CALTIME",    NULL,       NULL,    NULL       },
+    { UNIT_CALTIME, 0,            "realistic timing",  "REALTIME",   NULL,       NULL,    NULL       },
+    { UNIT_W1B,     UNIT_W1B,     "W1 position B",     "W1B",        NULL,       NULL,    NULL       },
+    { UNIT_W1B,     0,            "W1 position A",     "W1A",        NULL,       NULL,    NULL       },
+    { UNIT_W2B,     UNIT_W2B,     "W2 position B",     "W2B",        NULL,       NULL,    NULL       },
+    { UNIT_W2B,     0,            "W2 position A",     "W2A",        NULL,       NULL,    NULL       },
+
+/*    Entry Flags          Value  Print String  Match String  Validation    Display        Descriptor        */
+/*    -------------------  -----  ------------  ------------  ------------  -------------  ----------------- */
+    { MTAB_XDV,             1u,    "SC",         "SC",         &hp_set_dib,  &hp_show_dib,  (void *) &clk_dib },
+    { MTAB_XDV | MTAB_NMO, ~1u,    "DEVNO",      "DEVNO",      &hp_set_dib,  &hp_show_dib,  (void *) &clk_dib },
+
+    { 0 }
+    };
+
+/* Debugging trace list */
+
+static DEBTAB clk_deb [] = {
+    { "CSRW",  TRACE_CSRW  },                   /* interface control, status, read, and write actions */
+    { "PSERV", TRACE_PSERV },                   /* clock unit service scheduling calls */
+    { "IOBUS", TRACE_IOBUS },                   /* interface I/O bus signals and data words */
+    { NULL,    0           }
+    };
+
+/* Device descriptor */
+
+DEVICE clk_dev = {
+    "CLK",                                      /* device name */
+    clk_unit,                                   /* unit array */
+    clk_reg,                                    /* register array */
+    clk_mod,                                    /* modifier array */
+    1,                                          /* number of units */
+    0,                                          /* address radix */
+    0,                                          /* address width */
+    0,                                          /* address increment */
+    0,                                          /* data radix */
+    0,                                          /* data width */
+    NULL,                                       /* examine routine */
+    NULL,                                       /* deposit routine */
+    &clk_reset,                                 /* reset routine */
+    NULL,                                       /* boot routine */
+    NULL,                                       /* attach routine */
+    NULL,                                       /* detach routine */
+    &clk_dib,                                   /* device information block pointer */
+    DEV_DISABLE | DEV_DEBUG,                    /* device flags */
+    0,                                          /* debug control flags */
+    clk_deb,                                    /* debug flag name array */
+    NULL,                                       /* memory size change routine */
+    NULL                                        /* logical device name */
+    };
+
+
+
+/* Time Base Generator local SCP support routines */
+
+
+/* Time Base Generator interface.
 
    The time base generator (CLK) provides periodic interrupts from 100
    microseconds to 1000 seconds.  The CLK uses a calibrated timer to provide the
@@ -1135,8 +1518,10 @@ int32 poll_time;
    expected.
 */
 
-uint32 clkio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
+static uint32 clk_interface (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
+uint16   status;
+int32    tick_count;
 IOSIGNAL signal;
 IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
@@ -1167,15 +1552,31 @@ while (working_set) {
 
 
         case ioIOI:                                     /* I/O data input */
-            stat_data = IORETURN (SCPE_OK, clk_error);  /* merge in return status */
+            if (lost_tick == SET) {                     /* if the lost-tick flip-flop is set */
+                status = ST_ERROR;                      /*   then indicate an error */
+
+                if (clk_unit [0].flags & UNIT_W1B)      /* if W1 is in position B */
+                    status |= ST_ERROR_W1B;             /*   then set the status in bit 5 as well */
+                }
+
+            else                                        /* otherwise the error flip-flop is clear */
+                status = 0;                             /*   so clear the error status */
+
+            stat_data = IORETURN (SCPE_OK, status);     /* merge in the return status */
+
+            tprintf (clk_dev, TRACE_CSRW, "Status is %s\n",
+                     fmt_bitset (status, status_format));
             break;
 
 
         case ioIOO:                                     /* I/O data output */
-            clk_select = IODATA (stat_data) & 07;       /* save select */
-            sim_cancel (&clk_unit);                     /* stop the clock */
+            clk_select = CN_RATE (IODATA (stat_data));  /* save select */
+            sim_cancel (&clk_unit [0]);                 /* stop the clock */
             clk.control = CLEAR;                        /* clear control */
             working_set = working_set | ioSIR;          /* set interrupt request (IOO normally doesn't) */
+
+            tprintf (clk_dev, TRACE_CSRW, "Control is %s rate\n",
+                     rate_name [clk_select]);
             break;
 
 
@@ -1187,30 +1588,30 @@ while (working_set) {
         case ioCRS:                                     /* control reset */
         case ioCLC:                                     /* clear control flip-flop */
             clk.control = CLEAR;
-            sim_cancel (&clk_unit);                     /* deactivate unit */
+            sim_cancel (&clk_unit [0]);                 /* deactivate unit */
             break;
 
 
-        case ioSTC:                                             /* set control flip-flop */
+        case ioSTC:                                     /* set control flip-flop */
             clk.control = SET;
-            if (clk_unit.flags & UNIT_DIAG)                     /* diag mode? */
-                clk_unit.flags = clk_unit.flags & ~UNIT_IDLE;   /* not calibrated */
-            else
-                clk_unit.flags = clk_unit.flags | UNIT_IDLE;    /* is calibrated */
 
-            if (!sim_is_active (&clk_unit)) {                   /* clock running? */
-                clk_tick = clk_delay (0);                       /* get tick count */
+            if (!sim_is_active (&clk_unit [0])) {               /* clock running? */
+                tick_count = clk_delay (0);                     /* get tick count */
 
-                if ((clk_unit.flags & UNIT_DIAG) == 0)          /* calibrated? */
+                if (clk_unit [0].flags & UNIT_CALTIME)          /* calibrated? */
                     if (clk_select == 2)                        /* 10 msec. interval? */
-                        clk_tick = sync_poll (INITIAL);         /* sync poll */
+                        tick_count = sync_poll (INITIAL);       /* sync poll */
                     else
-                        sim_rtcn_init (clk_tick, TMR_CLK);      /* initialize timer */
+                        sim_rtcn_init (tick_count, TMR_CLK);    /* initialize timer */
 
-                sim_activate (&clk_unit, clk_tick);             /* start clock */
+                tprintf (clk_dev, TRACE_PSERV, "Rate %s delay %d service rescheduled\n",
+                         rate_name [clk_select], tick_count);
+
+                sim_activate (&clk_unit [0], tick_count);       /* start clock */
                 clk_ctr = clk_delay (1);                        /* set repeat ctr */
                 }
-            clk_error = 0;                                      /* clear error */
+
+            lost_tick = CLEAR;                                  /* clear error */
             break;
 
 
@@ -1241,39 +1642,63 @@ return stat_data;
 
    As with the I/O handler, if the time base period is set to ten milliseconds,
    the console poll timer is used instead of an independent timer.
+
+
+   Implementation notes:
+
+    1. If the TBG is calibrated, it is synchronized with the TTY keyboard poll
+       service to permit idling.
 */
 
-t_stat clk_svc (UNIT *uptr)
+static t_stat clk_service (UNIT *uptr)
 {
-if (!clk.control)                                       /* control clear? */
+int32 tick_count;
+
+tprintf (clk_dev, TRACE_PSERV, "Service entered with prescaler %d\n",
+         clk_ctr);
+
+if (clk.control == CLEAR)                               /* control clear? */
     return SCPE_OK;                                     /* done */
 
-if (clk_unit.flags & UNIT_DIAG)                         /* diag mode? */
-    clk_tick = clk_delay (0);                           /* get fixed delay */
-else if (clk_select == 2)                               /* 10 msec period? */
-    clk_tick = sync_poll (SERVICE);                     /* sync poll */
-else
-    clk_tick = sim_rtcn_calb (clk_tps[clk_select], TMR_CLK);    /* calibrate delay */
-
-sim_activate (uptr, clk_tick);                          /* reactivate */
-clk_ctr = clk_ctr - 1;                                  /* decrement counter */
-if (clk_ctr <= 0) {                                     /* end of interval? */
-    if (clk.flag)
-        clk_error = CLK_ERROR;                          /* overrun? error */
+if (clk_unit [0].flags & UNIT_CALTIME)                  /* cal mode? */
+    if (clk_select == 2)                                /* 10 msec period? */
+        tick_count = sync_poll (SERVICE);               /* sync poll */
     else
-        clkio (&clk_dib, ioENF, 0);                     /* set flag */
+        tick_count = sim_rtcn_calb (ticks [clk_select], /* calibrate delay */
+                                    TMR_CLK);
+
+else                                                    /* otherwise the TBG is in real-time mode */
+    tick_count = clk_delay (0);                         /* get fixed delay */
+
+clk_ctr = clk_ctr - 1;                                  /* decrement counter */
+
+if (clk_ctr <= 0) {                                     /* end of interval? */
+    if (clk.flag) {
+        lost_tick = SET;                                /* overrun? error */
+
+        tprintf (clk_dev, TRACE_PSERV, "Clock tick lost\n");
+        }
+
+    else
+        clk_interface (&clk_dib, ioENF, 0);             /* set flag */
+
     clk_ctr = clk_delay (1);                            /* reset counter */
     }
-return SCPE_OK;
+
+tprintf (clk_dev, TRACE_PSERV, "Rate %s delay %d service %s\n",
+         rate_name [clk_select], tick_count,
+         (clk_select == 2 ? "coscheduled" : "scheduled"));
+
+return sim_activate (uptr, tick_count);                 /* reactivate */
 }
 
 
 /* Reset routine */
 
-t_stat clk_reset (DEVICE *dptr)
+static t_stat clk_reset (DEVICE *dptr)
 {
 if (sim_switches & SWMASK ('P')) {                      /* initialization reset? */
-    clk_error = 0;                                      /* clear error */
+    lost_tick = CLEAR;                                  /* clear error */
     clk_select = 0;                                     /* clear select */
     clk_ctr = 0;                                        /* clear counter */
 
@@ -1287,13 +1712,23 @@ return SCPE_OK;
 }
 
 
+
+/* Time Base Generator local utility routines */
+
+
 /* Clock delay routine */
 
-int32 clk_delay (int32 flg)
+static int32 clk_delay (int32 flg)
 {
-int32 sel = clk_select;
+int32 sel;
 
-if ((clk_unit.flags & UNIT_DIAG) && (sel >= 4)) sel = sel - 3;
-if (flg) return clk_rpt[sel];
-else return clk_time[sel];
+if (clk_unit [0].flags & UNIT_W2B && clk_select >= 4)   /* if jumper W2 is in position B */
+    sel = clk_select - 3;                               /*   then rates 4-7 rescale to 1-4 */
+else                                                    /* otherwise */
+    sel = clk_select;                                   /*   the rate selector is used as is */
+
+if (flg)                                                /* if the prescaler value is wanted */
+    return scale [sel];                                 /*   then return it */
+else                                                    /* otherwise */
+    return delay [sel];                                 /*   return the tick delay count */
 }

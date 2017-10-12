@@ -1,6 +1,6 @@
 /* hp_tapelib.c: HP magnetic tape controller simulator library
 
-   Copyright (c) 2013-2016, J. David Bryan
+   Copyright (c) 2013-2017, J. David Bryan
    Copyright (c) 2004-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   22-Apr-17    JDB     Corrected status_name array element count
    10-Oct-16    JDB     Moved "hp3000_defs.h" inclusion from "hp_tapelib.h"
    01-Jul-16    JDB     Changed tl_attach to reset the event delay times pointer
    09-Jun-16    JDB     Added casts for ptrdiff_t to int32 values
@@ -801,6 +802,7 @@ static const char *status_name [] = {           /* indexed by MTSE value */
     "terminated with end of medium seen",       /*   MTSE_EOM     */
     "succeeded with data error",                /*   MTSE_RECE    */
     "failed with no write ring",                /*   MTSE_WRP     */
+    "failed with logical end of tape",          /*   MTSE_LEOT    */
     "failed with tape runaway"                  /*   MTSE_RUNAWAY */
     };
 

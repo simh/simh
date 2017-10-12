@@ -83,7 +83,7 @@
 
 extern uint16 port;                     //port called in dev_table[port]
 
-/* function prototypes */
+/* internal function prototypes */
 
 t_stat i8255_reset (DEVICE *dptr, uint16 baseport);
 uint8 i8255_get_dn(void);
@@ -154,7 +154,7 @@ DEVICE i8255_dev = {
     i8255_unit,         //units
     i8255_reg,          //registers
     NULL,               //modifiers
-    1,                  //numunits
+    I8255_NUM,          //numunits 
     16,                 //aradix
     16,                 //awidth
     1,                  //aincr

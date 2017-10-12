@@ -121,7 +121,7 @@ extern t_stat (*nexusR[NEXUS_NUM])(int32 *dat, int32 ad, int32 md);
 extern t_stat (*nexusW[NEXUS_NUM])(int32 dat, int32 ad, int32 md);
 extern int32 iccs_rd (void);
 extern int32 nicr_rd (void);
-extern int32 icr_rd (t_bool interp);
+extern int32 icr_rd (void);
 extern int32 todr_rd (void);
 extern int32 rxcs_rd (void);
 extern int32 rxdb_rd (void);
@@ -422,7 +422,7 @@ switch (rg) {
         break;
 
     case MT_ICR:                                        /* ICR */
-        val = icr_rd (FALSE);
+        val = icr_rd ();
         break;
 
     case MT_TODR:                                       /* TODR */

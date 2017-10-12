@@ -1164,7 +1164,7 @@ CHECK_LENGTH:
             reason = STOP_INVA;
             break;
             }
-        if (reason = iomod (ilnt, D, mtf_mod))          /* valid modifier? */
+        if ((reason = iomod (ilnt, D, mtf_mod)))        /* valid modifier? */
             break;
 
         if (dev == IO_MT)                               /* BCD? */

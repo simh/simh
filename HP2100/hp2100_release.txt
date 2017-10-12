@@ -1,6 +1,6 @@
                            SIMH/HP 2100 RELEASE NOTES
                            ==========================
-                             Last update: 2017-01-11
+                             Last update: 2017-09-06
 
 
 This file documents the release history of the simulator for the Hewlett-Packard
@@ -12,13 +12,32 @@ simulator code base is available at:
   https://github.com/simh/simh
 
 ...and may be downloaded at any time.  A code snapshot is identified by the "git
-commit ID" that is displayed by the simulator welcome banner.
+commit ID" that is displayed in the simulator welcome banner.
 
 Therefore, HP 2100 releases are simply documentation checkpoints that describe
 the changes that have occurred since the last checkpoint.  Generally, a release
 is written when one or more major changes have been incorporated.  Minor bug
 fixes will be available immediately from the repository but only noted as part
 of the next release document.
+
+
+
+===============================
+Reporting Bugs in the Simulator
+===============================
+
+If you find a bug in the HP 2100 simulator, please report it either to the SIMH
+issue tracker on github at:
+
+  https://github.com/simh/simh/issues
+
+...or to the SIMH mailing list; see:
+
+  http://mailman.trailing-edge.com/mailman/listinfo/simh
+
+...for subscribing information.  In either case, please include a console log
+that contains a reproducible test case that illustrates the problem.  See the
+"Recording Simulator Activities" section of the "SIMH User's Guide" for details.
 
 
 
@@ -35,11 +54,13 @@ diagnostic tests.  See the accompanying "hp2100_diag.txt" file for details.
 
 The simulator has been tested with the following operating systems:
 
+ - SIO, BCS, and MTS.
+
  - 2000E, 2000F, and 2000/Access Time-Shared BASIC.
 
  - DOS, DOS-M, and DOS-III.
 
- - RTE-II, RTE-III, RTE-IVB, and RTE-6/VM.
+ - RTE, RTE-B, RTE-C, RTE-II, RTE-III, RTE-IV, RTE-IVB, and RTE-6/VM.
 
 The user's manual for the simulator is provided in Microsoft Word format in the
 "doc" subdirectory of the code base snapshot downloaded from the github site.  A
@@ -137,6 +158,424 @@ Revision 5010:
 
 
 ======================
+Release 27, 2017-09-06
+======================
+
+This release of the HP 2100 simulator adds the following features:
+
+ - Support for the HP 2613, 2617, and 2618 line printers has been added to the
+   LPT device.  The default printer remains the HP 2607.
+
+ - The LPT device simulation has been rewritten to support realistic and
+   optimized timing, compact and expanded output modes, custom VFU tape images,
+   and tracing of internal operations.
+
+ - The LOAD command has been rewritten to load files containing absolute binary
+   loaders into the protected address space of the 21xx machines and configure
+   the I/O instructions.  For the 1000, LOAD can also be used to load boot
+   loader ROM images other than those provided directly by the simulator.
+
+ - The DUMP command has been added to write the binary loader currently resident
+   in memory to an absolute binary file.
+
+ - The TTY punch unit and the LPS, LPT, and PTP devices now position a newly
+   attached file at the end of the file rather than at the start.  As a result,
+   output will append to, rather than overwrite, the existing content.
+
+ - The DA, DP, DQ, and DS disc devices add the PROTECT and UNPROTECT options.
+   These replace the now-deprecated LOCKED and WRITEENABLED options and more
+   accurately reflect the labelling of the data protection switches on the disc
+   drives.
+
+ - The simulator message that is displayed when a programmed halt occurs has
+   been changed to indicate that the halt code comes from the T-register value.
+
+ - The Basic Binary Loader (BBL) is now installed by default in the 21xx
+   machines.  It is automatically configured to the select code of the paper
+   tape reader.  It may be overwritten with a different loader (e.g., the Basic
+   Binary Disc Loader or Basic Moving-head Disc Loader) using the LOAD command.
+   Performing a power-on reset of the CPU reinstalls the BBL.
+
+ - Symbolic display and entry has been rewritten to improve efficiency and
+   expanded to cover the full instruction set including optional microcode
+   extensions that are currently enabled.
+
+ - CPU instruction execution and data accesses may be selectively traced.  The
+   resulting trace listing is similar to the output of a logic analyzer
+   connected to the CPU and I/O buses.
+
+ - DMA/DCPC commands, status, and data accesses may be selectively traced.
+
+ - TBG commands, status, and service entries may be selectively traced.
+
+ - The DIAG option of the TBG device has been replaced with the REALTIME, W1A,
+   W1B, W2A, and W2B options.  Configuring the TBG to run its diagnostic now
+   uses the REALTIME and W2B options, and restoring the normal configuration
+   uses the CALTIME and W2A options.  The W1A and W1B options extend the
+   software compatibility of the TBG.
+
+ - The MUXM device has been renamed MUXC to reflect that it is the multiplexer
+   control card.  The previous MUXM name is deprecated but will still work in
+   existing simulation command files.
+
+ - The multiplexer control card (MUXC) may be enabled and disabled independently
+   of the upper and lower data cards (MUX and MUXL), reflecting its optional
+   status in hardware configurations.
+
+ - Memory address parsing for commands has been changed to add <page>.<offset>
+   format for physical addresses, where both the page and the offset range from
+   0 to 1777 octal.  Linear addressing is now restricted to the 32K logical
+   address space (0 to 77777 octal).  Memory display uses linear addressing for
+   locations within the logical address space; locations above 32K use the
+   physical address format.
+
+ - The previously separate STOP_INST, STOP_DEV, STOP_IOE, and INDMAX
+   pseudo-registers used to stop the simulator under certain conditions have
+   been replaced by the SET CPU STOP=<stopname>[,<stopname>...] and the SET CPU
+   INDIR=<limit> commands.  Stops may be temporarily bypassed by adding the -B
+   switch to the command that resumes execution.
+
+ - The HP 2100 Simulator User's Guide has been rewritten and significantly
+   expanded.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - The simulator passes the HP 2613/17/18 line printer diagnostic as described
+   in the "hp2100_diag.txt" file.
+
+ - The line printer terminates each print line with the HP-standard CR/LF pair.
+   If the output file is to be retained as a text file on a Unix system, removal
+   of the carriage returns, e.g., via the "dos2unix" utility, may be desirable.
+
+ - The LOAD command can no longer be used to read general absolute binary paper
+   tape images into memory.  The ATTACH PTR and BOOT PTR commands must now be
+   used to read paper tapes.
+
+ - The OS, OSTBG, VMA, EMA, VIS, and SIGNAL CPU debug flags have been removed.
+   Tracing of these firmware instructions is now performed by specifying SET CPU
+   DEBUG=EXEC and SET CPU EXEC with the appropriate opcode range and mask, as
+   follows:
+
+     * SET CPU DEBUG=OS     => SET CPU EXEC=105340;177760
+     * SET CPU DEBUG=VMA    => SET CPU EXEC=105240;177760
+     * SET CPU DEBUG=EMA    => SET CPU EXEC=105240;177760
+     * SET CPU DEBUG=VIS    => SET CPU EXEC=101460;173760
+     * SET CPU DEBUG=SIGNAL => SET CPU EXEC=105600;177760
+
+ - The separate tracing of time-base generator interrupt instructions provided
+   by the OS and OSTBG CPU debug flags is no longer supported.  Entering the
+   replacement command above traces all OS instructions, including the TBG
+   interrupt instructions.
+
+ - The TIMER, RRR 16, .FLUN, and the OS/VMA, VIS, and SIGNAL self-test
+   instructions are no longer exempt from the undefined/unimplemented
+   instruction stop tests.  Attempted execution of these instructions without
+   the appropriate firmware options installed will cause simulation stops if the
+   UNDEF (TIMER and RRR) or UNIMPL (.FLUN and self-tests) option is enabled.
+   Because of this change, the default state of the unimplemented instruction
+   stop has been reversed from "on" to "off".
+
+ - The "stop on I/O error" features controlled by the STOP_IOE register values
+   have been removed from the DR, LPS, LPT, MSC, MTC, and PTP devices, as all of
+   these report I/O error status to the CPU via their interface input registers.
+   STOP_IOE has been removed from the PTR device and replaced with SET CPU
+   STOP=IOERR, as this device does not report I/O error status to the CPU
+   through its interface.
+
+ - The LOCKED and WRITEENABLED options for the MSC and MTC devices are
+   deprecated.  The supported method of write-protecting a tape drive is to
+   attach the tape image with the -R (read-only) switch or by setting the host
+   operating system's read-only attribute on the tape image file.  This
+   simulates removing the write ring from the tape reel before mounting it on
+   the drive.  There is no hardware method of write-protecting a mounted and
+   positioned tape reel.
+
+ - If the previous ATTACH behavior (overwriting rather than appending) is
+   desired for the TTY punch unit and the LPS, LPT, and PTP devices, set the
+   device's (P)POS register to 0 after attaching.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  EXAMINE -M for addresses > 32K displays misleading operands.
+
+     VERSION:  Release 26.
+
+     OBSERVATION:  Current-page memory references of instructions residing above
+     the 32K logical address space are printed as though they reside at their
+     locations modulo 32K.  For example, DEPOSIT 170001 026020 and EXAMINE -M
+     170001 displays JMP 70020, and DEPOSIT 200001 026020 displays JMP 20.
+
+     CAUSE:  The printed addresses assume that the instructions will be executed
+     from their respective pages (modulo 32).  However, instructions can be
+     executed only when they are mapped into the logical address space, and any
+     given physical page may be mapped to any arbitrary logical page.
+     Therefore, the address printed may not represent the actual logical address
+     after mapping.
+
+     RESOLUTION:  Modify "fprint_cpu" (hp2100_sys.c) to use Z/C address notation
+     for memory references in instructions residing in physical memory above
+     32K.
+
+     STATUS:  Fixed in Release 27.
+
+
+  2. PROBLEM:  Enabling IOP firmware should not be allowed on the 1000 F-Series.
+
+     VERSION:  Release 26.
+
+     OBSERVATION:  The command "SET CPU 1000-F,IOP" is allowed, but it should
+     not be, as the IOP firmware is not supported on this machine.
+
+     CAUSE:  The F-Series does not provide the firmware mapping table entries
+     that permit operation of the 2000/Access I/O Processor firmware.  IOP
+     instruction opcodes 10x400-17 and 10x420-37 are marked as "HP Reserved" in
+     the F-Series mapping table, and opcodes 10x460-77 are dedicated to the VIS
+     microcode.
+
+     RESOLUTION:  Modify the "cpu_features" array (hp2100_cpu.c) to remove the
+     IOP option from the 1000 F-Series entry.
+
+     STATUS:  Fixed in Release 27.
+
+
+  3. PROBLEM:  A rejected model change still changes the CPU options.
+
+     VERSION:  Release 26.
+
+     OBSERVATION:  Changing to a CPU model that does not support the current
+     memory size will reduce memory to the maximum supported by the new model.
+     If the truncated portion contains non-zero values, the simulator will ask
+     for confirmation before proceeding.  If the truncation is rejected, the CPU
+     options are still set to those of the new model, even though the old model
+     is retained.  For example:
+
+       sim> SET CPU 1000-F,128K
+       sim> SHOW CPU
+       CPU     idle disabled
+               128KW, 1000-F, EAU
+               FP, no IOP, DMS
+               FFP, DBI, no EMA/VMA
+               no VIS, no SIGNAL
+       sim> DEPOSIT 100000 1
+       sim> SET CPU 2116
+       Really truncate memory [N]?NO
+       Command not completed
+       sim> SHOW CPU
+       CPU     idle disabled
+               128KW, 1000-F, no EAU
+               no FP, no IOP, no DMS
+               no FFP, no DBI, no EMA/VMA
+               no VIS, no SIGNAL
+
+     CAUSE:  The CPU options are set before the memory size is changed, so when
+     the size change is rejected, the new CPU options are retained.
+
+     RESOLUTION:  Modify "cpu_set_model" (hp2100_cpu.c) to perform the memory
+     size change first, so that if it is rejected, the CPU options have not been
+     changed.
+
+     STATUS:  Fixed in Release 27.
+
+
+  4. PROBLEM:  Virtual memory mapping fails for accesses above 126 MB.
+
+     VERSION:  Release 26.
+
+     OBSERVATION:  A program using virtual memory provided by the RTE-6/VM
+     operating system may access up to 128 MB of data, although VMA programs
+     default to a 16 MB limit.  Accesses to data in virtual memory are mapped
+     through the last two DMS user map registers.  Normally, each VMA access
+     maps in the memory page corresponding to the virtual address plus the
+     following memory page.  This allows access to single items up to 1024 words
+     in size starting at any offset within the (first) page.
+
+     If a data item resides in the last 2 MB of virtual memory, access to an
+     item that crosses the page boundary is incorrect.  Instead of accessing
+     words in the second page, the accesses wrap around within the first page.
+
+     CAUSE:  The suit number part of the virtual address is not restored before
+     checking the allocation status of the page table entry corresponding to the
+     second (spillover) page.  As a result, an unallocated second page in the
+     last 2 MB of virtual memory is seen as beyond the VM area limit, and
+     instead of generating a page fault to allocate the second page, the map
+     registers are set up to prevent access to the second page by setting the
+     first page address into both map registers.
+
+     RESOLUTION:  Modify "cpu_vma_lbp" (hp2100_cpu5.c) to check for spill page
+     allocation correctly.
+
+     STATUS:  Fixed in Release 27.
+
+
+  5. PROBLEM:  Memory expansion is not disabled when DMS is disabled.
+
+     VERSION:  Release 26.
+
+     OBSERVATION:  If the Memory Expansion Module in a 1000-Series CPU has been
+     enabled, and then the DMS firmware option is disabled or the CPU is changed
+     to a model that does not support memory expansion (e.g., a 2100), memory
+     expansion remains enabled.  In this case, memory accesses should revert to
+     physical addressing, but instead logical-to-physical address translation
+     through the currently enabled map remains in effect.
+
+     CAUSE:  Disabling DMS should set the "dms_enb" flag to 0, but it does not.
+
+     RESOLUTION:  Modify "set_model" and "set_option" (hp2100_cpu.c) to clear
+     the "dms_enb" flag if DMS is not enabled after the model or option change.
+
+     STATUS:  Fixed in Release 27.
+
+
+
+======================
+Release 26, 2017-05-01
+======================
+
+This release of the HP 2100 simulator does not add any new features.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - Starting with the next release, the LOAD command will be rewritten to load
+   files containing absolute binary loaders into the protected address space of
+   the 21xx machines and configure the I/O instructions.  The LOAD command is
+   not designed for general loading of absolute binary files, as it does not
+   initialize the A and B registers as some HP software expects.  It is intended
+   only to install bootstrap loaders.  The BOOT PTR command is the proper
+   simulation of the hardware absolute paper tape loader.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  The RWCS debug option shown in the user's guide does not exist.
+
+     VERSION:  Release 25.
+
+     OBSERVATION:  The "HP2100 Simulator User's Guide" says that the RWCS debug
+     option may be specified for the DS and DA devices to trace "disk read/
+     write/control/status commands."  However, entering a SET DS DEBUG=RWCS
+     command gives an "Invalid argument" error.
+
+     CAUSE:  The option name is misspelled; the correct option is RWSC.
+
+     RESOLUTION:  Modify "hp2100_doc.doc" to list the correct option name.
+
+     STATUS:  Fixed in Release 26.
+
+
+  2. PROBLEM:  Halt opcodes 1060xx and 1070xx do not display in mnemonic form.
+
+     VERSION:  Release 25.
+
+     OBSERVATION:  Halt instructions 106000-106077 and 107000-107077 are not
+     displayed in mnemonic form, either directly with an EXAMINE -M command
+     or in the message displayed for a programmed halt.  These instruction
+     ranges are displayed in octal only.
+
+     CAUSE:  Section 3.20, "Input/Output Instructions," of the "HP 1000
+     M/E/F-Series Computers Technical Reference Handbook" (HP 5955-0282, March
+     1980) says, in part, "Bit 11, where relevant, specifies the A- or
+     B-register or distinguishes between set control and clear control;
+     otherwise, bit 11 may be a logic 0 or a logic 1 without affecting the
+     instruction (although the assembler will assign zeros in this case)."  The
+     HLT instruction does not specify the A/B register, so the valid opcodes are
+     102000-102077, 103000-103777, 106000-106077, and 107000-107077.  However,
+     the latter two ranges are omitted from the "opcode" and "opc_val" tables
+     used for decoding.
+
+     RESOLUTION:  Add the 1060xx/107xx range to the "opc_val" table and a second
+     "HLT" string to the "opcode" table (hp2100_sys.c) to permit mnemonic
+     display of this instruction range.
+
+     STATUS:  Fixed in Release 26.
+
+
+  3. PROBLEM:  The SFB (scan for byte) opcode displays as SBT (store byte).
+
+     VERSION:  Release 25.
+
+     OBSERVATION:  Entering the "EVAL -M 105767" command should display the
+     "SFB" mnemonic.  Instead, it displays "SBT".
+
+     CAUSE:  The entry in the opcode mnemonic table corresponding to the 105767
+     value is "SBT", which is incorrect.  It should be "SFB" (SBT is 105764).
+
+     RESOLUTION:  Modify the "opcode" table (hp2100_sys.c) to use the correct
+     mnemonic for the SFB instruction.
+
+     STATUS:  Fixed in Release 26.
+
+
+  4. PROBLEM:  Host file system seek errors are not caught.
+
+     VERSION:  Release 25.
+
+     OBSERVATION:  The MAC/ICD disc library checks for host file system read or
+     write errors and returns Uncorrectable Data Error status if an error is
+     indicated.  However, host file system seeks are simply assumed to succeed;
+     no indication of an error is given if a call fails.  A failed seek should
+     be detected, and a Drive Fault (positioner error) should be returned.
+
+     CAUSE:  Oversight.
+
+     RESOLUTION:  Modify "position_sector" (hp2100_disclib.c) to test the
+     "sim_fseek" call for error status and to simulate a Drive Fault (AGC error)
+     if the call fails.
+
+     STATUS:  Fixed in Release 26.
+
+
+  5. PROBLEM:  Set Flow Control and Cancel commands fail if port key is not set.
+
+     VERSION:  Release 25.
+
+     OBSERVATION:  HP 8-channel multiplexer commands that refer to ports do so
+     indirectly by passing a port key, rather than a port number.  The
+     key-to-port translation is established by the "Set Port Key" command, which
+     must be executed before any port-specific commands.  If a port key has not
+     been established, then all port-specific commands should be ignored.
+     However, the "Cancel first receive buffer" and "Set flow control" commands
+     cause program corruption if the key has not been set.
+
+     CAUSE:  The test for key validity is improperly applied for these commands.
+
+     RESOLUTION:  Modify "exec_command" (hp2100_mpx.c) to ignore these commands
+     if the port key has not been set.
+
+     STATUS:  Fixed in Release 26.
+
+
+  6. ENHANCEMENT:  Improve the EAU shift and rotate instruction simulations.
+
+     VERSION:  Release 25.
+
+     OBSERVATION:  The shift and rotate instructions (ASL, ASR, LSL, LSR, RRL,
+     and RRR) perform 32-bit operations on the combined B and A registers.  The
+     original implementation treated the 16-bit registers independently.
+     However, it is faster and smaller to form a 32-bit operand, apply the
+     operation, and then split the operand back into the B and A registers.
+     Modern compilers, such as gcc, recognize the shifting and masking patterns
+     necessary for a rotation and generate a single rotate-left or rotate-right
+     machine instruction.
+
+     RESOLUTION:  Modify "cpu_eau" (hp2100_cpu1.c) to reimplement the shift and
+     rotate instructions as 32-bit operations.
+
+     STATUS:  Fixed in Release 26.
+
+
+
+======================
 Release 25, 2017-01-11
 ======================
 
@@ -144,42 +583,42 @@ This is the initial checkpoint release of the HP 2100 simulator, corresponding
 to the 25th set of changes to the 4.0 code base.  The following devices are
 currently simulated:
 
-  - 2114C CPU with up to 16 KW of memory
-  - 2115A CPU with up to 8 KW of memory
-  - 2116C CPU with up to 32 KW of memory
-  - 2100A CPU with up to 32 KW of memory
-  - 1000 M/E/F-Series CPU with up to 1024 KW of memory
-  - EAU, FP, IOP, DMS, FFP, DBI, VIS, and SIGNAL microcode extensions
-  - RTE-IV EMA or RTE-6/VM OS and VMA microcode extensions
-  - 12531C Buffered Teleprinter Interface with one 2752 Teleprinter
-  - 12539C Time Base Generator
-  - 12557A Disc Controller with four 2870 drives
-  - 12559C Magnetic Tape Controller with one 3030 drive
-  - 12565A Disc Controller with two 2883 drives
-  - 12566B Microcircuit Interface with a loopback connector
-  - 12578A Direct Memory Access Controller
-  - 12581A Memory Protect
-  - 12597A Duplex Register Interface with one 2748 Paper Tape Reader
-  - 12597A Duplex Register Interface with one 2895 Paper Tape Punch
-  - 12606B Fixed Head Disc Controller with one 2770/2771 drive
-  - 12607B Direct Memory Access Controller
-  - 12610B Drum Controller with one 2773/2774/2775 drive
-  - 12620A Privileged Interrupt Fence
-  - 12653A Printer Controller with one 2767 Line Printer
-  - 12792C 8-Channel Asynchronous Multiplexer
-  - 12821A Disc Interface with four 7906H/7920H/7925H drives
-  - 12845B Printer Controller with one 2607 Line Printer
-  - 12875A Interprocessor Link
-  - 12892B Memory Protect
-  - 12895A Direct Memory Access Controller
-  - 12897B Dual-Channel Port Controller
-  - 12920A 16-Channel Terminal Multiplexer
-  - 12936A Privileged Interrupt Fence
-  - 12966A Buffered Asynchronous Communications Interface
-  - 13037D Disc Controller with eight 7905/7906/7920/7925 drives
-  - 13181A Magnetic Tape Controller with four 7970B drives
-  - 13183A Magnetic Tape Controller with four 7970E drives
-  - 13210A Disc Controller with four 7900 drives
+ - 2114C CPU with up to 16 KW of memory
+ - 2115A CPU with up to 8 KW of memory
+ - 2116C CPU with up to 32 KW of memory
+ - 2100A CPU with up to 32 KW of memory
+ - 1000 M/E/F-Series CPU with up to 1024 KW of memory
+ - EAU, FP, IOP, DMS, FFP, DBI, VIS, and SIGNAL microcode extensions
+ - RTE-IV EMA or RTE-6/VM OS and VMA microcode extensions
+ - 12531C Buffered Teleprinter Interface with one 2752 Teleprinter
+ - 12539C Time Base Generator
+ - 12557A Disc Controller with four 2870 drives
+ - 12559C Magnetic Tape Controller with one 3030 drive
+ - 12565A Disc Controller with two 2883 drives
+ - 12566B Microcircuit Interface with a loopback connector
+ - 12578A Direct Memory Access Controller
+ - 12581A Memory Protect
+ - 12597A Duplex Register Interface with one 2748 Paper Tape Reader
+ - 12597A Duplex Register Interface with one 2895 Paper Tape Punch
+ - 12606B Fixed Head Disc Controller with one 2770/2771 drive
+ - 12607B Direct Memory Access Controller
+ - 12610B Drum Controller with one 2773/2774/2775 drive
+ - 12620A Privileged Interrupt Fence
+ - 12653A Printer Controller with one 2767 Line Printer
+ - 12792C 8-Channel Asynchronous Multiplexer
+ - 12821A Disc Interface with four 7906H/7920H/7925H drives
+ - 12845B Printer Controller with one 2607 Line Printer
+ - 12875A Interprocessor Link
+ - 12892B Memory Protect
+ - 12895A Direct Memory Access Controller
+ - 12897B Dual-Channel Port Controller
+ - 12920A 16-Channel Terminal Multiplexer
+ - 12936A Privileged Interrupt Fence
+ - 12966A Buffered Asynchronous Communications Interface
+ - 13037D Disc Controller with eight 7905/7906/7920/7925 drives
+ - 13181A Magnetic Tape Controller with four 7970B drives
+ - 13183A Magnetic Tape Controller with four 7970E drives
+ - 13210A Disc Controller with four 7900 drives
 
 The "HP 2100 Simulator User's Guide" manual describes the configuration and
 operation of each of these devices in detail.
@@ -194,12 +633,11 @@ Implementation Notes
 
  - Starting with the next release, the LOAD command will restrict its operation
    to the addresses occupied by the bootstrap loaders, i.e., the last 64
-   locations in memory (up to 32K), unless forced by the addition of the "-F"
-   switch.  The LOAD command is not designed for general loading of absolute
-   binary files, as it does not initialize the A and B registers as some HP
-   software expects.  It is intended only to install bootstrap loaders.  The
-   BOOT PTR command is the proper simulation of the hardware absolute paper tape
-   loader.
+   locations in memory (up to 32K).  The LOAD command is not designed for
+   general loading of absolute binary files, as it does not initialize the A and
+   B registers as some HP software expects.  It is intended only to install
+   bootstrap loaders.  The BOOT PTR command is the proper simulation of the
+   hardware absolute paper tape loader.
 
 
 ----------

@@ -396,7 +396,7 @@ if (new_val != ctx->iport) {
     ctx->ipcr |= (new_val & 0x0f);
     ctx->ipcr |= 0x10;
     if (ctx->acr & 0x01)
-    	ctx->ists |= ISTS_IPC;
+        ctx->ists |= ISTS_IPC;
     }
 
 ctx->iport = new_val;
@@ -411,7 +411,7 @@ if (new_val != ctx->iport) {
     ctx->ipcr |= (new_val & 0x0f);
     ctx->ipcr |= 0x20;
     if (ctx->acr & 0x02)
-    	ctx->ists |= ISTS_IPC;
+        ctx->ists |= ISTS_IPC;
     }
 
 ctx->iport = new_val;
@@ -426,7 +426,7 @@ if (new_val != ctx->iport) {
     ctx->ipcr |= (new_val & 0x0f);
     ctx->ipcr |= 0x40;
     if (ctx->acr & 0x04)
-    	ctx->ists |= ISTS_IPC;
+        ctx->ists |= ISTS_IPC;
     }
 
 ctx->iport = new_val;
@@ -441,7 +441,7 @@ if (new_val != ctx->iport) {
     ctx->ipcr |= (new_val & 0x0f);
     ctx->ipcr |= 0x80;
     if (ctx->acr & 0x08)
-    	ctx->ists |= ISTS_IPC;
+        ctx->ists |= ISTS_IPC;
     }
 
 ctx->iport = new_val;

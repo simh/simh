@@ -1,6 +1,9 @@
-                             HP 2100 SIMULATOR FIXES
-                             =======================
-                             Last update: 2016-08-05
+                          HP 2100 SIMULATOR FIX ARCHIVE
+                          =============================
+                            Final update: 2016-08-05
+
+See the "SIMH/HP 2100 Release Notes" file for bug fixes implemented after the
+date above.
 
 
   1. PROBLEM:  Booting from magnetic tape reports "HALT instruction, P: 77756

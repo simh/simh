@@ -142,8 +142,8 @@ t_stat i8253_reset (DEVICE *dptr, uint16 baseport)
         sim_printf("i8253_reset: too many devices!\n");
         return SCPE_MEM;
     }
-    sim_printf("   8253-%d: Reset\n", i8253_devnum);
-    sim_printf("   8253-%d: Registered at %04X\n", i8253_devnum, baseport);
+    sim_printf("      8253-%d: Reset\n", i8253_devnum);
+    sim_printf("      8253-%d: Registered at %04X\n", i8253_devnum, baseport);
     i8253_port[i8253_devnum] = baseport;
     reg_dev(i8253t0, baseport, i8253_devnum); 
     reg_dev(i8253t1, baseport + 1, i8253_devnum); 

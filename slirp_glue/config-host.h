@@ -24,7 +24,9 @@ int qemu_setsockopt (int s, int level, int optname, void *optval, int optlen);
 int qemu_recv (int s, void *buf, size_t len, int flags);
 #ifdef _MSC_VER
 #define snprintf _snprintf
+#ifndef strcasecmp
 #define strcasecmp stricmp
+#endif
 #define inline
 #else
 #ifndef _WIN32

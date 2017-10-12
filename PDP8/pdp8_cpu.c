@@ -25,6 +25,7 @@
 
    cpu          central processor
 
+   07-Sep-17    RMS     Fixed sim_eval declaration in history routine (COVERITY)
    09-Mar-17    RMS     Fixed PCQ_ENTRY for interrupts (COVERITY)
    13-Feb-17    RMS     RESET clear L'AC, per schematics
    28-Jan-17    RMS     Renamed switch register variable to SR, per request
@@ -1576,7 +1577,6 @@ t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 int32 l, k, di, lnt;
 const char *cptr = (const char *) desc;
 t_stat r;
-t_value sim_eval;
 InstHistory *h;
 
 if (hst_lnt == 0)                                       /* enabled? */
@@ -1599,8 +1599,8 @@ for (k = 0; k < lnt; k++) {                             /* print specified */
         if (h->ir < 06000)
             fprintf (st, "%05o  ", h->ea);
         else fprintf (st, "       ");
-        sim_eval = h->ir;
-        if ((fprint_sym (st, h->pc & ADDRMASK, &sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
+        sim_eval[0] = h->ir;
+        if ((fprint_sym (st, h->pc & ADDRMASK, sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
             fprintf (st, "(undefined) %04o", h->ir);
         if (h->ir < 04000)
             fprintf (st, "  [%04o]", h->opnd);

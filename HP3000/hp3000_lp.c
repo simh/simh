@@ -1,6 +1,6 @@
 /* hp3000_lp.c: HP 3000 30209A Line Printer Interface simulator
 
-   Copyright (c) 2016, J. David Bryan
+   Copyright (c) 2016-2017, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +25,16 @@
 
    LP           HP 30209A Line Printer Interface
 
+   07-Sep-17    JDB     Changed PCHR and UPCHR registers to PUNCHR and UNPCHR
+                        Changed PRTBUF, OVPCHR, PUNCHR, and UNPCHR to REG_A
+   05-Sep-17    JDB     Changed REG_A (permit any symbolic override) to REG_X
+   20-Jul-17    JDB     Added a forced detach option (-F switch) to "lp_detach"
+   24-Jun-17    JDB     Added "report_error", fixed "lp_set_model" times bug
+   22-Jun-17    JDB     Moved deferred offline/detach cancel to SET ONLINE
+   26-Apr-17    JDB     Fixed "lp_service" return for VFU channel not punched
+                        Restricted auto-print on buffer full to the 2607
+                        Paper fault is now delayed until the TOF for the 2607
+                        Changed "activate_unit" to schedule zero-length delays
    12-Sep-16    JDB     Changed DIB register macro usage from SRDATA to DIB_REG
    03-Sep-16    JDB     Added power-fail detection
    08-Jul-16    JDB     Added REG entry to save the transfer unit wait field
@@ -201,19 +211,17 @@
    issued while the print buffer contains data or the printer unit is busy
    executing a print action.
 
-   The SET LP OFFLINE and SET LP DETACH commands check for data in the print
-   buffer or a print operation in progress.  If either condition is true, they
-   set their respective deferred-action flags and display "Command deferred."  A
-   SHOW LP will show that the device is still online and attached.  Once
+   The SET LP OFFLINE and DETACH LP commands check for data in the print buffer
+   or a print operation in progress.  If either condition is true, they set
+   their respective deferred-action flags and display "Command not completed."
+   A SHOW LP will show that the device is still online and attached.  Once
    simulation is resumed and the print operation completes, the printer is set
    offline or detached as requested.  No console message reports this, as it is
    assumed that the executing program will detect the condition and report
    accordingly.  A subsequent SHOW LP will indicate the new status.
 
-   A SET LP ONLINE or ATTACH LP command when the corresponding deferred-action
-   flag is set simply clears the flag.  In particular, an ATTACH LP command must
-   not specify a new image filename; if one is specified while a deferred detach
-   is in progress, the routine returns SCPE_NOFNC ("Command not allowed").
+   A SET LP ONLINE command when a deferred-action flag is set simply clears the
+   flag, which cancels the pending offline or detach condition.
 
    A RESET LP command also clears the deferred-action flags and so clears any
    pending offline or detach.  However, it also clears the print buffer and
@@ -476,11 +484,22 @@
 #define DEV_REALTIME        (1u << DEV_REALTIME_SHIFT)  /* realistic timing flag */
 
 
-/* Printer unit flags */
+/* Printer unit flags.
 
-#define UNIT_MODEL_SHIFT    (UNIT_V_UF + 0)     /* bits 0-2: printer model ID */
-#define UNIT_EXPAND_SHIFT   (UNIT_V_UF + 3)     /* bits 3-3: printer uses expanded output */
-#define UNIT_OFFLINE_SHIFT  (UNIT_V_UF + 4)     /* bits 4-4: printer is offline */
+   UNIT_V_UF +  7   6   5   4   3   2   1   0
+              +---+---+---+---+---+---+---+---+
+              | - | - | - | O | E |   model   |
+              +---+---+---+---+---+---+---+---+
+
+   Where:
+
+     O = offline
+     E = expanded output
+*/
+
+#define UNIT_MODEL_SHIFT    (UNIT_V_UF + 0)     /* printer model ID */
+#define UNIT_EXPAND_SHIFT   (UNIT_V_UF + 3)     /* printer uses expanded output */
+#define UNIT_OFFLINE_SHIFT  (UNIT_V_UF + 4)     /* printer is offline */
 
 #define UNIT_MODEL_MASK     0000007u            /* model ID mask */
 
@@ -537,23 +556,30 @@ typedef enum {
 
    This table contains the characteristics that vary between printer models.
    The "char_set" field values reflect printer Option 001, 96/128-character set.
+   The "not_ready" field indicates whether a paper fault sets a separate
+   not-ready status or simply takes the printer offline.  The "fault_at_eol"
+   field indicates whether a paper fault is reported at the end of any line or
+   only at the top of the next form.
 */
 
 typedef struct {
     uint32  line_length;                        /* the maximum number of print positions */
     uint32  char_set;                           /* the size of the character set */
     uint32  vfu_channels;                       /* the number of VFU channels */
+    t_bool  not_ready;                          /* TRUE if the printer reports a separate not ready status */
     t_bool  overprints;                         /* TRUE if the printer supports overprinting */
+    t_bool  autoprints;                         /* TRUE if the printer automatically prints on buffer overflow */
+    t_bool  fault_at_eol;                       /* TRUE if a paper fault is reported at the end of any line */
     } PRINTER_PROPS;
 
 static const PRINTER_PROPS print_props [] = {   /* printer properties, indexed by PRINTER_TYPE */
-/*     line    char    VFU      over  */
-/*    length   set   channels  prints */
-/*    ------  -----  --------  ------ */
-    {  132,   128,      8,     FALSE  },        /* HP_2607 */
-    {  136,    96,     12,     TRUE   },        /* HP_2613 */
-    {  136,    96,     12,     TRUE   },        /* HP_2617 */
-    {  132,    96,     12,     TRUE   }         /* HP_2618 */
+/*     line    char    VFU      not     over    auto   fault  */
+/*    length   set   channels  ready   prints  prints  at EOL */
+/*    ------  -----  --------  ------  ------  ------  ------ */
+    {  132,   128,      8,     FALSE,  FALSE,  TRUE,   FALSE  },    /* HP_2607 */
+    {  136,    96,     12,     TRUE,   TRUE,   FALSE,  TRUE   },    /* HP_2613 */
+    {  136,    96,     12,     TRUE,   TRUE,   FALSE,  TRUE   },    /* HP_2617 */
+    {  132,    96,     12,     TRUE,   TRUE,   FALSE,  TRUE   }     /* HP_2618 */
     };
 
 
@@ -568,9 +594,10 @@ static const PRINTER_PROPS print_props [] = {   /* printer properties, indexed b
    Implementation notes:
 
     1. Although all of the printers operate more slowly with a 96/128-character
-       set than with a 64-character set, the times reflect the smaller set size.
-       Also, some models provide different print rates, depending on how many
-       and/or which characters are printed.  These variances are not simulated.
+       set installed than with a 64-character set, the times reflect the smaller
+       set size.  Also, some models provide different print rates, depending on
+       how many and/or which characters are printed.  These variations are not
+       simulated.
 */
 
 typedef struct {
@@ -1035,7 +1062,7 @@ static t_bool  power_warning    = FALSE;        /* PFWARN is not asserted to the
 /* Printer state */
 
 static t_bool paper_fault     = TRUE;           /* TRUE if the printer is out of paper */
-static t_bool tape_fault      = FALSE;          /* TRUE if there is no punch in a VFU channel command */
+static t_bool tape_fault      = FALSE;          /* TRUE if there is no punch in a commanded VFU channel */
 static t_bool offline_pending = FALSE;          /* TRUE if an offline request is waiting for the printer to finish */
 static uint32 overprint_char  = DEL;            /* character to use if overprinted */
 static uint32 current_line    = 1;              /* current form line */
@@ -1066,6 +1093,7 @@ static t_stat      ui_reset      (DEVICE *dptr);
 static t_stat       master_reset          (t_bool programmed_clear);
 static void         clear_interface_logic (void);
 static void         activate_unit         (UNIT   *uptr);
+static void         report_error          (FILE   *stream);
 static OUTBOUND_SET set_interrupt         (uint32 interrupt);
 static OUTBOUND_SET set_device_status     (uint32 status_mask, uint32 new_status_word);
 static OUTBOUND_SET handshake_xfer        (void);
@@ -1166,12 +1194,12 @@ static REG lp_reg [] = {
     { ORDATA (CNTL,   control_word,                        16),                             PV_RZRO            },
     { ORDATA (ISTAT,  int_status_word,                     16),                             PV_RZRO            },
     { ORDATA (DSTAT,  dev_status_word,                     16),                             PV_RZRO            },
-    { ORDATA (READ,   read_word,                           16),                             PV_RZRO | REG_A    },
-    { ORDATA (WRITE,  write_word,                          16),                             PV_RZRO | REG_A    },
+    { ORDATA (READ,   read_word,                           16),                             PV_RZRO | REG_X    },
+    { ORDATA (WRITE,  write_word,                          16),                             PV_RZRO | REG_X    },
     { YRDATA (J2WX,   jumper_set,                          10,                              PV_RZRO)           },
 
-    { ORDATA (DATOUT, data_out,                            16),                             PV_RZRO | REG_A    },
-    { ORDATA (DATIN,  data_in,                             16),                             PV_RZRO | REG_A    },
+    { ORDATA (DATOUT, data_out,                            16),                             PV_RZRO | REG_X    },
+    { ORDATA (DATIN,  data_in,                             16),                             PV_RZRO | REG_X    },
 
     { FLDATA (DCOUT,  device_command_out,                              0)                                      },
     { FLDATA (DFIN,   device_flag_in,                                  0)                                      },
@@ -1195,8 +1223,8 @@ static REG lp_reg [] = {
     { DRDATA (FORMLN, form_length,                          8),                             PV_LEFT | REG_RO   },
     { BRDATA (TITLE,  vfu_title,                  8,        8,                LINE_SIZE),             REG_HRO  },
     { BRDATA (VFU,    VFU,                        2,    VFU_WIDTH,            VFU_SIZE),    PV_RZRO | REG_RO   },
-    { ORDATA (PCHR,   punched_char,                         8),                             PV_RZRO | REG_A    },
-    { ORDATA (UPCHR,  unpunched_char,                       8),                             PV_RZRO | REG_A    },
+    { ORDATA (PUNCHR, punched_char,                         8),                             PV_RZRO | REG_A    },
+    { ORDATA (UNPCHR, unpunched_char,                       8),                             PV_RZRO | REG_A    },
 
     { DRDATA (BTIME,  fast_times.buffer_load,              24),                             PV_LEFT | REG_NZ   },
     { DRDATA (PTIME,  fast_times.print,                    24),                             PV_LEFT | REG_NZ   },
@@ -1650,9 +1678,7 @@ return IORETURN (outbound_signals, outbound_value);     /* return the outbound s
 
    This service routine is called once for each state of the device transfer
    handshake.  The handshake sequencer schedules the transfer events with the
-   appropriate delays.  If no delay is required, the service routine is entered
-   directly from the sequencer.  Otherwise, an event is scheduled, and the
-   routine is entered when the event time expires.
+   appropriate delays.
 
    Jumper W10 determines the output polarity of the DEV CMD signal to the
    device, and jumpers W2 and W6 determine the input edges of the DEV FLAG
@@ -1679,10 +1705,9 @@ return IORETURN (outbound_signals, outbound_value);     /* return the outbound s
        Device Flag is accomplished by comparing the current state to the prior
        state.
 
-    2. If the routine was entered by event timer expiration, the handshake
+    2. As the routine was entered by an event timer expiration, the handshake
        sequencer must be called explicitly, and any returned backplane signals
-       must be asserted explicitly.  If the routine was called directly, the
-       sequencer is responsible for asserting backplane signals as required.
+       must be asserted explicitly.
 
     3. This routine may be called with a NULL "uptr" parameter to update the
        saved last state of the "device_flag_in" variable.  The NULL value
@@ -1692,7 +1717,6 @@ return IORETURN (outbound_signals, outbound_value);     /* return the outbound s
 static t_stat xfer_service (UNIT *uptr)
 {
 static t_bool device_flag_last = FALSE;
-const  t_bool timed_entry = (uptr != NULL && uptr->wait > 0);   /* TRUE if entry was by event timer */
 t_stat        result;
 OUTBOUND_SET  signals;
 
@@ -1718,15 +1742,13 @@ else                                                    /* otherwise Device Comm
 
 device_flag_last = device_flag_in;                      /* save the current state of the flag */
 
-if (timed_entry) {                                      /* if this is a timed entry */
-    signals = handshake_xfer ();                        /*   then continue the handshake */
+signals = handshake_xfer ();                            /* continue the handshake */
 
-    if (signals & INTREQ)                               /* if an interrupt request was generated */
-        iop_assert_INTREQ (&lp_dib);                    /*   then assert the INTREQ signal */
+if (signals & INTREQ)                                   /* if an interrupt request was generated */
+    iop_assert_INTREQ (&lp_dib);                        /*   then assert the INTREQ signal */
 
-    if (signals & SRn)                                  /* if a service request was generated */
-        mpx_assert_SRn (&lp_dib);                       /*   then assert the SRn signal */
-    }
+if (signals & SRn)                                      /* if a service request was generated */
+    mpx_assert_SRn (&lp_dib);                           /*   then assert the SRn signal */
 
 return result;                                          /* return the result of the service call */
 }
@@ -1742,14 +1764,16 @@ return result;                                          /* return the result of 
 
 static t_stat pulse_service (UNIT *uptr)
 {
+t_stat status;
+
 dprintf (lp_dev, DEB_SERV, "Pulse service entered\n");
 
 device_command = CLEAR;                                 /* clear the device command flip-flop */
 
-activate_unit (xfer_uptr);                              /* let the device know that command has denied */
+status = xfer_service (xfer_uptr);                      /* let the device know that command has denied */
 handshake_xfer ();                                      /*   and continue the handshake */
 
-return SCPE_OK;
+return status;
 }
 
 
@@ -1788,7 +1812,7 @@ return SCPE_OK;                                         /* return success */
 
    Implementation notes:
 
-    1. Calling "master_clear" with a FALSE parameter indicates that this is a
+    1. Calling "master_reset" with a FALSE parameter indicates that this is a
        commanded reset.  This allows the connected device-specific reset
        routines to distinguish from a Programmed Master Clear.
 */
@@ -1880,23 +1904,42 @@ return;
 }
 
 
-/* Activate a unit.
+/* Activate the unit.
 
-   The specified unit is added to the event queue if a non-zero event time has
-   been given.  Otherwise, the event handler is called directly.
+   The specified unit is activated using the unit's "wait" time.  If tracing
+   is enabled, the activation is logged to the debug file.
+
+
+   Implementation notes:
+
+    1. A zero-length delay is scheduled, rather than calling the service routine
+       directly, so that the status return value from the event service routine
+       is correctly passed back to SCP.
 */
 
 static void activate_unit (UNIT *uptr)
 {
-if (uptr->wait > 0) {                                   /* if the event time is set */
-    dprintf (lp_dev, DEB_SERV, "%s delay %u service scheduled\n",
-             unit_name [uptr - lp_unit], uptr->wait);
+dprintf (lp_dev, DEB_SERV, "%s delay %u service scheduled\n",
+         unit_name [uptr - lp_unit], uptr->wait);
 
-    sim_activate (uptr, uptr->wait);                    /*   then activate the unit */
-    }
+sim_activate (uptr, uptr->wait);                    /* activate the unit */
 
-else                                                    /* otherwise */
-    uptr->action (uptr);                                /*   call the event handler directly */
+return;
+}
+
+
+/* Report a stream I/O error to the console.
+
+   If a stream I/O error has been detected, this routine will print an error
+   message to the simulation console and clear the stream's error indicator.
+*/
+
+static void report_error (FILE *stream)
+{
+cprintf ("%s simulator printer I/O error: %s\n",        /* report the error to the console */
+         sim_name, strerror (errno));
+
+clearerr (stream);                                      /* clear the error */
 
 return;
 }
@@ -2022,29 +2065,15 @@ return outbound_signals;                                    /* return INTREQ if 
    The device service is scheduled after each state transition, except the
    return to the idle state, to detect the change in the Device Command signal
    or to schedule the change in the Device Flag.  The device determines whether
-   the service is entered immediately or after an event time expires.
+   the service will be entered immediately (at the next poll) or after a delay
+   time expires.
 
    For the diagnostic device, the service routine is entered immediately for all
-   transitions.  If the DHA is configured for flag-follows-command mode, the
-   full handshake cycle executes before returning from the routine.  If it is
-   configured for flag-follows-control-6, the routine returns after the Idle-to-
-   Device_Command_1 state transition to wait for control word bit 6 to be set.
-   When it is, the routine is reentered, transitions from Device_Command_1 to
-   Device_Flag_1, and then returns to wait for control word bit 6 to be cleared.
-   When it is, the routine is entered and completes the transition from
-   Device_Flag_1 to the Idle state (assuming a word transfer).
+   transitions.  For the printer device, the service routine is entered
+   immediately for Device Flag assertions, but flag denials are scheduled with a
+   delay corresponding to the printer operation time.  The operations are as
+   follows:
 
-   For the printer device, the service routine is entered immediately for Device
-   Flag assertions, but flag denials are scheduled with a delay corresponding to
-   the printer operation time.  The initial handshake entry transitions from
-   Idle to Device_Command_1, calls the service routine, which sets Device Flag,
-   transitions to Device_Flag_1, schedules the service routine, and returns to
-   wait for the event timer to expire.  When it does, the event service routine
-   is entered, which clears Device Flag and calls this routine to continue the
-   handshake.  The routine transitions from Device_Flag_1 to Idle to complete
-   the handshake sequence.
-
-   Summarizing:
                                          Diagnostic Service  Diagnostic Service
      State             Printer Service    Flag follows Cmd   Flag follows cont.6
      ----------------  ----------------  ------------------  -------------------
@@ -2135,12 +2164,17 @@ return outbound_signals;                                    /* return INTREQ if 
        DATA OUT and DATA IN lines, so we must simulate the multiplexing
        accurately with respect to the intermediate values before the handshake
        is complete.
+
+    5. The sequencer loop is used only during a device end assertion to move
+       from Idle to Device_Command_1 and back to Idle.  All other transitions
+       involve unit activation and so exit this routine after the sequence state
+       is changed.
 */
 
 static OUTBOUND_SET handshake_xfer (void)
 {
 const SEQ_STATE entry_state      = sequencer;           /* the state of the sequencer at entry */
-t_bool          started          = FALSE;               /* TRUE if the sequencer started */
+t_bool          reset            = FALSE;               /* TRUE if the sequencer is reset */
 OUTBOUND_SET    outbound_signals = NO_SIGNALS;
 SEQ_STATE       last_state;
 
@@ -2172,8 +2206,6 @@ do {                                                    /* run the sequencer as 
 
                     activate_unit (xfer_uptr);          /* schedule device flag assertion */
                     }
-
-                started = TRUE;                         /* indicate that the sequencer was started */
                 }
             break;
 
@@ -2188,7 +2220,9 @@ do {                                                    /* run the sequencer as 
                     write_xfer     = CLEAR;             /*     and write transfer flip-flops */
 
                     sequencer = Idle;                   /* idle the sequencer */
-                    device_sr = SET;                    /*   and request channel service */
+                    reset     = TRUE;                   /*   and indicate that it was reset */
+
+                    device_sr = SET;                    /* request channel service */
                     break;
                     }
 
@@ -2274,13 +2308,8 @@ if (DPRINTING (lp_dev, DEB_STATE))
         hp_debug (&lp_dev, DEB_STATE, "Sequencer transitioned from the %s state to the %s state\n",
                   state_name [entry_state], state_name [sequencer]);
 
-    else if (started)
-        if (device_end)
-            hp_debug (&lp_dev, DEB_STATE, "Sequencer reset by device end\n");
-
-        else
-            hp_debug (&lp_dev, DEB_STATE, "Sequencer executed a full %s-transfer cycle\n",
-                      (control_word & CN_BYTE_XFER ? "byte" : "word"));
+    else if (reset && device_end)
+        hp_debug (&lp_dev, DEB_STATE, "Sequencer reset by device end\n");
 
 if (device_sr && sio_busy)                              /* if the interface has requested service */
     outbound_signals |= SRn;                            /*   then assert SRn to the channel */
@@ -2478,13 +2507,13 @@ return outbound_signals;                                /* return INTREQ if any 
    indicate that the buffer load or print operation is complete.
 
    In simulation, this service routine is called twice for each transfer.  It is
-   called directly with Device Command set and then after a variable delay with
-   Device Command clear.  In response to the former call, the routine sets the
-   Device Flag, loads the character buffer or prints the buffered line, and then
-   sets up an event delay corresponding to the operation performed.  In response
-   to the latter call, the routine clears the Device Flag and then clears the
-   event delay time, so that the routine will be reentered directly when Device
-   Command sets again.
+   called immediately with Device Command set and then after a variable delay
+   with Device Command clear.  In response to the former call, the routine sets
+   the Device Flag, loads the character buffer or prints the buffered line, and
+   then sets up an event delay corresponding to the operation performed.  In
+   response to the latter call, the routine clears the Device Flag and then
+   clears the event delay time, so that the routine will be reentered
+   immediately when Device Command sets again.
 
    If a SET LP OFFLINE command or a DETACH LP command simulating an out-of-paper
    condition is given, the printer will not honor the command immediately if
@@ -2496,11 +2525,12 @@ return outbound_signals;                                /* return INTREQ if any 
    conclude the handshake.
 
    Control word bit 10 determines whether the code on the data out lines is
-   interpreted as a character (0) or a format command (1).  Character data is
-   loaded into the buffer; if the line length is exceeded, the printer
-   automatically prints the buffer contents, advances the paper one line, and
-   stores the new character in the empty buffer.  If a control character is sent
-   but the printer cannot print it, a space is loaded in its place.
+   interpreted as a character (0) or a format command (1).  If there is room in
+   the print buffer, the character is loaded.  If not, then depending on the
+   model, the printer either discards the character or automatically prints the
+   buffer contents, advances the paper one line, and stores the new character in
+   the empty buffer.  If a control character is sent but the printer cannot
+   print it, a space is loaded in its place.
 
    A format command causes the current buffer to be printed, and then the paper
    is advanced by a prescribed amount.  Two output modes are provided: compact
@@ -2550,14 +2580,18 @@ return outbound_signals;                                /* return INTREQ if any 
 
    Implementation notes:
 
-    1. Because attached files are opened in binary mode, newline translation
+    1. When a paper-out condition is detected, the 2607 printer goes offline
+       only when the next top-of-form is reached.  The 2613/17/18 printers go
+       offline as soon as the current line completes.
+
+    2. Because attached files are opened in binary mode, newline translation
        (i.e., from LF to CR LF) is not performed by the host system.  Therefore,
        we write explicit CR LF pairs to end lines, even in compact mode, as
        required for fidelity to HP peripherals.  If bare LFs are used by the
        host system, the printer output file must be postprocessed to remove the
        CRs.
 
-    2. Overprinting in expanded mode is simulated by merging the lines in the
+    3. Overprinting in expanded mode is simulated by merging the lines in the
        buffer.  A format command to suppress spacing resets the buffer index but
        saves the previous buffer length as a "high water mark" that will be
        extended if the overlaying line is longer.  This process may be repeated
@@ -2570,30 +2604,36 @@ return outbound_signals;                                /* return INTREQ if any 
        "overprint character" (which defaults to DEL, but can be changed by the
        user) replaces the character in the buffer.
 
-    3. Printers that support 12-channel VFUs treat the VFU format command as
+    4. Printers that support 12-channel VFUs treat the VFU format command as
        modulo 16.  Printers that support 8-channel VFUs treat the command as
        modulo 8.
 
-    4. As a convenience to the user, the printer output file is flushed when a
-       TOF operation is performed.
+    5. As a convenience to the user, the printer output file is flushed when a
+       TOF operation is performed.  This permits inspection of the output file
+       from the SCP command prompt while output is ongoing.
 
-    5. The user may examine the TFAULT and PFAULT registers to determine why the
+    6. The user may examine the TFAULT and PFAULT registers to determine why the
        printer went offline.
 
-    6. The transfer service may be called with a null pointer to update the
+    7. The transfer service may be called with a null pointer to update the
        potential change in the flag state.
 
-    7. If printing is attempted with the printer offline, this routine will be
+    8. If printing is attempted with the printer offline, this routine will be
        called with STROBE asserted (device_command_in TRUE) and DEMAND denied
        (device_flag_in TRUE).  The printer ignores STROBE if DEMAND is not
        asserted, so we simply return in this case.  This will hang the handshake
        until the printer is set online, and we are reentered with DEMAND
-       asserted.
+       asserted.  As a consequence, explicit protection against "uptr->fileref"
+       being NULL is not required.
+
+    9. Explicit tests for lowercase and control characters are much faster and
+       are used rather than calls to "islower" and "iscntrl", which must
+       consider the current locale.
 */
 
 static t_stat lp_service (UNIT *uptr)
 {
-const t_bool  printing = ((control_word & CN_FORMAT) != 0); /* TRUE if a print command was received */
+const t_bool  printing = ((control_word & CN_FORMAT) != 0);    /* TRUE if a print command was received */
 static uint32 overprint_index = 0;
 PRINTER_TYPE  model;
 uint8         data_byte, format_byte;
@@ -2602,6 +2642,8 @@ uint32        line_count, slew_count, vfu_status;
 
 if (uptr == NULL)                                       /* if we're called for a state update */
     return SCPE_OK;                                     /*   then return with no other action */
+else                                                    /* otherwise */
+    model = GET_MODEL (uptr->flags);                    /*   get the printer type */
 
 dprintf (lp_dev, DEB_SERV, "%s state printer service entered\n",
          state_name [sequencer]);
@@ -2610,12 +2652,16 @@ if (device_command_out == FALSE) {                      /* if STROBE has denied 
     if (printing) {                                     /*   then if printing occurred */
         buffer_index = 0;                               /*     then clear the buffer */
 
-        if (paper_fault)                                /* if an out-of-paper condition is pending */
-            return lp_detach (uptr);                    /*   then complete it now with the printer offline */
+        if (paper_fault) {                              /* if an out-of-paper condition is pending */
+            if (print_props [model].fault_at_eol        /*   then if the printer faults at the end of any line */
+              || current_line == 1)                     /*     or the printer is at the top of the form */
+                return lp_detach (uptr);                /*       then complete it now with the printer offline */
+            }
 
         else if (tape_fault) {                          /* otherwise if a referenced VFU channel was not punched */
             dprintf (lp_dev, DEB_CMD, "Commanded VFU channel is not punched\n");
-            return lp_set_alarm (uptr);                 /*   then take the printer offline now */
+            lp_set_alarm (uptr);                        /*   then set an alarm condition that takes the printer offline */
+            return SCPE_OK;
             }
 
         else if (offline_pending) {                     /* otherwise if a non-alarm offline request is pending */
@@ -2630,8 +2676,6 @@ if (device_command_out == FALSE) {                      /* if STROBE has denied 
 
 else if (device_flag_in == FALSE) {                     /* otherwise if STROBE has asserted while DEMAND is asserted */
     device_flag_in = TRUE;                              /*   then deny DEMAND */
-
-    model = GET_MODEL (uptr->flags);                    /* get the printer type */
 
     data_byte = (uint8) (data_out & DATA_MASK);         /* only the lower 7 bits are connected */
 
@@ -2657,9 +2701,12 @@ else if (device_flag_in == FALSE) {                     /* otherwise if STROBE h
             buffer_index++;                             /* increment the buffer index */
 
             uptr->wait = dlyptr->buffer_load;           /* schedule the buffer load delay */
+
+            dprintf (lp_dev, DEB_XFER, "Character %s sent to printer\n",
+                     fmt_char (data_byte));
             }
 
-        else {                                          /* otherwise the buffer is full */
+        else if (print_props [model].autoprints) {      /* otherwise if a buffer overflow auto-prints */
             dprintf (lp_dev, DEB_CMD, "Buffer overflow printed %u characters on line %u\n",
                      buffer_index, current_line);
 
@@ -2669,7 +2716,7 @@ else if (device_flag_in == FALSE) {                     /* otherwise if STROBE h
             fwrite (buffer, sizeof buffer [0],          /* write the buffer to the printer file */
                     buffer_index, uptr->fileref);
 
-            uptr->pos = ftell (uptr->fileref);          /* update the file position */
+            uptr->pos = (t_addr) ftell (uptr->fileref); /* update the file position */
 
             current_line = current_line + 1;            /* move the paper one line */
 
@@ -2687,10 +2734,17 @@ else if (device_flag_in == FALSE) {                     /* otherwise if STROBE h
             uptr->wait = dlyptr->print                  /* schedule the print delay */
                            + dlyptr->advance            /*   plus the paper advance delay */
                            + dlyptr->buffer_load;       /*   plus the buffer load delay */
+
+            dprintf (lp_dev, DEB_XFER, "Character %s sent to printer\n",
+                     fmt_char (data_byte));
             }
 
-        dprintf (lp_dev, DEB_XFER, "Character %s sent to printer\n",
-                 fmt_char (data_byte));
+        else {
+            uptr->wait = dlyptr->buffer_load;           /* schedule the buffer load delay */
+
+            dprintf (lp_dev, DEB_CMD, "Buffer overflow discards character %s\n",
+                     fmt_char (data_byte));
+            }
         }
 
     else {                                              /* otherwise this is a print format command */
@@ -2812,21 +2866,18 @@ else if (device_flag_in == FALSE) {                     /* otherwise if STROBE h
         uptr->wait = dlyptr->print                      /* schedule the print delay */
                        + slew_count * dlyptr->advance;  /*   plus the paper advance delay */
 
-        uptr->pos = ftell (uptr->fileref);              /* update the file position */
+        uptr->pos = (t_addr) ftell (uptr->fileref);     /* update the file position */
 
         if (slew_count > 0)
             dprintf (lp_dev, DEB_CMD, "Printer advanced %u line%s to line %u\n",
                      slew_count, (slew_count == 1 ? "" : "s"), current_line);
         }
 
-    if (ferror (uptr->fileref)) {                           /* if a host file system error occurred */
-        cprintf ("%s simulator printer I/O error: %s\n",    /*   then report the error to the console */
-                 sim_name, strerror (errno));
+    if (ferror (uptr->fileref)) {                       /* if a host file system error occurred */
+        report_error (uptr->fileref);                   /*   then report the error to the console */
 
-        clearerr (uptr->fileref);                           /* clear the error */
-
-        lp_set_alarm (uptr);                                /* set an alarm condition */
-        return SCPE_IOERR;                                  /*   and stop the simulator */
+        lp_set_alarm (uptr);                            /* set an alarm condition */
+        return SCPE_IOERR;                              /*   and stop the simulator */
         }
     }
 
@@ -2840,16 +2891,11 @@ return SCPE_OK;                                         /* return event service 
    equivalent of loading paper into the printer and pressing the ONLINE button.
    The transition from offline to online causes an interrupt.
 
-   A new image file may be requested by giving the "-N" switch to the attach
+   A new image file may be requested by giving the "-N" switch to the ATTACH
    command.  If an existing file is specified with "-N", it will be cleared; if
-   specified without "-P", printer output will be appended to the end of the
+   specified without "-N", printer output will be appended to the end of the
    existing file content.  In all cases, the paper is positioned at the top of
    the form.
-
-   As a special case, a detach (out-of-paper condition) that has been deferred
-   until printing completes may be cancelled by giving an attach command without
-   a filename, i.e., ATTACH LP.  If a filename is given, but the detach is still
-   pending, the routine returns a "Command not allowed" error.
 
 
    Implementation notes:
@@ -2865,33 +2911,29 @@ return SCPE_OK;                                         /* return event service 
 
 static t_stat lp_attach (UNIT *uptr, CONST char *cptr)
 {
-t_stat result = SCPE_OK;
+t_stat result;
 
-if (paper_fault && offline_pending)                     /* if an out-of-paper condition is deferred */
-    if (cptr == NULL)                                   /*   then if an attach command is given without a filename */
-        offline_pending = FALSE;                        /*     then cancel the request, leaving the file attached */
+result = attach_unit (uptr, cptr);                      /* attach the specified printer image file */
 
-    else                                                /* otherwise a filename was specified */
-        return SCPE_NOFNC;                              /*   but we can't attach until the previous file detaches */
+if (result == SCPE_OK                                   /* if the attach was successful */
+  && (sim_switches & SIM_SW_REST) == 0) {               /*   and we are not being called during a RESTORE command */
+    set_device_status (ST_NOT_READY, 0);                /*     then clear not-ready status */
 
-else {                                                  /* otherwise no deferral is active */
-    result = attach_unit (uptr, cptr);                  /*   so attach the specified printer image file */
+    current_line = 1;                                   /* reset the line counter to the top of the form */
 
-    if (result == SCPE_OK                               /* if the attach was successful */
-      && (sim_switches & SIM_SW_REST) == 0) {           /*   and we are not being called during a RESTORE command */
-        set_device_status (ST_NOT_READY, 0);            /*     then clear not-ready status */
-
-        current_line = 1;                               /* reset the line counter to the top of the form */
-
-        if (sim_switches & SWMASK ('N'))                /* if a new (empty) file was requested */
-            uptr->pos = 0;                              /*   then position at the start of the file */
-
-        else if (fseek (uptr->fileref, 0, SEEK_END) == 0)   /* otherwise append by seeking to the end of the file */
-            uptr->pos = (t_addr) ftell (uptr->fileref);     /*   and repositioning if the seek succeeded */
+    if (fseek (uptr->fileref, 0, SEEK_END) == 0) {      /* append by seeking to the end of the file */
+        uptr->pos = (t_addr) ftell (uptr->fileref);     /*   and repositioning if the seek succeeded */
 
         dprintf (lp_dev, DEB_CMD, "Printer paper loaded\n");
 
         lp_set_locality (uptr, Online);                 /* set the printer online */
+        }
+
+    else {                                              /* otherwise a host file system error occurred */
+        report_error (uptr->fileref);                   /*   so report the error to the console */
+
+        lp_set_alarm (uptr);                            /* set an alarm condition */
+        result = SCPE_IOERR;                            /*   and report that the attached failed */
         }
     }
 
@@ -2909,15 +2951,22 @@ return result;                                          /* return the result of 
 /* Detach the printer image file.
 
    The specified file is detached from the indicated unit.  This is the
-   simulation equivalent to unloading the paper from the printer or the printer
-   running out of paper.  The out-of-paper condition cause a paper fault alarm,
-   and the printer goes offline.  The transition from online to offline causes
-   an interrupt.
+   simulation equivalent of running out of paper or unloading the paper from the
+   printer.  The out-of-paper condition cause a paper fault alarm, and the
+   printer goes offline.  The transition from online to offline causes an
+   interrupt.
 
    When the printer runs out of paper, it will not go offline until characters
-   present in the buffer are printed and paper motion stops.  In simulation,
-   entering a DETACH LP command while the printer is busy will defer the file
-   detach until the current print operation completes.
+   present in the buffer are printed and paper motion stops.  In addition, the
+   2607 printer waits until the paper reaches the top-of-form position before
+   going offline.
+
+   In simulation, entering a DETACH LP command while the printer is busy will
+   defer the file detach until print operations reach the top of the next form
+   (2607) or until the current print operation completes (2613/17/18).  An
+   immediate detach may be forced by adding the -F switch to the DETACH command.
+   This simulates physically removing the paper from the printer and succeeds
+   regardless of the current printer state.
 
 
    Implementation notes:
@@ -2931,26 +2980,45 @@ return result;                                          /* return the result of 
     2. The DETACH ALL command will fail if any detach routine returns a status
        other than SCPE_OK.  Because a deferred detach is not fatal, we must
        return SCPE_OK, but we still want to print a warning to the user.
+
+    3. Because the 2607 only paper faults at TOF, we must explicitly set the
+       offline_pending flag, as lp_set_alarm may not have been called.
 */
 
 static t_stat lp_detach (UNIT *uptr)
 {
+const PRINTER_TYPE model = GET_MODEL (uptr->flags);     /* the printer model number */
+
 if (uptr->flags & UNIT_ATTABLE)                         /* if we're being called for the printer unit */
     if ((uptr->flags & UNIT_ATT) == 0)                  /*   then if the unit is not currently attached */
         return SCPE_UNATT;                              /*     then report it */
 
-    else if (lp_set_alarm (uptr)                        /* otherwise if a paper alarm is accepted */
-      || (sim_switches & SIM_SW_SHUT)) {                /*   or this is a shutdown call */
-        paper_fault = TRUE;                             /*     then set the out-of-paper condition */
-        dprintf (lp_dev, DEB_CMD, "Printer is out of paper\n");
-        return detach_unit (uptr);                      /*       and detach the unit */
-        }
+    else {
+        if (sim_switches & (SWMASK ('F') | SIM_SW_SHUT)) {  /* if this is a forced detach or shut down request */
+            current_line = 1;                               /*   then reset the printer to TOF to enable detaching */
+            sim_cancel (uptr);                              /*     and terminate */
+            device_command_out = FALSE;                     /*       any print action in progress */
+            }
 
-    else {                                              /* otherwise the alarm was rejected at this time */
-        paper_fault = TRUE;                             /*   so set the out-of-paper condition now */
-        dprintf (lp_dev, DEB_CMD, "Paper out request deferred until print completes\n");
-        cputs ("Command deferred\n");                   /*     but the actual detach must be deferred */
-        return SCPE_OK;                                 /*       until the buffer prints */
+        if ((print_props [model].fault_at_eol           /* otherwise if the printer faults at the end of any line */
+          || current_line == 1)                         /*   or the printer is at the top of the form */
+          && lp_set_alarm (uptr)) {                     /*   and a paper alarm is accepted */
+            paper_fault = TRUE;                         /*     then set the out-of-paper condition */
+
+            dprintf (lp_dev, DEB_CMD, "Printer is out of paper\n");
+
+            return detach_unit (uptr);                  /*       and detach the unit */
+            }
+
+        else {                                          /* otherwise the alarm was rejected at this time */
+            paper_fault = TRUE;                         /*   so set the out-of-paper condition */
+            offline_pending = TRUE;                     /*     but defer the detach */
+
+            dprintf (lp_dev, DEB_CMD, "Paper out request deferred until print completes\n");
+
+            cprintf ("%s\n", sim_error_text (SCPE_INCOMP)); /* report that the actual detach must be deferred */
+            return SCPE_OK;                                 /*   until the buffer has been printed */
+            }
         }
 
 else                                                    /* otherwise */
@@ -3007,7 +3075,7 @@ switch ((DEVICE_MODES) value) {                         /* dispatch the mode to 
         break;
     }
 
-return SCPE_OK;                                         /* the mode change succeeds */
+return SCPE_OK;                                         /* mode changes always succeed */
 }
 
 
@@ -3022,7 +3090,7 @@ return SCPE_OK;                                         /* the mode change succe
 static t_stat lp_set_model (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 if (lp_dev.flags & DEV_REALTIME)                        /* if the printer is in real-time mode */
-    dlyptr = &real_times [GET_MODEL (uptr->flags)];     /*   then use the times for the new model */
+    dlyptr = &real_times [GET_MODEL (value)];           /*   then use the times for the new model */
 
 return SCPE_OK;                                         /* allow the reassignment to proceed */
 }
@@ -3033,22 +3101,28 @@ return SCPE_OK;                                         /* allow the reassignmen
    This validation routine is called to set the printer online or offline.  The
    "value" parameter is UNIT_OFFLINE if the printer is going offline and is zero
    if the printer is going online.  This simulates pressing the ON/OFFLINE
-   button on the printer.
+   button on the printer.  The unit must be attached (i.e., paper must be
+   loaded), before the printer may be set online or offline.
 
    If the printer is being taken offline, the buffer is checked to see if any
    characters are present.  If they are, or if the printer unit is currently
    scheduled (i.e., executing a print operation), the offline request is
-   deferred until printing completes, and the routine prints "Command deferred"
-   to inform the user.  Otherwise, the unit is set offline, DEMAND is denied,
-   and DEV END is asserted to indicate that the printer is not ready.
+   deferred until printing completes, and the routine returns "Command not
+   complete" status to inform the user.  Otherwise, the unit is set offline,
+   DEMAND is denied, and DEV END is asserted to indicate that the printer is not
+   ready.
 
-   If the printer is being put online, the unit must be attached (i.e., paper
-   must be loaded), or the command is rejected.  If paper is present, the unit
-   is set online, and any tape fault present is cleared.  If the sequencer
+   If the printer is being put online and paper is present, the unit is set
+   online, and any paper or tape fault present is cleared.  If the sequencer
    indicates an incomplete handshake, as would occur if paper ran out while
    printing, the transfer service is called to complete the handshake by
    asserting DEMAND.  Otherwise, DEMAND is asserted explicitly, and DEV END is
    denied.
+
+   As a special case, a detach (out-of-paper condition) or offline request that
+   has been deferred until printing completes may be cancelled by setting the
+   printer online.  No other action is taken, because the printer has never
+   transitioned to the offline state.
 
    Transitions between the offline and online state cause interrupts, and INTREQ
    is asserted to the IOP if a transition occurred (but not, e.g., for a SET LP
@@ -3057,9 +3131,9 @@ return SCPE_OK;                                         /* allow the reassignmen
 
    Implementation notes:
 
-    1. Because a deferred offline request is not fatal, we return SCPE_OK to
-       allow command files to continue to execute, but we print a warning to the
-       user.
+    1. Although a deferred offline request is not fatal, we return SCPE_INCOMP
+       to prevent "set_cmd" from setting the UNIT_OFFLINE bit in the unit flags
+       before the printer actually goes offline.
 */
 
 static t_stat lp_set_on_offline (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
@@ -3068,11 +3142,17 @@ if ((uptr->flags & UNIT_ATT) == 0)                      /* if the printer is det
     return SCPE_UNATT;                                  /*   then it can't be set online or offline */
 
 else if (value == UNIT_ONLINE)                          /* otherwise if this is an online request */
-    lp_set_locality (uptr, Online);                     /*   then set the printer online */
+    if (paper_fault && offline_pending) {               /*   then if an out-of-paper condition is deferred */
+        paper_fault = FALSE;                            /*     then cancel the request */
+        offline_pending = FALSE;                        /*       leaving the file attached */
+        }
+
+    else                                                /*   otherwise it's a normal online request */
+        lp_set_locality (uptr, Online);                 /*     so set the printer online */
 
 else if (lp_set_locality (uptr, Offline) == FALSE) {    /* otherwise if it cannot be set offline now */
-    cputs ("Command deferred\n");                       /*   then let the user know */
     dprintf (lp_dev, DEB_CMD, "Offline request deferred until print completes\n");
+    return SCPE_INCOMP;                                 /*   then let the user know */
     }
 
 return SCPE_OK;                                         /* return operation success */
@@ -3169,8 +3249,8 @@ static t_stat lp_show_vfu (FILE *st, UNIT *uptr, int32 value, CONST void *desc)
 static const char header_1 [] = " Ch 1 Ch 2 Ch 3 Ch 4 Ch 5 Ch 6 Ch 7 Ch 8 Ch 9 Ch10 Ch11 Ch12";
 static const char header_2 [] = " ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ----";
 
-const PRINTER_TYPE model = GET_MODEL (uptr->flags);
-const uint32 channel_count = print_props [model].vfu_channels;
+const PRINTER_TYPE model = GET_MODEL (uptr->flags);             /* the printer model number */
+const uint32 channel_count = print_props [model].vfu_channels;  /* the count of VFU channels */
 uint32 chan, line, current_channel;
 
 if (value == 0)                                         /* if we're called for a summary display */
@@ -3242,6 +3322,7 @@ return SCPE_OK;
 
 static t_stat lp_reset (t_bool programmed_clear)
 {
+const PRINTER_TYPE model = GET_MODEL (xfer_unit.flags); /* the printer model number */
 OUTBOUND_SET signals;
 uint32       new_status = 0;
 t_stat       result     = SCPE_OK;
@@ -3263,7 +3344,7 @@ offline_pending = FALSE;                                /* cancel any pending of
 tape_fault  = FALSE;                                    /* clear any tape fault */
 paper_fault = ! (xfer_unit.flags & UNIT_ATT);           /*   and set paper fault if out of paper */
 
-if (paper_fault)                                        /* if a paper fault exists */
+if (paper_fault && print_props [model].not_ready)       /* if paper is out and the printer reports it separately */
     new_status |= ST_NOT_READY;                         /*   then set not-ready status */
 
 if (xfer_unit.flags & UNIT_OFFLINE) {                   /* if the printer is offline */
@@ -3307,8 +3388,8 @@ return NO_SIGNALS;                                      /* no special control ac
 
    This routine is called when an alarm condition exists.  An alarm occurs when
    paper is out (paper fault) or a VFU command addresses a channel that does not
-   contain a punch (tape fault).  In response, the printer goes not ready and
-   offline.
+   contain a punch (tape fault).  In response, the printer goes offline and,
+   for all models except the 2607, becomes not-ready.
 
    On entry, the routine attempts to set the printer offline.  If this succeeds,
    the printer is set not-ready.  If it fails (for reasons explained in the
@@ -3318,9 +3399,13 @@ return NO_SIGNALS;                                      /* no special control ac
 
 static t_bool lp_set_alarm (UNIT *uptr)
 {
+const PRINTER_TYPE model = GET_MODEL (uptr->flags);     /* the printer model number */
+
 if (lp_set_locality (uptr, Offline)) {                  /* if the printer went offline */
-    set_device_status (ST_NOT_READY, ST_NOT_READY);     /*   then set the printer not-ready */
-    return TRUE;                                        /*     and return completion success */
+    if (print_props [model].not_ready)                  /*   then if the printer reports ready status separately */
+        set_device_status (ST_NOT_READY, ST_NOT_READY); /*     then set the printer not-ready */
+
+    return TRUE;                                        /* return completion success */
     }
 
 else                                                    /* otherwise the offline request is pending */
@@ -3367,7 +3452,7 @@ if (printer_state == Offline) {                         /* if the printer is goi
       && sim_is_active (uptr) == FALSE) {               /*     and the printer is idle */
         uptr->flags |= UNIT_OFFLINE;                    /*       then set the printer offline now */
 
-        signals = set_device_status (ST_ONLINE, 0);     /*       then set the printer offline now */
+        signals = set_device_status (ST_ONLINE, 0);     /* update the printer status */
 
         device_flag_in = TRUE;                          /* DEMAND denies while the printer is offline */
         device_end_in  = TRUE;                          /* DEV END asserts while the printer is offline */
@@ -3377,7 +3462,7 @@ if (printer_state == Offline) {                         /* if the printer is goi
 
     else {                                              /*   otherwise the request must wait */
         offline_pending = TRUE;                         /*     until the line is printed */
-        return FALSE;                                   /*   that the command is not complete */
+        return FALSE;                                   /*       and the command is not complete */
         }
     }
 
@@ -3405,9 +3490,8 @@ dprintf (lp_dev, DEB_CMD, "Printer set %s\n",
 if (signals & INTREQ)                                   /* if the transition caused an interrupt */
     iop_assert_INTREQ (&lp_dib);                        /*   then assert the INTREQ signal */
 
-offline_pending = FALSE;
-
-return TRUE;
+offline_pending = FALSE;                                /* the operation completed */
+return TRUE;                                            /*   successfully */
 }
 
 
@@ -3417,8 +3501,8 @@ return TRUE;
    associated with the stream "vf" or with the standard 66-line tape if the
    stream is NULL.  The "uptr" parameter points to the printer unit.
 
-   The standard VFU tape (1535-2655 for the 8-channel HP 2607 and 2613-80001 for
-   the 12-channel HP 2613, 2617, and 2618) defines the channels as:
+   The standard VFU tape (02607-80024 for the 8-channel HP 2607 and 02613-80001
+   for the 12-channel HP 2613, 2617, and 2618) defines the channels as:
 
      Chan  Description
      ----  --------------
@@ -3432,12 +3516,12 @@ return TRUE;
        8   Sixth page
        9   Bottom of form
 
-   ...with channels 10-12 uncommitted.  A custom tape must dedicate channel 1 to
-   the top-of-form, but the other channels may be defined as desired.
+   ...with channels 10-12 uncommitted.
 
    A custom tape file starts with a VFU definition line and then contains one
    channel-definition line for each line of the form.  The number of lines
-   establishes the form length.
+   establishes the form length.  Channel 1 must be dedicated to the top-of-form,
+   but the other channels may be defined as desired.
 
    A semicolon appearing anywhere on a line begins a comment, and the semicolon
    and all following characters are ignored.  Zero-length lines, including lines
@@ -3517,7 +3601,7 @@ return TRUE;
 
 static t_stat lp_load_vfu (UNIT *uptr, FILE *vf)
 {
-const PRINTER_TYPE model = GET_MODEL (uptr->flags);     /* get the printer type */
+const PRINTER_TYPE model = GET_MODEL (uptr->flags);     /* the printer model number */
 uint32             line, channel, vfu_status;
 int32              len;
 char               buffer [LINE_SIZE], punch [LINE_SIZE], no_punch;
@@ -3525,10 +3609,8 @@ char               *bptr, *tptr;
 uint16             tape [VFU_SIZE] = { 0 };
 
 if (vf == NULL) {                                       /* if the standard VFU is requested */
-    strcpy (vfu_title, "Standard VFU");                 /*   then set the title */
-
-    tape [ 1] = VFU_CHANNEL_1;                          /* punch channel 1 for the top of form */
-    tape [60] = VFU_CHANNEL_2 | VFU_CHANNEL_9;          /* punch channels 2 and 9 for the bottom of form */
+    tape [ 1] = VFU_CHANNEL_1;                          /*   then punch channel 1 for the top of form */
+    tape [60] = VFU_CHANNEL_2 | VFU_CHANNEL_9;          /*     and channels 2 and 9 for the bottom of form */
 
     for (line = 1; line <= 60; line++) {                            /* load each of the 60 printable lines */
         tape [line] |= VFU_CHANNEL_3                                /* punch channel 3 for single space */
@@ -3542,6 +3624,7 @@ if (vf == NULL) {                                       /* if the standard VFU i
         }
 
     form_length = 66;                                   /* set the form length */
+    strcpy (vfu_title, "Standard VFU");                 /*   and set the title */
     }
 
 else {                                                  /* otherwise load a custom VFU from the file */
@@ -3665,12 +3748,9 @@ while (len == 0) {
         if (feof (vf))                                  /*   then if the end of file was seen */
             return 0;                                   /*     then return an EOF indication */
 
-        else {                                          /*   otherwise report the error to the console */
-            cprintf ("%s simulator line printer I/O error: %s\n",
-                     sim_name, strerror (errno));
-
-            clearerr (vf);                              /* clear the error */
-            return -1;                                  /*   and return an error indication */
+        else {                                          /*   otherwise */
+            report_error (vf);                          /*     report the error to the console */
+            return -1;                                  /*       and return an error indication */
             }
 
     len = strlen (line);                                /* get the current line length */

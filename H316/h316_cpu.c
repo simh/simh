@@ -1,6 +1,6 @@
 /* h316_cpu.c: Honeywell 316/516 CPU simulator
 
-   Copyright (c) 1999-2015, Robert M. Supnik
+   Copyright (c) 1999-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          H316/H516 CPU
 
+   07-Sep-17    RMS     Fixed sim_eval declaration in history routine (COVERITY)
    21-May-13    RLA     Add IMP/TIP support
                         Move SMK/OTK instructions here (from CLK)
                         Make SET CPU DMA work as documented
@@ -1757,7 +1758,6 @@ t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 cr, k, di, op, lnt;
 const char *cptr = (const char *) desc;
-t_value sim_eval;
 t_stat r;
 InstHistory *h;
 static uint8 has_opnd[16] = {
@@ -1786,8 +1786,8 @@ for (k = 0; k < lnt; k++) {                             /* print specified */
         if (h->pc & HIST_EA)
             fprintf (st, "%05o  ", h->ea);
         else fprintf (st, "       ");
-        sim_eval = h->ir;
-        if ((fprint_sym (st, h->pc & X_AMASK, &sim_eval,
+        sim_eval[0] = h->ir;
+        if ((fprint_sym (st, h->pc & X_AMASK, sim_eval,
             &cpu_unit, SWMASK ('M'))) > 0)
             fprintf (st, "(undefined) %06o", h->ir);
         op = I_GETOP (h->ir) & 017;                     /* base op */

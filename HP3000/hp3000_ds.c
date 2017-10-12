@@ -1,6 +1,6 @@
 /* hp3000_ds.c: HP 3000 30229B Cartridge Disc Interface simulator
 
-   Copyright (c) 2016, J. David Bryan
+   Copyright (c) 2016-2017, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +25,7 @@
 
    DS           HP 30229B Cartridge Disc Interface
 
+   05-Sep-17    JDB     Changed REG_A (permit any symbolic override) to REG_X
    12-Sep-16    JDB     Changed DIB register macro usage from SRDATA to DIB_REG
    09-Jun-16    JDB     Added casts for ptrdiff_t to int32 values
    08-Jun-16    JDB     Corrected %d format to %u for unsigned values
@@ -435,7 +436,7 @@ static REG ds_reg [] = {
     { FLDATA (OVRUN,  flags,                     5)                             },
     { FLDATA (XFRNG,  flags,                     6)                             },
 
-    { ORDATA (BUFFER, buffer_word,      16),          REG_A | REG_FIT | PV_RZRO },
+    { ORDATA (BUFFER, buffer_word,      16),          REG_X | REG_FIT | PV_RZRO },
     { ORDATA (STATUS, status_word,      16),                  REG_FIT | PV_RZRO },
     { DRDATA (RETRY,  retry_counter,     4),                  REG_FIT | PV_LEFT },
 

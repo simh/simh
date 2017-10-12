@@ -1,6 +1,6 @@
-/* hp2100_di.h: HP 12821A HP-IB Disc Interface simulator definitions
+/* hp2100_di.h: HP 12821A HP-IB Disc Interface simulator declarations
 
-   Copyright (c) 2010-2016, J. David Bryan
+   Copyright (c) 2010-2017, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    DI           12821A Disc Interface
 
+   15-Mar-17    JDB     Trace flags are now global
+   09-Mar-17    JDB     Changed the DIAG option to DIAGNOSTIC
+   10-Jan-17    JDB     Moved byte accessors to hp2100_defs.h
    13-May-16    JDB     Modified for revised SCP API function parameter types
    14-Feb-12    JDB     First release
    16-Nov-10    JDB     Created DI common definitions file
@@ -88,16 +91,6 @@ typedef enum {
 #define SET_BUSADR(f)   (((f) & UNIT_M_BUSADR) << UNIT_V_BUSADR)
 
 
-/* Debug flags */
-
-#define DEB_CPU         (1 << 0)                        /* words received from and sent to the CPU */
-#define DEB_CMDS        (1 << 1)                        /* interface commands received from the CPU */
-#define DEB_BUF         (1 << 2)                        /* data read from and written to the card FIFO */
-#define DEB_XFER        (1 << 3)                        /* data received and transmitted via HP-IB */
-#define DEB_RWSC        (1 << 4)                        /* device read/write/status/control commands */
-#define DEB_SERV        (1 << 5)                        /* unit service scheduling calls */
-
-
 /* HP-IB control line state bit flags.
 
    NOTE that these flags align with the corresponding flags in the DI status
@@ -136,53 +129,34 @@ typedef enum {
 #define PPR(a)          (uint8) (1 << (7 - (a)))        /* parallel poll response */
 
 
-/* Byte accessors */
-
-#define BYTE_SHIFT      8                               /* byte shift count */
-#define UPPER_BYTE      0177400                         /* high-order byte mask */
-#define LOWER_BYTE      0000377                         /* low-order byte mask */
-
-#define GET_UPPER(w)    (uint8) (((w) & UPPER_BYTE) >> BYTE_SHIFT)
-#define GET_LOWER(w)    (uint8) ((w) & LOWER_BYTE)
-
-#define SET_UPPER(b)    (uint16) ((b) << BYTE_SHIFT)
-#define SET_LOWER(b)    (uint16) (b)
-#define SET_BOTH(b)     (SET_UPPER (b) | SET_LOWER (b))
-
-typedef enum {
-    upper,                                              /* upper byte selected */
-    lower                                               /* lower byte selected */
-    } SELECTOR;
-
-
 /* Per-card state variables */
 
 typedef struct {
-    FLIP_FLOP control;                                  /* control flip-flop */
-    FLIP_FLOP flag;                                     /* flag flip-flop */
-    FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
-    FLIP_FLOP srq;                                      /* SRQ flip-flop */
-    FLIP_FLOP edt;                                      /* EDT flip-flop */
-    FLIP_FLOP eor;                                      /* EOR flip-flop */
-    SELECTOR  ibp;                                      /* input byte pointer selector */
-    SELECTOR  obp;                                      /* output byte pointer selector */
+    FLIP_FLOP     control;                      /* control flip-flop */
+    FLIP_FLOP     flag;                         /* flag flip-flop */
+    FLIP_FLOP     flagbuf;                      /* flag buffer flip-flop */
+    FLIP_FLOP     srq;                          /* SRQ flip-flop */
+    FLIP_FLOP     edt;                          /* EDT flip-flop */
+    FLIP_FLOP     eor;                          /* EOR flip-flop */
+    BYTE_SELECTOR ibp;                          /* input byte pointer selector */
+    BYTE_SELECTOR obp;                          /* output byte pointer selector */
 
-    uint16    cntl_register;                            /* control word register */
-    uint16    status_register;                          /* status word register */
-    uint16    input_data_register;                      /* input data register */
+    uint16        cntl_register;                /* control word register */
+    uint16        status_register;              /* status word register */
+    uint16        input_data_register;          /* input data register */
 
-    uint32    fifo [FIFO_SIZE];                         /* FIFO buffer */
-    uint32    fifo_count;                               /* FIFO occupancy counter */
-    REG      *fifo_reg;                                 /* FIFO register pointer */
+    uint32        fifo [FIFO_SIZE];             /* FIFO buffer */
+    uint32        fifo_count;                   /* FIFO occupancy counter */
+    REG          *fifo_reg;                     /* FIFO register pointer */
 
-    uint32    acceptors;                                /* unit bitmap of the bus acceptors */
-    uint32    listeners;                                /* unit bitmap of the bus listeners */
-    uint32    talker;                                   /* unit bitmap of the bus talker */
+    uint32        acceptors;                    /* unit bitmap of the bus acceptors */
+    uint32        listeners;                    /* unit bitmap of the bus listeners */
+    uint32        talker;                       /* unit bitmap of the bus talker */
 
-    uint8     bus_cntl;                                 /* HP-IB bus control state (ATN, EOI, etc.) */
-    uint8     poll_response;                            /* address bitmap of parallel poll responses */
+    uint8         bus_cntl;                     /* HP-IB bus control state (ATN, EOI, etc.) */
+    uint8         poll_response;                /* address bitmap of parallel poll responses */
 
-    double    ifc_timer;                                /* 100 microsecond IFC timer */
+    double        ifc_timer;                    /* 100 microsecond IFC timer */
     } DI_STATE;
 
 
@@ -230,17 +204,17 @@ typedef struct {
    These definitions should be included before any device-specific modifiers.
 */
 
-#define DI_MODS(dev)    \
-    { MTAB_XTD | MTAB_VDV,             1, "ADDRESS", "ADDRESS", &di_set_address, &di_show_address, &dev }, \
-                                                                                                           \
-    { MTAB_XTD | MTAB_VDV,             1, NULL,      "DIAG",    &di_set_cable,   NULL,             &dev }, \
-    { MTAB_XTD | MTAB_VDV,             0, NULL,      "HPIB",    &di_set_cable,   NULL,             &dev }, \
-    { MTAB_XTD | MTAB_VDV,             0, "CABLE",   NULL,      NULL,            &di_show_cable,   &dev }, \
-                                                                                                           \
-    { MTAB_XTD | MTAB_VDV,             0, "SC",      "SC",      &hp_setsc,       &hp_showsc,       &dev }, \
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO,  0, "DEVNO",   "DEVNO",   &hp_setdev,      &hp_showdev,      &dev }, \
-                                                                                                           \
-    { MTAB_XTD | MTAB_VUN,             0, "BUS",     "BUS",     &di_set_address, &di_show_address, &dev }
+#define DI_MODS(dev,dib)    \
+    { MTAB_XTD | MTAB_VDV,             1,  "ADDRESS", "ADDRESS",    &di_set_address, &di_show_address, &dev },          \
+                                                                                                                        \
+    { MTAB_XTD | MTAB_VDV,             1,  NULL,      "DIAGNOSTIC", &di_set_cable,   NULL,             &dev },          \
+    { MTAB_XTD | MTAB_VDV,             0,  NULL,      "HPIB",       &di_set_cable,   NULL,             &dev },          \
+    { MTAB_XTD | MTAB_VDV,             0,  "CABLE",   NULL,         NULL,            &di_show_cable,   &dev },          \
+                                                                                                                        \
+    { MTAB_XTD | MTAB_VDV,             1,  "SC",      "SC",         &hp_set_dib,     &hp_show_dib,     (void *) &dib }, \
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, ~1u, "DEVNO",   "DEVNO",      &hp_set_dib,     &hp_show_dib,     (void *) &dib }, \
+                                                                                                                        \
+    { MTAB_XTD | MTAB_VUN,             0,  "BUS",     "BUS",        &di_set_address, &di_show_address, &dev }
 
 
 /* Disc interface global bus routine definitions */

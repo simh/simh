@@ -1,6 +1,6 @@
                            SIMH/HP 3000 RELEASE NOTES
                            ==========================
-                             Last update: 2017-01-23
+                             Last update: 2017-09-07
 
 
 This file documents the release history of the Hewlett-Packard 3000 simulator.
@@ -173,6 +173,234 @@ the MPE version used:
    file remains internally consistent.  A memory patch is impossible, but
    workarounds are to increase the code segment limit before running DPAN4 and
    to restore DPAN4.PUB.SYS from the FOS tape if it has been damaged.
+
+
+
+=====================
+Release 6, 2017-09-07
+=====================
+
+This release of the HP 3000 simulator adds the following features:
+
+ - The new "-F" switch to the DETACH LP command forces an immediate detach,
+   regardless of the current paper position.  This is the simulation equivalent
+   of physically removing the paper from the printer.  Without the switch,
+   detaching is the equivalent of running out of paper, which permits printing
+   to continue to the end of the line (2613/17/18) or the page (2607) before the
+   printer goes offline.
+
+ - The HP 3000 Simulator User's Guide has been revised to add a new section
+   describing the simulator commands corresponding to hardware actions and to
+   rewrite the "Realistic, Calibrated, and Optimized Timing" section to describe
+   the three timing modes more clearly.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - The LP device's PCHR (punched channel character) and UPCHR (unpunched channel
+   character) registers have been renamed to PUNCHR and UNPCHR, respectively,
+   for compatibility with the HP 2100 simulator's LPT device.
+
+ - The manual clarifies that the display radix for shift counts, bit positions,
+   starting bits and counts, and the CIR values for the PAUS and HALT
+   instructions may be overridden with command-line switches.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  Cancelling a deferred detach with ATTACH LP is rejected.
+
+     VERSION:  Release 5.
+
+     OBSERVATION:  The line printer "Unit Options" section of the HP 3000
+     Simulator User's Guide states that a DETACH LP command will be deferred if
+     there are characters in the print buffer.  It further states that entering
+     ATTACH LP without specifying a filename will cancel the action.  This does
+     not work.  Entering ATTACH LP prints "Too few arguments" and does not alter
+     a pending detach.
+
+     CAUSE:  The SCP routine "attach_cmd" checks for the presence of a filename
+     before calling the line printer simulator's "lp_attach" routine.  If the
+     filename is omitted, "lp_attach" is never called to cancel the pending
+     detach.
+
+     RESOLUTION:  Modify "lp_set_on_offline" (hp3000_lp.c) to cancel a deferred
+     detach, and modify the User's Guide to state that SET LP ONLINE is used to
+     cancel both the deferred offline and deferred detach actions.
+
+     STATUS:  Fixed in Release 6.
+
+
+  2. PROBLEM:  Changing printer models does not change the REALTIME delays.
+
+     VERSION:  Release 5.
+
+     OBSERVATION:  In REALTIME mode, the line printer simulator attempts to
+     model the print buffer load and print-and-space operation delays inherent
+     in the physical hardware.  However, after setting a different model, the
+     buffer load, print, and paper advance times have not been changed.
+
+     CAUSE:  The "lp_set_model" routine that is called in response to a "SET
+     LP <model>" command sets the realistic times to those of the current model
+     rather than those of the new model.
+
+     RESOLUTION:  Modify "lp_set_model" (hp3000_lp.c) to use the new model value
+     to index into the realistic times array.
+
+     STATUS:  Fixed in Release 6.
+
+
+  3. PROBLEM:  Paper cannot be removed from a 2607 printer except at the TOF.
+
+     VERSION:  Release 5.
+
+     OBSERVATION:  Printing a few lines on a 2607 and then attempting to remove
+     the paper with the DETACH LP command displays "Command not completed" on
+     the simulation console.  The file remains attached and therefore cannot be
+     manipulated externally.
+
+     CAUSE:  The DETACH command simulates both running out of paper and removing
+     the paper from the printer.  For the former, the 2607 continues to print
+     until the current form is complete (i.e., the top of what would be the next
+     form is reached).  For the latter, the paper may be physically removed by
+     the operator while at any print position.  The simulator incorrectly
+     forbids the latter operation unless the paper is positioned at the TOF.
+
+     RESOLUTION:  Modify "lp_detach" (hp3000_lp.c) to add a "forced detach"
+     option ("DETACH -F LP") to detach the printer regardless of print position.
+
+     STATUS:  Fixed in Release 6.
+
+
+
+=====================
+Release 5, 2017-04-30
+=====================
+
+This release of the HP 3000 simulator does not add any new features.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - The 2607 line printer simulation now defers an out-of-paper alarm until the
+   paper reaches the top-of-form position, consistent with the hardware
+   behavior.  The 2613/17/18 printers continue to defer only until the current
+   line is printed.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  Host file system seek errors are not caught.
+
+     VERSION:  Release 4.
+
+     OBSERVATION:  The MAC/ICD disc library checks for host file system read or
+     write errors and returns Uncorrectable Data Error status if an error is
+     indicated.  However, host file system seeks are simply assumed to succeed;
+     no indication of an error is given if a call fails.  A failed seek should
+     be detected, and a Drive Fault (positioner error) should be returned.
+
+     CAUSE:  Oversight.
+
+     RESOLUTION:  Modify "position_sector" (hp_disclib.c) to test the
+     "sim_fseek" call for error status and to simulate a Drive Fault (AGC error)
+     if the call fails.
+
+     STATUS:  Fixed in Release 5.
+
+
+  2. PROBLEM:  An interrupted EDIT instruction does not resume properly.
+
+     VERSION:  Release 4.
+
+     OBSERVATION:  The EDIT instruction is interruptible between operations. If
+     an interrupt is detected, two words are pushed onto the stack before the
+     interrupt handler is called.  These words hold the current significance
+     trigger, loop count, float character, and fill character.  This allows the
+     instruction to resume from the point of suspension.  However, the
+     significance trigger is not preserved properly; it is always clear after an
+     interrupt.
+
+     CAUSE:  The significance trigger is preserved in the MSB of the upper byte
+     of the word pushed onto the stack, but a 16-bit value with the MSB set is
+     used to set the upper byte.  As only the lower 8 bits of the value are used
+     to set the byte, the MSB is lost.
+
+     RESOLUTION:  Modify "edit" (hp3000_cpu_cis.c) to use the full 16-bit value
+     when storing the significance trigger.
+
+     STATUS:  Fixed in Release 5.
+
+
+  3. PROBLEM:  Tracing a tape runaway error prints gibberish in the log file.
+
+     VERSION:  Release 4.
+
+     OBSERVATION:  Tracing tape controller commands or command initiations and
+     completions reports the success or failure of calls to the simulator tape
+     library, e.g., "write failed with no write ring."  A call that fails with
+     Tape Runaway status, such as a read across a long erase gap, should report
+     that the operation "failed with tape runaway."  Instead, it reports
+     gibberish.
+
+     CAUSE:  The descriptive lookup table is missing an entry for the MTSE_LEOT
+     status that precedes MTSE_RUNAWAY.  Attempting to look up the description
+     for MTSE_RUNAWAY indexes beyond the end of the table.
+
+     RESOLUTION:  Modify the "status_name" array (hp_tapelib.c) to include
+     descriptions for all of the possible simulator tape library status returns.
+
+     STATUS:  Fixed in Release 5.
+
+
+  4. PROBLEM: Commanding a VFU channel that is not punched causes a simulator
+     stop.
+
+     VERSION:  Release 4.
+
+     OBSERVATION:  A format command that specifies a slew to a VFU channel that
+     is not punched causes a tape fault, and the printer goes offline.  However,
+     the simulator then incorrectly stops with a "System halt" message, rather
+     than reflecting the "not ready" status back to MPE.
+
+     CAUSE:  The return value from the "lp_set_alarm" routine is being passed
+     back as the status of the "lp_service" call.  However, the return value is
+     a Boolean and is TRUE if the printer successfully went offline.  When
+     interpreted as a service status return value, TRUE is seen as STOP_SYSHALT
+     and causes a system halt simulator stop.
+
+     RESOLUTION:  Modify "lp_service" (hp3000_lp.c) to return SCPE_OK after the
+     tape fault alarm is set, allowing the simulation to continue.
+
+     STATUS:  Fixed in Release 5.
+
+
+  5. PROBLEM:  The 2613/17/18 printers do not ignore characters exceeding the
+     line length.
+
+     VERSION:  Release 4.
+
+     OBSERVATION:  When characters are output in excess of the defined line
+     length, the printer performs an automatic print-and-space operation and
+     prints the excess characters on the following line.  This operation is
+     correct for the 2607 printer but not for the 2613/17/18 printers, which
+     ignore output that exceeds the line length.
+
+     CAUSE:  Excess character handling should be, but is not, model-specific.
+
+     RESOLUTION:  Modify the "print_props" table (hp3000_lp.c) to add a field
+     for automatic printing, and modify "lp_service" to check the field to
+     decide if excess characters are printed or ignored.
+
+     STATUS:  Fixed in Release 5.
 
 
 

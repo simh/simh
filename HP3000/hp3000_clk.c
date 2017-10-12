@@ -197,7 +197,7 @@ static const int32 delay [8] = {                /* clock delays, in event ticks 
     mS (10),                                    /*   100 = 10 milliseconds */
     mS (100),                                   /*   101 = 100 milliseconds */
     S (1),                                      /*   110 = 1 second */
-    S (10),                                     /*   111 = 10 seconds */
+    S (10)                                      /*   111 = 10 seconds */
     };
 
 static const int32 ticks [8] = {                /* clock ticks per second */

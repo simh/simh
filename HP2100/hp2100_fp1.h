@@ -1,6 +1,6 @@
-/* hp2100_fp1.h: HP 2100/1000 multiple-precision floating point definitions
+/* hp2100_fp1.h: HP 2100/1000 multiple-precision floating point declarations
 
-   Copyright (c) 2005-2014, J. David Bryan
+   Copyright (c) 2005-2017, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,14 +23,13 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   15-Feb-17    JDB     Deleted unneeded guard macro definition
    24-Dec-14    JDB     Changed fp_ucom return from uint32 to uint16
    14-Mar-13    MP      Changed guard macro name to avoid reserved namespace
    16-Oct-06    JDB     Generalized FP calling sequences for F-Series
    12-Oct-06    JDB     Altered x_trun for F-Series FFP compatibility
 */
 
-#ifndef HP2100_FP1_H_
-#define HP2100_FP1_H_  0
 
 
 /* Special operands. */
@@ -51,5 +50,3 @@ uint16 fp_ucom   (OP *mantissa, OPSIZE precision);
 uint32 fp_pcom   (OP *packed, OPSIZE precision);
 uint32 fp_trun   (OP *result, OP source, OPSIZE precision);
 uint32 fp_cvt    (OP *result, OPSIZE source_precision, OPSIZE dest_precision);
-
-#endif

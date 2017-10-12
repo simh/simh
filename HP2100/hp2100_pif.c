@@ -1,6 +1,6 @@
-/* hp2100_pif.c: HP 12620A/12936A privileged interrupt fence simulator
+/* hp2100_pif.c: HP 12620A/12936A Privileged Interrupt Fence simulator
 
-   Copyright (c) 2008-2016, J. David Bryan
+   Copyright (c) 2008-2017, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,8 +23,11 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the author.
 
-   PIF          12620A/12936A privileged interrupt fence
+   PIF          12620A/12936A Privileged Interrupt Fence
 
+   15-Mar-17    JDB     Trace flags are now global
+   11-Mar-17    JDB     Revised the trace outputs
+   17-Jan-17    JDB     Changed "hp_---sc" and "hp_---dev" to "hp_---_dib"
    13-May-16    JDB     Modified for revised SCP API function parameter types
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
    28-Mar-11    JDB     Tidied up signal handling
@@ -33,10 +36,10 @@
    18-Jun-08    JDB     Created PIF device
 
    References:
-   - 12620A Breadboard Interface Kit Operating and Service Manual
-     (12620-90001, May-1978)
-   - 12936A Privileged Interrupt Fence Accessory Installation and Service Manual
-     (12936-90001, Mar-1974)
+     - 12620A Breadboard Interface Kit Operating and Service Manual
+         (12620-90001, May 1978)
+     - 12936A Privileged Interrupt Fence Accessory Installation and Service Manual
+         (12936-90001, March 1974)
 
 
    The Privileged Interupt Fence (PIF) was used in DOS and RTE systems to
@@ -95,7 +98,9 @@
 */
 
 
+
 #include "hp2100_defs.h"
+
 
 
 /* Device flags */
@@ -158,13 +163,25 @@ REG pif_reg [] = {
     };
 
 MTAB pif_mod [] = {
-    { MTAB_XTD | MTAB_VDV,            0, NULL,    "12620A", &pif_set_card, NULL,           NULL     },
-    { MTAB_XTD | MTAB_VDV,            1, NULL,    "12936A", &pif_set_card, NULL,           NULL     },
-    { MTAB_XTD | MTAB_VDV,            0, "TYPE",  NULL,     NULL,          &pif_show_card, NULL     },
-    { MTAB_XTD | MTAB_VDV,            0, "SC",    "SC",     &hp_setsc,     &hp_showsc,     &pif_dev },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEVNO", "DEVNO",  &hp_setdev,    &hp_showdev,    &pif_dev },
+/*    Entry Flags          Value  Print String  Match String  Validation      Display         Descriptor        */
+/*    -------------------  -----  ------------  ------------  --------------  --------------  ----------------- */
+    { MTAB_XDV,              0,   NULL,         "12620A",     &pif_set_card, NULL,            NULL              },
+    { MTAB_XDV,              1,   NULL,         "12936A",     &pif_set_card, NULL,            NULL              },
+    { MTAB_XDV,              0,   "TYPE",       NULL,         NULL,          &pif_show_card,  NULL              },
+
+    { MTAB_XDV,              1u,  "SC",         "SC",         &hp_set_dib,   &hp_show_dib,    (void *) &pif_dib },
+    { MTAB_XDV | MTAB_NMO,  ~1u,  "DEVNO",      "DEVNO",      &hp_set_dib,   &hp_show_dib,    (void *) &pif_dib },
     { 0 }
     };
+
+/* Debugging trace list */
+
+static DEBTAB pif_deb [] = {
+    { "CMD",   TRACE_CMD   },                   /* interface commands */
+    { "IOBUS", TRACE_IOBUS },                   /* interface I/O bus signals and data words */
+    { NULL,    0           }
+    };
+
 
 DEVICE pif_dev = {
     "PIF",                                  /* device name */
@@ -186,7 +203,7 @@ DEVICE pif_dev = {
     &pif_dib,                               /* device information block */
     DEV_DEBUG | DEV_DISABLE,                /* device flags */
     0,                                      /* debug control flags */
-    NULL,                                   /* debug flag name table */
+    pif_deb,                                /* debug flag name table */
     NULL,                                   /* memory size change routine */
     NULL };                                 /* logical device name */
 
@@ -218,9 +235,7 @@ DEVICE pif_dev = {
 
 uint32 pif_io (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-const char *hold_or_clear = (signal_set & ioCLF ? ",C" : "");
 const t_bool is_rte_pif = (pif_dev.flags & DEV_12936) == 0;
-
 IOSIGNAL signal;
 IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
@@ -231,19 +246,13 @@ while (working_set) {
 
         case ioCLF:                                     /* clear flag flip-flop */
             pif.flag = pif.flagbuf = CLEAR;             /* clear flag buffer and flag */
-
-            if (DEBUG_PRS (pif_dev))
-                fputs (">>PIF: [CLF] Flag cleared\n", sim_deb);
             break;
 
 
         case ioSTF:                                     /* set flag flip-flop */
-            if (is_rte_pif) {                           /* RTE PIF? */
+            if (is_rte_pif)                             /* RTE PIF? */
                 pif.flag = pif.flagbuf = SET;           /* set flag buffer and flag */
 
-                if (DEBUG_PRS (pif_dev))
-                    fputs (">>PIF: [STF] Flag set\n", sim_deb);
-                }
             break;
 
 
@@ -263,9 +272,6 @@ while (working_set) {
             if (!is_rte_pif) {                          /* DOS PIF? */
                 pif.flag = pif.flagbuf = SET;           /* set flag buffer and flag */
                 working_set = working_set | ioSIR;      /* set SIR (not normally done for IOO) */
-
-                if (DEBUG_PRS (pif_dev))
-                    fprintf (sim_deb, ">>PIF: [OTx%s] Flag set\n", hold_or_clear);
                 }
             break;
 
@@ -274,27 +280,22 @@ while (working_set) {
             pif.flag = pif.flagbuf =                    /* set or clear flag and flag buffer */
                 (is_rte_pif ? SET : CLEAR);
 
-            if (DEBUG_PRS (pif_dev))
-                fprintf (sim_deb, ">>PIF: [POPIO] Flag %s\n",
-                                  (is_rte_pif ? "set" : "cleared"));
+            tprintf (pif_dev, TRACE_CMD, "Power-on reset\n");
             break;
 
 
         case ioCRS:                                     /* control reset */
+            tprintf (pif_dev, TRACE_CMD, "Control reset\n");
+
+        /* fall into ioCLC handler */
+
         case ioCLC:                                     /* clear control flip-flop */
             pif.control = CLEAR;                        /* clear control */
-
-            if (DEBUG_PRS (pif_dev))
-                fprintf (sim_deb, ">>PIF: [%s%s] Control cleared\n",
-                                  (signal == ioCRS ? "CRS" : "CLC"), hold_or_clear);
             break;
 
 
         case ioSTC:                                     /* set control flip-flop */
             pif.control = SET;                          /* set control */
-
-            if (DEBUG_PRS (pif_dev))
-                fprintf (sim_deb, ">>PIF: [STC%s] Control set\n", hold_or_clear);
             break;
 
 
@@ -310,10 +311,9 @@ while (working_set) {
                 setIRQ (dibptr->select_code, !pif.control & pif.flag & pif.flagbuf);
                 }
 
-            if (DEBUG_PRS (pif_dev))
-                fprintf (sim_deb, ">>PIF: [SIR] PRL = %d, IRQ = %d\n",
-                                  PRL (dibptr->select_code),
-                                  IRQ (dibptr->select_code));
+            tprintf (pif_dev, TRACE_CMD, "Fence %s%s lower-priority interrupts\n",
+                     (IRQ (dibptr->select_code) ? "requests an interrupt and " : ""),
+                     (PRL (dibptr->select_code) ? "allows" : "inhibits"));
             break;
 
 

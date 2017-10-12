@@ -1,6 +1,6 @@
 /* i1620_sys.c: IBM 1620 simulator interface
 
-   Copyright (c) 2002-2015, Robert M. Supnik
+   Copyright (c) 2002-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   25-May-17    RMS     Tweaks and corrections from Tom McBride
+   18-May-17    RMS     Changed fprint_val to handle undefined opcodes on stops
    19-Mar-12    RMS     Fixed declaration of CCT (Mark Pizzolato)
 */
 
@@ -271,7 +273,7 @@ struct opc opcode[] = {
     { "TNS",  72+I_2,  0 }, { "TNF",  73+I_2,  0 },
     { "BBT",  90+I_2,  0 }, { "BMK",  91+I_2,  0 },
     { "ORF",  92+I_2,  0 }, { "ANDF", 93+I_2,  0 },
-    { "CPFL", 94+I_2,  0 }, { "EORF", 95+I_2,  0 },
+    { "CPLF", 94+I_2,  0 }, { "EORF", 95+I_2,  0 },
     { "OTD",  96+I_2,  0 }, { "DTO",  97+I_2,  0 },
     { NULL,   0, 0 }
     };
@@ -388,12 +390,17 @@ for (i = 0; opcode[i].str != NULL; i++) {               /* find opcode */
         ((opfl != I_1E) && (opfl != I_0E))))
         break;
     }
-if (opcode[i].str == NULL)
+if (opcode[i].str == NULL) {                            /* invalid opcode */
+    if ((sw & SIM_SW_STOP) != 0) {                      /* stop message? */
+        fprintf (of, "%02d", op);                       /* print numeric opcode */
+        return -(INST_LEN - 1);                         /* report success */
+        }
     return SCPE_ARG;
+    }
 if (I_GETQP (opfl) == I_M_QNP)                          /* Q no print? */
     qmp = 0;
 
-fprintf (of, "%s", opcode[i].str);                      /* print opcode */
+fprintf (of, "%-4s", opcode[i].str);                      /* print opcode */
 if (I_GETPP (opfl) == I_M_PP)                           /* P required? */
     fprint_addr (of, ' ', &val[I_P], I_M_QX);
 else if ((I_GETPP (opfl) == I_M_PCP) && (pmp || qmp))   /* P opt & needed? */

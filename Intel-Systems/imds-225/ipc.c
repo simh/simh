@@ -31,6 +31,8 @@
 
 #include "system_defs.h"
 
+#define DEBUG   0
+
 /* function prototypes */
 
 uint8 get_mbyte(uint16 addr);
@@ -123,15 +125,18 @@ uint16 get_mword(uint16 addr)
 void put_mbyte(uint16 addr, uint8 val)
 {
     if (addr >= 0xF800) {               //monitor ROM - always there
-        sim_printf("Write to R/O memory address %04X from PC=%04X - ignored\n", addr, PCX);
+        if (DEBUG)
+            sim_printf("Write to R/O memory address %04X from PC=%04X - ignored\n", addr, PCX);
         return;
     } 
     if ((addr < 0x1000) && ((ipc_cont_unit.u3 & 0x04) == 0)) { //startup
-        sim_printf("Write to R/O memory address %04X from PC=%04X - ignored\n", addr, PCX);
+        if (DEBUG)
+            sim_printf("Write to R/O memory address %04X from PC=%04X - ignored\n", addr, PCX);
         return;
     }
     if ((addr >= 0xE800) && (addr < 0xF000) && ((ipc_cont_unit.u3 & 0x10) == 0)) { //diagnostic ROM
-        sim_printf("Write to R/O memory address %04X from PC=%04X - ignored\n", addr, PCX);
+        if (DEBUG)
+            sim_printf("Write to R/O memory address %04X from PC=%04X - ignored\n", addr, PCX);
         return;
     }
     RAM_put_mbyte(addr, val);

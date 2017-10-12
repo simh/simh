@@ -1,6 +1,6 @@
 /* alpha_sys.c: Alpha simulator interface
 
-   Copyright (c) 2003-2006, Robert M Supnik
+   Copyright (c) 2003-20017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -22,6 +22,8 @@
    Except as contained in this notice, the name of Robert M Supnik shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   26-May-17    RMS     Fixed bad mnemonics and reversed definitions in opcode 12
 */
 
 #include "alpha_defs.h"
@@ -198,9 +200,9 @@ const char *opcode[] = {
  "MSKLL", "EXTLL", "INSLL",
  "ZAP", "ZAPNOT", "MSKQL", "SRL",
  "EXTQL", "SLL", "INSQL", "SRA",
- "MSKWQ", "EXTWQ", "INSWQ",
- "MSKLQ", "EXTLQ", "INSLQ",
- "MSKQH", "EXTQH", "INSQH",
+ "MSKWH", "INSWH", "EXTWH",
+ "MSKLH", "INSLH", "EXTLH",
+ "MSKQH", "INSQH", "EXTQH",
  "MULL", "MULQ", "UMULH",
  "MULL/V", "MULLQ/V",
  "ITOFS", "ITOFF", "ITOFT",

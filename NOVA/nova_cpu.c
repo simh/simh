@@ -1,6 +1,6 @@
 /* nova_cpu.c: NOVA CPU simulator
 
-   Copyright (c) 1993-2013, Robert M. Supnik
+   Copyright (c) 1993-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          Nova central processor
 
+   07-Sep-17    RMS     Fixed sim_eval declaration in history routine (COVERITY)
    17-Mar-13    RMS     Added clarifying brances to IND_STEP macro (Dave Bryan)
    04-Jul-07    BKR     DEV_SET/CLR macros now used,
                         support for non-existant devices added
@@ -1372,8 +1373,6 @@ return ( SCPE_OK ) ;
 
 int hist_fprintf( FILE * fp, int itemNum, Hist_entry * hptr )
 {
-t_value     sim_eval ;
-
 if ( hptr )
     {
     if ( itemNum == 0 )
@@ -1394,8 +1393,8 @@ if ( hptr )
         fprintf( fp, "%06o  %06o   ", SP, FP ) ;
         }
 
-    sim_eval = (hptr->ir & 0xFFFF) ;
-    if ( (fprint_sym(fp, (hptr->pc & AMASK), &sim_eval, &cpu_unit, SWMASK ('M'))) > 0 )
+    sim_eval[0] = (hptr->ir & 0xFFFF) ;
+    if ( (fprint_sym(fp, (hptr->pc & AMASK), sim_eval, &cpu_unit, SWMASK ('M'))) > 0 )
         {
         fprintf( fp, "(undefined) %04o", (hptr->ir & 0xFFFF) ) ;
     }

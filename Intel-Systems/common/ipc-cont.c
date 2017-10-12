@@ -33,6 +33,8 @@
 
 #include "system_defs.h"                /* system header in system dir */
 
+#define DEBUG   0
+
 /* function prototypes */
 
 uint8 ipc_cont(t_bool io, uint8 data);    /* ipc_cont*/
@@ -96,8 +98,8 @@ DEVICE ipc_cont_dev = {
 
 t_stat ipc_cont_reset(DEVICE *dptr, uint16 baseport)
 {
-    sim_printf("   ipc_cont[%d]: Reset\n", 0);
-    sim_printf("   ipc_cont[%d]: Registered at %04X\n", 0, baseport);
+    sim_printf("      ipc_cont[%d]: Reset\n", 0);
+    sim_printf("      ipc_cont[%d]: Registered at %04X\n", 0, baseport);
     reg_dev(ipc_cont, baseport, 0); 
     ipc_cont_unit[0].u3 = 0x00; /* ipc reset */
     return SCPE_OK;
@@ -112,8 +114,9 @@ t_stat ipc_cont_reset(DEVICE *dptr, uint16 baseport)
 uint8 ipc_cont(t_bool io, uint8 data)
 {
     if (io == 0) {                      /* read status port */
-        sim_printf("   ipc_cont: read data=%02X ipc_cont_unit[%d].u3=%02X\n", 
-            ipc_cont_unit[0].u3, 0, ipc_cont_unit[0].u3);
+        if (DEBUG)
+            sim_printf("   ipc_cont: read data=%02X ipc_cont_unit[%d].u3=%02X\n", 
+                ipc_cont_unit[0].u3, 0, ipc_cont_unit[0].u3);
         return ipc_cont_unit[0].u3;
     } else {                            /* write control port */
         //this simulates an 74LS259 register 
@@ -152,7 +155,8 @@ uint8 ipc_cont(t_bool io, uint8 data)
             default:
                 break;
         }
-        sim_printf("   ipc_cont: write data=%02X ipc_cont_unit[%d].u3=%02X\n", data, 0, ipc_cont_unit[0].u3);
+        if (DEBUG)
+            sim_printf("   ipc_cont: write data=%02X ipc_cont_unit[%d].u3=%02X\n", data, 0, ipc_cont_unit[0].u3);
     }
     return 0;
 }

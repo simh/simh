@@ -33,7 +33,7 @@
 #define SET_XACK(VAL)       (xack = VAL)
 
 //chip definitions for the iSBC-80/10
-/* set the base I/O address and device count  for the 8251s */
+/* set the base I/O address and device count for the 8251s */
 #define I8251_BASE      0xEC
 #define I8251_NUM       1
 
@@ -59,7 +59,7 @@
 /* set the base I/O address for the iSBC 201 */
 #define SBC201_BASE     0x88
 #define SBC201_INT      INT_1
-#define SBC201_NUM      1
+#define SBC201_NUM      0
 
 /* set the base I/O address for the iSBC 202 */
 #define SBC202_BASE     0x78

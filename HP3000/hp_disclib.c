@@ -1,6 +1,6 @@
 /* hp_disclib.c: HP MAC/ICD disc controller simulator library
 
-   Copyright (c) 2011-2016, J. David Bryan
+   Copyright (c) 2011-2017, J. David Bryan
    Copyright (c) 2004-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   22-Apr-17    JDB     A failed sim_fseek call now causes a drive fault
    10-Oct-16    JDB     Moved "hp3000_defs.h" inclusion from "hp_disclib.h"
    03-Aug-16    JDB     "fmt_bitset" now allows multiple concurrent calls
    09-Jun-16    JDB     Added casts for ptrdiff_t to int32 values
@@ -227,9 +228,9 @@
 
    The drive status field contains only a subset of the status maintained by
    drives in hardware.  Specifically, the Attention, Read-Only, First Status,
-   and Seek Check bits are stored in the status field.  The other bits (Format
-   Enabled, Not Ready, and Drive Busy) are set dynamically whenever status is
-   requested (the Drive Fault bit is not simulated).
+   Fault, and Seek Check bits are stored in the status field.  The other bits
+   (Format Enabled, Not Ready, and Drive Busy) are set dynamically whenever
+   status is requested.
 
    Per-drive opcode and phase values allow seeks to be overlapped.  For example,
    a Seek issued to unit 0 may be followed by a Read issued to unit 1.  When the
@@ -1279,7 +1280,7 @@ static t_bool start_write      (CVPTR cvptr, UNIT *uptr);
 static void   end_write        (CVPTR cvptr, UNIT *uptr, CNTLR_FLAG_SET flags);
 static t_bool position_sector  (CVPTR cvptr, UNIT *uptr);
 static void   next_sector      (CVPTR cvptr, UNIT *uptr);
-static void   io_error         (CVPTR cvptr, UNIT *uptr);
+static void   io_error         (CVPTR cvptr, UNIT *uptr, CNTLR_STATUS status);
 static void   set_completion   (CVPTR cvptr, UNIT *uptr, CNTLR_STATUS status);
 static void   clear_controller (CVPTR cvptr, CNTLR_CLEAR clear_type);
 static void   idle_controller  (CVPTR cvptr);
@@ -3528,7 +3529,7 @@ count = sim_fread (cvptr->buffer + offset,              /* read the sector from 
                    WORDS_PER_SECTOR, uptr->fileref);
 
 if (ferror (uptr->fileref)) {                           /* if a host file system error occurred */
-    io_error (cvptr, uptr);                             /*   then report it to the simulation console */
+    io_error (cvptr, uptr, Uncorrectable_Data_Error);   /*   then report it to the simulation console */
     return FALSE;                                       /*     and terminate with Uncorrectable Data Error status */
     }
 
@@ -3764,7 +3765,7 @@ sim_fwrite (cvptr->buffer + offset, sizeof (DL_BUFFER), /* write the sector to t
             WORDS_PER_SECTOR, uptr->fileref);
 
 if (ferror (uptr->fileref))                             /* if a host file system error occurred, then report it */
-    io_error (cvptr, uptr);                             /*    and terminate with Uncorrectable Data Error status */
+    io_error (cvptr, uptr, Uncorrectable_Data_Error);   /*    and terminate with Uncorrectable Data Error status */
 
 else if (cvptr->status != Normal_Completion)            /* otherwise if a diagnostic override is present */
     end_command (cvptr, uptr, cvptr->status);           /*   then report the indicated status */
@@ -3828,9 +3829,12 @@ return;
 
    If the addresses are valid, the drive is checked to ensure that it is ready
    for positioning.  If it is, the file is positioned to a byte offset in the
-   image file that is calculated from the CHS address.  The data phase is set up
-   to begin the data transfer, and the routine returns TRUE to indicate that the
-   file position is set.
+   image file that is calculated from the CHS address.  If positioning succeeds,
+   the data phase is set up to begin the data transfer, and the routine returns
+   TRUE to indicate that the file position is set.  If positioning fails with a
+   host file system error, it is reported to the simulation console, and the
+   routine returns FALSE to indicate that an AGC (drive positioner) fault
+   occurred.
 
 
    Implementation notes:
@@ -3900,17 +3904,24 @@ else if (uptr->flags & UNIT_UNLOAD)                     /* otherwise if the driv
 else {                                                  /* otherwise we are ready to move the heads */
     set_file_pos (cvptr, uptr, model);                  /*   so calculate the new position */
 
-    sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);     /* set the image file position */
+    if (sim_fseek (uptr->fileref, uptr->pos, SEEK_SET)) {   /* set the image file position; if it failed */
+        io_error (cvptr, uptr, Status_2_Error);             /*   then report it to the simulation console */
 
-    uptr->PHASE = Data_Phase;                           /* set up the data transfer phase */
+        dl_load_unload (cvptr, uptr, FALSE);                /* unload the heads */
+        uptr->STATUS |= S2_FAULT;                           /*   and set Fault status */
+        }
 
-    if (cvptr->device->flags & DEV_REALTIME)            /* if the real time mode is enabled */
-        uptr->wait = cvptr->dlyptr->data_xfer           /*   then base the delay on the sector preamble size */
-                       * cmd_props [uptr->OPCODE].preamble_size;
-    else                                                /* otherwise */
-        uptr->wait = cvptr->dlyptr->data_xfer;          /*   start the transfer with a nominal delay */
+    else {                                              /* otherwise the seek succeeded */
+        uptr->PHASE = Data_Phase;                       /*   so set up the data transfer phase */
 
-    return TRUE;                                        /* report that positioning was accomplished */
+        if (cvptr->device->flags & DEV_REALTIME)        /* if the real time mode is enabled */
+            uptr->wait = cvptr->dlyptr->data_xfer       /*   then base the delay on the sector preamble size */
+                           * cmd_props [uptr->OPCODE].preamble_size;
+        else                                            /* otherwise */
+            uptr->wait = cvptr->dlyptr->data_xfer;      /*   start the transfer with a nominal delay */
+
+        return TRUE;                                    /* report that positioning was accomplished */
+        }
     }
 
 return FALSE;                                           /* positioning failed or was deferred */
@@ -4085,22 +4096,24 @@ return TRUE;                                            /* the seek is underway 
 }
 
 
-/* Report an I/O error.
+/* Report a stream I/O error.
 
    Errors indicated by the host file system are printed on the simulation
-   console, and the current command is terminated with an Uncorrectable Data
-   Error indication from the controller.  The target OS will retry the
-   operation; if it continues to fail, the OS will handle it appropriately.
+   console, and the current command is terminated with the supplied status
+   indication.  The target OS will respond to the status return appropriately.
 */
 
-static void io_error (CVPTR cvptr, UNIT *uptr)
+static void io_error (CVPTR cvptr, UNIT *uptr, CNTLR_STATUS status)
 {
 cprintf ("%s simulator disc library I/O error: %s\n",   /* report the error to the console */
          sim_name, strerror (errno));
 
+dpprintf (cvptr->device, cvptr->device->dctrl, "Host system stream I/O call failed: %s\n",
+          strerror (errno));
+
 clearerr (uptr->fileref);                               /* clear the error */
 
-end_command (cvptr, uptr, Uncorrectable_Data_Error);    /* terminate the command with a bad data error */
+end_command (cvptr, uptr, status);                      /* terminate the command with the supplied status */
 return;
 }
 
@@ -4174,9 +4187,9 @@ return;
 
    Implementation notes:
 
-    1. The Attention, Read-Only, First Status, and Seek Check bits are stored
-       in the unit status field.  The other status bits are determined
-       dynamically (the Drive Fault bit is not simulated).
+    1. The Attention, Read-Only, First Status, Fault, and Seek Check bits are
+       stored in the unit status field.  The other status bits are determined
+       dynamically.
 
     2. The Drive Busy bit is set if the unit is in the seek phase.  In hardware,
        this bit indicates that the heads are not positioned over a track, i.e.,

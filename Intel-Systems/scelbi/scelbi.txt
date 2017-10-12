@@ -1,0 +1,139 @@
+SCELBI Simulator with Intel 8008 CPU
+====================================
+
+1. Background.
+
+	The SCELBI (SCientic-ELectronics-BIology) computer was probably
+the first commercially available micro-computer marketed toward hobbyist.
+The first market announce for SCELBI-8H was a tiny advertisement in the 
+back of the March 1974 issue of QST, an amateur radio magazine. 
+The computer was built around the Intel 8008 architecture.  There were two
+versions of the SCELBI. The first version was called the 8H. The H standing
+for hobbyist. The second version was called the 8B, the B standing for
+business.  It had all the features of the 8H, but added support for up 
+to 16K of memory. As the default memory configuration for the SCELBI simulator
+is 16K, it is really a SCELBI-8B that is simulated. More information about the
+SCELBI computer can be found at: http://www.willegal.net/scelbi/scelbi.html
+and http://history-computer.com/ModernComputer/Personal/Scelbi.html.
+
+2. Hardware
+
+        We are simulating a SCELBI-8B from about 1975, with the following 
+configuration:
+
+        device          simulates
+        name(s)
+
+        I8008           SCELBI-8B with Intel 8008 CPU, 16KB of RAM.
+        TTY             Serial "bit banger" interface (commonly to an
+                        ASR-33), is assumed to be connected to a serial
+                        "glass TTY" that is your terminal running the Simulator.
+        PTR             Paper Tape Reader, not implemented yet.
+
+2.1 CPU
+
+	You may select different memory sizes, the default size is 16K. 
+
+        SET I8008 4K
+        SET I8008 8K
+        SET I8008 12K
+        SET I8008 16K
+
+CPU Registers include the following:
+
+        name    size    comments
+
+        PC      14      The Program Counter
+        A       8       The accumulator
+        B       8       The B register.
+        C       8       The C register.
+        D       8       The E register.
+        E       8       The E register.
+        HL      16      The HL register pair.  H is the top 8 bits, L is
+                        the bottom 8 bits.
+        SP      3       Stack Pointer to return address in stack.
+        CF      1       Carry Flag.
+        ZF      1       Zero Flag.
+        PF      1       Parity Flag.
+        SF      1       Sign Flag.
+        WRU     8       The interrupt character.  This starts as 005
+                        (Ctrl-E)
+
+2.2 The TTY Serial Interface
+
+	This interface simulates a "bitbanger" TTY interface as 
+implemented on the SCELBI computer in the SCELBAL source code.
+Inport 2 bit 7 is used as input from the TTY and Outport 2 bit 0 
+is used as output to the TTY. In other SCELBI documentation Inport 5
+is used for input from the TTY and Outport 6 is used for output to the TTY.
+The I/O simulation routines are mapped in the i/o configuration table
+to both port variants.
+
+	There are also functions that support simulated I/O for
+an Intel 8008 computer built for a master thesis in 1975.
+These functions are however not mapped in the i/o configuration
+table as they conflict with the SCELBI TTY interface.
+
+3. Sample Software
+
+	SCELBAL was called the SCientific ELementary BAsic for the 8008 
+and 8080 by SCELBI Computer Consulting.  SCELBAL could be run on a SCELBI 
+or other 8008 based machine that had 8K of memory. SCELBAL completely 
+supported floating point math with 6 digits of precision.  As time went on, 
+additional packages including matrix arithmetic and math functions were added.
+
+SCELBAL can be downloaded from http://www.willegal.net/scelbi/scelbal.html
+there are assembler source, hex and binary images available for three
+variants of SCELBAL. The web page also includes information about SCELBAL
+and a link to a scan of the SCELBI's SCELBAL book:
+http://www.scelbi.com/files/docs/scelbal/SCELBAL.pdf
+In chapter 14 of the SCELBAL book there is a language reference.
+
+To run SCELBAL on the SCELBI simulator, download the binary code from:
+http://www.willegal.net/scelbi/software/sc1.bin
+
+Then start the simulator, load the code and run:
+
+SCELBI simulator V4.0-0 Beta        git commit id: ba447399
+sim> d pc 100
+sim> load sc1.bin
+11942 Bytes loaded.
+sim> g
+
+READY
+
+SCR
+
+READY
+
+10 A=1
+20 B=7
+30 PRINT "A + B =";
+40 PRINT A+B
+50 END
+LIST
+10 A=1
+20 B=7
+30 PRINT "A + B =";
+40 PRINT A+B
+50 END
+
+READY
+
+RUN
+A + B = 8.0
+
+READY
+
+<exit simulation by pressing Ctrl-E>
+Simulation stopped, PC: 000103 (INP 5)
+sim> exit
+
+
+Some notes on SCELBAL:
+  Only upper case is recognized.
+  Always do SCR before entering a program, otherwise strange
+    things will happen.
+  The binary code at the web page above shall be loaded starting 
+    at address 0100. The program shall also start to run from
+    address 0100.

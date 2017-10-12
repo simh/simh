@@ -38,6 +38,8 @@
 
 #include "system_defs.h"
 
+#define DEBUG   0
+
 /* function prototypes */
 
 t_stat RAM_reset (DEVICE *dptr, uint16 base, uint16 size);
@@ -108,9 +110,10 @@ t_stat RAM_reset (DEVICE *dptr, uint16 base, uint16 size)
             return SCPE_MEM;
         }
     }
-    sim_printf("      RAM: Available [%04X-%04XH]\n", 
-        RAM_unit.u3,
-        RAM_unit.u3 + RAM_unit.capac - 1);
+    if (DEBUG)
+        sim_printf("      RAM: Available [%04X-%04XH]\n", 
+            RAM_unit.u3,
+            RAM_unit.u3 + RAM_unit.capac - 1);
     sim_debug (DEBUG_flow, &RAM_dev, "RAM_reset: Done\n");
     return SCPE_OK;
 }

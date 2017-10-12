@@ -73,8 +73,8 @@ UNIT cdr_unit = {
     };
 
 REG cdr_reg[] = {
-    { FLDATA (LAST, ind[IN_LAST], 0) },
-    { DRDATA (POS, cdr_unit.pos, T_ADDR_W), PV_LEFT },
+    { FLDATAD (LAST, ind[IN_LAST], 0, "last card indicator") },
+    { DRDATAD (POS, cdr_unit.pos, T_ADDR_W, "position in the reader input file"), PV_LEFT },
     { NULL }
     };
 
@@ -367,7 +367,7 @@ if ((i = strlen (cdr_buf)) > 0) {                       /* anything at all? */
         }
     else {                                              /* line too long */
         ind[IN_RDCHK] = 1;
-        sim_printf ("CDR line too long");
+        sim_perror ("CDR line too long");
         return SCPE_IOERR;
         }
     }
@@ -433,7 +433,7 @@ switch (op) {                                           /* decode op */
     case OP_DN:
 
         /* DN punches all characters the same as WN except that a flagged
-           zero is punched as a hypehen (-) instead of a flagged
+           zero is punched as a hyphen (-) instead of a flagged
            zero ([). Punching begins at the P address and continues until
            the last digit of the storage module containing the P address
            has been punched. If the amount of data to be punched is an 
@@ -534,7 +534,7 @@ fputs (cdp_buf, cdp_unit.fileref);                      /* write card */
 cdp_unit.pos = ftell (cdp_unit.fileref);                /* count char */
 if (ferror (cdp_unit.fileref)) {                        /* error? */
     ind[IN_WRCHK] = 1;
-    sim_perror ("CDR I/O error");
+    sim_perror ("CDP I/O error");
     clearerr (cdp_unit.fileref);
     return SCPE_IOERR;
     }
