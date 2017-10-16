@@ -420,6 +420,11 @@ The MacPorts package manager is available to provide these external packages.  O
     # port install vde2
     # port install libsdl2
 
+Or, the Homebrew package manager is available to provide these external packages.  Once Homebrew is installed, these commands will install the required dependent packages:
+
+    # brew install vde
+    # brew install sdl2
+    
 ###### Linux - Dependencies
 
 Different Linux distributions have different package managment systems:

@@ -249,6 +249,10 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         LIBPATH += /opt/local/lib
         OS_LDFLAGS += -L/opt/local/lib
       endif
+      ifeq (libopt,$(shell if $(TEST) -d /usr/local/lib; then echo libopt; fi))
+        LIBPATH += /usr/local/lib
+        OS_LDFLAGS += -L/usr/local/lib
+      endif
       ifeq (libXt,$(shell if $(TEST) -d /usr/X11/lib; then echo libXt; fi))
         LIBPATH += /usr/X11/lib
         OS_LDFLAGS += -L/usr/X11/lib
