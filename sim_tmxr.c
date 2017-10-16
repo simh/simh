@@ -3542,8 +3542,7 @@ if (!found) {
     tmxr_open_devices = (TMXR **)realloc(tmxr_open_devices, (tmxr_open_device_count+1)*sizeof(*tmxr_open_devices));
     tmxr_open_devices[tmxr_open_device_count++] = mux;
     for (i=0; i<mux->lines; i++)
-        if (0 == mux->ldsc[i].send.delay)
-            mux->ldsc[i].send.delay = SEND_DEFAULT_DELAY;
+        mux->ldsc[i].send.after = mux->ldsc[i].send.delay = 0;
     }
 #if defined(SIM_ASYNCH_MUX)
 pthread_mutex_unlock (&sim_tmxr_poll_lock);
@@ -3610,6 +3609,41 @@ return _tmxr_locate_line_send_expect (cptr, snd, NULL);
 t_stat tmxr_locate_line_expect (const char *cptr, EXPECT **exp)
 {
 return _tmxr_locate_line_send_expect (cptr, NULL, exp);
+}
+
+static const char *_tmxr_send_expect_line_name (const SEND *snd, const EXPECT *exp)
+{
+static char line_name[CBUFSIZE];
+int i, j;
+
+strcpy (line_name, "");
+for (i=0; i<tmxr_open_device_count; ++i)
+    for (j=0; j<tmxr_open_devices[i]->lines; ++j)
+        if ((snd == &tmxr_open_devices[i]->ldsc[j].send) ||
+            (exp == &tmxr_open_devices[i]->ldsc[j].expect)) {
+            if (tmxr_open_devices[i]->lines > 1)
+                snprintf (line_name, sizeof (line_name), "%s:%d", tmxr_open_devices[i]->ldsc[j].send.dptr->name, j);
+            else
+                strncpy (line_name, tmxr_open_devices[i]->ldsc[j].send.dptr->name, sizeof (line_name));
+            break;
+            }
+return line_name;
+}
+
+const char *tmxr_send_line_name (const SEND *snd)
+{
+if (snd == sim_cons_get_send ())
+    return "CONSOLE";
+else
+    return _tmxr_send_expect_line_name (snd, NULL);
+}
+
+const char *tmxr_expect_line_name (const EXPECT *exp)
+{
+if (exp == sim_cons_get_expect ())
+    return "CONSOLE";
+else
+    return _tmxr_send_expect_line_name (NULL, exp);
 }
 
 t_stat tmxr_change_async (void)

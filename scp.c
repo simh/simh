@@ -1621,24 +1621,29 @@ ASSERT      failure have several different actions:
       " must match.  Data in the string may contain escaped character strings.\n\n"
       " The SEND command can also insert input into any serial device on a\n"
       " simulated system as if it was entered by a user.\n\n"
-      "++SEND {-t} <dev>:line {after=nn,}{delay=nn,}\"<string>\"\n\n"
+      "++SEND {-t} {<dev>:line} {after=nn,}{delay=nn,}\"<string>\"\n"
+      "++NOSEND {<dev>:line}\n\n"
+      " The NOSEND command removes any undelivered input data which may be\n"
+      " pending on a line.\n"
       "4Delay\n"
-      " Specifies a positive integer representing a minimal instruction delay\n"
-      " between characters being sent.  The value specified in a delay\n"
-      " argument persists across SEND commands to the same device (console or\n"
-      " serial device).  The delay parameter can be set by itself with:\n\n"
+      " Specifies an integer (>=0) representing a minimal instruction delay\n"
+      " between characters being sent.  The delay parameter can be set by\n"
+      " itself with:\n\n"
       "++SEND DELAY=n\n\n"
-      " The default value of the delay parameter is 1000.\n"
+      " which will set the default delay value for subsequent SEND commands\n"
+      " which don't specify an explicit DELAY parameter along with a string\n"
+      " If a SEND command is processed and no DELAY value has been specified,\n"
+      " the default value of the delay parameter is 1000.\n"
        /***************** 80 character line width template *************************/
       "4After\n"
-      " Specifies a positive integer representing a minimal number of instructions\n"
+      " Specifies an integer (>=0) representing a minimal number of instructions\n"
       " which must execute before the first character in the string is sent.\n"
-      " The value specified as the after parameter persists across SEND commands\n"
-      " to the same device (console or serial device).   The after parameter value\n"
-      " can be set by itself with:\n\n"
+      " The after parameter value can be set by itself with:\n\n"
       "++SEND AFTER=n\n\n"
-      " If the after parameter isn't explicitly set, it defaults to the value of\n"
-      " the delay parameter.\n"
+      " which will set the default after value for subsequent SEND commands\n"
+      " which don't specify an explicit AFTER parameter along with a string\n"
+      " If a SEND command is processed and no AFTER value has been specified,\n"
+      " the default value of the delay parameter is the DELAY parameter value.\n"
       "4Escaping String Data\n"
       " The following character escapes are explicitly supported:\n"
       "++\\r  Sends the ASCII Carriage Return character (Decimal value 13)\n"
@@ -1757,10 +1762,12 @@ ASSERT      failure have several different actions:
       " Specifies the number of instructions which should be executed before\n"
       " simulator instruction execution should stop.  The default is to stop\n"
       " executing instructions immediately (i.e. HALTAFTER=0).\n"
-      " The HaltAfter delay, once set, persists for all expect behaviors for\n"
-      " that device.\n"
-      " The HaltAfter parameter value can be set by itself with:\n\n"
+      " The default HaltAfter delay, once set, persists for all expect behaviors\n"
+      " for that device.\n"
+      " The default HaltAfter parameter value can be set by itself with:\n\n"
       "++EXPECT HALTAFTER=n\n\n"
+      " A unique HaltAfter value can be specified with each expect matching rule\n"
+      " which if it is not specified then the default value will be used.\n"
       " To avoid potentially unpredictable system hehavior that will happen\n"
       " if multiple expect rules are in effect and a haltafter value is large\n"
       " enough for more than one expect rule to match before an earlier haltafter\n"
@@ -1955,7 +1962,8 @@ static CTAB cmd_table[] = {
     { "IGNORE",     &noop_cmd,      0,          HLP_IGNORE },
     { "ECHO",       &echo_cmd,      0,          HLP_ECHO },
     { "ASSERT",     &assert_cmd,    1,          HLP_ASSERT },
-    { "SEND",       &send_cmd,      0,          HLP_SEND },
+    { "SEND",       &send_cmd,      1,          HLP_SEND },
+    { "NOSEND",     &send_cmd,      0,          HLP_SEND },
     { "EXPECT",     &expect_cmd,    1,          HLP_EXPECT },
     { "NOEXPECT",   &expect_cmd,    0,          HLP_EXPECT },
     { "!",          &spawn_cmd,     0,          HLP_SPAWN },
@@ -3717,14 +3725,20 @@ return SCPE_OK;
 
    Syntax: SEND {After=m},{Delay=n},"string-to-send"
 
-   After  - is a positive integer representing a number of instruction delay 
-            before the initial characters is sent.  The value specified
-            in a after argument persists across SEND commands.  The after
-            parameter can be set by itself with SEND AFTER=n
-   Delay  - is a positive integer representing a minimal instruction delay 
-            before and between characters being sent.  The value specified
-            in a delay argument persists across SEND commands.  The delay
-            parameter can be set by itself with SEND DELAY=n
+   After  - is an integer (>= 0) representing a number of instruction 
+            delay before the initial characters is sent.  The after 
+            parameter can is set by itself (with SEND AFTER=n). 
+            The value specified then persists across SEND commands, 
+            and is the default value used in subsequent SEND commands 
+            which don't specify an explicit AFTER parameter.  This default
+            value is visible externally via an environment variable.
+   Delay  - is an integer (>= 0) representing a number of instruction 
+            delay before and between characters being sent.  The
+            delay parameter can is set by itself (with SEND DELAY=n) 
+            The value specified persists across SEND commands, and is
+            the default value used in subsequent SEND commands which
+            don't specify an explicit DELAY parameter.  This default
+            value is visible externally via an environment variable.
    String - must be quoted.  Quotes may be either single or double but the
             opening anc closing quote characters must match.  Within quotes 
             C style character escapes are allowed.  
@@ -3746,14 +3760,53 @@ return SCPE_OK;
         \xh{h} where each h is a hex digit (0-9A-Fa-f)
    */
 
+static uint32 get_default_env_parameter (const char *dev_name, const char *param_name, uint32 default_value)
+{
+char varname[CBUFSIZE];
+uint32 val;
+char *endptr;
+const char *colon = strchr (dev_name, ':');
+
+if (colon)
+    snprintf (varname, sizeof(varname), "%s_%*.*s_%s", param_name, (int)(colon-dev_name), (int)(colon-dev_name), dev_name, colon + 1);
+else
+    snprintf (varname, sizeof(varname), "%s_%s", param_name, dev_name);
+if (!getenv (varname))
+    val = default_value;
+else {
+    val = strtoul (getenv (varname), &endptr, 0);
+    if (*endptr)
+        val = default_value;
+    }
+return val;
+}
+
+static void set_default_env_parameter (const char *dev_name, const char *param_name, uint32 value)
+{
+char varname[CBUFSIZE];
+char valbuf[CBUFSIZE];
+
+const char *colon = strchr (dev_name, ':');
+
+if (colon)
+    snprintf (varname, sizeof(varname), "%s_%*.*s_%s", param_name, (int)(colon-dev_name), (int)(colon-dev_name), dev_name, colon + 1);
+else
+    snprintf (varname, sizeof(varname), "%s_%s", param_name, dev_name);
+snprintf (valbuf, sizeof(valbuf), "%u", value);
+setenv(varname, valbuf, 1);
+}
+
 t_stat send_cmd (int32 flag, CONST char *cptr)
 {
 char gbuf[CBUFSIZE];
 CONST char *tptr;
 uint8 dbuf[CBUFSIZE];
 uint32 dsize = 0;
-uint32 delay = 0;
-uint32 after = 0;
+const char *dev_name;
+uint32 delay;
+t_bool delay_set = FALSE;
+uint32 after;
+t_bool after_set = FALSE;
 t_stat r;
 SEND *snd;
 
@@ -3768,7 +3821,11 @@ if (sim_isalpha(gbuf[0]) && (strchr (gbuf, ':'))) {
     }
 else
     snd = sim_cons_get_send ();
-
+dev_name = tmxr_send_line_name (snd);
+if (!flag)
+    return sim_send_clear (snd);
+delay = get_default_env_parameter (dev_name, "SIM_SEND_DELAY", SEND_DEFAULT_DELAY);
+after = get_default_env_parameter (dev_name, "SIM_SEND_AFTER", delay);
 while (*cptr) {
     if ((!strncmp(gbuf, "DELAY=", 6)) && (gbuf[6])) {
         delay = (uint32)get_uint (&gbuf[6], 10, 10000000, &r);
@@ -3776,6 +3833,9 @@ while (*cptr) {
             return sim_messagef (SCPE_ARG, "Invalid Delay Value\n");
         cptr = tptr;
         tptr = get_glyph (cptr, gbuf, ',');
+        delay_set = TRUE;
+        if (!after_set)
+            after = delay;
         continue;
         }
     if ((!strncmp(gbuf, "AFTER=", 6)) && (gbuf[6])) {
@@ -3784,24 +3844,28 @@ while (*cptr) {
             return sim_messagef (SCPE_ARG, "Invalid After Value\n");
         cptr = tptr;
         tptr = get_glyph (cptr, gbuf, ',');
+        after_set = TRUE;
         continue;
         }
     if ((*cptr == '"') || (*cptr == '\''))
         break;
     return SCPE_ARG;
     }
-if (*cptr) {
-    if ((*cptr != '"') && (*cptr != '\''))
-        return sim_messagef (SCPE_ARG, "String must be quote delimited\n");
-    cptr = get_glyph_quoted (cptr, gbuf, 0);
-    if (*cptr != '\0')
-        return SCPE_2MARG;                  /* No more arguments */
-
-    if (SCPE_OK != sim_decode_quoted_string (gbuf, dbuf, &dsize))
-        return sim_messagef (SCPE_ARG, "Invalid String\n");
+if (!*cptr) {
+    if ((!delay_set) && (!after_set))
+        return SCPE_2FARG;
+    set_default_env_parameter (dev_name, "SIM_SEND_DELAY", delay);
+    set_default_env_parameter (dev_name, "SIM_SEND_AFTER", after);
+    return SCPE_OK;
     }
-if ((dsize == 0) && (delay == 0) && (after == 0))
-    return SCPE_2FARG;
+if ((*cptr != '"') && (*cptr != '\''))
+    return sim_messagef (SCPE_ARG, "String must be quote delimited\n");
+cptr = get_glyph_quoted (cptr, gbuf, 0);
+if (*cptr != '\0')
+    return SCPE_2MARG;                  /* No more arguments */
+
+if (SCPE_OK != sim_decode_quoted_string (gbuf, dbuf, &dsize))
+    return sim_messagef (SCPE_ARG, "Invalid String\n");
 return sim_send_input (snd, dbuf, dsize, after, delay);
 }
 
@@ -10414,13 +10478,16 @@ t_stat sim_set_expect (EXPECT *exp, CONST char *cptr)
 char gbuf[CBUFSIZE];
 CONST char *tptr;
 CONST char *c1ptr;
+const char *dev_name;
+uint32 after;
 t_bool after_set = FALSE;
-uint32 after = exp->after;
 int32 cnt = 0;
 t_stat r;
 
 if ((cptr == NULL) || (*cptr == 0))
     return SCPE_2FARG;
+dev_name = tmxr_expect_line_name (exp);
+after = get_default_env_parameter (dev_name, "SIM_EXPECT_HALTAFTER", 0);
 if (*cptr == '[') {
     cnt = (int32) strtotv (cptr + 1, &c1ptr, 10);
     if ((cptr == c1ptr) || (*c1ptr != ']'))
@@ -10434,14 +10501,20 @@ if ((!strncmp(gbuf, "HALTAFTER=", 10)) && (gbuf[10])) {
     after = (uint32)get_uint (&gbuf[10], 10, 100000000, &r);
     if (r != SCPE_OK)
         return sim_messagef (SCPE_ARG, "Invalid Halt After Value\n");
-    after_set = TRUE;
     cptr = tptr;
+    after_set = TRUE;
     }
 if ((*cptr != '\0') && (*cptr != '"') && (*cptr != '\''))
     return sim_messagef (SCPE_ARG, "String must be quote delimited\n");
 cptr = get_glyph_quoted (cptr, gbuf, 0);
 
-return sim_exp_set (exp, gbuf, cnt, (after_set ? after : exp->after), sim_switches, cptr);
+/* Hsndle a bare HALTAFTER=nnn command */
+if ((gbuf[0] == '\0') && (*cptr == '\0') && after_set) {
+    set_default_env_parameter (dev_name, "SIM_EXPECT_HALTAFTER", after);
+    return SCPE_OK;
+    }
+
+return sim_exp_set (exp, gbuf, cnt, after, sim_switches, cptr);
 }
 
 /* Clear expect */
@@ -10540,11 +10613,6 @@ uint8 *match_buf;
 uint32 match_size;
 int i;
 
-/* Hsndle a bare HALTAFTER=nnn command */
-if ((*match == '\0') && (*act == '\0') && after) {
-    exp->after = after;
-    return SCPE_OK;
-    }
 /* Validate the match string */
 match_buf = (uint8 *)calloc (strlen (match) + 1, 1);
 if (!match_buf)
@@ -10598,8 +10666,8 @@ if (after && exp->size)
 exp->rules = (EXPTAB *) realloc (exp->rules, sizeof (*exp->rules)*(exp->size + 1));
 ep = &exp->rules[exp->size];
 exp->size += 1;
-exp->after = after;                                     /* set halt after value */
 memset (ep, 0, sizeof(*ep));
+ep->after = after;                                     /* set halt after value */
 ep->match_pattern = (char *)malloc (strlen (match) + 1);
 if (ep->match_pattern)
     strcpy (ep->match_pattern, match);
@@ -10660,6 +10728,9 @@ return SCPE_OK;
 
 t_stat sim_exp_show_tab (FILE *st, const EXPECT *exp, const EXPTAB *ep)
 {
+const char *dev_name = dev_name = tmxr_expect_line_name (exp);
+uint32 default_haltafter = get_default_env_parameter (dev_name, "SIM_EXPECT_HALTAFTER", 0);
+
 if (!ep)
     return SCPE_OK;
 fprintf (st, "    EXPECT");
@@ -10671,6 +10742,8 @@ if (ep->switches & EXP_TYP_REGEX)
     fprintf (st, " -r");
 if (ep->switches & EXP_TYP_REGEX_I)
     fprintf (st, " -i");
+if (ep->after != default_haltafter)
+    fprintf (st, " HALTAFTER=%d", (int)ep->after);
 fprintf (st, " %s", ep->match_pattern);
 if (ep->cnt > 0)
     fprintf (st, " [%d]", ep->cnt);
@@ -10683,6 +10756,8 @@ return SCPE_OK;
 t_stat sim_exp_show (FILE *st, CONST EXPECT *exp, const char *match)
 {
 CONST EXPTAB *ep = (CONST EXPTAB *)sim_exp_fnd (exp, match, 0);
+const char *dev_name = dev_name = tmxr_expect_line_name (exp);
+uint32 default_haltafter = get_default_env_parameter (dev_name, "SIM_EXPECT_HALTAFTER", 0);
 
 if (exp->buf_size) {
     char *bstr = sim_encode_quoted_string (exp->buf, exp->buf_ins);
@@ -10690,10 +10765,10 @@ if (exp->buf_size) {
     fprintf (st, "  Match Buffer Size: %d\n", exp->buf_size);
     fprintf (st, "  Buffer Insert Offset: %d\n", exp->buf_ins);
     fprintf (st, "  Buffer Contents: %s\n", bstr);
+    if (default_haltafter)
+        fprintf (st, "  Default HaltAfter: %u instructions\n", (unsigned)default_haltafter);
     free (bstr);
     }
-if (exp->after)
-    fprintf (st, "  Halt After: %d instructions\n", exp->after);
 if (exp->dptr && (exp->dbit & exp->dptr->dctrl))
     fprintf (st, "  Expect Debugging via: SET %s DEBUG%s%s\n", sim_dname(exp->dptr), exp->dptr->debflags ? "=" : "", exp->dptr->debflags ? get_dbg_verb (exp->dbit, exp->dptr) : "");
 fprintf (st, "  Match Rules:\n");
@@ -10885,8 +10960,8 @@ if (i != exp->size) {                                   /* Found? */
             }
         sim_activate (&sim_expect_unit,                 /* schedule simulation stop when indicated */
                       (ep->switches & EXP_TYP_TIME) ?  
-                            (int32)((sim_timer_inst_per_sec ()*exp->after)/1000000.0) : 
-                            exp->after);
+                            (int32)((sim_timer_inst_per_sec ()*ep->after)/1000000.0) : 
+                            ep->after);
         }
     /* Matched data is no longer available for future matching */
     exp->buf_data = exp->buf_ins = 0;
@@ -10911,12 +10986,8 @@ if (snd->insoff+size > snd->bufsize) {
     }
 memcpy(snd->buffer+snd->insoff, data, size);
 snd->insoff += size;
-if (delay)
-    snd->delay = (sim_switches & SWMASK ('T')) ? (uint32)((sim_timer_inst_per_sec()*delay)/1000000.0) : delay;
-if (after)
-    snd->after = (sim_switches & SWMASK ('T')) ? (uint32)((sim_timer_inst_per_sec()*after)/1000000.0) : after;
-if (snd->after == 0)
-    snd->after = snd->delay;
+snd->delay = (sim_switches & SWMASK ('T')) ? (uint32)((sim_timer_inst_per_sec()*delay)/1000000.0) : delay;
+snd->after = (sim_switches & SWMASK ('T')) ? (uint32)((sim_timer_inst_per_sec()*after)/1000000.0) : after;
 snd->next_time = sim_gtime() + snd->after;
 return SCPE_OK;
 }
@@ -10933,6 +11004,7 @@ return SCPE_OK;
 
 t_stat sim_show_send_input (FILE *st, const SEND *snd)
 {
+fprintf (st, "%s\n", tmxr_send_line_name (snd));
 if (snd->extoff < snd->insoff) {
     fprintf (st, "  %d bytes of pending input Data:\n    ", snd->insoff-snd->extoff);
     fprint_buffer_string (st, snd->buffer+snd->extoff, snd->insoff-snd->extoff);

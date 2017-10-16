@@ -773,6 +773,7 @@ struct EXPTAB {
     uint32              size;                           /* match string size */
     char                *match_pattern;                 /* match pattern for format */
     int32               cnt;                            /* proceed count */
+    uint32              after;                          /* delay before halting */
     int32               switches;                       /* flags */
 #define EXP_TYP_PERSIST         (SWMASK ('P'))      /* rule persists after match, default is once a rule matches, it is removed */
 #define EXP_TYP_CLEARALL        (SWMASK ('C'))      /* clear all rules after matching this rule, default is to once a rule matches, it is removed */
@@ -792,7 +793,6 @@ struct EXPECT {
     uint32              dbit;                           /* Debugging Bit */
     EXPTAB              *rules;                         /* match rules */
     int32               size;                           /* count of match rules */
-    uint32              after;                          /* delay before halting */
     uint8               *buf;                           /* buffer of output data which has produced */
     uint32              buf_ins;                        /* buffer insertion point for the next output data */
     uint32              buf_size;                       /* buffer size */

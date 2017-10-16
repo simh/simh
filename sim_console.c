@@ -234,7 +234,7 @@ TMLN sim_con_ldsc = { 0 };                                          /* console l
 TMXR sim_con_tmxr = { 1, 0, 0, &sim_con_ldsc, NULL, &sim_con_telnet };/* console line mux */
 
 
-SEND sim_con_send = {SEND_DEFAULT_DELAY, &sim_con_telnet, DBG_SND};
+SEND sim_con_send = {0, &sim_con_telnet, DBG_SND};
 EXPECT sim_con_expect = {&sim_con_telnet, DBG_EXP};
 
 static t_bool sim_con_console_port = TRUE;
@@ -3969,7 +3969,8 @@ else {
                               (sim_switches & SWMASK ('I')) ? "" : "\n");
     free (mbuf);
     mbuf = sim_encode_quoted_string ((uint8 *)mbuf2, strlen (mbuf2));
-    sim_exp_set (&sim_con_expect, mbuf, 0, sim_con_expect.after, EXP_TYP_PERSIST, NULL);
+    sim_switches = EXP_TYP_PERSIST;
+    sim_set_expect (&sim_con_expect, mbuf);
     free (mbuf);
     free (mbuf2);
     }
@@ -3992,7 +3993,7 @@ else {
 
     rbuf = (uint8 *)malloc (1 + strlen(cptr));
 
-    decode ((char *)rbuf, cptr);                        /* decod string */
+    decode ((char *)rbuf, cptr);                        /* decode string */
     sim_send_input (&sim_con_send, rbuf, strlen((char *)rbuf), 0, 0); /* queue it for output */
     free (rbuf);
     }
@@ -4011,9 +4012,12 @@ if (cptr == NULL || *cptr == 0)                         /* no argument string? *
     return SCPE_2FARG;                                  /* need an argument */
 
 val = (int32) get_uint (cptr, 10, INT_MAX, &r);         /* parse the argument */
+if (r == SCPE_OK) {                                     /* parse OK? */
+    char gbuf[CBUFSIZE];
 
-if (r == SCPE_OK)                                       /* parse OK? */
-    sim_con_expect.after = val;                         /* save the delay value */
+    snprintf (gbuf, sizeof (gbuf), "HALTAFTER=%d", val);
+    expect_cmd (1, gbuf);
+    }
 
 return r;
 }
