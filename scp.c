@@ -6819,7 +6819,8 @@ if ((flag == RU_RUN) || (flag == RU_GO)) {              /* run or go */
                                              (flag == RU_RUN) ? "RUN" : "GO", gbuf, cptr);
         sim_switches = 0;
         GET_SWITCHES (cptr);
-        if ((*cptr == '\'') || (*cptr == '"')) {        /* Expect UNTIL condition */
+        if (((*cptr == '\'') || (*cptr == '"')) ||      /* Expect UNTIL condition */
+            (!sim_strncasecmp(cptr, "HALTAFTER=", 10))) {
             r = expect_cmd (1, cptr);
             if (r != SCPE_OK)
                 return r;
