@@ -2448,7 +2448,7 @@ while (*tptr) {
             if (0 == MATCH_CMD (gbuf, "LOG")) {
                 if ((NULL == cptr) || ('\0' == *cptr))
                     return sim_messagef (SCPE_2FARG, "Missing Log Specifier\n");
-                strncpy(logfiletmpl, cptr, sizeof(logfiletmpl)-1);
+                strlcpy(logfiletmpl, cptr, sizeof(logfiletmpl));
                 continue;
                 }
              if (0 == MATCH_CMD (gbuf, "LOOPBACK")) {
@@ -2514,14 +2514,14 @@ while (*tptr) {
             if (0 == MATCH_CMD (gbuf, "CONNECT")) {
                 if ((NULL == cptr) || ('\0' == *cptr))
                     return sim_messagef (SCPE_2FARG, "Missing Connect Specifier\n");
-                strncpy (destination, cptr, sizeof(destination)-1);
+                strlcpy (destination, cptr, sizeof(destination));
                 continue;
                 }
             if (0 == MATCH_CMD (gbuf, "SPEED")) {
                 if ((NULL == cptr) || ('\0' == *cptr) || 
                     (_tmln_speed_delta (cptr) < 0))
                     return sim_messagef (SCPE_ARG, "Invalid Speed Specifier: %s\n", (cptr ? cptr : ""));
-                strncpy (speed, cptr, sizeof(speed)-1);
+                strlcpy (speed, cptr, sizeof(speed));
                 continue;
                 }
             cptr = get_glyph (gbuf, port, ';');
@@ -2572,7 +2572,7 @@ while (*tptr) {
             char *eptr;
 
             memset (hostport, '\0', sizeof(hostport));
-            strncpy (hostport, destination, sizeof(hostport)-1);
+            strlcpy (hostport, destination, sizeof(hostport));
             if ((eptr = strchr (hostport, ';')))
                 *(eptr++) = '\0';
             if (eptr) {
@@ -2599,16 +2599,17 @@ while (*tptr) {
         if (modem_control != mp->modem_control)
             return SCPE_ARG;
         if (logfiletmpl[0]) {
-            strncpy(mp->logfiletmpl, logfiletmpl, sizeof(mp->logfiletmpl)-1);
+            strlcpy(mp->logfiletmpl, logfiletmpl, sizeof(mp->logfiletmpl));
             for (i = 0; i < mp->lines; i++) {
                 lp = mp->ldsc + i;
                 sim_close_logfile (&lp->txlogref);
                 lp->txlog = NULL;
                 lp->txlogname = (char *)realloc(lp->txlogname, CBUFSIZE);
+                lp->txlogname[CBUFSIZE-1] = '\0';
                 if (mp->lines > 1)
-                    sprintf(lp->txlogname, "%s_%d", mp->logfiletmpl, i);
+                    snprintf(lp->txlogname, CBUFSIZE-1, "%s_%d", mp->logfiletmpl, i);
                 else
-                    strcpy (lp->txlogname, mp->logfiletmpl);
+                    strlcpy (lp->txlogname, mp->logfiletmpl, CBUFSIZE);
                 r = sim_open_logfile (lp->txlogname, TRUE, &lp->txlog, &lp->txlogref);
                 if (r != SCPE_OK) {
                     free (lp->txlogname);
@@ -3624,7 +3625,7 @@ for (i=0; i<tmxr_open_device_count; ++i)
             if (tmxr_open_devices[i]->lines > 1)
                 snprintf (line_name, sizeof (line_name), "%s:%d", tmxr_open_devices[i]->ldsc[j].send.dptr->name, j);
             else
-                strncpy (line_name, tmxr_open_devices[i]->ldsc[j].send.dptr->name, sizeof (line_name));
+                strlcpy (line_name, tmxr_open_devices[i]->ldsc[j].send.dptr->name, sizeof (line_name));
             break;
             }
 return line_name;
@@ -4477,7 +4478,7 @@ if (lp->txlog)                                          /* close existing log */
 lp->txlogname = (char *) calloc (CBUFSIZE, sizeof (char)); /* alloc namebuf */
 if (lp->txlogname == NULL)                              /* can't? */
     return SCPE_MEM;
-strncpy (lp->txlogname, cptr, CBUFSIZE);                /* save file name */
+strlcpy (lp->txlogname, cptr, CBUFSIZE);                /* save file name */
 sim_open_logfile (cptr, TRUE, &lp->txlog, &lp->txlogref);/* open log */
 if (lp->txlog == NULL) {                                /* error? */
     free (lp->txlogname);                               /* free buffer */

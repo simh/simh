@@ -2323,7 +2323,7 @@ if ((!cptr) || (*cptr == '\0'))
 cptr = get_glyph_nc (cptr, gbuf, '"');                  /* get quote delimited token */
 if (gbuf[0] == '\0') {                                  /* Token started with quote */
     gbuf[sizeof (gbuf)-1] = '\0';
-    strncpy (gbuf, cptr, sizeof (gbuf)-1);
+    strlcpy (gbuf, cptr, sizeof (gbuf));
     gptr = strchr (gbuf, '"');
     if (gptr)
         *gptr = '\0';
@@ -3001,7 +3001,7 @@ sim_on_inherit =(sim_switches & SWMASK ('O')) || sim_on_inherit; /* -o means inh
 errabort = sim_switches & SWMASK ('E');                 /* -e means abort on error */
 
 abuf[sizeof(abuf)-1] = '\0';
-strncpy (abuf, fcptr, sizeof(abuf)-1);
+strlcpy (abuf, fcptr, sizeof(abuf));
 c = abuf;
 do_arg[10] = NULL;                                      /* make sure the argument list always ends with a NULL */
 for (nargs = 0; nargs < 10; ) {                         /* extract arguments */
@@ -5235,7 +5235,7 @@ if (sim_is_running)
 if ((!cptr) || (*cptr == 0))
     return SCPE_2FARG;
 gbuf[sizeof(gbuf)-1] = '\0';
-strncpy (gbuf, cptr, sizeof(gbuf)-1);
+strlcpy (gbuf, cptr, sizeof(gbuf));
 sim_trim_endspc(gbuf);
 if (chdir(gbuf) != 0)
     return sim_messagef(SCPE_IOERR, "Unable to directory change to: %s\n", gbuf);
@@ -5531,7 +5531,7 @@ char lbuf[4*CBUFSIZE];
 if ((!cptr) || (*cptr == 0))
     return SCPE_2FARG;
 lbuf[sizeof(lbuf)-1] = '\0';
-strncpy (lbuf, cptr, sizeof(lbuf)-1);
+strlcpy (lbuf, cptr, sizeof(lbuf));
 sim_trim_endspc(lbuf);
 file = sim_fopen (lbuf, "r");
 if (file == NULL) {                         /* open failed? */
@@ -5668,7 +5668,7 @@ if (uptr == NULL)
     return SCPE_IERR;
 max = uptr->capac - 1;
 abuf[sizeof(abuf)-1] = '\0';
-strncpy (abuf, cptr, sizeof(abuf)-1);
+strlcpy (abuf, cptr, sizeof(abuf));
 if ((aptr = strchr (abuf, ';'))) {                      /* ;action? */
     cptr += aptr - abuf + 1;
     if (flg != SSH_ST)                                  /* only on SET */
@@ -5919,7 +5919,7 @@ if (uptr->flags & UNIT_ATT) {                           /* already attached? */
         }
     }
 gbuf[sizeof(gbuf)-1] = '\0';
-strncpy (gbuf, cptr, sizeof(gbuf)-1);
+strlcpy (gbuf, cptr, sizeof(gbuf));
 sim_trim_endspc (gbuf);                                 /* trim trailing spc */
 return scp_attach_unit (dptr, uptr, gbuf);              /* attach */
 }
@@ -5948,7 +5948,7 @@ if ((dptr = find_dev_from_unit (uptr)) == NULL)
 uptr->filename = (char *) calloc (CBUFSIZE, sizeof (char)); /* alloc name buf */
 if (uptr->filename == NULL)
     return SCPE_MEM;
-strncpy (uptr->filename, cptr, CBUFSIZE);               /* save name */
+strlcpy (uptr->filename, cptr, CBUFSIZE);               /* save name */
 if ((sim_switches & SWMASK ('R')) ||                    /* read only? */
     ((uptr->flags & UNIT_RO) != 0)) {
     if (((uptr->flags & UNIT_ROABLE) == 0) &&           /* allowed? */
@@ -6263,7 +6263,7 @@ GET_SWITCHES (cptr);                                    /* get switches */
 if (*cptr == 0)                                         /* must be more */
     return SCPE_2FARG;
 gbuf[sizeof(gbuf)-1] = '\0';
-strncpy (gbuf, cptr, sizeof(gbuf)-1);
+strlcpy (gbuf, cptr, sizeof(gbuf));
 sim_trim_endspc (gbuf);
 if ((sfile = sim_fopen (gbuf, "wb")) == NULL)
     return SCPE_OPENERR;
@@ -6418,7 +6418,7 @@ GET_SWITCHES (cptr);                                    /* get switches */
 if (*cptr == 0)                                         /* must be more */
     return SCPE_2FARG;
 gbuf[sizeof(gbuf)-1] = '\0';
-strncpy (gbuf, cptr, sizeof(gbuf)-1);
+strlcpy (gbuf, cptr, sizeof(gbuf));
 sim_trim_endspc (gbuf);
 if ((rfile = sim_fopen (gbuf, "rb")) == NULL)
     return SCPE_OPENERR;
@@ -7939,7 +7939,7 @@ if (prompt) {                                           /* interactive? */
         if (tmpc == NULL)                               /* bad result? */
             cptr = NULL;
         else {
-            strncpy (cptr, tmpc, size);                 /* copy result */
+            strlcpy (cptr, tmpc, size);                 /* copy result */
             free (tmpc) ;                               /* free temp */
             }
         }
@@ -10114,7 +10114,7 @@ if ((act != NULL) && (*act != 0)) {                     /* new action? */
     char *newp = (char *) calloc (CBUFSIZE+1, sizeof (char)); /* alloc buf */
     if (newp == NULL)                                   /* mem err? */
         return SCPE_MEM;
-    strncpy (newp, act, CBUFSIZE);                      /* copy action */
+    strlcpy (newp, act, CBUFSIZE);                      /* copy action */
     bp->act = newp;                                     /* set pointer */
     }
 sim_brk_summ = sim_brk_summ | (sw & ~BRK_TYP_TEMP);
@@ -10342,7 +10342,7 @@ if ((ep = strchr (sim_brk_act[sim_do_depth], ';'))) {   /* cmd delimiter? */
     sim_brk_act[sim_do_depth] += lnt + 1;               /* adv ptr */
     }
 else {
-    strncpy (buf, sim_brk_act[sim_do_depth], size);     /* copy action */
+    strlcpy (buf, sim_brk_act[sim_do_depth], size);     /* copy action */
     sim_brk_clract ();                                  /* no more */
     }
 return buf;
@@ -10729,7 +10729,7 @@ return SCPE_OK;
 
 t_stat sim_exp_show_tab (FILE *st, const EXPECT *exp, const EXPTAB *ep)
 {
-const char *dev_name = dev_name = tmxr_expect_line_name (exp);
+const char *dev_name = tmxr_expect_line_name (exp);
 uint32 default_haltafter = get_default_env_parameter (dev_name, "SIM_EXPECT_HALTAFTER", 0);
 
 if (!ep)
@@ -10757,7 +10757,7 @@ return SCPE_OK;
 t_stat sim_exp_show (FILE *st, CONST EXPECT *exp, const char *match)
 {
 CONST EXPTAB *ep = (CONST EXPTAB *)sim_exp_fnd (exp, match, 0);
-const char *dev_name = dev_name = tmxr_expect_line_name (exp);
+const char *dev_name = tmxr_expect_line_name (exp);
 uint32 default_haltafter = get_default_env_parameter (dev_name, "SIM_EXPECT_HALTAFTER", 0);
 
 if (exp->buf_size) {
@@ -12419,7 +12419,7 @@ if (fp == NULL) {
          * of the executable.  Failing that, we're out of luck.
          */
         fbuf[sizeof(fbuf)-1] = '\0';
-        strncpy (fbuf, sim_argv[0], sizeof (fbuf)-1);
+        strlcpy (fbuf, sim_argv[0], sizeof (fbuf));
         if ((p = (char *)match_ext (fbuf, "EXE")))
             *p = '\0';
         if ((p = strrchr (fbuf, '\\'))) {
