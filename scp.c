@@ -582,6 +582,7 @@ static int32 sim_do_echo = 0;                           /* the echo status of th
 static int32 sim_show_message = 1;                      /* the message display status of the currently open do file */
 static int32 sim_on_inherit = 0;                        /* the inherit status of on state and conditions when executing do files */
 static int32 sim_do_depth = 0;
+static t_bool sim_cmd_echoed = FALSE;                   /* Command was emitted already prior to message output */
 
 static int32 sim_on_check[MAX_DO_NEST_LVL+1];
 static char *sim_on_actions[MAX_DO_NEST_LVL+1][SCPE_MAX_ERR+1];
@@ -985,7 +986,7 @@ static const char simh_help[] =
       " attached read only, its contents can be examined but not modified.\n"
       "5-q\n"
       " If the -q switch is specified when creating a new file (-n) or opening one\n"
-      " read only (-r), the message announcing this fact is suppressed.\n"
+      " read only (-r), any messages announcing these facts will be suppressed.\n"
       "5-f\n"
       " For simulated magnetic tapes, the ATTACH command can specify the format of\n"
       " the attached tape image file:\n\n"
@@ -2283,6 +2284,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         }
     if (*cptr == 0)                                     /* ignore blank */
         continue;
+    sim_cmd_echoed = TRUE;
     sim_sub_args (cbuf, sizeof(cbuf), argv);
     if (sim_log)                                        /* log cmd */
         fprintf (sim_log, "%s%s\n", sim_prompt, cptr);
@@ -3089,6 +3091,7 @@ do {
         continue;
     if (echo)                                           /* echo if -v */
         sim_printf("%s> %s\n", do_position(), cptr);
+    sim_cmd_echoed = echo;
     if (*cptr == ':')                                   /* ignore label */
         continue;
     cptr = get_glyph_cmd (cptr, gbuf);                  /* get command glyph */
@@ -5958,18 +5961,14 @@ if ((sim_switches & SWMASK ('R')) ||                    /* read only? */
     if (uptr->fileref == NULL)                          /* open fail? */
         return attach_err (uptr, SCPE_OPENERR);         /* yes, error */
     uptr->flags = uptr->flags | UNIT_RO;                /* set rd only */
-    if (!sim_quiet && !(sim_switches & SWMASK ('Q'))) {
-        sim_printf ("%s: unit is read only\n", sim_dname (dptr));
-        }
+    sim_messagef (SCPE_OK, "%s: unit is read only\n", sim_dname (dptr));
     }
 else {
     if (sim_switches & SWMASK ('N')) {                  /* new file only? */
         uptr->fileref = sim_fopen (cptr, "wb+");        /* open new file */
         if (uptr->fileref == NULL)                      /* open fail? */
             return attach_err (uptr, SCPE_OPENERR);     /* yes, error */
-        if (!sim_quiet && !(sim_switches & SWMASK ('Q'))) {
-            sim_printf ("%s: creating new file\n", sim_dname (dptr));
-            }
+        sim_messagef (SCPE_OK, "%s: creating new file\n", sim_dname (dptr));
         }
     else {                                              /* normal */
         uptr->fileref = sim_fopen (cptr, "rb+");        /* open r/w */
@@ -5985,9 +5984,7 @@ else {
                 if (uptr->fileref == NULL)              /* open fail? */
                     return attach_err (uptr, SCPE_OPENERR); /* yes, error */
                 uptr->flags = uptr->flags | UNIT_RO;    /* set rd only */
-                if (!sim_quiet) {
-                    sim_printf ("%s: unit is read only\n", sim_dname (dptr));
-                    }
+                sim_messagef (SCPE_OK, "%s: unit is read only\n", sim_dname (dptr));
                 }
             else {                                      /* doesn't exist */
                 if (sim_switches & SWMASK ('E'))        /* must exist? */
@@ -5995,9 +5992,7 @@ else {
                 uptr->fileref = sim_fopen (cptr, "wb+");/* open new file */
                 if (uptr->fileref == NULL)              /* open fail? */
                     return attach_err (uptr, SCPE_OPENERR); /* yes, error */
-                if (!sim_quiet) {
-                    sim_printf ("%s: creating new file\n", sim_dname (dptr));
-                    }
+                sim_messagef (SCPE_OK, "%s: creating new file\n", sim_dname (dptr));
                 }
             }                                           /* end if null */
         }                                               /* end else */
@@ -6008,9 +6003,7 @@ if (uptr->flags & UNIT_BUFABLE) {                       /* buffer? */
         uptr->filebuf = calloc (cap, SZ_D (dptr));      /* allocate */
     if (uptr->filebuf == NULL)                          /* no buffer? */
         return attach_err (uptr, SCPE_MEM);             /* error */
-    if (!sim_quiet) {
-        sim_printf ("%s: buffering file in memory\n", sim_dname (dptr));
-        }
+    sim_messagef (SCPE_OK, "%s: buffering file in memory\n", sim_dname (dptr));
     uptr->hwmark = (uint32)sim_fread (uptr->filebuf,    /* read file */
         SZ_D (dptr), cap, uptr->fileref);
     uptr->flags = uptr->flags | UNIT_BUF;               /* set buffered */
@@ -6126,9 +6119,7 @@ if ((dptr = find_dev_from_unit (uptr)) == NULL)
 if ((uptr->flags & UNIT_BUF) && (uptr->filebuf)) {
     uint32 cap = (uptr->hwmark + dptr->aincr - 1) / dptr->aincr;
     if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {
-        if (!sim_quiet) {
-            sim_printf ("%s: writing buffer to file\n", sim_dname (dptr));
-            }
+        sim_messagef (SCPE_OK, "%s: writing buffer to file\n", sim_dname (dptr));
         rewind (uptr->fileref);
         sim_fwrite (uptr->filebuf, SZ_D (dptr), cap, uptr->fileref);
         if (ferror (uptr->fileref))
@@ -11315,6 +11306,8 @@ int32 len;
 va_list arglist;
 t_bool inhibit_message = (!sim_show_message || (stat & SCPE_NOMESSAGE));
 
+if ((stat == SCPE_OK) && (sim_quiet || (sim_switches & SWMASK ('Q'))))
+    return stat;
 while (1) {                                         /* format passed string, args */
     va_start (arglist, fmt);
 #if defined(NO_vsnprintf)
@@ -11341,10 +11334,11 @@ while (1) {                                         /* format passed string, arg
     break;
     }
 
-if ((sim_do_ocptr[sim_do_depth]) &&
-    ((stat & ~SCPE_NOMESSAGE) != SCPE_OK)) {
-    if (!sim_do_echo && !sim_quiet && !inhibit_message)
+if (sim_do_ocptr[sim_do_depth]) {
+    if (!sim_do_echo && !sim_quiet && !inhibit_message && !sim_cmd_echoed) {
         sim_printf("%s> %s\n", do_position(), sim_do_ocptr[sim_do_depth]);
+        sim_cmd_echoed = TRUE;
+        }
     else {
         if (sim_deb) {                      /* Always put context in debug output */
             TMLN *saved_oline = sim_oline;
