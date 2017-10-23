@@ -3174,8 +3174,8 @@ if (flag >= 0) {
     sim_do_echo = saved_sim_do_echo;                    /* restore echo state we entered with */
     sim_show_message = saved_sim_show_message;          /* restore message display state we entered with */
     sim_on_inherit = saved_sim_on_inherit;              /* restore ON inheritance state we entered with */
+    sim_quiet = saved_sim_quiet;                        /* restore quiet mode we entered with */
     }
-sim_quiet = saved_sim_quiet;                            /* restore quiet mode we entered with */
 if ((flag >= 0) || (!sim_on_inherit)) {
     for (i=0; i<SCPE_MAX_ERR; i++) {                    /* release any on commands */
         free (sim_on_actions[sim_do_depth][i]);
