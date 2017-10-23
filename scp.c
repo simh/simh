@@ -11335,7 +11335,7 @@ while (1) {                                         /* format passed string, arg
     }
 
 if (sim_do_ocptr[sim_do_depth]) {
-    if (!sim_do_echo && !sim_quiet && !inhibit_message && !sim_cmd_echoed) {
+    if (!sim_do_echo && !inhibit_message && !sim_cmd_echoed) {
         sim_printf("%s> %s\n", do_position(), sim_do_ocptr[sim_do_depth]);
         sim_cmd_echoed = TRUE;
         }
