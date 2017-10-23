@@ -3140,7 +3140,7 @@ do {
         }
     if ((stat >= SCPE_BASE) && (stat != SCPE_EXIT) &&   /* error from cmd? */
         (stat != SCPE_STEP)) {
-        if (!echo && !sim_quiet &&                      /* report if not echoing */
+        if (!echo &&                                    /* report if not echoing */
             !stat_nomessage &&                          /* and not suppressing messages */
             !(cmdp && cmdp->message)) {                 /* and not handling them specially */
             sim_printf("%s> %s\n", do_position(), sim_do_ocptr[sim_do_depth]);
