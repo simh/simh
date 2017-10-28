@@ -701,7 +701,7 @@ if (lp->serport) {                                      /* serial port connectio
         return 0;
     written = sim_write_serial (lp->serport, &(lp->txb[i]), length);
     if (written > 0)
-        lp->txnexttime = floor (sim_gtime () + (lp->txdelta * sim_timer_inst_per_sec ()));
+        lp->txnexttime = floor (sim_gtime () + (written * lp->txdelta * sim_timer_inst_per_sec ()));
     return written;
     }
 else {                                                  /* Telnet connection */

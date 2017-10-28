@@ -879,18 +879,10 @@ return read;                                            /* return the number of 
 
 int32 sim_write_serial (SERHANDLE port, char *buffer, int32 count)
 {
-if (WaitForSingleObject (port->oWriteReady.hEvent, 0) == WAIT_TIMEOUT)
-    return 0;
 if ((!WriteFile (port->hPort, (LPVOID) buffer,   /* write the buffer to the serial port */
                  (DWORD) count, NULL, &port->oWriteSync)) &&
     (GetLastError () != ERROR_IO_PENDING)) {
     sim_error_serial ("WriteFile",              /* function failed; report unexpected error */
-                      (int) GetLastError ());
-    return -1;                                  /* return failure to caller */
-    }
-if ((!WaitCommEvent (port->hPort, &port->dwEvtMask, &port->oWriteReady)) &&
-    (GetLastError () != ERROR_IO_PENDING)) {
-    sim_error_serial ("WaitCommEvent",          /* function failed; report unexpected error */
                       (int) GetLastError ());
     return -1;                                  /* return failure to caller */
     }
