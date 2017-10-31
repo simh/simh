@@ -1,6 +1,6 @@
 /* sim_serial.h: OS-dependent serial port routines header file
 
-   Copyright (c) 2008, J. David Bryan
+   Copyright (c) 2008, J. David Bryan, Mark Pizzolato
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from the author.
 
    07-Oct-08    JDB     [serial] Created file
+   22-Apr-12    MP      Adapted from code originally written by J. David Bryan
+
 */
 
 

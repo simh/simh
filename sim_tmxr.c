@@ -697,10 +697,10 @@ if (lp->loopback)
     return loop_write (lp, &(lp->txb[i]), length);
 
 if (lp->serport) {                                      /* serial port connection? */
-    if (sim_gtime () < lp->txnexttime)
+    if ((sim_gtime () < lp->txnexttime) && (sim_is_running))
         return 0;
     written = sim_write_serial (lp->serport, &(lp->txb[i]), length);
-    if (written > 0)
+    if ((written > 0) && (sim_is_running))
         lp->txnexttime = floor (sim_gtime () + (written * lp->txdelta * sim_timer_inst_per_sec ()));
     return written;
     }
@@ -2724,7 +2724,9 @@ while (*tptr) {
                     sim_control_serial (lp->serport, TMXR_MDM_DTR|TMXR_MDM_RTS, 0, NULL);
                 lp->cnms = sim_os_msec ();                  /* record time of connection */
                 if (sim_switches & SWMASK ('V')) {          /* -V flag reports connection on port */
-                    sim_os_ms_sleep (TMXR_DTR_DROP_TIME);
+                    sim_os_ms_sleep (TMXR_DTR_DROP_TIME);   /* Wait for DTR to be noticed */
+                    lp->ser_connect_pending = FALSE;        /* Mark line as ready for action */
+                    lp->conn = TRUE;
                     tmxr_report_connection (mp, lp);        /* report the connection to the line */
                     }
                 }
@@ -2833,7 +2835,9 @@ while (*tptr) {
                     sim_control_serial (lp->serport, TMXR_MDM_DTR|TMXR_MDM_RTS, 0, NULL);
                 lp->cnms = sim_os_msec ();                  /* record time of connection */
                 if (sim_switches & SWMASK ('V')) {          /* -V flag reports connection on port */
-                    sim_os_ms_sleep (TMXR_DTR_DROP_TIME);
+                    sim_os_ms_sleep (TMXR_DTR_DROP_TIME);   /* Wait for DTR to be noticed */
+                    lp->ser_connect_pending = FALSE;        /* Mark line as ready for action */
+                    lp->conn = TRUE;
                     tmxr_report_connection (mp, lp);        /* report the connection to the line */
                     }
                 }
@@ -3661,6 +3665,9 @@ t_stat tmxr_attach_ex (TMXR *mp, UNIT *uptr, CONST char *cptr, t_bool async)
 t_stat r;
 int32 i;
 
+if (mp->dptr == NULL)                                   /* has device been set? */
+    mp->dptr = find_dev_from_unit (uptr);               /* no, so set device now */
+
 r = tmxr_open_master (mp, cptr);                        /* open master socket */
 if (r != SCPE_OK)                                       /* error? */
     return r;
@@ -3680,9 +3687,6 @@ if (!async || (uptr->flags & TMUF_NOASYNCH))            /* if asynch disabled */
 #else
 uptr->dynflags |= TMUF_NOASYNCH;                        /* tag as no asynch */
 #endif
-
-if (mp->dptr == NULL)                                   /* has device been set? */
-    mp->dptr = find_dev_from_unit (uptr);               /* no, so set device now */
 
 if (mp->dptr) {
     for (i=0; i<mp->lines; i++) {
