@@ -543,11 +543,20 @@ else
 
 psave = lp->txbpi;                                      /* save insertion pointer */
 lp->txbpi = lp->txbpr;                                  /* insert connection message */
+if ((lp->serport) && (!sim_is_running)) {
+    sim_os_ms_sleep (TMXR_DTR_DROP_TIME);               /* Wait for DTR to be noticed */
+    lp->ser_connect_pending = FALSE;                    /* Mark line as ready for action */
+    lp->conn = TRUE;
+    }
 tmxr_linemsg (lp, msgbuf);                              /* beginning of buffer */
 lp->txbpi = psave;                                      /* restore insertion pointer */
 
 unwritten = tmxr_send_buffered_data (lp);               /* send the message */
 
+if ((lp->serport) && (!sim_is_running)) {
+    lp->ser_connect_pending = TRUE;                     /* Mark line as not yet ready for action */
+    lp->conn = FALSE;
+    }
 if (unwritten == 0)                                     /* buffer now empty? */
     lp->xmte = 1;                                       /* reenable transmission if paused */
 
@@ -2723,12 +2732,8 @@ while (*tptr) {
                 if (!lp->mp->modem_control)                 /* raise DTR and RTS for non modem control lines */
                     sim_control_serial (lp->serport, TMXR_MDM_DTR|TMXR_MDM_RTS, 0, NULL);
                 lp->cnms = sim_os_msec ();                  /* record time of connection */
-                if (sim_switches & SWMASK ('V')) {          /* -V flag reports connection on port */
-                    sim_os_ms_sleep (TMXR_DTR_DROP_TIME);   /* Wait for DTR to be noticed */
-                    lp->ser_connect_pending = FALSE;        /* Mark line as ready for action */
-                    lp->conn = TRUE;
+                if (sim_switches & SWMASK ('V'))            /* -V flag reports connection on port */
                     tmxr_report_connection (mp, lp);        /* report the connection to the line */
-                    }
                 }
             else {
                 lp->datagram = datagram;
@@ -2834,12 +2839,8 @@ while (*tptr) {
                 if (!lp->mp->modem_control)                 /* raise DTR and RTS for non modem control lines */
                     sim_control_serial (lp->serport, TMXR_MDM_DTR|TMXR_MDM_RTS, 0, NULL);
                 lp->cnms = sim_os_msec ();                  /* record time of connection */
-                if (sim_switches & SWMASK ('V')) {          /* -V flag reports connection on port */
-                    sim_os_ms_sleep (TMXR_DTR_DROP_TIME);   /* Wait for DTR to be noticed */
-                    lp->ser_connect_pending = FALSE;        /* Mark line as ready for action */
-                    lp->conn = TRUE;
+                if (sim_switches & SWMASK ('V'))            /* -V flag reports connection on port */
                     tmxr_report_connection (mp, lp);        /* report the connection to the line */
-                    }
                 }
             else {
                 lp->datagram = datagram;
