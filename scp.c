@@ -1775,9 +1775,9 @@ ASSERT      failure have several different actions:
       " delay has expired, only a single EXPECT rule can be defined if a non-zero\n"
       " HaltAfter parameter has been set.\n"
       /***************** 80 character line width template *************************/
-#define HLP_SLEEP       "*Commands Waiting_For_Time"
-      "3Waiting For Time\n"
-      " A simulator command file may wait for a specific period of time with the\n"
+#define HLP_SLEEP       "*Commands Executing_Command_Files Pausing_Command_Execution"
+      "3Pausing Command Execution\n"
+      " A simulator command file may wait for a specific period of time with the\n\n"
       "++SLEEP NUMBER[SUFFIX]...\n\n"
       " Pause for NUMBER seconds.  SUFFIX may be 's' for seconds (the default),\n"
       " 'm' for minutes, 'h' for hours or 'd' for days.  NUMBER may be an\n"
