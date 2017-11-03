@@ -1775,6 +1775,15 @@ ASSERT      failure have several different actions:
       " delay has expired, only a single EXPECT rule can be defined if a non-zero\n"
       " HaltAfter parameter has been set.\n"
       /***************** 80 character line width template *************************/
+#define HLP_SLEEP       "*Commands Waiting_For_Time"
+      "3Waiting For Time\n"
+      " A simulator command file may wait for a specific period of time with the\n"
+      "++SLEEP NUMBER[SUFFIX]...\n\n"
+      " Pause for NUMBER seconds.  SUFFIX may be 's' for seconds (the default),\n"
+      " 'm' for minutes, 'h' for hours or 'd' for days.  NUMBER may be an\n"
+      " arbitrary floating point number.  Given two or more arguments, pause\n"
+      " for the amount of time specified by the sum of their values.\n\n"
+      /***************** 80 character line width template *************************/
 #define HLP_ASSERT      "*Commands Executing_Command_Files Testing_Simulator_State"
 #define HLP_IF          "*Commands Executing_Command_Files Testing_Simulator_State"
       "3Testing Simulator State\n"
@@ -1967,6 +1976,7 @@ static CTAB cmd_table[] = {
     { "NOSEND",     &send_cmd,      0,          HLP_SEND },
     { "EXPECT",     &expect_cmd,    1,          HLP_EXPECT },
     { "NOEXPECT",   &expect_cmd,    0,          HLP_EXPECT },
+    { "SLEEP",      &sleep_cmd,     0,          HLP_SLEEP },
     { "!",          &spawn_cmd,     0,          HLP_SPAWN },
     { "HELP",       &help_cmd,      0,          HLP_HELP },
 #if defined(USE_SIM_VIDEO)
@@ -3943,6 +3953,52 @@ if (*cptr && (cptr[strlen(cptr)-1] != '"') && (cptr[strlen(cptr)-1] != '\''))
 return sim_exp_show (st, exp, gbuf);
 }
 
+
+/* Sleep command */
+
+t_stat sleep_cmd (int32 flag, CONST char *cptr)
+{
+char *tptr;
+double wait;
+
+while (*cptr) {
+    wait = strtod (cptr, &tptr);
+    switch (*tptr) {
+        case ' ':
+        case '\t':
+        case '\0':
+            break;
+        case 's':
+        case 'S':
+            ++tptr;
+            break;
+        case 'm':
+        case 'M':
+            ++tptr;
+            wait *= 60.0;
+            break;
+        case 'h':
+        case 'H':
+            ++tptr;
+            wait *= (60.0*60.0);
+            break;
+        case 'd':
+        case 'D':
+            ++tptr;
+            wait *= (24.0*60.0*60.0);
+            break;
+        default:
+            return sim_messagef (SCPE_ARG, "Invalid Sleep unit '%c'\n", *cptr);
+        }
+    wait *= 1000.0;                             /* Convert to Milliseconds */
+    cptr = tptr;
+    while (wait > 1000.0)
+        wait -= sim_os_ms_sleep (1000);
+    if (wait > 0.0)
+        sim_os_ms_sleep ((unsigned)wait);
+    }
+return SCPE_OK;
+}
 
 /* Goto command */
 

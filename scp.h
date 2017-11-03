@@ -103,6 +103,7 @@ t_stat noop_cmd (int32 flag, CONST char *ptr);
 t_stat assert_cmd (int32 flag, CONST char *ptr);
 t_stat send_cmd (int32 flag, CONST char *ptr);
 t_stat expect_cmd (int32 flag, CONST char *ptr);
+t_stat sleep_cmd (int32 flag, CONST char *ptr);
 t_stat help_cmd (int32 flag, CONST char *ptr);
 t_stat screenshot_cmd (int32 flag, CONST char *ptr);
 t_stat spawn_cmd (int32 flag, CONST char *ptr);
