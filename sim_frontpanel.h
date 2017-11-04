@@ -56,7 +56,7 @@ extern "C" {
 
 #if !defined(__VAX)         /* Unsupported platform */
 
-#define SIM_FRONTPANEL_VERSION   4
+#define SIM_FRONTPANEL_VERSION   5
 
 /**
 
@@ -194,7 +194,7 @@ sim_panel_add_register_indirect_bits (PANEL *panel,
     the values contained in the set of registers it has declared interest in via
     the sim_panel_add_register APIs.
     
-       1)  The values can be polled (when ever it is desired) by calling
+       1)  The values can be polled (whenever it is desired) by calling
            sim_panel_get_registers().
        2)  The panel can call sim_panel_set_display_callback_interval() to 
            specify a callback routine and a periodic rate that the callback 
@@ -254,6 +254,8 @@ sim_panel_set_sampling_parameters (PANEL *panel,
     sim_panel_exec_halt     - Stop instruction execution
     sim_panel_exec_boot     - Boot a simulator from a specific device
     sim_panel_exec_run      - Start/Resume a simulator running instructions
+    sim_panel_exec_start    - Start a simulator running instructions 
+                              after resetting all devices
     sim_panel_exec_step     - Have a simulator execute a single step
  */
 
@@ -262,6 +264,9 @@ sim_panel_exec_halt (PANEL *panel);
 
 int
 sim_panel_exec_boot (PANEL *panel, const char *device);
+
+int
+sim_panel_exec_start (PANEL *panel);
 
 int
 sim_panel_exec_run (PANEL *panel);
@@ -475,18 +480,15 @@ void sim_panel_clear_error (void);
 
     The panek<->simulator wire protocol can be traced if protocol problems arise.
     
-    sim_panel_set_debug_file    - Specifies the log file to record debug traffic
     sim_panel_set_debug_mode    - Specifies the debug detail to be recorded
     sim_panel_flush_debug       - Flushes debug output to disk
 
  */
-void
-sim_panel_set_debug_file (PANEL *panel, const char *debug_file);
-
 #define DBG_XMT         1   /* Transmit Data */
 #define DBG_RCV         2   /* Receive Data */
 #define DBG_REQ         4   /* Request Data */
 #define DBG_RSP         8   /* Response Data */
+#define DBG_THR        16   /* Thread Activities */
 
 void
 sim_panel_set_debug_mode (PANEL *panel, int debug_bits);

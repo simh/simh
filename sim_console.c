@@ -1916,6 +1916,7 @@ if (sim_rem_master_mode) {
     sim_printf ("Command input starting on Master Remote Console Session\n");
     stat = sim_run_boot_prep (0);
     sim_rem_master_was_enabled = TRUE;
+    sim_last_cmd_stat = SCPE_OK;
     while (sim_rem_master_mode) {
         sim_rem_consoles[0].single_mode = FALSE;
         sim_cancel (rem_con_data_unit);
@@ -1925,8 +1926,14 @@ if (sim_rem_master_mode) {
             stat_nomessage = stat & SCPE_NOMESSAGE;         /* extract possible message supression flag */
             stat = _sim_rem_message ("RUN", stat);
             }
+        sim_debug (DBG_MOD, &sim_remote_console, "Master Session Returned: Status - %d Active_Line: %d, Mode: %s, Active Cmd: %s\n", stat, sim_rem_cmd_active_line, sim_rem_consoles[0].single_mode ? "Single" : "^E Stopped", sim_rem_active_command ? sim_rem_active_command->name : "");
         if (stat == SCPE_EXIT)
             sim_rem_master_mode = FALSE;
+        sim_rem_cmd_active_line = 0;                    /* Make it look like */
+        sim_rem_consoles[0].single_mode = FALSE;
+        if (stat != SCPE_STEP)
+            sim_rem_active_command = &allowed_single_remote_cmds[0];/* Dummy */
+        sim_last_cmd_stat = SCPE_BARE_STATUS(stat);     /* make exit status available to remote console */
         }
     sim_rem_master_was_enabled = FALSE;
     sim_rem_master_was_connected = FALSE;

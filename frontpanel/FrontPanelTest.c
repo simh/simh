@@ -153,7 +153,7 @@ if ((f = fopen (sim_config, "w"))) {
     if (debug) {
         fprintf (f, "set verbose\n");
         fprintf (f, "set debug -n -a simulator.dbg\n");
-        fprintf (f, "set cpu conhalt\n");
+        fprintf (f, "set cpu simhalt\n");
         fprintf (f, "set remote telnet=2226\n");
         fprintf (f, "set rem-con debug=XMT;RCV;MODE;REPEAT;CMD\n");
         fprintf (f, "set remote notelnet\n");
@@ -187,13 +187,53 @@ if (!panel) {
     }
 
 if (debug) {
-    sim_panel_set_debug_mode (panel, DBG_XMT|DBG_RCV|DBG_REQ|DBG_RSP);
+    sim_panel_set_debug_mode (panel, DBG_XMT|DBG_RCV|DBG_REQ|DBG_RSP|DBG_THR);
     }
-tape = sim_panel_add_device_panel (panel, "TAPE DRIVE");
+if (1) {
+    tape = sim_panel_add_device_panel (panel, "TAPE DRIVE");
 
-if (!tape) {
-    printf ("Error adding tape device to simulator: %s\n", sim_panel_get_error());
-    goto Done;
+    if (!tape) {
+        printf ("Error adding tape device to simulator: %s\n", sim_panel_get_error());
+        goto Done;
+        }
+    if (debug) {
+        sim_panel_set_debug_mode (tape, DBG_XMT|DBG_RCV|DBG_REQ|DBG_RSP|DBG_THR);
+        }
+    }
+if (1) {
+    long noop_noop_noop_halt = 0x00010101, addr400 = 0x00000400, pc_value;
+    int mstime = 0;
+
+    if (sim_panel_mem_deposit (panel, sizeof(addr400), &addr400, sizeof(noop_noop_noop_halt), &noop_noop_noop_halt)) {
+        printf ("Error setting 00000000 to %08X: %s\n", noop_noop_noop_halt, sim_panel_get_error());
+        goto Done;
+        }
+    if (sim_panel_gen_deposit (panel, "PC", sizeof(addr400), &addr400)) {
+        printf ("Error setting PC to %08X: %s\n", addr400, sim_panel_get_error());
+        goto Done;
+        }
+    if (sim_panel_exec_start (panel)) {
+        printf ("Error starting simulator execution: %s\n", sim_panel_get_error());
+        goto Done;
+        }
+    while ((sim_panel_get_state (panel) == Run) &&
+           (mstime < 1000)) {
+        usleep (100000);
+        mstime += 100;
+        }
+    if (sim_panel_get_state (panel) != Halt) {
+        printf ("Unexpected execution state not Halt: %d\n", sim_panel_get_state (panel));
+        goto Done;
+        }
+    pc_value = 0;
+    if (sim_panel_gen_examine (panel, "PC", sizeof(pc_value), &pc_value)) {
+        printf ("Unexpected error getting PC value: %s\n", sim_panel_get_error());
+        goto Done;
+        }
+    if (pc_value != addr400 + 4) {
+        printf ("Unexpected error getting PC value: %08X, expected: %08X\n", pc_value, addr400 + 4);
+        goto Done;
+        }
     }
 
 if (sim_panel_add_register_array (panel, "PCQ",  NULL, sizeof(PCQ)/sizeof(PCQ[0]), sizeof(PCQ[0]), &PCQ)) {
@@ -328,7 +368,7 @@ if (!sim_panel_dismount (panel, "RL0")) {
     printf ("Unexpected success while dismounting media file from non mounted RL0: %s\n", sim_panel_get_error());
     goto Done;
     }
-if (sim_panel_mount (panel, "RL0", "-N", "TEST-RL.DSK")) {
+if (sim_panel_mount (panel, "RL0", "-NQ", "TEST-RL.DSK")) {
     printf ("Error while mounting media file TEST-RL.DSK on RL0: %s\n", sim_panel_get_error());
     goto Done;
     }
@@ -389,6 +429,42 @@ if (sim_panel_add_register_bits (panel, "PC",  NULL, 32, PC_bits)) {
     printf ("Error adding register 'PSL' bits: %s\n", sim_panel_get_error());
     goto Done;
     }
+if (1) {
+    long noop_noop_noop_halt = 0x00010101, addr400 = 0x00000400, pc_value;
+    int mstime = 0;
+
+    if (sim_panel_mem_deposit (panel, sizeof(addr400), &addr400, sizeof(noop_noop_noop_halt), &noop_noop_noop_halt)) {
+        printf ("Error setting 00000000 to %08X: %s\n", noop_noop_noop_halt, sim_panel_get_error());
+        goto Done;
+        }
+    if (sim_panel_gen_deposit (panel, "PC", sizeof(addr400), &addr400)) {
+        printf ("Error setting PC to %08X: %s\n", addr400, sim_panel_get_error());
+        goto Done;
+        }
+    if (sim_panel_exec_run(panel)) {
+        printf ("Error starting simulator execution: %s\n", sim_panel_get_error());
+        goto Done;
+        }
+    while ((sim_panel_get_state (panel) == Run) &&
+           (mstime < 1000)) {
+        usleep (100000);
+        mstime += 100;
+        }
+    if (sim_panel_get_state (panel) != Halt) {
+        printf ("Unexpected execution state not Halt\n");
+        goto Done;
+        }
+    pc_value = 0;
+    if (sim_panel_gen_examine (panel, "PC", sizeof(pc_value), &pc_value)) {
+        printf ("Unexpected error getting PC value: %s\n", sim_panel_get_error());
+        goto Done;
+        }
+    if (pc_value != addr400 + 4) {
+        printf ("Unexpected error getting PC value: %08X, expected: %08X\n", pc_value, addr400 + 4);
+        goto Done;
+        }
+    }
+
 
 sim_panel_clear_error ();
 while (1) {
