@@ -201,7 +201,7 @@ if (1) {
         }
     }
 if (1) {
-    long noop_noop_noop_halt = 0x00010101, addr400 = 0x00000400, pc_value;
+    unsigned int noop_noop_noop_halt = 0x00010101, addr400 = 0x00000400, pc_value;
     int mstime = 0;
 
     if (sim_panel_mem_deposit (panel, sizeof(addr400), &addr400, sizeof(noop_noop_noop_halt), &noop_noop_noop_halt)) {
@@ -321,7 +321,7 @@ if (sim_panel_get_registers (panel, NULL)) {
     goto Done;
     }
 if (1) {
-    long deadbeef = 0xdeadbeef, beefdead = 0xbeefdead, addr200 = 0x00000200, beefdata;
+    unsigned int deadbeef = 0xdeadbeef, beefdead = 0xbeefdead, addr200 = 0x00000200, beefdata;
 
     if (sim_panel_set_register_value (panel, "R0", "DEADBEEF")) {
         printf ("Error setting R0 to DEADBEEF: %s\n", sim_panel_get_error());
@@ -430,7 +430,7 @@ if (sim_panel_add_register_bits (panel, "PC",  NULL, 32, PC_bits)) {
     goto Done;
     }
 if (1) {
-    long noop_noop_noop_halt = 0x00010101, addr400 = 0x00000400, pc_value;
+    unsigned int noop_noop_noop_halt = 0x00010101, addr400 = 0x00000400, pc_value;
     int mstime = 0;
 
     if (sim_panel_mem_deposit (panel, sizeof(addr400), &addr400, sizeof(noop_noop_noop_halt), &noop_noop_noop_halt)) {
