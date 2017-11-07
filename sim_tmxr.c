@@ -4454,7 +4454,9 @@ if (lp == NULL)                                                 /* bad line numb
 if ((lp->sock) || (lp->serport)) {                              /* connection active? */
     if (!lp->notelnet)
         tmxr_linemsg (lp, "\r\nOperator disconnected line\r\n\n");/* report closure */
-    tmxr_reset_ln_ex (lp, (sim_switches & SWMASK ('C')));       /* drop the line */
+    if (lp->serport && (sim_switches & SWMASK ('C')))
+        return tmxr_detach_ln (lp);
+    return tmxr_reset_ln_ex (lp, FALSE);                        /* drop the line */
     }
 
 return SCPE_OK;
