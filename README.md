@@ -304,6 +304,7 @@ The EXPECT command now exists to provide a means of reacting to simulator output
     NEXT                             Step across a subroutine call or step a single instruction.
     EXPECT                           React to output produced by a simulated system
     SEND                             Inject input to a simulated system's console
+    SLEEP time                       Pause command execution for specified time
     SCREENSHOT                       Snapshot the current video display window
     RUN UNTIL breakpoint             Establish the breakpoiunt specified and run until it is encountered
     RUN UNTIL "output-string" ...    Establish the specified "output-string" as an EXPECT and run until it is encountered.
