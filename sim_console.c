@@ -503,6 +503,7 @@ struct REMOTE {
     t_bool          repeat_pending;         /* repeat delivery pending */
     char            *repeat_action;         /* command(s) to repeatedly execute */
     int             smp_sample_interval;    /* cycles between samples */
+    int             smp_sample_dither_pct;  /* dithering of cycles interval */
     uint32          smp_reg_count;          /* sample register count */
     BITSAMPLE_REG   *smp_regs;              /* registers being sampled */
     };
@@ -614,7 +615,10 @@ for (i=connections=0; i<sim_rem_con_tmxr.lines; i++) {
         uint32 reg;
         DEVICE *dptr = NULL;
 
-        fprintf (st, "Register Bit Sampling is occurring every %d cycles\n", rem->smp_sample_interval);
+        if (rem->smp_sample_dither_pct)
+            fprintf (st, "Register Bit Sampling is occurring every %d cycles (dithered %d percent)\n", rem->smp_sample_interval, rem->smp_sample_dither_pct);
+        else
+            fprintf (st, "Register Bit Sampling is occurring every %d cycles\n", rem->smp_sample_interval);
         fprintf (st, " Registers being sampled are: ");
         for (reg = 0; reg < rem->smp_reg_count; reg++) {
             if (rem->smp_regs[reg].indirect)
@@ -1027,7 +1031,7 @@ return stat;
 static t_stat sim_rem_collect_cmd_setup (int32 line, CONST char **iptr)
 {
 char gbuf[CBUFSIZE];
-int32 samples, cycles;
+int32 samples, cycles, dither_pct;
 t_bool all_stop = FALSE;
 t_stat stat = SCPE_OK;
 CONST char *cptr = *iptr;
@@ -1073,6 +1077,7 @@ if ((stat != SCPE_OK) || (samples <= 0)) {      /* error? */
     }
 else {
     const char *tptr;
+    int32 event_time = rem->smp_sample_interval;
 
     cptr = get_glyph (cptr, gbuf, 0);               /* get next glyph */
     if (MATCH_CMD (gbuf, "SAMPLES") != 0) {
@@ -1094,6 +1099,23 @@ else {
     if ((MATCH_CMD (gbuf, "CYCLES") != 0) || (*cptr == 0)) {
         *iptr = cptr;
         return sim_messagef (SCPE_ARG, "Expected CYCLES found: %s\n", gbuf);
+        }
+    cptr = get_glyph (cptr, gbuf, 0);               /* get next glyph */
+    if ((MATCH_CMD (gbuf, "DITHER") != 0) || (*cptr == 0)) {
+        *iptr = cptr;
+        return sim_messagef (SCPE_ARG, "Expected DITHER found: %s\n", gbuf);
+        }
+    cptr = get_glyph (cptr, gbuf, 0);               /* get next glyph */
+    dither_pct = (int32) get_uint (gbuf, 10, INT_MAX, &stat);
+    if ((stat != SCPE_OK) ||                        /* error? */
+        (dither_pct < 0) || (dither_pct > 25)) {
+        *iptr = cptr;
+        return sim_messagef (SCPE_ARG, "Expected value found: %s\n", gbuf);
+        }
+    cptr = get_glyph (cptr, gbuf, 0);               /* get next glyph */
+    if ((MATCH_CMD (gbuf, "PERCENT") != 0) || (*cptr == 0)) {
+        *iptr = cptr;
+        return sim_messagef (SCPE_ARG, "Expected PERCENT found: %s\n", gbuf);
         }
     tptr = strcpy (gbuf, "STOP");                   /* Start from a clean slate */
     sim_rem_collect_cmd_setup (rem->line, &tptr);
@@ -1167,7 +1189,9 @@ else {
         sim_rem_collect_cmd_setup (line, &cptr);/* Cleanup mess */
         return stat;
         }
-    sim_activate (&rem_con_smp_smpl_units[rem->line], rem->smp_sample_interval);
+    if (rem->smp_sample_dither_pct)
+        event_time = (((rand() % (2 * rem->smp_sample_dither_pct)) - rem->smp_sample_dither_pct) * event_time) / 100;
+    sim_activate (&rem_con_smp_smpl_units[rem->line], event_time);
     }
 *iptr = cptr;
 return stat;
@@ -1244,10 +1268,14 @@ t_stat sim_rem_con_smp_collect_svc (UNIT *uptr)
 int line = uptr - rem_con_smp_smpl_units;
 REMOTE *rem = &sim_rem_consoles[line];
 
-sim_debug (DBG_SAM, &sim_remote_console, "sim_rem_con_smp_collect_svc(line=%d) - interval=%d\n", line, rem->smp_sample_interval);
+sim_debug (DBG_SAM, &sim_remote_console, "sim_rem_con_smp_collect_svc(line=%d) - interval=%d, dither=%d%%\n", line, rem->smp_sample_interval, rem->smp_sample_dither_pct);
 if (rem->smp_sample_interval && (rem->smp_reg_count != 0)) {
+    int32 event_time = rem->smp_sample_interval;
+
+    if (rem->smp_sample_dither_pct)
+        event_time = (((rand() % (2 * rem->smp_sample_dither_pct)) - rem->smp_sample_dither_pct) * event_time) / 100;
     sim_rem_collect_registers (rem);
-    sim_activate (uptr, rem->smp_sample_interval);        /* reschedule */
+    sim_activate (uptr, event_time);                    /* reschedule */
     }
 return SCPE_OK;
 }

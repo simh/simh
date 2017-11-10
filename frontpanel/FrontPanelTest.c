@@ -401,20 +401,24 @@ if (sim_panel_break_output_set (panel, "-P \"Device? [XQA0]: \"")) {
     printf ("Unexpected error establishing an output breakpoint: %s\n", sim_panel_get_error());
     goto Done;
     }
-if (!sim_panel_set_sampling_parameters (panel, 0, 199)) {
-    printf ("Unexpected success setting sampling parameters to 0, 199\n");
+if (!sim_panel_set_sampling_parameters_ex (panel, 0, 0, 199)) {
+    printf ("Unexpected success setting sampling parameters to 0, 0, 199\n");
     goto Done;
     }
-if (!sim_panel_set_sampling_parameters (panel, 199, 0)) {
-    printf ("Unexpected success setting sampling parameters to 199, 0\n");
+if (!sim_panel_set_sampling_parameters_ex (panel, 199, 0, 0)) {
+    printf ("Unexpected success setting sampling parameters to 199, 0, 0\n");
     goto Done;
     }
 if (!sim_panel_add_register_bits (panel, "PSL",  NULL, 32, PSL_bits)) {
     printf ("Unexpected success setting PSL bits before setting sampling parameters\n");
     goto Done;
     }
-if (sim_panel_set_sampling_parameters (panel, 500, 100)) {
-    printf ("Unexpected error setting sampling parameters to 200, 100: %s\n", sim_panel_get_error());
+if (!sim_panel_set_sampling_parameters_ex (panel, 500, 40, 100)) {
+    printf ("Unexpected success setting sampling parameters to 500, 40, 100\n");
+    goto Done;
+    }
+if (sim_panel_set_sampling_parameters_ex (panel, 500, 10, 100)) {
+    printf ("Unexpected error setting sampling parameters to 500, 10, 100: %s\n", sim_panel_get_error());
     goto Done;
     }
 if (sim_panel_add_register_indirect_bits (panel, "PC",  NULL, 32, PC_indirect_bits)) {

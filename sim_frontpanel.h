@@ -56,7 +56,7 @@ extern "C" {
 
 #if !defined(__VAX)         /* Unsupported platform */
 
-#define SIM_FRONTPANEL_VERSION   5
+#define SIM_FRONTPANEL_VERSION   6
 
 /**
 
@@ -68,7 +68,7 @@ extern "C" {
         device_panel_count  the number of sub panels for connected devices
 
     Note 1: - The path specified must be either a fully specified path or 
-              it could be merey the simulator name if the simulator binary
+              it could be merely the simulator name if the simulator binary
               is located in the current PATH.
             - The simulator binary must be built from the same version 
               simh source code that the frontpanel API was acquired fron 
@@ -229,11 +229,16 @@ sim_panel_set_display_callback_interval (PANEL *panel,
 
     When a front panel application wants to get averaged bit sample
     values, it must first declare the sampling parameters that will
-    be used while collecting the bit values.
+    be used while collecting the bit values.  The dithering 
+    percentage must be 25% or less and when non 0 causes the sample
+    frequency to vary by plus or minus a random percentage value up 
+    to the specified value.
 
    sim_panel_set_sampling_parameters 
+   sim_panel_set_sampling_parameters_ex 
 
         sample_frequency    cycles/instructions between sample captures
+        sample_dither_pct   percentage of sample_frequency to vary randomly
         sample_depth        how many samples to accumulate in the rolling
                             average for each bit sample.  Returned bit
                             sample values will range from 0 thru this 
@@ -241,10 +246,15 @@ sim_panel_set_display_callback_interval (PANEL *panel,
  */
 
 int
+sim_panel_set_sampling_parameters_ex (PANEL *panel,
+                                      unsigned int sample_frequency,
+                                      unsigned int sample_dither_pct,
+                                      unsigned int sample_depth);
+
+int
 sim_panel_set_sampling_parameters (PANEL *panel,
                                    unsigned int sample_frequency,
                                    unsigned int sample_depth);
-
 /**
 
     When a front panel application needs to change the running

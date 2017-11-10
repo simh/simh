@@ -166,6 +166,7 @@ struct PANEL {
     void                    *callback_context;
     int                     usecs_between_callbacks;
     unsigned int            sample_frequency;
+    unsigned int            sample_dither_pct;
     unsigned int            sample_depth;
     int                     debug;
     char                    *simulator_version;
@@ -211,7 +212,8 @@ static const char *register_repeat_units = " usecs ";
 static const char *register_get_prefix = "show time";
 static const char *register_collect_prefix = "collect ";
 static const char *register_collect_mid1 = " samples every ";
-static const char *register_collect_mid2 = " cycles ";
+static const char *register_collect_mid2 = " cycles dither ";
+static const char *register_collect_mid3 = " percent ";
 static const char *register_get_postfix = "sampleout";
 static const char *register_get_echo = "# REGISTERS-DONE";
 static const char *register_repeat_echo = "# REGISTERS-REPEAT-DONE";
@@ -550,9 +552,10 @@ for (i=0; i<panel->reg_count; i++) {
         }
     }
 pthread_mutex_unlock (&panel->io_lock);
-if (_panel_sendf (panel, &cmd_stat, &response, "%s%u%s%u%s%s\r", register_collect_prefix, panel->sample_depth, 
-                                                                 register_collect_mid1, panel->sample_frequency,
-                                                                 register_collect_mid2, buf)) {
+if (_panel_sendf (panel, &cmd_stat, &response, "%s%u%s%u%s%u%s%s\r", register_collect_prefix, panel->sample_depth, 
+                                                                     register_collect_mid1, panel->sample_frequency,
+                                                                     register_collect_mid2, panel->sample_dither_pct,
+                                                                     register_collect_mid3, buf)) {
     sim_panel_set_error ("Error establishing bit data collection:%s", response);
     free (response);
     free (buf);
@@ -1312,12 +1315,17 @@ return 0;
 }
 
 int
-sim_panel_set_sampling_parameters (PANEL *panel,
-                                   unsigned int sample_frequency,
-                                   unsigned int sample_depth)
+sim_panel_set_sampling_parameters_ex (PANEL *panel,
+                                      unsigned int sample_frequency,
+                                      unsigned int sample_dither_pct,
+                                      unsigned int sample_depth)
 {
 if (sample_frequency == 0) {
     sim_panel_set_error ("Invalid sample frequency value: %u", sample_frequency);
+    return -1;
+    }
+if (sample_dither_pct > 25) {
+    sim_panel_set_error ("Invalid sample dither percentage value: %u", sample_dither_pct);
     return -1;
     }
 if (sample_depth == 0) {
@@ -1325,8 +1333,20 @@ if (sample_depth == 0) {
     return -1;
     }
 panel->sample_frequency = sample_frequency;
+panel->sample_dither_pct = sample_dither_pct;
 panel->sample_depth = sample_depth;
 return 0;
+}
+
+int
+sim_panel_set_sampling_parameters (PANEL *panel,
+                                   unsigned int sample_frequency,
+                                   unsigned int sample_depth)
+{
+return sim_panel_set_sampling_parameters_ex (panel,
+                                             sample_frequency,
+                                             5,
+                                             sample_depth);
 }
 
 int
@@ -1888,7 +1908,7 @@ static void *
 _panel_reader(void *arg)
 {
 PANEL *p = (PANEL*)arg;
-REG *r = NULL;
+REG *r;
 int sched_policy;
 struct sched_param sched_priority;
 char buf[4096];
@@ -1957,6 +1977,7 @@ while ((p->sock != INVALID_SOCKET) &&
     s = buf;
     while ((eol = strchr (s, '\n'))) {
         /* Line to process */
+        r = NULL;
         *eol++ = '\0';
         while ((*s) && (s[strlen(s)-1] == '\r'))
             s[strlen(s)-1] = '\0';
