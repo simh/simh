@@ -464,7 +464,7 @@ lp->dstb = 0;                                           /* default bin mode */
 lp->rxbpr = lp->rxbpi = lp->rxcnt = lp->rxpcnt = 0;     /* init receive indexes */
 if (!lp->txbfd || lp->notelnet)                         /* if not buffered telnet */
     lp->txbpr = lp->txbpi = lp->txcnt = lp->txpcnt = 0; /*   init transmit indexes */
-lp->txdrp = 0;
+lp->txdrp = lp->txstall = 0;
 tmxr_set_get_modem_bits (lp, 0, 0, NULL);
 if ((!lp->mp->buffered) && (!lp->txbfd)) {
     lp->txbfd = 0;
@@ -532,7 +532,7 @@ if ((!lp->notelnet) || (sim_switches & SWMASK ('V'))) {
 if (!mp->buffered) {
     lp->txbpi = 0;                                      /* init buf pointers */
     lp->txbpr = (int32)(lp->txbsz - strlen (msgbuf));
-    lp->rxcnt = lp->txcnt = lp->txdrp = 0;              /* init counters */
+    lp->rxcnt = lp->txcnt = lp->txdrp = lp->txstall = 0;/* init counters */
     lp->rxpcnt = lp->txpcnt = 0;
     }
 else
@@ -2072,7 +2072,7 @@ if ((lp->txbfd && !lp->notelnet) || (TXBUF_AVAIL(lp) > 1)) {/* room for char (+ 
         }
     return SCPE_OK;                                     /* char sent */
     }
-++lp->txdrp; lp->xmte = 0;                              /* no room, dsbl line */
+++lp->txstall; lp->xmte = 0;                            /* no room, dsbl line */
 return SCPE_STALL;                                      /* char not sent */
 }
 
@@ -4405,6 +4405,8 @@ if (lp->txcnt || lp->txbpi)
                ((lp->txcnt > 0) && (lp->txcnt > lp->txbsz)) ? lp->txbsz : lp->txbpi);
 if (lp->txdrp)
     fprintf (st, "  dropped = %d\n", lp->txdrp);
+if (lp->txstall)
+    fprintf (st, "  stalled = %d\n", lp->txstall);
 return;
 }
 

@@ -153,6 +153,7 @@ struct tmln {
     int32               txcnt;                          /* xmt count */
     int32               txpcnt;                         /* xmt packet count */
     int32               txdrp;                          /* xmt drop count */
+    int32               txstall;                        /* xmt stall count */
     int32               txbsz;                          /* xmt buffer size */
     int32               txbfd;                          /* xmt buffered flag */
     t_bool              modem_control;                  /* line supports modem control behaviors */
