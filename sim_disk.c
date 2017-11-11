@@ -2143,7 +2143,7 @@ if ((dwStatus >= ERROR_INVALID_STARTING_CODESEG) && (dwStatus <= ERROR_INFLOOP_I
     }
 errno = EINVAL;
 }
-#if defined(__GNUC__)
+#if defined(__GNUC__) && defined(HAVE_NTDDDISK_H)
 #include <ddk/ntddstor.h>
 #include <ddk/ntdddisk.h>
 #else
