@@ -297,7 +297,7 @@ int32 old_clk_tps = clk_tps;
 /*
  * The value provided is in hardware clicks. For a frequency of 4.1 
  * MHz, that means that dividing by 4096 (shifting 12 to the right) we get
- * the aproximate value in millisenconds. If any of rhe rightmost bits is
+ * the aproximate value in milliseconds. If any of the rightmost bits is
  * one, we add one unit (4096 ticks ). Reference:
  * AA-H391A-TK_DECsystem-10_DECSYSTEM-20_Processor_Reference_Jun1982.pdf
  * (page 4-37)
@@ -305,6 +305,10 @@ int32 old_clk_tps = clk_tps;
 tim_new_period = new_interval & ~TIM_HWRE_MASK;
 if (new_interval & TIM_HWRE_MASK) tim_new_period += 010000;
     
+if (tim_new_period == 0) {
+    sim_debug (DEB_TPS, &tim_dev, "update_interval() - ignoring 0 value interval\n");
+    return FALSE;
+    }
 /* clk_tps is the new number of clocks ticks per second */
 clk_tps = (int32) ceil(((double)TIM_HW_FREQ /(double)tim_new_period) - 0.5);
 if (clk_tps != old_clk_tps)
