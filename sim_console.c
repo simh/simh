@@ -879,6 +879,8 @@ stat = sim_rem_active_command->action (sim_rem_active_command->arg, cptr);/* exe
 if (stat != SCPE_OK)
     stat = _sim_rem_message (gbuf, stat);       /* display results */
 sim_last_cmd_stat = SCPE_BARE_STATUS(stat);
+if (sim_vm_post != NULL)                        /* optionally let the simulator know */
+    (*sim_vm_post) (TRUE);                      /* something might have changed */
 if (!sim_processing_event) {
     sim_ttrun ();                               /* set console mode */
     sim_cancel (rem_con_data_unit);             /* force immediate activation of sim_rem_con_data_svc */
