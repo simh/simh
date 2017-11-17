@@ -489,32 +489,28 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       LIBEXTSAVE := $(LIBEXT)
       LIBEXT = dll.a
     endif
-    ifneq (,$(call find_include,SDL2/SDL))
-      ifneq (,$(call find_lib,SDL2))
-        VIDEO_CCDEFS += -DHAVE_LIBSDL -DUSE_SIM_VIDEO `$(realpath $(dir $(call find_include,SDL2/SDL))../../bin/sdl2-config) --cflags`
-        VIDEO_LDFLAGS += `$(realpath $(dir $(call find_include,SDL2/SDL))../../bin/sdl2-config) --libs`
-        VIDEO_FEATURES = - video capabilities provided by libSDL2 (Simple Directmedia Layer)
+    ifneq (,$(shell which sdl2-config))
+      VIDEO_CCDEFS += -DHAVE_LIBSDL -DUSE_SIM_VIDEO `sdl2-config --cflags`
+      VIDEO_LDFLAGS += `sdl2-config --libs`
+      VIDEO_FEATURES = - video capabilities provided by libSDL2 (Simple Directmedia Layer)
+      DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/sim_ws.c
+      DISPLAYVT = ${DISPLAYD}/vt11.c
+      DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
+      $(info using libSDL2: $(call find_include,SDL2/SDL))
+      ifeq (Darwin,$(OSTYPE))
+        VIDEO_CCDEFS += -DSDL_MAIN_AVAILABLE
+      endif
+    else
+      ifneq (,$(shell which sdl-config))
+        VIDEO_CCDEFS += -DHAVE_LIBSDL -DUSE_SIM_VIDEO `sdl-config --cflags`
+        VIDEO_LDFLAGS += `sdl-config --libs`
+        VIDEO_FEATURES = - video capabilities provided by libSDL (Simple Directmedia Layer)
         DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/sim_ws.c
         DISPLAYVT = ${DISPLAYD}/vt11.c
         DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
-        $(info using libSDL2: $(call find_include,SDL2/SDL))
+        $(info using libSDL: $(call find_include,SDL/SDL))
         ifeq (Darwin,$(OSTYPE))
           VIDEO_CCDEFS += -DSDL_MAIN_AVAILABLE
-        endif
-      endif
-    else
-      ifneq (,$(call find_include,SDL/SDL))
-        ifneq (,$(call find_lib,SDL))
-          VIDEO_CCDEFS += -DHAVE_LIBSDL -DUSE_SIM_VIDEO `$(realpath $(dir $(call find_include,SDL/SDL))../../bin/sdl-config) --cflags`
-          VIDEO_LDFLAGS += `$(realpath $(dir $(call find_include,SDL/SDL))../../bin/sdl-config) --libs`
-          VIDEO_FEATURES = - video capabilities provided by libSDL (Simple Directmedia Layer)
-          DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/sim_ws.c
-          DISPLAYVT = ${DISPLAYD}/vt11.c
-          DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
-          $(info using libSDL: $(call find_include,SDL/SDL))
-          ifeq (Darwin,$(OSTYPE))
-            VIDEO_CCDEFS += -DSDL_MAIN_AVAILABLE
-          endif
         endif
       endif
     endif
