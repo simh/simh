@@ -7637,6 +7637,7 @@ void put_rval (REG *rptr, uint32 idx, t_value val)
 {
 size_t sz;
 t_value mask;
+t_value old_val;
 uint32 *ptr;
 
 #define PUT_RVAL(sz,rp,id,v,m) \
@@ -7644,6 +7645,8 @@ uint32 *ptr;
             (sz)((*(((sz *) rp->loc) + id) & \
             ~((m) << (rp)->offset)) | ((v) << (rp)->offset))
 
+if (rptr->write_callback)
+    old_val = get_rval (rptr, idx);
 if (rptr == sim_PC)
     sim_brk_npc (0);
 sz = SZ_R (rptr);
@@ -7696,6 +7699,8 @@ else PUT_RVAL (t_uint64, rptr, idx, val, mask);
 #else
 else PUT_RVAL (uint32, rptr, idx, val, mask);
 #endif
+if ((rptr->write_callback) && (!(sim_switches & SIM_SW_REST)))
+    rptr->write_callback (old_val, rptr, idx);
 return;
 }
 
