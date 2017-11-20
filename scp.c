@@ -1373,7 +1373,8 @@ static const char simh_help[] =
       " %%CTIME%%, %%DATE_YYYY%%, %%DATE_YY%%, %%DATE_YC%%, %%DATE_MM%%, %%DATE_MMM%%,\n"
       " %%DATE_MONTH%%, %%DATE_DD%%, %%DATE_D%%, %%DATE_WYYYY%%, %%DATE_WW%%,\n"
       " %%TIME_HH%%, %%TIME_MM%%, %%TIME_SS%%, %%STATUS%%, %%TSTATUS%%, %%SIM_VERIFY%%,\n"
-      " %%SIM_QUIET%%, %%SIM_MESSAGE%%\n\n"
+      " %%SIM_QUIET%%, %%SIM_MESSAGE%% %%SIM_MESSAGE%%\n"
+      " %%SIM_NAME%%, %%SIM_BIN_NAME%%, %%SIM_BIN_PATH%%m %%SIM_OSTYPE%%\n\n"
       "+Token %%0 expands to the command file name.\n"
       "+Token %%n (n being a single digit) expands to the n'th argument\n"
       "+Token %%* expands to the whole set of arguments (%%1 ... %%9)\n\n"
@@ -1412,7 +1413,11 @@ static const char simh_help[] =
       "++%%SIM_VERIFY%%        The Verify/Verbose mode of the current Do command file\n"
       "++%%SIM_VERBOSE%%       The Verify/Verbose mode of the current Do command file\n"
       "++%%SIM_QUIET%%         The Quiet mode of the current Do command file\n"
-      "++%%SIM_MESSAGE%%       The message display status of the current Do command file\n\n"
+      "++%%SIM_MESSAGE%%       The message display status of the current Do command file\n"
+      "++%%SIM_NAME%%          The name of the current simulator\n"
+      "++%%SIM_BIN_NAME%%      The program name of the current simulator\n"
+      "++%%SIM_BIN_PATH%%      The program path that invoked the current simulator\n"
+      "++%%SIM_OSTYPE%%        The Operating System running the current simulator\n\n"
       "+Environment variable lookups are done first with the precise name between\n"
       "+the %% characters and if that fails, then the name between the %% characters\n"
       "+is upcased and a lookup of that valus is attempted.\n\n"
@@ -2152,7 +2157,7 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
             return 0;
             }
         if (*cbuf)                                      /* concat args */
-            strlcat (cbuf, " ", sizeof(cbuf)); 
+            strlcat (cbuf, " ", sizeof (cbuf)); 
         sprintf(&cbuf[strlen(cbuf)], "%s%s%s", strchr(argv[i], ' ') ? "\"" : "", argv[i], strchr(argv[i], ' ') ? "\"" : "");
         lookswitch = FALSE;                             /* no more switches */
         }
@@ -2201,6 +2206,7 @@ if (!sim_quiet) {
     printf ("\n");
     show_version (stdout, NULL, NULL, 0, NULL);
     }
+show_version (stdnul, NULL, NULL, 1, NULL);             /* Quietly set SIM_OSTYPE */
 if (sim_dflt_dev == NULL)                               /* if no default */
     sim_dflt_dev = sim_devices[0];
 if (((sim_dflt_dev->flags & DEV_DEBUG) == 0) &&         /* default device without debug? */
@@ -2245,7 +2251,7 @@ else if (*argv[0]) {                                    /* sim name arg? */
     strncpy (nbuf + 1, argv[0], PATH_MAX + 1);          /* copy sim name */
     if ((np = (char *)match_ext (nbuf, "EXE")))         /* remove .exe */
         *np = 0;
-    strlcat (nbuf, ".ini\"", sizeof(nbuf));         /* add .ini" */
+    strlcat (nbuf, ".ini\"", sizeof (nbuf));            /* add .ini" */
     stat = do_cmd (-1, nbuf) & ~SCPE_NOMESSAGE;         /* proc default cmd file */
     if (stat == SCPE_OPENERR) {                         /* didn't exist/can't open? */
         np = strrchr (nbuf, '/');                       /* stript path and try again in cwd */
@@ -4841,6 +4847,7 @@ fprintf (st, " %s", SIM_VERSION_MODE);
 if (flag) {
     t_bool idle_capable;
     uint32 os_ms_sleep_1, os_tick_size;
+    char os_type[128] = "Unknown";
 
     fprintf (st, "\n    Simulator Framework Capabilities:");
     fprintf (st, "\n        %s", sim_si64);
@@ -4934,6 +4941,8 @@ if (flag) {
 #else
             "VAX";
 #endif
+        strlcpy (os_type, "OpenVMS ", sizeof (os_type));
+        strlcat (os_type, arch, sizeof (os_type));
         fprintf (st, "\n        OS: OpenVMS %s %s", arch, __VMS_VERSION);
         }
 #elif defined(_WIN32)
@@ -4959,6 +4968,7 @@ if (flag) {
         fprintf (st, "\n        OS: %s", osversion);
         fprintf (st, "\n        Architecture: %s%s%s, Processors: %s", arch, proc_arch3264 ? " on " : "", proc_arch3264 ? proc_arch3264  : "", procs);
         fprintf (st, "\n        Processor Id: %s, Level: %s, Revision: %s", proc_id ? proc_id : "", proc_level ? proc_level : "", proc_rev ? proc_rev : "");
+        strlcpy (os_type, "Windows", sizeof (os_type));
         }
 #else
     if (1) {
@@ -4966,17 +4976,29 @@ if (flag) {
         FILE *f;
         
         if ((f = popen ("uname -a", "r"))) {
-            memset (osversion, 0, sizeof(osversion));
+            memset (osversion, 0, sizeof (osversion));
             do {
-                if (NULL == fgets (osversion, sizeof(osversion)-1, f))
+                if (NULL == fgets (osversion, sizeof (osversion)-1, f))
                     break;
                 sim_trim_endspc (osversion);
                 } while (osversion[0] == '\0');
             pclose (f);
             }
         fprintf (st, "\n        OS: %s", osversion);
+        if ((f = popen ("uname", "r"))) {
+            memset (os_type, 0, sizeof (os_type));
+            do {
+                if (NULL == fgets (os_type, sizeof (os_type)-1, f))
+                    break;
+                sim_trim_endspc (os_type);
+                } while (os_type[0] == '\0');
+            pclose (f);
+            }
         }
 #endif
+    if ((!strcmp (os_type, "Unknown")) && (getenv ("OSTYPE")))
+        strlcpy (os_type, getenv ("OSTYPE"), sizeof (os_type));
+    setenv ("SIM_OSTYPE", os_type, 1);
     }
 #if defined(SIM_GIT_COMMIT_ID)
 #define S_xstr(a) S_str(a)
@@ -5394,19 +5416,19 @@ strlcpy (WildName, cptr, sizeof(WildName));
 cptr = WildName;
 sim_trim_endspc (WildName);
 if ((!stat (WildName, &filestat)) && (filestat.st_mode & S_IFDIR))
-    strlcat (WildName, "/*", sizeof(WildName));
+    strlcat (WildName, "/*", sizeof (WildName));
 if ((*cptr != '/') || (0 == memcmp (cptr, "./", 2)) || (0 == memcmp (cptr, "../", 3))) {
 #if defined (VMS)
-    getcwd (WholeName, sizeof(WholeName)-1, 0);
+    getcwd (WholeName, sizeof (WholeName)-1, 0);
 #else
-    getcwd (WholeName, sizeof(WholeName)-1);
+    getcwd (WholeName, sizeof (WholeName)-1);
 #endif
-    strlcat (WholeName, "/", sizeof(WholeName));
-    strlcat (WholeName, cptr, sizeof(WholeName));
+    strlcat (WholeName, "/", sizeof (WholeName));
+    strlcat (WholeName, cptr, sizeof (WholeName));
     sim_trim_endspc (WholeName);
     }
 else
-    strlcpy (WholeName, cptr, sizeof(WholeName));
+    strlcpy (WholeName, cptr, sizeof (WholeName));
 while ((c = strstr (WholeName, "/./")))
     memmove (c + 1, c + 3, 1 + strlen (c + 3));
 while ((c = strstr (WholeName, "//")))
@@ -5427,14 +5449,14 @@ if (c) {
     }
 else {
 #if defined (VMS)
-    getcwd (WholeName, sizeof(WholeName)-1, 0);
+    getcwd (WholeName, sizeof (WholeName)-1, 0);
 #else
-    getcwd (WholeName, sizeof(WholeName)-1);
+    getcwd (WholeName, sizeof (WholeName)-1);
 #endif
     }
 cptr = WholeName;
 #if defined (HAVE_GLOB)
-memset (&paths, 0, sizeof(paths));
+memset (&paths, 0, sizeof (paths));
 if (0 == glob (cptr, 0, NULL, &paths)) {
 #else
 dir = opendir(DirName[0] ? DirName : "/.");
