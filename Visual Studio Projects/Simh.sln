@@ -254,6 +254,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "scelbi", "scelbi.vcproj", "
 		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "3B2", "3B2.vcproj", "{56178F08-8783-4ADA-820C-20C06412678E}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -472,6 +477,10 @@ Global
 		{1E92CC4B-9ED5-4CD4-BD35-061F25126523}.Debug|Win32.Build.0 = Debug|Win32
 		{1E92CC4B-9ED5-4CD4-BD35-061F25126523}.Release|Win32.ActiveCfg = Release|Win32
 		{1E92CC4B-9ED5-4CD4-BD35-061F25126523}.Release|Win32.Build.0 = Release|Win32
+		{56178F08-8783-4ADA-820C-20C06412678E}.Debug|Win32.ActiveCfg = Debug|Win32
+		{56178F08-8783-4ADA-820C-20C06412678E}.Debug|Win32.Build.0 = Debug|Win32
+		{56178F08-8783-4ADA-820C-20C06412678E}.Release|Win32.ActiveCfg = Release|Win32
+		{56178F08-8783-4ADA-820C-20C06412678E}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

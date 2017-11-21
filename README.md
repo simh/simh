@@ -4,6 +4,8 @@
 
 ### New Simulators
 
+#### Seth Morabito has implemented a AT&T 3B2 simulator.
+
 #### Leonid Broukhis and Serge Vakulenko have implemented a simulator for the Soviet mainframe BESM-6 computer.
 
 #### Matt Burke has implemented new VAX model simulators:
