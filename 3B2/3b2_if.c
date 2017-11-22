@@ -85,8 +85,8 @@ DEVICE if_dev = {
 };
 
 IF_STATE if_state;
-uint32   if_sec_ptr;
-t_bool   if_irq;
+uint32   if_sec_ptr = 0;
+t_bool   if_irq = FALSE;
 
 /* Function implementation */
 
@@ -425,7 +425,14 @@ void if_handle_command()
         break;
     case IF_WRITE_TRACK:
         sim_debug(EXECUTE_MSG, &if_dev, "\tCOMMAND\t%02x\tWrite Track\n", if_state.cmd);
-        assert(0); /* NOT YET IMPLEMENTED */
+        /* Set DRQ */
+        if_state.drq = TRUE;
+        if_state.status |= IF_DRQ;
+        if (if_state.cmd & IF_E_FLAG) {
+            if_activate(IF_W_DELAY + IF_VERIFY_DELAY + head_switch_delay);
+        } else {
+            if_activate(IF_W_DELAY + head_switch_delay);
+        }
         break;
     case IF_FORCE_INT:
         sim_debug(EXECUTE_MSG, &if_dev, "\tCOMMAND\t%02x\tForce Interrupt\n", if_state.cmd);
@@ -481,19 +488,24 @@ void if_write(uint32 pa, uint32 val, size_t size)
 
         sim_debug(WRITE_MSG, &if_dev, "\tDATA\t%02x\n", val);
 
-        if (uptr->fileref == NULL ||
-            ((if_state.cmd & 0xf0) != IF_WRITE_SEC &&
-             (if_state.cmd & 0xf0) != IF_WRITE_SEC_M)) {
-            /* Not attached, or not a write command */
+        if ((uptr->flags & UNIT_ATT) == 0) {
+            /* Not attached */
             break;
         }
 
-        /* Find the right offset, and update the value. */
-        pos = if_buf_offset();
-        fbuf[pos + if_sec_ptr++] = (uint8) val;
+        if ((if_state.cmd & 0xf0) == IF_WRITE_TRACK) {
+            /* We intentionally ignore WRITE TRACK data, because
+             * This is only used for low-level MFM formatting,
+             * which we do not emulate. */
+        } else if ((if_state.cmd & 0xf0) == IF_WRITE_SEC ||
+                   (if_state.cmd & 0xf0) == IF_WRITE_SEC_M) {
+            /* Find the right offset, and update the value. */
+            pos = if_buf_offset();
+            fbuf[pos + if_sec_ptr++] = (uint8) val;
 
-        if (if_sec_ptr >= IF_SECTOR_SIZE) {
-            if_sec_ptr = 0;
+            if (if_sec_ptr >= IF_SECTOR_SIZE) {
+                if_sec_ptr = 0;
+            }
         }
 
         break;
