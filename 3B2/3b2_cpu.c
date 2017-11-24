@@ -48,6 +48,9 @@ volatile uint32 abort_context;
 /* Pointer to the last decoded instruction */
 instr *cpu_instr;
 
+/* The instruction to use if there is no history storage */
+instr inst;
+
 /* Circular buffer of instructions */
 instr *INST = NULL;
 uint32 cpu_hist_size = 0;
@@ -1311,6 +1314,10 @@ t_bool cpu_on_interrupt(uint8 ipl)
     uint32 new_pcbp;
     uint16 id = ipl; /* TODO: Does this need to be uint16? */
 
+    sim_debug(IRQ_MSG, &cpu_dev,
+              "[%08x] [cpu_on_interrupt] ipl=%d\n",
+              R[NUM_PC], ipl);
+
     /*
      * "If a nonmaskable interrupt request is received, an auto-vector
      * interrupt acknowledge cycle is performed (as if an autovector
@@ -1367,8 +1374,6 @@ t_stat sim_instr(void)
     /* Used for field calculation */
     uint32   width, offset;
     t_uint64 mask;
-
-    instr inst;
 
     operand *src1, *src2, *src3, *dst;
 

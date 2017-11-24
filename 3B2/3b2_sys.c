@@ -76,6 +76,18 @@ const char *sim_stop_messages[] = {
     "Unimplemented MMU Feature"
 };
 
+void full_reset()
+{
+    cpu_reset(&cpu_dev);
+    tti_a_reset(&tti_a_dev);
+    tti_b_reset(&tti_b_dev);
+    iu_timer_reset(&iu_timer_dev);
+    timer_reset(&timer_dev);
+    if_reset(&if_dev);
+    id_reset(&id_dev);
+    csr_reset(&csr_dev);
+}
+
 t_stat sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
     int32 i;

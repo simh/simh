@@ -43,6 +43,7 @@ extern DEBTAB sys_deb_tab[];
 
 struct timer_ctr {
     uint16 divider;
+    uint16 val;
     uint8  mode;
     t_bool lmb;
     t_bool enabled;
