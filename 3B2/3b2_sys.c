@@ -45,7 +45,7 @@ REG *sim_PC = &cpu_reg[0];
    there may be up to 3 operands, for a maximum of 20 bytes */
 int32 sim_emax = 20;
 
-extern instr cpu_instr;
+extern instr *cpu_instr;
 
 DEVICE *sim_devices[] = {
     &cpu_dev,
@@ -153,7 +153,7 @@ t_stat fprint_sym(FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw)
     }
 
     if (sw & (int32) SWMASK('M')) {
-        fprint_sym_m(of, &cpu_instr);
+        fprint_sym_m(of, cpu_instr);
         return SCPE_OK;
     }
 

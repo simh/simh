@@ -45,8 +45,8 @@ uint32 *RAM = NULL;
 jmp_buf save_env;
 volatile uint32 abort_context;
 
-/* The last decoded instruction */
-instr cpu_instr;
+/* Pointer to the last decoded instruction */
+instr *cpu_instr;
 
 /* Circular buffer of instructions */
 instr *INST = NULL;
@@ -1368,6 +1368,8 @@ t_stat sim_instr(void)
     uint32   width, offset;
     t_uint64 mask;
 
+    instr inst;
+
     operand *src1, *src2, *src3, *dst;
 
     stop_reason = 0;
@@ -1497,40 +1499,44 @@ t_stat sim_instr(void)
         R[NUM_PSW] &= ~PSW_TM;
         R[NUM_PSW] |= PSW_TM_MASK;
 
-        /* Decode the instruction */
-        memset(&cpu_instr, 0, sizeof(instr));
-        cpu_ilen = decode_instruction(&cpu_instr);
-
         /* Record the instruction for history */
         if (cpu_hist_size > 0) {
-            /* Shallow copy */
-            INST[cpu_hist_p] = cpu_instr;
-            INST[cpu_hist_p].valid = TRUE;
+            cpu_instr = &INST[cpu_hist_p];
             cpu_hist_p = (cpu_hist_p + 1) % cpu_hist_size;
+        } else {
+            cpu_instr = &inst;
         }
+
+        /* Decode the instruction */
+        memset(cpu_instr, 0, sizeof(instr));
+        cpu_ilen = decode_instruction(cpu_instr);
+
+        /* Make sure to update the valid bit for history keeping (if
+         * enabled) */
+        cpu_instr->valid = TRUE;
 
         /*
          * Operate on the decoded instruction.
          */
 
         /* Get the operands */
-        if (cpu_instr.mn->src_op1 >= 0) {
-            src1 = &cpu_instr.operands[cpu_instr.mn->src_op1];
+        if (cpu_instr->mn->src_op1 >= 0) {
+            src1 = &cpu_instr->operands[cpu_instr->mn->src_op1];
         }
 
-        if (cpu_instr.mn->src_op2 >= 0) {
-            src2 = &cpu_instr.operands[cpu_instr.mn->src_op2];
+        if (cpu_instr->mn->src_op2 >= 0) {
+            src2 = &cpu_instr->operands[cpu_instr->mn->src_op2];
         }
 
-        if (cpu_instr.mn->src_op3 >= 0) {
-            src3 = &cpu_instr.operands[cpu_instr.mn->src_op3];
+        if (cpu_instr->mn->src_op3 >= 0) {
+            src3 = &cpu_instr->operands[cpu_instr->mn->src_op3];
         }
 
-        if (cpu_instr.mn->dst_op >= 0) {
-            dst = &cpu_instr.operands[cpu_instr.mn->dst_op];
+        if (cpu_instr->mn->dst_op >= 0) {
+            dst = &cpu_instr->operands[cpu_instr->mn->dst_op];
         }
 
-        switch (cpu_instr.mn->opcode) {
+        switch (cpu_instr->mn->opcode) {
         case ADDW2:
         case ADDH2:
         case ADDB2:
