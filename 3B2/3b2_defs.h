@@ -53,7 +53,7 @@ noret __libc_longjmp (jmp_buf buf, int val);
 /* -v flag for examine routine */
 #define EX_V_FLAG 1 << 21
 
-#define MAX_HIST_SIZE  1000000
+#define MAX_HIST_SIZE  10000000
 #define MIN_HIST_SIZE  64
 #define MAXMEMSIZE     (1 << 22)             /* 4 MB */
 #define MEM_SIZE       (cpu_unit.capac)      /* actual memory size */
