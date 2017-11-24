@@ -151,7 +151,7 @@ void csr_write(uint32 pa, uint32 val, size_t size)
         csr_data &= ~CSRPARE;
         break;
     case 0x0b:    /* Set System Reset Request */
-        iu_reset(&iu_dev);
+        iu_reset();
         cpu_reset(&cpu_dev);
         cpu_boot(0, &cpu_dev);
         break;
