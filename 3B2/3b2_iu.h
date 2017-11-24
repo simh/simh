@@ -180,9 +180,6 @@ typedef struct iu_timer_state {
 extern IU_PORT  iu_port_a;
 extern IU_PORT  iu_port_b;
 
-/* Global reset */
-extern t_stat iu_reset();
-
 /* Function prototypes */
 t_stat tti_a_reset(DEVICE *dptr);
 t_stat tti_b_reset(DEVICE *dptr);

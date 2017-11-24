@@ -250,28 +250,6 @@ void iu_txrdy_b_irq() {
     }
 }
 
-t_stat iu_reset()
-{
-    t_stat result;
-
-    result = tti_a_reset(&tti_a_dev);
-    if (result != SCPE_OK) {
-        return result;
-    }
-
-    result = tti_b_reset(&tti_b_dev);
-    if (result != SCPE_OK) {
-        return result;
-    }
-
-    result = iu_timer_reset(&iu_timer_dev);
-    if (result != SCPE_OK) {
-        return result;
-    }
-
-    return SCPE_OK;
-}
-
 t_stat tti_a_reset(DEVICE *dptr)
 {
     memset(&iu_state, 0, sizeof(IU_STATE));

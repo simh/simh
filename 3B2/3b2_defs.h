@@ -295,8 +295,10 @@ noret __libc_longjmp (jmp_buf buf, int val);
 #define TMR_CLK 0   /* The clock responsible for IPL 15 interrupts */
 #define TMR_TOD 1   /* The Time-of-Day clock */
 
-#define TPS_CLK 100
-#define TPS_TOD 10
+#define CLK_MIN_TICKS 500    /* No fewer than 500 sim steps between ticks */
+
+#define TPS_CLK       100    /* 100 ticks per second */
+#define TPS_TOD       10     /* 10 ticks per second  */
 
 
 /* TIMING SECTION                                  */
@@ -304,7 +306,7 @@ noret __libc_longjmp (jmp_buf buf, int val);
 /* Calculate delays (in simulator steps) for times */
 /* System clock runs at 10MHz; 100ns period.       */
 
-#define US_PER_INST         0.9
+#define US_PER_INST         1.0
 
 #define INST_PER_MS         (1000.0 / US_PER_INST)
 
