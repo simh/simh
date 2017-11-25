@@ -334,7 +334,7 @@ t_stat nvram_detach(UNIT *uptr)
 uint32 nvram_read(uint32 pa, size_t size)
 {
     uint32 offset = pa - NVRAMBASE;
-    uint32 data;
+    uint32 data = 0;
     uint32 sc = (~(offset & 3) << 3) & 0x1f;
 
     switch(size) {
