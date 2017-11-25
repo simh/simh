@@ -310,7 +310,7 @@ t_stat iu_svc_tti_a(UNIT *uptr)
               temp & 0xff, temp & 0xff);
 
     if (iu_port_a.conf & RX_EN) {
-        if ((iu_port_a.stat & STS_FFL == 0) && iu_port_a.w_p == iu_port_a.r_p) {
+        if ((iu_port_a.stat & STS_FFL) == 0 && iu_port_a.w_p == iu_port_a.r_p) {
             sim_debug(READ_MSG, &tti_a_dev,
                       ">>> FIFO FULL ON KEYBOARD READ!!!! <<<\n");
             iu_port_a.stat |= STS_FFL;
@@ -541,8 +541,8 @@ void iu_write(uint32 pa, uint32 val, size_t size)
         iu_state.imr = (uint8) val;
         csr_data &= ~CSRUART;
         /* Possibly cause an interrupt */
-        iu_txrdy_a_irq(PORT_A);
-        iu_txrdy_b_irq(PORT_B);
+        iu_txrdy_a_irq();
+        iu_txrdy_b_irq();
         break;
     case CTUR:  /* Counter/Timer Upper Preset Value */
         /* Clear out high byte */
