@@ -1559,7 +1559,7 @@ t_stat sim_instr(void)
         case ALSW3:
             a = cpu_read_op(src2);
             b = cpu_read_op(src1);
-            result = a << (b & 0x1f);
+            result = (t_uint64)a << (b & 0x1f);
             cpu_write_op(dst, result);
             cpu_set_nz_flags(result, dst);
             cpu_set_c_flag(0);
@@ -2295,7 +2295,7 @@ t_stat sim_instr(void)
             cpu_set_v_flag_op(result, dst);
             break;
         case MULW2:
-            result = cpu_read_op(src1) * cpu_read_op(dst);
+            result = (t_uint64)cpu_read_op(src1) * (t_uint64)cpu_read_op(dst);
             cpu_write_op(dst, (uint32)(result & WORD_MASK));
             cpu_set_nz_flags((uint32)(result & WORD_MASK), dst);
             cpu_set_c_flag(0);
@@ -2316,7 +2316,7 @@ t_stat sim_instr(void)
             cpu_set_v_flag_op(result, src1);
             break;
         case MULW3:
-            result = cpu_read_op(src1) * cpu_read_op(src2);
+            result = (t_uint64)cpu_read_op(src1) * (t_uint64)cpu_read_op(src2);
             cpu_write_op(dst, (uint32)(result & WORD_MASK));
             cpu_set_nz_flags((uint32)(result & WORD_MASK), dst);
             cpu_set_c_flag(0);

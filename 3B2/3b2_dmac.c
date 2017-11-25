@@ -196,11 +196,6 @@ void dmac_program(uint8 reg, uint8 val)
 
         channel = &dma_state.channels[chan_num];
 
-        if (channel == NULL) {
-            /* This should never happen */
-            return;
-        }
-
         switch (reg & 1) {
         case 0: /* Address */
             channel->addr &= ~(0xff << dma_state.bff * 8);
