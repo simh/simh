@@ -310,13 +310,14 @@ t_stat iu_svc_tti_a(UNIT *uptr)
               temp & 0xff, temp & 0xff);
 
     if (iu_port_a.conf & RX_EN) {
-        if ((iu_port_a.stat & STS_FFL) == 0 && iu_port_a.w_p == iu_port_a.r_p) {
-            sim_debug(READ_MSG, &tti_a_dev,
-                      ">>> FIFO FULL ON KEYBOARD READ!!!! <<<\n");
-            iu_port_a.stat |= STS_FFL;
-        } else {
+        if ((iu_port_a.stat & STS_FFL) == 0) {
             iu_port_a.rxbuf[iu_port_a.w_p] = (temp & 0xff);
             iu_port_a.w_p = (iu_port_a.w_p + 1) % IU_BUF_SIZE;
+            if (iu_port_a.w_p == iu_port_b.w_p) {
+                sim_debug(READ_MSG, &tti_a_dev,
+                          ">>> FIFO FULL ON KEYBOARD READ!!!! <<<\n");
+                iu_port_a.stat |= STS_FFL;
+            }
         }
         iu_port_a.stat |= STS_RXR;
         iu_state.istat |= ISTS_RAI;
