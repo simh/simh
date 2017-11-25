@@ -45,8 +45,11 @@ uint32 *RAM = NULL;
 jmp_buf save_env;
 volatile uint32 abort_context;
 
-/* The last decoded instruction */
-instr cpu_instr;
+/* Pointer to the last decoded instruction */
+instr *cpu_instr;
+
+/* The instruction to use if there is no history storage */
+instr inst;
 
 /* Circular buffer of instructions */
 instr *INST = NULL;
@@ -1311,6 +1314,10 @@ t_bool cpu_on_interrupt(uint8 ipl)
     uint32 new_pcbp;
     uint16 id = ipl; /* TODO: Does this need to be uint16? */
 
+    sim_debug(IRQ_MSG, &cpu_dev,
+              "[%08x] [cpu_on_interrupt] ipl=%d\n",
+              R[NUM_PC], ipl);
+
     /*
      * "If a nonmaskable interrupt request is received, an auto-vector
      * interrupt acknowledge cycle is performed (as if an autovector
@@ -1497,40 +1504,44 @@ t_stat sim_instr(void)
         R[NUM_PSW] &= ~PSW_TM;
         R[NUM_PSW] |= PSW_TM_MASK;
 
-        /* Decode the instruction */
-        memset(&cpu_instr, 0, sizeof(instr));
-        cpu_ilen = decode_instruction(&cpu_instr);
-
         /* Record the instruction for history */
         if (cpu_hist_size > 0) {
-            /* Shallow copy */
-            INST[cpu_hist_p] = cpu_instr;
-            INST[cpu_hist_p].valid = TRUE;
+            cpu_instr = &INST[cpu_hist_p];
             cpu_hist_p = (cpu_hist_p + 1) % cpu_hist_size;
+        } else {
+            cpu_instr = &inst;
         }
+
+        /* Decode the instruction */
+        memset(cpu_instr, 0, sizeof(instr));
+        cpu_ilen = decode_instruction(cpu_instr);
+
+        /* Make sure to update the valid bit for history keeping (if
+         * enabled) */
+        cpu_instr->valid = TRUE;
 
         /*
          * Operate on the decoded instruction.
          */
 
         /* Get the operands */
-        if (cpu_instr.mn->src_op1 >= 0) {
-            src1 = &cpu_instr.operands[cpu_instr.mn->src_op1];
+        if (cpu_instr->mn->src_op1 >= 0) {
+            src1 = &cpu_instr->operands[cpu_instr->mn->src_op1];
         }
 
-        if (cpu_instr.mn->src_op2 >= 0) {
-            src2 = &cpu_instr.operands[cpu_instr.mn->src_op2];
+        if (cpu_instr->mn->src_op2 >= 0) {
+            src2 = &cpu_instr->operands[cpu_instr->mn->src_op2];
         }
 
-        if (cpu_instr.mn->src_op3 >= 0) {
-            src3 = &cpu_instr.operands[cpu_instr.mn->src_op3];
+        if (cpu_instr->mn->src_op3 >= 0) {
+            src3 = &cpu_instr->operands[cpu_instr->mn->src_op3];
         }
 
-        if (cpu_instr.mn->dst_op >= 0) {
-            dst = &cpu_instr.operands[cpu_instr.mn->dst_op];
+        if (cpu_instr->mn->dst_op >= 0) {
+            dst = &cpu_instr->operands[cpu_instr->mn->dst_op];
         }
 
-        switch (cpu_instr.mn->opcode) {
+        switch (cpu_instr->mn->opcode) {
         case ADDW2:
         case ADDH2:
         case ADDB2:
@@ -1548,7 +1559,7 @@ t_stat sim_instr(void)
         case ALSW3:
             a = cpu_read_op(src2);
             b = cpu_read_op(src1);
-            result = a << (b & 0x1f);
+            result = (t_uint64)a << (b & 0x1f);
             cpu_write_op(dst, result);
             cpu_set_nz_flags(result, dst);
             cpu_set_c_flag(0);
@@ -2284,7 +2295,7 @@ t_stat sim_instr(void)
             cpu_set_v_flag_op(result, dst);
             break;
         case MULW2:
-            result = cpu_read_op(src1) * cpu_read_op(dst);
+            result = (t_uint64)cpu_read_op(src1) * (t_uint64)cpu_read_op(dst);
             cpu_write_op(dst, (uint32)(result & WORD_MASK));
             cpu_set_nz_flags((uint32)(result & WORD_MASK), dst);
             cpu_set_c_flag(0);
@@ -2305,7 +2316,7 @@ t_stat sim_instr(void)
             cpu_set_v_flag_op(result, src1);
             break;
         case MULW3:
-            result = cpu_read_op(src1) * cpu_read_op(src2);
+            result = (t_uint64)cpu_read_op(src1) * (t_uint64)cpu_read_op(src2);
             cpu_write_op(dst, (uint32)(result & WORD_MASK));
             cpu_set_nz_flags((uint32)(result & WORD_MASK), dst);
             cpu_set_c_flag(0);

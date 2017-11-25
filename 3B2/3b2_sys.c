@@ -45,7 +45,7 @@ REG *sim_PC = &cpu_reg[0];
    there may be up to 3 operands, for a maximum of 20 bytes */
 int32 sim_emax = 20;
 
-extern instr cpu_instr;
+extern instr *cpu_instr;
 
 DEVICE *sim_devices[] = {
     &cpu_dev,
@@ -54,7 +54,11 @@ DEVICE *sim_devices[] = {
     &tod_dev,
     &nvram_dev,
     &csr_dev,
-    &iu_dev,
+    &tti_a_dev,
+    &tto_a_dev,
+    &tti_b_dev,
+    &tto_b_dev,
+    &iu_timer_dev,
     &dmac_dev,
     &if_dev,
     &id_dev,
@@ -71,6 +75,18 @@ const char *sim_stop_messages[] = {
     "Exception Stack Too Deep",
     "Unimplemented MMU Feature"
 };
+
+void full_reset()
+{
+    cpu_reset(&cpu_dev);
+    tti_a_reset(&tti_a_dev);
+    tti_b_reset(&tti_b_dev);
+    iu_timer_reset(&iu_timer_dev);
+    timer_reset(&timer_dev);
+    if_reset(&if_dev);
+    id_reset(&id_dev);
+    csr_reset(&csr_dev);
+}
 
 t_stat sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
@@ -153,7 +169,7 @@ t_stat fprint_sym(FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw)
     }
 
     if (sw & (int32) SWMASK('M')) {
-        fprint_sym_m(of, &cpu_instr);
+        fprint_sym_m(of, cpu_instr);
         return SCPE_OK;
     }
 

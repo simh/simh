@@ -39,6 +39,7 @@ extern REG *sim_PC;
 extern int32 sim_emax;
 extern DEVICE *sim_devices[];
 
+void full_reset();
 t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag);
 t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val,
                   int32 sw);

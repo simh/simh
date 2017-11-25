@@ -62,9 +62,6 @@
 #define MODE_V_CHM      6                 /* Channel mode */
 #define MODE_M_CHM      0x3
 
-#define PORT_A          0
-#define PORT_B          1
-
 /* Used by the DMAC */
 #define IUA_DATA_REG  3
 #define IUB_DATA_REG  11
@@ -120,11 +117,16 @@
 #define UM_MASK       0x70
 #define UM_SHIFT      4
 
+#define PORT_A            0
+#define PORT_B            1
+
 #define IU_MODE(x)    ((x & UM_MASK) >> UM_SHIFT)
 
-extern DEVICE iu_dev;
-
-#define IU_TTY_DELAY      25000
+extern DEVICE tti_a_dev;
+extern DEVICE tto_a_dev;
+extern DEVICE tti_b_dev;
+extern DEVICE tto_b_dev;
+extern DEVICE iu_timer_dev;
 
 #define IUBASE            0x49000
 #define IUSIZE            0x100
@@ -146,42 +148,53 @@ extern DEVICE iu_dev;
 
 #define IU_TIMER_STP      4.33792
 
-struct port {
-    uint8 stat;           /* Port Status */
-    uint8 cmd;            /* Command */
-    uint8 mode[2];        /* Two mode buffers */
-    uint8 modep;          /* Point to mode[0] or mode[1] */
-    uint8 conf;           /* Configuration bits */
-    uint8 buf;            /* Character data */
-};
+#define IU_BUF_SIZE       3
+
+typedef struct iu_port {
+    uint8 stat;               /* Port Status */
+    uint8 cmd;                /* Command */
+    uint8 mode[2];            /* Two mode buffers */
+    uint8 modep;              /* Point to mode[0] or mode[1] */
+    uint8 conf;               /* Configuration bits */
+    uint8 txbuf;              /* Transmit Holding Register */
+    uint8 rxbuf[IU_BUF_SIZE]; /* Receive Holding Register (3 bytes) */
+    uint8 w_p;                /* Buffer Write Pointer */
+    uint8 r_p;                /* Buffer Read Pointer */
+    t_bool drq;               /* DRQ enabled */
+} IU_PORT;
 
 typedef struct iu_state {
     uint8 istat;          /* Interrupt Status */
     uint8 imr;            /* Interrupt Mask Register */
-    uint16 c_set;         /* Timer / Counter Setting */
-    int32  c_val;         /* Timer / Counter Value */
-    t_bool c_en;          /* Counter Enabled */
-    t_bool drqa;          /* Port A DRQ */
-    t_bool drqb;          /* Port B DRQ */
     uint8 acr;
     uint8 opcr;           /* Output Port Configuration */
     uint8 inprt;          /* Input Port Data */
     uint8 ipcr;           /* Input Port Change Register */
-    struct port port[2];  /* Port A and B */
 } IU_STATE;
 
-extern IU_STATE iu_state;
+typedef struct iu_timer_state {
+    uint16 c_set;
+    t_bool c_en;
+} IU_TIMER_STATE;
+
+extern IU_PORT  iu_port_a;
+extern IU_PORT  iu_port_b;
 
 /* Function prototypes */
-
-t_stat iu_reset(DEVICE *dptr);
-t_stat iu_svc_tti(UNIT *uptr);
-t_stat iu_svc_tto(UNIT *uptr);
+t_stat tti_a_reset(DEVICE *dptr);
+t_stat tti_b_reset(DEVICE *dptr);
+t_stat iu_timer_reset(DEVICE *dptr);
+t_stat iu_svc_tti_a(UNIT *uptr);
+t_stat iu_svc_tto_a(UNIT *uptr);
+t_stat iu_svc_tti_b(UNIT *uptr);
+t_stat iu_svc_tto_b(UNIT *uptr);
 t_stat iu_svc_timer(UNIT *uptr);
 uint32 iu_read(uint32 pa, size_t size);
 void iu_write(uint32 pa, uint32 val, size_t size);
 void iua_drq_handled();
 void iub_drq_handled();
+void iu_txrdy_a_irq();
+void iu_txrdy_b_irq();
 
 static SIM_INLINE void iu_tx(uint8 portno, uint8 val);
 static SIM_INLINE void iu_w_buf(uint8 portno, uint8 val);

@@ -55,8 +55,8 @@ DEVICE dmac_dev = {
 dmac_drq_handler dmac_drq_handlers[] = {
     {DMA_ID_CHAN,  IDBASE+ID_DATA_REG,  &id_drq,        id_drq_handled},
     {DMA_IF_CHAN,  IFBASE+IF_DATA_REG,  &if_state.drq,  if_drq_handled},
-    {DMA_IUA_CHAN, IUBASE+IUA_DATA_REG, &iu_state.drqa, iua_drq_handled},
-    {DMA_IUB_CHAN, IUBASE+IUB_DATA_REG, &iu_state.drqb, iub_drq_handled},
+    {DMA_IUA_CHAN, IUBASE+IUA_DATA_REG, &iu_port_a.drq, iua_drq_handled},
+    {DMA_IUB_CHAN, IUBASE+IUB_DATA_REG, &iu_port_b.drq, iub_drq_handled},
     {0,            0,                   NULL,           NULL }
 };
 
@@ -196,11 +196,6 @@ void dmac_program(uint8 reg, uint8 val)
 
         channel = &dma_state.channels[chan_num];
 
-        if (channel == NULL) {
-            /* This should never happen */
-            return;
-        }
-
         switch (reg & 1) {
         case 0: /* Address */
             channel->addr &= ~(0xff << dma_state.bff * 8);
@@ -251,6 +246,8 @@ void dmac_program(uint8 reg, uint8 val)
             dma_state.mask |= (1 << channel_id);
         } else {
             dma_state.mask &= ~(1 << channel_id);
+            /* Set the appropriate DRQ */
+            /* *dmac_drq_handlers[channel_id].drq = TRUE; */
         }
 
         sim_debug(WRITE_MSG, &dmac_dev,
@@ -278,7 +275,7 @@ void dmac_program(uint8 reg, uint8 val)
         break;
     case 15: /* Write All Mask Register Bits */
         sim_debug(WRITE_MSG, &dmac_dev,
-                  "[%08x] Clear DMAC Interrupt. val=%02x\n",
+                  "[%08x] Write DMAC mask (all bits). Val=%02x\n",
                   R[NUM_PC], val);
         dma_state.mask = val & 0xf;
         break;
