@@ -506,7 +506,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       ifneq (,$(call find_lib,SDL2))
         ifneq (,$(findstring Haiku,$(OSTYPE)))
           ifneq (,$(shell which sdl2-config))
-            SDL2_CONFIG = sdl2_config
+            SDL2_CONFIG = sdl2-config
           endif
         else
           SDL2_CONFIG = $(realpath $(dir $(call find_include,SDL2/SDL))../../bin/sdl2-config)
@@ -529,7 +529,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         ifneq (,$(call find_lib,SDL))
           ifneq (,$(findstring Haiku,$(OSTYPE)))
             ifneq (,$(shell which sdl-config))
-              SDL_CONFIG = sdl_config
+              SDL_CONFIG = sdl-config
             endif
           else
             SDL_CONFIG = $(realpath $(dir $(call find_include,SDL/SDL))../../bin/sdl-config)
