@@ -502,28 +502,50 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       LIBEXTSAVE := $(LIBEXT)
       LIBEXT = dll.a
     endif
-    ifneq (,$(shell which sdl2-config))
-      VIDEO_CCDEFS += -DHAVE_LIBSDL -DUSE_SIM_VIDEO `sdl2-config --cflags`
-      VIDEO_LDFLAGS += `sdl2-config --libs`
-      VIDEO_FEATURES = - video capabilities provided by libSDL2 (Simple Directmedia Layer)
-      DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/sim_ws.c
-      DISPLAYVT = ${DISPLAYD}/vt11.c
-      DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
-      $(info using libSDL2: $(call find_include,SDL2/SDL))
-      ifeq (Darwin,$(OSTYPE))
-        VIDEO_CCDEFS += -DSDL_MAIN_AVAILABLE
+    ifneq (,$(call find_include,SDL2/SDL))
+      ifneq (,$(call find_lib,SDL2))
+        ifneq (,$(findstring Haiku,$(OSTYPE)))
+          ifneq (,$(shell which sdl2-config))
+            SDL2_CONFIG = sdl2_config
+          endif
+        else
+          SDL2_CONFIG = $(realpath $(dir $(call find_include,SDL2/SDL))../../bin/sdl2-config)
+        endif
+        ifneq (,$(SDL2_CONFIG))
+          VIDEO_CCDEFS += -DHAVE_LIBSDL -DUSE_SIM_VIDEO `$(SDL2_CONFIG) --cflags`
+          VIDEO_LDFLAGS += `$(SDL2_CONFIG) --libs`
+          VIDEO_FEATURES = - video capabilities provided by libSDL2 (Simple Directmedia Layer)
+          DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/sim_ws.c
+          DISPLAYVT = ${DISPLAYD}/vt11.c
+          DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
+          $(info using libSDL2: $(call find_include,SDL2/SDL))
+          ifeq (Darwin,$(OSTYPE))
+            VIDEO_CCDEFS += -DSDL_MAIN_AVAILABLE
+          endif
+        endif
       endif
     else
-      ifneq (,$(shell which sdl-config))
-        VIDEO_CCDEFS += -DHAVE_LIBSDL -DUSE_SIM_VIDEO `sdl-config --cflags`
-        VIDEO_LDFLAGS += `sdl-config --libs`
-        VIDEO_FEATURES = - video capabilities provided by libSDL (Simple Directmedia Layer)
-        DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/sim_ws.c
-        DISPLAYVT = ${DISPLAYD}/vt11.c
-        DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
-        $(info using libSDL: $(call find_include,SDL/SDL))
-        ifeq (Darwin,$(OSTYPE))
-          VIDEO_CCDEFS += -DSDL_MAIN_AVAILABLE
+      ifneq (,$(call find_include,SDL/SDL))
+        ifneq (,$(call find_lib,SDL))
+          ifneq (,$(findstring Haiku,$(OSTYPE)))
+            ifneq (,$(shell which sdl-config))
+              SDL_CONFIG = sdl_config
+            endif
+          else
+            SDL_CONFIG = $(realpath $(dir $(call find_include,SDL/SDL))../../bin/sdl-config)
+          endif
+          ifneq (,$(SDL_CONFIG))
+            VIDEO_CCDEFS += -DHAVE_LIBSDL -DUSE_SIM_VIDEO `$(SDL_CONFIG) --cflags`
+            VIDEO_LDFLAGS += `$(SDL_CONFIG) --libs`
+            VIDEO_FEATURES = - video capabilities provided by libSDL (Simple Directmedia Layer)
+            DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/sim_ws.c
+            DISPLAYVT = ${DISPLAYD}/vt11.c
+            DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
+            $(info using libSDL: $(call find_include,SDL/SDL))
+            ifeq (Darwin,$(OSTYPE))
+              VIDEO_CCDEFS += -DSDL_MAIN_AVAILABLE
+            endif
+          endif
         endif
       endif
     endif
