@@ -67,6 +67,19 @@
 #
 # CC Command (and platform available options).  (Poor man's autoconf)
 #
+ifneq (,$(GREP_OPTIONS))
+  $(info GREP_OPTIONS is defined in your environment.)
+  $(info )
+  $(info This variable interfers with the proper operation of this script.)
+  $(info )
+  $(info The GREP_OPTIONS environment variable feature of grep is deprecated)
+  $(info for exactly this reason and will be removed from future versions of)
+  $(info grep.  The grep man page suggests that you use an alias or a script)
+  $(info to invoke grep with your preferred options.)
+  $(info )
+  $(info unset the GREP_OPTIONS environment variable to use this makefile)
+  $(error 1)
+endif
 ifeq (old,$(shell gmake --version /dev/null 2>&1 | grep 'GNU Make' | awk '{ if ($$3 < "3.81") {print "old"} }'))
   GMAKE_VERSION = $(shell gmake --version /dev/null 2>&1 | grep 'GNU Make' | awk '{ print $$3 }')
   $(warning *** Warning *** GNU Make Version $(GMAKE_VERSION) is too old to)
