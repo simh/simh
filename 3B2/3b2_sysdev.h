@@ -59,6 +59,7 @@ uint32 nvram_read(uint32 pa, size_t size);
 t_stat nvram_attach(UNIT *uptr, CONST char *cptr);
 t_stat nvram_detach(UNIT *uptr);
 const char *nvram_description(DEVICE *dptr);
+t_stat nvram_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 void nvram_write(uint32 pa, uint32 val, size_t size);
 
 /* 8253 Timer */
@@ -78,8 +79,41 @@ uint32 csr_read(uint32 pa, size_t size);
 void csr_write(uint32 pa, uint32 val, size_t size);
 
 /* TOD */
+
+typedef enum tod_action {
+    TOD_SAVE,
+    TOD_RESTORE
+} TOD_ACTION;
+
+typedef struct tod_data {
+    time_t rsec;       /* Real clock time from the host */
+    t_uint64 ssec;     /* Simulated time in 1/10th second since the epoch */
+    uint8 tsec;        /* 1/10 seconds */
+    uint8 unit_sec;    /* 1's column seconds */
+    uint8 ten_sec;     /* 10's column seconds */
+    uint8 unit_min;    /* 1's column minutes */
+    uint8 ten_min;     /* 10's column  minutes */
+    uint8 unit_hour;   /* 1's column hours */
+    uint8 ten_hour;    /* 10's column hours */
+    uint8 unit_day;    /* 1's column day of month */
+    uint8 ten_day;     /* 10's column day of month */
+    uint8 wday;        /* Day of week (0-6) */
+    uint8 unit_mon;    /* 1's column month */
+    uint8 ten_mon;     /* 10's column month */
+    uint8 year;        /* 1, 2, 4, 8 shift register */
+    uint8 pad[3];      /* Padding to 32 bytes */
+} TOD_DATA;
+
+void tod_init_time();
+void tod_update_tdata();
+void tod_update_ssec();
+void tod_sync();
 t_stat tod_svc(UNIT *uptr);
 t_stat tod_reset(DEVICE *dptr);
+t_stat tod_attach(UNIT *uptr, CONST char *cptr);
+t_stat tod_detach(UNIT *uptr);
+const char *tod_description(DEVICE *dptr);
+t_stat tod_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 uint32 tod_read(uint32 pa, size_t size);
 void tod_write(uint32, uint32 val, size_t size);
 #endif
