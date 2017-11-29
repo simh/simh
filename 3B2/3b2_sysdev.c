@@ -671,20 +671,17 @@ void timer_write(uint32 pa, uint32 val, size_t size)
 }
 
 /*
- * MM58174A Real-Time-Clock
+ * MM58174A Time Of Day Clock
+ *
+ * Despite its name, this device is not used by the 3B2 as a clock. It
+ * is only used to store the current date and time between boots. It
+ * is set when an operator changes the date and time. Is is read at
+ * boot time. Therefore, we do not need to treat it as a clock or
+ * timer device here.
  */
-
-/* The year is NOT stored in the TOD clock. However, it does store an
- * integer indicating which year in a 4-year Leap-Year cycle the
- * current year is. To simplify converting from seconds into a TOD
- * structure, we will map this into the range 1985...1988, for
- * internal purposes only.
- */
-
-int tod_years[4] = {85, 86, 87, 88};
 
 UNIT tod_unit = {
-    UDATA(&tod_svc, UNIT_IDLE+UNIT_FIX+UNIT_BINK, sizeof(TOD_DATA))
+    UDATA(NULL, UNIT_FIX+UNIT_BINK, sizeof(TOD_DATA))
 };
 
 DEVICE tod_dev = {
@@ -692,18 +689,13 @@ DEVICE tod_dev = {
     1, 16, 8, 4, 16, 32,
     NULL, NULL, &tod_reset,
     NULL, &tod_attach, &tod_detach,
-    NULL, DEV_DEBUG, 0, sys_deb_tab, NULL, NULL,
+    NULL, 0, 0, sys_deb_tab, NULL, NULL,
     &tod_help, NULL, NULL,
     &tod_description
 };
 
 t_stat tod_reset(DEVICE *dptr)
 {
-    int32 t;
-
-    t = sim_rtcn_init_unit(&tod_unit, TPS_TOD, TMR_TOD);
-    sim_activate_after(&tod_unit, 1000000 / TPS_TOD);
-
     if (tod_unit.filebuf == NULL) {
         tod_unit.filebuf = calloc(sizeof(TOD_DATA), 1);
         if (tod_unit.filebuf == NULL) {
@@ -717,7 +709,6 @@ t_stat tod_reset(DEVICE *dptr)
 t_stat tod_attach(UNIT *uptr, CONST char *cptr)
 {
     t_stat r;
-    TOD_DATA *td = (TOD_DATA *)uptr->filebuf;
 
     uptr->flags = uptr->flags | (UNIT_ATTABLE | UNIT_BUFABLE);
 
@@ -727,12 +718,6 @@ t_stat tod_attach(UNIT *uptr, CONST char *cptr)
         uptr->flags = uptr->flags & (uint32) ~(UNIT_ATTABLE | UNIT_BUFABLE);
     } else {
         uptr->hwmark = (uint32) uptr->capac;
-        if (!td->ssec) {
-            tod_init_time();
-        } else {
-            tod_sync();
-        }
-        tod_update_tdata();
     }
 
     return r;
@@ -741,10 +726,6 @@ t_stat tod_attach(UNIT *uptr, CONST char *cptr)
 t_stat tod_detach(UNIT *uptr)
 {
     t_stat r;
-    TOD_DATA *td = (TOD_DATA *)uptr->filebuf;
-
-    /* We're about to detach, so update the current tod clock */
-    tod_update_tdata();
 
     r = detach_unit(uptr);
 
@@ -756,33 +737,17 @@ t_stat tod_detach(UNIT *uptr)
 }
 
 /*
- * If no time is set in the system clock, grab it from the
- * real wall clock.
+ * Re-set the tod_data registers based on the current simulated time.
  */
-void tod_init_time()
+void tod_resync()
 {
-    TOD_DATA *td = (TOD_DATA *)tod_unit.filebuf;
-    int result;
-    struct timespec now;
-    sim_rtcn_get_time(&now, TMR_TOD);
-    td->rsec = (time_t)now.tv_sec;
-    td->ssec = (t_uint64)now.tv_sec * 10;
-}
-
-/*
- * Re-set the tod_data registers based on the current value of ssec
- */
-void tod_update_tdata()
-{
-    int result;
     struct timespec now;
     struct tm tm;
+    time_t sec;
     TOD_DATA *td = (TOD_DATA *)tod_unit.filebuf;
-    time_t sec = td->ssec / 10;
 
-    sim_debug(EXECUTE_MSG, &tod_dev,
-              ">>> Epoch time from tod_update_tdata() = %lu\n",
-              sec);
+    sim_rtcn_get_time(&now, TMR_CLK);
+    sec = now.tv_sec - td->delta;
 
     /* Populate the tm struct based on current sim_time */
     localtime_r(&sec, &tm);
@@ -800,38 +765,20 @@ void tod_update_tdata()
     td->unit_day = tm.tm_mday % 10;
     td->ten_day = tm.tm_mday / 10;
     td->year = 1 << ((tm.tm_year - 1) % 4);
-    sim_rtcn_get_time(&now, TMR_TOD);
-    sim_debug(EXECUTE_MSG, &tod_dev,
-              ">>> Updated rsec to %lu\n",
-              now.tv_sec);
-    td->rsec = now.tv_sec;
-}
-
-void tod_sync()
-{
-    int result;
-    struct timespec now;
-    TOD_DATA *td = (TOD_DATA *)tod_unit.filebuf;
-    sim_rtcn_get_time(&now, TMR_TOD);
-    sim_debug(EXECUTE_MSG, &tod_dev,
-              ">>> Syncing clock. Clock gained %lu seconds\n",
-              now.tv_sec - td->rsec);
-    td->ssec += ((time_t)now.tv_sec - td->rsec) * (t_uint64)10;
 }
 
 /*
- * Re-set the value of ssec based on the current values of the
- * tod_data registers.
+ * Re-calculate the delta between real time and simulated time
  */
-void tod_update_ssec()
+void tod_update_delta()
 {
+    struct timespec now;
     struct tm tm = {0};
-    time_t simtime = 0;
+    time_t ssec;
     TOD_DATA *td = (TOD_DATA *)tod_unit.filebuf;
+    sim_rtcn_get_time(&now, TMR_CLK);
 
-    /* We've been asked to re-set the TOD register values based on the
-     * current 1/10th seconds since the epoch (ssec) */
-
+    /* Compute the simulated seconds value */
     tm.tm_sec = (td->ten_sec * 10) + td->unit_sec;
     tm.tm_min = (td->ten_min * 10) + td->unit_min;
     tm.tm_hour = (td->ten_hour * 10) + td->unit_hour;
@@ -848,26 +795,9 @@ void tod_update_ssec()
     case 8: /* Leap Year */
         tm.tm_year = 88;
     }
-
     tm.tm_isdst = 0;
-    simtime = mktime(&tm);
-    sim_debug(EXECUTE_MSG, &tod_dev,
-              ">>> Epoch time from tod_update_ssec() = %lu\n",
-              simtime);
-    td->ssec = (t_uint64)simtime * 10;
-}
-
-t_stat tod_svc(UNIT *uptr)
-{
-    int32 t;
-    TOD_DATA *td = (TOD_DATA *)(uptr->filebuf);
-
-    td->ssec++;
-
-    t = sim_rtcn_calb(TPS_TOD, TMR_TOD);
-    sim_activate_after(&tod_unit, (uint32) (1000000 / TPS_TOD));
-
-    return SCPE_OK;
+    ssec = mktime(&tm);
+    td->delta = now.tv_sec - ssec;
 }
 
 uint32 tod_read(uint32 pa, size_t size)
@@ -875,70 +805,36 @@ uint32 tod_read(uint32 pa, size_t size)
     uint8 reg;
     TOD_DATA *td = (TOD_DATA *)(tod_unit.filebuf);
 
+    tod_resync();
+
     reg = pa - TODBASE;
 
     switch(reg) {
     case 0x04:        /* 1/10 Sec    */
         return td->tsec;
     case 0x08:        /* 1 Sec       */
-        sim_debug(READ_MSG, &tod_dev,
-                  "READ TOD: td->unit_sec=%d\n",
-                  td->unit_sec);
         return td->unit_sec;
     case 0x0c:        /* 10 Sec      */
-        sim_debug(READ_MSG, &tod_dev,
-                  "READ TOD: td->ten_sec=%d\n",
-                  td->ten_sec);
         return td->ten_sec;
     case 0x10:        /* 1 Min       */
-        sim_debug(READ_MSG, &tod_dev,
-                  "READ TOD: td->unit_min=%d\n",
-                  td->unit_min);
         return td->unit_min;
     case 0x14:        /* 10 Min      */
-        sim_debug(READ_MSG, &tod_dev,
-                  "READ TOD: td->ten_min=%d\n",
-                  td->ten_min);
         return td->ten_min;
     case 0x18:        /* 1 Hour      */
-        sim_debug(READ_MSG, &tod_dev,
-                  "READ TOD: td->unit_hour=%d\n",
-                  td->unit_hour);
         return td->unit_hour;
     case 0x1c:        /* 10 Hour     */
-        sim_debug(READ_MSG, &tod_dev,
-                  "READ TOD: td->ten_hour=%d\n",
-                  td->ten_hour);
         return td->ten_hour;
     case 0x20:        /* 1 Day       */
-        sim_debug(READ_MSG, &tod_dev,
-                  "READ TOD: td->unit_day=%d\n",
-                  td->unit_day);
         return td->unit_day;
     case 0x24:        /* 10 Day      */
-        sim_debug(READ_MSG, &tod_dev,
-                  "READ TOD: td->ten_day=%d\n",
-                  td->ten_day);
         return td->ten_day;
     case 0x28:        /* Day of Week */
-        sim_debug(READ_MSG, &tod_dev,
-                  "READ TOD: td->wday=%d\n",
-                  td->wday);
         return td->wday;
     case 0x2c:        /* 1 Month     */
-        sim_debug(READ_MSG, &tod_dev,
-                  "READ TOD: td->unit_mon=%d\n",
-                  td->unit_mon);
         return td->unit_mon;
     case 0x30:        /* 10 Month    */
-        sim_debug(READ_MSG, &tod_dev,
-                  "READ TOD: td->ten_mon=%d\n",
-                  td->ten_mon);
         return td->ten_mon;
     case 0x34:        /* Year        */
-        sim_debug(READ_MSG, &tod_dev,
-                  "READ TOD: td->year=%d\n",
-                  td->year);
         return td->year;
     default:
         break;
@@ -960,83 +856,42 @@ void tod_write(uint32 pa, uint32 val, size_t size)
         break;
     case 0x08:        /* 1 Sec       */
         td->unit_sec = (uint8) val;
-        sim_debug(WRITE_MSG, &tod_dev,
-                  "WRITE TOD: td->unit_sec=%d\n",
-                  td->unit_sec);
         break;
     case 0x0c:        /* 10 Sec      */
         td->ten_sec = (uint8) val;
-        sim_debug(WRITE_MSG, &tod_dev,
-                  "WRITE TOD: td->ten_sec=%d\n",
-                  td->ten_sec);
         break;
     case 0x10:        /* 1 Min       */
         td->unit_min = (uint8) val;
-        sim_debug(WRITE_MSG, &tod_dev,
-                  "WRITE TOD: td->unit_min=%d\n",
-                  td->unit_min);
         break;
     case 0x14:        /* 10 Min      */
         td->ten_min = (uint8) val;
-        sim_debug(WRITE_MSG, &tod_dev,
-                  "WRITE TOD: td->ten_min=%d\n",
-                  td->ten_min);
         break;
     case 0x18:        /* 1 Hour      */
         td->unit_hour = (uint8) val;
-        sim_debug(WRITE_MSG, &tod_dev,
-                  "WRITE TOD: td->unit_hour=%d\n",
-                  td->unit_hour);
         break;
     case 0x1c:        /* 10 Hour     */
         td->ten_hour = (uint8) val;
-        sim_debug(WRITE_MSG, &tod_dev,
-                  "WRITE TOD: td->ten_hour=%d\n",
-                  td->ten_hour);
         break;
     case 0x20:        /* 1 Day       */
         td->unit_day = (uint8) val;
-        sim_debug(WRITE_MSG, &tod_dev,
-                  "WRITE TOD: td->unit_day=%d\n",
-                  td->unit_day);
         break;
     case 0x24:        /* 10 Day      */
         td->ten_day = (uint8) val;
-        sim_debug(WRITE_MSG, &tod_dev,
-                  "WRITE TOD: td->ten_day=%d\n",
-                  td->ten_day);
         break;
     case 0x28:        /* Day of Week */
         td->wday = (uint8) val;
-        sim_debug(WRITE_MSG, &tod_dev,
-                  "WRITE TOD: td->wday=%d\n",
-                  td->wday);
         break;
     case 0x2c:        /* 1 Month     */
         td->unit_mon = (uint8) val;
-        sim_debug(WRITE_MSG, &tod_dev,
-                  "WRITE TOD: td->unit_mon=%d\n",
-                  td->unit_mon);
         break;
     case 0x30:        /* 10 Month    */
         td->ten_mon = (uint8) val;
-        sim_debug(WRITE_MSG, &tod_dev,
-                  "WRITE TOD: td->ten_mon=%d\n",
-                  td->ten_mon);
         break;
     case 0x34:        /* Year */
         td->year = (uint8) val;
-        sim_debug(WRITE_MSG, &tod_dev,
-                  "WRITE TOD: td->year=%d\n",
-                  td->year);
     case 0x38:
         if (val & 1) {
-            /* Start the clock */
-            sim_debug(WRITE_MSG, &tod_dev, "Start the clock and resync TOD registers.\n");
-            tod_update_ssec();
-        } else {
-            /* Stop the clock */
-            sim_debug(WRITE_MSG, &tod_dev, "Stop the clock\n");
+            tod_update_delta();
         }
         break;
     default:

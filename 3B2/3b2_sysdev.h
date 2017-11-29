@@ -80,14 +80,8 @@ void csr_write(uint32 pa, uint32 val, size_t size);
 
 /* TOD */
 
-typedef enum tod_action {
-    TOD_SAVE,
-    TOD_RESTORE
-} TOD_ACTION;
-
 typedef struct tod_data {
-    time_t rsec;       /* Real clock time from the host */
-    t_uint64 ssec;     /* Simulated time in 1/10th second since the epoch */
+    int32 delta;       /* Delta between simulated time and real time (sec.) */
     uint8 tsec;        /* 1/10 seconds */
     uint8 unit_sec;    /* 1's column seconds */
     uint8 ten_sec;     /* 10's column seconds */
@@ -104,11 +98,8 @@ typedef struct tod_data {
     uint8 pad[3];      /* Padding to 32 bytes */
 } TOD_DATA;
 
-void tod_init_time();
-void tod_update_tdata();
-void tod_update_ssec();
-void tod_sync();
-t_stat tod_svc(UNIT *uptr);
+void tod_resync();
+void tod_update_delta();
 t_stat tod_reset(DEVICE *dptr);
 t_stat tod_attach(UNIT *uptr, CONST char *cptr);
 t_stat tod_detach(UNIT *uptr);

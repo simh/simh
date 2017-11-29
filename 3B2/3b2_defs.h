@@ -292,13 +292,10 @@ noret __libc_longjmp (jmp_buf buf, int val);
 
 /* Timer definitions */
 
-#define TMR_CLK 0   /* The clock responsible for IPL 15 interrupts */
-#define TMR_TOD 1   /* The Time-of-Day clock */
+#define TMR_CLK   0         /* The clock responsible for IPL 15 interrupts */
+#define TPS_CLK   100       /* 100 ticks per second */
 
-#define CLK_MIN_TICKS 500    /* No fewer than 500 sim steps between ticks */
-
-#define TPS_CLK       100    /* 100 ticks per second */
-#define TPS_TOD       10     /* 10 ticks per second  */
+#define CLK_MIN_TICKS 500   /* No fewer than 500 sim steps between ticks */
 
 
 /* TIMING SECTION                                  */

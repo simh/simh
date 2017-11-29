@@ -3,9 +3,6 @@ AT&T 3B2 Simulator
 
 This module contains a simulator for the AT&T 3B2 Model 400 microcomputer.
 
-*CAUTION*: The simulator is under active and heavy development. It is
-usable today, but please consider this emulator to be a beta.
-
 Devices
 -------
 
@@ -20,6 +17,7 @@ devices are given in parentheses:
   - SCN2681A Integrated DUART (IU)
   - TMS2793 Integrated Floppy Controller (IF)
   - uPD7261A Integrated MFM Fixed Disk Controller (ID)
+  - MM58174A Time Of Day Clock (TOD)
 
 Usage
 -----
@@ -39,11 +37,14 @@ You will be greeted with the message:
 
     SYSTEM FAILURE: CONSULT YOUR SYSTEM ADMINISTRATION UTILITIES GUIDE
 
-NVRAM can be saved between boots by attaching it to a file.
+NVRAM and Time of Day can be saved between boots by attaching both
+devices to files.
 
-    sim> ATTACH NVRAM <file>
+    sim> ATTACH NVRAM <nvram-file>
+    sim> ATTACH TOD <tod-file>
 
-On subsequent boots, you will instead see the message
+If you have no operating system installed on the hard drive, on
+subsequent boots you will instead see the message
 
     SELF-CHECK
 
@@ -68,10 +69,11 @@ of available firmware programs.
 Booting UNIX SVR3
 -----------------
 
-UNIX SVR3 for the 3B2 partially boots. To boot UNIX, attach the first
-disk image from the 3B2 "Essential Utilities" distribution.
+UNIX SVR3 is the only operating system available for the 3B2.  To boot
+UNIX, attach the first disk image from the 3B2 "Essential Utilities"
+distribution.
 
-    sim> ATTACH IF <disk-image>
+    sim> ATTACH IF <floppy-image>
     sim> BOOT CPU
 
 Once you reach the `SYSTEM FAILURE` message, type `mcp` to enter
@@ -92,8 +94,9 @@ Installing SVR3
 ---------------
 
 To install SVR3 to the first hard disk, first, attach a new image
+to the ID0 device:
 
-    sim> ATTACH ID0 <disk-image>
+    sim> ATTACH ID0 <hd-image>
 
 Then, boot the file `idtools` from the "3B2 Maintenance Utilities -
 Issue 4.0" floppy diskette.
