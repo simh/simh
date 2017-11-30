@@ -518,7 +518,7 @@ void iu_write(uint32 pa, uint32 val, size_t size)
             if ((iu_port_a.stat & STS_FFL) == 0) {
                 iu_port_a.rxbuf[iu_port_a.w_p] = (uint8) val;
                 iu_port_a.w_p = (iu_port_a.w_p + 1) % IU_BUF_SIZE;
-                if (iu_port_a.w_p == iu_port_b.r_p) {
+                if (iu_port_a.w_p == iu_port_a.r_p) {
                     sim_debug(WRITE_MSG, &tto_a_dev,
                               ">>> FIFO FULL ON LOOPBACK THRA! <<<");
                     iu_port_a.stat |= STS_FFL;

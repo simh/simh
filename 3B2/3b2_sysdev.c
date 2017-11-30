@@ -788,12 +788,18 @@ void tod_update_delta()
     switch(td->year) {
     case 1: /* Leap Year - 3 */
         tm.tm_year = 85;
+        break;
     case 2: /* Leap Year - 2 */
         tm.tm_year = 86;
+        break;
     case 4: /* Leap Year - 1 */
         tm.tm_year = 87;
+        break;
     case 8: /* Leap Year */
         tm.tm_year = 88;
+        break;
+    default:
+        break;
     }
     tm.tm_isdst = 0;
     ssec = mktime(&tm);
@@ -889,6 +895,7 @@ void tod_write(uint32 pa, uint32 val, size_t size)
         break;
     case 0x34:        /* Year */
         td->year = (uint8) val;
+        break;
     case 0x38:
         if (val & 1) {
             tod_update_delta();

@@ -2037,7 +2037,7 @@ t_stat sim_instr(void)
             R[NUM_PC] = cpu_effective_address(dst);
             continue;
         case LLSW3:
-            result = cpu_read_op(src2) << (cpu_read_op(src1) & 0x1f);
+            result = (t_uint64)cpu_read_op(src2) << (cpu_read_op(src1) & 0x1f);
             cpu_write_op(dst, (uint32)(result & WORD_MASK));
             cpu_set_nz_flags((uint32)(result & WORD_MASK), dst);
             break;
