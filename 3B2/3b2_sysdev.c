@@ -750,7 +750,7 @@ void tod_resync()
     sec = now.tv_sec - td->delta;
 
     /* Populate the tm struct based on current sim_time */
-    localtime_r(&sec, &tm);
+    tm = *localtime(&sec);
 
     td->tsec = 0;
     td->unit_sec = tm.tm_sec % 10;
@@ -797,7 +797,7 @@ void tod_update_delta()
     }
     tm.tm_isdst = 0;
     ssec = mktime(&tm);
-    td->delta = now.tv_sec - ssec;
+    td->delta = (int32)(now.tv_sec - ssec);
 }
 
 uint32 tod_read(uint32 pa, size_t size)
