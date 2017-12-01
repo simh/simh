@@ -413,10 +413,8 @@ static SIM_INLINE t_stat get_pdce(uint32 va, uint32 *pd, uint8 *pd_acc)
 
 static SIM_INLINE void put_sdce(uint32 va, uint32 sd0, uint32 sd1)
 {
-    uint32 tag;
     uint8 ci;
 
-    tag   = SD_TAG(va);
     ci    = (SID(va) * NUM_SDCE) + SD_IDX(va);
 
     mmu_state.sdcl[ci] = SD_TO_SDCL(va, sd0);
@@ -426,17 +424,13 @@ static SIM_INLINE void put_sdce(uint32 va, uint32 sd0, uint32 sd1)
 
 static SIM_INLINE void put_pdce(uint32 va, uint32 sd0, uint32 pd)
 {
-    uint32 tag, pdclh, pdcrh;
+    uint32 pdclh;
     uint8  ci;
 
-    tag   = PD_TAG(va);
     ci    = (SID(va) * NUM_PDCE) + PD_IDX(va);
 
     /* Left side contains the 'U' bit we care about */
     pdclh = mmu_state.pdclh[ci];
-
-    /* Right side */
-    pdcrh = mmu_state.pdcrh[ci];
 
     /* Pick the least-recently-replaced side */
     if (pdclh & PDCLH_USED_MASK) { /* Right side replaced more recently */
@@ -454,11 +448,9 @@ static SIM_INLINE void put_pdce(uint32 va, uint32 sd0, uint32 pd)
 
 static SIM_INLINE void flush_sdce(uint32 va)
 {
-    uint32 tag;
     uint8 ci;
 
     ci  = (SID(va) * NUM_SDCE) + SD_IDX(va);
-    tag = SD_TAG(va);
 
     if (mmu_state.sdch[ci] & SD_GOOD_MASK) {
         mmu_state.sdch[ci] &= ~SD_GOOD_MASK;
@@ -538,10 +530,9 @@ static SIM_INLINE t_stat mmu_check_perm(uint8 flags, uint8 r_acc)
  */
 static SIM_INLINE void mmu_update_sd(uint32 va, uint32 mask)
 {
-    uint32 sd0, tag;
+    uint32 sd0;
     uint8  ci;
 
-    tag = SD_TAG(va);
     ci  = (SID(va) * NUM_SDCE) + SD_IDX(va);
 
     /* We go back to main memory to find the SD because the SD may

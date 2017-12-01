@@ -486,7 +486,7 @@ t_stat timer0_svc(UNIT *uptr)
 t_stat timer1_svc(UNIT *uptr)
 {
     struct timer_ctr *ctr;
-    int32 t, ticks;
+    int32 ticks;
 
     ctr = (struct timer_ctr *)uptr->tmr;
 
@@ -501,7 +501,7 @@ t_stat timer1_svc(UNIT *uptr)
         ticks = TPS_CLK;
     }
 
-    t = sim_rtcn_calb(ticks, TMR_CLK);
+    sim_rtcn_calb(ticks, TMR_CLK);
     sim_activate_after(uptr, (uint32) (1000000 / ticks));
 
     return SCPE_OK;
