@@ -422,6 +422,15 @@ The MacPorts package manager is available to provide these external packages.  O
 
     # port install vde2
     # port install libsdl2
+    # port install libsdl2_ttf
+
+OR
+
+The HomeBrew package manager can be used to provide these packages:
+
+    $ brew install vde
+    $ brew install sdl2
+    $ brew install sdl2_ttf
 
 ###### Linux - Dependencies
 
@@ -432,6 +441,7 @@ Ubuntu:
     # apt-get install libpcap-dev
     # apt-get install vde2
     # apt-get install libsdl2
+    # apt-get install libsdl2_ttf
 
 #### Windows
 
