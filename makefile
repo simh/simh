@@ -98,10 +98,13 @@ endif
 # building the pdp11, pdp10, or any vax simulator could use networking support
 ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring pdp10,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS)),$(findstring all,$(MAKECMDGOALS))))
   NETWORK_USEFUL = true
-  ifneq (,$(findstring all,$(MAKECMDGOALS))$(word 2,$(MAKECMDGOALS)))
+  ifneq (,$(findstring all,$(MAKECMDGOALS)))
     BUILD_MULTIPLE = s
     VIDEO_USEFUL = true
     BESM6_BUILD = true
+  endif
+  ifneq (,$(word 2,$(MAKECMDGOALS)))
+    BUILD_MULTIPLE = s
   endif
 else
   ifeq ($(MAKECMDGOALS),)
@@ -1539,21 +1542,21 @@ ifneq (,$(BESM6_BUILD))
             $(info ***)
         endif
     endif
-  ifeq (,$(and ${VIDEO_LDFLAGS}, ${FONTFILE}, $(BESM6_BUILD)))
-      $(info *** No SDL ttf support available.  BESM-6 video panel disabled.)
-      $(info ***)
-      BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
-  else ifneq (,$(and $(findstring sdl2,${VIDEO_LDFLAGS}),$(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)))
-      $(info using libSDL2_ttf: $(call find_lib,SDL2_ttf) $(call find_include,SDL2/SDL_ttf))
-      $(info ***)
-      BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL2_ttf
-  else ifneq (,$(and $(call find_include,SDL/SDL_ttf),$(call find_lib,SDL_ttf)))
-      $(info using libSDL_ttf: $(call find_lib,SDL_ttf) $(call find_include,SDL/SDL_ttf))
-      $(info ***)
-      BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL_ttf
-  else
-      BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
-  endif
+    ifeq (,$(and ${VIDEO_LDFLAGS}, ${FONTFILE}, $(BESM6_BUILD)))
+        $(info *** No SDL ttf support available.  BESM-6 video panel disabled.)
+        $(info ***)
+        BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
+    else ifneq (,$(and $(findstring sdl2,${VIDEO_LDFLAGS}),$(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)))
+        $(info using libSDL2_ttf: $(call find_lib,SDL2_ttf) $(call find_include,SDL2/SDL_ttf))
+        $(info ***)
+        BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL2_ttf
+    else ifneq (,$(and $(call find_include,SDL/SDL_ttf),$(call find_lib,SDL_ttf)))
+        $(info using libSDL_ttf: $(call find_lib,SDL_ttf) $(call find_include,SDL/SDL_ttf))
+        $(info ***)
+        BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL_ttf
+    else
+        BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
+    endif
 endif
 
 ###
