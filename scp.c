@@ -1180,6 +1180,9 @@ static const char simh_help[] =
       "+set clock nocatchup         disable catchup clock ticks\n"
       "+set clock catchup           enable catchup clock ticks\n"
       "+set clock calib=n%%          specify idle calibration skip %%\n"
+      "+set clock stop=n            stop execution after n instructions\n\n"
+      " The set clock stop command allows execution to have a bound when\n"
+      " execution starts with a BOOT, NEXT or CONTINUE command.\n"
 #define HLP_SET_ASYNCH "*Commands SET Asynch"
       "3Asynch\n"
       "+set asynch                  enable asynchronous I/O\n"
@@ -8383,7 +8386,7 @@ CONST char *tptr;
 
 *status = SCPE_OK;
 val = strtotv ((CONST char *)cptr, &tptr, radix);
-if ((cptr == tptr) || ((max > 0) && (val > max)))
+if ((cptr == tptr) || (val > max))
     *status = SCPE_ARG;
 else {
     while (sim_isspace (*tptr)) tptr++;

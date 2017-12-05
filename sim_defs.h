@@ -231,9 +231,11 @@ typedef unsigned long           t_uint64;
 #if defined (USE_INT64)                                 /* 64b data */
 typedef t_int64         t_svalue;                       /* signed value */
 typedef t_uint64        t_value;                        /* value */
+#define T_VALUE_MAX     0xffffffffffffffffuLL
 #else                                                   /* 32b data */
 typedef int32           t_svalue;
 typedef uint32          t_value;
+#define T_VALUE_MAX     0xffffffffUL
 #endif                                                  /* end 64b data */
 
 #if defined (USE_INT64) && defined (USE_ADDR64)         /* 64b address */

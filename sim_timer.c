@@ -1313,7 +1313,7 @@ t_value stop_time;
 
 if (cptr == NULL)
     return SCPE_ARG;
-stop_time = get_uint (cptr, 10, 0, &r);
+stop_time = get_uint (cptr, 10, T_VALUE_MAX, &r);
 if (r != SCPE_OK)
     return r;
 if (stop_time <= (t_value)sim_gtime())
