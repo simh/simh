@@ -1085,7 +1085,8 @@ _panel_add_register (PANEL *panel,
                      size_t bit_count)
 {
 REG *regs, *reg;
-char *response = NULL;
+char *response = NULL, *c;
+unsigned long long data;
 size_t i;
 int cmd_stat;
 
@@ -1172,13 +1173,14 @@ for (i=0; i<panel->reg_count; i++) {
     }
 pthread_mutex_unlock (&panel->io_lock);
 /* Validate existence of requested register/array */
-if (_panel_sendf (panel, &cmd_stat, &response, "EXAMINE %s %s%s\r", device_name? device_name : "", name, (element_count > 0) ? "[0]" : "")) {
+if (_panel_sendf (panel, &cmd_stat, &response, "EXAMINE -H %s %s%s\r", device_name? device_name : "", name, (element_count > 0) ? "[0]" : "")) {
     free (reg->name);
     free (reg->device_name);
     free (regs);
     return -1;
     }
-if (!strcmp ("Invalid argument\r\n", response)) {
+c = strchr (response, ':');
+if ((!strcmp ("Invalid argument\r\n", response)) || (!c)) {
     sim_panel_set_error ("Invalid Register: %s %s", device_name? device_name : "", name);
     free (response);
     free (reg->name);
@@ -1186,6 +1188,7 @@ if (!strcmp ("Invalid argument\r\n", response)) {
     free (regs);
     return -1;
     }
+data = strtoull (c + 1, NULL, 16);
 free (response);
 if (element_count > 0) {
     if (_panel_sendf (panel, &cmd_stat, &response, "EXAMINE %s %s[%d]\r", device_name? device_name : "", name, element_count-1)) {
@@ -1214,7 +1217,8 @@ pthread_mutex_unlock (&panel->io_lock);
 if (_panel_register_query_string (panel, &panel->reg_query, &panel->reg_query_size))
     return -1;
 if (bits) {
-    memset (bits, 0, sizeof (*bits) * bit_count);
+    for (i=0; i<bit_count; i++)
+        bits[i] = (data & (1LL<<i)) ? panel->sample_depth : 0;
     if (_panel_establish_register_bits_collection (panel))
         return -1;
     }
