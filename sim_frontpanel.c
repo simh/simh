@@ -165,6 +165,8 @@ struct PANEL {
     int                     callback_thread_running;
     void                    *callback_context;
     int                     usecs_between_callbacks;
+    pthread_t               debugflush_thread;
+    int                     debugflush_thread_running;
     unsigned int            sample_frequency;
     unsigned int            sample_dither_pct;
     unsigned int            sample_depth;
@@ -224,6 +226,7 @@ static const char *command_done_echo = "# COMMAND-DONE";
 static int little_endian;
 static void *_panel_reader(void *arg);
 static void *_panel_callback(void *arg);
+static void *_panel_debugflusher(void *arg);
 static void sim_panel_set_error (const char *fmt, ...);
 static pthread_key_t panel_thread_id;
 
@@ -354,6 +357,34 @@ if (p && p->Debug && (dbits & p->debug)) {
     free (obuf);
     }
 }
+
+static void *
+_panel_debugflusher(void *arg)
+{
+PANEL *p = (PANEL*)arg;
+
+pthread_setspecific (panel_thread_id, "debugflush");
+
+pthread_mutex_lock (&p->io_lock);
+p->debugflush_thread_running = 1;
+pthread_mutex_unlock (&p->io_lock);
+pthread_cond_signal (&p->startup_done);   /* Signal we're ready to go */
+msleep (100);
+pthread_mutex_lock (&p->io_lock);
+while (p->sock != INVALID_SOCKET) {
+    pthread_mutex_unlock (&p->io_lock);
+    msleep (15000);
+    sim_panel_flush_debug (p);
+    pthread_mutex_lock (&p->io_lock);
+    }
+pthread_mutex_unlock (&p->io_lock);
+pthread_mutex_lock (&p->io_lock);
+pthread_setspecific (panel_thread_id, NULL);
+p->debugflush_thread_running  = 0;
+pthread_mutex_unlock (&p->io_lock);
+return NULL;
+}
+
 
 static void
 _set_debug_file (PANEL *panel, const char *debug_file)
@@ -837,10 +868,16 @@ if (1) {
     pthread_mutex_lock (&p->io_lock);
     p->io_thread_running = 0;
     pthread_create (&p->io_thread, &attr, _panel_reader, (void *)p);
-    pthread_attr_destroy(&attr);
     while (!p->io_thread_running)
         pthread_cond_wait (&p->startup_done, &p->io_lock); /* Wait for thread to stabilize */
+    if (p->Debug) {
+        p->debugflush_thread_running = 0;
+        pthread_create (&p->debugflush_thread, &attr, _panel_debugflusher, (void *)p);
+        while (!p->debugflush_thread_running)
+            pthread_cond_wait (&p->startup_done, &p->io_lock); /* Wait for thread to stabilize */
+        }
     pthread_mutex_unlock (&p->io_lock);
+    pthread_attr_destroy(&attr);
     pthread_cond_destroy (&p->startup_done);
     }
 if (simulator_panel) {
@@ -977,11 +1014,13 @@ if (panel) {
         panel->sock = INVALID_SOCKET;
         sim_close_sock (sock);
         pthread_join (panel->io_thread, NULL);
-        pthread_mutex_destroy (&panel->io_lock);
-        pthread_mutex_destroy (&panel->io_send_lock);
-        pthread_mutex_destroy (&panel->io_command_lock);
-        pthread_cond_destroy (&panel->io_done);
         }
+    if (panel->Debug)
+        pthread_join (panel->debugflush_thread, NULL);
+    pthread_mutex_destroy (&panel->io_lock);
+    pthread_mutex_destroy (&panel->io_send_lock);
+    pthread_mutex_destroy (&panel->io_command_lock);
+    pthread_cond_destroy (&panel->io_done);
 #if defined(_WIN32)
     if (panel->hProcess) {
         TerminateProcess (panel->hProcess, 0);
