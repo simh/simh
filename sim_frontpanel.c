@@ -2194,17 +2194,26 @@ while ((p->sock != INVALID_SOCKET) &&
         while (isspace(0xFF & (*s)))
             ++s;
         }
-    if ((p->State == Run) && (!strcmp (s, sim_prompt))) {
-        _panel_debug (p, DBG_RSP, "State transitioning to Halt", NULL, 0);
-        p->State = Halt;
-        }
     memmove (buf, s, strlen (s)+1);
     buf_data = strlen (buf);
-    if (!strcmp("Simulator Running...", buf)) {
+    _panel_debug (p, DBG_RSP, "Remnant Buffer Contents: '%s'", NULL, 0, buf);
+    if (!memcmp ("Simulator Running...", buf, 20)) {
         _panel_debug (p, DBG_RSP, "State transitioning to Run", NULL, 0);
         p->State = Run;
-        buf_data = 0;
-        buf[0] = '\0';
+        buf_data -= 20;
+        if (buf_data) {
+            memmove (buf, buf + 20, buf_data + 1);
+            /* Since there is more to look at, we need to let the state 
+               transition to Run propagate before examining that.*/
+            pthread_mutex_unlock (&p->io_lock);
+            msleep (100);
+            pthread_mutex_lock (&p->io_lock);
+            }
+        buf[buf_data] = '\0';
+        }
+    if ((p->State == Run) && (!strcmp (buf, sim_prompt))) {
+        _panel_debug (p, DBG_RSP, "State transitioning to Halt", NULL, 0);
+        p->State = Halt;
         }
     }
 if (p->io_waiting) {
