@@ -480,6 +480,7 @@ struct BITSAMPLE {
 typedef struct BITSAMPLE_REG BITSAMPLE_REG;
 struct BITSAMPLE_REG {
     REG             *reg;           /* Register to be sampled */
+    uint32           idx;           /* Register index */
     t_bool          indirect;       /* Register value points at memory */
     DEVICE          *dptr;          /* Device register is part of */
     UNIT            *uptr;          /* Unit Register is related to */
@@ -534,7 +535,10 @@ if (rem->smp_reg_count == 0) {
 for (reg = 0; reg < rem->smp_reg_count; reg++) {
     uint32 bit;
 
-    fprintf (st, "}%s %s%s %d:", rem->smp_regs[reg].dptr->name, rem->smp_regs[reg].reg->name, rem->smp_regs[reg].indirect ? " -I" : "", rem->smp_regs[reg].bits[0].depth);
+    if (rem->smp_regs[reg].reg->depth > 1)
+        fprintf (st, "}%s %s[%d] %s %d:", rem->smp_regs[reg].dptr->name, rem->smp_regs[reg].reg->name, rem->smp_regs[reg].idx, rem->smp_regs[reg].indirect ? " -I" : "", rem->smp_regs[reg].bits[0].depth);
+    else
+        fprintf (st, "}%s %s%s %d:", rem->smp_regs[reg].dptr->name, rem->smp_regs[reg].reg->name, rem->smp_regs[reg].indirect ? " -I" : "", rem->smp_regs[reg].bits[0].depth);
     for (bit = 0; bit < rem->smp_regs[reg].width; bit++)
         fprintf (st, "%s%d", (bit != 0) ? "," : "", rem->smp_regs[reg].bits[bit].tot);
     fprintf (st, "\n");
@@ -625,7 +629,10 @@ for (i=connections=0; i<sim_rem_con_tmxr.lines; i++) {
                 fprintf (st, " indirect ");
             if (dptr != rem->smp_regs[reg].dptr)
                 fprintf (st, "%s ", rem->smp_regs[reg].dptr->name);
-            fprintf (st, "%s%s", rem->smp_regs[reg].reg->name, ((reg + 1) < rem->smp_reg_count) ? ", " : "");
+            if (rem->smp_regs[reg].reg->depth > 1)
+                fprintf (st, "%s[%d]%s", rem->smp_regs[reg].reg->name, rem->smp_regs[reg].idx, ((reg + 1) < rem->smp_reg_count) ? ", " : "");
+            else
+                fprintf (st, "%s%s", rem->smp_regs[reg].reg->name, ((reg + 1) < rem->smp_reg_count) ? ", " : "");
             dptr = rem->smp_regs[reg].dptr;
             }
         fprintf (st, "\n");
@@ -1128,6 +1135,7 @@ else {
         char tbuf[2*CBUFSIZE];
         uint32 bit, width;
         REG *reg;
+        uint32 idx;
         int32 saved_switches = sim_switches;
         t_bool indirect = FALSE;
         BITSAMPLE_REG *smp_regs;
@@ -1156,6 +1164,25 @@ else {
             stat = sim_messagef (SCPE_NXREG, "Nonexistent Register: %s\n", gbuf);
             break;
             }
+        if (*tptr == '[') {                             /* subscript? */
+            const char *tgptr = ++tptr;
+
+            if (reg->depth <= 1) {                      /* array register? */
+                stat = sim_messagef (SCPE_SUB, "Not Array Register: %s\n", reg->name);
+                break;
+                }
+            idx = (uint32) strtotv (tgptr, &tptr, 10);  /* convert index */
+            if ((tgptr == tptr) || (*tptr++ != ']')) {
+                stat = sim_messagef (SCPE_SUB, "Missing or Invalid Register Subscript: %s[%s\n", reg->name, tgptr);
+                break;
+                }
+            if (idx >= reg->depth) {                    /* validate subscript */
+                stat = sim_messagef (SCPE_SUB, "Invalid Register Subscript: %s[%d]\n", reg->name, idx);
+                break;
+                }
+            }
+        else
+            idx = 0;                                    /* not array */
         smp_regs = (BITSAMPLE_REG *)realloc (rem->smp_regs, (rem->smp_reg_count + 1) * sizeof(*smp_regs));
         if (smp_regs == NULL) {
             stat = SCPE_MEM;
@@ -1163,6 +1190,7 @@ else {
             }
         rem->smp_regs = smp_regs;
         smp_regs[rem->smp_reg_count].reg = reg;
+        smp_regs[rem->smp_reg_count].idx = idx;
         smp_regs[rem->smp_reg_count].dptr = sim_dfdev;
         smp_regs[rem->smp_reg_count].uptr = sim_dfunit;
         smp_regs[rem->smp_reg_count].indirect = indirect;
@@ -1235,7 +1263,7 @@ for (i = 0; i < bit->depth; i++)    /* set all value bits */
 static void sim_rem_collect_reg_bits (BITSAMPLE_REG *reg)
 {
 uint32 i;
-t_value val = get_rval (reg->reg, 0);
+t_value val = get_rval (reg->reg, reg->idx);
 
 if (reg->indirect)
     val = get_aval ((t_addr)val, reg->dptr, reg->uptr);
