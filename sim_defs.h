@@ -115,6 +115,10 @@
 #if defined(_MSC_VER) && (_MSC_VER < 1900)
 #define snprintf _snprintf      /* poor man's snprintf which will work most of the time but has different return value */
 #endif
+#if defined(__VAX)
+extern int sim_vax_snprintf(char *buf, size_t buf_size, const char *fmt, ...);
+#define snprintf sim_vax_snprintf
+#endif
 #include <stdarg.h>
 #include <string.h>
 #include <errno.h>

@@ -599,3 +599,20 @@ free (shmem);
 }
 
 #endif
+
+#if defined(__VAX)
+/* 
+ * We privide a 'basic' snprintf, which 'might' overrun a buffer, but
+ * the actual use cases don't on other platforms and none of the callers
+ * care about the function return value.
+ */
+int sim_vax_snprintf(char *buf, size_t buf_size, const char *fmt, ...)
+{
+va_list arglist;
+
+va_start (arglist, fmt);
+vsprintf (buf, fmt, arglist);
+va_end (arglist);
+return 0;
+}
+#endif
