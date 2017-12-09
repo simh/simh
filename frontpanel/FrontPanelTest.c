@@ -62,6 +62,7 @@ unsigned int PCQ[32];
 int PSL_bits[32];
 int PC_bits[32];
 int PC_indirect_bits[32];
+int PCQ_3_bits[32];
 
 int update_display = 1;
 
@@ -422,7 +423,7 @@ if (sim_panel_set_sampling_parameters_ex (panel, 500, 10, 100)) {
     goto Done;
     }
 if (sim_panel_add_register_indirect_bits (panel, "PC",  NULL, 32, PC_indirect_bits)) {
-    printf ("Error adding register 'PSL' bits: %s\n", sim_panel_get_error());
+    printf ("Error adding register 'PC' indirect bits: %s\n", sim_panel_get_error());
     goto Done;
     }
 if (sim_panel_add_register_bits (panel, "PSL",  NULL, 32, PSL_bits)) {
@@ -431,6 +432,10 @@ if (sim_panel_add_register_bits (panel, "PSL",  NULL, 32, PSL_bits)) {
     }
 if (sim_panel_add_register_bits (panel, "PC",  NULL, 32, PC_bits)) {
     printf ("Error adding register 'PSL' bits: %s\n", sim_panel_get_error());
+    goto Done;
+    }
+if (sim_panel_add_register_bits (panel, "PCQ[3]",  NULL, 32, PCQ_3_bits)) {
+    printf ("Error adding register 'PCQ[3]' bits: %s\n", sim_panel_get_error());
     goto Done;
     }
 if (1) {
@@ -464,7 +469,24 @@ if (1) {
         goto Done;
         }
     if (pc_value != addr400 + 4) {
-        printf ("Unexpected error getting PC value: %08X, expected: %08X\n", pc_value, addr400 + 4);
+        printf ("Unexpected PC value after HALT: %08X, expected: %08X\n", pc_value, addr400 + 4);
+        goto Done;
+        }
+    if (sim_panel_gen_deposit (panel, "PC", sizeof(addr400), &addr400)) {
+        printf ("Error setting PC to %08X: %s\n", addr400, sim_panel_get_error());
+        goto Done;
+        }
+    if (sim_panel_exec_step (panel)) {
+        printf ("Error executing a single step: %s\n", sim_panel_get_error());
+        goto Done;
+        }
+    pc_value = 0;
+    if (sim_panel_gen_examine (panel, "PC", sizeof(pc_value), &pc_value)) {
+        printf ("Unexpected error getting PC value: %s\n", sim_panel_get_error());
+        goto Done;
+        }
+    if (pc_value != addr400 + 1) {
+        printf ("Unexpected PC value after STEP: %08X, expected: %08X\n", pc_value, addr400 + 1);
         goto Done;
         }
     }
