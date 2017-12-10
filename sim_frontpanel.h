@@ -56,7 +56,7 @@ extern "C" {
 
 #if !defined(__VAX)         /* Unsupported platform */
 
-#define SIM_FRONTPANEL_VERSION   7
+#define SIM_FRONTPANEL_VERSION   8
 
 /**
 
@@ -477,7 +477,9 @@ sim_panel_get_state (PANEL *panel);
     All APIs routines which return an int return 0 for 
     success and -1 for an error.  
 
-    An API which returns an error (-1), will not change the panel state.
+    An API which returns an error (-1), will not change the panel state
+    except to possibly set the panel state to Error if the panel
+    condition is no longer useful.
     
     sim_panel_get_error     - the details of the most recent error
     sim_panel_clear_error   - clears the error buffer
@@ -492,6 +494,7 @@ void sim_panel_clear_error (void);
     
     sim_panel_set_debug_mode    - Specifies the debug detail to be recorded
     sim_panel_flush_debug       - Flushes debug output to disk
+    sim_panel_debug       -       Write message to the debug file
 
  */
 #define DBG_XMT         1   /* Transmit Data */
@@ -499,9 +502,13 @@ void sim_panel_clear_error (void);
 #define DBG_REQ         4   /* Request Data */
 #define DBG_RSP         8   /* Response Data */
 #define DBG_THR        16   /* Thread Activities */
+#define DBG_APP        32   /* Application Activities */
 
 void
 sim_panel_set_debug_mode (PANEL *panel, int debug_bits);
+
+void
+sim_panel_debug (PANEL *panel, const char *fmt, ...);
 
 void
 sim_panel_flush_debug (PANEL *panel);
