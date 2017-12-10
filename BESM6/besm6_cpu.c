@@ -63,8 +63,6 @@ uint32 PRP, MPRP;
 uint32 READY, READY2;                   /* ready flags of various devices */
 int32 tmr_poll = CLK_DELAY;             /* pgm timer poll */
 
-extern const char *scp_errors[];
-
 /* Wired (non-registered) bits of interrupt registers (GRP and PRP)
  * cannot be cleared by writing to the GRP and must be cleared by clearing
  * the registers generating the corresponding interrupts.
@@ -1590,7 +1588,7 @@ t_stat sim_instr (void)
         M[017] += corr_stack;
         if (cpu_dev.dctrl) {
             const char *message = (r >= SCPE_BASE) ?
-                scp_errors [r - SCPE_BASE] :
+                sim_error_text (r) :
                 sim_stop_messages [r];
             besm6_debug ("/// %05o%s: %s", PC,
                          (RUU & RUU_RIGHT_INSTR) ? "п" : "л",

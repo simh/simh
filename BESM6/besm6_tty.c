@@ -946,18 +946,17 @@ void vt_cmd_exec (int num)
     CONST char *cptr;
     CTAB *cmdp;
     t_stat err;
-    extern char *scp_errors[];
 
     cptr = get_glyph (vt_cbuf [num], gbuf, 0);      /* get command glyph */
     cmdp = lookup_cmd (gbuf);                       /* lookup command */
     if (! cmdp) {
-        tmxr_linemsg (t, scp_errors[SCPE_UNK - SCPE_BASE]);
+        tmxr_linemsg (t, sim_error_text (SCPE_UNK));
         tmxr_linemsg (t, "\r\n");
         return;
     }
     err = cmdp->action (num, cptr);                 /* if found, exec */
     if (err >= SCPE_BASE) {                         /* error? */
-        tmxr_linemsg (t, scp_errors [err - SCPE_BASE]);
+        tmxr_linemsg (t, sim_error_text (err));
         tmxr_linemsg (t, "\r\n");
     }
     if (err == SCPE_EXIT) {                         /* close telnet session */
