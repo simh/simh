@@ -1373,7 +1373,7 @@ t_stat sim_instr(void)
 
     /* Used for field calculation */
     uint32   width, offset;
-    t_uint64 mask;
+    uint32   mask;
 
     operand *src1, *src2, *src3, *dst;
 
@@ -1989,8 +1989,12 @@ t_stat sim_instr(void)
         case EXTFB:
             width = (cpu_read_op(src1) & 0x1f) + 1;
             offset = cpu_read_op(src2) & 0x1f;
-            mask = (1ul << width) - 1;
-            mask = (mask << offset) & WORD_MASK;
+            if (width >= 32) {
+                mask = -1;
+            } else {
+                mask = (1ul << width) - 1;
+            }
+            mask = mask << offset;
 
             if (width + offset > 32) {
                 mask |= (1ul << ((width + offset) - 32)) - 1;
@@ -2016,7 +2020,11 @@ t_stat sim_instr(void)
         case INSFB:
             width = (cpu_read_op(src1) & 0x1f) + 1;
             offset = cpu_read_op(src2) & 0x1f;
-            mask = ((1ul << width) - 1) & WORD_MASK;
+            if (width >= 32) {
+                mask = -1;
+            } else {
+                mask = (1ul << width) - 1;
+            }
 
             a = cpu_read_op(src3) & mask; /* src */
             b = cpu_read_op(dst);         /* dst */
@@ -2171,7 +2179,7 @@ t_stat sim_instr(void)
             cpu_set_c_flag(0);
             break;
         case ROTW:
-            a = cpu_read_op(src1) & 31;
+            a = cpu_read_op(src1) & 0x1f;
             b = (uint32) cpu_read_op(src2);
             mask = (CHAR_BIT * sizeof(a) - 1);
             d = (b >> a) | (b << ((~a + 1) & mask));
