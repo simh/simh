@@ -53,11 +53,11 @@ DEVICE dmac_dev = {
 };
 
 dmac_drq_handler dmac_drq_handlers[] = {
-    {DMA_ID_CHAN,  IDBASE+ID_DATA_REG,  &id_drq,        id_drq_handled},
-    {DMA_IF_CHAN,  IFBASE+IF_DATA_REG,  &if_state.drq,  if_drq_handled},
-    {DMA_IUA_CHAN, IUBASE+IUA_DATA_REG, &iu_port_a.drq, iua_drq_handled},
-    {DMA_IUB_CHAN, IUBASE+IUB_DATA_REG, &iu_port_b.drq, iub_drq_handled},
-    {0,            0,                   NULL,           NULL }
+    {DMA_ID_CHAN,  IDBASE+ID_DATA_REG,  &id_drq,         id_drq_handled},
+    {DMA_IF_CHAN,  IFBASE+IF_DATA_REG,  &if_state.drq,   if_drq_handled},
+    {DMA_IUA_CHAN, IUBASE+IUA_DATA_REG, &iu_console.drq, iua_drq_handled},
+    {DMA_IUB_CHAN, IUBASE+IUB_DATA_REG, &iu_contty.drq,  iub_drq_handled},
+    {0,            0,                   NULL,            NULL }
 };
 
 t_stat dmac_reset(DEVICE *dptr)

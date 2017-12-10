@@ -29,6 +29,7 @@
 */
 
 #include "3b2_iu.h"
+#include "sim_tmxr.h"
 
 /*
  * The 3B2/400 has two on-board serial ports, labeled CONSOLE and
@@ -42,12 +43,11 @@
  * In addition to the two TX/RX ports, the SCN27681A also has one
  * programmable timer.
  *
- * The SCN2681A UART is represented here by five devices:
+ * The SCN2681A UART is represented here by four devices:
  *
  *   - Console TTI (Input, port A)
  *   - Console TTO (Output, port A)
- *   - Contty  TTI (Input, port B)
- *   - Contty  TTO (Output, port B)
+ *   - Contty (I/O, port B. Terminal multiplexer with one line)
  *   - IU Timer
  */
 
@@ -60,8 +60,8 @@
 IU_STATE iu_state;
 
 /* The tx/rx state for ports A and B */
-IU_PORT iu_port_a;
-IU_PORT iu_port_b;
+IU_PORT iu_console;
+IU_PORT iu_contty;
 
 /* The timer state */
 IU_TIMER_STATE iu_timer_state;
@@ -112,84 +112,89 @@ BITFIELD conf_bits[] = {
     ENDBITS
 };
 
-/* TTI (Port A) data structures */
+/* TTI (Console) data structures */
 
-REG tti_a_reg[] = {
-    { HRDATADF(STAT, iu_port_a.stat,   8, "Status", sr_bits)       },
-    { HRDATADF(CONF, iu_port_a.conf,   8, "Config", conf_bits)     },
-    { BRDATAD(DATA,  iu_port_a.rxbuf,  16, 8, IU_BUF_SIZE, "Data") },
+REG tti_reg[] = {
+    { HRDATADF(STAT, iu_console.stat,   8, "Status", sr_bits)       },
+    { HRDATADF(CONF, iu_console.conf,   8, "Config", conf_bits)     },
+    { BRDATAD(DATA,  iu_console.rxbuf,  16, 8, IU_BUF_SIZE, "Data") },
     { NULL }
 };
 
-UNIT tti_a_unit = { UDATA(&iu_svc_tti_a, UNIT_IDLE, 0), TMLN_SPD_9600_BPS };
+UNIT tti_unit = { UDATA(&iu_svc_tti, UNIT_IDLE, 0), TMLN_SPD_9600_BPS };
 
-DEVICE tti_a_dev = {
-    "TTIA", &tti_a_unit, tti_a_reg, NULL,
+DEVICE tti_dev = {
+    "TTI", &tti_unit, tti_reg, NULL,
     1, 8, 32, 1, 8, 8,
-    NULL, NULL, &tti_a_reset,
+    NULL, NULL, &tti_reset,
     NULL, NULL, NULL, NULL,
     DEV_DEBUG, 0, sys_deb_tab
 };
 
-/* TTO (Port A) data structures */
+/* TTO (Console) data structures */
 
-REG tto_a_reg[] = {
-    { HRDATADF(STAT,  iu_port_a.stat,  8, "Status", sr_bits)                      },
+REG tto_reg[] = {
+    { HRDATADF(STAT,  iu_console.stat,  8, "Status", sr_bits)                      },
     { HRDATADF(ISTAT, iu_state.istat,  8, "Interrupt Status", isr_bits)           },
     { HRDATAD(IMR,    iu_state.imr,    8, "Interrupt Mask")                       },
     { HRDATADF(ACR,   iu_state.acr,    8, "Auxiliary Control Register", acr_bits) },
-    { HRDATAD(DATA,   iu_port_a.txbuf, 8, "Data")                                 },
+    { HRDATAD(DATA,   iu_console.txbuf, 8, "Data")                                 },
     { NULL }
 };
 
-UNIT tto_a_unit = { UDATA(&iu_svc_tto_a, TT_MODE_8B, 0), SERIAL_OUT_WAIT };
+UNIT tto_unit = { UDATA(&iu_svc_tto, TT_MODE_8B, 0), SERIAL_OUT_WAIT };
 
-DEVICE tto_a_dev = {
-    "TTOA", &tto_a_unit, tto_a_reg, NULL,
+DEVICE tto_dev = {
+    "TTO", &tto_unit, tto_reg, NULL,
     1, 8, 32, 1, 8, 8,
     NULL, NULL, NULL,
     NULL, NULL, NULL, NULL,
     DEV_DEBUG, 0, sys_deb_tab
 };
 
-/* TTI (Port B) data structures */
+/* CONTTY data structures */
 
-REG tti_b_reg[] = {
-    { HRDATADF(STAT, iu_port_b.stat,   8, "Status", sr_bits)       },
-    { HRDATADF(CONF, iu_port_b.conf,   8, "Config", conf_bits)     },
-    { BRDATAD(DATA,  iu_port_b.rxbuf,  16, 8, IU_BUF_SIZE, "Data") },
-    { NULL }
-};
+/*
+ * The CONTTY "multiplexer" is a bit unusual in that it serves only a
+ * single line, representing the built-in CONTTY port. On a real
+ * 3B2/400, the system board's dual UART serves both CONSOLE and
+ * CONTTY lines, giving support for two terminals. In the simulator,
+ * the CONSOLE is served by TTI and TTO devices, whereas the CONTTY is
+ * served by a TMXR multiplexer.
+ */
 
-UNIT tti_b_unit = { UDATA(&iu_svc_tti_b, UNIT_IDLE, 0), TMLN_SPD_9600_BPS };
+TMLN *contty_ldsc = NULL;
+TMXR contty_desc = { 1, 0, 0, NULL };
 
-DEVICE tti_b_dev = {
-    "TTIB", &tti_b_unit, tti_b_reg, NULL,
-    1, 8, 32, 1, 8, 8,
-    NULL, NULL, &tti_b_reset,
-    NULL, NULL, NULL, NULL,
-    DEV_DEBUG, 0, sys_deb_tab
-};
-
-/* TTO (Port B) data structures */
-
-REG tto_b_reg[] = {
-    { HRDATADF(STAT,  iu_port_b.stat,  8, "Status", sr_bits)                      },
-    { HRDATADF(ISTAT, iu_state.istat,  8, "Interrupt Status", isr_bits)           },
-    { HRDATAD(IMR,    iu_state.imr,    8, "Interrupt Mask")                       },
+REG contty_reg[] = {
+    { HRDATADF(STAT,  iu_contty.stat,  8, "Status", sr_bits) },
+    { HRDATADF(CONF,  iu_contty.conf,  8, "Config", conf_bits) },
+    { BRDATAD(RXDATA, iu_contty.rxbuf, 16, 8, IU_BUF_SIZE, "RX Data") },
+    { HRDATAD(TXDATA, iu_contty.txbuf, 8, "TX Data") },
+    { HRDATADF(ISTAT, iu_state.istat,  8, "Interrupt Status", isr_bits) },
+    { HRDATAD(IMR,    iu_state.imr,    8, "Interrupt Mask") },
     { HRDATADF(ACR,   iu_state.acr,    8, "Auxiliary Control Register", acr_bits) },
-    { HRDATAD(DATA,   iu_port_b.txbuf, 8, "Data")                                 },
     { NULL }
 };
 
-UNIT tto_b_unit = { UDATA(&iu_svc_tto_b, TT_MODE_8B, 0), SERIAL_OUT_WAIT };
+UNIT contty_unit[2] = {
+    { UDATA(&iu_svc_contty, UNIT_IDLE|UNIT_ATTABLE, 0) },
+    { UDATA(&iu_svc_contty_xmt, UNIT_DIS, 0), SERIAL_OUT_WAIT }
+};
 
-DEVICE tto_b_dev = {
-    "TTOB", &tto_b_unit, tto_b_reg, NULL,
+UNIT *contty_rcv_unit = &contty_unit[0];
+UNIT *contty_xmt_unit = &contty_unit[1];
+
+DEVICE contty_dev = {
+    "CONTTY", contty_unit, contty_reg, NULL,
     1, 8, 32, 1, 8, 8,
-    NULL, NULL, NULL,
-    NULL, NULL, NULL, NULL,
-    DEV_DEBUG, 0, sys_deb_tab
+    &tmxr_ex, &tmxr_dep, &contty_reset,
+    NULL, &contty_attach, &contty_detach,
+    NULL, DEV_DISABLE|DEV_DEBUG|DEV_MUX,
+    0, sys_deb_tab, NULL, NULL,
+    NULL, NULL,
+    (void *)&contty_desc,
+    NULL
 };
 
 /* IU Timer data structures */
@@ -209,68 +214,95 @@ DEVICE iu_timer_dev = {
     DEV_DEBUG, 0, sys_deb_tab
 };
 
+t_stat contty_attach(UNIT *uptr, CONST char *cptr)
+{
+    t_stat r = tmxr_attach(&contty_desc, uptr, cptr);
+    TMLN *lp;
+
+    if (r != SCPE_OK) {
+        tmxr_clear_modem_control_passthru(&contty_desc);
+        return r;
+    }
+
+    lp = &contty_ldsc[0];
+    tmxr_set_get_modem_bits(lp, TMXR_MDM_DTR|TMXR_MDM_RTS, 0, NULL);
+
+    return SCPE_OK;
+}
+
+t_stat contty_detach(UNIT *uptr)
+{
+    t_stat r = tmxr_detach(&contty_desc, uptr);
+    tmxr_clear_modem_control_passthru(&contty_desc);
+
+    return r;
+}
 
 void increment_modep_a()
 {
     iu_increment_a = FALSE;
-    iu_port_a.modep++;
+    iu_console.modep++;
 
-    if (iu_port_a.modep > 1) {
-        iu_port_a.modep = 0;
+    if (iu_console.modep > 1) {
+        iu_console.modep = 0;
     }
 }
 
 void increment_modep_b()
 {
     iu_increment_b = FALSE;
-    iu_port_b.modep++;
+    iu_contty.modep++;
 
-    if (iu_port_b.modep > 1) {
-        iu_port_b.modep = 0;
+    if (iu_contty.modep > 1) {
+        iu_contty.modep = 0;
     }
 }
 
 void iu_txrdy_a_irq() {
     if ((iu_state.imr & ISTS_TAI) &&
-        (iu_port_a.conf & TX_EN) &&
-        (iu_port_a.stat & STS_TXR)) {
-        sim_debug(EXECUTE_MSG, &tto_a_dev,
-                  "Firing IU TTY IRQ 13 ON TX/State Change: PORT A\n");
+        (iu_console.conf & TX_EN) &&
+        (iu_console.stat & STS_TXR)) {
         csr_data |= CSRUART;
     }
 }
 
 void iu_txrdy_b_irq() {
     if ((iu_state.imr & ISTS_TBI) &&
-        (iu_port_b.conf & TX_EN) &&
-        (iu_port_b.stat & STS_TXR)) {
-        sim_debug(EXECUTE_MSG, &tto_b_dev,
-                  "Firing IU TTY IRQ 13 ON TX/State Change: PORT B\n");
+        (iu_contty.conf & TX_EN) &&
+        (iu_contty.stat & STS_TXR)) {
         csr_data |= CSRUART;
     }
 }
 
-t_stat tti_a_reset(DEVICE *dptr)
+t_stat tti_reset(DEVICE *dptr)
 {
     memset(&iu_state, 0, sizeof(IU_STATE));
-    memset(&iu_port_a, 0, sizeof(IU_PORT));
+    memset(&iu_console, 0, sizeof(IU_PORT));
 
-    /* Start the TTI A polling loop */
-    if (!sim_is_active(&tti_a_unit)) {
-        sim_activate(&tti_a_unit, tti_a_unit.wait);
+    tmxr_set_console_units(&tti_unit, &tto_unit);
+
+    /* Input Port logic is inverted - 0 means set */
+    iu_state.inprt = ~(IU_DCDA);
+
+    /* Start the Console TTI polling loop */
+    if (!sim_is_active(&tti_unit)) {
+        sim_activate(&tti_unit, tti_unit.wait);
     }
 
     return SCPE_OK;
 }
 
-t_stat tti_b_reset(DEVICE *dtpr)
+t_stat contty_reset(DEVICE *dtpr)
 {
-    memset(&iu_state, 0, sizeof(IU_STATE));
-    memset(&iu_port_b, 0, sizeof(IU_PORT));
+    if (contty_ldsc == NULL) {
+        contty_desc.ldsc =
+            contty_ldsc =
+            (TMLN *)calloc(1, sizeof(*contty_ldsc));
+    }
 
-    /* Start the TTI B polling loop */
-    if (!sim_is_active(&tti_b_unit)) {
-        sim_activate(&tti_b_unit, tti_b_unit.wait);
+    /* Start the CONTTY polling loop */
+    if (!sim_is_active(contty_rcv_unit)) {
+        sim_activate(contty_rcv_unit, contty_rcv_unit->wait);
     }
 
     return SCPE_OK;
@@ -285,7 +317,7 @@ t_stat iu_timer_reset(DEVICE *dptr)
 
 /* Service routines */
 
-t_stat iu_svc_tti_a(UNIT *uptr)
+t_stat iu_svc_tti(UNIT *uptr)
 {
     int32 temp;
 
@@ -305,26 +337,17 @@ t_stat iu_svc_tti_a(UNIT *uptr)
          return temp;
     }
 
-    sim_debug(READ_MSG, &tti_a_dev,
-              ">>> TTIA: Receive %02x (%c)\n",
-              temp & 0xff, temp & 0xff);
-
-    if (iu_port_a.conf & RX_EN) {
-        if ((iu_port_a.stat & STS_FFL) == 0) {
-            iu_port_a.rxbuf[iu_port_a.w_p] = (temp & 0xff);
-            iu_port_a.w_p = (iu_port_a.w_p + 1) % IU_BUF_SIZE;
-            if (iu_port_a.w_p == iu_port_b.w_p) {
-                sim_debug(READ_MSG, &tti_a_dev,
-                          ">>> FIFO FULL ON KEYBOARD READ!!!! <<<\n");
-                iu_port_a.stat |= STS_FFL;
+    if (iu_console.conf & RX_EN) {
+        if ((iu_console.stat & STS_FFL) == 0) {
+            iu_console.rxbuf[iu_console.w_p] = (temp & 0xff);
+            iu_console.w_p = (iu_console.w_p + 1) % IU_BUF_SIZE;
+            if (iu_console.w_p == iu_contty.w_p) {
+                iu_console.stat |= STS_FFL;
             }
         }
-        iu_port_a.stat |= STS_RXR;
+        iu_console.stat |= STS_RXR;
         iu_state.istat |= ISTS_RAI;
         if (iu_state.imr & 0x02) {
-            sim_debug(EXECUTE_MSG, &tti_a_dev,
-                      "Firing IRQ 13 ON TTI A RECEIVE (%c)\n",
-                      (temp & 0xff));
             csr_data |= CSRUART;
         }
     }
@@ -332,23 +355,63 @@ t_stat iu_svc_tti_a(UNIT *uptr)
     return SCPE_OK;
 }
 
-t_stat iu_svc_tti_b(UNIT *uptr)
-{
-    sim_clock_coschedule_tmr_abs(uptr, TMR_CLK, 2);
 
-    /* TODO: Handle TTIB as a terminal */
-
-    return SCPE_OK;
-}
-
-t_stat iu_svc_tto_a(UNIT *uptr)
+t_stat iu_svc_tto(UNIT *uptr)
 {
     iu_txrdy_a_irq();
     return SCPE_OK;
 }
 
-t_stat iu_svc_tto_b(UNIT *uptr)
+t_stat iu_svc_contty(UNIT *uptr)
 {
+    int32 temp, ln;
+
+    if ((uptr->flags & UNIT_ATT) == 0) {
+        return SCPE_OK;
+    }
+
+    ln = tmxr_poll_conn(&contty_desc);
+    if (ln >= 0) {
+        contty_ldsc[ln].rcve = 1;
+        /* Set DCR */
+        iu_state.inprt &= ~(IU_DCDB);
+        iu_state.ipcr = IU_DCDB;
+        /* Cause an interrupt */
+        csr_data |= CSRUART;
+    }
+
+    tmxr_poll_rx(&contty_desc);
+
+    if (contty_ldsc[0].conn) {
+        temp = tmxr_getc_ln(&contty_ldsc[0]);
+        if (temp & SCPE_BREAK) {
+            sim_debug(EXECUTE_MSG, &contty_dev,
+                      "*** BREAK RECEIVED ON CONTTY!\n");
+        }
+        if (temp) {
+            if (iu_contty.conf & RX_EN) {
+                if ((iu_contty.stat & STS_FFL) == 0) {
+                    iu_contty.rxbuf[iu_contty.w_p] = (temp & 0xff);
+                    iu_contty.w_p = (iu_contty.w_p + 1) % IU_BUF_SIZE;
+                    if (iu_contty.w_p == iu_contty.w_p) {
+                        iu_contty.stat |= STS_FFL;
+                    }
+                }
+                iu_contty.stat |= STS_RXR;
+                iu_state.istat |= ISTS_RBI;
+                if (iu_state.imr & 0x02) {
+                    csr_data |= CSRUART;
+                }
+            }
+        }
+    }
+
+    return sim_clock_coschedule_tmr(uptr, TMR_CLK, 2);
+}
+
+t_stat iu_svc_contty_xmt(UNIT *uptr)
+{
+    tmxr_poll_tx(&contty_desc);
     iu_txrdy_b_irq();
     return SCPE_OK;
 }
@@ -395,27 +458,24 @@ uint32 iu_read(uint32 pa, size_t size)
 
     switch (reg) {
     case MR12A:
-        modep = iu_port_a.modep;
-        data = iu_port_a.mode[modep];
+        modep = iu_console.modep;
+        data = iu_console.mode[modep];
         iu_increment_a = TRUE;
         break;
     case SRA:
-        data = iu_port_a.stat;
+        data = iu_console.stat;
         break;
     case RHRA:
-        data = iu_port_a.rxbuf[iu_port_a.r_p];
-        iu_port_a.r_p = (iu_port_a.r_p + 1) % IU_BUF_SIZE;
-        sim_debug(READ_MSG, &tti_a_dev,
-                  "[%08x] RHRA = %02x (%c)\n",
-                  R[NUM_PC], (data & 0xff), (data & 0xff));
-        iu_port_a.stat &= ~(STS_RXR|STS_FFL);
+        data = iu_console.rxbuf[iu_console.r_p];
+        iu_console.r_p = (iu_console.r_p + 1) % IU_BUF_SIZE;
+        iu_console.stat &= ~(STS_RXR|STS_FFL);
         iu_state.istat &= ~ISTS_RAI;
         csr_data &= ~CSRUART;
         break;
     case IPCR:
         data = iu_state.ipcr;
-        /* Reading the port resets the upper four bits */
-        iu_state.ipcr &= 0x0f;
+        /* Reading the port resets it */
+        iu_state.ipcr = 0;
         csr_data &= ~CSRUART;
         break;
     case ISR:
@@ -428,52 +488,38 @@ uint32 iu_read(uint32 pa, size_t size)
         data = iu_timer_state.c_set & 0xff;
         break;
     case MR12B:
-        modep = iu_port_b.modep;
-        data = iu_port_b.mode[modep];
+        modep = iu_contty.modep;
+        data = iu_contty.mode[modep];
         iu_increment_b = TRUE;
         break;
     case SRB:
-        data = iu_port_b.stat;
-        sim_debug(READ_MSG, &tti_b_dev,
-                  "[%08x] SRB = %02x\n",
-                  R[NUM_PC], (data & 0xff));
+        data = iu_contty.stat;
         break;
     case RHRB:
-        data = iu_port_b.rxbuf[iu_port_b.r_p];
-        iu_port_b.r_p = (iu_port_b.r_p + 1) % IU_BUF_SIZE;
-        sim_debug(READ_MSG, &tti_b_dev,
-                  "[%08x] RHRB = %02x (%c)\n",
-                  R[NUM_PC], (data & 0xff), (data & 0xff));
-        iu_port_b.stat &= ~(STS_RXR|STS_FFL);
+        data = iu_contty.rxbuf[iu_contty.r_p];
+        iu_contty.r_p = (iu_contty.r_p + 1) % IU_BUF_SIZE;
+        iu_contty.stat &= ~(STS_RXR|STS_FFL);
         iu_state.istat &= ~ISTS_RBI;
         break;
     case INPRT:
-        /* TODO: Correct behavior for DCD on contty */
-        /* For now, this enables DCD/DTR on console only */
-        data = 0x8e;
+        data = iu_state.inprt;
         break;
     case START_CTR:
         data = 0;
         iu_state.istat &= ~ISTS_CRI;
         delay = (uint32) (IU_TIMER_STP * iu_timer_state.c_set);
         sim_activate_abs(&iu_timer_unit, (int32) DELAY_US(delay));
-        sim_debug(READ_MSG, &iu_timer_dev,
-                  "[%08x] Activating IU timer to fire in %04x steps\n",
-                  R[NUM_PC], iu_timer_state.c_set);
         break;
     case STOP_CTR:
         data = 0;
         iu_state.istat &= ~ISTS_CRI;
         csr_data &= ~CSRUART;
         sim_cancel(&iu_timer_unit);
-        sim_debug(READ_MSG, &iu_timer_dev,
-                  "[%08x] Cancelling IU timer\n",
-                  R[NUM_PC]);
         break;
     case 17: /* Clear DMAC interrupt */
         data = 0;
-        iu_port_a.drq = FALSE;
-        iu_port_b.drq = FALSE;
+        iu_console.drq = FALSE;
+        iu_contty.drq = FALSE;
         csr_data &= ~CSRDMA;
         break;
     default:
@@ -493,39 +539,31 @@ void iu_write(uint32 pa, uint32 val, size_t size)
 
     switch (reg) {
     case MR12A:
-        modep = iu_port_a.modep;
-        iu_port_a.mode[modep] = val & 0xff;
+        modep = iu_console.modep;
+        iu_console.mode[modep] = val & 0xff;
         iu_increment_a = TRUE;
         break;
     case CSRA:
         /* Set baud rate - not implemented */
         break;
     case CRA:  /* Command A */
-        sim_debug(WRITE_MSG, &tti_a_dev,
-                  "[%08x] CRA = %02x\n",
-                  R[NUM_PC], (val & 0xff));
         iu_w_cmd(PORT_A, (uint8) val);
         break;
     case THRA:  /* TX/RX Buf A */
-        sim_debug(WRITE_MSG, &tto_a_dev,
-                  "[%08x] THRA = %02x (%c)\n",
-                  R[NUM_PC], (val & 0xff), (val & 0xff));
         /* Loopback mode */
-        if ((iu_port_a.mode[1] & 0xc0) == 0x80) {
-            iu_port_a.txbuf = (uint8) val;
+        if ((iu_console.mode[1] & 0xc0) == 0x80) {
+            iu_console.txbuf = (uint8) val;
 
             /* This is also a Receive */
-            if ((iu_port_a.stat & STS_FFL) == 0) {
-                iu_port_a.rxbuf[iu_port_a.w_p] = (uint8) val;
-                iu_port_a.w_p = (iu_port_a.w_p + 1) % IU_BUF_SIZE;
-                if (iu_port_a.w_p == iu_port_a.r_p) {
-                    sim_debug(WRITE_MSG, &tto_a_dev,
-                              ">>> FIFO FULL ON LOOPBACK THRA! <<<");
-                    iu_port_a.stat |= STS_FFL;
+            if ((iu_console.stat & STS_FFL) == 0) {
+                iu_console.rxbuf[iu_console.w_p] = (uint8) val;
+                iu_console.w_p = (iu_console.w_p + 1) % IU_BUF_SIZE;
+                if (iu_console.w_p == iu_contty.r_p) {
+                    iu_console.stat |= STS_FFL;
                 }
             }
 
-            iu_port_a.stat |= STS_RXR;
+            iu_console.stat |= STS_RXR;
             iu_state.istat |= ISTS_RAI;
         } else {
             iu_tx(PORT_A, (uint8) val);
@@ -536,9 +574,6 @@ void iu_write(uint32 pa, uint32 val, size_t size)
         iu_state.acr = (uint8) val;
         break;
     case IMR:
-        sim_debug(WRITE_MSG, &tti_a_dev,
-                  "[%08x] IMR = %02x\n",
-                  R[NUM_PC], (val & 0xff));
         iu_state.imr = (uint8) val;
         csr_data &= ~CSRUART;
         /* Possibly cause an interrupt */
@@ -558,49 +593,50 @@ void iu_write(uint32 pa, uint32 val, size_t size)
         iu_timer_state.c_set |= (val & 0xff);
         break;
     case MR12B:
-        modep = iu_port_b.modep;
-        iu_port_b.mode[modep] = val & 0xff;
+        modep = iu_contty.modep;
+        iu_contty.mode[modep] = val & 0xff;
         iu_increment_b = TRUE;
         break;
     case CRB:  /* Command B */
-        sim_debug(WRITE_MSG, &tti_b_dev,
-                  "[%08x] CRB = %02x\n",
-                  R[NUM_PC], (val & 0xff));
         iu_w_cmd(PORT_B, (uint8) val);
         break;
     case CSRB:
         break;
     case THRB: /* TX/RX Buf B */
-        sim_debug(WRITE_MSG, &tto_b_dev,
-                  "[%08x] THRB = %02x (%c)\n",
-                  R[NUM_PC], (val & 0xff), (val & 0xff));
         /* Loopback mode */
-        if ((iu_port_b.mode[1] & 0xc0) == 0x80) {
-            iu_port_a.txbuf = (uint8) val;
+        if ((iu_contty.mode[1] & 0xc0) == 0x80) {
+            iu_contty.txbuf = (uint8) val;
 
             /* This is also a Receive */
-            if ((iu_port_b.stat & STS_FFL) == 0) {
-                iu_port_b.rxbuf[iu_port_b.w_p] = (uint8) val;
-                iu_port_b.w_p = (iu_port_b.w_p + 1) % IU_BUF_SIZE;
-                if (iu_port_b.w_p == iu_port_b.r_p) {
-                    sim_debug(WRITE_MSG, &tto_b_dev,
-                              ">>> FIFO FULL ON LOOPBACK THRB! <<<");
-                    iu_port_b.stat |= STS_FFL;
+            if ((iu_contty.stat & STS_FFL) == 0) {
+                iu_contty.rxbuf[iu_contty.w_p] = (uint8) val;
+                iu_contty.w_p = (iu_contty.w_p + 1) % IU_BUF_SIZE;
+                if (iu_contty.w_p == iu_contty.r_p) {
+                    iu_contty.stat |= STS_FFL;
                 }
             }
 
-            iu_port_b.stat |= STS_RXR;
+            iu_contty.stat |= STS_RXR;
             iu_state.istat |= ISTS_RBI;
         } else {
             iu_tx(PORT_B, (uint8) val);
         }
         break;
     case OPCR:
+        sim_debug(EXECUTE_MSG, &contty_dev,
+                  ">>> OPCR written: %02x\n",
+                  (uint8) val);
         iu_state.opcr = (uint8) val;
         break;
     case SOPR:
+        sim_debug(EXECUTE_MSG, &contty_dev,
+                  ">>> SOPR written: %02x\n",
+                  (uint8) val);
         break;
     case ROPR:
+        sim_debug(EXECUTE_MSG, &contty_dev,
+                  ">>> ROPR written: %02x\n",
+                  (uint8) val);
         break;
     default:
         break;
@@ -609,15 +645,11 @@ void iu_write(uint32 pa, uint32 val, size_t size)
 
 void iua_drq_handled()
 {
-    sim_debug(EXECUTE_MSG, &tto_a_dev,
-              "Firing IU IRQ 13 on DRQ (A) Hanlded\n");
     csr_data |= CSRDMA;
 }
 
 void iub_drq_handled()
 {
-    sim_debug(EXECUTE_MSG, &tto_a_dev,
-              "Firing IU IRQ 13 on DRQ (B) Hanlded\n");
     csr_data |= CSRDMA;
 }
 
@@ -625,13 +657,14 @@ static SIM_INLINE void iu_tx(uint8 portno, uint8 val)
 {
     IU_PORT *p;
     UNIT *uptr;
+    TMLN *lp;
 
     if (portno == 0) {
-        p = &iu_port_a;
-        uptr = &tto_a_unit;
+        p = &iu_console;
+        uptr = &tto_unit;
     } else {
-        p = &iu_port_b;
-        uptr = &tto_b_unit;
+        p = &iu_contty;
+        uptr = contty_xmt_unit;
     }
 
     p->txbuf = val;
@@ -643,6 +676,9 @@ static SIM_INLINE void iu_tx(uint8 portno, uint8 val)
         if (portno == PORT_A) {
             /* Write the character to the SIMH console */
             sim_putchar(val);
+        } else {
+            lp = &contty_ldsc[0];
+            tmxr_putc_ln(lp, val);
         }
 
         /* The buffer is now empty, we've transmitted, so set TXR */
@@ -660,9 +696,9 @@ static SIM_INLINE void iu_w_cmd(uint8 portno, uint8 cmd)
     IU_PORT *p;
 
     if (portno == 0) {
-        p = &iu_port_a;
+        p = &iu_console;
     } else {
-        p = &iu_port_b;
+        p = &iu_contty;
     }
 
     /* Enable or disable transmitter        */

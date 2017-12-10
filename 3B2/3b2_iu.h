@@ -94,10 +94,6 @@
 #define SOPR          14
 #define ROPR          15
 
-#define UNIT_CONSOLE_TTI    0
-#define UNIT_CONSOLE_TTO    1
-#define UNIT_IU_TIMER       2
-
 /* Registers - R/W */
 #define MR12A         0
 #define MR12B         8
@@ -122,10 +118,9 @@
 
 #define IU_MODE(x)    ((x & UM_MASK) >> UM_SHIFT)
 
-extern DEVICE tti_a_dev;
-extern DEVICE tto_a_dev;
-extern DEVICE tti_b_dev;
-extern DEVICE tto_b_dev;
+extern DEVICE tti_dev;
+extern DEVICE tto_dev;
+extern DEVICE contty_dev;
 extern DEVICE iu_timer_dev;
 
 #define IUBASE            0x49000
@@ -149,6 +144,9 @@ extern DEVICE iu_timer_dev;
 #define IU_TIMER_STP      4.33792
 
 #define IU_BUF_SIZE       3
+
+#define IU_DCDA           0x01
+#define IU_DCDB           0x02
 
 typedef struct iu_port {
     uint8 stat;               /* Port Status */
@@ -177,17 +175,19 @@ typedef struct iu_timer_state {
     t_bool c_en;
 } IU_TIMER_STATE;
 
-extern IU_PORT  iu_port_a;
-extern IU_PORT  iu_port_b;
+extern IU_PORT  iu_console;
+extern IU_PORT  iu_contty;
 
 /* Function prototypes */
-t_stat tti_a_reset(DEVICE *dptr);
-t_stat tti_b_reset(DEVICE *dptr);
+t_stat contty_attach(UNIT *uptr, CONST char *cptr);
+t_stat contty_detach(UNIT *uptr);
+t_stat tti_reset(DEVICE *dptr);
+t_stat contty_reset(DEVICE *dptr);
 t_stat iu_timer_reset(DEVICE *dptr);
-t_stat iu_svc_tti_a(UNIT *uptr);
-t_stat iu_svc_tto_a(UNIT *uptr);
-t_stat iu_svc_tti_b(UNIT *uptr);
-t_stat iu_svc_tto_b(UNIT *uptr);
+t_stat iu_svc_tti(UNIT *uptr);
+t_stat iu_svc_tto(UNIT *uptr);
+t_stat iu_svc_contty(UNIT *uptr);
+t_stat iu_svc_contty_xmt(UNIT *uptr);
 t_stat iu_svc_timer(UNIT *uptr);
 uint32 iu_read(uint32 pa, size_t size);
 void iu_write(uint32 pa, uint32 val, size_t size);
