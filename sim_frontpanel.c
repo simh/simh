@@ -276,19 +276,29 @@ static void __panel_debug (PANEL *p, int dbits, const char *fmt, const char *buf
 
 static void __panel_vdebug (PANEL *p, int dbits, const char *fmt, const char *buf, int bufsize, va_list arglist)
 {
-if (p && p->Debug && (dbits & p->debug)) {
-    int i;
+size_t obufsize = 10240 + 9*bufsize;
+
+while (p && p->Debug && (dbits & p->debug)) {
+    int i, len;
     struct timespec time_now;
     char timestamp[32];
     char threadname[50];
-    size_t obufsize = 10240 + 8*bufsize;
     char *obuf = (char *)_panel_malloc (obufsize);
 
     clock_gettime(CLOCK_REALTIME, &time_now);
     sprintf (timestamp, "%lld.%03d ", (long long)(time_now.tv_sec), (int)(time_now.tv_nsec/1000000));
     sprintf (threadname, "%s:%s ", p->parent ? p->device_name : "CPU", (pthread_getspecific (panel_thread_id)) ? (char *)pthread_getspecific (panel_thread_id) : ""); 
     
-    vsnprintf (obuf, obufsize - 1, fmt, arglist);
+    obuf[obufsize - 1] = '\0';
+    len = vsnprintf (obuf, obufsize - 1, fmt, arglist);
+    if (len < 0)
+        return;
+    /* If the formatted result didn't fit into the buffer, then grow the buffer and try again */
+    if (len >= (int)(obufsize - 9*bufsize)) {
+        obufsize = len + 1 + 9*bufsize;
+        free (obuf);
+        continue;
+        }
 
     for (i=0; i<bufsize; ++i) {
         switch ((unsigned char)buf[i]) {
@@ -354,6 +364,7 @@ if (p && p->Debug && (dbits & p->debug)) {
         }
     fprintf(p->Debug, "%s%s%s\n", timestamp, threadname, obuf);
     free (obuf);
+    break;
     }
 }
 
@@ -2424,9 +2435,10 @@ while (1) {                                         /* format passed string, arg
     len = vsnprintf (sim_panel_error_buf, sim_panel_error_bufsize-1, fmt, arglist);
     va_end (arglist);
 
-/* If the formatted result didn't fit into the buffer, then grow the buffer and try again */
-
-    if ((len < 0) || (len >= (int)(sim_panel_error_bufsize-1))) {
+    if (len < 0)        /* Format encoding error? */
+        break;
+    /* If the formatted result didn't fit into the buffer, then grow the buffer and try again */
+    if (len >= (int)(sim_panel_error_bufsize-1)) {
         free (sim_panel_error_buf);
         sim_panel_error_bufsize = sim_panel_error_bufsize * 2;
         while ((int)sim_panel_error_bufsize < len + 1)
@@ -2461,9 +2473,11 @@ while (1) {                                         /* format passed string, arg
     len = vsnprintf (buf, bufsize-1, fmt, arglist);
     va_end (arglist);
 
-/* If the formatted result didn't fit into the buffer, then grow the buffer and try again */
+    if (len < 0)
+        return sim_panel_set_error (NULL, "Format encoding error while processing '%s'", fmt);
 
-    if ((len < 0) || ((len + post_fix_len) >= bufsize-1)) {
+    /* If the formatted result didn't fit into the buffer, then grow the buffer and try again */
+    if ((len + post_fix_len) >= bufsize-1) {
         if (buf != stackbuf)
             free (buf);
         bufsize = bufsize * 2;
