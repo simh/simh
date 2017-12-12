@@ -188,8 +188,9 @@ if (!panel) {
     }
 
 if (debug) {
-    sim_panel_set_debug_mode (panel, DBG_XMT|DBG_RCV|DBG_REQ|DBG_RSP|DBG_THR);
+    sim_panel_set_debug_mode (panel, DBG_XMT|DBG_RCV|DBG_REQ|DBG_RSP|DBG_THR|DBG_APP);
     }
+sim_panel_debug (panel, "Starting Debug\n");
 if (1) {
     tape = sim_panel_add_device_panel (panel, "TAPE DRIVE");
 
