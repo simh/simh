@@ -66,6 +66,9 @@ int PCQ_3_bits[32];
 
 int update_display = 1;
 
+int debug = 0;
+
+
 static void
 DisplayCallback (PANEL *panel, unsigned long long simulation_time, void *context)
 {
@@ -141,14 +144,10 @@ sim_panel_flush_debug (panel);
 return;
 }
 
-int
-main (int argc, char **argv)
+int panel_setup ()
 {
 FILE *f;
-int debug = 0;
 
-if ((argc > 1) && ((!strcmp("-d", argv[1])) || (!strcmp("-D", argv[1])) || (!strcmp("-debug", argv[1]))))
-    debug = 1;
 /* Create pseudo config file for a test */
 if ((f = fopen (sim_config, "w"))) {
     if (debug) {
@@ -175,7 +174,6 @@ if ((f = fopen (sim_config, "w"))) {
     fclose (f);
     }
 
-InitDisplay();
 signal (SIGINT, halt_handler);
 panel = sim_panel_start_simulator_debug (sim_path,
                                          sim_config,
@@ -199,7 +197,7 @@ if (1) {
         goto Done;
         }
     if (debug) {
-        sim_panel_set_debug_mode (tape, DBG_XMT|DBG_RCV|DBG_REQ|DBG_RSP|DBG_THR);
+        sim_panel_set_debug_mode (tape, DBG_XMT|DBG_RCV|DBG_REQ|DBG_RSP|DBG_THR|DBG_APP);
         }
     }
 if (1) {
@@ -491,9 +489,64 @@ if (1) {
         goto Done;
         }
     }
+return 0;
 
+Done:
+sim_panel_destroy (panel);
+panel = NULL;
 
+/* Get rid of pseudo config file created above */
+remove (sim_config);
+return -1;
+}
+
+int
+main (int argc, char **argv)
+{
+if ((argc > 1) && ((!strcmp("-d", argv[1])) || (!strcmp("-D", argv[1])) || (!strcmp("-debug", argv[1]))))
+    debug = 1;
+
+if (panel_setup())
+    goto Done;
+if (1) {
+    struct {
+        unsigned int addr;
+        char *instr;
+        } long_running_program[] = {
+            {0x2000,  "MOVL #7FFFFFFF,R0"},
+            {0x2007,  "MOVL #7FFFFFFF,R1"},
+            {0x200E,  "SOBGTR R1,200E"},
+            {0x2011,  "SOBGTR R0,2007"},
+            {0x2014,  "HALT"},
+            {0,NULL}
+        };
+    int i;
+
+    sim_panel_debug (panel, "Testing sim_panel_destroy() with simulator in Run State");
+    for (i=0; long_running_program[i].instr; i++)
+        if (sim_panel_mem_deposit_instruction (panel, sizeof(long_running_program[i].addr), 
+                                               &long_running_program[i].addr, long_running_program[i].instr)) {
+            printf ("Error setting depositing instruction '%s' into memory at location %XR0: %s\n", 
+                    long_running_program[i].instr, long_running_program[i].addr, sim_panel_get_error());
+            goto Done;
+            }
+    if (sim_panel_gen_deposit (panel, "PC", sizeof(long_running_program[0].addr), &long_running_program[0].addr)) {
+        printf ("Error setting PC to %X: %s\n", long_running_program[0].addr, sim_panel_get_error());
+        goto Done;
+        }
+    if (sim_panel_exec_start (panel)) {
+        printf ("Error starting simulator execution: %s\n", sim_panel_get_error());
+        goto Done;
+        }
+    usleep (2000000);  /* 2 Seconds */
+    sim_panel_debug (panel, "Shutting down while simulator is running");
+    sim_panel_destroy (panel);
+    }
 sim_panel_clear_error ();
+InitDisplay();
+if (panel_setup())
+    goto Done;
+sim_panel_debug (panel, "Testing with Command interface");
 while (1) {
     size_t i;
     char cmd[512];
@@ -542,6 +595,6 @@ while (1) {
 Done:
 sim_panel_destroy (panel);
 
-/* Get rid of pseudo config file created above */
+/* Get rid of pseudo config file created earlier */
 remove (sim_config);
 }
