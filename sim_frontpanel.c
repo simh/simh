@@ -889,7 +889,7 @@ if (p->sock == INVALID_SOCKET) {
         }
     goto Error_Return;
     }
-_panel_debug (p, DBG_XMT|DBG_RCV, "Connected to simulator on %s after %dms\n", NULL, 0, p->hostport, (int)i*100);
+_panel_debug (p, DBG_XMT|DBG_RCV, "Connected to simulator on %s after %dms", NULL, 0, p->hostport, (int)i*100);
 pthread_mutex_init (&p->io_lock, NULL);
 pthread_mutex_init (&p->io_send_lock, NULL);
 pthread_mutex_init (&p->io_command_lock, NULL);
@@ -909,7 +909,7 @@ if (1) {
     pthread_create (&p->io_thread, &attr, _panel_reader, (void *)p);
     while (!p->io_thread_running)
         pthread_cond_wait (&p->startup_done, &p->io_lock); /* Wait for thread to stabilize */
-    if (p->Debug) {
+    if ((p->Debug) && (p->parent == NULL)) {
         p->debugflush_thread_running = 0;
         pthread_create (&p->debugflush_thread, &attr, _panel_debugflusher, (void *)p);
         while (!p->debugflush_thread_running)
@@ -981,6 +981,8 @@ if (1) {
     sim_panel_set_error (NULL, "%s", errbuf);
     free (errbuf);
     }
+if (!simulator_panel)
+    sim_cleanup_sock();
 return NULL;
 }
 
@@ -1022,13 +1024,15 @@ sim_panel_destroy (PANEL *panel)
 REG *reg;
 
 if (panel) {
-    _panel_debug (panel, DBG_XMT|DBG_RCV, "Closing Panel %s\n", NULL, 0, panel->device_name? panel->device_name : panel->path);
+    _panel_debug (panel, DBG_XMT|DBG_RCV, "Closing Panel %s", NULL, 0, panel->device_name? panel->device_name : panel->path);
     if (panel->devices) {
         size_t i;
 
         for (i=0; i<panel->device_count; i++) {
-            if (panel->devices[i])
+            if (panel->devices[i]) {
                 sim_panel_destroy (panel->devices[i]);
+                panel->devices[i] = NULL;
+                }
             }
         free (panel->devices);
         panel->devices = NULL;
@@ -1042,19 +1046,26 @@ if (panel) {
         sim_panel_set_display_callback_interval (panel, NULL, NULL, 0);
         /* Next, attempt a simulator shutdown only with the master panel */
         if (panel->parent == NULL) {
-            if (panel->State == Run)
+            if (panel->State == Run) {
+                int i;
+
                 _panel_send (panel, "\005\r", 2);
+                for (i=0; (panel->State == Run) && (i < 10); i++)
+                    msleep(100);
+                if (panel->State == Run)
+                    _panel_debug (panel, DBG_THR, "Unable to HALT running simulator for shutdown", NULL, 0);
+                }
             _panel_send (panel, "EXIT\r", 5);
             }
         /* Wait for up to 2 seconds for a graceful shutdown */
+        panel->sock = INVALID_SOCKET;
         for (wait_count=0; panel->io_thread_running && (wait_count<20); ++wait_count)
             msleep (100);
         /* Now close the socket which should stop a pending read that hasn't completed */
-        panel->sock = INVALID_SOCKET;
         sim_close_sock (sock);
         pthread_join (panel->io_thread, NULL);
         }
-    if (panel->Debug)
+    if ((panel->Debug) && (panel->parent == NULL))
         pthread_join (panel->debugflush_thread, NULL);
     pthread_mutex_destroy (&panel->io_lock);
     pthread_mutex_destroy (&panel->io_send_lock);
@@ -1097,7 +1108,8 @@ if (panel) {
     free (panel->simulator_version);
     if ((panel->Debug) && (!panel->parent))
         fclose (panel->Debug);
-    sim_cleanup_sock ();
+    if (!panel->parent)
+        sim_cleanup_sock ();
     _panel_deregister_panel (panel);
     free (panel);
     }
@@ -1378,6 +1390,7 @@ panel->callback_context = context;
 if (usecs_between_callbacks && (0 == panel->usecs_between_callbacks)) { /* Need to start/enable callbacks */
     pthread_attr_t attr;
 
+    _panel_debug (panel, DBG_THR, "Starting callback thread, Interval: %d usecs", NULL, 0, usecs_between_callbacks);
     panel->usecs_between_callbacks = usecs_between_callbacks;
     pthread_cond_init (&panel->startup_done, NULL);
     pthread_attr_init(&attr);
@@ -1389,6 +1402,7 @@ if (usecs_between_callbacks && (0 == panel->usecs_between_callbacks)) { /* Need 
     pthread_cond_destroy (&panel->startup_done);
     }
 if ((usecs_between_callbacks == 0) && panel->usecs_between_callbacks) { /* Need to stop callbacks */
+    _panel_debug (panel, DBG_THR, "Shutting down callback thread", NULL, 0);
     panel->usecs_between_callbacks = 0;                             /* flag disabled */
     pthread_mutex_unlock (&panel->io_lock);                         /* allow access */
     pthread_join (panel->callback_thread, NULL);                    /* synchronize with thread rundown */
@@ -1856,6 +1870,45 @@ return 0;
 }
 
 /**
+
+   sim_panel_mem_deposit_instruction
+
+        addr_size    the size (in local storage) of the buffer which 
+                     contains the memory address of the data to be deposited
+                     into the simulator
+        addr         a pointer to the buffer containing the memory address
+                     of the data to be deposited into the simulator
+        instruction  a pointer to the buffer that contains the mnemonic 
+                     instruction to be deposited at the indicated address
+ */
+
+ int
+sim_panel_mem_deposit_instruction (PANEL *panel, 
+                                   size_t addr_size,
+                                   const void *addr,
+                                   const char *instruction)
+{
+unsigned long long address = 0;
+int cmd_stat;
+
+if (!panel || (panel->State == Error)) {
+    sim_panel_set_error (NULL, "Invalid Panel");
+    return -1;
+    }
+if (panel->State == Run) {
+    sim_panel_set_error (NULL, "Not Halted");
+    return -1;
+    }
+if (little_endian)
+    memcpy (&address, addr, addr_size);
+else
+    memcpy (((char *)&address) + sizeof(address)-addr_size, addr, addr_size);
+if (_panel_sendf (panel, &cmd_stat, NULL, (panel->radix == 16) ? "DEPOSIT -H %llx %s" : "DEPOSIT -H %llo %s", address, instruction))
+    return -1;
+return 0;
+}
+
+/**
    sim_panel_set_register_value
 
         name        the name of a simulator register or a memory address
@@ -2269,7 +2322,7 @@ Start_Next_Line:
         }
     }
 if (p->io_waiting) {
-    _panel_debug (p, DBG_RCV, "Receive: restarting waiting thread while exiting", NULL, 0);
+    _panel_debug (p, DBG_THR, "Receive: restarting waiting thread while exiting", NULL, 0);
     p->io_waiting = 0;
     pthread_cond_signal (&p->io_done);
     }
@@ -2377,11 +2430,13 @@ while ((p->sock != INVALID_SOCKET) &&
     }
 pthread_mutex_unlock (&p->io_lock);
 /* stop any established repeating activity in the simulator */
-if (p->parent == NULL)          /* Top level panel? */
+if (p->parent == NULL) {        /* Top level panel? */
+    _panel_debug (p, DBG_THR, "Stopping All Repeats before exiting", NULL, 0);
     _panel_sendf (p, &cmd_stat, NULL, "%s", register_repeat_stop_all);
+    }
 else {
-    if (p->State == Run)
-        _panel_sendf (p, &cmd_stat, NULL, "%s", register_repeat_stop);
+    _panel_debug (p, DBG_THR, "Stopping Repeats before exiting", NULL, 0);
+    _panel_sendf (p, &cmd_stat, NULL, "%s", register_repeat_stop);
     }
 pthread_mutex_lock (&p->io_lock);
 _panel_debug (p, DBG_THR, "Exiting", NULL, 0);

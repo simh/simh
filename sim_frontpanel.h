@@ -56,7 +56,7 @@ extern "C" {
 
 #if !defined(__VAX)         /* Unsupported platform */
 
-#define SIM_FRONTPANEL_VERSION   8
+#define SIM_FRONTPANEL_VERSION   9
 
 /**
 
@@ -322,12 +322,14 @@ sim_panel_break_output_clear (PANEL *panel, const char *condition);
     memory or a register one of the following routines should 
     be called:  
     
-    sim_panel_gen_examine        - Examine register or memory
-    sim_panel_gen_deposit        - Deposit to register or memory
-    sim_panel_mem_examine        - Examine memory location
-    sim_panel_mem_deposit        - Deposit to memory location
-    sim_panel_set_register_value - Deposit to a register or memory 
-                                   location
+    sim_panel_gen_examine               - Examine register or memory
+    sim_panel_gen_deposit               - Deposit to register or memory
+    sim_panel_mem_examine               - Examine memory location
+    sim_panel_mem_deposit               - Deposit to memory location
+    sim_panel_mem_deposit_instruction   - Deposit instruction to memory 
+                                          location
+    sim_panel_set_register_value        - Deposit to a register or memory 
+                                          location
  */
 
 
@@ -407,6 +409,25 @@ sim_panel_mem_deposit (PANEL *panel,
                        const void *addr,
                        size_t value_size,
                        const void *value);
+
+/**
+
+   sim_panel_mem_deposit_instruction
+
+        addr_size    the size (in local storage) of the buffer which 
+                     contains the memory address of the data to be deposited
+                     into the simulator
+        addr         a pointer to the buffer containing the memory address
+                     of the data to be deposited into the simulator
+        instruction  a pointer to the buffer that contains the mnemonic 
+                     instruction to be deposited at the indicated address
+ */
+
+int
+sim_panel_mem_deposit_instruction (PANEL *panel, 
+                                   size_t addr_size,
+                                   const void *addr,
+                                   const char *instruction);
 
 /**
 

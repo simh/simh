@@ -1232,7 +1232,7 @@ t_stat sim_rem_con_repeat_svc (UNIT *uptr)
 int line = uptr - rem_con_repeat_units;
 REMOTE *rem = &sim_rem_consoles[line];
 
-sim_debug (DBG_REP, &sim_remote_console, "sim_rem_con_repeat_svc(line=%d) - interval=%d\n", line, rem->repeat_interval);
+sim_debug (DBG_REP, &sim_remote_console, "sim_rem_con_repeat_svc(line=%d) - interval=%d usecs\n", line, rem->repeat_interval);
 if (rem->repeat_interval) {
     rem->repeat_pending = TRUE;
     sim_activate_after (uptr, rem->repeat_interval);        /* reschedule */
@@ -1382,7 +1382,9 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
             }
         }
     else {
-        if ((!rem->repeat_pending) || (rem->buf_ptr != 0)) {
+        if (((!rem->repeat_pending) && (rem->act == NULL)) ||   /* Repeat isn't pending AND no prior commands still active */
+            (rem->buf_ptr != 0) ||                              /* OR Not at beginning of line */
+            (tmxr_input_pending_ln (lp))) {                     /* OR input available to read */
             c = tmxr_getc_ln (lp);
             if (!(TMXR_VALID & c))
                 continue;
@@ -1461,10 +1463,12 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
                     break;
                     }
                 else {
-                    if (rem->repeat_pending) {
+                    if ((rem->repeat_pending) &&            /* New repeat pending */
+                        (rem->act = NULL) &&                /* AND no prior still active */
+                        (!tmxr_input_pending_ln (lp))) {    /* AND no session input pending */
                         rem->repeat_pending = FALSE;
-                        sim_rem_setact (i, rem->repeat_action);
-                        sim_rem_getact (i, rem->buf, rem->buf_size);
+                        sim_rem_setact (rem-sim_rem_consoles, rem->repeat_action);
+                        sim_rem_getact (rem-sim_rem_consoles, rem->buf, rem->buf_size);
                         if (!master_session)
                             tmxr_linemsgf (lp, "%s%s\n", sim_prompt, rem->buf);
                         else
@@ -1566,7 +1570,10 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
                     break;
                 }
             c = 0;
-            if ((!got_command) && (rem->single_mode) && (tmxr_input_pending_ln (lp))) {
+            if ((!got_command) &&                   /* No Command yet */
+                (rem->single_mode) &&               /* AND single command mode */
+                (tmxr_input_pending_ln (lp)) &&     /* AND something ready to read */
+                (rem->act == NULL)) {               /* AND no prior still active */
                 c = tmxr_getc_ln (lp);
                 c = c & ~TMXR_VALID;
                 }
