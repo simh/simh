@@ -65,8 +65,7 @@
 #define ID_SEEK_BASE        700    /* us */
 #define ID_RECAL_WAIT       6000   /* us */
 
-/* Reading data takes about 8ms per sector, plus time to seek if not
-   on cylinder */
+/* Reading data takes about 8ms per sector */
 #define ID_RW_WAIT          8000   /* us */
 
 /* Sense Unit Status completes in about 200 us */
@@ -90,37 +89,30 @@
 uint8    id_dpr = 0;
 /* Data FIFO pointer - Write */
 uint8    id_dpw = 0;
-/* Selected unit */
-uint8    id_sel = 0;
 /* Controller Status Register */
 uint8    id_status = 0;
 /* Unit Interrupt Status */
-uint8    id_int_status;
+uint8    id_int_status = 0;
 /* Last command received */
 uint8    id_cmd = 0;
 /* DMAC request */
 t_bool   id_drq = FALSE;
 /* 8-byte FIFO */
 uint8    id_data[ID_FIFO_LEN] = {0};
-/* INT output pin */
-t_bool   id_irq = FALSE;
-/* Special flag for seek end SIS */
-t_bool   id_seek_sis = FALSE;
-
-/* State of each drive */
-
+/* SRQM bit */
+t_bool   id_srqm = FALSE;
+/* The logical unit number (0-1) */
+uint8    id_unit_num = 0;
+/* The physical unit number (0-3) */
+uint8    id_ua = 0;
 /* Cylinder the drive is positioned on */
 uint16   id_cyl[ID_NUM_UNITS] = {0};
-
-/* DTLH byte for each drive */
-uint8    id_dtlh[ID_NUM_UNITS] = {0};
-
-/* Arguments of last READ, WRITE, VERIFY ID, or READ ID command */
-
 /* Ending Track Number (from Specify) */
 uint8    id_etn = 0;
 /* Ending Sector Number (from Specify) */
 uint8    id_esn = 0;
+/* DTLH word (from Specify) */
+uint8    id_dtlh = 0;
 /* Physical sector number */
 uint8    id_psn = 0;
 /* Physical head number */
@@ -135,6 +127,8 @@ uint8    id_lhn = 0;
 uint8    id_lsn = 0;
 /* Number of sectors to transfer, decremented after each sector */
 uint8    id_scnt = 0;
+/* Whether we are using polling mode or not */
+t_bool   id_polling = FALSE;
 /* Sector buffer */
 uint8    id_buf[ID_SEC_SIZE];
 /* Buffer pointer */
@@ -143,22 +137,19 @@ size_t   id_buf_ptr = 0;
 uint8    id_idfield[ID_IDFIELD_LEN];
 uint8    id_idfield_ptr = 0;
 
-/*
- * TODO: Macros used for debugging timers. Remove when debugging is complete.
- */
-double id_start_time;
-
-#define ID_START_TIME() { id_start_time = sim_gtime(); }
-#define ID_DIFF_MS()    ((sim_gtime() - id_start_time) / INST_PER_MS)
+uint8    id_seek_state[ID_NUM_UNITS] = {ID_SEEK_NONE};
 
 UNIT id_unit[] = {
-    {UDATA (&id_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BINK, ID_DSK_SIZE), 0, 0 },
-    {UDATA (&id_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BINK, ID_DSK_SIZE), 0, 1 },
+    { UDATA (&id_unit_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BINK, ID_DSK_SIZE), 0, ID0, 0 },
+    { UDATA (&id_unit_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BINK, ID_DSK_SIZE), 0, ID1, 0 },
+    { UDATA (&id_ctlr_svc, UNIT_FIX+UNIT_BINK, 0) },
     { NULL }
 };
 
+UNIT    *id_ctlr_unit = &id_unit[ID_CTLR];
+
 /* The currently selected drive number */
-UNIT    *id_sel_unit = &id_unit[0];
+UNIT    *id_sel_unit = &id_unit[ID0];
 
 REG id_reg[] = {
     { HRDATAD(CMD,  id_cmd,    8, "Command") },
@@ -179,10 +170,11 @@ DEVICE id_dev = {
 
 /* Function implementation */
 
-static SIM_INLINE void id_activate(uint32 delay)
+t_bool id_int()
 {
-    ID_START_TIME();
-    sim_activate_abs(id_sel_unit, (int32) delay);
+    return (((id_status & ID_STAT_CEL) ||
+             (id_status & ID_STAT_CEH) ||
+             ((id_status & ID_STAT_SRQ) && !id_srqm)));
 }
 
 static SIM_INLINE void id_clear_fifo()
@@ -191,54 +183,151 @@ static SIM_INLINE void id_clear_fifo()
     id_dpw = 0;
 }
 
-t_stat id_svc(UNIT *uptr)
+/* TODO: Remove after debugging */
+static SIM_INLINE void id_activate(UNIT *uptr, int32 delay)
 {
-    /* Complete the last command */
-    id_status = ID_STAT_CEH;
+    sim_activate(uptr, delay);
+}
 
-    switch (CMD_NUM) {
+/*
+ * Service routine for ID controller.
+ *
+ * The simulated HD controller must service Sense Interrupt Status,
+ * Specify, and Detect Error independent of the operation of either ID
+ * unit, which may be in the middle of a seek or other operation.
+ */
+t_stat id_ctlr_svc(UNIT *uptr)
+{
+    uint8 cmd;
+
+    cmd = uptr->u4;  /* The command that caused the activity */
+
+    id_srqm = FALSE;
+    id_status &= ~(ID_STAT_CB);
+    id_status |= ID_STAT_CEH;
+    uptr->u4 = 0;
+
+    switch (cmd) {
+    case ID_CMD_SIS:
+        sim_debug(EXECUTE_MSG, &id_dev,
+                  "[%08x]\tINTR\t\tCOMPLETING Sense Interrupt Status.\n",
+                  R[NUM_PC]);
+        id_data[0] = id_int_status;
+        id_int_status = 0;
+        break;
+    default:
+        sim_debug(EXECUTE_MSG, &id_dev,
+                  "[%08x]\tINTR\t\tCOMPLETING OTHER COMMAND 0x%x (CONTROLLER)\n",
+                  R[NUM_PC], cmd);
+        break;
+    }
+
+    return SCPE_OK;
+}
+
+/*
+ * Service routine for ID0 and ID1 units.
+ */
+t_stat id_unit_svc(UNIT *uptr)
+{
+    uint8 unit, other, cmd;
+
+    unit  = uptr->u3;  /* The unit number that needs an interrupt */
+    cmd   = uptr->u4;  /* The command that caused the activity    */
+    other = unit ^ 1;  /* The number of the other unit            */
+
+    /* If the other unit is active, we cannot interrupt, so we delay
+     * here */
+    if (id_unit[other].u4 == ID_CMD_RDATA ||
+        id_unit[other].u4 == ID_CMD_WDATA) {
+        id_activate(uptr, 1000);
+        return SCPE_OK;
+    }
+
+    id_srqm = FALSE;
+    id_status &= ~(ID_STAT_CB);
+    /* Note that we don't set CEH, in case this is a SEEK/RECAL ID_SEEK_1 */
+
+    switch (cmd) {
     case ID_CMD_SEEK:   /* fall-through */
     case ID_CMD_RECAL:
-        /* SRQ is only set in polling mode (POL bit is 0) */
-        if ((id_dtlh[UNIT_NUM] & ID_DTLH_POLL) == 0) {
-            id_status |= ID_STAT_SRQ;
-        }
-        if (uptr->flags & UNIT_ATT) {
-            id_int_status = ID_IST_SEN|(uint8)uptr->ID_UNIT_NUM;
+        /* In POLLING mode, SEEK and RECAL actually interrupt twice.
+         *
+         * 1. Immediately after the correct number of stepping pulses
+         *    have been issued (SRQ is not set)
+         *
+         * 2. After the drive has completed seeking and is ready
+         *    for a new command (SRQ is set)
+         */
+        if (id_polling) {
+            switch (id_seek_state[unit]) {
+            case ID_SEEK_0:
+                id_status |= ID_STAT_CEH;
+                sim_debug(EXECUTE_MSG, &id_dev,
+                          "[%08x]\tINTR\t\tCOMPLETING Recal/Seek SEEK_0 UNIT %d\n",
+                          R[NUM_PC], unit);
+                id_seek_state[unit] = ID_SEEK_1;
+                id_activate(uptr, DELAY_US(8000)); /* TODO: Correct Delay based on steps */
+                break;
+            case ID_SEEK_1:
+                sim_debug(EXECUTE_MSG, &id_dev,
+                          "[%08x]\tINTR\t\tCOMPLETING Recal/Seek SEEK_1 UNIT %d\n",
+                          R[NUM_PC], unit);
+                id_seek_state[unit] = ID_SEEK_NONE;
+                id_status |= ID_STAT_SRQ;
+                uptr->u4 = 0; /* Only clear out the command on a SEEK_1, never a SEEK_0 */
+                if (uptr->flags & UNIT_ATT) {
+                    id_int_status |= (ID_IST_SEN|unit);
+                } else {
+                    id_int_status |= (ID_IST_NR|unit);
+                }
+                break;
+            default:
+                sim_debug(EXECUTE_MSG, &id_dev,
+                          "[%08x]\tINTR\t\tERROR, NOT SEEK_0 OR SEEK_1, UNIT %d\n",
+                          R[NUM_PC], unit);
+                break;
+            }
         } else {
-            id_int_status = ID_IST_NR|(uint8)uptr->ID_UNIT_NUM;
+            sim_debug(EXECUTE_MSG, &id_dev,
+                      "[%08x]\tINTR\t\tCOMPLETING NON-POLLING Recal/Seek UNIT %d\n",
+                      R[NUM_PC], unit);
+            id_status |= ID_STAT_CEH;
+            uptr->u4 = 0;
+            if (uptr->flags & UNIT_ATT) {
+                id_int_status |= (ID_IST_SEN|unit);
+            } else {
+                id_int_status |= (ID_IST_NR|unit);
+            }
         }
-        break;
-    case ID_CMD_SIS:
-        if (!id_seek_sis) {
-            id_status = ID_STAT_CEL;
-        }
-        id_seek_sis = FALSE;
-        id_data[0] = id_int_status;
-        id_status &= ~ID_STAT_SRQ;
+
         break;
     case ID_CMD_SUS:
-        if ((id_sel_unit->flags & UNIT_ATT) == 0) {
+        sim_debug(EXECUTE_MSG, &id_dev,
+                  "[%08x]\tINTR\t\tCOMPLETING Sense Unit Status UNIT %d\n",
+                  R[NUM_PC], unit);
+        id_status |= ID_STAT_CEH;
+        uptr->u4 = 0;
+        if ((uptr->flags & UNIT_ATT) == 0) {
             /* If no HD is attached, SUS puts 0x00 into the data
                buffer */
             id_data[0] = 0;
         } else {
             /* Put Unit Status into byte 0 */
             id_data[0] = (ID_UST_DSEL|ID_UST_SCL|ID_UST_RDY);
-            if (id_cyl[UNIT_NUM] == 0) {
+            if (id_cyl[unit] == 0) {
                 id_data[0] |= ID_UST_TK0;
             }
         }
         break;
     default:
+        sim_debug(EXECUTE_MSG, &id_dev,
+                  "[%08x]\tINTR\t\tCOMPLETING OTHER COMMAND 0x%x UNIT %d\n",
+                  R[NUM_PC], cmd, unit);
+        id_status |= ID_STAT_CEH;
+        uptr->u4 = 0;
         break;
     }
-
-    sim_debug(EXECUTE_MSG, &id_dev,
-              "[%08x] \tINTR\t\tDELTA=%f ms\n",
-              R[NUM_PC], ID_DIFF_MS());
-
-    id_irq = TRUE;
 
     return SCPE_OK;
 }
@@ -269,12 +358,9 @@ static SIM_INLINE t_lba id_lba(uint16 cyl, uint8 head, uint8 sec)
 
 /* At the end of each sector read or write, we update the FIFO
  * with the correct return parameters. */
-static void SIM_INLINE id_end_rw(uint8 est) {
-    sim_debug(EXECUTE_MSG, &id_dev,
-              ">>> ending R/W with status: %02x\n",
-              est);
-    id_dpr = 0;
-    id_dpw = 0;
+static void SIM_INLINE id_end_rw(uint8 est)
+{
+    id_clear_fifo();
     id_data[0] = est;
     id_data[1] = id_phn;
     id_data[2] = ~(id_lcnh);
@@ -286,20 +372,11 @@ static void SIM_INLINE id_end_rw(uint8 est) {
 
 /* The controller wraps id_lsn, id_lhn, and id_lcnl on each sector
  * read, so that they point to the next C/H/S */
-static void SIM_INLINE id_update_chs() {
-    sim_debug(EXECUTE_MSG, &id_dev,
-              ">>> id_update_chs(): id_esn=%02x id_etn=%02x\n",
-              id_esn, id_etn);
-
+static void SIM_INLINE id_update_chs()
+{
     if (id_lsn++ >= id_esn) {
-        sim_debug(EXECUTE_MSG, &id_dev,
-                  ">>> id_update_chs(): id_lsn reset to 0. id_lhn is %02x\n",
-                  id_lhn);
         id_lsn = 0;
         if (id_lhn++ >= id_etn) {
-            sim_debug(EXECUTE_MSG, &id_dev,
-                      ">>> id_update_chs(): id_lhn reset to 0. id_lcnl is %02x\n",
-                      id_lcnl);
             id_lhn = 0;
             if (id_lcnl == 0xff) {
                 id_lcnl = 0;
@@ -311,7 +388,8 @@ static void SIM_INLINE id_update_chs() {
     }
 }
 
-uint32 id_read(uint32 pa, size_t size) {
+uint32 id_read(uint32 pa, size_t size)
+{
     uint8 reg;
     uint16 cyl;
     t_lba lba;
@@ -354,7 +432,7 @@ uint32 id_read(uint32 pa, size_t size) {
                     /* It's time to read a new sector into our sector buf */
                     id_buf_ptr = 0;
                     cyl = (uint16) (((uint16)id_lcnh << 8)|(uint16)id_lcnl);
-                    id_cyl[UNIT_NUM] = cyl;
+                    id_cyl[id_unit_num] = cyl;
                     lba = id_lba(cyl, id_lhn, id_lsn);
                     if (sim_disk_rdsect(id_sel_unit, lba, id_buf, &sectsread, 1) == SCPE_OK) {
                         if (sectsread !=1) {
@@ -362,11 +440,6 @@ uint32 id_read(uint32 pa, size_t size) {
                                       "[%08x]\tERROR: ASKED TO READ ONE SECTOR, READ: %d\n",
                                       R[NUM_PC], sectsread);
                         }
-                        sim_debug(READ_MSG, &id_dev,
-                                  "[%08x] \tRDATA\tCYL=%d PHN=%d LCNH=%02x "
-                                  "LCNL=%02x LHN=%d LSN=%d SCNT=%d LBA=%04x\n",
-                                  R[NUM_PC], cyl, id_phn, id_lcnh, id_lcnl,
-                                  id_lhn, id_lsn, id_scnt-1, lba);
                         id_update_chs();
                     } else {
                         /* Uh-oh! */
@@ -379,10 +452,9 @@ uint32 id_read(uint32 pa, size_t size) {
                 }
 
                 data = id_buf[id_buf_ptr++];
-
                 sim_debug(READ_MSG, &id_dev,
-                          "[%08x]\tSECTOR DATA\t%02x\t(%c)\n",
-                          R[NUM_PC], data, (data >= 0x20 && data < 0x7f) ? data : '.');
+                          "[%08x]\tDATA\t%02x\n",
+                          R[NUM_PC], data);
 
                 /* Done with this current sector, update id_scnt */
                 if (id_buf_ptr >= ID_SEC_SIZE) {
@@ -411,8 +483,7 @@ uint32 id_read(uint32 pa, size_t size) {
                         id_idfield_ptr = 0;
                     } else {
                         /* All done, set return codes */
-                        id_dpr = 0;
-                        id_dpw = 0;
+                        id_clear_fifo();
                         id_data[0] = 0;
                         id_data[1] = id_scnt;
                     }
@@ -478,13 +549,13 @@ void id_write(uint32 pa, uint32 val, size_t size)
 
             /* Write to the disk buffer */
             if (id_buf_ptr < ID_SEC_SIZE) {
-                sim_debug(WRITE_MSG, &id_dev,
-                          "[%08x]\tSECTOR DATA\t%02x\t(%c)\n",
-                          R[NUM_PC], val, (val >= 0x20 && val < 0x7f) ? val : '.');
                 id_buf[id_buf_ptr++] = (uint8)(val & 0xff);
+                sim_debug(WRITE_MSG, &id_dev,
+                          "[%08x]\tDATA\t%02x\n",
+                          R[NUM_PC], (uint8)(val & 0xff));
             } else {
                 sim_debug(WRITE_MSG, &id_dev,
-                          "[%08x] ERROR\tWDATA OVERRUN\n",
+                          "[%08x]\tERROR\tWDATA OVERRUN\n",
                           R[NUM_PC]);
                 id_end_rw(ID_EST_OVR);
                 return;
@@ -495,7 +566,7 @@ void id_write(uint32 pa, uint32 val, size_t size)
                 /* It's time to start the next sector, and flush the old. */
                 id_buf_ptr = 0;
                 cyl = (uint16) (((uint16) id_lcnh << 8)|(uint16)id_lcnl);
-                id_cyl[UNIT_NUM] = cyl;
+                id_cyl[id_unit_num] = cyl;
                 lba = id_lba(cyl, id_lhn, id_lsn);
                 if (sim_disk_wrsect(id_sel_unit, lba, id_buf, &sectswritten, 1) == SCPE_OK) {
                     if (sectswritten !=1) {
@@ -503,11 +574,6 @@ void id_write(uint32 pa, uint32 val, size_t size)
                                   "[%08x]\tERROR: ASKED TO WRITE ONE SECTOR, WROTE: %d\n",
                                   R[NUM_PC], sectswritten);
                     }
-                    sim_debug(WRITE_MSG, &id_dev,
-                              "[%08x]\tWDATA\tCYL=%d PHN=%d LCNH=%02x "
-                              "LCNL=%02x LHN=%d LSN=%d SCNT=%d LBA=%04x\n",
-                              R[NUM_PC], cyl, id_phn, id_lcnh, id_lcnl,
-                              id_lhn, id_lsn, id_scnt, lba);
                     id_update_chs();
                     if (--id_scnt == 0) {
                         id_end_rw(0);
@@ -521,13 +587,11 @@ void id_write(uint32 pa, uint32 val, size_t size)
                     return;
                 }
             }
-
             return;
         } else {
             sim_debug(WRITE_MSG, &id_dev,
                       "[%08x]\tDATA\t%02x\n",
                       R[NUM_PC], val);
-
             if (id_dpw < ID_FIFO_LEN) {
                 id_data[id_dpw++] = (uint8) val;
             } else {
@@ -552,38 +616,25 @@ void id_handle_command(uint8 val)
     uint32 time;
     t_lba lba;
 
-    /* Save the full command byte */
-    id_cmd = val;
-
     /* Reset the FIFO pointer */
-    id_dpr = 0;
-    id_dpw = 0;
-
-    /* Writing a command always de-asserts INT output, UNLESS
-       the SRQ bit is set. */
-    if ((id_status & ID_STAT_SRQ) != ID_STAT_SRQ) {
-        id_irq = FALSE;
-    }
+    id_clear_fifo();
 
     /* Is this an aux command or a full command? */
     if ((val & 0xf0) == 0) {
         aux_cmd = val & 0x0f;
-        id_status &= ~(ID_STAT_CB);
 
         if (aux_cmd & ID_AUX_CLCE) {
             sim_debug(WRITE_MSG, &id_dev,
                       "[%08x] \tCOMMAND\t%02x\tAUX:CLCE\n",
                       R[NUM_PC], val);
-            id_status &= ~(ID_STAT_CEL|ID_STAT_CEH);
-            sim_cancel(id_sel_unit);
+            id_status &= ~(ID_STAT_CEH|ID_STAT_CEL);
         }
 
         if (aux_cmd & ID_AUX_HSRQ) {
             sim_debug(WRITE_MSG, &id_dev,
                       "[%08x] \tCOMMAND\t%02x\tAUX:HSRQ\n",
                       R[NUM_PC], val);
-            id_status &= ~ID_STAT_SRQ;
-            sim_cancel(id_sel_unit);
+            id_srqm = TRUE;
         }
 
         if (aux_cmd & ID_AUX_CLB) {
@@ -597,83 +648,123 @@ void id_handle_command(uint8 val)
             sim_debug(WRITE_MSG, &id_dev,
                       "[%08x]\tCOMMAND\t%02x\tAUX:RESET\n",
                       R[NUM_PC], val);
-            sim_cancel(id_sel_unit);
             id_clear_fifo();
+            sim_cancel(id_sel_unit);
+            sim_cancel(id_ctlr_unit);
+            id_status = 0;
+            id_srqm = FALSE;
         }
 
         /* Just return early */
         return;
     }
 
-    /* Now that we know it's not an aux command, get the unit number
-       this command is for */
-    id_sel_unit = &id_unit[UNIT_NUM];
-
-    cmd = (id_cmd >> 4) & 0xf;
-
-    /* If this command is anything BUT a sense interrupt status, set
-     * the seek flag to false.
-     */
-    if (cmd != ID_CMD_SIS) {
-        id_seek_sis = FALSE;
+    /* If the controller is busy and this isn't an AUX command, do
+     * nothing */
+    if (id_status & ID_STAT_CB) {
+        sim_debug(EXECUTE_MSG, &id_dev,
+                  "!!! Controller Busy. Skipping command byte %02x\n",
+                  val);
+        return;
     }
 
-    id_status = ID_STAT_CB;
+    /* A full command always resets CEH and CEL */
+    id_status &= ~(ID_STAT_CEH|ID_STAT_CEL);
+
+    /* Save the full command byte */
+    id_cmd = val;
+    cmd = (id_cmd >> 4) & 0xf;
+
+    /* Now that we know it's not an aux command, we can get the unit
+     * number. Note that we don't update the unit in the case of three
+     * special commands. */
+    if (cmd != ID_CMD_SIS && cmd != ID_CMD_SPEC && cmd != ID_CMD_DERR) {
+        if ((id_cmd & 3) != id_ua) {
+            id_unit_num = id_cmd & 1;
+            id_ua = id_cmd & 3;
+            id_sel_unit = &id_unit[id_unit_num];
+        }
+    }
+
+    /* TODO: Fix this hack */
+    if (cmd == ID_CMD_SIS || cmd == ID_CMD_SPEC || cmd == ID_CMD_DERR) {
+        id_ctlr_unit->u4 = cmd;
+    } else {
+        id_sel_unit->u4 = cmd;
+    }
+
+    id_status |= ID_STAT_CB;
 
     switch(cmd) {
     case ID_CMD_SIS:
         sim_debug(WRITE_MSG, &id_dev,
-                  "[%08x]\tCOMMAND\t%02x\tSense Int. Status - %d\n",
-                  R[NUM_PC], val, UNIT_NUM);
-        id_activate(DELAY_US(ID_SIS_WAIT));
+                  "[%08x]\tCOMMAND\t%02x\tSense Int. Status\n",
+                  R[NUM_PC], val);
+        id_status &= ~ID_STAT_SRQ; /* SIS immediately de-asserts SRQ */
+        id_activate(id_ctlr_unit, DELAY_US(ID_SIS_WAIT));
         break;
     case ID_CMD_SPEC:
         sim_debug(WRITE_MSG, &id_dev,
-                  "[%08x]\tCOMMAND\t%02x\tSpecify - %d - ETN=%02x ESN=%02x\n",
-                  R[NUM_PC], val, UNIT_NUM, id_data[3], id_data[4]);
-        id_dtlh[UNIT_NUM] = id_data[1];
+                  "[%08x]\tCOMMAND\t%02x\tSpecify - ETN=%02x ESN=%02x\n",
+                  R[NUM_PC], val, id_data[3], id_data[4]);
+        id_dtlh = id_data[1];
         id_etn = id_data[3];
         id_esn = id_data[4];
-        id_activate(DELAY_US(ID_SPEC_WAIT));
+        id_polling = (id_dtlh & ID_DTLH_POLL) == 0;
+        id_activate(id_ctlr_unit, DELAY_US(ID_SPEC_WAIT));
         break;
     case ID_CMD_SUS:
         sim_debug(WRITE_MSG, &id_dev,
                   "[%08x]\tCOMMAND\t%02x\tSense Unit Status - %d\n",
-                  R[NUM_PC], val, UNIT_NUM);
-        id_activate(DELAY_US(ID_SUS_WAIT));
+                  R[NUM_PC], val, id_ua);
+        id_activate(id_sel_unit, DELAY_US(ID_SUS_WAIT));
         break;
     case ID_CMD_DERR:
         sim_debug(WRITE_MSG, &id_dev,
-                  "[%08x]\tCOMMAND\t%02x\tDetect Error - %d\n",
-                  R[NUM_PC], val, UNIT_NUM);
-        id_status |= ID_STAT_CEH;
-        id_activate(DELAY_US(ID_CMD_WAIT));
+                  "[%08x]\tCOMMAND\t%02x\tDetect Error\n",
+                  R[NUM_PC], val);
+        id_activate(id_ctlr_unit, DELAY_US(ID_CMD_WAIT));
         break;
     case ID_CMD_RECAL:
-        sim_debug(WRITE_MSG, &id_dev,
-                  "[%08x]\tCOMMAND\t%02x\tRecalibrate - %d\n",
-                  R[NUM_PC], val, UNIT_NUM);
-        id_cyl[UNIT_NUM] = 0;
-        time = id_cyl[UNIT_NUM];
-        id_activate(DELAY_US(ID_RECAL_WAIT + (time * ID_SEEK_WAIT)));
-        id_seek_sis = TRUE;
+        time = id_cyl[id_unit_num];
+        id_cyl[id_unit_num] = 0;
+        id_seek_state[id_unit_num] = ID_SEEK_0;
+        if (id_polling) {
+            sim_debug(WRITE_MSG, &id_dev,
+                      "[%08x]\tCOMMAND\t%02x\tRecalibrate - %d - POLLING\n",
+                      R[NUM_PC], val, id_ua);
+            id_activate(id_sel_unit, DELAY_US(1000));
+        } else {
+            sim_debug(WRITE_MSG, &id_dev,
+                      "[%08x]\tCOMMAND\t%02x\tRecalibrate - %d - NORMAL\n",
+                      R[NUM_PC], val, id_ua);
+            id_activate(id_sel_unit, DELAY_US(ID_RECAL_WAIT + (time * ID_SEEK_WAIT)));
+        }
         break;
     case ID_CMD_SEEK:
-        sim_debug(WRITE_MSG, &id_dev,
-                  "[%08x]\tCOMMAND\t%02x\tSeek - %d\n",
-                  R[NUM_PC], val, UNIT_NUM);
         id_lcnh = id_data[0];
         id_lcnl = id_data[1];
         cyl = id_lcnh << 8 | id_lcnl;
-        time = (uint32) abs(id_cyl[UNIT_NUM] - cyl);
-        id_activate(DELAY_US(ID_SEEK_BASE + (ID_SEEK_WAIT * time)));
-        id_cyl[UNIT_NUM] = cyl;
-        id_seek_sis = TRUE;
+        time = (uint32) abs(id_cyl[id_unit_num] - cyl);
+        id_cyl[id_unit_num] = cyl;
+        id_seek_state[id_unit_num] = ID_SEEK_0;
+
+        if (id_polling) {
+            sim_debug(WRITE_MSG, &id_dev,
+                      "[%08x]\tCOMMAND\t%02x\tSeek - %d - POLLING\n",
+                      R[NUM_PC], val, id_ua);
+            id_activate(id_sel_unit, DELAY_US(1000));
+        } else {
+            sim_debug(WRITE_MSG, &id_dev,
+                      "[%08x]\tCOMMAND\t%02x\tSeek - %d - NORMAL\n",
+                      R[NUM_PC], val, id_ua);
+            id_activate(id_sel_unit, DELAY_US(ID_SEEK_BASE + (time * ID_SEEK_WAIT)));
+        }
         break;
     case ID_CMD_FMT:
         sim_debug(WRITE_MSG, &id_dev,
                   "[%08x]\tCOMMAND\t%02x\tFormat - %d\n",
-                  R[NUM_PC], val, UNIT_NUM);
+                  R[NUM_PC], val, id_ua);
 
         id_phn  = id_data[0];
         id_scnt = id_data[1];
@@ -689,7 +780,7 @@ void id_handle_command(uint8 val)
                 for (id_buf_ptr = 0; id_buf_ptr < ID_SEC_SIZE; id_buf_ptr++) {
                     id_buf[id_buf_ptr] = pattern;
                 }
-                lba = id_lba(id_cyl[UNIT_NUM], id_phn, sec++);
+                lba = id_lba(id_cyl[id_unit_num], id_phn, sec++);
                 if (sim_disk_wrsect(id_sel_unit, lba, id_buf, NULL, 1) == SCPE_OK) {
                     sim_debug(EXECUTE_MSG, &id_dev,
                               "[%08x]\tFORMAT: PHN=%d SCNT=%d PAT=%02x LBA=%04x\n",
@@ -710,20 +801,20 @@ void id_handle_command(uint8 val)
 
         id_data[1] = id_scnt;
 
-        id_activate(DELAY_US(ID_CMD_WAIT));
+        id_activate(id_sel_unit, DELAY_US(ID_CMD_WAIT));
         break;
     case ID_CMD_VID:
         sim_debug(WRITE_MSG, &id_dev,
                   "[%08x]\tCOMMAND\t%02x\tVerify ID - %d\n",
-                  R[NUM_PC], val, UNIT_NUM);
+                  R[NUM_PC], val, id_ua);
         id_data[0] = 0;
         id_data[1] = 0x05; /* What do we put here? */
-        id_activate(DELAY_US(ID_CMD_WAIT));
+        id_activate(id_sel_unit, DELAY_US(ID_CMD_WAIT));
         break;
     case ID_CMD_RID:
         sim_debug(WRITE_MSG, &id_dev,
                   "[%08x]\tCOMMAND\t%02x\tRead ID - %d\n",
-                  R[NUM_PC], val, UNIT_NUM);
+                  R[NUM_PC], val, id_ua);
         if (id_sel_unit->flags & UNIT_ATT) {
             id_drq = TRUE;
 
@@ -737,20 +828,20 @@ void id_handle_command(uint8 val)
         } else {
             sim_debug(EXECUTE_MSG, &id_dev,
                       "[%08x]\tUNIT %d NOT ATTACHED, CANNOT READ ID.\n",
-                      R[NUM_PC], UNIT_NUM);
+                      R[NUM_PC], id_ua);
         }
-        id_activate(DELAY_US(ID_CMD_WAIT));
+        id_activate(id_sel_unit, DELAY_US(ID_CMD_WAIT));
         break;
     case ID_CMD_RDIAG:
         sim_debug(WRITE_MSG, &id_dev,
                   "[%08x]\tCOMMAND\t%02x\tRead Diag - %d\n",
-                  R[NUM_PC], val, UNIT_NUM);
-        id_activate(DELAY_US(ID_CMD_WAIT));
+                  R[NUM_PC], val, id_ua);
+        id_activate(id_sel_unit, DELAY_US(ID_CMD_WAIT));
         break;
     case ID_CMD_RDATA:
         sim_debug(WRITE_MSG, &id_dev,
                   "[%08x]\tCOMMAND\t%02x\tRead Data - %d\n",
-                  R[NUM_PC], val, UNIT_NUM);
+                  R[NUM_PC], val, id_ua);
         if (id_sel_unit->flags & UNIT_ATT) {
             id_drq = TRUE;
             id_buf_ptr = 0;
@@ -765,38 +856,32 @@ void id_handle_command(uint8 val)
         } else {
             sim_debug(EXECUTE_MSG, &id_dev,
                       "[%08x]\tUNIT %d NOT ATTACHED, CANNOT READ DATA.\n",
-                      R[NUM_PC], UNIT_NUM);
+                      R[NUM_PC], id_ua);
         }
-
-        time = (uint32) abs(id_cyl[UNIT_NUM] - ((id_lcnh<<8)|id_lcnl));
-        if (time == 0) {
-            time++;
-        }
-        time = time * ID_SEEK_WAIT;
-        id_activate(DELAY_US(time + ID_RW_WAIT));
+        id_activate(id_sel_unit, DELAY_US(ID_RW_WAIT));
         break;
     case ID_CMD_CHECK:
         sim_debug(WRITE_MSG, &id_dev,
                   "[%08x]\tCOMMAND\t%02x\tCheck - %d\n",
-                  R[NUM_PC], val, UNIT_NUM);
-        id_activate(DELAY_US(ID_CMD_WAIT));
+                  R[NUM_PC], val, id_ua);
+        id_activate(id_sel_unit, DELAY_US(ID_CMD_WAIT));
         break;
     case ID_CMD_SCAN:
         sim_debug(WRITE_MSG, &id_dev,
                   "[%08x]\tCOMMAND\t%02x\tScan - %d\n",
-                  R[NUM_PC], val, UNIT_NUM);
-        id_activate(DELAY_US(ID_CMD_WAIT));
+                  R[NUM_PC], val, id_ua);
+        id_activate(id_sel_unit, DELAY_US(ID_CMD_WAIT));
         break;
     case ID_CMD_VDATA:
         sim_debug(WRITE_MSG, &id_dev,
                   "[%08x]\tCOMMAND\t%02x\tVerify Data - %d\n",
-                  R[NUM_PC], val, UNIT_NUM);
-        id_activate(DELAY_US(ID_CMD_WAIT));
+                  R[NUM_PC], val, id_ua);
+        id_activate(id_sel_unit, DELAY_US(ID_CMD_WAIT));
         break;
     case ID_CMD_WDATA:
         sim_debug(WRITE_MSG, &id_dev,
                   "[%08x]\tCOMMAND\t%02x\tWrite Data - %d\n",
-                  R[NUM_PC], val, UNIT_NUM);
+                  R[NUM_PC], val, id_ua);
         if (id_sel_unit->flags & UNIT_ATT) {
             id_drq = TRUE;
             id_buf_ptr = 0;
@@ -811,14 +896,9 @@ void id_handle_command(uint8 val)
         } else {
             sim_debug(EXECUTE_MSG, &id_dev,
                       "[%08x]\tUNIT %d NOT ATTACHED, CANNOT WRITE.\n",
-                      R[NUM_PC], UNIT_NUM);
+                      R[NUM_PC], id_ua);
         }
-        time = (uint32) abs(id_cyl[UNIT_NUM] - ((id_lcnh<<8)|id_lcnl));
-        if (time == 0) {
-            time++;
-        }
-        time = time * ID_SEEK_WAIT;
-        id_activate(DELAY_US(time + ID_RW_WAIT));
+        id_activate(id_sel_unit, DELAY_US(ID_RW_WAIT));
         break;
     }
 }
@@ -836,9 +916,9 @@ CONST char *id_description(DEVICE *dptr)
 
 t_stat id_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
-    fprintf(st, "71MB MFM Integrated Hard Disk (ID)\n\n");
+    fprintf(st, "72MB MFM Integrated Hard Disk (ID)\n\n");
     fprintf(st,
             "The ID controller implements the integrated MFM hard disk controller\n"
-            "of the 3B2/400. Up to four drives are supported on a single controller.\n");
+            "of the 3B2/400. Up to two drives are supported on a single controller.\n");
     return SCPE_OK;
 }

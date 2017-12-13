@@ -3114,7 +3114,7 @@ static SIM_INLINE uint8 cpu_ipl()
     }
 
     /* CSRDISK is cleared when the floppy "if_irq" goes low */
-    if (id_irq || (csr_data & CSRDISK)) {
+    if (id_int() || (csr_data & CSRDISK)) {
         return 11;
     }
 

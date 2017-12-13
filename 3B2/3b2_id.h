@@ -35,10 +35,14 @@
 #include "3b2_sysdev.h"
 #include "sim_disk.h"
 
-/* Command Codes (bits 3-7 of command byte) */
+#define ID0             0
+#define ID1             1
+#define ID_CTLR         2
 
 #define ID_DATA_REG     0
 #define ID_CMD_STAT_REG 1
+
+/* Command Codes (bits 3-7 of command byte) */
 
 #define ID_CMD_AUX      0x00  /* Auxiliary Command */
 #define ID_CMD_SIS      0x01  /* Sense int. status */
@@ -71,17 +75,17 @@
 #define ID_STAT_CEH     0x40
 #define ID_STAT_CB      0x80
 
-#define ID_IST_SEN      0x80
-#define ID_IST_RC       0x40
-#define ID_IST_SER      0x20
-#define ID_IST_EQC      0x10
-#define ID_IST_NR       0x08
+#define ID_IST_SEN      0x80    /* Seek End        */
+#define ID_IST_RC       0x40    /* Ready Change    */
+#define ID_IST_SER      0x20    /* Seek Error      */
+#define ID_IST_EQC      0x10    /* Equipment Check */
+#define ID_IST_NR       0x08    /* Not Ready       */
 
-#define ID_UST_DSEL     0x10
-#define ID_UST_SCL      0x08
-#define ID_UST_TK0      0x04
-#define ID_UST_RDY      0x02
-#define ID_UST_WFL      0x01
+#define ID_UST_DSEL     0x10    /* Drive Selected  */
+#define ID_UST_SCL      0x08    /* Seek Complete   */
+#define ID_UST_TK0      0x04    /* Track 0         */
+#define ID_UST_RDY      0x02    /* Ready           */
+#define ID_UST_WFL      0x01    /* Write Fault     */
 
 #define ID_EST_ENC      0x80
 #define ID_EST_OVR      0x40
@@ -94,13 +98,17 @@
 
 #define ID_DTLH_POLL    0x10
 
+#define ID_SEEK_NONE    -1
+#define ID_SEEK_0       0
+#define ID_SEEK_1       1
+
 /* Geometry */
 
 #define ID_CYL          925
 #define ID_SEC_SIZE     512    /* Bytes per sector */
 #define ID_SEC_CNT      18     /* Sectors per track */
 #define ID_HEADS        9
-#define ID_CYL_SIZE     512 * 18
+#define ID_CYL_SIZE     ID_SEC_SIZE * ID_SEC_CNT
 
 /* Unit, Register, Device descriptions */
 
@@ -109,13 +117,10 @@
 
 #define ID_NUM_UNITS   2
 
-/* Unit number field in UNIT structure */
-#define ID_UNIT_NUM    u3
-
 extern DEVICE id_dev;
 extern DEBTAB sys_deb_tab[];
 extern t_bool id_drq;
-extern t_bool id_irq;
+extern t_bool id_int();
 
 #define IDBASE 0x4a000
 #define IDSIZE 0x2
@@ -124,11 +129,12 @@ extern t_bool id_irq;
 #define ID_DSK_SIZE    ID_CYL * ID_SEC_CNT * ID_HEADS
 
 #define CMD_NUM      ((id_cmd >> 4) & 0xf)
-#define UNIT_NUM     (id_cmd & 1)  /* We intentionally ignore the top unit address bit  */
 
 /* Function prototypes */
 
-t_stat id_svc(UNIT *uptr);
+t_bool id_int();
+t_stat id_ctlr_svc(UNIT *uptr);
+t_stat id_unit_svc(UNIT *uptr);
 t_stat id_reset(DEVICE *dptr);
 t_stat id_attach(UNIT *uptr, CONST char *cptr);
 t_stat id_detach(UNIT *uptr);
