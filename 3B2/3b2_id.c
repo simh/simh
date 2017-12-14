@@ -29,30 +29,17 @@
 */
 
 /*
- * The larger of the two hard drive options shipped with the AT&T 3B2
- * was a 72MB Wren II ST-506 MFM hard disk. That's what we emulate
- * here, as a start.
+ * This file contains the code for the Integrated Disk (ID) controller
+ * (based on the uPD7261) and up to two winchester hard disks.
  *
- *   Formatted Capacity: 76,723,200 Bytes
+ * Supported winchester drives are:
  *
- *   Cylinders:     925
- *   Sectors/Track:  18
- *   Heads:           9
- *   Bytes/Sector:  512
- *   Avg. seek:      28 ms
- *   Seek/track:      5 ms
- *
- *   Drive Information from the 3B2 FAQ:
- *
- *   Drive type      drv id  cyls trk/cyl sec/trk byte/cyl    abbrev
- *   --------------- ------  ---- ------- ------- --------    ------
- *   Wren II 30MB       3     697     5      18     512       HD30
- *   Wren II 72MB       5     925     9      18     512       HD72
- *   Fujitsu M2243AS    8     754    11      18     512       HD72C
- *   Micropolis 1325    5    1024     8      18     512       HD72
- *   Maxtor 1140        4*    918=   15      18     512       HD120
- *   Maxtor 1190        11   1224+   15      18     512       HD135
- *
+ *   SIMH Name  ID    Cyl  Head  Sec  Byte/Sec  Note
+ *   ---------  --   ----  ----  ---  --------  ----------------------
+ *   HD30       3     697     5   18    512     CDC Wren 94155-36
+ *   HD72       5     925     9   18    512     CDC Wren II 94156-86
+ *   HD72C      8     754    11   18    512     Fujitsu M2243AS
+ *   HD135      11   1224    15   18    512     Maxtor XT1190
  */
 
 #include <assert.h>
@@ -79,11 +66,6 @@
 
 /* The catch-all command wait time is about 140 us */
 #define ID_CMD_WAIT         140    /* us */
-
-/* State. The DP7261 supports four MFM (winchester) disks connected
-   simultaneously.  There is only one set of registers, however, so
-   commands must be completed for one unit before they can begin on
-   another unit. */
 
 /* Data FIFO pointer - Read */
 uint8    id_dpr = 0;
@@ -139,10 +121,25 @@ uint8    id_idfield_ptr = 0;
 
 uint8    id_seek_state[ID_NUM_UNITS] = {ID_SEEK_NONE};
 
+struct id_dtype {
+    uint8  hd;    /* Number of heads */
+    uint32 capac; /* Capacity (in sectors) */
+};
+
+static struct id_dtype id_dtab[] = {
+    ID_DRV(HD30),
+    ID_DRV(HD72),
+    ID_DRV(HD72C),
+    ID_DRV(HD135),
+    { 0 }
+};
+
 UNIT id_unit[] = {
-    { UDATA (&id_unit_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BINK, ID_DSK_SIZE), 0, ID0, 0 },
-    { UDATA (&id_unit_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BINK, ID_DSK_SIZE), 0, ID1, 0 },
-    { UDATA (&id_ctlr_svc, UNIT_FIX+UNIT_BINK, 0) },
+    { UDATA (&id_unit_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BINK+
+             (ID_HD72_DTYPE << ID_V_DTYPE), ID_DSK_SIZE(HD72)), 0, ID0, 0 },
+    { UDATA (&id_unit_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BINK+
+             (ID_HD72_DTYPE << ID_V_DTYPE), ID_DSK_SIZE(HD72)), 0, ID1, 0 },
+    { UDATA (&id_ctlr_svc, 0, 0) },
     { NULL }
 };
 
@@ -158,8 +155,20 @@ REG id_reg[] = {
     { NULL }
 };
 
+MTAB id_mod[] = {
+    { MTAB_XTD|MTAB_VUN, ID_HD30_DTYPE, NULL, "HD30",
+      &id_set_type, NULL, NULL, "Set HD30 Disk Type" },
+    { MTAB_XTD|MTAB_VUN, ID_HD72_DTYPE, NULL, "HD72",
+      &id_set_type, NULL, NULL, "Set HD72 Disk Type" },
+    { MTAB_XTD|MTAB_VUN, ID_HD72C_DTYPE, NULL, "HD72C",
+      &id_set_type, NULL, NULL, "Set HD72C Disk Type" },
+    { MTAB_XTD|MTAB_VUN, ID_HD135_DTYPE, NULL, "HD135",
+      &id_set_type, NULL, NULL, "Set HD135 Disk Type" },
+    { 0 }
+};
+
 DEVICE id_dev = {
-    "ID", id_unit, id_reg, NULL,
+    "ID", id_unit, id_reg, id_mod,
     ID_NUM_UNITS, 16, 32, 1, 16, 8,
     NULL, NULL, &id_reset,
     NULL, &id_attach, &id_detach, NULL,
@@ -332,6 +341,24 @@ t_stat id_unit_svc(UNIT *uptr)
     return SCPE_OK;
 }
 
+t_stat id_set_type(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+    t_stat r;
+
+    if (val < 0 || val > ID_MAX_DTYPE) {
+        return SCPE_ARG;
+    }
+
+    if (uptr->flags & UNIT_ATT) {
+        return SCPE_ALATT;
+    }
+
+    uptr->flags = (uptr->flags & ~ID_DTYPE) | (val << ID_V_DTYPE);
+    uptr->capac = (t_addr)id_dtab[val].capac;
+
+    return SCPE_OK;
+}
+
 t_stat id_reset(DEVICE *dptr)
 {
     id_clear_fifo();
@@ -349,9 +376,13 @@ t_stat id_detach(UNIT *uptr)
 }
 
 /* Return the logical block address of the given sector */
-static SIM_INLINE t_lba id_lba(uint16 cyl, uint8 head, uint8 sec)
+static t_lba id_lba(uint16 cyl, uint8 head, uint8 sec)
 {
-    return((ID_SEC_CNT * ID_HEADS * cyl) +
+    uint8 dtype;
+
+    dtype = ID_GET_DTYPE(id_sel_unit->flags);
+
+    return((ID_SEC_CNT * id_dtab[dtype].hd * cyl) +
            (ID_SEC_CNT * head) +
            sec);
 }
@@ -911,14 +942,22 @@ void id_drq_handled()
 
 CONST char *id_description(DEVICE *dptr)
 {
-    return "72MB MFM Hard Disk";
+    return "MFM Hard Disk Controller";
 }
 
 t_stat id_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
-    fprintf(st, "72MB MFM Integrated Hard Disk (ID)\n\n");
-    fprintf(st,
-            "The ID controller implements the integrated MFM hard disk controller\n"
-            "of the 3B2/400. Up to two drives are supported on a single controller.\n");
+    fprintf(st, "Integrated Hard Disk (ID)\n\n");
+    fprintf(st, "The ID device implements the integrated MFM hard disk controller\n");
+    fprintf(st, "of the 3B2/400. Up to two drives are supported on a single controller.\n\n");
+    fprintf(st, "Supported device types are:\n\n");
+    fprintf(st, "  Name    Size    ID    Cyl  Head  Sec  Byte/Sec  Description\n");
+    fprintf(st, "  ----  --------  --   ----  ----  ---  --------  ----------------------\n");
+    fprintf(st, "  HD30   30.6 MB   3    697     5   18    512     CDC Wren 94155-36\n");
+    fprintf(st, "  HD72   73.2 MB   5    925     9   18    512     CDC Wren II 94156-86\n");
+    fprintf(st, "  HD72C  72.9 MB   8    754    11   18    512     Fujitsu M2243AS\n");
+    fprintf(st, "  HD135 161.0 MB  11   1224    15   18    512     Maxtor XT1190\n\n");
+    fprintf(st, "The drive ID and geometry values are used when low-level formatting a\n");
+    fprintf(st, "drive using the AT&T 'idtools' utility.\n");
     return SCPE_OK;
 }

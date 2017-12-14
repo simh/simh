@@ -102,13 +102,43 @@
 #define ID_SEEK_0       0
 #define ID_SEEK_1       1
 
-/* Geometry */
+/* Drive Geometries */
 
-#define ID_CYL          925
-#define ID_SEC_SIZE     512    /* Bytes per sector */
-#define ID_SEC_CNT      18     /* Sectors per track */
-#define ID_HEADS        9
-#define ID_CYL_SIZE     ID_SEC_SIZE * ID_SEC_CNT
+/* Common across all drive types */
+#define ID_SEC_SIZE        512
+#define ID_SEC_CNT         18
+#define ID_CYL_SIZE        ID_SEC_SIZE * ID_SEC_CNT
+
+/* Specific to each drive type */
+#define ID_MAX_DTYPE       3
+
+#define ID_HD30_DTYPE      0
+#define ID_HD30_CYL        697
+#define ID_HD30_HEADS      5
+#define ID_HD30_LBN        62730
+
+#define ID_HD72_DTYPE      1
+#define ID_HD72_CYL        925
+#define ID_HD72_HEADS      9
+#define ID_HD72_LBN        149850
+
+#define ID_HD72C_DTYPE     2
+#define ID_HD72C_CYL       754
+#define ID_HD72C_HEADS     11
+#define ID_HD72C_LBN       149292
+
+#define ID_HD135_DTYPE     3
+#define ID_HD135_CYL       1224
+#define ID_HD135_HEADS     15
+#define ID_HD135_LBN       330480
+
+#define ID_V_DTYPE         (DKUF_V_UF + 0)
+#define ID_M_DTYPE         3
+#define ID_DTYPE           (ID_M_DTYPE << ID_V_DTYPE)
+#define ID_GET_DTYPE(x)    (((x) >> ID_V_DTYPE) & ID_M_DTYPE)
+#define ID_DRV(d)          { ID_##d##_HEADS, ID_##d##_LBN }
+
+#define ID_DSK_SIZE(d)     ID_##d##_LBN
 
 /* Unit, Register, Device descriptions */
 
@@ -125,9 +155,6 @@ extern t_bool id_int();
 #define IDBASE 0x4a000
 #define IDSIZE 0x2
 
-/* Total disk size, in sectors */
-#define ID_DSK_SIZE    ID_CYL * ID_SEC_CNT * ID_HEADS
-
 #define CMD_NUM      ((id_cmd >> 4) & 0xf)
 
 /* Function prototypes */
@@ -136,6 +163,7 @@ t_bool id_int();
 t_stat id_ctlr_svc(UNIT *uptr);
 t_stat id_unit_svc(UNIT *uptr);
 t_stat id_reset(DEVICE *dptr);
+t_stat id_set_type(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat id_attach(UNIT *uptr, CONST char *cptr);
 t_stat id_detach(UNIT *uptr);
 uint32 id_read(uint32 pa, size_t size);
