@@ -343,8 +343,6 @@ t_stat id_unit_svc(UNIT *uptr)
 
 t_stat id_set_type(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-    t_stat r;
-
     if (val < 0 || val > ID_MAX_DTYPE) {
         return SCPE_ARG;
     }
