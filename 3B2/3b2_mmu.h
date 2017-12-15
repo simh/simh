@@ -253,10 +253,10 @@
 #define PD_WFAULT(pd)     ((pd >> 4) & 1)
 #define PD_REF(pd)        ((pd >> 5) & 1)
 #define PD_ADDR(pd)       (pd & 0xfffff800)   /* Address portion of PD */
-#define PD_USED_MASK      0x40
 #define PD_R_MASK         0x20
 #define PD_M_MASK         0x2
 #define PD_GOOD_MASK      0x1u
+#define PDCLH_USED_MASK   0x40u
 #define PDCXL_TAG(pdcxl)  (pdcxl & 0xffff)
 
 #define PD_LOC(sd1,va)    SD_SEG_ADDR(sd1) + (PSL(va) * 4)
@@ -272,8 +272,6 @@
 /* Always set 'present' to true on conversion */
 #define PDCXH_TO_PD(pdch)     ((pdch & 0xfffff836)|1)
 #define PDCXL_TO_ACC(pdcl)    (((pdcl & 0xff000000) >> 24) & 0xff)
-
-#define PDCLH_USED_MASK       0x40u
 
 /* Fault codes */
 #define MMU_FAULT(f) {                                      \
@@ -424,25 +422,48 @@ static SIM_INLINE void put_sdce(uint32 va, uint32 sd0, uint32 sd1)
 
 static SIM_INLINE void put_pdce(uint32 va, uint32 sd0, uint32 pd)
 {
-    uint32 pdclh;
     uint8  ci;
 
     ci    = (SID(va) * NUM_PDCE) + PD_IDX(va);
 
-    /* Left side contains the 'U' bit we care about */
-    pdclh = mmu_state.pdclh[ci];
+    /* Cache Replacement Algorithm
+     * (from the WE32101 MMU Information Manual)
+     *
+     * 1. If G==0 for the left-hand entry, the new PD is cached in the
+     *    left-hand entry and the U bit (left-hand side) is cleared to
+     *    0.
+     *
+     * 2. If G==1 for the left-hand entry, and G==0 for the right-hand
+     *    entry, the new PD is cached in the right-hand entry and the
+     *    U bit (left-hand side) is set to 1.
+     *
+     * 3. If G==1 for both entries, the U bit in the left-hand entry
+     *    is examined. If U==0, the new PD is cached in the right-hand
+     *    entry of the PDC row and U is set to 1. If U==1, it is
+     *    cached in the left-hand entry and U is cleared to 0.
+     */
 
-    /* Pick the least-recently-replaced side */
-    if (pdclh & PDCLH_USED_MASK) { /* Right side replaced more recently */
-        /* Add to left side of cache without the U bit set */
+    if ((mmu_state.pdclh[ci] & PD_GOOD_MASK) == 0) {
+        /* Use the left entry */
         mmu_state.pdcll[ci] = SD_TO_PDCXL(va, sd0);
         mmu_state.pdclh[ci] = PD_TO_PDCXH(pd, sd0);
-        mmu_state.pdcll[ci] &= ~PDCLH_USED_MASK;
-    } else {                       /* Left side replaced more recently  */
-        /* Add to right side of cache and set the U bit on the left side */
+        mmu_state.pdclh[ci] &= ~PDCLH_USED_MASK;
+    } else if ((mmu_state.pdcrh[ci] & PD_GOOD_MASK) == 0) {
+        /* Use the right entry */
         mmu_state.pdcrl[ci] = SD_TO_PDCXL(va, sd0);
         mmu_state.pdcrh[ci] = PD_TO_PDCXH(pd, sd0);
-        mmu_state.pdcll[ci] |= PDCLH_USED_MASK;
+        mmu_state.pdclh[ci] |= PDCLH_USED_MASK;
+    } else {
+        /* Pick the least-recently-replaced side */
+        if (mmu_state.pdclh[ci] & PDCLH_USED_MASK) {
+            mmu_state.pdcll[ci] = SD_TO_PDCXL(va, sd0);
+            mmu_state.pdclh[ci] = PD_TO_PDCXH(pd, sd0);
+            mmu_state.pdclh[ci] &= ~PDCLH_USED_MASK;
+        } else {
+            mmu_state.pdcrl[ci] = SD_TO_PDCXL(va, sd0);
+            mmu_state.pdcrh[ci] = PD_TO_PDCXH(pd, sd0);
+            mmu_state.pdclh[ci] |= PDCLH_USED_MASK;
+        }
     }
 }
 
@@ -484,11 +505,10 @@ static SIM_INLINE void flush_cache_sec(uint8 sec)
 {
     int i;
 
-    for (i = 0; i < MMU_SDCS; i++) {
+    for (i = 0; i < NUM_SDCE; i++) {
         mmu_state.sdch[(sec * NUM_SDCE) + i] &= ~SD_GOOD_MASK;
     }
-    for (i = 0; i < MMU_PDCS; i++) {
-        mmu_state.pdclh[(sec * NUM_PDCE) + i] |= PD_USED_MASK;
+    for (i = 0; i < NUM_PDCE; i++) {
         mmu_state.pdclh[(sec * NUM_PDCE) + i] &= ~PD_GOOD_MASK;
         mmu_state.pdcrh[(sec * NUM_PDCE) + i] &= ~PD_GOOD_MASK;
     }

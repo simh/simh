@@ -66,9 +66,6 @@ IU_PORT iu_contty;
 /* The timer state */
 IU_TIMER_STATE iu_timer_state;
 
-/* The power flag */
-t_bool iu_killpower = FALSE;
-
 /* Flags for incrementing mode pointers */
 t_bool iu_increment_a = FALSE;
 t_bool iu_increment_b = FALSE;
