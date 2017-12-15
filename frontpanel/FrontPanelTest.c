@@ -438,11 +438,11 @@ if (sim_panel_add_register_bits (panel, "PCQ[3]",  NULL, 32, PCQ_3_bits)) {
     goto Done;
     }
 if (1) {
-    unsigned int noop_noop_noop_halt = 0x00010101, addr400 = 0x00000400, pc_value;
+    unsigned int noop_noop_noop_halt = 0x00010101, brb_self = 0x0000FE11, addr400 = 0x00000400, pc_value;
     int mstime = 0;
 
     if (sim_panel_mem_deposit (panel, sizeof(addr400), &addr400, sizeof(noop_noop_noop_halt), &noop_noop_noop_halt)) {
-        printf ("Error setting 00000000 to %08X: %s\n", noop_noop_noop_halt, sim_panel_get_error());
+        printf ("Error setting %08X to %08X: %s\n", addr400, noop_noop_noop_halt, sim_panel_get_error());
         goto Done;
         }
     if (sim_panel_gen_deposit (panel, "PC", sizeof(addr400), &addr400)) {
@@ -488,6 +488,31 @@ if (1) {
         printf ("Unexpected PC value after STEP: %08X, expected: %08X\n", pc_value, addr400 + 1);
         goto Done;
         }
+    if (sim_panel_mem_deposit (panel, sizeof(addr400), &addr400, sizeof(brb_self), &brb_self)) {
+        printf ("Error setting %08X to %08X: %s\n", addr400, brb_self, sim_panel_get_error());
+        goto Done;
+        }
+    if (sim_panel_gen_deposit (panel, "PC", sizeof(addr400), &addr400)) {
+        printf ("Error setting PC to %08X: %s\n", addr400, sim_panel_get_error());
+        goto Done;
+        }
+    if (sim_panel_exec_run(panel)) {
+        printf ("Error starting simulator execution: %s\n", sim_panel_get_error());
+        goto Done;
+        }
+    while ((sim_panel_get_state (panel) == Run) &&
+           (mstime < 1000)) {
+        usleep (100000);
+        mstime += 100;
+        }
+    if (sim_panel_exec_halt (panel)) {
+        printf ("Error executing halt: %s\n", sim_panel_get_error());
+        goto Done;
+        }
+    if (sim_panel_get_state (panel) != Halt) {
+        printf ("State not Halt after successful Halt\n");
+        goto Done;
+        }
     }
 return 0;
 
@@ -511,7 +536,7 @@ if (panel_setup())
 if (1) {
     struct {
         unsigned int addr;
-        char *instr;
+        const char *instr;
         } long_running_program[] = {
             {0x2000,  "MOVL #7FFFFFFF,R0"},
             {0x2007,  "MOVL #7FFFFFFF,R1"},
@@ -522,7 +547,7 @@ if (1) {
         };
     int i;
 
-    sim_panel_debug (panel, "Testing sim_panel_destroy() with simulator in Run State");
+    sim_panel_debug (panel, "Testing sim_panel_exec_halt and sim_panel_destroy() () with simulator in Run State");
     for (i=0; long_running_program[i].instr; i++)
         if (sim_panel_mem_deposit_instruction (panel, sizeof(long_running_program[i].addr), 
                                                &long_running_program[i].addr, long_running_program[i].instr)) {
@@ -538,7 +563,18 @@ if (1) {
         printf ("Error starting simulator execution: %s\n", sim_panel_get_error());
         goto Done;
         }
-    usleep (2000000);  /* 2 Seconds */
+    usleep (100000);    /* .1 seconds */
+    sim_panel_debug (panel, "Testing sim_panel_exec_halt");
+    if (sim_panel_exec_halt (panel)) {
+        printf ("Error halting simulator execution: %s\n", sim_panel_get_error());
+        goto Done;
+        }
+    sim_panel_debug (panel, "Testing sim_panel_exec_run");
+    if (sim_panel_exec_run (panel)) {
+        printf ("Error resuming simulator execution: %s\n", sim_panel_get_error());
+        goto Done;
+        }
+    usleep (2000000);   /* 2 Seconds */
     sim_panel_debug (panel, "Shutting down while simulator is running");
     sim_panel_destroy (panel);
     }

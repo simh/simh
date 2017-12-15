@@ -56,7 +56,7 @@ extern "C" {
 
 #if !defined(__VAX)         /* Unsupported platform */
 
-#define SIM_FRONTPANEL_VERSION   9
+#define SIM_FRONTPANEL_VERSION   10
 
 /**
 

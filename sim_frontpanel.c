@@ -158,6 +158,7 @@ struct PANEL {
     char                    *io_response;
     size_t                  io_response_data;
     size_t                  io_response_size;
+    const char              *completion_string;
     pthread_cond_t          io_done;
     pthread_cond_t          startup_done;
     PANEL_DISPLAY_PCALLBACK callback;
@@ -392,6 +393,8 @@ static void *
 _panel_debugflusher(void *arg)
 {
 PANEL *p = (PANEL*)arg;
+int flush_interval = 15;
+int sleeps = 0;
 
 pthread_setspecific (panel_thread_id, "debugflush");
 
@@ -403,8 +406,9 @@ msleep (100);
 pthread_mutex_lock (&p->io_lock);
 while (p->sock != INVALID_SOCKET) {
     pthread_mutex_unlock (&p->io_lock);
-    msleep (15000);
-    sim_panel_flush_debug (p);
+    msleep (1000);
+    if (0 == (sleeps++)%flush_interval)
+        sim_panel_flush_debug (p);
     pthread_mutex_lock (&p->io_lock);
     }
 pthread_mutex_unlock (&p->io_lock);
@@ -468,6 +472,9 @@ return sent;
 
 static int
 _panel_sendf (PANEL *p, int *completion_status, char **response, const char *fmt, ...);
+
+static int
+_panel_sendf_completion (PANEL *p, char **response, const char *completion, const char *fmt, ...);
 
 static int
 _panel_register_query_string (PANEL *panel, char **buf, size_t *buf_size)
@@ -1046,15 +1053,8 @@ if (panel) {
         sim_panel_set_display_callback_interval (panel, NULL, NULL, 0);
         /* Next, attempt a simulator shutdown only with the master panel */
         if (panel->parent == NULL) {
-            if (panel->State == Run) {
-                int i;
-
-                _panel_send (panel, "\005\r", 2);
-                for (i=0; (panel->State == Run) && (i < 10); i++)
-                    msleep(100);
-                if (panel->State == Run)
-                    _panel_debug (panel, DBG_THR, "Unable to HALT running simulator for shutdown", NULL, 0);
-                }
+            if (panel->State == Run)
+                sim_panel_exec_halt (panel);
             _panel_send (panel, "EXIT\r", 5);
             }
         /* Wait for up to 2 seconds for a graceful shutdown */
@@ -1459,8 +1459,14 @@ if (panel->parent) {
     return -1;
     }
 if (panel->State == Run) {
-    if (1 != _panel_send (panel, "\005", 1))
+    if (_panel_sendf_completion (panel, NULL, sim_prompt, "\005")) {
+        _panel_debug (panel, DBG_THR, "Error trying to HALT running simulator: %s", NULL, 0, sim_panel_get_error ());
         return -1;
+        }
+    if (panel->State == Run) {
+        _panel_debug (panel, DBG_THR, "Unable to HALT running simulator", NULL, 0);
+        return -1;
+        }
     }
 return 0;
 }
@@ -1469,6 +1475,7 @@ int
 sim_panel_exec_boot (PANEL *panel, const char *device)
 {
 int cmd_stat;
+char *response, *simtime;
 
 if (!panel || (panel->State == Error)) {
     sim_panel_set_error (NULL, "Invalid Panel");
@@ -1485,12 +1492,17 @@ if (panel->State == Run) {
 /* A BOOT or RUN command will restart the simulator's time base. */
 /* We account for that so that the frontpanel application sees ever */
 /* increasing time values when register data is delivered. */
-if (_panel_sendf (panel, &cmd_stat, NULL, "SHOW TIME\r"))
+if (_panel_sendf (panel, &cmd_stat, &response, "SHOW TIME\r"))
     return -1;
-panel->simulation_time_base += panel->simulation_time;
-if (_panel_sendf (panel, NULL, NULL, "BOOT %s\r", device))
+if ((simtime = strstr (response, "Time:"))) {
+    panel->simulation_time = strtoull (simtime + 5, NULL, 10);
+    panel->simulation_time_base += panel->simulation_time;
+    }
+free (response);
+if (_panel_sendf_completion (panel, NULL, "Simulator Running...", "BOOT %s\r", device)) {
+    _panel_debug (panel, DBG_THR, "Unable to BOOT simulator: %s", NULL, 0, sim_panel_get_error());
     return -1;
-msleep (100);                       /* Allow Run/Hslt state to settle */
+    }
 return 0;
 }
 
@@ -1498,6 +1510,7 @@ int
 sim_panel_exec_start (PANEL *panel)
 {
 int cmd_stat;
+char *response, *simtime;
 
 if (!panel || (panel->State == Error)) {
     sim_panel_set_error (NULL, "Invalid Panel");
@@ -1514,12 +1527,20 @@ if (panel->State == Run) {
 /* A BOOT or RUN command will restart the simulator's time base. */
 /* We account for that so that the frontpanel application sees ever */
 /* increasing time values when register data is delivered. */
-if (_panel_sendf (panel, &cmd_stat, NULL, "SHOW TIME\r"))
+if (_panel_sendf (panel, &cmd_stat, &response, "SHOW TIME\r")) {
+    _panel_debug (panel, DBG_THR, "Unable to send SHOW TIME command while starting simulator: %s", NULL, 0, sim_panel_get_error());
     return -1;
+    }
+if ((simtime = strstr (response, "Time:"))) {
+    panel->simulation_time = strtoull (simtime + 5, NULL, 10);
+    panel->simulation_time_base += panel->simulation_time;
+    }
+free (response);
 panel->simulation_time_base += panel->simulation_time;
-if (_panel_sendf (panel, NULL, NULL, "RUN -Q\r", 5))
+if (_panel_sendf_completion (panel, NULL, "Simulator Running...", "RUN -Q\r", 5)) {
+    _panel_debug (panel, DBG_THR, "Unable to start simulator: %s", NULL, 0, sim_panel_get_error());
     return -1;
-msleep (100);                       /* Allow Run/Hslt state to settle */
+    }
 return 0;
 }
 
@@ -1538,9 +1559,8 @@ if (panel->State == Run) {
     sim_panel_set_error (NULL, "Not Halted");
     return -1;
     }
-if (_panel_sendf (panel, NULL, NULL, "CONT\r", 5))
+if (_panel_sendf_completion (panel, NULL, "Simulator Running...", "CONT\r"))
     return -1;
-msleep (100);                       /* Allow Run/Hslt state to settle */
 return 0;
 }
 
@@ -1559,9 +1579,10 @@ if (panel->State == Run) {
     sim_panel_set_error (NULL, "Not Halted");
     return -1;
     }
-    
-if (5 != _panel_send (panel, "STEP\r", 5))
+if (_panel_sendf_completion (panel, NULL, sim_prompt, "STEP")) {
+    _panel_debug (panel, DBG_THR, "Error trying to STEP running simulator: %s", NULL, 0, sim_panel_get_error ());
     return -1;
+    }
 return 0;
 }
 
@@ -1579,11 +1600,6 @@ if (panel->parent) {
     sim_panel_set_error (NULL, "Can't establish a breakpoint from device front panel");
     return -1;
     }
-if (panel->State == Run) {
-    sim_panel_set_error (NULL, "Not Halted");
-    return -1;
-    }
-    
 if ((_panel_sendf (panel, &cmd_stat, &response, "BREAK %s\r", condition)) ||
     (*response)) {
     sim_panel_set_error (NULL, "Error establishing breakpoint at '%s': %s", condition, response ? response : "");
@@ -1608,11 +1624,6 @@ if (panel->parent) {
     sim_panel_set_error (NULL, "Can't clear a breakpoint from device front panel");
     return -1;
     }
-if (panel->State == Run) {
-    sim_panel_set_error (NULL, "Not Halted");
-    return -1;
-    }
-    
 if ((_panel_sendf (panel, &cmd_stat, &response, "NOBREAK %s\r", condition)) ||
     (*response)) {
     sim_panel_set_error (NULL, "Error clearing breakpoint at '%s': %s", condition, response ? response : "");
@@ -1637,11 +1648,6 @@ if (panel->parent) {
     sim_panel_set_error (NULL, "Can't establish an output breakpoint from device front panel");
     return -1;
     }
-if (panel->State == Run) {
-    sim_panel_set_error (NULL, "Not Halted");
-    return -1;
-    }
-    
 if ((_panel_sendf (panel, &cmd_stat, &response, "EXPECT %s\r", condition)) ||
     (*response)) {
     sim_panel_set_error (NULL, "Error establishing output breakpoint for '%s': %s", condition, response ? response : "");
@@ -1666,11 +1672,6 @@ if (panel->parent) {
     sim_panel_set_error (NULL, "Can't clear an output breakpoint from device front panel");
     return -1;
     }
-if (panel->State == Run) {
-    sim_panel_set_error (NULL, "Not Halted");
-    return -1;
-    }
-    
 if ((_panel_sendf (panel, &cmd_stat, &response, "NOEXPECT %s\r", condition)) ||
     (*response)) {
     sim_panel_set_error (NULL, "Error clearing output breakpoint for '%s': %s", condition, response ? response : "");
@@ -1962,17 +1963,9 @@ if (!panel || (panel->State == Error)) {
     sim_panel_set_error (NULL, "Invalid Panel");
     return -1;
     }
-pthread_mutex_lock (&panel->io_lock);
 OrigState = panel->State;
-if (OrigState == Run) {
+if (OrigState == Run)
     sim_panel_exec_halt (panel);
-    while (panel->State == Run) {
-        pthread_mutex_unlock (&panel->io_lock);
-        msleep (100);
-        pthread_mutex_lock (&panel->io_lock);
-        }
-    }
-pthread_mutex_unlock (&panel->io_lock);
 do {
     if (_panel_sendf (panel, &cmd_stat, &response, "ATTACH %s %s %s", switches, device, path)) {
         stat = -1;
@@ -1983,10 +1976,8 @@ do {
         stat = -1;
         }
     } while (0);
-pthread_mutex_lock (&panel->io_lock);
 if (OrigState == Run)
     sim_panel_exec_run (panel);
-pthread_mutex_unlock (&panel->io_lock);
 free (response);
 return stat;
 }
@@ -2010,17 +2001,9 @@ if (!panel || (panel->State == Error)) {
     sim_panel_set_error (NULL, "Invalid Panel");
     return -1;
     }
-pthread_mutex_lock (&panel->io_lock);
 OrigState = panel->State;
-if (OrigState == Run) {
+if (OrigState == Run)
     sim_panel_exec_halt (panel);
-    while (panel->State == Run) {
-        pthread_mutex_unlock (&panel->io_lock);
-        msleep (100);
-        pthread_mutex_lock (&panel->io_lock);
-        }
-    }
-pthread_mutex_unlock (&panel->io_lock);
 do {
     if (_panel_sendf (panel, &cmd_stat, &response, "DETACH %s", device)) {
         stat = -1;
@@ -2031,10 +2014,8 @@ do {
         stat = -1;
         }
     } while (0);
-pthread_mutex_lock (&panel->io_lock);
 if (OrigState == Run)
     sim_panel_exec_run (panel);
-pthread_mutex_unlock (&panel->io_lock);
 free (response);
 return stat;
 }
@@ -2302,6 +2283,13 @@ Start_Next_Line:
     buf_data = strlen (buf);
     if (buf_data)
         _panel_debug (p, DBG_RSP, "Remnant Buffer Contents: '%s'", NULL, 0, buf);
+    if ((!p->parent) && 
+        (p->completion_string) && 
+        (!memcmp (buf, p->completion_string, strlen (p->completion_string)))) {
+        _panel_debug (p, DBG_RCV, "*Received Command Complete - Match: '%s'", NULL, 0, p->completion_string);
+        p->io_waiting = 0;
+        pthread_cond_signal (&p->io_done);
+        }
     if (!memcmp ("Simulator Running...", buf, 20)) {
         _panel_debug (p, DBG_RSP, "State transitioning to Run", NULL, 0);
         p->State = Run;
@@ -2513,20 +2501,20 @@ return -1;
 }
 
 static int
-_panel_sendf (PANEL *p, int *completion_status, char **response, const char *fmt, ...)
+_panel_vsendf_completion (PANEL *p, int *completion_status, char **response, const char *completion_string, const char *fmt, va_list arglist)
 {
 char stackbuf[1024];
 int bufsize = sizeof(stackbuf);
 char *buf = stackbuf;
 int len, status_echo_len = 0, sent_len;
 int post_fix_len = completion_status ? 7 + sizeof (command_done_echo) + sizeof (command_status) : 1;
-va_list arglist;
 int ret;
 
+if (completion_status && completion_string)         /* one or the other, but */
+    return -1;                                      /* not both */
+
 while (1) {                                         /* format passed string, args */
-    va_start (arglist, fmt);
     len = vsnprintf (buf, bufsize-1, fmt, arglist);
-    va_end (arglist);
 
     if (len < 0)
         return sim_panel_set_error (NULL, "Format encoding error while processing '%s'", fmt);
@@ -2554,17 +2542,20 @@ if (len && (buf[len-1] != '\r')) {
 
 pthread_mutex_lock (&p->io_command_lock);
 ++p->command_count;
-if (completion_status) {
-    sprintf (&buf[len], "%s\r%s\r", command_status, command_done_echo);
-    status_echo_len = strlen (&buf[len]);
+if (completion_status || completion_string) {
+    if (completion_status) {
+        sprintf (&buf[len], "%s\r%s\r", command_status, command_done_echo);
+        status_echo_len = strlen (&buf[len]);
+        }
     pthread_mutex_lock (&p->io_lock);
+    p->completion_string = completion_string;
     p->io_response_data = 0;
     }
 
 _panel_debug (p, DBG_REQ, "Command %d Request%s: %*.*s", NULL, 0, p->command_count, completion_status ? " (with response)" : "", len, len, buf);
 ret = ((len + status_echo_len) == (sent_len = _panel_send (p, buf, len + status_echo_len))) ? 0 : -1;
 
-if (completion_status) {
+if (completion_status || completion_string) {
     if (!ret) {                                     /* Sent OK? */
         char *tresponse = NULL;
 
@@ -2575,29 +2566,39 @@ if (completion_status) {
         if (0 == memcmp (buf, p->io_response + strlen (sim_prompt), len)) {
             char *eol, *status;
             memcpy (tresponse, p->io_response + strlen (sim_prompt) + len + 1, p->io_response_data + 1 - (strlen (sim_prompt) + len + 1));
-            *completion_status = -1;
-            status = strstr (tresponse, command_status);
-            if (status) {
-                *(status - strlen (sim_prompt)) = '\0';
-                status += strlen (command_status) + 2;
-                eol = strchr (status, '\r');
-                if (eol)
-                    *eol = '\0';
-                sscanf (status, "Status:%08X-", completion_status);
+            if (completion_status) {
+                *completion_status = -1;
+                status = strstr (tresponse, command_status);
+                if (status) {
+                    *(status - strlen (sim_prompt)) = '\0';
+                    status += strlen (command_status) + 2;
+                    eol = strchr (status, '\r');
+                    if (eol)
+                        *eol = '\0';
+                    sscanf (status, "Status:%08X-", completion_status);
+                    }
                 }
             }
         else
             memcpy (tresponse, p->io_response, p->io_response_data + 1);
         if (response) {
             *response = tresponse;
-            _panel_debug (p, DBG_RSP, "Command %d Response(Status=%d): '%s'", NULL, 0, p->command_count, *completion_status, *response);
+            if (completion_status)
+                _panel_debug (p, DBG_RSP, "Command %d Response(Status=%d): '%s'", NULL, 0, p->command_count, *completion_status, *response);
+            else
+                _panel_debug (p, DBG_RSP, "Command %d Response - Match '%s': '%s'", NULL, 0, p->command_count, completion_string, *response);
             }
         else {
             free (tresponse);
-            if (p->io_response_data)
-                _panel_debug (p, DBG_RSP, "Discarded Unwanted Command %d Response Data(Status=%d):", p->io_response, p->io_response_data, p->command_count, *completion_status);
+            if (p->io_response_data) {
+                if (completion_status)
+                    _panel_debug (p, DBG_RSP, "Discarded Unwanted Command %d Response Data(Status=%d):", p->io_response, p->io_response_data, p->command_count, *completion_status);
+                else
+                    _panel_debug (p, DBG_RSP, "Discarded Unwanted Command %d Response Data - Match '%s':", p->io_response, p->io_response_data, p->command_count, completion_string);
+                }
             }
         }
+    p->completion_string = NULL;
     p->io_response_data = 0;
     p->io_response[0] = '\0';
     pthread_mutex_unlock (&p->io_lock);
@@ -2611,6 +2612,30 @@ pthread_mutex_unlock (&p->io_command_lock);
 if (buf != stackbuf)
     free (buf);
 return ret;
+}
+
+static int
+_panel_sendf (PANEL *p, int *completion_status, char **response, const char *fmt, ...)
+{
+va_list arglist;
+int status;
+
+va_start (arglist, fmt);
+status = _panel_vsendf_completion (p, completion_status, response, NULL, fmt, arglist);
+va_end (arglist);
+return status;
+}
+
+static int
+_panel_sendf_completion (PANEL *p, char **response, const char *completion, const char *fmt, ...)
+{
+va_list arglist;
+int status;
+
+va_start (arglist, fmt);
+status = _panel_vsendf_completion (p, NULL, response, completion, fmt, arglist);
+va_end (arglist);
+return status;
 }
 
 
