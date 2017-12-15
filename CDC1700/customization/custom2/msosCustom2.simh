@@ -1,0 +1,149 @@
+# Script to generate a customized MSOS 5.0 installation tape.
+#
+# Customizations:
+#   1. Set system creation date to 4/19/17
+#   2. Change the system name to "SIMH  DEVELOPMENT SYSTEM"
+#
+# Requires:
+#       MSOS5-A.dsk and MSOS5-B.dsk     Installation boot disks
+#       sysdat.tap                      Modified sysdat.asm as only file on
+#                                       the tape (80 char records)
+#       Installation  tape              Default is MSOS5_SL136.tap which can
+#                                       be copied from bitsavers.org. This can
+#                                       be overridden by specifying the
+#                                       installation tape on the command line:
+#
+#                                         cdc1700 msosCustom1.simh install.tap
+#
+# Creates:
+#       MSOS5-Install.tap               New installation tape. If it already
+#                                       exists, it will be overwritten
+#       Scratch?.tap                    Tapes for temporary use. If they
+#                                       already exist, they will be overwritten
+#       %DATETIME%.lpt                  Unique LPT output file for this run
+#
+set env CDD0=MSOS5-A.dsk
+set env CDD1=MSOS5-B.dsk
+set env MT0=%1
+if "%MT0%"=="" set env MT0=MSOS5_SL136.tap
+set env MT1A=Scratch3.tap
+set env MT1B=MSOS5-Install.tap
+set env MT2A=sysdat.tap
+set env MT2B=Scratch1.tap
+set env MT3=Scratch2.tap
+set cpu instr=basic
+set cpu mode65k,64k
+#set throttle 30%
+set mt type=1732-3
+set mt3 9track
+set lp type=1742
+att lp %DATETIME%.lpt
+att cdd0 %CDD0%
+att cdd1 %CDD1%
+att -r mt0 %MT0%
+att mt1 %MT1A%
+att -r mt2 %MT2A%
+att mt3 %MT3%
+set env TODAY=%DATE_MM%%DATE_DD%%DATE_19XX_YY%
+#
+# The following command will patch out unimplemented devices (1728 card
+# reader/punch)
+#
+expect "SET PROGRAM PROTECT" set cpu protect; d 056D 0649; d 057E 0649; d 0589 0649; c
+expect "DATE/TIME  MMDDYYHHMM \n\r\n" send "%TODAY%%TIME_HH%%TIME_MM%\r"; c
+expect ":00 " send after=1000000,"\007"; c
+expect "MI\r\n" send "*BATCH,4\r"; c
+expect "J \r\n" send "*JOB\r"; c
+expect "J \r\n" send "*K,I17,P16\r"; c
+expect "J \r\n" send "*ASSEM\r"; c
+expect "J \r\n" send "*mtup\r"; c
+expect "NEXT:  \007" send "OPEN,O16,NL,U,A,SF0\r"; c
+expect "NEXT:  \007" send "CLOSE,O16,RW\r"; c
+expect "NEXT:  \007" send "EXIT\r"; c
+expect "J \r\n" send "*REW,17\r"; c
+# Use SKED to extract and edit the skeleton file
+expect "J \r\n" send "*SKED\r"; c
+expect "NEXT\r\n\007" send "ADF,6,1\r"; c
+expect "NEXT\r\n\007" send "BUILD,6\r"; c
+expect "ENTER LU\r\n\007" send "\r"; goto insert1
+send delay=10000
+autoload cdd
+run 0
+goto end
+
+:insert1
+det mt2
+att -q mt2 %MT2B%
+expect "NEXT\r\n\007" send "INSERT,1,4\r"; c
+expect "\007" send "*S,SYSMON,$3034\r"; c
+expect "\007" send "*S,SYSDAY,$3139\r"; c
+expect "\007" send "*S,SYSYER,$3137\r"; c
+expect "\007" send "\r"; c
+expect "NEXT\r\n\007" send "DELETE,2,4\r"; c
+expect "NEXT\r\n\007" send "INSERT,8,4\r"; c
+expect "\007" send "*V       SIMH  DEVELOPMENT SYSTEM\r"; c
+expect "\007" send "\r"; c
+expect "NEXT\r\n\007" send "DELETE,9\r"; c
+expect "NEXT\r\n\007" send "DUMP,17\r"; c
+expect "NEXT\r\n\007" send "EXIT\r"; c
+expect "J \r\n" send "*REW,6\r"; c
+expect "J \r\n" send "*ADF,6,1\r"; goto libild
+continue
+
+:libild
+expect "J \r\n" send delay=5000,"*LIBILD\r"; c
+expect "CONTROL LU  = \007" send "\r"; c
+expect "DEFS LU     = \007" send "\r"; c
+expect "INSTALL LU  = \007" send "18\r"; c
+expect "NEWLIB LU   = \007" send "\r"; c
+expect "LIB 01 LU   = \007" send "16\r"; c
+expect "LIB 02 LU   = \007" send "6\r"; c
+expect "LIB 03 LU   = \007" send "\r"; c
+expect "SKELETON LU = \007" send "17\r"; c
+expect "CR WHEN READY. \r\n\007" send "\r"; c
+expect "CR WHEN READY \r\n\007" send "\r"; c
+expect "OUTPUT LIBRARY LU'S \007" send "*Z\r"; c
+expect "J \r\n" send "*REW,6,16\r"; goto mtup
+continue
+
+:mtup
+det mt1
+att mt1 %MT1B%
+expect "J \r\n" send "*mtup\r"; c
+expect "NEXT:  \007" send "OPEN,O18,NL,U,A,SF0\r"; c
+expect "NEXT:  \007" send "CLOSE,O18,RW\r"; c
+expect "NEXT:  \007" send "OPEN,O16,NL,U,A,SF0,,LB13000\r"; c
+expect "NEXT:  \007" send "OPEN,I6,NL,U,A,SF0,,LB13000\r"; c
+expect "NEXT:  \007" send "COPY,FC1\r"; c
+expect "NEXT:  \007" send "CLOSE,O16,RW\r"; c
+expect "NEXT:  \007" send "CLOSE,I6,RW\r"; c
+expect "NEXT:  \007" send "OPEN,O16,NL,U,A,SF1,,LB13000\r"; c
+expect "NEXT:  \007" send "OPEN,I18,NL,U,A,SF0,,LB13000\r"; c
+expect "NEXT:  \007" send "COPY,FC1\r"; c
+expect "NEXT:  \007" send "CLOSE,O16,RW\r"; c
+expect "NEXT:  \007" send "CLOSE,I18,RW\r"; c
+expect "NEXT:  \007" send "OPEN,I6,NL,U,A,SF2,,LB13000\r"; c
+expect "NEXT:  \007" send "OPEN,O16,NL,U,A,SF2,,LB13000\r"; c
+expect "NEXT:  \007" send "COPY,FC1\r"; c
+expect "NEXT:  \007" send "CLOSE,O16,RW\r"; c
+expect "NEXT:  \007" send "CLOSE,I6,RW\r"; c
+expect "NEXT:  \007" send "OPEN,I6,NL,U,A,SF3,,LB13000\r"; c
+expect "NEXT:  \007" send "OPEN,O16,NL,U,A,SF3,,LB13000\r"; c
+expect "NEXT:  \007" send "COPY,FC1\r"; c
+expect "NEXT:  \007" send "CLOSE,O16,RW\r"; c
+expect "NEXT:  \007" send "CLOSE,I6,RW\r"; c
+expect "NEXT:  \007" send "OPEN,I6,NL,U,A,SF4,,LB13000\r"; c
+expect "NEXT:  \007" send "OPEN,O16,NL,U,A,SF4,,LB13000\r"; c
+expect "NEXT:  \007" send "COPY,FC1\r"; c
+expect "NEXT:  \007" send "CLOSE,O16,RW\r"; c
+expect "NEXT:  \007" send "CLOSE,I6,RW\r"; c
+expect "NEXT:  \007" send "OPEN,I6,NL,U,A,SF5,,LB13000\r"; c
+expect "NEXT:  \007" send "OPEN,O16,NL,U,A,SF5,,LB13000\r"; c
+expect "NEXT:  \007" send "COPY,FC1\r"; c
+expect "NEXT:  \007" send "CLOSE,O16,RW\r"; c
+expect "NEXT:  \007" send "CLOSE,I6,RW\r"; c
+expect "NEXT:  \007" send "EXIT\r"; c
+expect "J \r\n" send "*Z\r"; c
+continue
+
+:end

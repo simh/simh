@@ -26,7 +26,7 @@
 */
 
 /* cdc1700_dev1.c: equipment number 1 I/O device support
- *                 Simh devices: tti, tto, ptr, ptp, cdr
+ *                 Simh devices: tti, tto, ptr, ptp
  */
 
 #include "cdc1700_defs.h"
@@ -140,21 +140,21 @@ t_stat tt_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 
 IO_DEVICE TTIdev = IODEV("TTI", "1711-A", 1711, 1, 1, 0,
                          NULL, NULL, NULL, NULL, NULL,
-                         TTIstate, NULL, NULL, NULL,
+                         TTIstate, NULL, NULL, NULL, NULL, NULL,
                          0xF, 2,
                          MASK_REGISTER0 | MASK_REGISTER1,
                          MASK_REGISTER1, 0, 0, 0, 0, NULL);
 
 IO_DEVICE TTOdev = IODEV("TTO", "1711-A", 1711, 1, 1, 0,
                          NULL, NULL, NULL, NULL, NULL,
-                         TTOstate, NULL, NULL, NULL,
+                         TTOstate, NULL, NULL, NULL, NULL, NULL,
                          0xF, 2,
                          MASK_REGISTER0 | MASK_REGISTER1,
                          MASK_REGISTER1, 0, 0, 0, 0, NULL);
 
 IO_DEVICE TTdev = IODEV("TT", "1711-A", 1711, 1, 1, 0,
                         TTreject, TTin, TTout, NULL, NULL,
-                        TTstate, NULL, NULL, NULL,
+                        TTstate, NULL, NULL, NULL, NULL, NULL,
                         0xF, 2,
                         MASK_REGISTER0 | MASK_REGISTER1,
                         0, 0, 0, 0, 0, NULL);
@@ -841,7 +841,7 @@ t_stat ptr_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 
 IO_DEVICE PTRdev = IODEV(NULL, "1721-A", 1721, 1, 2, 0,
                          fw_reject, PTRin, PTRout, NULL, NULL,
-                         NULL, NULL, NULL, NULL,
+                         NULL, NULL, NULL, NULL, NULL, NULL,
                          0xF, 2,
                          MASK_REGISTER0 | MASK_REGISTER1,
                          MASK_REGISTER1, 0, 0, 0, 0, NULL);
@@ -1147,7 +1147,7 @@ t_stat ptp_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 
 IO_DEVICE PTPdev = IODEV(NULL, "1723-A", 1723, 1, 4, 0,
                          fw_reject, PTPin, PTPout, NULL, NULL,
-                         NULL, NULL, NULL, NULL,
+                         NULL, NULL, NULL, NULL, NULL, NULL,
                          0xF, 2,
                          MASK_REGISTER0 | MASK_REGISTER1,
                          MASK_REGISTER1, 0, 0, 0, 0, NULL);
@@ -1397,164 +1397,6 @@ t_stat ptp_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr
   return scp_help(st, dptr, uptr, flag, helpString, cptr);
 }
 
-t_stat cdr_svc(UNIT *);
-t_stat cdr_reset(DEVICE *);
-
-enum IOstatus CDRin(IO_DEVICE *, uint8);
-enum IOstatus CDRout(IO_DEVICE *, uint8);
-
-/*
-        1729-A/B Card Reader
-
-   Addresses
-                                Computer Instruction
-   Q Register         Output From A        Input to A
-
-      00E0                                   Read
-      00E1              Director Function    Director Status
-
-
-  Operations:
-
-  Director Function
-
-    15                               7   6   5   4   3   2   1   0
-   +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-   | X | X | X | X | X | X | X | X | X |   |   |   |   |   |   |   |
-   +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-                                         |   |   |   |   |   |   |
-                                         |   |   |   |   |   |   Clr Controller
-                                         |   |   |   |   |   Clr Interrupts
-                                         |   |   |   |   Data Interrupt Req.
-                                         |   |   |   Interrupt on End of Record
-                                         |   |   Interrupt on Alarm
-                                         |   Start Motion
-                                         Stop Motion
-
-  Status Response:
-
-  Director Status
-
-    15                  10   9   8   7   6   5   4   3   2   1   0
-   +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-   | X | X | X | X | X | X |   |   |   |   |   |   |   |   |   |   |
-   +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-                             |   |   |   |   |   |   |   |   |   |
-                             |   |   |   |   |   |   |   |   |   Ready
-                             |   |   |   |   |   |   |   |   Busy
-                             |   |   |   |   |   |   |   Interrupt
-                             |   |   |   |   |   |   Data
-                             |   |   |   |   |   End Of Record
-                             |   |   |   |   Alarm
-                             |   |   |   Lost Data
-                             |   |   Protected
-                             |   Existence Code
-                             Read Station Empty
-
- */
-
-IO_DEVICE CDRdev = IODEV(NULL, "1729", 1729, 1, 6, 0,
-                         fw_reject, CDRin, CDRout, NULL, NULL,
-                         NULL, NULL, NULL, NULL,
-                         0xF, 2,
-                         MASK_REGISTER0 | MASK_REGISTER1,
-                         MASK_REGISTER1, 0, 0, 0, 0, NULL);
-
-/* CDR data structures
-
-   cdr_dev      CDR device descriptor
-   cdr_unit     CDR unit descriptor
-   cdr_reg      CDR register list
-   cdr_mod      CDR modifiers list
-*/
-
-UNIT cdr_unit = {
-  UDATA(&cdr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0), SERIAL_IN_WAIT
-};
-
-REG cdr_reg[] = {
-  { HRDATAD(FUNCTION, CDRdev.FUNCTION, 16, "Last director function issued") },
-  { HRDATAD(STATUS, CDRdev.STATUS, 16, "Director status register") },
-  { HRDATAD(IENABLE, CDRdev.IENABLE, 16, "Interrupts enabled") },
-  { NULL }
-};
-
-MTAB cdr_mod[] = {
-  { MTAB_XTD | MTAB_VDV, 0, "1729 Card Reader" },
-  { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", NULL,
-    NULL, &show_addr, NULL, "Display equipment address" },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "PROTECT",
-    &set_protected, NULL, NULL, "Device is protected (unimplemented)" },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "NOPROTECT",
-    &clear_protected, NULL, NULL, "Device is unprotected (unimplemented)" },
-  { 0 }
-};
-
-DEBTAB cdr_deb[] = {
-  { "TRACE",       DBG_DTRACE,     "Trace device I/O requests" },
-  { "STATE",       DBG_DSTATE,     "Display device state changes" },
-  { "LOCATION",    DBG_DLOC,       "Display address for I/O instructions" },
-  { "FIRSTREJ",    DBG_DFIRSTREJ,  "Suppress display of 2nd ... I/O rejects" },
-  { "ALL", DBG_DTRACE | DBG_DSTATE | DBG_DLOC },
-  { NULL }
-};
-
-DEVICE cdr_dev = {
-  "CDR", &cdr_unit, cdr_reg, cdr_mod,
-  1, 10, 31, 1, 8, 8,
-  NULL, NULL, &cdr_reset,
-  NULL, NULL, NULL,
-  &CDRdev,
-  DEV_DEBUG | DEV_NOEQUIP | DEV_INDEV | DEV_PROTECT, 0, cdr_deb,
-  NULL, NULL, NULL, NULL, NULL, NULL
-};
-
-/* Unit service */
-
-t_stat cdr_svc(UNIT *uptr)
-{
-  /***  TODO: Implement Card Reader support ***/
-  return SCPE_OK;
-}
-
-/* Reset routine */
-
-t_stat cdr_reset(DEVICE *dptr)
-{
-  DEVRESET(&CDRdev);
-
-  ptr_unit.buf = 0;
-  if (!sim_is_running)
-    sim_activate(&cdr_unit, cdr_unit.wait);
-  return SCPE_OK;
-}
-
-/* Perform I/O */
-
-enum IOstatus CDRin(IO_DEVICE *iod, uint8 reg)
-{
-  /*
-   * The framework only passes IN operations for the data register (0x90)
-   */
-  Areg = cdr_unit.buf;
-  CDRdev.STATUS &= IO_ST_BUSY | IO_ST_DATA;
-  return IO_REPLY;
-}
-
-enum IOstatus CDRout(IO_DEVICE *iod, uint8 reg)
-{
-  switch (reg) {
-    case 0x00:
-      return IO_REJECT;
-
-    case 0x01:
-      doDirectorFunc(&cdr_dev, FALSE);
-      /*** TODO: Process local director functions ***/
-      break;
-  }
-  return IO_REPLY;
-}
-
 /*
  * Return device 1 interrupt status. If any of the sub-devices have their
  * interrupt status active, return the device 1 interrupt mask bit.
@@ -1563,7 +1405,7 @@ uint16 dev1INTR(DEVICE *dptr)
 {
   uint16 status;
 
-  status = TTIdev.STATUS |  TTOdev.STATUS | PTRdev.STATUS | PTPdev.STATUS | CDRdev.STATUS;
+  status = TTIdev.STATUS |  TTOdev.STATUS | PTRdev.STATUS | PTPdev.STATUS;
 
   return (status & IO_ST_INT) != 0 ? 1 << 1 : 0;
 }
@@ -1584,6 +1426,4 @@ void dev1Interrupts(char *buf)
     strcat(buf, " PTR");
   if ((PTPdev.STATUS & IO_ST_INT) != 0)
     strcat(buf, " PTP");
-  if ((CDRdev.STATUS & IO_ST_INT) != 0)
-    strcat(buf, " CDR");
 }

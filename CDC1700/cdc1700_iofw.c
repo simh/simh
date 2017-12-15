@@ -46,7 +46,7 @@ t_bool IOFWinitialized = FALSE;
 
 /*
  * This I/O framework provides an implementation of a generic device. The
- * framework provides for up to 8 read and 8 write device registers. The
+ * framework provides for up to 16 read and 16 write device registers. The
  * read device registers may be stored and read directly from the framework
  * or may cause an entry to the device-specific portion of the device
  * driver. The framework may be setup to dynamically reject I/O requests
@@ -110,6 +110,10 @@ t_bool IOFWinitialized = FALSE;
  *                                        interrupt handling
  *      void            (*iod_clear)(DEVICE *);
  *                                      - Perform clear controller operation
+ *      uint8           (*iod_decode)(DEVICE *, t_bool, uint8);
+ *                                      - Non-std device register decode
+ *      t_bool          (*iod_chksta)(t_bool, uint8);
+ *                                      - Check for valid station address(es)
  *      uint16          iod_ienable;    - Device interrupt enables
  *      uint16          iod_oldienable; - Previous iod_ienable
  *      uint16          iod_imask;      - Valid device interrupts
@@ -119,10 +123,10 @@ t_bool IOFWinitialized = FALSE;
  *                                              "clear interrupts"
  *      uint16          iod_rmask;      - Register mask (vs. station addr)
  *      uint8           iod_regs;       - # of device registers
- *      uint8           iod_validmask;  - Bitmap of valid registers
- *      uint8           iod_readmap;    - Bitmap of read registers
- *      uint8           iod_rejmapR;    - Bitmaps of register R/W
- *      uint8           iod_rejmapW;            access to be rejected
+ *      uint16          iod_validmask;  - Bitmap of valid registers
+ *      uint16          iod_readmap;    - Bitmap of read registers
+ *      uint16          iod_rejmapR;    - Bitmaps of register R/W
+ *      uint16          iod_rejmapW;            access to be rejected
  *      uint8           iod_flags;      - Device flags
  * #define STATUS_ZERO  0x01            - Status register read returns 0
  * #define DEVICE_DC    0x02            - Device is buffered data channel
@@ -143,6 +147,10 @@ t_bool IOFWinitialized = FALSE;
  *      uint16          iod_private8;   - Device-specific use
  *      uint8           iod_private9;   - Device-specific use
  *      t_bool          iod_private10;  - Device-specific use
+ *      uint16          iod_private11;  - Device-specific use
+ *      uint16          iod_private12;  - Device-specific use
+ *      uint8           iod_private13;  - Device-specific use
+ *      uint8           iod_private14;  - Device-specific use
  *
  * The macro CHANGED(iod, n) will return what bits have been changed in write
  * register 'n' just after it has been written.
@@ -193,12 +201,27 @@ void fw_init(void)
 enum IOstatus fw_doIO(DEVICE *dptr, t_bool output)
 {
   IO_DEVICE *iod = (IO_DEVICE *)dptr->ctxt;
-  uint8 rej = (output ? iod->iod_rejmapW : iod->iod_rejmapR) & ~MASK_REGISTER1;
+  uint16 rej = (output ? iod->iod_rejmapW : iod->iod_rejmapR) & ~MASK_REGISTER1;
   uint8 reg;
 
   if ((iod->iod_flags & DEVICE_DC) != 0)
     reg = ((IOQreg & IO_W) - iod->iod_dcbase) >> 11;
   else reg = IOQreg & iod->iod_rmask;
+
+  /*
+   * Check for special station address handling for this device.
+   */
+  if (iod->iod_chksta != NULL)
+    if (!(*iod->iod_chksta)(output, reg))
+      return IO_INTERNALREJECT;
+
+  /*
+   * Handle non-standard register decoding. E.g. For the 1752 drum controller,
+   * if bit 0 of the equipment address is set, bits 1 - 3 are ignored so all
+   * odd addresses map to "Director Function".
+   */
+  if (iod->iod_decode != NULL)
+    reg = (*iod->iod_decode)(iod, output, reg);
 
   /*
    * Check for valid device address
@@ -298,7 +321,7 @@ enum IOstatus fw_doBDCIO(IO_DEVICE *iod, uint16 *data, t_bool output, uint8 reg)
  * must make sure that the active interrupt flag is set whenever one or more
  * interrupt source is active and the interrupt(s) have been enabled.
  * Interrupts are typically generated when a status flag is raised but we also
- * need to handle removing an interrupt souce when a flag is dropped.
+ * need to handle removing an interrupt source when a flag is dropped.
  *
  * In addition, some devices have non-standard interrupts and we need to
  * provide a callback to a device-specific routine to check for such

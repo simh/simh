@@ -49,7 +49,7 @@ extern t_bool FirstRejSeen;
 extern uint32 CountRejects;
 
 extern DEVICE cpu_dev, dca_dev, dcb_dev, dcc_dev, tti_dev, tto_dev,
-  ptr_dev, ptp_dev, cdr_dev;
+  ptr_dev, ptp_dev;
 
 static const char *status[] = {
   "REPLY", "REJECT", "INTERNALREJECT"
@@ -326,7 +326,7 @@ enum IOstatus doIO(t_bool output, DEVICE **device)
      *  001     - 1711/1712/1713 teletypewriter
      *  010     - 1721/1722 paper tape reader
      *  100     - 1723/1724 paper tape punch
-     *  110     - 1729 card reader
+     *  110     - 1729 card reader (not implemented on device address 1)
      */
     switch ((IOQreg >> 4) & 0x7) {
     case 0x01:
@@ -341,10 +341,6 @@ enum IOstatus doIO(t_bool output, DEVICE **device)
       dev = &ptp_dev;
       break;
 
-    case 0x06:
-      dev = &cdr_dev;
-      break;
-      
     default:
       return IO_INTERNALREJECT;
     }

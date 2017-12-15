@@ -93,7 +93,7 @@ t_stat rtc_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 
 IO_DEVICE RTCdev = IODEV(NULL, "10336-1", 10336, 13, 0xFF, 0,
                          NULL, RTCin, RTCout, NULL, NULL,
-                         NULL, NULL, RTCraised, NULL,
+                         NULL, NULL, RTCraised, NULL, NULL, NULL,
                          0x7F, 2,
                          MASK_REGISTER0 | MASK_REGISTER1,
                          MASK_REGISTER1,
@@ -158,7 +158,7 @@ struct RTCtimebase {
 */
 
 UNIT rtc_unit = {
-  UDATA(&rtc_svc, 0, 0), RTC_10MSEC
+  UDATA(&rtc_svc, 0, 0), RTC_10USEC
 };
 
 REG rtc_reg[] = {
@@ -346,7 +346,8 @@ t_stat rtc_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr
     "1 Hardware Description\n"
     " The 10336-1 is a Real Time Clock which can generate periodic interrupts\n"
     " or measure elapsed time. The timer resolution is set via jumpers on the\n"
-    " physical hardware. For the simulator, the resolution can be changed by:\n\n"
+    " physical hardware. For the simulator, the default resolution is\n"
+    " 10 uSec and can be changed by:\n\n"
     "+sim> SET %D RATE=1usec\n"
     "+sim> SET %D RATE=10usec\n"
     "+sim> SET %D RATE=100usec\n"

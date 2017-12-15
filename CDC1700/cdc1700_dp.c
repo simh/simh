@@ -231,7 +231,7 @@ t_stat dp_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 
 IO_DEVICE DPdev = IODEV(NULL, "1738-B", 1738, 3, 0xFF, 0,
                         DPreject, DPin, DPout, NULL, NULL,
-                        DPstate, DPintr, NULL, NULL,
+                        DPstate, DPintr, NULL, NULL, NULL, NULL,
                         0x7F, 8,
                         MASK_REGISTER1 | MASK_REGISTER2 | MASK_REGISTER3 | \
                         MASK_REGISTER4 | MASK_REGISTER5 | MASK_REGISTER6 | \

@@ -50,6 +50,8 @@ FE QL2 10196  095C      Quick Look 2 (more detailed instruction set test)
 4B PET 12166  0C14      1732-2/1732-3 Magnetic Tape Test
                         Passed in programmed I/O mode
                         Failed in DMA mode
+80 DRM 11086  2702      BG504 Drum Test
+                        Passed
 91 RTC 10216  04DA      System 17 Real Time Clock Test
                         Passed
 
@@ -269,7 +271,7 @@ FC DPC 09146  0685      Disk Call-up Program
 87 SCC 07155  0BCD      Synchronous Communication Controller (FJ606-A) Test
 88 CPC 10216  0E5C      1725-1 Card Punch Test
 89 BSC 11196  0CC3      Cyberdata Bisync Controller Test
-8A HFP 07046  1CDE      1781-a Hardware Floating Point Unit Test
+8A HFP 07046  1CDE      1781-A Hardware Floating Point Unit Test
 90 IOM 11096  0B8B      IOM Mother Unit Digital Input/Output Test
 91 RTC 10216  04DA      System 17 Real Time Clock Test
 92 PT1 10205  0617      1720-1 Paper Tape Punch Test

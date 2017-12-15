@@ -300,7 +300,7 @@ t_bool CDintr(IO_DEVICE *);
 
 IO_DEVICE CDdev = IODEV(NULL, "1733-2", 1733, 3, 0xFF, 0,
                         CDreject, CDin, CDout, NULL, NULL,
-                        CDstate, CDintr, NULL, NULL,
+                        CDstate, CDintr, NULL, NULL, NULL, NULL,
                         0x7F, 8,
                         MASK_REGISTER0 | MASK_REGISTER1 | MASK_REGISTER2 | \
                         MASK_REGISTER3 | MASK_REGISTER4 | MASK_REGISTER5 | \
@@ -876,7 +876,7 @@ void CDDiskIO(UNIT *uptr, uint16 iotype)
 
       if ((cd_dev.dctrl & DBG_DERROR) != 0)
         fprintf(DBGOUT,
-                "%sCD - ReadWrite/Compare failed - %s\r\n",
+                "%sCD - Read/Write/Compare failed - %s\r\n",
                 INTprefix, error);
 
       fw_IOalarm(FALSE, &cd_dev, &CDdev, "Alarm");
@@ -1235,6 +1235,8 @@ enum IOstatus CDout(IO_DEVICE *iod, uint8 reg)
           /*** TODO: Check protect conditions ***/
         }
 
+        CDdev.STATUS &= ~IO_1733_SINGLE;
+
         if ((IOAreg & IO_1733_USEL) != 0) {
           CDdev.iod_drive = NULL;
           CDdev.STATUS &= ~(IO_1733_ONCYL | IO_ST_BUSY | IO_ST_READY);
@@ -1243,6 +1245,13 @@ enum IOstatus CDout(IO_DEVICE *iod, uint8 reg)
               ((iou->ondrive[1]->flags & UNIT_ATT) != 0)) {
             CDdev.iod_drive = iou;
             CDdev.STATUS |= IO_ST_READY;
+
+            /*
+             * We only need to check on of the physical drives to see if it is
+             * an 856-4 since both drive types are updated together.
+             */
+            if ((iou->ondrive[0]->flags & UNIT_856_4) == 0)
+              CDdev.STATUS |= IO_1733_SINGLE;
 
             if (iou->active == NULL) {
               int first = ((cd_dev.flags & DEV_FIXED) != 0) ? 1 : 0;
@@ -1351,14 +1360,14 @@ enum IOstatus CDout(IO_DEVICE *iod, uint8 reg)
  */
 t_stat CDautoload(void)
 {
-  UNIT *uptr = &cd_unit[(cd_dev.flags & DEV_FIXED) ==0 ? 0 : 1];
+  UNIT *uptr = &cd_unit[(cd_dev.flags & DEV_FIXED) == 0 ? 0 : 1];
 
   if ((uptr->flags & UNIT_ATT) != 0) {
     uint32 i;
 
     for (i = 0; i < CD_NUMSC; i++) {
       t_offset offset = i * CD_NUMBY;
-      void * buf = &M[i * CD_NUMWD];
+      void *buf = &M[i * CD_NUMWD];
 
       if (sim_fseeko(uptr->fileref, offset, SEEK_SET) ||
           (sim_fread(buf, sizeof(uint16), CD_NUMWD, uptr->fileref) != CD_NUMWD))

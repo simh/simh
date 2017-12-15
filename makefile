@@ -1570,7 +1570,8 @@ CDC1700 = ${CDC1700D}/cdc1700_cpu.c ${CDC1700D}/cdc1700_dis.c \
         ${CDC1700D}/cdc1700_dc.c ${CDC1700D}/cdc1700_iofw.c \
         ${CDC1700D}/cdc1700_lp.c ${CDC1700D}/cdc1700_dp.c \
         ${CDC1700D}/cdc1700_cd.c ${CDC1700D}/cdc1700_sym.c \
-        ${CDC1700D}/cdc1700_rtc.c ${CDC1700D}/cdc1700_msos5.c
+        ${CDC1700D}/cdc1700_rtc.c ${CDC1700D}/cdc1700_drm.c \
+        ${CDC1700D}/cdc1700_msos5.c
 CDC1700_OPT = -I ${CDC1700D}
 
 ###

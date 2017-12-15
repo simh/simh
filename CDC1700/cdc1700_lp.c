@@ -182,7 +182,7 @@ t_stat lp_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 
 IO_DEVICE LPdev = IODEV(NULL, "Line Printer", 1740, 4, 0xFF, 0,
                         fw_reject, LPin, LPout, NULL, NULL,
-                        NULL, NULL, NULL, NULL,
+                        NULL, NULL, NULL, NULL, NULL, NULL,
                         0x7F, 4,
                         MASK_REGISTER0 | MASK_REGISTER1 | MASK_REGISTER3,
                         MASK_REGISTER1,
@@ -215,7 +215,7 @@ IO_DEVICE LPdev = IODEV(NULL, "Line Printer", 1740, 4, 0xFF, 0,
 */
 
 UNIT lp_unit = {
-  UDATA(&lp_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0), LP_OUT_WAIT
+  UDATA(&lp_svc, UNIT_SEQ+UNIT_ATTABLE, 0), LP_OUT_WAIT
 };
 
 REG lp_reg_1740[] = {
@@ -326,10 +326,12 @@ const char *LPprivateState[4] = {
 void LPstate(const char *where, DEVICE *dev, IO_DEVICE *iod)
 {
   fprintf(DBGOUT,
-          "%s[%s %s: Func: %04X, Func2: %04X, Sta: %04X, Ena: %04x, Count: %d, \
-Private: %s%s\r\n",
+          "%s[%s %s: Func: %04X, Func2: %04X, Sta: %04X, Ena: %04x]\r\n",
           INTprefix, dev->name, where,
-          iod->FUNCTION, iod->FUNCTION2, iod->STATUS, iod->IENABLE,
+          iod->FUNCTION, iod->FUNCTION2, iod->STATUS, iod->IENABLE);
+  fprintf(DBGOUT,
+          "%s[%s %s: Count: %d, Private: %s%s\r\n",
+          INTprefix, dev->name, where,
           iod->iod_LPcolumn,
           LPprivateState[iod->iod_LPstate],
           iod->iod_LPoverwrite ? ",Overwrite" : "");
@@ -391,11 +393,35 @@ t_stat lp_svc(UNIT *uptr)
   return SCPE_OK;
 }
 
+/* I/O routines */
+static void lp_puts(char *s)
+{
+  if (fputs(s, lp_unit.fileref) == EOF) {
+    perror("LP I/O error (puts)");
+    clearerr(lp_unit.fileref);
+    return;
+  }
+  lp_unit.pos += strlen(s);
+}
+
+static void lp_putc(uint8 ch)
+{
+  if (putc(ch, lp_unit.fileref) == EOF) {
+    perror("LP I/O error (putc)");
+    clearerr(lp_unit.fileref);
+    return;
+  }
+  lp_unit.pos++;
+}
+
 /* Reset routine */
 
 t_stat lp_reset(DEVICE *dptr)
 {
   t_stat r;
+
+  if ((lp_dev.dctrl & DBG_TRACE) != 0)
+    fprintf(DBGOUT, "%s[LP: lp_reset() entry]\r\n", INTprefix);
 
   if (LPdev.iod_type == IOtype_default) {
     /*
@@ -408,8 +434,11 @@ t_stat lp_reset(DEVICE *dptr)
 
   if (IOFWinitialized)
     if ((dptr->flags & DEV_DIS) == 0)
-      if ((r = checkReset(dptr, LPdev.iod_equip)) != SCPE_OK)
+      if ((r = checkReset(dptr, LPdev.iod_equip)) != SCPE_OK) {
+        if ((lp_dev.dctrl & DBG_TRACE) != 0)
+          fprintf(DBGOUT, "%s[LP: lp_reset() disabled]\r\n", INTprefix);
         return r;
+      }
 
   DEVRESET(&LPdev);
 
@@ -420,6 +449,9 @@ t_stat lp_reset(DEVICE *dptr)
   fw_setForced(&LPdev, IO_ST_READY);
 
   LPdev.STATUS |= IO_ST_DATA | IO_ST_EOP;
+
+  if ((lp_dev.dctrl & DBG_TRACE) != 0)
+    fprintf(DBGOUT, "%s[LP: lp_reset() exit]\r\n", INTprefix);
 
   return SCPE_OK;
 }
@@ -511,12 +543,9 @@ enum IOstatus LPout(IO_DEVICE *iod, uint8 reg)
               /*** TODO: implement format tape decoding ***/
             }
 
-            if ((lp_unit.flags & UNIT_ATT) != 0) {
-              if (fputs(ccontrol, lp_unit.fileref) == EOF) {
-                perror("LP I/O error");
-                clearerr(lp_unit.fileref);
-              }
-            }
+            if ((lp_unit.flags & UNIT_ATT) != 0)
+              lp_puts((char *)ccontrol);
+
             fw_IOunderwayData(&LPdev, 0);
 
             LPdev.iod_LPstate = IODP_LPCCWAIT;
@@ -567,12 +596,8 @@ enum IOstatus LPout(IO_DEVICE *iod, uint8 reg)
             if ((lp_unit.flags & UNIT_ATT) != 0) {
               int i;
               
-              for (i = 0; i < iod->iod_LPcolumn; i++) {
-                if (putc(buffer[i], lp_unit.fileref) == EOF) {
-                  perror("LP I/O error");
-                  clearerr(lp_unit.fileref);
-                }
-              }
+              for (i = 0; i < iod->iod_LPcolumn; i++)
+                lp_putc(buffer[i]);
             }
           }
           fw_IOunderwayEOP(&LPdev, IO_ST_INT);
@@ -597,19 +622,12 @@ enum IOstatus LPout(IO_DEVICE *iod, uint8 reg)
             if ((lp_unit.flags & UNIT_ATT) != 0) {
               int i;
 
-              if (iod->iod_LPoverwrite) {
-                if (putc('\r', lp_unit.fileref) == EOF) {
-                  perror("LP I/O error");
-                  clearerr(lp_unit.fileref);
-                }
-              }
+              if (iod->iod_LPoverwrite)
+                lp_putc('\r');
 
-              for (i = 0; i < iod->iod_LPcolumn; i++) {
-                if (putc(buffer[i], lp_unit.fileref) == EOF) {
-                  perror("LP I/O error");
-                  clearerr(lp_unit.fileref);
-                }
-              }
+              for (i = 0; i < iod->iod_LPcolumn; i++)
+                lp_putc(buffer[i]);
+
               iod->iod_LPoverwrite = TRUE;
             }
           }
@@ -620,16 +638,10 @@ enum IOstatus LPout(IO_DEVICE *iod, uint8 reg)
           /*** TODO: Implement format tape operations.
                For now, all operations generate a single space motion ***/
           if ((lp_unit.flags & UNIT_ATT) != 0) {
-            if (putc('\n', lp_unit.fileref) == EOF) {
-              perror("LP I/O error");
-              clearerr(lp_unit.fileref);
-            }
-            if ((Areg & IO_1740_DSP) != 0) {
-              if (putc('\n', lp_unit.fileref) == EOF) {
-                perror("LP I/O error");
-                clearerr(lp_unit.fileref);
-              }
-            }
+            lp_putc('\n');
+
+            if ((Areg & IO_1740_DSP) != 0)
+              lp_putc('\n');
           }
           iod->iod_LPoverwrite = FALSE;
           printwait = TRUE;

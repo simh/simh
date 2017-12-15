@@ -24,7 +24,7 @@
    in this Software without prior written authorization from John Forecast.
 
 */
-
+        
 /* cdc1700_mt.c: 1732-A/B and 1732-3 magtape device support
  *               Simh devices: mt0, mt1, mt2, mt3
  */
@@ -127,6 +127,8 @@ extern t_bool IOFWinitialized;
 extern UNIT cpu_unit;
 
 t_stat mt_show_transport(FILE *, UNIT *, int32, CONST void *);
+t_stat mt_set_9track(UNIT *, int32, CONST char *, void *);
+t_stat mt_set_7track(UNIT *, int32, CONST char *, void *);
 t_stat mt_show_type(FILE *, UNIT *, int32, CONST void *);
 t_stat mt_set_type(UNIT *, int32, CONST char *, void *);
 
@@ -352,7 +354,7 @@ t_stat mt_help(FILE *, DEVICE *, UNIT *, int32, const char *);
                  |   |   |   (1732-A only, additional unit select bit)
                  |   |   Select Tape Unit
                  |   Deselect Tape Unit
-                 Select Low Read Threshold (1733-3 only)
+                 Select Low Read Threshold (1732-3 only)
 
   Status Response:
 
@@ -377,8 +379,8 @@ t_stat mt_help(FILE *, DEVICE *, UNIT *, int32, const char *);
      |   |   |   |   File Mark
      |   |   |   Controller Active
      |   |   Fill
-     |   Storage Parity Error (1733-3 only)
-     Protect Fault (1733-3 only)
+     |   Storage Parity Error (1732-3 only)
+     Protect Fault (1732-3 only)
 
   Director Status 2 
 
@@ -389,7 +391,7 @@ t_stat mt_help(FILE *, DEVICE *, UNIT *, int32, const char *);
                              |   |   |   |   |   |   |   |   |   |
                              |   |   |   |   |   |   |   |   |   556 BPI
                              |   |   |   |   |   |   |   |   800 BPI
-                             |   |   |   |   |   |   |   1600 BPI (1733-3 only)
+                             |   |   |   |   |   |   |   1600 BPI (1732-3 only)
                              |   |   |   |   |   |   Seven Track
                              |   |   |   |   |   Write Enable
                              |   |   |   |   PE - Warning
@@ -402,7 +404,7 @@ t_stat mt_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 
 IO_DEVICE MTdev = IODEV(NULL, "Magtape", 1732, 7, 0xFF, 0,
                         MTreject, MTin, MTout, MTBDCin, MTBDCout,
-                        MTstate, NULL, NULL, MTclear,
+                        MTstate, NULL, NULL, MTclear, NULL, NULL,
                         0x7F, 4,
                         MASK_REGISTER0 | MASK_REGISTER1 | MASK_REGISTER2 | \
                         MASK_REGISTER3,
@@ -419,6 +421,7 @@ IO_DEVICE MTdev = IODEV(NULL, "Magtape", 1732, 7, 0xFF, 0,
 #define iod_CWA         iod_readR[3]            /* current DSA address */
 #define iod_LWA         iod_private6            /* last word address */
 #define iod_DSApending  iod_private10           /* DSA request pending */
+#define iod_FWA         iod_private11           /* first word address */
 
 /*
  * Define delay functions other than the standard motion commands. The low
@@ -486,6 +489,10 @@ MTAB mt_mod[] = {
     &sim_tape_set_capac, &sim_tape_show_capac, NULL, "Specify tape capacity" },
   { MTAB_XTD|MTAB_VUN, 0, "TRANSPORT", NULL,
     NULL, &mt_show_transport, NULL, "Display type of tape transport" },
+  { MTAB_XTD|MTAB_VUN, 0, NULL, "9TRACK",
+    &mt_set_9track, NULL, NULL, "Set drive as 9-track transport" },
+  { MTAB_XTD|MTAB_VUN, 0, NULL, "7TRACK",
+    &mt_set_7track, NULL, NULL, "Set drive as 7-track transport" },
   { MTAB_XTD|MTAB_VDV, 0, NULL, "STOPONREJECT",
     &set_stoponrej, NULL, NULL, "Stop simulation if I/O is rejected" },
   { MTAB_XTD|MTAB_VDV, 0, NULL, "NOSTOPONREJECT",
@@ -507,6 +514,8 @@ MTAB mt_mod[] = {
 #define DBG_V_MTIO      (DBG_SPECIFIC+4)/* Trace library routine calls */
 #define DBG_V_DENS      (DBG_SPECIFIC+5)/* Trace density select changes */
 #define DBG_V_SELECT    (DBG_SPECIFIC+6)/* Trace drive select/de-select */
+#define DBG_V_RDSA      (DBG_SPECIFIC+7)/* Read data after DSA transfer */
+#define DBG_V_WDSA      (DBG_SPECIFIC+8)/* Write data before DSA transfer */
 
 #define DBG_OPS         (1 << DBG_V_OPS)
 #define DBG_READ        (1 << DBG_V_READ)
@@ -515,6 +524,8 @@ MTAB mt_mod[] = {
 #define DBG_MTIO        (1 << DBG_V_MTIO)
 #define DBG_DENS        (1 << DBG_V_DENS)
 #define DBG_SELECT      (1 << DBG_V_SELECT)
+#define DBG_RDSA        (1 << DBG_V_RDSA)
+#define DBG_WDSA        (1 << DBG_V_WDSA)
 
 DEBTAB mt_deb[] = {
   { "TRACE",       DBG_DTRACE,     "Trace device I/O requests" },
@@ -529,6 +540,8 @@ DEBTAB mt_deb[] = {
   { "MTIO",        DBG_MTIO,       "Trace tape library routine calls" },
   { "DENS",        DBG_DENS,       "Trace denisty select changes" },
   { "SELECT",      DBG_SELECT,     "Trace transport select/de-select" },
+  { "RDSA",        DBG_RDSA,       "Dump buffer after DSA read" },
+  { "WDSA",        DBG_WDSA,       "Dump buffer before DSA write" },
   { NULL }
 };
 
@@ -745,6 +758,42 @@ void mt_dump(void)
   }
 }
 
+void mt_DSAdump(uint16 lwa, t_bool rw)
+{
+  uint16 cwa = MTdev.iod_FWA;
+  int idx;
+  char msg[80], text[16], temp[8];
+
+  fprintf(DBGOUT, "Dump of DSA %s buffer (FWA: %04X, LWA: %04X):\r\n",
+          rw ? "write" : "read", cwa, lwa);
+
+  msg[0] = '\0';
+  idx = 0;
+
+  while (cwa != lwa) {
+    text[idx++] = chars[(M[cwa] >> 8) & 0x7F];
+    text[idx++] = chars[M[cwa] & 0x7F];
+
+    sprintf(temp, "0x%04X", M[cwa]);
+    if (msg[0] != '\0')
+      strcat(msg, " ");
+    strcat(msg, temp);
+
+    if (idx == 10) {
+      text[idx++] = '\0';
+      fprintf(DBGOUT, "%-55s%s\r\n", msg, text);
+      msg[0] = '\0';
+      idx = 0;
+    }
+    cwa++;
+  }
+
+  if (idx != 0) {
+    text[idx++] = '\0';
+    fprintf(DBGOUT, "%-55s%s\r\n", msg, text);
+  }
+}
+
 /*
  * Dump the current internal state of the MT device.
  */
@@ -788,7 +837,7 @@ t_stat mt_show_type(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
       break;
 
     case DEVTYPE_1732_3:
-      fprintf(st, "1733-3 Magnetic Tape Controller");
+      fprintf(st, "1732-3 Magnetic Tape Controller");
       break;
 
     default:
@@ -839,6 +888,36 @@ t_stat mt_show_transport(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
       fprintf(st, "7-track 6173 transport");
     else fprintf(st, "9-track 6193 transport");
   }
+  return SCPE_OK;
+}
+
+/*
+ * Set drive to 9-track transport.
+ */
+t_stat mt_set_9track(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+  if (uptr == NULL)
+    return SCPE_IERR;
+
+  if ((uptr->flags & UNIT_ATT) != 0)
+    return SCPE_ALATT;
+
+  uptr->flags &= ~UNIT_7TRACK;
+  return SCPE_OK;
+}
+
+/*
+ * Set drive to 7-track transport.
+ */
+t_stat mt_set_7track(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+  if (uptr == NULL)
+    return SCPE_IERR;
+
+  if ((uptr->flags & UNIT_ATT) != 0)
+    return SCPE_ALATT;
+
+  uptr->flags |= UNIT_7TRACK;
   return SCPE_OK;
 }
 
@@ -988,6 +1067,8 @@ t_stat mt_svc(UNIT *uptr)
 
           if ((mt_dev.dctrl & DBG_OPS) != 0)
             mt_trace(uptr, "DSA read complete", (t_stat)-1, FALSE);
+          if ((mt_dev.dctrl & DBG_RDSA) != 0)
+            mt_DSAdump(MTdev.iod_LWA, FALSE);
           break;
         }
 
@@ -1005,6 +1086,8 @@ t_stat mt_svc(UNIT *uptr)
 
           if ((mt_dev.dctrl & DBG_OPS) != 0)
             mt_trace(uptr, "DSA read complete - no data", (t_stat)-1, FALSE);
+          if ((mt_dev.dctrl & DBG_RDSA) != 0)
+            mt_DSAdump(MTdev.iod_CWA, FALSE);
           break;
         }
 
@@ -1108,181 +1191,187 @@ t_stat mt_svc(UNIT *uptr)
      * motion" does set "end of operation" if a tape mark or end of tape
      * is detected.
      */
-  case IO_1732_READ:
-    MTremain = 0;
-    status = sim_tape_rdrecf(uptr, MTbuf, &MTremain, MTSIZ);
+    case IO_1732_READ:
+      MTremain = 0;
+      status = sim_tape_rdrecf(uptr, MTbuf, &MTremain, MTSIZ);
 
-    if ((mt_dev.dctrl & DBG_MTIO) != 0)
-      mtio_trace(uptr, "rdrecf", status, TRUE, MTremain);
+      if ((mt_dev.dctrl & DBG_MTIO) != 0)
+        mtio_trace(uptr, "rdrecf", status, TRUE, MTremain);
 
-    switch (status) {
-      case MTSE_OK:
-        break;
+      switch (status) {
+        case MTSE_OK:
+          break;
 
-      case MTSE_TMK:
-        MTdev.STATUS |= IO_ST_ALARM | IO_1732_FMARK;
-        break;
+        case MTSE_TMK:
+          MTdev.STATUS |= IO_ST_ALARM | IO_1732_FMARK;
+          break;
 
-      case MTSE_EOM:
-        MTdev.STATUS |= IO_ST_ALARM | IO_1732_EOT;
-        break;
+        case MTSE_EOM:
+          MTdev.STATUS |= IO_ST_ALARM | IO_1732_EOT;
+          break;
 
-      case MTSE_RECE:
-        MTdev.STATUS |= IO_ST_ALARM | IO_ST_PARITY;
-        MTremain = 0;
-        break;
-    }
-    MToffset = 0;
+        case MTSE_RECE:
+         MTdev.STATUS |= IO_ST_ALARM | IO_ST_PARITY;
+         MTremain = 0;
+         break;
+      }
+      MToffset = 0;
 
-    if ((MTdev.STATUS & (IO_1732_FMARK | IO_1732_EOT | IO_ST_PARITY)) == 0)
-      mask &= ~IO_ST_EOP;
+      if ((MTdev.STATUS & (IO_1732_FMARK | IO_1732_EOT | IO_ST_PARITY)) == 0)
+        mask &= ~IO_ST_EOP;
 
-    if ((mt_dev.dctrl & DBG_OPS) != 0)
-      mt_trace(uptr, "READ", status, TRUE);
-    if ((mt_dev.dctrl & DBG_READ) != 0)
-      mt_dump();
+      if ((mt_dev.dctrl & DBG_OPS) != 0)
+        mt_trace(uptr, "READ", status, TRUE);
+      if ((mt_dev.dctrl & DBG_READ) != 0)
+        mt_dump();
 
-    if (MTremain > 0) {
+      if (MTremain > 0) {
+        if (MTdev.iod_DSApending) {
+          MTdev.iod_DSApending = FALSE;
+          MTdev.iod_delay = IO_DSA_READ;
+          sim_activate(uptr, mt_densityTimeout(FALSE));
+          if ((mt_dev.dctrl & DBG_OPS) != 0) {
+            int32 u = uptr - mt_dev.units;
+            
+            fprintf(DBGOUT,
+                    "[MT%d: DSA Read started, CWA: 0x%04X, LWA: 0x%04X, Mode: 0x%X\r\n",
+                    u, MTdev.iod_CWA, MTdev.iod_LWA, MTdev.iod_mode);
+          }
+          return SCPE_OK;
+        }
+        MTdev.iod_delay = IO_DELAY_RDATA;
+        sim_activate(uptr, MT_MIN_WAIT);
+        return SCPE_OK;
+      }
+      MTmode = MT_IDLE;
+      break;
+
+    case IO_1732_WRITE:
+      if ((mt_dev.dctrl & DBG_OPS) != 0)
+        mt_trace(uptr, "WRITE", (t_stat)-1, FALSE);
+
       if (MTdev.iod_DSApending) {
         MTdev.iod_DSApending = FALSE;
-        MTdev.iod_delay = IO_DSA_READ;
+        MTdev.iod_delay = IO_DSA_WRITE;
+
+        if ((mt_dev.dctrl & DBG_WDSA) != 0)
+          mt_DSAdump(MTdev.iod_LWA, TRUE);
+
         sim_activate(uptr, mt_densityTimeout(FALSE));
         if ((mt_dev.dctrl & DBG_OPS) != 0) {
           int32 u = uptr - mt_dev.units;
 
           fprintf(DBGOUT,
-                  "[MT%d: DSA Read started, CWA: 0x%04X, LWA: 0x%04X, Mode: 0x%X\r\n",
+                  "[MT%d: DSA Write started, CWA: 0x%04X, LWA: 0x%04X, Mode: 0x%X\r\n",
                   u, MTdev.iod_CWA, MTdev.iod_LWA, MTdev.iod_mode);
         }
         return SCPE_OK;
       }
-      MTdev.iod_delay = IO_DELAY_RDATA;
+      MTdev.iod_delay = IO_DELAY_WDATA;
       sim_activate(uptr, MT_MIN_WAIT);
       return SCPE_OK;
-    }
-    MTmode = MT_IDLE;
-    break;
 
-  case IO_1732_WRITE:
-    if ((mt_dev.dctrl & DBG_OPS) != 0)
-      mt_trace(uptr, "WRITE", (t_stat)-1, FALSE);
+    case IO_1732A_REWU:
+      status = sim_tape_rewind(uptr);
 
-    if (MTdev.iod_DSApending) {
-      MTdev.iod_DSApending = FALSE;
-      MTdev.iod_delay = IO_DSA_WRITE;
-      sim_activate(uptr, mt_densityTimeout(FALSE));
-      if ((mt_dev.dctrl & DBG_OPS) != 0) {
-        int32 u = uptr - mt_dev.units;
+      if ((mt_dev.dctrl & DBG_MTIO) != 0)
+        mtio_trace(uptr, "rewind & unload", status, FALSE, 0);
 
-        fprintf(DBGOUT,
-                "[MT%d: DSA Write started, CWA: 0x%04X, LWA: 0x%04X, Mode: 0x%X\r\n",
-                u, MTdev.iod_CWA, MTdev.iod_LWA, MTdev.iod_mode);
-      }
-      return SCPE_OK;
-    }
-    MTdev.iod_delay = IO_DELAY_WDATA;
-    sim_activate(uptr, MT_MIN_WAIT);
-    return SCPE_OK;
-
-  case IO_1732A_REWU:
-    status = sim_tape_rewind(uptr);
-
-    if ((mt_dev.dctrl & DBG_MTIO) != 0)
-      mtio_trace(uptr, "rewind & unload", status, FALSE, 0);
-
-    MTdev.STATUS |= IO_1732_BOT;
-    mt_detach(uptr);
-    if ((mt_dev.dctrl & DBG_OPS) != 0)
-      mt_trace(uptr, "REWU", status, FALSE);
-
-    mask &= ~IO_ST_EOP;
-    break;
+      MTdev.STATUS |= IO_1732_BOT;
+      mt_detach(uptr);
+      if ((mt_dev.dctrl & DBG_OPS) != 0)
+        mt_trace(uptr, "REWU", status, FALSE);
+      
+      mask &= ~IO_ST_EOP;
+      break;
 
     /*
      * The following commands set "end of operation" when the command
      * completes.
      */
-  case IO_1732_BACKSP:
-    status = sim_tape_sprecr(uptr, &temp);
-
-    if ((mt_dev.dctrl & DBG_MTIO) != 0)
-      mtio_trace(uptr, "sprecr", status, FALSE, 0);
-
-    if (status == MTSE_TMK)
-      MTdev.STATUS |= IO_1732_FMARK;
-    if (sim_tape_bot(uptr))
-      MTdev.STATUS |= IO_1732_BOT;
-    if (sim_tape_eot(uptr))
-      MTdev.STATUS |= IO_1732_EOT;
-    if ((mt_dev.dctrl & DBG_OPS) != 0)
-      mt_trace(uptr, "BACKSP", status, FALSE);
-    break;
-
-  case IO_1732_WFM:
-    status = sim_tape_wrtmk(uptr);
-
-    if ((mt_dev.dctrl & DBG_MTIO) != 0)
-      mtio_trace(uptr, "wrtmk", status, FALSE, 0);
-
-#if 0
-    MTdev.STATUS |= IO_ST_ALARM | IO_1732_FMARK;
-#endif
-    if (sim_tape_eot(uptr))
-      MTdev.STATUS |= IO_1732_EOT;
-    if ((mt_dev.dctrl & DBG_OPS) != 0)
-      mt_trace(uptr, "WFM", status, FALSE);
-    break;
-
-  case IO_1732_SFWD:
-    while (!sim_tape_eot(uptr)) {
-      status = sim_tape_sprecf(uptr, &temp);
-
-      if ((mt_dev.dctrl & DBG_MTIO) != 0)
-        mtio_trace(uptr, "sprecf", status, FALSE, 0);
-
-      if (status == MTSE_TMK) {
-        MTdev.STATUS |= IO_1732_FMARK;
-        break;
-      }
-    }
-    if (sim_tape_bot(uptr))
-      MTdev.STATUS |= IO_1732_BOT;
-    if (sim_tape_eot(uptr))
-      MTdev.STATUS |= IO_1732_EOT;
-    if ((mt_dev.dctrl & DBG_OPS) != 0)
-      mt_trace(uptr, "SFWD", status, FALSE);
-    break;
-
-  case IO_1732_SBACK:
-    while (!sim_tape_bot(uptr)) {
+    case IO_1732_BACKSP:
       status = sim_tape_sprecr(uptr, &temp);
 
       if ((mt_dev.dctrl & DBG_MTIO) != 0)
         mtio_trace(uptr, "sprecr", status, FALSE, 0);
 
-      if (status == MTSE_TMK) {
+      if (status == MTSE_TMK)
         MTdev.STATUS |= IO_1732_FMARK;
-        break;
+      if (sim_tape_bot(uptr))
+        MTdev.STATUS |= IO_1732_BOT;
+      if (sim_tape_eot(uptr))
+        MTdev.STATUS |= IO_1732_EOT;
+      if ((mt_dev.dctrl & DBG_OPS) != 0)
+        mt_trace(uptr, "BACKSP", status, FALSE);
+      break;
+
+    case IO_1732_WFM:
+      status = sim_tape_wrtmk(uptr);
+
+      if ((mt_dev.dctrl & DBG_MTIO) != 0)
+        mtio_trace(uptr, "wrtmk", status, FALSE, 0);
+
+#if 0
+      MTdev.STATUS |= IO_ST_ALARM | IO_1732_FMARK;
+#endif
+      if (sim_tape_eot(uptr))
+        MTdev.STATUS |= IO_1732_EOT;
+      if ((mt_dev.dctrl & DBG_OPS) != 0)
+        mt_trace(uptr, "WFM", status, FALSE);
+      break;
+
+    case IO_1732_SFWD:
+      while (!sim_tape_eot(uptr)) {
+        status = sim_tape_sprecf(uptr, &temp);
+        
+        if ((mt_dev.dctrl & DBG_MTIO) != 0)
+          mtio_trace(uptr, "sprecf", status, FALSE, 0);
+        
+        if (status == MTSE_TMK)
+          MTdev.STATUS |= IO_1732_FMARK;
+
+        if (status != MTSE_OK)
+          break;
       }
-    }
-    if (sim_tape_bot(uptr))
+      if (sim_tape_bot(uptr))
+        MTdev.STATUS |= IO_1732_BOT;
+      if (sim_tape_eot(uptr))
+        MTdev.STATUS |= IO_1732_EOT;
+      if ((mt_dev.dctrl & DBG_OPS) != 0)
+        mt_trace(uptr, "SFWD", status, FALSE);
+      break;
+
+     case IO_1732_SBACK:
+       while (!sim_tape_bot(uptr)) {
+         status = sim_tape_sprecr(uptr, &temp);
+
+         if ((mt_dev.dctrl & DBG_MTIO) != 0)
+           mtio_trace(uptr, "sprecr", status, FALSE, 0);
+
+         if (status == MTSE_TMK)
+           MTdev.STATUS |= IO_1732_FMARK;
+
+         if (status != MTSE_OK)
+           break;
+       }
+       if (sim_tape_bot(uptr))
+         MTdev.STATUS |= IO_1732_BOT;
+       if (sim_tape_eot(uptr))
+         MTdev.STATUS |= IO_1732_EOT;
+       if ((mt_dev.dctrl & DBG_OPS) != 0)
+         mt_trace(uptr, "SBACK", status, FALSE);
+       break;
+
+    case IO_1732_REWL:
+      status = sim_tape_rewind(uptr);
+
+      if ((mt_dev.dctrl & DBG_MTIO) != 0)
+        mtio_trace(uptr, "rewind", status, FALSE, 0);
+      
       MTdev.STATUS |= IO_1732_BOT;
-    if (sim_tape_eot(uptr))
-      MTdev.STATUS |= IO_1732_EOT;
-    if ((mt_dev.dctrl & DBG_OPS) != 0)
-      mt_trace(uptr, "SBACK", status, FALSE);
-    break;
-
-  case IO_1732_REWL:
-    status = sim_tape_rewind(uptr);
-
-    if ((mt_dev.dctrl & DBG_MTIO) != 0)
-      mtio_trace(uptr, "rewind", status, FALSE, 0);
-
-    MTdev.STATUS |= IO_1732_BOT;
-    if ((mt_dev.dctrl & DBG_OPS) != 0)
-      mt_trace(uptr, "REWL", status, FALSE);
-    break;
+      if ((mt_dev.dctrl & DBG_OPS) != 0)
+        mt_trace(uptr, "REWL", status, FALSE);
+      break;
   }
 
   /*
@@ -1915,7 +2004,7 @@ enum IOstatus MTout(IO_DEVICE *iod, uint8 reg)
       if ((uptr == NULL) || (MTdev.iod_type == DEVTYPE_1732_A))
         return IO_REJECT;
       MTdev.iod_LWA = LoadFromMem(IOAreg);
-      MTdev.iod_CWA = ++IOAreg;
+      MTdev.iod_CWA = MTdev.iod_FWA = ++IOAreg;
       MTdev.iod_DSApending = TRUE;
       if ((mt_dev.dctrl & DBG_OPS) != 0)
         mt_DSAtrace(uptr, "setup");
@@ -1991,8 +2080,10 @@ t_stat mt_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
     "+sim> SET %D 1732-A\n"
     "+sim> SET %D 1732-3\n\n"
     " The first 3 transports (MT0, MT1, MT2) are 9-track drives and MT3 is a\n"
-    " 7-track drive. Each drive may be individually write-locked or\n"
-    " write-enabled with:\n\n"
+    " 7-track drive. The type of a transport may be changed with:\n\n"
+    "+sim> SET %U 9TRACK\n"
+    "+sim> SET %U 7TRACK\n\n"
+    " Each drive may be individually write-locked or write-enabled with:\n\n"
     "+sim> SET %U LOCKED\n"
     "+sim> SET %U WRITEENABLED\n\n"
     " The 1732-A controller can only perform I/O 1 or 2 bytes at a time. In\n"
