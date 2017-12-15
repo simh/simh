@@ -715,7 +715,7 @@ t_stat drm_attach (UNIT *uptr, CONST char *cptr)
 {
   t_addr capac = uptr->capac;
   t_stat r;
-  uint16 tracks;
+  t_offset tracks;
 
   r = attach_unit(uptr, cptr);
   if (r != SCPE_OK)
@@ -744,7 +744,7 @@ t_stat drm_attach (UNIT *uptr, CONST char *cptr)
     return sim_messagef(SCPE_OPENERR, "Invalid file size");
   }
   DRMdev.STATUS = IO_ST_READY | IO_ST_DATA;
-  DRMdev.iod_tracks = tracks;
+  DRMdev.iod_tracks = (uint16)tracks;
   DRMdev.iod_event = Instructions;
 
   return SCPE_OK;

@@ -392,7 +392,7 @@ enum IOstatus {
 #define MOD_ENHRA       0x0038
 #define MOD_ENHRB       0x0007
 
-#define REG_NONE        0x0
+#define REG_NOREG       0x0
 #define REG_R1          0x1
 #define REG_R2          0x2
 #define REG_R3          0x3

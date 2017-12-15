@@ -270,28 +270,28 @@ int disassem(char *buf, uint16 addr, t_bool dbg, t_bool targ, t_bool exec)
                     case OPC_STOSJMP:
                       if (enhMode == 0) {
                         enhValid = TRUE;
-                        if (enhRB == REG_NONE)
+                        if (enhRB == REG_NOREG)
                           strcpy(enhInstr, "SJE");
                         else sprintf(enhInstr, "SJ%c", enhRegChar[enhRB]);
                       }
                       break;
 
                     case OPC_STOADD:
-                      if ((enhMode == 0) && (enhRB != REG_NONE)) {
+                      if ((enhMode == 0) && (enhRB != REG_NOREG)) {
                         enhValid = TRUE;
                         sprintf(enhInstr, "AR%c", enhRegChar[enhRB]);
                       }
                       break;
 
                     case OPC_STOSUB:
-                      if ((enhMode == 0) && (enhRB != REG_NONE)) {
+                      if ((enhMode == 0) && (enhRB != REG_NOREG)) {
                         enhValid = TRUE;
                         sprintf(enhInstr, "SB%c", enhRegChar[enhRB]);
                       }
                       break;
 
                     case OPC_STOAND:
-                      if (enhRB != REG_NONE)
+                      if (enhRB != REG_NOREG)
                         switch (enhMode) {
                           case WORD_REG:
                             enhValid = TRUE;
@@ -308,21 +308,21 @@ int disassem(char *buf, uint16 addr, t_bool dbg, t_bool targ, t_bool exec)
                     case OPC_STOLOADST:
                       switch (enhMode) {
                         case WORD_REG:
-                          if (enhRB != REG_NONE) {
+                          if (enhRB != REG_NOREG) {
                             enhValid = TRUE;
                             sprintf(enhInstr, "LR%c", enhRegChar[enhRB]);
                           }
                           break;
 
                         case WORD_MEM:
-                          if (enhRB != REG_NONE) {
+                          if (enhRB != REG_NOREG) {
                             enhValid = TRUE;
                             sprintf(enhInstr, "SR%c", enhRegChar[enhRB]);
                           }
                           break;
 
                         case CHAR_REG:
-                          if (enhRB != REG_NONE) {
+                          if (enhRB != REG_NOREG) {
                             enhValid = TRUE;
                             enhChar = TRUE;
                             strcpy(enhInstr, "LCA");
@@ -330,7 +330,7 @@ int disassem(char *buf, uint16 addr, t_bool dbg, t_bool targ, t_bool exec)
                           break;
 
                         case CHAR_MEM:
-                          if (enhRB != REG_NONE) {
+                          if (enhRB != REG_NOREG) {
                             enhValid = TRUE;
                             enhChar = TRUE;
                             strcpy(enhInstr, "SCA");
@@ -340,7 +340,7 @@ int disassem(char *buf, uint16 addr, t_bool dbg, t_bool targ, t_bool exec)
                       break;
 
                     case OPC_STOOR:
-                      if (enhRB != REG_NONE)
+                      if (enhRB != REG_NOREG)
                         switch (enhMode) {
                           case WORD_REG:
                             enhValid = TRUE;
@@ -357,14 +357,14 @@ int disassem(char *buf, uint16 addr, t_bool dbg, t_bool targ, t_bool exec)
                     case OPC_STOCRE:
                       switch (enhMode) {
                         case WORD_REG:
-                          if (enhRB != REG_NONE) {
+                          if (enhRB != REG_NOREG) {
                             enhValid = TRUE;
                             sprintf(enhInstr, "C%cE", enhRegChar[enhRB]);
                           }
                           break;
 
                         case CHAR_REG:
-                          if (enhRB != REG_NONE) {
+                          if (enhRB != REG_NOREG) {
                             enhValid = TRUE;
                             enhChar = TRUE;
                             strcpy(enhInstr, "CCE");
