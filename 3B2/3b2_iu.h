@@ -113,6 +113,9 @@
 #define UM_MASK       0x70
 #define UM_SHIFT      4
 
+/* Power-off bit */
+#define IU_KILLPWR    0x04
+
 #define PORT_A            0
 #define PORT_B            1
 

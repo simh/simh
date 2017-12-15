@@ -72,7 +72,8 @@ const char *sim_stop_messages[] = {
     "IRQ",
     "Exception/Trap",
     "Exception Stack Too Deep",
-    "Unimplemented MMU Feature"
+    "Unimplemented MMU Feature",
+    "System Powered Off"
 };
 
 void full_reset()

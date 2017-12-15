@@ -66,6 +66,9 @@ IU_PORT iu_contty;
 /* The timer state */
 IU_TIMER_STATE iu_timer_state;
 
+/* The power flag */
+t_bool iu_killpower = FALSE;
+
 /* Flags for incrementing mode pointers */
 t_bool iu_increment_a = FALSE;
 t_bool iu_increment_b = FALSE;
@@ -632,6 +635,12 @@ void iu_write(uint32 pa, uint32 val, size_t size)
         sim_debug(EXECUTE_MSG, &contty_dev,
                   ">>> SOPR written: %02x\n",
                   (uint8) val);
+        /* Bit 2 of the IU output register is used as a soft power
+         * switch. When set, the machine will power down
+         * immediately. */
+        if (val & IU_KILLPWR) {
+            stop_reason = STOP_POWER;
+        }
         break;
     case ROPR:
         sim_debug(EXECUTE_MSG, &contty_dev,
