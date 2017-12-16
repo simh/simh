@@ -1464,7 +1464,7 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
                     }
                 else {
                     if ((rem->repeat_pending) &&            /* New repeat pending */
-                        (rem->act = NULL) &&                /* AND no prior still active */
+                        (rem->act == NULL) &&               /* AND no prior still active */
                         (!tmxr_input_pending_ln (lp))) {    /* AND no session input pending */
                         rem->repeat_pending = FALSE;
                         sim_rem_setact (rem-sim_rem_consoles, rem->repeat_action);
