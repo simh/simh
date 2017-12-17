@@ -144,7 +144,7 @@ struct PANEL {
     int                     new_register;
     size_t                  reg_query_size;
     unsigned long long      array_element_data;
-    OperationalState        State;
+    volatile OperationalState State;
     unsigned long long      simulation_time;
     unsigned long long      simulation_time_base;
     pthread_t               io_thread;
@@ -2031,6 +2031,7 @@ struct sched_param sched_priority;
 char buf[4096];
 int buf_data = 0;
 int processing_register_output = 0;
+int io_wait_done;
 
 /* 
    Boost Priority for this response processing thread to quickly digest 
@@ -2271,6 +2272,12 @@ while ((p->sock != INVALID_SOCKET) &&
             p->io_response_data += strlen(s);
             strcpy (p->io_response + p->io_response_data, "\r\n");
             p->io_response_data += 2;
+            if ((!p->parent) && 
+                (p->completion_string) && 
+                (!memcmp (s, p->completion_string, strlen (p->completion_string)))) {
+                _panel_debug (p, DBG_RCV, "Match with potentially coalesced additional data: '%s'", NULL, 0, p->completion_string);
+                break;
+                }
             }
         else
             _panel_debug (p, DBG_RCV, "Receive Data Discarded: '%s'", NULL, 0, s);
@@ -2279,7 +2286,7 @@ Start_Next_Line:
         while (isspace(0xFF & (*s)))
             ++s;
         }
-    memmove (buf, s, strlen (s)+1);
+    memmove (buf, s, strlen (s) + 1);
     buf_data = strlen (buf);
     if (buf_data)
         _panel_debug (p, DBG_RSP, "Remnant Buffer Contents: '%s'", NULL, 0, buf);
@@ -2287,26 +2294,41 @@ Start_Next_Line:
         (p->completion_string) && 
         (!memcmp (buf, p->completion_string, strlen (p->completion_string)))) {
         _panel_debug (p, DBG_RCV, "*Received Command Complete - Match: '%s'", NULL, 0, p->completion_string);
-        p->io_waiting = 0;
-        pthread_cond_signal (&p->io_done);
+        io_wait_done = 1;
         }
     if (!memcmp ("Simulator Running...", buf, 20)) {
         _panel_debug (p, DBG_RSP, "State transitioning to Run", NULL, 0);
         p->State = Run;
         buf_data -= 20;
-        if (buf_data) {
-            memmove (buf, buf + 20, buf_data + 1);
-            /* Since there is more to look at, we need to let the state 
-               transition to Run propagate before examining that.*/
-            pthread_mutex_unlock (&p->io_lock);
-            msleep (100);
-            pthread_mutex_lock (&p->io_lock);
-            }
         buf[buf_data] = '\0';
+        if (buf_data) {
+            memmove (buf, buf + 20, strlen (buf + 20) + 1);
+            buf_data = strlen (buf);
+            _panel_debug (p, DBG_RSP, "Remnant Buffer Contents: '%s'", NULL, 0, buf);
+            if (io_wait_done) {                     /* someone waiting for this? */
+                _panel_debug (p, DBG_RCV, "*Match Command Complete - Match signaling waiting thread", NULL, 0);
+                io_wait_done = 0;
+                p->io_waiting = 0;
+                p->completion_string = NULL;
+                pthread_cond_signal (&p->io_done);
+                /* Let this state transition propagate to the interested thread(s) */
+                /* before processing remaining buffered data */
+                pthread_mutex_unlock (&p->io_lock);
+                msleep (100);
+                pthread_mutex_lock (&p->io_lock);
+                }
+            }
         }
     if ((p->State == Run) && (!strcmp (buf, sim_prompt))) {
         _panel_debug (p, DBG_RSP, "State transitioning to Halt", NULL, 0);
         p->State = Halt;
+        }
+    if (io_wait_done) {
+        _panel_debug (p, DBG_RCV, "*Match Command Complete - Match signaling waiting thread", NULL, 0);
+        io_wait_done = 0;
+        p->io_waiting = 0;
+        p->completion_string = NULL;
+        pthread_cond_signal (&p->io_done);
         }
     }
 if (p->io_waiting) {
@@ -2550,16 +2572,20 @@ if (completion_status || completion_string) {
     pthread_mutex_lock (&p->io_lock);
     p->completion_string = completion_string;
     p->io_response_data = 0;
+    p->io_waiting = 1;
     }
 
 _panel_debug (p, DBG_REQ, "Command %d Request%s: %*.*s", NULL, 0, p->command_count, completion_status ? " (with response)" : "", len, len, buf);
 ret = ((len + status_echo_len) == (sent_len = _panel_send (p, buf, len + status_echo_len))) ? 0 : -1;
 
 if (completion_status || completion_string) {
-    if (!ret) {                                     /* Sent OK? */
+    if (ret) {                                      /* Send failed? */
+        p->completion_string = NULL;
+        p->io_waiting = 0;
+        }
+    else {                                          /* Sent OK? */
         char *tresponse = NULL;
 
-        p->io_waiting = 1;
         while (p->io_waiting)
             pthread_cond_wait (&p->io_done, &p->io_lock); /* Wait for completion */
         tresponse = (char *)_panel_malloc (p->io_response_data + 1);

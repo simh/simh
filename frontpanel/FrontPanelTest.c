@@ -85,7 +85,7 @@ if (!update_display)
     return;
 update_display = 0;
 buf1[sizeof(buf1)-1] = buf2[sizeof(buf2)-1] = buf3[sizeof(buf3)-1] = 0;
-sprintf (buf1, "%s PC: %08X   SP: %08X   AP: %08X   FP: %08X  @PC: %08X\r\n", states[sim_panel_get_state (panel)], PC, SP, AP, FP, atPC);
+sprintf (buf1, "%4s PC: %08X   SP: %08X   AP: %08X   FP: %08X  @PC: %08X\r\n", states[sim_panel_get_state (panel)], PC, SP, AP, FP, atPC);
 sprintf (buf2, "PSL: %08X %s\r\n", PSL, "");
 sprintf (buf3, "R0:%08X  R1:%08X  R2:%08X  R3:%08X   R4:%08X   R5:%08X\r\n", R0, R1, R2, R3, R4, R5);
 sprintf (buf4, "R6:%08X  R7:%08X  R8:%08X  R9:%08X  R10:%08X  R11:%08X\r\n", R6, R7, R8, R9, R10, R11);
@@ -439,7 +439,7 @@ if (sim_panel_add_register_bits (panel, "PCQ[3]",  NULL, 32, PCQ_3_bits)) {
     }
 if (1) {
     unsigned int noop_noop_noop_halt = 0x00010101, brb_self = 0x0000FE11, addr400 = 0x00000400, pc_value;
-    int mstime = 0;
+    int mstime;
 
     if (sim_panel_mem_deposit (panel, sizeof(addr400), &addr400, sizeof(noop_noop_noop_halt), &noop_noop_noop_halt)) {
         printf ("Error setting %08X to %08X: %s\n", addr400, noop_noop_noop_halt, sim_panel_get_error());
@@ -453,6 +453,7 @@ if (1) {
         printf ("Error starting simulator execution: %s\n", sim_panel_get_error());
         goto Done;
         }
+    mstime = 0;
     while ((sim_panel_get_state (panel) == Run) &&
            (mstime < 1000)) {
         usleep (100000);
@@ -500,6 +501,7 @@ if (1) {
         printf ("Error starting simulator execution: %s\n", sim_panel_get_error());
         goto Done;
         }
+    mstime = 0;
     while ((sim_panel_get_state (panel) == Run) &&
            (mstime < 1000)) {
         usleep (100000);
