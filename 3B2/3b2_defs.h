@@ -343,7 +343,6 @@ extern void increment_modep_a();
 extern void increment_modep_b();
 
 /* global symbols from the MMU */
-extern t_bool mmu_enabled();
 extern void mmu_enable();
 extern void mmu_disable();
 extern uint8 read_b(uint32 va, uint8 acc);

@@ -517,7 +517,7 @@ void if_write(uint32 pa, uint32 val, size_t size)
 /*
  * Compute the offset of the currently selected C/H/S
  */
-SIM_INLINE uint32 if_buf_offset()
+static SIM_INLINE uint32 if_buf_offset()
 {
     uint32 pos;
 

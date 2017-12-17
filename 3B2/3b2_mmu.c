@@ -681,7 +681,7 @@ t_stat mmu_decode_va(uint32 va, uint8 r_acc, t_bool fc, uint32 *pa)
     uint8 pd_acc;
     t_stat sd_cached, pd_cached;
 
-    if (!mmu_enabled()) {
+    if (!mmu_state.enabled) {
         *pa = va;
         return SCPE_OK;
     }
@@ -824,11 +824,6 @@ uint32 mmu_xlate_addr(uint32 va, uint8 r_acc)
         cpu_abort(NORMAL_EXCEPTION, EXTERNAL_MEMORY_FAULT);
         return 0;
     }
-}
-
-SIM_INLINE t_bool mmu_enabled()
-{
-    return mmu_state.enabled;
 }
 
 void mmu_enable()
