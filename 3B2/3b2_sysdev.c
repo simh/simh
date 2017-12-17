@@ -59,6 +59,8 @@ uint32 *NVRAM = NULL;
 
 extern DEVICE cpu_dev;
 
+int32 tmxr_poll = 0;
+
 /* CSR */
 
 uint16 csr_data;
@@ -486,7 +488,7 @@ t_stat timer0_svc(UNIT *uptr)
 t_stat timer1_svc(UNIT *uptr)
 {
     struct timer_ctr *ctr;
-    int32 ticks;
+    int32 ticks, t;
 
     ctr = (struct timer_ctr *)uptr->tmr;
 
@@ -501,8 +503,9 @@ t_stat timer1_svc(UNIT *uptr)
         ticks = TPS_CLK;
     }
 
-    sim_rtcn_calb(ticks, TMR_CLK);
+    t = sim_rtcn_calb(ticks, TMR_CLK);
     sim_activate_after(uptr, (uint32) (1000000 / ticks));
+    tmxr_poll = t;
 
     return SCPE_OK;
 }

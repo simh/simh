@@ -134,11 +134,11 @@ DEVICE tti_dev = {
 /* TTO (Console) data structures */
 
 REG tto_reg[] = {
-    { HRDATADF(STAT,  iu_console.stat,  8, "Status", sr_bits)                      },
+    { HRDATADF(STAT,  iu_console.stat, 8, "Status", sr_bits)                      },
     { HRDATADF(ISTAT, iu_state.istat,  8, "Interrupt Status", isr_bits)           },
     { HRDATAD(IMR,    iu_state.imr,    8, "Interrupt Mask")                       },
     { HRDATADF(ACR,   iu_state.acr,    8, "Auxiliary Control Register", acr_bits) },
-    { HRDATAD(DATA,   iu_console.txbuf, 8, "Data")                                 },
+    { HRDATAD(DATA,   iu_console.txbuf, 8, "Data")                                },
     { NULL }
 };
 
@@ -178,8 +178,8 @@ REG contty_reg[] = {
 };
 
 UNIT contty_unit[2] = {
-    { UDATA(&iu_svc_contty, UNIT_IDLE|UNIT_ATTABLE, 0) },
-    { UDATA(&iu_svc_contty_xmt, UNIT_DIS, 0), SERIAL_OUT_WAIT }
+    { UDATA(&iu_svc_contty_rcv, UNIT_ATTABLE, 0) },
+    { UDATA(&iu_svc_contty_xmt, TT_MODE_8B, 0), SERIAL_OUT_WAIT }
 };
 
 UNIT *contty_rcv_unit = &contty_unit[0];
@@ -259,7 +259,7 @@ void increment_modep_b()
 }
 
 void iu_txrdy_a_irq() {
-    if ((iu_state.imr & ISTS_TAI) &&
+    if ((iu_state.imr & IMR_TXRA) &&
         (iu_console.conf & TX_EN) &&
         (iu_console.stat & STS_TXR)) {
         csr_data |= CSRUART;
@@ -267,7 +267,7 @@ void iu_txrdy_a_irq() {
 }
 
 void iu_txrdy_b_irq() {
-    if ((iu_state.imr & ISTS_TBI) &&
+    if ((iu_state.imr & IMR_TXRB) &&
         (iu_contty.conf & TX_EN) &&
         (iu_contty.stat & STS_TXR)) {
         csr_data |= CSRUART;
@@ -300,6 +300,10 @@ t_stat contty_reset(DEVICE *dtpr)
             (TMLN *)calloc(1, sizeof(*contty_ldsc));
     }
 
+    memset(&iu_state, 0, sizeof(IU_STATE));
+    memset(&iu_contty, 0, sizeof(IU_PORT));
+    tmxr_set_config_line(&contty_ldsc[0], "115200-8N1");
+
     /* Start the CONTTY polling loop */
     if (!sim_is_active(contty_rcv_unit)) {
         sim_activate(contty_rcv_unit, contty_rcv_unit->wait);
@@ -321,7 +325,7 @@ t_stat iu_svc_tti(UNIT *uptr)
 {
     int32 temp;
 
-    sim_clock_coschedule_tmr_abs(uptr, TMR_CLK, 2);
+    sim_clock_coschedule(uptr, tmxr_poll);
 
     /* TODO:
 
@@ -347,7 +351,7 @@ t_stat iu_svc_tti(UNIT *uptr)
         }
         iu_console.stat |= STS_RXR;
         iu_state.istat |= ISTS_RAI;
-        if (iu_state.imr & 0x02) {
+        if (iu_state.imr & IMR_RXRA) {
             csr_data |= CSRUART;
         }
     }
@@ -362,7 +366,7 @@ t_stat iu_svc_tto(UNIT *uptr)
     return SCPE_OK;
 }
 
-t_stat iu_svc_contty(UNIT *uptr)
+t_stat iu_svc_contty_rcv(UNIT *uptr)
 {
     int32 temp, ln;
 
@@ -373,9 +377,9 @@ t_stat iu_svc_contty(UNIT *uptr)
     ln = tmxr_poll_conn(&contty_desc);
     if (ln >= 0) {
         contty_ldsc[ln].rcve = 1;
-        /* Set DCR */
+        /* Set DCD */
         iu_state.inprt &= ~(IU_DCDB);
-        iu_state.ipcr = IU_DCDB;
+        iu_state.ipcr |= IU_DCDB;
         /* Cause an interrupt */
         csr_data |= CSRUART;
     }
@@ -384,11 +388,7 @@ t_stat iu_svc_contty(UNIT *uptr)
 
     if (contty_ldsc[0].conn) {
         temp = tmxr_getc_ln(&contty_ldsc[0]);
-        if (temp & SCPE_BREAK) {
-            sim_debug(EXECUTE_MSG, &contty_dev,
-                      "*** BREAK RECEIVED ON CONTTY!\n");
-        }
-        if (temp) {
+        if (temp && !(temp & SCPE_BREAK)) {
             if (iu_contty.conf & RX_EN) {
                 if ((iu_contty.stat & STS_FFL) == 0) {
                     iu_contty.rxbuf[iu_contty.w_p] = (temp & 0xff);
@@ -399,14 +399,16 @@ t_stat iu_svc_contty(UNIT *uptr)
                 }
                 iu_contty.stat |= STS_RXR;
                 iu_state.istat |= ISTS_RBI;
-                if (iu_state.imr & 0x02) {
+                if (iu_state.imr & IMR_RXRB) {
                     csr_data |= CSRUART;
                 }
             }
         }
     }
 
-    return sim_clock_coschedule_tmr(uptr, TMR_CLK, 2);
+    tmxr_clock_coschedule(uptr, tmxr_poll);
+
+    return SCPE_OK;
 }
 
 t_stat iu_svc_contty_xmt(UNIT *uptr)
@@ -420,7 +422,7 @@ t_stat iu_svc_timer(UNIT *uptr)
 {
     iu_state.istat |= ISTS_CRI;
 
-    if (iu_state.imr & 0x08) {
+    if (iu_state.imr & IMR_CTR) {
         csr_data |= CSRUART;
     }
 
@@ -498,8 +500,14 @@ uint32 iu_read(uint32 pa, size_t size)
     case RHRB:
         data = iu_contty.rxbuf[iu_contty.r_p];
         iu_contty.r_p = (iu_contty.r_p + 1) % IU_BUF_SIZE;
-        iu_contty.stat &= ~(STS_RXR|STS_FFL);
-        iu_state.istat &= ~ISTS_RBI;
+        /* If the FIFO is not empty, we must cause another interrupt
+         * to continue reading */
+        if (iu_contty.r_p == iu_contty.w_p) {
+            iu_contty.stat &= ~(STS_RXR|STS_FFL);
+            iu_state.istat &= ~ISTS_RBI;
+        } else {
+            csr_data |= CSRUART;
+        }
         break;
     case INPRT:
         data = iu_state.inprt;
@@ -534,29 +542,30 @@ void iu_write(uint32 pa, uint32 val, size_t size)
 {
     uint8 reg;
     uint8 modep;
+    uint8 bval = (uint8) val;
 
     reg = (uint8) (pa - IUBASE);
 
     switch (reg) {
     case MR12A:
         modep = iu_console.modep;
-        iu_console.mode[modep] = val & 0xff;
+        iu_console.mode[modep] = bval;
         iu_increment_a = TRUE;
         break;
     case CSRA:
         /* Set baud rate - not implemented */
         break;
     case CRA:  /* Command A */
-        iu_w_cmd(PORT_A, (uint8) val);
+        iu_w_cmd(PORT_A, bval);
         break;
     case THRA:  /* TX/RX Buf A */
         /* Loopback mode */
         if ((iu_console.mode[1] & 0xc0) == 0x80) {
-            iu_console.txbuf = (uint8) val;
+            iu_console.txbuf = bval;
 
             /* This is also a Receive */
             if ((iu_console.stat & STS_FFL) == 0) {
-                iu_console.rxbuf[iu_console.w_p] = (uint8) val;
+                iu_console.rxbuf[iu_console.w_p] = bval;
                 iu_console.w_p = (iu_console.w_p + 1) % IU_BUF_SIZE;
                 if (iu_console.w_p == iu_console.r_p) {
                     iu_console.stat |= STS_FFL;
@@ -565,16 +574,19 @@ void iu_write(uint32 pa, uint32 val, size_t size)
 
             iu_console.stat |= STS_RXR;
             iu_state.istat |= ISTS_RAI;
+            if (iu_state.imr & IMR_RXRA) {
+                csr_data |= CSRUART;
+            }
         } else {
-            iu_tx(PORT_A, (uint8) val);
+            iu_tx(PORT_A, bval);
         }
         csr_data &= ~CSRUART;
         break;
     case ACR:  /* Auxiliary Control Register */
-        iu_state.acr = (uint8) val;
+        iu_state.acr = bval;
         break;
     case IMR:
-        iu_state.imr = (uint8) val;
+        iu_state.imr = bval;
         csr_data &= ~CSRUART;
         /* Possibly cause an interrupt */
         iu_txrdy_a_irq();
@@ -584,32 +596,32 @@ void iu_write(uint32 pa, uint32 val, size_t size)
         /* Clear out high byte */
         iu_timer_state.c_set &= 0x00ff;
         /* Set high byte */
-        iu_timer_state.c_set |= (val & 0xff) << 8;
+        iu_timer_state.c_set |= ((uint16) bval << 8);
         break;
     case CTLR:  /* Counter/Timer Lower Preset Value */
         /* Clear out low byte */
         iu_timer_state.c_set &= 0xff00;
         /* Set low byte */
-        iu_timer_state.c_set |= (val & 0xff);
+        iu_timer_state.c_set |= bval;
         break;
     case MR12B:
         modep = iu_contty.modep;
-        iu_contty.mode[modep] = val & 0xff;
+        iu_contty.mode[modep] = bval;
         iu_increment_b = TRUE;
         break;
     case CRB:  /* Command B */
-        iu_w_cmd(PORT_B, (uint8) val);
+        iu_w_cmd(PORT_B, bval);
         break;
     case CSRB:
         break;
     case THRB: /* TX/RX Buf B */
         /* Loopback mode */
         if ((iu_contty.mode[1] & 0xc0) == 0x80) {
-            iu_contty.txbuf = (uint8) val;
+            iu_contty.txbuf = bval;
 
             /* This is also a Receive */
             if ((iu_contty.stat & STS_FFL) == 0) {
-                iu_contty.rxbuf[iu_contty.w_p] = (uint8) val;
+                iu_contty.rxbuf[iu_contty.w_p] = bval;
                 iu_contty.w_p = (iu_contty.w_p + 1) % IU_BUF_SIZE;
                 if (iu_contty.w_p == iu_contty.r_p) {
                     iu_contty.stat |= STS_FFL;
@@ -618,31 +630,25 @@ void iu_write(uint32 pa, uint32 val, size_t size)
 
             iu_contty.stat |= STS_RXR;
             iu_state.istat |= ISTS_RBI;
+            if (iu_state.imr & IMR_RXRB) {
+                csr_data |= CSRUART;
+            }
         } else {
-            iu_tx(PORT_B, (uint8) val);
+            iu_tx(PORT_B, bval);
         }
         break;
     case OPCR:
-        sim_debug(EXECUTE_MSG, &contty_dev,
-                  ">>> OPCR written: %02x\n",
-                  (uint8) val);
-        iu_state.opcr = (uint8) val;
+        iu_state.opcr = bval;
         break;
     case SOPR:
-        sim_debug(EXECUTE_MSG, &contty_dev,
-                  ">>> SOPR written: %02x\n",
-                  (uint8) val);
         /* Bit 2 of the IU output register is used as a soft power
          * switch. When set, the machine will power down
          * immediately. */
-        if (val & IU_KILLPWR) {
+        if (bval & IU_KILLPWR) {
             stop_reason = STOP_POWER;
         }
         break;
     case ROPR:
-        sim_debug(EXECUTE_MSG, &contty_dev,
-                  ">>> ROPR written: %02x\n",
-                  (uint8) val);
         break;
     default:
         break;

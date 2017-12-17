@@ -333,6 +333,9 @@ extern DEVICE dmac_dev;
 /* global symbols from the CSR */
 extern uint16 csr_data;
 
+/* global symbols from the timer */
+extern int32 tmxr_poll;
+
 /* global symbols from the IU */
 extern t_bool iu_increment_a;
 extern t_bool iu_increment_b;
