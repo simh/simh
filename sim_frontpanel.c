@@ -975,7 +975,7 @@ if (fIn)
     fclose (fIn);
 if (fOut) {
     fclose (fOut);
-    remove (p->temp_config);
+    (void)remove (p->temp_config);
     }
 if (buf)
     free (buf);
@@ -1094,7 +1094,7 @@ if (panel) {
     free (panel->device_name);
     free (panel->config);
     if (panel->temp_config)
-        remove (panel->temp_config);
+        (void)remove (panel->temp_config);
     free (panel->temp_config);
     reg = panel->regs;
     while (panel->reg_count--) {

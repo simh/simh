@@ -63,6 +63,7 @@ int PSL_bits[32];
 int PC_bits[32];
 int PC_indirect_bits[32];
 int PCQ_3_bits[32];
+unsigned long long simulation_time;
 
 int update_display = 1;
 
@@ -70,8 +71,9 @@ int debug = 0;
 
 
 static void
-DisplayCallback (PANEL *panel, unsigned long long simulation_time, void *context)
+DisplayCallback (PANEL *panel, unsigned long long sim_time, void *context)
 {
+simulation_time = sim_time;
 update_display = 1;
 }
 
@@ -86,7 +88,7 @@ if (!update_display)
 update_display = 0;
 buf1[sizeof(buf1)-1] = buf2[sizeof(buf2)-1] = buf3[sizeof(buf3)-1] = 0;
 sprintf (buf1, "%4s PC: %08X   SP: %08X   AP: %08X   FP: %08X  @PC: %08X\r\n", states[sim_panel_get_state (panel)], PC, SP, AP, FP, atPC);
-sprintf (buf2, "PSL: %08X %s\r\n", PSL, "");
+sprintf (buf2, "PSL: %08X                               Instructions Executed: %lld\r\n", PSL, simulation_time);
 sprintf (buf3, "R0:%08X  R1:%08X  R2:%08X  R3:%08X   R4:%08X   R5:%08X\r\n", R0, R1, R2, R3, R4, R5);
 sprintf (buf4, "R6:%08X  R7:%08X  R8:%08X  R9:%08X  R10:%08X  R11:%08X\r\n", R6, R7, R8, R9, R10, R11);
 #if defined(_WIN32)
@@ -376,7 +378,7 @@ if (sim_panel_dismount (panel, "RL0")) {
     printf ("Error while dismounting media file from RL0: %s\n", sim_panel_get_error());
     goto Done;
     }
-remove ("TEST-RL.DSK");
+(void)remove ("TEST-RL.DSK");
 if (sim_panel_break_set (panel, "400")) {
     printf ("Unexpected error establishing a breakpoint: %s\n", sim_panel_get_error());
     goto Done;
@@ -523,7 +525,7 @@ sim_panel_destroy (panel);
 panel = NULL;
 
 /* Get rid of pseudo config file created above */
-remove (sim_config);
+(void)remove (sim_config);
 return -1;
 }
 
@@ -634,5 +636,5 @@ Done:
 sim_panel_destroy (panel);
 
 /* Get rid of pseudo config file created earlier */
-remove (sim_config);
+(void)remove (sim_config);
 }
