@@ -132,7 +132,7 @@ printf (CSI "H");   /* Position to Top of Screen (1,1) */
 printf (CSI "2J");  /* Clear Screen */
 #endif
 printf ("\n\n\n\n");
-printf ("^C to Halt, Commands: BOOT, CONT, EXIT\n");
+printf ("^C to Halt, Commands: BOOT, CONT, EXIT, BREAK, NOBREAK\n");
 }
 
 volatile int halt_cpu = 0;
@@ -618,6 +618,14 @@ while (1) {
             }
         else if (!strcmp("EXIT", cmd))
             goto Done;
+        else if (!memcmp("BREAK ", cmd, 6)) {
+            if (sim_panel_break_set (panel, cmd + 6))
+                printf("Error Setting Breakpoint '%s': %s\n", cmd + 6, sim_panel_get_error ());
+            }
+        else if (!memcmp("NOBREAK ", cmd, 8)) {
+            if (sim_panel_break_clear (panel, cmd + 8))
+                printf("Error Clearing Breakpoint '%s': %s\n", cmd + 8, sim_panel_get_error ());
+            }
         else
             printf ("Huh? %s\r\n", cmd);
         }
