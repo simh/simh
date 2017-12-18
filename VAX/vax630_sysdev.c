@@ -206,6 +206,7 @@ REG rom_reg[] = {
     };
 
 MTAB rom_mod[] = {
+    { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,     NULL, &show_mapped_addr, (void *)ROMBASE, "Display base address" },
     { UNIT_NODELAY, UNIT_NODELAY, "fast access", "NODELAY", NULL, NULL, NULL, "Disable calibrated ROM access speed" },
     { UNIT_NODELAY, 0, "1usec calibrated access", "DELAY",  NULL, NULL, NULL, "Enable calibrated ROM access speed" },
     { 0 }
@@ -234,8 +235,13 @@ REG nvr_reg[] = {
     { NULL }
     };
 
+MTAB nvr_mod[] = {
+    { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,     NULL, &show_mapped_addr, (void *)NVRBASE, "Display base address" },
+    { 0 }
+    };
+
 DEVICE nvr_dev = {
-    "NVR", &nvr_unit, nvr_reg, NULL,
+    "NVR", &nvr_unit, nvr_reg, nvr_mod,
     1, 16, NVRAWIDTH, 4, 16, 32,
     &nvr_ex, &nvr_dep, &nvr_reset,
     NULL, &nvr_attach, &nvr_detach,

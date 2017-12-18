@@ -31,6 +31,7 @@ t_stat set_autocon (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat set_addr (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat show_addr (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat show_mapped_addr (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat set_addr_flt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat set_vec (UNIT *uptr, int32 arg, CONST char *cptr, void *desc);
 t_stat show_vec (FILE *st, UNIT *uptr, int32 arg, CONST void *desc);
