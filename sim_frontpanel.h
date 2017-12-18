@@ -56,7 +56,7 @@ extern "C" {
 
 #if !defined(__VAX)         /* Unsupported platform */
 
-#define SIM_FRONTPANEL_VERSION   10
+#define SIM_FRONTPANEL_VERSION   11
 
 /**
 
@@ -349,6 +349,7 @@ sim_panel_gen_examine (PANEL *panel,
                        const char *name_or_addr,
                        size_t size,
                        void *value);
+
 /**
 
    sim_panel_gen_deposit
@@ -446,6 +447,33 @@ sim_panel_set_register_value (PANEL *panel,
 
 /**
 
+    A front panel application might want to have access to the
+    instruction execution history that a simulator may be capable 
+    of providing.  If this functionality is desired, enabling of
+    recording instruction history should be explicitly enabled 
+    in the sim_config file that the simulator is started with.
+ */
+
+/**
+
+   sim_panel_get_history
+
+        count        the number of instructions to return
+        size         the size (in local storage) of the buffer which will
+                     receive the data returned when examining the simulator
+        buffer       a pointer to the buffer which will be loaded with the
+                     instruction history returned from the simulator
+ */
+
+int
+sim_panel_get_history (PANEL *panel, 
+                       int count,
+                       size_t size,
+                       char *buffer);
+
+
+/**
+
     When a front panel application needs to change the media
     in a simulated removable media device one of the following 
     routines should be called:
@@ -495,7 +523,7 @@ sim_panel_get_state (PANEL *panel);
 
 /**
 
-    All APIs routines which return an int return 0 for 
+    All API routines which return an int return 0 for 
     success and -1 for an error.  
 
     An API which returns an error (-1), will not change the panel state

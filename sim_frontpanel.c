@@ -199,7 +199,8 @@ struct PANEL {
  *                       thread attempts to write to the socket.
  *                        acquired and released in: _panel_send
  *   io_command_lock     To serialize frontpanel application command requests
- *                        acquired and released in: _panel_get_registers, _panel_sendf
+ *                        acquired and released in: _panel_get_registers, 
+ *                                                  _panel_sendf_completion
  *
  *  Condition Var:  Sync Mutex:  Purpose & Duration:
  *   io_done        io_lock
@@ -1732,6 +1733,43 @@ return 0;
 
 /**
 
+   sim_panel_get_history
+
+        count        the number of instructions to return
+        size         the size (in local storage) of the buffer which will
+                     receive the data returned when examining the simulator
+        buffer       a pointer to the buffer which will be loaded with the
+                     instruction history returned from the simulator
+ */
+
+int
+sim_panel_get_history (PANEL *panel, 
+                       int count,
+                       size_t size,
+                       char *buffer)
+{
+char *response = NULL;
+int cmd_stat;
+
+if (!panel || (panel->State == Error)) {
+    sim_panel_set_error (NULL, "Invalid Panel");
+    return -1;
+    }
+if (panel->State == Run) {
+    sim_panel_set_error (NULL, "Not Halted");
+    return -1;
+    }
+if (_panel_sendf (panel, &cmd_stat, &response, "SHOW HISTORY=%d", count)) {
+    free (response);
+    return -1;
+    }
+strncpy (buffer, response, size);
+free (response);
+return 0;
+}
+
+/**
+
    sim_panel_gen_deposit
 
         name_or_addr the name the simulator knows this register by
@@ -2157,65 +2195,63 @@ while ((p->sock != INVALID_SOCKET) &&
                     if (r)
                         continue;                               /* process next line */
                     }
-                if (!p->io_waiting) {
-                    if (r) {
-                        if (strcmp (s, r->name)) {
+                if (r) {
+                    if (strcmp (s, r->name)) {
+                        unsigned long long data;
+
+                        data = strtoull (e, NULL, 16);
+                        if (little_endian)
+                            memcpy (r->addr, &data, r->size);
+                        else
+                            memcpy (r->addr, ((char *)&data) + sizeof(data)-r->size, r->size);
+                        r = NULL;
+                        }
+                    s = eol;
+                    while (isspace(0xFF & (*s)))
+                        ++s;
+                    continue;                               /* process next line */
+                    }
+                for (i=0; i<p->reg_count; i++) {
+                    if (p->regs[i].element_count == 0) {
+                        if (!strcmp(p->regs[i].name, s)) {
                             unsigned long long data;
 
                             data = strtoull (e, NULL, 16);
                             if (little_endian)
-                                memcpy (r->addr, &data, r->size);
+                                memcpy (p->regs[i].addr, &data, p->regs[i].size);
                             else
-                                memcpy (r->addr, ((char *)&data) + sizeof(data)-r->size, r->size);
-                            r = NULL;
+                                memcpy (p->regs[i].addr, ((char *)&data) + sizeof(data)-p->regs[i].size, p->regs[i].size);
+                            break;
                             }
-                        s = eol;
-                        while (isspace(0xFF & (*s)))
-                            ++s;
-                        continue;                               /* process next line */
                         }
-                    for (i=0; i<p->reg_count; i++) {
-                        if (p->regs[i].element_count == 0) {
-                            if (!strcmp(p->regs[i].name, s)) {
-                                unsigned long long data;
+                    else {
+                        size_t name_len = strlen (p->regs[i].name);
 
-                                data = strtoull (e, NULL, 16);
+                        if ((0 == memcmp (p->regs[i].name, s, name_len)) && (s[name_len] == '[')) {
+                            size_t array_index = (size_t)atoi (s + name_len + 1);
+                            size_t end_index = array_index;
+                            char *end = strchr (s + name_len + 1, '[');
+
+                            if (end)
+                                end_index = (size_t)atoi (end + 1);
+                            if (strcmp (e, " same as above")) 
+                                p->array_element_data = strtoull (e, NULL, 16);
+                            while (array_index <= end_index) {
                                 if (little_endian)
-                                    memcpy (p->regs[i].addr, &data, p->regs[i].size);
+                                    memcpy ((char *)(p->regs[i].addr) + (array_index * p->regs[i].size), &p->array_element_data, p->regs[i].size);
                                 else
-                                    memcpy (p->regs[i].addr, ((char *)&data) + sizeof(data)-p->regs[i].size, p->regs[i].size);
-                                break;
+                                    memcpy ((char *)(p->regs[i].addr) + (array_index * p->regs[i].size), ((char *)&p->array_element_data) + sizeof(p->array_element_data)-p->regs[i].size, p->regs[i].size);
+                                ++array_index;
                                 }
-                            }
-                        else {
-                            size_t name_len = strlen (p->regs[i].name);
-
-                            if ((0 == memcmp (p->regs[i].name, s, name_len)) && (s[name_len] == '[')) {
-                                size_t array_index = (size_t)atoi (s + name_len + 1);
-                                size_t end_index = array_index;
-                                char *end = strchr (s + name_len + 1, '[');
-
-                                if (end)
-                                    end_index = (size_t)atoi (end + 1);
-                                if (strcmp (e, " same as above")) 
-                                    p->array_element_data = strtoull (e, NULL, 16);
-                                while (array_index <= end_index) {
-                                    if (little_endian)
-                                        memcpy ((char *)(p->regs[i].addr) + (array_index * p->regs[i].size), &p->array_element_data, p->regs[i].size);
-                                    else
-                                        memcpy ((char *)(p->regs[i].addr) + (array_index * p->regs[i].size), ((char *)&p->array_element_data) + sizeof(p->array_element_data)-p->regs[i].size, p->regs[i].size);
-                                    ++array_index;
-                                    }
-                                break;
-                                }
+                            break;
                             }
                         }
-                    if (i != p->reg_count) {
-                        s = eol;
-                        while (isspace(0xFF & (*s)))
-                            ++s;
-                        continue;
-                        }
+                    }
+                if (i != p->reg_count) {
+                    s = eol;
+                    while (isspace(0xFF & (*s)))
+                        ++s;
+                    continue;
                     }
                 --e;
                 *e = ':';
@@ -2242,6 +2278,7 @@ while ((p->sock != INVALID_SOCKET) &&
             _panel_debug (p, DBG_RCV, "*Register Block Complete", NULL, 0);
             --p->io_reg_query_pending;
             p->io_waiting = 0;
+            processing_register_output = 0;
             pthread_cond_signal (&p->io_done);
             goto Start_Next_Line;
             }
@@ -2435,6 +2472,8 @@ while ((p->sock != INVALID_SOCKET) &&
             pthread_mutex_lock (&p->io_lock);
             break;
             }
+        if (p->callback)
+            p->callback (p, p->simulation_time_base + p->simulation_time, p->callback_context);
         pthread_mutex_lock (&p->io_lock);
         }
     }
