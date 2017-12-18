@@ -173,9 +173,7 @@ return auto_config (NULL, 0);                           /* autoconfigure */
 
 t_stat show_mapped_addr (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
-uint32 base = (uint32)desc;
-
-fprintf (st, "address=%08X-%08X", base, (int)(base + uptr->capac - 1));
+fprintf (st, "address=%p-%p", desc, ((const char *)desc) + uptr->capac - 1);
 return SCPE_OK;
 }
 
