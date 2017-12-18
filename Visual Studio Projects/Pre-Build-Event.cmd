@@ -201,7 +201,7 @@ if %_VC_VER% GEQ 14 goto _check_new_library
 if %_LIB_VC_VER% LSS 14 goto _done_library
 goto _setup_library
 :_check_new_library
-if %_LIB_VC_VER% GEQ 14 godo _done_library
+if %_LIB_VC_VER% GEQ 14 goto _done_library
 :_setup_library
 if %_VC_VER% LSS 14 set _VCLIB_DIR_=vstudio 2008
 if %_VC_VER% GEQ 14 set _VCLIB_DIR_=vstudio
