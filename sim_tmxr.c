@@ -1979,7 +1979,8 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
                             lp->notelnet = FALSE;
                             tmxr_putc_ln (lp, TN_WONT); 
                             tmxr_putc_ln (lp, tmp); 
-                            lp->telnet_sent_opts[tmp] |= TNOS_WONT;/* Record WONT sent */
+                            if (lp->conn)                       /* Still connected ? */
+                                lp->telnet_sent_opts[tmp] |= TNOS_WONT;/* Record WONT sent */
                             }
                         }
                 case TNS_SKIP: default:                 /* skip char */
