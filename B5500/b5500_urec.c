@@ -40,6 +40,7 @@
 /* Reset after sent to system */
 #define MODE_EOF        (0x40 << UNIT_V_CARD_MODE)
 
+#define TMR_RTC         0
 
 
 /* std devices. data structures
@@ -211,7 +212,7 @@ DEVICE              lpr_dev = {
 
 #if NUM_DEVS_CON > 0
 UNIT                con_unit[] = {
-    {UDATA(con_srv, 0, 0), 0},  /* A */
+    {UDATA(con_srv, UNIT_IDLE, 0), 0},  /* A */
 };
 
 DEVICE              con_dev = {
@@ -849,11 +850,11 @@ lpr_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
    fprintf (st, "     Channel 4:     Skip to next odd line\n");
    fprintf (st, "     Channel 5:     Skip to middle or top of page\n");
    fprintf (st, "     Channel 6:     Skip 1/4 of page\n");
-   fprintf (st, "     Channel 7:     Skip one linee\n");
-   fprintf (st, "     Channel 8:     Skip one linetop of page\n");
-   fprintf (st, "     Channel 9:     Skip one linetop of page\n");
-   fprintf (st, "     Channel 10:    Skip one linetop of page\n");
-   fprintf (st, "     Channel 11:    Skip one linetop of page\n");
+   fprintf (st, "     Channel 7:     Skip one line\n");
+   fprintf (st, "     Channel 8:     Skip one line\n");
+   fprintf (st, "     Channel 9:     Skip one line\n");
+   fprintf (st, "     Channel 10:    Skip one line\n");
+   fprintf (st, "     Channel 11:    Skip one line\n");
    fprintf (st, "     Channel 12:    Skip to top of page\n");
    fprint_set_help(st, dptr);
    fprint_show_help(st, dptr);
@@ -998,7 +999,11 @@ con_srv(UNIT *uptr) {
             }
         }
     }
-    sim_activate(uptr, 1000);
+
+    if (uptr->u5 & (URCSTA_FILL|URCSTA_READ))
+        sim_activate(uptr, 1000);
+    else
+        sim_clock_coschedule_tmr (con_unit, TMR_RTC, 1);
     return SCPE_OK;
 }
 
