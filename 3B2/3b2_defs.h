@@ -124,14 +124,15 @@ noret __libc_longjmp (jmp_buf buf, int val);
 #define C_STACK_FAULT        9
 
 /* Debug flags */
-#define READ_MSG     0x01
-#define WRITE_MSG    0x02
-#define DECODE_MSG   0x04
-#define EXECUTE_MSG  0x08
-#define INIT_MSG     0x10
-#define IRQ_MSG      0x20
-#define IO_D_MSG     0x40
-#define TRACE_MSG    0x80
+#define READ_MSG     0x001
+#define WRITE_MSG    0x002
+#define DECODE_MSG   0x004
+#define EXECUTE_MSG  0x008
+#define INIT_MSG     0x010
+#define IRQ_MSG      0x020
+#define IO_D_MSG     0x040
+#define TRACE_MSG    0x080
+#define ERR_MSG      0x100
 
 /* Data types operated on by instructions. NB: These integer values
    have meaning when decoding instructions, so this is not just an

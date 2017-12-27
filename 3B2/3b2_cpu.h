@@ -85,6 +85,7 @@
  * Opcodes
  */
 typedef enum {
+    HALT    = 0x00, /* Undocumented instruction */
     SPOPRD  = 0x02,
     SPOPD2  = 0x03,
     MOVAW   = 0x04,

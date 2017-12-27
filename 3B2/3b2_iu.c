@@ -302,7 +302,7 @@ t_stat contty_reset(DEVICE *dtpr)
 
     memset(&iu_state, 0, sizeof(IU_STATE));
     memset(&iu_contty, 0, sizeof(IU_PORT));
-    tmxr_set_config_line(&contty_ldsc[0], "115200-8N1");
+    tmxr_set_config_line(&contty_ldsc[0], "9600-8N1");
 
     /* Start the CONTTY polling loop */
     if (!sim_is_active(contty_rcv_unit)) {
