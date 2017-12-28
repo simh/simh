@@ -1309,6 +1309,51 @@ I1620 = ${I1620D}/i1620_cd.c ${I1620D}/i1620_dp.c ${I1620D}/i1620_pt.c \
 	${I1620D}/i1620_fp.c ${I1620D}/i1620_sys.c
 I1620_OPT = -I ${I1620D}
 
+I7000D = I7000
+I7090 = ${I7000D}/i7090_cpu.c ${I7000D}/i7090_sys.c ${I7000D}/i7090_chan.c \
+	${I7000D}/i7090_cdr.c ${I7000D}/i7090_cdp.c ${I7000D}/i7090_lpr.c \
+	${I7000D}/i7000_chan.c ${I7000D}/i7000_mt.c ${I7000D}/i7090_drum.c \
+	${I7000D}/i7090_hdrum.c ${I7000D}/i7000_chron.c ${I7000D}/i7000_dsk.c \
+	${I7000D}/i7000_com.c ${I7000D}/i7000_ht.c 
+I7090_OPT = -I $(I7000D) -DUSE_INT64 -DI7090 -DUSE_SIM_CARD
+
+I7080D = I7000
+I7080 = ${I7000D}/i7080_cpu.c ${I7000D}/i7080_sys.c ${I7000D}/i7080_chan.c \
+	${I7000D}/i7080_drum.c ${I7000D}/i7000_cdp.c ${I7000D}/i7000_cdr.c \
+	${I7000D}/i7000_con.c ${I7000D}/i7000_chan.c ${I7000D}/i7000_lpr.c \
+	${I7000D}/i7000_mt.c ${I7000D}/i7000_chron.c ${I7000D}/i7000_dsk.c \
+	${I7000D}/i7000_com.c ${I7000D}/i7000_ht.c 
+I7080_OPT = -I $(I7000D) -DI7080 -DUSE_SIM_CARD
+
+I7070D = I7000
+I7070 = ${I7000D}/i7070_cpu.c ${I7000D}/i7070_sys.c ${I7000D}/i7070_chan.c \
+	${I7000D}/i7000_cdp.c ${I7000D}/i7000_cdr.c ${I7000D}/i7000_con.c \
+	${I7000D}/i7000_chan.c ${I7000D}/i7000_lpr.c ${I7000D}/i7000_mt.c \
+	${I7000D}/i7000_chron.c ${I7000D}/i7000_dsk.c ${I7000D}/i7000_com.c \
+	${I7000D}/i7000_ht.c 
+I7070_OPT = -I $(I7000D) -DUSE_INT64 -DI7070 -DUSE_SIM_CARD
+
+I7010D = I7000
+I7010 = ${I7000D}/i7010_cpu.c ${I7000D}/i7010_sys.c ${I7000D}/i7010_chan.c \
+	${I7000D}/i7000_cdp.c ${I7000D}/i7000_cdr.c ${I7000D}/i7000_con.c \
+	${I7000D}/i7000_chan.c ${I7000D}/i7000_lpr.c ${I7000D}/i7000_mt.c \
+	${I7000D}/i7000_chron.c ${I7000D}/i7000_dsk.c ${I7000D}/i7000_com.c \
+	${I7000D}/i7000_ht.c 
+I7010_OPT = -I $(I7010D) -DI7010 -DUSE_SIM_CARD
+
+I704D  = I7000
+I704   = ${I7000D}/i7090_cpu.c ${I7000D}/i7090_sys.c ${I7000D}/i7090_chan.c \
+	 ${I7000D}/i7090_cdr.c ${I7000D}/i7090_cdp.c ${I7000D}/i7090_lpr.c \
+	 ${I7000D}/i7000_mt.c ${I7000D}/i7090_drum.c ${I7000D}/i7000_chan.c 
+I704_OPT = -I $(I7000D) -DUSE_INT64 -DI704 -DUSE_SIM_CARD
+
+
+I701D  = I7000
+I701   = ${I7000D}/i701_cpu.c ${I7000D}/i701_sys.c ${I7000D}/i701_chan.c \
+	 ${I7000D}/i7090_cdr.c ${I7000D}/i7090_cdp.c ${I7000D}/i7090_lpr.c \
+	 ${I7000D}/i7000_mt.c ${I7000D}/i7090_drum.c ${I7000D}/i7000_chan.c 
+I701_OPT = -I $(I7000D) -DUSE_INT64 -DI701 -DUSE_SIM_CARD
+
 
 I7094D = I7094
 I7094 = ${I7094D}/i7094_cpu.c ${I7094D}/i7094_cpu1.c ${I7094D}/i7094_io.c \
@@ -1622,7 +1667,7 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 cdc1700 \
 	swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 isys8010 isys8020 \
-	isys8030 isys8024 imds-225 scelbi 3b2
+	isys8030 isys8024 imds-225 scelbi 3b2 i701 i704 i7010 i7070 i7080 i7090
 
 all : ${ALL}
 
@@ -2005,6 +2050,42 @@ ${BIN}b5500${EXE} : ${B5500} ${SIM}
 ${BIN}3b2${EXE} : ${ATT3B2} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${ATT3B2} ${SIM} ${ATT3B2_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+i7090 : $(BIN)i7090$(EXE)
+
+${BIN}i7090${EXE} : ${I7090} ${SIM} 
+	${MKDIRBIN}
+	${CC} ${I7090} ${SIM} ${I7090_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+i7080 : $(BIN)i7080$(EXE)
+
+${BIN}i7080${EXE} : ${I7080} ${SIM} 
+	${MKDIRBIN}
+	${CC} ${I7080} ${SIM} ${I7080_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+i7070 : $(BIN)i7070$(EXE)
+
+${BIN}i7070${EXE} : ${I7070} ${SIM} 
+	${MKDIRBIN}
+	${CC} ${I7070} ${SIM} ${I7070_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+i7010 : $(BIN)i7010$(EXE)
+
+${BIN}i7010${EXE} : ${I7010} ${SIM} 
+	${MKDIRBIN}
+	${CC} ${I7010} ${SIM} ${I7010_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+i704 : $(BIN)i704$(EXE)
+
+${BIN}i704${EXE} : ${I704} ${SIM} 
+	${MKDIRBIN}
+	${CC} ${I704} ${SIM} ${I704_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+i701 : $(BIN)i701$(EXE)
+
+${BIN}i701${EXE} : ${I701} ${SIM} 
+	${MKDIRBIN}
+	${CC} ${I701} ${SIM} ${I701_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
 # Front Panel API Demo/Test program
 

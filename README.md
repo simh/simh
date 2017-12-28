@@ -21,7 +21,9 @@
 
 #### Gerardo Ospina has implemented a Manchester University SSEM (Small Scale Experimental Machine) simulator.
 
-#### Richard Cornwell has implemented a Burroughs B5500 simulator.
+#### Richard Cornwell has implemented a Burroughs B5500.
+
+#### Richard Cornwell has implemented the IBM 701, IBM 704, IBM 7010/1410, IBM 7070/7074, IBM 7080/702/705/7053 and IBM 7090/7094/709/704 simulators.
 
 #### Dave Bryan has implemented an HP-3000 Series III simulator.
 
