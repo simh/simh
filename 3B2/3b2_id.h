@@ -127,10 +127,18 @@
 #define ID_HD72C_HEADS     11
 #define ID_HD72C_LBN       149292
 
+/* The HD135 is actually just an HD161 with only 1024 cylinders
+ * formatted. This is a software limitation, not hardware. */
+
 #define ID_HD135_DTYPE     3
 #define ID_HD135_CYL       1224
 #define ID_HD135_HEADS     15
 #define ID_HD135_LBN       330480
+
+#define ID_HD161_DTYPE     3
+#define ID_HD161_CYL       1224
+#define ID_HD161_HEADS     15
+#define ID_HD161_LBN       330480
 
 #define ID_V_DTYPE         (DKUF_V_UF + 0)
 #define ID_M_DTYPE         3

@@ -131,6 +131,7 @@ static struct id_dtype id_dtab[] = {
     ID_DRV(HD72),
     ID_DRV(HD72C),
     ID_DRV(HD135),
+    ID_DRV(HD161),
     { 0 }
 };
 
@@ -155,6 +156,10 @@ REG id_reg[] = {
     { NULL }
 };
 
+/* HD161 and HD135 are identical; the difference is only in the
+ * software being run on the emulator. SVR 2.0 will support a maximum
+ * of 1024 cylinders, so can only format the first 1024 cylinders of
+ * the HD135. SVR 3.0+ can support all 1224 cylinders of the HD161. */
 MTAB id_mod[] = {
     { MTAB_XTD|MTAB_VUN, ID_HD30_DTYPE, NULL, "HD30",
       &id_set_type, NULL, NULL, "Set HD30 Disk Type" },
@@ -164,6 +169,8 @@ MTAB id_mod[] = {
       &id_set_type, NULL, NULL, "Set HD72C Disk Type" },
     { MTAB_XTD|MTAB_VUN, ID_HD135_DTYPE, NULL, "HD135",
       &id_set_type, NULL, NULL, "Set HD135 Disk Type" },
+    { MTAB_XTD|MTAB_VUN, ID_HD161_DTYPE, NULL, "HD161",
+      &id_set_type, NULL, NULL, "Set HD161 Disk Type" },
     { 0 }
 };
 
@@ -954,7 +961,8 @@ t_stat id_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
     fprintf(st, "  HD30   30.6 MB   3    697     5   18    512     CDC Wren 94155-36\n");
     fprintf(st, "  HD72   73.2 MB   5    925     9   18    512     CDC Wren II 94156-86\n");
     fprintf(st, "  HD72C  72.9 MB   8    754    11   18    512     Fujitsu M2243AS\n");
-    fprintf(st, "  HD135 161.0 MB  11   1224    15   18    512     Maxtor XT1190\n\n");
+    fprintf(st, "  HD135 135.0 MB  11   1024    15   18    512     Maxtor XT1190 (SVR2)\n\n");
+    fprintf(st, "  HD161 161.4 MB  11   1224    15   18    512     Maxtor XT1190 (SVR3+)\n\n");
     fprintf(st, "The drive ID and geometry values are used when low-level formatting a\n");
     fprintf(st, "drive using the AT&T 'idtools' utility.\n");
     return SCPE_OK;
