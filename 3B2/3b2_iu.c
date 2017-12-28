@@ -121,7 +121,7 @@ REG tti_reg[] = {
     { NULL }
 };
 
-UNIT tti_unit = { UDATA(&iu_svc_tti, UNIT_IDLE, 0), TMLN_SPD_9600_BPS };
+UNIT tti_unit = { UDATA(&iu_svc_tti, UNIT_IDLE, 0), TMLN_SPD_19200_BPS };
 
 DEVICE tti_dev = {
     "TTI", &tti_unit, tti_reg, NULL,
@@ -177,6 +177,19 @@ REG contty_reg[] = {
     { NULL }
 };
 
+char *brg_rates[IU_SPEED_REGS][IU_SPEEDS] = {
+    {NULL,    "110",   NULL,   NULL,
+     "300",   NULL,    NULL,   "1200",
+     "2400",  "4800",  NULL,   "9600",
+     "38400", NULL,    NULL,   NULL},
+    {NULL,    "110",   NULL,   NULL,
+     "300",   NULL,    "1200", NULL,
+     NULL,    "2400",  "4800", "9600",
+     "19200", NULL,    NULL,   NULL}
+};
+
+char *parity[3] = {"O", "E", "N"};
+
 UNIT contty_unit[2] = {
     { UDATA(&iu_svc_contty_rcv, UNIT_ATTABLE, 0) },
     { UDATA(&iu_svc_contty_xmt, TT_MODE_8B, 0), SERIAL_OUT_WAIT }
@@ -213,6 +226,12 @@ DEVICE iu_timer_dev = {
     NULL, NULL, NULL, NULL,
     DEV_DEBUG, 0, sys_deb_tab
 };
+
+uint8 brg_reg = 0;       /* Selected baud-rate generator register */
+uint8 brg_clk = 11;      /* Selected baud-rate generator clock */
+uint8 parity_sel = 1;    /* Selected parity */
+uint8 bits_per_char = 7;
+
 
 t_stat contty_attach(UNIT *uptr, CONST char *cptr)
 {
@@ -294,6 +313,8 @@ t_stat tti_reset(DEVICE *dptr)
 
 t_stat contty_reset(DEVICE *dtpr)
 {
+    char line_config[16];
+
     if (contty_ldsc == NULL) {
         contty_desc.ldsc =
             contty_ldsc =
@@ -302,7 +323,17 @@ t_stat contty_reset(DEVICE *dtpr)
 
     memset(&iu_state, 0, sizeof(IU_STATE));
     memset(&iu_contty, 0, sizeof(IU_PORT));
-    tmxr_set_config_line(&contty_ldsc[0], "9600-8N1");
+    brg_reg = 0;
+    brg_clk = BRG_DEFAULT;
+    parity_sel = PARITY_EVEN;
+    bits_per_char = 7;
+
+    sprintf(line_config, "%s-%d%s1",
+            brg_rates[brg_reg][brg_clk],
+            bits_per_char,
+            parity[parity_sel]);
+
+    tmxr_set_config_line(&contty_ldsc[0], line_config);
 
     /* Start the CONTTY polling loop */
     if (!sim_is_active(contty_rcv_unit)) {
@@ -543,6 +574,7 @@ void iu_write(uint32 pa, uint32 val, size_t size)
     uint8 reg;
     uint8 modep;
     uint8 bval = (uint8) val;
+    char  line_config[16];
 
     reg = (uint8) (pa - IUBASE);
 
@@ -553,7 +585,7 @@ void iu_write(uint32 pa, uint32 val, size_t size)
         iu_increment_a = TRUE;
         break;
     case CSRA:
-        /* Set baud rate - not implemented */
+        /* Set baud rate - not yet implemented on console */
         break;
     case CRA:  /* Command A */
         iu_w_cmd(PORT_A, bval);
@@ -584,6 +616,7 @@ void iu_write(uint32 pa, uint32 val, size_t size)
         break;
     case ACR:  /* Auxiliary Control Register */
         iu_state.acr = bval;
+        brg_reg = (bval >> 7) & 1;
         break;
     case IMR:
         iu_state.imr = bval;
@@ -608,11 +641,41 @@ void iu_write(uint32 pa, uint32 val, size_t size)
         modep = iu_contty.modep;
         iu_contty.mode[modep] = bval;
         iu_increment_b = TRUE;
+        if (modep == 0) {
+            if ((bval >> 4) & 1) {
+                /* No parity */
+                parity_sel = PARITY_NONE;
+            } else {
+                /* Parity enabled */
+                if (bval & 4) {
+                    parity_sel = PARITY_ODD;
+                } else {
+                    parity_sel = PARITY_EVEN;
+                }
+            }
+
+            bits_per_char = (bval & 3) + 5;
+        }
         break;
     case CRB:  /* Command B */
         iu_w_cmd(PORT_B, bval);
         break;
     case CSRB:
+        brg_clk = (bval >> 4) & 0xf;
+
+        if (brg_rates[brg_reg][brg_clk] != NULL) {
+            sprintf(line_config, "%s-%d%s1",
+                    brg_rates[brg_reg][brg_clk],
+                    bits_per_char,
+                    parity[parity_sel]);
+
+            sim_debug(EXECUTE_MSG, &contty_dev,
+                      "Setting CONTTY line to %s\n",
+                      line_config);
+
+            tmxr_set_config_line(&contty_ldsc[0], line_config);
+        }
+
         break;
     case THRB: /* TX/RX Buf B */
         /* Loopback mode */

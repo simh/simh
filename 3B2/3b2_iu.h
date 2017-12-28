@@ -41,6 +41,13 @@
 #define CMD_MISC_SHIFT  4                 /* Command */
 #define CMD_MISC_MASK   0x7
 
+#define IU_SPEED_REGS   2                 /* Two speed select registers, */
+#define IU_SPEEDS       16                /* with 16 speeds each */
+
+#define PARITY_ODD      0
+#define PARITY_EVEN     1
+#define PARITY_NONE     2
+
 #define STS_RXR         0x01              /* Receiver ready */
 #define STS_FFL         0x02              /* FIFO full */
 #define STS_TXR         0x04              /* Transmitter ready */
@@ -159,6 +166,10 @@ extern DEVICE iu_timer_dev;
 #define IU_DCDB           0x02
 #define IU_DTRA           0x01
 #define IU_DTRB           0x02
+
+/* Default baud rate generator (9600 baud) */
+#define BRG_DEFAULT       11
+
 
 typedef struct iu_port {
     uint8 stat;               /* Port Status */
