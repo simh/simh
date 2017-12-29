@@ -921,7 +921,7 @@ sim_instr(void)
              }
              /* Hold out until all channels have idled out */
              sim_interval = 0;
-             sim_process_event();
+             (void)sim_process_event();
              chan_proc();
              f = chan_active(0);
              for (shiftcnt = 1; shiftcnt < NUM_CHAN; shiftcnt++)  {

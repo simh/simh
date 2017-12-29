@@ -244,9 +244,10 @@ print_line(UNIT * uptr, int chan, int unit)
             for (; i > 1; i--) {
                 if (uptr->flags & UNIT_ATT)
                     sim_fwrite("\r\n", 1, 2, uptr->fileref);
-                if (uptr->flags & ECHO)
+                if (uptr->flags & ECHO) {
                     sim_putchar('\r');
                     sim_putchar('\n');
+                }
                 uptr->u4++;
                 if (uptr->u4 > (int32)uptr->capac) {
                     uptr->u4 = 1;

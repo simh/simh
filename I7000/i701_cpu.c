@@ -354,7 +354,7 @@ sim_instr(void)
                         f |= chan_active(shiftcnt);
                     }
                     sim_interval = 0;
-                    sim_process_event();
+                    (void)sim_process_event();
                 } while (f);
                 if (reason != 0)
                      IC = MA;
