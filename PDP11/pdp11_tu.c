@@ -25,6 +25,7 @@
 
    tu           TM02/TM03 magtape
 
+   28-Dec-17    RMS     Read tape mark must set Massbus EXC
    13-Mar-17    RMS     Annotated fall through in switch
    23-Oct-13    RMS     Revised for new boot setup routine
    18-Apr-11    MP      Fixed t_addr printouts for 64b big-endian systems
@@ -664,7 +665,7 @@ switch (fnc) {                                          /* case on function */
                 break;
                 }
             } while ((tufc != 0) && !sim_tape_eot (uptr));
-        if (tufc)
+        if (tufc != 0)
             tu_set_er (ER_FCE);
         else tutc = tutc & ~TC_FCS;
         break;
@@ -677,7 +678,7 @@ switch (fnc) {                                          /* case on function */
                 break;
                 }
             } while (tufc != 0);
-        if (tufc)
+        if (tufc != 0)
             tu_set_er (ER_FCE);
         else tutc = tutc & ~TC_FCS;
         break;
@@ -700,8 +701,6 @@ switch (fnc) {                                          /* case on function */
         if ((uptr->UDENS == TC_1600) && sim_tape_bot (uptr))
             tufs = tufs | FS_ID;                        /* PE BOT? ID burst */
         if ((st = sim_tape_rdrecf (uptr, xbuf, &tbc, MT_MAXFR))) {/* read fwd */
-            if (st == MTSE_TMK)                         /* tmk also sets FCE */
-                tu_set_er (ER_FCE);
             r = tu_map_err (drv, st, 1);                /* map error */
             break;                                      /* done */
             }
@@ -764,8 +763,6 @@ switch (fnc) {                                          /* case on function */
     case FNC_WCHKR:                                     /* wcheck = read */
         tufc = 0;                                       /* clear frame count */
         if ((st = sim_tape_rdrecr (uptr, xbuf + 4, &tbc, MT_MAXFR))) {/* read rev */
-            if (st == MTSE_TMK)                         /* tmk also sets FCE */
-                tu_set_er (ER_FCE);
             r = tu_map_err (drv, st, 1);                /* map error */
             break;                                      /* done */
             }
@@ -859,7 +856,9 @@ if (flg & FS_ATA)
 return;
 }
 
-/* Map tape error status */
+/* Map tape error status
+
+   Note that tape mark on a data transfer sets FCE and Massbus EXC */
 
 t_stat tu_map_err (int32 drv, t_stat st, t_bool qdt)
 {
@@ -873,7 +872,11 @@ switch (st) {
         break;
 
     case MTSE_TMK:                                      /* end of file */
-        tufs = tufs | FS_TMK;
+        tufs = tufs | FS_TMK;                           /* set TMK status */
+        if (qdt) {                                      /* data transfer? */
+            tu_set_er (ER_FCE);                         /* set FCE */
+            mba_set_exc (tu_dib.ba);                    /* set exception*/
+        }
         break;
 
     case MTSE_IOERR:                                    /* IO error */
