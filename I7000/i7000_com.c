@@ -1,5 +1,8 @@
 /* i7090_com.c: IBM 7094 7750 communications interface simulator
+   Derived from Bob Supnik's i7094_com.c 
 
+
+   Copyright (c) 2005-2009, Robert M Supnik
    Copyright (c) 2010-2016, Richard Cornwell
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -19,9 +22,10 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Richard Cornwell shall not be
-   used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from Richard Cornwell
+   Except as contained in this notice, the name of Robert Supnik or Richard Cornwell
+   shall not be used in advertising or otherwise to promote the sale, use or other
+   dealings in this Software without prior written authorization from Robert Supnik
+   or Richard Cornwell
 
    com          7750 controller
    coml         7750 lines
