@@ -3365,6 +3365,25 @@ while (sim_isspace (*ip)) {                                 /* skip leading spac
     sim_sub_instr_off[outstr_off++] = ip - instr;
     *op++ = *ip++;
     }
+/* If entire string is within quotes, strip the quotes */
+if ((*ip == '"') || (*ip == '\'')) {                        /* start with a quote character? */
+    const char *cptr = ip;
+    char *tp = op;              /* use remainder of output buffer as temp buffer */
+
+    cptr = get_glyph_quoted (cptr, tp, 0);                  /* get quoted string */
+    while (sim_isspace (*cptr))
+        ++cptr;                                             /* skip over trailing spaces */
+    if (*cptr == '\0') {                                    /* full string was quoted? */
+        uint32 dsize;
+
+        if (SCPE_OK == sim_decode_quoted_string (tp, tp, &dsize)) {
+            while (sim_isspace (*tp))
+                memmove (tp, tp + 1, strlen (tp));
+            strlcpy (ip, tp, instr_size - (ip - instr));/* copy quoted contents to input buffer */
+            strlcpy (sim_sub_instr + (ip -  instr), tp, instr_size - (ip - instr));
+            }
+        }
+    }
 istart = ip;
 for (; *ip && (op < oend); ) {
     if ((ip [0] == '%') && (ip [1] == '%')) {           /* literal % insert? */
