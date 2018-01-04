@@ -732,6 +732,7 @@ static CTAB allowed_remote_cmds[] = {
     { "DIR",      &dir_cmd,           0 },
     { "LS",       &dir_cmd,           0 },
     { "ECHO",     &echo_cmd,          0 },
+    { "ECHOF",    &echof_cmd,         0 },
     { "SET",      &set_cmd,           0 },
     { "SHOW",     &show_cmd,          0 },
     { "HELP",     &x_help_cmd,        0 },
@@ -757,6 +758,7 @@ static CTAB allowed_master_remote_cmds[] = {
     { "DIR",      &dir_cmd,           0 },
     { "LS",       &dir_cmd,           0 },
     { "ECHO",     &echo_cmd,          0 },
+    { "ECHOF",    &echof_cmd,         0 },
     { "SET",      &set_cmd,           0 },
     { "SHOW",     &show_cmd,          0 },
     { "HELP",     &x_help_cmd,        0 },
@@ -785,6 +787,7 @@ static CTAB allowed_single_remote_cmds[] = {
     { "DIR",      &dir_cmd,           0 },
     { "LS",       &dir_cmd,           0 },
     { "ECHO",     &echo_cmd,          0 },
+    { "ECHOF",    &echof_cmd,         0 },
     { "SHOW",     &show_cmd,          0 },
     { "HELP",     &x_help_cmd,        0 },
     { NULL,       NULL }

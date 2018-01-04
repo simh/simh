@@ -1611,14 +1611,56 @@ ASSERT      failure have several different actions:
 #endif
 
 
-#define HLP_ECHO        "*Commands Executing_Command_Files Displaying_Arbitrary_Text"
+#define HLP_ECHO        "*Commands Executing_Command_Files Displaying_Arbitrary_Text ECHO_Command"
        /***************** 80 character line width template *************************/
       "3Displaying Arbitrary Text\n"
-      " The ECHO command is a useful way of annotating command files.  ECHO prints\n"
-      " out its arguments on the console (and log):\n\n"
+      " The ECHO and ECHOF commands are useful ways of annotating command files.\n\n"
+      "4ECHO command\n"
+      " The ECHO command prints out its arguments on the console (and log)\n"
+      " followed by a newline:\n\n"
       "++ECHO <string>      output string to console\n\n"
       " If there is no argument, ECHO prints a blank line on the console.  This\n"
       " may be used to provide spacing in the console display or log.\n"
+       /***************** 80 character line width template *************************/
+#define HLP_ECHOF       "*Commands Executing_Command_Files Displaying_Arbitrary_Text ECHOF_Command"
+       /***************** 80 character line width template *************************/
+      "4ECHOF command\n"
+      " The ECHOF command prints out its arguments on the console (and log)\n"
+      " followed by a newline:\n\n"
+       /***************** 80 character line width template *************************/
+      "++ECHOF {-n} \"<string>\"|<string>   output string to console\n\n"
+      " If there is no argument, ECHOF prints a blank line on the console.\n"
+      " The string argument may be delimited by quote characters.  Quotes may\n"
+      " be either single or double but the opening and closing quote characters\n"
+      " must match.  If the string is enclosed in quotes, the string may\n"
+      " contain escaped character strings which is interpreted as described\n"
+      " in Quoted_String_Data and the resulting string is output.\n\n"
+      " A command alias can be used to replace the ECHO command with the ECHOF\n"
+      " command:\n\n"
+      "++sim> SET ENV ECHO=ECHOF\n"
+      "5Switches\n"
+      " Switches can be used to influence the behavior of ECHOF commands\n\n"
+      "6-n\n"
+      " The -n switch indicates that the supplied string should be output\n"
+      " without a newline after the string is written.\n"
+      "5Quoted String Data\n"
+      " String data enclosed in quotes is transformed interpreting character\n"
+      " escapes.  The following character escapes are explicitly supported:\n"
+      "++\\r  Sends the ASCII Carriage Return character (Decimal value 13)\n"
+      "++\\n  Sends the ASCII Linefeed character (Decimal value 10)\n"
+      "++\\f  Sends the ASCII Formfeed character (Decimal value 12)\n"
+      "++\\t  Sends the ASCII Horizontal Tab character (Decimal value 9)\n"
+      "++\\v  Sends the ASCII Vertical Tab character (Decimal value 11)\n"
+      "++\\b  Sends the ASCII Backspace character (Decimal value 8)\n"
+      "++\\\\  Sends the ASCII Backslash character (Decimal value 92)\n"
+      "++\\'  Sends the ASCII Single Quote character (Decimal value 39)\n"
+      "++\\\"  Sends the ASCII Double Quote character (Decimal value 34)\n"
+      "++\\?  Sends the ASCII Question Mark character (Decimal value 63)\n"
+      "++\\e  Sends the ASCII Escape character (Decimal value 27)\n"
+      " as well as octal character values of the form:\n"
+      "++\\n{n{n}} where each n is an octal digit (0-7)\n"
+      " and hext character values of the form:\n"
+      "++\\xh{h} where each h is a hex digit (0-9A-Fa-f)\n"
        /***************** 80 character line width template *************************/
 #define HLP_SEND        "*Commands Executing_Command_Files Injecting_Console_Input"
        /***************** 80 character line width template *************************/
@@ -1990,6 +2032,7 @@ static CTAB cmd_table[] = {
     { "PROCEED",    &noop_cmd,      0,          HLP_PROCEED },
     { "IGNORE",     &noop_cmd,      0,          HLP_IGNORE },
     { "ECHO",       &echo_cmd,      0,          HLP_ECHO },
+    { "ECHOF",      &echof_cmd,     0,          HLP_ECHOF },
     { "ASSERT",     &assert_cmd,    1,          HLP_ASSERT },
     { "SEND",       &send_cmd,      1,          HLP_SEND },
     { "NOSEND",     &send_cmd,      0,          HLP_SEND },
@@ -2970,6 +3013,29 @@ sim_printf ("%s\n", cptr);
 return SCPE_OK;
 }
 
+/* EchoF command */
+
+t_stat echof_cmd (int32 flag, CONST char *cptr)
+{
+char gbuf[CBUFSIZE];
+uint8 dbuf[CBUFSIZE];
+uint32 dsize = 0;
+
+GET_SWITCHES (cptr);
+if (!*cptr)
+    return SCPE_2FARG;
+if ((*cptr == '"') || (*cptr == '\'')) {
+    cptr = get_glyph_quoted (cptr, gbuf, 0);
+    if (*cptr != '\0')
+        return SCPE_2MARG;              /* No more arguments */
+    if (SCPE_OK != sim_decode_quoted_string (gbuf, dbuf, &dsize))
+        return sim_messagef (SCPE_ARG, "Invalid String\n");
+    cptr = dbuf;
+    }
+sim_printf ("%s%s", cptr, (sim_switches & SWMASK('N')) ? "" : "\n");
+return SCPE_OK;
+}
+
 /* Do command
 
    Syntax: DO {-E} {-V} <filename> {<arguments>...}
@@ -3153,7 +3219,8 @@ do {
         ((cmdp->action != &return_cmd) &&
          (cmdp->action != &goto_cmd) &&
          (cmdp->action != &on_cmd) &&
-         (cmdp->action != &echo_cmd)))
+         (cmdp->action != &echo_cmd) &&
+         (cmdp->action != &echof_cmd)))
         sim_last_cmd_stat = stat;                       /* save command error status */
     switch (stat) {
         case SCPE_AFAIL:
