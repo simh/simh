@@ -942,14 +942,26 @@ while (sim_isspace (*rem->act))                 /* skip spaces */
     rem->act++;
 if (*rem->act == 0)                             /* now empty? */
     return sim_rem_clract (line);
-if ((ep = strchr (rem->act, ';'))) {            /* cmd delimiter? */
+ep = strpbrk (rem->act, ";\"'");                /* search for a semicolon or single or double quote */
+if ((ep != NULL) && (*ep != ';')) {             /* if a quoted string is present */
+    char quote = *ep++;                         /*   then save the opening quotation mark */
+
+    while (ep [0] != '\0' && ep [0] != quote)   /* while characters remain within the quotes */
+        if (ep [0] == '\\' && ep [1] == quote)  /*   if an escaped quote sequence follows */
+            ep = ep + 2;                        /*     then skip over the pair */
+        else                                    /*   otherwise */
+            ep = ep + 1;                        /*     skip the non-quote character */  
+    ep = strchr (ep, ';');                      /* the next semicolon is outside the quotes if it exists */
+    }
+
+if (ep != NULL) {                               /* if a semicolon is present */
     lnt = ep - rem->act;                        /* cmd length */
     memcpy (buf, rem->act, lnt + 1);            /* copy with ; */
     buf[lnt] = 0;                               /* erase ; */
     rem->act += lnt + 1;                        /* adv ptr */
     }
 else {
-    strncpy (buf, rem->act, size);              /* copy action */
+    strlcpy (buf, rem->act, size);              /* copy action */
     rem->act += strlen (rem->act);              /* adv ptr to end */
     }
 return buf;
