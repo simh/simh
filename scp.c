@@ -3030,7 +3030,8 @@ if ((*cptr == '"') || (*cptr == '\'')) {
         return SCPE_2MARG;              /* No more arguments */
     if (SCPE_OK != sim_decode_quoted_string (gbuf, dbuf, &dsize))
         return sim_messagef (SCPE_ARG, "Invalid String\n");
-    cptr = dbuf;
+    dbuf[dsize] = 0;
+    cptr = (char *)dbuf;
     }
 sim_printf ("%s%s", cptr, (sim_switches & SWMASK('N')) ? "" : "\n");
 return SCPE_OK;
@@ -3376,7 +3377,8 @@ if ((*ip == '"') || (*ip == '\'')) {                        /* start with a quot
     if (*cptr == '\0') {                                    /* full string was quoted? */
         uint32 dsize;
 
-        if (SCPE_OK == sim_decode_quoted_string (tp, tp, &dsize)) {
+        if (SCPE_OK == sim_decode_quoted_string (tp, (uint8 *)tp, &dsize)) {
+            tp[dsize] = '\0';
             while (sim_isspace (*tp))
                 memmove (tp, tp + 1, strlen (tp));
             strlcpy (ip, tp, instr_size - (ip - instr));/* copy quoted contents to input buffer */
