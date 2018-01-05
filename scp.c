@@ -10879,7 +10879,8 @@ if (switches & EXP_TYP_REGEX) {
     }
 else {
     sim_data_trace(exp->dptr, exp->dptr->units, (const uint8 *)match, "", strlen(match)+1, "Expect Match String", exp->dbit);
-    sim_decode_quoted_string (match, match_buf, &match_size);
+    /* quoted string was validated above, this decode operation will always succeed */
+    (void)sim_decode_quoted_string (match, match_buf, &match_size);
     ep->match = match_buf;
     ep->size = match_size;
     }
