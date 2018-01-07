@@ -702,14 +702,19 @@ static t_stat x_sampleout_cmd (int32 flag, CONST char *cptr)
 return 4+SCPE_IERR;         /* This routine should never be called */
 }
 
-static t_stat x_step_cmd (int32 flag, CONST char *cptr)
+static t_stat x_execute_cmd (int32 flag, CONST char *cptr)
 {
 return 5+SCPE_IERR;         /* This routine should never be called */
 }
 
-static t_stat x_run_cmd (int32 flag, CONST char *cptr)
+static t_stat x_step_cmd (int32 flag, CONST char *cptr)
 {
 return 6+SCPE_IERR;         /* This routine should never be called */
+}
+
+static t_stat x_run_cmd (int32 flag, CONST char *cptr)
+{
+return 7+SCPE_IERR;         /* This routine should never be called */
 }
 
 static t_stat x_help_cmd (int32 flag, CONST char *cptr);
@@ -751,6 +756,7 @@ static CTAB allowed_master_remote_cmds[] = {
     { "REPEAT",   &x_repeat_cmd,      0 },
     { "COLLECT",  &x_collect_cmd,     0 },
     { "SAMPLEOUT",&x_sampleout_cmd,   0 },
+    { "EXECUTE",  &x_execute_cmd,     0 },
     { "STEP",     &x_step_cmd,        0 },
     { "PWD",      &pwd_cmd,           0 },
     { "SAVE",     &save_cmd,          0 },
@@ -785,6 +791,7 @@ static CTAB allowed_single_remote_cmds[] = {
     { "REPEAT",   &x_repeat_cmd,      0 },
     { "COLLECT",  &x_collect_cmd,     0 },
     { "SAMPLEOUT",&x_sampleout_cmd,   0 },
+    { "EXECUTE",  &x_execute_cmd,     0 },
     { "PWD",      &pwd_cmd,           0 },
     { "DIR",      &dir_cmd,           0 },
     { "LS",       &dir_cmd,           0 },
@@ -799,6 +806,7 @@ static CTAB remote_only_cmds[] = {
     { "REPEAT",   &x_repeat_cmd,      0 },
     { "COLLECT",  &x_collect_cmd,     0 },
     { "SAMPLEOUT",&x_sampleout_cmd,   0 },
+    { "EXECUTE",  &x_execute_cmd,     0 },
     { NULL,       NULL }
     };
 
@@ -1461,7 +1469,7 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
     while (1) {
         if (stat == SCPE_EXIT)
             return stat|SCPE_NOMESSAGE;
-        if (!rem->single_mode) {
+        if ((!rem->single_mode) && (rem->act == NULL)) {
             read_start_time = sim_os_msec();
             if (master_session)
                 tmxr_linemsg (lp, "sim> ");
@@ -1475,26 +1483,24 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
                     if (!master_session)
                         tmxr_linemsgf (lp, "%s%s\n", sim_prompt, rem->buf);
                     else
-                        tmxr_linemsgf (lp, "%s%s\n", sim_is_running ? "SIM> " : "sim> ", rem->buf);
-                    rem->buf_ptr = strlen (rem->repeat_action);
+                        tmxr_linemsgf (lp, "%s%s\n", "SIM> ", rem->buf);
+                    rem->buf_ptr = strlen (rem->buf);
                     got_command = TRUE;
                     break;
                     }
-                else {
-                    if ((rem->repeat_pending) &&            /* New repeat pending */
-                        (rem->act == NULL) &&               /* AND no prior still active */
-                        (!tmxr_input_pending_ln (lp))) {    /* AND no session input pending */
-                        rem->repeat_pending = FALSE;
-                        sim_rem_setact (rem-sim_rem_consoles, rem->repeat_action);
-                        sim_rem_getact (rem-sim_rem_consoles, rem->buf, rem->buf_size);
-                        if (!master_session)
-                            tmxr_linemsgf (lp, "%s%s\n", sim_prompt, rem->buf);
-                        else
-                            tmxr_linemsgf (lp, "%s%s\n", sim_is_running ? "SIM> " : "sim> ", rem->buf);
-                        rem->buf_ptr = strlen (rem->repeat_action);
-                        got_command = TRUE;
-                        break;
-                        }
+                if ((rem->repeat_pending) &&            /* New repeat pending */
+                    (rem->act == NULL) &&               /* AND no prior still active */
+                    (!tmxr_input_pending_ln (lp))) {    /* AND no session input pending */
+                    rem->repeat_pending = FALSE;
+                    sim_rem_setact (rem-sim_rem_consoles, rem->repeat_action);
+                    sim_rem_getact (rem-sim_rem_consoles, rem->buf, rem->buf_size);
+                    if (!master_session)
+                        tmxr_linemsgf (lp, "%s%s\n", sim_prompt, rem->buf);
+                    else
+                        tmxr_linemsgf (lp, "%s%s\n", "SIM> ", rem->buf);
+                    rem->buf_ptr = strlen (rem->buf);
+                    got_command = TRUE;
+                    break;
                     }
                 }
             if (!rem->single_mode) {
@@ -1706,21 +1712,32 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
                                     stat = sim_rem_repeat_cmd_setup (i, &cptr);
                                     }
                                 else {
-                                    if (cmdp->action == &x_collect_cmd) {
-                                        sim_debug (DBG_CMD, &sim_remote_console, "sample_cmd executing\n");
-                                        stat = sim_rem_collect_cmd_setup (i, &cptr);
+                                    if (cmdp->action == &x_execute_cmd) {
+                                        sim_debug (DBG_CMD, &sim_remote_console, "execute_cmd executing\n");
+                                        if (rem->act)
+                                            stat = SCPE_IERR;
+                                        else {
+                                            sim_rem_setact (rem-sim_rem_consoles, cptr);
+                                            stat = SCPE_OK;
+                                            }
                                         }
                                     else {
-                                        if (sim_con_stable_registers && 
-                                            sim_rem_master_mode) {  /* can we process command now? */
-                                            sim_debug (DBG_CMD, &sim_remote_console, "Processing Command directly\n");
-                                            sim_oline = lp;         /* specify output socket */
-                                            sim_remote_process_command ();
-                                            stat = SCPE_OK;         /* any message has already been emitted */
+                                        if (cmdp->action == &x_collect_cmd) {
+                                            sim_debug (DBG_CMD, &sim_remote_console, "collect_cmd executing\n");
+                                            stat = sim_rem_collect_cmd_setup (i, &cptr);
                                             }
                                         else {
-                                            sim_debug (DBG_CMD, &sim_remote_console, "Processing Command via SCPE_REMOTE\n");
-                                            stat = SCPE_REMOTE;     /* force processing outside of sim_instr() */
+                                            if (sim_con_stable_registers && 
+                                                sim_rem_master_mode) {  /* can we process command now? */
+                                                sim_debug (DBG_CMD, &sim_remote_console, "Processing Command directly\n");
+                                                sim_oline = lp;         /* specify output socket */
+                                                sim_remote_process_command ();
+                                                stat = SCPE_OK;         /* any message has already been emitted */
+                                                }
+                                            else {
+                                                sim_debug (DBG_CMD, &sim_remote_console, "Processing Command via SCPE_REMOTE\n");
+                                                stat = SCPE_REMOTE;     /* force processing outside of sim_instr() */
+                                                }
                                             }
                                         }
                                     }
