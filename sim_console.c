@@ -963,6 +963,7 @@ if (ep != NULL) {                               /* if a semicolon is present */
 else {
     strlcpy (buf, rem->act, size);              /* copy action */
     rem->act += strlen (rem->act);              /* adv ptr to end */
+    sim_rem_clract (line);
     }
 return buf;
 }
@@ -1794,7 +1795,7 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
     }
 if (sim_rem_master_was_connected &&                         /* Master mode ever connected? */
     !sim_rem_con_tmxr.ldsc[0].sock)                         /* Master Connection lost? */
-    return SCPE_EXIT;                                       /* simulator has been 'unplugged' */
+    return sim_messagef (SCPE_EXIT, "Master Session Disconnect");/* simulator has been 'unplugged' */
 if (sim_rem_cmd_active_line != -1) {
     if (steps)
         sim_activate(uptr, steps);                          /* check again after 'steps' instructions */
@@ -1998,6 +1999,8 @@ if (sim_rem_master_mode) {
     sim_rem_master_was_enabled = TRUE;
     sim_last_cmd_stat = SCPE_OK;
     while (sim_rem_master_mode) {
+        char *brk_action;
+
         sim_rem_consoles[0].single_mode = FALSE;
         sim_cancel (rem_con_data_unit);
         sim_activate (rem_con_data_unit, -1);
@@ -2006,9 +2009,14 @@ if (sim_rem_master_mode) {
             stat_nomessage = stat & SCPE_NOMESSAGE;         /* extract possible message supression flag */
             stat = _sim_rem_message ("RUN", stat);
             }
-        sim_debug (DBG_MOD, &sim_remote_console, "Master Session Returned: Status - %d Active_Line: %d, Mode: %s, Active Cmd: %s\n", stat, sim_rem_cmd_active_line, sim_rem_consoles[0].single_mode ? "Single" : "^E Stopped", sim_rem_active_command ? sim_rem_active_command->name : "");
+        brk_action = sim_brk_replace_act (NULL);
+        sim_debug (DBG_MOD, &sim_remote_console, "Master Session Returned: Status - %d Active_Line: %d, Mode: %s, Active Cmd: %s%s%s\n", stat, sim_rem_cmd_active_line, sim_rem_consoles[0].single_mode ? "Single" : "^E Stopped", sim_rem_active_command ? sim_rem_active_command->name : "", brk_action ? " Break Action: " : "", brk_action ? brk_action : "");
         if (stat == SCPE_EXIT)
             sim_rem_master_mode = FALSE;
+        if (brk_action) {
+            free (sim_rem_consoles[0].act);
+            sim_rem_consoles[0].act = brk_action;
+            }
         sim_rem_cmd_active_line = 0;                    /* Make it look like */
         sim_rem_consoles[0].single_mode = FALSE;
         if (stat != SCPE_STEP)

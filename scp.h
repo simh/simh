@@ -274,6 +274,7 @@ uint32 sim_brk_test (t_addr bloc, uint32 btyp);
 void sim_brk_clrspc (uint32 spc, uint32 btyp);
 void sim_brk_npc (uint32 cnt);
 void sim_brk_setact (const char *action);
+char *sim_brk_replace_act (char *new_action);
 const char *sim_brk_message(void);
 t_stat sim_send_input (SEND *snd, uint8 *data, size_t size, uint32 after, uint32 delay);
 t_stat sim_show_send_input (FILE *st, const SEND *snd);

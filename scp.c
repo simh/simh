@@ -10557,6 +10557,14 @@ else
     sim_brk_clract ();
 }
 
+char *sim_brk_replace_act (char *new_action)
+{
+char *old_action = sim_brk_act_buf[sim_do_depth];
+
+sim_brk_act_buf[sim_do_depth] = new_action;
+return old_action;
+}
+
 /* New PC */
 
 void sim_brk_npc (uint32 cnt)
