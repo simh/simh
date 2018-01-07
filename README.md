@@ -1,8 +1,6 @@
 # SIMH v4.0 - Beta
 
-[![Coverity Scan Build Status](https://scan.coverity.com/projects/11982/badge.svg)](https://scan.coverity.com/projects/simh)
-
-## WHAT'S NEW
+## WHAT'S NEW                   [![Coverity Scan Build Status](https://scan.coverity.com/projects/11982/badge.svg)](https://scan.coverity.com/projects/simh)
 
 ### New Simulators
 
