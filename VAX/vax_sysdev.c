@@ -294,6 +294,7 @@ int32 ssc_rd (int32 pa);
 void ssc_wr (int32 pa, int32 val, int32 lnt);
 int32 tmr_tir_rd (int32 tmr);
 void tmr_csr_wr (int32 tmr, int32 val);
+int32 tmr_csr_rd (int32 tmr);
 void tmr_sched (int32 tmr);
 void tmr_incr (int32 tmr, uint32 inc);
 int32 tmr0_inta (void);
@@ -1309,9 +1310,7 @@ switch (rg) {
         return txcs_rd ();
 
     case 0x40:                                          /* T0CSR */
-        sim_debug (DBG_REGR, &sysd_dev, "tmr_csr_rd(tmr=%d) - 0x%X", 0, tmr_csr[0]);
-        sim_debug_bits_hdr (DBG_REGR, &sysd_dev, " ", tmr_csr_bits, tmr_csr[0], tmr_csr[0], 1);
-        return tmr_csr[0];
+        return tmr_csr_rd (0);
 
     case 0x41:                                          /* T0INT */
         return tmr_tir_rd (0);
@@ -1325,9 +1324,7 @@ switch (rg) {
         return tmr_tivr[0];
 
     case 0x44:                                          /* T1CSR */
-        sim_debug (DBG_REGR, &sysd_dev, "tmr_csr_rd(tmr=%d) - 0x%X\n", 1, tmr_csr[1]);
-        sim_debug_bits_hdr (DBG_REGR, &sysd_dev, "tmr_csr_rd(tmr=1)", tmr_csr_bits, tmr_csr[1], tmr_csr[1], 1);
-        return tmr_csr[1];
+        return tmr_csr_rd (1);
 
     case 0x45:                                          /* T1INT */
         return tmr_tir_rd (1);
@@ -1512,6 +1509,13 @@ sim_debug (DBG_REGR, &sysd_dev, "tmr_tir_rd(tmr=%d) - 0x%X\n", tmr, tmr_tir[tmr]
 return tmr_tir[tmr];
 }
 
+int32 tmr_csr_rd (int32 tmr)
+{
+sim_debug (DBG_REGR, &sysd_dev, "tmr_csr_rd(tmr=%d) - 0x%X", tmr, tmr_csr[tmr]);
+sim_debug_bits_hdr (DBG_REGR, &sysd_dev, " ", tmr_csr_bits, tmr_csr[tmr], tmr_csr[tmr], 1);
+return tmr_csr[tmr];
+}
+
 void tmr_csr_wr (int32 tmr, int32 val)
 {
 int32 before_tmr_csr;
@@ -1520,20 +1524,23 @@ if ((tmr < 0) || (tmr > 1))
     return;
 
 before_tmr_csr = tmr_csr[tmr];
-sim_debug (DBG_REGW, &sysd_dev, "tmr_csr_wr(tmr=%d) - 0x%X", tmr, val);
+sim_debug (DBG_REGW, &sysd_dev, "tmr_csr_wr(tmr=%d) - Writing 0x%X", tmr, val);
 sim_debug_bits_hdr (DBG_REGW, &sysd_dev, " ", tmr_csr_bits, val, val, 1);
 
 if ((val & TMR_CSR_RUN) == 0) {                         /* clearing run? */
-    sim_cancel (&sysd_unit[tmr]);                       /* cancel timer */
     if (tmr_csr[tmr] & TMR_CSR_RUN)                     /* run 1 -> 0? */
         tmr_tir[tmr] = tmr_tir_rd (tmr);                /* update itr */
+    sim_cancel (&sysd_unit[tmr]);                       /* cancel timer */
     }
 tmr_csr[tmr] = tmr_csr[tmr] & ~(val & TMR_CSR_W1C);     /* W1C csr */
 tmr_csr[tmr] = (tmr_csr[tmr] & ~TMR_CSR_RW) |           /* new r/w */
     (val & TMR_CSR_RW);
-sim_debug_bits_hdr (DBG_REGW, &sysd_dev, "tmr_csr_wr() - Result", tmr_csr_bits, before_tmr_csr, tmr_csr[tmr], 1);
-if (val & TMR_CSR_XFR)                                  /* xfr set? */
+sim_debug (DBG_REGW, &sysd_dev, "tmr_csr_wr(tmr=%d) - ", tmr);
+sim_debug_bits_hdr (DBG_REGW, &sysd_dev, "Result", tmr_csr_bits, before_tmr_csr, tmr_csr[tmr], 1);
+if (val & TMR_CSR_XFR) {                                /* xfr set? */
     tmr_tir[tmr] = tmr_tnir[tmr];
+    sim_debug (DBG_REGW, &sysd_dev, "tmr_csr_wr(tmr=%d) - XFR set TIR=0x%X\n", tmr, tmr_tir[tmr]);
+    }
 if (val & TMR_CSR_RUN)  {                               /* run? */
     if (val & TMR_CSR_XFR)                              /* new tir? */
         sim_cancel (&sysd_unit[tmr]);                   /* stop prev */
@@ -1546,8 +1553,8 @@ else
         if (tmr_tir[tmr] == 0)                          /* if ovflo, */
             tmr_tir[tmr] = tmr_tnir[tmr];               /* reload tir */
         }
-if ((tmr_csr[tmr] & (TMR_CSR_DON | TMR_CSR_IE)) !=      /* update int */
-    (TMR_CSR_DON | TMR_CSR_IE)) {
+if ((before_tmr_csr & (TMR_CSR_DON | TMR_CSR_IE)) &&
+    ((tmr_csr[tmr] & (TMR_CSR_DON | TMR_CSR_IE)) == 0)) {/* update int */
     sim_debug (DBG_INT, &sysd_dev, "tmr_csr_wr(tmr=%d) - CLR_INT\n", tmr);
     if (tmr)
         CLR_INT (TMR1);
@@ -1586,7 +1593,7 @@ if (new_tir < tmr_tir[tmr]) {                           /* ovflo? */
         tmr_sched (tmr);                                /*  reactivate */
         }
     if (tmr_csr[tmr] & TMR_CSR_IE) {                    /* set int req */
-        sim_debug (DBG_INT, &sysd_dev, "tmr_csr_wr(tmr=%d) - SET_INT\n", tmr);
+        sim_debug (DBG_INT, &sysd_dev, "tmr_incr(tmr=%d) - SET_INT\n", tmr);
         if (tmr)
             SET_INT (TMR1);
         else 
@@ -1605,27 +1612,33 @@ else {
 void tmr_sched (int32 tmr)
 {
 uint32 usecs_sched = tmr_tir[tmr] ? (~tmr_tir[tmr] + 1) : 0xFFFFFFFF;
+double usecs_sched_d = tmr_tir[tmr] ? (double)(~tmr_tir[tmr] + 1) : (1.0 + (double)0xFFFFFFFFu);
 
+sim_cancel (&sysd_unit[tmr]);                       /* Make sure not active */
+if (sysd_unit[tmr].usecs_remaining != 0.0)
+    sim_debug (DBG_SCHD, &sysd_dev, "tmr_sched(tmr=%d) - BUG - usecs remaining = %.0f usecs\n", tmr, sysd_unit[tmr].usecs_remaining);
 if ((ADDR_IS_ROM(fault_PC)) &&                      /* running from ROM and */
     (usecs_sched < TMR_INC)) {                      /* short delay? */
     tmr_inst[tmr] = TRUE;                           /* wait for instructions */
-    sim_debug (DBG_SCHD, &sysd_dev, "tmr_sched(tmr=%d) - after %u instructions\n", tmr, usecs_sched);
     sim_activate (&sysd_unit[tmr], usecs_sched);
+    sim_debug (DBG_SCHD, &sysd_dev, "tmr_sched(tmr=%d) - after %u instructions - activate after: %.0f usecs\n", tmr, usecs_sched, sim_activate_time_usecs (&sysd_unit[tmr]));
     }
 else {
     tmr_inst[tmr] = FALSE;
-    sim_debug (DBG_SCHD, &sysd_dev, "tmr_sched(tmr=%d) - after %u usecs\n", tmr, usecs_sched);
-    sim_activate_after (&sysd_unit[tmr], usecs_sched);
+    sim_activate_after_d (&sysd_unit[tmr], usecs_sched_d);
+    sim_debug (DBG_SCHD, &sysd_dev, "tmr_sched(tmr=%d) - after %.0f usecs - activate after: %.0f usecs\n", tmr, usecs_sched_d, sim_activate_time_usecs (&sysd_unit[tmr]));
     }
 }
 
 int32 tmr0_inta (void)
 {
+sim_debug (DBG_INT, &sysd_dev, "tmr0_inta() - Int Ack - Vector=0x%X\n", tmr_tivr[0]);
 return tmr_tivr[0];
 }
 
 int32 tmr1_inta (void)
 {
+sim_debug (DBG_INT, &sysd_dev, "tmr1_inta() - Int Ack - Vector=0x%X\n", tmr_tivr[1]);
 return tmr_tivr[1];
 }
 
