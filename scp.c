@@ -7272,16 +7272,14 @@ if (sim_deb && (sim_deb != stdout) && (sim_deb != sim_log)) {/* debug if enabled
 
 t_stat sim_run_boot_prep (int32 flag)
 {
-UNIT *uptr;
 t_stat r;
 
 sim_interval = 0;                                       /* reset queue */
 sim_time = sim_rtime = 0;
-noqueue_time = 0;
-for (uptr = sim_clock_queue; uptr != QUEUE_LIST_END; uptr = sim_clock_queue) {
-    sim_clock_queue = uptr->next;
-    uptr->next = NULL;
-    }
+noqueue_time = 0;                                       /* reset queue */
+while (sim_clock_queue != QUEUE_LIST_END)
+    sim_cancel (sim_clock_queue);
+noqueue_time = sim_interval = 0;
 r = reset_all (0);
 if ((r == SCPE_OK) && (flag == RU_RUN)) {
     if ((run_cmd_did_reset) && (0 == (sim_switches & SWMASK ('Q')))) {
