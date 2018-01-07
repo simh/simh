@@ -10003,6 +10003,7 @@ if (nptr != QUEUE_LIST_END)
     nptr->time += (uptr->next) ? 0 : uptr->time;
 if (!uptr->next)
     uptr->time = 0;
+uptr->usecs_remaining = 0;
 if (sim_clock_queue != QUEUE_LIST_END)
     sim_interval = sim_clock_queue->time;
 else sim_interval = noqueue_time = NOQUEUE_WAIT;
