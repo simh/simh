@@ -959,6 +959,14 @@ static const char simh_help[] =
       "+++++++++D MQ 0\n"
       "++BREAK 100;                 delete action on break at 100\n\n"
        /***************** 80 character line width template *************************/
+#define HLP_DEBUG       "*Commands Stopping_The_Simulator User_Specified_Stop_Conditions DEBUG"
+#define HLP_NODEBUG     "*Commands Stopping_The_Simulator User_Specified_Stop_Conditions DEBUG"
+      "4Debug\n"
+      " The DEBUG snd NODEBUG commands are aliases for the \"SET DEBUG\" and\n"
+      " \"SET NODEBUG\" commands.  Additionally, support is provided that is\n"
+      " equivalent to the \"SET <dev> DEBUG=opt1{;opt2}\" and\n"
+      " \"SET <dev> NODEBUG=opt1{;opt2}\" commands.\n\n"
+       /***************** 80 character line width template *************************/
       "2Connecting and Disconnecting Devices\n"
       " Except for main memory and network devices, units are simulated as\n"
       " unstructured binary disk files in the host file system.  Before using a\n"
@@ -1998,6 +2006,8 @@ static CTAB cmd_table[] = {
     { "BOOT",       &run_cmd,       RU_BOOT,    HLP_BOOT,       NULL, &run_cmd_message },
     { "BREAK",      &brk_cmd,       SSH_ST,     HLP_BREAK },
     { "NOBREAK",    &brk_cmd,       SSH_CL,     HLP_NOBREAK },
+    { "DEBUG",      &debug_cmd,     1,          HLP_DEBUG},
+    { "NODEBUG",    &debug_cmd,     0,          HLP_NODEBUG },
     { "ATTACH",     &attach_cmd,    0,          HLP_ATTACH },
     { "DETACH",     &detach_cmd,    0,          HLP_DETACH },
     { "ASSIGN",     &assign_cmd,    0,          HLP_ASSIGN },
@@ -5828,6 +5838,25 @@ stat = sim_dir_scan (sname, sim_copy_entry, &copy_state);
 if ((stat == SCPE_OK) && (copy_state.count))
     return sim_messagef (SCPE_OK, "      %3d file(s) copied\n", copy_state.count);
 return copy_state.stat;
+}
+
+/* Debug command */
+
+t_stat debug_cmd (int32 flg, CONST char *cptr)
+{
+char gbuf[CBUFSIZE];
+CONST char *svptr;
+DEVICE *dptr;
+
+GET_SWITCHES (cptr);                                    /* get switches */
+cptr = get_glyph (svptr = cptr, gbuf, 0);               /* get next glyph */
+if ((dptr = find_dev (gbuf)))                           /* device match? */
+return set_dev_debug (dptr, NULL, flg, *cptr ? cptr : NULL);
+cptr = svptr;
+if (flg)
+    return sim_set_debon (0, cptr);
+else
+    return sim_set_deboff (0, cptr);
 }
 
 /* Breakpoint commands */

@@ -771,6 +771,8 @@ static CTAB allowed_master_remote_cmds[] = {
     { "NOBREAK",  &brk_cmd,      SSH_CL },
     { "EXPECT",   &expect_cmd,        1 },
     { "NOEXPECT", &expect_cmd,        0 },
+    { "DEBUG",    &debug_cmd,         1 },
+    { "NODEBUG",  &debug_cmd,         0 },
     { "SEND",     &send_cmd,          0 },
     { NULL,       NULL }
     };
@@ -2204,7 +2206,6 @@ char gbuf[CBUFSIZE];
 t_stat r;
 time_t now;
 
-sim_deb_switches = sim_switches;                        /* save debug switches */
 if ((cptr == NULL) || (*cptr == 0))                     /* need arg */
     return SCPE_2FARG;
 cptr = get_glyph_nc (cptr, gbuf, 0);                    /* get file name */
@@ -2215,6 +2216,7 @@ r = sim_open_logfile (gbuf, FALSE, &sim_deb, &sim_deb_ref);
 if (r != SCPE_OK)
     return r;
 
+sim_deb_switches = sim_switches;                        /* save debug switches */
 if (sim_deb_switches & SWMASK ('R')) {
     clock_gettime(CLOCK_REALTIME, &sim_deb_basetime);
     if (!(sim_deb_switches & (SWMASK ('A') | SWMASK ('T'))))

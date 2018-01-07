@@ -109,6 +109,7 @@ t_stat screenshot_cmd (int32 flag, CONST char *ptr);
 t_stat spawn_cmd (int32 flag, CONST char *ptr);
 t_stat echo_cmd (int32 flag, CONST char *ptr);
 t_stat echof_cmd (int32 flag, CONST char *ptr);
+t_stat debug_cmd (int32 flag, CONST char *ptr);
 
 /* Allow compiler to help validate printf style format arguments */
 #if !defined __GNUC__
