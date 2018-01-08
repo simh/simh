@@ -5575,9 +5575,7 @@ if (dir) {
 #endif
     t_offset FileSize;
     char FileName[PATH_MAX + 1];
-#if defined (HAVE_FNMATCH)
     char *MatchName = 1 + strrchr (cptr, '/');;
-#endif
     char *p_name;
     struct tm *local;
 #if defined (HAVE_GLOB)
@@ -5591,6 +5589,9 @@ if (dir) {
     while ((ent = readdir (dir))) {
 #if defined (HAVE_FNMATCH)
         if (fnmatch(MatchName, ent->d_name, 0))
+            continue;
+#else
+        if (strcmp(MatchName, ent->d_name) != 0)
             continue;
 #endif
         sprintf (FileName, "%s/%s", DirName, ent->d_name);
