@@ -798,6 +798,8 @@ static CTAB allowed_single_remote_cmds[] = {
     { "ECHO",     &echo_cmd,          0 },
     { "ECHOF",    &echof_cmd,         0 },
     { "SHOW",     &show_cmd,          0 },
+    { "DEBUG",    &debug_cmd,         1 },
+    { "NODEBUG",  &debug_cmd,         0 },
     { "HELP",     &x_help_cmd,        0 },
     { NULL,       NULL }
     };
@@ -1398,12 +1400,14 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
             sim_is_running = 0;
             sim_rem_collect_all_registers ();
             sim_stop_timer_services ();
-            for (j=0; j < sim_rem_con_tmxr.lines; j++) {
-                TMLN *lpj = &sim_rem_con_tmxr.ldsc[j];
-                if ((i == j) || (!lpj->conn))
-                    continue;
-                tmxr_linemsgf (lpj, "\nRemote Master Console(%s) Entering Commands\n", lp->ipad);
-                tmxr_send_buffered_data (lpj);     /* flush any buffered data */
+            if (rem->act == NULL) {
+                for (j=0; j < sim_rem_con_tmxr.lines; j++) {
+                    TMLN *lpj = &sim_rem_con_tmxr.ldsc[j];
+                    if ((i == j) || (!lpj->conn))
+                        continue;
+                    tmxr_linemsgf (lpj, "\nRemote Master Console(%s) Entering Commands\n", lp->ipad);
+                    tmxr_send_buffered_data (lpj);     /* flush any buffered data */
+                    }
                 }
             }
         }
