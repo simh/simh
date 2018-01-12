@@ -153,9 +153,9 @@ struct PANEL {
     pthread_mutex_t         io_send_lock;
     pthread_mutex_t         io_command_lock;
     int                     command_count;
-    int                     io_reg_query_pending;
     int                     io_waiting;
     char                    *io_response;
+    char                    *halt_reason;
     size_t                  io_response_data;
     size_t                  io_response_size;
     const char              *completion_string;
@@ -177,6 +177,7 @@ struct PANEL {
     FILE                    *Debug;
 #if defined(_WIN32)
     HANDLE                  hProcess;
+    DWORD                   dwProcessId;
 #else
     pid_t                   pidProcess;
 #endif
@@ -221,7 +222,7 @@ static const char *register_collect_mid3 = " percent ";
 static const char *register_get_postfix = "sampleout";
 static const char *register_get_start = "# REGISTERS-START";
 static const char *register_get_end = "# REGISTERS-DONE";
-static const char *register_repeat_start = "# REGISTERS-REPEAT-START\r";
+static const char *register_repeat_start = "# REGISTERS-REPEAT-START";
 static const char *register_repeat_end = "# REGISTERS-REPEAT-DONE";
 static const char *register_dev_echo = "# REGISTERS-FOR-DEVICE:";
 static const char *register_ind_echo = "# REGISTER-INDIRECT:";
@@ -408,9 +409,9 @@ pthread_mutex_lock (&p->io_lock);
 while (p->sock != INVALID_SOCKET) {
     pthread_mutex_unlock (&p->io_lock);
     msleep (1000);
+    pthread_mutex_lock (&p->io_lock);
     if (0 == (sleeps++)%flush_interval)
         sim_panel_flush_debug (p);
-    pthread_mutex_lock (&p->io_lock);
     }
 pthread_mutex_unlock (&p->io_lock);
 pthread_mutex_lock (&p->io_lock);
@@ -484,7 +485,7 @@ size_t i, j, buf_data, buf_needed = 0, reg_count = 0, bit_reg_count = 0;
 const char *dev;
 
 pthread_mutex_lock (&panel->io_lock);
-buf_needed = 3 + 
+buf_needed = 3 + 7 +                        /* EXECUTE */
              strlen (register_get_start) +  /* # REGISTERS-START */
              strlen (register_get_prefix);  /* SHOW TIME */
 for (i=0; i<panel->reg_count; i++) {
@@ -492,7 +493,7 @@ for (i=0; i<panel->reg_count; i++) {
         ++bit_reg_count;
     else {
         ++reg_count;
-        buf_needed += 9 + strlen (panel->regs[i].name) + (panel->regs[i].device_name ? strlen (panel->regs[i].device_name) : 0);
+        buf_needed += 10 + strlen (panel->regs[i].name) + (panel->regs[i].device_name ? strlen (panel->regs[i].device_name) : 0);
         if (panel->regs[i].element_count > 0)
             buf_needed += 4 + 6 /* 6 digit register array index */;
         if (panel->regs[i].indirect)
@@ -514,7 +515,7 @@ if (buf_needed > *buf_size) {
     }
 buf_data = 0;
 if (reg_count) {
-    sprintf (*buf + buf_data, "%s\r%s\r", register_get_start, register_get_prefix);
+    sprintf (*buf + buf_data, "EXECUTE %s;%s;", register_get_start, register_get_prefix);
     buf_data += strlen (*buf + buf_data);
     }
 dev = "";
@@ -536,7 +537,7 @@ for (i=j=0; i<panel->reg_count; i++) {
         strcpy (tbuf, *buf);
         free (*buf);
         *buf = tbuf;
-        sprintf (*buf + buf_data, "%s%s%s\r", (i == 0)? "" : "\r", register_dev_echo, reg_dev);
+        sprintf (*buf + buf_data, "%s%s%s;", (i == 0)? "" : ";", register_dev_echo, reg_dev);
         buf_data += strlen (*buf + buf_data);
         dev = reg_dev;
         j = 0;
@@ -544,21 +545,21 @@ for (i=j=0; i<panel->reg_count; i++) {
         }
     if (panel->regs[i].element_count == 0) {
         if (j == 0)
-            sprintf (*buf + buf_data, "E -H %s %s", dev, panel->regs[i].name);
+            sprintf (*buf + buf_data, "E -16 %s %s", dev, panel->regs[i].name);
         else
             sprintf (*buf + buf_data, ",%s", panel->regs[i].name);
         }
     else {
         if (j == 0)
-            sprintf (*buf + buf_data, "E -H %s %s[0:%d]", dev, panel->regs[i].name, (int)(panel->regs[i].element_count-1));
+            sprintf (*buf + buf_data, "E -16 %s %s[0:%d]", dev, panel->regs[i].name, (int)(panel->regs[i].element_count-1));
         else
             sprintf (*buf + buf_data, ",%s[0:%d]", panel->regs[i].name, (int)(panel->regs[i].element_count-1));
         }
     ++j;
     buf_data += strlen (*buf + buf_data);
     }
-if (buf_data && ((*buf)[buf_data-1] != '\r')) {
-    strcpy (*buf + buf_data, "\r");
+if (buf_data && ((*buf)[buf_data-1] != ';')) {
+    strcpy (*buf + buf_data, ";");
     buf_data += strlen (*buf + buf_data);
     }
 for (i=j=0; i<panel->reg_count; i++) {
@@ -566,13 +567,13 @@ for (i=j=0; i<panel->reg_count; i++) {
 
     if ((!panel->regs[i].indirect) || (panel->regs[i].bits))
         continue;
-    sprintf (*buf + buf_data, "%s%s\rE -H %s %s,$\r", register_ind_echo, panel->regs[i].name, reg_dev, panel->regs[i].name);
+    sprintf (*buf + buf_data, "%s%s;E -16 %s %s,$;", register_ind_echo, panel->regs[i].name, reg_dev, panel->regs[i].name);
     buf_data += strlen (*buf + buf_data);
     }
 if (bit_reg_count) {
     strcpy (*buf + buf_data, register_get_postfix);
     buf_data += strlen (*buf + buf_data);
-    strcpy (*buf + buf_data, "\r");
+    strcpy (*buf + buf_data, ";");
     buf_data += strlen (*buf + buf_data);
     }
 strcpy (*buf + buf_data, register_get_end);
@@ -855,6 +856,7 @@ if (!simulator_panel) {
     if (CreateProcessA(NULL, cmd, NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &StartupInfo, &ProcessInfo)) {
         CloseHandle (ProcessInfo.hThread);
         p->hProcess = ProcessInfo.hProcess;
+        p->dwProcessId = ProcessInfo.dwProcessId;
         }
     else { /* Creation Problem */
         sim_panel_set_error (NULL, "CreateProcess Error: %d", GetLastError());
@@ -1074,6 +1076,8 @@ if (panel) {
     pthread_cond_destroy (&panel->io_done);
 #if defined(_WIN32)
     if (panel->hProcess) {
+        GenerateConsoleCtrlEvent (CTRL_BREAK_EVENT, panel->dwProcessId);
+        msleep (200);
         TerminateProcess (panel->hProcess, 0);
         WaitForSingleObject (panel->hProcess, INFINITE);
         CloseHandle (panel->hProcess);
@@ -1106,6 +1110,7 @@ if (panel) {
     free (panel->regs);
     free (panel->reg_query);
     free (panel->io_response);
+    free (panel->halt_reason);
     free (panel->simulator_version);
     if ((panel->Debug) && (!panel->parent))
         fclose (panel->Debug);
@@ -1353,12 +1358,9 @@ if (panel->reg_query_size != _panel_send (panel, panel->reg_query, panel->reg_qu
     pthread_mutex_unlock (&panel->io_command_lock);
     return -1;
     }
-while (panel->io_reg_query_pending != 0) {
-    pthread_mutex_unlock (&panel->io_lock);
-    msleep (100);
-    pthread_mutex_lock (&panel->io_lock);
-    }
-++panel->io_reg_query_pending;
+if (panel->io_response_data)
+    _panel_debug (panel, DBG_RCV, "Receive Data Discarded: ", panel->io_response, panel->io_response_data);
+panel->io_response_data = 0;
 panel->io_waiting = 1;
 while (panel->io_waiting)
     pthread_cond_wait (&panel->io_done, &panel->io_lock);
@@ -1372,7 +1374,7 @@ return 0;
 int
 sim_panel_get_registers (PANEL *panel, unsigned long long *simulation_time)
 {
-return _panel_get_registers (panel, 0, simulation_time);
+return _panel_get_registers (panel, (panel->State == Halt), simulation_time);
 }
 
 int
@@ -1472,6 +1474,15 @@ if (panel->State == Run) {
 return 0;
 }
 
+const char *
+sim_panel_halt_text (PANEL *panel)
+{
+if (!panel || !panel->halt_reason)
+    return "";
+return panel->halt_reason;
+}
+
+
 int
 sim_panel_exec_boot (PANEL *panel, const char *device)
 {
@@ -1538,7 +1549,7 @@ if ((simtime = strstr (response, "Time:"))) {
     }
 free (response);
 panel->simulation_time_base += panel->simulation_time;
-if (_panel_sendf_completion (panel, NULL, "Simulator Running...", "RUN -Q\r", 5)) {
+if (_panel_sendf_completion (panel, NULL, "Simulator Running...", "RUN\r", 5)) {
     _panel_debug (panel, DBG_THR, "Unable to start simulator: %s", NULL, 0, sim_panel_get_error());
     return -1;
     }
@@ -1764,6 +1775,40 @@ if (_panel_sendf (panel, &cmd_stat, &response, "SHOW HISTORY=%d", count)) {
     return -1;
     }
 strncpy (buffer, response, size);
+free (response);
+return 0;
+}
+
+int
+sim_panel_device_debug_mode (PANEL *panel, 
+                             const char *device,
+                             int set_unset,
+                             const char *mode_bits)
+{
+char *response = NULL;
+int cmd_stat;
+
+if (!panel || (panel->State == Error)) {
+    sim_panel_set_error (NULL, "Invalid Panel");
+    return -1;
+    }
+if (_panel_sendf (panel, &cmd_stat, &response, "SHOW %s", device) ||
+    (cmd_stat)) {
+    sim_panel_set_error (NULL, "Can't %s Debug Mode: '%s' on Device '%s': %s", 
+                               set_unset ? "Enable" : "Disable", mode_bits ? mode_bits : "", device, response);
+    free (response);
+    return -1;
+    }
+free (response);
+response = NULL;
+if (_panel_sendf (panel, &cmd_stat, &response, "%sDEBUG %s %s", 
+                         set_unset ? "" : "NO", device, mode_bits ? mode_bits : "") ||
+    (cmd_stat)) {
+    sim_panel_set_error (NULL, "Can't %s Debug Mode: '%s' on Device '%s': %s", 
+                               set_unset ? "Enable" : "Disable", mode_bits ? mode_bits : "", device, response);
+    free (response);
+    return -1;
+    }
 free (response);
 return 0;
 }
@@ -2069,7 +2114,7 @@ struct sched_param sched_priority;
 char buf[4096];
 int buf_data = 0;
 int processing_register_output = 0;
-int io_wait_done;
+int io_wait_done = 0;
 
 /* 
    Boost Priority for this response processing thread to quickly digest 
@@ -2119,18 +2164,20 @@ while ((p->sock != INVALID_SOCKET) &&
     int new_data;
     char *s, *e, *eol;
 
-    pthread_mutex_unlock (&p->io_lock);
-    new_data = sim_read_sock (p->sock, &buf[buf_data], sizeof(buf)-(buf_data+1));
-    pthread_mutex_lock (&p->io_lock);
-    if (new_data <= 0) {
-        sim_panel_set_error (NULL, "%s", sim_get_err_sock("Unexpected socket read"));
-        _panel_debug (p, DBG_RCV, "%s", NULL, 0, sim_panel_get_error());
-        p->State = Error;
-        break;
+    if (NULL == strchr (buf, '\n')) {
+        pthread_mutex_unlock (&p->io_lock);
+        new_data = sim_read_sock (p->sock, &buf[buf_data], sizeof(buf)-(buf_data+1));
+        pthread_mutex_lock (&p->io_lock);
+        if (new_data <= 0) {
+            sim_panel_set_error (NULL, "%s", sim_get_err_sock("Unexpected socket read"));
+            _panel_debug (p, DBG_RCV, "%s", NULL, 0, sim_panel_get_error());
+            p->State = Error;
+            break;
+            }
+        _panel_debug (p, DBG_RCV, "Received %d bytes: ", &buf[buf_data], new_data, new_data);
+        buf_data += new_data;
+        buf[buf_data] = '\0';
         }
-    _panel_debug (p, DBG_RCV, "Received %d bytes: ", &buf[buf_data], new_data, new_data);
-    buf_data += new_data;
-    buf[buf_data] = '\0';
     s = buf;
     while ((eol = strchr (s, '\n'))) {
         /* Line to process */
@@ -2258,72 +2305,72 @@ while ((p->sock != INVALID_SOCKET) &&
                 /* Unexpected Register Data Found (or other output containing a : character) */
                 }
             }
-        if (!strcmp (s + strlen (sim_prompt), register_repeat_end)) {
-            _panel_debug (p, DBG_RCV, "*Repeat Block Complete", NULL, 0);
+        if ((strlen (s) > strlen (sim_prompt)) && (!strcmp (s + strlen (sim_prompt), register_repeat_end))) {
+            _panel_debug (p, DBG_RCV, "*Repeat Block Complete (Accumulated Data = %d)", NULL, 0, (int)p->io_response_data);
             if (p->callback) {
                 pthread_mutex_unlock (&p->io_lock);
                 p->callback (p, p->simulation_time_base + p->simulation_time, p->callback_context);
                 pthread_mutex_lock (&p->io_lock);
                 }
             processing_register_output = 0;
+            p->io_response_data = 0;
+            p->io_response[p->io_response_data] = '\0';
             goto Start_Next_Line;
             }
-        if ((!strcmp (s + strlen (sim_prompt), register_repeat_start)) ||
-            (!strcmp (s + strlen (sim_prompt), register_get_start))) {
+        if ((strlen (s) > strlen (sim_prompt)) && 
+            ((!strcmp (s + strlen (sim_prompt), register_repeat_start)) ||
+             (!strcmp (s + strlen (sim_prompt), register_get_start)))) {
             _panel_debug (p, DBG_RCV, "*Repeat/Register Block Starting", NULL, 0);
             processing_register_output = 1;
             goto Start_Next_Line;
             }
-        if (!strcmp (s + strlen (sim_prompt), register_get_end)) {
+        if ((strlen (s) > strlen (sim_prompt)) && 
+            (!strcmp (s + strlen (sim_prompt), register_get_end))) {
             _panel_debug (p, DBG_RCV, "*Register Block Complete", NULL, 0);
-            --p->io_reg_query_pending;
             p->io_waiting = 0;
             processing_register_output = 0;
             pthread_cond_signal (&p->io_done);
             goto Start_Next_Line;
             }
-        if (!strcmp (s + strlen (sim_prompt), command_done_echo)) {
+        if ((strlen (s) > strlen (sim_prompt)) && (!strcmp (s + strlen (sim_prompt), command_done_echo))) {
             _panel_debug (p, DBG_RCV, "*Received Command Complete", NULL, 0);
             p->io_waiting = 0;
             pthread_cond_signal (&p->io_done);
             goto Start_Next_Line;
             }
         /* Non Register Data Found (echo of EXAMINE or other commands and/or command output) */
-        if (p->io_waiting) {
-            char *t;
+        if (p->io_response_data + strlen (s) + 3 > p->io_response_size) {
+            char *t = (char *)_panel_malloc (p->io_response_data + strlen (s) + 3);
 
-            if (p->io_response_data + strlen (s) + 3 > p->io_response_size) {
-                t = (char *)_panel_malloc (p->io_response_data + strlen (s) + 3);
-                if (t == NULL) {
-                    _panel_debug (p, DBG_RCV, "%s", NULL, 0, sim_panel_get_error());
-                    p->State = Error;
-                    break;
-                    }
-                memcpy (t, p->io_response, p->io_response_data);
-                free (p->io_response);
-                p->io_response = t;
-                p->io_response_size = p->io_response_data + strlen (s) + 3;
-                }
-            _panel_debug (p, DBG_RCV, "Receive Data Accumulated: '%s'", NULL, 0, s);
-            strcpy (p->io_response + p->io_response_data, s);
-            p->io_response_data += strlen(s);
-            strcpy (p->io_response + p->io_response_data, "\r\n");
-            p->io_response_data += 2;
-            if ((!p->parent) && 
-                (p->completion_string) && 
-                (!memcmp (s, p->completion_string, strlen (p->completion_string)))) {
-                _panel_debug (p, DBG_RCV, "Match with potentially coalesced additional data: '%s'", NULL, 0, p->completion_string);
+            if (t == NULL) {
+                _panel_debug (p, DBG_RCV, "%s", NULL, 0, sim_panel_get_error());
+                p->State = Error;
                 break;
                 }
+            memcpy (t, p->io_response, p->io_response_data);
+            free (p->io_response);
+            p->io_response = t;
+            p->io_response_size = p->io_response_data + strlen (s) + 3;
             }
-        else
-            _panel_debug (p, DBG_RCV, "Receive Data Discarded: '%s'", NULL, 0, s);
+        _panel_debug (p, DBG_RCV, "Receive Data Accumulated: '%s'", NULL, 0, s);
+        strcpy (p->io_response + p->io_response_data, s);
+        p->io_response_data += strlen(s);
+        strcpy (p->io_response + p->io_response_data, "\r\n");
+        p->io_response_data += 2;
+        if ((!p->parent) && 
+            (p->completion_string) && 
+            (!memcmp (s, p->completion_string, strlen (p->completion_string)))) {
+            _panel_debug (p, DBG_RCV, "Match with potentially coalesced additional data: '%s'", NULL, 0, p->completion_string);
+            if (eol < &buf[buf_data])
+                memset (s + strlen (s), ' ', eol - (s + strlen (s)));
+            break;
+            }
 Start_Next_Line:
         s = eol;
         while (isspace(0xFF & (*s)))
             ++s;
         }
-    memmove (buf, s, strlen (s) + 1);
+    memmove (buf, s, buf_data - (s - buf) + 1);
     buf_data = strlen (buf);
     if (buf_data)
         _panel_debug (p, DBG_RSP, "Remnant Buffer Contents: '%s'", NULL, 0, buf);
@@ -2337,28 +2384,36 @@ Start_Next_Line:
         _panel_debug (p, DBG_RSP, "State transitioning to Run", NULL, 0);
         p->State = Run;
         buf_data -= 20;
-        buf[buf_data] = '\0';
         if (buf_data) {
-            memmove (buf, buf + 20, strlen (buf + 20) + 1);
-            buf_data = strlen (buf);
+            memmove (buf, buf + 20, buf_data + 1);
             _panel_debug (p, DBG_RSP, "Remnant Buffer Contents: '%s'", NULL, 0, buf);
-            if (io_wait_done) {                     /* someone waiting for this? */
-                _panel_debug (p, DBG_RCV, "*Match Command Complete - Match signaling waiting thread", NULL, 0);
-                io_wait_done = 0;
-                p->io_waiting = 0;
-                p->completion_string = NULL;
-                pthread_cond_signal (&p->io_done);
-                /* Let this state transition propagate to the interested thread(s) */
-                /* before processing remaining buffered data */
-                pthread_mutex_unlock (&p->io_lock);
-                msleep (100);
-                pthread_mutex_lock (&p->io_lock);
-                }
+            }
+        else
+            buf[buf_data] = '\0';
+        if (io_wait_done) {                     /* someone waiting for this? */
+            _panel_debug (p, DBG_RCV, "*Match Command Complete - Match signaling waiting thread", NULL, 0);
+            io_wait_done = 0;
+            p->io_waiting = 0;
+            p->completion_string = NULL;
+            pthread_cond_signal (&p->io_done);
+            /* Let this state transition propagate to the interested thread(s) */
+            /* before processing remaining buffered data */
+            pthread_mutex_unlock (&p->io_lock);
+            msleep (100);
+            pthread_mutex_lock (&p->io_lock);
             }
         }
     if ((p->State == Run) && (!strcmp (buf, sim_prompt))) {
-        _panel_debug (p, DBG_RSP, "State transitioning to Halt", NULL, 0);
+        _panel_debug (p, DBG_RSP, "State transitioning to Halt: io_wait_done: %d", NULL, 0, io_wait_done);
         p->State = Halt;
+        free (p->halt_reason);
+        p->halt_reason = (char *)_panel_malloc (1 + strlen (p->io_response));
+        if (p->halt_reason == NULL) {
+            _panel_debug (p, DBG_RCV, "%s", NULL, 0, sim_panel_get_error());
+            p->State = Error;
+            break;
+            }
+        strcpy (p->halt_reason, p->io_response);
         }
     if (io_wait_done) {
         _panel_debug (p, DBG_RCV, "*Match Command Complete - Match signaling waiting thread", NULL, 0);
@@ -2426,43 +2481,40 @@ while ((p->sock != INVALID_SOCKET) &&
     msleep (500);
     pthread_mutex_lock (&p->io_lock);
     if (new_register) {
-        if (p->io_reg_query_pending == 0) {
-            size_t repeat_data = strlen (register_repeat_prefix) +  /* prefix */
-                                 20                              +  /* max int width */
-                                 strlen (register_repeat_units)  +  /* units and spacing */
-                                 buf_data                        +  /* command contents */
-                                 1                               +  /* carriage return */
-                                 strlen (register_repeat_start)  +  /* auto repeat begin */
-                                 1                               +  /* carriage return */
-                                 strlen (register_repeat_end)    +  /* auto repeat completion */
-                                 1                               +  /* carriage return */
-                                 1;                                 /* NUL */
-            char *repeat = (char *)malloc (repeat_data);
-            char *c;
+        size_t repeat_data = strlen (register_repeat_prefix) +  /* prefix */
+                             20                              +  /* max int width */
+                             strlen (register_repeat_units)  +  /* units and spacing */
+                             buf_data                        +  /* command contents */
+                             1                               +  /* ; */
+                             strlen (register_repeat_start)  +  /* auto repeat begin */
+                             1                               +  /* ; */
+                             strlen (register_repeat_end)    +  /* auto repeat completion */
+                             1                               +  /* carriage return */
+                             1;                                 /* NUL */
+        char *repeat = (char *)malloc (repeat_data);
+        char *c;
 
-            sprintf (repeat, "%s%d%s%s%*.*s", register_repeat_prefix, 
-                                         p->usecs_between_callbacks, 
-                                         register_repeat_units, 
-                                         register_repeat_start,
-                                         (int)buf_data, (int)buf_data, buf);
-            pthread_mutex_unlock (&p->io_lock);
-            for (c = strchr (repeat, '\r'); c != NULL; c = strchr (c, '\r'))
-                *c = ';';                               /* replace carriage returns with semicolons */
-            c = strstr (repeat, register_get_end);      /* remove register_done_echo string and */
-            if (c)                                      /* always true */
-                strcpy (c, register_repeat_end);        /* replace it with the register_repeat_end string */
-            if (_panel_sendf (p, &cmd_stat, NULL, "%s", repeat)) {
-                pthread_mutex_lock (&p->io_lock);
-                free (repeat);
-                break;
-                }
+        c = strstr (buf, register_get_start);       /* remove register_get_start string and anything before it */
+        if (c) {                                    /* always true */
+            buf_data -= (c - buf) + strlen (register_get_start);
+            c += strlen (register_get_start);
+            }
+        sprintf (repeat, "%s%d%s%s%*.*s", register_repeat_prefix, 
+                                     p->usecs_between_callbacks, 
+                                     register_repeat_units, 
+                                     register_repeat_start,
+                                     (int)buf_data, (int)buf_data, c);
+        pthread_mutex_unlock (&p->io_lock);
+        c = strstr (repeat, register_get_end);      /* remove register_done_echo string and */
+        if (c)                                      /* always true */
+            strcpy (c, register_repeat_end);        /* replace it with the register_repeat_end string */
+        if (_panel_sendf (p, &cmd_stat, NULL, "%s", repeat)) {
             pthread_mutex_lock (&p->io_lock);
             free (repeat);
+            break;
             }
-        else {                              /* already busy */
-            p->new_register = 1;            /* retry later */
-            _panel_debug (p, DBG_XMT, "Waiting on prior command completion before specifying repeat interval", NULL, 0);
-            }
+        pthread_mutex_lock (&p->io_lock);
+        free (repeat);
         }
     /* when halted, we directly poll the halted system to get updated */
     /* register state which may have changed due to panel activities */
@@ -2545,7 +2597,7 @@ while (1) {                                         /* format passed string, arg
     if (len >= (int)(sim_panel_error_bufsize-1)) {
         free (sim_panel_error_buf);
         sim_panel_error_bufsize = sim_panel_error_bufsize * 2;
-        while ((int)sim_panel_error_bufsize < len + 1)
+        while ((int)sim_panel_error_bufsize < len + 2)
             sim_panel_error_bufsize = sim_panel_error_bufsize * 2;
         sim_panel_error_buf = (char *) malloc (sim_panel_error_bufsize);
         if (sim_panel_error_buf == NULL) {
@@ -2610,6 +2662,8 @@ if (completion_status || completion_string) {
         }
     pthread_mutex_lock (&p->io_lock);
     p->completion_string = completion_string;
+    if (p->io_response_data)
+        _panel_debug (p, DBG_RCV, "Receive Data Discarded: ", p->io_response, p->io_response_data);
     p->io_response_data = 0;
     p->io_waiting = 1;
     }

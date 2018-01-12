@@ -56,7 +56,7 @@ extern "C" {
 
 #if !defined(__VAX)         /* Unsupported platform */
 
-#define SIM_FRONTPANEL_VERSION   11
+#define SIM_FRONTPANEL_VERSION   12
 
 /**
 
@@ -284,6 +284,19 @@ sim_panel_exec_run (PANEL *panel);
 int
 sim_panel_exec_step (PANEL *panel);
 
+
+
+/**
+    A simulator often displays some useful information as it stops
+    executing instructions.
+
+    sim_panel_halt_text     - Returns the simulator output immediately prior 
+                              to the most recent transition to the Halt state.
+ */
+
+const char *
+sim_panel_halt_text (PANEL *panel);
+
 /**
 
     When a front panel application wants to describe conditions that 
@@ -470,6 +483,34 @@ sim_panel_get_history (PANEL *panel,
                        int count,
                        size_t size,
                        char *buffer);
+
+
+/**
+
+    A front panel application might want some details of simulator
+    and/or device behavior that is provided by a particular simulator 
+    via debug information.  Debugging for particular device(s)
+    and/or simulator debug settings can be controlled via the
+    sim_panel_device_debug_mode API.
+ */
+
+/**
+
+   sim_panel_device_debug_mode
+
+        device       the device whose debug mode is to change
+        set_untset   1 to set debug flags, 0 to clear debug flags
+        mode_bits    character string with different debug mode bits 
+                     to enable or disable.  An empty string will
+                     enable or disable all mode bits for the specified 
+                     device
+ */
+
+int
+sim_panel_device_debug_mode (PANEL *panel, 
+                             const char *device,
+                             int set_unset,
+                             const char *mode_bits);
 
 
 /**
