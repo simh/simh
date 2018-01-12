@@ -1,6 +1,6 @@
                            SIMH/HP 3000 RELEASE NOTES
                            ==========================
-                             Last update: 2017-09-07
+                             Last update: 2018-01-12
 
 
 This file documents the release history of the Hewlett-Packard 3000 simulator.
@@ -47,7 +47,7 @@ General Information
 The simulator passes the HP 32230 offline diagnostic suite with some expected
 failures due to unimplemented features.  For example, the disc diagnostic
 error-correction logic tests and the tape diagnostic CRCC and LRCC tests fail,
-as these features are not supported.  However, all features that are required
+as these features are not simulated.  However, all features that are required
 for MPE operation pass their respective diagnostic tests.
 
 The simulator has been tested with MPE-V/R version E.01.00.  Specifically:
@@ -173,6 +173,79 @@ the MPE version used:
    file remains internally consistent.  A memory patch is impossible, but
    workarounds are to increase the code segment limit before running DPAN4 and
    to restore DPAN4.PUB.SYS from the FOS tape if it has been damaged.
+
+
+
+=====================
+Release 7, 2018-01-12
+=====================
+
+This release of the HP 3000 simulator adds the following features:
+
+ - Reading and writing to terminal sessions connected to the ATC have been
+   improved significantly.  File uploads via Telnet using the Reflection
+   terminal emulator are now over 100 times faster than before, e.g., the
+   transfer time for a one-megabyte file has decreased from 69 minutes to 30
+   seconds.  Block mode reads show similar speed improvements.  Copy-and-paste
+   into the terminal window, Reflection file downloads, and output to the
+   terminal window in REMOTEACK mode show speed improvements of five to fifteen
+   times.  Output in LOCALACK mode has been improved by around 50%.
+
+ - Information regarding Reflection file transfers and serial port disconnection
+   options has been added to Section 4.1.1, "Terminal Data Interface," of the HP
+   3000 Simulator User's Guide.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - File transfer using the Reflection terminal emulator requires an 8-bit data
+   path.  To achieve this, the session must use MPE terminal type 12 (this may
+   be configured either during a system reload or by specifying the TERM=12
+   parameter when logging on with :HELLO), and the channel must be set to 8B,
+   REMOTEACK, and NOCAPSLOCK modes.  Note that MPE's default terminal type 10
+   writes 7-bit data with odd parity, and characters with the parity bit on may
+   be displayed by the terminal emulator as extended characters in the Roman-8
+   symbol set.  To avoid a garbled display when using the TERM=12 parameter to
+   override the default, the channel should be set to 8B mode after logging on
+   and back to 7B after logging off.
+
+ - The MPE-V/R software kit has been updated to increase the number of terminal
+   buffers per port from 3 to 5.  Using the default of 3 may cause the system
+   to report "MPE Table TBUF has overflowed!!!" to the system console while
+   performing Reflection file uploads.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  Serial port output stalls are not handled properly.
+
+     VERSION:  Release 6.
+
+     OBSERVATION:  The ATCD device supports I/O via host serial ports as well as
+     via Telnet connections.  While output via Telnet works correctly, output
+     via serial ports fails.  Attempting to output to the ATCD results in a few
+     characters written, and then the line hangs.  Sometimes pressing ENTER at
+     the system console (ATCD channel 0) causes a few more characters to appear
+     on the serial terminal.  Eventually, the line hangs permanently.
+
+     CAUSE:  The terminal multiplexer library (sim_tmxr.c, part of the SIMH
+     framework) had provided a 256-byte output buffer for each line, independent
+     of the connection type (Telnet or serial).  The library was changed to
+     reduce the serial buffer size to one byte.  If the library output routine
+     receives the second character before the first one has been written to the
+     serial port, it returns SCPE_STALL status to indicate a buffer overflow.
+     The ATCD simulation correctly responds to this status by rescheduling the
+     output attempt.  However, it fails to call the "tmxr_poll_tx" routine to
+     write to the serial port, so the rescheduled attempt fails as well.
+
+     RESOLUTION:  Modify "line_service" (hp3000_atc.c) to call "tmxr_poll_tx" if
+     a buffer overflow occurs.
+
+     STATUS:  Fixed in Release 7.
 
 
 
