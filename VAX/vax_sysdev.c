@@ -1615,8 +1615,6 @@ uint32 usecs_sched = tmr_tir[tmr] ? (~tmr_tir[tmr] + 1) : 0xFFFFFFFF;
 double usecs_sched_d = tmr_tir[tmr] ? (double)(~tmr_tir[tmr] + 1) : (1.0 + (double)0xFFFFFFFFu);
 
 sim_cancel (&sysd_unit[tmr]);                       /* Make sure not active */
-if (sysd_unit[tmr].usecs_remaining != 0.0)
-    sim_debug (DBG_SCHD, &sysd_dev, "tmr_sched(tmr=%d) - BUG - usecs remaining = %.0f usecs\n", tmr, sysd_unit[tmr].usecs_remaining);
 if ((ADDR_IS_ROM(fault_PC)) &&                      /* running from ROM and */
     (usecs_sched < TMR_INC)) {                      /* short delay? */
     tmr_inst[tmr] = TRUE;                           /* wait for instructions */
