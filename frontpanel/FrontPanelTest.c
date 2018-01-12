@@ -44,6 +44,35 @@
 #define usleep(n) Sleep(n/1000)
 #else
 #include <unistd.h>
+#if defined(HAVE_NCURSES)
+#include <ncurses.h>
+#define fgets(buf, n, f) (OK == getnstr(buf, n))
+#define printf my_printf
+static void my_printf (const char *fmt, ...)
+{
+va_list arglist;
+int len;
+static char *buf = NULL;
+static int buf_size = 0;
+char *c;
+
+while (1) {
+    va_start (arglist, fmt);
+    len = vsnprintf (buf, buf_size, fmt, arglist);
+    va_end (arglist);
+    if (len < 0)
+        return;
+    if (len < buf_size)
+        break;
+    buf = realloc (buf, len + 2);
+    buf_size = len + 1;
+    buf[buf_size] = '\0';
+    }
+while (c = strstr (buf, "\r\n"))
+    memmove (c, c + 1, strlen (c));
+printw ("%s", buf);
+}
+#endif /* HAVE_NCURSES */
 #endif
 const char *sim_path = 
 #if defined(_WIN32)
@@ -56,8 +85,8 @@ const char *sim_config =
             "VAX-PANEL.ini";
 
 /* Registers visible on the Front Panel */
-unsigned int PC, SP, FP, AP, PSL, R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, atPC;
-unsigned int PCQ[32];
+static unsigned int PC, SP, FP, AP, PSL, R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, atPC;
+static unsigned int PCQ[32];
 
 int PSL_bits[32];
 int PC_bits[32];
@@ -78,44 +107,72 @@ update_display = 1;
 }
 
 static void
-DisplayRegisters (PANEL *panel)
+DisplayRegisters (PANEL *panel, int get_pos, int set_pos)
 {
 char buf1[100], buf2[100], buf3[100], buf4[100];
 static const char *states[] = {"Halt", "Run "};
 
-buf1[sizeof(buf1)-1] = buf2[sizeof(buf2)-1] = buf3[sizeof(buf3)-1] = 0;
-sprintf (buf1, "%4s PC: %08X   SP: %08X   AP: %08X   FP: %08X  @PC: %08X\r\n", states[sim_panel_get_state (panel)], PC, SP, AP, FP, atPC);
-sprintf (buf2, "PSL: %08X                               Instructions Executed: %lld\r\n", PSL, simulation_time);
-sprintf (buf3, "R0:%08X  R1:%08X  R2:%08X  R3:%08X   R4:%08X   R5:%08X\r\n", R0, R1, R2, R3, R4, R5);
-sprintf (buf4, "R6:%08X  R7:%08X  R8:%08X  R9:%08X  R10:%08X  R11:%08X\r\n", R6, R7, R8, R9, R10, R11);
+buf1[sizeof(buf1)-1] = buf2[sizeof(buf2)-1] = buf3[sizeof(buf3)-1] = buf4[sizeof(buf4)-1] = 0;
+sprintf (buf1, "%4s PC: %08X   SP: %08X   AP: %08X   FP: %08X  @PC: %08X\n", states[sim_panel_get_state (panel)], PC, SP, AP, FP, atPC);
+sprintf (buf2, "PSL: %08X                               Instructions Executed: %lld\n", PSL, simulation_time);
+sprintf (buf3, "R0:%08X  R1:%08X  R2:%08X  R3:%08X   R4:%08X   R5:%08X\n", R0, R1, R2, R3, R4, R5);
+sprintf (buf4, "R6:%08X  R7:%08X  R8:%08X  R9:%08X  R10:%08X  R11:%08X\n", R6, R7, R8, R9, R10, R11);
 #if defined(_WIN32)
 if (1) {
     static HANDLE out = NULL;
-    CONSOLE_SCREEN_BUFFER_INFO info;
-    static COORD origin;
+    static CONSOLE_SCREEN_BUFFER_INFO info;
+    static COORD origin = {0, 0};
     int written;
 
     if (out == NULL)
         out = GetStdHandle (STD_OUTPUT_HANDLE);
-    GetConsoleScreenBufferInfo (out, &info);
+    if (get_pos)
+        GetConsoleScreenBufferInfo (out, &info);
     SetConsoleCursorPosition (out, origin);
     WriteConsoleA(out, buf1, strlen(buf1), &written, NULL);
     WriteConsoleA(out, buf2, strlen(buf2), &written, NULL);
     WriteConsoleA(out, buf3, strlen(buf3), &written, NULL);
     WriteConsoleA(out, buf4, strlen(buf4), &written, NULL);
-    SetConsoleCursorPosition (out, info.dwCursorPosition);
+    if (set_pos)
+        SetConsoleCursorPosition (out, info.dwCursorPosition);
     }
+#else
+if (1) {
+#if defined(HAVE_NCURSES)
+    static int row, col;
+
+    if (get_pos)
+        getyx (stdscr, row, col);
+    wmove (stdscr, 0, 0);
 #else
 #define ESC "\033"
 #define CSI ESC "["
-printf (CSI "s");   /* Save Cursor Position */
-printf (CSI "H");   /* Position to Top of Screen (1,1) */
-printf ("%s", buf1);
-printf ("%s", buf2);
-printf ("%s", buf3);
-printf ("%s", buf4);
-printf (CSI "s");   /* Restore Cursor Position */
-printf ("\r\n");
+    if (get_pos)
+        printf (CSI "s");   /* Save Cursor Position */
+    printf (CSI "H");   /* Position to Top of Screen (1,1) */
+#endif /* HAVE_NCURSES */
+    printf ("%s", buf1);
+    printf ("%s", buf2);
+    printf ("%s", buf3);
+    printf ("%s", buf4);
+#if defined(HAVE_NCURSES)
+    if (set_pos)
+        wmove (stdscr, row, col);   /* Restore Cursor Position */
+    wrefresh (stdscr);
+#else
+    if (set_pos)
+        printf (CSI "s");   /* Restore Cursor Position */
+    printf ("\r\n");
+#endif /* HAVE_NCURSES */
+    }
+#endif
+}
+
+static
+void CleanupDisplay (void)
+{
+#if (!defined(_WIN32)) && defined(HAVE_NCURSES)
+endwin ();
 #endif
 }
 
@@ -125,11 +182,25 @@ void InitDisplay (void)
 #if defined(_WIN32)
 system ("cls");
 #else
+#if defined(HAVE_NCURSES)
+int max_height = 0, max_width = 0;
+
+initscr ();
+wclear (stdscr);
+scrollok (stdscr, 1);
+getmaxyx(stdscr, max_height, max_width);
+setscrreg(5, max_height - 1);
+#else /* HAVE_NCURSES */
 printf (CSI "H");   /* Position to Top of Screen (1,1) */
 printf (CSI "2J");  /* Clear Screen */
 #endif
+#endif
 printf ("\n\n\n\n");
 printf ("^C to Halt, Commands: BOOT, CONT, EXIT, BREAK, NOBREAK, EXAMINE, HISTORY\n");
+#if (!defined(_WIN32)) && defined(HAVE_NCURSES)
+wrefresh (stdscr);
+#endif
+atexit (CleanupDisplay);
 }
 
 volatile int halt_cpu = 0;
@@ -151,7 +222,7 @@ FILE *f;
 if ((f = fopen (sim_config, "w"))) {
     if (debug) {
         fprintf (f, "set verbose\n");
-        fprintf (f, "set debug -n -a simulator.dbg\n");
+        fprintf (f, "set debug -n -a -p simulator.dbg\n");
         fprintf (f, "set cpu simhalt\n");
         fprintf (f, "set remote telnet=2226\n");
         fprintf (f, "set rem-con debug=XMT;RCV;MODE;REPEAT;CMD\n");
@@ -260,7 +331,7 @@ if (sim_panel_add_register (panel, "FP",  "CPU", sizeof(FP), &FP)) {
     printf ("Error adding register 'FP': %s\n", sim_panel_get_error());
     goto Done;
     }
-if (sim_panel_add_register (panel, "AP",  NULL, sizeof(SP), &AP)) {
+if (sim_panel_add_register (panel, "AP",  NULL, sizeof(AP), &AP)) {
     printf ("Error adding register 'AP': %s\n", sim_panel_get_error());
     goto Done;
     }
@@ -359,10 +430,6 @@ if (sim_panel_set_display_callback_interval (panel, &DisplayCallback, NULL, 2000
     printf ("Error setting automatic display callback: %s\n", sim_panel_get_error());
     goto Done;
     }
-if (!sim_panel_get_registers (panel, NULL)) {
-    printf ("Unexpected success getting register data: %s\n", sim_panel_get_error());
-    goto Done;
-    }
 sim_panel_clear_error ();
 if (!sim_panel_dismount (panel, "RL0")) {
     printf ("Unexpected success while dismounting media file from non mounted RL0: %s\n", sim_panel_get_error());
@@ -393,11 +460,15 @@ if (sim_panel_break_output_clear (panel, "\"32..31..30\"")) {
     printf ("Unexpected error clearing an output breakpoint: %s\n", sim_panel_get_error());
     goto Done;
     }
-if (sim_panel_break_output_set (panel, "-P \"Normal operation not possible.\"")) {
+if (sim_panel_break_output_set (panel, "-P \"Normal operation not possible.\" SHOW QUEUE")) {
     printf ("Unexpected error establishing an output breakpoint: %s\n", sim_panel_get_error());
     goto Done;
     }
 if (sim_panel_break_output_set (panel, "-P \"Device? [XQA0]: \"")) {
+    printf ("Unexpected error establishing an output breakpoint: %s\n", sim_panel_get_error());
+    goto Done;
+    }
+if (sim_panel_break_output_set (panel, "-P \"(1..15): \" SEND \"4\\r\"; GO")) {
     printf ("Unexpected error establishing an output breakpoint: %s\n", sim_panel_get_error());
     goto Done;
     }
@@ -451,6 +522,10 @@ if (1) {
         }
     if (sim_panel_exec_run(panel)) {
         printf ("Error starting simulator execution: %s\n", sim_panel_get_error());
+        goto Done;
+        }
+    if (!sim_panel_get_registers (panel, NULL)) {
+        printf ("Unexpected success getting register data: %s\n", sim_panel_get_error());
         goto Done;
         }
     mstime = 0;
@@ -515,7 +590,28 @@ if (1) {
         printf ("State not Halt after successful Halt\n");
         goto Done;
         }
+    if (sim_panel_device_debug_mode (panel, "DZ", 1, NULL)) {
+        printf ("Can't enable Debug for DZ device: %s\n", sim_panel_get_error());
+        goto Done;
+        }
+    if (sim_panel_device_debug_mode (panel, "DZ", 0, "REG")) {
+        printf ("Can't enable REG Debug for DZ device: %s\n", sim_panel_get_error());
+        goto Done;
+        }
+    if (!sim_panel_device_debug_mode (panel, "DZ", 0, "REGZZZ")) {
+        printf ("Unexpected success disabling REGZZZ Debug for DZ device\n");
+        goto Done;
+        }
+    if (!sim_panel_device_debug_mode (panel, "ZZZDZ", 1, NULL)) {
+        printf ("Unexpected success enabling Debug for ZZZDZ device\n");
+        goto Done;
+        }
+    if (sim_panel_device_debug_mode (panel, "DZ", 0, NULL)) {
+        printf ("Can't disable All Debug for DZ device: %s\n", sim_panel_get_error());
+        goto Done;
+        }
     }
+sim_panel_clear_error ();
 return 0;
 
 Done:
@@ -551,9 +647,27 @@ if (arg)
 return (i > 0) && (arg ? 1 : (string[i] == '\0'));
 }
 
+struct execution_breakpoint {
+    unsigned int addr;
+    const char *desc;
+    const char *extra;
+    } breakpoints[] = {
+        {0x2004EAD3, "test 52 failure path"},
+        {0x2004E6EC, "Test 52: de_programmable_timers.lis line 228 - Generic Error Dispatch",                       "SHOW HIST=10; EX SYSD STATE"},
+        {0x2004E7F9, "Test 52: de_programmable_timers.lis line 381 - Interrupt Did Not Occur",                      "SHOW HIST=10; EX SYSD STATE"},
+        {0x2004E97C, "Test 53: Subtest 05 - clock failed to tick within at least 100 ms. - de_toy.lis line 232",    "SHOW HIST=10; EX SYSD STATE"},
+        {0x2004E9BB, "Test 53: Subtest 07 - Time of year clock is not ticking - de_toy.lis line 274",               "SHOW HIST=10; EX SYSD STATE"},
+        {0x2004E9D3, "Test 53: Subtest 08 - Time of year clock is not ticking - de_toy.lis line 295",               "SHOW HIST=10; EX SYSD STATE"},
+        {0x2004EA2D, "Test 53: Subtest 09 - Running Slow - de_toy.lis line 359",                                    "SHOW HIST=10; EX SYSD STATE"},
+        {0x2004EA39, "Test 53: Subtest 0A - Running Fast - de_toy.lis line 366",                                    "SHOW HIST=10; EX SYSD STATE"},
+        {0x0, NULL}
+    };
+
 int
 main (int argc, char **argv)
 {
+int was_halted = 1, i;
+
 if ((argc > 1) && ((!strcmp("-d", argv[1])) || (!strcmp("-D", argv[1])) || (!strcmp("-debug", argv[1]))))
     debug = 1;
 
@@ -605,53 +719,52 @@ if (1) {
     sim_panel_destroy (panel);
     }
 sim_panel_clear_error ();
-InitDisplay();
-if (panel_setup())
+InitDisplay ();
+if (panel_setup ())
     goto Done;
-if (sim_panel_break_set (panel, "2004EAD3")) {
-    printf ("Error establishing breakpoint at test 52 failure path: %s\n", sim_panel_get_error());
-    goto Done;
-    }
-if (sim_panel_break_set (panel, "2004E6EC")) {  /* de_programmable_timers.lis line 228 */
-    printf ("Error establishing breakpoint at test 52 failure path programmable_timers.lis line 228: %s\n", sim_panel_get_error());
-    goto Done;
-    }
-if (sim_panel_break_set (panel, "2004E7F9")) {  /* de_programmable_timers.lis line 228 */
-    printf ("Error establishing breakpoint at test 52 failure path programmable_timers.lis line 381: %s\n", sim_panel_get_error());
-    goto Done;
-    }
-if (sim_panel_break_set (panel, "2004E97C")) {  /* Error clock failed to tick within at least 100 ms. - line 232 - Subtest 5 */
-    printf ("Error establishing breakpoint at Error clock failed to tick within at least 100 ms. - line 232 - Subtest 5: %s\n", sim_panel_get_error());
-    goto Done;
-    }
-if (sim_panel_break_set (panel, "2004E9BB")) {  /* Time of year clock is not ticking - line 274 - Subtest 7 */
-    printf ("Error establishing breakpoint at Time of year clock is not ticking - line 274 - Subtest 7: %s\n", sim_panel_get_error());
-    goto Done;
-    }
-if (sim_panel_break_set (panel, "2004E9D3")) {  /* Time of year clock is not ticking - line 295 - Subtest 8 */
-    printf ("Error establishing breakpoint at Time of year clock is not ticking - line 295 - Subtest 8: %s\n", sim_panel_get_error());
-    goto Done;
-    }
-if (sim_panel_break_set (panel, "2004EA2D")) {  /* Running Slow - line 359 - Subtest 9 */
-    printf ("Error establishing breakpoint at Running Slow - line 359 - Subtest 9: %s\n", sim_panel_get_error());
-    goto Done;
-    }
-if (sim_panel_break_set (panel, "2004EA39")) {  /* Running Fast - line 366 - Subtest 10 */
-    printf ("Error establishing breakpoint at the third test 53 failure path: %s\n", sim_panel_get_error());
-    goto Done;
+for (i=0; breakpoints[i].addr; i++) {
+    char buf[120];
+
+    sprintf (buf, "%08X;SHOW QUEUE%s%s", breakpoints[i].addr, breakpoints[i].extra ? ";" : "", breakpoints[i].extra ? breakpoints[i].extra : "");
+    if (sim_panel_break_set (panel, buf)) {
+        printf ("Error establishing breakpoint at %s: %s\n", breakpoints[i].desc, sim_panel_get_error());
+        goto Done;
+        }
     }
 sim_panel_debug (panel, "Testing with Command interface");
+DisplayRegisters(panel, 1, 1);
 while (1) {
     char cmd[512];
     const char *arg;
 
     while (sim_panel_get_state (panel) == Halt) {
-        DisplayRegisters (panel);
+        sim_panel_debug (panel, "Halted - Getting registers...");
+        sim_panel_get_registers (panel, &simulation_time);
+        if (!was_halted) {
+            const char *haltmsg = sim_panel_halt_text (panel);
+            const char *bpt;
+            unsigned int Bpt_PC;
+
+            DisplayRegisters (panel, 0, 1);
+            if (*haltmsg)
+                printf ("%s", haltmsg);
+            if ((bpt = strstr (haltmsg, "Breakpoint, PC: "))) {
+                sscanf (bpt, "Breakpoint, PC: %X", &Bpt_PC);
+                for (i=0; breakpoints[i].addr; i++) {
+                    if (Bpt_PC == breakpoints[i].addr) {
+                        printf ("Breakpoint at: %08X %s\n", breakpoints[i].addr, breakpoints[i].desc);
+                        break;
+                        }
+                    }
+                }
+            }
+        was_halted = 1;
         printf ("SIM> ");
         if (!fgets (cmd, sizeof(cmd)-1, stdin))
             break;
         while (strlen(cmd) && isspace(cmd[strlen(cmd)-1]))
             cmd[strlen(cmd)-1] = '\0';
+        DisplayRegisters (panel, 1, 1);
         if (match_command ("BOOT", cmd, &arg)) {
             if (sim_panel_exec_boot (panel, arg))
                 break;
@@ -690,17 +803,24 @@ while (1) {
             else
                 printf("%s\n", history);
             }
+        else if (match_command ("DEBUG ", cmd, &arg)) {
+            if (sim_panel_device_debug_mode (panel, arg, 1, NULL))
+                printf("Error setting debug mode: %s\n", sim_panel_get_error ());
+            }
         else if ((match_command ("EXIT", cmd, NULL)) || (match_command ("QUIT", cmd, NULL)))
             goto Done;
-        else
+        else {
+            DisplayRegisters (panel, 0, 1);
             printf ("Huh? %s\r\n", cmd);
+            }
         }
     while (sim_panel_get_state (panel) == Run) {
-        usleep (100);
+        usleep (100000);
         if (update_display) {
             update_display = 0;
-            DisplayRegisters(panel);
+            DisplayRegisters(panel, 0, 0);
             }
+        was_halted = 0;
         if (halt_cpu) {
             halt_cpu = 0;
             sim_panel_exec_halt (panel);
@@ -709,6 +829,7 @@ while (1) {
     }
 
 Done:
+DisplayRegisters (panel, 0, 1);
 sim_panel_destroy (panel);
 
 /* Get rid of pseudo config file created earlier */

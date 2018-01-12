@@ -463,6 +463,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       $(info using regex: $(call find_include,regex))
     endif
   endif
+  # Find available ncurses library.
+  ifneq (,$(call find_include,ncurses))
+    ifneq (,$(call find_lib,ncurses))
+      OS_CURSES_DEFS += -DHAVE_NCURSES -lncurses
+    endif
+  endif
   ifneq (,$(call find_include,dlfcn))
     ifneq (,$(call find_lib,dl))
       OS_CCDEFS += -DHAVE_DLOPEN=$(LIBEXT)
@@ -2093,5 +2099,5 @@ frontpaneltest : ${BIN}frontpaneltest${EXE}
 
 ${BIN}frontpaneltest${EXE} : frontpanel/FrontPanelTest.c sim_sock.c sim_frontpanel.c
 	${MKDIRBIN}
-	${CC} frontpanel/FrontPanelTest.c sim_sock.c sim_frontpanel.c $(CC_OUTSPEC) ${LDFLAGS}
+	${CC} frontpanel/FrontPanelTest.c sim_sock.c sim_frontpanel.c $(CC_OUTSPEC) ${LDFLAGS} $(OS_CURSES_DEFS)
 
