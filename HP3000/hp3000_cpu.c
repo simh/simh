@@ -25,6 +25,8 @@
 
    CPU          HP 3000 Series III Central Processing Unit
 
+   05-Sep-17    JDB     Removed the -B (binary display) option; use -2 instead
+                        Changed REG_A (permit any symbolic override) to REG_X
    19-Jan-17    JDB     Added comments describing the OPND and EXEC trace options
    29_Dec-16    JDB     Changed the status mnemonic flag from REG_S to REG_T
    07-Nov-16    JDB     Renamed cpu_byte_to_word_ea to cpu_byte_ea
@@ -1024,8 +1026,7 @@ UNIT cpu_unit [] = {
    modification.  User flags describe the permitted and default display formats,
    as follows:
 
-     - REG_A  permits any display
-     - REG_B  permits binary display
+     - REG_X  permits any symbolic display
      - REG_M  defaults to CPU instruction mnemonic display
      - REG_T  defaults to CPU status mnemonic display
 
@@ -1058,15 +1059,15 @@ static REG cpu_reg [] = {
     { ORDATA (SR,      SR,                    3),                           REG_FIT },  /* stack register counter */
     { ORDATA (Z,       Z,                    16),                           REG_FIT },  /* stack limit register */
     { ORDATA (SBANK,   SBANK,                 4),                           REG_FIT },  /* stack segment bank register */
-    { ORDATA (RA,      TR [0],               16),          REG_A          | REG_FIT },  /* top of stack register */
-    { ORDATA (RB,      TR [1],               16),          REG_A          | REG_FIT },  /* top of stack - 1 register */
-    { ORDATA (RC,      TR [2],               16),          REG_A          | REG_FIT },  /* top of stack - 2 register */
-    { ORDATA (RD,      TR [3],               16),          REG_A          | REG_FIT },  /* top of stack - 3 register */
-    { ORDATA (X,       X,                    16),          REG_A          | REG_FIT },  /* index register */
-    { ORDATA (STA,     STA,                  16),          REG_T | REG_B  | REG_FIT },  /* status register */
-    { ORDATA (SWCH,    SWCH,                 16),          REG_A          | REG_FIT },  /* switch register */
-    { ORDATA (CPX1,    CPX1,                 16),          REG_B          | REG_FIT },  /* run-mode interrupt flags */
-    { ORDATA (CPX2,    CPX2,                 16),          REG_B          | REG_FIT },  /* halt-mode interrupt flags */
+    { ORDATA (RA,      TR [0],               16),          REG_X          | REG_FIT },  /* top of stack register */
+    { ORDATA (RB,      TR [1],               16),          REG_X          | REG_FIT },  /* top of stack - 1 register */
+    { ORDATA (RC,      TR [2],               16),          REG_X          | REG_FIT },  /* top of stack - 2 register */
+    { ORDATA (RD,      TR [3],               16),          REG_X          | REG_FIT },  /* top of stack - 3 register */
+    { ORDATA (X,       X,                    16),          REG_X          | REG_FIT },  /* index register */
+    { ORDATA (STA,     STA,                  16),          REG_T          | REG_FIT },  /* status register */
+    { ORDATA (SWCH,    SWCH,                 16),          REG_X          | REG_FIT },  /* switch register */
+    { ORDATA (CPX1,    CPX1,                 16),                           REG_FIT },  /* run-mode interrupt flags */
+    { ORDATA (CPX2,    CPX2,                 16),                           REG_FIT },  /* halt-mode interrupt flags */
     { ORDATA (PCLK,    PCLK,                 16),                           REG_FIT },  /* process clock register */
     { ORDATA (CNTR,    CNTR,                  6),                 REG_HRO | REG_FIT },  /* microcode counter */
     { ORDATA (MOD,     MOD,                  16),                 REG_HRO | REG_FIT },  /* module control register */
@@ -1331,8 +1332,8 @@ DEVICE cpu_dev = {
        volatile-qualified type and have been changed between the setjmp
        invocation and longjmp call are indeterminate."
 
-       Therefore, after a microcode abort, we cannot depend upon the values of
-       any local variables.
+       Therefore, the "device" and "status" variables are marked volatile to
+       ensure that they are reloaded after a longjmp caused by a micrcode abort.
 
     2. In hardware, the NEXT microcode order present at the end of each
        instruction transfers the NIR content to the CIR, reads the memory word
@@ -1398,10 +1399,11 @@ static const char *const stack_formats [] = {           /* stack register displa
     };
 
 int        abortval;
-HP_WORD    label, parameter, device;
+HP_WORD    label, parameter;
 TRAP_CLASS trap;
 t_bool     exec_test;
-t_stat     status = SCPE_OK;
+volatile   HP_WORD device;
+volatile   t_stat  status = SCPE_OK;
 
 
 /* Instruction prelude */

@@ -1,6 +1,6 @@
 /* hp_disclib.h: HP MAC/ICD disc controller simulator library declarations
 
-   Copyright (c) 2011-2016, J. David Bryan
+   Copyright (c) 2011-2017, J. David Bryan
    Copyright (c) 2004-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,6 +24,7 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the authors.
 
+   05-Sep-17    JDB     Changed REG_A (permit any symbolic override) to REG_X
    10-Oct-16    JDB     Moved "hp3000_defs.h" inclusion to "hp_disclib.c"
    13-May-16    JDB     Modified for revised SCP API function parameter types
    24-Mar-16    JDB     Added the DL_BUFFER type to define the disc buffer array
@@ -479,7 +480,7 @@ typedef CNTLR_VARS          *CVPTR;             /* pointer to a controller state
     { DRDATA (HEAD,     (cntlr).head,                6),                     PV_LEFT            }, \
     { DRDATA (SECTOR,   (cntlr).sector,              8),                     PV_LEFT            }, \
     { DRDATA (COUNT,    (cntlr).count,              16),                     PV_LEFT            }, \
-    { BRDATA (SECBUF,   (buffer),             8,    16,   DL_BUFSIZE),       REG_A              }, \
+    { BRDATA (SECBUF,   (buffer),             8,    16,   DL_BUFSIZE),       REG_X              }, \
     { DRDATA (INDEX,    (cntlr).index,               8),                     PV_LEFT            }, \
     { DRDATA (LENGTH,   (cntlr).length,              8),                     PV_LEFT            }, \
     { DRDATA (POLLU,    (cntlr).poll_unit,           4),                               REG_HRO  }, \

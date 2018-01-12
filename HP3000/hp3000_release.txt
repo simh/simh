@@ -1,6 +1,6 @@
                            SIMH/HP 3000 RELEASE NOTES
                            ==========================
-                             Last update: 2017-04-30
+                             Last update: 2018-01-12
 
 
 This file documents the release history of the Hewlett-Packard 3000 simulator.
@@ -47,7 +47,7 @@ General Information
 The simulator passes the HP 32230 offline diagnostic suite with some expected
 failures due to unimplemented features.  For example, the disc diagnostic
 error-correction logic tests and the tape diagnostic CRCC and LRCC tests fail,
-as these features are not supported.  However, all features that are required
+as these features are not simulated.  However, all features that are required
 for MPE operation pass their respective diagnostic tests.
 
 The simulator has been tested with MPE-V/R version E.01.00.  Specifically:
@@ -173,6 +173,180 @@ the MPE version used:
    file remains internally consistent.  A memory patch is impossible, but
    workarounds are to increase the code segment limit before running DPAN4 and
    to restore DPAN4.PUB.SYS from the FOS tape if it has been damaged.
+
+
+
+=====================
+Release 7, 2018-01-12
+=====================
+
+This release of the HP 3000 simulator adds the following features:
+
+ - Reading and writing to terminal sessions connected to the ATC have been
+   improved significantly.  File uploads via Telnet using the Reflection
+   terminal emulator are now over 100 times faster than before, e.g., the
+   transfer time for a one-megabyte file has decreased from 69 minutes to 30
+   seconds.  Block mode reads show similar speed improvements.  Copy-and-paste
+   into the terminal window, Reflection file downloads, and output to the
+   terminal window in REMOTEACK mode show speed improvements of five to fifteen
+   times.  Output in LOCALACK mode has been improved by around 50%.
+
+ - Information regarding Reflection file transfers and serial port disconnection
+   options has been added to Section 4.1.1, "Terminal Data Interface," of the HP
+   3000 Simulator User's Guide.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - File transfer using the Reflection terminal emulator requires an 8-bit data
+   path.  To achieve this, the session must use MPE terminal type 12 (this may
+   be configured either during a system reload or by specifying the TERM=12
+   parameter when logging on with :HELLO), and the channel must be set to 8B,
+   REMOTEACK, and NOCAPSLOCK modes.  Note that MPE's default terminal type 10
+   writes 7-bit data with odd parity, and characters with the parity bit on may
+   be displayed by the terminal emulator as extended characters in the Roman-8
+   symbol set.  To avoid a garbled display when using the TERM=12 parameter to
+   override the default, the channel should be set to 8B mode after logging on
+   and back to 7B after logging off.
+
+ - The MPE-V/R software kit has been updated to increase the number of terminal
+   buffers per port from 3 to 5.  Using the default of 3 may cause the system
+   to report "MPE Table TBUF has overflowed!!!" to the system console while
+   performing Reflection file uploads.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  Serial port output stalls are not handled properly.
+
+     VERSION:  Release 6.
+
+     OBSERVATION:  The ATCD device supports I/O via host serial ports as well as
+     via Telnet connections.  While output via Telnet works correctly, output
+     via serial ports fails.  Attempting to output to the ATCD results in a few
+     characters written, and then the line hangs.  Sometimes pressing ENTER at
+     the system console (ATCD channel 0) causes a few more characters to appear
+     on the serial terminal.  Eventually, the line hangs permanently.
+
+     CAUSE:  The terminal multiplexer library (sim_tmxr.c, part of the SIMH
+     framework) had provided a 256-byte output buffer for each line, independent
+     of the connection type (Telnet or serial).  The library was changed to
+     reduce the serial buffer size to one byte.  If the library output routine
+     receives the second character before the first one has been written to the
+     serial port, it returns SCPE_STALL status to indicate a buffer overflow.
+     The ATCD simulation correctly responds to this status by rescheduling the
+     output attempt.  However, it fails to call the "tmxr_poll_tx" routine to
+     write to the serial port, so the rescheduled attempt fails as well.
+
+     RESOLUTION:  Modify "line_service" (hp3000_atc.c) to call "tmxr_poll_tx" if
+     a buffer overflow occurs.
+
+     STATUS:  Fixed in Release 7.
+
+
+
+=====================
+Release 6, 2017-09-07
+=====================
+
+This release of the HP 3000 simulator adds the following features:
+
+ - The new "-F" switch to the DETACH LP command forces an immediate detach,
+   regardless of the current paper position.  This is the simulation equivalent
+   of physically removing the paper from the printer.  Without the switch,
+   detaching is the equivalent of running out of paper, which permits printing
+   to continue to the end of the line (2613/17/18) or the page (2607) before the
+   printer goes offline.
+
+ - The HP 3000 Simulator User's Guide has been revised to add a new section
+   describing the simulator commands corresponding to hardware actions and to
+   rewrite the "Realistic, Calibrated, and Optimized Timing" section to describe
+   the three timing modes more clearly.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - The LP device's PCHR (punched channel character) and UPCHR (unpunched channel
+   character) registers have been renamed to PUNCHR and UNPCHR, respectively,
+   for compatibility with the HP 2100 simulator's LPT device.
+
+ - The manual clarifies that the display radix for shift counts, bit positions,
+   starting bits and counts, and the CIR values for the PAUS and HALT
+   instructions may be overridden with command-line switches.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  Cancelling a deferred detach with ATTACH LP is rejected.
+
+     VERSION:  Release 5.
+
+     OBSERVATION:  The line printer "Unit Options" section of the HP 3000
+     Simulator User's Guide states that a DETACH LP command will be deferred if
+     there are characters in the print buffer.  It further states that entering
+     ATTACH LP without specifying a filename will cancel the action.  This does
+     not work.  Entering ATTACH LP prints "Too few arguments" and does not alter
+     a pending detach.
+
+     CAUSE:  The SCP routine "attach_cmd" checks for the presence of a filename
+     before calling the line printer simulator's "lp_attach" routine.  If the
+     filename is omitted, "lp_attach" is never called to cancel the pending
+     detach.
+
+     RESOLUTION:  Modify "lp_set_on_offline" (hp3000_lp.c) to cancel a deferred
+     detach, and modify the User's Guide to state that SET LP ONLINE is used to
+     cancel both the deferred offline and deferred detach actions.
+
+     STATUS:  Fixed in Release 6.
+
+
+  2. PROBLEM:  Changing printer models does not change the REALTIME delays.
+
+     VERSION:  Release 5.
+
+     OBSERVATION:  In REALTIME mode, the line printer simulator attempts to
+     model the print buffer load and print-and-space operation delays inherent
+     in the physical hardware.  However, after setting a different model, the
+     buffer load, print, and paper advance times have not been changed.
+
+     CAUSE:  The "lp_set_model" routine that is called in response to a "SET
+     LP <model>" command sets the realistic times to those of the current model
+     rather than those of the new model.
+
+     RESOLUTION:  Modify "lp_set_model" (hp3000_lp.c) to use the new model value
+     to index into the realistic times array.
+
+     STATUS:  Fixed in Release 6.
+
+
+  3. PROBLEM:  Paper cannot be removed from a 2607 printer except at the TOF.
+
+     VERSION:  Release 5.
+
+     OBSERVATION:  Printing a few lines on a 2607 and then attempting to remove
+     the paper with the DETACH LP command displays "Command not completed" on
+     the simulation console.  The file remains attached and therefore cannot be
+     manipulated externally.
+
+     CAUSE:  The DETACH command simulates both running out of paper and removing
+     the paper from the printer.  For the former, the 2607 continues to print
+     until the current form is complete (i.e., the top of what would be the next
+     form is reached).  For the latter, the paper may be physically removed by
+     the operator while at any print position.  The simulator incorrectly
+     forbids the latter operation unless the paper is positioned at the TOF.
+
+     RESOLUTION:  Modify "lp_detach" (hp3000_lp.c) to add a "forced detach"
+     option ("DETACH -F LP") to detach the printer regardless of print position.
+
+     STATUS:  Fixed in Release 6.
 
 
 

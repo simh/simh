@@ -1,6 +1,6 @@
 /* hp_tapelib.h: HP magnetic tape controller simulator library declarations
 
-   Copyright (c) 2013-2016, J. David Bryan
+   Copyright (c) 2013-2017, J. David Bryan
    Copyright (c) 2004-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,6 +24,7 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the authors.
 
+   05-Sep-17    JDB     Changed REG_A (permit any symbolic override) to REG_X
    10-Oct-16    JDB     Moved "hp3000_defs.h" inclusion to "hp_tapelib.c"
    13-May-16    JDB     Modified for revised SCP API function parameter types
    24-Mar-16    JDB     Added the TL_BUFFER type to define the tape buffer array
@@ -419,7 +420,7 @@ typedef CNTLR_VARS *CVPTR;                      /* a pointer to a controller sta
     { ORDATA (STATUS, (cntlr).status,                    16),                               REG_RO   }, \
     { DRDATA (USEL,   (cntlr).unit_selected,              4),                     PV_LEFT | REG_RO   }, \
     { YRDATA (UATTN,  (cntlr).unit_attention,             4,                      PV_RZRO)           }, \
-    { BRDATA (RECBUF, (buffer),                   8,      8,       TL_BUFSIZE),   REG_A              }, \
+    { BRDATA (RECBUF, (buffer),                   8,      8,       TL_BUFSIZE),   REG_X              }, \
     { DRDATA (LIBSTA, (cntlr).call_status,               16),                     PV_LEFT            }, \
     { DRDATA (LENGTH, (cntlr).length,                    24),                     PV_LEFT            }, \
     { DRDATA (INDEX,  (cntlr).index,                     24),                     PV_LEFT            }, \

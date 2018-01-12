@@ -23,6 +23,9 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   05-Sep-17    JDB     Removed the -B (binary display) option; use -2 instead
+                        Rewrote "fprint_sym" for better coverage
+   11-May-17    JDB     Corrected comment in "fprint_value"
    28-Apr-17    JDB     Added void cast to "fprint_instruction" call for left stackop
    03-Mar-17    JDB     Added an implementation note to the "parse_sym" routine
    29-Dec-16    JDB     Changed the switch for STA format from -S to -T;
@@ -33,7 +36,7 @@
    27-Sep-16    JDB     Added COBOL firmware mnemonics
                         Modified "fprint_instruction" to handle two-word instructions
    15-Sep-16    JDB     Modified "one_time_init" to set aux_cmds "message" field
-   03-Sep-16    JDB     Added the STOP_POWER and STOP_ARSINH messages
+   03-Sep-16    JDB     Added the STOP_POWER and STOP_ARSINH status messages
    01-Sep-16    JDB     Moved the "hp_cold_cmd" routine to the CPU (as "cpu_cold_cmd")
                         Added the POWER command
    03-Aug-16    JDB     Improved "fmt_char" and "fmt_bitset" to allow multiple calls
@@ -98,6 +101,26 @@ extern DEVICE ms_dev;                           /* 7970 Magnetic Tape */
 
 #define SCPE_OK_2_WORDS     ((t_stat) -1)       /* two words produced or consumed */
 #define SCPE_OK_3_WORDS     ((t_stat) -2)       /* three words produced or consumed */
+
+
+/* Symbolic mode and format override switches */
+
+#define A_SWITCH            SWMASK ('A')
+#define B_SWITCH            SWMASK ('B')
+#define C_SWITCH            SWMASK ('C')
+#define D_SWITCH            SWMASK ('D')
+#define E_SWITCH            SWMASK ('E')
+#define H_SWITCH            SWMASK ('H')
+#define I_SWITCH            SWMASK ('I')
+#define M_SWITCH            SWMASK ('M')
+#define O_SWITCH            SWMASK ('O')
+#define T_SWITCH            SWMASK ('T')
+
+#define MODE_SWITCHES       (C_SWITCH | E_SWITCH | I_SWITCH | M_SWITCH | T_SWITCH)
+#define FORMAT_SWITCHES     (A_SWITCH | B_SWITCH | D_SWITCH | H_SWITCH | O_SWITCH)
+
+#define SYMBOLIC_SWITCHES   (MODE_SWITCHES | A_SWITCH)          /* -A is both a mode and a format switch */
+#define ALL_SWITCHES        (MODE_SWITCHES | FORMAT_SWITCHES)
 
 
 /* Address parsing configuration flags */
@@ -952,7 +975,7 @@ static t_stat hp_brk_cmd   (int32 arg, CONST char *buf);
 
 /* System interface local utility routines */
 
-static void   fprint_value       (FILE *ofile, t_value val,  uint32 radix, uint32 width, uint32 format);
+static t_stat fprint_value       (FILE *ofile, t_value val,  uint32 radix, uint32 width, uint32 format);
 static t_stat fprint_order       (FILE *ofile, t_value *val, uint32 radix);
 static t_stat fprint_subop       (FILE *ofile, t_value *val, uint32 radix, t_addr addr, int32 switches);
 static t_stat fprint_instruction (FILE *ofile, const OP_TABLE ops, t_value *val,
@@ -1177,58 +1200,85 @@ return SCPE_ARG;                                        /* return an error if ca
 
 /* Print a value in symbolic format.
 
-   Print the data value in the format specified by the optional switches on the
-   output stream supplied.  This routine is called to print:
+   This routine prints a data value in the format specified by the optional
+   switches on the output stream provided.  On entry, "ofile" is the opened
+   output stream, and the other parameters depend on the reason the routine was
+   called, as follows:
 
-     - the next instruction mnemonic when the simulator stops
-     - the result of EXAMining a register marked with a user flag
-     - the result of EXAMining a memory address
-     - the result of EVALuating a symbol
+     * To print the next instruction mnemonic when the simulator stops:
+        - addr = the program counter
+        - val  = a pointer to sim_eval [0]
+        - uptr = NULL
+        - sw   = "-M" | SIM_SW_STOP
 
-   On entry, "ofile" is the opened output stream, "addr" is respectively the
-   program counter, register radix and flags, memory address, or symbol index,
-   "val" is a pointer to an array of t_values of depth "sim_emax" representing
-   the value to be printed, "uptr" is respectively NULL, NULL, a pointer to the
-   named unit, or a pointer to the default unit, and "sw" contains any switches
-   passed on the command line.  "sw" also includes SIM_SW_STOP for a simulator
-   stop call or SIM_SW_REG for a register call.
+     * To print the result of EXAMining a register with REG_VMIO or a user flag:
+        - addr = the ORed register radix and user flags
+        - val  = a pointer to a single t_value
+        - uptr = NULL
+        - sw   = the command line switches | SIM_SW_REG
+
+     * To print the result of EXAMining a memory address:
+        - addr = the memory address
+        - val  = a pointer to sim_eval [0]
+        - uptr = a pointer to the named unit
+        - sw   = the command line switches
+
+     * To print the result of EVALuating a symbol:
+        - addr = the symbol index
+        - val  = a pointer to sim_eval [addr]
+        - uptr = a pointer to the default unit (cpu_unit)
+        - sw   = the command line switches
 
    On exit, a status code is returned to the caller.  If the format requested is
    not supported, SCPE_ARG status is returned, which causes the caller to print
-   the value in numeric format.  Otherwise, SCPE_OK status is returned if a
-   single-word value was consumed, or the negative number of extra words (beyond
-   the first) consumed in printing the symbol is returned.  For example,
-   printing a two-word symbol would return SCPE_OK_2_WORDS (= -1).
+   the value in numeric format with the default radix.  Otherwise, SCPE_OK
+   status is returned if a single-word value was consumed, or the negative
+   number of extra words (beyond the first) consumed in printing the symbol is
+   returned.  For example, printing a two-word symbol would return
+   SCPE_OK_2_WORDS (= -1).
 
-   The following symbolic formats are supported by the listed switches:
+   The following symbolic modes are supported by including the indicated
+   switches on the command line:
 
-     Switch   Interpretation
+     Switch   Display Interpretation
      ------   --------------------------------------------------
-       -a     a single character in the right-hand byte
-       -b     a 16-bit binary value
-       -c     a two-character packed string
-       -e     an EDIT instruction subprogram mnemonic
-       -i     an I/O program instruction mnemonic
-       -m     a CPU instruction mnemonic
-       -s     a CPU status mnemonic
+       -A     a single character in the right-hand byte
+       -C     a two-character packed string
+       -E     an EDIT instruction subprogram mnemonic
+       -ER    an EDIT mnemonic starting with the right-hand byte
+       -I     an I/O program instruction mnemonic
+       -M     a CPU instruction mnemonic
+       -T     a CPU status mnemonic
 
-       -o     override numeric output to octal
-       -d     override numeric output to decimal
-       -h     override numeric output to hex
-       -r     begin EDIT interpretation with the right-hand byte
+   In the absence of a mode switch, the value is displayed in a numeric format.
 
-   Memory may be displayed in any format.  All registers may be overridden to
-   display in octal, decimal, or hexadecimal numeric format.  Only registers
-   marked with the REG_A flag may be displayed in any format.  Registers marked
-   with REG_B may be displayed in binary format.  Registers marked with REG_M
-   will default to CPU instruction mnemonic display.  Registers marked with
-   REG_T will default to CPU status mnemonic display.
+   When displaying data in one of the mnemonic modes, an additional switch may
+   be specified to indicate the desired operand format, as follows:
 
-   When displaying mnemonics, operand values are displayed in a radix suitable
-   to the type of the value.  Address values are displayed in the CPU's address
-   radix, which is octal, and data values are displayed in the CPU's data radix,
-   which defaults to octal but may be set to a different radix or overridden by
-   a switch on the command line.
+     Switch   Operand Interpretation
+     ------   --------------------------------------------------
+       -A     a single character in the right-hand byte
+       -B     a binary value
+       -O     an octal value
+       -D     a decimal value
+       -H     a hexadecimal value
+
+   Except for -B, these switches may be used without a mode switch to display a
+   numeric value in the specified form.  To summarize, the valid switch
+   combinations are:
+
+     -A
+     -C
+     -E [ -R ] [ -A | -B | -O | -D | -H ]
+     -I        [ -A | -B | -O | -D | -H ]
+     -M        [ -A | -B | -O | -D | -H ]
+     -T        [ -A | -B | -O | -D | -H ]
+
+   When displaying mnemonics, operand values by default are displayed in a radix
+   suitable to the type of the value.  Address values are displayed in the CPU's
+   address radix, which is octal, and data values are displayed in the CPU's
+   data radix, which defaults to octal but may be set to a different radix or
+   overridden by a switch on the command line.
 
 
    Implementation notes:
@@ -1241,76 +1291,116 @@ return SCPE_ARG;                                        /* return an error if ca
     2. Displaying a register having a symbolic default format (e.g., CIR) will
        use the default unless the radix is overridden on the command line.  For
        example, "EXAMINE CIR" displays the CIR value as an instruction mnemonic,
-       whereas "EXAMINE -O CIR" displays the value as octal.  Adding "-M" will
+       whereas "EXAMINE -D CIR" displays the value as decimal.  Adding "-M" will
        force mnemonic display and allow the radix switch to override the operand
-       display.  For example, "EXAMINE -M -O CIR" displays the value as mnemonic
-       and overrides the operand radix to octal.
+       display.  For example, "EXAMINE -M -D CIR" displays the value as mnemonic
+       and overrides the operand radix to decimal.
+
+    3. We return SCPE_INVSW when multiple modes or formats are specified, but
+       the callers do not act on this; they use the fallback formatter if any
+       status error is returned.  We could work around this by printing "Invalid
+       switch" to the console and returning SCPE_OK, but this does not stop
+       IEXAMINE from prompting for the replacement value(s) or EXAMINE from
+       printing a range.
+
+    4. Radix switches and the -C switch are conceptually mutually exclusive.
+       However, if we return an error when "format" is non-zero, then -C will be
+       ignored, and the fallback formatter will use the radix switch.  The other
+       choice is to process -C and ignore the radix switch; this is the option
+       implemented.
+
+    5. Because -A is both a mode and a format switch, we must check its presence
+       using SYMBOLIC_SWITCHES separately from the other modes to allow (e.g.)
+       both "EXAMINE -A" and "EXAMINE -M -A".  If -A is added to MODE_SWITCHES,
+       the latter form would be rejected as having conflicting modes.
+
+    6. The penultimate condition of the multiway "if-else if" mode test checks
+       for no mode switches.  This succeeds when -A is specified alone because
+       the earlier SYMBOLIC_SWITCHES test failed (so -A is present), but none of
+       the other mode switches are present.
 */
 
 t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val, UNIT *uptr, int32 sw)
 {
-const t_bool is_reg = (sw & SIM_SW_REG) != 0;               /* TRUE if this is a register access */
-uint32 radix_override;
+int32  formats, modes;
+uint32 radix;
 
-if (sw & SWMASK ('A') && (!is_reg || addr & REG_A))         /* if ASCII character display is requested and permitted */
-    if (val [0] <= D8_SMAX) {                               /*     then if the value is a single character */
-        fputs (fmt_char ((uint32) val [0]), ofile);         /*       then format and print it */
-        return SCPE_OK;
-        }
+if ((sw & (SIM_SW_REG | ALL_SWITCHES)) == SIM_SW_REG)   /* if we are formatting a register without overrides */
+    if (addr & REG_A)                                   /*   then if the default format is character */
+        sw |= A_SWITCH;                                 /*     then set the -A switch */
 
-    else                                                    /*   otherwise */
-        return SCPE_ARG;                                    /*     report that it cannot be displayed */
+    else if (addr & REG_C)                              /*   otherwise if the default mode is string */
+        sw |= C_SWITCH;                                 /*     then set the -C switch */
 
-else if (sw & SWMASK ('C') && (!is_reg || addr & REG_A)) {  /* if ASCII string display is requested and permitted */
-    fputs (fmt_char (UPPER_BYTE (val [0])), ofile);         /*     then format and print the upper byte */
-    fputc (',', ofile);                                     /*       followed by a separator */
-    fputs (fmt_char (LOWER_BYTE (val [0])), ofile);         /*         then format and print the lower byte */
+    else if (addr & REG_M)                              /*   otherwise if the default mode is instruction mnemonic */
+        sw |= M_SWITCH;                                 /*     then set the -M switch */
+
+    else if (addr & REG_T)                              /*   otherwise if the default mode is status */
+        sw |= T_SWITCH;                                 /*     then set the -T switch */
+
+if ((sw & SYMBOLIC_SWITCHES) == 0)                      /* if there are no symbolic mode overrides */
+    return SCPE_ARG;                                    /*   then return an error to use the standard formatter */
+
+
+formats = sw & FORMAT_SWITCHES;                         /* separate the format switches */
+modes   = sw & MODE_SWITCHES;                           /*   from the mode switches */
+
+if (formats == A_SWITCH)                                /* if the -A switch is specified */
+    radix = 256;                                        /*   then override the radix to character */
+
+else if (formats == B_SWITCH)                           /* otherwise if the -B switch is specified */
+    radix = 2;                                          /*   then override the radix to binary */
+
+else if (formats == D_SWITCH)                           /* otherwise if the -D switch is specified */
+    radix = 10;                                         /*   then override the radix to decimal */
+
+else if (formats == H_SWITCH)                           /* otherwise if the -H switch is specified */
+    radix = 16;                                         /*   then override the radix to hexadecimal */
+
+else if (formats == O_SWITCH)                           /* otherwise if the -O switch is specified */
+    radix = 8;                                          /*   then override the radix to octal */
+
+else if (formats == 0)                                  /* otherwise if no format switch is specified */
+    radix = 0;                                          /*   then indicate that the default radix is to be used */
+
+else                                                    /* otherwise more than one format is specified */
+    return SCPE_INVSW;                                  /*   so return an error */
+
+if (modes == M_SWITCH)                                  /* if mnemonic mode is specified */
+    return fprint_cpu (ofile, val, radix, sw);          /*   then format and print the value in mnemonic format */
+
+else if (modes == I_SWITCH)                             /* otherwise if I/O channel order mode is specified */
+    return fprint_order (ofile, val, radix);            /*   then format and print it */
+
+else if (modes == E_SWITCH)                             /* otherwise if an EDIT subop memory display is requested */
+    return fprint_subop (ofile, val, radix, addr, sw);  /*   then format and print it */
+
+else if (modes == T_SWITCH) {                           /* otherwise if status display is requested */
+    fputs (fmt_status ((uint32) val [0]), ofile);       /*   then format the status flags and condition code */
+    fputc (' ', ofile);                                 /*     and add a separator */
+
+    if (fprint_value (ofile, STATUS_CS (val [0]),       /* if the code segment number */
+                     (radix ? radix : cpu_dev.dradix),  /*   prints with the specified radix */
+                     STATUS_CS_WIDTH, PV_RZRO) == SCPE_OK)
+        return SCPE_OK;                                 /*     then return success */
+
+    else                                                /* otherwise print it */
+        return fprint_val (ofile, STATUS_CS (val [0]),  /*   in the CPU's default data radix */
+                           cpu_dev.dradix, D8_WIDTH, PV_RZRO);
+    }
+
+else if (modes == C_SWITCH) {                           /* otherwise if ASCII string mode is specified */
+    fputs (fmt_char (UPPER_BYTE (val [0])), ofile);     /*   then format and print the upper byte */
+    fputc (',', ofile);                                 /*     followed by a separator */
+    fputs (fmt_char (LOWER_BYTE (val [0])), ofile);     /*       followed by the lower byte */
     return SCPE_OK;
     }
 
-else if (sw & SWMASK ('B')                                  /* if binary display is requested */
-  && (!is_reg || addr & (REG_A | REG_B))) {                 /*   and is permitted */
-    fprint_val (ofile, val [0], 2, DV_WIDTH, PV_RZRO);      /*     then format and print the value */
-    return SCPE_OK;
-    }
+else if (modes == 0)                                    /* otherwise if single-character mode was specified */
+    return fprint_value (ofile, val [0], radix, 0, 0);  /*   then format and print it */
 
-else {                                                      /* otherwise display as numeric or mnemonic */
-    if (sw & SWMASK ('O'))                                  /* if an octal override is present */
-        radix_override = 8;                                 /*   then print the value in base 8 */
-    else if (sw & SWMASK ('D'))                             /* otherwise if a decimal override is present */
-        radix_override = 10;                                /*   then print the value in base 10 */
-    else if (sw & SWMASK ('H'))                             /* otherwise if a hex override is present */
-        radix_override = 16;                                /*   then print the value in base 16 */
-    else                                                    /* otherwise */
-        radix_override = 0;                                 /*   use the default radix setting */
-
-    if (sw & SWMASK ('I') && !is_reg)                       /* if I/O channel order memory display is requested */
-        return fprint_order (ofile, val, radix_override);   /*   then format and print it */
-
-    else if (sw & SWMASK ('E') && !is_reg)                  /* otherwise if an EDIT subop memory display is requested */
-        return fprint_subop (ofile, val, radix_override, addr, sw);
-
-    else if (sw & SWMASK ('M')                              /* otherwise if CPU instruction display is requested */
-      && (!is_reg || addr & (REG_A | REG_M))                /*   and is permitted */
-      || is_reg && addr & REG_M && radix_override == 0)     /* or if displaying a register that defaults to mnemonic */
-        return fprint_cpu (ofile, val, radix_override, sw); /*   then format and print it */
-
-    else if (sw & SWMASK ('T')                              /* otherwise if status display is requested */
-      && (!is_reg || addr & (REG_A | REG_T))                /*   and is permitted */
-      || is_reg && addr & REG_T && radix_override == 0) {   /* or if displaying a register that defaults to status */
-        fputs (fmt_status ((uint32) val [0]), ofile);       /*   then format the status flags and condition code */
-        fputc (' ', ofile);                                 /*     and add a separator */
-
-        fprint_value (ofile, STATUS_CS (val [0]),           /* print the code segment number */
-                      (radix_override ? radix_override : cpu_dev.dradix),
-                      STATUS_CS_WIDTH, PV_RZRO);
-
-        return SCPE_OK;
-        }
-
-    else                                                    /* otherwise */
-        return SCPE_ARG;                                    /*   request that the value be printed numerically */
-    }
+else                                                    /* otherwise the modes conflict */
+    return SCPE_INVSW;                                  /*   so return an error */
 }
 
 
@@ -2025,11 +2115,11 @@ return formatted;                                       /* return a pointer to t
 
 /* Format a character for printing.
 
-   This routine formats single 8-bit character value into a printable string and
-   returns a pointer to that string.  Printable characters retain their original
-   form but are enclosed in single quotes.  Control characters are translated to
-   readable strings.  Characters outside of the ASCII range are presented as
-   escaped octal values.
+   This routine formats a single 8-bit character value into a printable string
+   and returns a pointer to that string.  Printable characters retain their
+   original form but are enclosed in single quotes.  Control characters are
+   translated to readable strings.  Characters outside of the ASCII range are
+   presented as escaped octal values.
 
 
    Implementation notes:
@@ -2914,24 +3004,39 @@ return status;                                          /* return the handler st
 /* System interface local utility routines */
 
 
-/* Print a numeric value with a radix identifier.
+/* Print a numeric value in a given radix with a radix identifier.
 
-   This routine prints a numeric value with a leading radix indicator if the
-   specified print radix is not the same as the current CPU data radix.  It uses
-   the HP 3000 convention of a leading "%", "#", or "!" character to indicate
-   an octal, decimal, or hexadecimal number.
+   This routine prints a numeric value using the specified radix, width, and
+   output format.  If the radix is 256, then the value is printed as a single
+   character.  Otherwise, it is printed as a numeric value with a leading radix
+   indicator if the specified print radix is not the same as the current CPU
+   data radix.  It uses the HP 3000 convention of a leading "%", "#", or "!"
+   character to indicate an octal, decimal, or hexadecimal number (there is no
+   binary convention, so a leading "@" is used arbitrarily).
 
    On entry, the "ofile" parameter is the opened output stream, "val" is the
    value to print, "radix" is the desired print radix, "width" is the number of
    significant bits in the value, and "format" is a format specifier (PV_RZRO,
-   PV_RSPC, or PV_LEFT).  On exit, the status of the print operation is
-   returned.
+   PV_RSPC, or PV_LEFT).  On exit, the routine returns SCPE_OK if the value was
+   printed successfully, or SCPE_ARG if the value could not be printed.
 */
 
-static void fprint_value (FILE *ofile, t_value val, uint32 radix, uint32 width, uint32 format)
+static t_stat fprint_value (FILE *ofile, t_value val, uint32 radix, uint32 width, uint32 format)
 {
-if (radix != cpu_dev.dradix)                            /* if the requested radix is not the current data radix */
-    if (radix == 8)                                     /*   then if the requested radix is octal */
+if (radix == 256)                                       /* if ASCII character display is requested */
+    if (val <= D8_SMAX) {                               /*   then if the value is a single character */
+        fputs (fmt_char ((uint32) val), ofile);         /*     then format and print it */
+        return SCPE_OK;                                 /*       and report success */
+        }
+
+    else                                                /* otherwise */
+        return SCPE_ARG;                                /*   report that it cannot be displayed */
+
+else if (radix != cpu_dev.dradix)                       /* otherwise if the requested radix is not the current data radix */
+    if (radix == 2)                                     /*   then if the requested radix is binary */
+        fputc ('@', ofile);                             /*     then print the binary indicator */
+
+    else if (radix == 8)                                /*   otherwise if the requested radix is octal */
         fputc ('%', ofile);                             /*     then print the octal indicator */
 
     else if (radix == 10)                               /*   otherwise if it is decimal */
@@ -2945,7 +3050,7 @@ if (radix != cpu_dev.dradix)                            /* if the requested radi
 
 fprint_val (ofile, val, radix, width, format);          /* print the value in the radix specified */
 
-return;
+return SCPE_OK;                                         /* return success */
 }
 
 
@@ -2979,16 +3084,15 @@ return;
 
      - Address values are printed in the CPU's address radix, which is octal.
 
-     - Counts are printed in decimal.
+     - Counts are printed by default in decimal.
 
      - Control and status values are printed in the CPU's data radix, which
-       defaults to octal but may be set to a different radix with SET CPU
-       OCT|DEC|HEX.
+       defaults to octal.
 
    The radix for operand values other than addresses may be overridden by a
    switch on the command line.  A value printed in a radix other than the
-   current data radix is preceded by a radix identifier ("%" for octal, "#" for
-   decimal, or "!" for hexadecimal).
+   current data radix is preceded by a radix identifier ("@" for binary, "%" for
+   octal, "#" for decimal, or "!" for hexadecimal).
 
    The routine returns SCPE_OK_2_WORDS to indicate that two words were consumed.
 
@@ -3031,7 +3135,7 @@ switch (order) {                                        /* dispatch operand prin
 
     case sioJUMP:
     case sioJUMPC:                                      /* print the jump target address */
-        fprint_value (ofile, ioaw, cpu_dev.aradix,
+        fprint_value (ofile, ioaw, cpu_dev.aradix,      /*   in the CPU's address radix */
                       LA_WIDTH, PV_RZRO);
         break;
 
@@ -3042,7 +3146,7 @@ switch (order) {                                        /* dispatch operand prin
         break;
 
     case sioSBANK:                                      /* print the bank address */
-        fprint_value (ofile, ioaw & BA_MASK,
+        fprint_value (ofile, ioaw & BA_MASK,            /*   in the CPU's address radix */
                       cpu_dev.aradix, BA_WIDTH, PV_RZRO);
         break;
 
@@ -3078,7 +3182,7 @@ switch (order) {                                        /* dispatch operand prin
 
         fputc (',', ofile);
 
-        fprint_value (ofile, ioaw, cpu_dev.aradix,
+        fprint_value (ofile, ioaw, cpu_dev.aradix,      /* prnit the address in the CPU's address radix */
                       LA_WIDTH, PV_RZRO);
         break;
     }
@@ -3562,7 +3666,6 @@ switch (ops [op_index].operand) {                       /* dispatch by the opera
             prefix = " ";                               /*   so just use a space to separate the value */
 
         op_value = (op_value & ~op_mask [opS11]) >> EIS_SDEC_SHIFT; /* remove the flags from the S decrement value */
-        op_radix = (radix ? radix : cpu_dev.dradix);                /*   and set the print radix */
         break;
 
 
