@@ -68,7 +68,7 @@ while (1) {
     buf_size = len + 1;
     buf[buf_size] = '\0';
     }
-while (c = strstr (buf, "\r\n"))
+while ((c = strstr (buf, "\r\n")))
     memmove (c, c + 1, strlen (c));
 printw ("%s", buf);
 }
