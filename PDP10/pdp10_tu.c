@@ -1163,7 +1163,7 @@ int_req = int_req & ~INT_TU;                            /* clear interrupt */
 for (u = 0; u < TU_NUMDR; u++) {                        /* loop thru units */
     uptr = tu_dev.units + u;
     sim_tape_reset (uptr);                              /* clear pos flag */
-    if (!uptr->TU_STATEFLAGS & TUS_ATTPENDING)          /* Delayed on-line must survive massbus clear */
+    if (!(uptr->TU_STATEFLAGS & TUS_ATTPENDING))        /* Delayed on-line must survive massbus clear */
         sim_cancel (uptr);                              /* cancel activity */
     else {
         if (!sim_is_active(uptr) )
