@@ -804,8 +804,14 @@ while (1) {
                 printf("%s\n", history);
             }
         else if (match_command ("DEBUG ", cmd, &arg)) {
-            if (sim_panel_device_debug_mode (panel, arg, 1, NULL))
-                printf("Error setting debug mode: %s\n", sim_panel_get_error ());
+            if (arg[0] == '-') {
+                if (sim_panel_device_debug_mode (panel, NULL, 1, arg))
+                    printf("Error setting debug mode: %s\n", sim_panel_get_error ());
+                }
+            else {
+                if (sim_panel_device_debug_mode (panel, arg, 1, NULL))
+                    printf("Error setting debug mode: %s\n", sim_panel_get_error ());
+                }
             }
         else if ((match_command ("EXIT", cmd, NULL)) || (match_command ("QUIT", cmd, NULL)))
             goto Done;

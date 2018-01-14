@@ -1792,8 +1792,9 @@ if (!panel || (panel->State == Error)) {
     sim_panel_set_error (NULL, "Invalid Panel");
     return -1;
     }
-if (_panel_sendf (panel, &cmd_stat, &response, "SHOW %s", device) ||
-    (cmd_stat)) {
+if ((device != NULL) &&
+    ((_panel_sendf (panel, &cmd_stat, &response, "SHOW %s", device) ||
+     (cmd_stat)))) {
     sim_panel_set_error (NULL, "Can't %s Debug Mode: '%s' on Device '%s': %s", 
                                set_unset ? "Enable" : "Disable", mode_bits ? mode_bits : "", device, response);
     free (response);
@@ -1802,7 +1803,7 @@ if (_panel_sendf (panel, &cmd_stat, &response, "SHOW %s", device) ||
 free (response);
 response = NULL;
 if (_panel_sendf (panel, &cmd_stat, &response, "%sDEBUG %s %s", 
-                         set_unset ? "" : "NO", device, mode_bits ? mode_bits : "") ||
+                         set_unset ? "" : "NO", device ? device : "", mode_bits ? mode_bits : "") ||
     (cmd_stat)) {
     sim_panel_set_error (NULL, "Can't %s Debug Mode: '%s' on Device '%s': %s", 
                                set_unset ? "Enable" : "Disable", mode_bits ? mode_bits : "", device, response);
