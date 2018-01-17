@@ -167,8 +167,10 @@ static uint32 sim_throt_ms_start = 0;
 static uint32 sim_throt_ms_stop = 0;
 static uint32 sim_throt_type = 0;
 static uint32 sim_throt_val = 0;
+static uint32 sim_throt_drift_pct = SIM_THROT_DRIFT_PCT_DFLT;
 static uint32 sim_throt_state = SIM_THROT_STATE_INIT;
 static double sim_throt_cps;
+static double sim_throt_peak_cps;
 static double sim_throt_inst_start;
 static uint32 sim_throt_sleep_time = 0;
 static int32 sim_throt_wait = 0;
@@ -910,7 +912,7 @@ if (!rtc_avail)                                         /* no timer? */
     return rtc_currd[tmr];
 if (sim_calb_tmr != tmr) {
     rtc_currd[tmr] = (int32)(sim_timer_inst_per_sec()/ticksper);
-    sim_debug (DBG_CAL, &sim_timer_dev, "calibrated calibrated tmr=%d against internal system tmr=%d, tickper=%d (result: %d)\n", tmr, sim_calb_tmr, ticksper, rtc_currd[tmr]);
+    sim_debug (DBG_CAL, &sim_timer_dev, "calibrated tmr=%d against internal system tmr=%d, tickper=%d (result: %d)\n", tmr, sim_calb_tmr, ticksper, rtc_currd[tmr]);
     return rtc_currd[tmr];
     }
 new_rtime = sim_os_msec ();                             /* wall time */
@@ -1260,6 +1262,8 @@ REG sim_throttle_reg[] = {
     { DRDATAD (THROT_STATE,      sim_throt_state,        32, ""), PV_RSPC|REG_RO},
     { DRDATAD (THROT_SLEEP_TIME, sim_throt_sleep_time,   32, ""), PV_RSPC|REG_RO},
     { DRDATAD (THROT_WAIT,       sim_throt_wait,         32, ""), PV_RSPC|REG_RO},
+    { DRDATAD (THROT_DELAY,      sim_idle_stable,        32, "Seconds before throttling starts"), PV_RSPC},
+    { DRDATAD (THROT_DRIFT_PCT,  sim_throt_drift_pct,    32, "Percent of throttle drift before correction"), PV_RSPC},
     { NULL }
     };
 
@@ -1671,9 +1675,12 @@ else {
         break;
 
     case SIM_THROT_PCT:
-        fprintf (st, "Throttle:                      %d%%\n", sim_throt_val);
-        if (sim_throt_wait)
+        if (sim_throt_wait) {
+            fprintf (st, "Throttle:                      %d%% of %s cycles per second\n", sim_throt_val, sim_fmt_numeric (sim_throt_peak_cps));
             fprintf (st, "Throttling by sleeping for:    %d ms every %d cycles\n", sim_throt_sleep_time, sim_throt_wait);
+            }
+        else
+            fprintf (st, "Throttle:                      %d%%\n", sim_throt_val);
         break;
 
     case SIM_THROT_SPC:
@@ -1696,7 +1703,7 @@ return SCPE_OK;
 void sim_throt_sched (void)
 {
 sim_throt_state = SIM_THROT_STATE_INIT;
-if (sim_throt_type)
+if (sim_throt_type != SIM_THROT_NONE)
     sim_activate (&sim_throttle_unit, SIM_THROT_WINIT);
 }
 
@@ -1718,16 +1725,42 @@ t_stat sim_throt_svc (UNIT *uptr)
 {
 int32 tmr;
 uint32 delta_ms;
-double a_cps, d_cps;
+double a_cps, d_cps, delta_inst;
+t_bool throt_changed = FALSE;
 
 switch (sim_throt_state) {
 
     case SIM_THROT_STATE_INIT:                          /* take initial reading */
+        if ((sim_calb_tmr != -1) && (rtc_hz[sim_calb_tmr] != 0)) {
+            if (rtc_calibrations[sim_calb_tmr] < sim_idle_stable) {
+                sim_throt_ms_start = sim_os_msec ();
+                sim_throt_inst_start = sim_gtime ();
+                sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc(INIT) Deferring until stable (%d more seconds)\n", (int)(sim_idle_stable - rtc_calibrations[sim_calb_tmr]));
+                return sim_activate (uptr, rtc_hz[sim_calb_tmr]*rtc_currd[sim_calb_tmr]);
+                }
+            sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc(INIT) Computing Throttling values based on the last second's execution rate\n");
+            sim_throt_state = SIM_THROT_STATE_TIME;
+            if (sim_throt_peak_cps < (double)(rtc_hz[sim_calb_tmr] * rtc_currd[sim_calb_tmr])) 
+                sim_throt_peak_cps = (double)rtc_hz[sim_calb_tmr] * rtc_currd[sim_calb_tmr];
+            return sim_throt_svc (uptr);
+            }
+        else
+            sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc(INIT) Calibrated timer not available. Falling back to legacy method\n");
         sim_idle_ms_sleep (sim_idle_rate_ms);           /* start on a tick boundary to calibrate */
         sim_throt_ms_start = sim_os_msec ();
-        sim_throt_inst_start = sim_gtime();
+        sim_throt_inst_start = sim_gtime ();
         if (sim_throt_type != SIM_THROT_SPC) {          /* dynamic? */
-            sim_throt_wait = SIM_THROT_WST;
+            switch (sim_throt_type) {
+                case SIM_THROT_PCT:
+                    sim_throt_wait = (int32)((sim_throt_peak_cps * sim_throt_val) / 100.0);
+                    break;
+                case SIM_THROT_KCYC:
+                    sim_throt_wait = sim_throt_val * 1000;
+                    break;
+                case SIM_THROT_MCYC:
+                    sim_throt_wait = sim_throt_val * 1000000;
+                    break;
+                }
             sim_throt_state = SIM_THROT_STATE_TIME;     /* next state */
             }
         else {                                          /* Non dynamic? */
@@ -1741,34 +1774,43 @@ switch (sim_throt_state) {
     case SIM_THROT_STATE_TIME:                          /* take final reading */
         sim_throt_ms_stop = sim_os_msec ();
         delta_ms = sim_throt_ms_stop - sim_throt_ms_start;
+        delta_inst = sim_gtime () - sim_throt_inst_start;
         if (delta_ms < SIM_THROT_MSMIN) {               /* not enough time? */
-            if (sim_throt_wait >= 100000000) {          /* too many inst? */
+            if (delta_inst >= 100000000.0) {            /* too many inst? */
                 sim_throt_state = SIM_THROT_STATE_INIT; /* fails in 32b! */
                 sim_printf ("Can't throttle.  Host CPU is too fast with a minimum sleep time of %d ms\n", sim_idle_rate_ms);
                 sim_set_throt (0, NULL);                /* disable throttling */
                 return SCPE_OK;
                 }
-            sim_idle_ms_sleep (sim_idle_rate_ms);       /* start on a tick boundart to calibrate */
-            sim_throt_wait = sim_throt_wait * SIM_THROT_WMUL;
-            sim_throt_ms_start = sim_os_msec ();
+            sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc() Not enough time.  %d ms executing %.f instructions.\n", 
+                                (int)delta_ms, delta_inst);
+            sim_throt_wait = (int32)(delta_inst * SIM_THROT_WMUL);
             sim_throt_inst_start = sim_gtime();
+            sim_idle_ms_sleep (sim_idle_rate_ms);       /* start on a tick boundart to calibrate */
+            sim_throt_ms_start = sim_os_msec ();
             }
         else {                                          /* long enough */
-            a_cps = ((double) sim_throt_wait) * 1000.0 / (double) delta_ms;
+            a_cps = (((double) delta_inst) * 1000.0) / (double) delta_ms;
             if (sim_throt_type == SIM_THROT_MCYC)       /* calc desired cps */
                 d_cps = (double) sim_throt_val * 1000000.0;
-            else if (sim_throt_type == SIM_THROT_KCYC)
-                d_cps = (double) sim_throt_val * 1000.0;
-            else d_cps = (a_cps * ((double) sim_throt_val)) / 100.0;
-            if (d_cps >= a_cps) {
+            else
+                if (sim_throt_type == SIM_THROT_KCYC)
+                    d_cps = (double) sim_throt_val * 1000.0;
+                else
+                    d_cps = (sim_throt_peak_cps * sim_throt_val) / 100.0;
+            if (d_cps > a_cps) {
+                sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc() CPU too slow.  Values a_cps = %f, d_cps = %f\n", 
+                                                    a_cps, d_cps);
                 sim_throt_state = SIM_THROT_STATE_INIT;
+                sim_printf ("*********** WARNING ***********\n");
                 sim_printf ("Host CPU is too slow to simulate %s instructions per second\n", sim_fmt_numeric(d_cps));
+                sim_printf ("Host CPU can only simulate %s instructions per second\n", sim_fmt_numeric(sim_throt_peak_cps));
                 sim_printf ("Throttling disabled.\n");
                 sim_set_throt (0, NULL);
                 return SCPE_OK;
                 }
             while (1) {
-                sim_throt_wait = (int32)                /* time between waits */
+                sim_throt_wait = (int32)                /* cycles between sleeps */
                     ((a_cps * d_cps * ((double) sim_throt_sleep_time)) /
                      (1000.0 * (a_cps - d_cps)));
                 if (sim_throt_wait >= SIM_THROT_WMIN)   /* long enough? */
@@ -1783,13 +1825,7 @@ switch (sim_throt_state) {
             sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc() Throttle values a_cps = %f, d_cps = %f, wait = %d, sleep = %d ms\n", 
                                                 a_cps, d_cps, sim_throt_wait, sim_throt_sleep_time);
             sim_throt_cps = d_cps;                  /* save the desired rate */
-            /* Run through all timers and adjust the calibration for each */
-            /* one that is running to reflect the throttle rate */
-            for (tmr=0; tmr<=SIM_NTIMERS; tmr++)
-                if (rtc_hz[tmr]) {                                      /* running? */
-                    rtc_gtime[tmr] = sim_gtime();                       /* save instruction time */
-                    rtc_currd[tmr] = (int32)(sim_throt_cps / rtc_hz[tmr]);/* use throttle calibration */
-                    }
+            throt_changed = TRUE;
             }
         break;
 
@@ -1803,27 +1839,64 @@ switch (sim_throt_state) {
             if (sim_throt_type != SIM_THROT_SPC) {      /* when not dynamic throttling */
                 if (sim_throt_type == SIM_THROT_MCYC)   /* calc desired cps */
                     d_cps = (double) sim_throt_val * 1000000.0;
-                else if (sim_throt_type == SIM_THROT_KCYC)
-                    d_cps = (double) sim_throt_val * 1000.0;
-                else d_cps = (a_cps * ((double) sim_throt_val)) / 100.0;
-                if (fabs(100.0 * (d_cps - a_cps) / a_cps) > (double)SIM_THROT_DRIFT_PCT) {
-                    sim_throt_wait = sim_throt_val;
-                    sim_throt_state = SIM_THROT_STATE_TIME;/* next state to recalibrate */
-                    sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc() Recalibrating throttle based on values a_cps = %f, d_cps = %f\n", 
-                                                        a_cps, d_cps);
+                else
+                    if (sim_throt_type == SIM_THROT_KCYC)
+                        d_cps = (double) sim_throt_val * 1000.0;
+                    else
+                        d_cps = (sim_throt_peak_cps * sim_throt_val) / 100.0;
+                if (fabs(100.0 * (d_cps - a_cps) / d_cps) > (double)sim_throt_drift_pct) {
+                    sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc() Recalibrating throttle based on values a_cps = %f, d_cps = %f deviating by %.2f%% from the desired value\n", 
+                                                        a_cps, d_cps, fabs(100.0 * (d_cps - a_cps) / d_cps));
+                    if ((a_cps > d_cps) &&                      /* too fast? */
+                        ((100.0 * (a_cps - d_cps) / d_cps) > (100 - sim_throt_drift_pct))) {
+                        sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc() Restarting calibrating throttle going too fast: a_cps = %f, d_cps = %f deviating by %.2f%% from the desired value\n", 
+                                                            a_cps, d_cps, fabs(100.0 * (d_cps - a_cps) / d_cps));
+                        while (1) {
+                            sim_throt_wait = (int32)            /* cycles between sleeps */
+                                ((sim_throt_peak_cps * d_cps * ((double) sim_throt_sleep_time)) /
+                                 (1000.0 * (sim_throt_peak_cps - d_cps)));
+                            if (sim_throt_wait >= SIM_THROT_WMIN)/* long enough? */
+                                break;
+                            sim_throt_sleep_time += sim_os_sleep_inc_ms;
+                            sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc() Wait too small, increasing sleep time to %d ms.  Values a_cps = %f, d_cps = %f, wait = %d\n", 
+                                                                sim_throt_sleep_time, sim_throt_peak_cps, d_cps, sim_throt_wait);
+                            }
+                        }
+                    else {                                      /* slow or within reasonable range */
+                        sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc() Adjusting wait before sleep interval by %d\n", 
+                                                            (int32)(((d_cps - a_cps) * (double)sim_throt_wait) / d_cps));
+                        sim_throt_wait += (int32)(((d_cps - a_cps) * (double)sim_throt_wait) / d_cps);
+                        }
+                    sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc() Throttle values a_cps = %f, d_cps = %f, wait = %d, sleep = %d ms\n", 
+                                                        a_cps, d_cps, sim_throt_wait, sim_throt_sleep_time);
+                    sim_throt_cps = d_cps;                      /* save the desired rate */
+                    sim_throt_ms_start = sim_os_msec ();
+                    sim_throt_inst_start = sim_gtime();
+                    throt_changed = TRUE;
                     }
-                sim_throt_inst_start = sim_gtime();
                 }
             else {                                      /* record instruction rate */
                 sim_throt_cps = (int32)a_cps;
                 sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc() Recalibrating Special %d/%u Cycles Per Second of %f\n", 
                                                     sim_throt_wait, sim_throt_sleep_time, sim_throt_cps);
+                sim_throt_inst_start = sim_gtime();
+                sim_throt_ms_start = sim_os_msec ();
                 }
-            sim_throt_ms_start = sim_os_msec ();
             }
         break;
         }
 
+if (throt_changed) {
+    /* Run through all timers and adjust the calibration for each */
+    /* one that is running to reflect the throttle rate */
+    for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
+        if (rtc_hz[tmr]) {                                      /* running? */
+            rtc_currd[tmr] = (int32)(sim_throt_cps / rtc_hz[tmr]);/* use throttle calibration */
+            if (sim_clock_unit[tmr])
+                sim_activate_abs (sim_clock_unit[tmr], rtc_currd[tmr]);/* reschedule next tick */
+            }
+        }
+    }
 sim_activate (uptr, sim_throt_wait);                    /* reschedule */
 return SCPE_OK;
 }
