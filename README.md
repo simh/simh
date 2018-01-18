@@ -45,7 +45,7 @@
 
 ### Simulator Front Panel API
 
-The sim_frontpanel API provides a programatic interface to start and control any simulator without any special additions to the simulator code.
+The sim_frontpanel API provides a programmatic interface to start and control any simulator without any special additions to the simulator code.
 
 ### New Functionality
 
@@ -129,7 +129,7 @@ Host platforms which have libSDL available can leverage this functionality.
       devices.  (Still experimental - not currently by default)
 
 #### Clock/Timer Enhancements
-    * Asynchronhous clocks ticks exist to better support modern processors 
+    * Asynchronous clocks ticks exist to better support modern processors 
       that have variable clock speeds.  The initial clock calibration model 
       presumed a constant simulated instruction execution rate.  
       Modern processors have variable processor speeds which breaks this 
@@ -150,7 +150,7 @@ Host platforms which have libSDL available can leverage this functionality.
 	  the Internet can use NAT packet transport.  This also works for WiFi 
 	  connected host systems.
 	* Packet Transmission Throttling.  When connected to a LAN which has 
-	  legacy network adapaters (DEQNA, DEUNA) on legacy systems, it is very
+	  legacy network adapters (DEQNA, DEUNA) on legacy systems, it is very
 	  easy for a simulated system to overrun the receiving capacity of the
 	  older systems.  Throttling of simulated traffic delivered to the LAN 
 	  can be used to mitigate this problem.
@@ -271,13 +271,13 @@ The EXPECT command now exists to provide a means of reacting to simulator output
     SET ENV -p "Prompt" Name=Default Gather User input into an Environment Variable
     SET ASYNCH                       Enable Asynchronous I/O
     SET NOASYNCH                     Disable Asynchronous I/O
-    SET VERIFY                       Enable commang display while processing DO command files
-    SET NOVERIFY                     Enable commang display while processing DO command files
+    SET VERIFY                       Enable command display while processing DO command files
+    SET NOVERIFY                     Enable command display while processing DO command files
     SET MESSAGE                      Enable error message output when commands complete (default)
     SET NOMESSAGE                    Disable error message output when commands complete
     SET QUIET                        Set minimal output mode for command execution
     SET NOQUIET                      Set normal output mode for command execution
-    SET PROMPT                       Change the prompt used by the simulator (defaulr sim>)
+    SET PROMPT                       Change the prompt used by the simulator (default sim>)
     SET THROTTLE x/t                 Throttle t ms every x cycles
     SET REMOTE TELNET=port           Specify remote console telnet port
     SET REMOTE NOTELNET              Disables remote console
@@ -292,7 +292,7 @@ The EXPECT command now exists to provide a means of reacting to simulator output
     SHOW ON                          Display ON condition dispatch actions
     SET ON                           Enable ON condition error dispatching
     SET NOON                         Disable ON condition error dispatching
-    GOTO                             Transfer to lable in the current DO command file
+    GOTO                             Transfer to label in the current DO command file
     CALL                             Call subroutine at indicated label
     RETURN                           Return from subroutine call
     SHIFT                            Slide argument parameters %1 thru %9 left 1
@@ -310,10 +310,10 @@ The EXPECT command now exists to provide a means of reacting to simulator output
     SEND                             Inject input to a simulated system's console
     SLEEP time                       Pause command execution for specified time
     SCREENSHOT                       Snapshot the current video display window
-    RUN UNTIL breakpoint             Establish the breakpoiunt specified and run until it is encountered
+    RUN UNTIL breakpoint             Establish the breakpoint specified and run until it is encountered
     RUN UNTIL "output-string" ...    Establish the specified "output-string" as an EXPECT and run until it is encountered.
-    GO UNTIL breakpoint              Establish the breakpoiunt specified and go until it is encountered
-    GO UNTILE "output-string" ...    Establish the specified "output-string" as an EXPECT and go until it is encountered.
+    GO UNTIL breakpoint              Establish the breakpoint specified and go until it is encountered
+    GO UNTIL "output-string" ...     Establish the specified "output-string" as an EXPECT and go until it is encountered.
 
 #### Command Processing Enhancements
 
@@ -329,7 +329,7 @@ Built In variables %DATE%, %TIME%, %DATETIME%, %LDATE%, %LTIME%, %CTIME%, %DATE_
 
    Omitted parameters result in null-string substitutions.
 
-   Tokens preceeded and followed by % characters are expanded as environment
+   Tokens preceded and followed by % characters are expanded as environment
    variables, and if an environment variable isn't found then it can be one of 
    several special variables: 
    
@@ -366,11 +366,11 @@ Built In variables %DATE%, %TIME%, %DATETIME%, %LDATE%, %LTIME%, %CTIME%, %DATE_
           
    Environment variable lookups are done first with the precise name between 
    the % characters and if that fails, then the name between the % characters
-   is upcased and a lookup of that valus is attempted.
+   is upcased and a lookup of that values is attempted.
 
    The first Space delimited token on the line is extracted in uppercase and 
    then looked up as an environment variable.  If found it the value is 
-   supstituted for the original string before expanding everything else.  If 
+   substituted for the original string before expanding everything else.  If 
    it is not found, then the original beginning token on the line is left 
    untouched.
 
@@ -436,7 +436,7 @@ The HomeBrew package manager can be used to provide these packages:
 
 ###### Linux - Dependencies
 
-Different Linux distributions have different package managment systems:
+Different Linux distributions have different package management systems:
 
 Ubuntu:
 
