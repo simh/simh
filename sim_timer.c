@@ -1078,7 +1078,7 @@ fprintf (st, "Minimum Host Sleep Time:       %d ms (%dHz)\n", sim_os_sleep_min_m
 if (sim_os_sleep_min_ms != sim_os_sleep_inc_ms)
     fprintf (st, "Minimum Host Sleep Incr Time:  %d ms\n", sim_os_sleep_inc_ms);
 fprintf (st, "Host Clock Resolution:         %d ms\n", sim_os_clock_resoluton_ms);
-fprintf (st, "Execution Rate:                %s instructions/sec\n", sim_fmt_numeric (inst_per_sec));
+fprintf (st, "Execution Rate:                %s cycles/sec\n", sim_fmt_numeric (inst_per_sec));
 if (sim_idle_enab) {
     fprintf (st, "Idling:                        Enabled\n");
     fprintf (st, "Time before Idling starts:     %d seconds\n", sim_idle_stable);
@@ -1702,9 +1702,20 @@ return SCPE_OK;
 
 void sim_throt_sched (void)
 {
-sim_throt_state = SIM_THROT_STATE_INIT;
-if (sim_throt_type != SIM_THROT_NONE)
-    sim_activate (&sim_throttle_unit, SIM_THROT_WINIT);
+if (sim_throt_type != SIM_THROT_NONE) {
+    if (sim_throt_state == SIM_THROT_STATE_THROTTLE) {  /* Previously calibrated? */
+        /* Reset recalibration reference times */
+        sim_throt_ms_start = sim_os_msec ();
+        sim_throt_inst_start = sim_gtime ();
+        /* Start with prior calibrated delay */
+        sim_activate (&sim_throttle_unit, sim_throt_wait);
+        }
+    else {
+        /* Start calibration initially */
+        sim_throt_state = SIM_THROT_STATE_INIT;
+        sim_activate (&sim_throttle_unit, SIM_THROT_WINIT);
+        }
+    }
 }
 
 void sim_throt_cancel (void)
