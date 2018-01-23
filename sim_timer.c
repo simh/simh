@@ -2106,6 +2106,7 @@ pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
 sim_debug (DBG_TIM, &sim_timer_dev, "_timer_thread() - starting\n");
 
 pthread_mutex_lock (&sim_timer_lock);
+sim_timer_thread_running = TRUE;
 pthread_cond_signal (&sim_timer_startup_cond);   /* Signal we're ready to go */
 while (sim_asynch_timer && sim_is_running) {
     struct timespec start_time, stop_time;
@@ -2179,6 +2180,7 @@ while (sim_asynch_timer && sim_is_running) {
     else {/* Something wants to adjust the queue since the wait condition was signaled */
         }
     }
+sim_timer_thread_running = FALSE;
 pthread_mutex_unlock (&sim_timer_lock);
 
 sim_debug (DBG_TIM, &sim_timer_dev, "_timer_thread() - exiting\n");
@@ -2341,7 +2343,6 @@ if (sim_asynch_timer) {
     pthread_attr_destroy( &attr);
     pthread_cond_wait (&sim_timer_startup_cond, &sim_timer_lock); /* Wait for thread to stabilize */
     pthread_cond_destroy (&sim_timer_startup_cond);
-    sim_timer_thread_running = TRUE;
     }
 pthread_mutex_unlock (&sim_timer_lock);
 #endif
@@ -2397,7 +2398,6 @@ if (sim_timer_thread_running) {
     pthread_cond_signal (&sim_timer_wake);
     pthread_mutex_unlock (&sim_timer_lock);
     pthread_join (sim_timer_thread, NULL);
-    sim_timer_thread_running = FALSE;
     /* Any wallclock queued events are now migrated to the normal event queue */
     while (sim_wallclock_queue != QUEUE_LIST_END) {
         UNIT *uptr = sim_wallclock_queue;
@@ -2551,12 +2551,14 @@ if ((sim_asynch_timer) &&
         }
     if (prvptr == NULL) {                           /* inserting at head */
         uptr->a_next = QUEUE_LIST_END;              /* Temporarily mark as active */
-        while (sim_wallclock_entry) {               /* wait for any prior entry has been digested */
-            sim_debug (DBG_TIM, &sim_timer_dev, "sim_timer_activate_after(%s, %.0f usecs) - queue insert entry %s busy waiting for 1ms\n", 
-                       sim_uname(uptr), usec_delay, sim_uname(sim_wallclock_entry));
-            pthread_mutex_unlock (&sim_timer_lock);
-            sim_os_ms_sleep (1);
-            pthread_mutex_lock (&sim_timer_lock);
+        if (sim_timer_thread_running) {
+            while (sim_wallclock_entry) {               /* wait for any prior entry has been digested */
+                sim_debug (DBG_TIM, &sim_timer_dev, "sim_timer_activate_after(%s, %.0f usecs) - queue insert entry %s busy waiting for 1ms\n", 
+                           sim_uname(uptr), usec_delay, sim_uname(sim_wallclock_entry));
+                pthread_mutex_unlock (&sim_timer_lock);
+                sim_os_ms_sleep (1);
+                pthread_mutex_lock (&sim_timer_lock);
+                }
             }
         sim_wallclock_entry = uptr;
         pthread_mutex_unlock (&sim_timer_lock);
