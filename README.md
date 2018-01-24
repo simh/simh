@@ -1,6 +1,45 @@
-# SIMH v4.0 - Beta
+# SIMH v4.0 - Beta                   [![Coverity Scan Build Status](https://scan.coverity.com/projects/11982/badge.svg)](https://scan.coverity.com/projects/simh)
 
-## WHAT'S NEW                   [![Coverity Scan Build Status](https://scan.coverity.com/projects/11982/badge.svg)](https://scan.coverity.com/projects/simh)
+## Table of Contents:
+[WHAT'S NEW](whats-new)  
+. . [New Simulators](new-simulators)  
+. . [Simulator Front Panel API](simulator-front-panel-api)  
+. . [New Functionality](new-functionality)  
+. . . . [Remote Console Facility](remote-console-facility)  
+. . . . [VAX/PDP11 Enhancements](vaxpdp11-enhancements)  
+. . . . [PDP10 Enhancements](pdp10-enhancements)  
+. . . . [SDS 940 Enhancements](sds-940-enhancements)  
+. . . . [Terminal Multiplexer additions](terminal-multiplexer-additions)  
+. . . . [Video Display Capabilities](video-display-capabilities)  
+. . . . [Asynchronous I/O](asynchronous-io)  
+. . . . [Clock/Timer Enhancements](clocktimer-enhancements)  
+. . . . [Ethernet Transport Enhancements](ethernet-transport-enhancements)  
+. . . . [Disk Extensions](disk-extensions)  
+. . . . [Embedded ROM support](embedded-rom-support)  
+. . . . [Control Flow](control-flow)  
+. . . . [Scriptable interactions with running simulators](scriptable-interactions-with-running-simulators)  
+. . . . [Help](help)  
+. . . . [Generic SCP support Clock Coscheduling as opposed to per simulator implementations](generic-scp-support-clock-coscheduling-as-opposed-to-per-simulator-implementations)  
+. . . . [New SCP Commands](new-scp-commands)  
+. . . . [Command Processing Enhancements](command-[rocessing-enhancements)  
+. . . . . . [Environment variable insertion](environment-variable-insertion)  
+. . . . . . [Command aliases](command-aliases)  
+. . . . . . [Do command argument manipulation](do-command-argument-manipulation)  
+. . [Building and running a simulator](building-and-running-a-simulator)  
+. . . . [Use Prebuilt Windows Simulators](use-prebuilt-sindows-simulators)  
+. . . . [Building simulators yourself](building-simulators-yourself)  
+. . . . . . [Linux/OSX other *nix platforms](linuxosx-other-nix-platforms)  
+. . . . . . . . [Build Dependencies](build-dependencies)  
+. . . . . . . . . . [OS X - Dependencies](os-x--dependencies)  
+. . . . . . . . . . [Linux - Dependencies](linux--dependencies)  
+. . . . . . [Windows](windows)  
+. . . . . . . . [Required related files](required-related-files)  
+. . . . . . . . [Visual Studio (Standard or Express) 2008, 2010, 2012, 2013 or Visual Studio Community 2015](visual-studio-standard-or-express-2008-2010-2012-2013-or-visual-studio-community-2015)  
+. . . . . . . . [MinGW](mingw)  
+. . . . . . [VMS](vms)  
+. . [Problem Reports](problem-reports)  
+
+## WHAT'S NEW
 
 ### New Simulators
 
@@ -141,6 +180,8 @@ Host platforms which have libSDL available can leverage this functionality.
       or throttling is now consistent.  Reasonable idling behavior is 
       now possible without requiring that the host system clock tick be
       10ms or less.
+    * Simulator writers have access to timing services and explicit wall 
+      clock delays where appropriate.
 
 #### Ethernet Transport Enhancements
 	* UDP packet transport.  Direct simulator connections to HECnet can be 
@@ -242,7 +283,7 @@ Interactions with ASSERT command and "DO -e":
 Other related changes/extensions:
 The "!" command (execute a command on the local OS), now returns the command's exit status as the status from the "!" command.  This allows ON conditions to handle error status responses from OS commands and act as desired.
 
-#### Scriptable interactions with running simulators.
+#### Scriptable interactions with running simulators
 
 The EXPECT command now exists to provide a means of reacting to simulator output and the SEND command exists to inject data into programs running within a simulator.
 
@@ -256,13 +297,18 @@ The EXPECT command now exists to provide a means of reacting to simulator output
 
 #### Help
 
+The built-in help system provides a heirarchical oriented help command interface.  
+In addition, there is explicit support for per device help:
+
     HELP dev
     HELP dev ATTACH
     HELP dev SET  (aka HELP SET dev)
     HELP dev SHOW (aka HELP SHOW dev)
     HELP dev REGISTERS
 
-#### Generic scp support Clock Coscheduling as opposed to per simulator implementations.
+#### Generic SCP support Clock Coscheduling as opposed to per simulator implementations
+
+Device simulator authors can easily schedule their device polling activities to allow for efficient simulator execution when polling for device activity while still being well behaved when their simulated system is actually idle.
 
 #### New SCP Commands:
 
@@ -390,7 +436,7 @@ The SHIFT command will shift the %1 thru %9 arguments to the left one position.
 
 ### Use Prebuilt Windows Simulators
 
-Simulators for the Windows platform are built and made available on a regular basis (at least once a week if changes have been made to the codebase).  
+Simulators for the Windows platform are built and made available on a regular basis (at least once a week if substantive changes have been made to the codebase).  
 
 The prebuilt Windows binaries will run on all versions of Microsoft Windows from Windows XP onward.
 
@@ -449,7 +495,7 @@ Ubuntu:
 
 Compiling on windows is supported with recent versions of Microsoft Visual Studio (Standard or Express) and using GCC via the MinGW environment.  Things may also work under Cygwin, but that is not the preferred windows environment.  Not all features will be available as well as with either Visual Studio or MinGW.
 
-##### Required related files.  
+##### Required related files
 The file https://github.com/simh/simh/blob/master/Visual%20Studio%20Projects/0ReadMe_Projects.txt
 
 ##### Visual Studio (Standard or Express) 2008, 2010, 2012, 2013 or Visual Studio Community 2015
