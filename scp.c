@@ -11231,6 +11231,10 @@ return SCPE_OK;
 
 t_stat sim_show_send_input (FILE *st, const SEND *snd)
 {
+const char *dev_name = tmxr_send_line_name (snd);
+uint32 delay = get_default_env_parameter (dev_name, "SIM_SEND_DELAY", SEND_DEFAULT_DELAY);
+uint32 after = get_default_env_parameter (dev_name, "SIM_SEND_AFTER", delay);
+
 fprintf (st, "%s\n", tmxr_send_line_name (snd));
 if (snd->extoff < snd->insoff) {
     fprintf (st, "  %d bytes of pending input Data:\n    ", snd->insoff-snd->extoff);
@@ -11250,6 +11254,10 @@ if ((snd->delay > (sim_timer_inst_per_sec()/1000000.0)) && ((sim_timer_inst_per_
     fprintf (st, "  Minimum of %d instructions (%d microseconds) between characters\n", (int)snd->delay, (int)(snd->delay/(sim_timer_inst_per_sec()/1000000.0)));
 else
     fprintf (st, "  Minimum of %d instructions between characters\n", (int)snd->delay);
+if (after)
+    fprintf (st, "  Default delay before first character input is %u instructions\n", after);
+if (delay)
+    fprintf (st, "  Default delay between character input is %u instructions\n", after);
 if (snd->dptr && (snd->dbit & snd->dptr->dctrl))
     fprintf (st, "  Send Debugging via: SET %s DEBUG%s%s\n", sim_dname(snd->dptr), snd->dptr->debflags ? "=" : "", snd->dptr->debflags ? get_dbg_verb (snd->dbit, snd->dptr) : "");
 return SCPE_OK;

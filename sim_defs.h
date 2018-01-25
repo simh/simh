@@ -403,7 +403,7 @@ typedef uint32          t_addr;
 #define SCPE_AMBREG     (SCPE_BASE + 46)                /* ambiguous register */
 #define SCPE_REMOTE     (SCPE_BASE + 47)                /* remote console command */
 
-#define SCPE_MAX_ERR    (SCPE_BASE + 48)                /* Maximum SCPE Error Value */
+#define SCPE_MAX_ERR    (SCPE_BASE + 47)                /* Maximum SCPE Error Value */
 #define SCPE_KFLAG      0x1000                          /* tti data flag */
 #define SCPE_BREAK      0x2000                          /* tti break flag */
 #define SCPE_NOMESSAGE  0x10000000                      /* message display supression flag */
