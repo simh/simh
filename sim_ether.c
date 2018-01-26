@@ -2434,8 +2434,8 @@ fprintf (st, "    eth0   en0                                  (No description av
 #if defined(HAVE_TAP_NETWORK)
 fprintf (st, "    eth1   tap:tapN                             (Integrated Tun/Tap support)\n");
 #endif
-#if defined(HAVE_SLIRP_NETWORK)
-fprintf (st, "    eth2   vde:device                           (Integrated VDE support)\n");
+#if defined(HAVE_VDE_NETWORK)
+fprintf (st, "    eth2   vde:device{:optional-switch-port}    (Integrated VDE support)\n");
 #endif
 #if defined(HAVE_SLIRP_NETWORK)
 fprintf (st, "    eth3   nat:{optional-nat-parameters}        (Integrated NAT (SLiRP) support)\n");
