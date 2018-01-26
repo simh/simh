@@ -2084,6 +2084,11 @@ if (0 == strncmp("tap:", savname, 4)) {
 else { /* !tap: */
   if (0 == strncmp("vde:", savname, 4)) {
 #if defined(HAVE_VDE_NETWORK)
+    int vdeport = 0;            /* VDE port. zero => assign automatically */
+    char *vdeschem_s = NULL;    /* VDE device scheme ("vde:") */
+    char *vdeswitch_s = NULL;   /* VDE swtich name */
+    char *vdeport_s = NULL;     /* VDE switch port (optional), numeric */
+      
     struct vde_open_args voa;
     const char *devname = savname + 4;
 
@@ -2094,7 +2099,17 @@ else { /* !tap: */
       }
     while (isspace(*devname))
         ++devname;
-    if (!(*handle = (void*) vde_open((char *)devname, (char *)"simh", &voa)))
+    
+    vdeschem_s = strtok(savname,":");  /* Extract scheme               */
+    vdeswitch_s= strtok(NULL,":");     /* Extract switch name          */
+    vdeport_s  = strtok(NULL,":");     /* Extract optional port number */
+
+    if (vdeport_s != NULL) {
+        vdeport = atoi(vdeport_s);
+    }
+      
+    voa.port = vdeport;
+    if (!(*handle = (void*) vde_open((char *)vdeswitch_s, (char *)"simh", &voa)))
       strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
     else {
       *eth_api = ETH_API_VDE;
@@ -2419,8 +2434,8 @@ fprintf (st, "    eth0   en0                                  (No description av
 #if defined(HAVE_TAP_NETWORK)
 fprintf (st, "    eth1   tap:tapN                             (Integrated Tun/Tap support)\n");
 #endif
-#if defined(HAVE_SLIRP_NETWORK)
-fprintf (st, "    eth2   vde:device                           (Integrated VDE support)\n");
+#if defined(HAVE_VDE_NETWORK)
+fprintf (st, "    eth2   vde:device{:optional-switch-port}    (Integrated VDE support)\n");
 #endif
 #if defined(HAVE_SLIRP_NETWORK)
 fprintf (st, "    eth3   nat:{optional-nat-parameters}        (Integrated NAT (SLiRP) support)\n");
