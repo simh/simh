@@ -827,7 +827,7 @@ t_stat ethq_init(ETH_QUE* que, int max)
     que->item = (struct eth_item *) calloc(max, sizeof(struct eth_item));
     if (!que->item) {
       /* failed to allocate memory */
-      sim_printf("EthQ: failed to allocate dynamic queue[%d]\r\n", max);
+      sim_printf("EthQ: failed to allocate dynamic queue[%d]\n", max);
       return SCPE_MEM;
     };
     que->max = max;
@@ -1115,7 +1115,7 @@ static void load_function(const char* function, _func* func_ptr) {
     *func_ptr = (_func)((size_t)dlsym(hLib, function));
 #endif
     if (*func_ptr == 0) {
-    sim_printf ("Eth: Failed to find function '%s' in %s\r\n", function, lib_name);
+    sim_printf ("Eth: Failed to find function '%s' in %s\n", function, lib_name);
     lib_loaded = 3;
   }
 }
@@ -1157,11 +1157,11 @@ int load_pcap(void) {
 #endif
       if (hLib == 0) {
         /* failed to load DLL */
-        sim_printf ("Eth: Failed to load %s\r\n", lib_name);
+        sim_printf ("Eth: Failed to load %s\n", lib_name);
 #ifdef _WIN32
-        sim_printf ("Eth: You must install Npcap or WinPcap 4.x to use networking\r\n");
+        sim_printf ("Eth: You must install Npcap or WinPcap 4.x to use networking\n");
 #else
-        sim_printf ("Eth: You must install libpcap to use networking\r\n");
+        sim_printf ("Eth: You must install libpcap to use networking\n");
 #endif
         lib_loaded = 2;
         break;
@@ -1939,7 +1939,7 @@ return NULL;
 t_stat eth_set_async (ETH_DEV *dev, int latency)
 {
 #if !defined(USE_READER_THREAD) || !defined(SIM_ASYNCH_IO)
-char *msg = "Eth: can't operate asynchronously, must poll\r\n";
+char *msg = "Eth: can't operate asynchronously, must poll\n";
 sim_printf ("%s", msg);
 return SCPE_NOFNC;
 #else
@@ -2003,10 +2003,8 @@ if (0 == strncmp("tap:", savname, 4)) {
   while (isspace(*devname))
       ++devname;
 #if defined(HAVE_TAP_NETWORK)
-  if (!strcmp(savname, "tap:tapN")) {
-    sim_printf ("Eth: Must specify actual tap device name (i.e. tap:tap0)\r\n");
-    return SCPE_OPENERR | SCPE_NOMESSAGE;
-    }
+  if (!strcmp(savname, "tap:tapN"))
+    return sim_messagef (SCPE_OPENERR, "Eth: Must specify actual tap device name (i.e. tap:tap0)\n");
 #endif
 #if (defined(__linux) || defined(__linux__)) && defined(HAVE_TAP_NETWORK)
   if ((tun = open("/dev/net/tun", O_RDWR)) >= 0) {
@@ -2084,17 +2082,29 @@ if (0 == strncmp("tap:", savname, 4)) {
 else { /* !tap: */
   if (0 == strncmp("vde:", savname, 4)) {
 #if defined(HAVE_VDE_NETWORK)
+    char vdeswitch_s[CBUFSIZE]; /* VDE switch name */
+    char vdeport_s[CBUFSIZE];   /* VDE switch port (optional), numeric */
+      
     struct vde_open_args voa;
     const char *devname = savname + 4;
 
     memset(&voa, 0, sizeof(voa));
-    if (!strcmp(savname, "vde:vdedevice")) {
-      sim_printf ("Eth: Must specify actual vde device name (i.e. vde:/tmp/switch)\r\n");
-      return SCPE_OPENERR | SCPE_NOMESSAGE;
-      }
+    if (!strcmp(savname, "vde:vdedevice"))
+      return sim_messagef (SCPE_OPENERR, "Eth: Must specify actual vde device name (i.e. vde:/tmp/switch)\n");
     while (isspace(*devname))
-        ++devname;
-    if (!(*handle = (void*) vde_open((char *)devname, (char *)"simh", &voa)))
+      ++devname;
+    devname = get_glyph_nc (devname, vdeswitch_s, ':'); /* Extract switch name          */
+    devname = get_glyph_nc (devname, vdeport_s, 0);     /* Extract optional port number */
+
+    if (vdeport_s[0]) {                                 /* port provided? */
+      t_stat r;
+
+      voa.port = (int)get_uint (vdeport_s, 10, 255, &r);
+      if (r != SCPE_OK)
+          return sim_messagef (SCPE_OPENERR, "Eth: Invalid vde port number: %s in %s\n", vdeport_s, savname);
+      }
+
+    if (!(*handle = (void*) vde_open((char *)vdeswitch_s, (char *)"simh", &voa)))
       strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
     else {
       *eth_api = ETH_API_VDE;
@@ -2110,7 +2120,7 @@ else { /* !tap: */
       const char *devname = savname + 4;
 
       while (isspace(*devname))
-          ++devname;
+        ++devname;
       if (!(*handle = (void*) sim_slirp_open(devname, opaque, &_slirp_callback, dptr, dbit)))
         strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
       else {
@@ -2127,13 +2137,11 @@ else { /* !tap: */
         char hostport[2*CBUFSIZE];
         const char *devname = savname + 4;
 
-        if (!strcmp(savname, "udp:sourceport:remotehost:remoteport")) {
-          sim_printf ("Eth: Must specify actual udp host and ports(i.e. udp:1224:somehost.com:2234)\r\n");
-          return SCPE_OPENERR | SCPE_NOMESSAGE;
-          }
+        if (!strcmp(savname, "udp:sourceport:remotehost:remoteport"))
+          return sim_messagef (SCPE_OPENERR, "Eth: Must specify actual udp host and ports(i.e. udp:1224:somehost.com:2234)\n");
 
         while (isspace(*devname))
-            ++devname;
+          ++devname;
         if (SCPE_OK != sim_parse_addr_ex (devname, host, sizeof(host), "localhost", port, sizeof(port), localport, sizeof(localport), NULL))
           return SCPE_OPENERR;
 
@@ -2141,23 +2149,19 @@ else { /* !tap: */
           strcpy (localport, port);
         sprintf (hostport, "%s:%s", host, port);
         if ((SCPE_OK == sim_parse_addr (hostport, NULL, 0, NULL, NULL, 0, NULL, "localhost")) &&
-            (0 == strcmp (localport, port))) {
-          sim_printf ("Eth: Must specify different udp localhost ports\r\n");
-          return SCPE_OPENERR | SCPE_NOMESSAGE;
-          }
+            (0 == strcmp (localport, port)))
+          return sim_messagef (SCPE_OPENERR, "Eth: Must specify different udp localhost ports\n");
         *fd_handle = sim_connect_sock_ex (localport, hostport, NULL, NULL, SIM_SOCK_OPT_DATAGRAM);
         if (INVALID_SOCKET == *fd_handle)
-            return SCPE_OPENERR;
+          return SCPE_OPENERR;
         *eth_api = ETH_API_UDP;
         *handle = (void *)1;  /* Flag used to indicated open */
         }
       else { /* not udp:, so attempt to open the parameter as if it were an explicit device name */
 #if defined(HAVE_PCAP_NETWORK)
         *handle = (void*) pcap_open_live(savname, bufsz, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
-        if (!*handle) { /* can't open device */
-          sim_printf ("Eth: pcap_open_live error - %s\r\n", errbuf);
-          return SCPE_OPENERR | SCPE_NOMESSAGE;
-          }
+        if (!*handle)   /* can't open device */
+          return sim_messagef (SCPE_OPENERR, "Eth: pcap_open_live error - %s\n", errbuf);
         *eth_api = ETH_API_PCAP;
 #if !defined(HAS_PCAP_SENDPACKET) && defined (xBSD) && !defined (__APPLE__)
         /* Tell the kernel that the header is fully-formed when it gets it.
@@ -2174,7 +2178,7 @@ else { /* !tap: */
 #ifdef USE_SETNONBLOCK
         /* set ethernet device non-blocking so pcap_dispatch() doesn't hang */
         if (pcap_setnonblock (*handle, 1, errbuf) == -1) {
-          sim_printf ("Eth: Failed to set non-blocking: %s\r\n", errbuf);
+          sim_printf ("Eth: Failed to set non-blocking: %s\n", errbuf);
           }
 #endif
 #if defined (__APPLE__)
@@ -2210,15 +2214,15 @@ if (bpf_filter && (*eth_api == ETH_API_PCAP)) {
   /* compile filter string */
   if ((status = pcap_compile((pcap_t*)(*handle), &bpf, bpf_filter, 1, bpf_netmask)) < 0) {
     sprintf(errbuf, "%s", pcap_geterr((pcap_t*)(*handle)));
-    sim_printf("Eth: pcap_compile error: %s\r\n", errbuf);
+    sim_printf("Eth: pcap_compile error: %s\n", errbuf);
     /* show erroneous BPF string */
-    sim_printf ("Eth: BPF string is: |%s|\r\n", bpf_filter);
+    sim_printf ("Eth: BPF string is: |%s|\n", bpf_filter);
     }
   else {
     /* apply compiled filter string */
     if ((status = pcap_setfilter((pcap_t*)(*handle), &bpf)) < 0) {
       sprintf(errbuf, "%s", pcap_geterr((pcap_t*)(*handle)));
-      sim_printf("Eth: pcap_setfilter error: %s\r\n", errbuf);
+      sim_printf("Eth: pcap_setfilter error: %s\n", errbuf);
       }
     else {
 #ifdef USE_SETNONBLOCK
@@ -2279,16 +2283,14 @@ strncpy (namebuf, savname, sizeof(namebuf)-1);
 savname = namebuf;
 r = _eth_open_port(namebuf, &dev->eth_api, &dev->handle, &dev->fd_handle, errbuf, NULL, (void *)dev, dptr, dbit);
 
-if (errbuf[0]) {
-  sim_printf ("Eth: open error - %s\r\n", errbuf);
-  return SCPE_OPENERR | SCPE_NOMESSAGE;
-  }
+if (errbuf[0])
+  return sim_messagef (SCPE_OPENERR, "Eth: open error - %s\n", errbuf);
 if (r != SCPE_OK)
   return r;
 
 if (!strcmp (desc, "No description available"))
     strcpy (desc, "");
-sim_printf ("Eth: opened OS device %s%s%s\r\n", savname, desc[0] ? " - " : "", desc);
+sim_printf ("Eth: opened OS device %s%s%s\n", savname, desc[0] ? " - " : "", desc);
 
 /* get the NIC's hardware MAC address */
 eth_get_nic_hw_addr(dev, savname);
@@ -2399,7 +2401,7 @@ ethq_destroy (&dev->read_queue);         /* release FIFO queue */
 #endif
 
 _eth_close_port (dev->eth_api, pcap, pcap_fd);
-sim_printf ("Eth: closed %s\r\n", dev->name);
+sim_printf ("Eth: closed %s\n", dev->name);
 
 /* clean up the mess */
 free(dev->name);
@@ -2419,8 +2421,8 @@ fprintf (st, "    eth0   en0                                  (No description av
 #if defined(HAVE_TAP_NETWORK)
 fprintf (st, "    eth1   tap:tapN                             (Integrated Tun/Tap support)\n");
 #endif
-#if defined(HAVE_SLIRP_NETWORK)
-fprintf (st, "    eth2   vde:device                           (Integrated VDE support)\n");
+#if defined(HAVE_VDE_NETWORK)
+fprintf (st, "    eth2   vde:device{:switch-port-number}      (Integrated VDE support)\n");
 #endif
 #if defined(HAVE_SLIRP_NETWORK)
 fprintf (st, "    eth3   nat:{optional-nat-parameters}        (Integrated NAT (SLiRP) support)\n");
@@ -2541,11 +2543,11 @@ status = _eth_write (dev, &send, NULL);
 if (status != SCPE_OK) {
   const char *msg;
   msg = (dev->eth_api == ETH_API_PCAP) ?
-      "Eth: Error Transmitting packet: %s\r\n"
-        "You may need to run as root, or install a libpcap version\r\n"
-        "which is at least 0.9 from your OS vendor or www.tcpdump.org\r\n" :
-      "Eth: Error Transmitting packet: %s\r\n"
-        "You may need to run as root.\r\n";
+      "Eth: Error Transmitting packet: %s\n"
+        "You may need to run as root, or install a libpcap version\n"
+        "which is at least 0.9 from your OS vendor or www.tcpdump.org\n" :
+      "Eth: Error Transmitting packet: %s\n"
+        "You may need to run as root.\n";
   sim_printf(msg, strerror(errno));
   return status;
   }
@@ -3767,15 +3769,15 @@ if (dev->eth_api == ETH_API_PCAP) {
   /* compile filter string */
   if ((status = pcap_compile((pcap_t*)dev->handle, &bpf, buf, 1, bpf_netmask)) < 0) {
     sprintf(errbuf, "%s", pcap_geterr((pcap_t*)dev->handle));
-    sim_printf("Eth: pcap_compile error: %s\r\n", errbuf);
+    sim_printf("Eth: pcap_compile error: %s\n", errbuf);
     /* show erroneous BPF string */
-    sim_printf ("Eth: BPF string is: |%s|\r\n", buf);
+    sim_printf ("Eth: BPF string is: |%s|\n", buf);
     }
   else {
     /* apply compiled filter string */
     if ((status = pcap_setfilter((pcap_t*)dev->handle, &bpf)) < 0) {
       sprintf(errbuf, "%s", pcap_geterr((pcap_t*)dev->handle));
-      sim_printf("Eth: pcap_setfilter error: %s\r\n", errbuf);
+      sim_printf("Eth: pcap_setfilter error: %s\n", errbuf);
       }
     else {
       /* Save BPF filter string */
@@ -3896,7 +3898,7 @@ if (used < max) {
 #endif
 #ifdef HAVE_VDE_NETWORK
 if (used < max) {
-  sprintf(list[used].name, "%s", "vde:device");
+  sprintf(list[used].name, "%s", "vde:device{:switch-port-number}");
   sprintf(list[used].desc, "%s", "Integrated VDE support");
   list[used].eth_api = ETH_API_VDE;
   ++used;
@@ -3933,7 +3935,7 @@ memset(list, 0, max*sizeof(*list));
 errbuf[0] = '\0';
 /* retrieve the device list */
 if (pcap_findalldevs(&alldevs, errbuf) == -1) {
-  sim_printf ("Eth: error in pcap_findalldevs: %s\r\n", errbuf);
+  sim_printf ("Eth: error in pcap_findalldevs: %s\n", errbuf);
   }
 else {
   /* copy device list into the passed structure */
@@ -3956,7 +3958,7 @@ i = eth_host_devices(i, max, list);
 
 /* If no devices were found and an error message was left in the buffer, display it */
 if ((i == 0) && (errbuf[0])) {
-    sim_printf ("Eth: pcap_findalldevs warning: %s\r\n", errbuf);
+    sim_printf ("Eth: pcap_findalldevs warning: %s\n", errbuf);
     }
 
 /* return device count */
