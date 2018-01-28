@@ -1737,7 +1737,6 @@ t_stat sim_throt_svc (UNIT *uptr)
 int32 tmr;
 uint32 delta_ms;
 double a_cps, d_cps, delta_inst;
-t_bool throt_changed = FALSE;
 
 switch (sim_throt_state) {
 
@@ -1836,7 +1835,20 @@ switch (sim_throt_state) {
             sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc() Throttle values a_cps = %f, d_cps = %f, wait = %d, sleep = %d ms\n", 
                                                 a_cps, d_cps, sim_throt_wait, sim_throt_sleep_time);
             sim_throt_cps = d_cps;                  /* save the desired rate */
-            throt_changed = TRUE;
+            /* Run through all timers and adjust the calibration for each */
+            /* one that is running to reflect the throttle rate */
+            for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
+                if (rtc_hz[tmr]) {                                      /* running? */
+                    rtc_currd[tmr] = (int32)(sim_throt_cps / rtc_hz[tmr]);/* use throttle calibration */
+                    rtc_ticks[tmr] = rtc_hz[tmr] - 1;                     /* force clock calibration on next tick */
+                    rtc_rtime[tmr] = sim_throt_ms_start - 1000 + 1000/rtc_hz[tmr];/* adjust calibration parameters to reflect throttled rate */
+                    rtc_gtime[tmr] = sim_throt_inst_start - sim_throt_cps + sim_throt_cps/rtc_hz[tmr];
+                    rtc_nxintv[tmr] = 1000;
+                    rtc_based[tmr] = rtc_currd[tmr];
+                    if (sim_clock_unit[tmr])
+                        sim_activate_abs (sim_clock_unit[tmr], rtc_currd[tmr]);/* reschedule next tick */
+                    }
+                }
             }
         break;
 
@@ -1883,7 +1895,6 @@ switch (sim_throt_state) {
                     sim_throt_cps = d_cps;                      /* save the desired rate */
                     sim_throt_ms_start = sim_os_msec ();
                     sim_throt_inst_start = sim_gtime();
-                    throt_changed = TRUE;
                     }
                 }
             else {                                      /* record instruction rate */
@@ -1897,17 +1908,6 @@ switch (sim_throt_state) {
         break;
         }
 
-if (throt_changed) {
-    /* Run through all timers and adjust the calibration for each */
-    /* one that is running to reflect the throttle rate */
-    for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
-        if (rtc_hz[tmr]) {                                      /* running? */
-            rtc_currd[tmr] = (int32)(sim_throt_cps / rtc_hz[tmr]);/* use throttle calibration */
-            if (sim_clock_unit[tmr])
-                sim_activate_abs (sim_clock_unit[tmr], rtc_currd[tmr]);/* reschedule next tick */
-            }
-        }
-    }
 sim_activate (uptr, sim_throt_wait);                    /* reschedule */
 return SCPE_OK;
 }
