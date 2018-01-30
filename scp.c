@@ -1940,6 +1940,7 @@ ASSERT      failure have several different actions:
       " The -i switch, if present, causes comparisons to be case insensitive.\n"
       " <string1> and <string2> are quoted string values which may have\n"
       " environment variables substituted as desired.\n"
+      " Either quoted string may alternatively be an environment variable name.\n"
       " <compare-op> may be one of:\n\n"
       "++==  - equal\n"
       "++EQU - equal\n"
@@ -3676,8 +3677,8 @@ return 1;
        <logical-op> and <conditional-op> are the same as that
        allowed for examine and deposit search specifications.
 
-   Syntax: ASSERT {-i} {NOT} "<string1>" <compare-op> "<string2>"
-   Syntax: IF {-i} {NOT} "<string1>" <compare-op> "<string2>" commandtoprocess{; additionalcommandtoprocess}...
+   Syntax: ASSERT {-i} {NOT} "<string1>"|EnvVarName1 <compare-op> "<string2>"|EnvVarName2
+   Syntax: IF {-i} {NOT} "<string1>"|EnvVarName1 <compare-op> "<string2>"|EnvVarName2 commandtoprocess{; additionalcommandtoprocess}...
 
        If -i is specified, the comparisons are done in a case insensitive manner.
        If NOT is specified, the resulting expression value is inverted.
@@ -3697,6 +3698,28 @@ return 1;
             >=  - greater than or equal
             GEQ - greater than or equal
 */
+static CONST char *_get_string (CONST char *iptr, char *optr, char mchar)
+{
+const char *ap;
+CONST char *tptr, *gptr;
+REG *rptr;
+
+tptr = (CONST char *)get_glyph_gen (iptr, optr, mchar, (sim_switches & SWMASK ('I')), TRUE, '\\');
+if (*optr != '"') {
+    ap = getenv (optr);
+    if (!ap)
+        return tptr;
+    /* for legacy ASSERT/IF behavior give precidence to REGister names over Environment Variables */
+    get_glyph (optr, optr, 0);
+    rptr = find_reg (optr, &gptr, sim_dfdev);
+    if (rptr)
+        return tptr;
+    snprintf (optr, CBUFSIZE - 1, "\"%s\"", ap);
+    get_glyph_gen (optr, optr, 0, (sim_switches & SWMASK ('I')), TRUE, '\\');
+    }
+return tptr;
+}
+
 t_stat assert_cmd (int32 flag, CONST char *cptr)
 {
 char gbuf[CBUFSIZE], gbuf2[CBUFSIZE];
@@ -3725,7 +3748,8 @@ if (!strcmp (gbuf, "EXIST")) {                          /* File Exist Test? */
     Exist = TRUE;                                       /* remember that, and */
     cptr = (CONST char *)tptr;
     }
-if (Exist || (*cptr == '"')) {                          /* quoted string comparison? */
+tptr = _get_string (cptr, gbuf, '=');                   /* get first string */
+if (Exist || (*gbuf == '"')) {                          /* quoted string comparison? */
     char op[CBUFSIZE];
     static struct {
         const char *op;
@@ -3743,16 +3767,14 @@ if (Exist || (*cptr == '"')) {                          /* quoted string compari
             {"<=",   0, -1, FALSE},
             {"LEQ",  0, -1, FALSE},
             {">",    1,  1, FALSE},
-            {"GTR",  1,      1, FALSE},
+            {"GTR",  1,  1, FALSE},
             {">=",   0,  1, FALSE},
             {"GEQ",  0,  1, FALSE},
             {NULL}};
 
-    tptr = (CONST char *)get_glyph_gen (cptr, gbuf, '=', (sim_switches & SWMASK ('I')), TRUE, '\\');
-                                                    /* get first string */
     if (!*tptr)
         return SCPE_2FARG;
-    cptr += strlen (gbuf);
+    cptr = tptr;
     while (sim_isspace (*cptr))                         /* skip spaces */
         ++cptr;
     if (!Exist) {
@@ -3765,8 +3787,7 @@ if (Exist || (*cptr == '"')) {                          /* quoted string compari
         cptr += strlen (op);
         while (sim_isspace (*cptr))                         /* skip spaces */
             ++cptr;
-        cptr = (CONST char *)get_glyph_gen (cptr, gbuf2, 0, (sim_switches & SWMASK ('I')), TRUE, '\\');
-                                                            /* get second string */
+        cptr = _get_string (cptr, gbuf2, 0);                /* get second string */
         if (*cptr) {                                        /* more? */
             if (flag)                                       /* ASSERT has no more args */
                 return SCPE_2MARG;
@@ -3808,7 +3829,7 @@ else {
             addr = sim_vm_parse_addr (sim_dfdev, gbuf, &gptr);
         else
             addr = (t_addr) strtotv (gbuf, &gptr, sim_dfdev ? sim_dfdev->dradix : sim_dflt_dev->dradix);
-        if (gbuf == gptr)                               /* error? */
+        if (gbuf == gptr)                               /* not register? */
             return SCPE_NXREG;
         }
     if (*gptr != 0)                                     /* more? must be search */
