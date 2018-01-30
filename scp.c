@@ -565,7 +565,7 @@ static double sim_time;
 static uint32 sim_rtime;
 static int32 noqueue_time;
 volatile int32 stop_cpu = 0;
-static sim_stop_sleep_ms = 250;
+static unsigned int sim_stop_sleep_ms = 250;
 static char **sim_argv;
 t_value *sim_eval = NULL;
 static t_value sim_last_val;
