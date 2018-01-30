@@ -230,17 +230,16 @@ The following extensions to the SCP command language without affecting prior beh
                                  targets of goto's, they could be used to 
                                  provide comments in do command files, for 
                                  example (":: This is a comment")
+    RETURN {status}              Return from the current do command file 
+                                 execution with the specified status or
+                                 the status from the last executed command 
+                                 if no status is specified.  Status can be
+                                 a number or a SCPE_<conditionname> name 
+                                 string.
     SET ON                       Enables error trapping for currently defined 
                                  traps (by ON commands)
     SET NOON                     Disables error trapping for currently 
                                  defined traps (by ON commands)
-    RETURN                       Return from the current do command file 
-                                 execution with the status from the last 
-                                 executed command
-    RETURN <statusvalue>         Return from the current do command file 
-                                 execution with the indicated status.  Status 
-                                 can be a number or a SCPE_<conditionname> 
-                                 name string.
     ON <statusvalue> commandtoprocess{; additionalcommandtoprocess}
                                  Sets the action(s) to take when the specific 
                                  error status is returned by a command in the 
@@ -256,16 +255,25 @@ The following extensions to the SCP command language without affecting prior beh
                                  specified with each delimited by a semicolon 
                                  character (just like breakpoint action 
                                  commands).
-    ON <statusvalue>                   
+    ON CONTROL_C commandtoprocess{; additionalcommandtoprocess}
+                                 Specifies particular actions to perform when
+                                 the operator enters CTRL+C while a command
+                                 procedure is running.  The default action is 
+                                 to exit the current and any nested command 
+                                 procedures and return to the sim> input prompt.
+    ON <statusvalue>             Clears the action(s) to take when condition occurs
     ON ERROR                     Clears the default actions to take when any 
                                  otherwise unspecified error status is 
                                  returned by a command in the currently 
                                  running do command file.
+    ON CONTROL_C
+                                 Restores the default CTRL+C behavior for the
+                                 currently running command procedure.
 
 
 Error traps can be taken for any command which returns a status other than SCPE_STEP, SCPE_OK, and SCPE_EXIT.   
 
-ON Traps can specify any status value from the following list: NXM, UNATT, IOERR, CSUM, FMT, NOATT, OPENERR, MEM, ARG, STEP, UNK, RO, INCOMP, STOP, TTIERR, TTOERR, EOF, REL, NOPARAM, ALATT, TIMER, SIGERR, TTYERR, SUB, NOFNC, UDIS, NORO, INVSW, MISVAL, 2FARG, 2MARG, NXDEV, NXUN, NXREG, NXPAR, NEST, IERR, MTRLNT, LOST, TTMO, STALL, AFAIL.  These values can be indicated by name or by their internal numeric value (not recommended).
+ON Traps can specify any status value from the following list: NXM, UNATT, IOERR, CSUM, FMT, NOATT, OPENERR, MEM, ARG, STEP, UNK, RO, INCOMP, STOP, TTIERR, TTOERR, EOF, REL, NOPARAM, ALATT, TIMER, SIGERR, TTYERR, SUB, NOFNC, UDIS, NORO, INVSW, MISVAL, 2FARG, 2MARG, NXDEV, NXUN, NXREG, NXPAR, NEST, IERR, MTRLNT, LOST, TTMO, STALL, AFAIL, NOTATT, AMBREG.  These values can be indicated by name or by their internal numeric value (not recommended).
 
 Interactions with ASSERT command and "DO -e":
 

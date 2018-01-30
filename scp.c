@@ -565,6 +565,7 @@ static double sim_time;
 static uint32 sim_rtime;
 static int32 noqueue_time;
 volatile int32 stop_cpu = 0;
+static sim_stop_sleep_ms = 250;
 static char **sim_argv;
 t_value *sim_eval = NULL;
 static t_value sim_last_val;
@@ -1557,6 +1558,10 @@ static const char simh_help[] =
       " Assertion failed\n"
       "5 INVREM\n"
       " Invalid remote console command\n"
+      "5 NOTATT\n"
+      " Not attached \n"
+      "5 AMBREG\n"
+      " Ambiguous register\n"
 #define HLP_SHIFT       "*Commands Executing_Command_Files SHIFT"
       "3SHIFT\n"
       "++shift                    shift the command file's positional parameters\n"
@@ -1564,10 +1569,59 @@ static const char simh_help[] =
       "3CALL\n"
       "++call                     transfer control to a labeled subroutine\n"
       "                         a command file.\n"
-#define HLP_ON          "*Commands Executing_Command_Files ON"
-      "3ON\n"
-      "++on <condition> <action>  perform action(s) after condition\n"
-      "++on <condition>           clear action for specific condition\n"
+       /***************** 80 character line width template *************************/
+#define HLP_ON          "*Commands Executing_Command_Files Error_Trapping"
+      "3Error Trapping\n"
+      " Error traps can be taken when any command returns a non success status.\n"
+      " Actions to be performed for particular status returns are specified with\n"
+      " the ON command.\n"
+      "4Enabling Error Traps\n"
+      " Error trapping is enabled with:\n\n"
+      "++set on                   enable error traps\n"
+      "4Disabling Error Traps\n"
+      " Error trapping is disabled with:\n\n"
+      "++set noon                 disable error traps\n"
+      "4ON\n"
+      " To set the action(s) to take when a specific error status is returned by\n"
+      " a command in the currently running do command file:\n\n"
+      "++on <statusvalue> commandtoprocess{; additionalcommandtoprocess}\n\n"
+      " To clear the action(s) taken take when a specific error status is returned:\n\n"
+      "++on <statusvalue>\n\n"
+      " To set the default action(s) to take when any otherwise unspecified error\n"
+      " status is returned by a command in the currently running do command file:\n\n"
+      "++on error commandtoprocess{; additionalcommandtoprocess}\n\n"
+      " To clear the default action(s) taken when any otherwise unspecified error\n"
+      " status is returned:\n\n"
+      "++on error\n"
+      "5Parameters\n"
+      " Error traps can be taken for any command which returns a status other\n"
+      " than SCPE_STEP, SCPE_OK, and SCPE_EXIT.\n\n"
+      " ON Traps can specify any of these status values:\n\n"
+      "++NXM, UNATT, IOERR, CSUM, FMT, NOATT, OPENERR, MEM, ARG,\n"
+      "++STEP, UNK, RO, INCOMP, STOP, TTIERR, TTOERR, EOF, REL,\n"
+      "++NOPARAM, ALATT, TIMER, SIGERR, TTYERR, SUB, NOFNC, UDIS,\n"
+      "++NORO, INVSW, MISVAL, 2FARG, 2MARG, NXDEV, NXUN, NXREG,\n"
+      "++NXPAR, NEST, IERR, MTRLNT, LOST, TTMO, STALL, AFAIL,\n"
+      "++NOTATT, AMBREG\n\n"
+      " These values can be indicated by name or by their internal\n"
+      " numeric value (not recommended).\n"
+      /***************** 80 character line width template *************************/
+      "3CONTROL-C Trapping\n"
+      " A special ON trap is available to describe action(s) to be taken\n"
+      " when CONTROL_C (aka SIGINT) occurs during the execution of\n"
+      " simh commands and/or command procedures.\n\n"
+      "++on CONTROL_C <action>    perform action(s) after CTRL+C\n"
+      "++on CONTROL_C             restore default CTRL+C action\n\n"
+      " The default ON CONTROL_C handler will exit nested DO command\n"
+      " procedures and return to the sim> prompt.\n\n"
+      " Note 1: When a simulator is executing instructions entering CTRL+C\n"
+      "+will cause the CNTL+C character to be delivered to the simulator as\n"
+      "+input.  The simulator instruction execution can be stopped by entering\n"
+      "+the WRU character (usually CTRL+E).  Once instruction execution has\n"
+      "+stopped, CTRL+C can be entered and potentially acted on by the\n"
+      "+ON CONTROL_C trap handler.\n"
+      " Note 2: The ON CONTROL_C trapping is not affected by the SET ON and\n"
+      "+SET NOON commands.\n"
 #define HLP_PROCEED     "*Commands Executing_Command_Files PROCEED"
 #define HLP_IGNORE      "*Commands Executing_Command_Files PROCEED"
        /***************** 80 character line width template *************************/
@@ -1576,49 +1630,21 @@ static const char simh_help[] =
       " placeholders for an ON action condition which should be explicitly ignored\n"
       "++proceed                  continue command file execution without doing anything\n"
       "++ignore                   continue command file execution without doing anything\n"
-
-#if 0
-
-    SET ON                       Enables error trapping for currently defined 
-                                 traps (by ON commands)
-    SET NOON                     Disables error trapping for currently 
-                                 defined traps (by ON commands)
-    ON <statusvalue> commandtoprocess{; additionalcommandtoprocess}
-                                 Sets the action(s) to take when the specific 
-                                 error status is returned by a command in the 
-                                 currently running do command file.  Multiple 
-                                 actions can be specified with each delimited 
-                                 by a semicolon character (just like 
-                                 breakpoint action commands).
-    ON ERROR commandtoprocess{; additionalcommandtoprocess}
-                                 Sets the default action(s) to take when any 
-                                 otherwise unspecified error status is returned 
-                                 by a command in the currently running do 
-                                 command file.  Multiple actions can be 
-                                 specified with each delimited by a semicolon 
-                                 character (just like breakpoint action 
-                                 commands).
-    ON <statusvalue>                   
-    ON ERROR                     Clears the default actions to take when any 
-                                 otherwise unspecified error status is 
-                                 returned by a command in the currently 
-                                 running do command file.
-
-
-Error traps can be taken for any command which returns a status other than SCPE_STEP, SCPE_OK, and SCPE_EXIT.   
-
-ON Traps can specify any status value from the following list: NXM, UNATT, IOERR, CSUM, FMT, NOATT, OPENERR, MEM, ARG, STEP, UNK, RO, INCOMP, STOP, TTIERR, TTOERR, EOF, REL, NOPARAM, ALATT, TIMER, SIGERR, TTYERR, SUB, NOFNC, UDIS, NORO, INVSW, MISVAL, 2FARG, 2MARG, NXDEV, NXUN, NXREG, NXPAR, NEST, IERR, MTRLNT, LOST, TTMO, STALL, AFAIL.  These values can be indicated by name or by their internal numeric value (not recommended).
-
-Interactions with ASSERT command and "DO -e":
-DO -e       is equivalent to SET ON, which by itself it equivalent to "SET ON; ON ERROR RETURN".
-ASSERT      failure have several different actions:
-       If error trapping is not enabled then AFAIL causes exit from the current do command file.
-       If error trapping is enabled and an explicit "ON AFAIL" action is defined, then the specified action is performed.
-       If error trapping is enabled and no "ON AFAIL" action is defined, then an AFAIL causes exit from the current do command file.
-
-#endif
-
-
+      "3DO Command Processing Interactions With ASSERT\n"
+      " The command:\n\n"
+      "++DO -e commandfile\n\n"
+      " is equivalent to starting the invoked command file with:\n\n"
+      "++SET ON\n\n"
+      " which by itself it equivalent to:\n\n"
+      "++SET ON\n"
+      "++ON ERROR RETURN\n\n"
+      " ASSERT failures have several different actions:\n\n"
+      "+*   If error trapping is not enabled then AFAIL causes exit from the\n"
+      "++current do command file.\n"
+      "+*   If error trapping is enabled and an explicit \"ON AFAIL\" action\n"
+      "++is defined, then the specified action is performed.\n"
+      "+*   If error trapping is enabled and no \"ON AFAIL\" action is defined,\n"
+      "++then an AFAIL causes exit from the current do command file.\n"
 #define HLP_ECHO        "*Commands Executing_Command_Files Displaying_Arbitrary_Text ECHO_Command"
        /***************** 80 character line width template *************************/
       "3Displaying Arbitrary Text\n"
@@ -1851,7 +1877,7 @@ ASSERT      failure have several different actions:
       " 'm' for minutes, 'h' for hours or 'd' for days.  NUMBER may be an\n"
       " arbitrary floating point number.  Given two or more arguments, pause\n"
       " for the amount of time specified by the sum of their values.\n"
-      " NOTE: A SLEEP command is interruptable with SIGINT (^C).\n\n"
+      " NOTE: A SLEEP command is interruptable with SIGINT (CTRL+C).\n\n"
       /***************** 80 character line width template *************************/
 #define HLP_ASSERT      "*Commands Executing_Command_Files Testing_Simulator_State"
 #define HLP_IF          "*Commands Executing_Command_Files Testing_Simulator_State"
@@ -2268,6 +2294,7 @@ if ((stat = sim_brk_init ()) != SCPE_OK) {
         sim_error_text (stat));
     return 0;
     }
+signal (SIGINT, int_handler);
 if (!sim_quiet) {
     printf ("\n");
     show_version (stdout, NULL, NULL, 0, NULL);
@@ -2356,16 +2383,32 @@ CTAB *cmdp;
 
 stat = SCPE_BARE_STATUS(stat);                          /* remove possible flag */
 while (stat != SCPE_EXIT) {                             /* in case exit */
+    if (stop_cpu) {                                     /* SIGINT happened? */
+        stop_cpu = FALSE;
+        if (!sim_ttisatty()) {
+            stat = SCPE_EXIT;
+            break;
+            }
+        if (sim_on_actions[sim_do_depth][SCPE_MAX_ERR])
+            sim_brk_setact (sim_on_actions[sim_do_depth][SCPE_MAX_ERR]);
+        }
     if ((cptr = sim_brk_getact (cbuf, sizeof(cbuf))))   /* pending action? */
         printf ("%s%s\n", sim_prompt, cptr);            /* echo */
-    else if (sim_vm_read != NULL) {                     /* sim routine? */
-        printf ("%s", sim_prompt);                      /* prompt */
-        cptr = (*sim_vm_read) (cbuf, sizeof(cbuf), stdin);
+    else {
+        if (sim_vm_read != NULL) {                      /* sim routine? */
+            printf ("%s", sim_prompt);                  /* prompt */
+            cptr = (*sim_vm_read) (cbuf, sizeof(cbuf), stdin);
+            }
+        else
+            cptr = read_line_p (sim_prompt, cbuf, sizeof(cbuf), stdin);/* read with prmopt*/
         }
-    else cptr = read_line_p (sim_prompt, cbuf, sizeof(cbuf), stdin);/* read with prmopt*/
-    if (cptr == NULL) {                                 /* EOF? */
-        if (sim_ttisatty()) continue;                   /* ignore tty EOF */
-        else break;                                     /* otherwise exit */
+    if (cptr == NULL) {                                 /* EOF? or SIGINT? */
+        if (sim_ttisatty()) {
+            printf ("\n");
+            continue;                                   /* ignore tty EOF */
+            }
+        else
+            break;                                      /* otherwise exit */
         }
     if (*cptr == 0)                                     /* ignore blank */
         continue;
@@ -3147,7 +3190,7 @@ if (flag >= 0) {                                        /* Only bump nesting fro
     ++sim_do_depth;
     if (sim_on_inherit) {                               /* inherit ON condition actions? */
         sim_on_check[sim_do_depth] = sim_on_check[sim_do_depth-1]; /* inherit On mode */
-        for (i=0; i<SCPE_MAX_ERR; i++) {                /* replicate any on commands */
+        for (i=0; i<=SCPE_MAX_ERR; i++) {               /* replicate appropriate on commands */
             if (sim_on_actions[sim_do_depth-1][i]) {
                 sim_on_actions[sim_do_depth][i] = (char *)malloc(1+strlen(sim_on_actions[sim_do_depth-1][i]));
                 if (NULL == sim_on_actions[sim_do_depth][i]) {
@@ -3186,6 +3229,14 @@ if (errabort)                                           /* -e flag? */
     set_on (1, NULL);                                   /* equivalent to ON ERROR RETURN */
 
 do {
+    if (stop_cpu) {                                     /* SIGINT? */
+        if (sim_on_actions[sim_do_depth][SCPE_MAX_ERR]) {
+            stop_cpu = FALSE;
+            sim_brk_setact (sim_on_actions[sim_do_depth][SCPE_MAX_ERR]);/* Use specified action */
+            }
+        else
+            break;                                      /* Exit this command procedure */
+        }
     sim_do_ocptr[sim_do_depth] = cptr = sim_brk_getact (cbuf, sizeof(cbuf)); /* get bkpt action */
     if (!sim_do_ocptr[sim_do_depth]) {                  /* no pending action? */
         sim_do_ocptr[sim_do_depth] = cptr = read_line (cbuf, sizeof(cbuf), fpin);/* get cmd line */
@@ -3222,7 +3273,8 @@ do {
             else
                 stat = cmdp->action (cmdp->arg, cptr);  /* exec other cmd */
         }
-    else stat = SCPE_UNK;                               /* bad cmd given */
+    else
+        stat = SCPE_UNK;                                /* bad cmd given */
     echo = sim_do_echo;                                 /* Allow for SET VERIFY */
     stat_nomessage = stat & SCPE_NOMESSAGE;             /* extract possible message supression flag */
     stat_nomessage = stat_nomessage || (!sim_show_message);/* Apply global suppression */
@@ -3232,7 +3284,8 @@ do {
          (cmdp->action != &goto_cmd) &&
          (cmdp->action != &on_cmd) &&
          (cmdp->action != &echo_cmd) &&
-         (cmdp->action != &echof_cmd)))
+         (cmdp->action != &echof_cmd) &&
+         (cmdp->action != &sleep_cmd)))
         sim_last_cmd_stat = stat;                       /* save command error status */
     switch (stat) {
         case SCPE_AFAIL:
@@ -3287,7 +3340,7 @@ if (flag >= 0) {
     sim_quiet = saved_sim_quiet;                        /* restore quiet mode we entered with */
     }
 if ((flag >= 0) || (!sim_on_inherit)) {
-    for (i=0; i<SCPE_MAX_ERR; i++) {                    /* release any on commands */
+    for (i=0; i<=SCPE_MAX_ERR; i++) {                    /* release any on commands */
         free (sim_on_actions[sim_do_depth][i]);
         sim_on_actions[sim_do_depth][i] = NULL;
         }
@@ -3785,16 +3838,16 @@ if (Exist || (*gbuf == '"')) {                          /* quoted string compari
         if (!optr->op)
             return sim_messagef (SCPE_ARG, "Invalid operator: %s\n", op);
         cptr += strlen (op);
-        while (sim_isspace (*cptr))                         /* skip spaces */
+        while (sim_isspace (*cptr))                     /* skip spaces */
             ++cptr;
-        cptr = _get_string (cptr, gbuf2, 0);                /* get second string */
-        if (*cptr) {                                        /* more? */
-            if (flag)                                       /* ASSERT has no more args */
+        cptr = _get_string (cptr, gbuf2, 0);            /* get second string */
+        if (*cptr) {                                    /* more? */
+            if (flag)                                   /* ASSERT has no more args */
                 return SCPE_2MARG;
             }
         else {
-            if (!flag)                                      
-                return SCPE_2FARG;                          /* IF needs actions! */
+            if (!flag)
+                return SCPE_2FARG;                      /* IF needs actions! */
             }
         result = sim_cmp_string (gbuf, gbuf2);
         result = ((result == optr->aval) || (result == optr->bval));
@@ -4100,8 +4153,6 @@ t_stat sleep_cmd (int32 flag, CONST char *cptr)
 char *tptr;
 double wait;
 
-stop_cpu = 0;
-signal (SIGINT, int_handler);
 while (*cptr) {
     wait = strtod (cptr, &tptr);
     switch (*tptr) {
@@ -4129,7 +4180,6 @@ while (*cptr) {
             wait *= (24.0*60.0*60.0);
             break;
         default:
-            signal (SIGINT, SIG_DFL);                               /* cancel WRU */
             return sim_messagef (SCPE_ARG, "Invalid Sleep unit '%c'\n", *cptr);
         }
     wait *= 1000.0;                             /* Convert to Milliseconds */
@@ -4139,8 +4189,7 @@ while (*cptr) {
     if ((wait > 0.0) && (!stop_cpu))
         sim_os_ms_sleep ((unsigned)wait);
     }
-signal (SIGINT, SIG_DFL);                               /* cancel WRU */
-stop_cpu = 0;
+stop_cpu = 0;                   /* Clear in case sleep was interrupted */
 return SCPE_OK;
 }
 
@@ -4241,9 +4290,15 @@ cptr = get_glyph (cptr, gbuf, 0);
 if ('\0' == gbuf[0]) return SCPE_ARG;                   /* unspecified condition */
 if (0 == strcmp("ERROR", gbuf))
     cond = 0;
-else
-    if (SCPE_OK != sim_string_to_stat (gbuf, &cond))
-        return SCPE_ARG;
+else {
+    if (SCPE_OK != sim_string_to_stat (gbuf, &cond)) {
+        if ((MATCH_CMD (gbuf, "CONTROL_C") == 0) || 
+            (MATCH_CMD (gbuf, "SIGINT") == 0))
+            cond = SCPE_MAX_ERR;
+        else
+            return SCPE_ARG;
+        }
+    }
 if ((NULL == cptr) || ('\0' == *cptr)) {                /* Empty Action */
     free(sim_on_actions[sim_do_depth][cond]);           /* Clear existing condition */
     sim_on_actions[sim_do_depth][cond] = NULL; }
@@ -7163,11 +7218,6 @@ if ((r = sim_check_console (30)) != SCPE_OK) {          /* check console, error?
     sim_ttcmd ();
     sim_messagef (r, "sim_check_console () returned: %s\n", sim_error_text (r));
     }
-if (signal (SIGINT, int_handler) == SIG_ERR) {          /* set WRU */
-    sim_is_running = 0;                                 /* flag idle */
-    sim_ttcmd ();
-    return sim_messagef (SCPE_SIGERR, "Can't establish SIGINT");
-    }
 #ifdef SIGHUP
 if (signal (SIGHUP, int_handler) == SIG_ERR) {          /* set WRU */
     sim_is_running = 0;                                 /* flag idle */
@@ -7232,11 +7282,14 @@ do {
         sim_activate (&sim_step_unit, sim_step);
     } while (1);
 
+if ((SCPE_BARE_STATUS(r) == SCPE_STOP) &&                   /* WRU exit from sim_instr() */
+    (sim_on_actions[sim_do_depth][SCPE_STOP] == NULL) &&    /* without a handler for a STOP condition */
+    (sim_on_actions[sim_do_depth][0] == NULL))
+    sim_os_ms_sleep (sim_stop_sleep_ms);                    /* wait a bit for SIGINT */
 sim_is_running = 0;                                     /* flag idle */
 sim_stop_timer_services ();                             /* disable wall clock timing */
 sim_ttcmd ();                                           /* restore console */
 sim_brk_clrall (BRK_TYP_DYN_STEPOVER);                  /* cancel any step/over subroutine breakpoints */
-signal (SIGINT, SIG_DFL);                               /* cancel WRU */
 #ifdef SIGHUP
 signal (SIGHUP, SIG_DFL);                               /* cancel WRU */
 #endif
@@ -9796,8 +9849,10 @@ t_stat sim_process_event (void)
 UNIT *uptr;
 t_stat reason;
 
-if (stop_cpu)                                           /* stop CPU? */
+if (stop_cpu) {                                         /* stop CPU? */
+    stop_cpu = 0;
     return SCPE_STOP;
+    }
 AIO_UPDATE_QUEUE;
 UPDATE_SIM_TIME;                                        /* update sim time */
 
@@ -9839,8 +9894,10 @@ if (sim_clock_queue == QUEUE_LIST_END) {                /* queue empty? */
 else
     sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Processing Queue Complete New Interval = %d(%s)\n", sim_interval, sim_uname(sim_clock_queue));
 
-if ((reason == SCPE_OK) && stop_cpu)
+if ((reason == SCPE_OK) && stop_cpu) {
+    stop_cpu = 0;
     reason = SCPE_STOP;
+    }
 sim_processing_event = FALSE;
 return reason;
 }
@@ -11343,9 +11400,9 @@ if (cond == (SCPE_MAX_ERR-SCPE_BASE)) {       /* not found? */
     if (0 == (cond = strtol(gbuf, NULL, 0)))  /* try explicit number */
         return SCPE_ARG;
     }
+*stat = cond;
 if (cond > SCPE_MAX_ERR)
     return SCPE_ARG;
-*stat = cond;
 return SCPE_OK;    
 }
 
