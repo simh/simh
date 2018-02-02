@@ -347,12 +347,12 @@ extern struct timespec sim_deb_basetime;                /* debug base time for r
 extern DEVICE **sim_internal_devices;
 extern uint32 sim_internal_device_count;
 extern UNIT *sim_clock_queue;
-extern int32 sim_is_running;
+extern volatile t_bool sim_is_running;
 extern t_bool sim_processing_event;                     /* Called from sim_process_event */
 extern char *sim_prompt;                                /* prompt string */
 extern const char *sim_savename;                        /* Simulator Name used in Save/Restore files */
 extern t_value *sim_eval;
-extern volatile int32 stop_cpu;
+extern volatile t_bool stop_cpu;
 extern uint32 sim_brk_types;                            /* breakpoint info */
 extern uint32 sim_brk_dflt;
 extern uint32 sim_brk_summ;

@@ -541,7 +541,7 @@ UNIT *sim_dfunit = NULL;
 DEVICE **sim_internal_devices = NULL;
 uint32 sim_internal_device_count = 0;
 int32 sim_opt_out = 0;
-int32 sim_is_running = 0;
+volatile t_bool sim_is_running = FALSE;
 t_bool sim_processing_event = FALSE;
 uint32 sim_brk_summ = 0;
 uint32 sim_brk_types = 0;
@@ -564,7 +564,7 @@ size_t *sim_sub_instr_off = NULL;
 static double sim_time;
 static uint32 sim_rtime;
 static int32 noqueue_time;
-volatile int32 stop_cpu = 0;
+volatile t_bool stop_cpu = FALSE;
 static unsigned int sim_stop_sleep_ms = 250;
 static char **sim_argv;
 t_value *sim_eval = NULL;
@@ -2264,12 +2264,12 @@ if (sim_vm_init != NULL)                                /* call once only */
     (*sim_vm_init)();
 sim_finit ();                                           /* init fio package */
 setenv ("SIM_NAME", sim_name, 1);                       /* Publish simulator name */
-stop_cpu = 0;
+stop_cpu = FALSE;
 sim_interval = 0;
 sim_time = sim_rtime = 0;
 noqueue_time = 0;
 sim_clock_queue = QUEUE_LIST_END;
-sim_is_running = 0;
+sim_is_running = FALSE;
 sim_log = NULL;
 if (sim_emax <= 0)
     sim_emax = 1;
@@ -4189,7 +4189,7 @@ while (*cptr) {
     if ((wait > 0.0) && (!stop_cpu))
         sim_os_ms_sleep ((unsigned)wait);
     }
-stop_cpu = 0;                   /* Clear in case sleep was interrupted */
+stop_cpu = FALSE;                   /* Clear in case sleep was interrupted */
 return SCPE_OK;
 }
 
@@ -7206,30 +7206,26 @@ for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* reposition all */
                 return sim_messagef (SCPE_IERR, "Can't seek to %u in %s for %s\n", (unsigned)uptr->pos, uptr->filename, sim_uname (uptr));
         }
     }
-stop_cpu = 0;
-sim_is_running = 1;                                     /* flag running */
-if ((r = sim_ttrun ()) != SCPE_OK) {                          /* set console mode */
-    sim_is_running = 0;                                 /* flag idle */
+if ((r = sim_ttrun ()) != SCPE_OK) {                    /* set console mode */
     sim_ttcmd ();
     return sim_messagef (SCPE_TTYERR, "sim_ttrun() returned: %s\n", sim_error_text (r));
     }
 if ((r = sim_check_console (30)) != SCPE_OK) {          /* check console, error? */
-    sim_is_running = 0;                                 /* flag idle */
     sim_ttcmd ();
     sim_messagef (r, "sim_check_console () returned: %s\n", sim_error_text (r));
     }
 #ifdef SIGHUP
 if (signal (SIGHUP, int_handler) == SIG_ERR) {          /* set WRU */
-    sim_is_running = 0;                                 /* flag idle */
     sim_ttcmd ();
     return sim_messagef (SCPE_SIGERR, "Can't establish SIGHUP");
     }
 #endif
 if (signal (SIGTERM, int_handler) == SIG_ERR) {         /* set WRU */
-    sim_is_running = 0;                                 /* flag idle */
     sim_ttcmd ();
     return sim_messagef (SCPE_SIGERR, "Can't establish SIGTERM");
     }
+stop_cpu = FALSE;
+sim_is_running = TRUE;                                  /* flag running */
 if (sim_step)                                           /* set step timer */
     sim_activate (&sim_step_unit, sim_step);
 fflush(stdout);                                         /* flush stdout */
@@ -7278,15 +7274,15 @@ do {
         }
     else
         sim_step = 1;
-    if (sim_step)                                           /* set step timer */
+    if (sim_step)                                       /* set step timer */
         sim_activate (&sim_step_unit, sim_step);
     } while (1);
 
-if ((SCPE_BARE_STATUS(r) == SCPE_STOP) &&                   /* WRU exit from sim_instr() */
-    (sim_on_actions[sim_do_depth][SCPE_STOP] == NULL) &&    /* without a handler for a STOP condition */
+if ((SCPE_BARE_STATUS(r) == SCPE_STOP) &&               /* WRU exit from sim_instr() */
+    (sim_on_actions[sim_do_depth][SCPE_STOP] == NULL) &&/* without a handler for a STOP condition */
     (sim_on_actions[sim_do_depth][0] == NULL))
-    sim_os_ms_sleep (sim_stop_sleep_ms);                    /* wait a bit for SIGINT */
-sim_is_running = 0;                                     /* flag idle */
+    sim_os_ms_sleep (sim_stop_sleep_ms);                /* wait a bit for SIGINT */
+sim_is_running = FALSE;                                 /* flag idle */
 sim_stop_timer_services ();                             /* disable wall clock timing */
 sim_ttcmd ();                                           /* restore console */
 sim_brk_clrall (BRK_TYP_DYN_STEPOVER);                  /* cancel any step/over subroutine breakpoints */
@@ -7451,7 +7447,7 @@ return sim_cancel (&sim_step_unit);
 
 void int_handler (int sig)
 {
-stop_cpu = 1;
+stop_cpu = TRUE;
 return;
 }
 
@@ -9895,7 +9891,7 @@ else
     sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Processing Queue Complete New Interval = %d(%s)\n", sim_interval, sim_uname(sim_clock_queue));
 
 if ((reason == SCPE_OK) && stop_cpu) {
-    stop_cpu = 0;
+    stop_cpu = FALSE;
     reason = SCPE_STOP;
     }
 sim_processing_event = FALSE;

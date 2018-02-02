@@ -170,7 +170,6 @@ extern void setClockFrequency(const uint32 Value);
 extern uint32 PCX;
 extern int32 SR;
 extern UNIT cpu_unit;
-extern volatile int32 stop_cpu;
 
 /* Debug Flags */
 static DEBTAB generic_dt[] = {

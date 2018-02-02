@@ -1397,7 +1397,7 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
             continue;
             }
         else {
-            sim_is_running = 0;
+            sim_is_running = FALSE;
             sim_rem_collect_all_registers ();
             sim_stop_timer_services ();
             if (rem->act == NULL) {
@@ -1422,7 +1422,7 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
             if (rem->single_mode) {
                 if (c == sim_int_char) {            /* ^E (the interrupt character) must start continue mode console interaction */
                     rem->single_mode = FALSE;       /* enter multi command mode */
-                    sim_is_running = 0;
+                    sim_is_running = FALSE;
                     sim_rem_collect_all_registers ();
                     sim_stop_timer_services ();
                     stat = SCPE_STOP;
@@ -1787,7 +1787,7 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
                     tmxr_linemsg (lpj, "Simulator Running...");
                     tmxr_send_buffered_data (lpj);
                     }
-                sim_is_running = 1;
+                sim_is_running = TRUE;
                 sim_start_timer_services ();
                 }
             if (cmdp && (cmdp->action == &x_continue_cmd))
@@ -2768,7 +2768,7 @@ if (!sim_rem_master_mode) {
     else
         c = SCPE_OK;
     if (c == SCPE_STOP) {                                   /* ^E */
-        stop_cpu = 1;                                       /* Force a stop (which is picked up by sim_process_event */
+        stop_cpu = TRUE;                                    /* Force a stop (which is picked up by sim_process_event */
         return SCPE_OK;
         }
     if ((sim_con_tmxr.master == 0) &&                       /* not Telnet? */
@@ -2958,7 +2958,6 @@ extern pthread_mutex_t     sim_tmxr_poll_lock;
 extern pthread_cond_t      sim_tmxr_poll_cond;
 extern int32               sim_tmxr_poll_count;
 extern t_bool              sim_tmxr_poll_running;
-extern int32 sim_is_running;
 
 pthread_t           sim_console_poll_thread;       /* Keyboard Polling Thread Id */
 t_bool              sim_console_poll_running = FALSE;
