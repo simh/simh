@@ -586,7 +586,8 @@ static int32 sim_do_depth = 0;
 static t_bool sim_cmd_echoed = FALSE;                   /* Command was emitted already prior to message output */
 
 static int32 sim_on_check[MAX_DO_NEST_LVL+1];
-static char *sim_on_actions[MAX_DO_NEST_LVL+1][SCPE_MAX_ERR+1];
+static char *sim_on_actions[MAX_DO_NEST_LVL+1][SCPE_MAX_ERR+2];
+#define ON_SIGINT_ACTION (SCPE_MAX_ERR+1)
 static char sim_do_filename[MAX_DO_NEST_LVL+1][CBUFSIZE];
 static const char *sim_do_ocptr[MAX_DO_NEST_LVL+1];
 static const char *sim_do_label[MAX_DO_NEST_LVL+1];
@@ -2389,8 +2390,8 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
             stat = SCPE_EXIT;
             break;
             }
-        if (sim_on_actions[sim_do_depth][SCPE_MAX_ERR])
-            sim_brk_setact (sim_on_actions[sim_do_depth][SCPE_MAX_ERR]);
+        if (sim_on_actions[sim_do_depth][ON_SIGINT_ACTION])
+            sim_brk_setact (sim_on_actions[sim_do_depth][ON_SIGINT_ACTION]);
         }
     if ((cptr = sim_brk_getact (cbuf, sizeof(cbuf))))   /* pending action? */
         printf ("%s%s\n", sim_prompt, cptr);            /* echo */
@@ -3232,9 +3233,9 @@ if (errabort)                                           /* -e flag? */
 
 do {
     if (stop_cpu) {                                     /* SIGINT? */
-        if (sim_on_actions[sim_do_depth][SCPE_MAX_ERR]) {
+        if (sim_on_actions[sim_do_depth][ON_SIGINT_ACTION]) {
             stop_cpu = FALSE;
-            sim_brk_setact (sim_on_actions[sim_do_depth][SCPE_MAX_ERR]);/* Use specified action */
+            sim_brk_setact (sim_on_actions[sim_do_depth][ON_SIGINT_ACTION]);/* Use specified action */
             }
         else
             break;                                      /* Exit this command procedure */
@@ -4296,11 +4297,13 @@ else {
     if (SCPE_OK != sim_string_to_stat (gbuf, &cond)) {
         if ((MATCH_CMD (gbuf, "CONTROL_C") == 0) || 
             (MATCH_CMD (gbuf, "SIGINT") == 0))
-            cond = SCPE_MAX_ERR;
+            cond = ON_SIGINT_ACTION;                    /* Special case */
         else
-            return SCPE_ARG;
+            return sim_messagef (SCPE_ARG, "Invalid argument: %s\n", gbuf);
         }
     }
+if (cond == SCPE_OK)
+    return sim_messagef (SCPE_ARG, "Invalid argument: %s\n", gbuf);
 if ((NULL == cptr) || ('\0' == *cptr)) {                /* Empty Action */
     free(sim_on_actions[sim_do_depth][cond]);           /* Clear existing condition */
     sim_on_actions[sim_do_depth][cond] = NULL; }
@@ -5391,12 +5394,16 @@ for (lvl=sim_do_depth; lvl >= 0; --lvl) {
     fprintf(st, " is %s\n", (sim_on_check[lvl]) ? "enabled" : "disabled");
     for (i=1; i<SCPE_BASE; ++i) {
         if (sim_on_actions[lvl][i])
-            fprintf(st, "    on %5d    %s\n", i, sim_on_actions[lvl][i]); }
+            fprintf(st, "    on %6d    %s\n", i, sim_on_actions[lvl][i]); }
     for (i=SCPE_BASE; i<=SCPE_MAX_ERR; ++i) {
         if (sim_on_actions[lvl][i])
-            fprintf(st, "    on %-5s    %s\n", scp_errors[i-SCPE_BASE].code, sim_on_actions[lvl][i]); }
+            fprintf(st, "    on %-6s    %s\n", scp_errors[i-SCPE_BASE].code, sim_on_actions[lvl][i]); }
     if (sim_on_actions[lvl][0])
-        fprintf(st, "    on ERROR    %s\n", sim_on_actions[lvl][0]);
+        fprintf(st, "    on ERROR     %s\n", sim_on_actions[lvl][0]);
+    if (sim_on_actions[lvl][ON_SIGINT_ACTION]) {
+        fprintf(st, "CONTROL+C/SIGINT Handling:\n");
+        fprintf(st, "    on CONTROL_C %s\n", sim_on_actions[lvl][ON_SIGINT_ACTION]);
+        }
     fprintf(st, "\n");
     }
 if (sim_on_inherit)
@@ -11387,14 +11394,14 @@ int32 cond;
 cptr = get_glyph (cptr, gbuf, 0);
 if (0 == memcmp("SCPE_", gbuf, 5))
     memmove (gbuf, gbuf+5, 1 + strlen (gbuf+5));/* skip leading SCPE_ */
-for (cond=0; cond < (SCPE_MAX_ERR-SCPE_BASE); cond++)
+for (cond=0; cond <= (SCPE_MAX_ERR-SCPE_BASE); cond++)
     if (0 == strcmp(scp_errors[cond].code, gbuf)) {
         cond += SCPE_BASE;
         break;
         }
 if (0 == strcmp(gbuf, "OK"))
     cond = SCPE_OK;
-if (cond == (SCPE_MAX_ERR-SCPE_BASE)) {       /* not found? */
+if (cond == (1+SCPE_MAX_ERR-SCPE_BASE)) {       /* not found? */
     if (0 == (cond = strtol(gbuf, NULL, 0)))  /* try explicit number */
         return SCPE_ARG;
     }
