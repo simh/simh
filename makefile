@@ -614,7 +614,7 @@ SWTP6800_OPT = -I ${SWTP6800D}
 # Build everything
 #
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
-	vax vax780 nova eclipse hp2100 i1401 i1620 s3 \
+	vax vax780 nova eclipse hp2100 hp3000 i1401 i1620 s3 \
 	altair altairz80 gri i7094 ibm1130 id16 \
 	id32 sds lgp h316 swtp6800mp-a swtp6800mp-a2
 
@@ -714,6 +714,12 @@ hp2100 : ${BIN}hp2100${EXE}
 ${BIN}hp2100${EXE} : ${HP2100} ${SIM}
 	${MKDIRBIN}
 	${CC} ${HP2100} ${SIM} ${HP2100_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+hp3000 : ${BIN}hp3000${EXE}
+
+${BIN}hp3000${EXE} : ${HP3000} ${SIM}
+	${MKDIRBIN}
+	${CC} ${HP3000} ${SIM} ${HP3000_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
 i1401 : ${BIN}i1401${EXE}
 

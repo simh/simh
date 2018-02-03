@@ -624,7 +624,7 @@ typedef struct sim_debtab DEBTAB;
 #include "sim_sock.h"
 #ifdef CONST
 #undef CONST
-#define CONST
 #endif /* CONST */
+#define CONST
 
 #endif

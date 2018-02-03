@@ -34,9 +34,6 @@
 				Name="VCXMLDataGeneratorTool"
 			/>
 			<Tool
-				Name="VCWebServiceProxyGeneratorTool"
-			/>
-			<Tool
 				Name="VCMIDLTool"
 			/>
 			<Tool
@@ -111,9 +108,6 @@
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
-			/>
-			<Tool
-				Name="VCWebServiceProxyGeneratorTool"
 			/>
 			<Tool
 				Name="VCMIDLTool"
@@ -234,6 +228,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\HP2100\hp2100_disclib.c"
+				>
+			</File>
+			<File
 				RelativePath="..\HP2100\hp2100_dp.c"
 				>
 			</File>
@@ -298,10 +296,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\HP2100\hp_disclib.c"
-				>
-			</File>
-			<File
 				RelativePath="..\scp.c"
 				>
 			</File>
@@ -352,6 +346,10 @@
 			</File>
 			<File
 				RelativePath="..\HP2100\hp2100_di.h"
+				>
+			</File>
+			<File
+				RelativePath="..\HP2100\hp2100_disclib.h"
 				>
 			</File>
 			<File
