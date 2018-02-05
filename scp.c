@@ -4990,17 +4990,15 @@ const char *scale, *width;
 if (sim_switches & SWMASK ('B'))
     kval = 1024;
 mval = kval * kval;
-if (dptr->flags & DEV_SECTORS) {
-    kval = kval / 512;
-    mval = mval / 512;
-    }
+if (dptr->flags & DEV_SECTORS)
+    psize = psize * 512;
 if ((dptr->dwidth / dptr->aincr) > 8)
     width = "W";
 else 
     width = "B";
-if (uptr->capac < (kval * 10))
+if (psize < (kval * 10))
     scale = "";
-else if (uptr->capac < (mval * 10)) {
+else if (psize < (mval * 10)) {
     scale = "K";
     psize = psize / kval;
     }
