@@ -52,6 +52,7 @@ extern "C" {
 
 #if defined (_WIN32)                                    /* Windows */
 #include <winsock2.h>
+#include <winerror.h>
 
 #elif !defined (__OS2__) || defined (__EMX__)           /* VMS, Mac, Unix, OS/2 EMX */
 #include <sys/types.h>                                  /* for fcntl, getpid */
