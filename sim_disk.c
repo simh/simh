@@ -80,9 +80,6 @@ Internal routines:
 #include <ctype.h>
 #include <sys/stat.h>
 
-#ifdef _WIN32
-#include <windows.h>
-#endif
 #if defined SIM_ASYNCH_IO
 #include <pthread.h>
 #endif

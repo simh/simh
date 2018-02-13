@@ -3285,7 +3285,6 @@ return SCPE_OK;
 
 #include <fcntl.h>
 #include <io.h>
-#include <windows.h>
 #define RAW_MODE 0
 static HANDLE std_input;
 static HANDLE std_output;

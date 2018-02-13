@@ -41,6 +41,7 @@
 
 #if defined(_WIN32)
 #include <windows.h>
+#include <winerror.h>
 #define usleep(n) Sleep(n/1000)
 #else
 #include <unistd.h>

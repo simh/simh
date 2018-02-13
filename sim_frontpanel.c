@@ -63,6 +63,7 @@ extern "C" {
 #if defined(_WIN32)
 #include <process.h>
 #include <windows.h>
+#include <winerror.h>
 #define sleep(n) Sleep(n*1000)
 #define msleep(n) Sleep(n)
 #define strtoull _strtoui64

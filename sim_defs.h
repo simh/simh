@@ -127,6 +127,7 @@ extern int sim_vax_snprintf(char *buf, size_t buf_size, const char *fmt, ...);
 
 #ifdef _WIN32
 #include <winsock2.h>
+#include <windows.h>
 #include <winerror.h>
 #undef PACKED                       /* avoid macro name collision */
 #undef ERROR                        /* avoid macro name collision */
