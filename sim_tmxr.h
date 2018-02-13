@@ -279,6 +279,7 @@ t_stat tmxr_show_cstat (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat tmxr_show_lines (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat tmxr_show_open_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST char* desc);
 t_stat tmxr_activate (UNIT *uptr, int32 interval);
+t_stat tmxr_activate_abs (UNIT *uptr, int32 interval);
 t_stat tmxr_activate_after (UNIT *uptr, uint32 usecs_walltime);
 t_stat tmxr_activate_after_abs (UNIT *uptr, uint32 usecs_walltime);
 t_stat tmxr_clock_coschedule (UNIT *uptr, int32 interval);
@@ -314,6 +315,7 @@ void _tmxr_debug (uint32 dbits, TMLN *lp, const char *msg, char *buf, int bufsiz
 #endif
 #if (!defined(NOT_MUX_USING_CODE))
 #define sim_activate tmxr_activate
+#define sim_activate_abs tmxr_activate_abs
 #define sim_activate_after tmxr_activate_after
 #define sim_activate_after_abs tmxr_activate_after_abs
 #define sim_clock_coschedule tmxr_clock_coschedule 
