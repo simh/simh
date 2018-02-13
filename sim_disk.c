@@ -1732,8 +1732,8 @@ if (capac && (capac != (t_offset)-1)) {
         if ((filesystem_capac != (t_offset)-1) &&           /* Known file system data size AND */
             (filesystem_capac > capac))                     /* Data size greater than container size? */
             capac = filesystem_capac;                       /* Use file system data size */
-        if ((filesystem_capac != (t_offset)-1) &&           /* Known file system data size AND */
-            (capac > (((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1))) || /* Data > current size */
+        if (((filesystem_capac != (t_offset)-1) &&           /* Known file system data size AND */
+             (capac > (((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)))) || /* Data > current size */
             (DKUF_F_STD != DK_GET_FMT (uptr)))              /* OR ! autosizeable disk */
             uptr->capac = (t_addr)(capac/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));  /* update current size */
         }

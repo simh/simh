@@ -713,11 +713,12 @@ if (lp->serport) {                                      /* serial port connectio
 else {                                                  /* Telnet connection */
     written = sim_write_sock (lp->sock, &(lp->txb[i]), length);
 
-    if (written == SOCKET_ERROR)                        /* did an error occur? */
+    if (written == SOCKET_ERROR) {                      /* did an error occur? */
         if (lp->datagram)
             return written;                             /* ignore errors on datagram sockets */
         else
             return -1;                                  /* return error indication */
+        }
     }
 if ((written > 0) && (lp->txbps) && (sim_is_running))
     lp->txnexttime = floor (sim_gtime () + ((written * lp->txdelta * sim_timer_inst_per_sec ()) / TMXR_RX_BPS_UNIT_SCALE));
