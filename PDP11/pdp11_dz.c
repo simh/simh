@@ -302,7 +302,8 @@ DIB dz_dib = {
 
 UNIT dz_unit[2] = {
         { UDATA (&dz_svc, UNIT_IDLE|UNIT_ATTABLE|DZ_8B_DFLT, 0) },
-        { UDATA (&dz_xmt_svc, UNIT_DIS, 0), SERIAL_OUT_WAIT } };
+        { UDATA (&dz_xmt_svc, UNIT_DIS, 0) }
+    };
 
 REG dz_reg[] = {
     { BRDATADF (CSR,   dz_csr,   DEV_RDX, 16, MAX_DZ_MUXES, "control/status register", dz_csr_bits) },
@@ -531,9 +532,11 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             line = (dz * DZ_LINES) + CSR_GETTL (dz_csr[dz]);
             lp = &dz_ldsc[line];                        /* get line desc */
             c = sim_tt_outcvt (dz_tdr[dz], TT_GET_MODE (dz_unit[0].flags));
-            if (c >= 0)                                 /* store char */
+            if (c >= 0) {                               /* store char */
                 tmxr_putc_ln (lp, c);
-            sim_activate (&dz_unit[1], dz_unit[1].wait);/* */
+                dz_update_xmti ();
+                sim_activate_after_abs (&dz_unit[1], lp->txdelta);/* */
+                }
             }
         break;
         }
@@ -670,8 +673,9 @@ for (dz = 0; dz < dz_desc.lines/DZ_LINES; dz++) {       /* loop thru muxes */
             }
         }
     if ((dz_csr[dz] & CSR_TIE) && (dz_csr[dz] & CSR_TRDY)) /* ready plus int? */
-         dz_set_txint (dz);
-    else dz_clr_txint (dz);                             /* no int req */
+        dz_set_txint (dz);
+    else
+        dz_clr_txint (dz);                              /* no int req */
     }
 return;
 }
@@ -792,11 +796,13 @@ return auto_config (dptr->name, ndev);                  /* auto config */
 
 t_stat dz_attach (UNIT *uptr, CONST char *cptr)
 {
-int32 dz, muxln;
+int32 dz, muxln, ln;
 t_stat r;
 
 if ((sim_switches & SWMASK ('M')) || dz_mctl)           /* modem control? */
     tmxr_set_modem_control_passthru (&dz_desc);
+for (ln = 0; ln < dz_desc.lines; ln++)
+    tmxr_set_line_output_unit (&dz_desc, ln, &dz_unit[1]);
 r = tmxr_attach (&dz_desc, uptr, cptr);                 /* attach mux */
 if (r != SCPE_OK) {                                     /* error? */
     tmxr_clear_modem_control_passthru (&dz_desc);
