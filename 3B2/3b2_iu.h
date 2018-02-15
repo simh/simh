@@ -44,9 +44,9 @@
 #define IU_SPEED_REGS   2                 /* Two speed select registers, */
 #define IU_SPEEDS       16                /* with 16 speeds each */
 
-#define PARITY_ODD      0
-#define PARITY_EVEN     1
-#define PARITY_NONE     2
+#define IU_PARITY_ODD   0
+#define IU_PARITY_EVEN  1
+#define IU_PARITY_NONE  2
 
 #define STS_RXR         0x01              /* Receiver ready */
 #define STS_FFL         0x02              /* FIFO full */

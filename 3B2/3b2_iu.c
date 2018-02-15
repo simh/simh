@@ -325,7 +325,7 @@ t_stat contty_reset(DEVICE *dtpr)
     memset(&iu_contty, 0, sizeof(IU_PORT));
     brg_reg = 0;
     brg_clk = BRG_DEFAULT;
-    parity_sel = PARITY_EVEN;
+    parity_sel = IU_PARITY_EVEN;
     bits_per_char = 7;
 
     sprintf(line_config, "%s-%d%s1",
@@ -644,13 +644,13 @@ void iu_write(uint32 pa, uint32 val, size_t size)
         if (modep == 0) {
             if ((bval >> 4) & 1) {
                 /* No parity */
-                parity_sel = PARITY_NONE;
+                parity_sel = IU_PARITY_NONE;
             } else {
                 /* Parity enabled */
                 if (bval & 4) {
-                    parity_sel = PARITY_ODD;
+                    parity_sel = IU_PARITY_ODD;
                 } else {
-                    parity_sel = PARITY_EVEN;
+                    parity_sel = IU_PARITY_EVEN;
                 }
             }
 
