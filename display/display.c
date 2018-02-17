@@ -13,7 +13,7 @@
  */
 
 /*
- * Copyright (c) 2003-2004, Philip L. Budne
+ * Copyright (c) 2003-2018 Philip L. Budne
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -131,7 +131,6 @@ static struct color color_red = { pred, ELEMENTS(pred), 100000 };
 static struct display displays[] = {
    /*
      * TX-0
-     * 
      *
      * Unknown manufacturer
      * 
@@ -140,8 +139,6 @@ static struct display displays[] = {
      * 50us point plot time (20,000 points/sec)
      * P17 Phosphor??? Two phosphor layers:
      * fast blue (.05s half life), and slow green (.2s half life)
-     * 
-     * 
      */
     { DIS_TX0, "MIT TX-0", &color_p17, NULL, 512, 512 },
 
@@ -216,8 +213,9 @@ static struct display displays[] = {
 
     /*
      * Type 340 Display system
-     * on PDP-4/6/7/9/10
+     * on PDP-1/4/6/7/9/10
      *
+     * Raytheon 16ADP7A CRT, same as Type 30
      * 1024x1024
      * 9 3/8" raster (.01" dot pitch)
      * 0,0 at lower left
@@ -989,16 +987,13 @@ display_scale(void)
 /*
  * handle keyboard events
  *
- * data switches; 18 -- enough for PDP-1/4/7/9/15 (for munching squares!)
+ * data switches: bit toggled on key up, all cleared on space
+ * enough for PDP-1/4/7/9/15 (for munching squares!):
  * 123 456 789 qwe rty uio
- * bit toggled on key up
- * all cleared on space
  *
- * spacewar switches; bit high as long as key down
- * asdf kl;'
- * just where PDP-1 spacewar expects them!
- * key mappings same as MIT Media Lab Java PDP-1 simulator
- * 
+ * second set of 18 for PDP-6/10, IBM7xxx (shifted versions of above):
+ * !@# $%^ &*( QWE RTY UIO
+ *
  */
 unsigned long spacewar_switches = 0;
 
@@ -1006,15 +1001,13 @@ unsigned long spacewar_switches = 0;
 void
 display_keydown(int k)
 {
+    /*printf("down '%c'\r\n", k); /**/
     switch (k) {
-    case 'f': case 'F': spacewar_switches |= 01; break; /* torpedos */
-    case 'd': case 'D': spacewar_switches |= 02; break; /* engines */
-    case 'a': case 'A': spacewar_switches |= 04; break; /* rotate R */
-    case 's': case 'S': spacewar_switches |= 010; break; /* rotate L */
-    case '\'': case '"': spacewar_switches |= 040000; break; /* torpedos */
-    case ';': case ':': spacewar_switches |= 0100000; break; /* engines */
-    case 'k': case 'K': spacewar_switches |= 0200000; break; /* rotate R */
-    case 'l': case 'L': spacewar_switches |= 0400000; break; /* rotate L */
+/* handle spacewar switches: see display.h for copious commentary */
+#define SWSW(LC,UC,BIT,POS36,FUNC36) \
+    case LC: case UC: spacewar_switches |= BIT; return;
+    SPACEWAR_SWITCHES
+#undef SWSW
     default: return;
     }
 }
@@ -1023,19 +1016,16 @@ display_keydown(int k)
 void
 display_keyup(int k)
 {
-    unsigned long test_switches = cpu_get_switches();
+    unsigned long test_switches, test_switches2;
 
-    /* fetch console switches from simulator? */
+    cpu_get_switches(&test_switches, &test_switches2);
     switch (k) {
-    case 'f': case 'F': spacewar_switches &= ~01; return;
-    case 'd': case 'D': spacewar_switches &= ~02; return;
-    case 'a': case 'A': spacewar_switches &= ~04; return;
-    case 's': case 'S': spacewar_switches &= ~010; return;
+/* handle spacewar switches: see display.h for copious commentary */
+#define SWSW(LC,UC,BIT,POS36,NAME36) \
+    case LC: case UC: spacewar_switches &= ~BIT; return;
 
-    case '\'': case '"': spacewar_switches &= ~040000; return;
-    case ';': case ':': spacewar_switches &= ~0100000; return;
-    case 'k': case 'K': spacewar_switches &= ~0200000; return;
-    case 'l': case 'L': spacewar_switches &= ~0400000; return;
+    SPACEWAR_SWITCHES
+#undef SWSW
 
     case '1': test_switches ^= 1<<17; break;
     case '2': test_switches ^= 1<<16; break;
@@ -1049,20 +1039,45 @@ display_keyup(int k)
     case '8': test_switches ^= 1<<10; break;
     case '9': test_switches ^= 1<<9; break;
 
-    case 'q': case 'Q': test_switches ^= 1<<8; break;
-    case 'w': case 'W': test_switches ^= 1<<7; break;
-    case 'e': case 'E': test_switches ^= 1<<6; break;
+    case 'q': test_switches ^= 1<<8; break;
+    case 'w': test_switches ^= 1<<7; break;
+    case 'e': test_switches ^= 1<<6; break;
 
-    case 'r': case 'R': test_switches ^= 1<<5; break;
-    case 't': case 'T': test_switches ^= 1<<4; break;
-    case 'y': case 'Y': test_switches ^= 1<<3; break;
+    case 'r': test_switches ^= 1<<5; break;
+    case 't': test_switches ^= 1<<4; break;
+    case 'y': test_switches ^= 1<<3; break;
 
-    case 'u': case 'U': test_switches ^= 1<<2; break;
-    case 'i': case 'I': test_switches ^= 1<<1; break;
-    case 'o': case 'O': test_switches ^= 1; break;
+    case 'u': test_switches ^= 1<<2; break;
+    case 'i': test_switches ^= 1<<1; break;
+    case 'o': test_switches ^= 1; break;
 
-    case ' ': test_switches = 0; break;
+    /* second set of 18 switches */
+    case '!': test_switches2 ^= 1<<17; break;
+    case '@': test_switches2 ^= 1<<16; break;
+    case '#': test_switches2 ^= 1<<15; break;
+
+    case '$': test_switches2 ^= 1<<14; break;
+    case '%': test_switches2 ^= 1<<13; break;
+    case '^': test_switches2 ^= 1<<12; break;
+
+    case '&': test_switches2 ^= 1<<11; break;
+    case '*': test_switches2 ^= 1<<10; break;
+    case '(': test_switches2 ^= 1<<9; break;
+
+    case 'Q': test_switches2 ^= 1<<8; break;
+    case 'W': test_switches2 ^= 1<<7; break;
+    case 'E': test_switches2 ^= 1<<6; break;
+
+    case 'R': test_switches2 ^= 1<<5; break;
+    case 'T': test_switches2 ^= 1<<4; break;
+    case 'Y': test_switches2 ^= 1<<3; break;
+
+    case 'U': test_switches2 ^= 1<<2; break;
+    case 'I': test_switches2 ^= 1<<1; break;
+    case 'O': test_switches2 ^= 1; break;
+
+    case ' ': test_switches = test_switches2 = 0; break;
     default: return;
     }
-    cpu_set_switches(test_switches);
+    cpu_set_switches(test_switches, test_switches2);
 }

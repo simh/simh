@@ -1704,15 +1704,16 @@ return SCPE_OK;
 
 #ifdef USE_DISPLAY
 /* set "test switches"; from display code */
+#include "display/display.h"      /* prototypes */
 
-void cpu_set_switches(unsigned long bits)
+void cpu_set_switches(unsigned long v1, unsigned long v2)
 {
-/* just what we want; smaller CPUs might want to shift down? */
-TW = bits;
+TW = v1 ^ v2;
 }
 
-unsigned long cpu_get_switches(void)
+void cpu_get_switches(unsigned long *p1, unsigned long *p2)
 {
-return TW;
+*p1 = TW;
+*p2 = 0;
 }
 #endif
