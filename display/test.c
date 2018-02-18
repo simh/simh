@@ -11,7 +11,7 @@
  */
 
 /*
- * Copyright (c) 2003-2004, Philip L. Budne
+ * Copyright (c) 2003-2018, Philip L. Budne
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -57,18 +57,17 @@
 static unsigned long test_switches = 0;
 
 /* called from display code: */
-unsigned long
-cpu_get_switches(void) {
-    return test_switches;
+void
+cpu_get_switches(unsigned long *p1, unsigned long *p2) {
+    *p1 = test_switches;
+    *p2 = 0;
 }
 
 /* called from display code: */
 void
-cpu_set_switches(bits)
-    unsigned long bits;
-{
-    printf("switches: %06lo\n", bits);
-    test_switches = bits;
+cpu_set_switches(unsigned long w1, unsigned long w2) {
+    test_switches = w1 ^ w2;
+    printf("switches: %06lo\n", test_switches);
 }
 
 void
@@ -178,7 +177,7 @@ main(void) {
     if (!display_init(TEST_DIS, TEST_RES, NULL))
         exit(EXIT_FAILURE);
 
-    cpu_set_switches(04000UL);          /* classic starting value */
+    cpu_set_switches(04000UL,0);          /* classic starting value */
     for (;;) {
 #ifdef T2
       t2();

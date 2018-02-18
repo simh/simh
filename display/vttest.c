@@ -1380,13 +1380,13 @@ main(void) {
 /*
  * callbacks from display.c
  */
-unsigned long
-cpu_get_switches(void) {
-    return 0;
+void
+cpu_get_switches(unsigned long *p1, unsigned long *p2) {
+    *p1 = *p2 = 0;
 }
 
 void
-cpu_set_switches(unsigned long bits) {
+cpu_set_switches(unsigned long w1, unsigned long w2) {
 }
 
 /*

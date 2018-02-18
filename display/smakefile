@@ -64,28 +64,28 @@ ALL:    $(ALL)
 # munching squares; see README file for
 # how to use console switches
 
-MUNCH=$(DRIVER) xy.o test.o
+MUNCH=$(DRIVER) display.o test.o
 munch$(EXT): $(MUNCH)
-        $(CC) $(LDFLAGS) -o munch$(EXT) $(MUNCH) $(LIBS)
+	$(CC) $(LDFLAGS) -o munch$(EXT) $(MUNCH) $(LIBS)
 
-VT11=$(DRIVER) vt11.o vttest.o xy.o
+VT11=$(DRIVER) vt11.o vttest.o display.o
 vt11$(EXT): $(VT11)
-        $(CC) $(LDFLAGS) -o vt11$(EXT) $(VT11) $(LIBS)
+	$(CC) $(LDFLAGS) -o vt11$(EXT) $(VT11) $(LIBS)
 
-xy.o: xy.h ws.h
-vt11.o: xy.h vt11.h
-x11.o: ws.h xy.h
+display.o: display.h ws.h
+vt11.o: display.h vt11.h
+x11.o: ws.h display.h
 carbon.o: ws.h
 win32.o: ws.h
-test.o: xy.h vt11.h
-vttest.o: xy.h vt11.h vtmacs.h
+test.o: display.h vt11.h
+vttest.o: display.h vt11.h vtmacs.h
 
 clean:
-        rm -f *.o *~ .#*        # Unix
+	rm -f *.o *~ .#*                # Unix
 #       if exist *.o del /q *.o         # Win32
 #       if exist *~ del /q *~           # Win32
 #       if exist .#* del /q .#*         # Win32
 
 clobber: clean
-        rm -f $(ALL)            # Unix
+	rm -f $(ALL)            # Unix
 #       if exist *.exe del /q *.exe     # Win32
