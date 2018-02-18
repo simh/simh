@@ -1210,6 +1210,7 @@ cpu_get_switches(unsigned long *p1, unsigned long *p2)
     *p1 = TAC;
     *p2 = 0;
 }
+#endif
 
 t_stat sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag) {
     uint32 word;
