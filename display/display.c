@@ -105,13 +105,20 @@ struct display {
 
 /*
  * original phosphor constants from Raphael Nabet's XMame 0.72.1 PDP-1 sim.
- * not even sure Type30 really used P17 (guess by Daniel P. B. Smith)
+ *
+ * http://bitsavers.trailing-edge.com/components/rca/hb-3/1963_HB-3_CRT_Storage_Tube_and_Monoscope_Section.pdf
+ * pdf p374 says 16ADP7 used P7 phosphor.
+ * pdf pp28-32 describe P7 phosphor (spectra, buildup, persistence)
+ *
+ * https://www.youtube.com/watch?v=hZumwXS4fJo
+ * "3RP7A CRT - P7 Phosphor Persistence" shows colors/persistence
  */
-static struct phosphor p17[] = {
+ */
+static struct phosphor p7[] = {
     {0.11, 0.11, 1.0,  0.5, 0.05},  /* fast blue */
     {1.0,  1.0,  0.11, 0.5, 0.20}   /* slow yellow/green */
 };
-static struct color color_p17 = { p17, ELEMENTS(p17), 125000 };
+static struct color color_p7 = { p7, ELEMENTS(p7), 125000 };
 
 /* green phosphor for VR14, VR17, VR20 */
 static struct phosphor p29[] = {{0.0260, 1.0, 0.00121, 0.5, 0.025}};
@@ -137,10 +144,10 @@ static struct display displays[] = {
      * 12" tube, 
      * maximum dot size ???
      * 50us point plot time (20,000 points/sec)
-     * P17 Phosphor??? Two phosphor layers:
+     * P7 Phosphor??? Two phosphor layers:
      * fast blue (.05s half life), and slow green (.2s half life)
      */
-    { DIS_TX0, "MIT TX-0", &color_p17, NULL, 512, 512 },
+    { DIS_TX0, "MIT TX-0", &color_p7, NULL, 512, 512 },
 
     
     /*
@@ -152,12 +159,12 @@ static struct display displays[] = {
      * 16" tube, 14 3/8" square raster
      * maximum dot size .015"
      * 50us point plot time (20,000 points/sec)
-     * P17 Phosphor??? Two phosphor layers:
+     * P7 Phosphor??? Two phosphor layers:
      * fast blue (.05s half life), and slow green (.2s half life)
      * 360 lb
      * 7A at 115+-10V 60Hz
      */
-    { DIS_TYPE30, "Type 30", &color_p17, NULL, 1024, 1024 },
+    { DIS_TYPE30, "Type 30", &color_p7, NULL, 1024, 1024 },
 
     /*
      * VR14
@@ -221,7 +228,7 @@ static struct display displays[] = {
      * 0,0 at lower left
      * 8 intensity levels
      */
-    { DIS_TYPE340, "Type 340", &color_p17, NULL, 1024, 1024 }
+    { DIS_TYPE340, "Type 340", &color_p7, NULL, 1024, 1024 }
 };
 
 /*
