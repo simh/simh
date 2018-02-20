@@ -66,15 +66,13 @@ int words[] = {
     CHAR(060, 061, 062), CHAR(063, 064, 065), CHAR(066, 067, ' '),
     CHAR(070, 071, 072), CHAR(073, 074, 075), CHAR(076, 077, ' '),
 
+    CHAR(CHRESC, CHRESC, CHRESC),
+    MCHR|S2|IN7,
     CHAR(CHRLC, CHRCR, CHRLF),
     CHAR(000, 001, 002), CHAR(003, 004, 005), CHAR(006, 007, ' '),
     CHAR(010, 011, 012), CHAR(013, 014, 015), CHAR(016, 017, ' '),
     CHAR(020, 021, 022), CHAR(023, 024, 025), CHAR(026, 027, ' '),
-    CHAR(030, 031, 032),      /* 33-37 are control codes */
-    CHAR(040, 041, 042), CHAR(043, 044, 045), CHAR(046, 047, ' '),
-    CHAR(050, 051, 052), CHAR(053, 054, 055), CHAR(056, 057, ' '),
-    CHAR(060, 061, 062), CHAR(063, 064, 065), CHAR(066, 067, ' '),
-    CHAR(070, 071, 072), CHAR(073, 074, 075), CHAR(076, 077, ' '),
+    CHAR(030, 031, 032),
     CHAR(CHRESC, 0, 0),
     STP
 #elif 1
