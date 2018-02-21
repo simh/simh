@@ -1007,7 +1007,6 @@ unsigned long spacewar_switches = 0;
 void
 display_keydown(int k)
 {
-    /*printf("down '%c'\r\n", k); /**/
     switch (k) {
 /* handle spacewar switches: see display.h for copious commentary */
 #define SWSW(LC,UC,BIT,POS36,FUNC36) \
