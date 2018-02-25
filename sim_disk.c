@@ -92,6 +92,8 @@ struct disk_context {
     uint32              xfer_element_size;  /* Disk Bus Transfer size (1 - byte, 2 - word, 4 - longword) */
     uint32              storage_sector_size;/* Sector size of the containing storage */
     uint32              removable;          /* Removable device flag */
+    uint32              is_cdrom;           /* Host system CDROM Device */
+    uint32              media_removed;      /* Media not available flag */
     uint32              auto_format;        /* Format determined dynamically */
 #if defined _WIN32
     HANDLE              disk_handle;        /* OS specific Raw device handle */
@@ -282,7 +284,7 @@ static t_stat sim_os_disk_unload_raw (FILE *f);
 static t_bool sim_os_disk_isavailable_raw (FILE *f);
 static t_stat sim_os_disk_rdsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread, t_seccnt sects);
 static t_stat sim_os_disk_wrsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectswritten, t_seccnt sects);
-static t_stat sim_os_disk_info_raw (FILE *f, uint32 *sector_size, uint32 *removable);
+static t_stat sim_os_disk_info_raw (FILE *f, uint32 *sector_size, uint32 *removable, uint32 *is_cdrom);
 static char *HostPathToVhdPath (const char *szHostPath, char *szVhdPath, size_t VhdPathSize);
 static char *VhdPathToHostPath (const char *szVhdPath, char *szHostPath, size_t HostPathSize);
 static t_offset get_filesystem_size (UNIT *uptr);
@@ -383,6 +385,8 @@ return SCPE_OK;
 
 t_bool sim_disk_isavailable (UNIT *uptr)
 {
+struct disk_context *ctx;
+
 if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return FALSE;
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
@@ -392,7 +396,28 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
         return TRUE;
         break;
     case DKUF_F_RAW:                                    /* Raw Physical Disk Access */
-        return sim_os_disk_isavailable_raw (uptr->fileref);
+        ctx = (struct disk_context *)uptr->disk_ctx;
+
+        if (sim_os_disk_isavailable_raw (uptr->fileref)) {
+            if (ctx->media_removed) {
+                int32 saved_switches = sim_switches;
+                int32 saved_quiet = sim_quiet;
+                char *path = (char *)malloc (1 + strlen (uptr->filename));
+
+                sim_switches = 0;
+                sim_quiet = 1;
+                strcpy (path, uptr->filename);
+                sim_disk_attach (uptr, path, ctx->sector_size, ctx->xfer_element_size, 
+                                 FALSE, ctx->dbit, NULL, 0, 0);
+                sim_quiet = saved_quiet;
+                sim_switches = saved_switches;
+                free (path);
+                ctx->media_removed = 0;
+                }
+            }
+        else
+            ctx->media_removed = 1;
+        return !ctx->media_removed;
         break;
     default:
         return FALSE;
@@ -797,11 +822,15 @@ return r;
 
 t_stat sim_disk_unload (UNIT *uptr)
 {
+struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
+
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_STD:                                    /* Simh */
     case DKUF_F_VHD:                                    /* VHD format */
+        ctx->media_removed = 1;
         return sim_disk_detach (uptr);
     case DKUF_F_RAW:                                    /* Raw Physical Disk Access */
+        ctx->media_removed = 1;
         return sim_os_disk_unload_raw (uptr->fileref);  /* remove/eject disk */
         break;
     default:
@@ -1302,7 +1331,7 @@ char tbuf[4*CBUFSIZE];
 FILE *(*open_function)(const char *filename, const char *mode) = sim_fopen;
 FILE *(*create_function)(const char *filename, t_offset desiredsize) = NULL;
 t_offset (*size_function)(FILE *file);
-t_stat (*storage_function)(FILE *file, uint32 *sector_size, uint32 *removable) = NULL;
+t_stat (*storage_function)(FILE *file, uint32 *sector_size, uint32 *removable, uint32 *is_cdrom) = NULL;
 t_bool created = FALSE, copied = FALSE;
 t_bool auto_format = FALSE;
 t_offset capac, filesystem_capac;
@@ -1523,6 +1552,7 @@ ctx->capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* save capaci
 ctx->xfer_element_size = (uint32)xfer_element_size;     /* save xfer_element_size */
 ctx->dptr = dptr;                                       /* save DEVICE pointer */
 ctx->dbit = dbit;                                       /* save debug bit */
+ctx->media_removed = 0;                                 /* default present */
 sim_debug (ctx->dbit, ctx->dptr, "sim_disk_attach(unit=%d,filename='%s')\n", (int)(uptr-ctx->dptr->units), uptr->filename);
 ctx->auto_format = auto_format;                         /* save that we auto selected format */
 ctx->storage_sector_size = (uint32)sector_size;         /* Default */
@@ -1578,7 +1608,7 @@ uptr->pos = 0;
 
 /* Get Device attributes if they are available */
 if (storage_function)
-    storage_function (uptr->fileref, &ctx->storage_sector_size, &ctx->removable);
+    storage_function (uptr->fileref, &ctx->storage_sector_size, &ctx->removable, &ctx->is_cdrom);
 
 if ((created) && (!copied)) {
     t_stat r = SCPE_OK;
@@ -1592,7 +1622,7 @@ if ((created) && (!copied)) {
          2) it allocates storage for the whole disk at creation time to
             avoid strange failures which may happen during simulator execution
             if the containing disk is full
-         3) it leaves a Sinh Format disk at the intended size so it may
+         3) it leaves a Simh Format disk at the intended size so it may
             subsequently be autosized with the correct size.
     */
     if (secbuf == NULL)
@@ -2256,6 +2286,7 @@ static FILE *sim_os_disk_open_raw (const char *rawdevicename, const char *openmo
 {
 HANDLE Handle;
 DWORD DesiredAccess = 0;
+uint32 is_cdrom;
 
 if (strchr (openmode, 'r'))
     DesiredAccess |= GENERIC_READ;
@@ -2274,12 +2305,25 @@ if (!memcmp ("\\.\\", rawdevicename, 3)) {
     strcpy (tmpname + 1, rawdevicename);
     Handle = CreateFileA (tmpname, DesiredAccess, FILE_SHARE_READ|FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_RANDOM_ACCESS|FILE_FLAG_WRITE_THROUGH, NULL);
     free (tmpname);
-    if (Handle != INVALID_HANDLE_VALUE)
+    if (Handle != INVALID_HANDLE_VALUE) {
+        if ((sim_os_disk_info_raw (Handle, NULL, NULL, &is_cdrom)) || 
+            (DesiredAccess & GENERIC_WRITE) && is_cdrom) {
+            CloseHandle (Handle);
+            errno = EACCES;
+            return NULL;
+            }
         return (FILE *)Handle;
+        }
     }
 Handle = CreateFileA (rawdevicename, DesiredAccess, FILE_SHARE_READ|FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_RANDOM_ACCESS|FILE_FLAG_WRITE_THROUGH, NULL);
 if (Handle == INVALID_HANDLE_VALUE) {
     _set_errno_from_status (GetLastError ());
+    return NULL;
+    }
+if ((sim_os_disk_info_raw (Handle, NULL, NULL, &is_cdrom)) || 
+    (DesiredAccess & GENERIC_WRITE) && is_cdrom) {
+    CloseHandle (Handle);
+    errno = EACCES;
     return NULL;
     }
 return (FILE *)Handle;
@@ -2364,7 +2408,7 @@ static t_stat sim_os_disk_unload_raw (FILE *Disk)
 DWORD BytesReturned;
 uint32 Removable = FALSE;
 
-sim_os_disk_info_raw (Disk, NULL, &Removable);
+sim_os_disk_info_raw (Disk, NULL, &Removable, NULL);
 if (Removable) {
     if (!DeviceIoControl((HANDLE)Disk,                  /* handle to disk */
                          IOCTL_STORAGE_EJECT_MEDIA,     /* dwIoControlCode */
@@ -2390,7 +2434,7 @@ static t_bool sim_os_disk_isavailable_raw (FILE *Disk)
 DWORD BytesReturned;
 uint32 Removable = FALSE;
 
-sim_os_disk_info_raw (Disk, NULL, &Removable);
+sim_os_disk_info_raw (Disk, NULL, &Removable, NULL);
 if (Removable) {
     if (!DeviceIoControl((HANDLE)Disk,                  /* handle to disk */
                          IOCTL_STORAGE_CHECK_VERIFY,    /* dwIoControlCode */
@@ -2408,26 +2452,27 @@ if (Removable) {
 return TRUE;
 }
 
-static t_stat sim_os_disk_info_raw (FILE *Disk, uint32 *sector_size, uint32 *removable)
+static t_stat sim_os_disk_info_raw (FILE *Disk, uint32 *sector_size, uint32 *removable, uint32 *is_cdrom)
 {
 DWORD IoctlReturnSize;
 STORAGE_DEVICE_NUMBER Device;
 
 ZeroMemory (&Device, sizeof (Device));
-if (DeviceIoControl((HANDLE)Disk,                      /* handle to volume */
-                     IOCTL_STORAGE_GET_DEVICE_NUMBER,  /* dwIoControlCode */
-                     NULL,                             /* lpInBuffer */
-                     0,                                /* nInBufferSize */
-                     (LPVOID) &Device,                 /* output buffer */
-                     (DWORD) sizeof(Device),           /* size of output buffer */
-                     (LPDWORD) &IoctlReturnSize,       /* number of bytes returned */
-                     (LPOVERLAPPED) NULL))             /* OVERLAPPED structure */
-     sim_printf ("Device OK - Type: %s, Number: %d\n", _device_type_name (Device.DeviceType), (int)Device.DeviceNumber);
+DeviceIoControl((HANDLE)Disk,                      /* handle to volume */
+                IOCTL_STORAGE_GET_DEVICE_NUMBER,  /* dwIoControlCode */
+                NULL,                             /* lpInBuffer */
+                0,                                /* nInBufferSize */
+                (LPVOID) &Device,                 /* output buffer */
+                (DWORD) sizeof(Device),           /* size of output buffer */
+                (LPDWORD) &IoctlReturnSize,       /* number of bytes returned */
+                (LPOVERLAPPED) NULL);             /* OVERLAPPED structure */
 
 if (sector_size)
     *sector_size = 512;
 if (removable)
     *removable = 0;
+if (is_cdrom)
+    *is_cdrom = (Device.DeviceType == FILE_DEVICE_CD_ROM) || (Device.DeviceType == FILE_DEVICE_DVD);
 #ifdef IOCTL_STORAGE_READ_CAPACITY
 if (1) {
     STORAGE_READ_CAPACITY S;
@@ -2496,8 +2541,6 @@ if (1) {
             *removable = H.MediaRemovable;
     }
 #endif
-if (removable && *removable)
-    sim_printf ("Removable Device\n");
 return SCPE_OK;
 }
 
@@ -2644,12 +2687,14 @@ if (sectswritten)
 return SCPE_OK;
 }
 
-static t_stat sim_os_disk_info_raw (FILE *f, uint32 *sector_size, uint32 *removable)
+static t_stat sim_os_disk_info_raw (FILE *f, uint32 *sector_size, uint32 *removable, uint32 *is_cdrom)
 {
 if (sector_size)
     *sector_size = 512;
 if (removable)
     *removable = 0;
+if (is_cdrom)
+    *is_cdrom = 0;
 return SCPE_OK;
 }
 
@@ -2702,7 +2747,7 @@ static t_stat sim_os_disk_wrsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *s
 return SCPE_NOFNC;
 }
 
-static t_stat sim_os_disk_info_raw (FILE *f, uint32 *sector_size, uint32 *removable)
+static t_stat sim_os_disk_info_raw (FILE *f, uint32 *sector_size, uint32 *removable, uint32 *is_cdrom)
 {
 return SCPE_NOFNC;
 }
