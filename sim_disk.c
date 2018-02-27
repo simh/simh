@@ -1984,8 +1984,12 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_STD:                                    /* SIMH format */
     case DKUF_F_VHD:                                    /* VHD format */
     case DKUF_F_RAW:                                    /* Raw Physical Disk Access */
+#if defined(_WIN32)
+        saved_errno = GetLastError ();
+#endif
         perror (msg);
-        sim_printf ("%s %s: %s\n", sim_uname(uptr), msg, strerror(saved_errno));
+        sim_printf ("%s %s: %s\n", sim_uname(uptr), msg, sim_get_os_error_text (saved_errno));
+        break;
     default:
         ;
     }

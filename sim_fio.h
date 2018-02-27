@@ -69,6 +69,7 @@ t_offset sim_fsize_name_ex (const char *fname);
 t_stat sim_copyfile (const char *source_file, const char *dest_file, t_bool overwrite_existing);
 void sim_buf_swap_data (void *bptr, size_t size, size_t count);
 void sim_buf_copy_swapped (void *dptr, const void *bptr, size_t size, size_t count);
+const char *sim_get_os_error_text (int error);
 typedef struct SHMEM SHMEM;
 t_stat sim_shmem_open (const char *name, size_t size, SHMEM **shmem, void **addr);
 void sim_shmem_close (SHMEM *shmem);
