@@ -845,6 +845,7 @@ DWORD commerrors;
 COMSTAT cs;
 char *bptr;
 
+memset (brk, 0, count);                                 /* start with no break indicators */
 if (!ClearCommError (port->hPort, &commerrors, &cs)) {  /* get the comm error flags  */
     sim_error_serial ("ClearCommError",                 /* function failed; report unexpected error */
                       (int) GetLastError ());
