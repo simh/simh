@@ -764,7 +764,7 @@ t_stat examine(uint32 va, uint8 *val) {
     succ = mmu_decode_va(va, 0, FALSE, &pa);
 
     if (succ == SCPE_OK) {
-        if (addr_is_rom(pa) || addr_is_io(pa) || addr_is_mem(pa)) {
+        if (addr_is_rom(pa) || addr_is_mem(pa)) {
             *val = pread_b(pa);
             return SCPE_OK;
         } else {
@@ -784,7 +784,7 @@ t_stat deposit(uint32 va, uint8 val) {
     succ = mmu_decode_va(va, 0, FALSE, &pa);
 
     if (succ == SCPE_OK) {
-        if (addr_is_mem(pa) || addr_is_io(pa)) {
+        if (addr_is_mem(pa)) {
             pwrite_b(pa, val);
             return SCPE_OK;
         } else {

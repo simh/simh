@@ -571,12 +571,13 @@ t_stat cpu_ex(t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
         *vptr = value;
         return succ;
     } else {
-        if (!(addr_is_rom(uaddr) || addr_is_mem(uaddr) || addr_is_io(uaddr))) {
+        if (addr_is_rom(uaddr) || addr_is_mem(uaddr)) {
+            *vptr = (uint32) pread_b(uaddr);
+            return SCPE_OK;
+        } else {
             *vptr = 0;
             return SCPE_NXM;
         }
-        *vptr = (uint32) pread_b(uaddr);
-        return SCPE_OK;
     }
 }
 
@@ -587,11 +588,12 @@ t_stat cpu_dep(t_value val, t_addr addr, UNIT *uptr, int32 sw)
     if (sw & EX_V_FLAG) {
         return deposit(uaddr, (uint8) val);
     } else {
-        if (!(addr_is_rom(uaddr) || addr_is_mem(uaddr) || addr_is_io(uaddr))) {
+        if (addr_is_mem(uaddr)) {
+            pwrite_b(uaddr, (uint8) val);
+            return SCPE_OK;
+        } else {
             return SCPE_NXM;
         }
-        pwrite_b(uaddr, (uint8) val);
-        return SCPE_OK;
     }
 }
 
