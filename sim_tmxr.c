@@ -986,15 +986,29 @@ if (mp->last_poll_time == 0) {                          /* first poll initializa
     if (!uptr)                                          /* Attached ? */
         return -1;                                      /* No connections are possinle! */
 
+    uptr->dynflags |= UNIT_TM_POLL;                     /* Tag as polling unit */
+    uptr->tmxr = (void *)mp;                            /* Connect UNIT to TMXR */
+
     if (mp->poll_interval == 0)                         /* Assure reasonable polling interval */
         mp->poll_interval = TMXR_DEFAULT_CONNECT_POLL_INTERVAL;
 
-    if (!(uptr->dynflags & TMUF_NOASYNCH)) {            /* if asynch not disabled */
+    if (!(uptr->dynflags & TMUF_NOASYNCH))              /* if asynch not disabled */
         sim_cancel (uptr);
-        }
+
     for (i=0; i < mp->lines; i++) {
+        if (mp->ldsc[i].uptr)
+            mp->ldsc[i].uptr->dynflags |= UNIT_TM_POLL; /* Tag as polling unit */
+        else
+            mp->ldsc[i].uptr = uptr;                    /* default line input polling to primary poll unit */
+        if (mp->ldsc[i].o_uptr)
+            mp->ldsc[i].o_uptr->dynflags |= UNIT_TM_POLL;/* Tag as polling unit */
+        else
+            mp->ldsc[i].o_uptr = uptr;                  /* default line output polling to primary poll unit */
         if (!(mp->uptr->dynflags & TMUF_NOASYNCH)) {    /* if asynch not disabled */
-            sim_cancel (mp->ldsc[i].uptr);
+            if (mp->ldsc[i].uptr)
+                sim_cancel (mp->ldsc[i].uptr);
+            if (mp->ldsc[i].o_uptr)
+                sim_cancel (mp->ldsc[i].o_uptr);
             }
         }
     }
