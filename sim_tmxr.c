@@ -1630,8 +1630,11 @@ t_stat tmxr_set_config_line (TMLN *lp, CONST char *config)
 t_stat r;
 
 tmxr_debug_trace_line (lp, "tmxr_set_config_line()");
-if (lp->serport)
+if (lp->serport) {
     r = sim_config_serial (lp->serport, config);
+    if (r == SCPE_OK)
+        tmxr_set_line_speed (lp, config);
+    }
 else {
     lp->serconfig = (char *)realloc (lp->serconfig, 1 + strlen (config));
     strcpy (lp->serconfig, config);
