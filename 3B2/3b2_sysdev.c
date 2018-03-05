@@ -90,7 +90,8 @@ UNIT csr_unit = {
 };
 
 REG csr_reg[] = {
-    { HRDATADF(DATA, csr_data, 16, "CSR Data", csr_bits) }
+    { HRDATADF(DATA, csr_data, 16, "CSR Data", csr_bits) },
+    { NULL }
 };
 
 DEVICE csr_dev = {
