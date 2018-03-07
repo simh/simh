@@ -2310,7 +2310,7 @@ if (!memcmp ("\\.\\", rawdevicename, 3)) {
     Handle = CreateFileA (tmpname, DesiredAccess, FILE_SHARE_READ|FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_RANDOM_ACCESS|FILE_FLAG_WRITE_THROUGH, NULL);
     free (tmpname);
     if (Handle != INVALID_HANDLE_VALUE) {
-        if ((sim_os_disk_info_raw (Handle, NULL, NULL, &is_cdrom)) || 
+        if ((sim_os_disk_info_raw ((FILE *)Handle, NULL, NULL, &is_cdrom)) || 
             (DesiredAccess & GENERIC_WRITE) && is_cdrom) {
             CloseHandle (Handle);
             errno = EACCES;
@@ -2324,7 +2324,7 @@ if (Handle == INVALID_HANDLE_VALUE) {
     _set_errno_from_status (GetLastError ());
     return NULL;
     }
-if ((sim_os_disk_info_raw (Handle, NULL, NULL, &is_cdrom)) || 
+if ((sim_os_disk_info_raw ((FILE *)Handle, NULL, NULL, &is_cdrom)) || 
     (DesiredAccess & GENERIC_WRITE) && is_cdrom) {
     CloseHandle (Handle);
     errno = EACCES;
