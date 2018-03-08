@@ -41,7 +41,7 @@
 #endif
 
 #ifndef SIM_VERSION_MODE
-#define SIM_VERSION_MODE "Beta"
+#define SIM_VERSION_MODE "Current"
 #endif
 
 #if defined(SIM_NEED_GIT_COMMIT_ID)
