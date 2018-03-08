@@ -102,6 +102,11 @@ extern "C" {
 #define PCAP_READ_TIMEOUT  1
 #endif
 
+#include <time.h>
+#if defined(__struct_timespec_defined) && !defined(_TIMESPEC_DEFINED)
+#define _TIMESPEC_DEFINED
+#endif
+
 /* set related values to have correct relationships */
 #if defined (USE_READER_THREAD)
 #include <pthread.h>
@@ -113,8 +118,6 @@ extern "C" {
 #if (!defined (xBSD) && !defined(_WIN32) && !defined(VMS) && !defined(__CYGWIN__)) || defined (HAVE_TAP_NETWORK) || defined (HAVE_VDE_NETWORK)
 #define MUST_DO_SELECT 1
 #endif
-#else
-#include <time.h>
 #endif /* USE_READER_THREAD */
 
 /* give priority to USE_NETWORK over USE_SHARED */
