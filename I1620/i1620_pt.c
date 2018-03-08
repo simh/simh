@@ -26,6 +26,7 @@
    ptr          1621 paper tape reader
    ptp          1624 paper tape punch
 
+   23-Jun-17    RMS     PTR/PTP errors does not set read check
    10-Jun-17    RMS     Fixed typo in PTP unit (Dave Wise)
    26-May-17    RMS     Added deferred IO
    25-May-17    RMS     Fixed treatment of X0C82 on RN (Tom McBride)
@@ -232,7 +233,7 @@ if ((op != OP_RN) && (op != OP_RA))                     /* RN & RA only */
 if ((ptr_unit.flags & UNIT_ATT) == 0)                   /* catch unattached */
     return SCPE_UNATT;
 ptr_mode = 0;
-cpuio_set_inp (op, &ptr_unit);
+cpuio_set_inp (op, IO_PTR, &ptr_unit);
 return SCPE_OK;
 }
 
@@ -245,7 +246,7 @@ if (op != OP_RA)                                        /* RA only */
 if ((ptr_unit.flags & UNIT_ATT) == 0)                   /* catch unattached */
     return SCPE_UNATT;
 ptr_mode = 1;
-cpuio_set_inp (op, &ptr_unit);
+cpuio_set_inp (op, IO_BTR, &ptr_unit);
 return SCPE_OK;
 }
 
@@ -343,7 +344,6 @@ int32 temp;
 
 do {
     if ((temp = getc (ptr_unit.fileref)) == EOF) {      /* read char */
-        ind[IN_RDCHK] = 1;                              /* err, rd chk */
         if (feof (ptr_unit.fileref)) {                  /* EOF? */
             sim_printf ("PTR end of file\n");
             clearerr (ptr_unit.fileref);
@@ -398,7 +398,7 @@ if ((op != OP_WN) && (op != OP_WA) && (op != OP_DN))
 if ((ptp_unit.flags & UNIT_ATT) == 0)                   /* catch unattached */
     return SCPE_UNATT;
 ptp_mode = 0;
-cpuio_set_inp (op, &ptp_unit);
+cpuio_set_inp (op, IO_PTP, &ptp_unit);
 return SCPE_OK;
 }
 
@@ -411,7 +411,7 @@ if (op != OP_WA)                                        /* WA only */
 if ((ptp_unit.flags & UNIT_ATT) == 0)                   /* catch unattached */
     return SCPE_UNATT;
 ptp_mode = 1;
-cpuio_set_inp (op, &ptp_unit);
+cpuio_set_inp (op, IO_BTP, &ptp_unit);
 return SCPE_OK;
 }
 
@@ -505,7 +505,6 @@ return SCPE_OK;
 t_stat ptp_write (uint32 c)
 {
 if (putc (c, ptp_unit.fileref) == EOF) {                /* write char */
-    ind[IN_WRCHK] = 1;                                  /* error? */
     sim_perror ("PTP I/O error");
     clearerr (ptp_unit.fileref);
     return SCPE_IOERR;

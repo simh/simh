@@ -186,7 +186,8 @@ uint8 d, l, z;
 z = 1;                                                  /* assume zero */
 for (l = 1; l <= FP_LMAX; l++) {                        /* scan to get length */
     d = M[ad] & DIGIT;                                  /* get mant digit */
-    if (d) z = 0;                                       /* non-zero? */
+    if (d)                                              /* non-zero? */
+        z = 0;
     if ((l != 1) && (M[ad] & FLAG)) {                   /* flag past first dig? */
         *lnt = l;                                       /* set returns */
         if (zro)

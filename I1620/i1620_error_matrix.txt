@@ -1,0 +1,29 @@
+Device  Error                   Action
+
+CDR     RN, RA invalid char     set RDCHK; if IOSTOP set, stop simulator with INVCHR
+        unattached              stop simulator with UNATT (CHANGED - used to set RDCHK too)
+        end of file             stop simulator witn NOCD (CHANGED - used to set RDCHK too)
+        file read error         set RDCHK; stop simulator with IOERR
+        input line too long     set RDCHK; stop simulator with IOERR
+
+CDP     WN,DN invalid digit     set WRCHK; if IOSTOP set, stop simulator with INVCHR
+        WA invalid char         set WRCHK; if IOSTOP set, stop simulator with INVCHR
+        unattached              stop simulator with UNATT (CHANGED - used to set WRCHK too)
+        file write error        set WRCHK; stop simulator with IOERR
+
+LPT     bad K control field     set PRCHK; if IOSTOP set, stop simulator with INVFNC
+        WN,DN invalid digit     set PRCHK and WRCHK; if IOSTOP set, stop simulator with INVFNC
+        WA invalid char         set PRCHK and WRCHK; if IOSTOP set, stop simulator with INVFNC
+        unattached              stop simulator with UNATT (CHANGED - used to set WRCHK too)
+        file write error        set PRCHK and WRCHK; stop simulator with IOERR
+
+PTR     RN, RA invalid char     set RDCHK but complete operation; if IOSTOP set at end, stop simulator with INVCHR
+        RN, RA parity error     set RDCHK but complete operation; if IOSTOP set at end, stop simulator with INVCHR
+        WN, DN invalid digit    set WRCHK; if IOSTOP set, stop simulator with INVCHR
+        WA invalid char         set WRCHK; if IOSTOP set, stop simulator with INVCHR
+        unattached              stop simulator with UNATT (CHANGED - used to set WRCHK too)
+        file write error        set WRCHK; stop simulator with IOERR
+
+TTY     RN, RA invalid char     ignored, echoed as beep/bell
+        WN, DN invalid digit    ignored, printed as :
+        WA invalid char         set WRCHK; if IOSTOP set, stop simulator with INVCHR
