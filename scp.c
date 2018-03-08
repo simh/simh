@@ -1983,7 +1983,7 @@ static const char simh_help[] =
       " file.  Otherwise, the next command in the command file is processed.\n\n"
       "5String Comparison Expressions\n"
       " String Values can be compared with:\n"
-      "++{-i} {NOT} \"<string1>\" <compare-op> \"<string2>\"\n\n"
+      "++{-i} {NOT} \"<string1>\"|EnVarName1 <compare-op> \"<string2>|EnvVarName2\"\n\n"
       " The -i switch, if present, causes comparisons to be case insensitive.\n"
       " <string1> and <string2> are quoted string values which may have\n"
       " environment variables substituted as desired.\n"
@@ -2421,7 +2421,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
             cptr = (*sim_vm_read) (cbuf, sizeof(cbuf), stdin);
             }
         else
-            cptr = read_line_p (sim_prompt, cbuf, sizeof(cbuf), stdin);/* read with prmopt*/
+            cptr = read_line_p (sim_prompt, cbuf, sizeof(cbuf), stdin);/* read with prompt*/
         }
     if (cptr == NULL) {                                 /* EOF? or SIGINT? */
         if (sim_ttisatty()) {
@@ -3824,7 +3824,7 @@ if (!strcmp (gbuf, "EXIST")) {                          /* File Exist Test? */
     Exist = TRUE;                                       /* remember that, and */
     cptr = (CONST char *)tptr;
     }
-tptr = _get_string (cptr, gbuf, '=');                   /* get first string */
+tptr = _get_string (cptr, gbuf, ' ');                   /* get first string */
 if (Exist || (*gbuf == '"')) {                          /* quoted string comparison? */
     char op[CBUFSIZE];
     static struct {
@@ -3856,11 +3856,13 @@ if (Exist || (*gbuf == '"')) {                          /* quoted string compari
     if (!Exist) {
         get_glyph (cptr, op, '"');
         for (optr = compare_ops; optr->op; optr++)
-            if (0 == strcmp (op, optr->op))
+            if (0 == strncmp (op, optr->op, strlen (optr->op)))
                 break;
         if (!optr->op)
             return sim_messagef (SCPE_ARG, "Invalid operator: %s\n", op);
-        cptr += strlen (op);
+        cptr += strlen (optr->op);
+        if ((!isspace (*cptr)) && isalpha (optr->op[strlen (optr->op) - 1]) && isalnum (*cptr))
+            return sim_messagef (SCPE_ARG, "Invalid operator: %s\n", op);
         while (sim_isspace (*cptr))                     /* skip spaces */
             ++cptr;
         cptr = _get_string (cptr, gbuf2, 0);            /* get second string */
@@ -8307,9 +8309,10 @@ static const char *get_glyph_gen (const char *iptr, char *optr, char mchar, t_bo
 {
 t_bool quoting = FALSE;
 t_bool escaping = FALSE;
+t_bool got_quoted = FALSE;
 char quote_char = 0;
 
-while ((*iptr != 0) && 
+while ((*iptr != 0) && (!got_quoted) &&
        ((quote && quoting) || ((sim_isspace (*iptr) == 0) && (*iptr != mchar)))) {
     if (quote) {
         if (quoting) {
@@ -8317,8 +8320,10 @@ while ((*iptr != 0) &&
                 if (*iptr == escape_char)
                     escaping = TRUE;
                 else
-                    if (*iptr == quote_char)
+                    if (*iptr == quote_char) {
                         quoting = FALSE;
+                        got_quoted = TRUE;
+                        }
                 }
             else
                 escaping = FALSE;
