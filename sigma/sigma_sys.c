@@ -49,7 +49,7 @@ extern uint32 *M;
 extern UNIT cpu_unit;
 
 t_stat fprint_sym_m (FILE *of, uint32 inst);
-t_stat parse_sym_m (const char *cptr, t_value *val);
+t_stat parse_sym_m (CONST char *cptr, t_value *val);
 void fprint_ebcdic (FILE *of, uint32 c);
 
 extern t_stat lp_read_cct (FILE *cfile);
@@ -539,7 +539,7 @@ if (r != SCPE_OK)
 return 0;
 }
 
-t_stat parse_sym_m (const char *cptr, t_value *val)
+t_stat parse_sym_m (CONST char *cptr, t_value *val)
 {
 uint32 i, sgn;
 t_stat r;

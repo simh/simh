@@ -1914,7 +1914,7 @@ return SCPE_OK;
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 i, k, di, lnt;
-const char *cptr = (const char *) desc;
+CONST char *cptr = (CONST char *) desc;
 t_value sim_eval[MAX_L + 1];
 t_stat r;
 InstHistory *h;

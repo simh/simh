@@ -48,7 +48,7 @@ extern REG cpu_reg[];
 extern uint16 *M;
 
 t_stat fprint_sym_m (FILE *of, t_addr addr, t_value *val);
-t_stat parse_sym_m (const char *cptr, t_addr addr, t_value *val);
+t_stat parse_sym_m (CONST char *cptr, t_addr addr, t_value *val);
 extern t_stat lp_load (FILE *fileref, CONST char *cptr, CONST char *fnam);
 extern t_stat pt_dump (FILE *of, CONST char *cptr, CONST char *fnam);
 
@@ -566,7 +566,7 @@ return -1;
                         <= 0  -number of extra words
 */
 
-t_stat parse_sym_m (const char *cptr, t_addr addr, t_value *val)
+t_stat parse_sym_m (CONST char *cptr, t_addr addr, t_value *val)
 {
 uint32 i, j, t, df, db, inst;
 int32 r1, r2;
