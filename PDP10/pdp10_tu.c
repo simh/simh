@@ -1,6 +1,6 @@
 /* pdp10_tu.c - PDP-10 RH11/TM03/TU45 magnetic tape simulator
 
-   Copyright (c) 1993-2017, Robert M Supnik
+   Copyright (c) 1993-2018, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    tu           RH11/TM03/TU45 magtape
 
+   12-Jan-18    RMS     Fixed missing () in logical test (Mark Pizzolato)
+   29-Dec-17    RMS     Read tape mark must set Massbus EXC (TRE)
    28-Mar-17    RMS     Documented switch fall through case (COVERITY)
    17-Mar-13    RMS     Fixed bug in read/write check reverse (Dave Bryan)
    29-Apr-07    RMS     Fixed bug in setting FCE on TMK (Naoki Hamada)
@@ -44,8 +46,8 @@
    28-Mar-03    RMS     Added multiformat support
    28-Feb-03    RMS     Revised for magtape library
    27-Jan-03    RMS     Changed to dynamically allocate buffer
-   21-Nov-02    RMS     Fixed bug in bootstrap (reported by Michael Thompson)
-                        Fixed bug in read (reported by Harris Newman)
+   21-Nov-02    RMS     Fixed bug in bootstrap (Michael Thompson)
+                        Fixed bug in read (Harris Newman)
    29-Sep-02    RMS     Added variable vector support
                         New data structures
    28-Aug-02    RMS     Added end of medium support
@@ -818,6 +820,7 @@ t_stat st, r = SCPE_OK;
 drv = (int32) (uptr - tu_dev.units);                    /* get drive # */
 
 /* Set MOL for a delayed attach */
+
 if (uptr->TU_STATEFLAGS & TUS_ATTPENDING) {
     uptr->TU_STATEFLAGS &= ~TUS_ATTPENDING;             /* Allow transition to on-line */
     tufs = tufs | FS_ATA | FS_SSC;                      /* set attention */
@@ -856,7 +859,7 @@ switch (fnc) {                                          /* case on function */
                 break;
                 }
             } while ((tufc != 0) && !sim_tape_eot (uptr));
-        if (tufc)
+        if (tufc != 0)
             set_tuer (ER_FCE);
         else tutc = tutc & ~TC_FCS;
         tufs = tufs | FS_ATA;
@@ -870,7 +873,7 @@ switch (fnc) {                                          /* case on function */
                 break;
                 }
             } while (tufc != 0);
-        if (tufc)
+        if (tufc != 0)
             set_tuer (ER_FCE);
         else tutc = tutc & ~TC_FCS;
         tufs = tufs | FS_ATA;
@@ -908,8 +911,6 @@ switch (fnc) {                                          /* case on function */
             tufs = tufs | FS_ID;                        /* PE BOT? ID burst */
         TXFR (ba, wc, 0);                               /* validate transfer */
         if ((st = sim_tape_rdrecf (uptr, xbuf, &tbc, MT_MAXFR))) {/* read fwd */
-            if (st == MTSE_TMK)                         /* TMK also sets FCE */
-                set_tuer (ER_FCE);
             r = tu_map_err (uptr, st, 1);               /* map error */
             break;                                      /* done */
             }
@@ -970,8 +971,6 @@ switch (fnc) {                                          /* case on function */
         tufc = 0;                                       /* clear frame count */
         TXFR (ba, wc, 1);                               /* validate xfer rev */
         if ((st = sim_tape_rdrecr (uptr, xbuf + 4, &tbc, MT_MAXFR))) {/* read rev */
-            if (st == MTSE_TMK)                         /* TMK also sets FCE */
-                set_tuer (ER_FCE);
             r = tu_map_err (uptr, st, 1);               /* map error */
             break;                                      /* done */
             }
@@ -1084,7 +1083,9 @@ tuiff = 0;                                              /* clear CSTB INTR */
 return VEC_TU;                                          /* acknowledge */
 }
 
-/* Map tape error status */
+/* Map tape error status
+
+   Note that tape mark on a data transfer sets FCE and Massbus EXC */
 
 t_stat tu_map_err (UNIT *uptr, t_stat st, t_bool qdt)
 {
@@ -1100,6 +1101,10 @@ switch (st) {
 
     case MTSE_TMK:                                      /* end of file */
         tufs = tufs | FS_TMK;
+        if (qdt) {                                      /* data transfer? */
+            set_tuer (ER_FCE);                          /* set FCE */
+            tucs1 = tucs1 | CS1_TRE;
+            }
         break;
 
     case MTSE_IOERR:                                    /* IO error */
@@ -1163,7 +1168,7 @@ int_req = int_req & ~INT_TU;                            /* clear interrupt */
 for (u = 0; u < TU_NUMDR; u++) {                        /* loop thru units */
     uptr = tu_dev.units + u;
     sim_tape_reset (uptr);                              /* clear pos flag */
-    if (!(uptr->TU_STATEFLAGS & TUS_ATTPENDING))        /* Delayed on-line must survive massbus clear */
+    if (!(uptr->TU_STATEFLAGS & TUS_ATTPENDING))        /* delayed on-line must survive massbus clear */
         sim_cancel (uptr);                              /* cancel activity */
     else {
         if (!sim_is_active(uptr) )
