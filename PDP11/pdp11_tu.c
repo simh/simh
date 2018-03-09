@@ -876,7 +876,7 @@ switch (st) {
         if (qdt) {                                      /* data transfer? */
             tu_set_er (ER_FCE);                         /* set FCE */
             mba_set_exc (tu_dib.ba);                    /* set exception*/
-        }
+            }
         break;
 
     case MTSE_IOERR:                                    /* IO error */
