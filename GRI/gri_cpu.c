@@ -518,7 +518,8 @@ while (reason == 0) {                                   /* loop until halted */
             MA = IDX_ADD (MA);                          /* index? */
             if (op & TRP_DEF) {                         /* defer? */
                 t = (M[MA] + 1) & DMASK;                /* autoinc */
-                if (MEM_ADDR_OK (MA)) M[MA] = t;
+                if (MEM_ADDR_OK (MA))
+                    M[MA] = t;
                 MA = IDX_ADD (t);                       /* index? */
                 }
             TRP = SC;                                   /* save SC */
