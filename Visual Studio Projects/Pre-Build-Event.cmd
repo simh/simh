@@ -247,17 +247,27 @@ exit 1
 
 :_GitHooks
 if not exist ..\.git goto _done_hooks
-if exist ..\.git\hooks\post-commit goto _done_hooks
+if not exist ..\.git\hooks\post-commit goto _initial_hooks
+fc /b ..\.git\hooks\post-commit git-hooks\post-commit >nul
+if %ERRORLEVEL% equ 0 goto _done_hooks
+echo *****************************************************
+echo *****************************************************
+echo ** Installing updated git hooks repository         **
+echo *****************************************************
+echo *****************************************************
+goto _install_hooks
+:_initial_hooks
 echo *****************************************************
 echo *****************************************************
 echo ** Installing git hooks in newly cloned repository **
 echo *****************************************************
 echo *****************************************************
+:_install_hooks
 copy /y git-hooks\post* ..\.git\hooks\
 call :WhereInPath git.exe > NUL 2>&1
 if %ERRORLEVEL% neq 0 goto _done_hooks
 pushd ..
-git log -1 "--pretty=%%H" >.git-commit-id
+git log -1 --pretty="SIM_GIT_COMMIT_ID %H%nSIM_GIT_COMMIT_TIME %aI" >.git-commit-id
 popd
 :_done_hooks
 
@@ -268,15 +278,18 @@ rem This race can happen at the beginning of a parallel build where
 rem several projects can start execution at almost the same time.
 rem
 SET GIT_COMMIT_ID=
+SET GIT_COMMIT_TIME=
 if not exist ..\.git-commit-id goto _NoId
-for /F %%i in (..\.git-commit-id) do SET GIT_COMMIT_ID=%%i
+for /F "usebackq tokens=2" %%i in (`findstr /C:SIM_GIT_COMMIT_ID ..\.git-commit-id`) do SET GIT_COMMIT_ID=%%i
+for /F "usebackq tokens=2" %%i in (`findstr /C:SIM_GIT_COMMIT_TIME ..\.git-commit-id`) do SET GIT_COMMIT_TIME=%%i
 :_NoId
 SET OLD_GIT_COMMIT_ID=
 if not exist .git-commit-id.h echo.>.git-commit-id.h
-for /F "tokens=3" %%i in (.git-commit-id.h) do SET OLD_GIT_COMMIT_ID=%%i
+for /F "usebackq tokens=3" %%i in (`findstr /C:SIM_GIT_COMMIT_ID ..\.git-commit-id`) do SET OLD_GIT_COMMIT_ID=%%i
 if "%GIT_COMMIT_ID%" equ "%OLD_GIT_COMMIT_ID%" goto _IdGood
 echo Generating updated .git-commit-id.h containing id %GIT_COMMIT_ID%
 echo #define SIM_GIT_COMMIT_ID %GIT_COMMIT_ID% >.git-commit-id.h
+echo #define SIM_GIT_COMMIT_TIME %GIT_COMMIT_TIME% >>.git-commit-id.h
 if errorlevel 1 echo Retrying...
 if errorlevel 1 goto _SetId
 :_IdGood

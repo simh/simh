@@ -5215,6 +5215,10 @@ if (flag) {
 #define S_xstr(a) S_str(a)
 #define S_str(a) #a
 fprintf (st, "%sgit commit id: %8.8s", flag ? "\n        " : "        ", S_xstr(SIM_GIT_COMMIT_ID));
+#if defined(SIM_GIT_COMMIT_TIME)
+if (flag)
+    fprintf (st, "%sgit commit time: %s", "\n        ", S_xstr(SIM_GIT_COMMIT_TIME));
+#endif
 #undef S_str
 #undef S_xstr
 #endif

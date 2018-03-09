@@ -50,6 +50,7 @@
 
 #if !defined(SIM_GIT_COMMIT_ID)
 #define SIM_GIT_COMMIT_ID $Format:%H$
+#define SIM_GIT_COMMIT_TIME $Format:%aI$
 #endif
 
 /*
