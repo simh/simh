@@ -35,7 +35,7 @@ extern uint32 pal_type;
 
 t_stat fprint_sym_m (FILE *of, t_addr addr, uint32 inst);
 t_stat parse_sym_m (CONST char *cptr, t_addr addr, t_value *inst);
-int32 parse_reg (const char *cptr);
+int32 parse_reg (CONST char *cptr);
 
 extern t_stat fprint_pal_hwre (FILE *of, uint32 inst);
 extern t_stat parse_pal_hwre (CONST char *cptr, t_value *inst);
@@ -802,7 +802,7 @@ return -3;
 
 /* Parse a register */
 
-int32 parse_reg (const char *cptr)
+int32 parse_reg (CONST char *cptr)
 {
 t_stat r;
 int32 reg;
