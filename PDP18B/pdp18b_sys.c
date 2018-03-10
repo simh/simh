@@ -268,7 +268,7 @@ return SCPE_OK;                                         /* done */
         word to execute (bit 1 of last character set)
 */
 
-t_stat hri_load_7915 (FILE *fileref, const char *cptr)
+t_stat hri_load_7915 (FILE *fileref, CONST char *cptr)
 {
 int32 bits, origin, val;
 char gbuf[CBUFSIZE];
