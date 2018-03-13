@@ -77,6 +77,10 @@
    tmxr_send_buffered_data -            transmit buffered data
    tmxr_set_modem_control_passthru -    enable modem control on a multiplexer
    tmxr_clear_modem_control_passthru -  disable modem control on a multiplexer
+   tmxr_set_port_speed_control -        Declare that tmxr_set_config_line is used
+   tmxr_clear_port_speed_control -      Declare that tmxr_set_config_line is not used
+   tmxr_set_line_port_speed_control -   Declare that tmxr_set_config_line is used for line
+   tmxr_clear_line_port_speed_control - Declare that tmxr_set_config_line is not used for line
    tmxr_set_get_modem_bits -            set and/or get a line modem bits
    tmxr_set_line_loopback -             enable or disable loopback mode on a line
    tmxr_get_line_loopback -             returns the current loopback status of a line
@@ -1414,6 +1418,78 @@ t_stat tmxr_clear_modem_control_passthru (TMXR *mp)
 return tmxr_clear_modem_control_passthru_state (mp, FALSE);
 }
 
+/* Declare that tmxr_set_config_line is used.
+
+   This would best be called in a device reset routine and left set.
+
+   If the device implementor wants to make this behavior a user option
+   we've got to reject the attempt to set or clear this mode if any 
+   ports on the MUX are attached.
+*/
+t_stat tmxr_set_port_speed_control (TMXR *mp)
+{
+int i;
+
+if (mp->uptr && !(mp->uptr->flags & UNIT_ATT))
+    return sim_messagef (SCPE_ALATT, "Can't change speed mode while attached.\n:");
+mp->port_speed_control = TRUE;
+for (i=0; i<mp->lines; ++i)
+    mp->ldsc[i].port_speed_control = mp->port_speed_control;
+return SCPE_OK;
+}
+
+/* Declare that tmxr_set_config_line is not used.
+
+   This should be only be called after a previous call to 
+   tmxr_set_port_speed_control since the default is cleared.  It can not
+   be called if any ports on the device are attached.
+*/
+t_stat tmxr_clear_port_speed_control (TMXR *mp)
+{
+int i;
+
+if (mp->uptr && !(mp->uptr->flags & UNIT_ATT))
+    return sim_messagef (SCPE_ALATT, "Can't change speed mode while attached.\n:");
+mp->port_speed_control = FALSE;
+for (i=0; i<mp->lines; ++i)
+    mp->ldsc[i].port_speed_control = mp->port_speed_control;
+return SCPE_OK;
+}
+
+/* Declare that tmxr_set_config_line is used for line.
+
+   This would best be called in a device reset routine and left set.
+
+   If the device implementor wants to make this behavior a user option
+   we've got to reject the attempt to set or clear this mode if any 
+   ports on the MUX are attached.
+*/
+t_stat tmxr_set_line_port_speed_control (TMXR *mp, int line)
+{
+if (mp->uptr && !(mp->uptr->flags & UNIT_ATT))
+    return sim_messagef (SCPE_ALATT, "Can't change speed mode while attached.\n:");
+if (line >= mp->lines)
+    return sim_messagef (SCPE_ARG, "Invalid line for multiplexer: %d\n", line);
+mp->ldsc[line].port_speed_control = TRUE;
+return SCPE_OK;
+}
+
+/* Declare that tmxr_set_config_line is not used for line.
+
+   This should be only be called after a previous call to 
+   tmxr_set_port_speed_control since the default is cleared.  It can not
+   be called if any ports on the device are attached.
+*/
+t_stat tmxr_clear_line_port_speed_control (TMXR *mp, int line)
+{
+if (mp->uptr && !(mp->uptr->flags & UNIT_ATT))
+    return sim_messagef (SCPE_ALATT, "Can't change speed mode while attached.\n:");
+if (line >= mp->lines)
+    return sim_messagef (SCPE_ARG, "Invalid line for multiplexer: %d\n", line);
+mp->ldsc[line].port_speed_control = FALSE;
+return SCPE_OK;
+}
+
 /* Manipulate the modem control bits of a specific line
 
    Inputs:
@@ -1633,7 +1709,7 @@ tmxr_debug_trace_line (lp, "tmxr_set_config_line()");
 if (lp->serport) {
     r = sim_config_serial (lp->serport, config);
     if (r == SCPE_OK)
-        tmxr_set_line_speed (lp, config);
+        r = tmxr_set_line_speed (lp, config);
     }
 else {
     lp->serconfig = (char *)realloc (lp->serconfig, 1 + strlen (config));
@@ -2381,6 +2457,8 @@ if (*cptr == '*') {
         return r;
     lp->rxbpsfactor = TMXR_RX_BPS_UNIT_SCALE * rxbpsfactor;
     }
+if ((lp->serport) && (lp->rxbpsfactor != 0.0))
+    lp->rxbpsfactor = TMXR_RX_BPS_UNIT_SCALE;
 lp->rxdelta = _tmln_speed_delta (speed);
 lp->rxnexttime = 0.0;
 uptr = lp->uptr;
@@ -2414,7 +2492,7 @@ t_stat tmxr_open_master (TMXR *mp, CONST char *cptr)
 int32 i, line, nextline = -1;
 char tbuf[CBUFSIZE], listen[CBUFSIZE], destination[CBUFSIZE], 
      logfiletmpl[CBUFSIZE], buffered[CBUFSIZE], hostport[CBUFSIZE], 
-     port[CBUFSIZE], option[CBUFSIZE], speed[CBUFSIZE];
+     port[CBUFSIZE], option[CBUFSIZE], speed[CBUFSIZE], dev_name[CBUFSIZE];
 SOCKET sock;
 SERHANDLE serport;
 CONST char *tptr = cptr;
@@ -2422,6 +2500,7 @@ t_bool nolog, notelnet, listennotelnet, modem_control, loopback, datagram, packe
 TMLN *lp;
 t_stat r = SCPE_OK;
 
+snprintf (dev_name, sizeof(dev_name), "%s%s", mp->uptr ? sim_dname (find_dev_from_unit (mp->uptr)) : "", mp->uptr ? " " : "");
 if (*tptr == '\0')
     return SCPE_ARG;
 for (i = 0; i < mp->lines; i++) {               /* initialize lines */
@@ -2547,6 +2626,8 @@ while (*tptr) {
                 if ((NULL == cptr) || ('\0' == *cptr) || 
                     (_tmln_speed_delta (cptr) < 0))
                     return sim_messagef (SCPE_ARG, "Invalid Speed Specifier: %s\n", (cptr ? cptr : ""));
+                if (mp->port_speed_control && (_tmln_speed_delta (cptr) > 0) && (!(sim_switches & SIM_SW_REST)))
+                    return sim_messagef (SCPE_ARG, "%s simulator programmatically sets %sport speed\n", sim_name, dev_name);
                 strlcpy (speed, cptr, sizeof(speed));
                 continue;
                 }
@@ -3692,10 +3773,10 @@ int32 i;
 if (mp->dptr == NULL)                                   /* has device been set? */
     mp->dptr = find_dev_from_unit (uptr);               /* no, so set device now */
 
+mp->uptr = uptr;                                        /* save unit for polling */
 r = tmxr_open_master (mp, cptr);                        /* open master socket */
 if (r != SCPE_OK)                                       /* error? */
     return r;
-mp->uptr = uptr;                                        /* save unit for polling */
 uptr->filename = tmxr_mux_attach_string (uptr->filename, mp);/* save */
 uptr->flags = uptr->flags | UNIT_ATT;                   /* no more errors */
 uptr->tmxr = (void *)mp;
@@ -4071,9 +4152,14 @@ t_stat tmxr_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
 {
 TMXR *mux = (TMXR *)dptr->help_ctx;
 t_bool single_line = FALSE;               /* default to Multi-Line help */
+t_bool port_speed_control = FALSE;
+t_bool modem_control = FALSE;
 
-if (mux)
-   single_line = (mux->lines == 1);
+if (mux) {
+    single_line = (mux->lines == 1);
+    port_speed_control = mux->port_speed_control;
+    modem_control = mux->modem_control;
+    }
 
 if (!flag)
     fprintf (st, "%s Multiplexer Attach Help\n\n", dptr->name);
@@ -4081,7 +4167,7 @@ if (single_line) {          /* Single Line Multiplexer */
     fprintf (st, "The %s multiplexer may be connected to terminal emulators supporting the\n", dptr->name);
     fprintf (st, "Telnet protocol via sockets, or to hardware terminals via host serial\n");
     fprintf (st, "ports.\n\n");
-    if (mux->modem_control) {
+    if (modem_control) {
         fprintf (st, "The %s device is a full modem control device and therefore is capable of\n", dptr->name);
         fprintf (st, "passing port configuration information and modem signals.\n");
         }
@@ -4103,7 +4189,7 @@ else {
     fprintf (st, "Telnet protocol via sockets, or to hardware terminals via host serial\n");
     fprintf (st, "ports.  Concurrent Telnet and serial connections may be mixed on a given\n");
     fprintf (st, "multiplexer.\n\n");
-    if (mux && mux->modem_control) {
+    if (modem_control) {
         fprintf (st, "The %s device is a full modem control device and therefore is capable of\n", dptr->name);
         fprintf (st, "passing port configuration information and modem signals on all lines.\n");
         }
@@ -4154,56 +4240,88 @@ else {
         fprintf (st, "Valid line numbers are from 0 thru %d\n\n", mux->lines-1);
     }
 if (single_line) {          /* Single Line Multiplexer */
-    fprintf (st, "The input data rate for the %s device can be controlled by\n", dptr->name);
-    fprintf (st, "specifying SPEED=nnn{*fac} on the the ATTACH command.\n");
+    if (port_speed_control) {
+        fprintf (st, "The data rate for the %s device is set programmatically within\n", dptr->name);
+        fprintf (st, "the running simulator.  When connected via a telnet session, a\n");
+        fprintf (st, "speed increase factor can be specified with a SPEED=*factor on\n");
+        fprintf (st, "the ATTACH command.\n");
+        }
+    else {
+        fprintf (st, "The data rate for the %s device can be controlled by\n", dptr->name);
+        fprintf (st, "specifying SPEED=nnn{*factor} on the the ATTACH command.\n");
+        }
     }
 else {
-    fprintf (st, "The input data rate for all lines or a particular line of a the %s\n", dptr->name);
-    fprintf (st, "device can be controlled by specifying SPEED=nnn{*fac} on the ATTACH command.\n");
+    if (port_speed_control) {
+        fprintf (st, "The data rates for the lines of the %s device are set\n", dptr->name);
+        fprintf (st, "programmatically within the running simulator.  When connected\n");
+        fprintf (st, "via telnet sessions, a speed increase factor can be specified with\n");
+        fprintf (st, "a SPEED=*factor on the ATTACH command.\n");
+        }
+    else {
+        fprintf (st, "The data rate for all lines or a particular line of a the %s\n", dptr->name);
+        fprintf (st, "device can be controlled by specifying SPEED=nnn{*fac} on the ATTACH\n");
+        fprintf (st, "command.\n");
+        }
     }
-fprintf (st, "SPEED values can be any one of:\n\n");
-fprintf (st, "    0 50 75 110 134 150 300 600 1200 1800 2000 2400\n");
-fprintf (st, "    3600 4800 7200 9600 19200 38400 57600 76800 115200\n\n");
-fprintf (st, "A SPEED value of 0 causes input data to be delivered to the simulated\n");
-fprintf (st, "port as fast as it arrives.\n\n");
-fprintf (st, "If a simulated multiplexor devices can programmatically set a serial\n");
-fprintf (st, "port line speed, the programmatically specified speed will take precidence\n");
-fprintf (st, "over any input speed specified on an attach command.\n");
+if (!port_speed_control) {
+    fprintf (st, "SPEED values can be any one of:\n\n");
+    fprintf (st, "    0 50 75 110 134 150 300 600 1200 1800 2000 2400\n");
+    fprintf (st, "    3600 4800 7200 9600 19200 38400 57600 76800 115200\n\n");
+    fprintf (st, "A SPEED value of 0 causes input data to be delivered to the simulated\n");
+    fprintf (st, "port as fast as it arrives.\n\n");
+    }
+else {
+    fprintf (st, "\n");
+    }
 fprintf (st, "Some simulated systems run very much faster than the original system\n");
-fprintf (st, "which is being simulated.  To accommodate this, the speed specified may\n");
-fprintf (st, "include a factor which will increase the input data delivery rate by\n");
-fprintf (st, "the specified factor.  A factor is specified with a speed value of the\n");
-fprintf (st, "form \"speed*factor\".  Factor values can range from 1 thru 32.\n");
-fprintf (st, "Example:\n\n");
-fprintf (st, "   sim> ATTACH %s 1234,SPEED=2400\n", dptr->name);
-fprintf (st, "   sim> ATTACH %s 1234,SPEED=9600*8\n", dptr->name);
-if (!single_line)
-    fprintf (st, "   sim> ATTACH %s Line=2,SPEED=2400\n", dptr->name);
-fprintf (st, "\n");
-fprintf (st, "The SPEED parameter only influences the rate at which data is deliverd\n");
-fprintf (st, "into the simulated multiplexor port.  Output data rates are unaffected\n");
-fprintf (st, "If an attach command specifies a speed multiply factor, that value will\n");
-fprintf (st, "persist independent of any programatic action by the simulated system to\n");
-fprintf (st, "change the port speed.\n\n");
-fprintf (st, "An optional serial port configuration string may be present after the port\n");
-fprintf (st, "name.  If present, it must be separated from the port name with a semicolon\n");
-fprintf (st, "and has this form:\n\n");
-fprintf (st, "   <rate>-<charsize><parity><stopbits>\n\n");
-fprintf (st, "where:\n");
-fprintf (st, "   rate     = communication rate in bits per second\n");
-fprintf (st, "   charsize = character size in bits (5-8, including optional parity)\n");
-fprintf (st, "   parity   = parity designator (N/E/O/M/S for no/even/odd/mark/space parity)\n");
-fprintf (st, "   stopbits = number of stop bits (1, 1.5, or 2)\n\n");
-fprintf (st, "As an example:\n\n");
-fprintf (st, "   9600-8n1\n\n");
-fprintf (st, "The supported rates, sizes, and parity options are host-specific.  If\n");
-fprintf (st, "a configuration string is not supplied, then the default of 9600-8N1\n");
-fprintf (st, "is used.\n");
-fprintf (st, "Note: The serial port configuration option is only available on multiplexer\n");
-fprintf (st, "      lines which are not operating with full modem control behaviors enabled.\n");
-fprintf (st, "      Lines with full modem control behaviors enabled have all of their\n");
-fprintf (st, "      configuration managed by the Operating System running within the\n");
-fprintf (st, "      simulator.\n\n");
+fprintf (st, "which is being simulated.  To accommodate this, multiplexer lines \n");
+fprintf (st, "connected via telnet sessions may include a factor which will increase\n");
+fprintf (st, "the input and output data delivery rates by the specified factor.\n");
+fprintf (st, "A factor is specified with a speed ");
+if (!port_speed_control) {
+    fprintf (st, "value of the form \"speed*factor\"\n");
+    fprintf (st, "Factor values can range from 1 thru 32.\n");
+    fprintf (st, "Example:\n\n");
+    fprintf (st, "   sim> ATTACH %s 1234,SPEED=2400\n", dptr->name);
+    fprintf (st, "   sim> ATTACH %s 1234,SPEED=9600*8\n", dptr->name);
+    if (!single_line)
+        fprintf (st, "   sim> ATTACH %s Line=2,SPEED=2400\n", dptr->name);
+    fprintf (st, "\n");
+    }
+else {
+    fprintf (st, "value of the form \"*factor\"\n");
+    fprintf (st, "Factor values can range from 1 thru 32.\n");
+    fprintf (st, "Example:\n\n");
+    fprintf (st, "   sim> ATTACH %s 1234,SPEED=*8\n", dptr->name);
+    if (!single_line)
+        fprintf (st, "   sim> ATTACH %s Line=2,SPEED=*4\n", dptr->name);
+    fprintf (st, "\n");
+    fprintf (st, "If an attach command specifies a speed multiply factor, that value will\n");
+    fprintf (st, "persist independent of any programatic action by the simulated system to\n");
+    fprintf (st, "change the port speed.\n\n");
+    }
+if (!port_speed_control) {
+    fprintf (st, "An optional serial port configuration string may be present after the port\n");
+    fprintf (st, "name.  If present, it must be separated from the port name with a semicolon\n");
+    fprintf (st, "and has this form:\n\n");
+    fprintf (st, "   <rate>-<charsize><parity><stopbits>\n\n");
+    fprintf (st, "where:\n");
+    fprintf (st, "   rate     = communication rate in bits per second\n");
+    fprintf (st, "   charsize = character size in bits (5-8, including optional parity)\n");
+    fprintf (st, "   parity   = parity designator (N/E/O/M/S for no/even/odd/mark/space parity)\n");
+    fprintf (st, "   stopbits = number of stop bits (1, 1.5, or 2)\n\n");
+    fprintf (st, "As an example:\n\n");
+    fprintf (st, "   9600-8n1\n\n");
+    fprintf (st, "The supported rates, sizes, and parity options are host-specific.  If\n");
+    fprintf (st, "a configuration string is not supplied, then the default of 9600-8N1\n");
+    fprintf (st, "is used.\n");
+    fprintf (st, "Note: The serial port configuration option is only available on multiplexer\n");
+    fprintf (st, "      lines which are not operating with full modem control behaviors enabled.\n");
+    fprintf (st, "      Lines with full modem control behaviors enabled have all of their\n");
+    fprintf (st, "      configuration managed by the Operating System running within the\n");
+    fprintf (st, "      simulator.\n\n");
+    }
 fprintf (st, "An attachment to a serial port with the '-V' switch will cause a\n");
 fprintf (st, "connection message to be output to the connected serial port.\n");
 fprintf (st, "This will help to confirm the correct port has been connected and\n");

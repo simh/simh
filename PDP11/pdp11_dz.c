@@ -782,6 +782,7 @@ sim_debug(DBG_TRC, dptr, "dz_reset()\n");
 
 if (dz_ldsc == NULL)
     dz_desc.ldsc = dz_ldsc = (TMLN *)calloc (dz_desc.lines, sizeof(*dz_ldsc));
+tmxr_set_port_speed_control (&dz_desc);
 for (i = 0; i < dz_desc.lines/DZ_LINES; i++)            /* init muxes */
     dz_clear (i, TRUE);
 dz_rxi = dz_txi = 0;                                    /* clr master int */
