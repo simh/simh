@@ -40,9 +40,9 @@ extern int32 sim_emax;
 extern DEVICE *sim_devices[];
 
 void full_reset();
-t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag);
-t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val,
+t_stat sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag);
+t_stat parse_sym(CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val,
                   int32 sw);
-t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw);
+t_stat fprint_sym(FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw);
 
 #endif

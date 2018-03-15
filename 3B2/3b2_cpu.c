@@ -68,10 +68,6 @@ extern uint16 csr_data;
 uint32 R[16];
 
 /* Other global CPU state */
-int8   cpu_dtype      = -1;        /* Default datatype for the current
-                                      instruction */
-int8   cpu_etype      = -1;        /* Currently set expanded datatype */
-
 t_bool cpu_nmi        = FALSE;     /* If set, there has been an NMI */
 
 int32  pc_incr        = 0;         /* Length (in bytes) of instruction
@@ -727,7 +723,196 @@ t_stat cpu_set_hist(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     return SCPE_OK;
 }
 
-void fprint_sym_m(FILE *st, instr *ip)
+t_stat fprint_sym_m(FILE *of, t_addr addr, t_value *val)
+{
+    uint8 desc, mode, reg, class, etype;
+    uint32 w;
+    int32 vp, inst, i;
+    mnemonic *mn;
+    char reg_name[8];
+
+    mn = NULL;
+    vp = 0;
+    etype = -1;
+
+    inst = (int32) val[vp++];
+
+    if (inst == 0x30) {
+        /* Scan to find opcode */
+        inst = 0x3000 | val[vp++];
+        for (i = 0; i < HWORD_OP_COUNT; i++) {
+            if (hword_ops[i].opcode == inst) {
+                mn = &hword_ops[i];
+                break;
+            }
+        }
+    } else {
+        mn = &ops[inst];
+    }
+
+    if (mn == NULL) {
+        fprintf(of, "???");
+        return -(vp - 1);
+    }
+
+    fprintf(of, "%s", mn->mnemonic);
+
+    for (i = 0; i < mn->op_count; i++) {
+
+        /* Special cases for non-descriptor opcodes */
+        if (mn->mode == OP_BYTE) {
+            mode = 6;
+            reg = 15;
+        } else if (mn->mode == OP_HALF) {
+            mode = 5;
+            reg = 15;
+        } else if (mn->mode == OP_COPR) {
+            mode = 4;
+            reg = 15;
+        } else {
+            desc = val[vp++];
+            mode = (desc >> 4) & 0xf;
+            reg = desc & 0xf;
+
+            /* Find the expanded data type, if any */
+            if (mode == 14 &&
+                (reg == 0 || reg == 2 || reg == 3 ||
+                 reg == 4 || reg == 6 || reg == 7)) {
+                etype = reg;
+                /* The real descriptor byte lies one ahead */
+                desc = val[vp++];
+                mode = (desc >> 4) & 0xf;
+                reg = desc & 0xf;
+            }
+        }
+
+        fputc(i ? ',' : ' ', of);
+
+        switch (etype) {
+        case 0:
+            fprintf(of, "{uword}");
+            break;
+        case 2:
+            fprintf(of, "{uhalf}");
+            break;
+        case 3:
+            fprintf(of, "{ubyte}");
+            break;
+        case 4:
+            fprintf(of, "{word}");
+            break;
+        case 6:
+            fprintf(of, "{half}");
+            break;
+        case 7:
+            fprintf(of, "{sbyte}");
+            break;
+        default:
+            /* do nothing */
+            break;
+        }
+
+        switch(mode) {
+        case 0:  /* Positive Literal */
+        case 1:  /* Positive Literal */
+        case 2:  /* Positive Literal */
+        case 3:  /* Positive Literal */
+        case 15: /* Negative Literal */
+            fprintf(of, "&%d", desc);
+            break;
+        case 4:  /* Halfword Immediate, Register Mode */
+            switch (reg) {
+            case 15: /* Word Immediate */
+                OP_R_W(w, val, vp);
+                fprintf(of, "&0x%x", w);
+                break;
+            default: /* Register Mode */
+                cpu_register_name(reg, reg_name, 8);
+                fprintf(of, "%s", reg_name);
+                break;
+            }
+            break;
+        case 5:  /* Halfword Immediate, Register Deferred */
+            switch (reg) {
+            case 15:
+                OP_R_H(w, val, vp);
+                fprintf(of, "&0x%x", w);
+                break;
+            default:
+                cpu_register_name(reg, reg_name, 8);
+                fprintf(of, "(%s)", reg_name);
+                break;
+            }
+            break;
+        case 6:  /* Byte Immediate, FP Short Offset */
+            switch (reg) {
+            case 15:
+                OP_R_B(w, val, vp);
+                fprintf(of, "&0x%x", w);
+                break;
+            default:
+                fprintf(of, "%d(%%fp)", reg);
+                break;
+            }
+            break;
+        case 7:  /* Absolute, AP Short Offset */
+            switch (reg) {
+            case 15:
+                OP_R_W(w, val, vp);
+                fprintf(of, "$0x%x", w);
+                break;
+            default:
+                fprintf(of, "%d(%%ap)", reg);
+                break;
+            }
+            break;
+        case 8:   /* Word Displacement */
+            OP_R_W(w, val, vp);
+            cpu_register_name(reg, reg_name, 8);
+            fprintf(of, "0x%x(%s)", w, reg_name);
+            break;
+        case 9:   /* Word Displacement Deferred */
+            OP_R_W(w, val, vp);
+            cpu_register_name(reg, reg_name, 8);
+            fprintf(of, "*0x%x(%s)", w, reg_name);
+            break;
+        case 10:  /* Halfword Displacement */
+            OP_R_H(w, val, vp);
+            cpu_register_name(reg, reg_name, 8);
+            fprintf(of, "0x%x(%s)", w, reg_name);
+            break;
+        case 11:  /* Halfword Displacement Deferred */
+            OP_R_H(w, val, vp);
+            cpu_register_name(reg, reg_name, 8);
+            fprintf(of, "*0x%x(%s)", w, reg_name);
+            break;
+        case 12:  /* Byte Displacement */
+            OP_R_B(w, val, vp);
+            cpu_register_name(reg, reg_name, 8);
+            fprintf(of, "%d(%s)", w, reg_name);
+            break;
+        case 13:  /* Byte Displacement Deferred */
+            OP_R_B(w, val, vp);
+            cpu_register_name(reg, reg_name, 8);
+            fprintf(of, "*%d(%s)", w, reg_name);
+            break;
+        case 14:
+            if (reg == 15) {
+                OP_R_W(w, val, vp);
+                fprintf(of, "*$0x%x", w);
+            }
+            break;
+        default:
+            fprintf(of, "<?>");
+            break;
+        }
+    }
+
+
+    return -(vp - 1);
+}
+
+void fprint_sym_hist(FILE *st, instr *ip)
 {
     int32 i;
 
@@ -794,7 +979,7 @@ t_stat cpu_show_hist(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
             if (ip->mn == NULL || ip->mn->op_count < 0) {
                 fprintf(st, "???");
             } else {
-                fprint_sym_m(st, ip);
+                fprint_sym_hist(st, ip);
                 if (ip->mn->op_count > 0 && ip->mn->mode == OP_DESC) {
                     fprintf(st, "\n                            ");
                     for (j = 0; j < (uint32) ip->mn->op_count; j++) {
@@ -936,7 +1121,7 @@ void cpu_show_operand(FILE *st, operand *op)
         }
         break;
     case 15:
-        fprintf(st, "&%d", (int32)op->embedded.w);
+        fprintf(st, "&0x%x", (int32)op->embedded.w);
         break;
     }
 }
@@ -989,18 +1174,13 @@ static SIM_INLINE void clear_instruction(instr *inst)
 
 /*
  * Decode a single descriptor-defined operand from the instruction
- * stream. Returns the number of bytes consumed during decode.
+ * stream. Returns the number of bytes consumed during decode.type
  */
-static uint8 decode_operand(uint32 pa, instr *instr, uint8 op_number)
+static uint8 decode_operand(uint32 pa, instr *instr, uint8 op_number, uint8 *etype)
 {
     uint8 desc;
     uint8 offset = 0;
     operand *oper = &instr->operands[op_number];
-
-    /* Set the default data type if none is already set */
-    if (cpu_dtype == -1) {
-        cpu_dtype = instr->mn->dtype;
-    }
 
     /* Read in the descriptor byte */
     desc = read_b(pa + offset++, ACC_OF);
@@ -1008,7 +1188,7 @@ static uint8 decode_operand(uint32 pa, instr *instr, uint8 op_number)
     oper->mode = (desc >> 4) & 0xf;
     oper->reg = desc & 0xf;
     oper->dtype = instr->mn->dtype;
-    oper->etype = cpu_etype;
+    oper->etype = *etype;
 
     switch (oper->mode) {
     case 0:  /* Positive Literal */
@@ -1016,7 +1196,7 @@ static uint8 decode_operand(uint32 pa, instr *instr, uint8 op_number)
     case 2:  /* Positive Literal */
     case 3:  /* Positive Literal */
     case 15: /* Negative literal */
-        oper->embedded.b = (uint8)desc;
+        oper->embedded.b = desc;
         oper->data = oper->embedded.b;
         break;
     case 4:  /* Word Immediate, Register Mode */
@@ -1110,9 +1290,9 @@ static uint8 decode_operand(uint32 pa, instr *instr, uint8 op_number)
         case 7: /* Expanded Datatype */
             /* Recursively decode the remainder of the operand after
                storing the expanded datatype */
-            cpu_etype = (int8) oper->reg;
-            oper->etype = cpu_etype;
-            offset += decode_operand(pa + offset, instr, op_number);
+            *etype = (int8) oper->reg;
+            oper->etype = *etype;
+            offset += decode_operand(pa + offset, instr, op_number, etype);
             break;
         default:
             cpu_abort(NORMAL_EXCEPTION, RESERVED_DATATYPE);
@@ -1134,9 +1314,9 @@ static uint8 decode_operand(uint32 pa, instr *instr, uint8 op_number)
  *      the opcode type.
  *   3. Fetch each opcode from main memory.
  *
- * This routine may alter the PSW's ET (Exception Type) and
- * ISC (Internal State Code) registers if an exceptional condition
- * is encountered during decode.
+ * This routine is guaranteed not to change state.
+ *
+ * returns: a Normal Exception if an error occured, or 0 on success.
  */
 uint8 decode_instruction(instr *instr)
 {
@@ -1146,6 +1326,9 @@ uint8 decode_instruction(instr *instr)
     uint32 pa;
     mnemonic *mn = NULL;
     int i;
+    int8 etype = -1;  /* Expanded datatype (if any) */
+
+    clear_instruction(instr);
 
     pa = R[NUM_PC];
 
@@ -1153,10 +1336,6 @@ uint8 decode_instruction(instr *instr)
     instr->psw = R[NUM_PSW];
     instr->sp  = R[NUM_SP];
     instr->pc  = pa;
-
-    /* Reset our data types */
-    cpu_etype = -1;
-    cpu_dtype = -1;
 
     if (read_operand(pa + offset++, &b1) != SCPE_OK) {
         /* We tried to read out of a page that doesn't exist. We
@@ -1222,13 +1401,13 @@ uint8 decode_instruction(instr *instr)
 
         /* Decode subsequent operands */
         for (i = 1; i < mn->op_count; i++) {
-            offset += decode_operand(pa + offset, instr, (uint8) i);
+            offset += decode_operand(pa + offset, instr, (uint8) i, &etype);
         }
 
         break;
     case OP_DESC:
         for (i = 0; i < mn->op_count; i++) {
-            offset += decode_operand(pa + offset, instr, (uint8) i);
+            offset += decode_operand(pa + offset, instr, (uint8) i, &etype);
         }
         break;
     }
@@ -1508,7 +1687,6 @@ t_stat sim_instr(void)
         }
 
         /* Decode the instruction */
-        clear_instruction(cpu_instr);
         pc_incr = decode_instruction(cpu_instr);
 
         /* Make sure to update the valid bit for history keeping (if

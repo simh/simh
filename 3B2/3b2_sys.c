@@ -160,17 +160,16 @@ t_stat fprint_sym(FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw)
     num = 0;
     vp = 0;
 
+    if (sw & (int32) SWMASK('M')) {
+        return fprint_sym_m(of, addr, val);
+    }
+
     if (sw & (int32) SWMASK ('B')) {
         len = 1;
     } else if (sw & (int32) SWMASK ('H')) {
         len = 2;
     } else if (sw & (int32) SWMASK ('W')) {
         len = 4;
-    }
-
-    if (sw & (int32) SWMASK('M')) {
-        fprint_sym_m(of, cpu_instr);
-        return SCPE_OK;
     }
 
     if (sw & (int32) SWMASK('C')) {

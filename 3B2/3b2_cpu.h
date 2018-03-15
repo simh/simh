@@ -403,7 +403,8 @@ t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs);
 
 void cpu_register_name(uint8 reg, char *buf, size_t len);
 void cpu_show_operand(FILE *st, operand *op);
-void fprint_sym_m(FILE *st, instr *ip);
+void fprint_sym_hist(FILE *st, instr *ip);
+t_stat fprint_sym_m(FILE *of, t_addr addr, t_value *val);
 
 instr *cpu_next_instruction(void);
 
@@ -486,6 +487,22 @@ static SIM_INLINE void sub(t_uint64 a, t_uint64 b, operand *dst);
         } else {                                                   \
             result = (B) / (A);                                    \
         }                                                          \
+    }
+
+#define OP_R_W(d,a,p) {                         \
+        (d) = (uint32) (a)[(p)++];              \
+        (d) |= (uint32) (a)[(p)++] << 8u;       \
+        (d) |= (uint32) (a)[(p)++] << 16u;      \
+        (d) |= (uint32) (a)[(p)++] << 24u;      \
+    }
+
+#define OP_R_H(d,a,p) {                         \
+        (d) = (uint16) (a)[(p)++];              \
+        (d) |= (uint16) (a)[(p)++] << 8u;       \
+    }
+
+#define OP_R_B(d,a,p) {                        \
+        (d) = (uint8) (a)[(p)++];              \
     }
 
 #endif
