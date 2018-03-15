@@ -1,6 +1,7 @@
 # SIMH v4.0 - Current
 
 [![Coverity Scan Build Status](https://scan.coverity.com/projects/11982/badge.svg)](https://scan.coverity.com/projects/simh)
+[![Build Status](https://travis-ci.org/simh/simh.svg)](https://travis-ci.org/simh/simh)
 
 ## Table of Contents:
 [WHAT'S NEW since simh v3.9](#whats-new-since-simh-v39)  
