@@ -4,6 +4,7 @@ install_osx() {
     brew install sdl2
     brew install sdl2_ttf
     brew install vde
+    brew install sdl2_ttf
 }
 
 install_linux() {
