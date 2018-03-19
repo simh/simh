@@ -1614,6 +1614,30 @@ ifneq (,$(BESM6_BUILD))
     ifeq (,$(and ${VIDEO_LDFLAGS}, ${FONTFILE}, $(BESM6_BUILD)))
         $(info *** No SDL ttf support available.  BESM-6 video panel disabled.)
         $(info ***)
+        ifeq (Darwin,$(OSTYPE))
+          $(info *** Info *** Install the MacPorts libSDL2-ttf development package to provide this)
+          $(info *** Info *** functionality for your OS X system:)
+          $(info *** Info ***       # port install libsdl2-ttf-dev)
+          ifeq (/usr/local/bin/brew,$(shell which brew))
+            $(info *** Info ***)
+            $(info *** Info *** OR)
+            $(info *** Info ***)
+            $(info *** Info *** Try to influence the HomeBrew package maintainers to add the)
+            $(info *** Info *** libSDL2-ttf development package to provide this functionality.)
+          endif
+        else
+          ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
+            $(info *** Info *** Install the development components of libSDL-ttf or libSDL2-ttf)
+            $(info *** Info *** packaged for your Linux operating system distribution:)
+            $(info *** Info ***        $$ sudo apt-get install libsdl2-ttf-dev)
+            $(info *** Info ***    or)
+            $(info *** Info ***        $$ sudo apt-get install libsdl-ttf-dev)
+          else
+            $(info *** Info *** Install the development components of libSDL-ttf packaged by your)
+            $(info *** Info *** operating system distribution and rebuild your simulator to)
+            $(info *** Info *** enable this extra functionality.)
+          endif
+        endif
         BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
     else ifneq (,$(and $(findstring sdl2,${VIDEO_LDFLAGS}),$(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)))
         $(info using libSDL2_ttf: $(call find_lib,SDL2_ttf) $(call find_include,SDL2/SDL_ttf))
