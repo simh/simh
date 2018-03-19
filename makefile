@@ -1622,8 +1622,9 @@ ifneq (,$(BESM6_BUILD))
             $(info *** Info ***)
             $(info *** Info *** OR)
             $(info *** Info ***)
-            $(info *** Info *** Try to influence the HomeBrew package maintainers to add the)
-            $(info *** Info *** libSDL2-ttf development package to provide this functionality.)
+            $(info *** Info *** Install the HomeBrew sdl2_ttf package to provide this)
+            $(info *** Info *** functionality for your OS X system:)
+            $(info *** Info ***       $$ brew install sdl2_ttf)
           endif
         else
           ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
