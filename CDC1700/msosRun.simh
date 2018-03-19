@@ -18,11 +18,8 @@ att lp %DATETIME%.lpt
 att cdd0 %CDD0%
 att cdd1 %CDD1%
 set env DATEANDTIME=%DATE_MM%%DATE_DD%%DATE_19XX_YY%%TIME_HH%%TIME_MM%
-#
-# The following command will patch out unimplemented devices (1728 card
-# reader/punch and 1752 drum)
-#
-expect "SET PROGRAM PROTECT" set cpu protect; d 056D 0649; d 057E 0649; d 0589 0649; d 057C 0649; c
+send delay=10000
+expect "SET PROGRAM PROTECT" set cpu protect; c
 expect "DATE/TIME  MMDDYYHHMM \n\r\n" send "%DATEANDTIME%\r"; c
 autoload cdd
 run 0

@@ -26,6 +26,7 @@
    cdr          1622 card reader
    cdp          1622 card punch
 
+   23-Jun-17    RMS     Unattached error does not set RDCHK/WRCHK
    09-Mar-17    RMS     Guardbanded translation table lookups (COVERITY)
    31-Jan-15    TFM     Changes to translation tables (Tom McBride)
    10-Dec-13    RMS     Fixed WA card punch translations (Bob Armstrong)
@@ -339,10 +340,8 @@ t_stat cdr_read (void)
 int32 i;
 
 ind[IN_LAST] = 0;                                       /* clear last card */
-if ((cdr_unit.flags & UNIT_ATT) == 0) {                 /* attached? */
-    ind[IN_RDCHK] = 1;                                  /* no, error */
+if ((cdr_unit.flags & UNIT_ATT) == 0)                   /* attached? */
     return SCPE_UNATT;
-    }
 
 for (i = 0; i < CD_LEN + 2; i++)                        /* clear buffer */
     cdr_buf[i] = ' ';
@@ -520,10 +519,8 @@ return SCPE_OK;
 
 t_stat cdp_write (uint32 len)
 {
-if ((cdp_unit.flags & UNIT_ATT) == 0) {                 /* attached? */
-    ind[IN_WRCHK] = 1;                                  /* no, error */
+if ((cdp_unit.flags & UNIT_ATT) == 0)                   /* attached? */
     return SCPE_UNATT;
-    }
 
 while ((len > 0) && (cdp_buf[len - 1] == ' '))          /* trim spaces */
     --len;

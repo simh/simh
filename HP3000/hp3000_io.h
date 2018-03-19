@@ -321,15 +321,15 @@ struct dib {                                    /* the Device Information Block 
     };
 
 #define DIB_REGS(dib) \
-/*    Macro   Name     Location                    Width   Flags   */ \
-/*    ------  -------  --------------------------  -----  -------  */ \
-    { DRDATA (DIBDN,   dib.device_number,           32),   REG_HRO }, \
-    { DRDATA (DIBSRN,  dib.service_request_number,  32),   REG_HRO }, \
-    { DRDATA (DIBPRI,  dib.interrupt_priority,      32),   REG_HRO }, \
-    { ORDATA (DIBMASK, dib.interrupt_mask,          32),   REG_HRO }, \
-    { ORDATA (DIBIRQ,  dib.interrupt_request,       32),   REG_HRO }, \
-    { ORDATA (DIBACT,  dib.interrupt_active,        32),   REG_HRO }, \
-    { ORDATA (DIBSR,   dib.service_request,         32),   REG_HRO }
+/*    Macro   Name     Location                    Width  Flags   */ \
+/*    ------  -------  --------------------------  -----  ------- */ \
+    { DRDATA (DIBDN,   dib.device_number,           32),  REG_HRO }, \
+    { DRDATA (DIBSRN,  dib.service_request_number,  32),  REG_HRO }, \
+    { DRDATA (DIBPRI,  dib.interrupt_priority,      32),  REG_HRO }, \
+    { ORDATA (DIBMASK, dib.interrupt_mask,          32),  REG_HRO }, \
+    { ORDATA (DIBIRQ,  dib.interrupt_request,       32),  REG_HRO }, \
+    { ORDATA (DIBACT,  dib.interrupt_active,        32),  REG_HRO }, \
+    { ORDATA (DIBSR,   dib.service_request,         32),  REG_HRO }
 
 
 /* Calibrated timer numbers */

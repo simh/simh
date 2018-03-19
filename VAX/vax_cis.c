@@ -26,7 +26,7 @@
    On a full VAX, this module simulates the VAX commercial instruction set (CIS).
    On a subset VAX, this module implements the emulated instruction fault.
 
-   30-May-16    RMS     Fixed WorldLshift FOR REAL
+   30-May-16    RMS     Fixed WordLshift FOR REAL
    16-Oct-08    RMS     Fixed bug in ASHP left overflow calc (Word/NibbleLshift)
                         Fixed bug in DIVx (LntDstr calculation)
    28-May-08    RMS     Inlined physical memory routines

@@ -1,0 +1,51 @@
+# Script to run the MSOS5 installation verification procedure
+# Requires:
+#       Installation tape               Default is MSOS5_SL136.tap which can
+#                                       be copied from bitsavers.org. This
+#                                       can be overridden by specifying the
+#                                       installation tape on the command line:
+#
+#                                         cdc1700 msosInstall.simh install.tap
+#
+# Creates:
+#       MSOS5-A.dsk and MSOS5-B.dsk     installation disks
+#       %DATETIME%.lpt                  unique LPT output file for this run
+#
+set env CDD0=MSOS5-A.dsk
+set env CDD1=MSOS5-B.dsk
+set env MT0=%1
+if "%MT0%"=="" set env MT0=MSOS5_SL136.tap
+set cpu instr=basic
+set cpu mode65k,64k
+set throttle 50%
+set mt type=1732-3
+set lp type=1742
+att lp %DATETIME%.lpt
+att cdd0 %CDD0%
+att cdd1 %CDD1%
+att -r mt0 %MT0%
+set env DATEANDTIME=%DATE_MM%%DATE_DD%%DATE_19XX_YY%%TIME_HH%%TIME_MM%
+
+set env DATE1=%DATE_MM%/%DATE_DD%/%DATE_19XX_YY%
+set env DATE2=%DATE_MM%%DATE_DD%%DATE_19XX_YY%
+echo This script will execute the installation verification procedure. It will
+echo detect 3 errors:
+echo
+echo 1. Partition setup error
+echo 2. File Manager sequential file error
+echo 3. Fortran Formatted I/O error
+echo
+send delay=10000
+expect "SET PROGRAM PROTECT  \r\n" set cpu protect; c
+expect "DATE/TIME  MMDDYYHHMM \n\r\n" send "%DATE2%%TIME_HH%%TIME_MM%\r"; c
+expect ":00 " send after=1000000,"\007"; c
+expect "MI\r\n" send "DB\r"; c
+expect "IN\n\r\007" send "REW,6\r"; c
+expect "NEXT  \n\r\007" send "ADF,6,2\r"; c
+expect "NEXT  \n\r\007" send "OFF\r"; c
+expect "OUT \n\r" send "\007"; c
+expect "MI\r\n" send "VERIFY\r"; c
+expect "TESTS COMPLETE." step 100000
+autoload cdd
+run 0
+

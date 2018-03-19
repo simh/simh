@@ -48,7 +48,7 @@
 
    This module implements 1-16 individual serial interfaces similar in function
    to the console.  These interfaces are mapped to Telnet based connections as
-   though they were the four lines of a terminal multiplexor.  The connection
+   though they were the 16 lines of a terminal multiplexor.  The connection
    polling mechanism is superimposed onto the keyboard of the first interface.
 
    The done and enable flags are maintained locally, and only a master interrupt

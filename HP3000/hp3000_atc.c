@@ -26,6 +26,9 @@
 
    ATCD,ATCC    HP 30032B Asynchronous Terminal Controller
 
+   18-Dec-17    JDB     Return event time instead of status from "activate_unit"
+   11-Dec-17    JDB     Reschedule "line_service" if receive buffer has data
+   26-Oct-17    JDB     Call "tmxr_poll_tx" if transmit buffer is full
    05-Sep-17    JDB     Changed REG_A (permit any symbolic override) to REG_X
    16-Sep-16    JDB     Fixed atcd_detach to skip channel cancel if SIM_SW_REST
    12-Sep-16    JDB     Changed DIB register macro usage from SRDATA to DIB_REG
@@ -783,7 +786,7 @@ static void tci_master_reset  (void);
 
 static t_stat  line_service  (UNIT    *uptr);
 static t_stat  poll_service  (UNIT    *uptr);
-static t_stat  activate_unit (UNIT    *uptr,   ACTIVATOR reason);
+static int32   activate_unit (UNIT    *uptr,   ACTIVATOR reason);
 static uint32  service_time  (HP_WORD control, ACTIVATOR reason);
 static void    store         (HP_WORD control, HP_WORD   data);
 static void    receive       (int32   channel, int32 data, t_bool loopback);
@@ -1724,6 +1727,7 @@ tdi_master_reset ();                                    /* perform a master rese
 if (sim_switches & SWMASK ('P')) {                      /* if this is a power-on reset */
     sim_rtcn_init (poll_unit.wait, TMR_ATC);            /*   then initialize the poll timer */
     fast_data_time = FAST_IO_TIME;                      /* restore the initial fast data time */
+    atcd_ldsc [0].xmte = 1;                             /* enable transmission on the system console port */
     }
 
 if (atc_is_polling) {                                       /* if we're polling for the simulation console */
@@ -1826,6 +1830,14 @@ return status;
    unit 16 if it is attached.  In all cases, it is imperative that we not reject
    the request for unit 16; otherwise any remaining device detaches will not be
    performed.
+
+
+   Implementation notes:
+
+    1. Detaching the multiplexer resets each line first, which flushes the
+       output buffer.  This ensures that buffered data that has not been output
+       via a poll_service entry before the DETACH command was issued is written
+       before the line is disconnected.
 */
 
 static t_stat atcd_detach (UNIT *uptr)
@@ -1976,14 +1988,21 @@ return;
    The channel service routine runs only when there are characters to read or
    write.  It is scheduled either at a realistic rate corresponding to the
    programmed baud rate of the channel to be serviced, or at a somewhat faster
-   optimized rate.  It is entered when a channel buffer is ready for output or
-   when the poll routine determines that there are characters ready for input.
+   optimized rate.  It is entered when a channel buffer is ready for output,
+   when the poll routine determines that there are characters ready for input,
+   or while waiting for an ACK to complete an ENQ/ACK handshake.
 
    On entry, the receive channel buffer is checked for a character.  If one is
    not already present, then the terminal multiplexer library is called to
    retrieve the waiting character.  If a valid character is now available, it is
    processed.  If the receive channel has its "diagnose" bit set, the character
    is also passed to the auxiliary channels.
+
+   If a received character is not available, then the unit's "wait" field is
+   checked to see if an ACK is expected in reply to an earlier ENQ.  If a wait
+   time is present, it is doubled, and the service is rescheduled.  However, if
+   the new wait time is longer than the current poll time, service rescheduling
+   is abandoned in favor of the normal poll for received characters.
 
    The send channel buffer is then checked for a character to output.  If one is
    present, then if it is an all-mark (sync) character, it is discarded, as the
@@ -1999,18 +2018,36 @@ return;
    simulation console (if output is to channel 0) or to the terminal multiplexer
    library for output via Telnet or a serial port on the host machine.  If the
    channel has its "diagnose" bit set, the character is also passed to the
-   auxiliary channels.
+   auxiliary channels.  If an ENQ was transmitted, service is rescheduled to
+   wait for reception of the ACK.
 
    If the data flag is clear, the indicated receive and send channels are
    checked for completion flags.  If either is set, an interrupt is requested.
 
+   If characters remain in the Telnet receive buffer, the service routine is
+   rescheduled to receive the next one.  Otherwise, the routine goes idle until
+   the next character is output or the next poll determines that there are
+   characters to receive.
+
 
    Implementation notes:
 
-    1. Calling "tmxr_getc_ln" for channel 0 is OK, as reception is disabled by
+    1. The "wait" fields of the channel units are not used (i.e., are set to
+       zero) except when channels are waiting for ACKs.  Because we want to
+       retrieve the ACK as quickly as possible but also minimize the load on the
+       host system, we initially wait the normal reception time (fast or
+       realistic) and then double the wait each time it expires without
+       reception.  Therefore, a non-zero "wait" value indicates that an ACK is
+       expected.
+
+    2. Receipt of any character cancels a pending ACK wait, even though it is
+       possible that the character is not an ACK (for example, if the character
+       was received but not processed before the ENQ was sent).
+
+    3. Calling "tmxr_getc_ln" for channel 0 is OK, as reception is disabled by
        default and therefore will return 0.
 
-    2. The send channel buffer will always be non-zero if a character is present
+    4. The send channel buffer will always be non-zero if a character is present
        (even a NUL) because the data word will have DDS_IS_SEND set.
 
        The receive buffer will always be non-zero if a character is present
@@ -2019,27 +2056,45 @@ return;
        TMXR_VALID set, and characters looped back from sending will have
        DDS_IS_SEND set.
 
-    3. Reception of a loopback character is performed immediately because the
+    5. Reception of a loopback character is performed immediately because the
        reception occurs concurrently with transmission.  Reception of a locally
        generated ACK is scheduled with a one-character delay to reflect the
        remote device transmission delay.
 
-    4. If storing an ACK locally overwrites a character already present but not
+    6. If storing an ACK locally overwrites a character already present but not
        yet processed, then the receive routine will set the character lost flag.
 
-    5. Both TMXR_VALID and SCPE_KFLAG are set on internally generated ACKs only
+    7. Both TMXR_VALID and SCPE_KFLAG are set on internally generated ACKs only
        so that a debug trace will record the generation correctly.
 
-    6. The console library "sim_putchar_s" routine and the terminal multiplexer
-       library "tmxr_putc_ln" routine return SCPE_STALL if the Telnet output
-       buffer is full.  In this case, transmission is rescheduled with a delay
-       to allow the buffer to drain.
+    8. The console library "sim_putchar_s" routine and the terminal multiplexer
+       library "tmxr_putc_ln" routine return SCPE_STALL if they are called when
+       the transmit buffer is full.  When called to add the last character to
+       the buffer, the routines return SCPE_OK but also change the "xmte" field
+       of the terminal multiplexer line (TMLN) structure from 1 to 0 to indicate
+       that further calls will be rejected; the value is set back to 1 when the
+       transmit buffer empties.
 
-       They also return SCPE_LOST if the line has been dropped on the remote
-       end.  We ignore the error here to allow the simulation to continue while
-       ignoring the output.
+       Entry with the transmit buffer full causes the service to be rescheduled
+       to retry the write after a short delay.  The "tmxr_poll_tx" routine must
+       be called in this case, as it is responsible for transmitting the buffer
+       contents and therefore freeing space in the buffer.
 
-    7. The receive/send completion flag (buffer flag) will not set unless the
+       Both library "put" routines also return SCPE_LOST if the line has been
+       dropped on the remote end.  We ignore that error here to allow the
+       simulation to continue while ignoring the output to a disconnected
+       terminal.
+
+    9. Characters written using "tmxr_putc_ln" are buffered and not transmitted
+       until the buffer is full, the character is an ENQ (and so we will be
+       waiting to receive an ACK), or the next input poll is performed.  The
+       last case ensures that the buffer is flushed when output is complete, as
+       there is no indication from the CPU that the last character has been
+       sent.  This does incur a delay of up to 10 milliseconds, but this is
+       imperceptible by the user.  Buffering offers significantly better
+       throughput compared to transmitting each character as it is written.
+
+   10. The receive/send completion flag (buffer flag) will not set unless the
        interrupt enable flag for that channel is also set.  If enable is not
        set, the completion indication will be lost.
 */
@@ -2058,17 +2113,35 @@ dprintf (atcd_dev, DEB_SERV, "Channel %d service entered\n",
 
 /* Reception service */
 
-recv_data = recv_buffer [channel];                          /* get the current buffer character */
+recv_data = recv_buffer [channel];                      /* get the current buffer character */
 
-if (recv_data == 0)                                         /* if there's none present */
-    recv_data = tmxr_getc_ln (&atcd_ldsc [channel]);        /*   then see if there's a character ready via Telnet */
+if (recv_data == 0) {                                   /* if no character is present */
+    if (uptr->wait)                                     /*   then if the channel is waiting for an ACK */
+        tmxr_poll_rx (&atcd_mdsc);                      /*     then poll the line to see if it has arrived */
 
-if (recv_data & ~DDR_DATA_MASK) {                           /* if we now have a valid character */
-    receive (channel, recv_data, loopback);                 /*   then process the reception */
-
-    if (recv_param [channel] & DPI_DIAGNOSE)                /* if a diagnosis is requested */
-        diagnose (recv_param [channel], recv_data);         /*   then route the data to the auxiliary channels */
+    recv_data = tmxr_getc_ln (&atcd_ldsc [channel]);    /* see if there's now a character ready */
     }
+
+if (recv_data & ~DDR_DATA_MASK) {                       /* if we now have a valid character */
+    receive (channel, recv_data, loopback);             /*   then process the reception */
+
+    if (recv_param [channel] & DPI_DIAGNOSE)            /* if a diagnosis is requested */
+        diagnose (recv_param [channel], recv_data);     /*   then route the data to the auxiliary channels */
+
+    uptr->wait = 0;                                     /* clear any pending ACK wait */
+    }
+
+else if (uptr->wait) {                                  /* otherwise if an ACK is expected but has not arrived */
+    uptr->wait = uptr-> wait * 2;                       /*   then double the wait time for the next check */
+
+    if (uptr->wait < poll_unit.wait) {                  /* if the wait is shorter than the standard poll wait */
+        sim_activate (uptr, uptr->wait);                /*   then reschedule the line service */
+
+        dprintf (atcd_dev, DEB_SERV, "Channel %d delay %d service rescheduled for ACK\n",
+                 channel, uptr->wait);
+        }
+    }
+
 
 /* Transmission service */
 
@@ -2133,43 +2206,56 @@ if (send_buffer [channel]) {                                /* if data is availa
         cvtd_data = sim_tt_outcvt (LOWER_BYTE (send_data),      /*   so convert it as directed */
                                    TT_GET_MODE (uptr->flags));  /*     by the output mode flag */
 
-        if (cvtd_data >= 0)                                     /* if the converted character is printable */
-            if (channel == 0)                                   /*   then if we are writing to channel 0 */
-                result = sim_putchar_s (cvtd_data);             /*     then output it to the simulation console */
-            else                                                /*   otherwise */
-                result = tmxr_putc_ln (&atcd_ldsc [channel],    /*     output it to the multiplexer line */
-                                       cvtd_data);
-
-        if (result == SCPE_STALL) {                             /* if the buffer is full */
+        if (cvtd_data >= 0 && atcd_ldsc [channel].xmte == 0) {  /* if it's printable but the transmit buffer is full */
             activate_unit (uptr, Stall);                        /*   then retry the output a while later */
-            result = SCPE_OK;                                   /*     and return OK to continue */
+
+            tmxr_poll_tx (&atcd_mdsc);                          /* transmit the line buffer */
+
+            dprintf (atcd_dev, DEB_XFER, "Channel %d character %s transmission stalled for full buffer\n",
+                     channel, fmt_char (cvtd_data));
             }
 
-        else if (result == SCPE_OK || result == SCPE_LOST) {    /* otherwise if the character is queued to transmit */
-            tmxr_poll_tx (&atcd_mdsc);                          /*   then send (or ignore) it */
+        else {                                                  /* otherwise the character will be consumed */
+            if (cvtd_data >= 0)                                 /* if the converted character is printable */
+                if (channel == 0)                               /*   then if we are writing to channel 0 */
+                    result = sim_putchar_s (cvtd_data);         /*     then output it to the simulation console */
 
-            if (DPRINTING (atcd_dev, DEB_XFER))
-                if (result == SCPE_LOST)
-                    hp_debug (&atcd_dev, DEB_XFER, "Channel %d character %s discarded by connection loss\n",
-                              channel, fmt_char (char_data));
+                else {                                              /*   otherwise */
+                    result = tmxr_putc_ln (&atcd_ldsc [channel],    /*     output it to the multiplexer line */
+                                           cvtd_data);
 
-                else if (cvtd_data >= 0)
-                    hp_debug (&atcd_dev, DEB_XFER, "Channel %d character %s sent\n",
-                              channel, fmt_char (cvtd_data));
+                    if (char_data == ENQ                        /* if sending an ENQ */
+                      || atcd_ldsc [channel].xmte == 0)         /*   or the output buffer is full */
+                        tmxr_poll_tx (&atcd_mdsc);              /*     then transmit the line buffer */
+                    }
 
-                else
-                    hp_debug (&atcd_dev, DEB_XFER, "Channel %d character %s discarded by output filter\n",
-                              channel, fmt_char (char_data));
+            if (result == SCPE_OK || result == SCPE_LOST) {     /* if the character is queued to transmit */
+                if (DPRINTING (atcd_dev, DEB_XFER))
+                    if (result == SCPE_LOST)
+                        hp_debug (&atcd_dev, DEB_XFER, "Channel %d character %s discarded by connection loss\n",
+                                  channel, fmt_char (char_data));
 
-            if (send_param [channel] & DPI_DIAGNOSE)            /* if a diagnosis is requested */
-                diagnose (send_param [channel], send_data);     /*   then route the data to the auxiliary channels */
+                    else if (cvtd_data >= 0)
+                        hp_debug (&atcd_dev, DEB_XFER, "Channel %d character %s sent\n",
+                                  channel, fmt_char (cvtd_data));
 
-            send_buffer [channel] = 0;                          /* clear the buffer */
+                    else
+                        hp_debug (&atcd_dev, DEB_XFER, "Channel %d character %s discarded by output filter\n",
+                                  channel, fmt_char (char_data));
 
-            if (send_param [channel] & DPI_ENABLE_IRQ)          /* if this channel is enabled to interrupt */
-                send_status [channel] |= DST_COMPLETE;          /*   then set the completion flag */
+                if (send_param [channel] & DPI_DIAGNOSE)        /* if a diagnosis is requested */
+                    diagnose (send_param [channel], send_data); /*   then route the data to the auxiliary channels */
 
-            result = SCPE_OK;                                   /* return OK in case the connection was lost */
+                send_buffer [channel] = 0;                      /* clear the buffer */
+
+                if (send_param [channel] & DPI_ENABLE_IRQ)      /* if this channel is enabled to interrupt */
+                    send_status [channel] |= DST_COMPLETE;      /*   then set the completion flag */
+
+                if (cvtd_data == ENQ && result == SCPE_OK)      /* if an ENQ was successfully sent */
+                    uptr->wait = activate_unit (uptr, Receive); /*   then schedule the ACK reception */
+
+                result = SCPE_OK;                               /* return OK in case the connection was lost */
+                }
             }
         }
     }
@@ -2178,6 +2264,9 @@ if (send_buffer [channel]) {                                /* if data is availa
 if (tdi_data_flag == CLEAR)                             /* if an interrupt is not currently pending */
     scan_channels (channel);                            /*   then scan the channels for completion flags */
 
+if (tmxr_rqln (&atcd_ldsc [channel]))                   /* if characters are still available on this channel */
+    activate_unit (uptr, Receive);                      /*   then reschedule the line service */
+
 return result;                                          /* return the result of the service */
 }
 
@@ -2185,10 +2274,9 @@ return result;                                          /* return the result of 
 /* Multiplexer poll service.
 
    The poll service routine is used to poll for Telnet connections and incoming
-   characters.  It also polls the simulation console for channel 0.  Polling
-   starts at simulator startup or when the TDI is enabled and stops when it is
-   disabled.
-
+   characters.  It also polls the simulation console for channel 0 and flushes
+   the output buffers for all channels.  Polling starts at simulator startup or
+   when the TDI is enabled and stops when it is disabled.
 
    Implementation notes:
 
@@ -2201,20 +2289,30 @@ return result;                                          /* return the result of 
        may be shorter than the channel service time, and as the console provides
        no buffering, a second character received before the channel service had
        been entered would be lost.
+
+    3. A channel that is waiting for an ACK to complete an ENQ/ACK handshake has
+       its unit "wait" field set non-zero.  If the field value is greater than
+       the realistic reception time, then the line service is scheduled
+       immediately, as the channel has already waited the minimum time necessary
+       (the "wait" field value is doubled each time the line service is entered
+       before the ACK has been received).  Otherwise, the service is scheduled
+       using the normal reception time.
 */
 
 static t_stat poll_service (UNIT *uptr)
 {
-int32 chan, line_state;
+int32  chan, line_state;
 t_stat status = SCPE_OK;
 
-dprintf (atcd_dev, DEB_PSERV, "Poll service entered\n");
+dprintf (atcd_dev, DEB_PSERV, "Poll delay %d service entered\n",
+         uptr->wait);
 
 if ((atcc_dev.flags & DEV_DIS) == 0)
-    dprintf (atcc_dev, DEB_PSERV, "Poll service entered\n");
+    dprintf (atcc_dev, DEB_PSERV, "Poll delay %d service entered\n",
+             uptr->wait);
 
 if ((atcd_dev.flags & DEV_DIAG) == 0) {                 /* if we're not in diagnostic mode */
-    chan = tmxr_poll_conn (&atcd_mdsc);                 /*   then check for a new multiplex connection */
+    chan = tmxr_poll_conn (&atcd_mdsc);                 /*   then check for a new multiplexer connection */
 
     if (chan != -1) {                                   /* if a new connection was established */
         atcd_ldsc [chan].rcve = TRUE;                   /*   then enable the channel to receive */
@@ -2224,7 +2322,8 @@ if ((atcd_dev.flags & DEV_DIAG) == 0) {                 /* if we're not in diagn
         }
     }
 
-tmxr_poll_rx (&atcd_mdsc);                              /* poll the multiplex connections for input */
+tmxr_poll_tx (&atcd_mdsc);                              /* flush the multiplexer output buffers */
+tmxr_poll_rx (&atcd_mdsc);                              /*   and poll the multiplexer connections for input */
 
 if ((atcc_dev.flags & (DEV_DIAG | DEV_DIS)) == 0)       /* if we're not in diagnostic mode or are disabled */
     for (chan = FIRST_TERM; chan <= LAST_TERM; chan++)  /*   then scan the channels for line state changes */
@@ -2258,9 +2357,15 @@ if (status >= SCPE_KFLAG) {                             /* if a character was pr
     line_service (&line_unit [0]);                      /* run the system console's I/O service */
     }
 
-for (chan = FIRST_TERM; chan <= LAST_TERM; chan++)      /* check each of the receive channels for available input */
-    if (tmxr_rqln (&atcd_ldsc [chan]))                  /* if characters are available on this channel */
-        activate_unit (&line_unit [chan], Receive);     /*   then activate the channel's I/O service */
+for (chan = FIRST_TERM; chan <= LAST_TERM; chan++)                  /* check each of the channels for available input */
+    if (tmxr_rqln (&atcd_ldsc [chan]))                              /* if characters are available on this channel */
+        if (line_unit [chan].wait > line_unit [chan].recv_time) {   /*   then if the channel is waiting for an ACK */
+            sim_cancel (&line_unit [chan]);                         /*     then cancel any current wait */
+            activate_unit (&line_unit [chan], Loop);                /*       and activate the line service immediately */
+            }
+
+        else                                                        /*   otherwise this is a normal input */
+            activate_unit (&line_unit [chan], Receive);             /*     so schedule with the normal receive timing */
 
 if (cpu_is_calibrated)                                  /* if the process clock is calibrated */
     uptr->wait = sim_activate_time (cpu_pclk_uptr);     /*   then synchronize with it */
@@ -2292,7 +2397,7 @@ return status;                                          /* return the service st
        called.
 */
 
-static t_stat activate_unit (UNIT *uptr, ACTIVATOR reason)
+static int32 activate_unit (UNIT *uptr, ACTIVATOR reason)
 {
 const int32 channel = (int32) (uptr - line_unit);       /* the channel number */
 int32 delay = 0;
@@ -2340,7 +2445,8 @@ else                                                    /* otherwise, we are in 
 dprintf (atcd_dev, DEB_SERV, "Channel %d delay %d service scheduled\n",
          channel, delay);
 
-return sim_activate (uptr, delay);                      /* activate the unit and return the activation status */
+sim_activate (uptr, delay);                             /* activate the unit */
+return delay;                                           /*   and return the activation delay */
 }
 
 
@@ -2640,17 +2746,20 @@ else {                                                  /* otherwise a normal ch
             recv_buffer [channel] = recv_data | pad;        /*       and replace the character in the buffer */
             }
 
-        if (recv_param [channel] & DPI_ENABLE_ECHO) {       /* if the channel has echo enabled */
-            char_echo = sim_tt_outcvt (recv_data,           /*   then convert the character per the output mode */
+        if (recv_param [channel] & DPI_ENABLE_ECHO) {   /* if the channel has echo enabled */
+            char_echo = sim_tt_outcvt (recv_data,       /*   then convert the character per the output mode */
                                        TT_GET_MODE (line_unit [channel].flags));
 
-            if (char_echo >= 0) {                           /* if the converted character is valid for the mode */
-                if (channel == 0)                           /*   then if this is for channel 0 */
-                    sim_putchar (char_echo);                /*     then write it back to the simulation console */
+            if (char_echo >= 0) {                       /* if the converted character is valid for the mode */
+                if (channel == 0)                       /*   then if this is for channel 0 */
+                    sim_putchar (char_echo);            /*     then write it back to the simulation console */
 
-                else {                                              /* otherwise */
-                    tmxr_putc_ln (&atcd_ldsc [channel], char_echo); /*   write it to the multiplexer output line */
-                    tmxr_poll_tx (&atcd_mdsc);                      /*     and poll to transmit it now */
+                else {                                  /* otherwise */
+                    tmxr_putc_ln (&atcd_ldsc [channel], /*   write it to the multiplexer output line */
+                                  char_echo);
+
+                    if (atcd_ldsc [channel].xmte == 0)  /* if the output buffer is full */
+                        tmxr_poll_tx (&atcd_mdsc);      /*   then transmit the line buffer */
                     }
 
                 dprintf (atcd_dev, DEB_XFER, ("Channel %d character %s echoed\n"),

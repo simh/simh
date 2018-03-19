@@ -2,4 +2,5 @@
 #
 # A hook script that is called after a successful
 # checkout to record the commit-id in the working directory.
-git log -1 --pretty="%H" >.git-commit-id
+git log -1 --pretty="SIM_GIT_COMMIT_ID %H%nSIM_GIT_COMMIT_TIME %aI" >.git-commit-id
+

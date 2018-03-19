@@ -39,13 +39,14 @@ extern int disassem(char *, uint16, t_bool, t_bool, t_bool);
 extern uint16 M[];
 extern REG cpu_reg[];
 extern DEVICE cpu_dev, dca_dev, dcb_dev, dcc_dev,
-  tti_dev, tto_dev, ptr_dev, ptp_dev, cdr_dev, mt_dev, lp_dev, dp_dev,
-  cd_dev, rtc_dev;
+  tti_dev, tto_dev, ptr_dev, ptp_dev, mt_dev, lp_dev, dp_dev,
+  cd_dev, drm_dev, rtc_dev;
 extern UNIT cpu_unit;
 
 t_stat autoload(int32, CONST char *);
 t_stat CDautoload(void);
 t_stat DPautoload(void);
+t_stat DRMautoload(void);
 
 t_bool RelValid = FALSE;
 uint16 RelBase;
@@ -76,13 +77,11 @@ DEVICE *sim_devices[] = {
   &tto_dev,
   &ptr_dev,
   &ptp_dev,
-#if 0
-  &cdr_dev,
-#endif
   &mt_dev,
   &lp_dev,
   &dp_dev,
   &cd_dev,
+  &drm_dev,
   NULL
 };
 
@@ -92,7 +91,8 @@ const char *sim_stop_messages[] = {
   "Selective Stop",
   "Invalid bits set in EXI instruction",
   "Breakpoint",
-  "Stop on reject"
+  "Stop on reject",
+  "Unimpl. instruction"
 };
 
 /*
@@ -113,7 +113,7 @@ static void postUpdate(t_bool from_scp)
 {
   /*
    * Rebuild the I/O device and buffered data channel tables in case the
-   * command the configuration.
+   * command changed the configuration.
    */
   buildIOtable();
   buildDCtables();
@@ -346,6 +346,8 @@ t_stat autoload(int32 flag, CONST char *ptr)
     return CDautoload();
   if (dptr == &dp_dev)
     return DPautoload();
+  if (dptr == &drm_dev)
+    return DRMautoload();
 
   return SCPE_NOFNC;
 }

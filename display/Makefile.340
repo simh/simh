@@ -1,0 +1,13 @@
+# Makefile for type340 test/debug
+
+ALL=tdbg tx
+all:	$(ALL)
+
+tdbg:	tst340.c type340.c Makefile.340 type340.h type340cmd.h
+	cc -g -o tdbg tst340.c type340.c -DTY340_NODISPLAY -DDEBUG_TY340 -DDUMP
+
+tx:	tst340.c type340.c display.c x11.c Makefile.340 ws.h type340.h type340cmd.h display.h
+	cc -g -o tx tst340.c type340.c display.c x11.c -lm -lX11 -lXt -DDUMP
+
+clean:
+	rm -f $(ALL)

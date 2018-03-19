@@ -1,6 +1,6 @@
 /* sim_serial.c: OS-dependent serial port routines
 
-   Copyright (c) 2008, J. David Bryan
+   Copyright (c) 2008, J. David Bryan, Mark Pizzolato
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,7 @@
    UNIX-specific code and testing.
 
    07-Oct-08    JDB     [serial] Created file
+   22-Apr-12    MP      Adapted from code originally written by J. David Bryan
 
 
    This module provides OS-dependent routines to access serial ports on the host
@@ -844,6 +845,7 @@ DWORD commerrors;
 COMSTAT cs;
 char *bptr;
 
+memset (brk, 0, count);                                 /* start with no break indicators */
 if (!ClearCommError (port->hPort, &commerrors, &cs)) {  /* get the comm error flags  */
     sim_error_serial ("ClearCommError",                 /* function failed; report unexpected error */
                       (int) GetLastError ());
@@ -879,18 +881,10 @@ return read;                                            /* return the number of 
 
 int32 sim_write_serial (SERHANDLE port, char *buffer, int32 count)
 {
-if (WaitForSingleObject (port->oWriteReady.hEvent, 0) == WAIT_TIMEOUT)
-    return 0;
 if ((!WriteFile (port->hPort, (LPVOID) buffer,   /* write the buffer to the serial port */
                  (DWORD) count, NULL, &port->oWriteSync)) &&
     (GetLastError () != ERROR_IO_PENDING)) {
     sim_error_serial ("WriteFile",              /* function failed; report unexpected error */
-                      (int) GetLastError ());
-    return -1;                                  /* return failure to caller */
-    }
-if ((!WaitCommEvent (port->hPort, &port->dwEvtMask, &port->oWriteReady)) &&
-    (GetLastError () != ERROR_IO_PENDING)) {
-    sim_error_serial ("WaitCommEvent",          /* function failed; report unexpected error */
                       (int) GetLastError ());
     return -1;                                  /* return failure to caller */
     }

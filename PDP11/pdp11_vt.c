@@ -545,15 +545,16 @@ int32 SR;                               /* switch register */
 #endif
 
 void
-cpu_set_switches(unsigned long val)
+cpu_set_switches(unsigned long v1, unsigned long v2)
 {
-    SR = val;
+    SR = v1 ^ v2;
 }
 
-unsigned long
-cpu_get_switches(void)
+void
+cpu_get_switches(unsigned long *p1, unsigned long *p2)
 {
-    return SR;
+    *p1 = SR;
+    *p2 = 0;
 }
 #else  /* USE_DISPLAY not defined */
 char pdp11_vt_unused;   /* sometimes empty object modules cause problems */

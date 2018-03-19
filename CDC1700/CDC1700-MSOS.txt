@@ -874,7 +874,7 @@ the simtools respository on github:
           *Z
 
     This will compile the source code, send a message to the comment device
-(typically the console TTY) and then load an execute the program. If the
+(typically the console TTY) and then load and execute the program. If the
 program reads data from standard input it should follow the *LGO command.
 
   4. The compiler/assembler expects each line of input to be in a separate
@@ -892,8 +892,8 @@ program reads data from standard input it should follow the *LGO command.
      running. Listings should be sent to the line printer along with any
      output from the application.
 
-If you want to code is Macro Assembler, the operations are the same; change
-*FTN to *ASSEM and change the OPT parameters. Documentation for both the
-Macro Assembler and Fortran compiler are available on bitsavers.org.
+If you want to code in Macro Assembler, the operations are the same; change
+*FTN to *ASSEM and change the OPT parameters. Documentation for both the Macro
+Assembler and Fortran compiler are available on bitsavers.org.
 
 

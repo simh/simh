@@ -491,7 +491,7 @@ t_stat lp_read_cct (FILE *cfile)
 {
 uint32 col, rpt, ptr, mask;
 uint8 cctbuf[CCT_LNT];
-const char *cptr;
+CONST char *cptr;
 t_stat r;
 char cbuf[CBUFSIZE], gbuf[CBUFSIZE];
 

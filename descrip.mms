@@ -16,6 +16,7 @@
 # This build script will accept the following build options.
 #
 #            ALL             Just Build "Everything".
+#            3B2             Just Build The AT&T 3B2.
 #            ALTAIR          Just Build The MITS Altair.
 #            ALTAIRZ80       Just Build The MITS Altair Z80.
 #            BESM6           Just Build The BESM-6.
@@ -305,6 +306,17 @@ PCAP_SIMH_INC = /INCL=($(PCAP_DIR))
   @ IF (F$SEARCH("$(BLD_DIR)*.*").NES."") THEN DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.*;*
   @ IF (("$(BUILDING_ROMS)".EQS."").AND.(F$SEARCH("$(BIN_DIR)BuildROMs-$(ARCH).EXE").EQS."")) THEN $(MMS) BUILDROMS/MACRO=(BUILDING_ROMS=1$(NEST_DEBUG))
 
+
+# AT&T 3B2 Simulator Definitions.
+#
+ATT3B2_DIR = SYS$DISK:[.3B2]
+ATT3B2_LIB = $(LIB_DIR)ATT3B2-$(ARCH).OLB
+ATT3B2_SOURCE = $(ATT3B2_DIR)3B2_CPU.C,$(ATT3B2_DIR)3B2_DMAC.C,\
+                $(ATT3B2_DIR)3B2_ID.C,$(ATT3B2_DIR)3B2_IF.C,\
+                $(ATT3B2_DIR)3B2_IO.C,$(ATT3B2_DIR)3B2_IU.C,\
+                $(ATT3B2_DIR)3B2_MMU.C,$(ATT3B2_DIR)3B2_SYS.C,\
+                $(ATT3B2_DIR)3B2_SYSDEV.C
+ATT3B2_OPTIONS = /INCL=($(SIMH_DIR),$(ATT3B2_DIR))/DEF=($(CC_DEFS))
 
 # MITS Altair Simulator Definitions.
 #
@@ -686,7 +698,7 @@ CDC1700_SOURCE = $(CDC1700_DIR)CDC1700_CPU.C,$(CDC1700_DIR)CDC1700_DIS.C,$(CDC17
 	$(CDC1700_DIR)CDC1700_SYS.C,$(CDC1700_DIR)CDC1700_DEV1.C,$(CDC1700_DIR)CDC1700_MT.C,\
 	$(CDC1700_DIR)CDC1700_DC.C,$(CDC1700_DIR)CDC1700_IOFW.C,$(CDC1700_DIR)CDC1700_LP.C,\
 	$(CDC1700_DIR)CDC1700_DP.C,$(CDC1700_DIR)CDC1700_CD.C,$(CDC1700_DIR)CDC1700_SYM.C,\
-	$(CDC1700_DIR)CDC1700_RTC.C $(CDC1700_DIR)CDC1700_MSOS5.C
+	$(CDC1700_DIR)CDC1700_RTC.C $(CDC1700_DIR)CDC1700_MSOS5.C $(CDC1700_DIR)CDC1700_DRM.C
 CDC1700_OPTIONS = /INCL=($(SIMH_DIR),$(CDC1700_DIR))/DEF=($(CC_DEFS))
 
 #
@@ -1032,6 +1044,17 @@ $(SIMH_LIB64) : $(SIMH_SOURCE)
         $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 .ENDIF
+
+$(ATT3B2_LIB) : $(ATT3B2_SOURCE)
+        $!
+        $! Building The $(ATT3B2_LIB) Library.
+        $!
+        $ $(CC)$(ATT3B2_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(ALTAIR_LIB) : $(ALTAIR_SOURCE)
         $!
@@ -1698,6 +1721,33 @@ $(I7094_LIB) :
 #
 # Individual Simulator Builds.
 #
+
+#
+# If Not On VAX, Build The AT&T 3B2 Simulator.
+#
+.IFDEF ALPHA_OR_IA64
+ATT3B2 : $(BIN_DIR)ATT3B2-$(ARCH).EXE
+        $! ATT3B2 aka 3B2 done
+.ELSE
+#
+# Else We Are On VAX And Tell The User We Can't Build On VAX
+# Due To The Use Of INT64.
+#
+ATT3B2 : 
+        $! Sorry, Can't Build $(BIN_DIR)ATT3B2-$(ARCH).EXE Simulator
+        $! Because It Requires The Use Of INT64.
+.ENDIF
+
+$(BIN_DIR)ATT3B2-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(ATT3B2_LIB)
+        $!
+        $! Building The $(BIN_DIR)ATT3B2-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(ATT3B2_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)ATT3B2-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(ATT3B2_LIB)/LIBRARY,$(SIMH_NONET_LIB)/LIBRARY
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $ COPY $(BIN_DIR)ATT3B2-$(ARCH).EXE $(BIN_DIR)3B2-$(ARCH).EXE
+
 ALTAIR : $(BIN_DIR)ALTAIR-$(ARCH).EXE
         $! ALTAIR done
 

@@ -169,6 +169,14 @@ if (dptr == NULL)
 return auto_config (NULL, 0);                           /* autoconfigure */
 }
 
+/* Show device address */
+
+t_stat show_mapped_addr (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+fprintf (st, "address=%p-%p", desc, ((const char *)desc) + uptr->capac - 1);
+return SCPE_OK;
+}
+
 /* Change device vector */
 
 t_stat set_vec (UNIT *uptr, int32 arg, CONST char *cptr, void *desc)

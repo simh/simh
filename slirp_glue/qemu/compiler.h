@@ -55,4 +55,9 @@
 #define GCC_FMT_ATTR(n, m)
 #endif
 
+#if defined (__clang__)
+  #pragma clang diagnostic ignored "-Wunknown-pragmas"
+  #pragma clang diagnostic ignored "-Waddress-of-packed-member"
+#endif
+
 #endif /* COMPILER_H */

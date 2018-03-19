@@ -1295,7 +1295,7 @@ main(void) {
 
     puts("initial tests work for both VT11 and VS60");
     for (df = VT, start = 0, more = 1; more; ) {
-        vt11_reset();                   /* reset everything */
+        vt11_reset(NULL, 0);            /* reset everything */
         vt11_set_dpc(start);            /* start section */
         c = 0;
         while (vt11_cycle(USEC, 1)) {
@@ -1315,7 +1315,7 @@ main(void) {
     puts("move the light pen through the tracking object");
     fflush(stdout);
     for (df = LP, start = 0, more = 1; more; ) {
-        vt11_reset();                   /* reset everything */
+        vt11_reset(NULL, 0);            /* reset everything */
         vt11_set_dpc(start);            /* start section */
         c = 0;
         while (vt11_cycle(USEC, 1)) {
@@ -1335,7 +1335,7 @@ main(void) {
     ws_beep();
     puts("following tests require VS60");
     for (df = VS, start = 0, more = 1; more; ) {
-        vt11_reset();                   /* reset everything */
+        vt11_reset(NULL, 0);            /* reset everything */
         vt11_set_str((uint16)(0200 | '~'));     /* set terminating char. */
         vt11_set_anr((uint16)(040000 | (2<<12) | 04000 | 01234));
                                         /* set associative name 0123x */
@@ -1358,7 +1358,7 @@ main(void) {
     fflush(stdout);
     wf_update(1);                       /* do first-time init */
     for (df = WF, start = 0, more = 1; more; ) {
-        vt11_reset();                   /* reset everything */
+        vt11_reset(NULL, 0);            /* reset everything */
         vt11_set_dpc(start);            /* start section */
         c = 0;
         while (vt11_cycle(USEC, 1)) {
@@ -1380,13 +1380,13 @@ main(void) {
 /*
  * callbacks from display.c
  */
-unsigned long
-cpu_get_switches(void) {
-    return 0;
+void
+cpu_get_switches(unsigned long *p1, unsigned long *p2) {
+    *p1 = *p2 = 0;
 }
 
 void
-cpu_set_switches(unsigned long bits) {
+cpu_set_switches(unsigned long w1, unsigned long w2) {
 }
 
 /*

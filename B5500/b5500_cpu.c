@@ -3894,20 +3894,21 @@ cpu_set_size(UNIT * uptr, int32 val, CONST char *cptr, void *desc)
 {
     t_uint64            mc = 0;
     uint32              i;
+    int32               v;
 
+    v = val >> UNIT_V_MSIZE;
+    v = (v + 1) * 4096;
+    if ((v < 0) || (v > MAXMEMSIZE))
+        return SCPE_ARG;
+    for (i = v-1; i < MEMSIZE; i++)
+        mc |= M[i];
+    if ((mc != 0) && (!get_yn("Really truncate memory [N]?", FALSE)))
+        return SCPE_OK;
     cpu_unit[0].flags &= ~UNIT_MSIZE;
     cpu_unit[0].flags |= val;
     cpu_unit[1].flags &= ~UNIT_MSIZE;
     cpu_unit[1].flags |= val;
-    val >>= UNIT_V_MSIZE;
-    val = (val + 1) * 4096;
-    if ((val < 0) || (val > MAXMEMSIZE))
-        return SCPE_ARG;
-    for (i = val; i < MEMSIZE; i++)
-        mc |= M[i];
-    if ((mc != 0) && (!get_yn("Really truncate memory [N]?", FALSE)))
-        return SCPE_OK;
-    MEMSIZE = val;
+    MEMSIZE = v;
     for (i = MEMSIZE; i < MAXMEMSIZE; i++)
         M[i] = 0;
     return SCPE_OK;

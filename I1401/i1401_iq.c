@@ -38,7 +38,6 @@
 #define UNIT_V_PCH      (UNIT_V_UF + 0)                 /* output conv */
 #define UNIT_PCH        (1 << UNIT_V_PCH)
 
-extern volatile int32 stop_cpu;
 extern uint8 M[];
 extern int32 BS, iochk, ind[64];
 extern UNIT cpu_unit;

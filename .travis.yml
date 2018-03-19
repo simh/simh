@@ -1,0 +1,7 @@
+os:
+  - linux
+  - osx
+language: c
+sudo: required
+install: sh -ex .travis/deps.sh
+script: make all

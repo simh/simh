@@ -116,7 +116,7 @@ t_stat dc_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 
 IO_DEVICE DCAdev = IODEV(NULL, "1706-A", DC, 0, 0xFF, IO_1706_1_A,
                          DCreject, DCin, DCout, NULL, NULL,
-                         DCstate, NULL, NULL, NULL,
+                         DCstate, NULL, NULL, NULL, NULL, NULL,
                          0x7F, 4,
                          MASK_REGISTER0 | MASK_REGISTER1 |      \
                          MASK_REGISTER2 | MASK_REGISTER3,
@@ -124,7 +124,7 @@ IO_DEVICE DCAdev = IODEV(NULL, "1706-A", DC, 0, 0xFF, IO_1706_1_A,
 
 IO_DEVICE DCBdev = IODEV(NULL, "1706-A", DC, 0, 0xFF, IO_1706_2_A,
                          DCreject, DCin, DCout, NULL, NULL,
-                         DCstate, NULL, NULL, NULL,
+                         DCstate, NULL, NULL, NULL, NULL, NULL,
                          0x7F, 4,
                          MASK_REGISTER0 | MASK_REGISTER1 |      \
                          MASK_REGISTER2 | MASK_REGISTER3,
@@ -132,7 +132,7 @@ IO_DEVICE DCBdev = IODEV(NULL, "1706-A", DC, 0, 0xFF, IO_1706_2_A,
 
 IO_DEVICE DCCdev = IODEV(NULL, "1706-A", DC, 0, 0xFF, IO_1706_3_A,
                          DCreject, DCin, DCout, NULL, NULL,
-                         DCstate, NULL, NULL, NULL,
+                         DCstate, NULL, NULL, NULL, NULL, NULL,
                          0x7F, 4,
                          MASK_REGISTER0 | MASK_REGISTER1 |      \
                          MASK_REGISTER2 | MASK_REGISTER3,

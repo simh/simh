@@ -80,6 +80,11 @@ mostly from the early period of its release:
 
                         [Equipment address: 0x3]
 
+        DRM             1752 Drum memory controller with 64 - 1024 tracks of
+                        drum memory (each track is 3072 words).
+
+                        [Equipment address: 0x2]
+
 Notes:
         DP and CDD use the same equipment address so only 1 of them may be
         enabled (default is for CDD to be enabled).
@@ -132,11 +137,12 @@ handling:
 
 3.2 Disk autoload
 
-        The autoload mechanism loads track 0 from logical drive 0 of a disk
-controller to memory location 0, it does not start execution of the loaded
-code (some of the diagnostics code relies on this). Both DP and CD controllers
-support the autoload command ("autoload dp" or "autoload cd") which is
-normally followed by a "run 0" command to start execution of the loaded code.
+        The autoload mechanism loads track 0 from logical drive 0 of a disk or
+drum controller to memory location 0, it does not start execution of the loaded
+code (some of the diagnostics code relies on this). DP, CDD and DRM controllers
+support the autoload command ("autoload dp", "autoload cdd" or "autoload drm")
+which is normally followed by a "run 0" command to start execution of the
+loaded code.
 
 4. Operating The Simulator
 
@@ -195,5 +201,15 @@ The actual key combination may be changed by issuing the command
 5. Software
 
         There is some software available at bitsavers.org in the
-bits/CDC/1700_Cyber18 directory, see CDC1700_Diagnostics.txt and
-CDC1700_MSOS.txt for more details.
+bits/CDC/1700_Cyber18 directory, see CDC1700-Diagnostics.txt and
+CDC1700-MSOS.txt for more details.
+
+
+6. Cyber-18
+
+        The CDC 1700 later morphed into the Cyber-18 series. This series
+included an enhanced instruction set using unused bits from the 1700
+instruction encoding. The simulator can detect these instructions and can be
+configured to stop if it tries to execute such an instruction
+(set cpu debug=enhanced). Due to a lack of detailed documentation it it
+unlikely that the enhanced instruction set will ever be completely implemented.

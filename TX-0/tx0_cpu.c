@@ -1193,19 +1193,24 @@ for (k = 0; k < lnt; k++) {                             /* print specified */
 return SCPE_OK;
 }
 
+#ifdef USE_DISPLAY
+#include "display/display.h"      /* prototypes */
+
 /* set "test switches"; from display code */
 void
-cpu_set_switches(unsigned long bits)
+cpu_set_switches(unsigned long v1, unsigned long v2)
 {
     /* just what we want; smaller CPUs might want to shift down? */
-    TAC = bits;
+    TAC = v1 ^ v2;
 }
 
-unsigned long
-cpu_get_switches(void)
+void
+cpu_get_switches(unsigned long *p1, unsigned long *p2)
 {
-    return TAC;
+    *p1 = TAC;
+    *p2 = 0;
 }
+#endif
 
 t_stat sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag) {
     uint32 word;

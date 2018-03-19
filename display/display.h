@@ -8,7 +8,7 @@
  */
 
 /*
- * Copyright (c) 2003-2004, Philip L. Budne
+ * Copyright (c) 2003-2018, Philip L. Budne
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -37,11 +37,15 @@
  * known display types
  */
 enum display_type {
+    /*
+     * Give TX-0 the rightful spot as the progenitor
+     * of the PDP-1, and thus all DEC machines.
+     */
+    DIS_TX0 = 0,
     DIS_VR14 = 14,
     DIS_VR17 = 17,
     DIS_VR20 = 20,
     DIS_TYPE30 = 30,
-        DIS_TX0 = 33,
     DIS_VR48 = 48,
     DIS_TYPE340 = 340
 };
@@ -86,7 +90,7 @@ extern int display_age(int,int);
 #define DISPLAY_INT_MIN 0               /* lowest "on" level */
 
 /*
- * plot a point; argumen        ts are x, y, intensity, color (0/1)
+ * plot a point; arguments are x, y, intensity, color (0/1)
  * returns true if light pen active (mouse button down)
  * at (or very near) this location.
  *
@@ -119,9 +123,77 @@ extern void display_lp_radius(int);
 
 /*
  * set by simulated spacewar switch box switches
- * 18 bits (only high 4 and low 4 used)
+ * bits high as long as key down
+ *
+ * asdf kl;'
+ * bits just where PDP-1 spacewar expects them!
+ * key mappings same as MIT Media Lab Java PDP-1 simulator
+ *
+ * PDP-6/10 SPCWAR adds hyperspace button, two more players.
+ * All additional bits above PDP-1 18-bit word.
  */
 extern unsigned long spacewar_switches;
+
+/*
+ * spacewar_switches fruit salad:
+ *
+ * the low 18 bits spacewar_swiches (a 32-bit int)
+ * are the switches for PDP-1 spacewar (four at either end)
+ * where the game expects them.
+ *
+ * Additional bits for the PDP-6/10 game are in the upper 14 bits:
+ * existing (top player) hyperspace buttons in the top two bits,
+ * and bottom players in two 6-bit bytes
+ *
+ * Too much mess to have in three places (display.c key up/down and
+ * the PDP-10 interface code), so I'm using a common idiom from the PDP-10
+ * world: define a macro that expands to multiple macro invocations
+ * and redefine the inner macro as needed before expanding the outer macro.
+ *
+ * I have little/no expectation that this is actually playable, but
+ * you could rig up an AVR (or other USB MCU) with switch boxes to
+ * look like a USB HID keyboard.  For full historical accuracy, please
+ * use wooden controllers!
+ *
+ * Phil Budne Feb 2018
+ */
+
+/* SWSW (SpaceWar SWitch) macro args:
+ * LC: lower case key
+ * UC: upper case key
+ * BIT: bit in spacewar_switches (1 means switch on)
+ *      yes, 32-bit int bits expressed in octal
+ *      (which is just like decimal, if you're missing two fingers)
+ * POS: user in PDP-6/10 parlance Upper/Lower Left/Right
+ * FUNC: function name in PDP-6/10 parlance (FIRE means beam or torpedo)
+ * comment is meaning in PDP-1 parlance
+ *
+ * entries in order of PDP-1 function bit order
+ */
+#define SPACEWAR_SWITCHES \
+    SWSW('f', 'F',           01, UL, FIRE) /* torpedos */       \
+    SWSW('d', 'D',           02, UL, THRUST) /* engines */      \
+    SWSW('a', 'A',           04, UL, CW) /* rotate R */         \
+    SWSW('s', 'S',          010, UL, CCW) /* rotate L */        \
+    SWSW('g', 'G', 010000000000, UL, HYPER) /* PDP-6/10 hyperspace */ \
+    \
+    SWSW('\'', '"',      040000, UR, FIRE) /* torpedos */       \
+    SWSW(';', ':',      0100000, UR, THRUST) /* engines */      \
+    SWSW('k', 'K',      0200000, UR, CW) /* rotate R */         \
+    SWSW('l', 'L',      0400000, UR, CCW) /* rotate L */        \
+    SWSW('\r','\n',020000000000, UR, HYPER) /* PDP-6/10 hyperspace */ \
+    \
+    SWSW('v', 'V',     01000000, LL, FIRE) /* torpedos */       \
+    SWSW('c', 'C',     02000000, LL, THRUST) /* engines */      \
+    SWSW('z', 'Z',     04000000, LL, CW) /* rotate R */         \
+    SWSW('x', 'X',    010000000, LL, CCW) /* rotate L */        \
+    SWSW('b', 'B',    020000000, LL, HYPER) /* hyperspace */    \
+    \
+    SWSW('.', '>',   0100000000, LR, FIRE) /* torpedos */       \
+    SWSW(',', '<',   0200000000, LR, THRUST) /* engines */      \
+    SWSW('n', 'N',   0400000000, LR, CW) /* rotate R */         \
+    SWSW('m', 'M',  01000000000, LR, CCW) /* rotate L */        \
+    SWSW('/', '?',  02000000000, LR, HYPER) /* hyperspace */
 
 /*
  * light pen "tip switch" activated (for VS60 emulation etc.)
@@ -138,7 +210,7 @@ extern unsigned char display_tablet;
 
 /*
  * users of this library are expected to provide these calls.
- * simulator will set 18 simulated switches.
+ * simulator will set up to 36 simulated switches.
  */
-extern unsigned long cpu_get_switches(void);    /* get current switch state */
-extern void cpu_set_switches(unsigned long);    /* set switches */
+extern void cpu_get_switches(unsigned long *p1, unsigned long *p2);
+extern void cpu_set_switches(unsigned long, unsigned long);

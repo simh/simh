@@ -26,6 +26,8 @@
    This CPU module incorporates code and comments from the 1620 simulator by
    Geoff Kuenning, with his permission.
 
+   23-Jun-17    RMS     BS should not enable indexing unless configured
+   15-Jun-17    RMS     Added more information to IO in progress message
    26-May-17    RMS     Added deferred IO mode for slow devices
    20-May-17    RMS     Changed to commit PC on certain stops
                         Added SET CPU RELEASE command
@@ -94,6 +96,7 @@
 
    cpuio_mode           set if IO in progress
    cpuio_opc            saved IO opcode
+   cpuio_dev            saved IO device number
    cpuio_cnt            character counter; increments
    PAR                  P address; increments
 
@@ -152,6 +155,7 @@ uint32 io_stop = 1;                                     /* I/O stop */
 uint32 ar_stop = 1;                                     /* arith stop */
 uint32 cpuio_inp = 0;                                   /* IO in progress */
 uint32 cpuio_opc = 0;
+uint32 cpuio_dev = 0;
 uint32 cpuio_cnt = 0;
 int32 ind_max = 16;                                     /* iadr nest limit */
 uint16 pcq[PCQ_SIZE] = { 0 };                           /* PC queue */
@@ -249,6 +253,7 @@ REG cpu_reg[] = {
     { FLDATAD (IOSTOP, io_stop, 0, "I/O stop") },
     { FLDATAD (IOINP, cpuio_inp, 0, "IO in progress"), REG_RO },
     { DRDATAD (IOOPC, cpuio_opc, 6, "IO opcode"), REG_RO },
+    { DRDATAD (IODEV, cpuio_dev, 7, "IO device"), REG_RO },
     { DRDATA (IOCNT, cpuio_cnt, 16), REG_RO },
     { BRDATA (IND, ind, 10, 1, NUM_IND) },
     { FLDATAD (IAE, iae, 0, "indirect address enable (Model 2 only)") },
@@ -960,7 +965,7 @@ while (reason == SCPE_OK) {                             /* loop until halted */
             }
         break;
 
-/* Branch and select - P is valid */
+/* Branch and select - P is valid - Model 2 only */
 
     case OP_BS:
         t = M[ADDR_A (saved_PC, I_SEL)] & DIGIT;        /* get select */
@@ -969,10 +974,12 @@ while (reason == SCPE_OK) {                             /* loop until halted */
             idxe = idxb = 0;                            /* indexing off */
             break;
         case 1:
-            idxe = 1; idxb = 0;                         /* index band A */
+            if ((cpu_unit.flags & IF_IDX) != 0)         /* indexing present? */
+                idxe = 1; idxb = 0;                     /* index band A */
             break;
         case 2:
-            idxe = idxb = 1;                            /* index band B */
+            if ((cpu_unit.flags & IF_IDX) != 0)         /* indexing present? */
+                idxe = idxb = 1;                        /* index band B */
             break;
         case 8:
             iae = 0;                                    /* indirect off */
@@ -1111,8 +1118,13 @@ for (i = 0; commit_pc[i] != 0; i++) {                   /* check stop code */
 actual_PC = PC;                                         /* save cur PC for RLS */
 pcq_r->qptr = pcq_p;                                    /* update pc q ptr */
 upd_ind ();
-if (cpuio_inp != 0)                                     /* flag IO in progress */
-    sim_printf ("\r\nIO in progress");
+if (cpuio_inp != 0) {                                   /* flag IO in progress */
+    const char *opstr = opc_lookup (cpuio_opc, cpuio_dev * 100, NULL);
+
+    if (opstr != NULL)
+        sim_printf ("\r\nIO in progress (%s %05d)", opstr, PAR);
+    else sim_printf ("\r\nIO in progress (%02d %05d,%05d)", cpuio_opc, PAR, cpuio_dev * 100);
+    }
 return reason;
 }
 
@@ -2164,10 +2176,11 @@ return SCPE_OK;
 
 /* Set and clear IO in progress */
 
-t_stat cpuio_set_inp (uint32 op, UNIT *uptr)
+t_stat cpuio_set_inp (uint32 op, uint32 dev, UNIT *uptr)
 {
 cpuio_inp = 1;
 cpuio_opc = op;
+cpuio_dev = dev;
 cpuio_cnt = 0;
 if (uptr != NULL)
     DEFIO_ACTIVATE_ABS (uptr);
@@ -2178,6 +2191,7 @@ t_stat cpuio_clr_inp (UNIT *uptr)
 {
 cpuio_inp = 0;
 cpuio_opc = 0;
+cpuio_dev = 0;
 cpuio_cnt = 0;
 if (uptr != NULL)
     sim_cancel (uptr);
@@ -2225,6 +2239,7 @@ DEVICE *dptr;
 if (cpuio_inp != 0) {                                   /* IO in progress? */
     cpuio_inp = 0;
     cpuio_opc = 0;
+    cpuio_dev = 0;
     cpuio_cnt = 0;
     for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
         if (((dptr->flags & DEV_DEFIO) != 0) && (dptr->reset != NULL))
@@ -2413,7 +2428,7 @@ return SCPE_OK;
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 i, k, di, lnt;
-const char *cptr = (const char *) desc;
+CONST char *cptr = (CONST char *) desc;
 t_value sim_eval[INST_LEN];
 t_stat r;
 InstHistory *h;

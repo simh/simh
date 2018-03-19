@@ -13,7 +13,7 @@
  */
 
 /*
- * Copyright (c) 2003-2004, Philip L. Budne
+ * Copyright (c) 2003-2018, Philip L. Budne
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -38,6 +38,10 @@
  * from the authors.
  */
 
+#ifndef USE_XKB
+#define USE_XKB 1
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,6 +55,9 @@
 #include <X11/Core.h>
 #include <X11/Shell.h>
 #include <X11/cursorfont.h>
+#ifdef USE_XKB
+#include <X11/XKBlib.h>
+#endif
 
 #include <sys/types.h>
 #include <sys/time.h>
@@ -155,6 +162,55 @@ handle_button_release(w, d, e, b)
         *b = TRUE;
 }
 
+/*
+ * map keyboard XEvent to 8 bit char or -1
+ */
+static int
+mapkey(e)
+    XEvent *e;
+{
+    int shift = (ShiftMask & e->xkey.state) != 0;
+    KeySym key;
+
+#ifdef USE_XKB
+    /*
+     * X Keyboard Extension
+     * described in
+     * https://www.x.org/releases/X11R7.7/doc/libX11/XKB/xkblib.html#Xkb_Keyboard_Extension_Support_for_Keyboards
+     * copyright 1995, 1996
+     *
+     * use XkbLibraryVersion and/or XkbQueryExtension
+     * to determine if available???
+     */
+    key = XkbKeycodeToKeysym(dpy, e->xkey.keycode, 0, shift);
+#elif 1
+    /*
+     * documented in
+     * Xlib: C Language X Interface (X Version 11, Release 4)
+     * copyright 1989
+     */
+    int keysyms_per_keycode_return;
+    KeySym *keysyms = XGetKeyboardMapping(dpy,
+                                          e->xkey.keycode,
+                                          1,
+                                          &keysyms_per_keycode_return);
+    key = keysyms[0];
+    XFree(keysyms);
+#else  /* just in case... */
+    /* XKeycodeToKeysym deprecated */
+    key = XKeycodeToKeysym(dpy, e->xkey.keycode, shift);
+#endif
+
+    if ((key & 0xff00) == 0)
+        return key & 0xff;
+
+    switch (key) {
+    case XK_Return: return '\r';
+    }
+    /* printf("ignoring keycode %#x\r\n", key); /**/
+    return -1;
+}
+
 static void
 handle_key_press(w, d, e, b)
     Widget w;
@@ -162,12 +218,9 @@ handle_key_press(w, d, e, b)
     XEvent *e;
     Boolean *b;
 {
-    int shift = (ShiftMask & e->xkey.state) != 0;
-    KeySym key = XKeycodeToKeysym( dpy, e->xkey.keycode, shift );
-
-    /*printf("key %d down\n", key); fflush(stdout);*/
-    if ((key & 0xff00) == 0)
-        display_keydown(key);
+    int k = mapkey(e);
+    if (k >= 0)
+        display_keydown(k);
 
     if (b)
         *b = TRUE;
@@ -180,12 +233,9 @@ handle_key_release(w, d, e, b)
     XEvent *e;
     Boolean *b;
 {
-    int shift = (ShiftMask & e->xkey.state) != 0;
-    KeySym key = XKeycodeToKeysym( dpy, e->xkey.keycode, shift );
-
-    /*printf("key %d up\n", key); fflush(stdout);*/
-    if ((key & 0xff00) == 0)
-        display_keyup(key);
+    int k = mapkey(e);
+    if (k >= 0)
+        display_keyup(k);
 
     if (b)
         *b = TRUE;
@@ -216,7 +266,9 @@ ws_init(const char *crtname,    /* crt type name */
     int argc;
     char *argv[1];
     int height, width;
-
+#ifdef USE_XKB
+    Bool supported;
+#endif
     xpixels = xp;               /* save screen size */
     ypixels = yp;
 
@@ -226,6 +278,16 @@ ws_init(const char *crtname,    /* crt type name */
     argv[0] = NULL;
     dpy = XtOpenDisplay( app_context, NULL, NULL, crtname, NULL, 0,
                         &argc, argv);
+
+#ifdef USE_XKB
+    /*
+     * suppress synthetic key up events from autorepeat
+     * (will still see repeated down events)
+     * see keymap function for XKb history
+     */
+    supported = False;
+    (void) XkbSetDetectableAutoRepeat(dpy, True, &supported);
+#endif
 
     scr = DefaultScreen(dpy);
 

@@ -12,6 +12,7 @@
 typedef char *caddr_t;
 
 # include <windows.h>
+# include <winerror.h>
 # include <winsock2.h>
 # include <ws2tcpip.h>
 # include <sys/timeb.h>

@@ -1,6 +1,6 @@
 # Script to install MSOS5 onto cartridge disks
 # Requires:
-#       Installtion tape                Default is MSOS5_SL136.tap which can
+#       Installation tape               Default is MSOS5_SL136.tap which can
 #                                       be copied from bitsavers.org. This
 #                                       can be overridden by specifying the
 #                                       installation tape on the command line:
@@ -13,7 +13,7 @@
 #
 set env CDD0=MSOS5-A.dsk
 set env CDD1=MSOS5-B.dsk
-set env MT0=%2
+set env MT0=%1
 if "%MT0%"=="" set env MT0=MSOS5_SL136.tap
 set env LPT=MSOSinstall.lpt
 set cpu instr=basic
@@ -46,14 +46,20 @@ echo 1. Partition setup error
 echo 2. File Manager sequential file error
 echo 3. Fortran Formatted I/O error
 echo
+send delay=10000
 expect "DATE MM/DD/YY \r\r\r\r\n" send "%DATE1%\r"; c
 expect -p "DATE/TIME  MMDDYYHHMM \n\r\n" send "%DATE2%%TIME_HH%%TIME_MM%\r"; c
 expect "Q\r\r\r\r\n" send "*i,3\r"; c
 expect "Q\r\r\r\r\n" send "*V\r"; c
 expect -p "YOU MAY AUTOLOAD" step 100000; autoload cdd; go 0
 expect "SET PROGRAM PROTECT  \r\n" set cpu protect; c
-expect -p ":00 " send after=100000,"\007"; c
+expect -p ":00 " send after=1000000,"\007"; c
 expect "MI\r\n" send "*BATCH\r"; c
+expect "MI\r\n" send "DB\r"; c
+expect "IN\n\r\007" send "REW,6\r"; c
+expect "NEXT  \n\r\007" send "ADF,6,2\r";       c
+expect "NEXT  \n\r\007" send "OFF\r"; c
+expect "OUT \n\r" send "\007"; c
 expect "MI\r\n" send "VERIFY\r"; c
 expect "TESTS COMPLETE." step 100000
 boot mt0

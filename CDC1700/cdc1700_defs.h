@@ -44,6 +44,7 @@
 #define SCPE_INVEXI     3               /* Invalid bit in EXI delta */
 #define SCPE_IBKPT      4               /* Breakpoint */
 #define SCPE_REJECT     5               /* Stop on reject */
+#define SCPE_UNIMPL     6               /* Unimplemented instruction */
 
 /*
  * Private device flags
@@ -113,11 +114,13 @@
 
 #define UNIT_V_854      (UNIT_V_UF + 0) /* 854 vs. 853 disk pack drive */
 #define UNIT_V_856_4    (UNIT_V_UF + 0) /* 856_4 vs. 856_2 drive */
+#define UNIT_V_DRMSIZE  (UNIT_V_UF + 0) /* 1752 drum memory assignment */
 
 #define UNIT_7TRACK     (1 << UNIT_V_7TRACK)
 #define UNIT_WPROT      (1 << UNIT_V_WPROT)
 #define UNIT_854        (1 << UNIT_V_854)
 #define UNIT_856_4      (1 << UNIT_V_856_4)
+#define UNIT_DRMSIZE    (1 << UNIT_V_DRMSIZE)
 
 /*
  * CPU
@@ -386,8 +389,10 @@ enum IOstatus {
  */
 #define MOD_ENHRE       0x0080
 #define MOD_ENHIN       0x0040
+#define MOD_ENHRA       0x0038
+#define MOD_ENHRB       0x0007
 
-//#define REG_NONE        0x0
+#define REG_NOREG       0x0
 #define REG_R1          0x1
 #define REG_R2          0x2
 #define REG_R3          0x3
@@ -396,40 +401,48 @@ enum IOstatus {
 #define REG_A           0x6
 #define REG_I           0x7
 
+#define OPC_ENHF4       0xF000
+#define OPC_ENHF5       0x0F00
+
 #define WORD_REG        0x0
 #define WORD_MEM        0x1
 #define CHAR_REG        0x2
 #define CHAR_MEM        0x3
 
-#define OPC_ENHSUBJX    0x5000
-#define OPC_ENHADDR     0x8000
-#define OPC_ENHSUBR     0x9000
-#define OPC_ENHANDR     0xA000
-#define OPC_ENHANDM     0xA100
-#define OPC_ENHLOAD     0xC000
-#define OPC_ENHSTORE    0xC100
-#define OPC_ENHLOADC    0xC200
-#define OPC_ENHSTOREC   0xC300
-#define OPC_ENHORR      0xD000
-#define OPC_ENHORM      0xD100
-#define OPC_CMPREQ      0xE000
-#define OPC_CMPCEQ      0xE200
+#define OPC_STOSJMP     0x5000
+#define OPC_STOADD      0x8000
+#define OPC_STOSUB      0x9000
+#define OPC_STOAND      0xA000
+#define OPC_STOLOADST   0xC000
+#define OPC_STOOR       0xD000
+#define OPC_STOCRE      0xE000
 
+#define OPC_FLDF3A      0x07
+#define OPC_FLDRSV1     0x0
+#define OPC_FLDRSV2     0x1
 #define OPC_FLDSFZ      0x2
 #define OPC_FLDSFN      0x3
 #define OPC_FLDLOAD     0x4
 #define OPC_FLDSTORE    0x5
 #define OPC_FLDCLEAR    0x6
 #define OPC_FLDSET      0x7
+#define OPC_FLDSTR      0xF000
+#define OPC_FLDLTH      0x0F00
 
-#define OPC_ENHSKIPZ    0x0
-#define OPC_ENHSKIPNZ   0x1
-#define OPC_ENHSKIPPOS  0x2
-#define OPC_ENHSKIPNEG  0x3
-#define OPC_ENHSKIPR1   0x4
-#define OPC_ENHSKIPR2   0x8
-#define OPC_ENHSKIPR3   0xC
-#define OPC_ENHSKIPR4   0x0
+#define OPC_ENHXFRRA    0xE0
+#define OPC_ENHXFRF2A   0x18
+#define OPC_ENHXFRRB    0x7
+
+#define OPC_ENHSKIPTY   0x30
+#define OPC_ENHSKIPREG  0xC0
+#define OPC_ENHSKIPCNT  0xF
+
+#define OPC_DRPMBZ      0x10
+#define OPC_DRPRA       0xE0
+#define OPC_DRPSK       0xF
+
+#define OPC_MISCRA      0xE0
+#define OPC_MISCF3      0xF
 
 #define OPC_ENHLMM      0x1
 #define OPC_ENHLRG      0x2
@@ -553,6 +566,8 @@ struct io_device {
   t_bool                (*iod_intr)(struct io_device *);
   uint16                (*iod_raised)(DEVICE *);
   void                  (*iod_clear)(DEVICE *);
+  uint8                 (*iod_decode)(struct io_device *, t_bool, uint8);
+  t_bool                (*iod_chksta)(t_bool, uint8);
   uint16                iod_ienable;
   uint16                iod_oldienable;
   uint16                iod_imask;
@@ -561,15 +576,15 @@ struct io_device {
   uint16                iod_cmask;
   uint16                iod_rmask;
   uint8                 iod_regs;
-  uint8                 iod_validmask;
-  uint8                 iod_readmap;
-  uint8                 iod_rejmapR;
-  uint8                 iod_rejmapW;
+  uint16                iod_validmask;
+  uint16                iod_readmap;
+  uint16                iod_rejmapR;
+  uint16                iod_rejmapW;
   uint8                 iod_flags;
   uint8                 iod_dc;
-  uint16                iod_readR[8];
-  uint16                iod_writeR[8];
-  uint16                iod_prevR[8];
+  uint16                iod_readR[16];
+  uint16                iod_writeR[16];
+  uint16                iod_prevR[16];
   uint16                iod_forced;
   t_uint64              iod_event;
   uint16                iod_private;
@@ -582,6 +597,10 @@ struct io_device {
   uint16                iod_private8;
   uint8                 iod_private9;
   t_bool                iod_private10;
+  uint16                iod_private11;
+  uint16                iod_private12;
+  uint8                 iod_private13;
+  uint8                 iod_private14;
 };
 #define STATUS          iod_readR[1]
 #define DEVSTATUS(iod)  ((iod)->iod_readR[1])
@@ -598,23 +617,31 @@ struct io_device {
 #define CLRSTICKY(iod, reg, value) \
   ((iod)->iod_sticky[reg] &= ~value)
 
-#define MASK_REGISTER0  0x01
-#define MASK_REGISTER1  0x02
-#define MASK_REGISTER2  0x04
-#define MASK_REGISTER3  0x08
-#define MASK_REGISTER4  0x10
-#define MASK_REGISTER5  0x20
-#define MASK_REGISTER6  0x40
-#define MASK_REGISTER7  0x80
+#define MASK_REGISTER0  0x0001
+#define MASK_REGISTER1  0x0002
+#define MASK_REGISTER2  0x0004
+#define MASK_REGISTER3  0x0008
+#define MASK_REGISTER4  0x0010
+#define MASK_REGISTER5  0x0020
+#define MASK_REGISTER6  0x0040
+#define MASK_REGISTER7  0x0080
+#define MASK_REGISTER8  0x0100
+#define MASK_REGISTER9  0x0200
+#define MASK_REGISTER10 0x0400
+#define MASK_REGISTER11 0x0800
+#define MASK_REGISTER12 0x1000
+#define MASK_REGISTER13 0x2000
+#define MASK_REGISTER14 0x4000
+#define MASK_REGISTER15 0x8000
 
 #define STATUS_ZERO     0x01
 #define DEVICE_DC       0x02
 #define AQ_ONLY         0x04
 
-#define IODEV(name, model, id, equ, sta, base, busy, ior, iow, bdcr, bdcw, dump, intr, raised, clear, mask, regs, valid, map, rejR, rejW, flags, dc, devspec) \
+#define IODEV(name, model, id, equ, sta, base, busy, ior, iow, bdcr, bdcw, dump, intr, raised, clear, decode, chksta, mask, regs, valid, map, rejR, rejW, flags, dc, devspec) \
   { name, model, IOtype_default, equ, sta, 0, base, \
     NULL, NULL, NULL, \
-    busy, ior, iow, bdcr, bdcw, dump, intr, raised, clear, \
+    busy, ior, iow, bdcr, bdcw, dump, intr, raised, clear, decode, chksta, \
     0, 0, IO_##id##_INTR, IO_##id##_DIRMSK, IO_##id##_STMSK, \
     IO_##id##_STCINT | IO_ST_INT, \
     mask, regs, valid, map, rejR, rejW, flags, dc, \
@@ -722,7 +749,7 @@ typedef uint16 devINTR(DEVICE *);
 #define IO_1711_SWRITE  0x0100                  /* Select write mode */
 #define IO_1711_DIRMSK  (IO_1711_SREAD | IO_1711_SWRITE | IO_DIR_ALARM | \
                          IO_DIR_EOP | IO_DIR_DATA | IO_DIR_CINT | IO_DIR_CCONT)
-#define IO_1711_INTR    (IO_DIR_ALARM |IO_DIR_EOP | IO_DIR_DATA)
+#define IO_1711_INTR    (IO_DIR_ALARM | IO_DIR_EOP | IO_DIR_DATA)
 
 #define IO_1711_MANUAL  0x0800                  /* Manual interrupt */
 #define IO_1711_MON     0x0400                  /* Motor on */
@@ -796,6 +823,47 @@ typedef uint16 devINTR(DEVICE *);
                          IO_ST_ALARM | IO_ST_EOP | IO_ST_DATA | \
                          IO_ST_INT | IO_ST_BUSY | IO_ST_READY)
 #define IO_1726_STCINT  (IO_ST_ALARM | IO_ST_EOP | IO_ST_DATA)
+
+/*
+ * 1728-A/B Card Reader/Punch
+ */
+#define IO_1728_MASK    0x0060                  /* Station mask */
+#define IO_1728_CR      0x0020                  /* Card reader select */
+#define IO_1728_CP      0x0040                  /* Card puch select */
+
+#define IO_1728_OFFSET  0x0100                  /* Offset request */
+#define IO_1728_FEED    0x0080                  /* Initiate feed cycle */
+
+#define IO_1728_DIRMSK  (IO_1728_OFFSET | IO_1728_FEED | IO_DIR_ALARM | \
+                         IO_DIR_EOP | IO_DIR_DATA | IO_DIR_CINT | \
+                         IO_DIR_CCONT)
+#define IO_1728_INTR    (IO_DIR_ALARM | IO_DIR_EOP | IO_DIR_DATA)
+
+#define IO_1728_CBFULL  0x0800                  /* Chip box full */
+#define IO_1728_EOF     0x0400                  /* End of file */
+#define IO_1728_FEEDAL  0x0200                  /* Feed alert */
+#define IO_1728_ERROR   0x0100                  /* Pre-read or punch error */
+#define IO_1728_STMSK   (IO_1728_CBFULL | IO_1728_EOF | IO_1728_FEEDAL | \
+                         IO_1728_ERROR | IO_ST_PROT | IO_ST_LOST | \
+                         IO_ST_EOP | IO_ST_DATA | IO_ST_INT | IO_ST_BUSY | \
+                         IO_ST_READY)
+#define IO_1728_STCINT  (IO_DIR_ALARM | IO_DIR_EOP | IO_DIR_DATA)
+
+#define IO_ST2_INTLOCK  0x0400                  /* Door interlock */
+#define IO_ST2_PUNINH   0x0200                  /* Punch inhibit set */
+#define IO_ST2_MANUAL   0x0100                  /* Manual mode */
+#define IO_ST2_PUNERR   0x0080                  /* Punch error */
+#define IO_ST2_PREERR   0x0040                  /* Pre-read error */
+#define IO_ST2_STKJAM   0x0020                  /* Stacker area jam */
+#define IO_ST2_PUNJAM   0x0010                  /* Punch area jam */
+#define IO_ST2_READJAM  0x0008                  /* Read area jam */
+#define IO_ST2_FFEED    0x0004                  /* Fail to feed */
+#define IO_ST2_FULL     0x0002                  /* Stacker full */
+#define IO_ST2_EMPTY    0x0001                  /* Hopper empty */
+#define IO_1728_ST2MSK  (IO_ST2_INTLOCK | IO_ST2_PUNINH | IO_ST2_MANUAL | \
+                         IO_ST2_PUNERR | IO_ST2_PREERR | IO_ST2_STKJAM | \
+                         IO_ST2_PUNJAM | IO_ST2_READJAM | IO_ST2_FFEED | \
+                         IO_ST2_FULL | IO_ST2_EMPTY)
 
 /*
  * 1729-A/B Card Reader
@@ -998,6 +1066,29 @@ typedef uint16 devINTR(DEVICE *);
 #define IO_1742_STCINT  (IO_ST_ALARM | IO_ST_EOP | IO_ST_DATA)
 
 /*
+ * 1752-1/2/3/4 Drum
+ */
+#define IO_1752_DIRMSK  (IO_DIR_ALARM | IO_DIR_EOP | IO_DIR_CINT | \
+                         IO_DIR_CCONT)
+#define IO_1752_INTR    (IO_DIR_ALARM | IO_DIR_EOP)
+
+#define IO_1752_OVERR   0x8000                  /* Sector overrange error */
+#define IO_1752_GUARDED 0x4000                  /* Guarded address error */
+#define IO_1752_SECCMP  0x2000                  /* Sector compare */
+#define IO_1752_POWERF  0x1000                  /* Power failure */
+#define IO_1752_TIMERR  0x0800                  /* Timing track error */
+#define IO_1752_GUARDE  0x0400                  /* Guarded address enabled */
+#define IO_1752_PROTF   0x0200                  /* Protect fault */
+#define IO_1752_CHECKW  0x0100                  /* Checkword error */
+#define IO_1752_STMSK   (IO_1752_OVERR | IO_1752_GUARDED | IO_1752_SECCMP | \
+                         IO_1752_POWERF | IO_1752_TIMERR | IO_1752_GUARDE | \
+                         IO_1752_PROTF | IO_1752_CHECKW | IO_ST_PROT | \
+                         IO_ST_LOST | IO_ST_ALARM | IO_ST_EOP | IO_ST_DATA | \
+                         IO_ST_INT | IO_ST_BUSY | IO_ST_READY)
+
+#define IO_1752_STCINT  (IO_ST_ALARM | IO_ST_EOP)
+
+/*
  * 10336-1 Real-Time Clock
  */
 #define IO_10336_ACK    0x0002                  /* Acknowledge interrupt */
@@ -1012,6 +1103,15 @@ typedef uint16 devINTR(DEVICE *);
 #define IO_10336_INTR   0
 #define IO_10336_STMSK  0
 #define IO_10336_STCINT 0
+
+/*
+ * M05 addressing scheme used by Cyber-18 enhanced instruction set for
+ * magtape access.
+ */
+#define M05_SAMPLE      0x0000                  /* Sample (peripheral input) */
+#define M05_SET         0x0008                  /* Set (peripheral output) */
+#define M05_DEVICE      0x0070                  /* Device selection */
+#define M05_CONTR       0x0380                  /* Controller selection */
 
 /*
  * Timing parameters
@@ -1047,8 +1147,14 @@ typedef uint16 devINTR(DEVICE *);
 #define CD_IO_WAIT       800                    /* Sector I/O wait time */
 #define CD_RTZS_WAIT     200                    /* Return to zero seek wait */
 
+#define DRM_ACCESS_WAIT 5800                    /* Average access latency */
+#define DRM_SECTOR_WAIT  350                    /* Sector I/O time */
+
 #define DC_START_WAIT      4                    /* Startup delay */
 #define DC_IO_WAIT         4                    /* I/O transfer delay */
 #define DC_EOP_WAIT        5                    /* EOP delay */
+
+#define RDR_IN_WAIT      200                    /* Card reader feed wait */
+#define PUN_OUT_WAIT     200                    /* Card punch feed wait */
 
 #endif

@@ -1523,6 +1523,7 @@ static t_stat vh_reset (    DEVICE  *dptr   )
 {
     int32   i;
 
+    tmxr_set_port_speed_control (&vh_desc);
     if (vh_desc.lines > VH_MUXES*VH_LINES)
         vh_desc.lines = VH_MUXES*VH_LINES;
     for (i = 0; i < vh_desc.lines; i++)

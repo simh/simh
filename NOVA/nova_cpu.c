@@ -1422,7 +1422,7 @@ return ( 0 ) ;
 t_stat hist_show( FILE * st, UNIT * uptr, int32 val, CONST void * desc )
 {
 int32           k, di, lnt ;
-const char *    cptr = (const char *) desc ;
+CONST char *    cptr = (CONST char *) desc ;
 t_stat          r ;
 Hist_entry *    hptr ;
 

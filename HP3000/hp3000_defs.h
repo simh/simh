@@ -1,6 +1,6 @@
 /* hp3000_defs.h: HP 3000 simulator general declarations
 
-   Copyright (c) 2016, J. David Bryan
+   Copyright (c) 2016-2017, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +23,8 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
-   29_Dec-16    JDB     Changed the status mnemonic flag from REG_S to REG_T
+   16-Oct-17    JDB     Suppressed logical-not-parentheses warning on clang
+   29-Dec-16    JDB     Changed the status mnemonic flag from REG_S to REG_T
    20-Nov-16    JDB     Added mapped memory access classes
    24-Oct-16    JDB     Added half-byte definitions for CIS decoding
    10-Oct-16    JDB     Moved ACCESS_CLASS definition here from hp3000_cpu.h
@@ -134,6 +135,7 @@
 */
 
 #if defined (__clang__)
+  #pragma clang diagnostic ignored "-Wlogical-not-parentheses"
   #pragma clang diagnostic ignored "-Wlogical-op-parentheses"
   #pragma clang diagnostic ignored "-Wbitwise-op-parentheses"
   #pragma clang diagnostic ignored "-Wshift-op-parentheses"

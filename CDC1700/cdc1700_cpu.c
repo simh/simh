@@ -50,28 +50,50 @@
  *       CPU interrupts are edge-triggered. The interrupt trigger is
  *       automatically lowered when the CPU starts processing interrupt 0.
  *
- * 2. There is no documention on relative timing. For example, the paper tape
+ * 2. Interrupts - undocumented feature
+ *
+ *    The 1704 and 1784 processor doucmentation has a section describing
+ *    interrupt handling. There is a sub-section titled "Sharing subroutines
+ *    between interrupt levels" which indicates that a subroutine such as:
+ *
+ *        SUBR    ADC     0
+ *                IIN
+ *                <code>
+ *                EIN
+ *                JMP*    (SUBR)
+ *
+ *    may be shared between interrupt levels. It include the text "Interrupts
+ *    occuring after the execution of the RTJ are blocked because the IIN is
+ *    executed. These interrupts are not recognized until after the jump is
+ *    executed, because one instruction must be executed after an EIN before
+ *    the interrupt system is active".
+ *
+ *    The implication of this is that interrupts must be deferred for one
+ *    instruction following an RTJ. And indeed, deferring interrupts after
+ *    an RTJ fixed a crash I was seeing on a customized version of MSOS 5.0.
+ *
+ * 3. There is no documention on relative timing. For example, the paper tape
  *    punch diagnostic enables Alarm+Data interrupts and assumes that it will
  *    be able to execute some number of instructions before the interrupt
  *    occurs. How many instructions should we delay if interrupts are enabled
  *    and all conditions are met to deliver the interrupt immediately?
  *
- * 3. Some peripherals, notably the teletypewriter, do not have a protected
+ * 4. Some peripherals, notably the teletypewriter, do not have a protected
  *    status bit. Does this mean that any application can directly affect
  *    them?
  *
  *      -  The teletypewriter may be addressed by either a protected or a
  *         nonprotected instruction (see SC17 Reference Manual).
  *
- * 4. The 1740/1742 line printer controllers are incorrectly documented as
+ * 5. The 1740/1742 line printer controllers are incorrectly documented as
  *    having the status register at offset 3, it is at offset 1 like all
  *    other peripherals.
  *
- * 5. For the 1738 disk pack controller, what is the correct response if an
+ * 6. For the 1738 disk pack controller, what is the correct response if an
  *    operation is initiated with no drive selected? For now, we'll reject
  *    the request.
  *
- * 6. For the 1706-A buffered data channel, what interrupt is used to signal
+ * 7. For the 1706-A buffered data channel, what interrupt is used to signal
  *    "End of Operation"? A channel-specific interrupt or a pass-through
  *    interrupt from the device being controlled or some other?
  *
@@ -123,6 +145,7 @@ uint8 P[MAXMEMSIZE];
 
 t_uint64 Instructions;
 uint16 Preg, Areg, Qreg, Mreg, CAenable, OrigPreg, Pending, IOAreg, IOQreg;
+uint16 R1reg, R2reg, R3reg, R4reg;
 uint8 Pfault, Protected, lastP, Oflag, INTflag, DEFERflag;
 
 t_bool ExecutionStarted = FALSE;
@@ -177,7 +200,7 @@ t_stat cpu_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 
 IO_DEVICE CPUdev = IODEV(NULL, "1714", CPU, 0, 0xFF, 0,
                          NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-                         0, 0, 0, 0, 0, 0, 0, 0, NULL);
+                         NULL, NULL, 0, 0, 0, 0, 0, 0, 0, 0, NULL);
 
 /* CPU data structures
 
@@ -1128,6 +1151,7 @@ t_stat executeAnInstruction(void)
       StoreToMem(operand, Preg);
       Preg = operand;
       INCP;
+      DEFERflag = 1;
       break;
 
     case OPC_STQ:
@@ -1185,7 +1209,8 @@ t_stat executeAnInstruction(void)
                 }
                 break;
               }
-              /*** TODO: Enhanced skip instructions ***/
+              Preg = OrigPreg;
+              return SCPE_UNIMPL;
               break;
           }
           break;
@@ -1427,8 +1452,8 @@ t_stat executeAnInstruction(void)
 
             case INSTR_ENHANCED:
               if ((instr & OPC_MODMASK) != 0) {
-                /*** TODO: Enhanced instructions ***/
-                goto done;
+                Preg = OrigPreg;
+                return SCPE_UNIMPL;
               }
               break;
           }
@@ -1635,7 +1660,8 @@ t_stat executeAnInstruction(void)
 
             case INSTR_ENHANCED:
               if ((instr & OPC_MODMASK) != 0) {
-                /*** TODO: Enhanced miscellaneous instructions ***/
+                Preg = OrigPreg;
+                return SCPE_UNIMPL;
               }
               break;
           }

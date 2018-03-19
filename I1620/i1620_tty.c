@@ -136,7 +136,7 @@ DEVICE tty_dev = {
 /* The following constant is a list of valid 1620 numeric characters 
    that can be entered from the keyboard. They are the digits 0-9, 
    record mark(|), numeric blank(@) and group mark(}). All others
-   are cosidered invalid. When entering data, these characters may
+   are considered invalid. When entering data, these characters may
    all be preceeded by tilde(~) or accent(`) to indicate that the
    following character should be entered into storage with a flag.
 
@@ -285,7 +285,7 @@ switch (op) {                                           /* case on op */
     case OP_WN:
     case OP_DN:
     case OP_WA:
-        cpuio_set_inp (op, &tty_unit[UTTO]);            /* set IO in progress */
+        cpuio_set_inp (op, IO_TTY, &tty_unit[UTTO]);    /* set IO in progress */
         break;
 
     case OP_RN:
@@ -293,7 +293,7 @@ switch (op) {                                           /* case on op */
         tti_unlock = 1;                                 /* unlock keyboard */
         tti_flag = 0;                                   /* init flag */
         tto_write ('>');                                /* prompt user */
-        cpuio_set_inp (op, NULL);                       /* set IO in progress */
+        cpuio_set_inp (op, IO_TTY, NULL);               /* set IO in progress */
         break;
 
     default:                                            /* invalid function */
@@ -316,7 +316,7 @@ if ((temp = sim_poll_kbd ()) < SCPE_KFLAG)              /* no char or error? */
     return temp;
 if (tti_unlock == 0)                                    /* expecting input? */
     return SCPE_OK;                                     /* no, ignore */
-raw = (int8) temp;
+raw = (int8) (temp & 0x7F);
 
 if (raw == '\r') {                                      /* return? */
     tto_write (raw);                                    /* echo */

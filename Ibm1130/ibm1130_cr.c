@@ -1,6 +1,7 @@
 #include "ibm1130_defs.h"
 #include "ibm1130_fmt.h"
 #include <ctype.h>
+#include <sys/stat.h>
 
 #ifdef _WIN32
 #  include <io.h>       /* Microsoft puts definition of mktemp into io.h rather than stdlib.h */

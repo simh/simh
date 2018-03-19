@@ -303,6 +303,34 @@ if ((cpu_unit.flags & IF_IDX) && flg) {                 /* indexing? */
 return;
 }
 
+/* Look up an opcode
+
+   Inputs:
+        op      =       opcode (decimal)
+        qv      =       Q value (full 5 digits)
+    Outputs:
+        *opcst  =       pointer to opcode string
+                        (NULL if not found)
+        *fl     =       opcode flags (optional)
+*/
+
+const char *opc_lookup (uint32 op, uint32 qv, uint32 *fl)
+{
+uint32 i, opfl;
+
+for (i = 0; opcode[i].str != NULL; i++) {               /* find opcode */
+    opfl = opcode[i].opv & 0xFF0000;                    /* get flags */
+    if ((op == (opcode[i].opv & 0xFF)) &&               /* op match? */
+        ((qv == opcode[i].qv) ||                        /* q match or */
+        ((opfl != I_1E) && (opfl != I_0E)))) {          /* not needed? */
+            if (fl != NULL)
+                *fl = opfl;
+            return opcode[i].str;
+        }
+    }
+return NULL;
+}
+
 /* Symbolic decode
 
    Inputs:
@@ -323,6 +351,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
 {
 int32 pmp, qmp, i, c, d, any;
 uint32 op, qv, opfl;
+const char *opstr;
 
 if (uptr == NULL)
     uptr = &cpu_unit;
@@ -383,14 +412,9 @@ for (i = qv = pmp = qmp = 0; i < ADDR_LEN; i++) {       /* test addr */
     }
 if ((val[0] | val[1]) & FLAG)                           /* flags force */
     pmp = qmp = 1;
-for (i = 0; opcode[i].str != NULL; i++) {               /* find opcode */
-    opfl = opcode[i].opv & 0xFF0000;
-    if ((op == (opcode[i].opv & 0xFF)) &&
-        ((qv == opcode[i].qv) ||
-        ((opfl != I_1E) && (opfl != I_0E))))
-        break;
-    }
-if (opcode[i].str == NULL) {                            /* invalid opcode */
+opstr = opc_lookup (op, qv, &opfl);                     /* find opcode */
+
+if (opstr == NULL) {                                    /* invalid opcode */
     if ((sw & SIM_SW_STOP) != 0) {                      /* stop message? */
         fprintf (of, "%02d", op);                       /* print numeric opcode */
         return -(INST_LEN - 1);                         /* report success */
@@ -400,7 +424,7 @@ if (opcode[i].str == NULL) {                            /* invalid opcode */
 if (I_GETQP (opfl) == I_M_QNP)                          /* Q no print? */
     qmp = 0;
 
-fprintf (of, "%-4s", opcode[i].str);                      /* print opcode */
+fprintf (of, ((sw & SIM_SW_STOP)? "%s": "%-4s"), opstr);/* print opcode */
 if (I_GETPP (opfl) == I_M_PP)                           /* P required? */
     fprint_addr (of, ' ', &val[I_P], I_M_QX);
 else if ((I_GETPP (opfl) == I_M_PCP) && (pmp || qmp))   /* P opt & needed? */

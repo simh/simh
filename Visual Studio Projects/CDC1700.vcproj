@@ -213,6 +213,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\CDC1700\cdc1700_drm.c"
+				>
+			</File>
+			<File
 				RelativePath="..\CDC1700\cdc1700_io.c"
 				>
 			</File>

@@ -726,13 +726,13 @@ return SCPE_OK;
 
 void tmr_sched (uint32 nicr)
 {
-uint32 usecs = (nicr) ? (~nicr + 1) : 0xFFFFFFFF;
+double usecs = (nicr) ? (double)(~nicr + 1) : (double)0x100000000LL;
 
 clk_tps = (int32)((1000000.0 / usecs) + 0.5);
 
-sim_debug (TMR_DB_SCHED, &tmr_dev, "tmr_sched(nicr=0x%08X-usecs=0x%08X) - tps=%d\n", nicr, usecs, clk_tps);
+sim_debug (TMR_DB_SCHED, &tmr_dev, "tmr_sched(nicr=0x%08X-usecs=%.0f) - tps=%d\n", nicr, usecs, clk_tps);
 tmr_poll = sim_rtcn_calb (clk_tps, TMR_CLK);
-sim_activate_after (&tmr_unit, usecs);
+sim_activate_after_d (&tmr_unit, usecs);
 }
 
 /* 100Hz TODR reset */

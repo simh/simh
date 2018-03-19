@@ -2705,7 +2705,7 @@ return SCPE_OK;
 t_stat cpu_show_addr (FILE *of, UNIT *uptr, int32 val, CONST void *desc)
 {
 t_stat r;
-const char *cptr = (const char *) desc;
+CONST char *cptr = (CONST char *) desc;
 uint32 ad, bpa, dlnt, virt;
 static const char *lnt_str[] = {
     "byte",
@@ -2825,7 +2825,7 @@ t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 k, di, lnt;
 t_stat r;
-const char *cptr = (const char *) desc;
+CONST char *cptr = (CONST char *) desc;
 InstHistory *h;
 
 if (hst_lnt == 0)                                   /* enabled? */

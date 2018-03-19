@@ -375,8 +375,8 @@ return sim_fseeko (st, (t_offset)offset, whence);
 }
 
 #if defined(_WIN32)
-static const char *
-GetErrorText(DWORD dwError)
+const char *
+sim_get_os_error_text (int Error)
 {
 static char szMsgBuffer[2048];
 DWORD dwStatus;
@@ -384,13 +384,13 @@ DWORD dwStatus;
 dwStatus = FormatMessageA (FORMAT_MESSAGE_FROM_SYSTEM|
                            FORMAT_MESSAGE_IGNORE_INSERTS,     //  __in      DWORD dwFlags,
                            NULL,                              //  __in_opt  LPCVOID lpSource,
-                           dwError,                           //  __in      DWORD dwMessageId,
+                           Error,                             //  __in      DWORD dwMessageId,
                            0,                                 //  __in      DWORD dwLanguageId,
                            szMsgBuffer,                       //  __out     LPTSTR lpBuffer,
                            sizeof (szMsgBuffer) -1,           //  __in      DWORD nSize,
                            NULL);                             //  __in_opt  va_list *Arguments
 if (0 == dwStatus)
-    snprintf(szMsgBuffer, sizeof(szMsgBuffer) - 1, "Error Code: 0x%lX", dwError);
+    snprintf(szMsgBuffer, sizeof(szMsgBuffer) - 1, "Error Code: 0x%X", Error);
 while (sim_isspace (szMsgBuffer[strlen (szMsgBuffer)-1]))
     szMsgBuffer[strlen (szMsgBuffer) - 1] = '\0';
 return szMsgBuffer;
@@ -400,7 +400,7 @@ t_stat sim_copyfile (const char *source_file, const char *dest_file, t_bool over
 {
 if (CopyFileA (source_file, dest_file, !overwrite_existing))
     return SCPE_OK;
-return sim_messagef (SCPE_ARG, "Error Copying '%s' to '%s': %s\n", source_file, dest_file, GetErrorText (GetLastError ()));
+return sim_messagef (SCPE_ARG, "Error Copying '%s' to '%s': %s\n", source_file, dest_file, sim_get_os_error_text (GetLastError ()));
 }
 
 #include <io.h>
@@ -470,6 +470,12 @@ return ftruncate(fileno(fptr), (off_t)size);
 #if HAVE_UTIME
 #include <utime.h>
 #endif
+
+const char *
+sim_get_os_error_text (int Error)
+{
+return strerror (Error);
+}
 
 t_stat sim_copyfile (const char *source_file, const char *dest_file, t_bool overwrite_existing)
 {
@@ -598,4 +604,21 @@ if (shmem->shm_fd != -1)
 free (shmem);
 }
 
+#endif
+
+#if defined(__VAX)
+/* 
+ * We privide a 'basic' snprintf, which 'might' overrun a buffer, but
+ * the actual use cases don't on other platforms and none of the callers
+ * care about the function return value.
+ */
+int sim_vax_snprintf(char *buf, size_t buf_size, const char *fmt, ...)
+{
+va_list arglist;
+
+va_start (arglist, fmt);
+vsprintf (buf, fmt, arglist);
+va_end (arglist);
+return 0;
+}
 #endif

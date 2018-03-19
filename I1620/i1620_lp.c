@@ -1,6 +1,6 @@
 /* i1620_lp.c: IBM 1443 line printer simulator
 
-   Copyright (c) 2002-2015, Robert M. Supnik
+   Copyright (c) 2002-2017, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    lpt          1443 line printer
 
+   15-Jun-17    RMS     Fixed K constants and print-no-spacing (Tom McBride)
+                        Added option to emulate form feed with newlines
    31-Jan-15    TFM     Fixed various problems ... see comments in code
    10-Dec-13    RMS     Fixed DN wraparound (Bob Armstrong)
                         Fixed test on VFU 10 (Bob Armstrong)
@@ -37,10 +39,13 @@
 #include "i1620_defs.h"
 
 #define LPT_BSIZE       197                             /* buffer size */
+#define UNIT_V_FF       (UNIT_V_UF + 0)
+#define UNIT_FF         (1 << UNIT_V_FF)
 
-#define K_IMM           0x10                            /* control now */
+/* decoded print control */
+
+#define K_IMM           0x10                            /* before print */
 #define K_LIN           0x20                            /* spc lines */
-#define K_CH10          0x40                            /* chan 10 */
 #define K_LCNT          0x03                            /* line count */
 #define K_CHAN          0x0F                            /* channel */
 
@@ -59,8 +64,9 @@ t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
 t_stat lpt_attach (UNIT *uptr, CONST char *cptr);
 void lpt_buf_init (void);
-t_stat lpt_num(uint32 pa, uint32 f1, t_bool dump);      /* tfm: length parameter removed, not needed */
-t_stat lpt_print (void);
+t_stat lpt_num(uint32 pa, uint32 f1, t_bool dump);
+t_stat lpt_print (uint32 flag);
+t_stat lpt_spcop (int32 ctrl);
 t_stat lpt_space (int32 lines, int32 lflag);
 
 #define CHP(ch,val)     ((val) & (1 << (ch)))
@@ -79,7 +85,7 @@ UNIT lpt_unit = {
 REG lpt_reg[] = {
     { BRDATAD (LBUF, lpt_buf, 8, 8, LPT_BSIZE + 1, "line buffer") },
     { DRDATAD (BPTR, lpt_bptr, 8, "buffer pointer") },
-    { HRDATAD (PCTL, lpt_savctrl, 8, "saved print control directive") },
+    { HRDATAD (PCTL, lpt_savctrl, 6, "saved print control directive") },
     { FLDATAD (PRCHK, ind[IN_PRCHK], 0, "print check indicator") },
     { FLDATAD (PRCH9, ind[IN_PRCH9], 0, "channel 9 indicator") },
     { FLDATAD (PRCH12, ind[IN_PRCH12], 0, "channel 12 indicator") },
@@ -91,8 +97,14 @@ REG lpt_reg[] = {
     { NULL }
     };
 
+MTAB lp_mod[] = {
+    { UNIT_FF, 0, "no form feeds", "NOFF", NULL },
+    { UNIT_FF, UNIT_FF, "form feeds", "FF", NULL }, 
+    { 0 }
+    };
+
 DEVICE lpt_dev = {
-    "LPT", &lpt_unit, lpt_reg, NULL,
+    "LPT", &lpt_unit, lpt_reg, lp_mod,
     1, 10, 31, 1, 8, 7,
     NULL, NULL, &lpt_reset,
     NULL, &lpt_attach, NULL
@@ -103,10 +115,10 @@ DEVICE lpt_dev = {
 /* Numeric (flag plus digit) to lineprinter (ASCII) */
 
 const int8 num_to_lpt[32] = {
- '0', '1', '2', '3', '4', '5', '6', '7',                /* tfm: All invalid char treated as errors */
- '8', '9', '|', -1,  '@',  -1,  -1, 'G',                /* tfm: @, G only print on DN; else NB is blank */
+ '0', '1', '2', '3', '4', '5', '6', '7',                /* All invalid char treated as errors */
+ '8', '9', '|', -1,  '@',  -1,  -1, 'G',                /* @, G only print on DN; else NB is blank */
  '-', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
- 'Q', 'R', 'W',  -1, '*',  -1,  -1, 'X'                 /* tfm: W, *, X only print on DN */
+ 'Q', 'R', 'W',  -1, '*',  -1,  -1, 'X'                 /* W, *, X only print on DN */
  };
 
 /* Alphameric (digit pair) to lineprinter (ASCII) */
@@ -146,6 +158,24 @@ const int8 alp_to_lpt[256] = {                          /* tfm: invalid codes 02
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1
  };
 
+/* K validation and translation table - entryies 80:FF always 0 */
+
+static const int8 lpt_ktbl[128] = {
+  0, 0, 0, 11, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,     /* 00 */
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,       /* 10 */
+  0, K_LIN|1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 20 */
+  0, 0, 0, K_IMM|11, K_IMM|12, 0, 0, 0, 0, 0,           /* 30 */
+         0, 0, 0, 0, 0, 0,
+  10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 0, 0, 0, 0, 0,      /* 40 */
+  0, K_IMM|K_LIN|1, K_IMM|K_LIN|2, K_IMM|K_LIN|3, 0,    /* 50 */
+         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, K_LIN|2, K_LIN|3, 0, 0, 0, 0, 0, 0,             /* 60 */
+         0, 0, 0, 0, 0, 0,
+  K_IMM|10, K_IMM|1, K_IMM|2, K_IMM|3, K_IMM|4,         /* 70 */
+         K_IMM|5, K_IMM|6, K_IMM|7, K_IMM|8, K_IMM|9,
+         0, 0, 0, 0, 0, 0,
+  };
+
 /* Line printer IO routine
  
    - Hard errors halt the system.
@@ -157,6 +187,7 @@ t_stat lpt (uint32 op, uint32 pa, uint32 f0, uint32 f1)
 {
 int8 lpc;
 uint8 z, d;
+int32 ctrl;
 t_stat r, sta;
 
 sta = SCPE_OK;
@@ -166,16 +197,24 @@ ind[IN_PRBSY] = 0;                                      /* printer free */
 switch (op) {                                           /* decode op */
 
     case OP_K:                                          /* control */
-        lpt_savctrl = (f0 << 4) | f1;                   /* form ctrl */
-        if (lpt_savctrl & K_IMM)                        /* immediate? */
-            return lpt_print ();
-        break;
+        ctrl = lpt_ktbl[((f0 & 0x7) << 4) | (f1 & 0xF)]; /* xlate ctrl */
+        if ((f0 > 7) || (ctrl == 0)) {                  /* invalid? */
+            ind[IN_PRCHK] = 1;                          /* print chk */
+            if (io_stop)                                /* set return status */
+                sta = STOP_INVFNC;
+            }
+        else {
+            if ((ctrl & K_IMM) != 0)                    /* immediate? */
+                return lpt_spcop (ctrl);                /* execute */
+            else lpt_savctrl = ctrl;                    /* otherwise, save */
+            }
+        return sta;
 
     case OP_DN:
-        return lpt_num (pa, f1, TRUE);                  /* dump numeric  (tfm: removed len parm ) */
+        return lpt_num (pa, f1, TRUE);                  /* dump numeric */
 
     case OP_WN:
-        return lpt_num (pa, f1, FALSE);                 /* write numeric (tfm: removed len parm ) */
+        return lpt_num (pa, f1, FALSE);                 /* write numeric */
 
     case OP_WA:
         for ( ; lpt_bptr < LPT_BSIZE; lpt_bptr++) {     /* only fill buf */
@@ -192,11 +231,9 @@ switch (op) {                                           /* decode op */
             lpt_buf[lpt_bptr] = lpc & 0x7F;             /* fill buffer */
             pa = ADDR_A (pa, 2);                        /* incr mem addr */
             }
-        if ((f1 & 1) == 0) {            ;               /* print now? */
-            r = lpt_print ();                           /* print line */
-            if (r != SCPE_OK)
-                return r;
-            }
+        r = lpt_print (f1);                             /* print line */
+        if (r != SCPE_OK)
+            return r;
         return sta;
 
     default:                                            /* invalid function */
@@ -208,7 +245,7 @@ return SCPE_OK;
 
 /* Print numeric */
 
-t_stat lpt_num (uint32 pa, uint32 f1, t_bool dump)      /* tfm: removed len parm and reorganized code */
+t_stat lpt_num (uint32 pa, uint32 f1, t_bool dump)
 {
 uint8 d;
 int8 lpc;
@@ -232,57 +269,55 @@ for ( ; lpt_bptr < LPT_BSIZE; lpt_bptr++) {             /* only fill buf */
     lpt_buf[lpt_bptr] = lpc & 0x7F;                     /* put char into buffer (tfm: correct increment)*/
     PP (pa);                                            /* incr mem addr */
     }
-if ((f1 & 1) == 0) {                                    /* print now? */
-    r = lpt_print ();                                   /* print line */
-    if (r != SCPE_OK)
-        return r;
-    }
+r = lpt_print (f1);                                     /* print line */
+if (r != SCPE_OK)
+    return r;
 return sta;
 }
 
-/* Print and space */
+/* Print and possibly space - any spacing operation is non-immediate */
 
-t_stat lpt_print (void)
+t_stat lpt_print (uint32 flag)
 {
-int32 i, chan, ctrl = lpt_savctrl;
+int32 i;
 
 if ((lpt_unit.flags & UNIT_ATT) == 0) {                 /* not attached? */
-    ind[IN_PRCHK] = ind[IN_WRCHK] = 1;                  /* wr, pri check */
+    ind[IN_PRCHK] = 1;                                  /* pri check */
     return SCPE_UNATT;
     }
-
-ind[IN_PRBSY] = 1;                                      /* print busy */
-sim_activate (&lpt_unit, lpt_unit.wait);                /* start timer */
 
 for (i = LPT_WIDTH; i <= LPT_BSIZE; i++)                /* clear unprintable */
     lpt_buf[i] = ' ';
 while ((lpt_bptr > 0) && (lpt_buf[lpt_bptr - 1] == ' '))
     lpt_buf[--lpt_bptr] = 0;                            /* trim buffer */
-if (lpt_bptr) {                                         /* any line? */
+if (lpt_bptr != 0) {                                    /* any line? */
     fputs (lpt_buf, lpt_unit.fileref);                  /* print */
+    if ((flag & 1) != 0)                                /* no space? */
+        fputc ('\r', lpt_unit.fileref);                 /* bare return */
     lpt_unit.pos = ftell (lpt_unit.fileref);            /* update pos */
     lpt_buf_init ();                                    /* reinit buf */
     if (ferror (lpt_unit.fileref)) {                    /* error? */
-        ind[IN_PRCHK] = ind[IN_WRCHK] = 1;              /* wr, pri check */
+        ind[IN_PRCHK] = 1;                              /* pri check */
         sim_perror ("LPT I/O error");
         clearerr (lpt_unit.fileref);
         return SCPE_IOERR;
         }
     }
+if ((flag & 1) == 0)                                    /* spacing? */
+    return lpt_spcop (lpt_savctrl);                     /* execute */
+return SCPE_OK;                                         /* done */
+}
 
-lpt_savctrl = 0x61;                                     /* reset ctrl */
-if ((ctrl & K_LIN) == ((ctrl & K_IMM)? 0: K_LIN))       /* space lines? */
-    return lpt_space (ctrl & K_LCNT, FALSE);
-chan = lpt_savctrl & K_CHAN;                            /* basic chan */
-if ((lpt_savctrl & K_CH10) == 0) {                      /* chan 10-12? */
-    if (chan == 0)
-        chan = 10;
-    else if (chan == 3)
-        chan = 11;
-    else if (chan == 4)
-        chan = 12;
-    else chan = 0;
-    }
+/* Space operation - direct (K) or deferred (WA, WN, DN) */
+
+t_stat lpt_spcop (int32 ctrl)
+{
+int32 chan, i;
+
+lpt_savctrl = K_LIN|1;                                  /* reset saved control */
+if ((ctrl & K_LIN) != 0)                                /* space lines? */
+    return lpt_space (ctrl & K_LCNT, FALSE);            /* execute spacing op */
+chan = lpt_savctrl & K_CHAN;                            /* get chan */
 if ((chan == 0) || (chan > 12))
     return STOP_INVFNC;
 for (i = 1; i < cct_lnt + 1; i++) {                     /* sweep thru cct */
@@ -304,7 +339,8 @@ t_stat lpt_space (int32 count, int32 sflag)
 int32 i;
 
 cct_ptr = (cct_ptr + count) % cct_lnt;                  /* adv cct, mod lnt */
-if (sflag && CHP (0, cct[cct_ptr]))                     /* skip, top of form? */
+if (sflag && CHP (0, cct[cct_ptr]) &&                   /* skip, top of form, */
+    ((lpt_unit.flags & UNIT_FF) != 0))                  /* and use form feeds? */
     fputs ("\n\f", lpt_unit.fileref);                   /* nl, ff */
 else {
     for (i = 0; i < count; i++)                         /* count lines */
@@ -319,6 +355,8 @@ if (ferror (lpt_unit.fileref)) {                        /* error? */
     clearerr (lpt_unit.fileref);
     return SCPE_IOERR;
     }
+ind[IN_PRBSY] = 1;                                      /* print busy */
+sim_activate (&lpt_unit, lpt_unit.wait);                /* start timer */
 return SCPE_OK;
 }
 
@@ -348,7 +386,7 @@ t_stat lpt_reset (DEVICE *dptr)
 {
 lpt_buf_init ();                                        /* clear buffer */
 cct_ptr = 0;                                            /* clear cct ptr */
-lpt_savctrl = 0x61;                                     /* clear cct action */
+lpt_savctrl = K_LIN|1;                                  /* reset cct action */
 ind[IN_PRCHK] = ind[IN_PRBSY] = 0;                      /* clear indicators */
 ind[IN_PRCH9] = ind[IN_PRCH12] = 0;
 return SCPE_OK;
