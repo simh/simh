@@ -5679,7 +5679,7 @@ if (dir) {
 #endif
     t_offset FileSize;
     char FileName[PATH_MAX + 1];
-    char *MatchName = 1 + strrchr (cptr, '/');;
+    const char *MatchName = 1 + strrchr (cptr, '/');;
     char *p_name;
     struct tm *local;
 #if defined (HAVE_GLOB)
