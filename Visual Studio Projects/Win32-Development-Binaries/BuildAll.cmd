@@ -101,13 +101,14 @@ if not exist ..\..\.git\hooks\post-commit copy ..\git-hooks\post* ..\..\.git\hoo
 pushd ..\..
 git checkout -q master
 git fetch -q origin master
-git log -1 "--pretty=%%H" >.git-commit-id
+git log -1 --pretty="SIM_GIT_COMMIT_ID %%H%%nSIM_GIT_COMMIT_TIME %%aI" >.git-commit-id
 popd
 pushd ..
-for /F %%i in (..\.git-commit-id) do set GIT_COMMIT_ID=%%i
-for /F "tokens=3 delims=/" %%i in ("%DATE%") do set D_YYYY=%%i
-for /F "tokens=2 delims=/ " %%i in ("%DATE%") do set D_MM=%%i
-for /F "tokens=2 delims=/" %%i in ("%DATE%") do set D_DD=%%i
+for /F "usebackq tokens=3" %%i in (`findstr /C:SIM_GIT_COMMIT_ID ..\.git-commit-id`) do set GIT_COMMIT_ID=%%i
+for /F "usebackq tokens=3" %%i in (`findstr /C:SIM_GIT_COMMIT_TIME ..\.git-commit-id`) do set GIT_COMMIT_TIME=%%i
+for /F "tokens=3 delims=-T" %%i in ("%GIT_COMMIT_TIME%") do set D_YYYY=%%i
+for /F "tokens=3 delims=-T" %%i in ("%GIT_COMMIT_TIME%") do set D_MM=%%j
+for /F "tokens=3 delims=-T" %%i in ("%GIT_COMMIT_TIME%") do set D_DD=%%k
 for /F "usebackq tokens=3" %%i in (`findstr/C:"#define SIM_MAJOR" ..\sim_rev.h`) do set _SIM_MAJOR=%%i
 for /F "usebackq tokens=3" %%i in (`findstr/C:"#define SIM_MINOR" ..\sim_rev.h`) do set _SIM_MINOR=%%i
 for /F "usebackq tokens=3" %%i in (`findstr/C:"#define SIM_PATCH" ..\sim_rev.h`) do set _SIM_PATCH=-%%i
