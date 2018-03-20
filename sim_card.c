@@ -527,7 +527,7 @@ sim_read_card(UNIT * uptr)
     }
 
     if (ferror(uptr->fileref)) {        /* error? */
-        perror("Card reader I/O error");
+        sim_perror("Card reader I/O error");
         clearerr(uptr->fileref);
         return SCPE_IOERR;
     }
@@ -1127,6 +1127,10 @@ t_stat sim_card_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, cons
     fprintf (st, "Attach command switches\n");
     fprintf (st, "    -F          Open the indicated card deck in a specific format (default\n");
     fprintf (st, "                is AUTO, alternatives are BIN, TEXT, BCD and CBN)\n");
+    if ((uptr->flags & UNIT_RO) == 0) {
+        fprintf (st, "    -N          Create a new punch output file (default is to append to\n");
+        fprintf (st, "                an existing file if it exists)\n");
+        }
     return SCPE_OK;
 }
 
