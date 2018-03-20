@@ -846,6 +846,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     else
       ifeq (git-submodule,$(if $(shell cd .. ; git rev-parse --git-dir 2>/dev/null),git-submodule))
         GIT_COMMIT_ID=$(shell cd .. ; git submodule status | grep "$(notdir $(realpath .))" | awk '{ print $$1 }')
+        GIT_COMMIT_TIME=$(shell git --git-dir=$(realpath .)/.git log $(GIT_COMMIT_ID) -1 --pretty="%aI")
       else
         GIT_COMMIT_ID=undetermined-git-id
         GIT_COMMIT_TIME=undetermined-commit-time
