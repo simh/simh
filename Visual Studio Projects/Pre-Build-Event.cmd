@@ -267,7 +267,7 @@ copy /y git-hooks\post* ..\.git\hooks\
 call :WhereInPath git.exe > NUL 2>&1
 if %ERRORLEVEL% neq 0 goto _done_hooks
 pushd ..
-git log -1 --pretty="SIM_GIT_COMMIT_ID %H%nSIM_GIT_COMMIT_TIME %aI" >.git-commit-id
+git log -1 --pretty="SIM_GIT_COMMIT_ID %%H%%nSIM_GIT_COMMIT_TIME %%aI" >.git-commit-id
 popd
 :_done_hooks
 
