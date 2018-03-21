@@ -3836,6 +3836,7 @@ else {
     for (i=0; i<tmxr_open_device_count; ++i) {
         TMXR *mp = tmxr_open_devices[i];
         TMLN *lp;
+		UNIT *o_uptr = mp->ldsc[0].o_uptr;
         char *attach;
 
         fprintf(st, "Multiplexer device: %s", (mp->dptr ? sim_dname (mp->dptr) : ""));
@@ -3853,6 +3854,11 @@ else {
             fprintf(st, ", ModemControl=enabled");
         if (mp->buffered)
             fprintf(st, ", Buffered=%d", mp->buffered);
+        for (j = 1; j < mp->lines; j++)
+			if (o_uptr != mp->ldsc[j].o_uptr)
+				break;
+		if (j == mp->lines)
+			fprintf(st, ", Output Unit: %s", sim_uname (o_uptr));
         attach = tmxr_mux_attach_string (NULL, mp);
         if (attach)
             fprintf(st, ",\n    attached to %s, ", attach);
@@ -3881,7 +3887,7 @@ else {
                     fprintf (st, " - %stelnet", lp->notelnet ? "no" : "");
                 if (lp->uptr && (lp->uptr != lp->mp->uptr))
                     fprintf (st, " - Unit: %s", sim_uname (lp->uptr));
-                if (lp->o_uptr && (lp->o_uptr != lp->mp->uptr) && (lp->o_uptr != lp->uptr))
+                if ((lp->o_uptr != o_uptr) && lp->o_uptr && (lp->o_uptr != lp->mp->uptr) && (lp->o_uptr != lp->uptr))
                     fprintf (st, " - Output Unit: %s", sim_uname (lp->o_uptr));
                 if (mp->modem_control != lp->modem_control)
                     fprintf(st, ", ModemControl=%s", lp->modem_control ? "enabled" : "disabled");
