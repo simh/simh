@@ -83,7 +83,7 @@ typedef enum {
 #define UNIT_CPU_V_SWITCHER     (UNIT_V_UF+6)               /* switcher 8086 <--> 8080/Z80 enabled          */
 #define UNIT_CPU_SWITCHER       (1 << UNIT_CPU_V_SWITCHER)
 
-#if defined (__linux) || defined (__linux__) || defined(__NetBSD__) || defined (__OpenBSD__) || defined (__FreeBSD__) || defined (__APPLE__) || defined (__hpux)
+#if defined (__linux) || defined (__linux__) || defined(__NetBSD__) || defined (__OpenBSD__) || defined (__FreeBSD__) || defined (__APPLE__) || defined (__hpux) || defined (__CYGWIN__)
 #define UNIX_PLATFORM 1
 #else
 #define UNIX_PLATFORM 0
