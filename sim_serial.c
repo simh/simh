@@ -421,7 +421,8 @@ if (port == INVALID_HANDLE) {
     return port;
     }
 
-status = sim_config_serial (port, config);              /* set serial configuration */
+status = (lp) ? tmxr_set_config_line (lp, config)       /* set serial configuration */
+              : sim_config_serial (port, config);       /* set serial configuration */
 
 if (status != SCPE_OK) {                                /* port configuration error? */
     sim_close_serial (port);                            /* close the port */

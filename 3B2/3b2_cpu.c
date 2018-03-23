@@ -725,7 +725,7 @@ t_stat cpu_set_hist(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 
 t_stat fprint_sym_m(FILE *of, t_addr addr, t_value *val)
 {
-    uint8 desc, mode, reg, class, etype;
+    uint8 desc, mode, reg, etype;
     uint32 w;
     int32 vp, inst, i;
     mnemonic *mn;
@@ -739,7 +739,7 @@ t_stat fprint_sym_m(FILE *of, t_addr addr, t_value *val)
 
     if (inst == 0x30) {
         /* Scan to find opcode */
-        inst = 0x3000 | val[vp++];
+        inst = 0x3000 | (int8) val[vp++];
         for (i = 0; i < HWORD_OP_COUNT; i++) {
             if (hword_ops[i].opcode == inst) {
                 mn = &hword_ops[i];
@@ -770,7 +770,7 @@ t_stat fprint_sym_m(FILE *of, t_addr addr, t_value *val)
             mode = 4;
             reg = 15;
         } else {
-            desc = val[vp++];
+            desc = (uint8) val[vp++];
             mode = (desc >> 4) & 0xf;
             reg = desc & 0xf;
 
@@ -780,7 +780,7 @@ t_stat fprint_sym_m(FILE *of, t_addr addr, t_value *val)
                  reg == 4 || reg == 6 || reg == 7)) {
                 etype = reg;
                 /* The real descriptor byte lies one ahead */
-                desc = val[vp++];
+                desc = (uint8) val[vp++];
                 mode = (desc >> 4) & 0xf;
                 reg = desc & 0xf;
             }
@@ -1176,7 +1176,7 @@ static SIM_INLINE void clear_instruction(instr *inst)
  * Decode a single descriptor-defined operand from the instruction
  * stream. Returns the number of bytes consumed during decode.type
  */
-static uint8 decode_operand(uint32 pa, instr *instr, uint8 op_number, uint8 *etype)
+static uint8 decode_operand(uint32 pa, instr *instr, uint8 op_number, int8 *etype)
 {
     uint8 desc;
     uint8 offset = 0;

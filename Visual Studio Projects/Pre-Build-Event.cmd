@@ -252,7 +252,7 @@ fc /b ..\.git\hooks\post-commit git-hooks\post-commit >nul
 if %ERRORLEVEL% equ 0 goto _done_hooks
 echo *****************************************************
 echo *****************************************************
-echo ** Installing updated git hooks repository         **
+echo ** Installing updated git hooks in repository      **
 echo *****************************************************
 echo *****************************************************
 goto _install_hooks
@@ -265,9 +265,21 @@ echo *****************************************************
 :_install_hooks
 copy /y git-hooks\post* ..\.git\hooks\
 call :WhereInPath git.exe > NUL 2>&1
-if %ERRORLEVEL% neq 0 goto _done_hooks
+if %ERRORLEVEL% equ 0 goto _do_hooks
+echo ** WARNING ** WARNING ** WARNING ** WARNING ** WARNING **
+echo ** WARNING ** WARNING ** WARNING ** WARNING ** WARNING **
+echo **                                                     **
+echo **   Git Commit id invalid.  You must perform a        **
+echo **   git checkout on the current branch to solve       **
+echo **   this problem.                                     **
+echo **                                                     **
+echo ** WARNING ** WARNING ** WARNING ** WARNING ** WARNING **
+echo ** WARNING ** WARNING ** WARNING ** WARNING ** WARNING **
+echo error: Review the Output Tab for more details.
+exit 1
+:_do_hooks
 pushd ..
-git log -1 --pretty="SIM_GIT_COMMIT_ID %H%nSIM_GIT_COMMIT_TIME %aI" >.git-commit-id
+git log -1 --pretty="SIM_GIT_COMMIT_ID %%H%%nSIM_GIT_COMMIT_TIME %%aI" >.git-commit-id
 popd
 :_done_hooks
 
