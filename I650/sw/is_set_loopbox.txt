@@ -1,0 +1,77 @@
+
+                               deck 21. extra instr for general computing 
+                                                set loopbox O2=800
+                                                tr zero     O2=453
+
+21   1 1800 00 0000 0970       set loopbox: 0 800 00r nnn    
+                                 if r=0 resets loopbox (= 000 000 000)
+                                 if r=1 sets loopbox for a-param, with value 0-999 from float 
+                                        contents of register nnn. clears loobox value 
+                                        for b and c. if float value at register is outside 
+                                        range 0-999 program stops at 2222
+                                 if r=2 sets loobox for b
+                                 if r=3 sets loobox for c
+
+21   2 0998 00 1000 0000   param1m (const to decrement param)
+21   3 0997 35 0006 0987   bxa    slt   0006   svlb
+21   4 0996 35 0003 0987   bxb    slt   0003   svlb 
+21   5 0995 00 0000 0987   bxc    nop          svlb
+21   6 0994 60 0000 0950   fldc   rau   0000   setb1
+21   7 0993 00 0000 0000   shbx   
+21   8 0992 00 0000 0000   svfc
+21   9 0991 01 0000 0000   hi01
+21  10 0990 50 0000 0000   hi50
+
+
+21  11 0970 65 1045 0971          ral   paramb        is nnn0000000
+21  12 0971 45 0972 0987          brnz  (cont) svlb
+21  13 0972 16 0998 0973          sl    param1m
+21  14 0973 45 0975 0977          brnz  (cont) seta
+21  15 0975 16 0998 0976          sl    param1m
+21  16 0976 45 0979 0978          brnz  setc   setb
+21  17 0977 69 0997 0980   seta   ld    bxa    setbx
+21  18 0978 69 0996 0980   setb   ld    bxb    setbx
+21  19 0979 69 0995 0980   setc   ld    bxc    setbx
+21  20 0980 24 0993 0981   setbx  std   shbx 
+21  21 0981 65 1023 0982          ral   paramc        lower acc is nnn0000000
+21  22 0982 30 0003 0983          srt   3                          00 0nnn 000
+21  23 0983 15 0994 8002          al    fldc   8002 
+                            8002  rau   [c]    setb1  read float value at [c] as nnnxxxxxee
+21  24 0984 35 0003 0985   setb2  slt   3             upper acc is 000000nnn  
+21  25 0985 16 8002 0986   setb3  sl    8002          clear lower acc
+21  26 0986 69 0993 8001          ld    shbx   8001
+                            8001  slt   [0,3,6]       upper acc is 000 000 nnn, 000 nnn 000, or nnn 000 000
+21  27 0987 21 1017 1095   svlb   stu   lbox   1095   save loopbox
+
+21  28 0950 21 0992 0951   setb1  stu   svfc          save [c] float value
+21  29 0951 44 0952 0987          brnzu        svlb   if [c] is zero go to save loopbox 
+21  30 0952 46 1315 0953          brmin 1315          if [c] is <0 go to 2222 stop
+21  31 0953 35 0008 0954          slt   8             upper acc is ee00000000
+21  32 0954 11 0990 0955          su    hi50
+21  33 0955 44 0956 0962          brnzu        i00n   jump if [c] is in range 0-9
+21  34 0956 11 0991 0957          su    hi01
+21  35 0957 44 0958 0961          brnzu        i0nn   jump if [c] is in range 10-99
+21  36 0958 11 0991 0959          su    hi01
+21  37 0959 44 1315 0960          brnzu 1315   innn   jump if [c] is in range 100-999, else go to 2222 stop
+21  38 0960 69 0969 0963    innn  ld    stnnn  ixxx
+21  39 0961 69 0968 0963    i0nn  ld    stn0n  ixxx
+21  40 0962 69 0967 0963    i00n  ld    st00n  ixxx
+21  41 0963 24 0984 0964    ixxx  std   setb2
+21  42 0964 65 0992 0984          ral   svfc   setb2
+
+21  43 1453 60 1009 0965          rau   last          get last result                
+
+                               tr zero: 0 453 bbb ccc   
+                                 goto b if last result is zero
+                                 goto c if last result is non zero
+
+21  44 0965 30 0002 0966          srt   2
+21  45 0966 44 1120 0974          brnzu gotoc  gotob
+21  46 0974 60 1045 1027    gotob rau   paramb goto
+
+21  47 0967 35 0001 0985    st00n slt   1      setb3
+21  48 0968 35 0002 0985    st0nn slt   2      setb3
+21  49 0969 35 0003 0985    stnnn slt   3      setb3
+
+21  50 0988 00 0000 0000                               vacant location
+21  51 0989 00 0000 0000                               vacant location

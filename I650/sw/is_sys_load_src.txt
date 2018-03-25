@@ -1,0 +1,97 @@
+                                        1
+                                        1 interpretive system (is) loader
+                                        1 creates a 1-word load cards 
+                                        1 deck by reading cards as 
+                                        1 writen in manual 
+                                        1
+                                        1 this program is manually 
+                                        1 assembled (just using soap to
+                                        1 load it) as is (1956) predates
+                                        1 soap (1957)
+                                        1
+                                           0880 70 1951  0881 rdcrd rd    loc         read card
+                                           0881 60 1951  0892       rau   loc   lbl1  prepare accumulator for move
+                                           0882 10 0870  0883 lbl2  au    stw  
+                                           0883 15 0871  0884       al    ldw  
+                                           0884 10 1952  0885       au    wc          
+                                           0885 21 0874  0886       stu   nwc  
+                                           0886 11 1952  8002       su    wc  
+                                           8002 69 1953  8003       ld    w           move one word form card read area
+                                           8003 24 0000  0887       std         
+                                           0887 15 0872  0888 nxt   al    iaddr       increase address by 1
+                                           0888 10 8001  0889       au    8001  
+                                           0889 11 0874  0890       su    nwc         test for end of moving
+                                           0890 44 0891  0880       brnzu lbl3  rdcrd
+                                           0891 10 0874  8002 lbl3  au    nwc   nxt   return to move another word
+                                           0892 44 0893  0880 lbl1  brnzu       rdcrd if loc is zero read next card
+                                           0893 11 0873  0894       su    i2000
+                                           0894 46 0895  0880       brmin       rdcrd if loc >= 2000 read next card
+                                           0895 10 0873  0882       au    i2000 lbl2
+                                        1   
+                                        1 constants
+                                        1   
+                                           0870 24 0000  0887 stw   std   0000  nxt  store word
+                                           0871 69 1953  8003 ldw   ld    w          load word from card read
+                                           0872 00 0001  0000 iaddr 
+                                           0873 00 2000  0000 i2000 
+                                           0874 00 0000  0000 nwc                    temp variable 
+                                        1   
+                                        1 card read area
+                                        1   
+                                        1  1951 00 1002  0000 loc   location     
+                                        1  1952 00 0002  0000 wc    word count
+                                        1  1953 00 3333  4444 W     word1
+                                        1  1954 00 5555  6666       word2
+                                        1  1955 00 0000  0000       word3
+                                        1  1956 00 0000  0000       word4
+                                        1  1957 00 0000  0007       word5
+                                        1  1958 00 0000  0008       word6
+                                        1   
+                                        1   
+                                        1 generate system
+                                        1 punch the whole is system on a 1 
+                                        1 word per card format
+                                        1 from 0900 to 1999
+                                        1   
+                                           0801 65 0852  0802 lblw  ral   loc1        prepare accumulator for move
+                                           0802 10 0850  0803       au    stw2  
+                                           0803 15 0851  8002       al    ldw2  
+                                           8002 69 0000  8003       ld                move one word to card punch area
+                                           8003 24 0000  0804       std   ww      
+                                           0804 65 0852  0805 p1w   ral   loc1        set word loc in card punch area
+                                           0805 15 0854  0806       al    wloc0
+                                           0806 20 1979  0807       stl   wloc 
+                                           0807 10 1978  0808       au    cnum        set card number in card punch area
+                                           0808 10 0855  0809       au    icard 
+                                           0809 21 1978  0810       stu   cnum  
+                                           0810 71 1977  0811 pch1w pch   1977        punch 1w card
+                                           0811 65 0852  0812       ral   loc1
+                                           0812 16 0853  0813       sl    loc2
+                                           0813 46 0814  9999       brmin       9999  if loc1 >= loc2 terminate
+                                           0814 15 0853  0815       al    loc2 
+                                           0815 15 0872  0816       al    iaddr       increment loc1
+                                           0816 20 0852  0801       stl   loc1  lblw  go punch next word
+                                        1   
+                                        1 constants
+                                        1   
+                                           0850 24 1980  0804 stw2  std   wdata p1w  store word for punch
+                                           0851 69 0000  8003 ldw2  ld    0000       load word 
+                                           0852 00 0900  0000 loc1                   first location to punch
+                                           0853 00 1999  0000 loc2                   last location to punch
+                                           0854 24 0000  8000 wloc0                  word location on 1e load card format
+                                           0855 00 0000  0001 icard                  just one 
+                                        1   
+                                        1 card punch area (1 word per card load card)
+                                        1 make first word negative so is control panel
+                                        1 punchs a load card with y(12) hi punch set
+                                        1   
+                                         - 1977 69 1954  1953                        
+                                           1978 00 0000  0000  cnum                  card number 
+                                           1979 24 0000  8000  wloc                  word location
+                                           1980 00 0000  0000  wdata                 word data in load card
+                                           1981 00 0000  0000  
+                                           1982 00 0000  0000  
+                                           1983 00 0000  0000  
+                                           1984 00 0000  0000  
+                                           1985 00 0000  0000  
+                                           1986 00 0000  0000  
