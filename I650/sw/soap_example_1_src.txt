@@ -1,0 +1,39 @@
+                                        1
+                                        1 example 1 calculate f of x
+                                        1  
+                                        1 f(x) = a*x*x+b*x+c
+                                        1
+                                        1 card output 
+                                        1      word1 word2
+                                        1      x     f(x)
+                                        1
+                                               blr 1951  1960 read area
+                                               regp0027  0028 punch area
+                                        1
+                                               synstart  1000 prgm start 
+                                        1
+                                          startnop 0000 setx
+                                          setx rauone   stx   set x
+                                          stx  stup0001       to 1
+                                               mpya           calculate
+                                               alob           f
+                                               rau 8002
+                                               mpyp0001
+                                               aloc
+                                               stlp0002
+                                               pchp0001       punch
+                                               raup0001       is x max 
+                                               supxmax
+                                               nzu       9999
+                                               aupi01   stx   step x
+                                        1
+                                          one   00 0000  0001 constants
+                                          xmax  00 0000  0100
+                                          i01   00 0000  0101
+                                        1
+                                          a     00 0000  0002 params
+                                          b     00 0000  0003 for f(x)
+                                          c     00 0000  0004
+                                        1
+                                         -neg   00 0000  0006
+                                         -negz  00 0000  0000

@@ -1,0 +1,1399 @@
+                                        1            soap 2
+                                        1
+                                        1 symbolic optimal assembly prog
+                                        1
+                                        1           for   the
+                                        1
+                                        1           ibm   650
+                                        1
+                                        1     data processing system
+                                        1
+                                               regs0000  0399 symbol tab
+                                               rege0400  0599 equiv tabl
+                                               rega0600  0799 avail tabl
+                                               regn0800  0899 num op tab
+                                               blr 1000  1000 entry
+                                               blr 1001  1012 pseudo ent
+                                               blr 1021  1049 reg table
+                                               regc1050  1164 sym op tab
+                                               bla 1098  1099  
+                                               bla 1148  1149
+                                               blr 1900  1900 manual pat
+                                               synreadc  1950
+                                               blr 1951  1962 read area
+                                               regt1990  1992 type
+                                               regp1977  1986 punch area
+                                               blr 1998  1999
+                                               equxxxx1  1961
+                                               equxxxx2  1962
+                                               blr 1563  1570 type2
+                                               bla 1565  1565
+                                               bla 1569  1569
+                                               regb0900  0901 sub 2
+                                               regh0902  0904 type 2
+                                               regm0905  0907 
+                                               regq0908  0909
+                                               regr1200  1207 sub 5
+                                               regu1250  1259 sub 13
+                                               regv0910  0912 equ syn
+                                               regx0913  0914 type 0
+                                               regy0915  0916 equ syn
+                                               regz0917  0919
+                                               regw0920  0922
+                                               blr 0923  0968 multiple r
+                                               regi1300  1307 sub 13
+                                        1
+                                        1    control program
+                                        1
+                                           1000lddreadc sub16 entry       
+                                        1
+                                          readcrcd 1999  1998 read card   
+                                           1998ldd 1951       transfer    
+                                               stdp0001       alphabetic  
+                                               ldd 1952       input       
+                                               stdp0002       to          
+                                               ldd 1953       output      
+                                               stdp0003                   
+                                               ldd 1954                   
+                                               stdp0004                   
+                                               ldd 1955                   
+                                               stdp0005                   
+                                               ldd 1956                   
+                                               stdp0006                   
+                                               ralp0009       step        
+                                               alo1ixxx       card        
+                                               stlp0009       number      
+                                               rau 1960       store       
+                                               srt 0002       control     
+                                               stup0008       info        
+                                               auptorg                    
+                                               stlp0010  8003 transfer    
+                                           8003nop 0000  9999 to type     
+                                        1
+                                          punchpchp0001 readc punch read  
+                                        1
+                                          setccraureadc sub10 sudo exit   
+                                        1
+                                           1900lddreadc sub14 manual pat  
+                                          t0001lddx     subr3 type 0      
+                                        1
+                                          x0001ldd      procl 650         
+                                               ldd      procd command or  
+                                               lddpunch proci constants   
+                                        1
+                                          x0002nop 0000  8003 pseudo op   
+                                        1
+                                          t0002raureadc sub10 type 1 com  
+                                        1
+                                          x     00 0000 x0001             
+                                        1
+                                        1    relocate routine
+                                        1
+                                               hedt
+                                          t0003lddq     subr3 process op  
+                                          q0002nop 0000 illop illegal op  
+                                          q0001ral 1951       is l fixed  
+                                               slt 0002                   
+                                               nzu      rel               
+                                               rau 1957       fixed l     
+                                               sup2000i       drum core   
+                                               bmi      fc                
+                                               aup 8001 res   fixed drum  
+                                          fc   ral 1957 setl  fixed core  
+                                          sr   ralxxxx1 setl  set l       
+                                          setl slt 0004                   
+                                               lddp0008                   
+                                               sdap0008 prod              
+                                          rel  rau 1957       drum core   
+                                               sup2000i                   
+                                               bmi      rc                
+                                               aupddiff       relocate    
+                                               bmi      bl    drum addr   
+                                               aup2000i res               
+                                          res  stuxxxx1                   
+                                               lddsr    sub2r reserve l   
+                                          rc   ral 1957       relocate    
+                                               alocdiff       core        
+                                               slo9060                    
+                                               bmi      bl                
+                                               alo 8001 setl              
+                                          bl   rauprod  sub12 blank l     
+                                        1
+                                               regj0944  0944 d type 2
+                                               regg0941  0941
+                                        1
+                                          prod lddproi        set d exit  
+                                               stdexitx                   
+                                               rau 1952       what is d   
+                                               lddh     subr4             
+                                          h0001ral 1958       relocate    
+                                               slo2000i       d or c      
+                                               bmi 1564  1563             
+                                          h0002srt 0008       c d or f    
+                                               aup1500   8003             
+                                           1563ralcdiff cdd   c           
+                                           1564ralddiff cdd   d           
+                                           1566ral 1958 j0001 f           
+                                          cdd  alo 1958 j0001             
+                                          h0003nop 0000 g0003 symbolic    
+                                        1
+                                               regj0960  0960 i 
+                                               regf0955  0955 
+                                        1
+                                          proi lddpunch       set i exit  
+                                               stdexitx                   
+                                               rau 1953       what is i   
+                                               lddm     subr4             
+                                          m0001ral 1959       relocate    
+                                               slo2000i       d or c      
+                                               bmi 1568  1567             
+                                          m0002srt 0008       c d or f    
+                                               aup1504   8003             
+                                           1567ralcdiff cdi   c           
+                                           1568ralddiff cdi   d           
+                                           1570ral 1959 j0001 f           
+                                          cdi  alo 1959 j0001             
+                                          m0003nop 0000 f0003 symbolic    
+                                        1
+                                          q     00 0000 q0001 constants   
+                                          9060  00 0000  9060             
+                                          h     00 0000 h0001             
+                                          1500  00 0000  1500             
+                                          m     00 0000 m0001             
+                                          1504  00 0000  1504             
+                                          xxxx1 01 0000 xxxx1 eraseable   
+                                               hed 
+                                        1
+                                        1      bop routine
+                                        1
+                                           1001ldd      sub16 initialize  
+                                               raureadc sub10 punch       
+                                        1
+                                        1          blr routine
+                                        1
+                                           1002ral 1959 blr   reserve     
+                                          blr  slo 1958       fwa to      
+                                               aup 8001       lwa         
+                                               lddsetcc sub2r             
+                                        1 
+                                        1      rbr routine
+                                        1 
+                                           1012rauddiff                   
+                                               alo 1959 blr               
+                                        1 
+                                        1      bla routine
+                                        1 
+                                           1003lddh8xxx       set drum    
+                                               stddrumt       tag to 8    
+                                               ral 1959       unreserve   
+                                               slo 1958       fwa         
+                                               aup 8001       to          
+                                               lddsetcc sub2u lwa         
+                                        1 
+                                        1      reg routine
+                                        1  
+                                               hedr
+                                           1004ral 1952       is          
+                                               srt 0008       region      
+                                               slo90xxx       character   
+                                               bmi       1002 alphabetic  
+                                               alo29xxx                   
+                                               bmi 1002                   
+                                               slt 0004       store       
+                                               alost          region      
+                                               aup 1958       origin      
+                                               auph9xxx  8002              
+                                           8002stu 9999  1002              
+                                        1 
+                                          st   stu 1021  1002 constants    
+                                               hed
+                                        1
+                                        1      equ req and syn routine
+                                        1
+                                               hedz
+                                           1005lddh8xxx both  equ         
+                                           1006lddh9xxx both  syn         
+                                          both stdtag                     
+                                               rau 1953       what is i   
+                                               lddz     subr4             
+                                          z0001ral 1959 y0001 absolute    
+                                          z0002lddy     subr9 regional    
+                                          y0001stle     td                
+                                          y0002ralp0010 bp    reg error   
+                                          z0003lddw     subr6 symbolic    
+                                          w0001ralequiv y0001 s defined   
+                                          w0002ralp0010 bp    s undefind  
+                                          w0003ralp0010 bp    s tab full  
+                                        1 
+                                          td   rau 1952       head d      
+                                               ldd      sub15 and equate  
+                                               lddv     subr6 to e        
+                                          v0003ralp0010 bp    s tab full  
+                                          v0001aloe     sd                
+                                          v0002aloe     sd                
+                                          sd   lddtt    subr7             
+                                        1 
+                                          tt   lddtag         test tag    
+                                               bdosetcc                   
+                                               raue           reserve e   
+                                               lddsetcc sub2r             
+                                        1 
+                                           1011lddh8xxx       req         
+                                               stdtag         routine     
+                                               ral 1959       is i        
+                                               slo2000i       drum o cor  
+                                               bmid                       
+                                               alocdiff cd                
+                                          d    aloddiff cd                
+                                          cd   alo2000i y0001             
+                                        1 
+                                          z     00 0000 z0001 constants   
+                                          y     00 0089 y0001             
+                                          w     00 0000 w0001             
+                                          v     00 0000 v0001             
+                                          88    00 8800  0000             
+                                        1 
+                                          bp   alo88          by pass     
+                                               stlp0010 punch             
+                                        1 
+                                          tag   01 0000 tag   eraseable   
+                                          e     01 0000 e                 
+                                               hed
+                                        1 
+                                        1      alf routine
+                                        1 
+                                           1007ldd      procl proces loc  
+                                               ldd 1952                   
+                                               stdp0007                   
+                                               ral 1953       replace     
+                                               nzepunch       blank i     
+                                               lddsoap2       by          
+                                               stdp0003 punch soap2       
+                                          soap2alfsoap2 soap2 constant    
+                                        1 
+                                        1      pat routine
+                                        1  
+                                           1008rau      sub10             
+                                               lddreadc sub14             
+                                        1 
+                                        1          hed routine
+                                        1 
+                                           1009ral 1952       store       
+                                               srt 0008       heading     
+                                               stl0000h setcc character   
+                                        1 
+                                        1      rel routine
+                                        1  
+                                               hedm
+                                           1010ral 1952       set         
+                                               nze      sdd   drum        
+                                               ral 1958 sdd   and         
+                                          sdd  stlddiff       core        
+                                               ral 1953       deltas      
+                                               nze      scd               
+                                               ral 1959 scd               
+                                          scd  stlcdiff setcc             
+                                        1 
+                                          ddiff 01 0000 ddiff eraseable   
+                                          cdiff 01 0000 cdiff             
+                                               hed
+                                        1 
+                                        1      load availablity table
+                                        1 
+                                               hedl
+                                           1999ral 1951       calc        
+                                               srt 0004       loc         
+                                               slt 0004       w2          
+                                               alo 8002                   
+                                               alo 8002                   
+                                               aloc1                      
+                                               aupc2     8003             
+                                           8003ldd 9995  8002 load        
+                                           8002std 9994 tup   table       
+                                          tup  suptw                      
+                                               nzu      readc             
+                                               auptwp2                    
+                                               alo1dxxx  8003             
+                                        1 
+                                          c1   stda0001 tup   constants   
+                                          c2   ldd 1952  8002             
+                                          tw   ldd 1958  8002             
+                                          twp2 ldd 1960  8002             
+                                               hed
+                                        1          optimizing table
+                                        1 
+                                          n0001 00 0404  0998 nop         
+                                          n0002 00 0404  0998 hlt         
+                                          n0003 33 2322  0999 ufa         
+                                          n0004 00 0505  0998 rtc         
+                                          n0005 00 0505  0998 rtn         
+                                          n0006 00 0505  0998 rta         
+                                          n0007 00 0505  0998 wtn         
+                                          n0008 00 0505  0998 wta         
+                                          n0009 33 1212  0999 lib         
+                                          n0010 33 0202  0999 ldi         
+                                          n0011 33 0504  0999 aup         
+                                          n0012 33 0504  0999 sup         
+                                          n0013 99 9999  9999 not used    
+                                          n0014 99 9999  9999 not used    
+                                          n0015 33 1110  0999 div         
+                                          n0016 33 0504  0999 alo         
+                                          n0017 33 0504  0999 slo         
+                                          n0018 33 0504  0999 aml         
+                                          n0019 33 0504  0999 sml         
+                                          n0020 33 2120  0999 mpy         
+                                          n0021 54 0303  0999 stl         
+                                          n0022 45 0303  0999 stu         
+                                          n0023 34 0303  0999 sda         
+                                          n0024 34 0303  0999 sia         
+                                          n0025 33 0303  0999 std         
+                                          n0026 44 0505  0998 nts         
+                                          n0027 00 0505  0998 bin         
+                                          n0028 00 0505  0998 set         
+                                          n0029 33 1212  0999 sib         
+                                          n0030 33 0202  0999 sti         
+                                          n0031 00 0000  0988 srt         
+                                          n0032 00 0000  0888 srd         
+                                          n0033 33 2726  0999 fad         
+                                          n0034 33 2726  0999 fsb         
+                                          n0035 33 0000  0999 fdv         
+                                          n0036 00 0000  0988 slt         
+                                          n0037 00 0000  0988 sct         
+                                          n0038 33 2726  0999 fam         
+                                          n0039 33 2726  0999 fsm         
+                                          n0040 33 0000  0999 fmp         
+                                          n0041 33 0404  0998 nza         
+                                          n0042 33 0404  0998 bmz         
+                                          n0043 33 0404  0998 nzb         
+                                          n0044 33 0404  0998 bmb         
+                                          n0045 34 0405  0998 nzu         
+                                          n0046 43 0504  0998 nze         
+                                          n0047 33 0404  0998 bmi         
+                                          n0048 33 0505  0998 bov         
+                                          n0049 33 0404  0998 nzc         
+                                          n0050 33 0404  0998 bmc         
+                                          n0051 00 0000  0898 axa         
+                                          n0052 00 0000  0898 sxa         
+                                          n0053 00 0000  0898 axb         
+                                          n0054 00 0000  0898 sxb         
+                                          n0055 44 0505  0998 nef         
+                                          n0056 00 0505  0998 rwd         
+                                          n0057 00 0505  0998 wtm         
+                                          n0058 00 0505  0998 bst         
+                                          n0059 00 0000  0898 axc         
+                                          n0060 00 0000  0898 sxc         
+                                          n0061 33 0504  0999 rau         
+                                          n0062 33 0504  0999 rsu         
+                                          n0063 99 9999  9999 not used    
+                                          n0064 99 9999  9999 not used    
+                                          n0065 33 1110  0999 dvr         
+                                          n0066 33 0504  0999 ral         
+                                          n0067 33 0504  0999 rsl         
+                                          n0068 33 0504  0999 ram         
+                                          n0069 33 0504  0999 rsm         
+                                          n0070 33 0303  0999 ldd         
+                                          n0071 00 0000  0999 rd1         
+                                          n0072 00 0000  0999 wr1         
+                                          n0073 00 0000  0999 rc1         
+                                          n0074 00 0000  0999 rd2         
+                                          n0075 00 0000  0999 wr2         
+                                          n0076 00 0000  0999 rc2         
+                                          n0077 00 0000  0999 rd3         
+                                          n0078 00 0000  0999 wr3         
+                                          n0079 00 0000  0999 rc3         
+                                          n0080 00 0505  0999 rpy         
+                                          n0081 00 0000  0898 raa         
+                                          n0082 00 0000  0898 rsa         
+                                          n0083 00 0000  0898 rab         
+                                          n0084 00 0000  0898 rsb         
+                                          n0085 33 0506  0999 tlu         
+                                          n0086 00 0606  0998 sds         
+                                          n0087 00 0606  0998 rds         
+                                          n0088 00 0606  0998 wds         
+                                          n0089 00 0000  0898 rac         
+                                          n0090 00 0000  0898 rsc         
+                                          n0091 44 0505  0998 bdo         
+                                          n0092 33 0505  0998 bd1         
+                                          n0093 33 0505  0998 bd2         
+                                          n0094 33 0505  0998 bd3         
+                                          n0095 33 0505  0998 bd4         
+                                          n0096 33 0505  0998 bd5         
+                                          n0097 33 0505  0998 bd6         
+                                          n0098 33 0505  0998 bd7         
+                                          n0099 33 0505  0998 bd8         
+                                          n0100 44 0505  0998 bd9         
+                                        1 
+                                        1      symbolic op table
+                                        1 
+                                          c0001 61 7366  1007 alf         
+                                          c0002 61 7376  0015 alo         
+                                          c0003 61 7473  0017 aml         
+                                          c0004 61 8477  0010 aup         
+                                          c0005 61 8761  0050 axa         
+                                          c0006 61 8762  0052 axb         
+                                          c0007 61 8763  0058 axc         
+                                          c0008 62 6476  0090 bdo         
+                                          c0009 62 6491  0091 bd1         
+                                          c0010 62 6492  0092 bd2         
+                                          c0011 62 6493  0093 bd3         
+                                          c0012 62 6494  0094 bd4         
+                                          c0013 62 6495  0095 bd5         
+                                          c0014 62 6496  0096 bd6         
+                                          c0015 62 6497  0097 bd7         
+                                          c0016 62 6498  0098 bd8         
+                                          c0017 62 6499  0099 bd9         
+                                          c0018 62 6975  0026 bin         
+                                          c0019 62 7361  1003 bla         
+                                          c0020 62 7379  1002 blr         
+                                          c0021 62 7461  0041 bma         
+                                          c0022 62 7462  0043 bmb         
+                                          c0023 62 7463  0049 bmc         
+                                          c0024 62 7469  0046 bmi         
+                                          c0025 62 7677  1001 bop         
+                                          c0026 62 7685  0047 bov         
+                                          c0027 62 8283  0057 bst         
+                                          c0028 64 6985  0014 div         
+                                          c0029 64 8579  0064 dvr         
+                                          c0030 65 7884  1005 equ         
+                                          c0031 66 6164  0032 fad         
+                                          c0032 66 6174  0037 fam         
+                                          c0033 66 6485  0034 fdv         
+                                          c0034 66 7477  0039 fmp         
+                                          c0035 66 8262  0033 fsb         
+                                          c0036 66 8274  0038 fsm         
+                                          c0037 68 6564  1009 hed         
+                                          c0038 68 7383  0001 hlt         
+                                          c0039 73 6464  0069 ldd         
+                                          c0040 73 6469  0009 ldi         
+                                          c0041 73 6962  0008 lib         
+                                          c0042 74 7788  0019 mpy         
+                                          c0043 75 6566  0054 nef         
+                                          c0044 75 7677  0000 nop         
+                                          c0045 75 8382  0025 nts         
+                                          c0046 75 8961  0040 nza         
+                                          c0047 75 8962  0042 nzb         
+                                          c0048 75 8963  0048 nzc         
+                                          c0051 75 8965  0045 nze         
+                                          c0052 75 8984  0044 nzu         
+                                          c0053 77 6183  1008 pat         
+                                          c0054 77 6368  0071 pch         
+                                          c0055 79 6161  0080 raa         
+                                          c0056 79 6162  0082 rab         
+                                          c0057 79 6163  0088 rac         
+                                          c0058 79 6173  0065 ral         
+                                          c0059 79 6174  0067 ram         
+                                          c0060 79 6184  0060 rau         
+                                          c0061 79 6279  1012 rbr         
+                                          c0062 79 6364  0070 rcd         
+                                          c0063 79 6391  0072 rc1         
+                                          c0064 79 6392  0075 rc2         
+                                          c0065 79 6393  0078 rc3         
+                                          c0066 79 6482  0086 rds         
+                                          c0067 79 6491  0070 rd1         
+                                          c0068 79 6492  0073 rd2         
+                                          c0069 79 6493  0076 rd3         
+                                          c0070 79 6567  1004 reg         
+                                          c0071 79 6573  1010 rel         
+                                          c0072 79 6578  1011 req         
+                                          c0073 79 7788  0079 rpy         
+                                          c0074 79 8261  0081 rsa         
+                                          c0075 79 8262  0083 rsb         
+                                          c0076 79 8263  0089 rsc         
+                                          c0077 79 8273  0066 rsl         
+                                          c0078 79 8274  0068 rsm         
+                                          c0079 79 8284  0061 rsu         
+                                          c0080 79 8361  0005 rta         
+                                          c0081 79 8363  0003 rtc         
+                                          c0082 79 8375  0004 rtn         
+                                          c0083 79 8664  0055 rwd         
+                                          c0084 82 6383  0036 sct         
+                                          c0085 82 6461  0022 sda         
+                                          c0086 82 6482  0085 sds         
+                                          c0087 82 6583  0027 set         
+                                          c0088 82 6961  0023 sia         
+                                          c0089 82 6962  0028 sib         
+                                          c0090 82 7376  0016 slo         
+                                          c0091 82 7383  0035 slt         
+                                          c0092 82 7473  0018 sml         
+                                          c0093 82 7964  0031 srd         
+                                          c0094 82 7983  0030 srt         
+                                          c0095 82 8364  0024 std         
+                                          c0096 82 8369  0029 sti         
+                                          c0097 82 8373  0020 stl         
+                                          c0098 82 8384  0021 stu         
+                                          c0101 82 8477  0011 sup         
+                                          c0102 82 8761  0051 sxa         
+                                          c0103 82 8762  0053 sxb         
+                                          c0104 82 8763  0059 sxc         
+                                          c0105 82 8875  1006 syn         
+                                          c0106 83 7384  0084 tlu         
+                                          c0107 84 6661  0002 ufa         
+                                          c0108 86 6482  0087 wds         
+                                          c0109 86 7991  0071 wr1         
+                                          c0110 86 7992  0074 wr2         
+                                          c0111 86 7993  0077 wr3         
+                                          c0112 86 8361  0007 wta         
+                                          c0113 86 8374  0056 wtm         
+                                          c0114 86 8375  0006 wtn         
+                                          c0115 99 9999  0001 table end   
+                                        1 
+                                        1    sub 1 store k in fwa to lwa
+                                        1 
+                                               hed1        
+                                          subr1stdexitx       store exit  
+                                               stuxxxx1       store k     
+                                               lddfwa         set         
+                                               sdafwa         fwa         
+                                               slt 0004       lwa         
+                                               sdaxxxx2       addresses   
+                                               raufwa                     
+                                               aloxxxx1  8003             
+                                           8003stl 9999 next  store k     
+                                          next supxxxx2       end of      
+                                               nzu      exitx loop test   
+                                               aup 8001                   
+                                               aup1dxxx  8003 step        
+                                        1 
+                                          fwa  stl 9998 next  constants   
+                                          xxxx2 01 0000 xxxx2 eraseable   
+                                               hed
+                                        1 
+                                        1      sub 2 reserve unreserve
+                                        1 
+                                               hed2  
+                                          sub2rstdexity       reserve     
+                                               lddz     ru    entry       
+                                          sub2ustdexity       unreserve   
+                                               ldd1i    ru    entry       
+                                          ru   stdw           set w       
+                                               stln           store n     
+                                               slo 8001       calc ao     
+                                               aup 8003       and po      
+                                               srt 0003                   
+                                               stux                       
+                                               sup 8001                   
+                                               slt 0001                   
+                                               stup                       
+                                               sup 8001                   
+                                               slt 0002                   
+                                               aup 8003                   
+                                               aupx                       
+                                               alop                       
+                                               slt 0004                   
+                                               aloc1                      
+                                               stlb0002                   
+                                               lddc2                      
+                                               sdaspr                     
+                                               aupc3    su                
+                                          su   stusa                      
+                                               aupc4     8003             
+                                           8003ral 9992 b0002             
+                                          b0002slt 0009 xx                
+                                          xx   stuuh                      
+                                               slt 0001                   
+                                               ral 8002                   
+                                               aupw                       
+                                               srt 0001                   
+                                               aupuh    spr               
+                                          spr  srt 0009 sa                
+                                          sa   stl 9983 b0001             
+                                          b0001raln           is n zero  
+                                               nze      exity             
+                                               slo1i          reduce n   
+                                               stln           by 1       
+                                               rausa          is ai      
+                                               supa197        in last    
+                                               bmi      tp    block of   
+                                               aupa201  su    4          
+                                        1
+                                          tp   ralspr         is p 9     
+                                               sloc2                      
+                                               nze      zp                
+                                               aloc5          step p     
+                                               lddc1                      
+                                               sdab0002                   
+                                               stlspr                     
+                                               rausa          reduce ai  
+                                               supc6    su    by 196     
+                                        1
+                                          zp   lddc1          set p      
+                                               stdb0002       to zero    
+                                               lddc7                      
+                                               stdspr                     
+                                               rausa          reduce ai  
+                                               supc8    su    by 195     
+                                        1
+                                          c1   slt 0000 xx    constants  
+                                          c2   srt 0009 sa                
+                                          c3   stla0001 b0001             
+                                          c4    45 0000  0001             
+                                          1i    00 0000  0001             
+                                          a197 stla0197 b0001             
+                                          a201 stla0201 b0001             
+                                          c5   srt 0010 sa                
+                                          c6    00 0196  0000             
+                                          c7   srt 0000 sa                
+                                          c8    00 0195  0000             
+                                          z     00 0000  0000             
+                                          w     01 0000 w     eraseable  
+                                          n     01 0000 n                 
+                                          b0002 01 0000 b0002             
+                                          spr   01 0000 spr               
+                                          sa    01 0000 sa                
+                                          uh    01 0000 uh                
+                                          x     01 0000 x                 
+                                               hed
+                                        1
+                                        1      sub 3 process op code
+                                        1
+                                               hed3
+                                          subr3stdexitx       store exit 
+                                               ral 1954                   
+                                               srt 0004       is op      
+                                               nze      illop blank      
+                                               slt 0006       is op      
+                                               nzu      num   numeric    
+                                               srt 0002                   
+                                               stlxxxx1       search     
+                                               slo 8001       symbolic   
+                                               tluc0001       op table   
+                                               alo1      8002             
+                                           8002ral 9997 next  is         
+                                          next sloxxxx1       sym op     
+                                               slt 0006       legal      
+                                               nzuillop                   
+                                               slt 0001       test for   
+                                               nzupseu        pseudo op  
+                                               slt 0001 sno   store num  
+                                          sno  stlp0007       650 op     
+                                               srt 0004       get optim  
+                                               alo3      8002 constants  
+                                           8002ldd 9996 nex               
+                                          nex  stdoptim exitx             
+                                        1
+                                          num  slo4           form       
+                                               slt 0002       numeric    
+                                               slo 8002       op         
+                                               srt 0001       code       
+                                               alo 8001 sno               
+                                        1
+                                          illopralp0010       illegal op 
+                                               alo5           set 8      
+                                               stlp0010       for blank  
+                                               ldd6     nex   op         
+                                        1
+                                          pseu slt 0003       pseudo     
+                                               aloexitx       op         
+                                               alo1ixxx  8002             
+                                        1
+                                          1    ral 0000 next  constants  
+                                          2     10 0000  0000             
+                                          3    lddn0001 nex               
+                                          4     90 9000  0000             
+                                          5     00 0000  0008             
+                                          6     55 0505  0999             
+                                               hed
+                                        1
+                                        1      sub 4 what is address
+                                        1
+                                               hed4
+                                          subr4stdexitz       store exit
+                                               stuxxxx1       store addr
+                                               srt 0008       is c5     
+                                               nzu      exitz blank     
+                                               stuxxxx2       save c5   
+                                               rau 8002       are low 4 
+                                               aup90xxx       characters
+                                               bovloop  loop  numeric   
+                                          loop auph1                      
+                                               bov      sym               
+                                               slt 0002                   
+                                               nzuloop                    
+                                               ralxxxx2       low 4 num 
+                                               slo90xxx       is c5     
+                                               bmi      sym   alphabetic
+                                               alo29xxx                   
+                                               bmisym                     
+                                               ral1ixxx       regional  
+                                               aupxxxx1 aex               
+                                          aex  aloexitz                   
+                                               slo 8002  8001             
+                                          sym  rauxxxx1       hed symbol
+                                               ldd      sub15             
+                                               alo2ixxx       step exit 
+                                               stuhsymb aex               
+                                          h1    10 0000  0000             
+                                          hsymb 01 0000 hsymb eraseable 
+                                               hed
+                                        1
+                                        1      sub 5 test absolute address
+                                        1
+                                               hed5
+                                          subr5stdexitz       store exit
+                                               stlxxxx1       store a   
+                                               slt 0004                   
+                                               slo 8002                   
+                                               tlur0001       tlu       
+                                               aloget    8002 range     
+                                           8002rau 9972 x     table     
+                                          x    slt 0006                   
+                                               srt 0006                   
+                                               aupexitz                   
+                                               aloxxxx1                   
+                                               sup 8003  8001             
+                                          get  rau 0000 x                 
+                                          r0001 00 1999  0000 range     
+                                          r0002 00 7999  0003 table     
+                                          r0003 00 8003  0001             
+                                          r0004 00 8004  0003             
+                                          r0005 00 8007  0001             
+                                          r0006 00 8999  0003             
+                                          r0007 00 9059  0002             
+                                          r0008 99 9999  0003             
+                                               hed
+                                        1
+                                        1      sub 6 symbol test routine
+                                        1
+                                               hed6
+                                          subr6stdexitz       store exit
+                                               stus           store symb
+                                               lddswof        set switch
+                                               stdsw          off       
+                                               mpysc          scramble  
+                                               ral 8002       symbol    
+                                               slt 0003       giving    
+                                               mpycf          lo        
+                                               srt 0001                   
+                                               slt 0004       set       
+                                               alol1p1        test      
+                                               stllop1        word      
+                                               slo1dxxx                   
+                                               stllo    sli   save lo   
+                                          sli  stlli     8001 init li   
+                                           8001ral 9990 a     is cont of
+                                          a    nze      und   li zero   
+                                               slos           is cont of
+                                               nzesw    def   li symb   
+                                          sw   ralli    off   is li     
+                                          off  slolmax        maximum   
+                                               nze      max               
+                                               alolmp1  sli   step li   
+                                          on   slolo          is li equa
+                                               nze      swsym to lo     
+                                               alolop1  sli   step li   
+                                          max  lddswon        set       
+                                               stdsw          switch on 
+                                               rall1    sli   zero li   
+                                        1
+                                          und  ralexitz       undefined 
+                                               alo1ixxx       step      
+                                               stlexitz       exit      
+                                               ralli                      
+                                               slol1                      
+                                               stllsymb asu               
+                                        1
+                                          def  ralli          defined   
+                                               lddasu   subr8 get       
+                                          asu  aups     exitz equivalent
+                                        1
+                                          swsymhlt 0111 symof s tab full
+                                          symoflddsymon       set sw sym
+                                               stdswsym symon on        
+                                          symonralexitz                   
+                                               alo2ixxx  8002             
+                                        1
+                                          swof ralli    off   constants 
+                                          swon ralli    on                
+                                          sc    10 0100  1001             
+                                          cf    00 0000  0004             
+                                          l1   ral 0000 a                 
+                                          l1p1 ral 0001 a                 
+                                          lmax rale0000 a                 
+                                          lmp1 rale0001 a                 
+                                          s     01 0000 s     erasable  
+                                          sw    01 0000 sw                
+                                          lo    01 0000 lo                
+                                          li    01 0000 li                
+                                          lsymb 01 0000 lsymb             
+                                               hed
+                                        1
+                                        1      sub 7 store symbol and equiv
+                                        1
+                                               hed7
+                                          subr7stdexitz       store exit
+                                               lddss                      
+                                               sdaxxxx2  8001 store     
+                                           8001stu 9988 a     symbol    
+                                          a    sup 8001                   
+                                               stlxxxx1       save e    
+                                               srt 0004                   
+                                               div2ixxx       calculate 
+                                               slt 0004       location  
+                                               aloc1          of        
+                                               lddc2          e         
+                                               sdasel         and       
+                                               lddc3          store     
+                                               sdaser                     
+                                               stlobee                    
+                                               slo 8001                   
+                                               aloxxxx1 obee              
+                                          obee ldd 9986 b                 
+                                          b    nzuser                     
+                                               slt 0004 sel               
+                                          ss   stu 9987 a     constants 
+                                          c1   ldde0001 b                
+                                          c2   sda 9985 exitz             
+                                          c3   sia 9984 exitz             
+                                          obee  01 0000 obee  erasable  
+                                          sel   01 0000 sel               
+                                          ser   01 0000 ser               
+                                               hed
+                                        1 
+                                        1    sub 8 given sym loc get equiv
+                                        1
+                                               hed8
+                                          subr8stdexit        store exit
+                                               ldd 8003                   
+                                               sdalsymb       store l   
+                                               ral 8001                   
+                                               div2dxxx                   
+                                               slt 0004                   
+                                               aloe1     8002             
+                                           8002ldd 9975 tr                
+                                          tr   nzu      lh                
+                                               ram 8001 lr    get e rh  
+                                          lh   ram 8001       get e lh  
+                                               srt 0004 lr                
+                                          lr   ldd 8003                   
+                                               siaequiv                   
+                                               rallsymb exit              
+                                          e1   ldde0001 tr    constant  
+                                          exit  01 0000 exit  eraseable 
+                                          equiv 01 0000 equiv             
+                                               hed
+                                        1
+                                        1      sub 9 calculate reg address
+                                               hed9
+                                          subr9stdexitz       store exit
+                                               srt 0008                   
+                                               ral 8003                   
+                                               slt 0004                   
+                                               aloc      8002 is        
+                                           8002ral 9991 nex   region    
+                                          nex  bdoill         defined   
+                                               slt 0001                   
+                                               ral 8002                   
+                                               srt 0001                   
+                                               lddexitz                   
+                                               bd6      l                 
+                                               bd5d     i                 
+                                          l    alo 1957 all               
+                                          d    alo 1958 all               
+                                          i    alo 1959 all               
+                                          all  slo1ixxx                   
+                                               bmiill   exitz             
+                                          ill  ralexitz       undefined 
+                                               alo1ixxx  8002 or illeg  
+                                        1
+                                          c    ral 0960 nex   constant  
+                                               hed
+                                        1      sub 10 set cc 8 and punch
+                                        1 
+                                          sub10alop0010                   
+                                               alo84th                    
+                                               stlp0010                   
+                                               pchp0001  8003             
+                                        1
+                                          84th  00 0800  0000 constant   
+                                        1
+                                        1      sub 11 find and reserve best
+                                        1
+                                               hed0
+                                          sub11ldddrumt       test       
+                                               bdo      sex   drum tag   
+                                               stlexit        is adr l   
+                                               bd6di                      
+                                               ral 8003 ssw   l          
+                                          di   lddf           d or i     
+                                               sdaxxxx1 sub13 find optim 
+                                          gda  slt 0004       dynam adr  
+                                               alo 8002                   
+                                               alo 8002 ssw               
+                                          ssw  lddoff         set sw off 
+                                               stdsw                      
+                                               aloa1p1        get table  
+                                               stlbp1         start addr 
+                                               slo1dxxx                   
+                                               stlao    sai   save ao    
+                                          sai  stlai     8001             
+                                           8001rau 9975 ta    is locat   
+                                          ta   nzuyes   sw    available  
+                                          sw   rauai    swof              
+                                          swof sloamax        is ai max  
+                                               nze      max               
+                                               aloamp1  sai   step ai    
+                                          swon sloao          is ai equa 
+                                               nze      full  to ao      
+                                               alobp1   sai   step ai    
+                                          max  lddon          set sw on  
+                                               stdsw                      
+                                               rala1    sai   set ai to  
+                                        1
+                                          full hlt 0222       drum paked 
+                                               lddh9xxx       set drum   
+                                               stddrumt       tag to 9   
+                                               ralexit  sex   step exit  
+                                          sex  alo1ixxx  8002             
+                                        1
+                                          yes  sct 0000       reserve    
+                                               slt 0001       location   
+                                               srt 0001       found      
+                                               stlxxxx2       save p     
+                                               sup 8003                   
+                                               slt 0004                   
+                                               aup 8001                   
+                                               alosrp    8002             
+                                           8002srt 0009 sca   nulify sct 
+                                          sca  rau 8003                   
+                                               aloai                      
+                                               lddst                      
+                                               sdaeras   8001             
+                                           8001stu 9972 ca                
+                                          ca   sup 8001       calculate  
+                                               sloa1          location   
+                                               srt 0004       found      
+                                               div4i                      
+                                               mpy500                     
+                                               alo 8003                   
+                                               sup 8001                   
+                                               aupxxxx2                   
+                                               mpy50                      
+                                               alo 8003                   
+                                               sup 8001 exit              
+                                          f     00 0000 gda   constants  
+                                          off  ralai    swof              
+                                          a1p1 raua0002 ta                
+                                          amax raua0200 ta                
+                                          amp1 raua0201 ta                
+                                          on   ralai    swon              
+                                          a1   raua0001 ta                
+                                          srp  srt 0000 sca               
+                                          st   stu 9999 ca                
+                                          4i    00 0000  0004              
+                                          500   00 0000  0500              
+                                          50    00 0000  0050              
+                                          fon  ral 8001 stepx             
+                                          ao    01 0000 ao    erasable   
+                                          ai    01 0000 ai                
+                                          bp1   01 0000 bp1               
+                                          exit  01 0000 exit              
+                                               hed
+                                        1
+                                        1          sub 12 set blank l 8
+                                        1
+                                          sub12alop0010                   
+                                               alo87th                    
+                                               stlp0010  8003             
+                                        1
+                                          87th  00 0000  8000 constant   
+                                        1
+                                        1      sub 13 cal optimum dynamic adr
+                                        1
+                                               hedy
+                                          sub13stdexitz       store exit 
+                                               bd5      i     d or i     
+                                               raloptim       d          
+                                               slt 0001                   
+                                               slo 8002                   
+                                               slt 0001                   
+                                               alo 8001                   
+                                               srt 0003 seo               
+                                          i    raloptim       i          
+                                               bd2shop        shift test 
+                                               bd3xas         xas test   
+                                               slt 0002 seo               
+                                          seo  stlxxxx1       save ev od 
+                                               ralopreg       is base    
+                                               div2ixxx       even or od 
+                                               rau 8003                   
+                                               aloxxxx1                   
+                                               nzu      rb                
+                                               slt 0002                   
+                                               ral 8002 rb                
+                                          rb   srt 0008       get base   
+                                               aloopreg       plus delta 
+                                               div50          mod 50     
+                                               ral 8003 exitz             
+                                        1
+                                          shop ralp0007       tlu units  
+                                               srt 0004       digit of   
+                                               slt 0009       d address  
+                                               slo 8002                   
+                                               tluu0001                   
+                                               alogu     8002             
+                                           8002ral 9969 top               
+                                          top  slt 0002                   
+                                               lddoptim       is op srd  
+                                               bd3      seo              
+                                               slt 0004 seo   srd        
+                                        1
+                                          xas  ralp0007       tlu        
+                                               srt 0004       d address  
+                                               slt 0006                   
+                                               slo 8002                   
+                                               tlui0001                   
+                                               alogxd    8002             
+                                           8002ral 9968 nxt               
+                                          nxt  slt 0004 seo               
+                                        1
+                                          u0001 00 2322  2524 shift      
+                                          u0002 10 0706  0706 optimizing 
+                                          u0003 20 0706  0908 table      
+                                          u0004 30 0908  1110             
+                                          u0005 40 1110  1312             
+                                          u0006 50 1312  1514             
+                                          u0007 60 1514  1716             
+                                          u0008 70 1716  1918             
+                                          u0009 80 1918  2120             
+                                          u0010 90 2120  2322             
+                                        1
+                                          i0001 19 9906  0600 x accum    
+                                          i0002 79 9907  0700 add sub    
+                                          i0003 80 0008  0800 table      
+                                          i0004 80 0106  0600             
+                                          i0005 80 0209  0800             
+                                          i0006 80 0308  0900             
+                                          i0007 90 5908  0800             
+                                          i0008 99 9909  0900             
+                                        1
+                                          gu   ral 0000 top   constants  
+                                          gxd  ral 0000 nxt               
+                                          50    00 0000  0050              
+                                               hed
+                                        1
+                                        1      sub 14 punch avail table
+                                        1
+                                               hedp
+                                          sub14stdexitx       store exit 
+                                               ldd85th        set punch  
+                                               stdp0010       8          
+                                               ldda1          init a1    
+                                               stdxxxx1                   
+                                               ralrs1   loop  init rs    
+                                          loop aupc1     8001             
+                                           8001stl 9999 next  set locat  
+                                          next suptw1                     
+                                               nzu      srs               
+                                               aupc2                      
+                                               aloc3     8003             
+                                          srs  stlxxxx2       save rs    
+                                               rauc4                      
+                                               aloxxxx1  8002             
+                                           8002ldd 9998  8003 store      
+                                           8003std 9997 tp    av table   
+                                          tp   suptw2                     
+                                               nzu      pun               
+                                               aupc5                      
+                                               aloc6     8002             
+                                          pun  pchp0001                   
+                                               sloaim         is ai max  
+                                               nze      exitx             
+                                               aloamp1        step ai    
+                                               stlxxxx1                   
+                                               ralxxxx2                   
+                                               sloc7    loop              
+                                        1
+                                          c1   stlp0001 next  constants  
+                                          c2   stlp0009 next              
+                                          c3    00 0500  0500             
+                                          c4   stdp0002 tp                
+                                          c5   stdp0010 tp                
+                                          c6    00 0001  0000             
+                                          c7    00 1499  1499             
+                                          tw1  stlp0007 next              
+                                          tw2  stdp0008 tp                
+                                          85th  00 0080  0000              
+                                          a1   ldda0001  8003              
+                                          rs1   00 0000  0450              
+                                          aim  ldda0200  8003              
+                                          amp1 ldda0201  8003              
+                                               hed
+                                        1
+                                        1         sub 15 heading routine
+                                        1
+                                               hedh
+                                          sub15stdexity       save exit  
+                                               ldd 8003       is c1      
+                                               slt 0008       blank      
+                                               nzudh                      
+                                               rau 8001       head       
+                                               aup0000h exity             
+                                          dh   rau 8001 exity dont head  
+                                               hed
+                                        1
+                                        1         sub 16 initialization
+                                        1
+                                          sub16stdexity       store exit 
+                                               rali1                      
+                                               stup0009       zero card  
+                                               std0000h       zero head  
+                                               ldd      subr1 zero sym t 
+                                               rali2          make drum  
+                                               aupi3          available  
+                                               ldd      subr1             
+                                               lddh8xxx       set drum   
+                                               stddrumt       tag to 8   
+                                               lddi4          set swsym  
+                                               stdswsym       off        
+                                               rali5          undefine   
+                                               auph8xxx       regions    
+                                               lddexity subr1             
+                                        1
+                                          i1    00s0001 e0200 constants  
+                                          i2    00a0001 a0200             
+                                          i3    11 1111  1111             
+                                          i4    01 0111 symof             
+                                          i5    00 1021  1049             
+                                          pacofbd6findi findl             
+                                        1
+                                        1      sub 17 calc 800x equivalent
+                                        1 
+                                               hedx
+                                          sb17dldddeq   di    d equiv    
+                                          sb17ilddieq   di    i equiv    
+                                          di   stdxxxx1       save tag   
+                                               stuexity       store exit 
+                                               stlxxxx2       store 800x 
+                                               lddxxxx1 sub13 get optim  
+                                          sda  stlxxxx1       dynam addr 
+                                               div2ixxx       is dy addr 
+                                               nzuod    ev    even or od 
+                                          od   ral8002  eo                
+                                          ev   ral8003  eo                
+                                          eo   sloxxxx2                   
+                                               nze      add1              
+                                               ralxxxx1 exity             
+                                          add1 ralxxxx1                   
+                                               alo1ixxx exity             
+                                        1
+                                          deq   00 0008 sda   constants  
+                                          ieq   00 0009 sda               
+                                          8002  00 0000  8002             
+                                          8003  00 0000  8003             
+                                               hed
+                                        1
+                                        1          sub 18 index address
+                                        1
+                                               hedw
+                                          indexstdexity       store exit 
+                                               stlxxxx1       store addr 
+                                               rau 1954                   
+                                               slt 0007                   
+                                               lddexity                   
+                                               bd5d           d or i     
+                                               slt 0002 d                 
+                                          d    srt 0009                   
+                                               mpy2000i                   
+                                               lddexity                   
+                                               bd6ds          drum 0 cor 
+                                               srt 0001 ds    core       
+                                          ds   aloxxxx1 exity             
+                                        1
+                                          exity 01 0000 exity erasabele  
+                                               hed
+                                        1    
+                                        1          sub 19 process location
+                                        1
+                                               regd0923  0923 proc l
+                                               regg0925  0925
+                                               regj0928  0928
+                                               regk0931  0931
+                                               regl0933  0933
+                                        1
+                                               heda
+                                          proclstdexitx       store exit 
+                                               rau 1951       is l blank 
+                                               nzunb                      
+                                               ldddrumt       blank test 
+                                               bdob     d0002 drum tag   
+                                          b    ralopreg setl  blank      
+                                          setl slt 0004       set l      
+                                               lddp0008       to dr      
+                                               sdap0008 exitx             
+                                          nb   lddg     subr4 what is l  
+                                          g0001ral 1957 k0001 absolute   
+                                          g0002lddk     subr9 regional   
+                                          g0003lddj     subr6 symbolic   
+                                          k0001lddl     subr5 test range 
+                                          k0002rau87th  x     reg error  
+                                          x    aupp0010       set blank  
+                                               stup0010 setl  l8         
+                                          l0001stlopreg setl  drum addr  
+                                          l0002aup86th  800x  800x       
+                                          l0003lddorceq 89x   core addr  
+                                          l0004rau87th  x     other      
+                                          800x lddorxeq 89x               
+                                          89x  stdopreg x                 
+                                          j0001ralequiv k0001 sym defind 
+                                          j0002rald     sub11 sym undef  
+                                          j0003rau87th  x     s tab full 
+                                          d0001stlopreg ss    s eq found 
+                                          d0002rau87th  x     drum paked 
+                                          ss   auphsymb       store      
+                                               alolsymb       symbol     
+                                               lddb     subr7             
+                                        1                                  
+                                          g     00 0000 g0001 constants   
+                                          k     00 0090 k0001             
+                                          j     00 0000 j0001             
+                                          l     00 0000 l0001             
+                                          d     00 0090 d0001             
+                                          86th  00 0008  0000             
+                                          87th  00 0000  8000             
+                                          exitx 01 0000 exitx eraseable   
+                                               hed
+                                        1
+                                        1      sub 20 process data address
+                                        1
+                                               regd0937  0937 proc d
+                                               regf0939  0939
+                                               regg0941  0941
+                                               regj0944  0944
+                                               regk0946  0946
+                                               regl0949  0949
+                                        1
+                                               hedb
+                                          procdstdexitx       store exit 
+                                               rau 1952       is d blank 
+                                               nzunb                      
+                                               rald     sub11 find       
+                                          d0001stlorbal l0004 optimum    
+                                          d0002rau88th  x     drum paked 
+                                          bt   lddoptim       is op      
+                                               bd1exitx       a branch   
+                                               stlopreg exitx d to or    
+                                          x    aupp0010       set blank  
+                                               stup0010 exitx             
+                                          nb   lddg     subr4 what is d  
+                                          g0001ral 1958 j0001 absolute   
+                                          g0002lddj     subr9 regional   
+                                          g0003lddk     subr6 symbolic   
+                                          j0001lddl     subr5 test range 
+                                          j0002rau88th  x     reg error  
+                                          l0001lddaxd   index drum addr  
+                                          l0002slt 0004 800x  800x       
+                                          l0003lddaxc   index core addr  
+                                          l0004slt 0004 sd    other      
+                                          800x lddp0007       set 800x d 
+                                               sdap0007                   
+                                               srt 0004                   
+                                               aupxeq   sb17d get 800x e 
+                                          scd  slt 0004       set core d 
+                                               lddp0007                   
+                                               sdap0007                   
+                                               srt 0004                   
+                                               lddceq   sub13 get core e 
+                                          sceq stlorceq bt    save core  
+                                          k0001ralequiv j0001 sym defind 
+                                          k0002ralf     sub11 sym undef  
+                                          k0003rau88th  x     s tab full 
+                                          f0001stleq    ss    save eq    
+                                          f0002rau88th  x     drum paked 
+                                          ss   auphsymb       store      
+                                               alolsymb       symbol     
+                                               ldd      subr7             
+                                               raleq    l0004             
+                                          sd   lddp0007       set d addr 
+                                               sdap0007                   
+                                               srt 0004 bt                
+                                          d     00 0088 d0001 constants  
+                                          g     00 0000 g0001             
+                                          j     00 0088 j0001             
+                                          l     00 0000 l0001             
+                                          f     00 0088 f0001             
+                                          k     00 0000 k0001             
+                                          axd   00 0088 d0001             
+                                          axc   00 0098 scd               
+                                          xeq  stlorxeq bt                
+                                          ceq   00 0008 sceq              
+                                          88th  00 0000  0800              
+                                          eq    01 0000 eq    erasable   
+                                               hed
+                                        1
+                                        1      sub 21 process instr address
+                                        1
+                                               regd0953  0953 proc i
+                                               regf0955  0955
+                                               regg0958  0958
+                                               regj0960  0960
+                                               regk0962  0962
+                                               regl0965  0965
+                                        1
+                                               hedc
+                                          procistdexitx       store exit 
+                                               rau 1953       is i blank 
+                                               nzunb                      
+                                               rau 1952       is d blank 
+                                               nzudnb                     
+                                               ldddrumt       d i blank  
+                                               bdo      g0002 test drum  
+                                               ralorbal l0004 tag        
+                                          dnb  rald     sub11 find best  
+                                          d0001stlorbal l0004 found      
+                                          d0002ralp0010 x     drum paked 
+                                          x    alo89th                    
+                                               stlp0010 exitx             
+                                          nb   lddf     subr4 what is i  
+                                          f0001ral 1959 j0001 absolute   
+                                          f0002lddj     subr9 regional   
+                                          f0003lddk     subr6 symbolic   
+                                          j0001lddl     subr5 test range 
+                                          j0002ralp0010 x     reg error  
+                                          l0001lddaxd   index drum addr  
+                                          l0002lddp0007 800x  800x       
+                                          l0003lddaxc   index core addr  
+                                          l0004lddp0007       other      
+                                               siap0007 mor               
+                                          800x siap0007                   
+                                               aupxeq   sb17i get 800x e 
+                                          90xx lddp0007       set core   
+                                               siap0007       address    
+                                               lddceq   sub13 get core e 
+                                          k0001ralequiv j0001 sym defind 
+                                          k0002ralg     sub11 sym undef  
+                                          k0003ralp0010 x     s tab full 
+                                          g0001lddp0007 si    found best 
+                                          g0002ralp0010 x     drum paked 
+                                          si   siap0007                   
+                                               auphsymb       store      
+                                               alolsymb       symbol     
+                                               lddmor   subr7             
+                                          mor  lddorbal       set or     
+                                               stdopreg exitx to orb     
+                                          sceq stlorceq mor   save core  
+                                        1
+                                          d     00 0089 d0001 constants   
+                                          f     00 0000 f0001             
+                                          j     00 0089 j0001             
+                                          k     00 0000 k0001             
+                                          l     00 0000 l0001             
+                                          g     00 0089 g0001             
+                                          89th  00 0000  0080             
+                                          axd   00 0089 l0004             
+                                          axc   00 0099 90xx              
+                                          xeq  stlorxeq mor               
+                                          ceq   00 0009 sceq              
+                                               hed
+                                        1
+                                          1ixxx 00 0000  0001 constants   
+                                          1dxxx 00 0001  0000             
+                                          2ixxx 00 0000  0002             
+                                          2dxxx 00 0002  0000             
+                                          h8xxx 80 0000  0000             
+                                          h9xxx 90 0000  0000             
+                                          90xxx 00 0000  0090             
+                                          29xxx 00 0000  0029             
+                                          2000i 00 0000  2000 constant    
+                                          torg  00 0000 t0001             
+                                        1
+                                               pat

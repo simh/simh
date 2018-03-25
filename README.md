@@ -83,6 +83,8 @@
 
 #### Hans-Åke Lund has implemented an SCELBI (SCientic-ELectronics-BIology) simulator.
 
+#### Roberto Sancho has implemented an IBM 650 simulator.
+
 ### New Host Platform support - HP-UX and AIX
 
 ### Simulator Front Panel API

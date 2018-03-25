@@ -244,10 +244,19 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "isys8024", "isys8024.vcproj
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "imds-225", "imds-225.vcproj", "{A66F0D85-174F-4AFE-A44E-7FAE3D3727BC}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ibmpc", "ibmpc.vcproj", "{76EF8599-7AB0-4C8D-997B-AAEEE724A5D0}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ibmpcxt", "ibmpcxt.vcproj", "{0026A4C2-655A-4C03-B6CA-B1EAF79FA4D1}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "scelbi", "scelbi.vcproj", "{1E92CC4B-9ED5-4CD4-BD35-061F25126523}"
 	ProjectSection(ProjectDependencies) = postProject
@@ -282,6 +291,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "I7070", "I7070.vcproj", "{F
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "I7010", "I7010.vcproj", "{55A727F0-B5C8-48E8-9EF2-D5DAF679C520}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "I650", "I650.vcproj", "{95B64699-4B93-4BFE-9024-0A2302D9B71A}"
 	ProjectSection(ProjectDependencies) = postProject
 		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
 	EndProjectSection
@@ -532,6 +546,10 @@ Global
 		{55A727F0-B5C8-48E8-9EF2-D5DAF679C520}.Debug|Win32.Build.0 = Debug|Win32
 		{55A727F0-B5C8-48E8-9EF2-D5DAF679C520}.Release|Win32.ActiveCfg = Release|Win32
 		{55A727F0-B5C8-48E8-9EF2-D5DAF679C520}.Release|Win32.Build.0 = Release|Win32
+		{95B64699-4B93-4BFE-9024-0A2302D9B71A}.Debug|Win32.ActiveCfg = Debug|Win32
+		{95B64699-4B93-4BFE-9024-0A2302D9B71A}.Debug|Win32.Build.0 = Debug|Win32
+		{95B64699-4B93-4BFE-9024-0A2302D9B71A}.Release|Win32.ActiveCfg = Release|Win32
+		{95B64699-4B93-4BFE-9024-0A2302D9B71A}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
