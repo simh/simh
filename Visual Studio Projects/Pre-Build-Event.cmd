@@ -297,7 +297,7 @@ for /F "usebackq tokens=2" %%i in (`findstr /C:SIM_GIT_COMMIT_TIME ..\.git-commi
 :_NoId
 SET OLD_GIT_COMMIT_ID=
 if not exist .git-commit-id.h echo.>.git-commit-id.h
-for /F "usebackq tokens=3" %%i in (`findstr /C:SIM_GIT_COMMIT_ID ..\.git-commit-id`) do SET OLD_GIT_COMMIT_ID=%%i
+for /F "usebackq tokens=3" %%i in (`findstr /C:SIM_GIT_COMMIT_ID .git-commit-id.h`) do SET OLD_GIT_COMMIT_ID=%%i
 if "%GIT_COMMIT_ID%" equ "%OLD_GIT_COMMIT_ID%" goto _IdGood
 echo Generating updated .git-commit-id.h containing id %GIT_COMMIT_ID%
 echo #define SIM_GIT_COMMIT_ID %GIT_COMMIT_ID% >.git-commit-id.h
