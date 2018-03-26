@@ -6280,8 +6280,9 @@ if ((sim_switches & SWMASK ('R')) ||                    /* read only? */
     uptr->fileref = sim_fopen (cptr, "rb");             /* open rd only */
     if (uptr->fileref == NULL)                          /* open fail? */
         return attach_err (uptr, SCPE_OPENERR);         /* yes, error */
+    if (!(uptr->flags & UNIT_RO))
+        sim_messagef (SCPE_OK, "%s: unit is read only\n", sim_dname (dptr));
     uptr->flags = uptr->flags | UNIT_RO;                /* set rd only */
-    sim_messagef (SCPE_OK, "%s: unit is read only\n", sim_dname (dptr));
     }
 else {
     if (sim_switches & SWMASK ('N')) {                  /* new file only? */
@@ -6451,7 +6452,7 @@ if ((uptr->flags & UNIT_BUF) && (uptr->filebuf)) {
         }
     uptr->flags = uptr->flags & ~UNIT_BUF;
     }
-uptr->flags = uptr->flags & ~(UNIT_ATT | UNIT_RO);
+uptr->flags = uptr->flags & ~(UNIT_ATT | ((uptr->flags & UNIT_ROABLE) ? UNIT_RO : 0));
 free (uptr->filename);
 uptr->filename = NULL;
 if (fclose (uptr->fileref) == EOF)
