@@ -111,7 +111,7 @@
                                         TC59D magnetic tape
                                         TC15/TU56 DECtape
                                         LT15/LT19 additional Teletypes
-					DR15C parallel interface to UC15
+                                        DR15C parallel interface to UC15
 
    ??Indicates not implemented.  The PDP-4 manual refers to a memory
    ??extension control; there is no documentation on it.

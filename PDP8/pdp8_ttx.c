@@ -77,7 +77,7 @@ uint8 ttix_buf[TTX_MAXL] = { 0 };                       /* input buffers */
 uint8 ttox_buf[TTX_MAXL] = { 0 };                       /* output buffers */
 TMLN ttx_ldsc[TTX_MAXL] = { {0} };                      /* line descriptors */
 TMXR ttx_desc = { TTX_INIL, 0, 0, ttx_ldsc };           /* mux descriptor */
-#define ttx_lines	ttx_desc.lines
+#define ttx_lines       ttx_desc.lines
 
 int32 ttix (int32 IR, int32 AC);
 int32 ttox (int32 IR, int32 AC);

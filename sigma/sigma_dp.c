@@ -158,14 +158,14 @@
    type         #sectors/       #surfaces/      #cylinders/
                  surface         cylinder        drive
 
-   7242         6               20              203		    =24MB
-   7261         11              20              203		    =45MB
-   7271         6               20              406		    =48MB
+   7242         6               20              203         =24MB
+   7261         11              20              203         =45MB
+   7271         6               20              406         =48MB
    3288         17              5               822         =67MB
    7276         11              19              411         =86MB
    7266         11              20              411         =90MB
-   3282         11              19              815		    =170MB
-   3283         17              19              815		    =263MB
+   3282         11              19              815         =170MB
+   3283         17              19              815         =263MB
 
    On the T3281, each drive can be a different type.  The size field
    in each unit selects the drive capacity for each drive and thus
