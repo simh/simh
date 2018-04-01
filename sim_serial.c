@@ -338,17 +338,21 @@ int number = sim_serial_devices(SER_MAX_DEVICE, list);
 fprintf(st, "Serial devices:\n");
 if (number == -1)
     fprintf(st, "  serial support not available in simulator\n");
-else
-if (number == 0)
-    fprintf(st, "  no serial devices are available\n");
 else {
-    size_t min, len;
-    int i;
-    for (i=0, min=0; i<number; i++)
-        if ((len = strlen(list[i].name)) > min)
-            min = len;
-    for (i=0; i<number; i++)
-        fprintf(st," ser%d\t%-*s%s%s%s\n", i, (int)min, list[i].name, list[i].desc[0] ? " (" : "", list[i].desc, list[i].desc[0] ? ")" : "");
+    if (number == 0) {
+        fprintf(st, "  no serial devices are available.\n");
+        fprintf(st, "You may need to run with privilege or set device permissions\n");
+        fprintf(st, "to access local serial ports\n");
+        }
+    else {
+        size_t min, len;
+        int i;
+        for (i=0, min=0; i<number; i++)
+            if ((len = strlen(list[i].name)) > min)
+                min = len;
+        for (i=0; i<number; i++)
+            fprintf(st," ser%d\t%-*s%s%s%s\n", i, (int)min, list[i].name, list[i].desc[0] ? " (" : "", list[i].desc, list[i].desc[0] ? ")" : "");
+        }
     }
 if (serial_open_device_count) {
     int i;
