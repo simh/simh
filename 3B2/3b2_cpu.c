@@ -2245,9 +2245,8 @@ t_stat sim_instr(void)
             break;
         case GATE:
             cpu_km = TRUE;
-            abort_context = C_PROCESS_GATE_PCB;
             if (R[NUM_SP] < read_w(R[NUM_PCBP] + 12, ACC_AF) ||
-                R[NUM_SP] >= read_w(R[NUM_PCBP] + 16, ACC_AF)) {
+                R[NUM_SP] > read_w(R[NUM_PCBP] + 16, ACC_AF)) {
                 sim_debug(EXECUTE_MSG, &cpu_dev,
                           "[%08x] STACK OUT OF BOUNDS IN GATE. "
                           "SP=%08x, R[NUM_PCBP]+12=%08x, "
@@ -2909,12 +2908,9 @@ static SIM_INLINE void cpu_on_normal_exception(uint8 isc)
               "[%08x] [cpu_on_normal_exception %d] %%sp=%08x abort_context=%d\n",
               R[NUM_PC], isc, R[NUM_SP], abort_context);
 
-    abort_context = C_PROCESS_GATE_PCB;
-
     cpu_km = TRUE;
-
     if (R[NUM_SP] < read_w(R[NUM_PCBP] + 12, ACC_AF) ||
-        R[NUM_SP] >= read_w(R[NUM_PCBP] + 16, ACC_AF)) {
+        R[NUM_SP] > read_w(R[NUM_PCBP] + 16, ACC_AF)) {
         sim_debug(EXECUTE_MSG, &cpu_dev,
                   "[%08x] STACK OUT OF BOUNDS IN EXCEPTION HANDLER. "
                   "SP=%08x, R[NUM_PCBP]+12=%08x, "
@@ -2923,10 +2919,8 @@ static SIM_INLINE void cpu_on_normal_exception(uint8 isc)
                   R[NUM_SP],
                   read_w(R[NUM_PCBP] + 12, ACC_AF),
                   read_w(R[NUM_PCBP] + 16, ACC_AF));
-        abort_context = C_NONE;
         cpu_abort(STACK_EXCEPTION, STACK_BOUND);
     }
-
     cpu_km = FALSE;
 
     /* Set context for STACK (FAULT) */
