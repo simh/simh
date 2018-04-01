@@ -2001,10 +2001,15 @@ static const char simh_help[] =
       " and a numeric comparison is performed. For example: \"+1\" EQU \"1\" will be\n"
       " true.\n"
       "5File Existence Expressions\n"
-      " File existence can be determined with:\n"
+      " File existence can be determined with:\n\n"
       "++{NOT} EXIST \"<filespec>\"\n\n"
       "++{NOT} EXIST <filespec>\n\n"
       " Specifies a true (false {NOT}) condition if the file exists.\n"
+      "5File Comparison Expressions\n"
+      " Files can have their contents compared with:\n\n"
+      "++-D {NOT} \"<filespec1>\" == \"<filespec2>\" \n\n"
+      " Specifies a true (false {NOT}) condition if the indicated files\n"
+      " have the same contents.\n\n"
        /***************** 80 character line width template *************************/
 #define HLP_EXIT        "*Commands Exiting_The_Simulator"
       "2Exiting The Simulator\n"
@@ -3724,11 +3729,44 @@ int sim_cmp_string (const char *s1, const char *s2)
 long int v1, v2;
 char *ep1, *ep2;
 
+if (sim_switches & SWMASK ('F')) {      /* File Compare? */
+    FILE *f1, *f2;
+    int c1, c2;
+    char *filename1, *filename2;
+
+    filename1 = (char *)malloc (strlen (s1));
+    strcpy (filename1, s1 + 1);
+    filename1[strlen (filename1) - 1] = '\0';
+    filename2 = (char *)malloc (strlen (s2));
+    strcpy (filename2, s2 + 1);
+    filename2[strlen (filename2) - 1] = '\0';
+
+    f1 = fopen (filename1, "rb");
+    f2 = fopen (filename2, "rb");
+    free (filename1);
+    free (filename2);
+    if ((f1 == NULL) && (f2 == NULL))   /* Both can't open? */
+        return 0;                       /* Call that equal */
+    if (f1 == NULL) {
+        fclose (f2);
+        return -1;
+        }
+    if (f2 == NULL) {
+        fclose (f1);
+        return 1;
+        }
+    while (((c1 = fgetc (f1)) == (c2 = fgetc (f2))) &&
+           (c1 != EOF)) ;
+    fclose (f1);
+    fclose (f2);
+    return c1 - c2;
+    }
 v1 = strtol(s1+1, &ep1, 0);
 v2 = strtol(s2+1, &ep2, 0);
 if ((ep1 != s1 + strlen (s1) - 1) ||
     (ep2 != s2 + strlen (s2) - 1))
-    return strcmp (s1, s2);
+    return (strlen (s1) == strlen (s2)) ? strncmp (s1 + 1, s2 + 1, strlen (s1) - 2)
+                                        : strcmp (s1, s2);
 if (v1 == v2)
     return 0;
 if (v1 < v2)
@@ -3776,7 +3814,7 @@ CONST char *tptr, *gptr;
 REG *rptr;
 
 tptr = (CONST char *)get_glyph_gen (iptr, optr, mchar, (sim_switches & SWMASK ('I')), TRUE, '\\');
-if (*optr != '"') {
+if ((*optr != '"') && (*optr != '\'')) {
     ap = getenv (optr);
     if (!ap)
         return tptr;
@@ -3820,7 +3858,8 @@ if (!strcmp (gbuf, "EXIST")) {                          /* File Exist Test? */
     cptr = (CONST char *)tptr;
     }
 tptr = _get_string (cptr, gbuf, ' ');                   /* get first string */
-if (Exist || (*gbuf == '"')) {                          /* quoted string comparison? */
+if (Exist || (*gbuf == '"') || (*gbuf == '\'')) {       /* quoted string comparison? */
+    char quote = *gbuf;
     char op[CBUFSIZE];
     static struct {
         const char *op;
@@ -3849,7 +3888,7 @@ if (Exist || (*gbuf == '"')) {                          /* quoted string compari
     while (sim_isspace (*cptr))                         /* skip spaces */
         ++cptr;
     if (!Exist) {
-        get_glyph (cptr, op, '"');
+        get_glyph (cptr, op, quote);
         for (optr = compare_ops; optr->op; optr++)
             if (0 == strncmp (op, optr->op, strlen (optr->op)))
                 break;
