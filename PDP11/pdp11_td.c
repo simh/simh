@@ -456,6 +456,8 @@ OP CODE 11 (Resened)
 
 #include "pdp11_td.h"
 
+#define MIN(a,b) (((a) < (b)) ? (a) : (b))
+
 /* DL Definitions */
 
 /* registers */
@@ -994,7 +996,7 @@ switch (opcode) {
         break;
 
     case TD_OPINI:
-        for (unit=0; unit < 2; unit++)
+        for (unit=0; unit < MIN(ctlr->dptr->numunits, 2); unit++)
             sim_cancel (ctlr->uptr+unit);
         ctlr->ibptr = 0;
         ctlr->obptr = 0;
