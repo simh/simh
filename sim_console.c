@@ -2239,7 +2239,13 @@ if (r != SCPE_OK)
 
 sim_deb_switches = sim_switches;                        /* save debug switches */
 if (sim_deb_switches & SWMASK ('R')) {
+    struct tm loc_tm, gmt_tm;
+
     clock_gettime(CLOCK_REALTIME, &sim_deb_basetime);
+    /* Adjust the relative timebase to reflect the localtime GMT offset */
+    loc_tm = *localtime (&sim_deb_basetime.tv_sec);
+    gmt_tm = *gmtime (&sim_deb_basetime.tv_sec);
+    sim_deb_basetime.tv_sec -= mktime (&gmt_tm) - mktime (&loc_tm);
     if (!(sim_deb_switches & (SWMASK ('A') | SWMASK ('T'))))
         sim_deb_switches |= SWMASK ('T');
     }
