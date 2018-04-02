@@ -2471,6 +2471,8 @@ if (lp->rxbpsfactor == 0.0)
 lp->txbps = lp->rxbps;
 lp->txdelta = lp->rxdelta;
 lp->txnexttime = lp->rxnexttime;
+if (lp->o_uptr)
+    lp->o_uptr->wait = lp->txdelta;
 return SCPE_OK;
 }
 
@@ -3836,7 +3838,8 @@ else {
     for (i=0; i<tmxr_open_device_count; ++i) {
         TMXR *mp = tmxr_open_devices[i];
         TMLN *lp;
-		UNIT *o_uptr = mp->ldsc[0].o_uptr;
+        UNIT *o_uptr = mp->ldsc[0].o_uptr;
+        UNIT *uptr = mp->ldsc[0].uptr;
         char *attach;
 
         fprintf(st, "Multiplexer device: %s", (mp->dptr ? sim_dname (mp->dptr) : ""));
@@ -3855,10 +3858,18 @@ else {
         if (mp->buffered)
             fprintf(st, ", Buffered=%d", mp->buffered);
         for (j = 1; j < mp->lines; j++)
-			if (o_uptr != mp->ldsc[j].o_uptr)
-				break;
-		if (j == mp->lines)
-			fprintf(st, ", Output Unit: %s", sim_uname (o_uptr));
+            if (o_uptr != mp->ldsc[j].o_uptr)
+                break;
+        if (j == mp->lines)
+            fprintf(st, ", Output Unit: %s", sim_uname (o_uptr));
+        for (j = 1; j < mp->lines; j++)
+            if (uptr != mp->ldsc[j].uptr)
+                break;
+        if (j == mp->lines) {
+            fprintf(st, ",\n    Input Polling Unit: %s", sim_uname (uptr));
+            if (uptr != mp->uptr)
+                fprintf(st, ", Connection Polling Unit: %s", sim_uname (mp->uptr));
+            }
         attach = tmxr_mux_attach_string (NULL, mp);
         if (attach)
             fprintf(st, ",\n    attached to %s, ", attach);
@@ -4085,7 +4096,7 @@ if (!(uptr->dynflags & UNIT_TM_POLL))
 sooner = _tmxr_activate_delay (uptr, 0x7FFFFFFF);
 if (sooner != 0x7FFFFFFF) {
     if (sooner < 0) {
-sooner = _tmxr_activate_delay (uptr, 0x7FFFFFFF);
+sooner = _tmxr_activate_delay (uptr, 0x7FFFFFFF);   /* Breakpoint here on unexpected value */
         }
     sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "scheduling %s after %d instructions rather than %u usecs\n", sim_uname (uptr), sooner, usecs_walltime);
     return _sim_activate (uptr, sooner);                        /* Handle the busy case directly */
