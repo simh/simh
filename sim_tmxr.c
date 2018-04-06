@@ -929,7 +929,7 @@ if (lp->destination || lp->port || lp->txlogname) {
             char portname[CBUFSIZE];
 
             get_glyph_nc (lp->destination, portname, ';');
-            sprintf (growstring(&tptr, 25 + strlen (lp->destination)), ",Connect=%s%s%s", portname, strcmp("9600-8N1", lp->serconfig) ? ";" : "", strcmp("9600-8N1", lp->serconfig) ? lp->serconfig : "");
+            sprintf (growstring(&tptr, 25 + strlen (lp->destination)), ",Connect=%s%s%s", portname, strcmp("9600-8N1", lp->serconfig ? lp->serconfig : "") ? ";" : "", strcmp("9600-8N1", lp->serconfig ? lp->serconfig : "") ? lp->serconfig : "");
             }
         else
             sprintf (growstring(&tptr, 25 + strlen (lp->destination)), ",Connect=%s%s", lp->destination, ((lp->mp->notelnet != lp->notelnet) && (!lp->datagram)) ? (lp->notelnet ? ";notelnet" : ";telnet") : "");
@@ -4517,7 +4517,7 @@ if ((lp->sock) || (lp->connecting)) {                   /* tcp connection? */
         fprintf (st, "Connection from IP address %s\n", lp->ipad);
     }
 else
-    if (lp->destination)                                /* remote connection? */
+    if ((lp->destination) && (!lp->serport))            /* remote connection? */
         fprintf (st, "Connecting to remote port %s\n", lp->destination);/* print port name */
 if (lp->sock) {
     char *sockname, *peername;
