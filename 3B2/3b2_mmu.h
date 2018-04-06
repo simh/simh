@@ -208,6 +208,7 @@
 #define SSL(va)           (((va) >> 17) & 0x1fff)
 #define SOT(va)           (va & 0x1ffff)
 #define PSL(va)           (((va) >> 11) & 0x3f)
+#define PSL_C(va)         ((va) & 0x1f800)
 #define POT(va)           (va & 0x7ff)
 
 /* Get the maximum length of an SSL from SRAMB */
@@ -217,6 +218,7 @@
 #define SD_PRESENT(sd0)   ((sd0) & 1)
 #define SD_MODIFIED(sd0)  (((sd0) >> 1) & 1)
 #define SD_CONTIG(sd0)    (((sd0) >> 2) & 1)
+#define SD_PAGED(sd0)     ((((sd0) >> 2) & 1) == 0)
 #define SD_CACHE(sd0)     (((sd0) >> 3) & 1)
 #define SD_TRAP(sd0)      (((sd0) >> 4) & 1)
 #define SD_REF(sd0)       (((sd0) >> 5) & 1)
@@ -245,7 +247,7 @@
 #define SDCE_TO_SD1(sdch)      (sdch & 0xffffffe0)
 
 /* Maximum size (in bytes) of a segment */
-#define MAX_OFFSET(sd0)   ((SD_MAX_OFF(sd0) + 1) << 3)
+#define MAX_OFFSET(sd0)   ((SD_MAX_OFF(sd0) + 1) * 8)
 
 #define PD_PRESENT(pd)    (pd & 1)
 #define PD_MODIFIED(pd)   ((pd >> 1) & 1)
@@ -276,7 +278,8 @@
 /* Fault codes */
 #define MMU_FAULT(f) {                                      \
         if (fc) {                                           \
-            mmu_state.fcode = ((((uint32)r_acc)<<7)|(((uint32)(CPU_CM))<<5)|f);   \
+            mmu_state.fcode = ((((uint32)r_acc)<<7)|        \
+                               (((uint32)(CPU_CM))<<5)|f);  \
             mmu_state.faddr = va;                           \
         }                                                   \
     }

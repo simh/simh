@@ -395,6 +395,7 @@ t_stat cpu_reset(DEVICE *dptr);
 t_stat cpu_set_size(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat cpu_set_hist(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat cpu_show_hist(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat cpu_show_stack(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat cpu_set_halt(UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_clear_halt(UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_boot(int32 unit_num, DEVICE *dptr);
