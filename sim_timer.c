@@ -1765,10 +1765,10 @@ switch (sim_throt_state) {
 
     case SIM_THROT_STATE_INIT:                          /* take initial reading */
         if ((sim_calb_tmr != -1) && (rtc_hz[sim_calb_tmr] != 0)) {
-            if (rtc_calibrations[sim_calb_tmr] < sim_idle_stable) {
+            if (rtc_calibrations[sim_calb_tmr] < sim_throt_delay) {
                 sim_throt_ms_start = sim_os_msec ();
                 sim_throt_inst_start = sim_gtime ();
-                sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc(INIT) Deferring until stable (%d more seconds)\n", (int)(sim_idle_stable - rtc_calibrations[sim_calb_tmr]));
+                sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc(INIT) Deferring until stable (%d more seconds)\n", (int)(sim_throt_delay - rtc_calibrations[sim_calb_tmr]));
                 return sim_activate (uptr, rtc_hz[sim_calb_tmr]*rtc_currd[sim_calb_tmr]);
                 }
             sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc(INIT) Computing Throttling values based on the last second's execution rate\n");
