@@ -175,6 +175,9 @@ static double sim_throt_inst_start;
 static uint32 sim_throt_sleep_time = 0;
 static int32 sim_throt_wait = 0;
 static uint32 sim_throt_delay = 3;
+#define CLK_TPS 10
+#define CLK_INIT (SIM_INITIAL_IPS/CLK_TPS)
+static int32 sim_int_clk_tps;
 static UNIT *sim_clock_unit[SIM_NTIMERS+1] = {NULL};
 UNIT * volatile sim_clock_cosched_queue[SIM_NTIMERS+1] = {NULL};
 static int32 sim_cosched_interval[SIM_NTIMERS+1];
@@ -1252,6 +1255,24 @@ return SCPE_OK;
 REG sim_timer_reg[] = {
     { DRDATAD (IDLE_CYC_MS,      sim_idle_cyc_ms,        32, "Cycles Per Millisecond"), PV_RSPC|REG_RO},
     { DRDATAD (ROM_DELAY,        sim_rom_delay,          32, "ROM memory reference delay"), PV_RSPC|REG_RO},
+    { DRDATAD (TICK_RATE_0,      rtc_hz[0],              32, "Timer 0 Ticks Per Second") },
+    { DRDATAD (TICK_SIZE_0,      rtc_currd[0],           32, "Timer 0 Tick Size") },
+    { DRDATAD (TICK_RATE_1,      rtc_hz[1],              32, "Timer 1 Ticks Per Second") },
+    { DRDATAD (TICK_SIZE_1,      rtc_currd[1],           32, "Timer 1 Tick Size") },
+    { DRDATAD (TICK_RATE_2,      rtc_hz[2],              32, "Timer 2 Ticks Per Second") },
+    { DRDATAD (TICK_SIZE_2,      rtc_currd[2],           32, "Timer 2 Tick Size") },
+    { DRDATAD (TICK_RATE_3,      rtc_hz[3],              32, "Timer 3 Ticks Per Second") },
+    { DRDATAD (TICK_SIZE_3,      rtc_currd[3],           32, "Timer 3 Tick Size") },
+    { DRDATAD (TICK_RATE_4,      rtc_hz[4],              32, "Timer 4 Ticks Per Second") },
+    { DRDATAD (TICK_SIZE_4,      rtc_currd[4],           32, "Timer 4 Tick Size") },
+    { DRDATAD (TICK_RATE_5,      rtc_hz[5],              32, "Timer 5 Ticks Per Second") },
+    { DRDATAD (TICK_SIZE_5,      rtc_currd[5],           32, "Timer 5 Tick Size") },
+    { DRDATAD (TICK_RATE_6,      rtc_hz[6],              32, "Timer 6 Ticks Per Second") },
+    { DRDATAD (TICK_SIZE_6,      rtc_currd[6],           32, "Timer 6 Tick Size") },
+    { DRDATAD (TICK_RATE_7,      rtc_hz[7],              32, "Timer 7 Ticks Per Second") },
+    { DRDATAD (TICK_SIZE_7,      rtc_currd[7],           32, "Timer 7 Tick Size") },
+    { DRDATAD (INTERNAL_TICK_RATE,sim_int_clk_tps,       32, "Internal Timer Ticks Per Second") },
+    { DRDATAD (INTERNAL_TICK_SIZE,rtc_currd[SIM_NTIMERS],32, "Internal Timer Tick Size") },
     { NULL }
     };
 
@@ -1385,6 +1406,7 @@ static const char *sim_throttle_description (DEVICE *dptr)
 {
 return "Throttle facility";
 }
+
 
 DEVICE sim_timer_dev = {
     "INT-CLOCK", sim_timer_units, sim_timer_reg, sim_timer_mod, 
@@ -2215,10 +2237,6 @@ return NULL;
    
    To solve this we merely run an internal clock at 10Hz.
  */
-
-#define CLK_TPS 10
-#define CLK_INIT (SIM_INITIAL_IPS/CLK_TPS)
-static int32 sim_int_clk_tps;
 
 static t_stat sim_timer_clock_tick_svc (UNIT *uptr)
 {
