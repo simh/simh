@@ -1430,7 +1430,7 @@ t_stat tmxr_set_port_speed_control (TMXR *mp)
 {
 int i;
 
-if (mp->uptr && !(mp->uptr->flags & UNIT_ATT))
+if (!mp->port_speed_control && mp->uptr && !(mp->uptr->flags & UNIT_ATT))
     return sim_messagef (SCPE_ALATT, "Can't change speed mode while attached.\n:");
 mp->port_speed_control = TRUE;
 for (i=0; i<mp->lines; ++i)
@@ -1448,7 +1448,7 @@ t_stat tmxr_clear_port_speed_control (TMXR *mp)
 {
 int i;
 
-if (mp->uptr && !(mp->uptr->flags & UNIT_ATT))
+if (mp->port_speed_control && mp->uptr && !(mp->uptr->flags & UNIT_ATT))
     return sim_messagef (SCPE_ALATT, "Can't change speed mode while attached.\n:");
 mp->port_speed_control = FALSE;
 for (i=0; i<mp->lines; ++i)
@@ -2139,6 +2139,9 @@ tmxr_debug_trace_line (lp, "tmxr_putc_ln()");
     if (lp->txbpi == lp->txbpr)                           \
         lp->txbpr = (1+lp->txbpr)%lp->txbsz, ++lp->txdrp; \
     }
+if ((lp->xmte == 0) && (TXBUF_AVAIL(lp) > 1) &&
+    ((lp->txbps == 0) || (lp->txnexttime <= sim_gtime ())))
+    lp->xmte = 1;                                       /* enable line transmit */
 if ((lp->txbfd && !lp->notelnet) || (TXBUF_AVAIL(lp) > 1)) {/* room for char (+ IAC)? */
     if ((TN_IAC == (u_char) chr) && (!lp->notelnet))    /* char == IAC in telnet session? */
         TXBUF_CHAR (lp, TN_IAC);                        /* stuff extra IAC char */
@@ -2252,7 +2255,7 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
 #endif
         if ((lp->xmte == 0) && 
             ((lp->txbps == 0) ||
-             (lp->txnexttime >= sim_gtime ())))
+             (lp->txnexttime <= sim_gtime ())))
             lp->xmte = 1;                               /* enable line transmit */
         }
     }                                                   /* end for */
@@ -4045,12 +4048,15 @@ for (i=0; i<mp->lines; i++) {
         }
     if ((uptr == lp->o_uptr) &&         /* output completion unit? */
         (lp->txbps)          &&         /* while rate limiting */
-        (tmxr_tqln(lp))) {              /* with queued output data */
+        (lp->txnexttime)) {             /* with queued output data */
         if (lp->txnexttime > sim_gtime_now)
             due = (int32)(lp->txnexttime - sim_gtime_now);
         else
             due = sim_processing_event ? 1 : 0;     /* avoid potential infinite loop if called from service routine */
-        sooner = MIN(sooner, due);
+        if (i == 0)
+            sooner = due;
+        else
+            sooner = MIN(sooner, due);
         }
     }
 return sooner;
@@ -4070,10 +4076,14 @@ if (sooner != interval) {
     return _sim_activate (uptr, sooner);                /* Handle the busy case */
     }
 #if defined(SIM_ASYNCH_MUX)
-if (!sim_asynch_enabled)
+if (!sim_asynch_enabled) {
+    sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "scheduling %s after %d instructions\n", sim_uname (uptr), interval);
     return _sim_activate (uptr, interval);
+    }
+sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "scheduling %s asynchronously instead of %d instructions\n", sim_uname (uptr), interval);
 return SCPE_OK;
 #else
+sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "scheduling %s after %d instructions\n", sim_uname (uptr), interval);
 return _sim_activate (uptr, interval);
 #endif
 }
@@ -4096,17 +4106,21 @@ if (!(uptr->dynflags & UNIT_TM_POLL))
 sooner = _tmxr_activate_delay (uptr, 0x7FFFFFFF);
 if (sooner != 0x7FFFFFFF) {
     if (sooner < 0) {
-sooner = _tmxr_activate_delay (uptr, 0x7FFFFFFF);   /* Breakpoint here on unexpected value */
+        sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "scheduling %s for %u usecs produced overflow interval %d instructions, sceduling for %d instructions\n", sim_uname (uptr), usecs_walltime, sooner, 0x7FFFFFFF);
+        sooner = _tmxr_activate_delay (uptr, 0x7FFFFFFF);   /* Breakpoint here on unexpected value */
         }
     sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "scheduling %s after %d instructions rather than %u usecs\n", sim_uname (uptr), sooner, usecs_walltime);
     return _sim_activate (uptr, sooner);                        /* Handle the busy case directly */
     }
 #if defined(SIM_ASYNCH_MUX)
-if (!sim_asynch_enabled)
+if (!sim_asynch_enabled) {
+    sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "scheduling %s after %u usecs\n", sim_uname (uptr), usecs_walltime);
     return _sim_activate_after (uptr, (double)usecs_walltime);
     }
+sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "scheduling %s asynchronously instead of %u usecs\n", sim_uname (uptr), usecs_walltime);
 return SCPE_OK;
 #else
+sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "scheduling %s after %u usecs\n", sim_uname (uptr), usecs_walltime);
 return _sim_activate_after (uptr, (double)usecs_walltime);
 #endif
 }
@@ -5202,5 +5216,11 @@ if ((dptr) && (dbits & dptr->dctrl)) {
         else
             sim_debug (dbits, dptr, "%s %d bytes '%s'\n", msg, bufsize, tmxr_debug_buf);
         }
+    if ((lp->rxnexttime != 0.0) || (lp->txnexttime != 0.0))
+        if (lp->rxnexttime != 0.0)
+            sim_debug (dbits, dptr, " rxnexttime=%.0f", lp->rxnexttime);
+        if (lp->txnexttime != 0.0)
+            sim_debug (dbits, dptr, " txnexttime=%.0f", lp->txnexttime);
+        sim_debug (dbits, dptr, "\n");
     }
 }
