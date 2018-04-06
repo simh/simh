@@ -497,7 +497,7 @@ const uint32 shift_32_table[65] =
 
 t_stat cpu_show_stack(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
-    int i, j;
+    uint32 i, j;
     uint32 addr, v, count;
     uint8 tmp;
     char *cptr = (char *) desc;
