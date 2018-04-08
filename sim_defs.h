@@ -580,6 +580,8 @@ struct UNIT {
     t_bool              (*cancel)(UNIT *);
     double              usecs_remaining;                /* time balance for long delays */
     char                *uname;                         /* Unit name */
+    DEVICE              *dptr;                          /* DEVICE linkage (backpointer) */
+    uint32              dctrl;                          /* debug control */
 #ifdef SIM_ASYNCH_IO
     void                (*a_check_completion)(UNIT *);
     t_bool              (*a_is_active)(UNIT *);
@@ -634,7 +636,7 @@ struct UNIT {
 #define UNIT_NO_FIO     0000004         /* fileref is NOT a FILE * */
 #define UNIT_DISK_CHK   0000010         /* disk data debug checking (sim_disk) */
 #define UNIT_TMR_UNIT   0000020         /* Unit registered as a calibrated timer */
-#define UNIT_V_DF_TAPE  5               /* Bit offset for Tape Density reservation */
+#define UNIT_V_DF_TAPE  6               /* Bit offset for Tape Density reservation */
 #define UNIT_S_DF_TAPE  3               /* Bits Reserved for Tape Density */
 
 struct BITFIELD {

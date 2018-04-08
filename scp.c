@@ -516,7 +516,7 @@ void int_handler (int signal);
 t_stat set_prompt (int32 flag, CONST char *cptr);
 t_stat sim_set_asynch (int32 flag, CONST char *cptr);
 t_stat sim_set_environment (int32 flag, CONST char *cptr);
-static const char *get_dbg_verb (uint32 dbits, DEVICE* dptr);
+static const char *get_dbg_verb (uint32 dbits, DEVICE* dptr, UNIT *uptr);
 
 /* Global data */
 
@@ -2152,6 +2152,8 @@ static C1TAB set_dev_tab[] = {
 static C1TAB set_unit_tab[] = {
     { "ENABLED",    &set_unit_enbdis,   1 },
     { "DISABLED",   &set_unit_enbdis,   0 },
+    { "DEBUG",      &set_dev_debug,     2+1 },
+    { "NODEBUG",    &set_dev_debug,     2+0 },
     { NULL,         NULL,               0 }
     };
 
@@ -2198,6 +2200,7 @@ static SHTAB show_dev_tab[] = {
     };
 
 static SHTAB show_unit_tab[] = {
+    { "DEBUG",      &show_dev_debug,            1 },
     { NULL, NULL, 0 }
     };
 
@@ -2674,6 +2677,7 @@ void fprint_set_help_ex (FILE *st, DEVICE *dptr, t_bool silent)
 MTAB *mptr;
 DEBTAB *dep;
 t_bool found = FALSE;
+t_bool deb_desc_available = FALSE;
 char buf[CBUFSIZE], header[CBUFSIZE];
 
 sprintf (header, "\n%s device SET commands:\n\n", dptr->name);
@@ -2707,13 +2711,11 @@ if ((dptr->flags & DEV_DEBUG) || (dptr->debflags)) {
     sprintf (buf, "set %s NODEBUG", sim_dname (dptr));
     fprintf (st,  "%-30s\tDisables debugging for device %s\n", buf, sim_dname (dptr));
     if (dptr->debflags) {
-        t_bool desc_available = FALSE;
-
         strcpy (buf, "");
         fprintf (st, "set %s DEBUG=", sim_dname (dptr));
         for (dep = dptr->debflags; dep->name != NULL; dep++) {
             fprintf (st, "%s%s", ((dep == dptr->debflags) ? "" : ";"), dep->name);
-            desc_available |= ((dep->desc != NULL) && (dep->desc[0] != '\0'));
+            deb_desc_available |= ((dep->desc != NULL) && (dep->desc[0] != '\0'));
             }
         fprintf (st, "\n");
         fprintf (st,  "%-30s\tEnables specific debugging for device %s\n", buf, sim_dname (dptr));
@@ -2722,11 +2724,6 @@ if ((dptr->flags & DEV_DEBUG) || (dptr->debflags)) {
             fprintf (st, "%s%s", ((dep == dptr->debflags) ? "" : ";"), dep->name);
         fprintf (st, "\n");
         fprintf (st,  "%-30s\tDisables specific debugging for device %s\n", buf, sim_dname (dptr));
-        if (desc_available) {
-            fprintf (st, "\n*%s device DEBUG settings:\n", sim_dname (dptr));
-            for (dep = dptr->debflags; dep->name != NULL; dep++)
-                fprintf (st, "%4s%-12s%s\n", "", dep->name, dep->desc ? dep->desc : "");
-            }
         }
     }
 if ((dptr->modifiers) && (dptr->units) && (dptr->numunits != 1)) {
@@ -2736,6 +2733,27 @@ if ((dptr->modifiers) && (dptr->units) && (dptr->numunits != 1)) {
         fprintf (st,  "%-30s\tEnables unit %sn\n", buf, sim_dname (dptr));
         sprintf (buf, "set %sn DISABLE", sim_dname (dptr));
         fprintf (st,  "%-30s\tDisables unit %sn\n", buf, sim_dname (dptr));
+        }
+    if (((dptr->flags & DEV_DEBUG) || (dptr->debflags)) &&
+        ((DEV_TYPE(dptr) == DEV_DISK) || (DEV_TYPE(dptr) == DEV_TAPE))) {
+        sprintf (buf, "set %sn DEBUG", sim_dname (dptr));
+        fprintf (st,  "%-30s\tEnables debugging for device unit %sn\n", buf, sim_dname (dptr));
+        sprintf (buf, "set %sn NODEBUG", sim_dname (dptr));
+        fprintf (st,  "%-30s\tDisables debugging for device unit %sn\n", buf, sim_dname (dptr));
+        if (dptr->debflags) {
+            strcpy (buf, "");
+            fprintf (st, "set %sn DEBUG=", sim_dname (dptr));
+            for (dep = dptr->debflags; dep->name != NULL; dep++)
+                fprintf (st, "%s%s", ((dep == dptr->debflags) ? "" : ";"), dep->name);
+            fprintf (st, "\n");
+            fprintf (st,  "%-30s\tEnables specific debugging for device unit %sn\n", buf, sim_dname (dptr));
+            fprintf (st, "set %sn NODEBUG=", sim_dname (dptr));
+            for (dep = dptr->debflags; dep->name != NULL; dep++)
+                fprintf (st, "%s%s", ((dep == dptr->debflags) ? "" : ";"), dep->name);
+            fprintf (st, "\n");
+            fprintf (st,  "%-30s\tDisables specific debugging for device unit %sn\n", buf, sim_dname (dptr));
+            }
+
         }
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
         if ((!MODMASK(mptr,MTAB_VUN)) && MODMASK(mptr,MTAB_XTD))
@@ -2750,6 +2768,11 @@ if ((dptr->modifiers) && (dptr->units) && (dptr->numunits != 1)) {
                 fprintf (st,  "%-30s\t%s\n", "", mptr->help);
             }
         }
+    }
+if (deb_desc_available) {
+    fprintf (st, "\n*%s device DEBUG settings:\n", sim_dname (dptr));
+    for (dep = dptr->debflags; dep->name != NULL; dep++)
+        fprintf (st, "%4s%-12s%s\n", "", dep->name, dep->desc ? dep->desc : "");
     }
 if (!found && !silent)
     fprintf (st, "No SET help is available for the %s device\n", dptr->name);
@@ -4661,7 +4684,7 @@ while (*cptr != 0) {                                    /* do all mods */
                 if (cvptr)                              /* = value? */
                     return SCPE_ARG;
                 if (uptr->flags & UNIT_DIS)             /* disabled? */
-                     return SCPE_UDIS;
+                    return SCPE_UDIS;
                 if ((mptr->valid) &&                    /* invalid? */
                     ((r = mptr->valid (uptr, mptr->match, cvptr, mptr->desc)) != SCPE_OK))
                     return r;
@@ -4769,20 +4792,28 @@ else {
 return SCPE_OK;
 }
 
-/* Set device debug enabled/disabled routine */
+/* Set device/unit debug enabled/disabled routine */
 
-t_stat set_dev_debug (DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr)
+t_stat set_dev_debug (DEVICE *dptr, UNIT *uptr, int32 flags, CONST char *cptr)
 {
+int32 flag = flags & 1;
+t_bool uflag = ((flags & 2) != 0);
 char gbuf[CBUFSIZE];
 DEBTAB *dep;
 
 if ((dptr->flags & DEV_DEBUG) == 0)
     return SCPE_NOFNC;
 if (cptr == NULL) {                                     /* no arguments? */
-    dptr->dctrl = flag ? (dptr->debflags ? flag : 0xFFFFFFFF) : 0;/* disable/enable w/o table */
+    if (uflag)
+        uptr->dctrl = flag ? (dptr->debflags ? flag : 0xFFFFFFFF) : 0;/* disable/enable w/o table */
+    else
+        dptr->dctrl = flag ? (dptr->debflags ? flag : 0xFFFFFFFF) : 0;/* disable/enable w/o table */
     if (flag && dptr->debflags) {                       /* enable with table? */
         for (dep = dptr->debflags; dep->name != NULL; dep++)
-            dptr->dctrl = dptr->dctrl | dep->mask;      /* set all */
+            if (uflag)
+                uptr->dctrl = uptr->dctrl | dep->mask;      /* set all */
+            else
+                dptr->dctrl = dptr->dctrl | dep->mask;      /* set all */
         }
     return SCPE_OK;
     }
@@ -4793,8 +4824,15 @@ while (*cptr) {
     for (dep = dptr->debflags; dep->name != NULL; dep++) {
         if (strcmp (dep->name, gbuf) == 0) {            /* match? */
             if (flag)
-                dptr->dctrl = dptr->dctrl | dep->mask;
-            else dptr->dctrl = dptr->dctrl & ~dep->mask;
+                if (uflag)
+                    uptr->dctrl = uptr->dctrl | dep->mask;
+                else
+                    dptr->dctrl = dptr->dctrl | dep->mask;
+            else
+                if (uflag)
+                    uptr->dctrl = uptr->dctrl & ~dep->mask;
+                else
+                    dptr->dctrl = dptr->dctrl & ~dep->mask;
             break;
             }
         }                                               /* end for */
@@ -5407,11 +5445,38 @@ fprintf (st, "Radix=%d\n", dptr->dradix);
 return SCPE_OK;
 }
 
-t_stat show_dev_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr)
+t_stat show_dev_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 uflag, CONST char *cptr)
 {
-int32 any = 0;
 DEBTAB *dep;
+uint32 unit;
+int32 any = 0;
 
+if (uflag) {
+    if ((dptr->flags & DEV_DEBUG) || (dptr->debflags)) {
+        if (!uptr->dctrl)
+            return SCPE_OK;
+        if (dptr->debflags == NULL)
+            fprintf (st, "%s: Debugging enabled\n", sim_uname (uptr));
+        else {
+            uint32 dctrl = uptr->dctrl;
+
+            for (dep = dptr->debflags; (dctrl != 0) && (dep->name != NULL); dep++) {
+                if ((dctrl & dep->mask) == dep->mask) {
+                    dctrl &= ~dep->mask;
+                    if (any)
+                        fputc (';', st);
+                    else
+                        fprintf (st, "%s: Debug=", sim_uname (uptr));
+                    fputs (dep->name, st);
+                    any = 1;
+                    }
+                }
+            if (any)
+                fputc ('\n', st);
+            }
+        }
+    return SCPE_OK;
+    }
 if ((dptr->flags & DEV_DEBUG) || (dptr->debflags)) {
     if (dptr->dctrl == 0)
         fputs ("Debugging disabled", st);
@@ -5432,6 +5497,8 @@ if ((dptr->flags & DEV_DEBUG) || (dptr->debflags)) {
             }
         }
     fputc ('\n', st);
+    for (unit = 0; unit < dptr->numunits; unit++)
+        show_dev_debug (st, dptr, &dptr->units[unit], 1, NULL);
     return SCPE_OK;
     }
 else return SCPE_NOFNC;
@@ -5718,7 +5785,7 @@ if (dir) {
 #endif
     t_offset FileSize;
     char FileName[PATH_MAX + 1];
-    const char *MatchName = 1 + strrchr (cptr, '/');;
+    const char *MatchName = 1 + strrchr (cptr, '/');
     char *p_name;
     struct tm *local;
 #if defined (HAVE_GLOB)
@@ -9068,17 +9135,23 @@ uint32 i, j;
 
 if (uptr == NULL)
     return NULL;
+if (uptr->dptr)
+    return uptr->dptr;
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
     for (j = 0; j < dptr->numunits; j++) {
-        if (uptr == (dptr->units + j))
+        if (uptr == (dptr->units + j)) {
+            uptr->dptr = dptr;
             return dptr;
+            }
         }
     }
 for (i = 0; i<sim_internal_device_count; i++) {
     dptr = sim_internal_devices[i];
     for (j = 0; j < dptr->numunits; j++) {
-        if (uptr == (dptr->units + j))
+        if (uptr == (dptr->units + j)) {
+            uptr->dptr = dptr;
             return dptr;
+            }
         }
     }
 return NULL;
@@ -11142,7 +11215,7 @@ if (exp->buf_size) {
     free (bstr);
     }
 if (exp->dptr && (exp->dbit & exp->dptr->dctrl))
-    fprintf (st, "  Expect Debugging via: SET %s DEBUG%s%s\n", sim_dname(exp->dptr), exp->dptr->debflags ? "=" : "", exp->dptr->debflags ? get_dbg_verb (exp->dbit, exp->dptr) : "");
+    fprintf (st, "  Expect Debugging via: SET %s DEBUG%s%s\n", sim_dname(exp->dptr), exp->dptr->debflags ? "=" : "", exp->dptr->debflags ? get_dbg_verb (exp->dbit, exp->dptr, NULL) : "");
 fprintf (st, "  Match Rules:\n");
 if (!*match)
     return sim_exp_showall (st, exp);
@@ -11404,7 +11477,7 @@ if (after)
 if (delay)
     fprintf (st, "  Default delay between character input is %u instructions\n", after);
 if (snd->dptr && (snd->dbit & snd->dptr->dctrl))
-    fprintf (st, "  Send Debugging via: SET %s DEBUG%s%s\n", sim_dname(snd->dptr), snd->dptr->debflags ? "=" : "", snd->dptr->debflags ? get_dbg_verb (snd->dbit, snd->dptr) : "");
+    fprintf (st, "  Send Debugging via: SET %s DEBUG%s%s\n", sim_dname(snd->dptr), snd->dptr->debflags ? "=" : "", snd->dptr->debflags ? get_dbg_verb (snd->dbit, snd->dptr, NULL) : "");
 return SCPE_OK;
 }
 
@@ -11481,7 +11554,7 @@ int32 debug_unterm  = 0;
 
 /* Finds debug phrase matching bitmask from from device DEBTAB table */
 
-static const char *get_dbg_verb (uint32 dbits, DEVICE* dptr)
+static const char *get_dbg_verb (uint32 dbits, DEVICE* dptr, UNIT *uptr)
 {
 static const char *debtab_none    = "DEBTAB_ISNULL";
 static const char *debtab_nomatch = "DEBTAB_NOMATCH";
@@ -11491,7 +11564,7 @@ int32 offset = 0;
 if (dptr->debflags == 0)
     return debtab_none;
 
-dbits &= dptr->dctrl;                           /* Look for just the bits that matched */
+dbits &= (dptr->dctrl | (uptr ? uptr->dctrl : 0));/* Look for just the bits that matched */
 
 /* Find matching words for bitmask */
 
@@ -11507,9 +11580,9 @@ return some_match ? some_match : debtab_nomatch;
 
 /* Prints standard debug prefix unless previous call unterminated */
 
-static const char *sim_debug_prefix (uint32 dbits, DEVICE* dptr)
+static const char *sim_debug_prefix (uint32 dbits, DEVICE* dptr, UNIT* uptr)
 {
-const char* debug_type = get_dbg_verb (dbits, dptr);
+const char* debug_type = get_dbg_verb (dbits, dptr, uptr);
 char tim_t[32] = "";
 char tim_a[32] = "";
 char pc_s[64] = "";
@@ -11602,7 +11675,7 @@ if (sim_deb && dptr && (dptr->dctrl & dbits)) {
 
     sim_oline = NULL;                                                   /* avoid potential debug to active socket */
     if (!debug_unterm)
-        fprintf(sim_deb, "%s", sim_debug_prefix(dbits, dptr));          /* print prefix if required */
+        fprintf(sim_deb, "%s", sim_debug_prefix(dbits, dptr, NULL));    /* print prefix if required */
     if (header)
         fprintf(sim_deb, "%s: ", header);
     fprint_fields (sim_deb, (t_value)before, (t_value)after, bitdefs);  /* print xlation, transition */
@@ -11777,29 +11850,25 @@ return stat | SCPE_NOMESSAGE;
    Callers should be calling sim_debug() which is a macro
    defined in scp.h which evaluates the action condition before 
    incurring call overhead. */
-void _sim_debug (uint32 dbits, DEVICE* vdptr, const char* fmt, ...)
+static void _sim_vdebug (uint32 dbits, DEVICE* dptr, UNIT *uptr, const char* fmt, va_list arglist)
 {
-DEVICE *dptr = (DEVICE *)vdptr;
-if (sim_deb && dptr && (dptr->dctrl & dbits)) {
+if (sim_deb && dptr && ((dptr->dctrl | (uptr ? uptr->dctrl : 0)) & dbits)) {
     TMLN *saved_oline = sim_oline;
     char stackbuf[STACKBUFSIZE];
     int32 bufsize = sizeof(stackbuf);
     char *buf = stackbuf;
-    va_list arglist;
     int32 i, j, len;
-    const char* debug_prefix = sim_debug_prefix(dbits, dptr);   /* prefix to print if required */
+    const char* debug_prefix = sim_debug_prefix(dbits, dptr, uptr);   /* prefix to print if required */
 
     sim_oline = NULL;                                   /* avoid potential debug to active socket */
     buf[bufsize-1] = '\0';
 
     while (1) {                                         /* format passed string, args */
-        va_start (arglist, fmt);
 #if defined(NO_vsnprintf)
         len = vsprintf (buf, fmt, arglist);
 #else                                                   /* !defined(NO_vsnprintf) */
         len = vsnprintf (buf, bufsize-1, fmt, arglist);
 #endif                                                  /* NO_vsnprintf */
-        va_end (arglist);
 
 /* If the formatted result didn't fit into the buffer, then grow the buffer and try again */
 
@@ -11847,14 +11916,35 @@ if (sim_deb && dptr && (dptr->dctrl & dbits)) {
         free (buf);
     sim_oline = saved_oline;                            /* restore original socket */
     }
-return;
+}
+
+void _sim_debug_unit (uint32 dbits, UNIT *uptr, const char* fmt, ...)
+{
+DEVICE *dptr = (uptr ? uptr->dptr : NULL);
+
+if (sim_deb && (((dptr ? dptr->dctrl : 0) | (uptr ? uptr->dctrl : 0)) & dbits)) {
+    va_list arglist;
+    va_start (arglist, fmt);
+    _sim_vdebug (dbits, dptr, uptr, fmt, arglist);
+    va_end (arglist);
+    }
+}
+
+void _sim_debug_device (uint32 dbits, DEVICE* dptr, const char* fmt, ...)
+{
+if (sim_deb && dptr && (dptr->dctrl & dbits)) {
+    va_list arglist;
+    va_start (arglist, fmt);
+    _sim_vdebug (dbits, dptr, NULL, fmt, arglist);
+    va_end (arglist);
+    }
 }
 
 void sim_data_trace(DEVICE *dptr, UNIT *uptr, const uint8 *data, const char *position, size_t len, const char *txt, uint32 reason)
 {
 
-if (sim_deb && (dptr->dctrl & reason)) {
-    sim_debug (reason, dptr, "%s %s %slen: %08X\n", sim_uname(uptr), txt, position, (unsigned int)len);
+if (sim_deb && ((dptr->dctrl | (uptr ? uptr->dctrl : 0)) & reason)) {
+    _sim_debug_unit (reason, uptr, "%s %s %slen: %08X\n", sim_uname(uptr), txt, position, (unsigned int)len);
     if (data && len) {
         unsigned int i, same, group, sidx, oidx, ridx, eidx, soff;
         char outbuf[80], strbuf[28], rad50buf[36], ebcdicbuf[32];
@@ -11901,7 +11991,7 @@ if (sim_deb && (dptr->dctrl & reason)) {
                 continue;
                 }
             if (same > 0) {
-                sim_debug (reason, dptr, "%04X thru %04X same as above\n", i-(16*same), i-1);
+                _sim_debug_unit (reason, uptr, "%04X thru %04X same as above\n", i-(16*same), i-1);
                 same = 0;
                 }
             group = (((len - i) > 16) ? 16 : (len - i));
@@ -11944,10 +12034,10 @@ if (sim_deb && (dptr->dctrl & reason)) {
             strbuf[soff+sidx] = '\0';
             ebcdicbuf[eidx] = '\0';
             rad50buf[ridx] = '\0';
-            sim_debug (reason, dptr, "%04X%-48s %s%s%s\n", i, outbuf, strbuf, ebcdicbuf, rad50buf);
+            _sim_debug_unit (reason, uptr, "%04X%-48s %s%s%s\n", i, outbuf, strbuf, ebcdicbuf, rad50buf);
             }
         if (same > 0) {
-            sim_debug (reason, dptr, "%04X thru %04X same as above\n", i-(16*same), (unsigned int)(len-1));
+            _sim_debug_unit (reason, uptr, "%04X thru %04X same as above\n", i-(16*same), (unsigned int)(len-1));
             }
         }
     }
