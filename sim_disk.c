@@ -1522,11 +1522,21 @@ else
 
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_STD:                                    /* SIMH format */
-        if (NULL == (uptr->fileref = sim_vhd_disk_open (cptr, "rb"))) {
-            if (errno == EBADF)                        /* VHD but broken */
+        if (NULL == (uptr->fileref = sim_vhd_disk_open (cptr, "rb"))) { /* Try VHD */
+            if (errno == EBADF)                         /* VHD but broken */
                 return SCPE_OPENERR;
-            open_function = sim_fopen;
-            size_function = sim_fsize_ex;
+            if (NULL == (uptr->fileref = sim_os_disk_open_raw (cptr, "rb"))) {
+                open_function = sim_fopen;
+                size_function = sim_fsize_ex;
+                break;
+                }
+            sim_disk_set_fmt (uptr, 0, "RAW", NULL);        /* set file format to RAW */
+            sim_os_disk_close_raw (uptr->fileref);          /* close raw file*/
+            open_function = sim_os_disk_open_raw;
+            size_function = sim_os_disk_size_raw;
+            storage_function = sim_os_disk_info_raw;
+            auto_format = TRUE;
+            uptr->fileref = NULL;
             break;
             }
         sim_disk_set_fmt (uptr, 0, "VHD", NULL);        /* set file format to VHD */
@@ -2296,7 +2306,10 @@ static FILE *sim_os_disk_open_raw (const char *rawdevicename, const char *openmo
 HANDLE Handle;
 DWORD DesiredAccess = 0;
 uint32 is_cdrom;
+char *tmpname = (char *)malloc (2 + strlen (rawdevicename));
 
+if (tmpname == NULL)
+    return NULL;
 if (strchr (openmode, 'r'))
     DesiredAccess |= GENERIC_READ;
 if (strchr (openmode, 'w') || strchr (openmode, '+'))
@@ -2305,37 +2318,26 @@ if (strchr (openmode, 'w') || strchr (openmode, '+'))
    escape sequence.  This only affecdts RAW device names and UNC paths.
    We handle the RAW device name case here by prepending paths beginning 
    with \.\ with an extra \. */
-if (!memcmp ("\\.\\", rawdevicename, 3)) {
-    char *tmpname = (char *)malloc (2 + strlen (rawdevicename));
-
-    if (tmpname == NULL)
-        return NULL;
+if ((!memcmp ("\\.\\", rawdevicename, 3)) ||
+    (!memcmp ("/./", rawdevicename, 3))) {
     *tmpname = '\\';
     strcpy (tmpname + 1, rawdevicename);
-    Handle = CreateFileA (tmpname, DesiredAccess, FILE_SHARE_READ|FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_RANDOM_ACCESS|FILE_FLAG_WRITE_THROUGH, NULL);
-    free (tmpname);
-    if (Handle != INVALID_HANDLE_VALUE) {
-        if ((sim_os_disk_info_raw ((FILE *)Handle, NULL, NULL, &is_cdrom)) || 
-            (DesiredAccess & GENERIC_WRITE) && is_cdrom) {
-            CloseHandle (Handle);
-            errno = EACCES;
-            return NULL;
-            }
-        return (FILE *)Handle;
+    }
+else
+    strcpy (tmpname, rawdevicename);
+Handle = CreateFileA (tmpname, DesiredAccess, FILE_SHARE_READ|FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_RANDOM_ACCESS|FILE_FLAG_WRITE_THROUGH, NULL);
+free (tmpname);
+if (Handle != INVALID_HANDLE_VALUE) {
+    if ((sim_os_disk_info_raw ((FILE *)Handle, NULL, NULL, &is_cdrom)) || 
+        (DesiredAccess & GENERIC_WRITE) && is_cdrom) {
+        CloseHandle (Handle);
+        errno = EACCES;
+        return NULL;
         }
+    return (FILE *)Handle;
     }
-Handle = CreateFileA (rawdevicename, DesiredAccess, FILE_SHARE_READ|FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_RANDOM_ACCESS|FILE_FLAG_WRITE_THROUGH, NULL);
-if (Handle == INVALID_HANDLE_VALUE) {
-    _set_errno_from_status (GetLastError ());
-    return NULL;
-    }
-if ((sim_os_disk_info_raw ((FILE *)Handle, NULL, NULL, &is_cdrom)) || 
-    (DesiredAccess & GENERIC_WRITE) && is_cdrom) {
-    CloseHandle (Handle);
-    errno = EACCES;
-    return NULL;
-    }
-return (FILE *)Handle;
+_set_errno_from_status (GetLastError ());
+return NULL;
 }
 
 static int sim_os_disk_close_raw (FILE *f)
