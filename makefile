@@ -453,11 +453,11 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     endif
   endif
   # Find available RegEx library.  Prefer libpcreposix.
-  ifneq (,$(call find_include,pcreposix))
-    ifneq (,$(call find_lib,pcreposix))
+  ifneq (,$(and $(call find_include,pcreposix),$(call find_include,pcre)))
+    ifneq (,$(and $(call find_lib,pcreposix),$(call find_lib,pcre)))
       OS_CCDEFS += -DHAVE_PCREPOSIX_H
-      OS_LDFLAGS += -lpcreposix
-      $(info using libpcreposix: $(call find_lib,pcreposix) $(call find_include,pcreposix))
+      OS_LDFLAGS += -lpcreposix -lpcre
+      $(info using libpcreposix: $(call find_lib,pcreposix) $(call find_lib,pcre) $(call find_include,pcreposix) $(call find_include,pcre))
       ifeq ($(LD_SEARCH_NEEDED),$(call need_search,pcreposix))
         OS_LDFLAGS += -L$(dir $(call find_lib,pcreposix))
       endif

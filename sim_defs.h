@@ -140,6 +140,7 @@ extern int sim_vax_snprintf(char *buf, size_t buf_size, const char *fmt, ...);
 #endif
 #if defined(HAVE_PCREPOSIX_H)
 #include <pcreposix.h>
+#include <pcre.h>
 #define USE_REGEX 1
 #elif defined(HAVE_REGEX_H)
 #include <regex.h>

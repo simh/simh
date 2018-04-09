@@ -5206,7 +5206,7 @@ if (flag) {
     fprintf (st, "\n        %s", sim_toffset_64 ? "Large File (>2GB) support" : "No Large File support");
     fprintf (st, "\n        SDL Video support: %s", vid_version());
 #if defined (HAVE_PCREPOSIX_H)
-    fprintf (st, "\n        PCRE RegEx support for EXPECT commands");
+    fprintf (st, "\n        PCRE RegEx (Version %s) support for EXPECT commands", pcre_version());
 #elif defined (HAVE_REGEX_H)
     fprintf (st, "\n        RegEx support for EXPECT commands");
 #else
