@@ -2622,6 +2622,12 @@ if (strchr (openmode, 'r') && (strchr (openmode, '+') || strchr (openmode, 'w'))
 else
     if (strchr (openmode, 'r'))
         mode = O_RDONLY;
+if (mode == O_RDONLY) {
+    struct stat statb;
+
+    if (stat (rawdevicename, &statb))       /* test for existence/access */
+        return (FILE *)NULL;
+    }
 #ifdef O_LARGEFILE
 mode |= O_LARGEFILE;
 #endif
