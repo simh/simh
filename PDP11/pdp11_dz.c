@@ -78,7 +78,9 @@
 #if !defined (DZ_MUXES)
 #define DZ_MUXES        1
 #endif
+#if !defined (MAX_DZ_MUXES)
 #define MAX_DZ_MUXES    32
+#endif
 #define DZ_LINES        (UNIBUS ? 8 : 4)                /* lines per DZ mux */
 
 #if DZ_MUXES > MAX_DZ_MUXES

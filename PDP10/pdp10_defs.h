@@ -627,8 +627,8 @@ typedef struct pdp_dib DIB;
 
 /* I/O system parameters */
 
-#define DZ_MUXES        4                               /* max # of muxes */
-#define DZ_LINES        8                               /* lines per mux */
+#define DZ_MUXES        4                               /* default # of muxes */
+#define MAX_DZ_MUXES    4                               /* max # of muxes */
 #define KMC_UNITS       1                               /* max # of KMCs */
 #define INITIAL_KMCS    0                               /* Number initially enabled */
 #define DUP_LINES       4                               /* max # of DUP11's */
