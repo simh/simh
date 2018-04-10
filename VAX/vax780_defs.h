@@ -253,8 +253,7 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc
 
 /* I/O system definitions */
 
-#define DZ_MUXES        4                               /* max # of DZV muxes */
-#define DZ_LINES        8                               /* lines per DZV mux */
+#define DZ_MUXES        4                               /* default # of DZV muxes */
 #define VH_MUXES        4                               /* max # of DHU muxes */
 #define DLX_LINES       16                              /* max # of KL11/DL11's */
 #define DCX_LINES       16                              /* max # of DC11's */

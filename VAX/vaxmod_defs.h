@@ -271,8 +271,7 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc
 
 /* I/O system definitions */
 
-#define DZ_MUXES        4                               /* max # of DZV muxes */
-#define DZ_LINES        4                               /* lines per DZV mux */
+#define DZ_MUXES        4                               /* default # of DZV muxes */
 #define VH_MUXES        4                               /* max # of DHQ muxes */
 #define MT_MAXFR        (1 << 16)                       /* magtape max rec */
 

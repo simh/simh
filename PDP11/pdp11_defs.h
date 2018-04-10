@@ -483,8 +483,7 @@ typedef struct {
 
 /* IO parameters */
 
-#define DZ_MUXES        4                               /* max # of DZ muxes */
-#define DZ_LINES        8                               /* lines per DZ mux */
+#define DZ_MUXES        4                               /* default # of DZ muxes */
 #define VH_MUXES        4                               /* max # of VH muxes */
 #define DLX_LINES       16                              /* max # of KL11/DL11's */
 #define DCX_LINES       16                              /* max # of DC11's */
