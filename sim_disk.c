@@ -296,10 +296,11 @@ struct sim_disk_fmt {
     t_stat              (*impl_fnc)(void);              /* Implemented Test Function */
     };
 
-static struct sim_disk_fmt fmts[DKUF_N_FMT] = {
-    { "SIMH", 0, DKUF_F_STD, NULL},
-    { "RAW",  0, DKUF_F_RAW, sim_os_disk_implemented_raw},
-    { "VHD",  0, DKUF_F_VHD, sim_vhd_disk_implemented},
+static struct sim_disk_fmt fmts[] = {
+    { "AUTO", 0, DKUF_F_AUTO, NULL},
+    { "SIMH", 0, DKUF_F_STD,  NULL},
+    { "RAW",  0, DKUF_F_RAW,  sim_os_disk_implemented_raw},
+    { "VHD",  0, DKUF_F_VHD,  sim_vhd_disk_implemented},
     { NULL,   0, 0}
     };
 
@@ -313,7 +314,7 @@ if (uptr == NULL)
     return SCPE_IERR;
 if (cptr == NULL)
     return SCPE_ARG;
-for (f = 0; f < DKUF_N_FMT && fmts[f].name; f++) {
+for (f = 0; fmts[f].name; f++) {
     if (fmts[f].name && (strcmp (cptr, fmts[f].name) == 0)) {
         if ((fmts[f].impl_fnc) && (fmts[f].impl_fnc() != SCPE_OK))
             return SCPE_NOFNC;
@@ -322,7 +323,7 @@ for (f = 0; f < DKUF_N_FMT && fmts[f].name; f++) {
         return SCPE_OK;
         }
     }
-return SCPE_ARG;
+return sim_messagef (SCPE_ARG, "Unknown disk format: %s\n", cptr);
 }
 
 /* Show disk format */
@@ -332,7 +333,7 @@ t_stat sim_disk_show_fmt (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 int32 f = DK_GET_FMT (uptr);
 size_t i;
 
-for (i = 0; i < DKUF_N_FMT; i++)
+for (i = 0; fmts[i].name; i++)
     if (fmts[i].fmtval == f) {
         fprintf (st, "%s format", fmts[i].name);
         return SCPE_OK;
@@ -1352,8 +1353,9 @@ if (sim_switches & SWMASK ('F')) {                      /* format spec? */
     cptr = get_glyph (cptr, gbuf, 0);                   /* get spec */
     if (*cptr == 0)                                     /* must be more */
         return SCPE_2FARG;
-    if (sim_disk_set_fmt (uptr, 0, gbuf, NULL) != SCPE_OK)
-        return sim_messagef (SCPE_ARG, "Invalid Disk Format: %s\n", gbuf);
+    if ((sim_disk_set_fmt (uptr, 0, gbuf, NULL) != SCPE_OK) ||
+        (DK_GET_FMT (uptr) == DKUF_F_AUTO))
+        return sim_messagef (SCPE_ARG, "Invalid Override Disk Format: %s\n", gbuf);
     sim_switches = sim_switches & ~(SWMASK ('F'));      /* Record Format specifier already processed */
     auto_format = TRUE;
     }
@@ -1521,29 +1523,31 @@ else
         }
 
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
-    case DKUF_F_STD:                                    /* SIMH format */
-        if (NULL == (uptr->fileref = sim_vhd_disk_open (cptr, "rb"))) { /* Try VHD */
-            if (errno == EBADF)                         /* VHD but broken */
-                return SCPE_OPENERR;
-            if (NULL == (uptr->fileref = sim_os_disk_open_raw (cptr, "rb"))) {
-                open_function = sim_fopen;
-                size_function = sim_fsize_ex;
-                break;
-                }
-            sim_disk_set_fmt (uptr, 0, "RAW", NULL);        /* set file format to RAW */
-            sim_os_disk_close_raw (uptr->fileref);          /* close raw file*/
-            open_function = sim_os_disk_open_raw;
-            size_function = sim_os_disk_size_raw;
-            storage_function = sim_os_disk_info_raw;
-            auto_format = TRUE;
+    case DKUF_F_AUTO:                                   /* SIMH format */
+        auto_format = TRUE;
+        if (NULL != (uptr->fileref = sim_vhd_disk_open (cptr, "rb"))) { /* Try VHD */
+            sim_disk_set_fmt (uptr, 0, "VHD", NULL);    /* set file format to VHD */
+            sim_vhd_disk_close (uptr->fileref);         /* close vhd file*/
             uptr->fileref = NULL;
             break;
             }
-        sim_disk_set_fmt (uptr, 0, "VHD", NULL);        /* set file format to VHD */
-        sim_vhd_disk_close (uptr->fileref);             /* close vhd file*/
-        auto_format = TRUE;
-        uptr->fileref = NULL;
-        /* Fall through to normal VHD processing */
+        if (NULL != (uptr->fileref = sim_os_disk_open_raw (cptr, "rb"))) {
+            sim_disk_set_fmt (uptr, 0, "RAW", NULL);    /* set file format to RAW */
+            sim_os_disk_close_raw (uptr->fileref);      /* close raw file*/
+            open_function = sim_os_disk_open_raw;
+            size_function = sim_os_disk_size_raw;
+            storage_function = sim_os_disk_info_raw;
+            uptr->fileref = NULL;
+            break;
+            }
+        sim_disk_set_fmt (uptr, 0, "SIMH", NULL);       /* set file format to SIMH */
+        open_function = sim_fopen;
+        size_function = sim_fsize_ex;
+        break;
+    case DKUF_F_STD:                                    /* SIMH format */
+        open_function = sim_fopen;
+        size_function = sim_fsize_ex;
+        break;
     case DKUF_F_VHD:                                    /* VHD format */
         open_function = sim_vhd_disk_open;
         create_function = sim_vhd_disk_create;
@@ -1842,7 +1846,7 @@ free (uptr->disk_ctx);
 uptr->disk_ctx = NULL;
 uptr->io_flush = NULL;
 if (auto_format)
-    sim_disk_set_fmt (uptr, 0, "SIMH", NULL);           /* restore file format */
+    sim_disk_set_fmt (uptr, 0, "AUTO", NULL);           /* restore file format */
 if (close_function (fileref) == EOF)
     return SCPE_IOERR;
 return SCPE_OK;
