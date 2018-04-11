@@ -155,6 +155,8 @@
 
 #define ID_NUM_UNITS   2
 
+#define DMA_ID_SVC     IDBASE+ID_DATA_REG
+
 extern DEVICE id_dev;
 extern DEBTAB sys_deb_tab[];
 extern t_bool id_drq;
@@ -180,9 +182,8 @@ CONST char *id_description(DEVICE *dptr);
 t_stat id_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 void id_handle_data(uint8 val);
 void id_handle_command(uint8 val);
+void id_after_dma();
 
 static SIM_INLINE t_lba id_lba(uint16 cyl, uint8 head, uint8 sec);
-
-void id_drq_handled();
 
 #endif

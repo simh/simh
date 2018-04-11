@@ -121,7 +121,7 @@ REG tti_reg[] = {
     { NULL }
 };
 
-UNIT tti_unit = { UDATA(&iu_svc_tti, UNIT_IDLE, 0), TMLN_SPD_19200_BPS };
+UNIT tti_unit = { UDATA(&iu_svc_tti, UNIT_IDLE, 0), TMLN_SPD_9600_BPS };
 
 DEVICE tti_dev = {
     "TTI", &tti_unit, tti_reg, NULL,
@@ -198,13 +198,25 @@ UNIT contty_unit[2] = {
 UNIT *contty_rcv_unit = &contty_unit[0];
 UNIT *contty_xmt_unit = &contty_unit[1];
 
+DEBTAB contty_deb_tab[] = {
+    {"EXEC", EXECUTE_MSG, "Execute"},
+    {"XMT",  TMXR_DBG_XMT,  "Transmitted Data"},
+    {"RCV",  TMXR_DBG_RCV,  "Received Data"},
+    {"MDM",  TMXR_DBG_MDM,  "Modem Signals"},
+    {"CON",  TMXR_DBG_CON,  "connection activities"},
+    {"TRC",  TMXR_DBG_TRC,  "trace routine calls"},
+    {"ASY",  TMXR_DBG_ASY,  "Asynchronous Activities"},
+    {0}
+};
+
+
 DEVICE contty_dev = {
     "CONTTY", contty_unit, contty_reg, NULL,
     1, 8, 32, 1, 8, 8,
     &tmxr_ex, &tmxr_dep, &contty_reset,
     NULL, &contty_attach, &contty_detach,
     NULL, DEV_DISABLE|DEV_DEBUG|DEV_MUX,
-    0, sys_deb_tab, NULL, NULL,
+    0, contty_deb_tab, NULL, NULL,
     NULL, NULL,
     (void *)&contty_desc,
     NULL
@@ -235,9 +247,14 @@ uint8 bits_per_char = 7;
 
 t_stat contty_attach(UNIT *uptr, CONST char *cptr)
 {
-    t_stat r = tmxr_attach(&contty_desc, uptr, cptr);
+    t_stat r;
     TMLN *lp;
 
+    tmxr_set_modem_control_passthru(&contty_desc);
+    tmxr_set_line_unit(&contty_desc, 0, contty_rcv_unit);
+    tmxr_set_line_output_unit(&contty_desc, 0, contty_xmt_unit);
+
+    r = tmxr_attach(&contty_desc, uptr, cptr);
     if (r != SCPE_OK) {
         tmxr_clear_modem_control_passthru(&contty_desc);
         return r;
@@ -281,6 +298,9 @@ void iu_txrdy_a_irq() {
     if ((iu_state.imr & IMR_TXRA) &&
         (iu_console.conf & TX_EN) &&
         (iu_console.stat & STS_TXR)) {
+        sim_debug(EXECUTE_MSG, &tto_dev,
+                  "[iu_txrdy_a_irq()] Firing IRQ after transmit of %02x (%c)\n",
+                  (uint8) iu_console.txbuf, (char) iu_console.txbuf);
         csr_data |= CSRUART;
     }
 }
@@ -289,6 +309,9 @@ void iu_txrdy_b_irq() {
     if ((iu_state.imr & IMR_TXRB) &&
         (iu_contty.conf & TX_EN) &&
         (iu_contty.stat & STS_TXR)) {
+        sim_debug(EXECUTE_MSG, &contty_dev,
+                  "[iu_txrdy_b_irq()] Firing IRQ after transmit of %02x (%c)\n",
+                  (uint8) iu_contty.txbuf, (char) iu_contty.txbuf);
         csr_data |= CSRUART;
     }
 }
@@ -297,8 +320,6 @@ t_stat tti_reset(DEVICE *dptr)
 {
     memset(&iu_state, 0, sizeof(IU_STATE));
     memset(&iu_console, 0, sizeof(IU_PORT));
-
-    tmxr_set_console_units(&tti_unit, &tto_unit);
 
     /* Input Port logic is inverted - 0 means set */
     iu_state.inprt = ~(IU_DCDA);
@@ -314,12 +335,19 @@ t_stat tti_reset(DEVICE *dptr)
 t_stat contty_reset(DEVICE *dtpr)
 {
     char line_config[16];
+    t_stat result;
 
     if (contty_ldsc == NULL) {
         contty_desc.ldsc =
             contty_ldsc =
             (TMLN *)calloc(1, sizeof(*contty_ldsc));
     }
+
+    tmxr_set_port_speed_control(&contty_desc);
+
+    /* tmxr_set_line_unit(&contty_desc, 0, contty_rcv_unit); */
+    /* tmxr_set_line_output_unit(&contty_desc, 0, contty_xmt_unit); */
+    /* tmxr_set_console_units(&tti_unit, &tto_unit); */
 
     memset(&iu_state, 0, sizeof(IU_STATE));
     memset(&iu_contty, 0, sizeof(IU_PORT));
@@ -393,7 +421,16 @@ t_stat iu_svc_tti(UNIT *uptr)
 
 t_stat iu_svc_tto(UNIT *uptr)
 {
-    iu_txrdy_a_irq();
+    /* If there's more DMA to do, do it */
+    if (iu_console.dma && ((dma_state.mask >> DMA_IUA_CHAN) & 0x1) == 0) {
+        iu_dma(DMA_IUA_CHAN, IUBASE+IUA_DATA_REG);
+    } else {
+        /* The buffer is now empty, we've transmitted, so set TXR */
+        iu_console.stat |= STS_TXR;
+        iu_state.istat |= 1;
+        iu_txrdy_a_irq();
+    }
+
     return SCPE_OK;
 }
 
@@ -444,8 +481,20 @@ t_stat iu_svc_contty_rcv(UNIT *uptr)
 
 t_stat iu_svc_contty_xmt(UNIT *uptr)
 {
+    dma_channel *chan = &dma_state.channels[DMA_IUB_CHAN];
+
     tmxr_poll_tx(&contty_desc);
-    iu_txrdy_b_irq();
+
+    if (chan->wcount_c >= 0) {
+        /* More DMA to do */
+        iu_dma(DMA_IUB_CHAN, IUBASE+IUB_DATA_REG);
+    } else {
+        /* The buffer is now empty, we've transmitted, so set TXR */
+        iu_contty.stat |= STS_TXR;
+        iu_state.istat |= 0x10;
+        iu_txrdy_b_irq();
+    }
+
     return SCPE_OK;
 }
 
@@ -501,9 +550,14 @@ uint32 iu_read(uint32 pa, size_t size)
     case RHRA:
         data = iu_console.rxbuf[iu_console.r_p];
         iu_console.r_p = (iu_console.r_p + 1) % IU_BUF_SIZE;
-        iu_console.stat &= ~(STS_RXR|STS_FFL);
-        iu_state.istat &= ~ISTS_RAI;
-        csr_data &= ~CSRUART;
+        /* If the FIFO is not empty, we must cause another interrupt
+         * to continue reading */
+        if (iu_console.r_p == iu_console.w_p) {
+            iu_console.stat &= ~(STS_RXR|STS_FFL);
+            iu_state.istat &= ~ISTS_RAI;
+        } else {
+            csr_data |= CSRUART;
+        }
         break;
     case IPCR:
         data = iu_state.ipcr;
@@ -557,8 +611,12 @@ uint32 iu_read(uint32 pa, size_t size)
         break;
     case 17: /* Clear DMAC interrupt */
         data = 0;
+        /*
         iu_console.drq = FALSE;
+        iu_console.dma = FALSE;
         iu_contty.drq = FALSE;
+        iu_contty.dma = FALSE;
+        */
         csr_data &= ~CSRDMA;
         break;
     default:
@@ -591,28 +649,8 @@ void iu_write(uint32 pa, uint32 val, size_t size)
         iu_w_cmd(PORT_A, bval);
         break;
     case THRA:  /* TX/RX Buf A */
-        /* Loopback mode */
-        if ((iu_console.mode[1] & 0xc0) == 0x80) {
-            iu_console.txbuf = bval;
-
-            /* This is also a Receive */
-            if ((iu_console.stat & STS_FFL) == 0) {
-                iu_console.rxbuf[iu_console.w_p] = bval;
-                iu_console.w_p = (iu_console.w_p + 1) % IU_BUF_SIZE;
-                if (iu_console.w_p == iu_console.r_p) {
-                    iu_console.stat |= STS_FFL;
-                }
-            }
-
-            iu_console.stat |= STS_RXR;
-            iu_state.istat |= ISTS_RAI;
-            if (iu_state.imr & IMR_RXRA) {
-                csr_data |= CSRUART;
-            }
-        } else {
-            iu_tx(PORT_A, bval);
-        }
-        csr_data &= ~CSRUART;
+        iu_tx(PORT_A, bval);
+        sim_activate_abs(&tto_unit, tto_unit.wait);
         break;
     case ACR:  /* Auxiliary Control Register */
         iu_state.acr = bval;
@@ -678,27 +716,8 @@ void iu_write(uint32 pa, uint32 val, size_t size)
 
         break;
     case THRB: /* TX/RX Buf B */
-        /* Loopback mode */
-        if ((iu_contty.mode[1] & 0xc0) == 0x80) {
-            iu_contty.txbuf = bval;
-
-            /* This is also a Receive */
-            if ((iu_contty.stat & STS_FFL) == 0) {
-                iu_contty.rxbuf[iu_contty.w_p] = bval;
-                iu_contty.w_p = (iu_contty.w_p + 1) % IU_BUF_SIZE;
-                if (iu_contty.w_p == iu_contty.r_p) {
-                    iu_contty.stat |= STS_FFL;
-                }
-            }
-
-            iu_contty.stat |= STS_RXR;
-            iu_state.istat |= ISTS_RBI;
-            if (iu_state.imr & IMR_RXRB) {
-                csr_data |= CSRUART;
-            }
-        } else {
-            iu_tx(PORT_B, bval);
-        }
+        iu_tx(PORT_B, bval);
+        sim_activate_abs(contty_xmt_unit, contty_ldsc[0].txdelta);
         break;
     case OPCR:
         iu_state.opcr = bval;
@@ -718,51 +737,60 @@ void iu_write(uint32 pa, uint32 val, size_t size)
     }
 }
 
-void iua_drq_handled()
+t_stat iu_tx(uint8 portno, uint8 val)
 {
-    csr_data |= CSRDMA;
-}
-
-void iub_drq_handled()
-{
-    csr_data |= CSRDMA;
-}
-
-static SIM_INLINE void iu_tx(uint8 portno, uint8 val)
-{
-    IU_PORT *p;
-    UNIT *uptr;
-    TMLN *lp;
-
-    if (portno == 0) {
-        p = &iu_console;
-        uptr = &tto_unit;
-    } else {
-        p = &iu_contty;
-        uptr = contty_xmt_unit;
-    }
-
-    p->txbuf = val;
+    IU_PORT *p = (portno == PORT_A) ? &iu_console : &iu_contty;
+    UNIT *uptr = (portno == PORT_A) ? &tto_unit : contty_xmt_unit;
+    uint8 ists = (portno == PORT_A) ? ISTS_RAI : ISTS_RBI;
+    uint8 imr_mask = (portno == PORT_A) ? IMR_RXRA : IMR_RXRB;
+    int32 c;
+    t_stat status = SCPE_OK;
 
     if (p->conf & TX_EN) {
-        p->stat &= ~(STS_TXR|STS_TXE);
-        iu_state.istat &= ~(1 << (portno*4));
+        if ((p->mode[1] & 0xc0) == 0x80) {            /* Loopback mode */
+            p->txbuf = val;
 
-        if (portno == PORT_A) {
-            /* Write the character to the SIMH console */
-            sim_putchar(val);
-        } else {
-            lp = &contty_ldsc[0];
-            tmxr_putc_ln(lp, val);
+            /* This is also a Receive */
+            if ((p->stat & STS_FFL) == 0) {
+                p->rxbuf[p->w_p] = val;
+                p->w_p = (p->w_p + 1) % IU_BUF_SIZE;
+                if (p->w_p == p->r_p) {
+                    p->stat |= STS_FFL;
+                }
+            }
+
+            p->stat |= STS_RXR;
+            iu_state.istat |= ists;
+            if (iu_state.imr & imr_mask) {
+                csr_data |= CSRUART;
+            }
+
+            return SCPE_OK;
+        } else {                                      /* Direct mode */
+            c = sim_tt_outcvt(val, TTUF_MODE_8B);
+
+            if (c >= 0) {
+                p->txbuf = c;
+                p->stat &= ~(STS_TXR|STS_TXE);
+                iu_state.istat &= ~(1 << (portno*4));
+
+                if (portno == PORT_A) {
+                    /* Write the character to the SIMH console */
+                    sim_debug(EXECUTE_MSG, &tto_dev,
+                              "[iu_tx] CONSOLE transmit %02x (%c)\n",
+                              (uint8) c, (char) c);
+                    status = sim_putchar(c);
+                } else {
+                    sim_debug(EXECUTE_MSG, &contty_dev,
+                              "[iu_tx] CONTTY transmit %02x (%c)\n",
+                              (uint8) c, (char) c);
+                    status = tmxr_putc_ln(&contty_ldsc[0], c);
+                }
+            }
         }
-
-        /* The buffer is now empty, we've transmitted, so set TXR */
-        p->stat |= STS_TXR;
-        iu_state.istat |= (1 << (portno*4));
-
-        /* Possibly cause an interrupt */
-        sim_activate_abs(uptr, uptr->wait);
     }
+
+    return status;
 }
 
 static SIM_INLINE void iu_w_cmd(uint8 portno, uint8 cmd)
@@ -783,6 +811,7 @@ static SIM_INLINE void iu_w_cmd(uint8 portno, uint8 cmd)
         p->stat &= ~STS_TXR;
         p->stat &= ~STS_TXE;
         p->drq = FALSE;
+        p->dma = FALSE;
     } else if (cmd & CMD_ETX) {
         p->conf |= TX_EN;
         /* TXE and TXR are always set by an ENABLE */
@@ -864,4 +893,53 @@ static SIM_INLINE void iu_w_cmd(uint8 portno, uint8 cmd)
         /* Not Implemented */
         break;
     }
+}
+
+/*
+ * Initiate DMA transfer or continue one already in progress.
+ */
+void iu_dma(uint8 channel, uint32 service_address)
+{
+    uint8 data;
+    uint32 addr;
+    t_stat status = SCPE_OK;
+    dma_channel *chan = &dma_state.channels[channel];
+    UNIT *uptr = (channel == DMA_IUA_CHAN) ? &tto_unit : contty_xmt_unit;
+    IU_PORT *port = (channel == DMA_IUA_CHAN) ? &iu_console : &iu_contty;
+
+    /* Immediate acknowledge of DMA */
+    port->drq = FALSE;
+
+    if (!port->dma) {
+        /* Set DMA transfer type */
+        port->dma = 1u << ((dma_state.mode >> 2) & 0xf);
+    }
+
+    if (port->dma == DMA_READ) {
+        addr = dma_address(channel, chan->ptr, TRUE);
+        chan->addr_c = chan->addr + chan->ptr + 1;
+        data = pread_b(addr);
+        status = iu_tx(channel - 2, data);
+        if (status == SCPE_OK) {
+            chan->ptr++;
+            chan->wcount_c--;
+        } else if (status == SCPE_LOST) {
+            chan->ptr = 0;
+            chan->wcount_c = -1;
+        }
+
+        sim_activate_abs(uptr, uptr->wait);
+
+        if (chan->wcount_c >= 0) {
+            /* Return early so we don't finish DMA */
+            return;
+        }
+    }
+
+    /* Done with DMA */
+    port->dma = DMA_NONE;
+
+    dma_state.mask |= (1 << channel);
+    dma_state.status |= (1 << channel);
+    csr_data |= CSRDMA;
 }

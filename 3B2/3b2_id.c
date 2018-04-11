@@ -939,7 +939,7 @@ void id_handle_command(uint8 val)
     }
 }
 
-void id_drq_handled()
+void id_after_dma()
 {
     id_status &= ~ID_STAT_DRQ;
     id_drq = FALSE;

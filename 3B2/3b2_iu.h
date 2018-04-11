@@ -140,6 +140,8 @@ extern DEVICE tto_dev;
 extern DEVICE contty_dev;
 extern DEVICE iu_timer_dev;
 
+extern int32 tmxr_poll;
+
 #define IUBASE            0x49000
 #define IUSIZE            0x100
 
@@ -167,6 +169,11 @@ extern DEVICE iu_timer_dev;
 #define IU_DTRA           0x01
 #define IU_DTRB           0x02
 
+#define DMA_NONE   0
+#define DMA_VERIFY 1
+#define DMA_WRITE  2
+#define DMA_READ   4
+
 /* Default baud rate generator (9600 baud) */
 #define BRG_DEFAULT       11
 
@@ -181,7 +188,8 @@ typedef struct iu_port {
     uint8 rxbuf[IU_BUF_SIZE]; /* Receive Holding Register (3 bytes) */
     uint8 w_p;                /* Buffer Write Pointer */
     uint8 r_p;                /* Buffer Read Pointer */
-    t_bool drq;               /* DRQ enabled */
+    uint8 dma;                /* Currently active DMA mode */
+    t_bool drq;               /* DMA request enabled */
 } IU_PORT;
 
 typedef struct iu_state {
@@ -212,14 +220,15 @@ t_stat iu_svc_tto(UNIT *uptr);
 t_stat iu_svc_contty_rcv(UNIT *uptr);
 t_stat iu_svc_contty_xmt(UNIT *uptr);
 t_stat iu_svc_timer(UNIT *uptr);
+t_stat iu_tx(uint8 portno, uint8 val);
 uint32 iu_read(uint32 pa, size_t size);
 void iu_write(uint32 pa, uint32 val, size_t size);
 void iua_drq_handled();
 void iub_drq_handled();
 void iu_txrdy_a_irq();
 void iu_txrdy_b_irq();
+void iu_dma(uint8 channel, uint32 service_address);
 
-static SIM_INLINE void iu_tx(uint8 portno, uint8 val);
 static SIM_INLINE void iu_w_buf(uint8 portno, uint8 val);
 static SIM_INLINE void iu_w_cmd(uint8 portno, uint8 val);
 static SIM_INLINE void iu_update_rxi(uint8 c);

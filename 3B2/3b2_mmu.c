@@ -695,8 +695,11 @@ t_stat mmu_decode_va(uint32 va, uint8 r_acc, t_bool fc, uint32 *pa)
         if (fc && mmu_check_perm(SD_ACC(sd0), r_acc) != SCPE_OK) {
             sim_debug(EXECUTE_MSG, &mmu_dev,
                       "[%08x] CONTIGUOUS: NO ACCESS TO MEMORY AT %08x.\n"
+                      "\t\tsd0=%08x sd0_addr=%08x\n"
                       "\t\tcpu_cm=%d acc_req=%x sd_acc=%02x\n",
-                      R[NUM_PC], va, CPU_CM, r_acc, SD_ACC(sd0));
+                      R[NUM_PC], va,
+                      sd0, SD_ADDR(va),
+                      CPU_CM, r_acc, SD_ACC(sd0));
             MMU_FAULT(MMU_F_ACC);
             return SCPE_NXM;
         }

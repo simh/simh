@@ -532,7 +532,8 @@ static SIM_INLINE uint32 if_buf_offset()
     return pos;
 }
 
-void if_drq_handled()
+void if_after_dma()
 {
+    if_state.drq = FALSE;
     if_state.status &= ~IF_DRQ;
 }

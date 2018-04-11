@@ -59,7 +59,7 @@ uint32 *NVRAM = NULL;
 
 extern DEVICE cpu_dev;
 
-int32 tmxr_poll = 0;
+int32 tmxr_poll = 16667;
 
 /* CSR */
 

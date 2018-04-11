@@ -329,6 +329,40 @@ extern t_bool cpu_km;
 typedef void (*callback)(void);
 
 /* global symbols from the DMAC */
+typedef struct {
+    uint8  page;
+    uint16 addr;     /* Original addr       */
+    uint16 wcount;   /* Original wcount     */
+    uint16 addr_c;   /* Current addr        */
+    int32  wcount_c; /* Current word-count  */
+    uint16 ptr;      /* Pointer into memory */
+} dma_channel;
+
+typedef struct {
+    /* Byte (high/low) flip-flop */
+    uint8  bff;
+
+    /* Address and count registers for channels 0-3 */
+    dma_channel channels[4];
+
+    /* DMAC programmable registers */
+    uint8 command;
+    uint8 mode;
+    uint8 request;
+    uint8 mask;
+    uint8 status;
+} DMA_STATE;
+
+extern DMA_STATE dma_state;
+
+static SIM_INLINE uint32 dma_address(uint8 channel, uint32 offset, t_bool r) {
+    uint32 addr;
+    addr = (PHYS_MEM_BASE + dma_state.channels[channel].addr + offset);
+    /* The top bit of the page address is a R/W bit, so we mask it here */
+    addr |= (uint32) (((uint32)dma_state.channels[channel].page & 0x7f) << 16);
+    return addr;
+}
+
 extern DEVICE dmac_dev;
 
 /* global symbols from the CSR */

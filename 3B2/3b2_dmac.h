@@ -72,42 +72,19 @@
 
 #define DMA_IF_READ      (IFBASE + IF_DATA_REG)
 
-
-typedef struct {
-    uint8  page;
-    uint16 addr;     /* Original addr      */
-    uint16 wcount;   /* Original wcount    */
-    uint16 addr_c;   /* Current addr       */
-    uint16 wcount_c; /* Current word-count */
-} dma_channel;
-
-typedef struct {
-    /* Byte (high/low) flip-flop */
-    uint8  bff;
-
-    /* Address and count registers for channels 0-3 */
-    dma_channel channels[4];
-
-    /* DMAC programmable registers */
-    uint8 command;
-    uint8 mode;
-    uint8 request;
-    uint8 mask;
-    uint8 status;
-} DMA_STATE;
-
 typedef struct {
     uint8  channel;
     uint32 service_address;
     t_bool *drq;
-    void  (*handled_callback)();
-} dmac_drq_handler;
+    void  (*dma_handler)(uint8 channel, uint32 service_address);
+    void  (*after_dma_callback)();
+} dmac_dma_handler;
 
 /* DMAC */
 t_stat dmac_reset(DEVICE *dptr);
 uint32 dmac_read(uint32 pa, size_t size);
 void dmac_write(uint32 pa, uint32 val, size_t size);
 void dmac_service_drqs();
-void dmac_transfer(uint8 channel, uint32 service_address);
+void dmac_generic_dma(uint8 channel, uint32 service_address);
 
 #endif

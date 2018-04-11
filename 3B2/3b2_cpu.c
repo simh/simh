@@ -1,4 +1,4 @@
-/* 3b2_cpu.c: AT&T 3B2 Model 400 CPU (WE32100) Implementation
+ /* 3b2_cpu.c: AT&T 3B2 Model 400 CPU (WE32100) Implementation
 
    Copyright (c) 2017, Seth J. Morabito
 

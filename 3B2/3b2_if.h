@@ -132,7 +132,7 @@ t_stat if_svc(UNIT *uptr);
 t_stat if_reset(DEVICE *dptr);
 uint32 if_read(uint32 pa, size_t size);
 void if_write(uint32 pa, uint32 val, size_t size);
-void if_drq_handled();
 void if_handle_command();
+void if_after_dma();
 
 #endif

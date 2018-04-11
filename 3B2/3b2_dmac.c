@@ -52,12 +52,12 @@ DEVICE dmac_dev = {
     DEV_DEBUG, 0, sys_deb_tab
 };
 
-dmac_drq_handler dmac_drq_handlers[] = {
-    {DMA_ID_CHAN,  IDBASE+ID_DATA_REG,  &id_drq,         id_drq_handled},
-    {DMA_IF_CHAN,  IFBASE+IF_DATA_REG,  &if_state.drq,   if_drq_handled},
-    {DMA_IUA_CHAN, IUBASE+IUA_DATA_REG, &iu_console.drq, iua_drq_handled},
-    {DMA_IUB_CHAN, IUBASE+IUB_DATA_REG, &iu_contty.drq,  iub_drq_handled},
-    {0,            0,                   NULL,            NULL }
+dmac_dma_handler device_dma_handlers[] = {
+    {DMA_ID_CHAN,  IDBASE+ID_DATA_REG,  &id_drq,         dmac_generic_dma, id_after_dma},
+    {DMA_IF_CHAN,  IFBASE+IF_DATA_REG,  &if_state.drq,   dmac_generic_dma, if_after_dma},
+    {DMA_IUA_CHAN, IUBASE+IUA_DATA_REG, &iu_console.drq, iu_dma,           NULL},
+    {DMA_IUB_CHAN, IUBASE+IUB_DATA_REG, &iu_contty.drq,  iu_dma,           NULL},
+    {0,            0,                   NULL,            NULL,             NULL }
 };
 
 t_stat dmac_reset(DEVICE *dptr)
@@ -72,6 +72,7 @@ t_stat dmac_reset(DEVICE *dptr)
         dma_state.channels[i].wcount = 0;
         dma_state.channels[i].addr_c = 0;
         dma_state.channels[i].wcount_c = 0;
+        dma_state.channels[i].ptr = 0;
     }
 
     return SCPE_OK;
@@ -209,6 +210,7 @@ void dmac_program(uint8 reg, uint8 val)
             channel->wcount &= ~(0xff << dma_state.bff * 8);
             channel->wcount |= (val & 0xff) << (dma_state.bff * 8);
             channel->wcount_c = channel->wcount;
+            channel->ptr = 0;
             sim_debug(WRITE_MSG, &dmac_dev,
                       "Set word count channel %d byte %d = %08x\n",
                       chan_num, dma_state.bff, channel->wcount);
@@ -268,9 +270,12 @@ void dmac_program(uint8 reg, uint8 val)
         dma_state.command = 0;
         dma_state.status = 0;
         for (i = 0; i < 4; i++) {
+            dma_state.channels[i].page = 0;
             dma_state.channels[i].addr = 0;
             dma_state.channels[i].wcount = 0;
-            dma_state.channels[i].page = 0;
+            dma_state.channels[i].addr_c = 0;
+            dma_state.channels[i].wcount_c = 0;
+            dma_state.channels[i].ptr = 0;
         }
         break;
     case 15: /* Write All Mask Register Bits */
@@ -352,27 +357,14 @@ void dmac_write(uint32 pa, uint32 val, size_t size)
     }
 }
 
-static SIM_INLINE uint32 dma_address(uint8 channel, uint32 offset, t_bool r) {
-    uint32 addr;
-
-    addr = (PHYS_MEM_BASE +
-            dma_state.channels[channel].addr +
-            offset);
-
-    /* The top bit of the page address is a R/W bit, so we mask it here */
-    addr |= (uint32) (((uint32)dma_state.channels[channel].page & 0x7f) << 16);
-
-    return addr;
-}
-
-void dmac_transfer(uint8 channel, uint32 service_address)
+void dmac_generic_dma(uint8 channel, uint32 service_address)
 {
     uint8 data;
     int32 i;
-    uint16 offset;
     uint32 addr;
-
     dma_channel *chan = &dma_state.channels[channel];
+
+    i = (int32) chan->wcount_c;
 
     /* TODO: This does not handle decrement-mode transfers,
        which don't seem to be used in SVR3 */
@@ -380,41 +372,41 @@ void dmac_transfer(uint8 channel, uint32 service_address)
     switch ((dma_state.mode >> 2) & 0xf) {
     case DMA_MODE_VERIFY:
         sim_debug(EXECUTE_MSG, &dmac_dev,
-                  "[%08x] [dmac_transfer channel=%d] unhandled VERIFY request.\n",
+                  "[%08x] [dmac_generic_dma channel=%d] unhandled VERIFY request.\n",
                   R[NUM_PC], channel);
         break;
     case DMA_MODE_WRITE:
         sim_debug(EXECUTE_MSG, &dmac_dev,
-                  "[%08x] [dmac_transfer channel=%d] write: %d bytes from %08x\n",
+                  "[%08x] [dmac_generic_dma channel=%d] write: %d bytes from %08x\n",
                   R[NUM_PC], channel,
                   chan->wcount + 1,
                   dma_address(channel, 0, TRUE));
-        offset = 0;
-        for (i = chan->wcount; i >= 0; i--) {
-            addr = dma_address(channel, offset, TRUE);
-            chan->addr_c = dma_state.channels[channel].addr + offset;
-            offset++;
+        for (; i >= 0; i--) {
+            chan->wcount_c--;
+            addr = dma_address(channel, chan->ptr, TRUE);
+            chan->addr_c = dma_state.channels[channel].addr + chan->ptr;
+            chan->ptr++;
             data = pread_b(service_address);
             write_b(addr, data);
         }
         break;
     case DMA_MODE_READ:
         sim_debug(EXECUTE_MSG, &dmac_dev,
-                  "[%08x] [dmac_transfer channel=%d] read: %d bytes to %08x\n",
+                  "[%08x] [dmac_generic_dma channel=%d] read: %d bytes to %08x\n",
                   R[NUM_PC], channel,
                   chan->wcount + 1,
                   dma_address(channel, 0, TRUE));
-        offset = 0;
-        for (i = chan->wcount; i >= 0; i--) {
-            addr = dma_address(channel, offset++, TRUE);
-            chan->addr_c = dma_state.channels[channel].addr + offset;
+        for (; i >= 0; i--) {
+            chan->wcount_c = i;
+            addr = dma_address(channel, chan->ptr++, TRUE);
+            chan->addr_c = dma_state.channels[channel].addr + chan->ptr;
             data = pread_b(addr);
             write_b(service_address, data);
         }
         break;
     }
 
-    /* End of Process must set the IF channel's mask bit */
+    /* End of Process must set the channel's mask bit */
     dma_state.mask |= (1 << channel);
     dma_state.status |= (1 << channel);
 }
@@ -424,16 +416,16 @@ void dmac_transfer(uint8 channel, uint32 service_address)
  */
 void dmac_service_drqs()
 {
-    dmac_drq_handler *h;
+    dmac_dma_handler *h;
 
-    for (h = &dmac_drq_handlers[0]; h->drq != NULL; h++) {
+    for (h = &device_dma_handlers[0]; h->drq != NULL; h++) {
         /* Only trigger if the channel has a DRQ set and its channel's
            mask bit is 0 */
         if (*h->drq && ((dma_state.mask >> h->channel) & 0x1) == 0) {
-            dmac_transfer(h->channel, h->service_address);
-            *h->drq = FALSE; /* Immediately clear DRQ state */
-            if (h->handled_callback != NULL) {
-                h->handled_callback();
+            h->dma_handler(h->channel, h->service_address);
+            /* Each handler is responsible for clearing its own DRQ line! */
+            if (h->after_dma_callback != NULL) {
+                h->after_dma_callback();
             }
         }
     }
