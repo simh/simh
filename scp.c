@@ -7648,10 +7648,10 @@ for (gptr = gbuf, reason = SCPE_OK;
         for (highr = lowr; highr->name != NULL; highr++) ;
         sim_switches = sim_switches | SIM_SW_HIDE;
         reason = exdep_reg_loop (ofile, sim_schrptr, flag, cptr,
-            lowr, --highr, 0, 0);
+            lowr, --highr, 0, 0xFFFFFFFF);
         if ((!sim_oline) && (sim_log && (ofile == stdout)))
             exdep_reg_loop (sim_log, sim_schrptr, EX_E, cptr,
-                lowr, --highr, 0, 0);
+                lowr, --highr, 0, 0xFFFFFFFF);
         continue;
         }
 
@@ -7713,7 +7713,7 @@ t_stat exdep_reg_loop (FILE *ofile, SCHTAB *schptr, int32 flag, CONST char *cptr
     REG *lowr, REG *highr, uint32 lows, uint32 highs)
 {
 t_stat reason;
-uint32 idx, val_start=lows;
+uint32 idx, val_start=lows, limits;
 t_value val, last_val;
 REG *rptr;
 int32 saved_switches = sim_switches;
@@ -7727,7 +7727,10 @@ for (rptr = lowr; rptr <= highr; rptr++) {
         (rptr->flags & REG_HIDDEN))
         continue;
     val = last_val = 0;
-    for (idx = lows; idx <= highs; idx++) {
+    limits = highs;
+    if (highs == 0xFFFFFFFF)
+        limits = (rptr->depth > 1) ? (rptr->depth - 1) : 0;
+    for (idx = lows; idx <= limits; idx++) {
         if (idx >= rptr->depth)
             return SCPE_SUB;
         sim_eval[0] = val = get_rval (rptr, idx);
@@ -7765,16 +7768,16 @@ for (rptr = lowr; rptr <= highr; rptr++) {
                 return reason;
             }
         }
-    if ((flag == EX_E) && (val_start != highs)) {
+    if ((flag == EX_E) && (val_start != limits)) {
         if (highs == val_start+1) {
-            reason = ex_reg (ofile, val, flag, rptr, highs);
+            reason = ex_reg (ofile, val, flag, rptr, limits);
             sim_switches = saved_switches;
             if (reason != SCPE_OK)
                 return reason;
             }
         else {
-            if (val_start+1 != highs)
-                fprintf (ofile, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, highs);
+            if (val_start+1 != limits)
+                fprintf (ofile, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, limits);
             else
                 fprintf (ofile, "%s[%d]: same as above\n", rptr->name, val_start+1);
             }
