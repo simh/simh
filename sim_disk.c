@@ -2616,25 +2616,23 @@ return sim_toffset_64 ? SCPE_OK : SCPE_NOFNC;
 static FILE *sim_os_disk_open_raw (const char *rawdevicename, const char *openmode)
 {
 int mode = 0;
+int fd;
 
 if (strchr (openmode, 'r') && (strchr (openmode, '+') || strchr (openmode, 'w')))
     mode = O_RDWR;
 else
     if (strchr (openmode, 'r'))
         mode = O_RDONLY;
-if (mode == O_RDONLY) {
-    struct stat statb;
-
-    if (stat (rawdevicename, &statb))       /* test for existence/access */
-        return (FILE *)NULL;
-    }
 #ifdef O_LARGEFILE
 mode |= O_LARGEFILE;
 #endif
 #ifdef O_DSYNC
 mode |= O_DSYNC;
 #endif
-return (FILE *)((long)open (rawdevicename, mode, 0));
+fd = open (rawdevicename, mode, 0);
+if (fd < 0)
+    return (FILE *)NULL;
+return (FILE *)((long)fd);
 }
 
 static int sim_os_disk_close_raw (FILE *f)
