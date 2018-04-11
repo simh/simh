@@ -335,7 +335,6 @@ t_stat tti_reset(DEVICE *dptr)
 t_stat contty_reset(DEVICE *dtpr)
 {
     char line_config[16];
-    t_stat result;
 
     if (contty_ldsc == NULL) {
         contty_desc.ldsc =
