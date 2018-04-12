@@ -251,8 +251,6 @@ t_stat contty_attach(UNIT *uptr, CONST char *cptr)
     TMLN *lp;
 
     tmxr_set_modem_control_passthru(&contty_desc);
-    tmxr_set_line_unit(&contty_desc, 0, contty_rcv_unit);
-    tmxr_set_line_output_unit(&contty_desc, 0, contty_xmt_unit);
 
     r = tmxr_attach(&contty_desc, uptr, cptr);
     if (r != SCPE_OK) {
@@ -343,10 +341,9 @@ t_stat contty_reset(DEVICE *dtpr)
     }
 
     tmxr_set_port_speed_control(&contty_desc);
-
-    /* tmxr_set_line_unit(&contty_desc, 0, contty_rcv_unit); */
-    /* tmxr_set_line_output_unit(&contty_desc, 0, contty_xmt_unit); */
-    /* tmxr_set_console_units(&tti_unit, &tto_unit); */
+    tmxr_set_line_unit(&contty_desc, 0, contty_rcv_unit);
+    tmxr_set_line_output_unit(&contty_desc, 0, contty_xmt_unit);
+    tmxr_set_console_units(&tti_unit, &tto_unit);
 
     memset(&iu_state, 0, sizeof(IU_STATE));
     memset(&iu_contty, 0, sizeof(IU_PORT));
