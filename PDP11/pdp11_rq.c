@@ -2817,6 +2817,8 @@ uint32 i;
 t_stat r;
 DEVICE *dptr = find_dev_from_unit (uptr);
 
+if (cptr == NULL)
+    return sim_messagef (SCPE_ARG, "Must specify UNIT=value\n");
 plug = (int32) get_uint (cptr, 10, 0xFFFFFFFF, &r);
 if ((r != SCPE_OK) || (plug > 65534))
     return sim_messagef (SCPE_ARG, "Invalid Unit Plug Number: %s\n", cptr);
@@ -3052,7 +3054,7 @@ UNIT *uptr = &dptr->units[unitno];
 
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];
-M[BOOT_UNIT >> 1] = uptr->unit_plug;
+M[BOOT_UNIT >> 1] = (uint16)uptr->unit_plug;
 M[BOOT_CSR >> 1] = dibp->ba & DMASK;
 cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
