@@ -28,8 +28,6 @@
    from the author.
 */
 
-#include <assert.h>
-
 #include "3b2_cpu.h"
 #include "rom_400_bin.h"
 
@@ -68,6 +66,8 @@ extern uint16 csr_data;
 uint32 R[16];
 
 /* Other global CPU state */
+uint8  cpu_int_ipl    = 0;         /* Interrupt IPL level */
+uint8  cpu_int_vec    = 0;         /* Interrupt vector */
 t_bool cpu_nmi        = FALSE;     /* If set, there has been an NMI */
 
 int32  pc_incr        = 0;         /* Length (in bytes) of instruction
@@ -147,6 +147,8 @@ MTAB cpu_mod[] = {
       &cpu_set_size, NULL, NULL, "Set Memory to 4M bytes" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
       &cpu_set_hist, &cpu_show_hist, NULL, "Displays instruction history" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "VIRTUAL", NULL,
+      NULL, &cpu_show_virt, NULL, "Show translation for virtual address" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "STACK", "STACK",
       NULL, &cpu_show_stack, NULL, "Display the current stack with optional depth" },
     { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle },
@@ -566,6 +568,10 @@ t_stat cpu_boot(int32 unit_num, DEVICE *dptr)
      *     in the PCB, if bit I in PSW is set.
      */
 
+    sim_debug(EXECUTE_MSG, &cpu_dev,
+              "CPU Boot/Reset Initiated. PC=%08x SP=%08x\n",
+              R[NUM_PC], R[NUM_SP]);
+
     mmu_disable();
 
     R[NUM_PCBP] = pread_w(0x80);
@@ -581,10 +587,6 @@ t_stat cpu_boot(int32 unit_num, DEVICE *dptr)
     /* set ISC to External Reset */
     R[NUM_PSW] &= ~PSW_ISC_MASK;
     R[NUM_PSW] |= 3 << PSW_ISC ;
-
-    sim_debug(EXECUTE_MSG, &cpu_dev,
-              ">>> CPU BOOT/RESET COMPLETE. PC=%08x SP=%08x\n",
-              R[NUM_PC], R[NUM_SP]);
 
     return SCPE_OK;
 }
@@ -972,6 +974,29 @@ void fprint_sym_hist(FILE *st, instr *ip)
         }
     }
 }
+
+t_stat cpu_show_virt(FILE *of, UNIT *uptr, int32 val, CONST void *desc)
+{
+    uint32 va, pa;
+    t_stat r;
+
+    const char *cptr = (const char *)desc;
+    if (cptr) {
+        va = (uint32) get_uint(cptr, 16, 0xffffffff, &r);
+        if (r == SCPE_OK) {
+            r = mmu_decode_va(va, 0, FALSE, &pa);
+            if (r == SCPE_OK) {
+                fprintf(of, "Virtual %08x = Physical %08x\n", va, pa);
+                return SCPE_OK;
+            }
+        }
+    }
+
+    fprintf(of, "Translation not possible.\n");
+
+    return SCPE_OK;
+}
+
 
 t_stat cpu_show_hist(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
@@ -1528,10 +1553,9 @@ static SIM_INLINE void cpu_context_switch_1(uint32 new_pcbp)
     }
 }
 
-t_bool cpu_on_interrupt(uint8 ipl)
+void cpu_on_interrupt(uint16 vec)
 {
     uint32 new_pcbp;
-    uint16 id = ipl; /* TODO: Does this need to be uint16? */
 
     /*
      * "If a nonmaskable interrupt request is received, an auto-vector
@@ -1540,7 +1564,7 @@ t_bool cpu_on_interrupt(uint8 ipl)
      * Interrupt-ID is fetched. The value 0 is used as the ID."
      */
     if (cpu_nmi) {
-        id = 0;
+        vec = 0;
     }
 
     cpu_km = TRUE;
@@ -1548,10 +1572,11 @@ t_bool cpu_on_interrupt(uint8 ipl)
     if (R[NUM_PSW] & PSW_QIE_MASK) {
         /* TODO: Maybe implement quick interrupts at some point, but
            the 3B2 ROM and SVR3 don't appear to use them. */
-        assert(0);
+        stop_reason = STOP_ERR;
+        return;
     }
 
-    new_pcbp = read_w(0x8c + (4 * id), ACC_AF);
+    new_pcbp = read_w(0x8c + (4 * vec), ACC_AF);
 
     /* Save the old PCBP */
     irq_push_word(R[NUM_PCBP]);
@@ -1572,8 +1597,6 @@ t_bool cpu_on_interrupt(uint8 ipl)
     cpu_context_switch_3(new_pcbp);
 
     cpu_km = FALSE;
-
-    return TRUE;
 }
 
 t_stat sim_instr(void)
@@ -1589,6 +1612,9 @@ t_stat sim_instr(void)
     /* Used for field calculation */
     uint32   width, offset;
     uint32   mask;
+
+    /* Generic index */
+    uint32   i;
 
     operand *src1, *src2, *src3, *dst;
 
@@ -1698,9 +1724,20 @@ t_stat sim_instr(void)
             increment_modep_b();
         }
 
-        /* Process pending IRQ, if applicable */
-        if (PSW_CUR_IPL < cpu_ipl()) {
-            cpu_on_interrupt(cpu_ipl());
+        /* Set the correct IRQ state */
+        cpu_calc_ints();
+
+        if (PSW_CUR_IPL < cpu_int_ipl) {
+            cpu_on_interrupt(cpu_int_vec);
+            for (i = 0; i < CIO_SLOTS; i++) {
+                if (cio[i].intr &&
+                    cio[i].ipl == cpu_int_ipl &&
+                    cio[i].ivec == cpu_int_vec) {
+                    cio[i].intr = FALSE;
+                }
+            }
+            cpu_int_ipl = 0;
+            cpu_int_vec = 0;
             cpu_nmi = FALSE;
             cpu_in_wait = FALSE;
         }
@@ -3171,7 +3208,9 @@ static uint32 cpu_read_op(operand * op)
             data = sign_extend_b(R[op->reg] & BYTE_MASK);
             break;
         default:
-            assert(0);
+            stop_reason = STOP_ERR;
+            data = 0;
+            break;
         }
 
         op->data = data;
@@ -3233,7 +3272,7 @@ static uint32 cpu_read_op(operand * op)
         op->data = data;
         return data;
     default:
-        assert(0);
+        stop_reason = STOP_ERR;
         return 0;
     }
 }
@@ -3288,53 +3327,42 @@ static void cpu_write_op(operand * op, t_uint64 val)
         write_b(eff, val & BYTE_MASK);
         break;
     default:
-        assert(0);
+        stop_reason = STOP_ERR;
+        break;
     }
 }
 
 /*
- * This returns the current state of the IPL (Interrupt
- * Priority Level) bus. This is affected by:
- *
- *  - Latched values in the CSR for:
- *    o CSRCLK     15
- *    o CSRDMA     13
- *    o CSRUART    13
- *    o CSRDISK    11
- *    o CSRPIR9    9
- *    o CSRPIR8    8
- *  - IRQ currently enabled for:
- *    o HD Ctlr.   11
+ * Calculate the current state of interrupts.
+ * TODO: This could use a refactor. It's getting code-smelly.
  */
-static SIM_INLINE uint8 cpu_ipl()
+static void cpu_calc_ints()
 {
-    /* CSRPIR9 is cleared by writing to c_pir8 */
+    uint32 i;
+
+    /* First scan for a CIO interrupt */
+    for (i = 0; i < CIO_SLOTS; i++) {
+        if (cio[i].intr) {
+            cpu_int_ipl = cio[i].ipl;
+            cpu_int_vec = cio[i].ivec;
+            return;
+        }
+    }
+
+    /* If none was found, look for system board interrupts */
     if (csr_data & CSRPIR8) {
-        return 8;
+        cpu_int_ipl = cpu_int_vec = CPU_PIR8_IPL;
+    } else if (csr_data & CSRPIR9) {
+        cpu_int_ipl = cpu_int_vec = CPU_PIR9_IPL;
+    } else if (id_int() || (csr_data & CSRDISK)) {
+        cpu_int_ipl = cpu_int_vec = CPU_ID_IF_IPL;
+    } else if ((csr_data & CSRUART) || (csr_data & CSRDMA)) {
+        cpu_int_ipl = cpu_int_vec = CPU_IU_DMA_IPL;
+    } else if (csr_data & CSRCLK) {
+        cpu_int_ipl = cpu_int_vec = CPU_TMR_IPL;
+    } else {
+        cpu_int_ipl = cpu_int_vec = 0;
     }
-
-    /* CSRPIR9 is cleared by writing to c_pir9 */
-    if (csr_data & CSRPIR9) {
-        return 9;
-    }
-
-    /* CSRDISK is cleared when the floppy "if_irq" goes low */
-    if (id_int() || (csr_data & CSRDISK)) {
-        return 11;
-    }
-
-    /* CSRDMA is cleared by write/read to 0x49011 */
-    /* CSRUART is cleared when the uart "iu_irq" goes low */
-    if ((csr_data & CSRUART) || (csr_data & CSRDMA)) {
-        return 13;
-    }
-
-    /* CSRCLK is cleared by $clrclkint */
-    if (csr_data & CSRCLK) {
-        return 15;
-    }
-
-    return 0;
 }
 
 /*

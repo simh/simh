@@ -73,7 +73,8 @@ const char *sim_stop_messages[] = {
     "Exception/Trap",
     "Exception Stack Too Deep",
     "Unimplemented MMU Feature",
-    "System Powered Off"
+    "System Powered Off",
+    "Simulator Error"
 };
 
 void full_reset()

@@ -29,7 +29,6 @@
 */
 
 #include "3b2_if.h"
-#include <assert.h>
 
 /*
  * TODO: Macros used for debugging timers. Remove when debugging is complete.
@@ -397,7 +396,12 @@ void if_handle_command()
         }
         break;
     case IF_READ_SEC_M:
-        assert(0);
+        /* Not yet implemented. Halt the emulator. */
+        sim_debug(EXECUTE_MSG, &if_dev,
+                  "\tCOMMAND\t%02x\tRead Sector (Multi) - NOT IMPLEMENTED\n",
+                  if_state.cmd);
+        stop_reason = STOP_ERR;
+        break;
     case IF_WRITE_SEC:
         sim_debug(EXECUTE_MSG, &if_dev, "\tCOMMAND\t%02x\tWrite Sector %d/%d/%d\n",
                   if_state.cmd, if_state.track, if_state.side, if_state.sector);
@@ -411,7 +415,11 @@ void if_handle_command()
         }
         break;
     case IF_WRITE_SEC_M:
-        assert(0);
+        /* Not yet implemented. Halt the emulator. */
+        sim_debug(EXECUTE_MSG, &if_dev,
+                  "\tCOMMAND\t%02x\tWrite Sector (Multi) - NOT IMPLEMENTED\n",
+                  if_state.cmd);
+        stop_reason = STOP_ERR;
         break;
     case IF_READ_ADDR:
         sim_debug(EXECUTE_MSG, &if_dev, "\tCOMMAND\t%02x\tRead Address\n", if_state.cmd);
@@ -421,7 +429,8 @@ void if_handle_command()
         break;
     case IF_READ_TRACK:
         sim_debug(EXECUTE_MSG, &if_dev, "\tCOMMAND\t%02x\tRead Track\n", if_state.cmd);
-        assert(0); /* NOT YET IMPLEMENTED */
+        /* Not yet implemented. Halt the emulator. */
+        stop_reason = STOP_ERR;
         break;
     case IF_WRITE_TRACK:
         sim_debug(EXECUTE_MSG, &if_dev, "\tCOMMAND\t%02x\tWrite Track\n", if_state.cmd);

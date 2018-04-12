@@ -42,7 +42,6 @@
  *   HD135      11   1224    15   18    512     Maxtor XT1190
  */
 
-#include <assert.h>
 #include "3b2_id.h"
 
 /* Wait times, in CPU steps, for various actions */
@@ -525,7 +524,9 @@ uint32 id_read(uint32 pa, size_t size)
                     }
                 }
             } else {
-                assert(0); // cmd not Read Data or Read ID
+                /* cmd not Read Data or Read ID */
+                stop_reason = STOP_ERR;
+                return 0;
             }
 
             return data;
