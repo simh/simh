@@ -693,10 +693,44 @@ struct drvtyp {
     int32       rctc;                                   /* RCT copies */
     int32       rbn;                                    /* RBNs */
     uint16      mod;                                    /* MSCP model */
-    int32       med;                                    /* MSCP media */
+    int32       MediaId;                                /* MSCP media */
     int32       flgs;                                   /* flags */
     const char  *name;                                  /* name */
     };
+
+/*
+
+MediaId
+
+Is defined in the MSCP Basic Disk Functions Manual, page 4-37 to 4-38:
+
+The media type identifier is a 32-bit number, and it's coded like this:
+The high 25 bits are 5 characters, each coded with 5 bits. The low 7 
+bits is a binary coded 2 digits.
+
+Looking at it, you have:
+D0,D1,A0,A1,A2,N
+
+For an RA81, it would be:
+
+D0,D1 is the preferred device type name for the unit. In our case, 
+that would be "DU".
+A0,A1,A2 is the name of the media used on the unit. In our case "RA".
+N is the value of the two decimal digits, so 81 for this example.
+
+And for letters, the coding is that A=1, B=2 and so on. 0 means the 
+character is not used.
+
+So, again, for an RA81, we would get:
+
+Decimal Values:        4,    21,    18,     1,     0,      81
+Hex Values:            4,    15,    12,     1,     0,      51
+Binary Values:     00100, 10101, 10010, 00001, 00000, 1010001
+Hex 4 bit Nibbles:    2     5     6     4   1     0     5   1
+
+The 32bit value of RA81_MED is 0x25641051
+
+ */
 
 #define RQ_DRV(d) \
   { d##_SECT, d##_SURF, d##_CYL,  d##_TPG, \
@@ -2634,7 +2668,7 @@ cp->pak[pkt].d[ONL_UIDB] = 0;
 cp->pak[pkt].d[ONL_UIDC] = 0;
 cp->pak[pkt].d[ONL_UIDD] = (UID_DISK << ONL_UIDD_V_CLS) |
     (drv_tab[dtyp].mod << ONL_UIDD_V_MOD);              /* UID hi */
-PUTP32 (pkt, ONL_MEDL, drv_tab[dtyp].med);              /* media type */
+PUTP32 (pkt, ONL_MEDL, drv_tab[dtyp].MediaId);          /* media type */
 if (all) {                                              /* if long form */
     PUTP32 (pkt, ONL_SIZL, maxlbn);                     /* user LBNs */
     cp->pak[pkt].d[ONL_VSNL] = 01234 + lu;              /* vol serial # */
