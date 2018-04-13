@@ -664,7 +664,7 @@ t_stat mmu_decode_va(uint32 va, uint8 r_acc, t_bool fc, uint32 *pa)
             return SCPE_NXM;
         }
 
-        if (mmu_get_pd(va, r_acc, fc, sd0, sd1, &pd, &pd_acc) != SCPE_OK) {
+        if (SD_PAGED(sd0) && mmu_get_pd(va, r_acc, fc, sd0, sd1, &pd, &pd_acc) != SCPE_OK) {
             sim_debug(EXECUTE_MSG, &mmu_dev,
                       "[%08x] Could not get PD (full miss). r_acc=%d, fc=%d, va=%08x\n",
                       R[NUM_PC], r_acc, fc, va);
