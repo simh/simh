@@ -5216,11 +5216,12 @@ if ((dptr) && (dbits & dptr->dctrl)) {
         else
             sim_debug (dbits, dptr, "%s %d bytes '%s'\n", msg, bufsize, tmxr_debug_buf);
         }
-    if ((lp->rxnexttime != 0.0) || (lp->txnexttime != 0.0))
+    if ((lp->rxnexttime != 0.0) || (lp->txnexttime != 0.0)) {
         if (lp->rxnexttime != 0.0)
             sim_debug (dbits, dptr, " rxnexttime=%.0f", lp->rxnexttime);
         if (lp->txnexttime != 0.0)
             sim_debug (dbits, dptr, " txnexttime=%.0f", lp->txnexttime);
         sim_debug (dbits, dptr, "\n");
+        }
     }
 }
