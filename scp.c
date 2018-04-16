@@ -4575,8 +4575,20 @@ if (sim_switches & SWMASK ('P')) {
     else
         cptr = deflt;
     }
-else
+else {
     cptr = get_glyph (cptr, varname, '=');              /* get environment variable name */
+    strlcpy (cbuf, cptr, sizeof(cbuf));
+    sim_trim_endspc (cbuf);
+    cptr = cbuf;
+    if (sim_switches & SWMASK ('S')) {                  /* Quote String argument? */
+        uint32 str_size;
+
+        get_glyph_quoted (cptr, cbuf, 0);
+        if (SCPE_OK != sim_decode_quoted_string (cbuf, (uint8 *)cbuf, &str_size)) 
+            return sim_messagef (SCPE_ARG, "Invalid quoted string: %s\n", cbuf);
+        cbuf[str_size] = '\0';
+        }
+    }
 setenv(varname, cptr, 1);
 return SCPE_OK;
 }
