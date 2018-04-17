@@ -5,11 +5,11 @@
                             uses two extra o2 codes: o2=800 (set lbox) and o2=453 (tr zero)
 
                             warning: comments are allowed past column 28 but some characters 
-                            are forbidden: uppercase letters, question mark, exclamation, number char,
-                            ampersand char. if these chars are used, the line (i.e. the card for this
-                            line) will be interpreted as a load card, and program will crash on trying
-                            to execute it.
+                            are forbidden: uppercase letters, question mark, if these chars 
+                            are used, the line (i.e. the card for this line) will be interpreted 
+                            as a load card, and interpreter will crash on trying to execute it.
                            
+                            interpretive system syntax               c-like equivalent sytax
 
       100 -9 000 201 400    initp -move        i1    prime           initp: prime[c]=1
       101 +0 001 050 100           loop  c     050   initp                  c++; if c<50 goto initp
@@ -30,7 +30,7 @@
       111 +1 300 301 301    loop2  add   num   mult  mult            loop2: mult=mult+num
 
       112 +2 301 203 000           sub   mult  i50   last
-      113 +0 201 103 114           tr    sgn   loop1 cont                   if mult >= 50 goto loop1 (go to b if +, go to c if -)
+      113 +0 201 103 114           tr    sgn   loop1 cont                   if mult >= 50 goto loop1 // tr to b if +, go to c if -
 
       114 +0 800 003 301           set   lbox  c     mult                   c=mult
       115 -9 000 200 400          -move        zero  prime                  prime[c]=0
@@ -40,14 +40,14 @@
       120 +9 000 201 300    loope  move        i1    num             loope: num=1
       121 +0 800 002 202           set   lbox  b     i2                     b=2
                      
-      122 +1 300 201 300    prt1   add   num   i1    num             prt1:  num++
+      122 +1 300 201 300    prt1   add   num   i1    num              prt1: num++
 
       123 -9 000 400 000          -move        prime last                   last=prime[b]
       124 +0 453 127 126           tr    zero  prt2  cont                   if last = 0 goto prt2
 
       126 +0 410 300 300           pch         num   num                    punch num
 
-      127 +0 010 050 122    prt2  loop   b     050   prt1            prt2:  b++; if b<50 goto prt1
+      127 +0 010 050 122    prt2  loop   b     050   prt1             prt2: b++; if b<50 goto prt1
 
       128 +0 000 000 000           unc   stop                               end
 
