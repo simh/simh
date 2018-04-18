@@ -1,0 +1,80 @@
+           5                 SUBROUTINE 21  COSINE                                     
+               E00AV    STO  ARTHX           BEGIN CISINE                               
+                        SLT   0008             ARGUMENT                                 
+                        STU  ARTHF           ALARM IF PWR                               
+                        RSM   8002             OVERSCALE                                
+                        ALO  AV1             COSX EQUALS                                
+                        BMI  AV2              ONE IF PWR                                
+                        SLO  AV3              UNDERSCALE                                            
+                        BMI        AV4                                                   
+                        SRT   0004                                                       
+                        ALO  AV5                                                         
+                        STL  AV6                                                         
+                        RAU  ARTHF           FORM                                         
+                        MPY  AV7    AV6       FRACTIONAL                                  
+               AV6      HLT  AV6    AV23      AND INTGRL                                  
+               AV23     STL  ARTHG             PARTS                                      
+                        RAU   8003                                                       
+                        MPY  AV8             FORM S AS                                  
+                        STL  ARTHE            ONE MINUS                                 
+                        RSM  ARTHG            TWICE ABVAL                               
+                        SML   8001            OF FRACTNL                                
+                        ALO  AV9                PART                                    
+                        RAU   8002                                                       
+                        STU  ARTHF                                                       
+                        MPY   8001            FORM SINE                                 
+                        STU  ARTHG                                                       
+                        RAU  AV16             POLYNOMIAL                                
+                        MPY  ARTHG           APPROXIMATOR                               
+                        RAU   8003                                                       
+                        AUP  AV15                                                        
+                        MPY  AR7HG                                                       
+                        RAU   8003                                                       
+                        AUP  AV14                                                        
+                        MPY  ARTHG                                                       
+                        RAU   8003                                                       
+                        AUP  AV13                                                        
+                        MPY  ARTHG                                                       
+                        SRT   0001                                                       
+                        RAU   8003                                                       
+                        AUP  AV12             EQUALS ONE                                 
+                        MPY  ARTHF                                                       
+                        SCT   0000                                                       
+                        BOV  AV19                                                        
+                        STL  AR7HF                                                       
+                        RAL   8003            ROUND                                      
+                        SRT   0002            AND                                        
+                        STL  ARTHG            ADJUST                                     
+                        RSU  ARTHF             POWER                                     
+                        SRT   0002                                                       
+                        BMI        AV25                                                  
+                        SUP   8003                                                       
+                        ALO  AV8   AV24                                                  
+               AV24     AUP  ARTHG                                                       
+                        SLT   0002 AV22                                                  
+               AV22     STU  ARTHF           DETERMINE                                   
+                        RAU  ARTHE            SIGN OF                                    
+                        NZU          AV20       RESULT                                   
+               AV20     RSL  ARTHF   ARTHX                                               
+               AV25     RAL  ARTHF   ARTHX                                               
+                        SUP   8003                                                       
+                        SLO  AV8    AV24                                                   
+               AV2      RAL  ARTHE           OVERSCALE                                     
+                        LDD  ARTHX   3211      DISPLAY                                     
+               AV4      RAL  AV21   ARTHX    COSX IS ONE                                   
+               AV19     RAL   8002           COSX IS ZERO                                  
+                        SLO   8001  ARTHX                                                  
+               AV17     RAU  AV21   AV22     COSX IS PLUS                                  
+               AV1       57   0000   0000     OR MINUS 1                                   
+               AV3       11   0000   0000                                                  
+               AV5      SRD   0011  AV23                                                   
+               AV7       31   8309   8862                                                  
+               AV8       50   0000   0000                                                  
+               AV9       99   9999   9999                                                  
+               AV12      15   7079   6318                                                  
+               AV13   -  64   5963   7111                                                  
+               AV14      07   9689   6793                                                  
+               AV15   -  00   4673   7656                                                  
+               AV16      00   0151   4842                                                  
+               AV21      10   0000   0050                                                  
+           5                 LAST CARD SUBROUTINE 21                                        

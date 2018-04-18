@@ -1,0 +1,87 @@
+           5                 SUBROUTINE 22  SINE                                              
+               E00AW    STD  ARTHX           BEGIN SINE                                      
+                        STL  ARTHE            SUBROUTINE                                     
+                        SLT   0008             STORE                                         
+                        STU  ARTHF            ARGUMENT                                       
+                        RSM   8002           IS POWER                                        
+                        ALO  AW1               OVERSCALE                                     
+                        BMI  AW2             IF SO ALARM                                     
+                        SLO  AW3             IS P0WER                                        
+                        BMI         AW4        UNDERSCALE                                    
+                        SRT   0004           IF SO SINX                                      
+                        ALO  AW5              EQUALS X                                       
+                        STL  AW6                                                             
+                        RAU  ARTHF           F0RM FRACTL                                     
+                        MPY  AW7    AW6       PART                                           
+               AW6      HLT  AW6    AW23                                                     
+               AW23     STL  ARTHG                                                           
+                        RAU   8003           IS INTGRAL                                      
+                        MPY  AW8              PAR7 0DD                                       
+                        RAL   8002                                                           
+                        NZE         AW9       IF SO FLIP                                     
+                        RSL  ARTHE           SGN OF X                                        
+                        STL  ARTHE  AW9                                                      
+               AW9      RSM  ARTHG            FORM S AS 2                                    
+                        SML   8001           MINUS 2 ALPH                                    
+                        NZU         AW10     IF 2 ALPH                                       
+                        AUP  AW11            GRTG 1 OR 2                                     
+                        NZU  AW17   AW10     ALPH OTHER                                      
+               AU10     RAM   8002           WISE                                            
+                        STL  ARTHF           FORM SINE                                       
+                        RAU   8002            POLYNOMIAL                                     
+                        MPY   8001                                                           
+                        STU  ARTHG           APPROXIMATOR                                    
+                        RAU  AW16                                                            
+                        MPY  ARTHG                                                           
+                        RAU   8003                                                           
+                        AUP  AW15                                                            
+                        MPY  ARTHG                                                           
+                        RAU   8003                                                           
+                        AUP  AW14                                                            
+                        MPY  ARTHG                                                           
+                        RAU   8003                                                           
+                        AUP  AW13                                                            
+                        MPY  ARTHG                                                           
+                        SRT   0001                                                           
+                        RAU   8003                                                           
+                        AUP  AW12                                                            
+                        MPY  ARTHF                                                           
+                        SCT   0000                                                           
+                        BOV  AW19                                                            
+                        STL  ARTHF            SINE TO 0                                      
+                        RAL   8003                                                           
+                        SRT   0002           ROUND                                           
+                        STL  ARTHG                                                           
+                        RSU  ARTHF                                                           
+                        SRT   0002           ADJUST POWER                                    
+                        BMI         AW25                                                     
+                        SUP   8003                                                           
+                        ALO  AW8    AW24                                                     
+               AW24     AUP  ARTHG                                                           
+                        SLT   0002  AW22                                                   
+               AW25     SUP   8003                                                         
+                        SLO  AW8    AW24                                                   
+               AW22     STU  ARTHF           DETERMINE                                     
+                        RAL  ARTHE            PROPER SIGN                                  
+                        BMI         AW20      OF RESULT                                    
+                        RSL  ARTHF  ARTHX       EXIT                                       
+               AW20     RAL  ARTHF  ARTHX       EXIT                                       
+               AW4      RAL  ARTHE  ARTHX    SINX IS X                                     
+               AW17     RAU  AW21   AW22     SINX IS ONE                                   
+               AW19     RAL   8002           SINX IS ZERO                                  
+                        SLO   8001  ARTHX                                                  
+               AW1       57   0000   0000     CONSTANTS                                    
+               AW3       09   0000   0000                                                  
+               AW5      SRT   0009  AW23                                                   
+               AW7       31   8309   8862                                                  
+               AW8       50   0000   0000                                                  
+               AW11      00   0000   0002                                                  
+               AW12      15   7079   6318                                                  
+               AW13   -  64   5963   7111                                                  
+               AW14      07   9689   6793                                                  
+               AW15   -  00   4673   7656                                                  
+               AW16      00   0151   4842                                                  
+               AW21      10   0000   0050                                                  
+               AW2      RAL  ARTHE           ALARM FOR                                     
+                        LDD  ARTHX   3221    SINE                                          
+           5                 LAST CARD SUBROUTINE 22                                        
