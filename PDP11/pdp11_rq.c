@@ -2447,9 +2447,9 @@ t_bool rq_una (MSC *cp, uint16 lu)
 uint16 pkt;
 UNIT *uptr = rq_getucb (cp, lu);
 
-sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_una (%s. Unit=%d)\n", sim_uname (uptr), lu);
 if (uptr == NULL)                                       /* huh? */
     return OK;
+sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_una (%s. Unit=%d)\n", sim_uname (uptr), lu);
 if (!rq_deqf (cp, &pkt))                                /* get log pkt */
     return ERR;
 cp->pak[pkt].d[RSP_REFL] = 0;                           /* ref = 0 */
