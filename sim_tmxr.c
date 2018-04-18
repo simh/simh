@@ -447,6 +447,8 @@ static u_char mantra[] = {                  /* Telnet Option Negotiation Mantra 
 
 #define TMXR_GUARD  ((int32)(lp->serport ? 1 : sizeof(mantra)))/* buffer guard */
 
+#define TMXR_LINE_DISABLED (-1)
+
 /* Local routines */
 
 static void tmxr_add_to_open_list (TMXR* mux);
@@ -714,14 +716,22 @@ if (lp->loopback)
 if (lp->serport) {                                      /* serial port connection? */
     written = sim_write_serial (lp->serport, &(lp->txb[i]), length);
     }
-else {                                                  /* Telnet connection */
-    written = sim_write_sock (lp->sock, &(lp->txb[i]), length);
+else {
+    if (lp->sock) {                                     /* Telnet connection */
+        written = sim_write_sock (lp->sock, &(lp->txb[i]), length);
 
-    if (written == SOCKET_ERROR) {                      /* did an error occur? */
-        if (lp->datagram)
-            return written;                             /* ignore errors on datagram sockets */
-        else
-            return -1;                                  /* return error indication */
+        if (written == SOCKET_ERROR) {                  /* did an error occur? */
+            if (lp->datagram)
+                return written;                         /* ignore errors on datagram sockets */
+            else
+                return -1;                              /* return error indication */
+            }
+        }
+    else {
+        if (lp->conn == TMXR_LINE_DISABLED) {
+            written = length;                           /* Count here output timing is correct */
+            lp->txdrp += length;                        /* Record as having been dropped on the floor */
+            }
         }
     }
 if ((written > 0) && (lp->txbps) && (sim_is_running))
@@ -909,9 +919,11 @@ tptr = (char *) calloc (1, 1);
 if (tptr == NULL)                                       /* no more mem? */
     return tptr;
 
-if (lp->destination || lp->port || lp->txlogname) {
+if (lp->destination || lp->port || lp->txlogname || (lp->conn == TMXR_LINE_DISABLED)) {
     if ((lp->mp->lines > 1) || (lp->port))
         sprintf (growstring(&tptr, 32), "Line=%d", (int)(lp-lp->mp->ldsc));
+    if (lp->conn == TMXR_LINE_DISABLED)
+        sprintf (growstring(&tptr, 32), ",Disabled");
     if (lp->modem_control != lp->mp->modem_control)
         sprintf (growstring(&tptr, 32), ",%s", lp->modem_control ? "Modem" : "NoModem");
     if (lp->txbfd && (lp->txbsz != lp->mp->buffered))
@@ -2501,7 +2513,7 @@ char tbuf[CBUFSIZE], listen[CBUFSIZE], destination[CBUFSIZE],
 SOCKET sock;
 SERHANDLE serport;
 CONST char *tptr = cptr;
-t_bool nolog, notelnet, listennotelnet, modem_control, loopback, datagram, packet;
+t_bool nolog, notelnet, listennotelnet, modem_control, loopback, datagram, packet, disabled;
 TMLN *lp;
 t_stat r = SCPE_OK;
 
@@ -2529,7 +2541,7 @@ while (*tptr) {
     memset(port,        '\0', sizeof(port));
     memset(option,      '\0', sizeof(option));
     memset(speed,       '\0', sizeof(speed));
-    nolog = notelnet = listennotelnet = loopback = FALSE;
+    nolog = notelnet = listennotelnet = loopback = disabled = FALSE;
     datagram = mp->datagram;
     packet = mp->packet;
     if (mp->buffered)
@@ -2627,6 +2639,12 @@ while (*tptr) {
                 strlcpy (destination, cptr, sizeof(destination));
                 continue;
                 }
+            if (0 == MATCH_CMD (gbuf, "DISABLED")) {
+                if ((NULL != cptr) && ('\0' != *cptr))
+                    return sim_messagef (SCPE_2FARG, "Unexpected Disabled Specifier: %s\n", cptr);
+                disabled = TRUE;
+                continue;
+                }
             if (0 == MATCH_CMD (gbuf, "SPEED")) {
                 if ((NULL == cptr) || ('\0' == *cptr) || 
                     (_tmln_speed_delta (cptr) < 0))
@@ -2672,6 +2690,10 @@ while (*tptr) {
                     return sim_messagef (SCPE_ARG, "Invalid Specifier: %s\n", option);
             }
         }
+    if (disabled) {
+        if (destination[0] || listen[0] || loopback)
+            return sim_messagef (SCPE_ARG, "Can't disable line with%s%s%s%s%s\n", destination[0] ? " CONNECT=" : "", destination, listen[0] ? " " : "", listen, loopback ? " LOOPBACK" : "");
+        }
     if (destination[0]) {
         /* Validate destination */
         serport = sim_open_serial (destination, NULL, &r);
@@ -2708,6 +2730,8 @@ while (*tptr) {
             }
         }
     if (line == -1) {
+        if (disabled)
+            return sim_messagef (SCPE_ARG, "Must specify line to disable\n");
         if (modem_control != mp->modem_control)
             return SCPE_ARG;
         if (logfiletmpl[0]) {
@@ -2979,6 +3003,8 @@ while (*tptr) {
             tmxr_set_line_loopback (lp, loopback);
             sim_messagef (SCPE_OK, "Line %d operating in loopback mode\n", line);
             }
+        if (disabled)
+            lp->conn = TMXR_LINE_DISABLED;                  /* Mark as not available */
         lp->modem_control = modem_control;
         if (speed[0] && (!datagram) && (!lp->serport))
             tmxr_set_line_speed (lp, speed);
@@ -3897,6 +3923,8 @@ else {
                 if (lp->dptr && (mp->dptr != lp->dptr))
                     fprintf (st, "Device: %s ", sim_dname(lp->dptr));
                 fprintf (st, "Line: %d", j);
+                if (lp->conn == TMXR_LINE_DISABLED)
+                    fprintf (st, " - Disabled");
                 if (mp->notelnet != lp->notelnet)
                     fprintf (st, " - %stelnet", lp->notelnet ? "no" : "");
                 if (lp->uptr && (lp->uptr != lp->mp->uptr))
@@ -4389,6 +4417,8 @@ if (single_line) {          /* Single Line Multiplexer */
 else {
     fprintf (st, "A line on the %s device can be attached in LOOPBACK mode:\n\n", dptr->name);
     fprintf (st, "   sim> ATTACH %s Line=n,Loopback\n\n", dptr->name);
+    fprintf (st, "A line on the %s device can be specifically disabled:\n\n", dptr->name);
+    fprintf (st, "   sim> ATTACH %s Line=n,Disable\n\n", dptr->name);
     }
 fprintf (st, "When operating in LOOPBACK mode, all outgoing data arrives as input and\n");
 fprintf (st, "outgoing modem signals (if enabled) (DTR and RTS) are reflected in the\n");
