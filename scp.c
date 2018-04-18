@@ -6659,6 +6659,8 @@ const char *sim_uname (UNIT *uptr)
 DEVICE *d;
 char uname[CBUFSIZE];
 
+if (!uptr)
+    return "";
 if (uptr->uname)
     return uptr->uname;
 d = find_dev_from_unit(uptr);

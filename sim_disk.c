@@ -391,6 +391,7 @@ t_bool is_available;
 
 if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return FALSE;
+ctx = (struct disk_context *)uptr->disk_ctx;
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_STD:                                    /* SIMH format */
         is_available = TRUE;
@@ -399,8 +400,6 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
         is_available = TRUE;
         break;
     case DKUF_F_RAW:                                    /* Raw Physical Disk Access */
-        ctx = (struct disk_context *)uptr->disk_ctx;
-
         if (sim_os_disk_isavailable_raw (uptr->fileref)) {
             if (ctx->media_removed) {
                 int32 saved_switches = sim_switches;
