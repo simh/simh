@@ -38,11 +38,12 @@
 /* Memory */
 #define MAXMEMSIZE      (4000)
 #define MEMSIZE         cpu_unit.capac          /* actual memory size */
-#define MEMMASK         (MEMSIZE - 1)           /* Memory bits */
+#define MEMMASK         (MEMSIZE - 1)                   /* Memory bits */
 
 #define MEM_ADDR_OK(x)  (((uint32) (x)) < MEMSIZE)
 extern t_int64          DRUM[MAXMEMSIZE];
 extern int              DRUM_NegativeZeroFlag[MAXMEMSIZE];
+extern char             DRUM_Symbolic_Buffer[MAXMEMSIZE * 80];
 
 extern int WriteDrum(int AR, t_int64 d, int NegZero);
 extern int ReadDrum(int AR, t_int64 * d, int * NegZero);
@@ -96,9 +97,10 @@ extern uint32       cdp_cmd(UNIT *, uint16, uint16);
 extern UNIT         cdp_unit[];
 
 /* Device status information stored in u5 */
-#define URCSTA_ERR      0002    /* Error reading record */
-#define URCSTA_BUSY     0010    /* Device is busy */
-#define URCSTA_LOAD    01000    /* Load flag for 533 card reader */
+#define URCSTA_ERR       0002    /* Error reading record */
+#define URCSTA_BUSY      0010    /* Device is busy */
+#define URCSTA_LOAD     01000    /* Load flag for 533 card reader */
+#define URCSTA_SOAPSYMB 02000    /* Get soap symbolic info when reading the card */
 
 
 /* Character codes in IBM 650 as stated in p4 Andree Programming the IBM 650 Mag Drum 
@@ -153,8 +155,12 @@ extern UNIT         cdp_unit[];
 #define CHR_8           98
 #define CHR_9           99
 
-extern char    digits_ascii[40];
-extern char    mem_to_ascii[100];
+extern struct card_wirings {
+    uint32      mode;
+    const char  *name;
+} wirings[];
+extern char    digits_ascii[31];
+extern char    mem_to_ascii[101];
 extern int     ascii_to_NN(int ch);
 extern uint16  ascii_to_hol[128];
 
@@ -168,7 +174,6 @@ extern int         cycle_time;
 /* I/O Command codes */
 #define IO_RDS  1       /* Read record */
 #define IO_WRS  4       /* Write one record */
-
 
 extern const char *cpu_description(DEVICE *dptr);
 
@@ -231,13 +236,9 @@ extern const char *cpu_description(DEVICE *dptr);
 #define WIRING_8WORD       (  0x000 << UNIT_V_CARD_MODE)
 #define WIRING_SOAP        (  0x100 << UNIT_V_CARD_MODE)
 #define WIRING_IS          (  0x200 << UNIT_V_CARD_MODE)
+#define WIRING_IT          (  0x300 << UNIT_V_CARD_MODE)
 #define UNIT_CARD_ECHO     ( 0x1000 << UNIT_V_CARD_MODE)
 #define UNIT_CARD_PRINT    ( 0x2000 << UNIT_V_CARD_MODE)
-
-struct card_wirings {
-    uint32      mode;
-    const char  *name;
-};
 
 /* Decimal helper functions */
 extern int Get_HiDigit(t_int64 d);

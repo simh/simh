@@ -1,0 +1,267 @@
+       5                     PACKAGE 1                                                  
+       5                 CONTAINS FOLLOWING                                             
+       5                     ROUTINES                                                  
+       5                E00AI  ADDITION                                                
+       5                E00AJ  MULTIPLICATION                                           
+       5                E00AG  DIVISION                                                
+       5                E00AO  DIVIDE REVERSE                                           
+       5                E00AF  FLOAT TO LOWER AND ACC                                   
+       5                E00AE  FLOAT TO LOWER                                           
+       5                E00AQ  READ                                                    
+       5                E00AR  PUNCH                                                   
+       5                E00TH  FIX TO LOWER                                             
+   1        E00AI    STD  ARTHX  AI1     ADD             1833    24  1786  1789        
+   2        AI1      STL  ARTHG                          1789    20  1794  1799        
+   3                 LDD         ARTHB                   1799    69  1802  1805        
+   4                 RAM   8002          STORE ACC       1802    67  8002  1767        
+   5                 STL  ARTHF          POWER           1767    20  1772  1894        
+   6                 SML  ARTHE                          1894    18  1902  1759        
+   7                 SLT   0001                          1759    35  0001  1766        
+   8                 NZU  AI12           FIND MAX        1766    44  1773  1771        
+   9                 LDD  AI3A                           1771    69  1774  1777        
+  10                 SRT   0005          POWER           1777    30  0005  1790        
+  11                 SDA  AI3            SET EXPNNTS     1790    22  1793  1796        
+  12                 BMI         AI2     AND THEN        1796    46  1899  1754        
+  13                 RAM  ARTHE            PERFORM       1899    67  1902  1817        
+  14                 STL  ARTHF           ADDITION       1817    20  1772  1776        
+  15                 RAL  ARTHH                          1776    65  1788  1943        
+  16                 LDD  ARTHM  AI3                     1943    69  1824  1793        
+  17        AI3      SRT   0000  AI3B                    1793    30  0000  1811        
+  18        AI3A     SRT   0000  AI3B                    1774    30  0000  1811        
+  19        AI3B     ALO   8001  AI5                     1811    15  8001  1770        
+  20        AI2      RAL  ARTHM                          1754    65  1824  1779        
+  21                 LDD  ARTHH  AI3                     1779    69  1788  1793        
+  22        AI5      RAU   8002          CLEAR ARTHE     1770    60  8002  1780        
+  23                 STL  ARTHE  ARTHS   TO SCALE        1780    20  1902  1762        
+  24        AI12     BMI         AI13                    1773    46  1778  1828        
+  25                 RAL  ARTHG  AI10                    1778    65  1794  1904        
+  26        AI13     RAL  ACC    ARTHX                   1828    65  0000  1786        
+  27        ARTHB    STD  ARTHY          BREAK UP EXP    1805    24  1808  1826        
+  28                 SLT   0008          AND MANTISSA    1826    35  0008  1996        
+  29                 STL  ARTHE          STORE POWER     1996    20  1902  1755        
+  30                 RAU   8003          AND MANTISSA    1755    60  8003  1763        
+  31                 SLT   0001          OF LOWER        1763    35  0001  1769        
+  32                 STU  ARTHM                          1769    21  1824  1997        
+  33                 RAU  ACC                            1997    60  0000  1855        
+  34                 SRT   0002          STORE POWER     1855    30  0002  1761        
+  35                 SLO   8002          AND MANTISSA    1761    16  8002  1819        
+  36                 SLT   0001          OF ACC          1819    35  0001  1775        
+  37                 ALO   8001                          1775    15  8001  1783        
+  38                 STU  ARTHH  ARTHY                   1783    21  1788  1808        
+  39        ARTHS    SCT   0000          NORMALIZE       1762    36  0000  1782        
+  40                 BOV  AI6            BRNCH IF ZRO    1782    47  1942  1787        
+  41                 STL  ARTHG          SHIFT COUNT     1787    20  1794  1797        
+  42                 RAL   8003          ROUND ON        1797    65  8003  1905        
+  43                 SRD   0002          NINTH DIGIT     1905    31  0002  1813        
+  44                 SLT   0002          CHECK FOR       1813    35  0002  1869        
+  45                 STL  ARTHM          ROUNDOFF        1869    20  1824  1877        
+  46                 NZU  AI7    AI8     OVERFLOW        1877    44  1831  1834        
+  47        AI8      RAM   8003             AND          1834    67  8003  1841        
+  48                 SML  ARTHG          CORRECT IF      1841    18  1794  1800        
+  49                 ALO  AJ2            NECESSARY       1800    15  1903  1822          
+  50                 SLT   0008                          1822    35  0008  1791          
+  51                 RAL   8002                          1791    65  8002  1849          
+  52                 AML  ARTHE                          1849    17  1902  1757          
+  53                 ALO  ARTHF                          1757    15  1772  1827          
+  54                 BMI  AI11A          PWR TOO SMAL    1827    46  1752  1781          
+  55                 NZU  AI11           PWR TOO LRGE    1781    44  1785  1836          
+  56                 SLT   0002                          1836    35  0002  1893          
+  57                 STU  ACC1                           1893    21  1998  1901          
+  58                 RAL  ARTHM                          1901    65  1824  1829          
+  59                 BMI         AI9     COMBINE         1829    46  1944  1995          
+  60                 SLO  ACC1   AI10                    1944    16  1998  1904          
+  61        AI10     STL  ACC    ARTHX   AND             1904    20  0000  1786          
+  62        AI9      ALO  ACC1   AI10                    1995    15  1998  1904          
+  63        AI7      SRT   0001          ADJUST          1831    30  0001  1792          
+  64                 STL  ARTHM                          1792    20  1824  1927          
+  65                 SLT   0001  AI8                     1927    35  0001  1834          
+  66        AI6      RAL   8003  AI10                    1942    65  8003  1904          
+  67        E00AJ    STD  ARTHX          MULTIPLY        1832    24  1786  1839          
+  68                 LDD         ARTHB                   1839    69  1852  1805          
+  69                 RAM   8002          ACC POWER       1852    67  8002  1867          
+  70                 SLO  AJ1            MINUS 48        1867    16  1820  1825          
+  71                 STL  ARTHF                          1825    20  1772  1875          
+  72                 RAU  ARTHH                          1875    60  1788  1756          
+  73                 MPY  ARTHM  ARTHS                   1756    19  1824  1762          
+  74        E00AG    STD  ARTHX  AG1     DIVIDE          1830    24  1786  1889          
+  75        AG1      LDD         ARTHB   IS DIVISOR      1889    69  1842  1805          
+  76                 NZU         AG3       ZER0          1842    44  1812  1846          
+  77                 RSM   8002          DIVISOR         1812    68  8002  1821          
+  78                 ALO  AG2            POWER MINUS     1821    15  1876  1895          
+  79                 STL  ARTHF            49            1895    20  1772  1768          
+  80                 RAU  ARTHM          SH1FT           1768    60  1824  1879          
+  81                 SRT   0001          DIVIDEND        1879    30  0001  1885          
+  82                 DVR  ARTHH          DO DIVIDE       1885    64  1788  1803          
+  83                 RAU   8002  ARTHS                   1803    60  8002  1762          
+  84        E00AO    STD  ARTHX          DIV REVERSE     1882    24  1786  1989          
+  85                 STL  ACC2                           1989    20  1843  1896          
+  86                 RAL  ACC                            1896    65  0000  1810          
+  87                 LDD  ACC2                           1810    69  1843  1897          
+  88                 STD  ACC    AG1                     1897    24  0000  1889          
+  89        E00AF    STD  ACC6           FL0AT TO LWR    1947    24  1858  1911          
+  90                 LDD  AE4    E00AE    AND ACC        1911    69  1925  1928          
+  91        AE4      STL  ACC    ACC6                    1925    20  0000  1858          
+  92        E00AE    STD  ARTHX          FLOAT TO LWR    1928    24  1786  1840          
+  93                 RAU   8002           ONLY           1840    60  8002  1753          
+  94                 SCT   0000          NORMALIZE       1753    36  0000  1975          
+  95                 STL  ACC3                           1975    20  1881  1784          
+  96                 BOV  AD1            ZER0 CHECK      1784    47  1851  1890          
+  97                 RAL   8003                          1890    65  8003  1798          
+  98                 SRD   0002          ROUND FOR       1798    31  0002  1807          
+  99                 SLT   0002          PLACING EXP     1807    35  0002  1764          
+ 100                 NZU         AE6     CHECK ROUND     1764    44  1818  1891          
+ 101                 LDD   8003           OVERFLOW       1818    69  8003  1874          
+ 102                 SRT   0001                          1874    30  0001  1884          
+ 103                 ALO   8001  AE6                     1884    15  8001  1891          
+ 104        AE6      BMI  AE2            INSERT          1891    46  1844  1845          
+ 105                 ALO  AJ3    AE5      EXP0NENT       1845    15  1848  1804          
+ 106        AE2      SLO  AJ3    AE5                     1844    16  1848  1804          
+ 107        AE5      SLO  ACC3   ARTHX                   1804    16  1881  1786          
+ 108        E00TH    STD  ARTHX          FIX L0WER       1932    24  1786  1990          
+ 109                 SLT   0008          TO LOWER        1990    35  0008  1859        
+ 110                 STU  ARTHM                          1859    21  1824  1878        
+ 111                 RAM   8002          TEST EXP        1878    67  8002  1887        
+ 112                 SLO  AJ5            STORE ZER0      1887    16  1940  1945        
+ 113                 BMI  AD1            IF LESS THAN    1945    46  1851  1850        
+ 114                 SLO  AJ4            50     ALARM    1850    16  1853  1758        
+ 115                 BMI         AD3     1F GRTR THAN    1758    46  1861  1862        
+ 116                 SRT   0004           59             1861    30  0004  1921        
+ 117                 ALO  AR7                            1921    15  1924  1929        
+ 118                 LDD  AD2A           MODIFY          1929    69  1835  1838        
+ 119                 SDA  AD2             SHIFT          1838    22  1991  1971        
+ 120                 RAL  ARTHM                          1971    65  1824  1930        
+ 121                 SLT   0002  AD2                     1930    35  0002  1991        
+ 122        AD1      RAL   8003  ARTHX   STORE ZERO      1851    65  8003  1786        
+ 123        AD2      SRT   0000  ARTHX   SHIFT C0NST     1991    30  0000  1786        
+ 124        AD2A     SRT   0000  ARTHX                   1835    30  0000  1786        
+ 125        AD3      LDD  ARTHX   3031   FIX ALARM       1862    69  1786  3031        
+ 126        AG3      LDD  ARTHX   3061   DIVIDE ALARM    1846    69  1786  3061        
+ 127        AI11     LDD  ARTHX   3081   SCALE ALARM     1785    69  1786  3081        
+ 128        AI11A    HLT   1081  AI6                     1752    01  1081  1942        
+ 129        AG2       49   0000   0000                   1876    49  0000  0000        
+ 130        AJ1       48   0000   0000                   1820    48  0000  0000        
+ 131        AJ2       00   0000   0001                   1903    00  0000  0001        
+ 132        AJ3       00   0000   0059                   1848    00  0000  0059        
+ 133        AJ4       10   0000   0000                   1853    10  0000  0000        
+ 134        AJ5       50   0000   0000                   1940    50  0000  0000        
+ 135        E00AQ    STD  J0001  AQ1     READ            1974    24  1977  1880        
+ 136        AQ1      RD1   1976  AQ3                     1880    70  1976  1898        
+ 137        AQ3      RAM  P0001  AQ3A                    1898    67  1951  1806        
+ 138        AQ3B     RAM  P0001  AQ3A    CHECK FOR       1892    67  1951  1806        
+ 139        AQ3A     NZE         AQ8     LAST WORD       1806    45  1860  1837        
+ 140                 LDD  AQ5    AQ4     ON CARD         1860    69  1863  1816        
+ 141        AQ4      STD  ACC4                           1816    24  1870  1873        
+ 142                 AUP   8003          READ IN         1873    10  8003  1931        
+ 143                 SRT   0004          LABEL FOR       1931    30  0004  1941        
+ 144                 SIA  ACC5            PRESENT        1941    23  1795  1948        
+ 145                 SLO   8001           VARIABLE       1948    16  8001  1856        
+ 146                 ALO          8002   GET I Y OR C    1856    15  1809  8002        
+ 147                 RAU   0000          ADDRESS FROM    1809    60  0000  1987   was RAU A000 - 00 0000 0000
+ 146                 AUP  ACC5           ABCON DICT      1987    10  1795  1949        
+ 149                 SLT   0004  ACC4      GENERATE      1949    35  0004  1870        
+ 150        AQ5      AUP  AQ7            INSTRUCTION     1863    10  1866  1857        
+ 151                 ALO  P0010                          1857    15  1960  1965        
+ 152                 ALO          8002   GET AND         1965    15  1968  8002        
+ 153                 LDD  P0002   8003   STORE WORD      1968    69  1952  8003        
+ 154        AQ7      STD   0000                          1866    24  0000  1907        
+ 155                 RAL  P0010          INCREMENT       1907    65  1960  1915        
+ 156                 ALO  AQ9            WORD COUNT      1915    15  1918  1854        
+ 157                 STL  P0010                          1854    20  1960  1963        
+ 158                 ALO  AQ3B    8002                   1963    15  1892  8002        
+ 159        AQ8      RAL  P0001          CHECK FOR       1837    65  1951  1765        
+ 160                 BMI  J0001  AQ1     LAST CARD       1765    46  1977  1880        
+ 161        E00AR    STD  P0005          PUNCH 0UT       1801    24  1955  1908        
+ 162                 STU  J0003                          1908    21  1979  1935        
+ 163                 SIA  P0008          STORE STMNT     1935    23  1958  1912        
+ 164                 STU  J0004          NUMBER          1912    21  1980  1886        
+ 165                 SDA  P0004          STORE WORD      1886    22  1954  1909        
+ 166                 SLO   8001          COUNT           1909    16  8001  1917        
+ 167                 NZE  AR10   AR9     TEST ZERO       1917    45  1920  1872        
+ 168        AR10     STU  J0005          STMT NUMBER     1920    21  1981  1814        
+ 169                 STD  J0006          SET PUNCH       1814    24  1982  1972       
+ 170                 STD  J0007          BAND TO         1972    24  1983  1864       
+ 171                 STD  J0008          ZEROES          1864    24  1984  1888       
+ 172                 STD  P0010  AR3     SET COUNTER     1888    24  1960  1913       
+ 173        AR3      RAL  P0004                          1913    65  1954  1910       
+ 174                 SLO  AR7                            1910    16  1924  1936       
+ 175                 BMI  AR8            TEST WORD       1936    46  1994  1992       
+ 176                 STL  P0004  AR4     COUNT           1992    20  1954  1865       
+ 177        AR4      ALO          8002   GET WORD        1865    15  1868  8002       
+ 178                 RAL  P0000          LABEL FROM      1868    65  1950  1914       
+ 179                 AUP   8003          PUNCH CONSTS    1914    10  8003  1922       
+ 180                 SLT   0001                          1922    35  0001  1938       
+ 181                 SDA  P0007          MODIFY LABEL    1938    22  1957  1961       
+ 182                 SLO   8001                          1961    16  8001  1919       
+ 183                 SRT   0001                          1919    30  0001  1926       
+ 184                 ALO  P0007                          1926    15  1957  1962       
+ 185                 SLT   0004          INSERT STMNT    1962    35  0004  1923       
+ 186                 ALO  P0008          NUMBER          1923    15  1958  1964       
+ 187                 AUP  P0010                          1964    10  1960  1916       
+ 188                 AUP          8003                   1916    10  1969  8003       
+ 189                 STL  J0001          STORE LABEL     1969    20  1977  1988       
+ 190                 RAL   8002          FOR PUNCHING    1988    65  8002  1900       
+ 191                 LDD         AQ4     MODIFY LABEL    1900    69  1906  1816       
+ 192                 AUP  AR6            INTO DRUM       1906    10  1966  1934       
+ 193                 ALO  P0010          LOC IN READ     1934    15  1960  1967       
+ 194                 ALO          8003   GET WORD        1967    15  1970  8003       
+ 195                 STD  J0002          STORE IN        1970    24  1978  1993       
+ 196                 RAL  P0010          PUNCH BAND      1993    65  1960  1815       
+ 197                 ALO  AQ9                            1815    15  1918  1973       
+ 196                 STL  P0010  AR3                     1973    20  1960  1913       
+ 199        AR6      LDD   0000   8002                   1966    69  0000  8002       
+ 200        AR7       00   0001   0000                   1924    00  0001  0000       
+ 201        AR8      PCH  J0001  P0005   PUNCH           1994    71  1977  1955       
+ 202        AR9      RAL   8000          IF STMT NMBR    1872    65  8000  1937       
+ 203                 BMI  AR10   P0005   ZRO PCH ONLY    1937    46  1920  1955       
+ 204        AQ9       00   0002   0000   IF 8000 NEG     1918    00  0002  0000       
+ 205        J0010     80   0000   8800   CONTROL CNST    1986    80  0000  8800       
+ 206         1976    RAM   1951            READ          1976    67  1951  1744       
+ 207                 AUP   8003           UP TO          1744    10  8003  1741       
+ 208                 SLT   0004            SEVEN         1741    35  0004  1748       
+ 209                 SDA  P0009          CONTIGUOUS      1748    22  1959  1737       
+ 210                 SRT   0004          VARIABLES       1737    30  0004  1746       
+ 211                 LDD         AQ4     PER CARD        1746    69  1750  1816       
+ 212                 RAL   8003                          1750    65  8003  1749       
+ 213                 AUP  P0009                          1749    10  1959  1740       
+ 214                 ALO   8001                          1740    15  8001  1751       
+ 215                 AUP  AQ9B                           1751    10  1738  1742       
+ 216                 ALO  AQ10   AQ11                    1742    15  1745  1735       
+ 217        AQ11     SUP  AQ9B                           1735    11  1738  1743       
+ 218                 NZU         AQ8                     1743    44  1747  1837       
+ 219                 AUP   8001                          1747    10  8001  1736       
+ 220                 SUP  AR7                            1736    11  1924  1739       
+ 221                 SLO   8001   8003                   1739    16  8001  8003       
+ 222        AQ9B     LDD   1952   8002                   1738    69  1952  8002       
+ 223        AQ10     STD   0000  AQ11                    1745    24  0000  1735       
+       1                                  VARS
+            ARTHX     00   0000   0000                   1786    00  0000  0000
+            ARTHG     00   0000   0000                   1794    00  0000  0000
+            ARTHF     00   0000   0000                   1772    00  0000  0000
+            ARTHE     00   0000   0000                   1902    00  0000  0000
+            ARTHH     00   0000   0000                   1788    00  0000  0000
+            ARTHM     00   0000   0000                   1824    00  0000  0000
+            ARTHY     00   0000   0000                   1808    00  0000  0000
+            ACC       00   0000   0000                   0000    00  0000  0000
+            ACC1      00   0000   0000                   1998    00  0000  0000
+            ACC2      00   0000   0000                   1843    00  0000  0000
+            ACC3      00   0000   0000                   1881    00  0000  0000
+            ACC4      00   0000   0000                   1870    00  0000  0000
+            ACC5      00   0000   0000                   1795    00  0000  0000
+            ACC6      00   0000   0000                   1858    00  0000  0000
+            J0001     00   0000   0000                   1977    00  0000  0000
+            J0002     00   0000   0000                   1978    00  0000  0000
+            J0003     00   0000   0000                   1979    00  0000  0000
+            J0004     00   0000   0000                   1980    00  0000  0000
+            J0005     00   0000   0000                   1981    00  0000  0000
+            J0006     00   0000   0000                   1982    00  0000  0000
+            J0007     00   0000   0000                   1983    00  0000  0000
+            J0008     00   0000   0000                   1984    00  0000  0000
+            P0000     00   0000   0000                   1950    00  0000  0000
+            P0001     00   0000   0000                   1951    00  0000  0000
+            P0002     00   0000   0000                   1952    00  0000  0000
+            P0004     00   0000   0000                   1954    00  0000  0000
+            P0005     00   0000   0000                   1955    00  0000  0000
+            P0007     00   0000   0000                   1957    00  0000  0000
+            P0008     00   0000   0000                   1958    00  0000  0000
+            P0009     00   0000   0000                   1959    00  0000  0000
+            P0010     00   0000   0000                   1960    00  0000  0000
