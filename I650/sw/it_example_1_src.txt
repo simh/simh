@@ -1,0 +1,8 @@
++0000000050000000002000000001100000000070000000000001725
+
+0001+                                     read                       f  rd dta
+0002+                                     y2 z 0j                    f  set p
+0003+                                     4k i1k i5k m1k 1k          f  i loop
+0004+                                     y2 z ci1 s y1 x y2         f  new p
+0005+                                     t y2 t i5                  f  pch p
+0007+                                     h                         ff  stop

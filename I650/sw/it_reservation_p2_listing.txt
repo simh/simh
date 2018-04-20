@@ -1,0 +1,27 @@
+       5                RESERVATION PACKAGE   R2                                          
+       5                RESERVATION PACKAGE   R2                                          
+       4                  LAAAA  U1999   INITIAL LOCN                                     
+       4                  ACC    U0000   RESERVE ACC                                      
+       4                  P       1950   RESERVE FOR                                      
+       3                  P1951   1960   PUNCH CONSTS                                     
+       4                  W       1977   RESERVE W                                        
+       3                  W1978   1986   STORAGE BAND                                     
+       3                  J1977   1986   PUNCH BAND                                       
+       1                   1621   1950   RESERVE                                          
+       1                   1961   1976    FOR                                             
+       1                   1987   1998    SUBROUTINES                                     
+       4                  E00TH   1932   FIX ENTRY                                        
+       4                  E00AE   1928   FLOAT TO LWR                                     
+       4                  E00AF   1947   FLOAT TO ACC                                     
+       4                  E00AG   1830   DIVIDE ENTRY                                     
+       4                  E00AI   1833   ADD ENTRY                                        
+       4                  E00AK   1704   FIX FIX POWR                                     
+       4                  E00AL   1654   FLT FIX POWR                                     
+       4                  E00AM   1653   RV FX FX PWR                                     
+       4                  E00AN   1651   RV FL FX PWR                                     
+       4                  E00AJ   1832   MULTIPLY                                         
+       4                  E00AO   1882   REV DIVIDE                                       
+       4                  E00AQ   1974   READ ENTRY                                       
+       4                  E00AR   1801   PUNCH ENTRY                                      
+             1809    RAU  A0000   1987   GET A0000                                      
+       5                 LAST CARD OF R2                                                   

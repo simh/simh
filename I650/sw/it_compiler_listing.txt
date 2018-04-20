@@ -1,0 +1,1789 @@
+   1   5                CARNEGIE TECH COMPILER     IT    0000    00  0000  0000              
+   2   5                     MARCH 15   1957             0000    00  0000  0000              
+   3   1                   0000   0024                   0000    00  0000  0000              
+   4   4                  D      U0031                   0000    00  0000  0000              
+   5   3                  D0032   0040                   0000    00  0000  0000              
+   6   3                  T0042   0050                   0000    00  0000  0000              
+   7   1                   0051   0143                   0000    00  0000  0000              
+   8   1                   0150   0197                   0000    00  0000  0000              
+   9   1                   0200   0247                   0000    00  0000  0000              
+  10   1                   0250   0297                   0000    00  0000  0000              
+  11   1                   0300   0329                   0000    00  0000  0000              
+  12   3                  O0600   0623                   0000    00  0000  0000              
+  13   3                  E0374   0382                   0000    00  0000  0000              
+  14   3                  A0383   0482                   0000    00  0000  0000              
+  15   3                  M0500   0503                   0000    00  0000  0000              
+  16   3                  Q0550   0563                   0000    00  0000  0000              
+  17   3                  N0568   0591                   0000    00  0000  0000              
+  18   1                   1951   1960   RESRVE READ     0000    00  0000  0000              
+  19   3                  J1977   1986   J BAND          0000    00  0000  0000              
+  20   3                  W1977   1986     W BAND        0000    00  0000  0000              
+  21   4                  S       1957                   0000    00  0000  0000              
+  22   4                  PC      1958                   0000    00  0000  0000              
+  23   4                  FFBIT   1959                   0000    00  0000  0000              
+  24   4                  TAU     1960                   0000    00  0000  0000              
+  25   4                  PS     U1234                   0000    00  0000  0000              
+  26   4                  READA  U1111                   0000    00  0000  0000              
+  27   4                  START  U1999                   0000    00  0000  0000              
+  28        START    RD1   0051              READ        1999    70  0051  0351              
+  29                 RAU  CNTRL                          0351    60  0354  0359              
+  30                 STU  W0010          HEADER CARD     0359    21  1986  0339              
+  31                 RAL  S                              0339    65  1957  0361              
+  32                 LDD         SR3                     0361    69  0364  0367              
+  33                 LDD         SR3ED                   0364    69  0517  0370              
+  34                 RAU  SIX            ABSOLUTE        0517    60  0520  0025              
+  35                 STU  A0001  PS0     VALUE COUNT     0025    21  0383  0336              
+  36        PS0      STL  PSI             CLEAR          0336    20  0041  0144              
+  37                 LDD  TAU1                           0144    69  0147  0350              
+  38                 STD  TAU    PS                      0350    24  1960  1234              
+  39        PS       RAU  FFBIT          CHECK LAST      1234    60  1959  0363              
+  40                 NZU  END    READA   STATEMENT       0363    44  0567  1111              
+  41        READA    RD1   0051          FIRST READ      1111    70  0051  0651              
+  42                 RAL   0057          STORE STMNT     0651    65  0057  0511              
+  43                 STL   0000          NUMBER          0511    20  0000  0353              
+  44                 RAL  ONET           TALLY AND       0353    65  0356  0661              
+  45                 STL  FLAG            FLAG SET TO    0661    20  0365  0368              
+  46                 STL  TALLY  PS1A    ONE             0368    20  0373  0026              
+  47        PS1      RD1   0051  PS1A     NEXT READ      0650    70  0051  0026              
+  48        PS1A     RAU  MAX             ALARM IF       0026    60  0029  0333              
+  49                 SUP  TALLY          TALLY IS        0333    11  0373  0027              
+  50                 NZU         LARM    MAXIMUM         0027    44  0331  0332              
+  51                 RAL  TALLY          KK XXXX YYYY    0331    65  0373  0527              
+  52                 ALO  STORE             IS           0527    15  0030  0335              
+  53                 LDD  PS2    SR1     0600510000      0335    69  0338  0341              
+  54        PS2      RAL  TALLY          TALLY PLUS      0338    65  0373  0627              
+  55                 ALO  SIXT           SIX IS TALLY    0627    15  0330  0485              
+  56                 STL  TALLY          GAMMA EQUALS    0485    20  0373  0526              
+  57                 RAU   0056          WORD6 TIMES     0526    60  0056  0711              
+  58                 SRT   0002  PS2B     01             0711    30  0002  0667              
+  59        PS2B     STU  GAMMA          L EQUALS END    0667    21  0372  0525              
+  60                 STL  L              SYMBOL          0525    20  0529  0532              
+  61                 RAU   8002                          0532    60  8002  0491      
+  62                 SUP  RSL            RECYCLE IF L    0491    11  0344  0149      
+  63                 NZU  PS1            IS NOT F        0149    44  0650  0504      
+  64                 RAL  FFTY1          INITIALIZE U    0504    65  0357  0761      
+  65                 STL  U              IF L IS F       0761    20  0515  0518      
+  66                 RAL  TALLY          TALLY MINUS     0518    65  0373  0677      
+  67                 SLO  ONET           ONE             0677    16  0356  0811      
+  68                 SLT   0004          TALLY IN DTA    0811    35  0004  0371      
+  69                 STL  TALLY          QUOTA EQUALS    0371    20  0373  0626      
+  70                 STL  QUOTA  PS2A    TALLY           0626    20  0531  0334      
+  71        PS2A     STU  V1                             0334    21  0488  0541      
+  72                 STU  K              PRESET ALL      0541    21  0146  0199      
+  73                 STU  T0001          PERTINENT       0199    21  0042  0145      
+  74                 STU  NU             COUNTERS        0145    21  0700  0653      
+  75                 STU  J0001          TO ZERO         0653    21  1977  0530      
+  76                 STU  N                              0530    21  0484  0337      
+  77                 STU  NBAR                           0337    21  0342  0345      
+  78                 STU  MU                             0345    21  0750  0703      
+  79                 STU  ARITH                          0703    21  0358  0861      
+  80                 STU  ABVAL                          0861    21  0366  0369      
+  81                 STU  OPSGN                          0369    21  0524  0727      
+  82                 STU  RELAT                          0727    21  0632  0535      
+  83                 STU  R      PS3     R EQUALS 0      0535    21  0340  0343      
+  84        PS3      RAU  GAMMA                          0343    60  0372  0777      
+  85                 NZU         PS5     OUT IF GAMMA    0777    44  0631  0682      
+  86                 SRT   0002          IS ZERO         0631    30  0002  0487      
+  87                 STU  GAMMA          FETCH NEXT      0487    21  0372  0625      
+  88                 RAU   8002          SYMBOL S        0625    60  8002  0483      
+  89                 NZU         PS3     RECYCLE IF S    0483    44  0537  0343      
+  90                 ALO  L              ZERO  IF NOT    0537    15  0529  0533      
+  91                 STL  R      PS3D    R EQUALS L      0533    20  0340  0493      
+  92        PS3D     STU  L      PS3A    L EQUAL DS      0493    21  0529  0732      
+  93        PS3A     RAL   8003          IF L EQUALS     0732    65  8003  0489      
+  94                 SRT   0008           AN INTEGER     0489    30  0008  0507      
+  95                 SLO  NINTY           SET INTGR      0507    16  0360  0565      
+  96                 BMI  PS3G   PS3C    TO L AND L      0565    46  0668  0519      
+  97        PS3G     RAU  L      PS3B    EQUAL TO 99     0668    60  0529  0633      
+  98        PS3C     RAU  L              THEN RETURN     0519    60  0529  0683      
+  99                 STU  INTGR           TO PS3B        0683    21  0538  0641      
+ 100                 RAU  NINTY                          0641    60  0360  0665      
+ 101                 SRT   0001                          0665    30  0001  0521      
+ 102                 AUP  NINTY  PS3BA                   0521    10  0360  0715      
+ 103        PS3B     SRT   0008           GENERATE       0633    30  0008  0701      
+ 104                 ALO  R                  ENTRY       0701    15  0340  0495      
+ 105                 SRT   0004           TO SYMBOL      0495    30  0004  0355      
+ 106                 STL  TEMP1          PAIR TABLE      0355    20  0509  0362      
+ 107                 RAL  PS4            FETCH SWITCH    0362    65  0765  0669      
+ 108                 LDD  TEMP1          FROM TABLE      0669    69  0509  0512      
+ 109                 TLU   0150   8002   IF SWITCH IS    0512    84  0150  8002      
+ 110        PS4      RAU   0000           ADMISSABLE     0765    60  0000  0505      
+ 111                 SUP  TEMP1            GO TO         0505    11  0509  0513      
+ 112                 SRT   0004           GENERATORS     0513    30  0004  0523      
+ 113                 NZU  ALARM          ALARM IF NOT    0523    44  0827  0028      
+ 114                 SLT   0004   8003                   0028    35  0004  8003      
+ 115        PS5      RAU  TALLY           DECREMENT      0682    60  0373  0877      
+ 116                 SUP  ONE    PS5A     TALLY IF       0877    11  0630  0635      
+ 117        PS5A     STU  TALLY           GAMMA ZERO     0635    21  0373  0676      
+ 118                 NZU         PS10    OUT IF TALLY    0676    44  0629  0680      
+ 119                 AUP  PS6     8003   IS ZERO  IF     0629    10  0782  8003      
+ 120        PS6      RAU   0000          NOT GAMMA IS    0782    60  0000  0655      
+ 121                 STU  GAMMA  PS3     NEXT WORD       0655    21  0372  0343          
+ 122        PS7      STD  PS8              STORE         0800    24  0753  0506          
+ 123                 BMI         PS7A     GENERATED      0506    46  0659  0510          
+ 124                 SLO  U      PS7B    INDTRUCTION     0659    16  0515  0719          
+ 125        PS7A     ALO  U      PS7B      AND           0510    15  0515  0719          
+ 126        PS7B     LDD  PS7C           INCREMENT U     0719    69  0522  0675          
+ 127                 SDA  PS7C    8001   BY ONE          0675    22  0522  8001          
+ 128        PS7C     STU   0000          AND RETURN      0522    21  0000  0803          
+ 129                 RAL  U              TO GENERATOR    0803    65  0515  0769          
+ 130                 ALO  ONE            IF STORAGE      0769    15  0630  0685          
+ 131                 STL  U              NOT EXCEEDED    0685    20  0515  0718          
+ 132                 SLO  MAXU            OTHERWISE      0718    16  0671  0725          
+ 133                 BMI  PS8             ALARM          0725    46  0753  0679          
+ 134                 RAL  OONE   LARM                    0679    65  0832  0332          
+ 135        PS8      HLT   0000  PS8                     0753    01  0000  0753          
+ 136        PS10     RAL  L              IF TALLY IS     0680    65  0529  0733          
+ 137                 STL  R              ZERO SET LR     0733    20  0340  0543          
+ 138                 RAU  NINTY  PS3BA   EQUAL TO 90L    0543    60  0360  0715          
+ 139        PS3BA    SLT   0008           AND ENTER      0715    35  0008  0783          
+ 140                 STU  L      PS3B     GEN TABLE      0783    21  0529  0633          
+ 141        PS12     RAU  TEMP9          FROM END OF     0850    60  0853  0657          
+ 142                 STU  W0004           STATEMENT      0657    21  1980  0833          
+ 143                 STL  W0005           GENERATORS     0833    20  1981  0534          
+ 144                 RAU   0000                          0534    60  0000  0705          
+ 145                 LDD         STNON     FORM ENTRY    0705    69  0508  0911          
+ 146                 AUP  D0004              FOR         0508    10  0035  0539          
+ 147                 STU  W0001           STATEMENT      0539    21  1977  0730          
+ 148                 RAL  NONO           DICTIONARY      0730    65  0883  0637          
+ 149                 SLT   0004                          0637    35  0004  0347          
+ 150                 STL  W0002                          0347    20  1978  0681          
+ 151                 RAU  NONON                          0681    60  0634  0639          
+ 152                 STL  W0006                          0639    20  1982  0735          
+ 153                 STU  W0003                          0735    21  1979  0882          
+ 154                 LDD         PS133                   0882    69  0785  0638          
+ 155                 RAU  TEMP9                          0785    60  0853  0707          
+ 156                 STU  W0001                          0707    21  1977  0780          
+ 157                 RAL  FFTY1          UBAR EQUALS     0780    65  0357  0961          
+ 158                 STL  UBAR           FIFTYONE        0961    20  0516  0819          
+ 159                 SLO  PC             ALARM IF        0819    16  1958  0663          
+ 160                 SLO  U                 STORAGE      0663    16  0515  0869          
+ 161                 SLO  A0001          EXCEEDED        0869    16  0383  0687          
+ 162                 ALO   1956              BUT         0687    15  1956  1011          
+ 163                 BMI         PS13C       WITH        1011    46  0815  0514          
+ 164                 RAU  O0002          OPTION OF       0815    60  0601  0755          
+ 165                 SRT   0006              FINAL       0755    30  0006  0919          
+ 166                 STL  W0002          PRINTOUT        0919    20  1978  0731          
+ 167                 STL  FFBIT                          0731    20  1959  0662          
+ 168                 LDD         PS133                   0662    69  0865  0638          
+ 169                 RAL  OTWO   LARM                    0865    65  0768  0332          
+ 170        PS13C    RAL  TALLY                          0514    65  0373  0927          
+ 171                 SLO  QUOTA                          0927    16  0531  0835          
+ 172                 NZE         PS13A   STORE           0835    45  0688  0689          
+ 173                 ALO   8001          ORIGINAL        0688    15  8001  0545          
+ 174                 ALO  TWO            STATEMENT       0545    15  0148  0903          
+ 175                 STL  TALLY          AS              0903    20  0373  0726          
+ 176                 ALO  PS13B          COMMENTS        0726    15  0729  0933          
+ 177                 LDD  PS14   SR1                     0933    69  0486  0341          
+ 178        PS13A    STU  W0005                          0689    21  1981  0684          
+ 179                 STD  W0006  PS14                    0684    24  1982  0486          
+ 180        PS13B     01   9999  W0005                   0729    01  9999  1981          
+ 181        PS133    STD  FINI                           0638    24  0691  0494
+ 182                 RAL  PC             INCREMENT       0494    65  1958  0713
+ 183                 ALO  ONE            PROGRAM         0713    15  0630  0935
+ 184                 STL  PC             COUNTER         0935    20  1958  1061
+ 185                 STL  W0009                          1061    20  1985  0738
+ 186                 PCH  W0001              AND         0738    71  1977  0977
+ 187                 STU  W0001  FINI      PUNCH         0977    21  1977  0691
+ 188        PS14     RAU  UBAR           FETCH WORD      0486    60  0516  0721
+ 189                 AUP  PS14A   8003    IN UBAR        0721    10  0624  8003
+ 190        PS14A    RAL   0000                          0624    65  0000  0805
+ 191                 STL  TEMP3                          0805    20  0709  0712
+ 192                 BMI         PS16    IF WORD IS      0712    46  0915  0566
+ 193                 RAL  UBAR            NEGATIVE       0915    65  0516  0771
+ 194                 SLO  FFTY1  PS15     ASSIGN IT      0771    16  0357  1161
+ 195        PS15     SRT   0004          A SYMBOLIC      1161    30  0004  0821
+ 196                 LDD  PS15A  SR3      LOCATION       0821    69  0674  0367
+ 197        PS15A    AUP  TEMP9                          0674    10  0853  0757
+ 198                 STU  W0001                          0757    21  1977  0830
+ 199                 RAM  TEMP3  PS16                    0830    67  0709  0566
+ 200        PS16     SLT   0002                          0566    35  0002  0673
+ 201                 STL  TEMP3           EXTRACT        0673    20  0709  0762
+ 202                 RAU   8003          OPERATION       0762    60  8003  0969
+ 203                 SLT   0006          FROM WORD       0969    35  0006  0983
+ 204                 STU  TEMP4                          0983    21  0788  0741
+ 205                 ALO  PS18           FETCH OP        0741    15  0544  0249
+ 206                 STU  TEMP1          MNEMONIC        0249    21  0509  0812
+ 207                 TLU  O0001   8002    FROM TABLE     0812    84  0600  8002
+ 208        PS18     RAU   0000          AND CHECK       0544    60  0000  0855
+ 209                 SUP  TEMP4          FOR ADMISS      0855    11  0788  0593
+ 210                 SRT   0006          STORE OP IF     0593    30  0006  0807
+ 211                 NZU  ALARM          ADMISSABLE      0807    44  0827  0862
+ 212                 STL  W0002  PS27                    0862    20  1978  0781
+ 213        PS27     RAL  TEMP3           EXTRACT        0781    65  0709  0763
+ 214                 SLT   0004          DATA ADDRESS    0763    35  0004  0723
+ 215                 STL  TEMP3           FROM WORD      0723    20  0709  0912
+ 216                 RAU   8003          OUT IF D IS     0912    60  8003  1019
+ 217                 NZU         PS19    NEXT LOC        1019    44  0773  0724
+ 218                 SRT   0001          OUT IF D IS     0773    30  0001  0779
+ 219                 NZU  PS18A          NOT ACCUM       0779    44  1033  0734
+ 220                 RAU  ACCUM  PS19                    0734    60  0737  0724
+ 221        PS18A    SRT   0002          OUT IF D NOT    1033    30  0002  0739
+ 222                 NZU  PS20           ADDRSS WITHN    0739    44  0643  0594
+ 223                 SRT   0003           STATEMENT      0594    30  0003  0953
+ 224                 SLO  FFTY1          GENERATE        0953    16  0357  1211
+ 225                 SRT   0004          MNEMONIC        1211    30  0004  0871
+ 226                 LDD         SR3     IF D IS IN      0871    69  0774  0367
+ 227                 AUP  TEMP9  PS19     STATEMENT      0774    10  0853  0724
+ 228        PS20     STL  TEMP1          GENERATE        0643    20  0509  0962
+ 229                 RAU   8003           MNEMONIC IF    0962    60  8003  1069
+ 230                 SLT   0004           D IS NEITHR    1069    35  0004  0829
+ 231                 AUP  PS23    8003   NEXT NOR IN     0829    10  0932  8003
+ 232        PS23     RAU  D               STATEMENT      0932    60  0031  0985
+ 233                 STU  TEMP2                          0985    21  0490  0693
+ 234                 SUP  D0009          OUT IF D IS     0693    11  0040  0595
+ 235                 NZU  PS23A           NOT EXTNSN     0595    44  0299  0900
+ 236                 RAL  TEMP1          IF EXTENSION    0900    65  0509  0813
+ 237                 SRT   0007          GENERATE        0813    30  0007  0879
+ 238                 LDD         SR3      MNEMONIC       0879    69  0982  0367
+ 239                 AUP  D0009  PS19                    0982    10  0040  0724
+ 240        PS23A    RAU  TEMP1                          0299    60  0509  0863
+ 241                 SRT   0007          GEN NUMERIC     0863    30  0007  0929
+ 242                 LDD         PS100   TAG IF DATA     0929    69  1032  1035
+ 243                 NZE         PS23B     IS NOT        1032    45  0536  0787
+ 244                 AUP  NONON  PS23B    EXTENSION      0536    10  0634  0787
+ 245        PS23B    AUP  TEMP2  PS19                    0787    10  0490  0724
+ 246        PS19     STU  W0004                          0724    21  1980  1083
+ 247                 RSU  FLAG   PS25    NEGATIVE        1083    61  0365  1119
+ 248        FLAG      10   0000   0000   FLAG IF DATA    0365    10  0000  0000
+ 249        PS25     STU  FLAG           POSITIVE        1119    21  0365  0818
+ 250                 BMI         PS26    FLAG IF INST    0818    46  0921  0672
+ 251                 RAU  W0004          RECYCLE         0921    60  1980  1085
+ 252                 STU  W0003  PS27    IF D  IF NOT    1085    21  1979  0781
+ 253        PS26     RAU  UBAR           PUNCH AND       0672    60  0516  0971
+ 254                 AUP  ONE             RECYCLE TO     0971    10  0630  1135
+ 255                 STU  UBAR            PS13C IF       1135    21  0516  1169
+ 256                 SUP  U               UDAR NOT       1169    11  0515  1219
+ 257                 NZU         PS28     EQUAL TO       1219    44  0823  0824
+ 258                 LDD  PS13C  PS133          U        0823    69  0514  0638
+ 259        PS28     RAL  S              S EQUALS S      0824    65  1957  1261
+ 260                 ALO  ONET           PLUS ONE        1261    15  0356  1311
+ 261                 STL  S              AND FORM        1311    20  1957  0660
+ 262                 LDD         SR3     NEXT LOCATN     0660    69  0913  0367
+ 263                 LDD         SR3ED                   0913    69  0666  0370
+ 264                 RAU  W0003                          0666    60  1979  1133
+ 265                 NZU  PS30   PS29                    1133    44  0837  0838
+ 266        PS30     RAU  W0004                          0837    60  1980  1185
+ 267                 NZU  PS32   PS31                    1185    44  0789  0540
+ 268        PS32     LDD  TAU    PS133                   0789    69  1960  0638
+ 269        PS29     RAU  TEMP9                          0838    60  0853  0857
+ 270                 STU  W0003  PS30                    0857    21  1979  0837
+ 271        PS31     RAU  TEMP9                          0540    60  0853  0907
+ 272                 STU  W0004  PS32                    0907    21  1980  0789
+ 273        TAU      NOP   0000  PS                      1960    00  0000  1234
+ 274        TAU1     NOP   0000  PS                      0147    00  0000  1234
+ 275        SR1      STD  EXIT   SR1E                    0341    24  0644  0497
+ 276        SR1A     SLO  INCR   SR1E                    0950    16  1003  0497
+ 277        SR1E     SLT   0002                          0497    35  0002  1053
+ 278                 NZU         EXIT                    1053    44  0957  0644
+ 279                 SLT   0002          SR1 BLOCKS      0957    35  0002  0963
+ 280                 LDD  SR1D           KK CONSEC       0963    69  0716  1269
+ 281                 SDA  SR1D           LOCATIONS       1269    22  0716  1319
+ 282                 SRT   0004          FROM XXXX TO    1319    30  0004  0979
+ 283                 LDD  SR1L           YYYY            0979    69  1082  1235
+ 284                 SDA  SR1L    8001                   1235    22  1082  8001
+ 285        SR1D     STD   0000  SR1A                    0716    24  0000  0950
+ 286        SR1L     LDD   0000  SR1D                    1082    69  0000  0716
+ 287        INCR      00   9998   9999                   1003    00  9998  9999
+ 288        SR3      STD  EXIT           SR3 CONVERTS    0367    24  0644  0547
+ 289                 DIV  TWSIX          THREE DIGIT     0547    14  1000  1050
+ 290                 STL  TEMP1          NUMBERS INTO    1050    20  0509  1012
+ 291                 LDD  SR3B   SR3A    TWO LETTER      1012    69  0965  0868
+ 292        SR3A     STD  TEMP2          MNEMONICS       0868    24  0490  0743
+ 293                 AUP  ONET                           0743    10  0356  1361
+ 294                 SRT   0001                          1361    30  0001  0717
+ 295                 NZU         SR3A1                   0717    44  1021  0722
+ 296                 SLO  NINEO                          1021    16  0874  1029
+ 297                 NZU         SR3A2                   1029    44  1183  0784
+ 298                 ALO  STL    SR3A2                   1183    15  0636  0784
+ 299        SR3A1    SLT   0001                          0722    35  0001  1079
+ 300                 SUP   8001  TEMP2                   1079    11  8001  0490
+ 301        SR3A2    ALO  NINEO                          0784    15  0874  1129            
+ 302                 SLT   0001  TEMP2                   1129    35  0001  0490           
+ 303        SR3B     SRT   0002                          0965    30  0002  1071           
+ 304                 AUP  TEMP1                          1071    10  0509  1013           
+ 305                 LDD  SR3C   SR3A                    1013    69  0766  0868           
+ 306        SR3C     SLT   0002  EXIT                    0766    35  0002  0644           
+ 307        SR3ED    STD  EXIT           GENERATE        0370    24  0644  0597           
+ 308                 RAU   8003          SYMBOLIC        0597    60  8003  0905            
+ 309                 SLT   0004          LOCATION        0905    35  0004  1015            
+ 310                 AUP  LOCUS          FOR NEXT        1015    10  0918  0873            
+ 311                 STU  TEMP9  EXIT    STATEMENT       0873    21  0853  0644            
+ 312        SRN      STD  EXIT           SRN FORMS       1100    24  0644  0647            
+ 313                 RAL  ARITH           NUMBERS        0647    65  0358  1063            
+ 314                 NZE  SRN5           OUT IF FLOAT    1063    45  0816  0767            
+ 315                 RAL  SRN2           ING POINT       0767    65  0670  0775            
+ 316                 SLO  MU             FIX ASINTEG     0775    16  0750  0955            
+ 317                 AUP  N       8002   ER IF FIXED     0955    10  0484  8002            
+ 318        SRN2     SRT   0010          POINT           0670    30  0010  1027            
+ 319                 RAU   8003  SRN4                    1027    60  8003  1285            
+ 320        SRN5     RAL  MU             FLOATING PT     0816    65  0750  1005            
+ 321                 ALO  FFTY1          EXPONENT IS     1005    15  0357  1411            
+ 322                 SRT   0004            MU PLUS       1411    30  0004  1121            
+ 323                 ALO  NBAR           FORTY NINE      1121    15  0342  0697            
+ 324                 STL  TEMP1           PLUS NBAR      0697    20  0509  1062            
+ 325                 SLT   0008                          1062    35  0008  0831            
+ 326                 NZU  SRN6           MNTISA ALARM    0831    44  1335  0686            
+ 327                 RAL  N                              0686    65  0484  0839            
+ 328                 SRT   0002          AND MANTISSA    0839    30  0002  0645            
+ 329                 RAU   8002              IS          0645    60  8002  1103            
+ 330                 NZU         SRN4                    1103    44  1007  1285            
+ 331                 SCT   0000            N TO 8 SIG    1007    36  0000  1179            
+ 332                 AUP  TEMP1          NIFICANT FIG    1179    10  0509  1113            
+ 333                 SUP   8002          URES            1113    11  8002  1171            
+ 334                 RAU   8003  SRN4                    1171    60  8003  1285            
+ 335        SRN6     RAL  OTREY  LARM    ALARM           1335    65  0888  0332            
+ 336        SRN4     STU  N      EXIT                    1285    21  0484  0644            
+ 337        SRAC     STD  EXIT           ABSOLUTE        1150    24  0644  0747            
+ 338                 RAU  FOUR           CONSTANT        0747    60  1200  1055            
+ 339                 STU  JAY    SRACR    ROUTINE        1055    21  0710  1163            
+ 340        SRACR    RAU  JAY                            1163    60  0710  1065            
+ 341                 SUP  A0001          OUT IF JAY      1065    11  0383  0887            
+ 342                 NZU         SRAC3   EQUALS ABCNT    0887    44  0791  0492            
+ 343                 RAL  JAY                            0791    65  0710  1115            
+ 344                 ALO  ONE            INCRMNT JAY     1115    15  0630  1385            
+ 345                 STL  JAY                            1385    20  0710  1213            
+ 346                 ALO  SRAC1   8002   FETCH JAYTH     1213    15  0866  8002            
+ 347        SRAC1    RAL  A0001  SRAC2    CONSTANT       0866    65  0383  0937            
+ 348        SRAC2    SLO  N              RECYCLE IF N    0937    16  0484  0889            
+ 349                 NZE  SRACR  SRAC5   EQUALS JTH      0889    45  1163  0793            
+ 350        SRAC5    RAL  JAY            CONSTANT        0793    65  0710  1165            
+ 351                 ALO  RAL                            1165    15  0968  0923            
+ 352                 ALO  ABCON                          0923    15  0776  0881            
+ 353                 RAL   8002  EXIT                    0881    65  8002  0644            
+ 354        SRAC3    RAU  JAY                            0492    60  0710  1215            
+ 355                 AUP  ONE                            1215    10  0630  1435            
+ 356                 STU  A0001          N STORED AS     1435    21  0383  0736            
+ 357                 STU  JAY                            0736    21  0710  1263            
+ 358                 SUP  ABCNT          NEW ABCON IF    1263    11  0916  1221            
+ 359                 BMI         SRAC7   ABCNT  NOT      1221    46  0924  0825            
+ 360                 AUP   8001          EXCEEDED        0924    10  8001  0931            
+ 361                 AUP  SRAC6          NEW AB CONST    0931    10  0834  0939         
+ 362                 LDD  N       8003                   0939    69  0484  8003         
+ 363        SRAC7    RAL  OFIVE  LARM      ALARM         0825    65  0528  0332         
+ 364        ABCNT     00   0099   0000   RAL A1 PLUS     0916    00  0099  0000         
+ 365        SRAC6    STD  A0001  SRAC5   JAY IN LOWER    0834    24  0383  0793         
+ 366        PS100    STD  FINI           INTERLACE       1035    24  0691  0694         
+ 367                 SRT   0003                          0694    30  0003  1153         
+ 368                 SLO   8002          FOUR            1153    16  8002  1461         
+ 369                 SLT   0001                          1461    35  0001  0817         
+ 370                 ALO   8001          DIGITS          0817    15  8001  0875         
+ 371                 SLT   0001                          0875    35  0001  0981         
+ 372                 SLO   8002                          0981    16  8002  0989         
+ 373                 SLT   0001            WITH          0989    35  0001  0695         
+ 374                 ALO   8001                          0695    15  8001  1203         
+ 375                 SLT   0001                          1203    35  0001  0759         
+ 376                 SLO   8002            ZEROES        0759    16  8002  0867         
+ 377                 SLT   0001                          0867    35  0001  0973         
+ 378                 ALO   8001                          0973    15  8001  1031         
+ 379                 SLT   0001  FINI                    1031    35  0001  0691         
+ 380        D0001         I              SYMBOLS FOR     0032    69  0000  0000         
+ 381        D0002         Y               PROBLEM        0033    88  0000  0000         
+ 382        D0003         C                VARIABLES     0034    63  0000  0000         
+ 383        D0004         S                              0035    82  0000  0000         
+ 384        D0005         A                              0036    61  0000  0000         
+ 385        D0006         P                              0037    77  0000  0000         
+ 386        D0007         W                              0038    86  0000  0000         
+ 387        D0008     00   0800   0000                   0039    00  0800  0000         
+ 388        D0009         E00AA                          0040    65  9090  6161         
+A388   5           MNEMONICS FOR REQUIERD OPERATIONS     0000    00  0000  0000      In original listing, some opcodes has a different 
+ 389        O0001     00   0075   7677   NOP             0600    00  0075  7677      name. Changed to regula SOAP names
+ 390        O0002     00   0168   7383   HLT             0601    00  0168  7383         
+ 391        O0003     00   1061   8477   AUP             0602    00  1061  8477      original -> new value   
+ 392        O0004     00   1561   7376   ALO             0603    00  1561  7376         
+ 393        O0005     00   1682   7376   SLO             0604    00  1682  7376         
+ 394        O0006     00   1761   7473   AML             0605    00  1761  7473      AAB -> AML    00 1761 6162 -> 00 1761 7473
+ 395        O0007     00   1882   7473   SML             0606    00  1882  7473      SAB -> SML    00 1882 6162 -> 00 1882 7473
+ 396        O0008     00   1974   7788   MPY             0607    00  1974  7788         
+ 397        O0009     00   2082   8373   STL             0608    00  2082  8373         
+ 398        O0010     00   2482   8364   STD             0609    00  2482  8364         
+ 399        O0011     00   3582   7383   SLT             0610    00  3582  7383         
+ 400        O0012     00   4575   8965   NZE             0611    00  4575  8965      NZA -> NZE    00 4575 8961 -> 00 4575 8965       
+ 401        O0013     00   4662   7469   BMI             0612    00  4662  7469         
+ 402        O0014     00   6079   6184   RAU             0613    00  6079  6184         
+ 403        O0015     00   6179   8284   RSU             0614    00  6179  8284         
+ 404        O0016     00   6464   8579   DVR             0615    00  6464  8579         
+ 405        O0017     00   6579   6173   RAL             0616    00  6579  6173         
+ 406        O0018     00   6679   8273   RSL             0617    00  6679  8273         
+ 407        O0019     00   6779   6174   RAM             0618    00  6779  6174      RAB -> RAM    00 6779 6162 -> 00 6779 6174       
+ 408        O0020     00   6879   8274   RSM             0619    00  6879  8274      RSB -> RSM    00 6879 8262 -> 00 6879 8274       
+ 409        O0021     00   6973   6464   LDD             0620    00  6973  6464         
+ 410        O0022     00   7079   6491   RD1             0621    00  7079  6491      RDS -> RD1    00 7079 6482 -> 00 7079 6491
+ 411        O0023     00   7177   6368   PCH             0622    00  7177  6368         
+ 412        O0024     00   9968   7383   HLT             0623    00  9968  7383         
+ 413        A0001     00   0006   0000    PRESET         0383    00  0006  0000         
+ 414        A0002     00   0000   0001     ABSOLUTE      0384    00  0000  0001         
+ 415        A0005     00   0000   1000      CONSTANTS    0387    00  0000  1000         
+ 416        A0006     00   0000   2000                   0388    00  0000  2000         
+ 417        A0007     00   0000   3000                   0389    00  0000  3000         
+ 418         0150     00   6163  AI      ABSOLUTE        0150    00  6163  1018         
+ 419         0151     00   6169  AI       VALUE          0151    00  6169  1018         
+ 420         0152     00   6173  AL                      0152    00  6173  0628         
+ 421         0153     00   6178  AL                      0153    00  6178  0628       
+ 422         0154     00   6188  AI                      0154    00  6188  1018       
+ 423         0155     00   6282  BS        B MINUS       0155    00  6282  0987       
+ 424         0156     00   6299  BN                      0156    00  6299  0654       
+ 425         0157     00   6369  CI           C          0157    00  6369  0974       
+ 426         0158     00   6373  CEEL                    0158    00  6373  0678       
+ 427         0159     00   6375  CMTX                    0159    00  6375  0880       
+ 428         0160     00   6399  CN                      0160    00  6399  0704       
+ 429         0161     00   6463  WY      DIVIDE          0161    00  6463  1068       
+ 430         0162     00   6466  DF                      0162    00  6466  1271       
+ 431         0163     00   6469  WY                      0163    00  6469  1068       
+ 432         0164     00   6471  ZN                      0164    00  6471  0826       
+ 433         0165     00   6473  WL                      0165    00  6473  0728       
+ 434         0166     00   6478  WE                      0166    00  6478  1233       
+ 435         0167     00   6488  WY                      0167    00  6488  1068       
+ 436         0168     00   6499  ZN                      0168    00  6499  0826       
+ 437         0169     00   6572  PS3                     0169    00  6572  0343       
+ 438         0170     00   6663  WY        F             0170    00  6663  1068       
+ 439         0171     00   6666  FF         O            0171    00  6666  1321       
+ 440         0172     00   6669  WY          N           0172    00  6669  1068       
+ 441         0173     00   6671  ZN           L          0173    00  6671  0826       
+ 442         0174     00   6673  WL            E         0174    00  6673  0728       
+ 443         0175     00   6678  WE             F        0175    00  6678  1233       
+ 444         0176     00   6682  PS3             T       0176    00  6682  0343       
+ 445         0177     00   6688  WY                      0177    00  6688  1068       
+ 446         0178     00   6699  ZN                      0178    00  6699  0826       
+ 447         0179     00   6769  GI                      0179    00  6769  1024       
+ 448         0180     00   6773  GL        GO            0180    00  6773  0778       
+ 449         0181     00   6799  GN                      0181    00  6799  0754       
+ 450         0182     00   6866  PS3                     0182    00  6866  0343       
+ 451         0183     00   6966  IF         HALT         0183    00  6966  1371       
+ 452         0184     00   6969  II          IF          0184    00  6969  1074       
+ 453         0185     00   6973  IL           I          0185    00  6973  0828       
+ 454         0186     00   6999  IN                      0186    00  6999  0804       
+ 455         0187     00   7164  PW                      0187    00  7164  1369       
+ 456         0188     00   7166  PF       DECIMAL        0188    00  7166  1421       
+ 457         0189     00   7172  PCMMA      POINT        0189    00  7172  1077       
+ 458         0190     00   7177  PW                      0190    00  7177  1369       
+ 459         0191     00   7178  PF                      0191    00  7178  1421       
+ 460         0192     00   7179  PF                      0192    00  7179  1421       
+ 461         0193     00   7182  PW                      0193    00  7182  1369       
+ 462         0194     00   7187  PW                      0194    00  7187  1369       
+ 463         0195     00   7199  PN                      0195    00  7199  0854       
+ 464         0196     00   7263  WY                      0196    00  7263  1068       
+ 465         0197     00   7266  QF                      0197    00  7266  1471       
+ 466         0200     00   7269  WY                      0200    00  7269  1068       
+ 467         0201     00   7271  ZN                      0201    00  7271  0826       
+ 468         0202     00   7273  WL       COMMA          0202    00  7273  0728       
+ 469         0203     00   7278  WE                      0203    00  7278  1233       
+ 470         0204     00   7282  PS3     COMMA MINUS     0204    00  7282  0343       
+ 471         0205     00   7288  WY                      0205    00  7288  1068       
+ 472         0206     00   7299  ZN                      0206    00  7299  0826       
+ 473         0207     00   7363  WY                      0207    00  7363  1068       
+ 474         0208     00   7369  WY                      0208    00  7369  1068       
+ 475         0209     00   7371  ZN                      0209    00  7371  0826       
+ 476         0210     00   7373  WL                      0210    00  7373  0728       
+ 477         0211     00   7378  WE                      0211    00  7378  1233       
+ 478         0212     00   7382  PS3     LEFT MINUS      0212    00  7382  0343       
+ 479         0213     00   7388  WY                      0213    00  7388  1068       
+ 480         0214     00   7399  ZN                      0214    00  7399  0826       
+ 481         0215     00   7463  MINI                    0215    00  7463  1118        
+ 482         0216     00   7469  MINI      M     L       0216    00  7469  1118        
+ 483         0217     00   7471  MINN       I O   E      0217    00  7471  0876        
+ 484         0218     00   7473  MINL        N N   F     0218    00  7473  0878        
+ 485         0219     00   7478  MINL         U     T    0219    00  7478  0878        
+ 486         0220     00   7488  MINI          S         0220    00  7488  1118        
+ 487         0221     00   7499  MINN                    0221    00  7499  0876        
+ 488         0222     00   7573  PS3                     0222    00  7573  0343        
+ 489         0223     00   7763  WY                      0223    00  7763  1068        
+ 490         0224     00   7769  WY                      0224    00  7769  1068        
+ 491         0225     00   7771  ZN                      0225    00  7771  0826        
+ 492         0226     00   7773  WL                      0226    00  7773  0728        
+ 493         0227     00   7778  WE                      0227    00  7778  1233        
+ 494         0228     00   7782  PS3     P MINUS         0228    00  7782  0343        
+ 495         0229     00   7788  WY          MATRIX      0229    00  7788  1068        
+ 496         0230     00   7799  ZN        POWER         0230    00  7799  0826        
+ 497         0231     00   7864  EW                      0231    00  7864  1419        
+ 498         0232     00   7866  EE                      0232    00  7866  1521        
+ 499         0233     00   7872  QCMMA                   0233    00  7872  1127        
+ 500         0234     00   7877  EW                      0234    00  7877  1419        
+ 501         0235     00   7878  EE                      0235    00  7878  1521        
+ 502         0236     00   7879  EE                      0236    00  7879  1521        
+ 503         0237     00   7882  EW                      0237    00  7882  1419        
+ 504         0238     00   7887  EW      EXTENSIONS      0238    00  7887  1419        
+ 505         0239     00   7899  EN                      0239    00  7899  0904        
+ 506         0240     00   7964  RW                      0240    00  7964  1469        
+ 507         0241     00   7966  RR                      0241    00  7966  1571        
+ 508         0242     00   7969  RR                      0242    00  7969  1571        
+ 509         0243     00   7972  RCMMA                   0243    00  7972  1177        
+ 510         0244     00   7977  RW                      0244    00  7977  1469        
+ 511         0245     00   7978  RR                      0245    00  7978  1571        
+ 512         0246     00   7979  RR                      0246    00  7979  1571        
+ 513         0247     00   7982  RW                      0247    00  7982  1469        
+ 514         0250     00   7983  RR                      0250    00  7983  1571        
+ 515         0251     00   7987  RW                      0251    00  7987  1469        
+ 516         0252     00   7989  RZ                      0252    00  7989  0744        
+ 517         0253     00   8263  WY      RIGHT PAREN     0253    00  8263  1068        
+ 518         0254     00   8269  WY                      0254    00  8269  1068        
+ 519         0255     00   8271  ZN                      0255    00  8271  0826        
+ 520         0256     00   8273  WL                      0256    00  8273  0728        
+ 521         0257     00   8278  WE                      0257    00  8278  1233        
+ 522         0258     00   8288  WY                      0258    00  8288  1068        
+ 523         0259     00   8299  ZN                      0259    00  8299  0826        
+ 524         0260     00   8363  TC                      0260    00  8363  1168        
+ 525         0261     00   8369  TI                      0261    00  8369  1124        
+ 526         0262     00   8373  TL                      0262    00  8373  0928        
+ 527         0263     00   8388  TY                      0263    00  8388  0843        
+ 528         0264     00   8463  MY                      0264    00  8463  1218        
+ 529         0265     00   8469  MY                      0265    00  8469  1218        
+ 530         0266     00   8471  MN                      0266    00  8471  0926        
+ 531         0267     00   8473  ML                      0267    00  8473  0978        
+ 532         0268     00   8478  ME        SUM           0268    00  8478  1283        
+ 533         0269     00   8488  MY                      0269    00  8488  1218        
+ 534         0270     00   8499  MN                      0270    00  8499  0926        
+ 535         0271     00   8563  MY                      0271    00  8563  1218        
+ 536         0272     00   8569  MY                      0272    00  8569  1218        
+ 537         0273     00   8571  MN                      0273    00  8571  0926        
+ 538         0274     00   8573  ML                      0274    00  8573  0978        
+ 539         0275     00   8578  ME                      0275    00  8578  1283        
+ 540         0276     00   8588  MY        TYPE          0276    00  8588  1218        
+ 541         0277     00   8599  MN                      0277    00  8599  0926     
+ 542         0278     00   8663  MY                      0278    00  8663  1218     
+ 543         0279     00   8669  MY                      0279    00  8669  1218     
+ 544         0280     00   8671  MN        RELATIONS     0280    00  8671  0926     
+ 545         0281     00   8673  ML                      0281    00  8673  0978     
+ 546         0282     00   8678  ME                      0282    00  8678  1283     
+ 547         0283     00   8688  MY                      0283    00  8688  1218     
+ 548         0284     00   8699  MN                      0284    00  8699  0926     
+ 549         0285     00   8763  WY                      0285    00  8763  1068     
+ 550         0286     00   8769  WY                      0286    00  8769  1068     
+ 551         0287     00   8771  ZN                      0287    00  8771  0826     
+ 552         0288     00   8773  WL                      0288    00  8773  0728     
+ 553         0289     00   8778  WE                      0289    00  8778  1233     
+ 554         0290     00   8788  WY                      0290    00  8788  1068     
+ 555         0291     00   8799  ZN                      0291    00  8799  0826     
+ 556         0292     00   8869  YI                      0292    00  8869  1174     
+ 557         0293     00   8873  YL                      0293    00  8873  1028     
+ 558         0294     00   8875  YMTX                    0294    00  8875  0930     
+ 559         0295     00   8899  YN                      0295    00  8899  0954     
+ 560         0296     00   8963  WY                      0296    00  8963  1068     
+ 561         0297     00   8969  WY                      0297    00  8969  1068     
+ 562         0300     00   8971  ZN                      0300    00  8971  0826     
+ 563         0301     00   8973  WL                      0301    00  8973  0728     
+ 564         0302     00   8978  WE                      0302    00  8978  1233     
+ 565         0303     00   8982  PS3                     0303    00  8982  0343     
+ 566         0304     00   8988  WY                      0304    00  8988  1068     
+ 567         0305     00   8999  ZN                      0305    00  8999  0826     
+ 568         0306     00   9063  ENDY      TIMES         0306    00  9063  1268     
+ 569         0307     00   9064  PS12                    0307    00  9064  0850     
+ 570         0308     00   9067  ENDG                    0308    00  9067  0772     
+ 571         0309     00   9068  ENDH                    0309    00  9068  1023     
+ 572         0310     00   9069  ENDY                    0310    00  9069  1268     
+ 573         0311     00   9073  ENDL                    0311    00  9073  1078     
+ 574         0312     00   9078  PS12                    0312    00  9078  0850     
+ 575         0313     00   9083  ENDT                    0313    00  9083  0938     
+ 576         0314     00   9088  ENDY         Y          0314    00  9088  1268     
+ 577         0315     00   9962  NF                      0315    00  9962  0917     
+ 578         0316     00   9964  NW                      0316    00  9964  1519     
+ 579         0317     00   9965  NR      SUBSTITUTION    0317    00  9965  0720     
+ 580         0318     00   9966  NF                      0318    00  9966  0917     
+ 581         0319     00   9969  NR                      0319    00  9969  0720     
+ 582         0320     00   9971  NF                      0320    00  9971  0917     
+ 583         0321     00   9972  NCMMA                   0321    00  9972  1227     
+ 584         0322     00   9977  NW                      0322    00  9977  1519     
+ 585         0323     00   9978  NR                      0323    00  9978  0720     
+ 586         0324     00   9979  NR                      0324    00  9979  0720     
+ 587         0325     00   9982  NW                      0325    00  9982  1519     
+ 588         0326     00   9983  NR          FIRST       0326    00  9983  0720     
+ 589         0327     00   9987  NW      CHARACTERS      0327    00  9987  1519     
+ 590         0328     00   9989  NZ                      0328    00  9989  0794     
+ 591         0329     00   9999  NF                      0329    00  9999  0917     
+ 592        AI       RAL  OTWO           RAL RSL         1018    65  0768  1073     
+ 593                 STL  TEMP4          BECOME          1073    20  0788  0841     
+ 594                 LDD  AI1    UCHGE    RAM RSM        0841    69  0844  0797     
+ 595        AI1      LDD         SETEL   L IS R          0844    69  0847  1250     
+ 596                 STL  ABVAL  PS3     ABVAL NONZRO    0847    20  0366  0343     
+ 597        AL       LDD         STBTA   BETA IS U       0628    69  1081  0884     
+ 598                 STU  V1             V1 IS ZERO      1081    21  0488  0891     
+ 599                 RAL  RAM              COMPILE       0891    65  0894  0349     
+ 600                 ALO  LOW             RAM 8002       0349    15  0352  1057     
+ 601                 LDD         OSGN1                   1057    69  0760  1313     
+ 602                 STU  OPSGN  AI1     OPSGN ZERO      0760    21  0524  0844     
+ 603        BS       LDD         DROPU    DCRMNT U       0987    69  0640  0893     
+ 604                 RAL  A0001          ABCON COUNT     0640    65  0383  1037     
+ 605                 SLO  ONE             MINUS ONE      1037    16  0630  1485     
+ 606                 STL  A0001                          1485    20  0383  0786     
+ 607                 RAU  N      BN1                     0786    60  0484  1039     
+ 608        BN       LDD  BN1    SRN                     0654    69  1039  1100     
+ 609        BN1      STU  NBAR           NBAR EQUALS     1039    21  0342  0745     
+ 610                 LDD         CHKAR       N           0745    69  0198  0751     
+ 611                 RAL  ONET           ARITH EQUALS    0198    65  0356  1511     
+ 612                 STU  N                ONE           1511    21  0484  1087     
+ 613                 STL  ARITH  NF2                     1087    20  0358  1561     
+ 614        CEEL     RAL  THREE                          0678    65  1131  1535     
+ 615                 LDD  CI     SETEL                   1535    69  0974  1250     
+ 616        CI       RAL  C      CI1                     0974    65  1277  1181     
+ 617        CI1      AUP  ONET   ADLOW                   1181    10  0356  1611     
+ 618        ADLOW    STU  TEMP1          STORE V AND     1611    21  0509  1112     
+ 619                 STL  TEMP2             ARITH        1112    20  0490  0943     
+ 620                 LDD         CHKAR                   0943    69  0346  0751     
+ 621                 RAL  SLTI3          COMPILE         0346    65  0499  1253     
+ 622                 LDD         OSGN1   SLT 0004 AND    1253    69  0656  1313     
+ 623                 STU  OPSGN                          0656    21  0524  1327     
+ 624                 RAU  LOW1             ALO 8002      1327    60  0980  1585     
+ 625                 AUP  ALO                            1585    10  0988  0993     
+ 626                 LDD         PS7     COMPILE         0993    69  0496  0800     
+ 627                 RAL   8003  VAR2     RALV0000       0496    65  8003  1303     
+ 628        CMTX     RAU  TWO    YMTX1    V IS TWO       0880    60  0148  1353     
+ 629        CN       RAL  C      CN1     V EQUALS C      0704    65  1277  1231     
+ 630        CN1      AUP  ONET   VAR     ARITH IS ONE    1231    10  0356  1661     
+ 631        VAR      STU  TEMP1          STORE V AND     1661    21  0509  1162     
+ 632                 STL  TEMP2             ARITH        1162    20  0490  1043     
+ 633                 LDD         CHKAR                   1043    69  0546  0751     
+ 634                 LDD         STBTA                   0546    69  0549  0884     
+ 635                 LDD         SRN     GENERATE N      0549    69  0652  1100     
+ 636                 LDD         CHKNN                   0652    69  1105  0658     
+ 637                 SLT   0004  VAR2                    1105    35  0004  1303     
+ 638        VAR2     ALO  RAL              COMPILE       1303    15  0968  1123     
+ 639                 ALO  TEMP2            RAL VN        1123    15  0490  0795     
+ 640                 LDD  VAR1   OSGN1                   0795    69  0248  1313     
+ 641        VAR1     RAL  TEMP1          SET ARITH       0248    65  0509  1363     
+ 642                 STL  ARITH  EEC2                    1363    20  0358  1711     
+ 643        DF       RAL  SXTNT          BEGIN READ      1271    65  1224  1229     
+ 644                 LDD  PS5A   LDSR                    1229    69  0635  1038     
+ 645        EE       LDD  RR     NUINC                   1521    69  1571  1274     
+ 646        EEC2     STU  OPSGN  PS3                     1711    21  0524  0343     
+ 647        EN       LDD         CHKAR                   0904    69  1107  0751     
+ 648                 LDD         SRN     GENERATE N      1107    69  0810  1100     
+ 649                 LDD         CHKNN                   0810    69  1413  0658     
+ 650                 ALO  D0001           COMPILE        1413    15  0032  1137     
+ 651                 ALO  EXT            LDD0000EN       1137    15  0690  0845     
+ 652                 LDD         OSGN1                   0845    69  0298  1313     
+ 653                 STU  OPSGN                          0298    21  0524  1377     
+ 654                 RAL  NU                             1377    65  0700  1155     
+ 655                 ALO  EN1                            1155    15  0708  1463     
+ 656                 AUP   8002          IF JNU NOT      1463    10  8002  1621     
+ 657                 SLO  ONE            EQUAL   JNU     1621    16  0630  1635     
+ 658                 LDD  EN4            PLUS ONE        1635    69  1088  0941     
+ 659                 SDA  EN4     8003   COMPILE         0941    22  1088  8003     
+ 660        EN1      RAL  J0001          NOPPHIJNU       0708    65  1977  1281     
+ 661                 STL  TEMP2  EN4                     1281    20  0490  1088           
+ 662        EN4      SLO  J0001                          1088    16  1977  1331           
+ 663                 NZE         EN3                     1331    45  0934  1685           
+ 664                 RAL  TEMP2                          0934    65  0490  0895           
+ 665                 SLO  ONET                           0895    16  0356  1761           
+ 666                 SLT   0004                          1761    35  0004  1671           
+ 667                 ALO  PHI                            1671    15  1324  1279           
+ 668                 LDD  EN3    OSGN1                   1279    69  1685  1313           
+ 669        EN3      RAU  N              EXTENSION       1685    60  0484  1089           
+ 670                 SUP  MAXE           NUMBER          1089    11  0542  0897           
+ 671                 BMI         EN2A    SET ARITH       0897    46  1300  0801           
+ 672                 RAU  ONET   EN2                     1300    60  0356  1811           
+ 673        EN2A     RAU   8002  EN2                     0801    60  8002  1811           
+ 674        EN2      STU  ARITH          V1 TO ZERO      1811    21  0358  1861           
+ 675                 STL  V1     PS3                     1861    20  0488  0343           
+ 676        EW       LDD  RW     NUINC                   1419    69  1469  1274           
+ 677        ENDG     RAL  RELAT          END STMNT IF    0772    65  0632  1187           
+ 678                 NZE         PS12    RELAT ZERO      1187    45  0740  0850           
+ 679                 LDD  ENDG1          IF GO INTGR     0740    69  1093  0596           
+ 680                 SDA  ENDG1               THEN       0596    22  1093  0646           
+ 681                 LDD  ENDG3          INST OF         0646    69  0599  0702           
+ 682                 SDA  ENDG3          UMINUSTWO       0702    22  0599  0752           
+ 683                 RAL  U              SET TO DATA     0752    65  0515  1569           
+ 684                 SLO  TWO            OF UMINUS1      1569    16  0148  1403           
+ 685                 LDD  ENDGA                THEN      1403    69  0706  0809           
+ 686                 SDA  ENDGA          DECOMPILE       0809    22  0706  0859           
+ 687                 LDD  ENDGB                          0859    69  1212  1265           
+ 688                 SDA  ENDGB                IF        1265    22  1212  1315           
+ 689                 ALO          8002     GO I INTGR    1315    15  1318  8002           
+ 690                 RAL   0001                THEN      1318    65  0001  1205           
+ 691                 SLT   0002             ENDGR        1205    35  0002  1911           
+ 692                 NZU  ENDGR                          1911    44  1365  0966           
+ 693                 SRT   0002  ENDGA                   0966    30  0002  0706           
+ 694        ENDGA    LDD   0000  ENDGB                   0706    69  0000  1212           
+ 695        ENDGB    SIA   0000                          1212    23  0000  1453           
+ 696                 LDD         DROPU   IF RELAT        1453    69  0756  0893           
+ 697                 RAL  RELAT          NEG  THEM       0756    65  0632  1237           
+ 698                 BMI  ENDG2  ENDG5      ENDG2        1237    46  0790  0991           
+ 699        ENDGR    RAL  RELAT          IF RELAT NEG    1365    65  0632  1287           
+ 700                 BMI  ENDG2  ENDG4   THEN ENDG2      1287    46  0790  1041           
+ 701        ENDG2    RAM   8002          INST OF         0790    67  8002  0649           
+ 702                 STL  BETA           RELATMINUS1     0649    20  1503  0806           
+ 703                 LDD  ENDG4  BMONE   SET TO U        0806    69  1041  0944           
+ 704        ENDG4    RAL  U      ENDG3   DATA OF         1041    65  0515  0599           
+ 705        ENDG3    LDD   0000  ENDG1   RELAT SET       0599    69  0000  1093           
+ 706        ENDG1    SDA   0000           TO U           1093    22  0000  1553           
+ 707                 RSU  U              COMPILE         1553    61  0515  1619           
+ 708                 LDD  ENDG5  PS7     NEG  NOP        1619    69  0991  0800           
+ 709        ENDG5    STU  RELAT  PS12    RELAT ZERO      0991    21  0632  0850           
+ 710        ENDH     RAU  U              COMPILE         1023    60  0515  1669           
+ 711                 AUP  OONE            HLT U 0000     1669    10  0832  1337           
+ 712                 LDD  PS12   PS7                     1337    69  0850  0800           
+ 713        ENDL     LDD  ENDY   DROPK                   1078    69  1268  1721           
+ 714        ENDT     RAL  FOURT          END PUNCH       0938    65  1091  0945           
+ 715                 SLO  J0001           GENERATOR      0945    16  1977  1381           
+ 716                 BMI  ALARM            COMPILES      1381    46  0827  1735           
+ 717                 RAL   8001           LDD PNCHSR     1735    65  8001  1143           
+ 718                 SLT   0004          IF NR OF        1143    35  0004  1603           
+ 719                 ALO   0000           VARIABLES      1603    15  0000  1255           
+ 720                 STL  N               LESS THAN      1255    20  0484  1387           
+ 721                 LDD         SRAC       FIVE         1387    69  0840  1150       
+ 722                 LDD         OSGN1                   0840    69  1193  1313       
+ 723                 RAL  SVNTT                          1193    65  0696  0851       
+ 724                 LDD  PS12   LDSR                    0851    69  0850  1038       
+ 725        ENDY     LDD         CHKNK   IF U EQUALS     1268    69  1771  1374       
+ 726                 LDD         UBETA    BETA PLUS 1    1771    69  1424  1427       
+ 727                 NZE  ENDY1           RAL BECOMES    1424    45  1128  1329       
+ 728                 RSL  NZE              STL           1329    66  1132  1437       
+ 729                 STL  TEMP4           IN BETA        1437    20  0788  1141       
+ 730                 RAL  BETA                           1141    65  1503  1157       
+ 731                 LDD         CHGOP                   1157    69  0860  1513       
+ 732                 STL  TEMP1                          0860    20  0509  1262       
+ 733                 RAL  BETA                           1262    65  1503  1207       
+ 734                 SLO  ONE                            1207    16  0630  1785       
+ 735                 STL  TEMP4                          1785    20  0788  1191       
+ 736                 ALO  ENDY2   8002   SET CONTENTS    1191    15  0994  8002   
+ 737        ENDY2    RAL   0000           BETA MINUS     0994    65  0000  1305       
+ 738                 STL  TEMP2           ONE EQUAL      1305    20  0490  1243       
+ 739                 RAM   8002           TO CONTENT     1243    67  8002  0901       
+ 740                 SLO  STLA1           BETA WITH      0901    16  1004  0909       
+ 741                 NZE  PS12            SIGN BETA      0909    45  0850  1563       
+ 742                 RAU  TEMP4          MINUS ONE       1563    60  0788  1293       
+ 743                 STU  U              IF BETA         1293    21  0515  1368       
+ 744                 RAU  TEMP2          MINUS ONE       1368    60  0490  0995       
+ 745                 BMI         ENDY3    CONTAINS       0995    46  0348  0699       
+ 746                 RSU  TEMP1  ENDY4    STL ACC        0348    61  0509  1613       
+ 747        ENDY3    RAU  TEMP1  ENDY4                   0699    60  0509  1613       
+ 748        ENDY4    LDD  PS12   PS7                     1613    69  0850  0800       
+ 749        ENDY1    RSL  FRONE          IF U NOT BTA    1128    66  1431  1835       
+ 750                 STL  TEMP4            PLUS ONE      1835    20  0788  1241       
+ 751                 LDD         UCHGE    RECOMPILE      1241    69  1044  0797       
+ 752                 RAL  U               RALY0 0000     1044    65  0515  1719       
+ 753                 SLO  TWO                            1719    16  0148  1653       
+ 754                 STL  U                 TO           1653    20  0515  1418       
+ 755                 ALO  ENDY6   8002                   1418    15  1821  8002       
+ 756        ENDY6    RAU   0000           ALO U 0000     1821    60  0000  1355       
+ 757                 AUP  U              LDD ACC 8002    1355    10  0515  1769       
+ 758                 AUP  TWO             STDYO 0000     1769    10  0148  1703       
+ 759                 SRT   0004                          1703    30  0004  1663       
+ 760                 RAU   8003          WITH SGN OF     1663    60  8003  1871       
+ 761                 SLT   0004           LAST INST      1871    35  0004  1481       
+ 762                 LDD         PS7       NEGATIVE      1481    69  0984  0800       
+ 763                 RAL  U                              0984    65  0515  1819       
+ 764                 ALO  ENDY7   8002                   1819    15  0822  8002       
+ 765        ENDY7    RSL   0000                          0822    66  0000  1405       
+ 766                 STL  TEMP1                          1405    20  0509  1312       
+ 767                 RAU  LDAC                           1312    60  1415  1869       
+ 768                 LDD         PS7                     1869    69  0872  0800       
+ 769                 RAU  TEMP1                          0872    60  0509  1713       
+ 770                 LDD  PS12   PS7                     1713    69  0850  0800       
+ 771        FF       STU  FFBIT  PS3     FFBIT ON        1321    21  1959  0343       
+ 772        GI       RAL  ALO            COMPILE         1024    65  0988  1343       
+ 773                 ALO  ABCON           ALO A0 8002    1343    15  0776  1531       
+ 774                 ALO  LOW1           WHERE A0        1531    15  0980  1885       
+ 775                 LDD         OSGN1    WILL CONT      1885    69  1138  1313       
+ 776                 RAU  OONE   EEC2     S0 ADDRSS      1138    60  0832  1711       
+ 777        GL       LDD  GI     CHKAR                   0778    69  1024  0751       
+ 778        GN       LDD         CHKAR                   0754    69  1257  0751       
+ 779                 LDD         SRN                     1257    69  0910  1100       
+ 780                 LDD         CHKNN    COMPILE        0910    69  1763  0658       
+ 781                 ALO  GO             NOP0000SN       1763    15  1016  1921       
+ 782                 LDD  EEC2   OSGN1                   1921    69  1711  1313       
+ 783        IF       LDD  NI     CHKNK                   1371    69  1474  1374       
+ 784        II       RAL  I      ADLOW                   1074    65  1477  1611       
+ 785        IL       RAL  ONE                            0828    65  0630  1935       
+ 786                 LDD  II     SETEL                   1935    69  1074  1250       
+ 787        IN       RAL  I      VAR     V EQUALS I      0804    65  1477  1661       
+ 788        ME       LDD  ML     NUMIN   DCRMNT NU       1283    69  0978  1581       
+ 789        ML       RAU         STREL   RELAT IS L      0978    60  1631  0836       
+ 790                 LDD         DROPK                   1631    69  1034  1721       
+ 791                 LDD         CHKTK   TO ML1 IF       1034    69  1487  0890       
+ 792                 NZE         ML1       TK IS ZERO    1487    45  0940  1291       
+ 793                 LDD  ML1    TKNZ1   TKNZ1AND ML1    0940    69  1291  1094       
+ 794        ML1      LDD         SETEK                   1291    69  1752  1134       
+A794                 LDD         NGLFT                   1752    69  1144  0947       
+ 795                 STU  ABVAL  PS3     ABVAL ZERO      1144    21  0366  0343       
+ 796        MY       RAU         STREL   RELAT IS L      1218    60  1971  0836       
+ 797                 LDD         CHKTK   TO MINI IF      1971    69  1524  0890       
+ 798                 NZE  MY1    MINI    TK IS ZERO      1524    45  1178  1118       
+ 799        MY1      LDD  ML1    TKNZ2                   1178    69  1291  1194       
+ 800        MN       RAU         STREL   RELAT IS L      0926    60  1379  0836       
+ 801                 LDD         CHKTK   TO MINN IF      1379    69  1182  0890       
+ 802                 NZE         MINN      TK IS ZERO    1182    45  0886  0876       
+ 803                 LDD         SRN      COMPILE        0886    69  1139  1100       
+ 804                 LDD  MY1    GENN     RAL AJAY       1139    69  1178  1681       
+ 805        MINI     RAL  OONE            RAL RAM        1118    65  0832  1537       
+ 806                 STL  TEMP4            BECOMES       1537    20  0788  1341       
+ 807                 LDD         UCHGE   RSL RSM         1341    69  1244  0797       
+ 808                 RAL  D0004          L IS S          1244    65  0035  1189       
+ 809                 STL  L      PS3G     THEN PS3G      1189    20  0529  0668       
+ 810        MINL     LDD  PS3G   NGLFT                   0878    69  0668  0947       
+ 811        MINN     LDD         SRN                     0876    69  1429  1100       
+ 812                 RSU  N              N IS MINUS N    1429    61  0484  1239       
+ 813                 STU  N                COMPILE       1239    21  0484  1587       
+ 814                 LDD         GENN     RAL AJAY       1587    69  0990  1681       
+ 815                 RAL  D0004          L IS S          0990    65  0035  1289       
+ 816                 STL  L      WY       THEN WY        1289    20  0529  1068       
+ 817        M0001     84   0000  IDEM    SWITCHING       0500    84  0000  1455       
+ 818        M0002     85   0000  GRTR     DICTIONARY     0501    85  0000  1505       
+ 819        M0003     86   0000  GRTRZ     FOR           0502    86  0000  1555       
+ 820        M0004     99   9999  ALARM    RELATIONS      0503    99  9999  0827       
+ 821        IDEM     RAL  U              COMPILE         1455    65  0515  1919       
+ 822                 STL  RELAT           NZE0000NEXT    1919    20  0632  0936       
+ 823                 RAL  NZE    GRTR1                   0936    65  1132  1637       
+ 824        GRTRZ    RAL  U              V EQUALS U      1555    65  0515  1969       
+ 825                 STL  RELAT  GRTZ1     COMPILE       1969    20  0632  0986       
+ 826        GRTZ1    RAL  BMI    GRTR1   BMI0000NEXT     0986    65  1339  1637       
+ 827        GRTR1    LDD  EEC2   OSGN1   OPSGN ZERO      1637    69  1711  1313       
+ 828        GRTR     RSL  U              V EQUALS U      1505    66  0515  0770       
+ 829                 SLO  ONE             PLUS ONE       0770    16  0630  1036       
+ 830                 STL  RELAT          COMPILE         1036    20  0632  1086       
+ 831                 RAL  NZE            NZE0000NEXT     1086    65  1132  1687       
+ 832                 LDD         OSGN1                   1687    69  1040  1313       
+ 833                 STU  OPSGN  GRTZ1                   1040    21  0524  0986       
+ 834        NCMMA    LDD  NR     COMMA                   1227    69  0720  1173       
+ 835        NF       RAU  INTGR          N EQUALS L      0917    60  0538  1393       
+ 836                 SRT   0008           AND N          1393    30  0008  1961       
+ 837                 ALO  N                              1961    15  0484  1389       
+ 838                 SRT   0001          MU EQUALS MU    1389    30  0001  1045       
+ 839                 STL  N                PLUS ONE      1045    20  0484  1737       
+ 840                 RAU  MU                             1737    60  0750  1605        
+ 841                 AUP  ONE    NF2                     1605    10  0630  1561        
+ 842        NF2      STU  MU     PS3                     1561    21  0750  0343        
+ 843        NI       RAL  NI1                            1474    65  1527  1731        
+ 844                 LDD  RELAT          SWITCH TO       1731    69  0632  1136        
+ 845                 TLU  M0001   8002    RELATION       1136    84  0500  8002        
+ 846        NI1      RAU   0000            COMPILER      1527    60  0000  1655        
+ 847                 SUP  RELAT   8003                   1655    11  0632  8003        
+ 848        NR       STL  NBAR           N NBAR MU       0720    20  0342  1095        
+ 849                 STL  N               DEL AND        1095    20  0484  1787        
+ 850                 STL  MU             ARITH ZERO      1787    20  0750  1753        
+ 851                 STL  ARITH  NF                      1753    20  0358  0917        
+ 852        NW       LDD  NR     TKOP    STORE OP        1519    69  0720  1223        
+ 853        NZ       LDD  NR     NZ4                     0794    69  0720  1273        
+ 854        NZ4      STD  OUT                            1273    24  0976  1479        
+ 855                 LDD  NZ1    CHKNK                   1479    69  1232  1374        
+ 856        NZ1      RAL   0001          COMPILE         1232    65  0001  1705        
+ 857                 SLT   0002           STL ACC        1705    35  0002  1362        
+ 858                 SUP  SIXTR              OR          1362    11  1465  0820        
+ 859                 NZU         FLOTE    LDD FLOATK     0820    44  1323  1574        
+ 860                 SUP  SIXT               OR          1323    11  0330  1186        
+ 861                 NZU         FIXVA    LDD FIX        1186    44  1439  1090        
+ 862                 SUP  NNTEN              OR          1439    11  0592  0997        
+ 863                 NZU         FLOTE                   0997    44  0951  1574        
+ 864                 RAL  FIVEO  LARM      ALARM         0951    65  1054  0332        
+ 865        NZ3      RAU  V1             TO NZ2 IF       1350    60  0488  1443        
+ 866                 NZU  OUT    NZ2      V1 ZERO        1443    44  0976  0498        
+ 867        NZ2      RAL  STLA1                          0498    65  1004  0959        
+ 868                 LDD         OSGN1                   0959    69  1412  1313        
+ 869                 STU  OPSGN  FLOT1                   1412    21  0524  1577        
+ 870        FLOTE    RAU  ARITH           FLOAT IF       1574    60  0358  1813        
+ 871                 NZU  NZ3                            1813    44  1350  1468        
+ 872                 RAL  FIVET           Y AND FIX      1468    65  0922  1627        
+ 873                 LDD  FLOT1  LDSR    C AND FIX       1627    69  1577  1038        
+ 874        FLOT1    RAU   8003  OUT                     1577    60  8003  0976        
+ 875        FIXVA    RAU  ARITH                          1090    60  0358  1863        
+ 876                 NZU         NZ2                     1863    44  0967  0498        
+ 877                 RAL  FIXNR                          0967    65  0870  0925        
+ 878                 LDD  NZ2    LDSR                    0925    69  0498  1038        
+ 879        PCMMA    LDD  PF     COMMA                   1077    69  1421  1173        
+ 880        PF       STL  N              N NBAR AND      1421    20  0484  1837        
+ 881                 STL  NBAR            MU ZERO        1837    20  0342  1145        
+ 882                 STL  MU     PN       THEN PN        1145    20  0750  0854        
+ 883        PN       RAL  ONET           ARITH TO        0854    65  0356  1462        
+ 884                 STL  ARITH  NF2      FLOATING       1462    20  0358  1561        
+ 885        PW       LDD  PF     TKOP    TKOP AND PF     1369    69  1421  1223        
+ 886        QCMMA    LDD  EE     COMMA                   1127    69  1521  1173        
+ 887        QF       RAU  TAU                            1471    60  1960  1515        
+ 888                 SUP  TAU5             QUANT         1515    11  1518  1373        
+ 889                 NZU  TF1                            1373    44  1677  1228        
+ 890                 LDD  TF1    STSMT     IF SO         1228    69  1677  1030        
+ 891        STSMT    STD  FINI           STORE STMT      1030    24  0691  1294        
+ 892                 RAL  FLOP1           NO OF STMT     1294    65  1047  1001        
+ 893                 AUP   0000           FOLLOWING      1001    10  0000  1755        
+ 894                 SLO  ONE             QUANT          1755    16  0630  1236        
+ 895                 ALO          8002                   1236    15  1489  8002        
+ 896                 STU  N0001  FINI                    1489    21  0568  0691        
+ 897        TF1      RAU  PSI              IF NOT        1677    60  0041  1195        
+ 898                 AUP  ONE            INCRMNT PSI     1195    10  0630  1286        
+ 899                 STU  PSI             ANS SET        1286    21  0041  1344        
+ 900                 MPY  SIXT             COUNT         1344    19  0330  1336         
+ 901                 STL  FLOP1                          1336    20  1047  1400         
+ 902                 RAL  ONE    TF2                     1400    65  0630  1386         
+ 903        QUA4     NZU         CURTN   IF TALLY        1450    44  1803  1104         
+ 904                 AUP          8003    NON ZERO       1803    10  0856  8003         
+ 905                 RAL   0000  QUA20   SEND NXT WRD    0856    65  0000  1805         
+ 906        QUA20    STL  GAMMA  QUA3    TO GAMMA        1805    20  0372  0975         
+ 907        QUA3     RAU  GAMMA                          0975    60  0372  1727         
+ 908                 NZU         QUA1                    1727    44  1781  1282         
+ 909                 SRT   0002          EXTRACT         1781    30  0002  1887         
+ 910                 STU  GAMMA          PEWTH           1887    21  0372  1025         
+ 911                 RAU   8002          SYMBOL          1025    60  8002  1333         
+ 912                 STU  TEMP1          IS              1333    21  0509  1512         
+ 913                 NZU  QUA2   QUA3    SYMBOL ZERO     1512    44  1565  0975         
+ 914        QUA1     RAU  TALLY           INCRMNT        1282    60  0373  1777         
+ 915                 SUP  ONE              TALLY         1777    11  0630  1436         
+ 916                 STU  TALLY  QUA4                    1436    21  0373  1450         
+ 917        QUA2     SUP  SVTY2          IS SYMBOL K     1565    11  1568  1423         
+ 918                 NZU  QUA5                           1423    44  1827  1278         
+ 919                 RAL  CHI            INCRMNT CHI     1278    65  1831  1486         
+ 920                 ALO  ONE    TF2                     1486    15  0630  1386         
+ 921        TF2      STL  CHI             CLEAR L        1386    20  1831  1084         
+ 922                 STU  STAR            AND STAR       1084    21  1188  1391         
+ 923                 STU  EL     QUA3                    1391    21  0746  0975         
+ 924        QUA5     RAU  EL                             1827    60  0746  1051         
+ 925                 AUP  ONET           INCRMNT EL      1051    10  0356  1562         
+ 926                 STU  EL             ALARM  IF       1562    21  0746  0749         
+ 927                 SUP  SIXT            MORE THAN      0749    11  0330  1536         
+ 928                 NZU  QUA7   QUA50    FIVE SYMBLS    1536    44  1539  1140         
+ 929        QUA50    RAL  PSI                            1140    65  0041  1245         
+ 930                 SLO  ONE                            1245    16  0630  1586         
+ 931                 STL  PSI    ALARM                   1586    20  0041  0827         
+ 932        QUA7     RAU  STAR                           1539    60  1188  1493         
+ 933                 SRT   0002                          1493    30  0002  0799         
+ 934                 AUP  TEMP1                          0799    10  0509  1913         
+ 935                 ALO  FLOP1                          1913    15  1047  1101         
+ 936                 ALO  CHI                            1101    15  1831  1636         
+ 937                 SLO  SEVEN                          1636    16  1589  1543         
+ 938                 ALO          8002                   1543    15  0796  8002         
+ 939                 STU  N0001                          0796    21  0568  0972         
+ 940                 STU  STAR   QUA3                    0972    21  1188  0975         
+ 941        CURTN    LDD         FLOP    STORE           1104    69  1307  0960         
+ 942                 RAL  W0005  CURT1   CONVERT NO      1307    65  1981  1686         
+ 943        CURT1    SLT   0002          OF STATMNTS     1686    35  0002  1593         
+ 944                 SUP  NINTY           BEING          1593    11  0360  1615         
+ 945                 SUP   8003           QUANTIFIED     1615    11  8003  1473         
+ 946                 NZE         CURT2     TO PURE       1473    45  1026  1877         
+ 947                 AUP   8001  CURT1     NUMERIC       1026    10  8001  1686         
+ 948        CURT2    AUP   8001                          1877    10  8001  1736         
+ 949                 SRT   0002                          1736    30  0002  1643         
+ 950                 SLO   8002                          1643    16  8002  1151         
+ 951                 SRT   0001                          1151    30  0001  1357         
+ 952                 ALO   8001                          1357    15  8001  1665         
+ 953                 SLO   8002                          1665    16  8002  1523         
+ 954                 SRT   0001                          1523    30  0001  1529         
+ 955                 ALO   8001                          1529    15  8001  1937         
+ 956                 SLT   0002                          1937    35  0002  1693         
+ 957                 ALO  FLOP1                          1693    15  1047  1201         
+ 958                 SLO  TWO                            1201    16  0148  1853         
+ 959                 ALO          8002                   1853    15  0906  8002         
+ 960                 STU  N0001                          0906    21  0568  1022       
+ 961                 LDD  W0004                          1022    69  1980  1383       
+ 962                 STD   0001          VARIABLE        1383    24  0001  1154       
+ 963                 LDD  Z                              1154    69  1407  1010       
+ 964                 STD   0002          Z               1010    24  0002  1855       
+ 965                 LDD  W0003          LOWER           1855    69  1979  1332       
+ 966                 STD   0003          VARIABLE        1332    24  0003  0956       
+ 967                 RAU  FIVET                          0956    60  0922  1927       
+ 968                 STL   0004                          1927    20  0004  1457       
+ 969                 ALO  TAU6   QUA9                    1457    15  1060  1715       
+ 970        QUA9     STU  TALLY          RETURN TO       1715    21  0373  1076       
+ 971                 STL  TAU             SCANNER        1076    20  1960  1963       
+ 972                 RAL  RSL    PS2B                    1963    65  0344  0667       
+ 973        TAU6     RAL  TAU5   QUA11   SET TAU         1060    65  1518  1573       
+ 974        QUA11    STL  TAU    TAU2     TO TAU5        1573    20  1960  0564       
+ 975        TAU5     LDD         STSMT                   1518    69  1072  1030       
+ 976                 RAL  TAU2   QUA11                   1072    65  0564  1573       
+ 977        TAU2     LDD  QUA21  DCRMT                   0564    69  1017  0920       
+ 978        QUA21    LDD         FLOP                    1017    69  0970  0960       
+ 979                 RAU  W0005                          0970    60  1981  1786       
+ 980                 NZU  PS     QUA10   NUMBER          1786    44  1234  1190       
+ 981        QUA10    RAL  W0004          STORE           1190    65  1980  1836       
+ 982                 STU   0000                          1836    21  0000  1903       
+ 983                 STL   0001          QUANT VARBLE    1903    20  0001  1204       
+ 984                 STL   0003                          1204    20  0003  1006       
+ 985                 LDD  Z              Z               1006    69  1407  1110       
+ 986                 STD   0002                          1110    24  0002  1905       
+ 987                 RAL  W0002           INCREMENT      1905    65  1978  1433       
+ 988                 STL   0005           IF MINUS       1433    20  0005  0758       
+ 989                 SLO  M               OTHERWISE      0758    16  1612  1067       
+ 990                 SLT   0002           Z S INCRMNT    1067    35  0002  1623       
+ 991                 NZU         QUAMN                   1623    44  1328  1378       
+ 992                 RAU  D0004  QUAMN                   1328    60  0035  1378       
+ 993        QUAMN    STU   0004                          1378    21  0004  1507       
+ 994                 RAU  SEVNT                          1507    60  1160  1765       
+ 995                 STL   0006                          1765    20  0006  1009       
+ 996                 ALO  TAU3   QUA9    TO SCANNER      1009    15  1662  1715       
+ 997        DCRMT    STD  FINI           DECREMENT       0920    24  0691  1394       
+ 998                 RAU  PSI             QUANT COUNT    1394    60  0041  1295       
+ 999                 STU  TEMP3  DCMT3    FOR ALL        1295    21  0709  1712       
+1000        DCMT3    RAU  TEMP3           PSI LESS       1712    60  0709  0664       
+1001                 NZU         FINI     THAN OR        0664    44  1117  0691       
+1002                 SUP  ONE             EQUAL TO       1117    11  0630  1886       
+1003                 STU  TEMP3           CURRENT        1886    21  0709  1762       
+1004                 MPY  SIXT            PSI            1762    19  0330  1936       
+1005                 ALO  DCMT1                          1936    15  1639  1743       
+1006                 LDD  DCMT2                          1743    69  0846  0849       
+1007                 SDA  DCMT2   8002                   0849    22  0846  8002       
+1008        DCMT1    RAU  N0005                          1639    60  0572  1428       
+1009                 SUP   0000                          1428    11  0000  1056       
+1010                 NZU  DCMT3  DCMT2                   1056    44  1712  0846       
+1011        DCMT2    STU  N0005  DCMT3                   0846    21  0572  1712       
+1012        TAU3     LDD         FLOP    STORE           1662    69  1815  0960       
+1013                 LDD  RAM                            1815    69  0894  1097       
+1014                 STD   0001          G               1097    24  0001  1254       
+1015                 RAU  W0006                          1254    60  1982  1987       
+1016                 STL   0000                          1987    20  0000  1304       
+1017                 STL   0007                          1304    20  0007  1210       
+1018                 LDD         STNON                   1210    69  0714  0911       
+1019                 STU   0002                          0714    21  0002  1106       
+1020                 LDD  WDIF                           1106    69  1059  1812       
+1021                 STD   0003             IF           1812    24  0003  1156       
+1022                 LDD  D0007                          1156    69  0038  1441       
+1023                 STD   0005                W         1441    24  0005  0808       
+1024                 RAL  W0002          CHECK FOR       0808    65  1978  1483       
+1025                 SLO  M               NEGATIVE       1483    16  1612  1167       
+1026                 SLT   0002           INCREMENT      1167    35  0002  1673       
+1027                 NZU  QUA30                          1673    44  1478  1528       
+1028                 LDD  W0004                          1528    69  1980  1533       
+1029                 STD   0004                          1533    24  0004  1557       
+1030                 LDD  W0001  QUA31                   1557    69  1977  1080       
+1031        QUA30    LDD  W0001                          1478    69  1977  1130       
+1032                 STD   0004          UPPER VARBLE    1130    24  0004  1607       
+1033                 LDD  W0004  QUA31                   1607    69  1980  1080       
+1034        QUA31    STD   0006          QUANT VARBLE    1080    24  0006  1109       
+1035                 RAU  NINET                          1109    60  1862  1217       
+1036                 STL   0007                          1217    20  0007  1260       
+1037                 STD   0008                          1260    24  0008  1912       
+1038                 ALO  TAU4   QUA9    TO SCANNER      1912    15  1865  1715       
+1039        TAU4     RAL  PSI                            1865    65  0041  1345       
+1040                 SLO  ONE                            1345    16  0630  1238       
+1041                 STL  PSI                            1238    20  0041  1444       
+1042                 NZE  QUA22  PS0                     1444    45  0548  0336       
+1043        QUA22    RAL  TAU2                           0548    65  0564  1020       
+1044                 STL  TAU    QUA21                   1020    20  1960  1017       
+1045        FLOP     STD  OUT                            0960    24  0976  1579       
+1046                 RAU  PSI                            1579    60  0041  1395       
+1047                 MPY  SIXT           STORE STATMT    1395    19  0330  1288       
+1048                 STL  FLOP1                          1288    20  1047  1500       
+1049                 SLO  SIX                            1500    16  0520  1075       
+1050                 ALO         FLOP3                   1075    15  1578  1583       
+1051                  06  N0001  W0001                   1578    06  0568  1977       
+1052        FLOP3    LDD  OUT    SR1                     1583    69  0976  0341       
+1053        RCMMA    LDD  RR     COMMA                   1177    69  1571  1173       
+1054        RR       RAL  K              K EQUALS K      1571    65  0146  1251       
+1055                 STU  V1                             1251    21  0488  1491       
+1056                 ALO  ONE            PLUS ONE        1491    15  0630  1338       
+1057                 SLT   0005                          1338    35  0005  1301       
+1056                 NZU  ALARM                          1301    44  0827  1206       
+1059                 SRT   0005                          1206    30  0005  1070       
+1060                 STL  K      RR2                     1070    20  0146  0899       
+1061        RR2      ALO  RR1     8002   TK EQUALS       0899    15  0802  8002       
+1062        RR1      STU  T0001  PS3       ZERO          0802    21  0042  0343       
+1063        RW       RAL  STL            COMPILE         1469    65  0636  1541       
+1064                 ALO  K                STL WK        1541    15  0146  1351       
+1065                 ALO  W                              1351    15  1354  1159       
+1066                 LDD         OSGN1   OPSGN ZERO      1159    69  1962  1313       
+1067                 STU  OPSGN                          1962    21  0524  1628       
+1068                 LDD         SETEK                   1628    69  1881  1134       
+1069                 LDD  RR     TKOP                    1881    69  1571  1223       
+1070        RZ       LDD  RR     NZ4                     0744    69  1571  1273       
+1071        TI       RAL  ONE    TIFF    PUNCH           1124    65  0630  1388       
+1072        TY       RAL  TWO    TIFF     GENERATORS     0843    65  0148  1388       
+1073        TC       RAL  THREE  TIFF                    1168    65  1131  1388       
+1074        TL       RAL  LDSR1  TIFF                    0928    65  1931  1388       
+1075        TIFF     ALO  AB3            COMPILES        1388    15  1591  1445       
+1076                 STL  TMBLE          PROGRAM         1445    20  0949  0852       
+1077                 LDD         UBETA    WHICH          0852    69  1256  1427       
+1078                 NZE         TI4     IDENTIFIES      1256    45  1310  0764       
+1079                 RAL  U               VARIANLES      1310    65  0515  1120       
+1080                 SLO  THREE          WHOSE VALUES    1120    16  1131  1438         
+1081                 STL  U               ARE TO BE      1438    20  0515  1618         
+1082                 RAL  TMBLE  TI2      PUNCHED        1618    65  0949  1404         
+1083        TI4      LDD         DROPU                   0764    69  1267  0893         
+1084                 ALO          8002                   1267    15  1170  8002         
+1085                 RAU   0000                          1170    60  0000  1306         
+1086                 SLT   0002                          1306    35  0002  0814         
+1087                 SRT   0006                          0814    30  0006  1629         
+1088                 STU  N                              1629    21  0484  1488         
+1089                 LDD  TI2    SRAC                    1488    69  1404  1150         
+1090        TI2      LDD         OSGN1                   1404    69  1657  1313         
+1091                 LDD  PS3    COMMA                   1657    69  0343  1173         
+1092        AB3       15   5003   0000                   1591    15  5003  0000         
+1093        TMBLE     00   0000   0000                   0949    00  0000  0000         
+1094        WE       LDD  WL     NUMIN                   1233    69  0728  1581         
+1095        WL       LDD         DROPK   IS PREVIOUS     0728    69  1382  1721         
+1096                 LDD         CHKTK     OPERATION     1382    69  1538  0890         
+1097                 NZE  WL1    ALPHA     ZERO          1538    45  0642  1793         
+1098        ALPHA    LDD         SETEK   IF SO EK        1793    69  0896  1134         
+1099                 RAL  K              IS ARITH AND    0896    65  0146  1401         
+1100                 STU  ABVAL  RR2     ABVAL ZERO      1401    21  0366  0899         
+1101        WL1      LDD  ALPHA  TKNZ1     THEN          0642    69  1793  1094         
+1102        TKNZ1    STD  OUT             RETURN PS3     1094    24  0976  1679         
+1103                 STL  TEMP1           IF NOT IS      1679    20  0509  0864         
+1104                 SLO  P                PPN P         0864    16  1317  1122         
+1105                 NZE         PWRW    IF NOT IS       1122    45  1126  1678         
+1106                 LDD         GETEK   WK FXD OR FL    1126    69  1729  1432         
+1107                 NZE  FLTW1  NFLW1   IF FL IS ARI    1729    45  1482  1633         
+1108        FLTW1    RAL  ARITH          TH FIXED OR     1482    65  0358  0914         
+1109                 NZE  FLTW2  NFLW2      FLOATING     0914    45  1668  1220         
+1110        FLTW2    RAL  V1     WL3A    IF V1 ZERO      1668    65  0488  1843         
+1111        WL3A     LDD  GAMM   SWTCH     COMPILE       1843    69  0946  0999         
+1112        SWTCH    NZE  RALWK  STLAC    STL ACC        0999    45  0902  1454         
+1113        STLAC    STD  EXIT              AND          1454    24  0644  1147         
+1114                 RAL  STLA1           RAL WK         1147    65  1004  1209         
+1115                 LDD         OSGN1   IF NON ZERO     1209    69  0964  1313         
+1116                 STU  OPSGN  RALW1     COMPILE       0964    21  0524  1728         
+1117        STLA1    STL   0001   0000    RAL WK         1004    20  0001  0000         
+1118        RALWK    STD  EXIT   RALW1                   0902    24  0644  1728         
+1119        RALW1    RAL  K              SET OPSGN       1728    65  0146  1451         
+1120                 ALO  W                TO ZERO       1451    15  1354  1259         
+1121                 ALO  RAL             IN BOTH        1259    15  0968  1723         
+1122                 LDD         OSGN1      CASES        1723    69  1176  1313         
+1123                 STU  OPSGN  EXIT                    1176    21  0524  0644         
+1124        GAMM     RAU  OTWO   GAMM1   INCREMENT       0946    60  0768  1773         
+1125        GAMM1    ALO  ONE    WL3C     OPN AND        1773    15  0630  1588         
+1126        WL3C     AUP  TEMP1           SET V1         1588    10  0509  1014         
+1127                 STU  TEMP1  NETTA   THEN GO TO      1014    21  0509  1064         
+1128        NETTA    STL  V1     FL1K    ARITH GEN       1064    20  0488  1641         
+1129        NFLW2    RAL  FIVET          COMPILE         1220    65  0922  1778         
+1130                 LDD         LDSR     LDD FLOATK     1778    69  1532  1038         
+1131                 STU  OPSGN          AND MERGE       1532    21  0524  1828         
+1132                 RAL  ONET            WITH FLOAT     1828    65  0356  1114         
+1133                 STL  ARITH  WL3A       FLOAT        1114    20  0358  1843         
+1134        NFLW1    RAL  ARITH          IF WK FIXED     1633    65  0358  1164         
+1135                 NZE  N1FW2  N1NW2    IS PRESENT     1164    45  1718  1270         
+1136        N1FW2    RAL  V1                FIXED        1718    65  0488  1893         
+1137                 LDD         SWTCH   TO SWITCH IF    1893    69  0996  0999         
+1138                 RAL  FOURT           FLOAT THEN     0996    65  1091  1495         
+1139                 LDD  GAMM   LDSR     LDD FLOAT      1495    69  0946  1038         
+1140        N1NW2    RAU  OONE   WL3C     FIX FIX        1270    60  0832  1588        
+1141        PWRW     LDD         GETEK   IS WK FIXED     1678    69  1582  1432        
+1142                 NZE         PWRP    IF NOT IS       1582    45  1638  1688        
+1143                 RAL  ARITH           PRESENT FLT    1638    65  0358  1214        
+1144                 NZE  PWRFL          IF NOT          1214    45  1768  1320        
+1145                 RAL  FOURT            COMPILE       1320    65  1091  1545        
+1146                 LDD  PWRFL  LDSR     LDD FLOAT      1545    69  1768  1038        
+1147        PWRFL    RAL  ONET           FLOAT FLOAT     1768    65  0356  1264        
+1148                 STL  ARITH           COMPILES       1264    20  0358  1314        
+1149                 LDD         LDSR      LDD LOG       1314    69  1367  1038        
+1150                 LDD  PWR1   STLAC     STL ACC       1367    69  1370  1454        
+1151        PWR1     RAU  OONE   GAMM1                   1370    60  0832  1773        
+1152        PWRP     RAL  V1               RAL WK        1688    65  0488  1943        
+1153                 LDD         SWTCH    COMPILE        1943    69  1046  0999        
+1154                 RAL  ARITH            STL ACC       1046    65  0358  1364        
+1155                 STL  V1               ANDOR         1364    20  0488  1691        
+1156                 ALO  TWLVT            RAL WK AND    1691    15  1494  1049        
+1157                 LDD  OUT    LDSR     POWER INVRT    1049    69  0976  1038        
+1158        WY       LDD         CHKTK   IS PREVIOUS     1068    69  1172  0890        
+1159                 NZE         ALPHA    OPN ZERO       1172    45  1226  1793        
+1160                 LDD  ALPHA  TKNZ2                   1226    69  1793  1194        
+1161        TKNZ2    STD  OUT                            1194    24  0976  1779        
+1162                 STL  TEMP1           IF NOT IS      1779    20  0509  1414        
+1163                 SLO  P                OPN P         1414    16  1317  1222        
+1164                 NZE         POWR    IF NOT IS       1222    45  1276  1878        
+1165                 LDD         GETEK    PREV FLOAT     1276    69  1829  1432        
+1166                 NZE  FLT1   NFLT1    IF SO GO TO    1829    45  1632  1683        
+1167        FLT1     RAL  V1             ALTR IF PREV    1632    65  0488  1993        
+1168                 NZE  FLT2            NOT IN ACC     1993    45  1096  1197        
+1169                 LDD  FLT2   ALTR                    1197    69  1096  1099        
+1170        FLT2     RAL  ARITH          COMPILE         1096    65  0358  1464        
+1171                 NZE  NETTA            FLOAT IF      1464    45  1064  1420        
+1172                 RAL  FOURT            PRESENT       1420    65  1091  1595        
+1173                 LDD         LDSR       FIXED        1595    69  0598  1038        
+1174                 RAL  ONET                           0598    65  0356  1514        
+1175                 STL  ARITH  NETTA                   1514    20  0358  1064        
+1176        NFLT1    RAL  ARITH          IF NOT FLOAT    1683    65  0358  1564        
+1177                 NZE  FX1F2           FIX GO TO      1564    45  1818  1470        
+1178                 RAU  OTREY  WL3C    WL3C    IF      1470    60  0888  1588        
+1179        FX1F2    LDD         BMONE   FLOAT FIX       1818    69  1272  0944        
+1180                 RSU  BETA            COMPILE NEG    1272    61  1503  1707        
+1181                 SUP  AR33           LDD BETA FTK    1707    11  1360  1915        
+1182                 LDD  AR34   PS7      TO ALTR3       1915    69  1868  0800        
+1183        AR33     LDD   0000   9005    AND THEN       1360    69  0000  9005        
+1184        AR34     LDD  NETTA             NETTA        1868    69  1064  1417        
+1185                 STD  EXIT   ALTR3                   1417    24  0644  1247        
+1186        ALTR     STD  EXIT           ALTR PERFRMS    1099    24  0644  1297        
+1187                 LDD         BMONE    FOLLOWING      1297    69  1550  0944        
+1188                 LDD  ALTR3  STAC1   SEQUENTIALLY    1550    69  1247  1600        
+1189        BMONE    STD  FINI           BETA MINUS      0944    24  0691  1544        
+1190                 RAL  BETA            ONE TO         1544    65  1503  1757        
+1191                 SLO  ONE             TEMP4          1757    16  0630  1738        
+1192                 STL  TEMP4  I4ZU1                   1738    20  0788  1741        
+1193        I4ZU1    RAL  TEMP4          INST OF         1741    65  0788  1594        
+1194                 ALO  I4ZU3            CONTENTS      1594    15  1347  1501        
+1195                 LDD  I4ZU2            OF TEMP4      1501    69  1504  1807        
+1196                 SDA  I4ZU2            EQUALS U      1807    22  1504  1857        
+1197                 RAU   8002   8003   IF NOT LDD      1857    60  8002  8003        
+1198        I4ZU3    LDD   0000                          1347    69  0000  1554        
+1199                 STD  TEMP2                          1554    24  0490  1644        
+1200                 RAM   8001          IF LDD SET      1644    67  8001  1551        
+1201                 SLO  CKLDD            DATA OF       1551    16  1604  1309        
+1202                 SLT   0002            CONTENTS      1309    35  0002  1965        
+1203                 NZU         I4ZU4       OF          1965    44  1520  1570        
+1204                 RAL  U                TEMP4 TO      1520    65  0515  1620        
+1205                 SRT   0004               U          1620    30  0004  1682        
+1206                 AUP  OONE   I4ZU5                   1682    10  0832  1788        
+1207        I4ZU4    RAL  U      I4ZU5                   1570    65  0515  1788        
+1208        I4ZU5    AUP  I4ZU2                          1788    10  1504  1359        
+1209                 LDD  TEMP2   8003                   1359    69  0490  8003        
+1210        I4ZU2    SDA   0000  FINI                    1504    22  0000  0691        
+1211        STAC1    STD  FINI           COMPILE NEG     1600    24  0691  1694        
+1212                 RSU  BETA            STL ACC BTA    1694    61  1503  1907        
+1213                 SRT   0004                          1907    30  0004  1467        
+1214                 SUP  STLA1                          1467    11  1004  1409        
+1215                 LDD  FINI   PS7                     1409    69  0691  0800        
+1216        ALTR3    LDD         IUM2U                   1247    69  1650  1654        
+1217                 RAL  BETA                           1650    65  1503  0858        
+1218                 STL  TEMP4                          0858    20  0788  1791        
+1219                 LDD         BMINI                   1791    69  1744  1397        
+1220                 RAL  OONE                           1744    65  0832  1838        
+1221                 STL  OPSGN  EXIT                    1838    20  0524  0644        
+1222        IUM2U    STD  FINI           U MINUS TWO     1654    24  0691  1794        
+1223                 RAL  U               TO TEMP4       1794    65  0515  1670        
+1224                 SLO  TWO             THEN I4ZU1     1670    16  0148  1704        
+1225                 STL  TEMP4  I4ZU1                   1704    20  0788  1741        
+1226        BMINI    STD  FINI           CONTENTS OF     1397    24  0691  1844        
+1227                 RSU  TEMP4           CONTENTS OF    1844    61  0788  1894        
+1228                 SUP  BMIN2   8003     TEMP4 MADE    1894    11  1447  8003        
+1229        BMIN2    SML   0000           NEGATIVE       1447    18  0000  1356        
+1230                 RAU   8002                          1356    60  8002  1066        
+1231                 SLO  TEMP4                          1066    16  0788  1944        
+1232                 SLO  BMIN3   8002                   1944    16  1497  8002        
+1233        BMIN3     21   0000  FINI                    1497    21  0000  0691        
+1234        EXIT     HLT  EXIT   EXIT                    0644    01  0644  0644        
+1235        FINI     HLT  FINI   FINI                    0691    01  0691  0691        
+1236        OUT      HLT  OUT    OUT                     0976    01  0976  0976        
+1237        OSGN1    STD  FINI   OSGN3   SET SIGN OF     1313    24  0691  1994        
+1238        OSGN3    AUP  OPSGN           INSTRUCTION    1994    10  0524  1879        
+1239                 AUP  OSGN2   8003     TO BE         1879    10  1732  8003        
+1240        OSGN2    RAU   8002             COMPILED     1732    60  8002  1841        
+1241                 LDD  FINI   PS7                     1841    69  0691  0800        
+1242        UBETA    STD  FINI           IS U EQUAL      1427    24  0691  1645        
+1243                 RAL  BETA             TO BETA       1645    65  1503  0908        
+1244                 ALO  ONE             PLUS ONE       0908    15  0630  1888        
+1245                 SLO  U      FINI                    1888    16  0515  0691        
+1246        CHGOP    STD  FINI   CHGE1     OP  OF        1513    24  0691  1695        
+1247        CHGE1    ALO  CHG1           CONTENTS OF     1695    15  0648  1754        
+1248                 LDD  CHG2           LOWER           1754    69  0958  1614        
+1249                 SDA  CHG2    8002     CHANGED BY    1614    22  0958  8002        
+1250        CHG1     RAL   0000           CONTENTS OF    0648    65  0000  1406        
+1251                 BMI         CHG3     TEMP4          1406    46  1459  1410        
+1252                 SLO  TEMP4  CHG2                    1459    16  0788  0958        
+1253        CHG3     ALO  TEMP4  CHG2                    1410    15  0788  0958        
+1254        CHG2     STL   0000  FINI                    0958    20  0000  0691        
+1255        POWR     LDD         GETEK   IS PREV FLT     1878    69  1782  1432        
+1256                 NZE  POWR1  POWRF    IF SO IS       1782    45  1938  1988        
+1257        POWR1    RAL  V1              PREV IN ACC    1938    65  0488  1745        
+1258                 NZE  POWR4           ALTR IF NOT    1745    45  0698  1149        
+1259                 LDD  POWR4  ALTR                    1149    69  0698  1099        
+1260        POWR4    RAL  ARITH          IF PRES FIX     0698    65  0358  1664         
+1261                 NZE  POWR2            COMPILE       1664    45  1918  1720         
+1262                 RAL  FOURT             FLOAT        1720    65  1091  1795         
+1263                 LDD         LDSR     AND SET        1795    69  0748  1038         
+1264                 RAL  ONET            OPSGN TO       0748    65  0356  1714         
+1265                 STL  ARITH  POWR2       ONE         1714    20  0358  1918         
+1266        POWR2    RAL  ONET           COMPILE         1918    65  0356  1764         
+1267                 LDD  PWR1   LDSR     LDD LOG        1764    69  1370  1038         
+1268        POWRF    LDD  POWR3  ALTR    IF PREV FIX     1988    69  1891  1099         
+1269        POWR3    RAL  ARITH             ALTR         1891    65  0358  1814         
+1270                 STL  V1              COMPILE        1814    20  0488  1941         
+1271                 ALO  TENT   OPLD                    1941    15  1845  1199         
+1272        OPLD     LDD  OUT    LDSR                    1199    69  0976  1038         
+1273        OPWK     ALO  K              COMPILES        1700    15  0146  1601         
+1274                 ALO  W      OPWK1    OPN WK NEXT    1601    15  1354  1509         
+1275        OPWK1    LDD  OPWK2  OSGN1                   1509    69  1864  1313         
+1276        OPWK2    STU  OPSGN  OUT                     1864    21  0524  0976         
+1277        LDSR     STD  LDSR1          OPSGN ZERO      1038    24  1931  1184         
+1278                 ALO  LDSR2          COMPILES        1184    15  1689  1895         
+1279                 LDD         OSGN1    LDD0000LOWR    1895    69  0798  1313         
+1280                 STU  OPSGN  LDSR1   PLUS 9000       0798    21  0524  1931         
+1281        LDSR1    HLT  LDSR1  LDSR1                   1931    01  1931  1931         
+1282        LDSR2    LDD   0000   9000                   1689    69  0000  9000         
+1283        OPACC    ALO  ACC    OPWK1                   1750    15  1804  1509         
+1284        FL1K     RAL  AR5            FETCH OPN       1641    65  1945  1249         
+1285                 LDD  TEMP1           ENTRY FROM     1249    69  0509  1914         
+1286                 TLU  Q0001   8002    SWITCHING      1914    84  0550  8002         
+1287        AR5      RAU   0000            DICTIONARY    1945    60  0000  1456         
+1288                 SUP  TEMP1          ALARM IF        1456    11  0509  1964         
+1289                 SRT   0004           OPN IS         1964    30  0004  1125         
+1290                 NZU  ALARM           INVALID        1125    44  0827  1180         
+1291                 SLT   0004   8003   IF VALID GO     1180    35  0004  8003         
+1292        Q0001     64   0000  FPDV    SWITCHING       0550    64  0000  1506         
+1293        Q0002     65   0000  FPDV1   DICTIONARY      0551    65  0000  1556         
+1294        Q0003     66   0000  FPDV2   FOR ARITHMTC    0552    66  0000  1606         
+1295        Q0004     67   0000  FPDV3   SUBGENRATORS    0553    67  0000  1656         
+1296        Q0005     78   0000  FPPWR                   0554    78  0000  1706         
+1297        Q0006     82   0000  FPAD                    0555    82  0000  1756         
+1298        Q0007     83   0000  FPAD1                   0556    83  0000  1806         
+1299        Q0008     84   0000  FPAD                    0557    84  0000  1756         
+1300        Q0009     85   0000  FPAD3                   0558    85  0000  1856         
+1301        Q0010     87   0000  FPMU                    0559    87  0000  1906         
+1302        Q0011     88   0000  FPMU1                   0560    88  0000  1008         
+1303        Q0012     89   0000  FPMU                    0561    89  0000  1906         
+1304        Q0013     90   0000  FPMU3                   0562    90  0000  1058         
+1305        Q0014     99   0000  ALARM                   0563    99  0000  0827         
+1306        FPAD     RAL  EIGTT  OPLD     TO ARITH       1756    65  1559  1199         
+1307        FPAD1    RAL  ALO    OPWK     GENERATORS     1806    65  0988  1700         
+1308        FPMU1    RAL  RAU            START OF        1008    65  1116  1322         
+1309                 ALO  LOW             ARITHMETIC     1322    15  0352  1108         
+1310                 LDD         OSGN1   SUBGENERATRS    1108    69  1166  1313         
+1311                 STU  OPSGN                          1166    21  0524  1928         
+1312                 RAL  MPY    OPWK                    1928    65  1832  1700         
+1313        FPMU     RAL  NINET  OPLD                    1906    65  1862  1199         
+1314        FPDV     RAL  SIXT   OPLD                    1506    65  0330  1199         
+1315        FPDV1    RAL  DVR    OPWK                    1556    65  1609  1700         
+1316        FPDV2    RAL  FRTNT  OPLD                    1606    65  1659  1199         
+1317        FPPWR    RAL  NINET                          1706    65  1862  1517         
+1318                 LDD         LDSR                    1517    69  1770  1038         
+1319                 RAL  TWOT                           1770    65  1823  1929         
+1320                 LDD  NZ2    LDSR                    1929    69  0498  1038       
+1321        FPAD3    LDD         UBETA   IS U EQUAL      1856    69  1709  1427       
+1322                 NZE  ADD4            BETA PLUS 1    1709    45  1216  1266       
+1323                 RSL  FIVEO  MULTN                   1266    66  1054  1759       
+1324        ADD4     LDD         ALTR    ALTR AND        1216    69  1820  1099       
+1325                 RAL  ALO    OPACC     ALO ACC       1820    65  0988  1750       
+1326        FPDV3    LDD         ALTR    ALTR AND        1656    69  1809  1099       
+1327                 RAL  DVR    OPACC     DVR ACC       1809    65  1609  1750       
+1328        FPMU3    RAU  RAU                            1058    60  1116  1372       
+1329                 STU  TEMP6                          1372    21  1326  1230       
+1330                 RAL  U                              1230    65  0515  1870       
+1331                 LDD         CHKOP                   1870    69  1873  1376       
+1332                 STL  TEMP4                          1873    20  0788  1991       
+1333                 SLO  BMI                            1991    16  1339  1995       
+1334                 STL  TEMP5                          1995    20  1299  0952       
+1335                 LDD         UBETA                   0952    69  1158  1427       
+1336                 NZE         MULT1                   1158    45  1316  1366       
+1337                 RAL  ABVAL                          1316    65  0366  1422       
+1338                 NZE  MULT3                          1422    45  1426  1280       
+1339                 RSL  OFIVE                          1280    66  0528  1733       
+1340                 STL  TEMP4  MULT2                   1733    20  0788  0692       
+1341        MULT3    RAL  RAU                            1426    65  1116  1472       
+1342                 ALO  LOW                            1472    15  0352  1208       
+1343                 LDD         OSGN1                   1208    69  1416  1313       
+1344                 STU  OPSGN                          1416    21  0524  1330       
+1345                 STU  ABVAL  MULT4                   1330    21  0366  1920       
+1346        MULT2    RAL  U                              0692    65  0515  1970       
+1347                 SLO  ONE                            1970    16  0630  1739       
+1348                 LDD  MULT4  CHGOP                   1739    69  1920  1513       
+1349        MULT4    LDD         ALTR                    1920    69  1923  1099       
+1350                 RAL  MPY    OPACC                   1923    65  1832  1750       
+1351        MULT1    RAL  ABVAL                          1366    65  0366  1522       
+1352                 NZE  MULT3                          1522    45  1426  1380       
+1353                 RAM  TEMP4                          1380    67  0788  1146       
+1354                 ALO  TEMP6                          1146    15  1326  1882       
+1355                 STL  TEMP6                          1882    20  1326  1430       
+1356                 RAL  BETA                           1430    65  1503  1258       
+1357                 LDD         CHKOP                   1258    69  1466  1376       
+1358                 NZE         MLT7A                   1466    45  1572  1622       
+1359                 ALO  OONE                           1572    15  0832  1789       
+1360                 NZE  MULT6                          1789    45  0742  1196       
+1361                 RSM  TEMP4  MLT7B                   1196    68  0788  1246       
+1362        MLT7A    RAM  TEMP4  MLT7B                   1622    67  0788  1246       
+1363        MLT7B    SLO  OFIVE                          1246    16  0528  1783       
+1364                 STL  TEMP4  MULT7                   1783    20  0788  0792       
+1365        MULT7    RAL  BETA                           0792    65  1503  1308       
+1366                 SLO  ONE                            1308    16  0630  1839       
+1367                 LDD         CHGOP                   1839    69  0842  1513       
+1368                 RAL  TEMP5  MULTN                   0842    65  1299  1759       
+1369        MULTN    STL  TEMP4                          1759    20  0788  0892       
+1370                 RAL  BETA                           0892    65  1503  1358       
+1371                 LDD  OPWK2  CHGOP                   1358    69  1864  1513       
+1372        MULT8    RAL  BETA                           1800    65  1503  1408       
+1373                 STL  U                              1408    20  0515  1968       
+1374                 LDD         CHGOP                   1968    69  1672  1513       
+1375                 STL  TEMP5                          1672    20  1299  1002       
+1376                 BMI         MULT9                   1002    46  1458  1508       
+1377                 RAU  OONE   MULT9                   1458    60  0832  1508       
+1378        MULT9    STU  OPSGN                          1508    21  0524  1480       
+1379                 RAL  TEMP6                          1480    65  1326  1932       
+1380                 ALO  LOW                            1932    15  0352  1558        
+1381                 LDD         OSGN1                   1558    69  1516  1313        
+1382                 STU  OPSGN                          1516    21  0524  1530        
+1383                 RAM  TEMP5                          1530    67  1299  1854        
+1384                 LDD  OUT    OSGN1                   1854    69  0976  1313        
+1385        MULT6    RAL  TEMP5                          0742    65  1299  1904        
+1386                 STL  TEMP4  MULT8                   1904    20  0788  1800        
+1387        YI       RAL  Y      CI1                     1174    65  1580  1181        
+1388        YL       RAL  TWO                            1028    65  0148  1608        
+1389                 LDD  YI     SETEL                   1608    69  1174  1250        
+1390        YMTX     RAU  ONE    YMTX1    V IS ONE       0930    60  0630  1353        
+1391        YMTX1    AUP  RAL              COMPILE       1353    10  0968  1973        
+1392                 AUP  I              RAL I 0000      1973    10  1477  1833        
+1393                 LDD         PS7      PLUS V         1833    69  1889  0800        
+1394                 RAL  U              BETA IS U       1889    65  0515  1722        
+1395                 SLO  ONE            MINUS ONE       1722    16  0630  1939        
+1396                 STL  BETA                           1939    20  1503  1658        
+1397                 STU  ABVAL          ABVAL ZERO      1658    21  0366  1772        
+1398                 LDD  YMTX2                          1772    69  1175  1630        
+1399                 STD  OUT    FPMU3                   1630    24  0976  1058        
+1400        YMTX2    RSL  ONET            DECREMENT      1175    66  0356  1566        
+1401                 LDD         SETJN       JNU         1566    69  1822  1225        
+1402                 ALO  ALO              COMPILE       1822    15  0988  1296        
+1403                 ALO  PHI            ALO PHIJNU      1296    15  1324  1680        
+1404                 LDD         OSGN1                   1680    69  1883  1313        
+1405                 RAL  M              R EQUALS        1883    65  1612  1567        
+1406                 SLO  OONE           LEFT PAREN      1567    16  0832  1989        
+1407                 STL  R      PS3G    YL OR CL        1989    20  0340  0668        
+1408        YN       RAL  Y      CN1     V EQUALS Y      0954    65  1580  1231        
+1409        ZN       LDD         SRN     GENERATE N      0826    69  1730  1100        
+1410                 LDD  WY     GENN                    1730    69  1068  1681        
+1411        CHKAR    STD  OUT            ALARM IF        0751    24  0976  1780        
+1412                 RAL  ARITH           FLOATING       1780    65  0358  1616        
+1413                 NZE  ALARM  OUT                     1616    45  0827  0976        
+1414        CHKNK    STD  FINI           ALARM IF K      1374    24  0691  1346        
+1415                 RAU  NU              AND NU         1346    60  0700  1708        
+1416                 AUP  K               NON ZERO       1708    10  0146  1651        
+1417                 NZU  ALARM  FINI                    1651    44  0827  0691        
+1418        CHKNN    STD  EXIT           ALARM IF N      0658    24  0644  1547        
+1419                 SRT   0004          IS MORE         1547    30  0004  1758        
+1420                 ALO  TYPE3                          1758    15  1666  1872        
+1421                 NZU  SRN6           THAN  2000      1872    44  1335  1476        
+1422                 SLO   8001                          1476    16  8001  1933        
+1423                 SRT   0006  EXIT     DIGITS         1933    30  0006  0644        
+1424        CHKOP    STD  FINI                           1376    24  0691  1396        
+1425                 ALO          8002                   1396    15  1349  8002        
+1426                  67   9999                          1349    67  9999  1808        
+1427                 SLT   0002                          1808    35  0002  1716        
+1428                 SLO   8002                          1716    16  8002  1275        
+1429                 SRT   0002                          1275    30  0002  1284        
+1430                 ALO  RAL    FINI                    1284    15  0968  0691        
+1431        CHKTK    STD  OUT                            0890    24  0976  1830        
+1432                 RAL  K              FETCH TK        1830    65  0146  1701        
+1433                 ALO          8002                   1701    15  1858  8002        
+1434                 RAL  T0001  OUT                     1858    65  0042  0976        
+1435        COMMA    STD  OUT            INCREMENT       1173    24  0976  1880        
+1436                 RAL  ONET               JNU         1880    65  0356  1766        
+1437                 LDD         SETJN       THEN        1766    69  1922  1225        
+1438                 SLO  ONE              COMPILE       1922    16  0630  1240        
+1439                 ALO  STL             STL PHIJNU     1240    15  0636  0942        
+1440                 ALO  PHI            MINUS ONE       0942    15  1324  1930         
+1441                 LDD         OSGN1                   1930    69  1334  1313         
+1442                 STU  OPSGN                          1334    21  0524  1384         
+1443                 RAL   8003  OUT                     1384    65  8003  0976         
+1444        DROPK    STD  OUT            DECREMENT       1721    24  0976  1434         
+1445                 RAL  K                    K         1434    65  0146  1751         
+1446                 SLO  ONE                            1751    16  0630  1290         
+1447                 STL  K      OUT                     1290    20  0146  0976         
+1448        DROPU    STD  EXIT           DECRMNT U       0893    24  0644  1597         
+1449                 RAL  U                              1597    65  0515  1972         
+1450                 SLO  ONE                            1972    16  0630  1340         
+1451                 STL  U      EXIT                    1340    20  0515  0644         
+1452        GENN     STD  OUT                            1681    24  0976  1484         
+1453                 LDD         STBTA                   1484    69  1390  0884         
+1454                 LDD         SRAC                    1390    69  1446  1150         
+1455                 LDD         OSGN1                   1446    69  1399  1313         
+1456                 STU  OPSGN  OUT                     1399    21  0524  0976         
+1457        GETEK    STD  EXIT           GET PRESENT     1432    24  0644  1647         
+1458                 RAL  K              EK VALUE        1647    65  0146  1801         
+1459                 ALO          8002                   1801    15  1908  8002         
+1460                 RAL  E0001  EXIT                    1908    65  0374  0644         
+1461        NGLFT    STD  OUT                            0947    24  0976  1534         
+1462                 RAL  D0004                          1534    65  0035  1440         
+1463                 STL  L                              1440    20  0529  1584         
+1464                 STU  V1                             1584    21  0488  0992         
+1465                 RAL  ABVAL                          0992    65  0366  1624         
+1466                 NZE         NGLNA                   1624    45  1634  1684         
+1467                 RAL  U                              1634    65  0515  1674         
+1468                 LDD         CHKOP                   1674    69  1734  1376         
+1469                 ALO  OTWO                           1734    15  0768  1724         
+1470                 NZE  NGLNB                          1724    45  1784  1834         
+1471                 RAL  OONE   NGLNB                   1834    65  0832  1784         
+1472        NGLNB    STL  TEMP4                          1784    20  0788  1042         
+1473                 LDD  OUT    UCHGE                   1042    69  0976  0797         
+1474        NGLNA    LDD         STBTA                   1684    69  1490  0884         
+1475                 RAL  RSL                            1490    65  0344  1449         
+1476                 ALO  LOW                            1449    15  0352  1859         
+1477                 LDD         OSGN1                   1859    69  1816  1313         
+1478                 STU  OPSGN  OUT                     1816    21  0524  0976         
+1479        NUINC    STD  OUT                            1274    24  0976  1884         
+1480                 RAL  NU             NU EQUALS NU    1884    65  0700  1909         
+1481                 AUP   8002            PLUS ONE      1909    10  8002  1617         
+1482                 AUP  ONE               AND          1617    10  0630  1540         
+1483                 STU  NU             JNU EQUALS      1540    21  0700  1460         
+1484                 AUP  NU2             JNUMINUSONE    1460    10  1866  1774         
+1485                 ALO  NU1     8002                   1774    15  1934  8002         
+1486        NU1      LDD  J0001   8003                   1934    69  1977  8003         
+1487        NU2      STD  J0001  OUT                     1866    24  1977  0976         
+1488        NUMIN    STD  OUT                            1581    24  0976  1590         
+1489                 RAL  NU             NU EQUALS NU    1590    65  0700  1510         
+1490                 SLO  ONE             MINUS ONE      1510    16  0630  1640         
+1491                 STL  NU     OUT                     1640    20  0700  0976         
+1492        SETEK    STD  EXIT           SET EK          1134    24  0644  1697         
+1493                 RAU  ARITH          EQUAL TO        1697    60  0358  1916         
+1494                 ALO  K              ARTHH           1916    15  0146  1851         
+1495                 ALO          8002                   1851    15  1560  8002         
+1496                 STU  E0001  EXIT                    1560    21  0374  0644         
+1497        SETEL    STD  EXIT           SET VARIABLE    1250    24  0644  1747         
+1498                 STL  LDSR1               TYPE       1747    20  1931  1690         
+1499                 RAL  R              SET L EQUAL     1690    65  0340  1496         
+1500                 STL  L      EXIT      TO R          1496    20  0529  0644       
+1501        SETJN    STD  EXIT            JNU EQUALS     1225    24  0644  1797       
+1502                 STL  TEMP1          JNU  PLUS       1797    20  0509  1966       
+1503                 RAL  NU                             1966    65  0700  1610       
+1504                 ALO  STJN1            CONTENTS      1610    15  1667  1824       
+1505                 LDD  STJN2                          1824    69  1740  1546       
+1506                 SDA  STJN2   8002    OF LOWER       1546    22  1740  8002       
+1507        STJN1    RAL  J0001                          1667    65  1977  1790       
+1508                 ALO  TEMP1  STJN2                   1790    15  0509  1740       
+1509        STJN2    STL  J0001                          1740    20  1977  1840       
+1510                 SLT   0004  EXIT                    1840    35  0004  0644       
+1511        STBTA    STD  EXIT                           0884    24  0644  1847       
+1512                 RAL  U                              1847    65  0515  1874       
+1513                 STL  BETA   EXIT                    1874    20  1503  0644       
+1514        STNON    STD  EXIT                           0911    24  0644  1897       
+1515                 LDD         PS100                   1897    69  1850  1035       
+1516                 AUP  NONON  EXIT                    1850    10  0634  0644       
+1517        STREL    LDD  L              SET RELATION    0836    69  0529  1890       
+1518                 STD  RELAT   8003       TYPE        1890    24  0632  8003       
+1519        TKOP     STD  FINI            STORE OPN      1223    24  0691  1596       
+1520                 RAU  K                IN TK         1596    60  0146  1901       
+1521                 AUP  TKOP1             AND          1901    10  1660  1717       
+1522                 LDD  R       8003    EXIT  FROM     1717    69  0340  8003       
+1523        TKOP1    STD  T0001  FINI       FINI         1660    24  0042  0691       
+1524        UCHGE    STD  FINI           U EQUALS U      0797    24  0691  1646       
+1525                 RAL  U              MINUS ONE       1646    65  0515  1924       
+1526                 SLO  ONE    CHGE1                   1924    16  0630  1695       
+1527        LARM     STL  L               SET ERROR      0332    20  0529  1940       
+1528                 STL  R      ALARM    IDENTIFCTN     1940    20  0340  0827       
+1529        ALARM    RAU   0000          ALARM           0827    60  0000  1710       
+1530                 SLT   0001           SUBROUTINE     1710    35  0001  1767       
+1531                 ALO  L               DISPLAYS       1767    15  0529  1990       
+1532                 SLT   0003           L R AND        1990    35  0003  1499       
+1533                 ALO  R               STATEMENT      1499    15  0340  1696       
+1534                 SLT   0002             NR           1696    35  0002  1760       
+1535                 HLT   1234  PS                      1760    01  1234  1234       
+1536        END      RAL  A0001          END AND FNLP    0567    65  0383  1092       
+1537                 SRT   0004          PUNCHABCONS     1092    30  0004  1810       
+1538                 STL   1955              AND         1810    20  1955  1860       
+1539                 RAU   1951          RESERVATION     1860    60  1951  1910       
+1540                 AUP  A0002             CARDS        1910    10  0384  1142       
+1541                 AUP  A0002                          1142    10  0384  1192       
+1542                 STU  A0003                          1192    21  0385  1242       
+1543                 AUP   1952                          1242    10  1952  1817       
+1544                 AUP  A0002                          1817    10  0384  1292       
+1545                 STU  A0004                          1292    21  0386  1342       
+1546                 AUP   1953                          1342    10  1953  1867       
+1547                 AUP  A0002                          1867    10  0384  1392       
+1548                 LDD         STNON                   1392    69  1746  0911       
+1549                 STU  W0004                          1746    21  1980  1442       
+1550                 RAL  NONON                          1442    65  0634  1492       
+1551                 STU  W0005                          1492    21  1981  1542       
+1552                 STU  W0006                          1542    21  1982  1592       
+1553                 STL  W0003                          1592    20  1979  1642       
+1554                 RAU  NONO                           1642    60  0883  1692       
+1555                 SLT   0004                          1692    35  0004  1917       
+1556                 STU  W0002                          1917    21  1978  1742       
+1557                 RAU  D0005                          1742    60  0036  1792       
+1558                 STU  W0001                          1792    21  1977  1842       
+1559                 LDD         PS133                   1842    69  1796  0638       
+1560                 RAU  A0001  APCH4                   1796    60  0383  1892         
+1561        APCH4    SRT   0004                          1892    30  0004  1967         
+1562                 LDD         STNON                   1967    69  1974  0911         
+1563                 AUP  D0005                          1974    10  0036  1942         
+1564                 STU  W0001                          1942    21  1977  1992         
+1565                 RAL  A0001                          1992    65  0383  1846         
+1566                 ALO          8002                   1846    15  1549  8002         
+1567                 RAL  A0001                          1549    65  0383  1896         
+1568                 STL  TEMP1                          1896    20  0509  1325         
+1569                 BMI  APCH1  APCH2                   1325    46  1946  1996         
+1570        APCH2    AUP  CNTRL                          1996    10  0354  1375         
+1571                 STU  W0010  APCH3                   1375    21  1986  1947         
+1572        APCH1    RAU  D0008  APCH2                   1946    60  0039  1996         
+1573        APCH3    RAM  TEMP1  CKLDD                   1947    67  0509  1604         
+1574        CKLDD    LDD   8003                          1604    69  8003  1425         
+1575                 SDA  TEMP1                          1425    22  0509  1475         
+1576                 AUP   8003                          1475    10  8003  1997         
+1577                 SIA  TEMP2                          1997    23  0490  0848         
+1578                 SLT   0002                          0848    35  0002  1525         
+1579                 RAU   8003                          1525    60  8003  0898         
+1580                 LDD         PS100                   0898    69  1052  1035         
+1581                 AUP  NONO                           1052    10  0883  0948         
+1582                 SLT   0004                          0948    35  0004  1575         
+1583                 STU  W0002                          1575    21  1978  0998         
+1584                 RAU  TEMP1                          0998    60  0509  1625         
+1585                 SRT   0004                          1625    30  0004  1048         
+1586                 LDD         STNON                   1048    69  1102  0911         
+1587                 STU  W0003                          1102    21  1979  1098         
+1588                 RAU  TEMP2                          1098    60  0490  1148         
+1589                 LDD         STNON                   1148    69  1152  0911         
+1590                 STU  W0004                          1152    21  1980  1198         
+1591                 STL  W0005                          1198    20  1981  1248         
+1592                 LDD         PS133                   1248    69  1202  0638         
+1593                 RAU  A0001                          1202    60  0383  1298         
+1594                 SUP  ONE                            1298    11  0630  1348         
+1595                 STU  A0001                          1348    21  0383  1398         
+1596                 NZU  APCH4  FNLPC                   1398    44  1892  1252         
+1597        FNLPC    STU  W0001                          1252    21  1977  1448         
+1598                 STU  W0002                          1448    21  1978  1498         
+1599                 STU  K                              1498    21  0146  1599         
+1600                 STU  JAY    FNL1                    1599    21  0710  1675         
+1601        FNL1     RAU  JAY    FNL2                    1675    60  0710  1725         
+1602        FNL2     AUP  ONET                           1725    10  0356  1775         
+1603                 STU  GAMMA                          1775    21  0372  1825         
+1604                 RAU  TYPE4                          1825    60  1548  1875         
+1605                 STU  W0010                          1875    21  1986  1598         
+1606                 RAL  FNL3                           1598    65  1302  1925         
+1607                 ALO  K       8002                   1925    15  0146  8002         
+1608        FNL3     RAL  D0001                          1302    65  0032  1648         
+1609                 STL  W0003                          1648    20  1979  1698         
+1610                 STL  TEMP2                          1698    20  0490  1748         
+1611                 RAU  GAMMA                          1748    60  0372  1798         
+1612                 LDD         PS100                   1798    69  1352  1035         
+1613                 AUP  YOU                            1352    10  1975  1848         
+1614                 STU  W0004                          1848    21  1980  1898         
+1615                 LDD         PS133                   1898    69  1402  0638         
+1616                 RAL  FNL4                           1402    65  1526  1948         
+1617                 ALO  K       8002                   1948    15  0146  8002         
+1618        FNL4     RAL   1951                          1526    65  1951  1576         
+1619                 STL  TEMP1                          1576    20  0509  1626         
+1620                 ALO  GAMMA                          1626    15  0372  1998       
+1621                 STL  JAY                            1998    20  0710  1676       
+1622                 SLO  GAMMA                          1676    16  0372  1649       
+1623                 NZE  FNL5                           1649    45  1452  1726       
+1624                 RAL   8001                          1726    65  8001  1699       
+1625                 SLO  ONET                           1699    16  0356  1776       
+1626                 STL  GAMMA  FNL5                    1776    20  0372  1452       
+1627        FNL6     PCH  W0001                          1900    71  1977  1749       
+1628                 RAU  K                              1749    60  0146  1502       
+1629                 AUP  ONE                            1502    10  0630  1799       
+1630                 STU  K                              1799    21  0146  1849       
+1631                 SUP  FIVE                           1849    11  1552  1826       
+1632                 NZU  FNL1    9876   FINISH          1826    44  1675  9876       
+1633        FNL5     RAU  TYPE3                          1452    60  1666  1876       
+1634                 STU  W0010                          1876    21  1986  1899       
+1635                 RAU  JAY                            1899    60  0710  1926       
+1636                 LDD         STNON                   1926    69  1949  0911       
+1637                 STU  W0004                          1949    21  1980  1950       
+1638                 RAU  GAMMA                          1950    60  0372  1602       
+1639                 AUP  ONET                           1602    10  0356  1976       
+1640                 LDD         STNON                   1976    69  1652  0911       
+1641                 AUP  TEMP2                          1652    10  0490  1702       
+1642                 STU  W0003  FNL6                    1702    21  1979  1900       
+1643        ONET      00   0000   0001                   0356    00  0000  0001       
+1644        TWOT      00   0000   0002                   1823    00  0000  0002       
+1646        FOURT     00   0000   0004                   1091    00  0000  0004       
+1647        FIVET     00   0000   0005                   0922    00  0000  0005       
+1648        SIXT      00   0000   0006                   0330    00  0000  0006       
+1649        SEVNT     00   0000   0007                   1160    00  0000  0007       
+1650        EIGTT     00   0000   0008                   1559    00  0000  0008       
+1651        NINET     00   0000   0009                   1862    00  0000  0009       
+1652        TENT      00   0000   0010                   1845    00  0000  0010       
+1653        TWLVT     00   0000   0012                   1494    00  0000  0012       
+1654        FRTNT     00   0000   0014                   1659    00  0000  0014       
+1655        SXTNT     00   0000   0016                   1224    00  0000  0016       
+1656        SVNTT     00   0000   0017                   0696    00  0000  0017       
+1657        NNTEN     00   0000   0019                   0592    00  0000  0019       
+1658        TWSIX     00   0000   0026                   1000    00  0000  0026       
+1659        SIXTR     00   0000   0063                   1465    00  0000  0063       
+1660        NINTY     00   0000   0090                   0360    00  0000  0090       
+1661        ONE       00   0001   0000                   0630    00  0001  0000       
+1662        TWO       00   0002   0000                   0148    00  0002  0000       
+1663        THREE     00   0003   0000                   1131    00  0003  0000       
+1664        FOUR      00   0004   0000                   1200    00  0004  0000       
+1665        FIVE      00   0005   0000                   1552    00  0005  0000       
+1666        SIX       00   0006   0000                   0520    00  0006  0000       
+1667        SEVEN     00   0007   0000                   1589    00  0007  0000       
+1668        FFTY1     00   0051   0000                   0357    00  0051  0000       
+1669        OONE      01   0000   0000                   0832    01  0000  0000       
+1670        OTWO      02   0000   0000                   0768    02  0000  0000       
+1671        OTREY     03   0000   0000                   0888    03  0000  0000       
+1672        OFIVE     05   0000   0000                   0528    05  0000  0000       
+1673        FRONE     41   0000   0000                   1431    41  0000  0000       
+1674        FIVEO     50   0000   0000                   1054    50  0000  0000       
+1675        SVTY2     72   0000   0000                   1568    72  0000  0000       
+1676        NINEO     90   0000   0000                   0874    90  0000  0000       
+1677        ALO       15   0000   0000                   0988    15  0000  0000       
+1678        MPY       19   0000   0000                   1832    19  0000  0000       
+1679        STL       20   0000   0000                   0636    20  0000  0000       
+1680        NZE       45   0000   0000                   1132    45  0000  0000       
+1681        BMI       46   0000   0000                   1339    46  0000  0000         
+1682        RAU       60   0000   0000                   1116    60  0000  0000         
+1683        DVR       64   0000   0000                   1609    64  0000  0000         
+1684        RAL       65   0000   0000                   0968    65  0000  0000         
+1685        RSL       66   0000   0000                   0344    66  0000  0000         
+1686        RAM       67   0000   0000                   0894    67  0000  0000         
+1687        ABCON     00   5000   0000                   0776    00  5000  0000         
+1688        ACC       00   0001   0000                   1804    00  0001  0000         
+1689        ACCUM         ACC                            0737    61  6363  0000         
+1690        C         00   3000   0000                   1277    00  3000  0000         
+1691        CNTRL     00   0000   8000                   0354    00  0000  8000         
+1692        EXT       00   0000   9000                   0690    00  0000  9000         
+1693        FIXNR     00   0000   0501                   0870    00  0000  0501         
+1694        GO        00   4000   4000                   1016    00  4000  4000         
+1695        LDAC     LDD   0001   8002                   1415    69  0001  8002         
+1696        I         00   1000   0000                   1477    00  1000  0000         
+1697        LOCUS     73   6161   6161                   0918    73  6161  6161         
+1698        LOW       00   8002   0000                   0352    00  8002  0000         
+1699        LOW1      00   0000   8002                   0980    00  0000  8002         
+1700        M             M                              1612    74  0000  0000         
+1701        MAX       00   0000   0025                   0029    00  0000  0025         
+1702        MAXE      00   0000   0500                   0542    00  0000  0500         
+1703        MAXU      00   0143   0000                   0671    00  0143  0000         
+1704        NONO      00   0000   9090                   0883    00  0000  9090         
+1705        NONON     00   9090   9090                   0634    00  9090  9090         
+1706        P             P                              1317    77  0000  0000         
+1707        PHI       00   6000   0000                   1324    00  6000  0000         
+1708        SLTI3     35   1003   0000                   0499    35  1003  0000         
+1709        STLA1    STL   0001   0000                   1004    20  0001  0000         
+1710        STORE     06   0051   0000                   0030    06  0051  0000         
+1711        TEMP9     73   6161   6161                   0853    73  6161  6161         
+1712        TYPE3     80   0000   8000                   1666    80  0000  8000         
+1713        TYPE4     88   0000   8000                   1548    88  0000  8000         
+1714        W         00   7000   0000                   1354    00  7000  0000         
+1715        WDIF      69   6600   0000                   1059    69  6600  0000         
+1716        Y         00   2000   0000                   1580    00  2000  0000         
+1717        YOU           U0000                          1975    84  9090  9090         
+1718        Z             Z                              1407    89  0000  0000         
+            PSI       00   0000   0000                   0041    00  0000  0000
+            TALLY     00   0000   0000                   0373    00  0000  0000
+            GAMMA     00   0000   0000                   0372    00  0000  0000
+            L         00   0000   0000                   0529    00  0000  0000
+            U         00   0000   0000                   0515    00  0000  0000
+            QUOTA     00   0000   0000                   0531    00  0000  0000
+            V1        00   0000   0000                   0488    00  0000  0000
+            K         00   0000   0000                   0146    00  0000  0000
+            NU        00   0000   0000                   0700    00  0000  0000
+            N         00   0000   0000                   0484    00  0000  0000
+            NBAR      00   0000   0000                   0342    00  0000  0000
+            MU        00   0000   0000                   0750    00  0000  0000
+            ARITH     00   0000   0000                   0358    00  0000  0000
+            ABVAL     00   0000   0000                   0366    00  0000  0000
+            OPSGN     00   0000   0000                   0524    00  0000  0000
+            RELAT     00   0000   0000                   0632    00  0000  0000
+            R         00   0000   0000                   0340    00  0000  0000
+            INTGR     00   0000   0000                   0538    00  0000  0000
+            TEMP1     00   0000   0000                   0509    00  0000  0000
+            UBAR      00   0000   0000                   0516    00  0000  0000
+            TEMP2     00   0000   0000                   0490    00  0000  0000
+            TEMP3     00   0000   0000                   0709    00  0000  0000
+            TEMP4     00   0000   0000                   0788    00  0000  0000
+            TEMP5     00   0000   0000                   1299    00  0000  0000
+            TEMP6     00   0000   0000                   1326    00  0000  0000
+            JAY       00   0000   0000                   0710    00  0000  0000
+            BETA      00   0000   0000                   1503    00  0000  0000
+            FLOP1     00   0000   0000                   1047    00  0000  0000
+            CHI       00   0000   0000                   1831    00  0000  0000
+            STAR      00   0000   0000                   1188    00  0000  0000
+            EL        00   0000   0000                   0746    00  0000  0000
+   1   5                                                 
+   2   5                CARNEGIE TECH COMPILER     IT    
+   3   5                  DECEMBER 18   1957             
+   4   5                                 
+   5   5                    ERRATA BUGFIX
+   6   5                                 
+1442X                STU  OPSGN                          1334    21  0524  1902         
+1442A                STD  V1      1384                   1902    24  0488  1384         
+   1   5                                                 
+   2   5                CARNEGIE TECH COMPILER     IT    
+   3   5                   APRIL 18   1958               
+   4   5                                                 
+   5   5                    ERRATA BUGFIX
+   6   5                                 
+ 341X                SUP  A0001          OUT IF JAY      1065    11  0383  1137
+A341X                STU  NEWAB   0887                   1137    21  0845  0887
+ 603X       BS       LDD         DROPU    DCRMNT U       0987    69  0690  0893     
+A603X                RAL  NEWAB                          0690    65  0845  0298
+B603X                NZE  BSA     0640                   0298    45  0786  0640
+ 606X                STL  A0001  BSA                     1485    20  0383  0786     
+ 607X       BSA      RAU  N      BN1                     0786    60  0484  1039     
+ 650X                LDD   1377  LDSR     COMPILE        1413    69  1377  1038     
+    X       NEWAB     00   0000   0000                   0845    00  0000  0000
+   1   5                                                 
+   2   5                CARNEGIE TECH COMPILER     IT    
+   3   5                       NO DATE
+   4   5                                                 
+   5   5                    ERRATA BUGFIX
+   6   5                                 
+ 793X                LDD  ML1A   TKNZ1   TKNZ1AND ML1    0940    69  1802  1094       
+ 799X       MY1      LDD  ML1A   TKNZ2                   1178    69  1802  1194       
+A793X       ML1A     SLO   8002                          1802    16  8002  1852
+B793X                STL  ABVAL  ML1                     1852    20  0366  1291
+ 804X                LDD   1971  GENN     RAL AJAY       1139    69  1971  1681       
+
+
+
+
+
