@@ -1,0 +1,62 @@
++        2         0        50        10            1672
+
+   1+                                     2k i1k 1k 1k 50k           f  c1 to
+   2+                                     ci1 z 1j                   f  c50=1
+    +                                     i1 z 1                     f  n=1
+   3+                                     i1 z i1 s 1                f  n=n+1
+    +                                     g 5 if i1 w 50             f  gt 50
+    +                                     g 3 if ci1 u 0j            f  c(n)=0
+    +                                     i2 z i1                    f  m=n
+   4+                                     i2 z i2 s i1               f  m=m+n
+    +                                     g 3 if i2 w 50             f  gt 50
+    +                                     ci2 z 0j                   f  c(m)=0
+    +                                     g 4                        f  goto 4
+   5+                                     i1 z 1                     f  n=1
+   6+                                     i1 z i1 s 1                f  n=n+1
+    +                                     g 10 if i1 w 50            f  gt 50
+    +                                     g 8 if ci1 u 0j            f  c(n)=0
+   7+                                     t i1                       f  pch n
+   8+                                     g 6                        f  goto 6
+  10+                                     h                         ff  stop
+
+
+prime number generator using the sieve of eratosthenes
+converted to ibm 650 IT compliler 
+
+ IT system syntax      IT notation in manual       c-like equivalent syntax
+
+ 1+ 2k i1k 1k 1k 50k   1: 2,i1,1,1,50,             for(num=1,num<=50;num++)
+ 2+ ci1 z 1j           2: ci1 <- 1.                    prime(num) = 1.0 
+                                                   
+  + i1 z 1                i1 <- 1                  num=1
+
+ 3+ i1 z i1 s 1        3: i1 <- i1 + 1      loop1: num++
+  + g 5 if i1 w 50        g 5 if i1 >= 50          if num >= 50 goto loope 
+
+  + g 3 if ci1 u 0j       g 3 if ci1 = 0.          if prime(num)=0 goto loop1
+  + i2 z i1               i2 <- i1                 mult=num   
+
+ 4+ i2 z i2 s i1       4: i2 <- i2 + i1     loop2: mult=mult+num
+  + g 3 if i2 w 50        g 3 if i2 >= 50          if mult >= 50 goto loop1
+
+  + ci2 z 0j              ci2 <- 0.                prime(mult) = 0.0
+  + g 4                   g 4                      goto loop2
+
+ 5+ i1 z 1             5: i1 <- 1           loope: num = 1
+ 6+ i1 z i1 s 1           i1 <- i1 + 1       prt1: num++
+  + g 10 if i1 w 50       g 10 if i1 >= 50         if num >= 50 goto prt3
+
+  + g 8 if ci1 u 0j       g 8 if ci1 = 0.          if prime(num)=0 goto prt2
+ 7+ t i1                  t i1                     punch num
+ 8+ g 6                   g 6                prt2: goto prt1
+10+ h                     h                  prt3: end
+
+control card is calculated as follows
+
+number of i integer variables: 2 (i1 and i2)
+number of y float variables: 0
+number of c float variables: 50 (ci1 ranges from c1 to c50)
+higher statement number: 10
+using run time package p1 (265 words)
+mem avail N = 1999 - (2 + 0 + 50 + 10 + 265) = 1672
+

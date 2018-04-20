@@ -1,0 +1,27 @@
+                                        5       reservation package   r2                                          
+                                        5       reservation package   r2                                          
+                                        4         laaaa u1999 initial locn                                     
+                                        4         acc   u0000 reserve acc                                      
+                                        4         p      1950 reserve for                                      
+                                        3         p1951  1960 punch consts                                     
+                                        4         w      1977 reserve w                                        
+                                        3         w1978  1986 storage band                                     
+                                        3         j1977  1986 punch band                                       
+                                        1          1621  1950 reserve                                          
+                                        1          1961  1976  for                                             
+                                        1          1987  1998  subroutines                                     
+                                        4         e00th  1932 fix entry                                        
+                                        4         e00ae  1928 float to lwr                                     
+                                        4         e00af  1947 float to acc                                     
+                                        4         e00ag  1830 divide entry                                     
+                                        4         e00ai  1833 add entry                                        
+                                        4         e00ak  1704 fix fix powr                                     
+                                        4         e00al  1654 flt fix powr                                     
+                                        4         e00am  1653 rv fx fx pwr                                     
+                                        4         e00an  1651 rv fl fx pwr                                     
+                                        4         e00aj  1832 multiply                                         
+                                        4         e00ao  1882 rev divide                                       
+                                        4         e00aq  1974 read entry                                       
+                                        4         e00ar  1801 punch entry                                      
+                                           1809raua0000  1987 get a0000                                      
+                                        5          last card of r2                                                   
