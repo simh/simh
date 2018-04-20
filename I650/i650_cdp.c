@@ -32,7 +32,7 @@
 #include "i650_defs.h"
 #include "sim_card.h"
 
-#define UNIT_CDP        UNIT_ATTABLE | MODE_026
+#define UNIT_CDP        UNIT_ATTABLE | MODE_026 | MODE_LOWER
 
 /* std devices. data structures
 
@@ -77,13 +77,6 @@ DEVICE              cdp_dev = {
     NULL, NULL, &cdp_help, NULL, NULL, &cdp_description
 };
 
-static struct card_wirings wirings[] = {
-    {WIRING_8WORD,  "8WORD"},
-    {WIRING_SOAP,   "SOAP"}, 
-    {WIRING_IS,     "IS"}, 
-    {0, 0},
-};
-
 // vars where card is encoded for punching
 char card_buf[120];
 int card_nbuf;
@@ -116,13 +109,20 @@ void encode_lpt_num(t_int64 d, int l)
 {
     char s[20];
     int i,n;
+    char pad;
     
+    if (l < 0) {
+        l=-l; pad = ' '; // if l < 0 pad with space
+    } else {
+        pad = '0';       // if l > 0 pag with zero
+    }
     d=AbsWord(d);
     for (i=9;i>=0;i--) {
         n = (int) (d % 10);
         d = d / 10;
         s[i] = '0' + n;
     }
+    if (pad == ' ') for(i=0;i<9;i++) if (s[i] == '0') {s[i] = ' ';} else break;
     s[10] = 0;
     encode_lpt_str(&s[10-l]);
 }
@@ -131,6 +131,7 @@ void encode_lpt_num(t_int64 d, int l)
 #define     wf_NN_NNNN_NNNNs    1
 #define     wf_sN_NNNNNNN_NN    3
 #define     wf_sN_NNN_NNN_NNN   4
+#define     wf_nnnnnnnnnNs      5
 
 void encode_lpt_word(t_int64 d, int NegZero, int wFormat)
 {
@@ -154,6 +155,9 @@ void encode_lpt_word(t_int64 d, int NegZero, int wFormat)
         n = Shift_Digits(&d, 3); encode_lpt_num(n, 3); encode_lpt_spc(1);
         n = Shift_Digits(&d, 3); encode_lpt_num(n, 3); encode_lpt_spc(1);
         n = Shift_Digits(&d, 3); encode_lpt_num(n, 3); 
+    } else if (wFormat == wf_nnnnnnnnnNs) {
+        encode_lpt_num(d,-10);  // replace leading zeroes by spaces
+        encode_char(0, neg ? '-':' '); 
     } else { // default: wFormat == wf_NNNNNNNNNNs
         encode_lpt_num(d,10);
         encode_char(0, neg ? '-':' '); 
@@ -164,6 +168,8 @@ void encode_lpt_word(t_int64 d, int NegZero, int wFormat)
 // if d negative, sign on last digit (units digit)
 // if bSetHiPuch=1, set HiPunch on last digit. 
 // if bSetHiPuch=2, set HiPunch on last digit and on second digit. 
+// if bSetHiPuch=3, set HiPunch on third digit 
+// if last digit is negative, never set HiPunch even if asked for (a card column cannot have both X(11) and Y(12) punched)
 void sprintf_word(char * pch_word, t_int64 d, int NegZero, int bSetHiPuch)
 {
     int i,n,neg, hi; 
@@ -178,8 +184,9 @@ void sprintf_word(char * pch_word, t_int64 d, int NegZero, int bSetHiPuch)
     }
     for (i=9;i>=0;i--) {
         hi = 0;
-        if ((i==1) && (bSetHiPuch == 2)) hi = 1; // Set Hi Punch on second digit
-        if ((i==9) && (bSetHiPuch > 0))  hi = 1; // Set Hi Punch on last digit (units digit)
+        if ((i==1) && (bSetHiPuch == 2)) hi = 1;                                            // Set Hi Punch on second digit
+        if ((i==2) && (bSetHiPuch == 3)) hi = 1;                                            // Set Hi Punch on third digit
+        if ((i==9) && ( (bSetHiPuch == 1) || (bSetHiPuch == 2)  ) && (neg == 0))  hi = 1;   // Set Hi Punch on last digit (units digit)
         n = (int) (d % 10);
         d = d / 10;
         n = n + hi * 10; 
@@ -226,6 +233,7 @@ void encode_soap_wiring(int addr)
     // encode soap card simulating soap control panel wiring for 533 
     // from SOAP II manual at http://www.bitsavers.org/pdf/ibm/650/24-4000-0_SOAPII.pdf
     // storage in output block
+    //                +-------------------+ 
     //    Word 1977:  | <-  Location   -> | Alphabetic
     //         1978:  | <-  Data Addr  -> | Alphabetic
     //         1979:  | <-  Inst Addr  -> | Alphabetic
@@ -351,16 +359,20 @@ void encode_soap_wiring(int addr)
             encode_lpt_num(pat2, 4);
             encode_lpt_spc(5);
         }
-    } else if (ty == 1) {
-        // print coment line
-        encode_lpt_str("1");
+    } else if ((ty == 1) || (ty == 5)) {
+        // print coment for card type 1 (SOAP II) or type 5 (SOAP modified for IT)
+        encode_char(0, '0' + ty);
         encode_lpt_spc(14);
         encode_lpt_str(loc); encode_lpt_str(OpCode); 
         encode_lpt_str(data_addr); encode_lpt_str(Data_Tag); 
         encode_lpt_str(inst_addr); encode_lpt_str(Instr_Tag); 
         encode_lpt_str(rem1); encode_lpt_str(rem2); 
     } else {
-        encode_lpt_spc(1);
+        if (ty == 0) {
+            encode_lpt_spc(1);
+        } else {
+            encode_char(0, '0' + ty);
+        }
         encode_lpt_str(loc); 
         encode_lpt_spc(2); encode_char(0, neg ? '-':' '); encode_lpt_spc(1);
         encode_lpt_str(OpCode); encode_lpt_spc(3); 
@@ -512,6 +524,162 @@ void encode_is_wiring(int addr)
     }
 }
 
+void encode_it_wiring(int addr) 
+{
+    // encode card for IT compiler modified soap 
+    // from IT manual at http://www.bitsavers.org/pdf/ibm/650/CarnegieInternalTranslator.pdf
+    // storage in output block 
+    //                +-------------------+ 
+    //    Word 1977:  | <-  Loc. Label -> | Alphabetic
+    //         1978:  | <-   Op Code   -> | Alphabetic
+    //         1979:  | <-  Data Addr  -> | Alphabetic
+    //         1980:  | <-  Inst Addr  -> | Alphabetic
+    //         1981:  | <-   Remarks   -> | Alphabetic
+    //         1982:  | <-   Remarks   -> | Alphabetic
+    //                +-------------------+ 
+    //         1983:  |                   | Not Used
+    //         1984:  |                   | Not Used
+    //                +-------------------+ 
+    //         1985:  |   |N N N N|       | N N N N=Card Number
+    //         1986:  |a|b|c|d|e|f|g|h|i|j| a = 0/8 =8 -> reservation card
+    //                                      b = 0/8 (regional setting) =0 -> card type 3, =8 -> card type 4
+    //                                      c = 0/8 
+    //                                      d = 0/8 =8 -> negative value
+    //                                      e = 0/8 
+    //                                      f = 0/8 
+    //                                      g = 0/8 =8 -> punching a PIT card
+    //                                      h = 0/8 =8 -> type 1 data out format
+    //                                      i = 0/8 
+    //                                      j = 0/8 
+    //                              
+    // SIT printout format
+    //    | Card Num | Ty |  Location  |  Sg  |  OpCode  |   Data Addr |  Instr Addr  |  Remarks  
+    // SIT punch format is SOAP source card format
+    //    Column:   41 | 42 | 43 44 45 46 47 | 48 49 50 | 51 52 53 54 55 | 56 | 57 58 59 60 61 | 62 | 63 64 65 66 67 68 69 70 71 72
+    //              Ty | Sg |    Location    |  OpCode  |   Data Addr    |    |  Instr Addr    |    | Remarks
+    //
+    //    Ty = Type = blank, 3 or 4 (regional setting)
+    //    Sg = sign = blank or -
+    //
+    // If word 1986 contains 8 in digit h, it is a type 1 data out card format
+    //                +----+------+-------+ 
+    //    Word 1977:  | VV | +NNN | SSSS  | IT variable 1
+    //         1978:  |       Word        | 
+    //                +-------------------+ 
+    //         1979:  |                   | IT variable 2 (zero if none)
+    //         1980:  |                   |
+    //                +-------------------+ 
+    //         1981:  |                   | IT variable 3
+    //         1982:  |                   |
+    //                +-------------------+ 
+    //         1983:  |                   | IT variable 4
+    //         1984:  |                   | 
+    //                +-------------------+ 
+    //         1985:  |                   | Not used
+    //         1986:  |8|0|0|0|0|0|8|8|0|0| control word for type 1 data out card
+    //
+    //    VV = IT variable being punched: 01 -> I type, 02 -> Y type, 03 -> C type
+    //    + N N N = variable number (I5 -> 01 0005). + means zoro with Y(12) overpunch
+    //    S S S S = statement number of IT source program where TYPE command that generates the card is
+    //    Word = value from IT variable. If type I, is an integer. If type C or Y
+    //           type is word is float (M MMMMMMM EE -> M=mantisa, EE=exponent)
+    //           can be is negative (X(11) overpunch in last digit)
+    //    up to 4 pairs var-word per card
+    //    leading zeroes of each word are replaced by spaces
+
+    char pch_word[20];
+    char loc[6], data_addr[6], inst_addr[6], OpCode[6], rem1[6], rem2[6];
+    t_int64 d;
+    int CardNum, ty;
+    int b, neg, b_pit, b_reg, b_resv, b_data; // punch control flags
+    int i;
+
+    word_to_ascii(loc,       1, 5, DRUM[addr + 0]);
+    word_to_ascii(OpCode,    1, 3, DRUM[addr + 1]);
+    word_to_ascii(data_addr, 1, 5, DRUM[addr + 2]);
+    word_to_ascii(inst_addr, 1, 5, DRUM[addr + 3]);
+    word_to_ascii(rem1,      1, 5, DRUM[addr + 4]);
+    word_to_ascii(rem2,      1, 5, DRUM[addr + 5]);
+    CardNum  = (int) ((DRUM[addr + 8] / D4) % D4);
+    d        =  DRUM[addr + 9];
+    b        = ((int) (d % 10) == 8) ? 1:0; d = d / 10;
+    b        = ((int) (d % 10) == 8) ? 1:0; d = d / 10;
+    b_data   = ((int) (d % 10) == 8) ? 1:0; d = d / 10;
+    b_pit    = ((int) (d % 10) == 8) ? 1:0; d = d / 10;
+    b        = ((int) (d % 10) == 8) ? 1:0; d = d / 10;
+    b        = ((int) (d % 10) == 8) ? 1:0; d = d / 10;
+    neg      = ((int) (d % 10) == 8) ? 1:0; d = d / 10;
+    b        = ((int) (d % 10) == 8) ? 1:0; d = d / 10;
+    b_reg    = ((int) (d % 10) == 8) ? 1:0; d = d / 10;
+    b_resv   = ((int) (d % 10) == 8) ? 1:0; d = d / 10;
+
+    // printf("bits %06d%04d%c ", printfw(DRUM[addr + 9]));    // to echo the status digits of punched card
+
+    // generate card
+    if (b_data) {
+        // punch type 1 data out card
+        for (i=0;i<4;i++) {
+            sprintf_word(pch_word, DRUM[addr + i*2+0], 0, (i==0) ? 3:0);    // punch variable name
+            encode_pch_str(pch_word);   
+            sprintf_word(pch_word, DRUM[addr + i*2+1], 0, (i==0) ? 3:0);    // punch variable value
+            encode_pch_str(pch_word);   
+            if (DRUM[addr + i*2+2] == 0) break;                             // if next word is zero, no more variables to punch
+        }
+    } else {
+        // punch SOAP source instruction
+        for(i=0;i<40;i++) encode_pch_str(" "); // leave 40 first columns blank
+        if (b_resv) {
+            if (b_reg) {
+                ty = 4;
+            } else {
+                ty = 3;
+            }
+        } else {
+            ty = 0;
+        }
+        encode_char(ty  == 0 ? ' ' : '0'+ty, 0); 
+        encode_char(neg == 0 ? ' ' : '-',    0); 
+        encode_pch_str(loc);
+        encode_pch_str(OpCode);
+        encode_pch_str(data_addr);
+        encode_pch_str(" ");
+        encode_pch_str(inst_addr);
+        encode_pch_str(" ");
+        encode_pch_str(rem1);
+        encode_pch_str(rem2);
+        // convert to lowercase for punching
+        for (i=40;i<card_nbuf;i++) 
+            if ((card_buf[i] >= 'A') && (card_buf[i] <= 'Z')) 
+                card_buf[i] = card_buf[i] - 'A' + 'a';
+        card_buf[card_nbuf] = 0;
+    }
+
+    // generate printout
+    if (b_data) {
+        // print type 1 data out card. replace leading zeroes by spaces on each word
+        for (i=0;i<4;i++) {
+            encode_lpt_word(DRUM[addr + i*2+0], 0, wf_nnnnnnnnnNs); // print variable name
+            encode_lpt_spc(1);
+            encode_lpt_word(DRUM[addr + i*2+1], 0, wf_nnnnnnnnnNs); // print variable value
+            encode_lpt_spc(1);
+            if (DRUM[addr + i*2+2] == 0) break;                             // if next word is zero, no more variables to punch
+        }
+    } else {
+        // print generated soap source listing
+        encode_lpt_spc(2);
+        encode_lpt_num(CardNum, -4); 
+        encode_lpt_spc(2);
+        encode_char(0, ty  == 0 ? ' ' : '0'+ty); 
+        encode_lpt_spc(2);
+        encode_lpt_str(loc); 
+        encode_lpt_spc(2); encode_char(0, neg ? '-':' '); encode_lpt_spc(1);
+        encode_lpt_str(OpCode); encode_lpt_spc(3); 
+        encode_lpt_str(data_addr); encode_lpt_spc(1); encode_lpt_spc(2); 
+        encode_lpt_str(inst_addr); encode_lpt_spc(6); 
+        encode_lpt_str(rem1); encode_lpt_str(rem2); 
+    }
+}
+
 /* Card punch routine */
 uint32 cdp_cmd(UNIT * uptr, uint16 cmd, uint16 addr)
 {
@@ -525,7 +693,7 @@ uint32 cdp_cmd(UNIT * uptr, uint16 cmd, uint16 addr)
 
     /* Test ready */
     if ((uptr->flags & UNIT_ATT) == 0) {
-        sim_debug(DEBUG_CMD, &cdp_dev, "No cards (no file attached)\r\n");
+        sim_debug(DEBUG_CMD, &cdp_dev, "No cards (no file attached)\n");
         return SCPE_NOCARDS;
     }
 
@@ -539,8 +707,11 @@ uint32 cdp_cmd(UNIT * uptr, uint16 cmd, uint16 addr)
         // encode soap card simulating soap control panel wiring for 533 (gasp!)
         encode_soap_wiring(addr);
     } else if (wiring == WIRING_IS) {
-        // encode it card 
+        // encode floating point interpretive system (bell interpreter) card 
         encode_is_wiring(addr);
+    } else if (wiring == WIRING_IT) {
+        // encode Carnegie Internal Translator compiler card 
+        encode_it_wiring(addr);
     } else if (wiring == WIRING_8WORD) {
         // encode 8 words per card
         encode_8word_wiring(addr);
@@ -561,14 +732,14 @@ uint32 cdp_cmd(UNIT * uptr, uint16 cmd, uint16 addr)
         if (uptr->flags & UNIT_CARD_PRINT) {
             // printout will be directed to file attached to CDP0 unit, if any
             if (cdp_unit[0].flags & UNIT_ATT) {
-                sim_fwrite(&card_lpt, 1, card_nlpt, cdp_unit[0].fileref);
+                sim_fwrite(card_lpt, 1, card_nlpt, cdp_unit[0].fileref);
             }
         }
     }
 
     // trim right spaces for printing punch card
     card_buf[card_nbuf] = 0;
-    sim_debug(DEBUG_DETAIL, &cpu_dev, "Punch Card: %s\r\n", card_buf);
+    sim_debug(DEBUG_DETAIL, &cpu_dev, "Punch Card: %s\n", card_buf);
 
     /* punch the cards */
     data = (struct _card_data *)uptr->up7;
@@ -588,10 +759,10 @@ uint32 cdp_cmd(UNIT * uptr, uint16 cmd, uint16 addr)
         }
     }
     sim_punch_card(uptr, NULL);
-    sim_debug(DEBUG_CMD, &cdp_dev, "PUNCH\r\n");
+    sim_debug(DEBUG_CMD, &cdp_dev, "PUNCH\n");
     uptr->u5 |= URCSTA_BUSY;
-    uptr->u4 = 0;
-            
+    uptr->u6++; // incr number of punched cards 
+
     uptr->u5 &= ~URCSTA_BUSY;
 
     return SCPE_OK;
@@ -694,9 +865,11 @@ cdp_attach(UNIT * uptr, CONST char *file)
 {
     t_stat              r;
 
-    if ((r = sim_card_attach(uptr, file)) != SCPE_OK)
-        return r;
+    r = sim_card_attach(uptr, file);
+    if (SCPE_BARE_STATUS(r) != SCPE_OK)
+       return r;
     uptr->u5 = 0;
+    uptr->u6 = 0; // u6 = number of cards punched
 
     return SCPE_OK;
 }

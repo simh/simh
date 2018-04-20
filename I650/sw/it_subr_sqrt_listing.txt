@@ -1,0 +1,62 @@
+           5                 SUBROUTINE 20  SQUARE RT                                   
+               E00AU    STD  ARTHX           SQUARE ROOT                                
+                        BMI  AU1             ALARM IF NEG                               
+                        SLT   0008                                                      
+                        NZU         AU2      TEST FOR ZRO                               
+                        STL  ARTHF           BREAK UP EXP                               
+                        RAL   8003           AND MANTISSA                               
+                        SLT   0002           CALCULATE                                  
+                        STL  ARTHE            INITIAL X                                 
+                        AUP  AU8    AU3                                                 
+               AU4      RAU  ARTHE           CALCULATE                                  
+                        DVR  ARTHG            NEXT X                                    
+                        SLO   8001            VALUE                                     
+                        NZE         AU5                                                 
+                        BMI         AU5      TEST FOR END                               
+                        ALO   8001                                                      
+                        ALO   8001  AU3                                                 
+               AU3      DVR  AU9             RECYCLE                                    
+                        STL  ARTHG  AU4                                                 
+               AU5      RAL  ARTHF           MODIFY                                     
+                        ALO  AU10             EXPONENT                                  
+                        SRT   0008                                                      
+                        DIV  AU9                                                        
+                        ALO   8003                                                      
+                        STL  ARTHF           TEST EVEN OR                               
+                        NZU         AU6       ODD EXP                                   
+                        RAU  ARTHG           EXP ODD                                    
+                        SRT   0001                                                      
+                        MPY  AU11            MPY BY SQRT                                
+                        SRD   0010  AU7       OF 10                                     
+               AU7      SLT   0002                                                      
+                        ALO  ARTHF  ARTHX    GO TO EXIT                                 
+               AU6      RAL  ARTHG           EXP EVEN                                   
+                        SRD   0002  AU7                                                 
+               AU2      RAL   8003  ARTHX    STORE ZERO                                 
+               AU1      LDD  ARTHX   3201    SQRT ALARM                                 
+               AU8       00   0000   0001    CONSTANTS                                  
+               AU9       00   0000   0002                                               
+               AU10      49   0000   0000                                               
+               AU11      03   1622   7766                                               
+           5                 LAST CARD SUBROUTINE 20                                    
+                                                                                        
+                                                                                        
+                                                                                        
+                                                                                        
+                                                                                        
+                                                                                        
+                                                                                        
+                                                                                        
+                                                                                        
+                                                                                        
+                                                                                        
+                                                                                        
+                                                                                        
+                                                                                        
+                                                                                        
+                                                                                        
+                                                                                        
+                                                                                        
+                                                                      ?                 
+                                                                                        
+? ?                                                                                 ????
