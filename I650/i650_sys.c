@@ -69,16 +69,6 @@ const char         *sim_stop_messages[] = {
     0
 };
 
-static t_stat ibm650_deck_cmd(int32 arg, CONST char *buf);
-
-static CTAB aux_cmds [] = {
-/*    Name         Action Routine     Argument   Help String */
-/*    ----------   -----------------  ---------  ----------- */
-    { "CARDDECK",  &ibm650_deck_cmd,         0,  "Card Deck Operations: Join/Split/Print\n"    },
-
-    { NULL }
-    };
-
 /* Simulator debug controls */
 DEBTAB              dev_debug[] = {
     {"CMD", DEBUG_CMD},
@@ -96,18 +86,8 @@ DEBTAB              crd_debug[] = {
     {0, 0}
 };
 
-// simulator available IBM 533 wirings
-struct card_wirings wirings[] = {
-    {WIRING_8WORD,  "8WORD"},
-    {WIRING_SOAP,   "SOAP"}, 
-    {WIRING_IS,     "IS"}, 
-    {WIRING_IT,     "IT"}, 
-    {0, 0},
-};
-
-
 // code of char in IBM 650 memory
-char    mem_to_ascii[101] = {
+char    mem_to_ascii[100] = {
 /* 00 */  ' ', '~', '~', '~', '~', '~', '~', '~', '~', '~',
 /* 10 */  '~', '~', '~', '~', '~', '~', '~', '~', '.', ')',
 /* 20 */  '+', '~', '~', '~', '~', '~', '~', '~', '$', '*',
@@ -117,15 +97,16 @@ char    mem_to_ascii[101] = {
 /* 60 */  '~', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I',
 /* 70 */  '~', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R',
 /* 80 */  '~', '~', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-/* 90 */  '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-0};
+/* 90 */  '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'
+};
 
 // representation of word digit 0-9 in card including Y(12) and X(11) punchs
-char    digits_ascii[31] = {
+char    digits_ascii[40] = {
           '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',   /* 0-9 */  
           '?', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I',   /* 0-9 w/HiPunch Y(12) */
           '!', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R',   /* 0-9 w/Negative Punch X(11) */
-          0};
+          '&', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '#'    /* 0-9 with botch Negative Punch X(11) and HiPunch Y(12)*/
+};
 
 uint16          ascii_to_hol[128] = {
    /* Control                              */
@@ -172,18 +153,6 @@ uint16          ascii_to_hol[128] = {
 };
 
 
-/* Initialize vm  */
-void
-vm_init(void) {
-    int i;
-    // Initialize vm memory to all plus zero 
-    for(i = 0; i < MAXMEMSIZE; i++) DRUM[i] = DRUM_NegativeZeroFlag[i] = 0;
-    // init specific commands
-    sim_vm_cmd = aux_cmds;                       /* set up the auxiliary command table */
-}
-
-
-void (*sim_vm_init) (void) = &vm_init;
 
 /* Load a card image file into memory.  */
 
@@ -544,370 +513,6 @@ int Shift_Digits(t_int64 * d, int nDigits)
     if (neg) *d=-*d;
     return n;
 }
-/* deck operations 
-
-   carddeck [-q] <operation> <parameters...>
-
-                        allowed operations are split, join, print
-
-                        default format for card files is AUTO, this allow to intermix source decks
-                        with different formats. To set the format for carddeck operations use
-
-                           set cpr0 -format xxxx
-                        
-                        this will apply to all operations, both on reading and writing deck files
-
-   carddeck split       split the deck being punched in IBM 533 device in two separate destination decks
-
-                        carddeck split <count> <dev|file0> <file1> <file2>
-
-                        <dev>    should be cdp1 to cdp3. File must be attached. The cards punched on 
-                                 this file are the ones on source deck to split.
-
-                        <file0>  if instead of cdp1, cdp2 or cdp3, a file can be specified containing
-                                 the source deck to be splitted
-
-                        <count>  number of cards in each splitted deck. 
-                                 If count >= 0, indicates the cards on first destination deck file 
-                                                remaining cards go to the second destination deck
-                                 If count < 0,  indicates the cards on second destination deck file 
-                                                (so deck 2 contains lasts count cards from source)
-
-                        <file1>  first destination deck file
-                        <file2>  second destination deck file
-                                 
-                        when using <dev> as source both <file1> or <file2> can have same name as the currently 
-                        attached file to cdp device. On command execution, cdp gest its file detached.
-                        file1 and file are created (overwritten if already exists).
-
-                        when using <file0> as source both <file1> or <file2> can have same name as <file0>.
-                        <file0> is completly read by SimH in its internal buffer (room for 10K cards) 
-                        and then splitted to <file1> and <file2>. 
-
-   carddeck join        join several deck files into a new one
-
-                        carddeck join <file1> <file2> ... as <file>
-
-                        <file1>  first source deck file
-                        <file2>  second source deck file
-                        ...
-                        <file>   destination deck file
-
-                        any source file <file1>, <file2>, etc can have same name as destination file <file>.
-                        Each source file is completly read in turn by SimH in its internal buffer (room for 10K cards) 
-                        and then written on destination file. This allos to append une deck on the top/end of 
-                        another one.
-
-   carddeck print       print deck on console, and on simulated IBM 407 is any file is attached to cpd0
-
-                        carddeck print <file>                         
-
-   switches:            if present mut be just after carddeck and before deck operation
-    -Q                  quiet return status. 
-           
-*/
-
-// max number of cards in deck for cadrdeck internal command
-#define MAX_CARDS_IN_DECK  10000
-
-// load card file fn and add its cards to 
-// DeckImage array, up to a max of nMaxCards
-// increment nCards with the number of added cards
-// uses cdr0 device/unit
-t_stat deck_load(CONST char *fn, uint16 * DeckImage, int * nCards)
-{
-    UNIT *              uptr = &cdr_unit[0];
-    struct _card_data   *data;
-    t_stat              r;
-    int i, convert_to_ascii;
-    uint16 c;
-
-    if (*nCards < 0) {
-        *nCards = 0;
-        convert_to_ascii = 1;
-    } else {
-        convert_to_ascii = 0;
-    }
-
-    // set flags for read only
-    uptr->flags |= UNIT_RO; 
-
-    // attach file to cdr unit 0
-    r = (cdr_dev.attach)(uptr, fn);
-    if (r != SCPE_OK) return r;
-
-    // read all cards from file
-    while (1) {
-        if (*nCards >= MAX_CARDS_IN_DECK) {
-            r = sim_messagef (SCPE_IERR, "Too many cards\n");
-            break;
-        }
-        r = sim_read_card(uptr);
-        if (r == SCPE_EOF) {
-            r = SCPE_OK; break;            // normal termination on card file read finished
-        } else if (r != SCPE_OK) break;    // abnormal termination on error
-        data = (struct _card_data *)uptr->up7;
-        // add card read to deck
-        for (i=0; i<80; i++) {
-            c = data->image[i];
-            if (convert_to_ascii) c = data->hol_to_ascii[c];
-            DeckImage[*nCards * 80 + i] = c;
-        }
-        *nCards = *nCards + 1;
-    }
-
-    // deattach file from cdr unit 0
-    r = (cdr_dev.detach)(uptr);
-    if (r != SCPE_OK) return r;
-
-    return SCPE_OK;
-}
-
-// write nCards starting at card from DeckImage array to file fn
-// uses cdr0 device/unit
-t_stat deck_save(CONST char *fn, uint16 * DeckImage, int card, int nCards)
-{
-    UNIT *              uptr = &cdr_unit[0];
-    struct _card_data   *data;
-    t_stat              r;
-    int i,nc;
-
-    // set flags for create new file
-    uptr->flags &= ~UNIT_RO; 
-    sim_switches |= SWMASK ('N');
-
-    // attach file to cdr unit 0
-    r = (cdr_dev.attach)(uptr, fn);
-    if (r != SCPE_OK) return r;
-
-    // write cards to file
-    for  (nc=0;nc<nCards;nc++) {
-        if (nc + card >= MAX_CARDS_IN_DECK) {
-            r = sim_messagef (SCPE_IERR, "Reading outside of Deck\n");
-            break;
-        }
-
-        data = (struct _card_data *)uptr->up7;
-        // read card from deck
-        for (i=0; i<80; i++) data->image[i] = DeckImage[(nc + card) * 80 + i];
-
-        r = sim_punch_card(uptr, NULL);
-        if (r != SCPE_OK) break;    // abnormal termination on error
-    }
-
-    // deattach file from cdr unit 0
-    (cdr_dev.detach)(uptr);
-
-    return r;
-}
-
-// carddeck split <count> <dev|file0> <file1> <file2>
-static t_stat deck_split_cmd(CONST char *cptr)
-{
-    char fn0[4*CBUFSIZE];
-    char fn1[4*CBUFSIZE];
-    char fn2[4*CBUFSIZE];
-
-    char gbuf[4*CBUFSIZE];
-    DEVICE *dptr;
-    UNIT *uptr;
-    t_stat r;
-
-    uint16 DeckImage[80 * MAX_CARDS_IN_DECK];
-    int nCards, nCards1, tail; 
-
-    while (sim_isspace (*cptr)) cptr++;                     // trim leading spc 
-    if (*cptr == '-') {
-        tail = 1;
-        cptr++;
-    } else {
-        tail = 0;
-    }
-    cptr = get_glyph (cptr, gbuf, 0);                       // get cards count param    
-    nCards1 = (int32) get_uint (gbuf, 10, 10000, &r);
-    if (r != SCPE_OK) return sim_messagef (SCPE_ARG, "Invalid count value\n");
-
-    cptr = get_glyph (cptr, gbuf, 0);                       // get dev|file0 param    
-    if ((strlen(gbuf) != 4) || (strncmp(gbuf, "CDP", 3)) ||
-        (gbuf[3] < '1') || (gbuf[3] > '3') ) {
-        // is a file
-        strcpy(fn0, gbuf);
-    } else {
-        // is cpd1 cpd2 or cpd3 device
-        dptr = find_unit (gbuf, &uptr);                     /* locate unit */
-        if (dptr == NULL)                                   /* found dev? */
-            return SCPE_NXDEV;
-        if (uptr == NULL)                                   /* valid unit? */
-            return SCPE_NXUN;
-        if ((uptr->flags & UNIT_ATT) == 0)                  /* attached? */
-            return SCPE_NOTATT;
-        strcpy(fn0, uptr->filename);
-        sim_card_detach(uptr);                              // detach file from cdp device to be splitted
-    }
-
-    // read source deck
-    nCards = 0;
-    r = deck_load(fn0, DeckImage, &nCards);
-    if (r != SCPE_OK) return sim_messagef (r, "Cannot read source deck (%s)\n", fn0);
-
-    // calc nCards1 = cards in first deck
-    if (tail) {
-        // calc cards remaining when last nCardCount are removed from source deck
-        nCards1 = nCards - nCards1;
-        if (nCards1 < 0) nCards1 = 0;
-    }
-    if (nCards1 > nCards) nCards1 = nCards;
-
-    while (sim_isspace (*cptr)) cptr++;                     // trim leading spc 
-    cptr = get_glyph_quoted (cptr, fn1, 0);                 // get next param: filename 1
-    if (fn1[0] == 0) return sim_messagef (SCPE_ARG, "Missing first filename\n");
-    while (sim_isspace (*cptr)) cptr++;                     // trim leading spc 
-    cptr = get_glyph_quoted (cptr, fn2, 0);                 // get next param: filename 2
-    if (fn2[0] == 0) return sim_messagef (SCPE_ARG, "Missing second filename\n");
-    
-    r = deck_save(fn1, DeckImage, 0, nCards1);
-    if (r != SCPE_OK) return sim_messagef (r, "Cannot write destination deck1 (%s)\n", fn0);
-
-    r = deck_save(fn2, DeckImage, nCards1, nCards-nCards1);
-    if (r != SCPE_OK) return sim_messagef (r, "Cannot write destination deck2 (%s)\n", fn0);
-
-    if ((sim_switches & SWMASK ('Q')) == 0) {
-        sim_messagef (SCPE_OK, "Deck splitted to %d/%d cards\n", nCards1, nCards-nCards1);
-    }
-    return SCPE_OK;
-
-}
-
-// carddeck join <file1> <file2> ... as <file>
-static t_stat deck_join_cmd(CONST char *cptr)
-{
-    char fnSrc[4*CBUFSIZE];
-    char fnDest[4*CBUFSIZE];
-    CONST char *cptr0;
-    CONST char *cptrAS;
-    char gbuf[4*CBUFSIZE];
-    t_stat r;
-
-    uint16 DeckImage[80 * MAX_CARDS_IN_DECK];
-    int i,nDeck, nCards, nCards1;
-
-    cptr0 = cptr;
-    // look for "as"
-    while (*cptr) {
-        while (sim_isspace (*cptr)) cptr++;                 // trim leading spc 
-        cptrAS = cptr; // mark position of AS
-        cptr = get_glyph_quoted (cptr, gbuf, 0);            // get next param
-        if (gbuf[0] == 0) return sim_messagef (SCPE_ARG, "AS <file> not found\n");
-        for (i=0;i<2;i++) gbuf[i] = sim_toupper(gbuf[i]);
-        if (strcmp(gbuf, "AS") == 0) break;
-    }
-
-    while (sim_isspace (*cptr)) cptr++;                     // trim leading spc 
-    cptr = get_glyph_quoted (cptr, fnDest, 0);              // get next param: destination filename 
-    if (fnDest[0] == 0) return sim_messagef (SCPE_ARG, "Missing destination filename\n");
-    if (*cptr) return sim_messagef (SCPE_ARG, "Extra unknown parameters after destination filename\n");
-
-    cptr = cptr0;                                           // restore cptr to scan source filenames
-    nDeck = nCards = 0;
-    while (1) {
-
-        while (sim_isspace (*cptr)) cptr++;                 // trim leading spc 
-        if (cptrAS == cptr) break;                          // break if reach "AS"
-        cptr = get_glyph_quoted (cptr, fnSrc, 0);           // get next param: source filename 
-        if (fnSrc[0] == 0) return sim_messagef (SCPE_ARG, "Missing source filename\n");
-
-        // read source deck
-        nCards1 = nCards;
-        r = deck_load(fnSrc, DeckImage, &nCards);
-        if (r != SCPE_OK) return sim_messagef (r, "Cannot read source deck (%s)\n", fnSrc);
-        nDeck++;
-
-        if ((sim_switches & SWMASK ('Q')) == 0) {
-            sim_messagef (SCPE_OK, "Source Deck %d has %d cards (%s)\n", nDeck, nCards - nCards1, fnSrc);
-        }
-    }
-    r = deck_save(fnDest, DeckImage, 0, nCards);
-    if (r != SCPE_OK) return sim_messagef (r, "Cannot write destination deck (%s)\n", fnDest);
-
-    if ((sim_switches & SWMASK ('Q')) == 0) {
-        sim_messagef (SCPE_OK, "Destination Deck has %d cards (%s)\n", nCards, fnDest);
-    }
-    
-    return SCPE_OK;
-}
-
-// carddeck print <file> 
-static t_stat deck_print_cmd(CONST char *cptr)
-{
-    char fn[4*CBUFSIZE];
-    char line[81]; 
-    t_stat r;
-
-    uint16 DeckImage[80 * MAX_CARDS_IN_DECK];
-    int i,c,nc,nCards;
-
-    while (sim_isspace (*cptr)) cptr++;                     // trim leading spc 
-    cptr = get_glyph_quoted (cptr, fn, 0);                  // get next param: source filename 
-    if (fn[0] == 0) return sim_messagef (SCPE_ARG, "Missing filename\n");
-    if (*cptr) return sim_messagef (SCPE_ARG, "Extra unknown parameters after filename\n");
-
-    // read deck to be printed (-1 to convert to ascii value, not hol)
-    nCards = -1;
-    r = deck_load(fn, DeckImage, &nCards);
-    if (r != SCPE_OK) return sim_messagef (r, "Cannot read deck to print (%s)\n", fn);
-
-    for (nc=0; nc<nCards; nc++) {
-        // read card, check and, store in line
-        for (i=0;i<80;i++) {
-            c = DeckImage[nc * 80 + i];
-            c = toupper(c);                             // IBM 407 can only print uppercase
-            if ((c == '?') || (c == '!')) c = '0';      // remove Y(12) or X(11) punch on zero 
-            if (strchr(mem_to_ascii, c) == 0) c = ' ';  // space if not in IBM 650 character set
-            line[i] = c;
-        }
-        line[80]=0;
-        sim_trim_endspc(line); 
-        // echo on console (add CR LF)
-        for (i=0;i<(int)strlen(line);i++) sim_putchar(line[i]);     
-        sim_putchar(13);sim_putchar(10);
-        // printout will be directed to file attached to CDP0 unit, if any
-        if (cdp_unit[0].flags & UNIT_ATT) {
-            sim_fwrite(line, 1, strlen(line), cdp_unit[0].fileref); // fwrite clears line!
-            line[0] = 13; line[1] = 10; line[2] = 0;  
-            sim_fwrite(line, 1, 2, cdp_unit[0].fileref); 
-        }
-    }
-
-    if ((sim_switches & SWMASK ('Q')) == 0) {
-        sim_messagef (SCPE_OK, "Printed Deck with %d cards (%s)\n", nCards, fn);
-    }
-    
-    return SCPE_OK;
-}
-
-static t_stat ibm650_deck_cmd(int32 arg, CONST char *buf)
-{
-    char gbuf[4*CBUFSIZE];
-    const char *cptr;
-
-    cptr = get_glyph (buf, gbuf, 0);                   // get next param
-    if (strcmp(gbuf, "-Q") == 0) {
-        sim_switches |= SWMASK ('Q');
-        cptr = get_glyph (cptr, gbuf, 0);
-    }
-
-    if (strcmp(gbuf, "JOIN") == 0) {
-        return deck_join_cmd(cptr);
-    }
-    if (strcmp(gbuf, "SPLIT") == 0) {
-        return deck_split_cmd(cptr);
-    }
-    if (strcmp(gbuf, "PRINT") == 0) {
-        return deck_print_cmd(cptr);
-    }
-    return sim_messagef (SCPE_ARG, "Unknown deck command operation\n");
-}
-
 
 
 

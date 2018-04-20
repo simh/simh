@@ -32,7 +32,7 @@
 #include "i650_defs.h"
 #include "sim_card.h"
 
-#define UNIT_CDR        UNIT_ATTABLE | UNIT_RO | MODE_026 | MODE_LOWER
+#define UNIT_CDR        UNIT_ATTABLE | UNIT_RO | MODE_026
 
 
 /* std devices. data structures
@@ -54,9 +54,9 @@ t_stat              cdr_set_wiring (UNIT *uptr, int32 val, CONST char *cptr, voi
 t_stat              cdr_show_wiring (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 UNIT                cdr_unit[] = {
-   {UDATA(cdr_srv, UNIT_CDR, 0), 300},  // Unit 0 used internally for carddeck operations simulator specific command
-   {UDATA(cdr_srv, UNIT_CDR, 0), 300},  // unit 1 is default for initial model (1954)  
-   {UDATA(cdr_srv, UNIT_CDR, 0), 300},  // storage unit (1955) allows two extra card/readers for a total of 3
+   {UDATA(cdr_srv, UNIT_CDR, 0), 300},  // 4 readers. Unit 0 not used
+   {UDATA(cdr_srv, UNIT_CDR, 0), 300},       
+   {UDATA(cdr_srv, UNIT_CDR, 0), 300},       
    {UDATA(cdr_srv, UNIT_CDR, 0), 300},       
 };
 
@@ -74,106 +74,89 @@ DEVICE              cdr_dev = {
     NULL, NULL, &cdr_help, NULL, NULL, &cdr_description
 };
 
+static struct card_wirings wirings[] = {
+    {WIRING_8WORD,  "8WORD"},
+    {WIRING_SOAP,   "SOAP"}, 
+    {WIRING_IS,     "IS"}, 
+    {0, 0},
+};
 
-// get 10 digits word with sign from card buf (the data struct). return 1 if HiPunch set on any digit
-int decode_8word_wiring(struct _card_data * data, int addr) 
+
+// decode digit 0-9 read from card to get value and X(11) and Y(12) punch state (minus/HiPunch)
+// return -1 if not a digit number
+int decode_digit(char c1, int * HiPunch, int * NegPunch)
+{
+    int i,n; 
+
+    *HiPunch = *NegPunch = 0;
+    //       N is 0..9 or ?A..I (0..9 with Y(12) High Punch set)
+    //                 or !J..R (0..9 with X(11) Minus Punch set). 
+    //                 or &S..Z# (0..9 with both X(11) and Y(12) Punch set). 
+
+    if (c1 == 32)  return 0;                    // space read as zero
+    for (i=0; i<40; i++) {
+        if (c1 == digits_ascii[i]) {
+            n = i % 10;
+            i = i / 10;
+            *HiPunch  = (i & 1);
+            *NegPunch = (i >> 1);
+            return n;
+        }
+    }
+    return -1;                                  // not a valid digit
+}
+
+// get 10 digits word from buf, with sign. return 1 if HiPunch set on any digit
+int decode_8word_wiring(char * buf, int addr) 
 {
     // decode up to 8 numerical words per card 
     // input card
     //       NNNNNNNNNN ... 8 times
+    //       N is 0..9 or ?A..I (0..9 with Y(12) High Punch set)
+    //                 or !J..R (0..9 with X(11) Minus Punch set). 
+    //                 or &S..Z# (0..9 with both X(11) and Y(12) Punch set). 
     //       If last digit of word has X(11) punch whole word is set as negative value
-    //       If N is non numeric, a 0 is assumed
+    //       If N is a space, a 0 is assumed
     // put the decoded data in drum at addr (if addr < 0 -> do not store in drum)
     // return 1 if any colum has Y(12) hi-punch set
-    uint16 c1,c2;
-    int wn,iCol,iDigit;
-    int HiPunch, NegPunch, NegZero; 
+    int c1,c2,wn,eor,iCol;
+    int HiPunch, hip; 
+    int NegPunch, NegZero; 
+    int nDigits; 
     t_int64 d;
 
-    NegZero = 0;                                    // flag set if negative zero is read
-    HiPunch = 0;                                    // set to 1 if Y(12) high punch found
-    iCol = 0;                                       // current read colum in card
-    for (wn=0;wn<8;wn++) {                          // one card generates 8 words in drum mem
-        d = NegPunch = 0;
-        // read word digits
-        for (iDigit=0;iDigit<10;iDigit++) {
-            c1 = data->image[iCol++];
-            c2 = data->hol_to_ascii[c1];            // convert to ascii
-            if ((c1 == 0xA00) || (c2 == '?')) {
-                c1 = 0xA00; c2 = '?';               // the punched value +0 should be represented by ascii ? 
-            }
-            if ((c2 == '+') && (iCol == 1)) {       // on IT control card, first char is a Y(12) punch to make control card a load card. 
-                c1 = 0xA00; c2 = '?';               // Digit interpreted as +0
-            }
-            if (strchr(digits_ascii, c2) == NULL) { // scan digits ascii to check if this is a valid numeric digit with Y or X punch
-                c1 = 0;                             // nondigits chars interpreted as blank
-            }
-            if (c1 & 0x800) HiPunch  = 1;       // if column has Hi Punch Y(12) set, signal it
-            NegPunch = (c1 & 0x400) ? 1:0;      // if column has minus X(11) set, signal it
-            c1 = c1 & 0x3FF;                    // remove X and Y punches
-            c2 = data->hol_to_ascii[c1];        // convert to ascii again
-            c2 = c2 - '0';                      // convert ascii to binary digit 
-            if ((c2 < 0) || (c2 > 9)) c2 = 0;   // nondigits chars interpreted as zero
+    NegZero = 0;                            // flag set if negative zero is read
+    HiPunch = 0;                            // set to 1 if Y(12) high punch found
+    eor = 0;                                // signals end of card record
+    iCol = 0;                               // current read colum in card
+    for (wn=0;wn<8;wn++) {                  // one card generates 8 words in drum mem
+        d = 0;
+        nDigits=0;                          // number of digits
+        while (1) {
+            c1 = buf[iCol++];
+            if (c1 < ' ') {eor = 1; break;} // end of card
+            c2 = decode_digit(c1, &hip, &NegPunch);
+            if (hip) HiPunch = 1;           // if any column has Hi Punch Y(12) set, signal it
+            if (c2 < 0) c2 = 0;             // nondigits chars interpreted as zero
             d = d * 10 + c2;
+            nDigits++;
+            if (nDigits == 10) {
+                // end of word
+                if (NegPunch) {             // has last digit a minus X(11) punch set?
+                    d = -d;                 // yes, change sign of word read
+                    if (d == 0) NegZero=1;  // word read is minus zero
+                }
+                break;
+            }
         }
-        // end of word. set sign
-        if (NegPunch) {                         // has last digit a minus X(11) punch set?
-            d = -d;                 // yes, change sign of word read
-            if (d == 0) NegZero=1;  // word read is minus zero
-        }
+        if (nDigits == 0) break;                        // no well-formed word read -> terminate card processing
         if (addr >= 0) WriteDrum(addr++, d, NegZero);   // store word read from card into drum  
+        if (eor) break;                                 // end of card sensed -> terminate card processing
 
     } 
     return HiPunch;
 }
 
-// load soap symbolic info, This is a facility to help debugging of soap programs into SimH 
-// does not exist in real hw
-void decode_soap_symb_info(struct _card_data * data, int addr) 
-{
-    t_int64 d;
-    int op,da,ia,i,i2,p;
-    char buf[81];
-    uint16 c1,c2;
-
-    // check soap 1-word load card initial word
-    d = DRUM[addr + 0];
-    if (d != 6919541953LL) return; // not a 1-word load card
-
-    // get the address where the 1-word card will be loaded (into da)
-    d  = DRUM[addr+2];
-    op = Shift_Digits(&d, 2);               // current inst opcode
-    da = Shift_Digits(&d, 4);               // addr of data 
-    ia = Shift_Digits(&d, 4);               // addr of next instr
-    if ((op != 24) && (ia != 8000)) return; // not a 1-word load card
-    if (da >= (int)MEMSIZE) return;         // destination address out of range
-
-    // convert card image punches to ascii buf for processing, starting at col 40
-    // keep 026 fortran charset
-    for (i=40;i<80;i++) {
-        c1 = data->image[i];
-        c2 = data->hol_to_ascii[c1];        
-        c2 = (strchr(mem_to_ascii, toupper(c2))) ? c2:' ';      
-        if (c2 == '~') c2 = ' ';
-        buf[i] = (char) c2; 
-    }
-    buf[80] = 0; // terminate string
-
-    // copy soap symbolic info
-    i2 = 80;
-    while (1) {                             // calc i2 = last non space char to copy
-        if (--i2 < 41) return;              // noting to copy
-        if (buf[i2] > 32) break;
-    }
-    p = da * 80;
-    for (i=0;i<80;i++) 
-        DRUM_Symbolic_Buffer[p+i] = 0;      // clear drum[da] symbolic info
-    if (i2-41 >= 80) i2 = 80-1 + 41;        // only copy max 79 chars
-    for (i=41;i<=i2;i++) {
-        if ((i==47) || (i==50) || (i==55)) DRUM_Symbolic_Buffer[p++] = 32; // add space separation between op, da, ia fields
-        DRUM_Symbolic_Buffer[p++] = buf[i]; 
-    }
-}
 
 t_int64 decode_num_word(char * buf, int nDigits, int bSpaceIsZero) 
 {
@@ -210,8 +193,7 @@ t_int64 decode_alpha_word(char * buf, int n)
     return d;
 }
 
-
-void decode_soap_wiring(struct _card_data * data, int addr) 
+void decode_soap_wiring(char * buf, int addr) 
 {
     // decode soap card simulating soap control panel wiring for 533 
     // from SOAP II manual at http://www.bitsavers.org/pdf/ibm/650/24-4000-0_SOAPII.pdf
@@ -223,7 +205,6 @@ void decode_soap_wiring(struct _card_data * data, int addr)
     //    Sg = sign = blank or -
     //    Tg = Tag  = 
     // storage in input block
-    //                +-------------------+ 
     //    Word 1951:  | <-  Location   -> | Alphabetic
     //         1952:  | <-  Data Addr  -> | Alphabetic
     //         1953:  | <-  Inst Addr  -> | Alphabetic
@@ -237,23 +218,8 @@ void decode_soap_wiring(struct _card_data * data, int addr)
     //         1958:  |           |N N N N| D Absolute Part
     //         1959:  |           |N N N N| I Absolute Part
     //         1960:  |             |T b n| T=Type (0 if Blank), b=0/8 (for non blank type), n=0/8 (for negative)
-    //                +-------------------+ 
     //                              
     int ty,neg;
-    char buf[81];
-    int i;
-    uint16 c1,c2;
-
-    // convert card image punches to ascii buf for processing
-    // keep 026 fortran charset
-    for (i=0;i<80;i++) {
-        c1 = data->image[i];
-        c2 = data->hol_to_ascii[c1];        
-        c2 = (strchr(mem_to_ascii, toupper(c2))) ? c2:' ';      
-        if (c2 == '~') c2 = ' ';
-        buf[i] = (char) c2; 
-    }
-    buf[80] = 0; // terminate string
 
     DRUM[addr + 0] = decode_alpha_word(&buf[42], 5);            // Location (5 chars)
     DRUM[addr + 1] = decode_alpha_word(&buf[50], 5);            // Data Addr (5 chars)
@@ -268,13 +234,11 @@ void decode_soap_wiring(struct _card_data * data, int addr)
     DRUM[addr + 7] = decode_num_word(&buf[51], 4, 0);           // Absolute Part of Data Addr
     DRUM[addr + 8] = decode_num_word(&buf[57], 4, 0);           // Absolute Part of Instr Addr
 
-    ty = buf[40] - '0';
-    if ((ty < 0) || (ty > 9)) ty = 0;
+    if (buf[40] == '1') {ty = 18; } else
+    if (buf[40] == '2') {ty = 28; } else {ty = 0; }
     neg = (buf[41] == '-') ? 8:0;
 
-    DRUM[addr + 9] = ty * 100 + 
-                     (ty ? 80:0) +
-                     neg;                                  // |T b n| T=Type (0 if Blank), b=0/8 (for non blank type), n=0/8 (for negative)
+    DRUM[addr + 9] = ty * 10 + neg;                                 // |T b n| T=Type (0 if Blank), b=0/8 (for non blank type), n=0/8 (for negative)
 }
 
 int sformat(char * buf, const char * match)
@@ -294,20 +258,18 @@ int sformat(char * buf, const char * match)
     return 1; // end of match string -> return 1 -> buf matches
 }
 
-void decode_is_wiring(struct _card_data * data, int addr) 
+void decode_is_wiring(char * buf, int addr) 
 {
     // decode Floationg Decimal Interpretive System (IS) card simulating control panel wiring for 533 as described 
-    // in manual at http://www.bitsavers.org/pdf/ibm/650/28-4024_FltDecIntrpSys.pdf
+    // in manual at http://www.bitsavers.org/pdf/ibm/650/28-4024_FltDecIntrpSys
     // input card
     //    Column:    1 2 3 4 |  5  6 |  7  8  9 | 10 | 11 | 12 - 21 | 22 | 23 - 32 | 33 | 34 - 43 | 44 | 45 - 54 | 55 | 56 - 65 | 66 | 67 - 76 | 77 78 79 | 80
     //                 Card  |       | Location | wc | s1 |  Word1  | s2 |  Word2  | s3 |  Word3  | s4 |  Word4  | s5 |  Word5  | s6 |  Word6  | Problem  | 
     //                 Num   |                                                                                                                   Num
     //
-    //    wc   = Word Count (range 0 to 6, space for 1)
-    //    s1   = sign of word 1 (-, + or <space> (same as +))
-    //    Tr   = Tracing identification
-    //    Word = word in format NNNNNNNNNN
-    //            N is 0..9, <space> (same as 0)
+    //    wc = Word Count (space for 1)
+    //    s1 = sign of word 1 (space for +)
+    //    Tr = Tracing identification
     //
     // Alternate input format to allow system deck loading 
     //    Column:    1 2 |  3 | 4  5  6 | 7 | 8 9 10 11 | 12 | 13 - 24       
@@ -316,13 +278,13 @@ void decode_is_wiring(struct _card_data * data, int addr)
     //
     // Alternate input format to allow IT source program loading 
     //    Column:    1 2 3 4 |  5  6 |  7  8  9 | 10 | 11 | 12 - 24
-    //                 Card  | Blank | Location |    | sg | N NNN NNN NNN  <- This is an IS instruction (format O1 A B C)
+    //                 Card  | Blank | Location |    | sg | N NNN NNN NNN  <- This is an IT instruction (format O1 A B C)
     //                 Num   | 
     //    Column:    1 2 3 4 |  5  6 |  7  8  9 | 10 | 11 | 12 - 23
-    //                 Card  | Blank | Location |    | sg | N NNNNNNN NN   <- This is an IS float numeric constant (mantissa and exponent)
+    //                 Card  | Blank | Location |    | sg | N NNNNNNN NN   <- This is an IT float numeric constant (mantissa and exponent)
     //                 Num   | 
     //    Column:    1 2 3 4 |  5  6 |  7  8  9 | 10 - 23
-    //                 Card  | Blank | Location | blanks                   <- This is an IS transfer card (location is start of IT program) 
+    //                 Card  | Blank | Location | blanks                   <- This is an IT transfer card (location is start of IT program) 
     //                 Num   | 
     //
     // storage in input block
@@ -339,27 +301,18 @@ void decode_is_wiring(struct _card_data * data, int addr)
     //                +-------------------+ 
     //         1959:  |  Problem Number   | 
     //                +-------------------+ 
-    //
+    // input card
+    //       WordN is 0..9,<space> 
+    //       sign  is -,+,<space>
     // put the decoded data in drum at addr (if addr < 0 -> do not store in drum)
     // card number is ignored on reading
 
     int wc,neg,i;
     int NegZero; 
     t_int64 d;
-    char buf[81];
-    uint16 c1,c2;
-
-    // convert card image punches to ascii buf for processing
-    // keep 0..9,+,-,<space>, replace anything else by <space>
-    for (i=0;i<80;i++) {
-        c1 = data->image[i];
-        c2 = data->hol_to_ascii[c1];        
-        buf[i] = (strchr("+-0123456789", c2)) ? ((char) (c2)):' ';      
-    }
-    buf[80] = 0; // terminate string
 
     if (           sformat(&buf[6], "                   ")) {
-       // card with firsts 26 cols blank = blank card: read as all zero, one word count
+       // blank card: read as all zero, one word count
        // this allows to have blank cards/comments card as long as the comment starts on column 27 of more
        DRUM[addr + 1] = 1 * D4;                                              // word count 
     } else if (    sformat(&buf[5], " NNN   ")) {
@@ -426,80 +379,6 @@ void decode_is_wiring(struct _card_data * data, int addr)
     }
 }
 
-void decode_it_wiring(struct _card_data * data, int addr) 
-{
-    // decode IT compiler card simulating control panel wiring for 533 
-    // from IT manual at http://www.bitsavers.org/pdf/ibm/650/CarnegieInternalTranslator.pdf
-    // source program input card
-    //    Column:  1  2  3  4 |   5   | 6 - 42 |  43 - 70  | 71 72 |  73 - 80  |
-    //               N N N N  |   +   |        | Statement |       | Comments  |
-    //              Statement | Y(12) |        |  max 28   |       |  max 8    |
-    //                Number  | Punch |        |  chars    |       |  chars    |        
-    //
-    // storage in input block
-    //                +-------------------+ 
-    //    Word 0051:  | <-  Statement  -> | Alphabetic
-    //         0052:  | <-  Statement  -> | Alphabetic
-    //         0053:  | <-  Statement  -> | Alphabetic
-    //         0054:  | <-  Statement  -> | Alphabetic
-    //         0055:  | <-  Statement  -> | Alphabetic
-    //         0056:  | <-  Statement  -> | Alphabetic
-    //                +-+-+-+-+-+-|-+-+-+-|
-    //         0057:  |           |N N N N| Statement Number
-    //                +-+-+-+-+-+-|-+-+-+-|
-    //         0058:  |                   | Not used
-    //         0059:  |                   | Not used
-    //         0060:  |                   | Not used
-    //                +-------------------+ 
-    //                              
-    // type 1 data input card
-    //    Column:  1  2 |   3   | 4  5  6 | 7 8 9 10 | 11 - 20 |  
-    //              VV  |   +   |  N N N  | D D D D  |  Word
-    //                  | Y(12) |
-    //                  | Punch |
-    //    VV = IT variable being loaded: 01 -> I type, 02 -> Y type, 03 -> C type
-    //    N N N = variable number (I5 -> 01 + 005)
-    //    D D D D = variable arbitrary non-zero identification number
-    //    Word = word to be loaded into IT variable. If type I, is an integer. If type C or Y
-    //           type is word is float (M MMMMMMM EE -> M=mantisa, EE=exponent)
-    //           if word is negative, last digit get X(11) overpunch
-    //    up to 4 pairs var-word per card
-    //    last card signaed with a X(11) overpunch in col 10
-    //    space is considered as zero
-    // type 2 data input card is a load card. No spaces are allowed
-
-    char buf[81];
-    int i;
-    uint16 c1,c2;
-
-    // convert card image punches to ascii buf for processing
-    // keep 026 fortran charset
-    for (i=0;i<80;i++) {
-        c1 = data->image[i];
-        c2 = data->hol_to_ascii[c1];        
-        c2 = (strchr(mem_to_ascii, toupper(c2))) ? c2:' ';      
-        if (c2 == '~') c2 = ' ';
-        buf[i] = (char) c2; 
-    }
-    buf[80] = 0; // terminate string
-
-    if (buf[2] == '+') {
-        // type 1 data card
-        // re-read as 8 word per card
-        decode_8word_wiring(data, addr);
-        return;
-    }
-    DRUM[addr + 0] = decode_alpha_word(&buf[42], 5);            // Statement (5 chars)
-    DRUM[addr + 1] = decode_alpha_word(&buf[47], 5);            // Statement (5 chars)
-    DRUM[addr + 2] = decode_alpha_word(&buf[52], 5);            // Statement (5 chars)
-    DRUM[addr + 3] = decode_alpha_word(&buf[57], 5);            // Statement (5 chars)
-    DRUM[addr + 4] = decode_alpha_word(&buf[62], 5);            // Statement (5 chars)
-    DRUM[addr + 5] = decode_alpha_word(&buf[67], 3);            // Statement (3 chars)
-
-    DRUM[addr + 6] = decode_num_word(&buf[0], 4, 1);            // Statement Number (space is read as digit zero)
-
-}
-
 
 
 /*
@@ -507,10 +386,11 @@ void decode_it_wiring(struct _card_data * data, int addr)
  */
 uint32 cdr_cmd(UNIT * uptr, uint16 cmd, uint16 addr)
 {
+    int i,c;
     struct _card_data   *data;
+    char buf[81]; 
+    int buf_len;
     uint32              wiring;
-    int i;
-    char cbuf[81]; 
 
     /* Are we currently tranfering? */
     if (uptr->u5 & URCSTA_BUSY)
@@ -521,25 +401,25 @@ uint32 cdr_cmd(UNIT * uptr, uint16 cmd, uint16 addr)
 
     /* Test ready */
     if ((uptr->flags & UNIT_ATT) == 0) {
-        sim_debug(DEBUG_CMD, &cdr_dev, "No cards (no file attached)\n");
+        sim_debug(DEBUG_CMD, &cdr_dev, "No cards (no file attached)\r\n");
         return SCPE_NOCARDS;
     }
 
     /* read the cards */
-    sim_debug(DEBUG_CMD, &cdr_dev, "READ\n");
+    sim_debug(DEBUG_CMD, &cdr_dev, "READ\r\n");
     uptr->u5 |= URCSTA_BUSY;
 
     switch(sim_read_card(uptr)) {
     case SCPE_EOF:
-         sim_debug(DEBUG_DETAIL, &cdr_dev, "EOF\n");
+         sim_debug(DEBUG_DETAIL, &cdr_dev, "EOF\r\n");
          uptr->u5 = 0;
          return SCPE_NOCARDS;
     case SCPE_UNATT:
-         sim_debug(DEBUG_DETAIL, &cdr_dev, "Not Attached\n");
+         sim_debug(DEBUG_DETAIL, &cdr_dev, "Not Attached\r\n");
          uptr->u5 = 0;
          return SCPE_NOCARDS;
     case SCPE_IOERR:
-         sim_debug(DEBUG_DETAIL, &cdr_dev, "ERR\n");
+         sim_debug(DEBUG_DETAIL, &cdr_dev, "ERR\r\n");
          uptr->u5 = 0;
          return SCPE_NOCARDS;
     case SCPE_OK:
@@ -548,35 +428,30 @@ uint32 cdr_cmd(UNIT * uptr, uint16 cmd, uint16 addr)
 
     data = (struct _card_data *)uptr->up7;
 
-    // make local copy of card for debug output
-    for (i=0; i<80; i++)
-        cbuf[i] = data->hol_to_ascii[data->image[i]];
-    cbuf[80] = 0; // terminate string
-    sim_debug(DEBUG_DETAIL, &cpu_dev, "Read Card: %s\n", sim_trim_endspc(cbuf));
+    // make local copy of card
+    buf_len = data->ptr;
+    if (buf_len == 0) {
+        buf_len = data->len;
+    }
+    for (i=0;i<80;i++) {    
+        if (i < buf_len) {
+            c = data->cbuff[i];
+            if (c < ' ') c = ' ';
+            buf[i] = c;
+        } else {
+            buf[i] = ' ';
+        }
+    }
+    buf[80] = 0; // terminate string
 
-    // uint16 data->image[] array that holds the actual punched rows on card
-    // using this codification:
-    //
-    //  Row Name    value in image[]    comments
-    //
-    //  Y	        0x800               Hi Punch Y(12)
-    //  X	        0x400               Minus Punch X(11)
-    //  0	        0x200               also called T (Ten, 10)
-    //  1	        0x100
-    //  2  	        0x080
-    //  3	        0x040
-    //  4	        0x020
-    //  5	        0x010
-    //  6	        0x008
-    //  7           0x004
-    //  8           0x002
-    //  9	        0x001
-    //
-    // If several columns are punched, the values are ORed: eg char A is represented as a punch 
-    // on row Y and row 1, so it value in image array will be 0x800 | 0x100 -> 0x900
+    // trim right spaces for printing read card
+    for (i=80;i>=0;i--) if (buf[i] > 32) break;
+    c = buf[i+1]; buf[i+1]=0;
+    sim_debug(DEBUG_DETAIL, &cpu_dev, "Read Card: %s\r\n", buf);
+    buf[i+1]=c;
 
     // check if it is a load card (Y(12) = HiPunch set on any column of card) signales it
-    if (decode_8word_wiring(data, -1)) {
+    if (decode_8word_wiring(buf, -1)) {
          uptr->u5 |= URCSTA_LOAD;
     } else {
          uptr->u5 &= ~URCSTA_LOAD;
@@ -588,23 +463,16 @@ uint32 cdr_cmd(UNIT * uptr, uint16 cmd, uint16 addr)
     // using the control panel wiring. 
     if (uptr->u5 & URCSTA_LOAD) {
         // load card -> use 8 words per card encoding
-        decode_8word_wiring(data, addr);
-        if (uptr->u5 & URCSTA_SOAPSYMB) {
-            // requested to load soap symb info 
-            decode_soap_symb_info(data, addr);
-        }
+        decode_8word_wiring(buf, addr);
     } else if (wiring == WIRING_SOAP) {
         // decode soap card simulating soap control panel wiring for 533 (gasp!)
-        decode_soap_wiring(data, addr);
+        decode_soap_wiring(buf, addr);
     } else if (wiring == WIRING_IS) {
-        // decode floating point interpretive system (bell interpreter) card 
-        decode_is_wiring(data, addr);
-    } else if (wiring == WIRING_IT) {
-        // decode Carnegie Internal Translator compiler card 
-        decode_it_wiring(data, addr);
+        // decode it card 
+        decode_is_wiring(buf, addr);
     } else {
         // default wiring: decode up to 8 numerical words per card. Can be a load card
-        decode_8word_wiring(data, addr);
+        decode_8word_wiring(buf, addr);
     }
    
     uptr->u5 &= ~URCSTA_BUSY;
@@ -658,18 +526,11 @@ cdr_attach(UNIT * uptr, CONST char *file)
 {
     t_stat              r;
 
-    if (uptr->flags & UNIT_ATT)         // remove current deck in read hopper before attaching
-       sim_card_detach(uptr);           // the new one
-
-    r = sim_card_attach(uptr, file);
-    if (SCPE_BARE_STATUS(r) != SCPE_OK)
-       return r;
+    if ((r = sim_card_attach(uptr, file)) != SCPE_OK)
+        return r;
     uptr->u5 = 0;
     uptr->u4 = 0;
     uptr->u6 = 0;
-    if (sim_switches & SWMASK ('L')) {                    /* Load Symbolic SOAP info?  */
-         uptr->u5 |= URCSTA_SOAPSYMB;
-    }
     return SCPE_OK;
 }
 
