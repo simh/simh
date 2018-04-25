@@ -704,7 +704,7 @@ else                                                    /* Telnet connection */
 
 static int32 tmxr_write (TMLN *lp, int32 length)
 {
-int32 written;
+int32 written = 0;
 int32 i = lp->txbpr;
 
 if ((lp->txbps) && (sim_gtime () < lp->txnexttime) && (sim_is_running))
