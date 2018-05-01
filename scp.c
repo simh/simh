@@ -9721,46 +9721,144 @@ return ret;
 /* Radix independent input/output package
 
    strtotv - general radix input routine
+   strtotsv - general radix input routine
 
    Inputs:
         inptr   =       string to convert
         endptr  =       pointer to first unconverted character
         radix   =       radix for input
-   Outputs:
+   Output strtotv:
         value   =       converted value
+   Outputs strtotsv:
+        value   =       converted signed value
 
    On an error, the endptr will equal the inptr.
+
+   If the value of radix is zero, the syntax expected is similar 
+   to that of integer constants, which is formed by a succession of:
+
+      - An optional sign character (+ or -)
+      - An optional prefix indicating octal or hexadecimal radix 
+        ("0" or "0x"/"0X" respectively)
+      - A sequence of decimal digits (if no radix prefix was specified) 
+        or one of binary, octal or hexadecimal digits if a specific 
+        prefix is present
+
+   If the radix value is between 2 and 36, the format expected for 
+   the integral number is a succession of any of the valid digits 
+   and/or letters needed to represent integers of the specified 
+   radix (starting from '0' and up to 'z'/'Z' for radix 36). The 
+   sequence may optionally be preceded by a sign (either + or -) and, 
+   if base is 16, an optional "0x" or "0X" prefix.  If the base is 2,
+   an optional "0b" or "0B" prefix.
+
 */
 
 t_value strtotv (CONST char *inptr, CONST char **endptr, uint32 radix)
 {
-int32 nodigit;
+t_bool nodigits;
 t_value val;
 uint32 c, digit;
 
-*endptr = inptr;                                        /* assume fails */
-if ((radix < 2) || (radix > 36))
+if (endptr)
+    *endptr = inptr;                                    /* assume fails */
+if (((radix < 2) || (radix > 36)) && (radix != 0))
     return 0;
 while (sim_isspace (*inptr))                            /* bypass white space */
     inptr++;
+if (((radix == 0) || (radix == 16)) && 
+    ((!memcmp("0x", inptr, 2)) || (!memcmp("0X", inptr, 2)))) {
+    radix = 16;
+    inptr += 2;
+    }
+if (((radix == 0) || (radix == 2)) && 
+    ((!memcmp("0b", inptr, 2)) || (!memcmp("0B", inptr, 2)))) {
+    radix = 2;
+    inptr += 2;
+    }
+if ((radix == 0) && (*inptr == '0'))            /* Default radix and octal? */
+    radix = 8;
+if (radix == 0)                                 /* Default base 10 radix */
+    radix = 10;
 val = 0;
-nodigit = 1;
+nodigits = TRUE;
 for (c = *inptr; sim_isalnum(c); c = *++inptr) {        /* loop through char */
     c = sim_toupper (c);
     if (sim_isdigit (c))                                /* digit? */
         digit = c - (uint32) '0';
-    else if (radix <= 10)                               /* stop if not expected */
-        break;
-    else digit = c + 10 - (uint32) 'A';                 /* convert letter */
+    else {
+        if (radix <= 10)                                /* stop if not expected */
+            break;
+        else 
+            digit = c + 10 - (uint32) 'A';              /* convert letter */
+        }
     if (digit >= radix)                                 /* valid in radix? */
         return 0;
     val = (val * radix) + digit;                        /* add to value */
-    nodigit = 0;
+    nodigits = FALSE;
     }
-if (nodigit)                                            /* no digits? */
+if (nodigits)                                           /* no digits? */
     return 0;
-*endptr = inptr;                                        /* result pointer */
+if (endptr)
+    *endptr = inptr;                                    /* result pointer */
 return val;
+}
+
+t_svalue strtotsv (CONST char *inptr, CONST char **endptr, uint32 radix)
+{
+t_bool nodigits;
+t_svalue val;
+t_svalue negate = 1;
+uint32 c, digit;
+
+if (endptr)
+    *endptr = inptr;                                    /* assume fails */
+if (((radix < 2) || (radix > 36)) && (radix != 0))
+    return 0;
+while (sim_isspace (*inptr))                            /* bypass white space */
+    inptr++;
+if ((*inptr == '-') ||
+    (*inptr == '+')) {
+    if (*inptr == '-')
+        negate = -1;
+    ++inptr;
+    }
+if (((radix == 0) || (radix == 16)) && 
+    ((!memcmp("0x", inptr, 2)) || (!memcmp("0X", inptr, 2)))) {
+    radix = 16;
+    inptr += 2;
+    }
+if (((radix == 0) || (radix == 2)) && 
+    ((!memcmp("0b", inptr, 2)) || (!memcmp("0B", inptr, 2)))) {
+    radix = 2;
+    inptr += 2;
+    }
+if ((radix == 0) && (*inptr == '0'))            /* Default radix and octal? */
+    radix = 8;
+if (radix == 0)                                 /* Default base 10 radix */
+    radix = 10;
+val = 0;
+nodigits = TRUE;
+for (c = *inptr; sim_isalnum(c); c = *++inptr) {        /* loop through char */
+    c = sim_toupper (c);
+    if (sim_isdigit (c))                                /* digit? */
+        digit = c - (uint32) '0';
+    else {
+        if (radix <= 10)                                /* stop if not expected */
+            break;
+        else
+            digit = c + 10 - (uint32) 'A';              /* convert letter */
+        }
+    if (digit >= radix)                                 /* valid in radix? */
+        return 0;
+    val = (val * radix) + digit;                        /* add to value */
+    nodigits = FALSE;
+    }
+if (nodigits)                                           /* no digits? */
+    return 0;
+if (endptr)
+    *endptr = inptr;                                    /* result pointer */
+return val * negate;
 }
 
 /* fprint_val - general radix printing routine
