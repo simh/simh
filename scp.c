@@ -9782,9 +9782,15 @@ t_stat sprint_val (char *buffer, t_value val, uint32 radix,
 {
 #define MAX_WIDTH ((int) ((CHAR_BIT * sizeof (t_value) * 4 + 3)/3))
 t_value owtest, wtest;
+t_bool negative = FALSE;
 int32 d, digit, ndigits, commas = 0;
 char dbuf[MAX_WIDTH + 1];
 
+if (((format == PV_LEFTSIGN) || (format == PV_RCOMMASIGN)) &&
+    (0 > (t_svalue)val)) {
+    val = (t_value)(-((t_svalue)val));
+    negative = TRUE;
+    }
 for (d = 0; d < MAX_WIDTH; d++)
     dbuf[d] = (format == PV_RZRO)? '0': ' ';
 dbuf[MAX_WIDTH] = 0;
@@ -9795,11 +9801,15 @@ do {
     val = val / radix;
     dbuf[d] = (char)((digit <= 9)? '0' + digit: 'A' + (digit - 10));
     } while ((d > 0) && (val != 0));
+if (negative && (format == PV_LEFTSIGN))
+    dbuf[--d] = '-';
 
 switch (format) {
     case PV_LEFT:
+    case PV_LEFTSIGN:
         break;
     case PV_RCOMMA:
+    case PV_RCOMMASIGN:
         for (digit = 0; digit < MAX_WIDTH; digit++)
             if (dbuf[digit] != ' ')
                 break;
@@ -9810,6 +9820,8 @@ switch (format) {
         for (digit=1; digit<=commas; digit++)
             dbuf[MAX_WIDTH - (digit * 4)] = ',';
         d = d - commas;
+        if (negative && (format == PV_RCOMMASIGN))
+            dbuf[--d] = '-';
         if (width > MAX_WIDTH) {
             if (!buffer)
                 return width;

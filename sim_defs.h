@@ -418,6 +418,8 @@ typedef uint32          t_addr;
 #define PV_RSPC         1                               /* right, space fill */
 #define PV_RCOMMA       2                               /* right, space fill. Comma separate every 3 */
 #define PV_LEFT         3                               /* left justify */
+#define PV_RCOMMASIGN   6                               /* right, space fill. Comma separate every 3 treat as signed */
+#define PV_LEFTSIGN     7                               /* left justify treat as signed */
 
 /* Default timing parameters */
 
