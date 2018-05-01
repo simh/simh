@@ -813,10 +813,27 @@ static const char simh_help[] =
 #define HLP_EVALUATE    "*Commands Evaluating_Instructions"
        /***************** 80 character line width template *************************/
       "2Evaluating Instructions\n"
-      " The EVAL command evaluates a symbolic expression and returns the equivalent\n"
+      " The EVAL command evaluates a symbolic instruction and returns the equivalent\n"
       " numeric value.  This is useful for obtaining numeric arguments for a search\n"
       " command:\n\n"
-      "++EVAL <expression>\n"
+      "++EVAL <expression>\n\n"
+      " Examples:\n\n"
+      "+On the VAX simulator:\n"
+      "++sim> eval addl2 r2,r3\n"
+      "++0:      005352C0\n"
+      "++sim> eval addl2 #ff,6(r0)\n"
+      "++0:      00FF8FC0\n"
+      "++4:      06A00000\n"
+      "++sim> eval 'AB\n"
+      "++0:      00004241\n\n"
+      "+On the PDP-8:\n"
+      "++sim> eval tad 60\n"
+      "++0:      1060\n"
+      "++sim> eval tad 300\n"
+      "++tad 300\n"
+      "++Can't be parsed as an instruction or data\n\n"
+      " 'tad 300' fails, because with an implicit PC of 0, location 300 can't be\n"
+      " reached with direct addressing.\n"
        /***************** 80 character line width template *************************/
       "2Loading and Saving Programs\n"
 #define HLP_LOAD        "*Commands Loading_and_Saving_Programs LOAD"
@@ -8273,13 +8290,13 @@ t_stat r;
 GET_SWITCHES (cptr);
 GET_RADIX (rdx, dptr->dradix);
 for (i = 0; i < sim_emax; i++)
-sim_eval[i] = 0;
+    sim_eval[i] = 0;
 if (*cptr == 0)
     return SCPE_2FARG;
 if ((r = parse_sym ((CONST char *)cptr, 0, dptr->units, sim_eval, sim_switches)) > 0) {
     sim_eval[0] = get_uint (cptr, rdx, width_mask[dptr->dwidth], &r);
     if (r != SCPE_OK)
-        return r;
+        return sim_messagef (r, "%s\nCan't be parsed as an instruction or data\n", cptr);
     }
 lim = 1 - r;
 for (i = a = 0; a < lim; ) {
