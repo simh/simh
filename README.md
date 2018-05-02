@@ -328,6 +328,7 @@ Device simulator authors can easily schedule their device polling activities to 
     SCREENSHOT filename.bmp          Save video window to the specified file
     SET ENV Name=Value               Set Environment variable
     SET ENV -p "Prompt" Name=Default Gather User input into an Environment Variable
+    SET ENV -a Name=Expression       Evaluate an expression and store result in an Environment Variable
     SET ASYNCH                       Enable Asynchronous I/O
     SET NOASYNCH                     Disable Asynchronous I/O
     SET VERIFY                       Enable command display while processing DO command files
@@ -358,6 +359,7 @@ Device simulator authors can easily schedule their device polling activities to 
     NOOP                             A no-op command
     ON                               Establish or cancel an ON condition dispatch
     IF                               Test some simulator state and conditionally execute commands
+    IF (C-style-expression)          Test some simulator state and conditionally execute commands
     CD                               Change working directory
     SET DEFAULT                      Change working directory
     PWD                              Show working directory

@@ -481,6 +481,7 @@ void fprint_capac (FILE *st, DEVICE *dptr, UNIT *uptr);
 void fprint_sep (FILE *st, int32 *tokens);
 REG *find_reg_glob (CONST char *ptr, CONST char **optr, DEVICE **gdptr);
 REG *find_reg_glob_reason (CONST char *cptr, CONST char **optr, DEVICE **gdptr, t_stat *stat);
+const char *sim_eval_expression (const char *cptr, t_svalue *value, t_bool parens_required, t_stat *stat);
 
 /* Forward references */
 
@@ -671,6 +672,7 @@ const struct scp_error {
          {"EXPECT",  "Expect matched"},
          {"AMBREG",  "Ambiguous register name"},
          {"REMOTE",  "remote console command"},
+         {"INVEXPR", "invalid expression"},
     };
 
 const size_t size_map[] = { sizeof (int8),
@@ -1231,9 +1233,42 @@ static const char simh_help[] =
       "+SET NOASYNCH                disable asynchronous I/O\n"
 #define HLP_SET_ENVIRON "*Commands SET Environment"
       "3Environment\n"
-      "4Explicitily Changing A Variable\n"
+      "4Explicitily Changing a Variable\n"
       "+SET ENVIRONMENT name=val    set environment variable\n"
       "+SET ENVIRONMENT name        clear environment variable\n"
+      "4Arithmetic Computations into a Variable\n\n"
+      "+SET ENVIRONMENT -A name=expression\n\n"
+      " Expression can contain any of these C language operators:\n\n"
+      "++ (                  Open Parenthesis\n"
+      "++ )                  Close Parenthesis\n"
+      "++ -                  Subtraction\n"
+      "++ +                  Addition\n"
+      "++ *                  Multiplication\n"
+      "++ /                  Division\n"
+      "++ %%                  Modulus\n"
+      "++ &&                 Logical AND\n"
+      "++ ||                 Logical OR\n"
+      "++ &                  Bitwise AND\n"
+      "++ |                  Bitwise Inclusive OR\n"
+      "++ ^                  Bitwise Exclusive OR\n"
+      "++ >>                 Bitwise Right Shift\n"
+      "++ <<                 Bitwise Left Shift\n"
+      "++ ==                 Equality\n"
+      "++ !=                 Inequality\n"
+      "++ <=                 Less than or Equal\n"
+      "++ <                  Less than\n"
+      "++ >=                 Greater than or Equal\n"
+      "++ >                  Greater than\n"
+      "++ !                  Logical Negation\n"
+      "++ ~                  Bitwise Compliment\n\n"
+      " Operator precedence is consistent with C language precedence.\n\n"
+      " Expression can contain arbitrary combinations of constant\n"
+      " values, simulator registers and environment variables \n"
+      "5Examples:\n"
+      "++SET ENV -A A=7+2\n"
+      "++SET ENV -A A=A-1\n"
+      "++ECHO A=%%A%%\n"
+      "++A=8\n"
       "4Gathering Input From A User\n"
       " Input from a user can be obtained by:\n\n"
       "+set environment -P \"Prompt String\" name=default\n\n"
@@ -1975,8 +2010,42 @@ static const char simh_help[] =
       " failed\" message.  Otherwise, the command file will continue to bring up\n"
       " the operating system.\n"
       "4Conditional Expressions\n"
-      " The IF and ASSERT commands evaluate three different forms of conditional\n"
+      " The IF and ASSERT commands evaluate five different forms of conditional\n"
       " expressions.:\n\n"
+      "5C Style Simulator State Expressions\n"
+
+      " Comparisons can optionally be done with complete C style computational\n"
+      " expressions which leverage the C operations in the below table and can\n"
+      " optionally reference any combination of values that are constants or\n"
+      " contained in environment variables or simulator registers.  C style\n"
+      " expression evaluation is initiated by enclosing the expression in\n"
+      " parenthesis.\n\n"
+      " Expression can contain any of these C language operators:\n\n"
+      "++ (                  Open Parenthesis\n"
+      "++ )                  Close Parenthesis\n"
+      "++ -                  Subtraction\n"
+      "++ +                  Addition\n"
+      "++ *                  Multiplication\n"
+      "++ /                  Division\n"
+      "++ %%                  Modulus\n"
+      "++ &&                 Logical AND\n"
+      "++ ||                 Logical OR\n"
+      "++ &                  Bitwise AND\n"
+      "++ |                  Bitwise Inclusive OR\n"
+      "++ ^                  Bitwise Exclusive OR\n"
+      "++ >>                 Bitwise Right Shift\n"
+      "++ <<                 Bitwise Left Shift\n"
+      "++ ==                 Equality\n"
+      "++ !=                 Inequality\n"
+      "++ <=                 Less than or Equal\n"
+      "++ <                  Less than\n"
+      "++ >=                 Greater than or Equal\n"
+      "++ >                  Greater than\n"
+      "++ !                  Logical Negation\n"
+      "++ ~                  Bitwise Compliment\n\n"
+      " Operator precedence is consistent with C language precedence.\n\n"
+      " Expression can contain arbitrary combinations of constant\n"
+      " values, simulator registers and environment variables \n"
       "5Simulator State Expressions\n"
       " The values of simulator registers can be evaluated with:\n\n"
       "++{NOT} {<dev>} <reg>|<addr>{<logical-op><value>}<conditional-op><value>\n\n"
@@ -3961,59 +4030,69 @@ if (Exist || (*gbuf == '"') || (*gbuf == '\'')) {       /* quoted string compari
         }
     }
 else {
-    cptr = get_glyph (cptr, gbuf, 0);                   /* get register */
-    rptr = find_reg (gbuf, &gptr, sim_dfdev);           /* parse register */
-    if (rptr) {                                         /* got register? */
-        if (*gptr == '[') {                             /* subscript? */
-            if (rptr->depth <= 1)                       /* array register? */
-                return SCPE_ARG;
-            idx = (uint32) strtotv (++gptr, &tptr, 10); /* convert index */
-            if ((gptr == tptr) || (*tptr++ != ']'))
-                return SCPE_ARG;
-            gptr = tptr;                                /* update */
+    while (sim_isspace (*cptr))                         /* skip spaces */
+        ++cptr;
+    if (*cptr == '(') {
+        t_svalue value;
+
+        cptr = sim_eval_expression (cptr, &value, TRUE, &r);
+        result = (value != 0);
+        }
+    else {
+        cptr = get_glyph (cptr, gbuf, 0);                   /* get register */
+        rptr = find_reg (gbuf, &gptr, sim_dfdev);           /* parse register */
+        if (rptr) {                                         /* got register? */
+            if (*gptr == '[') {                             /* subscript? */
+                if (rptr->depth <= 1)                       /* array register? */
+                    return SCPE_ARG;
+                idx = (uint32) strtotv (++gptr, &tptr, 10); /* convert index */
+                if ((gptr == tptr) || (*tptr++ != ']'))
+                    return SCPE_ARG;
+                gptr = tptr;                                /* update */
+                }
+            else idx = 0;                                   /* not array */
+            if (idx >= rptr->depth)                         /* validate subscript */
+                return SCPE_SUB;
             }
-        else idx = 0;                                   /* not array */
-        if (idx >= rptr->depth)                         /* validate subscript */
-            return SCPE_SUB;
-        }
-    else {                                              /* not reg, check for memory */
-        if (sim_dfdev && sim_vm_parse_addr)             /* get addr */
-            addr = sim_vm_parse_addr (sim_dfdev, gbuf, &gptr);
-        else
-            addr = (t_addr) strtotv (gbuf, &gptr, sim_dfdev ? sim_dfdev->dradix : sim_dflt_dev->dradix);
-        if (gbuf == gptr)                               /* not register? */
-            return SCPE_NXREG;
-        }
-    if (*gptr != 0)                                     /* more? must be search */
-        get_glyph (gptr, gbuf, 0);
-    else {
-        if (*cptr == 0)                                 /* must be more */
-            return SCPE_2FARG;
-        cptr = get_glyph (cptr, gbuf, 0);               /* get search cond */
-        }
-    if (*cptr) {                                        /* more? */
-        if (flag)                                       /* ASSERT has no more args */
-            return SCPE_2MARG;
-        }
-    else {
-        if (!flag)                                      
-            return SCPE_2FARG;                          /* IF needs actions! */
-        }
-    if (rptr) {                                         /* Handle register case */
-        if (!get_rsearch (gbuf, rptr->radix, &sim_stabr) ||  /* parse condition */
-            (sim_stabr.boolop == -1))                   /* relational op reqd */
-            return SCPE_MISVAL;
-        sim_eval[0] = get_rval (rptr, idx);             /* get register value */
-        result = test_search (sim_eval, &sim_stabr);    /* test condition */
-        }
-    else {                                              /* Handle memory case */
-        if (!get_asearch (gbuf, sim_dfdev ? sim_dfdev->dradix : sim_dflt_dev->dradix, &sim_staba) ||  /* parse condition */
-            (sim_staba.boolop == -1))                    /* relational op reqd */
-            return SCPE_MISVAL;
-        reason = get_aval (addr, sim_dfdev, sim_dfunit);/* get data */
-        if (reason != SCPE_OK)                          /* return if error */
-            return reason;
-        result = test_search (sim_eval, &sim_staba);    /* test condition */
+        else {                                              /* not reg, check for memory */
+            if (sim_dfdev && sim_vm_parse_addr)             /* get addr */
+                addr = sim_vm_parse_addr (sim_dfdev, gbuf, &gptr);
+            else
+                addr = (t_addr) strtotv (gbuf, &gptr, sim_dfdev ? sim_dfdev->dradix : sim_dflt_dev->dradix);
+            if (gbuf == gptr)                               /* not register? */
+                return SCPE_NXREG;
+            }
+        if (*gptr != 0)                                     /* more? must be search */
+            get_glyph (gptr, gbuf, 0);
+        else {
+            if (*cptr == 0)                                 /* must be more */
+                return SCPE_2FARG;
+            cptr = get_glyph (cptr, gbuf, 0);               /* get search cond */
+            }
+        if (*cptr) {                                        /* more? */
+            if (flag)                                       /* ASSERT has no more args */
+                return SCPE_2MARG;
+            }
+        else {
+            if (!flag)                                      
+                return SCPE_2FARG;                          /* IF needs actions! */
+            }
+        if (rptr) {                                         /* Handle register case */
+            if (!get_rsearch (gbuf, rptr->radix, &sim_stabr) ||  /* parse condition */
+                (sim_stabr.boolop == -1))                   /* relational op reqd */
+                return SCPE_MISVAL;
+            sim_eval[0] = get_rval (rptr, idx);             /* get register value */
+            result = test_search (sim_eval, &sim_stabr);    /* test condition */
+            }
+        else {                                              /* Handle memory case */
+            if (!get_asearch (gbuf, sim_dfdev ? sim_dfdev->dradix : sim_dflt_dev->dradix, &sim_staba) ||  /* parse condition */
+                (sim_staba.boolop == -1))                    /* relational op reqd */
+                return SCPE_MISVAL;
+            reason = get_aval (addr, sim_dfdev, sim_dfunit);/* get data */
+            if (reason != SCPE_OK)                          /* return if error */
+                return reason;
+            result = test_search (sim_eval, &sim_staba);    /* test condition */
+            }
         }
     }
 if (Not ^ result) {
@@ -4604,6 +4683,20 @@ else {
         if (SCPE_OK != sim_decode_quoted_string (cbuf, (uint8 *)cbuf, &str_size)) 
             return sim_messagef (SCPE_ARG, "Invalid quoted string: %s\n", cbuf);
         cbuf[str_size] = '\0';
+        }
+    else {
+        if (sim_switches & SWMASK ('A')) {              /* Arithmentic Expression Evaluation argument? */
+            t_svalue val;
+            t_stat stat;
+
+            cptr = sim_eval_expression (cptr, &val, FALSE, &stat);
+            if (stat == SCPE_OK) {
+                sprintf (cbuf, "%ld", (long)val);
+                cptr = cbuf;
+                }
+            else
+                return stat;
+            }
         }
     }
 setenv(varname, cptr, 1);
@@ -13122,3 +13215,543 @@ va_end (ap);
 return r;
 }
 #endif
+
+/*
+ * Expression evaluation package
+ * 
+ * Derived from code provided by Gabriel Pizzolato
+ */
+
+
+typedef t_svalue (*Operator_Function)(t_svalue, t_svalue);
+
+typedef struct Operator {
+    const char *string;
+    int         precedence;
+    int         unary;
+    Operator_Function
+                function;
+    const char *description;
+    } Operator;
+
+typedef struct Stack_Element {
+    Operator *op;
+    char data[72];
+    } Stack_Element;
+
+typedef struct Stack {
+    int size;
+    int pointer;
+    int id;
+    Stack_Element *elements;
+    } Stack;
+
+#define STACK_GROW_AMOUNT 5             /* Number of elements to add to stack when needed */
+
+/* static variable allocation */
+static int stack_counter = 0; /* number of stacks current allocated */
+
+/* start of true stack code */
+/*-----------------------------------------------------------------------------
+ * Delete the given stack and free all memory associated with it.
+ -----------------------------------------------------------------------------*/
+void delete_Stack (Stack *sp)
+{
+if (sp == NULL)
+    return;
+
+sim_debug (SIM_DBG_EXP_STACK, sim_dflt_dev, "[Stack %d has been deallocated]\n", sp->id);
+
+/* Free the data that the stack was pointing at */
+free (sp->elements);
+free (sp);
+stack_counter--;
+}
+
+/*-----------------------------------------------------------------------------
+ * Check to see if a stack is empty
+ -----------------------------------------------------------------------------*/
+static t_bool isempty_Stack (Stack *this_Stack)
+{
+return (this_Stack->pointer == 0);
+}
+
+/*-----------------------------------------------------------------------------
+ * Create a new stack.
+ -----------------------------------------------------------------------------*/
+static Stack *new_Stack (void)
+{
+/* Stack variable to return */
+Stack *this_Stack = (Stack *)calloc(1, sizeof(*this_Stack));
+
+this_Stack->id = ++stack_counter;
+sim_debug (SIM_DBG_EXP_STACK, sim_dflt_dev, "[Stack %d has been allocated]\n", this_Stack->id);
+
+return this_Stack; /* Returns created stack */
+}
+
+/*-----------------------------------------------------------------------------
+ * Remove the top element from the specified stack
+ -----------------------------------------------------------------------------*/
+static t_bool pop_Stack (Stack * this_Stack, char *data, Operator **op)
+{
+*op = NULL;
+*data = '\0';
+
+if (isempty_Stack(this_Stack))
+    return FALSE;
+
+strcpy (data, this_Stack->elements[this_Stack->pointer-1].data);
+*op = this_Stack->elements[this_Stack->pointer-1].op;
+--this_Stack->pointer;
+
+if (*op)
+    sim_debug (SIM_DBG_EXP_STACK, sim_dflt_dev, "[Stack %d - Popping %s(%d)]\n", 
+                                                this_Stack->id, (*op)->string, (*op)->precedence);
+else
+    sim_debug (SIM_DBG_EXP_STACK, sim_dflt_dev, "[Stack %d - Popping %s]\n", 
+                                                this_Stack->id, data);
+
+return TRUE;                      /* Success */
+}
+
+/*-----------------------------------------------------------------------------
+ * Add an element to the specified stack.
+ -----------------------------------------------------------------------------*/
+static t_bool push_Stack (Stack * this_Stack, char *data, Operator *op)
+{
+if (this_Stack == NULL)
+    return FALSE;
+
+if (this_Stack->pointer == this_Stack->size) {  /* If necessary, grow stack */
+    this_Stack->size += STACK_GROW_AMOUNT;
+    this_Stack->elements = (Stack_Element *)realloc (this_Stack->elements, this_Stack->size * sizeof(*this_Stack->elements));
+    memset (&this_Stack->elements[this_Stack->size - STACK_GROW_AMOUNT], 0, STACK_GROW_AMOUNT * sizeof(*this_Stack->elements));
+    }
+
+this_Stack->elements[this_Stack->pointer].op = op;
+strlcpy (this_Stack->elements[this_Stack->pointer].data, data, sizeof (this_Stack->elements[this_Stack->pointer].data));
+++this_Stack->pointer;
+
+if (op)
+    sim_debug (SIM_DBG_EXP_STACK, sim_dflt_dev, "[Stack %d - Popping %s(%d)]\n", 
+                                                this_Stack->id, op->string, op->precedence);
+else
+    sim_debug (SIM_DBG_EXP_STACK, sim_dflt_dev, "[Stack %d - Popping %s]\n", 
+                                                this_Stack->id, data);
+
+return TRUE;                      /* Success */
+}
+
+/*-----------------------------------------------------------------------------
+ * Return the element at the top of the stack.
+ -----------------------------------------------------------------------------*/
+static t_bool top_Stack (Stack * this_Stack, char *data, Operator **op)
+{
+if (isempty_Stack(this_Stack))
+    return FALSE;
+
+strcpy (data, this_Stack->elements[this_Stack->pointer-1].data);
+*op = this_Stack->elements[this_Stack->pointer-1].op;
+
+if (*op)
+    sim_debug (SIM_DBG_EXP_STACK, sim_dflt_dev, "[Stack %d - Topping %s(%d)]\n", 
+                                                this_Stack->id, (*op)->string, (*op)->precedence);
+else
+    sim_debug (SIM_DBG_EXP_STACK, sim_dflt_dev, "[Stack %d - Topping %s]\n", 
+                                                this_Stack->id, data);
+
+return TRUE;                      /* Success */
+}
+
+/* All Functions implementing operations */
+
+static t_svalue _op_add (t_svalue augend, t_svalue addend)
+{
+return augend + addend;
+}
+
+static t_svalue _op_sub (t_svalue subtrahend, t_svalue minuend)
+{
+return minuend - subtrahend;
+}
+
+static t_svalue _op_mult (t_svalue factorx, t_svalue factory)
+{
+return factorx * factory;
+}
+
+static t_svalue _op_div (t_svalue divisor, t_svalue dividend)
+{
+return dividend / divisor;
+}
+
+static t_svalue _op_mod (t_svalue divisor, t_svalue dividend)
+{
+return dividend % divisor;
+}
+
+static t_svalue _op_comp (t_svalue data, t_svalue unused)
+{
+return ~data;
+}
+
+static t_svalue _op_log_not (t_svalue data, t_svalue unused)
+{
+return !data;
+}
+
+static t_svalue _op_log_and (t_svalue data1, t_svalue data2)
+{
+return data1 && data2;
+}
+
+static t_svalue _op_log_or (t_svalue data1, t_svalue data2)
+{
+return data1 || data2;
+}
+
+static t_svalue _op_bit_and (t_svalue data1, t_svalue data2)
+{
+return data1 & data2;
+}
+
+static t_svalue _op_bit_rsh (t_svalue shift, t_svalue data)
+{
+return data >> shift;
+}
+
+static t_svalue _op_bit_lsh (t_svalue shift, t_svalue data)
+{
+return data << shift;
+}
+
+static t_svalue _op_bit_or (t_svalue data1, t_svalue data2)
+{
+return data1 | data2;
+}
+
+static t_svalue _op_bit_xor (t_svalue data1, t_svalue data2)
+{
+return data1 ^ data2;
+}
+
+static t_svalue _op_eq (t_svalue data1, t_svalue data2)
+{
+return data1 == data2;
+}
+
+static t_svalue _op_ne (t_svalue data1, t_svalue data2)
+{
+return data1 != data2;
+}
+
+static t_svalue _op_le (t_svalue data1, t_svalue data2)
+{
+return data1 <= data2;
+}
+
+static t_svalue _op_lt (t_svalue data1, t_svalue data2)
+{
+return data1 < data2;
+}
+
+static t_svalue _op_ge (t_svalue data1, t_svalue data2)
+{
+return data1 >= data2;
+}
+
+static t_svalue _op_gt (t_svalue data1, t_svalue data2)
+{
+return data1 > data2;
+}
+
+/* 
+ * The order of elements in this array is significant.  
+ * Care must be taken so that longer strings which have
+ * shorter strings contained in them must come first.
+ * For example "!=" must come before "!".
+ *
+ * These operators implement C language operator precedence
+ * as described in:
+ *   http://en.cppreference.com/w/c/language/operator_precedence
+ */
+static Operator operators[] = {
+    {"(",        1, 0, NULL,            "Open Parenthesis"},
+    {")",        1, 0, NULL,            "Close Parenthesis"},
+    {"+",        4, 0, _op_add,         "Addition"},
+    {"-",        4, 0, _op_sub,         "Subtraction"},
+    {"*",        3, 0, _op_mult,        "Multiplication"},
+    {"/",        3, 0, _op_div,         "Division"},
+    {"%",        3, 0, _op_mod,         "Modulus"},
+    {"&&",      11, 0, _op_log_and,     "Logical AND"},
+    {"||",      12, 0, _op_log_or,      "Logical OR"},
+    {"&",        8, 0,  _op_bit_and,     "Bitwise AND"},
+    {">>",       5, 0, _op_bit_rsh,     "Bitwise Right Shift"},
+    {"<<",       5, 0, _op_bit_lsh,     "Bitwise Left Shift"},
+    {"|",       10, 0, _op_bit_or,      "Bitwise Inclusive OR"},
+    {"^",        9, 0, _op_bit_xor,     "Bitwise Exclusive OR"},
+    {"==",       7, 0, _op_eq,          "Equality"},
+    {"!=",       7, 0, _op_ne,          "Inequality"},
+    {"<=",       6, 0, _op_le,          "Less than or Equal"},
+    {"<",        6, 0, _op_lt,          "Less than"},
+    {">=",       6, 0, _op_ge,          "Greater than or Equal"},
+    {">",        6, 0, _op_gt,          "Greater than"},
+    {"!",        2, 1, _op_log_not,     "Logical Negation"},
+    {"~",        2, 1, _op_comp,        "Bitwise Compliment"},
+    {NULL}};
+
+static const char *get_glyph_exp (const char *cptr, char *buf, Operator **oper, t_stat *stat)
+{
+static const char HexDigits[] = "0123456789abcdefABCDEF";
+static const char OctalDigits[] = "01234567";
+static const char BinaryDigits[] = "01";
+
+*stat = SCPE_OK;                            /* Assume Success */
+*buf = '\0';
+*oper = NULL;
+while (isspace (*cptr))
+    ++cptr;
+if (isalpha (*cptr)) {
+    while (isalnum (*cptr))
+        *buf++ = *cptr++;
+    *buf = '\0';
+    }
+else {
+    if (isdigit (*cptr)) {
+        if ((!memcmp (cptr, "0x", 2)) ||    /* Hex Number */
+            (!memcmp (cptr, "0X", 2))) {
+            memcpy (buf, cptr, 2);
+            cptr += 2;
+            buf += 2;
+            while (strchr (HexDigits, *cptr))
+                *buf++ = *cptr++;
+            *buf = '\0';
+            }
+        else {
+            if ((!memcmp (cptr, "0b", 2)) ||/* Binary Number */
+                (!memcmp (cptr, "0B", 2))) {
+                memcpy (buf, cptr, 2);
+                cptr += 2;
+                buf += 2;
+                while (strchr (BinaryDigits, *cptr))
+                    *buf++ = *cptr++;
+                *buf = '\0';
+                }
+            else {
+                if (*cptr == '0') {         /* Octal Number */
+                    while (strchr (OctalDigits, *cptr))
+                        *buf++ = *cptr++;
+                    *buf = '\0';
+                    }
+                else {                      /* Decimal Number */
+                    while (isdigit (*cptr))
+                        *buf++ = *cptr++;
+                    *buf = '\0';
+                    }
+                }
+            }
+        if (isalpha (*cptr)) {              /* Numbers can't be followed by alpha character */
+            *stat = SCPE_INVEXPR;
+            return cptr;
+            }
+        }
+    else {
+        if (((cptr[0] == '-') || (cptr[0] == '+')) &&
+            (isdigit (cptr[1]))) {          /* Signed Decimal Number */
+            *buf++ = *cptr++;
+            while (isdigit (*cptr))
+                *buf++ = *cptr++;
+            *buf = '\0';
+            if (isalpha (*cptr)) {           /* Numbers can't be followed by alpha character */
+                *stat = SCPE_INVEXPR;
+                return cptr;
+                }
+            }
+        else
+            {                               /* Special Characters (operators) */
+            Operator *op;
+
+            for (op = operators; op->string; op++) {
+                if (!memcmp (cptr, op->string, strlen (op->string))) {
+                    strcpy (buf, op->string);
+                    cptr += strlen (op->string);
+                    *oper = op;
+                    break;
+                    }
+                }
+            if (!op->string) {
+                *stat = SCPE_INVEXPR;
+                return cptr;
+                }
+            }
+        }
+    }
+while (isspace (*cptr))
+    ++cptr;
+return cptr;
+}
+
+/*
+ * Translate a string containing an infix ordered expression 
+ * into a stack containing that expression in postfix order 
+ */
+static const char *sim_into_postfix (Stack *stack1, const char *cptr, t_stat *stat, t_bool parens_required)
+{
+const char *start = cptr;
+const char *last_cptr;
+int parens = 0;
+Operator *op = NULL, *last_op;
+Stack *stack2 = new_Stack();        /* working stack */
+char gbuf[CBUFSIZE];
+
+while (isspace(*cptr))              /* skip leading whitespace */
+    ++cptr;
+if (parens_required && (*cptr != '(')) {
+    delete_Stack (stack2);
+    *stat = SCPE_INVEXPR;
+    return cptr;
+    }
+while (*cptr) {
+    last_cptr = cptr;
+    last_op = op;
+    cptr = get_glyph_exp (cptr, gbuf, &op, stat);
+    if (*stat != SCPE_OK) {
+        delete_Stack (stack2);
+        return cptr;
+        }
+    if (!last_op && !op && ((gbuf[0] == '-') || (gbuf[0] == '+'))) {
+        for (op = operators; gbuf[0] != op->string[0]; op++);
+        gbuf[0] = '0';
+        cptr = last_cptr + 1;
+        }
+    if (!op) {
+        push_Stack (stack1, gbuf, op);
+        continue;
+        }
+    if (!strcmp (op->string, "(")) {
+        ++parens;
+        push_Stack (stack2, gbuf, op);
+        continue;
+        }
+    if (!strcmp (op->string, ")")) {
+        char temp_buf[CBUFSIZE];
+        Operator *temp_op;
+
+        --parens;
+        pop_Stack (stack2, temp_buf, &temp_op);
+        while (!temp_op || strcmp (temp_op->string, "(")) {
+            push_Stack (stack1, temp_buf, temp_op);
+            pop_Stack (stack2, temp_buf, &temp_op);
+            }
+        if (parens_required && (parens == 0)) {
+            delete_Stack (stack2);
+            return cptr;
+            }
+        continue;
+        }
+    while (!isempty_Stack(stack2)) {
+        char top_buf[CBUFSIZE];
+        Operator *top_op;
+
+        top_Stack (stack2, top_buf, &top_op);
+        if (op->precedence > top_op->precedence)
+            break;
+        pop_Stack (stack2, top_buf, &top_op);
+        push_Stack (stack1, top_buf, top_op);
+        }
+    push_Stack (stack2, gbuf, op);
+    }
+/* migrate the rest of stack2 onto stack1 */
+while (!isempty_Stack (stack2)) {
+    pop_Stack (stack2, gbuf, &op);
+    push_Stack (stack1, gbuf, op);
+    }
+
+delete_Stack (stack2);          /* deletes the working stack */
+return cptr;                    /* return any unprocessed input */
+}
+
+static t_svalue sim_value_of(const char *data)
+{
+if (isalpha (*data)) {
+    CONST char *gptr;
+    REG *rptr = find_reg (data, &gptr, sim_dfdev);
+
+    if (rptr)
+        return get_rval (rptr, 0);
+    gptr = getenv (data);
+    data = gptr;
+    }
+return strtotsv(data, NULL, 0);
+}
+
+/*
+ * Evaluate a given stack1 containing a postfix expression 
+ */
+static t_svalue sim_eval_postfix (Stack *stack1, t_stat *stat) {
+Stack *stack2 = new_Stack();    /* local working stack2 which is holds the numbers operators */
+char temp_data[CBUFSIZE];       /* Holds the items popped from the stack2 */
+Operator *temp_op;
+
+*stat = SCPE_OK;
+/* Reverse stack1 onto stack2 leaving stack1 empty */
+while (!isempty_Stack(stack1)) {
+    pop_Stack (stack1, temp_data, &temp_op);
+    push_Stack (stack2, temp_data, temp_op);
+    }
+
+/* Loop through the postfix expression in stack2 evaluating until stack2 is empty */
+while (!isempty_Stack(stack2)) {
+    pop_Stack (stack2, temp_data, &temp_op);
+    if (temp_op) {              /* operator? */
+        char item1[CBUFSIZE];
+        Operator *op1;
+        char item2[CBUFSIZE];
+        Operator *op2;
+
+        if (!pop_Stack (stack1, item1, &op1)) {
+            *stat = SCPE_INVEXPR;
+            return 0;
+            }
+        if (temp_op->unary)
+            strlcpy (item2, "0", sizeof (item2));
+        else {
+            if ((!pop_Stack (stack1, item2, &op2)) && 
+                (temp_op->string[0] != '-') &&
+                (temp_op->string[0] != '+')) {
+                *stat = SCPE_INVEXPR;
+                return 0;
+                }
+            }
+        sprint_val (temp_data, (t_value)temp_op->function (sim_value_of (item1), sim_value_of (item2)), 10, sizeof(temp_data) - 1, PV_LEFTSIGN);
+        push_Stack (stack1, temp_data, NULL);
+        }
+    else
+        push_Stack (stack1, temp_data, temp_op);
+    }
+if (!pop_Stack (stack1, temp_data, &temp_op)) {
+    *stat = SCPE_INVEXPR;
+    return 0;
+    }
+delete_Stack (stack2);
+return sim_value_of (temp_data);
+}
+
+const char *sim_eval_expression (const char *cptr, t_svalue *value, t_bool parens_required, t_stat *stat)
+{
+const char *iptr = cptr;
+Stack *postfix = new_Stack (); /* for the postfix expression */
+
+*value = 0;
+cptr = sim_into_postfix (postfix, cptr, stat, parens_required);
+if (*stat != SCPE_OK) {
+    delete_Stack (postfix);
+    *stat = sim_messagef (SCPE_ARG, "Invalid Expression Element:\n%s\n%*s^\n", iptr, (int)(cptr-iptr), "");
+    return cptr;
+    }
+
+*value = sim_eval_postfix (postfix, stat);
+delete_Stack (postfix);
+return cptr;
+}
