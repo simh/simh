@@ -89,12 +89,12 @@ extern DEVICE       cp_dev;
 extern DIB          cdr_dib;
 extern DEVICE       cdr_dev;
 extern uint32       cdr_cmd(UNIT *, uint16, uint16);
-extern UNIT         cdr_unit[];
+extern UNIT         cdr_unit[4];
 
 extern DIB          cdp_dib;
 extern DEVICE       cdp_dev;
 extern uint32       cdp_cmd(UNIT *, uint16, uint16);
-extern UNIT         cdp_unit[];
+extern UNIT         cdp_unit[4];
 
 /* Device status information stored in u5 */
 #define URCSTA_ERR       0002    /* Error reading record */

@@ -53,7 +53,7 @@ const char         *cdr_description(DEVICE *dptr);
 t_stat              cdr_set_wiring (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat              cdr_show_wiring (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
-UNIT                cdr_unit[] = {
+UNIT                cdr_unit[4] = {
    {UDATA(cdr_srv, UNIT_CDR, 0), 300},  // Unit 0 used internally for carddeck operations simulator specific command
    {UDATA(cdr_srv, UNIT_CDR, 0), 300},  // unit 1 is default for initial model (1954)  
    {UDATA(cdr_srv, UNIT_CDR, 0), 300},  // storage unit (1955) allows two extra card/readers for a total of 3
@@ -113,7 +113,7 @@ int decode_8word_wiring(struct _card_data * data, int addr)
             c1 = c1 & 0x3FF;                    // remove X and Y punches
             c2 = data->hol_to_ascii[c1];        // convert to ascii again
             c2 = c2 - '0';                      // convert ascii to binary digit 
-            if ((c2 < 0) || (c2 > 9)) c2 = 0;   // nondigits chars interpreted as zero
+            if (c2 > 9) c2 = 0;   // nondigits chars interpreted as zero
             d = d * 10 + c2;
         }
         // end of word. set sign
@@ -168,7 +168,6 @@ void decode_soap_symb_info(struct _card_data * data, int addr)
     p = da * 80;
     for (i=0;i<80;i++) 
         DRUM_Symbolic_Buffer[p+i] = 0;      // clear drum[da] symbolic info
-    if (i2-41 >= 80) i2 = 80-1 + 41;        // only copy max 79 chars
     for (i=41;i<=i2;i++) {
         if ((i==47) || (i==50) || (i==55)) DRUM_Symbolic_Buffer[p++] = 32; // add space separation between op, da, ia fields
         DRUM_Symbolic_Buffer[p++] = buf[i]; 

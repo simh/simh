@@ -54,7 +54,7 @@ t_stat              cdp_show_wiring (FILE *st, UNIT *uptr, int32 val, CONST void
 t_stat              cdp_set_echo (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat              cdp_show_echo (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
-UNIT                cdp_unit[] = {
+UNIT                cdp_unit[4] = {
     {UDATA(cdp_srv, UNIT_CDP, 0), 600},      // unit 0 is the printing mechanism of 407
     {UDATA(cdp_srv, UNIT_CDP, 0), 600},      
     {UDATA(cdp_srv, UNIT_CDP, 0), 600},    
@@ -122,11 +122,13 @@ void encode_lpt_num(t_int64 d, int l)
         d = d / 10;
         s[i] = '0' + n;
     }
-    if (pad == ' ') for(i=0;i<9;i++) {
-        if (s[i] != '0') break;
-        s[i] = ' ';
-    }
     s[10] = 0;
+    if (pad == ' ') {
+        for(i=0;i<9;i++) {
+            if (s[i] != '0') break;
+            s[i] = ' ';
+        }
+    }
     encode_lpt_str(&s[10-l]);
 }
 

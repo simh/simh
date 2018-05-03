@@ -924,7 +924,7 @@ sim_instr(void)
                 break;
             }
             // should wait for drum to fetch inst?
-            if ((AR >= 0) && (AR < (int)MEMSIZE)) {
+            if (AR < (int)MEMSIZE) {
                 if ((AR % 50) != DrumAddr) continue; // yes
             }
             CpuStepsUsed = 0; // init inst execution
@@ -1144,10 +1144,12 @@ cpu_set_size(UNIT * uptr, int32 val, CONST char *cptr, void *desc)
     if (v == 2) {v = 4000;} else v = 0;
     if ((v <= 0) || (v > MAXMEMSIZE))
         return SCPE_ARG;
-    for (i = v; i < MEMSIZE; i++) {
-        if ((DRUM[i] != 0) || (DRUM_NegativeZeroFlag[i] != 0)) {
-           mc = 1;
-           break;
+    if (v < 4000) {
+        for (i = v; i < MEMSIZE; i++) {
+            if ((DRUM[i] != 0) || (DRUM_NegativeZeroFlag[i] != 0)) {
+               mc = 1;
+            break;
+            }
         }
     }
     for (i=0;i<MAXMEMSIZE * 80;i++) 

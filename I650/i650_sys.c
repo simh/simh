@@ -618,7 +618,7 @@ t_stat deck_load(CONST char *fn, uint16 * DeckImage, int * nCards)
 {
     UNIT *              uptr = &cdr_unit[0];
     struct _card_data   *data;
-    t_stat              r;
+    t_stat              r, r2;
     int i, convert_to_ascii;
     uint16 c;
 
@@ -657,7 +657,8 @@ t_stat deck_load(CONST char *fn, uint16 * DeckImage, int * nCards)
     }
 
     // deattach file from cdr unit 0
-    r = (cdr_dev.detach)(uptr);
+    r2 = (cdr_dev.detach)(uptr);
+    if (r == SCPE_OK) r = r2; 
     if (r != SCPE_OK) return r;
 
     return SCPE_OK;
@@ -809,6 +810,7 @@ static t_stat deck_join_cmd(CONST char *cptr)
 
     cptr = cptr0;                                           // restore cptr to scan source filenames
     nDeck = nCards = 0;
+    memset(DeckImage, 0, sizeof(DeckImage));
     while (1) {
 
         while (sim_isspace (*cptr)) cptr++;                 // trim leading spc 
