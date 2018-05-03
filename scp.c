@@ -13270,12 +13270,16 @@ return r;
 
 typedef t_svalue (*Operator_Function)(t_svalue, t_svalue);
 
+typedef t_svalue (*Operator_String_Function)(const char *, const char *);
+
 typedef struct Operator {
     const char *string;
     int         precedence;
     int         unary;
     Operator_Function
                 function;
+    Operator_String_Function
+                string_function;
     const char *description;
     } Operator;
 
@@ -13351,7 +13355,7 @@ strcpy (data, this_Stack->elements[this_Stack->pointer-1].data);
 --this_Stack->pointer;
 
 if (*op)
-    sim_debug (SIM_DBG_EXP_STACK, sim_dflt_dev, "[Stack %d - Popping %s(%d)]\n", 
+    sim_debug (SIM_DBG_EXP_STACK, sim_dflt_dev, "[Stack %d - Popping '%s'(precedence %d)]\n", 
                                                 this_Stack->id, (*op)->string, (*op)->precedence);
 else
     sim_debug (SIM_DBG_EXP_STACK, sim_dflt_dev, "[Stack %d - Popping %s]\n", 
@@ -13379,10 +13383,10 @@ strlcpy (this_Stack->elements[this_Stack->pointer].data, data, sizeof (this_Stac
 ++this_Stack->pointer;
 
 if (op)
-    sim_debug (SIM_DBG_EXP_STACK, sim_dflt_dev, "[Stack %d - Popping %s(%d)]\n", 
+    sim_debug (SIM_DBG_EXP_STACK, sim_dflt_dev, "[Stack %d - Pushing '%s'(precedence %d)]\n", 
                                                 this_Stack->id, op->string, op->precedence);
 else
-    sim_debug (SIM_DBG_EXP_STACK, sim_dflt_dev, "[Stack %d - Popping %s]\n", 
+    sim_debug (SIM_DBG_EXP_STACK, sim_dflt_dev, "[Stack %d - Pushing %s]\n", 
                                                 this_Stack->id, data);
 
 return TRUE;                      /* Success */
@@ -13400,7 +13404,7 @@ strcpy (data, this_Stack->elements[this_Stack->pointer-1].data);
 *op = this_Stack->elements[this_Stack->pointer-1].op;
 
 if (*op)
-    sim_debug (SIM_DBG_EXP_STACK, sim_dflt_dev, "[Stack %d - Topping %s(%d)]\n", 
+    sim_debug (SIM_DBG_EXP_STACK, sim_dflt_dev, "[Stack %d - Topping '%s'(precedence %d)]\n", 
                                                 this_Stack->id, (*op)->string, (*op)->precedence);
 else
     sim_debug (SIM_DBG_EXP_STACK, sim_dflt_dev, "[Stack %d - Topping %s]\n", 
@@ -13511,6 +13515,36 @@ static t_svalue _op_gt (t_svalue data1, t_svalue data2)
 return data1 > data2;
 }
 
+static t_svalue _op_str_eq (const char *str1, const char *str2)
+{
+return (0 == strcmp (str1, str2));
+}
+
+static t_svalue _op_str_ne (const char *str1, const char *str2)
+{
+return (0 != strcmp (str1, str2));
+}
+
+static t_svalue _op_str_le (const char *str1, const char *str2)
+{
+return (0 > strcmp (str1, str2));
+}
+
+static t_svalue _op_str_lt (const char *str1, const char *str2)
+{
+return (0 >= strcmp (str1, str2));
+}
+
+static t_svalue _op_str_ge (const char *str1, const char *str2)
+{
+return (0 < strcmp (str1, str2));
+}
+
+static t_svalue _op_str_gt (const char *str1, const char *str2)
+{
+return (0 <= strcmp (str1, str2));
+}
+
 /* 
  * The order of elements in this array is significant.  
  * Care must be taken so that longer strings which have
@@ -13522,28 +13556,28 @@ return data1 > data2;
  *   http://en.cppreference.com/w/c/language/operator_precedence
  */
 static Operator operators[] = {
-    {"(",        1, 0, NULL,            "Open Parenthesis"},
-    {")",        1, 0, NULL,            "Close Parenthesis"},
-    {"+",        4, 0, _op_add,         "Addition"},
-    {"-",        4, 0, _op_sub,         "Subtraction"},
-    {"*",        3, 0, _op_mult,        "Multiplication"},
-    {"/",        3, 0, _op_div,         "Division"},
-    {"%",        3, 0, _op_mod,         "Modulus"},
-    {"&&",      11, 0, _op_log_and,     "Logical AND"},
-    {"||",      12, 0, _op_log_or,      "Logical OR"},
-    {"&",        8, 0,  _op_bit_and,     "Bitwise AND"},
-    {">>",       5, 0, _op_bit_rsh,     "Bitwise Right Shift"},
-    {"<<",       5, 0, _op_bit_lsh,     "Bitwise Left Shift"},
-    {"|",       10, 0, _op_bit_or,      "Bitwise Inclusive OR"},
-    {"^",        9, 0, _op_bit_xor,     "Bitwise Exclusive OR"},
-    {"==",       7, 0, _op_eq,          "Equality"},
-    {"!=",       7, 0, _op_ne,          "Inequality"},
-    {"<=",       6, 0, _op_le,          "Less than or Equal"},
-    {"<",        6, 0, _op_lt,          "Less than"},
-    {">=",       6, 0, _op_ge,          "Greater than or Equal"},
-    {">",        6, 0, _op_gt,          "Greater than"},
-    {"!",        2, 1, _op_log_not,     "Logical Negation"},
-    {"~",        2, 1, _op_comp,        "Bitwise Compliment"},
+    {"(",       99, 0, NULL,            NULL,           "Open Parenthesis"},
+    {")",       99, 0, NULL,            NULL,           "Close Parenthesis"},
+    {"+",        4, 0, _op_add,         NULL,           "Addition"},
+    {"-",        4, 0, _op_sub,         NULL,           "Subtraction"},
+    {"*",        3, 0, _op_mult,        NULL,           "Multiplication"},
+    {"/",        3, 0, _op_div,         NULL,           "Division"},
+    {"%",        3, 0, _op_mod,         NULL,           "Modulus"},
+    {"&&",      11, 0, _op_log_and,     NULL,           "Logical AND"},
+    {"||",      12, 0, _op_log_or,      NULL,           "Logical OR"},
+    {"&",        8, 0, _op_bit_and,     NULL,           "Bitwise AND"},
+    {">>",       5, 0, _op_bit_rsh,     NULL,           "Bitwise Right Shift"},
+    {"<<",       5, 0, _op_bit_lsh,     NULL,           "Bitwise Left Shift"},
+    {"|",       10, 0, _op_bit_or,      NULL,           "Bitwise Inclusive OR"},
+    {"^",        9, 0, _op_bit_xor,     NULL,           "Bitwise Exclusive OR"},
+    {"==",       7, 0, _op_eq,          _op_str_eq,     "Equality"},
+    {"!=",       7, 0, _op_ne,          _op_str_ne,     "Inequality"},
+    {"<=",       6, 0, _op_le,          _op_str_le,     "Less than or Equal"},
+    {"<",        6, 0, _op_lt,          _op_str_lt,     "Less than"},
+    {">=",       6, 0, _op_ge,          _op_str_ge,     "Greater than or Equal"},
+    {">",        6, 0, _op_gt,          _op_str_gt,     "Greater than"},
+    {"!",        2, 1, _op_log_not,     NULL,           "Logical Negation"},
+    {"~",        2, 1, _op_comp,        NULL,           "Bitwise Compliment"},
     {NULL}};
 
 static const char *get_glyph_exp (const char *cptr, char *buf, Operator **oper, t_stat *stat)
@@ -13613,21 +13647,25 @@ else {
                 return cptr;
                 }
             }
-        else
-            {                               /* Special Characters (operators) */
-            Operator *op;
-
-            for (op = operators; op->string; op++) {
-                if (!memcmp (cptr, op->string, strlen (op->string))) {
-                    strcpy (buf, op->string);
-                    cptr += strlen (op->string);
-                    *oper = op;
-                    break;
-                    }
+        else {                               /* Special Characters (operators) */
+            if ((*cptr == '"') || (*cptr == '\'')) {
+                cptr = (CONST char *)get_glyph_gen (cptr, buf, 0, (sim_switches & SWMASK ('I')), TRUE, '\\');
                 }
-            if (!op->string) {
-                *stat = SCPE_INVEXPR;
-                return cptr;
+            else {
+                Operator *op;
+
+                for (op = operators; op->string; op++) {
+                    if (!memcmp (cptr, op->string, strlen (op->string))) {
+                        strcpy (buf, op->string);
+                        cptr += strlen (op->string);
+                        *oper = op;
+                        break;
+                        }
+                    }
+                if (!op->string) {
+                    *stat = SCPE_INVEXPR;
+                    return cptr;
+                    }
                 }
             }
         }
@@ -13647,7 +13685,7 @@ const char *start = cptr;
 const char *last_cptr;
 int parens = 0;
 Operator *op = NULL, *last_op;
-Stack *stack2 = new_Stack();        /* working stack */
+Stack *stack2 = new_Stack();        /* operator stack */
 char gbuf[CBUFSIZE];
 
 while (isspace(*cptr))              /* skip leading whitespace */
@@ -13670,24 +13708,31 @@ while (*cptr) {
         gbuf[0] = '0';
         cptr = last_cptr + 1;
         }
+    sim_debug (SIM_DBG_EXP_EVAL, sim_dflt_dev, "[Glyph: %s]\n", op ? op->string : gbuf);
     if (!op) {
         push_Stack (stack1, gbuf, op);
         continue;
         }
-    if (!strcmp (op->string, "(")) {
+    if (0 == strcmp (op->string, "(")) {
         ++parens;
         push_Stack (stack2, gbuf, op);
         continue;
         }
-    if (!strcmp (op->string, ")")) {
+    if (0 == strcmp (op->string, ")")) {
         char temp_buf[CBUFSIZE];
         Operator *temp_op;
 
         --parens;
-        pop_Stack (stack2, temp_buf, &temp_op);
-        while (!temp_op || strcmp (temp_op->string, "(")) {
+        if ((!pop_Stack (stack2, temp_buf, &temp_op)) ||
+            (parens < 0)){
+            *stat = sim_messagef (SCPE_INVEXPR, "Invalid Parenthesis nesting\n");
+            delete_Stack (stack2);
+            return cptr;
+            }
+        while (0 != strcmp (temp_op->string, "(")) {
             push_Stack (stack1, temp_buf, temp_op);
-            pop_Stack (stack2, temp_buf, &temp_op);
+            if (!pop_Stack (stack2, temp_buf, &temp_op))
+                break;
             }
         if (parens_required && (parens == 0)) {
             delete_Stack (stack2);
@@ -13700,35 +13745,44 @@ while (*cptr) {
         Operator *top_op;
 
         top_Stack (stack2, top_buf, &top_op);
-        if (op->precedence > top_op->precedence)
+        if (top_op->precedence > op->precedence)
             break;
         pop_Stack (stack2, top_buf, &top_op);
         push_Stack (stack1, top_buf, top_op);
         }
     push_Stack (stack2, gbuf, op);
     }
+if (parens != 0)
+    *stat = sim_messagef (SCPE_INVEXPR, "Invalid Parenthesis nesting\n");
 /* migrate the rest of stack2 onto stack1 */
 while (!isempty_Stack (stack2)) {
     pop_Stack (stack2, gbuf, &op);
     push_Stack (stack1, gbuf, op);
     }
 
-delete_Stack (stack2);          /* deletes the working stack */
+delete_Stack (stack2);          /* delete the working operator stack */
 return cptr;                    /* return any unprocessed input */
 }
 
-static t_svalue sim_value_of(const char *data)
+static t_bool _value_of (const char *data, t_svalue *svalue, char *string, size_t string_size)
 {
+CONST char *gptr;
 if (isalpha (*data)) {
-    CONST char *gptr;
     REG *rptr = find_reg (data, &gptr, sim_dfdev);
 
-    if (rptr)
-        return get_rval (rptr, 0);
+    if (rptr) {
+        *svalue = (t_svalue)get_rval (rptr, 0);
+        sprint_val (string + 1, *svalue, 10, string_size - 2, PV_LEFTSIGN);
+        *string = '"';
+        strlcpy (&string[strlen (string)], "\"", string_size - strlen (string));
+        return TRUE;
+        }
     gptr = getenv (data);
-    data = gptr;
+    data = (gptr ? gptr : "");
     }
-return strtotsv(data, NULL, 0);
+*svalue = strtotsv(data, &gptr, 0);
+snprintf (string, string_size - 1, "\"%s\"", data);
+return (*gptr == '\0');
 }
 
 /*
@@ -13738,11 +13792,19 @@ static t_svalue sim_eval_postfix (Stack *stack1, t_stat *stat) {
 Stack *stack2 = new_Stack();    /* local working stack2 which is holds the numbers operators */
 char temp_data[CBUFSIZE];       /* Holds the items popped from the stack2 */
 Operator *temp_op;
+t_svalue temp_val;
+char temp_string[CBUFSIZE + 2];
 
 *stat = SCPE_OK;
 /* Reverse stack1 onto stack2 leaving stack1 empty */
 while (!isempty_Stack(stack1)) {
     pop_Stack (stack1, temp_data, &temp_op);
+    if (temp_op)
+        sim_debug (SIM_DBG_EXP_EVAL, sim_dflt_dev, "[Expression element: %s (%d)\n", 
+                                                   temp_op->string, temp_op->precedence);
+    else
+        sim_debug (SIM_DBG_EXP_EVAL, sim_dflt_dev, "[Expression element: %s\n", 
+                                                   temp_data);
     push_Stack (stack2, temp_data, temp_op);
     }
 
@@ -13750,14 +13812,17 @@ while (!isempty_Stack(stack1)) {
 while (!isempty_Stack(stack2)) {
     pop_Stack (stack2, temp_data, &temp_op);
     if (temp_op) {              /* operator? */
-        char item1[CBUFSIZE];
+        t_bool num1;
+        t_svalue val1;
+        char item1[CBUFSIZE], string1[CBUFSIZE+2];
         Operator *op1;
-        char item2[CBUFSIZE];
+        t_bool num2;
+        t_svalue val2;
+        char item2[CBUFSIZE], string2[CBUFSIZE+2];
         Operator *op2;
 
         if (!pop_Stack (stack1, item1, &op1)) {
             *stat = SCPE_INVEXPR;
-            delete_Stack (stack2);
             return 0;
             }
         if (temp_op->unary)
@@ -13771,7 +13836,12 @@ while (!isempty_Stack(stack2)) {
                 return 0;
                 }
             }
-        sprint_val (temp_data, (t_value)temp_op->function (sim_value_of (item1), sim_value_of (item2)), 10, sizeof(temp_data) - 1, PV_LEFTSIGN);
+        num1 = _value_of (item1, &val1, string1, sizeof (string1));
+        num2 = _value_of (item2, &val2, string2, sizeof (string2));
+        if ((!(num1 && num2)) && temp_op->string_function)
+            sprint_val (temp_data, (t_value)temp_op->string_function (string1, string2), 10, sizeof(temp_data) - 1, PV_LEFTSIGN);
+        else
+            sprint_val (temp_data, (t_value)temp_op->function (val1, val2), 10, sizeof(temp_data) - 1, PV_LEFTSIGN);
         push_Stack (stack1, temp_data, NULL);
         }
     else
@@ -13779,10 +13849,14 @@ while (!isempty_Stack(stack2)) {
     }
 if (!pop_Stack (stack1, temp_data, &temp_op)) {
     *stat = SCPE_INVEXPR;
+    delete_Stack (stack2);
     return 0;
     }
 delete_Stack (stack2);
-return sim_value_of (temp_data);
+if (_value_of (temp_data, &temp_val, temp_string, sizeof (temp_string)))
+    return temp_val;
+else
+    return (t_svalue)(strlen (temp_string) > 2);
 }
 
 const char *sim_eval_expression (const char *cptr, t_svalue *value, t_bool parens_required, t_stat *stat)
