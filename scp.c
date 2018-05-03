@@ -2394,6 +2394,8 @@ if ((sim_eval = (t_value *) calloc (sim_emax, sizeof (t_value))) == NULL) {
     fprintf (stderr, "Unable to allocate examine buffer\n");
     return 0;
     };
+if (sim_dflt_dev == NULL)                               /* if no default */
+    sim_dflt_dev = sim_devices[0];
 if ((stat = reset_all_p (0)) != SCPE_OK) {
     fprintf (stderr, "Fatal simulator initialization error\n%s\n",
         sim_error_text (stat));
@@ -2410,8 +2412,6 @@ if (!sim_quiet) {
     show_version (stdout, NULL, NULL, 0, NULL);
     }
 show_version (stdnul, NULL, NULL, 1, NULL);             /* Quietly set SIM_OSTYPE */
-if (sim_dflt_dev == NULL)                               /* if no default */
-    sim_dflt_dev = sim_devices[0];
 if (((sim_dflt_dev->flags & DEV_DEBUG) == 0) &&         /* default device without debug? */
     (sim_dflt_dev->debflags == NULL)) {
     sim_dflt_dev->flags |= DEV_DEBUG;                   /* connect default event debugging */
@@ -6356,6 +6356,15 @@ for (i = 0; sim_internal_device_count && (dptr = sim_internal_devices[i]); ++i) 
 return SCPE_OK;
 }
 
+static DEBTAB scp_debug[] = {
+  {"EVENT",     SIM_DBG_EVENT,      "event dispatch activities"},
+  {"ACTIVATE",  SIM_DBG_ACTIVATE,   "queue insertion activities"},
+  {"QUEUE",     SIM_DBG_AIO_QUEUE,  "asynch event queue activities"},
+  {"EXPSTACK",  SIM_DBG_EXP_STACK,  "expression stack activities"},
+  {"EXPEVAL",   SIM_DBG_EXP_EVAL,   "expression evaluation activities"},
+  {0}
+};
+
 /* Reset to powerup state
 
    Inputs:
@@ -6372,6 +6381,42 @@ int32 old_sw = sim_switches;
 sim_switches = SWMASK ('P');
 r = reset_all (start);
 sim_switches = old_sw;
+if (sim_dflt_dev) { /* Make sure that SCP debug options are available */
+    sim_dflt_dev->flags |= DEV_DEBUG;
+    if (!sim_dflt_dev->debflags)
+        sim_dflt_dev->debflags = scp_debug;
+    else {
+        DEBTAB *cdptr, *sdptr, *ndptr;
+
+        for (sdptr = scp_debug; sdptr->name; sdptr++) {
+            for (cdptr = sim_dflt_dev->debflags; cdptr->name; cdptr++) {
+                if (sdptr->mask == cdptr->mask)
+                    break;
+                }
+            if (sdptr->mask != cdptr->mask) {
+                int i, dcount = 0;
+
+                for (cdptr = sim_dflt_dev->debflags; cdptr->name; cdptr++)
+                    dcount++;
+                for (cdptr = scp_debug; cdptr->name; cdptr++)
+                    dcount++;
+                ndptr = (DEBTAB *)calloc (1 + dcount, sizeof (*ndptr));
+                for (dcount = 0, cdptr =sim_dflt_dev->debflags; cdptr->name; cdptr++)
+                    ndptr[dcount++] = *cdptr;
+                for (cdptr = scp_debug; cdptr->name; cdptr++) {
+                    for (i = 0; i < dcount; i++) {
+                        if (cdptr->mask == ndptr[i].mask)
+                            break;
+                        }
+                    if (i == dcount)
+                        ndptr[dcount++] = *cdptr;
+                    }
+                sim_dflt_dev->debflags = ndptr;
+                break;
+                }
+            }
+        }
+    }
 return r;
 }
 

@@ -844,11 +844,11 @@ struct DEBTAB {
 #define DEBUG_PRI(d,m)  (sim_deb && (d.dctrl & (m)))
 #define DEBUG_PRJ(d,m)  (sim_deb && ((d)->dctrl & (m)))
 
-#define SIM_DBG_EVENT       0x010000
-#define SIM_DBG_ACTIVATE    0x020000
-#define SIM_DBG_AIO_QUEUE   0x040000
-#define SIM_DBG_EXP_STACK   0x080000
-#define SIM_DBG_EXP_EVAL    0x100000
+#define SIM_DBG_EVENT       0x010000        /* event dispatch activities */
+#define SIM_DBG_ACTIVATE    0x020000        /* queue insertion activities */
+#define SIM_DBG_AIO_QUEUE   0x040000        /* asynch event queue activities */
+#define SIM_DBG_EXP_STACK   0x080000        /* expression stack activities */
+#define SIM_DBG_EXP_EVAL    0x100000        /* expression evaluation activities */
 
 /* Open File Reference */
 struct FILEREF {
