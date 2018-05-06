@@ -938,7 +938,7 @@ sim_instr(void)
                 WaitForInterlock = 0;
             }
             // should wait for drum to fetch data?
-            if ((bReadData) && (AR >= 0) && (AR < (int)MEMSIZE)) {
+            if ((bReadData) && (AR < (int)MEMSIZE)) {
                 if ((AR % 50) != DrumAddr) continue; // yes
             }
             MachineCycle = 3; // exec instr
