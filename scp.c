@@ -13823,6 +13823,7 @@ while (!isempty_Stack(stack2)) {
 
         if (!pop_Stack (stack1, item1, &op1)) {
             *stat = SCPE_INVEXPR;
+            delete_Stack (stack2);
             return 0;
             }
         if (temp_op->unary)
