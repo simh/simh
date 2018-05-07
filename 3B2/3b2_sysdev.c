@@ -754,7 +754,7 @@ void tod_resync()
     sec = now.tv_sec - td->delta;
 
     /* Populate the tm struct based on current sim_time */
-    tm = *localtime(&sec);
+    tm = *gmtime(&sec);
 
     td->tsec = 0;
     td->unit_sec = tm.tm_sec % 10;
@@ -782,6 +782,9 @@ void tod_update_delta()
     TOD_DATA *td = (TOD_DATA *)tod_unit.filebuf;
     sim_rtcn_get_time(&now, TMR_CLK);
 
+    /* Let the host decide if it is DST or not */
+    tm.tm_isdst = -1;
+
     /* Compute the simulated seconds value */
     tm.tm_sec = (td->ten_sec * 10) + td->unit_sec;
     tm.tm_min = (td->ten_min * 10) + td->unit_min;
@@ -789,6 +792,10 @@ void tod_update_delta()
     /* tm struct stores as 0-11, tod struct as 1-12 */
     tm.tm_mon = ((td->ten_mon * 10) + td->unit_mon) - 1;
     tm.tm_mday = (td->ten_day * 10) + td->unit_day;
+
+    /* We're forced to do this weird arithmetic because the TOD chip
+     * used by the 3B2 does not store the year. It only stores the
+     * offset from the nearest leap year. */
     switch(td->year) {
     case 1: /* Leap Year - 3 */
         tm.tm_year = 85;
@@ -805,7 +812,7 @@ void tod_update_delta()
     default:
         break;
     }
-    tm.tm_isdst = 0;
+
     ssec = mktime(&tm);
     td->delta = (int32)(now.tv_sec - ssec);
 }
