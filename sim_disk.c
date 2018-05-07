@@ -1528,6 +1528,8 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
             sim_disk_set_fmt (uptr, 0, "VHD", NULL);    /* set file format to VHD */
             sim_vhd_disk_close (uptr->fileref);         /* close vhd file*/
             uptr->fileref = NULL;
+            open_function = sim_vhd_disk_open;
+            size_function = sim_vhd_disk_size;
             break;
             }
         if (NULL != (uptr->fileref = sim_os_disk_open_raw (cptr, "rb"))) {
@@ -1562,8 +1564,11 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
     }
 uptr->filename = (char *) calloc (CBUFSIZE, sizeof (char));/* alloc name buf */
 uptr->disk_ctx = ctx = (struct disk_context *)calloc(1, sizeof(struct disk_context));
-if ((uptr->filename == NULL) || (uptr->disk_ctx == NULL))
+if ((uptr->filename == NULL) || (uptr->disk_ctx == NULL)) {
+    free (uptr->filename);
+    free (uptr->disk_ctx);
     return _err_return (uptr, SCPE_MEM);
+    }
 strncpy (uptr->filename, cptr, CBUFSIZE);               /* save name */
 ctx->sector_size = (uint32)sector_size;                 /* save sector_size */
 ctx->capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* save capacity units (word: 2, byte: 1) */
