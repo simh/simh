@@ -201,15 +201,15 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     endif
     ifeq (need-hooks,$(NEED_HOOKS))
       $(info *** Installing git hooks in local repository ***)
-      GIT_HOOKS += $(shell /bin/cp './Visual Studio Projects/git-hooks/post-commit' ./.git/hooks/)
-      GIT_HOOKS += $(shell /bin/cp './Visual Studio Projects/git-hooks/post-checkout' ./.git/hooks/)
-      GIT_HOOKS += $(shell /bin/cp './Visual Studio Projects/git-hooks/post-merge' ./.git/hooks/)
+      GIT_HOOKS += $(shell cp './Visual Studio Projects/git-hooks/post-commit' ./.git/hooks/)
+      GIT_HOOKS += $(shell cp './Visual Studio Projects/git-hooks/post-checkout' ./.git/hooks/)
+      GIT_HOOKS += $(shell cp './Visual Studio Projects/git-hooks/post-merge' ./.git/hooks/)
       GIT_HOOKS += $(shell ./.git/hooks/post-checkout)
       ifneq (,$(strip $(GIT_HOOKS)))
         $(info *** Warning - Error installing git hooks *** $(GIT_HOOKS))
       else
         ifneq (commit-id-exists,$(shell if $(TEST) -e .git-commit-id; then echo commit-id-exists; fi))
-          $(shell /bin/rm .git-commit-id)
+          $(shell rm .git-commit-id)
         endif
       endif
     endif
