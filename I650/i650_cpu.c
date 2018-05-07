@@ -924,7 +924,7 @@ sim_instr(void)
                 break;
             }
             // should wait for drum to fetch inst?
-            if (AR < (int)MEMSIZE) {
+            if (AR < MEMSIZE) {
                 if ((AR % 50) != DrumAddr) continue; // yes
             }
             CpuStepsUsed = 0; // init inst execution
@@ -938,7 +938,7 @@ sim_instr(void)
                 WaitForInterlock = 0;
             }
             // should wait for drum to fetch data?
-            if ((bReadData) && (AR < (int)MEMSIZE)) {
+            if ((bReadData) && (AR < MEMSIZE)) {
                 if ((AR % 50) != DrumAddr) continue; // yes
             }
             MachineCycle = 3; // exec instr
@@ -946,7 +946,7 @@ sim_instr(void)
             // should wait for cpu to exec the inst?
             if (CpuStepsUsed > 0) {CpuStepsUsed--; continue;} // yes
             // should wait for drum to store data?
-            if ((bWriteDrum) && (AR >= 0) && (AR < (int)MEMSIZE)) {
+            if ((bWriteDrum) && (AR < MEMSIZE)) {
                 if ((AR % 50) != DrumAddr) continue; // yes
             }
             MachineCycle = 5; // terminate the instr execution
