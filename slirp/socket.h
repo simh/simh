@@ -22,37 +22,37 @@ struct socket {
 
   int pollfds_idx;                 /* GPollFD GArray index */
 
-  Slirp *slirp;			   /* managing slirp instance */
+  Slirp *slirp;                    /* managing slirp instance */
 
-			/* XXX union these with not-yet-used sbuf params */
-  struct mbuf *so_m;	           /* Pointer to the original SYN packet,
-				    * for non-blocking connect()'s, and
-				    * PING reply's */
-  struct tcpiphdr *so_ti;	   /* Pointer to the original ti within
-				    * so_mconn, for non-blocking connections */
+                        /* XXX union these with not-yet-used sbuf params */
+  struct mbuf *so_m;               /* Pointer to the original SYN packet,
+                                    * for non-blocking connect()'s, and
+                                    * PING reply's */
+  struct tcpiphdr *so_ti;          /* Pointer to the original ti within
+                                    * so_mconn, for non-blocking connections */
   int so_urgc;
-  struct in_addr so_faddr;	   /* foreign host table entry */
-  struct in_addr so_laddr;	   /* local host table entry */
-  uint16_t so_fport;		   /* foreign port */
-  uint16_t so_lport;		   /* local port */
+  struct in_addr so_faddr;         /* foreign host table entry */
+  struct in_addr so_laddr;         /* local host table entry */
+  uint16_t so_fport;               /* foreign port */
+  uint16_t so_lport;               /* local port */
 
-  uint8_t	so_iptos;	/* Type of service */
-  uint8_t	so_emu;		/* Is the socket emulated? */
+  uint8_t       so_iptos;       /* Type of service */
+  uint8_t       so_emu;         /* Is the socket emulated? */
 
-  u_char	so_type;		/* Type of socket, UDP or TCP */
-  int	so_state;		/* internal state flags SS_*, below */
+  u_char        so_type;                /* Type of socket, UDP or TCP */
+  int   so_state;               /* internal state flags SS_*, below */
 
-  struct 	tcpcb *so_tcpcb;	/* pointer to TCP protocol control block */
-  u_int	so_expire;		/* When the socket will expire */
+  struct        tcpcb *so_tcpcb;        /* pointer to TCP protocol control block */
+  u_int so_expire;              /* When the socket will expire */
 
-  int	so_queued;		/* Number of packets queued from this socket */
-  int	so_nqueued;		/* Number of packets queued in a row
-				 * Used to determine when to "downgrade" a session
-					 * from fastq to batchq */
+  int   so_queued;              /* Number of packets queued from this socket */
+  int   so_nqueued;             /* Number of packets queued in a row
+                                 * Used to determine when to "downgrade" a session
+                                         * from fastq to batchq */
 
-  struct sbuf so_rcv;		/* Receive buffer */
-  struct sbuf so_snd;		/* Send buffer */
-  void * extra;			/* Extra pointer */
+  struct sbuf so_rcv;           /* Receive buffer */
+  struct sbuf so_snd;           /* Send buffer */
+  void * extra;                 /* Extra pointer */
 };
 
 
@@ -60,21 +60,21 @@ struct socket {
  * Socket state bits. (peer means the host on the Internet,
  * local host means the host on the other end of the modem)
  */
-#define SS_NOFDREF		0x001	/* No fd reference */
+#define SS_NOFDREF              0x001   /* No fd reference */
 
-#define SS_ISFCONNECTING	0x002	/* Socket is connecting to peer (non-blocking connect()'s) */
-#define SS_ISFCONNECTED		0x004	/* Socket is connected to peer */
-#define SS_FCANTRCVMORE		0x008	/* Socket can't receive more from peer (for half-closes) */
-#define SS_FCANTSENDMORE	0x010	/* Socket can't send more to peer (for half-closes) */
-#define SS_FWDRAIN		0x040	/* We received a FIN, drain data and set SS_FCANTSENDMORE */
+#define SS_ISFCONNECTING        0x002   /* Socket is connecting to peer (non-blocking connect()'s) */
+#define SS_ISFCONNECTED         0x004   /* Socket is connected to peer */
+#define SS_FCANTRCVMORE         0x008   /* Socket can't receive more from peer (for half-closes) */
+#define SS_FCANTSENDMORE        0x010   /* Socket can't send more to peer (for half-closes) */
+#define SS_FWDRAIN              0x040   /* We received a FIN, drain data and set SS_FCANTSENDMORE */
 
-#define SS_CTL			0x080
-#define SS_FACCEPTCONN		0x100	/* Socket is accepting connections from a host on the internet */
-#define SS_FACCEPTONCE		0x200	/* If set, the SS_FACCEPTCONN socket will die after one accept */
+#define SS_CTL                  0x080
+#define SS_FACCEPTCONN          0x100   /* Socket is accepting connections from a host on the internet */
+#define SS_FACCEPTONCE          0x200   /* If set, the SS_FACCEPTCONN socket will die after one accept */
 
-#define SS_PERSISTENT_MASK	0xf000	/* Unremovable state bits */
-#define SS_HOSTFWD		0x1000	/* Socket describes host->guest forwarding */
-#define SS_INCOMING		0x2000	/* Connection was initiated by a host on the internet */
+#define SS_PERSISTENT_MASK      0xf000  /* Unremovable state bits */
+#define SS_HOSTFWD              0x1000  /* Socket describes host->guest forwarding */
+#define SS_INCOMING             0x2000  /* Connection was initiated by a host on the internet */
 
 struct socket * solookup(struct socket *, struct in_addr, u_int, struct in_addr, u_int);
 struct socket * socreate(Slirp *);

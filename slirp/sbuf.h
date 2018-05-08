@@ -12,13 +12,13 @@
 #define sbspace(sb) ((sb)->sb_datalen - (sb)->sb_cc)
 
 struct sbuf {
-	u_int	sb_cc;		/* actual chars in buffer */
-	u_int	sb_datalen;	/* Length of data  */
-	char	*sb_wptr;	/* write pointer. points to where the next
-				 * bytes should be written in the sbuf */
-	char	*sb_rptr;	/* read pointer. points to where the next
-				 * byte should be read from the sbuf */
-	char	*sb_data;	/* Actual data */
+        u_int   sb_cc;          /* actual chars in buffer */
+        u_int   sb_datalen;     /* Length of data  */
+        char    *sb_wptr;       /* write pointer. points to where the next
+                                 * bytes should be written in the sbuf */
+        char    *sb_rptr;       /* read pointer. points to where the next
+                                 * byte should be read from the sbuf */
+        char    *sb_data;       /* Actual data */
 };
 
 void sbfree(struct sbuf *);

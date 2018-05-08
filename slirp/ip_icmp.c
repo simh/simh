@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 1982, 1986, 1988, 1993
- *	The Regents of the University of California.  All rights reserved.
+ *      The Regents of the University of California.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)ip_icmp.c	8.2 (Berkeley) 1/4/94
+ *      @(#)ip_icmp.c   8.2 (Berkeley) 1/4/94
  * ip_icmp.c,v 1.7 1995/05/30 08:09:42 rgrimes Exp
  */
 
@@ -40,13 +40,13 @@ static const char icmp_ping_msg[] = "This is a pseudo-PING packet used by Slirp 
 /* list of actions for icmp_error() on RX of an icmp message */
 static const int icmp_flush[19] = {
 /*  ECHO REPLY (0)  */   0,
-		         1,
-		         1,
+                         1,
+                         1,
 /* DEST UNREACH (3) */   1,
 /* SOURCE QUENCH (4)*/   1,
 /* REDIRECT (5) */       1,
-		         1,
-		         1,
+                         1,
+                         1,
 /* ECHO (8) */           0,
 /* ROUTERADVERT (9) */   1,
 /* ROUTERSOLICIT (10) */ 1,
@@ -150,7 +150,7 @@ icmp_input(struct mbuf *m, int hlen)
   DEBUG_ARG("icmp_type = %d", icp->icmp_type);
   switch (icp->icmp_type) {
   case ICMP_ECHO:
-    ip->ip_len += hlen;	             /* since ip_input subtracts this */
+    ip->ip_len += hlen;              /* since ip_input subtracts this */
     if (ip->ip_dst.s_addr == slirp->vhost_addr.s_addr) {
       icmp_reflect(m);
     } else if (slirp->restricted) {
@@ -163,11 +163,11 @@ icmp_input(struct mbuf *m, int hlen)
         return;
       }
       if(udp_attach(so) == -1) {
-	DEBUG_MISC("icmp_input udp_attach errno = %d-%s\n",
-		    errno,strerror(errno));
-	sofree(so);
-	m_free(m);
-	goto end_error;
+        DEBUG_MISC("icmp_input udp_attach errno = %d-%s\n",
+                    errno,strerror(errno));
+        sofree(so);
+        m_free(m);
+        goto end_error;
       }
       so->so_m = m;
       so->so_faddr = ip->ip_dst;
@@ -182,23 +182,23 @@ icmp_input(struct mbuf *m, int hlen)
       addr.sin_family = AF_INET;
       if ((so->so_faddr.s_addr & slirp->vnetwork_mask.s_addr) ==
           slirp->vnetwork_addr.s_addr) {
-	/* It's an alias */
-	if (so->so_faddr.s_addr == slirp->vnameserver_addr.s_addr) {
-	  if (get_dns_addr(&addr.sin_addr) < 0)
-	    addr.sin_addr = loopback_addr;
-	} else {
-	  addr.sin_addr = loopback_addr;
-	}
+        /* It's an alias */
+        if (so->so_faddr.s_addr == slirp->vnameserver_addr.s_addr) {
+          if (get_dns_addr(&addr.sin_addr) < 0)
+            addr.sin_addr = loopback_addr;
+        } else {
+          addr.sin_addr = loopback_addr;
+        }
       } else {
-	addr.sin_addr = so->so_faddr;
+        addr.sin_addr = so->so_faddr;
       }
       addr.sin_port = so->so_fport;
       if(sendto(so->s, icmp_ping_msg, strlen(icmp_ping_msg), 0,
-		(struct sockaddr *)&addr, sizeof(addr)) == -1) {
-	DEBUG_MISC("icmp_input udp sendto tx errno = %d-%s\n",
-		    errno,strerror(errno));
-	icmp_error(m, ICMP_UNREACH,ICMP_UNREACH_NET, 0,strerror(errno));
-	udp_detach(so);
+                (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+        DEBUG_MISC("icmp_input udp sendto tx errno = %d-%s\n",
+                    errno,strerror(errno));
+        icmp_error(m, ICMP_UNREACH,ICMP_UNREACH_NET, 0,strerror(errno));
+        udp_detach(so);
       }
     } /* if ip->ip_dst.s_addr == alias_addr.s_addr */
     break;
@@ -224,13 +224,13 @@ end_error:
 
 
 /*
- *	Send an ICMP message in response to a situation
+ *      Send an ICMP message in response to a situation
  *
- *	RFC 1122: 3.2.2	MUST send at least the IP header and 8 bytes of header. MAY send more (we do).
- *			MUST NOT change this header information.
- *			MUST NOT reply to a multicast/broadcast IP address.
- *			MUST NOT reply to a multicast/broadcast MAC address.
- *			MUST reply to only the first fragment.
+ *      RFC 1122: 3.2.2 MUST send at least the IP header and 8 bytes of header. MAY send more (we do).
+ *                      MUST NOT change this header information.
+ *                      MUST NOT reply to a multicast/broadcast IP address.
+ *                      MUST NOT reply to a multicast/broadcast MAC address.
+ *                      MUST reply to only the first fragment.
  */
 /*
  * Send ICMP_UNREACH back to the source regarding msrc.
@@ -279,8 +279,8 @@ icmp_error(struct mbuf *msrc, u_char type, u_char code, int minsize,
   if(ip->ip_p == IPPROTO_ICMP) {
     icp = (struct icmp *)((char *)ip + shlen);
     /*
-     *	Assume any unknown ICMP type is an error. This isn't
-     *	specified by the RFC, but think about it..
+     *  Assume any unknown ICMP type is an error. This isn't
+     *  specified by the RFC, but think about it..
      */
     if(icp->icmp_type>18 || icmp_flush[icp->icmp_type]) goto end_error;
   }
@@ -395,7 +395,7 @@ icmp_reflect(struct mbuf *m)
      * mbuf's data back, and adjust the IP length.
      */
     memmove((caddr_t)(ip + 1), (caddr_t)ip + hlen,
-	    (unsigned )(m->m_len - hlen));
+            (unsigned )(m->m_len - hlen));
     hlen -= optlen;
     ip->ip_hl = hlen >> 2;
     ip->ip_len -= optlen;

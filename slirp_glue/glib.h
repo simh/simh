@@ -19,10 +19,10 @@ typedef struct GPollFD {
 #if defined(_WIN32)
   SOCKET        fd;
 #else
-  gint		fd;
+  gint      fd;
 #endif
-  gushort 	events;
-  gushort 	revents;
+  gushort   events;
+  gushort   revents;
 } GPollFD;
 typedef struct _GArray {
     gchar *data;

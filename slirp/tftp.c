@@ -87,9 +87,9 @@ static int tftp_session_find(Slirp *slirp, struct tftp_t *tp)
 
     if (tftp_session_in_use(spt)) {
       if (!memcmp(&spt->client_ip, &tp->ip.ip_src, sizeof(spt->client_ip))) {
-	if (spt->client_port == tp->udp.uh_sport) {
-	  return k;
-	}
+        if (spt->client_port == tp->udp.uh_sport) {
+          return k;
+        }
       }
     }
   }
@@ -131,7 +131,7 @@ static int tftp_send_oack(struct tftp_session *spt,
     m = m_get(spt->slirp);
 
     if (!m)
-	return -1;
+        return -1;
 
     memset(m->m_data, 0, m->m_size);
 
@@ -348,25 +348,25 @@ static void tftp_handle_rrq(Slirp *slirp, struct tftp_t *tp, int pktlen)
       k += strlen(key) + 1;
 
       if (k >= pktlen) {
-	  tftp_send_error(spt, 2, "Access violation", tp);
-	  return;
+          tftp_send_error(spt, 2, "Access violation", tp);
+          return;
       }
 
       value = &tp->x.tp_buf[k];
       k += strlen(value) + 1;
 
       if (strcasecmp(key, "tsize") == 0) {
-	  int tsize = atoi(value);
-	  struct stat stat_p;
+          int tsize = atoi(value);
+          struct stat stat_p;
 
-	  if (tsize == 0) {
-	      if (stat(spt->filename, &stat_p) == 0)
-		  tsize = stat_p.st_size;
-	      else {
-		  tftp_send_error(spt, 1, "File not found", tp);
-		  return;
-	      }
-	  }
+          if (tsize == 0) {
+              if (stat(spt->filename, &stat_p) == 0)
+                  tsize = stat_p.st_size;
+              else {
+                  tftp_send_error(spt, 1, "File not found", tp);
+                  return;
+              }
+          }
 
           option_name[nb_options] = "tsize";
           option_value[nb_options] = tsize;

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 1982, 1986, 1988, 1993
- *	The Regents of the University of California.  All rights reserved.
+ *      The Regents of the University of California.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,20 +26,20 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)mbuf.h	8.3 (Berkeley) 1/21/94
+ *      @(#)mbuf.h      8.3 (Berkeley) 1/21/94
  * mbuf.h,v 1.9 1994/11/14 13:54:20 bde Exp
  */
 
 #ifndef _MBUF_H_
 #define _MBUF_H_
 
-#define MINCSIZE 4096	/* Amount to increase mbuf if too small */
+#define MINCSIZE 4096   /* Amount to increase mbuf if too small */
 
 /*
  * Macros for type conversion
- * mtod(m,t) -	convert mbuf pointer to data pointer of correct type
+ * mtod(m,t) -  convert mbuf pointer to data pointer of correct type
  */
-#define mtod(m,t)	((t)(m)->m_data)
+#define mtod(m,t)       ((t)(m)->m_data)
 
 /* XXX About mbufs for slirp:
  * Only one mbuf is ever used in a chain, for each "cell" of data.
@@ -53,9 +53,9 @@
  * How much room is in the mbuf, from m_data to the end of the mbuf
  */
 #define M_ROOM(m) ((m->m_flags & M_EXT)? \
-			(((m)->m_ext + (m)->m_size) - (m)->m_data) \
-		   : \
-			(((m)->m_dat + (m)->m_size) - (m)->m_data))
+                        (((m)->m_ext + (m)->m_size) - (m)->m_data) \
+                   : \
+                        (((m)->m_dat + (m)->m_size) - (m)->m_data))
 
 /*
  * How much free room there is
@@ -64,28 +64,28 @@
 #define M_TRAILINGSPACE M_FREEROOM
 
 struct mbuf {
-	/* XXX should union some of these! */
-	/* header at beginning of each mbuf: */
-	struct	mbuf *m_next;		/* Linked list of mbufs */
-	struct	mbuf *m_prev;
-	struct	mbuf *m_nextpkt;	/* Next packet in queue/record */
-	struct	mbuf *m_prevpkt;	/* Flags aren't used in the output queue */
-	int	m_flags;		/* Misc flags */
+        /* XXX should union some of these! */
+        /* header at beginning of each mbuf: */
+        struct  mbuf *m_next;           /* Linked list of mbufs */
+        struct  mbuf *m_prev;
+        struct  mbuf *m_nextpkt;        /* Next packet in queue/record */
+        struct  mbuf *m_prevpkt;        /* Flags aren't used in the output queue */
+        int     m_flags;                /* Misc flags */
 
-	int	m_size;			/* Size of data */
-	struct	socket *m_so;
+        int     m_size;                 /* Size of data */
+        struct  socket *m_so;
 
-	caddr_t	m_data;			/* Location of data */
-	int	m_len;			/* Amount of data in this mbuf */
+        caddr_t m_data;                 /* Location of data */
+        int     m_len;                  /* Amount of data in this mbuf */
 
-	Slirp *slirp;
-	bool	arp_requested;
-	uint64_t expiration_date;
-	/* start of dynamic buffer area, must be last element */
-	union {
-		char	m_dat[1]; /* ANSI don't like 0 sized arrays */
-		char	*m_ext;
-	};
+        Slirp *slirp;
+        bool    arp_requested;
+        uint64_t expiration_date;
+        /* start of dynamic buffer area, must be last element */
+        union {
+                char    m_dat[1]; /* ANSI don't like 0 sized arrays */
+                char    *m_ext;
+        };
 };
 
 #define ifq_prev m_prev
@@ -94,11 +94,11 @@ struct mbuf {
 #define ifs_next m_nextpkt
 #define ifq_so m_so
 
-#define M_EXT			0x01	/* m_ext points to more (malloced) data */
-#define M_FREELIST		0x02	/* mbuf is on free list */
-#define M_USEDLIST		0x04	/* XXX mbuf is on used list (for dtom()) */
-#define M_DOFREE		0x08	/* when m_free is called on the mbuf, free()
-					 * it rather than putting it on the free list */
+#define M_EXT                   0x01    /* m_ext points to more (malloced) data */
+#define M_FREELIST              0x02    /* mbuf is on free list */
+#define M_USEDLIST              0x04    /* XXX mbuf is on used list (for dtom()) */
+#define M_DOFREE                0x08    /* when m_free is called on the mbuf, free()
+                                         * it rather than putting it on the free list */
 
 void m_init(Slirp *);
 void m_cleanup(Slirp *slirp);

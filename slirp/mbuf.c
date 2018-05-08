@@ -64,38 +64,38 @@ void m_cleanup(Slirp *slirp)
 struct mbuf *
 m_get(Slirp *slirp)
 {
-	register struct mbuf *m;
-	int flags = 0;
+        register struct mbuf *m;
+        int flags = 0;
 
-	DEBUG_CALL("m_get");
+        DEBUG_CALL("m_get");
 
-	if (slirp->m_freelist.m_next == &slirp->m_freelist) {
-		m = (struct mbuf *)malloc(SLIRP_MSIZE);
-		if (m == NULL) goto end_error;
-		slirp->mbuf_alloced++;
-		if (slirp->mbuf_alloced > MBUF_THRESH)
-			flags = M_DOFREE;
-		m->slirp = slirp;
-	} else {
-		m = slirp->m_freelist.m_next;
-		remque(m);
-	}
+        if (slirp->m_freelist.m_next == &slirp->m_freelist) {
+                m = (struct mbuf *)malloc(SLIRP_MSIZE);
+                if (m == NULL) goto end_error;
+                slirp->mbuf_alloced++;
+                if (slirp->mbuf_alloced > MBUF_THRESH)
+                        flags = M_DOFREE;
+                m->slirp = slirp;
+        } else {
+                m = slirp->m_freelist.m_next;
+                remque(m);
+        }
 
-	/* Insert it in the used list */
-	insque(m,&slirp->m_usedlist);
-	m->m_flags = (flags | M_USEDLIST);
+        /* Insert it in the used list */
+        insque(m,&slirp->m_usedlist);
+        m->m_flags = (flags | M_USEDLIST);
 
-	/* Initialise it */
-	m->m_size = SLIRP_MSIZE - offsetof(struct mbuf, m_dat);
-	m->m_data = m->m_dat;
-	m->m_len = 0;
+        /* Initialise it */
+        m->m_size = SLIRP_MSIZE - offsetof(struct mbuf, m_dat);
+        m->m_data = m->m_dat;
+        m->m_len = 0;
         m->m_nextpkt = NULL;
         m->m_prevpkt = NULL;
         m->arp_requested = false;
         m->expiration_date = (uint64_t)-1;
 end_error:
-	DEBUG_ARG("m = %lx", (long )m);
-	return m;
+        DEBUG_ARG("m = %lx", (long )m);
+        return m;
 }
 
 void
@@ -106,24 +106,24 @@ m_free(struct mbuf *m)
   DEBUG_ARG("m = %lx", (long )m);
 
   if(m) {
-	/* Remove from m_usedlist */
-	if (m->m_flags & M_USEDLIST)
-	   remque(m);
+        /* Remove from m_usedlist */
+        if (m->m_flags & M_USEDLIST)
+           remque(m);
 
-	/* If it's M_EXT, free() it */
-	if (m->m_flags & M_EXT)
-	   free(m->m_ext);
+        /* If it's M_EXT, free() it */
+        if (m->m_flags & M_EXT)
+           free(m->m_ext);
 
-	/*
-	 * Either free() it or put it on the free list
-	 */
-	if (m->m_flags & M_DOFREE) {
-		m->slirp->mbuf_alloced--;
-		free(m);
-	} else if ((m->m_flags & M_FREELIST) == 0) {
-		insque(m,&m->slirp->m_freelist);
-		m->m_flags = M_FREELIST; /* Clobber other flags */
-	}
+        /*
+         * Either free() it or put it on the free list
+         */
+        if (m->m_flags & M_DOFREE) {
+                m->slirp->mbuf_alloced--;
+                free(m);
+        } else if ((m->m_flags & M_FREELIST) == 0) {
+                insque(m,&m->slirp->m_freelist);
+                m->m_flags = M_FREELIST; /* Clobber other flags */
+        }
   } /* if(m) */
 }
 
@@ -135,16 +135,16 @@ m_free(struct mbuf *m)
 void
 m_cat(struct mbuf *m, struct mbuf *n)
 {
-	/*
-	 * If there's no room, realloc
-	 */
-	if (M_FREEROOM(m) < n->m_len)
-		m_inc(m,m->m_size+MINCSIZE);
+        /*
+         * If there's no room, realloc
+         */
+        if (M_FREEROOM(m) < n->m_len)
+                m_inc(m,m->m_size+MINCSIZE);
 
-	memcpy(m->m_data+m->m_len, n->m_data, n->m_len);
-	m->m_len += n->m_len;
+        memcpy(m->m_data+m->m_len, n->m_data, n->m_len);
+        m->m_len += n->m_len;
 
-	m_free(n);
+        m_free(n);
 }
 
 
@@ -152,24 +152,24 @@ m_cat(struct mbuf *m, struct mbuf *n)
 void
 m_inc(struct mbuf *m, int size)
 {
-	int datasize;
+        int datasize;
 
-	/* some compiles throw up on gotos.  This one we can fake. */
+        /* some compiles throw up on gotos.  This one we can fake. */
         if(m->m_size>size) return;
 
         if (m->m_flags & M_EXT) {
-	  datasize = m->m_data - m->m_ext;
-	  m->m_ext = (char *)realloc(m->m_ext,size);
-	  m->m_data = m->m_ext + datasize;
+          datasize = m->m_data - m->m_ext;
+          m->m_ext = (char *)realloc(m->m_ext,size);
+          m->m_data = m->m_ext + datasize;
         } else {
-	  char *dat;
-	  datasize = m->m_data - m->m_dat;
-	  dat = (char *)malloc(size);
-	  memcpy(dat, m->m_dat, m->m_size);
+          char *dat;
+          datasize = m->m_data - m->m_dat;
+          dat = (char *)malloc(size);
+          memcpy(dat, m->m_dat, m->m_size);
 
-	  m->m_ext = dat;
-	  m->m_data = m->m_ext + datasize;
-	  m->m_flags |= M_EXT;
+          m->m_ext = dat;
+          m->m_data = m->m_ext + datasize;
+          m->m_flags |= M_EXT;
         }
 
         m->m_size = size;
@@ -181,17 +181,17 @@ m_inc(struct mbuf *m, int size)
 void
 m_adj(struct mbuf *m, int len)
 {
-	if (m == NULL)
-		return;
-	if (len >= 0) {
-		/* Trim from head */
-		m->m_data += len;
-		m->m_len -= len;
-	} else {
-		/* Trim from tail */
-		len = -len;
-		m->m_len -= len;
-	}
+        if (m == NULL)
+                return;
+        if (len >= 0) {
+                /* Trim from head */
+                m->m_data += len;
+                m->m_len -= len;
+        } else {
+                /* Trim from tail */
+                len = -len;
+                m->m_len -= len;
+        }
 }
 
 
@@ -201,12 +201,12 @@ m_adj(struct mbuf *m, int len)
 int
 m_copy(struct mbuf *n, struct mbuf *m, int off, int len)
 {
-	if (len > M_FREEROOM(n))
-		return -1;
+        if (len > M_FREEROOM(n))
+                return -1;
 
-	memcpy((n->m_data + n->m_len), (m->m_data + off), len);
-	n->m_len += len;
-	return 0;
+        memcpy((n->m_data + n->m_len), (m->m_data + off), len);
+        n->m_len += len;
+        return 0;
 }
 
 
@@ -218,24 +218,24 @@ m_copy(struct mbuf *n, struct mbuf *m, int off, int len)
 struct mbuf *
 dtom(Slirp *slirp, void *dat)
 {
-	struct mbuf *m;
+        struct mbuf *m;
 
-	DEBUG_CALL("dtom");
-	DEBUG_ARG("dat = %lx", (long )dat);
+        DEBUG_CALL("dtom");
+        DEBUG_ARG("dat = %lx", (long )dat);
 
-	/* bug corrected for M_EXT buffers */
-	for (m = slirp->m_usedlist.m_next; m != &slirp->m_usedlist;
-	     m = m->m_next) {
-	  if (m->m_flags & M_EXT) {
-	    if( (char *)dat>=m->m_ext && (char *)dat<(m->m_ext + m->m_size) )
-	      return m;
-	  } else {
-	    if( (char *)dat >= m->m_dat && (char *)dat<(m->m_dat + m->m_size) )
-	      return m;
-	  }
-	}
+        /* bug corrected for M_EXT buffers */
+        for (m = slirp->m_usedlist.m_next; m != &slirp->m_usedlist;
+             m = m->m_next) {
+          if (m->m_flags & M_EXT) {
+            if( (char *)dat>=m->m_ext && (char *)dat<(m->m_ext + m->m_size) )
+              return m;
+          } else {
+            if( (char *)dat >= m->m_dat && (char *)dat<(m->m_dat + m->m_size) )
+              return m;
+          }
+        }
 
-	DEBUG_ERROR("dtom failed");
+        DEBUG_ERROR("dtom failed");
 
-	return (struct mbuf *)0;
+        return (struct mbuf *)0;
 }
