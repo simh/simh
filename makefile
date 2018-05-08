@@ -232,7 +232,10 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     OS_LDFLAGS = -lm
   else # Non-Android Builds
     ifeq (,$(INCLUDES)$(LIBRARIES))
-      INCPATH:=/usr/include
+      INCPATH:=$(shell LANG=C; $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | tr -d '\n')
+      ifeq (,$(INCPATH))
+        INCPATH:=/usr/include
+      endif
       LIBPATH:=/usr/lib
     else
       $(info *** Warning ***)
