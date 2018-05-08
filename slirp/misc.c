@@ -114,6 +114,7 @@ fork_exec(struct socket *so, const char *ex, int do_pty)
 int
 fork_exec(struct socket *so, const char *ex, int do_pty)
 {
+#if defined(NEED_FORK_EXEC)
         int s;
         struct sockaddr_in addr;
         socklen_t addrlen = sizeof(addr);
@@ -229,6 +230,9 @@ fork_exec(struct socket *so, const char *ex, int do_pty)
 
                 return 1;
         }
+#else
+        return 0;
+#endif
 }
 #endif
 
