@@ -3988,7 +3988,7 @@ runtty.c_cc[VINTR] = 0;                                 /* OS X doesn't deliver 
 #else
 runtty.c_cc[VINTR] = sim_int_char;                      /* in case changed */
 #endif
-if (tcsetattr (0, TCSAFLUSH, &runtty) < 0)
+if (tcsetattr (fileno(stdin), TCSAFLUSH, &runtty) < 0)
     return SCPE_TTIERR;
 sim_os_set_thread_priority (PRIORITY_BELOW_NORMAL);     /* try to lower pri */
 return SCPE_OK;
@@ -3999,7 +3999,7 @@ static t_stat sim_os_ttcmd (void)
 if (!isatty (fileno (stdin)))                           /* skip if !tty */
     return SCPE_OK;
 sim_os_set_thread_priority (PRIORITY_NORMAL);           /* try to raise pri */
-if (tcsetattr (0, TCSAFLUSH, &cmdtty) < 0)
+if (tcsetattr (fileno(stdin), TCSAFLUSH, &cmdtty) < 0)
     return SCPE_TTIERR;
 return SCPE_OK;
 }

@@ -7511,22 +7511,26 @@ for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* reposition all */
         }
     }
 if ((r = sim_ttrun ()) != SCPE_OK) {                    /* set console mode */
+    r = sim_messagef (SCPE_TTYERR, "sim_ttrun() returned: %s - errno: %d - %s\n", sim_error_text (r), errno, strerror (errno));
     sim_ttcmd ();
-    return sim_messagef (SCPE_TTYERR, "sim_ttrun() returned: %s\n", sim_error_text (r));
+    return r;
     }
 if ((r = sim_check_console (30)) != SCPE_OK) {          /* check console, error? */
+    r = sim_messagef (r, "sim_check_console () returned: %s - errno: %d - %s\n", sim_error_text (r), errno, strerror (errno));
     sim_ttcmd ();
-    sim_messagef (r, "sim_check_console () returned: %s\n", sim_error_text (r));
+    return r;
     }
 #ifdef SIGHUP
 if (signal (SIGHUP, int_handler) == SIG_ERR) {          /* set WRU */
+    r = sim_messagef (SCPE_SIGERR, "Can't establish SIGHUP: errno: %d - %s", errno, strerror (errno));
     sim_ttcmd ();
-    return sim_messagef (SCPE_SIGERR, "Can't establish SIGHUP");
+    return r;
     }
 #endif
 if (signal (SIGTERM, int_handler) == SIG_ERR) {         /* set WRU */
+    r = sim_messagef (SCPE_SIGERR, "Can't establish SIGTERM: errno: %d - %s", errno, strerror (errno));
     sim_ttcmd ();
-    return sim_messagef (SCPE_SIGERR, "Can't establish SIGTERM");
+    return r;
     }
 stop_cpu = FALSE;
 sim_is_running = TRUE;                                  /* flag running */
