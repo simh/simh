@@ -41,6 +41,9 @@ extern "C" {
 #define fxread(a,b,c,d)         sim_fread (a, b, c, d)
 #define fxwrite(a,b,c,d)        sim_fwrite (a, b, c, d)
 
+#if ((defined (__linus) || defined (__linus__)) && (!defined (__ANDROID_API__) || (__ANDROID_API__ < 24)))
+#define DONT_DO_LARGEFILE 1
+#endif
 int32 sim_finit (void);
 #if (defined (__linux) || defined (__linux__) || defined (__hpux) || defined (_AIX) ||         \
      (defined (VMS) && (defined (__ALPHA) || defined (__ia64)) && (__DECC_VER >= 60590001)) || \

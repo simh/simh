@@ -324,7 +324,7 @@ return (t_offset)fileaddr;
 
 /* Linux */
 
-#if ((defined (__linux) || defined (__linux__)) && (!defined (__ANDROID_API__) || (__ANDROID_API__ >= 24))) || defined (__hpux) || defined (_AIX)
+#if defined (__linux) || defined (__linux__) || defined (__hpux) || defined (_AIX)
 #define S_SIM_IO_FSEEK_EXT_ 1
 int sim_fseeko (FILE *st, t_offset xpos, int origin)
 {
