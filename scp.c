@@ -5786,7 +5786,7 @@ typedef void (*DIR_ENTRY_CALLBACK)(const char *directory,
 
 #if defined (_WIN32)
 
-static t_stat sim_dir_scan (const char *cptr, DIR_ENTRY_CALLBACK entry, void *context)
+t_stat sim_dir_scan (const char *cptr, DIR_ENTRY_CALLBACK entry, void *context)
 {
 HANDLE hFind;
 WIN32_FIND_DATAA File;
@@ -5841,7 +5841,7 @@ return SCPE_OK;
 #endif
 #endif /* defined (HAVE_GLOB) */
 
-static t_stat sim_dir_scan (const char *cptr, DIR_ENTRY_CALLBACK entry, void *context)
+t_stat sim_dir_scan (const char *cptr, DIR_ENTRY_CALLBACK entry, void *context)
 {
 #if defined (HAVE_GLOB)
 glob_t  paths;
