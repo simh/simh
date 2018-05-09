@@ -230,7 +230,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       OS_CCDEFS += -DSIM_ASYNCH_IO 
     endif
     OS_LDFLAGS = -lm
-  else # Non-Android Builds
+  else # Non-Android (or Native Android) Builds
     ifeq (,$(INCLUDES)$(LIBRARIES))
       INCPATH:=$(shell LANG=C; $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | tr -d '\n')
       ifeq (,$(INCPATH))
@@ -288,7 +288,18 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     else
       ifeq (Linux,$(OSTYPE))
         ifneq (lib,$(findstring lib,$(UNSUPPORTED_BUILD)))
-          LIBPATH := $(sort $(foreach lib,$(shell /sbin/ldconfig -p | grep ' => /' | sed 's/^.* => //'),$(dir $(lib))))
+          ifneq (,$(shell if $(TEST) -d /system/lib; then echo systemlib; fi))
+            ifneq (,$(shell uname -a | grep 'aarch64 Android'))
+              OS_CCDEFS += -DCANT_USE_TERMIOS_TCSAFLUSH
+            endif
+            LIBPATH += /system/lib
+          endif
+          ifneq (,$(shell if $(TEST) -d /data/data/com.termux/files/usr/lib; then echo termuxlib; fi))
+            LIBPATH += /data/data/com.termux/files/usr/lib
+          endif
+          ifneq (,$(shell which ldconfig))
+            LIBPATH := $(sort $(foreach lib,$(shell ldconfig -p | grep ' => /' | sed 's/^.* => //'),$(dir $(lib))))
+          endif
         endif
         LIBEXT = so
       else
