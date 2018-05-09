@@ -287,11 +287,11 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       endif
     else
       ifeq (Linux,$(OSTYPE))
+        ifeq (Android,$(shell uname -o))
+          OS_CCDEFS += -D__ANDROID_API__=$(shell getprop ro.build.version.sdk)
+        endif
         ifneq (lib,$(findstring lib,$(UNSUPPORTED_BUILD)))
           ifneq (,$(shell if $(TEST) -d /system/lib; then echo systemlib; fi))
-            ifneq (,$(shell uname -a | grep 'aarch64 Android'))
-              OS_CCDEFS += -DCANT_USE_TERMIOS_TCSAFLUSH
-            endif
             LIBPATH += /system/lib
           endif
           ifneq (,$(shell if $(TEST) -d /data/data/com.termux/files/usr/lib; then echo termuxlib; fi))

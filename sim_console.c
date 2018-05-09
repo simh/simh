@@ -3928,7 +3928,7 @@ return SCPE_OK;
 
 #else
 
-#if !defined(CANT_USE_TERMIOS_TCSAFLUSH)
+#if !defined (__ANDROID_API__) || (__ANDROID_API__ < 26)
 #define TCSETATTR_ACTION TCSAFLUSH
 #else
 #define TCSETATTR_ACTION TCSANOW
