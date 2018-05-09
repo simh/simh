@@ -952,12 +952,12 @@ int ports = 0;
 memset(list, 0, max*sizeof(*list));
 #if defined(__linux) || defined(__linux__)
 if (1) {
-    struct dirent **namelist;
+    struct dirent **namelist = NULL;
     struct stat st;
 
     i = scandir("/sys/class/tty/", &namelist, NULL, NULL);
 
-    while (i--) {
+    while (0 < i--) {
         if (strcmp(namelist[i]->d_name, ".") &&
             strcmp(namelist[i]->d_name, "..")) {
             char path[1024], devicepath[1024], driverpath[1024];
