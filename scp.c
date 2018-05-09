@@ -5778,12 +5778,6 @@ t_stat pwd_cmd (int32 flg, CONST char *cptr)
 return show_cmd (0, "DEFAULT");
 }
 
-typedef void (*DIR_ENTRY_CALLBACK)(const char *directory, 
-                                   const char *filename,
-                                   t_offset FileSize,
-                                   const struct stat *filestat,
-                                   void *context);
-
 #if defined (_WIN32)
 
 t_stat sim_dir_scan (const char *cptr, DIR_ENTRY_CALLBACK entry, void *context)
