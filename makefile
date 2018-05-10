@@ -291,11 +291,11 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           OS_CCDEFS += -D__ANDROID_API__=$(shell getprop ro.build.version.sdk)
         endif
         ifneq (lib,$(findstring lib,$(UNSUPPORTED_BUILD)))
-          ifneq (,$(shell if $(TEST) -d /system/lib; then echo systemlib; fi))
-            LIBPATH += /system/lib
-          endif
-          ifneq (,$(shell if $(TEST) -d /data/data/com.termux/files/usr/lib; then echo termuxlib; fi))
-            LIBPATH += /data/data/com.termux/files/usr/lib
+          ifeq (Android,$(shell uname -o))
+            ifneq (,$(shell if $(TEST) -d /system/lib; then echo systemlib; fi))
+              LIBPATH += /system/lib
+            endif
+            LIBPATH += $(LD_LIBRARY_PATH)
           endif
           ifeq (ldconfig,$(shell if $(TEST) -e /sbin/ldconfig; then echo ldconfig; fi))
             LIBPATH := $(sort $(foreach lib,$(shell /sbin/ldconfig -p | grep ' => /' | sed 's/^.* => //'),$(dir $(lib))))
