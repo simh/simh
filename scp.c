@@ -5917,10 +5917,11 @@ if (dir) {
         if (fnmatch(MatchName, ent->d_name, 0))
             continue;
 #else
+        /* only match exact name without fnmatch support */
         if (strcmp(MatchName, ent->d_name) != 0)
             continue;
 #endif
-        sprintf (FileName, "%s/%s", DirName, ent->d_name);
+        sprintf (FileName, "%s%s", DirName, ent->d_name);
 #endif
         p_name = FileName + strlen (DirName);
         memset (&filestat, 0, sizeof (filestat));
