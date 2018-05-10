@@ -1025,7 +1025,7 @@ parse_sym(CONST char *cptr, t_addr addr, UNIT * uptr, t_value * val, int32 sw)
         i = 0;
         while (*cptr != '\0' && i < 6) {
             d <<= 6;
-            if (ascii_to_mem[0177 & *cptr] != -1)
+            if (ascii_to_mem[0177 & *cptr] != (const char)-1)
                 d |= ascii_to_mem[0177 & *cptr];
             cptr++;
             i++;

@@ -446,7 +446,7 @@ parse_sym(CONST char *cptr, t_addr addr, UNIT * uptr, t_value * val, int32 sw)
         i = 0;
         while (*cptr != '\0' && i < 6) {
             d <<= 6;
-            if (sim_ascii_to_six[0177 & *cptr] != -1)
+            if (sim_ascii_to_six[0177 & *cptr] != (const char)-1)
                 d |= sim_ascii_to_six[0177 & *cptr];
             cptr++;
             i++;
