@@ -297,8 +297,8 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           ifneq (,$(shell if $(TEST) -d /data/data/com.termux/files/usr/lib; then echo termuxlib; fi))
             LIBPATH += /data/data/com.termux/files/usr/lib
           endif
-          ifneq (,$(shell which ldconfig))
-            LIBPATH := $(sort $(foreach lib,$(shell ldconfig -p | grep ' => /' | sed 's/^.* => //'),$(dir $(lib))))
+          ifeq (ldconfig,$(shell if $(TEST) -e /sbin/ldconfig; then echo ldconfig; fi))
+            LIBPATH := $(sort $(foreach lib,$(shell /sbin/ldconfig -p | grep ' => /' | sed 's/^.* => //'),$(dir $(lib))))
           endif
         endif
         LIBEXT = so
