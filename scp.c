@@ -5321,7 +5321,14 @@ if (flag) {
 #else
     cpp = "C";
 #endif
-    fprintf (st, "\n        Simulator Compiled as %s%s%s on %s at %s", cpp, arch, build, __DATE__, __TIME__);
+#if !defined (SIM_BUILD_OS)
+#define SIM_BUILD_OS
+#endif
+#define S_xstr(a) S_str(a)
+#define S_str(a) #a
+    fprintf (st, "\n        Simulator Compiled as %s%s%s on %s at %s%s", cpp, arch, build, __DATE__, __TIME__, S_xstr(SIM_BUILD_OS));
+#undef S_str
+#undef S_xstr
 #endif
     fprintf (st, "\n        Memory Access: %s Endian", sim_end ? "Little" : "Big");
     fprintf (st, "\n        Memory Pointer Size: %d bits", (int)sizeof(dptr)*8);

@@ -288,7 +288,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     else
       ifeq (Linux,$(OSTYPE))
         ifeq (Android,$(shell uname -o))
-          OS_CCDEFS += -D__ANDROID_API__=$(shell getprop ro.build.version.sdk)
+          OS_CCDEFS += -D__ANDROID_API__=$(shell getprop ro.build.version.sdk) -DSIM_BUILD_OS=" On Android Version $(shell getprop ro.build.version.release)"
         endif
         ifneq (lib,$(findstring lib,$(UNSUPPORTED_BUILD)))
           ifeq (Android,$(shell uname -o))
