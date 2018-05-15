@@ -234,6 +234,8 @@ In addtion, many of the operate-class micro-orders changed.
 #define UNIT_EXT_INST   (1 << UNIT_V_EXT)
 #define UNIT_MSIZE      (1 << UNIT_V_MSIZE)
 
+#define MIN(a,b) (((a) < (b)) ? (a) : (b))
+
 #define HIST_PC         0x40000000
 #define HIST_V_SHF      18
 #define HIST_MIN        64
@@ -1228,7 +1230,7 @@ t_stat sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag) {
     } else {
         lo = strtotv(cptr, &result, 8) & 0xFFFF;
         sz = sim_fsize(fileref);
-        sz_words = sz / 4;
+        sz_words = MIN (sz, sizeof (M)) / 4;
         for (j = lo; j < sz_words; j++) {
             sim_fread(&word, 4, 1, fileref);
             M[j] = word;
