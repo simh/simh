@@ -453,7 +453,7 @@ vector(int i, int sy, int dy, int sx, int dx)
 {
     struct type340 *u = UNIT(0);
     int x0, y0, x1, y1;
-    int flags;
+    int flags = 0;
 
     DEBUGF(("v i%d y%c%d x%c%d\r\n", i,
             (sy ? '-' : '+'), dy,
