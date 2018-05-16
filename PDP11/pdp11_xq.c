@@ -1258,7 +1258,7 @@ t_stat xq_process_rbdl(CTLR* xq)
             xq->var->rbdl_buf[4] |= XQ_RST_ESETUP;/* loopback flag */
         break;
       case ETH_ITM_NORMAL: /* normal packet */
-        rbl -= 60;    /* keeps max packet size in 11 bits */
+        rbl = item->packet.len - 60;           /* keeps max packet size in 11 bits */
         xq->var->rbdl_buf[4] = (rbl & 0x0700); /* high bits of rbl */
         xq->var->rbdl_buf[4] |= 0x00f8;        /* set reserved bits to 1 */
         break;
