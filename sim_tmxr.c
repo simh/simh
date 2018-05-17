@@ -2411,7 +2411,7 @@ return SCPE_OK;
 
 static int32 _tmln_speed_delta (CONST char *cptr)
 {
-struct {
+static struct {
     const char *bps;
     int32 delta;
     } *spd, speeds[] = {
@@ -2438,10 +2438,16 @@ struct {
     {"0",       0}};                    /* End of List, last valid value */
 int nspeed;
 char speed[24];
+int nfactor = 1;
 
 nspeed = (uint32)strtotv (cptr, &cptr, 10);
 if ((*cptr != '\0') && (*cptr != '-') && (*cptr != '*'))
     return -1;
+if (*cptr == '*') {
+    nfactor = (uint32)strtotv (cptr+1, NULL, 10);
+    if ((nfactor < 1) || (nfactor > 32))
+        return -1;
+    }
 sprintf (speed, "%d", nspeed);
 
 spd = speeds;
@@ -3940,6 +3946,10 @@ else {
                     if (lp->rxbpsfactor != TMXR_RX_BPS_UNIT_SCALE)
                         fprintf(st, "*%.0f", lp->rxbpsfactor/TMXR_RX_BPS_UNIT_SCALE);
                     fprintf(st, " bps");
+                    }
+                else {
+                    if (lp->rxbpsfactor != TMXR_RX_BPS_UNIT_SCALE)
+                        fprintf(st, ", Speed=*%.0f bps", lp->rxbpsfactor/TMXR_RX_BPS_UNIT_SCALE);
                     }
                 fprintf (st, "\n");
                 }
