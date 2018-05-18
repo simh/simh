@@ -1636,8 +1636,6 @@ else {
     c = (char)toupper (*tptr++);
     if (c == '/') {
         val2 = strtotv (tptr, &tptr, 10);
-        while (sim_isspace (*tptr))
-            ++tptr;
         if ((*tptr != '\0') || (val == 0))
             return sim_messagef (SCPE_ARG, "Invalid throttle delay specifier: %s\n", cptr);
         }

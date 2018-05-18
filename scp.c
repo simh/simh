@@ -3291,7 +3291,7 @@ strlcpy (abuf, fcptr, sizeof(abuf));
 c = abuf;
 do_arg[10] = NULL;                                      /* make sure the argument list always ends with a NULL */
 for (nargs = 0; nargs < 10; ) {                         /* extract arguments */
-    while (sim_isspace (*c))                                /* skip blanks */
+    while (sim_isspace (*c))                            /* skip blanks */
         c++;
     if (*c == 0)                                        /* all done? */
         do_arg [nargs++] = NULL;                        /* null argument */
@@ -8558,6 +8558,7 @@ if (0 == memcmp (cptr, "\xEF\xBB\xBF", 3))              /* Skip/ignore UTF8_BOM 
     memmove (cptr, cptr + 3, strlen (cptr + 3));
 while (sim_isspace (*cptr))                             /* trim leading spc */
     cptr++;
+sim_trim_endspc (cptr);                                 /* trim trailing spc */
 if ((*cptr == ';') || (*cptr == '#')) {                 /* ignore comment */
     if (sim_do_echo)                                    /* echo comments if -v */
         sim_printf("%s> %s\n", do_position(), cptr);
