@@ -98,10 +98,11 @@ DEBTAB              crd_debug[] = {
 
 // simulator available IBM 533 wirings
 struct card_wirings wirings[] = {
-    {WIRING_8WORD,  "8WORD"},
-    {WIRING_SOAP,   "SOAP"}, 
-    {WIRING_IS,     "IS"}, 
-    {WIRING_IT,     "IT"}, 
+    {WIRING_8WORD,       "8WORD"},
+    {WIRING_SOAP,        "SOAP"}, 
+    {WIRING_IS,          "IS"}, 
+    {WIRING_IT,          "IT"}, 
+    {WIRING_FORTRANSIT,  "FORTRANSIT"}, 
     {0, 0},
 };
 
@@ -177,7 +178,9 @@ void
 vm_init(void) {
     int i;
     // Initialize vm memory to all plus zero 
-    for(i = 0; i < MAXMEMSIZE; i++) DRUM[i] = DRUM_NegativeZeroFlag[i] = 0;
+    for(i = 0; i < MAXDRUMSIZE; i++) DRUM[i] = DRUM_NegativeZeroFlag[i] = 0;
+    for(i = 0; i < 60; i++) IAS[i] = IAS_NegativeZeroFlag[i] = 0;
+
     // init specific commands
     sim_vm_cmd = aux_cmds;                       /* set up the auxiliary command table */
 }
@@ -193,68 +196,125 @@ sim_load(FILE * fileref, CONST char *cptr, CONST char *fnam, int flag)
    /* Currently not implimented until I know format of load files */
     return SCPE_NOFNC;
 }
-
-/* Symbol tables */
-typedef struct _opcode
-{
-    uint16              opbase;
-    const char         *name;
-    uint8               bReadData;      // =1 if inst fetchs data from memory
-}
-t_opcode;
+
 
 /* Opcodes */
-t_opcode  base_ops[] = {
-        {OP_AABL,     "AABL",       1},
-        {OP_AL,       "AL",         1},
-        {OP_AU,       "AU",         1},
-        {OP_BRNZ,     "BRNZ",       0},
-        {OP_BRMIN,    "BRMIN",      0},
-        {OP_BRNZU,    "BRNZU",      0},
-        {OP_BROV,     "BROV",       0},
-        {OP_BRD1,     "BRD1",       0},
-        {OP_BRD2,     "BRD2",       0},
-        {OP_BRD3,     "BRD3",       0},
-        {OP_BRD4,     "BRD4",       0},
-        {OP_BRD5,     "BRD5",       0},
-        {OP_BRD6,     "BRD6",       0},
-        {OP_BRD7,     "BRD7",       0},
-        {OP_BRD8,     "BRD8",       0},
-        {OP_BRD9,     "BRD9",       0},
-        {OP_BRD10,    "BRD10",      0},
-        {OP_DIV,      "DIV",        1},
-        {OP_DIVRU,    "DIVRU",      1},
-        {OP_LD,       "LD",         1},
-        {OP_MULT,     "MULT",       1},
-        {OP_NOOP,     "NOOP",       0},
-        {OP_PCH,      "PCH",        0},
-        {OP_RD,       "RD",         0},
-        {OP_RAABL,    "RAABL",      1},
-        {OP_RAL,      "RAL",        1},
-        {OP_RAU,      "RAU",        1},
-        {OP_RSABL,    "RSABL",      1},
-        {OP_RSL,      "RSL",        1},
-        {OP_RSU,      "RSU",        1},
-        {OP_SLT,      "SLT",        0},
-        {OP_SCT,      "SCT",        0},
-        {OP_SRT,      "SRT",        0},
-        {OP_SRD,      "SRD",        0},
-        {OP_STOP,     "STOP",       0},
-        {OP_STD,      "STD",        0},
-        {OP_STDA,     "STDA",       0},
-        {OP_STIA,     "STIA",       0},
-        {OP_STL,      "STL",        0},
-        {OP_STU,      "STU",        0},
-        {OP_SABL,     "SABL",       1},
-        {OP_SL,       "SL",         1},
-        {OP_SU,       "SU",         1},
-        {OP_TLU,      "TLU",        0},
-        {0,           NULL,         0}
+t_opcode  base_ops[100] = {
+        // opcode     name    soap name      R/W? option         Valid Data Address
+        {OP_NOOP,     "NOOP",  "NOP",          0, 0,             vda_DAITS},
+        {OP_STOP,     "STOP",  "HLT",          0, 0,             vda_DAITS},
+        {OP_UFA,      "FASN",  "UFA",   opReadDA, opStorUnit,    vda_DAIS},
+        {OP_RTC,      "RCT",   "RTC",          0, opCntrlUnit,   vda_T},
+        {OP_RTN,      "RT",    "RTN",          0, opCntrlUnit,   vda_T},
+        {OP_RTA,      "RTA",   "RTA",          0, opCntrlUnit,   vda_T},
+        {OP_WTN,      "WT",    "WTN",          0, opCntrlUnit,   vda_T},
+        {OP_WTA,      "WTA",   "WTA",          0, opCntrlUnit,   vda_T},
+        {OP_LIB,      "LBB",   "LIB",   opReadDA, opStorUnit,    vda_D,     IL_IAS},
+        {OP_LDI,      "LB",    "LDI",   opReadDA, opStorUnit,    vda_D,     IL_IAS},
+
+        {OP_AU,       "AU",    "AUP",   opReadDA, 0,             vda_DAIS},
+        {OP_SU,       "SU",    "SUP",   opReadDA, 0,             vda_DAIS},
+        {12,          NULL,    NULL,           0, 0,             0},     
+        {13,          NULL,    NULL,           0, 0,             0}, 
+        {OP_DIV,      "DIV",   "DIV",   opReadDA, 0,             vda_DAIS},
+        {OP_AL,       "AL",    "ALO",   opReadDA, 0,             vda_DAIS},
+        {OP_SL,       "SL",    "SLO",   opReadDA, 0,             vda_DAIS},
+        {OP_AABL,     "AABL",  "AML",   opReadDA, 0,             vda_DAIS},
+        {OP_SABL,     "SABL",  "SML",   opReadDA, 0,             vda_DAIS},
+        {OP_MULT,     "MULT",  "MPY",   opReadDA, 0,             vda_DAIS},
+
+        {OP_STL,      "STL",   "STL",  opWriteDA, 0,             vda_DS},
+        {OP_STU,      "STU",   "STU",  opWriteDA, 0,             vda_DS},
+        {OP_STDA,     "STDA",  "SDA",  opWriteDA, 0,             vda_DS},
+        {OP_STIA,     "STIA",  "SIA",  opWriteDA, 0,             vda_DS},
+        {OP_STD,      "STD",   "STD",  opWriteDA, 0,             vda_DS},
+        {OP_NTS,      "BNTS",  "NTS",          0, opCntrlUnit,   vda_DAIS},
+        {OP_BIN,      "BIN",   "BIN",          0, opCntrlUnit,   vda_D},
+        {OP_SET,      "SET",   "SET",          0, opStorUnit,    vda_S,     IL_IAS},
+        {OP_SIB,      "STBB",  "SIB",          0, opStorUnit,    vda_D,     IL_IAS},
+        {OP_STI,      "STB",   "STI",          0, opStorUnit,    vda_D,     IL_IAS},
+        
+        {OP_SRT,      "SRT",   "SRT",          0, 0,             vda_DAITS},
+        {OP_SRD,      "SRD",   "SRD",          0, 0,             vda_DAITS},
+        {OP_FAD,      "FA",    "FAD",   opReadDA, opStorUnit,    vda_DAIS},
+        {OP_FSB,      "FS",    "FSB",   opReadDA, opStorUnit,    vda_DAIS},
+        {OP_FDV,      "FD",    "FDV",   opReadDA, opStorUnit,    vda_DAIS},
+        {OP_SLT,      "SLT",   "SLT",          0, 0,             vda_DAITS},
+        {OP_SCT,      "SCT",   "SCT",          0, 0,             vda_DAITS},
+        {OP_FAM,      "FAAB",  "FAM",   opReadDA, opStorUnit,    vda_DAIS},
+        {OP_FSM,      "FSAB",  "FSM",   opReadDA, opStorUnit,    vda_DAIS},
+        {OP_FMP,      "FM",    "FMP",   opReadDA, opStorUnit,    vda_DAIS},
+        
+        {OP_NZA,      "BNZA",  "NZA",          0, opStorUnit,    vda_DAIS},
+        {OP_BMA,      "BMNA",  "BMA",          0, opStorUnit,    vda_DAIS},
+        {OP_NZB,      "BNZB",  "NZB",          0, opStorUnit,    vda_DAIS},
+        {OP_BMB,      "BMNB",  "BMB",          0, opStorUnit,    vda_DAIS},
+        {OP_BRNZU,    "BRNZU", "NZU",          0, 0,             vda_DAIS},
+        {OP_BRNZ,     "BRNZ",  "NZE",          0, 0,             vda_DAIS},
+        {OP_BRMIN,    "BRMIN", "BMI",          0, 0,             vda_DAIS},
+        {OP_BROV,     "BROV",  "BOV",          0, 0,             vda_DAIS},
+        {OP_NZC,      "BNZC",  "NZC",          0, opStorUnit,    vda_DAIS},
+        {OP_BMC,      "BMNC",  "BMC",          0, opStorUnit,    vda_DAIS},
+
+        {OP_AXA,      "AA",    "AXA",          0, opStorUnit,    vda_DAS},
+        {OP_SXA,      "SA",    "SXA",          0, opStorUnit,    vda_DAS},
+        {OP_AXB,      "AB",    "AXB",          0, opStorUnit,    vda_DAS},
+        {OP_SXB,      "SB",    "SXB",          0, opStorUnit,    vda_DAS},
+        {OP_NEF,      "BRNEF", "NEF",          0, opCntrlUnit,   vda_DAIS},
+        {OP_RWD,      "RWD",   "RWD",          0, opCntrlUnit,   vda_T},
+        {OP_WTM,      "WTM",   "WTM",          0, opCntrlUnit,   vda_T},
+        {OP_BST,      "BSP",   "BST",          0, opCntrlUnit,   vda_T},
+        {OP_AXC,      "AC",    "AXC",          0, opStorUnit,    vda_DAS},
+        {OP_SXC,      "SC",    "SXC",          0, opStorUnit,    vda_DAS},
+
+        {OP_RAU,      "RAU",   "RAU",   opReadDA, 0,             vda_DAIS},
+        {OP_RSU,      "RSU",   "RSU",   opReadDA, 0,             vda_DAIS},
+        {62,          NULL,    NULL,           0, 0,             0},     
+        {63,          NULL,    NULL,           0, 0,             0},     
+        {OP_DIVRU,    "DIVRU", "DVR",   opReadDA, 0,             vda_DAIS},
+        {OP_RAL,      "RAL",   "RAL",   opReadDA, 0,             vda_DAIS},
+        {OP_RSL,      "RSL",   "RSL",   opReadDA, 0,             vda_DAIS},
+        {OP_RAABL,    "RAABL", "RAM",   opReadDA, 0,             vda_DAIS},
+        {OP_RSABL,    "RSABL", "RSM",   opReadDA, 0,             vda_DAIS},
+        {OP_LD,       "LD",    "LDD",   opReadDA, 0,             vda_DAIS},
+
+        {OP_RD,       "RD",    "RD1",          0, 0,             vda_DS,    IL_RD1},
+        {OP_PCH,      "PCH",   "WR1",          0, 0,             vda_DS,    IL_WR1},
+        {OP_RC1,      "RC1",   "RC1",          0, opStorUnit,    vda_DS,    IL_RD1},
+        {OP_RD2,      "RD2",   "RD2",          0, opStorUnit,    vda_DS,    IL_RD23},
+        {OP_WR2,      "WR2",   "WR2",          0, opStorUnit,    vda_DS,    IL_WR23},
+        {OP_RC2,      "RC2",   "RC2",          0, opStorUnit,    vda_DS,    IL_RD23},
+        {OP_RD3,      "RD3",   "RD3",          0, opStorUnit,    vda_DS,    IL_RD23},
+        {OP_WR3,      "WR3",   "WR3",          0, opStorUnit,    vda_DS,    IL_WR23},
+        {OP_RC3,      "RC3",   "RC3",          0, opStorUnit,    vda_DS,    IL_RD23},
+        {OP_RPY,      "RPY",   "RPY",          0, opCntrlUnit,   vda_D},
+
+        {OP_RAA,      "RAA",   "RAA",          0, opStorUnit,    vda_DAS},
+        {OP_RSA,      "RSA",   "RSA",          0, opStorUnit,    vda_DAS},
+        {OP_RAB,      "RAB",   "RAB",          0, opStorUnit,    vda_DAS},
+        {OP_RSB,      "RSB",   "RSB",          0, opStorUnit,    vda_DAS},
+        {OP_TLU,      "TLU",   "TLU",          0, 0,             vda_DS},
+        {OP_SDS,      "SDS",   "SDS",          0, opCntrlUnit,   vda_9000},
+        {OP_RDS,      "RDS",   "RDS",          0, opCntrlUnit,   vda_9000},
+        {OP_WDS,      "WDS",   "WDS",          0, opCntrlUnit,   vda_9000},
+        {OP_RAC,      "RAC",   "RAC",          0, opStorUnit,    vda_DAS},
+        {OP_RSC,      "RSC",   "RSC",          0, opStorUnit,    vda_DAS},
+
+        {OP_BRD10,    "BRD10", "BDO",          0, 0,             vda_DAIS},
+        {OP_BRD1,     "BRD1",  "BD1",          0, 0,             vda_DAIS},
+        {OP_BRD2,     "BRD2",  "BD2",          0, 0,             vda_DAIS},
+        {OP_BRD3,     "BRD3",  "BD3",          0, 0,             vda_DAIS},
+        {OP_BRD4,     "BRD4",  "BD4",          0, 0,             vda_DAIS},
+        {OP_BRD5,     "BRD5",  "BD5",          0, 0,             vda_DAIS},
+        {OP_BRD6,     "BRD6",  "BD6",          0, 0,             vda_DAIS},
+        {OP_BRD7,     "BRD7",  "BD7",          0, 0,             vda_DAIS},
+        {OP_BRD8,     "BRD8",  "BD8",          0, 0,             vda_DAIS},
+        {OP_BRD9,     "BRD9",  "BD9",          0, 0,             vda_DAIS}
 };
 
 /* Print out an instruction */
 void
-print_opcode(FILE * of, t_int64 val, t_opcode * tab)
+print_opcode(FILE * of, t_int64 val)
 {
 
     int sgn;
@@ -262,25 +322,21 @@ print_opcode(FILE * of, t_int64 val, t_opcode * tab)
     int DA; 
     int op;
     int n;
+    CONST char * opname;
 
     if (val < 0) {sgn = -1; val = -val;} else sgn = 1;
-    op = Shift_Digits(&val, 2);          // opcode
-    DA = Shift_Digits(&val, 4);          // data address
-    IA = Shift_Digits(&val, 4);          // intruction address
 
-    while (tab->name != NULL) {
-        if (tab->opbase == op) {
-            fputs(tab->name, of);
-            n = strlen(tab->name);
-            while (n++<6) fputc(' ', of);
-            fprintf(of, "%04d ", DA);
-            fputc(' ', of);
-            fprintf(of, "%04d ", IA);
-            return;
-        }
-        tab++;
+    opname = DecodeOpcode(val, &op, &DA, &IA);
+    if (opname == NULL) {
+       fprintf(of, " %d Unknown opcode", op);
+       return; 
     }
-    fprintf(of, " %d Unknown opcode", op);
+    fputs(opname, of);
+    n = strlen(opname);
+    while (n++<6) fputc(' ', of);
+    fprintf(of, "%04d ", DA);
+    fputc(' ', of);
+    fprintf(of, "%04d ", IA);
 }
 
 /* Symbolic decode
@@ -298,7 +354,7 @@ print_opcode(FILE * of, t_int64 val, t_opcode * tab)
 t_stat
 fprint_sym(FILE * of, t_addr addr, t_value * val, UNIT * uptr, int32 sw)
 {
-    t_int64            inst;
+    t_int64            d, inst;
     int                NegZero;
     int ch;
 
@@ -318,9 +374,10 @@ fprint_sym(FILE * of, t_addr addr, t_value * val, UNIT * uptr, int32 sw)
     if (sw & SWMASK('C') ) {
         int                 i;
 
+        d = inst;
         fputs("   '", of);
         for (i=0;i<5;i++) {
-            ch = Shift_Digits(&inst, 2);
+            ch = Shift_Digits(&d, 2);
             fputc(mem_to_ascii[ch], of);
         }
         fputc('\'', of);
@@ -329,20 +386,25 @@ fprint_sym(FILE * of, t_addr addr, t_value * val, UNIT * uptr, int32 sw)
     if (sw & SWMASK('M')) {
         fputs("   ", of);
         inst = AbsWord(inst);
-        print_opcode(of, inst, base_ops);
+        print_opcode(of, inst);
     }
     return SCPE_OK;
 }
 
-t_opcode *
-find_opcode(char *op, t_opcode * tab)
+int 
+find_opcode(char *op)
 {
-    while (tab->name != NULL) {
-        if (*tab->name != '\0' && strcmp(op, tab->name) == 0)
-            return tab;
-        tab++;
+    int i;
+    if (op == NULL) return -1;
+    for (i=0;i<100;i++) {
+        if (base_ops[i].name1 == NULL) continue;
+        // accept both mnemonic sets: operation manual one (name1) and soap one (name2)
+        if ((base_ops[i].name1 != NULL) && (strcmp(op, base_ops[i].name1) == 0))
+            return i;
+        if ((base_ops[i].name2 != NULL) && (strcmp(op, base_ops[i].name2) == 0))
+            return i;
     }
-    return NULL;
+    return -1;
 }
 
 /* read n digits, optionally with sign NNNN[+|-]
@@ -414,9 +476,8 @@ int ascii_to_NN(int ch)
 t_stat parse_sym(CONST char *cptr, t_addr addr, UNIT * uptr, t_value * val, int32 sw)
 {
     t_int64             d;
-    int                 da, ia;
+    int                 op, da, ia;
     char                ch, opcode[100];
-    t_opcode            *op;
     int                 i;
     int neg, IsNeg;
 
@@ -429,8 +490,14 @@ t_stat parse_sym(CONST char *cptr, t_addr addr, UNIT * uptr, t_value * val, int3
 
         cptr = get_glyph(cptr, opcode, 0);
 
-        op = find_opcode(opcode, base_ops);
-        if (op == 0) return STOP_UUO;
+        op = find_opcode(opcode);
+        if (op < 0) return STOP_UUO;
+
+        if (DecodeOpcode(op * (t_int64) D8, &op, &da, &ia) == NULL) {
+            // opcode exists, but not availble because associated hw (Storage Unit or Control Unit) 
+            // is not enabled
+            return STOP_UUO;
+        }
 
         while (isspace(*cptr)) cptr++;
         /* Collect first argument: da */
@@ -443,13 +510,15 @@ t_stat parse_sym(CONST char *cptr, t_addr addr, UNIT * uptr, t_value * val, int3
         cptr = parse_n(&d, cptr, 4);
         ia = (int) d; 
         // construct inst
-        d = op->opbase * (t_int64) D8 + da * (t_int64) D4 + (t_int64) ia;
+        d = op * (t_int64) D8 + da * (t_int64) D4 + (t_int64) ia;
     } else if (sw & SWMASK('C')) {
         d = 0;
+        if ((*cptr == 34) || (*cptr == 39)) cptr++; // skip double or single quotes if present
         for(i=0; i<5;i++) {
             d = d * 100;
             ch = *cptr; 
             if (ch == '\0') continue;
+            if ((*cptr == 34) || (*cptr == 39)) continue; // double or single quotes mark end of text
             cptr++;
             d = d + ascii_to_NN(ch);
         }
@@ -468,24 +537,6 @@ t_stat parse_sym(CONST char *cptr, t_addr addr, UNIT * uptr, t_value * val, int3
     }
     return SCPE_OK;
 }
-
-// get data for opcode
-// return pointer to opcode name if opcode found, else NULL
-const char * get_opcode_data(int opcode, int * bReadData)
-{
-    t_opcode * tab = base_ops; 
-
-    *bReadData = 0;
-    while (tab->name != NULL) {
-        if (tab->opbase == opcode) {
-            *bReadData  = tab->bReadData;
-            return tab->name;
-        }
-        tab++;
-    }
-    return NULL;
-}
-
 
 /* Helper functions */
 
@@ -568,10 +619,10 @@ int Shift_Digits(t_int64 * d, int nDigits)
                                  the source deck to be splitted
 
                         <count>  number of cards in each splitted deck. 
-                                 If count >= 0, indicates the cards on first destination deck file 
-                                                remaining cards go to the second destination deck
-                                 If count < 0,  indicates the cards on second destination deck file 
-                                                (so deck 2 contains lasts count cards from source)
+                                 If count > 0, indicates the cards on first destination deck file 
+                                               remaining cards go to the second destination deck
+                                 If count < 0, indicates the cards on second destination deck file 
+                                               (so deck 2 contains lasts count cards from source)
 
                         <file1>  first destination deck file
                         <file2>  second destination deck file
@@ -602,13 +653,19 @@ int Shift_Digits(t_int64 * d, int nDigits)
 
                         carddeck print <file>                         
 
+   carddeck echolast    echo on console last n cards already read that are in the take hopper
+
+                        carddeck echolasty <count> <dev> 
+
+                        <count>  number of cards to display (upo to 10)
+
+                        <dev>    should be cdr1 to cdr3. Unit for Take hopper
+
+
    switches:            if present mut be just after carddeck and before deck operation
     -Q                  quiet return status. 
            
 */
-
-// max number of cards in deck for cadrdeck internal command
-#define MAX_CARDS_IN_DECK  10000
 
 // load card file fn and add its cards to 
 // DeckImage array, up to a max of nMaxCards
@@ -702,6 +759,38 @@ t_stat deck_save(CONST char *fn, uint16 * DeckImage, int card, int nCards)
     return r;
 }
 
+// echo/print nCards from DeckImage array 
+// uses cdp0 device/unit
+void deck_print_echo(uint16 * DeckImage, int nCards, int bPrint, int bEcho)
+{
+    char line[81]; 
+    int i,c,nc;
+
+    for (nc=0; nc<nCards; nc++) {
+        // read card, check and, store in line
+        for (i=0;i<80;i++) {
+            c = DeckImage[nc * 80 + i];
+            c = toupper(c);                             // IBM 407 can only print uppercase
+            if ((c == '?') || (c == '!')) c = '0';      // remove Y(12) or X(11) punch on zero 
+            if (strchr(mem_to_ascii, c) == 0) c = ' ';  // space if not in IBM 650 character set
+            line[i] = c;
+        }
+        line[80]=0;
+        sim_trim_endspc(line); 
+        // echo on console (add CR LF)
+        if (bEcho) {
+            for (i=0;i<(int)strlen(line);i++) sim_putchar(line[i]);     
+            sim_putchar(13);sim_putchar(10);
+        }
+        // printout will be directed to file attached to CDP0 unit, if any
+        if ((bPrint) && (cdp_unit[0].flags & UNIT_ATT)) {
+            sim_fwrite(line, 1, strlen(line), cdp_unit[0].fileref); // fwrite clears line!
+            line[0] = 13; line[1] = 10; line[2] = 0;  
+            sim_fwrite(line, 1, 2, cdp_unit[0].fileref); 
+        }
+    }
+}
+
 // carddeck split <count> <dev|file0> <file1> <file2>
 static t_stat deck_split_cmd(CONST char *cptr)
 {
@@ -727,14 +816,16 @@ static t_stat deck_split_cmd(CONST char *cptr)
     cptr = get_glyph (cptr, gbuf, 0);                       // get cards count param    
     nCards1 = (int32) get_uint (gbuf, 10, 10000, &r);
     if (r != SCPE_OK) return sim_messagef (SCPE_ARG, "Invalid count value\n");
+    if (nCards1 == 0) return sim_messagef (SCPE_ARG, "Count cannot be zero\n");
 
-    cptr = get_glyph (cptr, gbuf, 0);                       // get dev|file0 param    
+    get_glyph (cptr, gbuf, 0);                              // get dev param 
+    cptr = get_glyph_quoted (cptr, fn0, 0);                 // re-read using get_glyph_quoted to do not 
+                                                            // change the capitalization of file name
     if ((strlen(gbuf) != 4) || (strncmp(gbuf, "CDP", 3)) ||
         (gbuf[3] < '1') || (gbuf[3] > '3') ) {
         // is a file
-        strcpy(fn0, gbuf);
     } else {
-        // is cpd1 cpd2 or cpd3 device
+        // is cdp1 cdp2 or cdp3 device
         dptr = find_unit (gbuf, &uptr);                     /* locate unit */
         if (dptr == NULL)                                   /* found dev? */
             return SCPE_NXDEV;
@@ -742,6 +833,7 @@ static t_stat deck_split_cmd(CONST char *cptr)
             return SCPE_NXUN;
         if ((uptr->flags & UNIT_ATT) == 0)                  /* attached? */
             return SCPE_NOTATT;
+        // get the file name
         strcpy(fn0, uptr->filename);
         sim_card_detach(uptr);                              // detach file from cdp device to be splitted
     }
@@ -842,11 +934,10 @@ static t_stat deck_join_cmd(CONST char *cptr)
 static t_stat deck_print_cmd(CONST char *cptr)
 {
     char fn[4*CBUFSIZE];
-    char line[81]; 
     t_stat r;
 
     uint16 DeckImage[80 * MAX_CARDS_IN_DECK];
-    int i,c,nc,nCards;
+    int nCards;
 
     while (sim_isspace (*cptr)) cptr++;                     // trim leading spc 
     cptr = get_glyph_quoted (cptr, fn, 0);                  // get next param: source filename 
@@ -858,32 +949,66 @@ static t_stat deck_print_cmd(CONST char *cptr)
     r = deck_load(fn, DeckImage, &nCards);
     if (r != SCPE_OK) return sim_messagef (r, "Cannot read deck to print (%s)\n", fn);
 
-    for (nc=0; nc<nCards; nc++) {
-        // read card, check and, store in line
-        for (i=0;i<80;i++) {
-            c = DeckImage[nc * 80 + i];
-            c = toupper(c);                             // IBM 407 can only print uppercase
-            if ((c == '?') || (c == '!')) c = '0';      // remove Y(12) or X(11) punch on zero 
-            if (strchr(mem_to_ascii, c) == 0) c = ' ';  // space if not in IBM 650 character set
-            line[i] = c;
-        }
-        line[80]=0;
-        sim_trim_endspc(line); 
-        // echo on console (add CR LF)
-        for (i=0;i<(int)strlen(line);i++) sim_putchar(line[i]);     
-        sim_putchar(13);sim_putchar(10);
-        // printout will be directed to file attached to CDP0 unit, if any
-        if (cdp_unit[0].flags & UNIT_ATT) {
-            sim_fwrite(line, 1, strlen(line), cdp_unit[0].fileref); // fwrite clears line!
-            line[0] = 13; line[1] = 10; line[2] = 0;  
-            sim_fwrite(line, 1, 2, cdp_unit[0].fileref); 
-        }
-    }
+    deck_print_echo(DeckImage, nCards, 1,1);
 
     if ((sim_switches & SWMASK ('Q')) == 0) {
         sim_messagef (SCPE_OK, "Printed Deck with %d cards (%s)\n", nCards, fn);
     }
     
+    return SCPE_OK;
+}
+
+// carddeck echolast <dev> <count>
+static t_stat deck_echolast_cmd(CONST char *cptr)
+{
+    char gbuf[4*CBUFSIZE];
+    t_stat r;
+
+    uint16 DeckImage[80 * MAX_CARDS_IN_DECK];
+    int i,nc,nCards, ic, nh, ncdr;
+
+    while (sim_isspace (*cptr)) cptr++;                     // trim leading spc 
+
+    cptr = get_glyph (cptr, gbuf, 0);                       // get cards count param    
+    nCards = (int32) get_uint (gbuf, 10, MAX_CARDS_IN_READ_TAKE_HOPPER, &r);
+    if (r != SCPE_OK) return sim_messagef (SCPE_ARG, "Invalid count value\n");
+    if (nCards == 0) return sim_messagef (SCPE_ARG, "Count cannot be zero\n");
+
+    cptr = get_glyph (cptr, gbuf, 0);                       // get dev param    
+    if ((strlen(gbuf) != 4) || (strncmp(gbuf, "CDR", 3)) ||
+        (gbuf[3] < '1') || (gbuf[3] > '3') ) {
+        return sim_messagef (SCPE_ARG, "Device should be CDR1 CDR2 or CDR3\n");
+    }
+    ncdr = gbuf[3] - '1'; // ncdr=0 for cdr1, =1 for cdr2, and so on
+    if ((ncdr >= 0) && (ncdr < 3)){
+        // safety check
+    } else {
+        return sim_messagef (SCPE_ARG, "Invalid Device number\n");
+    }
+
+    if (*cptr) return sim_messagef (SCPE_ARG, "Extra unknown parameters\n");
+
+    // get nCards form read card take hopper buffer
+    // that is, print last nCards read
+
+    // get last nCards cards, so
+    // first card to echo is count ones before last one
+    nh = ReadHopperLast[ncdr] - (nCards-1);                 
+    nh = nh % MAX_CARDS_IN_READ_TAKE_HOPPER;
+    for (nc=0; nc<nCards; nc++) {
+        // copy card form read hopper buf to deck image
+        ic = (ncdr * MAX_CARDS_IN_READ_TAKE_HOPPER + nh) * 80;
+        for (i=0;i<80;i++) DeckImage[nc * 80 + i] = ReadHopper[ic + i];
+        // get previous read card
+        nh = (nh + 1) % MAX_CARDS_IN_READ_TAKE_HOPPER;
+    }
+
+    deck_print_echo(DeckImage, nCards, 0,1);
+
+    if ((sim_switches & SWMASK ('Q')) == 0) {
+        sim_messagef (SCPE_OK, "Last %d cards from Read take Hopper\n", nCards);
+    }
+        
     return SCPE_OK;
 }
 
@@ -906,6 +1031,9 @@ static t_stat ibm650_deck_cmd(int32 arg, CONST char *buf)
     }
     if (strcmp(gbuf, "PRINT") == 0) {
         return deck_print_cmd(cptr);
+    }
+    if (strcmp(gbuf, "ECHOLAST") == 0) {
+        return deck_echolast_cmd(cptr);
     }
     return sim_messagef (SCPE_ARG, "Unknown deck command operation\n");
 }

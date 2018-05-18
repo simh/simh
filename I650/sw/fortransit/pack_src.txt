@@ -1,0 +1,684 @@
+                                        1 
+                                        1 fortran package 
+                                        1 source code
+                                        1 
+                                               blr 1945  1950 entry power subr     total reservation 
+                                               regp1951  1960 read band            1947 - 1999, 0000
+                                               blr 1961  1968 entry built-in subr  (54 words)
+                                               blr 1969  1976 entry func subr 
+                                               regj1977  1986 punch band      
+                                               blr 1987  1987
+                                               regw1988  1998 storage band                                   
+                                        1 
+                                        1 save index registers 
+                                        1
+                                          ezzzastdezzzx
+                                               ldd 8005
+                                               stdezzia
+                                               ldd 8006
+                                               stdezzib
+                                               ldd 8007
+                                               stdezzic ezzzx
+                                        1
+                                        1 restore saved index registers and return to erthx
+                                        1
+                                          ezzzblddezzia
+                                               raa 8001
+                                               lddezzib
+                                               rab 8001
+                                               lddezzic 
+                                               rac 8001 erthx
+                                          ezzzx 00 0000  0000
+                                          ezzia 00 0000  0000
+                                          ezzib 00 0000  0000
+                                          ezzic 00 0000  0000
+                                        1 
+                                        1 overflow checking
+                                        1
+                                          e00aabov       8001
+                                               hlt 0100  8001 alarm arithmetic overflow
+                                        1 
+                                        1 (l) fixed point <- (u) float
+                                        1
+                                          e00thstderthx       float upper
+                                               srt 0002       to fix lower        
+                                               stuartha       save mantissa                      
+                                               ram 8002       test exp              
+                                               slon51         store zero            
+                                               bmiad1         if less than          
+                                               slon10         51     alarm          
+                                               bmi      ad3   if grtr than          
+                                               srt 0004       60                    
+                                               aloonet                               
+                                               lddad2a        modify                
+                                               sdaad2          shift                
+                                               ralartha                             
+                                               slt 0002 ad2                         
+                                          ad1  ral 8003 erthx store zero            
+                                          ad2  srt 0000 erthx shift const           
+                                          ad2a srt 0000 erthx                       
+                                          ad3  ldderthx
+                                               hlt 0501  8001 alarm float >= 10e10 thus cannot be converted to fix 
+                                          n10   10 0000  0000                       
+                                          n51   51 0000  0000                                 
+                                          onet  00 0001  0000                
+                                          erthx 00 0000  0000                 
+                                          artha 00 0000  0000                   
+                                        1 
+                                        1 (u) and (acc) float <- (l) fixed point 
+                                        1
+                                          e00afstdartha       float to up   
+                                               ldd      e00ae and acc        
+                                               stuacc   artha
+                                        1 
+                                        1 (u) float <- (l) fixed point 
+                                        1
+                                          e00aestderthx       float to up             
+                                               rau 8002 ae0    only                   
+                                          ae0  sct 0000       normalize               
+                                               stlarthb                                
+                                               bovad1         zero check              
+                                               ral 8003                               
+                                               srd 0002       round for               
+                                               slt 0002       placing exp             
+                                               nzu      ae6   check round             
+                                               ldd 8003        overflow               
+                                               srt 0001                               
+                                               alo 8001 ae6                           
+                                          ae6  bmiae2         insert                  
+                                               aloaj3   ae5    exponent               
+                                          ae2  sloaj3   ae5                           
+                                          ae5  sloarthb  
+                                               rau 8002 erthx
+                                          aj3   00 0000  0060
+                                          arthb 00 0000  0000                   
+                                        1 
+                                        1 punch card
+                                        1
+                                          e00arstderthx       punch out 
+                                               lddj0008     
+                                               siaj0008       store stmnt     
+                                               lddonet
+                                               sdanvars       and nvars to pch
+                                               slo 8001       if stmt zero 
+                                               nzear3         punch if 
+                                               ral 8000       8000 is neg 
+                                               bmiar3   erthx else exit
+                                          ar3  lddar3a  ar5   init pch card
+                                          ar3a ralnvars       dec nvars              
+                                               sloonet                         
+                                               bmiar8         test word       
+                                               stlnvars       count           
+                                               alo       8002 get nword addr
+                                               ralw0002       in lower
+                                               lddnword
+                                               sdanword       store num of words to punch
+                                               slt 0004
+                                               lddadwrd
+                                               sdaadwrd ar4   store addr of word to punch
+                                          ar4  ralnpch        is card full 
+                                               sloarn7         
+                                               bmiar4a
+                                               pchj0001        yes punch and
+                                               lddar4a  ar5    call init card
+                                          ar4a ralnpch        incr no of 
+                                               aloonet         punched words npch 
+                                               stlnpch        
+                                               raladwrd       indr adwrd
+                                               aloonet        
+                                               stladwrd
+                                               sloonet
+                                               alo       8002 get adwrd 
+                                               raly0000        contents
+                                               stldatwd        store in datwd
+                                               raudatld
+                                               alonpch        store at 
+                                               alo       8003  j0000 plus 
+                                               stdj0000        npch
+                                               ralnword       decr var nwords
+                                               sloonet         to be punched
+                                               nze      ar3a   
+                                               bmiar3a
+                                               stlnword ar4
+                                          ar5  stdar5x        sub init pch card
+                                               ralj0008       incr card
+                                               aloonet         number
+                                               stlj0008
+                                               stunpch        card with zero
+                                               stdj0001        punched words 
+                                               stdj0002       set punch     
+                                               stdj0003        band to       
+                                               stdj0004        zeroes        
+                                               stdj0005
+                                               stdj0006
+                                               stdj0007 ar5x
+                                          ar8  pchj0001 erthx punch           
+                                          onet  00 0001  0000                
+                                          arn7  00 0007  0000                
+                                          j0008 00 0000  0000 card counter   
+                                          j0010 80 0000  0080 control cnst   
+                                          ar5x  00 0000  0000 exit for sub init pch card
+                                          nvars 00 0000  0000 num of vars to pch
+                                          nword 00 0000  0000 num of words per var to pch
+                                          adwrd 00 0000  0000 addr of word to pch
+                                          npch  00 0000  0000 num of words punched in chard
+                                          datwd 00 0000  0000 data word to be punched
+                                        1 
+                                        1 read card
+                                        1
+                                          e00aqstderthx       read in
+                                               lddonet
+                                               sdanvars       nvars to read
+                                               stunpch  aq3a  init to zero
+                                          aq3a ralnvars       dec nvars              
+                                               sloonet                         
+                                               bmierthx       exit if zero
+                                               stlnvars           
+                                               alo       8002 get nword addr
+                                               ralw0002       in lower
+                                               lddnword
+                                               sdanword       store num of words to rd
+                                               slt 0004
+                                               lddadwrd
+                                               sdaadwrd aq4   store addr of word to rd
+                                          aq4  ralnpch        check if should rd new card
+                                               nzeaq4a
+                                               rcdp0001        yes read card
+                                               lddarn7
+                                               stdnpch  aq4a
+                                          aq4a ralnpch        decr no of available
+                                               sloonet        punched words npch in read card
+                                               stlnpch 
+                                               ralarn7
+                                               slonpch        get word at 
+                                               alo       8002  p0000 plus 
+                                               lddp0000        npch in dist
+                                               stddatwd        store it in datwd
+                                               raudatld
+                                               aloadwrd       incr adwrd
+                                               aloonet        
+                                               stladwrd
+                                               sloonet
+                                               alo       8003 set adwrd 
+                                               stdy0000        contents from upper
+                                               ralnword       decr var nwords
+                                               sloonet         to be read
+                                               nze      aq3a   
+                                               bmiaq3a
+                                               stlnword aq4
+                                          onet  00 0001  0000                
+                                          datldldddatwd  8002 load card word into dist and jump to lower                 
+                                        1                                
+                                        1 alarm if try to use a not defined subroutine
+                                        1
+                                          e00akhlt 9010  8001 alarm fix ** fix undef
+                                          e00alhlt 9011  8001 alarm float ** fix undef
+                                          e00lqhlt 9302  8001 alarm float ** float undef
+                                          e00abhlt 9001  8001 alarm logf undef
+                                          e00achlt 9002  8001 alarm expf undef
+                                          e00lohlt 9300  8001 alarm lnf undef
+                                          e00lphlt 9301  8001 alarm expnf undef
+                                          e00avhlt 9021  8001 alarm cosf undef
+                                          e00awhlt 9022  8001 alarm sinf undef
+                                          e00axhlt 9023  8001 alarm sqrtf undef
+                                          e00ayhlt 9024  8001 alarm absf undef
+                                          e00azhlt 9025  8001 alarm intf undef
+                                          e00bahlt 9026  8001 alarm maxf undef
+                                          ezztyhlt 9099  8001 alarm function arg is fix but should be float
+                                        1                                  
+                                        1 start of subroutines
+                                        1
+                                        1 
+                                        1 (l) and (acc) fixed <- (l) fixed ** (acc) fixed
+                                        1
+                                          e00akstderthx       power fix fix. m ** p 
+                                               stlartha ak1   m is argmnt     
+                                          ak1  ramacc         p equals        
+                                               stlarthb        abval power    
+                                               ralone         h is result        
+                                               stlarthc ak3    init to one          
+                                          ak3  rauarthb       p is gtst           
+                                               mpyn50          intgr in           
+                                               stuarthb        p over two         
+                                               ral 8002       is remainder        
+                                               nze      ak5     zero              
+                                               rauarthc       if not h is         
+                                               mpyartha        h times m          
+                                               nzuak12
+                                               stlarthc ak5                       
+                                          ak5  rauarthb                           
+                                               nzu      ak6   is p zero           
+                                               rauartha       if not              
+                                               mpy 8001        m equals           
+                                               nzuak12
+                                               stlartha ak3    m squared          
+                                          ak6  rauacc         is power neg        
+                                               bmi      ak7   if so is h          
+                                               ramarthc          zero             
+                                               nze      ak8   if not is h         
+                                               sloone            one            
+                                               nzeak10  ak7                       
+                                          ak7  ralarthc ak11  exhibit h           
+                                          ak10 ral 8003 ak11
+                                          ak11 stlacc   erthx 
+                                          ak12 ldderthx       
+                                               hlt 0003  8001 alarm overflow. fix**fix results in value >= 10e10
+                                          ak8  ldderthx        
+                                               hlt 0010  8001 alarm zero raised to neg
+                                          n50   50 0000  0000                     
+                                          one   00 0000  0001                     
+                                          arthc 00 0000  0000                   
+                                        1 
+                                        1 (u) and (acc) float <- (u) float ** (acc) fixed
+                                        1
+                                          e00alstderthx       power float fix. m ** p 
+                                               stuartha al1   m is argmnt     
+                                          al1  ramacc         p equals        
+                                               stlarthb        abval power    
+                                               ralfp1         h is result 
+                                               stlarthc al3    init to float one          
+                                          al3  rauarthb       p is gtst           
+                                               mpyn50          intgr in           
+                                               stuarthb        p over two         
+                                               ral 8002       is remainder        
+                                               nze      al5     zero              
+                                               rauarthc       if not h is         
+                                               fmpartha        h times m          
+                                               boval12
+                                               stuarthc al5                       
+                                          al5  rauarthb                           
+                                               nzu      al6   is p zero           
+                                               rauartha       if not              
+                                               fmp 8001        m equals           
+                                               boval12
+                                               stuartha al3    m squared          
+                                          al6  rauacc         is power neg        
+                                               bmi      al7   if so is h          
+                                               ramarthc        zero             
+                                               nze      al8   if not calc
+                                               raufp1          h reciprocal
+                                               fdvarthc al11    
+                                          al7  rauarthc al11  exhibit h           
+                                          al11 stuacc   erthx
+                                          al12 ldderthx       
+                                               hlt 0049  8001 alarm overflow. float**fix results in value >= 10e49
+                                          al8  ldderthx       
+                                               hlt 0011  8001 alarm zero raised to neg
+                                          n50   50 0000  0000                     
+                                          fp1   10 0000  0051                     
+                                        1 
+                                        1 (u) float <- 10 ** (u) float 
+                                        1
+                                          e00acstderthx       exponential     
+                                               nze      ac5   is argument   
+                                               nzu      ezzty alarm function arg is fix but should be float
+                                               srt 0002         zero          
+                                               stuarthc       if not let      
+                                               rsm 8002        n be mantsa    
+                                               alon52          x be power     
+                                               bmiac4         is x grtr       
+                                               slt 0001        than ten       
+                                               nzuac5         or less than    
+                                               srt 0005        minus eight    
+                                               aloac6         if x within     
+                                               stlarthb        bounds gen     
+                                               rauarthc       int and        
+                                               srt 0006 arthb fract parts     
+                                          n52   52 0000  0000  of argument    
+                                          ac6  srt 0000       is arg neg      
+                                               bmiac8         if so int is    
+                                               stuarthb ac1   int minus 1     
+                                          ac8  supone         and fract is    
+                                               stuarthb       fract plus 1    
+                                               ral 8002                       
+                                               alon999  ac1                   
+                                          ac1  stlarthc       arthc is frac part
+                                               rau 8002       arthb is int part                
+                                               mpyac18        generate        
+                                               rau 8003                       
+                                               aupac17         polynomial     
+                                               mpyarthc                       
+                                               rau 8003        approximation     
+                                               aupac16              
+                                               mpyarthc                       
+                                               rau 8003          for          
+                                               aupac15                        
+                                               mpyarthc       exponential     
+                                               rau 8003                       
+                                               aupac14                        
+                                               mpyarthc                       
+                                               rau 8003                       
+                                               aupac13                        
+                                               mpyarthc                       
+                                               rau 8003                       
+                                               aupac12                        
+                                               mpyarthc        square         
+                                               rau 8003          result       
+                                               aupn10         scale and       
+                                               mpy 8003        float then     
+                                               srt 0001          exit         
+                                               stuartha                        
+                                               rauac19                        
+                                               auparthb                       
+                                               bmiac20                        
+                                               srt 0002                       
+                                               nzuac21                        
+                                               aupartha                        
+                                               srt 0008 ac20                  
+                                          ac4  ralarthc                       
+                                               bmi      ac21                  
+                                               rau 8003 erthx result zero
+                                          ac5  raufp1   erthx result 1 because argmnt is zero  
+                                          ac20 rau 8002 erthx result in upper
+                                          ac21 ldderthx       
+                                               hlt 0049  8001 alarm overflow. 10**float results in value >= 10e49
+                                          ac12  11 5129  2776                 
+                                          ac13  06 6273  0884                 
+                                          ac14  02 5439  3575                 
+                                          ac15  00 7295  1737                 
+                                          ac16  00 1742  1120                 
+                                          ac17  00 0255  4918                 
+                                          ac18  00 0093  2643                 
+                                          ac19  00 0000  0051                 
+                                          n999  99 9999  9999
+                                          n10   10 0000  0000                       
+                                          one   00 0000  0001                     
+                                          fp1   10 0000  0051                 
+                                          arthc 00 0000  0000                   
+                                        1 
+                                        1 (u) float <- log 10 (u) float 
+                                        1
+                                          e00abnze      ab10  if log arg zero      
+                                               nzu      ezzty alarm function arg is fix but should be float
+                                               bmiab10        or neg alarm      
+                                               stderthx     
+                                               srt 0002                         
+                                               stlarthb       store power 
+                                               rau 8003       form  z          
+                                               aupab1         equal arg        
+                                               stuarthc       minus root       
+                                               supab2         ten over arg     
+                                               dvrarthc       plus root        
+                                               stlartha           ten          
+                                               rau 8002                         
+                                               mpy 8001         z square       
+                                               stuarthc                         
+                                               rau 8003         generate       
+                                               mpyab7                           
+                                               rau 8003       polynomial       
+                                               aupab6                           
+                                               mpyarthc       approximatn      
+                                               rau 8003                         
+                                               aupab5                           
+                                               mpyarthc                          
+                                               rau 8003                         
+                                               aupab4                           
+                                               mpyarthc                          
+                                               rau 8003                         
+                                               aupab3                           
+                                               mpyartha                         
+                                               ral 8003                         
+                                               alon50                           
+                                               srt 0002                         
+                                               aloarthb       add power         
+                                               slon50                           
+                                               srd 0002         round           
+                                               rau 8002                         
+                                               sct 0000       normalize         
+                                               bovab12                          
+                                               bmi      ab13                    
+                                               supab9   ab11  adjust            
+                                          ab11 sup 8002 ab12   power            
+                                          ab12 rau 8003 
+                                               fsbfp1   erthx                   
+                                          ab13 aupab9   ab11                    
+                                          ab10 hlt 0001  8001 alarm log (zero or negavive)
+                                          ab1   00 3162  2780                   
+                                          ab2   00 6324  5560                   
+                                          ab3   86 8591  7180                   
+                                          ab4   28 9335  5240                   
+                                          ab5   17 7522  0710                   
+                                          ab6   09 4376  4760                   
+                                          ab7   19 1337  7140                   
+                                          n50   50 0000  0000                   
+                                          fp1   10 0000  0051                 
+                                          ab9   00 0000  0054
+                                          arthc 00 0000  0000 
+                                        1 
+                                        1 (u) and (acc) float <- (u) float ** (acc) float     
+                                        1               u**acc = 10**(log10(u)*acc) 
+                                        1                      = exp(log10(u)*acc)
+                                        1
+                                          e00lqstdlq1                          
+                                               ldd      e00ab log 10 (u)
+                                               fmpacc         mult by acc
+                                               lddlq1   e00ac 10 ** u
+                                          lq1   00 0000  0000 
+                                        1 
+                                        1 (u) float <- log e (u) float                        
+                                        1              ln(u) = log(u) / log(e) 
+                                        1              log10(e)=0.4342944819 
+                                        1
+                                          e00lostdlq1
+                                               ldd      e00ab log 10 (u)
+                                               fdvloge  lq1   div by log(e) const
+                                          lq1   00 0000  0000 
+                                          loge  43 4294  4850
+                                        1 
+                                        1 (u) float <- e ** (u) float                         
+                                        1              expn(u) = e ** u = exp(log10(e)*u)
+                                        1              e=2.71828182846 
+                                        1
+                                          e00lpstdlq1
+                                               fmploge        mult by log(e) const
+                                               lddlq1   e00ac 10 ** u
+                                          lq1   00 0000  0000 
+                                          loge  43 4294  4850
+                                        1 
+                                        1 (u) float <- absolute value (u) float                         
+                                        1
+                                          e00aynze       8001 exit if zero
+                                               nzu      ezzty alarm function arg is fix but should be float
+                                               stderthx 
+                                               ram 8003       remove sgn 
+                                               rau 8002 erthx result in upper and exit
+                                        1 
+                                        1 (u) float <- integer part (u) float                         
+                                        1
+                                          e00aznze       8001 exit if zero
+                                               nzu      ezzty alarm function arg is fix but should be float
+                                               stderthx 
+                                               stuarthc       save arg
+                                               srt 0002       exp in lower         
+                                               stuartha       mant in h
+                                               rsm 8002       make exp neg
+                                               alon57         
+                                               bmiaz4         big num so no fract part to remove
+                                               alon01
+                                               slt 0001        
+                                               nzuaz5         small num so no int part
+                                               srt 0005       set as right 
+                                               aloaz6         shifts to do   
+                                               stlarthb       
+                                               rauartha arthb 
+                                          n57   57 0000  0000 
+                                          n01   01 0000  0000
+                                          az6  srt 0000 
+                                               rau 8003 ae0   go to fix to float conversion routine
+                                          az5  rau 8002
+                                               rau 8002 erthx return zero
+                                          az4  rauarthc erthx return the arg unchanged
+                                        1 
+                                        1 (u) float <- max (float, float, ...)
+                                        1              should have two or more float parameters 
+                                        1
+                                          e00bastderthx 
+                                               stuartha       arg is max
+                                               ralerthx ba0
+                                          ba0  sloba10
+                                               bmiba9         no more args
+                                               ralerthx       set arg addr
+                                               lddba1          to be read
+                                               sdaba1   ba1
+                                          ba1  rau 0000       read arg
+                                               stuarthb
+                                               fsbartha       is grtr than
+                                               bmiba2         current result
+                                               rauarthb       yes store as
+                                               stuartha ba2   new result
+                                          ba2  ralerthx       select next
+                                               sloonet         arg
+                                               stlerthx ba0
+                                          ba9  rauartha erthx result in upper
+                                          ba10  00p0000  0000 fist arg addr
+                                        1 
+                                        1 (u) float <- square root (u) float 
+                                        1
+                                          e00axnze       8001 exit if zero
+                                               nzu      ezzty alarm function arg is fix but should be float
+                                               bmiax1         alarm sqrt(neg)                     
+                                               stderthx 
+                                               srt 0002                                                  
+                                               nzu      ax2   test for zro                               
+                                               slon01         convert fortransit exp (1.0=1e51) to it exp (1.0=1e50)
+                                               stlarthb       break up exp                               
+                                               ral 8003       and mantissa                               
+                                               slt 0002       calculate                                  
+                                               stlartha        initial x                                 
+                                               aupone   ax3                                              
+                                          ax4  rauartha       calculate                                  
+                                               dvrarthc        next x                                    
+                                               slo 8001        value                                     
+                                               nze      ax5                                              
+                                               bmi      ax5   test for end                               
+                                               alo 8001                                                  
+                                               alo 8001 ax3                                              
+                                          ax3  dvrtwo         recycle                                    
+                                               stlarthc ax4                                              
+                                          ax5  ralarthb       modify                                     
+                                               alon49         exponent                                  
+                                               srt 0008                                                  
+                                               divtwo                                                    
+                                               alo 8003                                                  
+                                               stlarthb       test even or                               
+                                               nzu      ax6    odd exp                                   
+                                               rauarthc       exp odd                                    
+                                               srt 0001                                                  
+                                               mpyax11        mpy by sqrt                                
+                                               srd 0010 ax7    of 10                                     
+                                          ax7  slt 0002                                                  
+                                               aloarthb 
+                                               aloone         exp 50 to 51
+                                               rau 8002 erthx go to exit                                 
+                                          ax6  ralarthc       exp even                                   
+                                               srd 0002 ax7                                              
+                                          ax2  rau 8003 erthx result zero                                 
+                                          ax1  hlt 0012  8001 alarm sqrt with negative argument
+                                          one   00 0000  0001 constants                                  
+                                          two   00 0000  0002                                            
+                                          n49   49 0000  0000                                            
+                                          ax11  03 1622  7766                                            
+                                        1 
+                                        1 (u) float <- cosinus (u) float (arg in radians: cos(pi/2) = 0)
+                                        1
+                                          e00avstderthx av0
+                                          av0  nze      av4   cos(0) is one
+                                               nzu      ezzty alarm function arg is fix but should be float
+                                               srt 0002         argument                                 
+                                               stuartha       alarm if pwr                               
+                                               rsm 8002         overscale                                
+                                               alon01         convert fortransit exp (1.0=1e51) to it exp (1.0=1e50)
+                                               alon57         cosx equals                                
+                                               bmiav2          one if pwr                                
+                                               sloav3          underscale                                            
+                                               bmi      av4                                                
+                                               srt 0004                                                   
+                                               aloav5                                                     
+                                               stlav6                                                     
+                                               rauartha       form                                         
+                                               mpyav7   av6    fractional                                  
+                                          av6  hltav6   av23   and intgrl                                  
+                                          av23 stlarthc         parts                                      
+                                               rau 8003                                                   
+                                               mpyn50         form s as                                  
+                                               stlarthb        one minus                                 
+                                               rsmarthc        twice abval                               
+                                               sml 8001        of fractnl                                
+                                               alon999           part                                    
+                                               rau 8002                                                   
+                                               stuartha                                                   
+                                               mpy 8001        form sine                                 
+                                               stuarthc                                                   
+                                               rauav16         polynomial                                
+                                               mpyarthc       approximator                               
+                                               rau 8003                                                   
+                                               aupav15                                                    
+                                               mpyarthc                                                   
+                                               rau 8003                                                   
+                                               aupav14                                                    
+                                               mpyarthc                                                   
+                                               rau 8003                                                   
+                                               aupav13                                                    
+                                               mpyarthc                                                   
+                                               srt 0001                                                   
+                                               rau 8003                                                   
+                                               auppih         equals one                                 
+                                               mpyartha                                                   
+                                               sct 0000                                                   
+                                               bovav19                                                    
+                                               stlartha                                                   
+                                               ral 8003        round                                      
+                                               srt 0002        and                                        
+                                               stlarthc        adjust                                     
+                                               rsuartha         power                                     
+                                               srt 0002                                                   
+                                               bmi      av25                                               
+                                               sup 8003                                                   
+                                               alon50   av24                                               
+                                          av24 auparthc                                                   
+                                               slt 0002 av22                                               
+                                          av22 stuartha       determine                                   
+                                               rauarthb        sign of                                    
+                                               nzu      av20    result                                   
+                                               rslartha av26
+                                          av20 ralartha av26                                            
+                                          av25 sup 8003                                                   
+                                               slon50   av24                                                
+                                          av2  rauarthb       overscale                                     
+                                               ldderthx        display                                     
+                                               hlt 0013  8001 alarm radian arg too big
+                                          av26 rau 8002
+                                               bmiav27
+                                               aupone   erthx
+                                          av27 supone   erthx
+                                          av4  ralav21  av26  cosx is one                                   
+                                          av19 ral 8002       cosx is zero                                  
+                                               slo 8001 av26                                               
+                                          av17 rauav21  av22  cosx is plus                                  
+                                          av3   11 0000  0000  or minus 1                                                                                    
+                                          av5  srd 0011 av23                                                
+                                          av7   31 8309  8862                                               
+                                          pih   15 7079  6327 pi / 2  integer
+                                         -av13  64 5963  7111                                               
+                                          av14  07 9689  6793                                               
+                                         -av15  00 4673  7656                                               
+                                          av16  00 0151  4842                                               
+                                          av21  10 0000  0050                                               
+                                          n999  99 9999  9999                                               
+                                          n50   50 0000  0000                     
+                                          one   00 0000  0001                     
+                                          n01   01 0000  0000
+                                          n57   57 0000  0000 
+                                        1 
+                                        1 (u) float <- sinus (u) float (arg in radians: sin(pi/2) = 1)
+                                        1
+                                          e00awnze       8001 sin(0) is zero
+                                               nzu      ezzty alarm function arg is fix but should be float
+                                               stderthx   
+                                               stuartha
+                                               raufpih
+                                               fsbartha av0   sin a = cos(pi/2 - a)
+                                          fpih  15 7079  6351 pi / 2 float
+                                        1                                
+                                        1 end of fortran package   
+                                        1                                 

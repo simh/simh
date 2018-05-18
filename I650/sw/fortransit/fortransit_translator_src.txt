@@ -1,0 +1,1724 @@
+                                        1 program for fortran                                    
+                                        1 statements to it statements                             
+                                               blr 1000  1010                                          
+                                               blr 1150  1171      functions                           
+                                               blr 1200  1210      nonarith t                          
+                                               blr 1450  1454      equ var ta                          
+                                               blr 1500  1519      jibase tbl                          
+                                               blr 1600  1699      varbl tabl                          
+                                               blr 1821  1830      startnarit                          
+                                               blr 1900  1930      pack band                           
+                                               blr 1948  1949                                          
+                                               regr1951  1960      read band                           
+                                               regp1977  1986      punch band                          
+                                               blr 1990  1998      comp gp ta                          
+                                               synstart  1999                                          
+                                               synreset  0228                                          
+                                               synstorg  1961                                          
+                                               synsubsc  1962                                          
+                                          startrcd 1952 reset      read first   
+                                          resetral 1960              card       
+                                               slt 0001            test for     
+                                               nzustart                         
+                                               stuiad              sub a        
+                                               stdsw4                 sub  a    
+                                               stdsw5                 sub  a    
+                                               stdctvar                         
+                                               lddeghts                         
+                                               stdp0010                         
+                                               lddcnpka                         
+                                               stdswpka pack                    
+                                          cnpkastltesta suba1      switch pka   
+                                          read raliac                is wd end  
+                                               nzearead             frst wd in  
+                                               raltemae             pack band   
+                                               sloendcn              if no rd   
+                                               nzearead  1830      next card    
+                                          endcn 00 6575  6400                   
+                                          areadrcd 1951              if yes     
+                                               ral 1960             punch hedr  
+                                               slt 0001             card and    
+                                               nzuread              reinitia    
+                                               slt 0001             lize        
+                                               nzupack                          
+                                               lddcnpka             pack sw a1  
+                                               stdswpka swt                     
+                                          swt  lddin2   tr ca      suba         
+                                          tr castdsw 59                         
+                                               raltemae                         
+                                               stutesta                         
+                                               nzenzt5  in2                     
+                                          nzt5 slt 0002                         
+                                               nzunzt 4 nzt5                    
+                                          pack ralltr f                         
+                                               ldd      tr uc                   
+                                               stdtemph                         
+                                               stlp0006                         
+                                               auppacka                         
+                                               lddtjasw sub x                   
+                                          suba1lddcnpkb              pack sw a2 
+                                               stdswpka                         
+                                               lddpacka                         
+                                               stdsw 59                         
+                                               lddswh                switch 3   
+                                               stdsw 60                         
+                                               rau 1960              statement  
+                                               stdp0008                         
+                                               stliac                           
+                                               stup0009 tra1b                   
+                                          tra1braltesta tr aa                   
+                                          cnpkbstltesta suba2                   
+                                          suba2alotemae tr aa                   
+                                          tr aaslt 0002                to temp  
+                                               nzunzt 4              test 6 cha 
+                                               stltemae sub a                   
+                                          nzt 4srt 0002              five char  
+                                               stutemae                         
+                                               aupiac                  index    
+                                               supcnbkb                         
+                                               nzu      stp r                   
+                                               aupcnbib                         
+                                               stuiac                  store    
+                                               aupcn f1  8003         word      
+                                          cn f1stl 1899 sub a                   
+                                          sub araltesta              lt parnt   
+                                               sloparnl                         
+                                               nzenztt                          
+                                               ralone   tr  l      add to cou   
+                                          tr  laloiad                           
+                                               stliad   tr  m                   
+                                          nztt aloplus                          
+                                               nzesw 60                         
+                                               rslone   tr  l      sub to cou   
+                                          tr  mnzenzt9a              set sw 3   
+                                               lddswh   tr  n         on        
+                                          nzt9alddsw 59 tr  n         off       
+                                          tr  nstdsw 60 sw 59                   
+                                          tr  onzenzt10            sw b on      
+                                               lddone              equal out    
+                                               stdsw4   sw 59                   
+                                          nzt10alocn a5                         
+                                               nzesw 59                         
+                                               lddone              comma out    
+                                               stdsw5   sw 59                   
+                                          swh  slomult  tr  o      suba         
+                                          in2  raliad   tr ml      parn count   
+                                          tr mlstuiad              zero iad     
+                                               nzestopa              test       
+                                               ralsw4              test type    
+                                               stusw4              reset equa   
+                                               nze      in3                     
+                                               ralsw5                           
+                                               nzein3   in4        out          
+                                          in3  ral 1900                         
+                                               stusw5                           
+                                               srt 0006              look up    
+                                               slt 0006              for        
+                                               stltemaa                         
+                                               ralcn j1              non        
+                                               lddtemaa                         
+                                               tlu 1200  8002        statemen   
+                                          tr  pslotemaa                         
+                                               slt 0004              look up    
+                                               nzustopb            nz is erro   
+                                               srt 0004  8002      zt is ok     
+                                          cn j1ral 0000 tr  p      suba         
+                                          scan stltemae                         
+                                               std 1992                         
+                                               lddnnal1                         
+                                               stdnn l1                         
+                                               lddswba1                         
+                                               stdsw ba                         
+                                               lddtj10b                         
+                                               stdtj 10                         
+                                               lddnzu2a                         
+                                               stdnzu2                          
+                                               lddsw oa tr mt                   
+                                          tr mtstdsw 56                         
+                                               rauiac                           
+                                               stlf3                            
+                                               stdtemac                         
+                                               lddsw bh tr tn                   
+                                          sw bhnzutr rn zt h4                   
+                                          tr rnalof3                            
+                                               aloone                           
+                                               stlf3                            
+                                               rau 8003 sw 56                   
+                                          sw oasupdecpt                         
+                                               nzu      zt g8                   
+                                               suptwo 1                         
+                                               nzu      zt g9                   
+                                               supnine                          
+                                               nzu      zt h1                   
+                                               supone 1                         
+                                               nzu      zt h2                   
+                                               supone 1                         
+                                               nzu      zt n8                   
+                                               supeight                         
+                                               nzu      zt h3                   
+                                               aupparnl tr mv                   
+                                          tr mvstutemaf tr mw                   
+                                          tr mwraltemac                         
+                                               slt 0002                         
+                                               alotemaf                         
+                                               stltemac nztb2                   
+                                          zt h4raltempf                         
+                                               sloone   tr rj                   
+                                          tr rjstltempf                         
+                                               stutemac                         
+                                               nzetx dg                         
+                                               ldd 1991                         
+                                               bd1flo2  arith                   
+                                          zt h2rauminus tr pn                   
+                                          tr pnlddf3                            
+                                               stdoutp                          
+                                               lddsw pa tr rp                   
+                                          tr rpstdsw 59                         
+                                               alotemaa                         
+                                               srt 0002                         
+                                               stltemaa tr rh                   
+                                          tr rhralnxtwd                         
+                                               sloone                           
+                                               lddnn m1                         
+                                               sdanxtwd tr pr                   
+                                          tr prrautemac                         
+                                               nzu      tr nk                   
+                                               srt 0002                         
+                                               stutemac                         
+                                               ral 8002                         
+                                               slt 0002 sw 59                   
+                                          tr nkstutemaa nxtwd                   
+                                          nn m1ral 0000                         
+                                               stltemac tr rh                   
+                                          zt g9rauplus  tr pn                   
+                                          sw pasupparnr                         
+                                               nzunzti4 zt i4                   
+                                          zt i4aup 8001                         
+                                               lddout1s tr ps                   
+                                          tr psstdf8                            
+                                               alotemaa                         
+                                               srt 0002                         
+                                               stltemaa                         
+                                               ralf3                            
+                                               sloone                           
+                                               stlf3    f8                      
+                                          out1sralone   tr pu                   
+                                          tr pualosw 61                         
+                                               stlsw 61 tr pr                   
+                                          nzti4supone 1                         
+                                               nzunzti5                         
+                                               rauplus  tr pv                   
+                                          tr pvldd      tr ps                   
+                                               rslsw 61 tr ux                   
+                                          tr uxbmitr pr zt l3                   
+                                          nzti5supnine                          
+                                               nzunzti7                         
+                                               raumult                          
+                                               ldd      tr ps                   
+                                               rslsw 61                         
+                                               nzetr ux nzti8                   
+                                          nzti7supone 1                         
+                                               nzunztq5                         
+                                               rauminus tr pv                   
+                                          nztq5supone 1                         
+                                               nzunztj5                         
+                                               raudivid tr pv                   
+                                          nztj5supseven                         
+                                               nzunztj6                         
+                                               raucomma tr pv                   
+                                          nztj6supone 1                         
+                                               nzunztj7 zt j7                   
+                                          zt j7rauparnl                         
+                                               ldd      tr ps                   
+                                               rslone   tr pu                   
+                                          nztj7supnine                          
+                                               nzunztj8 zt j8                   
+                                          nztj8aupequal                         
+                                               lddtr pr tr ps                   
+                                          zt j8rauequal                         
+                                               lddzt l3 tr ps                   
+                                          nzti8lddsw pc                         
+                                               stdsw 59 tr pr                   
+                                          sw pcsupparnr                         
+                                               nzu      zt i4                   
+                                               supone 1                         
+                                               nzunztk3                         
+                                               rauplus  tr py                   
+                                          tr pyldd      tr ps                   
+                                               rsusw 61                         
+                                               bmitr pr zt k4                   
+                                          nztk3supcn a5                         
+                                               nzunztk4                         
+                                               rauminus tr py                   
+                                          nztk4supeight                         
+                                               nzunztk5                         
+                                               raucomma tr py                   
+                                          nztk5supone 1                         
+                                               nzunzt03                         
+                                               rslsw 61                         
+                                               bmizt j7                         
+                                               lddsw pd                         
+                                               stdsw 59 zt j7                   
+                                          sw pdsupltr f                         
+                                               nzu      zt o2                   
+                                               aup 8001                         
+                                               lddsw ph                         
+                                               stdsw 59  8001                   
+                                          zt o2aup 8001 tr sb                   
+                                          nzt03supnine                          
+                                               nzunztj8                         
+                                               rauequal tr sb                   
+                                          tr sbsrt 0002                         
+                                               auptemac                         
+                                               slt 0002                         
+                                               stutemac tr qc                   
+                                          zt k4lddout4v                         
+                                               stdtesto tr qa                   
+                                          out4vralf3                            
+                                               aloone                           
+                                               stlf3    tr qc                   
+                                          tr qcraloutp                          
+                                               aloone                           
+                                               stloutp                          
+                                               ralnn m3                         
+                                               aloiac                           
+                                               stlf4     8001                   
+                                          nn m3rau 1899                         
+                                               srt 0004                         
+                                               ral 8002                         
+                                               nze      zt kb                   
+                                               ralf4                            
+                                               aloone                           
+                                               lddnn m4                         
+                                               sdaf4                            
+                                               ralnn n6                         
+                                               slof4                            
+                                               nze 8001 stopc                   
+                                          nn m4stu 0000 tr tz                   
+                                          tr tzraliac                           
+                                               aloone                           
+                                               stliac   zt kb                   
+                                          zt kbralnxtwd                         
+                                               aloone                           
+                                               lddnn m7                         
+                                               sdanxtwd                         
+                                               lddnn mb                         
+                                               sdastore                         
+                                               rauparnl                         
+                                               alotemaa                         
+                                               srt 0002 tr qd                   
+                                          tr qdstltemaa                         
+                                               lddout1v                         
+                                               stdtesto tr rg                   
+                                          sub vraltemac                         
+                                               slt 0002                         
+                                               nzu      tr qa                   
+                                               srt 0002 store                   
+                                          tr qarautemac                         
+                                               alotemaa                         
+                                               slt 0002                         
+                                               stutemac                         
+                                               stltemaa testo                   
+                                          out1vralf3                            
+                                               aloone                           
+                                               stlf3                            
+                                               slooutp                          
+                                               nzetr rg sw qa                   
+                                          nn mbstl 0000 tr qe                   
+                                          tr qestutemac                         
+                                               ralnxtwd                         
+                                               aloone                           
+                                               stlnxtwd                         
+                                               lddstore                         
+                                               sdastore tr rg                   
+                                          tr rgraltemaa                         
+                                               nzesub v nxtwd                   
+                                          sw qaraloutp                          
+                                               aloone                           
+                                               stloutp                          
+                                               ralnxtwd                         
+                                               ldd 8003                         
+                                               sdaf7                            
+                                               lddnnm16                         
+                                               sdanxtwd                         
+                                               lddnnm13                         
+                                               sdastore                         
+                                               ralf4                            
+                                               lddstore                         
+                                               sdaf4                            
+                                               slof7                            
+                                               sdaf7                            
+                                               lddout5v                         
+                                               stdtesto                         
+                                               raltemaa                         
+                                               nzenzto5 zt o5                   
+                                          nzto5aupparnr                         
+                                               srt 0002                         
+                                               std 1993 tr sk                   
+                                          zt o5ral 1992                         
+                                               nze      nzto5                   
+                                               rsl 8002                         
+                                               stlf7                            
+                                               raltemaa                         
+                                               std 1992 nzto5                   
+                                          nnm13stl 0000                         
+                                               ral 1993                         
+                                               nze      zt o6                   
+                                               ralf7                            
+                                               stu 1993                         
+                                               sloone                           
+                                               stlf7    zt o6                   
+                                          zt o6ralf4                            
+                                               slostore                         
+                                               nzetr qe zt l3                   
+                                          nnm16ral 0000 tr sk                   
+                                          tr skstltemaa sub v                   
+                                          zt l3raltemae                         
+                                               nze      tr rv                   
+                                               stdoutp                          
+                                               stutemae tr rv                   
+                                          tr rvraloutp                          
+                                               lddtr mw tr ud                   
+                                          tr udstdf1                            
+                                               stlout q                         
+                                               ldd      tr mt                   
+                                               stutemaf                         
+                                               ralf3                            
+                                               sloout q                         
+                                               nzetr mw                         
+                                               lddsw oa                         
+                                               stdsw 56 f1                      
+                                          out5vraltemaa                         
+                                               nzesub v                         
+                                               std 1993                         
+                                               ralf7                            
+                                               bmitr rm                         
+                                               sloone                           
+                                               stlf7    nxtwd                   
+                                          tr rmrautemac                         
+                                               sct 0000                         
+                                               ral 8003 store                   
+                                          zt h3rautemaf                         
+                                               supltr f                         
+                                               nzu      tr nf                   
+                                               aupseven                         
+                                               bmitr nf                         
+                                               lddsw oe                         
+                                               stdsw 56 tr nf                   
+                                          tr nfrauparnl tr mv                   
+                                          sw oesupparnr                         
+                                               nzunzth6 tr sq                   
+                                          nzth6aup 8001 tr mv                   
+                                          tr sqaup 8001                         
+                                               alosw oa tr sr                   
+                                          tr srstlsw 56 tr mv                   
+                                          zt h1raumult                          
+                                               alo      tr ro                   
+                                               supmult                          
+                                               nzutr mz tr sf                   
+                                          tr mzaup 8001                         
+                                               lddsw oa tr sc                   
+                                          tr scstdsw 56  8001                   
+                                          tr sfralf3    tr sa                   
+                                          tr saaloone                           
+                                               stltemae                         
+                                               lddsw bl                         
+                                               stdsw 50 tr so                   
+                                          tr solddsw oi tr sn                   
+                                          tr snstdsw 56 nztb2                   
+                                          tr rolddf3                            
+                                               stdf6    tr sr                   
+                                          zt g8aup 8001                         
+                                               alo      tr ro                   
+                                               supltr a                         
+                                               bmitr mz                         
+                                               aup 8001                         
+                                               supltr e                         
+                                               nzunzth6                         
+                                               aup 8001                         
+                                               alo      tr sr                   
+                                               supltr a                         
+                                               bmitr sf tr sq                   
+                                          sw blnzutr rn                         
+                                               raltempf                         
+                                               sloone                           
+                                               nzetr rj                         
+                                               ralone                           
+                                               std 1992 tr ru                   
+                                          tr rualof3    tr sl                   
+                                          tr slstloutp                          
+                                               ralf6                            
+                                               ldd      tr ud                   
+                                               rautemaf                         
+                                               lddsw ph tr rp                   
+                                          sw phsupmult                          
+                                               nzu      zt n7                   
+                                               aup 8001                         
+                                               supdivid                         
+                                               nzu      zt n7                   
+                                               aup 8001 sw pc                   
+                                          zt n7aup 8001 tr py                   
+                                          zt n8ralf3                            
+                                               stdf6    tr sa                   
+                                          sw oisupequal                         
+                                               bmi      nztb2                   
+                                               aupmult                          
+                                               nzu      zt n6                   
+                                               supcn a5                         
+                                               nzu      zt o4                   
+                                               sup 8001                         
+                                               nzu      zt n5                   
+                                               aupone 1                         
+                                               nzu      zt q4                   
+                                               aupplus                          
+                                               nzuzt q4 zt o1                   
+                                          zt q4ralf3    tr uy                   
+                                          tr uysupsw 61                         
+                                               bminztb2 tr sl                   
+                                          zt o1ldd      tr sn                   
+                                               supltr a                         
+                                               bmitr ry                         
+                                               aup 8001                         
+                                               supltr e                         
+                                               nzunztb2                         
+                                               lddtr so tr sn                   
+                                          tr ryaup 8001 tr sm                   
+                                          tr smlddsw oi tr sc                   
+                                          zt n6lddsw ja                         
+                                               stdsw 56                         
+                                               rslone   tr sp                   
+                                          tr spalosw 61                         
+                                               stlsw 61 nztb2                   
+                                          sw jasupltr a                         
+                                               bmitr ry zt q4                   
+                                          zt n5ralone   tr sp                   
+                                          zt o4ldd      tr sn                   
+                                               stutemaf                         
+                                               supmult                          
+                                               nzu      tr uv                   
+                                               rslsw 61                         
+                                               bmi      tr sd                   
+                                               rautemaf tr sm                   
+                                          tr uvralsw 61                         
+                                               bmitr sd tr so                   
+                                          tr sdrslone   tr ru                   
+                                          nn m7ral 0000 tr qd                   
+                                          nn n6stu 1931 tr tz                   
+                                          in4  lddnine  tr sh                   
+                                          tr shstd 1991 scan                    
+                                          arithralfive  rith1                   
+                                          rith1stutemab                         
+                                               auptx db                         
+                                               lddzt c5 flo 1                   
+                                          flo 1stdsw 62                         
+                                               stliae                           
+                                               stusw 59                         
+                                               lddtx de                         
+                                               stdsw 60                         
+                                               lddsw fa                         
+                                               stdsw 54                         
+                                               raufour                          
+                                               stliai                           
+                                               alotx dl                         
+                                               lddsw ba tr tn                   
+                                          tr tnstdsw 50                         
+                                               stlsw 61                         
+                                               stutempf                         
+                                               lddnn l1                         
+                                               stdnxtwd tx dg                   
+                                          tx dgralnxtwd            word to ac   
+                                               aloone              modify nex   
+                                               stlnxtwd  8002       word addr   
+                                          tr jmslt 0002                         
+                                               stltemaa                         
+                                               rau 8003 sw 50                   
+                                          nztatsupcomma            test for     
+                                               nzu      tx dm       comma       
+                                               aupplus             test for     
+                                               nzu      tx da       decimal p   
+                                               supone 1            test for     
+                                               nzu      sw 59       right pae   
+                                               supone 1            test for     
+                                               nzu      tx dj       plus sign   
+                                               supnine             test for     
+                                               nzu      tx dc       mult sign   
+                                               supone 1            test for     
+                                               nzu      tx dk       minus sig   
+                                               supone 1            test for     
+                                               nzu      tx dd       divide si   
+                                               supeight            test for     
+                                               nzu      sw 60       left pare   
+                                               supnine             test for     
+                                               nzu      tx df       equal sig   
+                                               aupequal tr ha      restore      
+                                          tr hastutemac                         
+                                               raltemab                         
+                                               slt 0002                         
+                                               nzustopm            test ten a   
+                                               alotemac                         
+                                               slt 0002                         
+                                               nzunztc8 zt cb                   
+                                          zt cbsrt 0002                         
+                                               stltemab tr hb      store tem    
+                                          tr hbraliae   tr jl      decr shift   
+                                          tr jlsloone               count       
+                                               stliae              store        
+                                               nzenztb2 zt b2      test         
+                                          nztb2raltemaa tr jm      temaa to a   
+                                          zt b2lddfive             reset shif   
+                                               stdiae               count       
+                                               raliac              decr word    
+                                               sloone               count       
+                                               stliac              store        
+                                               nzetx dg tx dh      test word    
+                                          nztc8supzerol            test tem a   
+                                               bmi      abnum       for numer   
+                                               aupzerol zt cb                   
+                                          abnumlddtr hb                         
+                                               stdoutp  tr hc                   
+                                          tr hcaupzerol tr jn      restore      
+                                          tr jnsrt 0002 tr jo                   
+                                          tr jostltemab sw 54                   
+                                          tr hestdiaf                           
+                                               lddnn l2            next pch     
+                                               stdtx di             word inst   
+                                               lddnn l3            punch stor   
+                                               stdstore             instr       
+                                               ldd      tr uc                   
+                                               stdp0006             punch ban   
+                                               lddsw fb                         
+                                               stdsw 54  8001                   
+                                          tr hnslt 0002 store                   
+                                          tr hostltemab            la to tem    
+                                               rauiaf              decr shift   
+                                               supone               count       
+                                               stuiaf              store        
+                                               nzunztb3                         
+                                               ralp0006                         
+                                               nzezt b4                         
+                                               lddfive  tr mr                   
+                                          tr mrstdiaf   tr ka                   
+                                          nztb3raltemab            tem ab to    
+                                               nzesw 54 outp       any more     
+                                          zt b4pch 1977 tr hp                   
+                                          tr karaltx di                         
+                                               aloone              modify nex   
+                                               stltx di             pch wd in   
+                                               lddstore            modify pun   
+                                               sdastore nztb3       store ins   
+                                          tr hpraltempf                         
+                                               sloone               count       
+                                               stltempf                         
+                                               nzenztb6            test         
+                                               lddstopn tr lg      set sw 54    
+                                          tr lgstdsw 54 nztb3       error sto   
+                                          nztb6lddsw fa tr lg                   
+                                          tx dhlddout 1 tr is                   
+                                          tr hkraltemab            tem ab to    
+                                               nzenztb7 outp       test         
+                                          nztb7slt 0002            tem ab to    
+                                               nzu      nztb7       high orde   
+                                               supzerol            test for     
+                                               bmitr hf tr hc       numeric     
+                                          tr hdsct 0000                         
+                                               stup0001                         
+                                               ralp0006 tj sw       insert f    
+                                          tjaswslt 0002            in last wd   
+                                               nzutr rf tr ex      of punch     
+                                          tr exalolast  tr sg      statement    
+                                          tjbswslt 0004            output       
+                                               nzu      tr ex                   
+                                               srt 0002             insert of   
+                                               nzutr rf            in last wd   
+                                               pch 1977            of read      
+                                               raltempf            statement    
+                                               sloone              output       
+                                               stltempf                         
+                                               nzetr rf stopn                   
+                                          tr sgstlp0006                         
+                                               ldd 1991                         
+                                               bd1      punch                   
+                                               pch 1977 out19                   
+                                          tr rfralsw 54                         
+                                               slostopn                         
+                                               nze       8001                   
+                                               rallast                          
+                                               lddtr sg tr uc                   
+                                          tr ucstdout q                         
+                                               stup0001                         
+                                               stdp0002                         
+                                               stdp0003                         
+                                               stdp0004                         
+                                               stdp0005 out q                   
+                                          tr hfrautemab tj 10                   
+                                          tj 10lddtstpr subj                    
+                                          tj10alddtstpr subj                    
+                                          tj10blddtr jo subj                    
+                                          tstprnzu      tj 20       precede     
+                                               stutemac            location     
+                                               sup 8001            number of    
+                                               ralltr t            last vari    
+                                               lddout30 tr kk      able in      
+                                          out30rauprodt            read or      
+                                               ldd      sube       punch        
+                                               lddout31 tr kk      statement    
+                                          out31rautemac            by t         
+                                               srt 0004             exit to     
+                                               sup 8003            punch out    
+                                               aupnine             put and      
+                                               slt 0004            continue     
+                                               ldd      sube       procedding   
+                                               slt 0002            statements   
+                                               lddout 1 tr kk                   
+                                          tj 20slt 0002                         
+                                               sup 8003                         
+                                               srt 0002                         
+                                               aloltr t tr jo                   
+                                          tx dfraultr z                         
+                                               ldd 1991                         
+                                               bd1tr uo tr hl                   
+                                          tr uostutemac                         
+                                               lddout 3 tr jz                   
+                                          tr hlstutemac             sign        
+                                               lddout 3 tr is                   
+                                          tr isstdoutp  tr hk                   
+                                          tr hrstdtemab tr jp                   
+                                          tr jplddtr hb tr jz                   
+                                          tr jzstdoutp  sw 54                   
+                                          tx ddraultr d tr hl      store divi   
+                                          tx djraultr s tr hl      store plus   
+                                          tx dkraultr m tr hl      store minu   
+                                          tx dbraultr r tr hl      store rtpa   
+                                          tx dmraultrkh tr hl      stor comma   
+                                          tx dclddsw bb tr li                   
+                                          tr listdsw 50                         
+                                               lddtr hb tr is                   
+                                          tr hmnzunztc1                         
+                                               lddsw ba                         
+                                               stdsw 50                         
+                                               ralltr p tr jo                   
+                                          tr ldlddsw bf                         
+                                               stdsw 50 tr mo                   
+                                          tr moaupltr e tr ha                   
+                                          tr mpnzu      zt g5                   
+                                               bmitr kp tr mo                   
+                                          zt g5raultr b tr pi                   
+                                          nztc1aupmult                          
+                                               alotemaa                         
+                                               srt 0002                         
+                                               stltemaa                         
+                                               raliae                           
+                                               aloone                           
+                                               stliae                           
+                                               lddltr x tr jk                   
+                                          tx daraultr j                         
+                                               lddsw bg tr pj                   
+                                          tr hunzu      zt c2                   
+                                               bmitr kp tr ld                   
+                                          tr kpaup 8001                         
+                                               lddsw ba                         
+                                               stdsw 50 nztat                   
+                                          zt c2rauzrob  tr pi                   
+                                          tr pilddsw ba tr pj                   
+                                          tr pjstdsw 50 tr hl                   
+                                          tx derautemab tr kh                   
+                                          tr khnzunztc5 sw 62                   
+                                          zt c5lddltr l tr hr                   
+                                          nztc5srt 0002                         
+                                               ral 8002                         
+                                               sloltrfh                         
+                                               nze      sw 61                   
+                                               rsutemab                         
+                                               lddnzu2  subj                    
+                                          nzu2 stutemac tj 5a                   
+                                          nzu2anzutj ba stopf                   
+                                          tj bastltemab                         
+                                               stutemac tj 8                    
+                                          tj 8 lddout 4 tr jz                   
+                                          tr ibsloone 1                         
+                                               ldd 8003                         
+                                               siatemae                         
+                                               slt 0003                         
+                                               stutemaf                         
+                                               nzu      zt d1                   
+                                               ral 8002                         
+                                               slt 0003                         
+                                               stutemaf                         
+                                               rsl 8003                         
+                                               alotemae                         
+                                               stltemae                         
+                                               lddsw hb tr if                   
+                                          tr ifstdsw 56 out 5                   
+                                          zt d1lddsw ha tr if                   
+                                          tr ikstdsw 50                         
+                                               slo 8002                         
+                                               stlf6                            
+                                               stdf7                            
+                                               stdf8                            
+                                               stdf9                            
+                                               lddone 1 tr kn                   
+                                          tr knstddim i                         
+                                               stlf1                            
+                                               stdf3                            
+                                               stdf4                            
+                                               stdf5                            
+                                               lddsw ia tr ki                   
+                                          tr kistdsw 57 tr hb                   
+                                          tr ilbminztd4                         
+                                               aup 8001                         
+                                               stutemac sw 57                   
+                                          tr imslt 0002                         
+                                               nzustopo                         
+                                               alotemac                         
+                                               stlf1    tr hb                   
+                                          nztd4aupmult                          
+                                               bminztd6                         
+                                               aupltr a                         
+                                               stutemac sw ib                   
+                                          tr inslt 0002                         
+                                               nzustopo                         
+                                               alotemac                         
+                                               stlf3    tr ig                   
+                                          tr iglddsw ib tr ki                   
+                                          nztd6aupdivid                         
+                                               nzu      zt e1                   
+                                               aupone 1                         
+                                               nzu      tr ig                   
+                                               aupnine                          
+                                               nzunzte1 tr ip                   
+                                          tr iplddsw ic tr ki                   
+                                          tr ioslt 0002                         
+                                               nzustopo                         
+                                               alotemac                         
+                                               stlf5    tr hb                   
+                                          zt e1lddone 1                         
+                                               stdf4    tr ip                   
+                                          nzte1ralf7                            
+                                               stdf9                            
+                                               stuf7                            
+                                               lddf6                            
+                                               stdf8                            
+                                               stuf6                            
+                                               ralf5                            
+                                               nze      zt e5                   
+                                               lddoutq1 tr lh                   
+                                          tr lhstdout q sub q                   
+                                          tr jrralf4                            
+                                               nzenztj2                         
+                                               ralf5    tr jt                   
+                                          nztj2rslf5    tr jt                   
+                                          tr jtalotemae                         
+                                               stltemae zt e5                   
+                                          zt e5ralf1                            
+                                               nzenzte6 nzte7                   
+                                          sub qstutemac zt f4                   
+                                          zt f4slt 0001                         
+                                               nzu      zt f4                   
+                                               supnine                          
+                                               auptemac                         
+                                               slt 0001                         
+                                               stutemac                         
+                                               ral 8002                         
+                                               nzezt f4                         
+                                               rautemac                         
+                                               mpydim i out q                   
+                                          nzte6lddoutq2 tr lh                   
+                                          tr jvrauf3                            
+                                               nzenzte7                         
+                                               raltemae                         
+                                               alof6                            
+                                               stltemae                         
+                                               stuf6                            
+                                               lddout12                         
+                                               stdsw 58 sw 56                   
+                                          nzte7lddout 6                         
+                                               stdsw 58                         
+                                               rauf3                            
+                                               lddtr ir subj                    
+                                          tr irstlf7    sw 56                   
+                                          sw 56ralf7    jtest       bypass      
+                                          jtestnzejstor jzero      insertion    
+                                          jstorralltr l            of l and r   
+                                               ldd      tr kk      for          
+                                               raltemae            specific     
+                                               bmitr ix tr iu      variable     
+                                          jzeroralf9               of array     
+                                               nzejstor                         
+                                               rautemae                         
+                                               ldd      sube                    
+                                               stltemab trajk                   
+                                          tr itstdsw 56                         
+                                               lddtemaf tr kn                   
+                                          tr iulddsw 58 tr iv                   
+                                          tr ivstdoutp                          
+                                               nzetr iz tr hc                   
+                                          tr izlddtr jo tr un                   
+                                          tr unslt 0004 sube1                   
+                                          tr ixrallmcom                         
+                                               lddout 7 tr kk                   
+                                          tr iystdoutp                          
+                                               ramtemae tr iz                   
+                                          tr jalddout 8 tr kk                   
+                                          tr kkstdoutp  tr jo                   
+                                          tr jblddsw 58 tr kk                   
+                                          tr jcnzenzte9 zt e9                   
+                                          nzte9lddout10 tr iv                   
+                                          tr jdlddout11 tr kk                   
+                                          tr jflddout 9 tr kk                   
+                                          tr jslddout12 tr kk                   
+                                          zt e9ralf7                            
+                                               nze      out12                   
+                                               raltemaf                         
+                                               nzenzte9 out11                   
+                                          tr jgnze      zt f2                   
+                                               ralltr s                         
+                                               lddout13 tr kk                   
+                                          tr jhlddout14 tr iv                   
+                                          tr jilddout15 tr kk                   
+                                          tr jjlddout16 tr kk                   
+                                          zt f2ralf9                            
+                                               nze      out16                   
+                                               ralltr s tr ji                   
+                                          tr jkstdtemab trajk                   
+                                          trajklddsw ba                         
+                                               stdsw 50 tr jp                   
+                                          flo  stltemab                         
+                                               raunine                          
+                                               slt 0004                         
+                                               aup 1900                         
+                                               stu 1900                         
+                                               lddeight tr sh                   
+                                          flo2 lddiac                           
+                                               stdiafi                          
+                                               lddone                           
+                                               stdtemph                         
+                                               ral 1900                         
+                                               slt 0004                         
+                                               stl 1900                         
+                                               ralthree                         
+                                               aupsw ka                         
+                                               lddsw lb flo 1                   
+                                          sw karaltr ua                         
+                                               supone   tr uw                   
+                                          tr uanzutx db zt f6                   
+                                          tr lpaupiai                           
+                                               stuiai    8002                   
+                                          zt f6lddsw be tr li                   
+                                          tr kfsrt 0002                         
+                                               stltemaf                         
+                                               raliac                           
+                                               sloone                           
+                                               lddiafi                          
+                                               stdiac                           
+                                               stliafi  out 1                   
+                                          sw lbralzt c5                         
+                                               aupone   tr uw                   
+                                          tr uwauptemph                         
+                                               stutemph  8002                   
+                                          tr kdaupone   tr lp                   
+                                          tx dlraltr ub                         
+                                               stu 1990 tr kd                   
+                                          tr ublddtr lq                         
+                                               stdtest                          
+                                               ralsw kb                         
+                                               aupsw ma                         
+                                               lddsw na tr qx                   
+                                          tr qxstdsw 62                         
+                                               stlsw 59                         
+                                               stusw 61 test                    
+                                          tr lqralmask1                         
+                                               lddtemab                         
+                                               tlu 1161                         
+                                               lddmask2                         
+                                               sdatesto                         
+                                               slocnaib  8002                   
+                                          mask1ral 0000                         
+                                               slotemab                         
+                                               nze 1171                         
+                                               lddltr q                         
+                                               stdtemab testo                   
+                                          mask2rau 0000 tr uo                   
+                                          tr lnsloone                           
+                                               stliai                           
+                                               nzetr lo                         
+                                               rautx dl                         
+                                               lddtr lo                         
+                                               stdtest                          
+                                               ldd 1991                         
+                                               bd1      tr se                   
+                                               alosw ka                         
+                                               lddsw lb tr qx                   
+                                          tr sealotx db                         
+                                               lddzt c5 tr qx                   
+                                          tr loraultr q tr hl                   
+                                          tr lznze      zt g3                   
+                                               sloone                           
+                                               stl 1990 tx db                   
+                                          sw naral 1990                         
+                                               aloone                           
+                                               stl 1990 zt c5                   
+                                          zt g3raliai   tr ln                   
+                                           1160 99 9999  9999      end of tab   
+                                          swba1nzunztat tx dh                   
+                                          sw bbsupmult  tr hm       for         
+                                          sw bdsupzerol tr il       50          
+                                          sw bealotemaa tr kf                   
+                                          sw bfsupltr e tr mp                   
+                                          sw bgsupltr e tr hu                   
+                                          sw faralfive  tr he      settings f   
+                                          sw fbraltemab tx di       switch 54   
+                                          sw haralf7    jtest      settings f   
+                                          sw hbrausw ha tr it       switch 56   
+                                          sw iaralf1    tr im      settings     
+                                          sw ibralf3    tr in       for         
+                                          sw icralf5    tr io       switch 57   
+                                          sw kbral 1990 tr lz                   
+                                          sw maraltr lq tr kd                   
+                                          nnal1ral 1899 tr jm                   
+                                          nn l1ral 1899 tr jm      nxt wd ins   
+                                          nn l2aup 1977 tr hn      to tx di     
+                                          nn l3stu 1977 tr ho      store pch    
+                                          out 1raup0001 tr hd                   
+                                          out 3lddtemac tr hr       exits       
+                                          out 4raltemac tr ib       from        
+                                          out 6ralslcom tr ja                   
+                                          out 5lddsw bd tr ik       store       
+                                          out 7lddout17 tr iy                   
+                                          out 8ralf6    tr jc       subroutin   
+                                          out 9ralltr r tr js                   
+                                          out10ralltr x tr jd                   
+                                          out11ralf7    tr jf                   
+                                          out12ralf8    tr jg                   
+                                          out13ralf8    tr jh                   
+                                          out14ralltr x tr ji                   
+                                          out15ralf9    tr jj                   
+                                          out16lddltr r tr jk                   
+                                          out17ralltr r tr jb                   
+                                          out19ralsw ab in10                    
+                                          outq1stlf5    tr jr                   
+                                          outq2stlf6    tr jv                   
+                                        1                                       
+                                        1 insert variables in table and         
+                                        1 assign i or y value depending         
+                                        1 if variable is fixed point or         
+                                        1 floating point                        
+                                          subj stdout   subj1         store     
+                                          subj1sct 0000              signed var 
+                                               stutest               in temploc 
+                                               rauctvar               zero      
+                                               stlsubsc              temporary  
+                                               stdstorg              counters   
+                                               nzej101  insvr                   
+                                          insvraupone                           
+                                               aloone 1                         
+                                               stuctvar               store     
+                                               stlstorg              mnemonic   
+                                               aup      j1           in varibal 
+                                               std 1599 j2           table      
+                                          j1   lddtest   8003                   
+                                          j2   ral 8001               test if   
+                                               bmi      j4b          subsc or   
+                                               rausubsc            nonsubsc     
+                                               supd20               halt over   
+                                               nzuj2a   stp n      20 subsc     
+                                          stp nhlt 0002 pack       variables    
+                                          j2a  aupd21               increment   
+                                               stusubsc            subsc ctr    
+                                               rautesto                         
+                                               srt 0003             set up      
+                                               stloute             j i base     
+                                               rautestn            word and     
+                                               slt 0004            store in     
+                                               aupoute             subscrpt     
+                                               aupstorg            table        
+                                               alosubsc                         
+                                               alo      j3                      
+                                               stu 1499 j4          set swchs   
+                                          j3   lddseta             a and a1     
+                                               sdaswcha            for fix      
+                                               lddseta1            flt test     
+                                               sdaswha1  8002      if subs vr   
+                                          j4   rautesto             increment   
+                                               nzunzmpy            storg ctr    
+                                               alotestn j4a        by i times   
+                                          nzmpympytestn j4a                     
+                                          j4a  alostorg                         
+                                               sloone 1            j minus 1    
+                                               stlstorg                         
+                                               stdtotlc fxflt                   
+                                          fxfltramtest              test var    
+                                               slt 0002            for fix or   
+                                               rau 8003            flt pt       
+                                               supltrni                         
+                                               bmiswcha             brch flt    
+                                               supseven                         
+                                               bmiswha1 swcha       brch fix    
+                                          seta ram 1499             sw a set    
+                                               rau 8002 j6                      
+                                          normaraustorg j7          sw a norm   
+                                          seta1ram 1499                         
+                                               rau 8002 j8          sw a1 set   
+                                          nrma1raustorg j9          swa1 norm   
+                                          j6   aloltr y out                     
+                                          j7   lddj6    sube2                   
+                                          j8   aloltr i out                     
+                                          j9   lddj8    sube2                   
+                                          j4b  lddstorg                         
+                                               stdtotlc nosub                   
+                                          nosublddnorma             sws a and   
+                                               stdswcha            a1 norm 44   
+                                               lddnrma1            fix flt if   
+                                               stdswha1 fxflt      nonsubs vr   
+                                          sube2stdoute2                         
+                                               ldddone1 sube                    
+                                          sube1slt 0006 sube                    
+                                          sube stdoute  lopff       set up      
+                                          lopffnzu      oute       doubl digt   
+                                               srt 0001            location     
+                                               stuteste            number for   
+                                               sup 8001            nonsubsc     
+                                               srt 0001            variables    
+                                               aloazero                         
+                                               aupteste lopff                   
+                                          done1srt 0002 oute2                   
+                                          j101 suphndrd             halt over   
+                                               nze      stp n      100 vars     
+                                               aup 8001 nxtvr       test        
+                                          nxtvraloone                           
+                                               stlmchct            variable     
+                                               alo      j101a      for table    
+                                               ram 1599 j101b       test        
+                                          j101alddtsvar                         
+                                               sdatsvar  8002                   
+                                          j101bsmltest                          
+                                               nzej102  match                   
+                                          j102 lddnormb             sws b c     
+                                               stdswchb            and d norm   
+                                               stdswchc            to repeat    
+                                               lddnormd            table        
+                                               stdswchd tsvar      search       
+                                          tsvarral 0000             increment   
+                                               bmi      plsad      storg and    
+                                               ralsubsc            subsc ctrs   
+                                               aloone              as needed    
+                                               stlsubsc            before       
+                                               alo      j103       continuing   
+                                               ram 1499 j104       search or    
+                                          j103 lddseta             exiting      
+                                               sdaswcha             set fix     
+                                               lddseta1            flt sign     
+                                               sdaswha1  8002      sw for mch   
+                                          j104 slt 0003                         
+                                               nzuj105                          
+                                               slt 0003                         
+                                               ral 8003 j106                    
+                                          j105 stuoute1                         
+                                               sup 8003                         
+                                               slt 0003                         
+                                               rau 8003                         
+                                               mpyoute1 j106                    
+                                          j106 stlprodt j107                    
+                                          j106astlprodt j107                    
+                                          j107 ralsubsc                         
+                                               alo       8002                   
+                                               ral 1499 swchd                   
+                                          normdbmiproc  j107a                   
+                                          setd bmifxflt j107a                   
+                                          j107aralprodt                         
+                                               alostorg swchb                   
+                                          swchbstlstorg fxflt       yes match   
+                                          proc ralmchct             if no       
+                                               sloctvar            match        
+                                               nzej108             insert       
+                                               rau 8001            variable     
+                                               alostorg insvr      in table     
+                                          j108 alo 8001 nxtvr       serch ovr   
+                                          plsadralstorg                         
+                                               aloone 1 swchc                   
+                                          swchcstlstorg nosub       yes match   
+                                          matchlddsetb              sws b c     
+                                               stdswchb            and d set    
+                                               lddsetc             if match     
+                                               stdswchc            found        
+                                               lddsetd                          
+                                               stdswchd tsvar                   
+                                        1                                       
+                                        1  subrotine constants                  
+                                          d20   00 0020  0000                   
+                                          d21   00 0021  0000                   
+                                          one   00 0001  0000                   
+                                          one 1 00 0000  0001                   
+                                          setb stlstorg fxflt                   
+                                          normbstlstorg proc                    
+                                          setc stlstorg nosub                   
+                                           1200 63 7600  1821       continue    
+                                           1201 64 6900  1822       dimension   
+                                           1202 64 7600  1823       do          
+                                           1203 65 7800  1824       equivalnce  
+                                           1204 67 7600  1825       go to       
+                                           1205 69 6600  1826       if          
+                                           1206 77 6100  1827       pause       
+                                           1207 77 8400  1828       punch       
+                                           1208 79 6500  1829       read        
+                                           1209 82 8300  1827       stop        
+                                           1210 99 9999  9999       end of tab  
+                                          subf2stdlast  subf3                   
+                                          subf3stutemaf subf1                   
+                                          subf1stlnext  sub f                   
+                                          sub fraltemaf lp f1                   
+                                          lp f1nze      zt f1                   
+                                               slt 0002             next char   
+                                               stltemaf                         
+                                               rau 8003 next                    
+                                          zt f1raliafi              dec iafi    
+                                               nze      last        final char  
+                                               sloone                           
+                                               stliafi                          
+                                               rsl 8002                         
+                                               aloiac                           
+                                               alocnffi  8002                   
+                                          cnffiral 1899 lp f1       sub f       
+                                          subk1aup 8001 sub k                   
+                                          subk2aupcomma sub k       restpr com  
+                                          sub kral 8003 trski                   
+                                          trskialotemph                         
+                                               slt 0002                         
+                                               nzusw6   zt 30                   
+                                          zt 30lddswv   tr cc                   
+                                          tr aslddstopm tr cc                   
+                                          tr ccstdsw6   tr qr                   
+                                          tr qrstltemph sub f                   
+                                          swv  srt 0002 tr as       sub k       
+                                          pch cstlp0001 punch                   
+                                          punchpch 1977 pack        end contin  
+                                          pch bpch 1977 sub f       do pch if   
+                                          headrraltotlc             statmnt no  
+                                               stlp0004             pch 37 40   
+                                               stup0006                         
+                                               stup0007                 61 70   
+                                               stdp0008               71  80    
+                                               stdp0001                         
+                                               lddlow88             set contro  
+                                               stdp0010                         
+                                               pch 1977 start                   
+                                           1822lddtr uh tr ug       dimension   
+                                          tr ugstdout q                         
+                                               raliac                           
+                                               slotwo                word cou   
+                                               stliafi                          
+                                               rau 1901 out q                   
+                                          tr uhslt 0008                         
+                                               aloswdma                         
+                                               lddtrdme subf2                   
+                                          trdmanzusubk1                         
+                                               raltemph            process v    
+                                               stutemph                         
+                                               stltest                          
+                                               stutesto            zero v j     
+                                               stutestn                         
+                                               ralswdmb subf1                   
+                                          trdmbnzu      ztdmc      comma test   
+                                               aupparnr                         
+                                               nzu      ztdmd      parenr tes   
+                                               aupparnr            2par z com   
+                                               srt 0001            collect su   
+                                               supnine              charater    
+                                               bmistopf            n            
+                                               auptesto                         
+                                               slt 0001 trdmg                   
+                                          ztdmcraltesto            subscript    
+                                               stltestn trdmg                   
+                                          trdmgstutesto sub f      ze           
+                                          ztdmdlddtrdmc                         
+                                               stdnext                          
+                                               raltestn            at comma     
+                                               nzesub f ztdmc      over 2 sub   
+                                          trdmclddswdma trdmh      supparltrd   
+                                          trdmhstdnext  trdmd                   
+                                          trdmdlddnzu3  trdmf                   
+                                          trdmelddnzu1  trdmf                   
+                                          trdmfstdout                           
+                                               rsutest  subj1                   
+                                          nzu1 nzupack  stopf                   
+                                          nzu3 nzusub f stopf                   
+                                          swdmasupparnl trdma      next 1       
+                                          swdmbsupcomma trdmb      next 2       
+                                           1823lddtr ue tr bd      do statmnt   
+                                          tr bdstdout q                         
+                                               raliac                           
+                                               sloone                           
+                                               stliafi                          
+                                               rau 1900            shift off    
+                                               slt 0004 out q                   
+                                          tr uealoswdoa                         
+                                               lddcn b4 subf2                   
+                                          swdoasupzerol tr  c                   
+                                          tr  cbmi      subk1                   
+                                               aupzerol                         
+                                               slt 0002                         
+                                               alotemph                         
+                                               stutemph                         
+                                               stltest  tr  b                   
+                                          tr  baloltr k             add comma   
+                                               stdp0003             punch wor   
+                                               stdp0005             punch wor   
+                                               stlp0001                         
+                                               ralswdob subf1                   
+                                          tr  dnzusubk1 zt5                     
+                                          zt5  rautemph                         
+                                               stltemph                         
+                                               lddtr  f subj                    
+                                          tr  fstlp0002              punch 2    
+                                               lddswdod            stlp0004tr   
+                                               stdsw 59                         
+                                               ralswdoc subf1                   
+                                          tr  gnzusubk2 zt7                     
+                                          zt7  raltemph                         
+                                               stltest               test b     
+                                               stutemph tx  e                   
+                                          tx  eslt 0002            to high      
+                                               nzu      tx  e       order       
+                                               supzerol                         
+                                               bminzt9                          
+                                               raltest  sw 59                   
+                                          nzt9 rautest                          
+                                               lddsw 59 subj                    
+                                          tr  hstup0006                         
+                                               pch 1977            pch card 0   
+                                               stup0001            zero punch   
+                                               stup0002            words for    
+                                               stdp0004                         
+                                               lddswdoe tr qo                   
+                                          tr  ilddswdof tr qo                   
+                                          tr qostdsw 59 sub f                   
+                                          tr  klddltr f            f in word    
+                                               stdp0006 punch        six        
+                                          tr  jnzezt7               t store m   
+                                               lddswdog            stlp0004tr   
+                                               stdsw 59                         
+                                               lddaone             0000 0  91   
+                                               stdp0002 zt7        one for h3   
+                                          cn b4ralp0004 tr  j      last         
+                                          swdobsupequal tr  d      next b       
+                                          swdocsupcomma tr  g      next c       
+                                          swdodstlp0004 tr  h      swdo2  1     
+                                          swdoestlp0004 tr  i      swdo2  2     
+                                          swdofstlp0002 tr  k      swdo2  3     
+                                          swdogstlp0004 tr  k      swdo2  4     
+                                           1826raucnif6            if statmnt   
+                                               lddtraea subj                    
+                                          traeastltempg flo                     
+                                          in10 lddltr f                         
+                                               stdp0006                         
+                                               stlsw 59                         
+                                               ralsw aa                         
+                                               lddzt 95 tr ui                   
+                                          tr dmnzusubk2 zt 95                   
+                                          zt 95raltemph                         
+                                               stutemph                         
+                                               srt 0002                         
+                                               aloltr g                         
+                                               stlp0001 sw 59                   
+                                          sw ablddzrojo                         
+                                               stdp0003                         
+                                               lddif                            
+                                               stdp0002                         
+                                               stup0009                         
+                                               ralltr v                         
+                                               auptempg                         
+                                               ldd      tradp                   
+                                               lddtempg                         
+                                               stdp0003                         
+                                               ralltr u                         
+                                               aupzrojo                         
+                                               lddsw ad tradp                   
+                                          tradpstdsw 59                         
+                                               stlp0004                         
+                                               stup0005 pch b                   
+                                          tr dsstdp0004 punch                   
+                                          sw aasupcomma tr dm      if           
+                                          sw adlddltr v tr ds      if           
+                                           1825stuiaw              go to        
+                                               ldd      tr bd                   
+                                               slt 0004                         
+                                               alocn a7                         
+                                               ldd      subf2                   
+                                               raltemph in5                     
+                                          cn a7supparnl                         
+                                               nzusubk1 in7                     
+                                          in5  srt 0002                         
+                                               aloltr g pch c                   
+                                          in7  ralcn f2                         
+                                               lddcnaf1 tr ui                   
+                                          tr uistdlast  subf1                   
+                                          tr  snzu      tr  u                   
+                                               supparnr                         
+                                               nzusubk2 tr  u                   
+                                          tr  uraltemph                         
+                                               stutemph            zero temph   
+                                               nzeloopr sub f                   
+                                          loopraupiaw                           
+                                               supcnakb                         
+                                               nzu      stp n                   
+                                               aupcnaib                         
+                                               stuiaw                           
+                                               aupcn f5  8003      stl1149sub   
+                                          cn f5stl 1989 sub f      computed     
+                                          tr  xstdp0002                         
+                                               lddltr u                         
+                                               stdp0004                         
+                                               rautemph                         
+                                               lddtr  y subj                    
+                                          tr  ystlp0003                         
+                                               raliaw   trgog                   
+                                          looptnze      punch                   
+                                               pch 1977                         
+                                               stup0009                         
+                                               stliaw   trgog                   
+                                          trgogldd      sube1                   
+                                               stlp0005                         
+                                               raliaw                           
+                                               alocn f6  8002      ldd1149sub   
+                                          cn f6ral 1989 tr  z      computed g   
+                                          tr  zsrt 0002                         
+                                               aloltr g                         
+                                               stlp0001                         
+                                               raliaw                           
+                                               sloone   loopt                   
+                                          cnaf1lddif    tr  x      computed g   
+                                          cn f2supparnr tr  s      computed g   
+                                        1                                       
+                                        1 changes for punch routine             
+                                           1828ralnnal1             set sw 50   
+                                               aloone              nxtwd and    
+                                               aupswba2            1991 for     
+                                               ldd      tm ra      processing   
+                                               raliac              punch        
+                                               sloone              statements   
+                                               stliac   arith                   
+                                          swba2supcomma             bypass      
+                                               nzutr hb            n comma      
+                                               lddtj10a            and reset    
+                                               stdtj 10            sw 50 to     
+                                               lddswba3            process      
+                                               stdsw ba tr li      statement    
+                                          swba3nzu      tx dh       if parnl    
+                                               supparnl            want elem    
+                                               nzu      tj 5       of array     
+                                               aupone 1             if comma    
+                                               nzu      tj 3       var asmbld   
+                                               aupcomma tr ha      to process   
+                                          tj 3 rautemab                         
+                                               nzu      tr hb                   
+                                               lddstrup subj                    
+                                          strupstutemac             precede     
+                                               sup 8001            var loc      
+                                               slt 0002            number by    
+                                               sup 8003            t for read   
+                                               srt 0002            and punch    
+                                               aloltr t            statements   
+                                               lddout21 tr kk                   
+                                          out21rautemac             if whole    
+                                               nzuout22 tr hb      array        
+                                          out22rauprodt            specified    
+                                               ldd      sube       by punch     
+                                               lddout23            statement    
+                                               stdoutp  tr jo      process ij   
+                                          out23rautemac            product      
+                                               srt 0004            followed     
+                                               sup 8003            by base      
+                                               aupnine                          
+                                               slt 0004                         
+                                               ldd      sube                    
+                                               slt 0002                         
+                                               stltemab tr jp                   
+                                          tj 5 lddnzu2b                         
+                                               stdnzu2  tx de                   
+                                          nzu2bstutemac tj 5a       rrecd loc   
+                                          tj 5aralltr t            num by t     
+                                               stltemab tj 8                    
+                                        1                                       
+                                        1 changes for read statements           
+                                           1829ralnnal1             set sw 50   
+                                               aupswba2            nxtwd and    
+                                               ldd      tm ra      1991 for     
+                                               rau 1900            read state   
+                                               srt 0002            ments        
+                                               stl 1900             bybass wd   
+                                               rautr rd            read         
+                                               aloltrdf             store df    
+                                               lddtjbsw sub x                   
+                                          tr rdralone   rith1                   
+                                          tm rastdoute                          
+                                               lddnine                          
+                                               std 1991                         
+                                               stusw ba                         
+                                               stlnn l1 oute                    
+                                          sub xstdtj sw                         
+                                               stllast   8003                   
+                                           1821ralccn01 pch c      continue     
+                                           1830ralltrff            end          
+                                               ldd      tr uc                   
+                                               stlp0006                         
+                                               pch 1977 headr                   
+                                           1827ralcst01 pch c      oause stop   
+                                          one 1 00 0000  0001      one 1        
+                                          two 1 00 0000  0002                   
+                                          seven 00 0000  0007                   
+                                          eight 00 0000  0008                   
+                                          nine  00 0000  0009      nine in 10   
+                                          cn a5 00 0000  0010      equl n com   
+                                          decpt 00 0000  0018      decimal pt   
+                                          parnr 00 0000  0019                   
+                                          plus  00 0000  0020      plus sign    
+                                          mult  00 0000  0029      milt sign    
+                                          minus 00 0000  0030      minus sign   
+                                          divid 00 0000  0031                   
+                                          comma 00 0000  0038                   
+                                          parnl 00 0000  0039                   
+                                          equal 00 0000  0048      equal sign   
+                                          ltr a 00 0000  0061                   
+                                          ltr e 00 0000  0065                   
+                                          ltr f 00 0000  0066                   
+                                          ltrni 00 0000  0069                   
+                                          ltr k 00 0000  0072                   
+                                          egton 00 0000  0081                   
+                                          low88 00 0000  0088                   
+                                          zerol 00 0000  0090      alpha o lo   
+                                          aone  00 0000  0091      alpha one    
+                                          ltrff 00 0000  6666                   
+                                          if    00 0000  6966                   
+                                          one   00 0001  0000      one in fif   
+                                          two   00 0002  0000      two in fif   
+                                          three 00 0003  0000      three in 5   
+                                          four  00 0004  0000      four in 5t   
+                                          five  00 0005  0000      five in 5t   
+                                          six   00 0006  0000                   
+                                          cnakb 00 0010  0000                   
+                                          cnaib 00 0011  0000                   
+                                          cnbkb 00 0025  0000                   
+                                          cnbib 00 0026  0000                   
+                                          cnif6 00 0091  6966                   
+                                          hndrd 00 0100  0000      table cnst   
+                                          ltr b 62 0000  0000                   
+                                          ltr d 64 0000  0000                   
+                                          ltrfh 66 0000  0000      f in hop     
+                                          ltr g 67 0000  0000                   
+                                          cst01 68 0000  0000      word halt    
+                                          ltr i 69 0000  0000                   
+                                          ltr j 71 0000  0000                   
+                                          ltr l 73 0000  0000                   
+                                          ltr m 74 0000  0000                   
+                                          ltr p 77 0000  0000                   
+                                          ltr q 78 0000  0000                   
+                                          ltr r 79 0000  0000                   
+                                          ltr s 82 0000  0000                   
+                                          ltr t 83 0000  0000                   
+                                          ltr u 84 0000  0000                   
+                                          ltr v 85 0000  0000                   
+                                          ltr x 87 0000  0000                   
+                                          ltr y 88 0000  0000                   
+                                          ltr z 89 0000  0000                   
+                                          ltrdf 00 0000  6466                   
+                                          ltrkh 72 0000  0000      k in hop     
+                                          azero 90 0000  0000                   
+                                          zrob  90 6200  0000                   
+                                          ccn01 88 9189  8891      cont const   
+                                          lmcom 73 7400  0000                   
+                                          slcom 82 7300  0000                   
+                                          stopahlt 0010 pack       nz parn co   
+                                          stopbhlt 0001 pack       tlu error    
+                                          stopfhlt 0400 pack       not intege   
+                                          stophhlt 0020 pack       pack error   
+                                          stp nhlt 0002 pack       table ovfl   
+                                          stp rhlt 0003 pack                    
+                                          stopmhlt 0004 pack       variable o   
+                                          stopnhlt 0300 pack       transltn o   
+                                          stopohlt 0100 pack       subscrpt o   
+                                           1171hlt 0030 pack       function n   
+                                          stopchlt 0005 pack       scan ovrfl   
+                                          eghts 00 0800  8080                   
+                                          zrojo 90 7190  0000      if constan   
+                                        1 process equivalence statement         
+                                           1824raliac                initialze  
+                                               slothree            word count   
+                                               stliafi             parn count   
+                                               stutemaa                         
+                                               rau 1902                         
+                                               slt 0002              is charac  
+                                               aloeqsw1 subf3        is charac  
+                                          eqsw1supparnl             left paren  
+                                               nzu      eq1         comma or    
+                                               aupone 1             rght paren  
+                                               nzu      eq2          if no      
+                                               aupparnr             restor var  
+                                               nzusubk1 eq3                     
+                                          eq1  raltemaa              yes left   
+                                               aloone               paren       
+                                               stuf1                 increment  
+                                               stdf3                parn count  
+                                               stdtemab                         
+                                               stdf9                 initialze  
+                                               stltemaa sub f       for new     
+                                        1 equivl set                        
+                                          eq2  rautemaa              yes comma  
+                                               nzueq2a  eqout        prnct zro  
+                                          eq2a rautemph             start new   
+                                               stltemph             equiv set   
+                                               lddouteq subj                    
+                                          outeqrau 8003              not zero   
+                                               srt 0004             proces var  
+                                               sup 8003              is base    
+                                               srt 0006             of new var  
+                                               stlout q              less than  
+                                               aupf1                 base of    
+                                               nzu      eq2aa        previous   
+                                               sup 8002              variable   
+                                               bmieq2b  eq2aa                   
+                                          eq2aastlf1    eq2b        save low    
+                                          eq2b ralprodt            base         
+                                               slof3                is ji       
+                                               bmieq2c             prod of      
+                                               alo 8001            new var      
+                                               stlf3               greater      
+                                               lddeq2ba            than prod    
+                                               stdeqsw2            of previos   
+                                               lddout q            variable     
+                                               stdtemae treq1       save bse    
+                                          treq1rauf9               of lrg ary   
+                                               supfive                          
+                                               nzu      stp n       save lrge   
+                                               aupsix              product      
+                                               stuf9                store       
+                                               stdf6               subsc tabl   
+                                               alosubsc            locat in     
+                                               aup       8003      equ bar ta   
+                                               stl 1449 eqsw2       halt if     
+                                          eq2baaloeq2b1            more         
+                                               lddeqsw3 eq2bb       than        
+                                          eq2bbstdsw 50 eq2be       five        
+                                          eq2belddeq2b2 eq2bc       variables   
+                                          eq2bcsdaf8               in equ set   
+                                               stlf7                            
+                                               rslf1    f7          read equ    
+                                          eq2b1ldd 1499 f8         var table    
+                                          eq2b2sia 0000 eq2bd      to insert    
+                                          eq2bdrauf6               low base     
+                                               supone              in 15xx      
+                                               nzu      sub f                   
+                                               stuf6                if ij       
+                                               aup       8003      prodt of     
+                                               ral 1449 sw 50                   
+                                          eqsw3aloeq2b3 eq2be                   
+                                          eq2b3sup 1499            equiv set    
+                                               bmi      eq2bd      chnge 15xx   
+                                               ldd 8003 f8         to minus     
+                                          eq2c lddeq2ca            in subsc     
+                                               stdeqsw2 treq1      table        
+                                          eq2caaloeq2b3                         
+                                               lddeqsw4 eq2bb                   
+                                          eqsw4aloeq2b1 eq2be                   
+                                          eq3  raltemaa             yes rght    
+                                               sloone              paren        
+                                               stltemaa             decrement   
+                                               lddeqout            paren        
+                                               stdlast  eq2a       count        
+                                          eqoutraleq3a1 eq3a        prepar to   
+                                          eq3a sloeq3a2            scan subsc   
+                                               nze      eq3d       table and    
+                                               aloeq3b             adjust       
+                                               lddeq3c1            bases        
+                                               sdaf4                            
+                                               lddeq3c2                         
+                                               sdaf5                            
+                                               stltemac  8001                   
+                                          eq3a1ral 1499 eq3ba                   
+                                          eq3a2ral 1519 eq3ba                   
+                                          eq3b ral 1520 eq3ba                   
+                                          eq3babmi      eq3bb                   
+                                               lddsetm  storm                   
+                                          eq3bblddeq3bc storm                   
+                                          stormstdswchm             compare     
+                                               rsm 8002            base of      
+                                               slt 0006            15xx with    
+                                               stuoutp             bse of eqv   
+                                               sup 8003            set          
+                                               slt 0004             if less     
+                                               aupf1               continue     
+                                               bmieq3c             scan         
+                                               nzueq3bc swchm       if equal    
+                                          eq3bcraltemac eq3a       adjust loc   
+                                          setm ramoutp             count        
+                                               slt 0004             if grter    
+                                               lddeq3bd            compare      
+                                               stdj106  j104       with orig    
+                                          eq3bdalotemab            bse of       
+                                               lddj106a            lrgst aray   
+                                               stdj106              decrease    
+                                               stltemab eq3bc      or increse   
+                                          eq3c sup 8001            base of      
+                                               auptemae            15xx as      
+                                               bmieq3cb            needed       
+                                               sup 8001                         
+                                               ram 8003                         
+                                               alof3    eq3ca                   
+                                          eq3caslotemab f4                      
+                                          eq3c1ldd 0000 f5                      
+                                          eq3c2sia 0000 eq3bc                   
+                                          eq3cbsup 8001                         
+                                               ram 8003 eq3ca                   
+                                          eq3d lddpack                          
+                                               stdlast  sub f                   
+                                               pat                              
+                                        1
+                                               equminus  0167                   
+                                               equswpka  0098                   
+                                               equread   0050                   
+                                               equpacka  0088                   
+                                        1 pack                                  
+                                        1 for transit i s and ii s              
+                                               bla 1000  1010                   
+                                               regr1951  1960                   
+                                          packaralr0001                         
+                                               nze      ztpk1                   
+                                               slt 0002                         
+                                               stlr0001                         
+                                               ral 8003                         
+                                               nzeswpkt packa                   
+                                          ztpk1ralr0002                         
+                                               nze      ztpk2                   
+                                               slt 0002                         
+                                               stlr0002                         
+                                               ral 8003                         
+                                               nzeswpkt ztpk1                   
+                                          ztpk2ralr0003                         
+                                               nze      ztpk3                   
+                                               slt 0002                         
+                                               stlr0003                         
+                                               ral 8003                         
+                                               nzeswpkt ztpk2                   
+                                          ztpk3ralr0004                         
+                                               nze      ztpk4                   
+                                               slt 0002                         
+                                               stlr0004                         
+                                               ral 8003                         
+                                               nzeswpkt ztpk3                   
+                                          ztpk4ralr0005                         
+                                               nze      ztpk5                   
+                                               slt 0002                         
+                                               stlr0005                         
+                                               ral 8003                         
+                                               nzeswpkt ztpk4                   
+                                          ztpk5ralr0006                         
+                                               nze      read                    
+                                               slt 0002                         
+                                               stlr0006                         
+                                               ral 8003                         
+                                               nzeswpkt ztpk5                   
+                                          swpktsloi49                           
+                                               nzenzk1                          
+                                               ralminus swpka                   
+                                          nzk1 alo 8001 swpka                   
+                                          i49   00 0000  0049                   
+                                               pat                                       
+                                               pst                                        

@@ -1,0 +1,34 @@
+c     ------------------------------
+c     prime number generator using the sieve of eratosthenes
+c     converted to fortransit
+c     ------------------------------
+c
+      dimension ifl(50)
+c     *** set ending number to be tested (must match array dimension)
+      isize=50
+c     *** mark all numbers in the sieve as prime initially, except 2
+      do 10 i=1,isize
+   10   ifl(i)=1
+      ifl(1)=0
+c
+c     *** work through the list, finding the next marked number
+c
+      do 40 num=1,isize
+      if (ifl(num)) 15,40,15
+c     *** marked number is the current prime, form its first multiple
+   15 iprme=num
+      mult=iprme+iprme
+c     *** unmark all multiples of the current prime
+   20 if (mult-isize) 25,25,40
+   25 do 30 i=mult,isize,iprme
+   30 ifl(i)=0
+c     *** go find next unmarked number
+   40 continue
+c
+c     *** print results - all numbers that are still marked
+c
+      do 50 num=1,isize
+      if (ifl(num)) 45,50,45
+   45 punch, num
+   50 continue
+      end

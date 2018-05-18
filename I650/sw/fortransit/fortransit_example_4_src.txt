@@ -1,0 +1,118 @@
+c     ------------------------------
+c     package functions test
+c     ------------------------------
+c
+c     test cosf and sinf
+c
+      pi=3.1415926
+      ainc=pi/10.0
+      do 1 i=0,20
+      a1=ainc*i
+      a2=cosf(a1)
+      a3=sinf(a1)
+    1 punch,i,a1,a2,a3
+      i=1111
+      punch,i  
+c     pause
+c
+c     test sqrtf
+c
+      do 2 i=0,9
+      a1=i
+      a2=sqrtf(a1)
+      ia2=a2         
+    2 punch,i,a2,ia2
+      i=2222
+      punch,i  
+c     pause
+c
+c     test maxf
+c
+      a=maxf(3.0,1.0,4.0,2.0)
+      b=maxf(-3.0,-1.0,-4.0,-2.0)
+      i=0
+      punch,i,a,b
+      i=3333
+      punch,i  
+c     pause
+c
+c     test intf
+c
+      do 4 i=0,18
+      a1=1.23456789e12 / (10.0**i)
+      a2=intf(-a1)
+      if (a1 - 1.0e8) 42,41,41
+   41 ia2=0
+      go to 4
+   42 ia2=a2
+    4 punch,i,a1,a2,ia2
+      i=4444
+      punch,i  
+c     pause
+c
+c     test absf
+c
+      do 5 i=0,10
+      a1=i
+      a2=absf(a1)
+      a3=-a1
+      a4=absf(a3)
+    5 punch,i,a2,a3,a4
+      i=5555
+      punch,i  
+c     pause
+c
+c     test expnf and lnf
+c
+      do 6 i=1,10,2
+      a1=i
+      a2=expnf(a1)
+      a3=lnf(a1)
+      ia1=a1
+      ia2=a2
+      ia3=a3
+    6 punch,i,a2,ia2,a3,ia3
+      i=6666
+      punch,i  
+c     pause
+c
+c     test expf and logf
+c
+      do 7 i=0,10
+      a1=(i-5)
+      a2=expf(a1)
+      a3=logf(a2)
+      ia1=a1
+      ia2=a2
+      ia3=a3
+    7 punch,i,a1,ia1,a2,ia2,a3,ia3
+      i=7777
+      punch,i  
+c     pause
+c
+c     test float**float
+c
+      do 8 i=0,10
+      a1=(i-5)
+      a1=a1/2
+      a2=10.0**a1
+      ia1=a1
+      ia2=a2
+    8 punch,i,a1,ia1,a2,ia2
+      i=8888
+      punch,i  
+c     pause
+c
+c     test float**int and int**int
+c
+      do 9 i=0,10
+      ia1=2**i
+      a2=2.0**i
+      ia2=a2
+      a3=i
+      a4=4.0**a3
+      ia4=a4
+    9 punch,i,ia1,a2,ia2,a4,ia4
+      i=9999
+      punch,i  
+      end

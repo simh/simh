@@ -23,7 +23,11 @@
 prime number generator using the sieve of eratosthenes
 converted to ibm 650 IT compliler 
 
- IT system syntax      IT notation in manual       c-like equivalent syntax
+note: ibm 650 terminates card reading on "ff" statement (numbered as 10), so 
+it is safe to add text and comments below that
+
+
+ IT syntax             IT notation in manual       c-like equivalent syntax
 
  1+ 2k i1k 1k 1k 50k   1: 2,i1,1,1,50,             for(num=1,num<=50;num++)
  2+ ci1 z 1j           2: ci1 <- 1.                    prime(num) = 1.0 

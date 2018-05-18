@@ -1,0 +1,21 @@
+                                        1 
+                                        1 fortran 
+                                        1 package reservation 
+                                        1 for package use
+                                        1 
+                                        1 includes 
+                                        1 - float fix conversions
+                                        1 - fortran read punch statemens
+                                        1 - fortran power operator
+                                        1 - fortran functions
+                                        1 excludes
+                                        1 - nothing
+                                        1 
+                                               regp1951  1960 read band            
+                                               regj1977  1986 punch band      
+                                               regw1988  1998 storage band                                   
+                                               blr 1401  1999 reserve 
+                                        1                     pack space
+                                        1                                
+                                        1 end of package reservation 
+                                        1                                 

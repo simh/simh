@@ -3,7 +3,7 @@
        5                 PLUS THE FOLLOWING
        5                    ROUTINES                                                  
        5                E00AK  POWER FIX FIX                                           
-       5                E00Am  POWER FIX FIX REVERSE                                   
+       5                E00AM  POWER FIX FIX REVERSE                                   
        5                E00AL  POWER FLOAT FIX                                         
        5                E00AN  POWER FLOAT FIX REVERSE                                 
    1        E00AI    STD  ARTHX  AI1     ADD             1833    24  1786  1789        
