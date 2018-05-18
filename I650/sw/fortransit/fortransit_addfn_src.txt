@@ -1,0 +1,71 @@
+                                        1
+                                        1 add function title routine
+                                        1 temporaly stored in ji table
+                                        1
+                                        1 missing from original listing
+                                        1 rewritten by roberto sancho
+                                        1 in may 2018
+                                        1
+                                               blr 0000  1999 
+                                        1
+                                               bla 1500  1519 
+                                               regr1951  1960 read band
+                                               equone    0066
+                                               equcnakb  1140
+                                               equreset  0228
+                                        1
+                                               equfstp6  1000 
+                                               equfstp7  1002 
+                                               equfnnum  1160  
+                                        1
+                                               synaddfn  1500 entry pt
+                                        1                     
+                                          addfnralfnnum       if no fn 
+                                               nze      fnl1   go fnl1
+                                               slocnakb       hlt 6 if 
+                                               bmi      fstp6  10 fn def
+                                               ralfnnum       hlt 7 if
+                                               alo       8002  not in 
+                                               rau 1149        alphabtic
+                                               supr0002        order 
+                                               bmifnl1  fstp7  
+                                          fnl1 ralfnnum       
+                                               aupr0002       store
+                                               alo       8002  fort fn
+                                               stu 1150        name
+                                               ralfnnum       incr num
+                                               aloone          of defnd 
+                                               stlfnnum        functs
+                                               aupr0003       store
+                                               alo       8002  it fn 
+                                               stu 1160 fnl2   name
+                                          fnl2 rd1 1951 reset continue
+                                        1
+                                          fstp6hlt 0006  fnl2 
+                                          fstp7hlt 0007  fnl2 
+                                          fnnum 00 0000  0000
+                                        1
+                                        1 load fortran functions in table
+                                        1
+                                           1150alf  lnf       fortran
+                                           1151alf absf       func names
+                                           1152alf cosf       in ascending
+                                           1153alf expf       order
+                                           1154alf intf
+                                           1155alf logf       right justified
+                                           1156alf maxf
+                                           1157alf sinf
+                                           1158alfexpnf
+                                           1159alfsqrtf
+                                        1
+                                           1161alf300ek       corresponding it
+                                           1162alf24ek        func names
+                                           1163alf21ek        left justified
+                                           1164alf2ek
+                                           1165alf25ek
+                                           1166alf1ek
+                                           1167alf26ek
+                                           1168alf22ek
+                                           1169alf301ek 
+                                           1170alf23ek                                  
+                                        1

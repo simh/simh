@@ -36,17 +36,28 @@
 
 
 /* Memory */
-#define MAXMEMSIZE      (4000)
-#define MEMSIZE         cpu_unit.capac          /* actual memory size */
-#define MEMMASK         (MEMSIZE - 1)                   /* Memory bits */
+#define MAXDRUMSIZE      (4000)
+#define DRUMSIZE         ((int)(cpu_unit.capac % 10) * 1000)          /* actual drum memory size */
 
-#define MEM_ADDR_OK(x)  (((uint32) (x)) < MEMSIZE)
-extern t_int64          DRUM[MAXMEMSIZE];
-extern int              DRUM_NegativeZeroFlag[MAXMEMSIZE];
-extern char             DRUM_Symbolic_Buffer[MAXMEMSIZE * 80];
+extern t_int64          DRUM[MAXDRUMSIZE];
+extern int              DRUM_NegativeZeroFlag[MAXDRUMSIZE];
+extern char             DRUM_Symbolic_Buffer[MAXDRUMSIZE * 80];
 
-extern int WriteDrum(int AR, t_int64 d, int NegZero);
-extern int ReadDrum(int AR, t_int64 * d, int * NegZero);
+extern t_int64          IOSync[10];
+extern int              IOSync_NegativeZeroFlag[10];
+
+#define STOR            (cpu_unit.flags & OPTION_STOR)
+#define CNTRL           (cpu_unit.flags & OPTION_CNTRL)
+#define FAST            (cpu_unit.flags & OPTION_FAST)
+
+extern t_int64          IAS[60];
+extern int              IAS_NegativeZeroFlag[60];
+extern int              IAS_TimingRing;
+
+extern int WriteAddr(int AR, t_int64 d, int NegZero);
+extern int ReadAddr(int AR, t_int64 * d, int * NegZero);
+extern CONST char * DecodeOpcode(t_int64 d, int * opcode, int * DA, int * IA);
+
 
 /* digits contants */
 #define D10            (10000000000LL)      // ten digits (10 zeroes)
@@ -86,10 +97,16 @@ extern DEBTAB crd_debug[];
 extern DEVICE       cp_dev;
 #endif
 
+// max number of cards in deck for carddeck internal command
+#define MAX_CARDS_IN_DECK  10000
+#define MAX_CARDS_IN_READ_TAKE_HOPPER 10
+
 extern DIB          cdr_dib;
 extern DEVICE       cdr_dev;
 extern uint32       cdr_cmd(UNIT *, uint16, uint16);
 extern UNIT         cdr_unit[4];
+extern char         ReadHopper[3 * MAX_CARDS_IN_READ_TAKE_HOPPER * 80];
+extern int          ReadHopperLast[3];
 
 extern DIB          cdp_dib;
 extern DEVICE       cdp_dev;
@@ -102,58 +119,6 @@ extern UNIT         cdp_unit[4];
 #define URCSTA_LOAD     01000    /* Load flag for 533 card reader */
 #define URCSTA_SOAPSYMB 02000    /* Get soap symbolic info when reading the card */
 
-
-/* Character codes in IBM 650 as stated in p4 Andree Programming the IBM 650 Mag Drum 
-   Also stated in www.bitsavers.org/pdf/ibm/650/28-4028_FOR_TRANSIT.pdf p37
-*/
-#define CHR_BLANK       00
-#define CHR_DOT         18     // card code: 12-3-8   .
-#define CHR_RPARENT     19     //            12-4-8   )
-#define CHR_AMPERSAND   20     //            12       +
-#define CHR_DOLLAR      28     //            11-3-8   $
-#define CHR_STAR        29     //            11-4-8   *
-#define CHR_NEG         30     //            11       -    minus sign for negative value
-#define CHR_SLASH       31     //            0-1      /
-#define CHR_COMMA       38     //            0-3-8    ,
-#define CHR_LPARENT     39     //            0-4-8    (
-#define CHR_EQUAL       48     //            3-8      =
-#define CHR_MINUS       49     //            4-8      -
-#define CHR_A           61
-#define CHR_B           62
-#define CHR_C           63
-#define CHR_D           64
-#define CHR_E           65
-#define CHR_F           66
-#define CHR_G           67
-#define CHR_H           68
-#define CHR_I           69
-#define CHR_J           71
-#define CHR_K           72
-#define CHR_L           73
-#define CHR_M           74
-#define CHR_N           75
-#define CHR_O           76
-#define CHR_P           77
-#define CHR_Q           78
-#define CHR_R           79
-#define CHR_S           82
-#define CHR_T           83
-#define CHR_U           84
-#define CHR_V           85
-#define CHR_W           86
-#define CHR_X           87
-#define CHR_Y           88
-#define CHR_Z           89
-#define CHR_0           90
-#define CHR_1           91
-#define CHR_2           92
-#define CHR_3           93
-#define CHR_4           94
-#define CHR_5           95
-#define CHR_6           96
-#define CHR_7           97
-#define CHR_8           98
-#define CHR_9           99
 
 extern struct card_wirings {
     uint32      mode;
@@ -178,6 +143,7 @@ extern int         cycle_time;
 extern const char *cpu_description(DEVICE *dptr);
 
 /* Opcodes */
+// Instructions on Basic machine 
 #define OP_AABL    17  // Add absolute to lower accumulator 
 #define OP_AL      15  // Add to lower accumulator 
 #define OP_AU      10  // Add to upper accumulator 
@@ -195,33 +161,136 @@ extern const char *cpu_description(DEVICE *dptr);
 #define OP_BRD8    98
 #define OP_BRD9    99
 #define OP_BRD10   90
-#define OP_DIV     14  // Divide 
-#define OP_DIVRU   64  // Divide and reset upper accumulator 
-#define OP_LD      69  // Load distributor 
-#define OP_MULT    19  // Multiply 
-#define OP_NOOP    00  // No operation 
-#define OP_PCH     71  // Punch a card 
-#define OP_RD      70  // Read a card 
-#define OP_RAABL   67  // Reset accumulator and add absolute to lower accumulator 
-#define OP_RAL     65  // Reset accumulator and add to lower accumulator 
-#define OP_RAU     60  // Reset accumulator and add to upper accumulator 
-#define OP_RSABL   68  // Reset accumulator and subtract absolute from lower accumulator 
-#define OP_RSL     66  // Reset accumulator and subtract from lower accumulator 
-#define OP_RSU     61  // Reset accumulator and subtract from upper accumulator 
-#define OP_SLT     35  // Shift accumulator left 
-#define OP_SCT     36  // Shift accumulator left and count  
-#define OP_SRT     30  // Shift accumulator right 
-#define OP_SRD     31  // Shift accumulator right and round accumulator 
-#define OP_STOP    01  // Stop if console switch is set to stop, otherwise continue as a NO-OP 
-#define OP_STD     24  // Store distributor into memory 
-#define OP_STDA    22  // Store lower accumulator data address into distributor, then store distributor into memory
-#define OP_STIA    23  // Store lower accumulator instruction address into distributor, then store distributor into memory
-#define OP_STL     20  // Store lower accumulator into memory 
-#define OP_STU     21  // Store upper accumulator into memory 
-#define OP_SABL    18  // Subtract absolute from lower accumulator 
-#define OP_SL      16  // Subtract from lower accumulator 
-#define OP_SU      11  // Subtract from upper accumulator 
-#define OP_TLU     84  // Table lookup 
+#define OP_DIV     14   // Divide 
+#define OP_DIVRU   64   // Divide and reset upper accumulator 
+#define OP_LD      69   // Load distributor 
+#define OP_MULT    19   // Multiply 
+#define OP_NOOP    00   // No operation 
+#define OP_PCH     71   // Punch a card 
+#define OP_RD      70   // Read a card 
+#define OP_RAABL   67   // Reset accumulator and add absolute to lower accumulator 
+#define OP_RAL     65   // Reset accumulator and add to lower accumulator 
+#define OP_RAU     60   // Reset accumulator and add to upper accumulator 
+#define OP_RSABL   68   // Reset accumulator and subtract absolute from lower accumulator 
+#define OP_RSL     66   // Reset accumulator and subtract from lower accumulator 
+#define OP_RSU     61   // Reset accumulator and subtract from upper accumulator 
+#define OP_SLT     35   // Shift accumulator left 
+#define OP_SCT     36   // Shift accumulator left and count  
+#define OP_SRT     30   // Shift accumulator right 
+#define OP_SRD     31   // Shift accumulator right and round accumulator 
+#define OP_STOP    01   // Stop if console switch is set to stop, otherwise continue as a NO-OP 
+#define OP_STD     24   // Store distributor into memory 
+#define OP_STDA    22   // Store lower accumulator data address into distributor, then store distributor into memory
+#define OP_STIA    23   // Store lower accumulator instruction address into distributor, then store distributor into memory
+#define OP_STL     20   // Store lower accumulator into memory 
+#define OP_STU     21   // Store upper accumulator into memory 
+#define OP_SABL    18   // Subtract absolute from lower accumulator 
+#define OP_SL      16   // Subtract from lower accumulator 
+#define OP_SU      11   // Subtract from upper accumulator 
+#define OP_TLU     84   // Table lookup 
+// Instructions on Storage Unit 
+// opcodes for indexing
+#define OP_AXA     50   // Add to index register A
+#define OP_SXA     51   // Substract from index A
+#define OP_RAA     80   // Reset Add Index A
+#define OP_RSA     81   // Reset Substract Index A
+#define OP_NZA     40   // Branch Non Zero Index A
+#define OP_BMA     41   // Branch Minus Index A
+#define OP_AXB     52   // Add to index register B
+#define OP_SXB     53   // Substract from index B
+#define OP_RAB     82   // Reset Add Index B
+#define OP_RSB     83   // Reset Substract Index B
+#define OP_NZB     42   // Branch Non Zero Index B
+#define OP_BMB     43   // Branch Minus Index B
+#define OP_AXC     58   // Add to index register C
+#define OP_SXC     59   // Substract from index C
+#define OP_RAC     88   // Reset Add Index C
+#define OP_RSC     89   // Reset Substract Index C
+#define OP_NZC     48   // Branch Non Zero Index C
+#define OP_BMC     49   // Branch Minus Index C
+// io for synchronizers 2 & 3
+#define OP_RC1     72   // Read Conditional sync 1
+#define OP_RD2     73   // Read Sync 2
+#define OP_WR2     74   // Write Sync 2
+#define OP_RC2     75   // Read Conditional Sync 2
+#define OP_RD3     76   // Read Sync 3
+#define OP_WR3     77   // Write Sync 3
+#define OP_RC3     78   // Read Conditional Sync 3
+// immediate access storage (ias)
+#define OP_LIB      8   // Load IAS block
+#define OP_LDI      9   // Load IAS
+#define OP_SIB     28   // Store IAS Block
+#define OP_STI     29   // Store IAS
+#define OP_SET     27   // Set IAS Timing Ring
+// floating point
+#define OP_FAD     32   // Floating Add
+#define OP_FSB     33   // Floating Subtract
+#define OP_FMP     39   // Floating Multiply
+#define OP_FDV     34   // Floating Divide
+#define OP_UFA     02   // Unnormalized Floating Add
+#define OP_FAM     37   // Floating Add Absolute (Magnitude)
+#define OP_FSM     38   // Floating Subtract Absolute (Magnitude)
+// Instructions on Control Unit
+// tape
+#define OP_RTN     04   // Read Tape Numeric
+#define OP_RTA     05   // Read Tape Alphameric
+#define OP_WTN     06   // Write Tape Numeric
+#define OP_WTA     07   // Write Tape Alphameric
+#define OP_RTC     03   // Read Tape for Checking
+#define OP_NTS     25   // Branch no Tape Signal
+#define OP_NEF     54   // Branch no End of File
+#define OP_RWD     55   // Rewind Tape
+#define OP_WTM     56   // Write Tape Mark
+#define OP_BST     57   // Backspace Tape
+// ramac disk
+#define OP_SDS     85   // Seek Disk Storage
+#define OP_RDS     86   // Read Disk Storage
+#define OP_WDS     87   // Write Disk Storage
+// inquiry stations
+#define OP_BIN     26   // Branch on Inquiry
+#define OP_RPY     79   // Reply on Inquiry
+
+// Valid Data Address (DA) 
+#define  vda_D      1   // 0000-1999    Drum
+#define  vda_A      2   // 8000-8003    Arithmetic unit registers (ACC Low & Hi), Distributor, Console Switches register 
+#define  vda_I      4   // 8005-8007    Index Registers (IR)
+#define  vda_T      8   // 8010-8015    Tape address
+#define  vda_S     16   // 9000-9059    Immediate Access Storage (IAS)
+#define  vda_9000  32   // 9000         Only addr 9000 valid 
+
+#define  vda_DAITS    (vda_D | vda_A | vda_I | vda_T | vda_S ) 
+#define  vda_DAIS     (vda_D | vda_A | vda_I |         vda_S ) 
+#define  vda_DAS      (vda_D | vda_A |                 vda_S ) 
+#define  vda_DS       (vda_D |                         vda_S ) 
+
+#define  opReadDA        1   // opcode fetchs data from DA address
+#define  opWriteDA       2   // opcode write data to DA
+
+#define  opStorUnit      1  // opcode available if IBM 653 Storage Unit is present
+#define  opCntrlUnit     2  // opcode available if IBM 652 Control Unit is present
+
+#define IL_RD1           1  // interlock on drum area 01-10/51-60 used in reading with RD1
+#define IL_WR1           2  // interlock on drum area 27-36/77-86 used in writing for WR1
+#define IL_RD23          3  // interlock on drum area 39-48/89-98 used in reading with RD2/RD3
+#define IL_WR23          4  // interlock on drum area 13-22/63-72 used in writing for WR2/WR3
+#define IL_IAS           5  // interlock on ias access
+#define IL_array         6  // interlock array definition value
+
+/* Symbol tables */
+typedef struct 
+{
+    uint16              opbase;         // opcode number
+    const char         *name1;          // opcode name as in operation manual
+    const char         *name2;          // opcode name as in soap 
+    uint8               opRW;           // =wDA, rDA or zero
+    int                 option;         // =0 -> opcode in basic machine, =1 -> Opcode because Storage Unit, =2 -> Opcode because Control Unit
+    int                 validDA;        // valid data address for this instruction
+    int                 opInterLock;    // Interlock required by opcode
+}
+t_opcode;
+
+extern t_opcode  base_ops[100];
+
 
 #define NEGZERO_value          0x7fffFFFFffffFFFF
 #define AccNegative            (((AccNegativeZeroFlag) || (ACC[1]<0) || (ACC[0]<0)) ? 1:0)
@@ -237,6 +306,7 @@ extern const char *cpu_description(DEVICE *dptr);
 #define WIRING_SOAP        (  0x100 << UNIT_V_CARD_MODE)
 #define WIRING_IS          (  0x200 << UNIT_V_CARD_MODE)
 #define WIRING_IT          (  0x300 << UNIT_V_CARD_MODE)
+#define WIRING_FORTRANSIT  (  0x400 << UNIT_V_CARD_MODE)
 #define UNIT_CARD_ECHO     ( 0x1000 << UNIT_V_CARD_MODE)
 #define UNIT_CARD_PRINT    ( 0x2000 << UNIT_V_CARD_MODE)
 
@@ -244,5 +314,6 @@ extern const char *cpu_description(DEVICE *dptr);
 extern int Get_HiDigit(t_int64 d);
 extern int Shift_Digits(t_int64 * d, int nDigits);
 extern char * word_to_ascii(char * buf, int CharStart, int CharLen, t_int64 d);
+
 
 

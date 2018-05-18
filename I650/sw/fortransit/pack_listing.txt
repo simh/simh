@@ -1,0 +1,774 @@
+     1
+     1 FORTRAN PACKAGE MISSING 
+     1 FROM ORIGINAL LISTING
+     1 REWRITTEN BY ROBERTO SANCHO
+     1 IN MAY 2018
+     1
+     1 FORTRAN PACKAGE
+     1 ENTRY POINTS
+     1
+                     SYN  LAAAA   1999   INITIAL LOCN                                        
+                     SYN  ACC     0000   RESERVE ACC                                    
+     1
+     1 BUILT-IN SUBROUTINES (180 WORDS)
+     1
+                     SYN  E00AA   1961   CHECK OVERLOW                  (0)
+                     SYN  E00TH   1962   FLOAT (U) TO FIX (L)           (501)                                     
+                     SYN  E00AE   1963   FIX (L) TO FLOAT (U)           (4) 
+                     SYN  E00AF   1964   FIX (L) TO FLOAT (U) AND (ACC) (5)                                 
+                     SYN  E00AQ   1965   READ ENTRY                     (16)                                 
+                     SYN  E00AR   1966   PUNCH ENTRY                    (17)  
+                     SYN  EZZZA   1967   SAVE INDEX REG                                
+                     SYN  EZZZB   1968   RESTORE INDEX REG                
+     1
+     1 POWER SUBROUTINES
+     1
+                     SYN  E00AK   1949   FIX (L) ** FIX (ACC) TO FIX (L) (10)
+                     SYN  E00AL   1948   FLOAT (U) ** FIX (ACC) TO FLOAT (U) AND (ACC) (11)
+                     SYN  E00LQ   1947   FLOAT (U) ** FLOAT (ACC) TO FLOAT (U) AND (ACC) (302)
+     1
+     1 FUNCTION SUBROUTINES 
+     1
+                     SYN  E00AB   1969   LOGF  (1)
+                     SYN  E00AC   1970   EXPF  (2) 
+                     SYN  E00LO   1971   LNF   (300)
+                     SYN  E00LP   1972   EXPNF (301)                  
+                     SYN  E00AV   1973   COSF  (21)
+                     SYN  E00AW   1974   SINF  (22)
+                     SYN  E00AX   1975   SQRTF (23)
+                     SYN  E00AY   1976   ABSF  (24)
+                     SYN  E00AZ   1945   INTF  (25)
+                     SYN  E00BA   1946   MAXF  (26)
+     1     
+     1                              
+     1 END OF FORTRAN PACKAGE ENTRY POINTS 
+     1           
+     1 -----------------------------------                  
+     1 
+     1 FORTRAN 
+     1 PACKAGE RESERVATION 
+     1 FOR PACKAGE BUILD
+     1 
+     1 INCLUDES 
+     1 - FLOAT FIX CONVERSIONS
+     1 - FORTRAN READ PUNCH STATEMENS
+     1 - FORTRAN POWER OPERATOR
+     1 - FORTRAN FUNCTIONS
+     1 EXCLUDES
+     1 - NOTHING
+     1 
+                     REG  Y0002   0002   FORTRANSIT 
+     1                                   VARS START ADDR
+                     BLR   0000   1400   RESERVE ALL 
+     1                                   DRUM EXCEPT 
+     1                                   PACK SPACE
+     1                                
+     1 END OF PACKAGE RESERVATION 
+     1                                      
+     1 -----------------------------------                  
+     1 
+     1 FORTRAN 
+     1 PACKAGE RESERVATION 
+     1 FOR PACKAGE USE
+     1 
+     1 INCLUDES 
+     1 - FLOAT FIX CONVERSIONS
+     1 - FORTRAN READ PUNCH STATEMENS
+     1 - FORTRAN POWER OPERATOR
+     1 - FORTRAN FUNCTIONS
+     1 EXCLUDES
+     1 - NOTHING
+     1 
+                     REG  P1951   1960   READ BAND            
+                     REG  J1977   1986   PUNCH BAND      
+                     REG  W1988   1998   STORAGE BAND                                   
+                     BLR   1401   1999   RESERVE 
+     1                                   PACK SPACE
+     1                                
+     1 END OF PACKAGE RESERVATION 
+     1                                      
+     1 -----------------------------------                  
+     1
+     1 FORTRAN PACKAGE 
+     1 SOURCE CODE
+     1
+                     BLR   1945   1950   ENTRY POWER SUBR     TOTAL RESERVATION 
+                     REG  P1951   1960   READ BAND            1947 - 1999, 0000
+                     BLR   1961   1968   ENTRY BUILT-IN SUBR  (54 WORDS)
+                     BLR   1969   1976   ENTRY FUNC SUBR 
+                     REG  J1977   1986   PUNCH BAND      
+                     BLR   1987   1987
+                     REG  W1988   1998   STORAGE BAND                                   
+     1 
+     1 SAVE INDEX REGISTERS 
+     1
+            EZZZA    STD  EZZZX
+                     LDD   8005
+                     STD  EZZIA
+                     LDD   8006
+                     STD  EZZIB
+                     LDD   8007
+                     STD  EZZIC  EZZZX
+     1 
+     1 RESTORE SAVED INDEX REGISTERS AND RETURN TO ERTHX
+     1
+            EZZZB    LDD  EZZIA
+                     RAA   8001
+                     LDD  EZZIB
+                     RAB   8001
+                     LDD  EZZIC  
+                     RAC   8001  ERTHX
+            EZZZX     00   0000   0000
+            EZZIA     00   0000   0000
+            EZZIB     00   0000   0000
+            EZZIC     00   0000   0000
+     1 
+     1 OVERFLOW CHECKING 
+     1
+            E00AA    BOV          8001
+                     HLT   0100   8001   ALARM ARITHMETIC OVERFLOW
+     1 
+     1 (L) FIXED POINT <- (U) FLOAT
+     1
+            E00TH    STD  ERTHX          FLOAT UPPER
+                     SRT   0002          TO FIX LOWER        
+                     STU  ARTHA          SAVE MANTISSA                      
+                     RAM   8002          TEST EXP              
+                     SLO  N51            STORE ZERO            
+                     BMI  AD1            IF LESS THAN          
+                     SLO  N10            51     ALARM          
+                     BMI         AD3     IF GRTR THAN          
+                     SRT   0004          60                    
+                     ALO  ONET                                  
+                     LDD  AD2A           MODIFY                
+                     SDA  AD2             SHIFT                
+                     RAL  ARTHA                                
+                     SLT   0002  AD2                           
+            AD1      RAL   8003  ERTHX   STORE ZERO            
+            AD2      SRT   0000  ERTHX   SHIFT CONST           
+            AD2A     SRT   0000  ERTHX                         
+            AD3      LDD  ERTHX
+                     HLT   0501   8001   ALARM FLOAT >= 10E10 THUS CANNOT BE CONVERTED TO FIX 
+            N10       10   0000   0000                         
+            N51       51   0000   0000                                   
+            ONET      00   0001   0000                  
+            ERTHX     00   0000   0000                   
+            ARTHA     00   0000   0000                     
+     1 
+     1 (U) AND (ACC) FLOAT <- (L) FIXED POINT 
+     1
+            E00AF    STD  ARTHA          FLOAT TO UP   
+                     LDD         E00AE   AND ACC        
+                     STU  ACC    ARTHA
+     1 
+     1 (U) FLOAT <- (L) FIXED POINT 
+     1
+            E00AE    STD  ERTHX          FLOAT TO UP             
+                     RAU   8002  AE0      ONLY                   
+            AE0      SCT   0000          NORMALIZE               
+                     STL  ARTHB                                   
+                     BOV  AD1            ZERO CHECK              
+                     RAL   8003                                  
+                     SRD   0002          ROUND FOR               
+                     SLT   0002          PLACING EXP             
+                     NZU         AE6     CHECK ROUND             
+                     LDD   8003           OVERFLOW               
+                     SRT   0001                                  
+                     ALO   8001  AE6                             
+            AE6      BMI  AE2            INSERT                  
+                     ALO  AJ3    AE5      EXPONENT               
+            AE2      SLO  AJ3    AE5                             
+            AE5      SLO  ARTHB   
+                     RAU   8002  ERTHX
+            AJ3       00   0000   0060
+            ARTHB     00   0000   0000                   
+     1 
+     1 PUNCH CARD
+     1
+            E00AR    STD  ERTHX          PUNCH OUT 
+                     LDD  J0008      
+                     SIA  J0008          STORE STMNT     
+                     LDD  ONET
+                     SDA  NVARS          AND NVARS TO PCH
+                     SLO   8001          IF STMT ZERO 
+                     NZE  AR3            PUNCH IF 
+                     RAL   8000          8000 IS NEG 
+                     BMI  AR3    ERTHX   ELSE EXIT
+            AR3      LDD  AR3A   AR5     INIT PCH CARD
+            AR3A     RAL  NVARS          DEC NVARS              
+                     SLO  ONET                            
+                     BMI  AR8            TEST WORD       
+                     STL  NVARS          COUNT           
+                     ALO          8002   GET NWORD ADDR
+                     RAL  W0002          IN LOWER
+                     LDD  NWORD
+                     SDA  NWORD          STORE NUM OF WORDS TO PUNCH
+                     SLT   0004
+                     LDD  ADWRD
+                     SDA  ADWRD  AR4     STORE ADDR OF WORD TO PUNCH
+            AR4      RAL  NPCH           IS CARD FULL 
+                     SLO  ARN7            
+                     BMI  AR4A
+                     PCH  J0001           YES PUNCH AND
+                     LDD  AR4A   AR5      CALL INIT CARD
+            AR4A     RAL  NPCH           INCR NO OF 
+                     ALO  ONET            PUNCHED WORDS NPCH 
+                     STL  NPCH         
+                     RAL  ADWRD          INDR ADWRD
+                     ALO  ONET          
+                     STL  ADWRD
+                     SLO  ONET
+                     ALO          8002   GET ADWRD 
+                     RAL  Y0000           CONTENTS
+                     STL  DATWD           STORE IN DATWD
+                     RAU  DATLD
+                     ALO  NPCH           STORE AT 
+                     ALO          8003    J0000 PLUS 
+                     STD  J0000           NPCH
+                     RAL  NWORD          DECR VAR NWORDS
+                     SLO  ONET            TO BE PUNCHED
+                     NZE         AR3A     
+                     BMI  AR3A
+                     STL  NWORD  AR4
+            AR5      STD  AR5X           SUB INIT PCH CARD
+                     RAL  J0008          INCR CARD
+                     ALO  ONET            NUMBER
+                     STL  J0008
+                     STU  NPCH           CARD WITH ZERO
+                     STD  J0001           PUNCHED WORDS 
+                     STD  J0002          SET PUNCH     
+                     STD  J0003           BAND TO       
+                     STD  J0004           ZEROES        
+                     STD  J0005
+                     STD  J0006
+                     STD  J0007  AR5X
+            AR8      PCH  J0001  ERTHX   PUNCH           
+            ONET      00   0001   0000                  
+            ARN7      00   0007   0000                  
+            J0008     00   0000   0000   CARD COUNTER   
+            J0010     80   0000   0080   CONTROL CNST   
+            AR5X      00   0000   0000   EXIT FOR SUB INIT PCH CARD
+            NVARS     00   0000   0000   NUM OF VARS TO PCH
+            NWORD     00   0000   0000   NUM OF WORDS PER VAR TO PCH
+            ADWRD     00   0000   0000   ADDR OF WORD TO PCH
+            NPCH      00   0000   0000   NUM OF WORDS PUNCHED IN CHARD
+            DATWD     00   0000   0000   DATA WORD TO BE PUNCHED
+     1 
+     1 READ CARD
+     1
+            E00AQ    STD  ERTHX          READ IN
+                     LDD  ONET
+                     SDA  NVARS          NVARS TO READ
+                     STU  NPCH   AQ3A    INIT TO ZERO
+            AQ3A     RAL  NVARS          DEC NVARS              
+                     SLO  ONET                            
+                     BMI  ERTHX          EXIT IF ZERO
+                     STL  NVARS              
+                     ALO          8002   GET NWORD ADDR
+                     RAL  W0002          IN LOWER
+                     LDD  NWORD
+                     SDA  NWORD          STORE NUM OF WORDS TO RD
+                     SLT   0004
+                     LDD  ADWRD
+                     SDA  ADWRD  AQ4     STORE ADDR OF WORD TO RD
+            AQ4      RAL  NPCH           CHECK IF SHOULD RD NEW CARD
+                     NZE  AQ4A
+                     RCD  P0001           YES READ CARD
+                     LDD  ARN7
+                     STD  NPCH   AQ4A
+            AQ4A     RAL  NPCH           DECR NO OF AVAILABLE
+                     SLO  ONET           PUNCHED WORDS NPCH IN READ CARD
+                     STL  NPCH 
+                     RAL  ARN7
+                     SLO  NPCH           GET WORD AT 
+                     ALO          8002    P0000 PLUS 
+                     LDD  P0000           NPCH IN DIST
+                     STD  DATWD           STORE IT IN DATWD
+                     RAU  DATLD
+                     ALO  ADWRD          INCR ADWRD
+                     ALO  ONET          
+                     STL  ADWRD
+                     SLO  ONET
+                     ALO          8003   SET ADWRD 
+                     STD  Y0000           CONTENTS FROM UPPER
+                     RAL  NWORD          DECR VAR NWORDS
+                     SLO  ONET            TO BE READ
+                     NZE         AQ3A     
+                     BMI  AQ3A
+                     STL  NWORD  AQ4
+            ONET      00   0001   0000                  
+            DATLD    LDD  DATWD   8002   LOAD CARD WORD INTO DIST AND JUMP TO LOWER                 
+     1                                  
+     1 ALARM IF TRY TO USE A NOT DEFINED SUBROUTINE
+     1
+            E00AK    HLT   9010   8001   ALARM FIX ** FIX UNDEF
+            E00AL    HLT   9011   8001   ALARM FLOAT ** FIX UNDEF
+            E00LQ    HLT   9302   8001   ALARM FLOAT ** FLOAT UNDEF
+            E00AB    HLT   9001   8001   ALARM LOGF UNDEF
+            E00AC    HLT   9002   8001   ALARM EXPF UNDEF
+            E00LO    HLT   9300   8001   ALARM LNF UNDEF
+            E00LP    HLT   9301   8001   ALARM EXPNF UNDEF
+            E00AV    HLT   9021   8001   ALARM COSF UNDEF
+            E00AW    HLT   9022   8001   ALARM SINF UNDEF
+            E00AX    HLT   9023   8001   ALARM SQRTF UNDEF
+            E00AY    HLT   9024   8001   ALARM ABSF UNDEF
+            E00AZ    HLT   9025   8001   ALARM INTF UNDEF
+            E00BA    HLT   9026   8001   ALARM MAXF UNDEF
+            EZZTY    HLT   9099   8001   ALARM FUNCTION ARG IS FIX BUT SHOULD BE FLOAT
+     1                                  
+     1 START OF SUBROUTINES
+     1
+     1 (L) AND (ACC) FIXED <- (L) FIXED ** (ACC) FIXED
+     1
+            E00AK    STD  ERTHX          POWER FIX FIX. M ** P 
+                     STL  ARTHA  AK1     M IS ARGMNT     
+            AK1      RAM  ACC            P EQUALS        
+                     STL  ARTHB           ABVAL POWER    
+                     RAL  ONE            H IS RESULT        
+                     STL  ARTHC  AK3      INIT TO ONE          
+            AK3      RAU  ARTHB          P IS GTST           
+                     MPY  N50             INTGR IN           
+                     STU  ARTHB           P OVER TWO         
+                     RAL   8002          IS REMAINDER        
+                     NZE         AK5       ZERO              
+                     RAU  ARTHC          IF NOT H IS         
+                     MPY  ARTHA           H TIMES M          
+                     NZU  AK12
+                     STL  ARTHC  AK5                         
+            AK5      RAU  ARTHB                              
+                     NZU         AK6     IS P ZERO           
+                     RAU  ARTHA          IF NOT              
+                     MPY   8001           M EQUALS           
+                     NZU  AK12
+                     STL  ARTHA  AK3      M SQUARED          
+            AK6      RAU  ACC            IS POWER NEG        
+                     BMI         AK7     IF SO IS H          
+                     RAM  ARTHC             ZERO             
+                     NZE         AK8     IF NOT IS H         
+                     SLO  ONE               ONE            
+                     NZE  AK10   AK7                         
+            AK7      RAL  ARTHC  AK11    EXHIBIT H           
+            AK10     RAL   8003  AK11
+            AK11     STL  ACC    ERTHX   
+            AK12     LDD  ERTHX          
+                     HLT   0003   8001   ALARM OVERFLOW. FIX**FIX RESULTS IN VALUE >= 10E10
+            AK8      LDD  ERTHX           
+                     HLT   0010   8001   ALARM ZERO RAISED TO NEG
+            N50       50   0000   0000                       
+            ONE       00   0000   0001                       
+            ARTHC     00   0000   0000                     
+     1 
+     1 (U) AND (ACC) FLOAT <- (U) FLOAT ** (ACC) FIXED
+     1
+            E00AL    STD  ERTHX          POWER FLOAT FIX. M ** P 
+                     STU  ARTHA  AL1     M IS ARGMNT     
+            AL1      RAM  ACC            P EQUALS        
+                     STL  ARTHB           ABVAL POWER    
+                     RAL  FP1            H IS RESULT 
+                     STL  ARTHC  AL3      INIT TO FLOAT ONE          
+            AL3      RAU  ARTHB          P IS GTST           
+                     MPY  N50             INTGR IN           
+                     STU  ARTHB           P OVER TWO         
+                     RAL   8002          IS REMAINDER        
+                     NZE         AL5       ZERO              
+                     RAU  ARTHC          IF NOT H IS         
+                     FMP  ARTHA           H TIMES M          
+                     BOV  AL12
+                     STU  ARTHC  AL5                         
+            AL5      RAU  ARTHB                              
+                     NZU         AL6     IS P ZERO           
+                     RAU  ARTHA          IF NOT              
+                     FMP   8001           M EQUALS           
+                     BOV  AL12
+                     STU  ARTHA  AL3      M SQUARED          
+            AL6      RAU  ACC            IS POWER NEG        
+                     BMI         AL7     IF SO IS H          
+                     RAM  ARTHC           ZERO             
+                     NZE         AL8     IF NOT CALC
+                     RAU  FP1             H RECIPROCAL
+                     FDV  ARTHC  AL11      
+            AL7      RAU  ARTHC  AL11    EXHIBIT H           
+            AL11     STU  ACC    ERTHX
+            AL12     LDD  ERTHX          
+                     HLT   0049   8001   ALARM OVERFLOW. FLOAT**FIX RESULTS IN VALUE >= 10E49
+            AL8      LDD  ERTHX          
+                     HLT   0011   8001   ALARM ZERO RAISED TO NEG
+            N50       50   0000   0000                       
+            FP1       10   0000   0051                       
+     1 
+     1 (U) FLOAT <- 10 ** (U) FLOAT 
+     1
+            E00AC    STD  ERTHX          EXPONENTIAL     
+                     NZE         AC5     IS ARGUMENT   
+                     NZU         EZZTY   ALARM FUNCTION ARG IS FIX BUT SHOULD BE FLOAT
+                     SRT   0002            ZERO          
+                     STU  ARTHC          IF NOT LET      
+                     RSM   8002           N BE MANTSA    
+                     ALO  N52             X BE POWER     
+                     BMI  AC4            IS X GRTR       
+                     SLT   0001           THAN TEN       
+                     NZU  AC5            OR LESS THAN    
+                     SRT   0005           MINUS EIGHT    
+                     ALO  AC6            IF X WITHIN     
+                     STL  ARTHB           BOUNDS GEN     
+                     RAU  ARTHC          INT AND        
+                     SRT   0006  ARTHB   FRACT PARTS     
+            N52       52   0000   0000    OF ARGUMENT    
+            AC6      SRT   0000          IS ARG NEG      
+                     BMI  AC8            IF SO INT IS    
+                     STU  ARTHB  AC1     INT MINUS 1     
+            AC8      SUP  ONE            AND FRACT IS    
+                     STU  ARTHB          FRACT PLUS 1    
+                     RAL   8002                          
+                     ALO  N999   AC1                     
+            AC1      STL  ARTHC          ARTHC IS FRAC PART
+                     RAU   8002          ARTHB IS INT PART                
+                     MPY  AC18           GENERATE        
+                     RAU   8003                          
+                     AUP  AC17            POLYNOMIAL     
+                     MPY  ARTHC                          
+                     RAU   8003           APPROXIM       
+                     AUP  AC16                ATION      
+                     MPY  ARTHC                          
+                     RAU   8003             FOR          
+                     AUP  AC15                           
+                     MPY  ARTHC          EXPONENTIAL     
+                     RAU   8003                          
+                     AUP  AC14                           
+                     MPY  ARTHC                          
+                     RAU   8003                          
+                     AUP  AC13                           
+                     MPY  ARTHC                          
+                     RAU   8003                          
+                     AUP  AC12                           
+                     MPY  ARTHC           SQUARE         
+                     RAU   8003             RESULT       
+                     AUP  N10            SCALE AND       
+                     MPY   8003           FLOAT THEN     
+                     SRT   0001             EXIT         
+                     STU  ARTHA                           
+                     RAU  AC19                           
+                     AUP  ARTHB                          
+                     BMI  AC20                           
+                     SRT   0002                          
+                     NZU  AC21                           
+                     AUP  ARTHA                           
+                     SRT   0008  AC20                    
+            AC4      RAL  ARTHC                          
+                     BMI         AC21                    
+                     RAU   8003  ERTHX   RESULT ZERO
+            AC5      RAU  FP1    ERTHX   RESULT 1 BECAUSE ARGMNT IS ZERO  
+            AC20     RAU   8002  ERTHX   RESULT IN UPPER
+            AC21     LDD  ERTHX          
+                     HLT   0049   8001   ALARM OVERFLOW. 10**FLOAT RESULTS IN VALUE >= 10E49
+            AC12      11   5129   2776                   
+            AC13      06   6273   0884                   
+            AC14      02   5439   3575                   
+            AC15      00   7295   1737                   
+            AC16      00   1742   1120                   
+            AC17      00   0255   4918                   
+            AC18      00   0093   2643                   
+            AC19      00   0000   0051                   
+            N999      99   9999   9999
+            N10       10   0000   0000                         
+            ONE       00   0000   0001                       
+            FP1       10   0000   0051                   
+            ARTHC     00   0000   0000                     
+     1 
+     1 (U) FLOAT <- LOG 10 (U) FLOAT 
+     1
+            E00AB    NZE         AB10    IF LOG ARG ZERO      
+                     NZU         EZZTY   ALARM FUNCTION ARG IS FIX BUT SHOULD BE FLOAT
+                     BMI  AB10           OR NEG ALARM      
+                     STD  ERTHX      
+                     SRT   0002                            
+                     STL  ARTHB          STORE POWER 
+                     RAU   8003          FORM  Z          
+                     AUP  AB1            EQUAL ARG        
+                     STU  ARTHC          MINUS ROOT       
+                     SUP  AB2            TEN OVER ARG     
+                     DVR  ARTHC          PLUS ROOT        
+                     STL  ARTHA              TEN          
+                     RAU   8002                            
+                     MPY   8001            Z SQUARE       
+                     STU  ARTHC                            
+                     RAU   8003            GENERATE       
+                     MPY  AB7                              
+                     RAU   8003          POLYNOMIAL       
+                     AUP  AB6                              
+                     MPY  ARTHC          APPROXIMATN      
+                     RAU   8003                            
+                     AUP  AB5                              
+                     MPY  ARTHC                             
+                     RAU   8003                            
+                     AUP  AB4                              
+                     MPY  ARTHC                             
+                     RAU   8003                            
+                     AUP  AB3                              
+                     MPY  ARTHA                            
+                     RAL   8003                            
+                     ALO  N50                              
+                     SRT   0002                            
+                     ALO  ARTHB          ADD POWER         
+                     SLO  N50                              
+                     SRD   0002            ROUND           
+                     RAU   8002                            
+                     SCT   0000          NORMALIZE         
+                     BOV  AB12                             
+                     BMI         AB13                      
+                     SUP  AB9    AB11    ADJUST            
+            AB11     SUP   8002  AB12     POWER            
+            AB12     RAU   8003  
+                     FSB  FP1    ERTHX                     
+            AB13     AUP  AB9    AB11                      
+            AB10     HLT   0001   8001   ALARM LOG (ZERO OR NEGAVIVE)
+            AB1       00   3162   2780                     
+            AB2       00   6324   5560                     
+            AB3       86   8591   7180                     
+            AB4       28   9335   5240                     
+            AB5       17   7522   0710                     
+            AB6       09   4376   4760                     
+            AB7       19   1337   7140                     
+            N50       50   0000   0000                     
+            FP1       10   0000   0051                   
+            AB9       00   0000   0054
+            ARTHC     00   0000   0000 
+     1 
+     1 (U) AND (ACC) FLOAT <- (U) FLOAT ** (ACC) FLOAT     
+     1               U**ACC = 10**(LOG10(U)*ACC) 
+     1                      = EXP(LOG10(U)*ACC)
+     1
+            E00LQ    STD  LQ1                          
+                     LDD         E00AB   LOG 10 (U)
+                     FMP  ACC            MULT BY ACC
+                     LDD  LQ1    E00AC   10 ** U
+            LQ1       00   0000   0000 
+     1 
+     1 (U) FLOAT <- LOG E (U) FLOAT                        
+     1              LN(U) = LOG(U) / LOG(E) 
+     1              LOG10(E)=0.4342944819 
+     1
+            E00LO    STD  LQ1
+                     LDD         E00AB   LOG 10 (U)
+                     FDV  LOGE   LQ1     DIV BY LOG(E) CONST
+            LQ1       00   0000   0000 
+            LOGE      43   4294   4850
+     1 
+     1 (U) FLOAT <- E ** (U) FLOAT                         
+     1              EXPN(U) = E ** U = EXP(LOG10(E)*U)
+     1              E=2.71828182846 
+     1
+            E00LP    STD  LQ1
+                     FMP  LOGE           MULT BY LOG(E) CONST
+                     LDD  LQ1    E00AC   10 ** U
+            LQ1       00   0000   0000 
+            LOGE      43   4294   4850
+     1 
+     1 (U) FLOAT <- ABSOLUTE VALUE (U) FLOAT                         
+     1
+            E00AY    NZE          8001  EXIT IF ZERO
+                     NZU         EZZTY  ALARM FUNCTION ARG IS FIX BUT SHOULD BE FLOAT
+                     STD  ERTHX 
+                     RAM   8003         REMOVE SGN 
+                     RAU   8002  ERTHX  RESULT IN UPPER AND EXIT
+     1 
+     1 (U) FLOAT <- INTEGER PART (U) FLOAT                         
+     1
+            E00AZ    NZE          8001   EXIT IF ZERO
+                     NZU         EZZTY   ALARM FUNCTION ARG IS FIX BUT SHOULD BE FLOAT
+                     STD  ERTHX  
+                     STU  ARTHC          SAVE ARG
+                     SRT   0002          EXP IN LOWER         
+                     STU  ARTHA          MANT IN H
+                     RSM   8002          MAKE EXP NEG
+                     ALO  N57            
+                     BMI  AZ4            BIG NUM SO NO FRACT PART TO REMOVE
+                     ALO  N01
+                     SLT   0001           
+                     NZU  AZ5            SMALL NUM SO NO INT PART
+                     SRT   0005          SET AS RIGHT 
+                     ALO  AZ6            SHIFTS TO DO   
+                     STL  ARTHB          
+                     RAU  ARTHA  ARTHB   
+            N57       57   0000   0000   
+            N01       01   0000   0000
+            AZ6      SRT   0000  
+                     RAU   8003  AE0     GO TO FIX TO FLOAT CONVERSION ROUTINE
+            AZ5      RAU   8002
+                     RAU   8002  ERTHX   RETURN ZERO
+            AZ4      RAU  ARTHC  ERTHX   RETURN THE ARG UNCHANGED
+     1 
+     1 (U) FLOAT <- MAX (FLOAT, FLOAT, ...)
+     1              SHOULD HAVE TWO OR MORE FLOAT PARAMETERS 
+     1
+            E00BA    STD  ERTHX  
+                     STU  ARTHA          ARG IS MAX
+                     RAL  ERTHX  BA0
+            BA0      SLO  BA10
+                     BMI  BA9            NO MORE ARGS
+                     RAL  ERTHX          SET ARG ADDR
+                     LDD  BA1             TO BE READ
+                     SDA  BA1    BA1
+            BA1      RAU   0000          READ ARG
+                     STU  ARTHB
+                     FSB  ARTHA          IS GRTR THAN
+                     BMI  BA2            CURRENT RESULT
+                     RAU  ARTHB          YES STORE AS
+                     STU  ARTHA  BA2     NEW RESULT
+            BA2      RAL  ERTHX          SELECT NEXT
+                     SLO  ONET            ARG
+                     STL  ERTHX  BA0
+            BA9      RAU  ARTHA  ERTHX   RESULT IN UPPER
+            BA10      00  P0000   0000   FIST ARG ADDR
+     1 
+     1 (U) FLOAT <- SQUARE ROOT (U) FLOAT 
+     1
+            E00AX    NZE          8001   EXIT IF ZERO
+                     NZU         EZZTY   ALARM FUNCTION ARG IS FIX BUT SHOULD BE FLOAT
+                     BMI  AX1            ALARM SQRT(NEG)                     
+                     STD  ERTHX  
+                     SRT   0002                                                     
+                     NZU         AX2     TEST FOR ZRO                               
+                     SLO  N01            CONVERT FORTRANSIT EXP (1.0=1E51) TO IT EXP (1.0=1E50)
+                     STL  ARTHB          BREAK UP EXP                               
+                     RAL   8003          AND MANTISSA                               
+                     SLT   0002          CALCULATE                                  
+                     STL  ARTHA           INITIAL X                                 
+                     AUP  ONE    AX3                                                
+            AX4      RAU  ARTHA          CALCULATE                                  
+                     DVR  ARTHC           NEXT X                                    
+                     SLO   8001           VALUE                                     
+                     NZE         AX5                                                
+                     BMI         AX5     TEST FOR END                               
+                     ALO   8001                                                     
+                     ALO   8001  AX3                                                
+            AX3      DVR  TWO            RECYCLE                                    
+                     STL  ARTHC  AX4                                                
+            AX5      RAL  ARTHB          MODIFY                                     
+                     ALO  N49            EXPONENT                                  
+                     SRT   0008                                                     
+                     DIV  TWO                                                       
+                     ALO   8003                                                     
+                     STL  ARTHB          TEST EVEN OR                               
+                     NZU         AX6      ODD EXP                                   
+                     RAU  ARTHC          EXP ODD                                    
+                     SRT   0001                                                     
+                     MPY  AX11           MPY BY SQRT                                
+                     SRD   0010  AX7      OF 10                                     
+            AX7      SLT   0002                                                     
+                     ALO  ARTHB  
+                     ALO  ONE            EXP 50 TO 51
+                     RAU   8002  ERTHX   GO TO EXIT                                 
+            AX6      RAL  ARTHC          EXP EVEN                                   
+                     SRD   0002  AX7                                                
+            AX2      RAU   8003  ERTHX   RESULT ZERO                                 
+            AX1      HLT   0012   8001   ALARM SQRT WITH NEGATIVE ARGUMENT
+            ONE       00   0000   0001   CONSTANTS                                  
+            TWO       00   0000   0002                                              
+            N49       49   0000   0000                                              
+            AX11      03   1622   7766                                              
+     1 
+     1 (U) FLOAT <- COSINUS (U) FLOAT (ARG IN RADIANS: COS(PI/2) = 0)
+     1
+            E00AV    STD  ERTHX  AV0
+            AV0      NZE         AV4     COS(0) IS ONE
+                     NZU         EZZTY   ALARM FUNCTION ARG IS FIX BUT SHOULD BE FLOAT
+                     SRT   0002            ARGUMENT                                 
+                     STU  ARTHA          ALARM IF PWR                               
+                     RSM   8002            OVERSCALE                                
+                     ALO  N01            CONVERT FORTRANSIT EXP (1.0=1E51) TO IT EXP (1.0=1E50)
+                     ALO  N57            COSX EQUALS                                
+                     BMI  AV2             ONE IF PWR                                
+                     SLO  AV3             UNDERSCALE                                            
+                     BMI         AV4                                                  
+                     SRT   0004                                                      
+                     ALO  AV5                                                        
+                     STL  AV6                                                        
+                     RAU  ARTHA          FORM                                         
+                     MPY  AV7    AV6      FRACTIONAL                                  
+            AV6      HLT  AV6    AV23     AND INTGRL                                  
+            AV23     STL  ARTHC            PARTS                                      
+                     RAU   8003                                                      
+                     MPY  N50            FORM S AS                                  
+                     STL  ARTHB           ONE MINUS                                 
+                     RSM  ARTHC           TWICE ABVAL                               
+                     SML   8001           OF FRACTNL                                
+                     ALO  N999              PART                                    
+                     RAU   8002                                                      
+                     STU  ARTHA                                                      
+                     MPY   8001           FORM SINE                                 
+                     STU  ARTHC                                                      
+                     RAU  AV16            POLYNOMIAL                                
+                     MPY  ARTHC          APPROXIMATOR                               
+                     RAU   8003                                                      
+                     AUP  AV15                                                       
+                     MPY  ARTHC                                                      
+                     RAU   8003                                                      
+                     AUP  AV14                                                       
+                     MPY  ARTHC                                                      
+                     RAU   8003                                                      
+                     AUP  AV13                                                       
+                     MPY  ARTHC                                                      
+                     SRT   0001                                                      
+                     RAU   8003                                                      
+                     AUP  PIH            EQUALS ONE                                 
+                     MPY  ARTHA                                                      
+                     SCT   0000                                                      
+                     BOV  AV19                                                       
+                     STL  ARTHA                                                      
+                     RAL   8003           ROUND                                      
+                     SRT   0002           AND                                        
+                     STL  ARTHC           ADJUST                                     
+                     RSU  ARTHA            POWER                                     
+                     SRT   0002                                                      
+                     BMI         AV25                                                 
+                     SUP   8003                                                      
+                     ALO  N50    AV24                                                 
+            AV24     AUP  ARTHC                                                      
+                     SLT   0002  AV22                                                 
+            AV22     STU  ARTHA          DETERMINE                                   
+                     RAU  ARTHB           SIGN OF                                    
+                     NZU         AV20      RESULT                                   
+                     RSL  ARTHA  AV26
+            AV20     RAL  ARTHA  AV26                                              
+            AV25     SUP   8003                                                      
+                     SLO  N50    AV24                                                  
+            AV2      RAU  ARTHB          OVERSCALE                                     
+                     LDD  ERTHX           DISPLAY                                     
+                     HLT   0013   8001   ALARM RADIAN ARG TOO BIG
+            AV26     RAU   8002
+                     BMI  AV27
+                     AUP  ONE    ERTHX
+            AV27     SUP  ONE    ERTHX
+            AV4      RAL  AV21   AV26    COSX IS ONE                                   
+            AV19     RAL   8002          COSX IS ZERO                                  
+                     SLO   8001  AV26                                                 
+            AV17     RAU  AV21   AV22    COSX IS PLUS                                  
+            AV3       11   0000   0000    OR MINUS 1                                                                                    
+            AV5      SRD   0011  AV23                                                  
+            AV7       31   8309   8862                                                 
+            PIH       15   7079   6327   PI / 2  INTEGER
+            AV13   -  64   5963   7111                                                 
+            AV14      07   9689   6793                                                 
+            AV15   -  00   4673   7656                                                 
+            AV16      00   0151   4842                                                 
+            AV21      10   0000   0050                                                 
+            N999      99   9999   9999                                                 
+            N50       50   0000   0000                       
+            ONE       00   0000   0001                       
+            N01       01   0000   0000
+            N57       57   0000   0000   
+     1 
+     1 (U) FLOAT <- SINUS (U) FLOAT (ARG IN RADIANS: SIN(PI/2) = 1)
+     1
+            E00AW    NZE          8001   SIN(0) IS ZERO
+                     NZU         EZZTY   ALARM FUNCTION ARG IS FIX BUT SHOULD BE FLOAT
+                     STD  ERTHX    
+                     STU  ARTHA
+                     RAU  PIHF
+                     FSB  ARTHA  AV0     SIN A = COS(PI/2 - A)
+            PIHF      15   7079   6351   PI / 2 FLOAT
+     1                                  
+     1 END OF FORTRAN PACKAGE     
+     1                                   
+       

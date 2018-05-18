@@ -1754,7 +1754,7 @@ A794                 LDD         NGLFT                   1752    69  1144  0947
    4   5                                 
    5   5                    ERRATA BUGFIX
    6   5                                 
-1442X                STU  OPSGN                          1334    21  0524  1902         
+1442                 STU  OPSGN                          1334    21  0524  1902         
 1442A                STD  V1      1384                   1902    24  0488  1384         
    1   5                                                 
    2   5                CARNEGIE TECH COMPILER     IT    
@@ -1762,26 +1762,26 @@ A794                 LDD         NGLFT                   1752    69  1144  0947
    4   5                                                 
    5   5                    ERRATA BUGFIX
    6   5                                 
- 341X                SUP  A0001          OUT IF JAY      1065    11  0383  1137
-A341X                STU  NEWAB   0887                   1137    21  0845  0887
- 603X       BS       LDD         DROPU    DCRMNT U       0987    69  0690  0893     
-A603X                RAL  NEWAB                          0690    65  0845  0298
-B603X                NZE  BSA     0640                   0298    45  0786  0640
- 606X                STL  A0001  BSA                     1485    20  0383  0786     
- 607X       BSA      RAU  N      BN1                     0786    60  0484  1039     
- 650X                LDD   1377  LDSR     COMPILE        1413    69  1377  1038     
-    X       NEWAB     00   0000   0000                   0845    00  0000  0000
+ 341                 SUP  A0001          OUT IF JAY      1065    11  0383  1137
+A341                 STU  NEWAB   0887                   1137    21  0845  0887
+ 603        BS       LDD         DROPU    DCRMNT U       0987    69  0690  0893     
+A603                 RAL  NEWAB                          0690    65  0845  0298
+B603                 NZE  BSA     0640                   0298    45  0786  0640
+ 606                 STL  A0001  BSA                     1485    20  0383  0786     
+ 607        BSA      RAU  N      BN1                     0786    60  0484  1039     
+ 650                 LDD   1377  LDSR     COMPILE        1413    69  1377  1038     
+            NEWAB     00   0000   0000                   0845    00  0000  0000
    1   5                                                 
    2   5                CARNEGIE TECH COMPILER     IT    
    3   5                       NO DATE
    4   5                                                 
    5   5                    ERRATA BUGFIX
    6   5                                 
- 793X                LDD  ML1A   TKNZ1   TKNZ1AND ML1    0940    69  1802  1094       
- 799X       MY1      LDD  ML1A   TKNZ2                   1178    69  1802  1194       
-A793X       ML1A     SLO   8002                          1802    16  8002  1852
-B793X                STL  ABVAL  ML1                     1852    20  0366  1291
- 804X                LDD   1971  GENN     RAL AJAY       1139    69  1971  1681       
+ 793                 LDD  ML1A   TKNZ1   TKNZ1AND ML1    0940    69  1802  1094       
+ 799        MY1      LDD  ML1A   TKNZ2                   1178    69  1802  1194       
+A793        ML1A     SLO   8002                          1802    16  8002  1852
+B793                 STL  ABVAL  ML1                     1852    20  0366  1291
+ 804                 LDD   1971  GENN     RAL AJAY       1139    69  1971  1681       
 
 
 

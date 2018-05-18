@@ -1,0 +1,1729 @@
+   1   1                   PROGRAM FOR FORTRAN                                    
+   2   1                  STATEMENTS TO IT STATEMENTS                             
+   3                 BLR   1000   1010                                          
+   4                 BLR   1150   1171      FUNCTIONS                           
+   5                 BLR   1200   1210      NONARITH T                          
+   6                 BLR   1450   1454      EQU VAR TA                          
+   7                 BLR   1500   1519      JIBASE TBL                          
+   8                 BLR   1600   1699      VARBL TABL                          
+   9                 BLR   1821   1830      STARTNARIT                          
+  10                 BLR   1900   1930      PACK BAND                           
+  11                 BLR   1948   1949                                          
+  12                 REG  R1951   1960      READ BAND                           
+  13                 REG  P1977   1986      PUNCH BAND                          
+  14                 BLR   1990   1998      COMP GP TA                          
+  15                 SYN  START   1999                                          
+  16                 SYN  RESET   0228                                          
+  17                 SYN  STORG   1961                                          
+  18                 SYN  SUBSC   1962                                          
+  19        START    RCD   1952  RESET      READ FIRST   1999    70  1952  0228
+  20        RESET    RAL   1960               CARD       0228    65  1960  0015
+  21                 SLT   0001             TEST FOR     0015    35  0001  0021
+  22                 NZU  START                          0021    44  1999  0026
+  23                 STU  IAD               SUB A        0026    21  0030  0033
+  24                 STD  SW4                  SUB  A    0033    24  0036  0039
+  25                 STD  SW5                  SUB  A    0039    24  0042  0045
+  26                 STD  CTVAR                          0045    24  0048  0001
+  27                 LDD  EGHTS                          0001    69  0004  0007
+  28                 STD  P0010                          0007    24  1986  0089
+  29                 LDD  CNPKA                          0089    69  0092  0095
+  30                 STD  SWPKA  PACK                    0095    24  0098  0051
+  31        CNPKA    STL  TESTA  SUBA1      SWITCH PKA   0092    20  0047  0000
+  32        READ     RAL  IAC                 IS WD END  0050    65  0003  0057
+  33                 NZE  AREAD              FRST WD IN  0057    45  0010  0011
+  34                 RAL  TEMAE              PACK BAND   0011    65  0014  0019
+  35                 SLO  ENDCN               IF NO RD   0019    16  0022  0027
+  36                 NZE  AREAD   1830      NEXT CARD    0027    45  0010  1830
+  37        ENDCN     00   6575   6400                   0022    00  6575  6400
+  38        AREAD    RCD   1951               IF YES     0010    70  1951  0101
+  39                 RAL   1960              PUNCH HEDR  0101    65  1960  0065
+  40                 SLT   0001              CARD AND    0065    35  0001  0071
+  41                 NZU  READ               REINITIA    0071    44  0050  0076
+  42                 SLT   0001              LIZE        0076    35  0001  0083
+  43                 NZU  PACK                           0083    44  0051  0038
+  44                 LDD  CNPKA              PACK SW A1  0038    69  0092  0145
+  45                 STD  SWPKA  SWT                     0145    24  0098  0151
+  46        SWT      LDD  IN2    TR CA      SUBA         0151    69  0054  0107
+  47        TR CA    STD  SW 59                          0107    24  0060  0013
+  48                 RAL  TEMAE                          0013    65  0014  0069
+  49                 STU  TESTA                          0069    21  0047  0100
+  50                 NZE  NZT5   IN2                     0100    45  0104  0054
+  51        NZT5     SLT   0002                          0104    35  0002  0061
+  52                 NZU  NZT 4  NZT5                    0061    44  0115  0104
+  53        PACK     RAL  LTR F                          0051    65  0154  0009
+  54                 LDD         TR UC                   0009    69  0012  0165
+  55                 STD  TEMPH                          0012    24  0215  0018
+  56                 STL  P0006                          0018    20  1982  0035
+  57                 AUP  PACKA                          0035    10  0088  0043
+  58                 LDD  TJASW  SUB X                   0043    69  0046  0049
+  59        SUBA1    LDD  CNPKB               PACK SW A2 0000    69  0053  0006
+  60                 STD  SWPKA                          0006    24  0098  0201
+  61                 LDD  PACKA                          0201    69  0088  0041
+  62                 STD  SW 59                          0041    24  0060  0063
+  63                 LDD  SWH                 SWITCH 3   0063    69  0016  0119
+  64                 STD  SW 60                          0119    24  0072  0025
+  65                 RAU   1960               STATEMENT  0025    60  1960  0265
+  66                 STD  P0008                          0265    24  1984  0037
+  67                 STL  IAC                            0037    20  0003  0056
+  68                 STU  P0009  TRA1B                   0056    21  1985  0138
+  69        TRA1B    RAL  TESTA  TR AA                   0138    65  0047  0251
+  70        CNPKB    STL  TESTA  SUBA2                   0053    20  0047  0150
+  71        SUBA2    ALO  TEMAE  TR AA                   0150    15  0014  0251
+  72        TR AA    SLT   0002                 TO TEMP  0251    35  0002  0157
+  73                 NZU  NZT 4               TEST 6 CHA 0157    44  0115  0062
+  74                 STL  TEMAE  SUB A                   0062    20  0014  0017
+  75        NZT 4    SRT   0002               FIVE CHAR  0115    30  0002  0121
+  76                 STU  TEMAE                          0121    21  0014  0067
+  77                 AUP  IAC                   INDEX    0067    10  0003  0207
+  78                 SUP  CNBKB                          0207    11  0110  0315
+  79                 NZU         STP R                   0315    44  0169  0020
+  80                 AUP  CNBIB                          0169    10  0122  0077
+  81                 STU  IAC                   STORE    0077    21  0003  0106
+  82                 AUP  CN F1   8003         WORD      0106    10  0059  8003
+  83        CN F1    STL   1899  SUB A                   0059    20  1899  0017
+  84        SUB A    RAL  TESTA               LT PARNT   0017    65  0047  0301
+  85                 SLO  PARNL                          0301    16  0204  0109
+  86                 NZE  NZTT                           0109    45  0112  0113
+  87                 RAL  ONE    TR  L      ADD TO COU   0113    65  0066  0171
+  88        TR  L    ALO  IAD                            0171    15  0030  0085
+  89                 STL  IAD    TR  M                   0085    20  0030  0133
+  90        NZTT     ALO  PLUS                           0112    15  0365  0219
+  91                 NZE  SW 60                          0219    45  0072  0023
+  92                 RSL  ONE    TR  L      SUB TO COU   0023    66  0066  0171
+  93        TR  M    NZE  NZT9A               SET SW 3   0133    45  0086  0087
+  94                 LDD  SWH    TR  N         ON        0087    69  0016  0269
+  95        NZT9A    LDD  SW 59  TR  N         OFF       0086    69  0060  0269
+  96        TR  N    STD  SW 60  SW 59                   0269    24  0072  0060
+  97        TR  O    NZE  NZT10             SW B ON      0200    45  0254  0005
+  98                 LDD  ONE               EQUAL OUT    0005    69  0066  0319
+  99                 STD  SW4    SW 59                   0319    24  0036  0060
+ 100        NZT10    ALO  CN A5                          0254    15  0257  0111
+ 101                 NZE  SW 59                          0111    45  0060  0415
+ 102                 LDD  ONE               COMMA OUT    0415    69  0066  0369
+ 103                 STD  SW5    SW 59                   0369    24  0042  0060
+ 104        SWH      SLO  MULT   TR  O      SUBA         0016    16  0419  0200
+ 105        IN2      RAL  IAD    TR ML      PARN COUNT   0054    65  0030  0135
+ 106        TR ML    STU  IAD               ZERO IAD     0135    21  0030  0183
+ 107                 NZE  STOPA               TEST       0183    45  0136  0137
+ 108                 RAL  SW4               TEST TYPE    0137    65  0036  0091
+ 109                 STU  SW4               RESET EQUA   0091    21  0036  0139
+ 110                 NZE         IN3                     0139    45  0142  0093
+ 111                 RAL  SW5                            0142    65  0042  0097
+ 112                 NZE  IN3    IN4        OUT          0097    45  0093  0351
+ 113        IN3      RAL   1900                          0093    65  1900  0055
+ 114                 STU  SW5                            0055    21  0042  0195
+ 115                 SRT   0006               LOOK UP    0195    30  0006  0159
+ 116                 SLT   0006               FOR        0159    35  0006  0073
+ 117                 STL  TEMAA                          0073    20  0127  0080
+ 118                 RAL  CN J1               NON        0080    65  0233  0187
+ 119                 LDD  TEMAA                          0187    69  0127  0130
+ 120                 TLU   1200   8002        STATEMEN   0130    84  1200  8002
+ 121        TR  P    SLO  TEMAA                          0250    16  0127  0031
+ 122                 SLT   0004               LOOK UP    0031    35  0004  0141
+ 123                 NZU  STOPB             NZ IS ERRO   0141    44  0245  0096
+ 124                 SRT   0004   8002      ZT IS OK     0096    30  0004  8002
+ 125        CN J1    RAL   0000  TR  P      SUBA         0233    65  0000  0250
+ 126        SCAN     STL  TEMAE                          0300    20  0014  0117
+ 127                 STD   1992                          0117    24  1992  0295
+ 128                 LDD  NNAL1                          0295    69  0148  0401
+ 129                 STD  NN L1                          0401    24  0304  0307
+ 130                 LDD  SWBA1                          0307    69  0160  0163
+ 131                 STD  SW BA                          0163    24  0116  0469
+ 132                 LDD  TJ10B                          0469    69  0172  0075
+ 133                 STD  TJ 10                          0075    24  0028  0081
+ 134                 LDD  NZU2A                          0081    69  0034  0237
+ 135                 STD  NZU2                           0237    24  0040  0143
+ 136                 LDD  SW OA  TR MT                   0143    69  0146  0099
+ 137        TR MT    STD  SW 56                          0099    24  0002  0105
+ 138                 RAU  IAC                            0105    60  0003  0357
+ 139                 STL  F3                             0357    20  0161  0064
+ 140                 STD  TEMAC                          0064    24  0167  0070
+ 141                 LDD  SW BH  TR TN                   0070    69  0123  0126
+ 142        SW BH    NZU  TR RN  ZT H4                   0123    44  0177  0078
+ 143        TR RN    ALO  F3                             0177    15  0161  0465
+ 144                 ALO  ONE                            0465    15  0066  0221
+ 145                 STL  F3                             0221    20  0161  0114
+ 146                 RAU   8003  SW 56                   0114    60  8003  0002
+ 147        SW OA    SUP  DECPT                          0146    11  0149  0103
+ 148                 NZU         ZT G8                   0103    44  0407  0008
+ 149                 SUP  TWO 1                          0407    11  0210  0515
+ 150                 NZU         ZT G9                   0515    44  0519  0120
+ 151                 SUP  NINE                           0519    11  0222  0227
+ 152                 NZU         ZT H1                   0227    44  0131  0032
+ 153                 SUP  ONE 1                          0131    11  0084  0189
+ 154                 NZU         ZT H2                   0189    44  0193  0044
+ 155                 SUP  ONE 1                          0193    11  0084  0239
+ 156                 NZU         ZT N8                   0239    44  0243  0094
+ 157                 SUP  EIGHT                          0243    11  0196  0451
+ 158                 NZU         ZT H3                   0451    44  0155  0156
+ 159                 AUP  PARNL  TR MV                   0155    10  0204  0209
+ 160        TR MV    STU  TEMAF  TR MW                   0209    21  0164  0217
+ 161        TR MW    RAL  TEMAC                          0217    65  0167  0271
+ 162                 SLT   0002                          0271    35  0002  0277
+ 163                 ALO  TEMAF                          0277    15  0164  0569
+ 164                 STL  TEMAC  NZTB2                   0569    20  0167  0170
+ 165        ZT H4    RAL  TEMPF                          0078    65  0181  0185
+ 166                 SLO  ONE    TR RJ                   0185    16  0066  0321
+ 167        TR RJ    STL  TEMPF                          0321    20  0181  0134
+ 168                 STU  TEMAC                          0134    21  0167  0220
+ 169                 NZE  TX DG                          0220    45  0024  0125
+ 170                 LDD   1991                          0125    69  1991  0144
+ 171                 BD1  FLO2   ARITH                   0144    91  0147  0199
+ 172        ZT H2    RAU  MINUS  TR PN                   0044    60  0197  0501
+ 173        TR PN    LDD  F3                             0501    69  0161  0214
+ 174                 STD  OUTP                           0214    24  0267  0270
+ 175                 LDD  SW PA  TR RP                   0270    69  0173  0176
+ 176        TR RP    STD  SW 59                          0176    24  0060  0213
+ 177                 ALO  TEMAA                          0213    15  0127  0231
+ 178                 SRT   0002                          0231    30  0002  0287
+ 179                 STL  TEMAA  TR RH                   0287    20  0127  0180
+ 180        TR RH    RAL  NXTWD                          0180    65  0283  0337
+ 181                 SLO  ONE                            0337    16  0066  0371
+ 182                 LDD  NN M1                          0371    69  0074  0327
+ 183                 SDA  NXTWD  TR PR                   0327    22  0283  0186
+ 184        TR PR    RAU  TEMAC                          0186    60  0167  0421
+ 185                 NZU         TR NK                   0421    44  0175  0226
+ 186                 SRT   0002                          0175    30  0002  0281
+ 187                 STU  TEMAC                          0281    21  0167  0320
+ 188                 RAL   8002                          0320    65  8002  0029
+ 189                 SLT   0002  SW 59                   0029    35  0002  0060
+ 190        TR NK    STU  TEMAA  NXTWD                   0226    21  0127  0283
+ 191        NN M1    RAL   0000                          0074    65  0000  0205
+ 192                 STL  TEMAC  TR RH                   0205    20  0167  0180
+ 193        ZT G9    RAU  PLUS   TR PN                   0120    60  0365  0501
+ 194        SW PA    SUP  PARNR                          0173    11  0276  0331
+ 195                 NZU  NZTI4  ZT I4                   0331    44  0235  0236
+ 196        ZT I4    AUP   8001                          0236    10  8001  0293
+ 197                 LDD  OUT1S  TR PS                   0293    69  0246  0249
+ 198        TR PS    STD  F8                             0249    24  0052  0255
+ 199                 ALO  TEMAA                          0255    15  0127  0381
+ 200                 SRT   0002                          0381    30  0002  0387
+ 201                 STL  TEMAA                          0387    20  0127  0230
+ 202                 RAL  F3                             0230    65  0161  0565
+ 203                 SLO  ONE                            0565    16  0066  0471
+ 204                 STL  F3     F8                      0471    20  0161  0052
+ 205        OUT1S    RAL  ONE    TR PU                   0246    65  0066  0521
+ 206        TR PU    ALO  SW 61                          0521    15  0124  0079
+ 207                 STL  SW 61  TR PR                   0079    20  0124  0186
+ 208        NZTI4    SUP  ONE 1                          0235    11  0084  0289
+ 209                 NZU  NZTI5                          0289    44  0343  0194
+ 210                 RAU  PLUS   TR PV                   0194    60  0365  0619
+ 211        TR PV    LDD         TR PS                   0619    69  0272  0249
+ 212                 RSL  SW 61  TR UX                   0272    66  0124  0129
+ 213        TR UX    BMI  TR PR  ZT L3                   0129    46  0186  0333
+ 214        NZTI5    SUP  NINE                           0343    11  0222  0377
+ 215                 NZU  NZTI7                          0377    44  0431  0082
+ 216                 RAU  MULT                           0082    60  0419  0223
+ 217                 LDD         TR PS                   0223    69  0326  0249
+ 218                 RSL  SW 61                          0326    66  0124  0179
+ 219                 NZE  TR UX  NZTI8                   0179    45  0129  0383
+ 220        NZTI7    SUP  ONE 1                          0431    11  0084  0339
+ 221                 NZU  NZTQ5                          0339    44  0393  0244
+ 222                 RAU  MINUS  TR PV                   0244    60  0197  0619
+ 223        NZTQ5    SUP  ONE 1                          0393    11  0084  0389
+ 224                 NZU  NZTJ5                          0389    44  0443  0294
+ 225                 RAU  DIVID  TR PV                   0294    60  0247  0619
+ 226        NZTJ5    SUP  SEVEN                          0443    11  0296  0551
+ 227                 NZU  NZTJ6                          0551    44  0305  0206
+ 228                 RAU  COMMA  TR PV                   0206    60  0259  0619
+ 229        NZTJ6    SUP  ONE 1                          0305    11  0084  0439
+ 230                 NZU  NZTJ7  ZT J7                   0439    44  0493  0344
+ 231        ZT J7    RAU  PARNL                          0344    60  0204  0309
+ 232                 LDD         TR PS                   0309    69  0162  0249
+ 233                 RSL  ONE    TR PU                   0162    66  0066  0521
+ 234        NZTJ7    SUP  NINE                           0493    11  0222  0427
+ 235                 NZU  NZTJ8  ZT J8                   0427    44  0481  0132
+ 236        NZTJ8    AUP  EQUAL                          0481    10  0184  0489
+ 237                 LDD  TR PR  TR PS                   0489    69  0186  0249
+ 238        ZT J8    RAU  EQUAL                          0132    60  0184  0539
+ 239                 LDD  ZT L3  TR PS                   0539    69  0333  0249
+ 240        NZTI8    LDD  SW PC                          0383    69  0286  0589
+ 241                 STD  SW 59  TR PR                   0589    24  0060  0186
+ 242        SW PC    SUP  PARNR                          0286    11  0276  0531
+ 243                 NZU         ZT I4                   0531    44  0285  0236
+ 244                 SUP  ONE 1                          0285    11  0084  0639
+ 245                 NZU  NZTK3                          0639    44  0543  0394
+ 246                 RAU  PLUS   TR PY                   0394    60  0365  0669
+ 247        TR PY    LDD         TR PS                   0669    69  0322  0249
+ 248                 RSU  SW 61                          0322    61  0124  0229
+ 249                 BMI  TR PR  ZT K4                   0229    46  0186  0433
+ 250        NZTK3    SUP  CN A5                          0543    11  0257  0211
+ 251                 NZU  NZTK4                          0211    44  0615  0166
+ 252                 RAU  MINUS  TR PY                   0166    60  0197  0669
+ 253        NZTK4    SUP  EIGHT                          0615    11  0196  0601
+ 254                 NZU  NZTK5                          0601    44  0355  0256
+ 255                 RAU  COMMA  TR PY                   0256    60  0259  0669
+ 256        NZTK5    SUP  ONE 1                          0355    11  0084  0689
+ 257                 NZU  NZT03                          0689    44  0593  0444
+ 258                 RSL  SW 61                          0444    66  0124  0279
+ 259                 BMI  ZT J7                          0279    46  0344  0483
+ 260                 LDD  SW PD                          0483    69  0336  0739
+ 261                 STD  SW 59  ZT J7                   0739    24  0060  0344
+ 262        SW PD    SUP  LTR F                          0336    11  0154  0359
+ 263                 NZU         ZT O2                   0359    44  0263  0264
+ 264                 AUP   8001                          0263    10  8001  0719
+ 265                 LDD  SW PH                          0719    69  0372  0225
+ 266                 STD  SW 59   8001                   0225    24  0060  8001
+ 267        ZT O2    AUP   8001  TR SB                   0264    10  8001  0571
+ 268        NZT03    SUP  NINE                           0593    11  0222  0477
+ 269                 NZU  NZTJ8                          0477    44  0481  0182
+ 270                 RAU  EQUAL  TR SB                   0182    60  0184  0571
+ 271        TR SB    SRT   0002                          0571    30  0002  0527
+ 272                 AUP  TEMAC                          0527    10  0167  0621
+ 273                 SLT   0002                          0621    35  0002  0577
+ 274                 STU  TEMAC  TR QC                   0577    21  0167  0370
+ 275        ZT K4    LDD  OUT4V                          0433    69  0386  0789
+ 276                 STD  TESTO  TR QA                   0789    24  0192  0345
+ 277        OUT4V    RAL  F3                             0386    65  0161  0665
+ 278                 ALO  ONE                            0665    15  0066  0671
+ 279                 STL  F3     TR QC                   0671    20  0161  0370
+ 280        TR QC    RAL  OUTP                           0370    65  0267  0721
+ 281                 ALO  ONE                            0721    15  0066  0771
+ 282                 STL  OUTP                           0771    20  0267  0420
+ 283                 RAL  NN M3                          0420    65  0273  0627
+ 284                 ALO  IAC                            0627    15  0003  0457
+ 285                 STL  F4      8001                   0457    20  0261  8001
+ 286        NN M3    RAU   1899                          0273    60  1899  0153
+ 287                 SRT   0004                          0153    30  0004  0313
+ 288                 RAL   8002                          0313    65  8002  0821
+ 289                 NZE         ZT KB                   0821    45  0174  0275
+ 290                 RAL  F4                             0174    65  0261  0715
+ 291                 ALO  ONE                            0715    15  0066  0871
+ 292                 LDD  NN M4                          0871    69  0224  0677
+ 293                 SDA  F4                             0677    22  0261  0314
+ 294                 RAL  NN N6                          0314    65  0317  0921
+ 295                 SLO  F4                             0921    16  0261  0765
+ 296                 NZE   8001  STOPC                   0765    45  8001  0769
+ 297        NN M4    STU   0000  TR TZ                   0224    21  0000  0203
+ 298        TR TZ    RAL  IAC                            0203    65  0003  0507
+ 299                 ALO  ONE                            0507    15  0066  0971
+ 300                 STL  IAC    ZT KB                   0971    20  0003  0275
+ 301        ZT KB    RAL  NXTWD                          0275    65  0283  0437
+ 302                 ALO  ONE                            0437    15  0066  1021
+ 303                 LDD  NN M7                          1021    69  0274  0727
+ 304                 SDA  NXTWD                          0727    22  0283  0436
+ 305                 LDD  NN MB                          0436    69  0839  0242
+ 306                 SDA  STORE                          0242    22  0395  0198
+ 307                 RAU  PARNL                          0198    60  0204  0409
+ 308                 ALO  TEMAA                          0409    15  0127  0581
+ 309                 SRT   0002  TR QD                   0581    30  0002  0487
+ 310        TR QD    STL  TEMAA                          0487    20  0127  0280
+ 311                 LDD  OUT1V                          0280    69  0533  0486
+ 312                 STD  TESTO  TR RG                   0486    24  0192  0445
+ 313        SUB V    RAL  TEMAC                          0350    65  0167  1071
+ 314                 SLT   0002                          1071    35  0002  0777
+ 315                 NZU         TR QA                   0777    44  0631  0345
+ 316                 SRT   0002  STORE                   0631    30  0002  0395
+ 317        TR QA    RAU  TEMAC                          0345    60  0167  1121
+ 318                 ALO  TEMAA                          1121    15  0127  0681
+ 319                 SLT   0002                          0681    35  0002  0537
+ 320                 STU  TEMAC                          0537    21  0167  0470
+ 321                 STL  TEMAA  TESTO                   0470    20  0127  0192
+ 322        OUT1V    RAL  F3                             0533    65  0161  0815
+ 323                 ALO  ONE                            0815    15  0066  1221
+ 324                 STL  F3                             1221    20  0161  0364
+ 325                 SLO  OUTP                           0364    16  0267  1271
+ 326                 NZE  TR RG  SW QA                   1271    45  0445  0325
+ 327        NN MB    STL   0000  TR QE                   0839    20  0000  0253
+ 328        TR QE    STU  TEMAC                          0253    21  0167  0520
+ 329                 RAL  NXTWD                          0520    65  0283  0587
+ 330                 ALO  ONE                            0587    15  0066  1321
+ 331                 STL  NXTWD                          1321    20  0283  0536
+ 332                 LDD  STORE                          0536    69  0395  0248
+ 333                 SDA  STORE  TR RG                   0248    22  0395  0445
+ 334        TR RG    RAL  TEMAA                          0445    65  0127  0731
+ 335                 NZE  SUB V  NXTWD                   0731    45  0350  0283
+ 336        SW QA    RAL  OUTP                           0325    65  0267  1371
+ 337                 ALO  ONE                            1371    15  0066  1421
+ 338                 STL  OUTP                           1421    20  0267  0570
+ 337                 RAL  NXTWD                          0570    65  0283  0637
+ 340                 LDD   8003                          0637    69  8003  0494
+ 341                 SDA  F7                             0494    22  0297  0400
+ 342                 LDD  NNM16                          0400    69  0303  0306
+ 343                 SDA  NXTWD                          0306    22  0283  0586
+ 344                 LDD  NNM13                          0586    69  0889  0292
+ 345                 SDA  STORE                          0292    22  0395  0298
+ 346                 RAL  F4                             0298    65  0261  0865
+ 347                 LDD  STORE                          0865    69  0395  0348
+ 348                 SDA  F4                             0348    22  0261  0414
+ 349                 SLO  F7                             0414    16  0297  0651
+ 350                 SDA  F7                             0651    22  0297  0450
+ 351                 LDD  OUT5V                          0450    69  0353  0356
+ 352                 STD  TESTO                          0356    24  0192  0495
+ 353                 RAL  TEMAA                          0495    65  0127  0781
+ 354                 NZE  NZTO5  ZT O5                   0781    45  0234  0335
+ 355        NZTO5    AUP  PARNR                          0234    10  0276  0831
+ 355                 SRT   0002                          0831    30  0002  0687
+ 357                 STD   1993  TR SK                   0687    24  1993  0346
+ 358        ZT O5    RAL   1992                          0335    65  1992  0347
+ 356                 NZE         NZTO5                   0347    45  0500  0234
+ 360                 RSL   8002                          0500    66  8002  0459
+ 361                 STL  F7                             0459    20  0297  0550
+ 362                 RAL  TEMAA                          0550    65  0127  0881
+ 363                 STD   1992  NZTO5                   0881    24  1992  0234
+ 364        NNM13    STL   0000                          0889    20  0000  0403
+ 365                 RAL   1993                          0403    65  1993  0397
+ 366                 NZE         ZT O6                   0397    45  0600  0701
+ 367                 RAL  F7                             0600    65  0297  0751
+ 368                 STU   1993                          0751    21  1993  0396
+ 368                 SLO  ONE                            0396    16  0066  1471
+ 370                 STL  F7     ZT O6                   1471    20  0297  0701
+ 371        ZT O6    RAL  F4                             0701    65  0261  0915
+ 372                 SLO  STORE                          0915    16  0395  0299
+ 373                 NZE  TR QE  ZT L3                   0299    45  0253  0333
+ 374        NNM16    RAL   0000  TR SK                   0303    65  0000  0346
+ 375        TR SK    STL  TEMAA  SUB V                   0346    20  0127  0350
+ 376        ZT L3    RAL  TEMAE                          0333    65  0014  0819
+ 377                 NZE         TR RV                   0819    45  0422  0323
+ 378                 STD  OUTP                           0422    24  0267  0620
+ 379                 STU  TEMAE  TR RV                   0620    21  0014  0323
+ 380        TR RV    RAL  OUTP                           0323    65  0267  1521
+ 381                 LDD  TR MW  TR UD                   1521    69  0217  0670
+ 382        TR UD    STD  F1                             0670    24  0373  0376
+ 383                 STL  OUT Q                          0376    20  0931  0284
+ 384                 LDD         TR MT                   0284    69  0737  0099
+ 385                 STU  TEMAF                          0737    21  0164  0367
+ 386                 RAL  F3                             0367    65  0161  0965
+ 387                 SLO  OUT Q                          0965    16  0931  0385
+ 388                 NZE  TR MW                          0385    45  0217  0939
+ 389                 LDD  SW OA                          0939    69  0146  0349
+ 390                 STD  SW 56  F1                      0349    24  0002  0373
+ 391        OUT5V    RAL  TEMAA                          0353    65  0127  0981
+ 392                 NZE  SUB V                          0981    45  0350  0435
+ 393                 STD   1993                          0435    24  1993  0446
+ 394                 RAL  F7                             0446    65  0297  0801
+ 395                 BMI  TR RM                          0801    46  0354  0405
+ 396                 SLO  ONE                            0405    16  0066  1571
+ 397                 STL  F7     NXTWD                   1571    20  0297  0283
+ 398        TR RM    RAU  TEMAC                          0354    60  0167  1721
+ 399                 SCT   0000                          1721    36  0000  0643
+ 400                 RAL   8003  STORE                   0643    65  8003  0395
+ 401        ZT H3    RAU  TEMAF                          0156    60  0164  0869
+ 402                 SUP  LTR F                          0869    11  0154  0509
+ 403                 NZU         TR NF                   0509    44  0363  0464
+ 404                 AUP  SEVEN                          0363    10  0296  0851
+ 405                 BMI  TR NF                          0851    46  0464  0455
+ 406                 LDD  SW OE                          0455    69  0058  0311
+ 407                 STD  SW 56  TR NF                   0311    24  0002  0464
+ 408        TR NF    RAU  PARNL  TR MV                   0464    60  0204  0209
+ 409        SW OE    SUP  PARNR                          0058    11  0276  1031
+ 410                 NZU  NZTH6  TR SQ                   1031    44  0485  0636
+ 411        NZTH6    AUP   8001  TR MV                   0485    10  8001  0209
+ 412        TR SQ    AUP   8001                          0636    10  8001  0693
+ 413                 ALO  SW OA  TR SR                   0693    15  0146  0901
+ 414        TR SR    STL  SW 56  TR MV                   0901    20  0002  0209
+ 415        ZT H1    RAU  MULT                           0032    60  0419  0423
+ 416                 ALO         TR RO                   0423    15  0426  1081
+ 417                 SUP  MULT                           0426    11  0419  0473
+ 418                 NZU  TR MZ  TR SF                   0473    44  0827  0128
+ 419        TR MZ    AUP   8001                          0827    10  8001  0583
+ 420                 LDD  SW OA  TR SC                   0583    69  0146  0399
+ 421        TR SC    STD  SW 56   8001                   0399    24  0002  8001
+ 422        TR SF    RAL  F3     TR SA                   0128    65  0161  1015
+ 423        TR SA    ALO  ONE                            1015    15  0066  1771
+ 424                 STL  TEMAE                          1771    20  0014  0417
+ 425                 LDD  SW BL                          0417    69  0720  0523
+ 426                 STD  SW 50  TR SO                   0523    24  0476  0329
+ 427        TR SO    LDD  SW OI  TR SN                   0329    69  0232  0535
+ 428        TR SN    STD  SW 56  NZTB2                   0535    24  0002  0170
+ 429        TR RO    LDD  F3                             1081    69  0161  0514
+ 430                 STD  F6     TR SR                   0514    24  0467  0901
+ 431        ZT G8    AUP   8001                          0008    10  8001  1065
+ 432                 ALO         TR RO                   1065    15  0068  1081
+ 433                 SUP  LTR A                          0068    11  1871  0375
+ 434                 BMI  TR MZ                          0375    46  0827  0379
+ 435                 AUP   8001                          0379    10  8001  0585
+ 436                 SUP  LTR E                          0585    11  0188  0743
+ 437                 NZU  NZTH6                          0743    44  0485  0398
+ 438                 AUP   8001                          0398    10  8001  0505
+ 439                 ALO         TR SR                   0505    15  0108  0901
+ 440                 SUP  LTR A                          0108    11  1871  0425
+ 441                 BMI  TR SF  TR SQ                   0425    46  0128  0636
+ 442        SW BL    NZU  TR RN                          0720    44  0177  0324
+ 443                 RAL  TEMPF                          0324    65  0181  0635
+ 444                 SLO  ONE                            0635    16  0066  1971
+ 445                 NZE  TR RJ                          1971    45  0321  0475
+ 446                 RAL  ONE                            0475    65  0066  0472
+ 447                 STD   1992  TR RU                   0472    24  1992  0545
+ 448        TR RU    ALO  F3     TR SL                   0545    15  0161  1115
+ 449        TR SL    STL  OUTP                           1115    20  0267  0770
+ 440                 RAL  F6                             0770    65  0467  0522
+ 451                 LDD         TR UD                   0522    69  0525  0670
+ 452                 RAU  TEMAF                          0525    60  0164  0919
+ 453                 LDD  SW PH  TR RP                   0919    69  0372  0176
+ 454        SW PH    SUP  MULT                           0372    11  0419  0573
+ 455                 NZU         ZT N7                   0573    44  0877  0178
+ 456                 AUP   8001                          0877    10  8001  0633
+ 457                 SUP  DIVID                          0633    11  0247  0951
+ 458                 NZU         ZT N7                   0951    44  0555  0178
+ 459                 AUP   8001  SW PC                   0555    10  8001  0286
+ 460        ZT N7    AUP   8001  TR PY                   0178    10  8001  0669
+ 461        ZT N8    RAL  F3                             0094    65  0161  1215
+ 462                 STD  F6     TR SA                   1215    24  0467  1015
+ 463        SW OI    SUP  EQUAL                          0232    11  0184  0989
+ 464                 BMI         NZTB2                   0989    46  0342  0170
+ 465                 AUP  MULT                           0342    10  0419  0623
+ 466                 NZU         ZT N6                   0623    44  0927  0278
+ 467                 SUP  CN A5                          0927    11  0257  0361
+ 468                 NZU         ZT O4                   0361    44  1265  0216
+ 469                 SUP   8001                          1265    11  8001  0572
+ 470                 NZU         ZT N5                   0572    44  0575  0526
+ 471                 AUP  ONE 1                          0575    10  0084  1039
+ 472                 NZU         ZT Q4                   1039    44  0793  0544
+ 473                 AUP  PLUS                           0793    10  0365  0969
+ 474                 NZU  ZT Q4  ZT O1                   0969    44  0544  0374
+ 475        ZT Q4    RAL  F3     TR UY                   0544    65  0161  1315
+ 476        TR UY    SUP  SW 61                          1315    11  0124  0429
+ 477                 BMI  NZTB2  TR SL                   0429    46  0170  1115
+ 478        ZT O1    LDD         TR SN                   0374    69  0977  0535
+ 479                 SUP  LTR A                          0977    11  1871  0625
+ 480                 BMI  TR RY                          0625    46  0328  0479
+ 481                 AUP   8001                          0479    10  8001  0685
+ 482                 SUP  LTR E                          0685    11  0188  0843
+ 483                 NZU  NZTB2                          0843    44  0170  0448
+ 484                 LDD  TR SO  TR SN                   0448    69  0329  0535
+ 485        TR RY    AUP   8001  TR SM                   0328    10  8001  0735
+ 486        TR SM    LDD  SW OI  TR SC                   0735    69  0232  0399
+ 487        ZT N6    LDD  SW JA                          0278    69  1131  0334
+ 488                 STD  SW 56                          0334    24  0002  0605
+ 489                 RSL  ONE    TR SP                   0605    66  0066  0622
+ 490        TR SP    ALO  SW 61                          0622    15  0124  0529
+ 491                 STL  SW 61  NZTB2                   0529    20  0124  0170
+ 492        SW JA    SUP  LTR A                          1131    11  1871  0675
+ 493                 BMI  TR RY  ZT Q4                   0675    46  0328  0544
+ 494        ZT N5    RAL  ONE    TR SP                   0526    65  0066  0622
+ 495        ZT O4    LDD         TR SN                   0216    69  1019  0535
+ 496                 STU  TEMAF                          1019    21  0164  0517
+ 497                 SUP  MULT                           0517    11  0419  0673
+ 498                 NZU         TR UV                   0673    44  1027  0378
+ 499                 RSL  SW 61                          1027    66  0124  0579
+ 500                 BMI         TR SD                   0579    46  0282  0683
+ 501                 RAU  TEMAF  TR SM                   0282    60  0164  0735
+ 502        TR UV    RAL  SW 61                          0378    65  0124  0629
+ 503                 BMI  TR SD  TR SO                   0629    46  0683  0329
+ 504        TR SD    RSL  ONE    TR RU                   0683    66  0066  0545
+ 505        NN M7    RAL   0000  TR QD                   0274    65  0000  0487
+ 506        NN N6    STU   1931  TR TZ                   0317    21  1931  0203
+ 507        IN4      LDD  NINE   TR SH                   0351    69  0222  0725
+ 508        TR SH    STD   1991  SCAN                    0725    24  1991  0300
+ 509        ARITH    RAL  FIVE   RITH1                   0199    65  0102  0557
+ 510        RITH1    STU  TEMAB                          0557    21  0212  1365
+ 511                 AUP  TX DB                          1365    10  0118  0723
+ 512                 LDD  ZT C5  FLO 1                   0723    69  0576  0679
+ 513        FLO 1    STD  SW 62                          0679    24  0332  0785
+ 514                 STL  IAE                            0785    20  1089  0392
+ 515                 STU  SW 59                          0392    21  0060  0413
+ 516                 LDD  TX DE                          0413    69  0266  1069
+ 517                 STD  SW 60                          1069    24  0072  0775
+ 518                 LDD  SW FA                          0775    69  0428  1181
+ 519                 STD  SW 54                          1181    24  0384  0787
+ 520                 RAU  FOUR                           0787    60  0090  0595
+ 521                 STL  IAI                            0595    20  0449  0152
+ 522                 ALO  TX DL                          0152    15  0655  0559
+ 523                 LDD  SW BA  TR TN                   0559    69  0116  0126
+ 524        TR TN    STD  SW 50                          0126    24  0476  0729
+ 525                 STL  SW 61                          0729    20  0124  1077
+ 526                 STU  TEMPF                          1077    21  0181  0434
+ 527                 LDD  NN L1                          0434    69  0304  0607
+ 528                 STD  NXTWD  TX DG                   0607    24  0283  0024
+ 529        TX DG    RAL  NXTWD             WORD TO AC   0024    65  0283  0837
+ 530                 ALO  ONE               MODIFY NEX   0837    15  0066  0672
+ 531                 STL  NXTWD   8002       WORD ADDR   0672    20  0283  8002
+ 532        TR JM    SLT   0002                          0650    35  0002  0657
+ 533                 STL  TEMAA                          0657    20  0127  0330
+ 534                 RAU   8003  SW 50                   0330    60  8003  0476
+ 535        NZTAT    SUP  COMMA             TEST FOR     0700    11  0259  0463
+ 536                 NZU         TX DM       COMMA       0463    44  0567  0168
+ 537                 AUP  PLUS              TEST FOR     0567    10  0365  1119
+ 538                 NZU         TX DA       DECIMAL P   1119    44  0773  0424
+ 539                 SUP  ONE 1             TEST FOR     0773    11  0084  1139
+ 540                 NZU         SW 59       RIGHT PAE   1139    44  0893  0060
+ 541                 SUP  ONE 1             TEST FOR     0893    11  0084  1189
+ 542                 NZU         TX DJ       PLUS SIGN   1189    44  0943  0594
+ 543                 SUP  NINE              TEST FOR     0943    11  0222  1127
+ 544                 NZU         TX DC       MULT SIGN   1127    44  1231  0382
+ 545                 SUP  ONE 1             TEST FOR     1231    11  0084  1239
+ 546                 NZU         TX DK       MINUS SIG   1239    44  0993  0644
+ 547                 SUP  ONE 1             TEST FOR     0993    11  0084  1289
+ 548                 NZU         TX DD       DIVIDE SI   1289    44  1043  0694
+ 549                 SUP  EIGHT             TEST FOR     1043    11  0196  1051
+ 550                 NZU         SW 60       LEFT PARE   1051    44  0705  0072
+ 551                 SUP  NINE              TEST FOR     0705    11  0222  1177
+ 552                 NZU         TX DF       EQUAL SIG   1177    44  1281  0432
+ 553                 AUP  EQUAL  TR HA      RESTORE      1281    10  0184  1339
+ 554        TR HA    STU  TEMAC                          1339    21  0167  0820
+ 555                 RAL  TEMAB                          0820    65  0212  0617
+ 556                 SLT   0002                          0617    35  0002  0823
+ 557                 NZU  STOPM             TEST TEN A   0823    44  1227  0478
+ 558                 ALO  TEMAC                          0478    15  0167  0722
+ 559                 SLT   0002                          0722    35  0002  0779
+ 560                 NZU  NZTC8  ZT CB                   0779    44  0733  0484
+ 561        ZT CB    SRT   0002                          0484    30  0002  0191
+ 562                 STL  TEMAB  TR HB      STORE TEM    0191    20  0212  1415
+ 563        TR HB    RAL  IAE    TR JL      DECR SHIFT   1415    65  1089  1093
+ 564        TR JL    SLO  ONE                COUNT       1093    16  0066  0772
+ 565                 STL  IAE               STORE        0772    20  1089  0442
+ 566                 NZE  NZTB2  ZT B2      TEST         0442    45  0170  0447
+ 567        NZTB2    RAL  TEMAA  TR JM      TEMAA TO A   0170    65  0127  0650
+ 568        ZT B2    LDD  FIVE              RESET SHIF   0447    69  0102  0755
+ 569                 STD  IAE                COUNT       0755    24  1089  0492
+ 570                 RAL  IAC               DECR WORD    0492    65  0003  0707
+ 571                 SLO  ONE                COUNT       0707    16  0066  0822
+ 572                 STL  IAC               STORE        0822    20  0003  0406
+ 573                 NZE  TX DG  TX DH      TEST WORD    0406    45  0024  0411
+ 574        NZTC8    SUP  ZEROL             TEST TEM A   0733    11  0686  0241
+ 575                 BMI         ABNUM       FOR NUMER   0241    46  0744  0645
+ 576                 AUP  ZEROL  ZT CB                   0744    10  0686  0484
+ 577        ABNUM    LDD  TR HB                          0645    69  1415  0218
+ 578                 STD  OUTP   TR HC                   0218    24  0267  0870
+ 579        TR HC    AUP  ZEROL  TR JN      RESTORE      0870    10  0686  0291
+ 580        TR JN    SRT   0002  TR JO                   0291    30  0002  0497
+ 581        TR JO    STL  TEMAB  SW 54                   0497    20  0212  0384
+ 582        TR HE    STD  IAF                            0750    24  0453  0456
+ 583                 LDD  NN L2             NEXT PCH     0456    69  0609  0262
+ 584                 STD  TX DI              WORD INST   0262    24  1465  0268
+ 585                 LDD  NN L3             PUNCH STOR   0268    69  0872  0825
+ 586                 STD  STORE              INSTR       0825    24  0395  0498
+ 587                 LDD         TR UC                   0498    69  1101  0165
+ 588                 STD  P0006              PUNCH BAN   1101    24  1982  0835
+ 589                 LDD  SW FB                          0835    69  0238  0341
+ 590                 STD  SW 54   8001                   0341    24  0384  8001
+ 591        TR HN    SLT   0002  STORE                   0800    35  0002  0395
+ 592        TR HO    STL  TEMAB             LA TO TEM    0850    20  0212  1565
+ 593                 RAU  IAF               DECR SHIFT   1565    60  0453  0757
+ 594                 SUP  ONE                COUNT       0757    11  0066  0922
+ 595                 STU  IAF               STORE        0922    21  0453  0506
+ 596                 NZU  NZTB3                          0506    44  0659  0260
+ 597                 RAL  P0006                          0260    65  1982  0887
+ 598                 NZE  ZT B4                          0887    45  0140  0391
+ 599                 LDD  FIVE   TR MR                   0391    69  0102  0805
+ 600        TR MR    STD  IAF    TR KA                   0805    24  0453  0556
+ 601        NZTB3    RAL  TEMAB             TEM AB TO    0659    65  0212  0667
+ 602                 NZE  SW 54  OUTP       ANY MORE     0667    45  0384  0267
+ 603        ZT B4    PCH   1977  TR HP                   0140    71  1977  1277
+ 604        TR KA    RAL  TX DI                          0556    65  1465  1219
+ 605                 ALO  ONE               MODIFY NEX   1219    15  0066  0972
+ 606                 STL  TX DI              PCH WD IN   0972    20  1465  0318
+ 607                 LDD  STORE             MODIFY PUN   0318    69  0395  0548
+ 608                 SDA  STORE  NZTB3       STORE INS   0548    22  0395  0659
+ 609        TR HP    RAL  TEMPF                          1277    65  0181  0885
+ 610                 SLO  ONE                COUNT       0885    16  0066  1022
+ 611                 STL  TEMPF                          1022    20  0181  0534
+ 612                 NZE  NZTB6             TEST         0534    45  0288  1389
+ 613                 LDD  STOPN  TR LG      SET SW 54    1389    69  0542  0695
+ 614        TR LG    STD  SW 54  NZTB3       ERROR STO   0695    24  0384  0659
+ 615        NZTB6    LDD  SW FA  TR LG                   0288    69  0428  0695
+ 616        TX DH    LDD  OUT 1  TR IS                   0411    69  0564  0717
+ 617        TR HK    RAL  TEMAB             TEM AB TO    0900    65  0212  0767
+ 618                 NZE  NZTB7  OUTP       TEST         0767    45  0920  0267
+ 619        NZTB7    SLT   0002             TEM AB TO    0920    35  0002  1327
+ 620                 NZU         NZTB7       HIGH ORDE   1327    44  1331  0920
+ 621                 SUP  ZEROL             TEST FOR     1331    11  0686  0441
+ 622                 BMI  TR HF  TR HC       NUMERIC     0441    46  0794  0870
+ 623        TR HD    SCT   0000                          0950    36  0000  0873
+ 624                 STU  P0001                          0873    21  1977  0380
+ 625                 RAL  P0006  TJ SW       INSERT F    0380    65  1982  0937
+ 626        TJASW    SLT   0002             IN LAST WD   0046    35  0002  0503
+ 627                 NZU  TR RF  TR EX      OF PUNCH     0503    44  0807  0158
+ 628        TR EX    ALO  LAST   TR SG      STATEMENT    0158    15  0461  1715
+ 629        TJBSW    SLT   0004             OUTPUT       1050    35  0004  0511
+ 630                 NZU         TR EX                   0511    44  1765  0158
+ 631                 SRT   0002              INSERT OF   1765    30  0002  1072
+ 632                 NZU  TR RF             IN LAST WD   1072    44  0807  0626
+ 633                 PCH   1977             OF READ      0626    71  1977  1377
+ 634                 RAL  TEMPF             STATEMENT    1377    65  0181  0935
+ 635                 SLO  ONE               OUTPUT       0935    16  0066  1122
+ 636                 STL  TEMPF                          1122    20  0181  0584
+ 637                 NZE  TR RF  STOPN                   0584    45  0807  0542
+ 638        TR SG    STL  P0006                          1715    20  1982  0985
+ 639                 LDD   1991                          0985    69  1991  0844
+ 640                 BD1         PUNCH                   0844    91  0547  0499
+ 641                 PCH   1977  OUT19                   0547    71  1977  1427
+ 642        TR RF    RAL  SW 54                          0807    65  0384  1439
+ 643                 SLO  STOPN                          1439    16  0542  0597
+ 644                 NZE          8001                   0597    45  1100  8001
+ 645                 RAL  LAST                           1100    65  0461  1815
+ 646                 LDD  TR SG  TR UC                   1815    69  1715  0165
+ 647        TR UC    STD  OUT Q                          0165    24  0931  0634
+ 648                 STU  P0001                          0634    21  1977  0430
+ 649                 STD  P0002                          0430    24  1978  1381
+ 650                 STD  P0003                          1381    24  1979  0482
+ 651                 STD  P0004                          0482    24  1980  0783
+ 652                 STD  P0005  OUT Q                   0783    24  1981  0931
+ 653        TR HF    RAU  TEMAB  TJ 10                   0794    60  0212  0028
+ 654   1DUP TJ 10    LDD  TR JO  SUBJ                    0028    69  0497  1250
+ 655        TJ 10    LDD  TSTPR  SUBJ                    0028    69  1431  1250
+ 656        TJ10A    LDD  TSTPR  SUBJ                    1300    69  1431  1250
+ 657        TJ10B    LDD  TR JO  SUBJ                    0172    69  0497  1250
+ 658        TSTPR    NZU         TJ 20       PRECEDE     1431    44  1035  0736
+ 659                 STU  TEMAC             LOCATION     1035    21  0167  0970
+ 660                 SUP   8001             NUMBER OF    0970    11  8001  1477
+ 661                 RAL  LTR T             LAST VARi    1477    65  0480  1085
+ 662                 LDD  OUT30  TR KK      ABLE IN      1085    69  0338  0491
+ 663        OUT30    RAU  PRODT             READ OR      0338    60  0541  0745
+ 664                 LDD         SUBE       PUNCH        0745    69  0598  1251
+ 665                 LDD  OUT31  TR KK      STATEMENT    0598    69  1301  0491
+ 666        OUT31    RAU  TEMAC             BY T         1301    60  0167  1172
+ 667                 SRT   0004              EXIT TO     1172    30  0004  0833
+ 668                 SUP   8003             PUNCH OUT    0833    11  8003  0591
+ 669                 AUP  NINE              PUT AND      0591    10  0222  1527
+ 670                 SLT   0004             CONTINUE     1527    35  0004  0987
+ 671                 LDD         SUBE       PROCEDDING   0987    69  0190  1251
+ 672                 SLT   0002             STATEMENTS   0190    35  0002  0647
+ 673                 LDD  OUT 1  TR KK                   0647    69  0564  0491
+ 674        TJ 20    SLT   0002                          0736    35  0002  1143
+ 675                 SUP   8003                          1143    11  8003  1351
+ 676                 SRT   0002                          1351    30  0002  0857
+ 677                 ALO  LTR T  TR JO                   0857    15  0480  0497
+ 678        TX DF    RAU  LTR Z                          0432    60  1135  1489
+ 679                 LDD   1991                          1489    69  1991  0894
+ 680                 BD1  TR UO  TR HL                   0894    91  0697  0549
+ 681        TR UO    STU  TEMAC                          0697    21  0167  1020
+ 682                 LDD  OUT 3  TR JZ                   1020    69  0923  0676
+ 683        TR HL    STU  TEMAC              SIGN        0549    21  0167  1070
+ 684                 LDD  OUT 3  TR IS                   1070    69  0923  0717
+ 685        TR IS    STD  OUTP   TR HK                   0717    24  0267  0900
+ 686        TR HR    STD  TEMAB  TR JP                   1350    24  0212  1865
+ 687        TR JP    LDD  TR HB  TR JZ                   1865    69  1415  0676
+ 688        TR JZ    STD  OUTP   SW 54                   0676    24  0267  0384
+ 689        TX DD    RAU  LTR D  TR HL      STORE DIVI   0694    60  0747  0549
+ 690        TX DJ    RAU  LTR S  TR HL      STORE PLUS   0594    60  0797  0549
+ 691        TX DK    RAU  LTR M  TR HL      STORE MINU   0644    60  0847  0549
+ 692        TX DB    RAU  LTR R  TR HL      STORE RTPA   0118    60  1222  0549
+ 693        TX DM    RAU  LTRKH  TR HL      STOR COMMA   0168    60  1272  0549
+ 694        TX DC    LDD  SW BB  TR LI                   0382    69  1185  0388
+ 695        TR LI    STD  SW 50                          0388    24  0476  0829
+ 696                 LDD  TR HB  TR IS                   0829    69  1415  0717
+ 697        TR HM    NZU  NZTC1                          1400    44  0553  0404
+ 898                 LDD  SW BA                          0404    69  0116  1269
+ 899                 STD  SW 50                          1269    24  0476  0879
+ 700                 RAL  LTR P  TR JO                   0879    65  0532  0497
+ 701        TR LD    LDD  SW BF                          1550    69  0603  0606
+ 702                 STD  SW 50  TR MO                   0606    24  0476  0929
+ 703        TR MO    AUP  LTR E  TR HA                   0929    10  0188  1339
+ 704        TR MP    NZU         ZT G5                   1700    44  0653  0454
+ 705                 BMI  TR KP  TR MO                   0653    46  0656  0929
+ 706        ZT G5    RAU  LTR B  TR PI                   0454    60  0907  0561
+ 707        NZTC1    AUP  MULT                           0553    10  0419  0973
+ 708                 ALO  TEMAA                          0973    15  0127  1481
+ 709                 SRT   0002                          1481    30  0002  1037
+ 710                 STL  TEMAA                          1037    20  0127  0530
+ 711                 RAL  IAE                            0530    65  1089  1193
+ 712                 ALO  ONE                            1193    15  0066  1322
+ 713                 STL  IAE                            1322    20  1089  0592
+ 714                 LDD  LTR X  TR JK                   0592    69  0795  0648
+ 715        TX DA    RAU  LTR J                          0424    60  1577  1531
+ 716                 LDD  SW BG  TR PJ                   1531    69  0684  1087
+ 717        TR HU    NZU         ZT C2                   1750    44  0703  0504
+ 718                 BMI  TR KP  TR LD                   0703    46  0656  1550
+ 719        TR KP    AUP   8001                          0656    10  8001  0513
+ 720                 LDD  SW BA                          0513    69  0116  1319
+ 721                 STD  SW 50  NZTAT                   1319    24  0476  0700
+ 722        ZT C2    RAU  ZROB   TR PI                   0504    60  0957  0561
+ 723        TR PI    LDD  SW BA  TR PJ                   0561    69  0116  1087
+ 724        TR PJ    STD  SW 50  TR HL                   1087    24  0476  0549
+ 725        TX DE    RAU  TEMAB  TR KH                   0266    60  0212  0817
+ 726        TR KH    NZU  NZTC5  SW 62                   0817    44  1372  0332
+ 727        ZT C5    LDD  LTR L  TR HR                   0576    69  0979  1350
+ 728        NZTC5    SRT   0002                          1372    30  0002  1029
+ 729                 RAL   8002                          1029    65  8002  1137
+ 730                 SLO  LTRFH                          1137    16  0240  0845
+ 731                 NZE         SW 61                   0845    45  0698  0124
+ 732                 RSU  TEMAB                          0698    61  0212  0867
+ 733                 LDD  NZU2   SUBJ                    0867    69  0040  1250
+ 734   1DUP NZU2     NZU  TJ BA  STOPF                   0040    44  1243  0944
+ 735        NZU2     STU  TEMAC  TJ 5A                   0040    21  0167  1120
+ 736        NZU2A    NZU  TJ BA  STOPF                   0034    44  1243  0944
+ 737        TJ BA    STL  TEMAB                          1243    20  0212  1965
+ 738                 STU  TEMAC  TJ 8                    1965    21  0167  1220
+ 739        TJ 8     LDD  OUT 4  TR JZ                   1220    69  1023  0676
+ 740        TR IB    SLO  ONE 1                          1800    16  0084  1539
+ 741                 LDD   8003                          1539    69  8003  0496
+ 742                 SIA  TEMAE                          0496    23  0014  0917
+ 743                 SLT   0003                          0917    35  0003  0875
+ 744                 STU  TEMAF                          0875    21  0164  0967
+ 745                 NZU         ZT D1                   0967    44  1422  1472
+ 746                 RAL   8002                          1422    65  8002  1581
+ 747                 SLT   0003                          1581    35  0003  1589
+ 748                 STU  TEMAF                          1589    21  0164  1017
+ 749                 RSL   8003                          1017    66  8003  0925
+ 750                 ALO  TEMAE                          0925    15  0014  1369
+ 751                 STL  TEMAE                          1369    20  0014  1067
+ 752                 LDD  SW HB  TR IF                   1067    69  1270  1073
+ 753        TR IF    STD  SW 56  OUT 5                   1073    24  0002  0855
+ 754        ZT D1    LDD  SW HA  TR IF                   1472    69  0975  1073
+ 755        TR IK    STD  SW 50                          1850    24  0476  1079
+ 756                 SLO   8002                          1079    16  8002  1187
+ 757                 STL  F6                             1187    20  0467  1320
+ 758                 STD  F7                             1320    24  0297  1950
+ 759                 STD  F8                             1950    24  0052  0905
+ 760                 STD  F9                             0905    24  0208  0611
+ 761                 LDD  ONE 1  TR KN                   0611    69  0084  1237
+ 762        TR KN    STD  DIM I                          1237    24  0290  1293
+ 763                 STL  F1                             1293    20  0373  0726
+ 764                 STD  F3                             0726    24  0161  0614
+ 765                 STD  F4                             0614    24  0261  0664
+ 766                 STD  F5                             0664    24  1117  1370
+ 767                 LDD  SW IA  TR KI                   1370    69  1123  0776
+ 768        TR KI    STD  SW 57  TR HB                   0776    24  1129  1415
+ 769        TR IL    BMI  NZTD4                          1401    46  0554  0955
+ 770                 AUP   8001                          0955    10  8001  0661
+ 771                 STU  TEMAC  SW 57                   0661    21  0167  1129
+ 772        TR IM    SLT   0002                          1551    35  0002  1057
+ 773                 NZU  STOPO                          1057    44  0711  0312
+ 774                 ALO  TEMAC                          0312    15  0167  1522
+ 775                 STL  F1     TR HB                   1522    20  0373  1415
+ 776        NZTD4    AUP  MULT                           0554    10  0419  1173
+ 777                 BMI  NZTD6                          1173    46  0826  1727
+ 778                 AUP  LTR A                          1727    10  1871  1025
+ 779                 STU  TEMAC  SW IB                   1025    21  0167  1420
+ 780        TR IN    SLT   0002                          1701    35  0002  1107
+ 781                 NZU  STOPO                          1107    44  0711  0362
+ 782                 ALO  TEMAC                          0362    15  0167  1572
+ 783                 STL  F3     TR IG                   1572    20  0161  0714
+ 784        TR IG    LDD  SW IB  TR KI                   0714    69  1420  0776
+ 785        NZTD6    AUP  DIVID                          0826    10  0247  1751
+ 786                 NZU         ZT E1                   1751    44  1055  0706
+ 787                 AUP  ONE 1                          1055    10  0084  1739
+ 788                 NZU         TR IG                   1739    44  1343  0714
+ 789                 AUP  NINE                           1343    10  0222  1777
+ 790                 NZU  NZTE1  TR IP                   1777    44  1731  0582
+ 791        TR IP    LDD  SW IC  TR KI                   0582    69  1235  0776
+ 792        TR IO    SLT   0002                          1801    35  0002  1257
+ 793                 NZU  STOPO                          1257    44  0711  0412
+ 794                 ALO  TEMAC                          0412    15  0167  1722
+ 795                 STL  F5     TR HB                   1722    20  1117  1415
+ 796        ZT E1    LDD  ONE 1                          0706    69  0084  1287
+ 797                 STD  F4     TR IP                   1287    24  0261  0582
+ 798        NZTE1    RAL  F7                             1731    65  0297  1851
+ 799                 STD  F9                             1851    24  0208  0761
+ 800                 STU  F7                             0761    21  0297  0202
+ 801                 LDD  F6                             0202    69  0467  1470
+ 802                 STD  F8                             1470    24  0052  1105
+ 803                 STU  F6                             1105    21  0467  1520
+ 804                 RAL  F5                             1520    65  1117  1772
+ 805                 NZE         ZT E5                   1772    45  0876  1877
+ 806                 LDD  OUTQ1  TR LH                   0876    69  1179  0632
+ 807        TR LH    STD  OUT Q  SUB Q                   0632    24  0931  0734
+ 808        TR JR    RAL  F4                             0252    65  0261  0316
+ 809                 NZE  NZTJ2                          0316    45  1570  1872
+ 810                 RAL  F5     TR JT                   1872    65  1117  1972
+ 811        NZTJ2    RSL  F5     TR JT                   1570    66  1117  1972
+ 812        TR JT    ALO  TEMAE                          1972    15  0014  1419
+ 813                 STL  TEMAE  ZT E5                   1419    20  0014  1877
+ 814        ZT E5    RAL  F1                             1877    65  0373  0528
+ 815                 NZE  NZTE6  NZTE7                   0528    45  0682  0883
+ 816        SUB Q    STU  TEMAC  ZT F4                   0734    21  0167  1720
+ 817        ZT F4    SLT   0001                          1720    35  0001  0578
+ 818                 NZU         ZT F4                   0578    44  1781  1720
+ 819                 SUP  NINE                           1781    11  0222  0628
+ 820                 AUP  TEMAC                          0628    10  0167  1223
+ 821                 SLT   0001                          1223    35  0001  1229
+ 822                 STU  TEMAC                          1229    21  0167  1770
+ 823                 RAL   8002                          1770    65  8002  1279
+ 824                 NZE  ZT F4                          1279    45  1720  0933
+ 825                 RAU  TEMAC                          0933    60  0167  1273
+ 826                 MPY  DIM I  OUT Q                   1273    19  0290  0931
+ 827        NZTE6    LDD  OUTQ2  TR LH                   0682    69  1285  0632
+ 828        TR JV    RAU  F3                             0302    60  0161  0366
+ 829                 NZE  NZTE7                          0366    45  0883  1323
+ 830                 RAL  TEMAE                          1323    65  0014  1469
+ 831                 ALO  F6                             1469    15  0467  1373
+ 832                 STL  TEMAE                          1373    20  0014  1217
+ 833                 STU  F6                             1217    21  0467  1820
+ 834                 LDD  OUT12                          1820    69  1423  0926
+ 835                 STD  SW 58  SW 56                   0926    24  1329  0002
+ 836        NZTE7    LDD  OUT 6                          0883    69  0786  1789
+ 837                 STD  SW 58                          1789    24  1329  0732
+ 838                 RAU  F3                             0732    60  0161  0416
+ 839                 LDD  TR IR  SUBJ                    0416    69  1569  1250
+ 840        TR IR    STL  F7     SW 56                   1569    20  0297  0002
+ 841   1DUP SW 56    RAU  SW HA  TR IT       SWITCH 56   0002    60  0975  1379
+ 842        SW 56    RAL  F7     JTEST       BYPASS      0002    65  0297  0352
+ 843        JTEST    NZE  JSTOR  JZERO      INSERTION    0352    45  0756  1307
+ 844        JSTOR    RAL  LTR L             OF L AND R   0756    65  0979  0983
+ 845                 LDD         TR KK      FOR          0983    69  0836  0491
+ 846                 RAL  TEMAE             SPECIFIC     0836    65  0014  1719
+ 847                 BMI  TR IX  TR IU      VARIABLE     1719    46  1473  1523
+ 848        JZERO    RAL  F9                OF ARRAY     1307    65  0208  0563
+ 849                 NZE  JSTOR                          0563    45  0756  1267
+ 850                 RAU  TEMAE                          1267    60  0014  1769
+ 851                 LDD         SUBE                    1769    69  1573  1251
+ 852                 STL  TEMAB  TRAJK                   1573    20  0212  0466
+ 853        TR IT    STD  SW 56                          1379    24  0002  1255
+ 854                 LDD  TEMAF  TR KN                   1255    69  0164  1237
+ 855        TR IU    LDD  SW 58  TR IV                   1523    69  1329  0782
+ 856        TR IV    STD  OUTP                           0782    24  0267  1870
+ 857                 NZE  TR IZ  TR HC                   1870    45  0474  0870
+ 858        TR IZ    LDD  TR JO  TR UN                   0474    69  0497  0402
+ 859        TR UN    SLT   0004  SUBE1                   0402    35  0004  0613
+ 860        TR IX    RAL  LMCOM                          1473    65  0976  1831
+ 861                 LDD  OUT 7  TR KK                   1831    69  0784  0491
+ 862        TR IY    STD  OUTP                           0452    24  0267  1970
+ 863                 RAM  TEMAE  TR IZ                   1970    67  0014  0474
+ 864        TR JA    LDD  OUT 8  TR KK                   0502    69  1305  0491
+ 865        TR KK    STD  OUTP   TR JO                   0491    24  0267  0497
+ 866        TR JB    LDD  SW 58  TR KK                   0552    69  1329  0491
+ 867        TR JC    NZE  NZTE9  ZT E9                   0602    45  0806  1357
+ 868        NZTE9    LDD  OUT10  TR IV                   0806    69  0709  0782
+ 869        TR JD    LDD  OUT11  TR KK                   0652    69  1355  0491
+ 870        TR JF    LDD  OUT 9  TR KK                   0702    69  1405  0491
+ 871        TR JS    LDD  OUT12  TR KK                   0752    69  1423  0491
+ 872        ZT E9    RAL  F7                             1357    65  0297  0802
+ 873                 NZE         OUT12                   0802    45  0856  1423
+ 874                 RAL  TEMAF                          0856    65  0164  1819
+ 875                 NZE  NZTE9  OUT11                   1819    45  0806  1355
+ 876        TR JG    NZE         ZT F2                   0852    45  0906  1407
+ 877                 RAL  LTR S                          0906    65  0797  0902
+ 878                 LDD  OUT13  TR KK                   0902    69  1455  0491
+ 879        TR JH    LDD  OUT14  TR IV                   0952    69  1555  0782
+ 880        TR JI    LDD  OUT15  TR KK                   1052    69  1705  0491
+ 881        TR JJ    LDD  OUT16  TR KK                   1102    69  1755  0491
+ 882        ZT F2    RAL  F9                             1407    65  0208  0663
+ 883                 NZE         OUT16                   0663    45  0516  1755
+ 884                 RAL  LTR S  TR JI                   0516    65  0797  1052
+ 885        TR JK    STD  TEMAB  TRAJK                   0648    24  0212  0466
+ 886        TRAJK    LDD  SW BA                          0466    69  0116  1869
+ 887                 STD  SW 50  TR JP                   1869    24  0476  1865
+ 888        FLO      STL  TEMAB                          1252    20  0212  0566
+ 889                 RAU  NINE                           0566    60  0222  0678
+ 890                 SLT   0004                          0678    35  0004  1839
+ 891                 AUP   1900                          1839    10  1900  1805
+ 892                 STU   1900                          1805    21  1900  0753
+ 893                 LDD  EIGHT  TR SH                   0753    69  0196  0725
+ 894        FLO2     LDD  IAC                            0147    69  0003  0956
+ 895                 STD  IAFI                           0956    24  0759  0462
+ 896                 LDD  ONE                            0462    69  0066  1969
+ 897                 STD  TEMPH                          1969    24  0215  0368
+ 898                 RAL   1900                          0368    65  1900  1855
+ 899                 SLT   0004                          1855    35  0004  0616
+ 900                 STL   1900                          0616    20  1900  0803
+ 901                 RAL  THREE                          0803    65  1056  0811
+ 902                 AUP  SW KA                          0811    10  0764  1723
+ 903                 LDD  SW LB  FLO 1                   1723    69  1026  0679
+ 904        SW KA    RAL  TR UA                          0764    65  1317  1773
+ 905                 SUP  ONE    TR UW                   1773    11  0066  1873
+ 906        TR UA    NZU  TX DB  ZT F6                   1317    44  0118  1973
+ 907        TR LP    AUP  IAI                            1302    10  0449  0853
+ 908                 STU  IAI     8002                   0853    21  0449  8002
+ 909        ZT F6    LDD  SW BE  TR LI                   1973    69  1076  0388
+ 910        TR KF    SRT   0002                          1352    30  0002  0809
+ 911                 STL  TEMAF                          0809    20  0164  1367
+ 912                 RAL  IAC                            1367    65  0003  1457
+ 913                 SLO  ONE                            1457    16  0066  0524
+ 914                 LDD  IAFI                           0524    69  0759  0512
+ 915                 STD  IAC                            0512    24  0003  1106
+ 916                 STL  IAFI   OUT 1                   1106    20  0759  0564
+ 917        SW LB    RAL  ZT C5                          1026    65  0576  1881
+ 918                 AUP  ONE    TR UW                   1881    10  0066  1873
+ 919        TR UW    AUP  TEMPH                          1873    10  0215  0574
+ 920                 STU  TEMPH   8002                   0574    21  0215  8002
+ 921        TR KD    AUP  ONE    TR LP                   1402    10  0066  1302
+ 922        TX DL    RAL  TR UB                          0655    65  0258  0713
+ 923                 STU   1990  TR KD                   0713    21  1990  1402
+ 924        TR UB    LDD  TR LQ                          0258    69  0861  0814
+ 925                 STD  TEST                           0814    24  1417  0624
+ 926                 RAL  SW KB                          0624    65  0728  1033
+ 927                 AUP  SW MA                          1033    10  0886  0641
+ 928                 LDD  SW NA  TR QX                   0641    69  0994  0897
+ 929        TR QX    STD  SW 62                          0897    24  0332  1335
+ 930                 STL  SW 59                          1335    20  0060  0763
+ 931                 STU  SW 61  TEST                    0763    21  0124  1417
+ 932        TR LQ    RAL  MASK1                          0861    65  0864  0674
+ 933                 LDD  TEMAB                          0674    69  0212  0666
+ 934                 TLU   1161                          0666    84  1161  1467
+ 935                 LDD  MASK2                          1467    69  0724  0778
+ 936                 SDA  TESTO                          0778    22  0192  0895
+ 937                 SLO  CNAIB   8002                   0895    16  0748  8002
+ 938        MASK1    RAL   0000                          0864    65  0000  1256
+ 939                 SLO  TEMAB                          1256    16  0212  1567
+ 940                 NZE   1171                          1567    45  1171  0774
+ 941                 LDD  LTR Q                          0774    69  0828  1931
+ 942                 STD  TEMAB  TESTO                   1931    24  0212  0192
+ 943        MASK2    RAU   0000  TR UO                   0724    60  0000  0697
+ 944        TR LN    SLO  ONE                            1552    16  0066  0824
+ 945                 STL  IAI                            0824    20  0449  1702
+ 946                 NZE  TR LO                          1702    45  1306  1557
+ 947                 RAU  TX DL                          1557    60  0655  0859
+ 948                 LDD  TR LO                          0859    69  1306  0909
+ 949                 STD  TEST                           0909    24  1417  0874
+ 940                 LDD   1991                          0874    69  1991  1044
+ 951                 BD1         TR SE                   1044    91  0947  0599
+ 952                 ALO  SW KA                          0947    15  0764  0924
+ 953                 LDD  SW LB  TR QX                   0924    69  1026  0897
+ 954        TR SE    ALO  TX DB                          0599    15  0118  0974
+ 955                 LDD  ZT C5  TR QX                   0974    69  0576  0897
+ 956        TR LO    RAU  LTR Q  TR HL                   1306    60  0828  0549
+ 957        TR LZ    NZE         ZT G3                   1752    45  1356  1707
+ 958                 SLO  ONE                            1356    16  0066  1024
+ 959                 STL   1990  TX DB                   1024    20  1990  0118
+ 950        SW NA    RAL   1990                          0994    65  1990  0945
+ 961                 ALO  ONE                            0945    15  0066  1074
+ 962                 STL   1990  ZT C5                   1074    20  1990  0576
+ 963        ZT G3    RAL  IAI    TR LN                   1707    65  0449  1552
+ 964         1160     99   9999   9999      END OF TAB   1160    99  9999  9999
+ 965        SWBA1    NZU  NZTAT  TX DH                   0160    44  0700  0411
+ 966        SW BB    SUP  MULT   TR HM       FOR         1185    11  0419  1400
+ 967        SW BD    SUP  ZEROL  TR IL       50          1802    11  0686  1401
+ 968        SW BE    ALO  TEMAA  TR KF                   1076    15  0127  1352
+ 969        SW BF    SUP  LTR E  TR MP                   0603    11  0188  1700
+ 970        SW BG    SUP  LTR E  TR HU                   0684    11  0188  1750
+ 971        SW FA    RAL  FIVE   TR HE      SETTINGS F   0428    65  0102  0750
+ 972        SW FB    RAL  TEMAB  TX DI       SWITCH 54   0238    65  0212  1465
+ 973        SW HA    RAL  F7     JTEST      SETTINGS F   0975    65  0297  0352
+ 974        SW HB    RAU  SW HA  TR IT       SWITCH 56   1270    60  0975  1379
+ 975        SW IA    RAL  F1     TR IM      SETTINGS     1123    65  0373  1551
+ 976        SW IB    RAL  F3     TR IN       FOR         1420    65  0161  1701
+ 977        SW IC    RAL  F5     TR IO       SWITCH 57   1235    65  1117  1801
+ 978        SW KB    RAL   1990  TR LZ                   0728    65  1990  1752
+ 979        SW MA    RAL  TR LQ  TR KD                   0886    65  0861  1402
+ 980        NNAL1    RAL   1899  TR JM                   0148    65  1899  0650
+ 981        NN L1    RAL   1899  TR JM      NXT WD INS   0304    65  1899  0650
+ 982        NN L2    AUP   1977  TR HN      TO TX DI     0609    10  1977  0800
+ 983        NN L3    STU   1977  TR HO      STORE PCH    0872    21  1977  0850
+ 984        OUT 1    RAU  P0001  TR HD                   0564    60  1977  0950
+ 985        OUT 3    LDD  TEMAC  TR HR       EXITS       0923    69  0167  1350
+ 986        OUT 4    RAL  TEMAC  TR IB       FROM        1023    65  0167  1800
+ 987        OUT 6    RAL  SLCOM  TR JA                   0786    65  1889  0502
+ 988        OUT 5    LDD  SW BD  TR IK       STORE       0855    69  1802  1850
+ 989        OUT 7    LDD  OUT17  TR IY                   0784    69  1337  0452
+ 990        OUT 8    RAL  F6     TR JC       SUBROUTIN   1305    65  0467  0602
+ 991        OUT 9    RAL  LTR R  TR JS                   1405    65  1222  0752
+ 992        OUT10    RAL  LTR X  TR JD                   0709    65  0795  0652
+ 993        OUT11    RAL  F7     TR JF                   1355    65  0297  0702
+ 994        OUT12    RAL  F8     TR JG                   1423    65  0052  0852
+ 995        OUT13    RAL  F8     TR JH                   1455    65  0052  0952
+ 998        OUT14    RAL  LTR X  TR JI                   1555    65  0795  1052
+ 997        OUT15    RAL  F9     TR JJ                   1705    65  0208  1102
+ 998        OUT16    LDD  LTR R  TR JK                   1755    69  1222  0648
+ 999        OUT17    RAL  LTR R  TR JB                   1337    65  1222  0552
+1000        OUT19    RAL  SW AB  IN10                    1427    65  0580  1385
+1001        OUTQ1    STL  F5     TR JR                   1179    20  1117  0252
+1002        OUTQ2    STL  F6     TR JV                   1285    20  0467  0302   
+1003   1                                                                       
+1004   1                 INSERT VARIABLES IN TABLE AND                        
+1005   1                 ASSIGN I OR Y VALUE DEPENDING                        
+1006   1                 IF VARIABLE IS FIXED POINT OR                        
+1007   1                 FLOATING POINT                                         
+1008        SUBJ     STD  OUT    SUBJ1         STORE     1250    24  0903  1406
+1009        SUBJ1    SCT   0000               SIGNED VAR 1406    36  0000  1429
+1010                 STU  TEST                IN TEMPLOC 1429    21  1417  1124
+1011                 RAU  CTVAR                ZERO      1124    60  0048  0953
+1012                 STL  SUBSC               TEMPORARY  0953    20  1962  0716
+1013                 STD  STORG               COUNTERS   0716    24  1961  0914
+1014                 NZE  J101   INSVR                   0914    45  0418  1174
+1015        INSVR    AUP  ONE                            1174    10  0066  1224
+1016                 ALO  ONE 1                          1224    15  0084  1939
+1017                 STU  CTVAR                STORE     1939    21  0048  1852
+1018                 STL  STORG               MNEMONIC   1852    20  1961  0964
+1019                 AUP         J1           IN VARIBAL 0964    10  1717  1274
+1020                 STD   1599  J2           TABLE      1717    24  1599  1053
+1021        J1       LDD  TEST    8003                   1274    69  1417  8003
+1022        J2       RAL   8001                TEST IF   1053    65  8001  0959
+1023                 BMI         J4B          SUBSC OR   0959    46  0562  0813
+1024                 RAU  SUBSC             NONSUBSC     0562    60  1962  1767
+1025                 SUP  D20                HALT OVER   1767    11  1324  1479
+1026                 NZU  J2A    STP N      20 SUBSC     1479    44  1083  0834
+1027        STP N    HLT   0002  PACK       VARIABLES    0834    01  0002  0051
+1028        J2A      AUP  D21                INCREMENT   1083    10  0936  0691
+1029                 STU  SUBSC             SUBSC CTR    0691    21  1962  0766
+1030                 RAU  TESTO                          0766    60  0192  0997
+1031                 SRT   0003              SET UP      0997    30  0003  1456
+1032                 STL  OUTE              J I BASE     1456    20  0911  1014
+1033                 RAU  TESTN             WORD AND     1014    60  1817  1374
+1034                 SLT   0004             STORE IN     1374    35  0004  1435
+1035                 AUP  OUTE              SUBSCRPT     1435    10  0911  0816
+1036                 AUP  STORG             TABLE        0816    10  1961  0866
+1037                 ALO  SUBSC                          0866    15  1962  1867
+1038                 ALO         J3                      1867    15  1424  1529
+1039                 STU   1499  J4          SET SWCHS   1424    21  1499  1103
+1040        J3       LDD  SETA              A AND A1     1529    69  0832  1485
+1041                 SDA  SWCHA             FOR FIX      1485    22  1989  0642
+1042                 LDD  SETA1             FLT TEST     0642    69  0995  0798
+1043                 SDA  SWHA1   8002      IF SUBS VR   0798    22  1253  8002
+1044        J4       RAU  TESTO              INCREMENT   1103    60  0192  1047
+1045                 NZU  NZMPY             STORG CTR    1047    44  1303  1353
+1046                 ALO  TESTN  J4A        BY I TIMES   1353    15  1817  1474
+1047        NZMPY    MPY  TESTN  J4A                     1303    19  1817  1474
+1048        J4A      ALO  STORG                          1474    15  1961  0916
+1049                 SLO  ONE 1             J MINUS 1    0916    16  0084  0340
+1050                 STL  STORG                          0340    20  1961  1064
+1051                 STD  TOTLC  FXFLT                   1064    24  1967  1524
+1052        FXFLT    RAM  TEST               TEST VAR    1524    67  1417  1574
+1053                 SLT   0002             FOR FIX OR   1574    35  0002  0882
+1054                 RAU   8003             FLT PT       0882    60  8003  0390
+1055                 SUP  LTRNI                          0390    11  1393  1097
+1056                 BMI  SWCHA              BRCH FLT    1097    46  1989  1403
+1057                 SUP  SEVEN                          1403    11  0296  1553
+1058                 BMI  SWHA1  SWCHA       BRCH FIX    1553    46  1253  1989
+1059        SETA     RAM   1499              SW A SET    0832    67  1499  1703
+1060                 RAU   8002  J6                      1703    60  8002  0961
+1061        NORMA    RAU  STORG  J7          SW A NORM   1753    60  1961  0966
+1062        SETA1    RAM   1499                          0995    67  1499  1803
+1063                 RAU   8002  J8          SW A1 SET   1803    60  8002  1011
+1064        NRMA1    RAU  STORG  J9          SWA1 NORM   1853    60  1961  1016
+1065        J6       ALO  LTR Y  OUT                     0961    15  1114  0903
+1066        J7       LDD  J6     SUBE2                   0966    69  0961  1214
+1067        J8       ALO  LTR I  OUT                     1011    15  1264  0903
+1068        J9       LDD  J8     SUBE2                   1016    69  1011  1214
+1069        J4B      LDD  STORG                          0813    69  1961  1314
+1070                 STD  TOTLC  NOSUB                   1314    24  1967  1724
+1071        NOSUB    LDD  NORMA              SWS A AND   1724    69  1753  1556
+1072                 STD  SWCHA             A1 NORM 44   1556    24  1989  0692
+1073                 LDD  NRMA1             FIX FLT IF   0692    69  1853  1706
+1074                 STD  SWHA1  FXFLT      NONSUBS VR   1706    24  1253  1524
+1075        SUBE2    STD  OUTE2                          1214    24  0468  1774
+1076                 LDD  DONE1  SUBE                    1774    69  0878  1251
+1077        SUBE1    SLT   0006  SUBE                    0613    35  0006  1251
+1078        SUBE     STD  OUTE   LOPFF       SET UP      1251    24  0911  1364
+1079        LOPFF    NZU         OUTE       DOUBL DIGT   1364    44  0518  0911
+1080                 SRT   0001             LOCATION     0518    30  0001  1075
+1081                 STU  TESTE             NUMBER FOR   1075    21  0630  1133
+1082                 SUP   8001             NONSUBSC     1133    11  8001  0440
+1083                 SRT   0001             VARIABLES    0440    30  0001  1147
+1084                 ALO  AZERO                          1147    15  0604  1059
+1085                 AUP  TESTE  LOPFF                   1059    10  0630  1364
+1086        DONE1    SRT   0002  OUTE2                   0878    30  0002  0468
+1087        J101     SUP  HNDRD              HALT OVER   0418    11  1874  1579
+1088                 NZE         STP N      100 VARS     1579    45  0932  0834
+1089                 AUP   8001  NXTVR       TEST        0932    10  8001  0490
+1090        NXTVR    ALO  ONE                            0490    15  0066  1974
+1091                 STL  MCHCT             VARIABLE     1974    20  1729  0982
+1092                 ALO         J101A      FOR TABLE    0982    15  1535  0540
+1093                 RAM   1599  J101B       TEST        1535    67  1599  0654
+1094        J101A    LDD  TSVAR                          0540    69  1443  0546
+1095                 SDA  TSVAR   8002                   0546    22  1443  8002
+1096        J101B    SML  TEST                           0654    18  1417  1125
+1097                 NZE  J102   MATCH                   1125    45  0928  1779
+1098        J102     LDD  NORMB              SWS B C     0928    69  1032  1585
+1099                 STD  SWCHB             AND D NORM   1585    24  0438  0741
+1100                 STD  SWCHC             TO REPEAT    0741    24  1094  1197
+1101                 LDD  NORMD             TABLE        1197    69  0704  1757
+1102                 STD  SWCHD  TSVAR      SEARCH       1757    24  0310  1443
+1103        TSVAR    RAL   0000              INCREMENT   1443    65  0000  1756
+1104                 BMI         PLSAD      STORG AND    1756    46  1109  0360
+1105                 RAL  SUBSC             SUBSC CTRS   1109    65  1962  0568
+1106                 ALO  ONE               AS NEEDED    0568    15  0066  1175
+1107                 STL  SUBSC             BEFORE       1175    20  1962  1066
+1108                 ALO         J103       CONTINUING   1066    15  1225  1879
+1109                 RAM   1499  J104       SEARCH OR    1225    67  1499  0754
+1110        J103     LDD  SETA              EXITING      1879    69  0832  1735
+1111                 SDA  SWCHA              SET FIX     1735    22  1989  0742
+1112                 LDD  SETA1             FLT SIGN     0742    69  0995  0848
+1113                 SDA  SWHA1   8002      SW FOR MCH   0848    22  1253  8002
+1114        J104     SLT   0003                          0754    35  0003  0863
+1115                 NZU  J105                           0863    44  0618  0668
+1116                 SLT   0003                          0668    35  0003  0978
+1117                 RAL   8003  J106                    0978    65  8003  1785
+1118        J105     STU  OUTE1                          0618    21  1275  1028
+1119                 SUP   8003                          1028    11  8003  1835
+1120                 SLT   0003                          1835    35  0003  1493
+1121                 RAU   8003                          1493    60  8003  0804
+1122                 MPY  OUTE1  J106                    0804    19  1275  1785
+1123        J106     STL  PRODT  J107                    1785    20  0541  1144
+1124        J106A    STL  PRODT  J107                    0854    20  0541  1144
+1125        J107     RAL  SUBSC                          1144    65  1962  0718
+1126                 ALO          8002                   0718    15  1325  8002
+1127                 RAL   1499  SWCHD                   1325    65  1499  0310
+1128        NORMD    BMI  PROC   J107A                   0704    46  1807  0308
+1129        SETD     BMI  FXFLT  J107A                   0904    46  1524  0308
+1130        J107A    RAL  PRODT                          0308    65  0541  1045
+1131                 ALO  STORG  SWCHB                   1045    15  1961  0438
+1132   1DUP SWCHB    STL  STORG  PROC        SERCH OVR   0438    20  1961  1807
+1133        SWCHB    STL  STORG  FXFLT       YES MATCH   0438    20  1961  1524
+1134        PROC     RAL  MCHCT              IF NO       1807    65  1729  1183
+1135                 SLO  CTVAR             MATCH        1183    16  0048  0954
+1136                 NZE  J108              INSERT       0954    45  0358  1259
+1137                 RAU   8001             VARIABLE     1259    60  8001  1116
+1138                 ALO  STORG  INSVR      IN TABLE     1116    15  1961  1174
+1139        J108     ALO   8001  NXTVR       SERCH OVR   0358    15  8001  0490
+1140        PLSAD    RAL  STORG                          0360    65  1961  1216
+1141                 ALO  ONE 1  SWCHC                   1216    15  0084  1094
+1142   1DUP SWCHC    STL  STORG  PROC        SERCH OVR   1094    20  1961  1807
+1143        SWCHC    STL  STORG  NOSUB       YES MATCH   1094    20  1961  1724
+1144        MATCH    LDD  SETB               SWS B C     1779    69  1082  1885
+1145                 STD  SWCHB             AND D SET    1885    24  0438  0791
+1146                 LDD  SETC              IF MATCH     0791    69  1194  1247
+1147                 STD  SWCHC             FOUND        1247    24  1094  1297
+1148                 LDD  SETD                           1297    69  0904  1857
+1149                 STD  SWCHD  TSVAR                   1857    24  0310  1443
+1150   1                                                                       
+1151   1                  SUBROUTINE CONSTANTS                                  
+1152        D20       00   0020   0000                   1324    00  0020  0000
+1153        D21       00   0021   0000                   0936    00  0021  0000
+1154        ONE       00   0001   0000                   0066    00  0001  0000
+1155        ONE 1     00   0000   0001                   0084    00  0000  0001
+1156        SETB     STL  STORG  FXFLT                   1082    20  1961  1524
+1157        NORMB    STL  STORG  PROC                    1032    20  1961  1807
+1158        SETC     STL  STORG  NOSUB                   1194    20  1961  1724
+1159         1200     63   7600   1821       CONTINUE    1200    63  7600  1821
+1160         1201     64   6900   1822       DIMENSION   1201    64  6900  1822
+1161         1202     64   7600   1823       DO          1202    64  7600  1823
+1162         1203     65   7800   1824       EQUIVALNCE  1203    65  7800  1824
+1163         1204     67   7600   1825       GO TO       1204    67  7600  1825
+1164         1205     69   6600   1826       IF          1205    69  6600  1826
+1165         1206     77   6100   1827       PAUSE       1206    77  6100  1827
+1166         1207     77   8400   1828       PUNCH       1207    77  8400  1828
+1167         1208     79   6500   1829       READ        1208    79  6500  1829
+1168         1209     82   8300   1827       STOP        1209    82  8300  1827
+1169         1210     99   9999   9999       END OF TAB  1210    99  9999  9999
+1170        SUBF2    STD  LAST   SUBF3                   1054    24  0461  1414
+1171        SUBF3    STU  TEMAF  SUBF1                   1414    21  0164  0768
+1172        SUBF1    STL  NEXT   SUB F                   0768    20  1375  1078
+1173        SUB F    RAL  TEMAF  LP F1                   1078    65  0164  1425
+1174        LP F1    NZE         ZT F1                   1425    45  1128  0680
+1175                 SLT   0002              NEXT CHAR   1128    35  0002  1935
+1176                 STL  TEMAF                          1935    20  0164  0818
+1177                 RAU   8003  NEXT                    0818    60  8003  1375
+1178        ZT F1    RAL  IAFI               DEC IAFI    0680    65  0759  0913
+1179                 NZE         LAST        FINAL CHAR  0913    45  1266  0461
+1180                 SLO  ONE                            1266    16  0066  1475
+1181                 STL  IAFI                           1475    20  0759  0612
+1182                 RSL   8002                          0612    66  8002  1525
+1183                 ALO  IAC                            1525    15  0003  0408
+1184                 ALO  CNFFI   8002                   0408    15  1061  8002
+1185        CNFFI    RAL   1899  LP F1       SUB F       1061    65  1899  1425
+1186        SUBK1    AUP   8001  SUB K                   1104    10  8001  1111
+1187        SUBK2    AUP  COMMA  SUB K       RESTPR COM  1254    10  0259  1111
+1188        SUB K    RAL   8003  TRSKI                   1111    65  8003  1575
+1189        TRSKI    ALO  TEMPH                          1575    15  0215  1725
+1190                 SLT   0002                          1725    35  0002  1132
+1191                 NZU  SW6    ZT 30                   1132    44  0986  1036
+1192        ZT 30    LDD  SWV    TR CC                   1036    69  0590  1543
+1193        TR AS    LDD  STOPM  TR CC                   1304    69  1227  1543
+1194        TR CC    STD  SW6    TR QR                   1543    24  0986  0640
+1195        TR QR    STL  TEMPH  SUB F                   0640    20  0215  1078
+1196        SWV      SRT   0002  TR AS       SUB K       0590    30  0002  1304
+1197        PCH C    STL  P0001  PUNCH                   1354    20  1977  0499
+1198        PUNCH    PCH   1977  PACK        END CONTIN  0499    71  1977  0051
+1199        PCH B    PCH   1977  SUB F       DO PCH IF   1404    71  1977  1078
+1200        HEADR    RAL  TOTLC              STATMNT NO  1554    65  1967  1775
+1201                 STL  P0004              PCH 37 40   1775    20  1980  1233
+1202                 STU  P0006                          1233    21  1982  1086
+1203                 STU  P0007                  61 70   1086    21  1983  1136
+1204                 STD  P0008                71  80    1136    24  1984  1387
+1205                 STD  P0001                          1387    24  1977  0730
+1206                 LDD  LOW88              SET CONTRO  0730    69  1283  1186
+1207                 STD  P0010                          1186    24  1986  0690
+1208                 PCH   1977  START                   0690    71  1977  1999
+1209         1822    LDD  TR UH  TR UG       DIMENSION   1822    69  1875  1178
+1210        TR UG    STD  OUT Q                          1178    24  0931  0884
+1211                 RAL  IAC                            0884    65  0003  0458
+1212                 SLO  TWO                 WORD COU   0458    16  1211  1316
+1213                 STL  IAFI                           1316    20  0759  0662
+1214                 RAU   1901  OUT Q                   0662    60  1901  0931
+1215        TR UH    SLT   0008                          1875    35  0008  1593
+1216                 ALO  SWDMA                          1593    15  0596  1704
+1217                 LDD  TRDME  SUBF2                   1704    69  0508  1054
+1218        TRDMA    NZU  SUBK1                          1754    44  1104  0558
+1219                 RAL  TEMPH             PROCESS V    0558    65  0215  1975
+1220                 STU  TEMPH                          1975    21  0215  0868
+1221                 STL  TEST                           0868    20  1417  1126
+1222                 STU  TESTO             ZERO V J     1126    21  0192  1095
+1223                 STU  TESTN                          1095    21  1817  1176
+1224                 RAL  SWDMB  SUBF1                   1176    65  0780  0768
+1225        TRDMB    NZU         ZTDMC      COMMA TEST   1804    44  0608  0658
+1226                 AUP  PARNR                          0608    10  0276  1182
+1227                 NZU         ZTDMD      PARENR TES   1182    44  1236  1286
+1228                 AUP  PARNR             2PAR Z COM   1236    10  0276  1232
+1229                 SRT   0001             COLLECT SU   1232    30  0001  0740
+1230                 SUP  NINE               CHARATER    0740    11  0222  1228
+1231                 BMI  STOPF             N            1228    46  0944  1282
+1232                 AUP  TESTO                          1282    10  0192  1347
+1233                 SLT   0001  TRDMG                   1347    35  0001  1854
+1234        ZTDMC    RAL  TESTO             SUBSCRIPT    0658    65  0192  1397
+1235                 STL  TESTN  TRDMG                   1397    20  1817  1854
+1236        TRDMG    STU  TESTO  SUB F      ZE           1854    21  0192  1078
+1237        ZTDMD    LDD  TRDMC                          1286    69  0790  1743
+1238                 STD  NEXT                           1743    24  1375  1278
+1239                 RAL  TESTN             AT COMMA     1278    65  1817  1226
+1240                 NZE  SUB F  ZTDMC      OVER 2 SUB   1226    45  1078  0658
+1241        TRDMC    LDD  SWDMA  TRDMH      SUPPARLTRD   0790    69  0596  0649
+1242        TRDMH    STD  NEXT   TRDMD                   0649    24  1375  1328
+1243        TRDMD    LDD  NZU3   TRDMF                   1328    69  1332  1336
+1244        TRDME    LDD  NZU1   TRDMF                   0508    69  1261  1336
+1245        TRDMF    STD  OUT                            1336    24  0903  1806
+1246                 RSU  TEST   SUBJ1                   1806    61  1417  1406
+1247        NZU1     NZU  PACK   STOPF                   1261    44  0051  0944
+1248        NZU3     NZU  SUB F  STOPF                   1332    44  1078  0944
+1249        SWDMA    SUP  PARNL  TRDMA      NEXT 1       0596    11  0204  1754
+1250        SWDMB    SUP  COMMA  TRDMB      NEXT 2       0780    11  0259  1804
+1251         1823    LDD  TR UE  TR BD      DO STATMNT   1823    69  1276  0830
+1252        TR BD    STD  OUT Q                          0830    24  0931  0934
+1253                 RAL  IAC                            0934    65  0003  0708
+1254                 SLO  ONE                            0708    16  0066  1326
+1255                 STL  IAFI                           1326    20  0759  0712
+1256                 RAU   1900             SHIFT OFF    0712    60  1900  1856
+1257                 SLT   0004  OUT Q                   1856    35  0004  0931
+1258        TR UE    ALO  SWDOA                          1276    15  0880  1386
+1259                 LDD  CN B4  SUBF2                   1386    69  0840  1054
+1260        SWDOA    SUP  ZEROL  TR  C                   0880    11  0686  0841
+1261        TR  C    BMI         SUBK1                   0841    46  1244  1104
+1262                 AUP  ZEROL                          1244    10  0686  0891
+1263                 SLT   0002                          0891    35  0002  1447
+1264                 ALO  TEMPH                          1447    15  0215  1376
+1265                 STU  TEMPH                          1376    21  0215  0918
+1266                 STL  TEST   TR  B                   0918    20  1417  1426
+1267        TR  B    ALO  LTR K              ADD COMMA   1426    15  0930  1436
+1268                 STD  P0003              PUNCH WOR   1436    24  1979  1382
+1269                 STD  P0005              PUNCH WOR   1382    24  1981  0984
+1270                 STL  P0001                          0984    20  1977  0980
+1271                 RAL  SWDOB  SUBF1                   0980    65  1333  0768
+1272        TR  D    NZU  SUBK1  ZT5                     0758    44  1104  0762
+1273        ZT5      RAU  TEMPH                          0762    60  0215  1476
+1274                 STL  TEMPH                          1476    20  0215  0968
+1275                 LDD  TR  F  SUBJ                    0968    69  1526  1250
+1276        TR  F    STL  P0002               PUNCH 2    1526    20  1978  1432
+1277                 LDD  SWDOD             STLP0004TR   1432    69  1486  0890
+1278                 STD  SW 59                          0890    24  0060  0963
+1279                 RAL  SWDOC  SUBF1                   0963    65  1366  0768
+1280        TR  G    NZU  SUBK2  ZT7                     0808    44  1254  0812
+1281        ZT7      RAL  TEMPH                          0812    65  0215  1576
+1282                 STL  TEST                TEST B     1576    20  1417  1726
+1283                 STU  TEMPH  TX  E                   1726    21  0215  1018
+1284        TX  E    SLT   0002             TO HIGH      1018    35  0002  1776
+1285                 NZU         TX  E       ORDER       1776    44  1030  1018
+1286                 SUP  ZEROL                          1030    11  0686  0941
+1287                 BMI  NZT9                           0941    46  1294  1145
+1288                 RAL  TEST   SW 59                   1145    65  1417  0060
+1289        NZT9     RAU  TEST                           1294    60  1417  1876
+1290                 LDD  SW 59  SUBJ                    1876    69  0060  1250
+1291        TR  H    STU  P0006                          0858    21  1982  1536
+1292                 PCH   1977             PCH CARD 0   1536    71  1977  1378
+1293                 STU  P0001             ZERO PUNCH   1378    21  1977  1080
+1294                 STU  P0002             WORDS FOR    1080    21  1978  1482
+1295                 STD  P0004                          1482    24  1980  1383
+1296                 LDD  SWDOE  TR QO                   1383    69  1586  0940
+1297        TR  I    LDD  SWDOF  TR QO                   0908    69  1311  0940
+1298        TR QO    STD  SW 59  SUB F                   0940    24  0060  1078
+1299        TR  K    LDD  LTR F             F IN WORD    0958    69  0154  1058
+1300                 STD  P0006  PUNCH        SIX        1058    24  1982  0499
+1301        TR  J    NZE  ZT7                T STORE M   1108    45  0812  1013
+1302                 LDD  SWDOG             STLP0004TR   1013    69  1416  1976
+1303                 STD  SW 59                          1976    24  0060  1063
+1304                 LDD  AONE              0000 0  91   1063    69  1466  1428
+1305                 STD  P0002  ZT7        ONE FOR H3   1428    24  1978  0812
+1306        CN B4    RAL  P0004  TR  J      LAST         0840    65  1980  1108
+1307        SWDOB    SUP  EQUAL  TR  D      NEXT B       1333    11  0184  0758
+1308        SWDOC    SUP  COMMA  TR  G      NEXT C       1366    11  0259  0808
+1309        SWDOD    STL  P0004  TR  H      SWDO2  1     1486    20  1980  0858
+1310        SWDOE    STL  P0004  TR  I      SWDO2  2     1586    20  1980  0908
+1311        SWDOF    STL  P0002  TR  K      SWDO2  3     1311    20  1978  0958
+1312        SWDOG    STL  P0004  TR  K      SWDO2  4     1416    20  1980  0958
+1313         1826    RAU  CNIF6             IF STATMNT   1826    60  1130  1736
+1314                 LDD  TRAEA  SUBJ                    1736    69  0990  1250
+1315        TRAEA    STL  TEMPG  FLO                     0990    20  1195  1252
+1316        IN10     LDD  LTR F                          1385    69  0154  1258
+1317                 STD  P0006                          1258    24  1982  1786
+1318                 STL  SW 59                          1786    20  0060  1113
+1319                 RAL  SW AA                          1113    65  1566  1478
+1320                 LDD  ZT 95  TR UI                   1478    69  1532  1836
+1321        TR DM    NZU  SUBK2  ZT 95                   1308    44  1254  1532
+1322        ZT 95    RAL  TEMPH                          1532    65  0215  1528
+1323                 STU  TEMPH                          1528    21  0215  1068
+1324                 SRT   0002                          1068    30  0002  1578
+1325                 ALO  LTR G                          1578    15  1582  1437
+1326                 STL  P0001  SW 59                   1437    20  1977  0060
+1327        SW AB    LDD  ZROJO                          0580    69  1433  1886
+1328                 STD  P0003                          1886    24  1979  1732
+1329                 LDD  IF                             1732    69  1936  1040
+1330                 STD  P0002                          1040    24  1978  1782
+1331                 STU  P0009                          1782    21  1985  0488
+1332                 RAL  LTR V                          0488    65  0991  1245
+1333                 AUP  TEMPG                          1245    10  1195  0699
+1334                 LDD         TRADP                   0699    69  1358  1361
+1335                 LDD  TEMPG                          1358    69  1195  0898
+1336                 STD  P0003                          0898    24  1979  1832
+1337                 RAL  LTR U                          1832    65  1487  1041
+1338                 AUP  ZROJO                          1041    10  1433  1537
+1339                 LDD  SW AD  TRADP                   1537    69  1090  1361
+1340        TRADP    STD  SW 59                          1361    24  0060  1213
+1341                 STL  P0004                          1213    20  1980  1483
+1342                 STU  P0005  PCH B                   1483    21  1981  1404
+1343        TR DS    STD  P0004  PUNCH                   1408    24  1980  0499
+1344        SW AA    SUP  COMMA  TR DM      IF           1566    11  0259  1308
+1345        SW AD    LDD  LTR V  TR DS      IF           1090    69  0991  1408
+1346         1825    STU  IAW               GO TO        1825    21  1180  1533
+1347                 LDD         TR BD                   1533    69  1587  0830
+1348                 SLT   0004                          1587    35  0004  1497
+1349                 ALO  CN A7                          1497    15  1458  1263
+1350                 LDD         SUBF2                   1263    69  1716  1054
+1351                 RAL  TEMPH  IN5                     1716    65  0215  1728
+1352        CN A7    SUP  PARNL                          1458    11  0204  1309
+1353                 NZU  SUBK1  IN7                     1309    44  1104  1464
+1354        IN5      SRT   0002                          1728    30  0002  1737
+1355                 ALO  LTR G  PCH C                   1737    15  1582  1354
+1356        IN7      RAL  CN F2                          1464    65  1118  1778
+1357                 LDD  CNAF1  TR UI                   1778    69  1882  1836
+1358        TR UI    STD  LAST   SUBF1                   1836    24  0461  0768
+1359        TR  S    NZU         TR  U                   1558    44  1411  0862
+1360                 SUP  PARNR                          1411    11  0276  1932
+1361                 NZU  SUBK2  TR  U                   1932    44  1254  0862
+1362        TR  U    RAL  TEMPH                          0862    65  0215  1878
+1363                 STU  TEMPH             ZERO TEMPH   1878    21  0215  1218
+1364                 NZE  LOOPR  SUB F                   1218    45  1230  1078
+1365        LOOPR    AUP  IAW                            1230    10  1180  1787
+1366                 SUP  CNAKB                          1787    11  1140  1295
+1367                 NZU         STP N                   1295    44  0749  0834
+1368                 AUP  CNAIB                          0749    10  0748  1708
+1369                 STU  IAW                            1708    21  1180  1583
+1370                 AUP  CN F5   8003      STL1149SUB   1583    10  1837  8003
+1371        CN F5    STL   1989  SUB F      COMPUTED     1837    20  1989  1078
+1372        TR  X    STD  P0002                          1758    24  1978  1733
+1373                 LDD  LTR U                          1733    69  1487  1190
+1374                 STD  P0004                          1190    24  1980  1783
+1375                 RAU  TEMPH                          1783    60  0215  1280
+1376                 LDD  TR  Y  SUBJ                    1280    69  1833  1250
+1377        TR  Y    STL  P0003                          1833    20  1979  1883
+1378                 RAL  IAW    TRGOG                   1883    65  1180  1887
+1379        LOOPT    NZE         PUNCH                   1808    45  0912  0499
+1380                 PCH   1977                          0912    71  1977  1330
+1381                 STU  P0009                          1330    21  1985  0538
+1382                 STL  IAW    TRGOG                   0538    20  1180  1887
+1383        TRGOG    LDD         SUBE1                   1887    69  1240  0613
+1384                 STL  P0005                          1240    20  1981  1034
+1385                 RAL  IAW                            1034    65  1180  1937
+1386                 ALO  CN F6   8002      LDD1149SUB   1937    15  1290  8002
+1387        CN F6    RAL   1989  TR  Z      COMPUTED G   1290    65  1989  1793
+1388        TR  Z    SRT   0002                          1793    30  0002  0799
+1389                 ALO  LTR G                          0799    15  1582  1987
+1390                 STL  P0001                          1987    20  1977  1380
+1391                 RAL  IAW                            1380    65  1180  0588
+1392                 SLO  ONE    LOOPT                   0588    16  0066  1808
+1393        CNAF1    LDD  IF     TR  X      COMPUTED G   1882    69  1936  1758
+1394        CN F2    SUP  PARNR  TR  S      COMPUTED G   1118    11  0276  1558
+1395   1                                                                       
+1396   1                 CHANGES FOR PUNCH ROUTINE                              
+1397         1828    RAL  NNAL1              SET SW 50   1828    65  0148  1858
+1398                 ALO  ONE               NXTWD AND    1858    15  0066  1430
+1399                 AUP  SWBA2             1991 FOR     1430    10  1933  0638
+1400                 LDD         TM RA      PROCESSING   0638    69  1091  1344
+1401                 RAL  IAC               PUNCH        1091    65  0003  1359
+1402                 SLO  ONE               STATEMENTS   1359    16  0066  1480
+1403                 STL  IAC    ARITH                   1480    20  0003  0199
+1404        SWBA2    SUP  COMMA              BYPASS      1933    11  0259  1313
+1405                 NZU  TR HB             N COMMA      1313    44  1415  1268
+1406                 LDD  TJ10A             AND RESET    1268    69  1300  1409
+1407                 STD  TJ 10             SW 50 TO     1409    24  0028  1084
+1408                 LDD  SWBA3             PROCESS      1084    69  0688  1141
+1409                 STD  SW BA  TR LI      STATEMENT    1141    24  0116  0388
+1410        SWBA3    NZU         TX DH       IF PARNL    0688    44  1191  0411
+1411                 SUP  PARNL             WANT ELEM    1191    11  0204  1459
+1412                 NZU         TJ 5       OF ARRAY     1459    44  1363  1564
+1413                 AUP  ONE 1              IF COMMA    1363    10  0084  1340
+1414                 NZU         TJ 3       VAR ASMBLD   1340    44  1843  1394
+1415                 AUP  COMMA  TR HA      TO PROCESS   1843    10  0259  1339
+1416        TJ 3     RAU  TEMAB                          1394    60  0212  1318
+1417                 NZU         TR HB                   1318    44  1530  1415
+1418                 LDD  STRUP  SUBJ                    1530    69  1134  1250
+1419        STRUP    STU  TEMAC              PRECEDE     1134    21  0167  1580
+1420                 SUP   8001             VAR LOC      1580    11  8001  0738
+1421                 SLT   0002             NUMBER BY    0738    35  0002  1345
+1422                 SUP   8003             T FOR READ   1345    11  8003  1559
+1423                 SRT   0002             AND PUNCH    1559    30  0002  1766
+1424                 ALO  LTR T             STATEMENTS   1766    15  0480  0788
+1425                 LDD  OUT21  TR KK                   0788    69  1241  0491
+1426        OUT21    RAU  TEMAC              IF WHOLE    1241    60  0167  1730
+1427                 NZU  OUT22  TR HB      ARRAY        1730    44  1184  1415
+1428        OUT22    RAU  PRODT             SPECIFIED    1184    60  0541  1395
+1429                 LDD         SUBE       BY PUNCH     1395    69  0948  1251
+1430                 LDD  OUT23             STATEMENT    0948    69  1709  0962
+1431                 STD  OUTP   TR JO      PROCESS IJ   0962    24  0267  0497
+1432        OUT23    RAU  TEMAC             PRODUCT      1709    60  0167  1780
+1433                 SRT   0004             FOLLOWED     1780    30  0004  1291
+1434                 SUP   8003             BY BASE      1291    11  8003  0849
+1435                 AUP  NINE                           0849    10  0222  1880
+1436                 SLT   0004                          1880    35  0004  1341
+1437                 LDD         SUBE                    1341    69  1444  1251
+1438                 SLT   0002                          1444    35  0002  1759
+1439                 STL  TEMAB  TR JP                   1759    20  0212  1865
+1440        TJ 5     LDD  NZU2B                          1564    69  1368  1234
+1441                 STD  NZU2   TX DE                   1234    24  0040  0266
+1442        NZU2B    STU  TEMAC  TJ 5A       RRECD LOC   1368    21  0167  1120
+1443        TJ 5A    RAL  LTR T             NUM BY T     1120    65  0480  0838
+1444                 STL  TEMAB  TJ 8                    0838    20  0212  1220
+1445   1                                                                       
+1446   1                  CHANGES FOR READ STATEMENTS                            
+1447         1829    RAL  NNAL1              SET SW 50   1829    65  0148  1809
+1448                 AUP  SWBA2             NXTWD AND    1809    10  1933  0888
+1449                 LDD         TM RA      1991 FOR     0888    69  1391  1344
+1450                 RAU   1900             READ STATE   1391    60  1900  1859
+1451                 SRT   0002             MENTS        1859    30  0002  1816
+1452                 STL   1900              BYBASS WD   1816    20  1900  0410
+1453                 RAU  TR RD             READ         0410    60  1413  1418
+1454                 ALO  LTRDF              STORE DF    1418    15  1284  1390
+1455                 LDD  TJBSW  SUB X                   1390    69  1050  0049
+1456        TR RD    RAL  ONE    RITH1                   1413    65  0066  0557
+1457        TM RA    STD  OUTE                           1344    24  0911  1714
+1458                 LDD  NINE                           1714    69  0222  1334
+1459                 STD   1991                          1334    24  1991  1494
+1460                 STU  SW BA                          1494    21  0116  1384
+1461                 STL  NN L1  OUTE                    1384    20  0304  0911
+1462        SUB X    STD  TJ SW                          0049    24  0937  1440
+1463                 STL  LAST    8003                   1440    20  0461  8003
+1464         1821    RAL  CCN01  PCH C      CONTINUE     1821    65  1434  1354
+1465         1830    RAL  LTRFF             END          1830    65  1484  1490
+1466                 LDD         TR UC                   1490    69  1893  0165
+1467                 STL  P0006                          1893    20  1982  0938
+1468                 PCH   1977  HEADR                   0938    71  1977  1554
+1469         1827    RAL  CST01  PCH C      OAUSE STOP   1827    65  1534  1354
+1470        ONE 1     00   0000   0001      ONE 1        0084    00  0000  0001
+1471        TWO 1     00   0000   0002                   0210    00  0000  0002
+1472        SEVEN     00   0000   0007                   0296    00  0000  0007
+1473        EIGHT     00   0000   0008                   0196    00  0000  0008
+1474        NINE      00   0000   0009      NINE IN 10   0222    00  0000  0009
+1475        CN A5     00   0000   0010      EQUL N COM   0257    00  0000  0010
+1476        DECPT     00   0000   0018      DECIMAL PT   0149    00  0000  0018
+1477        PARNR     00   0000   0019                   0276    00  0000  0019
+1478        PLUS      00   0000   0020      PLUS SIGN    0365    00  0000  0020
+1479        MULT      00   0000   0029      MILT SIGN    0419    00  0000  0029
+1480        MINUS     00   0000   0030      MINUS SIGN   0197    00  0000  0030
+1481        DIVID     00   0000   0031                   0247    00  0000  0031
+1482        COMMA     00   0000   0038                   0259    00  0000  0038
+1483        PARNL     00   0000   0039                   0204    00  0000  0039
+1484        EQUAL     00   0000   0048      EQUAL SIGN   0184    00  0000  0048
+1485        LTR A     00   0000   0061                   1871    00  0000  0061
+1486        LTR E     00   0000   0065                   0188    00  0000  0065
+1487        LTR F     00   0000   0066                   0154    00  0000  0066
+1488        LTRNI     00   0000   0069                   1393    00  0000  0069
+1489        LTR K     00   0000   0072                   0930    00  0000  0072
+1490        EGTON     00   0000   0081                   0460    00  0000  0081
+1491        LOW88     00   0000   0088                   1283    00  0000  0088
+1492        ZEROL     00   0000   0090      ALPHA O LO   0686    00  0000  0090
+1493        AONE      00   0000   0091      ALPHA ONE    1466    00  0000  0091
+1494        LTRFF     00   0000   6666                   1484    00  0000  6666
+1495        IF        00   0000   6966                   1936    00  0000  6966
+1496        ONE       00   0001   0000      ONE IN FIF   0066    00  0001  0000
+1497        TWO       00   0002   0000      TWO IN FIF   1211    00  0002  0000
+1498        THREE     00   0003   0000      THREE IN 5   1056    00  0003  0000
+1499        FOUR      00   0004   0000      FOUR IN 5T   0090    00  0004  0000
+1500        FIVE      00   0005   0000      FIVE IN 5T   0102    00  0005  0000
+1501        SIX       00   0006   0000                   0510    00  0006  0000
+1502        CNAKB     00   0010   0000                   1140    00  0010  0000
+1503        CNAIB     00   0011   0000                   0748    00  0011  0000
+1504        CNBKB     00   0025   0000                   0110    00  0025  0000
+1505        CNBIB     00   0026   0000                   0122    00  0026  0000
+1506        CNIF6     00   0091   6966                   1130    00  0091  6966
+1507        HNDRD     00   0100   0000      TABLE CNST   1874    00  0100  0000
+1508        LTR B     62   0000   0000                   0907    62  0000  0000
+1509        LTR D     64   0000   0000                   0747    64  0000  0000
+1510        LTRFH     66   0000   0000      F IN HOP     0240    66  0000  0000
+1511        LTR G     67   0000   0000                   1582    67  0000  0000
+1512        CST01     68   0000   0000      WORD HALT    1534    68  0000  0000
+1513        LTR I     69   0000   0000                   1264    69  0000  0000
+1514        LTR J     71   0000   0000                   1577    71  0000  0000
+1515        LTR L     73   0000   0000                   0979    73  0000  0000
+1516        LTR M     74   0000   0000                   0847    74  0000  0000
+1517        LTR P     77   0000   0000                   0532    77  0000  0000
+1518        LTR Q     78   0000   0000                   0828    78  0000  0000
+1519        LTR R     79   0000   0000                   1222    79  0000  0000
+1520        LTR S     82   0000   0000                   0797    82  0000  0000
+1521        LTR T     83   0000   0000                   0480    83  0000  0000
+1522        LTR U     84   0000   0000                   1487    84  0000  0000
+1523        LTR V     85   0000   0000                   0991    85  0000  0000
+1524        LTR X     87   0000   0000                   0795    87  0000  0000
+1525        LTR Y     88   0000   0000                   1114    88  0000  0000
+1526        LTR Z     89   0000   0000                   1135    89  0000  0000
+1527        LTRDF     00   0000   6466                   1284    00  0000  6466
+1528        LTRKH     72   0000   0000      K IN HOP     1272    72  0000  0000
+1529        AZERO     90   0000   0000                   0604    90  0000  0000
+1530        ZROB      90   6200   0000                   0957    90  6200  0000
+1531        CCN01     88   9189   8891      CONT CONST   1434    88  9189  8891
+1532        LMCOM     73   7400   0000                   0976    73  7400  0000
+1533        SLCOM     82   7300   0000                   1889    82  7300  0000
+1534        STOPA    HLT   0010  PACK       NZ PARN CO   0136    01  0010  0051
+1535        STOPB    HLT   0001  PACK       TLU ERROR    0245    01  0001  0051
+1536        STOPF    HLT   0400  PACK       NOT INTEGE   0944    01  0400  0051
+1537        STOPH    HLT   0020  PACK       PACK ERROR   0560    01  0020  0051
+1538        STP N    HLT   0002  PACK       TABLE OVFL   0834    01  0002  0051
+1539        STP R    HLT   0003  PACK                    0020    01  0003  0051
+1540        STOPM    HLT   0004  PACK       VARIABLE O   1227    01  0004  0051
+1541        STOPN    HLT   0300  PACK       TRANSLTN O   0542    01  0300  0051
+1542        STOPO    HLT   0100  PACK       SUBSCRPT O   0711    01  0100  0051
+1543         1171    HLT   0030  PACK       FUNCTION N   1171    01  0030  0051
+1544        STOPC    HLT   0005  PACK       SCAN OVRFL   0769    01  0005  0051
+1545        EGHTS     00   0800   8080                   0004    00  0800  8080
+1546        ZROJO     90   7190   0000      IF CONSTAN   1433    90  7190  0000
+1547   1                  PROCESS EQUIVALENCE STATEMENT                          
+1548         1824    RAL  IAC                INITIALZE   1824    65  0003  0610
+1549                 SLO  THREE             WORD COUNT   0610    16  1056  1461
+1550                 STL  IAFI              PARN COUNT   1461    20  0759  1012
+1551                 STU  TEMAA                          1012    21  0127  1584
+1552                 RAU   1902                          1584    60  1902  0660
+1553                 SLT   0002               IS CHARAC  0660    35  0002  1468
+1554                 ALO  EQSW1  SUBF3        IS CHARAC  1468    15  1734  1414
+1555        EQSW1    SUP  PARNL              LEFT PAREN  1734    11  0204  0710
+1556                 NZU         EQ1         COMMA OR    0710    44  1463  1764
+1557                 AUP  ONE 1              RGHT PAREN  1463    10  0084  1540
+1558                 NZU         EQ2          IF NO      1540    44  1943  1544
+1559                 AUP  PARNR              RESTOR VAR  1943    10  0276  1784
+1560                 NZU  SUBK1  EQ3                     1784    44  1104  0988
+1561        EQ1      RAL  TEMAA               YES LEFT   1764    65  0127  1834
+1562                 ALO  ONE                PAREN       1834    15  0066  1884
+1563                 STU  F1                  INCREMENT  1884    21  0373  1934
+1564                 STD  F3                 PARN COUNT  1934    24  0161  1814
+1565                 STD  TEMAB                          1814    24  0212  1866
+1566                 STD  F9                  INITIALZE  1866    24  0208  1561
+1567                 STL  TEMAA  SUB F       FOR NEW     1561    20  0127  1078
+1568   1                                     EQUIVL SET                        
+1569        EQ2      RAU  TEMAA               YES COMMA  1544    60  0127  1038
+1570                 NZU  EQ2A   EQOUT        PRNCT ZRO  1038    44  1441  0792
+1571        EQ2A     RAU  TEMPH              START NEW   1441    60  0215  1088
+1572                 STL  TEMPH              EQUIV SET   1088    20  0215  1568
+1573                 LDD  OUTEQ  SUBJ                    1568    69  1138  1250
+1574        OUTEQ    RAU   8003               NOT ZERO   1138    60  8003  1445
+1575                 SRT   0004              PROCES VAR  1445    30  0004  0760
+1576                 SUP   8003               IS BASE    0760    11  8003  1718
+1577                 SRT   0006              OF NEW VAR  1718    30  0006  1188
+1578                 STL  OUT Q               LESS THAN  1188    20  0931  1238
+1579                 AUP  F1                  BASE OF    1238    10  0373  1288
+1580                 NZU         EQ2AA        PREVIOUS   1288    44  1491  0842
+1581                 SUP   8002               VARIABLE   1491    11  8002  0899
+1582                 BMI  EQ2B   EQ2AA                   0899    46  0810  0842
+1583        EQ2AA    STL  F1     EQ2B        SAVE LOW    0842    20  0373  0810
+1584        EQ2B     RAL  PRODT             BASE         0810    65  0541  1495
+1585                 SLO  F3                 IS JI       1495    16  0161  1966
+1586                 BMI  EQ2C              PROD OF      1966    46  1338  1388
+1587                 ALO   8001             NEW VAR      1388    15  8001  1545
+1588                 STL  F3                GREATER      1545    20  0161  1864
+1589                 LDD  EQ2BA             THAN PROD    1864    69  1768  1438
+1590                 STD  EQSW2             OF PREVIOS   1438    24  1541  1594
+1591                 LDD  OUT Q             VARIABLE     1594    69  0931  1488
+1592                 STD  TEMAE  TREQ1       SAVE BSE    1488    24  0014  1818
+1593        TREQ1    RAU  F9                OF LRG ARY   1818    60  0208  1563
+1594                 SUP  FIVE                           1563    11  0102  0860
+1595                 NZU         STP N       SAVE LRGE   0860    44  1713  0834
+1596                 AUP  SIX               PRODUCT      1713    10  0510  1868
+1597                 STU  F9                 STORE       1868    21  0208  1711
+1598                 STD  F6                SUBSC TABL   1711    24  0467  1538
+1599                 ALO  SUBSC             LOCAT IN     1538    15  1962  1968
+1600                 AUP          8003      EQU BAR TA   1968    10  1588  8003
+1601                 STL   1449  EQSW2       HALT IF     1588    20  1449  1541
+1602        EQ2BA    ALO  EQ2B1             MORE         1768    15  1738  1744
+1603                 LDD  EQSW3  EQ2BB       THAN        1744    69  1547  0910
+1604        EQ2BB    STD  SW 50  EQ2BE       FIVE        0910    24  0476  1788
+1605        EQ2BE    LDD  EQ2B2  EQ2BC       VARIABLES   1788    69  1591  1794
+1606        EQ2BC    SDA  F8                IN EQU SET   1794    22  0052  0960
+1607                 STL  F7                             0960    20  0297  1060
+1608                 RSL  F1     F7          READ EQU    1060    66  0373  0297
+1609        EQ2B1    LDD   1499  F8         VAR TABLE    1738    69  1499  0052
+1610        EQ2B2    SIA   0000  EQ2BD      TO INSERT    1591    23  0000  1110
+1611        EQ2BD    RAU  F6                LOW BASE     1110    60  0467  1838
+1612                 SUP  ONE               IN 15XX      1838    11  0066  1888
+1613                 NZU         SUB F                   1888    44  1741  1078
+1614                 STU  F6                 IF IJ       1741    21  0467  1938
+1615                 AUP          8003      PRODT OF     1938    10  1791  8003
+1616                 RAL   1449  SW 50                   1791    65  1449  0476
+1617        EQSW3    ALO  EQ2B3  EQ2BE                   1547    15  1260  1788
+1618        EQ2B3    SUP   1499             EQUIV SET    1260    11  1499  1310
+1619                 BMI         EQ2BD      CHNGE 15XX   1310    46  1763  1110
+1620                 LDD   8003  F8         TO MINUS     1763    69  8003  0052
+1621        EQ2C     LDD  EQ2CA             IN SUBSC     1338    69  1841  1844
+1622                 STD  EQSW2  TREQ1      TABLE        1844    24  1541  1818
+1623        EQ2CA    ALO  EQ2B3                          1841    15  1260  1988
+1624                 LDD  EQSW4  EQ2BB                   1988    69  1891  0910
+1625        EQSW4    ALO  EQ2B1  EQ2BE                   1891    15  1738  1788
+1626        EQ3      RAL  TEMAA              YES RGHT    0988    65  0127  1590
+1627                 SLO  ONE               PAREN        1590    16  0066  1740
+1628                 STL  TEMAA              DECREMENT   1740    20  0127  1790
+1629                 LDD  EQOUT             PAREN        1790    69  0792  1595
+1630                 STD  LAST   EQ2A       COUNT        1595    24  0461  1441
+1631        EQOUT    RAL  EQ3A1  EQ3A        PREPAR TO   0792    65  1745  0949
+1632        EQ3A     SLO  EQ3A2             SCAN SUBSC   0949    16  1360  1840
+1633                 NZE         EQ3D       TABLE AND    1840    45  1894  1795
+1634                 ALO  EQ3B              ADJUST       1894    15  1597  1410
+1635                 LDD  EQ3C1             BASES        1410    69  1813  1890
+1636                 SDA  F4                             1890    22  0261  1964
+1637                 LDD  EQ3C2                          1964    69  1940  1944
+1638                 SDA  F5                             1944    22  1117  1941
+1639                 STL  TEMAC   8001                   1941    20  0167  8001
+1640        EQ3A1    RAL   1499  EQ3BA                   1745    65  1499  1460
+1641        EQ3A2    RAL   1519  EQ3BA                   1360    65  1519  1460
+1642        EQ3B     RAL   1520  EQ3BA                   1597    65  1520  1460
+1643        EQ3BA    BMI         EQ3BB                   1460    46  1863  0892
+1644                 LDD  SETM   STORM                   1863    69  0942  1845
+1645        EQ3BB    LDD  EQ3BC  STORM                   0892    69  1895  1845
+1646        STORM    STD  SWCHM              COMPARE     1845    24  0998  1560
+1647                 RSM   8002             BASE OF      1560    68  8002  0992
+1648                 SLT   0006             15XX WITH    0992    35  0006  1710
+1649                 STU  OUTP              BSE OF EQV   1710    21  0267  1042
+1650                 SUP   8003             SET          1042    11  8003  0999
+1651                 SLT   0004              IF LESS     0999    35  0004  1760
+1652                 AUP  F1                CONTINUE     1760    10  0373  1092
+1653                 BMI  EQ3C              SCAN         1092    46  1945  0646
+1654                 NZU  EQ3BC  SWCHM       IF EQUAL    0646    44  1895  0998
+1655        EQ3BC    RAL  TEMAC  EQ3A       ADJUST LOC   1895    65  0167  0949
+1656        SETM     RAM  OUTP              COUNT        0942    67  0267  1142
+1657                 SLT   0004              IF GRTER    1142    35  0004  1810
+1658                 LDD  EQ3BD             COMPARE      1810    69  1963  1192
+1659                 STD  J106   J104       WITH ORIG    1192    24  1785  0754
+1660        EQ3BD    ALO  TEMAB             BSE OF       1963    15  0212  1242
+1661                 LDD  J106A             LRGST ARAY   1242    69  0854  1860
+1662                 STD  J106               DECREASE    1860    24  1785  1292
+1663                 STL  TEMAB  EQ3BC      OR INCRESE   1292    20  0212  1895
+1664        EQ3C     SUP   8001             BASE OF      1945    11  8001  1761
+1665                 AUP  TEMAE             15XX AS      1761    10  0014  1342
+1666                 BMI  EQ3CB             NEEDED       1342    46  0696  0746
+1667                 SUP   8001                          0746    11  8001  1811
+1668                 RAM   8003                          1811    67  8003  1392
+1669                 ALO  F3     EQ3CA                   1392    15  0161  1442
+1670        EQ3CA    SLO  TEMAB  F4                      1442    16  0212  0261
+1671        EQ3C1    LDD   0000  F5                      1813    69  0000  1117
+1672        EQ3C2    SIA   0000  EQ3BC                   1940    23  0000  1895
+1673        EQ3CB    SUP   8001                          0696    11  8001  1861
+1674                 RAM   8003  EQ3CA                   1861    67  8003  1442
+1675        EQ3D     LDD  PACK                           1795    69  0051  1062
+1676                 STD  LAST   SUB F                   1062    24  0461  1078
+1677                 PAT                                                       
+1678   1
+   1                 EQU  MINUS   0167                                         
+   2                 EQU  SWPKA   0098                                         
+   3                 EQU  READ    0050                                         
+   4                 EQU  PACKA   0088                                         
+   5   1                   PACK                                                 
+   6   1                  FOR TRANSIT I S AND II S                              
+   7                 BLA   1000   1010                                         
+   8                 REG  R1951   1960                                         
+   9        PACKA    RAL  R0001                          0088    65  1951  1005
+  10                 NZE         ZTPK1                   1005    45  1008  1009
+  11                 SLT   0002                          1008    35  0002  1492
+  12                 STL  R0001                          1492    20  1951  1004
+  13                 RAL   8003                          1004    65  8003  1112
+  14                 NZE  SWPKT  PACKA                   1112    45  1542  0088
+  15        ZTPK1    RAL  R0002                          1009    65  1952  1007
+  16                 NZE         ZTPK2                   1007    45  1010  1212
+  17                 SLT   0002                          1010    35  0002  1592
+  18                 STL  R0002                          1592    20  1952  1006
+  19                 RAL   8003                          1006    65  8003  1742
+  20                 NZE  SWPKT  ZTPK1                   1742    45  1542  1009
+  21        ZTPK2    RAL  R0003                          1212    65  1953  1262
+  22                 NZE         ZTPK3                   1262    45  1792  1842
+  23                 SLT   0002                          1792    35  0002  1049
+  24                 STL  R0003                          1049    20  1953  1312
+  25                 RAL   8003                          1312    65  8003  1892
+  26                 NZE  SWPKT  ZTPK2                   1892    45  1542  1212
+  27        ZTPK3    RAL  R0004                          1842    65  1954  1362
+  28                 NZE         ZTPK4                   1362    45  1942  0796
+  29                 SLT   0002                          1942    35  0002  1099
+  30                 STL  R0004                          1099    20  1954  1412
+  31                 RAL   8003                          1412    65  8003  0846
+  32                 NZE  SWPKT  ZTPK3                   0846    45  1542  1842
+  33        ZTPK4    RAL  R0005                          0796    65  1955  1462
+  34                 NZE         ZTPK5                   1462    45  0896  0946
+  35                 SLT   0002                          0896    35  0002  1003
+  36                 STL  R0005                          1003    20  1955  1562
+  37                 RAL   8003                          1562    65  8003  0996
+  38                 NZE  SWPKT  ZTPK4                   0996    45  1542  0796
+  39        ZTPK5    RAL  R0006                          0946    65  1956  1712
+  40                 NZE         READ                    1712    45  1046  0050
+  41                 SLT   0002                          1046    35  0002  1762
+  42                 STL  R0006                          1762    20  1956  1812
+  43                 RAL   8003                          1812    65  8003  1096
+  44                 NZE  SWPKT  ZTPK5                   1096    45  1542  0946
+  45        SWPKT    SLO  I49                            1542    16  1146  1001
+  46                 NZE  NZK1                           1001    45  1862  1196
+  47                 RAL  MINUS  SWPKA                   1196    65  0197  0098
+  48        NZK1     ALO   8001  SWPKA                   1862    15  8001  0098
+  49        I49       00   0000   0049                   1146    00  0000  0049
+  50                 PAT                                                                      
+  51                 PST                                                                       
