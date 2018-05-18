@@ -169,8 +169,8 @@ struct tmln {
     uint32              rxpbsize;                       /* rcv packet buffer size */
     uint32              rxpboffset;                     /* rcv packet buffer offset */
     uint32              rxbps;                          /* rcv bps speed (0 - unlimited) */
-    double              rxbpsfactor;                    /* receive speed factor (scaled to usecs) */
-#define TMXR_RX_BPS_UNIT_SCALE 1000000.0
+    double              bpsfactor;                      /* receive speed factor (scaled to usecs) */
+#define TMXR_BPS_UNIT_SCALE 1000000.0
     uint32              rxdelta;                        /* rcv inter character min time (usecs) */
     double              rxnexttime;                     /* min time for next receive character */
     uint32              txbps;                          /* xmt bps speed (0 - unlimited) */
