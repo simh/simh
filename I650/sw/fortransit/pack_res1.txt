@@ -1,0 +1,21 @@
+                                        1 
+                                        1 fortran 
+                                        1 package reservation
+                                        1 for package build 
+                                        1 
+                                        1 includes 
+                                        1 - float fix conversions
+                                        1 - fortran read punch statemens
+                                        1 - fortran power operator
+                                        1 - fortran functions
+                                        1 excludes
+                                        1 - nothing
+                                        1 
+                                               regy0002  0002 fortransit 
+                                        1                     vars start addr
+                                               blr 0000  1400 reserve all 
+                                        1                     drum except 
+                                        1                     pack space
+                                        1                                
+                                        1 end of package reservation 
+                                        1                                 

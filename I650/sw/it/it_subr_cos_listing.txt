@@ -1,12 +1,12 @@
            5                 SUBROUTINE 21  COSINE                                     
-               E00AV    STO  ARTHX           BEGIN CISINE                               
+               E00AV    STD  ARTHX           BEGIN COSINE                               
                         SLT   0008             ARGUMENT                                 
                         STU  ARTHF           ALARM IF PWR                               
                         RSM   8002             OVERSCALE                                
                         ALO  AV1             COSX EQUALS                                
                         BMI  AV2              ONE IF PWR                                
                         SLO  AV3              UNDERSCALE                                            
-                        BMI        AV4                                                   
+                        BMI         AV4                                                   
                         SRT   0004                                                       
                         ALO  AV5                                                         
                         STL  AV6                                                         
@@ -22,13 +22,13 @@
                         ALO  AV9                PART                                    
                         RAU   8002                                                       
                         STU  ARTHF                                                       
-                        MPY   8001            FORM SINE                                 
+                        MPY   8001           FORM SINE                                 
                         STU  ARTHG                                                       
                         RAU  AV16             POLYNOMIAL                                
                         MPY  ARTHG           APPROXIMATOR                               
                         RAU   8003                                                       
                         AUP  AV15                                                        
-                        MPY  AR7HG                                                       
+                        MPY  ARTHG                                                       
                         RAU   8003                                                       
                         AUP  AV14                                                        
                         MPY  ARTHG                                                       
@@ -37,27 +37,27 @@
                         MPY  ARTHG                                                       
                         SRT   0001                                                       
                         RAU   8003                                                       
-                        AUP  AV12             EQUALS ONE                                 
+                        AUP  AV12            EQUALS ONE                                 
                         MPY  ARTHF                                                       
                         SCT   0000                                                       
                         BOV  AV19                                                        
-                        STL  AR7HF                                                       
-                        RAL   8003            ROUND                                      
-                        SRT   0002            AND                                        
-                        STL  ARTHG            ADJUST                                     
-                        RSU  ARTHF             POWER                                     
+                        STL  ARTHF                                                       
+                        RAL   8003           ROUND                                      
+                        SRT   0002           AND                                        
+                        STL  ARTHG           ADJUST                                     
+                        RSU  ARTHF            POWER                                     
                         SRT   0002                                                       
-                        BMI        AV25                                                  
+                        BMI         AV25                                                  
                         SUP   8003                                                       
-                        ALO  AV8   AV24                                                  
+                        ALO  AV8    AV24                                                  
                AV24     AUP  ARTHG                                                       
-                        SLT   0002 AV22                                                  
+                        SLT   0002  AV22                                                  
                AV22     STU  ARTHF           DETERMINE                                   
                         RAU  ARTHE            SIGN OF                                    
-                        NZU          AV20       RESULT                                   
-               AV20     RSL  ARTHF   ARTHX                                               
-               AV25     RAL  ARTHF   ARTHX                                               
-                        SUP   8003                                                       
+                        NZU         AV20       RESULT                                   
+                        RSL  ARTHF  ARTHX                                               
+               AV20     RAL  ARTHF  ARTHX                                               
+               AV25     SUP   8003                                                       
                         SLO  AV8    AV24                                                   
                AV2      RAL  ARTHE           OVERSCALE                                     
                         LDD  ARTHX   3211      DISPLAY                                     

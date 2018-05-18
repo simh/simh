@@ -1,0 +1,71 @@
+   1   1
+   2   1 ADD FUNCTION TITLE ROUTINE
+   3   1 TEMPORALY STORED IN JI TABLE
+   4   1
+   5   1 MISSING FROM ORIGINAL LISTING
+   6   1 REWRITTEN BY ROBERTO SANCHO
+   7   1 IN MAY 2018
+   8   1
+   9              BLR    0000    1999
+  10   1
+  11             BLA    1500    1519
+  12             REG   R1951    1960      READ BAND
+  13             EQU   ONE      0066
+  14             EQU   CNAKB    1140
+  15             EQU   RESET    0228
+  16   1
+  17             EQU   FSTP6    1000
+  18             EQU   FSTP7    1002
+  19             EQU   FNNUM    1160
+  20   1
+  21             SYN   ADDFN    1500      ENTRY PT
+  22   1
+  23    ADDFN    RAL   FNNUM              IF NO FN      1500    65  1160  1515
+  24             NZE           FNL1        GO FNL1      1515    45  1518  1519
+  25             SLO   CNAKB              HLT 6 IF      1518    16  1140  1501
+  26             BMI           FSTP6       10 FN DEF    1501    46  1504  1000
+  27             RAL   FNNUM              HLT 7 IF      1504    65  1160  1516
+  28             ALO            8002       NOT IN       1516    15  1502  8002
+  29             RAU    1149               ALPHABTIC    1502    60  1149  1503
+  30             SUP   R0002               ORDER        1503    11  1952  1507
+  31             BMI   FNL1    FSTP7                    1507    46  1519  1002
+  32    FNL1     RAL   FNNUM                            1519    65  1160  1517
+  33             AUP   R0002              STORE         1517    10  1952  1508
+  34             ALO            8002       FORT FN      1508    15  1511  8002
+  35             STU    1150               NAME         1511    21  1150  1505
+  36             RAL   FNNUM              INCR NUM      1505    65  1160  1506
+  37             ALO   ONE                 OF DEFND     1506    15  0066  1509
+  38             STL   FNNUM               FUNCTS       1509    20  1160  1513
+  39             AUP   R0003              STORE         1513    10  1953  1510
+  40             ALO            8002       IT FN        1510    15  1514  8002
+  41             STU    1160   FNL2        NAME         1514    21  1160  1512
+  42    FNL2     RD1    1951   RESET      CONTINUE      1512    70  1951  0228
+  43   1
+  44    FSTP6    HLT    0006    FNL2                    1000    01  0006  9999
+  45    FSTP7    HLT    0007    FNL2                    1002    01  0007  9999
+  46    FNNUM     00    0000    0000                    1160    00  0000  0000
+  47   1
+  48   1 LOAD FORTRAN FUNCTIONS IN TABLE
+  49   1
+  50     1150    ALF     LNF              FORTRAN
+  51     1151    ALF    ABSF              FUNC NAMES
+  52     1152    ALF    COSF              IN ASCENDING
+  53     1153    ALF    EXPF              ORDER
+  54     1154    ALF    INTF
+  55     1155    ALF    LOGF              RIGHT JUSTIFIED
+  56     1156    ALF    MAXF
+  57     1157    ALF    SINF
+  58     1158    ALF   EXPNF
+  59     1159    ALF   SQRTF
+  60   1
+  61     1161    ALF   300EK              CORRESPONDING IT
+  62     1162    ALF   24EK               FUNC NAMES
+  63     1163    ALF   21EK               LEFT JUSTIFIED
+  64     1164    ALF   2EK
+  65     1165    ALF   25EK
+  66     1166    ALF   1EK
+  67     1167    ALF   26EK
+  68     1168    ALF   22EK
+  69     1169    ALF   301EK 
+  70     1170    ALF   23EK 
+  71   1

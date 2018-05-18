@@ -1,0 +1,44 @@
+                                        1
+                                        1 fortran package missing 
+                                        1 from original listing
+                                        1 rewritten by roberto sancho
+                                        1 in may 2018
+                                        1
+                                        1 fortran package
+                                        1 entry points
+                                        1
+                                               synlaaaa  1999 initial locn                                        
+                                               synacc    0000 reserve acc                                    
+                                        1
+                                        1 built-in subroutines (180 words)
+                                        1
+                                               syne00aa  1961 check overlow                  (0)
+                                               syne00th  1962 float (u) to fix (l)           (501)                                     
+                                               syne00ae  1963 fix (l) to float (u)           (4) 
+                                               syne00af  1964 fix (l) to float (u) and (acc) (5)                                 
+                                               syne00aq  1965 read entry                     (16)                                 
+                                               syne00ar  1966 punch entry                    (17)  
+                                               synezzza  1967 save index reg                                
+                                               synezzzb  1968 restore index reg                
+                                        1
+                                        1 power subroutines
+                                        1
+                                               syne00ak  1949 fix (l) ** fix (acc) to float (u) and (acc) (10)
+                                               syne00al  1948 float (u) ** fix (acc) to float (u) and (acc) (11)
+                                               syne00lq  1947 float (u) ** float (acc) to float (u) and (acc) (302)
+                                        1
+                                        1 function subroutines 
+                                        1
+                                               syne00ab  1969 logf  (1)
+                                               syne00ac  1970 expf  (2) 
+                                               syne00lo  1971 lnf   (300)
+                                               syne00lp  1972 expnf (301)                  
+                                               syne00av  1973 cosf  (21)
+                                               syne00aw  1974 sinf  (22)
+                                               syne00ax  1975 sqrtf (23)
+                                               syne00ay  1976 absf  (24)
+                                               syne00az  1945 intf  (25)
+                                               syne00ba  1946 maxf  (26)
+                                        1                                   
+                                        1 end of fortran package entry points 
+                                        1                                   

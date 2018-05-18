@@ -1,0 +1,12 @@
+c     rectangular  matrix 
+c       multiplication
+      dimension a(4,5), b(5,3)
+      read 1,a,b
+      read 1,n,m,l
+    7 do 4 j=1,n
+    1 do 4 i=1,m
+    6 sum=0.0
+    2 do 3 k=1,l
+    3 sum = sum+a(i,k) * b(k,j)
+    4 punch 1, sum, i,j
+    8 end

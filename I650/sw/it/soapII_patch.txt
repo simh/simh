@@ -1,6 +1,7 @@
 
 ; These are the patches needed to make
 ; SOAP II to run with IT
+; (patches on original listing are for SOAP I)
 
 ; free address 1993, using 1945 instead
 dep 0954 65 1986 1945
