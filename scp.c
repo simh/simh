@@ -248,6 +248,9 @@
 #ifndef MAX
 #define MAX(a,b)  (((a) >= (b)) ? (a) : (b))
 #endif
+#ifndef MIN
+#define MIN(a,b)  (((a) <= (b)) ? (a) : (b))
+#endif
 
 /* search logical and boolean ops */
 
@@ -5795,30 +5798,27 @@ WIN32_FIND_DATAA File;
 struct stat filestat;
 char WildName[PATH_MAX + 1];
 
-if ((!stat (cptr, &filestat)) && (filestat.st_mode & S_IFDIR)) {
-    sprintf (WildName, "%s%c*", cptr, strchr (cptr, '/') ? '/' : '\\');
-    cptr = WildName;
-    }
+strlcpy (WildName, cptr, sizeof(WildName));
+cptr = WildName;
+sim_trim_endspc (WildName);
 if ((hFind =  FindFirstFileA (cptr, &File)) != INVALID_HANDLE_VALUE) {
     t_int64 FileSize;
     char DirName[PATH_MAX + 1], FileName[PATH_MAX + 1];
-    const char *c;
-    char pathsep = '/';
+    char *c;
+    const char *backslash = strchr (cptr, '\\');
+    const char *slash = strchr (cptr, '/');
+    const char *pathsep = (backslash && slash) ? MIN (backslash, slash) : (backslash ? backslash : slash);
 
     GetFullPathNameA(cptr, sizeof(DirName), DirName, (char **)&c);
-    c = strrchr(DirName, pathsep);
-    if (NULL == c) {
-        pathsep = '\\';
-        c = strrchr(cptr, pathsep);
+    c = strrchr (DirName, '\\');
+    *c = '\0';                                  /* Truncate to just directory path */
+    if (!pathsep || (!strcmp (slash, "/*")))    /* Separator wasn't mentioned? */
+        pathsep = "\\";                         /* Default to Windows backslash */
+    if (*pathsep == '/') {                      /* If slash separator? */
+        while ((c = strchr (DirName, '\\')))
+            *c = '/';                           /* Convert backslash to slash */
         }
-    if (c) {
-        memcpy(DirName, cptr, c - cptr);
-        DirName[c - cptr] = '\0';
-        }
-    else {
-        getcwd(DirName, PATH_MAX);
-        }
-    sprintf (&DirName[strlen (DirName)], "%c", pathsep);
+    sprintf (&DirName[strlen (DirName)], "%c", *pathsep);
     do {
         FileSize = (((t_int64)(File.nFileSizeHigh)) << 32) | File.nFileSizeLow;
         sprintf (FileName, "%s%s", DirName, File.cFileName);
@@ -5859,8 +5859,6 @@ memset (WholeName, 0, sizeof(WholeName));
 strlcpy (WildName, cptr, sizeof(WildName));
 cptr = WildName;
 sim_trim_endspc (WildName);
-if ((!stat (WildName, &filestat)) && (filestat.st_mode & S_IFDIR))
-    strlcat (WildName, "/*", sizeof (WildName));
 if ((*cptr != '/') || (0 == memcmp (cptr, "./", 2)) || (0 == memcmp (cptr, "../", 3))) {
 #if defined (VMS)
     getcwd (WholeName, sizeof (WholeName)-1, 0);
@@ -6017,16 +6015,27 @@ sim_printf (" %s\n", filename);
 t_stat dir_cmd (int32 flg, CONST char *cptr)
 {
 DIR_CTX dir_state;
-t_stat stat;
+t_stat r;
+char WildName[PATH_MAX + 1];
+
 
 memset (&dir_state, 0, sizeof (dir_state));
+strlcpy (WildName, cptr, sizeof(WildName));
+cptr = WildName;
+sim_trim_endspc (WildName);
 if (*cptr == '\0')
     cptr = "./*";
-stat = sim_dir_scan (cptr, sim_dir_entry, &dir_state);
+else {
+    struct stat filestat;
+
+    if ((!stat (WildName, &filestat)) && (filestat.st_mode & S_IFDIR))
+        strlcat (WildName, "/*", sizeof (WildName));
+    }
+r = sim_dir_scan (cptr, sim_dir_entry, &dir_state);
 sim_dir_entry (NULL, NULL, 0, NULL, &dir_state);    /* output summary */
-if (stat != SCPE_OK)
+if (r != SCPE_OK)
     return sim_messagef (SCPE_ARG, "File Not Found\n");
-return stat;
+return r;
 }
 
 
