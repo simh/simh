@@ -492,6 +492,9 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       OS_CURSES_DEFS += -DHAVE_NCURSES -lncurses
     endif
   endif
+  ifneq (,$(call find_include,semaphore))
+    OS_CCDEFS += -DHAVE_SEMAPHORE
+  endif
   ifneq (,$(call find_include,dlfcn))
     ifneq (,$(call find_lib,dl))
       OS_CCDEFS += -DHAVE_DLOPEN=$(LIBEXT)
