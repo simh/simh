@@ -56,11 +56,6 @@
 #include "sim_tmxr.h"
 #include <time.h>
 #include <assert.h>
-#if UNIX_PLATFORM
-#include <glob.h>
-#elif defined (_WIN32)
-#include <windows.h>
-#endif
 
 uint8 *URLContents(const char *URL, uint32 *length);
 #ifndef URL_READER_SUPPORT
@@ -123,7 +118,8 @@ uint8 *URLContents(const char *URL, uint32 *length) {
 
 #define PORT_TABLE_SIZE     256                 /* size of port mapping table                   */
 #define SLEEP_ALLOWED_START_DEFAULT 100         /* default initial value for sleepAllowedCounter*/
-#define DEFAULT_TIMER_DELTA 100                 /* default value for timer delta in ms          */
+#define DEFAULT_TIMER_DELTA         100         /* default value for timer delta in ms          */
+#define CPM_COMMAND_LINE_LENGTH     128
 
 static t_stat simh_dev_set_timeron  (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat simh_dev_set_timeroff (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
@@ -231,22 +227,55 @@ static uint32 newClockFrequency;
 static int32 setClockFrequencyPos   = 0;        /* determines state for sending the clock frequency             */
 static int32 getClockFrequencyPos   = 0;        /* determines state for receiving the clock frequency           */
 
-/* support for wild card expansion                                                                              */
-#if UNIX_PLATFORM
-static glob_t globS;
-static uint32 globPosNameList       = 0;
-static int32 globPosName            = 0;
-static int32 globValid              = FALSE;
-static int32 globError              = 0;
+/* support for wild card file expansion */
+
+#if defined (__MWERKS__) && defined (macintosh)
+const static char hostPathSeparator     = ':';  /* colon on Macintosh OS 9  */
+const static char hostPathSeparatorAlt  = ':';  /* no alternative           */
 #elif defined (_WIN32)
-static WIN32_FIND_DATA FindFileData;
-static HANDLE hFind                 = INVALID_HANDLE_VALUE;
-static int32 globFinished           = FALSE;
-static int32 globValid              = FALSE;
-static int32 globPosName            = 0;
-static int32 lastPathSeparator      = 0;
-static int32 firstPathCharacter     = 0;
+const static char hostPathSeparator     = '\\'; /* back slash in Windows    */
+const static char hostPathSeparatorAlt  = '/';  /* '/' is an alternative    */
+#else
+const static char hostPathSeparator     = '/';  /* slash in UNIX            */
+const static char hostPathSeparatorAlt  = '/';  /* no alternative           */
 #endif
+
+typedef struct NameNode {
+    char *name;
+    struct NameNode *next;
+} NameNode_t;
+
+static char cpmCommandLine[CPM_COMMAND_LINE_LENGTH];
+static NameNode_t *nameListHead         = NULL;
+static NameNode_t *currentName          = NULL;
+static int32 currentNameIndex           = 0;
+static int32 lastPathSeparatorIndex     = 0;
+static int32 firstPathCharacterIndex    = 0;
+
+static void deleteNameList() {
+    while (nameListHead != NULL) {
+        NameNode_t *next = nameListHead -> next;
+        free(nameListHead -> name);
+        free(nameListHead);
+        nameListHead = next;
+    }
+    currentName = NULL;
+    currentNameIndex = 0;
+}
+
+static void processDirEntry (const char *directory,
+                             const char *filename,
+                             t_offset FileSize,
+                             const struct stat *filestat,
+                             void *context) {
+    if (filename != NULL) {
+        NameNode_t *top = (NameNode_t *)malloc(sizeof(NameNode_t));
+        top -> name = strdup(filename);
+        top -> next = nameListHead;
+        nameListHead = top;
+    }
+}
+
 
 /* SIO status registers                                                                                         */
 static int32 warnLevelSIO           = 3;        /* display at most 'warnLevelSIO' times the same warning        */
@@ -1224,7 +1253,6 @@ static const char *cmdNames[kSimhPseudoDeviceCommands] = {
     "setCPUClockFrequency",
 };
 
-#define CPM_COMMAND_LINE_LENGTH    128
 #define TIMER_STACK_LIMIT          10       /* stack depth of timer stack   */
 static uint32 markTime[TIMER_STACK_LIMIT];  /* timer stack                  */
 static struct tm currentTime;
@@ -1309,25 +1337,12 @@ static t_stat simh_svc(UNIT *uptr) {
     return SCPE_OK;
 }
 
-static char cpmCommandLine[CPM_COMMAND_LINE_LENGTH];
 static void createCPMCommandLine(void) {
     int32 i, len = (GetBYTEWrapper(0x80) & 0x7f); /* 0x80 contains length of command line, discard first char   */
     for (i = 0; i < len - 1; i++)
         cpmCommandLine[i] = (char)GetBYTEWrapper(0x82 + i); /* the first char, typically ' ', is discarded      */
     cpmCommandLine[i] = 0; /* make C string */
 }
-
-#if defined (_WIN32)
-static void setLastPathSeparator(void) {
-    int32 i = 0;
-    while (cpmCommandLine[i])
-        i++;
-    while ((i >= 0) && (cpmCommandLine[i] != '\\'))
-        i--;
-    lastPathSeparator = i;
-    firstPathCharacter = 0;
-}
-#endif
 
 /* The CP/M command line is used as the name of a file and UNIT* uptr is attached to it. */
 static void attachCPM(UNIT *uptr) {
@@ -1419,37 +1434,23 @@ static int32 simh_in(const int32 port) {
             break;
 
         case getHostFilenamesCmd:
-#if UNIX_PLATFORM
-            if (globValid) {
-                if (globPosNameList < globS.gl_pathc) {
-                    if (!(result = globS.gl_pathv[globPosNameList][globPosName++])) {
-                        globPosNameList++;
-                        globPosName = 0;
-                    }
-                }
-                else {
-                    globValid = FALSE;
+            if (nameListHead != NULL) {
+                if (currentName == NULL) {
+                    deleteNameList();
                     lastCommand = 0;
-                    globfree(&globS);
+                }
+                else if (firstPathCharacterIndex <= lastPathSeparatorIndex)
+                    result = cpmCommandLine[firstPathCharacterIndex++];
+                else {
+                    result = currentName -> name[currentNameIndex];
+                    if (result == 0) {
+                        currentName = currentName -> next;
+                        firstPathCharacterIndex = currentNameIndex = 0;
+                    }
+                    else
+                        currentNameIndex++;
                 }
             }
-#elif defined (_WIN32)
-            if (globValid)
-                if (globFinished)
-                    globValid = FALSE;
-                else if (firstPathCharacter <= lastPathSeparator)
-                    result = cpmCommandLine[firstPathCharacter++];
-                else if (!(result = FindFileData.cFileName[globPosName++])) {
-                    globPosName = firstPathCharacter = 0;
-                    if (!FindNextFile(hFind, &FindFileData)) {
-                        globFinished = TRUE;
-                        FindClose(hFind);
-                        hFind = INVALID_HANDLE_VALUE;
-                    }
-                }
-#else
-            lastCommand = 0;
-#endif
             break;
 
         case attachPTRCmd:
@@ -1586,13 +1587,7 @@ static int32 simh_in(const int32 port) {
             break;
 
         case getHostOSPathSeparatorCmd:
-#if defined (__MWERKS__) && defined (macintosh)
-            result = ':';   /* colon on Macintosh OS 9  */
-#elif defined (_WIN32)
-            result = '\\';  /* back slash in Windows    */
-#else
-            result = '/';   /* slash in UNIX            */
-#endif
+            result = hostPathSeparator;
             break;
 
         default:
@@ -1728,39 +1723,30 @@ static int32 simh_out(const int32 port, const int32 data) {
                     isInReadPhase = FALSE;
                     break;
 
-                case getHostFilenamesCmd:
-#if UNIX_PLATFORM
-                    if (!globValid) {
-                        globValid = TRUE;
-                        globPosNameList = globPosName = 0;
+                case getHostFilenamesCmd:   /* list files of host file directory */
+                    if (nameListHead == NULL) {
+                        t_stat result;
+
                         createCPMCommandLine();
-                        globError = glob(cpmCommandLine, GLOB_ERR, NULL, &globS);
-                        if (globError) {
+                        lastPathSeparatorIndex = 0;
+                        while (cpmCommandLine[lastPathSeparatorIndex])
+                            lastPathSeparatorIndex++;
+                        while ((lastPathSeparatorIndex >= 0) && (cpmCommandLine[lastPathSeparatorIndex] != hostPathSeparator) && (cpmCommandLine[lastPathSeparatorIndex] != hostPathSeparatorAlt))
+                            lastPathSeparatorIndex--;
+                        firstPathCharacterIndex = 0;
+                        deleteNameList();
+                        result = sim_dir_scan(cpmCommandLine, processDirEntry, NULL);
+                        if (result == SCPE_OK) {
+                            currentName = nameListHead;
+                            currentNameIndex = 0;
+                        } else {
+                            deleteNameList();
                             sim_debug(VERBOSE_MSG, &simh_device,
                                       "SIMH: " ADDRESS_FORMAT
-                                      " Cannot expand '%s'. Error is %i.\n",
-                                      PCX, cpmCommandLine, globError);
-                            globfree(&globS);
-                            globValid = FALSE;
+                                      " Cannot expand '%s'. Error is %s.\n",
+                                      PCX, cpmCommandLine, sim_error_text(result));
                         }
                     }
-#elif defined (_WIN32)
-                    if (!globValid) {
-                        globValid = TRUE;
-                        globPosName = 0;
-                        globFinished = FALSE;
-                        createCPMCommandLine();
-                        setLastPathSeparator();
-                        hFind = FindFirstFile(cpmCommandLine, &FindFileData);
-                        if (hFind == INVALID_HANDLE_VALUE) {
-                            sim_debug(VERBOSE_MSG, &simh_device,
-                                      "SIMH: " ADDRESS_FORMAT
-                                      " Cannot expand '%s'. Error is %lu.\n",
-                                      PCX, cpmCommandLine, GetLastError());
-                            globValid = FALSE;
-                        }
-                    }
-#endif
                     break;
 
                 case SIMHSleepCmd:
@@ -1858,19 +1844,7 @@ static int32 simh_out(const int32 port, const int32 data) {
                 case resetSIMHInterfaceCmd:
                     markTimeSP  = 0;
                     lastCommand = 0;
-#if UNIX_PLATFORM
-                    if (globValid) {
-                        globValid = FALSE;
-                        globfree(&globS);
-                    }
-#elif defined (_WIN32)
-                    if (globValid) {
-                        globValid = FALSE;
-                        if (hFind != INVALID_HANDLE_VALUE) {
-                            FindClose(hFind);
-                        }
-                    }
-#endif
+                    deleteNameList();
                     break;
 
                 case showTimerCmd:  /* show time difference to timer on top of stack */
