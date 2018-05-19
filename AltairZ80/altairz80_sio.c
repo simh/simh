@@ -230,11 +230,14 @@ static int32 getClockFrequencyPos   = 0;        /* determines state for receivin
 /* support for wild card file expansion */
 
 #if defined (__MWERKS__) && defined (macintosh)
-const static char hostPathSeparator = ':';   /* colon on Macintosh OS 9  */
+const static char hostPathSeparator     = ':';  /* colon on Macintosh OS 9  */
+const static char hostPathSeparatorAlt  = ':';  /* no alternative           */
 #elif defined (_WIN32)
-const static char hostPathSeparator = '\\';  /* back slash in Windows    */
+const static char hostPathSeparator     = '\\'; /* back slash in Windows    */
+const static char hostPathSeparatorAlt  = '/';  /* '/' is an alternative    */
 #else
-const static char hostPathSeparator = '/';   /* slash in UNIX            */
+const static char hostPathSeparator     = '/';  /* slash in UNIX            */
+const static char hostPathSeparatorAlt  = '/';  /* no alternative           */
 #endif
 
 typedef struct NameNode {
@@ -266,7 +269,7 @@ static void processDirEntry (const char *directory,
                              const struct stat *filestat,
                              void *context) {
     if (filename != NULL) {
-        NameNode_t *top = malloc(sizeof(NameNode_t));
+        NameNode_t *top = (NameNode_t *)malloc(sizeof(NameNode_t));
         top -> name = strdup(filename);
         top -> next = nameListHead;
         nameListHead = top;
@@ -1722,15 +1725,17 @@ static int32 simh_out(const int32 port, const int32 data) {
 
                 case getHostFilenamesCmd:   /* list files of host file directory */
                     if (nameListHead == NULL) {
+                        t_stat result;
+
                         createCPMCommandLine();
                         lastPathSeparatorIndex = 0;
                         while (cpmCommandLine[lastPathSeparatorIndex])
                             lastPathSeparatorIndex++;
-                        while ((lastPathSeparatorIndex >= 0) && (cpmCommandLine[lastPathSeparatorIndex] != hostPathSeparator))
+                        while ((lastPathSeparatorIndex >= 0) && (cpmCommandLine[lastPathSeparatorIndex] != hostPathSeparator) && (cpmCommandLine[lastPathSeparatorIndex] != hostPathSeparatorAlt))
                             lastPathSeparatorIndex--;
                         firstPathCharacterIndex = 0;
                         deleteNameList();
-                        const t_stat result = sim_dir_scan(cpmCommandLine, processDirEntry, NULL);
+                        result = sim_dir_scan(cpmCommandLine, processDirEntry, NULL);
                         if (result == SCPE_OK) {
                             currentName = nameListHead;
                             currentNameIndex = 0;
