@@ -2267,8 +2267,10 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
 #endif
         if ((lp->xmte == 0) && 
             ((lp->txbps == 0) ||
-             (lp->txnexttime <= sim_gtime ())))
+             (lp->txnexttime <= sim_gtime ()))) {
             lp->xmte = 1;                               /* enable line transmit */
+            lp->txnexttime = 0.0;
+            }
         }
     }                                                   /* end for */
 }
