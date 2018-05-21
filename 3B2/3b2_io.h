@@ -221,12 +221,10 @@ t_stat cio_svc(UNIT *uptr);
 
 void cio_clear(uint8 cid);
 void cio_cexpress(uint8 cid, uint16 esize, cio_entry *cqe, uint8 *app_data);
-void cio_cqueue(uint8 cid, uint8 cmd_stat, uint16 esize,
-                cio_entry *cqe, uint8 *app_data);
+void cio_cqueue(uint8 cid, uint8 cmd_stat, uint16 esize, cio_entry *cqe, uint8 *app_data);
 void cio_rexpress(uint8 cid, uint16 esize, cio_entry *rqe, uint8 *app_data);
-t_stat cio_rqueue(uint8 cid, uint8 qnum, uint16 esize,
-                  cio_entry *rqe, uint8 *app_data);
-t_bool cio_cqueue_avail(uint cid, uint16 esize);
+t_stat cio_rqueue(uint8 cid, uint8 qnum, uint16 esize, cio_entry *rqe, uint8 *app_data);
+t_bool cio_cqueue_avail(uint8 cid, uint16 esize);
 uint16 cio_r_lp(uint8 cid, uint8 qnum, uint16 esize);
 uint16 cio_r_ulp(uint8 cid, uint8 qnum, uint16 esize);
 uint16 cio_c_lp(uint8 cid, uint16 esize);

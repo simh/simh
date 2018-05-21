@@ -119,7 +119,8 @@ void cio_sysgen(uint8 cid)
 
 void cio_cexpress(uint8 cid, uint16 esize, cio_entry *cqe, uint8 *app_data)
 {
-    uint32 cqp, i;
+    int32 i;
+    uint32 cqp;
 
     cqp = cio[cid].cqp;
 
@@ -145,7 +146,8 @@ void cio_cexpress(uint8 cid, uint16 esize, cio_entry *cqe, uint8 *app_data)
 void cio_cqueue(uint8 cid, uint8 cmd_stat, uint16 esize,
                 cio_entry *cqe, uint8 *app_data)
 {
-    uint32 cqp, top, i;
+    int32 i;
+    uint32 cqp, top;
     uint16 lp, ulp;
 
     /* Apply the CMD/STAT bit */
@@ -195,7 +197,8 @@ void cio_cqueue(uint8 cid, uint8 cmd_stat, uint16 esize,
  */
 void cio_rexpress(uint8 cid, uint16 esize, cio_entry *rqe, uint8 *app_data)
 {
-    uint32 rqp, i;
+    int32 i;
+    uint32 rqp;
 
     rqp = cio[cid].rqp;
 
@@ -221,7 +224,8 @@ void cio_rexpress(uint8 cid, uint16 esize, cio_entry *rqe, uint8 *app_data)
 t_stat cio_rqueue(uint8 cid, uint8 qnum, uint16 esize,
                   cio_entry *rqe, uint8 *app_data)
 {
-    uint32 rqp, top, i;
+    int32 i;
+    uint32 rqp, top;
     uint16 lp, ulp;
 
     /* Get the physical address of the request queue in main memory */
@@ -306,7 +310,7 @@ uint16 cio_c_ulp(uint8 cid, uint16 esize)
  * Returns true if there is room in the completion queue
  * for a new entry.
  */
-t_bool cio_cqueue_avail(uint cid, uint16 esize)
+t_bool cio_cqueue_avail(uint8 cid, uint16 esize)
 {
     uint32 lp, ulp;
 
@@ -611,8 +615,6 @@ void io_write(uint32 pa, uint32 val, size_t size)
 void dump_entry(uint32 dbits, DEVICE *dev, CONST char *type,
                 uint16 esize, cio_entry *entry, uint8 *app_data)
 {
-    uint32 i;
-
     sim_debug(dbits, dev,
               "*** %s ENTRY: byte_count=%04x, subdevice=%02x, opcode=%d, address=%08x\n",
               type, entry->byte_count, entry->subdevice,

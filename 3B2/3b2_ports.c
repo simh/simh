@@ -188,7 +188,7 @@ static void cio_irq(uint8 cid, uint8 dev, int32 delay)
  */
 t_stat ports_setnl(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-    int32 newln, newcards, i, t;
+    int32 newln, i, t;
     t_stat r = SCPE_OK;
 
     if (cptr == NULL) {
@@ -247,8 +247,7 @@ t_stat ports_setnl(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 static void ports_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data)
 {
     cio_entry centry = {0};
-    uint32 i, ln;
-    char c;
+    uint32 ln;
     PORTS_OPTIONS opts;
     char line_config[16];
     uint8 app_data[4] = {0};
@@ -524,7 +523,7 @@ void ports_express(uint8 cid)
 
 void ports_full(uint8 cid)
 {
-    uint32 i, ln;
+    uint32 i;
     cio_entry rqe;
     uint8 app_data[4] = {0};
 
@@ -537,8 +536,8 @@ void ports_full(uint8 cid)
 
 t_stat ports_reset(DEVICE *dptr)
 {
-    uint32 i;
-    uint8 cid, line, cards, ln, end_slot;
+    int32 i;
+    uint8 cid, line, ln, end_slot;
     TMLN *lp;
 
     sim_debug(TRACE_DBG, &ports_dev,

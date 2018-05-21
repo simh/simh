@@ -608,7 +608,7 @@ uint32 iu_read(uint32 pa, size_t size)
     case START_CTR:
         data = 0;
         iu_state.istat &= ~ISTS_CRI;
-        sim_activate_abs(&iu_timer_unit, iu_timer_state.c_set * IU_TIMER_RATE);
+        sim_activate_abs(&iu_timer_unit, (int32)(iu_timer_state.c_set * IU_TIMER_RATE));
         break;
     case STOP_CTR:
         data = 0;

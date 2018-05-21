@@ -257,7 +257,7 @@ static void ctc_cmd(uint8 cid,
     uint8  dev;
     uint8  sec_buf[512];
     int32  secrw = 0;
-    int32  b;
+    int32  b, j;
     struct vtoc vtoc = {0};
     struct pdinfo pdinfo = {0};
 
@@ -481,7 +481,7 @@ static void ctc_cmd(uint8 cid,
 
         for (b = 0; b < rqe->byte_count / 512; b++) {
             ctc_state[dev].time += 10;
-            for (int j = 0; j < 512; j++) {
+            for (j = 0; j < 512; j++) {
                 /* Fill the buffer */
                 sec_buf[j] = pread_b(rqe->address + (b * 512) + j);
             }
@@ -522,7 +522,7 @@ static void ctc_cmd(uint8 cid,
                       "[ctc_cmd] ... CTC_READ: 512 bytes from block %d (0x%x)\n",
                       lba, lba);
             sim_disk_rdsect(&ctc_unit, lba, sec_buf, &secrw, 1);
-            for (int j = 0; j < 512; j++) {
+            for (j = 0; j < 512; j++) {
                 /* Drain the buffer */
                 pwrite_b(rqe->address + (b * 512) + j, sec_buf[j]);
             }
@@ -605,8 +605,7 @@ void ctc_full(uint8 cid)
 
 t_stat ctc_reset(DEVICE *dptr)
 {
-    uint32 i;
-    uint8 cid, end_slot;
+    uint8 cid;
 
     sim_debug(TRACE_DBG, &ctc_dev,
               "[ctc_reset] Resetting CTC device\n");
