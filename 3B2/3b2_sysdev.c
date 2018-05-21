@@ -49,7 +49,7 @@ DEBTAB sys_deb_tab[] = {
     { "WRITE",      WRITE_MSG,      "Write activity"    },
     { "EXECUTE",    EXECUTE_MSG,    "Execute activity"  },
     { "IRQ",        IRQ_MSG,        "Interrupt activity"},
-    { "TRACE",      TRACE_MSG,      "Detailed activity" },
+    { "TRACE",      TRACE_DBG,      "Detailed activity" },
     { NULL,         0                                   }
 };
 
@@ -481,7 +481,7 @@ t_stat timer0_svc(UNIT *uptr)
         time = TIMER_STP_US;
     }
 
-    sim_activate_abs(uptr, (int32) DELAY_US(time));
+    sim_activate_after_abs(uptr, time);
 
     return SCPE_OK;
 }
@@ -489,7 +489,7 @@ t_stat timer0_svc(UNIT *uptr)
 t_stat timer1_svc(UNIT *uptr)
 {
     struct timer_ctr *ctr;
-    int32 ticks, t;
+    int32 t;
 
     ctr = (struct timer_ctr *)uptr->tmr;
 
@@ -498,14 +498,8 @@ t_stat timer1_svc(UNIT *uptr)
         csr_data |= CSRCLK;
     }
 
-    ticks = ctr->divider / TIMER_STP_US;
-
-    if (ticks < CLK_MIN_TICKS) {
-        ticks = TPS_CLK;
-    }
-
-    t = sim_rtcn_calb(ticks, TMR_CLK);
-    sim_activate_after(uptr, (uint32) (1000000 / ticks));
+    t = sim_rtcn_calb(TPS_CLK, TMR_CLK);
+    sim_activate_after_abs(uptr, 1000000/TPS_CLK);
     tmxr_poll = t;
 
     return SCPE_OK;
@@ -524,7 +518,7 @@ t_stat timer2_svc(UNIT *uptr)
         time = TIMER_STP_US;
     }
 
-    sim_activate_abs(uptr, (int32) DELAY_US(time));
+    sim_activate_after_abs(uptr, time);
 
     return SCPE_OK;
 }
@@ -598,7 +592,7 @@ void handle_timer_write(uint8 ctrnum, uint32 val)
         ctr->enabled = TRUE;
         ctr->stime = sim_gtime();
         sim_cancel(timer_clk_unit);
-        sim_activate_abs(timer_clk_unit, ctr->divider * TIMER_STP_US);
+        sim_activate_after_abs(timer_clk_unit, ctr->divider * TIMER_STP_US);
         break;
     case 0x20:
         ctr->divider &= 0x00ff;
@@ -608,7 +602,7 @@ void handle_timer_write(uint8 ctrnum, uint32 val)
         ctr->stime = sim_gtime();
         /* Kick the timer to get the new divider value */
         sim_cancel(timer_clk_unit);
-        sim_activate_abs(timer_clk_unit, ctr->divider * TIMER_STP_US);
+        sim_activate_after_abs(timer_clk_unit, ctr->divider * TIMER_STP_US);
         break;
     case 0x30:
         if (ctr->lmb) {
@@ -622,7 +616,7 @@ void handle_timer_write(uint8 ctrnum, uint32 val)
                       R[NUM_PC], ctrnum, val & 0xff);
             /* Kick the timer to get the new divider value */
             sim_cancel(timer_clk_unit);
-            sim_activate_abs(timer_clk_unit, ctr->divider * TIMER_STP_US);
+            sim_activate_after_abs(timer_clk_unit, ctr->divider * TIMER_STP_US);
         } else {
             ctr->lmb = TRUE;
             ctr->divider = (ctr->divider & 0xff00) | (val & 0xff);

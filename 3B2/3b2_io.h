@@ -79,19 +79,33 @@
  *
  * The Queue structures (one for request, one for completion) hold:
  *    - An express entry
+ *
+ * And then one or more queues, each queue consiting of
  *    - A set of pointers for load and unload from the queue
- *    - Zero or more Queue Entries
+ *    - One or more Queue Entries
  *
  * |    Address    | Size |  Contents                               |
  * +---------------+------+-----------------------------------------+
  * | QUEUE_P       |  12  | Express Queue Entry [1]                 |
- * | QUEUE_P + 12  |  2   | Load Pointer                            |
- * | QUEUE_P + 14  |  2   | Unload Pointer                          |
- * | QUEUE_P + 16  |  12  | Entry 0 [1]                             |
- * | QUEUE_P + 28  |  12  | Entry 1 [1]                             |
+ * +---------------+------+-----------------------------------------+
+ * | QUEUE_P + 12  |  2   | Load Pointer for Queue 0                |
+ * | QUEUE_P + 14  |  2   | Unload Pointer for Queue 0              |
+ * | QUEUE_P + 16  |  12  | Queue 0 Entry 0 [1]                     |
+ * | QUEUE_P + 28  |  12  | Queue 0 Entry 1 [1]                     |
+ * | ...           |  ... | ...                                     |
+ * +---------------+------+-----------------------------------------+
+ * | QUEUE_P + n   |  2   | Load Pointer for Queue 1                |
+ * | QUEUE_P + n   |  2   | Unload Pointer for Queue 1              |
+ * | QUEUE_P + n   |  12  | Queue 1 Entry 0 [1]                     |
+ * | QUEUE_P + n   |  12  | Queue 1 Entry 1 [1]                     |
  * | ...           |  ... | ...                                     |
  *
  *  [1] See Queue Entry above
+ *
+ * NB: There are multiple Request queues, usually one per subdevice,
+ * and EACH Request queue starts with a Load Pointer, an Unload
+ * Pointer, and then 'n' Queue Entries.
+ *
  */
 
 #ifndef _3B2_IO_H_
@@ -111,34 +125,33 @@
 #define IOF_CTRL        3
 #define IOF_STAT        5
 
-#define SYSGEN_PTR       PHYS_MEM_BASE
-#define CIO_LOAD_SIZE    0x4
-#define CIO_ENTRY_SIZE   0x0c
-#define CIO_QUE_OFFSET   0x10
-#define CIO_SLOTS        12
+#define SYSGEN_PTR      PHYS_MEM_BASE
 
 /* CIO opcodes */
-#define CIO_DLM          1
-#define CIO_ULM          2
-#define CIO_FCF          3
-#define CIO_DOS          4
-#define CIO_DSD          5
+#define CIO_DLM         1
+#define CIO_ULM         2
+#define CIO_FCF         3
+#define CIO_DOS         4
+#define CIO_DSD         5
 
 /* Map a physical address to a card ID */
 #define CID(pa)         (((((pa) >> 0x14) & 0x1f) / 2) - 1)
 /* Map a card ID to a base address */
 #define CADDR(bid)      (((((bid) + 1) * 2) << 0x14))
 
-#define CIO_INT0          0x1
-#define CIO_INT1          0x2
-
 /* Offsets into the request/completion queues of various values */
-#define LOAD_OFFSET       12
-#define ULOAD_OFFSET      14
-#define QUE_OFFSET        16
-#define QUE_E_SIZE        12
+#define LUSIZE          4    /* Load/Unload pointers size */
+#define QESIZE          8    /* Queue entry is 8 bytes + application data */
 
-#define CIO_SYGEN_MASK    0x3
+#define CIO_STAT        0
+#define CIO_CMD         1
+
+/* Sysgen State */
+#define CIO_INT_NONE    0
+#define CIO_INT0        1
+#define CIO_INT1        2
+#define CIO_SYSGEN      3
+
 
 typedef struct {
     uint16 id;                         /* Card ID                       */
@@ -153,10 +166,9 @@ typedef struct {
     uint8  no_rque;                    /* Number of request queues      */
     uint8  ipl;                        /* IPL that this card uses       */
     t_bool intr;                       /* Card needs to interrupt       */
-    uint8  cmdbits;                    /* Commands received since RESET */
+    uint8  sysgen_s;                   /* Sysgen state                  */
     uint8  seqbit;                     /* Squence Bit                   */
     uint8  op;                         /* Last received opcode          */
-    TMLN   *lines[4];                  /* Terminal Multiplexer lines    */
 } CIO_STATE;
 
 typedef struct {
@@ -164,7 +176,6 @@ typedef struct {
     uint8  subdevice;
     uint8  opcode;
     uint32 address;
-    uint32 app_data;
 } cio_entry;
 
 struct iolink {
@@ -208,15 +219,21 @@ extern CIO_STATE cio[CIO_SLOTS];
 t_stat cio_reset(DEVICE *dptr);
 t_stat cio_svc(UNIT *uptr);
 
-/* Put an entry into the Completion Queue's Express entry */
-void cio_cexpress(uint8 cid, cio_entry *cqe);
-/* Put an entry into the Completion Queue */
-void cio_cqueue(uint8 cid, cio_entry *cqe);
-/* Get an entry from the Request Queue */
-void cio_rqueue(uint8 cid, cio_entry *cqe);
-/* Perform a Sysgen */
+void cio_clear(uint8 cid);
+void cio_cexpress(uint8 cid, uint16 esize, cio_entry *cqe, uint8 *app_data);
+void cio_cqueue(uint8 cid, uint8 cmd_stat, uint16 esize,
+                cio_entry *cqe, uint8 *app_data);
+void cio_rexpress(uint8 cid, uint16 esize, cio_entry *rqe, uint8 *app_data);
+t_stat cio_rqueue(uint8 cid, uint8 qnum, uint16 esize,
+                  cio_entry *rqe, uint8 *app_data);
+t_bool cio_cqueue_avail(uint cid, uint16 esize);
+uint16 cio_r_lp(uint8 cid, uint8 qnum, uint16 esize);
+uint16 cio_r_ulp(uint8 cid, uint8 qnum, uint16 esize);
+uint16 cio_c_lp(uint8 cid, uint16 esize);
+uint16 cio_c_ulp(uint8 cid, uint16 esize);
 void cio_sysgen(uint8 cid);
-/* Debugging only */
-void dump_entry(CONST char *type, cio_entry *entry);
+
+void dump_entry(uint32 dbits, DEVICE *dev, CONST char *type,
+                uint16 esize, cio_entry *entry, uint8 *app_data);
 
 #endif

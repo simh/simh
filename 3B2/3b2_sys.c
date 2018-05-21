@@ -35,6 +35,8 @@
 #include "3b2_if.h"
 #include "3b2_id.h"
 #include "3b2_mmu.h"
+#include "3b2_ctc.h"
+#include "3b2_ports.h"
 #include "3b2_sysdev.h"
 
 char sim_name[] = "AT&T 3B2 Model 400";
@@ -61,6 +63,8 @@ DEVICE *sim_devices[] = {
     &dmac_dev,
     &if_dev,
     &id_dev,
+    &ports_dev,
+    &ctc_dev,
     NULL
 };
 
@@ -87,6 +91,8 @@ void full_reset()
     if_reset(&if_dev);
     id_reset(&id_dev);
     csr_reset(&csr_dev);
+    ports_reset(&ports_dev);
+    ctc_reset(&ctc_dev);
 }
 
 t_stat sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)

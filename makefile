@@ -1730,7 +1730,8 @@ ATT3B2 = ${ATT3B2D}/3b2_cpu.c ${ATT3B2D}/3b2_mmu.c \
 	${ATT3B2D}/3b2_iu.c ${ATT3B2D}/3b2_if.c \
 	${ATT3B2D}/3b2_id.c ${ATT3B2D}/3b2_dmac.c \
 	${ATT3B2D}/3b2_sys.c ${ATT3B2D}/3b2_io.c \
-	${ATT3B2D}/3b2_sysdev.c
+	${ATT3B2D}/3b2_ports.c ${ATT3B2D}/3b2_ctc.c \
+    ${ATT3B2D}/3b2_sysdev.c
 ATT3B2_OPT = -I ${ATT3B2D} -DUSE_INT64 -DUSE_ADDR64
 #
 # Build everything (not the unsupported/incomplete or experimental simulators)

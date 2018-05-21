@@ -236,8 +236,8 @@ t_bool addr_is_mem(uint32 pa)
 
 t_bool addr_is_io(uint32 pa)
 {
-    return ((pa >= IO_BASE && pa < IO_BASE + IO_SIZE) ||
-            (pa >= IOB_BASE && pa < IOB_BASE + IOB_SIZE));
+    return ((pa >= IO_BOTTOM && pa < IO_TOP) ||
+            (pa >= CIO_BOTTOM && pa < CIO_TOP));
 }
 
 /*
@@ -631,7 +631,7 @@ t_stat mmu_decode_va(uint32 va, uint8 r_acc, t_bool fc, uint32 *pa)
     uint8 pd_acc;
     t_stat sd_cached, pd_cached;
 
-    if (!mmu_state.enabled || addr_is_io(va)) {
+    if (!mmu_state.enabled) {
         *pa = va;
         return SCPE_OK;
     }

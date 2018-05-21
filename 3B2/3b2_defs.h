@@ -83,10 +83,10 @@ noret __libc_longjmp (jmp_buf buf, int val);
 #define PHYS_MEM_BASE 0x2000000
 
 #define ROM_BASE      0
-#define IO_BASE       0x40000
-#define IO_SIZE       0x10000
-#define IOB_BASE      0x200000
-#define IOB_SIZE      0x1E00000
+
+/* IO area */
+#define IO_BOTTOM     0x40000
+#define IO_TOP        0x50000
 
 /* Register numbers */
 #define NUM_FP         9
@@ -140,8 +140,8 @@ noret __libc_longjmp (jmp_buf buf, int val);
 #define EXECUTE_MSG  0x008
 #define INIT_MSG     0x010
 #define IRQ_MSG      0x020
-#define IO_D_MSG     0x040
-#define TRACE_MSG    0x080
+#define IO_DBG       0x040
+#define TRACE_DBG    0x080
 #define ERR_MSG      0x100
 
 /* Data types operated on by instructions. NB: These integer values
@@ -307,32 +307,17 @@ noret __libc_longjmp (jmp_buf buf, int val);
 #define MEMSIZE_REG    0x4C003
 #define CIO_BOTTOM     0x200000
 #define CIO_TOP        0x2000000
+#define CIO_SLOTS      12
 
-#define CIO_CSBIT      0x80
+#define CIO_CMDSTAT    0x80
 #define CIO_SEQBIT     0x40
 
 #define CIO_INT_DELAY  8000
-
 
 /* Timer definitions */
 
 #define TMR_CLK   0         /* The clock responsible for IPL 15 interrupts */
 #define TPS_CLK   100       /* 100 ticks per second */
-
-#define CLK_MIN_TICKS 500   /* No fewer than 500 sim steps between ticks */
-
-
-/* TIMING SECTION                                  */
-/* ----------------------------------------------- */
-/* Calculate delays (in simulator steps) for times */
-/* System clock runs at 10MHz; 100ns period.       */
-
-#define US_PER_INST         1.6
-
-#define INST_PER_MS         (1000.0 / US_PER_INST)
-
-#define DELAY_US(us)        ((uint32)((us) / US_PER_INST))
-#define DELAY_MS(ms)        ((uint32)(((ms) * 1000) / US_PER_INST))
 
 /* global symbols from the CPU */
 
@@ -415,6 +400,7 @@ extern void cpu_clear_irq(uint8 ipl, uint16 csr_flags);
 /* global symbols from the IO system */
 extern uint32 io_read(uint32 pa, size_t size);
 extern void io_write(uint32 pa, uint32 val, size_t size);
+extern void cio_clear(uint8 cid);
 extern void cio_xfer();
 extern uint8 cio_int;
 extern uint16 cio_ipl;

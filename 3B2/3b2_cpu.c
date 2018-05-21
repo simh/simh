@@ -127,8 +127,8 @@ static DEBTAB cpu_deb_tab[] = {
     { "EXECUTE",    EXECUTE_MSG,    "Instruction execute"   },
     { "INIT",       INIT_MSG,       "Initialization"        },
     { "IRQ",        IRQ_MSG,        "Interrupt Handling"    },
-    { "IO",         IO_D_MSG,       "I/O Dispatch"          },
-    { "TRACE",      TRACE_MSG,      "Call Trace"            },
+    { "IO",         IO_DBG,         "I/O Dispatch"          },
+    { "TRACE",      TRACE_DBG,      "Call Trace"            },
     { "ERROR",      ERR_MSG,        "Error"                 },
     { NULL,         0                                       }
 };
@@ -137,6 +137,11 @@ UNIT cpu_unit = { UDATA (NULL, UNIT_FIX|UNIT_BINK|UNIT_IDLE, MAXMEMSIZE) };
 
 #define UNIT_V_EXHALT   (UNIT_V_UF + 0)                 /* halt to console */
 #define UNIT_EXHALT     (1u << UNIT_V_EXHALT)
+
+const char *cio_names[8] = {
+    "", "*VOID*", "*VOID*", "PORTS",
+    "*VOID*", "CTC", "*VOID*", "*VOID*"
+};
 
 MTAB cpu_mod[] = {
     { UNIT_MSIZE, (1u << 20), NULL, "1M",
@@ -149,8 +154,10 @@ MTAB cpu_mod[] = {
       &cpu_set_hist, &cpu_show_hist, NULL, "Displays instruction history" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "VIRTUAL", NULL,
       NULL, &cpu_show_virt, NULL, "Show translation for virtual address" },
-    { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "STACK", "STACK",
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "STACK", NULL,
       NULL, &cpu_show_stack, NULL, "Display the current stack with optional depth" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "CIO", NULL,
+      NULL, &cpu_show_cio, NULL, "Display CIO configuration" },
     { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL },
     { UNIT_EXHALT, UNIT_EXHALT, "Halt on Exception", "EXHALT",
@@ -527,6 +534,19 @@ t_stat cpu_show_stack(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
         }
 
         fprintf(st, "  %08x: %08x\n", addr, v);
+    }
+
+    return SCPE_OK;
+}
+
+t_stat cpu_show_cio(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    uint32 i;
+
+    fprintf(st, "  SLOT     DEVICE\n");
+    fprintf(st, "---------------------\n");
+    for (i = 0; i < CIO_SLOTS; i++) {
+        fprintf(st, "   %d        %s\n", i, cio_names[cio[i].id & 0x7]);
     }
 
     return SCPE_OK;
@@ -988,13 +1008,18 @@ t_stat cpu_show_virt(FILE *of, UNIT *uptr, int32 val, CONST void *desc)
             if (r == SCPE_OK) {
                 fprintf(of, "Virtual %08x = Physical %08x\n", va, pa);
                 return SCPE_OK;
+            } else {
+                fprintf(of, "Translation not possible for virtual address.\n");
+                return SCPE_ARG;
             }
+        } else {
+            fprintf(of, "Illegal address format.\n");
+            return SCPE_ARG;
         }
     }
 
-    fprintf(of, "Translation not possible.\n");
-
-    return SCPE_OK;
+    fprintf(of, "Address argument required.\n");
+    return SCPE_ARG;
 }
 
 
@@ -1557,6 +1582,10 @@ void cpu_on_interrupt(uint16 vec)
 {
     uint32 new_pcbp;
 
+    sim_debug(IRQ_MSG, &cpu_dev,
+              "[%08x] [cpu_on_interrupt] vec=%02x (%d)\n",
+              R[NUM_PC], vec, vec);
+
     /*
      * "If a nonmaskable interrupt request is received, an auto-vector
      * interrupt acknowledge cycle is performed (as if an autovector
@@ -1733,6 +1762,10 @@ t_stat sim_instr(void)
                 if (cio[i].intr &&
                     cio[i].ipl == cpu_int_ipl &&
                     cio[i].ivec == cpu_int_vec) {
+                    sim_debug(IO_DBG, &cpu_dev,
+                              "[%08x] [IRQ] Handling CIO interrupt for card %d\n",
+                              R[NUM_PC], i);
+
                     cio[i].intr = FALSE;
                 }
             }

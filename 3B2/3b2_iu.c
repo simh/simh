@@ -324,7 +324,7 @@ t_stat tti_reset(DEVICE *dptr)
 
     /* Start the Console TTI polling loop */
     if (!sim_is_active(&tti_unit)) {
-        sim_activate(&tti_unit, tti_unit.wait);
+        sim_activate_after(&tti_unit, tti_unit.wait);
     }
 
     return SCPE_OK;
@@ -347,6 +347,10 @@ t_stat contty_reset(DEVICE *dtpr)
 
     memset(&iu_state, 0, sizeof(IU_STATE));
     memset(&iu_contty, 0, sizeof(IU_PORT));
+
+    /* DCD is off (inverted logic, 1 means off) */
+    iu_state.inprt |= IU_DCDB;
+
     brg_reg = 0;
     brg_clk = BRG_DEFAULT;
     parity_sel = IU_PARITY_EVEN;
@@ -361,7 +365,7 @@ t_stat contty_reset(DEVICE *dtpr)
 
     /* Start the CONTTY polling loop */
     if (!sim_is_active(contty_rcv_unit)) {
-        sim_activate(contty_rcv_unit, contty_rcv_unit->wait);
+        sim_activate_after(contty_rcv_unit, contty_rcv_unit->wait);
     }
 
     return SCPE_OK;
@@ -393,7 +397,7 @@ t_stat iu_svc_tti(UNIT *uptr)
     */
 
     if ((temp = sim_poll_kbd()) < SCPE_KFLAG) {
-         return temp;
+        return temp;
     }
 
     if (iu_console.conf & RX_EN) {
@@ -438,22 +442,26 @@ t_stat iu_svc_contty_rcv(UNIT *uptr)
         return SCPE_OK;
     }
 
-    ln = tmxr_poll_conn(&contty_desc);
-    if (ln >= 0) {
+    /* Check for connect */
+    if ((ln = tmxr_poll_conn(&contty_desc)) >= 0) {
         contty_ldsc[ln].rcve = 1;
-        /* Set DCD */
         iu_state.inprt &= ~(IU_DCDB);
         iu_state.ipcr |= IU_DCDB;
-        /* Cause an interrupt */
         csr_data |= CSRUART;
     }
 
-    tmxr_poll_rx(&contty_desc);
+    /* Check for disconnect */
+    if (!contty_ldsc[0].conn && (iu_state.inprt & IU_DCDB) == 0) {
+        contty_ldsc[0].rcve = 0;
+        iu_state.inprt |= IU_DCDB;
+        iu_state.ipcr |= IU_DCDB;
+        csr_data |= CSRUART;
+    } else if (iu_contty.conf & RX_EN) {
+        tmxr_poll_rx(&contty_desc);
 
-    if (contty_ldsc[0].conn) {
-        temp = tmxr_getc_ln(&contty_ldsc[0]);
-        if (temp && !(temp & SCPE_BREAK)) {
-            if (iu_contty.conf & RX_EN) {
+        if (contty_ldsc[0].conn) {
+            temp = tmxr_getc_ln(&contty_ldsc[0]);
+            if (temp && !(temp & SCPE_BREAK)) {
                 if ((iu_contty.stat & STS_FFL) == 0) {
                     iu_contty.rxbuf[iu_contty.w_p] = (temp & 0xff);
                     iu_contty.w_p = (iu_contty.w_p + 1) % IU_BUF_SIZE;
@@ -530,7 +538,7 @@ t_stat iu_svc_timer(UNIT *uptr)
 uint32 iu_read(uint32 pa, size_t size)
 {
     uint8 reg, modep;
-    uint32 data, delay;
+    uint32 data;
 
     reg = (uint8) (pa - IUBASE);
 
@@ -544,15 +552,17 @@ uint32 iu_read(uint32 pa, size_t size)
         data = iu_console.stat;
         break;
     case RHRA:
-        data = iu_console.rxbuf[iu_console.r_p];
-        iu_console.r_p = (iu_console.r_p + 1) % IU_BUF_SIZE;
-        /* If the FIFO is not empty, we must cause another interrupt
-         * to continue reading */
-        if (iu_console.r_p == iu_console.w_p) {
-            iu_console.stat &= ~(STS_RXR|STS_FFL);
-            iu_state.istat &= ~ISTS_RAI;
-        } else {
-            csr_data |= CSRUART;
+        if (iu_console.conf & RX_EN) {
+            data = iu_console.rxbuf[iu_console.r_p];
+            iu_console.r_p = (iu_console.r_p + 1) % IU_BUF_SIZE;
+            /* If the FIFO is not empty, we must cause another interrupt
+             * to continue reading */
+            if (iu_console.r_p == iu_console.w_p) {
+                iu_console.stat &= ~(STS_RXR|STS_FFL);
+                iu_state.istat &= ~ISTS_RAI;
+            } else if (iu_state.imr & IMR_RXRA) {
+                csr_data |= CSRUART;
+            }
         }
         break;
     case IPCR:
@@ -579,15 +589,17 @@ uint32 iu_read(uint32 pa, size_t size)
         data = iu_contty.stat;
         break;
     case RHRB:
-        data = iu_contty.rxbuf[iu_contty.r_p];
-        iu_contty.r_p = (iu_contty.r_p + 1) % IU_BUF_SIZE;
-        /* If the FIFO is not empty, we must cause another interrupt
-         * to continue reading */
-        if (iu_contty.r_p == iu_contty.w_p) {
-            iu_contty.stat &= ~(STS_RXR|STS_FFL);
-            iu_state.istat &= ~ISTS_RBI;
-        } else {
-            csr_data |= CSRUART;
+        if (iu_contty.conf & RX_EN) {
+            data = iu_contty.rxbuf[iu_contty.r_p];
+            iu_contty.r_p = (iu_contty.r_p + 1) % IU_BUF_SIZE;
+            /* If the FIFO is not empty, we must cause another interrupt
+             * to continue reading */
+            if (iu_contty.r_p == iu_contty.w_p) {
+                iu_contty.stat &= ~(STS_RXR|STS_FFL);
+                iu_state.istat &= ~ISTS_RBI;
+            } else if (iu_state.imr & IMR_RXRB) {
+                csr_data |= CSRUART;
+            }
         }
         break;
     case INPRT:
@@ -596,8 +608,7 @@ uint32 iu_read(uint32 pa, size_t size)
     case START_CTR:
         data = 0;
         iu_state.istat &= ~ISTS_CRI;
-        delay = (uint32) (IU_TIMER_STP * iu_timer_state.c_set);
-        sim_activate_abs(&iu_timer_unit, (int32) DELAY_US(delay));
+        sim_activate_abs(&iu_timer_unit, iu_timer_state.c_set * IU_TIMER_RATE);
         break;
     case STOP_CTR:
         data = 0;
@@ -607,12 +618,6 @@ uint32 iu_read(uint32 pa, size_t size)
         break;
     case 17: /* Clear DMAC interrupt */
         data = 0;
-        /*
-        iu_console.drq = FALSE;
-        iu_console.dma = FALSE;
-        iu_contty.drq = FALSE;
-        iu_contty.dma = FALSE;
-        */
         csr_data &= ~CSRDMA;
         break;
     default:
@@ -639,7 +644,18 @@ void iu_write(uint32 pa, uint32 val, size_t size)
         iu_increment_a = TRUE;
         break;
     case CSRA:
-        /* Set baud rate - not yet implemented on console */
+        if (brg_rates[brg_reg][brg_clk] != NULL) {
+            sprintf(line_config, "%s-%d%s1",
+                    brg_rates[brg_reg][brg_clk],
+                    bits_per_char,
+                    parity[parity_sel]);
+
+            sim_debug(EXECUTE_MSG, &contty_dev,
+                      "Setting CONTTY line to %s\n",
+                      line_config);
+
+            tmxr_set_config_line(&contty_ldsc[0], line_config);
+        }
         break;
     case CRA:  /* Command A */
         iu_w_cmd(PORT_A, bval);
@@ -756,8 +772,8 @@ t_stat iu_tx(uint8 portno, uint8 val)
             }
 
             p->stat |= STS_RXR;
-            iu_state.istat |= ists;
             if (iu_state.imr & imr_mask) {
+                iu_state.istat |= ists;
                 csr_data |= CSRUART;
             }
 
@@ -775,7 +791,7 @@ t_stat iu_tx(uint8 portno, uint8 val)
                     sim_debug(EXECUTE_MSG, &tto_dev,
                               "[iu_tx] CONSOLE transmit %02x (%c)\n",
                               (uint8) c, (char) c);
-                    status = sim_putchar(c);
+                    status = sim_putchar_s(c);
                 } else {
                     sim_debug(EXECUTE_MSG, &contty_dev,
                               "[iu_tx] CONTTY transmit %02x (%c)\n",

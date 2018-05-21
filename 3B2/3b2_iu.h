@@ -140,27 +140,8 @@ extern DEVICE tto_dev;
 extern DEVICE contty_dev;
 extern DEVICE iu_timer_dev;
 
-extern int32 tmxr_poll;
-
 #define IUBASE            0x49000
 #define IUSIZE            0x100
-
-/* The UART is driven by a 3.6864 MHz crystal. This is divided by 16
-   to clock the timer. (One peculiarity: 3.6864 MHz /16 is 230400 Hz,
-   but the SVR3 source code claims the /16 clock is actually 230525
-   Hz. So, we'll go with 230525 Hz until proven otherwise.)
-
-   UART clock period   = 4338ns
-   System clock period =  100ns
-
-   That means the system ticks 43.3792 times for every one tick of the
-   UART clock.
-
-   But this is a simulated system, where each simulator step is
-   CYCLES_PER_INST long. So we take that into account.
-*/
-
-#define IU_TIMER_STP      4.33792
 
 #define IU_BUF_SIZE       3
 
@@ -176,6 +157,8 @@ extern int32 tmxr_poll;
 
 /* Default baud rate generator (9600 baud) */
 #define BRG_DEFAULT       11
+
+#define IU_TIMER_RATE     2.114 /* microseconds per step */
 
 
 typedef struct iu_port {
