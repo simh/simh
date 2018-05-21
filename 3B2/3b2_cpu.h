@@ -387,7 +387,7 @@ typedef struct _instr {
 } instr;
 
 /* Function prototypes */
-
+t_stat sys_boot(int32 flag, CONST char *ptr);
 t_stat cpu_svc(UNIT *uptr);
 t_stat cpu_ex(t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep(t_value val, t_addr addr, UNIT *uptr, int32 sw);

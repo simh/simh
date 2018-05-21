@@ -76,6 +76,11 @@ t_bool cpu_ex_halt    = FALSE;     /* Flag to halt on exceptions /
                                       traps */
 t_bool cpu_km         = FALSE;     /* If true, kernel mode has been forced
                                       for memory access */
+CTAB sys_cmd[] = {
+    { "BOOT", &sys_boot, RU_BOOT,
+      "bo{ot}                   boot simulator\n", NULL, &run_cmd_message },
+    { NULL }
+};
 
 BITFIELD psw_bits[] = {
     BITFFMT(ET,2,%d),    /* Exception Type */
@@ -570,6 +575,19 @@ void cpu_load_rom()
     }
 }
 
+t_stat sys_boot(int32 flag, CONST char *ptr)
+{
+    char gbuf[CBUFSIZE];
+
+    get_glyph(ptr, gbuf, 0);
+
+    if (gbuf[0] && strcmp(gbuf, "CPU")) {
+        return SCPE_ARG;
+    }
+
+    return run_cmd(flag, "CPU");
+}
+
 t_stat cpu_boot(int32 unit_num, DEVICE *dptr)
 {
     /*
@@ -655,6 +673,10 @@ t_stat cpu_dep(t_value val, t_addr addr, UNIT *uptr, int32 sw)
 t_stat cpu_reset(DEVICE *dptr)
 {
     int i;
+
+    /* Link in our special "boot" command so we can boot with both
+     * "BO{OT}" and "BO{OT} CPU" */
+    sim_vm_cmd = sys_cmd;
 
     if (!sim_is_running) {
         /* Clear registers */
