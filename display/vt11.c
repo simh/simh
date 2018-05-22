@@ -275,7 +275,7 @@ enum linetype { SOLID=0, LONG_DASH, SHORT_DASH, DOT_DASH };
  * graphplot increment register value   15:10
  * X position register value            9:0
  */
-static unsigned char graphplot_step = 0;/* (scaled) graphplot step increment */
+static int32         graphplot_step = 0;/* (scaled) graphplot step increment */
 static int32         xpos = 0;          /* X position register * PSCALEF */
                                         /* note: offset has been applied! */
 static int           lp_xpos;           /* (normalized) */
@@ -582,8 +582,8 @@ static unsigned char refresh_rate = 0;  /* 2 bits:
 #define BLINK_COUNT 67                  /* 67 milliseconds */
 #endif
 
-unsigned char vt11_csp_w = VT11_CSP_W;  /* horizontal character spacing */
-unsigned char vt11_csp_h = VT11_CSP_H;  /* vertical character spacing */
+int32 vt11_csp_w = VT11_CSP_W;          /* horizontal character spacing */
+int32 vt11_csp_h = VT11_CSP_H;          /* vertical character spacing */
 /* VS60 spacing depends on char scale; above are right for char scale x1 */
 
 /* VS60 has a menu area to the right of the "main working surface" */
@@ -1760,24 +1760,38 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
      *                                  tPL := tL
      */
 
+    /*
+         The following code is commented out here and written more
+         compactly below since tPEn, tPEd, tPLn and tPLd are constants.
+
     if (rdx < 0) {
         if (x0 <= 0 && x0 >= rdx) {
             if (tPEd > 0) {
                 if (x0 * (long)tPEd < (long)tPEn * rdx)
                     tPEn = x0, tPEd = rdx;
-            } else                      /* tPEd < 0 */
+            } else                      // tPEd < 0 
                 if (x0 * (long)tPEd > (long)tPEn * rdx)
                     tPEn = x0, tPEd = rdx;
         }
-    } else {                            /* rdx > 0 */
+    } else {                            // rdx > 0
         if (x0 >= 0 && x0 <= rdx) {
             if (tPLd > 0) {
                 if (x0 * (long)tPLd < (long)tPLn * rdx)
                     tPLn = x0, tPLd = rdx;
-            } else                      /* tPLd < 0 */
+            } else                      // tPLd < 0
                 if (x0 * (long)tPLd > (long)tPLn * rdx)
                     tPLn = x0, tPLd = rdx;
         }
+    }
+    */
+
+    if (rdx < 0) {
+        if (x0 <= 0 && x0 >= rdx)       /* x0 not positive but less negative than rdx? */
+            tPEn = x0, tPEd = rdx;
+    } else {
+        if ((x0 >= 0 && x0 <= rdx) &&   /* x0 not negative but less than or equal to rdx */
+            (rdx != 0))                 /* and rdx not zero */
+            tPLn = x0, tPLd = rdx;
     }
 
     /*
@@ -1812,26 +1826,26 @@ clip3(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1)
      */
 
     tn = x0 - CLIPXMAX;
-
     if (rdx < 0) {
         if (tn <= 0 && tn >= rdx) {
             if (tPLd > 0) {
                 if (tn * (long)tPLd > (long)tPLn * rdx)
                     tPLn = tn, tPLd = rdx;
-            } else                      /* tPLd < 0 */
+            } else                      // tPLd < 0
                 if (tn * (long)tPLd < (long)tPLn * rdx)
                     tPLn = tn, tPLd = rdx;
         }
-    } else {                            /* rdx > 0 */
+    } else {                            // rdx > 0
         if (tn >= 0 && tn <= rdx) {
             if (tPEd > 0) {
                 if (tn * (long)tPEd > (long)tPEn * rdx)
                     tPEn = tn, tPEd = rdx;
-            } else                      /* tPEd < 0 */
+            } else                      // tPEd < 0
                 if (tn * (long)tPEd < (long)tPEn * rdx)
                     tPEn = tn, tPEd = rdx;
         }
     }
+
 
     /*
      * Bottom:  tB = NB . (PB - P0) / NB . (P1 - P0)
@@ -2113,6 +2127,7 @@ vector3(int i, int32 dx, int32 dy, int32 dz)   /* unscaled display-file units */
             return;
         default:
             DEBUGF("clip() bad return: %d\n", clip_vect);
+            /* Fallthrough */
         case -1:                        /* visible, not clipped */
             clip_vect = 0;
             break;                      /* draw immediately */
@@ -2141,17 +2156,21 @@ vector3(int i, int32 dx, int32 dy, int32 dz)   /* unscaled display-file units */
      */
 
     if (lp0_hit) {
-        long tangent;
+        long tangent = 0;
         int32 adx = ABS(dx), ady = ABS(dy);
         if (adx >= ady) {
-            tangent = 010000L * dy / dx;        /* signed */
+            if (dx)
+                tangent = 010000L * dy / dx;        /* signed */
             lp_ypos = y0 + tangent * (lp_xpos - x0) / 010000L;
-            tangent = 010000L * dz / dx;
+            if (dx)
+                tangent = 010000L * dz / dx;
             lp_zpos = z0 + tangent * (lp_xpos - x0) / 010000L;
         } else {
-            tangent = 010000L * dx / dy;        /* signed */
+            if (dy)
+                tangent = 010000L * dx / dy;        /* signed */
             lp_xpos = x0 + tangent * (lp_ypos - y0) / 010000L;
-            tangent = 010000L * dz / dy;
+            if (dy)
+                tangent = 010000L * dz / dy;
             lp_zpos = z0 + tangent * (lp_ypos - y0) / 010000L;
         }
         DEBUGF("adjusted LP coords (0%o,0%o,0%o)\r\n",

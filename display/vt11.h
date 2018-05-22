@@ -49,13 +49,13 @@ typedef unsigned int uint32;
  * spacing; to change the VT11 simulation from these default values,
  * set vt11_csp_{w,h} before calling any function named vt11_*.
  */
-extern unsigned char vt11_csp_w;        /* horizontal character spacing */
+extern int32 vt11_csp_w;                /* horizontal character spacing */
 #ifdef  VT11_NARROW_OPT                 /* W3 or W6 installed */
 #define VT11_CSP_W      12
 #else   /* VT11 normal;                    W4 or W5 installed */
 #define VT11_CSP_W      14
 #endif
-extern unsigned char vt11_csp_h;        /* vertical character spacing */
+extern int32 vt11_csp_h;                /* vertical character spacing */
 #ifdef  VT11_TALL_OPT                   /* W3 or W4 installed */
 #define VT11_CSP_H      26
 #else   /* VT11 normal;                    W5 or W6 installed */
