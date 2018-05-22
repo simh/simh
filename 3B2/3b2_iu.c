@@ -177,7 +177,7 @@ REG contty_reg[] = {
     { NULL }
 };
 
-char *brg_rates[IU_SPEED_REGS][IU_SPEEDS] = {
+CONST char *brg_rates[IU_SPEED_REGS][IU_SPEEDS] = {
     {NULL,    "110",   NULL,   NULL,
      "300",   NULL,    NULL,   "1200",
      "2400",  "4800",  NULL,   "9600",
@@ -188,7 +188,7 @@ char *brg_rates[IU_SPEED_REGS][IU_SPEEDS] = {
      "19200", NULL,    NULL,   NULL}
 };
 
-char *parity[3] = {"O", "E", "N"};
+CONST char *parity[3] = {"O", "E", "N"};
 
 UNIT contty_unit[2] = {
     { UDATA(&iu_svc_contty_rcv, UNIT_ATTABLE, 0) },

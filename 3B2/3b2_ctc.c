@@ -256,8 +256,8 @@ static void ctc_cmd(uint8 cid,
     uint32 maxpass, blkno, delay;
     uint8  dev;
     uint8  sec_buf[512];
-    int32  secrw = 0;
     int32  b, j;
+    t_seccnt secrw = 0;
     struct vtoc vtoc = {0};
     struct pdinfo pdinfo = {0};
 
@@ -358,7 +358,7 @@ static void ctc_cmd(uint8 cid,
 
         vtoc.sanity   = VTOC_VALID;
         vtoc.version  = 1;
-        strcpy(vtoc.volume, "ctctape");
+        strcpy((char *)vtoc.volume, "ctctape");
         vtoc.sectorsz = PD_BYTES;
         vtoc.nparts   = VTOC_PART;
 

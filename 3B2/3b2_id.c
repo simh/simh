@@ -105,7 +105,7 @@ size_t   id_buf_ptr = 0;
 uint8    id_idfield[ID_IDFIELD_LEN];
 uint8    id_idfield_ptr = 0;
 
-uint8    id_seek_state[ID_NUM_UNITS] = {ID_SEEK_NONE};
+int8     id_seek_state[ID_NUM_UNITS] = {ID_SEEK_NONE};
 
 struct id_dtype {
     uint8  hd;    /* Number of heads */
