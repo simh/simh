@@ -64,15 +64,15 @@
  * entries only.
 */
 
-#define DR_ENA		1		/* enable a device */
-#define DR_DIS		2		/* disable a device */
-#define DR_ABR		3		/* abort reception on a device */
-#define DR_ABX		4		/* abort transmission on a device */
-#define DR_BRK		5		/* transmit "break" on a device */
-#define DR_SUS		6		/* suspend xmit on a device */
-#define DR_RES		7		/* resume xmit on a device */
-#define DR_BLK		8		/* transmit STOP character */
-#define DR_UNB		9		/* transmit START character */
+#define DR_ENA      1       /* enable a device */
+#define DR_DIS      2       /* disable a device */
+#define DR_ABR      3       /* abort reception on a device */
+#define DR_ABX      4       /* abort transmission on a device */
+#define DR_BRK      5       /* transmit "break" on a device */
+#define DR_SUS      6       /* suspend xmit on a device */
+#define DR_RES      7       /* resume xmit on a device */
+#define DR_BLK      8       /* transmit STOP character */
+#define DR_UNB      9       /* transmit START character */
 
 /*
  * Sub-field values for the PPC_DEVICE completion entry; these appear
@@ -81,10 +81,10 @@
  * that this is a code for use in "device" completion entries only.
  */
 
-#define DC_NORM	0x00	/* command executed as requested */
-#define DC_DEV	0x01	/* bad device number */
-#define DC_NON	0x02	/* bad sub-code on request */
-#define DC_FAIL	0x03	/* failed to read express entry */
+#define DC_NORM 0x00    /* command executed as requested */
+#define DC_DEV  0x01    /* bad device number */
+#define DC_NON  0x02    /* bad sub-code on request */
+#define DC_FAIL 0x03    /* failed to read express entry */
 
 /*
  * Sub-field values for the PPC_RECV completion entry; these appear in
@@ -94,14 +94,14 @@
  * only.
 */
 
-#define RC_DSR	0x01	/* disruption of service */
-#define RC_FLU	0x02	/* buffer flushed */
-#define RC_TMR	0x04	/* inter-character timer expired */
-#define RC_BQO	0x08	/* PPC buffer queue overflow */
-#define RC_UAO	0x10	/* uart overrun */
-#define RC_PAR	0x20	/* parity error */
-#define RC_FRA	0x40	/* framing error */
-#define RC_BRK	0x80	/* break received */
+#define RC_DSR  0x01    /* disruption of service */
+#define RC_FLU  0x02    /* buffer flushed */
+#define RC_TMR  0x04    /* inter-character timer expired */
+#define RC_BQO  0x08    /* PPC buffer queue overflow */
+#define RC_UAO  0x10    /* uart overrun */
+#define RC_PAR  0x20    /* parity error */
+#define RC_FRA  0x40    /* framing error */
+#define RC_BRK  0x80    /* break received */
 
 /*
  * The following codes are included on the DISC (disconnect) command.
@@ -110,8 +110,8 @@
  * any combination.
  */
 
-#define GR_DTR		0x01
-#define GR_CREAD	0x02
+#define GR_DTR      0x01
+#define GR_CREAD    0x02
 
 /*
  * Sub-field values for the PPC_XMIT and PPC_OPTIONS completion
@@ -121,8 +121,8 @@
  * completion entries only.
 */
 
-#define GC_DSR	0x01	/* disruption of service */
-#define GC_FLU	0x02	/* buffer flushed */
+#define GC_DSR  0x01    /* disruption of service */
+#define GC_FLU  0x02    /* buffer flushed */
 
 /*
  * Sub-field values for the PPC_ASYNC completion entry; these appear
@@ -132,10 +132,10 @@
  * only.
 */
 
-#define AC_CON	0x01	/* connection detected */
-#define AC_DIS	0x02	/* disconnection detected */
-#define AC_BRK	0x03	/* asynchronous "break" */
-#define AC_FLU	0x04	/* xmit flush complete */
+#define AC_CON  0x01    /* connection detected */
+#define AC_DIS  0x02    /* disconnection detected */
+#define AC_BRK  0x03    /* asynchronous "break" */
+#define AC_FLU  0x04    /* xmit flush complete */
 
 /* Line Discipline flags (input and output) */
 
