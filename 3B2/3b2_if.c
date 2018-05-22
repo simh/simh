@@ -53,16 +53,14 @@ double if_start_time;
  *
  * 80 * 9 * 2 * 512 = 720KB
  *
- * The clock on pin 24 runs at 1.000 MHz, meaning that each
- * step is 6ms and head settling time is 30ms.
  */
 
-#define IF_STEP_DELAY       6000     /* us */
-#define IF_R_DELAY          85000    /* us */
-#define IF_W_DELAY          90000    /* us */
-#define IF_VERIFY_DELAY     30000    /* us */
-#define IF_HLD_DELAY        80000    /* us */
-#define IF_HSW_DELAY        60000    /* us */
+#define IF_STEP_DELAY       3000     /* us */
+#define IF_R_DELAY          65000    /* us */
+#define IF_W_DELAY          70000    /* us */
+#define IF_VERIFY_DELAY     20000    /* us */
+#define IF_HLD_DELAY        60000    /* us */
+#define IF_HSW_DELAY        40000    /* us */
 
 UNIT if_unit = {
     UDATA (&if_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+
