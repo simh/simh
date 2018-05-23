@@ -36,11 +36,7 @@
 #include "sim_defs.h"
 #include <setjmp.h>
 
-#if defined (__GNUC__)
-#define INLINE inline
-#else
 #define INLINE
-#endif
 
 /* Configuration */
 

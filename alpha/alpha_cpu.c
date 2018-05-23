@@ -1797,7 +1797,7 @@ t_value sim_val;
 extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw);
 
-static const h_fmt[64] = {
+static const int h_fmt[64] = {
     0,     0,     0,     0,     0,     0,     0,     0,
     H_MRF, H_MRF, H_MRF, H_MRF, H_MRF, H_MRF, H_MRF, H_MRF,
     H_IOP, H_IOP, H_IOP, H_IOP, H_FOP, H_FOP, H_FOP, H_FOP,
