@@ -427,9 +427,9 @@ if (dev & DEV_MTS) {                                    /* erase? */
         st = sim_tape_errecr (uptr, mt_bptr);
     else st = sim_tape_errecf (uptr, mt_bptr);          /* no, forward */
     }
-else {
-    if ((mt_bptr == 1) && (mtxb[0] == 017) &&           /* wr eof? */
-        ((mt_inst & 01670) == 00050))
+else {                                                  /* can't be reverse */
+    if ((mt_bptr == 1) && (mtxb[0] == 017) &&           /* 1 char BCD write */
+        (!(mt_inst & CHC_BIN)))                         /* of 017B? */
         st = sim_tape_wrtmk (uptr);                     /* write tape mark */
     else st = sim_tape_wrrecf (uptr, mtxb, mt_bptr);    /* write record */
     }
