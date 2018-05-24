@@ -72,6 +72,8 @@ typedef struct _opcode
 }
 t_opcode;
 
+extern void         print_opcode(FILE * ofile, t_value val, t_opcode *);
+extern t_opcode     word_ops[], char_ops[];
 
 t_stat chan_reset(DEVICE *);
 t_stat chan_boot(t_uint64);
