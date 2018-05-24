@@ -116,6 +116,8 @@ REG rtc_reg[] = {
   { FLDATA (IRQ, dev_ext_int, INT_V_RTC-INT_V_EXTD) },
   { DRDATA (TPS, rtc_tps, 32), PV_LEFT },
   { DRDATA (WAIT, rtc_unit.wait, 24), REG_NZ + PV_LEFT },
+  { DRDATA (INTERVAL, rtc_interval, 32), PV_LEFT | REG_RO },
+  { DRDATA (QUANTUM, rtc_quantum, 32), PV_LEFT | REG_RO },
   { NULL }
 };
 

@@ -36,7 +36,23 @@ d -m 1015 177766
 
 ; That's it...
 d p 1000
-echo Start your stopwatch and at the same moment type "GO".
-echo The program should halt in exactly 65 seconds ...
-
-
+set env -a RTC_INTERVAL=RTC.INTERVAL
+set env -a RTC_QUANTUM=RTC.QUANTUM
+set env -a RTC_TPS=RTC.TPS
+set env -a RTC_DELAY=(1000*(10*(65536/RTC_QUANTUM)))/RTC_TPS
+set env -a RTC_DELAY_SECS=RTC_DELAY/1000
+set env -a RTC_DELAY_MSECS=RTC_DELAY%1000
+echo The RTC runs at %RTC_TPS% ticks per second an increment of %RTC_QUANTUM%
+echo on each tick.
+echo The program should halt in approximately %RTC_DELAY_SECS%.%RTC_DELAY_MSECS% seconds ...
+echo Starting at: %TIME%.%TIME_MSEC%
+set env -a S_TIME_MSEC=((UTIME%1000000)*1000)+TIME_MSEC
+GO
+set env -a E_TIME_MSEC=((UTIME%1000000)*1000)+TIME_MSEC
+echo Done at: %TIME%.%TIME_MSEC%
+set env -a D_TIME_MSEC=E_TIME_MSEC-S_TIME_MSEC
+set env -a ESECS=D_TIME_MSEC/1000
+set env -a EMSECS=D_TIME_MSEC%1000
+echo Elapsed Time: %ESECS%.%EMSECS% seconds
+set env -a IPS=TICK_RATE_0*TICK_SIZE_0
+echo Running at %IPS% instructions per second
