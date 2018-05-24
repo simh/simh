@@ -4056,6 +4056,8 @@ else {
     if (*cptr == '(') {
         t_svalue value;
 
+        if ((cptr > sim_sub_instr_buf) && ((size_t)(cptr - sim_sub_instr_buf) < sim_sub_instr_size))
+            cptr = &sim_sub_instr[sim_sub_instr_off[cptr - sim_sub_instr_buf]]; /* get un-substituted string */
         cptr = sim_eval_expression (cptr, &value, TRUE, &r);
         result = (value != 0);
         }
@@ -4116,6 +4118,8 @@ else {
             }
         }
     }
+if ((cptr > sim_sub_instr_buf) && ((size_t)(cptr - sim_sub_instr_buf) < sim_sub_instr_size))
+    cptr = &sim_sub_instr[sim_sub_instr_off[cptr - sim_sub_instr_buf]]; /* get un-substituted string */
 if (Not ^ result) {
     if (!flag)
         sim_brk_setact (cptr);                          /* set up IF actions */
