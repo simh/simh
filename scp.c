@@ -555,10 +555,10 @@ int32 sim_brk_lnt = 0;
 int32 sim_brk_ins = 0;
 int32 sim_quiet = 0;
 int32 sim_step = 0;
-char *sim_sub_instr = NULL;
-char *sim_sub_instr_buf = NULL;
-size_t sim_sub_instr_size = 0;
-size_t *sim_sub_instr_off = NULL;
+char *sim_sub_instr = NULL;         /* Copy of pre-substitution buffer contents */
+char *sim_sub_instr_buf = NULL;     /* Buffer address that substitutions were saved in */
+size_t sim_sub_instr_size = 0;      /* substitution buffer size */
+size_t *sim_sub_instr_off = NULL;   /* offsets in substitution buffer where original data started */
 static double sim_time;
 static uint32 sim_rtime;
 static int32 noqueue_time;
@@ -4696,10 +4696,10 @@ else {
     cptr = get_glyph (cptr, varname, '=');              /* get environment variable name */
     strlcpy (cbuf, cptr, sizeof(cbuf));
     sim_trim_endspc (cbuf);
-    cptr = cbuf;
     if (sim_switches & SWMASK ('S')) {                  /* Quote String argument? */
         uint32 str_size;
 
+        cptr = cbuf;
         get_glyph_quoted (cptr, cbuf, 0);
         if (SCPE_OK != sim_decode_quoted_string (cbuf, (uint8 *)cbuf, &str_size)) 
             return sim_messagef (SCPE_ARG, "Invalid quoted string: %s\n", cbuf);
@@ -4709,8 +4709,11 @@ else {
         if (sim_switches & SWMASK ('A')) {              /* Arithmentic Expression Evaluation argument? */
             t_svalue val;
             t_stat stat;
+            const char *eptr = cptr;
 
-            cptr = sim_eval_expression (cptr, &val, FALSE, &stat);
+            if ((cptr > sim_sub_instr_buf) && ((size_t)(cptr - sim_sub_instr_buf) < sim_sub_instr_size))
+                eptr = &sim_sub_instr[sim_sub_instr_off[cptr - sim_sub_instr_buf]]; /* get un-substituted string */
+            cptr = sim_eval_expression (eptr, &val, FALSE, &stat);
             if (stat == SCPE_OK) {
                 sprintf (cbuf, "%ld", (long)val);
                 cptr = cbuf;
@@ -13469,12 +13472,16 @@ return factorx * factory;
 
 static t_svalue _op_div (t_svalue divisor, t_svalue dividend)
 {
-return dividend / divisor;
+if (divisor != 0)
+    return dividend / divisor;
+return T_SVALUE_MAX;
 }
 
 static t_svalue _op_mod (t_svalue divisor, t_svalue dividend)
 {
-return dividend % divisor;
+if (divisor != 0)
+    return dividend % divisor;
+return 0;
 }
 
 static t_svalue _op_comp (t_svalue data, t_svalue unused)
