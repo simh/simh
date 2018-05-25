@@ -13817,7 +13817,7 @@ static t_bool _value_of (const char *data, t_svalue *svalue, char *string, size_
 CONST char *gptr;
 
 if (isalpha (*data)) {
-    REG *rptr;
+    REG *rptr = NULL;
     DEVICE *dptr = sim_dfdev;
     const char *dot;
     
