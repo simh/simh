@@ -6765,8 +6765,13 @@ if ((uptr->flags & UNIT_BUF) && (uptr->filebuf)) {
 uptr->flags = uptr->flags & ~(UNIT_ATT | ((uptr->flags & UNIT_ROABLE) ? UNIT_RO : 0));
 free (uptr->filename);
 uptr->filename = NULL;
-if (fclose (uptr->fileref) == EOF)
-    return SCPE_IOERR;
+if (uptr->fileref) {                        /* Only close open file */
+    if (fclose (uptr->fileref) == EOF) {
+        uptr->fileref = NULL;
+        return SCPE_IOERR;
+        }
+    uptr->fileref = NULL;
+    }
 return SCPE_OK;
 }
 
