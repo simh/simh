@@ -495,6 +495,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   ifneq (,$(call find_include,semaphore))
     OS_CCDEFS += -DHAVE_SEMAPHORE
   endif
+  ifneq (,$(call find_include,sys/ioctl))
+    OS_CCDEFS += -DHAVE_SYS_IOCTL
+  endif
+  ifneq (,$(call find_include,linux/cdrom))
+    OS_CCDEFS += -DHAVE_LINUX_CDROM
+  endif
   ifneq (,$(call find_include,dlfcn))
     ifneq (,$(call find_lib,dl))
       OS_CCDEFS += -DHAVE_DLOPEN=$(LIBEXT)

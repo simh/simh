@@ -2608,6 +2608,12 @@ return SCPE_IOERR;
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#if defined(HAVE_SYS_IOCTL)
+#include <sys/ioctl.h>
+#endif
+#if defined(HAVE_LINUX_CDROM)
+#include <linux/cdrom.h>
+#endif
 
 static t_stat sim_os_disk_implemented_raw (void)
 {
@@ -2659,11 +2665,33 @@ return size;
 
 static t_stat sim_os_disk_unload_raw (FILE *f)
 {
-return SCPE_IOERR;
+#if defined(CDROM_GET_CAPABILITY) && defined(CDROMEJECT) && defined(CDROMEJECT_SW)
+if (ioctl ((int)((long)f), CDROM_GET_CAPABILITY, NULL) < 0)
+    return SCPE_OK;
+if (ioctl((int)((long)f), CDROM_LOCKDOOR, 0) < 0)
+    return SCPE_IOERR;
+if (ioctl((int)((long)f), CDROMEJECT) < 0)
+    return SCPE_IOERR;
+#endif
+return SCPE_OK;
 }
 
 static t_bool sim_os_disk_isavailable_raw (FILE *Disk)
 {
+#if defined(CDROMSTART) && defined(CDROM_GET_CAPABILITY)
+if (ioctl ((int)((long)Disk), CDROM_GET_CAPABILITY, NULL) < 0)
+    return TRUE;
+switch (ioctl((int)((long)Disk), CDROM_DRIVE_STATUS, CDSL_NONE)) {
+    case CDS_NO_INFO:
+    case CDS_NO_DISC:
+    case CDS_TRAY_OPEN:
+    case CDS_DRIVE_NOT_READY:
+    default: /* error */
+        return FALSE;
+    case CDS_DISC_OK:
+        return TRUE;
+    }
+#endif
 return TRUE;
 }
 
@@ -2709,12 +2737,31 @@ return SCPE_OK;
 
 static t_stat sim_os_disk_info_raw (FILE *f, uint32 *sector_size, uint32 *removable, uint32 *is_cdrom)
 {
-if (sector_size)
-    *sector_size = 512;
+if (sector_size) {
+#if defined(BLKSSZGET)
+    if (ioctl ((int)((long)f), BLKSSZGET, sector_size) < 0)
+#endif
+        *sector_size = 512;
+    }
 if (removable)
     *removable = 0;
-if (is_cdrom)
+if (is_cdrom) {
+#if defined(CDROM_GET_CAPABILITY)
+    int cd_cap = ioctl ((int)((long)f), CDROM_GET_CAPABILITY, NULL);
+
+    if (cd_cap < 0)
+        *is_cdrom = 0;
+    else {
+        *is_cdrom = 1;
+        if (removable)
+            *removable = 1;
+        if (sector_size)
+            *sector_size = 2048;
+        }
+#else
     *is_cdrom = 0;
+#endif
+    }
 return SCPE_OK;
 }
 
