@@ -75,6 +75,7 @@
 #define CTC_HWERROR     32
 #define CTC_RDONLY      33
 #define CTC_NOTREADY    36
+#define CTC_RWERROR     37
 #define CTC_NOMEDIA     42
 
 /* VTOC values */

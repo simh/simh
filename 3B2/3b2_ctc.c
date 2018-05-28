@@ -260,6 +260,7 @@ static void ctc_cmd(uint8 cid,
     t_seccnt secrw = 0;
     struct vtoc vtoc = {0};
     struct pdinfo pdinfo = {0};
+    t_stat result;
 
     uint32 lba;   /* Logical Block Address */
 
@@ -486,13 +487,18 @@ static void ctc_cmd(uint8 cid,
                 sec_buf[j] = pread_b(rqe->address + (b * 512) + j);
             }
             lba = blkno + b;
-            sim_debug(TRACE_DBG, &ctc_dev,
-                      "[ctc_cmd] ... CTC_WRITE: 512 bytes at block %d (0x%x)\n",
-                      lba, lba);
-            sim_disk_wrsect(&ctc_unit, lba, sec_buf, &secrw, 1);
+            result = sim_disk_wrsect(&ctc_unit, lba, sec_buf, &secrw, 1);
+            if (result == SCPE_OK) {
+                sim_debug(TRACE_DBG, &ctc_dev,
+                          "[ctc_cmd] ... CTC_WRITE: 512 bytes at block %d (0x%x)\n",
+                          lba, lba);
+                cqe->opcode = CTC_SUCCESS;
+            } else {
+                cqe->opcode = CTC_RWERROR;
+                break;
+            }
         }
 
-        cqe->opcode = CTC_SUCCESS;
         break;
     case CTC_READ:
         sim_debug(TRACE_DBG, &ctc_dev,
@@ -518,17 +524,28 @@ static void ctc_cmd(uint8 cid,
         for (b = 0; b < rqe->byte_count / 512; b++) {
             ctc_state[dev].time += 10;
             lba = blkno + b;
-            sim_debug(TRACE_DBG, &ctc_dev,
-                      "[ctc_cmd] ... CTC_READ: 512 bytes from block %d (0x%x)\n",
-                      lba, lba);
-            sim_disk_rdsect(&ctc_unit, lba, sec_buf, &secrw, 1);
-            for (j = 0; j < 512; j++) {
-                /* Drain the buffer */
-                pwrite_b(rqe->address + (b * 512) + j, sec_buf[j]);
+            result = sim_disk_rdsect(&ctc_unit, lba, sec_buf, &secrw, 1);
+            if (result == SCPE_OK) {
+                sim_debug(TRACE_DBG, &ctc_dev,
+                          "[ctc_cmd] ... CTC_READ: 512 bytes from block %d (0x%x)\n",
+                          lba, lba);
+                for (j = 0; j < 512; j++) {
+                    /* Drain the buffer */
+                    pwrite_b(rqe->address + (b * 512) + j, sec_buf[j]);
+                }
+            } else {
+                sim_debug(TRACE_DBG, &ctc_dev,
+                          "[ctc_cmd] Error reading sector at address %d. Giving up\n", lba);
+                break;
             }
         }
 
-        cqe->opcode = CTC_SUCCESS;
+        if (result == SCPE_OK) {
+            cqe->opcode = CTC_SUCCESS;
+        } else {
+            cqe->opcode = CTC_RWERROR;
+        }
+
         break;
     case CTC_CONFIG:
         sim_debug(TRACE_DBG, &ctc_dev,

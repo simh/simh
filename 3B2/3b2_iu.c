@@ -538,7 +538,7 @@ t_stat iu_svc_timer(UNIT *uptr)
 uint32 iu_read(uint32 pa, size_t size)
 {
     uint8 reg, modep;
-    uint32 data;
+    uint32 data = 0;
 
     reg = (uint8) (pa - IUBASE);
 
@@ -621,7 +621,6 @@ uint32 iu_read(uint32 pa, size_t size)
         csr_data &= ~CSRDMA;
         break;
     default:
-        data = 0;
         break;
     }
 
