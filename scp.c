@@ -3601,11 +3601,11 @@ else {                                  /* otherwise, check for Special Names */
         }
     /* Separate Date/Time info */
     else if (!strcmp ("DATE_YYYY", gbuf)) {/* Year (0000-9999) */
-        strftime (rbuf, sizeof(rbuf), "%Y", tmnow);
+        strftime (rbuf, rbuf_size, "%Y", tmnow);
         ap = rbuf;
         }
     else if (!strcmp ("DATE_YY", gbuf)) {/* Year (00-99) */
-        strftime (rbuf, sizeof(rbuf), "%y", tmnow);
+        strftime (rbuf, rbuf_size, "%y", tmnow);
         ap = rbuf;
         }
     else if (!strcmp ("DATE_YC", gbuf)) {/* Century (year/100) */
@@ -3630,19 +3630,19 @@ else {                                  /* otherwise, check for Special Names */
         ap = rbuf;
         }
     else if (!strcmp ("DATE_MM", gbuf)) {/* Month number (01-12) */
-        strftime (rbuf, sizeof(rbuf), "%m", tmnow);
+        strftime (rbuf, rbuf_size, "%m", tmnow);
         ap = rbuf;
         }
     else if (!strcmp ("DATE_MMM", gbuf)) {/* abbreviated Month name */
-        strftime (rbuf, sizeof(rbuf), "%b", tmnow);
+        strftime (rbuf, rbuf_size, "%b", tmnow);
         ap = rbuf;
         }
     else if (!strcmp ("DATE_MONTH", gbuf)) {/* full Month name */
-        strftime (rbuf, sizeof(rbuf), "%B", tmnow);
+        strftime (rbuf, rbuf_size, "%B", tmnow);
         ap = rbuf;
         }
     else if (!strcmp ("DATE_DD", gbuf)) {/* Day of Month (01-31) */
-        strftime (rbuf, sizeof(rbuf), "%d", tmnow);
+        strftime (rbuf, rbuf_size, "%d", tmnow);
         ap = rbuf;
         }
     else if (!strcmp ("DATE_D", gbuf)) { /* ISO 8601 weekday number (1-7) */
@@ -3671,19 +3671,19 @@ else {                                  /* otherwise, check for Special Names */
         ap = rbuf;
         }
     else if (!strcmp ("DATE_JJJ", gbuf)) {/* day of year (001-366) */
-        strftime (rbuf, sizeof(rbuf), "%j", tmnow);
+        strftime (rbuf, rbuf_size, "%j", tmnow);
         ap = rbuf;
         }
     else if (!strcmp ("TIME_HH", gbuf)) {/* Hour of day (00-23) */
-        strftime (rbuf, sizeof(rbuf), "%H", tmnow);
+        strftime (rbuf, rbuf_size, "%H", tmnow);
         ap = rbuf;
         }
     else if (!strcmp ("TIME_MM", gbuf)) {/* Minute of hour (00-59) */
-        strftime (rbuf, sizeof(rbuf), "%M", tmnow);
+        strftime (rbuf, rbuf_size, "%M", tmnow);
         ap = rbuf;
         }
     else if (!strcmp ("TIME_SS", gbuf)) {/* Second of minute (00-59) */
-        strftime (rbuf, sizeof(rbuf), "%S", tmnow);
+        strftime (rbuf, rbuf_size, "%S", tmnow);
         ap = rbuf;
         }
     else if (!strcmp ("TIME_MSEC", gbuf)) {/* Milliseconds of Second (000-999) */
