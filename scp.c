@@ -11100,7 +11100,6 @@ if ((ep != NULL) && (*ep != ';')) {                     /* if a quoted string is
             ep = ep + 1;                                /*     skip the non-quote character */  
     ep = strchr (ep, ';');                              /* the next semicolon is outside the quotes if it exists */
     }
-
 if (ep != NULL) {                                       /* if a semicolon is present */
     lnt = ep - sim_brk_act[sim_do_depth];               /* cmd length */
     memcpy (buf, sim_brk_act[sim_do_depth], lnt + 1);   /* copy with ; */
@@ -11111,6 +11110,7 @@ else {
     strlcpy (buf, sim_brk_act[sim_do_depth], size);     /* copy action */
     sim_brk_clract ();                                  /* no more */
     }
+sim_trim_endspc (buf);
 return buf;
 }
 
