@@ -2641,7 +2641,7 @@ else                                                    /* otherwise this is a r
         dprintf (atcd_dev, DEB_CSRW, "Receive channel %u invalid\n",
                  channel);
 
-    else if (data & DPI_IS_PARAM) {                     /* otherwise this is a parameter store */
+    else if (data & DPI_IS_PARAM) {                     /* otherwise if this is a parameter store */
         recv_param [channel] = data;                    /*   then save it */
 
         if (channel <= LAST_TERM) {                     /* if this is a terminal channel */

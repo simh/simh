@@ -1,6 +1,6 @@
 /* hp3000_mem.c: HP 3000 main memory simulator
 
-   Copyright (c) 2016, J. David Bryan
+   Copyright (c) 2016-2018, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +25,7 @@
 
    MEM          HP 3000 Series III Main Memory
 
+   21-May-18    JDB     Changed "access" to "mem_access" to avoid clashing
    10-Oct-16    JDB     Created
 
    References:
@@ -175,7 +176,7 @@ typedef struct {
     } ACCESS_PROPERTIES;
 
 
-static const ACCESS_PROPERTIES access [] = {    /* indexed by ACCESS_CLASS */
+static const ACCESS_PROPERTIES mem_access [] = {        /* indexed by ACCESS_CLASS */
 /*    bank_ptr  debug_flag   name                */
 /*    --------  -----------  ------------------- */
     {  NULL,    DEB_MDATA,   "absolute"          },     /* absolute */
@@ -374,14 +375,14 @@ t_bool mem_read (DEVICE *dptr, ACCESS_CLASS classification, uint32 offset, HP_WO
 {
 uint32 bank, address;
 
-if (access [classification].bank_ptr == NULL) {         /* if this is an absolute or DMA access */
+if (mem_access [classification].bank_ptr == NULL) {     /* if this is an absolute or DMA access */
     address = offset;                                   /*   then the "offset" is already a physical address */
     bank = TO_BANK (offset);                            /* separate the bank and offset */
     offset = TO_OFFSET (offset);                        /*   in case tracing is active */
     }
 
 else {                                                  /* otherwise the bank register is implied */
-    bank = *access [classification].bank_ptr;           /*   by the access classification */
+    bank = *mem_access [classification].bank_ptr;       /*   by the access classification */
     address = bank << LA_WIDTH | offset;                /* form the physical address with the supplied offset */
     }
 
@@ -450,10 +451,10 @@ else {                                                  /* otherwise the access 
             break;
         }                                               /* all cases are handled */
 
-    dpprintf (dptr, access [classification].debug_flag,
+    dpprintf (dptr, mem_access [classification].debug_flag,
               BOV_FORMAT "  %s%s\n", bank, offset, *value,
-              access [classification].name,
-              access [classification].debug_flag == DEB_MDATA ? " read" : "");
+              mem_access [classification].name,
+              mem_access [classification].debug_flag == DEB_MDATA ? " read" : "");
 
     return TRUE;                                        /* indicate success with the returned value stored */
     }
@@ -505,14 +506,14 @@ t_bool mem_write (DEVICE *dptr, ACCESS_CLASS classification, uint32 offset, HP_W
 {
 uint32 bank, address;
 
-if (access [classification].bank_ptr == NULL) {         /* if this is an absolute or DMA access */
+if (mem_access [classification].bank_ptr == NULL) {     /* if this is an absolute or DMA access */
     address = offset;                                   /*   then "offset" is already a physical address */
     bank = TO_BANK (offset);                            /* separate the bank and offset */
     offset = TO_OFFSET (offset);                        /*   in case tracing is active */
     }
 
 else {                                                  /* otherwise the bank register is implied */
-    bank = *access [classification].bank_ptr;           /*    by the access classification */
+    bank = *mem_access [classification].bank_ptr;       /*    by the access classification */
     address = bank << LA_WIDTH | offset;                /* form the physical address with the supplied offset */
     }
 
@@ -567,9 +568,9 @@ else {                                                  /* otherwise the access 
 
         }                                               /* all cases are handled */
 
-    dpprintf (dptr, access [classification].debug_flag,
+    dpprintf (dptr, mem_access [classification].debug_flag,
               BOV_FORMAT "  %s write\n", bank, offset, value,
-              access [classification].name);
+              mem_access [classification].name);
 
     return TRUE;                                        /* indicate success with the value written */
     }
@@ -685,10 +686,10 @@ bap->word_address = cpu_byte_ea (INVERT_CHECK (bap->class), /* convert the new b
                                  *bap->byte_offset,         /*   and check the bounds if originally requested */
                                  bap->count);
 
-if (access [bap->class].bank_ptr == NULL)               /* if this is an absolute or DMA access */
+if (mem_access [bap->class].bank_ptr == NULL)           /* if this is an absolute or DMA access */
     bank = 0;                                           /*   then the byte offset is already a physical address */
 else                                                    /* otherwise */
-    bank = *access [bap->class].bank_ptr;               /*   the bank register is implied by the classification */
+    bank = *mem_access [bap->class].bank_ptr;           /*   the bank register is implied by the classification */
 
 bap->initial_byte_address = TO_PA (bank, bap->word_address) * 2 /* save the physical starting byte address */
                               + (bap->initial_byte_offset & 1);
