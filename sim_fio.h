@@ -76,6 +76,8 @@ const char *sim_get_os_error_text (int error);
 typedef struct SHMEM SHMEM;
 t_stat sim_shmem_open (const char *name, size_t size, SHMEM **shmem, void **addr);
 void sim_shmem_close (SHMEM *shmem);
+int32 sim_shmem_atomic_add (int32 *ptr, int32 val);
+t_bool sim_shmem_atomic_cas (int32 *ptr, int32 oldv, int32 newv);
 
 extern t_bool sim_taddr_64;         /* t_addr is > 32b and Large File Support available */
 extern t_bool sim_toffset_64;       /* Large File (>2GB) file I/O support */

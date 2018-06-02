@@ -458,6 +458,16 @@ if (shmem->hMapping != INVALID_HANDLE_VALUE)
 free (shmem);
 }
 
+int32 sim_shmem_atomic_add (int32 *p, int32 v)
+{
+return InterlockedExchangeAdd ((volatile long *) p,v) + (v);
+}
+
+t_bool sim_shmem_atomic_cas (int32 *ptr, int32 oldv, int32 newv)
+{
+return (InterlockedCompareExchange ((LONG volatile *) ptr, newv, oldv) == oldv);
+}
+
 #else /* !defined(_WIN32) */
 #include <unistd.h>
 int sim_set_fsize (FILE *fptr, t_addr size)
@@ -602,6 +612,16 @@ if (shmem->shm_base != MAP_FAILED)
 if (shmem->shm_fd != -1)
     close (shmem->shm_fd);
 free (shmem);
+}
+
+int32 sim_shmem_atomic_add (int32 *p, int32 v)
+{
+return __sync_add_and_fetch((int *) p, v);
+}
+
+t_bool sim_shmem_atomic_cas (int32 *ptr, int32 oldv, int32 newv)
+{
+return __sync_bool_compare_and_swap (ptr, oldv, newv);
 }
 
 #endif
