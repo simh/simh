@@ -1,6 +1,6 @@
 /* hp3000_sys.c: HP 3000 system common interface
 
-   Copyright (c) 2016-2017, J. David Bryan
+   Copyright (c) 2016-2018, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -2335,7 +2335,7 @@ while ((bitfmt.alternate || bitset)                     /* while more bits */
     bnptr = bitfmt.names [index];                       /*     point at the name for the current bit */
 
     if (bnptr)                                          /* if the name is defined */
-        if (*bnptr == '\1')                             /*   then if this name has an alternate */
+        if (*bnptr == '\1' && bitfmt.alternate)         /*   then if this name has an alternate */
             if (bitset & test_bit)                      /*     then if the bit is asserted */
                 bnptr++;                                /*       then point at the name for the "1" state */
             else                                        /*     otherwise */
