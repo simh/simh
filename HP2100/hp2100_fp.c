@@ -1,28 +1,30 @@
 /* hp2100_fp.c: HP 2100 floating point instructions
 
    Copyright (c) 2002-2015, Robert M. Supnik
+   Copyright (c) 2017       J. David Bryan
 
-   Permission is hereby granted, free of charge, to any person obtaining a
-   copy of this software and associated documentation files (the "Software"),
-   to deal in the Software without restriction, including without limitation
-   the rights to use, copy, modify, merge, publish, distribute, sublicense,
-   and/or sell copies of the Software, and to permit persons to whom the
-   Software is furnished to do so, subject to the following conditions:
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
 
    The above copyright notice and this permission notice shall be included in
    all copies or substantial portions of the Software.
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+   AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not be
+   Except as contained in this notice, the names of the authors shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from Robert M Supnik.
+   in this Software without prior written authorization from the authors.
 
+   26-Jun-17    JDB     Replaced SEXT with SEXT16
    03-Jan-15    JDB     Made the utility routines static
    21-Jan-08    JDB     Corrected fp_unpack mantissa high-word return
                         (from Mark Pizzolato)
@@ -228,13 +230,13 @@ UnpackFP (&fop1, FPAB);                                 /* unpack A-B */
 UnpackFP (&fop2, opnd);                                 /* unpack op */
 if (fop1.fr && fop2.fr) {                               /* if both != 0 */
     res.exp = fop1.exp + fop2.exp + 1;                  /* exp = sum */
-    shi1 = SEXT (fop1.fr >> 16);                        /* mpy hi */
-    shi2 = SEXT (fop2.fr >> 16);                        /* mpc hi */
+    shi1 = SEXT16 (UPPER_WORD (fop1.fr));               /* mpy hi */
+    shi2 = SEXT16 (UPPER_WORD (fop2.fr));               /* mpc hi */
     t1 = shi2 * ((int32) ((fop1.fr >> 1) & 077600));    /* mpc hi * (mpy lo/2) */
     t2 = shi1 * ((int32) ((fop2.fr >> 1) & 077600));    /* mpc lo * (mpy hi/2) */
     t3 = t1 + t2;                                       /* cross product */
     t4 = (shi1 * shi2) & ~1;                            /* mpy hi * mpc hi */
-    t5 = (SEXT (t3 >> 16)) << 1;                        /* add in cross */
+    t5 = SEXT16 (UPPER_WORD (t3)) << 1;                 /* add in cross */
     res.fr = (t4 + t5) & DMASK32;                       /* bit<0> is lost */
     }
 return StoreFP (&res);                                  /* store */
@@ -282,7 +284,7 @@ if (fop1.fr) {                                          /* dvd != 0? */
     q1 = divx (ba, dvrh, NULL);                         /* Q1 = rem / dvrh */
     ba = (fop2.fr & 0xFF00) << 13;                      /* dvrl / 8 */
     q2 = divx (ba, dvrh, NULL);                         /* dvrl / dvrh */
-    ba = -(SEXT (q2)) * (SEXT (q0));                    /* -Q0 * Q2 */
+    ba = - SEXT16 (LOWER_WORD (q2)) * SEXT16 (LOWER_WORD (q0)); /* -Q0 * Q2 */
     ba = (ba >> 16) & 0xFFFF;                           /* save ms half */
     if (q1 & SIGN) quo.fr = quo.fr - 0x00010000;        /* Q1 < 0? -1 */
     if (ba & SIGN) quo.fr = quo.fr - 0x00010000;        /* -Q0*Q2 < 0? */
@@ -372,8 +374,8 @@ uint32 val;
 fop.fr = ((uint32) mantissa.fpk[0] << 16) | mantissa.fpk[1];
 fop.exp = exponent;
 val = PackFP (&fop);
-result->fpk[0] = (int16) (val >> 16);
-result->fpk[1] = (int16) val;
+result->fpk[0] = UPPER_WORD (val);
+result->fpk[1] = LOWER_WORD (val);
 return 0;
 }
 
@@ -401,8 +403,8 @@ uint32 operand;
 
 operand = ((uint32) packed.fpk[0] << 16) | packed.fpk[1];
 UnpackFP (&fop, operand);
-mantissa->fpk[0] = (uint16) (fop.fr >> 16);
-mantissa->fpk[1] = (uint16) fop.fr;
+mantissa->fpk[0] = UPPER_WORD (fop.fr);
+mantissa->fpk[1] = LOWER_WORD (fop.fr);
 *exponent = fop.exp;
 return 0;
 }

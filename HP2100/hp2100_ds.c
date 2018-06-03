@@ -1,7 +1,7 @@
 /* hp2100_ds.c: HP 13037D/13175D disc controller/interface simulator
 
    Copyright (c) 2004-2012, Robert M. Supnik
-   Copyright (c) 2012-2016  J. David Bryan
+   Copyright (c) 2012-2018  J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,14 @@
 
    DS           13037D/13175D disc controller/interface
 
+   07-May-18    JDB     Removed "dl_clear_controller" status return
+   27-Feb-18    JDB     Added the BMDL
+   21-Feb-18    JDB     ATTACH -N now creates a full-size disc image
+   11-Jul-17    JDB     Renamed "ibl_copy" to "cpu_ibl"
+   15-Mar-17    JDB     Trace flags are now global
+                        Changed DEBUG_PRI calls to tprintfs
+   10-Mar-17    JDB     Added IOBUS to the debug table
+   09-Mar-17    JDB     Deprecated LOCKED/WRITEENABLED for PROTECT/UNPROTECT
    13-May-16    JDB     Modified for revised SCP API function parameter types
    04-Mar-16    JDB     Name changed to "hp2100_disclib" until HP 3000 integration
    30-Dec-14    JDB     Added S-register parameters to ibl_copy
@@ -122,6 +130,7 @@
 
 
 #include "hp2100_defs.h"
+#include "hp2100_cpu.h"
 #include "hp2100_disclib.h"
 
 
@@ -140,16 +149,6 @@
 #define FIFO_FULL       (ds.fifo_count == FIFO_SIZE)    /* FIFO full test */
 
 #define PRESET_ENABLE   TRUE                            /* Preset Jumper (W4) is enabled */
-
-
-/* Debug flags */
-
-#define DEB_CPU         (1 << 0)                        /* words received from and sent to the CPU */
-#define DEB_CMDS        (1 << 1)                        /* interface commands received from the CPU */
-#define DEB_BUF         (1 << 2)                        /* data read from and written to the card FIFO */
-#define DEB_RWSC        (1 << 3)                        /* device read/write/status/control commands */
-#define DEB_SERV        (1 << 4)                        /* unit service scheduling calls */
-
 
 
 /* Per-card state variables */
@@ -305,17 +304,23 @@ static REG ds_reg [] = {
     };
 
 static MTAB ds_mod [] = {
-/*    mask         match        pstring            mstring         valid            disp  desc */
-    { UNIT_UNLOAD, UNIT_UNLOAD, "heads unloaded",  "UNLOADED",     &ds_load_unload, NULL, NULL },
-    { UNIT_UNLOAD, 0,           "heads loaded",    "LOADED",       &ds_load_unload, NULL, NULL },
+/*    Mask Value    Match Value   Print String       Match String     Validation        Display  Descriptor */
+/*    ------------  ------------  -----------------  ---------------  ----------------  -------  ---------- */
+    { UNIT_UNLOAD,  UNIT_UNLOAD,  "heads unloaded",  "UNLOADED",      &ds_load_unload,  NULL,    NULL       },
+    { UNIT_UNLOAD,  0,            "heads loaded",    "LOADED",        &ds_load_unload,  NULL,    NULL       },
 
-    { UNIT_WLK,    UNIT_WLK,    "write locked",    "LOCKED",       NULL,            NULL, NULL },
-    { UNIT_WLK,    0,           "write enabled",   "WRITEENABLED", NULL,            NULL, NULL },
+    { UNIT_WLK,     UNIT_WLK,     "protected",       "PROTECT",       NULL,             NULL,    NULL       },
+    { UNIT_WLK,     0,            "unprotected",     "UNPROTECT",     NULL,             NULL,    NULL       },
 
-    { UNIT_FMT,    UNIT_FMT,    "format enabled",  "FORMAT",       NULL,            NULL, NULL },
-    { UNIT_FMT,    0,           "format disabled", "NOFORMAT",     NULL,            NULL, NULL },
+    { UNIT_WLK,     UNIT_WLK,     NULL,              "LOCKED",        NULL,             NULL,    NULL       },
+    { UNIT_WLK,     0,            NULL,              "WRITEENABLED",  NULL,             NULL,    NULL       },
 
-/*    mask                               match                  pstring     mstring     valid          disp  desc */
+    { UNIT_FMT,     UNIT_FMT,     "format enabled",  "FORMAT",        NULL,             NULL,    NULL       },
+    { UNIT_FMT,     0,            "format disabled", "NOFORMAT",      NULL,             NULL,    NULL       },
+
+/*                                                              Print       Match                                 */
+/*    Mask Value                         Match Value            String      String      Validation     Disp  Desc */
+/*    ---------------------------------  ---------------------  ----------  ----------  -------------  ----  ---- */
     { UNIT_AUTO | UNIT_ATT,              UNIT_AUTO,             "autosize", "AUTOSIZE", &dl_set_model, NULL, NULL },
     { UNIT_AUTO | UNIT_ATT | UNIT_MODEL, MODEL_7905,            "7905",     "7905",     &dl_set_model, NULL, NULL },
     { UNIT_AUTO | UNIT_ATT | UNIT_MODEL, MODEL_7906,            "7906",     "7906",     &dl_set_model, NULL, NULL },
@@ -326,18 +331,21 @@ static MTAB ds_mod [] = {
     { UNIT_ATT | UNIT_MODEL,             UNIT_ATT | MODEL_7920, "7920",     NULL,       NULL,          NULL, NULL },
     { UNIT_ATT | UNIT_MODEL,             UNIT_ATT | MODEL_7925, "7925",     NULL,       NULL,          NULL, NULL },
 
-    { MTAB_XTD | MTAB_VDV,            0, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &ds_dev },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &ds_dev },
+/*    Entry Flags          Value  Print String  Match String  Validation    Display        Descriptor       */
+/*    -------------------  -----  ------------  ------------  ------------  -------------  ---------------- */
+    { MTAB_XDV,              1u,  "SC",         "SC",         &hp_set_dib,  &hp_show_dib,  (void *) &ds_dib },
+    { MTAB_XDV | MTAB_NMO,  ~1u,  "DEVNO",      "DEVNO",      &hp_set_dib,  &hp_show_dib,  (void *) &ds_dib },
     { 0 }
     };
 
 static DEBTAB ds_deb [] = {
-    { "CPU",  DEB_CPU  },
-    { "CMDS", DEB_CMDS },
-    { "BUF",  DEB_BUF  },
-    { "RWSC", DEB_RWSC },
-    { "SERV", DEB_SERV },
-    { NULL,   0 }
+    { "RWSC",  DEB_RWSC    },
+    { "CMDS",  DEB_CMDS    },
+    { "CPU",   DEB_CPU     },
+    { "BUF",   DEB_BUF     },
+    { "SERV",  DEB_SERV    },
+    { "IOBUS", TRACE_IOBUS },
+    { NULL,    0           }
     };
 
 DEVICE ds_dev = {
@@ -431,7 +439,6 @@ static const char * const output_state [] = { "Data", "Command" };
 const char * const hold_or_clear = (signal_set & ioCLF ? ",C" : "");
 
 uint16   data;
-t_stat   status;
 IOSIGNAL signal;
 IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 t_bool   command_issued = FALSE;
@@ -446,8 +453,7 @@ while (working_set) {
             ds.flag = CLEAR;                            /* clear the flag */
             ds.flagbuf = CLEAR;                         /*   and flag buffer */
 
-            if (DEBUG_PRI (ds_dev, DEB_CMDS))
-                fputs (">>DS cmds: [CLF] Flag cleared\n", sim_deb);
+            tprintf (ds_dev, DEB_CMDS, "[CLF] Flag cleared\n");
             break;
 
 
@@ -456,8 +462,7 @@ while (working_set) {
             ds.flag = SET;                              /* set the flag */
             ds.flagbuf = SET;                           /*   and flag buffer */
 
-            if (DEBUG_PRI (ds_dev, DEB_CMDS))
-                fputs (">>DS cmds: [STF] Flag set\n", sim_deb);
+            tprintf (ds_dev, DEB_CMDS, "[STF] Flag set\n");
             break;
 
 
@@ -475,12 +480,11 @@ while (working_set) {
             data = fifo_unload ();                          /* unload the next word from the FIFO */
             stat_data = IORETURN (SCPE_OK, data);           /* merge in the return status */
 
-            if (DEBUG_PRI (ds_dev, DEB_CPU))
-                fprintf (sim_deb, ">>DS cpu:  [LIx%s] Data = %06o\n", hold_or_clear, data);
+            tprintf (ds_dev, DEB_CPU, "[LIx%s] Data = %06o\n", hold_or_clear, data);
 
             if (FIFO_EMPTY) {                               /* is the FIFO now empty? */
-                if (ds.srq == SET && DEBUG_PRI (ds_dev, DEB_CMDS))
-                    fprintf (sim_deb, ">>DS cmds: [LIx%s] SRQ cleared\n", hold_or_clear);
+                if (ds.srq == SET)
+                    tprintf (ds_dev, DEB_CMDS, "[LIx%s] SRQ cleared\n", hold_or_clear);
 
                 ds.srq = CLEAR;                             /* clear SRQ */
 
@@ -495,9 +499,8 @@ while (working_set) {
         case ioIOO:                                         /* I/O data output */
             data = IODATA (stat_data);                      /* mask to just the data word */
 
-            if (DEBUG_PRI (ds_dev, DEB_CPU))
-                fprintf (sim_deb, ">>DS cpu:  [OTx%s] %s = %06o\n",
-                         hold_or_clear, output_state [ds.cmfol], data);
+            tprintf (ds_dev, DEB_CPU, "[OTx%s] %s = %06o\n",
+                     hold_or_clear, output_state [ds.cmfol], data);
 
             fifo_load (data);                               /* load the word into the FIFO */
 
@@ -514,8 +517,8 @@ while (working_set) {
                     }
 
                 if (FIFO_STOP) {                            /* is the FIFO now full enough? */
-                    if (ds.srq == SET && DEBUG_PRI (ds_dev, DEB_CMDS))
-                        fprintf (sim_deb, ">>DS cmds: [OTx%s] SRQ cleared\n", hold_or_clear);
+                    if (ds.srq == SET)
+                        tprintf (ds_dev, DEB_CMDS, "[OTx%s] SRQ cleared\n", hold_or_clear);
 
                     ds.srq = CLEAR;                         /* clear SRQ to stop filling */
                     }
@@ -528,14 +531,12 @@ while (working_set) {
             ds.flagbuf = SET;                           /*   and flag buffer */
             ds.cmrdy = CLEAR;                           /* clear the command ready flip-flop */
 
-            if (DEBUG_PRI (ds_dev, DEB_CMDS))
-                fputs (">>DS cmds: [POPIO] Flag set\n", sim_deb);
+            tprintf (ds_dev, DEB_CMDS, "[POPIO] Flag set\n");
             break;
 
 
         case ioCRS:                                         /* control reset */
-            if (DEBUG_PRI (ds_dev, DEB_CMDS))
-                fputs (">>DS cmds: [CRS] Master reset\n", sim_deb);
+            tprintf (ds_dev, DEB_CMDS, "[CRS] Master reset\n");
 
             ds.control = CLEAR;                             /* clear the control */
             ds.cmfol = CLEAR;                               /*   and command follows flip-flops */
@@ -543,17 +544,14 @@ while (working_set) {
             if (PRESET_ENABLE) {                            /* is preset enabled for this interface? */
                 fifo_clear ();                              /* clear the FIFO */
 
-                status = dl_clear_controller (&mac_cntlr,   /* do a hard clear of the controller */
-                                              ds_unit, hard_clear);
-
-                stat_data = IORETURN (status, 0);           /* return the status from the controller */
+                dl_clear_controller (&mac_cntlr, ds_unit,   /* do a hard clear of the controller */
+                                     hard_clear);
                 }
             break;
 
 
         case ioCLC:                                     /* clear control flip-flop */
-            if (DEBUG_PRI (ds_dev, DEB_CMDS))
-                fprintf (sim_deb, ">>DS cmds: [CLC%s] Control cleared\n", hold_or_clear);
+            tprintf (ds_dev, DEB_CMDS, "[CLC%s] Control cleared\n", hold_or_clear);
 
             ds.control = CLEAR;                         /* clear the control */
             ds.edt = CLEAR;                             /*   and EDT flip-flops */
@@ -569,16 +567,14 @@ while (working_set) {
 
             interrupt_enabled = TRUE;                   /* check for drive attention */
 
-            if (DEBUG_PRI (ds_dev, DEB_CMDS))
-                fprintf (sim_deb, ">>DS cmds: [STC%s] Control set\n", hold_or_clear);
+            tprintf (ds_dev, DEB_CMDS, "[STC%s] Control set\n", hold_or_clear);
             break;
 
 
         case ioEDT:                                     /* end data transfer */
             ds.edt = SET;                               /* set the EDT flip-flop */
 
-            if (DEBUG_PRI (ds_dev, DEB_CPU))
-                fputs (">>DS cpu:  [EDT] DCPC transfer ended\n", sim_deb);
+            tprintf (ds_dev, DEB_CPU, "[EDT] DCPC transfer ended\n");
             break;
 
 
@@ -698,10 +694,8 @@ return stat_data;
 
 t_stat ds_service_drive (UNIT *uptr)
 {
-static const char completion_message [] = ">>DS rwsc: Unit %d %s command completed\n";
 t_stat result;
 t_bool seek_completion;
-int32 unit;
 FLIP_FLOP entry_srq = ds.srq;                           /* get the SRQ state on entry */
 CNTLR_PHASE entry_phase = (CNTLR_PHASE) uptr->PHASE;    /* get the operation phase on entry */
 uint32 entry_status = uptr->STAT;                       /* get the drive status on entry */
@@ -777,9 +771,8 @@ if ((CNTLR_PHASE) uptr->PHASE == data_phase)            /* is the drive in the d
         }                                               /* end of data phase operation dispatch */
 
 
-if (DEBUG_PRI (ds_dev, DEB_CMDS) && entry_srq != ds.srq)
-    fprintf (sim_deb, ">>DS cmds: SRQ %s\n", ds.srq == SET ? "set" : "cleared");
-
+if (entry_srq != ds.srq)
+    tprintf (ds_dev, DEB_CMDS, "SRQ %s\n", ds.srq == SET ? "set" : "cleared");
 
 if (uptr->wait)                                             /* was service requested? */
     activate_unit (uptr);                                   /* schedule the next event */
@@ -795,22 +788,18 @@ if (mac_cntlr.state != cntlr_busy) {                        /* is the command co
     }
 
 
-if (DEBUG_PRI (ds_dev, DEB_RWSC)) {
-    unit = uptr - ds_unit;                                  /* get the unit number */
+if (result == SCPE_IERR)                                    /* did an internal error occur? */
+    tprintf (ds_dev, DEB_RWSC, "Unit %d %s command %s phase service not handled\n",
+             uptr - ds_unit, dl_opcode_name (MAC, (CNTLR_OPCODE) uptr->OP),
+             dl_phase_name ((CNTLR_PHASE) uptr->PHASE));
 
-    if (result == SCPE_IERR)                                /* did an internal error occur? */
-        fprintf (sim_deb, ">>DS rwsc: Unit %d %s command %s phase service not handled\n",
-                 unit, dl_opcode_name (MAC, (CNTLR_OPCODE) uptr->OP),
-                 dl_phase_name ((CNTLR_PHASE) uptr->PHASE));
+else if (seek_completion)                                           /* if a seek has completed */
+    tprintf (ds_dev, DEB_RWSC, "Unit %d %s command completed\n",    /*   report the unit command */
+             uptr - ds_unit, dl_opcode_name (MAC, (CNTLR_OPCODE) uptr->OP));
 
-    else if (seek_completion)                               /* if a seek has completed */
-        fprintf (sim_deb, completion_message,               /*   report the unit command */
-                 unit, dl_opcode_name (MAC, (CNTLR_OPCODE) uptr->OP));
-
-    else if (mac_cntlr.state == cntlr_wait)                 /* if the controller has stopped */
-        fprintf (sim_deb, completion_message,               /*   report the controller command */
-                 unit, dl_opcode_name (MAC, mac_cntlr.opcode));
-    }
+else if (mac_cntlr.state == cntlr_wait)                             /* if the controller has stopped */
+    tprintf (ds_dev, DEB_RWSC, "Unit %d %s command completed\n",    /*   report the controller command */
+             uptr - ds_unit, dl_opcode_name (MAC, mac_cntlr.opcode));
 
 return result;                                              /* return the result of the service */
 }
@@ -932,8 +921,8 @@ switch ((CNTLR_PHASE) uptr->PHASE) {                    /* dispatch the current 
     }                                                   /* end of phase dispatch */
 
 
-if (result == SCPE_IERR && DEBUG_PRI (ds_dev, DEB_RWSC))    /* did an internal error occur? */
-    fprintf (sim_deb, ">>DS rwsc: Controller %s command %s phase service not handled\n",
+if (result == SCPE_IERR)                                /* did an internal error occur? */
+    tprintf (ds_dev, DEB_RWSC, "Controller %s command %s phase service not handled\n",
              dl_opcode_name (MAC, opcode), dl_phase_name ((CNTLR_PHASE) uptr->PHASE));
 
 
@@ -941,9 +930,8 @@ if (mac_cntlr.state != cntlr_busy) {                    /* has the controller st
     poll_interface ();                                  /* poll the interface for the next command */
     poll_drives ();                                     /* poll the drives for Attention status */
 
-    if (DEBUG_PRI (ds_dev, DEB_RWSC))
-        fprintf (sim_deb, ">>DS rwsc: Controller %s command completed\n",
-                 dl_opcode_name (MAC, opcode));
+    tprintf (ds_dev, DEB_RWSC, "Controller %s command completed\n",
+             dl_opcode_name (MAC, opcode));
     }
 
 return result;                                          /* return the result of the service */
@@ -1027,23 +1015,43 @@ return SCPE_OK;
    Attention bits in the drive status, so we poll the drives to ensure that the
    CPU is notified that the drive is now online.
 
+   If a new file is specified, the file is initialized to its capacity by
+   writing a zero to the last byte in the file.
+
 
    Implementation notes:
 
     1. If we are called during a RESTORE command, the drive status will not be
        changed, so polling the drives will have no effect.
+
+    2. The C standard says, "A binary stream need not meaningfully support fseek
+       calls with a whence value of SEEK_END," so instead we determine the
+       offset from the start of the file to the last byte and seek there.
 */
 
 t_stat ds_attach (UNIT *uptr, CONST char *cptr)
 {
-t_stat result;
+t_stat      result;
+t_addr      offset;
+const uint8 zero = 0;
 
 result = dl_attach (&mac_cntlr, uptr, cptr);            /* attach the drive */
 
-if (result == SCPE_OK)                                  /* was the attach successful? */
-    poll_drives ();                                     /* poll the drives to notify the CPU */
+if (result == SCPE_OK) {                                /* if the attach was successful */
+    poll_drives ();                                     /*   then poll the drives to notify the CPU */
 
-return result;
+    if (sim_switches & SWMASK ('N')) {                  /* if this is a new disc image */
+        offset = (t_addr)                               /*   then determine the offset of */
+          (uptr->capac * sizeof (int16) - sizeof zero); /*     the last byte in a full-sized file */
+
+        if (sim_fseek (uptr->fileref, offset, SEEK_SET) != 0    /* seek to the last byte */
+          || fwrite (&zero, sizeof zero, 1, uptr->fileref) == 0 /*   and write a zero to fill */
+          || fflush (uptr->fileref) != 0)                       /*     the file to its capacity */
+            clearerr (uptr->fileref);                           /* clear and ignore any errors */
+        }
+    }
+
+return result;                                          /* return the result of the attach */
 }
 
 
@@ -1068,116 +1076,259 @@ return result;
 }
 
 
-/* Boot a MAC disc drive.
+/* MAC disc bootstrap loaders (BMDL and 12992B).
 
-   The MAC disc bootstrap program is loaded from the HP 12992B Boot Loader ROM
-   into memory, the I/O instructions are configured for the interface card's
-   select code, and the program is run to boot from the specified unit.  The
-   loader supports booting from cylinder 0 of drive unit 0 only.  Before
-   execution, the S register is automatically set as follows:
+   The Basic Moving-Head Disc Loader (BMDL) consists of two programs.  The
+   program starting at address x7700 loads absolute paper tapes into memory.
+   The program starting at address x7750 loads a disc-resident bootstrap from
+   the MAC disc drive into memory.  The S register specifies the head to use.
 
-     15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
-     ------  ------  ----------------------   ---------   ---------
-     ROM #    0   1       select code         reserved      head
+   For a 2100/14/15/16 CPU, entering a LOAD DS or BOOT DS command loads the BMDL
+   into memory and executes the disc portion starting at x7750.  The bootstrap
+   reads 2047 words from cylinder 0 sector 0 of the specified head into memory
+   starting at location 2011 octal.  Loader execution ends with one of the
+   following instructions:
 
-   The boot routine sets bits 15-6 of the S register to appropriate values.
-   Bits 5-3 and 1-0 retain their original values, so S should be set before
-   booting.  These bits are typically set to 0, although bit 5 is set for an RTE
-   reconfiguration boot, and bits 1-0 may be set if booting from a head other
-   than 0 is desired.
+     * HLT 11B    - the disc read failed.
+     * JSB 2055,I - the disc read completed.
+
+   The HP 1000 uses the 12992B boot loader ROM to bootstrap the disc.  The head
+   number is obtained from bits 2-0 of the existing S-register value when the
+   loader is executed.  Bits 5-3 of the existing S-register value are also
+   retained and are available to the boot extension program.  The loader reads
+   6144 words from cylinder 0 sector 0 of the specified head into memory
+   starting at location 2011 octal.  Loader execution ends with one of the
+   following instructions:
+
+     * HLT 30     - the drive is not ready..
+     * JSB 2055,I - the disc read succeeded.
+
+   The loader automatically retries the operations for all disc errors other
+   than a drive fault.
 
 
    Implementation notes:
 
-    1. The Loader ROMs manual indicates that bits 2-0 select the head to use,
-       implying that heads 0-7 are valid.  However, Table 5 has entries only for
-       heads 0-3, and the boot loader code will malfunction if heads 4-7 are
-       specified.  The code masks the head number to three bits but forms the
-       Cold Load Read command by shifting the head number six bits to the left.
-       As the head field in the command is only two bits wide, specifying heads
-       4-7 will result in bit 2 being shifted into the opcode field, resulting
-       in a Recalibrate command.
+    1. After the BMDL has been loaded into memory, the paper tape portion may be
+       executed manually by setting the P register to the starting address
+       (x7700).
+
+    2. For compatibility with the "cpu_copy_loader" routine, the BMDL device I/O
+       instructions address select codes 10 and 11.
 */
 
+static const LOADER_ARRAY ds_loaders = {
+    {                               /* HP 21xx Basic Moving-Head Disc Loader (BMDL-7905) */
+      050,                          /*   loader starting index */
+      076,                          /*   DMA index */
+      034,                          /*   FWA index */
+      { 0002401,                    /*   77700:  PTAPE CLA,RSS             Paper Tape start */
+        0063722,                    /*   77701:        LDA 77722           */
+        0107700,                    /*   77702:        CLC 0,C             */
+        0002307,                    /*   77703:        CCE,INA,SZA,RSS     */
+        0102077,                    /*   77704:        HLT 77              */
+        0017735,                    /*   77705:        JSB 77735           */
+        0007307,                    /*   77706:        CMB,CCE,INB,SZB,RSS */
+        0027702,                    /*   77707:        JMP 77702           */
+        0077733,                    /*   77710:        STB 77733           */
+        0017735,                    /*   77711:        JSB 77735           */
+        0017735,                    /*   77712:        JSB 77735           */
+        0074000,                    /*   77713:        STB 0               */
+        0077747,                    /*   77714:        STB 77747           */
+        0047734,                    /*   77715:        ADB 77734           */
+        0002140,                    /*   77716:        SEZ,CLE             */
+        0102055,                    /*   77717:        HLT 55              */
+        0017735,                    /*   77720:        JSB 77735           */
+        0040001,                    /*   77721:        ADA 1               */
+        0177747,                    /*   77722:        STB 77747,I         */
+        0067747,                    /*   77723:        LDB 77747           */
+        0006104,                    /*   77724:        CLE,INB             */
+        0037733,                    /*   77725:        ISZ 77733           */
+        0027714,                    /*   77726:        JMP 77714           */
+        0017735,                    /*   77727:        JSB 77735           */
+        0054000,                    /*   77730:        CPB 0               */
+        0027701,                    /*   77731:        JMP 77701           */
+        0102011,                    /*   77732:        HLT 11              */
+        0000000,                    /*   77733:        NOP                 */
+        0100100,                    /*   77734:        RRL 16              */
+        0000000,                    /*   77735:        NOP                 */
+        0006400,                    /*   77736:        CLB                 */
+        0103710,                    /*   77737:        STC 10,C            */
+        0102310,                    /*   77740:        SFS 10              */
+        0027740,                    /*   77741:        JMP 77740           */
+        0106410,                    /*   77742:        MIB 10              */
+        0002240,                    /*   77743:        SEZ,CME             */
+        0127735,                    /*   77744:        JMP 77735,I         */
+        0005727,                    /*   77745:        BLF,BLF             */
+        0027737,                    /*   77746:        JMP 77737           */
+        0000000,                    /*   77747:        NOP                 */
+        0067777,                    /*   77750: DISC   LDB 77777           */
+        0174001,                    /*   77751:        STB 1,I             */
+        0006004,                    /*   77752:        INB                 */
+        0063732,                    /*   77753:        LDA 77732           */
+        0170001,                    /*   77754:        STA 1,I             */
+        0067776,                    /*   77755:        LDB 77776           */
+        0106606,                    /*   77756:        OTB 6               */
+        0106702,                    /*   77757:        CLC 2               */
+        0102602,                    /*   77760:        OTA 2               */
+        0102702,                    /*   77761:        STC 2               */
+        0063751,                    /*   77762:        LDA 77751           */
+        0102602,                    /*   77763:        OTA 2               */
+        0102501,                    /*   77764:        LIA 1               */
+        0001027,                    /*   77765:        ALS,ALF             */
+        0013767,                    /*   77766:        AND 77767           */
+        0000160,                    /*   77767:        CLE,ALS             */
+        0106710,                    /*   77770:        CLC 10              */
+        0103610,                    /*   77771:        OTA 10,C            */
+        0103706,                    /*   77772:        STC 6,C             */
+        0102310,                    /*   77773:        SFS 10              */
+        0027773,                    /*   77774:        JMP 77773           */
+        0117717,                    /*   77775:        JSB 77717,I         */
+        0000010,                    /*   77776:        SLA                 */
+        0002055 } },                /*   77777:        SEZ,SLA,INA,RSS     */
 
-const BOOT_ROM ds_rom = {
-    0017727,                    /* START JSB STAT      GET STATUS */
-    0002021,                    /*       SSA,RSS       IS DRIVE READY ? */
-    0027742,                    /*       JMP DMA         YES, SET UP DMA */
-    0013714,                    /*       AND B20         NO, CHECK STATUS BITS */
-    0002002,                    /*       SZA           IS DRIVE FAULTY OR HARD DOWN ? */
-    0102030,                    /*       HLT 30B         YES, HALT 30B, "RUN" TO TRY AGAIN */
-    0027700,                    /*       JMP START       NO, TRY AGAIN FOR DISC READY */
-    0102011,                    /* ADDR1 OCT 102011    */
-    0102055,                    /* ADDR2 OCT 102055    */
-    0164000,                    /* CNT   DEC -6144     */
-    0000007,                    /* D7    OCT 7         */
-    0001400,                    /* STCMD OCT 1400      */
-    0000020,                    /* B20   OCT 20        */
-    0017400,                    /* STMSK OCT 17400     */
-    0000000,                    /*       NOP           */
-    0000000,                    /*       NOP           */
-    0000000,                    /*       NOP           */
-    0000000,                    /*       NOP           */
-    0000000,                    /*       NOP           */
-    0000000,                    /*       NOP           */
-    0000000,                    /*       NOP           */
-    0000000,                    /*       NOP           */
-    0000000,                    /*       NOP           */
-    0000000,                    /* STAT  NOP           STATUS CHECK SUBROUTINE */
-    0107710,                    /*       CLC DC,C      SET STATUS COMMAND MODE */
-    0063713,                    /*       LDA STCMD     GET STATUS COMMAND */
-    0102610,                    /*       OTA DC        OUTPUT STATUS COMMAND */
-    0102310,                    /*       SFS DC        WAIT FOR STATUS#1 WORD */
-    0027733,                    /*       JMP *-1       */
-    0107510,                    /*       LIB DC,C         B-REG = STATUS#1 WORD */
-    0102310,                    /*       SFS DC         WAIT FOR STATUS#2 WORD */
-    0027736,                    /*       JMP *-1       */
-    0103510,                    /*       LIA DC,C         A-REG = STATUS#2 WORD */
-    0127727,                    /*       JMP STAT,I    RETURN */
-    0067776,                    /* DMA   LDB DMACW     GET DMA CONTROL WORD */
-    0106606,                    /*       OTB 6         OUTPUT DMA CONTROL WORD */
-    0067707,                    /*       LDB ADDR1     GET MEMORY ADDRESS */
-    0106702,                    /*       CLC 2         SET MEMORY ADDRESS INPUT MODE */
-    0106602,                    /*       OTB 2         OUTPUT MEMORY ADDRESS TO DMA */
-    0102702,                    /*       STC 2         SET WORD COUNT INPUT MODE */
-    0067711,                    /*       LDB CNT       GET WORD COUNT */
-    0106602,                    /*       OTB 2         OUTPUT WORD COUNT TO DMA */
-    0106710,                    /* CLDLD CLC DC        SET COMMAND INPUT MODE */
-    0102501,                    /*       LIA 1         LOAD SWITCH */
-    0106501,                    /*       LIB 1         REGISTER SETTINGS */
-    0013712,                    /*       AND D7        ISOLATE HEAD NUMBER */
-    0005750,                    /*       BLF,CLE,SLB   BIT 12=0? */
-    0027762,                    /*       JMP *+3       NO,MANUAL BOOT */
-    0002002,                    /*       SZA           YES,RPL BOOT. HEAD#=0? */
-    0001000,                    /*       ALS           NO,HEAD#1, MAKE HEAD#=2 */
-    0001720,                    /*       ALF,ALS       FORM COLD LOAD */
-    0001000,                    /*       ALS           COMMAND WORD */
-    0103706,                    /*       STC 6,C       ACTIVATE DMA */
-    0103610,                    /*       OTA DC,C      OUTPUT COLD LOAD COMMAND */
-    0102310,                    /*       SFS DC        IS COLD LOAD COMPLETED ? */
-    0027766,                    /*       JMP *-1         NO, WAIT */
-    0017727,                    /*       JSB STAT        YES, GET STATUS */
-    0060001,                    /*       LDA 1         */
-    0013715,                    /*       AND STMSK     A-REG = STATUS BITS OF STATUS#1 WD */
-    0002002,                    /*       SZA           IS TRANSFER OK ? */
-    0027700,                    /*       JMP START       NO,TRY AGAIN */
-    0117710,                    /* EXIT  JSB ADDR2,I     YES, EXEC LOADED PROGRAM _@ 2055B */
-    0000010,                    /* DMACW ABS DC        */
-    0170100,                    /*       ABS -START    */
+    {                               /* HP 1000 Loader ROM (12992B) */
+      IBL_START,                    /*   loader starting index */
+      IBL_DMA,                      /*   DMA index */
+      IBL_FWA,                      /*   FWA index */
+      { 0017727,                    /*   77700:  START JSB STAT      GET STATUS */
+        0002021,                    /*   77701:        SSA,RSS       IS DRIVE READY ? */
+        0027742,                    /*   77702:        JMP DMA       YES, SET UP DMA */
+        0013714,                    /*   77703:        AND B20       NO, CHECK STATUS BITS */
+        0002002,                    /*   77704:        SZA           IS DRIVE FAULTY OR HARD DOWN ? */
+        0102030,                    /*   77705:        HLT 30B       YES, HALT 30B, "RUN" TO TRY AGAIN */
+        0027700,                    /*   77706:        JMP START     NO, TRY AGAIN FOR DISC READY */
+        0102011,                    /*   77707:  ADDR1 OCT 102011    */
+        0102055,                    /*   77710:  ADDR2 OCT 102055    */
+        0164000,                    /*   77711:  CNT   DEC -6144     */
+        0000007,                    /*   77712:  D7    OCT 7         */
+        0001400,                    /*   77713:  STCMD OCT 1400      */
+        0000020,                    /*   77714:  B20   OCT 20        */
+        0017400,                    /*   77715:  STMSK OCT 17400     */
+        0000000,                    /*   77716:        NOP           */
+        0000000,                    /*   77717:        NOP           */
+        0000000,                    /*   77720:        NOP           */
+        0000000,                    /*   77721:        NOP           */
+        0000000,                    /*   77722:        NOP           */
+        0000000,                    /*   77723:        NOP           */
+        0000000,                    /*   77724:        NOP           */
+        0000000,                    /*   77725:        NOP           */
+        0000000,                    /*   77726:        NOP           */
+        0000000,                    /*   77727:  STAT  NOP           STATUS CHECK SUBROUTINE */
+        0107710,                    /*   77730:        CLC DC,C      SET STATUS COMMAND MODE */
+        0063713,                    /*   77731:        LDA STCMD     GET STATUS COMMAND */
+        0102610,                    /*   77732:        OTA DC        OUTPUT STATUS COMMAND */
+        0102310,                    /*   77733:        SFS DC        WAIT FOR STATUS#1 WORD */
+        0027733,                    /*   77734:        JMP *-1       */
+        0107510,                    /*   77735:        LIB DC,C      B-REG = STATUS#1 WORD */
+        0102310,                    /*   77736:        SFS DC        WAIT FOR STATUS#2 WORD */
+        0027736,                    /*   77737:        JMP *-1       */
+        0103510,                    /*   77740:        LIA DC,C      A-REG = STATUS#2 WORD */
+        0127727,                    /*   77741:        JMP STAT,I    RETURN */
+        0067776,                    /*   77742:  DMA   LDB DMACW     GET DMA CONTROL WORD */
+        0106606,                    /*   77743:        OTB 6         OUTPUT DMA CONTROL WORD */
+        0067707,                    /*   77744:        LDB ADDR1     GET MEMORY ADDRESS */
+        0106702,                    /*   77745:        CLC 2         SET MEMORY ADDRESS INPUT MODE */
+        0106602,                    /*   77746:        OTB 2         OUTPUT MEMORY ADDRESS TO DMA */
+        0102702,                    /*   77747:        STC 2         SET WORD COUNT INPUT MODE */
+        0067711,                    /*   77750:        LDB CNT       GET WORD COUNT */
+        0106602,                    /*   77751:        OTB 2         OUTPUT WORD COUNT TO DMA */
+        0106710,                    /*   77752:  CLDLD CLC DC        SET COMMAND INPUT MODE */
+        0102501,                    /*   77753:        LIA 1         LOAD SWITCH */
+        0106501,                    /*   77754:        LIB 1         REGISTER SETTINGS */
+        0013712,                    /*   77755:        AND D7        ISOLATE HEAD NUMBER */
+        0005750,                    /*   77756:        BLF,CLE,SLB   BIT 12=0? */
+        0027762,                    /*   77757:        JMP *+3       NO,MANUAL BOOT */
+        0002002,                    /*   77760:        SZA           YES,RPL BOOT. HEAD#=0? */
+        0001000,                    /*   77761:        ALS           NO,HEAD#1, MAKE HEAD#=2 */
+        0001720,                    /*   77762:        ALF,ALS       FORM COLD LOAD */
+        0001000,                    /*   77763:        ALS           COMMAND WORD */
+        0103706,                    /*   77764:        STC 6,C       ACTIVATE DMA */
+        0103610,                    /*   77765:        OTA DC,C      OUTPUT COLD LOAD COMMAND */
+        0102310,                    /*   77766:        SFS DC        IS COLD LOAD COMPLETED ? */
+        0027766,                    /*   77767:        JMP *-1       NO, WAIT */
+        0017727,                    /*   77770:        JSB STAT      YES, GET STATUS */
+        0060001,                    /*   77771:        LDA 1         */
+        0013715,                    /*   77772:        AND STMSK     A-REG = STATUS BITS OF STATUS#1 WD */
+        0002002,                    /*   77773:        SZA           IS TRANSFER OK ? */
+        0027700,                    /*   77774:        JMP START     NO,TRY AGAIN */
+        0117710,                    /*   77775:  EXIT  JSB ADDR2,I   YES, EXEC LOADED PROGRAM @ 2055B */
+        0000010,                    /*   77776:  DMACW ABS DC        */
+        0170100 } }                 /*   77777:        ABS -START    */
     };
+
+
+/* Device boot routine.
+
+   This routine is called directly by the BOOT DS and LOAD DS commands to copy
+   the device bootstrap into the upper 64 words of the logical address space.
+   It is also called indirectly by a BOOT CPU or LOAD CPU command when the
+   specified HP 1000 loader ROM socket contains a 12992B ROM.
+
+   When called in response to a BOOT DS or LOAD DS command, the "unitno"
+   parameter indicates the unit number specified in the BOOT command or is zero
+   for the LOAD command, and "dptr" points at the DS device structure.  The
+   bootstrap supports loading only from unit 0, and the command will be rejected
+   if another unit is specified (e.g., BOOT DS1).  Otherwise, depending on the
+   current CPU model, the BMDL or 12992B loader ROM will be copied into memory
+   and configured for the DS select code.  If the CPU is a 1000, the S register
+   will be set as it would be by the front-panel microcode.
+
+   When called for a BOOT/LOAD CPU command, the "unitno" parameter indicates the
+   select code to be used for configuration, and "dptr" will be NULL.  As above,
+   the BMDL or 12992B loader ROM will be copied into memory and configured for
+   the specified select code. The S register is assumed to be set correctly on
+   entry and is not modified.
+
+   In either case, if the CPU is a 21xx model, the paper tape portion of the
+   BMDL will be automatically configured for the select code of the paper tape
+   reader.
+
+   For the 12992B boot loader ROM for the HP 1000, the S register is set as
+   follows:
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | ROM # | 0   1 |      select code      | reserved  | 0 | head  |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Bit 12 must be 1 for a manual boot.  Bits 5-3 are nominally zero but are
+   reserved for the target operating system.  For example, RTE uses bit 5 to
+   indicate whether a standard (0) or reconfiguration (1) boot is desired.
+
+
+   Implementation notes:
+
+    1. In hardware, the BMDL was hand-configured for the disc and paper tape
+       reader select codes when it was installed on a given system.  Under
+       simulation, the LOAD and BOOT commands automatically configure the BMDL
+       to the current select codes of the PTR and DS devices.
+
+    2. The HP 1000 Loader ROMs manual indicates that bits 2-0 select the head to
+       use, implying that heads 0-7 are valid.  However, Table 5 has entries
+       only for heads 0-3, and the boot loader code will malfunction if heads
+       4-7 are specified.  The code masks the head number to three bits but
+       forms the Cold Load Read command by shifting the head number six bits to
+       the left.  As the head field in the command is only two bits wide,
+       specifying heads 4-7 will result in bit 2 being shifted into the opcode
+       field, resulting in a Recalibrate command.
+*/
 
 t_stat ds_boot (int32 unitno, DEVICE *dptr)
 {
-if (unitno != 0)                                        /* boot supported on drive unit 0 only */
-    return SCPE_NOFNC;                                  /* report "Command not allowed" if attempted */
+static const HP_WORD ds_preserved   = 0000073u;             /* S-register bits 5-3 and 1-0 are preserved */
+static const HP_WORD ds_manual_boot = 0010000u;             /* S-register bit 12 set for a manual boot */
 
-if (ibl_copy (ds_rom, ds_dib.select_code,               /* copy the boot ROM to memory and configure */
-              IBL_OPT | IBL_DS_HEAD,                    /*   the S register accordingly */
-              IBL_DS | IBL_MAN | IBL_SET_SC (ds_dib.select_code)))
-    return SCPE_IERR;                                   /* return an internal error if the copy failed */
-else
-    return SCPE_OK;
+if (dptr == NULL)                                           /* if we are being called for a BOOT/LOAD CPU */
+    return cpu_copy_loader (ds_loaders, unitno,             /*   then copy the boot loader to memory */
+                            IBL_S_NOCLEAR, IBL_S_NOSET);    /*     but do not alter the S register */
+
+else if (unitno != 0)                                       /* otherwise a BOOT DS for a non-zero unit */
+    return SCPE_NOFNC;                                      /*   is rejected as unsupported */
+
+else                                                        /* otherwise this is a BOOT/LOAD DS */
+    return cpu_copy_loader (ds_loaders, ds_dib.select_code, /*   so copy the boot loader to memory */
+                            ds_preserved, ds_manual_boot);  /*     and configure the S register if 1000 CPU */
 }
 
 
@@ -1273,23 +1424,16 @@ if (uptr) {                                             /* did the command start
     if (time)                                           /* was the unit scheduled? */
         activate_unit (uptr);                           /* activate it (and clear the "wait" field) */
 
-    if (DEBUG_PRI (ds_dev, DEB_RWSC)) {
-        unit = uptr - ds_unit;                          /* get the unit number */
+    if (time == 0)                                  /* was the unit busy? */
+        tprintf (ds_dev, DEB_RWSC, "Unit %d %s in progress\n",
+                 uptr - ds_unit, dl_opcode_name (MAC, drive_command));
 
-        if (time == 0)                                  /* was the unit busy? */
-            fprintf (sim_deb, ">>DS rwsc: Unit %d %s in progress\n",
-                     unit, dl_opcode_name (MAC, drive_command));
-
-        fputs (">>DS rwsc: ", sim_deb);
-
-        if (unit > DL_MAXDRIVE)
-            fputs ("Controller ", sim_deb);
-        else
-            fprintf (sim_deb, "Unit %d position %" T_ADDR_FMT "d ", unit, uptr->pos);
-
-        fprintf (sim_deb, "%s command initiated\n",
+    if (uptr - ds_unit > DL_MAXDRIVE)
+        tprintf (ds_dev, DEB_RWSC, "Controller %s command initiated\n",
                  dl_opcode_name (MAC, mac_cntlr.opcode));
-        }
+    else
+        tprintf (ds_dev, DEB_RWSC, "Unit %d position %" T_ADDR_FMT "d %s command initiated\n",
+                 uptr - ds_unit, uptr->pos, dl_opcode_name (MAC, mac_cntlr.opcode));
     }
 
 else                                                    /* the command failed to start */
@@ -1380,8 +1524,7 @@ static void fifo_load (uint16 data)
 uint32 index;
 
 if (FIFO_FULL) {                                            /* is the FIFO already full? */
-    if (DEBUG_PRI (ds_dev, DEB_BUF))
-        fprintf (sim_deb, ">>DS buf:  Attempted load to full FIFO, data %06o\n", data);
+    tprintf (ds_dev, DEB_BUF, "Attempted load to full FIFO, data %06o\n", data);
 
     return;                                                 /* return with the load ignored */
     }
@@ -1391,9 +1534,8 @@ index = (ds.fifo_reg->qptr + ds.fifo_count) % FIFO_SIZE;    /* calculate the ind
 ds.fifo [index] = data;                                     /* store the word in the FIFO */
 ds.fifo_count = ds.fifo_count + 1;                          /* increment the count of words stored */
 
-if (DEBUG_PRI (ds_dev, DEB_BUF))
-    fprintf (sim_deb, ">>DS buf:  Data %06o loaded into FIFO (%d)\n",
-             data, ds.fifo_count);
+tprintf (ds_dev, DEB_BUF, "Data %06o loaded into FIFO (%d)\n",
+         data, ds.fifo_count);
 
 return;
 }
@@ -1418,9 +1560,7 @@ static uint16 fifo_unload (void)
 uint16 data;
 
 if (FIFO_EMPTY) {                                           /* is the FIFO already empty? */
-    if (DEBUG_PRI (ds_dev, DEB_BUF))
-        fputs (">>DS buf:  Attempted unload from empty FIFO\n", sim_deb);
-
+    tprintf (ds_dev, DEB_BUF, "Attempted unload from empty FIFO\n");
     return 0;                                               /* return with no data */
     }
 
@@ -1429,9 +1569,8 @@ data = ds.fifo [ds.fifo_reg->qptr];                         /* get the word from
 ds.fifo_reg->qptr = (ds.fifo_reg->qptr + 1) % FIFO_SIZE;    /* update the FIFO queue pointer */
 ds.fifo_count = ds.fifo_count - 1;                          /* decrement the count of words stored */
 
-if (DEBUG_PRI (ds_dev, DEB_BUF))
-    fprintf (sim_deb, ">>DS buf:  Data %06o unloaded from FIFO (%d)\n",
-             data, ds.fifo_count);
+tprintf (ds_dev, DEB_BUF, "Data %06o unloaded from FIFO (%d)\n",
+         data, ds.fifo_count);
 
 return data;
 }
@@ -1446,8 +1585,7 @@ static void fifo_clear (void)
 {
 ds.fifo_count = 0;                                      /* clear the FIFO */
 
-if (DEBUG_PRI (ds_dev, DEB_BUF))
-    fputs (">>DS buf:  FIFO cleared\n", sim_deb);
+tprintf (ds_dev, DEB_BUF, "FIFO cleared\n");
 
 return;
 }
@@ -1461,19 +1599,14 @@ return;
 
 static t_stat activate_unit (UNIT *uptr)
 {
-int32 unit;
 t_stat result;
 
-if (DEBUG_PRI (ds_dev, DEB_SERV)) {
-    unit = uptr - ds_unit;                              /* calculate the unit number */
-
-    if (uptr == &ds_cntlr)
-        fprintf (sim_deb, ">>DS serv: Controller delay %d service scheduled\n",
-                 uptr->wait);
-    else
-        fprintf (sim_deb, ">>DS serv: Unit %d delay %d service scheduled\n",
-                 unit, uptr->wait);
-    }
+if (uptr == &ds_cntlr)
+    tprintf (ds_dev, DEB_SERV, "Controller delay %d service scheduled\n",
+             uptr->wait);
+else
+    tprintf (ds_dev, DEB_SERV, "Unit %d delay %d service scheduled\n",
+             uptr - ds_unit, uptr->wait);
 
 result = sim_activate (uptr, uptr->wait);               /* activate the unit */
 uptr->wait = 0;                                         /* reset the activation time */

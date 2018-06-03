@@ -24,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   03-Aug-17    JDB     Changed perror call for I/O errors to cprintf
    22-Apr-17    JDB     A failed sim_fseek call now causes a drive fault
    09-Mar-17    JDB     Added the simulator name to the "perror" message.
    17-Jan-17    JDB     Moved "hp2100_defs.h" inclusion to "hp2100_disclib.c"
@@ -2279,8 +2280,10 @@ static t_stat io_error (CVPTR cvptr, UNIT *uptr, CNTLR_STATUS status)
 {
 dl_end_command (cvptr, status);                         /* terminate the command with an error */
 
-perror ("HP 2100 simulator disc library I/O error");    /* report the error to the console */
-clearerr (uptr->fileref);                               /*   and clear the error in case we resume */
+cprintf ("%s simulator disc library I/O error: %s\n",   /* report the error to the console */
+         sim_name, strerror (errno));
+
+clearerr (uptr->fileref);                               /* clear the error */
 
 return SCPE_IOERR;                                      /* return an I/O error to stop the simulator */
 }

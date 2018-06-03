@@ -1,30 +1,33 @@
-/* hp2100_mt.c: HP 2100 12559A magnetic tape simulator
+/* hp2100_mt.c: HP 2100 12559C 9-Track Magnetic Tape Unit Interface
 
    Copyright (c) 1993-2016, Robert M. Supnik
+   Copyright (c) 2017,      J. David Bryan
 
-   Permission is hereby granted, free of charge, to any person obtaining a
-   copy of this software and associated documentation files (the "Software"),
-   to deal in the Software without restriction, including without limitation
-   the rights to use, copy, modify, merge, publish, distribute, sublicense,
-   and/or sell copies of the Software, and to permit persons to whom the
-   Software is furnished to do so, subject to the following conditions:
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
 
    The above copyright notice and this permission notice shall be included in
    all copies or substantial portions of the Software.
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+   AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not be
+   Except as contained in this notice, the names of the authors shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from Robert M Supnik.
+   in this Software without prior written authorization from the authors.
 
-   MT           12559A 3030 nine track magnetic tape
+   MT           12559C 9-Track Magnetic Tape Unit Interface
 
+   20-Jul-17    JDB     Removed "mtc_stopioe" variable and register
+   13-Mar-17    JDB     Deprecated LOCKED/WRITEENABLED for ATTACH -R
    13-May-16    JDB     Modified for revised SCP API function parameter types
    24-Dec-14    JDB     Added casts for explicit downward conversions
    10-Jan-13    MP      Added DEV_TAPE to DEVICE flags
@@ -58,9 +61,10 @@
    04-Oct-98    RMS     V2.4 magtape format
 
    References:
-   - 12559A 9-Track Magnetic Tape Unit Interface Kit Operating and Service Manual
-            (12559-9001, Jul-1970)
-   - SIMH Magtape Representation and Handling (Bob Supnik, 30-Aug-2006)
+     - 12559A 9-Track Magnetic Tape Unit Interface Kit Operating and Service Manual
+         (12559-9001, July 1970)
+     - SIMH Magtape Representation and Handling
+         (Bob Supnik, 30-Aug-2006)
 
 
    The 3030 was one of HP's earliest tape drives.  The 12559A controller
@@ -76,6 +80,7 @@
    feature of the 12578A DMA card for the 2116 computer.  The second meant that
    software drivers had to pad short records with blanks or nulls.
 
+
    Implementation notes:
 
     1. The HP 3030 Magnetic Tape Subsystem diagnostic, part number 20433-60001,
@@ -84,8 +89,11 @@
 */
 
 
+
 #include "hp2100_defs.h"
 #include "sim_tape.h"
+
+
 
 #define DB_V_SIZE       16                              /* max data buf */
 #define DBSIZE          (1 << DB_V_SIZE)                /* max data cmd */
@@ -132,7 +140,6 @@ int32 mtc_1st = 0;                                      /* first svc flop */
 int32 mtc_ctime = 40;                                   /* command wait */
 int32 mtc_gtime = 1000;                                 /* gap stop time */
 int32 mtc_xtime = 15;                                   /* data xfer time */
-int32 mtc_stopioe = 1;                                  /* stop on error */
 uint8 mtxb[DBSIZE] = { 0 };                             /* data buffer */
 t_mtrlnt mt_ptr = 0, mt_max = 0;                        /* buffer ptrs */
 static const uint32 mtc_cmd[] = {
@@ -180,8 +187,10 @@ REG mtd_reg[] = {
     };
 
 MTAB mtd_mod[] = {
-    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &mtd_dev },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &mtd_dev },
+/*    Entry Flags          Value  Print String  Match String  Validation    Display        Descriptor       */
+/*    -------------------  -----  ------------  ------------  ------------  -------------  ---------------- */
+    { MTAB_XDV,              2u,  "SC",         "SC",         &hp_set_dib,  &hp_show_dib,  (void *) &mt_dib },
+    { MTAB_XDV | MTAB_NMO,  ~2u,  "DEVNO",      "DEVNO",      &hp_set_dib,  &hp_show_dib,  (void *) &mt_dib },
     { 0 }
     };
 
@@ -216,19 +225,47 @@ REG mtc_reg[] = {
     { DRDATA (CTIME, mtc_ctime, 24), REG_NZ + PV_LEFT },
     { DRDATA (GTIME, mtc_gtime, 24), REG_NZ + PV_LEFT },
     { DRDATA (XTIME, mtc_xtime, 24), REG_NZ + PV_LEFT },
-    { FLDATA (STOP_IOE, mtc_stopioe, 0) },
     { ORDATA (SC, mtc_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, mtc_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
-MTAB mtc_mod[] = {
-    { MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL },
-    { MTAB_XTD | MTAB_VDV, 0, "FORMAT", "FORMAT",
-      &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
-    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &mtd_dev },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &mtd_dev },
+/* Modifier list.
+
+   The LOCKED and WRITEENABLED modifiers are deprecated.  The supported method
+   of write-protecting a tape drive is to attach the tape image with the -R
+   (read-only) switch or by setting the host operating system's read-only
+   attribute on the tape image file.  This simulates removing the write ring
+   from the tape reel before mounting it on the drive.  There is no hardware
+   method of write-protecting a mounted and positioned tape reel.
+
+
+   Implementation notes:
+
+    1. The UNIT_RO modifier displays "write ring" if the flag is not set.  There
+       is no corresponding entry for the opposite condition because "read only"
+       is automatically printed after the attached filename.
+
+    2. FORMAT is really a unit option, but as there is only one unit, it is
+       specified as MTAB_XDV so that SHOW MTC FORMAT is accepted, rather than
+       requiring SHOW MTC0 FORMAT.
+*/
+
+MTAB mtc_mod [] = {
+/*    Mask Value     Match Value    Print String      Match String     Validation    Display  Descriptor */
+/*    -------------  -------------  ----------------  ---------------  ------------  -------  ---------- */
+    { UNIT_RO,       0,             "write ring",     NULL,            NULL,         NULL,    NULL       },
+
+    { MTUF_WLK,      0,             NULL,             "WRITEENABLED",  NULL,         NULL,    NULL       },
+    { MTUF_WLK,      MTUF_WLK,      NULL,             "LOCKED",        NULL,         NULL,    NULL       },
+
+
+/*    Entry Flags          Value  Print String  Match String  Validation         Display             Descriptor       */
+/*    -------------------  -----  ------------  ------------  -----------------  ------------------  ---------------- */
+    { MTAB_XDV,              0,   "FORMAT",     "FORMAT",     &sim_tape_set_fmt, &sim_tape_show_fmt, NULL             },
+
+    { MTAB_XDV,              2u,  "SC",         "SC",         &hp_set_dib,       &hp_show_dib,       (void *) &mt_dib },
+    { MTAB_XDV | MTAB_NMO,  ~2u,  "DEVNO",      "DEVNO",      &hp_set_dib,       &hp_show_dib,       (void *) &mt_dib },
     { 0 }
     };
 
@@ -484,7 +521,7 @@ t_stat st, r = SCPE_OK;
 if ((mtc_unit.flags & UNIT_ATT) == 0) {                 /* offline? */
     mtc_sta = STA_LOCAL | STA_REJ;                      /* rejected */
     mtcio (&mtc_dib, ioENF, 0);                         /* set cch flg */
-    return IOERROR (mtc_stopioe, SCPE_UNATT);
+    return SCPE_OK;
     }
 
 switch (mtc_fnc) {                                      /* case on function */
@@ -603,7 +640,7 @@ switch (st) {
 
     case MTSE_IOERR:                                    /* IO error */
         mtc_sta = mtc_sta | STA_PAR;                    /* error */
-        if (mtc_stopioe) return SCPE_IOERR;
+        return SCPE_IOERR;
         break;
 
     case MTSE_INVRL:                                    /* invalid rec lnt */

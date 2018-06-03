@@ -1,6 +1,6 @@
 /* hp2100_cpu0.c: HP 1000 user microcode and unimplemented instruction set stubs
 
-   Copyright (c) 2006-2012, J. David Bryan
+   Copyright (c) 2006-2017, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    CPU0         User microcode and unimplemented firmware options
 
+   01-Aug-17    JDB     Changed .FLUN and self-tests to test for unimplemented stops
    09-May-12    JDB     Separated assignments from conditional expressions
    04-Nov-10    JDB     Removed DS note regarding PIF card (is now implemented)
    18-Sep-08    JDB     .FLUN and self-tests for VIS and SIGNAL are NOP if not present
@@ -138,8 +139,8 @@ if (op_ds [entry] != OP_N) {
 
 switch (entry) {                                        /* decode IR<3:0> */
 
-    default:                                            /* others undefined */
-        reason = stop_inst;
+    default:                                            /* others unimplemented */
+        reason = STOP (cpu_ss_unimpl);
     }
 
 return reason;
@@ -151,7 +152,7 @@ return reason;
    All UIG instructions unclaimed by installed firmware options are directed
    here.  User- or site-specific firmware may be simulated by dispatching to the
    appropriate simulator routine.  Unimplemented instructions should return
-   "stop_inst" to cause a simulator stop if enabled.
+   "STOP (cpu_ss_unimpl)" to cause a simulator stop if enabled.
 
    Implementation notes:
 
@@ -182,15 +183,7 @@ t_stat cpu_user (uint32 IR, uint32 intrq)
 t_stat reason = SCPE_OK;
 
 if (UNIT_CPU_TYPE == UNIT_TYPE_211X)                    /* 2116/15/14 CPU? */
-    return stop_inst;                                   /* user microprograms not supported */
-
-switch (IR) {
-    case 0105226:                                       /* firmware detection: FFP .FLUN */
-    case 0105355:                                       /* firmware detection: RTE-6/VM OS self-test */
-    case 0105477:                                       /* firmware detection: VIS self-test */
-    case 0105617:                                       /* firmware detection: SIGNAL/1000 self-test */
-        return SCPE_OK;                                 /* execute as NOP */
-    }
+    return STOP (cpu_ss_unimpl);                        /* user microprograms not supported */
 
 switch ((IR >> 4) & 037) {                              /* decode IR<8:4> */
 
@@ -212,8 +205,8 @@ switch ((IR >> 4) & 037) {                              /* decode IR<8:4> */
 /*  case 0nn:                                           ** other cases as needed */
 /*      return cpu_user_nn (IR, intrq);                 ** uncomment to handle instruction */
 
-    default:                                            /* others undefined */
-        reason = stop_inst;
+    default:                                            /* others unimplemented */
+        reason = STOP (cpu_ss_unimpl);
     }
 
 return reason;
@@ -223,8 +216,8 @@ return reason;
 /* Example user microprogram simulator.
 
    User- or site-specific firmware may be simulated by writing the appropriate
-   code below.  Unimplemented instructions should return "stop_inst" to cause a
-   simulator stop if enabled.
+   code below.  Unimplemented instructions should return "STOP (cpu_ss_unimpl)"
+   to cause a simulator stop if enabled.
 
    For information on the operand patterns used in the "op_user" array, see the
    comments preceding the "cpu_ops" routine in "hp2100_cpu1.c" and the "operand
@@ -263,8 +256,8 @@ switch (entry) {                                        /* decode IR<4:0> */
 /*  case 0nn:                                           ** other cases as needed */
 /*      break;                                          ** uncomment to handle instruction */
 
-    default:                                            /* others undefined */
-        reason = stop_inst;
+    default:                                            /* others unimplemented */
+        reason = STOP (cpu_ss_unimpl);
     }
 
 return reason;

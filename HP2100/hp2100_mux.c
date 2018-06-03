@@ -1,30 +1,40 @@
-/* hp2100_mux.c: HP 2100 12920A terminal multiplexor simulator
+/* hp2100_mux.c: HP 2100 12920A Asynchronous Multiplexer Interface simulator
 
-   Copyright (c) 2002-2016, Robert M Supnik
+   Copyright (c) 2002-2016, Robert M. Supnik
+   Copyright (c) 2017-2018  J. David Bryan
 
-   Permission is hereby granted, free of charge, to any person obtaining a
-   copy of this software and associated documentation files (the "Software"),
-   to deal in the Software without restriction, including without limitation
-   the rights to use, copy, modify, merge, publish, distribute, sublicense,
-   and/or sell copies of the Software, and to permit persons to whom the
-   Software is furnished to do so, subject to the following conditions:
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
 
    The above copyright notice and this permission notice shall be included in
    all copies or substantial portions of the Software.
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+   AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not be
+   Except as contained in this notice, the names of the authors shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from Robert M Supnik.
+   in this Software without prior written authorization from the authors.
 
-   MUX,MUXL,MUXM        12920A terminal multiplexor
+   MUX,MUXL,MUXC        12920A Asynchronous Multiplexer Interface
 
+   01-May-18    JDB     Removed ioCRS counter, as consecutive ioCRS calls are no longer made
+   28-Apr-18    JDB     Fixed output completion IRQ when port is not connected
+   03-Aug-17    JDB     Control card device renamed from MUXM to MUXC
+                        MUXC now enabled/disabled independently of MUX and MUXL
+                        Modified to use the "odd_parity" array in hp2100_sys.c
+   15-Mar-17    JDB     Trace flags are now global
+                        Changed DEBUG_PRI calls to tprintfs
+   10-Mar-17    JDB     Added IOBUS to the debug table
+   17-Jan-17    JDB     Changed "hp_---sc" and "hp_---dev" to "hp_---_dib"
    13-May-16    JDB     Modified for revised SCP API function parameter types
    29-Jun-15    JDB     Corrected typo in RTS macro definition
    24-Dec-14    JDB     Added casts for explicit downward conversions
@@ -82,7 +92,7 @@
 
      MUXL   lower data card (lines)
      MUX    upper data card (scanner)
-     MUXM   control card (modem control)
+     MUXC   control card (modem control)
 
    The lower and upper data cards must be in adjacent I/O slots.  The control
    card may be placed in any slot, although in practice it was placed in the
@@ -92,6 +102,124 @@
    The 12920A supported one or two control cards (two cards were used with
    801-type automatic dialers).  Under simulation, only one control card is
    supported.
+
+   The multiplexer responds to I/O instructions as follows:
+
+   Upper Data Card output word format (OTA and OTB):
+
+      15 |14  13  12 |11  10   9 | 8   7   6 | 5   4   3 | 2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | - |  channel number   | -   -   -   -   -   -   -   -   -   - |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+
+   Upper Data Card input word format (LIA, LIB, MIA, and MIB):
+
+      15 |14  13  12 |11  10   9 | 8   7   6 | 5   4   3 | 2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | S |  channel number   | -   -   -   -   -   - | D | B | L | R |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     S = Seeking
+     D = Diagnose
+     B = Break status
+     L = Character lost
+     R = Receive/send (0/1) character interrupt
+
+
+   Lower Data Card output control word format (OTA and OTB):
+
+      15 |14  13  12 |11  10   9 | 8   7   6 | 5   4   3 | 2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | 1 | R | I | E | D | char size |           baud rate           |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     R = Receive/send (0/1) configuration
+     I = Enable interrupt
+     E = Echo (receive)/parity (send)
+     D = Diagnose
+
+   Character size:
+
+     The three least-significant bits of the sum of the data, parity, and stop
+     bits.  For example, 7E1 is 1001, so 001 is coded.
+
+   Baud rate:
+
+     The value (14400 / device bit rate) - 1.  For example, 2400 baud is 005.
+
+
+   Lower Data Card output data word format (OTA and OTB):
+
+      15 |14  13  12 |11  10   9 | 8   7   6 | 5   4   3 | 2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | 0 | 1 | -   - | S |               transmit data               |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     S = Sync bit
+
+   Transmit data:
+
+     Right-justified with leading one bits.
+
+
+   Lower Data Card input word format (LIA, LIB, MIA, and MIB):
+
+      15 |14  13  12 |11  10   9 | 8   7   6 | 5   4   3 | 2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | P |      channel      |             receive data              |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     P = Computed parity
+
+   Receive data:
+
+     Right-justified with leading one bits
+
+
+   Control Card output word format (OTA and OTB):
+
+      15 |14  13  12 |11  10   9 | 8   7   6 | 5   4   3 | 2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | S | U |channel number | -   - |EC2|EC1|C2 |C1 |ES2|ES1|SS2|SS1|
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+
+   Control Card input word format (LIA, LIB, MIA, and MIB):
+
+      15 |14  13  12 |11  10   9 | 8   7   6 | 5   4   3 | 2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | 1   1 |channel number |I2 |I1 | 0   0   0   0 |ES2|ES1|S2 |S1 |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     S   = Scan
+     U   = Update
+     ECx = Enable command bit x
+     Cx  = Command bit x
+     ESx = Enable status bit x
+     Sx  = Status bit x
+     SSx = Stored status bit x
+     Ix  = Interrupt bit x
+
+   The control card provides two serial control outputs and two serial status
+   inputs for each of the 16 channels.  The card connects to the Request to Send
+   (CA) and Data Terminal Ready (CD) control lines and the Data Carrier Detect
+   (CF) and Data Set Ready (CC) status lines.  Addressable latches hold the
+   control line values and assert them continuously to the 16 channels.  In
+   addition, a 16-word by 4-bit RAM holds the expected state for each channel's
+   status lines and the corresponding interrupt enable bits to provide
+   notification if those lines change.
+
 
    Implementation notes:
 
@@ -134,24 +262,53 @@
        before the output character transmit interrupt).  If an output operation
        is not in progress, then the BREAK will be recognized at the next input
        poll.
+
+    2. In simulation, establishing a port connection asserts DSR to the control
+       card.  If the port is configured as a dataset connection (SET MUXLn
+       DATASET), DCD is also asserted.  Disconnecting denies DSR and DCD.  The
+       control card responds to DTR denying by dropping the port connection.
+       The RTS setting has no effect.
+
+    3. When a Bell 103 dataset answers a call, it asserts DSR first.  After the
+       handshake with the remote dataset completes, DCD asserts, typically
+       between 1.3 and 3.6 seconds later.  Similarly, when the remote dataset
+       terminates the call by sending a long (1.5 second) space, the local
+       dataset drops DSR first, followed by DCD after approximately 30
+       milliseconds.  The dataset simulation does not model these delays; DSR
+       and DCD transition up and down together.  This implies that the control
+       card software driver will see only one interrupt for each transition pair
+       instead of the expected two (presuming both DSR and DCD are enabled to
+       interrupt).
 */
+
 
 
 #include <ctype.h>
 
 #include "hp2100_defs.h"
+
 #include "sim_tmxr.h"
 
 
-/* Unit references */
 
-#define MUX_LINES       16                              /* number of user lines */
-#define MUX_ILINES      5                               /* number of diag rcv only lines */
+/* Program limits */
+
+#define TERM_COUNT          16                              /* number of terminal channels */
+#define AUX_COUNT           5                               /* number of auxiliary channels */
+
+#define RECV_CHAN_COUNT     (TERM_COUNT + AUX_COUNT)        /* number of receive channels */
+#define SEND_CHAN_COUNT     TERM_COUNT                      /* number of send channels */
+#define UNIT_COUNT          TERM_COUNT                      /* number of units */
+
+#define FIRST_TERM          0                               /* first terminal index */
+#define LAST_TERM           (FIRST_TERM + TERM_COUNT - 1)   /* last terminal index */
+#define FIRST_AUX           TERM_COUNT                      /* first auxiliary index */
+#define LAST_AUX            (FIRST_AUX + AUX_COUNT - 1)     /* last auxiliary index */
 
 
 /* Service times */
 
-#define MUXL_WAIT       500
+#define MUXL_WAIT       500                             /* initial fast receive/send time in event ticks */
 
 
 /* Unit flags */
@@ -161,11 +318,6 @@
 #define UNIT_MDM        (1 << UNIT_V_MDM)
 #define UNIT_DIAG       (1 << UNIT_V_DIAG)
 
-/* Debug flags */
-
-#define DEB_CMDS        (1 << 0)                        /* Command initiation and completion */
-#define DEB_CPU         (1 << 1)                        /* CPU I/O */
-#define DEB_XFER        (1 << 2)                        /* Socket receive and transmit */
 
 /* Channel number (OTA upper, LIA lower or upper) */
 
@@ -191,11 +343,46 @@
 #define OTL_CHAR        03777                           /* char mask */
 #define OTL_PAR         0200                            /* char parity */
 
+#define BAUD_RATE(p)        ((28800 / (OTL_BAUD (p) + 1) + 1) / 2)
+
+static const uint32 bits_per_char [8] = {       /* bits per character, indexed by OTL_LNT encoding */
+    9, 10, 11, 12, 5, 6, 7, 8
+    };
+
+static const BITSET_NAME lower_parameter_names [] = {   /* lower data card parameter word names */
+    "\1send\0receive",                                  /*   bit 14 */
+    "enable interrupt",                                 /*   bit 13 */
+    "enable parity/echo",                               /*   bit 12 */
+    "diagnose"                                          /*   bit 11 */
+    };
+
+static const BITSET_FORMAT lower_parameter_format =     /* names, offset, direction, alternates, bar */
+    { FMT_INIT (lower_parameter_names, 11, msb_first, has_alt, append_bar) };
+
+static const BITSET_NAME lower_data_names [] = {        /* lower data card output data word names */
+    "send",                                             /*   bit 14 */
+    NULL,                                               /*   bit 13 */
+    NULL,                                               /*   bit 12 */
+    "sync"                                              /*   bit 11 */
+    };
+
+static const BITSET_FORMAT lower_data_format =          /* names, offset, direction, alternates, bar */
+    { FMT_INIT (lower_data_names, 11, msb_first, no_alt, append_bar) };
+
+
 /* LIA, lower = received data */
 
 #define LIL_PAR         0100000                         /* parity */
 #define PUT_DCH(x)      (((x) & MUX_M_CHAN) << MUX_V_CHAN)
 #define LIL_CHAR        01777                           /* character */
+
+static const BITSET_NAME lower_input_names [] = {       /* lower data card input data word names */
+    "\1odd parity\0even parity",                        /*   bit 15 */
+    };
+
+static const BITSET_FORMAT lower_input_format =         /* names, offset, direction, alternates, bar */
+    { FMT_INIT (lower_input_names, 0, msb_first, has_alt, append_bar) };
+
 
 /* LIA, upper = status */
 
@@ -204,6 +391,29 @@
 #define LIU_BRK         0000004                         /* break */
 #define LIU_LOST        0000002                         /* char lost */
 #define LIU_TR          0000001                         /* trans/rcv */
+
+static const BITSET_NAME upper_status_names [] = {      /* upper data card status word names */
+    "seeking",                                          /*   bit 15 */
+    NULL,                                               /*   bit 14 */
+    NULL,                                               /*   bit 13 */
+    NULL,                                               /*   bit 12 */
+    NULL,                                               /*   bit 11 */
+    NULL,                                               /*   bit 10 */
+    NULL,                                               /*   bit  9 */
+    NULL,                                               /*   bit  8 */
+    NULL,                                               /*   bit  7 */
+    NULL,                                               /*   bit  6 */
+    NULL,                                               /*   bit  5 */
+    NULL,                                               /*   bit  4 */
+    "diagnose",                                         /*   bit  3 */
+    "break"                                             /*   bit  2 */
+    "lost",                                             /*   bit  1 */
+    "\1send\0receive"                                   /*   bit  0 */
+    };
+
+static const BITSET_FORMAT upper_status_format =        /* names, offset, direction, alternates, bar */
+    { FMT_INIT (upper_status_names, 0, msb_first, has_alt, no_bar) };
+
 
 /* OTA, control */
 
@@ -223,8 +433,29 @@
 #define OTC_SS2         0000002                         /* SSn flops */
 #define OTC_SS1         0000001
 #define OTC_RW          (OTC_ES2|OTC_ES1|OTC_SS2|OTC_SS1)
-#define RTS             OTC_C2                          /* C2 = rts */
-#define DTR             OTC_C1                          /* C1 = dtr */
+
+static const BITSET_NAME cntl_control_names [] = {      /* control card control word names */
+    "scan",                                             /*   bit 15 */
+    "update",                                           /*   bit 14 */
+    NULL,                                               /*   bit 13 */
+    NULL,                                               /*   bit 12 */
+    NULL,                                               /*   bit 11 */
+    NULL,                                               /*   bit 10 */
+    NULL,                                               /*   bit  9 */
+    NULL,                                               /*   bit  8 */
+    "EC2",                                              /*   bit  7 */
+    "EC1",                                              /*   bit  6 */
+    "\1C2\0~C2",                                        /*   bit  5 */
+    "\1C1\0~C1",                                        /*   bit  4 */
+    "ES2",                                              /*   bit  3 */
+    "ES1",                                              /*   bit  2 */
+    "\1S2\0~S2",                                        /*   bit  1 */
+    "\1S1\0~S1"                                         /*   bit  0 */
+    };
+
+static const BITSET_FORMAT cntl_control_format =        /* names, offset, direction, alternates, bar */
+    { FMT_INIT (cntl_control_names, 0, msb_first, has_alt, no_bar) };
+
 
 /* LIA, control */
 
@@ -237,37 +468,51 @@
 #define LIC_S2          0000002                         /* Sn flops */
 #define LIC_S1          0000001
 #define LIC_V_I         8                               /* S1 to I1 */
-#define CDET            LIC_S2                          /* S2 = cdet */
-#define DSR             LIC_S1                          /* S1 = dsr */
 
 #define LIC_TSTI(ch)    (((muxc_lia[ch] ^ muxc_ota[ch]) & \
                           ((muxc_ota[ch] & (OTC_ES2|OTC_ES1)) >> OTC_V_ES)) \
                          << LIC_V_I)
 
+static const BITSET_NAME cntl_status_names [] = {       /* control card status word names */
+    "I2",                                               /*   bit  9 */
+    "I1",                                               /*   bit  8 */
+    NULL,                                               /*   bit  7 */
+    NULL,                                               /*   bit  6 */
+    NULL,                                               /*   bit  5 */
+    NULL,                                               /*   bit  4 */
+    "ES2",                                              /*   bit  3 */
+    "ES1",                                              /*   bit  2 */
+    "\1S2\0~S2",                                        /*   bit  1 */
+    "\1S1\0~S1"                                         /*   bit  0 */
+    };
+
+static const BITSET_FORMAT cntl_status_format =         /* names, offset, direction, alternates, bar */
+    { FMT_INIT (cntl_status_names, 0, msb_first, has_alt, no_bar) };
+
+/* Control card #1 serial line bits */
+
+#define RTS                 OTC_C2              /* Control card #1 C2 = Request to Send */
+#define DTR                 OTC_C1              /* Control card #1 C1 = Data Terminal Ready */
+#define DCD                 LIC_S2              /* Control card #1 S2 = Data Carrier Detect */
+#define DSR                 LIC_S1              /* Control card #1 S1 = Data Set Ready */
+
+static const BITSET_NAME cntl_line_names [] = { /* Control card serial line status names */
+    "RTS",                                      /*   bit  5 */
+    "DTR",                                      /*   bit  4 */
+    NULL,                                       /*   bit  3 */
+    NULL,                                       /*   bit  2 */
+    "DCD",                                      /*   bit  1 */
+    "DSR"                                       /*   bit  0 */
+    };
+
+static const BITSET_FORMAT cntl_line_format =   /* names, offset, direction, alternates, bar */
+    { FMT_INIT (cntl_line_names, 0, msb_first, no_alt, no_bar) };
+
 
 /* Program constants */
 
-static const uint8 odd_par [256] = {
- 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,        /* 000-017 */
- 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,        /* 020-037 */
- 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,        /* 040-067 */
- 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,        /* 060-077 */
- 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,        /* 100-117 */
- 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,        /* 120-137 */
- 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,        /* 140-157 */
- 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,        /* 160-177 */
- 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,        /* 200-217 */
- 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,        /* 220-237 */
- 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,        /* 240-267 */
- 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,        /* 260-277 */
- 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,        /* 300-317 */
- 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,        /* 320-337 */
- 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,        /* 340-357 */
- 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1         /* 360-377 */
- };
-
-#define RCV_PAR(x)      (odd_par[(x) & 0377] ? 0 : LIL_PAR)
-#define XMT_PAR(x)      (odd_par[(x) & 0377] ? 0 : OTL_PAR)
+#define RCV_PAR(x)      (odd_parity [(x) & 0377] ? 0 : LIL_PAR)
+#define XMT_PAR(x)      (odd_parity [(x) & 0377] ? 0 : OTL_PAR)
 
 
 /* Multiplexer controller state variables */
@@ -296,20 +541,22 @@ uint32 muxc_scan = 0;                                   /* ctrl scan */
 
 /* Multiplexer per-line state variables */
 
-uint16 mux_sta   [MUX_LINES + MUX_ILINES];              /* line status */
-uint16 mux_rpar  [MUX_LINES + MUX_ILINES];              /* rcv param */
-uint16 mux_xpar  [MUX_LINES];                           /* xmt param */
-uint8  mux_rchp  [MUX_LINES + MUX_ILINES];              /* rcv chr pend */
-uint8  mux_xdon  [MUX_LINES];                           /* xmt done */
-uint8  muxc_ota  [MUX_LINES];                           /* ctrl: Cn,ESn,SSn */
-uint8  muxc_lia  [MUX_LINES];                           /* ctrl: Sn */
-uint8  mux_defer [MUX_LINES];                           /* break deferred flags */
+uint16 mux_sta   [RECV_CHAN_COUNT];             /* line status */
+uint16 mux_rpar  [RECV_CHAN_COUNT];             /* rcv param */
+uint16 mux_xpar  [SEND_CHAN_COUNT];             /* xmt param */
+
+uint8  mux_rchp  [RECV_CHAN_COUNT];             /* rcv chr pend */
+uint8  mux_defer [RECV_CHAN_COUNT];             /* rcv break deferred flags */
+uint8  mux_xdon  [SEND_CHAN_COUNT];             /* xmt done */
+
+uint8  muxc_ota  [TERM_COUNT];                  /* ctrl: Cn,ESn,SSn */
+uint8  muxc_lia  [TERM_COUNT];                  /* ctrl: Sn */
 
 
 /* Multiplexer per-line buffer variables */
 
-uint16 mux_rbuf[MUX_LINES + MUX_ILINES];                /* rcv buf */
-uint16 mux_xbuf[MUX_LINES];                             /* xmt buf */
+uint16 mux_rbuf [RECV_CHAN_COUNT];              /* rcv buf */
+uint16 mux_xbuf [SEND_CHAN_COUNT];              /* xmt buf */
 
 
 /* Multiplexer local routines */
@@ -334,35 +581,47 @@ t_stat mux_detach (UNIT *uptr);
 t_stat mux_setdiag (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 
-/* MUXL/MUXU device information block.
+/* Multiplexer SCP data structures */
+
+
+/* Terminal multiplexer library structures */
+
+static int32 mux_order [TERM_COUNT] = {         /* line connection order */
+    -1                                          /*   use the default order */
+    };
+
+static TMLN mux_ldsc [TERM_COUNT] = {           /* line descriptors */
+    { 0 }
+    };
+
+static TMXR mux_desc = {                        /* multiplexer descriptor */
+    TERM_COUNT,                                 /*   number of terminal lines */
+    0,                                          /*   listening port (reserved) */
+    0,                                          /*   master socket  (reserved) */
+    mux_ldsc,                                   /*   line descriptors */
+    mux_order,                                  /*   line connection order */
+    NULL                                        /*   multiplexer device (derived internally) */
+    };
+
+
+/* Device information blocks.
 
    The DIBs of adjacent cards must be contained in an array, so they are defined
    here and referenced in the lower and upper card device structures.
 */
 
-DIB mux_dib[] = {
-    { &muxlio, MUXL },
-    { &muxuio, MUXU }
+DIB mux_dib [] = {
+    { &muxlio, MUXL, 0 },
+    { &muxuio, MUXU, 0 }
     };
 
-#define muxl_dib mux_dib[0]
-#define muxu_dib mux_dib[1]
+#define muxl_dib            mux_dib [0]
+#define muxu_dib            mux_dib [1]
 
 
-/* MUXL data structures.
+/* Unit list */
 
-   muxl_dib     MUXL device information block
-   muxl_unit    MUXL unit list
-   muxl_reg     MUXL register list
-   muxl_mod     MUXL modifier list
-   muxl_dev     MUXL device descriptor
-*/
-
-TMXR mux_desc;
-
-DEVICE muxl_dev;
-
-UNIT muxl_unit[] = {
+static UNIT muxl_unit [UNIT_COUNT] = {
     { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
     { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
     { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
@@ -381,215 +640,253 @@ UNIT muxl_unit[] = {
     { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT }
     };
 
-REG muxl_reg[] = {
-    { FLDATA (CTL, muxl.control, 0) },
-    { FLDATA (FLG, muxl.flag,    0) },
-    { FLDATA (FBF, muxl.flagbuf, 0) },
-    { BRDATA (STA, mux_sta, 8, 16, MUX_LINES + MUX_ILINES) },
-    { BRDATA (RPAR, mux_rpar, 8, 16, MUX_LINES + MUX_ILINES) },
-    { BRDATA (XPAR, mux_xpar, 8, 16, MUX_LINES) },
-    { BRDATA (RBUF, mux_rbuf, 8, 16, MUX_LINES + MUX_ILINES) },
-    { BRDATA (XBUF, mux_xbuf, 8, 16, MUX_LINES) },
-    { BRDATA (RCHP, mux_rchp, 8, 1, MUX_LINES + MUX_ILINES) },
-    { BRDATA (XDON, mux_xdon, 8, 1, MUX_LINES) },
-    { BRDATA (BDFR, mux_defer, 8, 1, MUX_LINES) },
-    { URDATA (TIME, muxl_unit[0].wait, 10, 24, 0,
-              MUX_LINES, REG_NZ + PV_LEFT) },
-    { ORDATA (SC, muxl_dib.select_code, 6), REG_HRO },
-    { ORDATA (DEVNO, muxl_dib.select_code, 6), REG_HRO },
+
+/* Register list */
+
+static REG muxl_reg [] = {
+/*    Macro   Name   Location              Radix  Width  Offset       Depth              Flags       */
+/*    ------  -----  --------------------  -----  -----  ------ -----------------  ----------------- */
+    { FLDATA (CTL,   muxl.control,                         0)                                        },
+    { FLDATA (FLG,   muxl.flag,                            0)                                        },
+    { FLDATA (FBF,   muxl.flagbuf,                         0)                                        },
+    { BRDATA (STA,   mux_sta,                8,    16,           RECV_CHAN_COUNT)                    },
+    { BRDATA (RPAR,  mux_rpar,               8,    16,           RECV_CHAN_COUNT)                    },
+    { BRDATA (XPAR,  mux_xpar,               8,    16,           SEND_CHAN_COUNT)                    },
+    { BRDATA (RBUF,  mux_rbuf,               8,    16,           RECV_CHAN_COUNT), REG_A             },
+    { BRDATA (XBUF,  mux_xbuf,               8,    16,           SEND_CHAN_COUNT), REG_A             },
+    { BRDATA (RCHP,  mux_rchp,               8,     1,           RECV_CHAN_COUNT)                    },
+    { BRDATA (XDON,  mux_xdon,               8,     1,           SEND_CHAN_COUNT)                    },
+    { BRDATA (BDFR,  mux_defer,              8,     1,           TERM_COUNT)                         },
+    { URDATA (TIME,  muxl_unit[0].wait,     10,    24,     0,    TERM_COUNT,       REG_NZ | PV_LEFT) },
+    { ORDATA (SC,    muxl_dib.select_code,          6),                            REG_HRO           },
+    { ORDATA (DEVNO, muxl_dib.select_code,          6),                            REG_HRO           },
     { NULL }
     };
 
-MTAB muxl_mod[] = {
+
+/* Modifier list */
+
+static MTAB muxl_mod [] = {
     { TT_MODE, TT_MODE_UC, "UC", "UC", NULL, NULL, NULL },
     { TT_MODE, TT_MODE_7B, "7b", "7B", NULL, NULL, NULL },
     { TT_MODE, TT_MODE_8B, "8b", "8B", NULL, NULL, NULL },
     { TT_MODE, TT_MODE_7P, "7p", "7P", NULL, NULL, NULL },
 
-    { UNIT_MDM, UNIT_MDM, "dataset",    "DATASET",   NULL, NULL, NULL },
-    { UNIT_MDM,        0, "no dataset", "NODATASET", NULL, NULL, NULL },
+    { UNIT_MDM, UNIT_MDM, "data set", "DATASET",   NULL, NULL, NULL },
+    { UNIT_MDM,        0, "direct",   "NODATASET", NULL, NULL, NULL },
 
-    { MTAB_XTD | MTAB_VUN | MTAB_NC, 0, "LOG", "LOG",   &tmxr_set_log,   &tmxr_show_log, &mux_desc },
-    { MTAB_XTD | MTAB_VUN | MTAB_NC, 0, NULL,  "NOLOG", &tmxr_set_nolog, NULL,           &mux_desc },
+    { MTAB_XUN | MTAB_NC, 0, "LOG", "LOG",   &tmxr_set_log,   &tmxr_show_log, (void *) &mux_desc },
+    { MTAB_XUN | MTAB_NC, 0, NULL,  "NOLOG", &tmxr_set_nolog, NULL,           (void *) &mux_desc },
 
-    { MTAB_XTD | MTAB_VUN,            0, NULL,    "DISCONNECT", &tmxr_dscln, NULL,        &mux_desc },
-    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",         &hp_setsc,   &hp_showsc,  &muxl_dev },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO",      &hp_setdev,  &hp_showdev, &muxl_dev },
+    { MTAB_XUN,             0,   NULL,    "DISCONNECT", &tmxr_dscln, NULL,         (void *) &mux_desc },
+
+    { MTAB_XDV,             2u,  "SC",    "SC",         &hp_set_dib, &hp_show_dib, (void *) &mux_dib },
+    { MTAB_XDV | MTAB_NMO, ~2u,  "DEVNO", "DEVNO",      &hp_set_dib, &hp_show_dib, (void *) &mux_dib },
 
     { 0 }
     };
 
-DEVICE muxl_dev = {
-    "MUXL",                                 /* device name */
-    muxl_unit,                              /* unit array */
-    muxl_reg,                               /* register array */
-    muxl_mod,                               /* modifier array */
-    MUX_LINES,                              /* number of units */
-    10,                                     /* address radix */
-    31,                                     /* address width */
-    1,                                      /* address increment */
-    8,                                      /* data radix */
-    8,                                      /* data width */
-    NULL,                                   /* examine routine */
-    NULL,                                   /* deposit routine */
-    &muxc_reset,                            /* reset routine */
-    NULL,                                   /* boot routine */
-    NULL,                                   /* attach routine */
-    NULL,                                   /* detach routine */
-    &muxl_dib,                              /* device information block */
-    DEV_DISABLE,                            /* device flags */
-    0,                                      /* debug control flags */
-    NULL,                                   /* debug flag name table */
-    NULL,                                   /* memory size change routine */
-    NULL,                                   /* logical device name */
-    NULL,                                   /* help routine */
-    NULL,                                   /* help attach routine*/
-    NULL                                    /* help context */
+
+/* Debugging trace list */
+
+static DEBTAB muxl_deb [] = {
+    { "CSRW",  TRACE_CSRW  },                   /* Interface control, status, read, and write actions */
+    { "SERV",  TRACE_SERV  },                   /* Channel unit service scheduling calls */
+    { "XFER",  TRACE_XFER  },                   /* Data receptions and transmissions */
+    { "IOBUS", TRACE_IOBUS },                   /* interface I/O bus signals and data words */
+    { NULL,    0           }
     };
 
 
-/* MUXU data structures
+/* Device descriptor */
 
-   mux_order    MUX line connection order table
-   mux_ldsc     MUX terminal multiplexer line descriptors
-   mux_desc     MUX terminal multiplexer device descriptor
+DEVICE muxl_dev = {
+    "MUXL",                                     /* device name */
+    muxl_unit,                                  /* unit array */
+    muxl_reg,                                   /* register array */
+    muxl_mod,                                   /* modifier array */
+    UNIT_COUNT,                                 /* number of units */
+    10,                                         /* address radix */
+    31,                                         /* address width */
+    1,                                          /* address increment */
+    8,                                          /* data radix */
+    8,                                          /* data width */
+    NULL,                                       /* examine routine */
+    NULL,                                       /* deposit routine */
+    &muxc_reset,                                /* reset routine */
+    NULL,                                       /* boot routine */
+    NULL,                                       /* attach routine */
+    NULL,                                       /* detach routine */
+    &muxl_dib,                                  /* device information block pointer */
+    DEV_DISABLE | DEV_DEBUG,                    /* device flags */
+    0,                                          /* debug control flags */
+    muxl_deb,                                   /* debug flag name array */
+    NULL,                                       /* memory size change routine */
+    NULL,                                       /* logical device name */
+    NULL,                                       /* help routine */
+    NULL,                                       /* help attach routine*/
+    NULL                                        /* help context */
+    };
 
-   muxu_dib     MUXU device information block
-   muxu_unit    MUXU unit list
-   muxu_reg     MUXU register list
-   muxu_mod     MUXU modifier list
-   muxu_deb     MUXU debug list
-   muxu_dev     MUXU device descriptor
-*/
 
-DEVICE muxu_dev;
+/* Unit list */
 
-int32 mux_order [MUX_LINES] = { -1 };                       /* connection order */
-TMLN  mux_ldsc  [MUX_LINES] = { { 0 } };                    /* line descriptors */
-TMXR  mux_desc = { MUX_LINES, 0, 0, mux_ldsc, mux_order };  /* device descriptor */
+static UNIT muxu_unit = { UDATA (&muxi_svc, UNIT_ATTABLE, 0), POLL_FIRST };
 
-UNIT muxu_unit = { UDATA (&muxi_svc, UNIT_ATTABLE, 0), POLL_FIRST };
 
-REG muxu_reg[] = {
-    { ORDATA (IBUF, muxu_ibuf, 16) },
-    { ORDATA (OBUF, muxu_obuf, 16) },
-    { ORDATA (SC, muxu_dib.select_code, 6), REG_HRO },
-    { ORDATA (DEVNO, muxu_dib.select_code, 6), REG_HRO },
+/* Register list */
+
+static REG muxu_reg [] = {
+/*    Macro   Name   Location              Width   Flags  */
+/*    ------  -----  --------------------  -----  ------- */
+    { ORDATA (IBUF,  muxu_ibuf,             16)           },
+    { ORDATA (OBUF,  muxu_obuf,             16)           },
+    { ORDATA (SC,    muxu_dib.select_code,   6),  REG_HRO },
+    { ORDATA (DEVNO, muxu_dib.select_code,   6),  REG_HRO },
     { NULL }
     };
 
-MTAB muxu_mod[] = {
-    { UNIT_DIAG, UNIT_DIAG, "diagnostic mode", "DIAG", &mux_setdiag, NULL,            NULL },
-    { UNIT_DIAG, 0,         "terminal mode",   "TERM", &mux_setdiag, NULL,            NULL },
-    { UNIT_ATT,  UNIT_ATT,  "",                NULL,   NULL,         &tmxr_show_summ, &mux_desc },
 
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "LINEORDER", "LINEORDER", &tmxr_set_lnorder, &tmxr_show_lnorder, &mux_desc },
+/* Modifier list */
 
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,         NULL,        &tmxr_show_cstat, &mux_desc },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS",  NULL,         NULL,        &tmxr_show_cstat, &mux_desc },
-    { MTAB_XTD | MTAB_VDV,            1, NULL,          "DISCONNECT", &tmxr_dscln, NULL,             &mux_desc },
-    { MTAB_XTD | MTAB_VDV,            1, "SC",          "SC",         &hp_setsc,   &hp_showsc,       &muxl_dev },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO",       "DEVNO",      &hp_setdev,  &hp_showdev,      &muxl_dev },
+static MTAB muxu_mod [] = {
+    { UNIT_DIAG, UNIT_DIAG, "diagnostic mode", "DIAGNOSTIC", &mux_setdiag, NULL,            NULL               },
+    { UNIT_DIAG, 0,         "terminal mode",   "TERMINAL",   &mux_setdiag, NULL,            NULL               },
+    { UNIT_ATT,  UNIT_ATT,  "",                NULL,         NULL,         &tmxr_show_summ, (void *) &mux_desc },
+
+    { MTAB_XDV | MTAB_NMO,  0, "LINEORDER", "LINEORDER", &tmxr_set_lnorder, &tmxr_show_lnorder, &mux_desc },
+
+    { MTAB_XDV | MTAB_NMO,  1, "CONNECTIONS", NULL,         NULL,        &tmxr_show_cstat, (void *) &mux_desc },
+    { MTAB_XDV | MTAB_NMO,  0, "STATISTICS",  NULL,         NULL,        &tmxr_show_cstat, (void *) &mux_desc },
+    { MTAB_XDV,             1, NULL,          "DISCONNECT", &tmxr_dscln, NULL,             (void *) &mux_desc },
+
+    { MTAB_XDV,             2u, "SC",          "SC",         &hp_set_dib, &hp_show_dib, (void *) &mux_dib },
+    { MTAB_XDV | MTAB_NMO, ~2u, "DEVNO",       "DEVNO",      &hp_set_dib, &hp_show_dib, (void *) &mux_dib },
 
     { 0 }
     };
 
-DEBTAB muxu_deb [] = {
-    { "CMDS", DEB_CMDS },
-    { "CPU",  DEB_CPU },
-    { "XFER", DEB_XFER },
-    { NULL,   0 }
+
+/* Debugging trace list */
+
+static DEBTAB muxu_deb [] = {
+    { "CSRW",  TRACE_CSRW  },                   /* Interface control, status, read, and write actions */
+    { "PSERV", TRACE_PSERV },                   /* Poll unit service scheduling calls */
+    { "IOBUS", TRACE_IOBUS },                   /* interface I/O bus signals and data words */
+    { NULL,    0           }
     };
+
+
+/* Device descriptor */
 
 DEVICE muxu_dev = {
-    "MUX",                                  /* device name */
-    &muxu_unit,                             /* unit array */
-    muxu_reg,                               /* register array */
-    muxu_mod,                               /* modifier array */
-    1,                                      /* number of units */
-    10,                                     /* address radix */
-    31,                                     /* address width */
-    1,                                      /* address increment */
-    8,                                      /* data radix */
-    8,                                      /* data width */
-    &tmxr_ex,                               /* examine routine */
-    &tmxr_dep,                              /* deposit routine */
-    &muxc_reset,                            /* reset routine */
-    NULL,                                   /* boot routine */
-    &mux_attach,                            /* attach routine */
-    &mux_detach,                            /* detach routine */
-    &muxu_dib,                              /* device information block */
-    DEV_DISABLE | DEV_DEBUG  | DEV_MUX,     /* device flags */
-    0,                                      /* debug control flags */
-    muxu_deb,                               /* debug flag name table */
-    NULL,                                   /* memory size change routine */
-    NULL,                                   /* logical device name */
-    NULL,                                   /* help routine */
-    NULL,                                   /* help attach routine*/
-    (void *) &mux_desc                      /* help context */
+    "MUX",                                      /* device name */
+    &muxu_unit,                                 /* unit array */
+    muxu_reg,                                   /* register array */
+    muxu_mod,                                   /* modifier array */
+    1,                                          /* number of units */
+    10,                                         /* address radix */
+    31,                                         /* address width */
+    1,                                          /* address increment */
+    8,                                          /* data radix */
+    8,                                          /* data width */
+    &tmxr_ex,                                   /* examine routine */
+    &tmxr_dep,                                  /* deposit routine */
+    &muxc_reset,                                /* reset routine */
+    NULL,                                       /* boot routine */
+    &mux_attach,                                /* attach routine */
+    &mux_detach,                                /* detach routine */
+    &muxu_dib,                                  /* device information block pointer */
+    DEV_DISABLE | DEV_DEBUG | DEV_MUX,          /* device flags */
+    0,                                          /* debug control flags */
+    muxu_deb,                                   /* debug flag name array */
+    NULL,                                       /* memory size change routine */
+    NULL,                                       /* logical device name */
+    NULL,                                       /* help routine */
+    NULL,                                       /* help attach routine*/
+    (void *) &mux_desc                          /* help context */
     };
 
 
-/* MUXC data structures.
+/* Device information block */
 
-   muxc_dib     MUXC device information block
-   muxc_unit    MUXC unit list
-   muxc_reg     MUXC register list
-   muxc_mod     MUXC modifier list
-   muxc_dev     MUXC device descriptor
-*/
+static DIB muxc_dib = {
+    &muxcio,                                    /* device interface */
+    MUXC,                                       /* select code */
+    0                                           /* card index */
+    };
 
-DEVICE muxc_dev;
 
-DIB muxc_dib = { &muxcio, MUXC };
+/* Unit list */
 
 UNIT muxc_unit = { UDATA (NULL, 0, 0) };
 
-REG muxc_reg[] = {
-    { FLDATA (CTL, muxc.control, 0) },
-    { FLDATA (FLG, muxc.flag,    0) },
-    { FLDATA (FBF, muxc.flagbuf, 0) },
-    { FLDATA (SCAN, muxc_scan, 0) },
-    { ORDATA (CHAN, muxc_chan, 4) },
-    { BRDATA (DSO, muxc_ota, 8, 6, MUX_LINES) },
-    { BRDATA (DSI, muxc_lia, 8, 2, MUX_LINES) },
-    { ORDATA (SC, muxc_dib.select_code, 6), REG_HRO },
-    { ORDATA (DEVNO, muxc_dib.select_code, 6), REG_HRO },
+
+/* Register list */
+
+static REG muxc_reg [] = {
+/*    Macro   Name   Location              Radix  Width  Offset       Depth              Flags       */
+/*    ------  -----  --------------------  -----  -----  ------ -----------------  ----------------- */
+    { FLDATA (CTL,   muxc.control,                          0)                                       },
+    { FLDATA (FLG,   muxc.flag,                             0)                                       },
+    { FLDATA (FBF,   muxc.flagbuf,                          0)                                       },
+    { FLDATA (SCAN,  muxc_scan,                             0)                                       },
+    { ORDATA (CHAN,  muxc_chan,                     4)                                               },
+    { BRDATA (DSO,   muxc_ota,               2,     6,          TERM_COUNT)                          },
+    { BRDATA (DSI,   muxc_lia,               2,     2,          TERM_COUNT)                          },
+    { ORDATA (SC,    muxc_dib.select_code,          6),                            REG_HRO           },
+    { ORDATA (DEVNO, muxc_dib.select_code,          6),                            REG_HRO           },
     { NULL }
     };
 
-MTAB muxc_mod[] = {
-    { MTAB_XTD | MTAB_VDV,            0, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &muxc_dev },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &muxc_dev },
+
+/* Modifier list */
+
+static MTAB muxc_mod [] = {
+    { MTAB_XTD | MTAB_VDV,             1u, "SC",    "SC",    &hp_set_dib, &hp_show_dib, (void *) &muxc_dib },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, ~1u, "DEVNO", "DEVNO", &hp_set_dib, &hp_show_dib, (void *) &muxc_dib },
     { 0 }
     };
 
+
+/* Debugging trace list */
+
+static DEBTAB muxc_deb [] = {
+    { "CSRW",  TRACE_CSRW  },                   /* Interface control, status, read, and write actions */
+    { "XFER",  TRACE_XFER  },                   /* Data receptions and transmissions */
+    { "IOBUS", TRACE_IOBUS },                   /* interface I/O bus signals and data words */
+    { NULL,    0           }
+    };
+
+
+/* Device descriptor */
+
 DEVICE muxc_dev = {
-    "MUXM",                                 /* device name */
-    &muxc_unit,                             /* unit array */
-    muxc_reg,                               /* register array */
-    muxc_mod,                               /* modifier array */
-    1,                                      /* number of units */
-    10,                                     /* address radix */
-    31,                                     /* address width */
-    1,                                      /* address increment */
-    8,                                      /* data radix */
-    8,                                      /* data width */
-    NULL,                                   /* examine routine */
-    NULL,                                   /* deposit routine */
-    &muxc_reset,                            /* reset routine */
-    NULL,                                   /* boot routine */
-    NULL,                                   /* attach routine */
-    NULL,                                   /* detach routine */
-    &muxc_dib,                              /* device information block */
-    DEV_DISABLE,                            /* device flags */
-    0,                                      /* debug control flags */
-    NULL,                                   /* debug flag name table */
-    NULL,                                   /* memory size change routine */
-    NULL,                                   /* logical device name */
-    NULL,                                   /* help routine */
-    NULL,                                   /* help attach routine*/
-    NULL                                    /* help context */
+    "MUXM",                                     /* device name (deprecated; use MUXC) */
+    &muxc_unit,                                 /* unit array */
+    muxc_reg,                                   /* register array */
+    muxc_mod,                                   /* modifier array */
+    1,                                          /* number of units */
+    10,                                         /* address radix */
+    31,                                         /* address width */
+    1,                                          /* address increment */
+    8,                                          /* data radix */
+    8,                                          /* data width */
+    NULL,                                       /* examine routine */
+    NULL,                                       /* deposit routine */
+    &muxc_reset,                                /* reset routine */
+    NULL,                                       /* boot routine */
+    NULL,                                       /* attach routine */
+    NULL,                                       /* detach routine */
+    &muxc_dib,                                  /* device information block pointer */
+    DEV_DISABLE | DEV_DEBUG,                    /* device flags */
+    0,                                          /* debug control flags */
+    muxc_deb,                                   /* debug flag name array */
+    NULL,                                       /* memory size change routine */
+    NULL,                                       /* logical device name */
+    NULL,                                       /* help routine */
+    NULL,                                       /* help attach routine*/
+    NULL                                        /* help context */
     };
 
 
@@ -600,26 +897,15 @@ DEVICE muxc_dev = {
     1. The operating manual says that "at least 100 milliseconds of CLC 0s must
        be programmed" by systems employing the multiplexer to ensure that the
        multiplexer resets.  In practice, such systems issue 128K CLC 0
-       instructions.  As we provide debug logging of multiplexer resets, a CRS
-       counter is used to ensure that only one debug line is printed in response
-       to these 128K CRS invocations.
+       instructions.  In simulation, only one ioCRS invocation is required to
+       reset the multiplexer.
 */
 
 uint32 muxlio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-int32 ln;
-const char *hold_or_clear = (signal_set & ioCLF ? ",C" : "");
-static uint32 crs_count = 0;                            /* cntr for ioCRS repeat */
+int32    ln;
 IOSIGNAL signal;
 IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
-
-if (crs_count && !(signal_set & ioCRS)) {               /* counting CRSes and not present? */
-    if (DEBUG_PRI (muxu_dev, DEB_CMDS))                 /* report reset count */
-        fprintf (sim_deb, ">>MUXl cmds: [CRS] Multiplexer reset %d times\n",
-                          crs_count);
-
-    crs_count = 0;                                      /* clear counter */
-    }
 
 while (working_set) {
     signal = IONEXT (working_set);                      /* isolate next signal */
@@ -628,10 +914,6 @@ while (working_set) {
 
         case ioCLF:                                     /* clear flag flip-flop */
             muxl.flag = muxl.flagbuf = CLEAR;
-
-            if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-                fputs (">>MUXl cmds: [CLF] Flag cleared\n", sim_deb);
-
             mux_data_int ();                            /* look for new int */
             break;
 
@@ -639,9 +921,6 @@ while (working_set) {
         case ioSTF:                                     /* set flag flip-flop */
         case ioENF:                                     /* enable flag */
             muxl.flag = muxl.flagbuf = SET;
-
-            if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-                fputs (">>MUXl cmds: [STF] Flag set\n", sim_deb);
             break;
 
 
@@ -656,21 +935,28 @@ while (working_set) {
 
 
         case ioIOI:                                     /* I/O data input */
-            stat_data = IORETURN (SCPE_OK, muxl_ibuf);  /* merge in return status */
+            tprintf (muxl_dev, TRACE_CSRW, "Input data is channel %u | %s%04o\n",
+                     MUX_CHAN (muxl_ibuf),
+                     fmt_bitset (muxl_ibuf, lower_input_format),
+                     muxl_ibuf & LIL_CHAR);
 
-            if (DEBUG_PRI (muxu_dev, DEB_CPU))
-                fprintf (sim_deb, ">>MUXl cpu:  [LIx%s] Data = %06o\n", hold_or_clear, muxl_ibuf);
+            stat_data = IORETURN (SCPE_OK, muxl_ibuf);  /* merge in return status */
             break;
 
 
         case ioIOO:                                     /* I/O data output */
             muxl_obuf = IODATA (stat_data);             /* store data */
 
-            if (DEBUG_PRI (muxu_dev, DEB_CPU))
-                if (muxl_obuf & OTL_P)
-                    fprintf (sim_deb, ">>MUXl cpu:  [OTx%s] Parameter = %06o\n", hold_or_clear, muxl_obuf);
-                else
-                    fprintf (sim_deb, ">>MUXl cpu:  [OTx%s] Data = %06o\n", hold_or_clear, muxl_obuf);
+
+            if (muxl_obuf & OTL_P)
+                tprintf (muxl_dev, TRACE_CSRW, "Parameter is %s%u bits | %u baud\n",
+                         fmt_bitset (muxl_obuf, lower_parameter_format),
+                         bits_per_char [OTL_LNT (muxl_obuf)],
+                         BAUD_RATE (muxl_obuf));
+            else
+                tprintf (muxl_dev, TRACE_CSRW, "Output data is %s%04o\n",
+                         fmt_bitset (muxl_obuf, lower_data_format),
+                         muxl_obuf & OTL_CHAR);
             break;
 
 
@@ -680,92 +966,87 @@ while (working_set) {
 
 
         case ioCRS:                                     /* control reset */
-            if (crs_count == 0) {                       /* first reset? */
-                muxl.control = CLEAR;                   /* clear control flip-flop */
+            muxl.control = CLEAR;                       /* clear control flip-flop */
 
-                for (ln = 0; ln < MUX_LINES; ln++) {    /* clear transmit info */
-                    mux_xbuf[ln] = mux_xpar[ln] = 0;
-                    muxc_ota[ln] = muxc_lia[ln] = mux_xdon[ln] = 0;
-                    }
-
-                for (ln = 0; ln < (MUX_LINES + MUX_ILINES); ln++) {
-                    mux_rbuf[ln] = mux_rpar[ln] = 0;    /* clear receive info */
-                    mux_sta[ln] = mux_rchp[ln] = 0;
-                    }
+            for (ln = 0; ln < SEND_CHAN_COUNT; ln++) {  /* clear transmit info */
+                mux_xbuf[ln] = mux_xpar[ln] = 0;
+                muxc_ota[ln] = muxc_lia[ln] = mux_xdon[ln] = 0;
                 }
 
-            crs_count = crs_count + 1;                  /* increment count */
+            for (ln = 0; ln < RECV_CHAN_COUNT; ln++) {
+                mux_rbuf[ln] = mux_rpar[ln] = 0;        /* clear receive info */
+                mux_sta[ln] = mux_rchp[ln] = 0;
+                }
+
             break;
 
 
         case ioCLC:                                     /* clear control flip-flop */
             muxl.control = CLEAR;
-
-            if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-                fprintf (sim_deb, ">>MUXl cmds: [CLC%s] Data interrupt inhibited\n", hold_or_clear);
             break;
 
 
-        case ioSTC:                                                 /* set control flip-flop */
-            muxl.control = SET;                                     /* set control */
+        case ioSTC:                                             /* set control flip-flop */
+            muxl.control = SET;                                 /* set control */
 
-            ln = MUX_CHAN (muxu_obuf);                              /* get chan # */
+            ln = MUX_CHAN (muxu_obuf);                          /* get chan # */
 
-            if (muxl_obuf & OTL_TX) {                               /* transmit? */
-                if (ln < MUX_LINES) {                               /* line valid? */
-                    if (muxl_obuf & OTL_P) {                        /* parameter? */
-                        mux_xpar[ln] = (uint16) muxl_obuf;          /* store param value */
-                        if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-                            fprintf (sim_deb,
-                                ">>MUXl cmds: [STC%s] Transmit channel %d parameter %06o stored\n",
-                                hold_or_clear, ln, muxl_obuf);
-                        }
+            if (muxl_obuf & OTL_TX)                             /* if this is a send parameter or data */
+                if (ln >= SEND_CHAN_COUNT)                      /*   then report if the channel number is out of range */
+                    tprintf (muxl_dev, TRACE_CSRW, "Send channel %d invalid\n",
+                             ln);
 
-                    else {                                          /* data */
-                        if (mux_xpar[ln] & OTL_TPAR)                /* parity requested? */
-                            muxl_obuf =                             /* add parity bit */
-                                muxl_obuf & ~OTL_PAR |
-                                XMT_PAR(muxl_obuf);
-                        mux_xbuf[ln] = (uint16) muxl_obuf;          /* load buffer */
+                else if (muxl_obuf & OTL_P) {                   /* otherwise if this is a parameter store */
+                    mux_xpar[ln] = (uint16) muxl_obuf;          /*   then save it */
 
-                        if (sim_is_active (&muxl_unit[ln])) {       /* still working? */
-                            mux_sta[ln] = mux_sta[ln] | LIU_LOST;   /* char lost */
-                            if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-                                fprintf (sim_deb, ">>MUXl cmds: [STC%s] Transmit channel %d data overrun\n",
-                                                  hold_or_clear, ln);
-                            }
-                        else {
-                            if (muxu_unit.flags & UNIT_DIAG)        /* loopback? */
-                                mux_ldsc[ln].conn = 1;              /* connect this line */
-                            sim_activate (&muxl_unit[ln], muxl_unit[ln].wait);
-                            if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-                                fprintf (sim_deb, ">>MUXl cmds: [STC%s] Transmit channel %d data %06o scheduled\n",
-                                                  hold_or_clear, ln, muxl_obuf);
-                            }
-                        }
-                    }
-                else if (DEBUG_PRI (muxu_dev, DEB_CMDS))            /* line invalid */
-                    fprintf (sim_deb, ">>MUXl cmds: [STC%s] Transmit channel %d invalid\n", hold_or_clear, ln);
-                }
-
-            else                                                    /* receive */
-                if (ln < (MUX_LINES + MUX_ILINES)) {                /* line valid? */
-                    if (muxl_obuf & OTL_P) {                        /* parameter? */
-                        mux_rpar[ln] = (uint16) muxl_obuf;          /* store param value */
-                        if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-                            fprintf (sim_deb,
-                                ">>MUXl cmds: [STC%s] Receive channel %d parameter %06o stored\n",
-                                hold_or_clear, ln, muxl_obuf);
-                        }
-
-                    else if (DEBUG_PRI (muxu_dev, DEB_CMDS))        /* data (invalid action) */
-                        fprintf (sim_deb,
-                            ">>MUXl cmds: [STC%s] Receive channel %d parameter %06o invalid action\n",
-                            hold_or_clear, ln, muxl_obuf);
+                    tprintf (muxl_dev, TRACE_CSRW, "Channel %d send parameter %06o stored\n",
+                             ln, muxl_obuf);
                     }
 
-                else if (DEBUG_PRI (muxu_dev, DEB_CMDS))            /* line invalid */
-                    fprintf (sim_deb, ">>MUXl cmds: [STC%s] Receive channel %d invalid\n", hold_or_clear, ln);
+                else {                                          /* otherwise this is a data store */
+                    if (mux_xpar[ln] & OTL_TPAR)                /* if parity is enabled */
+                        muxl_obuf = muxl_obuf & ~OTL_PAR        /*   then replace the parity bit */
+                                      | XMT_PAR (muxl_obuf);    /*     with the calculated value */
+
+                    mux_xbuf[ln] = (uint16) muxl_obuf;          /* load buffer */
+
+                    if (sim_is_active (&muxl_unit[ln])) {       /* still working? */
+                        mux_sta[ln] = mux_sta[ln] | LIU_LOST;   /* char lost */
+
+                        tprintf (muxl_dev, TRACE_CSRW, "Channel %d send data overrun\n",
+                                 ln);
+                        }
+
+                    else {
+                        if (muxu_unit.flags & UNIT_DIAG)        /* loopback? */
+                            mux_ldsc[ln].conn = 1;              /* connect this line */
+
+                        sim_activate (&muxl_unit[ln], muxl_unit[ln].wait);
+
+                        tprintf (muxl_dev, TRACE_CSRW, "Channel %d send data %06o stored\n",
+                                 ln, muxl_obuf);
+
+                        tprintf (muxl_dev, TRACE_SERV, "Channel %d delay %d service scheduled\n",
+                                 ln, muxl_unit [ln].wait);
+                        }
+                    }
+
+            else                                        /* otherwise this is a receive parameter */
+                if (ln >= RECV_CHAN_COUNT)              /* report if the channel number is out of range */
+                    tprintf (muxl_dev, TRACE_CSRW, "Receive channel %d invalid\n",
+                             ln);
+
+                else if (muxl_obuf & OTL_P) {           /* otherwise if this is a parameter store */
+                    mux_rpar[ln] = (uint16) muxl_obuf;  /*   then save it */
+
+                    tprintf (muxl_dev, TRACE_CSRW, "Channel %d receive parameter %06o stored\n",
+                             ln, muxl_obuf);
+                    }
+
+                else                                    /* otherwise a data store to a receive channel is invalid */
+                    tprintf (muxl_dev, TRACE_CSRW, "Channel %d receive output data word %06o invalid\n",
+                             ln, muxl_obuf);
+
             break;
 
 
@@ -818,17 +1099,17 @@ while (working_set) {
         case ioIOI:                                     /* I/O data input */
             stat_data = IORETURN (SCPE_OK, muxu_ibuf);  /* merge in return status */
 
-            if (DEBUG_PRI (muxu_dev, DEB_CPU))
-                fprintf (sim_deb, ">>MUXu cpu:  [LIx] Status = %06o, channel = %d\n",
-                                  muxu_ibuf, MUX_CHAN(muxu_ibuf));
+            tprintf (muxu_dev, TRACE_CSRW, "Status is channel %u | %s\n",
+                     MUX_CHAN (muxu_ibuf),
+                     fmt_bitset (muxu_ibuf, upper_status_format));
             break;
 
 
         case ioIOO:                                     /* I/O data output */
             muxu_obuf = IODATA (stat_data);             /* store data */
 
-            if (DEBUG_PRI (muxu_dev, DEB_CPU))
-                fprintf (sim_deb, ">>MUXu cpu:  [OTx] Data channel = %d\n", MUX_CHAN(muxu_obuf));
+            tprintf (muxu_dev, TRACE_CSRW, "Channel %d is selected\n",
+                     MUX_CHAN (muxu_obuf));
             break;
 
 
@@ -852,7 +1133,6 @@ return stat_data;
 
 uint32 muxcio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-const char *hold_or_clear = (signal_set & ioCLF ? ",C" : "");
 uint16 data;
 int32 ln, old;
 IOSIGNAL signal;
@@ -865,10 +1145,6 @@ while (working_set) {
 
         case ioCLF:                                     /* clear flag flip-flop */
             muxc.flag = muxc.flagbuf = CLEAR;
-
-            if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-                fputs (">>MUXc cmds: [CLF] Flag cleared\n", sim_deb);
-
             mux_ctrl_int ();                            /* look for new int */
             break;
 
@@ -876,9 +1152,6 @@ while (working_set) {
         case ioSTF:                                     /* set flag flip-flop */
         case ioENF:                                     /* enable flag */
             muxc.flag = muxc.flagbuf = SET;
-
-            if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-                fputs (">>MUXc cmds: [STF] Flag set\n", sim_deb);
             break;
 
 
@@ -898,9 +1171,8 @@ while (working_set) {
                              (muxc_ota[muxc_chan] & (OTC_ES2 | OTC_ES1)) |  /* ES2, ES1 */
                              (muxc_lia[muxc_chan] & (LIC_S2 | LIC_S1)));    /* S2, S1 */
 
-            if (DEBUG_PRI (muxu_dev, DEB_CPU))
-                fprintf (sim_deb, ">>MUXc cpu:  [LIx%s] Status = %06o, channel = %d\n",
-                                  hold_or_clear, data, muxc_chan);
+            tprintf (muxc_dev, TRACE_CSRW, "Status is channel %u | %s\n",
+                     muxc_chan, fmt_bitset (data, cntl_status_format));
 
             muxc_chan = (muxc_chan + 1) & LIC_M_CHAN;               /* incr channel */
             stat_data = IORETURN (SCPE_OK, data);                   /* merge in return status */
@@ -910,6 +1182,9 @@ while (working_set) {
         case ioIOO:                                             /* I/O data output */
             data = IODATA (stat_data);                          /* clear supplied status */
             ln = muxc_chan = OTC_CHAN (data);                   /* set channel */
+
+            tprintf (muxc_dev, TRACE_CSRW, "Control is channel %u | %s\n",
+                     muxc_chan, fmt_bitset (data, cntl_control_format));
 
             if (data & OTC_SCAN) muxc_scan = 1;                 /* set scan flag */
             else muxc_scan = 0;
@@ -927,23 +1202,34 @@ while (working_set) {
                     muxc_ota[ln] =
                         (muxc_ota[ln] & ~OTC_C1) | (data & OTC_C1);
 
-                if (muxu_unit.flags & UNIT_DIAG)                /* loopback? */
+                tprintf (muxc_dev, TRACE_XFER, "Channel %d line status is %s\n",
+                         ln, fmt_bitset (muxc_ota [ln], cntl_line_format));
+
+                if (muxu_unit.flags & UNIT_DIAG) {              /* loopback? */
                     muxc_lia[ln ^ 1] =                          /* set S1, S2 to C1, C2 */
                         (muxc_lia[ln ^ 1] & ~(LIC_S2 | LIC_S1)) |
                         (muxc_ota[ln] & (OTC_C1 | OTC_C2)) >> OTC_V_C;
 
-                else if ((muxl_unit[ln].flags & UNIT_MDM) &&    /* modem ctrl? */
-                    (old & DTR) &&                              /* DTR drop? */
-                    !(muxc_ota[ln] & DTR)) {
-                    tmxr_linemsg (&mux_ldsc[ln], "\r\nLine hangup\r\n");
+                    tprintf (muxc_dev, TRACE_XFER, "Channel %d line status is %s\n",
+                             ln ^ 1, fmt_bitset (muxc_lia [ln ^ 1], cntl_line_format));
+                    }
+
+                else if ((muxl_unit[ln].flags & UNIT_MDM)       /* modem ctrl? */
+                  && (old & DTR) && !(muxc_ota[ln] & DTR)) {    /* DTR drop? */
+                    tprintf (muxc_dev, TRACE_CSRW, "Channel %d disconnected by DTR drop\n",
+                             ln);
+
+                    tmxr_linemsg (&mux_ldsc[ln], "\r\nDisconnected from the ");
+                    tmxr_linemsg (&mux_ldsc[ln], sim_name);
+                    tmxr_linemsg (&mux_ldsc[ln], " simulator\r\n\n");
+
                     tmxr_reset_ln (&mux_ldsc[ln]);              /* reset line */
                     muxc_lia[ln] = 0;                           /* dataset off */
+
+                    tprintf (muxc_dev, TRACE_XFER, "Channel %d disconnect dropped DCD and DSR\n",
+                             ln);
                     }
                 }                                               /* end update */
-
-            if (DEBUG_PRI (muxu_dev, DEB_CPU))
-                fprintf (sim_deb, ">>MUXc cpu:  [OTx%s] Parameter = %06o, channel = %d\n",
-                                  hold_or_clear, data, ln);
 
             if ((muxu_unit.flags & UNIT_DIAG) && (!muxc.flag))  /* loopback and flag clear? */
                 mux_ctrl_int ();                                /* status chg may interrupt */
@@ -1000,6 +1286,9 @@ t_stat muxi_svc (UNIT *uptr)
 int32 ln, c;
 t_bool loopback;
 
+tprintf (muxu_dev, TRACE_PSERV, "Poll delay %d service entered\n",
+         uptr->wait);
+
 loopback = ((muxu_unit.flags & UNIT_DIAG) != 0);        /* diagnostic mode? */
 
 if (!loopback) {                                        /* terminal mode? */
@@ -1013,16 +1302,21 @@ if (!loopback) {                                        /* terminal mode? */
     ln = tmxr_poll_conn (&mux_desc);                    /* look for connect */
 
     if (ln >= 0) {                                      /* got one? */
+        mux_ldsc[ln].rcve = 1;                          /* rcv enabled */
+        muxc_lia[ln] = muxc_lia[ln] | DSR;              /* set dsr */
+
         if ((muxl_unit[ln].flags & UNIT_MDM) &&         /* modem ctrl? */
             (muxc_ota[ln] & DTR))                       /* DTR? */
-            muxc_lia[ln] = muxc_lia[ln] | CDET;         /* set cdet */
-        muxc_lia[ln] = muxc_lia[ln] | DSR;              /* set dsr */
-        mux_ldsc[ln].rcve = 1;                          /* rcv enabled */
+            muxc_lia[ln] = muxc_lia[ln] | DCD;          /* set DCD */
+
+        tprintf (muxc_dev, TRACE_XFER, "Channel %d connected\n",
+                 ln);
         }
+
     tmxr_poll_rx (&mux_desc);                           /* poll for input */
     }
 
-for (ln = 0; ln < MUX_LINES; ln++) {                    /* loop thru lines */
+for (ln = 0; ln < SEND_CHAN_COUNT; ln++) {              /* loop thru lines */
     if (mux_ldsc[ln].conn) {                            /* connected? */
         if (loopback) {                                 /* diagnostic mode? */
             c = mux_xbuf[ln ^ 1] & OTL_CHAR;            /* get char from xmit line */
@@ -1035,7 +1329,7 @@ for (ln = 0; ln < MUX_LINES; ln++) {                    /* loop thru lines */
             c = SCPE_BREAK;                             /* supply it now */
 
         else
-            c = tmxr_getc_ln (&mux_ldsc[ln]);           /* get char from Telnet */
+            c = tmxr_getc_ln (&mux_ldsc[ln]);           /* get char from line */
 
         if (c)                                          /* valid char? */
             mux_receive (ln, c, loopback);              /* process it */
@@ -1056,56 +1350,68 @@ return SCPE_OK;
 
 t_stat muxo_svc (UNIT *uptr)
 {
-int32 c, fc, ln, altln;
+const int32 ln = uptr - muxl_unit;                      /* line # */
+const int32 altln = ln ^ 1;                             /* alt. line for diag mode */
+int32 c, fc;
 t_bool loopback;
+t_stat result = SCPE_OK;
 
-ln = uptr - muxl_unit;                                  /* line # */
-altln = ln ^ 1;                                         /* alt. line for diag mode */
+tprintf (muxl_dev, TRACE_SERV, "Channel %d service entered\n",
+         ln);
 
 fc = mux_xbuf[ln] & OTL_CHAR;                           /* full character data */
-c = fc & 0377;                                          /* Telnet character data */
+c = fc & 0377;                                          /* line character data */
 
 loopback = ((muxu_unit.flags & UNIT_DIAG) != 0);        /* diagnostic mode? */
 
-if (mux_ldsc[ln].conn) {                                /* connected? */
-    if (mux_ldsc[ln].xmte) {                            /* xmt enabled? */
-        if (loopback)                                   /* diagnostic mode? */
-            mux_ldsc[ln].conn = 0;                      /* clear connection */
+if (mux_ldsc[ln].xmte) {                                /* xmt enabled? */
+    if (loopback)                                       /* diagnostic mode? */
+        mux_ldsc[ln].conn = 0;                          /* clear connection */
 
-        else if (mux_defer[ln])                         /* break deferred? */
-            mux_receive (ln, SCPE_BREAK, loopback);     /* process it now */
+    else if (mux_defer[ln])                             /* break deferred? */
+        mux_receive (ln, SCPE_BREAK, loopback);         /* process it now */
 
-        if ((mux_xbuf[ln] & OTL_SYNC) == 0) {           /* start bit 0? */
-            TMLN *lp = &mux_ldsc[ln];                   /* get line */
-            c = sim_tt_outcvt (c, TT_GET_MODE (muxl_unit[ln].flags));
+    if ((mux_xbuf[ln] & OTL_SYNC) == 0) {               /* start bit 0? */
+        TMLN *lp = &mux_ldsc[ln];                       /* get line */
+        c = sim_tt_outcvt (c, TT_GET_MODE (muxl_unit[ln].flags));
 
-            if (mux_xpar[ln] & OTL_DIAG)                /* xmt diagnose? */
-                mux_diag (fc);                          /* before munge */
+        if (mux_xpar[ln] & OTL_DIAG)                    /* xmt diagnose? */
+            mux_diag (fc);                              /* before munge */
 
-            if (loopback) {                             /* diagnostic mode? */
-                mux_ldsc[altln].conn = 1;               /* set recv connection */
-                sim_activate (&muxu_unit, 1);           /* schedule receive */
-                }
-
-            else {                                      /* no loopback */
-                if (c >= 0)                             /* valid? */
-                    tmxr_putc_ln (lp, c);               /* output char */
-                tmxr_poll_tx (&mux_desc);               /* poll xmt */
-                }
+        if (loopback) {                                 /* diagnostic mode? */
+            mux_ldsc[altln].conn = 1;                   /* set recv connection */
+            sim_activate (&muxu_unit, 1);               /* schedule receive */
             }
 
-        mux_xdon[ln] = 1;                               /* set for xmit irq */
-
-        if (DEBUG_PRI (muxu_dev, DEB_XFER) && (loopback | (c >= 0)))
-            fprintf (sim_deb, ">>MUXl xfer: Line %d character %s sent\n",
-                ln, fmt_char ((uint8) (loopback ? fc : c)));
+        else {                                          /* no loopback */
+            if (c >= 0)                                 /* valid? */
+                result = tmxr_putc_ln (lp, c);          /* output char */
+            tmxr_poll_tx (&mux_desc);                   /* poll xmt */
+            }
         }
 
-    else {                                              /* buf full */
-        tmxr_poll_tx (&mux_desc);                       /* poll xmt */
-        sim_activate (uptr, muxl_unit[ln].wait);        /* wait */
-        return SCPE_OK;
-        }
+    else if (mux_ldsc [ln].conn == 0)                   /* sync character isn't seen by receiver */
+        result = SCPE_LOST;                             /*   so report transfer success if connected */
+
+    mux_xdon[ln] = 1;                                   /* set for xmit irq */
+
+    if (loopback || c >= 0)
+        if (result == SCPE_LOST)
+            tprintf (muxl_dev, TRACE_XFER, "Channel %d character %s discarded by connection loss\n",
+                     ln, fmt_char ((uint8) (loopback ? fc : c)));
+        else
+            tprintf (muxl_dev, TRACE_XFER, "Channel %d character %s sent\n",
+                     ln, fmt_char ((uint8) (loopback ? fc : c)));
+    }
+
+else {                                              /* buf full */
+    tmxr_poll_tx (&mux_desc);                       /* poll xmt */
+    sim_activate (uptr, muxl_unit[ln].wait);        /* wait */
+
+    tprintf (muxl_dev, TRACE_SERV, "Channel %d delay %d service rescheduled\n",
+             ln, muxl_unit [ln].wait);
+
+    return SCPE_OK;
     }
 
 if (!muxl.flag) mux_data_int ();                        /* scan for int */
@@ -1123,18 +1429,16 @@ if (c & SCPE_BREAK) {                                   /* break? */
         mux_rbuf[ln] = 0;                               /* break returns NUL */
         mux_sta[ln] = mux_sta[ln] | LIU_BRK;            /* set break status */
 
-        if (DEBUG_PRI (muxu_dev, DEB_XFER))
-            if (diag)
-                fputs (">>MUXl xfer: Break detected\n", sim_deb);
-            else
-                fputs (">>MUXl xfer: Deferred break processed\n", sim_deb);
+        if (diag)
+            tprintf (muxl_dev, TRACE_XFER, "Channel %d break detected\n", ln);
+        else
+            tprintf (muxl_dev, TRACE_XFER, "Channel %d deferred break processed\n", ln);
         }
 
     else {
         mux_defer[ln] = 1;                              /* defer break */
 
-        if (DEBUG_PRI (muxu_dev, DEB_XFER))
-            fputs (">>MUXl xfer: Break detected and deferred\n", sim_deb);
+        tprintf (muxl_dev, TRACE_XFER, "Channel %d break detected and deferred\n", ln);
 
         return;
         }
@@ -1156,9 +1460,8 @@ else {                                                  /* normal */
 
 mux_rchp[ln] = 1;                                       /* char pending */
 
-if (DEBUG_PRI (muxu_dev, DEB_XFER))
-    fprintf (sim_deb, ">>MUXl xfer: Line %d character %s received\n",
-                      ln, fmt_char ((uint8) c));
+tprintf (muxl_dev, TRACE_XFER, "Channel %d character %s received\n",
+         ln, fmt_char ((uint8) c));
 
 if (mux_rpar[ln] & OTL_DIAG)                            /* diagnose this line? */
     mux_diag (c);                                       /* do diagnosis */
@@ -1173,7 +1476,7 @@ void mux_data_int (void)
 {
 int32 i;
 
-for (i = 0; i < MUX_LINES; i++) {                       /* rcv lines */
+for (i = FIRST_TERM; i <= LAST_TERM; i++) {             /* rcv lines */
     if ((mux_rpar[i] & OTL_ENB) && mux_rchp[i]) {       /* enabled, char? */
         muxl_ibuf = PUT_DCH (i) |                       /* lo buf = char */
             mux_rbuf[i] & LIL_CHAR |
@@ -1182,14 +1485,14 @@ for (i = 0; i < MUX_LINES; i++) {                       /* rcv lines */
         mux_rchp[i] = 0;                                /* clr char, stat */
         mux_sta[i] = 0;
 
-        if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-            fprintf (sim_deb, ">>MUXl cmds: Receive channel %d interrupt requested\n", i);
+        tprintf (muxl_dev, TRACE_CSRW, "Channel %d receive interrupt requested\n",
+                 i);
 
         muxlio (&muxl_dib, ioENF, 0);                   /* interrupt */
         return;
         }
     }
-for (i = 0; i < MUX_LINES; i++) {                       /* xmt lines */
+for (i = FIRST_TERM; i <= LAST_TERM; i++) {             /* xmt lines */
     if ((mux_xpar[i] & OTL_ENB) && mux_xdon[i]) {       /* enabled, done? */
         muxl_ibuf = PUT_DCH (i) |                       /* lo buf = last rcv char */
             mux_rbuf[i] & LIL_CHAR |
@@ -1198,24 +1501,24 @@ for (i = 0; i < MUX_LINES; i++) {                       /* xmt lines */
         mux_xdon[i] = 0;                                /* clr done, stat */
         mux_sta[i] = 0;
 
-        if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-            fprintf (sim_deb, ">>MUXl cmds: Transmit channel %d interrupt requested\n", i);
+        tprintf (muxl_dev, TRACE_CSRW, "Channel %d send interrupt requested\n",
+                 i);
 
         muxlio (&muxl_dib, ioENF, 0);                   /* interrupt */
         return;
         }
     }
-for (i = MUX_LINES; i < (MUX_LINES + MUX_ILINES); i++) {    /* diag lines */
-    if ((mux_rpar[i] & OTL_ENB) && mux_rchp[i]) {           /* enabled, char? */
-        muxl_ibuf = PUT_DCH (i) |                           /* lo buf = char */
+for (i = FIRST_AUX; i <= LAST_AUX; i++) {               /* diag lines */
+    if ((mux_rpar[i] & OTL_ENB) && mux_rchp[i]) {       /* enabled, char? */
+        muxl_ibuf = PUT_DCH (i) |                       /* lo buf = char */
             mux_rbuf[i] & LIL_CHAR |
             RCV_PAR (mux_rbuf[i]);
-        muxu_ibuf = PUT_DCH (i) | mux_sta[i] | LIU_DG;      /* hi buf = stat */
-        mux_rchp[i] = 0;                                    /* clr char, stat */
+        muxu_ibuf = PUT_DCH (i) | mux_sta[i] | LIU_DG;  /* hi buf = stat */
+        mux_rchp[i] = 0;                                /* clr char, stat */
         mux_sta[i] = 0;
 
-        if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-            fprintf (sim_deb, ">>MUXl cmds: Receive channel %d interrupt requested\n", i);
+        tprintf (muxl_dev, TRACE_CSRW, "Channel %d receive interrupt requested\n",
+                 i);
 
         muxlio (&muxl_dib, ioENF, 0);                       /* interrupt */
         return;
@@ -1238,17 +1541,15 @@ void mux_ctrl_int (void)
 {
 int32 i, line_count;
 
-line_count = (muxc_scan ? MUX_LINES : 1);               /* check one or all lines */
+line_count = (muxc_scan ? TERM_COUNT : 1);              /* check one or all lines */
 
 for (i = 0; i < line_count; i++) {
     if (muxc_scan)                                      /* scanning? */
         muxc_chan = (muxc_chan + 1) & LIC_M_CHAN;       /* step channel */
-    if (LIC_TSTI (muxc_chan)) {                         /* status change? */
 
-        if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-            fprintf (sim_deb,
-                ">>MUXc cmds: Control channel %d interrupt requested (poll = %d)\n",
-                muxc_chan, i + 1);
+    if (LIC_TSTI (muxc_chan)) {                         /* status change? */
+        tprintf (muxc_dev, TRACE_CSRW, "Channel %u interrupt requested\n",
+                 muxc_chan);
 
         muxcio (&muxc_dib, ioENF, 0);                   /* set flag */
         break;
@@ -1264,7 +1565,7 @@ void mux_diag (int32 c)
 {
 int32 i;
 
-for (i = MUX_LINES; i < (MUX_LINES + MUX_ILINES); i++) {
+for (i = FIRST_AUX; i <= LAST_AUX; i++) {             /* diag lines */
     if (c & SCPE_BREAK) {                               /* break? */
         mux_sta[i] = mux_sta[i] | LIU_BRK;
         mux_rbuf[i] = 0;                                /* no char */
@@ -1288,10 +1589,12 @@ mux_rpar[i] = mux_xpar[i] = 0;
 mux_rchp[i] = mux_xdon[i] = 0;
 mux_sta[i] = mux_defer[i] = 0;
 muxc_ota[i] = muxc_lia[i] = 0;                          /* clear modem */
-if (mux_ldsc[i].conn &&                                 /* connected? */
-    ((muxu_unit.flags & UNIT_DIAG) == 0))               /* term mode? */
-    muxc_lia[i] = muxc_lia[i] | DSR |                   /* cdet, dsr */
-    (muxl_unit[i].flags & UNIT_MDM? CDET: 0);
+
+if (mux_ldsc [i].conn                                   /* connected? */
+  && (muxu_unit.flags & UNIT_DIAG) == 0)                /* term mode? */
+    muxc_lia[i] = muxc_lia[i] | DSR                     /* DCD, dsr */
+      | (muxl_unit[i].flags & UNIT_MDM ? DCD : 0);
+
 sim_cancel (&muxl_unit[i]);
 return;
 }
@@ -1304,18 +1607,15 @@ t_stat muxc_reset (DEVICE *dptr)
 int32 i;
 DIB *dibptr = (DIB *) dptr->ctxt;                       /* DIB pointer */
 
-if (dptr == &muxc_dev) {                                /* make all consistent */
-    hp_enbdis_pair (dptr, &muxl_dev);
+if (sim_switches & SWMASK ('P')                         /* initialization reset? */
+  && muxc_dev.lname == NULL)                            /* logical name unassigned? */
+    muxc_dev.lname = strdup ("MUXC");                   /* allocate and initialize the name */
+
+if (dptr == &muxl_dev)                                  /* make all consistent */
     hp_enbdis_pair (dptr, &muxu_dev);
-    }
-else if (dptr == &muxl_dev) {
-    hp_enbdis_pair (dptr, &muxc_dev);
-    hp_enbdis_pair (dptr, &muxu_dev);
-    }
-else {
-    hp_enbdis_pair (dptr, &muxc_dev);
+
+else if (dptr == &muxu_dev)
     hp_enbdis_pair (dptr, &muxl_dev);
-    }
 
 IOPRESET (dibptr);                                      /* PRESET device (does not use PON) */
 
@@ -1323,15 +1623,15 @@ muxc_chan = muxc_scan = 0;                              /* init modem scan */
 
 if (muxu_unit.flags & UNIT_ATT) {                       /* master att? */
     muxu_unit.wait = POLL_FIRST;                        /* set up poll */
-    sim_activate (&muxu_unit, muxu_unit.wait);          /* start Telnet poll immediately */
+    sim_activate (&muxu_unit, muxu_unit.wait);          /* start poll immediately */
     }
 else
     sim_cancel (&muxu_unit);                            /* else stop */
 
-for (i = 0; i < MUX_LINES; i++)
+for (i = FIRST_TERM; i <= LAST_TERM; i++)
     mux_reset_ln (i);                                   /* reset lines 0-15 */
 
-for (i = MUX_LINES; i < (MUX_LINES + MUX_ILINES); i++)  /* reset lines 16-20 */
+for (i = FIRST_AUX; i <= LAST_AUX; i++)                 /* reset lines 16-20 */
     mux_rbuf[i] = mux_rpar[i] = mux_sta[i] = mux_rchp[i] = 0;
 
 return SCPE_OK;
@@ -1351,7 +1651,7 @@ status = tmxr_attach (&mux_desc, uptr, cptr);           /* attach */
 
 if (status == SCPE_OK) {
     muxu_unit.wait = POLL_FIRST;                        /* set up poll */
-    sim_activate (&muxu_unit, muxu_unit.wait);          /* start Telnet poll immediately */
+    sim_activate (&muxu_unit, muxu_unit.wait);          /* start poll immediately */
     }
 
 return status;
@@ -1366,7 +1666,10 @@ int32 i;
 t_stat r;
 
 r = tmxr_detach (&mux_desc, uptr);                      /* detach */
-for (i = 0; i < MUX_LINES; i++) mux_ldsc[i].rcve = 0;   /* disable rcv */
+
+for (i = 0; i < TERM_COUNT; i++)                        /* disable rcv */
+    mux_ldsc[i].rcve = 0;
+
 sim_cancel (uptr);                                      /* stop poll */
 return r;
 }
@@ -1396,12 +1699,12 @@ t_stat mux_setdiag (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 int32 ln;
 
 if (val) {                                              /* set diag? */
-    mux_detach (uptr);                                  /* detach lines */
-    for (ln = 0; ln < MUX_LINES; ln++)                  /* enable transmission */
+    mux_detach (uptr);                                  /* detach Telnet lines */
+    for (ln = 0; ln < TERM_COUNT; ln++)                 /* enable transmission */
         mux_ldsc[ln].xmte = 1;                          /* on all lines */
     }
 else {                                                  /* set term */
-    for (ln = 0; ln < MUX_LINES; ln++)                  /* clear connections */
+    for (ln = 0; ln < TERM_COUNT; ln++)                 /* clear connections */
         mux_ldsc[ln].conn = 0;                          /* on all lines */
     }
 return SCPE_OK;

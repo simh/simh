@@ -1,6 +1,6 @@
 /* hp2100_fp1.c: HP 1000 multiple-precision floating point routines
 
-   Copyright (c) 2005-2016, J. David Bryan
+   Copyright (c) 2005-2017, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   07-Sep-17    JDB     Replaced "uint16" casts with "HP_WORD" for OP assignments
    16-May-16    JDB     Reformulated the definitions of op_mask
    24-Dec-14    JDB     Added casts for explicit downward conversions
                         Changed fp_ucom return from uint32 to uint16
@@ -480,7 +481,7 @@ int32 i;
 OP packed;
 
 if (precision == in_s)
-    packed.word = (uint16) (unpacked >> 48) & DMASK;    /* pack single integer */
+    packed.word = (HP_WORD) (unpacked >> 48) & DMASK;   /* pack single integer */
 
 else if (precision == in_d)
     packed.dword = (uint32) (unpacked >> 32) & DMASK32; /* pack double integer */
@@ -490,7 +491,7 @@ else {
         precision = fp_t;                               /* only four mantissa words */
 
     for (i = 3; i >= 0; i--) {                          /* pack fp 2 to 4 words */
-        packed.fpk[i] = (uint16) unpacked & DMASK;
+        packed.fpk[i] = (HP_WORD) unpacked & DMASK;
         unpacked = unpacked >> 16;
         }
     }
@@ -530,8 +531,8 @@ switch (unpacked.precision) {                           /* merge exponent into c
         break;
 
     case fp_e:                                          /* place in separate word */
-        packed.fpk[4] = (uint16) (unpacked.exponent << FP_V_EXP |
-                                 (unpacked.exponent < 0) << FP_V_ESIGN);
+        packed.fpk[4] = (HP_WORD) (unpacked.exponent << FP_V_EXP |
+                                  (unpacked.exponent < 0) << FP_V_ESIGN);
         break;
 
     case fp_a:                                          /* no action for value in accum */

@@ -1,6 +1,6 @@
                       SIMH/HP 21XX DIAGNOSTICS PERFORMANCE
                       ====================================
-                             Last update: 2016-12-18
+                             Last update: 2018-05-15
 
 
 The HP 24396 diagnostic suite has been run against the SIMH HP 21xx simulation.
@@ -84,7 +84,7 @@ The results of the diagnostic runs are summarized below:
 105000  2610/14 Line Printer                     1451    -    No simulation
 105101  2767 Line Printer                        1611  3.3-0  Passed
 105102  2607 Line Printer                        1446  3.3-0  Passed
-145103  2613/17/18 Line Printer                  1633    -    No simulation
+145103  2613/17/18 Line Printer                  1633  4.0-0  Passed
 105104  9866 Line Printer                        1541    -    No simulation
 105106  2631 Printer                             1913    -    No simulation
 105107  2635 Printing Terminal                   1913    -    No simulation
@@ -488,13 +488,13 @@ TEST RESULT:    Passed.
 
 
 
--------------------------------------
-DSN 143300 - General Purpose Register
--------------------------------------
+-------------------------------------------
+DSN 143300 - General Purpose Register (LPS)
+-------------------------------------------
 
 TESTED DEVICE:  LPS (hp2100_lps.c)
 
-CONFIGURATION:  sim> set LPS diag
+CONFIGURATION:  sim> set LPS DIAGNOSTIC
                 sim> deposit S 000014
                 sim> reset
                 sim> go 100
@@ -1064,7 +1064,7 @@ DSN 103115 - Privileged Interrupt
 TESTED DEVICE:  PIF (hp2100_pif.c)
 
 CONFIGURATION:  sim> set PIF 12936A
-                sim> set LPT DEV=44
+                sim> set LPT SC=44
 
                 sim> deposit S 004414
                 sim> reset
@@ -1096,9 +1096,9 @@ TEST RESULT:    Passed.
 
 
 
--------------------------------------
-DSN 143300 - General Purpose Register
--------------------------------------
+-------------------------------------------
+DSN 143300 - General Purpose Register (PIF)
+-------------------------------------------
 
 TESTED DEVICE:  PIF (hp2100_pif.c)
 
@@ -1133,6 +1133,81 @@ TEST REPORT:    GENERAL PURPOSE REGISTER DIAGNOSTIC,  DSN 143300
                 PASS 000001
 
                 HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+TEST NOTES:     Only test 00 (Basic I/O Test) is executed.  The other tests are
+                not applicable, as the 12620A card has no data path circuitry.
+
+
+
+--------------------------------------------
+DSN 143300 - General Purpose Register (IPLI)
+--------------------------------------------
+
+TESTED DEVICE:  IPLI (hp2100_ipl.c)
+
+CONFIGURATION:  sim> set IPLI DIAGNOSTIC
+
+                sim> deposit S 000032
+                sim> reset
+                sim> go 100
+
+                Programmed halt, T: 102074 (HLT 74)
+
+                sim> deposit S 000000
+                sim> go
+
+TEST REPORT:    GENERAL PURPOSE REGISTER DIAGNOSTIC,  DSN 143300
+
+                H024 PRESS PRESET (EXT&INT),RUN
+
+                Programmed halt, T: 102024 (HLT 24)
+
+                sim> reset
+                sim> go
+
+                H025 BASIC I-O COMPLETED
+
+                PASS 000001
+
+                Programmed halt, T: 102077 (HLT 77)
+
+TEST RESULT:    Passed.
+
+
+
+--------------------------------------------
+DSN 143300 - General Purpose Register (IPLO)
+--------------------------------------------
+
+TESTED DEVICE:  IPLO (hp2100_ipl.c)
+
+CONFIGURATION:  sim> set IPLI DIAGNOSTIC
+
+                sim> deposit S 000033
+                sim> reset
+                sim> go 100
+
+                Programmed halt, T: 102074 (HLT 74)
+
+                sim> deposit S 000000
+                sim> go
+
+TEST REPORT:    GENERAL PURPOSE REGISTER DIAGNOSTIC,  DSN 143300
+
+                H024 PRESS PRESET (EXT&INT),RUN
+
+                Programmed halt, T: 102024 (HLT 24)
+
+                sim> reset
+                sim> go
+
+                H025 BASIC I-O COMPLETED
+
+                PASS 000001
+
+                Programmed halt, T: 102077 (HLT 77)
 
 TEST RESULT:    Passed.
 
@@ -1596,12 +1671,12 @@ DSN 105102 - 2607 Line Printer
 
 TESTED DEVICE:  LPT (hp2100_lpt.c)
 
-CONFIGURATION:  sim> attach LPT scratch.2607.printer
+CONFIGURATION:  sim> attach -n LPT scratch.2607.printer
                 sim> deposit S 100015
                 sim> reset
                 sim> go 100
 
-                HALT instruction 102074
+                Programmed halt, T: 102074 (HLT 74)
 
                 sim> deposit S 001000
                 sim> reset
@@ -1609,7 +1684,7 @@ CONFIGURATION:  sim> attach LPT scratch.2607.printer
 
                 2607 LINE PRINTER DIAGNOSTIC
 
-                HALT instruction 102075
+                Programmed halt, T: 102075 (HLT 75)
 
                 sim> deposit A 000377
                 sim> deposit S 000000
@@ -1618,7 +1693,7 @@ CONFIGURATION:  sim> attach LPT scratch.2607.printer
 
 TEST REPORT:    H024 PRESS PRESET (EXT&INT),RUN
 
-                HALT instruction 102024
+                Programmed halt, T: 102024 (HLT 24)
 
                 sim> reset
                 sim> go
@@ -1626,69 +1701,153 @@ TEST REPORT:    H024 PRESS PRESET (EXT&INT),RUN
                 H025 BI-O COMP
                 H040 PWR OFF LP,PRESS RUN
 
-                HALT instruction 102040
+                Programmed halt, T: 102040 (HLT 40)
 
-                sim> set LPT poweroff
+                sim> set LPT POWEROFF
                 sim> go
 
                 H041 PWR ON LP,READY LP,PRESS RUN
 
-                HALT instruction 102041
+                Programmed halt, T: 102041 (HLT 41)
 
-                sim> set LPT poweron
+                sim> set LPT POWERON
                 sim> go
 
                 H042 PRINT SW OFF,PRESS RUN
 
-                HALT instruction 102042
+                Programmed halt, T: 102042 (HLT 42)
 
-                sim> set LPT offline
+                sim> set LPT OFFLINE
                 sim> go
 
                 H043 PRINT SW ON,PRESS RUN
 
-                HALT instruction 102043
+                Programmed halt, T: 102043 (HLT 43)
 
-                sim> set LPT online
+                sim> set LPT ONLINE
                 sim> go
 
                 H044 OPEN PLATEN,PRESS RUN
 
-                HALT instruction 102044
+                Programmed halt, T: 102044 (HLT 44)
 
-                sim> set LPT offline
+                sim> set LPT OFFLINE
                 sim> go
 
                 H045 CLOSE PLATEN,PRESS RUN
 
-                HALT instruction 102045
+                Programmed halt, T: 102045 (HLT 45)
 
-                sim> set LPT online
+                sim> set LPT ONLINE
                 sim> go
 
                 H046 REMOVE PAPER FROM LP,PRESS RUN
 
-                HALT instruction 102046
+                Programmed halt, T: 102046 (HLT 46)
 
                 sim> detach LPT
                 sim> go
 
                 H047 RESTORE PAPER IN LP, READY LP,PRESS RUN
 
-                HALT instruction 102047
+                Programmed halt, T: 102047 (HLT 47)
 
                 sim> attach LPT scratch.2607.printer
                 sim> go
 
                 PASS 000001
 
-                HALT instruction 102077
+                Programmed halt, T: 102077 (HLT 77)
 
 TEST RESULT:    Passed.
 
 TEST NOTES:     The standard tests 00-07 are executed.  Test 08 (operator
                 design) is selected as a standard test in this diagnostic only
                 and so is excluded manually.
+
+
+
+------------------------------------
+DSN 145103 - 2613/17/18 Line Printer
+------------------------------------
+
+TESTED DEVICE:  LPT (hp2100_lpt.c)
+
+CONFIGURATION:  sim> set LPT 2613,DIAGNOSTIC
+                sim> attach -n LPT scratch.2613.printer
+                sim> deposit S 000015
+                sim> reset
+                sim> go 100
+
+                Programmed halt, T: 102074 (HLT 74)
+
+                sim> deposit S 000000
+                sim> reset
+                sim> go
+
+TEST REPORT:    2613-2618 LINE PRINTER DIAG
+                H024 PRESS PRESET (EXT&INT),RUN
+
+                Programmed halt, T: 102024 (HLT 24)
+
+                sim> reset
+                sim> go
+
+                H025 BI-O COMP
+                H040 PWR OFF LP,PRESS RUN
+
+                Programmed halt, T: 102040 (HLT 40)
+
+                sim> set LPT POWEROFF
+                sim> go
+
+                H041 PWR ON, ON LINE LP,PRESS RUN
+
+                Programmed halt, T: 102041 (HLT 41)
+
+                sim> set LPT POWERON
+                sim> go
+
+                H042 LP TO OFF LINE,PRESS RUN
+
+                Programmed halt, T: 102042 (HLT 42)
+
+                sim> set LPT OFFLINE
+                sim> go
+
+                H043 LP TO ON LINE,PRESS RUN
+
+                Programmed halt, T: 102043 (HLT 43)
+
+                sim> set LPT ONLINE
+                sim> go
+
+                H044 OPEN DRUM GATE,PRESS RUN
+
+                Programmed halt, T: 102044 (HLT 44)
+
+                sim> detach LPT
+                sim> go
+
+                H046 REMOVE PAPER,CLOSE DRUM GATE,PRESS RUN
+
+                Programmed halt, T: 102046 (HLT 46)
+
+                sim> go
+
+                H047 RESTORE PAPER, ON LINE LP, PRESS RUN
+
+                Programmed halt, T: 102047 (HLT 47)
+
+                sim> attach LPT scratch.2613.printer
+                sim> set LPT ONLINE
+                sim> go
+
+                PASS 000001
+
+                Programmed halt, T: 102077 (HLT 77)
+
+TEST RESULT:    Passed.
 
 
 
@@ -2044,7 +2203,7 @@ TEST REPORT:    H0 7900/7901 CARTRIDGE DISC MEMORY DIAGNOSTIC
 
                 HALT instruction 102002
 
-                sim> set DPC0 unloaded
+                sim> set DPC0 unload
                 sim> go
 
                 H40 PROTECT U/D THEN READY UNIT  0
@@ -2052,15 +2211,14 @@ TEST REPORT:    H0 7900/7901 CARTRIDGE DISC MEMORY DIAGNOSTIC
                 [CTRL+E]
                 Simulation stopped
 
-                sim> set DPC0 locked
-                sim> set DPC0 loaded
+                sim> set DPC0 load,protect
                 sim> go
 
                 H41 CLEAR U/D PROTECT,LOAD,PUSH RUN
 
                 HALT instruction 102002
 
-                sim> set DPC0 writeenabled
+                sim> set DPC0 unprotect
                 sim> go
 
                 H71 PRESS PRESET(S) THEN PRESS RUN
@@ -3271,8 +3429,8 @@ TESTED DEVICE:  IPLI, IPLO (hp2100_ipl.c)
 
 BINARY TAPE:    24197-60001 Rev. B
 
-CONFIGURATION:  sim> set IPLI DIAG
-                sim> set IPLO DIAG
+CONFIGURATION:  sim> set IPLI DIAGNOSTIC
+                sim> set IPLO DIAGNOSTIC
                 sim> deposit S 003332
                 sim> reset
                 sim> go 2

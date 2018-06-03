@@ -1,6 +1,6 @@
 /* hp2100_cpu4.c: HP 1000 FPP/SIS
 
-   Copyright (c) 2006-2016, J. David Bryan
+   Copyright (c) 2006-2017, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    CPU4         Floating Point Processor and Scientific Instruction Set
 
+   07-Sep-17    JDB     Replaced "uint16" cast with "HP_WORD" for FPK assignment
    05-Aug-16    JDB     Renamed the P register from "PC" to "PR"
    24-Dec-14    JDB     Added casts for explicit downward conversions
    09-May-12    JDB     Separated assignments from conditional expressions
@@ -252,7 +253,8 @@ t_stat cpu_fpp (uint32 IR, uint32 intrq)
 OP fpop;
 OPS op;
 OPSIZE op1_prec, op2_prec, rslt_prec, cvt_prec;
-uint16 opcode, rtn_addr, stk_ptr;
+HP_WORD rtn_addr, stk_ptr;
+uint16 opcode;
 uint32 entry;
 t_stat reason = SCPE_OK;
 
@@ -314,7 +316,7 @@ switch (entry) {                                        /* decode IR<6:0> */
 
     case 0007:                                          /* [stk] 105007 (OP_A) */
         O = 0;                                          /* clear overflow */
-        stk_ptr = (uint16) PR;                          /* save ptr to next buf */
+        stk_ptr = PR;                                   /* save ptr to next buf */
         rtn_addr = op[0].word;                          /* save return address */
 
         while (TRUE) {
@@ -428,8 +430,8 @@ switch (entry) {                                        /* decode IR<6:0> */
     case 0134:                                          /* .DDIR 105134 (OP_N) */
         return cpu_dbi (0105326, intrq);                /* remap to double int handler */
 
-    default:                                            /* others undefined */
-        reason = stop_inst;
+    default:                                            /* others unimplemented */
+        reason = STOP (cpu_ss_unimpl);
         }
 
 return reason;
@@ -711,7 +713,7 @@ switch (entry) {                                        /* decode IR<3:0> */
             op[1].fpk[1] = op[1].fpk[1] | 2;            /* set "exponent" to 1 */
             }
 
-        op[2].fpk[0] = (uint16) exponent;
+        op[2].fpk[0] = (HP_WORD) exponent;
         fp_exec (0120, &op[3], op[2], NOP);             /* op3 = FLT(exponent) */
 
         fp_exec (0020, &op[4], op[1], plus_1);          /* op4 = op1 - 1.0 */
@@ -1117,8 +1119,8 @@ switch (entry) {                                        /* decode IR<3:0> */
         return reason;
 
 
-    default:                                            /* others undefined */
-        return stop_inst;
+    default:                                            /* others unimplemented */
+        return STOP (cpu_ss_unimpl);
         }
 
 AR = op[0].fpk[0];                                      /* save result */

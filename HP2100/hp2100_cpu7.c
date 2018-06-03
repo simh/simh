@@ -1,7 +1,7 @@
 /* hp2100_cpu7.c: HP 1000 VIS and SIGNAL/1000 microcode
 
    Copyright (c) 2008, Holger Veit
-   Copyright (c) 2006-2016, J. David Bryan
+   Copyright (c) 2006-2017, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
 
    CPU7         Vector Instruction Set and SIGNAL firmware
 
+   31-Jan-17    JDB     Revised to use tprintf and TRACE_OPND for debugging
+   26-Jan-17    JDB     Removed debug parameters from cpu_ema_* routines
    05-Aug-16    JDB     Renamed the P register from "PC" to "PR"
    24-Dec-14    JDB     Added casts for explicit downward conversions
    18-Mar-13    JDB     Moved EMA helper declarations to hp2100_cpu1.h
@@ -60,85 +62,6 @@
 
 
 static const OP zero   = { { 0, 0, 0, 0, 0 } };          /* DEC 0.0D0 */
-
-
-/* Vector Instruction Set
-
-   The VIS provides instructions that operate on one-dimensional arrays of
-   floating-point values.  Both single- and double-precision operations are
-   supported.  VIS uses the F-Series floating-point processor to handle the
-   floating-point math.
-
-   Option implementation by CPU was as follows:
-
-      2114    2115    2116    2100   1000-M  1000-E  1000-F
-     ------  ------  ------  ------  ------  ------  ------
-      N/A     N/A     N/A     N/A     N/A     N/A    12824A
-
-   The routines are mapped to instruction codes as follows:
-
-        Single-Precision        Double-Precision
-     Instr.  Opcode  Subcod  Instr.  Opcode  Subcod  Description
-     ------  ------  ------  ------  ------  ------  -----------------------------
-     VADD    101460  000000  DVADD   105460  004002  Vector add
-     VSUB    101460  000020  DVSUB   105460  004022  Vector subtract
-     VMPY    101460  000040  DVMPY   105460  004042  Vector multiply
-     VDIV    101460  000060  DVDIV   105460  004062  Vector divide
-     VSAD    101460  000400  DVSAD   105460  004402  Scalar-vector add
-     VSSB    101460  000420  DVSSB   105460  004422  Scalar-vector subtract
-     VSMY    101460  000440  DVSMY   105460  004442  Scalar-vector multiply
-     VSDV    101460  000460  DVSDV   105460  004462  Scalar-vector divide
-     VPIV    101461  0xxxxx  DVPIV   105461  0xxxxx  Vector pivot
-     VABS    101462  0xxxxx  DVABS   105462  0xxxxx  Vector absolute value
-     VSUM    101463  0xxxxx  DVSUM   105463  0xxxxx  Vector sum
-     VNRM    101464  0xxxxx  DVNRM   105464  0xxxxx  Vector norm
-     VDOT    101465  0xxxxx  DVDOT   105465  0xxxxx  Vector dot product
-     VMAX    101466  0xxxxx  DVMAX   105466  0xxxxx  Vector maximum value
-     VMAB    101467  0xxxxx  DVMAB   105467  0xxxxx  Vector maximum absolute value
-     VMIN    101470  0xxxxx  DVMIN   105470  0xxxxx  Vector minimum value
-     VMIB    101471  0xxxxx  DVMIB   105471  0xxxxx  Vector minimum absolute value
-     VMOV    101472  0xxxxx  DVMOV   105472  0xxxxx  Vector move
-     VSWP    101473  0xxxxx  DVSWP   105473  0xxxxx  Vector swap
-     .ERES   101474    --     --       --      --    Resolve array element address
-     .ESEG   101475    --     --       --      --    Load MSEG maps
-     .VSET   101476    --     --       --      --    Vector setup
-     [test]    --      --     --     105477    --    [self test]
-
-   Instructions use IR bit 11 to select single- or double-precision format.  The
-   double-precision instruction names begin with "D" (e.g., DVADD vs. VADD).
-   Most VIS instructions are two words in length, with a sub-opcode immediately
-   following the primary opcode.
-
-   Notes:
-
-     1. The .VECT (101460) and .DVCT (105460) opcodes preface a single- or
-        double-precision arithmetic operation that is determined by the
-        sub-opcode value.  The remainder of the dual-precision sub-opcode values
-        are "don't care," except for requiring a zero in bit 15.
-
-     2. The VIS uses the hardware FPP of the F-Series.  FPP malfunctions are
-        detected by the VIS firmware and are indicated by a memory-protect
-        violation and setting the overflow flag.  Under simulation,
-        malfunctions cannot occur.
-
-   Additional references:
-    - 12824A Vector Instruction Set User's Manual (12824-90001, Jun-1979).
-    - VIS Microcode Source (12824-18059, revision 3).
-*/
-
-static const OP_PAT op_vis[16] = {
-  OP_N,    OP_AAKAKAKK,OP_AKAKK, OP_AAKK,                /*  .VECT  VPIV   VABS   VSUM   */
-  OP_AAKK, OP_AAKAKK,  OP_AAKK,  OP_AAKK,                /*  VNRM   VDOT   VMAX   VMAB   */
-  OP_AAKK, OP_AAKK,    OP_AKAKK, OP_AKAKK,               /*  VMIN   VMIB   VMOV   VSWP   */
-  OP_AA,   OP_A,       OP_AAACCC,OP_N                    /*  .ERES  .ESEG  .VSET  [test] */
-  };
-
-static const t_bool op_ftnret[16] = {
-  FALSE, TRUE,  TRUE,  TRUE,
-  TRUE,  TRUE,  TRUE,  TRUE,
-  TRUE,  TRUE,  TRUE,  TRUE,
-  FALSE, TRUE,  TRUE, FALSE,
-  };
 
 
 /* handle the scalar/vector base ops */
@@ -361,115 +284,200 @@ for (i=0; i<n; i++) {
     }
 }
 
+
+/* Vector Instruction Set
+
+   The VIS provides instructions that operate on one-dimensional arrays of
+   floating-point values.  Both single- and double-precision operations are
+   supported.  VIS uses the F-Series floating-point processor to handle the
+   floating-point math.
+
+   Option implementation by CPU was as follows:
+
+      2114    2115    2116    2100   1000-M  1000-E  1000-F
+     ------  ------  ------  ------  ------  ------  ------
+      N/A     N/A     N/A     N/A     N/A     N/A    12824A
+
+   The routines are mapped to instruction codes as follows:
+
+        Single-Precision        Double-Precision
+     Instr.  Opcode  Subcod  Instr.  Opcode  Subcod  Description
+     ------  ------  ------  ------  ------  ------  -----------------------------
+     VADD    101460  000000  DVADD   105460  004002  Vector add
+     VSUB    101460  000020  DVSUB   105460  004022  Vector subtract
+     VMPY    101460  000040  DVMPY   105460  004042  Vector multiply
+     VDIV    101460  000060  DVDIV   105460  004062  Vector divide
+     VSAD    101460  000400  DVSAD   105460  004402  Scalar-vector add
+     VSSB    101460  000420  DVSSB   105460  004422  Scalar-vector subtract
+     VSMY    101460  000440  DVSMY   105460  004442  Scalar-vector multiply
+     VSDV    101460  000460  DVSDV   105460  004462  Scalar-vector divide
+     VPIV    101461  0xxxxx  DVPIV   105461  0xxxxx  Vector pivot
+     VABS    101462  0xxxxx  DVABS   105462  0xxxxx  Vector absolute value
+     VSUM    101463  0xxxxx  DVSUM   105463  0xxxxx  Vector sum
+     VNRM    101464  0xxxxx  DVNRM   105464  0xxxxx  Vector norm
+     VDOT    101465  0xxxxx  DVDOT   105465  0xxxxx  Vector dot product
+     VMAX    101466  0xxxxx  DVMAX   105466  0xxxxx  Vector maximum value
+     VMAB    101467  0xxxxx  DVMAB   105467  0xxxxx  Vector maximum absolute value
+     VMIN    101470  0xxxxx  DVMIN   105470  0xxxxx  Vector minimum value
+     VMIB    101471  0xxxxx  DVMIB   105471  0xxxxx  Vector minimum absolute value
+     VMOV    101472  0xxxxx  DVMOV   105472  0xxxxx  Vector move
+     VSWP    101473  0xxxxx  DVSWP   105473  0xxxxx  Vector swap
+     .ERES   101474    --     --       --      --    Resolve array element address
+     .ESEG   101475    --     --       --      --    Load MSEG maps
+     .VSET   101476    --     --       --      --    Vector setup
+     [test]    --      --     --     105477    --    [self test]
+
+   Instructions use IR bit 11 to select single- or double-precision format.  The
+   double-precision instruction names begin with "D" (e.g., DVADD vs. VADD).
+   Most VIS instructions are two words in length, with a sub-opcode immediately
+   following the primary opcode.
+
+   Notes:
+
+     1. The .VECT (101460) and .DVCT (105460) opcodes preface a single- or
+        double-precision arithmetic operation that is determined by the
+        sub-opcode value.  The remainder of the dual-precision sub-opcode values
+        are "don't care," except for requiring a zero in bit 15.
+
+     2. The VIS uses the hardware FPP of the F-Series.  FPP malfunctions are
+        detected by the VIS firmware and are indicated by a memory-protect
+        violation and setting the overflow flag.  Under simulation,
+        malfunctions cannot occur.
+
+   Additional references:
+    - 12824A Vector Instruction Set User's Manual (12824-90001, Jun-1979).
+    - VIS Microcode Source (12824-18059, revision 3).
+*/
+
+static const OP_PAT op_vis [16] = {
+  OP_N,    OP_AAKAKAKK, OP_AKAKK,  OP_AAKK,     /*  .VECT  VPIV   VABS   VSUM   */
+  OP_AAKK, OP_AAKAKK,   OP_AAKK,   OP_AAKK,     /*  VNRM   VDOT   VMAX   VMAB   */
+  OP_AAKK, OP_AAKK,     OP_AKAKK,  OP_AKAKK,    /*  VMIN   VMIB   VMOV   VSWP   */
+  OP_AA,   OP_A,        OP_AAACCC, OP_N         /*  .ERES  .ESEG  .VSET  [test] */
+  };
+
+static const t_bool op_ftnret [16] = {
+  FALSE, TRUE,  TRUE,  TRUE,
+  TRUE,  TRUE,  TRUE,  TRUE,
+  TRUE,  TRUE,  TRUE,  TRUE,
+  FALSE, TRUE,  TRUE, FALSE,
+  };
+
 t_stat cpu_vis (uint32 IR, uint32 intrq)
 {
+static const char *const difficulty [2] = { "hard", "easy" };
+
 t_stat reason = SCPE_OK;
 OPS op;
-OP ret;
-uint32 entry, rtn, rtn1 = 0, subcode = 0;
 OP_PAT pattern;
 OPSIZE opsize;
-t_bool debug = DEBUG_PRI (cpu_dev, DEB_VIS);
+uint32 entry, subcode;
+HP_WORD rtn = 0;
 
 opsize = (IR & 004000) ? fp_t : fp_f;                    /* double or single precision */
 entry = IR & 017;                                        /* mask to entry point */
-pattern = op_vis[entry];
+pattern = op_vis [entry];
 
-if (entry==0) {                                          /* retrieve sub opcode */
-    ret = ReadOp (PR, in_s);                             /* get it */
-    subcode = ret.word;
+if (entry == 0) {                                        /* retrieve sub opcode */
+    subcode = ReadF (PR);                                /* get it */
+
     if (subcode & 0100000)                               /* special property of ucode */
         subcode = AR;                                    /*   for reentry */
+
     PR = (PR + 1) & VAMASK;                              /* bump to real argument list */
     pattern = (subcode & 0400) ? OP_AAKAKK : OP_AKAKAKK; /* scalar or vector operation */
     }
 
 if (pattern != OP_N) {
-    if (op_ftnret[entry]) {                              /* most VIS instrs ignore RTN addr */
-        ret = ReadOp(PR, in_s);
-        rtn = rtn1 = ret.word;                           /* but save it just in case */
+    if (op_ftnret [entry]) {                             /* most VIS instrs ignore RTN addr */
+        rtn = ReadF (PR);                                /* get it */
         PR = (PR + 1) & VAMASK;                          /* move to next argument */
         }
+
     reason = cpu_ops (pattern, op, intrq);               /* get instruction operands */
+
     if (reason != SCPE_OK)                               /* evaluation failed? */
         return reason;                                   /* return reason for failure */
     }
 
-if (debug) {                                             /* debugging? */
-    fprintf (sim_deb, ">>CPU VIS: IR = %06o/%06o (",     /* print preamble and IR */
-             IR, subcode);
-    fprint_sym (sim_deb, err_PC, (t_value *) &IR,        /* print instruction mnemonic */
-                NULL, SWMASK('M'));
-    fprintf (sim_deb, "), P = %06o", err_PC);            /* print location */
-    fprint_ops (pattern, op);                            /* print operands */
-    fputc ('\n', sim_deb);                               /* terminate line */
-    }
-
 switch (entry) {                                         /* decode IR<3:0> */
+
    case 000:                                             /* .VECT (OP_special) */
        if (subcode & 0400)
            vis_svop(subcode,op,opsize);                  /* scalar/vector op */
        else
            vis_vvop(subcode,op,opsize);                  /* vector/vector op */
        break;
+
    case 001:                                             /* VPIV (OP_(A)AAKAKAKK) */
        vis_vpiv(op,opsize);
        break;
+
    case 002:                                             /* VABS (OP_(A)AKAKK) */
        vis_vabs(op,opsize);
        break;
+
    case 003:                                             /* VSUM (OP_(A)AAKK) */
        vis_vsmnm(op,opsize,FALSE);
        break;
+
    case 004:                                             /* VNRM (OP_(A)AAKK) */
        vis_vsmnm(op,opsize,TRUE);
        break;
+
    case 005:                                             /* VDOT (OP_(A)AAKAKK) */
        vis_vdot(op,opsize);
        break;
+
    case 006:                                             /* VMAX (OP_(A)AAKK) */
        vis_minmax(op,opsize,TRUE,FALSE);
        break;
+
    case 007:                                             /* VMAB (OP_(A)AAKK) */
        vis_minmax(op,opsize,TRUE,TRUE);
        break;
+
    case 010:                                             /* VMIN (OP_(A)AAKK) */
        vis_minmax(op,opsize,FALSE,FALSE);
        break;
+
    case 011:                                             /* VMIB (OP_(A)AAKK) */
        vis_minmax(op,opsize,FALSE,TRUE);
        break;
+
    case 012:                                             /* VMOV (OP_(A)AKAKK) */
        vis_movswp(op,opsize,FALSE);
        break;
+
    case 013:                                             /* VSWP (OP_(A)AKAKK) */
        vis_movswp(op,opsize,TRUE);
        break;
+
    case 014:                                             /* .ERES (OP_(A)AA) */
-       reason = cpu_ema_eres(&rtn,op[2].word,PR,debug);  /* handle the ERES instruction */
        PR = rtn;
-       if (debug)
-           fprintf (sim_deb,
-                    ">>CPU VIS: return .ERES: AR = %06o, BR = %06o, rtn=%s\n",
-                    AR, BR, PR==op[0].word ? "error" : "good");
+       reason = cpu_ema_eres(&PR,op[2].word,PR);        /* handle the ERES instruction */
+
+       tprintf (cpu_dev, TRACE_OPND, OPND_FORMAT "  return location is P+%u (%s)\n",
+                PR, IR, PR - err_PC, fmt_ab (PR - rtn));
        break;
 
    case 015:                                             /* .ESEG (OP_(A)A) */
-       reason = cpu_ema_eseg(&rtn,IR,op[0].word,debug);  /* handle the ESEG instruction */
        PR = rtn;
-       if (debug)
-           fprintf (sim_deb,
-                    ">>CPU VIS: return .ESEG: AR = %06o , BR = %06o, rtn=%s\n",
-                    AR, BR, rtn==rtn1 ? "error" : "good");
+       reason = cpu_ema_eseg(&PR,IR,op[0].word);        /* handle the ESEG instruction */
+
+       tprintf (cpu_dev, TRACE_OPND, OPND_FORMAT "  return location is P+%u (%s)\n",
+                PR, IR, PR - err_PC, fmt_ab (PR - rtn));
        break;
 
    case 016:                                             /* .VSET (OP_(A)AAACCC) */
-       reason = cpu_ema_vset(&rtn,op,debug);
        PR = rtn;
-       if (debug)
-           fprintf (sim_deb, ">>CPU VIS: return .VSET: AR = %06o BR = %06o, rtn=%s\n",
-                    AR, BR,
-                    rtn==rtn1 ? "error" : (rtn==(rtn1+1) ? "hard" : "easy") );
+       reason = cpu_ema_vset(&PR,op);
+
+       tprintf (cpu_dev, TRACE_OPND, OPND_FORMAT "  return location is P+%u (%s)\n",
+                PR, IR, PR - err_PC,
+                (PR == rtn
+                  ? fmt_ab (0)
+                  : difficulty [PR - rtn - 1]));
        break;
 
    case 017:                                             /* [test] (OP_N) */
@@ -477,65 +485,19 @@ switch (entry) {                                         /* decode IR<3:0> */
        SR = 0102077;                                     /* test passed code */
        PR = (PR + 1) & VAMASK;                           /* P+2 return for firmware w/VIS */
        break;
-   default:                                              /* others undefined */
-        reason = stop_inst;
-        }
+
+   default:                                              /* others unimplemented */
+        reason = STOP (cpu_ss_unimpl);
+   }
 
 return reason;
 }
 
 
-/* SIGNAL/1000 Instructions
-
-   The SIGNAL/1000 instructions provide fast Fourier transforms and complex
-   arithmetic.  They utilize the F-Series floating-point processor and the
-   Vector Instruction Set.
-
-   Option implementation by CPU was as follows:
-
-      2114    2115    2116    2100   1000-M  1000-E  1000-F
-     ------  ------  ------  ------  ------  ------  ------
-      N/A     N/A     N/A     N/A     N/A     N/A    92835A
-
-   The routines are mapped to instruction codes as follows:
-
-     Instr.  1000-F  Description
-     ------  ------  ----------------------------------------------
-     BITRV   105600  Bit reversal
-     BTRFY   105601  Butterfly algorithm
-     UNSCR   105602  Unscramble for phasor MPY
-     PRSCR   105603  Unscramble for phasor MPY
-     BITR1   105604  Swap two elements in array (alternate format)
-     BTRF1   105605  Butterfly algorithm (alternate format)
-     .CADD   105606  Complex number addition
-     .CSUB   105607  Complex number subtraction
-     .CMPY   105610  Complex number multiplication
-     .CDIV   105611  Complex number division
-     CONJG   105612  Complex conjugate
-     ..CCM   105613  Complex complement
-     AIMAG   105614  Return imaginary part
-     CMPLX   105615  Form complex number
-     [nop]   105616  [no operation]
-     [test]  105617  [self test]
-
-   Notes:
-
-     1. SIGNAL/1000 ROM data are available from Bitsavers.
-
-   Additional references (documents unavailable):
-    - HP Signal/1000 User Reference and Installation Manual (92835-90002).
-    - SIGNAL/1000 Microcode Source (92835-18075, revision 2).
-*/
+/* SIGNAL/1000 routines */
 
 #define RE(x) (x+0)
 #define IM(x) (x+2)
-
-static const OP_PAT op_signal[16] = {
-  OP_AAKK,  OP_AAFFKK, OP_AAFFKK,OP_AAFFKK,             /*  BITRV  BTRFY  UNSCR  PRSCR */
-  OP_AAAKK, OP_AAAFFKK,OP_AAA,   OP_AAA,                /*  BITR1  BTRF1  .CADD  .CSUB */
-  OP_AAA,   OP_AAA,    OP_AAA,   OP_A,                  /*  .CMPY  .CDIV  CONJG  ..CCM */
-  OP_AA,    OP_AAFF,   OP_N,     OP_N                   /*  AIMAG  CMPLX  ---    [test]*/
-  };
 
 /* complex addition helper */
 static void sig_caddsub(uint16 addsub,OPS op)
@@ -641,6 +603,56 @@ OP p;
 (void)fp_exec(004, i, p, NOP);                      /* imag := ad+bc */
 }
 
+
+/* SIGNAL/1000 Instructions
+
+   The SIGNAL/1000 instructions provide fast Fourier transforms and complex
+   arithmetic.  They utilize the F-Series floating-point processor and the
+   Vector Instruction Set.
+
+   Option implementation by CPU was as follows:
+
+      2114    2115    2116    2100   1000-M  1000-E  1000-F
+     ------  ------  ------  ------  ------  ------  ------
+      N/A     N/A     N/A     N/A     N/A     N/A    92835A
+
+   The routines are mapped to instruction codes as follows:
+
+     Instr.  1000-F  Description
+     ------  ------  ----------------------------------------------
+     BITRV   105600  Bit reversal
+     BTRFY   105601  Butterfly algorithm
+     UNSCR   105602  Unscramble for phasor MPY
+     PRSCR   105603  Unscramble for phasor MPY
+     BITR1   105604  Swap two elements in array (alternate format)
+     BTRF1   105605  Butterfly algorithm (alternate format)
+     .CADD   105606  Complex number addition
+     .CSUB   105607  Complex number subtraction
+     .CMPY   105610  Complex number multiplication
+     .CDIV   105611  Complex number division
+     CONJG   105612  Complex conjugate
+     ..CCM   105613  Complex complement
+     AIMAG   105614  Return imaginary part
+     CMPLX   105615  Form complex number
+     [nop]   105616  [no operation]
+     [test]  105617  [self test]
+
+   Notes:
+
+     1. SIGNAL/1000 ROM data are available from Bitsavers.
+
+   Additional references (documents unavailable):
+    - HP Signal/1000 User Reference and Installation Manual (92835-90002).
+    - SIGNAL/1000 Microcode Source (92835-18075, revision 2).
+*/
+
+static const OP_PAT op_signal [16] = {
+  OP_AAKK,  OP_AAFFKK,  OP_AAFFKK, OP_AAFFKK,   /*  BITRV  BTRFY  UNSCR  PRSCR */
+  OP_AAAKK, OP_AAAFFKK, OP_AAA,    OP_AAA,      /*  BITR1  BTRF1  .CADD  .CSUB */
+  OP_AAA,   OP_AAA,     OP_AAA,    OP_A,        /*  .CMPY  .CDIV  CONJG  ..CCM */
+  OP_AA,    OP_AAFF,    OP_N,      OP_N         /*  AIMAG  CMPLX  ---    [test]*/
+  };
+
 t_stat cpu_signal (uint32 IR, uint32 intrq)
 {
 t_stat reason = SCPE_OK;
@@ -649,23 +661,12 @@ OP a,b,c,d,p1,p2,p3,p4,m1,m2,wr,wi;
 uint32 entry, v, idx1, idx2;
 int32 exc, exd;
 
-t_bool debug = DEBUG_PRI (cpu_dev, DEB_SIG);
-
 entry = IR & 017;                                  /* mask to entry point */
 
 if (op_signal [entry] != OP_N) {
     reason = cpu_ops (op_signal [entry], op, intrq);    /* get instruction operands */
     if (reason != SCPE_OK)                              /* evaluation failed? */
         return reason;                                  /* return reason for failure */
-    }
-
-if (debug) {                                             /* debugging? */
-    fprintf (sim_deb, ">>CPU SIG: IR = %06o (", IR);     /* print preamble and IR */
-    fprint_sym (sim_deb, err_PC, (t_value *) &IR,        /* print instruction mnemonic */
-                NULL, SWMASK('M'));
-    fprintf (sim_deb, "), P = %06o", err_PC);            /* print location */
-    fprint_ops (op_signal[entry], op);                   /* print operands */
-    fputc ('\n', sim_deb);                               /* terminate line */
     }
 
 switch (entry) {                                   /* decode IR<3:0> */
@@ -933,8 +934,8 @@ switch (entry) {                                   /* decode IR<3:0> */
         break;
 
     case 016:                                       /* invalid */
-    default:                                        /* others undefined */
-        reason = stop_inst;
+    default:                                        /* others unimplemented */
+        reason = STOP (cpu_ss_unimpl);
         }
 
 return reason;
