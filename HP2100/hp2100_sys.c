@@ -1,7 +1,7 @@
 /* hp2100_sys.c: HP 2100 system common interface
 
    Copyright (c) 1993-2016, Robert M. Supnik
-   Copyright (c) 2017,      J. David Bryan
+   Copyright (c) 2017-2018, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   07-Mar-18    JDB     Added the GET_SWITCHES macro from scp.c
+   22-Feb-18    JDB     Added the <dev> option to the LOAD command
+   07-Sep-17    JDB     Replaced "uint16" cast with "MEMORY_WORD" for loader ROM
    07-Aug-17    JDB     Added "hp_attach" to attach a file for appending
    01-Aug-17    JDB     Added "ispunct" test for implied mnemonic parse
    20-Jul-17    JDB     Removed STOP_OFFLINE, STOP_PWROFF messages
@@ -106,6 +109,12 @@
 #include "hp2100_defs.h"
 #include "hp2100_cpu.h"
 
+
+
+/* Command-line switch parsing from scp.c */
+
+#define GET_SWITCHES(cp) \
+    if ((cp = get_sim_sw (cp)) == NULL) return SCPE_INVSW
 
 
 /* External I/O data structures */
@@ -754,31 +763,31 @@ static const OP_DESC iog_desc = {               /* Input/Output Group descriptor
 
 static const OP_TABLE iog_ops = {               /* IOG opcodes, indexed by IR bits 11 + 8-6 */
     { "HLT", 0102000u, opSCOHC },
-    { "",    0102100u, opNone  },                /* STF/CLF and STO/CLO */
-    { "",    0102200u, opNone  },                /* SFC and SOC */
-    { "",    0102300u, opNone  },                /* SFS and SOS */
+    { "",    0102100u, opNone  },               /* STF/CLF and STO/CLO */
+    { "",    0102200u, opNone  },               /* SFC and SOC */
+    { "",    0102300u, opNone  },               /* SFS and SOS */
     { "MIA", 0102400u, opSCHC  },
     { "LIA", 0102500u, opSCHC  },
     { "OTA", 0102600u, opSCHC  },
     { "STC", 0102700u, opSCHC  },
 
     { "HLT", 0106000u, opSCOHC },
-    { "",    0106100u, opNone  },                /* STF/CLF and STO/CLO */
-    { "",    0106200u, opNone  },                /* SFC and SOC */
-    { "",    0106300u, opNone  },                /* SFS and SOS */
+    { "",    0106100u, opNone  },               /* STF/CLF and STO/CLO */
+    { "",    0106200u, opNone  },               /* SFC and SOC */
+    { "",    0106300u, opNone  },               /* SFS and SOS */
     { "MIB", 0106400u, opSCHC  },
     { "LIB", 0106500u, opSCHC  },
     { "OTB", 0106600u, opSCHC  },
     { "CLC", 0106700u, opSCHC  },
 
-    { "STO", 0102101u, opNone, 0173777u },       /* STF 01 */
-    { "STF", 0102100u, opSC,   0173700u },       /* STF nn */
-    { "CLO", 0103101u, opNone, 0173777u },       /* CLF 01 */
-    { "CLF", 0103100u, opSC,   0173700u },       /* CLF nn */
-    { "SOC", 0102201u, opHC,   0172777u },       /* SFC 01 */
-    { "SFC", 0102200u, opSCHC, 0172700u },       /* SFC nn */
-    { "SOS", 0102301u, opHC,   0172777u },       /* SFS 01 */
-    { "SFS", 0102300u, opSCHC, 0172700u },       /* SFS nn */
+    { "STO", 0102101u, opNone, 0173777u },      /* STF 01 */
+    { "STF", 0102100u, opSC,   0173700u },      /* STF nn */
+    { "CLO", 0103101u, opNone, 0173777u },      /* CLF 01 */
+    { "CLF", 0103100u, opSC,   0173700u },      /* CLF nn */
+    { "SOC", 0102201u, opHC,   0172777u },      /* SFC 01 */
+    { "SFC", 0102200u, opSCHC, 0172700u },      /* SFC nn */
+    { "SOS", 0102301u, opHC,   0172777u },      /* SFS 01 */
+    { "SFS", 0102300u, opSCHC, 0172700u },      /* SFS nn */
 
     { NULL }
     };
@@ -1807,6 +1816,7 @@ static t_addr parse_addr     (DEVICE *dptr, CONST char *cptr, CONST char **tptr)
 static t_stat hp_exdep_cmd (int32 arg, CONST char *buf);
 static t_stat hp_run_cmd   (int32 arg, CONST char *buf);
 static t_stat hp_brk_cmd   (int32 arg, CONST char *buf);
+static t_stat hp_load_cmd  (int32 arg, CONST char *buf);
 
 
 /* System interface local utility routines */
@@ -1869,7 +1879,7 @@ void (*sim_vm_init) (void) = &one_time_init;    /* a pointer to the one-time ini
 DEVICE *sim_devices [] = {                      /* an array of pointers to the simulated devices */
     &cpu_dev,                                   /*   CPU (must be first) */
     &mp_dev,                                    /*   Memory Protect */
-    &dma1_dev,  &dma2_dev,                      /*   DMA/DCPC */
+    &dma1_dev, &dma2_dev,                       /*   DMA/DCPC */
     &ptr_dev,                                   /*   2748 Paper Tape Reader */
     &ptp_dev,                                   /*   2895 Paper Tape Punch */
     &tty_dev,                                   /*   2752 Teleprinter */
@@ -1952,6 +1962,8 @@ static CTAB aux_cmds [] = {
 
     { "BREAK",    &hp_brk_cmd,    0,         NULL        },
     { "NOBREAK",  &hp_brk_cmd,    0,         NULL        },
+
+    { "LOAD",     &hp_load_cmd,   0,         NULL        },
 
     { NULL }
     };
@@ -2038,19 +2050,22 @@ static CTAB aux_cmds [] = {
 
 t_stat sim_load (FILE *fptr, CONST char *cptr, CONST char *fnam, int flag)
 {
-const int reclen [2] = { TO_WORD (57, 0),               /* the two DUMP record length words */
-                         TO_WORD (7, 0) };
-const int reccnt [2] = { 57, 7 };                       /* the two DUMP record word counts */
-BOOT_ROM  loader;                                       /* an array of 64 words */
-int       record, count, address, word, checksum;
-t_stat    result;
-int32     trailer = 1;                                  /* > 0 while reading leader, < 0 while reading trailer */
-HP_WORD   select_code = 0;                              /* select code to configure; 0 implies no configuration */
+const int    reclen [2] = { TO_WORD (57, 0),            /* the two DUMP record length words */
+                            TO_WORD (7, 0) };
+const int    reccnt [2] = { 57, 7 };                    /* the two DUMP record word counts */
+int          record, count, address, word, checksum;
+t_stat       result;
+int32        trailer = 1;                               /* > 0 while reading leader, < 0 while reading trailer */
+HP_WORD      select_code = 0;                           /* select code to configure; 0 implies no configuration */
+LOADER_ARRAY boot = {                                   /* an array of two BOOT_LOADER structures */
+    { 000,       IBL_NA,  IBL_NA,  { 0 } },             /*   HP 21xx Loader */
+    { IBL_START, IBL_DMA, IBL_FWA, { 0 } }              /*   HP 1000 Loader */
+    };
 
 if (flag == 0) {                                        /* if this is a LOAD command */
     if (*cptr != '\0') {                                /*   then if a parameter follows */
-        select_code = (HP_WORD) get_uint (cptr, 8,      /*     then parse it as an octal number */
-                                          MAXDEV, &result);
+        select_code =                                   /*     then parse it as an octal number */
+          (HP_WORD) get_uint (cptr, 8, MAXDEV, &result);
 
         if (result != SCPE_OK)                          /* if a parse error occurred */
             return result;                              /*   then report it */
@@ -2058,8 +2073,6 @@ if (flag == 0) {                                        /* if this is a LOAD com
         else if (select_code < VARDEV)                  /* otherwise if the select code is invalid */
             return SCPE_ARG;                            /*   then report a bad argument */
         }
-
-    memset (loader, 0, sizeof loader);                  /* clear the boot loader ROM */
 
     while (TRUE) {                                      /* read absolute binary records from the file */
         do {                                            /* skip any blank leader or trailer present */
@@ -2102,9 +2115,10 @@ if (flag == 0) {                                        /* if this is a LOAD com
             if (word == EOF)                            /* if the word is not present */
                 return SCPE_FMT;                        /*   then the tape format is bad */
 
-            else {                                      /* otherwise */
-                loader [address++] = (uint16) word;     /*   save the data word in the loader array */
-                checksum = checksum + word;             /*     and include it in the record checksum */
+            else {                                                  /* otherwise */
+                boot [0].loader [address]   = (MEMORY_WORD) word;   /*   save the data word in */
+                boot [1].loader [address++] = (MEMORY_WORD) word;   /*     both loader arrays */
+                checksum = checksum + word;                         /*       and include it in the record checksum */
                 }
             }
 
@@ -2121,8 +2135,8 @@ if (flag == 0) {                                        /* if this is a LOAD com
             trailer = -10;                              /*   so prepare for a potential trailer */
         }                                               /*     and loop until all records are read */
 
-    cpu_ibl (loader, select_code,                       /* install the loader */
-             IBL_S_NOCLR, IBL_S_NOSET);                 /*   and configure the select code if requested */
+    cpu_copy_loader (boot, select_code,                 /* install the loader */
+                     IBL_S_NOCLEAR, IBL_S_NOSET);       /*   and configure the select code if requested */
     }
 
 
@@ -3249,7 +3263,7 @@ while ((bitfmt.alternate || bitset)                     /* while more bits */
     bnptr = bitfmt.names [index];                       /*     point at the name for the current bit */
 
     if (bnptr)                                          /* if the name is defined */
-        if (*bnptr == '\1')                             /*   then if this name has an alternate */
+        if (*bnptr == '\1' && bitfmt.alternate)         /*   then if this name has an alternate */
             if (bitset & test_bit)                      /*     then if the bit is asserted */
                 bnptr++;                                /*       then point at the name for the "1" state */
             else                                        /*     otherwise */
@@ -3851,6 +3865,62 @@ static t_stat hp_brk_cmd (int32 arg, CONST char *buf)
 parse_physical = FALSE;                                 /* allow the <logical-address> address form only */
 
 return brk_cmd (arg, buf);                              /* return the result of the standard handler */
+}
+
+
+/* Execute the LOAD command.
+
+   This command is intercepted to permit a device boot routine to be loaded
+   into memory.  The following command forms are valid:
+
+     LOAD <dev>
+     LOAD <filename> [ <select-code> ]
+
+   If the first form is used, and the device name is valid and bootable, the
+   corresponding boot loader is copied into memory in the highest 64 locations
+   of the logical address space.  Upon return, the loader will have been
+   configured for the device's select code or for the device and paper tape
+   reader select codes, in the case of a dual-use 21xx boot loader, and the P
+   register will have been set to point at the start of the loader.  The loader
+   then may be executed by a RUN command.  If the device name is valid, but the
+   device is not bootable, or no boot loader exists for the current CPU
+   configuration, the command is rejected.
+
+   If the second form is used, the file containing a loader in absolute binary
+   form is read into memory and configured as above.  See the "sim_load"
+   comments for details of this operation.
+
+
+   Implementation notes:
+
+    1. The "find_dev" routine requires that the device name be in upper case to
+       match.  The "get_glyph" routine performs case-shifting on the input
+       buffer.
+*/
+
+static t_stat hp_load_cmd (int32 arg, CONST char *buf)
+{
+CONST char *cptr;
+char cbuf [CBUFSIZE];
+DEVICE *dptr = NULL;
+
+GET_SWITCHES (buf);                                     /* parse any switches present */
+
+cptr = get_glyph (buf, cbuf, '\0');                     /* parse a potential device name */
+
+if (cbuf [0] != '\0') {                                 /* if the name is present */
+    dptr = find_dev (cbuf);                             /*   then see if it matches a device */
+
+    if (dptr != NULL)                                   /* if it does */
+        if (dptr->boot == NULL)                         /*   then if the device is not bootable */
+            return SCPE_NOFNC;                          /*     then report "Command not allowed" */
+        else if (*cptr != '\0')                         /*   otherwise if more characters follow */
+            return SCPE_2MARG;                          /*     then report "Too many arguments" */
+        else                                            /*   otherwise the device name stands alone */
+            return dptr->boot (0, dptr);                /*     so load the corresponding boot loader */
+    }
+
+return load_cmd (arg, buf);                             /* if it's not a device name, then try loading a file */
 }
 
 

@@ -25,6 +25,7 @@
 
    BACI         12966A Buffered Asynchronous Communications Interface
 
+   01-Nov-17    JDB     Fixed serial output buffer overflow handling
    15-Mar-17    JDB     Trace flags are now global
                         Changed DEBUG_PRI calls to tprintfs
    10-Mar-17    JDB     Added IOBUS to the debug table
@@ -87,13 +88,13 @@
    an "external rate" that is equivalent to 9600 baud, as most terminals were
    set to their maximum speeds.
 
-   We support the 12966A connected to an HP terminal emulator via Telnet.
-   Internally, we model the BACI as a terminal multiplexer with one line.  The
-   simulation is complicated by the half-duplex nature of the card (there is
-   only one FIFO, used selectively either for transmission or reception) and the
-   double-buffered UART (a Western Digital TR1863A), which has holding registers
-   as well as a shift registers for transmission and reception.  We model both
-   sets of device registers.
+   We support the 12966A connected to an HP terminal emulator via Telnet or a
+   serial port.  Internally, we model the BACI as a terminal multiplexer with
+   one line.  The simulation is complicated by the half-duplex nature of the
+   card (there is only one FIFO, used selectively either for transmission or
+   reception) and the double-buffered UART (a Western Digital TR1863A), which
+   has holding registers as well as a shift registers for transmission and
+   reception.  We model both sets of device registers.
 
    During an output operation, the first character output to the card passes
    through the FIFO and into the transmitter holding register.  Subsequent
@@ -122,12 +123,12 @@
    as an "optimized (fast) timing" option.  Optimization makes three
    improvements:
 
-    1. On output, characters in the FIFO are emptied into the Telnet buffer as a
+    1. On output, characters in the FIFO are emptied into the line buffer as a
        block, rather than one character per service call, and on input, all of
-       the characters available in the Telnet buffer are loaded into the FIFO as
-       a block.
+       the characters available in the line buffer are loaded into the FIFO as a
+       block.
 
-    2. The ENQ/ACK handshake is done locally, without involving the Telnet
+    2. The ENQ/ACK handshake is done locally, without involving the terminal
        client.
 
     3. Input occurring during an output operation is delayed until the second or
@@ -318,7 +319,7 @@
 /* Unit references */
 
 #define baci_term       baci_unit[0]                    /* terminal I/O unit */
-#define baci_poll       baci_unit[1]                    /* Telnet polling unit */
+#define baci_poll       baci_unit[1]                    /* line polling unit */
 
 
 /* BACI state variables */
@@ -391,11 +392,11 @@ t_stat baci_detach (UNIT *uptr);
    baci_deb     BACI debug list
    baci_dev     BACI device descriptor
 
-   Two units are used: one to handle character I/O via the Telnet library, and
-   another to poll for connections and input.  The character I/O service routine
-   runs only when there are characters to read or write.  It operates at the
-   approximate baud rate of the terminal (in CPU instructions per second) in
-   order to be compatible with the OS drivers.  The Telnet poll must run
+   Two units are used: one to handle character I/O via the multiplexer library,
+   and another to poll for connections and input.  The character I/O service
+   routine runs only when there are characters to read or write.  It operates at
+   the approximate baud rate of the terminal (in CPU instructions per second) in
+   order to be compatible with the OS drivers.  The line poll must run
    continuously, but it can operate much more slowly, as the only requirement is
    that it must not present a perceptible lag to human input.  To be compatible
    with CPU idling, it is co-scheduled with the master poll timer, which uses a
@@ -404,14 +405,14 @@ t_stat baci_detach (UNIT *uptr);
 
 DEVICE baci_dev;
 
-TMLN baci_ldsc = { 0 };                                 /* line descriptor */
-TMXR baci_desc = { 1, 0, 0, &baci_ldsc };               /* device descriptor */
+TMLN baci_ldsc = { 0 };                                             /* line descriptor */
+TMXR baci_desc = { 1, 0, 0, &baci_ldsc, NULL, &baci_dev };          /* device descriptor */
 
 DIB baci_dib = { &baci_io, BACI, 0 };
 
 UNIT baci_unit[] = {
     { UDATA (&baci_term_svc, UNIT_ATTABLE | UNIT_FASTTIME, 0) },    /* terminal I/O unit */
-    { UDATA (&baci_poll_svc, UNIT_DIS, POLL_FIRST) }                /* Telnet poll unit */
+    { UDATA (&baci_poll_svc, UNIT_DIS, POLL_FIRST) }                /* line poll unit */
     };
 
 REG baci_reg [] = {
@@ -466,15 +467,15 @@ MTAB baci_mod[] = {
     { UNIT_CAPSLOCK, UNIT_CAPSLOCK, "CAPS LOCK down", "CAPSLOCK",   NULL, NULL, NULL },
     { UNIT_CAPSLOCK,             0, "CAPS LOCK up",   "NOCAPSLOCK", NULL, NULL, NULL },
 
-    { MTAB_XTD | MTAB_VDV | MTAB_NC, 0, "LOG", "LOG",   &tmxr_set_log,   &tmxr_show_log, &baci_desc },
-    { MTAB_XTD | MTAB_VDV | MTAB_NC, 0,  NULL, "NOLOG", &tmxr_set_nolog, NULL,           &baci_desc },
+    { MTAB_XDV | MTAB_NC, 0, "LOG", "LOG",   &tmxr_set_log,   &tmxr_show_log, &baci_desc },
+    { MTAB_XDV | MTAB_NC, 0,  NULL, "NOLOG", &tmxr_set_nolog, NULL,           &baci_desc },
 
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTION", NULL,         NULL,        &tmxr_show_cstat, &baci_desc },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,         NULL,        &tmxr_show_cstat, &baci_desc },
-    { MTAB_XTD | MTAB_VDV,            0, NULL,         "DISCONNECT", &tmxr_dscln, NULL,             &baci_desc },
+    { MTAB_XDV | MTAB_NMO, 1, "CONNECTION", NULL,         NULL,        &tmxr_show_cstat, &baci_desc },
+    { MTAB_XDV | MTAB_NMO, 0, "STATISTICS", NULL,         NULL,        &tmxr_show_cstat, &baci_desc },
+    { MTAB_XDV,            0, NULL,         "DISCONNECT", &tmxr_dscln, NULL,             &baci_desc },
 
-    { MTAB_XTD | MTAB_VDV,             1u, "SC",    "SC",    &hp_set_dib, &hp_show_dib, (void *) &baci_dib },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, ~1u, "DEVNO", "DEVNO", &hp_set_dib, &hp_show_dib, (void *) &baci_dib },
+    { MTAB_XDV,             1u, "SC",    "SC",    &hp_set_dib, &hp_show_dib, (void *) &baci_dib },
+    { MTAB_XDV | MTAB_NMO, ~1u, "DEVNO", "DEVNO", &hp_set_dib, &hp_show_dib, (void *) &baci_dib },
     { 0 }
     };
 
@@ -768,7 +769,7 @@ return stat_data;
    The terminal service routine is used to transmit and receive characters.
 
    In terminal mode, it is started when a character is ready for output or when
-   the Telnet poll routine determines that there are characters ready for input
+   the line poll routine determines that there are characters ready for input
    and stopped when there are no more characters to output or input.  When the
    terminal is quiescent, this routine does not run.
 
@@ -808,11 +809,11 @@ return stat_data;
    first character after an ENQ is not an ACK.
 
    Finally, fast timing enables buffer combining.  For output, all characters
-   present in the FIFO are unloaded into the Telnet buffer before initiating a
-   packet send.  For input, all characters present in the Telnet buffer are
-   loaded into the FIFO.  This reduces network traffic and decreases simulator
-   overhead (there is only one service routine entry per block, rather than one
-   per character).
+   present in the FIFO are unloaded into the line buffer before initiating a
+   packet send.  For input, all characters present in the line buffer are loaded
+   into the FIFO.  This reduces network traffic and decreases simulator overhead
+   (there is only one service routine entry per block, rather than one per
+   character).
 
    In fast output mode, it is imperative that not less than 1500 instructions
    elapse between the first character load to the FIFO and the initiation of
@@ -826,6 +827,46 @@ return stat_data;
 
    To avoid this, the OTx output character handler does an absolute schedule for
    the first character to ensure that a full character time is used.
+
+
+   Implementation notes:
+
+    1. The terminal multiplexer library "tmxr_putc_ln" routine returns
+       SCPE_STALL if it is called when the transmit buffer is full.  When the
+       last character is added to the buffer, the routine returns SCPE_OK but
+       also changes the "xmte" field of the terminal multiplexer line (TMLN)
+       structure from 1 to 0 to indicate that further calls will be rejected.
+       The "xmte" value is set back to 1 when the tranmit buffer empties.
+
+       This presents two approaches to handling buffer overflows: either call
+       "tmxr_putc_ln" unconditionally and test for SCPE_STALL on return, or call
+       "tmxr_putc_ln" only if "xmte" is 1.  The former approach adds a new
+       character to the transmit buffer as soon as space is available, while the
+       latter adds a new character only when the buffer has completely emptied.
+       With either approach, transmission must be rescheduled after a delay to
+       allow the buffer to drain.
+
+       It would seem that the former approach is more attractive, as it would
+       allow the simulated I/O operation to complete more quickly.  However,
+       there are two mitigating factors.  First, the library attempts to write
+       the entire transmit buffer in one host system call, so there is usually
+       no time difference between freeing one buffer character and freeing the
+       entire buffer (barring host system buffer congestion).  Second, the
+       routine increments a "character dropped" counter when returning
+       SCPE_STALL status.  However, the characters actually would not be lost,
+       as the SCPE_STALL return would schedule retransmission when buffer space
+       is available, .  This would lead to erroneous reporting in the SHOW
+       <unit> STATISTICS command.
+
+       Therefore, we adopt the latter approach and reschedule transmission if
+       the "xmte" field is 0.  Note that the "tmxr_poll_tx" routine still must
+       be called in this case, as it is responsible for transmitting the buffer
+       contents and therefore freeing space in the buffer.
+
+    2. The "tmxr_putc_ln" library routine returns SCPE_LOST if the line is not
+       connected.  We ignore this error so that an OS may output an
+       initialization "welcome" message even when the terminal is not connected.
+       This permits the simulation to continue while ignoring the output.
 */
 
 t_stat baci_term_svc (UNIT *uptr)
@@ -834,11 +875,15 @@ uint32 data_bits, data_mask;
 const t_bool fast_timing = (baci_term.flags & UNIT_FASTTIME) != 0;
 const t_bool is_attached = (baci_term.flags & UNIT_ATT) != 0;
 t_stat status = SCPE_OK;
-t_bool xmit_loop = TRUE;
 t_bool recv_loop = TRUE;
+t_bool xmit_loop = (baci_ldsc.xmte != 0);               /* TRUE if the transmit buffer is not full */
 
 
 /* Transmission */
+
+if (baci_ldsc.xmte == 0)                                /* if the transmit buffer is full */
+    tprintf (baci_dev, DEB_XFER, "Transmission stalled for full buffer\n");
+
 
 while (xmit_loop && (baci_uart_thr & IN_VALID)) {       /* valid character in UART? */
     data_bits = 5 + (baci_cfcw & OUT_CHARSIZE);         /* calculate number of data bits */
@@ -864,6 +909,14 @@ while (xmit_loop && (baci_uart_thr & IN_VALID)) {       /* valid character in UA
             if (status == SCPE_OK)                      /* transmitted OK? */
                 tprintf (baci_dev, DEB_XFER, "Character %s transmitted from the UART\n",
                                              fmt_char ((uint8) baci_uart_tr));
+
+            else {
+                tprintf (baci_dev, DEB_XFER, "Character %s transmission failed with status %d\n",
+                                             fmt_char ((uint8) baci_uart_tr), status);
+
+                if (status == SCPE_LOST)                /* if the line is not connected */
+                    status = SCPE_OK;                   /*   then ignore the output */
+                }
             }
         }
 
@@ -879,11 +932,12 @@ while (xmit_loop && (baci_uart_thr & IN_VALID)) {       /* valid character in UA
         else                                            /* receive mode */
             baci_uart_thr = CLEAR_HR;                   /* clear holding register */
 
-        xmit_loop = fast_timing && !baci_enq_seen;      /* loop if fast mode and char not ENQ */
+        xmit_loop = (fast_timing && ! baci_enq_seen     /* loop if fast mode and char not ENQ */
+                      && baci_ldsc.xmte != 0);          /*   and buffer space is available */
         }
 
-    else
-        xmit_loop = FALSE;
+    else                                                /* otherwise transmission failed */
+        xmit_loop = FALSE;                              /*   so drop out of the loop */
     }
 
 
@@ -971,12 +1025,11 @@ return status;
 }
 
 
-/* BACI Telnet poll service.
+/* BACI line poll service.
 
-   This service routine is used to poll for Telnet connections and incoming
-   characters.  If characters are available, the terminal I/O service routine is
-   scheduled.  It starts when the socket is attached and stops when the socket
-   is detached.
+   This service routine is used to poll for connections and incoming characters.
+   If characters are available, the terminal I/O service routine is scheduled.
+   It starts when the line is attached and stops when the line is detached.
 
 
    Implementation notes:
@@ -1025,16 +1078,16 @@ baci_term.wait = service_time (baci_icw);               /* set terminal I/O time
 
 if (baci_term.flags & UNIT_ATT) {                       /* device attached? */
     baci_poll.wait = POLL_FIRST;                        /* set up poll */
-    sim_activate (&baci_poll, baci_poll.wait);          /* start Telnet poll immediately */
+    sim_activate (&baci_poll, baci_poll.wait);          /* start line poll immediately */
     }
 else
-    sim_cancel (&baci_poll);                            /* else stop Telnet poll */
+    sim_cancel (&baci_poll);                            /* else stop line poll */
 
 return SCPE_OK;
 }
 
 
-/* Attach controller */
+/* Attach line */
 
 t_stat baci_attach (UNIT *uptr, CONST char *cptr)
 {
@@ -1044,20 +1097,20 @@ status = tmxr_attach (&baci_desc, uptr, cptr);          /* attach to socket */
 
 if (status == SCPE_OK) {
     baci_poll.wait = POLL_FIRST;                        /* set up poll */
-    sim_activate (&baci_poll, baci_poll.wait);          /* start Telnet poll immediately */
+    sim_activate (&baci_poll, baci_poll.wait);          /* start line poll immediately */
     }
 return status;
 }
 
 
-/* Detach controller */
+/* Detach line */
 
 t_stat baci_detach (UNIT *uptr)
 {
 t_stat status;
 
 baci_ldsc.rcve = 0;                                     /* disable line reception */
-sim_cancel (&baci_poll);                                /* stop Telnet poll */
+sim_cancel (&baci_poll);                                /* stop line poll */
 status = tmxr_detach (&baci_desc, uptr);                /* detach socket */
 return status;
 }
@@ -1105,8 +1158,10 @@ baci_dsrw = 0;                                          /* clear status referenc
 baci_cfcw = baci_cfcw & ~OUT_ECHO;                      /* clear echo flag */
 baci_icw = baci_icw & OUT_BAUDRATE;                     /* clear interface control */
 
-if (baci_term.flags & UNIT_DIAG)                        /* diagnostic mode? */
+if (baci_term.flags & UNIT_DIAG) {                      /* diagnostic mode? */
     baci_status = baci_status & ~IN_MODEM | IN_SPARE;   /* clear loopback status, set BA */
+    baci_ldsc.xmte = 1;                                 /* enable transmitter */
+    }
 
 return;
 }

@@ -1,6 +1,6 @@
                       SIMH/HP 21XX DIAGNOSTICS PERFORMANCE
                       ====================================
-                             Last update: 2017-02-15
+                             Last update: 2018-05-15
 
 
 The HP 24396 diagnostic suite has been run against the SIMH HP 21xx simulation.
@@ -488,13 +488,13 @@ TEST RESULT:    Passed.
 
 
 
--------------------------------------
-DSN 143300 - General Purpose Register
--------------------------------------
+-------------------------------------------
+DSN 143300 - General Purpose Register (LPS)
+-------------------------------------------
 
 TESTED DEVICE:  LPS (hp2100_lps.c)
 
-CONFIGURATION:  sim> set LPS diag
+CONFIGURATION:  sim> set LPS DIAGNOSTIC
                 sim> deposit S 000014
                 sim> reset
                 sim> go 100
@@ -1096,9 +1096,9 @@ TEST RESULT:    Passed.
 
 
 
--------------------------------------
-DSN 143300 - General Purpose Register
--------------------------------------
+-------------------------------------------
+DSN 143300 - General Purpose Register (PIF)
+-------------------------------------------
 
 TESTED DEVICE:  PIF (hp2100_pif.c)
 
@@ -1133,6 +1133,81 @@ TEST REPORT:    GENERAL PURPOSE REGISTER DIAGNOSTIC,  DSN 143300
                 PASS 000001
 
                 HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+TEST NOTES:     Only test 00 (Basic I/O Test) is executed.  The other tests are
+                not applicable, as the 12620A card has no data path circuitry.
+
+
+
+--------------------------------------------
+DSN 143300 - General Purpose Register (IPLI)
+--------------------------------------------
+
+TESTED DEVICE:  IPLI (hp2100_ipl.c)
+
+CONFIGURATION:  sim> set IPLI DIAGNOSTIC
+
+                sim> deposit S 000032
+                sim> reset
+                sim> go 100
+
+                Programmed halt, T: 102074 (HLT 74)
+
+                sim> deposit S 000000
+                sim> go
+
+TEST REPORT:    GENERAL PURPOSE REGISTER DIAGNOSTIC,  DSN 143300
+
+                H024 PRESS PRESET (EXT&INT),RUN
+
+                Programmed halt, T: 102024 (HLT 24)
+
+                sim> reset
+                sim> go
+
+                H025 BASIC I-O COMPLETED
+
+                PASS 000001
+
+                Programmed halt, T: 102077 (HLT 77)
+
+TEST RESULT:    Passed.
+
+
+
+--------------------------------------------
+DSN 143300 - General Purpose Register (IPLO)
+--------------------------------------------
+
+TESTED DEVICE:  IPLO (hp2100_ipl.c)
+
+CONFIGURATION:  sim> set IPLI DIAGNOSTIC
+
+                sim> deposit S 000033
+                sim> reset
+                sim> go 100
+
+                Programmed halt, T: 102074 (HLT 74)
+
+                sim> deposit S 000000
+                sim> go
+
+TEST REPORT:    GENERAL PURPOSE REGISTER DIAGNOSTIC,  DSN 143300
+
+                H024 PRESS PRESET (EXT&INT),RUN
+
+                Programmed halt, T: 102024 (HLT 24)
+
+                sim> reset
+                sim> go
+
+                H025 BASIC I-O COMPLETED
+
+                PASS 000001
+
+                Programmed halt, T: 102077 (HLT 77)
 
 TEST RESULT:    Passed.
 
@@ -2128,7 +2203,7 @@ TEST REPORT:    H0 7900/7901 CARTRIDGE DISC MEMORY DIAGNOSTIC
 
                 HALT instruction 102002
 
-                sim> set DPC0 unloaded
+                sim> set DPC0 unload
                 sim> go
 
                 H40 PROTECT U/D THEN READY UNIT  0
@@ -2136,15 +2211,14 @@ TEST REPORT:    H0 7900/7901 CARTRIDGE DISC MEMORY DIAGNOSTIC
                 [CTRL+E]
                 Simulation stopped
 
-                sim> set DPC0 locked
-                sim> set DPC0 loaded
+                sim> set DPC0 load,protect
                 sim> go
 
                 H41 CLEAR U/D PROTECT,LOAD,PUSH RUN
 
                 HALT instruction 102002
 
-                sim> set DPC0 writeenabled
+                sim> set DPC0 unprotect
                 sim> go
 
                 H71 PRESS PRESET(S) THEN PRESS RUN
@@ -3355,8 +3429,8 @@ TESTED DEVICE:  IPLI, IPLO (hp2100_ipl.c)
 
 BINARY TAPE:    24197-60001 Rev. B
 
-CONFIGURATION:  sim> set IPLI DIAG
-                sim> set IPLO DIAG
+CONFIGURATION:  sim> set IPLI DIAGNOSTIC
+                sim> set IPLO DIAGNOSTIC
                 sim> deposit S 003332
                 sim> reset
                 sim> go 2

@@ -1,7 +1,7 @@
 /* hp2100_defs.h: HP 2100 System architectural declarations
 
    Copyright (c) 1993-2016, Robert M. Supnik
-   Copyright (c) 2017       J. David Bryan
+   Copyright (c) 2017-2018  J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   07-May-18    JDB     Added NOTE_SKIP, simplified setSKF macro
+   02-May-18    JDB     Added "SIRDEV" for first device to receive the SIR signal
+   16-Oct-17    JDB     Suppressed logical-not-parentheses warning on clang
    30-Aug-17    JDB     Replaced POLL_WAIT with POLL_PERIOD
    07-Aug-17    JDB     Added "hp_attach"
    20-Jul-17    JDB     Removed STOP_OFFLINE, STOP_PWROFF stop codes
@@ -185,6 +188,7 @@
 */
 
 #if defined (__clang__)
+  #pragma clang diagnostic ignored "-Wlogical-not-parentheses"
   #pragma clang diagnostic ignored "-Wlogical-op-parentheses"
   #pragma clang diagnostic ignored "-Wbitwise-op-parentheses"
   #pragma clang diagnostic ignored "-Wshift-op-parentheses"
@@ -330,9 +334,9 @@
 #define STOP_NOTAPE         8                   /* no tape */
 #define STOP_EOT            9                   /* end of tape */
 
-#define NOTE_IOG            10                  /* I/O instr executed */
-#define NOTE_INDINT         11                  /* indirect intr */
-
+#define NOTE_IOG            10                  /* an I/O instruction was executed */
+#define NOTE_INDINT         11                  /* an interrupt occurred while resolving an indirect address */
+#define NOTE_SKIP           12                  /* the SKF signal was asserted by an I/O interface */
 
 
 /* Modifier validation identifiers */
@@ -742,6 +746,7 @@ typedef enum { INITIAL, SERVICE } POLLMODE;             /* poll synchronization 
 #define DI_DC           044                             /* 12821A Disc Interface with CS/80 disc and tape devices */
 
 #define OPTDEV          002                             /* start of optional devices */
+#define SIRDEV          004                             /* start of devices that receive SIR */
 #define CRSDEV          006                             /* start of devices that receive CRS */
 #define VARDEV          010                             /* start of variable assignments */
 #define MAXDEV          077                             /* end of select code range */
@@ -781,9 +786,9 @@ typedef enum { INITIAL, SERVICE } POLLMODE;             /* poll synchronization 
 
     2. The ioSKF signal is never sent to an I/O handler.  Rather, it is returned
        from the handler if the SFC or SFS condition is true.  If the condition
-       is false, ioNONE is returned instead.  As these two values are returned
-       in the 16-bit data portion of the returned value, their assigned values
-       must be <= 100000 octal.
+       is false, ioNONE is returned instead.  As the ioSKF value is returned in
+       the upper 16 bits of the returned value, its assigned value must be >=
+       200000 octal.
 
     3. An I/O handler will receive ioCRS as a result of a CLC 0 instruction,
        ioPOPIO and ioCRS as a result of a RESET command, and ioPON, ioPOPIO, and
@@ -818,21 +823,22 @@ typedef enum { ioNONE  = 0000000,                       /* -- -- -- -- -- no sig
                ioIOI   = 0000004,                       /* -- -- T4 T5 -- I/O data input (CPU)
                                                            T2 T3 -- -- -- I/O data input (DMA) */
                ioIOO   = 0000010,                       /* -- T3 T4 -- -- I/O data output */
-               ioSKF   = 0000020,                       /* -- T3 T4 T5 -- skip on flag */
-               ioSFS   = 0000040,                       /* -- T3 T4 T5 -- skip if flag is set */
-               ioSFC   = 0000100,                       /* -- T3 T4 T5 -- skip if flag is clear */
-               ioSTC   = 0000200,                       /* -- -- T4 -- -- set control flip-flop (CPU)
+               ioSFS   = 0000020,                       /* -- T3 T4 T5 -- skip if flag is set */
+               ioSFC   = 0000040,                       /* -- T3 T4 T5 -- skip if flag is clear */
+               ioSTC   = 0000100,                       /* -- -- T4 -- -- set control flip-flop (CPU)
                                                            -- T3 -- -- -- set control flip-flop (DMA) */
-               ioCLC   = 0000400,                       /* -- -- T4 -- -- clear control flip-flop (CPU)
+               ioCLC   = 0000200,                       /* -- -- T4 -- -- clear control flip-flop (CPU)
                                                            -- T3 T4 -- -- clear control flip-flop (DMA) */
-               ioSTF   = 0001000,                       /* -- T3 -- -- -- set flag flip-flop */
-               ioCLF   = 0002000,                       /* -- -- T4 -- -- clear flag flip-flop (CPU)
+               ioSTF   = 0000400,                       /* -- T3 -- -- -- set flag flip-flop */
+               ioCLF   = 0001000,                       /* -- -- T4 -- -- clear flag flip-flop (CPU)
                                                            -- T3 -- -- -- clear flag flip-flop (DMA) */
-               ioEDT   = 0004000,                       /* -- -- T4 -- -- end data transfer */
-               ioCRS   = 0010000,                       /* -- -- -- T5 -- control reset */
-               ioPOPIO = 0020000,                       /* -- -- -- T5 -- power-on preset to I/O */
-               ioIAK   = 0040000,                       /* -- -- -- -- T6 interrupt acknowledge */
-               ioSIR   = 0100000 } IOSIGNAL;            /* -- -- -- T5 -- set interrupt request */
+               ioEDT   = 0002000,                       /* -- -- T4 -- -- end data transfer */
+               ioCRS   = 0004000,                       /* -- -- -- T5 -- control reset */
+               ioPOPIO = 0010000,                       /* -- -- -- T5 -- power-on preset to I/O */
+               ioIAK   = 0020000,                       /* -- -- -- -- T6 interrupt acknowledge */
+               ioSIR   = 0040000,                       /* -- -- -- T5 -- set interrupt request */
+
+               ioSKF   = 0200000 } IOSIGNAL;            /* -- T3 T4 T5 -- skip on flag */
 
 
 typedef uint32 IOCYCLE;                                 /* a set of signals forming one I/O cycle */
@@ -1003,7 +1009,7 @@ struct dib {                                    /* the Device Information Block 
 #define BIT_V(S)        ((S) & 037)                                     /* convert select code to bit position */
 #define BIT_M(S)        (1u << BIT_V (S))                               /* convert select code to bit mask */
 
-#define setSKF(B)       stat_data = IORETURN (SCPE_OK, (uint16) ((B) ? ioSKF : ioNONE))
+#define setSKF(B)       stat_data = ((B) ? ioSKF : ioNONE)
 
 #define setPRL(S,B)     dev_prl[(S)/32] = dev_prl[(S)/32] & ~BIT_M (S) | (((B) & 1) << BIT_V (S))
 #define setIRQ(S,B)     dev_irq[(S)/32] = dev_irq[(S)/32] & ~BIT_M (S) | (((B) & 1) << BIT_V (S))
@@ -1023,7 +1029,7 @@ struct dib {                                    /* the Device Information Block 
 
 /* Bitset formatting.
 
-   See the comments at the "fmt_bitset" function (hp3000_sys.c) for details of
+   See the comments at the "fmt_bitset" function (hp2100_sys.c) for details of
    the specification of bitset names and format structures.
 */
 

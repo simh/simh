@@ -1,6 +1,6 @@
 /* hp2100_cpu4.c: HP 1000 FPP/SIS
 
-   Copyright (c) 2006-2016, J. David Bryan
+   Copyright (c) 2006-2017, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    CPU4         Floating Point Processor and Scientific Instruction Set
 
+   07-Sep-17    JDB     Replaced "uint16" cast with "HP_WORD" for FPK assignment
    05-Aug-16    JDB     Renamed the P register from "PC" to "PR"
    24-Dec-14    JDB     Added casts for explicit downward conversions
    09-May-12    JDB     Separated assignments from conditional expressions
@@ -315,7 +316,7 @@ switch (entry) {                                        /* decode IR<6:0> */
 
     case 0007:                                          /* [stk] 105007 (OP_A) */
         O = 0;                                          /* clear overflow */
-        stk_ptr = (uint16) PR;                          /* save ptr to next buf */
+        stk_ptr = PR;                                   /* save ptr to next buf */
         rtn_addr = op[0].word;                          /* save return address */
 
         while (TRUE) {
@@ -712,7 +713,7 @@ switch (entry) {                                        /* decode IR<3:0> */
             op[1].fpk[1] = op[1].fpk[1] | 2;            /* set "exponent" to 1 */
             }
 
-        op[2].fpk[0] = (uint16) exponent;
+        op[2].fpk[0] = (HP_WORD) exponent;
         fp_exec (0120, &op[3], op[2], NOP);             /* op3 = FLT(exponent) */
 
         fp_exec (0020, &op[4], op[1], plus_1);          /* op4 = op1 - 1.0 */

@@ -1,7 +1,7 @@
 /* hp2100_cpu.c: HP 21xx/1000 Central Processing Unit/MEM/MP/DCPC simulator
 
    Copyright (c) 1993-2016, Robert M. Supnik
-   Copyright (c) 2017,      J. David Bryan
+   Copyright (c) 2017-2018, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -30,6 +30,11 @@
    DCPC1,DCPC2  12897B Dual Channel Port Controller
    MP           12581A/12892B Memory Protect
 
+   21-May-18    JDB     Changed "access" to "mem_access" to avoid clashing
+   07-May-18    JDB     Modified "io_dispatch" to display outbound signals
+   01-May-18    JDB     Multiple consecutive CLC 0 operations are now omitted
+   02-Apr-18    JDB     SET CPU 21MX now configures an M-Series model
+   22-Feb-18    JDB     Reworked "cpu_ibl" into "cpu_copy_loader"
    11-Aug-17    JDB     MEM must be disabled when DMS is disabled
    01-Aug-17    JDB     Changed SET/SHOW CPU [NO]IDLE to use sim_*_idle routines
    22-Jul-17    JDB     Renamed "intaddr" to CIR; added IR
@@ -892,14 +897,6 @@
 
 
 
-/* External data */
-
-extern DIB clk_dib;                                     /* CLK DIB for idle check */
-extern DIB ptr_dib;                                     /* PTR DIB for BBL configuration */
-
-extern const BOOT_ROM ptr_rom, dq_rom, ms_rom, ds_rom;  /* boot ROMs for cpu_boot routine */
-
-
 /* CPU program constants */
 
 
@@ -961,6 +958,7 @@ REG       *pcq_r = NULL;                        /* PC queue reg ptr */
 
 uint32    cpu_configuration;                    /* the current CPU option set and model */
 uint32    cpu_speed = 1;                        /* the CPU speed, expressed as a multiplier of a real machine */
+t_bool    is_1000 = FALSE;                      /* TRUE if the CPU is a 1000 M/E/F-Series */
 
 uint32 dev_prl [2] = { ~0u, ~0u };              /* device priority low bit vector */
 uint32 dev_irq [2] = {  0u,  0u };              /* device interrupt request bit vector */
@@ -985,9 +983,13 @@ static HP_WORD saved_MR = 0;                    /* M-register value between SCP 
 static uint32  fwanxm   = 0;                    /* first word addr of nx mem */
 static uint32  jsb_plb  = 2;                    /* protected lower bound for JSB */
 
-static uint32  exec_mask      = 0;              /* the current instruction execution trace mask */
-static uint32  exec_match     = D16_UMAX;       /* the current instruction execution trace matching value */
-static uint32  indirect_limit = 16;             /* the indirect chain length limit */
+static uint32  exec_mask        = 0;            /* the current instruction execution trace mask */
+static uint32  exec_match       = D16_UMAX;     /* the current instruction execution trace matching value */
+static uint32  indirect_limit   = 16;           /* the indirect chain length limit */
+static uint32  last_select_code = 0;            /* the last select code sent over the I/O backplane */
+
+static uint32  tbg_select_code = 0;             /* the time-base generator select code (for RTE idle check) */
+static DEVICE  *loader_rom [4] = { NULL };      /* the four boot loader ROM sockets in a 1000 CPU */
 
 
 /* Memory Expansion Unit local state */
@@ -1011,30 +1013,6 @@ static t_bool defer_tab [] = {                  /* deferral table, indexed by I/
     FALSE,                                      /*   soOTX */
     TRUE                                        /*   soCTL */
     };
-
-
-/* Basic Binary Loader */
-
-static const BOOT_ROM bbl = {
-    0107700, 0063770, 0106501, 0004010,
-    0002400, 0006020, 0063771, 0073736,
-    0006401, 0067773, 0006006, 0027717,
-    0107700, 0102077, 0027700, 0017762,
-    0002003, 0027712, 0003104, 0073774,
-    0017762, 0017753, 0070001, 0073775,
-    0063775, 0043772, 0002040, 0027751,
-    0017753, 0044000, 0000000, 0002101,
-    0102000, 0037775, 0037774, 0027730,
-    0017753, 0054000, 0027711, 0102011,
-    0027700, 0102055, 0027700, 0000000,
-    0017762, 0001727, 0073776, 0017762,
-    0033776, 0127753, 0000000, 0103710,
-    0102310, 0027764, 0102510, 0127762,
-    0173775, 0153775, 0100100, 0177765,
-    0000000, 0000000, 0000000, 0000000
-    };
-
-#define BBL_FWA             072                 /* BBL location to store negative FWA */
 
 
 /* CPU features table.
@@ -1122,10 +1100,12 @@ static t_stat set_model    (UNIT *uptr, int32 new_model, CONST char *cptr, void 
 static t_stat set_option   (UNIT *uptr, int32 option,    CONST char *cptr, void *desc);
 static t_stat clear_option (UNIT *uptr, int32 option,    CONST char *cptr, void *desc);
 static t_stat set_loader   (UNIT *uptr, int32 enable,    CONST char *cptr, void *desc);
+static t_stat set_roms     (UNIT *uptr, int32 option,    CONST char *cptr, void *desc);
 static t_stat set_exec     (UNIT *uptr, int32 option,    CONST char *cptr, void *desc);
 
 static t_stat show_stops (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat show_model (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat show_roms  (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat show_exec  (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat show_speed (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
@@ -1269,13 +1249,14 @@ static MTAB cpu_mod [] = {
     { UNIT_MODEL_MASK, UNIT_2114,   "",           "2114",       &set_model,    &show_model, (void *) "2114"   },
     { UNIT_MODEL_MASK, UNIT_2100,   "",           "2100",       &set_model,    &show_model, (void *) "2100"   },
     { UNIT_MODEL_MASK, UNIT_1000_E, "",           "1000-E",     &set_model,    &show_model, (void *) "1000-E" },
-    { UNIT_MODEL_MASK, UNIT_1000_E, NULL,         "21MX-E",     &set_model,    &show_model, (void *) "1000-E" },
     { UNIT_MODEL_MASK, UNIT_1000_M, "",           "1000-M",     &set_model,    &show_model, (void *) "1000-M" },
-    { UNIT_MODEL_MASK, UNIT_1000_M, NULL,         "21MX-M",     &set_model,    &show_model, (void *) "1000-M" },
 
 #if defined (HAVE_INT64)
     { UNIT_MODEL_MASK, UNIT_1000_F, "",           "1000-F",     &set_model,    &show_model, (void *) "1000-F" },
 #endif
+
+    { UNIT_MODEL_MASK, UNIT_1000_M, NULL,         "21MX-M",     &set_model,    &show_model, (void *) "1000-M" },
+    { UNIT_MODEL_MASK, UNIT_1000_E, NULL,         "21MX-E",     &set_model,    &show_model, (void *) "1000-E" },
 
     { UNIT_EAU,        UNIT_EAU,    "EAU",        "EAU",        &set_option,   NULL,        NULL              },
     { UNIT_EAU,        0,           "no EAU",     NULL,         NULL,          NULL,        NULL              },
@@ -1344,6 +1325,8 @@ static MTAB cpu_mod [] = {
     { MTAB_XDV,             256 * 1024, NULL,         "256K",          &set_size,     NULL,           NULL       },
     { MTAB_XDV,             512 * 1024, NULL,         "512K",          &set_size,     NULL,           NULL       },
     { MTAB_XDV,            1024 * 1024, NULL,         "1024K",         &set_size,     NULL,           NULL       },
+
+    { MTAB_XDV | MTAB_NMO,      0,      "ROMS",       "ROMS",          &set_roms,     &show_roms,     NULL       },
 
     { MTAB_XDV | MTAB_NMO,      1,      "STOPS",      "STOP",          &set_stops,    &show_stops,    NULL       },
     { MTAB_XDV,                 0,      NULL,         "NOSTOP",        &set_stops,    NULL,           NULL       },
@@ -1472,16 +1455,16 @@ typedef struct {
     const char  *name;                          /* the classification name */
     } ACCESS_PROPERTIES;
 
-static const ACCESS_PROPERTIES access [] = {    /* indexed by ACCESS_CLASS */
+static const ACCESS_PROPERTIES mem_access [] = {    /* indexed by ACCESS_CLASS */
 /*    debug_flag    name                */
 /*    ------------  ------------------- */
-    { TRACE_FETCH,  "instruction fetch" },      /*   instruction fetch */
-    { TRACE_DATA,   "data"              },      /*   data access */
-    { TRACE_DATA,   "data"              },      /*   data access, alternate map */
-    { TRACE_DATA,   "unprotected"       },      /*   data access, system map */
-    { TRACE_DATA,   "unprotected"       },      /*   data access, user map */
-    { TRACE_DATA,   "dma"               },      /*   DMA channel 1, port A map */
-    { TRACE_DATA,   "dma"               }       /*   DMA channel 2, port B map */
+    { TRACE_FETCH,  "instruction fetch" },          /*   instruction fetch */
+    { TRACE_DATA,   "data"              },          /*   data access */
+    { TRACE_DATA,   "data"              },          /*   data access, alternate map */
+    { TRACE_DATA,   "unprotected"       },          /*   data access, system map */
+    { TRACE_DATA,   "unprotected"       },          /*   data access, user map */
+    { TRACE_DATA,   "dma"               },          /*   DMA channel 1, port A map */
+    { TRACE_DATA,   "dma"               }           /*   DMA channel 2, port B map */
     };
 
 
@@ -1718,7 +1701,6 @@ t_bool    mp_mem_changed;                       /* TRUE if the MP or MEM registe
 static FLIP_FLOP mp_flag        = CLEAR;        /* MP flag flip-flop */
 static FLIP_FLOP mp_flagbuf     = CLEAR;        /* MP flag buffer flip-flop */
 static FLIP_FLOP mp_evrff       = SET;          /* enable violation register flip-flop */
-static t_bool    is_1000        = FALSE;        /* TRUE if the CPU is a 1000 M/E/F-Series */
 static char      meu_indicator;                 /* last map access indicator (S | U | A | B | -) */
 static uint32    meu_page;                      /* last physical page number accessed */
 
@@ -1820,22 +1802,29 @@ static const BITSET_NAME inbound_names [] = {   /* Inbound signal names, in IOSI
     "ENF",                                      /*   000000000002 */
     "IOI",                                      /*   000000000004 */
     "IOO",                                      /*   000000000010 */
-    "SKF",                                      /*   000000000020 */
-    "SFS",                                      /*   000000000040 */
-    "SFC",                                      /*   000000000100 */
-    "STC",                                      /*   000000000200 */
-    "CLC",                                      /*   000000000400 */
-    "STF",                                      /*   000000001000 */
-    "CLF",                                      /*   000000002000 */
-    "EDT",                                      /*   000000004000 */
-    "CRS",                                      /*   000000010000 */
-    "POPIO",                                    /*   000000020000 */
-    "IAK",                                      /*   000000040000 */
-    "SIR"                                       /*   000000100000 */
+    "SFS",                                      /*   000000000020 */
+    "SFC",                                      /*   000000000040 */
+    "STC",                                      /*   000000000100 */
+    "CLC",                                      /*   000000000200 */
+    "STF",                                      /*   000000000400 */
+    "CLF",                                      /*   000000001000 */
+    "EDT",                                      /*   000000002000 */
+    "CRS",                                      /*   000000004000 */
+    "POPIO",                                    /*   000000010000 */
+    "IAK",                                      /*   000000020000 */
+    "SIR"                                       /*   000000040000 */
     };
 
 static const BITSET_FORMAT inbound_format =     /* names, offset, direction, alternates, bar */
     { FMT_INIT (inbound_names, 0, lsb_first, no_alt, no_bar) };
+
+
+static const BITSET_NAME outbound_names [] = {  /* Outbound signal names, in IOSIGNAL order */
+    "SKF"                                       /*   000000200000 */
+    };
+
+static const BITSET_FORMAT outbound_format =    /* names, offset, direction, alternates, bar */
+    { FMT_INIT (outbound_names, 16, lsb_first, no_alt, no_bar) };
 
 
 /* I/O instruction sub-opcodes */
@@ -1890,9 +1879,10 @@ static uint32 io_dispatch   (uint32 select_code, IOCYCLE signal_set, HP_WORD dat
    execution.  This involves verifying that there are no device conflicts (e.g.,
    two devices with the same select code) and initializing the I/O state.  These
    actions accommodate reconfiguration of the I/O device settings and program
-   counter while the simulator was stopped.  The prelude also responds to one
-   command-line switch: if "-B" is specified, the current set of simulation stop
-   conditions is bypassed for the first instruction executed.
+   counter while the simulator was stopped.  The prelude also picks up the
+   time-base generator's select code for use in idle testing, and it checks for
+   one command-line switch: if "-B" is specified, the current set of simulation
+   stop conditions is bypassed for the first instruction executed.
 
    Second, the memory protect abort mechanism is set up.  MP aborts utilize the
    "setjmp/longjmp" mechanism to transfer control out of the instruction
@@ -2139,6 +2129,7 @@ static const char *const mp_mem_formats [] = {                  /* MP/MEM regist
 
 static uint32 exec_save;                                /* the trace flag settings saved by an EXEC match */
 static uint32 idle_save;                                /* the trace flag settings saved by an idle match */
+DEVICE *tbg_dptr;
 int    abortval;
 uint32 intrq, dmarq;                                    /* set after setjmp */
 t_bool exec_test;                                       /* set after setjmp */
@@ -2157,6 +2148,13 @@ sim_switches &= ~SWMASK ('P');                          /* clear the power-on sw
 
 if (hp_device_conflict ())                              /* if device assignment is inconsistent */
     return SCPE_STOP;                                   /*   then inhibit execution */
+
+tbg_dptr = find_dev ("CLK");                            /* get a pointer to the time-base generator device */
+
+if (tbg_dptr == NULL)                                           /* if the TBG device is not present */
+    return SCPE_IERR;                                           /*   then something is seriously wrong */
+else                                                            /* otherwise */
+    tbg_select_code = ((DIB *) tbg_dptr->ctxt)->select_code;    /*   get the select code from the device's DIB */
 
 io_initialize ();                                       /* set up the I/O data structures */
 cpu_ioerr_uptr = NULL;                                  /*   and clear the I/O error unit pointer */
@@ -2450,26 +2448,56 @@ return;
 /* CPU global utility routines */
 
 
-/* Install an initial binary loader into memory.
+/* Install a bootstrap loader into memory.
 
-   This routine copies the initial binary loader contained in "rom" to the last
-   64 words of main memory, limited by a 32K memory size.  If "dev" contains a
+   This routine copies the bootstrap loader specified by "boot" into the last 64
+   words of main memory, limited by a 32K memory size.  If "sc" contains the
    select code of an I/O interface (i.e., select code 10 or above), this routine
-   will configure the I/O instructions in the IBL to the supplied select code.
-   On exit, P will be set to point at the first word of the loader, and S will
-   be altered as directed by the "sr_clear" and "sr_set" masks.
+   will configure the I/O instructions in the loader to the supplied select
+   code.  On exit, P will be set to point at the loader starting program
+   address, and S will be altered as directed by the "sr_clear" and "sr_set"
+   masks if the current CPU is a 1000.
 
-   If I/O configuration is requested, each instruction in the IBL is examined as
-   it is copied to memory.  If the instruction is a non-HLT I/O instruction
-   referencing a select code >= 10, the select code will be reset by subtracting
-   10 and adding the value of the select code supplied in the "dev" parameter.
-   This permits configuration of IBLs that address two- or three-card
-   interfaces.  Passing a "dev" value of 0 will inhibit configuration.
+   The currently configured CPU family (21xx or 1000) determines which of two
+   BOOT_LOADER structures is accessed from the "boot" array.  Each structure
+   contains the 64-word loader array and three indicies into the loader
+   array that specify the start of program execution, the element containing the
+   DMA control word, and the element containing the (negative) address of the
+   first loader word in memory.
 
-   As an example, passing a "dev" value of 24 octal will alter these
+   21xx-series loaders consist of subsections handling one or two devices.  A
+   two-part loader is indicated by a starting program index other than 0, i.e.,
+   other than the beginning of the loader.  An example is the Basic Moving-Head
+   Disc Loader (BMDL), which consists of a paper tape loader section starting at
+   index 0 and a disc loader section starting at index 50 octal.  For these
+   loaders, I/O configuration depends on the "start_index" field of the selected
+   BOOTSTRAP structure: I/O instructions before the starting index are
+   configured to the current paper-tape reader select code, and instructions at
+   or after the starting index are configured to the device select code
+   specified by "sc".  Single-part loaders specify a starting index of 0, and
+   all I/O instructions are configured to the "sc" select code.
+
+   1000-series loaders are always single part and always start at index 0, so
+   they are always configured to use the "sc" select code.
+
+   If a given device does not have both a 21xx-series and a 1000-series loader,
+   the "start_index" field of the undefined loader will be set to the "IBL_NA"
+   value.  If this routine is called to copy an undefined loader, it will reject
+   the call with a "Command not allowed" error.
+
+   If I/O configuration is requested, each instruction in the loader array is
+   examined as it is copied to memory.  If the instruction is a non-HLT I/O
+   instruction referencing a select code >= 10, the select code will be reset by
+   subtracting 10 and adding the value of the select code supplied by the "sc"
+   parameter (or the paper-tape reader select code, as above).  This permits
+   configuration of loaders that address two- or three-card interfaces.  Passing
+   an "sc" value of 0 will inhibit configuration, and the loader array will be
+   copied verbatim.
+
+   As an example, passing an "sc" value of 24 octal will alter these I/O-group
    instructions as follows:
 
-         IBL      Configured
+        Loader    Configured
      Instruction  Instruction  Note
      -----------  -----------  ------------------------------
        OTA 10       OTA 24     Normal configuration
@@ -2477,46 +2505,92 @@ return;
        STC  6       STC  6     DCPC configuration not changed
        HLT 11       HLT 11     Halt instruction not changed
 
-   If configuration is performed, the routine will also alter the next-to-last
-   word unconditionally as above.  This word is assumed to contain a DCPC
-   control word; it is configured to reference the supplied select code.
+   If configuration is performed, two additional operations may be performed.
+   First, the routine will alter the word at the index specified by the
+   "dma_index" field of the selected BOOTSTRAP structure unconditionally as
+   above.  This word is assumed to contain a DMA control word; it is configured
+   to reference the supplied select code.  Second, it will set the word at the
+   index specified by the "fwa_index" field to the two's-complement of the
+   starting address of the loader in memory.  This value may be used by the
+   loader to check that it will not be overwritten by loaded data.
 
-   Finally, the routine sets the last word to the two's-complement of the
-   starting address of the IBL.  This value may be used by the loader to check
-   that it will not be overwritten by loaded data.
+   If either field is set to the IBL_NA value, then the corresponding
+   modification is not made.  For example, the 21xx Basic Binary Loader (BBL)
+   does not use DMA, so its "dma_index" field is set to IBL_NA, and so no DMA
+   control word modification is done.
+
+   This routine also unconditionally sets the P register to the starting
+   address for loader execution.  This is derived from the "start_index" field
+   and the starting memory address to which the loader is copied.
+
+   Finally, if the current CPU is a 1000-series machine, the S register bits
+   corresponding to those set in the "sr_clear" value are masked off, and the
+   bits corresponding to those in the "sr_set" value are set.  In addition, the
+   select code from the "sc" value is shifted left and ORed into the value.
+   This action presets the S-register to the correct value for the selected
+   loader.
+
+
+   Implementation notes:
+
+    1. The paper-tape reader's select code is determined on each entry to the
+       routine to accommodate select code reassignment by the user.
 */
 
-void cpu_ibl (const BOOT_ROM rom, int32 dev, HP_WORD sr_clear, HP_WORD sr_set)
+t_stat cpu_copy_loader (const LOADER_ARRAY boot, uint32 sc, HP_WORD sr_clear, HP_WORD sr_set)
 {
-int32 i;
-MEMORY_WORD wd;
+uint32      index, base, ptr_sc;
+MEMORY_WORD word;
+DEVICE      *ptr_dptr;
 
-set_loader (NULL, TRUE, NULL, NULL);                   /* enable loader (ignore errors) */
+if (boot [is_1000].start_index == IBL_NA)               /* if the bootstrap is not defined for the current CPU */
+    return SCPE_NOFNC;                                  /*   then reject the command */
 
-PR = ((MEMSIZE - 1) & ~IBL_MASK) & VAMASK;              /* start at mem top */
+else if (boot [is_1000].start_index > 0 && sc > 0) {    /* if this is a two-part loader with I/O reconfiguration */
+    ptr_dptr = find_dev ("PTR");                        /*   then get a pointer to the paper tape reader device */
 
-for (i = 0; i < IBL_LNT; i++) {                         /* copy bootstrap */
-    wd = rom [i];                                       /* get word */
-
-    if (dev >= VARDEV                                   /* if reconfiguration is desired */
-      && (wd & I_NMRMASK) == I_IO                       /*   and this is an I/O instruction */
-      && (wd & I_DEVMASK) >= VARDEV                     /*   and the referenced select code is >= 10B */
-      && I_GETIOOP (wd) != soHLT)                       /*   and it's not a halt instruction */
-        M [PR + i] = (wd + (dev - VARDEV)) & DMASK;     /*     then reconfigure the select code */
-
+    if (ptr_dptr == NULL)                               /* if the PTR device is not present */
+        return SCPE_IERR;                               /*   then something is seriously wrong */
     else                                                /* otherwise */
-        M [PR + i] = wd;                                /*   copy the instruction verbatim */
+        ptr_sc = ((DIB *) ptr_dptr->ctxt)->select_code; /*   get the select code from the device's DIB */
     }
 
-if (dev >= VARDEV)                                      /* if reconfiguration was performed */
-    M [PR + IBL_DPC] = M [PR + IBL_DPC] + dev - VARDEV  /*   then patch the DMA control word */
-                         & DMASK;
+else                                                    /* otherwise this is a single-part loader */
+    ptr_sc = 0;                                         /*   or I/O reconfiguration is not requested */
 
-M [PR + IBL_END] = (~PR + 1) & DMASK;                   /* fill in start of boot */
+base = MEMSIZE - 1 & ~IBL_MASK & LA_MASK;               /* get the base memory address of the loader */
+PR = base + boot [is_1000].start_index & R_MASK;        /*   and store the starting program address in P */
 
-SR = (SR & sr_clear) | sr_set;                          /* modify the S register as indicated */
+set_loader (NULL, TRUE, NULL, NULL);                    /* enable the loader (ignore errors if not 21xx) */
 
-return;
+for (index = 0; index < IBL_SIZE; index++) {            /* copy the bootstrap loader to memory */
+    word = boot [is_1000].loader [index];               /* get the next word */
+
+    if (sc == 0)                                        /* if reconfiguration is not requested */
+        M [base + index] = word;                        /*   then copy the instruction verbatim */
+
+    else if ((word & I_NMRMASK) == I_IO                             /* otherwise if this is an I/O instruction */
+      && (word & I_DEVMASK) >= VARDEV                               /*   and the referenced select code is >= 10B */
+      && I_GETIOOP (word) != soHLT)                                 /*   and it's not a halt instruction */
+        if (index < boot [is_1000].start_index)                     /*   then if this is a split loader */
+            M [base + index] = word + (ptr_sc - VARDEV) & DV_MASK;  /*     then reconfigure the paper tape reader */
+        else                                                        /*   otherwise */
+            M [base + index] = word + (sc - VARDEV) & DV_MASK;      /*     reconfigure the target device */
+
+    else if (index == boot [is_1000].dma_index)             /* otherwise if this is the DMA configuration word */
+        M [base + index] = word + (sc - VARDEV) & DV_MASK;  /*   then reconfigure the target device */
+
+    else if (index == boot [is_1000].fwa_index)         /* otherwise if this is the starting address word */
+        M [base + index] = NEG16 (base);                /*   then set the negative starting address of the bootstrap */
+
+    else                                                /* otherwise the word is not a special one */
+        M [base + index] = word;                        /*   so simply copy it */
+    }
+
+if (is_1000)                                            /* if the CPU is a 1000 */
+    SR = SR & sr_clear | sr_set | IBL_TO_SC (sc);       /*   then modify the S register as indicated */
+
+return SCPE_OK;                                         /* return success with the loader copied to memory */
 }
 
 
@@ -2561,6 +2635,10 @@ return;
        do this in preference to calling the recalculation routines directly, as
        some extended firmware instructions call this routine multiple times, and
        there is no point in recalculating until all calls are complete.
+
+    6. The I/O dispatcher returns NOTE_SKIP if the interface asserted the SKF
+       signal.  We must recalculate interrupts if the originating SFS or SFC
+       instruction included the CLF signal (e.g., SFS 0,C).
 */
 
 t_stat cpu_iog (HP_WORD IR, t_bool iotrap)
@@ -2605,12 +2683,13 @@ ioreturn = io_dispatch (dev, signal_set, iodata);       /* dispatch the I/O sign
 iostat = IOSTATUS (ioreturn);                           /* extract status */
 iodata = IODATA (ioreturn);                             /* extract return data value */
 
-if (iostat == SCPE_OK) {                                /* if instruction execution succeeded */
-    if ((sop == soSFC || sop == soSFS)                  /*   then if it is an SFC or SFS */
-      && (IOSIGNAL) iodata == ioSKF)                    /*     and SKF is asserted */
-        PR = PR + 1 & LA_MASK;                          /*       then bump P to skip then next instruction */
+if (iostat == NOTE_SKIP) {                              /* if the interface asserted SKF */
+    PR = PR + 1 & LA_MASK;                              /*   then bump P to skip then next instruction */
+    return (IR & I_HC ? NOTE_IOG : SCPE_OK);            /*     and request recalculation of interrupts if needed */
+    }
 
-    else if (sop == soLIX)                              /*   otherwise if is it an LIA or LIB */
+else if (iostat == SCPE_OK) {                           /* otherwise if instruction execution succeeded */
+    if (sop == soLIX)                                   /*   then if is it an LIA or LIB */
         ABREG [ab] = iodata;                            /*     then load the returned data */
 
     else if (sop == soMIX)                              /*   otherwise if it is an MIA or MIB */
@@ -2926,11 +3005,11 @@ if (index <= 1 && map < PAMAP)                          /* if the A/B register i
 else                                                    /* otherwise */
     TR = (HP_WORD) M [index];                           /*   return the physical memory value */
 
-tpprintf (dptr, access [classification].debug_flag,
+tpprintf (dptr, mem_access [classification].debug_flag,
           DMS_FORMAT "  %s%s\n",
           meu_indicator, meu_page, MR, TR,
-          access [classification].name,
-          access [classification].debug_flag == TRACE_FETCH ? "" : " read");
+          mem_access [classification].name,
+          mem_access [classification].debug_flag == TRACE_FETCH ? "" : " read");
 
 return TR;
 }
@@ -3056,10 +3135,10 @@ else if (index < fwanxm)                                /* otherwise if the loca
 
 TR = value;                                             /* save the value */
 
-tpprintf (dptr, access [classification].debug_flag,
+tpprintf (dptr, mem_access [classification].debug_flag,
           DMS_FORMAT "  %s write\n",
           meu_indicator, meu_page, MR, TR,
-          access [classification].name);
+          mem_access [classification].name);
 
 return;
 }
@@ -3393,11 +3472,22 @@ return;
          interrupt system and turn it off."
 
     4. Select code 0 cannot interrupt, so there is no SIR handler.
+
+    5. To guarantee proper initialization, the 12920A terminal multiplexer
+       requires that the Control Reset (CRS) I/O signal be asserted for a
+       minimum of 100 milliseconds.  In practice, this is achieved by executing
+       131,072 (128K) CLC 0 instructions in a tight loop.  This is not necessary
+       in simulation, and in fact is detrimental, as 262,000+ trace lines will
+       be written for each device that enables IOBUS tracing.  To avoid this,
+       consecutive CLC 0 operations after the first are omitted.  This is
+       detected by checking the select code and signal set of the last I/O
+       operation.
 */
 
 static uint32 cpuio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-uint32 sc;
+static IOCYCLE last_signal_set = ioNONE;                /* the last set of I/O signals processed */
+uint32   sc;
 IOSIGNAL signal;
 IOCYCLE  working_set = signal_set;                      /* no SIR handler needed */
 
@@ -3459,8 +3549,11 @@ while (working_set) {
             break;
 
         case ioCLC:                                     /* clear control flip-flop */
-            for (sc = CRSDEV; sc <= MAXDEV; sc++)       /* send CRS to devices */
-                io_dispatch (sc, ioCRS, 0);             /*   from select code 6 and up */
+            if (last_select_code != 0                   /* if the last I/O instruction */
+              || (last_signal_set & ioCLC) == 0)        /*   was not a CLC 0 */
+                for (sc = CRSDEV; sc <= MAXDEV; sc++)   /*     then assert the CRS signal */
+                    if (devs [sc] != NULL)              /*       to all occupied I/O slots  */
+                        io_dispatch (sc, ioCRS, 0);     /*         from select code 6 and up */
             break;
 
         default:                                        /* all other signals */
@@ -3469,6 +3562,8 @@ while (working_set) {
 
     working_set = working_set & ~signal;                /* remove current signal from set */
     }
+
+last_signal_set = signal_set;                           /* save the current signal set for the next call */
 
 return stat_data;
 }
@@ -3682,11 +3777,10 @@ return SCPE_OK;                                         /* return success status
    If this is the first call after simulator startup, the initial memory array
    is allocated, the default CPU and memory size configuration is set, and the
    SCP-required program counter pointer is set to point to the REG array element
-   corresponding to the P register.
-
-   If this is a power-on reset ("RESET -P"), the default Basic Binary Loader is
-   installed in protected memory (the upper 64 words of the defined memory
-   size).
+   corresponding to the P register.  In addition, the loader ROM sockets of the
+   1000-series CPUs are populated with the initial ROM set, and the Basic Binary
+   Loader (BBL) is installed in protected memory (the upper 64 words of the
+   defined memory size).
 
 
    Implementation notes:
@@ -3695,30 +3789,33 @@ return SCPE_OK;                                         /* return success status
        order automatically.  A fixed setting runs the risk of it not being
        updated if a change in the register order is made.
 
-    2. A power-on reset installs the BBL in 21xx machines.  The IBL copy routine
-       sets the last loader word to the two's complement of the loader starting
-       address and configures the second-to-last word (nominally the DMA control
-       word) to the I/O select code.  For the BBL, the starting address location
-       is five locations back, and the DMA control word is not used, so these
-       fixups are performed after copying.
+    2. The initial set of installed HP 1000 boot loader ROMs is:
+
+         Socket   ROM    Boot Device
+         ------  ------  ------------------------
+           0     12992K  2748 Paper Tape Reader
+           1     12992A  7900 or 2883 Disc Drive
+           2     12992D  7970 Magnetic Tape Drive
+           3     12992B  7905/06/20/25 Disc Drive
 */
 
 static t_stat cpu_reset (DEVICE *dptr)
 {
-if (M == NULL) {                                        /* initial call after startup? */
-    pcq_r = find_reg ("PCQ", NULL, dptr);               /* get PC queue pointer */
+if (M == NULL) {                                        /* if this is the initial call after simulator startup */
+    pcq_r = find_reg ("PCQ", NULL, dptr);               /*   then get the PC queue pointer */
 
-    if (pcq_r)                                          /* defined? */
-        pcq_r->qptr = 0;                                /* initialize queue */
-    else                                                /* not defined */
-        return SCPE_IERR;                               /* internal error */
+    if (pcq_r == NULL)                                  /* if the PCQ register is not present */
+        return SCPE_IERR;                               /*   then something is seriously wrong */
+    else                                                /* otherwise */
+        pcq_r->qptr = 0;                                /*   initialize the register's queue pointer */
 
-    M = (MEMORY_WORD *) calloc (PASIZE, sizeof (MEMORY_WORD));  /* alloc mem */
+    M = (MEMORY_WORD *) calloc (PASIZE,                 /* allocate and zero the main memory array */
+                                sizeof (MEMORY_WORD));  /*   to the maximum configurable size */
 
-    if (M == NULL)                                      /* alloc fail? */
-        return SCPE_MEM;
+    if (M == NULL)                                      /* if the allocation failed */
+        return SCPE_MEM;                                /*   then report a "Memory exhausted" error */
 
-    else {                                              /* do one-time init */
+    else {                                              /* otherwise perform one-time initialization */
         for (sim_PC = dptr->registers;                  /* find the P register entry */
              sim_PC->loc != &PR && sim_PC->loc != NULL; /*   in the register array */
              sim_PC++);                                 /*     for the SCP interface */
@@ -3728,27 +3825,22 @@ if (M == NULL) {                                        /* initial call after st
 
         MEMSIZE = 32768;                                /* set the initial memory size */
         set_model (NULL, UNIT_2116, NULL, NULL);        /*   and the initial CPU model */
+
+        loader_rom [0] = find_dev ("PTR");              /* install the 12992K ROM in socket 0 */
+        loader_rom [1] = find_dev ("DQC");              /*   and the 12992A ROM in socket 1 */
+        loader_rom [2] = find_dev ("MSC");              /*   and the 12992D ROM in socket 2 */
+        loader_rom [3] = find_dev ("DS");               /*   and the 12992B ROM in socket 3 */
+
+        loader_rom [0]->boot (0, loader_rom [0]);       /* install the BBL via the paper tape reader boot routine */
+        set_loader (NULL, FALSE, NULL, NULL);           /*   and then disable the loader, which was enabled */
         }
     }
 
 
-if (sim_switches & SWMASK ('P')) {                      /* if this is a power-on reset */
-    if (! is_1000) {                                    /*   then if the CPU is configured as a 21xx machine */
-        cpu_ibl (bbl, ptr_dib.select_code,              /*     then install the BBL and configure it */
-                 IBL_S_NOCLR, IBL_S_NOSET);             /*       to the paper tape reader's select code */
-
-        M [PR + BBL_FWA] = M [PR + IBL_END];            /* move the BBL starting address to correct location */
-        M [PR + IBL_DPC] = bbl [IBL_DPC];               /*   and restore the last two words of the BBL */
-        M [PR + IBL_END] = bbl [IBL_END];               /*     that are overwritten by the 1000 IBL */
-
-        set_loader (NULL, FALSE, NULL, NULL);          /* disable the loader, which was enabled by cpu_ibl */
-        }
-
-    IOPOWERON (&cpu_dib);                               /* issue the PON signal to the CPU */
-    }
-
-else                                                    /* PRESET */
-    IOPRESET (&cpu_dib);
+if (sim_switches & SWMASK ('P'))                        /* if this is a power-on reset */
+    IOPOWERON (&cpu_dib);                               /*   then issue the PON signal to the CPU */
+else                                                    /* otherwise */
+    IOPRESET (&cpu_dib);                                /*   issue a PRESET */
 
 sim_brk_dflt = SWMASK ('N');                            /* the default breakpoint type is "nomap" as MEM is disabled */
 
@@ -3756,36 +3848,68 @@ return SCPE_OK;
 }
 
 
-/* IBL routine (CPU boot) */
+/* Device boot routine.
+
+   This routine is called by the BOOT CPU and LOAD CPU commands to copy the
+   specified boot loader ROM program into the upper 64 words of the logical
+   address space.  It is equivalent to pressing the IBL (Initial Binary Loader)
+   button on the front panel of a 1000 M/E/F-Series CPU.
+
+   On entry, the S register must be set to indicate the specific boot loader ROM
+   and the associated device select code to be copied, as follows:
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | ROM # | -   - |      select code      | -   -   -   -   -   - |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Bits 15-14 select one of four loader ROM sockets on the CPU board that may
+   contain ROMs.  If the specified socket does, the contents of the ROM are
+   copied into the upper 64 words of memory and configured to use the specified
+   select code.  The unspecified bits of the S register are available for use by
+   the bootstrap program.
+
+   If the select code is less than 10 octal, the loader is not copied, and the
+   O (overflow) register is set to 1.  A successful copy and configuration
+   clears the O register.
+
+   The 21xx-series CPUs do not provide the IBL function.  If this routine is
+   invoked while the CPU is configured as one of these machines, the command is
+   rejected.
+
+
+   Implementation notes:
+
+    1. In hardware, a non-existent ROM (i.e., an empty socket) reads as though
+       all words contain 177777 octal.  This would result in the loader area of
+       memory containing 62 all-ones words, followed by a word set to 177777 +
+       SC - 000010, where SC is the configured select code, followed by a word
+       set to the negative starting address of the loader.  This is not
+       simulated; instead, an attempt to boot from an empty socket is rejected
+       with "Command not allowed."
+*/
 
 static t_stat cpu_boot (int32 unitno, DEVICE *dptr)
 {
-int32 dev = (SR >> IBL_V_DEV) & I_DEVMASK;
-int32 sel = (SR >> IBL_V_SEL) & IBL_M_SEL;
+const int32 select_code = IBL_SC  (SR);                 /* the select code from S register bits 11-6 */
+const int32 rom_socket  = IBL_ROM (SR);                 /* the ROM socket number from S register bits 15-14 */
 
-if (dev < 010)
-    return SCPE_NOFNC;
-
-switch (sel) {
-
-    case 0:                                             /* PTR boot */
-        cpu_ibl (ptr_rom, dev, IBL_S_NOCLR, IBL_S_NOSET);
-        break;
-
-    case 1:                                             /* DP/DQ boot */
-        cpu_ibl (dq_rom, dev, IBL_S_NOCLR, IBL_S_NOSET);
-        break;
-
-    case 2:                                             /* MS boot */
-        cpu_ibl (ms_rom, dev, IBL_S_NOCLR, IBL_S_NOSET);
-        break;
-
-    case 3:                                             /* DS boot */
-        cpu_ibl (ds_rom, dev, IBL_S_NOCLR, IBL_S_NOSET);
-        break;
+if (is_1000)                                            /* if this is a 1000-series CPU */
+    if (select_code < VARDEV) {                         /*   then if the select code is invalid */
+        O = 1;                                          /*     then set the overflow register */
+        return SCPE_ARG;                                /*       and reject the IBL with "Invalid argument" */
         }
 
-return SCPE_OK;
+    else if (loader_rom [rom_socket] == NULL)           /*   otherwise if the ROM socket is empty */
+        return SCPE_NXDEV;                              /*     then reject with "Non-existent device" */
+
+    else {                                                          /*   otherwise */
+        O = 0;                                                      /*     clear overflow to indicate a good IBL */
+        return loader_rom [rom_socket]->boot (select_code, NULL);   /*       and copy the ROM into memory */
+        }
+
+else                                                    /* otherwise this is a 21xx machine */
+    return SCPE_NOFNC;                                  /*   and IBL isn't supported */
 }
 
 
@@ -3930,7 +4054,7 @@ if (is_1000)                                            /* loader unsupported */
 else {                                                  /* 21xx CPU? */
     set_loader (uptr, FALSE, NULL, NULL);               /* save loader to shadow RAM */
     MEMSIZE = new_size;                                 /* set new memory size */
-    fwanxm = (uint32) MEMSIZE - IBL_LNT;                /* reserve memory for loader */
+    fwanxm = (uint32) MEMSIZE - IBL_SIZE;               /* reserve memory for loader */
     }
 
 for (i = fwanxm; i < old_size; i++)                     /* zero non-existent memory */
@@ -4052,7 +4176,7 @@ if (result == SCPE_OK) {                                            /* if the ch
     if (is_1000)
         fwanxm = (uint32) MEMSIZE;                      /* loader reserved only for 21xx */
     else                                                /* 2100 or 211x */
-        fwanxm = (uint32) MEMSIZE - IBL_LNT;            /* reserve memory for loader */
+        fwanxm = (uint32) MEMSIZE - IBL_SIZE;           /* reserve memory for loader */
     }
 
 return result;
@@ -4188,28 +4312,122 @@ return SCPE_OK;
 
 static t_stat set_loader (UNIT *uptr, int32 enable, CONST char *cptr, void *desc)
 {
-static BOOT_ROM loader;
-int32 i;
+static MEMORY_WORD loader [IBL_SIZE];
+uint32 i;
 t_bool is_enabled = (fwanxm == MEMSIZE);
 
 if (is_1000 || MEMSIZE == 0)                            /* valid only for 21xx and for initialized memory */
     return SCPE_NOFNC;
 
 if (is_enabled && (enable == 0)) {                      /* disable loader? */
-    fwanxm = (uint32) MEMSIZE - IBL_LNT;                /* decrease available memory */
-    for (i = 0; i < IBL_LNT; i++) {                     /* copy loader */
+    fwanxm = (uint32) MEMSIZE - IBL_SIZE;               /* decrease available memory */
+    for (i = 0; i < IBL_SIZE; i++) {                    /* copy loader */
         loader [i] = M [fwanxm + i];                    /* from memory */
         M [fwanxm + i] = 0;                             /* and zero location */
         }
     }
 
 else if ((!is_enabled) && (enable == 1)) {              /* enable loader? */
-    for (i = 0; i < IBL_LNT; i++)                       /* copy loader */
+    for (i = 0; i < IBL_SIZE; i++)                      /* copy loader */
         M [fwanxm + i] = loader [i];                    /* to memory */
     fwanxm = (uint32) MEMSIZE;                          /* increase available memory */
     }
 
 return SCPE_OK;
+}
+
+
+/* Change the set of installed loader ROMs.
+
+   This validation routine is called to install loader ROMs in the four
+   available sockets of a 1000-series CPU.  The routine processes commands of
+   the form:
+
+     SET CPU ROMS=[<dev0>][;[<dev1>][;[<dev2>][;[<dev3>]]]]
+
+   On entry, "cptr" points at the the first character of the ROM list.  The
+   option value and the unit and description pointers are not used.
+
+   All four ROM sockets are set for each command.  If no devices are specified,
+   then all sockets are emptied.  Otherwise, specifying a valid device name
+   installs the device loader ROM into the socket corresponding to the position
+   of the device name in the list.  Sockets may be left empty by omitting the
+   corresponding device name or by supplying fewer than four device names.
+
+   Loader ROMs may only be altered if the current CPU model is a 1000-series
+   machine, and a device must be bootable and have a loader ROM assigned, or the
+   command will be rejected.  A rejected command does not alter any of the ROM
+   assignments.
+
+   Example commands and their effects on the installed ROM sockets follow:
+
+     Command                Action
+     ---------------------  -------------------------------------------------
+     SET CPU ROMS=          Remove ROMs from sockets 0-3
+     SET CPU ROMS=PTR       Install PTR in 0; leave 1-3 empty
+     SET CPU ROMS=DS;MS     Install DS in 0 and MS in 1; leave 2 and 3 empty
+     SET CPU ROMS=;;DPC     Install DPC in 2; leave 0, 1, and 3 empty
+     SET CPU ROMS=DQC;;;DA  Install DQC in 0 and DA in 3; leave 1 and 2 empty
+
+
+   Implementation notes:
+
+    1. Entering "SET CPU ROMS" without an equals sign or list is rejected with a
+       "Missing value" error.  This is to prevent accidental socket clearing
+       when "SHOW CPU ROMS" was intended.
+*/
+
+static t_stat set_roms (UNIT *uptr, int32 option, CONST char *cptr, void *desc)
+{
+DEVICE *dptr;
+char   gbuf [CBUFSIZE];
+uint32 socket = 0;
+DEVICE *rom [4] = { NULL };
+
+if (is_1000 == FALSE)                                   /* if the CPU is not a 1000-series unit */
+    return SCPE_NOFNC;                                  /*   then reject the command */
+
+else if (cptr == NULL)                                  /* otherwise if the list is not specified */
+    return SCPE_MISVAL;                                 /*   then report that the list is missing */
+
+else if (*cptr == '\0') {                               /* otherwise if the list is null */
+    loader_rom [0] = NULL;                              /*   then empty */
+    loader_rom [1] = NULL;                              /*     all of the */
+    loader_rom [2] = NULL;                              /*       ROM sockets */
+    loader_rom [3] = NULL;
+    }
+
+else {                                                  /* otherwise */
+    while (*cptr) {                                     /*   loop through the arguments */
+        cptr = get_glyph (cptr, gbuf, ';');             /* get the next argument */
+
+        if (socket == 4)                                /* if all four sockets have been set */
+            return SCPE_2MARG;                          /*   then reject the command */
+
+        else if (gbuf [0] == '\0')                      /* otherwise if the device name is omitted */
+            rom [socket++] = NULL;                      /*   then empty the corresponding socket */
+
+        else {                                          /* otherwise we have a device name */
+            dptr = find_dev (gbuf);                     /*   so find the associated DEVICE pointer */
+
+            if (dptr == NULL)                           /* if the device name is not valid */
+                return SCPE_NXDEV;                      /*   then reject the command */
+
+            else if (dptr->boot == NULL)                /* otherwise if it's valid but not bootable */
+                return SCPE_NOFNC;                      /*   then reject the command */
+
+            else                                        /* otherwise */
+                rom [socket++] = dptr;                  /*   install the boot loader ROM */
+            }
+        }
+
+    loader_rom [0] = rom [0];                           /* install the ROM set */
+    loader_rom [1] = rom [1];                           /*   now that we have */
+    loader_rom [2] = rom [2];                           /*     a valid */
+    loader_rom [3] = rom [3];                           /*       device list */
+    }
+
+return SCPE_OK;                                         /* report that the command succeeded */
 }
 
 
@@ -4360,6 +4578,75 @@ if (! is_1000)                                          /* valid only for 21xx *
         fputs (", loader enabled", st);                 /* no, so access enabled */
 
 return SCPE_OK;
+}
+
+
+/* Show the set of installed loader ROMs.
+
+   This display routine is called to show the set of installed loader ROMs in
+   the four available sockets of a 1000-series CPU.  On entry, the "st"
+   parameter is the open output stream.  The other parameters are not used.
+
+   The routine prints a table of ROMs in this format:
+
+     Socket  Device    ROM
+     ------  -------  ------
+       0       PTR    12992K
+       1       DQC    12992A
+       2       DS     12992B
+       3     <empty>
+
+   If a given socket contains a ROM, the associated device name and HP part
+   number for the loader ROM are printed.
+
+   This routine services an extended modifier entry, so it must add the trailing
+   newline to the output before returning.
+*/
+
+static t_stat show_roms (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+struct LOOKUP_TABLE {
+    char    *name;                              /* device name */
+    char     suffix;                            /* ROM part number suffix */
+    };
+
+static const struct LOOKUP_TABLE lookup [] = {  /* table of device names and ROM part numbers */
+    { "DQC",  'A' },                            /*   12992A 7900/7901/2883 Disc Loader */
+    { "DS",   'B' },                            /*   12992B 7905/7906/7920/7925 Disc Loader */
+    { "MSC",  'D' },                            /*   12992D 7970 Magnetic Tape Loader */
+    { "DPC",  'F' },                            /*   12992F 7900/7901 Disc Loader */
+    { "DA",   'H' },                            /*   12992H 7906H/7920H/7925H/9885 Disc Loader */
+    { "IPLI", 'K' },                            /*   12992K Paper Tape Loader */
+    { "PTR",  'K' },                            /*   12992K Paper Tape Loader */
+    { NULL,   '?' }
+    };
+
+CONST char *dname;
+uint32 socket, index;
+char   letter = '?';
+
+fputc ('\n', st);                                       /* skip a line */
+fputs ("Socket  Device    ROM\n", st);                  /*   and print */
+fputs ("------  -------  ------\n", st);                /*     the table header */
+
+for (socket = 0; socket < 4; socket++)                  /* loop through the sockets */
+    if (loader_rom [socket] == NULL)                    /* if the socket is empty */
+        fprintf (st, "  %u     <empty>\n", socket);     /*   then report it as such */
+
+    else {                                              /* otherwise the socket is occupied */
+        dname = loader_rom [socket]->name;              /*   so get the device name */
+
+        for (index = 0; lookup [index].name; index++)       /* search the lookup table */
+            if (strcmp (lookup [index].name, dname) == 0) { /*   for a match to the device name */
+                letter = lookup [index].suffix;             /*     and get the part number suffix */
+                break;
+                }
+
+        fprintf (st, "  %u       %-4s   12992%c\n",     /* print the ROM information */
+                 socket, dname, letter);
+        }
+
+return SCPE_OK;                                         /* return success status */
 }
 
 
@@ -4722,7 +5009,7 @@ switch (UPPER_BYTE (IR)) {                              /* dispatch on bits 15-8
             && (mem_fast_read (PR, dms_ump) & I_MRG) == I_ISZ)  /*     and *-1 is ISZ <n> */
           && mp_fence == 0                                      /*   and the MP fence is zero */
           && M [xeqt] == 0                                      /*   and no program is executing */
-          && M [tbg] == clk_dib.select_code)                    /*   and the TBG select code is set */
+          && M [tbg] == tbg_select_code)                        /*   and the TBG select code is set */
 
           || PR == err_PC - 3                                   /*   or the jump target is *-3 (DOS through DOS-III) */
           && M [PR] == I_STF                                    /*   and *-3 is STF 0 */
@@ -5827,7 +6114,8 @@ for (i = 0; sim_devices [i] != NULL; i++) {             /* loop through all of t
         devs [dibptr->select_code] = dptr;              /*   then set the device pointer into the device table */
         dibs [dibptr->select_code] = dibptr;            /*     and set the DIB pointer into the dispatch table */
 
-        dibptr->io_handler (dibptr, ioSIR, 0);          /* set the interrupt request state */
+        if (dibptr->select_code >= SIRDEV)              /* if this device receives SIR */
+            dibptr->io_handler (dibptr, ioSIR, 0);      /*   then set the interrupt request state */
         }
     }
 
@@ -5872,21 +6160,19 @@ return;
 
    Implementation notes:
 
-     1. For select codes < 10 octal, an IOI signal reads the floating S-bus
-        (high on the 1000, low on the 21xx).  For select codes >= 10 octal, an
-        IOI reads the floating I/O bus (low on all machines).
+    1. For select codes < 10 octal, an IOI signal reads the floating S-bus
+       (high on the 1000, low on the 21xx).  For select codes >= 10 octal, an
+       IOI reads the floating I/O bus (low on all machines).
 
-     2. If the UNSC simulation stop is set, a stop will occur when an unassigned
-        device is accessed.  An exception is a CLC 0 instruction, which asserts
-        the CRS signal to all I/O devices from select code 6 up.  This is a
-        legitimate access and does not cause a stop.
+    2. The last select code used is saved for use by the CPU I/O handler in
+       detecting consecutive CLC 0 executions.
 */
 
 static uint32 io_dispatch (uint32 select_code, IOCYCLE signal_set, HP_WORD data)
 {
 uint32 stat_data;
 
-if (devs [select_code] != NULL) {                           /* if the I/O slot is occupied */
+if (dibs [select_code] != NULL) {                           /* if the I/O slot is occupied */
     tpprintf (devs [select_code], TRACE_IOBUS, "Received data %06o with signals %s\n",
               data, fmt_bitset (signal_set, inbound_format));
 
@@ -5895,11 +6181,14 @@ if (devs [select_code] != NULL) {                           /* if the I/O slot i
                                       signal_set,
                                       IORETURN (SCPE_OK, data));
 
-    tpprintf (devs [select_code], TRACE_IOBUS, "Returned data %06o\n", IODATA (stat_data));
-    }
+    tpprintf (devs [select_code], TRACE_IOBUS, "Returned data %06o with signals %s\n",
+              IODATA (stat_data), fmt_bitset (stat_data, outbound_format));
 
-else if (signal_set == ioCRS)                               /* otherwise the slot is empty, but if this is a CRS */
-    return SCPE_OK;                                         /*   then it's legal to send it to unassigned slots */
+    last_select_code = select_code;                         /* save the select code for CLC 0 detection */
+
+    if (stat_data & ioSKF)                                  /* if the interface asserted SKF */
+        stat_data = IORETURN (NOTE_SKIP, 0);                /*   then notify the caller to increment P */
+    }
 
 else if (signal_set & ioIOI)                                /* otherwise if it is an input request */
     if (select_code < VARDEV && is_1000)                    /*   then if it is an internal device of a 1000 CPU */

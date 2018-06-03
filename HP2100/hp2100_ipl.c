@@ -1,7 +1,7 @@
 /* hp2100_ipl.c: HP 12875A Processor Interconnect simulator
 
    Copyright (c) 2002-2016, Robert M. Supnik
-   Copyright (c) 2017,      J. David Bryan
+   Copyright (c) 2017-2018, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +26,10 @@
 
    IPLI, IPLO   12875A Processor Interconnect
 
+   22-May-18    JDB     Added process synchronization commands
+   01-May-18    JDB     Removed ioCRS counter, as consecutive ioCRS calls are no longer made
+   26-Mar-18    JDB     Converted from socket to shared memory connections
+   28-Feb-18    JDB     Added the special IOP BBL
    13-Aug-17    JDB     Revised so that only IPLI boots
    19-Jul-17    JDB     Removed unused "ipl_stopioe" variable and register
    11-Jul-17    JDB     Renamed "ibl_copy" to "cpu_ibl"
@@ -65,10 +69,12 @@
    09-May-03    RMS     Added network device flag
    31-Jan-03    RMS     Links are full duplex (found by Mike Gemeny)
 
-   Reference:
+   References:
      - 12875A Processor Interconnect Kit Operating and Service Manual
          (12875-90002, January 1974)
-
+     - 12566B, 12566B-001, 12566B-002, 12566B-003 Microcircuit Interface Kits
+       Operating and Service Manual
+         (12566-90015,  April 1976)
 
    The 12875A Processor Interconnect Kit consists four 12566A Microcircuit
    Interface cards.  Two are used in each processor.  One card in each system is
@@ -79,137 +85,423 @@
    on the lower priority card and received on the higher priority card.  Two
    sets of cards are used to support simultaneous transmission in both
    directions.
+
+
+   Implementation notes:
+
+    1. The "IPL" ("InterProcessor Link") designation is used throughout this
+       file for historical reasons, although HP designates this device as the
+       Processor Interconnect Kit.
 */
 
+
+
+#include <signal.h>
 
 #include "hp2100_defs.h"
 #include "hp2100_cpu.h"
 
-#include "sim_sock.h"
-#include "sim_tmxr.h"
-#include "sim_rev.h"
-
+#include "sim_timer.h"
 
 #if (SIM_MAJOR >= 4)
-  #define sim_close_sock(socket,master)     sim_close_sock (socket)
+  #include "sim_fio.h"
+#else
+  #include "sim_shmem.h"
 #endif
 
 
-typedef enum { ipli, iplo } CARD_INDEX;                 /* card index number */
 
-#define CARD_COUNT      2                               /* count of cards supported */
-
-#define UNIT_V_DIAG     (UNIT_V_UF + 0)                 /* diagnostic mode */
-#define UNIT_V_ACTV     (UNIT_V_UF + 1)                 /* making connection */
-#define UNIT_V_ESTB     (UNIT_V_UF + 2)                 /* connection established */
-#define UNIT_V_HOLD     (UNIT_V_UF + 3)                 /* character holding */
-#define UNIT_DIAG       (1 << UNIT_V_DIAG)
-#define UNIT_ACTV       (1 << UNIT_V_ACTV)
-#define UNIT_ESTB       (1 << UNIT_V_ESTB)
-#define UNIT_HOLD       (1 << UNIT_V_HOLD)
-#define IBUF            buf                             /* input buffer */
-#define OBUF            wait                            /* output buffer */
-#define DSOCKET         u3                              /* data socket */
-#define LSOCKET         u4                              /* listening socket */
+/* Process synchronization definitions */
 
 
-extern DIB ptr_dib;                                     /* need PTR select code for boot */
+/* Windows process synchronization */
 
-int32 ipl_edtdelay = 1;                                 /* EDT delay (msec) */
-int32 ipl_ptime = 31;                                   /* polling interval */
+#if defined (_WIN32)
+
+#pragma push_macro("CONST")
+#undef CONST
+
+#include <windows.h>
+
+#pragma pop_macro("CONST")
+
+
+typedef HANDLE              EVENT;              /* the event type */
+
+#define NO_EVENT            NULL                /* the initial (undefined) event value */
+
+
+/* UNIX process synchronization */
+
+#elif defined (HAVE_SEMAPHORE)
+
+#include <fcntl.h>
+#include <semaphore.h>
+#include <time.h>
+
+typedef sem_t               *EVENT;             /* the event type */
+
+#define NO_EVENT            SEM_FAILED          /* the initial (undefined) event value */
+
+static t_bool event_fallback = FALSE;           /* TRUE if semaphores are defined but not supported */
+
+
+/* Process synchronization stub */
+
+#else
+
+typedef uint32              EVENT;              /* the event type */
+
+#define NO_EVENT            0                   /* the initial (undefined) event value */
+
+
+#endif
+
+
+
+/* Program limits */
+
+#define CARD_COUNT          2                   /* count of cards supported */
+
+
+/* ATTACH mode switches */
+
+#define SP                  SWMASK ('S')        /* SP switch */
+#define IOP                 SWMASK ('I')        /* IOP switch */
+
+#define LISTEN              SWMASK ('L')        /* listen switch (deprecated) */
+#define CONNECT             SWMASK ('C')        /* connect switch (deprecated) */
+
+
+/* Per-unit state variables */
+
+#define ID                  u3                  /* session identifying number */
+
+
+/* Unit flags */
+
+#define UNIT_DIAG_SHIFT     (UNIT_V_UF + 0)     /* diagnostic mode */
+
+#define UNIT_DIAG           (1u << UNIT_DIAG_SHIFT)
+
+
+/* Unit references */
+
+typedef enum {
+    ipli,                                       /* inbound card index */
+    iplo                                        /* outbound card index */
+    } CARD_INDEX;
+
+#define ipli_unit           ipl_unit [ipli]     /* inbound card unit */
+#define iplo_unit           ipl_unit [iplo]     /* outbound card unit */
+
+
+/* Device information block references */
+
+#define ipli_dib            ipl_dib [ipli]      /* inbound card DIB */
+#define iplo_dib            ipl_dib [iplo]      /* outbound card DIB */
+
+
+/* IPL state */
 
 typedef struct {
-    FLIP_FLOP control;                                  /* control flip-flop */
-    FLIP_FLOP flag;                                     /* flag flip-flop */
-    FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
-    int32     hold;                                     /* holding character */
+    HP_WORD    output_word;                     /* output word register */
+    HP_WORD    input_word;                      /* input word register */
+    FLIP_FLOP  command;                         /* command flip-flop */
+    FLIP_FLOP  control;                         /* control flip-flop */
+    FLIP_FLOP  flag;                            /* flag flip-flop */
+    FLIP_FLOP  flagbuf;                         /* flag buffer flip-flop */
     } CARD_STATE;
 
-CARD_STATE ipl [CARD_COUNT];                            /* per-card state */
-
-IOHANDLER iplio;
-
-t_stat ipl_svc (UNIT *uptr);
-t_stat ipl_reset (DEVICE *dptr);
-t_stat ipl_attach (UNIT *uptr, CONST char *cptr);
-t_stat ipl_detach (UNIT *uptr);
-t_stat ipl_boot (int32 unitno, DEVICE *dptr);
-t_stat ipl_dscln (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-t_stat ipl_setdiag (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-t_bool ipl_check_conn (UNIT *uptr);
-
-/* Debug flags table */
-
-DEBTAB ipl_deb [] = {
-    { "CMDS",  DEB_CMDS    },
-    { "CPU",   DEB_CPU     },
-    { "XFER",  DEB_XFER    },
-    { "IOBUS", TRACE_IOBUS },                   /* interface I/O bus signals and data words */
-    { NULL,    0           }
-    };
-
-/* Common structures */
-
-DEVICE ipli_dev, iplo_dev;
-
-static DEVICE *dptrs [] = { &ipli_dev, &iplo_dev };
+static CARD_STATE ipl [CARD_COUNT];             /* per-card state */
 
 
-UNIT ipl_unit [] = {
-    { UDATA (&ipl_svc, UNIT_ATTABLE, 0) },
-    { UDATA (&ipl_svc, UNIT_ATTABLE, 0) }
-    };
+/* IPL I/O device state.
 
-#define ipli_unit ipl_unit [ipli]
-#define iplo_unit ipl_unit [iplo]
+   The 12566B Microcircuit Interface provides a 16-bit Data Out bus and a 16-bit
+   Data In bus, as well as an outbound Device Command signal and an inbound
+   Device Flag signal to indicate data availability.  The output and input
+   states are modelled by a pair of structures that also contain Boolean flags
+   to indicate cable connectivity.
+
+   The two interface cards provided each may be connected in one of four
+   possible ways:
+
+    1. No connection (the I/O cable is not connected).
+
+    2. Loopback connection (a loopback connector is in place).
+
+    3. Cross connection (an I/O cable connects one card to the other card in the
+       same machine).
+
+    4. Processor interconnection (an I/O cable connects a card in one machine to
+       a card in the other machine).
+
+   In simulation, these four connection states are modelled by setting input and
+   output pointers (accessors) to point at the appropriate state structures, as
+   follows:
+
+    1. The input and output accessors point at separate local input and output
+       state structures.
+
+    2. The input and output accessors point at a single local state structure.
+
+    3. The input and output accessors of one card point at the separate local
+       state structures of the other card.
+
+    4. The input and output accessors of one card point at the separate shared
+       state structures of the other card.
+
+   Connection is accomplished by having an output accessor and an input accessor
+   point at the same state structure.  Graphically, the four possibilities are:
+
+     1. No connection:
+
+                             +------------------+
+        card [n].output -->  |     Data Out     |
+                             +------------------+
+                             |  Device Command  |
+                             +------------------+
+
+                             +------------------+
+        card [n].input  -->  |     Data In      |
+                             +------------------+
+                             |   Device Flag    |
+                             +------------------+
 
 
-DIB ipl_dib [] = {
-    { &iplio, IPLI, 0 },
-    { &iplio, IPLO, 1 }
-    };
+     2. Loopback connection:
 
-#define ipli_dib ipl_dib [ipli]
-#define iplo_dib ipl_dib [iplo]
+                             +------------------+------------------+
+        card [n].output -->  |     Data Out     |     Data In      |  <-- card [n].input
+                             +------------------+------------------+
+                             |  Device Command  |   Device Flag    |
+                             +------------------+------------------+
 
 
-/* IPLI data structures
+     3. Cross connection:
 
-   ipli_dev     IPLI device descriptor
-   ipli_unit    IPLI unit descriptor
-   ipli_reg     IPLI register list
+                             +------------------+------------------+
+        card [0].output -->  |     Data Out     |     Data In      |  <-- card [1].input
+                             +------------------+------------------+
+                             |  Device Command  |   Device Flag    |
+                             +------------------+------------------+
+
+                             +------------------+------------------+
+        card [0].input  -->  |     Data In      |     Data Out     |  <-- card [1].output
+                             +------------------+------------------+
+                             |   Device Flag    |  Device Command  |
+                             +------------------+------------------+
+
+
+     4. Processor interconnection:
+
+                             +------------------+------------------+
+        card [0].output -->  |     Data Out     |     Data In      |  <-- card [1].input
+                             +------------------+------------------+
+                             |  Device Command  |   Device Flag    |
+                             +------------------+------------------+
+
+                             +------------------+------------------+
+        card [0].input  -->  |     Data In      |     Data Out     |  <-- card [1].output
+                             +------------------+------------------+
+                             |   Device Flag    |  Device Command  |
+                             +------------------+------------------+
+
+                             +------------------+------------------+
+        card [1].output -->  |     Data Out     |     Data In      |  <-- card [0].input
+                             +------------------+------------------+
+                             |  Device Command  |   Device Flag    |
+                             +------------------+------------------+
+
+                             +------------------+------------------+
+        card [1].input  -->  |     Data In      |     Data Out     |  <-- card [0].output
+                             +------------------+------------------+
+                             |   Device Flag    |  Device Command  |
+                             +------------------+------------------+
+
+   In all but case 1, two accessors point at the same structure but with
+   different views.
 */
 
-REG ipli_reg [] = {
-    { ORDATA (IBUF, ipli_unit.IBUF, 16) },
-    { ORDATA (OBUF, ipli_unit.OBUF, 16) },
-    { FLDATA (CTL, ipl [ipli].control, 0) },
-    { FLDATA (FLG, ipl [ipli].flag,    0) },
-    { FLDATA (FBF, ipl [ipli].flagbuf, 0) },
-    { ORDATA (HOLD, ipl [ipli].hold, 8) },
-    { DRDATA (TIME, ipl_ptime, 24), PV_LEFT },
-    { DRDATA (EDTDELAY, ipl_edtdelay, 32), REG_HIDDEN | PV_LEFT },
-    { ORDATA (SC, ipli_dib.select_code, 6), REG_HRO },
-    { ORDATA (DEVNO, ipli_dib.select_code, 6), REG_HRO },
+typedef struct {
+    t_bool   cable_connected;                   /* TRUE if the inbound cable is connected */
+    t_bool   device_flag_in;                    /* external DEVICE FLAG signal state */
+    HP_WORD  data_in;                           /* external DATA IN signal bus */
+    } INPUT_STATE, *INPUT_STATE_PTR;
+
+typedef struct {
+    t_bool   cable_connected;                   /* TRUE if the outbound cable is connected */
+    t_bool   device_command_out;                /* external DEVICE COMMAND signal state */
+    HP_WORD  data_out;                          /* external DATA OUT signal bus */
+    } OUTPUT_STATE, *OUTPUT_STATE_PTR;
+
+typedef struct {                                /* the normal ("forward direction") state view */
+    INPUT_STATE   input;
+    OUTPUT_STATE  output;
+    } FORWARD_STATE;
+
+typedef struct {                                /* the cross-connected ("reverse direction") state view */
+    OUTPUT_STATE  output;
+    INPUT_STATE   input;
+    } REVERSE_STATE;
+
+typedef union {                                 /* the state may be accessed in either direction */
+    FORWARD_STATE  forward;
+    REVERSE_STATE  reverse;
+    } IO_STATE, *IO_STATE_PTR;
+
+typedef IO_STATE IO_ARRAY [CARD_COUNT];         /* an array of I/O states for the two cards */
+
+static IO_ARRAY dev_bus;                        /* the local device I/O bus states */
+
+typedef struct {
+    INPUT_STATE_PTR   input;                    /* the input accessor */
+    OUTPUT_STATE_PTR  output;                   /* the output accessor */
+    } STATE_PTRS;
+
+static STATE_PTRS io_ptrs [CARD_COUNT] = {      /* the card accessors pointing at the local state */
+    { &dev_bus [ipli].forward.input,            /*   card [0].input */
+      &dev_bus [ipli].forward.output },         /*   card [0].output */
+
+    { &dev_bus [iplo].forward.input,            /*   card [1].input */
+      &dev_bus [iplo].forward.output }          /*   card [1].output */
+    };
+
+
+/* IPL interface state */
+
+static t_bool cpu_is_iop     = FALSE;           /* TRUE if this is the IOP instance, FALSE if SP instance */
+static int32  edt_delay      = 1;               /* EDT delay (msec) */
+static int32  poll_wait      = 50;              /* maximum poll wait time */
+
+static char   event_name [PATH_MAX];            /* the event name */
+static uint32 event_error    = 0;               /* the host OS error code from a failed process sync call */
+static t_bool wait_aborted   = FALSE;           /* TRUE if the user aborted a SET IPL WAIT command */
+static EVENT  event_id       = NO_EVENT;        /* the synchronization event */
+static SHMEM  *memory_region = NULL;            /* a pointer to the shared memory region descriptor */
+
+
+/* IPL local SCP support routines */
+
+static IOHANDLER ipl_interface;
+
+static t_stat ipl_set_diag (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat ipl_set_sync (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+
+static t_stat ipl_reset  (DEVICE *dptr);
+static t_stat ipl_boot   (int32 unitno, DEVICE *dptr);
+
+static t_stat ipl_attach (UNIT *uptr, CONST char *cptr);
+static t_stat ipl_detach (UNIT *uptr);
+
+
+/* IPL local utility routines */
+
+static t_stat card_service  (UNIT *uptr);
+static void   activate_unit (UNIT *uptr);
+static void   abort_handler (int signal);
+
+
+/* Process synchronization routines */
+
+static uint32 create_event       (const char *name, EVENT *event);
+static uint32 destroy_event      (const char *name, EVENT *event);
+static t_bool event_is_undefined (EVENT event);
+static uint32 wait_event         (EVENT event, uint32 wait_in_ms, t_bool *signaled);
+static uint32 signal_event       (EVENT event);
+
+
+/* IPL SCP data structures */
+
+/* Device information blocks */
+
+static DIB ipl_dib [CARD_COUNT] = {
+    { &ipl_interface,                           /*   the device's I/O interface function pointer */
+      IPLI,                                     /*   the device's select code (02-77) */
+      0 },                                      /*   the card index if multiple interfaces are supported */
+
+    { &ipl_interface,                           /*   the device's I/O interface function pointer */
+      IPLO,                                     /*   the device's select code (02-77) */
+      1 }                                       /*   the card index if multiple interfaces are supported */
+    };
+
+
+/* Unit lists */
+
+static UNIT ipl_unit [CARD_COUNT] = {
+    { UDATA (&card_service, UNIT_ATTABLE, 0) },
+    { UDATA (&card_service, UNIT_ATTABLE, 0) }
+    };
+
+
+/* Register lists */
+
+static REG ipli_reg [] = {
+/*    Macro   Name      Location                Width  Offset         Flags         */
+/*    ------  --------  ----------------------  -----  ------  -------------------- */
+    { ORDATA (IBUF,     ipl [ipli].input_word,   16)                                },
+    { ORDATA (OBUF,     ipl [ipli].output_word,  16)                                },
+    { FLDATA (CTL,      ipl [ipli].control,              0)                         },
+    { FLDATA (FLG,      ipl [ipli].flag,                 0)                         },
+    { FLDATA (FBF,      ipl [ipli].flagbuf,              0)                         },
+    { DRDATA (TIME,     poll_wait,               24),          PV_LEFT              },
+    { DRDATA (EDTDELAY, edt_delay,               32),          PV_LEFT | REG_HIDDEN },
+    { DRDATA (EVTERR,   event_error,             32),          PV_LEFT | REG_HRO    },
+    { ORDATA (SC,       ipli_dib.select_code,     6),                    REG_HRO    },
+    { ORDATA (DEVNO,    ipli_dib.select_code,     6),                    REG_HRO    },
     { NULL }
     };
 
-MTAB ipl_mod [] = {
-/*    Mask Value  Match Value  Print String       Match String  Validation     Display  Descriptor */
-/*    ----------  -----------  -----------------  ------------  -------------  -------  ---------- */
-    { UNIT_DIAG,  UNIT_DIAG,  "diagnostic mode",  "DIAGNOSTIC", &ipl_setdiag,  NULL,    NULL       },
-    { UNIT_DIAG,  0,          "link mode",        "LINK",       &ipl_setdiag,  NULL,    NULL       },
+static REG iplo_reg [] = {
+/*    Macro   Name      Location                Width  Offset         Flags         */
+/*    ------  --------  ----------------------  -----  ------  -------------------- */
+    { ORDATA (IBUF,     ipl [iplo].input_word,   16)                                },
+    { ORDATA (OBUF,     ipl [iplo].output_word,  16)                                },
+    { FLDATA (CTL,      ipl [iplo].control,              0)                         },
+    { FLDATA (FLG,      ipl [iplo].flag,                 0)                         },
+    { FLDATA (FBF,      ipl [iplo].flagbuf,              0)                         },
+    { DRDATA (TIME,     poll_wait,               24),          PV_LEFT              },
+    { ORDATA (SC,       iplo_dib.select_code,     6),                    REG_HRO    },
+    { ORDATA (DEVNO,    iplo_dib.select_code,     6),                    REG_HRO    },
+    { NULL }
+    };
 
-/*    Entry Flags           Value  Print String  Match String  Validation    Display        Descriptor        */
-/*    --------------------  -----  ------------  ------------  ------------  -------------  ----------------- */
-    { MTAB_XDV,               0u,  NULL,         "DISCONNECT", &ipl_dscln,   NULL,          NULL              },
-    { MTAB_XDV,               2u,  "SC",         "SC",         &hp_set_dib,  &hp_show_dib,  (void *) &ipl_dib },
-    { MTAB_XDV | MTAB_NMO,   ~2u,  "DEVNO",      "DEVNO",      &hp_set_dib,  &hp_show_dib,  (void *) &ipl_dib },
+
+/* Modifier lists */
+
+static MTAB ipl_mod [] = {
+/*    Mask Value  Match Value  Print String       Match String  Validation      Display  Descriptor */
+/*    ----------  -----------  -----------------  ------------  --------------  -------  ---------- */
+    { UNIT_DIAG,  UNIT_DIAG,  "diagnostic mode",  "DIAGNOSTIC", &ipl_set_diag,  NULL,    NULL       },
+    { UNIT_DIAG,  0,          "link mode",        "LINK",       &ipl_set_diag,  NULL,    NULL       },
+
+/*    Entry Flags           Value  Print String  Match String  Validation      Display        Descriptor        */
+/*    --------------------  -----  ------------  ------------  --------------  -------------  ----------------- */
+    { MTAB_XDV,               0u,  NULL,         "WAIT",       &ipl_set_sync,  NULL,          NULL              },
+    { MTAB_XDV,               1u,  NULL,         "SIGNAL",     &ipl_set_sync,  NULL,          NULL              },
+    { MTAB_XDV,               2u,  "SC",         "SC",         &hp_set_dib,    &hp_show_dib,  (void *) &ipl_dib },
+    { MTAB_XDV | MTAB_NMO,   ~2u,  "DEVNO",      "DEVNO",      &hp_set_dib,    &hp_show_dib,  (void *) &ipl_dib },
     { 0 }
     };
 
+
+/* Debugging trace lists */
+
+static DEBTAB ipl_deb [] = {
+    { "CMD",   TRACE_CMD   },                   /* trace interface or controller commands */
+    { "CSRW",  TRACE_CSRW  },                   /* trace interface control, status, read, and write actions */
+    { "PSERV", TRACE_PSERV },                   /* trace periodic unit service scheduling calls and entries */
+    { "XFER",  TRACE_XFER  },                   /* trace data transmissions */
+    { "IOBUS", TRACE_IOBUS },                   /* trace I/O bus signals and data words received and returned */
+    { NULL,    0           }
+    };
+
+
+/* Device descriptors */
+
 DEVICE ipli_dev = {
-    "IPLI",                                     /* device name */
+    "IPL",                                      /* device name (logical name "IPLI") */
     &ipli_unit,                                 /* unit array */
     ipli_reg,                                   /* register array */
     ipl_mod,                                    /* modifier array */
@@ -219,8 +511,8 @@ DEVICE ipli_dev = {
     1,                                          /* address increment */
     16,                                         /* data radix */
     16,                                         /* data width */
-    &tmxr_ex,                                   /* examine routine */
-    &tmxr_dep,                                  /* deposit routine */
+    NULL,                                       /* examine routine */
+    NULL,                                       /* deposit routine */
     &ipl_reset,                                 /* reset routine */
     &ipl_boot,                                  /* boot routine */
     &ipl_attach,                                /* attach routine */
@@ -231,26 +523,6 @@ DEVICE ipli_dev = {
     ipl_deb,                                    /* debug flag name table */
     NULL,                                       /* memory size change routine */
     NULL                                        /* logical device name */
-    };
-
-/* IPLO data structures
-
-   iplo_dev     IPLO device descriptor
-   iplo_unit    IPLO unit descriptor
-   iplo_reg     IPLO register list
-*/
-
-REG iplo_reg [] = {
-    { ORDATA (IBUF, iplo_unit.IBUF, 16) },
-    { ORDATA (OBUF, iplo_unit.OBUF, 16) },
-    { FLDATA (CTL, ipl [iplo].control, 0) },
-    { FLDATA (FLG, ipl [iplo].flag,    0) },
-    { FLDATA (FBF, ipl [iplo].flagbuf, 0) },
-    { ORDATA (HOLD, ipl [iplo].hold, 8) },
-    { DRDATA (TIME, ipl_ptime, 24), PV_LEFT },
-    { ORDATA (SC, iplo_dib.select_code, 6), REG_HRO },
-    { ORDATA (DEVNO, iplo_dib.select_code, 6), REG_HRO },
-    { NULL }
     };
 
 DEVICE iplo_dev = {
@@ -264,8 +536,8 @@ DEVICE iplo_dev = {
     1,                                          /* address increment */
     16,                                         /* data radix */
     16,                                         /* data width */
-    &tmxr_ex,                                   /* examine routine */
-    &tmxr_dep,                                  /* deposit routine */
+    NULL,                                       /* examine routine */
+    NULL,                                       /* deposit routine */
     &ipl_reset,                                 /* reset routine */
     NULL,                                       /* boot routine */
     &ipl_attach,                                /* attach routine */
@@ -278,13 +550,22 @@ DEVICE iplo_dev = {
     NULL                                        /* logical device name */
     };
 
+static DEVICE *dptrs [CARD_COUNT] = {
+    &ipli_dev,
+    &iplo_dev
+    };
+
+
 
 /* I/O signal handler for the IPLI and IPLO devices.
 
-   In the link mode, the IPLI and IPLO devices are linked via network
-   connections to the corresponding cards in another CPU instance.  In the
-   diagnostic mode, we simulate the attachment of the interprocessor cable
-   between IPLI and IPLO in this machine.
+   In the link mode, the IPLI and IPLO devices are linked via a shared memory
+   region to the corresponding cards in another CPU instance.  If only one or
+   the other device is in the diagnostic mode, we simulate the attachment of a
+   loopback connector to that device.  If both devices are in the diagnostic
+   mode, we simulate the attachment of the interprocessor cable between IPLI and
+   IPLO in this machine.
+
 
    Implementation notes:
 
@@ -329,9 +610,9 @@ DEVICE iplo_dev = {
        a data response to the SP.  This improves the race condition by delaying
        the IOP until the SP has a chance to receive the last word, recognize its
        own DMA input completion, drop out of the SFS loop, and execute the
-       STC/CLC.  The delay, "ipl_edtdelay", is initialized to one millisecond
-       but is exposed via a hidden IPLI register, "EDTDELAY", that allows the
-       user to lengthen the delay if necessary.
+       STC/CLC.  The delay, "edt_delay", is initialized to one millisecond but
+       is exposed via a hidden IPLI register, "EDTDELAY", that allows the user
+       to lengthen the delay if necessary.
 
        The condition is only improved, and not solved, because "sleep"ing the
        IOP doesn't guarantee that the SP will actually execute.  It's possible
@@ -339,37 +620,15 @@ DEVICE iplo_dev = {
        sleep expiration, the SP still has not executed the STC/CLC.  Still, in
        testing, the incidence dropped dramatically, so the problem is much less
        intrusive.
-
-    2. The operating manual for the 12920A Terminal Multiplexer says that "at
-       least 100 milliseconds of CLC 0s must be programmed" by systems employing
-       the multiplexer to ensure that the multiplexer resets.  In practice, such
-       systems issue 128K CLC 0 instructions.  As we provide debug logging of
-       IPL resets, a CRS counter is used to ensure that only one debug line is
-       printed in response to these 128K CRS invocations.
-
-    3. The STC handler may return "Unit not attached", "I/O error", or "No
-       connection on interprocessor link" status if the link fails or is
-       improperly configured.  If the error is corrected, the operation may be
-       retried by resuming simulated execution.
 */
 
-uint32 iplio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
+static uint32 ipl_interface (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-CARD_INDEX card = (CARD_INDEX) dibptr->card_index;      /* set card selector */
-UNIT *const uptr = &(ipl_unit [card]);                  /* associated unit pointer */
 const char *iotype [] = { "Status", "Command" };
-int32 sta;
-char msg [2];
-static uint32 crs_count [CARD_COUNT] = { 0, 0 };        /* per-card cntrs for ioCRS repeat */
+const CARD_INDEX card = (CARD_INDEX) dibptr->card_index;    /* set card selector */
+UNIT *const uptr = &(ipl_unit [card]);                      /* associated unit pointer */
 IOSIGNAL signal;
 IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
-
-if (crs_count [card] && !(signal_set & ioCRS)) {        /* counting CRSes and not present? */
-    tpprintf (dptrs [card], DEB_CMDS, "[CRS] Control cleared %d times\n",
-              crs_count [card]);
-
-    crs_count [card] = 0;                               /* clear counter */
-    }
 
 while (working_set) {
     signal = IONEXT (working_set);                      /* isolate next signal */
@@ -377,13 +636,15 @@ while (working_set) {
     switch (signal) {                                   /* dispatch I/O signal */
 
         case ioCLF:                                     /* clear flag flip-flop */
-            ipl [card].flag = ipl [card].flagbuf = CLEAR;
+            ipl [card].flag    = CLEAR;
+            ipl [card].flagbuf = CLEAR;
             break;
 
 
         case ioSTF:                                     /* set flag flip-flop */
         case ioENF:                                     /* enable flag */
-            ipl [card].flag = ipl [card].flagbuf = SET;
+            ipl [card].flag    = SET;
+            ipl [card].flagbuf = SET;
             break;
 
 
@@ -398,87 +659,68 @@ while (working_set) {
 
 
         case ioIOI:                                     /* I/O data input */
-            stat_data = IORETURN (SCPE_OK, uptr->IBUF); /* get return data */
+            stat_data = IORETURN (SCPE_OK, ipl [card].input_word); /* get return data */
 
-            tpprintf (dptrs [card], DEB_CPU, "[LIx] %s = %06o\n", iotype [card ^ 1], uptr->IBUF);
+            tpprintf (dptrs [card], TRACE_CSRW, "%s input word is %06o\n",
+                      iotype [card ^ 1], ipl [card].input_word);
             break;
 
 
-        case ioIOO:                                     /* I/O data output */
-            uptr->OBUF = IODATA (stat_data);            /* clear supplied status */
+        case ioIOO:                                         /* I/O data output */
+            ipl [card].output_word = IODATA (stat_data);    /* clear supplied status */
 
-            tpprintf (dptrs [card], DEB_CPU, "[OTx] %s = %06o\n", iotype [card], uptr->OBUF);
+            io_ptrs [card].output->data_out = ipl [card].output_word;
+
+            tpprintf (dptrs [card], TRACE_CSRW, "%s output word is %06o\n",
+                      iotype [card], ipl [card].output_word);
             break;
 
 
         case ioPOPIO:                                   /* power-on preset to I/O */
-            ipl [card].flag = ipl [card].flagbuf = SET; /* set flag buffer and flag */
-            uptr->OBUF = 0;                             /* clear output buffer */
+            ipl [card].flag        = SET;               /* set flag buffer and flag */
+            ipl [card].flagbuf     = SET;
+            ipl [card].output_word = 0;                 /* clear output buffer */
+
+            io_ptrs [card].output->data_out = 0;
             break;
 
 
         case ioCRS:                                     /* control reset */
-            if (crs_count [card] == 0)                  /* first reset? */
-                ipl [card].control = CLEAR;             /* clear control */
-
-            crs_count [card] = crs_count [card] + 1;    /* increment count */
-            break;
-
-
         case ioCLC:                                     /* clear control flip-flop */
             ipl [card].control = CLEAR;                 /* clear ctl */
-
-            tpprintf (dptrs [card], DEB_CMDS, "[CLC] Control cleared\n");
             break;
 
 
         case ioSTC:                                     /* set control flip-flop */
-            tpprintf (dptrs [card], DEB_CMDS, "[STC] Control set\n");
+            ipl [card].control = SET;                   /* set ctl */
 
-            if (uptr->flags & UNIT_ATT) {               /* attached? */
-                if (!ipl_check_conn (uptr)) {           /* not established? */
-                    cpu_ioerr_uptr = uptr;              /* save the failing unit */
-                    return IORETURN (STOP_NOCONN, 0);   /* lose */
+            io_ptrs [card].output->device_command_out = TRUE;   /* assert Device Command */
+
+            if (uptr->flags & UNIT_DIAG)                        /* if this card is in the diagnostic mode */
+                if (ipl_unit [card ^ 1].flags & UNIT_DIAG) {    /*   then if both cards are in diagnostic mode */
+                    ipl_unit [card ^ 1].wait = 1;               /*     then schedule the other card */
+                    activate_unit (&ipl_unit [card ^ 1]);       /*       for immediate reception */
                     }
 
-                msg [0] = UPPER_BYTE (uptr->OBUF);
-                msg [1] = LOWER_BYTE (uptr->OBUF);
-                sta = sim_write_sock (uptr->DSOCKET, msg, 2);
-
-                tpprintf (dptrs [card], DEB_XFER, "[STC] Socket write = %06o, status = %d\n",
-                          uptr->OBUF, sta);
-
-                if (sta == SOCKET_ERROR) {              /* if the write fails, report it to the console */
-                    cprintf ("%s simulator processor interconnect socket write error\n",
-                             sim_name);
-                    return IORETURN (SCPE_IOERR, 0);    /*   and stop the simulator with an I/O error */
+                else {                                          /*   otherwise simulate a loopback */
+                    uptr->wait = 1;                             /*     by scheduling this card */
+                    activate_unit (uptr);                       /*       for immediate reception */
                     }
 
-                ipl [card].control = SET;               /* set ctl */
-
-                sim_os_sleep (0);                       /* yield */
-                }
-
-            else if (uptr->flags & UNIT_DIAG) {                     /* diagnostic mode? */
-                ipl [card].control = SET;                           /* set ctl */
-                ipl_unit [card ^ 1].IBUF = uptr->OBUF;              /* output to other */
-                iplio ((DIB *) dptrs [card ^ 1]->ctxt, ioENF, 0);   /* set other flag */
-                }
-
-            else
-                return IORETURN (SCPE_UNATT, 0);                    /* lose */
+            tpprintf (dptrs [card], TRACE_XFER, "Word %06o sent to link\n",
+                      ipl [card].output_word);
             break;
 
 
         case ioEDT:                                     /* end data transfer */
-            if ((cpu_unit.flags & UNIT_IOP) &&          /* are we the IOP? */
-                (signal_set & ioIOO) &&                 /*   and doing output? */
-                (card == ipli)) {                       /*   on the input card? */
+            if (cpu_is_iop                              /* if this is the IOP instance */
+              && signal_set & ioIOO                     /*   and the card is doing output */
+              && card == ipli) {                        /*     on the input card */
 
-                tpprintf (dptrs [card], DEB_CMDS, "[EDT] Delaying DMA completion interrupt for %d msec\n",
-                          ipl_edtdelay);
+                tprintf (ipli_dev, TRACE_CMD, "Delaying DMA completion interrupt for %d msec\n",
+                         edt_delay);
 
-                sim_os_ms_sleep (ipl_edtdelay);         /* delay completion */
+                sim_os_ms_sleep (edt_delay);            /*       then delay DMA completion */
                 }
             break;
 
@@ -508,389 +750,1155 @@ return stat_data;
 
 /* Unit service - poll for input */
 
-t_stat ipl_svc (UNIT *uptr)
+static t_stat card_service (UNIT *uptr)
 {
-CARD_INDEX card;
-int32 nb;
-char msg [2];
+static uint32 delta [CARD_COUNT] = { 0, 0 };                /* per-card accumulated time between receptions */
+const CARD_INDEX card = (CARD_INDEX) (uptr == &iplo_unit);  /* set card selector */
+t_stat status = SCPE_OK;
 
-if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
-    return SCPE_OK;
+tpprintf (dptrs [card], TRACE_PSERV, "Poll delay %d service entered\n",
+          uptr->wait);
 
-sim_activate (uptr, ipl_ptime);                         /* reactivate */
+delta [card] = delta [card] + uptr->wait;               /* update the accumulated time */
 
-if (!ipl_check_conn (uptr))                             /* check for conn */
-    return SCPE_OK;                                     /* not connected */
+if (io_ptrs [card].input->device_flag_in == TRUE) {     /* if the Device Flag is asserted */
+    io_ptrs [card].input->device_flag_in = FALSE;       /*   then clear it */
 
-nb = sim_read_sock (uptr->DSOCKET, msg, ((uptr->flags & UNIT_HOLD)? 1: 2));
+    ipl [card].input_word = io_ptrs [card].input->data_in;  /* read the data input lines */
 
-if (nb < 0) {                                           /* connection closed? */
-    cprintf ("%s simulator processor interconnect socket read error\n",
-             sim_name);
-    return SCPE_IOERR;
+    tpprintf (dptrs [card], TRACE_XFER, "Word %06o delta %u received from link\n",
+              ipl [card].input_word, delta [card]);
+
+    ipl_interface (&ipl_dib [card], ioENF, 0);          /* set the flag */
+
+    io_ptrs [card].output->device_command_out = FALSE;  /* reset Device Command */
+
+    uptr->wait = 1;                                     /* restart polling at the minimum time */
+    delta [card] = 0;                                   /*   and clear the accumulated time */
     }
 
-else if (nb == 0)                                       /* no data? */
-    return SCPE_OK;
+else {                                                  /* otherwise Device Flag is denied */
+    uptr->wait = uptr-> wait * 2;                       /*   so double the wait time for the next check */
 
-card = (CARD_INDEX) (uptr == &iplo_unit);               /* set card selector */
+    if (uptr->wait > poll_wait)                         /* if the new time is greater than the maximum time */
+        uptr->wait = poll_wait;                         /*   then limit it to the maximum */
 
-if (uptr->flags & UNIT_HOLD) {                          /* holdover byte? */
-    uptr->IBUF = (ipl [card].hold << 8) | (((int32) msg [0]) & 0377);
-    uptr->flags = uptr->flags & ~UNIT_HOLD;
+    if (io_ptrs [card].input->cable_connected == FALSE  /* if the interconnecting cable is not present */
+      && cpu_ss_ioerr != SCPE_OK) {                     /*   and the I/O error stop is enabled */
+        cpu_ioerr_uptr = uptr;                          /*     then save the failing unit */
+        status = STOP_NOCONN;                           /*       and report the disconnection */
+        }
     }
-else if (nb == 1) {
-    ipl [card].hold = ((int32) msg [0]) & 0377;
-    uptr->flags = uptr->flags | UNIT_HOLD;
-    }
-else
-    uptr->IBUF = ((((int32) msg [0]) & 0377) << 8) | (((int32) msg [1]) & 0377);
 
-iplio ((DIB *) dptrs [card]->ctxt, ioENF, 0);           /* set flag */
+if (uptr->flags & UNIT_ATT)                             /* if the link is active */
+    activate_unit (uptr);                               /*   then continue to poll for input */
 
-tpprintf (dptrs [card], DEB_XFER, "Socket read = %06o, status = %d\n",
-          uptr->IBUF, nb);
-
-return SCPE_OK;
+return status;                                          /* return the event service status */
 }
 
 
-t_bool ipl_check_conn (UNIT *uptr)
-{
-SOCKET sock;
+/* Reset the IPL.
 
-if (uptr->flags & UNIT_ESTB)                            /* established? */
-    return TRUE;
+   This routine is called for a RESET, RESET IPLI, or RESET IPLO command.  It is
+   the simulation equivalent of the POPIO signal, which is asserted by the front
+   panel PRESET switch.
 
-if (uptr->flags & UNIT_ACTV) {                          /* active connect? */
-    if (sim_check_conn (uptr->DSOCKET, 0) <= 0)
-        return FALSE;
-    }
-
-else {
-    sock = sim_accept_conn (uptr->LSOCKET, NULL);       /* poll connect */
-
-    if (sock == INVALID_SOCKET)                         /* got a live one? */
-        return FALSE;
-
-    uptr->DSOCKET = sock;                               /* save data socket */
-    }
-
-uptr->flags = uptr->flags | UNIT_ESTB;                  /* conn established */
-return TRUE;
-}
-
-
-/* Reset routine.
-
-   Implementation notes:
-
-    1. We set up the first poll for socket connections to occur "immediately"
-       upon execution, so that clients will be connected before execution
-       begins.  Otherwise, a fast program may access the IPL before the poll
-       service routine activates.
+   For a power-on reset, the logical name "IPLI" is assigned to the first
+   processor interconnect card, so that it may referenced either as that name or
+   as "IPL" for use when a SET command affects both interfaces.
 */
 
-t_stat ipl_reset (DEVICE *dptr)
+static t_stat ipl_reset (DEVICE *dptr)
 {
 UNIT *uptr = dptr->units;
 DIB *dibptr = (DIB *) dptr->ctxt;                       /* DIB pointer */
 CARD_INDEX card = (CARD_INDEX) dibptr->card_index;      /* card number */
 
-hp_enbdis_pair (dptr, dptrs [card ^ 1]);                /* make pair cons */
+hp_enbdis_pair (dptr, dptrs [card ^ 1]);                /* ensure that the pair state is consistent */
 
-if (sim_switches & SWMASK ('P'))                        /* initialization reset? */
-    uptr->IBUF = uptr->OBUF = 0;                        /* clr buffers */
+if (sim_switches & SWMASK ('P')) {                      /* initialization reset? */
+    ipl [card].input_word = 0;
+    ipl [card].output_word = 0;
+
+    if (ipli_dev.lname == NULL)                         /* logical name unassigned? */
+        ipli_dev.lname = strdup ("IPLI");               /* allocate and initialize the name */
+    }
 
 IOPRESET (dibptr);                                      /* PRESET device (does not use PON) */
 
-if (uptr->flags & UNIT_ATT)                             /* socket attached? */
-    sim_activate (uptr, POLL_FIRST);                    /* activate first poll "immediately" */
-else
-    sim_cancel (uptr);                                  /* deactivate unit */
+if (uptr->flags & UNIT_ATT) {                           /* if the link is active */
+    uptr->wait = poll_wait;                             /*   then continue to poll for input */
+    activate_unit (uptr);                               /*     at the idle rate */
+    }
 
-uptr->flags = uptr->flags & ~UNIT_HOLD;                 /* clear holding flag */
+else                                                    /* otherwise the link is inactive */
+    sim_cancel (uptr);                                  /*   so stop input polling */
+
 return SCPE_OK;
 }
 
 
-/* Attach routine
+/* Attach one end of the interconnecting cables.
 
-   attach -l - listen for connection on port
-   attach -c - connect to ip address and port
+   This routine connects the IPL device pair to a shared memory region.  This
+   simulates connecting one end of the processor interconnect kit cables to the
+   card pair in this CPU.  The command is:
+
+     ATTACH [ -S | -I ] IPL <code>
+
+   ...where <code> is a user-selected decimal number between 1 and 65535 that
+   uniquely identifies the instance pair to interconnect.  The -S or -I switch
+   indicates whether this instance is acting as the System Processor or the I/O
+   Processor.  The command will be rejected if either device is in diagnostic
+   mode, or if the <code> is omitted, malformed, or out of range.
+
+   For backward compatibility with prior IPL implementations that used network
+   interconnections, the following commands are also accepted:
+
+     ATTACH [ -L ] [ IPLI | IPLO] <port-1>
+     ATTACH   -C   [ IPLI | IPLO] <port-2>
+
+   For these commands, -L or no switch indicates the SP instance, and -C
+   indicates the IOP instance.  <port-1> and <port-2> used to indicate the
+   network port numbers to use, but now it serves only to supply the code
+   number from the lesser of the two values.
+
+   Local memory is allocated to hold the code number string, which serves as the
+   "attached file name" for the SCP SHOW command.  If memory allocation fails,
+   the command is rejected.
+
+   This routine creates a shared memory region and an event (semaphore) that are
+   used to coordinate a data exchange with the other simulator instance.  If -S
+   or -I is specified, then creation occurs after the ATTACH command is given
+   for either the IPLI or IPLO device, and both devices are marked as attached.
+   If -L or -C is specified, then both devices must be attached before creation
+   occurs using the lower port number.
+
+   Two object names that identify the shared memory region and synchronization
+   event are derived from the <code> (or lower <port>) number:
+
+     /HP 2100-MEM-<code>
+     /HP 2100-EVT-<code>
+
+   Each simulator instance must use the same <code> (or <port> pair) when
+   attaching for the interconnection to occur.  This permits multiple instance
+   pairs to operate simultaneously and independently, if desired.
+
+   Once shared memory is allocated, pointers to the region for the SP and IOP
+   instances are set so that the output card pointer of one instance and the
+   input card pointer of the other instance reference the same memory structure.
+   This accomplishes the interconnection, as a write to one instance's card will
+   be seen by a read from the other instance's card.
+
+   If the shared memory allocation succeeds but the process synchronization
+   event creation fails, the routine returns "Command not completed" status to
+   indicate that interconnection without synchronization is permitted.
+
+
+   Implementation notes:
+
+    1. The implementation supports process synchronization only on the local
+       system.
+
+    2. The object names begin with slashes to conform to POSIX requirements to
+       guarantee that multiple instances to refer to the same shared memory
+       region.  Omitting the slash results in implementation-defined behavior on
+       POSIX systems.
 */
 
-t_stat ipl_attach (UNIT *uptr, CONST char *cptr)
+static t_stat ipl_attach (UNIT *uptr, CONST char *cptr)
 {
-SOCKET newsock;
-char *tptr = NULL;
-t_stat r;
+t_stat       status;
+int32        id_number;
+char         object_name [PATH_MAX];
+CONST        char *zptr;
+char         *tptr;
+IO_STATE_PTR isp;
+UNIT         *optr;
 
-#if (SIM_MAJOR >= 4)
+if ((ipli_unit.flags | iplo_unit.flags) & UNIT_DIAG)    /* if either unit is in diagnostic mode */
+    return SCPE_NOFNC;                                  /*   then the command is not allowed */
 
-uint32 i, t;
-char host [CBUFSIZE], port [CBUFSIZE], hostport [2 * CBUFSIZE + 3];
+else if (uptr->flags & UNIT_ATT)                        /* otherwise if the unit is currently attached */
+    ipl_detach (uptr);                                  /*   then detach it first */
 
-t_bool is_active;
+id_number = (int32) strtotv (cptr, &zptr, 10);          /* parse the command for the ID number */
 
-is_active = (uptr->flags & UNIT_ACTV) == UNIT_ACTV;     /* is the connection active? */
+if (cptr == zptr || *zptr != '\0' || id_number == 0)    /* if the parse failed or extra characters or out of range */
+    return SCPE_ARG;                                    /*   then reject the attach with an invalid argument error */
 
-if (uptr->flags & UNIT_ATT)                             /* if IPL is currently attached, */
-    ipl_detach (uptr);                                  /*   detach it first */
+else {                                                  /* otherwise a single number was specified */
+    tptr = (char *) malloc (strlen (cptr) + 1);         /*   so allocate a string buffer to hold the ID */
 
-if ((sim_switches & SWMASK ('C')) ||                    /* connecting? */
-  ((sim_switches & SIM_SW_REST) && is_active)) {        /*   or restoring an active connection? */
-    r = sim_parse_addr (cptr, host,                     /* parse the host and port */
-                        sizeof (host), "localhost",     /*   from the parameter string */
-                        port, sizeof (port),
-                        NULL, NULL);
+    if (tptr == NULL)                                   /* if the allocation failed */
+        return SCPE_MEM;                                /*   then reject the attach with an out-of-memory error */
 
-    if ((r != SCPE_OK) || (port [0] == '\0'))           /* parse error or missing port number? */
-        return SCPE_ARG;                                /* complain to the user */
+    else {                                              /* otherwise */
+        strcpy (tptr, cptr);                            /*   copy the ID number to the buffer */
+        uptr->filename = tptr;                          /*     and assign it as the attached object name */
 
-    sprintf(hostport, "%s%s%s%s%s", strchr(host, ':') ? "[" : "", host, strchr(host, ':') ? "]" : "", host [0] ? ":" : "", port);
+        uptr->flags |= UNIT_ATT;                        /* set the unit attached flag */
+        uptr->ID = id_number;                           /*   and save the ID number */
 
-    newsock = sim_connect_sock (hostport, NULL, NULL);
+        uptr->wait = poll_wait;                         /* set up the initial poll time */
+        activate_unit (uptr);                           /*   and activate the unit to poll */
+        }
 
-    if (newsock == INVALID_SOCKET)
-        return SCPE_IOERR;
+    if ((sim_switches & (SP | IOP)) == 0)               /* if this is not a single-device attach */
+        if (ipli_unit.ID == 0 || iplo_unit.ID == 0)     /*   then if both devices have not been attached yet */
+            return SCPE_OK;                             /*     then we've done all we can do */
 
-    cprintf ("Connecting to %s\n", hostport);
+        else if (ipli_unit.ID < iplo_unit.ID)           /*   otherwise */
+            id_number = ipli_unit.ID;                   /*     determine */
+        else                                            /*       the lower */
+            id_number = iplo_unit.ID;                   /*         ID number */
 
-    uptr->flags = uptr->flags | UNIT_ACTV;
-    uptr->LSOCKET = 0;
-    uptr->DSOCKET = newsock;
+    else {                                              /* otherwise this is a single-device attach */
+        if (uptr == &ipli_unit)                         /*   so if we are attaching the input unit */
+            optr = &iplo_unit;                          /*     then point at the output unit */
+        else                                            /*   otherwise we are attaching the output unit */
+            optr = &ipli_unit;                          /*     so point at the input unit */
+
+        optr->filename = tptr;                          /* assign the ID as the attached object name */
+
+        optr->flags |= UNIT_ATT;                        /* set the unit attached flag */
+        optr->ID = id_number;                           /*   and save the ID number */
+
+        optr->wait = poll_wait;                         /* set up the initial poll time */
+        activate_unit (optr);                           /*   and activate the unit to poll */
+        }
+
+    sprintf (object_name, "/%s-MEM-%d",                 /* generate the shared memory area name */
+             sim_name, id_number);
+
+    status = sim_shmem_open (object_name, sizeof dev_bus,   /* allocate the shared memory area */
+                             &memory_region, (void **) &isp);
+
+    if (status != SCPE_OK) {                                    /* if the allocation failed */
+        ipl_detach (uptr);                                      /*   then detach this unit */
+        return status;                                          /*     and report the error */
+        }
+
+    else {                                                      /* otherwise */
+        cpu_is_iop = ((sim_switches & (CONNECT | IOP)) != 0);   /*   -C or -I imply that this is the I/O Processor */
+
+        if (cpu_is_iop) {                                       /* if this is the IOP instance */
+            io_ptrs [ipli].input  = &isp [iplo].reverse.input;  /*   then cross-connect */
+            io_ptrs [ipli].output = &isp [iplo].reverse.output; /*     the input and output */
+            io_ptrs [iplo].input  = &isp [ipli].reverse.input;  /*       interface cards to the */
+            io_ptrs [iplo].output = &isp [ipli].reverse.output; /*         SP interface cards */
+            }
+
+        else {                                                  /* otherwise this is the SP instance */
+            io_ptrs [ipli].input  = &isp [ipli].forward.input;  /*   so connect */
+            io_ptrs [ipli].output = &isp [ipli].forward.output; /*     the interface cards */
+            io_ptrs [iplo].input  = &isp [iplo].forward.input;  /*       to the I/O cables */
+            io_ptrs [iplo].output = &isp [iplo].forward.output; /*         directly */
+            }
+
+        io_ptrs [ipli].output->cable_connected = TRUE;          /* indicate that the cables */
+        io_ptrs [iplo].output->cable_connected = TRUE;          /*   have been connected */
+        }
+
+    sprintf (event_name, "/%s-EVT-%d",                  /* generate the process synchronization event name */
+             sim_name, id_number);
+
+    event_error = create_event (event_name, &event_id); /* create the event */
+
+    if (event_error == 0)                               /* if event creation succeeded */
+        return SCPE_OK;                                 /*   then report a successful attach */
+    else                                                /* otherwise */
+        return SCPE_INCOMP;                             /*   report that the command did not complete */
+    }
+}
+
+
+/* Detach the interconnecting cables.
+
+   This routine disconnects the IPL device pair from the shared memory region.
+   This simulates disconnecting the processor interconnect kit cables from the
+   card pair in this CPU.  The command is:
+
+     DETACH IPL
+
+   For backward compatibility with prior IPL implementations that used network
+   interconnections, the following commands are also accepted:
+
+     DETACH IPLI
+     DETACH IPLO
+
+   In either case, the shared memory region and process synchronization event
+   are destroyed, and the card state pointers are reset to point at the local
+   memory structure.  If a single ATTACH was done, a single DETACH will detach
+   both devices and free the allocated "file name" memory.  The input poll is
+   also stopped.
+
+   If the event destruction failed, the routine returns "Command not completed"
+   status to indicate that the error code register should be checked.
+*/
+
+static t_stat ipl_detach (UNIT *uptr)
+{
+UNIT *optr;
+
+if ((uptr->flags & UNIT_ATT) == 0)                      /* if the unit is not attached */
+    if (sim_switches & SIM_SW_REST)                     /*   then if this is a restoration call */
+        return SCPE_OK;                                 /*     then return success */
+    else                                                /*   otherwise this is a manual request */
+        return SCPE_UNATT;                              /*     so complain that the unit is not attached */
+
+if (ipli_unit.filename == iplo_unit.filename) {         /* if both units are attached to the same object */
+    if (uptr == &ipli_unit)                             /*   then if we are detaching the input unit */
+        optr = &iplo_unit;                              /*     then point at the output unit */
+    else                                                /*   otherwise we are detaching the output unit */
+        optr = &ipli_unit;                              /*     so point at the input unit */
+
+    optr->filename = NULL;                              /* clear the other unit's attached object name */
+
+    optr->flags &= ~UNIT_ATT;                           /* clear the other unit's attached flag */
+    optr->ID = 0;                                       /*   and the ID number */
+
+    sim_cancel (optr);                                  /* cancel the other unit's poll */
     }
 
-else {
-    if (sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), NULL, NULL))
-        return SCPE_ARG;
-    sprintf(hostport, "%s%s%s%s%s", strchr(host, ':') ? "[" : "", host, strchr(host, ':') ? "]" : "", host [0] ? ":" : "", port);
-    newsock = sim_master_sock (hostport, &r);
-    if (r != SCPE_OK)
-        return r;
-    if (newsock == INVALID_SOCKET)
-        return SCPE_IOERR;
-    cprintf ("Listening on port %s\n", hostport);
-    uptr->flags = uptr->flags & ~UNIT_ACTV;
-    uptr->LSOCKET = newsock;
-    uptr->DSOCKET = 0;
+free (uptr->filename);                                  /* free the memory holding the ID number */
+uptr->filename = NULL;                                  /*   and clear the attached object name */
+
+uptr->flags &= ~UNIT_ATT;                               /* clear the unit attached flag */
+uptr->ID = 0;                                           /*   and the ID number */
+
+sim_cancel (uptr);                                      /* cancel the poll */
+
+io_ptrs [ipli].output->cable_connected = FALSE;         /* disconnect the cables */
+io_ptrs [iplo].output->cable_connected = FALSE;         /*   from both cards */
+
+io_ptrs [ipli].input  = &dev_bus [ipli].forward.input;  /* restore local control */
+io_ptrs [ipli].output = &dev_bus [ipli].forward.output; /*   over the I/O state */
+io_ptrs [iplo].input  = &dev_bus [iplo].forward.input;  /*     for both cards */
+io_ptrs [iplo].output = &dev_bus [iplo].forward.output;
+
+sim_shmem_close (memory_region);                        /* deallocate the shared memory region */
+memory_region = NULL;                                   /*   and clear the region pointer */
+
+event_error = destroy_event (event_name, &event_id);    /* destroy the event */
+
+if (event_error == 0)                                   /* if the destruction succeeded */
+    return SCPE_OK;                                     /*   then report success */
+else                                                    /* otherwise */
+    return SCPE_INCOMP;                                 /*   report that the command did not complete */
+}
+
+
+/* Set the diagnostic or link mode.
+
+   This validation routine is entered with the "value" parameter set to zero if
+   the unit is to be set into the link (normal) mode or non-zero if the unit is
+   to be set into the diagnostic mode.  The character and descriptor pointers
+   are not used.
+
+   In addition to setting or clearing the UNIT_DIAG flag, the I/O state pointers
+   are set to point at the appropriate state structure.  The selected pointer
+   configuration depends on whether none, one, or both the IPLI and IPLO devices
+   are in diagnostic mode.
+
+   If both devices are in diagnostic mode, the pointers are set to point at
+   their respective state structures but with the input and output pointers
+   reversed.  This simulates connecting one of the interprocessor cables between
+   the two cards within the same CPU, permitting the Processor Interconnect
+   Cable Diagnostic to be run.
+
+   If only one of the devices is in diagnostic mode, the pointers are set to
+   point at the device's state structure with the input and output pointers
+   reversed.  This simulates connected a loopback connector to the card,
+   permitting the General Register Diagnostic to be run.
+
+   If a device is in link mode, that device's pointers are set to point at the
+   corresponding parts of the device's state structure.  This simulates a card
+   with no cable connected.
+
+   If the device is attached, setting it into diagnostic mode will detach it
+   first.
+*/
+
+static t_stat ipl_set_diag (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+{
+if (value) {                                            /* if this is an entry into diagnostic mode */
+    ipl_detach (uptr);                                  /*   then detach it first */
+    uptr->flags |= UNIT_DIAG;                           /*     before setting the flag */
     }
-uptr->IBUF = uptr->OBUF = 0;
-uptr->flags = (uptr->flags | UNIT_ATT) & ~(UNIT_ESTB | UNIT_HOLD);
-tptr = (char *) malloc (strlen (hostport) + 1);         /* get string buf */
-if (tptr == NULL) {                                     /* no memory? */
-    ipl_detach (uptr);                                  /* close sockets */
-    return SCPE_MEM;
+
+else                                                    /* otherwise this is an entry into link mode */
+    uptr->flags &= ~UNIT_DIAG;                          /*   so clear the flag */
+
+if (ipli_unit.flags & iplo_unit.flags & UNIT_DIAG) {        /* if both devices are now in diagnostic mode */
+    io_ptrs [ipli].input  = &dev_bus [iplo].reverse.input;  /*   then connect the cable */
+    io_ptrs [ipli].output = &dev_bus [ipli].forward.output; /*     so that the outputs of one card */
+    io_ptrs [iplo].input  = &dev_bus [ipli].reverse.input;  /*       are connected to the inputs of the other card */
+    io_ptrs [iplo].output = &dev_bus [iplo].forward.output; /*         and vice versa */
+
+    io_ptrs [ipli].output->cable_connected = TRUE;          /* indicate that the cable */
+    io_ptrs [iplo].output->cable_connected = TRUE;          /*   has been connected between the cards */
     }
-strcpy (tptr, hostport);                                /* copy ipaddr:port */
+
+else {                                                          /* otherwise */
+    if (ipli_unit.flags & UNIT_DIAG) {                          /*   if the input card is in diagnostic mode */
+        io_ptrs [ipli].input  = &dev_bus [ipli].reverse.input;  /*     then loop the card outputs */
+        io_ptrs [ipli].output = &dev_bus [ipli].forward.output; /*       back to the inputs and vice versa */
+        io_ptrs [ipli].output->cable_connected = TRUE;          /*         and indicate that the card is connected */
+        }
+
+    else {                                                      /*   otherwise the card is in link mode */
+        io_ptrs [ipli].input  = &dev_bus [ipli].forward.input;  /*     so point at the card state */
+        io_ptrs [ipli].output = &dev_bus [ipli].forward.output; /*       in the normal direction */
+        io_ptrs [ipli].output->cable_connected = FALSE;         /*         and indicate that the card is not connected */
+        }
+
+    if (iplo_unit.flags & UNIT_DIAG) {                          /* otherwise */
+        io_ptrs [iplo].input  = &dev_bus [iplo].reverse.input;  /*   if the output card is in diagnostic mode */
+        io_ptrs [iplo].output = &dev_bus [iplo].forward.output; /*     then loop the card outputs */
+        io_ptrs [iplo].output->cable_connected = TRUE;          /*       back to the inputs and vice versa */
+        }                                                       /*         and indicate that the card is connected */
+
+    else {
+        io_ptrs [iplo].input  = &dev_bus [iplo].forward.input;  /*   otherwise the card is in link mode */
+        io_ptrs [iplo].output = &dev_bus [iplo].forward.output; /*     so point at the card state */
+        io_ptrs [iplo].output->cable_connected = FALSE;         /*       in the normal direction */
+        }                                                       /*         and indicate that the card is not connected */
+    }
+
+return SCPE_OK;
+}
+
+
+/* Synchronize the simulator instance.
+
+   This validation routine is entered with the "value" parameter set to zero to
+   wait on the synchronization event or non-zero to signal the synchronization
+   event.  The unit, character, and descriptor pointers are not used.
+
+   This routine is called for the following commands:
+
+     SET IPLI WAIT
+     SET IPLI SIGNAL
+
+   If the event object has not been created yet by attaching the IPL device, the
+   routine returns "Command not allowed" status.  For either command, the
+   routine returns "Command not completed" if the signal or wait function
+   returned an error to indicate that the error code register should be checked.
+
+   To permit the user to abort the wait command, a CTRL+C handler is installed,
+   and waits of one second each are performed in a loop.  The handler will set
+   the "wait_aborted" variable TRUE if it is called, and the loop then will
+   terminate and return with success status.
+
+
+   Implementation notes:
+
+    1. The "wait_event" routine returns TRUE if the event is signaled and FALSE
+       if it times out while waiting.
+*/
+
+static t_stat ipl_set_sync (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+{
+const uint32 wait_time = 1000;                          /* the wait time in milliseconds */
+t_bool signaled;
+
+if (event_is_undefined (event_id))                      /* if the event has not been defined yet */
+    return SCPE_NOFNC;                                  /*   then the command is not allowed */
+
+if (value) {                                            /* if this is a SIGNAL command */
+    event_error = signal_event (event_id);              /*   then signal the event */
+
+    if (event_error == 0)                               /* if signaling succeeded */
+        return SCPE_OK;                                 /*     then report command success */
+    else                                                /*   otherwise */
+        return SCPE_INCOMP;                             /*     report that the command did not complete */
+    }
+
+else {                                                  /* otherwise it's a WAIT command */
+    wait_aborted = FALSE;                               /* clear the abort flag */
+    signal (SIGINT, abort_handler);                     /*   and set up the CTRL+C handler */
+
+    do
+        event_error = wait_event (event_id, wait_time,      /* wait for the event */
+                                  &signaled);               /*   to be signaled */
+    while (! (event_error || wait_aborted || signaled));    /*     unless an error or user abort occurs */
+
+    signal (SIGINT, SIG_DFL);                           /* restore the default CTRL+C handler */
+
+    if (event_error == 0)                               /* if the wait function succeeded */
+        return SCPE_OK;                                 /*   then report command success */
+    else                                                /* otherwise */
+        return SCPE_INCOMP;                             /*   report that the command did not complete */
+    }
+}
+
+
+/* Handler for the CTRL+C signal.
+
+   This handler is installed while waiting for a synchronization event.  It is
+   called if the user presses CTRL+C to abort the wait command.
+*/
+
+static void abort_handler (int signal)
+{
+wait_aborted = TRUE;                                    /* the user has aborted the event wait */
+return;
+}
+
+
+/* Activate a unit.
+
+   The specified unit is added to the event queue with the delay specified by
+   the unit wait field.
+
+
+   Implementation notes:
+
+    1. This routine may be called with wait = 0, which will expire immediately
+       and enter the service routine with the next sim_process_event call.
+       Activation is required in this case to allow the service routine to
+       return an error code to stop the simulation.  If the service routine was
+       called directly, any returned error would be lost.
+*/
+
+static void activate_unit (UNIT *uptr)
+{
+const CARD_INDEX card = (CARD_INDEX) (uptr == &iplo_unit);  /* set card selector */
+
+tpprintf (dptrs [card], TRACE_PSERV, "Poll delay %u service scheduled\n",
+          uptr->wait);
+
+sim_activate (uptr, uptr->wait);                        /* activate the unit with the specified wait */
+
+return;
+}
+
+
+/* Processor interconnect bootstrap loaders (special BBL and 12992K).
+
+   The special Basic Binary Loader (BBL) used by the 2000 Access system loads
+   absolute binary programs into memory from either the processor interconnect
+   interface or the paper tape reader interface.  Two program entry points are
+   provided.  Starting the loader at address x7700 loads from the processor
+   interconnect, while starting at address x7750 loads from the paper tape
+   reader.  The S register setting does not affect loader operation.
+
+   For a 2100/14/15/16 CPU, entering a LOAD IPLI or BOOT IPLI command loads the
+   special BBL into memory and executes the processor interconnect portion
+   starting at x7700.  Loader execution ends with one of the following halt
+   instructions:
+
+     * HLT 11 - a checksum error occurred; A/B = the calculated/tape value.
+     * HLT 55 - the program load address would overlay the loader.
+     * HLT 77 - the end of input with successful read; A = the paper tape select
+                code, B = the processor interconnect select code.
+
+   The 12992K boot loader ROM reads an absolute program from the processor
+   interconnect or paper tape interfaces into memory.  The S register setting
+   does not affect loader operation.  Loader execution ends with one of the
+   following halt instructions:
+
+     * HLT 11 - a checksum error occurred; A/B = the calculated/tape value.
+     * HLT 55 - the program load address would overlay the ROM loader.
+     * HLT 77 - the end of tape was reached with a successful read.
+
+
+   Implementation notes:
+
+    1. After the BMDL has been loaded into memory, the paper tape portion may be
+       executed manually by setting the P register to the starting address
+       (x7750).
+
+    2. For compatibility with the "cpu_copy_loader" routine, the BBL device I/O
+       instructions address select code 10.
+
+    3. For 2000B, C, and F versions that use dual CPUs, the I/O Processor is
+       loaded with the standard BBL configured for the select codes of the
+       processor interconnect interface.  2000 Access must use the special BBL
+       because the paper tape reader is connected to the IOP in this version; in
+       prior versions, it was connected to the System Processor and could use
+       the paper-tape portion of the BMDL that was installed in the SP.
+*/
+
+static const LOADER_ARRAY ipl_loaders = {
+    {                               /* HP 21xx 2000/Access special Basic Binary Loader */
+      000,                          /*   loader starting index */
+      IBL_NA,                       /*   DMA index */
+      073,                          /*   FWA index */
+      { 0163774,                    /*   77700:  PI    LDA 77774,I               Processor Interconnect start */
+        0027751,                    /*   77701:        JMP 77751                 */
+        0107700,                    /*   77702:  START CLC 0,C                   */
+        0002702,                    /*   77703:        CLA,CCE,SZA               */
+        0063772,                    /*   77704:        LDA 77772                 */
+        0002307,                    /*   77705:        CCE,INA,SZA,RSS           */
+        0027760,                    /*   77706:        JMP 77760                 */
+        0017736,                    /*   77707:        JSB 77736                 */
+        0007307,                    /*   77710:        CMB,CCE,INB,SZB,RSS       */
+        0027705,                    /*   77711:        JMP 77705                 */
+        0077770,                    /*   77712:        STB 77770                 */
+        0017736,                    /*   77713:        JSB 77736                 */
+        0017736,                    /*   77714:        JSB 77736                 */
+        0074000,                    /*   77715:        STB 0                     */
+        0077771,                    /*   77716:        STB 77771                 */
+        0067771,                    /*   77717:        LDB 77771                 */
+        0047773,                    /*   77720:        ADB 77773                 */
+        0002040,                    /*   77721:        SEZ                       */
+        0102055,                    /*   77722:        HLT 55                    */
+        0017736,                    /*   77723:        JSB 77736                 */
+        0040001,                    /*   77724:        ADA 1                     */
+        0177771,                    /*   77725:        STB 77771,I               */
+        0037771,                    /*   77726:        ISZ 77771                 */
+        0000040,                    /*   77727:        CLE                       */
+        0037770,                    /*   77730:        ISZ 77770                 */
+        0027717,                    /*   77731:        JMP 77717                 */
+        0017736,                    /*   77732:        JSB 77736                 */
+        0054000,                    /*   77733:        CPB 0                     */
+        0027704,                    /*   77734:        JMP 77704                 */
+        0102011,                    /*   77735:        HLT 11                    */
+        0000000,                    /*   77736:        NOP                       */
+        0006600,                    /*   77737:        CLB,CME                   */
+        0103700,                    /*   77740:        STC 0,C                   */
+        0102300,                    /*   77741:        SFS 0                     */
+        0027741,                    /*   77742:        JMP 77741                 */
+        0106400,                    /*   77743:        MIB 0                     */
+        0002041,                    /*   77744:        SEZ,RSS                   */
+        0127736,                    /*   77745:        JMP 77736,I               */
+        0005767,                    /*   77746:        BLF,CLE,BLF               */
+        0027740,                    /*   77747:        JMP 77740                 */
+        0163775,                    /*   77750:  PTAPE LDA 77775,I               Paper tape start */
+        0043765,                    /*   77751:  CONFG ADA 77765                 */
+        0073741,                    /*   77752:        STA 77741                 */
+        0043766,                    /*   77753:        ADA 77766                 */
+        0073740,                    /*   77754:        STA 77740                 */
+        0043767,                    /*   77755:        ADA 77767                 */
+        0073743,                    /*   77756:        STA 77743                 */
+        0027702,                    /*   77757:  EOT   JMP 77702                 */
+        0063777,                    /*   77760:        LDA 77777                 */
+        0067776,                    /*   77761:        LDB 77776                 */
+        0102077,                    /*   77762:        HLT 77                    */
+        0027702,                    /*   77763:        JMP 77702                 */
+        0000000,                    /*   77764:        NOP                       */
+        0102300,                    /*   77765:        SFS 0                     */
+        0001400,                    /*   77766:        OCT 1400                  */
+        0002500,                    /*   77767:        OCT 2500                  */
+        0000000,                    /*   77770:        OCT 0                     */
+        0000000,                    /*   77771:        OCT 0                     */
+        0177746,                    /*   77772:        DEC -26                   */
+        0100100,                    /*   77773:        ABS -PI                   */
+        0077776,                    /*   77774:        DEF *+2                   */
+        0077777,                    /*   77775:        DEF *+2                   */
+        0000010,                    /*   77776:  PISC  OCT 10                    */
+        0000010 } },                /*   77777:  PTRSC OCT 10                    */
+
+    {                               /* HP 1000 Loader ROM (12992K) */
+      IBL_START,                    /*   loader starting index */
+      IBL_DMA,                      /*   DMA index */
+      IBL_FWA,                      /*   FWA index */
+      { 0107700,                    /*   77700:  ST    CLC 0,C            ; intr off */
+        0002401,                    /*   77701:        CLA,RSS            ; skip in */
+        0063756,                    /*   77702:  CN    LDA M11            ; feed frame */
+        0006700,                    /*   77703:        CLB,CCE            ; set E to rd byte */
+        0017742,                    /*   77704:        JSB READ           ; get #char */
+        0007306,                    /*   77705:        CMB,CCE,INB,SZB    ; 2's comp */
+        0027713,                    /*   77706:        JMP *+5            ; non-zero byte */
+        0002006,                    /*   77707:        INA,SZA            ; feed frame ctr */
+        0027703,                    /*   77710:        JMP *-3            */
+        0102077,                    /*   77711:        HLT 77B            ; stop */
+        0027700,                    /*   77712:        JMP ST             ; next */
+        0077754,                    /*   77713:        STA WC             ; word in rec */
+        0017742,                    /*   77714:        JSB READ           ; get feed frame */
+        0017742,                    /*   77715:        JSB READ           ; get address */
+        0074000,                    /*   77716:        STB 0              ; init csum */
+        0077755,                    /*   77717:        STB AD             ; save addr */
+        0067755,                    /*   77720:  CK    LDB AD             ; check addr */
+        0047777,                    /*   77721:        ADB MAXAD          ; below loader */
+        0002040,                    /*   77722:        SEZ                ; E =0 => OK */
+        0027740,                    /*   77723:        JMP H55            */
+        0017742,                    /*   77724:        JSB READ           ; get word */
+        0040001,                    /*   77725:        ADA 1              ; cont checksum */
+        0177755,                    /*   77726:        STA AD,I           ; store word */
+        0037755,                    /*   77727:        ISZ AD             */
+        0000040,                    /*   77730:        CLE                ; force wd read */
+        0037754,                    /*   77731:        ISZ WC             ; block done? */
+        0027720,                    /*   77732:        JMP CK             ; no */
+        0017742,                    /*   77733:        JSB READ           ; get checksum */
+        0054000,                    /*   77734:        CPB 0              ; ok? */
+        0027702,                    /*   77735:        JMP CN             ; next block */
+        0102011,                    /*   77736:        HLT 11             ; bad csum */
+        0027700,                    /*   77737:        JMP ST             ; next */
+        0102055,                    /*   77740:  H55   HLT 55             ; bad address */
+        0027700,                    /*   77741:        JMP ST             ; next */
+        0000000,                    /*   77742:  RD    NOP                */
+        0006600,                    /*   77743:        CLB,CME            ; E reg byte ptr */
+        0103710,                    /*   77744:        STC RDR,C          ; start reader */
+        0102310,                    /*   77745:        SFS RDR            ; wait */
+        0027745,                    /*   77746:        JMP *-1            */
+        0106410,                    /*   77747:        MIB RDR            ; get byte */
+        0002041,                    /*   77750:        SEZ,RSS            ; E set? */
+        0127742,                    /*   77751:        JMP RD,I           ; no, done */
+        0005767,                    /*   77752:        BLF,CLE,BLF        ; shift byte */
+        0027744,                    /*   77753:        JMP RD+2           ; again */
+        0000000,                    /*   77754:  WC    000000             ; word count */
+        0000000,                    /*   77755:  AD    000000             ; address */
+        0177765,                    /*   77756:  M11   DEC -11            ; feed count */
+        0000000,                    /*   77757:        NOP                */
+        0000000,                    /*   77760:        NOP                */
+        0000000,                    /*   77761:        NOP                */
+        0000000,                    /*   77762:        NOP                */
+        0000000,                    /*   77763:        NOP                */
+        0000000,                    /*   77764:        NOP                */
+        0000000,                    /*   77765:        NOP                */
+        0000000,                    /*   77766:        NOP                */
+        0000000,                    /*   77767:        NOP                */
+        0000000,                    /*   77770:        NOP                */
+        0000000,                    /*   77771:        NOP                */
+        0000000,                    /*   77772:        NOP                */
+        0000000,                    /*   77773:        NOP                */
+        0000000,                    /*   77774:        NOP                */
+        0000000,                    /*   77775:        NOP                */
+        0000000,                    /*   77776:        NOP                */
+        0100100 } }                 /*   77777:  MAXAD ABS -ST            ; max addr */
+    };
+
+
+/* Device boot routine.
+
+   This routine is called directly by the BOOT IPLI and LOAD IPLI commands to
+   copy the device bootstrap into the upper 64 words of the logical address
+   space.  It is also called indirectly by a BOOT CPU or LOAD CPU command when
+   the specified HP 1000 loader ROM socket contains a 12992K ROM.
+
+   When called in response to a BOOT IPLI or LOAD IPLI command, the "unitno"
+   parameter indicates the unit number specified in the BOOT command or is zero
+   for the LOAD command, and "dptr" points at the IPLI device structure.
+   Depending on the current CPU model, the special BBL or 12992K loader ROM will
+   be copied into memory and configured for the IPLI select code.  If the CPU is
+   a 1000, the S register will be set as it would be by the front-panel
+   microcode.
+
+   When called for a BOOT/LOAD CPU command, the "unitno" parameter indicates the
+   select code to be used for configuration, and "dptr" will be NULL.  As above,
+   the special BBL or 12992K loader ROM will be copied into memory and
+   configured for the specified select code.  The S register is assumed to be
+   set correctly on entry and is not modified.
+
+   For the 12992K boot loader ROM, the S register will be set as follows:
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | ROM # | 0   0 |   IPLI select code    | 0   0   0   0   0   0 |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+*/
+
+static t_stat ipl_boot (int32 unitno, DEVICE *dptr)
+{
+static const HP_WORD ipl_ptx = 074u;                    /* the index of the pointer to the IPL select code */
+static const HP_WORD ptr_ptx = 075u;                    /* the index of the pointer to the PTR select code */
+static const HP_WORD ipl_scx = 076u;                    /* the index of the IPL select code */
+static const HP_WORD ptr_scx = 077u;                    /* the index of the PTR select code */
+t_stat status;
+uint32 ptr_sc, ipl_sc;
+DEVICE *ptr_dptr;
+
+ptr_dptr = find_dev ("PTR");                            /* get a pointer to the paper tape reader device */
+
+if (ptr_dptr == NULL)                                   /* if the paper tape device is not present */
+    return SCPE_IERR;                                   /*   then something is seriously wrong */
+else                                                    /* otherwise */
+    ptr_sc = ((DIB *) ptr_dptr->ctxt)->select_code;     /*   get the select code from the device's DIB */
+
+if (dptr == NULL)                                       /* if we are being called for a BOOT/LOAD CPU command */
+    ipl_sc = (uint32) unitno;                           /*   then get the select code from the "unitno" parameter */
+else                                                    /* otherwise */
+    ipl_sc = ipli_dib.select_code;                      /*   use the device select code from the DIB */
+
+status = cpu_copy_loader (ipl_loaders, ipl_sc,          /* copy the boot loader to memory */
+                          IBL_S_NOCLEAR, IBL_S_NOSET);  /*   but do not alter the S register */
+
+if (status == SCPE_OK && mem_examine (PR + ptr_scx) <= MAXDEV) {    /* if the copy succeeded and is the special BBL */
+    mem_deposit (PR + ipl_ptx, (HP_WORD) PR + ipl_scx);             /*   then configure */
+    mem_deposit (PR + ptr_ptx, (HP_WORD) PR + ptr_scx);             /*     the pointers */
+    mem_deposit (PR + ipl_scx, (HP_WORD) ipli_dib.select_code);     /*       and select codes */
+    mem_deposit (PR + ptr_scx, (HP_WORD) ptr_sc);                   /*         for the loader */
+    }
+
+return status;                                          /* return the result of the boot configuration */
+}
+
+
+
+/* Process synchronization functions */
+
+
+
+#if defined (_WIN32)
+
+/* Windows process synchronization */
+
+
+/* Create a synchronization event.
+
+   This routine creates a synchronization event using the supplied name and
+   returns the event handle to the caller.  If creation succeeds, the routine
+   returns 0.  Otherwise, the error value is returned.
+
+   The event is created with these attributes: no security, automatic reset, and
+   initially non-signaled.
+*/
+
+static uint32 create_event (const char *name, EVENT *event)
+{
+*event = CreateEvent (NULL, FALSE, FALSE, name);      /* create an auto-reset, initially not-signaled event */
+
+tprintf (ipli_dev, TRACE_CMD, "Created event %p with identifier \"%s\"\n",
+         (void *) *event, name);
+
+if (*event == NULL)                                     /* if event creation failed */
+    return (uint32) GetLastError ();                    /*   then return the error code */
+else                                                    /* otherwise the creation succeeded */
+    return 0;                                           /*   so return success */
+}
+
+
+/* Destroy a synchronization event.
+
+   This routine destroys the synchronization event specified by the supplied
+   event handle.  If destruction succeeds, the event handle is invalidated, and
+   the routine returns 0.  Otherwise, the error value is returned.
+
+   The event name parameter is not used but is present for interoperability.
+*/
+
+static uint32 destroy_event (const char *name, EVENT *event)
+{
+BOOL status;
+
+if (*event == NULL)                                     /* if the event does not exist */
+    return 0;                                           /*   then indicate that it has already been destroyed */
+
+else {                                                  /* otherwise the event exists */
+    status = CloseHandle (*event);                      /*   so close it */
+    *event = NULL;                                      /*     and clear the event handle */
+
+    if (status == FALSE)                                /* if the close failed */
+        return (uint32) GetLastError ();                /*   then return the error code */
+    else                                                /* otherwise the close succeeded */
+        return 0;                                       /*   so return success */
+    }
+}
+
+
+/* Test if the synchronization event exists.
+
+   This routine returns TRUE if the supplied event handle does not exist and
+   FALSE if the handle refers to a defined event.
+*/
+
+static t_bool event_is_undefined (EVENT event)
+{
+return (event == NULL);                                 /* return TRUE if the event does not exist */
+}
+
+
+/* Wait for a synchronization event.
+
+   This routine waits for a synchronization event to be signaled or for the
+   supplied maximum wait time to elapse.  If the event identified by the
+   supplied handle is signaled, the routine returns 0 and sets the "signaled"
+   flag to TRUE.  If the timeout expires without the event being signaled, the
+   routine returns 0 with the "signaled" flag set to FALSE.  If the event wait
+   fails, the routine returns the error value.
+
+
+   Implementation notes:
+
+    1. The maximum wait time may be zero to test the signaled state and return
+       immediately, or may be set to "INFINITE" to wait forever.  The latter is
+       not recommended, as it provides the user with no means to cancel the wait
+       and return to the SCP prompt.
+*/
+
+static uint32 wait_event (EVENT event, uint32 wait_in_ms, t_bool *signaled)
+{
+const DWORD wait_time = (DWORD) wait_in_ms;             /* interval wait time in milliseconds */
+DWORD status;
+
+status = WaitForSingleObject (event, wait_time);        /* wait for the event, but not forever */
+
+tprintf (ipli_dev, TRACE_CMD, "Wait status is %lu\n", status);
+
+if (status == WAIT_FAILED)                              /* if the wait failed */
+    return (uint32) GetLastError ();                    /*   then return the error code */
+
+else {                                                  /* otherwise the wait completed */
+    *signaled = (status != WAIT_TIMEOUT);               /*   so set the flag TRUE if the wait did not time out */
+    return 0;                                           /*     and return success */
+    }
+}
+
+
+/* Signal the synchronization event.
+
+   This routine signals a the synchronization event specified by the supplied
+   event handle.  If signaling succeeds, the routine returns 0.  Otherwise, the
+   error value is returned.
+*/
+
+static uint32 signal_event (EVENT event)
+{
+BOOL status;
+
+status = SetEvent (event);                              /* signal the event */
+
+if (status == FALSE)                                    /* if the call failed */
+    return (uint32) GetLastError ();                    /*   then return the error code */
+else                                                    /* otherwise the signal succeeded */
+    return 0;                                           /*   so return success */
+}
+
+
+
+#elif defined (HAVE_SEMAPHORE)
+
+/* UNIX process synchronization */
+
+
+/* Create the synchronization event.
+
+   This routine creates a synchronization event using the supplied name and
+   returns an event object  to the caller.  If creation succeeds, the routine
+   returns 0.  Otherwise, the error value is returned.
+
+   Systems that define the semaphore functions but implement them as stubs will
+   return ENOSYS.  We handle this case by enabling fallback to the unimplemented
+   behavior, i.e., emulating a process wait by a two-second sleep.  All other
+   error returns are reported back to the caller.
+
+   Regarding the choice of event name, the Single Unix Standard says:
+
+     If [the] name begins with the <slash> character, then processes calling
+     sem_open() with the same value of name shall refer to the same semaphore
+     object, as long as that name has not been removed. If name does not begin
+     with the <slash> character, the effect is implementation-defined.
+
+   Therefore, event names passed to this routine should begin with a slash
+   character.
+
+   The event is created as initially not-signaled.
+*/
+
+static uint32 create_event (const char *name, EVENT *event)
+{
+*event = sem_open (name, O_CREAT, S_IRWXU, 0);          /* create an initially not-signaled event */
+
+if (*event == SEM_FAILED)                               /* if event creation failed */
+    if (errno == ENOSYS) {                              /*   then if the function is not implemented */
+        tprintf (ipli_dev, TRACE_CMD, "sem_open is unsupported on this system; using fallback\n");
+
+        event_fallback = TRUE;                          /*     then fall back to event emulation */
+        return 0;                                       /*       and claim that the open succeeded */
+        }
+
+    else {                                              /*   otherwise it is an unexpected error */
+        tprintf (ipli_dev, TRACE_CMD, "sem_open error is %u\n", errno);
+        return (uint32) errno;                          /*     so return the error code */
+        }
+
+else {                                                  /* otherwise the creation succeeded */
+    tprintf (ipli_dev, TRACE_CMD, "Created event %p with identifier \"%s\"\n",
+             (void *) *event, name);
+    return 0;                                           /*   so return success */
+    }
+}
+
+
+/* Destroy the synchronization event.
+
+   This routine destroys the synchronization event specified by the supplied
+   event name.  If destruction succeeds, the event object is invalidated, and
+   the routine returns 0.  Otherwise, the error value is returned.
+
+
+   Implementation notes:
+
+    1. If the other simulator instance destroys the event first, our
+       "sem_unlink" call will fail with ENOENT.  This is an expected error, and
+       the routine returns success in this case.
+*/
+
+static uint32 destroy_event (const char *name, EVENT *event)
+{
+int status;
+
+if (*event == SEM_FAILED)                               /* if the event does not exist */
+    return 0;                                           /*   then indicate that it has already been deleted */
+
+else {                                                  /* otherwise the event exists */
+    status = sem_unlink (name);                         /*   so delete it */
+    *event = SEM_FAILED;                                /*     and clear the event handle */
+
+    if (status != 0 && errno != ENOENT) {               /* if the deletion failed */
+        tprintf (ipli_dev, TRACE_CMD, "sem_unlink error is %u\n", errno);
+        return (uint32) errno;                          /*   then return the error code */
+        }
+
+    else                                                /* otherwise the deletion succeeded */
+        return 0;                                       /*   so return success */
+    }
+}
+
+
+/* Test if the synchronization event exists.
+
+   This routine returns TRUE if the supplied event object does not exist and
+   FALSE if the object refers to a defined event.
+*/
+
+static t_bool event_is_undefined (EVENT event)
+{
+if (event_fallback)                                     /* if events are being emulated */
+    return FALSE;                                       /*   then claim that the event is defined */
+else                                                    /* otherwise */
+    return (event == SEM_FAILED);                       /*   return TRUE if the event does not exist */
+}
+
+
+/* Wait for the synchronization event.
+
+   This routine waits for a synchronization event to be signaled or for the
+   supplied maximum wait time to elapse.  If the event identified by the
+   supplied event object is signaled, the routine returns 0 and sets the
+   "signaled" flag to TRUE.  If the timeout expires without the event being
+   signaled, the routine returns 0 with the "signaled" flag set to FALSE.  If
+   the event wait fails, the routine returns the error value.
+
+
+   Implementation notes:
+
+    1. The maximum wait time may be zero to test the signaled state and return
+       immediately, or may be set to a large value to wait forever.  The latter
+       is not recommended, as it provides the user with no means to cancel the
+       wait and return to the SCP prompt.
+*/
+
+static uint32 wait_event (EVENT event, uint32 wait_in_ms, t_bool *signaled)
+{
+const int wait_time = (int) wait_in_ms / 1000;          /* interval wait time in seconds */
+struct timespec until_time;
+int    status;
+
+if (event_fallback) {                                   /* if events are being emulated */
+    sim_os_sleep (2);                                   /*   then wait for two seconds */
+
+    *signaled = TRUE;                                   /* indicate a signaled completion */
+    return 0;                                           /*   and return success */
+    }
+
+else if (clock_gettime (CLOCK_REALTIME, &until_time)) { /* get the current time; if it failed */
+    tprintf (ipli_dev, TRACE_CMD, "clock_gettime error is %u\n", errno);
+    return (uint32) errno;                              /*   then return the error number */
+    }
+
+else                                                    /* otherwise */
+    until_time.tv_sec = until_time.tv_sec + wait_time;  /*   set the (absolute) timeout expiration */
+
+status = sem_timedwait (event, &until_time);            /* wait for the event, but not forever */
+
+*signaled = (status == 0);                              /* set the flag TRUE if the wait did not time out */
+
+if (status)                                             /* if the wait terminated */
+    if (errno == ETIMEDOUT || errno == EINTR)           /*   then if it timed out or was manually aborted */
+        return 0;                                       /*     then return success */
+
+    else {                                              /*   otherwise it's an unexpected error */
+        tprintf (ipli_dev, TRACE_CMD, "sem_timedwait error is %u\n", errno);
+        return (uint32) errno;                          /*     so return the error code */
+        }
+
+else                                                    /* otherwise the event is signaled */
+    return 0;                                           /*   so return success */
+}
+
+
+/* Signal the synchronization event.
+
+   This routine signals a the synchronization event specified by the supplied
+   event handle.  If signaling succeeds, the routine returns 0.  Otherwise, the
+   error value is returned.
+*/
+
+static uint32 signal_event (EVENT event)
+{
+int status;
+
+if (event_fallback)                                     /* if events are being emulated */
+    return 0;                                           /*   then claim that the event was signaled */
+else                                                    /* otherwise */
+    status = sem_post (event);                          /*   signal the event */
+
+if (status) {                                           /* if the call failed */
+    tprintf (ipli_dev, TRACE_CMD, "sem_post error is %u\n", errno);
+    return (uint32) errno;                              /*   then return the error code */
+    }
+
+else                                                    /* otherwise the event was signaled */
+    return 0;                                           /*   so return success */
+}
+
+
 
 #else
 
-uint32 i, t, ipa, ipp, oldf;
+/* Process synchronization stubs.
 
-r = get_ipaddr (cptr, &ipa, &ipp);
-if ((r != SCPE_OK) || (ipp == 0))
-    return SCPE_ARG;
-oldf = uptr->flags;
-if (oldf & UNIT_ATT)
-    ipl_detach (uptr);
-if ((sim_switches & SWMASK ('C')) ||
-    ((sim_switches & SIM_SW_REST) && (oldf & UNIT_ACTV))) {
-        if (ipa == 0)
-            ipa = 0x7F000001;
-        newsock = sim_connect_sock (ipa, ipp);
-        if (newsock == INVALID_SOCKET)
-            return SCPE_IOERR;
-        cprintf ("Connecting to IP address %d.%d.%d.%d, port %d\n",
-                 (ipa >> 24) & 0xff, (ipa >> 16) & 0xff,
-                 (ipa >> 8) & 0xff, ipa & 0xff, ipp);
-        uptr->flags = uptr->flags | UNIT_ACTV;
-        uptr->LSOCKET = 0;
-        uptr->DSOCKET = newsock;
-        }
-else {
-    if (ipa != 0)
-        return SCPE_ARG;
-    newsock = sim_master_sock (ipp);
-    if (newsock == INVALID_SOCKET)
-        return SCPE_IOERR;
-    cprintf ("Listening on port %d\n", ipp);
-    uptr->flags = uptr->flags & ~UNIT_ACTV;
-    uptr->LSOCKET = newsock;
-    uptr->DSOCKET = 0;
-    }
-uptr->IBUF = uptr->OBUF = 0;
-uptr->flags = (uptr->flags | UNIT_ATT) & ~(UNIT_ESTB | UNIT_HOLD);
-tptr = (char *) malloc (strlen (cptr) + 1);             /* get string buf */
-if (tptr == NULL) {                                     /* no memory? */
-    ipl_detach (uptr);                                  /* close sockets */
-    return SCPE_MEM;
-    }
-strcpy (tptr, cptr);                                    /* copy ipaddr:port */
+   The stubs return success, rather than failure, because we want the callers to
+   continue as though synchronization is occurring, even though the host system
+   does not support the operations necessary to implement this.  Without host
+   system synchronization support, the simulated system's OS might work, but if
+   the routines returned failure, then the simulator command files running on
+   such systems would refuse to run.
+
+
+   Implementation notes:
+
+    1. We provide an event wait by sleeping for a few seconds to give the other
+       simulator instance a chance to catch up.  This has a reasonable chance of
+       working, provided the other instance isn't preempted during the sleep.
+*/
+
+static uint32 create_event (const char *name, EVENT *event)
+{
+tprintf (ipli_dev, TRACE_CMD, "Synchronization is unsupported on this system; using fallback\n");
+return 0;
+}
+
+
+static uint32 destroy_event (const char *name, EVENT *event)
+{
+return 0;
+}
+
+
+static t_bool event_is_undefined (EVENT event)
+{
+return FALSE;
+}
+
+
+static uint32 wait_event (EVENT event, uint32 wait_in_ms, t_bool *signaled)
+{
+sim_os_sleep (2);                                       /* wait for two seconds */
+
+*signaled = TRUE;                                       /* then indicate a signaled completion */
+return 0;                                               /*   and return success */
+}
+
+
+static uint32 signal_event (EVENT event)
+{
+return 0;
+}
+
 
 #endif
-
-uptr->filename = tptr;                                  /* save */
-sim_activate (uptr, POLL_FIRST);                        /* activate first poll "immediately" */
-if (sim_switches & SWMASK ('W')) {                      /* wait? */
-    for (i = 0; i < 30; i++) {                          /* check for 30 sec */
-        t = ipl_check_conn (uptr);
-        if (t)                                          /* established? */
-            break;
-        if ((i % 10) == 0)                              /* status every 10 sec */
-            cprintf ("Waiting for connection\n");
-        sim_os_sleep (1);                               /* sleep 1 sec */
-        }
-    if (t)                                              /* if connected (set by "ipl_check_conn" above) */
-        cprintf ("Connection established\n");           /*   then report */
-    }
-return SCPE_OK;
-}
-
-/* Detach routine */
-
-t_stat ipl_detach (UNIT *uptr)
-{
-if (!(uptr->flags & UNIT_ATT))                          /* attached? */
-    return SCPE_OK;
-
-if (uptr->flags & UNIT_ACTV)
-    sim_close_sock (uptr->DSOCKET, 1);
-
-else {
-    if (uptr->flags & UNIT_ESTB)                        /* if established, */
-        sim_close_sock (uptr->DSOCKET, 0);              /* close data socket */
-    sim_close_sock (uptr->LSOCKET, 1);                  /* closen listen socket */
-    }
-
-free (uptr->filename);                                  /* free string */
-uptr->filename = NULL;
-uptr->LSOCKET = 0;
-uptr->DSOCKET = 0;
-uptr->flags = uptr->flags & ~(UNIT_ATT | UNIT_ACTV | UNIT_ESTB);
-sim_cancel (uptr);                                      /* don't poll */
-return SCPE_OK;
-}
-
-/* Disconnect routine */
-
-t_stat ipl_dscln (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
-{
-if (cptr)
-    return SCPE_ARG;
-if (((uptr->flags & UNIT_ATT) == 0) ||
-    (uptr->flags & UNIT_ACTV) ||
-    ((uptr->flags & UNIT_ESTB) == 0))
-    return SCPE_NOFNC;
-sim_close_sock (uptr->DSOCKET, 0);
-uptr->DSOCKET = 0;
-uptr->flags = uptr->flags & ~UNIT_ESTB;
-return SCPE_OK;
-}
-
-/* Diagnostic/normal mode routine */
-
-t_stat ipl_setdiag (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
-{
-if (val) {
-    ipli_unit.flags = ipli_unit.flags | UNIT_DIAG;
-    iplo_unit.flags = iplo_unit.flags | UNIT_DIAG;
-    }
-else {
-    ipli_unit.flags = ipli_unit.flags & ~UNIT_DIAG;
-    iplo_unit.flags = iplo_unit.flags & ~UNIT_DIAG;
-    }
-return SCPE_OK;
-}
-
-/* Interprocessor link bootstrap routine (HP Access Manual) */
-
-#define MAX_BASE        073
-#define IPL_PNTR        074
-#define PTR_PNTR        075
-#define IPL_DEVA        076
-#define PTR_DEVA        077
-
-static const BOOT_ROM ipl_rom = {
-    0163774,                    /*BBL LDA ICK,I         ; IPL sel code */
-    0027751,                    /*    JMP CFG           ; go configure */
-    0107700,                    /*ST  CLC 0,C           ; intr off */
-    0002702,                    /*    CLA,CCE,SZA       ; skip in */
-    0063772,                    /*CN  LDA M26           ; feed frame */
-    0002307,                    /*EOC CCE,INA,SZA,RSS   ; end of file? */
-    0027760,                    /*    JMP EOT           ; yes */
-    0017736,                    /*    JSB READ          ; get #char */
-    0007307,                    /*    CMB,CCE,INB,SZB,RSS ; 2's comp; null? */
-    0027705,                    /*    JMP EOC           ; read next */
-    0077770,                    /*    STB WC            ; word in rec */
-    0017736,                    /*    JSB READ          ; get feed frame */
-    0017736,                    /*    JSB READ          ; get address */
-    0074000,                    /*    STB 0             ; init csum */
-    0077771,                    /*    STB AD            ; save addr */
-    0067771,                    /*CK  LDB AD            ; check addr */
-    0047773,                    /*    ADB MAXAD         ; below loader */
-    0002040,                    /*    SEZ               ; E =0 => OK */
-    0102055,                    /*    HLT 55 */
-    0017736,                    /*    JSB READ          ; get word */
-    0040001,                    /*    ADA 1             ; cont checksum */
-    0177771,                    /*    STB AD,I          ; store word */
-    0037771,                    /*    ISZ AD */
-    0000040,                    /*    CLE               ; force wd read */
-    0037770,                    /*    ISZ WC            ; block done? */
-    0027717,                    /*    JMP CK            ; no */
-    0017736,                    /*    JSB READ          ; get checksum */
-    0054000,                    /*    CPB 0             ; ok? */
-    0027704,                    /*    JMP CN            ; next block */
-    0102011,                    /*    HLT 11            ; bad csum */
-    0000000,                    /*RD  0 */
-    0006600,                    /*    CLB,CME           ; E reg byte ptr */
-    0103700,                    /*IO1 STC RDR,C         ; start reader */
-    0102300,                    /*IO2 SFS RDR           ; wait */
-    0027741,                    /*    JMP *-1 */
-    0106400,                    /*IO3 MIB RDR           ; get byte */
-    0002041,                    /*    SEZ,RSS           ; E set? */
-    0127736,                    /*    JMP RD,I          ; no, done */
-    0005767,                    /*    BLF,CLE,BLF       ; shift byte */
-    0027740,                    /*    JMP IO1           ; again */
-    0163775,                    /*    LDA PTR,I         ; get ptr code */
-    0043765,                    /*CFG ADA SFS           ; config IO */
-    0073741,                    /*    STA IO2 */
-    0043766,                    /*    ADA STC */
-    0073740,                    /*    STA IO1 */
-    0043767,                    /*    ADA MIB */
-    0073743,                    /*    STA IO3 */
-    0027702,                    /*    JMP ST */
-    0063777,                    /*EOT LDA PSC           ; put select codes */
-    0067776,                    /*    LDB ISC           ; where xloader wants */
-    0102077,                    /*    HLT 77 */
-    0027702,                    /*    JMP ST */
-    0000000,                    /*    NOP */
-    0102300,                    /*SFS SFS 0 */
-    0001400,                    /*STC 1400 */
-    0002500,                    /*MIB 2500 */
-    0000000,                    /*WC  0 */
-    0000000,                    /*AD  0 */
-    0177746,                    /*M26 -26 */
-    0000000,                    /*MAX -BBL */
-    0007776,                    /*ICK ISC */
-    0007777,                    /*PTR IPT */
-    0000000,                    /*ISC 0 */
-    0000000                     /*IPT 0 */
-    };
-
-t_stat ipl_boot (int32 unitno, DEVICE *dptr)
-{
-const HP_WORD devi = (HP_WORD) ipli_dib.select_code;
-const HP_WORD devp = (HP_WORD) ptr_dib.select_code;
-
-cpu_ibl (ipl_rom, devi, IBL_S_CLR,                      /* copy the boot ROM to memory and configure */
-         IBL_SET_SC (devi) | devp);                     /*   the S register accordingly */
-
-mem_deposit (PR + MAX_BASE, (~PR + 1) & DMASK);         /* fix ups */
-mem_deposit (PR + IPL_PNTR, (HP_WORD) ipl_rom [IPL_PNTR] | PR);
-mem_deposit (PR + PTR_PNTR, (HP_WORD) ipl_rom [PTR_PNTR] | PR);
-mem_deposit (PR + IPL_DEVA, devi);
-mem_deposit (PR + PTR_DEVA, devp);
-return SCPE_OK;
-}

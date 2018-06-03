@@ -1,7 +1,7 @@
 /* hp2100_dr.c: HP 2100 12606B/12610B fixed head disk/drum simulator
 
    Copyright (c) 1993-2016, Robert M. Supnik
-   Copyright (c) 2017       J. David Bryan
+   Copyright (c) 2017-2018, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -27,6 +27,8 @@
    DR           12606B 2770/2771 fixed head disk
                 12610B 2773/2774/2775 drum
 
+   27-Feb-18    JDB     Added the BBDL, reworked drc_boot to use cpu_copy_loader
+   21-Feb-18    JDB     ATTACH -N now creates a full-size disc image
    19-Jul-17    JDB     Removed "dr_stopioe" variable and register
    11-Jul-17    JDB     Renamed "ibl_copy" to "cpu_ibl"
    27-Feb-17    JDB     ibl_copy no longer returns a status code
@@ -637,15 +639,29 @@ sim_cancel (&drd_unit[TMR_INH]);
 return SCPE_OK;
 }
 
-/* Attach routine */
+/* Attach a drive unit.
+
+   The specified file is attached to the indicated drive unit.  If a new file is
+   specified, the file is initialized to its capacity by setting the high-water
+   mark to the last byte in the file.
+*/
 
 t_stat drc_attach (UNIT *uptr, CONST char *cptr)
 {
-int32 sz = sz_tab[DR_GETSZ (uptr->flags)];
+t_stat      result;
+const int32 sz = sz_tab [DR_GETSZ (uptr->flags)];
 
-if (sz == 0) return SCPE_IERR;
-uptr->capac = sz;
-return attach_unit (uptr, cptr);
+if (sz == 0)
+    return SCPE_IERR;
+else
+    uptr->capac = sz;
+
+result = attach_unit (uptr, cptr);                      /* attach the drive */
+
+if (result == SCPE_OK && (sim_switches & SWMASK ('N'))) /* if the attach was successful and a new image was specified */
+    uptr->hwmark = (uint32) uptr->capac;                /*   then set the high-water mark to the last byte */
+
+return result;                                          /* return the result of the attach */
 }
 
 /* Set protected track count */
@@ -712,125 +728,159 @@ return SCPE_OK;
 }
 
 
-/* Basic Binary Disc Loader.
+/* 277x fixed disc/drum bootstrap loaders (BBDL).
 
-   The Basic Binary Disc Loader (BBDL) contains two programs.  The program
+   The Basic Binary Disc Loader (BBDL) consists of two programs.  The program
    starting at address x7700 loads absolute paper tapes into memory.  The
    program starting at address x7760 loads a disc-resident bootstrap from the
-   277x fixed-head disc/drum.  Entering a BOOT DRC command loads the BBDL into
-   memory and executes the disc portion starting at x7760.  The bootstrap issues
-   a CLC 0,C to clear the disc track and sector address registers and then sets
-   up a 64-word read from track 0 sector 0 to memory locations 0-77 octal.  It
-   then stores a JMP * instruction in location 77, starts the read, and jumps to
+   277x fixed-head disc/drum into memory.  The S register setting does not
+   affect loader operation.
+
+   Entering a LOAD DRC or BOOT DRC command loads the BBDL into memory and
+   executes the disc portion starting at x7760.  The bootstrap issues a CLC 0,C
+   to clear the disc track and sector address registers and then sets up a
+   64-word read from track 0 sector 0 to memory locations 0-77 octal.  It then
+   stores a JMP * instruction in location 77, starts the read, and jumps to
    location 77.  The JMP * causes the CPU to loop until the last word read from
-   the disc overlays location 77 which, typically, would be a JMP instruction to
-   the start of the disc-resident bootstrap.
+   the disc extension overlays location 77 which, typically, would be a JMP
+   instruction to the start of the disc-resident bootstrap.  The success or
+   failure of the transfer is not checked.
 
-   In hardware, the BBDL was hand-configured for the disc and paper tape reader
-   select codes when it was installed on a given system.  Under simulation, we
-   treat it as a standard HP 1000 loader, even though it is not structured that
-   way, and so the cpu_ibl mechanism used to load and configure it must be
-   augmented to account for the differences.
+   The HP 1000 does not support the 277x drives, so there is no 1000 boot loader
+   ROM for these peripherals.  Attempting to LOAD DRC or BOOT DRC while the CPU
+   is configured as a 1000 will be rejected.
 
 
-   Implementaion notes:
+   Implementation notes:
 
-    1. The full BBDL is loaded into memory, even though only the disc portion
-       will be used.
+    1. After the BBDL is loaded into memory, the paper tape portion may be
+       executed manually by setting the P register to the starting address
+       (x7700).
 
-    2. For compatibility with the cpu_ibl routine, the loader has been changed
-       from the standard HP version.  The device I/O instructions are modified
-       to address locations 10 and 11.
+    2. For compatibility with the cpu_copy_loader routine, the BBDL has been
+       altered from the standard HP version.  The device I/O instructions are
+       modified to address select codes 10 and 11.
+
+    3. The "HP 20854A Timeshared BASIC/2000, Level F System Operator's Manual"
+       (HP 02000-90074, November 1974) lists an IBL procedure for booting a 21MX
+       (i.e., 1000 M-Series) CPU from the fixed-head disc.  However, there is no
+       evidence that a fixed-head disc boot loader ROM ever existed.  Moreover,
+       the procedure listed is suspicious, as it specifies the command channel
+       select code instead of the data channel select code, so I/O instruction
+       configuration would be incorrect.  Also, the equivalent 2100 boot
+       procedure printed adjacently gives the wrong BBDL starting address (it is
+       listed correctly in the 1973 version of the manual).  Actually, the 21MX
+       and 2100 procedures appear to be verbatim copies of the moving-head disc
+       boot procedures listed two pages earlier.  Consequently, it would appear
+       that 21MX-based 2000 F TSB systems with fixed-head drives must boot from
+       paper tape.
 */
 
-static const BOOT_ROM dr_rom = {
-    0107700,                    /* ST2   CLC 0,C           START OF PAPER TAPE LOADER */
-    0002401,                    /*       CLA,RSS         */
-    0063726,                    /* CONT2 LDA CM21        */
-    0006700,                    /*       CLB,CCE         */
-    0017742,                    /*       JSB READ2       */
-    0007306,                    /* LEDR2 CMB,CCE,INB,SZB */
-    0027713,                    /*       JMP RECL2       */
-    0002006,                    /* EOTC2 INA,SZA         */
-    0027703,                    /*       JMP CONT2+1     */
-    0102077,                    /*       HLT 77B         */
-    0027700,                    /*       JMP ST2         */
-    0077754,                    /* RECL2 STB CNT2        */
-    0017742,                    /*       JSB READ2       */
-    0017742,                    /*       JSB READ2       */
-    0074000,                    /*       STB A           */
-    0077757,                    /*       STB ADR11       */
-    0067757,                    /* SUCID LDB ADR11       */
-    0047755,                    /*       ADB MAXAD       */
-    0002040,                    /*       SEZ             */
-    0027740,                    /*       JMP RESCU       */
-    0017742,                    /* LOAD2 JSB READ2       */
-    0040001,                    /*       ADA B           */
-    0177757,                    /* CM21  STB ADR11,I     */
-    0037757,                    /*       ISZ ADR11       */
-    0000040,                    /*       CLE             */
-    0037754,                    /*       ISZ CNT2        */
-    0027720,                    /*       JMP SUCID       */
-    0017742,                    /*       JSB READ2       */
-    0054000,                    /*       CPB A           */
-    0027702,                    /*       JMP CONT2       */
-    0102011,                    /*       HLT 11B         */
-    0027700,                    /*       JMP ST2         */
-    0102055,                    /* RESCU HLT 55B         */
-    0027700,                    /*       JMP ST2         */
-    0000000,                    /* READ2 NOP             */
-    0006600,                    /*       CLB,CME         */
-    0103710,                    /* RED2  STC PR,C        */
-    0102310,                    /*       SFS PR          */
-    0027745,                    /*       JMP *-1         */
-    0107410,                    /*       MIB PR,C        */
-    0002041,                    /*       SEZ,RSS         */
-    0127742,                    /*       JMP READ2,I     */
-    0005767,                    /*       BLF,CLE,BLF     */
-    0027744,                    /*       JMP RED2        */
-    0000000,                    /* CNT2  NOP             */
-    0000000,                    /* MAXAD NOP             */
-    0020000,                    /* CWORD ABS 20000B+DC   */
-    0000000,                    /* ADR11 NOP             */
+static const LOADER_ARRAY dr_loaders = {
+    {                               /* HP 21xx Basic Binary Disc Loader (BBDL) */
+      060,                          /*   loader starting index */
+      056,                          /*   DMA index */
+      055,                          /*   FWA index */
+      { 0107700,                    /*   77700:  ST2   CLC 0,C         START OF PAPER TAPE LOADER */
+        0002401,                    /*   77701:        CLA,RSS         */
+        0063726,                    /*   77702:  CONT2 LDA CM21        */
+        0006700,                    /*   77703:        CLB,CCE         */
+        0017742,                    /*   77704:        JSB READ2       */
+        0007306,                    /*   77705:  LEDR2 CMB,CCE,INB,SZB */
+        0027713,                    /*   77706:        JMP RECL2       */
+        0002006,                    /*   77707:  EOTC2 INA,SZA         */
+        0027703,                    /*   77710:        JMP CONT2+1     */
+        0102077,                    /*   77711:        HLT 77B         */
+        0027700,                    /*   77712:        JMP ST2         */
+        0077754,                    /*   77713:  RECL2 STB CNT2        */
+        0017742,                    /*   77714:        JSB READ2       */
+        0017742,                    /*   77715:        JSB READ2       */
+        0074000,                    /*   77716:        STB A           */
+        0077757,                    /*   77717:        STB ADR11       */
+        0067757,                    /*   77720:  SUCID LDB ADR11       */
+        0047755,                    /*   77721:        ADB MAXAD       */
+        0002040,                    /*   77722:        SEZ             */
+        0027740,                    /*   77723:        JMP RESCU       */
+        0017742,                    /*   77724:  LOAD2 JSB READ2       */
+        0040001,                    /*   77725:        ADA B           */
+        0177757,                    /*   77726:  CM21  STB ADR11,I     */
+        0037757,                    /*   77727:        ISZ ADR11       */
+        0000040,                    /*   77730:        CLE             */
+        0037754,                    /*   77731:        ISZ CNT2        */
+        0027720,                    /*   77732:        JMP SUCID       */
+        0017742,                    /*   77733:        JSB READ2       */
+        0054000,                    /*   77734:        CPB A           */
+        0027702,                    /*   77735:        JMP CONT2       */
+        0102011,                    /*   77736:        HLT 11B         */
+        0027700,                    /*   77737:        JMP ST2         */
+        0102055,                    /*   77740:  RESCU HLT 55B         */
+        0027700,                    /*   77741:        JMP ST2         */
+        0000000,                    /*   77742:  READ2 NOP             */
+        0006600,                    /*   77743:        CLB,CME         */
+        0103710,                    /*   77744:  RED2  STC PR,C        */
+        0102310,                    /*   77745:        SFS PR          */
+        0027745,                    /*   77746:        JMP *-1         */
+        0107410,                    /*   77747:        MIB PR,C        */
+        0002041,                    /*   77750:        SEZ,RSS         */
+        0127742,                    /*   77751:        JMP READ2,I     */
+        0005767,                    /*   77752:        BLF,CLE,BLF     */
+        0027744,                    /*   77753:        JMP RED2        */
+        0000000,                    /*   77754:  CNT2  NOP             */
+        0000000,                    /*   77755:  MAXAD NOP             */
+        0020010,                    /*   77756:  CWORD ABS 20000B+DC   */
+        0000000,                    /*   77757:  ADR11 NOP             */
+        0107700,                    /*   77760:  DLDR  CLC 0,C         START OF FIXED DISC LOADER */
+        0063756,                    /*   77761:        LDA CWORD       */
+        0102606,                    /*   77762:        OTA 6           */
+        0002700,                    /*   77763:        CLA,CCE         */
+        0102611,                    /*   77764:        OTA CC          */
+        0001500,                    /*   77765:        ERA             */
+        0102602,                    /*   77766:        OTA 2           */
+        0063777,                    /*   77767:        LDA WRDCT       */
+        0102702,                    /*   77770:        STC 2           */
+        0102602,                    /*   77771:        OTA 2           */
+        0103706,                    /*   77772:        STC 6,C         */
+        0102710,                    /*   77773:        STC DC          */
+        0067776,                    /*   77774:        LDB JMP77       */
+        0074077,                    /*   77775:        STB 77B         */
+        0024077,                    /*   77776:  JMP77 JMP 77B         */
+        0177700 } },                /*   77777:  WRDCT OCT -100        */
 
-    0107700,                    /* DLDR  CLC 0,C           START OF FIXED DISC LOADER */
-    0063756,                    /*       LDA CWORD       */
-    0102606,                    /*       OTA 6           */
-    0002700,                    /*       CLA,CCE         */
-    0102611,                    /*       OTA CC          */
-    0001500,                    /*       ERA             */
-    0102602,                    /*       OTA 2           */
-    0063777,                    /*       LDA WRDCT       */
-    0102702,                    /*       STC 2           */
-    0102602,                    /*       OTA 2           */
-    0103706,                    /*       STC 6,C         */
-    0102710,                    /*       STC DC          */
-    0067776,                    /*       LDB JMP77       */
-    0074077,                    /*       STB 77B         */
-    0024077,                    /* JMP77 JMP 77B         */
-    0177700                     /* WRDCT OCT -100        */
+    {                               /* HP 1000 Loader ROM does not exist */
+      IBL_NA,                       /*   loader starting index */
+      IBL_NA,                       /*   DMA index */
+      IBL_NA,                       /*   FWA index */
+      { 0 } }
     };
 
-#define BBDL_MAX_ADDR       0000055                     /* ROM index of the maximum address word */
-#define BBDL_DMA_CNTL       0000056                     /* ROM index of the DMA control word */
-#define BBDL_DISC_START     0000060                     /* ROM index of the disc loader */
+
+/* Device boot routine.
+
+   This routine is called by the LOAD DRC and BOOT DRC commands to copy the
+   device bootstrap into the upper 64 words of the logical address space.  On
+   entry, the "unitno" parameter is checked to ensure that it is 0, as the
+   bootstrap only loads from unit 0.  Then the BBDL is loaded into memory, the
+   disc portion is configured for the DRD/DRC select code pair, and the paper
+   tape portion is  configured for the select code of the paper tape reader.
+
+
+   Implementation notes:
+
+    1. The fixed-head disc/drum device is not supported on the HP 1000, so this
+       routine cannot be called by a BOOT CPU or LOAD CPU command.
+
+    2. In hardware, the BBDL was hand-configured for the disc and paper tape
+       reader select codes when it was installed on a given system.  Under
+       simulation, the LOAD and BOOT commands automatically configure the BBDL
+       to the current select codes of the PTR and DR devices.
+ */
 
 t_stat drc_boot (int32 unitno, DEVICE *dptr)
 {
-const HP_WORD dev = (HP_WORD) drd_dib.select_code;      /* data chan select code */
+if (unitno != 0)                                        /* a BOOT DRC for a non-zero unit */
+    return SCPE_NOFNC;                                  /*   is rejected as unsupported */
 
-if (unitno != 0)                                        /* boot supported on drive unit 0 only */
-    return SCPE_NOFNC;                                  /* report "Command not allowed" if attempted */
-
-cpu_ibl (dr_rom, dev, IBL_S_NOCLR, IBL_S_NOSET);        /* copy the boot ROM to memory and configure */
-
-mem_deposit (PR + BBDL_MAX_ADDR, mem_examine (PR + IBL_END));               /* move the maximum address word */
-mem_deposit (PR + BBDL_DMA_CNTL, (HP_WORD) dr_rom [BBDL_DMA_CNTL] + dev);   /* set up the DMA control word */
-
-mem_deposit (PR + IBL_DPC, (HP_WORD) dr_rom [IBL_DPC]); /* restore the overwritten word */
-mem_deposit (PR + IBL_END, (HP_WORD) dr_rom [IBL_END]); /* restore the overwritten word */
-
-PR = PR + BBDL_DISC_START;                              /* select the starting address */
-
-return SCPE_OK;
+else                                                            /* otherwise this is a BOOT/LOAD DRC */
+    return cpu_copy_loader (dr_loaders, drd_dib.select_code,    /*   so copy the boot loader to memory */
+                            IBL_S_NOCLEAR, IBL_S_NOSET);        /*     and preserve the S register */
 }

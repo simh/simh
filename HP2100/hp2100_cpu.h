@@ -1,7 +1,7 @@
 /* hp2100_cpu.h: HP 2100 CPU declarations
 
    Copyright (c) 2005-2016, Robert M. Supnik
-   Copyright (c) 2017,      J. David Bryan
+   Copyright (c) 2017-2018, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   22-Feb-18    JDB     Reworked "cpu_ibl" into "cpu_copy_loader"
+                        Cleaned up IBL definitions, added loader structure
    22-Jul-17    JDB     Renamed "intaddr" to CIR; added IR
    14-Jul-17    JDB     Removed calc_defer() prototype
    11-Jul-17    JDB     Moved "ibl_copy" and renamed to "cpu_ibl"
@@ -507,32 +509,50 @@
 #define I_SFS           0102300u                        /* SFS instruction */
 #define I_STF           0102100u                        /* STF instruction */
 
-/* IBL assignments */
 
-#define IBL_V_SEL       14                              /* ROM select <15:14> */
-#define IBL_M_SEL       03
-#define IBL_PTR         0000000u                        /* ROM 0: 12992K paper tape reader (PTR) */
-#define IBL_DP          0040000u                        /* ROM 1: 12992A 7900 disc (DP) */
-#define IBL_DQ          0060000u                        /* ROM 1: 12992A 2883 disc (DQ) */
-#define IBL_MS          0100000u                        /* ROM 2: 12992D 7970 tape (MS) */
-#define IBL_DS          0140000u                        /* ROM 3: 12992B 7905/06/20/25 disc (DS) */
-#define IBL_MAN         0010000u                        /* RPL/manual boot <13:12> */
-#define IBL_V_DEV       6                               /* select code <11:6> */
-#define IBL_OPT         0000070u                        /* options in <5:3> */
-#define IBL_DP_REM      0000001u                        /* DP removable <0:0> */
-#define IBL_DS_HEAD     0000003u                        /* DS head number <1:0> */
-#define IBL_LNT         64                              /* boot ROM length in words */
-#define IBL_MASK        (IBL_LNT - 1)                   /* boot length mask */
-#define IBL_DPC         (IBL_LNT - 2)                   /* DMA ctrl word */
-#define IBL_END         (IBL_LNT - 1)                   /* last location */
+/* Initial Binary Loader.
 
-#define IBL_S_CLR       0000000u                        /* cpu_ibl mask to clear the S register */
-#define IBL_S_NOCLR     0177777u                        /* cpu_ibl mask to preserve the S register */
-#define IBL_S_NOSET     0000000u                        /* cpu_ibl mask to preserve the S register */
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | ROM # | -   - |      select code      | -   -   -   -   -   - |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+*/
 
-#define IBL_SET_SC(s)   ((HP_WORD) ((s) << IBL_V_DEV))  /* position the select code in the S register */
+#define IBL_WIDTH           6                           /* loader ROM address width */
+#define IBL_MASK            ((1u << IBL_WIDTH) - 1)     /* loader ROM address mask (2 ** 6 - 1) */
+#define IBL_MAX             ((1u << IBL_WIDTH) - 1)     /* loader ROM address maximum (2 ** 6 - 1) */
+#define IBL_SIZE            (IBL_MAX + 1)               /* loader ROM size in words */
 
-typedef MEMORY_WORD BOOT_ROM [IBL_LNT];                 /* boot ROM data */
+#define IBL_START           0                           /* ROM array index of the program start */
+#define IBL_DMA             (IBL_MAX - 1)               /* ROM array index of the DMA configuration word */
+#define IBL_FWA             (IBL_MAX - 0)               /* ROM array index of the negative starting address */
+#define IBL_NA              (IBL_MAX + 1)               /* "not-applicable" ROM array index */
+
+#define IBL_S_CLEAR         0000000u                    /* cpu_copy_loader mask to clear the S register */
+#define IBL_S_NOCLEAR       0177777u                    /* cpu_copy_loader mask to preserve the S register */
+#define IBL_S_NOSET         0000000u                    /* cpu_copy_loader mask to preserve the S register */
+
+#define IBL_ROM_MASK        0140000u                    /* ROM socket selector mask */
+#define IBL_SC_MASK         0007700u                    /* device select code mask */
+#define IBL_USER_MASK       ~(IBL_ROM_MASK | IBL_SC_MASK)
+
+#define IBL_ROM_SHIFT       14
+#define IBL_SC_SHIFT        6
+
+#define IBL_ROM(s)          (((s) & IBL_ROM_MASK) >> IBL_ROM_SHIFT)
+#define IBL_SC(s)           (((s) & IBL_SC_MASK)  >> IBL_SC_SHIFT)
+
+#define IBL_TO_SC(c)        ((c) << IBL_SC_SHIFT & IBL_SC_MASK)
+
+
+typedef struct {
+    uint32       start_index;                   /* the array index of the start of the program */
+    uint32       dma_index;                     /* the array index of the DMA configuration word */
+    uint32       fwa_index;                     /* the array index of the negative starting address */
+    MEMORY_WORD  loader [IBL_SIZE];             /* the 64-word bootstrap loader program */
+    } BOOT_LOADER;
+
+typedef BOOT_LOADER LOADER_ARRAY [2];           /* array (21xx, 1000) of bootstrap loaders */
 
 
 /* Memory management */
@@ -641,6 +661,7 @@ extern UNIT      *cpu_ioerr_uptr;               /* pointer to a unit with an unr
 
 extern uint32    cpu_configuration;             /* the current CPU option set and model */
 extern uint32    cpu_speed;                     /* the CPU speed, expressed as a multiplier of a real machine */
+extern t_bool    is_1000;                       /* TRUE if the CPU is a 1000 M/E/F-Series */
 
 
 /* CPU global SCP support routines declared in scp.h
@@ -656,10 +677,10 @@ extern void cpu_post_cmd (t_bool from_scp);
 
 /* CPU global utility routines */
 
-extern void    cpu_ibl    (const BOOT_ROM rom, int32 dev, HP_WORD sr_clear, HP_WORD sr_set);
-extern t_stat  cpu_iog    (HP_WORD IR, t_bool iotrap);
-extern uint32  calc_int   (void);
-extern t_stat  resolve    (HP_WORD MA, HP_WORD *address, uint32 irq);
+extern t_stat  cpu_copy_loader (const LOADER_ARRAY boot, uint32 sc, HP_WORD sr_clear, HP_WORD sr_set);
+extern t_stat  cpu_iog         (HP_WORD IR, t_bool iotrap);
+extern uint32  calc_int        (void);
+extern t_stat  resolve         (HP_WORD MA, HP_WORD *address, uint32 irq);
 
 
 /* Memory global utility routines */

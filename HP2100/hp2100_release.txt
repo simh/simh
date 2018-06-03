@@ -1,6 +1,6 @@
                            SIMH/HP 2100 RELEASE NOTES
                            ==========================
-                             Last update: 2017-09-06
+                             Last update: 2018-05-23
 
 
 This file documents the release history of the simulator for the Hewlett-Packard
@@ -56,7 +56,7 @@ The simulator has been tested with the following operating systems:
 
  - SIO, BCS, and MTS.
 
- - 2000E, 2000F, and 2000/Access Time-Shared BASIC.
+ - 2000E, 2000F, and 2000 Access Time-Shared BASIC.
 
  - DOS, DOS-M, and DOS-III.
 
@@ -67,6 +67,18 @@ The user's manual for the simulator is provided in Microsoft Word format in the
 PDF version of the same manual is available at:
 
   http://alum.mit.edu/www/jdbryan/hp2100_doc.pdf
+
+For those intending to run 2000F or 2000/Access Time-Shared BASIC, a monograph
+entitled "Running HP 2000 Time-Shared BASIC on SIMH" is available at:
+
+  http://simh.trailing-edge.com/docs/running_hp_2000_tsb.pdf
+
+It discusses the requirements for successful TSB startup and operation and the
+issues involved in synchronizing the dual-CPU simulation setup required by TSB.
+TSB has run successfully on SIMH for many years, but the advent of multi-core
+host machines has increased the difficulty in getting the two SIMH instances to
+coordinate properly.  The paper presents some configuration guidelines that
+improve the probability of successfully running TSB.
 
 
 ------------------
@@ -97,6 +109,15 @@ restore programs is available from the HP Computer Museum at:
   http://www.hpmuseum.net/display_item.php?sw=565
 
 The archive contains instructions and a simulator command file.
+
+Preconfigured 2000E, 2000F, and 2000 Access software kits are available from the
+SIMH software repository here:
+
+  http://simh.trailing-edge.com/software.html
+
+Each kit contains a bootable disc image and associated command files that
+automate the system startup process.  Command files to perform new system
+generations are also included.
 
 QCTerm, an HP 700 terminal emulator for Microsoft Windows, is available from the
 HP Computer Museum at:
@@ -154,6 +175,259 @@ Revision 5010:
 
    A corrected version of $BALC is present on cartridge GF of the disc image
    supplied with the RTE-IVB software kit at the HP Computer Museum.
+
+
+
+======================
+Release 28, 2018-05-23
+======================
+
+This release of the HP 2100 simulator adds the following features:
+
+ - The IPLI and IPLO devices now use shared memory instead of network sockets to
+   simulate the 12875A Processor Interconnect kit that is used to communicate
+   between the System Processor and the I/O Processor of the HP 2000B, C, F, and
+   Access Time-Shared BASIC operating systems.  This change, in addition to a
+   new, adaptive service scheduling routine, improves data transfer time between
+   the processes by a factor of 7 to 1.
+
+ - Commands have been added to the IPL device to permit synchronization between
+   the two simulator processes running the HP 2000 Time-Shared BASIC operating
+   system.  This greatly improves system startup reliability and permits the use
+   of the HP-documented startup procedure of cross-loading the I/O Processor
+   program from the System Processor.
+
+ - The DIAGNOSTIC options of the IPLI and IPLO devices have been reworked to
+   permit testing with the HP General Register Diagnostic as well as the
+   Processor Interconnect Cable Diagnostic.
+
+ - The DEBUG options of the IPLI and IPLO devices have been expanded.
+
+ - The BOOT command now installs the correct binary loader for the CPU model.
+   For example, BOOT PTR installs and runs the Basic Binary Loader (BBL) if the
+   CPU is configured as a 2114/15/16 or 2100, or the 12992K Paper Tape Loader
+   ROM if the CPU is configured as a 1000 M/E/F-Series.  Prior releases
+   installed the HP 1000 loader ROM regardless of the CPU model.
+
+ - The LOAD command has been extended to permit copying of internal device boot
+   loaders into memory.  LOAD <dev> is identical to BOOT <dev> except that the
+   CPU is neither preset nor run.  In particular, LOAD CPU is the equivalent of
+   pressing the IBL button on the HP 1000 front panel.
+
+ - The new SET CPU ROMS command permits altering the set of preinstalled boot
+   loader ROMs for 1000 CPUs.  The new SHOW CPU ROMS command displays the
+   currently installed set.
+
+ - The -N (new file) option to the ATTACH command for disc devices now creates a
+   full-size image file, equivalent to formatting the new disc before use.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - The abbreviated "SET CPU 21MX" command no longer sets the CPU to an E-Series
+   model (i.e., to a 21MX-E, a.k.a. 1000-E); instead, it configures the CPU as
+   an original 21MX (a.k.a. 1000-M).  If an E-Series configuration is desired,
+   it must be requested explicitly with the "SET CPU 21MX-E" command.
+
+ - The "RESET -P CPU" command no longer restores the BBL to the protected memory
+   area of 21xx machines.  The "LOAD PTR" command may be used to perform this
+   function.
+
+ - The previous behavior of the "ATTACH -N" command for disc devices, i.e.,
+   creating a new zero-length image file, may be emulated by first deleting the
+   file and then attaching it without specifying the -N switch.  For instance,
+   the "DELETE <file>" and "ATTACH <unit> <file>" commands produce a new
+   zero-length file as "ATTACH -N <unit> <file>" did before this change.  The
+   "ATTACH -N" behavior of other devices, e.g., magnetic tape drives and
+   printers, did not change; a zero-length file is still created.
+
+ - With the change to a shared-memory implementation, only a single "ATTACH IPL"
+   command is required per instance to establish communication.  The System
+   Processor instance issues an "ATTACH -S IPL <code>" command, and the I/O
+   Processor instance must issue a corresponding "ATTACH -I IPL <code>" command,
+   where the <code> parameter is a user-selected decimal number that identifies
+   the instance pair.  The prior "ATTACH [-L | -C] [ IPLI | IPLO ] <port>"
+   commands are deprecated but retained, so that existing command files will
+   still work.  However, they too will use shared memory rather than network
+   connections.  Consequently, the SP and IOP instances are now required to
+   execute on the same machine, and the <ip-address> option is no longer
+   supported.
+
+ - Multiple consecutive CLC 0 instruction executions now cause only a single CRS
+   assertion to the I/O devices.  Therefore, IOBUS tracing when running HP 2000
+   Time-Shared BASIC systems no longer generates a pair of trace lines for each
+   of the 131,072 consecutive CLC 0 executions typically used to initialize the
+   12920A Asynchronous Multiplexer.
+
+ - The 12875A Processor Interconnect section of the HP2100 User's Guide has been
+   revised to describe the new ATTACH protocol and process synchronization
+   commands.
+
+ - A list of device boot loaders installed for given device/CPU combinations has
+   been added to the user's guide.
+
+ - The "21MX-M" and "21MX-E" CPU options that had been inadvertently omitted
+   from the last release of the user's guide have been restored.
+
+ - The "Running HP 2000 Time-Shared BASIC on SIMH" monograph has been revised to
+   cover the application of the new process synchronization commands to TSB
+   startup command files.
+
+ - Preconfigured software kits for 2000E, 2000F, and 2000 Access that employ
+   the new shared memory and process synchronization commands are now available;
+   see the "Available Software" section above for details.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  Serial port output stalls are not handled properly.
+
+     VERSION:  Release 27.
+
+     OBSERVATION:  The TTY, BACI, MPX, and MUX devices support I/O via host
+     serial ports as well as via Telnet connections.  While TTY, BACI, and MPX
+     output via Telnet works correctly, output via serial ports fails.  TTY
+     output drops characters if the serial port stalls.  Attempting to output to
+     the BACI results in "Console Telnet output stall" and a simulator stop.
+     Output to the MPX results in dropped characters and eventually an "IOPE"
+     (parity error) message from RTE.
+
+     CAUSE:  The terminal multiplexer library (sim_tmxr.c, part of the SIMH
+     framework) had provided a 256-byte output buffer for each line, independent
+     of the connection type (Telnet or serial).  The library was changed to
+     reduce the serial buffer size to one byte.  The BACI and MPX devices are
+     internally buffered and default to a "FASTTIME" mode that sends the entire
+     internal buffer to the library output routine.  When the routine receives
+     the second character, it returns SCPE_STALL status to indicate a buffer
+     overflow.  The device simulations did not expect and did not properly
+     handle this status.
+
+     The TTY and MUX devices are not buffered internally and were not affected
+     by the loss of serial buffering.  However, the TTY would drop output
+     characters if the host serial buffer overflowed.
+
+     RESOLUTION:  Modify "tto_svc" (hp2100_stddev.c), "baci_term_svc"
+     (hp2100_baci.c), and "line_service" (hp2100_mpx.c) to handle terminal
+     multiplexer library buffer overflows properly.
+
+     STATUS:  Fixed in Release 28.
+
+
+  2. PROBLEM:  The PTR device DIAGNOSTIC option shown in the user's guide does
+     not exist.
+
+     VERSION:  Release 27.
+
+     OBSERVATION:  The "HP2100 Simulator User's Guide" says that specifying the
+     DIAGNOSTIC option for the PTR device "converts the attached paper tape
+     image into a continuous loop" for use by the paper tape reader diagnostic
+     program.  However, entering a "SET PTR DIAGNOSTIC" command gives a
+     "Non-existent parameter" error.
+
+     CAUSE:  The option name specified in the PTR device's modifier table is
+     "DIAG".  It should be "DIAGNOSTIC" to match the option names used in the
+     other device simulations.
+
+     RESOLUTION:  Modify "ptr_mod" (hp_stddev.c) to use the correct option name.
+
+     STATUS:  Fixed in Release 28.
+
+
+  3. PROBLEM:  First Status is not cleared properly on the DP device.
+
+     VERSION:  Release 27.
+
+     OBSERVATION:  Execution of the RTE-I paper tape bootstrap for the 7900A and
+     the 2000F loader for the 7900A halts with disc errors.  The offending disc
+     status word is 040001 octal, which denotes First Status and Any Error.
+     Both programs expect disc status to be clear after an initial Seek and Read
+     are performed.  However, the disc drive and interface manuals state that
+     First Status is cleared by a Status Check command, which is not being
+     issued.
+
+     CAUSE:  Examination of the schematics in the 7900A Disc Drive Operating and
+     Service Manual (07900-90002 February 1975) and the 13210A Disc Drive
+     Interface Kit Operating and Service Manual (13210-90003 November 1974)
+     shows that, contrary to the documentation, First Status is cleared on a
+     Read, Write, Check Data, or Initialize command, as well as on a Status
+     Check command.  The current DP implementation follows the manual
+     description rather than the schematics, so it fails to clear First Status
+     when the initial Read is performed.
+
+     RESOLUTION:  Modify "dp_goc" (hp2100_dp.c) to clear First Status as well as
+     Attention when one of the applicable commands is performed.
+
+     STATUS:  Fixed in Release 28.
+
+
+  4. PROBLEM:  2000F and Access will not boot from a 7900 drive using the BMDL.
+
+     VERSION:  Release 27.
+
+     OBSERVATION:  Attempting to boot Time-Shared BASIC from a 7900 using the
+     Basic Moving-Head Disc Loader for the HP 2100 CPU results in a HLT 1
+     (unrecoverable disc error) in the TSB loader.  Booting the same system with
+     the 12992A loader ROM for the HP 1000 succeeds.
+
+     The BMDL configures DMA for an oversize (~32000 word) transfer and expects
+     the disc to terminate the operation with End of Cylinder (EOC) status.  The
+     TSB bootstrap successfully loads into memory.  When it starts, it issues a
+     CLC 0,C followed by a Check Status command that is expected to return zero,
+     i.e., all status bits clear.  However, the EOC bit is set, and the
+     bootstrap halts with a HLT 1.
+
+     CAUSE:  The "Disc Interface 1 PCA Schematic Diagram" in the HP 13210A Disc
+     Drive Interface Kit Operating and Service Manual (13210-90003, August 1974)
+     shows that the CRS signal, which is generated by the CLC 0 instruction,
+     does not affect the Status Register contents.  However, examination of an
+     actual hardware interface PCA shows that CRS assertion does clear the
+     register.
+
+     RESOLUTION:  Modify "dpcio" (hp2100_dp.c) to clear the status register on
+     receipt of a CRS signal.  Note that later versions of the service manual
+     (May 1975 and May 1978) show the correct CRS connection.
+
+     STATUS:  Fixed in Release 28.
+
+
+  5. PROBLEM:  Forcibly disconnected 2000E multiplexer ports are unresponsive.
+
+     VERSION:  Release 27.
+
+     OBSERVATION:  The HP Time-Shared BASIC system sets a limit on the time
+     allowed between dataset connection and login.  By default, this is 120
+     seconds but may be changed by the PHONES system operator command.  If the
+     user does not complete a login within the time allowed, the dataset will be
+     disconnected.
+
+     This action occurs as expected on the 2000E system, but while reconnecting
+     to the port succeeds, the line is unresponsive.  More importantly,
+     attempting to SLEEP the system hangs after responding to the "MAG TAPE
+     SLEEP?" question.
+
+     CAUSE:  Examining the source code where the SLEEP hang occurs shows that
+     the system is waiting in a loop for output to complete on the disconnected
+     port.  The forced disconnect code, which is shared by the PHONES, KILLID,
+     and SLEEP commands, calls the BYE processor to log out an active user.
+     However, for a PHONES disconnect, the user is not logged in.  The BYE
+     processor handles this condition correctly, but it returns to a common
+     routine (LLEND) that outputs a line feed to the port.  The multiplexer
+     simulation omits a write to a disconnected port but also erroneously omits
+     the output completion interrupt request.  Consequently, TSB believes that
+     the output is still in progress and therefore waits, in an infinite loop,
+     for the completion interrupt that never occurs.  Also, while the port is in
+     output mode, input is turned off, so the port appears to be unresponsive
+     when reconnected.
+
+     RESOLUTION:  Modify "muxo_svc" (hp2100_mux.c) to set "mux_xdon" to 1 to
+     trigger the completion interrupt regardless of whether or not the port is
+     connected to a Telnet session.
+
+     STATUS:  Fixed in Release 28.
 
 
 

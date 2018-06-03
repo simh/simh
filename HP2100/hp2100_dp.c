@@ -1,7 +1,7 @@
 /* hp2100_dp.c: HP 2100 12557A/13210A disc simulator
 
    Copyright (c) 1993-2016, Robert M. Supnik
-   Copyright (c) 2017       J. David Bryan
+   Copyright (c) 2017-2018  J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -27,6 +27,10 @@
    DP           12557A 2870 disc subsystem
                 13210A 7900 disc subsystem
 
+   27-Feb-18    JDB     Corrected the conditions that clear drive status
+                        Added the BMDL
+   13-Feb-18    JDB     First Status is now cleared on Read, etc.
+   26-Jan-18    JDB     ATTACH -N now creates a full-size disc image
    03-Aug-17    JDB     Changed perror call for I/O errors to cprintf
    11-Jul-17    JDB     Renamed "ibl_copy" to "cpu_ibl"
    22-Apr-17    JDB     Added fall-through comment for FNC_STA case in dpcio
@@ -82,7 +86,7 @@
      - 7900A Disc Drive Operating and Service Manual
          (07900-90002, February 1975)
      - 13210A Disc Drive Interface Kit Operating and Service Manual
-         (13210-90003, November 1974)
+         (13210-90003, May 1978)
      - 12557A Cartridge Disc Interface Kit Operating and Service Manual
          (12557-90001, Sepember 1970)
 
@@ -124,12 +128,103 @@
    drive's current position register during a read, i.e., the "on-disc" address
    field is assumed to match the current position.
 
-   The following implemented behaviors have been inferred from secondary sources
-   (diagnostics, operating system drivers, etc.), due to absent or contradictory
-   authoritative information; future correction may be needed:
+   NOTE: 13210A manuals dated November 1974 and earlier contain errors in the
+   schematics.  See the comments preceding the "dpcio" routine for details.
 
-     1. Status bit 15 (ATTENTION) does not set bit 0 (ANY ERROR) on the 12557A.
-     2. Omitting STC DC before Status Check does not set DC flag but does poll.
+
+   The 13210A interfaces respond to I/O instructions as follows:
+
+   Output Data Word format (OTA and OTB):
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |    command    | -   - | P | D | -   -   -   -   -   - | unit  | command
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |                          write data                           | data
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | -   -   -   -   -   -   -   - |       cylinder address        | data
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | -   -   -   -   -   - | head  | -   -   - |  sector address   | data
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | -   -   -   -   -   -   -   -   -   - |     sector count      | data
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     D = Defective Track
+     P = Protected Track
+
+   Command:
+
+     0000 = Status Check
+     0001 = Write Data
+     0010 = Read Data
+     0011 = Seek Record
+     0101 = Refine Sector
+     0110 = Check Data
+     1001 = Initialize Data
+     1011 = Address Record
+
+   The 12557A interface responds identically, except that the sector address and
+   sector count fields use one fewer bit each, i.e., use bits 3-0 and 4-0,
+   respectively.
+
+
+   Input Data Word format (LIA and LIB):
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | -   -   -   -   -   -   -   -   -   -   -   - |   attention   | command
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |                           read data                           | data
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | - | F | O | - | U | P | - | S | - | N | C | A | G | B | D | E | data
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     F = First Status
+     O = Overrun
+     U = Drive Unsafe
+     P = Data Protected
+     S = Seek Check
+     N = Not Ready
+     C = End of Cylinder
+     A = Address Error
+     G = Flagged Cylinder
+     B = Drive Busy
+     D = Data Error
+     E = Any Error
+
+   The 12557A interface responds identically, except that the status word is
+   extended as follows:
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | T | F | O | R | U | H | I | S | - | N | C | A | G | B | D | E | data
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where the differing bits are:
+
+     T = Attention
+     R = Read/Write Unsafe
+     H = Access Hunting
+     I = Seek Incomplete
+
+
+   Implementation notes:
+
+    1. The following implemented behaviors have been inferred from secondary
+       sources (diagnostics, operating system drivers, etc.), due to absent or
+       contradictory authoritative information; future correction may be needed:
+
+        - 12557A status bit 15 (ATTENTION) does not set bit 0 (ANY ERROR).
+
+        - 12557A clears status after a Check Status command, but 13210A does
+          not.
+
+        - Omitting STC DC before Status Check does not set DC flag but does
+          poll.
 */
 
 
@@ -158,7 +253,13 @@
 #define DP_SIZE3        (DP_NUMSF * DP_NUMCY * DP_NUMSC3 * DP_NUMWD)
 #define DP_NUMDRV       4                               /* # drives */
 
-/* Command word */
+/* Command word.
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |    command    | -   - | P | D | -   -   -   -   -   - | unit  |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+*/
 
 #define CW_V_FNC        12                              /* function */
 #define CW_M_FNC        017
@@ -197,35 +298,51 @@
 #define DA_CKMASK3      077
 #define DA_CKMASK       (dp_ctype ? DA_CKMASK3 : DA_CKMASK2)
 
-/* Status in dpc_sta[drv], (u) = unused in 13210, (d) = dynamic */
+/* Status in dpc_sta [drv].
 
-#define STA_ATN         0100000                         /* attention (u) */
-#define STA_1ST         0040000                         /* first status */
-#define STA_OVR         0020000                         /* overrun */
-#define STA_RWU         0010000                         /* rw unsafe NI (u) */
-#define STA_ACU         0004000                         /* access unsafe NI */
-#define STA_HUNT        0002000                         /* hunting NI (12557) */
-#define STA_PROT        0002000                         /* protected (13210) */
-#define STA_SKI         0001000                         /* incomplete NI (u) */
-#define STA_SKE         0000400                         /* seek error */
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | - | F | O | - | U | P | - | S | - | N | C | A | G | B | D | E | 13210A
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | T | F | O | R | U | H | I | S | - | N | C | A | G | B | D | E | 12557A
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+
+   Implementation notes:
+
+    1. The Data Protected, Not Ready, and Any Error bits are determined
+       dynamically. The other status bits are stored in the drive status array.
+*/
+
+#define STA_ATN         0100000                         /* (T) Attention (12557) */
+#define STA_1ST         0040000                         /* (F) First status */
+#define STA_OVR         0020000                         /* (O) Overrun */
+#define STA_RWU         0010000                         /* (R) Read/Write Unsafe (12557) */
+#define STA_ACU         0004000                         /* (U) Drive Unsafe */
+#define STA_PROT        0002000                         /* (P) Data Protected (13210) */
+#define STA_HUNT        0002000                         /* (H) Access Hunting (12557) */
+#define STA_SKI         0001000                         /* (I) Seek Incomplete (12557) */
+#define STA_SKE         0000400                         /* (S) Seek Check */
 /*                      0000200                            (unused) */
-#define STA_NRDY        0000100                         /* not ready (d) */
-#define STA_EOC         0000040                         /* end of cylinder */
-#define STA_AER         0000020                         /* addr error */
-#define STA_FLG         0000010                         /* flagged */
-#define STA_BSY         0000004                         /* seeking */
-#define STA_DTE         0000002                         /* data error */
-#define STA_ERR         0000001                         /* any error (d) */
+#define STA_NRDY        0000100                         /* (N) Not Ready */
+#define STA_EOC         0000040                         /* (C) End of Cylinder */
+#define STA_AER         0000020                         /* (A) Address Error */
+#define STA_FLG         0000010                         /* (G) Flagged Cylinder */
+#define STA_BSY         0000004                         /* (B) Drive Busy */
+#define STA_DTE         0000002                         /* (D) Data Error */
+#define STA_ERR         0000001                         /* (E) Any Error */
 
 #define STA_ERSET2      (STA_1ST | STA_OVR | STA_RWU | STA_ACU | \
                          STA_SKI | STA_SKE | STA_NRDY | \
                          STA_EOC | STA_AER | STA_DTE)   /* 12557A error set */
+
 #define STA_ERSET3      (STA_ATN | STA_1ST | STA_OVR | STA_RWU | STA_ACU | \
                          STA_SKI | STA_SKE | STA_NRDY | STA_EOC | STA_AER | \
                          STA_FLG | STA_BSY | STA_DTE)   /* 13210A error set */
-#define STA_ANYERR      (dp_ctype ? STA_ERSET3 : STA_ERSET2)
 
+#define STA_ANYERR      (dp_ctype ? STA_ERSET3 : STA_ERSET2)
 #define STA_UNLOADED    (dp_ctype ? (STA_NRDY | STA_BSY) : STA_NRDY)
+
 #define STA_MBZ13       (STA_ATN | STA_RWU | STA_SKI)   /* zero in 13210 */
 
 struct {
@@ -329,12 +446,38 @@ MTAB dpd_mod [] = {
     { 0 }
     };
 
+/* Debugging trace list */
+
+static DEBTAB dpd_deb [] = {
+    { "IOBUS", TRACE_IOBUS },                   /* trace I/O bus signals and data words received and returned */
+    { NULL,    0           }
+    };
+
+/* Device descriptor */
+
 DEVICE dpd_dev = {
-    "DPD", &dpd_unit, dpd_reg, dpd_mod,
-    1, 10, DP_N_NUMWD, 1, 8, 16,
-    NULL, NULL, &dpc_reset,
-    NULL, NULL, NULL,
-    &dpd_dib, DEV_DISABLE
+    "DPD",                                      /* device name */
+    &dpd_unit,                                  /* unit array */
+    dpd_reg,                                    /* register array */
+    dpd_mod,                                    /* modifier array */
+    1,                                          /* number of units */
+    10,                                         /* address radix */
+    DP_N_NUMWD,                                 /* address width = 4 GB */
+    1,                                          /* address increment */
+    8,                                          /* data radix */
+    16,                                         /* data width */
+    NULL,                                       /* examine routine */
+    NULL,                                       /* deposit routine */
+    &dpc_reset,                                 /* reset routine */
+    NULL,                                       /* boot routine */
+    NULL,                                       /* attach routine */
+    NULL,                                       /* detach routine */
+    &dpd_dib,                                   /* device information block pointer */
+    DEV_DISABLE | DEV_DEBUG,                    /* device flags */
+    0,                                          /* debug control flags */
+    dpd_deb,                                    /* debug flag name array */
+    NULL,                                       /* memory size change routine */
+    NULL                                        /* logical device name */
     };
 
 /* DPC data structures
@@ -405,12 +548,38 @@ MTAB dpc_mod [] = {
     { 0 }
     };
 
+/* Debugging trace list */
+
+static DEBTAB dpc_deb [] = {
+    { "IOBUS", TRACE_IOBUS },                   /* trace I/O bus signals and data words received and returned */
+    { NULL,    0           }
+    };
+
+/* Device descriptor */
+
 DEVICE dpc_dev = {
-    "DPC", dpc_unit, dpc_reg, dpc_mod,
-    DP_NUMDRV, 8, 24, 1, 8, 16,
-    NULL, NULL, &dpc_reset,
-    &dpc_boot, &dpc_attach, &dpc_detach,
-    &dpc_dib, DEV_DISABLE
+    "DPC",                                      /* device name */
+    dpc_unit,                                   /* unit array */
+    dpc_reg,                                    /* register array */
+    dpc_mod,                                    /* modifier array */
+    DP_NUMDRV,                                  /* number of units */
+    8,                                          /* address radix */
+    24,                                         /* address width = 4 GB */
+    1,                                          /* address increment */
+    8,                                          /* data radix */
+    16,                                         /* data width */
+    NULL,                                       /* examine routine */
+    NULL,                                       /* deposit routine */
+    &dpc_reset,                                 /* reset routine */
+    &dpc_boot,                                  /* boot routine */
+    &dpc_attach,                                /* attach routine */
+    &dpc_detach,                                /* detach routine */
+    &dpc_dib,                                   /* device information block pointer */
+    DEV_DISABLE | DEV_DEBUG,                    /* device flags */
+    0,                                          /* debug control flags */
+    dpc_deb,                                    /* debug flag name array */
+    NULL,                                       /* memory size change routine */
+    NULL                                        /* logical device name */
     };
 
 
@@ -549,6 +718,7 @@ return stat_data;
    flip-flops.  Only the 12557A has a command flip-flop.  IRQ, PRL, and SRQ are
    standard.
 
+
    Implementation notes:
 
     1. In hardware, the command channel card passes PRH to PRL.  The data card
@@ -558,6 +728,30 @@ return stat_data;
        the command card is interrupting.  This works in hardware, but we must
        break PRL at the command card under simulation to allow the command card
        to interrupt.
+
+    2. The 13210 manual says that a Check Status command clears the status
+       register, which consists of status word bits 14, 13, 11, 10, 8, 5, 4, 3,
+       1, and 0, i.e., all except bit 6 "Not Ready" and bit 2 "Drive Busy",
+       which are direct pass-throughs from the drive.  However, the schematic
+       shows that the register is cleared on STC assertion for any command
+       OTHER than Check Status.  In other words, every command except Check
+       Status clears the old status in order to assert new status (so two
+       successive Check Status commands will return the same status word,
+       contrary to the manual).  The simulator implements the schematic
+       behavior.
+
+    3. The schematics contained in 13210A manuals dated November 1974 and
+       earlier show that CRS does not clear the status register, but examining
+       the hardware PCA shows that it does.  The simulator implements the
+       hardware behavior.
+
+    4. The schematics contained in 13210A manuals dated November 1974 and
+       earlier show that CRS clears the attention register, but examining the
+       hardware PCA shows that it does not.  The signal marked CRS is actually
+       the XFER CYL signal from the sequencer, so the register is actually
+       cleared when a Check Status or Seek command is issued.  However, later
+       PCAs did add CRS to the other two clearing conditions.  The simulator
+       implements this later behavior.
 */
 
 uint32 dpcio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
@@ -625,6 +819,11 @@ while (working_set) {
 
             if (dp_ctype == A12557)                     /* 12557? */
                 dpc.command = CLEAR;                    /* clear command */
+
+            for (drv = 0; drv < DP_NUMDRV; drv++)       /* clear drive status */
+                dpc_sta [drv] &=                        /*   for each drive */
+                  ~(STA_1ST | STA_OVR | STA_RWU | STA_ACU | STA_EOC
+                    | STA_AER | STA_FLG | STA_DTE);
             break;
 
 
@@ -653,6 +852,11 @@ while (working_set) {
 
                 drv = CW_GETDRV (dpc_obuf);             /* get fnc, drv */
                 fnc = CW_GETFNC (dpc_obuf);             /* from cmd word */
+
+                if (fnc != FNC_STA)                     /* if this is not a status command */
+                    dpc_sta [drv] &=                    /*   then clear the status register */
+                      ~(STA_OVR | STA_RWU | STA_ACU | STA_EOC
+                        | STA_AER | STA_FLG | STA_DTE);
 
                 switch (fnc) {                          /* case on fnc */
 
@@ -732,7 +936,7 @@ dpc_eoc = 0;                                            /* clear end cyl */
 dpc_busy = drv + 1;                                     /* set busy */
 dpd_xfer = 1;                                           /* xfer in prog */
 dpc_unit[drv].FNC = fnc;                                /* save function */
-dpc_sta[drv] = dpc_sta[drv] & ~STA_ATN;                 /* clear ATN */
+dpc_sta[drv] &= ~(STA_ATN | STA_1ST);                   /* clear Attention and First Status */
 sim_activate (&dpc_unit[drv], time);                    /* activate unit */
 return;
 }
@@ -755,6 +959,8 @@ return;
    Status check -       transfer status, finish operation
    Check data
         chk     -       transfer sector count
+
+   The 12557A clears status after a Check Status command.  The 13210A does not.
 */
 
 t_stat dpd_svc (UNIT *uptr)
@@ -836,10 +1042,14 @@ switch (uptr->FNC) {                                    /* case function */
             dpdio (&dpd_dib, ioENF, 0);                 /* set dch flg */
             }
 
-        dpc_sta[drv] = dpc_sta[drv] &                   /* clr sta flags */
-            ~(STA_ATN | STA_1ST | STA_OVR |
-            STA_RWU | STA_ACU | STA_EOC |
-            STA_AER | STA_FLG | STA_DTE);
+        if (dp_ctype == A13210)
+            dpc_sta [drv] &= ~STA_ATN;                  /* clear the current drive's attention bit */
+        else
+            dpc_sta[drv] &=
+              ~(STA_ATN | STA_1ST | STA_OVR |
+                STA_RWU | STA_ACU | STA_EOC |
+                STA_AER | STA_FLG | STA_DTE);
+
         dpc_poll = 1;                                   /* enable polling */
         for (i = 0; i < DP_NUMDRV; i++) {               /* loop thru drives */
             if (dpc_sta[i] & STA_ATN) {                 /* any ATN set? */
@@ -1063,15 +1273,44 @@ return SCPE_OK;
 }
 
 
-/* Attach routine */
+/* Attach a drive unit.
+
+   The specified file is attached to the indicated drive unit, and the heads are
+   loaded, which will will set the First Status and Attention bits in the drive
+   status.  If a new file is specified, the file is initialized to its capacity
+   by writing a zero to the last byte in the file.
+
+
+   Implementation notes:
+
+    1. The C standard says, "A binary stream need not meaningfully support fseek
+       calls with a whence value of SEEK_END," so instead we determine the
+       offset from the start of the file to the last byte and seek there.
+*/
 
 t_stat dpc_attach (UNIT *uptr, CONST char *cptr)
 {
-t_stat r;
+t_stat      result;
+t_addr      offset;
+const uint8 zero = 0;
 
-r = attach_unit (uptr, cptr);                           /* attach unit */
-if (r == SCPE_OK) dpc_load_unload (uptr, 0, NULL, NULL);/* if OK, load heads */
-return r;
+result = attach_unit (uptr, cptr);                      /* attach the drive */
+
+if (result == SCPE_OK) {                                /* if the attach was successful */
+    dpc_load_unload (uptr, 0, NULL, NULL);              /*   then load the heads */
+
+    if (sim_switches & SWMASK ('N')) {                  /* if this is a new disc image */
+        offset = (t_addr)                               /*   then determine the offset of */
+          (uptr->capac * sizeof (int16) - sizeof zero); /*     the last byte in a full-sized file */
+
+        if (sim_fseek (uptr->fileref, offset, SEEK_SET) != 0    /* seek to the last byte */
+          || fwrite (&zero, sizeof zero, 1, uptr->fileref) == 0 /*   and write a zero to fill */
+          || fflush (uptr->fileref) != 0)                       /*     the file to its capacity */
+            clearerr (uptr->fileref);                           /* clear and ignore any errors */
+        }
+    }
+
+return result;                                          /* return the result of the attach */
 }
 
 
@@ -1140,82 +1379,278 @@ return SCPE_OK;
 }
 
 
-/* 7900/7901 bootstrap routine (HP 12992F ROM) */
+/* 7900/2870 disc bootstrap loaders (BMDL and 12992F).
 
-const BOOT_ROM dp_rom = {
-    0106710,                    /*ST CLC DC             ; clr dch */
-    0106711,                    /*   CLC CC             ; clr cch */
-    0017757,                    /*   JSB STAT           ; get status */
-    0067746,                    /*SK LDB SKCMD          ; seek cmd */
-    0106610,                    /*   OTB DC             ; cyl # */
-    0103710,                    /*   STC DC,C           ; to dch */
-    0106611,                    /*   OTB CC             ; seek cmd */
-    0103711,                    /*   STC CC,C           ; to cch */
-    0102310,                    /*   SFS DC             ; addr wd ok? */
-    0027710,                    /*   JMP *-1            ; no, wait */
-    0006400,                    /*   CLB */
-    0102501,                    /*   LIA 1              ; read switches */
-    0002011,                    /*   SLA,RSS            ; <0> set? */
-    0047747,                    /*   ADB BIT9           ; head 2 = removable */
-    0106610,                    /*   OTB DC             ; head/sector */
-    0103710,                    /*   STC DC,C           ; to dch */
-    0102311,                    /*   SFS CC             ; seek done? */
-    0027720,                    /*   JMP *-1            ; no, wait */
-    0017757,                    /*   JSB STAT           ; get status */
-    0067776,                    /*   LDB DMACW          ; DMA control */
-    0106606,                    /*   OTB 6 */
-    0067750,                    /*   LDB ADDR1          ; memory addr */
-    0106602,                    /*   OTB 2 */
-    0102702,                    /*   STC 2              ; flip DMA ctrl */
-    0067752,                    /*   LDB CNT            ; word count */
-    0106602,                    /*   OTB 2 */
-    0063745,                    /*   LDB RDCMD          ; read cmd */
-    0102611,                    /*   OTA CC             ; to cch */
-    0103710,                    /*   STC DC,C           ; start dch */
-    0103706,                    /*   STC 6,C            ; start DMA */
-    0103711,                    /*   STC CC,C           ; start cch */
-    0102311,                    /*   SFS CC             ; done? */
-    0027737,                    /*   JMP *-1            ; no, wait */
-    0017757,                    /*   JSB STAT           ; get status */
-    0027775,                    /*   JMP XT             ; done */
-    0037766,                    /*FSMSK 037766          ; status mask */
-    0004000,                    /*STMSK 004000          ; unsafe mask */
-    0020000,                    /*RDCMD 020000          ; read cmd */
-    0030000,                    /*SKCMD 030000          ; seek cmd */
-    0001000,                    /*BIT9  001000          ; head 2 select */
-    0102011,                    /*ADDR1 102011 */
-    0102055,                    /*ADDR2 102055 */
-    0164000,                    /*CNT   -6144. */
-    0, 0, 0, 0,                 /* unused */
-    0000000,                    /*STAT 0 */
-    0002400,                    /*   CLA                ; status request */
-    0102611,                    /*   OTC CC             ; to cch */
-    0103711,                    /*   STC CC,C           ; start cch */
-    0102310,                    /*   SFS DC             ; done? */
-    0027763,                    /*   JMP *-1 */
-    0102510,                    /*   LIA DC             ; get status */
-    0013743,                    /*   AND FSMSK          ; mask 15,14,3,0 */
-    0002003,                    /*   SZA,RSS            ; drive ready? */
-    0127757,                    /*   JMP STAT,I         ; yes */
-    0013744,                    /*   AND STMSK          ; fault? */
-    0002002,                    /*   SZA */
-    0102030,                    /*   HLT 30             ; yes */
-    0027700,                    /*   JMP ST             ; no, retry */
-    0117751,                    /*XT JSB ADDR2,I        ; start program */
-    0120010,                    /*DMACW 120000+DC */
-    0000000                     /*   -ST */
+   The Basic Moving-Head Disc Loader (BMDL) consists of two programs.  The
+   program starting at address x7700 loads absolute paper tapes into memory.
+   The program starting at address x7750 loads a disc-resident bootstrap from
+   the 7900 or 2870 disc drive into memory.  The S register setting does not
+   affect loader operation.
+
+   For a 2100/14/15/16 CPU, entering a LOAD DPC or BOOT DPC command loads the
+   BMDL into memory and executes the disc portion starting at x7750.  The
+   bootstrap reads 6144 (for a 7900) or 3072 (for a 2870) words from cylinder 0,
+   head 0, sector 0 into memory starting at location 2011 octal.  Loader
+   execution ends with the following instruction:
+
+     * JSB 2055,I - the disc read completed.
+
+   The BMDL configures DMA for an oversize (~32000 word) transfer and expects
+   the disc to terminate the operation with End of Cylinder (EOC) status.
+
+   The HP 1000 uses the 12992F boot loader ROM to bootstrap the 7900 disc.  Bit
+   0 of the S register determines whether the boot extension is read from
+   subchannel 0 (the fixed platter) or subchannel 1 (the removable platter).
+   The loader reads 6144 words from cylinder 0 sector 0 of the specified
+   subchannel into memory starting at location 2011 octal.  Loader execution
+   ends with one of the following instructions:
+
+     * HLT 30     - a drive fault occurred.
+     * JSB 2055,I - the disc read succeeded.
+
+   The loader automatically retries the operations for all disc errors other
+   than a drive fault.
+
+
+   Implementation notes:
+
+    1. After the BMDL has been loaded into memory, the paper tape portion may be
+       executed manually by setting the P register to the starting address
+       (x7700).
+
+    2. For compatibility with the "cpu_copy_loader" routine, the BMDL device I/O
+       instructions address select codes 10 and 11.
+
+    3. As published, the BMDL is configured to read from head 0 (the removable
+       platter, a.k.a. subchannel 1).  To read from head 2 (the fixed platter,
+       subchannel 0), the head/sector control word must be changed.
+*/
+
+#define BMDL_SUBCHANNEL_0   031000              /* BMDL control word to address subchannel 0 instead of 1 */
+
+static const LOADER_ARRAY dp_loaders = {
+    {                               /* HP 21xx Basic Moving-Head Disc Loader (BMDL-7900) */
+      050,                          /*   loader starting index */
+      077,                          /*   DMA index */
+      034,                          /*   FWA index */
+      { 0002401,                    /*   77700:  PTAPE CLA,RSS             Paper Tape start */
+        0063721,                    /*   77701:        LDA 77721           */
+        0107700,                    /*   77702:        CLC 0,C             */
+        0002307,                    /*   77703:        CCE,INA,SZA,RSS     */
+        0102077,                    /*   77704:        HLT 77              */
+        0017735,                    /*   77705:        JSB 77735           */
+        0007307,                    /*   77706:        CMB,CCE,INB,SZB,RSS */
+        0027702,                    /*   77707:        JMP 77702           */
+        0077733,                    /*   77710:        STB 77733           */
+        0017735,                    /*   77711:        JSB 77735           */
+        0017735,                    /*   77712:        JSB 77735           */
+        0074000,                    /*   77713:        STB 0               */
+        0077747,                    /*   77714:        STB 77747           */
+        0047734,                    /*   77715:        ADB 77734           */
+        0002140,                    /*   77716:        SEZ,CLE             */
+        0102055,                    /*   77717:        HLT 55              */
+        0017735,                    /*   77720:        JSB 77735           */
+        0177747,                    /*   77721:        STB 77747,I         */
+        0040001,                    /*   77722:        ADA 1               */
+        0067747,                    /*   77723:        LDB 77747           */
+        0006104,                    /*   77724:        CLE,INB             */
+        0037733,                    /*   77725:        ISZ 77733           */
+        0027714,                    /*   77726:        JMP 77714           */
+        0017735,                    /*   77727:        JSB 77735           */
+        0054000,                    /*   77730:        CPB 0               */
+        0027701,                    /*   77731:        JMP 77701           */
+        0102011,                    /*   77732:        HLT 11              */
+        0000000,                    /*   77733:        OCT 000000          */
+        0100100,                    /*   77734:        OCT 1n0100          */
+        0000000,                    /*   77735:        NOP                 */
+        0006400,                    /*   77736:        CLB                 */
+        0103710,                    /*   77737:        STC 10,C            */
+        0102310,                    /*   77740:        SFS 10              */
+        0027740,                    /*   77741:        JMP 77740           */
+        0107410,                    /*   77742:        MIB 10,C            */
+        0002240,                    /*   77743:        SEZ,CME             */
+        0127735,                    /*   77744:        JMP 77735,I         */
+        0005727,                    /*   77745:        BLF,BLF             */
+        0027737,                    /*   77746:        JMP 77737           */
+        0000000,                    /*   77747:        OCT 000000          */
+        0030000,                    /*   77750:  DISC  IOR 0               Disc start */
+        0067741,                    /*   77751:        LDB 77741           */
+        0106611,                    /*   77752:        OTB 11              */
+        0103711,                    /*   77753:        STC 11,C            */
+        0063750,                    /*   77754:        LDA 77750           */
+        0102610,                    /*   77755:        OTA 10              */
+        0103710,                    /*   77756:        STC 10,C            */
+        0102611,                    /*   77757:        OTA 11              */
+        0103711,                    /*   77760:        STC 11,C            */
+        0063777,                    /*   77761:        LDA 77777           */
+        0102606,                    /*   77762:        OTA 6               */
+        0063732,                    /*   77763:        LDA 77732           */
+        0102602,                    /*   77764:        OTA 2               */
+        0103710,                    /*   77765:        STC 10,C            */
+        0102702,                    /*   77766:        STC 2               */
+        0102602,                    /*   77767:        OTA 2               */
+        0106611,                    /*   77770:        OTB 11              */
+        0103710,                    /*   77771:        STC 10,C            */
+        0103706,                    /*   77772:        STC 6,C             */
+        0103711,                    /*   77773:        STC 11,C            */
+        0102311,                    /*   77774:        SFS 11              */
+        0027774,                    /*   77775:        JMP 77774           */
+        0117717,                    /*   77776:        JSB 77717,I         */
+        0120010 } },                /*   77777:        OCT 120010          */
+
+    {                               /* HP 1000 Loader ROM (12992F) */
+      IBL_START,                    /*   loader starting index */
+      IBL_DMA,                      /*   DMA index */
+      IBL_FWA,                      /*   FWA index */
+      { 0106710,                    /*   77700:  ST    CLC DC             ; clr dch */
+        0106711,                    /*   77701:        CLC CC             ; clr cch */
+        0017757,                    /*   77702:        JSB STAT           ; get status */
+        0067746,                    /*   77703:  SK    LDB SKCMD          ; seek cmd */
+        0106610,                    /*   77704:        OTB DC             ; cyl # */
+        0103710,                    /*   77705:        STC DC,C           ; to dch */
+        0106611,                    /*   77706:        OTB CC             ; seek cmd */
+        0103711,                    /*   77707:        STC CC,C           ; to cch */
+        0102310,                    /*   77710:        SFS DC             ; addr wd ok? */
+        0027710,                    /*   77711:        JMP *-1            ; no, wait */
+        0006400,                    /*   77712:        CLB                */
+        0102501,                    /*   77713:        LIA 1              ; read switches */
+        0002011,                    /*   77714:        SLA,RSS            ; <0> set? */
+        0047747,                    /*   77715:        ADB BIT9           ; head 2 = removable */
+        0106610,                    /*   77716:        OTB DC             ; head/sector */
+        0103710,                    /*   77717:        STC DC,C           ; to dch */
+        0102311,                    /*   77720:        SFS CC             ; seek done? */
+        0027720,                    /*   77721:        JMP *-1            ; no, wait */
+        0017757,                    /*   77722:        JSB STAT           ; get status */
+        0067776,                    /*   77723:        LDB DMACW          ; DMA control */
+        0106606,                    /*   77724:        OTB 6              */
+        0067750,                    /*   77725:        LDB ADDR1          ; memory addr */
+        0106602,                    /*   77726:        OTB 2              */
+        0102702,                    /*   77727:        STC 2              ; flip DMA ctrl */
+        0067752,                    /*   77730:        LDB CNT            ; word count */
+        0106602,                    /*   77731:        OTB 2              */
+        0063745,                    /*   77732:        LDB RDCMD          ; read cmd */
+        0102611,                    /*   77733:        OTA CC             ; to cch */
+        0103710,                    /*   77734:        STC DC,C           ; start dch */
+        0103706,                    /*   77735:        STC 6,C            ; start DMA */
+        0103711,                    /*   77736:        STC CC,C           ; start cch */
+        0102311,                    /*   77737:        SFS CC             ; done? */
+        0027737,                    /*   77740:        JMP *-1            ; no, wait */
+        0017757,                    /*   77741:        JSB STAT           ; get status */
+        0027775,                    /*   77742:        JMP XT             ; done */
+        0037766,                    /*   77743:  FSMSK OCT 037766         ; status mask */
+        0004000,                    /*   77744:  STMSK OCT 004000         ; unsafe mask */
+        0020000,                    /*   77745:  RDCMD OCT 020000         ; read cmd */
+        0030000,                    /*   77746:  SKCMD OCT 030000         ; seek cmd */
+        0001000,                    /*   77747:  BIT9  OCT 001000         ; head 2 select */
+        0102011,                    /*   77750:  ADDR1 OCT 102011         */
+        0102055,                    /*   77751:  ADDR2 OCT 102055         */
+        0164000,                    /*   77752:  CNT   DEC -6144.         */
+        0000000,                    /*   77753:        NOP                */
+        0000000,                    /*   77754:        NOP                */
+        0000000,                    /*   77755:        NOP                */
+        0000000,                    /*   77756:        NOP                */
+        0000000,                    /*   77757:  STAT  NOP                */
+        0002400,                    /*   77760:        CLA                ; status request */
+        0102611,                    /*   77761:        OTC CC             ; to cch */
+        0103711,                    /*   77762:        STC CC,C           ; start cch */
+        0102310,                    /*   77763:        SFS DC             ; done? */
+        0027763,                    /*   77764:        JMP *-1            */
+        0102510,                    /*   77765:        LIA DC             ; get status */
+        0013743,                    /*   77766:        AND FSMSK          ; mask 15,14,3,0 */
+        0002003,                    /*   77767:        SZA,RSS            ; drive ready? */
+        0127757,                    /*   77770:        JMP STAT,I         ; yes */
+        0013744,                    /*   77771:        AND STMSK          ; fault? */
+        0002002,                    /*   77772:        SZA                */
+        0102030,                    /*   77773:        HLT 30             ; yes */
+        0027700,                    /*   77774:        JMP ST             ; no, retry */
+        0117751,                    /*   77775:  XT    JSB ADDR2,I        ; start program */
+        0120010,                    /*   77776:  DMACW ABS 120000+DC      */
+        0000000 } }                 /*   77777:        ABS -ST            */
     };
+
+
+/* Device boot routine.
+
+   This routine is called directly by the BOOT DPC and LOAD DPC commands to copy
+   the device bootstrap into the upper 64 words of the logical address space.
+   It is also called indirectly by a BOOT CPU or LOAD CPU command when the
+   specified HP 1000 loader ROM socket contains a 12992F ROM.
+
+   When called in response to a BOOT DPC or LOAD DPC command, the "unitno"
+   parameter indicates the unit number specified in the BOOT command or is zero
+   for the LOAD command, and "dptr" points at the DPC device structure.  The
+   bootstrap supports loading only from unit 0, and the command will be rejected
+   if another unit is specified (e.g., BOOT DPC1).  Otherwise, depending on the
+   current CPU model, the BMDL or 12992F loader ROM will be copied into memory
+   and configured for the DPD/DPC select code pair.  If the CPU is a 1000, the S
+   register will be set as it would be by the front-panel microcode.
+
+   When called for a BOOT/LOAD CPU command, the "unitno" parameter indicates the
+   select code to be used for configuration, and "dptr" will be NULL.  As above,
+   the BMDL or 12992F loader ROM will be copied into memory and configured for
+   the specified select code. The S register is assumed to be set correctly on
+   entry and is not modified.
+
+   In either case, if the CPU is a 21xx model, the paper tape portion of the
+   BMDL will be automatically configured for the select code of the paper tape
+   reader.
+
+   For the 12992F boot loader ROM for the HP 1000, the S register is set as
+   follows:
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | ROM # | 0   0 |      select code      | reserved  | 0   0 | S |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     S = the subchannel number
+
+   Bit 0 specifies the subchannel containing the operating system.  For the
+   7900, either the fixed (0) or removable (1) platter may be specified.  For
+   the 7901, bit 0 must be 1.  If the -R switch is specified for the BOOT or
+   LOAD command, the loader ROM will be configured to boot from the removable
+   platter instead of the fixed platter.
+
+   Bits 5-3 are nominally zero but are reserved for the target operating system.
+   For example, RTE uses bit 5 to indicate whether a standard (0) or
+   reconfiguration (1) boot is desired.
+
+
+   Implementation notes:
+
+    1. In hardware, the BMDL was hand-configured for the disc and paper tape
+       reader select codes when it was installed on a given system.  Under
+       simulation, the LOAD and BOOT commands automatically configure the BMDL
+       to the current select codes of the PTR and DP devices.
+
+    2. As installed, the BMDL is configured to read from the removable platter
+       (a.k.a. subchannel 1).  If the -R switch is specified to read from the
+       fixed platter (subchannel 0), the head number in the head/sector control
+       word in memory is changed from 0 to 2.
+*/
 
 t_stat dpc_boot (int32 unitno, DEVICE *dptr)
 {
-const int32 dev = dpd_dib.select_code;                  /* data chan select code */
+static const HP_WORD dp_preserved = 0000070u;                   /* S-register bits 5-3 are preserved */
+const uint32 subchannel = sim_switches & SWMASK ('R') ? 1 : 0;  /* the selected boot subchannel */
+t_stat status;
 
-if (unitno != 0)                                        /* boot supported on drive unit 0 only */
-    return SCPE_NOFNC;                                  /* report "Command not allowed" if attempted */
+if (dptr == NULL)                                           /* if we are being called for a BOOT/LOAD CPU */
+    status = cpu_copy_loader (dp_loaders, unitno,           /*   then copy the boot loader to memory */
+                              IBL_S_NOCLEAR, IBL_S_NOSET);  /*     but do not alter the S register */
 
-cpu_ibl (dp_rom, dev, IBL_OPT,                          /* copy the boot ROM to memory and configure */
-         IBL_DP | IBL_SET_SC (dev)                      /*   the S register accordingly */
-           | (sim_switches & SWMASK ('R') ? IBL_DP_REM : 0));
+else if (unitno != 0)                                       /* otherwise a BOOT DPC for a non-zero unit */
+    return SCPE_NOFNC;                                      /*   is rejected as unsupported */
 
-return SCPE_OK;
+else                                                            /* otherwise this is a BOOT/LOAD DPC */
+    status = cpu_copy_loader (dp_loaders, dpd_dib.select_code,  /*   so copy the boot loader to memory */
+                              dp_preserved, subchannel);        /*     and configure the S register if 1000 CPU */
+
+if (status == SCPE_OK && subchannel == 0                /* if loader installed OK and boot is from subchan 0 */
+  && (PR & IBL_MASK) == dp_loaders [0].start_index)     /*   and the BMDL was installed */
+    mem_deposit (PR, BMDL_SUBCHANNEL_0);                /*     then change the control word to use head 2 */
+
+return status;                                          /* return the status of the installation */
 }

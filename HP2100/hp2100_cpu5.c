@@ -26,6 +26,7 @@
 
    CPU5         RTE-6/VM and RTE-IV firmware option instructions
 
+   07-Sep-17    JDB     Replaced "uint16" casts with "HP_WORD" for A/B assignments
    15-Jul-17    JDB     Replaced "vma_resolve" with "resolve"
    26-Jun-17    JDB     Replaced SEXT with SEXT16
    06-Jun-17    HV      Fixed bug in cpu_vma_lbp "last suit + 1" handler
@@ -623,7 +624,7 @@ if (!p30)                                               /* matched suit for 1st 
  * must be in idx 0 of PTE */
 if (pgidx==01777) {                                     /* suit switch situation */
     pgidx = 0;                                          /* select correct idx 0 */
-    suit = (uint16) (pagid + 1);                        /* suit needs increment */
+    suit = (HP_WORD) (pagid + 1 & D16_MASK);            /* suit needs increment with wraparound */
     if (suit==0) {                                      /* is it page 65536? */
         offset += 02000;                                /* adjust to 2nd page */
         suit = NILPAGE;
@@ -653,8 +654,8 @@ else {
         return cpu_vma_fault(IR, pagid+1,page31,31,ptepg,faultab,faultpc);
     }
 
-AR = (uint16) pagid;                                    /* return pagid in A */
-BR = (uint16) (page30 + offset);                        /* mapped address in B */
+AR = (HP_WORD) pagid;                                   /* return pagid in A */
+BR = (HP_WORD) (page30 + offset);                       /* mapped address in B */
 return SCPE_OK;
 }
 
@@ -1261,7 +1262,7 @@ YR = ReadW(MA);
 WriteW(vout++, MA); vin++;                              /* copy address of N */
 
 if (imax==0) goto easy;                                 /* easy case */
-AR = (uint16) (k / imax); AR++;                         /* calculate K/IMAX */
+AR = (HP_WORD) (k / imax); AR++;                        /* calculate K/IMAX */
 if (negflag) goto hard;                                 /* had a negative index? */
 if (YR > AR) goto hard;
 
@@ -1427,7 +1428,7 @@ if ((idext0 & 0100000) ||                               /* was nonstd MSEG? */
     e->npgs = msnum==e->msegno ? lastpgs : e->msegsz;   /* for last MSEG, only map available pgs */
     if (!cpu_ema_mmap01(e)) return FALSE;               /* map npgs pages at ipgs */
 }
-BR = (uint16) (e->mseg + e->msoff);                     /* return address of element */
+BR = (HP_WORD) (e->mseg + e->msoff);                    /* return address of element */
 return TRUE;                                            /* and everything done */
 }
 
@@ -1481,7 +1482,7 @@ if (npgs < e->msegsz) {
     e->mseg = mseg;                                     /* logical stat of MSEG */
     if (!cpu_ema_emat(e)) goto em16;                    /* do a std mapping */
 } else {
-    BR = (uint16) (mseg + e->offs);                     /* logical start of buffer */
+    BR = (HP_WORD) (mseg + e->offs);                    /* logical start of buffer */
     e->npgs = bufpgs;                                   /* S5 # pgs required */
     e->ipgs = e->pgoff;                                 /* S6 page offset to reqd pg */
     if (!cpu_ema_mmap02(e)) goto em16;                  /* do nonstd mapping */
@@ -1561,7 +1562,7 @@ if (xidex) {                                            /* is EMA declared? */
         idext0 = ReadWA(xidex+0) | 0100000;             /* set NS flag in id extension */
         WriteS (xidex + 0, idext0);                     /* save back value */
         AR = 0;                                         /* was successful */
-        BR = (uint16) (mseg + offs);                    /* calculate log address */
+        BR = (HP_WORD) (mseg + offs);                   /* calculate log address */
         (*rtn)++;                                       /* return via good exit */
         return SCPE_OK;
     }
@@ -1584,7 +1585,7 @@ while (ndim > 0) {
     if (sum & 0xffff8000) goto em15;                    /* overflow? */
     ndim--;
 }
-BR = (uint16) (abase + sum);                            /* add displacement */
+BR = (HP_WORD) (abase + sum);                           /* add displacement */
 (*rtn)++;                                               /* return via good exit */
 return SCPE_OK;
 

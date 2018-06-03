@@ -25,6 +25,7 @@
 
    MPX          12792C 8-Channel Asynchronous Multiplexer
 
+   01-Nov-17    JDB     Fixed serial output buffer overflow handling
    26-Jul-17    JDB     Changed BITFIELD macros to field constructors
    22-Apr-17    JDB     Corrected missing compound statements
    15-Mar-17    JDB     Trace flags are now global
@@ -73,8 +74,8 @@
    character editing, echoing, ENQ/ACK handshaking, and read terminator
    detection, substantially reducing the load on the CPU over the earlier 12920
    multiplexer.  It was supported by HP under RTE-MIII, RTE-IVB, and RTE-6/VM.
-   Under simulation, it connects with HP terminal emulators via Telnet to a
-   user-specified port.
+   Under simulation, it connects with HP terminal emulators via Telnet or serial
+   ports.
 
    The single interface card contained a Z80 CPU, DMA controller, CTC, four
    two-channel SIO UARTs, 16K of RAM, 8K of ROM, and I/O backplane latches and
@@ -246,7 +247,7 @@
 #define MPX_CNTLS           2                  /* number of control units */
 
 #define mpx_cntl            (mpx_unit [MPX_PORTS + 0])      /* controller unit */
-#define mpx_poll            (mpx_unit [MPX_PORTS + 1])      /* Telnet polling unit */
+#define mpx_poll            (mpx_unit [MPX_PORTS + 1])      /* polling unit */
 
 
 /* Character constants */
@@ -826,7 +827,7 @@ static  int32 mpx_iolen   = 0;                  /* length of current I/O xfer */
 static t_bool mpx_uien   = FALSE;               /* unsolicited interrupts enabled */
 static uint32 mpx_uicode = 0;                   /* unsolicited interrupt reason and port */
 
-struct {
+static struct {
     FLIP_FLOP control;                          /* control flip-flop */
     FLIP_FLOP flag;                             /* flag flip-flop */
     FLIP_FLOP flagbuf;                          /* flag buffer flip-flop */
@@ -955,16 +956,16 @@ static DIB mpx_dib = {
 /* Unit list.
 
    The first eight units correspond to the eight multiplexer line ports.  These
-   handle character I/O via the Telnet library.  A ninth unit acts as the card
-   controller, executing commands and transferring data to and from the I/O
-   buffers.  A tenth unit is responsible for polling for connections and socket
-   I/O.  It also holds the master socket.
+   handle character I/O via the multiplexer library.  A ninth unit acts as the
+   card controller, executing commands and transferring data to and from the I/O
+   buffers.  A tenth unit is responsible for polling for connections and line
+   I/O.  It also holds the master socket for Telnet connections.
 
    The character I/O service routines run only when there are characters to read
    or write.  They operate at the approximate baud rates of the terminals (in
    CPU instructions per second) in order to be compatible with the OS drivers.
    The controller service routine runs only when a command is executing or a
-   data transfer to or from the CPU is in progress.  The Telnet poll must run
+   data transfer to or from the CPU is in progress.  The poll service must run
    continuously, but it may operate much more slowly, as the only requirement is
    that it must not present a perceptible lag to human input.  To be compatible
    with CPU idling, it is co-scheduled with the master poll timer, which uses a
@@ -986,7 +987,7 @@ static UNIT mpx_unit [] = {
     { UDATA (&line_service, UNIT_FASTTIME, 0)             },    /* terminal I/O line 6 */
     { UDATA (&line_service, UNIT_FASTTIME, 0)             },    /* terminal I/O line 7 */
     { UDATA (&cntl_service, UNIT_DIS,      0)             },    /* controller unit */
-    { UDATA (&poll_service, POLL_FLAGS,    0), POLL_FIRST }     /* Telnet poll unit */
+    { UDATA (&poll_service, POLL_FLAGS,    0), POLL_FIRST }     /* poll unit */
     };
 
 
@@ -1626,21 +1627,20 @@ return SCPE_OK;
 /* Multiplexer line service.
 
    The line service routine is used to transmit and receive characters.  It is
-   started when a buffer is ready for output or when the Telnet poll routine
+   started when a buffer is ready for output or when the poll service routine
    determines that there are characters ready for input, and it is stopped when
    there are no more characters to output or input.  When a line is quiescent,
    this routine does not run.  Service times are selected to approximate the
    baud rate setting of the multiplexer port.
 
    "Fast timing" mode enables three optimizations.  First, buffered characters
-   are transferred via Telnet in blocks, rather than a character at a time; this
-   reduces network traffic and decreases simulator overhead (there is only one
-   service routine entry per block, rather than one per character).  Second,
-   ENQ/ACK handshaking is done locally, without involving the Telnet client.
-   Third, when editing and echo is enabled, entering BS echoes a backspace, a
-   space, and a backspace, and entering DEL echoes a backslash, a carriage
-   return, and a line feed, providing better compatibility with prior RTE
-   terminal drivers.
+   are transferred in blocks, rather than a character at a time; this reduces
+   line traffic and decreases simulator overhead (there is only one service
+   routine entry per block, rather than one per character).  Second, ENQ/ACK
+   handshaking is done locally, without involving the client.  Third, when
+   editing and echo is enabled, entering BS echoes a backspace, a space, and a
+   backspace, and entering DEL echoes a backslash, a carriage return, and a line
+   feed, providing better compatibility with prior RTE terminal drivers.
 
    Each read and write buffer begins with a reserved header byte that stores
    per-buffer information, such as whether handshaking should be suppressed
@@ -1654,7 +1654,7 @@ return SCPE_OK;
    write buffer is freed, and a UI check is made if the controller is idle, in
    case a write buffer request is pending.
 
-   For input, the character is retrieved from the Telnet buffer.  If a BREAK was
+   For input, the character is retrieved from the line buffer.  If a BREAK was
    received, break status is set, and the character is discarded (the current
    multiplexer library implementation always returns a NUL with a BREAK
    indication).  If the character is an XOFF, and XON/XOFF pacing is enabled, a
@@ -1685,6 +1685,59 @@ return SCPE_OK;
        service entry.  This allows the CPU time to unload the first buffer
        before the second fills up.  Once the first buffer is freed, the routine
        shifts back to burst mode to fill the remainder of the second buffer.
+
+    4. The terminal multiplexer library "tmxr_putc_ln" routine returns
+       SCPE_STALL if it is called when the transmit buffer is full.  When the
+       last character is added to the buffer, the routine returns SCPE_OK but
+       also changes the "xmte" field of the terminal multiplexer line (TMLN)
+       structure from 1 to 0 to indicate that further calls will be rejected.
+       The "xmte" value is set back to 1 when the tranmit buffer empties.
+
+       This presents two approaches to handling buffer overflows: either call
+       "tmxr_putc_ln" unconditionally and test for SCPE_STALL on return, or call
+       "tmxr_putc_ln" only if "xmte" is 1.  The former approach adds a new
+       character to the transmit buffer as soon as space is available, while the
+       latter adds a new character only when the buffer has completely emptied.
+       With either approach, transmission must be rescheduled after a delay to
+       allow the buffer to drain.
+
+       It would seem that the former approach is more attractive, as it would
+       allow the simulated I/O operation to complete more quickly.  However,
+       there are two mitigating factors.  First, the library attempts to write
+       the entire transmit buffer in one host system call, so there is usually
+       no time difference between freeing one buffer character and freeing the
+       entire buffer (barring host system buffer congestion).  Second, the
+       routine increments a "character dropped" counter when returning
+       SCPE_STALL status.  However, the characters actually would not be lost,
+       as the SCPE_STALL return would schedule retransmission when buffer space
+       is available, .  This would lead to erroneous reporting in the SHOW
+       <unit> STATISTICS command.
+
+       Therefore, we adopt the latter approach and reschedule transmission if
+       the "xmte" field is 0.  Note that the "tmxr_poll_tx" routine still must
+       be called in this case, as it is responsible for transmitting the buffer
+       contents and therefore freeing space in the buffer.
+
+    5. The "tmxr_putc_ln" library routine returns SCPE_LOST if the line is not
+       connected.  We ignore this error so that an OS may output an
+       initialization "welcome" message even when the terminal is not connected.
+       This permits the simulation to continue while ignoring the output.
+
+    6. The serial transmit buffer provided by the terminal multiplexer library
+       is restricted to one character.  Therefore, attempting to send several
+       characters in response to input, e.g., echoing "<BS> <space> <BS>" in
+       response to receiving a <BS>, will fail with SCPE_STALL.  Calling
+       "tmxr_poll_tx" between characters will not clear the buffer if the line
+       speed has been set explicitly.
+
+       To avoid having to do our own buffering for echoed characters, we call
+       the "tmxr_linemsg" routine which loops internally until the characters
+       have been transmitted.  This is ugly but is a consequence of the buffer
+       restriction imposed by the TMXR library.
+
+    7. Because ENQ/ACK handshaking is handled entirely on the multiplexer card
+       with no OS involvement, FASTTIME "local handling" consists simply of
+       omitting the handshake even if it is configured by the multiplexer.
 */
 
 static t_stat line_service (UNIT *uptr)
@@ -1699,14 +1752,19 @@ uint8 ch;
 int32 chx;
 uint32 buffer_count, write_count;
 t_stat status = SCPE_OK;
-t_bool recv_loop = !fast_binary_read;                           /* bypass if fast binary read */
-t_bool xmit_loop = !(fast_binary_read ||                        /* bypass if fast read or output suspended */
-                     (mpx_flags [port] & (FL_WAITACK | FL_XOFF)));
+t_bool recv_loop = !fast_binary_read;                               /* bypass if fast binary read */
+t_bool xmit_loop = !(fast_binary_read                               /* bypass if fast read */
+                     || mpx_flags [port] & (FL_WAITACK | FL_XOFF)   /*   or output suspended */
+                     || mpx_ldsc [port].xmte == 0);                 /*     or buffer full */
 
 
 tprintf (mpx_dev, DEB_CMDS, "Port %d service entered\n", port);
 
 /* Transmission service */
+
+if (mpx_ldsc [port].xmte == 0)                          /* if the transmit buffer is full */
+    tprintf (mpx_dev, DEB_XFER, "Port %d transmission stalled for full buffer\n",
+             port);
 
 write_count = buf_len (iowrite, port, get);             /* get the output buffer length */
 
@@ -1723,16 +1781,17 @@ while (xmit_loop && write_count > 0) {                  /* character available t
         continue;                                       /* continue with the first output character */
         }
 
-    if (mpx_flags [port] & FL_DO_ENQACK)                /* do handshake for this buffer? */
-        mpx_enq_cntr [port] = mpx_enq_cntr [port] + 1;  /* bump character counter */
-
-    if (mpx_enq_cntr [port] > ENQ_LIMIT) {              /* ready for ENQ? */
-        mpx_enq_cntr [port] = 0;                        /* clear ENQ counter */
-        mpx_ack_wait [port] = 0;                        /* clear ACK wait timer */
-
-        mpx_flags [port] |= FL_WAITACK;                 /* set wait for ACK */
+    if (mpx_enq_cntr [port] >= ENQ_LIMIT) {             /* ready for ENQ? */
         ch = ENQ;
         status = tmxr_putc_ln (&mpx_ldsc [port], ch);   /* transmit ENQ */
+
+        if (status == SCPE_OK || status == SCPE_LOST) { /* if transmission succeeded or is ignored */
+            mpx_enq_cntr [port] = 0;                    /*   then clear the ENQ counter */
+            mpx_ack_wait [port] = 0;                    /*     and the ACK wait timer */
+
+            mpx_flags [port] |= FL_WAITACK;             /* set wait for ACK */
+            }
+
         xmit_loop = FALSE;                              /* stop further transmission */
         }
 
@@ -1740,16 +1799,31 @@ while (xmit_loop && write_count > 0) {                  /* character available t
         ch = buf_get (iowrite, port) & data_mask;       /* get char and mask to bit width */
         status = tmxr_putc_ln (&mpx_ldsc [port], ch);   /* transmit the character */
 
-        write_count = write_count - 1;                  /* count the character */
-        xmit_loop = (status == SCPE_OK) && fast_timing; /*   and continue transmission if enabled */
+        if (status == SCPE_OK || status == SCPE_LOST) { /* if transmission succeeded or is ignored */
+            write_count = write_count - 1;              /*   then count the character */
+
+            xmit_loop = (fast_timing                        /* continue transmission if enabled */
+                          && mpx_ldsc [port].xmte != 0);    /*   and buffer space is available */
+
+            if (mpx_flags [port] & FL_DO_ENQACK)        /* if ENQ/ACK handshaking is enabled */
+                mpx_enq_cntr [port] += 1;               /*   then bump the character counter */
+            }
+
+        else                                            /* otherwise transmission failed */
+            xmit_loop = FALSE;                          /*   so exit the loop */
         }
 
-    if (status != SCPE_OK)                              /* if the transmission failed */
-        xmit_loop = FALSE;                              /*   then exit the loop */
-
-    else
+    if (status == SCPE_OK)
         tprintf (mpx_dev, DEB_XFER, "Port %d character %s transmitted\n",
                  port, fmt_char (ch));
+
+    else {
+        tprintf (mpx_dev, DEB_XFER, "Port %d character %s transmission failed with status %d\n",
+                 port, fmt_char (ch), status);
+
+        if (status == SCPE_LOST)                        /* if the line is not connected */
+            status = SCPE_OK;                           /*   then ignore the output */
+        }
 
     if (write_count == 0) {                             /* buffer complete? */
         buf_free (iowrite, port);                       /* free buffer */
@@ -1831,10 +1905,8 @@ while (recv_loop) {                                     /* OK to process? */
                 if (rt & RT_ENAB_ECHO) {                        /* echo enabled? */
                     tmxr_putc_ln (&mpx_ldsc [port], BS);        /* echo BS */
 
-                    if (fast_timing) {                          /* fast timing mode? */
-                        tmxr_putc_ln (&mpx_ldsc [port], ' ');   /* echo space */
-                        tmxr_putc_ln (&mpx_ldsc [port], BS);    /* echo BS */
-                        }
+                    if (fast_timing)                            /* fast timing mode? */
+                        tmxr_linemsg (&mpx_ldsc [port], " \b"); /* echo space and BS */
                     }
 
                 continue;
@@ -1847,8 +1919,7 @@ while (recv_loop) {                                     /* OK to process? */
                     if (fast_timing)                            /* fast timing mode? */
                         tmxr_putc_ln (&mpx_ldsc [port], '\\');  /* echo backslash */
 
-                    tmxr_putc_ln (&mpx_ldsc [port], CR);        /* echo CR */
-                    tmxr_putc_ln (&mpx_ldsc [port], LF);        /*   and LF */
+                    tmxr_linemsg (&mpx_ldsc [port], "\r\n");    /* echo CR and LF */
                     }
 
                 continue;
@@ -1865,7 +1936,8 @@ while (recv_loop) {                                     /* OK to process? */
 
             if ((ch == CR) && (rt & RT_END_ON_CR)) {
                 if (rt & RT_ENAB_ECHO)                      /* echo enabled? */
-                    tmxr_putc_ln (&mpx_ldsc [port], LF);    /* send LF */
+                    tmxr_linemsg (&mpx_ldsc [port], "\n");  /* send LF */
+
                 mpx_param = RS_ETC_CR;                      /* set termination condition */
                 }
 
@@ -1981,15 +2053,15 @@ else {                                                      /* normal service */
         tprintf (mpx_dev, DEB_CMDS, "Port %d service stopped\n", port);
     }
 
-return SCPE_OK;
+return status;
 }
 
 
-/* Telnet poll service.
+/* Poll service.
 
-   This service routine is used to poll for Telnet connections and incoming
-   characters.  It starts when the socket is attached and stops when the socket
-   is detached.
+   This service routine is used to poll for connections and incoming characters.
+   It is started when the listening socket or a serial line is attached and is
+   stopped when the socket and all lines are detached.
 
    Each line is then checked for a pending ENQ/ACK handshake.  If one is
    pending, the ACK counter is incremented, and if it times out, another ENQ is
@@ -2054,10 +2126,10 @@ return SCPE_OK;
     1. Under simulation, we also clear the input buffer register, even though
        the hardware doesn't.
 
-    2. We set up the first poll for Telnet connections to occur "immediately"
-       upon execution, so that clients will be connected before execution
-       begins.  Otherwise, a fast program may access the multiplexer before the
-       poll service routine activates.
+    2. We set up the first poll for connections to occur "immediately" upon
+       execution, so that clients will be connected before execution begins.
+       Otherwise, a fast program may access the multiplexer before the poll
+       service routine activates.
 
     3. We must set the "emptying_flags" and "filling_flags" values here, because
        they cannot be initialized statically, even though the values are
@@ -2079,10 +2151,10 @@ mpx_ibuf = 0;                                           /* clear input buffer */
 
 if (mpx_poll.flags & UNIT_ATT) {                        /* network attached? */
     mpx_poll.wait = POLL_FIRST;                         /* set up poll */
-    sim_activate (&mpx_poll, mpx_poll.wait);            /* start Telnet poll immediately */
+    sim_activate (&mpx_poll, mpx_poll.wait);            /* start poll immediately */
     }
 else
-    sim_cancel (&mpx_poll);                             /* else stop Telnet poll */
+    sim_cancel (&mpx_poll);                             /* else stop poll */
 
 return SCPE_OK;
 }
@@ -2092,23 +2164,32 @@ return SCPE_OK;
 
    We are called by the ATTACH MPX <port> command to attach the multiplexer to
    the listening port indicated by <port>.  Logically, it is the multiplexer
-   device that is attached; however, SIMH only allows units to be attached.
-   This makes sense for devices such as tape drives, where the attached media is
-   a property of a specific drive.  In our case, though, the listening port is a
-   property of the multiplexer card, not of any given serial line.  As ATTACH
-   MPX is equivalent to ATTACH MPX0, the port would, by default, be attached to
-   the first serial line and be reported there in a SHOW MPX command.
+   device that is attached; however, SIMH only allows units to be attached. This
+   makes sense for devices such as tape drives, where the attached media is a
+   property of a specific drive.  In our case, though, the listening port is a
+   property of the multiplexer card, not of any given line.  As ATTACH MPX is
+   equivalent to ATTACH MPX0, the port would, by default, be attached to the
+   first line and be reported there in a SHOW MPX command.
 
-   To preserve the logical picture, we attach the port to the Telnet poll unit,
-   which is normally disabled to inhibit its display.  Attaching to a disabled
-   unit is not allowed, so we first enable the unit, then attach it, then
-   disable it again.  Attachment is reported by the "show_status" routine below.
+   To preserve the logical picture, we attach the listening port to the poll
+   unit (unit 9), which is normally disabled to inhibit its display.  Serial
+   ports are attached to line units 0-7 normally.  Attachment is reported by the
+   "show_status" routine below.
 
-   A direct attach to the poll unit is only allowed when restoring a previously
-   saved session.
+   The connection poll service routine is synchronized with the other input
+   polling devices in the simulator to facilitate idling.
 
-   The Telnet poll service routine is synchronized with the other input polling
-   devices in the simulator to facilitate idling.
+
+   Implementation notes:
+
+    1. If we are being called as part of RESTORE processing, we may see a
+       request to attach the poll unit (unit 9).  This will occur if unit 9 was
+       attached when the SAVE was done.  In this case, the SIM_SW_REST flag will
+       be set in "sim_switches", and we will allow the call to succeed.
+
+    2. If the poll unit is attached, it will be enabled as part of RESTORE
+       processing.  We always unilaterally disable this unit to ensure that it
+       remains hidden.
 */
 
 static t_stat mpx_attach (UNIT *uptr, CONST char *cptr)
@@ -2133,15 +2214,21 @@ return status;
 
 /* Detach the multiplexer.
 
-   Normally, we are called by the DETACH MPX command, which is equivalent to
-   DETACH MPX0.  However, we may be called with other units in two cases.
+   We are called by the DETACH MPX command to detach the listening port and all
+   Telnet sessions.  We will also be called by DETACH ALL, RESTORE, and during
+   simulator shutdown.  For DETACH ALL and RESTORE, we must not fail the call,
+   or processing of other units will cease.
 
-   A DETACH ALL command will call us for unit 9 (the poll unit) if it is
-   attached.  Also, during simulator shutdown, we will be called for units 0-8
-   (detach_all in scp.c calls the detach routines of all units that do NOT have
-   UNIT_ATTABLE), as well as for unit 9 if it is attached.  In both cases, it is
-   imperative that we return SCPE_OK, otherwise any remaining device detaches
-   will not be performed.
+
+   Implementation notes:
+
+    1. During simulator shutdown, we will be called for units 0-8 (detach_all in
+       scp.c calls the detach routines of all units that do NOT have
+       UNIT_ATTABLE), as well as for unit 9 if it is attached.
+
+    2. We cannot fail a direct DETACH MPX9 (poll unit), because we cannot tell
+       that case apart from a DETACH ALL (a RESTORE will have the SIM_SW_REST
+       flag set in "sim_switches").
 */
 
 static t_stat mpx_detach (UNIT *uptr)
@@ -2157,7 +2244,7 @@ if ((uptr == mpx_unit) || (uptr == &mpx_poll)) {        /* base unit or poll uni
         sim_cancel (&mpx_unit [i]);                     /* cancel any scheduled I/O */
         }
 
-    sim_cancel (&mpx_poll);                             /* stop Telnet poll */
+    sim_cancel (&mpx_poll);                             /* stop poll */
     }
 
 return status;
@@ -2413,9 +2500,8 @@ switch (mpx_cmd) {
         mpx_enq_cntr [0] = 0;                           /* clear port 0 ENQ counter */
         mpx_ack_wait [0] = 0;                           /* clear port 0 ACK wait timer */
 
-        tmxr_putc_ln (&mpx_ldsc [0], ESC);              /* send fast binary read */
-        tmxr_putc_ln (&mpx_ldsc [0], 'e');              /*   escape sequence to port 0 */
-        tmxr_poll_tx (&mpx_desc);                       /* flush output */
+        tmxr_linemsg (&mpx_ldsc [0], "\033e");          /* send the fast binary read escape sequence to port 0 */
+        tmxr_poll_tx (&mpx_desc);                       /*   and flush the output */
 
         next_state = exec;                              /* set execution state */
         break;
@@ -2557,7 +2643,7 @@ return set_flag;
 }
 
 
-/* Poll for new Telnet connections */
+/* Poll for new connections */
 
 static void poll_connection (void)
 {

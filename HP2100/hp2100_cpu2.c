@@ -27,6 +27,7 @@
    CPU2         Floating-point, dynamic mapping, extended, and I/O processor
                 instructions
 
+   07-Sep-17    JDB     Removed unnecessary "uint16" casts
    10-Jul-17    JDB     Renamed the global routine "iogrp" to "cpu_iog"
    26-Jun-17    JDB     Replaced SEXT with SEXT16
    22-Mar-17    JDB     Corrected comments regarding IR bit 11 selecting A/B
@@ -480,11 +481,11 @@ switch (entry) {                                        /* decode IR<3:0> */
         break;
 
     case 030:                                           /* RSA, RSB 10x730 (OP_N) */
-        ABREG[absel] = (uint16) dms_upd_sr ();          /* save stat */
+        ABREG [absel] = dms_upd_sr ();                  /* save stat */
         break;
 
     case 031:                                           /* RVA, RVB 10x731 (OP_N) */
-        ABREG[absel] = (uint16) dms_upd_vr (err_PC);    /* return updated violation register */
+        ABREG [absel] = dms_upd_vr (err_PC);            /* return updated violation register */
         break;
 
     case 032:                                           /* DJP 105732 (OP_A) */
@@ -659,7 +660,7 @@ switch (entry) {                                        /* decode IR<4:0> */
         break;
 
     case 004:                                           /* CXA, CXB 10x744 (OP_N) */
-        ABREG[absel] = (uint16) XR;                     /* copy from XR */
+        ABREG [absel] = XR;                             /* copy from XR */
         break;
 
     case 005:                                           /* LDX 105745 (OP_K)*/
@@ -675,8 +676,8 @@ switch (entry) {                                        /* decode IR<4:0> */
 
     case 007:                                           /* XAX, XBX 10x747 (OP_N) */
         t = XR;                                         /* exchange XR */
-        XR = ABREG[absel];
-        ABREG[absel] = (uint16) t;
+        XR = ABREG [absel];
+        ABREG [absel] = t;
         break;
 
     case 010:                                           /* SAY, SBY 10x750 (OP_A) */
@@ -698,7 +699,7 @@ switch (entry) {                                        /* decode IR<4:0> */
         break;
 
     case 014:                                           /* CYA, CYB 10x754 (OP_N) */
-        ABREG[absel] = (uint16) YR;                     /* copy from YR */
+        ABREG [absel] = YR;                             /* copy from YR */
         break;
 
     case 015:                                           /* LDY 105755 (OP_K) */
@@ -714,8 +715,8 @@ switch (entry) {                                        /* decode IR<4:0> */
 
     case 017:                                           /* XAY, XBY 10x757 (OP_N) */
         t = YR;                                         /* exchange YR */
-        YR = ABREG[absel];
-        ABREG[absel] = (uint16) t;
+        YR = ABREG [absel];
+        ABREG [absel] = t;
         break;
 
 /* EIG module 2 */
@@ -1044,7 +1045,7 @@ switch (entry) {                                        /* decode IR<5:0> */
         break;
 
     case 002:                                           /* READF 105462 (OP_N) */
-        AR = (uint16) iop_sp;                           /* copy stk ptr */
+        AR = iop_sp;                                    /* copy stk ptr */
         break;
 
     case 003:                                           /* INS 105463 (OP_N) */

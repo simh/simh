@@ -26,6 +26,7 @@
 
    CPU1         Extended arithmetic and optional microcode dispatchers
 
+   07-Sep-17    JDB     Removed unnecessary "uint16" casts
    01-Aug-17    JDB     Changed TIMER and RRR 16 to test for undefined stops
    07-Jul-17    JDB     Changed "iotrap" from uint32 to t_bool
    26-Jun-17    JDB     Replaced SEXT with SEXT16
@@ -871,11 +872,11 @@ for (i = 0; i < OP_N_F; i++) {
             break;
 
         case OP_VAR:                                    /* inline variable operand */
-            (*op++).word = (uint16) PR;                 /* get pointer to variable */
+            (*op++).word = PR;                          /* get pointer to variable */
             break;
 
         case OP_ADR:                                    /* inline address operand */
-            (*op++).word = (uint16) MA;                 /* get address (set by "resolve" above) */
+            (*op++).word = MA;                          /* get address (set by "resolve" above) */
             break;
 
         case OP_ADK:                                    /* address of int constant */

@@ -1,7 +1,7 @@
 /* hp2100_stddev.c: HP2100 standard devices simulator
 
    Copyright (c) 1993-2016, Robert M. Supnik
-   Copyright (c) 2017       J. David Bryan
+   Copyright (c) 2017-2018, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -29,6 +29,9 @@
    TTY          12531C buffered teleprinter interface
    TBG          12539C time base generator
 
+   27-Feb-18    JDB     Added the BBL
+   22-Nov-17    JDB     Fixed TTY serial output buffer overflow handling
+   18-Sep-17    JDB     Changed PTR "DIAG" modifier to "DIAGNOSTIC"
    03-Aug-17    JDB     PTP and TTY now append to existing file data
    18-Jul-17    JDB     The PTR device now handles the IOERR simulation stop
    11-Jul-17    JDB     Renamed "ibl_copy" to "cpu_ibl"
@@ -370,7 +373,7 @@ REG ptr_reg[] = {
     };
 
 MTAB ptr_mod[] = {
-    { UNIT_DIAG, UNIT_DIAG, "diagnostic mode", "DIAG", NULL },
+    { UNIT_DIAG, UNIT_DIAG, "diagnostic mode", "DIAGNOSTIC", NULL },
     { UNIT_DIAG, 0, "reader mode", "READER", NULL },
     { MTAB_XTD | MTAB_VDV,             1u, "SC",    "SC",    &hp_set_dib, &hp_show_dib, (void *) &ptr_dib },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, ~1u, "DEVNO", "DEVNO", &hp_set_dib, &hp_show_dib, (void *) &ptr_dib },
@@ -710,69 +713,223 @@ return SCPE_OK;
 }
 
 
-/* Paper tape reader bootstrap routine (HP 12992K ROM) */
+/* Paper tape reader bootstrap loaders (BBL and 12992K).
 
-const BOOT_ROM ptr_rom = {
-    0107700,                    /*ST CLC 0,C            ; intr off */
-    0002401,                    /*   CLA,RSS            ; skip in */
-    0063756,                    /*CN LDA M11            ; feed frame */
-    0006700,                    /*   CLB,CCE            ; set E to rd byte */
-    0017742,                    /*   JSB READ           ; get #char */
-    0007306,                    /*   CMB,CCE,INB,SZB    ; 2's comp */
-    0027713,                    /*   JMP *+5            ; non-zero byte */
-    0002006,                    /*   INA,SZA            ; feed frame ctr */
-    0027703,                    /*   JMP *-3 */
-    0102077,                    /*   HLT 77B            ; stop */
-    0027700,                    /*   JMP ST             ; next */
-    0077754,                    /*   STA WC             ; word in rec */
-    0017742,                    /*   JSB READ           ; get feed frame */
-    0017742,                    /*   JSB READ           ; get address */
-    0074000,                    /*   STB 0              ; init csum */
-    0077755,                    /*   STB AD             ; save addr */
-    0067755,                    /*CK LDB AD             ; check addr */
-    0047777,                    /*   ADB MAXAD          ; below loader */
-    0002040,                    /*   SEZ                ; E =0 => OK */
-    0027740,                    /*   JMP H55 */
-    0017742,                    /*   JSB READ           ; get word */
-    0040001,                    /*   ADA 1              ; cont checksum */
-    0177755,                    /*   STA AD,I           ; store word */
-    0037755,                    /*   ISZ AD */
-    0000040,                    /*   CLE                ; force wd read */
-    0037754,                    /*   ISZ WC             ; block done? */
-    0027720,                    /*   JMP CK             ; no */
-    0017742,                    /*   JSB READ           ; get checksum */
-    0054000,                    /*   CPB 0              ; ok? */
-    0027702,                    /*   JMP CN             ; next block */
-    0102011,                    /*   HLT 11             ; bad csum */
-    0027700,                    /*   JMP ST             ; next */
-    0102055,                    /*H55 HALT 55           ; bad address */
-    0027700,                    /*   JMP ST             ; next */
-    0000000,                    /*RD 0 */
-    0006600,                    /*   CLB,CME            ; E reg byte ptr */
-    0103710,                    /*   STC RDR,C          ; start reader */
-    0102310,                    /*   SFS RDR            ; wait */
-    0027745,                    /*   JMP *-1 */
-    0106410,                    /*   MIB RDR            ; get byte */
-    0002041,                    /*   SEZ,RSS            ; E set? */
-    0127742,                    /*   JMP RD,I           ; no, done */
-    0005767,                    /*   BLF,CLE,BLF        ; shift byte */
-    0027744,                    /*   JMP RD+2           ; again */
-    0000000,                    /*WC 000000             ; word count */
-    0000000,                    /*AD 000000             ; address */
-    0177765,                    /*M11 -11               ; feed count */
-    0, 0, 0, 0, 0, 0, 0, 0,     /* unused */
-    0, 0, 0, 0, 0, 0, 0,        /* unused */
-    0000000                     /*MAXAD -ST             ; max addr */
+   The Basic Binary Loader (BBL) performs three functions, depending on the
+   setting of the S register, as follows:
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | C | -   -   -   -   -   -   -   -   -   -   -   -   -   - | V |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     C = Compare the paper tape to memory
+     V = Verify checksums on the paper tape
+
+   If bit 15 is set to 1, the loader will compare the absolute program on tape
+   to the contents of memory.  If bit 0 is set to 1, the loader will verify the
+   checksums of the absolute binary records on tape without altering memory.  If
+   neither bit is set, the loader will read the absolute program on the paper
+   tape into memory.  Loader execution ends with one of the following halt
+   instructions:
+
+     * HLT 00 - a comparison error occurred; A = the tape value.
+     * HLT 11 - a checksum error occurred; A/B = the tape/calculated value.
+     * HLT 55 - the program load address would overlay the loader.
+     * HLT 77 - the end of tape was reached with a successful read.
+
+   The 12992K boot loader ROM reads an absolute program on the paper tape into
+   memory.  The S register setting does not affect loader operation.  Loader
+   execution ends with one of the following halt instructions:
+
+     * HLT 11 - a checksum error occurred; A/B = the calculated/tape value.
+     * HLT 55 - the program load address would overlay the ROM loader.
+     * HLT 77 - the end of tape was reached with a successful read.
+
+   Note that the A/B register contents are in the opposite order of those in the
+   BBL when a checksum error occurs.
+*/
+
+static const LOADER_ARRAY ptr_loaders = {
+    {                               /* HP 21xx Basic Binary Loader (BBL) */
+      000,                          /*   loader starting index */
+      IBL_NA,                       /*   DMA index (not used) */
+      072,                          /*   FWA index */
+      { 0107700,                    /*   77700:  START CLC 0,C      */
+        0063770,                    /*   77701:        LDA 77770    */
+        0106501,                    /*   77702:        LIB 1        */
+        0004010,                    /*   77703:        SLB          */
+        0002400,                    /*   77704:        CLA          */
+        0006020,                    /*   77705:        SSB          */
+        0063771,                    /*   77706:        LDA 77771    */
+        0073736,                    /*   77707:        STA 77736    */
+        0006401,                    /*   77710:        CLB,RSS      */
+        0067773,                    /*   77711:        LDB 77773    */
+        0006006,                    /*   77712:        INB,SZB      */
+        0027717,                    /*   77713:        JMP 77717    */
+        0107700,                    /*   77714:        CLC 0,C      */
+        0102077,                    /*   77715:        HLT 77       */
+        0027700,                    /*   77716:        JMP 77700    */
+        0017762,                    /*   77717:        JSB 77762    */
+        0002003,                    /*   77720:        SZA,RSS      */
+        0027712,                    /*   77721:        JMP 77712    */
+        0003104,                    /*   77722:        CMA,CLE,INA  */
+        0073774,                    /*   77723:        STA 77774    */
+        0017762,                    /*   77724:        JSB 77762    */
+        0017753,                    /*   77725:        JSB 77753    */
+        0070001,                    /*   77726:        STA 1        */
+        0073775,                    /*   77727:        STA 77775    */
+        0063775,                    /*   77730:        LDA 77775    */
+        0043772,                    /*   77731:        ADA 77772    */
+        0002040,                    /*   77732:        SEZ          */
+        0027751,                    /*   77733:        JMP 77751    */
+        0017753,                    /*   77734:        JSB 77753    */
+        0044000,                    /*   77735:        ADB 0        */
+        0000000,                    /*   77736:        NOP          */
+        0002101,                    /*   77737:        CLE,RSS      */
+        0102000,                    /*   77740:        HLT 0        */
+        0037775,                    /*   77741:        ISZ 77775    */
+        0037774,                    /*   77742:        ISZ 77774    */
+        0027730,                    /*   77743:        JMP 77730    */
+        0017753,                    /*   77744:        JSB 77753    */
+        0054000,                    /*   77745:        CPB 0        */
+        0027711,                    /*   77746:        JMP 77711    */
+        0102011,                    /*   77747:        HLT 11       */
+        0027700,                    /*   77750:        JMP 77700    */
+        0102055,                    /*   77751:        HLT 55       */
+        0027700,                    /*   77752:        JMP 77700    */
+        0000000,                    /*   77753:        NOP          */
+        0017762,                    /*   77754:        JSB 77762    */
+        0001727,                    /*   77755:        ALF,ALF      */
+        0073776,                    /*   77756:        STA 77776    */
+        0017762,                    /*   77757:        JSB 77762    */
+        0033776,                    /*   77760:        IOR 77776    */
+        0127753,                    /*   77761:        JMP 77753,I  */
+        0000000,                    /*   77762:        NOP          */
+        0103710,                    /*   77763:        STC 10,C     */
+        0102310,                    /*   77764:        SFS 10       */
+        0027764,                    /*   77765:        JMP 77764    */
+        0102510,                    /*   77766:        LIA 10       */
+        0127762,                    /*   77767:        JMP 77762,I  */
+        0173775,                    /*   77770:        STA 77775,I  */
+        0153775,                    /*   77771:        CPA 77775,I  */
+        0100100,                    /*   77772:        RRL 16       */
+        0177765,                    /*   77773:        STB 77765,I  */
+        0000000,                    /*   77774:        NOP          */
+        0000000,                    /*   77775:        NOP          */
+        0000000,                    /*   77776:        NOP          */
+        0000000 } },                /*   77777:        NOP          */
+
+    {                               /* HP 1000 Loader ROM (12992K) */
+      IBL_START,                    /*   loader starting index */
+      IBL_DMA,                      /*   DMA index */
+      IBL_FWA,                      /*   FWA index */
+      { 0107700,                    /*   77700:  ST    CLC 0,C            ; intr off */
+        0002401,                    /*   77701:        CLA,RSS            ; skip in */
+        0063756,                    /*   77702:  CN    LDA M11            ; feed frame */
+        0006700,                    /*   77703:        CLB,CCE            ; set E to rd byte */
+        0017742,                    /*   77704:        JSB READ           ; get #char */
+        0007306,                    /*   77705:        CMB,CCE,INB,SZB    ; 2's comp */
+        0027713,                    /*   77706:        JMP *+5            ; non-zero byte */
+        0002006,                    /*   77707:        INA,SZA            ; feed frame ctr */
+        0027703,                    /*   77710:        JMP *-3            */
+        0102077,                    /*   77711:        HLT 77B            ; stop */
+        0027700,                    /*   77712:        JMP ST             ; next */
+        0077754,                    /*   77713:        STA WC             ; word in rec */
+        0017742,                    /*   77714:        JSB READ           ; get feed frame */
+        0017742,                    /*   77715:        JSB READ           ; get address */
+        0074000,                    /*   77716:        STB 0              ; init csum */
+        0077755,                    /*   77717:        STB AD             ; save addr */
+        0067755,                    /*   77720:  CK    LDB AD             ; check addr */
+        0047777,                    /*   77721:        ADB MAXAD          ; below loader */
+        0002040,                    /*   77722:        SEZ                ; E =0 => OK */
+        0027740,                    /*   77723:        JMP H55            */
+        0017742,                    /*   77724:        JSB READ           ; get word */
+        0040001,                    /*   77725:        ADA 1              ; cont checksum */
+        0177755,                    /*   77726:        STA AD,I           ; store word */
+        0037755,                    /*   77727:        ISZ AD             */
+        0000040,                    /*   77730:        CLE                ; force wd read */
+        0037754,                    /*   77731:        ISZ WC             ; block done? */
+        0027720,                    /*   77732:        JMP CK             ; no */
+        0017742,                    /*   77733:        JSB READ           ; get checksum */
+        0054000,                    /*   77734:        CPB 0              ; ok? */
+        0027702,                    /*   77735:        JMP CN             ; next block */
+        0102011,                    /*   77736:        HLT 11             ; bad csum */
+        0027700,                    /*   77737:        JMP ST             ; next */
+        0102055,                    /*   77740:  H55   HLT 55             ; bad address */
+        0027700,                    /*   77741:        JMP ST             ; next */
+        0000000,                    /*   77742:  RD    NOP                */
+        0006600,                    /*   77743:        CLB,CME            ; E reg byte ptr */
+        0103710,                    /*   77744:        STC RDR,C          ; start reader */
+        0102310,                    /*   77745:        SFS RDR            ; wait */
+        0027745,                    /*   77746:        JMP *-1            */
+        0106410,                    /*   77747:        MIB RDR            ; get byte */
+        0002041,                    /*   77750:        SEZ,RSS            ; E set? */
+        0127742,                    /*   77751:        JMP RD,I           ; no, done */
+        0005767,                    /*   77752:        BLF,CLE,BLF        ; shift byte */
+        0027744,                    /*   77753:        JMP RD+2           ; again */
+        0000000,                    /*   77754:  WC    000000             ; word count */
+        0000000,                    /*   77755:  AD    000000             ; address */
+        0177765,                    /*   77756:  M11   DEC -11            ; feed count */
+        0000000,                    /*   77757:        NOP                */
+        0000000,                    /*   77760:        NOP                */
+        0000000,                    /*   77761:        NOP                */
+        0000000,                    /*   77762:        NOP                */
+        0000000,                    /*   77763:        NOP                */
+        0000000,                    /*   77764:        NOP                */
+        0000000,                    /*   77765:        NOP                */
+        0000000,                    /*   77766:        NOP                */
+        0000000,                    /*   77767:        NOP                */
+        0000000,                    /*   77770:        NOP                */
+        0000000,                    /*   77771:        NOP                */
+        0000000,                    /*   77772:        NOP                */
+        0000000,                    /*   77773:        NOP                */
+        0000000,                    /*   77774:        NOP                */
+        0000000,                    /*   77775:        NOP                */
+        0000000,                    /*   77776:        NOP                */
+        0100100 } }                 /*   77777:  MAXAD ABS -ST            ; max addr */
     };
+
+
+/* Device boot routine.
+
+   This routine is called directly by the BOOT PTR and LOAD PTR commands to copy
+   the device bootstrap into the upper 64 words of the logical address space.
+   It is also called indirectly by a BOOT CPU or LOAD CPU command when the
+   specified HP 1000 loader ROM socket contains a 12992K ROM.
+
+   When called in response to a BOOT DPC or LOAD DPC command, the "unitno"
+   parameter indicates the unit number specified in the BOOT command or is zero
+   for the LOAD command, and "dptr" points at the PTR device structure.
+   Depending on the current CPU model, the BBL or 12992K loader ROM will be
+   copied into memory and configured for the PTR select code.  If the CPU is a
+   1000, the S register will be set as it would be by the front-panel microcode.
+
+   When called for a BOOT/LOAD CPU command, the "unitno" parameter indicates the
+   select code to be used for configuration, and "dptr" will be NULL.  As above,
+   the BBL or 12992K loader ROM will be copied into memory and configured for
+   the specified select code.  The S register is assumed to be set correctly on
+   entry and is not modified.
+
+   For the 12992K boot loader ROM, the S register will be set as follows:
+
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | ROM # | 0   0 |    PTR select code    | 0   0   0   0   0   0 |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+*/
 
 t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
-const int32 dev = ptr_dib.select_code;                  /* get device no */
+if (dptr == NULL)                                               /* if we are being called for a BOOT/LOAD CPU */
+    return cpu_copy_loader (ptr_loaders, unitno,                /*   then copy the boot loader to memory */
+                            IBL_S_NOCLEAR, IBL_S_NOSET);        /*     but do not alter the S register */
 
-cpu_ibl (ptr_rom, dev, IBL_S_CLR,                       /* copy the boot ROM to memory and configure */
-         IBL_PTR | IBL_SET_SC (dev));                   /*   the S register accordingly */
-
-return SCPE_OK;
+else                                                            /* otherwise this is a BOOT/LOAD PTR */
+    return cpu_copy_loader (ptr_loaders, ptr_dib.select_code,   /*   so copy the boot loader to memory */
+                            IBL_S_CLEAR, IBL_S_NOSET);          /*     and configure the S register if 1000 CPU */
 }
 
 
@@ -1132,23 +1289,23 @@ return SCPE_OK;
 
 t_stat tto_svc (UNIT *uptr)
 {
-int32 c;
 t_stat r;
 
-c = tty_buf;                                            /* get char */
-tty_buf = tty_shin;                                     /* shift in */
-tty_shin = 0377;                                        /* line inactive */
+r = tto_out (tty_buf);                                  /* output the character */
 
-r = tto_out (c);                                        /* output the character */
+if (r == SCPE_OK) {                                     /* if the output succeeded */
+    tty_buf = tty_shin;                                 /*   then shift the input line into the buffer */
+    tty_shin = 0377;                                    /*     and set the input line to the marking state */
 
-if (r != SCPE_OK) {                                     /* if an error occurred */
-    sim_activate (uptr, uptr->wait);                    /*   then schedule a retry */
-    return (r == SCPE_STALL ? SCPE_OK : r);             /* report a stall as success */
+    ttyio (&tty_dib, ioENF, 0);                         /* set the flag */
+    return SCPE_OK;                                     /*   and return success */
     }
 
-ttyio (&tty_dib, ioENF, 0);                             /* set flag */
+else {                                                  /* otherwise an error occurred */
+    sim_activate (uptr, uptr->wait);                    /*   so schedule a retry */
 
-return SCPE_OK;
+    return (r == SCPE_STALL ? SCPE_OK : r);             /* report a stall as success */
+    }
 }
 
 
