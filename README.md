@@ -73,7 +73,7 @@
 
 #### Updated HP2100 simulator from Dave Bryan.
 
-#### Beta Sigma 5, 6 & 7 simulator from Bob Supnik
+#### Sigma 5, 6 & 7 simulator from Bob Supnik
 
 #### Beta SAGE-II and PDQ-3 simulators from Holger Veit
 
@@ -540,7 +540,7 @@ package must be available while building your simulator.  The simh-vms-pcap.zip
 file can be downloaded from https://github.com/simh/simh/archive/vms-pcap.zip   
 This link will return a file called simh-vms-pcap.zip which should be unpacked as follows:
 
-    $ unzip -aa simh-vms-pcap.zip
+    $ unzip -a simh-vms-pcap.zip
     $ rename [.simh-vms-pcap]pcap-vms.dir []
 
 The PCAP-VMS components are presumed (by the descript.mms file) to be 

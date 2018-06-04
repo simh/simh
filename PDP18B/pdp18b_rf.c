@@ -129,7 +129,7 @@ int32 rf72 (int32 dev, int32 pulse, int32 dat);
 int32 rf_iors (void);
 t_stat rf_svc (UNIT *uptr);
 t_stat rf_reset (DEVICE *dptr);
-int32 rf_updsta (int32 news);
+int32 rf_updsta (int32 newst);
 t_stat rf_attach (UNIT *uptr, CONST char *cptr);
 t_stat rf_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
@@ -315,9 +315,9 @@ return SCPE_OK;
 
 /* Update status */
 
-int32 rf_updsta (int32 news)
+int32 rf_updsta (int32 newst)
 {
-rf_sta = (rf_sta | news) & ~(RFS_ERR | RFS_CLR);
+rf_sta = (rf_sta | newst) & ~(RFS_ERR | RFS_CLR);
 if (rf_sta & RFS_EFLGS)
     rf_sta = rf_sta | RFS_ERR;
 if ((rf_sta & (RFS_ERR | RFS_DON)) && (rf_sta & RFS_IE))

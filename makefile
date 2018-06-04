@@ -1,6 +1,7 @@
 #
 # This GNU make makefile has been tested on:
 #   Linux (x86 & Sparc & PPC)
+#   Android (Termux)
 #   OS X
 #   Solaris (x86 & Sparc) (gcc and Sun C)
 #   OpenBSD
@@ -37,13 +38,14 @@
 #
 # simh project support is provided for simulators that are built with 
 # dependent packages provided with the or by the operating system 
-# distribution OR for platforms where that isn't directly available (OS X) 
-# by packages from specific package management systems (MacPorts).  Users 
-# wanting to build simulators with locally build dependent packages or 
-# packages provided by an unsupported package management system can 
-# override where this procedure looks for include files and/or libraries.  
-# Overrides can be specified by define exported environment variables or 
-# GNU make command line arguments which specify INCLUDES and/or LIBRARIES.  
+# distribution OR for platforms where that isn't directly available 
+# (OS X) by packages from specific package management systems (MacPorts 
+# or Homebrew).  Users wanting to build simulators with locally build 
+# dependent packages or packages provided by an unsupported package 
+# management system can override where this procedure looks for include 
+# files and/or libraries.  Overrides can be specified by define exported 
+# environment variables or GNU make command line arguments which specify 
+# INCLUDES and/or LIBRARIES.  
 # Each of these, if specified, must be the complete list include directories
 # or library directories that should be used with each element separated by 
 # colons. (i.e. INCLUDES=/usr/include/:/usr/local/include/:...)
@@ -493,7 +495,10 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     endif
   endif
   ifneq (,$(call find_include,semaphore))
-    OS_CCDEFS += -DHAVE_SEMAPHORE
+    ifneq (, $(shell grep sem_timedwait $(call find_include,semaphore)))
+      OS_CCDEFS += -DHAVE_SEMAPHORE
+      $(info using semaphore: $(call find_include,semaphore))
+    endif
   endif
   ifneq (,$(call find_include,sys/ioctl))
     OS_CCDEFS += -DHAVE_SYS_IOCTL
@@ -1190,6 +1195,17 @@ PDP11 = ${PDP11D}/pdp11_fp.c ${PDP11D}/pdp11_cpu.c ${PDP11D}/pdp11_dz.c \
 PDP11_OPT = -DVM_PDP11 -I ${PDP11D} ${NETWORK_OPT} $(DISPLAY_OPT)
 
 
+UC15D = PDP11
+UC15 = ${UC15D}/pdp11_cis.c ${UC15D}/pdp11_cpu.c \
+	${UC15D}/pdp11_cpumod.c ${UC15D}/pdp11_cr.c \
+	${UC15D}/pdp11_fp.c ${UC15D}/pdp11_io.c \
+	${UC15D}/pdp11_io_lib.c ${UC15D}/pdp11_lp.c \
+	${UC15D}/pdp11_rh.c ${UC15D}/pdp11_rk.c \
+	${UC15D}/pdp11_stddev.c ${UC15D}/pdp11_sys.c \
+	${UC15D}/pdp11_uc15.c
+UC15_OPT = -DVM_PDP11 -DUC15 -I ${UC15D} -I ${PDP18BD}
+
+
 VAXD = VAX
 VAX = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c ${VAXD}/vax_io.c \
 	${VAXD}/vax_cis.c ${VAXD}/vax_octa.c  ${VAXD}/vax_cmode.c \
@@ -1748,7 +1764,7 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	i7094 ibm1130 id16 id32 sds lgp h316 cdc1700 \
 	swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 isys8010 isys8020 \
 	isys8030 isys8024 imds-225 scelbi 3b2 i701 i704 i7010 i7070 i7080 i7090 \
-	i650
+	i650 sigma uc15
 
 all : ${ALL}
 
@@ -1832,6 +1848,14 @@ pdp11 : ${BIN}BuildROMs${EXE} ${BIN}pdp11${EXE}
 ${BIN}pdp11${EXE} : ${PDP11} ${SIM}
 	${MKDIRBIN}
 	${CC} ${PDP11} ${SIM} ${PDP11_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+uc15 : ${BIN}uc15${EXE}
+
+${BIN}uc15${EXE} : ${UC15} ${SIM}
+	${MKDIRBIN}
+	${CC} ${UC15} ${SIM} ${UC15_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+vax : ${BIN}vax${EXE}
 
 vax : microvax3900
 

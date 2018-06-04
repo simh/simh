@@ -275,11 +275,11 @@ PCAP_SIMH_INC = /INCL=($(PCAP_DIR))
   @ 'MISS_SAY' "*** Error *** Attempting a Network Build but the VMS-PCAP components are not"
   @ 'MISS_SAY' "*** Error *** available"
   @ 'MISS_SAY' "*** Error *** "
-  @ 'MISS_SAY' "*** Error *** The vms-pcap.zip file can be downloaded from:"
+  @ 'MISS_SAY' "*** Error *** The simh-vms-pcap.zip file can be downloaded from:"
   @ 'MISS_SAY' "*** Error *** "
   @ 'MISS_SAY' "*** Error ***     https://github.com/simh/simh/archive/vms-pcap.zip"
   @ 'MISS_SAY' "*** Error *** "
-  @ 'MISS_SAY' "*** Error *** Be sure to ""unzip -aa simh-vms-pcap.zip"" to properly set the file attributes"
+  @ 'MISS_SAY' "*** Error *** Be sure to ""unzip -a simh-vms-pcap.zip"" to properly set the file attributes"
   @ 'MISS_SAY' "*** Error *** "
   @ 'MISS_SAY' "*** Error *** The PCAP-VMS components are presumed (by this procedure) to be"
   @ 'MISS_SAY' "*** Error *** located in a directory at the same level as the directory"
@@ -562,7 +562,7 @@ PDP18B_SOURCE = $(PDP18B_DIR)PDP18B_DT.C,$(PDP18B_DIR)PDP18B_DRM.C,\
                 $(PDP18B_DIR)PDP18B_RP.C,$(PDP18B_DIR)PDP18B_STDDEV.C,\
                 $(PDP18B_DIR)PDP18B_SYS.C,$(PDP18B_DIR)PDP18B_TT1.C,\
                 $(PDP18B_DIR)PDP18B_RB.C,$(PDP18B_DIR)PDP18B_FPP.C,\
-                $(PDP18B_DIR)PDP18B_G2TTY.C
+                $(PDP18B_DIR)PDP18B_G2TTY.C,$(PDP18B_DIR)PDP18B_DR15.C
 PDP4_OPTIONS = /INCL=($(SIMH_DIR),$(PDP18B_DIR))/DEF=($(CC_DEFS),"PDP4=1")
 PDP7_OPTIONS = /INCL=($(SIMH_DIR),$(PDP18B_DIR))/DEF=($(CC_DEFS),"PDP7=1")
 PDP9_OPTIONS = /INCL=($(SIMH_DIR),$(PDP18B_DIR))/DEF=($(CC_DEFS),"PDP9=1")

@@ -650,12 +650,8 @@ MTAB cpu_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOAUTOCONFIG",
       &set_autocon, NULL },
 #else
-    { MTAB_XTD|MTAB_VDV, MOD_1104, NULL, "11/04", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1105, NULL, "11/05", &cpu_set_model },
-    { MTAB_XTD|MTAB_VDV, MOD_1120, NULL, "11/20", &cpu_set_model },
     { UNIT_MSIZE, 16384, NULL, "16K", &cpu_set_size},
     { UNIT_MSIZE, 24576, NULL, "24K", &cpu_set_size},
-    { UNIT_MSIZE, 32768, NULL, "32K", &cpu_set_size},
 #endif
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "IOSPACE", NULL,
       NULL, &show_iospace },

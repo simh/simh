@@ -1,6 +1,6 @@
 /* pdp11_sys.c: PDP-11 simulator interface
 
-   Copyright (c) 1993-2016, Robert M Supnik
+   Copyright (c) 1993-2018, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   23-May-18    RMS     Changed UC15 simulator name
    14-Mar-16    RMS     Added UC15 support
    02-Sep-13    RMS     Added third Massbus, RS03/RS04
    29-Apr-12    RMS     Fixed compiler warning (Mark Pizzolato)
@@ -128,7 +129,11 @@ extern int32 saved_PC;
    sim_load             binary loader
 */
 
+#if !defined (UC15)
 char sim_name[] = "PDP-11";
+#else
+char sim_name[] = "UC-15";
+#endif
 
 REG *sim_PC = &cpu_reg[0];
 
