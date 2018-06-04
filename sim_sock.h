@@ -23,6 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-Oct-12    MP      Added definitions needed to detect possible tcp 
+                        connect failures
+   25-Sep-12    MP      Reworked for RFC3493 interfaces supporting IPv6 and IPv4
    04-Jun-08    RMS     Addes sim_create_sock, for IBM 1130
    14-Apr-05    RMS     Added WSAEINPROGRESS (from Tim Riker)
    20-Aug-04    HV      Added missing definition for OS/2 (from Holger Veit)
@@ -41,48 +44,95 @@
 */
 
 #ifndef SIM_SOCK_H_
-#define SIM_SOCK_H_     0
+#define SIM_SOCK_H_    0
+
+#ifdef  __cplusplus
+extern "C" {
+#endif
 
 #if defined (_WIN32)                                    /* Windows */
-#undef INT_PTR                                          /* hack, hack */
 #include <winsock2.h>
+#include <winerror.h>
 
 #elif !defined (__OS2__) || defined (__EMX__)           /* VMS, Mac, Unix, OS/2 EMX */
-#define WSAGetLastError()       errno                   /* Windows macros */
-#define SOCKET          int32
-#define WSAEWOULDBLOCK  EWOULDBLOCK
-#define WSAEINPROGRESS  EINPROGRESS
-#define INVALID_SOCKET  -1 
-#define SOCKET_ERROR    -1
 #include <sys/types.h>                                  /* for fcntl, getpid */
 #include <sys/socket.h>                                 /* for sockets */
+#include <string.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <netinet/in.h>                                 /* for sockaddr_in */
+#include <netinet/tcp.h>                                /* for TCP_NODELAY */
+#include <arpa/inet.h>                                  /* for inet_addr and inet_ntoa */
 #include <netdb.h>
 #include <sys/time.h>                                   /* for EMX */
+
+#define WSAGetLastError()       errno                   /* Windows macros */
+#define WSASetLastError(err) errno = err
+#define closesocket     close 
+#define SOCKET          int
+#if defined(__hpux)
+#define WSAEWOULDBLOCK  EAGAIN
+#else
+#define WSAEWOULDBLOCK  EWOULDBLOCK
+#endif
+#define WSAENAMETOOLONG ENAMETOOLONG
+#define WSAEINPROGRESS  EINPROGRESS
+#define WSAETIMEDOUT    ETIMEDOUT
+#define WSAEISCONN      EISCONN
+#define WSAECONNRESET   ECONNRESET
+#define WSAECONNREFUSED ECONNREFUSED
+#define WSAECONNABORTED ECONNABORTED
+#define WSAEHOSTUNREACH EHOSTUNREACH
+#define WSAEADDRINUSE   EADDRINUSE
+#if defined(EAFNOSUPPORT)
+#define WSAEAFNOSUPPORT EAFNOSUPPORT
+#endif
+#define WSAEACCES       EACCES
+#define WSAEINTR        EINTR
+#define INVALID_SOCKET  ((SOCKET)-1) 
+#define SOCKET_ERROR    -1
 #endif
 
 #if defined (VMS)                                       /* VMS unique */
 #include <ioctl.h>                                      /* for ioctl */
-#if !defined (timerclear)
-#define timerclear(tvp)         (tvp)->tv_sec = (tvp)->tv_usec = 0
+#if !defined (AI_NUMERICHOST)
+#define AI_NUMERICHOST 0
 #endif
-#endif
-#if defined(__EMX__)                                    /* OS/2 unique */
-#if !defined (timerclear)
-#define timerclear(tvp)         (tvp)->tv_sec = (tvp)->tv_usec = 0
+#if defined (__VAX)
+#define sockaddr_storage sockaddr
 #endif
 #endif
 
-SOCKET sim_master_sock (int32 port);
-SOCKET sim_connect_sock (int32 ip, int32 port);
-SOCKET sim_create_sock (void);
-SOCKET sim_accept_conn (SOCKET master, uint32 *ipaddr);
-int32 sim_check_conn (SOCKET sock, t_bool rd);
-int32 sim_read_sock (SOCKET sock, char *buf, int32 nbytes);
-int32 sim_write_sock (SOCKET sock, char *msg, int32 nbytes);
-void sim_close_sock (SOCKET sock, t_bool master);
-SOCKET sim_setnonblock (SOCKET sock);
+#if !defined(CBUFSIZE)
+#define CBUFSIZE 1024
+#define sim_printf printf
+#endif
+
+int sim_parse_addr (const char *cptr, char *host, size_t hostlen, const char *default_host, char *port, size_t port_len, const char *default_port, const char *validate_addr);
+int sim_parse_addr_ex (const char *cptr, char *host, size_t hostlen, const char *default_host, char *port, size_t port_len, char *localport, size_t local_port_len, const char *default_port);
+#define SIM_SOCK_OPT_REUSEADDR      0x0001
+#define SIM_SOCK_OPT_DATAGRAM       0x0002
+#define SIM_SOCK_OPT_NODELAY        0x0004
+#define SIM_SOCK_OPT_BLOCKING       0x0008
+SOCKET sim_master_sock_ex (const char *hostport, int *parse_status, int opt_flags);
+#define sim_master_sock(hostport, parse_status) sim_master_sock_ex(hostport, parse_status, ((sim_switches & SWMASK ('U')) ? SIM_SOCK_OPT_REUSEADDR : 0))
+SOCKET sim_connect_sock_ex (const char *sourcehostport, const char *hostport, const char *default_host, const char *default_port, int opt_flags);
+#define sim_connect_sock(hostport, default_host, default_port) sim_connect_sock_ex(NULL, hostport, default_host, default_port, 0)
+SOCKET sim_accept_conn_ex (SOCKET master, char **connectaddr, int opt_flags);
+#define sim_accept_conn(master, connectaddr) sim_accept_conn_ex(master, connectaddr, 0)
+int sim_check_conn (SOCKET sock, int rd);
+int sim_read_sock (SOCKET sock, char *buf, int nbytes);
+int sim_write_sock (SOCKET sock, const char *msg, int nbytes);
+void sim_close_sock (SOCKET sock);
+const char *sim_get_err_sock (const char *emsg);
+SOCKET sim_err_sock (SOCKET sock, const char *emsg);
+int sim_getnames_sock (SOCKET sock, char **socknamebuf, char **peernamebuf);
+void sim_init_sock (void);
+void sim_cleanup_sock (void);
+
+#ifdef  __cplusplus
+}
+#endif
 
 #endif

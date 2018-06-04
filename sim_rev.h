@@ -34,14 +34,14 @@
 
 /* V3.10 revision history
 
-   V3.10 backports an enormous number of modules and features from
+   V3.10 backports an significant number of modules and features from
    the SimH 4.x master branch, as well as some unique new features.
-   The revision history will be restarted with patch level 1.
 
 patch   date            module(s) and fix(es)
 
   0     tbd             scp.c and supporting libraries
                         - added sim_printf
+                        - added ATTACH -N switch
                         - added v4 compatibility macros
 
                         All simulator families
@@ -49,34 +49,72 @@ patch   date            module(s) and fix(es)
 
                         Eclipse/Nova
                         - fixed bug in Eclipse signed divide
-                        - revised to use sim_printf
+                        - added parity to terminal output
 
                         H316
+                        - added extended interrupts from Bob Armstrong
                         - numerous fixes from Bob Armstrong
 
                         HP2100
                         - latest version from Dave Bryan
 
                         i1401
-                        - read cards from and print to the console window
+                        - read cards from and output line printer to the console window
 
                         i1620
-                        - numerous fixes from Tom McBride and Bob Armstrong
+                        - added deferred IO and RELEASE button simulation
+                        - added SET TTY 1DIGIT
+                        - added SET LPT NOFF
+                        - numerous fixes from Tom McBride, Bob Armstrong, and Dave Wise
+
+                        i7094
+                        - fixed print chain selection
+
+                        Interdata
+                        - fixed bugs in TTP output mode selection
+                        - fixed bug in handling of OC to console display
+
+                        PDP1
+                        - added Expensive Typewriter ribbon color support
+                        - added ASCII output mode for paper tape punch
 
                         PDP8
-                        - added multi-segment loader and new breakpoints
-                          from Dave Gesswein
+                        - added multi-segment loader and new breakpoints from Dave Gesswein
+                        - changed RESET to clear L'AC, per schematics
+                        - added LS8E support for WPS8
 
                         PDP10
+                        - added ITS RIM10 support to loader
+                        - fixed bugs in ITS 1PROCEED
                         - numerous fixes from Tim Litt
 
                         PDP11
-                        - fixes to CR11
+                        - added NOBEVENT support for 11/03, 11/23
+                        - changed CR11 priority level to BR6
+                        - fixed bug in CSM
+                        - fixed bugs in CR11
+                        - fixed RJS11 register block length
+                        - fixed RF11 CSR address in boot code
+                        - fixed MMR1 tracking of PC and floating point operations
+                        - UC15 support
+
+                        PDP18B
+                        - added RB09 to PDP7 for unix v0
+                        - added drum to PDP9
+                        - added commands to set/show 3-cycle databreak registers
+                        - added RP03 support
+                        - added unix v0 character type support
+                        - UC15 support
 
                         SDS
-                        - bug fixes from ???
+                        - implemented tape erase
+                        - bug fixes
 
                         VAX
+                        - added unaligned IO support for VaxStation II Ultrix
+                        - fixed TODR to only increment if != 0
+                        - fixed compatibility mode checks in REI
+                        - fixed bug decimal instruction left shift routine
                         - minor modularization improvements per 4.X
 */
 
@@ -563,7 +601,7 @@ patch   date            module(s) and fix(es)
 
                         vaxmod_def.h
                         - moved all Qbus devices to BR4; deleted RP definitions
-
+*/
 
 /* V3.8 revision history
 
@@ -916,7 +954,7 @@ patch   date            module(s) and fix(es)
 
                         vax_cmode.c, vax_io.c, vax780_uba.c:
                         - fixed declarations (Mark Pizzolato)
-
+*/
 
 /* V3.7 revision history 
 
@@ -1188,7 +1226,7 @@ patch   date            module(s) and fix(es)
 
                         vax_syscm.c:
                         - fixed operand order in EIS instructions (W.F.J. Mueller)
-
+*/
 
 /* V3.6 revision history 
 
@@ -1362,7 +1400,7 @@ patch   date            module(s) and fix(es)
                           to support "denormal" argument from POLYH
                         - fixed EMODH to concatenate 15b of 16b extension
                         - fixed bug in reported VA on faulting cross-page write
-
+*/
 
 /* V3.5 revision history 
 
@@ -1499,6 +1537,7 @@ patch   date            module(s) and fix(es)
                         vaxmod_defs.h: added QDSS support
 
                         vax_io.c: revised autoconfiguration algorithm and interface
+*/
 
 /* V3.4 revision history 
 
@@ -1537,6 +1576,7 @@ patch   date            module(s) and fix(es)
                         - fixed error reporting
 
                         pdp11_tu.c: fixed error reporting
+*/
 
 /* V3.3 revision history 
 
@@ -1789,6 +1829,7 @@ patch   date            module(s) and fix(es)
                         vax_syslist.c:
                         - split from vax_sys.c
                         - removed PTR, PTP
+*/
 
 /* V3.2 revision history 
 
@@ -1988,6 +2029,7 @@ patch   date            module(s) and fix(es)
                         vax_cpu1.c:
                         - added PC read fault in EXTxV
                         - fixed PC write fault in INSV
+*/
 
 /* V3.1 revision history
 
@@ -2101,6 +2143,7 @@ patch   date            module(s) and fix(es)
                         id32_cpu.c:
                         - revised instruction decoding
                         - added instruction history
+*/
 
 /* V3.0 revision history 
 
@@ -2267,6 +2310,7 @@ patch   date            module(s) and fix(es)
                         id_pt.c: fixed type declaration (Mark Pizzolato)
 
                         gri_cpu.c: fixed bug in SC queue pointer management
+*/
 
 /* V2.10 revision history
 
@@ -2565,6 +2609,7 @@ patch   date            module(s) and fix(es)
                         - disabled by default
 
                         IBM 1620: first release
+*/
 
 /* V2.9 revision history
 

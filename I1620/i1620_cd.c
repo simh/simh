@@ -26,6 +26,7 @@
    cdr          1622 card reader
    cdp          1622 card punch
 
+   23-Jun-17    RMS     Unattached error does not set RDCHK/WRCHK
    09-Mar-17    RMS     Guardbanded translation table lookups (COVERITY)
    31-Jan-15    TFM     Changes to translation tables (Tom McBride)
    10-Dec-13    RMS     Fixed WA card punch translations (Bob Armstrong)
@@ -339,10 +340,8 @@ t_stat cdr_read (void)
 int32 i;
 
 ind[IN_LAST] = 0;                                       /* clear last card */
-if ((cdr_unit.flags & UNIT_ATT) == 0) {                 /* attached? */
-    ind[IN_RDCHK] = 1;                                  /* no, error */
+if ((cdr_unit.flags & UNIT_ATT) == 0)                   /* attached? */
     return SCPE_UNATT;
-    }
 
 for (i = 0; i < CD_LEN + 2; i++)                        /* clear buffer */
     cdr_buf[i] = ' ';
@@ -351,7 +350,7 @@ if (feof (cdr_unit.fileref))                            /* eof? */
     return STOP_NOCD;
 if (ferror (cdr_unit.fileref)) {                        /* error? */
     ind[IN_RDCHK] = 1;                                  /* set read check */
-    perror ("CDR I/O error");
+    sim_perror ("CDR I/O error");
     clearerr (cdr_unit.fileref);
     return SCPE_IOERR;
     }
@@ -367,7 +366,7 @@ if ((i = strlen (cdr_buf)) > 0) {                       /* anything at all? */
         }
     else {                                              /* line too long */
         ind[IN_RDCHK] = 1;
-        perror ("CDR line too long");
+        sim_perror ("CDR line too long");
         return SCPE_IOERR;
         }
     }
@@ -520,10 +519,8 @@ return SCPE_OK;
 
 t_stat cdp_write (uint32 len)
 {
-if ((cdp_unit.flags & UNIT_ATT) == 0) {                 /* attached? */
-    ind[IN_WRCHK] = 1;                                  /* no, error */
+if ((cdp_unit.flags & UNIT_ATT) == 0)                   /* attached? */
     return SCPE_UNATT;
-    }
 
 while ((len > 0) && (cdp_buf[len - 1] == ' '))          /* trim spaces */
     --len;
@@ -534,7 +531,7 @@ fputs (cdp_buf, cdp_unit.fileref);                      /* write card */
 cdp_unit.pos = ftell (cdp_unit.fileref);                /* count char */
 if (ferror (cdp_unit.fileref)) {                        /* error? */
     ind[IN_WRCHK] = 1;
-    perror ("CDP I/O error");
+    sim_perror ("CDP I/O error");
     clearerr (cdp_unit.fileref);
     return SCPE_IOERR;
     }

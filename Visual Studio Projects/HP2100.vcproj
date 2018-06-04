@@ -34,6 +34,9 @@
 				Name="VCXMLDataGeneratorTool"
 			/>
 			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
 				Name="VCMIDLTool"
 			/>
 			<Tool
@@ -108,6 +111,9 @@
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
+			/>
+			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
 			/>
 			<Tool
 				Name="VCMIDLTool"
@@ -312,6 +318,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\sim_shmem.c"
+				>
+			</File>
+			<File
 				RelativePath="..\sim_sock.c"
 				>
 			</File>
@@ -386,6 +396,10 @@
 			</File>
 			<File
 				RelativePath="..\sim_rev.h"
+				>
+			</File>
+			<File
+				RelativePath="..\sim_shmem.h"
 				>
 			</File>
 			<File

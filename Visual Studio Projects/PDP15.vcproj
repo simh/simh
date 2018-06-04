@@ -190,6 +190,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP18B\pdp18b_dr15.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP18B\pdp18b_drm.c"
 				>
 			</File>
@@ -199,6 +203,10 @@
 			</File>
 			<File
 				RelativePath="..\PDP18B\pdp18b_fpp.c"
+				>
+			</File>
+			<File
+				RelativePath="..\PDP18B\pdp18b_g2tty.c"
 				>
 			</File>
 			<File
@@ -243,6 +251,10 @@
 			</File>
 			<File
 				RelativePath="..\sim_fio.c"
+				>
+			</File>
+			<File
+				RelativePath="..\sim_shmem.c"
 				>
 			</File>
 			<File
@@ -292,6 +304,10 @@
 			</File>
 			<File
 				RelativePath="..\sim_rev.h"
+				>
+			</File>
+			<File
+				RelativePath="..\sim_shmem.h"
 				>
 			</File>
 			<File

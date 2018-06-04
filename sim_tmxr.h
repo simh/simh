@@ -65,7 +65,7 @@
 
 struct tmln {
     SOCKET              conn;                           /* line conn */
-    uint32              ipad;                           /* IP address */
+    char                *ipad;                          /* IP address */
     uint32              cnms;                           /* conn time */
     int32               tsta;                           /* Telnet state */
     int32               rcve;                           /* rcv enable */
@@ -111,8 +111,8 @@ t_stat tmxr_set_modem_control_passthru (TMXR *mp);
 t_stat tmxr_set_get_modem_bits (TMLN *lp, int32 bits_to_set, int32 bits_to_clear, int32 *incoming_bits);
 t_stat tmxr_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat tmxr_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
-void tmxr_msg (SOCKET sock, char *msg);
-void tmxr_linemsg (TMLN *lp, char *msg);
+void tmxr_msg (SOCKET sock, const char *msg);
+void tmxr_linemsg (TMLN *lp, const char *msg);
 void tmxr_fconns (FILE *st, TMLN *lp, int32 ln);
 void tmxr_fstats (FILE *st, TMLN *lp, int32 ln);
 t_stat tmxr_set_log (UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -126,6 +126,10 @@ t_stat tmxr_show_lnorder (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_show_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_show_cstat (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_show_lines (FILE *st, UNIT *uptr, int32 val, void *desc);
+
+/* V4.X shims */
+
+#define tmxr_set_console_units(rxuptr, txuptr)
 
 #endif
 

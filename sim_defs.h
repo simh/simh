@@ -1,6 +1,6 @@
 /* sim_defs.h: simulator definitions
 
-   Copyright (c) 1993-2016, Robert M Supnik
+   Copyright (c) 1993-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   23-Jun-17    RMS     Added #include sim_rev.h (Mark Pizzolato)
    25-Sep-16    RMS     Removed KBD_WAIT and friends
    08-Mar-16    RMS     Added shutdown invisible switch
    03-Feb-16    JDB     [4.0] Added "help_base" and "message" fields to sim_ctab
@@ -32,7 +33,7 @@
    05-Feb-13    JDB     Added REG_V_UF and REG_UFMASK for VM-specific register flags
    21-Jul-08    RMS     Removed inlining support
    28-May-08    RMS     Added inlining support
-   28-Jun-07    RMS     Added IA64 VMS support (from Norm Lastovica)
+   28-Jun-07    RMS     Added IA64 VMS support (Norm Lastovica)
    18-Jun-07    RMS     Added UNIT_IDLE flag
    18-Mar-07    RMS     Added UNIT_TEXT flag
    07-Mar-07    JDB     Added DEBUG_PRJ macro
@@ -110,6 +111,7 @@
 #ifndef _SIM_DEFS_H_
 #define _SIM_DEFS_H_    0
 
+#include "sim_rev.h"
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -261,6 +263,8 @@ typedef uint32          t_addr;
 #define SCPE_KFLAG      0010000                         /* tti data flag */
 #define SCPE_BREAK      0020000                         /* tti break flag */
 #define SCPE_DOFAILED   0040000                         /* fail in DO, not subproc */
+
+#define SCPE_NOMESSAGE  0                               /* 4.x compatiblity */
 
 /* Print value format codes */
 
@@ -452,7 +456,7 @@ struct sim_ctab {
                                                         /* action routine */
     int32               arg;                            /* argument */
     char                *help;                          /* help string */
-    const char          *help_base;                     /* [4.0] structured help base*/
+    const char          *help_base;                     /* [4.0] structured help base */
     void                (*message)(const char *unechoed_cmdline, t_stat stat);
                                                         /* [4.0] message printing routine */
     };
@@ -487,7 +491,7 @@ struct sim_mtab {
     void                *desc;                          /* value descriptor */
                                                         /* REG * if MTAB_VAL */
                                                         /* int * if not */
-    void                *help;                          /* (4.0 dummy) */
+    void                *help;                          /* [4.0] help */
     };
 
 #define MTAB_XTD        (1u << UNIT_V_RSV)              /* ext entry flag */
@@ -571,8 +575,17 @@ typedef struct sim_debtab DEBTAB;
 #include "sim_console.h"
 #include "sim_timer.h"
 #include "sim_fio.h"
+#include "sim_sock.h"
 
-/* V4 compatibility definitions */
+/* V4 compatibility definitions
+
+   The SCP API for version 4.0 introduces a number of "pointer-to-const"
+   parameter qualifiers that were not present in the 3.x versions.  To maintain
+   compatibility with the earlier versions, the new qualifiers are expressed as
+   "CONST" rather than "const".  This allows macro removal of the qualifiers
+   when compiling for SIMH 3.x.
+*/
+
 
 #if defined (__STDC__) || defined (_WIN32)
 #define ORDATAD(nm,loc,wd,desc) #nm, &(loc), 8, (wd), 0, 1
@@ -610,21 +623,25 @@ typedef struct sim_debtab DEBTAB;
     "nm", &(loc), (rdx), (wd), (off), (dep), ((fl) | REG_UNIT)
 #endif
 
-#define INT64_C(x)  (x)
+#ifndef INT64_C
+#define INT64_C(x)      (x##LL)
+#endif
 
-/* SCP API shim.
-
-   The SCP API for version 4.0 introduces a number of "pointer-to-const"
-   parameter qualifiers that were not present in the 3.x versions.  To maintain
-   compatibility with the earlier versions, the new qualifiers are expressed as
-   "CONST" rather than "const".  This allows macro removal of the qualifiers
-   when compiling for SIMH 3.x.
-*/
-
-#include "sim_sock.h"
+#ifdef PF_USER
+#undef PF_USER
+#endif /* PF_USER */
+#ifdef I_POP
+#undef I_POP
+#endif /* I_POP */
 #ifdef CONST
 #undef CONST
 #endif /* CONST */
 #define CONST
+#ifndef PRIORITY_ABOVE_NORMAL
+#define PRIORITY_ABOVE_NORMAL 0
+#endif
+#define sim_os_set_thread_priority(prio)
+
+#define BRK_TYP_DYN_STEPOVER 0
 
 #endif

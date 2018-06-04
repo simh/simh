@@ -1154,7 +1154,7 @@ switch (fnc) {                                          /* at speed, check fnc *
                 if (ba >= uptr->hwmark)
                     uptr->hwmark = ba + 1;
                 }
-/*                                                      /* ignore hdr */
+                                                        /* ignore hdr */
             sim_activate (uptr, DT_WSIZE * dt_ltime);
             if (M[DT_WC] == 0)
                 dt_substate = DTO_WCO;

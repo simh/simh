@@ -15,7 +15,6 @@
 #
 #            ALL             Just Build "Everything".
 #            ALTAIR          Just Build The MITS Altair.
-#            ALTAIRZ80       Just Build The MITS Altair Z80.
 #            ECLIPSE         Just Build The Data General Eclipse.
 #            GRI             Just Build The GRI Corporation GRI-909.
 #            LGP             Just Build The Royal-McBee LGP-30.
@@ -25,7 +24,6 @@
 #            I1401           Just Build The IBM 1401.
 #            I1620           Just Build The IBM 1620.
 #            I7094           Just Build The IBM 7094.
-#            IBM1130         Just Build The IBM 1130.
 #            ID16            Just Build The Interdata 16-bit CPU.
 #            ID32            Just Build The Interdata 32-bit CPU.
 #            NOVA            Just Build The Data General Nova.
@@ -39,8 +37,6 @@
 #            PDP15           Just Build The DEC PDP-15.
 #            S3              Just Build The IBM System 3.
 #            SDS             Just Build The SDS 940.
-#            SWTP6800MP-A    Just Build The SWTP6800MP-A.
-#            SWTP6800MP-A2   Just Build The SWTP6800MP-A2.
 #            VAX             Just Build The DEC VAX.
 #            VAX780          Just Build The DEC VAX780.
 #            CLEAN           Will Clean Files Back To Base Kit.
@@ -178,7 +174,7 @@ SIMH_LIB = $(LIB_DIR)SIMH-$(ARCH).OLB
 SIMH_SOURCE = $(SIMH_DIR)SIM_CONSOLE.C,$(SIMH_DIR)SIM_SOCK.C,\
               $(SIMH_DIR)SIM_TMXR.C,$(SIMH_DIR)SIM_ETHER.C,\
               $(SIMH_DIR)SIM_TAPE.C,$(SIMH_DIR)SIM_FIO.C,\
-              $(SIMH_DIR)SIM_TIMER.C
+              $(SIMH_DIR)SIM_TIMER.C,$(SIMH_DIR)SIM_SHMEM.C
 SIMH_MAIN = SCP.C
 .IFDEF ALPHA_OR_IA64
 SIMH_LIB64 = $(LIB_DIR)SIMH64-$(ARCH).OLB
@@ -246,11 +242,11 @@ PCAP_SIMH_INC = /INCL=($(PCAP_DIR))
   @ 'MISS_SAY' "*** Error *** Attempting a Network Build but the VMS-PCAP components are not"
   @ 'MISS_SAY' "*** Error *** available"
   @ 'MISS_SAY' "*** Error *** "
-  @ 'MISS_SAY' "*** Error *** The vms-pcap.zip file can be downloaded from:"
+  @ 'MISS_SAY' "*** Error *** The simh-vms-pcap.zip file can be downloaded from:"
   @ 'MISS_SAY' "*** Error *** "
-  @ 'MISS_SAY' "*** Error ***     https://github.com/markpizz/simh/downloads"
+  @ 'MISS_SAY' "*** Error ***     https://github.com/simh/simh/archive/vms-pcap.zip"
   @ 'MISS_SAY' "*** Error *** "
-  @ 'MISS_SAY' "*** Error *** Be sure to ""unzip -a vms-pcap"" to properly set the file attributes"
+  @ 'MISS_SAY' "*** Error *** Be sure to ""unzip -a simh-vms-pcap.zip"" to properly set the file attributes"
   @ 'MISS_SAY' "*** Error *** "
   @ 'MISS_SAY' "*** Error *** The PCAP-VMS components are presumed (by this procedure) to be"
   @ 'MISS_SAY' "*** Error *** located in a directory at the same level as the directory"
@@ -284,30 +280,6 @@ ALTAIR_LIB = $(LIB_DIR)ALTAIR-$(ARCH).OLB
 ALTAIR_SOURCE = $(ALTAIR_DIR)ALTAIR_SIO.C,$(ALTAIR_DIR)ALTAIR_CPU.C,\
                 $(ALTAIR_DIR)ALTAIR_DSK.C,$(ALTAIR_DIR)ALTAIR_SYS.C
 ALTAIR_OPTIONS = /INCL=($(SIMH_DIR),$(ALTAIR_DIR))/DEF=($(CC_DEFS))
-
-#
-# MITS Altair Z80 Simulator Definitions.
-#
-ALTAIRZ80_DIR = SYS$DISK:[.ALTAIRZ80]
-ALTAIRZ80_LIB1 = $(LIB_DIR)ALTAIRZ80L1-$(ARCH).OLB
-ALTAIRZ80_SOURCE1 = $(ALTAIRZ80_DIR)ALTAIRZ80_CPU.C,$(ALTAIRZ80_DIR)ALTAIRZ80_CPU_NOMMU.C,\
-                    $(ALTAIRZ80_DIR)ALTAIRZ80_DSK.C,$(ALTAIRZ80_DIR)DISASM.C,\
-                    $(ALTAIRZ80_DIR)ALTAIRZ80_SIO.C,$(ALTAIRZ80_DIR)ALTAIRZ80_SYS.C,\
-                    $(ALTAIRZ80_DIR)ALTAIRZ80_HDSK.C,$(ALTAIRZ80_DIR)ALTAIRZ80_NET.C,\
-                    $(ALTAIRZ80_DIR)FLASHWRITER2.C,$(ALTAIRZ80_DIR)I86_DECODE.C,\
-                    $(ALTAIRZ80_DIR)I86_OPS.C,$(ALTAIRZ80_DIR)I86_PRIM_OPS.C,\
-                    $(ALTAIRZ80_DIR)I8272.C,$(ALTAIRZ80_DIR)INSNSD.C,\
-                    $(ALTAIRZ80_DIR)MFDC.C,$(ALTAIRZ80_DIR)N8VEM.C,$(ALTAIRZ80_DIR)VFDHD.C
-ALTAIRZ80_LIB2 = $(LIB_DIR)ALTAIRZ80L2-$(ARCH).OLB
-ALTAIRZ80_SOURCE2 = $(ALTAIRZ80_DIR)S100_DISK1A.C,$(ALTAIRZ80_DIR)S100_DISK2.C,\
-                    $(ALTAIRZ80_DIR)S100_FIF.C,$(ALTAIRZ80_DIR)S100_MDRIVEH.C,\
-                    $(ALTAIRZ80_DIR)S100_MDSAD.C,$(ALTAIRZ80_DIR)S100_SELCHAN.C,\
-                    $(ALTAIRZ80_DIR)S100_SS1.C,$(ALTAIRZ80_DIR)S100_64FDC.C,\
-                    $(ALTAIRZ80_DIR)S100_SCP300F.C,$(ALTAIRZ80_DIR)SIM_IMD.C,\
-                    $(ALTAIRZ80_DIR)WD179X.C,$(ALTAIRZ80_DIR)S100_DISK3.C,\
-                    $(ALTAIRZ80_DIR)S100_ADCS6.C,$(ALTAIRZ80_DIR)S100_HDC1001.C,\
-                    $(ALTAIRZ80_DIR)S100_IF3.C
-ALTAIRZ80_OPTIONS = /INCL=($(SIMH_DIR),$(ALTAIRZ80_DIR))/DEF=($(CC_DEFS))
 
 #
 # Data General Nova Simulator Definitions.
@@ -437,20 +409,6 @@ ID32_SOURCE = $(ID32_DIR)ID32_CPU.C,$(ID32_DIR)ID32_SYS.C,$(ID32_DIR)ID_DP.C,\
 ID32_OPTIONS = /INCL=($(SIMH_DIR),$(ID32_DIR))/DEF=($(CC_DEFS))
 
 #
-# IBM 1130 Simulator Definitions.
-#
-IBM1130_DIR = SYS$DISK:[.IBM1130]
-IBM1130_LIB = $(LIB_DIR)IBM1130-$(ARCH).OLB
-IBM1130_SOURCE = $(IBM1130_DIR)IBM1130_CPU.C,$(IBM1130_DIR)IBM1130_CR.C,\
-                 $(IBM1130_DIR)IBM1130_DISK.C,$(IBM1130_DIR)IBM1130_STDDEV.C,\
-                 $(IBM1130_DIR)IBM1130_SYS.C,$(IBM1130_DIR)IBM1130_GDU.C,\
-                 $(IBM1130_DIR)IBM1130_GUI.C,$(IBM1130_DIR)IBM1130_PRT.C,\
-                 $(IBM1130_DIR)IBM1130_FMT.C,$(IBM1130_DIR)IBM1130_PTRP.C,\
-                 $(IBM1130_DIR)IBM1130_PLOT.C,$(IBM1130_DIR)IBM1130_SCA.C,\
-                 $(IBM1130_DIR)IBM1130_T2741.C
-IBM1130_OPTIONS = /INCL=($(SIMH_DIR),$(IBM1130_DIR))/DEF=($(CC_DEFS))
-
-#
 # IBM 1401 Simulator Definitions.
 #
 I1401_DIR = SYS$DISK:[.I1401]
@@ -513,7 +471,8 @@ PDP18B_SOURCE = $(PDP18B_DIR)PDP18B_DT.C,$(PDP18B_DIR)PDP18B_DRM.C,\
                 $(PDP18B_DIR)PDP18B_MT.C,$(PDP18B_DIR)PDP18B_RF.C,\
                 $(PDP18B_DIR)PDP18B_RP.C,$(PDP18B_DIR)PDP18B_STDDEV.C,\
                 $(PDP18B_DIR)PDP18B_SYS.C,$(PDP18B_DIR)PDP18B_TT1.C,\
-                $(PDP18B_DIR)PDP18B_RB.C,$(PDP18B_DIR)PDP18B_FPP.C
+                $(PDP18B_DIR)PDP18B_RB.C,$(PDP18B_DIR)PDP18B_FPP.C,\
+                $(PDP18B_DIR)PDP18B_G2TTY.C,$(PDP18B_DIR)PDP18B_DR15.C
 PDP4_OPTIONS = /INCL=($(SIMH_DIR),$(PDP18B_DIR))/DEF=($(CC_DEFS),"PDP4=1")
 PDP7_OPTIONS = /INCL=($(SIMH_DIR),$(PDP18B_DIR))/DEF=($(CC_DEFS),"PDP7=1")
 PDP9_OPTIONS = /INCL=($(SIMH_DIR),$(PDP18B_DIR))/DEF=($(CC_DEFS),"PDP9=1")
@@ -582,30 +541,6 @@ SDS_SOURCE = $(SDS_DIR)SDS_CPU.C,$(SDS_DIR)SDS_DRM.C,$(SDS_DIR)SDS_DSK.C,\
              $(SDS_DIR)SDS_MUX.C,$(SDS_DIR)SDS_RAD.C,$(SDS_DIR)SDS_STDDEV.C,\
              $(SDS_DIR)SDS_SYS.C
 SDS_OPTIONS = /INCL=($(SIMH_DIR),$(SDS_DIR))/DEF=($(CC_DEFS))
-
-#
-# SWTP 6800MP A
-#
-SWTP6800MP_A_DIR = SYS$DISK:[.SWTP6800.SWTP6800]
-SWTP6800MP_A_COMMON = SYS$DISK:[.SWTP6800.COMMON]
-SWTP6800MP_A_LIB = $(LIB_DIR)SWTP6800MP-A-$(ARCH).OLB
-SWTP6800MP_A_SOURCE = $(SWTP6800MP_A_COMMON)mp-a.c,$(SWTP6800MP_A_COMMON)m6800.c,\
-	$(SWTP6800MP_A_COMMON)m6810.c,$(SWTP6800MP_A_COMMON)bootrom.c,$(SWTP6800MP_A_COMMON)dc-4.c,\
-	$(SWTP6800MP_A_COMMON)mp-s.c,$(SWTP6800MP_A_DIR)mp-a_sys.c,$(SWTP6800MP_A_COMMON)mp-b2.c,\
-	$(SWTP6800MP_A_COMMON)mp-8m.c
-SWTP6800MP_A_OPTIONS = /INCL=($(SIMH_DIR),$(SWTP6800MP_A_DIR))/DEF=($(CC_DEFS))
-
-#
-# SWTP 6800MP A2
-#
-SWTP6800MP_A2_DIR = SYS$DISK:[.SWTP6800.SWTP6800]
-SWTP6800MP_A2_COMMON = SYS$DISK:[.SWTP6800.COMMON]
-SWTP6800MP_A2_LIB = $(LIB_DIR)SWTP6800MP-A2-$(ARCH).OLB
-SWTP6800MP_A2_SOURCE = $(SWTP6800MP_A2_COMMON)mp-a2.c,$(SWTP6800MP_A2_COMMON)m6800.c,\
-	$(SWTP6800MP_A2_COMMON)m6810.c,$(SWTP6800MP_A2_COMMON)bootrom.c,$(SWTP6800MP_A2_COMMON)dc-4.c,\
-	$(SWTP6800MP_A2_COMMON)mp-s.c,$(SWTP6800MP_A2_DIR)mp-a2_sys.c,$(SWTP6800MP_A2_COMMON)mp-b2.c,\
-	$(SWTP6800MP_A2_COMMON)mp-8m.c,$(SWTP6800MP_A2_COMMON)i2716.c
-SWTP6800MP_A2_OPTIONS = /INCL=($(SIMH_DIR),$(SWTP6800MP_A2_DIR))/DEF=($(CC_DEFS))
 
 #
 # Digital Equipment VAX Simulator Definitions.
@@ -681,17 +616,17 @@ I7094_OPTIONS = /INCL=($(SIMH_DIR),$(I7094_DIR))/DEF=($(CC_DEFS))
 # If we're not a VAX, Build Everything
 #
 .IFDEF ALPHA_OR_IA64
-ALL : ALTAIR ALTAIRZ80 ECLIPSE GRI LGP H316 HP2100 I1401 I1620 IBM1130 ID16 \
-      ID32 NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP10 PDP11 PDP15 S3 VAX VAX780 SDS \
-      I7094 SWTP6800MP-A SWTP6800MP-A2
+ALL : ALTAIR ECLIPSE GRI LGP H316 HP2100 I1401 I1620 ID16 \
+      ID32 NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP10 PDP11 PDP15 S3 \
+      VAX VAX780 SDS I7094
         $! No further actions necessary
 .ELSE
 #
 # Else We Are On VAX And Build Everything EXCEPT the 64b simulators
 #
-ALL : ALTAIR ALTAIRZ80 GRI H316 HP2100 I1401 I1620 IBM1130 ID16 ID32 \
-      NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP11 PDP15 S3 VAX VAX780 SDS SWTP6800MP-A \
-      SWTP6800MP-A2
+ALL : ALTAIR GRI H316 HP2100 I1401 I1620 ID16 ID32 \
+      NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP11 PDP15 S3 VAX VAX780 \
+      SDS
         $! No further actions necessary
 .ENDIF
 
@@ -742,28 +677,6 @@ $(ALTAIR_LIB) : $(ALTAIR_SOURCE)
         $! Building The $(ALTAIR_LIB) Library.
         $!
         $ $(CC)$(ALTAIR_OPTIONS) -
-               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-             LIBRARY/CREATE $(MMS$TARGET)
-        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
-
-$(ALTAIRZ80_LIB1) : $(ALTAIRZ80_SOURCE1)
-        $!
-        $! Building The $(ALTAIRZ80_LIB1) Library.
-        $!
-        $ $(CC)$(ALTAIRZ80_OPTIONS) -
-               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-             LIBRARY/CREATE $(MMS$TARGET)
-        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
-
-$(ALTAIRZ80_LIB2) : $(ALTAIRZ80_SOURCE2)
-        $!
-        $! Building The $(ALTAIRZ80_LIB2) Library.
-        $!
-        $ $(CC)$(ALTAIRZ80_OPTIONS) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
         $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
              LIBRARY/CREATE $(MMS$TARGET)
@@ -864,17 +777,6 @@ $(I1620_LIB) : $(I1620_SOURCE)
         $! Building The $(I1620_LIB) Library.
         $!
         $ $(CC)$(I1620_OPTIONS) -
-               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-             LIBRARY/CREATE $(MMS$TARGET)
-        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
-
-$(IBM1130_LIB) : $(IBM1130_SOURCE)
-        $!
-        $! Building The $(IBM1130_LIB) Library.
-        $!
-        $ $(CC)$(IBM1130_OPTIONS) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
         $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
              LIBRARY/CREATE $(MMS$TARGET)
@@ -1047,28 +949,6 @@ $(SDS_LIB) : $(SDS_SOURCE)
         $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-$(SWTP6800MP_A_LIB) : $(SWTP6800MP_A_SOURCE)
-        $!
-        $! Building The $(SWTP_LIB) Library.
-        $!
-        $ $(CC)$(SWTP6800MP_A_OPTIONS) -
-               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-             LIBRARY/CREATE $(MMS$TARGET)
-        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
-
-$(SWTP6800MP_A2_LIB) : $(SWTP6800MP_A2_SOURCE)
-        $!
-        $! Building The $(SWTP_LIB) Library.
-        $!
-        $ $(CC)$(SWTP6800MP_A2_OPTIONS) -
-               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-             LIBRARY/CREATE $(MMS$TARGET)
-        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
-
 $(VAX_LIB1) : $(VAX_SOURCE1)
         $!
         $! Building The $(VAX_LIB1) Library.
@@ -1164,18 +1044,6 @@ $(BIN_DIR)ALTAIR-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(ALTAIR_LIB)
                $(BLD_DIR)SCP.OBJ,$(ALTAIR_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-ALTAIRZ80 : $(BIN_DIR)ALTAIRZ80-$(ARCH).EXE
-        $! ALTAIRZ80 done
-
-$(BIN_DIR)ALTAIRZ80-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(ALTAIRZ80_LIB1) $(ALTAIRZ80_LIB2)
-        $!
-        $! Building The $(BIN_DIR)ALTAIRZ80-$(ARCH).EXE Simulator.
-        $!
-        $ $(CC)$(ALTAIRZ80_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)ALTAIRZ80-$(ARCH).EXE -
-               $(BLD_DIR)SCP.OBJ,$(ALTAIRZ80_LIB1)/LIBRARY, -
-               $(ALTAIRZ80_LIB2)/LIBRARY,$(SIMH_LIB)/LIBRARY
-        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 #
 # If Not On VAX, Build The Eclipse Simulator.
 #
@@ -1272,18 +1140,6 @@ $(BIN_DIR)I1620-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(I1620_LIB)
         $ $(CC)$(I1620_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
         $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)I1620-$(ARCH).EXE -
                $(BLD_DIR)SCP.OBJ,$(I1620_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
-        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
-
-IBM1130 : $(BIN_DIR)IBM1130-$(ARCH).EXE
-        $! IBM1130 done
-
-$(BIN_DIR)IBM1130-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(IBM1130_LIB)
-        $!
-        $! Building The $(BIN_DIR)IBM1130-$(ARCH).EXE Simulator.
-        $!
-        $ $(CC)$(IBM1130_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)IBM1130-$(ARCH).EXE -
-               $(BLD_DIR)SCP.OBJ,$(IBM1130_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 ID16 : $(BIN_DIR)ID16-$(ARCH).EXE
@@ -1453,30 +1309,6 @@ $(BIN_DIR)SDS-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(SDS_LIB)
         $ $(CC)$(SDS_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
         $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)SDS-$(ARCH).EXE -
                  $(BLD_DIR)SCP.OBJ,$(SDS_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
-        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
-
-SWTP6800MP-A : $(BIN_DIR)SWTP6800MP-A-$(ARCH).EXE
-        $! SWTP6800MP-A done
-
-$(BIN_DIR)SWTP6800MP-A-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(SWTP6800MP_A_LIB)
-        $!
-        $! Building The $(BIN_DIR)SWTP6800MP-A-$(ARCH).EXE Simulator.
-        $!
-        $ $(CC)$(SWTP_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)SWTP6800MP-A-$(ARCH).EXE -
-               $(BLD_DIR)SCP.OBJ,$(SWTP6800MP_A_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
-        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
-
-SWTP6800MP-A2 : $(BIN_DIR)SWTP6800MP-A2-$(ARCH).EXE
-        $! SWTP6800MP-A2 done
-
-$(BIN_DIR)SWTP6800MP-A2-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(SWTP6800MP_A2_LIB)
-        $!
-        $! Building The $(BIN_DIR)SWTP6800MP-A2-$(ARCH).EXE Simulator.
-        $!
-        $ $(CC)$(SWTP_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)SWTP6800MP-A2-$(ARCH).EXE -
-               $(BLD_DIR)SCP.OBJ,$(SWTP6800MP_A2_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 VAX : $(BIN_DIR)VAX-$(ARCH).EXE

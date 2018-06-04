@@ -1,6 +1,6 @@
 /* scp.c: simulator control program
 
-   Copyright (c) 1993-2017, Robert M Supnik
+   Copyright (c) 1993-2018, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,10 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   26-Mar-18    RMS     Modified DETACH for static use of UNIT_RO (Mark Pizzolato)
+   19-Mar-18    RMS     Removed redundant declarations
+   06-Mar-18    RMS     Moved switch routine declaration to scp.h
+                        Removed get_ipaddr
    10-Mar-17    MP      Fixed "noise" bugs (COVERITY)
    08-Mar-16    RMS     Added shutdown flag for detach_all
    28-Mar-15    RMS     Added sim_printf from GitHub master (Mark Pizzolato)
@@ -203,7 +207,6 @@
 /* Macros and data structures */
 
 #include "sim_defs.h"
-#include "sim_rev.h"
 #include <signal.h>
 #include <ctype.h>
 
@@ -275,6 +278,7 @@ CTAB *sim_vm_cmd = NULL;
 void (*sim_vm_fprint_addr) (FILE *st, DEVICE *dptr, t_addr addr) = NULL;
 t_addr (*sim_vm_parse_addr) (DEVICE *dptr, char *cptr, char **tptr) = NULL;
 t_bool (*sim_vm_fprint_stopped) (FILE *st, t_stat reason) = NULL;
+t_bool (*sim_vm_is_subroutine_call) (t_addr **ret_addrs) = NULL;
 
 /* Prototypes */
 
@@ -326,18 +330,15 @@ SCHTAB *get_search (char *cptr, int32 radix, SCHTAB *schptr);
 int32 test_search (t_value val, SCHTAB *schptr);
 char *get_glyph_gen (char *iptr, char *optr, char mchar, t_bool uc);
 int32 get_switches (char *cptr);
-char *get_sim_sw (char *cptr);
 t_stat get_aval (t_addr addr, DEVICE *dptr, UNIT *uptr);
 t_value get_rval (REG *rptr, uint32 idx);
 void put_rval (REG *rptr, uint32 idx, t_value val);
-t_value strtotv (char *inptr, char **endptr, uint32 radix);
 void fprint_help (FILE *st);
 void fprint_stopped (FILE *st, t_stat r);
 void fprint_capac (FILE *st, DEVICE *dptr, UNIT *uptr);
 char *read_line (char *ptr, int32 size, FILE *stream);
 char *read_line_p (char *prompt, char *ptr, int32 size, FILE *stream);
 REG *find_reg_glob (char *ptr, char **optr, DEVICE **gdptr);
-char *sim_trim_endspc (char *cptr);
 
 /* Forward references */
 
@@ -407,10 +408,11 @@ static const char *sim_sa64 = "64b addresses";
 static const char *sim_sa64 = "32b addresses";
 #endif
 #if defined (USE_NETWORK) || defined (USE_SHARED)
-static const char *sim_snet = "Ethernet support";
+const char *eth_capabilities(void);
 #else
-static const char *sim_snet = "no Ethernet";
+#define eth_capabilities()     "no Ethernet"
 #endif
+
 
 /* Tables and strings */
 
@@ -699,6 +701,8 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
     }                                                   /* end for */
 sim_quiet = sim_switches & SWMASK ('Q');                /* -q means quiet */
 
+sim_init_sock ();                                       /* init socket capabilities */
+
 if (sim_vm_init != NULL)                                /* call once only */
     (*sim_vm_init)();
 sim_finit ();                                           /* init fio package */
@@ -758,7 +762,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         printf ("sim> ");                               /* prompt */
         cptr = (*sim_vm_read) (cbuf, CBUFSIZE, stdin);
         }
-    else cptr = read_line_p ("sim> ", cbuf, CBUFSIZE, stdin);/* read with prmopt*/
+    else cptr = read_line_p ("sim> ", cbuf, CBUFSIZE, stdin);/* read with prompt*/
     if (cptr == NULL)                                   /* ignore EOF */
         continue;
     if (*cptr == 0)                                     /* ignore blank */
@@ -983,7 +987,7 @@ do {
               (!errabort || (stat < SCPE_BASE) || (stat == SCPE_STEP));
     if ((stat >= SCPE_BASE) && (stat != SCPE_EXIT) &&   /* error from cmd? */
         (stat != SCPE_STEP)) {
-        if (!echo && !sim_quiet &&                      /* report if not echoing */
+        if (!echo &&                                    /* report if not echoing */
             (!isdo || (stat & SCPE_DOFAILED))) {        /* and not from DO return */
             sim_printf("%s> %s\n", do_arg[0], ocptr);
             }
@@ -1510,7 +1514,7 @@ fprintf (st, "%s simulator V%d.%d-%d", sim_name, vmaj, vmin, vpat);
 if (vdelt)
     fprintf (st, "(%d)", vdelt);
 if (flag)
-    fprintf (st, " [%s, %s, %s]", sim_si64, sim_sa64, sim_snet);
+    fprintf (st, " [%s, %s, %s]", sim_si64, sim_sa64, eth_capabilities());
 fprintf (st, "\n");
 return SCPE_OK;
 }
@@ -1999,6 +2003,8 @@ return scp_attach_unit (dptr, uptr, cptr);              /* attach */
 
 t_stat scp_attach_unit (DEVICE *dptr, UNIT *uptr, char *cptr)
 {
+if (uptr->flags & UNIT_DIS)                             /* disabled? */
+    return SCPE_UDIS;
 if (dptr->attach != NULL)                               /* device routine? */
     return dptr->attach (uptr, cptr);                   /* call it */
 return attach_unit (uptr, cptr);                        /* no, std routine */
@@ -2010,8 +2016,6 @@ t_stat attach_unit (UNIT *uptr, char *cptr)
 {
 DEVICE *dptr;
 
-if (uptr->flags & UNIT_DIS)                             /* disabled? */
-    return SCPE_UDIS;
 if (!(uptr->flags & UNIT_ATTABLE))                      /* not attachable? */
     return SCPE_NOATT;
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
@@ -2186,7 +2190,7 @@ if ((uptr->flags & UNIT_BUF) && (uptr->filebuf)) {      /* buffered? */
         rewind (uptr->fileref);
         sim_fwrite (uptr->filebuf, SZ_D (dptr), cap, uptr->fileref);
         if (ferror (uptr->fileref))
-            perror ("I/O error");
+            sim_perror ("I/O error");
         }
     if (uptr->flags & UNIT_MUSTBUF) {                   /* dyn alloc? */
         free (uptr->filebuf);                           /* free buf */
@@ -2194,7 +2198,8 @@ if ((uptr->flags & UNIT_BUF) && (uptr->filebuf)) {      /* buffered? */
         }
     uptr->flags = uptr->flags & ~UNIT_BUF;
     }
-uptr->flags = uptr->flags & ~(UNIT_ATT | UNIT_RO);
+uptr->flags = uptr->flags & ~(UNIT_ATT |                /* clear ATT */
+    ((uptr->flags & UNIT_ROABLE) ? UNIT_RO : 0));       /* clear RO if dynamic */
 free (uptr->filename);
 uptr->filename = NULL;
 if (fclose (uptr->fileref) == EOF)
@@ -2272,9 +2277,26 @@ return SCPE_OK;
 
 /* Get device display name */
 
-char *sim_dname (DEVICE *dptr)
+const char *sim_dname (DEVICE *dptr)
 {
 return (dptr->lname? dptr->lname: dptr->name);
+}
+
+/* Get unit display name */
+
+const char *sim_uname (UNIT *uptr)
+{
+DEVICE *d;
+static char uname[CBUFSIZE];
+
+d = find_dev_from_unit(uptr);
+if (!d)
+    return "";
+if (d->numunits == 1)
+    sprintf (uname, "%s", sim_dname (d));
+else
+    sprintf (uname, "%s%d", sim_dname (d), (int)(uptr-d->units));
+return uname;
 }
 
 /* Save command
@@ -2316,7 +2338,7 @@ REG *rptr;
 fprintf (sfile, "%s\n%s\n%s\n%s\n%s\n%.0f\n",
     save_vercur,                                        /* [V2.5] save format */
     sim_name,                                           /* sim name */
-    sim_si64, sim_sa64, sim_snet,                       /* [V3.5] options */
+    sim_si64, sim_sa64, eth_capabilities (),            /* [V3.5] options */
     sim_time);                                          /* [V3.2] sim time */
 WRITE_I (sim_rtime);                                    /* [V2.6] sim rel time */
 
@@ -3604,6 +3626,156 @@ while ((--tptr >= cptr) && isspace (*tptr))
 return cptr;
 }
 
+int sim_isspace (char c)
+{
+return (c & 0x80) ? 0 : isspace (c);
+}
+
+int sim_islower (char c)
+{
+return (c & 0x80) ? 0 : islower (c);
+}
+
+int sim_isalpha (char c)
+{
+return (c & 0x80) ? 0 : isalpha (c);
+}
+
+int sim_isprint (char c)
+{
+return (c & 0x80) ? 0 : isprint (c);
+}
+
+int sim_isdigit (char c)
+{
+return (c & 0x80) ? 0 : isdigit (c);
+}
+
+int sim_isgraph (char c)
+{
+return (c & 0x80) ? 0 : isgraph (c);
+}
+
+int sim_isalnum (char c)
+{
+return (c & 0x80) ? 0 : isalnum (c);
+}
+
+/* strncasecmp() is not available on all platforms */
+int sim_strncasecmp (const char* string1, const char* string2, size_t len)
+{
+size_t i;
+unsigned char s1, s2;
+
+for (i=0; i<len; i++) {
+    s1 = (unsigned char)string1[i];
+    s2 = (unsigned char)string2[i];
+    if (sim_islower (s1))
+        s1 = (unsigned char)toupper (s1);
+    if (sim_islower (s2))
+        s2 = (unsigned char)toupper (s2);
+    if (s1 < s2)
+        return -1;
+    if (s1 > s2)
+        return 1;
+    if (s1 == 0)
+        return 0;
+    }
+return 0;
+}
+
+/* strcasecmp() is not available on all platforms */
+int sim_strcasecmp (const char *string1, const char *string2)
+{
+size_t i = 0;
+unsigned char s1, s2;
+
+while (1) {
+    s1 = (unsigned char)string1[i];
+    s2 = (unsigned char)string2[i];
+    if (sim_islower (s1))
+        s1 = (unsigned char)toupper (s1);
+    if (sim_islower (s2))
+        s2 = (unsigned char)toupper (s2);
+    if (s1 == s2) {
+        if (s1 == 0)
+            return 0;
+        i++;
+        continue;
+        }
+    if (s1 < s2)
+        return -1;
+    if (s1 > s2)
+        return 1;
+    }
+return 0;
+}
+
+/* strlcat() and strlcpy() are not available on all platforms */
+/* Copyright (c) 1998 Todd C. Miller <Todd.Miller@courtesan.com> */
+/*
+ * Appends src to string dst of size siz (unlike strncat, siz is the
+ * full size of dst, not space left).  At most siz-1 characters
+ * will be copied.  Always NUL terminates (unless siz <= strlen(dst)).
+ * Returns strlen(src) + MIN(siz, strlen(initial dst)).
+ * If retval >= siz, truncation occurred.
+ */
+size_t sim_strlcat(char *dst, const char *src, size_t size)
+{
+char *d = dst;
+const char *s = src;
+size_t n = size;
+size_t dlen;
+
+/* Find the end of dst and adjust bytes left but don't go past end */
+while (n-- != 0 && *d != '\0')
+    d++;
+dlen = d - dst;
+n = size - dlen;
+
+if (n == 0)
+    return (dlen + strlen(s));
+while (*s != '\0') {
+    if (n != 1) {
+        *d++ = *s;
+        n--;
+        }
+    s++;
+    }
+*d = '\0';
+
+return (dlen + (s - src));          /* count does not include NUL */
+}
+
+/*
+ * Copy src to string dst of size siz.  At most siz-1 characters
+ * will be copied.  Always NUL terminates (unless siz == 0).
+ * Returns strlen(src); if retval >= siz, truncation occurred.
+ */
+size_t sim_strlcpy (char *dst, const char *src, size_t size)
+{
+char *d = dst;
+const char *s = src;
+size_t n = size;
+
+/* Copy as many bytes as will fit */
+if (n != 0) {
+    while (--n != 0) {
+        if ((*d++ = *s++) == '\0')
+            break;
+        }
+    }
+
+    /* Not enough room in dst, add NUL and traverse rest of src */
+    if (n == 0) {
+        if (size != 0)
+            *d = '\0';              /* NUL-terminate dst */
+        while (*s++)
+            ;
+        }
+return (s - src - 1);               /* count does not include NUL */
+}
+
 /* get_yn               yes/no question
 
    Inputs:
@@ -3707,69 +3879,6 @@ else {
 if (term && (*tptr++ != term))
     return NULL;
 return tptr;
-}
-
-/* get_ipaddr           IP address:port
-
-   Inputs:
-        cptr    =       pointer to input string
-   Outputs:
-        ipa     =       pointer to IP address (may be NULL), 0 = none
-        ipp     =       pointer to IP port (may be NULL), 0 = none
-        result  =       status
-*/
-
-t_stat get_ipaddr (char *cptr, uint32 *ipa, uint32 *ipp)
-{
-char gbuf[CBUFSIZE];
-char *addrp, *portp, *octetp;
-uint32 i, addr, port, octet;
-t_stat r;
-
-if ((cptr == NULL) || (*cptr == 0))
-    return SCPE_ARG;
-strncpy (gbuf, cptr, CBUFSIZE);
-addrp = gbuf;                                           /* default addr */
-if (portp = strchr (gbuf, ':'))                         /* x:y? split */
-    *portp++ = 0;
-else if (strchr (gbuf, '.'))                            /* x.y...? */
-    portp = NULL;
-else {
-    portp = gbuf;                                       /* port only */
-    addrp = NULL;                                       /* no addr */
-    }
-if (portp) {                                            /* port string? */
-    if (ipp == NULL)                                    /* not wanted? */
-        return SCPE_ARG;
-    port = (int32) get_uint (portp, 10, 65535, &r);
-    if ((r != SCPE_OK) || (port == 0))
-        return SCPE_ARG;
-    }
-else port = 0;
-if (addrp) {                                            /* addr string? */
-    if (ipa == NULL)                                    /* not wanted? */
-        return SCPE_ARG;
-    for (i = addr = 0; i < 4; i++) {                    /* four octets */
-        octetp = strchr (addrp, '.');                   /* find octet end */
-        if (octetp != NULL)                             /* split string */
-            *octetp++ = 0;
-        else if (i < 3)                                 /* except last */
-            return SCPE_ARG;
-        octet = (int32) get_uint (addrp, 10, 255, &r);
-        if (r != SCPE_OK)
-            return SCPE_ARG;
-        addr = (addr << 8) | octet;
-        addrp = octetp;
-        }
-    if (((addr & 0377) == 0) || ((addr & 0377) == 255))
-        return SCPE_ARG;
-    }
-else addr = 0;
-if (ipp)                                                /* return req values */
-    *ipp = port;
-if (ipa)
-    *ipa = addr;
-return SCPE_OK;   
 }
 
 /* Find_device          find device matching input string
@@ -4209,7 +4318,7 @@ return 0;
    On an error, the endptr will equal the inptr.
 */
 
-t_value strtotv (char *inptr, char **endptr, uint32 radix)
+t_value strtotv (CONST char *inptr, CONST char **endptr, uint32 radix)
 {
 int32 nodigit;
 t_value val;
@@ -4331,6 +4440,11 @@ else printf ("%s", buf);
 if (sim_log)
     fprintf (sim_log, "%s", buf);
 return;
+}
+
+t_stat sim_messagef (t_stat stat, const char *fmt, ...)
+{
+return stat;
 }
 
 void sim_perror (char *msg)

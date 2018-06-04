@@ -1,6 +1,6 @@
 /* scp.h: simulator control program headers
 
-   Copyright (c) 1993-2014, Robert M Supnik
+   Copyright (c) 1993-2018, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   19-Mar-18    RMS     Added sim_trim_endspc
+   06-Mar-18    RMS     Moved switch routine declaration from scp.c
+                        Removed get_ipaddr declaration
    28-Dec-14    JDB     [4.0] Moved sim_load and sim_emax declarations from scp.c
    14-Dec-14    JDB     [4.0] Added sim_activate_time
                         [4.0] Changed sim_is_active to return t_bool
@@ -111,15 +114,39 @@ t_stat assign_device (DEVICE *dptr, char *cptr);
 t_stat deassign_device (DEVICE *dptr);
 t_stat reset_all (uint32 start_device);
 t_stat reset_all_p (uint32 start_device);
-char *sim_dname (DEVICE *dptr);
+const char *sim_dname (DEVICE *dptr);
+const char *sim_uname (UNIT *uptr);
 t_stat get_yn (char *ques, t_stat deflt);
+char *sim_trim_endspc(char *cptr);
+int sim_isspace (char c);
+int sim_islower (char c);
+int sim_isalpha (char c);
+int sim_isprint (char c);
+int sim_isdigit (char c);
+int sim_isgraph (char c);
+int sim_isalnum (char c);
+int sim_strncasecmp (const char *string1, const char *string2, size_t len);
+int sim_strcasecmp (const char *string1, const char *string2);
+size_t sim_strlcat (char *dst, const char *src, size_t size);
+size_t sim_strlcpy (char *dst, const char *src, size_t size);
+#ifndef strlcpy
+#define strlcpy(dst, src, size) sim_strlcpy((dst), (src), (size))
+#endif
+#ifndef strlcat
+#define strlcat(dst, src, size) sim_strlcat((dst), (src), (size))
+#endif
+#ifndef strncasecmp
+#define strncasecmp(str1, str2, len) sim_strncasecmp((str1), (str2), (len))
+#endif
+#ifndef strcasecmp
+#define strcasecmp(str1, str2) sim_strcasecmp ((str1), (str2))
+#endif
 char *get_sim_opt (int32 opt, char *cptr, t_stat *st);
 char *get_glyph (char *iptr, char *optr, char mchar);
 char *get_glyph_nc (char *iptr, char *optr, char mchar);
 t_value get_uint (char *cptr, uint32 radix, t_value max, t_stat *status);
 char *get_range (DEVICE *dptr, char *cptr, t_addr *lo, t_addr *hi,
     uint32 rdx, t_addr max, char term);
-t_stat get_ipaddr (char *cptr, uint32 *ipa, uint32 *ipp);
 t_value strtotv (char *cptr, char **endptr, uint32 radix);
 t_stat fprint_val (FILE *stream, t_value val, uint32 rdx, uint32 wid, uint32 fmt);
 CTAB *find_cmd (char *gbuf);
@@ -140,6 +167,8 @@ void sim_debug_u16 (uint32 dbits, DEVICE* dptr, const char* const* bitdefs,
 void sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...);
 void fprint_stopped_gen (FILE *st, t_stat v, REG *pc, DEVICE *dptr);
 void sim_printf (const char *fmt, ...);
+t_stat sim_messagef (t_stat stat, const char *fmt, ...);
+char *get_sim_sw(char *cptr);
 
 /* Global data */
 
@@ -201,5 +230,6 @@ extern t_bool (*sim_vm_fprint_stopped) (FILE *st, t_stat reason);
 
 #define sim_activate_time(u)    sim_is_active (u)
 void sim_perror (char *msg);
+extern t_bool (*sim_vm_is_subroutine_call) (t_addr **ret_addrs);
 
 #endif

@@ -1,6 +1,6 @@
 /* pdp11_fp.c: PDP-11 floating point simulator (32b version)
 
-   Copyright (c) 1993-2015, Robert M Supnik
+   Copyright (c) 1993-2018, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   28-May-18    RMS     Fixed FPCHG macro to avoid undefined operation (Mark Pizzolato)
    24-Mar-15    RMS     MMR1 does not track register changes (Johnny Billquist)
    20-Apr-13    RMS     MMR1 does not track PC changes (Johnny Billquist)
    22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
@@ -152,7 +153,7 @@
 
 /* Reg change word */
 
-#define FPCHG(v,r)      (((v) << FPCHG_V_VAL) | (r))
+#define FPCHG(v,r)      ((int32)((((uint32)(v)) << FPCHG_V_VAL) | (r)))
 #define FPCHG_REG       07                              /* register number */
 #define FPCHG_V_VAL     3                               /* offset to value */
 #define FPCHG_GETREG(x) ((x) & FPCHG_REG)

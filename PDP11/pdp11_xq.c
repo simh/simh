@@ -2073,6 +2073,9 @@ t_stat xq_process_bootrom (CTLR* xq)
       /* set to next bdl (implicit chain) */
       xq->var->rbdl_ba += 12;
       break;
+
+    default:
+      break;
   } /* switch */
 
   /* --------------------------- Done, finish up -----------------------------*/

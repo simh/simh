@@ -134,14 +134,14 @@
                       on the libpcap/kernel packet timeout specified on 
                       pcap_open_live.  If USE_READER_THREAD is not set, then 
                       MUST_DO_SELECT is irrelevant
-  USE_TAP_NETWORK   - Specifies that support for tap networking should be 
+  HAVE_TAP_NETWORK  - Specifies that support for tap networking should be 
                       included.  This can be leveraged, along with OS bridging
                       capabilities to share a single LAN interface.  This 
                       allows device names of the form tap:tap0 to be specified
                       at open time.  This functionality is only useful/needed 
                       on *nix platforms since native sharing of Windows NIC 
                       devices works with no external magic.
-  USE_VDE_NETWORK   - Specifies that support for vde networking should be 
+  HAVE_VDE_NETWORK  - Specifies that support for vde networking should be 
                       included.  This can be leveraged, along with OS bridging
                       capabilities to share a single LAN interface.  It also
                       can allow a simulator to have useful networking 
@@ -150,6 +150,9 @@
                       specified at open time.  This functionality is only 
                       available on *nix platforms since the vde api isn't 
                       available on Windows.
+  HAVE_SLIRP_NETWORK- Specifies that support for SLiRP networking should be 
+                      included.  This can be leveraged to provide User Mode 
+                      IP NAT connectivity for simulators.
 
   NEED_PCAP_SENDPACKET
                     - Specifies that you are using an older version of libpcap
@@ -365,49 +368,134 @@
 #include <ctype.h>
 #include "sim_ether.h"
 #include "sim_sock.h"
+#include "sim_timer.h"
+#if defined(_WIN32)
+#include <direct.h>
+#else
+#include <unistd.h>
+#endif
 
-extern FILE *sim_log;
+#define MAX(a,b) (((a) > (b)) ? (a) : (b))
 
+/* Internal routines - forward declarations */
+static int _eth_get_system_id (char *buf, size_t buf_size);
 
 /*============================================================================*/
 /*                  OS-independant ethernet routines                          */
 /*============================================================================*/
 
-t_stat eth_mac_scan (ETH_MAC* mac, char* strmac)
+t_stat eth_mac_scan (ETH_MAC* mac, const char* strmac)
 {
-  int a0, a1, a2, a3, a4, a5;
-  const ETH_MAC zeros = {0,0,0,0,0,0};
-  const ETH_MAC ones  = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-  ETH_MAC newmac;
+return eth_mac_scan_ex (mac, strmac, NULL);
+}
 
-  if ((6 != sscanf(strmac, "%x:%x:%x:%x:%x:%x", &a0, &a1, &a2, &a3, &a4, &a5)) &&
-      (6 != sscanf(strmac, "%x.%x.%x.%x.%x.%x", &a0, &a1, &a2, &a3, &a4, &a5)) &&
-      (6 != sscanf(strmac, "%x-%x-%x-%x-%x-%x", &a0, &a1, &a2, &a3, &a4, &a5)))
-    return SCPE_ARG;
-  if ((a0 > 0xFF) || (a1 > 0xFF) || (a2 > 0xFF) || (a3 > 0xFF) || (a4 > 0xFF) || (a5 > 0xFF))
-    return SCPE_ARG;
-  newmac[0] = a0;
-  newmac[1] = a1;
-  newmac[2] = a2;
-  newmac[3] = a3;
-  newmac[4] = a4;
-  newmac[5] = a5;
+t_stat eth_mac_scan_ex (ETH_MAC* mac, const char* strmac, UNIT *uptr)
+{
+  unsigned int a[6], g[6];
+  FILE *f;
+  char filebuf[64] = "";
+  uint32 i;
+  static const ETH_MAC zeros = {0,0,0,0,0,0};
+  static const ETH_MAC ones  = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+  ETH_MAC newmac;
+  struct {
+      uint32 bits;
+      char system_id[37];
+      char cwd[PATH_MAX];
+      char file[PATH_MAX];
+      ETH_MAC base_mac;
+      char uname[64];
+      char sim[128];
+      } state;
+  CONST char *cptr, *tptr;
+  uint32 data;
+
+  /* Allow generated MAC address */
+  /* XX:XX:XX:XX:XX:XX{/bits{>file}} */
+  /* bits (if specified) must be from 16 thru 48 */
+
+  memset (&state, 0, sizeof(state));
+  _eth_get_system_id (state.system_id, sizeof(state.system_id));
+  strncpy (state.sim, sim_name, sizeof(state.sim));
+  getcwd (state.cwd, sizeof(state.cwd));
+  if (uptr)
+    strncpy (state.uname, sim_uname (uptr), sizeof(state.uname)-1);
+  cptr = strchr (strmac, '>');
+  if (cptr) {
+    state.file[sizeof(state.file)-1] = '\0';
+    strncpy (state.file, cptr + 1, sizeof(state.file)-1);
+    if ((f = fopen (state.file, "r"))) {
+      filebuf[sizeof(filebuf)-1] = '\0';
+      fgets (filebuf, sizeof(filebuf)-1, f);
+      strmac = filebuf;
+      fclose (f);
+      strcpy (state.file, "");  /* avoid saving */
+      }
+    }
+  cptr = strchr (strmac, '/');
+  if (cptr) {
+    state.bits = (uint32)strtotv (cptr + 1, &tptr, 10);
+    if ((state.bits < 16) || (state.bits > 48))
+      return sim_messagef (SCPE_ARG, "Invalid MAC address bits specifier '%d'. Valid values are from 16 thru 48\n", state.bits);
+    }
+  else
+    state.bits = 48;
+  data = eth_crc32 (0, (void *)&state, sizeof(state));
+  for (i=g[0]=g[1]=0; i<4; i++)
+    g[i+2] = (data >> (i << 3)) & 0xFF;
+  if ((6 != sscanf(strmac, "%x:%x:%x:%x:%x:%x", &a[0], &a[1], &a[2], &a[3], &a[4], &a[5])) &&
+      (6 != sscanf(strmac, "%x.%x.%x.%x.%x.%x", &a[0], &a[1], &a[2], &a[3], &a[4], &a[5])) &&
+      (6 != sscanf(strmac, "%x-%x-%x-%x-%x-%x", &a[0], &a[1], &a[2], &a[3], &a[4], &a[5])))
+    return sim_messagef (SCPE_ARG, "Invalid MAC address format: '%s'\n", strmac);
+  for (i=0; i<6; i++)
+    if (a[i] > 0xFF)
+      return sim_messagef (SCPE_ARG, "Invalid MAC address byte value: %02X\n", a[i]);
+    else {
+      uint32 mask, shift;
+    
+      state.base_mac[i] = a[i];
+      if (((i + 1) << 3) < state.bits)
+          shift = 0;
+      else
+          shift = ((i + 1) << 3) - state.bits;
+      mask = 0xFF << shift;
+      newmac[i] = (unsigned char)((a[i] & mask) | (g[i] & ~mask));
+      }
 
   /* final check - mac cannot be broadcast or multicast address */
   if (!memcmp(newmac, zeros, sizeof(ETH_MAC)) ||  /* broadcast */
       !memcmp(newmac, ones,  sizeof(ETH_MAC)) ||  /* broadcast */
       (newmac[0] & 0x01)                          /* multicast */
      )
-    return SCPE_ARG;
+    return sim_messagef (SCPE_ARG, "Can't use Broadcast or MultiCast address as interface MAC address\n");
 
-  /* new mac is OK, copy into passed mac */
+  /* new mac is OK */
+  /* optionally save */
+  if (state.file[0]) {              /* Save File specified? */
+    f = fopen (state.file, "w");
+    if (f == NULL)
+      return sim_messagef (SCPE_ARG, "Can't open MAC address configuration file '%s'.\n", state.file);
+    eth_mac_fmt (&newmac, filebuf);
+    fprintf (f, "%s/48\n", filebuf);
+    fprintf (f, "system-id: %s\n", state.system_id);
+    fprintf (f, "directory: %s\n", state.cwd);
+    fprintf (f, "simulator: %s\n", state.sim);
+    fprintf (f, "device:    %s\n", state.uname);
+    fprintf (f, "file:      %s\n", state.file);
+    eth_mac_fmt (&state.base_mac, filebuf);
+    fprintf (f, "base-mac:  %s\n", filebuf);
+    fprintf (f, "specified: %d bits\n", state.bits);
+    fprintf (f, "generated: %d bits\n", 48-state.bits);
+    fclose (f);
+    }
+  /* copy into passed mac */
   memcpy (*mac, newmac, sizeof(ETH_MAC));
   return SCPE_OK;
 }
 
-void eth_mac_fmt(ETH_MAC* mac, char* buff)
+void eth_mac_fmt(ETH_MAC* const mac, char* buff)
 {
-  uint8* m = (uint8*) mac;
+  const uint8* m = (const uint8*) mac;
   sprintf(buff, "%02X:%02X:%02X:%02X:%02X:%02X", m[0], m[1], m[2], m[3], m[4], m[5]);
   return;
 }
@@ -513,21 +601,22 @@ void eth_setcrc(ETH_DEV* dev, int need_crc)
   dev->need_crc = need_crc;
 }
 
-void eth_packet_trace_ex(ETH_DEV* dev, const uint8 *msg, int len, char* txt, int detail, uint32 reason)
+void eth_packet_trace_ex(ETH_DEV* dev, const uint8 *msg, int len, const char* txt, int detail, uint32 reason)
 {
   if (dev->dptr->dctrl & reason) {
     char src[20];
     char dst[20];
-    unsigned short* proto = (unsigned short*) &msg[12];
+    const unsigned short* proto = (const unsigned short*) &msg[12];
     uint32 crc = eth_crc32(0, msg, len);
-    eth_mac_fmt((ETH_MAC*)&msg[0], dst);
-    eth_mac_fmt((ETH_MAC*)&msg[6], src);
+    eth_mac_fmt((ETH_MAC*)msg, dst);
+    eth_mac_fmt((ETH_MAC*)(msg+6), src);
     sim_debug(reason, dev->dptr, "%s  dst: %s  src: %s  proto: 0x%04X  len: %d  crc: %X\n",
           txt, dst, src, ntohs(*proto), len, crc);
     if (detail) {
       int i, same, group, sidx, oidx;
       char outbuf[80], strbuf[18];
-      static char hex[] = "0123456789ABCDEF";
+      static const char hex[] = "0123456789ABCDEF";
+
       for (i=same=0; i<len; i += 16) {
         if ((i > 0) && (0 == memcmp(&msg[i], &msg[i-16], 16))) {
           ++same;
@@ -551,28 +640,41 @@ void eth_packet_trace_ex(ETH_DEV* dev, const uint8 *msg, int len, char* txt, int
         strbuf[sidx] = '\0';
         sim_debug(reason, dev->dptr, "%04X%-48s %s\n", i, outbuf, strbuf);
       }
-      if (same > 0)
+      if (same > 0) {
         sim_debug(reason, dev->dptr, "%04X thru %04X same as above\n", i-(16*same), len-1);
+      }
     }
   }
 }
 
-void eth_packet_trace(ETH_DEV* dev, const uint8 *msg, int len, char* txt)
+void eth_packet_trace(ETH_DEV* dev, const uint8 *msg, int len, const char* txt)
 {
   eth_packet_trace_ex(dev, msg, len, txt, 0, dev->dbit);
 }
 
-char* eth_getname(int number, char* name)
+void eth_packet_trace_detail(ETH_DEV* dev, const uint8 *msg, int len, const char* txt)
+{
+  eth_packet_trace_ex(dev, msg, len, txt, 1     , dev->dbit);
+}
+
+const char* eth_getname(int number, char* name, char *desc)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
   int count = eth_devices(ETH_MAX_DEVICE, list);
 
-  if (count <= number) return NULL;
+  if ((number < 0) || (count <= number))
+      return NULL;
+  if (list[number].eth_api != ETH_API_PCAP) {
+    sim_printf ("Eth: Pcap capable device not found.  You may need to run as root\n");
+    return NULL;
+    }
+
   strcpy(name, list[number].name);
+  strcpy(desc, list[number].desc);
   return name;
 }
 
-char* eth_getname_bydesc(char* desc, char* name)
+const char* eth_getname_bydesc(const char* desc, char* name, char *ndesc)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
   int count = eth_devices(ETH_MAX_DEVICE, list);
@@ -591,34 +693,14 @@ char* eth_getname_bydesc(char* desc, char* name)
 
     /* found a case-insensitive description match */
     strcpy(name, list[i].name);
+    strcpy(ndesc, list[i].desc);
     return name;
   }
   /* not found */
   return NULL;
 }
 
-/* strncasecmp() is not available on all platforms */
-int eth_strncasecmp(char* string1, char* string2, size_t len)
-{
-  size_t i;
-  unsigned char s1, s2;
-
-  for (i=0; i<len; i++) {
-    s1 = string1[i];
-    s2 = string2[i];
-    if (islower (s1)) s1 = toupper (s1);
-    if (islower (s2)) s2 = toupper (s2);
-
-    if (s1 < s2)
-      return -1;
-    if (s1 > s2)
-      return 1;
-    if (s1 == 0) return 0;
-  }
-  return 0;
-}
-
-char* eth_getname_byname(char* name, char* temp)
+char* eth_getname_byname(const char* name, char* temp, char *desc)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
   int count = eth_devices(ETH_MAX_DEVICE, list);
@@ -629,9 +711,29 @@ char* eth_getname_byname(char* name, char* temp)
   n = strlen(name);
   for (i=0; i<count && !found; i++) {
     if ((n == strlen(list[i].name)) &&
-        (eth_strncasecmp(name, list[i].name, n) == 0)) {
+        (strncasecmp(name, list[i].name, n) == 0)) {
       found = 1;
       strcpy(temp, list[i].name); /* only case might be different */
+      strcpy(desc, list[i].desc);
+    }
+  }
+  return (found ? temp : NULL);
+}
+
+char* eth_getdesc_byname(char* name, char* temp)
+{
+  ETH_LIST  list[ETH_MAX_DEVICE];
+  int count = eth_devices(ETH_MAX_DEVICE, list);
+  size_t n;
+  int i, found;
+
+  found = 0;
+  n = strlen(name);
+  for (i=0; i<count && !found; i++) {
+    if ((n == strlen(list[i].name)) &&
+        (strncasecmp(name, list[i].name, n) == 0)) {
+      found = 1;
+      strcpy(temp, list[i].desc);
     }
   }
   return (found ? temp : NULL);
@@ -644,11 +746,40 @@ void eth_zero(ETH_DEV* dev)
   dev->reflections = -1;                          /* not established yet */
 }
 
-t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
+static char*   (*p_pcap_lib_version) (void);
+
+static ETH_DEV **eth_open_devices = NULL;
+static int eth_open_device_count = 0;
+static t_bool eth_show_active = FALSE;
+
+#if defined (USE_NETWORK) || defined (USE_SHARED)
+static void _eth_add_to_open_list (ETH_DEV* dev)
+{
+eth_open_devices = (ETH_DEV**)realloc(eth_open_devices, (eth_open_device_count+1)*sizeof(*eth_open_devices));
+eth_open_devices[eth_open_device_count++] = dev;
+}
+
+static void _eth_remove_from_open_list (ETH_DEV* dev)
+{
+int i, j;
+
+for (i=0; i<eth_open_device_count; ++i)
+    if (eth_open_devices[i] == dev) {
+        for (j=i+1; j<eth_open_device_count; ++j)
+            eth_open_devices[j-1] = eth_open_devices[j];
+        --eth_open_device_count;
+        break;
+        }
+}
+#endif
+
+t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
-  int number = eth_devices(ETH_MAX_DEVICE, list);
+  int number;
 
+  eth_show_active = TRUE;
+  number = eth_devices(ETH_MAX_DEVICE, list);
   fprintf(st, "ETH devices:\n");
   if (number == -1)
     fprintf(st, "  network support not available in simulator\n");
@@ -661,9 +792,32 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
       for (i=0, min=0; i<number; i++)
         if ((len = strlen(list[i].name)) > min) min = len;
       for (i=0; i<number; i++)
-        fprintf(st," %2d  %-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
+        fprintf(st," eth%d\t%-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
     }
+  if (p_pcap_lib_version) {
+    fprintf(st, "%s\n", p_pcap_lib_version());
+    }
+  if (eth_open_device_count) {
+    int i;
+    char desc[ETH_DEV_DESC_MAX], *d;
+
+    fprintf(st,"Open ETH Devices:\n");
+    for (i=0; i<eth_open_device_count; i++) {
+      d = eth_getdesc_byname(eth_open_devices[i]->name, desc);
+      if (d)
+        fprintf(st, " %-7s%s (%s)\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->dptr->units[0].filename, d);
+      else
+        fprintf(st, " %-7s%s\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->dptr->units[0].filename);
+      eth_show_dev (st, eth_open_devices[i]);
+      }
+    }
+  eth_show_active = FALSE;
   return SCPE_OK;
+}
+
+t_stat eth_show_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST char *desc)
+{
+return eth_show (st, uptr, val, NULL);
 }
 
 t_stat ethq_init(ETH_QUE* que, int max)
@@ -673,9 +827,7 @@ t_stat ethq_init(ETH_QUE* que, int max)
     que->item = (struct eth_item *) calloc(max, sizeof(struct eth_item));
     if (!que->item) {
       /* failed to allocate memory */
-      char* msg = "EthQ: failed to allocate dynamic queue[%d]\r\n";
-      printf(msg, max);
-      if (sim_log) fprintf(sim_log, msg, max);
+      sim_printf("EthQ: failed to allocate dynamic queue[%d]\n", max);
       return SCPE_MEM;
     };
     que->max = max;
@@ -698,6 +850,14 @@ t_stat ethq_destroy(ETH_QUE* que)
 
 void ethq_clear(ETH_QUE* que)
 {
+  int i;
+
+  /* free up any extended packets */
+  for (i=0; i<que->max; ++i)
+    if (que->item[i].packet.oversize) {
+      free (que->item[i].packet.oversize);
+      que->item[i].packet.oversize = NULL;
+      }
   /* clear packet array */
   memset(que->item, 0, sizeof(struct eth_item) * que->max);
   /* clear rest of structure */
@@ -709,6 +869,8 @@ void ethq_remove(ETH_QUE* que)
   struct eth_item* item = &que->item[que->head];
 
   if (que->count) {
+    if (item->packet.oversize)
+      free (item->packet.oversize);
     memset(item, 0, sizeof(struct eth_item));
     if (++que->head == que->max)
       que->head = 0;
@@ -716,7 +878,7 @@ void ethq_remove(ETH_QUE* que)
   }
 }
 
-void ethq_insert_data(ETH_QUE* que, int32 type, const uint8 *data, int used, int len, int crc_len, const uint8 *crc_data, int32 status)
+void ethq_insert_data(ETH_QUE* que, int32 type, const uint8 *data, int used, size_t len, size_t crc_len, const uint8 *crc_data, int32 status)
 {
   struct eth_item* item;
 
@@ -745,15 +907,23 @@ void ethq_insert_data(ETH_QUE* que, int32 type, const uint8 *data, int used, int
   item->packet.len = len;
   item->packet.used = used;
   item->packet.crc_len = crc_len;
-  memcpy(item->packet.msg, data, ((len > crc_len) ? len : crc_len));
-  if (crc_data && (crc_len > len))
-    memcpy(&item->packet.msg[len], crc_data, ETH_CRC_SIZE);
+  if (MAX (len, crc_len) <= sizeof (item->packet.msg)) {
+    memcpy(item->packet.msg, data, ((len > crc_len) ? len : crc_len));
+    if (crc_data && (crc_len > len))
+      memcpy(&item->packet.msg[len], crc_data, ETH_CRC_SIZE);
+    }
+  else {
+    item->packet.oversize = (uint8 *)realloc (item->packet.oversize, ((len > crc_len) ? len : crc_len));
+    memcpy(item->packet.oversize, data, ((len > crc_len) ? len : crc_len));
+    if (crc_data && (crc_len > len))
+      memcpy(&item->packet.oversize[len], crc_data, ETH_CRC_SIZE);
+    }
   item->packet.status = status;
 }
 
 void ethq_insert(ETH_QUE* que, int32 type, ETH_PACK* pack, int32 status)
 {
-  ethq_insert_data(que, type, pack->msg, pack->used, pack->len, pack->crc_len, NULL, status);
+ethq_insert_data(que, type, pack->oversize ? pack->oversize : pack->msg, pack->used, pack->len, pack->crc_len, NULL, status);
 }
 
 /*============================================================================*/
@@ -761,12 +931,22 @@ void ethq_insert(ETH_QUE* que, int32 type, ETH_PACK* pack, int32 status)
 /*============================================================================*/
 
 #if !defined (USE_NETWORK) && !defined (USE_SHARED)
-t_stat eth_open(ETH_DEV* dev, char* name, DEVICE* dptr, uint32 dbit)
+const char *eth_capabilities(void)
+    {return "no Ethernet";}
+t_stat eth_open(ETH_DEV* dev, const char* name, DEVICE* dptr, uint32 dbit)
   {return SCPE_NOFNC;}
 t_stat eth_close (ETH_DEV* dev)
   {return SCPE_NOFNC;}
+t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+  {
+  fprintf (st, "%s attach help\n\n", dptr->name);
+  fprintf (st, "This simulator was not built with ethernet device support\n");
+  return SCPE_OK;
+  }
 t_stat eth_check_address_conflict (ETH_DEV* dev, 
                                    ETH_MAC* const mac)
+  {return SCPE_NOFNC;}
+t_stat eth_set_throttle (ETH_DEV* dev, uint32 time, uint32 burst, uint32 delay)
   {return SCPE_NOFNC;}
 t_stat eth_set_async (ETH_DEV *dev, int latency)
   {return SCPE_NOFNC;}
@@ -786,38 +966,83 @@ int eth_devices (int max, ETH_LIST* dev)
   {return -1;}
 void eth_show_dev (FILE* st, ETH_DEV* dev)
   {}
+static int _eth_get_system_id (char *buf, size_t buf_size)
+  {memset (buf, 0, buf_size); return 0;}
 #else    /* endif unimplemented */
 
+const char *eth_capabilities(void)
+ {
+#if defined (USE_READER_THREAD)
+ return "Threaded "
+#else
+ return "Polled "
+#endif
+     "Ethernet Packet transports"
+#if defined (HAVE_PCAP_NETWORK)
+     ":PCAP"
+#endif
+#if defined (HAVE_TAP_NETWORK)
+     ":TAP"
+#endif
+#if defined (HAVE_VDE_NETWORK)
+     ":VDE"
+#endif
+#if defined (HAVE_SLIRP_NETWORK)
+     ":NAT"
+#endif
+     ":UDP";
+ }
+
+#if (defined (xBSD) || defined (__APPLE__)) && (defined (HAVE_TAP_NETWORK) || defined (HAVE_PCAP_NETWORK))
+#include <sys/ioctl.h>
+#include <net/bpf.h>
+#endif
+
+#if defined (HAVE_PCAP_NETWORK)
 /*============================================================================*/
 /*      WIN32, Linux, and xBSD routines use WinPcap and libpcap packages      */
 /*        OpenVMS Alpha uses a WinPcap port and an associated execlet         */
 /*============================================================================*/
 
-#if defined (xBSD) || defined(__APPLE__)
-#include <sys/ioctl.h>
-#include <net/bpf.h>
-#endif /* xBSD */
-
 #include <pcap.h>
 #include <string.h>
+#else
+struct pcap_pkthdr {
+    uint32 caplen;  /* length of portion present */
+    uint32 len;     /* length this packet (off wire) */
+};
+#define PCAP_ERRBUF_SIZE 256
+typedef void * pcap_t;  /* Pseudo Type to avoid compiler errors */
+#define DLT_EN10MB 1    /* Dummy Value to avoid compiler errors */
+#endif /* HAVE_PCAP_NETWORK */
 
-#ifdef USE_TAP_NETWORK
-#if defined(__linux)
+#ifdef HAVE_TAP_NETWORK
+#if defined(__linux) || defined(__linux__)
 #include <sys/ioctl.h> 
 #include <net/if.h> 
 #include <linux/if_tun.h> 
-#elif defined(USE_BSDTUNTAP)
+#elif defined(HAVE_BSDTUNTAP)
 #include <sys/types.h>
 #include <net/if_types.h>
 #include <net/if.h>
 #else /* We don't know how to do this on the current platform */
-#undef USE_TAP_NETWORK
+#undef HAVE_TAP_NETWORK
 #endif
-#endif /* USE_TAP_NETWORK */
+#endif /* HAVE_TAP_NETWORK */
 
-#ifdef USE_VDE_NETWORK
+#ifdef HAVE_VDE_NETWORK
+#ifdef  __cplusplus
+extern "C" {
+#endif
 #include <libvdeplug.h>
-#endif /* USE_VDE_NETWORK */
+#ifdef  __cplusplus
+}
+#endif
+#endif /* HAVE_VDE_NETWORK */
+
+#ifdef HAVE_SLIRP_NETWORK
+#include "sim_slirp.h"
+#endif /* HAVE_SLIRP_NETWORK */
 
 /* Allows windows to look up user-defined adapter names */
 #if defined(_WIN32)
@@ -834,12 +1059,12 @@ void eth_show_dev (FILE* st, ETH_DEV* dev)
 
 /* Dynamic DLL load variables */
 #ifdef _WIN32
-static HINSTANCE hLib = 0;                      /* handle to DLL */
+static HINSTANCE hLib = NULL;               /* handle to DLL */
 #else
 static void *hLib = 0;                      /* handle to Library */
 #endif
-static int lib_loaded = 0;                      /* 0=not loaded, 1=loaded, 2=library load failed, 3=Func load failed */
-static char* lib_name =
+static int lib_loaded = 0;                  /* 0=not loaded, 1=loaded, 2=library load failed, 3=Func load failed */
+static const char* lib_name =
 #if defined(_WIN32) || defined(__CYGWIN__)
                           "wpcap.dll";
 #elif defined(__APPLE__)
@@ -849,7 +1074,7 @@ static char* lib_name =
 #define __STR(tok) __STR_QUOTE(tok)
                           "libpcap." __STR(HAVE_DLOPEN);
 #endif
-static char* no_pcap = 
+static const char* no_pcap = 
 #if defined(_WIN32) || defined(__CYGWIN__)
                           "wpcap load failure";
 #else
@@ -878,22 +1103,29 @@ static int     (*p_pcap_fileno) (pcap_t *);
 #endif
 static int     (*p_pcap_sendpacket) (pcap_t* handle, const u_char* msg, int len);
 static int     (*p_pcap_setfilter) (pcap_t *, struct bpf_program *);
-static char*   (*p_pcap_lib_version) (void);
+static int     (*p_pcap_setnonblock)(pcap_t* a, int nonblock, char *errbuf);
 
 /* load function pointer from DLL */
-void load_function(char* function, void** func_ptr) {
+typedef int (*_func)();
+
+static void load_function(const char* function, _func* func_ptr) {
 #ifdef _WIN32
-    *func_ptr = GetProcAddress(hLib, function);
+    *func_ptr = (_func)((size_t)GetProcAddress(hLib, function));
 #else
-    *func_ptr = dlsym(hLib, function);
+    *func_ptr = (_func)((size_t)dlsym(hLib, function));
 #endif
     if (*func_ptr == 0) {
-    char* msg = "Eth: Failed to find function '%s' in %s\r\n";
-
-    printf (msg, function, lib_name);
-    if (sim_log) fprintf (sim_log, msg, function, lib_name);
+    sim_printf ("Eth: Failed to find function '%s' in %s\n", function, lib_name);
     lib_loaded = 3;
   }
+}
+
+static void try_load_function(const char* function, _func* func_ptr) {
+#ifdef _WIN32
+    *func_ptr = (_func)((size_t)GetProcAddress(hLib, function));
+#else
+    *func_ptr = (_func)((size_t)dlsym(hLib, function));
+#endif
 }
 
 /* load wpcap.dll as required */
@@ -902,26 +1134,35 @@ int load_pcap(void) {
     case 0:                  /* not loaded */
             /* attempt to load DLL */
 #ifdef _WIN32
-      hLib = LoadLibraryA(lib_name);
+      if (1) {
+        BOOL(WINAPI *p_SetDllDirectory)(LPCTSTR);
+        UINT(WINAPI *p_GetSystemDirectory)(LPTSTR lpBuffer, UINT uSize);
+
+        p_SetDllDirectory = (BOOL(WINAPI *)(LPCTSTR)) GetProcAddress(GetModuleHandleA("kernel32.dll"), "SetDllDirectoryA");
+        p_GetSystemDirectory = (UINT(WINAPI *)(LPTSTR, UINT)) GetProcAddress(GetModuleHandleA("kernel32.dll"), "GetSystemDirectoryA");
+        if (p_SetDllDirectory && p_GetSystemDirectory) {
+          char npcap_path[512] = "";
+
+          if (p_GetSystemDirectory (npcap_path, sizeof(npcap_path) - 7))
+            strlcat (npcap_path, "\\Npcap", sizeof(npcap_path));
+          if (p_SetDllDirectory(npcap_path))
+            hLib = LoadLibraryA(lib_name);
+          p_SetDllDirectory (NULL);
+          }
+        if (hLib == NULL)
+          hLib = LoadLibraryA(lib_name);
+        }
 #else
       hLib = dlopen(lib_name, RTLD_NOW);
 #endif
       if (hLib == 0) {
         /* failed to load DLL */
-        char* msg  = "Eth: Failed to load %s\r\n";
-        char* msg2 = 
+        sim_printf ("Eth: Failed to load %s\n", lib_name);
 #ifdef _WIN32
-                     "Eth: You must install WinPcap 4.x to use networking\r\n";
+        sim_printf ("Eth: You must install Npcap or WinPcap 4.x to use networking\n");
 #else
-                     "Eth: You must install libpcap to use networking\r\n";
+        sim_printf ("Eth: You must install libpcap to use networking\n");
 #endif
-
-        printf (msg, lib_name);
-        printf ("%s", msg2);
-        if (sim_log) {
-          fprintf (sim_log, msg, lib_name);
-          fprintf (sim_log, "%s", msg2);
-        }
         lib_loaded = 2;
         break;
       } else {
@@ -930,35 +1171,33 @@ int load_pcap(void) {
       }
 
       /* load required functions; sets dll_load=3 on error */
-      load_function("pcap_close",        (void**) &p_pcap_close);
-      load_function("pcap_compile",      (void**) &p_pcap_compile);
-      load_function("pcap_datalink",     (void**) &p_pcap_datalink);
-      load_function("pcap_dispatch",     (void**) &p_pcap_dispatch);
-      load_function("pcap_findalldevs",  (void**) &p_pcap_findalldevs);
-      load_function("pcap_freealldevs",  (void**) &p_pcap_freealldevs);
-      load_function("pcap_freecode",     (void**) &p_pcap_freecode);
-      load_function("pcap_geterr",       (void**) &p_pcap_geterr);
-      load_function("pcap_lookupnet",    (void**) &p_pcap_lookupnet);
-      load_function("pcap_open_live",    (void**) &p_pcap_open_live);
+      load_function("pcap_close",        (_func *) &p_pcap_close);
+      load_function("pcap_compile",      (_func *) &p_pcap_compile);
+      load_function("pcap_datalink",     (_func *) &p_pcap_datalink);
+      load_function("pcap_dispatch",     (_func *) &p_pcap_dispatch);
+      load_function("pcap_findalldevs",  (_func *) &p_pcap_findalldevs);
+      load_function("pcap_freealldevs",  (_func *) &p_pcap_freealldevs);
+      load_function("pcap_freecode",     (_func *) &p_pcap_freecode);
+      load_function("pcap_geterr",       (_func *) &p_pcap_geterr);
+      load_function("pcap_lookupnet",    (_func *) &p_pcap_lookupnet);
+      load_function("pcap_open_live",    (_func *) &p_pcap_open_live);
 #ifdef _WIN32
-      load_function("pcap_setmintocopy", (void**) &p_pcap_setmintocopy);
-      load_function("pcap_getevent",     (void**) &p_pcap_getevent);
+      load_function("pcap_setmintocopy", (_func *) &p_pcap_setmintocopy);
+      load_function("pcap_getevent",     (_func *) &p_pcap_getevent);
 #else
 #ifdef MUST_DO_SELECT
-      load_function("pcap_get_selectable_fd",     (void**) &p_pcap_get_selectable_fd);
+      load_function("pcap_get_selectable_fd",     (_func *) &p_pcap_get_selectable_fd);
 #endif
-      load_function("pcap_fileno",       (void**) &p_pcap_fileno);
+      load_function("pcap_fileno",       (_func *) &p_pcap_fileno);
 #endif
-      load_function("pcap_sendpacket",   (void**) &p_pcap_sendpacket);
-      load_function("pcap_setfilter",    (void**) &p_pcap_setfilter);
-      load_function("pcap_lib_version",  (void**) &p_pcap_lib_version);
+      load_function("pcap_sendpacket",   (_func *) &p_pcap_sendpacket);
+      load_function("pcap_setfilter",    (_func *) &p_pcap_setfilter);
+      load_function("pcap_setnonblock",  (_func *) &p_pcap_setnonblock);
+      load_function("pcap_lib_version",  (_func *) &p_pcap_lib_version);
 
-      if (lib_loaded == 1) {
+      if ((lib_loaded == 1) && (!eth_show_active)) {
         /* log successful load */
-        char* version = p_pcap_lib_version();
-        printf("%s\n", version);
-        if (sim_log)
-          fprintf(sim_log, "%s\n", version);
+        sim_printf("%s\n", p_pcap_lib_version());
       }
       break;
     default:                /* loaded or failed */
@@ -974,8 +1213,8 @@ void pcap_close(pcap_t* a) {
   }
 }
 
-/* OpenBSD has an ancient declaration of pcap_compile which doesn't have a const in the bpf string argument */
-#if defined (__OpenBSD__)
+/* Some platforms's pcap.h have an ancient declaration of pcap_compile which doesn't have a const in the bpf string argument */
+#if !defined (BPF_CONST_STRING)
 int pcap_compile(pcap_t* a, struct bpf_program* b, char* c, int d, bpf_u_int32 e) {
 #else
 int pcap_compile(pcap_t* a, struct bpf_program* b, const char* c, int d, bpf_u_int32 e) {
@@ -1101,7 +1340,15 @@ int pcap_setfilter(pcap_t* a, struct bpf_program* b) {
     return 0;
   }
 }
-#endif
+
+int pcap_setnonblock(pcap_t* a, int nonblock, char *errbuf) {
+  if (load_pcap() != 0) {
+    return p_pcap_setnonblock(a, nonblock, errbuf);
+  } else {
+    return 0;
+  }
+}
+#endif /* defined(USE_SHARED) && (defined(_WIN32) || defined(HAVE_DLOPEN)) */
 
 /* Some platforms have always had pcap_sendpacket */
 #if defined(_WIN32) || defined(__VMS)
@@ -1119,7 +1366,7 @@ int pcap_setfilter(pcap_t* a, struct bpf_program* b) {
    Return value: 0=Success, -1=Failure */
 int pcap_sendpacket(pcap_t* handle, const u_char* msg, int len)
 {
-#if defined (__linux)
+#if defined (__linux) || defined (__linux__)
   return (send(pcap_fileno(handle), msg, len, 0) == len)? 0 : -1;
 #else
   return (write(pcap_fileno(handle), msg, len) == len)? 0 : -1;
@@ -1140,32 +1387,32 @@ typedef struct _PACKET_OID_DATA PACKET_OID_DATA, *PPACKET_OID_DATA;
 typedef void **LPADAPTER;
 #define OID_802_3_CURRENT_ADDRESS               0x01010102 /* Extracted from ntddmdis.h */
 
-static int pcap_mac_if_win32(char *AdapterName, unsigned char MACAddress[6])
+static int pcap_mac_if_win32(const char *AdapterName, unsigned char MACAddress[6])
 {
   LPADAPTER         lpAdapter;
   PPACKET_OID_DATA  OidData;
   int               Status;
   int               ReturnValue;
 #ifdef _WIN32
-  HINSTANCE         hDll;         /* handle to DLL */
+  HMODULE           hDll;         /* handle to DLL */
 #else
   static void       *hDll = NULL; /* handle to Library */
   typedef int BOOLEAN;
 #endif
-  LPADAPTER (*p_PacketOpenAdapter)(char *AdapterName);
+  LPADAPTER (*p_PacketOpenAdapter)(const char *AdapterName);
   void (*p_PacketCloseAdapter)(LPADAPTER lpAdapter);
   int (*p_PacketRequest)(LPADAPTER  AdapterObject,BOOLEAN Set,PPACKET_OID_DATA  OidData);
 
 #ifdef _WIN32
   hDll = LoadLibraryA("packet.dll");
-  p_PacketOpenAdapter = (void *)GetProcAddress(hDll, "PacketOpenAdapter");
-  p_PacketCloseAdapter = (void *)GetProcAddress(hDll, "PacketCloseAdapter");
-  p_PacketRequest = (void *)GetProcAddress(hDll, "PacketRequest");
+  p_PacketOpenAdapter = (LPADAPTER (*)(const char *AdapterName))GetProcAddress(hDll, "PacketOpenAdapter");
+  p_PacketCloseAdapter = (void (*)(LPADAPTER lpAdapter))GetProcAddress(hDll, "PacketCloseAdapter");
+  p_PacketRequest = (int (*)(LPADAPTER  AdapterObject,BOOLEAN Set,PPACKET_OID_DATA  OidData))GetProcAddress(hDll, "PacketRequest");
 #else
   hDll = dlopen("packet.dll", RTLD_NOW);
-  p_PacketOpenAdapter = (void *)dlsym(hDll, "PacketOpenAdapter");
-  p_PacketCloseAdapter = (void *)dlsym(hDll, "PacketCloseAdapter");
-  p_PacketRequest = (void *)dlsym(hDll, "PacketRequest");
+  p_PacketOpenAdapter = (LPADAPTER (*)(const char *AdapterName))dlsym(hDll, "PacketOpenAdapter");
+  p_PacketCloseAdapter = (void (*)(LPADAPTER lpAdapter))dlsym(hDll, "PacketCloseAdapter");
+  p_PacketRequest = (int (*)(LPADAPTER  AdapterObject,BOOLEAN Set,PPACKET_OID_DATA  OidData))dlsym(hDll, "PacketRequest");
 #endif
   
   /* Open the selected adapter */
@@ -1183,7 +1430,7 @@ static int pcap_mac_if_win32(char *AdapterName, unsigned char MACAddress[6])
 
   /* Allocate a buffer to get the MAC adress */
 
-  OidData = malloc(6 + sizeof(PACKET_OID_DATA));
+  OidData = (PACKET_OID_DATA *)malloc(6 + sizeof(PACKET_OID_DATA));
   if (OidData == NULL) {
     p_PacketCloseAdapter(lpAdapter);
 #ifdef _WIN32
@@ -1217,6 +1464,7 @@ static int pcap_mac_if_win32(char *AdapterName, unsigned char MACAddress[6])
 #endif
   return ReturnValue;
 }
+
 #endif  /* defined(_WIN32) || defined(__CYGWIN__) */
 
 #if defined (__VMS) && !defined(__VAX)
@@ -1228,7 +1476,7 @@ static int pcap_mac_if_win32(char *AdapterName, unsigned char MACAddress[6])
 #include <stsdef.h>
 #include <nmadef.h>
 
-static int pcap_mac_if_vms(char *AdapterName, unsigned char MACAddress[6])
+static int pcap_mac_if_vms(const char *AdapterName, unsigned char MACAddress[6])
 {
   char VMS_Device[16];
   $DESCRIPTOR(Device, VMS_Device);
@@ -1305,12 +1553,14 @@ static int pcap_mac_if_vms(char *AdapterName, unsigned char MACAddress[6])
       return -1;
   return 0;
 }
-#endif
+#endif /* defined (__VMS) && !defined(__VAX) */
 
-static void eth_get_nic_hw_addr(ETH_DEV* dev, char *devname)
+static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname)
 {
   memset(&dev->host_nic_phy_hw_addr, 0, sizeof(dev->host_nic_phy_hw_addr));
   dev->have_host_nic_phy_addr = 0;
+  if (dev->eth_api != ETH_API_PCAP)
+    return;
 #if defined(_WIN32) || defined(__CYGWIN__)
   if (!pcap_mac_if_win32(devname, dev->host_nic_phy_hw_addr))
     dev->have_host_nic_phy_addr = 1;
@@ -1322,18 +1572,16 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, char *devname)
     char command[1024];
     FILE *f;
     int i;
-    char *patterns[] = {
+    const char *patterns[] = {
         "grep [0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]",
         "egrep [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]",
         NULL};
 
-    if (0 == strncmp("vde:", devname, 4))
-      return;
     memset(command, 0, sizeof(command));
     for (i=0; patterns[i] && (0 == dev->have_host_nic_phy_addr); ++i) {
       snprintf(command, sizeof(command)-1, "ifconfig %s | %s  >NIC.hwaddr", devname, patterns[i]);
-      system(command);
-      if (f = fopen("NIC.hwaddr", "r")) {
+      (void)system(command);
+      if (NULL != (f = fopen("NIC.hwaddr", "r"))) {
         while (0 == dev->have_host_nic_phy_addr) {
           if (fgets(command, sizeof(command)-1, f)) {
             char *p1, *p2;
@@ -1342,7 +1590,7 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, char *devname)
             while (p1) {
               p2 = strchr(p1+1, ':');
               if (p2 <= p1+3) {
-                int mac_bytes[6];
+                unsigned int mac_bytes[6];
                 if (6 == sscanf(p1-2, "%02x:%02x:%02x:%02x:%02x:%02x", &mac_bytes[0], &mac_bytes[1], &mac_bytes[2], &mac_bytes[3], &mac_bytes[4], &mac_bytes[5])) {
                   dev->host_nic_phy_hw_addr[0] = mac_bytes[0];
                   dev->host_nic_phy_hw_addr[1] = mac_bytes[1];
@@ -1368,6 +1616,71 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, char *devname)
 #endif
 }
 
+#if defined(__APPLE__)
+#include <uuid/uuid.h>
+#include <unistd.h>
+static int _eth_get_system_id (char *buf, size_t buf_size)
+{
+static struct timespec wait = {5, 0};   /* 5 seconds */
+static uuid_t uuid;
+
+memset (buf, 0, buf_size);
+if (buf_size < 37)
+  return -1;
+if (gethostuuid (uuid, &wait))
+  memset (uuid, 0, sizeof(uuid));
+uuid_unparse_lower(uuid, buf);
+return 0;
+}
+
+#elif defined(_WIN32)
+static int _eth_get_system_id (char *buf, size_t buf_size)
+{
+  LONG status;
+  DWORD reglen, regtype;
+  HKEY reghnd;
+
+  memset (buf, 0, buf_size);
+#ifndef KEY_WOW64_64KEY
+#define KEY_WOW64_64KEY         (0x0100)
+#endif
+  if ((status = RegOpenKeyExA (HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Cryptography", 0, KEY_QUERY_VALUE|KEY_WOW64_64KEY, &reghnd)) != ERROR_SUCCESS)
+    return -1;
+  reglen = buf_size;
+  if ((status = RegQueryValueExA (reghnd, "MachineGuid", NULL, &regtype, buf, &reglen)) != ERROR_SUCCESS) {
+    RegCloseKey (reghnd);
+    return -1;
+    }
+  RegCloseKey (reghnd );
+  /* make sure value is the right type, bail if not acceptable */
+  if ((regtype != REG_SZ) || (reglen > buf_size))
+    return -1;
+  /* registry value seems OK */
+  return 0;
+}
+
+#else
+static int _eth_get_system_id (char *buf, size_t buf_size)
+{
+FILE *f;
+
+memset (buf, 0, buf_size);
+if ((f = fopen ("/etc/machine-id", "r"))) {
+  fread (buf, 1, buf_size, f);
+  fclose (f);
+  }
+else {
+  if ((f = popen ("hostname", "r"))) {
+    fread (buf, 1, buf_size, f);
+    pclose (f);
+    }
+  }
+while ((strlen (buf) > 0) && sim_isspace(buf[strlen (buf) - 1]))
+  buf[strlen (buf) - 1] = '\0';
+return 0;
+}
+#endif
+
 /* Forward declarations */
 static void
 _eth_callback(u_char* info, const struct pcap_pkthdr* header, const u_char* data);
@@ -1375,74 +1688,101 @@ _eth_callback(u_char* info, const struct pcap_pkthdr* header, const u_char* data
 static t_stat
 _eth_write(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine);
 
-#if defined (USE_READER_THREAD)
-#include <pthread.h>
+static void
+_eth_error(ETH_DEV* dev, const char* where);
 
+#if defined(HAVE_SLIRP_NETWORK)
+static void _slirp_callback (void *opaque, const unsigned char *buf, int len)
+{
+struct pcap_pkthdr header;
+
+memset(&header, 0, sizeof(header));
+header.caplen = header.len = len;
+_eth_callback((u_char *)opaque, &header, buf);
+}
+#endif
+
+#if defined (USE_READER_THREAD)
 static void *
 _eth_reader(void *arg)
 {
 ETH_DEV* volatile dev = (ETH_DEV*)arg;
-int status;
-int sched_policy;
-struct sched_param sched_priority;
-#if defined (_WIN32)
-HANDLE hWait = pcap_getevent ((pcap_t*)dev->handle);
-#else
-int sel_ret;
+int status = 0;
+int sel_ret = 0;
 int do_select = 0;
-int select_fd;
+SOCKET select_fd = 0;
+#if defined (_WIN32)
+HANDLE hWait = (dev->eth_api == ETH_API_PCAP) ? pcap_getevent ((pcap_t*)dev->handle) : NULL;
+#endif
 
 switch (dev->eth_api) {
   case ETH_API_PCAP:
+#if defined (HAVE_PCAP_NETWORK)
 #if defined (MUST_DO_SELECT)
     do_select = 1;
     select_fd = pcap_get_selectable_fd((pcap_t *)dev->handle);
 #endif
+#endif
     break;
   case ETH_API_TAP:
   case ETH_API_VDE:
+  case ETH_API_UDP:
+  case ETH_API_NAT:
     do_select = 1;
     select_fd = dev->fd_handle;
     break;
   }
-#endif
 
 sim_debug(dev->dbit, dev->dptr, "Reader Thread Starting\n");
 
 /* Boost Priority for this I/O thread vs the CPU instruction execution 
-   thread which in general won't be readily yielding the processor when 
-   this thread needs to run */
-pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
-++sched_priority.sched_priority;
-pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
+   thread which, in general, won't be readily yielding the processor 
+   when this thread needs to run */
+sim_os_set_thread_priority (PRIORITY_ABOVE_NORMAL);
 
 while (dev->handle) {
 #if defined (_WIN32)
-  if (WAIT_OBJECT_0 == WaitForSingleObject (hWait, 250)) {
-#else
-  fd_set setl;
-  struct timeval timeout;
-
-  if (do_select) {
-    FD_ZERO(&setl);
-    FD_SET(select_fd, &setl);
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 250*1000;
-    sel_ret = select(1+select_fd, &setl, NULL, NULL, &timeout);
+  if (dev->eth_api == ETH_API_PCAP) {
+    if (WAIT_OBJECT_0 == WaitForSingleObject (hWait, 250))
+      sel_ret = 1;
     }
-  else
-    sel_ret = 1;
-  if (sel_ret < 0 && errno != EINTR) break;
-  if (sel_ret > 0) {
+  if ((dev->eth_api == ETH_API_UDP) || (dev->eth_api == ETH_API_NAT))
 #endif /* _WIN32 */
+  if (1) {
+    if (do_select) {
+#ifdef HAVE_SLIRP_NETWORK
+      if (dev->eth_api == ETH_API_NAT) {
+        sel_ret = sim_slirp_select ((SLIRP*)dev->handle, 250);
+        }
+      else
+#endif
+        {
+        fd_set setl;
+        struct timeval timeout;
+        
+        FD_ZERO(&setl);
+        FD_SET(select_fd, &setl);
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 250*1000;
+        sel_ret = select(1+select_fd, &setl, NULL, NULL, &timeout);
+        }
+      }
+    else
+      sel_ret = 1;
+    if (sel_ret < 0 && errno != EINTR) 
+      break;
+    }
+  if (sel_ret > 0) {
     if (!dev->handle)
       break;
     /* dispatch read request queue available packets */
     switch (dev->eth_api) {
+#ifdef HAVE_PCAP_NETWORK
       case ETH_API_PCAP:
         status = pcap_dispatch ((pcap_t*)dev->handle, -1, &_eth_callback, (u_char*)dev);
         break;
-#ifdef USE_TAP_NETWORK
+#endif
+#ifdef HAVE_TAP_NETWORK
       case ETH_API_TAP:
         if (1) {
           struct pcap_pkthdr header;
@@ -1456,12 +1796,16 @@ while (dev->handle) {
             header.caplen = header.len = len;
             _eth_callback((u_char *)dev, &header, buf);
             }
-          else
-            status = 0;
+          else {
+            if (len < 0)
+              status = -1;
+            else
+              status = 0;
+            }
           }
         break;
-#endif /* USE_TAP_NETWORK */
-#ifdef USE_VDE_NETWORK
+#endif /* HAVE_TAP_NETWORK */
+#ifdef HAVE_VDE_NETWORK
       case ETH_API_VDE:
         if (1) {
           struct pcap_pkthdr header;
@@ -1475,11 +1819,42 @@ while (dev->handle) {
             header.caplen = header.len = len;
             _eth_callback((u_char *)dev, &header, buf);
             }
-          else
-            status = 0;
+          else {
+            if (len < 0)
+              status = -1;
+            else
+              status = 0;
+            }
           }
         break;
-#endif /* USE_VDE_NETWORK */
+#endif /* HAVE_VDE_NETWORK */
+#ifdef HAVE_SLIRP_NETWORK
+      case ETH_API_NAT:
+        sim_slirp_dispatch ((SLIRP*)dev->handle);
+        status = 1;
+        break;
+#endif /* HAVE_SLIRP_NETWORK */
+      case ETH_API_UDP:
+        if (1) {
+          struct pcap_pkthdr header;
+          int len;
+          u_char buf[ETH_MAX_JUMBO_FRAME];
+
+          memset(&header, 0, sizeof(header));
+          len = (int)sim_read_sock (select_fd, (char *)buf, (int32)sizeof(buf));
+          if (len > 0) {
+            status = 1;
+            header.caplen = header.len = len;
+            _eth_callback((u_char *)dev, &header, buf);
+            }
+          else {
+            if (len < 0)
+              status = -1;
+            else
+              status = 0;
+            }
+          }
+        break;
       }
     if ((status > 0) && (dev->asynch_io)) {
       int wakeup_needed;
@@ -1490,6 +1865,22 @@ while (dev->handle) {
       if (wakeup_needed) {
         sim_debug(dev->dbit, dev->dptr, "Queueing automatic poll\n");
         sim_activate_abs (dev->dptr->units, dev->asynch_io_latency);
+        }
+      }
+    if (status < 0) {
+      ++dev->receive_packet_errors;
+      _eth_error (dev, "_eth_reader");
+      if (dev->handle) { /* Still attached? */
+#if defined (_WIN32)
+        hWait = (dev->eth_api == ETH_API_PCAP) ? pcap_getevent ((pcap_t*)dev->handle) : NULL;
+#endif
+        if (do_select) {
+          select_fd = dev->fd_handle;
+#if !defined (_WIN32) && defined(HAVE_PCAP_NETWORK)
+          if (dev->eth_api == ETH_API_PCAP)
+            select_fd = pcap_get_selectable_fd((pcap_t *)dev->handle);
+#endif
+          }
         }
       }
     }
@@ -1503,27 +1894,33 @@ static void *
 _eth_writer(void *arg)
 {
 ETH_DEV* volatile dev = (ETH_DEV*)arg;
-struct write_request *request;
-int sched_policy;
-struct sched_param sched_priority;
+ETH_WRITE_REQUEST *request;
 
 /* Boost Priority for this I/O thread vs the CPU instruction execution 
    thread which in general won't be readily yielding the processor when 
    this thread needs to run */
-pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
-++sched_priority.sched_priority;
-pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
+sim_os_set_thread_priority (PRIORITY_ABOVE_NORMAL);
 
 sim_debug(dev->dbit, dev->dptr, "Writer Thread Starting\n");
 
 pthread_mutex_lock (&dev->writer_lock);
 while (dev->handle) {
   pthread_cond_wait (&dev->writer_cond, &dev->writer_lock);
-  while (request = dev->write_requests) {
+  while (NULL != (request = dev->write_requests)) {
     /* Pull buffer off request list */
     dev->write_requests = request->next;
     pthread_mutex_unlock (&dev->writer_lock);
 
+    if (dev->throttle_delay != ETH_THROT_DISABLED_DELAY) {
+      uint32 packet_delta_time = sim_os_msec() - dev->throttle_packet_time;
+      dev->throttle_events <<= 1;
+      dev->throttle_events += (packet_delta_time < dev->throttle_time) ? 1 : 0;
+      if ((dev->throttle_events & dev->throttle_mask) == dev->throttle_mask) {
+        sim_os_ms_sleep (dev->throttle_delay);
+        ++dev->throttle_count;
+        }
+      dev->throttle_packet_time = sim_os_msec();
+      }
     dev->write_status = _eth_write(dev, &request->packet, NULL);
 
     pthread_mutex_lock (&dev->writer_lock);
@@ -1542,9 +1939,8 @@ return NULL;
 t_stat eth_set_async (ETH_DEV *dev, int latency)
 {
 #if !defined(USE_READER_THREAD) || !defined(SIM_ASYNCH_IO)
-char *msg = "Eth: can't operate asynchronously, must poll\r\n";
-printf ("%s", msg);
-if (sim_log) fprintf (sim_log, "%s", msg);
+char *msg = "Eth: can't operate asynchronously, must poll\n";
+sim_printf ("%s", msg);
 return SCPE_NOFNC;
 #else
 int wakeup_needed;
@@ -1575,14 +1971,281 @@ return SCPE_OK;
 #endif
 }
 
-t_stat eth_open(ETH_DEV* dev, char* name, DEVICE* dptr, uint32 dbit)
+t_stat eth_set_throttle (ETH_DEV* dev, uint32 time, uint32 burst, uint32 delay)
+{
+if (!dev)
+  return SCPE_IERR;
+dev->throttle_time = time;
+dev->throttle_burst = burst;
+dev->throttle_delay = delay;
+dev->throttle_mask = (1 << dev->throttle_burst) - 1;
+return SCPE_OK;
+}
+
+static t_stat _eth_open_port(char *savname, int *eth_api, void **handle, SOCKET *fd_handle, char errbuf[PCAP_ERRBUF_SIZE], char *bpf_filter, void *opaque, DEVICE *dptr, uint32 dbit)
 {
 int bufsz = (BUFSIZ < ETH_MAX_PACKET) ? ETH_MAX_PACKET : BUFSIZ;
+
+if (bufsz < ETH_MAX_JUMBO_FRAME)
+  bufsz = ETH_MAX_JUMBO_FRAME;    /* Enable handling of jumbo frames */
+
+*eth_api = 0;
+*handle = NULL;
+*fd_handle = 0;
+
+/* attempt to connect device */
+memset(errbuf, 0, PCAP_ERRBUF_SIZE);
+if (0 == strncmp("tap:", savname, 4)) {
+  int  tun = -1;    /* TUN/TAP Socket */
+  int  on = 1;
+  const char *devname = savname + 4;
+
+  while (isspace(*devname))
+      ++devname;
+#if defined(HAVE_TAP_NETWORK)
+  if (!strcmp(savname, "tap:tapN"))
+    return sim_messagef (SCPE_OPENERR, "Eth: Must specify actual tap device name (i.e. tap:tap0)\n");
+#endif
+#if (defined(__linux) || defined(__linux__)) && defined(HAVE_TAP_NETWORK)
+  if ((tun = open("/dev/net/tun", O_RDWR)) >= 0) {
+    struct ifreq ifr; /* Interface Requests */
+
+    memset(&ifr, 0, sizeof(ifr));
+    /* Set up interface flags */
+    strcpy(ifr.ifr_name, devname);
+    ifr.ifr_flags = IFF_TAP|IFF_NO_PI;
+
+    /* Send interface requests to TUN/TAP driver. */
+    if (ioctl(tun, TUNSETIFF, &ifr) >= 0) {
+      if (ioctl(tun, FIONBIO, &on)) {
+        strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
+        close(tun);
+        }
+      else {
+        *fd_handle = tun;
+        strcpy(savname, ifr.ifr_name);
+        }
+      }
+    else
+      strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
+    }
+  else
+    strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
+#elif defined(HAVE_BSDTUNTAP) && defined(HAVE_TAP_NETWORK)
+  if (1) {
+    char dev_name[64] = "";
+
+    snprintf(dev_name, sizeof(dev_name)-1, "/dev/%s", devname);
+    dev_name[sizeof(dev_name)-1] = '\0';
+
+    if ((tun = open(dev_name, O_RDWR)) >= 0) {
+      if (ioctl(tun, FIONBIO, &on)) {
+        strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
+        close(tun);
+        }
+      else {
+        *fd_handle = tun;
+        strcpy(savname, devname);
+        }
+#if defined (__APPLE__)
+      if (1) {
+        struct ifreq ifr;
+        int s;
+
+        memset (&ifr, 0, sizeof(ifr));
+        ifr.ifr_addr.sa_family = AF_INET;
+        strncpy(ifr.ifr_name, savname, sizeof(ifr.ifr_name));
+        if ((s = socket(AF_INET, SOCK_DGRAM, 0)) >= 0) {
+          if (ioctl(s, SIOCGIFFLAGS, (caddr_t)&ifr) >= 0) {
+            ifr.ifr_flags |= IFF_UP;
+            if (ioctl(s, SIOCSIFFLAGS, (caddr_t)&ifr)) {
+              strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
+              close(tun);
+              }
+            }
+          close(s);
+          }
+        }
+#endif
+      }
+    else
+      strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
+  }
+#else
+  strncpy(errbuf, "No support for tap: devices", PCAP_ERRBUF_SIZE-1);
+#endif /* !defined(__linux) && !defined(HAVE_BSDTUNTAP) */
+  if (0 == errbuf[0]) {
+    *eth_api = ETH_API_TAP;
+    *handle = (void *)1;  /* Flag used to indicated open */
+    }
+  }
+else { /* !tap: */
+  if (0 == strncmp("vde:", savname, 4)) {
+#if defined(HAVE_VDE_NETWORK)
+    char vdeswitch_s[CBUFSIZE]; /* VDE switch name */
+    char vdeport_s[CBUFSIZE];   /* VDE switch port (optional), numeric */
+      
+    struct vde_open_args voa;
+    const char *devname = savname + 4;
+
+    memset(&voa, 0, sizeof(voa));
+    if (!strcmp(savname, "vde:vdedevice"))
+      return sim_messagef (SCPE_OPENERR, "Eth: Must specify actual vde device name (i.e. vde:/tmp/switch)\n");
+    while (isspace(*devname))
+      ++devname;
+    devname = get_glyph_nc (devname, vdeswitch_s, ':'); /* Extract switch name          */
+    devname = get_glyph_nc (devname, vdeport_s, 0);     /* Extract optional port number */
+
+    if (vdeport_s[0]) {                                 /* port provided? */
+      t_stat r;
+
+      voa.port = (int)get_uint (vdeport_s, 10, 255, &r);
+      if (r != SCPE_OK)
+          return sim_messagef (SCPE_OPENERR, "Eth: Invalid vde port number: %s in %s\n", vdeport_s, savname);
+      }
+
+    if (!(*handle = (void*) vde_open((char *)vdeswitch_s, (char *)"simh", &voa)))
+      strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
+    else {
+      *eth_api = ETH_API_VDE;
+      *fd_handle = vde_datafd((VDECONN*)(*handle));
+      }
+#else
+    strncpy(errbuf, "No support for vde: network devices", PCAP_ERRBUF_SIZE-1);
+#endif /* defined(HAVE_VDE_NETWORK) */
+    }
+  else { /* !vde: */
+    if (0 == strncmp("nat:", savname, 4)) {
+#if defined(HAVE_SLIRP_NETWORK)
+      const char *devname = savname + 4;
+
+      while (isspace(*devname))
+        ++devname;
+      if (!(*handle = (void*) sim_slirp_open(devname, opaque, &_slirp_callback, dptr, dbit)))
+        strncpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE-1);
+      else {
+        *eth_api = ETH_API_NAT;
+        *fd_handle = 0;
+        }
+#else
+      strncpy(errbuf, "No support for nat: network devices", PCAP_ERRBUF_SIZE-1);
+#endif /* defined(HAVE_SLIRP_NETWORK) */
+      }
+    else { /* not nat: */
+      if (0 == strncmp("udp:", savname, 4)) {
+        char localport[CBUFSIZE], host[CBUFSIZE], port[CBUFSIZE];
+        char hostport[2*CBUFSIZE];
+        const char *devname = savname + 4;
+
+        if (!strcmp(savname, "udp:sourceport:remotehost:remoteport"))
+          return sim_messagef (SCPE_OPENERR, "Eth: Must specify actual udp host and ports(i.e. udp:1224:somehost.com:2234)\n");
+
+        while (isspace(*devname))
+          ++devname;
+        if (SCPE_OK != sim_parse_addr_ex (devname, host, sizeof(host), "localhost", port, sizeof(port), localport, sizeof(localport), NULL))
+          return SCPE_OPENERR;
+
+        if (localport[0] == '\0')
+          strcpy (localport, port);
+        sprintf (hostport, "%s:%s", host, port);
+        if ((SCPE_OK == sim_parse_addr (hostport, NULL, 0, NULL, NULL, 0, NULL, "localhost")) &&
+            (0 == strcmp (localport, port)))
+          return sim_messagef (SCPE_OPENERR, "Eth: Must specify different udp localhost ports\n");
+        *fd_handle = sim_connect_sock_ex (localport, hostport, NULL, NULL, SIM_SOCK_OPT_DATAGRAM);
+        if (INVALID_SOCKET == *fd_handle)
+          return SCPE_OPENERR;
+        *eth_api = ETH_API_UDP;
+        *handle = (void *)1;  /* Flag used to indicated open */
+        }
+      else { /* not udp:, so attempt to open the parameter as if it were an explicit device name */
+#if defined(HAVE_PCAP_NETWORK)
+        *handle = (void*) pcap_open_live(savname, bufsz, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
+        if (!*handle)   /* can't open device */
+          return sim_messagef (SCPE_OPENERR, "Eth: pcap_open_live error - %s\n", errbuf);
+        *eth_api = ETH_API_PCAP;
+#if !defined(HAS_PCAP_SENDPACKET) && defined (xBSD) && !defined (__APPLE__)
+        /* Tell the kernel that the header is fully-formed when it gets it.
+           This is required in order to fake the src address. */
+        if (1) {
+          int one = 1;
+          ioctl(pcap_fileno(*handle), BIOCSHDRCMPLT, &one);
+          }
+#endif /* xBSD */
+#if defined(_WIN32)
+        pcap_setmintocopy ((pcap_t*)(*handle), 0);
+#endif
+#if !defined (USE_READER_THREAD)
+#ifdef USE_SETNONBLOCK
+        /* set ethernet device non-blocking so pcap_dispatch() doesn't hang */
+        if (pcap_setnonblock (*handle, 1, errbuf) == -1) {
+          sim_printf ("Eth: Failed to set non-blocking: %s\n", errbuf);
+          }
+#endif
+#if defined (__APPLE__)
+        if (1) {
+          /* Deliver packets immediately, needed for OS X 10.6.2 and later
+           * (Snow-Leopard).
+           * See this thread on libpcap and Mac Os X 10.6 Snow Leopard on
+           * the tcpdump mailinglist: http://seclists.org/tcpdump/2010/q1/110
+           */
+          int v = 1;
+          ioctl(pcap_fileno(*handle), BIOCIMMEDIATE, &v);
+          }
+#endif /* defined (__APPLE__) */
+#endif /* !defined (USE_READER_THREAD) */
+#else
+        strncpy (errbuf, "Unknown or unsupported network device", PCAP_ERRBUF_SIZE-1);
+#endif /* defined(HAVE_PCAP_NETWORK) */
+        } /* not udp:, so attempt to open the parameter as if it were an explicit device name */
+      } /* !nat: */
+    } /* !vde: */
+  } /* !tap: */
+if (errbuf[0])
+  return SCPE_OPENERR;
+
+#ifdef USE_BPF
+if (bpf_filter && (*eth_api == ETH_API_PCAP)) {
+  struct bpf_program bpf;
+  int status;
+  bpf_u_int32  bpf_subnet, bpf_netmask;
+
+  if (pcap_lookupnet(savname, &bpf_subnet, &bpf_netmask, errbuf)<0)
+    bpf_netmask = 0;
+  /* compile filter string */
+  if ((status = pcap_compile((pcap_t*)(*handle), &bpf, bpf_filter, 1, bpf_netmask)) < 0) {
+    sprintf(errbuf, "%s", pcap_geterr((pcap_t*)(*handle)));
+    sim_printf("Eth: pcap_compile error: %s\n", errbuf);
+    /* show erroneous BPF string */
+    sim_printf ("Eth: BPF string is: |%s|\n", bpf_filter);
+    }
+  else {
+    /* apply compiled filter string */
+    if ((status = pcap_setfilter((pcap_t*)(*handle), &bpf)) < 0) {
+      sprintf(errbuf, "%s", pcap_geterr((pcap_t*)(*handle)));
+      sim_printf("Eth: pcap_setfilter error: %s\n", errbuf);
+      }
+    else {
+#ifdef USE_SETNONBLOCK
+      /* set file non-blocking */
+      status = pcap_setnonblock ((pcap_t*)(*handle), 1, errbuf);
+#endif /* USE_SETNONBLOCK */
+      }
+    pcap_freecode(&bpf);
+    }
+  }
+#endif /* USE_BPF */
+return SCPE_OK;
+}
+
+t_stat eth_open(ETH_DEV* dev, const char* name, DEVICE* dptr, uint32 dbit)
+{
+t_stat r;
+int bufsz = (BUFSIZ < ETH_MAX_PACKET) ? ETH_MAX_PACKET : BUFSIZ;
 char errbuf[PCAP_ERRBUF_SIZE];
-char temp[1024];
-char* savname = name;
+char temp[1024], desc[1024] = "";
+const char* savname = name;
+char namebuf[4*CBUFSIZE];
 int   num;
-char* msg;
 
 if (bufsz < ETH_MAX_JUMBO_FRAME)
   bufsz = ETH_MAX_JUMBO_FRAME;    /* Enable handling of jumbo frames */
@@ -1598,174 +2261,52 @@ if ((strlen(name) == 4)
     && isdigit(name[3])
    ) {
   num = atoi(&name[3]);
-  savname = eth_getname(num, temp);
+  savname = eth_getname(num, temp, desc);
   if (savname == NULL) /* didn't translate */
     return SCPE_OPENERR;
   }
 else {
   /* are they trying to use device description? */
-  savname = eth_getname_bydesc(name, temp);
+  savname = eth_getname_bydesc(name, temp, desc);
   if (savname == NULL) { /* didn't translate */
     /* probably is not ethX and has no description */
-    savname = eth_getname_byname(name, temp);
-    if (savname == NULL) /* didn't translate */
+    savname = eth_getname_byname(name, temp, desc);
+    if (savname == NULL) {/* didn't translate */
       savname = name;
+      desc[0] = '\0';   /* no description */
+      }
     }
   }
 
-/* attempt to connect device */
-memset(errbuf, 0, sizeof(errbuf));
-if (0 == strncmp("tap:", savname, 4)) {
-  int  tun = -1;    /* TUN/TAP Socket */
-  int  on = 1;
-  char dev_name[64] = "";
+namebuf[sizeof(namebuf)-1] = '\0';
+strncpy (namebuf, savname, sizeof(namebuf)-1);
+savname = namebuf;
+r = _eth_open_port(namebuf, &dev->eth_api, &dev->handle, &dev->fd_handle, errbuf, NULL, (void *)dev, dptr, dbit);
 
-#if defined(USE_TAP_NETWORK)
-  if (!strcmp(savname, "tap:tapN")) {
-    msg = "Eth: Must specify actual tap device name (i.e. tap:tap0)\r\n";
-    printf (msg, errbuf);
-    if (sim_log) fprintf (sim_log, msg, errbuf);
-    return SCPE_OPENERR;
-    }
-#endif
-#if defined(__linux) && defined(USE_TAP_NETWORK)
-  if ((tun = open("/dev/net/tun", O_RDWR)) >= 0) {
-    struct ifreq ifr; /* Interface Requests */
+if (errbuf[0])
+  return sim_messagef (SCPE_OPENERR, "Eth: open error - %s\n", errbuf);
+if (r != SCPE_OK)
+  return r;
 
-    memset(&ifr, 0, sizeof(ifr));
-    /* Set up interface flags */
-    strcpy(ifr.ifr_name, savname+4);
-    ifr.ifr_flags = IFF_TAP|IFF_NO_PI;
-
-    /* Send interface requests to TUN/TAP driver. */
-    if (ioctl(tun, TUNSETIFF, &ifr) >= 0) {
-      if (ioctl(tun, FIONBIO, &on)) {
-        strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
-        close(tun);
-        }
-      else {
-        dev->fd_handle = tun;
-        strcpy(savname, ifr.ifr_name);
-        }
-      }
-    else
-      strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
-    }
-  else
-    strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
-#elif defined(USE_BSDTUNTAP) && defined(USE_TAP_NETWORK)
-  snprintf(dev_name, sizeof(dev_name)-1, "/dev/%s", savname+4);
-  dev_name[sizeof(dev_name)-1] = '\0';
-
-  if ((tun = open(dev_name, O_RDWR)) >= 0) {
-    if (ioctl(tun, FIONBIO, &on)) {
-      strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
-      close(tun);
-      }
-    else {
-      dev->fd_handle = tun;
-      strcpy(savname, savname+4);
-      }
-#if defined (__APPLE__)
-    if (1) {
-      struct ifreq ifr;
-      int s;
-
-      memset (&ifr, 0, sizeof(ifr));
-      ifr.ifr_addr.sa_family = AF_INET;
-      strncpy(ifr.ifr_name, savname, sizeof(ifr.ifr_name));
-      if ((s = socket(AF_INET, SOCK_DGRAM, 0)) >= 0) {
-        if (ioctl(s, SIOCGIFFLAGS, (caddr_t)&ifr) >= 0) {
-          ifr.ifr_flags |= IFF_UP;
-          if (ioctl(s, SIOCSIFFLAGS, (caddr_t)&ifr)) {
-            strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
-            close(tun);
-            }
-          }
-        close(s);
-        }
-      }
-#endif
-    }
-  else
-    strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
-#else
-  strncpy(errbuf, "No support for tap: devices", sizeof(errbuf)-1);
-#endif /* !defined(__linux) && !defined(USE_BSDTUNTAP) */
-  if (0 == errbuf[0]) {
-    dev->eth_api = ETH_API_TAP;
-    dev->handle = (void *)1;  /* Flag used to indicated open */
-    }
-  }
-else
-  if (0 == strncmp("vde:", savname, 4)) {
-#if defined(USE_VDE_NETWORK)
-    struct vde_open_args voa;
-
-    memset(&voa, 0, sizeof(voa));
-    if (!strcmp(savname, "vde:vdedevice")) {
-      msg = "Eth: Must specify actual vde device name (i.e. vde:/tmp/switch)\r\n";
-      printf (msg, errbuf);
-      if (sim_log) fprintf (sim_log, msg, errbuf);
-      return SCPE_OPENERR;
-      }
-    if (!(dev->handle = (void*) vde_open(savname+4, "simh", &voa)))
-      strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
-    else {
-      dev->eth_api = ETH_API_VDE;
-      dev->fd_handle = vde_datafd((VDECONN*)dev->handle);
-      }
-#else
-    strncpy(errbuf, "No support for vde: network devices", sizeof(errbuf)-1);
-#endif /* !defined(__linux) && !defined(USE_BSDTUNTAP) */
-    }
-  else {
-    dev->handle = (void*) pcap_open_live(savname, bufsz, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
-    if (!dev->handle) { /* can't open device */
-      msg = "Eth: pcap_open_live error - %s\r\n";
-      printf (msg, errbuf);
-      if (sim_log) fprintf (sim_log, msg, errbuf);
-      return SCPE_OPENERR;
-      }
-    dev->eth_api = ETH_API_PCAP;
-    }
-if (errbuf[0]) {
-  msg = "Eth: open error - %s\r\n";
-  printf (msg, errbuf);
-  if (sim_log) fprintf (sim_log, msg, errbuf);
-  return SCPE_OPENERR;
-  }
-msg = "Eth: opened OS device %s\r\n";
-printf (msg, savname);
-if (sim_log) fprintf (sim_log, msg, savname);
+if (!strcmp (desc, "No description available"))
+    strcpy (desc, "");
+sim_printf ("Eth: opened OS device %s%s%s\n", savname, desc[0] ? " - " : "", desc);
 
 /* get the NIC's hardware MAC address */
 eth_get_nic_hw_addr(dev, savname);
 
 /* save name of device */
-dev->name = malloc(strlen(savname)+1);
+dev->name = (char *)malloc(strlen(savname)+1);
 strcpy(dev->name, savname);
 
 /* save debugging information */
 dev->dptr = dptr;
 dev->dbit = dbit;
 
-#if !defined(HAS_PCAP_SENDPACKET) && defined (xBSD) && !defined (__APPLE__)
-/* Tell the kernel that the header is fully-formed when it gets it.
-   This is required in order to fake the src address. */
-if (dev->eth_api == ETH_API_PCAP) {
-  int one = 1;
-  ioctl(pcap_fileno(dev->handle), BIOCSHDRCMPLT, &one);
-  }
-#endif /* xBSD */
-
 #if defined (USE_READER_THREAD)
 if (1) {
   pthread_attr_t attr;
 
-#if defined(_WIN32)
-  pcap_setmintocopy (dev->handle, 0);
-#endif
   ethq_init (&dev->read_queue, 200);         /* initialize FIFO queue */
   pthread_mutex_init (&dev->lock, NULL);
   pthread_mutex_init (&dev->writer_lock, NULL);
@@ -1773,39 +2314,59 @@ if (1) {
   pthread_cond_init (&dev->writer_cond, NULL);
   pthread_attr_init(&attr);
   pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
+#if defined(__hpux)
+  {
+    /* libpcap needs sizeof(long) * 8192 bytes on the stack */
+    size_t stack_size;
+    const size_t min_stack_size = sizeof(long) * 8192 * 3 / 2;
+    if (!pthread_attr_getstacksize(&attr, &stack_size) && stack_size < min_stack_size) {
+      pthread_attr_setstacksize(&attr, min_stack_size);
+    }
+  }
+#endif /* defined(__hpux) */
   pthread_create (&dev->reader_thread, &attr, _eth_reader, (void *)dev);
   pthread_create (&dev->writer_thread, &attr, _eth_writer, (void *)dev);
   pthread_attr_destroy(&attr);
   }
-#else /* !defined (USE_READER_THREAD */
-#ifdef USE_SETNONBLOCK
-/* set ethernet device non-blocking so pcap_dispatch() doesn't hang */
-if ((dev->eth_api == ETH_API_PCAP) && (pcap_setnonblock (dev->handle, 1, errbuf) == -1)) {
-  msg = "Eth: Failed to set non-blocking: %s\r\n";
-  printf (msg, errbuf);
-  if (sim_log) fprintf (sim_log, msg, errbuf);
-  }
+#endif /* defined (USE_READER_THREAD */
+_eth_add_to_open_list (dev);
+return SCPE_OK;
+}
+
+static t_stat _eth_close_port(int eth_api, pcap_t *pcap, SOCKET pcap_fd)
+{
+switch (eth_api) {
+#ifdef HAVE_PCAP_NETWORK
+  case ETH_API_PCAP:
+    pcap_close(pcap);
+    break;
 #endif
-#endif /* !defined (USE_READER_THREAD */
-#if defined (__APPLE__)
-if (dev->eth_api == ETH_API_PCAP) {
-  /* Deliver packets immediately, needed for OS X 10.6.2 and later
-   * (Snow-Leopard).
-   * See this thread on libpcap and Mac Os X 10.6 Snow Leopard on
-   * the tcpdump mailinglist: http://seclists.org/tcpdump/2010/q1/110
-   */
-  int v = 1;
-  ioctl(pcap_fileno(dev->handle), BIOCIMMEDIATE, &v);
-  }
+#ifdef HAVE_TAP_NETWORK
+  case ETH_API_TAP:
+    close(pcap_fd);
+    break;
 #endif
+#ifdef HAVE_VDE_NETWORK
+  case ETH_API_VDE:
+    vde_close((VDECONN*)pcap);
+    break;
+#endif
+#ifdef HAVE_SLIRP_NETWORK
+  case ETH_API_NAT:
+    sim_slirp_close((SLIRP*)pcap);
+    break;
+#endif
+  case ETH_API_UDP:
+    sim_close_sock(pcap_fd);
+    break;
+  }
 return SCPE_OK;
 }
 
 t_stat eth_close(ETH_DEV* dev)
 {
-char* msg = "Eth: closed %s\r\n";
 pcap_t *pcap;
-int pcap_fd;
+SOCKET pcap_fd;
 
 /* make sure device exists */
 if (!dev) return SCPE_UNATT;
@@ -1826,12 +2387,12 @@ pthread_mutex_destroy (&dev->self_lock);
 pthread_mutex_destroy (&dev->writer_lock);
 pthread_cond_destroy (&dev->writer_cond);
 if (1) {
-  struct write_request *buffer;
-   while (buffer = dev->write_buffers) {
+  ETH_WRITE_REQUEST *buffer;
+   while (NULL != (buffer = dev->write_buffers)) {
     dev->write_buffers = buffer->next;
     free(buffer);
     }
-  while (buffer = dev->write_requests) {
+  while (NULL != (buffer = dev->write_requests)) {
     dev->write_requests = buffer->next;
     free(buffer);
     }
@@ -1839,29 +2400,50 @@ if (1) {
 ethq_destroy (&dev->read_queue);         /* release FIFO queue */
 #endif
 
-switch (dev->eth_api) {
-  case ETH_API_PCAP:
-    pcap_close(pcap);
-    break;
-#ifdef USE_TAP_NETWORK
-  case ETH_API_TAP:
-    close(pcap_fd);
-    break;
-#endif
-#ifdef USE_VDE_NETWORK
-  case ETH_API_VDE:
-    vde_close((VDECONN*)pcap);
-    break;
-#endif
-  }
-printf (msg, dev->name);
-if (sim_log) fprintf (sim_log, msg, dev->name);
+_eth_close_port (dev->eth_api, pcap, pcap_fd);
+sim_printf ("Eth: closed %s\n", dev->name);
 
 /* clean up the mess */
 free(dev->name);
+free(dev->bpf_filter);
 eth_zero(dev);
-
+_eth_remove_from_open_list (dev);
 return SCPE_OK;
+}
+
+t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+fprintf (st, "%s attach help\n\n", dptr->name);
+fprintf (st, "   sim> SHOW ETHERNET\n");
+fprintf (st, "   libpcap version 1.0.0\n");
+fprintf (st, "   ETH devices:\n");
+fprintf (st, "    eth0   en0                                  (No description available)\n");
+#if defined(HAVE_TAP_NETWORK)
+fprintf (st, "    eth1   tap:tapN                             (Integrated Tun/Tap support)\n");
+#endif
+#if defined(HAVE_VDE_NETWORK)
+fprintf (st, "    eth2   vde:device{:switch-port-number}      (Integrated VDE support)\n");
+#endif
+#if defined(HAVE_SLIRP_NETWORK)
+fprintf (st, "    eth3   nat:{optional-nat-parameters}        (Integrated NAT (SLiRP) support)\n");
+#endif
+fprintf (st, "    eth4   udp:sourceport:remotehost:remoteport (Integrated UDP bridge support)\n");
+fprintf (st, "   sim> ATTACH %s eth0\n\n", dptr->name);
+fprintf (st, "or equivalently:\n\n");
+fprintf (st, "   sim> ATTACH %s en0\n\n", dptr->name);
+#if defined(HAVE_SLIRP_NETWORK)
+sim_slirp_attach_help (st, dptr, uptr, flag, cptr);
+#endif
+return SCPE_OK;
+}
+
+static int _eth_rand_byte()
+{
+static int rand_initialized = 0;
+
+if (!rand_initialized)
+  srand((unsigned int)sim_os_msec());
+return (rand() & 0xFF);
 }
 
 t_stat eth_check_address_conflict (ETH_DEV* dev, 
@@ -1869,7 +2451,9 @@ t_stat eth_check_address_conflict (ETH_DEV* dev,
 {
 ETH_PACK send, recv;
 t_stat status;
+uint32 i;
 int responses = 0;
+uint32 offset, function;
 char mac_string[32];
 
 eth_mac_fmt(mac, mac_string);
@@ -1892,41 +2476,41 @@ sim_debug(dev->dbit, dev->dptr, "Determining Address Conflict for MAC address: %
    be affected by an address conflict were physically present on a single
    Ethernet cable which might have been extended by a couple of repeaters).
    Since that time, essentially no networks are single collision domains.  
-   Thick and thinwire Ethernet cables don’t exist and very few networks 
+   Thick and thinwire Ethernet cables don't exist and very few networks 
    even have hubs.  Today, essentially all LANs are deployed using one 
    or more layers of network switches.  In a switched LAN environment, the 
-   switches on the LAN ‘learn’ which ports on the LAN source traffic from 
+   switches on the LAN "learn" which ports on the LAN source traffic from 
    which MAC addresses and then forward traffic destined for particular 
    MAC address to the appropriate ports.  If a particular MAC address is
-   already in use somewhere on the LAN, then the switches ‘know’ where 
+   already in use somewhere on the LAN, then the switches "know" where 
    it is.  The host based test using the loopback protocol is poorly 
    designed to detect this condition.  This test is performed by the host
-   first changing the device’s Physical MAC address to the address which
+   first changing the device's Physical MAC address to the address which
    is to be tested, and then sending a loopback packet FROM AND TO this
    MAC address with a loopback reply to be sent by a system which may be
    currently using the MAC address.  If no reply is received, then the 
    MAC address is presumed to be unused.  The sending of this packet will
    result in its delivery to the right system since the switch port/MAC
    address tables know where to deliver packets destined to this MAC 
-   address, however the response it generates won’t be delivered to the 
-   system performing the test since the switches on the LAN won’t know 
+   address, however the response it generates won't be delivered to the 
+   system performing the test since the switches on the LAN won't know 
    about the local port being the right target for packets with this MAC 
    address.  A better test design to detect these conflicts would be for 
    the testing system to send a loopback packet FROM the current physical
    MAC address (BEFORE changing it) TO the MAC address being tested with 
    the loopback response coming to the current physical MAC address of 
    the device.  If a response is received, then the address is in use and
-   the attempt to change the device’s MAC address should fail.  Since we 
-   can’t change the software running in these simulators to implement this
-   better conflict detection approach, we can still ‘do the right thing’ 
-   in the sim_ether layer.  We’re already handling the loopback test 
+   the attempt to change the device's MAC address should fail.  Since we 
+   can't change the software running in these simulators to implement this
+   better conflict detection approach, we can still "do the right thing" 
+   in the sim_ether layer.  We're already handling the loopback test 
    packets specially since we always had to avoid receiving the packets 
    which were being sent, but needed to allow for the incoming loopback 
    packets to be properly dealt with.  We can extend this current special
-   handling to change outgoing ‘loopback to self’ packets to have source 
-   AND loopback destination addresses in the packets to be the host NIC’s
+   handling to change outgoing "loopback to self" packets to have source 
+   AND loopback destination addresses in the packets to be the host NIC's
    physical address.  The switch network will already know the correct 
-   MAC/port relationship for the host NIC’s physical address, so loopback 
+   MAC/port relationship for the host NIC's physical address, so loopback 
    response packets will be delivered as needed.
 
    Code in _eth_write and _eth_callback provide the special handling to 
@@ -1938,41 +2522,53 @@ sim_debug(dev->dbit, dev->dptr, "Determining Address Conflict for MAC address: %
 /* build a loopback forward request packet */
 memset (&send, 0, sizeof(ETH_PACK));
 send.len = ETH_MIN_PACKET;                              /* minimum packet size */
+for (i=0; i<send.len; i++)
+  send.msg[i] = _eth_rand_byte();
 memcpy(&send.msg[0], mac, sizeof(ETH_MAC));             /* target address */
 memcpy(&send.msg[6], mac, sizeof(ETH_MAC));             /* source address */
 send.msg[12] = 0x90;                                    /* loopback packet type */
+send.msg[13] = 0;
 send.msg[14] = 0;                                       /* Offset */
+send.msg[15] = 0;
 send.msg[16] = 2;                                       /* Forward */
+send.msg[17] = 0;
 memcpy(&send.msg[18], mac, sizeof(ETH_MAC));            /* Forward Destination */
 send.msg[24] = 1;                                       /* Reply */
+send.msg[25] = 0;
 
 eth_filter(dev, 1, (ETH_MAC *)mac, 0, 0);
 
 /* send the packet */
 status = _eth_write (dev, &send, NULL);
 if (status != SCPE_OK) {
-  char *msg;
+  const char *msg;
   msg = (dev->eth_api == ETH_API_PCAP) ?
-      "Eth: Error Transmitting packet: %s\r\n"
-        "You may need to run as root, or install a libpcap version\r\n"
-        "which is at least 0.9 from your OS vendor or www.tcpdump.org\r\n" :
-      "Eth: Error Transmitting packet: %s\r\n"
-        "You may need to run as root.\r\n";
-  printf(msg, strerror(errno));
-  if (sim_log) fprintf (sim_log, msg, strerror(errno));
+      "Eth: Error Transmitting packet: %s\n"
+        "You may need to run as root, or install a libpcap version\n"
+        "which is at least 0.9 from your OS vendor or www.tcpdump.org\n" :
+      "Eth: Error Transmitting packet: %s\n"
+        "You may need to run as root.\n";
+  sim_printf(msg, strerror(errno));
   return status;
   }
 
 sim_os_ms_sleep (300);   /* time for a conflicting host to respond */
 
+eth_packet_trace_detail (dev, send.msg, send.len, "Sent-Address-Check");
+
 /* empty the read queue and count the responses */
 do {
   memset (&recv, 0, sizeof(ETH_PACK));
   status = eth_read (dev, &recv, NULL);
+  eth_packet_trace_detail (dev, recv.msg, recv.len, "Recv-Address-Check");
+  offset = 16 + (recv.msg[14] | (recv.msg[15] << 8));
+  function = 0;
+  if ((offset+2) < recv.len)
+    function = recv.msg[offset] | (recv.msg[offset+1] << 8);
   if (((0 == memcmp(send.msg+12, recv.msg+12, 2)) &&   /* Protocol Match */
-       (0 == memcmp(send.msg,    recv.msg+6,  6)) &&   /* Source Match */
-       (0 == memcmp(send.msg+6,  recv.msg,    6))) ||  /* Destination Match */
-      (0 == memcmp(send.msg, recv.msg, 14)))           /* Packet Match (Reflection) */
+       (function == 1) &&                              /* Function is Reply */
+       (0 == memcmp(&send.msg[offset], &recv.msg[offset], send.len-offset))) || /* Content Match */
+      (0 == memcmp(send.msg, recv.msg, send.len)))     /* Packet Match (Reflection) */
     responses++;
   } while (recv.len > 0);
 
@@ -1985,7 +2581,7 @@ t_stat eth_reflect(ETH_DEV* dev)
 /* Test with an address no NIC should have. */
 /* We do this to avoid reflections from the wire, */
 /* in the event that a simulated NIC has a MAC address conflict. */
-ETH_MAC mac = {0xfe,0xff,0xff,0xff,0xff,0xfe};
+static ETH_MAC mac = {0xfe,0xff,0xff,0xff,0xff,0xfe};
 
 sim_debug(dev->dbit, dev->dptr, "Determining Reflections...\n");
 
@@ -1996,13 +2592,97 @@ sim_debug(dev->dbit, dev->dptr, "Reflections = %d\n", dev->reflections);
 return dev->reflections;
 }
 
+static void
+_eth_error(ETH_DEV* dev, const char* where)
+{
+char msg[64];
+const char *netname = "";
+time_t now;
+
+time(&now);
+sim_printf ("%s", asctime(localtime(&now)));
+switch (dev->eth_api) {
+  case ETH_API_PCAP:
+      netname = "pcap";
+      break;
+  case ETH_API_TAP:
+      netname = "tap";
+      break;
+  case ETH_API_VDE:
+      netname = "vde";
+      break;
+  case ETH_API_UDP:
+      netname = "udp";
+      break;
+  case ETH_API_NAT:
+      netname = "nat";
+      break;
+  }
+sprintf(msg, "%s(%s): ", where, netname);
+switch (dev->eth_api) {
+#if defined(HAVE_PCAP_NETWORK)
+  case ETH_API_PCAP:
+      sim_printf ("%s%s\n", msg, pcap_geterr ((pcap_t*)dev->handle));
+      break;
+#endif
+  default:
+      sim_err_sock (INVALID_SOCKET, msg);
+      break;
+  }
+#ifdef USE_READER_THREAD
+pthread_mutex_lock (&dev->lock);
+++dev->error_waiting_threads;
+if (!dev->error_needs_reset)
+  dev->error_needs_reset = (((dev->transmit_packet_errors + dev->receive_packet_errors)%ETH_ERROR_REOPEN_THRESHOLD) == 0);
+pthread_mutex_unlock (&dev->lock);
+#else
+dev->error_needs_reset = (((dev->transmit_packet_errors + dev->receive_packet_errors)%ETH_ERROR_REOPEN_THRESHOLD) == 0);
+#endif
+/* Limit errors to 1 per second (per invoking thread (reader and writer)) */
+sim_os_sleep (1);
+/* 
+ When all of the threads which can reference this ETH_DEV object are
+ simultaneously waiting in this routine, we have the potential to close
+ and reopen the network connection.
+ We do this after ETH_ERROR_REOPEN_THRESHOLD total errors have occurred.  
+ In practice could be as frequently as once every ETH_ERROR_REOPEN_THRESHOLD/2 
+ seconds, but normally would be about once every 1.5*ETH_ERROR_REOPEN_THRESHOLD 
+ seconds (ONLY when the error condition exists).
+ */
+#ifdef USE_READER_THREAD
+pthread_mutex_lock (&dev->lock);
+if ((dev->error_waiting_threads == 2) &&
+    (dev->error_needs_reset)) {
+#else
+if (dev->error_needs_reset) {
+#endif
+  char errbuf[PCAP_ERRBUF_SIZE];
+  t_stat r;
+
+  _eth_close_port(dev->eth_api, (pcap_t *)dev->handle, dev->fd_handle);
+  sim_os_sleep (ETH_ERROR_REOPEN_PAUSE);
+
+  r = _eth_open_port(dev->name, &dev->eth_api, &dev->handle, &dev->fd_handle, errbuf, dev->bpf_filter, (void *)dev, dev->dptr, dev->dbit);
+  dev->error_needs_reset = FALSE;
+  if (r == SCPE_OK)
+    sim_printf ("%s ReOpened: %s \n", msg, dev->name);
+  else
+    sim_printf ("%s ReOpen Attempt Failed: %s - %s\n", msg, dev->name, errbuf);
+  ++dev->error_reopen_count;
+  }
+#ifdef USE_READER_THREAD
+--dev->error_waiting_threads;
+pthread_mutex_unlock (&dev->lock);
+#endif
+}
+
 static
 t_stat _eth_write(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
 {
 int status = 1;   /* default to failure */
 
 /* make sure device exists */
-if (!dev) return SCPE_UNATT;
+if ((!dev) || (dev->eth_api == ETH_API_NONE)) return SCPE_UNATT;
 
 /* make sure packet exists */
 if (!packet) return SCPE_ARG;
@@ -2010,14 +2690,18 @@ if (!packet) return SCPE_ARG;
 /* make sure packet is acceptable length */
 if ((packet->len >= ETH_MIN_PACKET) && (packet->len <= ETH_MAX_PACKET)) {
   int loopback_self_frame = LOOPBACK_SELF_FRAME(packet->msg, packet->msg);
+  int loopback_physical_response = LOOPBACK_PHYSICAL_RESPONSE(dev, packet->msg);
 
   eth_packet_trace (dev, packet->msg, packet->len, "writing");
 
   /* record sending of loopback packet (done before actual send to avoid race conditions with receiver) */
-  if (loopback_self_frame) {
-    if (dev->have_host_nic_phy_addr) {
+  if (loopback_self_frame || loopback_physical_response) {
+    /* Direct loopback responses to the host physical address since our physical address
+       may not have been learned yet. */
+    if (loopback_self_frame && dev->have_host_nic_phy_addr) {
       memcpy(&packet->msg[6],  dev->host_nic_phy_hw_addr, sizeof(ETH_MAC));
       memcpy(&packet->msg[18], dev->host_nic_phy_hw_addr, sizeof(ETH_MAC));
+      eth_packet_trace (dev, packet->msg, packet->len, "writing-fixed");
     }
 #ifdef USE_READER_THREAD
     pthread_mutex_lock (&dev->self_lock);
@@ -2031,18 +2715,20 @@ if ((packet->len >= ETH_MIN_PACKET) && (packet->len <= ETH_MAX_PACKET)) {
 
     /* dispatch write request (synchronous; no need to save write info to dev) */
   switch (dev->eth_api) {
+#ifdef HAVE_PCAP_NETWORK
     case ETH_API_PCAP:
       status = pcap_sendpacket((pcap_t*)dev->handle, (u_char*)packet->msg, packet->len);
       break;
-#ifdef USE_TAP_NETWORK
+#endif
+#ifdef HAVE_TAP_NETWORK
     case ETH_API_TAP:
-      status = ((packet->len == write(dev->fd_handle, (void *)packet->msg, packet->len)) ? 0 : -1);
+      status = (((int)packet->len == write(dev->fd_handle, (void *)packet->msg, packet->len)) ? 0 : -1);
       break;
 #endif
-#ifdef USE_VDE_NETWORK
+#ifdef HAVE_VDE_NETWORK
     case ETH_API_VDE:
       status = vde_send((VDECONN*)dev->handle, (void *)packet->msg, packet->len, 0);
-      if ((status == packet->len) || (status == 0))
+      if ((status == (int)packet->len) || (status == 0))
         status = 0;
       else
         if ((status == -1) && ((errno == EAGAIN) || (errno == EWOULDBLOCK)))
@@ -2051,7 +2737,20 @@ if ((packet->len >= ETH_MIN_PACKET) && (packet->len <= ETH_MAX_PACKET)) {
           status = 1;
       break;
 #endif
+#ifdef HAVE_SLIRP_NETWORK
+    case ETH_API_NAT:
+      status = sim_slirp_send((SLIRP*)dev->handle, (char *)packet->msg, (size_t)packet->len, 0);
+      if ((status == (int)packet->len) || (status == 0))
+        status = 0;
+      else
+        status = 1;
+      break;
+#endif
+    case ETH_API_UDP:
+      status = (((int32)packet->len == sim_write_sock (dev->fd_handle, (char *)packet->msg, (int32)packet->len)) ? 0 : -1);
+      break;
     }
+  ++dev->packets_sent;              /* basic bookkeeping */
   /* On error, correct loopback bookkeeping */
   if ((status != 0) && loopback_self_frame) {
 #ifdef USE_READER_THREAD
@@ -2062,6 +2761,10 @@ if ((packet->len >= ETH_MIN_PACKET) && (packet->len <= ETH_MAX_PACKET)) {
 #ifdef USE_READER_THREAD
     pthread_mutex_unlock (&dev->self_lock);
 #endif
+    }
+  if (status != 0) {
+    ++dev->transmit_packet_errors;
+    _eth_error (dev, "_eth_write");
     }
 
   } /* if packet->len */
@@ -2076,19 +2779,19 @@ return ((status == 0) ? SCPE_OK : SCPE_IOERR);
 t_stat eth_write(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
 {
 #ifdef USE_READER_THREAD
-struct write_request *request;
+ETH_WRITE_REQUEST *request;
 int write_queue_size = 1;
 
 /* make sure device exists */
-if (!dev) return SCPE_UNATT;
+if ((!dev) || (dev->eth_api == ETH_API_NONE)) return SCPE_UNATT;
 
 /* Get a buffer */
 pthread_mutex_lock (&dev->writer_lock);
-if (request = dev->write_buffers)
+if (NULL != (request = dev->write_buffers))
   dev->write_buffers = request->next;
 pthread_mutex_unlock (&dev->writer_lock);
-if (!request)
-  request = malloc(sizeof(*request));
+if (NULL == request)
+  request = (ETH_WRITE_REQUEST *)malloc(sizeof(*request));
 
 /* Copy buffer contents */
 request->packet.len = packet->len;
@@ -2102,7 +2805,7 @@ memcpy(request->packet.msg, packet->msg, packet->len);
 pthread_mutex_lock (&dev->writer_lock);
 request->next = NULL;
 if (dev->write_requests) {
-  struct write_request *last_request = dev->write_requests;
+  ETH_WRITE_REQUEST *last_request = dev->write_requests;
 
   ++write_queue_size;
   while (last_request->next) {
@@ -2138,6 +2841,7 @@ key ^= 0x3f;
 return (hash[key>>3] & (1 << (key&0x7)));
 }
 
+#if 0
 static int
 _eth_hash_validate(ETH_MAC *MultiCastList, int count, ETH_MULTIHASH hash)
 {
@@ -2189,6 +2893,7 @@ ETH_MULTIHASH thash = {0x01, 0x40, 0x00, 0x00, 0x48, 0x88, 0x40, 0x00};
 
 _eth_hash_validate(tMacs, sizeof(tMacs)/sizeof(tMacs[0]), thash);
 }
+#endif
 
 /* The IP header */
 struct IPHeader {
@@ -2270,11 +2975,12 @@ while (size > 1) {
   size -= sizeof(*buffer);
 }
 if (size) {
-  uint8 endbytes[2];
+  uint16 endword;
+  uint8 *endbytes = (uint8 *)&endword;
 
   endbytes[0] = *((uint8 *)buffer);
   endbytes[1] = 0;
-  cksum += *((uint16 *)endbytes);
+  cksum += endword;
   }
 
 /* Do a little shuffling  */
@@ -2310,9 +3016,9 @@ return (uint16)(~sum);
 }
 
 static void
-_eth_fix_ip_jumbo_offload(ETH_DEV* dev, const u_char* msg, int len)
+_eth_fix_ip_jumbo_offload(ETH_DEV* dev, u_char* msg, int len)
 {
-unsigned short* proto = (unsigned short*) &msg[12];
+const unsigned short* proto = (const unsigned short*) &msg[12];
 struct IPHeader *IP;
 struct TCPHeader *TCP = NULL;
 struct UDPHeader *UDP;
@@ -2395,7 +3101,7 @@ switch (IP->proto) {
        'template' header which may not include a value being populated 
        in the IP header length (which is only 16 bits).
        We process as payload everything which isn't known header data. */
-    payload_len = len - (14 + IP_HLEN(IP));
+    payload_len = (uint16)(len - (14 + IP_HLEN(IP)));
     mtu_payload = ETH_MIN_JUMBO_FRAME - (14 + IP_HLEN(IP));
     frag_offset = 0;
     while (payload_len > 0) {
@@ -2449,7 +3155,7 @@ switch (IP->proto) {
        'template' header which may not include a value being populated 
        in the IP header length (which is only 16 bits).
        We process as payload everything which isn't known header data. */
-    payload_len = len - (14 + IP_HLEN(IP) + TCP_DATA_OFFSET(TCP));
+    payload_len = (uint16)(len - (14 + IP_HLEN(IP) + TCP_DATA_OFFSET(TCP)));
     mtu_payload = ETH_MIN_JUMBO_FRAME - (14 + IP_HLEN(IP) + TCP_DATA_OFFSET(TCP));
     while (payload_len > 0) {
       if (payload_len > mtu_payload) {
@@ -2499,9 +3205,9 @@ switch (IP->proto) {
 }
 
 static void
-_eth_fix_ip_xsum_offload(ETH_DEV* dev, u_char* msg, int len)
+_eth_fix_ip_xsum_offload(ETH_DEV* dev, const u_char* msg, int len)
 {
-unsigned short* proto = (unsigned short*) &msg[12];
+const unsigned short* proto = (const unsigned short*) &msg[12];
 struct IPHeader *IP;
 struct TCPHeader *TCP;
 struct UDPHeader *UDP;
@@ -2558,6 +3264,65 @@ switch (IP->proto) {
   }
 }
 
+static int
+_eth_process_loopback (ETH_DEV* dev, const u_char* data, uint32 len)
+{
+int protocol = data[12] | (data[13] << 8);
+ETH_PACK  response;
+uint32 offset, function;
+
+if (protocol != 0x0090)     /* !ethernet loopback */
+  return 0;
+
+if (LOOPBACK_REFLECTION_TEST_PACKET(dev, data))
+  return 0;                 /* Ignore reflection check packet */
+
+offset   = 16 + (data[14] | (data[15] << 8));
+if (offset >= len)
+  return 0;
+function = data[offset] | (data[offset+1] << 8);
+
+if (function != 2) /*forward*/
+  return 0;
+
+/* The only packets we should be responding to are ones which 
+   we received due to them being directed to our physical MAC address, 
+   OR the Broadcast address OR to a Multicast address we're listening to 
+   (we may receive others if we're in promiscuous mode, but shouldn't 
+   respond to them) */
+if ((0 == (data[0]&1)) &&           /* Multicast or Broadcast */
+    (0 != memcmp(dev->filter_address[0], data, sizeof(ETH_MAC))))
+  return 0;
+
+/* Attempts to forward to multicast or broadcast addresses are explicitly 
+   ignored by consuming the packet and doing nothing else */
+if (data[offset+2]&1)
+  return 1;
+
+eth_packet_trace (dev, data, len, "rcvd");
+
+sim_debug(dev->dbit, dev->dptr, "_eth_process_loopback()\n");
+
+/* create forward response packet */
+memset(&response, 0, sizeof(response));
+response.len = len;
+memcpy(response.msg, data, len);
+memcpy(&response.msg[0], &response.msg[offset+2], sizeof(ETH_MAC));
+memcpy(&response.msg[6], dev->filter_address[0], sizeof(ETH_MAC));
+offset += 8 - 16; /* Account for the Ethernet Header and Offset value in this number  */
+response.msg[14] = offset & 0xFF;
+response.msg[15] = (offset >> 8) & 0xFF;
+
+/* send response packet */
+eth_write(dev, &response, NULL);
+
+eth_packet_trace(dev, response.msg, response.len, ((function == 1) ? "loopbackreply" : "loopbackforward"));
+
+++dev->loopback_packets_processed;
+
+return 1;
+}
+
 static void
 _eth_callback(u_char* info, const struct pcap_pkthdr* header, const u_char* data)
 {
@@ -2567,10 +3332,12 @@ int from_me = 0;
 int i;
 int bpf_used;
 
-if ((dev->have_host_nic_phy_addr) &&
-    (LOOPBACK_PHYSICAL_RESPONSE(dev->host_nic_phy_hw_addr, dev->physical_addr, data))) {
-  u_char *datacopy = malloc(header->len);
+if (LOOPBACK_PHYSICAL_RESPONSE(dev, data)) {
+  u_char *datacopy = (u_char *)malloc(header->len);
 
+  /* Since we changed the outgoing loopback packet to have the physical MAC address of the
+     host's interface instead of the programmatically set physical address of this pseudo
+     device, we restore parts of the modified packet back as needed */
   memcpy(datacopy, data, header->len);
   memcpy(datacopy, dev->physical_addr, sizeof(ETH_MAC));
   memcpy(datacopy+18, dev->physical_addr, sizeof(ETH_MAC));
@@ -2590,6 +3357,8 @@ switch (dev->eth_api) {
 #endif /* USE_BPF */
   case ETH_API_TAP:
   case ETH_API_VDE:
+  case ETH_API_UDP:
+  case ETH_API_NAT:
     bpf_used = 0;
     to_me = 0;
     eth_packet_trace (dev, data, header->len, "received");
@@ -2609,12 +3378,15 @@ switch (dev->eth_api) {
     if ((dev->hash_filter) && (!to_me) && (data[0] & 0x01))
       to_me = _eth_hash_lookup(dev->hash, data);
     break;
+  default:
+    bpf_used = to_me = 0;                           /* Should NEVER happen */
+    abort();
+    break;
   }
 
 /* detect reception of loopback packet to our physical address */
 if ((LOOPBACK_SELF_FRAME(dev->physical_addr, data)) ||
-    (dev->have_host_nic_phy_addr && 
-     LOOPBACK_PHYSICAL_REFLECTION(dev->host_nic_phy_hw_addr, data))) {
+    (LOOPBACK_PHYSICAL_REFLECTION(dev, data))) {
 #ifdef USE_READER_THREAD
   pthread_mutex_lock (&dev->self_lock);
 #endif
@@ -2631,25 +3403,31 @@ if ((LOOPBACK_SELF_FRAME(dev->physical_addr, data)) ||
 #ifdef USE_READER_THREAD
   pthread_mutex_unlock (&dev->self_lock);
 #endif
-}
+  }
 
 if (bpf_used ? to_me : (to_me && !from_me)) {
   if (header->len > ETH_MIN_JUMBO_FRAME) {
-    if (header->len <= header->caplen) /* Whole Frame captured? */
-      _eth_fix_ip_jumbo_offload(dev, data, header->len);
+    if (header->len <= header->caplen) {/* Whole Frame captured? */
+      u_char *datacopy = (u_char *)malloc(header->len);
+      memcpy(datacopy, data, header->len);
+      _eth_fix_ip_jumbo_offload(dev, datacopy, header->len);
+      free(datacopy);
+      }
     else
       ++dev->jumbo_truncated;
     return;
     }
+  if (_eth_process_loopback(dev, data, header->len))
+    return;  
 #if defined (USE_READER_THREAD)
   if (1) {
     int crc_len = 0;
     uint8 crc_data[4];
     uint32 len = header->len;
-    u_char* moved_data = NULL;
+    u_char *moved_data = NULL;
 
     if (header->len < ETH_MIN_PACKET) {   /* Pad runt packets before CRC append */
-      moved_data = malloc(ETH_MIN_PACKET);
+      moved_data = (u_char *)malloc(ETH_MIN_PACKET);
       memcpy(moved_data, data, len);
       memset(moved_data + len, 0, ETH_MIN_PACKET-len);
       len = ETH_MIN_PACKET;
@@ -2659,7 +3437,7 @@ if (bpf_used ? to_me : (to_me && !from_me)) {
     /* If necessary, fix IP header checksums for packets originated locally */
     /* but were presumed to be traversing a NIC which was going to handle that task */
     /* This must be done before any needed CRC calculation */
-    _eth_fix_ip_xsum_offload(dev, (u_char*)data, len);
+    _eth_fix_ip_xsum_offload(dev, (const u_char*)data, len);
     
     if (dev->need_crc)
       crc_len = eth_get_packet_crc32_data(data, len, crc_data);
@@ -2667,7 +3445,8 @@ if (bpf_used ? to_me : (to_me && !from_me)) {
     eth_packet_trace (dev, data, len, "rcvqd");
 
     pthread_mutex_lock (&dev->lock);
-    ethq_insert_data(&dev->read_queue, 2, data, 0, len, crc_len, crc_data, 0);
+    ethq_insert_data(&dev->read_queue, ETH_ITM_NORMAL, data, 0, len, crc_len, crc_data, 0);
+    ++dev->packets_received;
     pthread_mutex_unlock (&dev->lock);
     free(moved_data);
     }
@@ -2694,6 +3473,8 @@ if (bpf_used ? to_me : (to_me && !from_me)) {
 
   eth_packet_trace (dev, dev->read_packet->msg, dev->read_packet->len, "reading");
 
+  ++dev->packets_received;
+
   /* call optional read callback function */
   if (dev->read_callback)
     (dev->read_callback)(0);
@@ -2707,7 +3488,7 @@ int status;
 
 /* make sure device exists */
 
-if (!dev) return 0;
+if ((!dev) || (dev->eth_api == ETH_API_NONE)) return 0;
 
 /* make sure packet exists */
 if (!packet) return 0;
@@ -2723,10 +3504,12 @@ dev->read_callback = routine;
 /* dispatch read request to either receive a filtered packet or timeout */
 do {
   switch (dev->eth_api) {
+#ifdef HAVE_PCAP_NETWORK
     case ETH_API_PCAP:
       status = pcap_dispatch((pcap_t*)dev->handle, 1, &_eth_callback, (u_char*)dev);
       break;
-#ifdef USE_TAP_NETWORK
+#endif
+#ifdef HAVE_TAP_NETWORK
     case ETH_API_TAP:
       if (1) {
         struct pcap_pkthdr header;
@@ -2740,12 +3523,16 @@ do {
           header.caplen = header.len = len;
           _eth_callback((u_char *)dev, &header, buf);
           }
-        else
-          status = 0;
+        else {
+          if (len < 0)
+            status = -1;
+          else
+            status = 0;
+          }
         }
       break;
-#endif /* USE_TAP_NETWORK */
-#ifdef USE_VDE_NETWORK
+#endif /* HAVE_TAP_NETWORK */
+#ifdef HAVE_VDE_NETWORK
     case ETH_API_VDE:
       if (1) {
         struct pcap_pkthdr header;
@@ -2759,13 +3546,42 @@ do {
           header.caplen = header.len = len;
           _eth_callback((u_char *)dev, &header, buf);
           }
-        else
-          status = 0;
+        else {
+          if (len < 0)
+            status = -1;
+          else
+            status = 0;
+          }
         }
       break;
-#endif /* USE_VDE_NETWORK */
+#endif /* HAVE_VDE_NETWORK */
+    case ETH_API_UDP:
+      if (1) {
+        struct pcap_pkthdr header;
+        int len;
+        u_char buf[ETH_MAX_JUMBO_FRAME];
+
+        memset(&header, 0, sizeof(header));
+        len = (int)sim_read_sock (dev->fd_handle, (char *)buf, (int32)sizeof(buf));
+        if (len > 0) {
+          status = 1;
+          header.caplen = header.len = len;
+          _eth_callback((u_char *)dev, &header, buf);
+          }
+        else {
+          if (len < 0)
+            status = -1;
+          else
+            status = 0;
+          }
+        }
+      break;
     }
-  } while ((status) && (0 == packet->len));
+  } while ((status > 0) && (0 == packet->len));
+if (status < 0) {
+  ++dev->receive_packet_errors;
+  _eth_error (dev, "eth_reader");
+  }
 
 #else /* USE_READER_THREAD */
 
@@ -2800,15 +3616,12 @@ t_stat eth_filter_hash(ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
                        ETH_MULTIHASH* const hash)
 {
 int i;
-bpf_u_int32  bpf_subnet, bpf_netmask;
-char buf[114+66*ETH_FILTER_MAX];
-char errbuf[PCAP_ERRBUF_SIZE];
+char buf[116+66*ETH_FILTER_MAX];
 char mac[20];
 char* buf2;
 t_stat status;
 #ifdef USE_BPF
 struct bpf_program bpf;
-char* msg;
 #endif
 
 /* make sure device exists */
@@ -2851,10 +3664,12 @@ if (dev->dptr->dctrl & dev->dbit) {
     eth_mac_fmt(&dev->filter_address[i], mac);
     sim_debug(dev->dbit, dev->dptr, "  Addr[%d]: %s\n", i, mac);
     }
-  if (dev->all_multicast)
+  if (dev->all_multicast) {
     sim_debug(dev->dbit, dev->dptr, "All Multicast\n");
-  if (dev->promiscuous)
+    }
+  if (dev->promiscuous) {
     sim_debug(dev->dbit, dev->dptr, "Promiscuous\n");
+    }
   }
 
 /* setup BPF filters and other fields to minimize packet delivery */
@@ -2891,6 +3706,11 @@ if ((addr_count > 0) && (dev->reflections > 0)) {
       sprintf(&buf2[strlen(buf2)], "%s(ether src %s)", (*buf2) ? " or " : "", mac);
     }
   sprintf (&buf[strlen(buf)], ")");
+  if (1 == strlen(buf2)) {          /* all addresses were multicast? */
+    buf[strlen(buf)-6] = '\0';      /* Remove "not ()" */
+    if (strlen(buf) > 0)
+        buf[strlen(buf)-5] = '\0';  /* remove " and " */
+    }
   }
 if (strlen(buf) > 0)
   sprintf(&buf[strlen(buf)], ")");
@@ -2925,7 +3745,7 @@ if ((addr_count) && (dev->reflections > 0)) {
       sprintf (&buf[strlen(buf)], " or ((ether dst %s) and (ether src %s))", mac, mac);
       if (dev->have_host_nic_phy_addr) {
         eth_mac_fmt(&dev->host_nic_phy_hw_addr, mac);
-        sprintf(&buf[strlen(buf)], "or ((ether dst %s) and (ether proto 0x9000))", mac);
+        sprintf(&buf[strlen(buf)], " or ((ether dst %s) and (ether proto 0x9000))", mac);
       }
       break;
       }
@@ -2938,33 +3758,31 @@ sim_debug(dev->dbit, dev->dptr, "BPF string is: |%s|\n", buf);
 /* get netmask, which is a required argument for compiling.  The value, 
    in our case isn't actually interesting since the filters we generate 
    aren't referencing IP fields, networks or values */
-if ((dev->eth_api == ETH_API_PCAP) && (pcap_lookupnet(dev->name, &bpf_subnet, &bpf_netmask, errbuf)<0))
-  bpf_netmask = 0;
 
 #ifdef USE_BPF
 if (dev->eth_api == ETH_API_PCAP) {
+  char errbuf[PCAP_ERRBUF_SIZE];
+  bpf_u_int32  bpf_subnet, bpf_netmask;
+
+  if (pcap_lookupnet(dev->name, &bpf_subnet, &bpf_netmask, errbuf)<0)
+    bpf_netmask = 0;
   /* compile filter string */
-  if ((status = pcap_compile(dev->handle, &bpf, buf, 1, bpf_netmask)) < 0) {
-    sprintf(errbuf, "%s", pcap_geterr(dev->handle));
-    msg = "Eth: pcap_compile error: %s\r\n";
-    printf(msg, errbuf);
-    if (sim_log) fprintf (sim_log, msg, errbuf);
-    sim_debug(dev->dbit, dev->dptr, "Eth: pcap_compile error: %s\n", errbuf);
+  if ((status = pcap_compile((pcap_t*)dev->handle, &bpf, buf, 1, bpf_netmask)) < 0) {
+    sprintf(errbuf, "%s", pcap_geterr((pcap_t*)dev->handle));
+    sim_printf("Eth: pcap_compile error: %s\n", errbuf);
     /* show erroneous BPF string */
-    msg = "Eth: BPF string is: |%s|\r\n";
-    printf (msg, buf);
-    if (sim_log) fprintf (sim_log, msg, buf);
+    sim_printf ("Eth: BPF string is: |%s|\n", buf);
     }
   else {
     /* apply compiled filter string */
-    if ((status = pcap_setfilter(dev->handle, &bpf)) < 0) {
-      sprintf(errbuf, "%s", pcap_geterr(dev->handle));
-      msg = "Eth: pcap_setfilter error: %s\r\n";
-      printf(msg, errbuf);
-      if (sim_log) fprintf (sim_log, msg, errbuf);
-      sim_debug(dev->dbit, dev->dptr, "Eth: pcap_setfilter error: %s\n", errbuf);
+    if ((status = pcap_setfilter((pcap_t*)dev->handle, &bpf)) < 0) {
+      sprintf(errbuf, "%s", pcap_geterr((pcap_t*)dev->handle));
+      sim_printf("Eth: pcap_setfilter error: %s\n", errbuf);
       }
     else {
+      /* Save BPF filter string */
+      dev->bpf_filter = (char *)realloc(dev->bpf_filter, 1 + strlen(buf));
+      strcpy (dev->bpf_filter, buf);
 #ifdef USE_SETNONBLOCK
       /* set file non-blocking */
       status = pcap_setnonblock (dev->handle, 1, errbuf);
@@ -3004,14 +3822,19 @@ return SCPE_OK;
 */
 int eth_host_devices(int used, int max, ETH_LIST* list)
 {
-pcap_t* conn;
-int i, j, datalink;
-char errbuf[PCAP_ERRBUF_SIZE];
+pcap_t* conn = NULL;
+int i, j, datalink = 0;
 
 for (i=0; i<used; ++i) {
   /* Cull any non-ethernet interface types */
+#if defined(HAVE_PCAP_NETWORK)
+  char errbuf[PCAP_ERRBUF_SIZE];
+
   conn = pcap_open_live(list[i].name, ETH_MAX_PACKET, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
-  if (NULL != conn) datalink = pcap_datalink(conn), pcap_close(conn);
+  if (NULL != conn)
+    datalink = pcap_datalink(conn), pcap_close(conn);
+  list[i].eth_api = ETH_API_PCAP;
+#endif
   if ((NULL == conn) || (datalink != DLT_EN10MB)) {
     for (j=i; j<used-1; ++j)
       list[j] = list[j+1];
@@ -3024,7 +3847,7 @@ for (i=0; i<used; ++i) {
 /* replace device description with user-defined adapter name (if defined) */
 for (i=0; i<used; i++) {
   char regkey[2048];
-  char regval[2048];
+  unsigned char regval[2048];
   LONG status;
   DWORD reglen, regtype;
   HKEY reghnd;
@@ -3037,7 +3860,7 @@ for (i=0; i<used; i++) {
      registry key, rather than hardcoding the string as we do here. */
   if (list[i].name[strlen( "\\Device\\NPF_" )] == '{') {
     sprintf( regkey, "SYSTEM\\CurrentControlSet\\Control\\Network\\"
-             "{4D36E972-E325-11CE-BFC1-08002BE10318}\\%hs\\Connection", list[i].name+
+             "{4D36E972-E325-11CE-BFC1-08002BE10318}\\%s\\Connection", list[i].name+
              strlen( "\\Device\\NPF_" ) );
     if ((status = RegOpenKeyExA (HKEY_LOCAL_MACHINE, regkey, 0, KEY_QUERY_VALUE, &reghnd)) != ERROR_SUCCESS)
       continue;
@@ -3061,7 +3884,7 @@ for (i=0; i<used; i++) {
   } /* for */
 #endif
 
-#ifdef USE_TAP_NETWORK
+#ifdef HAVE_TAP_NETWORK
 if (used < max) {
 #if defined(__OpenBSD__)
   sprintf(list[used].name, "%s", "tap:tunN");
@@ -3069,16 +3892,33 @@ if (used < max) {
   sprintf(list[used].name, "%s", "tap:tapN");
 #endif
   sprintf(list[used].desc, "%s", "Integrated Tun/Tap support");
+  list[used].eth_api = ETH_API_TAP;
   ++used;
   }
 #endif
-#ifdef USE_VDE_NETWORK
+#ifdef HAVE_VDE_NETWORK
 if (used < max) {
-  sprintf(list[used].name, "%s", "vde:device");
+  sprintf(list[used].name, "%s", "vde:device{:switch-port-number}");
   sprintf(list[used].desc, "%s", "Integrated VDE support");
+  list[used].eth_api = ETH_API_VDE;
   ++used;
   }
 #endif
+#ifdef HAVE_SLIRP_NETWORK
+if (used < max) {
+  sprintf(list[used].name, "%s", "nat:{optional-nat-parameters}");
+  sprintf(list[used].desc, "%s", "Integrated NAT (SLiRP) support");
+  list[used].eth_api = ETH_API_NAT;
+  ++used;
+  }
+#endif
+
+if (used < max) {
+  sprintf(list[used].name, "%s", "udp:sourceport:remotehost:remoteport");
+  sprintf(list[used].desc, "%s", "Integrated UDP bridge support");
+  list[used].eth_api = ETH_API_UDP;
+  ++used;
+  }
 
 return used;
 }
@@ -3086,17 +3926,16 @@ return used;
 int eth_devices(int max, ETH_LIST* list)
 {
 int i = 0;
+char errbuf[PCAP_ERRBUF_SIZE] = "";
 #ifndef DONT_USE_PCAP_FINDALLDEVS
 pcap_if_t* alldevs;
 pcap_if_t* dev;
-char errbuf[PCAP_ERRBUF_SIZE];
 
 memset(list, 0, max*sizeof(*list));
+errbuf[0] = '\0';
 /* retrieve the device list */
 if (pcap_findalldevs(&alldevs, errbuf) == -1) {
-  char* msg = "Eth: error in pcap_findalldevs: %s\r\n";
-  printf (msg, errbuf);
-  if (sim_log) fprintf (sim_log, msg, errbuf);
+  sim_printf ("Eth: error in pcap_findalldevs: %s\n", errbuf);
   }
 else {
   /* copy device list into the passed structure */
@@ -3117,6 +3956,11 @@ else {
 /* Add any host specific devices and/or validate those already found */
 i = eth_host_devices(i, max, list);
 
+/* If no devices were found and an error message was left in the buffer, display it */
+if ((i == 0) && (errbuf[0])) {
+    sim_printf ("Eth: pcap_findalldevs warning: %s\n", errbuf);
+    }
+
 /* return device count */
 return i;
 }
@@ -3128,30 +3972,50 @@ if (!dev) {
   fprintf(st, "-- Not Attached\n");
   return;
   }
-fprintf(st, "  Name:                  %s\n", dev->name);
-fprintf(st, "  Reflections:           %d\n", dev->reflections);
-fprintf(st, "  Self Loopbacks Sent:   %d\n", dev->loopback_self_sent_total);
-fprintf(st, "  Self Loopbacks Rcvd:   %d\n", dev->loopback_self_rcvd_total);
+fprintf(st, "  Name:                    %s\n", dev->name);
+fprintf(st, "  Reflections:             %d\n", dev->reflections);
+fprintf(st, "  Self Loopbacks Sent:     %d\n", dev->loopback_self_sent_total);
+fprintf(st, "  Self Loopbacks Rcvd:     %d\n", dev->loopback_self_rcvd_total);
 if (dev->have_host_nic_phy_addr) {
   char hw_mac[20];
 
   eth_mac_fmt(&dev->host_nic_phy_hw_addr, hw_mac);
-  fprintf(st, "  Host NIC Address:      %s\n", hw_mac);
+  fprintf(st, "  Host NIC Address:        %s\n", hw_mac);
   }
 if (dev->jumbo_dropped)
-  fprintf(st, "  Jumbo Dropped:         %d\n", dev->jumbo_dropped);
+  fprintf(st, "  Jumbo Dropped:           %d\n", dev->jumbo_dropped);
 if (dev->jumbo_fragmented)
-  fprintf(st, "  Jumbo Fragmented:      %d\n", dev->jumbo_fragmented);
+  fprintf(st, "  Jumbo Fragmented:        %d\n", dev->jumbo_fragmented);
 if (dev->jumbo_truncated)
-  fprintf(st, "  Jumbo Truncated:       %d\n", dev->jumbo_truncated);
+  fprintf(st, "  Jumbo Truncated:         %d\n", dev->jumbo_truncated);
+if (dev->packets_sent)
+  fprintf(st, "  Packets Sent:            %d\n", dev->packets_sent);
+if (dev->transmit_packet_errors)
+  fprintf(st, "  Send Packet Errors:      %d\n", dev->transmit_packet_errors);
+if (dev->packets_received)
+  fprintf(st, "  Packets Received:        %d\n", dev->packets_received);
+if (dev->receive_packet_errors)
+  fprintf(st, "  Read Packet Errors:      %d\n", dev->receive_packet_errors);
+if (dev->error_reopen_count)
+  fprintf(st, "  Error ReOpen Count:      %d\n", dev->error_reopen_count);
+if (dev->loopback_packets_processed)
+  fprintf(st, "  Loopback Packets:        %d\n", dev->loopback_packets_processed);
 #if defined(USE_READER_THREAD)
 fprintf(st, "  Asynch Interrupts:       %s\n", dev->asynch_io?"Enabled":"Disabled");
 if (dev->asynch_io)
   fprintf(st, "  Interrupt Latency:       %d uSec\n", dev->asynch_io_latency);
+if (dev->throttle_count)
+  fprintf(st, "  Throttle Delays:         %d\n", dev->throttle_count);
 fprintf(st, "  Read Queue: Count:       %d\n", dev->read_queue.count);
 fprintf(st, "  Read Queue: High:        %d\n", dev->read_queue.high);
 fprintf(st, "  Read Queue: Loss:        %d\n", dev->read_queue.loss);
 fprintf(st, "  Peak Write Queue Size:   %d\n", dev->write_queue_peak);
+#endif
+if (dev->bpf_filter)
+  fprintf(st, "  BPF Filter: %s\n", dev->bpf_filter);
+#if defined(HAVE_SLIRP_NETWORK)
+if (dev->eth_api == ETH_API_NAT)
+  sim_slirp_show ((SLIRP *)dev->handle, st);
 #endif
 }
 #endif /* USE_NETWORK */

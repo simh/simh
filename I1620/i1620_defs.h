@@ -242,7 +242,8 @@ enum opcodes {
 
 /* Function declarations */
 
-t_stat cpuio_set_inp (uint32 op, UNIT *uptr);
+t_stat cpuio_set_inp (uint32 op, uint32 dev, UNIT *uptr);
 t_stat cpuio_clr_inp (UNIT *uptr);
+char *opc_lookup (uint32 op, uint32 qv, uint32 *fl);
 
 #endif

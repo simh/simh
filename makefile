@@ -62,7 +62,50 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     OSTYPE = cygwin
     OSNAME = windows-build
   endif
-  GCC_VERSION = $(shell $(GCC) -v /dev/null 2>&1 | grep 'gcc version' | awk '{ print $$3 }')
+  ifeq (,$(shell $(GCC) -v /dev/null 2>&1 | grep 'clang'))
+    GCC_VERSION = $(shell $(GCC) -v /dev/null 2>&1 | grep 'gcc version' | awk '{ print $$3 }')
+    COMPILER_NAME = GCC Version: $(GCC_VERSION)
+    ifeq (,$(GCC_VERSION))
+      ifeq (SunOS,$(OSTYPE))
+        ifneq (,$(shell $(GCC) -V 2>&1 | grep 'Sun C'))
+          SUNC_VERSION = $(shell $(GCC) -V 2>&1 | grep 'Sun C')
+          COMPILER_NAME = $(wordlist 2,10,$(SUNC_VERSION))
+          CC_STD = -std=c99
+        endif
+      endif
+      ifeq (HP-UX,$(OSTYPE))
+        ifneq (,$(shell what `which $(firstword $(GCC)) 2>&1`| grep -i compiler))
+          COMPILER_NAME = $(strip $(shell what `which $(firstword $(GCC)) 2>&1` | grep -i compiler))
+          CC_STD = -std=gnu99
+        endif
+      endif
+    else
+      ifeq (,$(findstring ++,$(GCC)))
+        CC_STD = -std=gnu99
+      else
+        CPP_BUILD = 1
+      endif
+    endif
+  else
+    NO_LTO = 1
+    OS_CCDEFS += -Wno-parentheses
+    ifeq (Apple,$(shell $(GCC) -v /dev/null 2>&1 | grep 'Apple' | awk '{ print $$1 }'))
+      COMPILER_NAME = $(shell $(GCC) -v /dev/null 2>&1 | grep 'Apple' | awk '{ print $$1 " " $$2 " " $$3 " " $$4 }')
+      CLANG_VERSION = $(word 4,$(COMPILER_NAME))
+    else
+      COMPILER_NAME = $(shell $(GCC) -v /dev/null 2>&1 | grep 'clang version' | awk '{ print $$1 " " $$2 " " $$3 }')
+      CLANG_VERSION = $(word 3,$(COMPILER_NAME))
+      ifeq (,$(findstring .,$(CLANG_VERSION)))
+        COMPILER_NAME = $(shell $(GCC) -v /dev/null 2>&1 | grep 'clang version' | awk '{ print $$1 " " $$2 " " $$3 " " $$4 }')
+        CLANG_VERSION = $(word 4,$(COMPILER_NAME))
+      endif
+    endif
+    ifeq (,$(findstring ++,$(GCC)))
+      CC_STD = -std=c99
+    else
+      CPP_BUILD = 1
+    endif
+  endif
   LTO_EXCLUDE_VERSIONS = 
   PCAPLIB = pcap
   ifeq (agcc,$(findstring agcc,$(GCC))) # Android target build?
@@ -71,27 +114,84 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       OS_CCDEFS += -DSIM_ASYNCH_IO 
     endif
     OS_LDFLAGS = -lm
-  else # Non-Android Builds
-    INCPATH:=/usr/include
-    LIBPATH:=/usr/lib
-    OS_CCDEFS = -D_GNU_SOURCE
+  else # Non-Android (or Native Android) Builds
+    ifeq (,$(INCLUDES)$(LIBRARIES))
+      INCPATH:=$(shell LANG=C; $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | tr -d '\n')
+      ifeq (,$(INCPATH))
+        INCPATH:=/usr/include
+      endif
+      LIBPATH:=/usr/lib
+    else
+      $(info *** Warning ***)
+      ifeq (,$(INCLUDES))
+        INCPATH:=$(shell LANG=C; $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | tr -d '\n')
+      else
+        $(info *** Warning *** Unsupported build with INCLUDES defined as: $(INCLUDES))
+        INCPATH:=$(strip $(subst :, ,$(INCLUDES)))
+        UNSUPPORTED_BUILD := include
+      endif
+      ifeq (,$(LIBRARIES))
+        LIBPATH:=/usr/lib
+      else
+        $(info *** Warning *** Unsupported build with LIBRARIES defined as: $(LIBRARIES))
+        LIBPATH:=$(strip $(subst :, ,$(LIBRARIES)))
+        ifeq (include,$(UNSUPPORTED_BUILD))
+          UNSUPPORTED_BUILD := include+lib
+        else
+          UNSUPPORTED_BUILD := lib
+        endif
+      endif
+      $(info *** Warning ***)
+    endif
+    OS_CCDEFS += -D_GNU_SOURCE
     GCC_OPTIMIZERS_CMD = $(GCC) -v --help 2>&1
     GCC_WARNINGS_CMD = $(GCC) -v --help 2>&1
+    LD_ELF = $(shell echo | $(GCC) -E -dM - | grep __ELF__)
     ifeq (Darwin,$(OSTYPE))
       OSNAME = OSX
       LIBEXT = dylib
-      # OSX's XCode gcc doesn't support LTO, but gcc built to explicitly enable it will work
-      ifeq (,$(shell $(GCC) -v /dev/null 2>&1 | grep '\-\-enable-lto'))
-        LTO_EXCLUDE_VERSIONS += $(GCC_VERSION)
+      ifneq (include,$(findstring include,$(UNSUPPORTED_BUILD)))
+        INCPATH:=$(shell LANG=C; $(GCC) -x c -v -E /dev/null 2>&1 | grep -A 10 '> search starts here' | grep '^ ' | grep -v 'framework directory' | tr -d '\n')
+      endif
+      ifeq (incopt,$(shell if $(TEST) -d /opt/local/include; then echo incopt; fi))
+        INCPATH += /opt/local/include
+        OS_CCDEFS += -I/opt/local/include
+      endif
+      ifeq (libopt,$(shell if $(TEST) -d /opt/local/lib; then echo libopt; fi))
+        LIBPATH += /opt/local/lib
+        OS_LDFLAGS += -L/opt/local/lib
+      endif
+      ifeq (HomeBrew,$(shell if $(TEST) -d /usr/local/Cellar; then echo HomeBrew; fi))
+        INCPATH += $(foreach dir,$(wildcard /usr/local/Cellar/*/*),$(dir)/include)
+        LIBPATH += $(foreach dir,$(wildcard /usr/local/Cellar/*/*),$(dir)/lib)
+      endif
+      ifeq (libXt,$(shell if $(TEST) -d /usr/X11/lib; then echo libXt; fi))
+        LIBPATH += /usr/X11/lib
+        OS_LDFLAGS += -L/usr/X11/lib
       endif
     else
       ifeq (Linux,$(OSTYPE))
-        LIBPATH := $(sort $(foreach lib,$(shell /sbin/ldconfig -p | grep ' => /' | sed 's/^.* => //'),$(dir $(lib))))
+        ifeq (Android,$(shell uname -o))
+          OS_CCDEFS += -D__ANDROID_API__=$(shell getprop ro.build.version.sdk) -DSIM_BUILD_OS=" On Android Version $(shell getprop ro.build.version.release)"
+        endif
+        ifneq (lib,$(findstring lib,$(UNSUPPORTED_BUILD)))
+          ifeq (Android,$(shell uname -o))
+            ifneq (,$(shell if $(TEST) -d /system/lib; then echo systemlib; fi))
+              LIBPATH += /system/lib
+            endif
+            LIBPATH += $(LD_LIBRARY_PATH)
+          endif
+          ifeq (ldconfig,$(shell if $(TEST) -e /sbin/ldconfig; then echo ldconfig; fi))
+            LIBPATH := $(sort $(foreach lib,$(shell /sbin/ldconfig -p | grep ' => /' | sed 's/^.* => //'),$(dir $(lib))))
+          endif
+        endif
         LIBEXT = so
       else
         ifeq (SunOS,$(OSTYPE))
           OSNAME = Solaris
-          LIBPATH := $(shell crle | grep 'Default Library Path' | awk '{ print $$5 }' | sed 's/:/ /g')
+          ifneq (lib,$(findstring lib,$(UNSUPPORTED_BUILD)))
+            LIBPATH := $(shell LANG=C; crle | grep 'Default Library Path' | awk '{ print $$5 }' | sed 's/:/ /g')
+          endif
           LIBEXT = so
           OS_LDFLAGS += -lsocket -lnsl
           ifeq (incsfw,$(shell if $(TEST) -d /opt/sfw/include; then echo incsfw; fi))
@@ -102,6 +202,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
             LIBPATH += /opt/sfw/lib
             OS_LDFLAGS += -L/opt/sfw/lib -R/opt/sfw/lib
           endif
+          OS_CCDEFS += -D_LARGEFILE_SOURCE
         else
           ifeq (cygwin,$(OSTYPE))
             # use 0readme_ethernet.txt documented Windows pcap build components
@@ -110,25 +211,101 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
             PCAPLIB = wpcap
             LIBEXT = a
           else
-            LDSEARCH :=$(shell ldconfig -r | grep 'search directories' | awk '{print $$3}' | sed 's/:/ /g')
-            ifneq (,$(LDSEARCH))
-              LIBPATH := $(LDSEARCH)
+            ifneq (,$(findstring AIX,$(OSTYPE)))
+              OS_LDFLAGS += -lm -lrt
+              ifeq (incopt,$(shell if $(TEST) -d /opt/freeware/include; then echo incopt; fi))
+                INCPATH += /opt/freeware/include
+                OS_CCDEFS += -I/opt/freeware/include
+              endif
+              ifeq (libopt,$(shell if $(TEST) -d /opt/freeware/lib; then echo libopt; fi))
+                LIBPATH += /opt/freeware/lib
+                OS_LDFLAGS += -L/opt/freeware/lib
+              endif
+            else
+              ifneq (,$(findstring Haiku,$(OSTYPE)))
+                HAIKU_ARCH=$(shell getarch)
+                ifeq ($(HAIKU_ARCH),)
+                  $(error Missing getarch command, your Haiku release is probably too old)
+                endif
+                ifeq ($(HAIKU_ARCH),x86_gcc2)
+                  $(error Unsupported arch x86_gcc2. Run setarch x86 and retry)
+                endif
+                INCPATH := $(shell findpaths -e -a $(HAIKU_ARCH) B_FIND_PATH_HEADERS_DIRECTORY)
+                INCPATH += $(shell findpaths -e B_FIND_PATH_HEADERS_DIRECTORY posix)
+                LIBPATH := $(shell findpaths -e -a $(HAIKU_ARCH) B_FIND_PATH_DEVELOP_LIB_DIRECTORY)
+                OS_LDFLAGS += -lnetwork
+              else
+                ifeq (,$(findstring NetBSD,$(OSTYPE)))
+                  ifneq (no ldconfig,$(findstring no ldconfig,$(shell which ldconfig 2>&1)))
+                    LDSEARCH :=$(shell LANG=C; ldconfig -r | grep 'search directories' | awk '{print $$3}' | sed 's/:/ /g')
+                  endif
+                  ifneq (,$(LDSEARCH))
+                    LIBPATH := $(LDSEARCH)
+                  else
+                    ifeq (,$(strip $(LPATH)))
+                      $(info *** Warning ***)
+                      $(info *** Warning *** The library search path on your $(OSTYPE) platform can't be)
+                      $(info *** Warning *** determined.  This should be resolved before you can expect)
+                      $(info *** Warning *** to have fully working simulators.)
+                      $(info *** Warning ***)
+                      $(info *** Warning *** You can specify your library paths via the LPATH environment)
+                      $(info *** Warning *** variable.)
+                      $(info *** Warning ***)
+                    else
+                      LIBPATH = $(subst :, ,$(LPATH))
+                    endif
+                  endif
+                  OS_LDFLAGS += $(patsubst %,-L%,$(LIBPATH))
+                endif
+              endif
             endif
             ifeq (usrpkglib,$(shell if $(TEST) -d /usr/pkg/lib; then echo usrpkglib; fi))
               LIBPATH += /usr/pkg/lib
+              INCPATH += /usr/pkg/include
               OS_LDFLAGS += -L/usr/pkg/lib -R/usr/pkg/lib
+              OS_CCDEFS += -I/usr/pkg/include
             endif
-            ifneq (,$(findstring NetBSD,$(OSTYPE))$(findstring FreeBSD,$(OSTYPE)))
+            ifeq (X11R7,$(shell if $(TEST) -d /usr/X11R7/lib; then echo X11R7; fi))
+              LIBPATH += /usr/X11R7/lib
+              INCPATH += /usr/X11R7/include
+              OS_LDFLAGS += -L/usr/X11R7/lib -R/usr/X11R7/lib
+              OS_CCDEFS += -I/usr/X11R7/include
+            endif
+            ifeq (/usr/local/lib,$(findstring /usr/local/lib,$(LIBPATH)))
+              INCPATH += /usr/local/include
+              OS_CCDEFS += -I/usr/local/include
+            endif
+            ifneq (,$(findstring NetBSD,$(OSTYPE))$(findstring FreeBSD,$(OSTYPE))$(findstring AIX,$(OSTYPE)))
               LIBEXT = so
             else
-              LIBEXT = a
+              ifeq (HP-UX,$(OSTYPE))
+                ifeq (ia64,$(shell uname -m))
+                  LIBEXT = so
+                else
+                  LIBEXT = sl
+                endif
+                OS_CCDEFS += -D_HPUX_SOURCE -D_LARGEFILE64_SOURCE
+                OS_LDFLAGS += -Wl,+b:
+                NO_LTO = 1
+              else
+                LIBEXT = a
+              endif
             endif
           endif
         endif
       endif
     endif
+    # Some gcc versions don't support LTO, so only use LTO when the compiler is known to support it
+    ifeq (,$(NO_LTO))
+      ifneq (,$(GCC_VERSION))
+        ifeq (,$(shell $(GCC) -v /dev/null 2>&1 | grep '\-\-enable-lto'))
+          LTO_EXCLUDE_VERSIONS += $(GCC_VERSION)
+        endif
+      endif
+    endif
   endif
   $(info lib paths are: $(LIBPATH))
+  $(info include paths are: $(INCPATH))
   find_lib = $(strip $(firstword $(foreach dir,$(strip $(LIBPATH)),$(wildcard $(dir)/lib$(1).$(LIBEXT)))))
   find_include = $(strip $(firstword $(foreach dir,$(strip $(INCPATH)),$(wildcard $(dir)/$(1).h))))
   ifneq (,$(call find_lib,m))
@@ -149,6 +326,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
     endif
   endif
+  ifneq (,$(call find_include,semaphore))
+    ifneq (, $(shell grep sem_timedwait $(call find_include,semaphore)))
+      OS_CCDEFS += -DHAVE_SEMAPHORE
+      $(info using semaphore: $(call find_include,semaphore))
+    endif
+  endif
   ifneq (,$(call find_include,dlfcn))
     ifneq (,$(call find_lib,dl))
       OS_CCDEFS += -DHAVE_DLOPEN=$(LIBEXT)
@@ -163,9 +346,17 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   endif
   ifneq (,$(NETWORK_USEFUL))
     ifneq (,$(call find_include,pcap))
+      ifneq (,$(shell grep 'pcap/pcap.h' $(call find_include,pcap) | grep include))
+        PCAP_H_PATH = $(dir $(call find_include,pcap))pcap/pcap.h
+      else
+        PCAP_H_PATH = $(call find_include,pcap)
+      endif
+      ifneq (,$(shell grep pcap_compile $(PCAP_H_PATH) | grep const))
+        BPF_CONST_STRING = -DBPF_CONST_STRING
+      endif
       ifneq (,$(call find_lib,$(PCAPLIB)))
         ifneq ($(USE_NETWORK),) # Network support specified on the GNU make command line
-          NETWORK_CCDEFS = -DUSE_NETWORK -I$(dir $(call find_include,pcap))
+          NETWORK_CCDEFS = -DUSE_NETWORK -I$(dir $(call find_include,pcap)) $(BPF_CONST_STRING)
           ifeq (cygwin,$(OSTYPE))
             # cygwin has no ldconfig so explicitly specify pcap object library
             NETWORK_LDFLAGS = -L$(dir $(call find_lib,$(PCAPLIB))) -Wl,-R,$(dir $(call find_lib,$(PCAPLIB))) -l$(PCAPLIB)
@@ -175,12 +366,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           $(info using libpcap: $(call find_lib,$(PCAPLIB)) $(call find_include,pcap))
           NETWORK_FEATURES = - static networking support using $(OSNAME) provided libpcap components
         else # default build uses dynamic libpcap
-          NETWORK_CCDEFS = -DUSE_SHARED -I$(dir $(call find_include,pcap))
+          NETWORK_CCDEFS = -DUSE_SHARED -I$(dir $(call find_include,pcap)) $(BPF_CONST_STRING)
           $(info using libpcap: $(call find_include,pcap))
           NETWORK_FEATURES = - dynamic networking support using $(OSNAME) provided libpcap components
         endif
       else
-        NETWORK_CCDEFS = -DUSE_SHARED -I$(dir $(call find_include,pcap))
+        NETWORK_CCDEFS = -DUSE_SHARED -I$(dir $(call find_include,pcap)) $(BPF_CONST_STRING)
         NETWORK_FEATURES = - dynamic networking support using $(OSNAME) provided libpcap components
         $(info using libpcap: $(call find_include,pcap))
       endif
@@ -216,10 +407,10 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       LIBEXT = $(LIBEXTSAVE)
     endif
     ifneq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
-	  # Given we have libpcap components, consider other network connections as well
+      # Given we have libpcap components, consider other network connections as well
       ifneq (,$(call find_lib,vdeplug))
         # libvdeplug requires the use of the OS provided libpcap
-		ifeq (,$(findstring usr/local,$(NETWORK_CCDEFS)))
+        ifeq (,$(findstring usr/local,$(NETWORK_CCDEFS)))
           ifneq (,$(call find_include,libvdeplug))
             # Provide support for vde networking
             NETWORK_CCDEFS += -DUSE_VDE_NETWORK
@@ -258,7 +449,7 @@ else
   GCC_VERSION = $(word 3,$(shell $(GCC) --version))
   LTO_EXCLUDE_VERSIONS = 4.5.2
   ifeq (pthreads,$(shell if exist ..\windows-build\pthreads\Pre-built.2\include\pthread.h echo pthreads))
-    PTHREADS_CCDEFS = -DUSE_READER_THREAD -DPTW32_STATIC_LIB -I../windows-build/pthreads/Pre-built.2/include
+    PTHREADS_CCDEFS = -DUSE_READER_THREAD -DPTW32_STATIC_LIB -D_POSIX_C_SOURCE -I../windows-build/pthreads/Pre-built.2/include
     ifeq (,$(NOASYNCH))
       PTHREADS_CCDEFS += -DSIM_ASYNCH_IO 
     endif
@@ -302,6 +493,9 @@ ifneq ($(DEBUG),)
 else
   CFLAGS_O = -O2
   LDFLAGS_O = 
+  ifeq (Darwin,$(OSTYPE))
+    NO_LTO = 1
+  endif
   GCC_MAJOR_VERSION = $(firstword $(subst  ., ,$(GCC_VERSION)))
   ifneq (3,$(GCC_MAJOR_VERSION))
     ifeq (,$(GCC_OPTIMIZERS_CMD))
@@ -347,7 +541,7 @@ ifneq (3,$(GCC_MAJOR_VERSION))
   endif
 endif
 ifneq (clean,$(MAKECMDGOALS))
-  BUILD_FEATURES := $(BUILD_FEATURES). GCC Version: $(GCC_VERSION)
+  BUILD_FEATURES := $(BUILD_FEATURES). $(COMPILER_NAME)
   $(info ***)
   $(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with:)
   $(info *** $(BUILD_FEATURES).)
@@ -370,7 +564,7 @@ LDFLAGS = $(OS_LDFLAGS) $(NETWORK_LDFLAGS) $(LDFLAGS_O)
 #
 BIN = BIN/
 SIM = scp.c sim_console.c sim_fio.c sim_timer.c sim_sock.c \
-	sim_tmxr.c sim_ether.c sim_tape.c
+	sim_tmxr.c sim_ether.c sim_tape.c sim_shmem.c
 
 
 #
@@ -402,7 +596,8 @@ PDP18BD = PDP18B
 PDP18B = ${PDP18BD}/pdp18b_dt.c ${PDP18BD}/pdp18b_drm.c ${PDP18BD}/pdp18b_cpu.c \
 	${PDP18BD}/pdp18b_lp.c ${PDP18BD}/pdp18b_mt.c ${PDP18BD}/pdp18b_rf.c \
 	${PDP18BD}/pdp18b_rp.c ${PDP18BD}/pdp18b_stddev.c ${PDP18BD}/pdp18b_sys.c \
-	${PDP18BD}/pdp18b_rb.c ${PDP18BD}/pdp18b_tt1.c ${PDP18BD}/pdp18b_fpp.c
+	${PDP18BD}/pdp18b_rb.c ${PDP18BD}/pdp18b_tt1.c ${PDP18BD}/pdp18b_fpp.c \
+	${PDP18BD}/pdp18b_g2tty.c ${PDP18BD}/pdp18b_dr15.c
 PDP4_OPT = -DPDP4 -I ${PDP18BD}
 PDP7_OPT = -DPDP7 -I ${PDP18BD}
 PDP9_OPT = -DPDP9 -I ${PDP18BD}
@@ -424,6 +619,17 @@ PDP11 = ${PDP11D}/pdp11_fp.c ${PDP11D}/pdp11_cpu.c ${PDP11D}/pdp11_dz.c \
 	${PDP11D}/pdp11_ke.c ${PDP11D}/pdp11_dc.c ${PDP11D}/pdp11_rs.c \
 	${PDP11D}/pdp11_io_lib.c
 PDP11_OPT = -DVM_PDP11 -I ${PDP11D} ${NETWORK_OPT}
+
+
+UC15D = PDP11
+UC15 = ${UC15D}/pdp11_cis.c ${UC15D}/pdp11_cpu.c \
+	${UC15D}/pdp11_cpumod.c ${UC15D}/pdp11_cr.c \
+	${UC15D}/pdp11_fp.c ${UC15D}/pdp11_io.c \
+	${UC15D}/pdp11_io_lib.c ${UC15D}/pdp11_lp.c \
+	${UC15D}/pdp11_rh.c ${UC15D}/pdp11_rk.c \
+	${UC15D}/pdp11_stddev.c ${UC15D}/pdp11_sys.c \
+	${UC15D}/pdp11_uc15.c
+UC15_OPT = -DVM_PDP11 -DUC15 -I ${UC15D} -I ${PDP18BD} ${NETWORK_OPT}
 
 
 VAXD = VAX
@@ -525,17 +731,6 @@ I7094 = ${I7094D}/i7094_cpu.c ${I7094D}/i7094_cpu1.c ${I7094D}/i7094_io.c \
 I7094_OPT = -DUSE_INT64 -I ${I7094D}
 
 
-IBM1130D = Ibm1130
-IBM1130 = ${IBM1130D}/ibm1130_cpu.c ${IBM1130D}/ibm1130_cr.c \
-	${IBM1130D}/ibm1130_disk.c ${IBM1130D}/ibm1130_stddev.c \
-	${IBM1130D}/ibm1130_sys.c ${IBM1130D}/ibm1130_gdu.c \
-	${IBM1130D}/ibm1130_gui.c ${IBM1130D}/ibm1130_prt.c \
-	${IBM1130D}/ibm1130_fmt.c ${IBM1130D}/ibm1130_ptrp.c \
-	${IBM1130D}/ibm1130_plot.c ${IBM1130D}/ibm1130_sca.c \
-	${IBM1130D}/ibm1130_t2741.c
-IBM1130_OPT = -I ${IBM1130D}
-
-
 ID16D = Interdata
 ID16 = ${ID16D}/id16_cpu.c ${ID16D}/id16_sys.c ${ID16D}/id_dp.c \
 	${ID16D}/id_fd.c ${ID16D}/id_fp.c ${ID16D}/id_idc.c ${ID16D}/id_io.c \
@@ -564,25 +759,6 @@ ALTAIR = ${ALTAIRD}/altair_sio.c ${ALTAIRD}/altair_cpu.c ${ALTAIRD}/altair_dsk.c
 ALTAIR_OPT = -I ${ALTAIRD}
 
 
-ALTAIRZ80D = AltairZ80
-ALTAIRZ80 = ${ALTAIRZ80D}/altairz80_cpu.c ${ALTAIRZ80D}/altairz80_cpu_nommu.c \
-	${ALTAIRZ80D}/altairz80_dsk.c ${ALTAIRZ80D}/disasm.c \
-	${ALTAIRZ80D}/altairz80_sio.c ${ALTAIRZ80D}/altairz80_sys.c \
-	${ALTAIRZ80D}/altairz80_hdsk.c ${ALTAIRZ80D}/altairz80_net.c \
-	${ALTAIRZ80D}/flashwriter2.c ${ALTAIRZ80D}/i86_decode.c \
-	${ALTAIRZ80D}/i86_ops.c ${ALTAIRZ80D}/i86_prim_ops.c \
-	${ALTAIRZ80D}/i8272.c ${ALTAIRZ80D}/insnsd.c \
-	${ALTAIRZ80D}/mfdc.c ${ALTAIRZ80D}/n8vem.c ${ALTAIRZ80D}/vfdhd.c \
-	${ALTAIRZ80D}/s100_disk1a.c ${ALTAIRZ80D}/s100_disk2.c ${ALTAIRZ80D}/s100_disk3.c\
-	${ALTAIRZ80D}/s100_fif.c ${ALTAIRZ80D}/s100_mdriveh.c \
-	${ALTAIRZ80D}/s100_mdsad.c ${ALTAIRZ80D}/s100_selchan.c \
-	${ALTAIRZ80D}/s100_ss1.c ${ALTAIRZ80D}/s100_64fdc.c \
-	${ALTAIRZ80D}/s100_scp300f.c ${ALTAIRZ80D}/sim_imd.c \
-	${ALTAIRZ80D}/wd179x.c ${ALTAIRZ80D}/s100_hdc1001.c \
-	${ALTAIRZ80D}/s100_if3.c ${ALTAIRZ80D}/s100_adcs6.c
-ALTAIRZ80_OPT = -I ${ALTAIRZ80D}
-
-
 GRID = GRI
 GRI = ${GRID}/gri_cpu.c ${GRID}/gri_stddev.c ${GRID}/gri_sys.c
 GRI_OPT = -I ${GRID}
@@ -599,24 +775,33 @@ SDS = ${SDSD}/sds_cpu.c ${SDSD}/sds_drm.c ${SDSD}/sds_dsk.c ${SDSD}/sds_io.c \
 	${SDSD}/sds_stddev.c ${SDSD}/sds_sys.c
 SDS_OPT = -I ${SDSD}
 
-SWTP6800D = swtp6800/swtp6800
-SWTP6800C = swtp6800/common
-SWTP6800MP-A = ${SWTP6800C}/mp-a.c ${SWTP6800C}/m6800.c ${SWTP6800C}/m6810.c \
-	${SWTP6800C}/bootrom.c ${SWTP6800C}/dc-4.c ${SWTP6800C}/mp-s.c ${SWTP6800D}/mp-a_sys.c \
-	${SWTP6800C}/mp-b2.c ${SWTP6800C}/mp-8m.c
-SWTP6800MP-A2 = ${SWTP6800C}/mp-a2.c ${SWTP6800C}/m6800.c ${SWTP6800C}/m6810.c \
-	${SWTP6800C}/bootrom.c ${SWTP6800C}/dc-4.c ${SWTP6800C}/mp-s.c ${SWTP6800D}/mp-a2_sys.c \
-	${SWTP6800C}/mp-b2.c ${SWTP6800C}/mp-8m.c ${SWTP6800C}/i2716.c
-SWTP6800_OPT = -I ${SWTP6800D}
+SIGMAD = sigma
+SIGMA = ${SIGMAD}/sigma_cpu.c ${SIGMAD}/sigma_sys.c ${SIGMAD}/sigma_cis.c \
+	${SIGMAD}/sigma_coc.c ${SIGMAD}/sigma_dk.c ${SIGMAD}/sigma_dp.c \
+	${SIGMAD}/sigma_fp.c ${SIGMAD}/sigma_io.c ${SIGMAD}/sigma_lp.c \
+	${SIGMAD}/sigma_map.c ${SIGMAD}/sigma_mt.c ${SIGMAD}/sigma_pt.c \
+    ${SIGMAD}/sigma_rad.c ${SIGMAD}/sigma_rtc.c ${SIGMAD}/sigma_tt.c
+SIGMA_OPT = -I ${SIGMAD}
 
+###
+### Unsupported/Incomplete simulators
+###
+
+ALPHAD = alpha
+ALPHA = ${ALPHAD}/alpha_500au_syslist.c ${ALPHAD}/alpha_cpu.c \
+    ${ALPHAD}/alpha_ev5_cons.c ${ALPHAD}/alpha_ev5_pal.c \
+    ${ALPHAD}/alpha_ev5_tlb.c ${ALPHAD}/alpha_fpi.c \
+    ${ALPHAD}/alpha_fpv.c ${ALPHAD}/alpha_io.c \
+    ${ALPHAD}/alpha_mmu.c ${ALPHAD}/alpha_sys.c
+ALPHA_OPT = -I ${ALPHAD} -DUSE_ADDR64 -DUSE_INT64
 
 #
 # Build everything
 #
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	vax vax780 nova eclipse hp2100 hp3000 i1401 i1620 s3 \
-	altair altairz80 gri i7094 ibm1130 id16 \
-	id32 sds lgp h316 swtp6800mp-a swtp6800mp-a2
+	altair gri i7094 id16 uc15 \
+	id32 sds lgp h316 sigma
 
 all : ${ALL}
 
@@ -663,7 +848,7 @@ ${BIN}pdp9${EXE} : ${PDP18B} ${SIM}
 
 pdp15 : ${BIN}pdp15${EXE}
 
-${BIN}pdp15${EXE} : ${PDP18B} ${SIM}
+${BIN}pdp15${EXE} : ${PDP18B} ${SIM} 
 	${MKDIRBIN}
 	${CC} ${PDP18B} ${SIM} ${PDP15_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
@@ -678,6 +863,12 @@ pdp11 : ${BIN}pdp11${EXE}
 ${BIN}pdp11${EXE} : ${PDP11} ${SIM}
 	${MKDIRBIN}
 	${CC} ${PDP11} ${SIM} ${PDP11_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+uc15 : ${BIN}uc15${EXE}
+
+${BIN}uc15${EXE} : ${UC15} ${SIM}
+	${MKDIRBIN}
+	${CC} ${UC15} ${SIM} ${UC15_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
 vax : ${BIN}vax${EXE}
 
@@ -715,13 +906,17 @@ ${BIN}hp2100${EXE} : ${HP2100} ${SIM}
 	${MKDIRBIN}
 	${CC} ${HP2100} ${SIM} ${HP2100_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
+i1401 : ${BIN}i1401${EXE}
+
 hp3000 : ${BIN}hp3000${EXE}
 
 ${BIN}hp3000${EXE} : ${HP3000} ${SIM}
+ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
 	${MKDIRBIN}
 	${CC} ${HP3000} ${SIM} ${HP3000_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-i1401 : ${BIN}i1401${EXE}
+else
+	$(info hp3000 can't be built using C++)
+endif
 
 ${BIN}i1401${EXE} : ${I1401} ${SIM}
 	${MKDIRBIN}
@@ -739,12 +934,6 @@ ${BIN}i7094${EXE} : ${I7094} ${SIM}
 	${MKDIRBIN}
 	${CC} ${I7094} ${SIM} ${I7094_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
-ibm1130 : ${BIN}ibm1130${EXE}
-
-${BIN}ibm1130${EXE} : ${IBM1130}
-	${MKDIRBIN}
-	${CC} ${IBM1130} ${SIM} ${IBM1130_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
 s3 : ${BIN}s3${EXE}
 
 ${BIN}s3${EXE} : ${S3} ${SIM}
@@ -756,12 +945,6 @@ altair : ${BIN}altair${EXE}
 ${BIN}altair${EXE} : ${ALTAIR} ${SIM}
 	${MKDIRBIN}
 	${CC} ${ALTAIR} ${SIM} ${ALTAIR_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-altairz80 : ${BIN}altairz80${EXE}
-
-${BIN}altairz80${EXE} : ${ALTAIRZ80} ${SIM}
-	${MKDIRBIN}
-	${CC} ${ALTAIRZ80} ${SIM} ${ALTAIRZ80_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
 gri : ${BIN}gri${EXE}
 
@@ -793,14 +976,15 @@ ${BIN}sds${EXE} : ${SDS} ${SIM}
 	${MKDIRBIN}
 	${CC} ${SDS} ${SIM} ${SDS_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
-swtp6800mp-a : ${BIN}swtp6800mp-a${EXE}
+sigma : ${BIN}sigma${EXE}
 
-${BIN}swtp6800mp-a${EXE} : ${SWTP6800MP-A} ${SIM}
+${BIN}sigma${EXE} : ${SIGMA} ${SIM}
 	${MKDIRBIN}
-	${CC} ${SWTP6800MP-A} ${SIM} ${SWTP6800_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+	${CC} ${SIGMA} ${SIM} ${SIGMA_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
-swtp6800mp-a2 : ${BIN}swtp6800mp-a2${EXE}
+alpha : ${BIN}alpha${EXE}
 
-${BIN}swtp6800mp-a2${EXE} : ${SWTP6800MP-A2} ${SIM}
+${BIN}alpha${EXE} : ${ALPHA} ${SIM}
 	${MKDIRBIN}
-	${CC} ${SWTP6800MP-A2} ${SIM} ${SWTP6800_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+	${CC} ${ALPHA} ${SIM} ${ALPHA_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+

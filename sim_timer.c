@@ -1,6 +1,6 @@
 /* sim_timer.c: simulator timer library
 
-   Copyright (c) 1993-2015, Robert M Supnik
+   Copyright (c) 1993-2017, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-May-17    RMS     Hacked for V4.0 CONST compatibility
    23-Nov-15    RMS     Fixed calibration lost path to reinitialize timer
    28-Mar-15    RMS     Revised to use sim_printf
    29-Dec-10    MP      Fixed clock resolution determination for Unix platforms

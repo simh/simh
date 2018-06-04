@@ -1,6 +1,6 @@
 /* sim_tmxr.c: Telnet terminal multiplexor library
 
-   Copyright (c) 2001-2015, Robert M Supnik
+   Copyright (c) 2001-2018, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   06-Mar-18    RMS     Revised for new IP address format in sim_sock
+   08-Jul-17    JDB     Corrected misleading indentation in tmxr_poll_tx
    06-Aug-15    JDB     [4.0] Added modem control functions
    28-Mar-15    RMS     Revised to use sim_printf
    16-Jan-11    MP      Made option negotiation more reliable
@@ -129,7 +131,6 @@
 #define TNS_CRPAD       005                             /* CR padding */
 #define TNS_DO          006                             /* DO request pending rejection */
 
-
 void tmxr_rmvrc (TMLN *lp, int32 p);
 int32 tmxr_send_buffered_data (TMLN *lp);
 TMLN *tmxr_find_ldsc (UNIT *uptr, int32 val, TMXR *mp);
@@ -157,7 +158,7 @@ SOCKET newsock;
 TMLN *lp;
 int32 *op;
 int32 i, j;
-uint32 ipaddr;
+char *ipaddr = NULL;
 
 static char mantra[] = {
     TN_IAC, TN_WILL, TN_LINE,
@@ -185,7 +186,7 @@ if (newsock != INVALID_SOCKET) {                        /* got a live one? */
 
     if (i >= mp->lines) {                               /* all busy? */
         tmxr_msg (newsock, "All connections busy\r\n");
-        sim_close_sock (newsock, 0);
+        sim_close_sock (newsock);
         }
     else {
         lp = mp->ldsc + i;                              /* get line desc */
@@ -232,7 +233,9 @@ void tmxr_reset_ln (TMLN *lp)
 if (lp->txlog)                                          /* dump log */
     fflush (lp->txlog);
 tmxr_send_buffered_data (lp);                           /* send buffered data */
-sim_close_sock (lp->conn, 0);                           /* reset conn */
+free (lp->ipad);
+lp->ipad = NULL;
+sim_close_sock (lp->conn);                              /* reset conn */
 lp->conn = lp->tsta = 0;                                /* reset state */
 lp->rxbpr = lp->rxbpi = 0;
 lp->txbpr = lp->txbpi = 0;
@@ -564,9 +567,9 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
     lp = mp->ldsc + i;                                  /* get line desc */
     if (lp->conn == 0)                                  /* skip if !conn */
         continue;
-        nbytes = tmxr_send_buffered_data (lp);          /* buffered bytes */
-        if (nbytes == 0)                                /* buf empty? enab line */
-            lp->xmte = 1;
+    nbytes = tmxr_send_buffered_data (lp);              /* buffered bytes */
+    if (nbytes == 0)                                    /* buf empty? enab line */
+        lp->xmte = 1;
         }                                               /* end for */
 return;
 }
@@ -630,7 +633,7 @@ t_stat r;
 port = (int32) get_uint (cptr, 10, 65535, &r);          /* get port */
 if ((r != SCPE_OK) || (port == 0))
     return SCPE_ARG;
-sock = sim_master_sock (port);                          /* make master socket */
+sock = sim_master_sock (cptr, &r);                      /* make master socket */
 if (sock == INVALID_SOCKET)                             /* open error */
     return SCPE_OPENERR;
 sim_printf ("Listening on port %d (socket %d)\n", port, sock);
@@ -689,7 +692,7 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru conn */
         tmxr_reset_ln (lp);
         }                                               /* end if conn */
     }                                                   /* end for */
-sim_close_sock (mp->master, 1);                         /* close master socket */
+sim_close_sock (mp->master);                            /* close master socket */
 mp->master = 0;
 return SCPE_OK;
 }
@@ -721,14 +724,14 @@ return SCPE_NOFNC;
 
 /* Output message to socket or line descriptor */
 
-void tmxr_msg (SOCKET sock, char *msg)
+void tmxr_msg (SOCKET sock, const char *msg)
 {
 if (sock)
     sim_write_sock (sock, msg, strlen (msg));
 return;
 }
 
-void tmxr_linemsg (TMLN *lp, char *msg)
+void tmxr_linemsg (TMLN *lp, const char *msg)
 {
 int32 len;
 
@@ -744,18 +747,14 @@ void tmxr_fconns (FILE *st, TMLN *lp, int32 ln)
 if (ln >= 0)
     fprintf (st, "line %d: ", ln);
 if (lp->conn) {
-    int32 o1, o2, o3, o4, hr, mn, sc;
+    int32 hr, mn, sc;
     uint32 ctime;
 
-    o1 = (lp->ipad >> 24) & 0xFF;
-    o2 = (lp->ipad >> 16) & 0xFF;
-    o3 = (lp->ipad >> 8) & 0xFF;
-    o4 = (lp->ipad) & 0xFF;
     ctime = (sim_os_msec () - lp->cnms) / 1000;
     hr = ctime / 3600;
     mn = (ctime / 60) % 60;
     sc = ctime % 60;
-    fprintf (st, "IP address %d.%d.%d.%d", o1, o2, o3, o4);
+    fprintf (st, "IP address %s", lp->ipad);
     if (ctime)
         fprintf (st, ", connected %02d:%02d:%02d\n", hr, mn, sc);
     }

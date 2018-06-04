@@ -1,6 +1,6 @@
 /* sim_console.c: simulator console I/O library
 
-   Copyright (c) 1993-2015, Robert M Supnik
+   Copyright (c) 1993-2018, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Mar-18    RMS     Fixed deboff not to close stdout or stderr (Dave Bryan)
    31-Mar-15    RMS     Backported parity feature from GitHub master
    10-Nov-14    JDB     Added -N option to SET CONSOLE LOG and SET CONSOLE DEBUG
    02-Jan-14    RMS     Added tab stop routines
@@ -360,7 +361,8 @@ if (!sim_quiet)
     printf ("Debug output disabled\n");
 if (sim_log)
     fprintf (sim_log, "Debug output disabled\n");
-fclose (sim_deb);
+if ((sim_deb != stdout) && (sim_deb != stderr))         /* don't close std channels! */
+    fclose(sim_deb);
 sim_deb = NULL;
 return SCPE_OK;
 }
