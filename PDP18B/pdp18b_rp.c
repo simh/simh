@@ -25,6 +25,7 @@
 
    rp           RP15/RP02/RP03 disk pack
 
+   30-May-18    RMS     Extra address bit only recognized on RP03 units
    15-Mar-16    RMS     Added RP03 support
                         Fixed handling of done flag
    07-Mar-16    RMS     Revised for dynamically allocated memory
@@ -135,9 +136,10 @@
 #define DA_M_CYL        0377
 #define GET_SECT(x)     (((x) >> DA_V_SECT) & DA_M_SECT)
 #define GET_SURF(x)     (((x) >> DA_V_SURF) & DA_M_SURF)
-#define GET_CYL(x)      ((((x) >> DA_V_CYL) & DA_M_CYL) + \
-                         (((x) & DA_C256)? 256: 0))
-#define GET_DA(x)       ((((GET_CYL (x) * RP_NUMSF) + GET_SURF (x)) * \
+#define GET_CYL(x,f)    ((((x) >> DA_V_CYL) & DA_M_CYL) + \
+                        (((((x) & DA_C256) != 0) && \
+                          (((f) & UNIT_RP03) != 0))? 256: 0))
+#define GET_DA(x,f)     ((((GET_CYL (x,f) * RP_NUMSF) + GET_SURF (x)) * \
                         RP_NUMSC) + GET_SECT (x))
 
 /* Current cylinder */
@@ -262,7 +264,8 @@ if (pulse & 04) {
             rp_updsta (STA_NXS, 0);
         if (GET_SURF (rp_da) >= RP_NUMSF)
             rp_updsta (STA_NXF, 0);
-        if (GET_CYL (rp_da) >= RP_QCYL (rp_unit[u].flags))
+        if (GET_CYL(rp_da, rp_unit[u].flags) >=
+            RP_QCYL(rp_unit[u].flags))
             rp_updsta (STA_NXC, 0);
         }
     else if (sb == 020) {                               /* DPCS */
@@ -331,7 +334,7 @@ if (pulse & 04) {
             (f == FN_SEEK) || (f == FN_RECAL))
             sim_activate (uptr, RP_MIN);                /* short delay */
         else {
-            c = GET_CYL (rp_da);
+            c = GET_CYL (rp_da, uptr->flags);
             c = abs (c - uptr->CYL) * rp_swait;         /* seek time */
             sim_activate (uptr, MAX (RP_MIN, c + rp_rwait));
             rp_sta = rp_sta & ~STA_DON;                 /* clear done */
@@ -370,7 +373,7 @@ if (f == FN_IDLE) {                                     /* idle? */
 
 if ((f == FN_SEEK) || (f == FN_RECAL)) {                /* seek or recal? */
     rp_busy = 0;                                        /* not busy */
-    cyl = (f == FN_SEEK)? GET_CYL (rp_da): 0;           /* get cylinder */
+    cyl = (f == FN_SEEK)? GET_CYL (rp_da, uptr->flags): 0; /* get cylinder */
     sim_activate (uptr, MAX (RP_MIN, abs (cyl - uptr->CYL) * rp_swait));
     uptr->CYL = cyl;                                    /* on cylinder */
     uptr->FUNC = FN_SEEK | FN_2ND;                      /* set second state */
@@ -397,16 +400,16 @@ if (GET_SECT (rp_da) >= RP_NUMSC)
     rp_updsta (STA_NXS, 0);
 if (GET_SURF (rp_da) >= RP_NUMSF)
     rp_updsta (STA_NXF, 0);
-if (GET_CYL (rp_da) >= RP_QCYL (uptr->flags))
+if (GET_CYL (rp_da, uptr->flags) >= RP_QCYL (uptr->flags))
     rp_updsta (STA_NXC, 0);
 if (rp_sta & (STA_NXS | STA_NXF | STA_NXC)) {           /* or bad disk addr? */
     rp_updsta (STA_DON, STB_SUFU);                      /* done, unsafe */
     return SCPE_OK;
     }
 
-uptr->CYL = GET_CYL (rp_da);                            /* on cylinder */
+uptr->CYL = GET_CYL (rp_da, uptr->flags);               /* on cylinder */
 pa = rp_ma & AMASK;                                     /* get mem addr */
-da = GET_DA (rp_da) * RP_NUMWD;                         /* get disk addr */
+da = GET_DA (rp_da, uptr->flags) * RP_NUMWD;            /* get disk addr */
 wc = 01000000 - rp_wc;                                  /* get true wc */
 if (((uint32) (pa + wc)) > MEMSIZE) {                   /* memory overrun? */
     nexm = 1;                                           /* set nexm flag */
@@ -455,7 +458,7 @@ if (cyl >= RP_QCYL (uptr->flags))                       /* cyl ovflo wraps */
 surf = (da % (RP_NUMSC * RP_NUMSF)) / RP_NUMSC;         /* get surface */
 sect = (da % (RP_NUMSC * RP_NUMSF)) % RP_NUMSC;         /* get sector */
 rp_da = ((cyl & DA_M_CYL) << DA_V_CYL) | (surf << DA_V_SURF) | (sect << DA_V_SECT);
-if (cyl >= 256)                                         /* cyl >= 8 bits? */
+if ((cyl >= 256) && ((uptr->flags & UNIT_RP03) != 0))   /* cyl >= 8 bits && RP03 */
     rp_da = rp_da | DA_C256;
 rp_busy = 0;                                            /* clear busy */
 rp_updsta (STA_DON, 0);                                 /* set done */
