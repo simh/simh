@@ -1855,8 +1855,6 @@ ${BIN}uc15${EXE} : ${UC15} ${SIM}
 	${MKDIRBIN}
 	${CC} ${UC15} ${SIM} ${UC15_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
-vax : ${BIN}vax${EXE}
-
 vax : microvax3900
 
 microvax3900 : ${BIN}BuildROMs${EXE} ${BIN}microvax3900${EXE}
