@@ -1,6 +1,6 @@
 /* sigma_tt.c: Sigma 7012 console teletype
 
-   Copyright (c) 2007-2008, Robert M. Supnik
+   Copyright (c) 2007-2018, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -30,6 +30,8 @@
    CR           input, mapped to NEWLINE and echoes CR-LF
    ^H           input, mapped to EOM and not echoed
    HT           input or output, simulates tabbing with fixed 8 character stops
+
+   02-Jun-2018  RMS     Defanged clang signed/unsigned whining (Mark Pizzolato)
 */
 
 #include "sigma_io_defs.h"
@@ -71,7 +73,7 @@ t_stat tti_rtc_svc (uint32 tm);
 t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tt_reset (DEVICE *dptr);
-t_stat tt_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat tt_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 void tto_echo (int32 c);
 
 extern t_stat io_set_pint (void);
@@ -214,8 +216,8 @@ return SCPE_OK;
 
 t_stat tto_svc (UNIT *uptr)
 {
-int32 c, cmd;
-uint32 st;
+int32 c;
+uint32 uc, cmd, st;
 
 switch (tt_cmd) {                                       /* case on state */
 
@@ -231,10 +233,10 @@ switch (tt_cmd) {                                       /* case on state */
         break;
 
     case TTS_WRITE:                                     /* char output */
-        st = chan_RdMemB (tt_dib.dva, &c);              /* get char */
+        st = chan_RdMemB (tt_dib.dva, &uc);             /* get char */
         if (CHS_IFERR (st))                             /* channel error? */
             return tt_chan_err (st);
-        c = ebcdic_to_ascii[c & 0xFF];                  /* convert to ASCII */
+        c = ebcdic_to_ascii[uc & 0xFF];                 /* convert to ASCII */
         tto_echo (c);                                   /* echo character */
         sim_activate (uptr, uptr->wait);                /* continue thread */
         if (st == CHS_ZBC)                              /* st = zbc? */
@@ -321,7 +323,7 @@ return SCPE_OK;
 
 /* Make mode flags uniform */
 
-t_stat tt_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat tt_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 tt_unit[TTO].flags = (tt_unit[TTO].flags & ~TT_MODE) | val;
 if (val == TT_MODE_7P)

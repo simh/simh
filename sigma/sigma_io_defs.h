@@ -260,17 +260,17 @@ uint32 chan_WrMemW (uint32 dva, uint32 dat);
 t_stat chan_reset_dev (uint32 dva);
 void io_sclr_req (uint32 inum, uint32 val);
 void io_sclr_arm (uint32 inum, uint32 val);
-t_stat io_set_dvc (UNIT* uptr, int32 val, char *cptr, void *desc);
-t_stat io_show_dvc (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat io_set_dva (UNIT* uptr, int32 val, char *cptr, void *desc);
-t_stat io_show_dva (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat io_show_cst (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat io_set_dvc (UNIT* uptr, int32 val, CONST char *cptr, void *desc);
+t_stat io_show_dvc (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat io_set_dva (UNIT* uptr, int32 val, CONST char *cptr, void *desc);
+t_stat io_show_dva (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat io_show_cst (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat io_boot (int32 u, DEVICE *dptr);
 
 /* Internal real-time event scheduler */
 
-t_stat rtc_set_tps (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat rtc_show_tps (FILE *of, UNIT *uptr, int32 val, void *desc);
+t_stat rtc_set_tps (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat rtc_show_tps (FILE *of, UNIT *uptr, int32 val, CONST void *desc);
 t_stat rtc_register (uint32 tm, uint32 idx, UNIT *uptr);
 
 #endif

@@ -158,14 +158,14 @@
    type         #sectors/       #surfaces/      #cylinders/
                  surface         cylinder        drive
 
-   7242         6               20              203		    =24MB
-   7261         11              20              203		    =45MB
-   7271         6               20              406		    =48MB
+   7242         6               20              203         =24MB
+   7261         11              20              203         =45MB
+   7271         6               20              406         =48MB
    3288         17              5               822         =67MB
    7276         11              19              411         =86MB
    7266         11              20              411         =90MB
-   3282         11              19              815		    =170MB
-   3283         17              19              815		    =263MB
+   3282         11              19              815         =170MB
+   3283         17              19              815         =263MB
 
    On the T3281, each drive can be a different type.  The size field
    in each unit selects the drive capacity for each drive and thus
@@ -290,11 +290,11 @@ t_bool dp_end_sec (UNIT *uptr, uint32 lnt, uint32 exp, uint32 st);
 int32 dp_clr_int (uint32 cidx);
 void dp_set_ski (uint32 cidx, uint32 un);
 void dp_clr_ski (uint32 cidx, uint32 un);
-t_stat dp_attach (UNIT *uptr, char *cptr);
-t_stat dp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat dp_set_auto (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat dp_set_ctl (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat dp_show_ctl (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat dp_attach (UNIT *uptr, CONST char *cptr);
+t_stat dp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat dp_set_auto (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat dp_set_ctl (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat dp_show_ctl (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 static DP_TYPE dp_tab[] = {
     { DP_ENT (7242, 7240) },
@@ -776,7 +776,7 @@ switch (uptr->UCMD) {
             else wd = 0;
             dp_buf[i] = wd;                             /* store in buffer */
             }
-        if (r = dp_write (uptr, da))                    /* write buf, err? */
+        if ((r = dp_write (uptr, da)))                  /* write buf, err? */
             return r;
         if (dp_end_sec (uptr, DP_WDSC, DP_WDSC, st))    /* transfer done? */
             return SCPE_OK;                             /* err or cont */
@@ -818,7 +818,7 @@ switch (uptr->UCMD) {
             chan_uen (dva);                             /* uend */
             return SCPE_OK;
             }
-        if (r = dp_read (uptr, da))                     /* read buf, error? */
+        if ((r = dp_read (uptr, da)))                   /* read buf, error? */
             return r;
         for (i = 0, st = 0; (i < (DP_WDSC * 4)) && (st != CHS_ZBC); i++) {
             st = chan_RdMemB (dva, &wd);                /* read byte */
@@ -843,7 +843,7 @@ switch (uptr->UCMD) {
             chan_uen (dva);                             /* uend */
                 return SCPE_OK;
             }
-        if (r = dp_read (uptr, da))                     /* read buf, error? */
+        if ((r = dp_read (uptr, da)))                   /* read buf, error? */
             return r;
         for (i = 0, st = 0; (i < DP_WDSC) && (st != CHS_ZBC); i++) {
             st = chan_WrMemW (dva, dp_buf[i]);          /* store in mem */
@@ -1225,7 +1225,7 @@ return SCPE_OK;
 
 /* Device attach */
 
-t_stat dp_attach (UNIT *uptr, char *cptr)
+t_stat dp_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 i, p;
 t_stat r;
@@ -1252,7 +1252,7 @@ return SCPE_OK;
 
 /* Set drive type command validation routine */
 
-t_stat dp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 dtype = GET_DTYPE (val);
 uint32 cidx = uptr->UCTX;
@@ -1269,7 +1269,7 @@ return SCPE_OK;
 
 /* Set unit autosize validation routine */
 
-t_stat dp_set_auto (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dp_set_auto (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 cidx = uptr->UCTX;
 
@@ -1284,7 +1284,7 @@ return SCPE_OK;
 
 /* Set controller type command validation routine */
 
-t_stat dp_set_ctl (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat dp_set_ctl (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 uint32 i, new_dtyp, cidx = uptr->UCTX;
 DP_CTX *ctx = &dp_ctx[cidx];
@@ -1320,7 +1320,7 @@ for (i = 0; i < DP_NUMDR_16B; i++) {
 return SCPE_OK;
 }
 
-t_stat dp_show_ctl (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat dp_show_ctl (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 uint32 cidx = uptr->UCTX;
 
