@@ -1,6 +1,6 @@
 /* pdp11_vh.c: DHQ11 asynchronous terminal multiplexor simulator
 
-   Copyright (c) 2004-2012, John A. Dundas III
+   Copyright (c) 2004-2018, John A. Dundas III
    Portions derived from work by Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,7 @@
 
    vh           DHQ11 asynch multiplexor for SIMH
 
+   28-May-18    RMS     Changed to avoid nested comment warnings (Mark Pizzolato)
    02-Jun-11    MP      Added debugging support to trace register, interrupt 
                         and data traffic (SET VH DEBUG[=REG;INT;XMT;RCV])
                         Added SET LOG and SET NOLOG support for logging mux
@@ -293,8 +294,8 @@ static TMLX vh_parm[VH_MUXES * VH_LINES] = { { 0 } };
 /* debugging bitmaps */
 #define DBG_REG  0x0001                                 /* trace read/write registers */
 #define DBG_INT  0x0002                                 /* display transfer requests */
-/* #define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
-/* #define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
+// #define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
+// #define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
 
 DEBTAB vh_debug[] = {
   {"REG",    DBG_REG},

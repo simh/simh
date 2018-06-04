@@ -1,6 +1,6 @@
 /* pdp11_rq.c: MSCP disk controller simulator
 
-   Copyright (c) 2002-2013, Robert M Supnik
+   Copyright (c) 2002-2018, Robert M Supnik
    Derived from work by Stephen F. Shirron
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,7 @@
 
    rq           RQDX3 disk controller
 
+   28-May-18    RMS     Changed to avoid nested comment warnings (Mark Pizzolato)
    23-Oct-13    RMS     Revised for new boot setup routine
    17-Mar-13    RMS     Fixed bug in ABORT link walk loop (Dave Bryan)
    14-Jan-09    JH      Added support for RD32 disc drive
@@ -1654,7 +1655,7 @@ if (bc & 1)                                             /* odd byte cnt? */
     return (ST_HST | SB_HST_OC);
 if (bc & 0xF0000000)                                    /* 'reasonable' bc? */
     return (ST_CMD | I_BCNT);
-/* if (lbn & 0xF0000000) return (ST_CMD | I_LBN);       /* 'reasonable' lbn? */
+// if (lbn & 0xF0000000) return (ST_CMD | I_LBN);       /* 'reasonable' lbn? */
 if (lbn >= maxlbn) {                                    /* accessing RCT? */
     if (lbn >= (maxlbn + drv_tab[dtyp].rcts))           /* beyond copy 1? */
         return (ST_CMD | I_LBN);                        /* lbn err */

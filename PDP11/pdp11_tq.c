@@ -1,6 +1,6 @@
 /* pdp11_tq.c: TMSCP tape controller simulator
 
-   Copyright (c) 2002-2013, Robert M Supnik
+   Copyright (c) 2002-2018, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tq           TQK50 tape controller
 
+   28-May-18    RMS     Changed to avoid nested comment warnings (Mark Pizzolato)
    23-Oct-13    RMS     Revised for new boot setup routine
    17-Mar-13    RMS     Fixed bug in ABORT link walk loop (Dave Bryan)
    17-Aug-11    RMS     Added CAPACITY modifier
@@ -786,8 +787,8 @@ else {                                                  /* valid cmd */
             tq_enqt (&uptr->pktq, pkt);                 /* do later */
             return OK;
             }
-/*      if (tq_cmf[cmd] & MD_CDL)                       /* clr cch lost? */
-/*          uptr->flags = uptr->flags & ~UNIT_CDL; */
+//      if (tq_cmf[cmd] & MD_CDL)                       /* clr cch lost? */
+//          uptr->flags = uptr->flags & ~UNIT_CDL;
         if ((mdf & MD_CSE) && (uptr->flags & UNIT_SXC)) /* clr ser exc? */
             uptr->flags = uptr->flags & ~UNIT_SXC;
         }

@@ -217,7 +217,7 @@ CTAB vax780_cmd[] = {
    Instead, the interrupt handler for a given UBA IPL
    reads a vector register that contains the Unibus vector
    for that IPL.
-
+*/
 /* Find highest priority vectorable interrupt */
 
 int32 eval_int (void)

@@ -1,7 +1,7 @@
 /* pdp11_xu.c: DEUNA/DELUA ethernet controller simulator
   ------------------------------------------------------------------------------
 
-   Copyright (c) 2003-2011, David T. Hittner
+   Copyright (c) 2003-2018, David T. Hittner
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -62,6 +62,7 @@
 
   Modification history:
 
+  28-May-18 RMS   Changed to avoid nested comment warnings (Mark Pizzolato)
   12-Jan-11  DTH  Added SHOW XU FILTERS modifier
   11-Jan-11  DTH  Corrected SELFTEST command, enabling use by VMS 3.7, VMS 4.7, and Ultrix 1.1
   09-Dec-10  MP   Added address conflict check during attach.
@@ -1041,7 +1042,7 @@ void xu_process_receive(CTLR* xu)
 
   sim_debug(DBG_TRC, xu->dev, "xu_process_receive(), buffers: %d\n", xu->var->rrlen);
 
-/* xu_dump_rxring(xu); /* debug receive ring */
+// xu_dump_rxring(xu); /* debug receive ring */
 
   /* process only when in the running state, and host buffers are available */
   if ((state != STATE_RUNNING) || no_buffers)
@@ -1213,7 +1214,7 @@ void xu_process_transmit(CTLR* xu)
   t_stat rstatus, wstatus;
 
   sim_debug(DBG_TRC, xu->dev, "xu_process_transmit()\n");
-/* xu_dump_txring(xu); /* debug receive ring */
+// xu_dump_txring(xu); /* debug receive ring */
 
   for (;;) {
 
