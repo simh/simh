@@ -93,8 +93,8 @@ ind[IN_INC] = 0;                                        /* clear inq clear */
 switch (mod) {                                          /* case on mod */
 
     case BCD_R:                                         /* input */
-/*      if (ind[IN_INR] == 0)                         */
-/*          return SCPE_OK;                           *//* return if no req */
+//      if (ind[IN_INR] == 0)
+//          return SCPE_OK;                             /* return if no req */
         ind[IN_INR] = 0;                                /* clear req */
         inq_puts ("[Enter]\r\n");                       /* prompt */
         for (i = 0; M[BS] != (BCD_GRPMRK + WM); i++) {  /* until GM + WM */

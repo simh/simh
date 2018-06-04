@@ -197,7 +197,7 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc
 
 /* CMCTL registers */
 
-/* #define CMCTLSIZE    (18 << 2)                     *//* 18 registers */
+// #define CMCTLSIZE    (18 << 2)                       /* 18 registers */
 #define CMCTLSIZE       (19 << 2)                       /* KA655X extra reg */
 #define CMCTLBASE       (REGBASE + 0x100)               /* CMCTL addr base */
 

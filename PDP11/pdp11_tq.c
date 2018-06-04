@@ -845,8 +845,8 @@ else {                                                  /* valid cmd */
             tq_enqt (&uptr->pktq, pkt);                 /* do later */
             return OK;
             }
-/*      if (tq_cmf[cmd] & MD_CDL)                     *//* clr cch lost? */
-/*          uptr->flags = uptr->flags & ~UNIT_CDL; */
+//      if (tq_cmf[cmd] & MD_CDL)                       /* clr cch lost? */
+//          uptr->flags = uptr->flags & ~UNIT_CDL;
         if ((mdf & MD_CSE) && (uptr->flags & UNIT_SXC)) /* clr ser exc? */
             uptr->flags = uptr->flags & ~UNIT_SXC;
         memset (uptr->results, 0, sizeof (struct tq_req_results)); /* init request state */

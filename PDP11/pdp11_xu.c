@@ -1016,8 +1016,8 @@ int32 xu_command(CTLR* xu)
       xu->var->rrlen = xu->var->udb[5];
       xu->var->rxnext = 0;
       xu->var->txnext = 0;
-// xu_dump_rxring(xu);
-// xu_dump_txring(xu);
+//    xu_dump_rxring(xu);
+//    xu_dump_txring(xu);
 
       break;
 
@@ -1200,7 +1200,7 @@ void xu_process_receive(CTLR* xu)
 
   sim_debug(DBG_TRC, xu->dev, "xu_process_receive(), buffers: %d\n", xu->var->rrlen);
 
-/* xu_dump_rxring(xu); *//* debug receive ring */
+// xu_dump_rxring(xu);  /* debug receive ring */
 
   /* process only when in the running state, and host buffers are available */
   if ((state != STATE_RUNNING) || no_buffers)
@@ -1375,7 +1375,7 @@ void xu_process_receive(CTLR* xu)
 
   /* set or clear interrupt, depending on what happened */
   xu_setclrint(xu, 0);
-// xu_dump_rxring(xu); /* debug receive ring */
+// xu_dump_rxring(xu);  /* debug receive ring */
 
 }
 

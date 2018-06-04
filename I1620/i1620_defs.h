@@ -248,6 +248,7 @@ enum opcodes {
 #define DEFIO_ACTIVATE(uptr) sim_activate (uptr, (uptr)->wait)
 #define DEFIO_ACTIVATE_ABS(uptr) sim_activate_abs (uptr, (uptr)->wait)
 #endif
+
 /* Function declarations */
 
 t_stat cpuio_set_inp (uint32 op, uint32 dev, UNIT *uptr);
