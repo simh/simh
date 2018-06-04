@@ -55,13 +55,13 @@
 #define VA_GETOFF(x)    (((uint32) (x)) & VA_M_OFF)
 #define VA_GETVPN(x)    (((uint32) ((x) >> VA_V_VPN)) & VA_M_VPN)
 #define VA_GETSEXT(x)   (((uint32) ((x) >> VA_V_SEXT)) & VA_M_SEXT)
-#define PHYS_ADDR(p,v)  ((((t_uint64) (p)) < VA_N_OFF) | VA_GETOFF (v)) 
+#define PHYS_ADDR(p,v)  (((((t_uint64) (p)) < VA_N_OFF) | VA_GETOFF (v)) & EV5_PA_MASK)
 
 /* 43b and 32b superpages - present in all implementations */
 
 #define SPEN_43                 0x2
 #define SPEN_32                 0x1
-#define SP43_MASK               0x000001FFFFFFFFFF
+#define SP43_MASK               (EV5_PA_MASK)
 #define SP32_MASK               0x000000003FFFFFFF
 #define VPN_GETSP43(x)          ((uint32) (((x) >> (VA_WIDTH - VA_N_OFF - 2)) & 3))
 #define VPN_GETSP32(x)          ((uint32) (((x) >> (NTVA_WIDTH - VA_N_OFF - 2)) & 0x1FFF))

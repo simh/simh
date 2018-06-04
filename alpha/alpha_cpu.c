@@ -27,7 +27,7 @@
    27-May-2017  RMS     Fixed MIN/MAXx4 iteration counts (Mark Pizzolato)
    26-May-2017  RMS     Fixed other reversed definitions in opcode 12
    28-Apr-2017  RMS     Fixed reversed definitions of INSQH, EXTQH (Maurice Marks)
-  	
+
    Alpha architecturally-defined CPU state:
 
    PC<63:0>                     program counter
@@ -1382,7 +1382,7 @@ while (reason == 0) {
             if (!(arch_mask & AMASK_CIX)) ABORT (EXC_RSVI);
             for (res = 0; rbv != 0; res++) {
                 rbv = rbv & ~(rbv & NEG_Q (rbv));
-				}
+                }
             break;
 
         case 0x31:                                      /* PERR */

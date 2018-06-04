@@ -541,7 +541,7 @@ if (sw & SWMASK ('C')) {                                /* char format? */
     for (sc = 0; sc < 64; sc = sc + 8) {                /* print string */
         c = (uint32) (val[0] >> sc) & 0x7F;
         fprintf (of, (c < 0x20)? "<%02X>": "%c", c);
-		}
+        }
     return -7;                                          /* return # chars */
     }
 if (sw & SWMASK ('M')) {                                /* inst format? */

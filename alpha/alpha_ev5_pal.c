@@ -164,7 +164,7 @@ REG ev5pal_reg[] = {
     { FLDATA (PWRFL, ev5_pwrfl, 0) },
     { FLDATA (SLI, ev5_sli, 0) },
     { NULL }
-	};
+    };
 
 DEVICE ev5pal_dev = {
     "EV5PAL", &ev5pal_unit, ev5pal_reg, NULL,
@@ -675,7 +675,7 @@ switch (fnc) {
         if (pal_mode && ((val ^ ev5_icsr) & ICSR_SDE)) {
             if (val & ICSR_SDE) { PAL_USE_SHADOW; }
             else { PAL_USE_MAIN; }
-			}
+            }
         ev5_icsr = val & ICSR_RW;
         itlb_set_spage ((((uint32) val) >> ICSR_V_SPE) & ICSR_M_SPE);
         fpen = (((uint32) val) >> ICSR_V_FPE) & 1;
@@ -815,12 +815,12 @@ static struct pal_opt ld_st_opt[] = {
     { HW_LD_PTE,    'P' },
     { HW_LD_LCK,    'L' },
     { 0 }
-	};
+    };
 
 static struct pal_opt rei_opt[] = {
     { HW_REI_S, 'S' },
     { 0 }
-	};
+    };
 
 /* Print options for hardware PAL instruction */
 
