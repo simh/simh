@@ -36,6 +36,9 @@
 				Name="VCXMLDataGeneratorTool"
 			/>
 			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
 				Name="VCMIDLTool"
 			/>
 			<Tool
@@ -117,6 +120,9 @@
 				Name="VCXMLDataGeneratorTool"
 			/>
 			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
 				Name="VCMIDLTool"
 			/>
 			<Tool
@@ -190,6 +196,10 @@
 			>
 			<File
 				RelativePath="..\PDP18B\pdp18b_cpu.c"
+				>
+			</File>
+			<File
+				RelativePath="..\PDP18B\pdp18b_dr15.c"
 				>
 			</File>
 			<File

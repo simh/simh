@@ -169,6 +169,7 @@
 #define MTA             0                               /* magtape */
 #define TC02            0                               /* DECtape */
 #define TTY1            16                              /* second Teletype(s) */
+#define UC15            0                               /* UC15 */
 #define BRMASK          0377400                         /* bounds mask */
 #define BRMASK_XVM      0777400                         /* bounds mask, XVM */
 #endif
