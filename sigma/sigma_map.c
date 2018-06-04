@@ -529,8 +529,7 @@ if (QCPU_S89)
             ((R[rn] & S89_SR1_MARG) >> S89_SR1_MAROFF);
         break;
     case 0xB:                                           /* read sr0, clr */
-        mem_sr0[memu] = mem_sr1[memu] = 0;
-        /* fall through */
+        mem_sr0[memu] = mem_sr1[memu] = 0;              /* fall through */
     case 0x8:                                           /* read sr0 */
         R[rn] = (wd & S89_SR0_RD) |
             (((1u << (chan_num + 1)) - 1) << (S89_SR0_V_PORTS - (chan_num + 1)));
@@ -559,8 +558,7 @@ else switch (CC) {                                      /* 5X0 */
         mmc_wlk[ppag | 1] = R[rn] & 0xF;
         break;
     case 0xC:                                           /* read sr0, clr */
-        mem_sr0[memu] = 0;                              /* clr */
-        /* fall through */
+        mem_sr0[memu] = 0;                              /* clr, fall through */
     case 0x8:                                           /* read sr0 */
         R[rn] = S5X0_SR0_FIXED | (wd & S5X0_SR0_RD) |
             (((1u << (chan_num + 1)) - 1) << (S5X0_SR0_V_PORTS - (chan_num + 1)));

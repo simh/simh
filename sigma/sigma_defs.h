@@ -34,10 +34,6 @@
 
 #include "sim_defs.h"                                   /* simulator defns */
 
-/* Rename of global PC variable to avoid namespace conflicts on some platforms */
-
-#define PC PC_Global
-
 #if defined(USE_INT64) || defined(USE_ADDR64)
 #error "Sigma 32b does not support 64b values!"
 #endif

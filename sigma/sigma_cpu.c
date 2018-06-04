@@ -248,7 +248,7 @@ extern uint32 io_tio (uint32 rn, uint32 bva);
 extern uint32 io_tdv (uint32 rn, uint32 bva);
 extern uint32 io_hio (uint32 rn, uint32 bva);
 extern uint32 io_aio (uint32 rn, uint32 bva);
-extern t_stat int_reset (DEVICE *dev);
+extern uint32 int_reset (DEVICE *dev);
 extern void io_set_eimax (uint32 lnt);
 extern void io_sclr_req (uint32 inum, uint32 val);
 extern void io_sclr_arm (uint32 inum, uint32 val);
@@ -476,7 +476,6 @@ while (reason == 0) {                                   /* loop until stop */
         if (sim_brk_summ &&
             sim_brk_test (PC, SWMASK ('E'))) {          /* breakpoint? */
             reason = STOP_IBKPT;                        /* stop simulation */
-            sim_interval++;                             /* don't count non-executed instruction */
             break;
             }
         if (PSW_QRX9 && (PC & PSW1_XA))                 /* S9 real ext && ext? */
@@ -1124,7 +1123,7 @@ switch (op) {
         res = R[rn] | opnd;
         CC34_W (res);                                   /* set CC's */
         R[rn] = res;                                    /* store */
-        break;
+    break;
 
     case OP_EOR:                                        /* xor */
         if ((tr = Ea (IR, &bva, VR, WD)) != 0)          /* get eff addr */
@@ -1134,7 +1133,7 @@ switch (op) {
         res = R[rn] ^ opnd;
         CC34_W (res);                                   /* set CC's */
         R[rn] = res;                                    /* store */
-        break;
+    break;
 
 /* Compares */
 
@@ -2705,7 +2704,7 @@ return SCPE_OK;
 t_stat cpu_show_addr (FILE *of, UNIT *uptr, int32 val, CONST void *desc)
 {
 t_stat r;
-CONST char *cptr = (CONST char *) desc;
+char *cptr = (char *) desc;
 uint32 ad, bpa, dlnt, virt;
 static const char *lnt_str[] = {
     "byte",
@@ -2825,7 +2824,7 @@ t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 k, di, lnt;
 t_stat r;
-CONST char *cptr = (CONST char *) desc;
+char *cptr = (char *) desc;
 InstHistory *h;
 
 if (hst_lnt == 0)                                   /* enabled? */

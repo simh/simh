@@ -261,7 +261,7 @@ typedef struct {
     uint32 tpos;                                        /* to position */
     } DP_SNSTAB;
 
-static char *dp_cname[] = {
+static const char *dp_cname[] = {
     "7240", "7270", "7260", "7275", "7265", "T3281"
     };
 
@@ -1113,7 +1113,7 @@ t_stat dp_ioerr (UNIT *uptr)
 uint32 cidx = uptr->UCTX;
 uint32 dva = dp_dib[cidx].dva;
 
-sim_perror ("DP I/O error");
+perror ("DP I/O error");
 clearerr (uptr->fileref);
 dp_ctx[cidx].dp_flags |= DPF_DPE;                       /* set DPE flag */
 chan_set_chf (dva, CHF_XMDE);

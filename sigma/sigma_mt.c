@@ -477,8 +477,7 @@ switch (st) {
     case MTSE_FMT:                                      /* illegal fmt */
     case MTSE_UNATT:                                    /* not attached */
     case MTSE_WRP:                                      /* write protect */
-        chan_set_chf (mt_dib.dva, CHF_XMME);            /* set err */
-        /* fall through */
+        chan_set_chf (mt_dib.dva, CHF_XMME);            /* set err, fall through */
     case MTSE_OK:                                       /* no error */
         chan_uen (mt_dib.dva);                          /* uend */
         return SCPE_IERR;

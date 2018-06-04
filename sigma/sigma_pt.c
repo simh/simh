@@ -1,6 +1,6 @@
 /* sigma_pt.c: Sigma 7060 paper tape reader/punch
 
-   Copyright (c) 2007-2008, Robert M. Supnik
+   Copyright (c) 2007-2018, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    pt           7060 paper-tape reader/punch
+
+   02-Jun-2018  RMS     Defanged clang signed/unsigned whining (Mark Pizzolato)
 */
 
 #include "sigma_io_defs.h"
@@ -158,7 +160,7 @@ return 0;
 t_stat pt_svc (UNIT *uptr)
 {
 int32 c;
-uint32 cmd;
+uint32 uc, cmd;
 uint32 st;
 
 switch (pt_cmd) {                                       /* case on state */
@@ -186,7 +188,7 @@ switch (pt_cmd) {                                       /* case on state */
                 break;
                 }
             else {                                      /* real error */
-                sim_perror ("PTR I/O error");
+                perror ("PTR I/O error");
                 clearerr (uptr->fileref);
                 chan_set_chf (pt_dib.dva, CHF_XMDE);    /* data error */
                 return pt_chan_err (SCPE_IOERR);        /* force uend */
@@ -196,7 +198,7 @@ switch (pt_cmd) {                                       /* case on state */
         if (c != 0)                                     /* leader done? */
             ptr_nzc = 1;                                /* set flag */
         if ((pt_cmd == PTS_READI) || ptr_nzc) {
-            st = chan_WrMemB (pt_dib.dva, c);           /* write to memory */
+            st = chan_WrMemB (pt_dib.dva, ((uint32) c));/* write to memory */
             if (CHS_IFERR (st))                         /* channel error? */
                 return pt_chan_err (st);
             if (st == CHS_ZBC)                          /* bc == 0? */
@@ -208,11 +210,11 @@ switch (pt_cmd) {                                       /* case on state */
         sim_activate (uptr, pt_unit[PTP].wait);         /* continue thread */
         if ((pt_unit[PTP].flags & UNIT_ATT) == 0)       /* not attached? */
             return ptp_stopioe? SCPE_UNATT: SCPE_OK;
-        st = chan_RdMemB (pt_dib.dva, (uint32 *)&c);    /* read from channel */
+        st = chan_RdMemB (pt_dib.dva, &uc);             /* read from channel */
         if (CHS_IFERR (st))                             /* channel error? */
             return pt_chan_err (st);
-        if (putc (c, pt_unit[PTP].fileref) == EOF) {
-            sim_perror ("PTP I/O error");
+        if (putc (((int32) uc), pt_unit[PTP].fileref) == EOF) {
+            perror ("PTP I/O error");
             clearerr (pt_unit[PTP].fileref);
             chan_set_chf (pt_dib.dva, CHF_XMDE);        /* data error */
             return pt_chan_err (SCPE_IOERR);            /* force uend */
