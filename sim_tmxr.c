@@ -2658,7 +2658,9 @@ while (*tptr) {
                 if ((NULL == cptr) || ('\0' == *cptr) || 
                     (_tmln_speed_delta (cptr) < 0))
                     return sim_messagef (SCPE_ARG, "Invalid Speed Specifier: %s\n", (cptr ? cptr : ""));
-                if (mp->port_speed_control && (_tmln_speed_delta (cptr) > 0) && (!(sim_switches & SIM_SW_REST)))
+                if (mp->port_speed_control && 
+                    ((_tmln_speed_delta (cptr) > 0) || (*cptr != '*')) && 
+                    (!(sim_switches & SIM_SW_REST)))
                     return sim_messagef (SCPE_ARG, "%s simulator programmatically sets %sport speed\n", sim_name, dev_name);
                 strlcpy (speed, cptr, sizeof(speed));
                 continue;
