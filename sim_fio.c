@@ -547,6 +547,7 @@ if ((stbuf.st_mode & S_IFIFO)) {
 return -1;
 }
 
+#if defined (__linux__) || defined (__APPLE__)
 #include <sys/mman.h>
 
 struct SHMEM {
@@ -616,15 +617,50 @@ free (shmem);
 
 int32 sim_shmem_atomic_add (int32 *p, int32 v)
 {
+#if defined (HAVE_GCC_SYNC_BUILTINS)
 return __sync_add_and_fetch((int *) p, v);
+#else
+return *p + v;
+#endif
 }
 
 t_bool sim_shmem_atomic_cas (int32 *ptr, int32 oldv, int32 newv)
 {
+#if defined (HAVE_GCC_SYNC_BUILTINS)
 return __sync_bool_compare_and_swap (ptr, oldv, newv);
+#else
+if (*ptr == oldv) {
+    *ptr = newv;
+    return 1;
+    }
+else
+    return 0;
+#endif
 }
 
-#endif
+#else /* !(defined (__linux__) || defined (__APPLE__)) */
+
+t_stat sim_shmem_open (const char *name, size_t size, SHMEM **shmem, void **addr)
+{
+return SCPE_NOFNC;
+}
+
+void sim_shmem_close (SHMEM *shmem)
+{
+}
+
+int32 sim_shmem_atomic_add (int32 *p, int32 v)
+{
+return -1;
+}
+
+t_bool sim_shmem_atomic_cas (int32 *ptr, int32 oldv, int32 newv)
+{
+return FALSE;
+}
+
+#endif /* defined (__linux__) || defined (__APPLE__) */
+#endif /* defined (_WIN32) */
 
 #if defined(__VAX)
 /* 
