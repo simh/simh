@@ -1,6 +1,6 @@
 /* i1620_cpu.c: IBM 1620 CPU simulator
 
-   Copyright (c) 2002-2017, Robert M. Supnik
+   Copyright (c) 2002-2018, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    This CPU module incorporates code and comments from the 1620 simulator by
    Geoff Kuenning, with his permission.
 
+   05-Jun-18    RMS     Fixed bug in select index A (COVERITY)
    23-Jun-17    RMS     BS should not enable indexing unless configured
    15-Jun-17    RMS     Added more information to IO in progress message
    26-May-17    RMS     Added deferred IO mode for slow devices
@@ -970,12 +971,14 @@ while (reason == SCPE_OK) {                             /* loop until halted */
             idxe = idxb = 0;                            /* indexing off */
             break;
         case 1:
-            if ((cpu_unit.flags & IF_IDX) != 0)         /* indexing present? */
+            if ((cpu_unit.flags & IF_IDX) != 0) {       /* indexing present? */
                 idxe = 1; idxb = 0;                     /* index band A */
+                }
             break;
         case 2:
-            if ((cpu_unit.flags & IF_IDX) != 0)         /* indexing present? */
+            if ((cpu_unit.flags & IF_IDX) != 0) {       /* indexing present? */
                 idxe = idxb = 1;                        /* index band B */
+                }
             break;
         case 8:
             iae = 0;                                    /* indirect off */
