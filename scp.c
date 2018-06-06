@@ -3540,7 +3540,7 @@ return stat | SCPE_NOMESSAGE;                           /* suppress message sinc
 */
 
 static const char *
-_sim_get_env_special (const char *gbuf, char *rbuf, size_t rbuf_size)
+_sim_gen_env_uplowcase (const char *gbuf, char *rbuf, size_t rbuf_size)
 {
 const char *ap;
 char tbuf[CBUFSIZE];
@@ -3548,11 +3548,23 @@ char tbuf[CBUFSIZE];
 ap = getenv(gbuf);                      /* first try using the literal name */
 if (!ap) {
     get_glyph (gbuf, tbuf, 0);          /* now try using the upcased name */
-    ap = getenv(tbuf);
+    if (strcmp (gbuf, tbuf))            /* upcase different? */
+        ap = getenv(tbuf);              /* lookup the upcase name */
     }
-if (ap)                                 /* environment variable found? */
+if (ap) {                               /* environment variable found? */
     strlcpy (rbuf, ap, rbuf_size);      /* Return the environment value */
-else {                                  /* otherwise, check for Special Names */
+    ap = rbuf;
+    }
+return ap;
+}
+
+static const char *
+_sim_get_env_special (const char *gbuf, char *rbuf, size_t rbuf_size)
+{
+const char *ap;
+
+ap = _sim_gen_env_uplowcase (gbuf, rbuf, rbuf_size);/* Look for environment variable */
+if (!ap) {                              /* no environment variable found? */
     time_t now = (time_t)cmd_time.tv_sec;
     struct tm *tmnow = localtime(&now);
 
@@ -7828,6 +7840,7 @@ t_stat exdep_cmd (int32 flag, CONST char *cptr)
 char gbuf[CBUFSIZE];
 CONST char *gptr;
 CONST char *tptr = NULL;
+const char *ap;
 int32 opt;
 t_addr low, high;
 t_stat reason;
@@ -7900,6 +7913,10 @@ for (gptr = gbuf, reason = SCPE_OK;
         continue;
         }
 
+    if ((ap = getenv (gptr))) {
+        strlcpy (gbuf, ap, sizeof (gbuf));
+        gptr = gbuf;
+        }
     tptr = get_range (sim_dfdev, gptr, &low, &high, sim_dfdev->aradix,
         (((sim_dfunit->capac == 0) || (flag == EX_E))? 0:
         sim_dfunit->capac - sim_dfdev->aincr), 0);
