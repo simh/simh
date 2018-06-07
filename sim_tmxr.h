@@ -309,6 +309,7 @@ void _tmxr_debug (uint32 dbits, TMLN *lp, const char *msg, char *buf, int bufsiz
 #define tmxr_debug_trace_line(lp, msg) do {if (sim_deb && (lp)->mp && (lp)->mp->dptr && (TMXR_DBG_TRC & (lp)->mp->dptr->dctrl)) sim_debug (TMXR_DBG_TRC, (lp)->mp->dptr, "Ln%d:%s\n", (int)((lp)-(lp)->mp->ldsc), (msg)); } while (0)
 #define tmxr_debug_connect(mp, msg) do {if (sim_deb && (mp)->dptr && (TMXR_DBG_CON & (mp)->dptr->dctrl)) sim_debug (TMXR_DBG_CON, mp->dptr, "%s\n", (msg)); } while (0)
 #define tmxr_debug_connect_line(lp, msg) do {if (sim_deb && (lp)->mp && (lp)->mp->dptr && (TMXR_DBG_CON & (lp)->mp->dptr->dctrl)) sim_debug (TMXR_DBG_CON, (lp)->mp->dptr, "Ln%d:%s\n", (int)((lp)-(lp)->mp->ldsc), (msg)); } while (0)
+t_stat tmxr_add_debug (DEVICE *dptr);
 
 #if defined(SIM_ASYNCH_MUX) && !defined(SIM_ASYNCH_IO)
 #undef SIM_ASYNCH_MUX

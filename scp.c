@@ -6389,6 +6389,8 @@ for (i = 0; i < start; i++) {
         return SCPE_IERR;
     }
 for (i = start; (dptr = sim_devices[i]) != NULL; i++) {
+    if (sim_switches & SWMASK('P'))
+        tmxr_add_debug (dptr);          /* Add TMXR debug to MUX devices */
     if (dptr->reset != NULL) {
         reason = dptr->reset (dptr);
         if (reason != SCPE_OK)
@@ -6414,6 +6416,45 @@ static DEBTAB scp_debug[] = {
   {0}
 };
 
+t_stat sim_add_debug_flags (DEVICE *dptr, DEBTAB *debflags)
+{
+dptr->flags |= DEV_DEBUG;
+if (!dptr->debflags)
+    dptr->debflags = debflags;
+else {
+    DEBTAB *cdptr, *sdptr, *ndptr;
+
+    for (sdptr = debflags; sdptr->name; sdptr++) {
+        for (cdptr = dptr->debflags; cdptr->name; cdptr++) {
+            if (sdptr->mask == cdptr->mask)
+                break;
+            }
+        if (sdptr->mask != cdptr->mask) {
+            int i, dcount = 0;
+
+            for (cdptr = dptr->debflags; cdptr->name; cdptr++)
+                dcount++;
+            for (cdptr = debflags; cdptr->name; cdptr++)
+                dcount++;
+            ndptr = (DEBTAB *)calloc (1 + dcount, sizeof (*ndptr));
+            for (dcount = 0, cdptr = dptr->debflags; cdptr->name; cdptr++)
+                ndptr[dcount++] = *cdptr;
+            for (cdptr = debflags; cdptr->name; cdptr++) {
+                for (i = 0; i < dcount; i++) {
+                    if (cdptr->mask == ndptr[i].mask)
+                        break;
+                    }
+                if (i == dcount)
+                    ndptr[dcount++] = *cdptr;
+                }
+            dptr->debflags = ndptr;
+            break;
+            }
+        }
+    }
+return SCPE_OK;
+}
+
 /* Reset to powerup state
 
    Inputs:
@@ -6430,42 +6471,8 @@ int32 old_sw = sim_switches;
 sim_switches = SWMASK ('P');
 r = reset_all (start);
 sim_switches = old_sw;
-if (sim_dflt_dev) { /* Make sure that SCP debug options are available */
-    sim_dflt_dev->flags |= DEV_DEBUG;
-    if (!sim_dflt_dev->debflags)
-        sim_dflt_dev->debflags = scp_debug;
-    else {
-        DEBTAB *cdptr, *sdptr, *ndptr;
-
-        for (sdptr = scp_debug; sdptr->name; sdptr++) {
-            for (cdptr = sim_dflt_dev->debflags; cdptr->name; cdptr++) {
-                if (sdptr->mask == cdptr->mask)
-                    break;
-                }
-            if (sdptr->mask != cdptr->mask) {
-                int i, dcount = 0;
-
-                for (cdptr = sim_dflt_dev->debflags; cdptr->name; cdptr++)
-                    dcount++;
-                for (cdptr = scp_debug; cdptr->name; cdptr++)
-                    dcount++;
-                ndptr = (DEBTAB *)calloc (1 + dcount, sizeof (*ndptr));
-                for (dcount = 0, cdptr =sim_dflt_dev->debflags; cdptr->name; cdptr++)
-                    ndptr[dcount++] = *cdptr;
-                for (cdptr = scp_debug; cdptr->name; cdptr++) {
-                    for (i = 0; i < dcount; i++) {
-                        if (cdptr->mask == ndptr[i].mask)
-                            break;
-                        }
-                    if (i == dcount)
-                        ndptr[dcount++] = *cdptr;
-                    }
-                sim_dflt_dev->debflags = ndptr;
-                break;
-                }
-            }
-        }
-    }
+if (sim_dflt_dev)   /* Make sure that SCP debug options are available */
+    sim_add_debug_flags (sim_dflt_dev, scp_debug);
 return r;
 }
 

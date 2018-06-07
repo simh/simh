@@ -305,6 +305,7 @@ CONST char *match_ext (CONST char *fnam, const char *ext);
 t_stat show_version (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat set_dev_debug (DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat show_dev_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
+t_stat sim_add_debug_flags (DEVICE *dptr, DEBTAB *debflags);
 const char *sim_error_text (t_stat stat);
 t_stat sim_string_to_stat (const char *cptr, t_stat *cond);
 t_stat sim_cancel_step (void);

@@ -3804,6 +3804,27 @@ else
 return SCPE_OK;
 }
 
+static DEBTAB tmxr_debug[] = {
+  {"XMT",       TMXR_DBG_XMT,       "Transmit Data"},
+  {"RCV",       TMXR_DBG_RCV,       "Received Data"},
+  {"RET",       TMXR_DBG_RET,       "Returned Received Data"},
+  {"MODEM",     TMXR_DBG_MDM,       "Modem Signals"},
+  {"CONNECT",   TMXR_DBG_CON,       "Connection Activities"},
+  {"ASYNC",     TMXR_DBG_ASY,       "Asynchronous Activities"},
+  {"TRACE",     TMXR_DBG_TRC,       "trace routine calls"},
+  {"XMTPKT",    TMXR_DBG_PXMT,      "Transmit Packet Data"},
+  {"RCVPKT",    TMXR_DBG_PRCV,      "Received Packet Data"},
+  {"EXPECT",    TMXR_DBG_EXP,       "Expect Activities"},
+  {"SEND",      TMXR_DBG_SEND,      "Send Activities"},
+  {0}
+};
+
+t_stat tmxr_add_debug (DEVICE *dptr)
+{
+if (!(dptr->flags & DEV_MUX))
+    return SCPE_OK;
+return sim_add_debug_flags (dptr, tmxr_debug);
+}
 
 /* Attach unit to master socket */
 
