@@ -13529,17 +13529,17 @@ return !data;
 
 static t_svalue _op_log_and (t_svalue data1, t_svalue data2)
 {
-return data1 && data2;
+return data2 && data1;
 }
 
 static t_svalue _op_log_or (t_svalue data1, t_svalue data2)
 {
-return data1 || data2;
+return data2 || data1;
 }
 
 static t_svalue _op_bit_and (t_svalue data1, t_svalue data2)
 {
-return data1 & data2;
+return data2 & data1;
 }
 
 static t_svalue _op_bit_rsh (t_svalue shift, t_svalue data)
@@ -13554,72 +13554,73 @@ return data << shift;
 
 static t_svalue _op_bit_or (t_svalue data1, t_svalue data2)
 {
-return data1 | data2;
+return data2 | data1;
 }
 
 static t_svalue _op_bit_xor (t_svalue data1, t_svalue data2)
 {
-return data1 ^ data2;
+return data2 ^ data1;
 }
 
 static t_svalue _op_eq (t_svalue data1, t_svalue data2)
 {
-return data1 == data2;
+return data2 == data1;
 }
 
 static t_svalue _op_ne (t_svalue data1, t_svalue data2)
 {
-return data1 != data2;
+return data2 != data1;
 }
 
 static t_svalue _op_le (t_svalue data1, t_svalue data2)
 {
-return data1 <= data2;
+return data2 <= data1;
 }
 
 static t_svalue _op_lt (t_svalue data1, t_svalue data2)
 {
-return data1 < data2;
+return data2 < data1;
 }
 
 static t_svalue _op_ge (t_svalue data1, t_svalue data2)
 {
-return data1 >= data2;
+return data2 >= data1;
 }
 
 static t_svalue _op_gt (t_svalue data1, t_svalue data2)
 {
-return data1 > data2;
+return data2 > data1;
 }
 
 static t_svalue _op_str_eq (const char *str1, const char *str2)
 {
-return (0 == strcmp (str1, str2));
+return (0 == strcmp (str2, str1));
 }
 
 static t_svalue _op_str_ne (const char *str1, const char *str2)
 {
-return (0 != strcmp (str1, str2));
+return (0 != strcmp (str2, str1));
 }
+
 
 static t_svalue _op_str_le (const char *str1, const char *str2)
 {
-return (0 > strcmp (str1, str2));
+return (0 > strcmp (str2, str1));
 }
 
 static t_svalue _op_str_lt (const char *str1, const char *str2)
 {
-return (0 >= strcmp (str1, str2));
+return (0 >= strcmp (str2, str1));
 }
 
 static t_svalue _op_str_ge (const char *str1, const char *str2)
 {
-return (0 < strcmp (str1, str2));
+return (0 < strcmp (str2, str1));
 }
 
 static t_svalue _op_str_gt (const char *str1, const char *str2)
 {
-return (0 <= strcmp (str1, str2));
+return (0 <= strcmp (str2, str1));
 }
 
 /* 
@@ -13668,7 +13669,7 @@ static const char BinaryDigits[] = "01";
 *oper = NULL;
 while (isspace (*cptr))
     ++cptr;
-if (isalpha (*cptr)) {
+if (isalpha (*cptr) || (*cptr == '_')) {
     while (isalnum (*cptr) || (*cptr == '.') || (*cptr == '_'))
         *buf++ = *cptr++;
     *buf = '\0';
@@ -13680,7 +13681,7 @@ else {
             memcpy (buf, cptr, 2);
             cptr += 2;
             buf += 2;
-            while (strchr (HexDigits, *cptr))
+            while (*cptr && strchr (HexDigits, *cptr))
                 *buf++ = *cptr++;
             *buf = '\0';
             }
@@ -13690,13 +13691,13 @@ else {
                 memcpy (buf, cptr, 2);
                 cptr += 2;
                 buf += 2;
-                while (strchr (BinaryDigits, *cptr))
+                while (*cptr && strchr (BinaryDigits, *cptr))
                     *buf++ = *cptr++;
                 *buf = '\0';
                 }
             else {
                 if (*cptr == '0') {         /* Octal Number */
-                    while (strchr (OctalDigits, *cptr))
+                    while (*cptr && strchr (OctalDigits, *cptr))
                         *buf++ = *cptr++;
                     *buf = '\0';
                     }
@@ -13845,7 +13846,7 @@ static t_bool _value_of (const char *data, t_svalue *svalue, char *string, size_
 {
 CONST char *gptr;
 
-if (isalpha (*data)) {
+if (isalpha (*data) || (*data == '_')) {
     REG *rptr = NULL;
     DEVICE *dptr = sim_dfdev;
     const char *dot;
@@ -13873,10 +13874,13 @@ if (isalpha (*data)) {
         }
     gptr = _sim_get_env_special (data, string + 1, string_size - 2);
     if (gptr) {
-        *svalue = strtotsv(string + 1, &gptr, 0);
+        t_bool numeric;
+
         *string = '"';
+        *svalue = strtotsv(string + 1, &gptr, 0);
+        numeric = (*gptr == '\0') || ((*gptr == '"') && (gptr[1] == '\0'));
         strlcpy (&string[strlen (string)], "\"", string_size - strlen (string));
-        return (*gptr == '\0');
+        return numeric;
         }
     else
         data = "";
@@ -13889,7 +13893,8 @@ return (*gptr == '\0');
 /*
  * Evaluate a given stack1 containing a postfix expression 
  */
-static t_svalue sim_eval_postfix (Stack *stack1, t_stat *stat) {
+static t_svalue sim_eval_postfix (Stack *stack1, t_stat *stat)
+{
 Stack *stack2 = new_Stack();    /* local working stack2 which is holds the numbers operators */
 char temp_data[CBUFSIZE];       /* Holds the items popped from the stack2 */
 Operator *temp_op;
