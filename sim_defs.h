@@ -851,6 +851,8 @@ struct DEBTAB {
 #define SIM_DBG_AIO_QUEUE   0x040000        /* asynch event queue activities */
 #define SIM_DBG_EXP_STACK   0x080000        /* expression stack activities */
 #define SIM_DBG_EXP_EVAL    0x100000        /* expression evaluation activities */
+#define SIM_DBG_BRK_ACTION  0x200000        /* action activities */
+#define SIM_DBG_DO          0x400000        /* do activities */
 
 /* Open File Reference */
 struct FILEREF {
