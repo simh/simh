@@ -13666,35 +13666,40 @@ static t_svalue _op_gt (t_svalue data1, t_svalue data2)
 return data2 > data1;
 }
 
+static int _i_strcmp (const char *s1, const char *s2)
+{
+return ((sim_switches & SWMASK('I')) ? strcasecmp (s2, s1) : strcmp (s2, s1));
+}
+
 static t_svalue _op_str_eq (const char *str1, const char *str2)
 {
-return (0 == strcmp (str2, str1));
+
+return (0 == _i_strcmp (str2, str1));
 }
 
 static t_svalue _op_str_ne (const char *str1, const char *str2)
 {
-return (0 != strcmp (str2, str1));
+return (0 != _i_strcmp (str2, str1));
 }
-
 
 static t_svalue _op_str_le (const char *str1, const char *str2)
 {
-return (0 > strcmp (str2, str1));
+return (0 > _i_strcmp (str2, str1));
 }
 
 static t_svalue _op_str_lt (const char *str1, const char *str2)
 {
-return (0 >= strcmp (str2, str1));
+return (0 >= _i_strcmp (str2, str1));
 }
 
 static t_svalue _op_str_ge (const char *str1, const char *str2)
 {
-return (0 < strcmp (str2, str1));
+return (0 < _i_strcmp (str2, str1));
 }
 
 static t_svalue _op_str_gt (const char *str1, const char *str2)
 {
-return (0 <= strcmp (str2, str1));
+return (0 <= _i_strcmp (str2, str1));
 }
 
 /* 
