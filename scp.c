@@ -519,7 +519,6 @@ t_stat do_cmd_label (int32 flag, CONST char *cptr, CONST char *label);
 void int_handler (int signal);
 t_stat set_prompt (int32 flag, CONST char *cptr);
 t_stat sim_set_asynch (int32 flag, CONST char *cptr);
-t_stat sim_set_environment (int32 flag, CONST char *cptr);
 static const char *get_dbg_verb (uint32 dbits, DEVICE* dptr, UNIT *uptr);
 
 /* Global data */
@@ -2507,8 +2506,10 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         if (sim_on_actions[sim_do_depth][ON_SIGINT_ACTION])
             sim_brk_setact (sim_on_actions[sim_do_depth][ON_SIGINT_ACTION]);
         }
-    if ((cptr = sim_brk_getact (cbuf, sizeof(cbuf))))   /* pending action? */
-        printf ("%s%s\n", sim_prompt, cptr);            /* echo */
+    if ((cptr = sim_brk_getact (cbuf, sizeof(cbuf)))) { /* pending action? */
+        if (sim_do_echo)
+            printf ("%s+ %s\n", sim_prompt, cptr);      /* echo */
+        }
     else {
         if (sim_vm_read != NULL) {                      /* sim routine? */
             printf ("%s", sim_prompt);                  /* prompt */
@@ -3347,6 +3348,7 @@ if (flag >= 0) {                                        /* Only bump nesting fro
         }
     }
 
+sim_debug (SIM_DBG_DO, sim_dflt_dev, "do_cmd_label(%d, flag=%d, '%s', '%s')\n", sim_do_depth, flag, fcptr, label ? label : "");
 strlcpy( sim_do_filename[sim_do_depth], do_arg[0], 
          sizeof (sim_do_filename[sim_do_depth]));       /* stash away do file name for possible use by 'call' command */
 sim_do_label[sim_do_depth] = label;                     /* stash away do label for possible use in messages */
@@ -3483,9 +3485,11 @@ if ((flag >= 0) || (!sim_on_inherit)) {
         }
     sim_on_check[sim_do_depth] = 0;                     /* clear on mode */
     }
-if (flag >= 0)
+sim_debug (SIM_DBG_DO, sim_dflt_dev, "do_cmd_label - exiting - stat:%d (%d, flag=%d, '%s', '%s')\n", stat, sim_do_depth, flag, fcptr, label ? label : "");
+if (flag >= 0) {
+    sim_brk_clract ();                                  /* defang breakpoint actions */
     --sim_do_depth;                                     /* unwind nesting */
-sim_brk_clract ();                                      /* defang breakpoint actions */
+    }
 if (cmdp && (cmdp->action == &return_cmd) && (0 != *cptr)) { /* return command with argument? */
     sim_string_to_stat (cptr, &stat);
     sim_last_cmd_stat = stat;                           /* save explicit status as command error status */
@@ -3730,18 +3734,95 @@ if (!ap) {                              /* no environment variable found? */
 return ap;
 }
 
+/* Substitute_args - replace %n tokens in 'instr' with the do command's arguments
+
+   Calling sequence
+   instr        =       input string
+   tmpbuf       =       temp buffer
+   maxstr       =       min (len (instr), len (tmpbuf))
+   do_arg[10]   =       arguments
+
+   Token "%0" represents the command file name.
+
+   The input sequence "\%" represents a literal "%", and "\\" represents a
+   literal "\".  All other character combinations are rendered literally.
+
+   Omitted parameters result in null-string substitutions.
+*/
+
+static void
+_sub_args (char *instr, char *tmpbuf, size_t str_size, char *do_arg[])
+{
+char *ip, *op, *ap, *oend = tmpbuf + str_size - 2;
+int i;
+char rbuf[CBUFSIZE];
+
+for (ip = instr, op = tmpbuf; *ip && (op < oend); ) {
+    if ((ip [0] == '\\') &&                             /* literal escape? */
+        ((ip [1] == '%') || (ip [1] == '\\'))) {        /*   and followed by '%' or '\'? */
+        *op++ = *ip++;                                  /* copy \ */
+        *op++ = *ip++;                                  /* copy escaped char */
+        }
+    else {
+        if ((*ip == '%') &&                             /* %n = sub */
+            ((sim_isdigit(ip[1]) && !sim_isdigit(ip[2])) ||
+             (ip[1] == '*'))) {
+            if ((ip[1] >= '0') && (ip[1] <= '9')) {
+                ap = do_arg[ip[1] - '0'];
+                for (i=0; i<ip[1] - '0'; ++i)           /* make sure we're not past the list end */
+                    if (do_arg[i] == NULL) {
+                        ap = NULL;
+                        break;
+                        }
+                if (ap) {                               /* non-null arg? */
+                    while (*ap && (op < oend))          /* copy the argument */
+                        *op++ = *ap++;
+                    }
+                }
+            else {                                      /* it was %* */
+                memset (rbuf, '\0', sizeof(rbuf));      /* %1 ... %9 = sub */
+                ap = rbuf;
+                for (i=1; i<=9; ++i) {
+                    if (do_arg[i] == NULL)
+                        break;
+                    else
+                        if ((sizeof(rbuf)-strlen(rbuf)) < (2 + strlen(do_arg[i]))) {
+                            if (strchr(do_arg[i], ' ')) { /* need to surround this argument with quotes */
+                                char quote = '"';
+                                if (strchr(do_arg[i], quote))
+                                    quote = '\'';
+                                sprintf(&rbuf[strlen(rbuf)], "%s%c%s%c\"", (i != 1) ? " " : "", quote, do_arg[i], quote);
+                                }
+                            else
+                                sprintf(&rbuf[strlen(rbuf)], "%s%s", (i != 1) ? " " : "", do_arg[i]);
+                            }
+                        else
+                            break;
+                    }
+                }
+            ip = ip + 2;
+            }
+        *op++ = *ip++;                                  /* literal character */
+        }
+    }
+*op = 0;                                                /* term buffer */
+strcpy (instr, tmpbuf);
+}
+
 void sim_sub_args (char *instr, size_t instr_size, char *do_arg[])
 {
 char gbuf[CBUFSIZE];
 char *ip = instr, *op, *oend, *istart, *tmpbuf;
 const char *ap;
 char rbuf[CBUFSIZE];
-int i;
 size_t instr_off = 0;
 size_t outstr_off = 0;
 
 clock_gettime(CLOCK_REALTIME, &cmd_time);
 tmpbuf = (char *)malloc(instr_size);
+/* directly insert %n arguments BEFORE substituting environment 
+   and special variables */
+_sub_args (instr, tmpbuf, instr_size, do_arg);
 op = tmpbuf;
 oend = tmpbuf + instr_size - 2;
 if (instr_size > sim_sub_instr_size) {
@@ -3782,46 +3863,14 @@ for (; *ip && (op < oend); ) {
         ip++;                                           /* skip one */
         *op++ = *ip++;                                  /* copy insert % */
         }
-    else 
+    else {
         if ((*ip == '%') && 
-            (sim_isalnum(ip[1]) || (ip[1] == '*') || (ip[1] == '_'))) {/* sub? */
-            if ((ip[1] >= '0') && (ip[1] <= ('9'))) {   /* %n = sub */
-                ap = do_arg[ip[1] - '0'];
-                for (i=0; i<ip[1] - '0'; ++i)           /* make sure we're not past the list end */
-                    if (do_arg[i] == NULL) {
-                        ap = NULL;
-                        break;
-                        }
-                ip = ip + 2;
-                }
-            else if (ip[1] == '*') {                    /* %1 ... %9 = sub */
-                memset (rbuf, '\0', sizeof(rbuf));
-                ap = rbuf;
-                for (i=1; i<=9; ++i)
-                    if (do_arg[i] == NULL)
-                        break;
-                    else
-                        if ((sizeof(rbuf)-strlen(rbuf)) < (2 + strlen(do_arg[i]))) {
-                            if (strchr(do_arg[i], ' ')) { /* need to surround this argument with quotes */
-                                char quote = '"';
-                                if (strchr(do_arg[i], quote))
-                                    quote = '\'';
-                                sprintf(&rbuf[strlen(rbuf)], "%s%c%s%c\"", (i != 1) ? " " : "", quote, do_arg[i], quote);
-                                }
-                            else
-                                sprintf(&rbuf[strlen(rbuf)], "%s%s", (i != 1) ? " " : "", do_arg[i]);
-                            }
-                        else
-                            break;
-                ip = ip + 2;
-                }
-            else {                                      /* check environment variable or special variables */
-                get_glyph_nc (ip+1, gbuf, '%');         /* get the literal name */
-                ap = _sim_get_env_special (gbuf, rbuf, sizeof (rbuf));
-                ip += 1 + strlen (gbuf);
-                if (*ip == '%') 
-                    ++ip;
-                }
+            (sim_isalpha(ip[1]) || (ip[1] == '_'))) {   /* sub env or special? */
+            get_glyph_nc (ip+1, gbuf, '%');         /* get the literal name */
+            ap = _sim_get_env_special (gbuf, rbuf, sizeof (rbuf));
+            ip += 1 + strlen (gbuf);
+            if (*ip == '%') 
+                ++ip;
             if (ap) {                                   /* non-null arg? */
                 while (*ap && (op < oend)) {            /* copy the argument */
                     sim_sub_instr_off[outstr_off++] = ip - instr;
@@ -3829,7 +3878,7 @@ for (; *ip && (op < oend); ) {
                     }
                 }
             }
-        else
+        else {
             if (ip == istart) {                         /* at beginning of input? */
                 get_glyph (istart, gbuf, 0);            /* substitute initial token */
                 ap = getenv(gbuf);                      /* if it is an environment variable name */
@@ -3848,6 +3897,8 @@ for (; *ip && (op < oend); ) {
                 sim_sub_instr_off[outstr_off++] = ip - instr;
                 *op++ = *ip++;                          /* literal character */
                 }
+            }
+        }
     }
 *op = 0;                                                /* term buffer */
 sim_sub_instr_off[outstr_off] = 0;
@@ -6413,6 +6464,8 @@ static DEBTAB scp_debug[] = {
   {"QUEUE",     SIM_DBG_AIO_QUEUE,  "asynch event queue activities"},
   {"EXPSTACK",  SIM_DBG_EXP_STACK,  "expression stack activities"},
   {"EXPEVAL",   SIM_DBG_EXP_EVAL,   "expression evaluation activities"},
+  {"ACTION",    SIM_DBG_BRK_ACTION, "action activities"},
+  {"DO",        SIM_DBG_DO,         "do activities"},
   {0}
 };
 
@@ -11132,9 +11185,11 @@ if (ep != NULL) {                                       /* if a semicolon is pre
     }
 else {
     strlcpy (buf, sim_brk_act[sim_do_depth], size);     /* copy action */
+    sim_brk_act[sim_do_depth] = NULL;                   /* mark as digested */
     sim_brk_clract ();                                  /* no more */
     }
 sim_trim_endspc (buf);
+sim_debug (SIM_DBG_BRK_ACTION, sim_dflt_dev, "sim_brk_getact(%d) - Returning: '%s'\n", sim_do_depth, buf);
 return buf;
 }
 
@@ -11142,6 +11197,8 @@ return buf;
 
 char *sim_brk_clract (void)
 {
+if (sim_brk_act[sim_do_depth])
+    sim_debug (SIM_DBG_BRK_ACTION, sim_dflt_dev, "sim_brk_clract(%d) - Clearing: '%s'\n", sim_do_depth, sim_brk_act[sim_do_depth]);
 free (sim_brk_act_buf[sim_do_depth]);
 return sim_brk_act[sim_do_depth] = sim_brk_act_buf[sim_do_depth] = NULL;
 }
@@ -11151,8 +11208,25 @@ return sim_brk_act[sim_do_depth] = sim_brk_act_buf[sim_do_depth] = NULL;
 void sim_brk_setact (const char *action)
 {
 if (action) {
-    sim_brk_act_buf[sim_do_depth] = (char *)realloc (sim_brk_act_buf[sim_do_depth], strlen (action) + 1);
-    strcpy (sim_brk_act_buf[sim_do_depth], action);
+    if (sim_brk_act[sim_do_depth] && (*sim_brk_act[sim_do_depth])) {
+        /* push new actions ahead of whatever is already pending */
+        size_t old_size = strlen (sim_brk_act[sim_do_depth]);
+        size_t new_size = strlen (action) + old_size + 3;
+        char *old_action = (char *)malloc (1 + old_size);
+
+        strlcpy (old_action, sim_brk_act[sim_do_depth], 1 + old_size);
+        sim_brk_act_buf[sim_do_depth] = (char *)realloc (sim_brk_act_buf[sim_do_depth], new_size);
+        strlcpy (sim_brk_act_buf[sim_do_depth], action, new_size);
+        strlcat (sim_brk_act_buf[sim_do_depth], "; ", new_size);
+        strlcat (sim_brk_act_buf[sim_do_depth], old_action, new_size);
+        sim_debug (SIM_DBG_BRK_ACTION, sim_dflt_dev, "sim_brk_setact(%d) - Pushed: '%s' ahead of: '%s'\n", sim_do_depth, action, old_action);
+        free (old_action);
+        }
+    else {
+        sim_brk_act_buf[sim_do_depth] = (char *)realloc (sim_brk_act_buf[sim_do_depth], strlen (action) + 1);
+        strcpy (sim_brk_act_buf[sim_do_depth], action);
+        sim_debug (SIM_DBG_BRK_ACTION, sim_dflt_dev, "sim_brk_setact(%d) - Set to: '%s'\n", sim_do_depth, action);
+        }
     sim_brk_act[sim_do_depth] = sim_brk_act_buf[sim_do_depth];
     }
 else
