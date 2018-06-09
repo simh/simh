@@ -13673,7 +13673,6 @@ return ((sim_switches & SWMASK('I')) ? strcasecmp (s2, s1) : strcmp (s2, s1));
 
 static t_svalue _op_str_eq (const char *str1, const char *str2)
 {
-
 return (0 == _i_strcmp (str2, str1));
 }
 
@@ -13684,22 +13683,22 @@ return (0 != _i_strcmp (str2, str1));
 
 static t_svalue _op_str_le (const char *str1, const char *str2)
 {
-return (0 > _i_strcmp (str2, str1));
+return (0 <= _i_strcmp (str2, str1));
 }
 
 static t_svalue _op_str_lt (const char *str1, const char *str2)
 {
-return (0 >= _i_strcmp (str2, str1));
+return (0 < _i_strcmp (str2, str1));
 }
 
 static t_svalue _op_str_ge (const char *str1, const char *str2)
 {
-return (0 < _i_strcmp (str2, str1));
+return (0 >= _i_strcmp (str2, str1));
 }
 
 static t_svalue _op_str_gt (const char *str1, const char *str2)
 {
-return (0 <= _i_strcmp (str2, str1));
+return (0 > _i_strcmp (str2, str1));
 }
 
 /* 
@@ -13924,6 +13923,7 @@ return cptr;                    /* return any unprocessed input */
 static t_bool _value_of (const char *data, t_svalue *svalue, char *string, size_t string_size)
 {
 CONST char *gptr;
+size_t data_size = strlen (data);
 
 if (isalpha (*data) || (*data == '_')) {
     REG *rptr = NULL;
@@ -13961,12 +13961,23 @@ if (isalpha (*data) || (*data == '_')) {
         strlcpy (&string[strlen (string)], "\"", string_size - strlen (string));
         return numeric;
         }
-    else
+    else {
         data = "";
+        data_size = 0;
+        }
     }
-*svalue = strtotsv(data, &gptr, 0);
-snprintf (string, string_size - 1, "\"%s\"", data);
-return (*gptr == '\0');
+string[0] = '\0';
+if ((data[0] == '\'') && (data_size > 1) && (data[data_size - 1] == '\''))
+    snprintf (string, string_size - 1, "\"%*.*s\"", (int)(data_size - 2), (int)(data_size - 2), data + 1);
+if ((data[0] == '"') && (data_size > 1) && (data[data_size - 1] == '"'))
+    strlcpy (string, data, string_size);
+if (string[0] == '\0') {
+    *svalue = strtotsv(data, &gptr, 0);
+    snprintf (string, string_size - 1, "\"%s\"", data);
+    return (*gptr == '\0');
+    }
+*svalue = strtotsv(string + 1, &gptr, 0);
+return ((*gptr == '\"') && ((gptr - string) == (strlen (string) - 2)));
 }
 
 /*
