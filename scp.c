@@ -3793,8 +3793,7 @@ for (ip = instr, op = tmpbuf; *ip && (op < oend); ) {
         }
     else {
         if ((*ip == '%') &&                             /* %n = sub */
-            ((sim_isdigit(ip[1]) && !sim_isdigit(ip[2])) ||
-             (ip[1] == '*'))) {
+            (sim_isdigit(ip[1]) || (ip[1] == '*'))) {
             if ((ip[1] >= '0') && (ip[1] <= '9')) {
                 ap = do_arg[ip[1] - '0'];
                 for (i=0; i<ip[1] - '0'; ++i)           /* make sure we're not past the list end */
