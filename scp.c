@@ -602,8 +602,34 @@ static DEBTAB sim_dflt_debug[] = {
   {0}
 };
 
-static UNIT sim_step_unit = { UDATA (&step_svc, 0, 0)  };
-static UNIT sim_expect_unit = { UDATA (&expect_svc, 0, 0)  };
+static const char *sim_int_step_description (DEVICE *dptr)
+{
+return "Step/Next facility";
+}
+
+static UNIT sim_step_unit = { UDATA (&step_svc, 0, 0) };
+DEVICE sim_step_dev = {
+    "INT-STEP", &sim_step_unit, NULL, NULL, 
+    1, 0, 0, 0, 0, 0, 
+    NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, DEV_NOSAVE, 0, 
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    sim_int_step_description};
+
+static const char *sim_int_expect_description (DEVICE *dptr)
+{
+return "Expect facility";
+}
+
+static UNIT sim_expect_unit = { UDATA (&expect_svc, 0, 0) };
+DEVICE sim_expect_dev = {
+    "INT-EXPECT", &sim_expect_unit, NULL, NULL, 
+    1, 0, 0, 0, 0, 0, 
+    NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, DEV_NOSAVE, 0, 
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    sim_int_expect_description};
+
 #if defined USE_INT64
 static const char *sim_si64 = "64b data";
 #else
@@ -2388,6 +2414,8 @@ sim_log = NULL;
 if (sim_emax <= 0)
     sim_emax = 1;
 sim_timer_init ();
+sim_register_internal_device (&sim_expect_dev);
+sim_register_internal_device (&sim_step_dev);
 
 if ((stat = sim_ttinit ()) != SCPE_OK) {
     fprintf (stderr, "Fatal terminal initialization error\n%s\n",
@@ -9403,11 +9431,11 @@ t_stat sim_register_internal_device (DEVICE *dptr)
 {
 uint32 i;
 
-for (i = 0; (sim_devices[i] != NULL); i++)
-    if (sim_devices[i] == dptr)
-        return SCPE_OK;
 for (i = 0; i < sim_internal_device_count; i++)
     if (sim_internal_devices[i] == dptr)
+        return SCPE_OK;
+for (i = 0; (sim_devices[i] != NULL); i++)
+    if (sim_devices[i] == dptr)
         return SCPE_OK;
 ++sim_internal_device_count;
 sim_internal_devices = (DEVICE **)realloc(sim_internal_devices, (sim_internal_device_count+1)*sizeof(*sim_internal_devices));
@@ -10419,11 +10447,15 @@ do {
         sim_interval = sim_clock_queue->time;
     else
         sim_interval = noqueue_time = NOQUEUE_WAIT;
-    sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Processing Event for %s\n", sim_uname (uptr));
     AIO_EVENT_BEGIN(uptr);
-    if (uptr->usecs_remaining)
+    if (uptr->usecs_remaining) {
+        sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Requeueing %s after %.0f usecs\n", sim_uname (uptr), uptr->usecs_remaining);
         reason = sim_timer_activate_after (uptr, uptr->usecs_remaining);
+        }
     else {
+        sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Processing Event for %s\n", sim_uname (uptr));
+        if (uptr->uname && ((*uptr->uname == '\0') || (*uptr->uname == ' ')))
+            reason = SCPE_OK;   /* do nothing breakpoint location */
         if (uptr->action != NULL)
             reason = uptr->action (uptr);
         else
@@ -10607,10 +10639,10 @@ AIO_CANCEL(uptr);
 AIO_UPDATE_QUEUE;
 if (sim_clock_queue == QUEUE_LIST_END)
     return SCPE_OK;
-sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Canceling Event for %s\n", sim_uname(uptr));
 UPDATE_SIM_TIME;                                        /* update sim time */
 if (!sim_is_active (uptr))
     return SCPE_OK;
+sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Canceling Event for %s\n", sim_uname(uptr));
 nptr = QUEUE_LIST_END;
 
 if (sim_clock_queue == uptr) {
