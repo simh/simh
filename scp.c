@@ -11819,6 +11819,9 @@ if (i != exp->size) {                                   /* Found? */
                                          ep->cnt, (ep->cnt == 1) ? "" : "es");
         }
     else {
+        uint32 after = ep->after;
+        int32 switches = ep->switches;
+
         if (ep->act && *ep->act) {
             sim_debug (exp->dbit, exp->dptr, "Initiating actions: %s\n", ep->act);
             }
@@ -11833,9 +11836,9 @@ if (i != exp->size) {                                   /* Found? */
                 sim_exp_clr_tab (exp, ep);              /* delete it */
             }
         sim_activate (&sim_expect_unit,                 /* schedule simulation stop when indicated */
-                      (ep->switches & EXP_TYP_TIME) ?  
-                            (int32)((sim_timer_inst_per_sec ()*ep->after)/1000000.0) : 
-                            ep->after);
+                      (switches & EXP_TYP_TIME) ?
+                            (int32)((sim_timer_inst_per_sec ()*after)/1000000.0) : 
+                            after);
         }
     /* Matched data is no longer available for future matching */
     exp->buf_data = exp->buf_ins = 0;
