@@ -2399,19 +2399,20 @@ for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
             _sim_activate (sim_clock_unit[tmr], clock_time);
             }
         /* Move coscheduled units to the standard event queue */
-        accum = 0;
+        /* scheduled to fire at the same time as the related */
+        /* clock unit is to fire with excess time reflected in */
+        /* the unit usecs_remaining value */
+        accum = sim_cosched_interval[tmr];
         while (sim_clock_cosched_queue[tmr] != QUEUE_LIST_END) {
             UNIT *cptr = sim_clock_cosched_queue[tmr];
-            double usecs_remaining = cptr->usecs_remaining;
 
-            cptr->usecs_remaining = 0;
             sim_clock_cosched_queue[tmr] = cptr->next;
             cptr->next = NULL;
             cptr->cancel = NULL;
             accum += cptr->time;
-            sim_debug (DBG_QUE, &sim_timer_dev, "sim_stop_timer_services() - tmr=%d scheduling %s after %d\n", tmr, sim_uname (cptr), clock_time + accum*rtc_currd[tmr]);
-            _sim_activate (cptr, clock_time + accum*rtc_currd[tmr]);
-            cptr->usecs_remaining = usecs_remaining;
+            _sim_activate (cptr, clock_time);
+            cptr->usecs_remaining = cptr->usecs_remaining + floor(1000000.0 * (accum - ((accum > 0) ? 1 : 0)) * rtc_clock_tick_size[tmr]);
+            sim_debug (DBG_QUE, &sim_timer_dev, "sim_stop_timer_services() - tmr=%d scheduling %s after %d and %.0f usecs\n", tmr, sim_uname (cptr), clock_time, cptr->usecs_remaining);
             }
         sim_cosched_interval[tmr] = 0;
         }
@@ -2529,7 +2530,8 @@ if ((sim_calb_tmr != -1) && (rtc_hz[sim_calb_tmr])) {       /* Calibrated Timer 
     int32 inst_til_calib = inst_til_tick + ((ticks_til_calib - 1) * rtc_currd[sim_calb_tmr]);
     uint32 usecs_til_calib = (uint32)ceil(inst_til_calib / inst_per_usec);
 
-    if (uptr != &sim_timer_units[sim_calb_tmr]) {           /* Not scheduling calibrated timer? */
+    if ((uptr != &sim_timer_units[sim_calb_tmr]) &&         /* Not scheduling calibrated timer */
+        (inst_til_tick > 0)) {                              /* and tick not pending? */
         if (inst_delay_d > (double)inst_til_calib) {        /* long wait? */
             stat = sim_clock_coschedule_tmr (uptr, sim_calb_tmr, ticks_til_calib - 1);
             uptr->usecs_remaining = (stat == SCPE_OK) ? usec_delay - usecs_til_calib : 0.0;
@@ -2541,7 +2543,7 @@ if ((sim_calb_tmr != -1) && (rtc_hz[sim_calb_tmr])) {       /* Calibrated Timer 
             }
         if ((usec_delay > usecs_per_tick) &&
             (ticks_til_calib > 1)) {                  /* long wait? */
-            double usecs_til_tick = inst_til_tick / inst_per_usec;
+            double usecs_til_tick = floor (inst_til_tick / inst_per_usec);
 
             stat = sim_clock_coschedule_tmr (uptr, sim_calb_tmr, 0);
             uptr->usecs_remaining = (stat == SCPE_OK) ? usec_delay - usecs_til_tick : 0.0;
@@ -2618,9 +2620,6 @@ if ((sim_asynch_timer) &&
     }
 #endif
 stat = _sim_activate (uptr, inst_delay);                /* queue it now */
-uptr->usecs_remaining = ((stat == SCPE_OK) && (0.0 < (usec_delay - ceil(inst_delay / inst_per_usec) ))) ? 
-                            usec_delay - floor(inst_delay / inst_per_usec) :
-                            0.0;
 sim_debug (DBG_TIM, &sim_timer_dev, "sim_timer_activate_after(%s, %.0f usecs) - queue addition at %d - remnant: %.0f\n", 
            sim_uname(uptr), usec_delay, inst_delay, uptr->usecs_remaining);
 sim_debug (DBG_CHK, &sim_timer_dev, "sim_timer_activate_after(%s, %.0f usecs) - result = %.0f usecs, %.0f usecs\n", 
