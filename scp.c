@@ -3829,7 +3829,8 @@ for (ip = instr, op = tmpbuf; *ip && (op < oend); ) {
                 }
             ip = ip + 2;
             }
-        *op++ = *ip++;                                  /* literal character */
+        else
+            *op++ = *ip++;                              /* literal character */
         }
     }
 *op = 0;                                                /* term buffer */
