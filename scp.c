@@ -581,7 +581,7 @@ static int32 sim_show_message = 1;                      /* the message display s
 static int32 sim_on_inherit = 0;                        /* the inherit status of on state and conditions when executing do files */
 static int32 sim_do_depth = 0;
 static t_bool sim_cmd_echoed = FALSE;                   /* Command was emitted already prior to message output */
-
+static char **sim_exp_argv = NULL;
 static int32 sim_on_check[MAX_DO_NEST_LVL+1];
 static char *sim_on_actions[MAX_DO_NEST_LVL+1][SCPE_MAX_ERR+2];
 #define ON_SIGINT_ACTION (SCPE_MAX_ERR+1)
@@ -3778,79 +3778,19 @@ return ap;
    Omitted parameters result in null-string substitutions.
 */
 
-static void
-_sub_args (char *instr, char *tmpbuf, size_t str_size, char *do_arg[])
-{
-char *ip, *op, *ap, *oend = tmpbuf + str_size - 2;
-int i;
-char rbuf[CBUFSIZE];
-
-for (ip = instr, op = tmpbuf; *ip && (op < oend); ) {
-    if ((ip [0] == '\\') &&                             /* literal escape? */
-        ((ip [1] == '%') || (ip [1] == '\\'))) {        /*   and followed by '%' or '\'? */
-        *op++ = *ip++;                                  /* copy \ */
-        *op++ = *ip++;                                  /* copy escaped char */
-        }
-    else {
-        if ((*ip == '%') &&                             /* %n = sub */
-            (sim_isdigit(ip[1]) || (ip[1] == '*'))) {
-            if ((ip[1] >= '0') && (ip[1] <= '9')) {
-                ap = do_arg[ip[1] - '0'];
-                for (i=0; i<ip[1] - '0'; ++i)           /* make sure we're not past the list end */
-                    if (do_arg[i] == NULL) {
-                        ap = NULL;
-                        break;
-                        }
-                if (ap) {                               /* non-null arg? */
-                    while (*ap && (op < oend))          /* copy the argument */
-                        *op++ = *ap++;
-                    }
-                }
-            else {                                      /* it was %* */
-                memset (rbuf, '\0', sizeof(rbuf));      /* %1 ... %9 = sub */
-                ap = rbuf;
-                for (i=1; i<=9; ++i) {
-                    if (do_arg[i] == NULL)
-                        break;
-                    else
-                        if ((sizeof(rbuf)-strlen(rbuf)) < (2 + strlen(do_arg[i]))) {
-                            if (strchr(do_arg[i], ' ')) { /* need to surround this argument with quotes */
-                                char quote = '"';
-                                if (strchr(do_arg[i], quote))
-                                    quote = '\'';
-                                sprintf(&rbuf[strlen(rbuf)], "%s%c%s%c\"", (i != 1) ? " " : "", quote, do_arg[i], quote);
-                                }
-                            else
-                                sprintf(&rbuf[strlen(rbuf)], "%s%s", (i != 1) ? " " : "", do_arg[i]);
-                            }
-                        else
-                            break;
-                    }
-                }
-            ip = ip + 2;
-            }
-        else
-            *op++ = *ip++;                              /* literal character */
-        }
-    }
-*op = 0;                                                /* term buffer */
-strcpy (instr, tmpbuf);
-}
-
 void sim_sub_args (char *instr, size_t instr_size, char *do_arg[])
 {
 char gbuf[CBUFSIZE];
 char *ip = instr, *op, *oend, *istart, *tmpbuf;
 const char *ap;
 char rbuf[CBUFSIZE];
+int i;
 size_t instr_off = 0;
 size_t outstr_off = 0;
 
+sim_exp_argv = do_arg;
 clock_gettime(CLOCK_REALTIME, &cmd_time);
 tmpbuf = (char *)malloc(instr_size);
-/* directly insert %n arguments BEFORE substituting environment 
-   and special variables */
-_sub_args (instr, tmpbuf, instr_size, do_arg);
 op = tmpbuf;
 oend = tmpbuf + instr_size - 2;
 if (instr_size > sim_sub_instr_size) {
@@ -3891,14 +3831,46 @@ for (; *ip && (op < oend); ) {
         ip++;                                           /* skip one */
         *op++ = *ip++;                                  /* copy insert % */
         }
-    else {
+    else 
         if ((*ip == '%') && 
-            (sim_isalpha(ip[1]) || (ip[1] == '_'))) {   /* sub env or special? */
-            get_glyph_nc (ip+1, gbuf, '%');         /* get the literal name */
-            ap = _sim_get_env_special (gbuf, rbuf, sizeof (rbuf));
-            ip += 1 + strlen (gbuf);
-            if (*ip == '%') 
-                ++ip;
+            (sim_isalnum(ip[1]) || (ip[1] == '*') || (ip[1] == '_'))) {/* sub? */
+            if ((ip[1] >= '0') && (ip[1] <= ('9'))) {   /* %n = sub */
+                ap = do_arg[ip[1] - '0'];
+                for (i=0; i<ip[1] - '0'; ++i)           /* make sure we're not past the list end */
+                    if (do_arg[i] == NULL) {
+                        ap = NULL;
+                        break;
+                        }
+                ip = ip + 2;
+                }
+            else if (ip[1] == '*') {                    /* %1 ... %9 = sub */
+                memset (rbuf, '\0', sizeof(rbuf));
+                ap = rbuf;
+                for (i=1; i<=9; ++i)
+                    if (do_arg[i] == NULL)
+                        break;
+                    else
+                        if ((sizeof(rbuf)-strlen(rbuf)) < (2 + strlen(do_arg[i]))) {
+                            if (strchr(do_arg[i], ' ')) { /* need to surround this argument with quotes */
+                                char quote = '"';
+                                if (strchr(do_arg[i], quote))
+                                    quote = '\'';
+                                sprintf(&rbuf[strlen(rbuf)], "%s%c%s%c\"", (i != 1) ? " " : "", quote, do_arg[i], quote);
+                                }
+                            else
+                                sprintf(&rbuf[strlen(rbuf)], "%s%s", (i != 1) ? " " : "", do_arg[i]);
+                            }
+                        else
+                            break;
+                ip = ip + 2;
+                }
+            else {                                      /* check environment variable or special variables */
+                get_glyph_nc (ip+1, gbuf, '%');         /* get the literal name */
+                ap = _sim_get_env_special (gbuf, rbuf, sizeof (rbuf));
+                ip += 1 + strlen (gbuf);
+                if (*ip == '%') 
+                    ++ip;
+                }
             if (ap) {                                   /* non-null arg? */
                 while (*ap && (op < oend)) {            /* copy the argument */
                     sim_sub_instr_off[outstr_off++] = ip - instr;
@@ -3906,7 +3878,7 @@ for (; *ip && (op < oend); ) {
                     }
                 }
             }
-        else {
+        else
             if (ip == istart) {                         /* at beginning of input? */
                 get_glyph (istart, gbuf, 0);            /* substitute initial token */
                 ap = getenv(gbuf);                      /* if it is an environment variable name */
@@ -3925,8 +3897,6 @@ for (; *ip && (op < oend); ) {
                 sim_sub_instr_off[outstr_off++] = ip - instr;
                 *op++ = *ip++;                          /* literal character */
                 }
-            }
-        }
     }
 *op = 0;                                                /* term buffer */
 sim_sub_instr_off[outstr_off] = 0;
@@ -14011,6 +13981,7 @@ if (string[0] == '\0') {
     snprintf (string, string_size - 1, "\"%s\"", data);
     return (*gptr == '\0');
     }
+sim_sub_args (string, string_size, sim_exp_argv);
 *svalue = strtotsv(string + 1, &gptr, 0);
 return ((*gptr == '\"') && ((gptr - string) == (strlen (string) - 2)));
 }
@@ -14096,6 +14067,7 @@ const char *sim_eval_expression (const char *cptr, t_svalue *value, t_bool paren
 const char *iptr = cptr;
 Stack *postfix = new_Stack (); /* for the postfix expression */
 
+sim_debug (SIM_DBG_EXP_EVAL, sim_dflt_dev, "[Evaluate Expression: %s\n", cptr);
 *value = 0;
 cptr = sim_into_postfix (postfix, cptr, stat, parens_required);
 if (*stat != SCPE_OK) {
