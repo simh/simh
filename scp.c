@@ -3409,11 +3409,13 @@ do {
         sim_do_ocptr[sim_do_depth] = cptr = read_line (cbuf, sizeof(cbuf), fpin);/* get cmd line */
         sim_goto_line[sim_do_depth] += 1;
         }
-    sim_sub_args (cbuf, sizeof(cbuf), do_arg);          /* substitute args */
     if (cptr == NULL) {                                 /* EOF? */
         stat = SCPE_OK;                                 /* set good return */
         break;
         }
+    sim_debug (SIM_DBG_DO, sim_dflt_dev, "Input Command:    %s\n", cbuf);
+    sim_sub_args (cbuf, sizeof(cbuf), do_arg);          /* substitute args */
+    sim_debug (SIM_DBG_DO, sim_dflt_dev, "Expanded Command: %s\n", cbuf);
     if (*cptr == 0)                                     /* ignore blank */
         continue;
     if (echo)                                           /* echo if -v */
@@ -3442,6 +3444,7 @@ do {
         }
     else
         stat = SCPE_UNK;                                /* bad cmd given */
+    sim_debug (SIM_DBG_DO, sim_dflt_dev, "Command '%s', Result: 0x%X - %s\n", cmdp->name, stat, sim_error_text (stat));
     echo = sim_do_echo;                                 /* Allow for SET VERIFY */
     stat_nomessage = stat & SCPE_NOMESSAGE;             /* extract possible message supression flag */
     stat_nomessage = stat_nomessage || (!sim_show_message);/* Apply global suppression */
@@ -13951,20 +13954,13 @@ if (isalpha (*data) || (*data == '_')) {
         rptr = find_reg_glob (data, &gptr, &dptr);
     if (rptr) {
         *svalue = (t_svalue)get_rval (rptr, 0);
-        sprint_val (string + 1, *svalue, 10, string_size - 2, PV_LEFTSIGN);
-        *string = '"';
-        strlcpy (&string[strlen (string)], "\"", string_size - strlen (string));
+        sprint_val (string, *svalue, 10, string_size - 1, PV_LEFTSIGN);
         return TRUE;
         }
-    gptr = _sim_get_env_special (data, string + 1, string_size - 2);
+    gptr = _sim_get_env_special (data, string, string_size - 1);
     if (gptr) {
-        t_bool numeric;
-
-        *string = '"';
-        *svalue = strtotsv(string + 1, &gptr, 0);
-        numeric = (*gptr == '\0') || ((*gptr == '"') && (gptr[1] == '\0'));
-        strlcpy (&string[strlen (string)], "\"", string_size - strlen (string));
-        return numeric;
+        *svalue = strtotsv(string, &gptr, 0);
+        return ((*gptr == '\0') && (*string));
         }
     else {
         data = "";
@@ -13978,12 +13974,11 @@ if ((data[0] == '"') && (data_size > 1) && (data[data_size - 1] == '"'))
     strlcpy (string, data, string_size);
 if (string[0] == '\0') {
     *svalue = strtotsv(data, &gptr, 0);
-    snprintf (string, string_size - 1, "\"%s\"", data);
-    return (*gptr == '\0');
+    return ((*gptr == '\0') && (*data));
     }
 sim_sub_args (string, string_size, sim_exp_argv);
-*svalue = strtotsv(string + 1, &gptr, 0);
-return ((*gptr == '\"') && ((gptr - string) == (strlen (string) - 2)));
+*svalue = strtotsv(string, &gptr, 0);
+return ((*gptr == '\0') && (*string));
 }
 
 /*
