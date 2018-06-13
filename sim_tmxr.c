@@ -2267,10 +2267,8 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
 #endif
         if ((lp->xmte == 0) && 
             ((lp->txbps == 0) ||
-             (lp->txnexttime <= sim_gtime ()))) {
+             (lp->txnexttime <= sim_gtime ())))
             lp->xmte = 1;                               /* enable line transmit */
-            lp->txnexttime = 0.0;
-            }
         }
     }                                                   /* end for */
 }
@@ -4107,16 +4105,21 @@ for (i=0; i<mp->lines; i++) {
         if (lp->rxnexttime > sim_gtime_now)
             due = (int32)(lp->rxnexttime - sim_gtime_now);
         else
-            due = sim_processing_event ? 1 : 0;     /* avoid potential infinite loop if called from service routine */
+            due = sim_processing_event ? 1 : 0; /* avoid potential infinite loop if called from service routine */
         sooner = MIN(sooner, due);
         }
     if ((uptr == lp->o_uptr) &&         /* output completion unit? */
-        (lp->txbps)          &&         /* while rate limiting */
-        (lp->txnexttime)) {             /* with queued output data */
+        (lp->txbps)) {                  /* while rate limiting */
         if (lp->txnexttime > sim_gtime_now)
             due = (int32)(lp->txnexttime - sim_gtime_now);
-        else
+        else {
+            if (tmxr_tqln(lp)) {        /* pending output data? */
+                tmxr_send_buffered_data (lp);/* flush it */
+                --i;                    /* backup line number */
+                continue;               /* go try again */
+                }
             due = sim_processing_event ? 1 : 0;     /* avoid potential infinite loop if called from service routine */
+            }
         if (i == 0)
             sooner = due;
         else
