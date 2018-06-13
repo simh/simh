@@ -2155,8 +2155,8 @@ t_stat sim_show_cons_speed (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONS
 {
 if (sim_con_ldsc.rxbps) {
     fprintf (st, "Speed = %d", sim_con_ldsc.rxbps);
-    if (sim_con_ldsc.bpsfactor != TMXR_BPS_UNIT_SCALE)
-        fprintf (st, "*%.0f", sim_con_ldsc.bpsfactor / TMXR_BPS_UNIT_SCALE);
+    if (sim_con_ldsc.bpsfactor != 1.0)
+        fprintf (st, "*%.0f", sim_con_ldsc.bpsfactor);
     fprintf (st, " bps\n");
     }
 return SCPE_OK;
@@ -2799,7 +2799,7 @@ if (!sim_rem_master_mode) {
         (sim_con_ldsc.serport == 0)) {                      /* and not serial? */
         if (c && sim_con_ldsc.rxbps)                        /* got something && rate limiting? */
             sim_con_ldsc.rxnexttime =                       /* compute next input time */
-                floor (sim_gtime () + ((sim_con_ldsc.rxdelta * sim_timer_inst_per_sec ()) / sim_con_ldsc.bpsfactor));
+                floor (sim_gtime () + ((sim_con_ldsc.rxdeltausecs * sim_timer_inst_per_sec ()) / USECS_PER_SECOND));
         if (c)
             sim_debug (DBG_RCV, &sim_con_telnet, "sim_poll_kbd() returning: '%c' (0x%02X)\n", sim_isprint (c & 0xFF) ? c & 0xFF : '.', c);
         return c;                                           /* in-window */

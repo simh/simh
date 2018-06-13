@@ -762,7 +762,7 @@ t_stat ports_xmt_svc(UNIT *uptr)
                 (ports_state[ln].oflag & ONLCR) &&
                 !(ports_state[ln].crlf)) {
                 if (tmxr_putc_ln(&ports_ldsc[ln], 0xd) == SCPE_OK) {
-                    wait = MIN(wait, ports_ldsc[ln].txdelta);
+                    wait = MIN(wait, ports_ldsc[ln].txdeltausecs);
                     sim_debug(IO_DBG, &ports_dev,
                               "[%08x] [ports_xmt_svc] [LINE %d] XMIT (crlf):  %02x (%c)\n",
                               R[NUM_PC], ln, 0xd, 0xd);
@@ -776,7 +776,7 @@ t_stat ports_xmt_svc(UNIT *uptr)
             ports_state[ln].crlf = FALSE;
 
             if (tmxr_putc_ln(&ports_ldsc[ln], c) == SCPE_OK) {
-                wait = MIN(wait, ports_ldsc[ln].txdelta);
+                wait = MIN(wait, ports_ldsc[ln].txdeltausecs);
                 ports_state[ln].tx_chars--;
                 ports_state[ln].tx_addr++;
                 sim_debug(IO_DBG, &ports_dev,

@@ -735,7 +735,7 @@ else {
         }
     }
 if ((written > 0) && (lp->txbps) && (sim_is_running))
-    lp->txnexttime = floor (sim_gtime () + ((written * lp->txdelta * sim_timer_inst_per_sec ()) / lp->bpsfactor));
+    lp->txnexttime = floor (sim_gtime () + ((written * lp->txdeltausecs * sim_timer_inst_per_sec ()) / USECS_PER_SECOND));
 return written;
 }
 
@@ -1784,9 +1784,9 @@ if (lp->rxbpi == lp->rxbpr)                             /* empty? zero ptrs */
     lp->rxbpi = lp->rxbpr = 0;
 if (val) {                                              /* Got something? */
     if (lp->rxbps)
-        lp->rxnexttime = floor (sim_gtime () + ((lp->rxdelta * sim_timer_inst_per_sec ()) / lp->bpsfactor));
+        lp->rxnexttime = floor (sim_gtime () + ((lp->rxdeltausecs * sim_timer_inst_per_sec ()) / USECS_PER_SECOND));
     else
-        lp->rxnexttime = floor (sim_gtime () + ((lp->mp->uptr->wait * sim_timer_inst_per_sec ()) / TMXR_BPS_UNIT_SCALE));
+        lp->rxnexttime = floor (sim_gtime () + ((lp->mp->uptr->wait * sim_timer_inst_per_sec ()) / USECS_PER_SECOND));
     }
 tmxr_debug_return(lp, val);
 return val;
@@ -2173,8 +2173,8 @@ if ((lp->txbfd && !lp->notelnet) || (TXBUF_AVAIL(lp) > 1)) {/* room for char (+ 
     sim_exp_check (&lp->expect, chr);                   /* process expect rules as needed */
     if (!sim_is_running) {                              /* attach message or other non simulation time message? */
         tmxr_send_buffered_data (lp);                   /* put data on wire */
-        sim_os_ms_sleep(((lp->txbps) && (lp->txdelta > 1000)) ? /* rate limiting output slower than 1000 cps */
-                        (lp->txdelta - 1000) / 1000 : 
+        sim_os_ms_sleep(((lp->txbps) && (lp->txdeltausecs > 1000)) ? /* rate limiting output slower than 1000 cps */
+                        (lp->txdeltausecs - 1000) / 1000 : 
                         10);                           /* wait an approximate character delay */
         }
     return SCPE_OK;                                     /* char sent */
@@ -2477,24 +2477,24 @@ if (*cptr == '*') {
 
     if (r != SCPE_OK)
         return r;
-    lp->bpsfactor = TMXR_BPS_UNIT_SCALE * bpsfactor;
+    lp->bpsfactor = bpsfactor;
     }
 if ((lp->serport) && (lp->bpsfactor != 0.0))
-    lp->bpsfactor = TMXR_BPS_UNIT_SCALE;
-lp->rxdelta = _tmln_speed_delta (speed);
+    lp->bpsfactor = 1.0;
+lp->rxdeltausecs = (uint32)(_tmln_speed_delta (speed) / lp->bpsfactor);
 lp->rxnexttime = 0.0;
 uptr = lp->uptr;
 if ((!uptr) && (lp->mp))
     uptr = lp->mp->uptr;
 if (uptr)
-    uptr->wait = lp->rxdelta;
+    uptr->wait = lp->rxdeltausecs;
 if (lp->bpsfactor == 0.0)
-    lp->bpsfactor = TMXR_BPS_UNIT_SCALE;
+    lp->bpsfactor = 1.0;
 lp->txbps = lp->rxbps;
-lp->txdelta = lp->rxdelta;
+lp->txdeltausecs = lp->rxdeltausecs;
 lp->txnexttime = lp->rxnexttime;
 if (lp->o_uptr)
-    lp->o_uptr->wait = lp->txdelta;
+    lp->o_uptr->wait = lp->txdeltausecs;
 return SCPE_OK;
 }
 
@@ -2532,7 +2532,7 @@ for (i = 0; i < mp->lines; i++) {               /* initialize lines */
     lp->mp = mp;                                /* set the back pointer */
     lp->modem_control = mp->modem_control;
     if (lp->bpsfactor == 0.0)
-        lp->bpsfactor = TMXR_BPS_UNIT_SCALE;
+        lp->bpsfactor = 1.0;
     }
 mp->ring_sock = INVALID_SOCKET;
 free (mp->ring_ipad);
@@ -3938,8 +3938,8 @@ else {
         if (mp->lines == 1) {
             if (mp->ldsc->rxbps) {
                 fprintf(st, ", Speed=%d", mp->ldsc->rxbps);
-                if (mp->ldsc->bpsfactor != TMXR_BPS_UNIT_SCALE)
-                    fprintf(st, "*%.0f", mp->ldsc->bpsfactor / TMXR_BPS_UNIT_SCALE);
+                if (mp->ldsc->bpsfactor != 1.0)
+                    fprintf(st, "*%.0f", mp->ldsc->bpsfactor);
                 fprintf(st, " bps");
                 }
             }
@@ -3967,13 +3967,13 @@ else {
                     fprintf(st, ", Loopback");
                 if (lp->rxbps) {
                     fprintf(st, ", Speed=%d", lp->rxbps);
-                    if (lp->bpsfactor != TMXR_BPS_UNIT_SCALE)
-                        fprintf(st, "*%.0f", lp->bpsfactor / TMXR_BPS_UNIT_SCALE);
+                    if (lp->bpsfactor != 1.0)
+                        fprintf(st, "*%.0f", lp->bpsfactor);
                     fprintf(st, " bps");
                     }
                 else {
-                    if (lp->bpsfactor != TMXR_BPS_UNIT_SCALE)
-                        fprintf(st, ", Speed=*%.0f bps", lp->bpsfactor / TMXR_BPS_UNIT_SCALE);
+                    if (lp->bpsfactor != 1.0)
+                        fprintf(st, ", Speed=*%.0f bps", lp->bpsfactor);
                     }
                 fprintf (st, "\n");
                 }
@@ -4679,8 +4679,8 @@ else {
             fprintf (st, "  speed = %u", lp->rxbps);
         else
             fprintf (st, "  speed = %u/%u", lp->rxbps, lp->txbps);
-        if (lp->bpsfactor / TMXR_BPS_UNIT_SCALE > 1.0)
-            fprintf (st, "*%.0f", lp->bpsfactor / TMXR_BPS_UNIT_SCALE);
+        if (lp->bpsfactor > 1.0)
+            fprintf (st, "*%.0f", lp->bpsfactor);
         fprintf (st, " bps\n");
         }
     }

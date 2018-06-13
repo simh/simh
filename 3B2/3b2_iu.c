@@ -728,7 +728,7 @@ void iu_write(uint32 pa, uint32 val, size_t size)
         break;
     case THRB: /* TX/RX Buf B */
         iu_tx(PORT_B, bval);
-        sim_activate_abs(contty_xmt_unit, contty_ldsc[0].txdelta);
+        sim_activate_abs(contty_xmt_unit, contty_ldsc[0].txdeltausecs);
         break;
     case OPCR:
         iu_state.opcr = bval;

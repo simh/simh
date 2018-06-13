@@ -536,7 +536,7 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             if (c >= 0) {                               /* store char */
                 tmxr_putc_ln (lp, c);
                 dz_update_xmti ();
-                sim_activate_after_abs (&dz_unit[1], lp->txdelta);/* */
+                sim_activate_after_abs (&dz_unit[1], lp->txdeltausecs);
                 }
             }
         break;
