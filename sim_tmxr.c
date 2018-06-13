@@ -474,7 +474,7 @@ if (!lp->txbfd || lp->notelnet)                         /* if not buffered telne
     lp->txbpr = lp->txbpi = lp->txcnt = lp->txpcnt = 0; /*   init transmit indexes */
 lp->txdrp = lp->txstall = 0;
 tmxr_set_get_modem_bits (lp, 0, 0, NULL);
-if ((!lp->mp->buffered) && (!lp->txbfd)) {
+if (lp->mp && (!lp->mp->buffered) && (!lp->txbfd)) {
     lp->txbfd = 0;
     lp->txbsz = TMXR_MAXBUF;
     lp->txb = (char *)realloc (lp->txb, lp->txbsz);
