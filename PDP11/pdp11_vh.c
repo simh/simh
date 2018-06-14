@@ -1121,13 +1121,15 @@ static t_stat vh_wr (   int32   ldata,
                     (lp->txchar & ~0377) | (data & 0377);
             lp->txchar = data;  /* TXCHAR */
             if (lp->txchar & TXCHAR_TX_DATA_VALID) {
-                if (lp->tbuf2 & TB2_TX_ENA)
-                    vh_putc (vh, lp,
-                        CSR_GETCHAN (vh_csr[vh]),
-                        lp->txchar);
-                q_tx_report (vh,
-                    CSR_GETCHAN (vh_csr[vh]) << CSR_V_TX_LINE);
-                lp->txchar &= ~TXCHAR_TX_DATA_VALID;
+                if (lp->tbuf2 & TB2_TX_ENA) {
+                    if (vh_putc (vh, lp, CSR_GETCHAN (vh_csr[vh]), 
+                                 lp->txchar) != SCPE_STALL) {
+                        q_tx_report (vh, CSR_GETCHAN (vh_csr[vh]) << CSR_V_TX_LINE);
+                        lp->txchar &= ~TXCHAR_TX_DATA_VALID;
+                    }
+                    else
+                        sim_activate_after_abs (vh_unit, lp->tmln->txdeltausecs);
+                }
             }
         }
         break;
@@ -1406,10 +1408,26 @@ static t_stat vh_svc (  UNIT    *uptr   )
                       ((lp->lstat >> 8) & 0376));
             /* BUG: should check for overflow above */
     }
-    /* scan all muxes, lines for DMA to complete; start every 3.12ms */
+    /* scan all muxes lines */
     for (vh = 0; vh < vh_desc.lines/VH_LINES; vh++) {
-        for (i = 0; i < VH_LINES; i++)
+        for (i = 0; i < VH_LINES; i++) {
+            int32   line = (vh * VH_LINES) + i;
+            TMLX    *lp = &vh_parm[line];
+
+            /* process any pending programmed output */
+            if (lp->txchar & TXCHAR_TX_DATA_VALID) {
+                if (lp->tbuf2 & TB2_TX_ENA) {
+                    if (vh_putc (vh, lp, CSR_GETCHAN (vh_csr[vh]),
+                                 lp->txchar) != SCPE_STALL) {
+                        q_tx_report (vh,
+                            CSR_GETCHAN (vh_csr[vh]) << CSR_V_TX_LINE);
+                        lp->txchar &= ~TXCHAR_TX_DATA_VALID;
+                    }
+                }
+            }
+            /* process pending DMA */
             doDMA (vh, i);
+        }
     }
     /* interrupt driven in a real DHQ */
     tmxr_poll_rx (&vh_desc);
