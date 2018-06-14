@@ -1557,10 +1557,7 @@ act_ms = sim_idle_ms_sleep (w_ms);                      /* wait */
 rtc_clock_time_idled[tmr] += act_ms;
 act_cyc = act_ms * sim_idle_cyc_ms;
 act_cyc += (sim_idle_cyc_ms * sim_idle_rate_ms) / 2;    /* account for half an interval's worth of cycles */
-if (sim_interval > act_cyc)
-    sim_interval = sim_interval - act_cyc;              /* count down sim_interval */
-else
-    sim_interval = 0;                                   /* or fire immediately */
+sim_interval = sim_interval - act_cyc;                  /* count down sim_interval to reflect idle period */
 if (sim_clock_queue == QUEUE_LIST_END)
     sim_debug (DBG_IDL, &sim_timer_dev, "slept for %d ms - pending event in %d instructions\n", act_ms, sim_interval);
 else

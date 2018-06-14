@@ -10417,7 +10417,7 @@ do {
     uptr->next = NULL;                                  /* hygiene */
     uptr->time = 0;
     if (sim_clock_queue != QUEUE_LIST_END)
-        sim_interval = sim_clock_queue->time;
+        sim_interval += sim_clock_queue->time;
     else
         sim_interval = noqueue_time = NOQUEUE_WAIT;
     AIO_EVENT_BEGIN(uptr);
