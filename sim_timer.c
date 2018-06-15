@@ -1478,6 +1478,7 @@ t_bool sim_idle (uint32 tmr, int sin_cyc)
 {
 uint32 w_ms, w_idle, act_ms;
 int32 act_cyc;
+static t_bool in_nowait = FALSE;
 
 if (rtc_clock_catchup_pending[tmr]) {                   /* Catchup clock tick pending? */
     sim_debug (DBG_CAL, &sim_timer_dev, "sim_idle(tmr=%d, sin_cyc=%d) - accelerating pending catch-up tick before idling %s\n", tmr, sin_cyc, sim_uname (sim_clock_unit[tmr]));
@@ -1546,9 +1547,12 @@ else
     w_idle = (w_ms * 1000) / sim_idle_rate_ms;          /* 1000 * intervals to wait */
 if (w_idle < 500) {                                     /* shorter than 1/2 the interval? */
     sim_interval -= sin_cyc;
-    sim_debug (DBG_IDL, &sim_timer_dev, "no wait\n");
+    if (!in_nowait)
+        sim_debug (DBG_IDL, &sim_timer_dev, "no wait, too short: %d usecs\n", w_idle);
+    in_nowait = TRUE;
     return FALSE;
     }
+in_nowait = FALSE;
 if (sim_clock_queue == QUEUE_LIST_END)
     sim_debug (DBG_IDL, &sim_timer_dev, "sleeping for %d ms - pending event in %d instructions\n", w_ms, sim_interval);
 else
