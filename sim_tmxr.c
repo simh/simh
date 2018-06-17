@@ -2488,11 +2488,8 @@ if ((!uptr) && (lp->mp))
     uptr = lp->mp->uptr;
 if (uptr)
     uptr->wait = lp->rxdeltausecs;
-if (lp->bpsfactor == 0.0)
-    lp->bpsfactor = 1.0;
 lp->txbps = lp->rxbps;
 lp->txdeltausecs = lp->rxdeltausecs;
-lp->txnexttime = lp->rxnexttime;
 if (lp->o_uptr)
     lp->o_uptr->wait = lp->txdeltausecs;
 return SCPE_OK;
@@ -4108,22 +4105,17 @@ for (i=0; i<mp->lines; i++) {
             due = sim_processing_event ? 1 : 0; /* avoid potential infinite loop if called from service routine */
         sooner = MIN(sooner, due);
         }
-    if ((uptr == lp->o_uptr) &&         /* output completion unit? */
+    if ((lp->conn) &&                   /* Connected? */
+        (uptr == lp->o_uptr) &&         /* output completion unit? */
         (lp->txbps)) {                  /* while rate limiting */
+        if ((tmxr_tqln(lp)) &&          /* pending output data? */
+            (lp->txnexttime < sim_gtime_now))
+            tmxr_send_buffered_data (lp);/* flush it */
         if (lp->txnexttime > sim_gtime_now)
             due = (int32)(lp->txnexttime - sim_gtime_now);
-        else {
-            if (tmxr_tqln(lp)) {        /* pending output data? */
-                tmxr_send_buffered_data (lp);/* flush it */
-                --i;                    /* backup line number */
-                continue;               /* go try again */
-                }
-            due = sim_processing_event ? 1 : 0;     /* avoid potential infinite loop if called from service routine */
-            }
-        if (i == 0)
-            sooner = due;
         else
-            sooner = MIN(sooner, due);
+            due = sim_processing_event ? 1 : 0; /* avoid potential infinite loop if called from service routine */
+        sooner = MIN(sooner, due);
         }
     }
 return sooner;
@@ -4223,17 +4215,17 @@ if (!(uptr->dynflags & UNIT_TM_POLL))
     return sim_clock_coschedule_tmr (uptr, tmr, ticks); /* Handle the non mux case */
 sooner = _tmxr_activate_delay (uptr, interval);
 if (sooner != interval) {
-    sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "tmxr_clock_coschedule_tmr() - scheduling %s after %d instructions rather than %d ticks (%d instructions)\n", sim_uname (uptr), sooner, ticks, interval);
+    sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "tmxr_clock_coschedule_tmr(tmr=%d) - scheduling %s after %d instructions rather than %d ticks (%d instructions)\n", tmr, sim_uname (uptr), sooner, ticks, interval);
     return _sim_activate (uptr, sooner);                /* Handle the busy case directly */
     }
 #if defined(SIM_ASYNCH_MUX)
 if (!sim_asynch_enabled) {
-    sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "tmxr_clock_coschedule_tmr() - coscheduling %s after interval %d ticks\n", sim_uname (uptr), ticks);
+    sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "tmxr_clock_coschedule_tmr(tmr=%d) - coscheduling %s after interval %d ticks\n", tmr, sim_uname (uptr), ticks);
     return sim_clock_coschedule (uptr, tmr, ticks);
     }
 return SCPE_OK;
 #else
-sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "tmxr_clock_coschedule_tmr() - coscheduling %s after interval %d ticks\n", sim_uname (uptr), ticks);
+sim_debug (TIMER_DBG_MUX, &sim_timer_dev, "tmxr_clock_coschedule_tmr(tmr=%d) - coscheduling %s after interval %d ticks\n", tmr, sim_uname (uptr), ticks);
 return sim_clock_coschedule_tmr (uptr, tmr, ticks);
 #endif
 }
