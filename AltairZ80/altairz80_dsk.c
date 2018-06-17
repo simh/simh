@@ -405,14 +405,14 @@ static t_stat dsk_attach(UNIT *uptr, CONST char *cptr) {
     const t_stat r = attach_unit(uptr, cptr);           /* attach unit  */
     if (r != SCPE_OK)                                   /* error?       */
         return r;
-    
+
     assert(uptr != NULL);
     thisUnitIndex = find_unit_index(uptr);
     assert((0 <= thisUnitIndex) && (thisUnitIndex < NUM_OF_DSK));
-    
+
     /*  If the file size is close to the mini-disk image size, set the number of
      tracks to 16, otherwise, 32 sectors per track. */
-    
+
     imageSize = sim_fsize(uptr -> fileref);
     sectors_per_track[thisUnitIndex] = (((MINI_DISK_SIZE - MINI_DISK_DELTA < imageSize) &&
                                          (imageSize < MINI_DISK_SIZE + MINI_DISK_DELTA)) ?

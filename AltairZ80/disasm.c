@@ -1205,10 +1205,14 @@ long disasm (unsigned char *data, char *output, int segsize, long offset)
           case 0x64: segover = "fs"; break;
           case 0x65: segover = "gs"; break;
         }
-    } else if (*data == 0x66)
-        osize = 48 - segsize, data++;
-    else if (*data == 0x67)
-        asize = 48 - segsize, data++;
+    } else if (*data == 0x66) {
+        osize = 48 - segsize;
+        data++;
+    }
+    else if (*data == 0x67) {
+        asize = 48 - segsize;
+        data++;
+    }
     else
         break;
     }

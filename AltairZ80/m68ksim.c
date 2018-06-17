@@ -1,31 +1,31 @@
 /*  m68kcpmsim.c: CP/M for Motorola 68000 definitions
- 
+
  Copyright (c) 2014, Peter Schorn
- 
+
  Permission is hereby granted, free of charge, to any person obtaining a
  copy of this software and associated documentation files (the "Software"),
  to deal in the Software without restriction, including without limitation
  the rights to use, copy, modify, merge, publish, distribute, sublicense,
  and/or sell copies of the Software, and to permit persons to whom the
  Software is furnished to do so, subject to the following conditions:
- 
+
  The above copyright notice and this permission notice shall be included in
  all copies or substantial portions of the Software.
- 
+
  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
  PETER SCHORN BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
  IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- 
+
  Except as contained in this notice, the name of Peter Schorn shall not
  be used in advertising or otherwise to promote the sale, use or other dealings
  in this Software without prior written authorization from Peter Schorn.
- 
+
  Based on work by David W. Schultz http://home.earthlink.net/~david.schultz (c) 2014
 
- 
+
  MC68000 simulation tailored to support CP/M-68K. It includes:
 
  16MB of memory. (Flat, function codes and address space types ignored.)
@@ -170,21 +170,21 @@ t_stat m68k_hdsk_boot(const int32 unitno, DEVICE *dptr,
                       const uint32 verboseMessage, const int32 hdskNumber) {
     UNIT *uptr;
     size_t i;
-    
+
     if ((unitno < 0) || (unitno >= hdskNumber))
         return SCPE_ARG;
-    
+
     uptr = (dptr -> units) + unitno;
     if (((uptr -> flags) & UNIT_ATT) == 0) {
         sim_debug(verboseMessage, dptr, "HDSK%d: Boot drive is not attached.\n", unitno);
         return SCPE_ARG;
     }
-    
+
     if (sim_fseek(uptr -> fileref, 0, SEEK_SET) != 0) {
         sim_debug(verboseMessage, dptr, "HDSK%d: Boot error seeking start.\n", unitno);
         return SCPE_ARG;
     }
-    
+
     i = sim_fread(&m68k_ram[M68K_BOOT_PC], 1, M68K_BOOT_LENGTH, uptr -> fileref);
     if (i != M68K_BOOT_LENGTH) {
         sim_debug(verboseMessage, dptr,
@@ -192,7 +192,7 @@ t_stat m68k_hdsk_boot(const int32 unitno, DEVICE *dptr,
                   unitno, M68K_BOOT_LENGTH);
         return SCPE_ARG;
     }
-    
+
     // Now put in values for the stack and PC vectors
     WRITE_LONG(m68k_ram, 0, M68K_BOOT_SP);  // SP
     WRITE_LONG(m68k_ram, 4, M68K_BOOT_PC);  // PC

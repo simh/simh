@@ -306,41 +306,41 @@ static int32 hdc1001dev(const int32 port, const int32 io, const int32 data)
 #define HDC1001_OP_HEAD   0x02
 #define HDC1001_OP_SECTOR 0x03
 
-#define HDC1001_CMD_NULL          0x00
-#define HDC1001_CMD_READ_DATA     0x01
-#define HDC1001_CMD_WRITE_DATA    0x02
-#define HDC1001_CMD_WRITE_HEADER  0x03
-#define HDC1001_CMD_READ_HEADER   0x04
+#define HDC1001_CMD_NULL            0x00
+#define HDC1001_CMD_READ_DATA       0x01
+#define HDC1001_CMD_WRITE_DATA      0x02
+#define HDC1001_CMD_WRITE_HEADER    0x03
+#define HDC1001_CMD_READ_HEADER     0x04
 
-#define HDC1001_STATUS_BUSY     0
+#define HDC1001_STATUS_BUSY         0
 #define HDC1001_STATUS_RANGE        1
 #define HDC1001_STATUS_NOT_READY    2
-#define HDC1001_STATUS_TIMEOUT  3
-#define HDC1001_STATUS_DAT_CRC  4
-#define HDC1001_STATUS_WR_FAULT 5
-#define HDC1001_STATUS_OVERRUN  6
-#define HDC1001_STATUS_HDR_CRC  7
-#define HDC1001_STATUS_MAP_FULL 8
-#define HDC1001_STATUS_COMPLETE 0xFF    /* Complete with No Error */
+#define HDC1001_STATUS_TIMEOUT      3
+#define HDC1001_STATUS_DAT_CRC      4
+#define HDC1001_STATUS_WR_FAULT     5
+#define HDC1001_STATUS_OVERRUN      6
+#define HDC1001_STATUS_HDR_CRC      7
+#define HDC1001_STATUS_MAP_FULL     8
+#define HDC1001_STATUS_COMPLETE     0xFF    /* Complete with No Error */
 
 #define HDC1001_CODE_NOOP           0x00
 #define HDC1001_CODE_VERSION        0x01
-#define HDC1001_CODE_GLOBAL     0x02
+#define HDC1001_CODE_GLOBAL         0x02
 #define HDC1001_CODE_SPECIFY        0x03
 #define HDC1001_CODE_SET_MAP        0x04
 #define HDC1001_CODE_HOME           0x05
 #define HDC1001_CODE_SEEK           0x06
 #define HDC1001_CODE_READ_HDR       0x07
-#define HDC1001_CODE_READWRITE  0x08
+#define HDC1001_CODE_READWRITE      0x08
 #define HDC1001_CODE_RELOCATE       0x09
-#define HDC1001_CODE_FORMAT     0x0A
-#define HDC1001_CODE_FORMAT_BAD 0x0B
-#define HDC1001_CODE_STATUS     0x0C
-#define HDC1001_CODE_SELECT     0x0D
+#define HDC1001_CODE_FORMAT         0x0A
+#define HDC1001_CODE_FORMAT_BAD     0x0B
+#define HDC1001_CODE_STATUS         0x0C
+#define HDC1001_CODE_SELECT         0x0D
 #define HDC1001_CODE_EXAMINE        0x0E
-#define HDC1001_CODE_MODIFY     0x0F
+#define HDC1001_CODE_MODIFY         0x0F
 
-#define HDC1001_IOPB_LEN    16
+#define HDC1001_IOPB_LEN            16
 
 #define TF_DATA     0
 #define TF_ERROR    1

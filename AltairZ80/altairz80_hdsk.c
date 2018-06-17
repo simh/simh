@@ -194,7 +194,7 @@ static DPB dpb[] = {
 
     { "CPM68K", (1 << 24),      (1<<17),0,      0,      0,      0,      0,
         0,      0,      0,      0,      0,      0,      0,      0,  NULL },             /* CP/M-68K HDSK                */
-    
+
     { "EZ80FL", 131072,         32,     0x03,   0x07,   0x00,   127,    0x003E,
         0xC0,   0x00,   0x0000, 0x0000, 0x02,   0x03,   0,      0,  NULL },             /* 128K FLASH                   */
 
@@ -846,7 +846,7 @@ int32 hdsk_read(void) {
             hdskStatus = CPM_ERROR;
             return hdskStatus;
         }
-        
+
         if (sim_fread(hdskbuf, 1, uptr -> HDSK_SECTOR_SIZE, uptr -> fileref) != (size_t)(uptr -> HDSK_SECTOR_SIZE)) {
             for (i = 0; i < uptr -> HDSK_SECTOR_SIZE; i++)
                 hdskbuf[i] = CPM_EMPTY;

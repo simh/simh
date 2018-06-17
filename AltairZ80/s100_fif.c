@@ -262,7 +262,7 @@ static int DoDiskOperation(desc_t *dsc, uint8 val)
         case READ_SEC:
             addr = (dsc->track * SPT) + dsc->sector - 1;
             if (sim_fseek(cpx, addr * SEC_SZ, SEEK_SET) == 0) {
-            rtn = sim_fread(blanksec, 1, SEC_SZ, cpx);
+                rtn = sim_fread(blanksec, 1, SEC_SZ, cpx);
                 if ((rtn != SEC_SZ) && (current_disk_flags & UNIT_DSK_VERBOSE) &&
                     (warnAttached[current_disk] < warnLevelDSK)) {
                 warnAttached[current_disk]++;
@@ -284,11 +284,11 @@ static int DoDiskOperation(desc_t *dsc, uint8 val)
         case WRITE_SEC:
             addr = (dsc->track * SPT) + dsc->sector - 1;
             if (sim_fseek(cpx, addr * SEC_SZ, SEEK_SET) == 0) {
-            addr = dsc->addr_l + (dsc->addr_h << 8); /* no assumption on endianness */
-            for (kt = 0; kt < SEC_SZ; kt++) {
-                blanksec[kt] = GetBYTEWrapper(addr++);
-            }
-            sim_fwrite(blanksec, 1, SEC_SZ, cpx);
+                addr = dsc->addr_l + (dsc->addr_h << 8); /* no assumption on endianness */
+                for (kt = 0; kt < SEC_SZ; kt++) {
+                    blanksec[kt] = GetBYTEWrapper(addr++);
+                }
+                sim_fwrite(blanksec, 1, SEC_SZ, cpx);
             } else {
                 if ((current_disk_flags & UNIT_DSK_VERBOSE) &&
                     (warnAttached[current_disk] < warnLevelDSK)) {
