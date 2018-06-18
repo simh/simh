@@ -4068,20 +4068,24 @@ return SCPE_OK;
 t_stat tmxr_detach (TMXR *mp, UNIT *uptr)
 {
 int32 i;
+char portname[CBUFSIZE];
 
 if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return SCPE_OK;
-tmxr_close_master (mp);                                 /* close master socket */
-free (uptr->filename);                                  /* free setup string */
-uptr->filename = NULL;
-uptr->tmxr = NULL;
-mp->last_poll_time = 0;
 for (i=0; i < mp->lines; i++) {
     mp->ldsc[i].uptr->tmxr = NULL;
     mp->ldsc[i].uptr->dynflags &= ~UNIT_TM_POLL;                    /* no polling */
     mp->ldsc[i].o_uptr->tmxr = NULL;
     mp->ldsc[i].o_uptr->dynflags &= ~UNIT_TM_POLL;                  /* no polling */
+    sprintf (portname, "%s:%d", mp->dptr->name, i);
+    expect_cmd (0, portname);                           /* clear dangling expects */
+    send_cmd (0, portname);                             /* clear dangling send data */
     }
+tmxr_close_master (mp);                                 /* close master socket */
+free (uptr->filename);                                  /* free setup string */
+uptr->filename = NULL;
+uptr->tmxr = NULL;
+mp->last_poll_time = 0;
 uptr->flags &= ~(UNIT_ATT);                             /* not attached */
 uptr->dynflags &= ~(UNIT_TM_POLL|TMUF_NOASYNCH);        /* no polling, not asynch disabled  */
 return SCPE_OK;
