@@ -2108,13 +2108,25 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
 
 int32 tmxr_rqln_bare (const TMLN *lp, t_bool speed)
 {
-if ((speed) && (lp->rxbps)) {                   /* consider speed and rate limiting? */
-    if (sim_gtime () < lp->rxnexttime)          /* too soon? */
-        return 0;
-    else
-        return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? lp->rxbsz : 0)) ? 1 : 0;
+if (speed) {
+    int32 send_data = 0;
+
+    if (lp->send.extoff < lp->send.insoff) {/* buffered SEND data? */
+        if (sim_gtime () < lp->send.next_time) 
+            send_data = 0;
+        else
+            send_data = lp->send.delay ? 1 : (lp->send.insoff - lp->send.extoff);
+        }
+    if (lp->rxbps) {                        /* consider speed and rate limiting? */
+        if (sim_gtime () < lp->rxnexttime)  /* too soon? */
+            return send_data;
+        else
+            return send_data + 
+                   ((lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? lp->rxbsz : 0)) ? 1 : 0);
+        }
     }
-return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? lp->rxbsz: 0));
+return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? lp->rxbsz: 0) + 
+        (lp->send.insoff - lp->send.extoff));
 }
 
 int32 tmxr_rqln (const TMLN *lp)
@@ -4100,13 +4112,21 @@ double sim_gtime_now = sim_gtime ();
 for (i=0; i<mp->lines; i++) {
     TMLN *lp = &mp->ldsc[i];
 
-    if ((uptr == lp->uptr) &&           /* read polling unit? */
-        (lp->rxbps)        &&           /* while rate limiting? */
-        (tmxr_rqln_bare (lp, FALSE))) { /* with pending input data */
-        if (lp->rxnexttime > sim_gtime_now)
-            due = (int32)(lp->rxnexttime - sim_gtime_now);
-        else
-            due = sim_processing_event ? 1 : 0; /* avoid potential infinite loop if called from service routine */
+    if (uptr == lp->uptr) {                     /* read polling unit? */
+        if ((lp->send.extoff < lp->send.insoff) &&
+            (sim_gtime_now < lp->send.next_time))
+            due = (int32)(lp->send.next_time - sim_gtime_now);
+        else {
+            if ((lp->rxbps)        &&           /* while rate limiting? */
+                (tmxr_rqln_bare (lp, FALSE))) { /* with pending input data */
+                if (lp->rxnexttime > sim_gtime_now)
+                    due = (int32)(lp->rxnexttime - sim_gtime_now);
+                else
+                    due = sim_processing_event ? 1 : 0; /* avoid potential infinite loop if called from service routine */
+                }
+            else
+                due = interval;
+            }
         sooner = MIN(sooner, due);
         }
     if ((lp->conn) &&                   /* Connected? */
