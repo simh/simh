@@ -728,9 +728,11 @@ else {
             }
         }
     else {
-        if (lp->conn == TMXR_LINE_DISABLED) {
+        if ((lp->conn == TMXR_LINE_DISABLED) ||
+            ((lp->conn == 0) && lp->txbfd)){
             written = length;                           /* Count here output timing is correct */
-            lp->txdrp += length;                        /* Record as having been dropped on the floor */
+            if (lp->conn == TMXR_LINE_DISABLED)
+                lp->txdrp += length;                    /* Record as having been dropped on the floor */
             }
         }
     }
@@ -2262,7 +2264,7 @@ TMLN *lp;
 tmxr_debug_trace (mp, "tmxr_poll_tx()");
 for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
     lp = mp->ldsc + i;                                  /* get line desc */
-    if (!lp->conn)                                      /* skip if !conn */
+    if ((!lp->conn) && (!lp->txbfd))                    /* skip if !conn and !buffered */
         continue;
     nbytes = tmxr_send_buffered_data (lp);              /* buffered bytes */
     if (nbytes == 0) {                                  /* buf empty? enab line */
@@ -3992,7 +3994,7 @@ else {
                 fprintf (st, "\n");
                 }
             if ((!lp->sock) && (!lp->connecting) && (!lp->serport) && (!lp->master)) {
-                if (lp->modem_control)
+                if ((lp->modem_control) || (lp->txbfd))
                     tmxr_fconns (st, lp, -1);
                 continue;
                 }
@@ -4134,7 +4136,7 @@ for (i=0; i<mp->lines; i++) {
             }
         sooner = MIN(sooner, due);
         }
-    if ((lp->conn) &&                   /* Connected? */
+    if ((lp->conn || lp->txbfd) &&      /* Connected (or buffered)? */
         (uptr == lp->o_uptr) &&         /* output completion unit? */
         (lp->txbps)) {                  /* while rate limiting */
         if ((tmxr_tqln(lp)) &&          /* pending output data? */
@@ -4647,7 +4649,7 @@ if (lp->cnms) {
         fprintf (st, " %s %02d:%02d:%02d\n", lp->connecting ? "Connecting for" : "Connected", hr, mn, sc);
     }
 else
-    fprintf (st, " Line disconnected\n");
+    fprintf (st, " Line disconnected%s\n", lp->txbfd ? " (buffered)" : "");
 
 if (lp->modem_control) {
     fprintf (st, " Modem Bits: %s%s%s%s%s%s\n", (lp->modembits & TMXR_MDM_DTR) ? "DTR " : "",
