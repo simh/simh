@@ -1004,8 +1004,8 @@ if (mp->last_poll_time == 0) {                          /* first poll initializa
     if (!uptr)                                          /* Attached ? */
         return -1;                                      /* No connections are possinle! */
 
-    uptr->dynflags |= UNIT_TM_POLL;                     /* Tag as polling unit */
     uptr->tmxr = (void *)mp;                            /* Connect UNIT to TMXR */
+    uptr->dynflags |= UNIT_TM_POLL;                     /* Tag as polling unit */
 
     if (mp->poll_interval == 0)                         /* Assure reasonable polling interval */
         mp->poll_interval = TMXR_DEFAULT_CONNECT_POLL_INTERVAL;
@@ -1014,12 +1014,16 @@ if (mp->last_poll_time == 0) {                          /* first poll initializa
         sim_cancel (uptr);
 
     for (i=0; i < mp->lines; i++) {
-        if (mp->ldsc[i].uptr)
+        if (mp->ldsc[i].uptr) {
+            mp->ldsc[i].uptr->tmxr = (void *)mp;        /* Connect UNIT to TMXR */
             mp->ldsc[i].uptr->dynflags |= UNIT_TM_POLL; /* Tag as polling unit */
+            }
         else
             mp->ldsc[i].uptr = uptr;                    /* default line input polling to primary poll unit */
-        if (mp->ldsc[i].o_uptr)
+        if (mp->ldsc[i].o_uptr) {
+            mp->ldsc[i].o_uptr->tmxr = (void *)mp;      /* Connect UNIT to TMXR */
             mp->ldsc[i].o_uptr->dynflags |= UNIT_TM_POLL;/* Tag as polling unit */
+            }
         else
             mp->ldsc[i].o_uptr = uptr;                  /* default line output polling to primary poll unit */
         if (!(mp->uptr->dynflags & TMUF_NOASYNCH)) {    /* if asynch not disabled */
@@ -1764,11 +1768,12 @@ int32 tmxr_getc_ln (TMLN *lp)
 int32 j; 
 t_stat val = 0;
 uint32 tmp;
+double sim_gtime_now = sim_gtime ();
 
 tmxr_debug_trace_line (lp, "tmxr_getc_ln()");
-if ((lp->conn && lp->rcve) &&                           /* conn & enb & */
+if (((lp->conn || lp->txbfd) && lp->rcve) &&            /* (conn or buffered) & enb & */
     ((!lp->rxbps) ||                                    /* (!rate limited || enough time passed)? */
-     (sim_gtime () >= lp->rxnexttime))) {
+     (sim_gtime_now >= lp->rxnexttime))) {
     if (!sim_send_poll_data (&lp->send, &val)) {        /* injected input characters available? */
         j = lp->rxbpi - lp->rxbpr;                      /* # input chrs */
         if (j) {                                        /* any? */
@@ -1786,9 +1791,9 @@ if (lp->rxbpi == lp->rxbpr)                             /* empty? zero ptrs */
     lp->rxbpi = lp->rxbpr = 0;
 if (val) {                                              /* Got something? */
     if (lp->rxbps)
-        lp->rxnexttime = floor (sim_gtime () + ((lp->rxdeltausecs * sim_timer_inst_per_sec ()) / USECS_PER_SECOND));
+        lp->rxnexttime = floor (sim_gtime_now + ((lp->rxdeltausecs * sim_timer_inst_per_sec ()) / USECS_PER_SECOND));
     else
-        lp->rxnexttime = floor (sim_gtime () + ((lp->mp->uptr->wait * sim_timer_inst_per_sec ()) / USECS_PER_SECOND));
+        lp->rxnexttime = floor (sim_gtime_now + ((lp->mp->uptr->wait * sim_timer_inst_per_sec ()) / USECS_PER_SECOND));
     }
 tmxr_debug_return(lp, val);
 return val;
@@ -2260,6 +2265,7 @@ void tmxr_poll_tx (TMXR *mp)
 {
 int32 i, nbytes;
 TMLN *lp;
+double sim_gtime_now = sim_gtime ();
 
 tmxr_debug_trace (mp, "tmxr_poll_tx()");
 for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
@@ -2277,7 +2283,7 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
 #endif
         if ((lp->xmte == 0) && 
             ((lp->txbps == 0) ||
-             (lp->txnexttime <= sim_gtime ())))
+             (lp->txnexttime <= sim_gtime_now)))
             lp->xmte = 1;                               /* enable line transmit */
         }
     }                                                   /* end for */
@@ -4092,10 +4098,10 @@ char portname[CBUFSIZE];
 if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return SCPE_OK;
 for (i=0; i < mp->lines; i++) {
-    mp->ldsc[i].uptr->tmxr = NULL;
     mp->ldsc[i].uptr->dynflags &= ~UNIT_TM_POLL;                    /* no polling */
-    mp->ldsc[i].o_uptr->tmxr = NULL;
+    mp->ldsc[i].uptr->tmxr = NULL;
     mp->ldsc[i].o_uptr->dynflags &= ~UNIT_TM_POLL;                  /* no polling */
+    mp->ldsc[i].o_uptr->tmxr = NULL;
     sprintf (portname, "%s:%d", mp->dptr->name, i);
     expect_cmd (0, portname);                           /* clear dangling expects */
     send_cmd (0, portname);                             /* clear dangling send data */
