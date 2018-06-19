@@ -2911,6 +2911,15 @@ while (*tptr) {
                     return sim_messagef (SCPE_ARG, "Can't open %s socket on %s%s%s\n", datagram ? "Datagram" : "Stream", datagram ? listen : "", datagram ? "<->" : "", hostport);
                 }
             }
+        if (speed[0] &&
+            (destination[0] == '\0') && 
+            (listen[0] == '\0') &&
+            (!loopback)) {
+            for (i = 0; i < mp->lines; i++) {
+                lp = mp->ldsc + i;
+                tmxr_set_line_speed (lp, speed);
+                }
+            }
         }
     else {                                                  /* line specific attach */
         lp = &mp->ldsc[line];
