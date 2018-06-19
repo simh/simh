@@ -2109,24 +2109,20 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
 int32 tmxr_rqln_bare (const TMLN *lp, t_bool speed)
 {
 if (speed) {
-    int32 send_data = 0;
-
     if (lp->send.extoff < lp->send.insoff) {/* buffered SEND data? */
         if (sim_gtime () < lp->send.next_time) 
-            send_data = 0;
+            return 0;
         else
-            send_data = lp->send.delay ? 1 : (lp->send.insoff - lp->send.extoff);
+            return lp->send.delay ? 1 : (lp->send.insoff - lp->send.extoff);
         }
     if (lp->rxbps) {                        /* consider speed and rate limiting? */
         if (sim_gtime () < lp->rxnexttime)  /* too soon? */
-            return send_data;
+            return 0;
         else
-            return send_data + 
-                   ((lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? lp->rxbsz : 0)) ? 1 : 0);
+            return 1;
         }
     }
-return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? lp->rxbsz: 0) + 
-        (lp->send.insoff - lp->send.extoff));
+return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? lp->rxbsz: 0));
 }
 
 int32 tmxr_rqln (const TMLN *lp)
