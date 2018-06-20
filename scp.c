@@ -8419,7 +8419,8 @@ for (i = 0, j = addr; i < sim_emax; i++, j = j + dptr->aincr) {
     else {
         if (!(uptr->flags & UNIT_ATT))
             return SCPE_UNATT;
-        if (uptr->dynflags & UNIT_NO_FIO)
+        if ((uptr->dynflags & UNIT_NO_FIO) ||
+            (uptr->fileref == NULL))
             return SCPE_NOFNC;
         if ((uptr->flags & UNIT_FIX) && (j >= uptr->capac)) {
             reason = SCPE_NXM;
