@@ -405,7 +405,7 @@ lineTwoStep(int x0, int y0, int x1, int y1)
                 if (d > 0) {
                     lpoint(x0 += stepx, y0);
                     lpoint(x0 += stepx, y0 += stepy);
-                    lpoint(x1 -= stepy, y1);
+                    lpoint(x1 -= stepx, y1);
                     lpoint(x1 -= stepx, y1 -= stepy);
                     d += incr1;
                 } else {
