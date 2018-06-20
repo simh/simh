@@ -607,7 +607,7 @@ static const char *sim_int_step_description (DEVICE *dptr)
 return "Step/Next facility";
 }
 
-static UNIT sim_step_unit = { UDATA (&step_svc, 0, 0) };
+static UNIT sim_step_unit = { UDATA (&step_svc, UNIT_IDLE, 0) };
 DEVICE sim_step_dev = {
     "INT-STEP", &sim_step_unit, NULL, NULL, 
     1, 0, 0, 0, 0, 0, 
