@@ -1749,7 +1749,8 @@ return r;
    Inputs:
         *lp     =       pointer to terminal line descriptor
    Output:
-        valid + char, 0 if line
+        (TMXR_VALID | char) or 0 if no data is currently available 
+                            on the specified line.
 
    Implementation note:
 
@@ -1757,11 +1758,6 @@ return r;
        receive break status associated with the character is cleared, and
        SCPE_BREAK is ORed into the return value.
 */
-
-int32 tmxr_input_pending_ln (TMLN *lp)
-{
-return (lp->rxbpi - lp->rxbpr);
-}
 
 int32 tmxr_getc_ln (TMLN *lp)
 {
@@ -2111,8 +2107,6 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
 }
 
 
-/* Return count of available characters for line */
-
 int32 tmxr_rqln_bare (const TMLN *lp, t_bool speed)
 {
 if (speed) {
@@ -2132,9 +2126,16 @@ if (speed) {
 return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? lp->rxbsz: 0));
 }
 
+/* Return count of available characters ready to be read for line */
+
 int32 tmxr_rqln (const TMLN *lp)
 {
 return tmxr_rqln_bare (lp, TRUE);
+}
+
+int32 tmxr_input_pending_ln (TMLN *lp)
+{
+return (lp->rxbpi - lp->rxbpr);
 }
 
 
