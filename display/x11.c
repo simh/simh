@@ -272,6 +272,10 @@ ws_init(const char *crtname,    /* crt type name */
     xpixels = xp;               /* save screen size */
     ypixels = yp;
 
+    if (getenv ("DISPLAY") == NULL) {
+        return 0;
+    }
+
     XtToolkitInitialize();
     app_context = XtCreateApplicationContext();
     argc = 0;
