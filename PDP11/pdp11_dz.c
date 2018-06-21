@@ -590,7 +590,7 @@ t_stat dz_xmt_svc (UNIT *uptr)
 {
 tmxr_poll_tx (&dz_desc);                                /* poll output */
 dz_update_xmti ();                                      /* update int */
-sim_clock_coschedule_after (uptr, 500000);              /* reactivate occasionally */
+sim_activate_after (uptr, 500000);                      /* reactivate occasionally */
 return SCPE_OK;
 }
 
