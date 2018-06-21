@@ -457,6 +457,7 @@ DEBTAB vh_debug[] = {
 static t_stat vh_rd (int32 *data, int32 PA, int32 access);
 static t_stat vh_wr (int32 data, int32 PA, int32 access);
 static t_stat vh_svc (UNIT *uptr);
+static t_stat vh_xmt_svc (UNIT *uptr);
 static t_stat vh_timersvc (UNIT *uptr);
 static int32 vh_rxinta (void);
 static int32 vh_txinta (void);
@@ -496,12 +497,13 @@ static DIB vh_dib = {
     IOLN_VH,    /* IO space per device */
 };
 
-static UNIT vh_unit[VH_MUXES+1] = {
-    { UDATA (&vh_svc, UNIT_IDLE|UNIT_ATTABLE, 0) },
+static UNIT vh_unit[VH_MUXES+3] = {
+    { UDATA (NULL, UNIT_ATTABLE, 0) },
 };
 
+static UNIT *vh_poll_unit;
+static UNIT *vh_xmit_unit;
 static UNIT *vh_timer_unit;
-static UNIT *vh_poll_unit = &vh_unit[0];
 
 static const REG vh_reg[] = {
     { BRDATADF (CSR,         vh_csr, DEV_RDX, 16, VH_MUXES, "control/status register, boards 0 to 3", vh_csr_bits) },
@@ -1120,17 +1122,8 @@ static t_stat vh_wr (   int32   ldata,
                     (lp->txchar & 0377) | (data << 8) :
                     (lp->txchar & ~0377) | (data & 0377);
             lp->txchar = data;  /* TXCHAR */
-            if (lp->txchar & TXCHAR_TX_DATA_VALID) {
-                if (lp->tbuf2 & TB2_TX_ENA) {
-                    if (vh_putc (vh, lp, CSR_GETCHAN (vh_csr[vh]), 
-                                 lp->txchar) != SCPE_STALL) {
-                        q_tx_report (vh, CSR_GETCHAN (vh_csr[vh]) << CSR_V_TX_LINE);
-                        lp->txchar &= ~TXCHAR_TX_DATA_VALID;
-                    }
-                    else
-                        sim_activate_after_abs (vh_unit, lp->tmln->txdeltausecs);
-                }
-            }
+            if (lp->txchar & TXCHAR_TX_DATA_VALID)
+                sim_activate_after_abs (vh_xmit_unit, lp->tmln->txdeltausecs);
         }
         break;
     case 2:     /* LPR */
@@ -1387,7 +1380,7 @@ static t_stat vh_timersvc (  UNIT    *uptr   )
 
 static t_stat vh_svc (  UNIT    *uptr   )
 {
-    int32   vh, newln, i;
+    int32   vh, newln;
 
     sim_debug(DBG_TRC, find_dev_from_unit(uptr), "vh_svc()\n");
 
@@ -1408,6 +1401,20 @@ static t_stat vh_svc (  UNIT    *uptr   )
                       ((lp->lstat >> 8) & 0376));
             /* BUG: should check for overflow above */
     }
+    /* interrupt driven in a real DHQ */
+    tmxr_poll_rx (&vh_desc);
+    for (vh = 0; vh < vh_desc.lines/VH_LINES; vh++)
+        vh_getc (vh);
+    sim_clock_coschedule (uptr, tmxr_poll); /* requeue ourselves */
+    return SCPE_OK;
+}
+
+static t_stat vh_xmt_svc (  UNIT    *uptr   )
+{
+    int32   vh, i;
+
+    sim_debug(DBG_TRC, find_dev_from_unit(uptr), "vh_xmt_svc()\n");
+
     /* scan all muxes lines */
     for (vh = 0; vh < vh_desc.lines/VH_LINES; vh++) {
         for (i = 0; i < VH_LINES; i++) {
@@ -1429,13 +1436,9 @@ static t_stat vh_svc (  UNIT    *uptr   )
             doDMA (vh, i);
         }
     }
-    /* interrupt driven in a real DHQ */
-    tmxr_poll_rx (&vh_desc);
-    for (vh = 0; vh < vh_desc.lines/VH_LINES; vh++)
-        vh_getc (vh);
     tmxr_poll_tx (&vh_desc);
     sim_clock_coschedule (uptr, tmxr_poll); /* requeue ourselves */
-    return (SCPE_OK);
+    return SCPE_OK;
 }
 
 /* init a channel on a controller */
@@ -1544,24 +1547,41 @@ static t_stat vh_reset (    DEVICE  *dptr   )
     tmxr_set_port_speed_control (&vh_desc);
     if (vh_desc.lines > VH_MUXES*VH_LINES)
         vh_desc.lines = VH_MUXES*VH_LINES;
-    for (i = 0; i < vh_desc.lines; i++)
+    for (i = 0; i < vh_desc.lines; i++) {
         vh_parm[i].tmln = &vh_ldsc[i];
-    vh_dev.numunits = (vh_desc.lines / VH_LINES) + 1;
-    vh_timer_unit = &vh_unit[vh_dev.numunits-1];
+        tmxr_set_line_unit (&vh_desc, i, vh_poll_unit);
+        tmxr_set_line_output_unit (&vh_desc, i, vh_xmit_unit);
+        }
+    vh_dev.numunits = (vh_desc.lines / VH_LINES) + 3;
+    if (vh_poll_unit)
+        sim_cancel (vh_poll_unit);
+    vh_poll_unit =  &vh_unit[(vh_desc.lines / VH_LINES) + 0];
+    vh_poll_unit->action = &vh_svc;
+    vh_poll_unit->flags = UNIT_DIS | UNIT_IDLE;
+    if (vh_xmit_unit)
+        sim_cancel (vh_xmit_unit);
+    vh_xmit_unit =  &vh_unit[(vh_desc.lines / VH_LINES) + 1];
+    vh_xmit_unit->action = &vh_xmt_svc;
+    vh_xmit_unit->flags = UNIT_DIS;
+    if (vh_timer_unit)
+        sim_cancel (vh_timer_unit);
+    vh_timer_unit = &vh_unit[(vh_desc.lines / VH_LINES) + 2];
     vh_timer_unit->action = &vh_timersvc;
     vh_timer_unit->flags = UNIT_DIS | UNIT_IDLE;
-    for (i = 0; i < vh_desc.lines/VH_LINES; i++) {
-        /* if Unibus, force DHU mode */
-        if (UNIBUS)
-            vh_unit[i].flags |= UNIT_MODEDHU;
-        vh_unit[i].flags &= ~UNIT_DIS;
-        vh_clear (i, TRUE);
+    for (i = 0; i < VH_MUXES; i++) {
+        if (i < vh_desc.lines/VH_LINES) {
+            /* if Unibus, force DHU mode */
+            if (UNIBUS)
+                vh_unit[i].flags |= UNIT_MODEDHU;
+            vh_unit[i].flags &= ~UNIT_DIS;
+            vh_clear (i, TRUE);
+        } else {
+            vh_unit[i].flags |= UNIT_DIS;
+        }
     }
     vh_rxi = vh_txi = 0;
     CLR_INT (VHRX);
     CLR_INT (VHTX);
-    sim_cancel (vh_poll_unit);
-    sim_cancel (vh_timer_unit);
     vh_dib.lnt = (vh_desc.lines / VH_LINES) * IOLN_VH;      /* set length */
     return (auto_config (dptr->name, (dptr->flags & DEV_DIS) ? 0 : vh_desc.lines/VH_LINES));
 }
@@ -1570,9 +1590,9 @@ static t_stat vh_reset (    DEVICE  *dptr   )
 static t_stat vh_attach (   UNIT    *uptr,
                 CONST char    *cptr   )
 {
-    if (uptr == vh_poll_unit)
-        return (tmxr_attach (&vh_desc, uptr, cptr));
-    return (SCPE_NOATT);
+    if (uptr == vh_unit)
+        return tmxr_attach (&vh_desc, uptr, cptr);
+    return SCPE_NOATT;
 }
 
 static t_stat vh_detach (   UNIT    *uptr   )
@@ -1661,7 +1681,7 @@ newln = (int32) get_uint (cptr, 10, (VH_MUXES * VH_LINES), &r);
 if ((r != SCPE_OK) || (newln == vh_desc.lines))
     return r;
 if ((newln == 0) || (newln % VH_LINES))
-    return SCPE_ARG;
+    return sim_messagef (SCPE_ARG, "VH line count must be a multiple of %d\n", VH_LINES);
 if (newln < vh_desc.lines) {
     for (i = newln, t = 0; i < vh_desc.lines; i++)
         t = t | vh_ldsc[i].conn;
