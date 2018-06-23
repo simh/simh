@@ -2498,8 +2498,14 @@ if (*cptr == '*') {
     if (r != SCPE_OK)
         return r;
     lp->bpsfactor = bpsfactor;
-    if (speed == cptr)                  /* just changing bps factor? */
+    if (speed == cptr) {                /* just changing bps factor? */
+        char speedbps[16];
+
+        sprintf (speedbps, "%d", lp->rxbps);
+        lp->rxdeltausecs = (uint32)(_tmln_speed_delta (speedbps) / lp->bpsfactor);
+        lp->txdeltausecs = lp->rxdeltausecs;
         return SCPE_OK;                 /* Done now */
+        }
     }
 lp->rxbps = rxbps;                      /* use supplied speed */
 if ((lp->serport) && (lp->bpsfactor != 0.0))
