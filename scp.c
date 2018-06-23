@@ -1381,7 +1381,7 @@ static const char simh_help[] =
       "+sh{ow} <unit> {arg,...}     show unit parameters\n"
       "+sh{ow} ethernet             show ethernet devices\n"
       "+sh{ow} serial               show serial devices\n"
-      "+sh{ow} multiplexer          show open multiplexer devices\n"
+      "+sh{ow} multiplexer {dev}    show open multiplexer device info\n"
 #if defined(USE_SIM_VIDEO)
       "+sh{ow} video                show video capabilities\n"
 #endif
