@@ -417,6 +417,11 @@ typedef struct {
     uint16  tbuf1;
     uint16  tbuf2;
     uint16  txchar;     /* single character I/O */
+    uint16  txstate;    /* transmit state */
+#define TXS_IDLE        0
+#define TXS_PIO_START   1
+#define TXS_PIO_PENDING 2
+#define TXS_DMA_PENDING 3
 } TMLX;
 
 static TMLN vh_ldsc[VH_MUXES * VH_LINES_ALLOC] = { { 0 } };
@@ -430,6 +435,8 @@ static TMLX vh_parm[VH_MUXES * VH_LINES_ALLOC] = { { 0 } };
 #define DBG_INT     0x0004                              /* display interrupt activities */
 #define DBG_TIM     0x0008                              /* display timing activities */
 #define DBG_TIMTRC  0x0010                              /* display trace timing activities */
+#define DBG_RCVSCH  0x0020                              /* display receive scheduling activities */
+#define DBG_XMTSCH  0x0040                              /* display transmit scheduling activities */
 #define DBG_XMT     TMXR_DBG_XMT                        /* display Transmitted Data */
 #define DBG_RCV     TMXR_DBG_RCV                        /* display Received Data */
 #define DBG_MDM     TMXR_DBG_MDM                        /* display Modem Signals */
@@ -444,6 +451,8 @@ DEBTAB vh_debug[] = {
   {"INT",    DBG_INT,    "interrupt activities"},
   {"TIM",    DBG_TIM,    "timing activities"},
   {"TIMTRC", DBG_TIMTRC, "trace timing activities"},
+  {"RCVSCH", DBG_RCVSCH, "receive scheduling activities"},
+  {"XMTSCH", DBG_XMTSCH, "transmit scheduling activities"},
   {"XMT",    DBG_XMT,    "Transmitted Data"},
   {"RCV",    DBG_RCV,    "Received Data"},
   {"MDM",    DBG_MDM,    "Modem Signals"},
@@ -1122,8 +1131,16 @@ static t_stat vh_wr (   int32   ldata,
                     (lp->txchar & 0377) | (data << 8) :
                     (lp->txchar & ~0377) | (data & 0377);
             lp->txchar = data;  /* TXCHAR */
-            if (lp->txchar & TXCHAR_TX_DATA_VALID)
-                sim_activate_after_abs (vh_xmit_unit, lp->tmln->txdeltausecs);
+            if (lp->txchar & TXCHAR_TX_DATA_VALID) {
+                if (lp->tbuf2 & TB2_TX_ENA) {
+                    lp->txstate = TXS_PIO_START;
+                    if (vh_putc (vh, lp, CSR_GETCHAN (vh_csr[vh]),
+                                 lp->txchar) != SCPE_STALL)
+                        lp->txstate = TXS_PIO_PENDING;
+                    sim_debug (DBG_XMTSCH, &vh_dev, "VH-%d PIO: %s - 0x%X\n", (int)(lp - vh_parm), (lp->txstate == TXS_PIO_PENDING) ? "Started" : "Scheduled Start", lp->txchar & 0xFF);
+                    sim_activate_after_abs (vh_xmit_unit, lp->tmln->txdeltausecs);
+                }
+            }
         }
         break;
     case 2:     /* LPR */
@@ -1280,7 +1297,7 @@ static t_stat vh_wr (   int32   ldata,
         /* if starting a DMA, clear DMA_ERR */
         if (vh_unit[vh].flags & UNIT_FASTDMA) {
             doDMA (vh, CSR_GETCHAN (vh_csr[vh]));
-            tmxr_send_buffered_data (lp->tmln);
+            sim_activate_after_abs (vh_xmit_unit, lp->tmln->txdeltausecs);
         }
         break;
     case 7:     /* TBUFFCT */
@@ -1316,7 +1333,8 @@ static void doDMA ( int32   vh,
     line = (vh * VH_LINES) + chan;
     lp = &vh_parm[line];
     if ((lp->tbuf2 & TB2_TX_ENA) && (lp->tbuf2 & TB2_TX_DMA_START)) {
-/* BUG: should compare against available xmit buffer space */
+        int32 sent = 0;
+
         pa = lp->tbuf1;
         pa |= (lp->tbuf2 & TB2_M_TBUFFAD) << 16;
         status = chan << CSR_V_TX_LINE;
@@ -1327,8 +1345,9 @@ static void doDMA ( int32   vh,
                 lp->tbuffct = 0;
                 break;
             }
-            if (vh_putc (vh, lp, chan, buf) != SCPE_OK)
+            if (vh_putc (vh, lp, chan, buf) == SCPE_STALL)
                 break;
+            ++sent;
             /* pa = (pa + 1) & PAMASK; */
             pa = (pa + 1) & ((1 << 22) - 1);
             lp->tbuffct--;
@@ -1336,10 +1355,14 @@ static void doDMA ( int32   vh,
         lp->tbuf1 = pa & 0177777;
         lp->tbuf2 = (lp->tbuf2 & ~TB2_M_TBUFFAD) |
                 ((pa >> 16) & TB2_M_TBUFFAD);
-        if ((lp->tbuffct == 0) || (!lp->tmln->conn)) {
+        sim_debug (DBG_XMTSCH, &vh_dev, "VH-%d DMAed: %d, remaining: %u - %s\n", (int)(lp - vh_parm), sent, lp->tbuffct, sim_error_text (status));
+        if ((sent == 0) &&
+            ((lp->tbuffct == 0) || (!lp->tmln->conn))) {
             lp->tbuf2 &= ~TB2_TX_DMA_START;
             q_tx_report (vh, status);
-        }
+            lp->txstate = TXS_IDLE;
+        } else
+            lp->txstate = TXS_DMA_PENDING;
     }
 }
 
@@ -1424,11 +1447,19 @@ static t_stat vh_xmt_svc (  UNIT    *uptr   )
             /* process any pending programmed output */
             if (lp->txchar & TXCHAR_TX_DATA_VALID) {
                 if (lp->tbuf2 & TB2_TX_ENA) {
-                    if (vh_putc (vh, lp, CSR_GETCHAN (vh_csr[vh]),
-                                 lp->txchar) != SCPE_STALL) {
-                        q_tx_report (vh,
-                            CSR_GETCHAN (vh_csr[vh]) << CSR_V_TX_LINE);
-                        lp->txchar &= ~TXCHAR_TX_DATA_VALID;
+                    sim_debug (DBG_XMTSCH, &vh_dev, "VH-%d PIO: %s - 0x%X\n", (int)(lp - vh_parm), (lp->txstate == TXS_PIO_PENDING) ? "Pending" : ((lp->txstate == TXS_PIO_START) ? "Starting" : "Unknown"), lp->txchar & 0xFF);
+                    switch (lp->txstate) {
+                        case TXS_PIO_PENDING:
+                            q_tx_report (vh,
+                                CSR_GETCHAN (vh_csr[vh]) << CSR_V_TX_LINE);
+                            lp->txchar &= ~TXCHAR_TX_DATA_VALID;
+                            lp->txstate = TXS_IDLE;
+                            break;
+                        case TXS_PIO_START:
+                            if (vh_putc (vh, lp, CSR_GETCHAN (vh_csr[vh]),
+                                         lp->txchar) != SCPE_STALL) 
+                                lp->txstate = TXS_PIO_PENDING;
+                            break;
                     }
                 }
             }
@@ -1437,7 +1468,7 @@ static t_stat vh_xmt_svc (  UNIT    *uptr   )
         }
     }
     tmxr_poll_tx (&vh_desc);
-    sim_clock_coschedule (uptr, tmxr_poll); /* requeue ourselves */
+    sim_activate_after (uptr, 250000); /* requeue ourselves */
     return SCPE_OK;
 }
 
@@ -1547,27 +1578,31 @@ static t_stat vh_reset (    DEVICE  *dptr   )
     tmxr_set_port_speed_control (&vh_desc);
     if (vh_desc.lines > VH_MUXES*VH_LINES)
         vh_desc.lines = VH_MUXES*VH_LINES;
-    for (i = 0; i < vh_desc.lines; i++) {
-        vh_parm[i].tmln = &vh_ldsc[i];
-        tmxr_set_line_unit (&vh_desc, i, vh_poll_unit);
-        tmxr_set_line_output_unit (&vh_desc, i, vh_xmit_unit);
-        }
     vh_dev.numunits = (vh_desc.lines / VH_LINES) + 3;
     if (vh_poll_unit)
         sim_cancel (vh_poll_unit);
     vh_poll_unit =  &vh_unit[(vh_desc.lines / VH_LINES) + 0];
     vh_poll_unit->action = &vh_svc;
     vh_poll_unit->flags = UNIT_DIS | UNIT_IDLE;
+    sim_set_uname (vh_poll_unit, "VH-RCV-CON");
+    vh_desc.uptr = vh_poll_unit;
     if (vh_xmit_unit)
         sim_cancel (vh_xmit_unit);
     vh_xmit_unit =  &vh_unit[(vh_desc.lines / VH_LINES) + 1];
     vh_xmit_unit->action = &vh_xmt_svc;
     vh_xmit_unit->flags = UNIT_DIS;
+    sim_set_uname (vh_xmit_unit, "VH-XMIT");
     if (vh_timer_unit)
         sim_cancel (vh_timer_unit);
     vh_timer_unit = &vh_unit[(vh_desc.lines / VH_LINES) + 2];
     vh_timer_unit->action = &vh_timersvc;
     vh_timer_unit->flags = UNIT_DIS | UNIT_IDLE;
+    sim_set_uname (vh_timer_unit, "VH-TIMER");
+    for (i = 0; i < vh_desc.lines; i++) {
+        vh_parm[i].tmln = &vh_ldsc[i];
+        tmxr_set_line_unit (&vh_desc, i, vh_poll_unit);
+        tmxr_set_line_output_unit (&vh_desc, i, vh_xmit_unit);
+        }
     for (i = 0; i < VH_MUXES; i++) {
         if (i < vh_desc.lines/VH_LINES) {
             /* if Unibus, force DHU mode */
