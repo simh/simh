@@ -2070,7 +2070,12 @@ static t_bool plugs_inited = FALSE;
 
 if (!plugs_inited ) {
     uint32 d;
+    char uname[16];
 
+    sprintf (uname, "%s-TIMER", dptr->name);
+    sim_set_uname (&dptr->units[4], uname);
+    sprintf (uname, "%s-QUESVC", dptr->name);
+    sim_set_uname (&dptr->units[5], uname);
     plugs_inited  = TRUE;
     for (d = 0; d < tq_dev.numunits - 2; d++)
         tq_unit[d].unit_plug = d;

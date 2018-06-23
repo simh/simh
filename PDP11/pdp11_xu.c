@@ -855,7 +855,13 @@ t_stat xu_reset(DEVICE* dptr)
   sim_debug(DBG_TRC, xu->dev, "xu_reset()\n");
   /* One time only initializations */
   if (!xu->var->initialized) {
+    char uname[16];
+
     xu->var->initialized = TRUE;
+    sprintf (uname, "%s-SVC", dptr->name);
+    sim_set_uname (&dptr->units[0], uname);
+    sprintf (uname, "%s-TMRSVC", dptr->name);
+    sim_set_uname (&dptr->units[1], uname);
     /* Set an initial MAC address in the DEC range */
     xu_setmac (dptr->units, 0, "08:00:2B:00:00:00/24", NULL);
     }

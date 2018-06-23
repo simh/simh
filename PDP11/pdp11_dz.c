@@ -785,6 +785,8 @@ sim_debug(DBG_TRC, dptr, "dz_reset()\n");
 if (dz_ldsc == NULL) {
     dz_desc.lines = DZ_MUXES * DZ_LINES;
     dz_desc.ldsc = dz_ldsc = (TMLN *)calloc (dz_desc.lines, sizeof(*dz_ldsc));
+    sim_set_uname (&dz_unit[0], "DZ-RCV-CON");
+    sim_set_uname (&dz_unit[1], "DZ-XMT");
     }
 if ((dz_desc.lines % DZ_LINES) != 0) {      /* Transition from Qbus to Unibus device */
     int32 newln = DZ_LINES * (1 + (dz_desc.lines / DZ_LINES));

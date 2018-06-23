@@ -2949,7 +2949,12 @@ if (cp->ctype == DEFAULT_CTYPE)
 
 if (!plugs_inited ) {
     uint32 d, u = 0;
+    char uname[16];
 
+    sprintf (uname, "%s-TIMER", dptr->name);
+    sim_set_uname (&dptr->units[4], uname);
+    sprintf (uname, "%s-QUESVC", dptr->name);
+    sim_set_uname (&dptr->units[5], uname);
     plugs_inited  = TRUE;
     for (i = 0; i < RQ_NUMCT; i++) {
         for (d = 0; d < rq_devmap[i]->numunits - 2; d++) {

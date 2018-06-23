@@ -2554,7 +2554,19 @@ t_stat xq_reset(DEVICE* dptr)
 
   /* One time only initializations */
   if (!xq->var->initialized) {
+    char uname[16];
+
     xq->var->initialized = TRUE;
+    sprintf (uname, "%s-SVC", dptr->name);
+    sim_set_uname (&dptr->units[0], uname);
+    sprintf (uname, "%s-TMRSVC", dptr->name);
+    sim_set_uname (&dptr->units[1], uname);
+    sprintf (uname, "%s-STARTSVC", dptr->name);
+    sim_set_uname (&dptr->units[2], uname);
+    sprintf (uname, "%s-RCVSVC", dptr->name);
+    sim_set_uname (&dptr->units[3], uname);
+    sprintf (uname, "%s-SRQRSVC", dptr->name);
+    sim_set_uname (&dptr->units[4], uname);
     /* Set an initial MAC address in the DEC range */
     xq_setmac (dptr->units, 0, "08:00:2B:00:00:00/24", NULL);
     }
