@@ -813,6 +813,7 @@ typedef struct {
     struct uq_ring      cq;                             /* cmd ring */
     struct uq_ring      rq;                             /* rsp ring */
     struct rqpkt        pak[RQ_NPKTS];                  /* packet queue */
+    uint16              max_plug;                       /* highest unit plug number */
     } MSC;
 
 /* debugging bitmaps */
@@ -1798,7 +1799,7 @@ UNIT *uptr;
 sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_gus\n");
 
 if (cp->pak[pkt].d[CMD_MOD] & MD_NXU) {                 /* next unit? */
-    if (lu == 65535) {                                  /* end of range? */
+    if (lu > cp->max_plug) {                            /* beyond last unit plug? */
         lu = 0;                                         /* reset to 0 */
         cp->pak[pkt].d[RSP_UN] = lu;
         }
@@ -3006,6 +3007,9 @@ for (i = 0; i < (RQ_NUMDR + 2); i++) {                  /* init units */
     if (uptr->rqxb == NULL)
         return SCPE_MEM;
     }
+for (i=cp->max_plug=0; i<RQ_NUMDR; i++)
+    if (dptr->units[i].unit_plug > cp->max_plug)
+        cp->max_plug = (uint16)dptr->units[i].unit_plug;
 return auto_config (0, 0);                              /* run autoconfig */
 }
 
