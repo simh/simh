@@ -243,7 +243,7 @@ int WriteAddr(int AR, t_int64 d, int NegZero)
         IAS[IAS_TimingRing] = d;
         IAS_NegativeZeroFlag[IAS_TimingRing] = NegZero;
         return 1;
-    } else if ((AR >= 0) && (AR < DRUMSIZE)) {
+    } else if ((AR >= 0) && (AR < DRUMSIZE) && (AR < MAXDRUMSIZE)) {
         if (d) NegZero = 0; // sanity check on Minus Zero
         DRUM[AR] = d;
         DRUM_NegativeZeroFlag[AR] = NegZero;
@@ -1536,8 +1536,8 @@ sim_instr(void)
             opname = DecodeOpcode(PR, &opcode, &DA, &IA);
             sim_debug(DEBUG_CMD, &cpu_dev, "Exec %04d: %02d %-6s %04d %04d %s%s\n", 
                                            IC, opcode, (opname == NULL) ? "???":opname, DA, IA,
-                                           (DRUM_Symbolic_Buffer[AR * 80] == 0) ? "" : "            symb: ", 
-                                           &DRUM_Symbolic_Buffer[AR * 80]);
+                                           ((AR >= MAXDRUMSIZE) || (DRUM_Symbolic_Buffer[AR * 80] == 0)) ? "" : "            symb: ", 
+                                           (AR >= MAXDRUMSIZE) ? "" : &DRUM_Symbolic_Buffer[AR * 80]);
             PROP = (uint16) opcode;
             if (opname == NULL) {
                 reason = STOP_UUO; 
