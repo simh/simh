@@ -406,16 +406,21 @@ main_argv = argv;
 
 #if SDL_MAJOR_VERSION == 1
 _XInitThreads();
-SDL_Init (SDL_INIT_VIDEO|SDL_INIT_NOPARACHUTE);
+status = SDL_Init (SDL_INIT_VIDEO|SDL_INIT_NOPARACHUTE);
 
 vid_main_thread_handle = SDL_CreateThread (main_thread , NULL);
 #else
 SDL_SetHint (SDL_HINT_RENDER_DRIVER, "software");
 
-SDL_Init (SDL_INIT_VIDEO);
+status = SDL_Init (SDL_INIT_VIDEO);
 
 vid_main_thread_handle = SDL_CreateThread (main_thread , "simh-main", NULL);
 #endif
+
+if (status) {
+    fprintf (stderr, "SDL Video subsystem can't initialize\n");
+    exit (1);
+    }
 
 sim_os_set_thread_priority (PRIORITY_ABOVE_NORMAL);
 
@@ -558,11 +563,11 @@ if (vid_active) {
 
         while (SDL_PushEvent (&user_event) < 0)
             sim_os_ms_sleep (10);
-        if (vid_thread_handle) {
-            SDL_WaitThread (vid_thread_handle, &status);
-            vid_thread_handle = NULL;
-            }
         vid_dev = NULL;
+        }
+    if (vid_thread_handle) {
+        SDL_WaitThread (vid_thread_handle, &status);
+        vid_thread_handle = NULL;
         }
     while (vid_ready)
         sim_os_ms_sleep (10);
@@ -1800,14 +1805,20 @@ return 0;
 
 int vid_thread (void *arg)
 {
+int stat;
+
 #if SDL_MAJOR_VERSION == 1
 _XInitThreads();
-SDL_Init (SDL_INIT_VIDEO|SDL_INIT_NOPARACHUTE);
+stat = SDL_Init (SDL_INIT_VIDEO|SDL_INIT_NOPARACHUTE);
 #else
 SDL_SetHint (SDL_HINT_RENDER_DRIVER, "software");
 
-SDL_Init (SDL_INIT_VIDEO);
+stat = SDL_Init (SDL_INIT_VIDEO);
 #endif
+if (stat) {
+    sim_printf ("SDL Video subsystem can't initialize\n");
+    return 0;
+    }
 vid_beep_setup (400, 660);
 vid_video_events ();
 vid_beep_cleanup ();
@@ -1864,7 +1875,10 @@ fprintf (st, "  SDL Events being processed on the main process thread\n");
 #endif
 if (!vid_active) {
 #if !defined (SDL_MAIN_AVAILABLE)
-    SDL_Init(SDL_INIT_VIDEO);
+    int stat = SDL_Init(SDL_INIT_VIDEO);
+
+    if (stat)
+        return sim_messagef (SCPE_OPENERR, "SDL_Init() failed.  Video subsystem is unavailable.\n");
 #endif
     }
 else {
