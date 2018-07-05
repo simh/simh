@@ -1,13 +1,19 @@
 This dirctory contains a set of Visual Studio 2008 build projects for the 
 current simh code base.  When used (with Visual Studio Express 2008 or 
-Visual Studio Express 2010) it populates a directory tree under the BIN 
-directory of the Simh distribution for temporary build files and produces 
-resulting executables in the BIN/NT/Win32-Debug or BIN/NT/Win32-Release 
-directories (depending on whether you target a Debug or Release build).  
+or a later Visual Studio version) it populates a directory tree under the 
+BIN directory of the Simh distribution for temporary build files and 
+produces resulting executables in the BIN/NT/Win32-Debug or 
+BIN/NT/Win32-Release directories (depending on whether you target a Debug 
+or Release build).
 
-The Visual Studio Projects expect that a winpcap developer pack and the
-Posix threads for windows package are available in a directory parallel 
-to the simh directory.  
+These projects, when used with Visual Studio 2008 will produce Release 
+build binaries that will run on Windows versions from XP onward.  Building
+with later versions of Visual Studio will have different Windows version
+compatibility.
+
+The Visual Studio Projects expect that various dependent packages that
+the simh code depends on are available in a directory parallel to the 
+simh directory.  
 
 For Example, the directory structure should look like:
 
@@ -33,7 +39,7 @@ To realize these benefits, you must build the desire simulator with
 USE_READER_THREAD defined.  The relevant simulators which have network 
 support are all of the VAX simulators and the PDP11 simulator.
 
-Additionally, simulators which contain devices which use the asynchronous
+Additionally, simulators which contain devices that use the asynchronous
 APIs in sim_disk.c and sim_tape.c can also achieve greater performance by
 leveraging pthreads to perform blocking I/O in separate threads.  Currently
 the simulators which have such devices are all of the VAX simulators and 

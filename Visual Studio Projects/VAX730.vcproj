@@ -21,7 +21,6 @@
 			OutputDirectory="..\BIN\NT\$(PlatformName)-$(ConfigurationName)"
 			IntermediateDirectory="..\BIN\NT\Project\simh\$(ProjectName)\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
-			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			CharacterSet="2"
 			>
 			<Tool
@@ -41,7 +40,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/PCRE/include/&quot;;&quot;../../windows-build/pthreads&quot;;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include"
+				AdditionalIncludeDirectories="../VAX/;../pdp11/;./;../;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include;../../windows-build/winpcap/Wpdpack/Include;../../windows-build/PCRE/include/;../../windows-build/pthreads;../../windows-build/libSDL/SDL2-2.0.5/include;../../windows-build/libpng-1.6.18"
 				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;VAX_730;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;SIM_ASYNCH_IO;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC;HAVE_SLIRP_NETWORK;USE_SIMH_SLIRP_DEBUG"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="0"
@@ -64,9 +63,9 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
-				AdditionalDependencies="wsock32.lib winmm.lib pcrestaticd.lib pcreposixstaticd.lib Iphlpapi.lib"
-				LinkIncremental="2"
-				AdditionalLibraryDirectories="../../winpcap/Wpdpack/Lib/;&quot;../../pthreads/Pre-built.2/lib/&quot;;&quot;../../windows-build/PCRE/lib/&quot;"
+				AdditionalDependencies="wsock32.lib winmm.lib Iphlpapi.lib pcrestaticd.lib pcreposixstaticd.lib SDL2-StaticD.lib SDL2_ttf-StaticD.lib freetype2412MT_D.lib libpng16.lib zlib.lib dxguid.lib Imm32.lib Version.lib"
+				LinkIncremental="1"
+				AdditionalLibraryDirectories="../../windows-build/lib/Debug/"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				StackReserveSize="10485760"
@@ -102,7 +101,6 @@
 			OutputDirectory="..\BIN\NT\$(PlatformName)-$(ConfigurationName)"
 			IntermediateDirectory="..\BIN\NT\Project\simh\$(ProjectName)\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
-			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			CharacterSet="2"
 			>
 			<Tool
@@ -127,7 +125,7 @@
 				FavorSizeOrSpeed="1"
 				OmitFramePointers="true"
 				WholeProgramOptimization="true"
-				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/PCRE/include/&quot;;&quot;../../windows-build/pthreads&quot;;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include"
+				AdditionalIncludeDirectories="../VAX/;../pdp11/;./;../;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include;../../windows-build/winpcap/Wpdpack/Include;../../windows-build/PCRE/include/;../../windows-build/pthreads;../../windows-build/libSDL/SDL2-2.0.5/include;../../windows-build/libpng-1.6.18"
 				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;VAX_730;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;SIM_ASYNCH_IO;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC;HAVE_SLIRP_NETWORK;USE_SIMH_SLIRP_DEBUG"
 				StringPooling="true"
 				RuntimeLibrary="0"
@@ -149,9 +147,9 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
-				AdditionalDependencies="wsock32.lib winmm.lib pcrestatic.lib pcreposixstatic.lib Iphlpapi.lib"
+				AdditionalDependencies="wsock32.lib winmm.lib Iphlpapi.lib pcrestatic.lib pcreposixstatic.lib SDL2-Static.lib SDL2_ttf-Static.lib freetype2412MT.lib libpng16.lib zlib.lib dxguid.lib Imm32.lib Version.lib"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="../../winpcap/Wpdpack/Lib/;&quot;../../pthreads/Pre-built.2/lib/&quot;;&quot;../../windows-build/PCRE/lib/&quot;"
+				AdditionalLibraryDirectories="../../windows-build/lib/Release/"
 				GenerateDebugInformation="false"
 				SubSystem="1"
 				StackReserveSize="10485760"

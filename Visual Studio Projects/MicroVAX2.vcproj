@@ -21,7 +21,6 @@
 			OutputDirectory="..\BIN\NT\$(PlatformName)-$(ConfigurationName)"
 			IntermediateDirectory="..\BIN\NT\Project\simh\$(ProjectName)\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
-			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			CharacterSet="0"
 			>
 			<Tool
@@ -41,7 +40,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/PCRE/include/&quot;;&quot;../../windows-build/pthreads&quot;;&quot;../../windows-build/libSDL/SDL2-2.0.5/include&quot;;&quot;../../windows-build/PCRE/include&quot;;&quot;../../windows-build/libpng-1.6.18&quot;;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include"
+				AdditionalIncludeDirectories="../VAX/;../pdp11/;../../windows-build/PCRE/include;./;../;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include;../../windows-build/winpcap/Wpdpack/Include;../../windows-build/PCRE/include/;../../windows-build/pthreads;../../windows-build/libSDL/SDL2-2.0.5/include;../../windows-build/libpng-1.6.18"
 				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;VAX_630;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;USE_SIM_VIDEO;HAVE_LIBSDL;SIM_ASYNCH_IO;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC;HAVE_LIBPNG;HAVE_SLIRP_NETWORK;USE_SIMH_SLIRP_DEBUG"
 				KeepComments="false"
 				MinimalRebuild="true"
@@ -65,9 +64,9 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
-				AdditionalDependencies="wsock32.lib winmm.lib SDL2-StaticD.lib dxguid.lib Imm32.lib Version.lib pcrestaticd.lib pcreposixstaticd.lib libpng16.lib zlib.lib Iphlpapi.lib"
-				LinkIncremental="2"
-				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;;&quot;../../windows-build/libSDL/SDL2-2.0.5/lib/&quot;;&quot;../../windows-build/libSDL/Microsoft DirectX SDK (June 2010)\Lib\x86&quot;;&quot;../../windows-build/PCRE/lib/&quot;;&quot;../../windows-build/libpng-1.6.18/projects/Debug Library&quot;"
+				AdditionalDependencies="wsock32.lib winmm.lib Iphlpapi.lib pcrestaticd.lib pcreposixstaticd.lib SDL2-StaticD.lib SDL2_ttf-StaticD.lib freetype2412MT_D.lib libpng16.lib zlib.lib dxguid.lib Imm32.lib Version.lib"
+				LinkIncremental="1"
+				AdditionalLibraryDirectories="../../windows-build/lib/Debug/"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				StackReserveSize="10485760"
@@ -103,7 +102,6 @@
 			OutputDirectory="..\BIN\NT\$(PlatformName)-$(ConfigurationName)"
 			IntermediateDirectory="..\BIN\NT\Project\simh\$(ProjectName)\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
-			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			CharacterSet="0"
 			>
 			<Tool
@@ -128,7 +126,7 @@
 				FavorSizeOrSpeed="1"
 				OmitFramePointers="true"
 				WholeProgramOptimization="false"
-				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/PCRE/include/&quot;;&quot;../../windows-build/pthreads&quot;;&quot;../../windows-build/libSDL/SDL2-2.0.5/include&quot;;&quot;../../windows-build/PCRE/include&quot;;&quot;../../windows-build/libpng-1.6.18&quot;;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include"
+				AdditionalIncludeDirectories="../VAX/;../pdp11/;../../windows-build/PCRE/include;./;../;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include;../../windows-build/winpcap/Wpdpack/Include;../../windows-build/PCRE/include/;../../windows-build/pthreads;../../windows-build/libSDL/SDL2-2.0.5/include;../../windows-build/libpng-1.6.18"
 				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;VAX_630;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;USE_SIM_VIDEO;HAVE_LIBSDL;SIM_ASYNCH_IO;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC;HAVE_LIBPNG;HAVE_SLIRP_NETWORK;USE_SIMH_SLIRP_DEBUG"
 				KeepComments="false"
 				StringPooling="true"
@@ -152,9 +150,9 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
-				AdditionalDependencies="wsock32.lib winmm.lib SDL2-Static.lib dxguid.lib Imm32.lib Version.lib pcrestatic.lib pcreposixstatic.lib libpng16.lib zlib.lib Iphlpapi.lib"
+				AdditionalDependencies="wsock32.lib winmm.lib Iphlpapi.lib pcrestatic.lib pcreposixstatic.lib SDL2-Static.lib SDL2_ttf-Static.lib freetype2412MT.lib libpng16.lib zlib.lib dxguid.lib Imm32.lib Version.lib"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;;&quot;../../windows-build/libSDL/SDL2-2.0.5/lib/&quot;;&quot;../../windows-build/libSDL/Microsoft DirectX SDK (June 2010)\Lib\x86&quot;;&quot;../../windows-build/PCRE/lib/&quot;;&quot;../../windows-build/libpng-1.6.18/projects/Release Library&quot;"
+				AdditionalLibraryDirectories="../../windows-build/lib/Release/"
 				GenerateDebugInformation="false"
 				SubSystem="1"
 				StackReserveSize="10485760"

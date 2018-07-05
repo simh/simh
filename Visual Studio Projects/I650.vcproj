@@ -21,7 +21,6 @@
 			OutputDirectory="..\BIN\NT\$(PlatformName)-$(ConfigurationName)"
 			IntermediateDirectory="..\BIN\NT\Project\simh\$(ProjectName)\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
-			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			CharacterSet="0"
 			>
 			<Tool
@@ -36,15 +35,12 @@
 				Name="VCXMLDataGeneratorTool"
 			/>
 			<Tool
-				Name="VCWebServiceProxyGeneratorTool"
-			/>
-			<Tool
 				Name="VCMIDLTool"
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="./;../;../I650/;&quot;../../windows-build/PCRE/include/&quot;"
+				AdditionalIncludeDirectories="../I650/;./;../;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include;../../windows-build/winpcap/Wpdpack/Include;../../windows-build/PCRE/include/;../../windows-build/pthreads;../../windows-build/libSDL/SDL2-2.0.5/include;../../windows-build/libpng-1.6.18"
 				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC;USE_SIM_CARD;USE_INT64"
 				KeepComments="false"
 				MinimalRebuild="true"
@@ -67,9 +63,9 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="wsock32.lib winmm.lib pcrestaticd.lib pcreposixstaticd.lib"
-				LinkIncremental="2"
-				AdditionalLibraryDirectories="../../windows-build/PCRE/lib/"
+				AdditionalDependencies="wsock32.lib winmm.lib Iphlpapi.lib pcrestaticd.lib pcreposixstaticd.lib SDL2-StaticD.lib SDL2_ttf-StaticD.lib freetype2412MT_D.lib libpng16.lib zlib.lib dxguid.lib Imm32.lib Version.lib"
+				LinkIncremental="1"
+				AdditionalLibraryDirectories="../../windows-build/lib/Debug/"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				StackReserveSize="10485760"
@@ -105,7 +101,6 @@
 			OutputDirectory="..\BIN\NT\$(PlatformName)-$(ConfigurationName)"
 			IntermediateDirectory="..\BIN\NT\Project\simh\$(ProjectName)\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
-			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			CharacterSet="0"
 			>
 			<Tool
@@ -120,9 +115,6 @@
 				Name="VCXMLDataGeneratorTool"
 			/>
 			<Tool
-				Name="VCWebServiceProxyGeneratorTool"
-			/>
-			<Tool
 				Name="VCMIDLTool"
 			/>
 			<Tool
@@ -130,7 +122,7 @@
 				Optimization="2"
 				InlineFunctionExpansion="1"
 				OmitFramePointers="true"
-				AdditionalIncludeDirectories="./;../;../I650/;&quot;../../windows-build/PCRE/include/&quot;"
+				AdditionalIncludeDirectories="../I650/;./;../;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include;../../windows-build/winpcap/Wpdpack/Include;../../windows-build/PCRE/include/;../../windows-build/pthreads;../../windows-build/libSDL/SDL2-2.0.5/include;../../windows-build/libpng-1.6.18"
 				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC;USE_SIM_CARD;USE_INT64"
 				StringPooling="true"
 				RuntimeLibrary="0"
@@ -151,9 +143,9 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="wsock32.lib winmm.lib pcrestatic.lib pcreposixstatic.lib"
+				AdditionalDependencies="wsock32.lib winmm.lib Iphlpapi.lib pcrestatic.lib pcreposixstatic.lib SDL2-Static.lib SDL2_ttf-Static.lib freetype2412MT.lib libpng16.lib zlib.lib dxguid.lib Imm32.lib Version.lib"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="../../windows-build/PCRE/lib/"
+				AdditionalLibraryDirectories="../../windows-build/lib/Release/"
 				GenerateDebugInformation="false"
 				SubSystem="1"
 				StackReserveSize="10485760"
