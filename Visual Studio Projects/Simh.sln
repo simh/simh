@@ -269,6 +269,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "3B2", "3B2.vcproj", "{56178
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "I701", "I701.vcproj", "{F1F44607-FB9E-428C-AD8F-56F98699D121}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "I7090", "I7090.vcproj", "{33EE34FC-A12F-47FE-9FD6-8B74D08718C7}"
 	ProjectSection(ProjectDependencies) = postProject
