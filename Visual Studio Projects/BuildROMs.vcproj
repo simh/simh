@@ -26,7 +26,7 @@
 			<Tool
 				Name="VCPreBuildEventTool"
 				Description="Check for required build dependencies &amp; git commit id"
-				CommandLine="Pre-Build-Event.cmd $(InputFileName) BUILD"
+				CommandLine="Pre-Build-Event.cmd BUILD"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
