@@ -208,11 +208,18 @@ DIB clk_dib = {
 
 UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE, 0), CLK_DELAY };
 
+BITFIELD clk_bits[] = {
+    BITNCF(6),                              /* MBZ */
+    BIT(IE),                                /* Interrupt Enable */
+    BIT(DONE),                              /* Done */
+    ENDBITS
+};
+
 REG clk_reg[] = {
-    { ORDATA (CSR, clk_csr, 16) },
-    { FLDATA (INT, IREQ (CLK), INT_V_CLK) },
-    { FLDATA (DONE, clk_csr, CSR_V_DONE) },
-    { FLDATA (IE, clk_csr, CSR_V_IE) },
+    { ORDATADF (CSR, clk_csr, 16, "Control Status Register", clk_bits) },
+    { FLDATAD (INT, IREQ (CLK), INT_V_CLK, "Processor Interrupt Pending") },
+    { FLDATAD (DONE, clk_csr, CSR_V_DONE, "Tick Interval Complete") },
+    { FLDATAD (IE, clk_csr, CSR_V_IE, "Interrupt Enabled") },
     { DRDATA (TIME, clk_unit.wait, 24), REG_NZ + PV_LEFT },
     { DRDATA (TPS, clk_tps, 16), PV_LEFT + REG_HRO },
     { DRDATA (DEFTPS, clk_default, 16), PV_LEFT + REG_HRO },
@@ -235,12 +242,26 @@ MTAB clk_mod[] = {
     { 0 }
     };
 
+#define DBG_RREG     1   /* register read access */
+#define DBG_WREG     2   /* register write access */
+#define DBG_INT      4   /* interrupt activity */
+#define DBG_INTA     8   /* interrupt activity */
+
+DEBTAB clk_debug[] = {
+  {"RREG",  DBG_RREG,   "register read access"},
+  {"WREG",  DBG_WREG,   "register write access"},
+  {"INT",   DBG_INT,    "interrupt activity"},
+  {"INTA",  DBG_INTA,   "interrupt acknowledgement"},
+  {0}
+};
+
 DEVICE clk_dev = {
     "CLK", &clk_unit, clk_reg, clk_mod,
     1, 0, 0, 0, 0, 0,
     NULL, NULL, &clk_reset,
     NULL, NULL, NULL,
-    &clk_dib, DEV_UBUS | DEV_QBUS
+    &clk_dib, DEV_DEBUG | DEV_UBUS | DEV_QBUS, 0,
+    clk_debug
     };
 
 /* Terminal input address routines */
@@ -416,16 +437,21 @@ return SCPE_OK;
 
 t_stat clk_rd (int32 *data, int32 PA, int32 access)
 {
+int32 orig_csr = clk_csr;
+
 if (clk_fnxm)                                           /* not there??? */
     return SCPE_NXM;
 if (CPUT (HAS_LTCM))                                    /* monitor bit? */
     *data = clk_csr & CLKCSR_IMP;
 else *data = clk_csr & (CLKCSR_IMP & ~CSR_DONE);        /* no, just IE */
+sim_debug_bits(DBG_RREG, &clk_dev, clk_bits, orig_csr, *data, 1);
 return SCPE_OK;
 }
 
 t_stat clk_wr (int32 data, int32 PA, int32 access)
 {
+int32 orig_csr = clk_csr;
+
 if (clk_fnxm)                                           /* not there??? */
     return SCPE_NXM;
 if (PA & 1)
@@ -434,8 +460,11 @@ clk_csr = (clk_csr & ~CLKCSR_RW) | (data & CLKCSR_RW);
 if (CPUT (HAS_LTCM) && ((data & CSR_DONE) == 0))        /* monitor bit? */
     clk_csr = clk_csr & ~CSR_DONE;                      /* clr if zero */
 if ((((clk_csr & CSR_IE) == 0) && !clk_fie) ||          /* unless IE+DONE */
-    ((clk_csr & CSR_DONE) == 0))                        /* clr intr */
+    ((clk_csr & CSR_DONE) == 0)) {                      /* clr intr */
     CLR_INT (CLK);
+    sim_debug (DBG_INT, &clk_dev, "CLR_INT(CLK)\n");
+    }
+sim_debug_bits(DBG_WREG, &clk_dev, clk_bits, orig_csr, clk_csr, 1);
 return SCPE_OK;
 }
 
@@ -446,8 +475,10 @@ t_stat clk_svc (UNIT *uptr)
 int32 t;
 
 clk_csr = clk_csr | CSR_DONE;                           /* set done */
-if ((clk_csr & CSR_IE) || clk_fie)
+if ((clk_csr & CSR_IE) || clk_fie) {
     SET_INT (CLK);
+    sim_debug (DBG_INT, &clk_dev, "SET_INT(CLK)\n");
+    }
 t = sim_rtcn_calb (clk_tps, TMR_CLK);                   /* calibrate clock */
 sim_activate_after (uptr, 1000000/clk_tps);             /* reactivate unit */
 tmr_poll = t;                                           /* set timer poll */
@@ -461,6 +492,7 @@ int32 clk_inta (void)
 {
 if (CPUT (CPUT_24))
     clk_csr = clk_csr & ~CSR_DONE;
+sim_debug (DBG_INTA, &clk_dev, "clk_inta() returning vector 0%o\n", clk_dib.vec);
 return clk_dib.vec;
 }
 
