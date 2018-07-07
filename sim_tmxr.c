@@ -3755,7 +3755,7 @@ pthread_mutex_unlock (&sim_tmxr_poll_lock);
 #endif
 }
 
-static t_stat _tmxr_locate_line_send_expect (const char *cptr, SEND **snd, EXPECT **exp)
+static t_stat _tmxr_locate_line_send_expect (const char *cptr, TMLN **lp, SEND **snd, EXPECT **exp)
 {
 char gbuf[CBUFSIZE];
 DEVICE *dptr;
@@ -3776,6 +3776,8 @@ for (i=0; i<tmxr_open_device_count; ++i)
         int line = (int)get_uint (cptr, 10, tmxr_open_devices[i]->lines, &r);
         if (r != SCPE_OK)
             return r;
+        if (lp)
+            *lp = &tmxr_open_devices[i]->ldsc[line];
         if (snd)
             *snd = &tmxr_open_devices[i]->ldsc[line].send;
         if (exp)
@@ -3787,12 +3789,17 @@ return SCPE_ARG;
 
 t_stat tmxr_locate_line_send (const char *cptr, SEND **snd)
 {
-return _tmxr_locate_line_send_expect (cptr, snd, NULL);
+return _tmxr_locate_line_send_expect (cptr, NULL, snd, NULL);
 }
 
 t_stat tmxr_locate_line_expect (const char *cptr, EXPECT **exp)
 {
-return _tmxr_locate_line_send_expect (cptr, NULL, exp);
+return _tmxr_locate_line_send_expect (cptr, NULL, NULL, exp);
+}
+
+t_stat tmxr_locate_line (const char *cptr, TMLN **lp)
+{
+return _tmxr_locate_line_send_expect (cptr, lp, NULL, NULL);
 }
 
 static const char *_tmxr_send_expect_line_name (const SEND *snd, const EXPECT *exp)

@@ -1761,7 +1761,10 @@ static const char simh_help[] =
       " followed by a newline:\n\n"
        /***************** 80 character line width template *************************/
       "++ECHOF {-n} \"<string>\"|<string>   output string to console\n\n"
-      " If there is no argument, ECHOF prints a blank line on the console.\n"
+      " The ECHOF command can also print output on a specified multiplexer line\n"
+      " (and log) followed by a newline:\n\n"
+      "++ECHOF {-n} dev:line \"<string>\"|<string>   output string to specified line\n\n"
+      " If there is no argument, ECHOF prints a blank line.\n"
       " The string argument may be delimited by quote characters.  Quotes may\n"
       " be either single or double but the opening and closing quote characters\n"
       " must match.  If the string is enclosed in quotes, the string may\n"
@@ -3238,12 +3241,21 @@ return SCPE_OK;
 t_stat echof_cmd (int32 flag, CONST char *cptr)
 {
 char gbuf[CBUFSIZE];
-uint8 dbuf[CBUFSIZE];
+CONST char *tptr;
+TMLN *lp = NULL;
+uint8 dbuf[4*CBUFSIZE];
 uint32 dsize = 0;
+t_stat r;
 
 GET_SWITCHES (cptr);
-if (!*cptr)
-    return SCPE_2FARG;
+tptr = get_glyph (cptr, gbuf, ',');
+if (sim_isalpha(gbuf[0]) && (strchr (gbuf, ':'))) {
+    r = tmxr_locate_line (gbuf, &lp);
+    if (r != SCPE_OK)
+        return r;
+    cptr = tptr;
+    }
+GET_SWITCHES (cptr);
 if ((*cptr == '"') || (*cptr == '\'')) {
     cptr = get_glyph_quoted (cptr, gbuf, 0);
     if (*cptr != '\0')
@@ -3253,7 +3265,12 @@ if ((*cptr == '"') || (*cptr == '\'')) {
     dbuf[dsize] = 0;
     cptr = (char *)dbuf;
     }
-sim_printf ("%s%s", cptr, (sim_switches & SWMASK('N')) ? "" : "\n");
+if (lp) {
+    tmxr_linemsgf (lp, "%s%s", cptr, (sim_switches & SWMASK('N')) ? "" : "\r\n");
+    tmxr_send_buffered_data (lp);
+    }
+else
+    sim_printf ("%s%s", cptr, (sim_switches & SWMASK('N')) ? "" : "\n");
 return SCPE_OK;
 }
 

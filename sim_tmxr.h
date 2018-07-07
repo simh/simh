@@ -295,6 +295,7 @@ t_stat tmxr_clock_coschedule_tmr_abs (UNIT *uptr, int32 tmr, int32 ticks);
 t_stat tmxr_change_async (void);
 t_stat tmxr_locate_line_send (const char *dev_line, SEND **snd);
 t_stat tmxr_locate_line_expect (const char *dev_line, EXPECT **exp);
+t_stat tmxr_locate_line (const char *dev_line, TMLN **lp);
 const char *tmxr_send_line_name (const SEND *snd);
 const char *tmxr_expect_line_name (const EXPECT *exp);
 t_stat tmxr_startup (void);
