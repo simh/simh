@@ -4198,11 +4198,11 @@ for (i=0; i<mp->lines; i++) {
         if ((tmxr_tqln(lp)) &&          /* pending output data */
             (lp->txnexttime < sim_gtime_now))/* that can be transmitted now? */
             tmxr_send_buffered_data (lp);/* flush it */
-        if (tmxr_tqln(lp) == 0)         /* no pending output data */
-            due = interval;             /* No rush */
+        if (lp->txnexttime > sim_gtime_now)
+            due = (int32)(lp->txnexttime - sim_gtime_now);
         else {
-            if (lp->txnexttime > sim_gtime_now)
-                due = (int32)(lp->txnexttime - sim_gtime_now);
+            if (tmxr_tqln(lp) == 0)         /* no pending output data */
+                due = interval;             /* No rush */
             else
                 due = sim_processing_event ? 1 : 0; /* avoid potential infinite loop if called from service routine */
             }
