@@ -434,13 +434,22 @@ return;
 uint32 sim_os_ms_sleep_init (void)
 {
 TIMECAPS timers;
+MMRESULT mm_status;
 
-if (timeGetDevCaps (&timers, sizeof (timers)) != TIMERR_NOERROR)
+mm_status = timeGetDevCaps (&timers, sizeof (timers));
+if (mm_status != TIMERR_NOERROR) {
+    fprintf (stderr, "timeGetDevCaps() returned: 0x%X, Last Error: 0x%X\n", mm_status, GetLastError());
     return 0;
-if (timers.wPeriodMin == 0)
+    }
+if (timers.wPeriodMin == 0) {
+    fprintf (stderr, "Unreasonable MultiMedia timer minimum value of 0\n");
     return 0;
-if (timeBeginPeriod (timers.wPeriodMin) != TIMERR_NOERROR)
+    }
+mm_status = timeBeginPeriod (timers.wPeriodMin);
+if (mm_status != TIMERR_NOERROR) {
+    fprintf (stderr, "timeBeginPeriod() returned: 0x%X, Last Error: 0x%X\n", mm_status, GetLastError());
     return 0;
+    }
 atexit (sim_timer_exit);
 /* return measured actual minimum sleep time */
 return _compute_minimum_sleep ();
@@ -1055,8 +1064,15 @@ do {
         sim_os_clock_resoluton_ms = clock_diff;
     clock_last = clock_now;
     } while (clock_now < clock_start + 100);
-sim_os_tick_hz = 1000/(sim_os_clock_resoluton_ms * (sim_idle_rate_ms/sim_os_clock_resoluton_ms));
-return (sim_idle_rate_ms != 0);
+if ((sim_idle_rate_ms != 0) && (sim_os_clock_resoluton_ms != 0))
+    sim_os_tick_hz = 1000/(sim_os_clock_resoluton_ms * (sim_idle_rate_ms/sim_os_clock_resoluton_ms));
+else {
+    fprintf (stderr, "Can't properly determine host system clock capabilities.\n");
+    fprintf (stderr, "Minimum Host Sleep Time:       %u ms\n", sim_os_sleep_min_ms);
+    fprintf (stderr, "Minimum Host Sleep Incr Time:  %u ms\n", sim_os_sleep_inc_ms);
+    fprintf (stderr, "Host Clock Resolution:         %u ms\n", sim_os_clock_resoluton_ms);
+    }
+return ((sim_idle_rate_ms == 0) || (sim_os_clock_resoluton_ms == 0));
 }
 
 /* sim_timer_idle_capable - tell if the host is Idle capable and what the host OS tick size is */
@@ -1255,6 +1271,7 @@ return SCPE_OK;
 
 REG sim_timer_reg[] = {
     { DRDATAD (IDLE_CYC_MS,      sim_idle_cyc_ms,        32, "Cycles Per Millisecond"), PV_RSPC|REG_RO},
+    { DRDATAD (IDLE_STABLE,      sim_idle_stable,        32, "IDLE stability delay"), PV_RSPC},
     { DRDATAD (ROM_DELAY,        sim_rom_delay,          32, "ROM memory reference delay"), PV_RSPC|REG_RO},
     { DRDATAD (TICK_RATE_0,      rtc_hz[0],              32, "Timer 0 Ticks Per Second") },
     { DRDATAD (TICK_SIZE_0,      rtc_currd[0],           32, "Timer 0 Tick Size") },
