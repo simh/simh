@@ -2416,17 +2416,23 @@ sim_is_running = FALSE;
 sim_log = NULL;
 if (sim_emax <= 0)
     sim_emax = 1;
-sim_timer_init ();
+if (sim_timer_init ()) {
+    fprintf (stderr, "Fatal timer initialization error\n");
+    read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
+    return 0;
+    }
 sim_register_internal_device (&sim_expect_dev);
 sim_register_internal_device (&sim_step_dev);
 
 if ((stat = sim_ttinit ()) != SCPE_OK) {
     fprintf (stderr, "Fatal terminal initialization error\n%s\n",
         sim_error_text (stat));
+    read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
     return 0;
     }
 if ((sim_eval = (t_value *) calloc (sim_emax, sizeof (t_value))) == NULL) {
     fprintf (stderr, "Unable to allocate examine buffer\n");
+    read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
     return 0;
     };
 if (sim_dflt_dev == NULL)                               /* if no default */
@@ -2434,11 +2440,13 @@ if (sim_dflt_dev == NULL)                               /* if no default */
 if ((stat = reset_all_p (0)) != SCPE_OK) {
     fprintf (stderr, "Fatal simulator initialization error\n%s\n",
         sim_error_text (stat));
+    read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
     return 0;
     }
 if ((stat = sim_brk_init ()) != SCPE_OK) {
     fprintf (stderr, "Fatal breakpoint table initialization error\n%s\n",
         sim_error_text (stat));
+    read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
     return 0;
     }
 signal (SIGINT, int_handler);

@@ -257,7 +257,10 @@ else
   if (stat == ETIMEDOUT)
     timedout = TRUE;
   else {
-    fprintf (stderr, "sim_idle_ms_sleep(%u): pthread_cond_timedwait() return %d - %s\n", msec, stat, strerror (stat));
+    char ans[32];
+
+    fprintf (stderr, "sim_idle_ms_sleep(%u): pthread_cond_timedwait() return %d - %s\r\n", msec, stat, strerror (stat));
+    read_line_p ("Hit Return to exit: ", ans, sizeof (ans) - 1, stdin);
     abort ();
     }
 sim_idle_wait = FALSE;
