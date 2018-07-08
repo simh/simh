@@ -391,7 +391,7 @@ static uint32   vh_rxi = 0; /* rcv interrupts */
 static uint32   vh_txi = 0; /* xmt interrupts */
 static uint32   vh_crit = 0;/* FIFO.CRIT */
 
-static uint32   vh_wait = 0;                    /* input polling adjustment */
+static uint32   vh_wait = 50;                   /* input polling adjustment */
 
 static const int32 bitmask[4] = { 037, 077, 0177, 0377 };
 
@@ -525,7 +525,7 @@ static const REG vh_reg[] = {
     { GRDATAD  (RCVINT,      vh_rxi, DEV_RDX, 32, 0,        "rcv interrupts 1 bit/channel") },
     { GRDATAD  (TXINT,       vh_txi, DEV_RDX, 32, 0,        "xmt interrupts 1 bit/channel") },
     { GRDATAD  (FIFOCRIT,   vh_crit, DEV_RDX, 32, 0,        "FIFO.CRIT 1 bit/channel") },
-    { DRDATAD  (TIME,       vh_wait, 24,                    "input polling adjustment"), PV_LEFT },
+    { DRDATAD  (TIME,       vh_wait, 24,                    "Slow DMA start delay"), PV_LEFT },
     { GRDATA   (DEVADDR,  vh_dib.ba, DEV_RDX, 32, 0), REG_HRO },
     { GRDATA   (DEVVEC,  vh_dib.vec, DEV_RDX, 16, 0), REG_HRO },
     { NULL }
@@ -644,7 +644,7 @@ static int32 vh_rxinta (void)
 
     for (vh = 0; vh < vh_desc.lines/VH_LINES; vh++) {
         if (vh_rxi & (1 << vh)) {
-            sim_debug(DBG_INT, &vh_dev, "vh_rzinta(vh=%d)\n", vh);
+            sim_debug(DBG_INT, &vh_dev, "vh_rxinta(vh=%d)\n", vh);
             vh_clr_rxint (vh);
             return (vh_dib.vec + (vh * 010));
         }
@@ -663,6 +663,7 @@ static void vh_clr_txint (  int32   vh  )
 
 static void vh_set_txint (  int32   vh  )
 {
+    sim_debug(DBG_INT, &vh_dev, "vh_set_txint(vh=%d)\n", vh);
     vh_txi |= (1 << vh);
     SET_INT (VHTX);
 }
@@ -1295,9 +1296,9 @@ static t_stat vh_wr (   int32   ldata,
                 (lp->tbuf2 & ~0377) | (data & 0377);
         lp->tbuf2 = data;
         /* if starting a DMA, clear DMA_ERR */
-        if (vh_unit[vh].flags & UNIT_FASTDMA) {
-            doDMA (vh, CSR_GETCHAN (vh_csr[vh]));
-            sim_activate_after_abs (vh_xmit_unit, lp->tmln->txdeltausecs);
+        if ((data & TB2_TX_ENA) && (data & TB2_TX_DMA_START)) {
+            sim_debug (DBG_XMTSCH, &vh_dev, "VH-%d DMA Starting: After %d\n", vh, (vh_unit[vh].flags & UNIT_FASTDMA) ? vh_wait/10 : vh_wait);
+            sim_activate_after_abs (vh_xmit_unit, (vh_unit[vh].flags & UNIT_FASTDMA) ? vh_wait/10 : vh_wait);
         }
         break;
     case 7:     /* TBUFFCT */
@@ -1355,7 +1356,7 @@ static void doDMA ( int32   vh,
         lp->tbuf1 = pa & 0177777;
         lp->tbuf2 = (lp->tbuf2 & ~TB2_M_TBUFFAD) |
                 ((pa >> 16) & TB2_M_TBUFFAD);
-        sim_debug (DBG_XMTSCH, &vh_dev, "VH-%d DMAed: %d, remaining: %u - %s\n", (int)(lp - vh_parm), sent, lp->tbuffct, sim_error_text (status));
+        sim_debug (DBG_XMTSCH, &vh_dev, "VH-%d DMAed: %d, remaining: %u - %d\n", (int)(lp - vh_parm), sent, lp->tbuffct, status);
         if ((sent == 0) &&
             ((lp->tbuffct == 0) || (!lp->tmln->conn))) {
             lp->tbuf2 &= ~TB2_TX_DMA_START;
@@ -1406,6 +1407,7 @@ static t_stat vh_svc (  UNIT    *uptr   )
     int32   vh, newln;
 
     sim_debug(DBG_TRC, find_dev_from_unit(uptr), "vh_svc()\n");
+    sim_debug(DBG_RCVSCH, find_dev_from_unit(uptr), "vh_svc()\n");
 
     /* sample every 10ms for modem changes (new connections) */
     newln = tmxr_poll_conn (&vh_desc);
@@ -1437,6 +1439,7 @@ static t_stat vh_xmt_svc (  UNIT    *uptr   )
     int32   vh, i;
 
     sim_debug(DBG_TRC, find_dev_from_unit(uptr), "vh_xmt_svc()\n");
+    sim_debug(DBG_XMTSCH, find_dev_from_unit(uptr), "vh_xmt_svc()\n");
 
     /* scan all muxes lines */
     for (vh = 0; vh < vh_desc.lines/VH_LINES; vh++) {
