@@ -239,6 +239,7 @@ uint32 sim_idle_ms_sleep (unsigned int msec)
 uint32 start_time = sim_os_msec();
 struct timespec done_time;
 t_bool timedout = FALSE;
+int stat;
 
 clock_gettime(CLOCK_REALTIME, &done_time);
 done_time.tv_sec += (msec/1000);
@@ -249,10 +250,16 @@ if (done_time.tv_nsec > 1000000000) {
   }
 pthread_mutex_lock (&sim_asynch_lock);
 sim_idle_wait = TRUE;
-if (!pthread_cond_timedwait (&sim_asynch_wake, &sim_asynch_lock, &done_time))
+stat = pthread_cond_timedwait (&sim_asynch_wake, &sim_asynch_lock, &done_time);
+if (stat == 0)
   sim_asynch_check = 0;                 /* force check of asynch queue now */
 else
-  timedout = TRUE;
+  if (stat == ETIMEDOUT)
+    timedout = TRUE;
+  else {
+    fprintf (stderr, "sim_idle_ms_sleep(%u): pthread_cond_timedwait() return %d - %s\n", msec, stat, strerror (stat));
+    abort ();
+    }
 sim_idle_wait = FALSE;
 pthread_mutex_unlock (&sim_asynch_lock);
 if (!timedout) {
