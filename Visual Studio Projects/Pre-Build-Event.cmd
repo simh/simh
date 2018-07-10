@@ -259,10 +259,24 @@ rem several projects can start execution at almost the same time.
 rem
 SET GIT_COMMIT_ID=
 SET GIT_COMMIT_TIME=
-if not exist ..\.git-commit-id goto _NoId
+if not exist ..\.git-commit-id goto _do_hooks
 for /F "usebackq tokens=2" %%i in (`findstr /C:SIM_GIT_COMMIT_ID ..\.git-commit-id`) do SET GIT_COMMIT_ID=%%i
 for /F "usebackq tokens=2" %%i in (`findstr /C:SIM_GIT_COMMIT_TIME ..\.git-commit-id`) do SET GIT_COMMIT_TIME=%%i
-:_NoId
+rem
+rem Some 'git' environments don't honor the installed hooks (Visual 
+rem Studio 2015 for example), and in this case the initially generated
+rem .git-commit-id file won't get updated.  We can't be sure of this 
+rem detail, so perform a manual check now.
+SET _GIT_COMMIT_ID_TEMP=.git-commit-id-temp-%RANDOM%
+"%_GIT_GIT%" log -1 --pretty="SIM_GIT_COMMIT_ID %%H%%nSIM_GIT_COMMIT_TIME %%aI" >%_GIT_COMMIT_ID_TEMP%
+for /F "usebackq tokens=2" %%i in (`findstr /C:SIM_GIT_COMMIT_ID %_GIT_COMMIT_ID_TEMP%`) do SET CURRENT_GIT_COMMIT_ID=%%i
+for /F "usebackq tokens=2" %%i in (`findstr /C:SIM_GIT_COMMIT_TIME %_GIT_COMMIT_ID_TEMP%`) do SET CURRENT_GIT_COMMIT_TIME=%%i
+if "%CURRENT_GIT_COMMIT_ID%" neq "%GIT_COMMIT_ID%" move /Y %_GIT_COMMIT_ID_TEMP% ..\.git-commit-id
+if "%CURRENT_GIT_COMMIT_ID%" equ "%GIT_COMMIT_ID%" del %_GIT_COMMIT_ID_TEMP%
+SET _GIT_COMMIT_ID_TEMP=
+SET CURRENT_GIT_COMMIT_ID=
+SET CURRENT_GIT_COMMIT_TIME=
+:_VerifyGitCommitId.h
 SET OLD_GIT_COMMIT_ID=
 if not exist .git-commit-id.h echo.>.git-commit-id.h
 for /F "usebackq tokens=3" %%i in (`findstr /C:SIM_GIT_COMMIT_ID .git-commit-id.h`) do SET OLD_GIT_COMMIT_ID=%%i
