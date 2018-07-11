@@ -248,9 +248,9 @@ if (done_time.tv_nsec > 1000000000) {
   done_time.tv_sec += done_time.tv_nsec/1000000000;
   done_time.tv_nsec = done_time.tv_nsec%1000000000;
   }
-pthread_mutex_lock (&sim_asynch_lock);
+pthread_mutex_lock (&sim_idle_lock);
 sim_idle_wait = TRUE;
-stat = pthread_cond_timedwait (&sim_asynch_wake, &sim_asynch_lock, &done_time);
+stat = pthread_cond_timedwait (&sim_asynch_wake, &sim_idle_lock, &done_time);
 if (stat == 0)
   sim_asynch_check = 0;                 /* force check of asynch queue now */
 else
@@ -264,7 +264,7 @@ else
     abort ();
     }
 sim_idle_wait = FALSE;
-pthread_mutex_unlock (&sim_asynch_lock);
+pthread_mutex_unlock (&sim_idle_lock);
 if (!timedout) {
     AIO_UPDATE_QUEUE;
     }
