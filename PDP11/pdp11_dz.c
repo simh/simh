@@ -668,7 +668,7 @@ for (dz = 0; dz < dz_desc.lines/DZ_LINES; dz++) {       /* loop thru muxes */
     for (i = 0; i < DZ_LINES; i++) {                    /* loop thru lines */
         j = (j + 1) & DZ_LNOMASK;                       /* next line */
         line = (dz * DZ_LINES) + j;                     /* get line num */
-        if ((linemask & (1 << j)) && dz_ldsc[line].xmte) {
+        if ((linemask & (1 << j)) && tmxr_txdone_ln (&dz_ldsc[line])) {
             CSR_PUTTL (dz_csr[dz], j);                  /* put ln in csr */
             dz_csr[dz] |= CSR_TRDY;                     /* set xmt rdy */
             break;

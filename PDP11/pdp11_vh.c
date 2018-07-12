@@ -1357,8 +1357,10 @@ static void doDMA ( int32   vh,
         lp->tbuf2 = (lp->tbuf2 & ~TB2_M_TBUFFAD) |
                 ((pa >> 16) & TB2_M_TBUFFAD);
         sim_debug (DBG_XMTSCH, &vh_dev, "VH-%d DMAed: %d, remaining: %u - %d\n", (int)(lp - vh_parm), sent, lp->tbuffct, status);
-        if ((sent == 0) &&
-            ((lp->tbuffct == 0) || (!lp->tmln->conn))) {
+        if (((tmxr_txdone_ln (lp->tmln)) &&
+             (sent == 0) &&
+             (lp->tbuffct == 0)) || 
+            (!lp->tmln->conn)) {
             lp->tbuf2 &= ~TB2_TX_DMA_START;
             q_tx_report (vh, status);
             lp->txstate = TXS_IDLE;
@@ -1453,6 +1455,8 @@ static t_stat vh_xmt_svc (  UNIT    *uptr   )
                     sim_debug (DBG_XMTSCH, &vh_dev, "VH-%d PIO: %s - 0x%X\n", (int)(lp - vh_parm), (lp->txstate == TXS_PIO_PENDING) ? "Pending" : ((lp->txstate == TXS_PIO_START) ? "Starting" : "Unknown"), lp->txchar & 0xFF);
                     switch (lp->txstate) {
                         case TXS_PIO_PENDING:
+                            if (0 == tmxr_txdone_ln (lp->tmln))     /* actually done? */
+                                break;
                             q_tx_report (vh,
                                 CSR_GETCHAN (vh_csr[vh]) << CSR_V_TX_LINE);
                             lp->txchar &= ~TXCHAR_TX_DATA_VALID;
