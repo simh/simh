@@ -176,6 +176,7 @@ struct tmln {
     uint32              txbps;                          /* xmt bps speed (0 - unlimited) */
     uint32              txdeltausecs;                   /* xmt inter character min time (usecs) */
     double              txnexttime;                     /* min time for next transmit character */
+    t_bool              txdone;                         /* sent data complete indicator - private */
     uint8               *txpb;                          /* xmt packet buffer */
     uint32              txpbsize;                       /* xmt packet buffer size */
     uint32              txppsize;                       /* xmt packet packet size */
@@ -277,6 +278,7 @@ t_stat tmxr_dscln (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 int32 tmxr_rqln (const TMLN *lp);
 int32 tmxr_tqln (const TMLN *lp);
 int32 tmxr_tpqln (const TMLN *lp);
+int32 tmxr_txdone_ln (TMLN *lp);
 t_bool tmxr_tpbusyln (const TMLN *lp);
 t_stat tmxr_set_lnorder (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat tmxr_show_lnorder (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
