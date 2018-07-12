@@ -2148,7 +2148,7 @@ ${BIN}b5500${EXE} : ${B5500} ${SIM}
 	${MKDIRBIN}
 	${CC} ${B5500} ${SIM} ${B5500_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
-3b2 : $(BIN)3b2$(EXE)
+3b2 : ${BIN}BuildROMs${EXE} $(BIN)3b2$(EXE)
  
 ${BIN}3b2${EXE} : ${ATT3B2} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
