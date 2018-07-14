@@ -12303,7 +12303,7 @@ if (sim_deb && (((sim_deb != stdout) && (sim_deb != sim_log)) || inhibit_message
 
 if (buf != stackbuf)
     free (buf);
-return stat | SCPE_NOMESSAGE;
+return stat | ((stat != SCPE_OK) ? SCPE_NOMESSAGE : 0);
 }
 
 /* Inline debugging - will print debug message if debug file is
