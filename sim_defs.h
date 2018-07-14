@@ -517,11 +517,11 @@ struct DEVICE {
 #define DEV_V_DYNM      2                               /* mem size dynamic */
 #define DEV_V_DEBUG     3                               /* debug capability */
 #define DEV_V_TYPE      4                               /* Attach type */
-#define DEV_S_TYPE      3                               /* Width of Type Field */
-#define DEV_V_SECTORS   7                               /* Unit Capacity is in 512byte sectors */
-#define DEV_V_DONTAUTO  8                               /* Do not auto detach already attached units */
-#define DEV_V_FLATHELP  9                               /* Use traditional (unstructured) help */
-#define DEV_V_NOSAVE    10                              /* Don't save device state */
+#define DEV_S_TYPE      4                               /* Width of Type Field */
+#define DEV_V_SECTORS   8                               /* Unit Capacity is in 512byte sectors */
+#define DEV_V_DONTAUTO  9                               /* Do not auto detach already attached units */
+#define DEV_V_FLATHELP  10                              /* Use traditional (unstructured) help */
+#define DEV_V_NOSAVE    11                              /* Don't save device state */
 #define DEV_V_UF_31     12                              /* user flags, V3.1 */
 #define DEV_V_UF        16                              /* user flags */
 #define DEV_V_RSV       31                              /* reserved */
