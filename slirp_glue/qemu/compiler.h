@@ -37,6 +37,7 @@
 #define inline __inline
 #endif
 
+#define register
 
 #if defined __GNUC__
 # if !QEMU_GNUC_PREREQ(4, 4)

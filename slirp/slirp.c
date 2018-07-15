@@ -314,7 +314,7 @@ void slirp_pollfds_fill(GArray *pollfds, uint32_t *timeout)
 
         for (so = slirp->tcb.so_next; so != &slirp->tcb;
                 so = so_next) {
-            int events = 0;
+            gushort events = 0;
 
             so_next = so->so_next;
 
