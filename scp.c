@@ -1536,7 +1536,27 @@ static const char simh_help[] =
       "+then looked up as an environment variable.  If found it the value is\n"
       "+supstituted for the original string before expanding everything else.  If\n"
       "+it is not found, then the original beginning token on the line is left\n"
-      "+untouched.\n"
+      "+untouched.\n\n"
+      "+Environment variable string substitution:\n\n"
+      "++%%XYZ:str1=str2%%\n\n"
+      "+would expand the XYZ environment variable, substituting each occurrence\n"
+      "+of \"str1\" in the expanded result with \"str2\".  \"str2\" can be the empty\n"
+      "+string to effectively delete all occurrences of \"str1\" from the expanded\n"
+      "+output.  \"str1\" can begin with an asterisk, in which case it will match\n"
+      "+everything from the beginning of the expanded output to the first\n"
+      "+occurrence of the remaining portion of str1.\n\n"
+      "+May also specify substrings for an expansion.\n\n"
+      "++%%XYZ:~10,5%%\n\n"
+      "+would expand the XYZ environment variable, and then use only the 5\n"
+      "+characters that begin at the 11th (offset 10) character of the expanded\n"
+      "+result.  If the length is not specified, then it defaults to the\n"
+      "+remainder of the variable value.  If either number (offset or length) is\n"
+      "+negative, then the number used is the length of the environment variable\n"
+      "+value added to the offset or length specified.\n\n"
+      "++%%XYZ:~-10%%\n\n"
+      "+would extract the last 10 characters of the XYZ variable.\n\n"
+      "++%%XYZ:~0,-2%%\n\n"
+      "+would extract all but the last 2 characters of the XYZ variable.\n"
 #define HLP_GOTO        "*Commands Executing_Command_Files GOTO"
       "3GOTO\n"
       " Commands in a command file execute in sequence until either an error\n"
@@ -3619,11 +3639,127 @@ if (ap) {                               /* environment variable found? */
 return ap;
 }
 
+/*
+Environment variable substitution:
+
+    %XYZ:str1=str2%
+
+would expand the XYZ environment variable, substituting each occurrence
+of "str1" in the expanded result with "str2".  "str2" can be the empty
+string to effectively delete all occurrences of "str1" from the expanded
+output.  "str1" can begin with an asterisk, in which case it will match
+everything from the beginning of the expanded output to the first
+occurrence of the remaining portion of str1.
+
+May also specify substrings for an expansion.
+
+    %XYZ:~10,5%
+
+would expand the XYZ environment variable, and then use only the 5
+characters that begin at the 11th (offset 10) character of the expanded
+result.  If the length is not specified, then it defaults to the
+remainder of the variable value.  If either number (offset or length) is
+negative, then the number used is the length of the environment variable
+value added to the offset or length specified.
+
+    %XYZ:~-10%
+
+would extract the last 10 characters of the XYZ variable.
+
+    %XYZ:~0,-2%
+
+would extract all but the last 2 characters of the XYZ variable.
+
+ */
+
+static void _sim_subststr_substr (const char *ops, char *rbuf, size_t rbuf_size)
+{
+int rbuf_len = (int)strlen (rbuf);
+char *tstr = (char *)malloc (1 + rbuf_len);
+
+strcpy (tstr, rbuf);
+
+if (*ops == '~') {      /* Substring? */
+    int offset, length;
+    int o, l;
+
+    switch (sscanf (ops + 1, "%d,%d", &o, &l)) {
+        case 2:
+            if (l < 0)
+                length = rbuf_len - MIN(-l, rbuf_len);
+            else
+                length = l;
+            /* fall through */
+        case 1:
+            if (o < 0)
+                offset = rbuf_len - MIN(-o, rbuf_len);
+            else
+                offset = MIN(o, rbuf_len);
+            break;
+        case 0:
+            offset = 0;
+            length = rbuf_len;
+            break;
+        }
+    if (offset + length > rbuf_len)
+        length = rbuf_len - offset;
+    memcpy (rbuf, tstr + offset, length);
+    rbuf[length] = '\0';
+    }
+else {
+    const char *eq;
+
+    if ((eq = strchr (ops, '='))) {     /* Substitute? */
+        const char *last = tstr;
+        const char *curr = tstr;
+        char *match = (char *)malloc (1 + (eq - ops));
+        size_t move_size;
+        t_bool asterisk_match;
+
+        strlcpy (match, ops, 1 + (eq - ops));
+        asterisk_match = (*ops == '*');
+        if (asterisk_match)
+            memmove (match, match + 1, 1 + strlen (match + 1));
+        while ((curr = strstr (last, match))) {
+            if (!asterisk_match) {
+                move_size = MIN((size_t)(curr - last), rbuf_size);
+                memcpy (rbuf, last, move_size);
+                rbuf_size -= move_size;
+                rbuf += move_size;
+                }
+            else
+                asterisk_match = FALSE;
+            move_size = MIN(strlen (eq + 1), rbuf_size);
+            memcpy (rbuf, eq + 1, move_size);
+            rbuf_size -= move_size;
+            rbuf += move_size;
+            curr += strlen (match);
+            last = curr;
+            }
+        move_size = MIN(strlen (last), rbuf_size);
+        memcpy (rbuf, last, move_size);
+        rbuf_size -= move_size;
+        rbuf += move_size;
+        if (rbuf_size)
+            *rbuf = '\0';
+        }
+    }
+free (tstr);
+}
+
 static const char *
 _sim_get_env_special (const char *gbuf, char *rbuf, size_t rbuf_size)
 {
 const char *ap;
+const char *fixup_needed = strchr (gbuf, ':');
+char *tgbuf = NULL;
+size_t tgbuf_size = MAX(rbuf_size, 1 + (size_t)(fixup_needed - gbuf));
 
+if (fixup_needed) {
+    tgbuf = (char *)calloc (tgbuf_size, 1);
+    memcpy (tgbuf, gbuf, (fixup_needed - gbuf));
+    gbuf = tgbuf;
+    }
 ap = _sim_gen_env_uplowcase (gbuf, rbuf, rbuf_size);/* Look for environment variable */
 if (!ap) {                              /* no environment variable found? */
     time_t now = (time_t)cmd_time.tv_sec;
@@ -3788,6 +3924,12 @@ if (!ap) {                              /* no environment variable found? */
         ap = rbuf;
         }
     }
+if (ap && fixup_needed) {   /* substring/substituted needed? */
+    strlcpy (tgbuf, ap, tgbuf_size);
+    _sim_subststr_substr (fixup_needed + 1, tgbuf, tgbuf_size);
+    strlcpy (rbuf, tgbuf, rbuf_size);
+    }
+free (tgbuf);
 return ap;
 }
 
