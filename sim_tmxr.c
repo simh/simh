@@ -2377,7 +2377,7 @@ return (0 != (lp->txppsize - lp->txppoffset));
 }
 
 /* Return transmitted data complete status */
-/* 0 – not done, 1 – just now done, -1 – previously done. */
+/* 0 - not done, 1 - just now done, -1 - previously done. */
 
 int32 tmxr_txdone_ln (TMLN *lp)
 {
