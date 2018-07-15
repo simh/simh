@@ -326,7 +326,6 @@
 #if defined (SIM_ASYNCH_IO)
 pthread_mutex_t sim_asynch_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t sim_asynch_wake = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t sim_idle_lock = PTHREAD_MUTEX_INITIALIZER;
 
 pthread_mutex_t sim_timer_lock     = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t sim_timer_wake      = PTHREAD_COND_INITIALIZER;

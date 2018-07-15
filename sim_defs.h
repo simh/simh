@@ -1063,7 +1063,6 @@ struct MEMFILE {
 
 extern pthread_mutex_t sim_asynch_lock;
 extern pthread_cond_t sim_asynch_wake;
-extern pthread_mutex_t sim_idle_lock;
 extern pthread_mutex_t sim_timer_lock;
 extern pthread_cond_t sim_timer_wake;
 extern t_bool sim_timer_event_canceled;
@@ -1176,7 +1175,6 @@ extern int32 sim_asynch_inst_latency;
     do {                                                          \
       pthread_mutex_destroy(&sim_asynch_lock);                    \
       pthread_cond_destroy(&sim_asynch_wake);                     \
-      pthread_mutex_destroy(&sim_idle_lock);                      \
       pthread_mutex_destroy(&sim_timer_lock);                     \
       pthread_cond_destroy(&sim_timer_wake);                      \
       pthread_mutex_destroy(&sim_tmxr_poll_lock);                 \
@@ -1226,7 +1224,6 @@ extern int32 sim_asynch_inst_latency;
     do {                                                          \
       pthread_mutex_destroy(&sim_asynch_lock);                    \
       pthread_cond_destroy(&sim_asynch_wake);                     \
-      pthread_mutex_destroy(&sim_idle_lock);                      \
       pthread_mutex_destroy(&sim_timer_lock);                     \
       pthread_cond_destroy(&sim_timer_wake);                      \
       pthread_mutex_destroy(&sim_tmxr_poll_lock);                 \

@@ -244,27 +244,18 @@ int stat;
 clock_gettime(CLOCK_REALTIME, &done_time);
 done_time.tv_sec += (msec/1000);
 done_time.tv_nsec += 1000000*(msec%1000);
-if (done_time.tv_nsec > 1000000000) {
+if (done_time.tv_nsec >= 1000000000) {
   done_time.tv_sec += done_time.tv_nsec/1000000000;
   done_time.tv_nsec = done_time.tv_nsec%1000000000;
   }
-pthread_mutex_lock (&sim_idle_lock);
+pthread_mutex_lock (&sim_asynch_lock);
 sim_idle_wait = TRUE;
-stat = pthread_cond_timedwait (&sim_asynch_wake, &sim_idle_lock, &done_time);
-if (stat == 0)
-  sim_asynch_check = 0;                 /* force check of asynch queue now */
-else
-  if (stat == ETIMEDOUT)
+if (pthread_cond_timedwait (&sim_asynch_wake, &sim_asynch_lock, &done_time))
     timedout = TRUE;
-  else {
-    char ans[32];
-
-    fprintf (stderr, "sim_idle_ms_sleep(%u): pthread_cond_timedwait() return %d - %s\r\n", msec, stat, strerror (stat));
-    read_line_p ("Hit Return to exit: ", ans, sizeof (ans) - 1, stdin);
-    abort ();
-    }
+else
+    sim_asynch_check = 0;                 /* force check of asynch queue now */
 sim_idle_wait = FALSE;
-pthread_mutex_unlock (&sim_idle_lock);
+pthread_mutex_unlock (&sim_asynch_lock);
 if (!timedout) {
     AIO_UPDATE_QUEUE;
     }
