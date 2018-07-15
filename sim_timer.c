@@ -694,7 +694,7 @@ while (sub->tv_nsec > diff->tv_nsec) {
 diff->tv_nsec -= sub->tv_nsec;
 diff->tv_sec -= sub->tv_sec;
 /* Normalize the result */
-while (diff->tv_nsec > 1000000000) {
+while (diff->tv_nsec >= 1000000000) {
     ++diff->tv_sec;
     diff->tv_nsec -= 1000000000;
     }
@@ -715,11 +715,11 @@ t_stat sim_timer_show_idle_mode (FILE* st, UNIT* uptr, int32 val, CONST void *  
 #if defined(SIM_ASYNCH_CLOCKS)
 static int sim_timespec_compare (struct timespec *a, struct timespec *b)
 {
-while (a->tv_nsec > 1000000000) {
+while (a->tv_nsec >= 1000000000) {
     a->tv_nsec -= 1000000000;
     ++a->tv_sec;
     }
-while (b->tv_nsec > 1000000000) {
+while (b->tv_nsec >= 1000000000) {
     b->tv_nsec -= 1000000000;
     ++b->tv_sec;
     }
