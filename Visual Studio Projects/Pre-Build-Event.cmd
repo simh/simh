@@ -21,15 +21,8 @@ rem             files are available in the directory ..\..\windows-build\
 rem
 rem  In addition to the optional activities mentioned above, other activities
 rem  are also performed.  These include:
-rem       - confirming that if the current source is a clone of the simh
-rem         git repository, then assuring that git hooks which manage making
-rem         the git commit hash available during builds are properly installed
-rem         in the repository hooks directory.  When the githooks are installed
-rem         the current commit id is generated if git.exe is available in the
-rem         current path.  If it isn't, then report that fact and suggest how
-rem         to make sure that it is.
-rem       - performing the activities which make the git repository commit id
-rem         available in an include file during compiles.
+rem       - performing the activities which make confirm or generate the git 
+rem         repository commit id available in an include file during compiles.
 rem
 rem
 
@@ -204,10 +197,10 @@ echo error: Review the Output Tab for more details.
 exit 1
 :_done_build
 
-:_GitHooks
-if not exist ..\.git goto _done_hooks
+:_CheckGit
+if not exist ..\.git goto _done_id
 call :FindGit _GIT_GIT
-if "%_GIT_GIT%" neq "" goto _check_hooks
+if "%_GIT_GIT%" neq "" goto _SetId
 echo ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR **
 echo ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR **
 echo **                                                    **
@@ -231,29 +224,7 @@ echo ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR **
 echo ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR **
 echo error: Review the Output Tab for more details.
 exit 1
-:_check_hooks
-if not exist ..\.git\hooks\post-commit goto _initial_hooks
-fc /b ..\.git\hooks\post-commit git-hooks\post-commit >nul
-if %ERRORLEVEL% equ 0 goto _done_hooks
-echo *****************************************************
-echo *****************************************************
-echo ** Installing updated git hooks in repository      **
-echo *****************************************************
-echo *****************************************************
-goto _install_hooks
-:_initial_hooks
-echo *****************************************************
-echo *****************************************************
-echo ** Installing git hooks in newly cloned repository **
-echo *****************************************************
-echo *****************************************************
-:_install_hooks
-copy /y git-hooks\post* ..\.git\hooks\
-:_do_hooks
-pushd ..
-"%_GIT_GIT%" log -1 --pretty="SIM_GIT_COMMIT_ID %%H%%nSIM_GIT_COMMIT_TIME %%aI" >.git-commit-id
-popd
-:_done_hooks
+:_done_git
 
 :_SetId
 rem
@@ -261,25 +232,23 @@ rem A race condition exists while creating the .git-commit-id.h file.
 rem This race can happen at the beginning of a parallel build where 
 rem several projects can start execution at almost the same time.
 rem
+SET ACTUAL_GIT_COMMIT_ID=
+SET ACTUAL_GIT_COMMIT_TIME=
 SET GIT_COMMIT_ID=
 SET GIT_COMMIT_TIME=
-if not exist ..\.git-commit-id goto _do_hooks
-for /F "usebackq tokens=2" %%i in (`findstr /C:SIM_GIT_COMMIT_ID ..\.git-commit-id`) do SET GIT_COMMIT_ID=%%i
-for /F "usebackq tokens=2" %%i in (`findstr /C:SIM_GIT_COMMIT_TIME ..\.git-commit-id`) do SET GIT_COMMIT_TIME=%%i
-rem
-rem Some 'git' environments don't honor the installed hooks (Visual 
-rem Studio 2015 for example), and in this case the initially generated
-rem .git-commit-id file won't get updated.  We can't be sure of this 
-rem detail, so perform a manual check now.
 SET _GIT_COMMIT_ID_TEMP=.git-commit-id-temp-%RANDOM%
 "%_GIT_GIT%" log -1 --pretty="SIM_GIT_COMMIT_ID %%H%%nSIM_GIT_COMMIT_TIME %%aI" >%_GIT_COMMIT_ID_TEMP%
-for /F "usebackq tokens=2" %%i in (`findstr /C:SIM_GIT_COMMIT_ID %_GIT_COMMIT_ID_TEMP%`) do SET CURRENT_GIT_COMMIT_ID=%%i
-for /F "usebackq tokens=2" %%i in (`findstr /C:SIM_GIT_COMMIT_TIME %_GIT_COMMIT_ID_TEMP%`) do SET CURRENT_GIT_COMMIT_TIME=%%i
-if "%CURRENT_GIT_COMMIT_ID%" neq "%GIT_COMMIT_ID%" move /Y %_GIT_COMMIT_ID_TEMP% ..\.git-commit-id
-if "%CURRENT_GIT_COMMIT_ID%" equ "%GIT_COMMIT_ID%" del %_GIT_COMMIT_ID_TEMP%
+for /F "usebackq tokens=2" %%i in (`findstr /C:SIM_GIT_COMMIT_ID %_GIT_COMMIT_ID_TEMP%`) do SET ACTUAL_GIT_COMMIT_ID=%%i
+for /F "usebackq tokens=2" %%i in (`findstr /C:SIM_GIT_COMMIT_TIME %_GIT_COMMIT_ID_TEMP%`) do SET ACTUAL_GIT_COMMIT_TIME=%%i
+if exist ..\.git-commit-id for /F "usebackq tokens=2" %%i in (`findstr /C:SIM_GIT_COMMIT_ID ..\.git-commit-id`) do SET GIT_COMMIT_ID=%%i
+if exist ..\.git-commit-id for /F "usebackq tokens=2" %%i in (`findstr /C:SIM_GIT_COMMIT_TIME ..\.git-commit-id`) do SET GIT_COMMIT_TIME=%%i
+if "%ACTUAL_GIT_COMMIT_ID%" neq "%GIT_COMMIT_ID%" move /Y %_GIT_COMMIT_ID_TEMP% ..\.git-commit-id
+if "%ACTUAL_GIT_COMMIT_ID%" equ "%GIT_COMMIT_ID%" del %_GIT_COMMIT_ID_TEMP%
+SET GIT_COMMIT_ID=%ACTUAL_GIT_COMMIT_ID%
+SET SIM_GIT_COMMIT_TIME=%ACTUAL_SIM_GIT_COMMIT_TIME%
 SET _GIT_COMMIT_ID_TEMP=
-SET CURRENT_GIT_COMMIT_ID=
-SET CURRENT_GIT_COMMIT_TIME=
+SET ACTUAL_GIT_COMMIT_ID=
+SET ACTUAL_GIT_COMMIT_TIME=
 :_VerifyGitCommitId.h
 SET OLD_GIT_COMMIT_ID=
 if not exist .git-commit-id.h echo.>.git-commit-id.h
@@ -292,7 +261,9 @@ if errorlevel 1 echo Retrying...
 if errorlevel 1 goto _SetId
 :_IdGood
 :_done_id
+if not exist .git-commit-id.h echo. >.git-commit-id.h
 goto :EOF
+
 
 :WhereInPath
 if "%~$PATH:1" NEQ "" exit /B 0

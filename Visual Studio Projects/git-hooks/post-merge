@@ -1,7 +1,0 @@
-#!/bin/sh
-#
-# A hook script that is called after a successful merge
-# to record the commit-id in the working directory.
-isodate=$(git log -1 --pretty="%ai"|sed -e 's/ /T/'|sed -e 's/ //')
-git log -1 --pretty="SIM_GIT_COMMIT_ID %H%nSIM_GIT_COMMIT_TIME $isodate" >.git-commit-id
-
