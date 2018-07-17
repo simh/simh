@@ -239,7 +239,6 @@ uint32 sim_idle_ms_sleep (unsigned int msec)
 uint32 start_time = sim_os_msec();
 struct timespec done_time;
 t_bool timedout = FALSE;
-int stat;
 
 clock_gettime(CLOCK_REALTIME, &done_time);
 done_time.tv_sec += (msec/1000);
@@ -2526,11 +2525,9 @@ for (tmr=0; tmr<=SIM_NTIMERS; tmr++)
         }
 if (sim_is_active (uptr))                               /* already active? */
     return SCPE_OK;
-if (usec_delay <= 0.0) {
-    sim_debug (DBG_QUE, &sim_timer_dev, "sim_timer_activate_after(%s, %.0f usecs) - invalid usec value\n", 
+if (usec_delay < 0.0) {
+    sim_debug (DBG_QUE, &sim_timer_dev, "sim_timer_activate_after(%s, %.0f usecs) - surprising usec value\n", 
                sim_uname(uptr), usec_delay);
-    uptr->usecs_remaining = 0.0;
-    return SCPE_ARG;
     }
 uptr->usecs_remaining = 0.0;
 /* 
