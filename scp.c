@@ -10603,6 +10603,13 @@ do {
             reason = SCPE_OK;
         }
     AIO_EVENT_COMPLETE(uptr, reason);
+    if ((reason != SCPE_OK)     &&  /* Provide context for unexpected errors */
+        (reason != SCPE_STOP)   && 
+        (reason != SCPE_STEP)   && 
+        (reason != SCPE_EXPECT) &&
+        (reason != SCPE_EXIT)   && 
+        (reason != SCPE_REMOTE))
+        reason = sim_messagef (SCPE_IERR, "\nUnexpected internal error while processing event for %s which returned %d - %s\n", sim_uname (uptr), reason, sim_error_text (reason));
     } while ((reason == SCPE_OK) && 
              (sim_interval <= 0) && 
              (sim_clock_queue != QUEUE_LIST_END) &&
