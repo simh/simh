@@ -3679,7 +3679,7 @@ char *tstr = (char *)malloc (1 + rbuf_len);
 strcpy (tstr, rbuf);
 
 if (*ops == '~') {      /* Substring? */
-    int offset, length = rbuf_len;
+    int offset = 0, length = rbuf_len;
     int o, l;
 
     switch (sscanf (ops + 1, "%d,%d", &o, &l)) {
@@ -3741,6 +3741,7 @@ else {
         rbuf += move_size;
         if (rbuf_size)
             *rbuf = '\0';
+        free (match);
         }
     }
 free (tstr);
