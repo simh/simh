@@ -867,8 +867,23 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         GIT_COMMIT_ID=$(shell cd .. ; git submodule status | grep "$(notdir $(realpath .))" | awk '{ print $$1 }')
         GIT_COMMIT_TIME=$(shell git --git-dir=$(realpath .)/.git log $(GIT_COMMIT_ID) -1 --pretty="%aI")
       else
-        GIT_COMMIT_ID=undetermined-git-id
-        GIT_COMMIT_TIME=undetermined-commit-time
+        $(info *** Error ***)
+        $(info *** Error *** The simh git commit id can not be determined.)
+        $(info *** Error ***)
+        $(info *** Error *** There are ONLY two supported ways to acquire and build)
+        $(info *** Error *** the simh source code:)
+        $(info *** Error ***   1: directly with git via:)
+        $(info *** Error ***      $$ git clone https://github.com/simh/simh)
+        $(info *** Error ***      $$ cd simh)
+        $(info *** Error ***      $$ make {simulator-name})
+        $(info *** Error *** OR)
+        $(info *** Error ***   2: download the source code zip archive from:)
+        $(info *** Error ***      $$ wget(or via browser) https://github.com/simh/simh/archive/master.zip)
+        $(info *** Error ***      $$ unzip master.zip)
+        $(info *** Error ***      $$ cd simh-master)
+        $(info *** Error ***      $$ make {simulator-name})
+        $(info *** Error ***)
+        $(error get simh source either with zip download or git clone)
       endif
     endif
   endif
