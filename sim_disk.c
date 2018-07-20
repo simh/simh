@@ -1339,7 +1339,7 @@ t_offset (*size_function)(FILE *file);
 t_stat (*storage_function)(FILE *file, uint32 *sector_size, uint32 *removable, uint32 *is_cdrom) = NULL;
 t_bool created = FALSE, copied = FALSE;
 t_bool auto_format = FALSE;
-t_offset capac, filesystem_capac;
+t_offset container_size, filesystem_size, current_unit_size;
 
 if (uptr->flags & UNIT_DIS)                             /* disabled? */
     return SCPE_UDIS;
@@ -1750,16 +1750,17 @@ if (sim_switches & SWMASK ('K')) {
     uptr->dynflags |= UNIT_DISK_CHK;
     }
 
-filesystem_capac = get_filesystem_size (uptr);
-capac = size_function (uptr->fileref);
-if (capac && (capac != (t_offset)-1)) {
+filesystem_size = get_filesystem_size (uptr);
+container_size = size_function (uptr->fileref);
+current_unit_size = ((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1);
+if (container_size && (container_size != (t_offset)-1)) {
     if (dontautosize) {
         t_addr saved_capac = uptr->capac;
 
-        if ((filesystem_capac != (t_offset)-1) &&
-            (filesystem_capac > (((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)))) {
+        if ((filesystem_size != (t_offset)-1) &&
+            (filesystem_size > current_unit_size)) {
             if (!sim_quiet) {
-                uptr->capac = (t_addr)(filesystem_capac/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
+                uptr->capac = (t_addr)(filesystem_size/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
                 sim_printf ("%s%d: The file system on the disk %s is larger than simulated device (%s > ", sim_dname (dptr), (int)(uptr-dptr->units), cptr, sprint_capac (dptr, uptr));
                 uptr->capac = saved_capac;
                 sim_printf ("%s)\n", sprint_capac (dptr, uptr));
@@ -1767,10 +1768,11 @@ if (capac && (capac != (t_offset)-1)) {
             sim_disk_detach (uptr);
             return SCPE_OPENERR;
             }
-        if ((capac < (((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1))) && (DKUF_F_STD != DK_GET_FMT (uptr))) {
+        if ((container_size < current_unit_size) && 
+            ((DKUF_F_VHD == DK_GET_FMT (uptr)) || (0 != (uptr->flags & UNIT_RO)))) {
             if (!sim_quiet) {
-                uptr->capac = (t_addr)(capac/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
-                sim_printf ("%s%d: non expandable disk %s is smaller than simulated device (%s < ", sim_dname (dptr), (int)(uptr-dptr->units), cptr, sprint_capac (dptr, uptr));
+                uptr->capac = (t_addr)(container_size/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
+                sim_printf ("%s%d: non expandable disk container '%s' is smaller than simulated device (%s < ", sim_dname (dptr), (int)(uptr-dptr->units), cptr, sprint_capac (dptr, uptr));
                 uptr->capac = saved_capac;
                 sim_printf ("%s)\n", sprint_capac (dptr, uptr));
                 }
@@ -1778,14 +1780,19 @@ if (capac && (capac != (t_offset)-1)) {
             return SCPE_OPENERR;
             }
         }
-    else {
-        if ((filesystem_capac != (t_offset)-1) &&           /* Known file system data size AND */
-            (filesystem_capac > capac))                     /* Data size greater than container size? */
-            capac = filesystem_capac;                       /* Use file system data size */
-        if (((filesystem_capac != (t_offset)-1) &&           /* Known file system data size AND */
-             (capac > (((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)))) || /* Data > current size */
-            (DKUF_F_STD != DK_GET_FMT (uptr)))              /* OR ! autosizeable disk */
-            uptr->capac = (t_addr)(capac/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));  /* update current size */
+    else {          /* Autosize */
+        if (filesystem_size != (t_offset)-1) {              /* Known file system data size AND */
+            if (filesystem_size > container_size)           /*    Data size greater than container size? */
+                container_size = filesystem_size +          /*       Use file system data size */
+                             (pdp11tracksize * sector_size);/*       plus any bad block data beyond the file system */
+            }
+        else {                                              /* Unrecognized file system */
+            if (container_size < current_unit_size)         /*     Use MAX of container or current device size */
+                if ((DKUF_F_VHD != DK_GET_FMT (uptr)) &&    /*     when size can be expanded */
+                    (0 == (uptr->flags & UNIT_RO)))
+                    container_size = current_unit_size;     /*     Use MAX of container or current device size */
+            }
+        uptr->capac = (t_addr)(container_size/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));  /* update current size */
         }
     }
 
