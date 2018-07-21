@@ -418,32 +418,59 @@ struct SHMEM {
     HANDLE hMapping;
     size_t shm_size;
     void *shm_base;
+    char *shm_name;
     };
 
 t_stat sim_shmem_open (const char *name, size_t size, SHMEM **shmem, void **addr)
 {
-*shmem = (SHMEM *)calloc (1, sizeof(**shmem));
+SYSTEM_INFO SysInfo;
+t_bool AlreadyExists;
 
+GetSystemInfo (&SysInfo);
+*shmem = (SHMEM *)calloc (1, sizeof(**shmem));
 if (*shmem == NULL)
     return SCPE_MEM;
-
+(*shmem)->shm_name = (char *)calloc (1, 1 + strlen (name));
+if ((*shmem)->shm_name == NULL) {
+    free (*shmem);
+    *shmem = NULL;
+    return SCPE_MEM;
+    }
+strcpy ((*shmem)->shm_name, name);
 (*shmem)->hMapping = INVALID_HANDLE_VALUE;
 (*shmem)->shm_size = size;
 (*shmem)->shm_base = NULL;
-(*shmem)->hMapping = CreateFileMappingA (INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, (DWORD)size, name);
+(*shmem)->hMapping = CreateFileMappingA (INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE|SEC_COMMIT, 0, (DWORD)(size+SysInfo.dwPageSize), name);
 if ((*shmem)->hMapping == INVALID_HANDLE_VALUE) {
+    DWORD LastError = GetLastError();
+
     sim_shmem_close (*shmem);
     *shmem = NULL;
-    return SCPE_OPENERR;
+    return sim_messagef (SCPE_OPENERR, "Can't CreateFileMapping of a %u byte shared memory segment '%s' - LastError=0x%X\n", size, name, LastError);
     }
+AlreadyExists = (GetLastError () == ERROR_ALREADY_EXISTS);
 (*shmem)->shm_base = MapViewOfFile ((*shmem)->hMapping, FILE_MAP_ALL_ACCESS, 0, 0, 0);
 if ((*shmem)->shm_base == NULL) {
+    DWORD LastError = GetLastError();
+
     sim_shmem_close (*shmem);
     *shmem = NULL;
-    return SCPE_OPENERR;
+    return sim_messagef (SCPE_OPENERR, "Can't MapViewOfFile() of a %u byte shared memory segment '%s' - LastError=0x%X\n", size, name, LastError);
     }
+if (AlreadyExists) {
+    if (*((DWORD *)((*shmem)->shm_base)) == 0)
+        Sleep (50);
+    if (*((DWORD *)((*shmem)->shm_base)) != (DWORD)size) {
+        DWORD SizeFound = *((DWORD *)((*shmem)->shm_base));
+        sim_shmem_close (*shmem);
+        *shmem = NULL;
+        return sim_messagef (SCPE_OPENERR, "Shared Memory segment '%s' is %u bytes instead of %d\n", name, SizeFound, (int)size);
+        }
+    }
+else
+    *((DWORD *)((*shmem)->shm_base)) = (DWORD)size;     /* Save Size in first page */
 
-*addr = (*shmem)->shm_base;
+*addr = ((char *)(*shmem)->shm_base + SysInfo.dwPageSize);      /* Point to the second paget for data */
 return SCPE_OK;
 }
 
@@ -455,6 +482,7 @@ if (shmem->shm_base != NULL)
     UnmapViewOfFile (shmem->shm_base);
 if (shmem->hMapping != INVALID_HANDLE_VALUE)
     CloseHandle (shmem->hMapping);
+free (shmem->shm_name);
 free (shmem);
 }
 
@@ -554,26 +582,40 @@ struct SHMEM {
     int shm_fd;
     size_t shm_size;
     void *shm_base;
+    char *shm_name;
     };
 
 t_stat sim_shmem_open (const char *name, size_t size, SHMEM **shmem, void **addr)
 {
 #ifdef HAVE_SHM_OPEN
 *shmem = (SHMEM *)calloc (1, sizeof(**shmem));
+mode_t orig_mask;
 
 *addr = NULL;
 if (*shmem == NULL)
     return SCPE_MEM;
+(*shmem)->shm_name = (char *)calloc (1, 1 + strlen (name) + ((*name != '/') ? 1 : 0));
+if ((*shmem)->shm_name == NULL) {
+    free (*shmem);
+    *shmem = NULL;
+    return SCPE_MEM;
+    }
 
+sprintf ((*shmem)->shm_name, "%s%s", ((*name != '/') ? "/" : ""), name);
 (*shmem)->shm_base = MAP_FAILED;
 (*shmem)->shm_size = size;
-(*shmem)->shm_fd = shm_open (name, O_RDWR, 0);
+(*shmem)->shm_fd = shm_open ((*shmem)->shm_name, O_RDWR, 0);
 if ((*shmem)->shm_fd == -1) {
-    (*shmem)->shm_fd = shm_open (name, O_CREAT | O_RDWR, 0660);
+    int last_errno;
+
+    orig_mask = umask (0000);
+    (*shmem)->shm_fd = shm_open ((*shmem)->shm_name, O_CREAT | O_RDWR, 0660);
+    last_errno = errno;
+    umask (orig_mask);                  /* Restore original mask */
     if ((*shmem)->shm_fd == -1) {
         sim_shmem_close (*shmem);
         *shmem = NULL;
-        return SCPE_OPENERR;
+        return sim_messagef (SCPE_OPENERR, "Can't shm_open() a %d byte shared memory segment '%s' - errno=%d - %s\n", (int)size, name, last_errno, strerror (last_errno));
         }
     if (ftruncate((*shmem)->shm_fd, size)) {
         sim_shmem_close (*shmem);
@@ -588,14 +630,16 @@ else {
         (statb.st_size != (*shmem)->shm_size)) {
         sim_shmem_close (*shmem);
         *shmem = NULL;
-        return SCPE_OPENERR;
+        return sim_messagef (SCPE_OPENERR, "Shared Memory segment '%s' is %d bytes instead of %d\n", name, (int)(statb.st_size), (int)size);
         }
     }
 (*shmem)->shm_base = mmap(NULL, (*shmem)->shm_size, PROT_READ | PROT_WRITE, MAP_SHARED, (*shmem)->shm_fd, 0);
 if ((*shmem)->shm_base == MAP_FAILED) {
+    int last_errno = errno;
+
     sim_shmem_close (*shmem);
     *shmem = NULL;
-    return SCPE_OPENERR;
+    return sim_messagef (SCPE_OPENERR, "Shared Memory '%s' mmap() failed. errno=%d - %s\n", name, last_errno, strerror (last_errno));
     }
 *addr = (*shmem)->shm_base;
 return SCPE_OK;
@@ -612,6 +656,7 @@ if (shmem->shm_base != MAP_FAILED)
     munmap (shmem->shm_base, shmem->shm_size);
 if (shmem->shm_fd != -1)
     close (shmem->shm_fd);
+free (shmem->shm_name);
 free (shmem);
 }
 
