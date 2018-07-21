@@ -394,7 +394,7 @@ ucb_buf = 0;
 CLR_INT (UCA);
 CLR_INT (UCB);
 if (uc15_shmem == NULL) {                               /* allocate shared state */
-    r = sim_shmem_open ("UC15SharedState", UC15_STATE_SIZE, &uc15_shmem, &basead);
+    r = sim_shmem_open ("UC15SharedState", UC15_STATE_SIZE * sizeof (int32), &uc15_shmem, &basead);
     if (r != SCPE_OK)
         return r;
     uc15_shstate = (int32 *) basead;
