@@ -332,6 +332,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       $(info using semaphore: $(call find_include,semaphore))
     endif
   endif
+  ifneq (,$(call find_include,sys/mman))
+    ifneq (,$(shell grep shm_open $(call find_include,sys/mman)))
+      OS_CCDEFS += -DHAVE_SHM_OPEN
+      $(info using mman: $(call find_include,sys/mman))
+    endif
+  endif
   ifneq (,$(call find_include,dlfcn))
     ifneq (,$(call find_lib,dl))
       OS_CCDEFS += -DHAVE_DLOPEN=$(LIBEXT)
