@@ -722,11 +722,11 @@ return cy;
 void SubDstr (dstr_t *s1, dstr_t *s2, dstr_t *ds)
 {
 uint32 i;
-dstr_t compl;
+dstr_t complm;
 
 for (i = 0; i < DSTRLNT; i++)                           /* 9's comp s2 */
-    compl.val[i] = 0x99999999 - s1->val[i];
-AddDstr (&compl, s2, ds, 1);                            /* s1 + ~s2 + 1 */
+    complm.val[i] = 0x99999999 - s1->val[i];
+AddDstr (&complm, s2, ds, 1);                           /* s1 + ~s2 + 1 */
 return;
 }
 

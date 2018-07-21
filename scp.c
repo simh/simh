@@ -3313,9 +3313,11 @@ for (i = 0, j = addr; i < sim_emax; i++, j = j + dptr->aincr) {
     else {
         if (!(uptr->flags & UNIT_ATT))
             return SCPE_UNATT;
-        if (uptr->flags & UNIT_RAW)
+        if (((uptr->flags & UNIT_RAW) != 0) ||
+            (uptr->fileref == NULL))
             return SCPE_NOFNC;
-        if ((uptr->flags & UNIT_FIX) && (j >= uptr->capac)) {
+        if (((uptr->flags & UNIT_FIX) != 0) &&
+            (j >= uptr->capac)) {
             reason = SCPE_NXM;
             break;
             }
@@ -4509,7 +4511,7 @@ do {
     if (uptr->action != NULL)
         reason = uptr->action (uptr);
     else reason = SCPE_OK;
-    } while ((reason == SCPE_OK) && (sim_interval == 0));
+    } while ((reason == SCPE_OK) && (sim_interval <= 0));
 
 /* Empty queue forces sim_interval != 0 */
 

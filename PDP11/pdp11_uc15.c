@@ -54,6 +54,8 @@
    implemented by setting signals with an atomic compare-and-swap.
    The signals may be polled with non-atomic operations but must be
    verified with an atomic compare-and-swap.
+
+   21-Jul-18    RMS         Fixed missing size multiplier in reset (Mark Pizzolato)
 */
 
 #include "pdp11_defs.h"
@@ -395,7 +397,7 @@ ucb_buf = 0;
 CLR_INT (UCA);
 CLR_INT (UCB);
 if (uc15_shmem == NULL) {                               /* allocate shared state */
-    r = sim_shmem_open ("UC15SharedState", UC15_STATE_SIZE * sizeof(int32), &uc15_shmem, &basead);
+    r = sim_shmem_open ("UC15SharedState", UC15_STATE_SIZE * sizeof (int32), &uc15_shmem, &basead);
     if (r != SCPE_OK)
         return r;
     uc15_shstate = (int32 *) basead;

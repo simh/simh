@@ -261,7 +261,7 @@ typedef struct {
     uint32 tpos;                                        /* to position */
     } DP_SNSTAB;
 
-static char *dp_cname[] = {
+static const char *dp_cname[] = {
     "7240", "7270", "7260", "7275", "7265", "T3281"
     };
 
