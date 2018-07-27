@@ -2259,6 +2259,10 @@ if (!sim_quiet) {
         sim_printf ("   Debug messages display time of day as hh:mm:ss.msec%s\n", sim_deb_switches & SWMASK ('R') ? " relative to the start of debugging" : "");
     if (sim_deb_switches & SWMASK ('A'))
         sim_printf ("   Debug messages display time of day as seconds.msec%s\n", sim_deb_switches & SWMASK ('R') ? " relative to the start of debugging" : "");
+    if (sim_deb_switches & SWMASK ('F'))
+        sim_printf ("   Debug messages will be filtered to summarize duplicate lines\n");
+    if (sim_deb_switches & SWMASK ('E'))
+        sim_printf ("   Debug messages containing blob data in EBCDIC will display in readable form\n");
     time(&now);
     fprintf (sim_deb, "Debug output to \"%s\" at %s", sim_logfile_name (sim_deb, sim_deb_ref), ctime(&now));
     show_version (sim_deb, NULL, NULL, 0, NULL);
@@ -2266,34 +2270,6 @@ if (!sim_quiet) {
 if (sim_deb_switches & SWMASK ('N'))
     sim_deb_switches &= ~SWMASK ('N');          /* Only process the -N flag initially */
 
-return SCPE_OK;
-}
-
-t_stat sim_debug_flush (void)
-{
-int32 saved_quiet = sim_quiet;
-int32 saved_sim_switches = sim_switches;
-int32 saved_deb_switches = sim_deb_switches;
-struct timespec saved_deb_basetime = sim_deb_basetime;
-char saved_debug_filename[CBUFSIZE];
-
-if (sim_deb == NULL)                                    /* no debug? */
-    return SCPE_OK;
-
-if (sim_deb == sim_log) {                               /* debug is log */
-    fflush (sim_deb);                                   /* fflush is the best we can do */
-    return SCPE_OK;
-    }
-
-strcpy (saved_debug_filename, sim_logfile_name (sim_deb, sim_deb_ref));
-
-sim_quiet = 1;
-sim_set_deboff (0, NULL);
-sim_switches = saved_deb_switches;
-sim_set_debon (0, saved_debug_filename);
-sim_deb_basetime = saved_deb_basetime;
-sim_switches = saved_sim_switches;
-sim_quiet = saved_quiet;
 return SCPE_OK;
 }
 
@@ -2330,6 +2306,10 @@ if (sim_deb) {
         fprintf (st, "   Debug messages display time of day as hh:mm:ss.msec%s\n", sim_deb_switches & SWMASK ('R') ? " relative to the start of debugging" : "");
     if (sim_deb_switches & SWMASK ('A'))
         fprintf (st, "   Debug messages display time of day as seconds.msec%s\n", sim_deb_switches & SWMASK ('R') ? " relative to the start of debugging" : "");
+    if (sim_deb_switches & SWMASK ('F'))
+        fprintf (st, "   Debug messages will be filtered to summarize duplicate lines\n");
+    if (sim_deb_switches & SWMASK ('E'))
+        fprintf (st, "   Debug messages containing blob data in EBCDIC will display in readable form\n");
     for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
         t_bool unit_debug = FALSE;
         uint32 unit;

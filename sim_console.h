@@ -90,7 +90,6 @@ t_stat sim_set_cons_nolog (int32 flg, CONST char *cptr);
 t_stat sim_set_deboff (int32 flag, CONST char *cptr);
 t_stat sim_set_cons_expect (int32 flg, CONST char *cptr);
 t_stat sim_set_cons_noexpect (int32 flg, CONST char *cptr);
-t_stat sim_debug_flush (void);
 t_stat sim_set_pchar (int32 flag, CONST char *cptr);
 t_stat sim_set_cons_speed (int32 flag, CONST char *cptr);
 t_stat sim_show_console (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
