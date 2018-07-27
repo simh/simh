@@ -10565,7 +10565,7 @@ return buf;
 t_stat sim_process_event (void)
 {
 UNIT *uptr;
-t_stat reason;
+t_stat reason, bare_reason;
 
 if (stop_cpu) {                                         /* stop CPU? */
     stop_cpu = 0;
@@ -10604,12 +10604,13 @@ do {
             reason = SCPE_OK;
         }
     AIO_EVENT_COMPLETE(uptr, reason);
-    if ((reason != SCPE_OK)     &&  /* Provide context for unexpected errors */
-        (reason != SCPE_STOP)   && 
-        (reason != SCPE_STEP)   && 
-        (reason != SCPE_EXPECT) &&
-        (reason != SCPE_EXIT)   && 
-        (reason != SCPE_REMOTE))
+    bare_reason = SCPE_BARE_STATUS (reason);
+    if ((bare_reason != SCPE_OK)     &&  /* Provide context for unexpected errors */
+        (bare_reason != SCPE_STOP)   && 
+        (bare_reason != SCPE_STEP)   && 
+        (bare_reason != SCPE_EXPECT) &&
+        (bare_reason != SCPE_EXIT)   && 
+        (bare_reason != SCPE_REMOTE))
         reason = sim_messagef (SCPE_IERR, "\nUnexpected internal error while processing event for %s which returned %d - %s\n", sim_uname (uptr), reason, sim_error_text (reason));
     } while ((reason == SCPE_OK) && 
              (sim_interval <= 0) && 
