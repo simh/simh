@@ -223,6 +223,7 @@
 #include "sim_disk.h"
 #include "sim_tape.h"
 #include "sim_ether.h"
+#include "sim_card.h"
 #include "sim_serial.h"
 #include "sim_video.h"
 #include "sim_sock.h"
@@ -520,6 +521,7 @@ void int_handler (int signal);
 t_stat set_prompt (int32 flag, CONST char *cptr);
 t_stat sim_set_asynch (int32 flag, CONST char *cptr);
 static const char *_get_dbg_verb (uint32 dbits, DEVICE* dptr, UNIT *uptr);
+static t_stat sim_library_unit_tests (void);
 static t_stat _sim_debug_flush (void);
 
 /* Global data */
@@ -2536,6 +2538,9 @@ else if (*argv[0]) {                                    /* sim name arg? */
         }
     }
 
+if (sim_switches & SWMASK ('T'))                        /* Command Line -T switch */
+    sim_library_unit_tests ();                          /* run library unit tests */
+
 stat = process_stdin_commands (SCPE_BARE_STATUS(stat), argv);
 
 detach_all (0, TRUE);                                   /* close files */
@@ -2820,6 +2825,13 @@ if (DEV_TYPE(dptr) == DEV_ETHER) {
     eth_attach_help (st, dptr, NULL, 0, NULL);
     return;
     }
+#if defined(USE_SIM_CARD) && defined(SIM_CARD_API)
+if (DEV_TYPE(dptr) == DEV_CARD) {
+    fprintf (st, "\n%s device attach commands:\n\n", dptr->name);
+    sim_card_attach_help (st, dptr, NULL, 0, NULL);
+    return;
+    }
+#endif
 if (!silent) {
     fprintf (st, "No ATTACH help is available for the %s device\n", dptr->name);
     if (dptr->help)
@@ -14385,4 +14397,122 @@ if (*stat != SCPE_OK) {
 *value = sim_eval_postfix (postfix, stat);
 delete_Stack (postfix);
 return cptr;
+}
+
+/*
+   Compiled in unit tests for the various device oriented library 
+   modules: sim_card, sim_disk, sim_tape, sim_ether, sim_tmxr, etc.
+ */
+
+static t_stat create_card_file (const char *filename, int cards)
+{
+FILE *f;
+int i;
+
+f = fopen (filename, "w");
+if (f == NULL)
+    return SCPE_OPENERR;
+for (i=0; i<cards; i++)
+    fprintf (f, "%05d ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\n", i);
+fclose (f);
+return SCPE_OK;
+}
+
+#define TST(_stat) do { if (SCPE_OK != (stat = (_stat))) {sim_printf ("Error: %d - '%s' processing: " #_stat "\n", stat, sim_error_text(stat)); goto done; }} while (0)
+
+static t_stat test_card (DEVICE *dptr)
+{
+t_stat stat = SCPE_OK;
+#if defined(USE_SIM_CARD) && defined(SIM_CARD_API)
+char cmd[CBUFSIZE];
+char saved_filename[4*CBUFSIZE];
+uint16 card_image[80];
+
+if ((dptr->units->flags & UNIT_RO) == 0)  /* Punch device? */
+    return SCPE_OK;
+
+sim_printf ("Testing %s device sim_card APIs\n", dptr->name);
+
+(void)remove("file1.deck");
+(void)remove("file2.deck");
+(void)remove("file3.deck");
+(void)remove("file4.deck");
+
+TST(create_card_file ("File10.deck", 10));
+TST(create_card_file ("File20.deck", 20));
+TST(create_card_file ("File30.deck", 30));
+TST(create_card_file ("File40.deck", 40));
+
+sprintf (cmd, "%s File10.deck", dptr->name);
+TST(attach_cmd (0, cmd));
+sprintf (cmd, "%s File20.deck", dptr->name);
+TST(attach_cmd (0, cmd));
+sprintf (cmd, "%s -S File30.deck", dptr->name);
+TST(attach_cmd (0, cmd));
+sprintf (cmd, "%s -S -E File40.deck", dptr->name);
+TST(attach_cmd (0, cmd));
+sprintf (saved_filename, "%s %s", dptr->name, dptr->units->filename);
+show_cmd (0, dptr->name);
+sim_printf ("Input Hopper Count:  %d\n", sim_card_input_hopper_count(dptr->units));
+sim_printf ("Output Hopper Count: %d\n", sim_card_output_hopper_count(dptr->units));
+while (!sim_card_eof (dptr->units))
+    TST(sim_read_card (dptr->units, card_image));
+sim_printf ("Input Hopper Count:  %d\n", sim_card_input_hopper_count(dptr->units));
+sim_printf ("Output Hopper Count: %d\n", sim_card_output_hopper_count(dptr->units));
+sim_printf ("Detaching %s\n", dptr->name);
+TST(detach_cmd (0, dptr->name));
+show_cmd (0, dptr->name);
+sim_printf ("Input Hopper Count:  %d\n", sim_card_input_hopper_count(dptr->units));
+sim_printf ("Output Hopper Count: %d\n", sim_card_output_hopper_count(dptr->units));
+sim_printf ("Attaching Saved Filenames: %s\n", saved_filename + strlen(dptr->name));
+TST(attach_cmd (0, saved_filename));
+show_cmd (0, dptr->name);
+sim_printf ("Input Hopper Count:  %d\n", sim_card_input_hopper_count(dptr->units));
+sim_printf ("Output Hopper Count: %d\n", sim_card_output_hopper_count(dptr->units));
+TST(detach_cmd (0, dptr->name));
+done:
+(void)remove ("file10.deck");
+(void)remove ("file20.deck");
+(void)remove ("file30.deck");
+(void)remove ("file40.deck");
+#endif /* defined(USE_SIM_CARD) && defined(SIM_CARD_API) */
+return stat;
+}
+
+static t_stat test_tape (DEVICE *dptr)
+{
+return SCPE_OK;
+}
+
+static t_stat test_disk (DEVICE *dptr)
+{
+return SCPE_OK;
+}
+
+static t_stat test_ether (DEVICE *dptr)
+{
+return SCPE_OK;
+}
+
+
+static t_stat sim_library_unit_tests (void)
+{
+int i;
+DEVICE *dptr;
+t_stat stat = SCPE_OK;
+
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+    if (DEV_TYPE(dptr) == DEV_CARD)
+        stat = test_card (dptr);
+    else
+        if (DEV_TYPE(dptr) == DEV_TAPE)
+            stat = test_tape (dptr);
+        else
+            if (DEV_TYPE(dptr) == DEV_DISK)
+                stat = test_disk (dptr);
+        else
+            if (DEV_TYPE(dptr) == DEV_ETHER)
+                stat = test_ether (dptr);
+    }
+return stat;
 }
