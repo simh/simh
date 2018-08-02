@@ -165,7 +165,7 @@ BITFIELD vh_csr_bits[] = {
 #define XOFF            (023)
 
 BITFIELD vh_rbuf_bits[] = {
-  BITF(RX_CHAR,4),                          /* Receive Character */
+  BITF(RX_CHAR,8),                          /* Receive Character */
   BITF(RX_LINE,4),                          /* Receive Line */
   BIT(PARITY_ERR),                          /* Parity Error */
   BIT(FRAME_ERR),                           /* Frame Error */
@@ -380,7 +380,7 @@ BITFIELD vh_tbuffct_bits[] = {
 static uint16   vh_csr[VH_MUXES]    = { 0 };    /* CSRs */
 static uint16   vh_timer[VH_MUXES]  = { 1 };    /* controller timeout */
 static uint16   vh_mcount[VH_MUXES] = { 0 };
-static uint32   vh_timeo[VH_MUXES]  = { 0 };
+static int32    vh_timeo[VH_MUXES]  = { 0 };
 static uint32   vh_ovrrun[VH_MUXES] = { 0 };    /* line overrun bits */
 /* XOFF'd channels, one bit/channel */
 static uint32   vh_stall[VH_MUXES]  = { 0 };
@@ -417,6 +417,11 @@ typedef struct {
     uint16  tbuf1;
     uint16  tbuf2;
     uint16  txchar;     /* single character I/O */
+#define TX_FIFO_SIZE 64
+    uint16  txfifo[TX_FIFO_SIZE];/* transmit FIFO - circular */
+
+    uint16  txfifo_idx; /* Extraction index */
+    uint16  txfifo_cnt; /* Count of FIFO entries  */
     uint16  txstate;    /* transmit state */
 #define TXS_IDLE        0
 #define TXS_PIO_START   1
@@ -518,7 +523,7 @@ static const REG vh_reg[] = {
     { BRDATADF (CSR,         vh_csr, DEV_RDX, 16, VH_MUXES, "control/status register, boards 0 to 3", vh_csr_bits) },
     { BRDATAD  (TIMER,     vh_timer, DEV_RDX, 16, VH_MUXES, "controller timeout, boards 0 to 3") },
     { BRDATAD  (MCOUNT,   vh_mcount, DEV_RDX, 16, VH_MUXES, "count down timer, boards 0 to 3") },
-    { BRDATAD  (TIMEO,     vh_timeo, DEV_RDX, 16, VH_MUXES, "control/status register, boards 0 to 3") },
+    { BRDATAD  (TIMEO,     vh_timeo, DEV_RDX, 16, VH_MUXES, "receive interrupt count down timer, boards 0 to 3") },
     { BRDATAD  (OVRRUN,   vh_ovrrun, DEV_RDX, 16, VH_MUXES, "line overrun bits, boards 0 to 3") },
     { BRDATAD  (STALL,     vh_stall, DEV_RDX, 16, VH_MUXES, "XOFF'd channels 1 bit/channel, boards 0 to 3") },
     { BRDATAD  (LOOP,       vh_loop, DEV_RDX, 16, VH_MUXES, "loopback status, boards 0 to 3") },
@@ -815,6 +820,41 @@ static int32 fifo_get ( int32   vh  )
     sim_clock_coschedule_abs (vh_poll_unit, tmxr_poll);
     return (data & 0177777);
 }
+/* TX FIFO get/put routines */
+
+/* return 0 on success, -1 on FIFO overflow */
+
+static int32 tx_fifo_free_count ( TMLX    *lp)
+{
+return TX_FIFO_SIZE - lp->txfifo_cnt;
+}
+
+static int32 tx_fifo_put ( TMLX    *lp,
+            int32   data    )
+{
+    int32   status = 0;
+
+    if (tx_fifo_free_count (lp) == 0)
+        return -1;
+    lp->txfifo[(lp->txfifo_idx + lp->txfifo_cnt) % TX_FIFO_SIZE] = data;
+    ++lp->txfifo_cnt;
+    return 0;
+}
+
+static int32 tx_fifo_get ( TMLX    *lp    )
+{
+    int32 data = lp->txfifo[lp->txfifo_idx];
+
+    if (lp->txfifo_cnt == 0)
+        return -1;
+    lp->txfifo[lp->txfifo_idx] = 0;
+    --lp->txfifo_cnt;
+    ++lp->txfifo_idx;
+    if (lp->txfifo_idx == TX_FIFO_SIZE)
+        lp->txfifo_idx = 0;
+    return (data & 0177777);
+}
+
 /* TX Q manipulation */
 
 static int32 dq_tx_report ( int32   vh  )
@@ -982,12 +1022,7 @@ static t_stat vh_rd (   int32   *data,
         line = (vh * VH_LINES) + CSR_GETCHAN (vh_csr[vh]);
         lp = &vh_parm[line];
         *data = (lp->lstat & ~0377) |       /* modem status */
-#if 0
-            (64 - tmxr_tqln (lp->tmln));
-fprintf (stderr, "\rtqln %d\n", 64 - tmxr_tqln (lp->tmln));
-#else
-            64;
-#endif
+                    tx_fifo_free_count (lp);
         break;
     case 4:     /* LNCTRL */
         if (CSR_GETCHAN (vh_csr[vh]) >= VH_LINES) {
@@ -1061,10 +1096,7 @@ static t_stat vh_wr (   int32   ldata,
                 (vh_csr[vh] & 0377) | (data << 8) :
                 (vh_csr[vh] & ~0377) | (data & 0377);
         if (data & CSR_MASTER_RESET) {
-            if ((vh_unit[vh].flags & UNIT_MODEDHU) && (data & CSR_SKIP))
-                data &= ~CSR_MASTER_RESET;
-            if (vh == 0) /* Only start unit service on the first unit.  Units are polled there */
-                sim_clock_coschedule (vh_poll_unit, tmxr_poll);
+            sim_cancel (vh_poll_unit);
             vh_mcount[vh] = MS2SIMH (1200); /* 1.2 seconds */
             sim_clock_coschedule (vh_timer_unit, tmxr_poll);
             sim_debug (DBG_TIM, &vh_dev, "vh_wr() - Master Reset Timeout set vh=%d, timeout=%d\n", vh, vh_mcount[vh]); 
@@ -1134,12 +1166,9 @@ static t_stat vh_wr (   int32   ldata,
             lp->txchar = data;  /* TXCHAR */
             if (lp->txchar & TXCHAR_TX_DATA_VALID) {
                 if (lp->tbuf2 & TB2_TX_ENA) {
-                    lp->txstate = TXS_PIO_START;
-                    if (vh_putc (vh, lp, CSR_GETCHAN (vh_csr[vh]),
-                                 lp->txchar) != SCPE_STALL)
-                        lp->txstate = TXS_PIO_PENDING;
-                    sim_debug (DBG_XMTSCH, &vh_dev, "VH-%d PIO: %s - 0x%X\n", (int)(lp - vh_parm), (lp->txstate == TXS_PIO_PENDING) ? "Started" : "Scheduled Start", lp->txchar & 0xFF);
-                    sim_activate_after_abs (vh_xmit_unit, lp->tmln->txdeltausecs);
+                    tx_fifo_put (lp, TXCHAR_TX_DATA_VALID | (data & 0377));
+                    sim_debug (DBG_XMTSCH, &vh_dev, "VH-%d PIO Scheduling Start - 0x%X\n", (int)(lp - vh_parm), lp->txchar & 0xFF);
+                    sim_activate_abs (vh_xmit_unit, 0);
                 }
             }
         }
@@ -1189,11 +1218,13 @@ static t_stat vh_wr (   int32   ldata,
             /* transmit 1 or 2 characters */
             if (!(lp->tbuf2 & TB2_TX_ENA))
                 break;
-            vh_putc (vh, lp, CSR_GETCHAN (vh_csr[vh]), data);
-            q_tx_report (vh, CSR_GETCHAN (vh_csr[vh]) << CSR_V_TX_LINE);
-            if (access != WRITEB)
-                vh_putc (vh, lp, CSR_GETCHAN (vh_csr[vh]),
-                    data >> 8);
+            tx_fifo_put (lp, TXCHAR_TX_DATA_VALID | (data & 0377));
+            if (lp->txfifo_cnt == 1) {
+                sim_debug (DBG_XMTSCH, &vh_dev, "VH-%d PIO Scheduling Start - 0x%X %s 0x%X\n", (int)(lp - vh_parm), data & 0xFF, (access == WRITEB) ? "" : "Extra Byte", data >> 8);
+                sim_activate_abs (vh_xmit_unit, 0);
+                }
+            if (access != WRITEB)                       /* second character */
+                tx_fifo_put (lp, TXCHAR_TX_DATA_VALID | ((data >> 8)& 0377));
         }
         break;
     case 4:     /* LNCTRL */
@@ -1216,6 +1247,11 @@ static t_stat vh_wr (   int32   ldata,
             if ((lp->tbuf2 & TB2_TX_ENA) &&
                 (lp->tbuf2 & TB2_TX_DMA_START)) {
                 lp->tbuf2 &= ~TB2_TX_DMA_START;
+                q_tx_report (vh, CSR_GETCHAN (vh_csr[vh]) << CSR_V_TX_LINE);
+            }
+            if ((lp->tbuf2 & TB2_TX_ENA) &&
+                (lp->txfifo_cnt != 0)) {
+                lp->txfifo_idx = lp->txfifo_cnt = 0;
                 q_tx_report (vh, CSR_GETCHAN (vh_csr[vh]) << CSR_V_TX_LINE);
             }
         }
@@ -1380,6 +1416,10 @@ static t_stat vh_timersvc (  UNIT    *uptr   )
     /* scan all DHU-mode muxes for RX FIFO timeout */
     for (vh = 0; vh < vh_desc.lines/VH_LINES; vh++) {
         if (vh_unit[vh].flags & UNIT_MODEDHU) {
+            if ((vh_csr[vh] & (CSR_SKIP | CSR_MASTER_RESET)) == (CSR_SKIP | CSR_MASTER_RESET)) {
+                sim_activate (vh_poll_unit, tmxr_poll);
+                vh_csr[vh] &= ~CSR_MASTER_RESET;
+                }
             if (vh_timeo[vh] && (vh_csr[vh] & CSR_RXIE)) {
                 vh_timeo[vh] -= 1;
                 if ((vh_timeo[vh] == 0) && rbuf_idx[vh]) {
@@ -1450,21 +1490,25 @@ static t_stat vh_xmt_svc (  UNIT    *uptr   )
             TMLX    *lp = &vh_parm[line];
 
             /* process any pending programmed output */
-            if (lp->txchar & TXCHAR_TX_DATA_VALID) {
+            if (lp->txfifo_cnt) {
                 if (lp->tbuf2 & TB2_TX_ENA) {
-                    sim_debug (DBG_XMTSCH, &vh_dev, "VH-%d PIO: %s - 0x%X\n", (int)(lp - vh_parm), (lp->txstate == TXS_PIO_PENDING) ? "Pending" : ((lp->txstate == TXS_PIO_START) ? "Starting" : "Unknown"), lp->txchar & 0xFF);
+                    sim_debug (DBG_XMTSCH, &vh_dev, "VH-%d PIO: %s - 0x%X\n", (int)(lp - vh_parm), (lp->txstate == TXS_PIO_PENDING) ? "Pending" : ((lp->txstate == TXS_PIO_START) ? "Starting" : ((lp->txstate == TXS_IDLE) ? "Idle" : "Unknown")), lp->txfifo[lp->txfifo_idx] & 0xFF);
                     switch (lp->txstate) {
                         case TXS_PIO_PENDING:
                             if (0 == tmxr_txdone_ln (lp->tmln))     /* actually done? */
                                 break;
+                            tx_fifo_get (lp);
                             q_tx_report (vh,
                                 CSR_GETCHAN (vh_csr[vh]) << CSR_V_TX_LINE);
-                            lp->txchar &= ~TXCHAR_TX_DATA_VALID;
                             lp->txstate = TXS_IDLE;
-                            break;
+                            if (lp->txfifo_cnt == 0) 
+                                break;
+                            /* fall through */
+                        case TXS_IDLE:
+                            lp->txstate = TXS_PIO_START;
                         case TXS_PIO_START:
                             if (vh_putc (vh, lp, CSR_GETCHAN (vh_csr[vh]),
-                                         lp->txchar) != SCPE_STALL) 
+                                         lp->txfifo[lp->txfifo_idx]) != SCPE_STALL)
                                 lp->txstate = TXS_PIO_PENDING;
                             break;
                     }
