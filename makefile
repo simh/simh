@@ -194,6 +194,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       CC_STD = -std=c99
     else
       CPP_BUILD = 1
+      OS_CCDEFS += -Wno-deprecated
     endif
   endif
   ifeq (git-repo,$(shell if $(TEST) -d ./.git; then echo git-repo; fi))
@@ -252,7 +253,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       endif
       $(info *** Warning ***)
     endif
-    OS_CCDEFS = -D_GNU_SOURCE
+    OS_CCDEFS += -D_GNU_SOURCE
     GCC_OPTIMIZERS_CMD = $(GCC) -v --help 2>&1
     GCC_WARNINGS_CMD = $(GCC) -v --help 2>&1
     LD_ELF = $(shell echo | $(GCC) -E -dM - | grep __ELF__)
