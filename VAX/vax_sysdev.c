@@ -1727,8 +1727,8 @@ if (*rom == 0) {                                        /* no boot? */
     r = cpu_load_bootcode (BOOT_CODE_FILENAME, BOOT_CODE_ARRAY, BOOT_CODE_SIZE, TRUE, 0);
     if (r != SCPE_OK)
         return r;
-    rom_wr_B (ROMBASE+4, sys_model ? 1 : 2);            /* Set Magic Byte to determine system type */
     }
+rom_wr_B (ROMBASE+4, sys_model ? 1 : 2);                /* Set Magic Byte to determine system type */
 sysd_powerup ();
 return SCPE_OK;
 }
