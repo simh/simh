@@ -12263,7 +12263,7 @@ while ((eol = strchr (debug_line_buf, '\n')) || flush) {
             }
         }
     debug_line_offset -= linesize;
-    if (debug_line_offset > 0)
+    if ((debug_line_offset > 0) && (!flush))
         memmove (debug_line_buf, eol + 1, debug_line_offset);
     debug_line_buf[debug_line_offset] = '\0';
     }
