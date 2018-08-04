@@ -1506,6 +1506,7 @@ static t_stat vh_xmt_svc (  UNIT    *uptr   )
                             /* fall through */
                         case TXS_IDLE:
                             lp->txstate = TXS_PIO_START;
+                            /* fall through */
                         case TXS_PIO_START:
                             if (vh_putc (vh, lp, CSR_GETCHAN (vh_csr[vh]),
                                          lp->txfifo[lp->txfifo_idx]) != SCPE_STALL)
