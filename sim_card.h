@@ -31,7 +31,7 @@
         Binary Card format:
                 Each record 160 characters.
                 First character   21012345
-                                  111 
+                                  111
                 Second characters 6789----
                 Top 4 bits of second character are 0.
                 It is unlikely that ascii text or BCD format
@@ -66,6 +66,8 @@
 extern "C" {
 #endif
 
+#define SIM_CARD_API    2               /* API Version */
+
 #define DEBUG_CARD      0x0000010       /* Show details */
 
 /* Flags for punch and reader. */
@@ -82,22 +84,31 @@ extern "C" {
 #define MODE_LOWER      (8 << UNIT_V_CARD_MODE)
 #define MODE_026        (0x10 << UNIT_V_CARD_MODE)
 #define MODE_029        (0x20 << UNIT_V_CARD_MODE)
-#define MODE_CHAR       (0x30 << UNIT_V_CARD_MODE)
+#define MODE_CHAR       (0x70 << UNIT_V_CARD_MODE)
 
 
-struct _card_data
-{
-    int                 ptr;            /* Pointer in buffer */
-    int                 len;            /* Length of buffer */
-    char                cbuff[1024];    /* Read in buffer for cards */
-    uint16              image[80];      /* Image */
-    uint8               hol_to_ascii[4096]; /* Back conversion table */
-};
+/* Card Reader Return Status code */
+typedef int t_cdstat;
+#define CDSE_OK     0   /* Good */
+#define CDSE_EOF    1   /* End of File */
+#define CDSE_EMPTY  2   /* Input Hopper Empty */
+#define CDSE_ERROR  3   /* Error Card Read */  
 
 /* Generic routines. */
-t_stat   sim_read_card(UNIT * uptr);
+
+     /* Read next card into image row 12,11,10,1-9 */
+     /* Return SCPE_EOF if end file detected. */
+t_cdstat sim_read_card(UNIT * uptr, uint16 image[80]);
+     /* Punch card from image row 12,11,10,1-9 */
+t_cdstat sim_punch_card(UNIT * uptr, uint16 image[80]);
+     /* Check if next card to be read is EOF */
 int      sim_card_eof(UNIT * uptr);
-t_stat   sim_punch_card(UNIT * uptr, UNIT *stkptr);
+     /* Return number of cards yet to read */
+t_addr   sim_hopper_size(UNIT * uptr);
+     /* Return number of cards punched */
+t_addr   sim_punch_count(UNIT * uptr);
+t_addr   sim_card_input_hopper_count(UNIT *uptr);
+t_addr   sim_card_output_hopper_count(UNIT *uptr);
 t_stat   sim_card_attach(UNIT * uptr, CONST char *file);
 t_stat   sim_card_detach(UNIT *uptr);
 
@@ -108,16 +119,16 @@ uint8    sim_hol_to_bcd(uint16 hol);
 uint16   sim_hol_to_ebcdic(uint16 hol);
 
 /* Format control routines. */
-t_stat sim_card_set_fmt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-t_stat sim_card_show_fmt (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat   sim_card_set_fmt (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat   sim_card_show_fmt (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 /* Help information */
-t_stat sim_card_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+t_stat   sim_card_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 
 /* Translation tables */
-extern const char      sim_six_to_ascii[64];
-extern const char      sim_ascii_to_six[128];
-extern const uint8     sim_parity_table[64];
+extern CONST char      sim_six_to_ascii[64];        /* Map BCD to ASCII */
+extern CONST char      sim_ascii_to_six[128];       /* Map 7 bit ASCII to BCD */
+extern CONST uint8     sim_parity_table[64];        /* 64 entry odd parity table */
 
 #ifdef  __cplusplus
 }
