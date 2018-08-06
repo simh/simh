@@ -2260,7 +2260,7 @@ if (!sim_quiet) {
     if (sim_deb_switches & SWMASK ('A'))
         sim_printf ("   Debug messages display time of day as seconds.msec%s\n", sim_deb_switches & SWMASK ('R') ? " relative to the start of debugging" : "");
     if (sim_deb_switches & SWMASK ('F'))
-        sim_printf ("   Debug messages will be filtered to summarize duplicate lines\n");
+        sim_printf ("   Debug messages will not be filtered to summarize duplicate lines\n");
     if (sim_deb_switches & SWMASK ('E'))
         sim_printf ("   Debug messages containing blob data in EBCDIC will display in readable form\n");
     time(&now);
@@ -2307,7 +2307,7 @@ if (sim_deb) {
     if (sim_deb_switches & SWMASK ('A'))
         fprintf (st, "   Debug messages display time of day as seconds.msec%s\n", sim_deb_switches & SWMASK ('R') ? " relative to the start of debugging" : "");
     if (sim_deb_switches & SWMASK ('F'))
-        fprintf (st, "   Debug messages will be filtered to summarize duplicate lines\n");
+        fprintf (st, "   Debug messages are not being filtered to summarize duplicate lines\n");
     if (sim_deb_switches & SWMASK ('E'))
         fprintf (st, "   Debug messages containing blob data in EBCDIC will display in readable form\n");
     for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
