@@ -2128,8 +2128,10 @@ return ((double)time->tv_sec)+(double)(time->tv_nsec)/1000000000.0;
 
 static void _double_to_timespec (struct timespec *time, double dtime)
 {
-time->tv_sec = (time_t)floor(dtime);
-time->tv_nsec = (long)((dtime-floor(dtime))*1000000000.0);
+double int_part = floor(dtime);
+
+time->tv_sec = (time_t)int_part;
+time->tv_nsec = (long)((dtime - int_part)*1000000000.0);
 }
 
 double sim_timenow_double (void)
