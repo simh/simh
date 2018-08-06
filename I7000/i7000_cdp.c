@@ -87,7 +87,7 @@ DEVICE              cdp_dev = {
     "CDP", cdp_unit, NULL, cdp_mod,
     NUM_DEVS_CDP, 8, 15, 1, 8, 8,
     NULL, NULL, NULL, NULL, &cdp_attach, &cdp_detach,
-    &cdp_dib, DEV_DISABLE | DEV_DEBUG, 0, crd_debug,
+    &cdp_dib, DEV_DISABLE | DEV_DEBUG | DEV_CARD, 0, crd_debug,
     NULL, NULL, &cdp_help, NULL, NULL, &cdp_description
 };
 
@@ -189,6 +189,8 @@ t_stat
 cdp_srv(UNIT *uptr) {
     int                 chan = UNIT_G_CHAN(uptr->flags);
     int                 u = (uptr - cdp_unit);
+    uint16              *image = (uint16 *)(uptr->up7);
+
     /* Waiting for disconnect */
     if (uptr->u5 & URCSTA_WDISCO) {
         if (chan_stat(chan, DEV_DISCO)) {
@@ -208,20 +210,22 @@ cdp_srv(UNIT *uptr) {
         /* Done waiting, punch card */
         if (uptr->u5 & URCSTA_FULL) {
 #ifdef STACK_DEV
-              switch(sim_punch_card(uptr,
-                        &stack_unit[(u * 10) + ((uptr->u5 >> 16) & 0xf)])) {
+              UNIT   *sptr = &stack_unit[(u * 10) + ((uptr->u5 >> 16) & 0xf)];
+              if ((uptr->flags & UNIT_ATT) != 0 || (sptr->flags & UNIT_ATT) == 0)
+                  sptr = uptr;
+              switch(sim_punch_card(sptr, image)) {
 #else
-              switch(sim_punch_card(uptr, NULL)) {
+              switch(sim_punch_card(uptr, image)) {
 #endif
-              case SCPE_EOF:
-              case SCPE_UNATT:
+              case CDSE_EOF:
+              case CDSE_EMPTY:
                   chan_set_eof(chan);
                   break;
                  /* If we get here, something is wrong */
-              case SCPE_IOERR:
+              case CDSE_ERROR:
                   chan_set_error(chan);
                   break;
-              case SCPE_OK:
+              case CDSE_OK:
                   break;
               }
               uptr->u5 &= ~URCSTA_FULL;
@@ -240,10 +244,7 @@ cdp_srv(UNIT *uptr) {
 
     /* Copy next column over */
     if (uptr->u5 & URCSTA_WRITE && uptr->u4 < 80) {
-        struct _card_data   *data;
         uint8               ch = 0;
-
-        data = (struct _card_data *)uptr->up7;
 
         switch(chan_read_char(chan, &ch, 0)) {
         case TIME_ERROR:
@@ -257,7 +258,7 @@ cdp_srv(UNIT *uptr) {
             else if (ch == 020)
                ch = 0;
             sim_debug(DEBUG_DATA, &cdp_dev, "%d: Char < %02o\n", u, ch);
-            data->image[uptr->u4++] = sim_bcd_to_hol(ch);
+            image[uptr->u4++] = sim_bcd_to_hol(ch);
             if (uptr->u4 == 80) {
                 chan_set(chan, DEV_REOR);
                 uptr->u5 |= URCSTA_WDISCO|URCSTA_BUSY|URCSTA_FULL;
@@ -278,24 +279,35 @@ cdp_ini(UNIT *uptr, t_bool f) {
 t_stat
 cdp_attach(UNIT * uptr, CONST char *file)
 {
-    t_stat              r;
+    t_stat        r;
 
     if ((r = sim_card_attach(uptr, file)) != SCPE_OK)
         return r;
-    uptr->u5 = 0;
+    if (uptr->up7 == 0) {
+        uptr->up7 = calloc(80, sizeof(uint16)); 
+        uptr->u5 = 0;
+    }
     return SCPE_OK;
 }
 
 t_stat
 cdp_detach(UNIT * uptr)
 {
-    if (uptr->u5 & URCSTA_FULL)
+    uint16        *image = (uint16 *)(uptr->up7);
+
+    if (uptr->u5 & URCSTA_FULL) {
 #ifdef STACK_DEV
-        sim_punch_card(uptr, &stack_unit[
-                ((uptr - cdp_unit) * 10) + ((uptr->u5 >> 16) & 0xf)]);
+        UNIT   *sptr = &stack_unit[((uptr - cdp_unit) * 10) + ((uptr->u5 >> 16) & 0xf)];
+        if ((uptr->flags & UNIT_ATT) != 0 || (sptr->flags & UNIT_ATT) == 0)
+            sptr = uptr;
+        sim_punch_card(sptr, image);
 #else
-        sim_punch_card(uptr, NULL);
+        sim_punch_card(uptr, image);
 #endif
+    }
+    if (uptr->up7 == 0) 
+        free(uptr->up7);
+    uptr->up7 = 0;
     return sim_card_detach(uptr);
 }
 

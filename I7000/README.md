@@ -6,7 +6,7 @@ Latest status for I7000 Cpus:
 
 ## i704
    * SAP works.  
-   * Fort2 unfinished.  
+   * Fort2 working.
 
 ## i7010
    * PR155 works.

@@ -77,7 +77,7 @@ DEVICE              cdp_dev = {
     "CDP", cdp_unit, NULL, cdp_mod,
     NUM_DEVS_CDP, 8, 15, 1, 8, 36,
     NULL, NULL, &cdp_reset, NULL, &cdp_attach, &cdp_detach,
-    &cdp_dib, DEV_DISABLE | DEV_DEBUG, 0, crd_debug,
+    &cdp_dib, DEV_DISABLE | DEV_DEBUG | DEV_CARD, 0, crd_debug,
     NULL, NULL, &cdp_help, NULL, NULL, &cdp_description
 };
 
@@ -121,19 +121,19 @@ t_stat cdp_srv(UNIT * uptr)
 {
     int                 chan = UNIT_G_CHAN(uptr->flags);
     int                 u = (uptr - cdp_unit);
+    uint16             *image = (uint16 *)(uptr->up7);
     int                 pos;
     t_uint64            wd;
     int                 bit;
     t_uint64            mask;
     int                 b;
     int                 col;
-    struct _card_data   *data;
 
     /* Channel has disconnected, abort current card. */
     if (uptr->u5 & URCSTA_CMD && chan_stat(chan, DEV_DISCO)) {
         if ((uptr->u5 & CDPSTA_POSMASK) != 0) {
             sim_debug(DEBUG_DETAIL, &cdp_dev, "punch card\n");
-            sim_punch_card(uptr, NULL);
+            sim_punch_card(uptr, image);
             uptr->u5 &= ~CDPSTA_PUNCH;
         }
         uptr->u5 &= ~(URCSTA_WRITE | URCSTA_CMD | CDPSTA_POSMASK);
@@ -189,7 +189,7 @@ t_stat cdp_srv(UNIT * uptr)
             sim_debug(DEBUG_CHAN, &cdp_dev, "unit=%d disconnect\n", u);
         }
         sim_debug(DEBUG_DETAIL, &cdp_dev, "punch card full\n");
-        sim_punch_card(uptr, NULL);
+        sim_punch_card(uptr, image);
         uptr->u5 |= URCSTA_IDLE;
         uptr->u5 &= ~(URCSTA_WRITE | CDPSTA_POSMASK | CDPSTA_PUNCH);
         uptr->wait = 85;
@@ -201,7 +201,6 @@ t_stat cdp_srv(UNIT * uptr)
 
     sim_debug(DEBUG_DATA, &cdp_dev, "unit=%d write column %d ", u, pos);
     wd = 0;
-    data = (struct _card_data *)uptr->up7;
     switch (chan_read(chan, &wd, 0)) {
     case DATA_OK:
         sim_debug(DEBUG_DATA, &cdp_dev, " %012llo\n", wd);
@@ -212,7 +211,7 @@ t_stat cdp_srv(UNIT * uptr)
 
         for (col = 35; col >= 0; mask <<= 1, col--) {
             if (wd & mask)
-                data->image[col + b] |= bit;
+                image[col + b] |= bit;
         }
         pos++;
         uptr->wait = 0;
@@ -258,13 +257,19 @@ cdp_attach(UNIT * uptr, CONST char *file)
 
     if ((r = sim_card_attach(uptr, file)) != SCPE_OK)
         return r;
-    uptr->u5 = CDPSTA_POSMASK;
+    if (uptr->up7 == 0) {
+        uptr->up7 = calloc(80, sizeof(uint16));
+        uptr->u5 = CDPSTA_POSMASK;
+    }
     return SCPE_OK;
 }
 
 t_stat
 cdp_detach(UNIT * uptr)
 {
+    if (uptr->up7 != 0)
+        free(uptr->up7);
+    uptr->up7 = 0;
     return sim_card_detach(uptr);
 }
 

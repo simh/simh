@@ -273,7 +273,7 @@ DEVICE              mtz_dev = {
     "MT", &mta_unit[NUM_DEVS_MT * 10], NULL, mt_mod,
     NUM_UNITS_MT, 8, 15, 1, 8, 8,
     NULL, NULL, &mt_reset, &mt_boot, &mt_attach, &mt_detach,
-    &mt_dib, DEV_BUF_NUM(NUM_DEVS_MT) | DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
+    &mt_dib, DEV_BUF_NUM(NUM_DEVS_MT) | DEV_DISABLE | DEV_DEBUG | DEV_TAPE, 0, dev_debug,
     NULL, NULL, &mt_help, NULL, NULL, &mt_description
 };
 #endif
@@ -283,7 +283,7 @@ DEVICE              mta_dev = {
     "MTA", mta_unit, NULL, mt_mod,
     NUM_UNITS_MT, 8, 15, 1, 8, 8,
     NULL, NULL, &mt_reset, &mt_boot, &mt_attach, &mt_detach,
-    &mt_dib, DEV_BUF_NUM(0) | DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
+    &mt_dib, DEV_BUF_NUM(0) | DEV_DISABLE | DEV_DEBUG | DEV_TAPE, 0, dev_debug,
     NULL, NULL, &mt_help, NULL, NULL, &mt_description
 };
 
@@ -292,7 +292,7 @@ DEVICE              mtb_dev = {
     "MTB", &mta_unit[10], NULL, mt_mod,
     NUM_UNITS_MT, 8, 15, 1, 8, 8,
     NULL, NULL, &mt_reset, &mt_boot, &mt_attach, &mt_detach,
-    &mt_dib, DEV_BUF_NUM(1) | DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
+    &mt_dib, DEV_BUF_NUM(1) | DEV_DISABLE | DEV_DEBUG | DEV_TAPE, 0, dev_debug,
     NULL, NULL, &mt_help, NULL, NULL, &mt_description
 };
 
@@ -301,7 +301,7 @@ DEVICE              mtc_dev = {
     "MTC", &mta_unit[20], NULL, mt_mod,
     NUM_UNITS_MT, 8, 15, 1, 8, 8,
     NULL, NULL, &mt_reset, &mt_boot, &mt_attach, &mt_detach,
-    &mt_dib, DEV_BUF_NUM(2) | DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
+    &mt_dib, DEV_BUF_NUM(2) | DEV_DISABLE | DEV_DEBUG | DEV_TAPE, 0, dev_debug,
     NULL, NULL, &mt_help, NULL, NULL, &mt_description
 };
 
@@ -310,7 +310,7 @@ DEVICE              mtd_dev = {
     "MTD", &mta_unit[30], NULL, mt_mod,
     NUM_UNITS_MT, 8, 15, 1, 8, 36,
     NULL, NULL, &mt_reset, &mt_boot, &mt_attach, &mt_detach,
-    &mt_dib, DEV_BUF_NUM(3) | DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
+    &mt_dib, DEV_BUF_NUM(3) | DEV_DISABLE | DEV_DEBUG | DEV_TAPE, 0, dev_debug,
     NULL, NULL, &mt_help, NULL, NULL, &mt_description
 };
 
@@ -319,7 +319,7 @@ DEVICE              mte_dev = {
     "MTE", &mta_unit[40], NULL, mt_mod,
     NUM_UNITS_MT, 8, 15, 1, 8, 8,
     NULL, NULL, &mt_reset, &mt_boot, &mt_attach, &mt_detach,
-    &mt_dib, DEV_BUF_NUM(4) | DEV_DIS | DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
+    &mt_dib, DEV_BUF_NUM(4) | DEV_DIS | DEV_DISABLE | DEV_DEBUG | DEV_TAPE, 0, dev_debug,
     NULL, NULL, &mt_help, NULL, NULL, &mt_description
 };
 
@@ -328,7 +328,7 @@ DEVICE              mtf_dev = {
     "MTF", &mta_unit[50], NULL, mt_mod,
     NUM_UNITS_MT, 8, 15, 1, 8, 8,
     NULL, NULL, &mt_reset, &mt_boot, &mt_attach, &mt_detach,
-    &mt_dib, DEV_BUF_NUM(5) | DEV_DIS | DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
+    &mt_dib, DEV_BUF_NUM(5) | DEV_DIS | DEV_DISABLE | DEV_DEBUG | DEV_TAPE, 0, dev_debug,
     NULL, NULL, &mt_help, NULL, NULL, &mt_description
 };
 #endif
@@ -510,7 +510,7 @@ uint32 mt_cmd(UNIT * uptr, uint16 cmd, uint16 dev)
             return SCPE_IOERR;
         }
         uptr->u5 |= MT_WEF;
-#if I7010 
+#if I7010
         chan_set_sel(chan, 1);
         chan_clear_status(chan);
         mt_chan[chan] = MTC_BSY | MTC_SEL | unit;
@@ -743,7 +743,7 @@ t_stat mt_srv(UNIT * uptr)
 
     /* Channel has disconnected, abort current read. */
     if ((mt_chan[chan] & 037) == (MTC_SEL | unit) &&
-            chan_stat(chan, DEV_DISCO)) {
+            chan_test(chan, DEV_DISCO)) {
         uptr->u5 &= ~MT_CMDMSK;
         reclen = uptr->hwmark;
         if (cmd == MT_WRS || cmd == MT_WRSB) {
@@ -757,16 +757,16 @@ t_stat mt_srv(UNIT * uptr)
             }
         } else if (cmd == MT_RDS || cmd == MT_RDSB) {
             sim_debug(DEBUG_DETAIL, dptr,
-                        "Read flush unit=%d %s Block %d chars\n",
-                         unit, (cmd == MT_RDS) ? "BCD" : "Binary", reclen);
+                        "Read flush unit=%d %s at %d Block %d chars\n",
+                         unit, (cmd == MT_RDS) ? "BCD" : "Binary", uptr->u6, reclen);
             /* Keep moving until end of block */
-            if (uptr->u6 < (int32)uptr->hwmark ) {
+            if (uptr->u6 < (int32)reclen ) {
                 reclen -= uptr->u6;
                 uptr->u3 += reclen;
                 uptr->u5 |= MT_SKIP|MT_IDLE;
                 uptr->u6 = 0;
                 uptr->hwmark = 0;
-                chan_clear(chan, DEV_DISCO | DEV_WEOR);
+                chan_clear(chan, DEV_WEOR );
                 sim_activate(uptr, reclen * T1_us);
                 return SCPE_OK;
             } else {
@@ -811,7 +811,7 @@ t_stat mt_srv(UNIT * uptr)
 #else
         chan_clear(chan, DEV_SEL|STA_TWAIT);
 #endif
-        mt_chan[chan] = 0; 
+        mt_chan[chan] = 0;
         sim_debug(DEBUG_DETAIL, dptr, "Skip unit=%d\n", unit);
         /* Allow time for tape to be restarted, before stop */
         sim_activate(uptr,  us_to_ticks(500));
@@ -879,6 +879,7 @@ t_stat mt_srv(UNIT * uptr)
                         chan_set_error(chan);
                     }
 #else
+                    chan_set(chan, DEV_REOR);
                     chan_set_attn(chan);
 #endif
                 }
@@ -891,7 +892,7 @@ t_stat mt_srv(UNIT * uptr)
             sim_debug(DEBUG_DETAIL, dptr, "%s Block %d chars\n",
                       (cmd == MT_RDS) ? "BCD" : "Binary", reclen);
 #ifdef I7010
-            if (mode && mt_buffer[bufnum][0] == 017) 
+            if (mode && mt_buffer[bufnum][0] == 017)
                 chan_set_eof(chan);
 #endif
 
@@ -944,7 +945,7 @@ t_stat mt_srv(UNIT * uptr)
                 sim_activate(uptr, (uptr->hwmark-uptr->u6) * T1_us);
                 uptr->u3 += (uptr->hwmark - uptr->u6);
                 uptr->u6 = uptr->hwmark;    /* Force read next record */
-            } 
+            }
             sim_activate(uptr, T1_us);
             break;
 
@@ -1057,6 +1058,7 @@ t_stat mt_srv(UNIT * uptr)
                     r = MTSE_OK;
                 } else {
                     sim_debug(DEBUG_DETAIL, dptr, "error=%d\n", r);
+                    uptr->u6 = uptr->hwmark;
                     uptr->u5 &= ~MT_CMDMSK;
                     chan_set_attn(chan);
                     chan_clear(chan, DEV_SEL);
@@ -1354,7 +1356,7 @@ mt_attach(UNIT * uptr, CONST char *file)
 {
     t_stat              r;
 
-    if ((r = sim_tape_attach(uptr, file)) != SCPE_OK)
+    if ((r = sim_tape_attach_ex(uptr, file, 0, 0)) != SCPE_OK)
         return r;
     uptr->u3 = 0;
     uptr->u5 |= MT_RDY;

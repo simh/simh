@@ -57,7 +57,7 @@ extern uint16       iotraps;
 extern uint8        iocheck;
 extern UNIT         cpu_unit;
 extern uint16       IC;
-extern uint8        AC[5 * 512];
+extern uint8        AC[6 * 512];
 extern int          chwait;
 extern uint16       selreg;
 extern uint16       selreg2;

@@ -81,7 +81,7 @@ DEVICE              cdr_dev = {
     "CDR", cdr_unit, NULL, cdr_mod,
     NUM_DEVS_CDR, 8, 15, 1, 8, 36,
     NULL, NULL, &cdr_reset, &cdr_boot, &cdr_attach, &cdr_detach,
-    &cdr_dib, DEV_DISABLE | DEV_DEBUG, 0, crd_debug,
+    &cdr_dib, DEV_DISABLE | DEV_DEBUG | DEV_CARD, 0, crd_debug,
     NULL, NULL, &cdr_help, NULL, NULL, &cdr_description
 };
 
@@ -118,9 +118,9 @@ t_stat cdr_srv(UNIT * uptr)
     int                 chan = UNIT_G_CHAN(uptr->flags);
     int                 u = (uptr - cdr_unit);
     int                 pos, col, b;
+    uint16              *image = (uint16 *)(uptr->up7);
     uint16              bit;
     t_uint64            mask, wd;
-    struct _card_data   *data;
 
     /* Channel has disconnected, abort current read. */
     if (uptr->u5 & URCSTA_CMD && chan_stat(chan, DEV_DISCO)) {
@@ -163,23 +163,23 @@ t_stat cdr_srv(UNIT * uptr)
 
     pos = (uptr->u5 & CDRPOSMASK) >> CDRPOSSHIFT;
     if (pos == (CDRPOSMASK >> CDRPOSSHIFT)) {
-        switch (sim_read_card(uptr)) {
-        case SCPE_UNATT:
-        case SCPE_IOERR:
+        switch (sim_read_card(uptr, image)) {
+        case CDSE_EMPTY:
+        case CDSE_ERROR:
             sim_debug(DEBUG_EXP, &cdr_dev, "unit=%d Setting ATTN\n", u);
             chan_set_error(chan);
             chan_set_attn(chan);
             uptr->u5 &= ~URCSTA_READ;
             sim_activate(uptr, us_to_ticks(1000));
             return SCPE_OK;
-        case SCPE_EOF:
+        case CDSE_EOF:
             sim_debug(DEBUG_EXP, &cdr_dev, "unit=%d EOF\n", u);
             chan_set_eof(chan);
             chan_set_attn(chan);
             uptr->u5 &= ~URCSTA_READ;
             sim_activate(uptr, us_to_ticks(1000));
             return SCPE_OK;
-        case SCPE_OK:
+        case CDSE_OK:
             break;
         }
         pos = 0;
@@ -196,7 +196,6 @@ t_stat cdr_srv(UNIT * uptr)
         return SCPE_OK;
     }
 
-    data = (struct _card_data *)uptr->up7;
     /* Bit flip into read buffer */
     bit = 1 << (pos / 2);
     mask = 1;
@@ -204,7 +203,7 @@ t_stat cdr_srv(UNIT * uptr)
     b = (pos & 1)?36:0;
 
     for (col = 35; col >= 0; mask <<= 1) {
-        if (data->image[col-- + b] & bit)
+        if (image[col-- + b] & bit)
              wd |= mask;
     }
 
@@ -246,7 +245,7 @@ cdr_boot(int32 unit_num, DEVICE * dptr)
     int                 chan = UNIT_G_CHAN(uptr->flags);
     t_stat              r;
     int                 pos;
-    struct _card_data   *data;
+    uint16             *image = (uint16 *)(uptr->up7);
 
     if ((uptr->flags & UNIT_ATT) == 0)
         return SCPE_UNATT;      /* attached? */
@@ -254,12 +253,11 @@ cdr_boot(int32 unit_num, DEVICE * dptr)
 /* Init for a read */
     if (cdr_cmd(uptr, IO_RDS, cdr_dib.addr) != SCPE_OK)
         return STOP_IONRDY;
-    r = sim_read_card(uptr);
+    r = sim_read_card(uptr, image);
     if (r != SCPE_OK)
         return r;
 
 /* Copy first three records. */
-    data = (struct _card_data *)uptr->up7;
     uptr->u5 &= ~CDRPOSMASK;
     for(pos = 0; pos <3; pos++) {
         uint16          bit = 1 << (pos / 2);
@@ -271,7 +269,7 @@ cdr_boot(int32 unit_num, DEVICE * dptr)
             break;
         M[pos] = 0;
         for (col = 35; col >= 0; mask <<= 1) {
-            if (data->image[col-- + b] & bit)
+            if (image[col-- + b] & bit)
                  M[pos] |= mask;
         }
         sim_debug(DEBUG_DATA, &cdr_dev, "boot read row %d %012llo\n",
@@ -295,14 +293,20 @@ cdr_attach(UNIT * uptr, CONST char *file)
 
     if ((r = sim_card_attach(uptr, file)) != SCPE_OK)
         return r;
-    uptr->u5 = 0;
-    uptr->u4 = 0;
+    if (uptr->up7 == 0) {
+        uptr->up7 = malloc(sizeof(uint16)*80);
+        uptr->u5 = 0;
+        uptr->u4 = 0;
+    }
     return SCPE_OK;
 }
 
 t_stat
 cdr_detach(UNIT * uptr)
 {
+    if (uptr->up7 != 0)
+       free(uptr->up7);
+    uptr->up7 = 0;
     return sim_card_detach(uptr);
 }
 

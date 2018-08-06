@@ -202,7 +202,7 @@ DEVICE              hta_dev = {
     "HTA", hta_unit, NULL, ht_mod,
     NUM_UNITS_HT + 1, 8, 15, 1, 8, 8,
     NULL, NULL, &ht_reset, &ht_boot, &ht_attach, &ht_detach,
-    &ht_dib, DEV_BUF_NUM(0) | DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
+    &ht_dib, DEV_BUF_NUM(0) | DEV_DISABLE | DEV_DEBUG | DEV_TAPE, 0, dev_debug,
     NULL, NULL, &ht_help, NULL, NULL, &ht_description
 };
 
@@ -211,7 +211,7 @@ DEVICE              htb_dev = {
     "HTB", &hta_unit[NUM_UNITS_HT + 1], NULL, ht_mod,
     NUM_UNITS_HT + 1, 8, 15, 1, 8, 8,
     NULL, NULL, &ht_reset, &ht_boot, &ht_attach, &ht_detach,
-    &ht_dib, DEV_BUF_NUM(1) | DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
+    &ht_dib, DEV_BUF_NUM(1) | DEV_DISABLE | DEV_DEBUG | DEV_TAPE, 0, dev_debug,
     NULL, NULL, &ht_help, NULL, NULL, &ht_description
 };
 #endif
@@ -959,7 +959,7 @@ ht_attach(UNIT * uptr, CONST char *file)
 {
     t_stat              r;
 
-    if ((r = sim_tape_attach(uptr, file)) != SCPE_OK)
+    if ((r = sim_tape_attach_ex(uptr, file, 0, 0)) != SCPE_OK)
         return r;
     uptr->u5 = HT_BOT /*|HT_ATTN */ ;
     return SCPE_OK;
