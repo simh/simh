@@ -213,7 +213,7 @@ uint16              l_reg[2];                   /* L current syllable pointer */
 uint8               ncsf_reg[2];                /* True if normal state */
 uint8               salf_reg[2];                /* True if subrogram mode */
 uint8               cwmf_reg[2];                /* True if character mode */
-uint8               hltf[2];                    /* True if processor halted */
+uint16              hltf[2];                    /* True if processor halted */
 uint8               msff_reg[2];                /* Mark stack flag Word mode */
 #define TFFF MSFF                               /* True state in Char mode */
 uint8               varf_reg[2];                /* Variant Flag */
@@ -926,7 +926,7 @@ void initiate() {
 /* Save processor state in case of error or halt */
 void storeInterrupt(int forced, int test) {
     int         f;
-    t_uint64    temp;
+    uint16      temp;
 
     if (forced || test)
         NCSF = 0;
@@ -946,7 +946,7 @@ void storeInterrupt(int forced, int test) {
         }
         /* Make ILCW */
         B = X | ((i)? PRESENT : 0) | FLAG | DFLAG;
-        next_addr(S);     /* Save B */
+        next_addr(S);           /* Save B */
         memory_cycle(11);
     } else {
         if (BROF || test) {     /* Push B First */
@@ -959,11 +959,11 @@ void storeInterrupt(int forced, int test) {
         }
     }
     AROF = 0;
-    B = ICW;            /* Set ICW into B */
-    next_addr(S); /* Save B */
+    B = ICW;                   /* Set ICW into B */
+    next_addr(S);              /* Save B */
     memory_cycle(11);
-    B = RCW(f);         /* Save IRCW */
-    next_addr(S); /* Save B */
+    B = RCW(f);                /* Save IRCW */
+    next_addr(S);              /* Save B */
     memory_cycle(11);
     if (CWMF) {
         /* Get the correct value of R */
@@ -1985,7 +1985,7 @@ sim_instr(void)
     int                 i;
     int                 j;
 
-    reason = 0;
+    reason = SCPE_OK;
     hltf[0] = 0;
     hltf[1] = 0;
     P1_run = 1;
@@ -1993,18 +1993,17 @@ sim_instr(void)
     while (reason == 0) {       /* loop until halted */
         if (P1_run == 0)
             return SCPE_STOP;
+        /* System is booting, wait until finished loading */
         while (loading) {
-            sim_interval = -1;
             reason = sim_process_event();
-            if (reason != SCPE_OK) {
+            if (reason != SCPE_OK)
                  break; /* process */
-            }
         }
+        /* Passed time quantum */
         if (sim_interval <= 0) {        /* event queue? */
             reason = sim_process_event();
-            if (reason != SCPE_OK) {
+            if (reason != SCPE_OK)
                  break; /* process */
-            }
         }
 
         if (sim_brk_summ) {
@@ -2027,20 +2026,15 @@ sim_instr(void)
         }
 
         /* Toggle between two CPU's. */
+        if (TROF == 0 && NCSF) {
+            if (Q != 0 || ((cpu_index)? HLTF : IAR) != 0)
+                storeInterrupt(1,0);
+        }
+
         if (cpu_index == 0 && P2_run == 1) {
             cpu_index = 1;
-            /* Check if interrupt pending. */
-            if (TROF == 0 && NCSF && ((Q != 0) || HLTF))
-                /* Force a SFI */
-                storeInterrupt(1,0);
         } else {
             cpu_index = 0;
-
-            /* Check if interrupt pending. */
-            if (TROF == 0 && NCSF && ((Q != 0) ||
-                                 (IAR != 0)))
-                /* Force a SFI */
-                storeInterrupt(1,0);
         }
         if (TROF == 0)
             next_prog();
@@ -2184,17 +2178,12 @@ crf_loop:
                 Ma = (F - field) & CORE;
                 memory_cycle(4);
                 AROF = 0;
-                if (A & FLAG) {
-                    if ((A & PRESENT) == 0) {
-                        if (NCSF)
-                            Q |= PRES_BIT;
-                        break;
-                    }
-                    GH = 0;
-                } else {
-                    GH = (A >> 12) & 070;
-                }
                 Ma = CF(A);
+                GH = 0;
+                if ((A & FLAG) == 0)
+                    GH = (A >> 12) & 070;
+                else if ((A & PRESENT) == 0 && NCSF)
+                    Q |= PRES_BIT;
                 break;
 
             case CMOP_RDA:      /* Recall Destination Address */
@@ -2203,34 +2192,29 @@ crf_loop:
                 S = (F - field) & CORE;
                 memory_cycle(3);
                 BROF = 0;
-                if (B & FLAG) {
-                    if ((B & PRESENT) == 0) {
-                        if (NCSF)
-                            Q |= PRES_BIT;
-                        break;
-                    }
-                    KV = 0;
-                } else {
-                    KV = (B >> 12) & 070;
-                }
                 S = CF(B);
+                KV = 0;
+                if ((B & FLAG) == 0)
+                    KV = (B >> 12) & 070;
+                else if ((B & PRESENT) == 0 && NCSF)
+                    Q |= PRES_BIT;
                 break;
 
             case CMOP_RCA:      /* Recall Control Address */
                 AROF = BROF;
-                A = B;  /* Save B temporarly */
+                A = B;          /* Save B temporarly */
                 atemp = S;      /* Save S */
                 S = (F - field) & CORE;
-                memory_cycle(3);        /* Load word in B */
+                memory_cycle(3);/* Load word in B */
                 S = atemp;      /* Restore S */
                 if (B & FLAG) {
                     if ((B & PRESENT) == 0) {
                         if (NCSF)
                             Q |= PRES_BIT;
-                        break;
+                    } else {
+                        C = CF(B);
+                        L = 0;
                     }
-                    C = CF(B);
-                    L = 0;
                 } else {
                     C = CF(B);
                     L = LF(B) + 1;
@@ -2318,9 +2302,10 @@ crf_loop:
                 A = B;
                 AROF = BROF;
                 B = ((t_uint64)(KV & 070) << (FFIELD_V - 3)) | toC(S);
+                atemp = S;
                 S = (F - field) & CORE;
                 memory_cycle(013);      /* Store B in S */
-                S = CF(B);
+                S = atemp;
                 B = A;
                 BROF = AROF;
                 AROF = 0;
@@ -2331,9 +2316,10 @@ crf_loop:
                 A = B;
                 AROF = BROF;
                 B = ((t_uint64)(GH & 070) << (FFIELD_V - 3)) | toC(Ma);
+                atemp = Ma;
                 Ma = (F - field) & CORE;
                 memory_cycle(015);      /* Store B in Ma */
-                Ma = CF(B);
+                Ma = atemp;
                 B = A;
                 BROF = AROF;
                 AROF = 0;
@@ -3652,6 +3638,12 @@ control:
                         do {
                             Ma = CF(B);
                             memory_cycle(5);
+                            if (sim_interval <= 0) {        /* event queue? */
+                                reason = sim_process_event();
+                                if (reason != SCPE_OK) {
+                                     break; /* process */
+                                }
+                            }
                             temp = (B & MANT) + (A & MANT);
                         } while ((temp & EXPO) == 0);
                         A = FLAG | PRESENT | toC(Ma);
@@ -3672,17 +3664,12 @@ control:
                         R = 0;
                         F = S;          /* Set F and X */
                         X = toF(S);
-                        if (B & FLAG) {
-                            if ((B & PRESENT) == 0) {
-                                if (NCSF)
-                                    Q |= PRES_BIT;
-                                break;
-                            }
-                            KV = 0;
-                        } else {
-                            KV = (uint8)((B >> (FFIELD_V - 3)) & 070);
-                        }
                         S = CF(B);
+                        KV = 0;
+                        if ((B & FLAG) == 0)
+                            KV = (uint8)((B >> (FFIELD_V - 3)) & 070);
+                        else if ((B & PRESENT) == 0 && NCSF)
+                            Q |= PRES_BIT;
                         break;
 
                 case VARIANT(WMOP_MKS): /* Mark Stack */
@@ -3846,6 +3833,8 @@ cpu_reset(DEVICE * dptr)
     GH = KV = Q = 0;
     hltf[0] = 0;
     P1_run = 0;
+    IAR = 0;
+    HALT = 0;
 
     idle_addr = 0;
     sim_brk_types = sim_brk_dflt = SWMASK('E') | SWMASK('A') | SWMASK('B');
@@ -3958,7 +3947,7 @@ cpu_show_hist(FILE * st, UNIT * uptr, int32 val, CONST void *desc)
     t_stat              r;
     t_value             sim_eval;
     struct InstHistory *h;
-    static const char   flags[] = "ABCNSMV";
+    CONST static char   flags[] = "ABCNSMV";
 
     if (hst_lnt == 0)
         return SCPE_NOFNC;      /* enabled? */
@@ -4008,8 +3997,7 @@ cpu_show_hist(FILE * st, UNIT * uptr, int32 val, CONST void *desc)
             fputc(' ', st);
             fprint_val(st, h->op, 8, 12, PV_RZRO);
             fputc(' ', st);
-            print_opcode(st, h->op,
-                ((h->flags & F_CWMF) ? char_ops : word_ops));
+            print_opcode(st, h->op, ((h->flags & F_CWMF) != 0));
             fputc(' ', st);
             fprint_val(st, h->iar, 8, 16, PV_RZRO);
             fputc('\n', st);    /* end line */

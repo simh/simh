@@ -136,7 +136,7 @@ const char          ascii_to_con[128] = {
    /* Control                              */
      -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
    /*sp    !    "    #    $    %    &    ' */
-    020, 032, 037, 013, 053, 017, 060, 014,     /* 40 - 77 */
+    020, 032, 037, 013, 053, 034, 060, 014,     /* 40 - 77 */
    /* (    )    *    +    ,    -    .    / */
     075, 055, 054, 072, 033, 040, 073, 021,
    /* 0    1    2    3    4    5    6    7 */
@@ -150,7 +150,7 @@ const char          ascii_to_con[128] = {
    /* P    Q    R    S    T    U    V    W */
     047, 050, 051, 022, 023, 024, 025, 026,
    /* X    Y    Z    [    \    ]    ^    _ */
-    027, 030, 031, 075, 036, 055, 057, 000,
+    027, 030, 031, 074, 036, 036, 057, 000,
    /* `    a    b    c    d    e    f    g */
     035, 061, 062, 063, 064, 065, 066, 067,     /* 140 - 177 */
    /* h    i    j    k    l    m    n    o */
@@ -158,7 +158,7 @@ const char          ascii_to_con[128] = {
    /* p    q    r    s    t    u    v    w */
     047, 050, 051, 022, 023, 024, 025, 026,
    /* x    y    z    {    |    }    ~   del*/
-    027, 030, 031, 057, 077, 017,  -1,  -1
+    027, 030, 031, 057, 052, 017,  -1,  -1
 };
 
 
@@ -341,9 +341,10 @@ t_opcode  char_ops[] = {
 
 /* Print out an instruction */
 void
-print_opcode(FILE * of, t_value val, t_opcode * tab)
+print_opcode(FILE * of, t_value val, int chr_mode)
 {
     uint16      op;
+    t_opcode   *tab = (chr_mode) ? char_ops: word_ops;
 
     op = val;
     while (tab->name != NULL) {
@@ -410,14 +411,14 @@ fprint_sym(FILE * of, t_addr addr, t_value * val, UNIT * uptr, int32 sw)
         fputs("   ", of);
         for (i = 36; i >= 0; i-=12) {
                 int     op = (int)(inst >> i) & 07777;
-                print_opcode(of, op, word_ops);
+                print_opcode(of, op, 0);
         }
     }
     if (sw & SWMASK('C')) {     /* Char mode opcodes */
         fputs("   ", of);
         for (i = 36; i >= 0; i-=12) {
                 int     op = (int)(inst >> i) & 07777;
-                print_opcode(of, op, char_ops);
+                print_opcode(of, op, 1);
         }
     }
     if (sw & SWMASK('B')) {     /* BCD mode */

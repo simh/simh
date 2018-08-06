@@ -280,7 +280,7 @@ t_stat dsk_srv(UNIT * uptr)
                 chan_set_end(chan);
             } else 
                 uptr->u5 &= ~(DK_RDCK|DK_RD|DK_WR);
-            sim_activate(eptr, 500);
+            sim_activate(eptr, 8000);
             return SCPE_OK;
         }
         sim_activate(uptr, 100);
@@ -432,7 +432,7 @@ t_stat esu_srv(UNIT * uptr)
            uptr->u5 -= DK_SECT;
         } 
     }
-    sim_activate(uptr, (uptr->flags & MODIB) ? 200 :100);
+    sim_activate(uptr, (uptr->flags & MODIB) ? 500 :300);
     return SCPE_OK;
 }
                 
@@ -456,8 +456,14 @@ dsk_boot(int32 unit_num, DEVICE * dptr)
     t_uint64    desc;
     int         i;
 
-    for(i = 0; i < 20; i++) 
+    for(i = 0; i < 20; i++) {
         esu_unit[i].u5 = 0;
+        sim_cancel(&esu_unit[i]);
+    }
+    dsk_unit[0].u5 = 0;
+    dsk_unit[1].u5 = 0;
+    sim_cancel(&dsk_unit[0]);
+    sim_cancel(&dsk_unit[1]);
 
     desc = (((t_uint64)dev)<<DEV_V)|DEV_IORD|DEV_OPT|020LL;
     return chan_boot(desc);

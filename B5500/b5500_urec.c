@@ -35,10 +35,6 @@
 #define UNIT_CDP        UNIT_ATTABLE | UNIT_DISABLE | MODE_029
 #define UNIT_LPR        UNIT_ATTABLE | UNIT_DISABLE
 
-/* For Card reader, when set returns end of file at end of deck. */
-/* Reset after sent to system */
-#define MODE_EOF        (0x40 << UNIT_V_CARD_MODE)
-
 #define TMR_RTC         0
 
 
@@ -84,6 +80,7 @@ DEBTAB              cdr_debug[] = {
 
 #if NUM_DEVS_CDR > 0
 t_stat              cdr_boot(int32, DEVICE *);
+t_stat              cdr_ini(DEVICE *);
 t_stat              cdr_srv(UNIT *);
 t_stat              cdr_attach(UNIT *, CONST char *);
 t_stat              cdr_detach(UNIT *);
@@ -92,6 +89,7 @@ const char         *cdr_description(DEVICE *dptr);
 #endif
 
 #if NUM_DEVS_CDP > 0
+t_stat              cdp_ini(DEVICE *);
 t_stat              cdp_srv(UNIT *);
 t_stat              cdp_attach(UNIT *, CONST char *);
 t_stat              cdp_detach(UNIT *);
@@ -106,6 +104,7 @@ struct _lpr_data
 }
 lpr_data[NUM_DEVS_LPR];
 
+t_stat              lpr_ini(DEVICE *);
 t_stat              lpr_srv(UNIT *);
 t_stat              lpr_attach(UNIT *, CONST char *);
 t_stat              lpr_detach(UNIT *);
@@ -146,16 +145,14 @@ MTAB                cdr_mod[] = {
     {MTAB_XTD | MTAB_VUN, 0, "FORMAT", "FORMAT",
           &sim_card_set_fmt, &sim_card_show_fmt, NULL,
           "Sets card format"},
-    {MODE_EOF, MODE_EOF, "EOF", "EOF", NULL, NULL, NULL,
-          "Causes EOF to be set when reader empty"},
     {0}
 };
 
 DEVICE              cdr_dev = {
     "CR", cdr_unit, NULL, cdr_mod,
     NUM_DEVS_CDR, 8, 15, 1, 8, 8,
-    NULL, NULL, NULL, &cdr_boot, &cdr_attach, &cdr_detach,
-    NULL, DEV_DISABLE | DEV_DEBUG, 0, cdr_debug,
+    NULL, NULL, &cdr_ini, &cdr_boot, &cdr_attach, &cdr_detach,
+    NULL, DEV_DISABLE | DEV_DEBUG | DEV_CARD, 0, cdr_debug,
     NULL, NULL, &cdr_help, NULL, NULL,
     &cdr_description
 };
@@ -176,8 +173,8 @@ MTAB                cdp_mod[] = {
 DEVICE              cdp_dev = {
     "CP", cdp_unit, NULL, cdp_mod,
     NUM_DEVS_CDP, 8, 15, 1, 8, 8,
-    NULL, NULL, NULL, NULL, &cdp_attach, &cdp_detach,
-    NULL, DEV_DISABLE | DEV_DEBUG, 0, cdr_debug,
+    NULL, NULL, &cdp_ini, NULL, &cdp_attach, &cdp_detach,
+    NULL, DEV_DISABLE | DEV_DEBUG | DEV_CARD, 0, cdr_debug,
     NULL, NULL, &cdp_help, NULL, NULL,
     &cdp_description
 };
@@ -202,7 +199,7 @@ MTAB                lpr_mod[] = {
 DEVICE              lpr_dev = {
     "LP", lpr_unit, NULL, lpr_mod,
     NUM_DEVS_LPR, 8, 15, 1, 8, 8,
-    NULL, NULL, NULL, NULL, &lpr_attach, &lpr_detach,
+    NULL, NULL, &lpr_ini, NULL, &lpr_attach, &lpr_detach,
     NULL, DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
     NULL, NULL, &lpr_help, NULL, NULL,
     &lpr_description
@@ -217,7 +214,7 @@ UNIT                con_unit[] = {
 DEVICE              con_dev = {
     "CON", con_unit, NULL, NULL,
     NUM_DEVS_CON, 8, 15, 1, 8, 8,
-    NULL, NULL, con_ini, NULL, NULL, NULL,
+    NULL, NULL, &con_ini, NULL, NULL, NULL,
     NULL, DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
     NULL, NULL, &con_help, NULL, NULL,
     &con_description
@@ -227,6 +224,17 @@ DEVICE              con_dev = {
 
 
 #if ((NUM_DEVS_CDR > 0) | (NUM_DEVS_CDP > 0))
+t_stat
+cdr_ini(DEVICE *dptr) {
+     int                i;
+
+     for(i = 0; i < NUM_DEVS_CDR; i++) {
+        cdr_unit[i].u5 = 0;
+        sim_cancel(&cdr_unit[i]);
+     }
+     return SCPE_OK;
+}
+
 /*
  * Device entry points for card reader.
  * And Card punch.
@@ -255,15 +263,13 @@ t_stat card_cmd(uint16 cmd, uint16 dev, uint8 chan, uint16 *wc)
         /* Check if we ran out of cards */
         if (uptr->u5 & URCSTA_EOF) {
             /* If end of file, return to system */
-            if (uptr->flags & MODE_EOF) {
-                sim_debug(DEBUG_DETAIL, &cdr_dev, "cdr %d %d report eof\n", u,
-                         chan);
-                chan_set_eof(chan);
-                uptr->flags &= ~MODE_EOF;
+            if (sim_card_input_hopper_count(uptr) != 0) 
+                uptr->u5 &= ~URCSTA_EOF;
+            else {
+                /* Clear unit ready */
+                iostatus &= ~(CARD1_FLAG << u);
+                return SCPE_UNATT;
             }
-            /* Clear unit ready */
-            iostatus &= ~(CARD1_FLAG << u);
-            return SCPE_UNATT;
         }
 
         if (cmd & URCSTA_BINARY) {
@@ -307,6 +313,7 @@ t_stat
 cdr_srv(UNIT *uptr) {
     int                 chan = URCSTA_CHMASK & uptr->u5;
     int                 u = (uptr - cdr_unit);
+    uint16              *image = (uint16 *)(uptr->up7);
 
     if (uptr->u5 & URCSTA_EOF) {
         sim_debug(DEBUG_DETAIL, &cdr_dev, "cdr %d %d unready\n", u, chan);
@@ -319,32 +326,27 @@ cdr_srv(UNIT *uptr) {
     /* Check if new card requested. */
     if (uptr->u4 == 0 && uptr->u5 & URCSTA_ACTIVE &&
                 (uptr->u5 & URCSTA_CARD) == 0) {
-        switch(sim_read_card(uptr)) {
-        case SCPE_UNATT:
+        switch(sim_read_card(uptr, image)) {
+        case CDSE_EMPTY:
              iostatus &= ~(CARD1_FLAG << u);
              uptr->u5 &= ~(URCSTA_ACTIVE);
              iostatus &= ~(CARD1_FLAG << u);
              chan_set_notrdy(chan);
              break;
-        case SCPE_EOF:
+        case CDSE_EOF:
              /* If end of file, return to system */
-             if (uptr->flags & MODE_EOF) {
-                sim_debug(DEBUG_DETAIL, &cdr_dev, "cdr %d %d set eof\n", u, chan);
-                chan_set_eof(chan);
-                uptr->flags &= ~MODE_EOF;
-             }
              uptr->u5 &= ~(URCSTA_ACTIVE);
              uptr->u5 |= URCSTA_EOF;
              chan_set_notrdy(chan);
              sim_activate(uptr, 500);
              break;
-        case SCPE_IOERR:
+        case CDSE_ERROR:
              chan_set_error(chan);
              uptr->u5 &= ~(URCSTA_ACTIVE);
              uptr->u5 |= URCSTA_EOF;
              chan_set_end(chan);
              break;
-        case SCPE_OK:
+        case CDSE_OK:
              uptr->u5 |= URCSTA_CARD;
              sim_activate(uptr, 500);
              break;
@@ -356,22 +358,18 @@ cdr_srv(UNIT *uptr) {
     /* Copy next column over */
     if (uptr->u5 & URCSTA_CARD &&
         uptr->u4 < ((uptr->u5 & URCSTA_BIN) ? 160 : 80)) {
-        struct _card_data   *data;
         uint8                ch = 0;
         int                  u = (uptr - cdr_unit);
 
-        data = (struct _card_data *)uptr->up7;
-
         if (uptr->u5 & URCSTA_BIN) {
-            ch = (data->image[uptr->u4 >> 1] >>
-                    ((uptr->u4 & 1)? 0 : 6)) & 077;
+            ch = (image[uptr->u4 >> 1] >> ((uptr->u4 & 1)?  0 : 6)) & 077;
         } else {
-            ch = sim_hol_to_bcd(data->image[uptr->u4]);
+            ch = sim_hol_to_bcd(image[uptr->u4]);
             /* Remap some characters from 029 to BCL */
             switch(ch) {
             case 0:     ch = 020; break; /* Translate blanks */
             case 10:    /* Check if 0 punch of 82 punch */
-                        if (data->image[uptr->u4] != 0x200) {
+                        if (image[uptr->u4] != 0x200) {
                            ch = 0;
                            if (uptr->u4 == 0)
                                chan_set_parity(chan);
@@ -439,6 +437,8 @@ cdr_attach(UNIT * uptr, CONST char *file)
 
     if ((r = sim_card_attach(uptr, file)) != SCPE_OK)
         return r;
+    if (uptr->up7 == 0) 
+        uptr->up7 = malloc(sizeof(uint16)*80);
     uptr->u5 &= URCSTA_BUSY;
     uptr->u4 = 0;
     uptr->u6 = 0;
@@ -451,6 +451,9 @@ cdr_detach(UNIT * uptr)
 {
     int                 u = uptr-cdr_unit;
 
+    if (uptr->up7 != 0)
+        free(uptr->up7);
+    uptr->up7 = 0;
     iostatus &= ~(CARD1_FLAG << u);
     return sim_card_detach(uptr);
 }
@@ -462,10 +465,6 @@ cdr_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
    fprintf (st, "The system supports up to two card readers, the second one is disabled\n");
    fprintf (st, "by default. To have the card reader return the EOF flag when the deck\n");
    fprintf (st, "has finished reading do:\n");
-   fprintf (st, "    sim> SET CRn EOF\n");
-   fprintf (st, "This flag is cleared each time a deck has been read, so it must be set\n");
-   fprintf (st, "again after each deck. MCP does not require this to be set as long as\n");
-   fprintf (st, "the deck includes a ?END card\n");
    fprint_set_help(st, dptr);
    fprint_show_help(st, dptr);
    return SCPE_OK;
@@ -485,26 +484,38 @@ cdr_description(DEVICE *dptr)
 
 /* Handle transfer of data for card punch */
 t_stat
+cdp_ini(DEVICE *dptr) {
+     int                i;
+
+     for(i = 0; i < NUM_DEVS_CDP; i++) {
+        cdp_unit[i].u5 = 0;
+        sim_cancel(&cdp_unit[i]);
+     }
+     return SCPE_OK;
+}
+
+t_stat
 cdp_srv(UNIT *uptr) {
     int                 chan = URCSTA_CHMASK & uptr->u5;
     int                 u = (uptr - cdp_unit);
+    uint16              *image = (uint16 *)(uptr->up7);
 
     if (uptr->u5 & URCSTA_BUSY) {
         /* Done waiting, punch card */
         if (uptr->u5 & URCSTA_FULL) {
               sim_debug(DEBUG_DETAIL, &cdp_dev, "cdp %d %d punch\n", u, chan);
-              switch(sim_punch_card(uptr, NULL)) {
-              case SCPE_EOF:
-              case SCPE_UNATT:
+              switch(sim_punch_card(uptr, image)) {
+              case CDSE_EOF:
+              case CDSE_EMPTY:
                   sim_debug(DEBUG_DETAIL, &cdp_dev, "cdp %d %d set eof\n", u,
                                  chan);
                   chan_set_eof(chan);
                   break;
                  /* If we get here, something is wrong */
-              case SCPE_IOERR:
+              case CDSE_ERROR:
                   chan_set_error(chan);
                   break;
-              case SCPE_OK:
+              case CDSE_OK:
                   break;
               }
               uptr->u5 &= ~URCSTA_FULL;
@@ -515,10 +526,7 @@ cdp_srv(UNIT *uptr) {
 
     /* Copy next column over */
     if (uptr->u5 & URCSTA_ACTIVE && uptr->u4 < 80) {
-        struct _card_data   *data;
         uint8               ch = 0;
-
-        data = (struct _card_data *)uptr->up7;
 
         if(chan_read_char(chan, &ch, 0)) {
              uptr->u5 |= URCSTA_BUSY|URCSTA_FULL;
@@ -526,7 +534,7 @@ cdp_srv(UNIT *uptr) {
         } else {
             sim_debug(DEBUG_DATA, &cdp_dev, "cdp %d: Char %d < %02o\n", u,
                          uptr->u4, ch);
-            data->image[uptr->u4++] = sim_bcd_to_hol(ch & 077);
+            image[uptr->u4++] = sim_bcd_to_hol(ch & 077);
         }
         sim_activate(uptr, 10);
     }
@@ -547,16 +555,24 @@ cdp_attach(UNIT * uptr, CONST char *file)
 
     if ((r = sim_card_attach(uptr, file)) != SCPE_OK)
         return r;
-    uptr->u5 = 0;
-    iostatus |= PUNCH_FLAG;
+    if (uptr->up7 == 0) {
+        uptr->up7 = calloc(80, sizeof(uint16));
+        uptr->u5 = 0;
+        iostatus |= PUNCH_FLAG;
+    }
     return SCPE_OK;
 }
 
 t_stat
 cdp_detach(UNIT * uptr)
 {
+    uint16              *image = (uint16 *)(uptr->up7);
+
     if (uptr->u5 & URCSTA_FULL)
-        sim_punch_card(uptr, NULL);
+        sim_punch_card(uptr, image);
+    if (uptr->up7 != 0)
+        free(uptr->up7);
+    uptr->up7 = 0;
     iostatus &= ~PUNCH_FLAG;
     return sim_card_detach(uptr);
 }
@@ -583,6 +599,16 @@ cdp_description(DEVICE *dptr)
 
 /* Line printer routines
 */
+t_stat
+lpr_ini(DEVICE *dptr) {
+     int                i;
+
+     for(i = 0; i < NUM_DEVS_LPR; i++) {
+        lpr_unit[i].u5 = 0;
+        sim_cancel(&lpr_unit[i]);
+     }
+     return SCPE_OK;
+}
 
 #if NUM_DEVS_LPR > 0
 t_stat
