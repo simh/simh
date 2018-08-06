@@ -78,7 +78,6 @@ SHMEM *uc15_shmem = NULL;                               /* shared state identifi
 int32 *uc15_shstate = NULL;                             /* shared state base */
 SHMEM *pdp15_shmem = NULL;                              /* PDP15 mem identifier */
 
-DEVICE dr15_dev;
 int32 dr60 (int32 dev, int32 pulse, int32 AC);
 int32 dr61 (int32 dev, int32 pulse, int32 AC);
 t_stat dr15_reset (DEVICE *dptr);

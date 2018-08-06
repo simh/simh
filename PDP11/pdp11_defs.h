@@ -885,7 +885,7 @@ extern UNIT cpu_unit;
 #define WrMemW(pa,d)    uc15_WrMemW (pa, d)
 #define WrMemB(pa, d)   uc15_WrMemB (pa, d)
 
-uint32 uc15_memsize;
+extern uint32 uc15_memsize;
 int32 uc15_RdMemW (int32 pa);
 int32 uc15_RdMemB (int32 pa);
 void uc15_WrMemW (int32 pa, int32 d);
