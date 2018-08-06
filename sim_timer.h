@@ -46,7 +46,7 @@ extern "C" {
 #endif
 
 #if defined (__APPLE__)
-#define HAVE_STRUCT_TIMESPEC 1   /* OSX defined the structure but doesn't tell us */
+#define HAVE_STRUCT_TIMESPEC     /* OSX defined the structure but doesn't tell us */
 #endif
 
 /* on HP-UX, CLOCK_REALTIME is enum, not preprocessor define */
@@ -55,12 +55,12 @@ extern "C" {
 #define NEED_CLOCK_GETTIME 1
 #if  defined(_MSC_VER)      /* Visual Studio/Visual C++ */
 #if _MSC_VER >= 1900        /* Visual Studio Community (2015) */
-#define HAVE_STRUCT_TIMESPEC 1
-#define _TIMESPEC_DEFINED 1
+#define HAVE_STRUCT_TIMESPEC
+#define _TIMESPEC_DEFINED
 #endif /* _MSC_VER >= 1900 */
 #endif /* defined(_MSC_VER) */
 #if !defined(HAVE_STRUCT_TIMESPEC)
-#define HAVE_STRUCT_TIMESPEC 1
+#define HAVE_STRUCT_TIMESPEC
 #if !defined(_TIMESPEC_DEFINED)
 #define _TIMESPEC_DEFINED
 struct timespec {
