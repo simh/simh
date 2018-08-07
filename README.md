@@ -360,6 +360,7 @@ Device simulator authors can easily schedule their device polling activities to 
     ON                               Establish or cancel an ON condition dispatch
     IF                               Test some simulator state and conditionally execute commands
     IF (C-style-expression)          Test some simulator state and conditionally execute commands
+    ELSE                             commands to execute when the previous IF wasn't true
     CD                               Change working directory
     SET DEFAULT                      Change working directory
     PWD                              Show working directory

@@ -591,6 +591,10 @@ static char *sim_on_actions[MAX_DO_NEST_LVL+1][SCPE_MAX_ERR+2];
 static char sim_do_filename[MAX_DO_NEST_LVL+1][CBUFSIZE];
 static const char *sim_do_ocptr[MAX_DO_NEST_LVL+1];
 static const char *sim_do_label[MAX_DO_NEST_LVL+1];
+static t_bool sim_if_cmd[MAX_DO_NEST_LVL+1];
+static t_bool sim_if_cmd_last[MAX_DO_NEST_LVL+1];
+static t_bool sim_if_result[MAX_DO_NEST_LVL+1];
+static t_bool sim_if_result_last[MAX_DO_NEST_LVL+1];
 
 t_stat sim_last_cmd_stat;                               /* Command Status */
 struct timespec cmd_time;                               /*  */
@@ -2030,6 +2034,8 @@ static const char simh_help[] =
       "++;\n"
       "++IF EXIST \"os.disk\" echo os.disk exists\n"
       "++IF NOT EXIST os.disk echo os.disk not existing\n"
+      "++IF EXIST \"os.disk\" echo os.disk exists\n"
+      "++ELSE                 echo os.disk not existing\n"
       "++ATTACH DS0 os.disk\n"
       "++BOOT DS\n"
       "++; A register contains error code; 0 = good boot\n"
@@ -2042,10 +2048,11 @@ static const char simh_help[] =
       " be echoed, the command file will be aborted with an \"Assertion failed\"\n"
       " message.  Otherwise, the command file will continue to bring up the\n"
       " operating system.\n"
-      "4IF\n"
+      "4IF-ELSE\n"
       " The IF command tests a simulator state condition and executes additional\n"
       " commands if the condition is true:\n\n"
-      "++IF <Conditional Expressions> commandtoprocess{; additionalcommandtoprocess}...\n\n"
+      "++IF <Conditional Expressions> commandtoprocess{; additionalcommandtoprocess}...\n"
+      "++{ELSE commandtoprocess{; additionalcommandtoprocess}...}\n\n"
       "5Examples:\n"
       " A command file might be used to bootstrap an operating system that\n"
       " halts after the initial load from disk.  The ASSERT command is then\n"
@@ -2232,6 +2239,7 @@ static CTAB cmd_table[] = {
     { "CALL",       &call_cmd,      0,          HLP_CALL },
     { "ON",         &on_cmd,        0,          HLP_ON },
     { "IF",         &assert_cmd,    0,          HLP_IF },
+    { "ELSE",       &assert_cmd,    2,          HLP_IF },
     { "PROCEED",    &noop_cmd,      0,          HLP_PROCEED },
     { "IGNORE",     &noop_cmd,      0,          HLP_IGNORE },
     { "ECHO",       &echo_cmd,      0,          HLP_ECHO },
@@ -2602,6 +2610,9 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         fprintf (sim_log, "%s%s\n", sim_prompt, cptr);
     if (sim_deb && (sim_deb != sim_log) && (sim_deb != stdout))
         fprintf (sim_deb, "%s%s\n", sim_prompt, cptr);
+    sim_if_cmd_last[sim_do_depth] = sim_if_cmd[sim_do_depth];
+    sim_if_result_last[sim_do_depth] = sim_if_result[sim_do_depth];
+    sim_if_result[sim_do_depth] = sim_if_cmd[sim_do_depth] = FALSE;
     cptr = get_glyph_cmd (cptr, gbuf);                  /* get command glyph */
     sim_switches = 0;                                   /* init switches */
     if ((cmdp = find_cmd (gbuf)))                       /* lookup command */
@@ -3488,6 +3499,9 @@ do {
     sim_switches = 0;                                   /* init switches */
     sim_gotofile = fpin;
     sim_do_echo = echo;
+    sim_if_cmd_last[sim_do_depth] = sim_if_cmd[sim_do_depth];
+    sim_if_result_last[sim_do_depth] = sim_if_result[sim_do_depth];
+    sim_if_result[sim_do_depth] = sim_if_cmd[sim_do_depth] = FALSE;
     if ((cmdp = find_cmd (gbuf))) {                     /* lookup command */
         if (cmdp->action == &return_cmd)                /* RETURN command? */
             break;                                      /*    done! */
@@ -4225,6 +4239,15 @@ cptr = (CONST char *)get_sim_opt (CMD_OPT_SW|CMD_OPT_DFT, (CONST char *)cptr, &r
 sim_stabr.boolop = sim_staba.boolop = -1;               /* no relational op dflt */
 if (*cptr == 0)                                         /* must be more */
     return SCPE_2FARG;
+if (flag == 2) {                                        /* ELSE command? */
+    if (!sim_if_cmd_last[sim_do_depth])
+        return sim_messagef (SCPE_UNK, "Invalid Command Sequence, ELSE not following IF\n");
+    if (*cptr == '\0')                                  /* no more? */
+        return sim_messagef (SCPE_2FARG, "Missing ELSE commands\n");
+    if (!sim_if_result_last[sim_do_depth])
+        sim_brk_setact (cptr);                          /* set up ELSE actions */
+    return SCPE_OK;
+    }
 tptr = get_glyph (cptr, gbuf, 0);                       /* get token */
 if (!strcmp (gbuf, "NOT")) {                            /* Conditional Inversion? */
     Not = TRUE;                                         /* remember that, and */
@@ -4279,13 +4302,14 @@ if (Exist || (*gbuf == '"') || (*gbuf == '\'')) {       /* quoted string compari
             ++cptr;
         cptr = _get_string (cptr, gbuf2, 0);            /* get second string */
         if (*cptr) {                                    /* more? */
-            if (flag)                                   /* ASSERT has no more args */
+            if (flag == 1)                              /* ASSERT has no more args */
                 return SCPE_2MARG;
             }
         else {
-            if (!flag)
-                return SCPE_2FARG;                      /* IF needs actions! */
+            if (flag != 1)
+                return SCPE_2FARG;                      /* IF/ELSE needs actions! */
             }
+        sim_if_cmd[sim_do_depth] = (flag == 0);         /* record IF command */
         result = sim_cmp_string (gbuf, gbuf2);
         result = ((result == optr->aval) || (result == optr->bval));
         if (optr->invert)
@@ -4293,8 +4317,10 @@ if (Exist || (*gbuf == '"') || (*gbuf == '\'')) {       /* quoted string compari
         }
     else {
         FILE *f = fopen (gbuf, "r");
+
         if (f)
             fclose (f);
+        sim_if_cmd[sim_do_depth] = (flag == 0);         /* record IF command */
         result = (f != NULL);
         }
     }
@@ -4369,12 +4395,16 @@ else {
 if ((cptr > sim_sub_instr_buf) && ((size_t)(cptr - sim_sub_instr_buf) < sim_sub_instr_size))
     cptr = &sim_sub_instr[sim_sub_instr_off[cptr - sim_sub_instr_buf]]; /* get un-substituted string */
 if (Not ^ result) {
-    if (!flag)
+    if (!flag) {
         sim_brk_setact (cptr);                          /* set up IF actions */
+        sim_if_result[sim_do_depth] = TRUE;
+        }
     }
 else
     if (flag)
         return SCPE_AFAIL;                              /* return assert status */
+    else
+        sim_if_result[sim_do_depth] = FALSE;
 return SCPE_OK;
 }
 
