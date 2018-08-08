@@ -91,7 +91,7 @@ if not exist ../../windows-build goto _notice1
 if not exist ../../windows-build/lib goto _notice2
 set _X_WINDOWS_BUILD=
 for /F "usebackq tokens=2" %%i in (`findstr /C:"WINDOWS-BUILD" ..\..\windows-build\Windows-Build_Versions.txt`) do SET _X_WINDOWS_BUILD=%%i
-if "%_X_WINDOWS_BUILD%" LSS "20180806" goto _notice2
+if "%_X_WINDOWS_BUILD%" LSS "20180808" goto _notice2
 set _X_WINDOWS_BUILD=
 if not exist ../../windows-build/lib/VisualCVersionSupport.txt goto _find_vc_support
 
