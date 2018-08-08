@@ -2508,7 +2508,7 @@ return inst_per_sec;
 
 t_stat sim_timer_activate (UNIT *uptr, int32 interval)
 {
-AIO_VALIDATE;
+AIO_VALIDATE(uptr);
 return sim_timer_activate_after (uptr, (double)((interval * 1000000.0) / sim_timer_inst_per_sec ()));
 }
 
@@ -2519,7 +2519,7 @@ int inst_delay, tmr;
 double inst_delay_d, inst_per_usec;
 t_stat stat;
 
-AIO_VALIDATE;
+AIO_VALIDATE(uptr);
 /* If this is a clock unit, we need to schedule the related timer unit instead */
 for (tmr=0; tmr<=SIM_NTIMERS; tmr++)
     if (sim_clock_unit[tmr] == uptr) {

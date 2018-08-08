@@ -10790,7 +10790,7 @@ return _sim_activate_after_abs (uptr, usec_delay);
 
 t_stat _sim_activate_after_abs (UNIT *uptr, double usec_delay)
 {
-AIO_VALIDATE;                   /* Can't call asynchronously */
+AIO_VALIDATE(uptr);             /* Can't call asynchronously */
 sim_cancel (uptr);
 return _sim_activate_after (uptr, usec_delay);
 }
@@ -10807,8 +10807,8 @@ return _sim_activate_after (uptr, usec_delay);
 
 t_stat _sim_activate_after (UNIT *uptr, double usec_delay)
 {
-AIO_VALIDATE;                   /* Can't call asynchronously */
-if (sim_is_active (uptr))                               /* already active? */
+AIO_VALIDATE(uptr);             /* Can't call asynchronously */
+if (sim_is_active (uptr))       /* already active? */
     return SCPE_OK;
 return sim_timer_activate_after (uptr, usec_delay);
 }
@@ -10826,7 +10826,7 @@ t_stat sim_cancel (UNIT *uptr)
 {
 UNIT *cptr, *nptr;
 
-AIO_VALIDATE;
+AIO_VALIDATE(uptr);
 if ((uptr->cancel) && uptr->cancel (uptr))
     return SCPE_OK;
 if (uptr->dynflags & UNIT_TMR_UNIT)
@@ -10881,7 +10881,7 @@ return SCPE_OK;
 
 t_bool sim_is_active (UNIT *uptr)
 {
-AIO_VALIDATE;
+AIO_VALIDATE(uptr);
 AIO_UPDATE_QUEUE;
 return (((uptr->next) || AIO_IS_ACTIVE(uptr) || ((uptr->dynflags & UNIT_TMR_UNIT) ? sim_timer_is_active (uptr) : FALSE)) ? TRUE : FALSE);
 }
@@ -10917,7 +10917,7 @@ int32 sim_activate_time (UNIT *uptr)
 {
 int32 accum;
 
-AIO_VALIDATE;
+AIO_VALIDATE(uptr);
 accum = _sim_timer_activate_time (uptr);
 if (accum >= 0)
     return accum;
@@ -10930,7 +10930,7 @@ UNIT *cptr;
 int32 accum;
 double result;
 
-AIO_VALIDATE;
+AIO_VALIDATE(uptr);
 result = sim_timer_activate_time_usecs (uptr);
 if (result >= 0)
     return result;

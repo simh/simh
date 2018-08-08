@@ -4260,7 +4260,7 @@ return _sim_activate (uptr, interval);
 
 t_stat tmxr_activate_abs (UNIT *uptr, int32 interval)
 {
-AIO_VALIDATE;                   /* Can't call asynchronously */
+AIO_VALIDATE(uptr);             /* Can't call asynchronously */
 sim_cancel (uptr);
 return tmxr_activate (uptr, interval);
 }
