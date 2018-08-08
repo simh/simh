@@ -1042,7 +1042,7 @@ ifneq ($(DEBUG),)
   BUILD_FEATURES = - debugging support
 else
   ifneq (clang,$(findstring clang,$(COMPILER_NAME)))
-    CFLAGS_O = -O2
+    CFLAGS_O = -O0
     ifeq (Darwin,$(OSTYPE))
       NO_LTO = 1
     endif
