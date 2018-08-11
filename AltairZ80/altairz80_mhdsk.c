@@ -45,7 +45,6 @@
 -------------------------------------------------------------------------------
 */
 #include "altairz80_defs.h"
-#include <assert.h>
 
 /**  Typedefs & Defines  **************************************/
 #define HDSK_SECTOR_SIZE        256             /* size of sector */
@@ -248,7 +247,7 @@ static int32 bootrom_mhdsk[BOOTROM_SIZE_MHDSK] = {
 static t_stat mhdsk_boot(int32 unitno, DEVICE *dptr) {
     const t_bool installSuccessful = (install_bootrom(bootrom_mhdsk, BOOTROM_SIZE_MHDSK,
                                                       MHDSK_BOOT_ADDRESS, FALSE) == SCPE_OK);
-    assert(installSuccessful);
+    ASSURE(installSuccessful);
     *((int32 *) sim_PC -> loc) = MHDSK_BOOT_ADDRESS;
     return SCPE_OK;
 }

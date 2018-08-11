@@ -55,7 +55,6 @@
 #include "sim_sock.h"
 #include "sim_tmxr.h"
 #include <time.h>
-#include <assert.h>
 
 uint8 *URLContents(const char *URL, uint32 *length);
 #ifndef URL_READER_SUPPORT
@@ -750,7 +749,7 @@ static void voidSleep(void) {
 static int32 sio0sCore(const int32 port, const int32 io, const int32 data) {
     int32 ch, result;
     const SIO_PORT_INFO spi = lookupPortInfo(port, &ch);
-    assert(spi.port == port);
+    ASSURE(spi.port == port);
     pollConnection();
     if (io == 0) { /* IN */
         if (sio_unit.u4) {                                  /* attached to a file?                      */
@@ -820,7 +819,7 @@ int32 sio0s(const int32 port, const int32 io, const int32 data) {
 static int32 sio0dCore(const int32 port, const int32 io, const int32 data) {
     int32 ch;
     const SIO_PORT_INFO spi = lookupPortInfo(port, &ch);
-    assert(spi.port == port);
+    ASSURE(spi.port == port);
     pollConnection();
     if (io == 0) { /* IN */
         if ((sio_unit.flags & UNIT_ATT) && (!sio_unit.u4))

@@ -28,7 +28,6 @@
 */
 
 #include "m68k.h"
-#include "assert.h"
 #include <ctype.h>
 #define SWITCHCPU_DEFAULT 0xfd
 
