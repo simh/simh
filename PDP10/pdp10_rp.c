@@ -71,7 +71,6 @@
 
 #include "pdp10_defs.h"
 #include <math.h>
-#include <assert.h>
 
 #define RP_NUMDR        8                               /* #drives */
 #define RP_NUMWD        128                             /* 36b words/sector */
@@ -1367,7 +1366,7 @@ if (!(uptr->flags & UNIT_ATT))
 M[FE_RHBASE] = fe_bootrh = rp_dib.ba;
 M[FE_UNIT] = fe_bootunit = unitno;
 
-assert (sizeof(boot_rom_dec) == sizeof(boot_rom_its));
+ASSURE (sizeof(boot_rom_dec) == sizeof(boot_rom_its));
 
 M[FE_KEEPA] = (M[FE_KEEPA] & ~INT64_C(0xFF)) | ((sim_switches & SWMASK ('A'))? 010 : 0);
 

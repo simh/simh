@@ -109,7 +109,6 @@ The other test was to configure DECnet on VMS 4.6 and do SET HOST.
 #include "pdp11_defs.h"
 #endif
 
-#include <assert.h>
 #include "sim_tmxr.h"
 #include "pdp11_ddcmp.h"
 
@@ -468,7 +467,7 @@ static t_bool insqueue (QH *entry, QH *pred)
 {
 if ((pred->queue->size > 0) && (pred->queue->count >= pred->queue->size))
     return FALSE;
-assert (entry->queue == NULL);
+ASSURE (entry->queue == NULL);
 entry->next = pred->next;
 entry->prev = pred;
 entry->queue = pred->queue;

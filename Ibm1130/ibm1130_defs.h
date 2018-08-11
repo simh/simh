@@ -16,7 +16,6 @@
 #include "sim_console.h"                    /* more SIMH defns (include path should include .., or make a copy) */
 
 #include <setjmp.h>
-#include <assert.h>
 #include <stdlib.h>
 
 #if defined(VMS)

@@ -96,7 +96,6 @@
 
 #include "pdp10_defs.h"
 #include "sim_tape.h"
-#include <assert.h>
 
 #define TU_NUMFM        1                               /* #formatters */
 #define TU_NUMDR        8                               /* #drives */
@@ -1383,7 +1382,7 @@ if (!(uptr->flags & UNIT_ATT))
 M[FE_RHBASE] = tu_dib.ba;
 M[FE_UNIT] = 0;                             /* Only one formatter in this implementation */
 
-assert (sizeof(boot_rom_dec) == sizeof(boot_rom_its));
+ASSURE (sizeof(boot_rom_dec) == sizeof(boot_rom_its));
 
 M[FE_MTFMT] = (unitno & TC_M_UNIT) | (TC_1600 << TC_V_DEN) | (TC_10C << TC_V_FMT);
 tu_unit[unitno].pos = 0;

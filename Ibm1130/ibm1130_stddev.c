@@ -351,8 +351,6 @@ static t_stat tti_svc (UNIT *uptr)
                                                     /* otherwise, so ^E can interrupt the simulator, */
     sim_activate(&tti_unit, tti_unit.wait);         /* always continue polling keyboard */
 
-    assert(sim_clock_queue != QUEUE_LIST_END);
-
     temp = sim_poll_kbd();
 
     if (temp < SCPE_KFLAG)

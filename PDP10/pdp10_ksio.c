@@ -73,7 +73,6 @@
 
 #include "pdp10_defs.h"
 #include <setjmp.h>
-#include <assert.h>
 #include <ctype.h>
 #include "sim_sock.h"
 #include "sim_tmxr.h"
@@ -664,7 +663,7 @@ if (seg) {                                              /* Unaligned head */
         --seg;
         break;
     default:
-        assert (FALSE);
+        ASSURE (FALSE);
         }
     if (bc == 0) {
         uba_debug_dma_out (dpy_ba, dpy_pa10, pa10);
@@ -677,7 +676,7 @@ ea = ba + bc;
 seg = bc - (ea & 3);
 
 if (seg > 0) { /* Body: Whole PDP-10 words, 4 bytes */
-    assert (((seg & 3) == 0) && (bc >= seg));
+    ASSURE (((seg & 3) == 0) && (bc >= seg));
     dpy_ba = ba;
     bc -= seg;
     for ( ; seg; seg -= 4, ba += 4) {           /* aligned longwords */
@@ -706,9 +705,9 @@ if (seg > 0) { /* Body: Whole PDP-10 words, 4 bytes */
     } /* Body */
 
  /* Tail: partial -10 word, must be aligned. 1-3 bytes */
-assert ((bc >= 0) && ((ba & 3) == 0));
+ASSURE ((bc >= 0) && ((ba & 3) == 0));
 if (bc) {
-    assert (bc <= 3);
+    ASSURE (bc <= 3);
     np = UBMPAGE (ba);                          /* Only one word, last possible page crossing */
     if (np != cp) {                             /* New (or first) page? */
         uba_debug_dma_out (dpy_ba, dpy_pa10, pa10);
@@ -730,7 +729,7 @@ if (bc) {
         buf[0] = (uint8) ((m >> V_BYTE0) & M_BYTE);
         break;
     default:
-        assert (FALSE);
+        ASSURE (FALSE);
         }
     }
 
@@ -777,7 +776,7 @@ cp = ~ba;
 seg = (4 - (ba & 3)) & 3;
 
 if (seg) {                                      /* Unaligned head, can only be WORD1 */
-    assert ((ba & 2) && (seg == 2));
+    ASSURE ((ba & 2) && (seg == 2));
     if (seg > bc)
         seg = bc;
     cp = UBMPAGE (ba);                          /* Only one word, can't cross page */
@@ -800,7 +799,7 @@ ea = ba + bc;
 seg = bc - (ea & 3);
 
 if (seg > 0) {
-    assert (((seg & 3) == 0) && (bc >= seg));
+    ASSURE (((seg & 3) == 0) && (bc >= seg));
     bc -= seg;
     for ( ; seg; seg -= 4, ba += 4) {           /* aligned longwords */
         np = UBMPAGE (ba);
@@ -824,9 +823,9 @@ if (seg > 0) {
     } /* Body */
 
 /* Tail: partial word, must be aligned, can only be WORD0 */
-assert ((bc >= 0) && ((ba & 3) == 0));
+ASSURE ((bc >= 0) && ((ba & 3) == 0));
 if (bc) {
-    assert (bc == 2);
+    ASSURE (bc == 2);
     np = UBMPAGE (ba);                          /* Only one word, last possible page crossing */
     if (np != cp) {                             /* New (or first) page? */
         uba_debug_dma_out (dpy_ba, dpy_pa10, pa10);
@@ -890,7 +889,7 @@ cp = ~ba;
 seg = (4 - (ba & 3)) & 3;
 
 if (seg) {                                      /* Unaligned head */
-    assert ((ba & 2) && (seg == 2));
+    ASSURE ((ba & 2) && (seg == 2));
     if (seg > bc)
         seg = bc;
     cp = UBMPAGE (ba);                          /* Only one word, can't cross page */
@@ -913,7 +912,7 @@ ea = ba + bc;
 seg = bc - (ea & 3);
 
 if (seg > 0) {
-    assert (((seg & 3) == 0) && (bc >= seg));
+    ASSURE (((seg & 3) == 0) && (bc >= seg));
     bc -= seg;
     for ( ; seg; seg -= 4, ba += 4) {           /* aligned longwords */
         np = UBMPAGE (ba);
@@ -937,9 +936,9 @@ if (seg > 0) {
     } /* Body */
 
 /* Tail: partial word, must be aligned */
-assert ((bc >= 0) && ((ba & 3) == 0));
+ASSURE ((bc >= 0) && ((ba & 3) == 0));
 if (bc) {
-    assert (bc == 2);
+    ASSURE (bc == 2);
     np = UBMPAGE (ba);                          /* Only one word, last possible page crossing */
     if (np != cp) {                             /* New (or first) page? */
         uba_debug_dma_out (dpy_ba, dpy_pa10, pa10);
@@ -1006,7 +1005,7 @@ ea = ba + bc;
 seg = bc - (ea & 3);
 
 if (seg > 0) {
-    assert (((seg & 3) == 0) && (bc >= seg));
+    ASSURE (((seg & 3) == 0) && (bc >= seg));
     bc -= seg;
     for ( ; seg; seg -= 4, ba += 4) {           /* aligned longwords */
         np = UBMPAGE (ba);
@@ -1090,7 +1089,7 @@ if (seg) {                                      /* Unaligned head */
         --seg;
         break;
     default:
-        assert (FALSE);
+        ASSURE (FALSE);
         }
     M[pa10++] = m;
     if (bc == 0) {
@@ -1103,7 +1102,7 @@ ea = ba + bc;
 seg = bc - (ea & 3);
 
 if (seg > 0) {
-    assert (((seg & 3) == 0) && (bc >= seg));
+    ASSURE (((seg & 3) == 0) && (bc >= seg));
     bc -= seg;
     for ( ; seg; seg -= 4, ba += 4) {           /* aligned longwords */
         np = UBMPAGE (ba);
@@ -1126,9 +1125,9 @@ if (seg > 0) {
 
 /* Tail: partial word, must be aligned */
 
-assert ((bc >= 0) && ((ba & 3) == 0));
+ASSURE ((bc >= 0) && ((ba & 3) == 0));
 if (bc) {
-    assert (bc <= 3);
+    ASSURE (bc <= 3);
     np = UBMPAGE (ba);                          /* Only one word, last possible page crossing */
     if (np != cp) {                             /* New (or first) page? */
         uba_debug_dma_in (dpy_ba, dpy_pa10, pa10);
@@ -1151,7 +1150,7 @@ if (bc) {
             m = (m & M_BYTE0) | (((d10) (buf[0])) << V_BYTE0);
             break;
         default:
-            assert (FALSE);
+            ASSURE (FALSE);
             }
         }
     else {
@@ -1167,7 +1166,7 @@ if (bc) {
             m = ((d10) (buf[0])) << V_BYTE0;
             break;
         default:
-            assert (FALSE);
+            ASSURE (FALSE);
             }
         }
     M[pa10++] = m;
@@ -1215,7 +1214,7 @@ cp = ~ba;
 seg = (4 - (ba & 3)) & 3;
 
 if (seg) {                                      /* Unaligned head */
-    assert ((ba & 2) && (seg == 2));
+    ASSURE ((ba & 2) && (seg == 2));
     if (seg > bc)
         seg = bc;
     cp = UBMPAGE (ba);                          /* Only one word, can't cross page */
@@ -1240,7 +1239,7 @@ ea = ba + bc;
 seg = bc - (ea & 3);
 
 if (seg > 0) {
-    assert (((seg & 3) == 0) && (bc >= seg));
+    ASSURE (((seg & 3) == 0) && (bc >= seg));
     bc -= seg;
     for ( ; seg; seg -= 4, ba += 4) {           /* aligned longwords */
         np = UBMPAGE (ba);
@@ -1263,9 +1262,9 @@ if (seg > 0) {
     } /* Body */
 
 /* Tail: partial word, must be aligned, can only be WORD0 */
-assert ((bc >= 0) && ((ba & 3) == 0));
+ASSURE ((bc >= 0) && ((ba & 3) == 0));
 if (bc) {
-    assert (bc == 2);
+    ASSURE (bc == 2);
     np = UBMPAGE (ba);                          /* Only one word, last possible page crossing */
     if (np != cp) {                             /* New (or first) page? */
         uba_debug_dma_in (dpy_ba, dpy_pa10, pa10);
@@ -1327,7 +1326,7 @@ cp = ~ba;
 seg = (4 - (ba & 3)) & 3;
 
 if (seg) {                                      /* Unaligned head */
-    assert ((ba & 2) && (seg == 2));
+    ASSURE ((ba & 2) && (seg == 2));
     if (seg > bc)
         seg = bc;
     cp = UBMPAGE (ba);                          /* Only one word, can't cross page */
@@ -1352,7 +1351,7 @@ ea = ba + bc;
 seg = bc - (ea & 3);
 
 if (seg > 0) {
-    assert (((seg & 3) == 0) && (bc >= seg));
+    ASSURE (((seg & 3) == 0) && (bc >= seg));
     bc -= seg;
     for ( ; seg; seg -= 4, ba += 4) {           /* aligned longwords */
         np = UBMPAGE (ba);
@@ -1373,9 +1372,9 @@ if (seg > 0) {
     } /* Body */
 
 /* Tail: partial word, must be aligned */
-assert ((bc >= 0) && ((ba & 3) == 0));
+ASSURE ((bc >= 0) && ((ba & 3) == 0));
 if (bc) {
-    assert (bc == 2);
+    ASSURE (bc == 2);
     np = UBMPAGE (ba);                          /* Only one word, last possible page crossing */
     if (np != cp) {                             /* New (or first) page? */
         uba_debug_dma_in (dpy_ba, dpy_pa10, pa10);
@@ -1439,7 +1438,7 @@ ea = ba + bc;
 seg = bc - (ea & 3);
 
 if (seg > 0) {
-    assert (((seg & 3) == 0) && (bc >= seg));
+    ASSURE (((seg & 3) == 0) && (bc >= seg));
     bc -= seg;
     for ( ; seg; seg -= 4, ba += 4) {           /* aligned longwords */
         np = UBMPAGE (ba);

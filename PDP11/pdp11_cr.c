@@ -290,7 +290,6 @@
 #define DFLT_AIECO   (0)
 #endif
 
-#include <assert.h>
 #define    CR_ER            (00404)
 #include "pdp11_cr_dat.h"
 #define    PUNCH_EOD        (07417)
@@ -703,9 +702,9 @@ static t_bool readCardImage (   UNIT    *uptr,
 
         /* Read card image into internal buffer */
 
-        assert (colStart < colEnd);
-        assert (colStart >= 0);
-        assert (colEnd <= 81);
+        ASSURE (colStart < colEnd);
+        ASSURE (colStart >= 0);
+        ASSURE (colEnd <= 81);
         for (col = colStart; col < colEnd; ) {
             int16    i;
             int    c1, c2, c3;
@@ -782,9 +781,9 @@ static t_bool readCardASCII (   UNIT    *uptr,
     int    c = 0, col, peek;
     FILE   *fp = uptr->fileref;
 
-    assert (colStart < colEnd);
-    assert (colStart >= 1);
-    assert (colEnd <= 80);
+    ASSURE (colStart < colEnd);
+    ASSURE (colStart >= 1);
+    ASSURE (colEnd <= 80);
 
     if (DEBUG_PRS (cr_dev))
         fprintf (sim_deb, "readCardASCII\n");
