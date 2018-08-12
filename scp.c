@@ -2416,6 +2416,7 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
     if ((*argv[i] == '-') && lookswitch) {              /* switch? */
         if (get_switches (argv[i], &sw, NULL) == SW_ERROR) {
             fprintf (stderr, "Invalid switch %s\n", argv[i]);
+            free (targv);
             return 0;
             }
         sim_switches = sim_switches | sw;
@@ -2423,6 +2424,7 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
     else {
         if ((strlen (argv[i]) + strlen (cbuf) + 3) >= sizeof(cbuf)) {
             fprintf (stderr, "Argument string too long\n");
+            free (targv);
             return 0;
             }
         if (*cbuf)                                      /* concat args */
@@ -10642,8 +10644,6 @@ do {
         }
     else {
         sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Processing Event for %s\n", sim_uname (uptr));
-        if (uptr->uname && ((*uptr->uname == '\0') || (*uptr->uname == ' ')))
-            reason = SCPE_OK;   /* do nothing breakpoint location */
         if (uptr->action != NULL)
             reason = uptr->action (uptr);
         else
