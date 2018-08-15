@@ -92,7 +92,17 @@ if not exist ../../windows-build/lib goto _notice2
 set _X_WINDOWS_BUILD=
 for /F "usebackq tokens=2" %%i in (`findstr /C:"WINDOWS-BUILD" ..\..\windows-build\Windows-Build_Versions.txt`) do SET _X_WINDOWS_BUILD=%%i
 if "%_X_WINDOWS_BUILD%" LSS "20180811" goto _notice2
+set _X_LAST_WINDOWS_BUILD=
+if exist Pre-Build-Event.last-windows-build-version.txt for /F "usebackq tokens=2" %%i in (`findstr /C:"WINDOWS-BUILD" Pre-Build-Event.last-windows-build-version.txt`) do SET _X_LAST_WINDOWS_BUILD=%%i
+if "%_X_WINDOWS_BUILD%" EQU "%_X_LAST_WINDOWS_BUILD%" goto _new_or_same_windows_build
+echo Library support has been updated, forcing clean version determination
+if exist ../../windows-build/lib/Debug rmdir/s/q ..\..\windows-build\lib\Debug
+if exist ../../windows-build/lib/Release rmdir/s/q ..\..\windows-build\lib\Release
+if exist ../../windows-build/lib/VisualCVersionSupport.txt del ..\..\windows-build\lib\VisualCVersionSupport.txt
+echo WINDOWS-BUILD           %_X_WINDOWS_BUILD% >Pre-Build-Event.last-windows-build-version.txt
+:_new_or_same_windows_build
 set _X_WINDOWS_BUILD=
+set _X_LAST_WINDOWS_BUILD=
 if not exist ../../windows-build/lib/VisualCVersionSupport.txt goto _find_vc_support
 
 set _X_VC_VER=
