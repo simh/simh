@@ -73,9 +73,38 @@ goto _do_rom
 :_done_rom
 popd
 
+:_CheckGit
+if not exist ..\.git goto _done_git
+call :FindGit _GIT_GIT
+if "%_GIT_GIT%" neq "" goto _done_git
+echo ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR **
+echo ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR **
+echo **                                                    **
+echo **   Your local simh code is in a git repository,     **
+echo **   however, the git program executable can not be   **
+echo **   readily found on your system.                    **
+echo **                                                    **
+echo **   You should download and install git from:        **
+echo **                                                    **
+echo **        https://git-scm.com/download/win            **
+echo **                                                    **
+echo **   while installing git for windows, be sure to     **
+echo **   select the option to "Use Git from the Windows   **
+echo **   Command Prompt"                                  **
+echo **                                                    **
+echo **   You should logout and login again after initally **
+echo ""   installing git to be sure that the installation  **
+echo **   location is properly visible in your search path.**
+echo **                                                    **
+echo ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR **
+echo ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR **
+echo error: Review the Output Tab for more details.
+exit 1
+:_done_git
+
 :_check_build
 if "%_X_BUILD%" == "" goto _done_build
-if not exist ../../windows-build-windows-build goto _check_files
+if not exist ..\..\windows-build-windows-build goto _check_files
 rem This is a newly extracted windows-build.zip file with the
 rem top level directory named as it existed in the zip file.
 rem We rename that top level directory.  If a previous one already
@@ -87,8 +116,8 @@ if errorlevel 1 goto _notice3
 if exist ../../windows-build-windows-build goto _notice3
 :_check_files
 call :FindVCVersion _VC_VER
-if not exist ../../windows-build goto _notice1
-if not exist ../../windows-build/lib goto _notice2
+if not exist ..\..\windows-build goto _notice1
+if not exist ..\..\windows-build/lib goto _notice2
 set _X_WINDOWS_BUILD=
 for /F "usebackq tokens=2" %%i in (`findstr /C:"WINDOWS-BUILD" ..\..\windows-build\Windows-Build_Versions.txt`) do SET _X_WINDOWS_BUILD=%%i
 if "%_X_WINDOWS_BUILD%" LSS "20180815" goto _notice2
@@ -156,6 +185,28 @@ set _LIB_VC_VER=
 :_done_library
 goto _done_build
 :_notice1
+if "%_TRIED_CLONE%" neq "" goto _notice1_announce
+if "%_GIT_GIT%" equ "" goto _notice1_announce
+echo *****************************************************
+echo *****************************************************
+echo **                                                 **
+echo ** The required build support is not yet available.**
+echo **                                                 **
+echo ** Using git to acquire a local copy of the        **
+echo ** windows-build repository from:                  **
+echo **                                                 **
+echo **    https://github.com/simh/windows-build        **
+echo **                                                 **
+echo ** This may take a minute or si.  Please wait...   **
+echo **                                                 **
+echo *****************************************************
+echo *****************************************************
+pushd ..\..
+"%_GIT_GIT%" clone https://github.com/simh/windows-build windows-build
+popd
+set _TRIED_CLONE=1
+goto _check_build
+:_notice1_announce
 echo *****************************************************
 echo *****************************************************
 echo **  The required build support is not available.   **
@@ -164,6 +215,25 @@ echo *****************************************************
 set _exit_reason=The required build support is not available.
 goto _ProjectInfo
 :_notice2
+if "%_TRIED_PULL%" neq "" goto _notice2_announce
+if "%_GIT_GIT%" equ "" goto _notice2_announce
+if not exist ..\..\windows-build\.git goto _notice2_announce
+echo *****************************************************
+echo *****************************************************
+echo **                                                 **
+echo **  The required build support is out of date.     **
+echo **                                                 **
+echo **  Attempting update of your local windows-build  **
+echo **  git repository.  This may take a minute...     **
+echo **                                                 **
+echo *****************************************************
+echo *****************************************************
+pushd ..\..\windows-build
+"%_GIT_GIT%" pull
+popd
+set _TRIED_PULL=1
+goto _check_build
+:_notice2_announce
 echo *****************************************************
 echo *****************************************************
 echo **  The required build support is out of date.     **
