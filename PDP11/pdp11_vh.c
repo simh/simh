@@ -779,10 +779,9 @@ static int32 fifo_get ( int32   vh  )
 {
     int32   data, i;
 
-    if (rbuf_idx[vh] == 0) {
-        vh_csr[vh] &= ~CSR_RX_DATA_AVAIL;
+    if (rbuf_idx[vh] == 0)
         return (0);
-    }
+
     /* pick off the first character, mark valid */
     data = vh_rbuf[vh][0] | RBUF_DATA_VALID;
     /* move the remainder up */
@@ -815,6 +814,10 @@ static int32 fifo_get ( int32   vh  )
             }
         }
     }
+
+    if (rbuf_idx[vh] == 0)                  /* FIFO just became empty? */
+        vh_csr[vh] &= ~CSR_RX_DATA_AVAIL;   /* clear CSR bit ti indicate this */
+
     /* Reschedule the next poll preceisely so that the 
        programmed input speed is observed. */
     sim_clock_coschedule_abs (vh_poll_unit, tmxr_poll);
