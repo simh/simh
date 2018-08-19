@@ -61,6 +61,11 @@ extern UNIT cio_unit;
 #define ATOW(arr,i)  ((uint32)arr[i+3] + ((uint32)arr[i+2] << 8) +      \
                       ((uint32)arr[i+1] << 16) + ((uint32)arr[i] << 24))
 
+/* Static function declarations */
+static t_stat ctc_show_cqueue(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat ctc_show_rqueue(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat ctc_show_queue_common(FILE *st, UNIT *uptr, int32 val, CONST void *desc, t_bool rq);
+
 static uint8   int_cid;             /* Interrupting card ID   */
 static uint8   int_subdev;          /* Interrupting subdevice */
 static t_bool  ctc_conf = FALSE;    /* Has a CTC card been configured? */
@@ -262,7 +267,7 @@ static void ctc_cmd(uint8 cid,
     uint8  sec_buf[512];
     int32  b, i, j;
     t_seccnt secrw = 0;
-    struct vtoc vtoc = {0};
+    struct vtoc vtoc = {{0}};
     struct pdinfo pdinfo = {0};
     t_stat result;
 

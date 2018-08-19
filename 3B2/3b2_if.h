@@ -124,10 +124,6 @@ extern t_bool if_irq;
 
 /* Function prototypes */
 
-static SIM_INLINE void if_set_irq();
-static SIM_INLINE void if_clear_irq();
-static SIM_INLINE void if_cancel_pending_irq();
-static SIM_INLINE uint32 if_buf_offset();
 t_stat if_svc(UNIT *uptr);
 t_stat if_reset(DEVICE *dptr);
 uint32 if_read(uint32 pa, size_t size);

@@ -184,6 +184,4 @@ void id_handle_data(uint8 val);
 void id_handle_command(uint8 val);
 void id_after_dma();
 
-static SIM_INLINE t_lba id_lba(uint16 cyl, uint8 head, uint8 sec);
-
 #endif

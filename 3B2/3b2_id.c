@@ -53,6 +53,9 @@
 #define ID_SIS_WAIT         142
 #define ID_CMD_WAIT         140
 
+/* Static function declarations */
+static SIM_INLINE t_lba id_lba(uint16 cyl, uint8 head, uint8 sec);
+
 /* Data FIFO pointer - Read */
 uint8    id_dpr = 0;
 /* Data FIFO pointer - Write */

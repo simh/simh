@@ -60,6 +60,14 @@ dmac_dma_handler device_dma_handlers[] = {
     {0,            0,                   NULL,            NULL,             NULL }
 };
 
+uint32 dma_address(uint8 channel, uint32 offset, t_bool r) {
+    uint32 addr;
+    addr = (PHYS_MEM_BASE + dma_state.channels[channel].addr + offset);
+    /* The top bit of the page address is a R/W bit, so we mask it here */
+    addr |= (uint32) (((uint32)dma_state.channels[channel].page & 0x7f) << 16);
+    return addr;
+}
+
 t_stat dmac_reset(DEVICE *dptr)
 {
     int i;

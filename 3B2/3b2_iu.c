@@ -31,6 +31,9 @@
 #include "3b2_iu.h"
 #include "sim_tmxr.h"
 
+/* Static function declarations */
+static SIM_INLINE void iu_w_cmd(uint8 portno, uint8 val);
+
 /*
  * The 3B2/400 has two on-board serial ports, labeled CONSOLE and
  * CONTTY. The CONSOLE port is (naturally) the system console.  The

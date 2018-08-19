@@ -59,6 +59,255 @@ DEVICE mmu_dev = {
     DEV_DEBUG, 0, sys_deb_tab
 };
 
+/*
+ * Find an SD in the cache.
+ */
+static SIM_INLINE t_stat get_sdce(uint32 va, uint32 *sd0, uint32 *sd1)
+{
+    uint32 tag, sdch, sdcl;
+    uint8 ci;
+
+    ci    = (SID(va) * NUM_SDCE) + SD_IDX(va);
+    tag   = SD_TAG(va);
+
+    sdch  = mmu_state.sdch[ci];
+    sdcl  = mmu_state.sdcl[ci];
+
+    if ((sdch & SD_GOOD_MASK) && SDCE_TAG(sdcl) == tag) {
+        *sd0 = SDCE_TO_SD0(sdch, sdcl);
+        *sd1 = SDCE_TO_SD1(sdch);
+        return SCPE_OK;
+    }
+
+    return SCPE_NXM;
+}
+
+/*
+ * Find a PD in the cache. Sets both the PD and the cached access
+ * permissions.
+ */
+static SIM_INLINE t_stat get_pdce(uint32 va, uint32 *pd, uint8 *pd_acc)
+{
+    uint32 tag, pdcll, pdclh, pdcrl, pdcrh;
+    uint8 ci;
+
+    ci    = (SID(va) * NUM_PDCE) + PD_IDX(va);
+    tag   = PD_TAG(va);
+
+    /* Left side */
+    pdcll = mmu_state.pdcll[ci];
+    pdclh = mmu_state.pdclh[ci];
+
+    /* Right side */
+    pdcrl = mmu_state.pdcrl[ci];
+    pdcrh = mmu_state.pdcrh[ci];
+
+    /* Search L and R to find a good entry with a matching tag. */
+    if ((pdclh & PD_GOOD_MASK) && PDCXL_TAG(pdcll) == tag) {
+        *pd = PDCXH_TO_PD(pdclh);
+        *pd_acc = PDCXL_TO_ACC(pdcll);
+        return SCPE_OK;
+    } else if ((pdcrh & PD_GOOD_MASK) && PDCXL_TAG(pdcrl) == tag) {
+        *pd = PDCXH_TO_PD(pdcrh);
+        *pd_acc = PDCXL_TO_ACC(pdcrl);
+        return SCPE_OK;
+    }
+
+    return SCPE_NXM;
+}
+
+static SIM_INLINE void put_sdce(uint32 va, uint32 sd0, uint32 sd1)
+{
+    uint8 ci;
+
+    ci    = (SID(va) * NUM_SDCE) + SD_IDX(va);
+
+    mmu_state.sdcl[ci] = SD_TO_SDCL(va, sd0);
+    mmu_state.sdch[ci] = SD_TO_SDCH(sd0, sd1);
+}
+
+
+static SIM_INLINE void put_pdce(uint32 va, uint32 sd0, uint32 pd)
+{
+    uint8  ci;
+
+    ci    = (SID(va) * NUM_PDCE) + PD_IDX(va);
+
+    /* Cache Replacement Algorithm
+     * (from the WE32101 MMU Information Manual)
+     *
+     * 1. If G==0 for the left-hand entry, the new PD is cached in the
+     *    left-hand entry and the U bit (left-hand side) is cleared to
+     *    0.
+     *
+     * 2. If G==1 for the left-hand entry, and G==0 for the right-hand
+     *    entry, the new PD is cached in the right-hand entry and the
+     *    U bit (left-hand side) is set to 1.
+     *
+     * 3. If G==1 for both entries, the U bit in the left-hand entry
+     *    is examined. If U==0, the new PD is cached in the right-hand
+     *    entry of the PDC row and U is set to 1. If U==1, it is
+     *    cached in the left-hand entry and U is cleared to 0.
+     */
+
+    if ((mmu_state.pdclh[ci] & PD_GOOD_MASK) == 0) {
+        /* Use the left entry */
+        mmu_state.pdcll[ci] = SD_TO_PDCXL(va, sd0);
+        mmu_state.pdclh[ci] = PD_TO_PDCXH(pd, sd0);
+        mmu_state.pdclh[ci] &= ~PDCLH_USED_MASK;
+    } else if ((mmu_state.pdcrh[ci] & PD_GOOD_MASK) == 0) {
+        /* Use the right entry */
+        mmu_state.pdcrl[ci] = SD_TO_PDCXL(va, sd0);
+        mmu_state.pdcrh[ci] = PD_TO_PDCXH(pd, sd0);
+        mmu_state.pdclh[ci] |= PDCLH_USED_MASK;
+    } else {
+        /* Pick the least-recently-replaced side */
+        if (mmu_state.pdclh[ci] & PDCLH_USED_MASK) {
+            mmu_state.pdcll[ci] = SD_TO_PDCXL(va, sd0);
+            mmu_state.pdclh[ci] = PD_TO_PDCXH(pd, sd0);
+            mmu_state.pdclh[ci] &= ~PDCLH_USED_MASK;
+        } else {
+            mmu_state.pdcrl[ci] = SD_TO_PDCXL(va, sd0);
+            mmu_state.pdcrh[ci] = PD_TO_PDCXH(pd, sd0);
+            mmu_state.pdclh[ci] |= PDCLH_USED_MASK;
+        }
+    }
+}
+
+static SIM_INLINE void flush_sdce(uint32 va)
+{
+    uint8 ci;
+
+    ci  = (SID(va) * NUM_SDCE) + SD_IDX(va);
+
+    if (mmu_state.sdch[ci] & SD_GOOD_MASK) {
+        mmu_state.sdch[ci] &= ~SD_GOOD_MASK;
+    }
+}
+
+static SIM_INLINE void flush_pdce(uint32 va)
+{
+    uint32 tag, pdcll, pdclh, pdcrl, pdcrh;
+    uint8 ci;
+
+    ci  = (SID(va) * NUM_PDCE) + PD_IDX(va);
+    tag = PD_TAG(va);
+
+    /* Left side */
+    pdcll = mmu_state.pdcll[ci];
+    pdclh = mmu_state.pdclh[ci];
+    /* Right side */
+    pdcrl = mmu_state.pdcrl[ci];
+    pdcrh = mmu_state.pdcrh[ci];
+
+    /* Search L and R to find a good entry with a matching tag. */
+    if ((pdclh & PD_GOOD_MASK) && PDCXL_TAG(pdcll) == tag)  {
+        mmu_state.pdclh[ci] &= ~PD_GOOD_MASK;
+    } else if ((pdcrh & PD_GOOD_MASK) && PDCXL_TAG(pdcrl) == tag) {
+        mmu_state.pdcrh[ci] &= ~PD_GOOD_MASK;
+    }
+}
+
+static SIM_INLINE void flush_cache_sec(uint8 sec)
+{
+    int i;
+
+    for (i = 0; i < NUM_SDCE; i++) {
+        mmu_state.sdch[(sec * NUM_SDCE) + i] &= ~SD_GOOD_MASK;
+    }
+    for (i = 0; i < NUM_PDCE; i++) {
+        mmu_state.pdclh[(sec * NUM_PDCE) + i] &= ~PD_GOOD_MASK;
+        mmu_state.pdcrh[(sec * NUM_PDCE) + i] &= ~PD_GOOD_MASK;
+    }
+}
+
+static SIM_INLINE void flush_caches()
+{
+    uint8 i;
+
+    for (i = 0; i < NUM_SEC; i++) {
+        flush_cache_sec(i);
+    }
+}
+
+static SIM_INLINE t_stat mmu_check_perm(uint8 flags, uint8 r_acc)
+{
+    switch(MMU_PERM(flags)) {
+    case 0:  /* No Access */
+        return SCPE_NXM;
+    case 1:  /* Exec Only */
+        if (r_acc != ACC_IF && r_acc != ACC_IFAD) {
+            return SCPE_NXM;
+        }
+        return SCPE_OK;
+    case 2: /* Read / Execute */
+        if (r_acc != ACC_AF && r_acc != ACC_OF &&
+            r_acc != ACC_IF && r_acc != ACC_IFAD &&
+            r_acc != ACC_MT) {
+            return SCPE_NXM;
+        }
+        return SCPE_OK;
+    default:
+        return SCPE_OK;
+    }
+}
+
+/*
+ * Update the M (modified) or R (referenced) bit the SD and cache
+ */
+static SIM_INLINE void mmu_update_sd(uint32 va, uint32 mask)
+{
+    uint32 sd0;
+    uint8  ci;
+
+    ci  = (SID(va) * NUM_SDCE) + SD_IDX(va);
+
+    /* We go back to main memory to find the SD because the SD may
+       have been loaded from cache, which is lossy. */
+    sd0 = pread_w(SD_ADDR(va));
+    pwrite_w(SD_ADDR(va), sd0|mask);
+
+    /* There is no 'R' bit in the SD cache, only an 'M' bit. */
+    if (mask == SD_M_MASK) {
+        mmu_state.sdch[ci] |= mask;
+    }
+}
+
+/*
+ * Update the M (modified) or R (referenced) bit the PD and cache
+ */
+static SIM_INLINE void mmu_update_pd(uint32 va, uint32 pd_addr, uint32 mask)
+{
+    uint32 pd, tag, pdcll, pdclh, pdcrl, pdcrh;
+    uint8  ci;
+
+    tag = PD_TAG(va);
+    ci  = (SID(va) * NUM_PDCE) + PD_IDX(va);
+
+    /* We go back to main memory to find the PD because the PD may
+       have been loaded from cache, which is lossy. */
+    pd = pread_w(pd_addr);
+    pwrite_w(pd_addr, pd|mask);
+
+    /* Update in the cache */
+
+    /* Left side */
+    pdcll = mmu_state.pdcll[ci];
+    pdclh = mmu_state.pdclh[ci];
+
+    /* Right side */
+    pdcrl = mmu_state.pdcrl[ci];
+    pdcrh = mmu_state.pdcrh[ci];
+
+    /* Search L and R to find a good entry with a matching tag, then
+       update the appropriate bit */
+    if ((pdclh & PD_GOOD_MASK) && PDCXL_TAG(pdcll) == tag) {
+        mmu_state.pdclh[ci] |= mask;
+    } else if ((pdcrh & PD_GOOD_MASK) && PDCXL_TAG(pdcrl) == tag) {
+        mmu_state.pdcrh[ci] |= mask;
+    }
+}
+
 t_stat mmu_init(DEVICE *dptr)
 {
     flush_caches();

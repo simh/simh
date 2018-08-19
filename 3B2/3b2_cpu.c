@@ -33,6 +33,43 @@
 
 #define MAX_SUB_RETURN_SKIP 9
 
+/* Static function declarations */
+static uint32 cpu_effective_address(operand * op);
+static uint32 cpu_read_op(operand * op);
+static void cpu_write_op(operand * op, t_uint64 val);
+static void cpu_set_nz_flags(t_uint64 data, operand * op);
+static void cpu_calc_ints();
+static SIM_INLINE void cpu_on_normal_exception(uint8 isc);
+static SIM_INLINE void cpu_on_stack_exception(uint8 isc);
+static SIM_INLINE void cpu_on_process_exception(uint8 isc);
+static SIM_INLINE void cpu_on_reset_exception(uint8 isc);
+static SIM_INLINE void cpu_perform_gate(uint32 index1, uint32 index2);
+static SIM_INLINE void clear_instruction(instr *inst);
+static SIM_INLINE int8 op_type(operand *op);
+static SIM_INLINE t_bool op_signed(operand *op);
+static SIM_INLINE uint32 sign_extend_b(uint8 val);
+static SIM_INLINE uint32 sign_extend_h(uint16 val);
+static SIM_INLINE t_bool cpu_z_flag();
+static SIM_INLINE t_bool cpu_n_flag();
+static SIM_INLINE t_bool cpu_c_flag();
+static SIM_INLINE t_bool cpu_v_flag();
+static SIM_INLINE void cpu_set_z_flag(t_bool val);
+static SIM_INLINE void cpu_set_n_flag(t_bool val);
+static SIM_INLINE void cpu_set_c_flag(t_bool val);
+static SIM_INLINE void cpu_set_v_flag(t_bool val);
+static SIM_INLINE void cpu_set_v_flag_op(t_uint64 val, operand *op);
+static SIM_INLINE uint8 cpu_execution_level();
+static SIM_INLINE void cpu_push_word(uint32 val);
+static SIM_INLINE uint32 cpu_pop_word();
+static SIM_INLINE void irq_push_word(uint32 val);
+static SIM_INLINE uint32 irq_pop_word();
+static SIM_INLINE void cpu_context_switch_1(uint32 pcbp);
+static SIM_INLINE void cpu_context_switch_2(uint32 pcbp);
+static SIM_INLINE void cpu_context_switch_3(uint32 pcbp);
+static SIM_INLINE t_bool op_is_psw(operand *op);
+static SIM_INLINE void add(t_uint64 a, t_uint64 b, operand *dst);
+static SIM_INLINE void sub(t_uint64 a, t_uint64 b, operand *dst);
+
 /* RO memory. */
 uint32 *ROM = NULL;
 
@@ -3436,43 +3473,6 @@ static SIM_INLINE t_bool op_signed(operand *op) {
     return (op_type(op) == WD || op_type(op) == HW || op_type(op) == SB);
 }
 
-static SIM_INLINE t_bool is_byte_immediate(operand * oper)
-{
-    return oper->mode == 6 && oper->reg == 15;
-}
-
-static SIM_INLINE t_bool is_halfword_immediate(operand * oper)
-{
-    return oper->mode == 5 && oper->reg == 15;
-}
-
-static SIM_INLINE t_bool is_word_immediate(operand * oper)
-{
-    return oper->mode == 4 && oper->reg == 15;
-}
-
-static SIM_INLINE t_bool is_positive_literal(operand * oper)
-{
-    return (oper->mode == 0 ||
-            oper->mode == 1 ||
-            oper->mode == 2);
-}
-
-static SIM_INLINE t_bool is_negative_literal(operand * oper)
-{
-    return oper->mode == 15;
-}
-
-/* Returns true if the operand may not be used as a destination */
-static SIM_INLINE t_bool invalid_destination(operand * oper)
-{
-    return (is_byte_immediate(oper) ||
-            is_halfword_immediate(oper) ||
-            is_word_immediate(oper) ||
-            is_positive_literal(oper) ||
-            is_negative_literal(oper));
-}
-
 static SIM_INLINE uint32 sign_extend_b(uint8 val)
 {
     if (val & 0x80)
@@ -3480,21 +3480,11 @@ static SIM_INLINE uint32 sign_extend_b(uint8 val)
     return (uint32) val;
 }
 
-static SIM_INLINE uint32 zero_extend_b(uint8 val)
-{
-    return (uint32) val & BYTE_MASK;
-}
-
 static SIM_INLINE uint32 sign_extend_h(uint16 val)
 {
     if (val & 0x8000)
         return ((uint32) val) | 0xffff0000;
     return (uint32) val;
-}
-
-static SIM_INLINE uint32 zero_extend_h(uint16 val)
-{
-    return (uint32) val & HALF_MASK;
 }
 
 /*
@@ -3637,11 +3627,6 @@ static SIM_INLINE uint32 irq_pop_word()
 static SIM_INLINE t_bool op_is_psw(operand *op)
 {
     return (op->mode == 4 && op->reg == NUM_PSW);
-}
-
-static SIM_INLINE t_bool op_is_sp(operand *op)
-{
-    return op->reg == NUM_SP;
 }
 
 static SIM_INLINE void sub(t_uint64 a, t_uint64 b, operand *dst)

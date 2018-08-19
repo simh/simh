@@ -212,9 +212,4 @@ void iu_txrdy_a_irq();
 void iu_txrdy_b_irq();
 void iu_dma(uint8 channel, uint32 service_address);
 
-static SIM_INLINE void iu_w_buf(uint8 portno, uint8 val);
-static SIM_INLINE void iu_w_cmd(uint8 portno, uint8 val);
-static SIM_INLINE void iu_update_rxi(uint8 c);
-static SIM_INLINE void iu_update_txi();
-
 #endif

@@ -151,9 +151,4 @@ void ctc_sysgen(uint8 cid);
 void ctc_express(uint8 cid);
 void ctc_full(uint8 cid);
 
-/* Largely here for debugging purposes */
-static t_stat ctc_show_cqueue(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
-static t_stat ctc_show_rqueue(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
-static t_stat ctc_show_queue_common(FILE *st, UNIT *uptr, int32 val, CONST void *desc, t_bool rq);
-
 #endif /* _3B2_CTC_H_ */

@@ -30,10 +30,11 @@
 
 #include "3b2_if.h"
 
-/*
- * TODO: Macros used for debugging timers. Remove when debugging is complete.
- */
-double if_start_time;
+/* Static function declarations */
+static SIM_INLINE void if_set_irq();
+static SIM_INLINE void if_clear_irq();
+static SIM_INLINE void if_cancel_pending_irq();
+static SIM_INLINE uint32 if_buf_offset();
 
 #ifndef MAX
 #define MAX(x,y) ((x) > (y) ? (x) : (y))

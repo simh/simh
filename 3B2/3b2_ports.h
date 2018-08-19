@@ -231,7 +231,4 @@ void ports_sysgen(uint8 cid);
 void ports_express(uint8 cid);
 void ports_full(uint8 cid);
 
-static t_stat ports_show_queue_common(FILE *st, UNIT *uptr, int32 val,
-                                      CONST void *desc, t_bool rq);
-
 #endif /* _3B2_PORTS_H_ */

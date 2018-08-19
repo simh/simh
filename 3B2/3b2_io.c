@@ -32,7 +32,7 @@
 
 #define CRC_POLYNOMIAL 0xEDB88320
 
-CIO_STATE  cio[CIO_SLOTS] = { 0 };
+CIO_STATE  cio[CIO_SLOTS] = {{0}};
 
 struct iolink iotable[] = {
     { MMUBASE,    MMUBASE+MMUSIZE,       &mmu_read,   &mmu_write   },
