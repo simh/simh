@@ -50,6 +50,9 @@ extern UNIT cio_unit;
 #define DELAY_UNK     1000
 #define DELAY_CATCHUP 10000
 
+#define CTC_DIAG_CRC1 0xa4a5752f
+#define CTC_DIAG_CRC2 0xd3d20eb3
+
 #define TAPE_DEV      0    /* CTAPE device */
 #define XMF_DEV       1    /* XM Floppy device */
 
@@ -61,6 +64,7 @@ extern UNIT cio_unit;
 static uint8   int_cid;             /* Interrupting card ID   */
 static uint8   int_subdev;          /* Interrupting subdevice */
 static t_bool  ctc_conf = FALSE;    /* Has a CTC card been configured? */
+static uint32  ctc_crc;             /* CRC32 of downloaded memory */
 
 struct partition vtoc_table[VTOC_PART] = {
     { 2, 0, 5272,  8928  },   /* 00 */
@@ -256,7 +260,7 @@ static void ctc_cmd(uint8 cid,
     uint32 maxpass, blkno, delay;
     uint8  dev;
     uint8  sec_buf[512];
-    int32  b, j;
+    int32  b, i, j;
     t_seccnt secrw = 0;
     struct vtoc vtoc = {0};
     struct pdinfo pdinfo = {0};
@@ -271,11 +275,14 @@ static void ctc_cmd(uint8 cid,
 
     switch(rqe->opcode) {
     case CIO_DLM:
+        for (i = 0; i < rqe->byte_count; i++) {
+            ctc_crc = cio_crc32_shift(ctc_crc, pread_b(rqe->address + i));
+        }
         sim_debug(TRACE_DBG, &ctc_dev,
                   "[ctc_cmd] CIO Download Memory: bytecnt=%04x "
-                  "addr=%08x return_addr=%08x subdev=%02x\n",
+                  "addr=%08x return_addr=%08x subdev=%02x (CRC=%08x)\n",
                   rqe->byte_count, rqe->address,
-                  rqe->address, rqe->subdevice);
+                  rqe->address, rqe->subdevice, ctc_crc);
         delay = DELAY_DLM;
         cqe->address = rqe->address + rqe->byte_count;
         cqe->opcode = CTC_SUCCESS;
@@ -288,18 +295,20 @@ static void ctc_cmd(uint8 cid,
         break;
     case CIO_FCF:
         sim_debug(TRACE_DBG, &ctc_dev,
-                  "[ctc_cmd] CIO Force Function Call: return opcode 0\n");
+                  "[ctc_cmd] CIO Force Function Call (CRC=%08x)\n", ctc_crc);
         delay = DELAY_FCF;
 
-        /* This is to pass diagnostics. TODO: Figure out how to parse
-         * the given test x86 code and determine how to respond
-         * correctly */
-        pwrite_h(0x200f000, 0x1);   /* Test success */
-        pwrite_h(0x200f002, 0x0);   /* Test Number */
-        pwrite_h(0x200f004, 0x0);   /* Actual */
-        pwrite_h(0x200f006, 0x0);   /* Expected */
-        pwrite_b(0x200f008, 0x1);   /* Success flag again */
-        pwrite_b(0x200f009, 0x30);  /* ??? */
+        /* If the currently running program is a diagnostic program,
+         * we are expected to write results into memory at address
+         * 0x200f000 */
+        if (ctc_crc == CTC_DIAG_CRC1 ||
+            ctc_crc == CTC_DIAG_CRC2) {
+            pwrite_h(0x200f000, 0x1);   /* Test success */
+            pwrite_h(0x200f002, 0x0);   /* Test Number */
+            pwrite_h(0x200f004, 0x0);   /* Actual */
+            pwrite_h(0x200f006, 0x0);   /* Expected */
+            pwrite_b(0x200f008, 0x1);   /* Success flag again */
+        }
 
         /* An interesting (?) side-effect of FORCE FUNCTION CALL is
          * that it resets the card state such that a new SYSGEN is
@@ -571,6 +580,8 @@ void ctc_sysgen(uint8 cid)
     cio_entry cqe = {0};
     uint8 rapp_data[12] = {0};
 
+    ctc_crc = 0;
+
     sim_debug(TRACE_DBG, &ctc_dev, "[ctc_sysgen] Handling Sysgen.\n");
     sim_debug(TRACE_DBG, &ctc_dev, "[ctc_sysgen]    rqp=%08x\n", cio[cid].rqp);
     sim_debug(TRACE_DBG, &ctc_dev, "[ctc_sysgen]    cqp=%08x\n", cio[cid].cqp);
@@ -623,6 +634,8 @@ void ctc_full(uint8 cid)
 t_stat ctc_reset(DEVICE *dptr)
 {
     uint8 cid;
+
+    ctc_crc = 0;
 
     sim_debug(TRACE_DBG, &ctc_dev,
               "[ctc_reset] Resetting CTC device\n");

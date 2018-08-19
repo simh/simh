@@ -71,7 +71,10 @@ extern UNIT cio_unit;
  */
 
 
+#ifndef MIN
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
+#endif
+
 #define PPQESIZE      12
 #define DELAY_ASYNC   25
 #define DELAY_DLM     100
@@ -87,6 +90,10 @@ extern UNIT cio_unit;
 #define DELAY_DEVICE  25
 #define DELAY_STD     100
 
+#define PORTS_DIAG_CRC1 0x7ceec900
+#define PORTS_DIAG_CRC2 0x77a1ea56
+#define PORTS_DIAG_CRC3 0x84cf938b
+
 #define LN(cid,port)   ((PORTS_LINES * ((cid) - base_cid)) + (port))
 #define LCID(ln)       (((ln) / PORTS_LINES) + base_cid)
 #define LPORT(ln)      ((ln) % PORTS_LINES)
@@ -95,6 +102,7 @@ t_bool  ports_conf = FALSE;  /* Have PORTS cards been configured? */
 int8    base_cid;            /* First cid in our contiguous block */
 uint8   int_cid;             /* Interrupting card ID   */
 uint8   int_subdev;          /* Interrupting subdevice */
+uint32  ports_crc;           /* CRC32 of downloaded memory */
 
 /* PORTS-specific state for each slot */
 PORTS_LINE_STATE *ports_state = NULL;
@@ -247,7 +255,7 @@ t_stat ports_setnl(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 static void ports_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data)
 {
     cio_entry centry = {0};
-    uint32 ln;
+    uint32 ln, i;
     PORTS_OPTIONS opts;
     char line_config[16];
     uint8 app_data[4] = {0};
@@ -258,13 +266,16 @@ static void ports_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data)
 
     switch(rentry->opcode) {
     case CIO_DLM:
-        centry.address = rentry->address + rentry->byte_count;
+        for (i = 0; i < rentry->byte_count; i++) {
+            ports_crc = cio_crc32_shift(ports_crc, pread_b(rentry->address + i));
+        }
         sim_debug(TRACE_DBG, &ports_dev,
                   "[%08x] [ports_cmd] CIO Download Memory: bytecnt=%04x "
-                  "addr=%08x return_addr=%08x subdev=%02x\n",
+                  "addr=%08x return_addr=%08x subdev=%02x (CRC=%08x)\n",
                   R[NUM_PC],
                   rentry->byte_count, rentry->address,
-                  centry.address, centry.subdevice);
+                  centry.address, centry.subdevice, ports_crc);
+        centry.address = rentry->address + rentry->byte_count;
         cio_cexpress(cid, PPQESIZE, &centry, app_data);
         cio_irq(cid, rentry->subdevice, DELAY_DLM);
         break;
@@ -277,25 +288,27 @@ static void ports_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data)
         break;
     case CIO_FCF:
         sim_debug(TRACE_DBG, &ports_dev,
-                  "[%08x] [ports_cmd] CIO Force Function Call\n",
-                  R[NUM_PC]);
+                  "[%08x] [ports_cmd] CIO Force Function Call (CRC=%08x)\n",
+                  R[NUM_PC], ports_crc);
 
-        /* This is to pass diagnostics. TODO: Figure out how to parse the
-         * given test x86 code and determine how to respond correctly */
-
-        pwrite_h(0x200f000, 0x1);   /* Test success */
-        pwrite_h(0x200f002, 0x0);   /* Test Number */
-        pwrite_h(0x200f004, 0x0);   /* Actual */
-        pwrite_h(0x200f006, 0x0);   /* Expected */
-        pwrite_b(0x200f008, 0x1);   /* Success flag again */
-        pwrite_b(0x200f009, 0x30);  /* ??? */
+        /* If the currently running program is a diagnostics program,
+         * we are expected to write results into memory at address
+         * 0x200f000 */
+        if (ports_crc == PORTS_DIAG_CRC1 ||
+            ports_crc == PORTS_DIAG_CRC2 ||
+            ports_crc == PORTS_DIAG_CRC3) {
+            pwrite_h(0x200f000, 0x1);   /* Test success */
+            pwrite_h(0x200f002, 0x0);   /* Test Number */
+            pwrite_h(0x200f004, 0x0);   /* Actual */
+            pwrite_h(0x200f006, 0x0);   /* Expected */
+            pwrite_b(0x200f008, 0x1);   /* Success flag again */
+        }
 
         /* An interesting (?) side-effect of FORCE FUNCTION CALL is
          * that it resets the card state such that a new SYSGEN is
          * required in order for new commands to work. In fact, an
          * INT0/INT1 combo _without_ a RESET can sysgen the board. So,
          * we reset the command bits here. */
-
         cio[cid].sysgen_s = 0;
         cio_cexpress(cid, PPQESIZE, &centry, app_data);
         cio_irq(cid, rentry->subdevice, DELAY_FCF);
@@ -502,6 +515,8 @@ void ports_sysgen(uint8 cid)
     cio_entry cqe = {0};
     uint8 app_data[4] = {0};
 
+    ports_crc = 0;
+
     cqe.opcode = 3; /* Sysgen success! */
 
     /* It's not clear why we put a response in both the express
@@ -539,6 +554,8 @@ t_stat ports_reset(DEVICE *dptr)
     int32 i;
     uint8 cid, line, ln, end_slot;
     TMLN *lp;
+
+    ports_crc = 0;
 
     sim_debug(TRACE_DBG, &ports_dev,
               "[ports_reset] Resetting PORTS device\n");

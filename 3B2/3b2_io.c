@@ -30,6 +30,8 @@
 
 #include "3b2_io.h"
 
+#define CRC_POLYNOMIAL 0xEDB88320
+
 CIO_STATE  cio[CIO_SLOTS] = { 0 };
 
 struct iolink iotable[] = {
@@ -66,6 +68,31 @@ void cio_clear(uint8 cid)
     cio[cid].sysgen_s = 0;
     cio[cid].seqbit = 0;
     cio[cid].op = 0;
+}
+
+/*
+ * A braindead CRC32 calculator.
+ *
+ * This is overkill for what we need: A simple way to tag the contents
+ * of a block of memory uploaded to a CIO card (so we can
+ * differentiate between desired functions without actually having to
+ * disassemble and understand 80186 code!)
+ */
+uint32 cio_crc32_shift(uint32 crc, uint8 data)
+{
+    uint8 i;
+
+    crc = ~crc;
+    crc ^= data;
+    for (i = 0; i < 8; i++) {
+        if (crc & 1) {
+            crc = (crc >> 1) ^ CRC_POLYNOMIAL;
+        } else {
+            crc = crc >> 1;
+        }
+    }
+
+    return ~crc;
 }
 
 void cio_sysgen(uint8 cid)

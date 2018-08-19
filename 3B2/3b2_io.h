@@ -220,6 +220,7 @@ t_stat cio_reset(DEVICE *dptr);
 t_stat cio_svc(UNIT *uptr);
 
 void cio_clear(uint8 cid);
+uint32 cio_crc32_shift(uint32 crc, uint8 data);
 void cio_cexpress(uint8 cid, uint16 esize, cio_entry *cqe, uint8 *app_data);
 void cio_cqueue(uint8 cid, uint8 cmd_stat, uint16 esize, cio_entry *cqe, uint8 *app_data);
 void cio_rexpress(uint8 cid, uint16 esize, cio_entry *rqe, uint8 *app_data);

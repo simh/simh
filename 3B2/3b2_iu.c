@@ -751,7 +751,6 @@ void iu_write(uint32 pa, uint32 val, size_t size)
 t_stat iu_tx(uint8 portno, uint8 val)
 {
     IU_PORT *p = (portno == PORT_A) ? &iu_console : &iu_contty;
-    UNIT *uptr = (portno == PORT_A) ? &tto_unit : contty_xmt_unit;
     uint8 ists = (portno == PORT_A) ? ISTS_RAI : ISTS_RBI;
     uint8 imr_mask = (portno == PORT_A) ? IMR_RXRA : IMR_RXRB;
     int32 c;

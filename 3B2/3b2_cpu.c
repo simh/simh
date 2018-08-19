@@ -932,7 +932,7 @@ t_stat fprint_sym_m(FILE *of, t_addr addr, t_value *val)
                 fprintf(of, "&0x%x", w);
                 break;
             default:
-                fprintf(of, "%d(%%fp)", reg);
+                fprintf(of, "%d(%%fp)", (int8) reg);
                 break;
             }
             break;
@@ -943,7 +943,7 @@ t_stat fprint_sym_m(FILE *of, t_addr addr, t_value *val)
                 fprintf(of, "$0x%x", w);
                 break;
             default:
-                fprintf(of, "%d(%%ap)", reg);
+                fprintf(of, "%d(%%ap)", (int8) reg);
                 break;
             }
             break;
@@ -970,12 +970,12 @@ t_stat fprint_sym_m(FILE *of, t_addr addr, t_value *val)
         case 12:  /* Byte Displacement */
             OP_R_B(w, val, vp);
             cpu_register_name(reg, reg_name, 8);
-            fprintf(of, "%d(%s)", w, reg_name);
+            fprintf(of, "%d(%s)", (int8) w, reg_name);
             break;
         case 13:  /* Byte Displacement Deferred */
             OP_R_B(w, val, vp);
             cpu_register_name(reg, reg_name, 8);
-            fprintf(of, "*%d(%s)", w, reg_name);
+            fprintf(of, "*%d(%s)", (int8) w, reg_name);
             break;
         case 14:
             if (reg == 15) {
