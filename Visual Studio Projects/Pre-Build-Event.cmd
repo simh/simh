@@ -229,7 +229,7 @@ echo **                                                 **
 echo *****************************************************
 echo *****************************************************
 pushd ..\..\windows-build
-"%_GIT_GIT%" pull
+"%_GIT_GIT%" pull https://github.com/simh/windows-build
 popd
 set _TRIED_PULL=1
 goto _check_build
