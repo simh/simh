@@ -30,10 +30,13 @@ rem Everything implicitly requires BUILD to also be set to have
 rem any meaning, it always gets set.
 set _X_BUILD=BUILD
 call :FindVCVersion _VC_VER
+
 set _PDB=%~dpn1.pdb
-if exist "%_PDB%" shift /1
 if exist "%_PDB%" del/q "%_PDB%"
 set _PDB=
+set _ARG=%~1
+if /i "%_ARG:~-4%" equ ".exe" shift /1
+set _ARG=
 
 :_next_arg
 if "%1" == "" goto _done_args
