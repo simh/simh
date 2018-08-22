@@ -30,6 +30,10 @@ rem Everything implicitly requires BUILD to also be set to have
 rem any meaning, it always gets set.
 set _X_BUILD=BUILD
 call :FindVCVersion _VC_VER
+set _PDB=%~dpn1.pdb
+if exist "%_PDB%" shift /1
+if exist "%_PDB%" del/q "%_PDB%"
+set _PDB=
 
 :_next_arg
 if "%1" == "" goto _done_args
@@ -120,7 +124,7 @@ if not exist ..\..\windows-build goto _notice1
 if not exist ..\..\windows-build/lib goto _notice2
 set _X_WINDOWS_BUILD=
 for /F "usebackq tokens=2" %%i in (`findstr /C:"WINDOWS-BUILD" ..\..\windows-build\Windows-Build_Versions.txt`) do SET _X_WINDOWS_BUILD=%%i
-if "%_X_WINDOWS_BUILD%" LSS "20180815" goto _notice2
+if "%_X_WINDOWS_BUILD%" LSS "20180821" goto _notice2
 set _X_LAST_WINDOWS_BUILD=
 if exist Pre-Build-Event.last-windows-build-version.txt for /F "usebackq tokens=2" %%i in (`findstr /C:"WINDOWS-BUILD" Pre-Build-Event.last-windows-build-version.txt`) do SET _X_LAST_WINDOWS_BUILD=%%i
 if "%_X_WINDOWS_BUILD%" EQU "%_X_LAST_WINDOWS_BUILD%" goto _new_or_same_windows_build
