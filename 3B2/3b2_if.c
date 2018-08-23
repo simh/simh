@@ -36,13 +36,6 @@ static SIM_INLINE void if_clear_irq();
 static SIM_INLINE void if_cancel_pending_irq();
 static SIM_INLINE uint32 if_buf_offset();
 
-#ifndef MAX
-#define MAX(x,y) ((x) > (y) ? (x) : (y))
-#endif
-#ifndef MIN
-#define MIN(x,y) ((x) < (y) ? (x) : (y))
-#endif
-
 /*
  * Disk Format:
  * ------------

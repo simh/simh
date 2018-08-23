@@ -210,6 +210,7 @@ void iua_drq_handled();
 void iub_drq_handled();
 void iu_txrdy_a_irq();
 void iu_txrdy_b_irq();
-void iu_dma(uint8 channel, uint32 service_address);
+void iu_dma_console(uint8 channel, uint32 service_address);
+void iu_dma_contty(uint8 channel, uint32 service_address);
 
 #endif

@@ -426,7 +426,7 @@ t_stat iu_svc_tto(UNIT *uptr)
 {
     /* If there's more DMA to do, do it */
     if (iu_console.dma && ((dma_state.mask >> DMA_IUA_CHAN) & 0x1) == 0) {
-        iu_dma(DMA_IUA_CHAN, IUBASE+IUA_DATA_REG);
+        iu_dma_console(DMA_IUA_CHAN, IUBASE+IUA_DATA_REG);
     } else {
         /* The buffer is now empty, we've transmitted, so set TXR */
         iu_console.stat |= STS_TXR;
@@ -492,9 +492,9 @@ t_stat iu_svc_contty_xmt(UNIT *uptr)
 
     tmxr_poll_tx(&contty_desc);
 
+    /* If there's more DMA to do, do it */
     if (chan->wcount_c >= 0) {
-        /* More DMA to do */
-        iu_dma(DMA_IUB_CHAN, IUBASE+IUB_DATA_REG);
+        iu_dma_contty(DMA_IUB_CHAN, IUBASE+IUB_DATA_REG);
     } else {
         /* The buffer is now empty, we've transmitted, so set TXR */
         iu_contty.stat |= STS_TXR;
@@ -911,14 +911,14 @@ static SIM_INLINE void iu_w_cmd(uint8 portno, uint8 cmd)
 /*
  * Initiate DMA transfer or continue one already in progress.
  */
-void iu_dma(uint8 channel, uint32 service_address)
+void iu_dma_console(uint8 channel, uint32 service_address)
 {
     uint8 data;
     uint32 addr;
     t_stat status = SCPE_OK;
     dma_channel *chan = &dma_state.channels[channel];
-    UNIT *uptr = (channel == DMA_IUA_CHAN) ? &tto_unit : contty_xmt_unit;
-    IU_PORT *port = (channel == DMA_IUA_CHAN) ? &iu_console : &iu_contty;
+    UNIT *uptr = &tto_unit;
+    IU_PORT *port = &iu_console;
 
     /* Immediate acknowledge of DMA */
     port->drq = FALSE;
@@ -936,12 +936,54 @@ void iu_dma(uint8 channel, uint32 service_address)
         if (status == SCPE_OK) {
             chan->ptr++;
             chan->wcount_c--;
-        } else if (status == SCPE_LOST) {
-            chan->ptr = 0;
-            chan->wcount_c = -1;
         }
 
         sim_activate_abs(uptr, uptr->wait);
+
+        if (chan->wcount_c >= 0) {
+            /* Return early so we don't finish DMA */
+            return;
+        }
+    }
+
+    /* Done with DMA */
+    port->dma = DMA_NONE;
+
+    dma_state.mask |= (1 << channel);
+    dma_state.status |= (1 << channel);
+    csr_data |= CSRDMA;
+}
+
+void iu_dma_contty(uint8 channel, uint32 service_address)
+{
+    uint8 data;
+    uint32 addr;
+    t_stat status = SCPE_OK;
+    dma_channel *chan = &dma_state.channels[channel];
+    UNIT *uptr = contty_xmt_unit;
+    IU_PORT *port = &iu_contty;
+    uint32 wait = 0x7fffffff;
+
+    /* Immediate acknowledge of DMA */
+    port->drq = FALSE;
+
+    if (!port->dma) {
+        /* Set DMA transfer type */
+        port->dma = 1u << ((dma_state.mode >> 2) & 0xf);
+    }
+
+    if (port->dma == DMA_READ) {
+        addr = dma_address(channel, chan->ptr, TRUE);
+        chan->addr_c = chan->addr + chan->ptr + 1;
+        data = pread_b(addr);
+        status = iu_tx(channel - 2, data);
+        if (status == SCPE_OK) {
+            wait = MIN(wait, contty_ldsc[0].txdeltausecs);
+            chan->ptr++;
+            chan->wcount_c--;
+        }
+
+        tmxr_activate_after(uptr, wait);
 
         if (chan->wcount_c >= 0) {
             /* Return early so we don't finish DMA */

@@ -50,6 +50,13 @@ noret __libc_longjmp (jmp_buf buf, int val);
 #define longjmp __libc_longjmp
 #endif
 
+#ifndef MAX
+#define MAX(x,y) ((x) > (y) ? (x) : (y))
+#endif
+#ifndef MIN
+#define MIN(x,y) ((x) < (y) ? (x) : (y))
+#endif
+
 /* -t flag: Translate a virtual address */
 #define EX_T_FLAG 1 << 19
 /* -v flag for examine routine */

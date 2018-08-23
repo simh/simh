@@ -74,11 +74,6 @@ extern UNIT cio_unit;
  *
  */
 
-
-#ifndef MIN
-#define MIN(a,b) (((a) < (b)) ? (a) : (b))
-#endif
-
 #define PPQESIZE      12
 #define DELAY_ASYNC   25
 #define DELAY_DLM     100
