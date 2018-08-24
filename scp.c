@@ -12226,7 +12226,7 @@ static void _sim_debug_write_flush (const char *buf, size_t len, t_bool flush)
 {
 char *eol;
 
-if (!(sim_deb_switches & SWMASK ('F'))) {           /* filtering disabled? */
+if (sim_deb_switches & SWMASK ('F')) {              /* filtering disabled? */
     if (len > 0)
         fwrite (buf, 1, len, sim_deb);              /* output now. */
     return;                                         /* done */
