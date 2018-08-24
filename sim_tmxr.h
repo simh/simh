@@ -260,7 +260,7 @@ t_stat tmxr_set_line_halfduplex (TMLN *lp, t_bool enable_loopback);
 t_bool tmxr_get_line_halfduplex (TMLN *lp);
 t_stat tmxr_set_line_speed (TMLN *lp, CONST char *speed);
 t_stat tmxr_set_config_line (TMLN *lp, CONST char *config);
-t_stat tmxr_set_line_modem_control (TMLN *lp, t_bool enabled);
+t_stat tmxr_set_line_modem_control (TMLN *lp, t_bool enab_disab);
 t_stat tmxr_set_line_unit (TMXR *mp, int line, UNIT *uptr_poll);
 t_stat tmxr_set_line_output_unit (TMXR *mp, int line, UNIT *uptr_poll);
 t_stat tmxr_set_console_units (UNIT *rxuptr, UNIT *txuptr);

@@ -109,8 +109,8 @@ extern int32    tmxr_poll, clk_tps;
 #define UNIT_V_HANGUP   (UNIT_V_UF + 3)
 #define UNIT_MODEDHU    (1 << UNIT_V_MODEDHU)
 #define UNIT_FASTDMA    (1 << UNIT_V_FASTDMA)
-#define UNIT_MODEM  (1 << UNIT_V_MODEM)
-#define UNIT_HANGUP (1 << UNIT_V_HANGUP)
+#define UNIT_MODEM      (1 << UNIT_V_MODEM)
+#define UNIT_HANGUP     (1 << UNIT_V_HANGUP)
 
 /* VHCSR - 160440 - Control and Status Register */
 
@@ -310,8 +310,8 @@ BITFIELD vh_fifodata_bits[] = {
 #define LNCTRL_V_MAINT      (6)
 #define LNCTRL_M_MAINT      (03)
 #define LNCTRL_LINK_TYPE    (1 << 8)    /* 0=data leads only, 1=modem */
-#define LNCTRL_DTR      (1 << 9)    /* DTR to modem */
-#define LNCTRL_RTS      (1 << 12)   /* RTS to modem */
+#define LNCTRL_DTR          (1 << 9)    /* DTR to modem */
+#define LNCTRL_RTS          (1 << 12)   /* RTS to modem */
 
 BITFIELD vh_lnctrl_bits[] = {
   BIT(TX_ABORT),                            /* Transmitter Abort */
@@ -889,20 +889,6 @@ static void q_tx_report (   int32   vh,
 }
 /* Channel get/put routines */
 
-static void HangupModem (   int32   vh,
-                TMLX    *lp,
-                int32   chan    )
-{
-    if (vh_unit[vh].flags & UNIT_MODEM)
-        lp->lstat &= ~(STAT_DCD|STAT_DSR|STAT_CTS|STAT_RI);
-    if (lp->lnctrl & LNCTRL_LINK_TYPE)
-        /* RBUF<0> = 0 for modem status */
-        fifo_put (vh, lp, RBUF_DIAG |
-                  RBUF_PUTLINE (chan) |
-                  ((lp->lstat >> 8) & 0376));
-        /* BUG: check for overflow above */
-}
-
 /* TX a character on a line, regardless of the TX enable state */
 
 static t_stat vh_putc ( int32   vh,
@@ -926,10 +912,7 @@ static t_stat vh_putc ( int32   vh,
         }
 #endif
         status = tmxr_putc_ln (lp->tmln, data);
-        if (status == SCPE_LOST) {
-            tmxr_reset_ln (lp->tmln);
-            HangupModem (vh, lp, chan);
-        } else if (status == SCPE_STALL) {
+        if (status == SCPE_STALL) {
             /* let's flush and try again */
             tmxr_send_buffered_data (lp->tmln);
             status = tmxr_putc_ln (lp->tmln, data);
@@ -958,6 +941,8 @@ static void vh_getc (   int32   vh  )
 {
     uint32  i, c;
     TMLX    *lp;
+    int32   modem_incoming_bits;
+    uint16  new_lstat;
 
     for (i = 0; i < (uint32)VH_LINES; i++) {
         if (rbuf_idx[vh] >= (FIFO_ALARM-1)) /* close to fifo capacity? */
@@ -972,6 +957,17 @@ static void vh_getc (   int32   vh  )
                     LPR_M_CHAR_LGTH];
                 fifo_put (vh, lp, RBUF_PUTLINE (i) | c);
             }
+        }
+        tmxr_set_get_modem_bits (lp->tmln, 0, 0, &modem_incoming_bits);
+        new_lstat = lp->lstat & ~(STAT_DSR | STAT_DCD | STAT_CTS | STAT_RI);
+        new_lstat |= (modem_incoming_bits & TMXR_MDM_DSR) ? STAT_DSR : 0;
+        new_lstat |= (modem_incoming_bits & TMXR_MDM_DCD) ? STAT_DCD : 0;
+        new_lstat |= (modem_incoming_bits & TMXR_MDM_CTS) ? STAT_CTS : 0;
+        new_lstat |= (modem_incoming_bits & TMXR_MDM_RNG) ? STAT_RI  : 0;
+        if (new_lstat != lp->lstat) {
+            lp->lstat = new_lstat;
+            if (lp->lnctrl & LNCTRL_LINK_TYPE)
+                fifo_put (vh, lp, RBUF_DIAG | RBUF_PUTLINE (i) | (lp->lstat >> 8) & 0376);
         }
     }
 }
@@ -1287,15 +1283,23 @@ static t_stat vh_wr (   int32   ldata,
             if (!(lp->lnctrl & LNCTRL_FORCE_XOFF))
                 vh_putc (vh, lp, CSR_GETCHAN (vh_csr[vh]), XON);
         }
+        tmxr_set_line_modem_control (lp->tmln, (data & LNCTRL_LINK_TYPE) && (vh_unit[vh].flags & UNIT_MODEM));
+        if (!(vh_unit[vh].flags & UNIT_MODEM))
+            tmxr_set_get_modem_bits (lp->tmln, (TMXR_MDM_DTR | TMXR_MDM_RTS), 0, NULL);
         /* check modem control bits */
-        if ( !(data & LNCTRL_DTR) &&    /* DTR 1->0 */
+        if ( !(data & LNCTRL_DTR) &&        /* DTR 1->0 */
               (lp->lnctrl & LNCTRL_DTR)) {
-            if ((lp->tmln->conn) && (vh_unit[vh].flags & UNIT_HANGUP)) {
+            if (vh_unit[vh].flags & UNIT_HANGUP) {
                 tmxr_linemsg (lp->tmln, "\r\nLine hangup\r\n");
-                tmxr_reset_ln (lp->tmln);
+                tmxr_set_get_modem_bits (lp->tmln, 0, TMXR_MDM_DTR, NULL);
             }
-            HangupModem (vh, lp, CSR_GETCHAN (vh_csr[vh]));
         }
+        if (!(lp->lnctrl & LNCTRL_DTR) &&   /* DTR 0->1 */
+            (data & LNCTRL_DTR)) {
+            tmxr_set_get_modem_bits (lp->tmln, TMXR_MDM_DTR, 0, NULL);
+            sim_activate_abs (vh_poll_unit, 0);
+        }
+        tmxr_set_get_modem_bits (lp->tmln, ((data & LNCTRL_RTS) ? TMXR_MDM_RTS : 0), ((data & LNCTRL_RTS) ? 0 : TMXR_MDM_RTS), NULL);
         lp->lnctrl = data;
         lp->tmln->rcve = (data & LNCTRL_RX_ENA) ? 1 : 0;
         tmxr_poll_rx (&vh_desc);
@@ -1454,22 +1458,40 @@ static t_stat vh_svc (  UNIT    *uptr   )
     sim_debug(DBG_TRC, find_dev_from_unit(uptr), "vh_svc()\n");
     sim_debug(DBG_RCVSCH, find_dev_from_unit(uptr), "vh_svc()\n");
 
-    /* sample every 10ms for modem changes (new connections) */
+    /* sample for modem changes (new connections) */
     newln = tmxr_poll_conn (&vh_desc);
     if (newln >= 0) {
         TMLX    *lp;
         int32   line;
+
         vh = newln / VH_LINES;  /* determine which mux */
         line = newln - (vh * VH_LINES);
         lp = &vh_parm[newln];
         lp->lstat |= STAT_DSR | STAT_DCD | STAT_CTS;
-        if (!(lp->lnctrl & LNCTRL_DTR))
-            lp->lstat |= STAT_RI;
+        lp->lstat &= ~STAT_RI;
         if (lp->lnctrl & LNCTRL_LINK_TYPE)
             fifo_put (vh, lp, RBUF_DIAG |
                       RBUF_PUTLINE (line) |
                       ((lp->lstat >> 8) & 0376));
             /* BUG: should check for overflow above */
+    }
+    if (newln == -2) {      /* Ringing */
+        for (newln = 0; newln < vh_desc.lines; newln++) {
+            TMLX    *lp;
+            int32   line;
+
+            vh = newln/VH_LINES;
+            line = newln - (vh * VH_LINES);
+            lp = &vh_parm[newln];
+            if (lp->lnctrl & LNCTRL_LINK_TYPE) {
+                if (lp->tmln->modembits & TMXR_MDM_RNG) {
+                    lp->lstat |= STAT_DSR | STAT_RI;
+                    fifo_put (vh, lp, RBUF_DIAG |
+                              RBUF_PUTLINE (line) |
+                              ((lp->lstat >> 8) & 0376));
+                }
+            }
+        }
     }
     /* interrupt driven in a real DHQ */
     tmxr_poll_rx (&vh_desc);
@@ -1631,6 +1653,7 @@ static t_stat vh_reset (    DEVICE  *dptr   )
     int32   i;
 
     tmxr_set_port_speed_control (&vh_desc);
+    tmxr_set_modem_control_passthru (&vh_desc);
     if (vh_desc.lines > VH_MUXES*VH_LINES)
         vh_desc.lines = VH_MUXES*VH_LINES;
     vh_dev.numunits = (vh_desc.lines / VH_LINES) + 3;
