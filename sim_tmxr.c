@@ -1000,6 +1000,7 @@ SOCKET newsock;
 TMLN *lp;
 int32 *op;
 int32 i, j;
+int32 ringing = -1;
 char *address;
 char msg[512];
 uint32 poll_time = sim_os_msec ();
@@ -1094,11 +1095,12 @@ if (mp->master) {
                     (lp->ser_connect_pending == FALSE) &&
                     ((lp->modembits & TMXR_MDM_DTR) == 0)) {
                     ++ringable_count;
-                    tmxr_set_get_modem_bits (lp, TMXR_MDM_RNG, 0, NULL);
+                    lp->modembits |= TMXR_MDM_RNG;
                     tmxr_debug_connect_line (lp, "tmxr_poll_conn() - Ringing line");
                     }
                 }
             if (ringable_count > 0) {
+                ringing = -2;
                 if (mp->ring_start_time == 0) {
                     mp->ring_start_time = poll_time;
                     mp->ring_sock = newsock;
@@ -1285,7 +1287,7 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
 
     }
 
-return -1;                                              /* no new connections made */
+return ringing;                                         /* no new connections made */
 }
 
 /* Reset a line.
@@ -1546,7 +1548,7 @@ if ((bits_to_set & ~(TMXR_MDM_OUTGOING)) ||         /* Assure only settable bits
     return SCPE_ARG;
 before_modem_bits = lp->modembits;
 lp->modembits |= bits_to_set;
-lp->modembits &= ~(bits_to_clear | TMXR_MDM_INCOMING);
+lp->modembits &= ~bits_to_clear;
 if ((lp->sock) || (lp->serport) || (lp->loopback)) {
     if (lp->modembits & TMXR_MDM_DTR) {
         incoming_state = TMXR_MDM_DSR;
@@ -2498,6 +2500,12 @@ while (1) {
     ++spd;
     }
 return -1;
+}
+
+t_stat tmxr_set_line_modem_control (TMLN *lp, t_bool enab_disab)
+{
+lp->modem_control = enab_disab;
+return SCPE_OK;
 }
 
 t_stat tmxr_set_line_speed (TMLN *lp, CONST char *speed)
