@@ -1600,6 +1600,8 @@ else {
                 }
             }
         }
+    if (!lp->conn)
+        lp->modembits &= ~(TMXR_MDM_DCD | TMXR_MDM_CTS);
     if ((lp->master) || (lp->mp && lp->mp->master) ||
         (lp->port && lp->destination))
         incoming_state = TMXR_MDM_DSR;
