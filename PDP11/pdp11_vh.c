@@ -967,7 +967,7 @@ static void vh_getc (   int32   vh  )
         if (new_lstat != lp->lstat) {
             lp->lstat = new_lstat;
             if (lp->lnctrl & LNCTRL_LINK_TYPE)
-                fifo_put (vh, lp, RBUF_DIAG | RBUF_PUTLINE (i) | (lp->lstat >> 8) & 0376);
+                fifo_put (vh, lp, RBUF_DIAG | RBUF_PUTLINE (i) | ((lp->lstat >> 8) & 0376));
         }
     }
 }
