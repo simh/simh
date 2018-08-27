@@ -270,7 +270,7 @@ t_stat udp_create (DEVICE *dptr, const char *premote, int32 *pln)
   // which is a handle used to identify this connection to all future udp_xyz()
   //  calls.
   t_stat ret;
-  char linkinfo[128];
+  char linkinfo[256];
   int32 link = udp_find_free_link();
   if (link < 0) return SCPE_MEM;
 
