@@ -393,12 +393,12 @@ int32 fdcdrv(int32 io, int32 data)
             pos, (unsigned int) pos);
         err = sim_fseek(dsk_unit[cur_dsk].fileref, pos, SEEK_SET); /* seek to offset */
         if (err) {
-            sim_printf("\nfdccmd: File error read sir seek\n");
+            sim_printf("\nfdccmd: Seek error read in SIR\n");
             return SCPE_IOERR;
         } 
         err = sim_fread(dsk_unit[cur_dsk].filebuf, SECT_SIZE, 1, dsk_unit[cur_dsk].fileref); /* read in buffer */
         if (err != 1) {
-            sim_printf("\nfdccmd: File error read SIR\n");
+            sim_printf("\nfdccmd: File error read in SIR\n");
             return SCPE_IOERR;
         }  
         dsk_unit[cur_dsk].u3 |= BUSY | DRQ; /* set DRQ & BUSY */
@@ -444,12 +444,12 @@ int32 fdccmd(int32 io, int32 data)
                     pos, (unsigned int) pos);
                 err = sim_fseek(dsk_unit[cur_dsk].fileref, pos, SEEK_SET); /* seek to offset */
                 if (err) {
-                    sim_printf("\nfdccmd: File error read seek\n");
+                    sim_printf("\nfdccmd: Seek error in read command\n");
                     return SCPE_IOERR;
                 } 
                 err = sim_fread(dsk_unit[cur_dsk].filebuf, SECT_SIZE, 1, dsk_unit[cur_dsk].fileref); /* read in buffer */
                 if (err != 1) {
-                    sim_printf("\nfdccmd: File error read\n");
+                    sim_printf("\nfdccmd: File error in read command\n");
                     return SCPE_IOERR;
                 }
                 dsk_unit[cur_dsk].u3 |= BUSY | DRQ; /* set DRQ & BUSY */
@@ -467,7 +467,7 @@ int32 fdccmd(int32 io, int32 data)
                         pos, (unsigned int) pos);
                     err = sim_fseek(dsk_unit[cur_dsk].fileref, pos, SEEK_SET); /* seek to offset */
                     if (err) {
-                        sim_printf("\nfdccmd: File error write seek\n");
+                        sim_printf("\nfdccmd: Seek error in write command\n");
                         return SCPE_IOERR;
                     } 
                     wrt_flag = 1;           /* set write flag */
