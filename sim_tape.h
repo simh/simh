@@ -209,6 +209,7 @@ t_stat sim_tape_set_dens (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat sim_tape_show_dens (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat sim_tape_set_asynch (UNIT *uptr, int latency);
 t_stat sim_tape_clr_asynch (UNIT *uptr);
+t_stat sim_tape_test (DEVICE *dptr);
 
 #ifdef  __cplusplus
 }

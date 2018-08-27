@@ -412,6 +412,28 @@ extern t_bool (*sim_vm_fprint_stopped) (FILE *st, t_stat reason);
 extern t_value (*sim_vm_pc_value) (void);
 extern t_bool (*sim_vm_is_subroutine_call) (t_addr **ret_addrs);
 
+/* Core SCP libraries can potentially have unit test routines.
+   These defines help implement consistent unit test functionality */
+
+#define SIM_TEST_INIT                                           \
+        int test_stat;                                          \
+        const char *sim_test;                                   \
+        jmp_buf sim_test_env;                                   \
+        if ((test_stat = setjmp (sim_test_env))) {              \
+            sim_printf ("Error: %d - '%s' processing: %s\n",    \
+                        test_stat, sim_error_text(test_stat),   \
+                        sim_test);                              \
+            return test_stat;                                   \
+            }
+#define SIM_TEST(_stat)                                         \
+        do {                                                    \
+            if (SCPE_OK != (test_stat = (_stat))) {             \
+                sim_test = #_stat;                              \
+                longjmp (sim_test_env, test_stat);              \
+                }                                               \
+            } while (0)
+
+
 #ifdef  __cplusplus
 }
 #endif

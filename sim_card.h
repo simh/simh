@@ -130,6 +130,9 @@ extern CONST char      sim_six_to_ascii[64];        /* Map BCD to ASCII */
 extern CONST char      sim_ascii_to_six[128];       /* Map 7 bit ASCII to BCD */
 extern CONST uint8     sim_parity_table[64];        /* 64 entry odd parity table */
 
+/* Unit test routine */
+extern sim_card_test (DEVICE *dptr);
+
 #ifdef  __cplusplus
 }
 #endif

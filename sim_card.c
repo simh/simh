@@ -1380,9 +1380,89 @@ t_stat sim_card_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, cons
     return SCPE_OK;
 }
 
-#else
+static t_stat create_card_file (const char *filename, int cards)
+{
+FILE *f;
+int i;
+
+f = fopen (filename, "w");
+if (f == NULL)
+    return SCPE_OPENERR;
+for (i=0; i<cards; i++)
+    fprintf (f, "%05d ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\n", i);
+fclose (f);
+return SCPE_OK;
+}
+
+#include <setjmp.h>
+
+t_stat sim_card_test (DEVICE *dptr)
+{
+t_stat stat = SCPE_OK;
+#if defined(USE_SIM_CARD) && defined(SIM_CARD_API)
+char cmd[CBUFSIZE];
+char saved_filename[4*CBUFSIZE];
+uint16 card_image[80];
+SIM_TEST_INIT;
+
+if ((dptr->units->flags & UNIT_RO) == 0)  /* Punch device? */
+    return SCPE_OK;
+
+sim_printf ("Testing %s device sim_card APIs\n", dptr->name);
+
+(void)remove("file1.deck");
+(void)remove("file2.deck");
+(void)remove("file3.deck");
+(void)remove("file4.deck");
+
+SIM_TEST(create_card_file ("File10.deck", 10));
+SIM_TEST(create_card_file ("File20.deck", 20));
+SIM_TEST(create_card_file ("File30.deck", 30));
+SIM_TEST(create_card_file ("File40.deck", 40));
+
+sprintf (cmd, "%s File10.deck", dptr->name);
+SIM_TEST(attach_cmd (0, cmd));
+sprintf (cmd, "%s File20.deck", dptr->name);
+SIM_TEST(attach_cmd (0, cmd));
+sprintf (cmd, "%s -S File30.deck", dptr->name);
+SIM_TEST(attach_cmd (0, cmd));
+sprintf (cmd, "%s -S -E File40.deck", dptr->name);
+SIM_TEST(attach_cmd (0, cmd));
+sprintf (saved_filename, "%s %s", dptr->name, dptr->units->filename);
+show_cmd (0, dptr->name);
+sim_printf ("Input Hopper Count:  %d\n", sim_card_input_hopper_count(dptr->units));
+sim_printf ("Output Hopper Count: %d\n", sim_card_output_hopper_count(dptr->units));
+while (!sim_card_eof (dptr->units))
+    SIM_TEST(sim_read_card (dptr->units, card_image));
+sim_printf ("Input Hopper Count:  %d\n", sim_card_input_hopper_count(dptr->units));
+sim_printf ("Output Hopper Count: %d\n", sim_card_output_hopper_count(dptr->units));
+sim_printf ("Detaching %s\n", dptr->name);
+SIM_TEST(detach_cmd (0, dptr->name));
+show_cmd (0, dptr->name);
+sim_printf ("Input Hopper Count:  %d\n", sim_card_input_hopper_count(dptr->units));
+sim_printf ("Output Hopper Count: %d\n", sim_card_output_hopper_count(dptr->units));
+sim_printf ("Attaching Saved Filenames: %s\n", saved_filename + strlen(dptr->name));
+SIM_TEST(attach_cmd (0, saved_filename));
+show_cmd (0, dptr->name);
+sim_printf ("Input Hopper Count:  %d\n", sim_card_input_hopper_count(dptr->units));
+sim_printf ("Output Hopper Count: %d\n", sim_card_output_hopper_count(dptr->units));
+SIM_TEST(detach_cmd (0, dptr->name));
+(void)remove ("file10.deck");
+(void)remove ("file20.deck");
+(void)remove ("file30.deck");
+(void)remove ("file40.deck");
+#endif /* defined(USE_SIM_CARD) && defined(SIM_CARD_API) */
+return stat;
+}
+
+#else   /* !defined(USE_SIM_CARD) */
 
 t_stat sim_card_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+    return SCPE_OK;
+}
+
+t_stat sim_card_test (DEVICE *dptr)
 {
     return SCPE_OK;
 }

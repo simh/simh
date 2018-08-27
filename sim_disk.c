@@ -51,6 +51,7 @@ Public routines:
    sim_disk_set_async        enable asynchronous operation
    sim_disk_clr_async        disable asynchronous operation
    sim_disk_data_trace       debug support
+   sim_disk_test             unit test routine
 
 Internal routines:
 
@@ -4663,3 +4664,8 @@ struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 return WriteVirtualDiskSectors(hVHD, buf, sects, sectswritten, ctx->sector_size, lba);
 }
 #endif
+
+t_stat sim_disk_test (DEVICE *dptr)
+{
+return SCPE_OK;
+}

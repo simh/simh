@@ -94,6 +94,7 @@ t_offset sim_disk_size (UNIT *uptr);
 t_bool sim_disk_vhd_support (void);
 t_bool sim_disk_raw_support (void);
 void sim_disk_data_trace (UNIT *uptr, const uint8 *data, size_t lba, size_t len, const char* txt, int detail, uint32 reason);
+t_stat sim_disk_test (DEVICE *dptr);
 
 #ifdef  __cplusplus
 }

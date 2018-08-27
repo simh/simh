@@ -378,8 +378,8 @@ void ethq_insert_data(ETH_QUE* que, int32 type,         /* insert item into FIFO
                   const uint8 *data, int used, size_t len, 
                   size_t crc_len, const uint8 *crc_data, int32 status);
 t_stat ethq_destroy(ETH_QUE* que);                      /* release FIFO queue */
-
 const char *eth_capabilities(void);
+t_stat sim_ether_test (DEVICE *dptr);                   /* unit test routine */
 
 #ifdef  __cplusplus
 }
