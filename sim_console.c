@@ -3159,6 +3159,8 @@ unsigned int status;
 IOSB iosb;
 $DESCRIPTOR (terminal_device, "tt");
 
+sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_ttinit()\n");
+
 status = sys$assign (&terminal_device, &tty_chan, 0, 0);
 if (status != SS$_NORMAL)
     return SCPE_TTIERR;
@@ -3177,6 +3179,8 @@ static t_stat sim_os_ttrun (void)
 unsigned int status;
 IOSB iosb;
 
+sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_ttrun()\n");
+
 status = sys$qiow (EFN, tty_chan, IO$_SETMODE, &iosb, 0, 0,
     &run_mode, sizeof (run_mode), 0, 0, 0, 0);
 if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL))
@@ -3188,6 +3192,8 @@ static t_stat sim_os_ttcmd (void)
 {
 unsigned int status;
 IOSB iosb;
+
+sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_ttcmd() - BSDTTY\n");
 
 status = sys$qiow (EFN, tty_chan, IO$_SETMODE, &iosb, 0, 0,
     &cmd_mode, sizeof (cmd_mode), 0, 0, 0, 0);
@@ -3236,6 +3242,8 @@ return (buf[0] | SCPE_KFLAG);
 static t_stat sim_os_poll_kbd (void)
 {
 t_stat response;
+
+sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_poll_kbd()\n");
 
 if (response = buffered_character) {
     buffered_character = 0;
@@ -3331,6 +3339,8 @@ ControlHandler(DWORD dwCtrlType)
 
 static t_stat sim_os_ttinit (void)
 {
+sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_ttinit()\n");
+
 SetConsoleCtrlHandler( ControlHandler, TRUE );
 std_input = GetStdHandle (STD_INPUT_HANDLE);
 std_output = GetStdHandle (STD_OUTPUT_HANDLE);
@@ -3345,6 +3355,8 @@ return SCPE_OK;
 
 static t_stat sim_os_ttrun (void)
 {
+sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_ttrun()\n");
+
 if ((sim_ttisatty ()) &&
     (std_input) &&                                      /* If Not Background process? */
     (std_input != INVALID_HANDLE_VALUE)) {
@@ -3370,6 +3382,8 @@ return SCPE_OK;
 
 static t_stat sim_os_ttcmd (void)
 {
+sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_ttcmd() - BSDTTY\n");
+
 if (sim_log) {
     fflush (sim_log);
     _setmode (_fileno (sim_log), _O_TEXT);
@@ -3556,6 +3570,8 @@ static t_stat sim_os_poll_kbd (void)
 {
 int c;
 
+sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_poll_kbd()\n");
+
 #if defined (__EMX__)
 switch (c = _read_kbd(0,0,0)) {                         /* EMX has _read_kbd */
 
@@ -3715,8 +3731,12 @@ int ps_getch(void) {
 
 /* Note that this only works if the call to sim_ttinit comes before any output to the console */
 
-static t_stat sim_os_ttinit (void) {
+static t_stat sim_os_ttinit (void) 
+{
     int i;
+
+    sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_ttinit()\n");
+
     /* this blank will later be replaced by the number of characters */
     char title[50] = " ";
     unsigned char ptitle[50];
@@ -3733,7 +3753,7 @@ static t_stat sim_os_ttinit (void) {
     title[0] = strlen(title) - 1;                       /* Pascal string done */
     for (i = 0; i <= title[0]; i++) {                   /* copy to unsigned char */
         ptitle[i] = title[i];
-    }
+        }
     SIOUXSetTitle(ptitle);
     return SCPE_OK;
 }
@@ -3761,6 +3781,8 @@ return 1;
 static t_stat sim_os_poll_kbd (void)
 {
 int c;
+
+sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_poll_kbd()\n");
 
 if (!ps_kbhit ())
     return SCPE_OK;
@@ -3803,7 +3825,9 @@ int cmdfl,runfl;                                        /* TTY flags */
 
 static t_stat sim_os_ttinit (void)
 {
-cmdfl = fcntl (0, F_GETFL, 0);                          /* get old flags  and status */
+sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_ttinit() - BSDTTY\n");
+
+cmdfl = fcntl (fileno (stdin), F_GETFL, 0);             /* get old flags  and status */
 runfl = cmdfl | FNDELAY;
 if (ioctl (0, TIOCGETP, &cmdtty) < 0)
     return SCPE_TTIERR;
@@ -3830,6 +3854,8 @@ return SCPE_OK;                                         /* return success */
 
 static t_stat sim_os_ttrun (void)
 {
+sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_ttrun() - BSDTTY\n");
+
 runtchars.t_intrc = sim_int_char;                       /* in case changed */
 fcntl (0, F_SETFL, runfl);                              /* non-block mode */
 if (ioctl (0, TIOCSETP, &runtty) < 0)
@@ -3844,6 +3870,8 @@ return SCPE_OK;
 
 static t_stat sim_os_ttcmd (void)
 {
+sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_ttcmd() - BSDTTY\n");
+
 sim_os_set_thread_priority (PRIORITY_NORMAL);           /* restore priority */
 fcntl (0, F_SETFL, cmdfl);                              /* block mode */
 if (ioctl (0, TIOCSETP, &cmdtty) < 0)
@@ -3869,6 +3897,8 @@ static t_stat sim_os_poll_kbd (void)
 {
 int status;
 unsigned char buf[1];
+
+sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_poll_kbd() - BSDTTY\n");
 
 status = read (0, buf, 1);
 if (status != 1) return SCPE_OK;
@@ -3918,9 +3948,14 @@ return SCPE_OK;
 #include <unistd.h>
 
 struct termios cmdtty, runtty;
+int cmdfl,runfl;                                        /* TTY flags */
 
 static t_stat sim_os_ttinit (void)
 {
+sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_ttinit()\n");
+
+cmdfl = fcntl (fileno (stdin), F_GETFL, 0);             /* get old flags  and status */
+runfl = cmdfl | FNDELAY;
 if (!isatty (fileno (stdin)))                           /* skip if !tty */
     return SCPE_OK;
 if (tcgetattr (0, &cmdtty) < 0)                         /* get old flags */
@@ -3967,8 +4002,11 @@ return SCPE_OK;
 
 static t_stat sim_os_ttrun (void)
 {
+sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_ttrun()\n");
+
 if (!isatty (fileno (stdin)))                           /* skip if !tty */
     return SCPE_OK;
+fcntl (fileno (stdin), F_SETFL, runfl);                 /* non-block mode */
 #if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
 runtty.c_cc[VINTR] = 0;                                 /* OS X doesn't deliver SIGINT to main thread when enabled */
 #else
@@ -3982,9 +4020,12 @@ return SCPE_OK;
 
 static t_stat sim_os_ttcmd (void)
 {
+sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_ttcmd() - BSDTTY\n");
+
 if (!isatty (fileno (stdin)))                           /* skip if !tty */
     return SCPE_OK;
 sim_os_set_thread_priority (PRIORITY_NORMAL);           /* try to raise pri */
+fcntl (0, F_SETFL, cmdfl);                              /* block mode */
 if (tcsetattr (fileno(stdin), TCSETATTR_ACTION, &cmdtty) < 0)
     return SCPE_TTIERR;
 return SCPE_OK;
@@ -4004,6 +4045,8 @@ static t_stat sim_os_poll_kbd (void)
 {
 int status;
 unsigned char buf[1];
+
+sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_poll_kbd()\n");
 
 status = read (0, buf, 1);
 if (status != 1) return SCPE_OK;
