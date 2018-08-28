@@ -208,6 +208,7 @@ echo ** This may take a minute or si.  Please wait...   **
 echo **                                                 **
 echo *****************************************************
 echo *****************************************************
+:_try_clone
 pushd ..\..
 "%_GIT_GIT%" clone https://github.com/simh/windows-build windows-build
 popd
@@ -224,7 +225,24 @@ goto _ProjectInfo
 :_notice2
 if "%_TRIED_PULL%" neq "" goto _notice2_announce
 if "%_GIT_GIT%" equ "" goto _notice2_announce
-if not exist ..\..\windows-build\.git goto _notice2_announce
+if exist ..\..\windows-build\.git goto _try_pull
+echo *****************************************************
+echo *****************************************************
+echo **                                                 **
+echo **  The required build support is out of date      **
+echo **  and currently isn't a git repository.          **
+echo **                                                 **
+echo **  Removing the current windows-build support     **
+echo **  in preparation for cloning the current         **
+echo **  windows-build git repository.                  **
+echo **                                                 **
+echo **  This may take several minutes...               **
+echo **                                                 **
+echo *****************************************************
+echo *****************************************************
+rmdir /s /q ..\..\windows-build
+goto _try_clone
+:_try_pull
 echo *****************************************************
 echo *****************************************************
 echo **                                                 **
