@@ -483,7 +483,7 @@ static t_stat vh_show_detail (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 static t_stat vh_show_rbuf (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat vh_show_txq (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat vh_putc (int32 vh, TMLX *lp, int32 chan, int32 data);
-static void vh_set_config (TMLX *lp );
+static void vh_set_config (TMLX *lp);
 static void doDMA (int32 vh, int32 chan);
 static t_stat vh_setmode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 static t_stat vh_show_vec (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
@@ -972,7 +972,7 @@ static void vh_getc (   int32   vh  )
     }
 }
 
-static void vh_set_config (     TMLX    *lp )
+static void vh_set_config (     TMLX    *lp)
 {
     char lineconfig[16];
     
@@ -1583,13 +1583,16 @@ static void vh_init_chan (  int32   vh,
     lp->lpr = (RATE_9600 << LPR_V_TX_SPEED) |
           (RATE_9600 << LPR_V_RX_SPEED) |
           (03 << LPR_V_CHAR_LGTH);
-    vh_set_config ( lp );
+    vh_set_config (lp);
     lp->lnctrl = 0;
     lp->lstat &= ~(STAT_MDL | STAT_DHUID | STAT_RI);
     if (vh_unit[vh].flags & UNIT_MODEDHU)
         lp->lstat |= STAT_DHUID | 64;
-    if (!(vh_unit[vh].flags & UNIT_MODEM))
-        lp->lstat |= STAT_DSR | STAT_DCD | STAT_CTS;
+    if (!(vh_unit[vh].flags & UNIT_MODEM)) {
+        lp->lstat |= STAT_DSR;
+        if (vh_unit[vh].flags & UNIT_HANGUP)
+            tmxr_set_get_modem_bits (lp->tmln, 0, TMXR_MDM_DTR | TMXR_MDM_RTS, NULL);
+        }
     lp->tmln->xmte = 1;
     lp->tmln->rcve = 0;
     lp->tbuffct = 0;
