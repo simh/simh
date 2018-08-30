@@ -595,6 +595,7 @@ static t_bool sim_if_cmd[MAX_DO_NEST_LVL+1];
 static t_bool sim_if_cmd_last[MAX_DO_NEST_LVL+1];
 static t_bool sim_if_result[MAX_DO_NEST_LVL+1];
 static t_bool sim_if_result_last[MAX_DO_NEST_LVL+1];
+static t_bool sim_cptr_is_action[MAX_DO_NEST_LVL+1];
 
 t_stat sim_last_cmd_stat;                               /* Command Status */
 struct timespec cmd_time;                               /*  */
@@ -2587,6 +2588,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
     if ((cptr = sim_brk_getact (cbuf, sizeof(cbuf)))) { /* pending action? */
         if (sim_do_echo)
             printf ("%s+ %s\n", sim_prompt, cptr);      /* echo */
+        sim_cptr_is_action[sim_do_depth] = TRUE;
         }
     else {
         if (sim_vm_read != NULL) {                      /* sim routine? */
@@ -2595,6 +2597,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
             }
         else
             cptr = read_line_p (sim_prompt, cbuf, sizeof(cbuf), stdin);/* read with prompt*/
+        sim_cptr_is_action[sim_do_depth] = FALSE;
         }
     if (cptr == NULL) {                                 /* EOF? or SIGINT? */
         if (sim_ttisatty()) {
@@ -2612,9 +2615,11 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         fprintf (sim_log, "%s%s\n", sim_prompt, cptr);
     if (sim_deb && (sim_deb != sim_log) && (sim_deb != stdout))
         fprintf (sim_deb, "%s%s\n", sim_prompt, cptr);
-    sim_if_cmd_last[sim_do_depth] = sim_if_cmd[sim_do_depth];
-    sim_if_result_last[sim_do_depth] = sim_if_result[sim_do_depth];
-    sim_if_result[sim_do_depth] = sim_if_cmd[sim_do_depth] = FALSE;
+    if (!sim_cptr_is_action[sim_do_depth]) {
+        sim_if_cmd_last[sim_do_depth] = sim_if_cmd[sim_do_depth];
+        sim_if_result_last[sim_do_depth] = sim_if_result[sim_do_depth];
+        sim_if_result[sim_do_depth] = sim_if_cmd[sim_do_depth] = FALSE;
+        }
     cptr = get_glyph_cmd (cptr, gbuf);                  /* get command glyph */
     sim_switches = 0;                                   /* init switches */
     if ((cmdp = find_cmd (gbuf)))                       /* lookup command */
@@ -3482,7 +3487,10 @@ do {
     if (!sim_do_ocptr[sim_do_depth]) {                  /* no pending action? */
         sim_do_ocptr[sim_do_depth] = cptr = read_line (cbuf, sizeof(cbuf), fpin);/* get cmd line */
         sim_goto_line[sim_do_depth] += 1;
+        sim_cptr_is_action[sim_do_depth] = FALSE;
         }
+    else
+        sim_cptr_is_action[sim_do_depth] = TRUE;
     if (cptr == NULL) {                                 /* EOF? */
         stat = SCPE_OK;                                 /* set good return */
         break;
@@ -3501,9 +3509,11 @@ do {
     sim_switches = 0;                                   /* init switches */
     sim_gotofile = fpin;
     sim_do_echo = echo;
-    sim_if_cmd_last[sim_do_depth] = sim_if_cmd[sim_do_depth];
-    sim_if_result_last[sim_do_depth] = sim_if_result[sim_do_depth];
-    sim_if_result[sim_do_depth] = sim_if_cmd[sim_do_depth] = FALSE;
+    if (!sim_cptr_is_action[sim_do_depth]) {
+        sim_if_cmd_last[sim_do_depth] = sim_if_cmd[sim_do_depth];
+        sim_if_result_last[sim_do_depth] = sim_if_result[sim_do_depth];
+        sim_if_result[sim_do_depth] = sim_if_cmd[sim_do_depth] = FALSE;
+        }
     if ((cmdp = find_cmd (gbuf))) {                     /* lookup command */
         if (cmdp->action == &return_cmd)                /* RETURN command? */
             break;                                      /*    done! */
@@ -4241,11 +4251,13 @@ cptr = (CONST char *)get_sim_opt (CMD_OPT_SW|CMD_OPT_DFT, (CONST char *)cptr, &r
 sim_stabr.boolop = sim_staba.boolop = -1;               /* no relational op dflt */
 if (*cptr == 0)                                         /* must be more */
     return SCPE_2FARG;
+if ((flag != 1) && (sim_cptr_is_action[sim_do_depth]))
+    return sim_messagef (SCPE_UNK, "Invalid Command Sequence, IF/ELSE nesting not allowed\n");
 if (flag == 2) {                                        /* ELSE command? */
     if (!sim_if_cmd_last[sim_do_depth])
         return sim_messagef (SCPE_UNK, "Invalid Command Sequence, ELSE not following IF\n");
     if (*cptr == '\0')                                  /* no more? */
-        return sim_messagef (SCPE_2FARG, "Missing ELSE commands\n");
+        return sim_messagef (SCPE_2FARG, "Missing ELSE action commands\n");
     if (!sim_if_result_last[sim_do_depth])
         sim_brk_setact (cptr);                          /* set up ELSE actions */
     return SCPE_OK;
@@ -4311,7 +4323,6 @@ if (Exist || (*gbuf == '"') || (*gbuf == '\'')) {       /* quoted string compari
             if (flag != 1)
                 return SCPE_2FARG;                      /* IF/ELSE needs actions! */
             }
-        sim_if_cmd[sim_do_depth] = (flag == 0);         /* record IF command */
         result = sim_cmp_string (gbuf, gbuf2);
         result = ((result == optr->aval) || (result == optr->bval));
         if (optr->invert)
@@ -4322,7 +4333,6 @@ if (Exist || (*gbuf == '"') || (*gbuf == '\'')) {       /* quoted string compari
 
         if (f)
             fclose (f);
-        sim_if_cmd[sim_do_depth] = (flag == 0);         /* record IF command */
         result = (f != NULL);
         }
     }
@@ -4396,6 +4406,7 @@ else {
     }
 if ((cptr > sim_sub_instr_buf) && ((size_t)(cptr - sim_sub_instr_buf) < sim_sub_instr_size))
     cptr = &sim_sub_instr[sim_sub_instr_off[cptr - sim_sub_instr_buf]]; /* get un-substituted string */
+sim_if_cmd[sim_do_depth] = (flag == 0);                 /* record IF command */
 if (Not ^ result) {
     if (!flag) {
         sim_brk_setact (cptr);                          /* set up IF actions */
