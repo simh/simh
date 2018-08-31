@@ -2474,9 +2474,13 @@ static struct {
     {"7200",    TMLN_SPD_7200_BPS},
     {"9600",    TMLN_SPD_9600_BPS},
     {"19200",   TMLN_SPD_19200_BPS},
+    {"25000",   TMLN_SPD_25000_BPS},
     {"38400",   TMLN_SPD_38400_BPS},
+    {"40000",   TMLN_SPD_40000_BPS},
+    {"50000",   TMLN_SPD_50000_BPS},
     {"57600",   TMLN_SPD_57600_BPS},
     {"76800",   TMLN_SPD_76800_BPS},
+    {"80000",   TMLN_SPD_80000_BPS},
     {"115200",  TMLN_SPD_115200_BPS},
     {"0",       0}};                    /* End of List, last valid value */
 int nspeed;
