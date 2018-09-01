@@ -341,17 +341,13 @@ SET ACTUAL_GIT_COMMIT_ID=
 SET ACTUAL_GIT_COMMIT_TIME=
 SET GIT_COMMIT_ID=
 SET GIT_COMMIT_TIME=
-SET _GIT_COMMIT_ID_TEMP=.git-commit-id-temp-%RANDOM%
-"%_GIT_GIT%" log -1 --pretty="SIM_GIT_COMMIT_ID %%H%%nSIM_GIT_COMMIT_TIME %%aI" >%_GIT_COMMIT_ID_TEMP%
-for /F "usebackq tokens=2" %%i in (`findstr /C:SIM_GIT_COMMIT_ID %_GIT_COMMIT_ID_TEMP%`) do SET ACTUAL_GIT_COMMIT_ID=%%i
-for /F "usebackq tokens=2" %%i in (`findstr /C:SIM_GIT_COMMIT_TIME %_GIT_COMMIT_ID_TEMP%`) do SET ACTUAL_GIT_COMMIT_TIME=%%i
+for /F "usebackq tokens=1" %%i in (`git log -1 "--pretty=%%H"`) do SET ACTUAL_GIT_COMMIT_ID=%%i
+for /F "usebackq tokens=1" %%i in (`git log -1 "--pretty=%%aI"`) do SET ACTUAL_GIT_COMMIT_TIME=%%i
 if exist ..\.git-commit-id for /F "usebackq tokens=2" %%i in (`findstr /C:SIM_GIT_COMMIT_ID ..\.git-commit-id`) do SET GIT_COMMIT_ID=%%i
 if exist ..\.git-commit-id for /F "usebackq tokens=2" %%i in (`findstr /C:SIM_GIT_COMMIT_TIME ..\.git-commit-id`) do SET GIT_COMMIT_TIME=%%i
-if "%ACTUAL_GIT_COMMIT_ID%" neq "%GIT_COMMIT_ID%" move /Y %_GIT_COMMIT_ID_TEMP% ..\.git-commit-id
-if "%ACTUAL_GIT_COMMIT_ID%" equ "%GIT_COMMIT_ID%" del %_GIT_COMMIT_ID_TEMP%
+if "%ACTUAL_GIT_COMMIT_ID%" neq "%GIT_COMMIT_ID%" "%_GIT_GIT%" log -1 --pretty="SIM_GIT_COMMIT_ID %%H%%nSIM_GIT_COMMIT_TIME %%aI" >..\.git-commit-id
 SET GIT_COMMIT_ID=%ACTUAL_GIT_COMMIT_ID%
 SET GIT_COMMIT_TIME=%ACTUAL_GIT_COMMIT_TIME%
-SET _GIT_COMMIT_ID_TEMP=
 SET ACTUAL_GIT_COMMIT_ID=
 SET ACTUAL_GIT_COMMIT_TIME=
 :_VerifyGitCommitId.h
