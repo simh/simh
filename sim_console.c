@@ -3955,7 +3955,15 @@ static t_stat sim_os_ttinit (void)
 sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_ttinit()\n");
 
 cmdfl = fcntl (fileno (stdin), F_GETFL, 0);             /* get old flags  and status */
-runfl = cmdfl | FNDELAY;
+runfl = cmdfl;
+/* 
+ * make sure systems with broken termios (that don't honor
+ * VMIN=0 and VTIME=0) actually implement non blocking reads.  
+ * This will have no negative effect on other systems since 
+ * this is turned on and off depending on whether simulation 
+ * is running or not.
+ */
+runfl = cmdfl | O_NDELAY;
 if (!isatty (fileno (stdin)))                           /* skip if !tty */
     return SCPE_OK;
 if (tcgetattr (0, &cmdtty) < 0)                         /* get old flags */
