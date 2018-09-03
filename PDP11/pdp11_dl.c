@@ -139,6 +139,10 @@ REG dli_reg[] = {
     };
 
 MTAB dli_mod[] = {
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 004, "ADDRESS", "ADDRESS",
+      &set_addr, &show_addr, NULL, "Bus address" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 1, "VECTOR", "VECTOR",
+      &set_vec, &show_vec_mux, (void *) &dlx_desc, "Interrupt vector"  },
     { MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
       &tmxr_dscln, NULL, &dlx_desc },
     { UNIT_ATT, UNIT_ATT, "summary", NULL,
@@ -147,12 +151,8 @@ MTAB dli_mod[] = {
       NULL, &tmxr_show_cstat, (void *) &dlx_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
       NULL, &tmxr_show_cstat, (void *) &dlx_desc },
-    { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
-      &set_addr, &show_addr, NULL },
     { MTAB_XTD | MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
       &set_addr_flt, NULL, NULL },
-    { MTAB_XTD|MTAB_VDV, 1, "VECTOR", NULL,
-      &set_vec, &show_vec_mux, (void *) &dlx_desc },
     { MTAB_XTD | MTAB_VDV, 0, "LINES", "LINES",
       &dlx_set_lines, &tmxr_show_lines, (void *) &dlx_desc },
     { 0 }
