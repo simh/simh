@@ -3818,6 +3818,14 @@ return SCPE_OK;
 #include <fcntl.h>
 #include <unistd.h>
 
+#if (!defined(O_NONBLOCK)) && defined(O_NDELAY)
+#define O_NONBLOCK O_NDELAY
+#else
+#if !defined(O_NONBLOCK)
+#define O_NONBLOCK FNDELAY
+#endif
+#endif
+
 struct sgttyb cmdtty,runtty;                            /* V6/V7 stty data */
 struct tchars cmdtchars,runtchars;                      /* V7 editing */
 struct ltchars cmdltchars,runltchars;                   /* 4.2 BSD editing */
@@ -3828,7 +3836,7 @@ static t_stat sim_os_ttinit (void)
 sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_ttinit() - BSDTTY\n");
 
 cmdfl = fcntl (fileno (stdin), F_GETFL, 0);             /* get old flags  and status */
-runfl = cmdfl | FNDELAY;
+runfl = cmdfl | O_NONBLOCK;
 if (ioctl (0, TIOCGETP, &cmdtty) < 0)
     return SCPE_TTIERR;
 if (ioctl (0, TIOCGETC, &cmdtchars) < 0)
@@ -3963,7 +3971,7 @@ runfl = cmdfl;
  * this is turned on and off depending on whether simulation 
  * is running or not.
  */
-runfl = cmdfl | O_NDELAY;
+runfl = cmdfl | O_NONBLOCK;
 if (!isatty (fileno (stdin)))                           /* skip if !tty */
     return SCPE_OK;
 if (tcgetattr (0, &cmdtty) < 0)                         /* get old flags */
