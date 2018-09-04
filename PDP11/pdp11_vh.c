@@ -990,7 +990,7 @@ static t_stat vh_rd (   int32   *data,
     int32   vh = ((PA - vh_dib.ba) >> 4), line;
     TMLX    *lp;
     static BITFIELD* bitdefs[] = {vh_csr_bits, vh_rbuf_bits, vh_lpr_bits, vh_stat_bits,
-                                  vh_lnctrl_bits, vh_tbuffad1_bits, vh_tbuffad1_bits, vh_tbuffct_bits};
+                                  vh_lnctrl_bits, vh_tbuffad1_bits, vh_tbuffad2_bits, vh_tbuffct_bits};
 
 
     if (vh > VH_MAXMUX)                         /* validate mux number */
