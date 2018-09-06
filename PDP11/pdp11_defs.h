@@ -528,6 +528,8 @@ struct pdp_dib {
                                                         /* DEVICE structure (e.g., DZ, VH, DL, DC). */
                                                         /* Populated by auto-configure */
     struct pdp_dib      *next;                          /* devices with more than one DIB can chain them */
+    DEVICE              *dptr;                          /* back pointer to related device */
+                                                        /* Populated by auto-configure */
     };
 
 typedef struct pdp_dib DIB;

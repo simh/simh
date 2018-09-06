@@ -333,6 +333,8 @@ typedef struct {
                                                         /* simulated through a single */
                                                         /* DEVICE structure (e.g., DZ, VH, DL, DC). */
                                                         /* Populated by auto-configure */
+    DEVICE              *dptr;                          /* back pointer to related device */
+                                                        /* Populated by auto-configure */
     } DIB;
 
 /* Unibus I/O page layout - XUB,RQB,RQC,RQD float based on number of DZ's

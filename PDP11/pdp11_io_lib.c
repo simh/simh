@@ -47,10 +47,9 @@ extern int32 int_vec_set[IPL_HLVL][32];                 /* bits to set in vector
 extern int32 (*int_ack[IPL_HLVL][32])(void);
 extern t_stat (*iodispR[IOPAGESIZE >> 1])(int32 *dat, int32 ad, int32 md);
 extern t_stat (*iodispW[IOPAGESIZE >> 1])(int32 dat, int32 ad, int32 md);
+extern DIB *iodibp[IOPAGESIZE >> 1];
 
 extern t_stat build_dib_tab (void);
-
-static DIB *iodibp[IOPAGESIZE >> 1];
 
 static void build_vector_tab (void);
 
@@ -307,6 +306,7 @@ const char *cdname;
 
 if ((dptr == NULL) || (dibp == NULL))                   /* validate args */
     return SCPE_IERR;
+dibp->dptr = dptr;                                      /* save back pointer */
 if (dibp->vnum > VEC_DEVMAX)
     return SCPE_IERR;
 vec = dibp->vec;
@@ -453,12 +453,7 @@ for (i = 0, dibp = NULL; i < (IOPAGESIZE >> 1); i++) {  /* loop thru entries */
     size_t l;
     if (iodibp[i] && (iodibp[i] != dibp)) {             /* new block? */
         dibp = iodibp[i];                               /* DIB for block */
-        for (j = 0, dptr = NULL; sim_devices[j] != NULL; j++) {
-            if (((DIB*) sim_devices[j]->ctxt) == dibp) {
-                dptr = sim_devices[j];                  /* locate device */
-                break;
-                }                                       /* end if */
-            }                                           /* end for j */
+        dptr = dibp->dptr;
         if ((dibp->ba+ dibp->lnt - 1) > maxaddr)
             maxaddr = dibp->ba+ dibp->lnt - 1;
         if (dibp->vec > maxvec)
@@ -522,12 +517,7 @@ fputc ('\n', st);
 for (i = 0, dibp = NULL; i < (IOPAGESIZE >> 1); i++) {  /* loop thru entries */
     if (iodibp[i] && (iodibp[i] != dibp)) {             /* new block? */
         dibp = iodibp[i];                               /* DIB for block */
-        for (j = 0, dptr = NULL; sim_devices[j] != NULL; j++) {
-            if (((DIB*) sim_devices[j]->ctxt) == dibp) {
-                dptr = sim_devices[j];                  /* locate device */
-                break;
-                }                                       /* end if */
-            }                                           /* end for j */
+        dptr = dibp->dptr;                              /* locate device */
         fprint_val (st, (t_value) dibp->ba, DEV_RDX, 32, PV_LEFT);
         fprintf (st, " - ");
         fprint_val (st, (t_value) dibp->ba + dibp->lnt - 1, DEV_RDX, 32, PV_LEFT);

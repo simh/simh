@@ -289,6 +289,8 @@ typedef struct {
                                                         /* simulated through a single */
                                                         /* DEVICE structure (e.g., DZ, VH, DL, DC). */
                                                         /* Populated by auto-configure */
+    DEVICE              *dptr;                          /* back pointer to related device */
+                                                        /* Populated by auto-configure */
     } DIB;
 
 /* Unibus I/O page layout - see pdp11_io_lib.c for address layout details
