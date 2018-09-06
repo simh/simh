@@ -255,7 +255,8 @@ int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf)
 {
 uint32 alim, lim, ma;
 
-if (ba >= (IOPAGEBASE & BUSMASK)) {
+/* I/O Page DMA only on Unibus systems */
+if (UNIBUS && (ba >= (uint32)(IOPAGEBASE & UNIMASK))) {
     int32 value;
 
     while (bc) {
@@ -296,7 +297,8 @@ int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf)
 {
 uint32 alim, lim, ma;
 
-if (ba >= (IOPAGEBASE & BUSMASK)) {
+/* I/O Page DMA only on Unibus systems */
+if (UNIBUS && (ba >= (uint32)(IOPAGEBASE & UNIMASK))) {
     int32 value;
     if ((ba & 1) || (bc & 1))
         return bc;
@@ -338,7 +340,8 @@ int32 Map_WriteB (uint32 ba, int32 bc, const uint8 *buf)
 {
 uint32 alim, lim, ma;
 
-if (ba >= (IOPAGEBASE & BUSMASK)) {
+/* I/O Page DMA only on Unibus systems */
+if (UNIBUS && (ba >= (uint32)(IOPAGEBASE & UNIMASK))) {
     while (bc) {
         if (iopageCPUReg (ba) ||
             (iopageW( ((int32) *buf++) & 0xff, ba, WRITEB) != SCPE_OK))
@@ -376,7 +379,8 @@ int32 Map_WriteW (uint32 ba, int32 bc, const uint16 *buf)
 {
 uint32 alim, lim, ma;
 
-if (ba >= (IOPAGEBASE & BUSMASK)) {
+/* I/O Page DMA only on Unibus systems */
+if (UNIBUS && (ba >= (uint32)(IOPAGEBASE & UNIMASK))) {
     if ((ba & 1) || (bc & 1))
         return bc;
     while (bc) {
