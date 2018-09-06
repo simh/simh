@@ -114,9 +114,13 @@ typedef struct SERPORT *SERHANDLE;
 #define TMLN_SPD_7200_BPS     1388 /* usec per character */
 #define TMLN_SPD_9600_BPS     1041 /* usec per character */
 #define TMLN_SPD_19200_BPS     520 /* usec per character */
+#define TMLN_SPD_25000_BPS     400 /* usec per character */
 #define TMLN_SPD_38400_BPS     260 /* usec per character */
+#define TMLN_SPD_40000_BPS     250 /* usec per character */
+#define TMLN_SPD_50000_BPS     200 /* usec per character */
 #define TMLN_SPD_57600_BPS     173 /* usec per character */
 #define TMLN_SPD_76800_BPS     130 /* usec per character */
+#define TMLN_SPD_80000_BPS     125 /* usec per character */
 #define TMLN_SPD_115200_BPS     86 /* usec per character */
 
 
