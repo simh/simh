@@ -1003,6 +1003,8 @@ display_scale(void)
  */
 unsigned long spacewar_switches = 0;
 
+unsigned char display_last_char;
+
 /* here from window system */
 void
 display_keydown(int k)

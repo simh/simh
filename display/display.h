@@ -196,6 +196,11 @@ extern unsigned long spacewar_switches;
     SWSW('/', '?',  02000000000, LR, HYPER) /* hyperspace */
 
 /*
+ * The last character typed in the display window.
+ */
+extern unsigned char display_last_char;
+
+/*
  * light pen "tip switch" activated (for VS60 emulation etc.)
  * should only be set from "driver" (window system layer)
  */

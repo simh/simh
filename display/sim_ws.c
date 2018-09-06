@@ -134,6 +134,63 @@ map_key(int k)
     return k;
 }
 
+
+static void
+key_to_ascii (SIM_KEY_EVENT *kev)
+{
+    static t_bool k_ctrl, k_shift, k_alt, k_win;
+
+#define MODKEY(L, R, mod)   \
+    case L: case R: mod = (kev->state != SIM_KEYPRESS_UP); break;
+#define MODIFIER_KEYS       \
+    MODKEY(SIM_KEY_ALT_L,    SIM_KEY_ALT_R,      k_alt)     \
+    MODKEY(SIM_KEY_CTRL_L,   SIM_KEY_CTRL_R,     k_ctrl)    \
+    MODKEY(SIM_KEY_SHIFT_L,  SIM_KEY_SHIFT_R,    k_shift)   \
+    MODKEY(SIM_KEY_WIN_L,    SIM_KEY_WIN_R,      k_win)
+#define SPCLKEY(K, LC, UC)  \
+    case K:                                                 \
+        if (kev->state != SIM_KEYPRESS_UP)                  \
+            display_last_char = (unsigned char)(k_shift ? UC : LC);\
+        break;
+#define SPECIAL_CHAR_KEYS   \
+    SPCLKEY(SIM_KEY_BACKQUOTE,      '`',  '~')              \
+    SPCLKEY(SIM_KEY_MINUS,          '-',  '_')              \
+    SPCLKEY(SIM_KEY_EQUALS,         '=',  '+')              \
+    SPCLKEY(SIM_KEY_LEFT_BRACKET,   '[',  '{')              \
+    SPCLKEY(SIM_KEY_RIGHT_BRACKET,  ']',  '}')              \
+    SPCLKEY(SIM_KEY_SEMICOLON,      ';',  ':')              \
+    SPCLKEY(SIM_KEY_SINGLE_QUOTE,   '\'', '"')              \
+    SPCLKEY(SIM_KEY_LEFT_BACKSLASH, '\\', '|')              \
+    SPCLKEY(SIM_KEY_COMMA,          ',',  '<')              \
+    SPCLKEY(SIM_KEY_PERIOD,         '.',  '>')              \
+    SPCLKEY(SIM_KEY_SLASH,          '/',  '?')              \
+    SPCLKEY(SIM_KEY_ESC,            '\033', '\033')         \
+    SPCLKEY(SIM_KEY_BACKSPACE,      '\177', '\177')       \
+    SPCLKEY(SIM_KEY_TAB,            '\t', '\t')             \
+    SPCLKEY(SIM_KEY_ENTER,          '\r', '\r')             \
+    SPCLKEY(SIM_KEY_SPACE,          ' ', ' ')
+
+    switch (kev->key) {
+        MODIFIER_KEYS
+        SPECIAL_CHAR_KEYS
+        case SIM_KEY_0: case SIM_KEY_1: case SIM_KEY_2: case SIM_KEY_3: case SIM_KEY_4:
+        case SIM_KEY_5: case SIM_KEY_6: case SIM_KEY_7: case SIM_KEY_8: case SIM_KEY_9:
+            if (kev->state != SIM_KEYPRESS_UP)
+                display_last_char = (unsigned char)('0' + (kev->key - SIM_KEY_0)); 
+            break;
+        case SIM_KEY_A: case SIM_KEY_B: case SIM_KEY_C: case SIM_KEY_D: case SIM_KEY_E:
+        case SIM_KEY_F: case SIM_KEY_G: case SIM_KEY_H: case SIM_KEY_I: case SIM_KEY_J:
+        case SIM_KEY_K: case SIM_KEY_L: case SIM_KEY_M: case SIM_KEY_N: case SIM_KEY_O:
+        case SIM_KEY_P: case SIM_KEY_Q: case SIM_KEY_R: case SIM_KEY_S: case SIM_KEY_T:
+        case SIM_KEY_U: case SIM_KEY_V: case SIM_KEY_W: case SIM_KEY_X: case SIM_KEY_Y:
+        case SIM_KEY_Z: 
+            if (kev->state != SIM_KEYPRESS_UP)
+                display_last_char = (unsigned char)((kev->key - SIM_KEY_A) + 
+                                        (k_ctrl ? 1 : (k_shift ? 'A' : 'a')));
+            break;
+        }
+}
+
 int
 ws_poll(int *valp, int maxus)
 {
@@ -172,6 +229,7 @@ ws_poll(int *valp, int maxus)
                 display_keyup(map_key(kev.key));
                 break;
             }
+        key_to_ascii (&kev);
         }
     return 1;
 }
