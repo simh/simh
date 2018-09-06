@@ -63,6 +63,7 @@
 
 #include "pdp11_defs.h"
 #include "sim_tmxr.h"
+#include "display/display.h"
 
 #define TTICSR_IMP      (CSR_DONE + CSR_IE)             /* terminal input */
 #define TTICSR_RW       (CSR_IE)
@@ -138,12 +139,26 @@ MTAB tti_mod[] = {
     { 0 }
     };
 
+#define DBG_RREG     1   /* register read access */
+#define DBG_WREG     2   /* register write access */
+#define DBG_INT      4   /* interrupt activity */
+#define DBG_INTA     8   /* interrupt activity */
+#define DBG_DATA    16   /* incoming data */
+
+DEBTAB tti_debug[] = {
+  {"RREG",  DBG_RREG,   "register read access"},
+  {"WREG",  DBG_WREG,   "register write access"},
+  {"DAT",   DBG_DATA,   "incoming data"},
+  {0}
+};
+
+
 DEVICE tti_dev = {
     "TTI", &tti_unit, tti_reg, tti_mod,
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &tti_reset,
     NULL, NULL, NULL,
-    &tti_dib, DEV_UBUS | DEV_QBUS
+    &tti_dib, DEV_DEBUG | DEV_UBUS | DEV_QBUS, 0, tti_debug
     };
 
 /* TTO data structures
@@ -242,11 +257,6 @@ MTAB clk_mod[] = {
     { 0 }
     };
 
-#define DBG_RREG     1   /* register read access */
-#define DBG_WREG     2   /* register write access */
-#define DBG_INT      4   /* interrupt activity */
-#define DBG_INTA     8   /* interrupt activity */
-
 DEBTAB clk_debug[] = {
   {"RREG",  DBG_RREG,   "register read access"},
   {"WREG",  DBG_WREG,   "register write access"},
@@ -272,17 +282,22 @@ switch ((PA >> 1) & 01) {                               /* decode PA<1> */
 
     case 00:                                            /* tti csr */
         *data = tti_csr & TTICSR_IMP;
-        return SCPE_OK;
+        break;
 
     case 01:                                            /* tti buf */
         tti_csr = tti_csr & ~CSR_DONE;
         CLR_INT (TTI);
         *data = tti_unit.buf & 0377;
         sim_activate_after_abs (&tti_unit, tti_unit.wait);  /* check soon for more input */
-        return SCPE_OK;
+        break;
+
+    default:
+        return SCPE_NXM;
         }                                               /* end switch PA */
 
-return SCPE_NXM;
+sim_debug (DBG_RREG, &tti_dev, "tti_rd(%s) - 0x%04X\n", ((PA >> 1) & 01) ? "BUF" : "CSR", *data);
+
+return SCPE_OK;
 }
 
 t_stat tti_wr (int32 data, int32 PA, int32 access)
@@ -297,13 +312,18 @@ switch ((PA >> 1) & 01) {                               /* decode PA<1> */
         else if ((tti_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
             SET_INT (TTI);
         tti_csr = (tti_csr & ~TTICSR_RW) | (data & TTICSR_RW);
-        return SCPE_OK;
+        break;
 
     case 01:                                            /* tti buf */
-        return SCPE_OK;
+        break;
+
+    default:
+        return SCPE_NXM;
         }                                               /* end switch PA */
 
-return SCPE_NXM;
+sim_debug (DBG_WREG, &tti_dev, "tti_wr(%s) - 0x%04X\n", ((PA >> 1) & 01) ? "BUF" : "CSR", data);
+
+return SCPE_OK;
 }
 
 /* Terminal input service */
@@ -317,11 +337,25 @@ sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
 if ((tti_csr & CSR_DONE) &&                             /* input still pending and < 500ms? */
     ((sim_os_msec () - tti_buftime) < 500))
      return SCPE_OK;
-if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
+#if defined(USE_DISPLAY)
+if (display_last_char) {
+    c = display_last_char | SCPE_KFLAG;
+    display_last_char = 0;
+    }
+else {
+    c = sim_poll_kbd ();
+    if (c < SCPE_KFLAG)                     /* no char or error? */
+        return c;
+    }
+#else
+if ((c = sim_poll_kbd ()) < SCPE_KFLAG) /* no char or error? */
     return c;
-if (c & SCPE_BREAK)                                     /* break? */
+#endif
+sim_debug (DBG_DATA, &tti_dev, "tti_svc() - Received data: 0x%02X '%c'\n", c & ~SCPE_KFLAG, c & ~SCPE_KFLAG);
+if (c & SCPE_BREAK)                         /* break? */
     uptr->buf = 0;
-else uptr->buf = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags));
+else
+    uptr->buf = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags));
 tti_buftime = sim_os_msec ();
 uptr->pos = uptr->pos + 1;
 tti_csr = tti_csr | CSR_DONE;
