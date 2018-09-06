@@ -1203,6 +1203,12 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
                             tmxr_debug_connect_line (lp, msg);
                             free (sockname);
                             free (peername);
+                            if (!lp->notelnet) {
+                                sim_write_sock (newsock, (char *)mantra, sizeof(mantra));
+                                tmxr_debug (TMXR_DBG_XMT, lp, "Sending", (char *)mantra, sizeof(mantra));
+                                lp->telnet_sent_opts = (uint8 *)realloc (lp->telnet_sent_opts, 256);
+                                memset (lp->telnet_sent_opts, 0, 256);
+                                }
                             return i;
                         case -1:                                /* failed connection */
                             sprintf (msg, "tmxr_poll_conn() - Outgoing Line Connection to %s failed", lp->destination);
