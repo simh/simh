@@ -406,17 +406,18 @@ for (i = 0; i < 7; i++)                                 /* seed PIRQ intr */
 if ((r = cpu_build_dib ()))                             /* build CPU entries */
     return r;
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
-    dibp = (DIB *) dptr->ctxt;                          /* get DIB */
-    if (dibp && !(dptr->flags & DEV_DIS)) {             /* defined, enabled? */
-        if (dptr->flags & DEV_MBUS) {                   /* Massbus? */
-            if ((r = build_mbus_tab (dptr, dibp)))      /* add to Mbus tab */
-                return r;
-            }
-        else {                                          /* no, Unibus */
-            if ((r = build_ubus_tab (dptr, dibp)))      /* add to Unibus tab */
-                return r;
-            }
-        }                                               /* end if enabled */
+    for (dibp = (DIB *) dptr->ctxt; dibp; dibp = dibp->next) {  /* loop thru dibs */
+        if (dibp && !(dptr->flags & DEV_DIS)) {         /* defined, enabled? */
+            if (dptr->flags & DEV_MBUS) {               /* Massbus? */
+                if ((r = build_mbus_tab (dptr, dibp)))  /* add to Mbus tab */
+                    return r;
+                }
+            else {                                      /* no, Unibus */
+                if ((r = build_ubus_tab (dptr, dibp)))  /* add to Unibus tab */
+                    return r;
+                }
+            }                                           /* end if enabled */
+        }
     }                                                   /* end for */
 return SCPE_OK;
 }
