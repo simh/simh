@@ -946,9 +946,6 @@ cpu_get_switches(unsigned long *p1, unsigned long *p2)
     *p1 = SR;
     *p2 = 0;
 }
-#else  /* USE_DISPLAY not defined */
-char pdp11_vt_unused;   /* sometimes empty object modules cause problems */
-#endif /* USE_DISPLAY not defined */
 
 t_stat vt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
@@ -1124,3 +1121,6 @@ const char helpString[] =
 ;
 return scp_help (st, dptr, uptr, flag, helpString, cptr);
 }
+#else  /* USE_DISPLAY not defined */
+char pdp11_vt_unused;   /* sometimes empty object modules cause problems */
+#endif /* USE_DISPLAY not defined */
