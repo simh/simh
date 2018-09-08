@@ -2538,7 +2538,8 @@ if (*cptr == '*') {
     if (r != SCPE_OK)
         return r;
     lp->bpsfactor = bpsfactor;
-    if (speed == cptr) {                /* just changing bps factor? */
+    if (!(lp->serport) &&               /* Not a serial port */
+        (speed == cptr)) {              /* AND just changing bps factor? */
         char speedbps[16];
 
         sprintf (speedbps, "%d", lp->rxbps);
@@ -2548,8 +2549,9 @@ if (*cptr == '*') {
         }
     }
 lp->rxbps = rxbps;                      /* use supplied speed */
-if ((lp->serport) && (lp->bpsfactor != 0.0))
-    lp->bpsfactor = 1.0;                /* Ignore bps factor for serial ports */
+if ((lp->bpsfactor == 0.0) ||           /* factor unspecified */
+    (lp->serport))                      /* OR serial port */
+    lp->bpsfactor = 1.0;                /* No bps factor */
 lp->rxdeltausecs = (uint32)(_tmln_speed_delta (speed) / lp->bpsfactor);
 lp->rxnexttime = 0.0;
 uptr = lp->uptr;
