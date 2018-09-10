@@ -526,9 +526,9 @@ t_stat rx_boot (int32 unitno, DEVICE *dptr)
 size_t i;
 
 for (i = 0; i < BOOT_LEN; i++)
-    M[(BOOT_START >> 1) + i] = boot_rom[i];
-M[BOOT_UNIT >> 1] = unitno & RX_M_NUMDR;
-M[BOOT_CSR >> 1] = rx_dib.ba & DMASK;
+    WrMemW (BOOT_START + (2 * i), boot_rom[i]);
+WrMemW (BOOT_UNIT, unitno & RX_M_NUMDR);
+WrMemW (BOOT_CSR, rx_dib.ba & DMASK);
 cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }

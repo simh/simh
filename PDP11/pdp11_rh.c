@@ -563,7 +563,7 @@ for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
     if (pbc > (bc - i))                                 /* limit to rem xfr */
         pbc = bc - i;
     for (j = 0; j < pbc; j = j + 2) {                   /* loop by words */
-        *buf++ = M[pa >> 1];                            /* fetch word */
+        *buf++ = RdMemW (pa);                           /* fetch word */
         if (!(massbus[mb].cs2 & CS2_UAI)) {             /* if not inhb */
             ba = ba + 2;                                /* incr ba, pa */
             pa = pa + 2;
@@ -602,7 +602,7 @@ for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
     if (pbc > (bc - i))                                 /* limit to rem xfr */
         pbc = bc - i;
     for (j = 0; j < pbc; j = j + 2) {                   /* loop by words */
-        M[pa >> 1] = *buf++;                            /* put word */
+        WrMemW (pa, *buf++);                            /* put word */
         if (!(massbus[mb].cs2 & CS2_UAI)) {             /* if not inhb */
             ba = ba + 2;                                /* incr ba, pa */
             pa = pa + 2;
@@ -641,7 +641,7 @@ for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
         pbc = bc - i;
     for (j = 0; j < pbc; j = j + 2) {                   /* loop by words */
         massbus[mb].db = *buf++;                        /* get dev word */
-        if (M[pa >> 1] != massbus[mb].db) {             /* miscompare? */
+        if (RdMemW (pa) != massbus[mb].db) {            /* miscompare? */
             mba_set_cs2 (CS2_WCE, mb);                  /* set error */
             massbus[mb].cs3 = massbus[mb].cs3 |         /* set even/odd */
                 ((pa & 1)? CS3_WCO: CS3_WCE);

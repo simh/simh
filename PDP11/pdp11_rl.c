@@ -1224,9 +1224,9 @@ t_stat rl_boot (int32 unitno, DEVICE *dptr)
 size_t i;
 
 for (i = 0; i < BOOT_LEN; i++)
-    M[(BOOT_START >> 1) + i] = boot_rom[i];
-M[BOOT_UNIT >> 1] = unitno & RLCS_M_DRIVE;
-M[BOOT_CSR >> 1] = rl_dib.ba & 0177777;
+    WrMemW (BOOT_START + (2 * i), boot_rom[i]);
+WrMemW (BOOT_UNIT, unitno & RLCS_M_DRIVE);
+WrMemW (BOOT_CSR, rl_dib.ba & 0177777);
 cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }

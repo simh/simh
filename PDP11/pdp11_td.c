@@ -1590,9 +1590,9 @@ static t_stat td_boot (int32 unitno, DEVICE *dptr)
 size_t i;
 
 for (i = 0; i < BOOT_LEN; i++)
-    M[(BOOT_START >> 1) + i] = boot_rom[i];
-M[BOOT_UNIT >> 1] = unitno & 1;
-M[BOOT_CSR >> 1] = (td_dib.ba & DMASK) + (unitno >> 1) * 010;
+    WrMemW (BOOT_START + (2 * i), boot_rom[i]);
+WrMemW (BOOT_UNIT, unitno & 1);
+WrMemW (BOOT_CSR, (td_dib.ba & DMASK) + (unitno >> 1) * 010);
 cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }

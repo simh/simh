@@ -1479,12 +1479,13 @@ size_t i;
 UNIT *uptr = dptr->units + unitno;
 
 for (i = 0; i < BOOT_LEN; i++)
-    M[(BOOT_START >> 1) + i] = boot_rom[i];
-M[BOOT_UNIT >> 1] = unitno & (RP_NUMDR - 1);
-M[BOOT_CSR >> 1] = mba_get_csr (rp_dib.ba) & DMASK;
+    WrMemW (BOOT_START + (2 * i), boot_rom[i]);
+WrMemW (BOOT_UNIT, unitno & (RP_NUMDR - 1));
+WrMemW (BOOT_CSR, mba_get_csr (rp_dib.ba) & DMASK);
 if (drv_tab[GET_DTYPE (uptr->flags)].ctrl == RP_CTRL)
-    M[BOOT_START >> 1] = 042102;                        /* "BD" */
-else M[BOOT_START >> 1] = 042122;                       /* "RD" */
+    WrMemW (BOOT_START, 042102);                    /* "BD" */
+else 
+    WrMemW (BOOT_START, 042122);                    /* "RD" */
 cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }

@@ -731,14 +731,14 @@ vt_boot(int32 unit, DEVICE *dptr)
     sim_set_memory_load_file (NULL, 0);
     /* Lunar Lander presumes a VT device vector base of 320 */
     if (0320 != vt_dib.vec) { /* If that is not the case, then copy the 320 vectors to the right place */
-        M[(vt_dib.vec >> 1) + 0] = M[(0320 >> 1) + 0];
-        M[(vt_dib.vec >> 1) + 1] = M[(0320 >> 1) + 1];
-        M[(vt_dib.vec >> 1) + 2] = M[(0324 >> 1) + 0];
-        M[(vt_dib.vec >> 1) + 3] = M[(0324 >> 1) + 1];
-        M[(vt_dib.vec >> 1) + 4] = M[(0330 >> 1) + 0];
-        M[(vt_dib.vec >> 1) + 5] = M[(0330 >> 1) + 1];
-        M[(vt_dib.vec >> 1) + 6] = M[(0334 >> 1) + 0];
-        M[(vt_dib.vec >> 1) + 7] = M[(0334 >> 1) + 1];
+        WrMemW (vt_dib.vec + 000, RdMemW (0320 + 0));
+        WrMemW (vt_dib.vec + 002, RdMemW (0320 + 2));
+        WrMemW (vt_dib.vec + 004, RdMemW (0324 + 0));
+        WrMemW (vt_dib.vec + 006, RdMemW (0324 + 2));
+        WrMemW (vt_dib.vec + 010, RdMemW (0330 + 0));
+        WrMemW (vt_dib.vec + 012, RdMemW (0330 + 2));
+        WrMemW (vt_dib.vec + 014, RdMemW (0334 + 0));
+        WrMemW (vt_dib.vec + 016, RdMemW (0334 + 2));
         }
     cpu_set_boot (saved_PC);
     set_cmd (0, "VT SCALE=1");

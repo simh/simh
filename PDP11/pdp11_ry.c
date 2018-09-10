@@ -693,9 +693,9 @@ size_t i;
 if ((ry_unit[unitno & RX_M_NUMDR].flags & UNIT_DEN) == 0)
     return SCPE_NOFNC;
 for (i = 0; i < BOOT_LEN; i++)
-    M[(BOOT_START >> 1) + i] = boot_rom[i];
-M[BOOT_UNIT >> 1] = unitno & RX_M_NUMDR;
-M[BOOT_CSR >> 1] = ry_dib.ba & DMASK;
+    WrMemW (BOOT_START + (2 * i), boot_rom[i]);
+WrMemW (BOOT_UNIT, unitno & RX_M_NUMDR);
+WrMemW (BOOT_CSR, ry_dib.ba & DMASK);
 cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }

@@ -2240,9 +2240,9 @@ size_t i;
 UNIT *uptr = &dptr->units[unitno];
 
 for (i = 0; i < BOOT_LEN; i++)
-    M[(BOOT_START >> 1) + i] = boot_rom[i];
-M[BOOT_UNIT >> 1] = (uint16)uptr->unit_plug;
-M[BOOT_CSR >> 1] = tq_dib.ba & DMASK;
+    WrMemW (BOOT_START + (2 * i), boot_rom[i]);
+WrMemW (BOOT_UNIT, (uint16)uptr->unit_plug);
+WrMemW (BOOT_CSR, tq_dib.ba & DMASK);
 cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }

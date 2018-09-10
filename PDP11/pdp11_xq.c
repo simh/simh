@@ -3153,7 +3153,7 @@ DIB *dib = (DIB *)dptr->ctxt;
 extern int32 REGFILE[6][2];                 /* R0-R5, two sets */
 
 for (i = 0; i < BOOT_LEN; i++)
-    M[(BOOT_START >> 1) + i] = boot_rom[i];
+    WrMemW (BOOT_START + (2 * i), boot_rom[i]);
 cpu_set_boot (BOOT_ENTRY);
 REGFILE[0][0] = ((dptr == &xq_dev) ? 4 : 5);
 return SCPE_OK;

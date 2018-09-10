@@ -1170,9 +1170,9 @@ size_t i;
 
 sim_tape_rewind (&ts_unit);
 for (i = 0; i < BOOT_LEN; i++)
-    M[(BOOT_START >> 1) + i] = boot_rom[i];
-M[BOOT_CSR0 >> 1] = ts_dib.ba & DMASK;
-M[BOOT_CSR1 >> 1] = (ts_dib.ba & DMASK) + 02;
+    WrMemW (BOOT_START + (2 * i), boot_rom[i]);
+WrMemW (BOOT_CSR0, ts_dib.ba & DMASK);
+WrMemW (BOOT_CSR1, (ts_dib.ba & DMASK) + 02);
 cpu_set_boot (BOOT_START);
 return SCPE_OK;
 }

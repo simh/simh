@@ -1236,9 +1236,9 @@ size_t i;
 
 dt_unit[unitno].pos = DT_EZLIN;
 for (i = 0; i < BOOT_LEN; i++)
-    M[(BOOT_START >> 1) + i] = boot_rom[i];
-M[BOOT_UNIT >> 1] = unitno & DT_M_NUMDR;
-M[BOOT_CSR >> 1] = (dt_dib.ba & DMASK) + 02;
+    WrMemW (BOOT_START + (2 * i), boot_rom[i]);
+WrMemW (BOOT_UNIT, unitno & DT_M_NUMDR);
+WrMemW (BOOT_CSR, (dt_dib.ba & DMASK) + 02);
 cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
