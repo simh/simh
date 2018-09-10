@@ -381,7 +381,7 @@ for (i = 0; i < dibp->vnum; i++) {                      /* loop thru vec */
             int_vec[ilvl][ibit] = vec;
         }
     }
-/* Register I/O space address and check for conflicts */
+/* Register(Deregister) I/O space address and check for conflicts */
 for (i = 0; i < (int32) dibp->lnt; i = i + 2) {         /* create entries */
     idx = ((dibp->ba + i) & IOPAGEMASK) >> 1;           /* index into disp */
     if ((iodispR[idx] && dibp->rd &&                    /* conflict? */
@@ -411,11 +411,13 @@ for (i = 0; i < (int32) dibp->lnt; i = i + 2) {         /* create entries */
                                         "Device %s address conflict with %s at 0%o\n",
                              sim_dname (dptr), cdname, (int)dibp->ba);
         }
-    if (dibp->rd)                                       /* set rd dispatch */
-        iodispR[idx] = dibp->rd;
-    if (dibp->wr)                                       /* set wr dispatch */
-        iodispW[idx] = dibp->wr;
-    iodibp[idx] = dibp;                                 /* remember DIB */
+    if ((dibp->rd == NULL) && (dibp->wr == NULL) && (dibp->vnum == 0)) 
+        iodibp[idx] = NULL;                         /* deregister DIB */
+    else {
+        iodispR[idx] = dibp->rd;                    /* set rd dispatch */
+        iodispW[idx] = dibp->wr;                    /* set wr dispatch */
+        iodibp[idx] = dibp;                         /* remember DIB */
+        }
     }
 return SCPE_OK;
 }
