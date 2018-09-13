@@ -1159,7 +1159,6 @@ static const char simh_help[] =
       "++++++++                     specify console serial port and optionally\n"
       "++++++++                     the port config (i.e. ;9600-8n1)\n"
       "+SET CONSOLE NOSERIAL        disable console serial session\n"
-      "+SET CONSOLE SPEED=nn{*fac}  specifies the maximum console port input rate\n"
        /***************** 80 character line width template *************************/
 #define HLP_SET_REMOTE "*Commands SET REMOTE"
       "3Remote\n"
