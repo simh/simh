@@ -567,6 +567,7 @@ static int32 noqueue_time;
 volatile t_bool stop_cpu = FALSE;
 static unsigned int sim_stop_sleep_ms = 250;
 static char **sim_argv;
+static int sim_exit_status = EXIT_SUCCESS;              /* optionally set by EXIT command */
 t_value *sim_eval = NULL;
 static t_value sim_last_val;
 static t_addr sim_last_addr;
@@ -2166,6 +2167,10 @@ static const char simh_help[] =
 #define HLP_EXIT        "*Commands Exiting_The_Simulator"
       "2Exiting The Simulator\n"
       " EXIT (synonyms QUIT and BYE) returns control to the operating system.\n"
+      "3 Exit Status\n"
+      " An optional numeric exit status may be provided on the EXIT command line\n"
+      " that an operating system script may act on.\n\n"
+      "++EXIT {status}        exit with optional status\n\n"
        /***************** 80 character line width template *************************/
 #define HLP_SCREENSHOT  "*Commands Screenshot_Video_Window"
       "2Screenshot Video Window\n"
@@ -2394,7 +2399,7 @@ char nbuf[PATH_MAX + 7];
 char **targv = NULL;
 int32 i, sw;
 t_bool lookswitch;
-t_stat stat;
+t_stat stat = SCPE_OK;
 
 #if defined (__MWERKS__) && defined (macintosh)
 argc = ccommand (&argv);
@@ -2455,7 +2460,7 @@ if (sim_emax <= 0)
 if (sim_timer_init ()) {
     fprintf (stderr, "Fatal timer initialization error\n");
     read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
-    return 0;
+    return EXIT_FAILURE;
     }
 sim_register_internal_device (&sim_expect_dev);
 sim_register_internal_device (&sim_step_dev);
@@ -2464,12 +2469,12 @@ if ((stat = sim_ttinit ()) != SCPE_OK) {
     fprintf (stderr, "Fatal terminal initialization error\n%s\n",
         sim_error_text (stat));
     read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
-    return 0;
+    return EXIT_FAILURE;
     }
 if ((sim_eval = (t_value *) calloc (sim_emax, sizeof (t_value))) == NULL) {
     fprintf (stderr, "Unable to allocate examine buffer\n");
     read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
-    return 0;
+    return EXIT_FAILURE;
     };
 if (sim_dflt_dev == NULL)                               /* if no default */
     sim_dflt_dev = sim_devices[0];
@@ -2477,13 +2482,13 @@ if ((stat = reset_all_p (0)) != SCPE_OK) {
     fprintf (stderr, "Fatal simulator initialization error\n%s\n",
         sim_error_text (stat));
     read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
-    return 0;
+    return EXIT_FAILURE;
     }
 if ((stat = sim_brk_init ()) != SCPE_OK) {
     fprintf (stderr, "Fatal breakpoint table initialization error\n%s\n",
         sim_error_text (stat));
     read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
-    return 0;
+    return EXIT_FAILURE;
     }
 signal (SIGINT, int_handler);
 if (!sim_quiet) {
@@ -2547,11 +2552,14 @@ else if (*argv[0]) {                                    /* sim name arg? */
             }
         }
     }
+if (stat == SCPE_OPENERR)                               /* didn't exist/can't open? */
+    stat = SCPE_OK;
 
 if (sim_switches & SWMASK ('T'))                        /* Command Line -T switch */
-    sim_library_unit_tests ();                          /* run library unit tests */
+    stat = sim_library_unit_tests ();                   /* run library unit tests */
 
-stat = process_stdin_commands (SCPE_BARE_STATUS(stat), argv);
+if (stat == SCPE_OK)
+    process_stdin_commands (SCPE_BARE_STATUS(stat), argv);
 
 detach_all (0, TRUE);                                   /* close files */
 sim_set_deboff (0, NULL);                               /* close debug */
@@ -2563,7 +2571,7 @@ AIO_CLEANUP;                                            /* Asynch I/O */
 sim_cleanup_sock ();                                    /* cleanup sockets */
 fclose (stdnul);                                        /* close bit bucket file handle */
 free (targv);                                           /* release any argv copy that was made */
-return 0;
+return sim_exit_status;
 }
 
 t_stat process_stdin_commands (t_stat stat, char *argv[])
@@ -2681,6 +2689,8 @@ return cmdp;
 
 t_stat exit_cmd (int32 flag, CONST char *cptr)
 {
+if (cptr && *cptr)
+    sim_exit_status = atoi (cptr);
 return SCPE_EXIT;
 }
 

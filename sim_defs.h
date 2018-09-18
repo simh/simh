@@ -125,6 +125,14 @@ extern int sim_vax_snprintf(char *buf, size_t buf_size, const char *fmt, ...);
 #include <limits.h>
 #include <ctype.h>
 
+#ifndef EXIT_FAILURE
+#define EXIT_FAILURE 1
+#endif
+#ifndef EXIT_SUCCESS
+#define EXIT_SUCCESS 0
+#endif
+
+
 #ifdef _WIN32
 #include <winsock2.h>
 #include <windows.h>
