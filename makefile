@@ -121,6 +121,7 @@ endif
 find_exe = $(abspath $(strip $(firstword $(foreach dir,$(strip $(subst :, ,$(PATH))),$(wildcard $(dir)/$(1))))))
 find_lib = $(abspath $(strip $(firstword $(foreach dir,$(strip $(LIBPATH)),$(wildcard $(dir)/lib$(1).$(LIBEXT))))))
 find_include = $(abspath $(strip $(firstword $(foreach dir,$(strip $(INCPATH)),$(wildcard $(dir)/$(1).h)))))
+find_test = $(abspath $(1)/tests/$(2)_test.ini)
 ifneq ($(findstring Windows,$(OS)),)
   ifeq ($(findstring .exe,$(SHELL)),.exe)
     # MinGW
@@ -1875,48 +1876,72 @@ ifeq ($(WIN32),)
 else
 	copy $(@D)\microvax3900${EXE} $(@D)\vax${EXE}
 endif
+ifneq (,$(call find_test,$(VAXD),microvax3900))
+	$@ $(call find_test,$(VAXD),microvax3900)
+endif
 
 microvax1 : ${BIN}BuildROMs${EXE} ${BIN}microvax1${EXE}
 
 ${BIN}microvax1${EXE} : ${VAX610} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX610} ${SIM} ${VAX610_OPT} -o $@ ${LDFLAGS}
+ifneq (,$(call find_test,$(VAXD),microvax1))
+	$@ $(call find_test,$(VAXD),microvax1)
+endif
 
 rtvax1000 : ${BIN}BuildROMs${EXE} ${BIN}rtvax1000${EXE}
 
 ${BIN}rtvax1000${EXE} : ${VAX630} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX630} ${SIM} ${VAX620_OPT} -o $@ ${LDFLAGS}
+ifneq (,$(call find_test,$(VAXD),rtvax1000))
+	$@ $(call find_test,$(VAXD),rtvax1000)
+endif
 
 microvax2 : ${BIN}BuildROMs${EXE} ${BIN}microvax2${EXE}
 
 ${BIN}microvax2${EXE} : ${VAX630} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX630} ${SIM} ${VAX630_OPT} -o $@ ${LDFLAGS}
+ifneq (,$(call find_test,$(VAXD),microvax2))
+	$@ $(call find_test,$(VAXD),microvax2)
+endif
 
 vax730 : ${BIN}BuildROMs${EXE} ${BIN}vax730${EXE}
 
 ${BIN}vax730${EXE} : ${VAX730} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX730} ${SIM} ${VAX730_OPT} -o $@ ${LDFLAGS}
+ifneq (,$(call find_test,$(VAXD),vax730))
+	$@ $(call find_test,$(VAXD),vax730)
+endif
 
 vax750 : ${BIN}BuildROMs${EXE} ${BIN}vax750${EXE}
 
 ${BIN}vax750${EXE} : ${VAX750} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX750} ${SIM} ${VAX750_OPT} -o $@ ${LDFLAGS}
+ifneq (,$(call find_test,$(VAXD),vax750))
+	$@ $(call find_test,$(VAXD),vax750)
+endif
 
 vax780 : ${BIN}BuildROMs${EXE} ${BIN}vax780${EXE}
 
 ${BIN}vax780${EXE} : ${VAX780} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX780} ${SIM} ${VAX780_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,$(VAXD),vax780))
+	$@ $(call find_test,$(VAXD),vax780)
+endif
 
 vax8600 : ${BIN}BuildROMs${EXE} ${BIN}vax8600${EXE}
 
 ${BIN}vax8600${EXE} : ${VAX8600} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX8600} ${SIM} ${VAX8600_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,$(VAXD),vax8600))
+	$@ $(call find_test,$(VAXD),vax8600)
+endif
 
 nova : ${BIN}nova${EXE}
 
