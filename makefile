@@ -121,7 +121,7 @@ endif
 find_exe = $(abspath $(strip $(firstword $(foreach dir,$(strip $(subst :, ,$(PATH))),$(wildcard $(dir)/$(1))))))
 find_lib = $(abspath $(strip $(firstword $(foreach dir,$(strip $(LIBPATH)),$(wildcard $(dir)/lib$(1).$(LIBEXT))))))
 find_include = $(abspath $(strip $(firstword $(foreach dir,$(strip $(INCPATH)),$(wildcard $(dir)/$(1).h)))))
-find_test = $(abspath $(1)/tests/$(2)_test.ini)
+find_test = $(abspath $(wildcard $(1)/tests/$(2)_test.ini))
 ifneq ($(findstring Windows,$(OS)),)
   ifeq ($(findstring .exe,$(SHELL)),.exe)
     # MinGW
