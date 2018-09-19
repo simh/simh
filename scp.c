@@ -984,9 +984,9 @@ static const char simh_help[] =
       " support only E (execution) breakpoints.\n\n"
       " Associated with a breakpoint are a count and, optionally, one or more\n"
       " actions.  Each time the breakpoint is taken, the associated count is\n"
-      " decremented.  If the count is less than or equal to 0, the breakpoint\n"
-      " occurs; otherwise, it is deferred.  When the breakpoint occurs, the\n"
-      " optional actions are automatically executed.\n\n"
+      " decremented.  If the resulting count is less than or equal to 0, the\n"
+      " breakpoint occurs; otherwise, it is deferred.  When the breakpoint occurs,\n"
+      " the optional actions are automatically executed.\n\n"
       " A breakpoint is set by the BREAK or the SET BREAK commands:\n\n"
       "++BREAK {-types} {<addr range>{[count]},{addr range...}}{;action;action...}\n"
       "++SET BREAK {-types} {<addr range>{[count]},{addr range...}}{;action;action...}\n\n"
@@ -2689,9 +2689,13 @@ return cmdp;
 
 t_stat exit_cmd (int32 flag, CONST char *cptr)
 {
-if (cptr && *cptr)
+t_stat r = SCPE_EXIT;
+
+if (cptr && *cptr) {
     sim_exit_status = atoi (cptr);
-return SCPE_EXIT;
+    r |= SCPE_NOMESSAGE;            /* exit silently with the specified status */
+    }
+return r;
 }
 
 /* Help command */
@@ -11611,8 +11615,9 @@ dev_name = tmxr_expect_line_name (exp);
 after = get_default_env_parameter (dev_name, "SIM_EXPECT_HALTAFTER", 0);
 if (*cptr == '[') {
     cnt = (int32) strtotv (cptr + 1, &c1ptr, 10);
-    if ((cptr == c1ptr) || (*c1ptr != ']'))
+    if ((cptr == c1ptr) || (*c1ptr != ']') || (cnt <= 0))
         return sim_messagef (SCPE_ARG, "Invalid Repeat count specification\n");
+    cnt -= 1;
     cptr = c1ptr + 1;
     while (sim_isspace(*cptr))
         ++cptr;
