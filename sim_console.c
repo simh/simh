@@ -2002,22 +2002,18 @@ t_stat stat = SCPE_OK;
 if (cptr && *cptr)
     return SCPE_2MARG;
 
-if (sim_rem_active_number > 0) {
-    sim_printf ("Can't change Remote Console mode from Remote Console\n");
-    return SCPE_INVREM;
-    }
+if (sim_rem_active_number > 0)
+    return sim_messagef (SCPE_INVREM, "Can't change Remote Console mode from Remote Console\n");
 
 if (sim_rem_con_tmxr.master || (!flag))                     /* Remote Console Enabled? */
     sim_rem_master_mode = flag;
-else {
-    sim_printf ("Can't enable Remote Console Master mode with Remote Console disabled\n");
-    return SCPE_INVREM;
-    }
+else
+    return sim_messagef (SCPE_INVREM, "Can't enable Remote Console Master mode with Remote Console disabled\n");
 
 if (sim_rem_master_mode) {
     t_stat stat_nomessage;
 
-    sim_printf ("Command input starting on Master Remote Console Session\n");
+    sim_messagef (SCPE_OK, "Command input starting on Master Remote Console Session\n");
     stat = sim_run_boot_prep (0);
     sim_rem_master_was_enabled = TRUE;
     sim_last_cmd_stat = SCPE_OK;
@@ -2284,9 +2280,7 @@ if (sim_deb == NULL)                                    /* no debug? */
 sim_close_logfile (&sim_deb_ref);
 sim_deb = NULL;
 sim_deb_switches = 0;
-if (!sim_quiet)
-    sim_printf ("Debug output disabled\n");
-return SCPE_OK;
+return sim_messagef (SCPE_OK, "Debug output disabled\n");
 }
 
 /* Show debug routine */
@@ -2666,7 +2660,7 @@ if (sim_rem_master_mode) {
         if (sim_rem_con_tmxr.ldsc[0].conn)
             break;
         if ((trys % 10) == 0) {                         /* Status every 10 sec */
-            sim_printf ("Waiting for Remote Console connection\r\n");
+            sim_messagef (SCPE_OK, "Waiting for Remote Console connection\r\n");
             fflush (stdout);
             if (sim_log)                                /* log file? */
                 fflush (sim_log);
@@ -2683,8 +2677,7 @@ if (sim_rem_master_mode) {
             sim_os_ms_sleep (100);
         sim_os_ms_sleep (100);
         tmxr_reset_ln (&sim_rem_con_tmxr.ldsc[0]);
-        sim_printf ("Console port must be Telnet or Serial with Master Remote Console\r\n");
-        return SCPE_EXIT;
+        return sim_messagef (SCPE_EXIT, "Console port must be Telnet or Serial with Master Remote Console\r\n");
         }
     }
 if (trys == sec) {
@@ -2700,7 +2693,7 @@ if (sim_con_ldsc.conn || sim_con_ldsc.txbfd) {          /* connected or buffered
     tmxr_poll_rx (&sim_con_tmxr);                       /* poll (check disconn) */
     if (sim_con_ldsc.conn || sim_con_ldsc.txbfd) {      /* still connected? */
         if (!sim_con_ldsc.conn) {
-            sim_printf ("Running with Buffered Console\r\n"); /* print transition */
+            sim_messagef (SCPE_OK, "Running with Buffered Console\r\n"); /* print transition */
             fflush (stdout);
             if (sim_log)                                /* log file? */
                 fflush (sim_log);
@@ -2712,7 +2705,7 @@ for (; trys < sec; trys++) {                            /* loop */
     if (tmxr_poll_conn (&sim_con_tmxr) >= 0) {          /* poll connect */
         sim_con_ldsc.rcve = 1;                          /* rcv enabled */
         if (trys) {                                     /* if delayed */
-            sim_printf ("Running\r\n");                 /* print transition */
+            sim_messagef (SCPE_OK, "Running\r\n");                 /* print transition */
             fflush (stdout);
             if (sim_log)                                /* log file? */
                 fflush (sim_log);
@@ -2723,7 +2716,7 @@ for (; trys < sec; trys++) {                            /* loop */
     if ((c == SCPE_STOP) || stop_cpu)
         return SCPE_STOP;
     if ((trys % 10) == 0) {                             /* Status every 10 sec */
-        sim_printf ("Waiting for console Telnet connection\r\n");
+        sim_messagef (SCPE_OK, "Waiting for console Telnet connection\r\n");
         fflush (stdout);
         if (sim_log)                                    /* log file? */
             fflush (sim_log);
