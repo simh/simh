@@ -650,6 +650,8 @@ t_stat r;
 
 if (!ptr || !*ptr)
     return SCPE_2FARG;
+if ((ptr = get_sim_sw (ptr)) == NULL)                   /* get switches */
+    return SCPE_INVSW;
 regptr = get_glyph (ptr, gbuf, 0);                      /* get glyph */
 if ((slptr = strchr (gbuf, '/'))) {                     /* found slash? */
     regptr = strchr (ptr, '/');                         /* locate orig */
