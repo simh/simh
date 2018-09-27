@@ -437,12 +437,6 @@ typedef struct {
 #define CLR_INT(dv)     int_req[IPL_##dv] = int_req[IPL_##dv] & ~(INT_##dv)
 #define IORETURN(f,v)   ((f)? (v): SCPE_OK)             /* cond error return */
 
-/* Logging */
-
-#define LOG_CPU_I       0x1                             /* intexc */
-#define LOG_CPU_R       0x2                             /* REI */
-#define LOG_CPU_P       0x4                             /* context */
-
 /* Function prototypes for I/O */
 
 int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf);

@@ -430,12 +430,16 @@ MTAB cpu_mod[] = {
     };
 
 DEBTAB cpu_deb[] = {
-    { "INTEXC",    LOG_CPU_I,         "interrupt and exception activities" },
-    { "REI",       LOG_CPU_R,         "REI activities" },
-    { "CONTEXT",   LOG_CPU_P,         "context switching activities" },
-    { "EVENT",     SIM_DBG_EVENT,     "event dispatch activities" },
-    { "ACTIVATE",  SIM_DBG_ACTIVATE,  "queue insertion activities" },
-    { "ASYNCH",    SIM_DBG_AIO_QUEUE, "asynch queue activities" },
+    { "INTEXC",    LOG_CPU_I,           "interrupt and exception activities" },
+    { "REI",       LOG_CPU_R,           "REI activities" },
+    { "CONTEXT",   LOG_CPU_P,           "context switching activities" },
+    { "RSVDFAULT", LOG_CPU_FAULT_RSVD,  "reserved fault activities" },
+    { "FLTFAULT",  LOG_CPU_FAULT_FLT,   "floating fault activities" },
+    { "CMODFAULT", LOG_CPU_FAULT_CMODE, "cmode fault activities" },
+    { "MCHKFAULT", LOG_CPU_FAULT_MCHK,  "machine check fault activities" },
+    { "EVENT",     SIM_DBG_EVENT,       "event dispatch activities" },
+    { "ACTIVATE",  SIM_DBG_ACTIVATE,    "queue insertion activities" },
+    { "ASYNCH",    SIM_DBG_AIO_QUEUE,   "asynch queue activities" },
     { NULL, 0 }
     };
 
@@ -3654,7 +3658,7 @@ char args[CBUFSIZE];
 t_stat r;
 int32 saved_sim_switches = sim_switches;
 
-sim_printf ("Loading boot code from %s%s\n", builtin_code ? "internal " : "", filename);
+sim_messagef (SCPE_OK, "Loading boot code from %s%s\n", builtin_code ? "internal " : "", filename);
 if (builtin_code)
     sim_set_memory_load_file (builtin_code, size);
 if (rom)

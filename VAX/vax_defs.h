@@ -87,6 +87,16 @@ extern jmp_buf save_env;
 #define CMODE_FAULT(cd) p1 = (cd), ABORT (ABORT_CMODE)
 #define MACH_CHECK(cd)  p1 = (cd), ABORT (ABORT_MCHK)
 
+/* Logging */
+
+#define LOG_CPU_I           0x001                       /* intexc */
+#define LOG_CPU_R           0x002                       /* REI */
+#define LOG_CPU_P           0x004                       /* process context */
+#define LOG_CPU_FAULT_RSVD  0x008                       /* reserved faults */
+#define LOG_CPU_FAULT_FLT   0x010                       /* floating faults*/
+#define LOG_CPU_FAULT_CMODE 0x020                       /* cmode faults */
+#define LOG_CPU_FAULT_MCHK  0x040                       /* machine check faults */
+
 /* Recovery queue */
 
 #define RQ_RN           0xF                             /* register */

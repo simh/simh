@@ -330,12 +330,6 @@ typedef struct {
 #define IORETURN(f,v)   ((f)? (v): SCPE_OK)             /* cond error return */
 extern int32 int_req[IPL_HLVL];                         /* intr, IPL 14-17 */
 
-/* Logging */
-
-#define LOG_CPU_I       0x1                             /* intexc */
-#define LOG_CPU_R       0x2                             /* REI */
-#define LOG_CPU_P       0x4                             /* context */
-
 /* System model */
 
 extern int32 sys_model;

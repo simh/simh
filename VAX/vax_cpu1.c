@@ -1201,6 +1201,11 @@ Rule    SRM formulation                     Comment
  9      tmp<31> = 1 => tmp<cur_mode> = 3, tmp<prv_mode> = 3>, tmp<fpd,is,ipl,dv,fu,iv> = 0 
 */
 
+#define REI_RSVD_FAULT(desc) do {                                                                                   \
+        sim_debug (LOG_CPU_FAULT_RSVD, &cpu_dev, "PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x - %s\n",\
+                     PC, PSL, SP - 8, newpc, newpsl, ((newpsl & IS)? IS: STK[newcur]), desc);                       \
+        RSVD_OPND_FAULT; } while (0)
+
 int32 op_rei (int32 acc)
 {
 int32 newpc = Read (SP, L_LONG, RA);
@@ -1211,23 +1216,23 @@ int32 newipl, i;
 
 if ((newpsl & PSL_MBZ) ||                               /* rule 8 */
     (newcur < oldcur))                                  /* rule 1 */
-    RSVD_OPND_FAULT;
+    REI_RSVD_FAULT("rule 8 or rule 1");
 if (newcur) {                                           /* to esu, skip 2,4,7 */
     if ((newpsl & (PSL_IS | PSL_IPL)) ||                /* rules 3,5 */
         (newcur > PSL_GETPRV (newpsl)))                 /* rule 6 */
-        RSVD_OPND_FAULT;                                /* end rei to esu */
+        REI_RSVD_FAULT("rule 3,5 or rule 6");           /* end rei to esu */
     }
 else {                                                  /* to k, skip 3,5,6 */
     newipl = PSL_GETIPL (newpsl);                       /* get new ipl */
     if ((newpsl & PSL_IS) &&                            /* setting IS? */
-       (((PSL & PSL_IS) == 0) || (newipl == 0)))        /* test rules 2,4 */
-        RSVD_OPND_FAULT;                                /* else skip 2,4 */
+        (((PSL & PSL_IS) == 0) || (newipl == 0)))       /* test rules 2,4 */
+        REI_RSVD_FAULT("rule 2 or rule 4");             /* else skip 2,4 */
     if (newipl > PSL_GETIPL (PSL))                      /* test rule 7 */
-        RSVD_OPND_FAULT;
+        REI_RSVD_FAULT("rule 7");
     }                                                   /* end if kernel */
 if (newpsl & PSL_CM) {                                  /* setting cmode? */
     if (BadCmPSL (newpsl))                              /* validate PSL */
-        RSVD_OPND_FAULT;
+        REI_RSVD_FAULT("cmode invalid PSL");
     for (i = 0; i < 7; i++)                             /* mask R0-R6, PC */
         R[i] = R[i] & WMASK;
     newpc = newpc & WMASK;
@@ -1235,7 +1240,8 @@ if (newpsl & PSL_CM) {                                  /* setting cmode? */
 SP = SP + 8;                                            /* pop stack */
 if (PSL & PSL_IS)                                       /* save stack */
     IS = SP;
-else STK[oldcur] = SP;
+else 
+    STK[oldcur] = SP;
 sim_debug (LOG_CPU_R, &cpu_dev, "PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x\n",
              PC, PSL, SP - 8, newpc, newpsl, ((newpsl & IS)? IS: STK[newcur]));
 PSL = (PSL & PSL_TP) | (newpsl & ~CC_MASK);             /* set PSL */
