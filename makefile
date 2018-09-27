@@ -1043,16 +1043,15 @@ ifneq ($(DEBUG),)
   BUILD_FEATURES = - debugging support
 else
   ifneq (,$(findstring clang,$(COMPILER_NAME))$(findstring LLVM,$(COMPILER_NAME)))
-    CFLAGS_O = -O0
-    ifeq (Darwin,$(OSTYPE))
-      NO_LTO = 1
-    endif
+    CFLAGS_O = -O2 -fno-strict-overflow
+    GCC_OPTIMIZERS_CMD = $(GCC) --help
+    NO_LTO = 1
   else
     NO_LTO = 1
     ifeq (Darwin,$(OSTYPE))
-      CFLAGS_O += -O4 -fno-strict-overflow -flto -fwhole-program
+      CFLAGS_O += -O4 -flto -fwhole-program
     else
-      CFLAGS_O := -O2 -fno-strict-overflow 
+      CFLAGS_O := -O2
     endif
   endif
   LDFLAGS_O = 
@@ -1061,6 +1060,8 @@ else
     ifeq (,$(GCC_OPTIMIZERS_CMD))
       GCC_OPTIMIZERS_CMD = $(GCC) --help=optimizers
     endif
+  endif
+  ifneq (,$(GCC_OPTIMIZERS_CMD))
     GCC_OPTIMIZERS = $(shell $(GCC_OPTIMIZERS_CMD))
   endif
   ifneq (,$(findstring $(GCC_VERSION),$(LTO_EXCLUDE_VERSIONS)))
