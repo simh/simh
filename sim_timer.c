@@ -443,7 +443,7 @@ MMRESULT mm_status;
 
 mm_status = timeGetDevCaps (&timers, sizeof (timers));
 if (mm_status != TIMERR_NOERROR) {
-    fprintf (stderr, "timeGetDevCaps() returned: 0x%X, Last Error: 0x%X\n", mm_status, GetLastError());
+    fprintf (stderr, "timeGetDevCaps() returned: 0x%X, Last Error: 0x%X\n", mm_status, (unsigned int)GetLastError());
     return 0;
     }
 if (timers.wPeriodMin == 0) {
@@ -452,7 +452,7 @@ if (timers.wPeriodMin == 0) {
     }
 mm_status = timeBeginPeriod (timers.wPeriodMin);
 if (mm_status != TIMERR_NOERROR) {
-    fprintf (stderr, "timeBeginPeriod() returned: 0x%X, Last Error: 0x%X\n", mm_status, GetLastError());
+    fprintf (stderr, "timeBeginPeriod() returned: 0x%X, Last Error: 0x%X\n", mm_status, (unsigned int)GetLastError());
     return 0;
     }
 atexit (sim_timer_exit);

@@ -446,7 +446,7 @@ if ((*shmem)->hMapping == INVALID_HANDLE_VALUE) {
 
     sim_shmem_close (*shmem);
     *shmem = NULL;
-    return sim_messagef (SCPE_OPENERR, "Can't CreateFileMapping of a %u byte shared memory segment '%s' - LastError=0x%X\n", size, name, LastError);
+    return sim_messagef (SCPE_OPENERR, "Can't CreateFileMapping of a %u byte shared memory segment '%s' - LastError=0x%X\n", (unsigned int)size, name, (unsigned int)LastError);
     }
 AlreadyExists = (GetLastError () == ERROR_ALREADY_EXISTS);
 (*shmem)->shm_base = MapViewOfFile ((*shmem)->hMapping, FILE_MAP_ALL_ACCESS, 0, 0, 0);
@@ -455,7 +455,7 @@ if ((*shmem)->shm_base == NULL) {
 
     sim_shmem_close (*shmem);
     *shmem = NULL;
-    return sim_messagef (SCPE_OPENERR, "Can't MapViewOfFile() of a %u byte shared memory segment '%s' - LastError=0x%X\n", size, name, LastError);
+    return sim_messagef (SCPE_OPENERR, "Can't MapViewOfFile() of a %u byte shared memory segment '%s' - LastError=0x%X\n", (unsigned int)size, name, (unsigned int)LastError);
     }
 if (AlreadyExists) {
     if (*((DWORD *)((*shmem)->shm_base)) == 0)
@@ -464,7 +464,7 @@ if (AlreadyExists) {
         DWORD SizeFound = *((DWORD *)((*shmem)->shm_base));
         sim_shmem_close (*shmem);
         *shmem = NULL;
-        return sim_messagef (SCPE_OPENERR, "Shared Memory segment '%s' is %u bytes instead of %d\n", name, SizeFound, (int)size);
+        return sim_messagef (SCPE_OPENERR, "Shared Memory segment '%s' is %u bytes instead of %d\n", name, (unsigned int)SizeFound, (int)size);
         }
     }
 else
