@@ -1567,6 +1567,31 @@ static const char simh_help[] =
       "+would extract the last 10 characters of the XYZ variable.\n\n"
       "++%%XYZ:~0,-2%%\n\n"
       "+would extract all but the last 2 characters of the XYZ variable.\n"
+      "4Parameter and Environment Variable File Parsing\n"
+      " The value of environment variables can be parsed as filenames\n"
+      " and have their values be expanded to full paths and/or into pieces.\n"
+      " Parsing and expansion of file names.\n\n"
+      "++%%~I%%     - expands the value of %%I%% removing any surrounding quotes (\")\n"
+      "++%%~fI%%    - expands the value of %%I%% to a fully qualified path name\n"
+      "++%%~pI%%    - expands the value of %%I%% to a path only\n"
+      "++%%~nI%%    - expands the value of %%I%% to a file name only\n"
+      "++%%~xI%%    - expands the value of %%I%% to a file extension only\n\n"
+      " The modifiers can be combined to get compound results:\n\n"
+      "++%%~pnI%%   - expands the value of %%I%% to a path and name only\n"
+      "++%%~nxI%%   - expands the value of %%I%% to a file name and extension only\n\n"
+      " In the above example above %%I%% can be replaced by other\n"
+      " environment variables or numeric parameters to a DO command\n"
+      " invokation.\n"
+      " Examples:\n\n"
+      "++sim> set env FNAME='xyzzy.ini'\n"
+      "++sim> echo ~FNAME=%%~FNAME%%\n"
+      "++xyzzy.ini\n"
+      "++sim> echo ~fFNAME=%%~fFNAME%%\n"
+      "++~fFNAME=/home/user/xyzzy.ini\n"
+      "++sim> echo ~nxFNAME=%%~nxFNAME%%\n"
+      "++~nxFNAME=xyzzy.ini\n"
+      "++sim> echo ~fFNAME=%%~pnFNAME%%\n"
+      "++~pnFNAME=/home/user/xyzzy\n\n"
 #define HLP_GOTO        "*Commands Executing_Command_Files GOTO"
       "3GOTO\n"
       " Commands in a command file execute in sequence until either an error\n"
@@ -4057,54 +4082,76 @@ for (; *ip && (op < oend); ) {
         ip++;                                           /* skip one */
         *op++ = *ip++;                                  /* copy insert % */
         }
-    else 
-        if ((*ip == '%') && 
-            (sim_isalnum(ip[1]) || (ip[1] == '*') || (ip[1] == '_'))) {/* sub? */
-            if ((ip[1] >= '0') && (ip[1] <= ('9'))) {   /* %n = sub */
-                ap = do_arg[ip[1] - '0'];
-                for (i=0; i<ip[1] - '0'; ++i)           /* make sure we're not past the list end */
+    else {
+        t_bool expand_it = FALSE;
+        char parts[32];
+
+        if (*ip == '%') {
+            ap = NULL;
+            ++ip;
+            if (*ip == '~') {
+                expand_it = TRUE;
+                ++ip;
+                for (i=0; (i < (sizeof (parts) - 1)) && (strchr ("fpnx", *ip)); i++, ip++) {
+                    parts[i] = *ip;
+                    parts[i + 1] = '\0';
+                    }
+                }
+            if ((*ip >= '0') && (*ip <= ('9'))) {       /* %n = sub */
+                ap = do_arg[*ip - '0'];
+                for (i=0; i<*ip - '0'; ++i)           /* make sure we're not past the list end */
                     if (do_arg[i] == NULL) {
                         ap = NULL;
                         break;
                         }
-                ip = ip + 2;
+                ++ip;
                 }
-            else if (ip[1] == '*') {                    /* %1 ... %9 = sub */
-                memset (rbuf, '\0', sizeof(rbuf));
-                ap = rbuf;
-                for (i=1; i<=9; ++i)
-                    if (do_arg[i] == NULL)
-                        break;
-                    else
-                        if ((sizeof(rbuf)-strlen(rbuf)) < (2 + strlen(do_arg[i]))) {
-                            if (strchr(do_arg[i], ' ')) { /* need to surround this argument with quotes */
-                                char quote = '"';
-                                if (strchr(do_arg[i], quote))
-                                    quote = '\'';
-                                sprintf(&rbuf[strlen(rbuf)], "%s%c%s%c\"", (i != 1) ? " " : "", quote, do_arg[i], quote);
+            else {
+                if (*ip == '*') {                       /* %1 ... %9 = sub */
+                    memset (rbuf, '\0', sizeof(rbuf));
+                    ap = rbuf;
+                    for (i=1; i<=9; ++i) {
+                        if (do_arg[i] == NULL)
+                            break;
+                        else
+                            if ((sizeof(rbuf)-strlen(rbuf)) < (2 + strlen(do_arg[i]))) {
+                                if (strchr(do_arg[i], ' ')) { /* need to surround this argument with quotes */
+                                    char quote = '"';
+                                    if (strchr(do_arg[i], quote))
+                                        quote = '\'';
+                                    sprintf(&rbuf[strlen(rbuf)], "%s%c%s%c\"", (i != 1) ? " " : "", quote, do_arg[i], quote);
+                                    }
+                                else
+                                    sprintf(&rbuf[strlen(rbuf)], "%s%s", (i != 1) ? " " : "", do_arg[i]);
                                 }
                             else
-                                sprintf(&rbuf[strlen(rbuf)], "%s%s", (i != 1) ? " " : "", do_arg[i]);
-                            }
-                        else
-                            break;
-                ip = ip + 2;
-                }
-            else {                                      /* check environment variable or special variables */
-                get_glyph_nc (ip+1, gbuf, '%');         /* get the literal name */
-                ap = _sim_get_env_special (gbuf, rbuf, sizeof (rbuf));
-                ip += 1 + strlen (gbuf);
-                if (*ip == '%') 
+                                break;
+                        }
                     ++ip;
+                    }
+                else {
+                    get_glyph_nc (ip, gbuf, '%');           /* get the literal name */
+                    ap = _sim_get_env_special (gbuf, rbuf, sizeof (rbuf));
+                    ip += strlen (gbuf);
+                    if (*ip == '%') 
+                        ++ip;
+                    }
                 }
             if (ap) {                                   /* non-null arg? */
+                char *expanded = NULL;
+
+                if (expand_it) {
+                    expanded = sim_filepath_parts (ap, parts);
+                    ap = expanded;
+                    }
                 while (*ap && (op < oend)) {            /* copy the argument */
                     sim_sub_instr_off[outstr_off++] = ip - instr;
                     *op++ = *ap++;
                     }
+                free (expanded);
                 }
             }
-        else
+        else {
             if (ip == istart) {                         /* at beginning of input? */
                 get_glyph (istart, gbuf, 0);            /* substitute initial token */
                 ap = getenv(gbuf);                      /* if it is an environment variable name */
@@ -4123,6 +4170,8 @@ for (; *ip && (op < oend); ) {
                 sim_sub_instr_off[outstr_off++] = ip - instr;
                 *op++ = *ip++;                          /* literal character */
                 }
+            }
+        }
     }
 *op = 0;                                                /* term buffer */
 sim_sub_instr_off[outstr_off] = 0;
@@ -4344,6 +4393,17 @@ if (Exist || (*gbuf == '"') || (*gbuf == '\'')) {       /* quoted string compari
     else {
         FILE *f = fopen (gbuf, "r");
 
+        if (!f) {
+            if (((gbuf[0] == '"') || (gbuf[0] == '\'')) &&      /* quoted? */
+                (gbuf[0] == gbuf[strlen (gbuf) - 1])) {
+                char *without_quotes = sim_filepath_parts (gbuf, "f");
+
+                if (without_quotes) {
+                    f = fopen (without_quotes, "r");
+                    free (without_quotes);
+                    }
+                }
+            }
         if (f)
             fclose (f);
         result = (f != NULL);
@@ -6092,7 +6152,8 @@ return SCPE_OK;
 t_stat show_default (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr)
 {
 char buffer[PATH_MAX];
-char *wd = getcwd(buffer, PATH_MAX);
+char *wd = sim_getcwd(buffer, PATH_MAX);
+
 fprintf (st, "%s\n", wd);
 return SCPE_OK;
 }
@@ -6189,11 +6250,7 @@ strlcpy (WildName, cptr, sizeof(WildName));
 cptr = WildName;
 sim_trim_endspc (WildName);
 if ((*cptr != '/') || (0 == memcmp (cptr, "./", 2)) || (0 == memcmp (cptr, "../", 3))) {
-#if defined (VMS)
-    getcwd (WholeName, sizeof (WholeName)-1, 0);
-#else
-    getcwd (WholeName, sizeof (WholeName)-1);
-#endif
+    sim_getcwd (WholeName, sizeof (WholeName)-1);
     strlcat (WholeName, "/", sizeof (WholeName));
     strlcat (WholeName, cptr, sizeof (WholeName));
     sim_trim_endspc (WholeName);
@@ -6219,11 +6276,7 @@ if (c) {
     DirName[1+c-WholeName] = '\0';
     }
 else {
-#if defined (VMS)
-    getcwd (WholeName, sizeof (WholeName)-1, 0);
-#else
-    getcwd (WholeName, sizeof (WholeName)-1);
-#endif
+    sim_getcwd (WholeName, sizeof (WholeName)-1);
     }
 cptr = WholeName;
 #if defined (HAVE_GLOB)

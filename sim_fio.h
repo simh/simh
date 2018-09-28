@@ -70,6 +70,9 @@ t_offset sim_ftell (FILE *st);
 t_offset sim_fsize_ex (FILE *fptr);
 t_offset sim_fsize_name_ex (const char *fname);
 t_stat sim_copyfile (const char *source_file, const char *dest_file, t_bool overwrite_existing);
+char *sim_filepath_parts (const char *pathname, const char *parts);
+char *sim_getcwd (char *buf, size_t buf_size);
+
 void sim_buf_swap_data (void *bptr, size_t size, size_t count);
 void sim_buf_copy_swapped (void *dptr, const void *bptr, size_t size, size_t count);
 const char *sim_get_os_error_text (int error);
