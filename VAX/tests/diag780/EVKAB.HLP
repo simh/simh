@@ -1,0 +1,224 @@
+1 TESTS
+        TEST    INST    |       TEST    INST    |       TEST    INST
+        ----    ----    |       ----    ----    |       ----    ----
+        1       BRB     |       2       BRW     |       3       BBC     
+        4       BBS     |       5       MOVB    |       6       MOVW    
+        7       MOVL    |       8       MOVQ    |       9       CLRB    
+        10      CLRW    |       11      CLRL    |       12      CLRQ    
+        13      MNEGB   |       14      MNEGW   |       15      MNEGL   
+        16      MCOMB   |       17      MCOMW   |       18      MCOML   
+        19      MOVZBW  |       20      MOVZBL  |       21      MOVZWL  
+        22      CVTBW   |       23      CVTBL   |       24      CVTWB   
+        25      CVTWL   |       26      CVTLB   |       27      CVTLW   
+        28      CMPB    |       29      CMPW    |       30      CMPL    
+        31      TSTB    |       32      TSTW    |       33      TSTL    
+        34      ADDB2   |       35      ADDB3   |       36      ADDW2   
+        37      ADDW3   |       38      ADDL2   |       39      ADDL3   
+        40      ADAWI   |       41      INCB    |       42      INCW    
+        43      INCL    |       44      ADWC    |       45      SUBB2   
+        46      SUBB3   |       47      SUBW2   |       48      SUBW3   
+        49      SUBL2   |       50      SUBL3   |       51      DECB    
+        52      DECW    |       53      DECL    |       54      SBWC    
+        55      MULB2   |       56      MULB3   |       57      MULW2   
+        58      MULW3   |       59      MULL2   |       60      MULL3   
+        61      EMUL    |       62      DIVB2   |       63      DIVB3   
+        64      DIVW2   |       65      DIVW3   |       66      DIVL2   
+        67      DIVL3   |       68      EDIV    |       69      ASHL    
+        70      ASHQ    |       71      BITB    |       72      BITW    
+        73      BITL    |       74      BISB2   |       75      BISB3   
+        76      BISW2   |       77      BISW3   |       78      BISL2   
+        79      BISL3   |       80      BICB2   |       81      BICB3   
+        82      BICW2   |       83      BICW3   |       84      BICL2   
+        85      BICL3   |       86      XORB2   |       87      XORB3   
+        88      XORW2   |       89      XORW3   |       90      XORL2   
+        91      XORL3   |       92      ROTL    |       93      FFC     
+        94      FFS     |       95      INSV    |       96      EXTV    
+        97      EXTZV   |       98      CMPV    |       99      CMPZV   
+        100     BNEQ    |       101     BEQL    |       102     BGTR    
+        103     BLEQ    |       104     BGEQ    |       105     BLSS    
+        106     BGTRU   |       107     BLEQU   |       108     BVC     
+        109     BVS     |       110     BCC     |       111     BCS     
+        112     BLBC    |       113     BLBS    |       114     BBCC    
+        115     BBCS    |       116     BBSC    |       117     BBSS    
+        118     BBCCI   |       119     BBSSI   |       120     ACBB    
+        121     ACBW    |       122     ACBL    |       123     AOBLEQ  
+        124     AOBLSS  |       125     SOBGEQ  |       126     SOBGTR  
+        127     INDEX   |       128     INSQUE  |       129     INSQHI  
+        130     INSQTI  |       131     REMQUE  |       132     REMQHI  
+        133     REMQTI  |       134     MOVC3   |       135     MOVC5   
+        136     MOVTC   |       137     MOVTUC  |       138     CMPC3   
+        139     CMPC5   |       140     SPANC   |       141     SCANC   
+        142     SKPC    |       143     LOCC    |       144     MATCHC  
+        145     MOVP    |       146     CMPP3   |       147     CMPP4   
+        148     ADDP4   |       149     ADDP6   |       150     SUBP4   
+        151     SUBP6   |       152     MULP    |       153     DIVP    
+        154     CVTLP   |       155     CVTPL   |       156     CVTPT   
+        157     CVTTP   |       158     CVTPS   |       159     CVTSP   
+        160     ASHP    |       161     EDITPC
+1 ATTACH
+ The CPU must be attached.  A VAX-11/730 CPU is a KA730, etc.
+
+2 KA730
+ DS> ATT KA730 HUB KAn (1) (2) (3) (4) (5) (6)
+        (1) Time-of-year clock (YES or NO)
+        (2) WCS last address
+        (3) Accelerator type (0 = FPA absent, 1 = FPA present)
+        (4) K-bytes of Main Memory
+        (5) User WCS loaded (YES or NO)
+        (6) SB errors (YES or NO)
+
+2 KA750
+ DS> ATT KA750 CMI KAn (1) (2) (3) (4) (5)
+        (1) G-Floating Instructions (YES or NO)
+        (2) H-Floating Instructions (YES or NO)
+        (3) Time-of-year clock (YES or NO)
+        (4) WCS Last Address, Hex
+        (5) Accelerator Type (0 = FPA absent, 1 = FPA present)
+
+2 KA780
+ DS> ATTACH KA780 SBI KAn (1) (2) (3) (4)
+        (1) G-Floating Instructions (YES or NO)
+        (2) H-Floating Instructions (YES or NO)
+        (3) WCS Last Address, Hex
+        (4) Accelerator Type (0 = FPA absent, 1 = FPA present)
+
+1 HELP
+ This program exercises most of the VAX native mode  instruction
+ set  that  can  be  executed in any mode, i.e., non-priviledged
+ instructions.   It  does  not  include   the   Floating   Point
+ instructions  that  are  in  EVKAC.   The program is capable of
+ running  under  the  Diagnostic  Supervisor   in   either   the
+ standalone environment or as a user task under VMS.  It is also
+ designed to run on any member of the VAX family of computers.
+
+1 SECTION
+
+2 INTEGER
+ Integer Arithmetic and Logical Instructions:
+
+ MOVB, MOVW, MOVL, MOVQ,  CLRB,  CLRW,  CLRL,  CLRQ,  MNEGB,
+ MNEGW,  MNEGL, MCOMB, MCOMW, MCOML, MOVZBW, MOVZBL, MOVZWL,
+ CVTBW, CVTBL, CVTWB, CVTWL, CVTLB, CVTLW, CMPB, CMPW, CMPL,
+ TSTB, TSTW, TSTL, ADDB2, ADDB3, ADDW2, ADDW3, ADDL2, ADDL3,
+ ADAWI, INCB, INCW, INCL, ADWC, SUBB2, SUBB3, SUBW2,  SUBW3,
+ SUBL2,  SUBL3, INCB, INCW, INCL, SBWC, MULB2, MULB3, MULW2,
+ MULW3, MULL2, MULL3,  EMUL,  DIVB2,  DIVB3,  DIVW2,  DIVW3,
+ DIVL2,  DIVL3,  EDIV,  ASHL, ASHQ, BITB, BITW, BITL, BISB2,
+ BISB3, BISW2, BISW3, BISL2,  BISL3,  BICB2,  BICB3,  BICW2,
+ BICW3,  BICL2,  BICL3,  XORB2,  XORB3, XORW2, XORW3, XORL2,
+ XORL3, and ROTL.
+
+ Integer Arithmetic Control Instructions:  ACBB, ACBW, ACBL,
+ AOBLEQ, AOBLSS, SOBGEQ, and SOBGTR.
+
+2 FIELD
+ Variable Length Bit Field Instructions:
+
+ EXTV, EXTV, INSV, CMPV, CMPZV, FFC, and FFS.
+
+ Single Bit Field Control  Instructions:   BBS,  BBC,  BBSS,
+ BBCS, BBSC, BBCC, BBSSI, BBCCI, BLBS, BLBC
+
+2 CONTROL
+ Basic Control Instructions:
+
+ BRB, BRW, BNEQ, BEQL, BGTR, BLEQ, BGEQ, BLSS, BGTRU, BLEQU,
+ BVC, BVS, BGEQU, and BLSSU.
+
+ Single Bit Field Control Instructions:
+
+ BBS, BBC, BBSS, BBCS, BBSC, BBCC, BBSSI, BBCCI, BLBS, BLBC
+
+ Integer Arithmetic Control Instructions:
+
+ ACBB, ACBW, ACBL, AOBLEQ, AOBLSS, SOBGEQ, and SOBGTR.
+
+2 QUEUE
+ Queue Instructions:
+
+ INSQUE, REMQUE, INSQHI, INSQTI, REMQHI, and REMQTI.
+
+2 CHARACTER
+ Character String Instructions:
+
+ MOVC3, MOVC5, MOVTC,  MOVTUC,  CMPC,  SCANC,  SPANC,  LOCC,
+ SKPC, and MATCHC.
+
+2 DECIMAL
+ Decimal String Instructions:
+
+ MOVP, CMPP3, CMPP4, ADDP4, ADDP6, SUBP4, SUBP6, MULP, DIVP,
+ CVTLP, CVTPL, CVTPT, CVTTP, CVTPS, CVTSP, and ASHP.
+
+2 MOVXMNEGX
+ All MOVX, MOVCn, MCOMX, MOVTXX, MNEG Instructions:
+
+ MOVB, MOVW, MOVL, MOVQ, MNEGB, MNEGW, MNEGL, MCOMB,  MCOMW,
+ MCOML, MOVZBW, MOVZBL, MOVZWL, MOVC3, MOVC5, MOVTC, MOVTUC,
+ and MOVP.
+
+2 CMPXX
+ All CMPX and CMPXX Instructions:
+
+ CMPB, CMPW, CMPL, CMPP3, CMPP4,  CMPC3,  CMPC5,  CMPV,  and
+ CMPZV.
+
+2 CVTXX
+ All CVTXX Instructions:
+
+ CVTLP, CVTPL, CVTPT, CVTTP, CVTPS, and CVTSP.
+
+2 ADDSUBMULDIV
+ All ADDxx, SUBxx, MULxx, and DIVxx Instructions.
+
+ ADDB2, ADDB3, ADDW2, ADDW3,  ADDL2,  ADDL3,  SUBB2,  SUBB3,
+ SUBW2,  SUBW3,  SUBL2,  SUBL3,  MULB2, MULB3, MULW2, MULW3,
+ MULL2, MULL3, DIVB2, DIVB3, DIVW2, DIVW3, DIVL2, and DIVL3.
+
+2 ASHX
+ All ASHX Instructions:
+
+ ASHL, ASHQ, and ASHP.
+
+1 EVENT
+ Event flags 2 through 6 are active with this program.
+
+2 FLAG2
+ Disables the interval  timer  interrupting  during  instruction
+ execution.
+
+2 FLAG3
+ Enables the interval timer interrupting while page faulting  is
+ also enabled.
+
+2 FLAG4
+ Enables the continuation of a subtest after an error  (normally
+ the subtest is aborted).
+
+2 FLAG5
+ Disables the DIVP instruction execution during  interval  timer
+ interrupting.
+
+2 FLAG6
+ Enables the user to create their own custom section of tests by
+ asking  what  tests  are to be executed.  If this flag is found
+ set, the diagnostic prompts the user for test numbers the  user
+ wants executed.  When done entering, hit Carriage Return to the
+ response for a test number, and the diagnostic will begin.  You
+ may  input  any  number  of  test  numbers.  IMPORTANT:  If you
+ select a particular section and that test number is NOT in  the
+ section,  THE  TEST  WILL  NOT  EXECUTE.   i.e.   SECTION takes
+ priority over FLAG6  selections.   To  obtain  a  list  of  the
+ instructions  and test numbers that execute those instructions,
+ type HELP EVKAB TESTS.
+
+ ****** THIS FLAG DOES NOT WORK IF THE OPERATOR FLAG BIT IS CLEAR ******
+
+1 QUICK
+ The QUICK flag disables the execution of the instructions  with
+ page  faulting  so  that  each  instruction  test  case is only
+ executed once for each addressing mode combination.
+
+1 SUMMARY
+ The summary report gives an error count  by  test  number.   No
+ report is generated if there were no errors.

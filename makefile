@@ -36,6 +36,15 @@
 # If debugging is desired, then GNU make can be invoked with
 # DEBUG=1 on the command line.
 #
+# The default build will run per simulator tests if they are 
+# available.  If building without running tests is desired, 
+# then GNU make should be invoked with TESTS=0 on the command 
+# line.
+#
+# Default test execution will produce summary output.  Detailed
+# test output can be produced if GNU make is invoked with 
+# TEST_ARG=-v on the command line.
+#
 # simh project support is provided for simulators that are built with 
 # dependent packages provided with the or by the operating system 
 # distribution OR for platforms where that isn't directly available 
@@ -88,6 +97,7 @@ ifeq (old,$(shell gmake --version /dev/null 2>&1 | grep 'GNU Make' | awk '{ if (
   $(warning *** Warning *** fully process this makefile)
 endif
 BUILD_SINGLE := $(MAKECMDGOALS) $(BLANK_SUFFIX)
+BUILD_MULTIPLE_VERB = is
 # building the pdp1, pdp11, tx-0, or any microvax simulator could use video support
 ifneq (,$(or $(findstring XXpdp1XX,$(addsuffix XX,$(addprefix XX,$(MAKECMDGOALS)))),$(findstring pdp11,$(MAKECMDGOALS)),$(findstring tx-0,$(MAKECMDGOALS)),$(findstring microvax1,$(MAKECMDGOALS)),$(findstring microvax2,$(MAKECMDGOALS)),$(findstring microvax3900,$(MAKECMDGOALS)),$(findstring XXvaxXX,$(addsuffix XX,$(addprefix XX,$(MAKECMDGOALS))))))
   VIDEO_USEFUL = true
@@ -102,11 +112,13 @@ ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring pdp10,$(MAKECMDGOA
   NETWORK_USEFUL = true
   ifneq (,$(findstring all,$(MAKECMDGOALS)))
     BUILD_MULTIPLE = s
+    BUILD_MULTIPLE_VERB = are
     VIDEO_USEFUL = true
     BESM6_BUILD = true
   endif
   ifneq (,$(word 2,$(MAKECMDGOALS)))
     BUILD_MULTIPLE = s
+    BUILD_MULTIPLE_VERB = are
   endif
 else
   ifeq ($(MAKECMDGOALS),)
@@ -114,6 +126,7 @@ else
     NETWORK_USEFUL = true
     VIDEO_USEFUL = true
     BUILD_MULTIPLE = s
+    BUILD_MULTIPLE_VERB = are
     BUILD_SINGLE := all $(BUILD_SINGLE)
     BESM6_BUILD = true
   endif
@@ -121,7 +134,12 @@ endif
 find_exe = $(abspath $(strip $(firstword $(foreach dir,$(strip $(subst :, ,$(PATH))),$(wildcard $(dir)/$(1))))))
 find_lib = $(abspath $(strip $(firstword $(foreach dir,$(strip $(LIBPATH)),$(wildcard $(dir)/lib$(1).$(LIBEXT))))))
 find_include = $(abspath $(strip $(firstword $(foreach dir,$(strip $(INCPATH)),$(wildcard $(dir)/$(1).h)))))
-find_test = $(abspath $(wildcard $(1)/tests/$(2)_test.ini))
+ifneq (0,$(TESTS))
+  find_test = $(abspath $(wildcard $(1)/tests/$(2)_test.ini))
+  TESTING_FEATURES = - Per simulator tests will be run
+else
+  TESTING_FEATURES = - Per simulator tests will be skipped
+endif
 ifneq ($(findstring Windows,$(OS)),)
   ifeq ($(findstring .exe,$(SHELL)),.exe)
     # MinGW
@@ -741,7 +759,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       else
         INCPATH = $(INCPATHSAVE)
         $(info *** Warning ***)
-        $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) are being built WITHOUT)
+        $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) $(BUILD_MULTIPLE_VERB) being built WITHOUT)
         $(info *** Warning *** libpcap networking support)
         $(info *** Warning ***)
         $(info *** Warning *** To build simulator(s) with libpcap networking support you)
@@ -782,7 +800,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       ifneq (,$(findstring Linux,$(OSTYPE))$(findstring Darwin,$(OSTYPE)))
         ifneq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
           $(info *** Info ***)
-          $(info *** Info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) are being built with)
+          $(info *** Info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) $(BUILD_MULTIPLE_VERB) being built with)
           $(info *** Info *** minimal libpcap networking support)
           $(info *** Info ***)
         endif
@@ -845,7 +863,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       NETWORK_CCDEFS += -DUSE_NETWORK
       NETWORK_FEATURES = - WITHOUT Local LAN networking support
       $(info *** Warning ***)
-      $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) are being built WITHOUT LAN networking support)
+      $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) $(BUILD_MULTIPLE_VERB) being built WITHOUT LAN networking support)
       $(info *** Warning ***)
       $(info *** Warning *** To build simulator(s) with networking support you should read)
       $(info *** Warning *** 0readme_ethernet.txt and follow the instructions regarding the)
@@ -1114,6 +1132,9 @@ ifneq (clean,$(MAKECMDGOALS))
   endif
   ifneq (,$(VIDEO_FEATURES))
     $(info *** $(VIDEO_FEATURES).)
+  endif
+  ifneq (,$(TESTING_FEATURES))
+    $(info *** $(TESTING_FEATURES).)
   endif
   ifneq (,$(GIT_COMMIT_ID))
     $(info ***)
@@ -1878,7 +1899,7 @@ else
 	copy $(@D)\microvax3900${EXE} $(@D)\vax${EXE}
 endif
 ifneq (,$(call find_test,$(VAXD),microvax3900))
-	$@ $(call find_test,$(VAXD),microvax3900)
+	$@ $(call find_test,$(VAXD),microvax3900) $(TEST_ARG)
 endif
 
 microvax1 : ${BIN}BuildROMs${EXE} ${BIN}microvax1${EXE}
@@ -1887,7 +1908,7 @@ ${BIN}microvax1${EXE} : ${VAX610} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX610} ${SIM} ${VAX610_OPT} -o $@ ${LDFLAGS}
 ifneq (,$(call find_test,$(VAXD),microvax1))
-	$@ $(call find_test,$(VAXD),microvax1)
+	$@ $(call find_test,$(VAXD),microvax1) $(TEST_ARG)
 endif
 
 rtvax1000 : ${BIN}BuildROMs${EXE} ${BIN}rtvax1000${EXE}
@@ -1896,7 +1917,7 @@ ${BIN}rtvax1000${EXE} : ${VAX630} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX630} ${SIM} ${VAX620_OPT} -o $@ ${LDFLAGS}
 ifneq (,$(call find_test,$(VAXD),rtvax1000))
-	$@ $(call find_test,$(VAXD),rtvax1000)
+	$@ $(call find_test,$(VAXD),rtvax1000) $(TEST_ARG)
 endif
 
 microvax2 : ${BIN}BuildROMs${EXE} ${BIN}microvax2${EXE}
@@ -1905,7 +1926,7 @@ ${BIN}microvax2${EXE} : ${VAX630} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX630} ${SIM} ${VAX630_OPT} -o $@ ${LDFLAGS}
 ifneq (,$(call find_test,$(VAXD),microvax2))
-	$@ $(call find_test,$(VAXD),microvax2)
+	$@ $(call find_test,$(VAXD),microvax2) $(TEST_ARG)
 endif
 
 vax730 : ${BIN}BuildROMs${EXE} ${BIN}vax730${EXE}
@@ -1914,7 +1935,7 @@ ${BIN}vax730${EXE} : ${VAX730} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX730} ${SIM} ${VAX730_OPT} -o $@ ${LDFLAGS}
 ifneq (,$(call find_test,$(VAXD),vax730))
-	$@ $(call find_test,$(VAXD),vax730)
+	$@ $(call find_test,$(VAXD),vax730) $(TEST_ARG)
 endif
 
 vax750 : ${BIN}BuildROMs${EXE} ${BIN}vax750${EXE}
@@ -1923,7 +1944,7 @@ ${BIN}vax750${EXE} : ${VAX750} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX750} ${SIM} ${VAX750_OPT} -o $@ ${LDFLAGS}
 ifneq (,$(call find_test,$(VAXD),vax750))
-	$@ $(call find_test,$(VAXD),vax750)
+	$@ $(call find_test,$(VAXD),vax750) $(TEST_ARG)
 endif
 
 vax780 : ${BIN}BuildROMs${EXE} ${BIN}vax780${EXE}
@@ -1932,7 +1953,7 @@ ${BIN}vax780${EXE} : ${VAX780} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX780} ${SIM} ${VAX780_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 ifneq (,$(call find_test,$(VAXD),vax780))
-	$@ $(call find_test,$(VAXD),vax780)
+	$@ $(call find_test,$(VAXD),vax780) $(TEST_ARG)
 endif
 
 vax8600 : ${BIN}BuildROMs${EXE} ${BIN}vax8600${EXE}
@@ -1941,7 +1962,7 @@ ${BIN}vax8600${EXE} : ${VAX8600} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX8600} ${SIM} ${VAX8600_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 ifneq (,$(call find_test,$(VAXD),vax8600))
-	$@ $(call find_test,$(VAXD),vax8600)
+	$@ $(call find_test,$(VAXD),vax8600) $(TEST_ARG)
 endif
 
 nova : ${BIN}nova${EXE}

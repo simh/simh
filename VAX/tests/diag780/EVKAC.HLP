@@ -1,0 +1,230 @@
+1 TESTS
+        TEST    INST    |       TEST    INST    |       TEST    INST
+        ----    ----    |       ----    ----    |       ----    ----
+        1       MOVF    |       2       MNEGF   |       3       TSTF    
+        4       CVTBF   |       5       CVTWF   |       6       CVTLF   
+        7       CVTFB   |       8       CVTFW   |       9       CVTFL   
+        10      CVTRFL  |       11      CMPF    |       12      ADDF2   
+        13      ADDF3   |       14      SUBF2   |       15      SUBF3   
+        16      MULF2   |       17      MULF3   |       18      DIVF2   
+        19      DIVF3   |       20      EMODF   |       21      POLYF   
+        22      ACBF    |       23      MNEGD   |       24      MOVD    
+        25      TSTD    |       26      CVTBD   |       27      CVTWD   
+        28      CVTLD   |       29      CVTDB   |       30      CVTDW   
+        31      CVTDL   |       32      CVTFD   |       33      CVTDF   
+        34      CVTRDL  |       35      CMPD    |       36      ADDD2   
+        37      ADDD3   |       38      SUBD2   |       39      SUBD3   
+        40      MULD2   |       41      MULD3   |       42      DIVD2   
+        43      DIVD3   |       44      EMODD   |       45      POLYD   
+        46      ACBD    |       47      MOVG    |       48      MNEGG   
+        49      CVTGB   |       50      CVTGW   |       51      CVTGL   
+        52      CVTRGL  |       53      CVTBG   |       54      CVTWG   
+        55      CVTLG   |       56      CVTFG   |       57      CVTGF   
+        58      CMPG    |       59      TSTG    |       60      ADDG2   
+        61      ADDG3   |       62      SUBG2   |       63      SUBG3   
+        64      MULG2   |       65      MULG3   |       66      DIVG2   
+        67      DIVG3   |       68      EMODG   |       69      POLYG   
+        70      ACBG    |       71      MOVH    |       72      MNEGH   
+        73      CVTHB   |       74      CVTHW   |       75      CVTHL   
+        76      CVTRHL  |       77      CVTBH   |       78      CVTWH   
+        79      CVTLH   |       80      CVTFH   |       81      CVTDH   
+        82      CVTGH   |       83      CVTHF   |       84      CVTHD   
+        85      CVTHG   |       86      CMPH    |       87      TSTH    
+        88      ADDH2   |       89      ADDH3   |       90      SUBH2   
+        91      SUBH3   |       92      MULH2   |       93      MULH3   
+        94      DIVH2   |       95      DIVH3   |       96      EMODH   
+        97      POLYH   |       98      ACBH
+
+1 ATTACH
+ The CPU must be attached.  A VAX-11/730 CPU is a KA730, etc.
+
+2 KA730
+ DS> ATT KA730 HUB KAn (1) (2) (3) (4) (5) (6)
+        (1) Time-of-year clock (YES or NO)
+        (2) WCS last address
+        (3) Accelerator type (0 = FPA absent, 1 = FPA present)
+        (4) K-bytes of Main Memory
+        (5) User WCS loaded (YES or NO)
+        (6) SB errors (YES or NO)
+
+2 KA750
+ DS> ATT KA750 CMI KAn (1) (2) (3) (4) (5)
+        (1) G-Floating Instructions (YES or NO)
+        (2) H-Floating Instructions (YES or NO)
+        (3) Time-of-year clock (YES or NO)
+        (4) WCS Last Address, Hex
+        (5) Accelerator Type (0 = FPA absent, 1 = FPA present)
+
+2 KA780
+ DS> ATTACH KA780 SBI KAn (1) (2) (3) (4)
+        (1) G-Floating Instructions (YES or NO)
+        (2) H-Floating Instructions (YES or NO)
+        (3) WCS Last Address, Hex
+        (4) Accelerator Type (0 = FPA absent, 1 = FPA present)
+
+1 HELP
+ This program exercises the floating point instructions that can
+ be  executed  in  any mode, i.e., non-priviledged instructions.
+ The  program  is  capable  of  running  under  the   Diagnostic
+ Supervisor  in  either  the standalone environment or as a user
+ task under VMS.  It is also designed to run on  any  member  of
+ the VAX family of computers.
+
+1 SECTION
+ Sections  have  been  allocated  to  test  certain  groups   of
+ instructions.   For  more  information, type HELP EVKAC SECTION
+ (section name).
+
+2 F_FLOATING
+
+ Single Precision Floating Point Instructions:
+
+ MOVF, MNEGF,  TSTF,  CVTBF,  CVTWF,  CVTLF,  CVTFB,  CVTFW,
+ CVTFL,  CVTRFL,  CMPF,  ADDFn,  SUBFn,  MULF, DIVFn, EMODF,
+ POLYF, ACBF.
+
+2 DOUBLE
+
+ Double  Precision  and  Extended  Range  Double   Precision
+ Floating Point Instructions:
+
+ MNEGD, MOVD,  TSTx,  CVTBD,  CVTWD,  CVTLD,  CVTDB,  CVTDW,
+ CVTDL,  CVTFD,  CVTDF,  CVTRDL,  CMPx, ADDDn, SUBDn, MULDn,
+ DIVDn, EMODx, POLYD, ACBD, MOVG, MNEGG, CVTGB, CMPG,  TSTG,
+ ADDGx, SUBGx, MULGx, DIVGx, EMODG, POLYG, ACBG.
+
+2 D_FLOATING
+
+ Double Precision Floating Point Instructions:
+
+ MNEGD, MOVD,  TSTx,  CVTBD,  CVTWD,  CVTLD,  CVTDB,  CVTDW,
+ CVTDL,  CVTFD,  CVTDF,  CVTRDL,  CMPx, ADDDn, SUBDn, MULDn,
+ DIVxn, EMODx, POLYD, ACBD.
+
+2 EXTENDED
+
+ Extended Range  Double  and  Quadruple  Precision  Floating
+ Point Instructions:
+
+ MOVG, MNEGG, CVTGB, CMPG, TSTG, ADDGx, SUBGx, MULGx, DIVGx,
+ EMODG,  POLYG, ACBG, MOVH, MNEGH, CVTHB, CMPH, TSTH, ADDHx,
+ SUBHx, MULHx, DIVHx, EMODH, POLYH, ACBH.
+
+2 G_FLOATING
+
+ Extended   Range   Double    Precision    Floating    Point
+ Instructions:
+
+ MOVG, MNEGG, CVTGB, CMPG, TSTG, ADDGx, SUBGx, MULGx, DIVGx,
+ EMODG, POLYG, ACBG.
+
+2 H_FLOATING
+
+ Extended   Range   Quadruple   Precision   Floating   Point
+ Instructions:
+
+ MOVH, MNEGH, CVTHB, CMPH, TSTH, ADDHx, SUBHx, MULHx, DIVHx,
+ EMODH, POLYH, ACBH.
+
+2 MOVXMNEGX
+
+ All MOVx and MNEGx  Single,  Double,  Double  Extended  and
+ Quadruple Extended Floating Point Instructions:
+
+ MOVF, MNEGF, MNEGD, MOVD, MOVG, MNEGG, MOVH, MNEGH.
+
+2 TSTX
+
+ All TSTx Single,  Double,  Double  Extended  and  Quadruple
+ Extended Floating Point Instructions:
+
+ TSTF, TSTD, TSTG, TSTH.
+
+2 CVTXX
+
+ All CVTxy and CVTxyz Single, Double,  Double  Extended  and
+ Quadruple Extended Floating Point Instructions:
+
+ CVTBF, CVTWF, CVTLF, CVTFB, CVTFW,  CVTFL,  CVTRFL,  CVTBD,
+ CVTWD,  CVTLD,  CVTDB,  CVTDW, CVTDL, CVTFD, CVTDF, CVTRDL,
+ CVTGB, CVTHB.
+
+2 CMPX
+
+ All CMPx Single,  Double,  Double  Extended  and  Quadruple
+ Extended Floating Point Instructions:
+
+ CMPF, CMPD, CMPG, CMPH.
+
+2 ADDSUBMULDIV
+
+ All ADDxn, SUBxn, MULxn and DIVxn  Single,  Double,  Double
+ Extended    and    Quadruple    Extended   Floating   Point
+ Instructions:
+
+ ADDFn, SUBFn, MULF,  DIVFn,  ADDDn,  SUBDn,  MULDn,  DIVDn,
+ ADDGx, SUBGx, MULGx, DIVGx, ADDHx, SUBHx, MULHx, DIVHx.
+
+2 EMODX
+
+ All EMODx Single, Double,  Double  Extended  and  Quadruple
+ Extended Floating Point Instructions:
+
+ EMODF, EMODD, EMODG, EMODH.
+
+2 POLYX
+
+ All POLYx Single, Double,  Double  Extended  and  Quadruple
+ Extended Floating Point Instructions:
+
+ POLYF, POLYD, POLYG, POLYH.
+
+2 ACBX
+
+ All ACBDx Single, Double, and Extended Range Floating Point
+ Instructions:
+
+ ACBF, ACBD, ACBG, ACBH.
+
+1 EVENT
+ Event flags 2 through 6 are active with this program.
+
+2 FLAG2
+ Disables the interval  timer  interrupting  during  instruction
+ execution.
+
+2 FLAG3
+ Enables the interval timer interrupting while page faulting  is
+ also enabled.
+
+2 FLAG4
+ Enables the continuation of a subtest after an error  (normally
+ the subtest is aborted).
+
+2 FLAG5
+ Disables the DIVP instruction execution during  interval  timer
+ interrupting.
+
+2 FLAG6
+ Enables the user to create their own custom section of tests by
+ asking  what  tests  are to be executed.  If this flag is found
+ set, the diagnostic prompts the user for test numbers the  user
+ wants executed.  When done entering, hit Carriage Return to the
+ response for a test number, and the diagnostic will begin.  You
+ may  input  any  number  of  test  numbers.  IMPORTANT:  If you
+ select a particular section and that test number is NOT in  the
+ section,  THE  TEST  WILL  NOT  EXECUTE.   i.e.   SECTION takes
+ priority over FLAG6  selections.   To  obtain  a  list  of  the
+ instructions and what test executes that instruction, type HELP
+ EVKAC TESTS.
+
+ ****** THIS FLAG DOES NOT WORK IF THE OPERATOR FLAG BIT IS CLEAR ******
+
+1 QUICK
+ The QUICK flag disables the execution of the instructions  with
+ page  faulting  so  that  each  instruction  test  case is only
+ executed once for each addressing mode combination.
+
+1 SUMMARY
+ The summary report gives an error count  by  test  number.   No
+ report is generated if there were no errors.

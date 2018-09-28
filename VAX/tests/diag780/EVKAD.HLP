@@ -1,0 +1,54 @@
+1 ATTACH
+ The CPU must be attached.  A VAX-11/730 CPU is a KA730, etc.
+
+2 KA730
+ DS> ATT KA730 HUB KAn (1) (2) (3) (4) (5) (6)
+        (1) Time-of-year clock (YES or NO)
+        (2) WCS last address
+        (3) Accelerator type (0 = FPA absent, 1 = FPA present)
+        (4) K-bytes of Main Memory
+        (5) User WCS loaded (YES or NO)
+        (6) SB errors (YES or NO)
+
+2 KA750
+ DS> ATT KA750 CMI KAn (1) (2) (3) (4) (5)
+        (1) G-Floating Instructions (YES or NO)
+        (2) H-Floating Instructions (YES or NO)
+        (3) Time-of-year clock (YES or NO)
+        (4) WCS Last Address, Hex
+        (5) Accelerator Type (0 = FPA absent, 1 = FPA present)
+
+2 KA780
+ DS> ATTACH KA780 SBI KAn (1) (2) (3) (4)
+        (1) G-Floating Instructions (YES or NO)
+        (2) H-Floating Instructions (YES or NO)
+        (3) WCS Last Address, Hex
+        (4) Accelerator Type (0 = FPA absent, 1 = FPA present)
+
+1 HELP
+ This program  exercises  all  of  the  VAX  compatibility  mode
+ instruction set.
+
+1 SECTION
+
+2 EXCEPTIONS
+ Tests the various compatibility mode  exceptions  by  verifying
+ the  mechanisms  used  by the VAX architecture to change to and
+ from PDP-11 compatibility mode.
+
+2 INSTRUCTIONS
+ Tests compatibility mode Single, Double,  and  Program  Control
+ instructions.
+
+1 EVENT
+ Event Flag 1 (set) - Accelerator testing (standalone  only)  is
+ inhibited.  Event Flag 1 (clear) - Accelerator testing provided
+ :  if Accelerator is present, the entire EVKAD  test  sequences
+ are  run  twice  for  each  test  pass,  once  with Accelerator
+ disabled, and once with Accelerator enabled.
+
+1 QUICK
+ The QUICK flag has no effect on this program.
+
+1 SUMMARY
+ This program does not provide a summary report.
