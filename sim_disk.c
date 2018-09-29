@@ -217,7 +217,7 @@ static void _disk_completion_dispatch (UNIT *uptr)
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 DISK_PCALLBACK callback = ctx->callback;
 
-sim_debug_unit (ctx->dbit, uptr, "_disk_completion_dispatch(unit=%d, dop=%d, callback=%p)\n", (int)(uptr-ctx->dptr->units), ctx->io_dop, ctx->callback);
+sim_debug_unit (ctx->dbit, uptr, "_disk_completion_dispatch(unit=%d, dop=%d, callback=%p)\n", (int)(uptr-ctx->dptr->units), ctx->io_dop, (void *)(ctx->callback));
 
 if (ctx->io_dop != DOP_DONE)
     abort();                                            /* horribly wrong, stop */
@@ -302,7 +302,7 @@ static struct sim_disk_fmt fmts[] = {
     { "SIMH", 0, DKUF_F_STD,  NULL},
     { "RAW",  0, DKUF_F_RAW,  sim_os_disk_implemented_raw},
     { "VHD",  0, DKUF_F_VHD,  sim_vhd_disk_implemented},
-    { NULL,   0, 0}
+    { NULL,   0, 0,           NULL}
     };
 
 /* Set disk format */
@@ -1096,7 +1096,6 @@ static uint16
 ODSChecksum (void *Buffer, uint16 WordCount)
     {
     int i;
-    uint16 Sum = 0;
     uint16 CheckSum = 0;
     uint16 *Buf = (uint16 *)Buffer;
 
@@ -2106,7 +2105,7 @@ for (i = 0; (stat == SCPE_OK) && (i < sec) && (i < 10); i++, da += wds)
             stat = SCPE_IOERR;
             break;
             }
-        if (wds != sim_fwrite (buf, sizeof (uint16), wds, uptr->fileref))
+        if ((size_t)wds != sim_fwrite (buf, sizeof (uint16), wds, uptr->fileref))
             stat = SCPE_IOERR;
         }
 free (buf);
@@ -3883,10 +3882,10 @@ void *handle;
     handle = dlopen("libuuid." S__STR(HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
     if (handle)
         uuid_generate_c = (void (*)(void *))((size_t)dlsym(handle, "uuid_generate"));
-if (uuid_generate_c)
-    uuid_generate_c(uuidaddr);
-else
-    _rand_uuid_gen (uuidaddr);
+    if (uuid_generate_c)
+        uuid_generate_c(uuidaddr);
+    else
+        _rand_uuid_gen (uuidaddr);
     if (handle)
         dlclose(handle);
 }

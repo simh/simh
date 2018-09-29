@@ -1122,14 +1122,6 @@ static void load_function(const char* function, _func* func_ptr) {
   }
 }
 
-static void try_load_function(const char* function, _func* func_ptr) {
-#ifdef _WIN32
-    *func_ptr = (_func)((size_t)GetProcAddress(hLib, function));
-#else
-    *func_ptr = (_func)((size_t)dlsym(hLib, function));
-#endif
-}
-
 /* load wpcap.dll as required */
 int load_pcap(void) {
   switch(lib_loaded) {
