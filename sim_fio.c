@@ -764,10 +764,12 @@ const char *p;
 
 if (((*filepath == '\'') || (*filepath == '"')) &&
     (filepath[strlen (filepath) - 1] == *filepath)) {
-    tempfilepath = malloc (1 + strlen (filepath));
+    size_t temp_size = 1 + strlen (filepath);
+
+    tempfilepath = malloc (temp_size);
     if (tempfilepath == NULL)
         return NULL;
-    strlcpy (tempfilepath, 1 + filepath, 1 + strlen (filepath));
+    strlcpy (tempfilepath, 1 + filepath, temp_size);
     tempfilepath[strlen (tempfilepath) - 1] = '\0';
     filepath = tempfilepath;
     }
@@ -776,28 +778,33 @@ if ((filepath[1] == ':')  ||
     (filepath[0] == '\\')){
         tot_len = 1 + strlen (filepath);
         fullpath = malloc (tot_len);
-        if (fullpath == NULL)
+        if (fullpath == NULL) {
+            free (tempfilepath);
             return NULL;
+            }
         strcpy (fullpath, filepath);
     }
 else {
     char dir[PATH_MAX+1] = "";
     char *wd = sim_getcwd(dir, sizeof (dir));
 
-    if (wd == NULL)
+    if (wd == NULL) {
+        free (tempfilepath);
         return NULL;
+        }
     tot_len = 1 + strlen (filepath) + 1 + strlen (dir);
     fullpath = malloc (tot_len);
-    if (fullpath == NULL)
+    if (fullpath == NULL) {
+        free (tempfilepath);
         return NULL;
-
+        }
     strlcpy (fullpath, dir, tot_len);
     strlcat (fullpath, "/", tot_len);
     strlcat (fullpath, filepath, tot_len);
     }
 while ((c = strchr (fullpath, '\\')))           /* standardize on / directory separator */
        *c = '/';
-while ((c = strstr (fullpath, "//")))           /* strip out redundant / characters */
+while ((c = strstr (fullpath + 1, "//")))       /* strip out redundant / characters (leaving the option for a leading //) */
        memmove (c, c + 1, 1 + strlen (c + 1));
 while ((c = strstr (fullpath, "/./")))          /* strip out irrelevant /./ sequences */
        memmove (c, c + 2, 1 + strlen (c + 2));
