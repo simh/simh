@@ -3956,7 +3956,6 @@ static t_stat sim_os_ttinit (void)
 sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_ttinit()\n");
 
 cmdfl = fcntl (fileno (stdin), F_GETFL, 0);             /* get old flags  and status */
-runfl = cmdfl;
 /* 
  * make sure systems with broken termios (that don't honor
  * VMIN=0 and VTIME=0) actually implement non blocking reads.  
@@ -4015,7 +4014,7 @@ sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_ttrun()\n");
 
 if (!isatty (fileno (stdin)))                           /* skip if !tty */
     return SCPE_OK;
-fcntl (fileno (stdin), F_SETFL, runfl);                 /* non-block mode */
+(void)fcntl (fileno (stdin), F_SETFL, runfl);           /* non-block mode */
 #if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
 runtty.c_cc[VINTR] = 0;                                 /* OS X doesn't deliver SIGINT to main thread when enabled */
 #else
@@ -4034,7 +4033,7 @@ sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_ttcmd() - BSDTTY\n");
 if (!isatty (fileno (stdin)))                           /* skip if !tty */
     return SCPE_OK;
 sim_os_set_thread_priority (PRIORITY_NORMAL);           /* try to raise pri */
-fcntl (0, F_SETFL, cmdfl);                              /* block mode */
+(void)fcntl (0, F_SETFL, cmdfl);                        /* block mode */
 if (tcsetattr (fileno(stdin), TCSETATTR_ACTION, &cmdtty) < 0)
     return SCPE_TTIERR;
 return SCPE_OK;

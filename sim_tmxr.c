@@ -1204,7 +1204,7 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
                             free (sockname);
                             free (peername);
                             if (!lp->notelnet) {
-                                sim_write_sock (newsock, (char *)mantra, sizeof(mantra));
+                                sim_write_sock (lp->sock, (char *)mantra, sizeof(mantra));
                                 tmxr_debug (TMXR_DBG_XMT, lp, "Sending", (char *)mantra, sizeof(mantra));
                                 lp->telnet_sent_opts = (uint8 *)realloc (lp->telnet_sent_opts, 256);
                                 memset (lp->telnet_sent_opts, 0, 256);
@@ -1255,7 +1255,7 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
                                 lp->ipad = address;                 /* ip address */
                                 tmxr_init_line (lp);                /* init line */
                                 if (!lp->notelnet) {
-                                    sim_write_sock (newsock, (char *)mantra, sizeof(mantra));
+                                    sim_write_sock (lp->sock, (char *)mantra, sizeof(mantra));
                                     tmxr_debug (TMXR_DBG_XMT, lp, "Sending", (char *)mantra, sizeof(mantra));
                                     lp->telnet_sent_opts = (uint8 *)realloc (lp->telnet_sent_opts, 256);
                                     memset (lp->telnet_sent_opts, 0, 256);
