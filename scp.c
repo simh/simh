@@ -3469,6 +3469,8 @@ if ((fpin = fopen (do_arg[0], "r")) == NULL) {          /* file failed to open? 
         return SCPE_OPENERR;                            /* return failure */
         }
     }
+else
+    strlcpy (cbuf, do_arg[0], sizeof (cbuf));           /* store name of successfully opened file */
 if (flag >= 0) {                                        /* Only bump nesting from command or nested */
     ++sim_do_depth;
     if (sim_on_inherit) {                               /* inherit ON condition actions? */
@@ -3494,8 +3496,11 @@ if (flag >= 0) {                                        /* Only bump nesting fro
     }
 
 sim_debug (SIM_DBG_DO, sim_dflt_dev, "do_cmd_label(%d, flag=%d, '%s', '%s')\n", sim_do_depth, flag, fcptr, label ? label : "");
-strlcpy( sim_do_filename[sim_do_depth], do_arg[0], 
-         sizeof (sim_do_filename[sim_do_depth]));       /* stash away do file name for possible use by 'call' command */
+if (NULL == (c = sim_filepath_parts (cbuf, "f")))
+    return SCPE_MEM;
+strlcpy( sim_do_filename[sim_do_depth], c, 
+         sizeof (sim_do_filename[sim_do_depth]));       /* stash away full path of do file name for possible use by 'call' command */
+free (c);
 sim_do_label[sim_do_depth] = label;                     /* stash away do label for possible use in messages */
 sim_goto_line[sim_do_depth] = 0;
 if (label) {
