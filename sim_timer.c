@@ -153,6 +153,7 @@ volatile t_bool sim_idle_wait = FALSE;              /* global flag */
 static int32 sim_calb_tmr = -1;                     /* the system calibrated timer */
 static int32 sim_calb_tmr_last = -1;                /* shadow value when at sim> prompt */
 static double sim_inst_per_sec_last = 0;            /* shadow value when at sim> prompt */
+static double sim_stop_time = 0;                    /* time when sim_stop_timer_services was called */
 
 static uint32 sim_idle_rate_ms = 0;
 static uint32 sim_os_sleep_min_ms = 0;
@@ -186,6 +187,7 @@ static t_bool sim_catchup_ticks = TRUE;
 #undef SIM_ASYNCH_CLOCKS
 #endif
 t_bool sim_asynch_timer = FALSE;
+
 
 #if defined (SIM_ASYNCH_CLOCKS)
 UNIT * volatile sim_wallclock_queue = QUEUE_LIST_END;
@@ -419,10 +421,7 @@ const t_bool rtc_avail = TRUE;
 
 uint32 sim_os_msec (void)
 {
-__int64 nowTime;
-
-GetSystemTimeAsFileTime ((FILETIME *)&nowTime);
-return (uint32)(((nowTime + 5000) / 10000) & 0xFFFFFFFF);
+return timeGetTime ();                      /* use Multi-Media time source */
 }
 
 void sim_os_sleep (unsigned int sec)
@@ -796,6 +795,7 @@ t_stat sim_timer_stop_svc (UNIT *uptr);
 #define DBG_ACK       0x080                 /* interrupt acknowledgement activities */
 #define DBG_CHK       0x100                 /* check scheduled activation time*/
 #define DBG_INT       0x200                 /* internal timer activities */
+#define DBG_GET       0x400                 /* get_time activities */
 DEBTAB sim_timer_debug[] = {
   {"TRACE",   DBG_TRC, "Trace routine calls"},
   {"IDLE",    DBG_IDL, "Idling activities"},
@@ -803,6 +803,7 @@ DEBTAB sim_timer_debug[] = {
   {"IACK",    DBG_ACK, "interrupt acknowledgement activities"},
   {"CALIB",   DBG_CAL, "Calibration activities"},
   {"TIME",    DBG_TIM, "Activation and scheduling activities"},
+  {"GETTIME", DBG_GET, "get_time activities"},
   {"INTER",   DBG_INT, "Internal timer activities"},
   {"THROT",   DBG_THR, "Throttling activities"},
   {"MUX",     DBG_MUX, "Tmxr scheduling activities"},
@@ -899,13 +900,19 @@ else {
 if (rtc_hz[tmr] != ticksper) {                          /* changing tick rate? */
     if (rtc_hz[tmr] == 0)
         rtc_clock_tick_start_time[tmr] = sim_timenow_double ();
+    if ((rtc_last_hz[tmr] != 0) && 
+        (rtc_last_hz[tmr] != ticksper) && 
+        (ticksper != 0))
+        rtc_currd[tmr] = (int32)(sim_timer_inst_per_sec () / ticksper);
     rtc_last_hz[tmr] = rtc_hz[tmr];
     rtc_hz[tmr] = ticksper;
     _rtcn_configure_calibrated_clock (tmr);
     if (ticksper != 0) {
         rtc_clock_tick_size[tmr] = 1.0 / ticksper;
-        rtc_currd[tmr] = (int32)(sim_timer_inst_per_sec () / ticksper);
+        sim_debug (DBG_CAL, &sim_timer_dev, "sim_rtcn_calb(ticksper=%d,tmr=%d) currd=%d\n", ticksper, tmr, rtc_currd[tmr]);
         }
+    else
+        sim_debug (DBG_CAL, &sim_timer_dev, "sim_rtcn_calb(ticksper=%d,tmr=%d) timer stopped currd was %d\n", ticksper, tmr, rtc_currd[tmr]);
     }
 if (ticksper == 0)                                      /* running? */
     return 10000;
@@ -2038,7 +2045,7 @@ return SCPE_STOP;
 
 void sim_rtcn_get_time (struct timespec *now, int tmr)
 {
-sim_debug (DBG_CAL, &sim_timer_dev, "sim_rtcn_get_time(tmr=%d)\n", tmr);
+sim_debug (DBG_GET, &sim_timer_dev, "sim_rtcn_get_time(tmr=%d)\n", tmr);
 clock_gettime (CLOCK_REALTIME, now);
 }
 
@@ -2097,7 +2104,8 @@ if ((rtc_hz[tmr] > sim_os_tick_hz) &&           /* faster than host tick */
     sim_debug (DBG_QUE, &sim_timer_dev, "_rtcn_tick_catchup_check() - Enabling catchup ticks for %s\n", sim_uname (sim_clock_unit[tmr]));
     return TRUE;
     }
-if (rtc_clock_catchup_eligible[tmr])
+if ((rtc_hz[tmr] > 0) && 
+    rtc_clock_catchup_eligible[tmr])
     {
     double tnow = sim_timenow_double();
 
@@ -2278,13 +2286,14 @@ return SCPE_OK;
   faster than the host system's clock.  This is optimal so that accurate 
   time measurements are taken.  If the simulated system doesn't have a 
   clock with an appropriate tick rate, an internal clock is run that meets 
-  this requirement, 
+  this requirement, OR when asynch clocks are enabled, the internal clock
+  is always run.
  */
 static void _rtcn_configure_calibrated_clock (int32 newtmr)
 {
 int32 tmr;
 
-/* Look for a timer running slower than the host system clock */
+/* Look for a timer running slower or the same as the host system clock */
 sim_int_clk_tps = MIN(CLK_TPS, sim_os_tick_hz);
 for (tmr=0; tmr<SIM_NTIMERS; tmr++) {
     if ((rtc_hz[tmr]) &&
@@ -2381,8 +2390,25 @@ return SCPE_OK;
 
 void sim_start_timer_services (void)
 {
-sim_debug (DBG_TRC, &sim_timer_dev, "sim_start_timer_services()\n");
-_rtcn_configure_calibrated_clock (sim_calb_tmr);
+/* 
+ * If we're quickly running again after being stopped for less than
+ * the time of one calibrated clock tick, then don't force a complete 
+ * recalibration of any timers that may have been previously running.
+ */
+if ((sim_calb_tmr_last != -1) && 
+    ((sim_timenow_double () - sim_stop_time) < rtc_clock_tick_size[sim_calb_tmr_last])) {
+    int32 clock_time = sim_activate_time (sim_clock_unit[sim_calb_tmr_last]);
+
+    sim_calb_tmr = sim_calb_tmr_last;
+    sim_cancel (sim_clock_unit[sim_calb_tmr]);
+    sim_activate (&sim_timer_units[sim_calb_tmr], clock_time);
+    sim_debug (DBG_TRC, &sim_timer_dev, "sim_start_timer_services() - restarting with previously calibrated timer %d (%s) at %d\n", sim_calb_tmr, sim_uname (sim_clock_unit[sim_calb_tmr]), clock_time);
+    }
+else {
+    sim_debug (DBG_TRC, &sim_timer_dev, "sim_start_timer_services() - starting from scratch\n");
+    sim_rtcn_init_all ();                                   /* re-init clocks */
+    _rtcn_configure_calibrated_clock (sim_calb_tmr);
+    }
 if (sim_timer_stop_time > sim_gtime())
     sim_activate_abs (&sim_stop_unit, (int32)(sim_timer_stop_time - sim_gtime()));
 #if defined(SIM_ASYNCH_CLOCKS)
@@ -2431,23 +2457,27 @@ for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
         accum = sim_cosched_interval[tmr];
         while (sim_clock_cosched_queue[tmr] != QUEUE_LIST_END) {
             UNIT *cptr = sim_clock_cosched_queue[tmr];
+            double usecs_remaining = cptr->usecs_remaining;
 
             sim_clock_cosched_queue[tmr] = cptr->next;
             cptr->next = NULL;
             cptr->cancel = NULL;
             accum += cptr->time;
+            cptr->usecs_remaining = 0.0;
             _sim_activate (cptr, clock_time);
-            cptr->usecs_remaining = cptr->usecs_remaining + floor(1000000.0 * (accum - ((accum > 0) ? 1 : 0)) * rtc_clock_tick_size[tmr]);
+            cptr->usecs_remaining = usecs_remaining + floor(1000000.0 * (accum - ((accum > 0) ? 1 : 0)) * rtc_clock_tick_size[tmr]);
             sim_debug (DBG_QUE, &sim_timer_dev, "sim_stop_timer_services() - tmr=%d scheduling %s after %d and %.0f usecs\n", tmr, sim_uname (cptr), clock_time, cptr->usecs_remaining);
             }
         sim_cosched_interval[tmr] = 0;
         }
     }
+
 sim_cancel (&SIM_INTERNAL_UNIT);                    /* Make sure Internal Timer is stopped */
 sim_cancel (&sim_timer_units[SIM_NTIMERS]);
 sim_calb_tmr_last = sim_calb_tmr;                   /* Save calibrated timer value for display */
 sim_inst_per_sec_last = sim_timer_inst_per_sec ();  /* Save execution rate for display */
 sim_calb_tmr = -1;
+sim_stop_time = sim_timenow_double ();              /* record when execution stopped */
 #if defined(SIM_ASYNCH_CLOCKS)
 pthread_mutex_lock (&sim_timer_lock);
 if (sim_timer_thread_running) {
@@ -2867,12 +2897,13 @@ if (uptr->a_next) {
     if (uptr == sim_wallclock_entry) {  /* Pending on the queue? */
         sim_wallclock_entry = NULL;
         uptr->a_next = NULL;
+        sim_debug (DBG_QUE, &sim_timer_dev, "Canceled Queue Pending Timer Event for %s\n", sim_uname(uptr));
         }
     else {
         if (uptr == sim_wallclock_queue) {
             sim_wallclock_queue = uptr->a_next;
             uptr->a_next = NULL;
-            sim_debug (DBG_QUE, &sim_timer_dev, "Canceling Timer Event for %s\n", sim_uname(uptr));
+            sim_debug (DBG_QUE, &sim_timer_dev, "Canceled Top Timer Event for %s\n", sim_uname(uptr));
             pthread_cond_signal (&sim_timer_wake);
             }
         else {
@@ -2888,7 +2919,7 @@ if (uptr->a_next) {
                 }
             }
         }
-    if (uptr->a_next == NULL) {
+    if (uptr->a_next == NULL) {         /* Was canceled? */
         uptr->a_due_time = uptr->a_due_gtime = uptr->a_usec_delay = 0;
         uptr->cancel = NULL;
         uptr->a_is_active = NULL;
