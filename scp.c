@@ -11633,6 +11633,10 @@ for (i=0; i<exp->size; i++) {
     free (exp->rules[i].match);                         /* deallocate match string */
     free (exp->rules[i].match_pattern);                 /* deallocate display format match string */
     free (exp->rules[i].act);                           /* deallocate action */
+#if defined(USE_REGEX)
+    if (exp->rules[i].switches & EXP_TYP_REGEX)
+        regfree (&exp->rules[i].regex);                               /* release compiled regex */
+#endif
     }
 free (exp->rules);
 exp->rules = NULL;
