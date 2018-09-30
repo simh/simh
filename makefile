@@ -479,8 +479,8 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       endif
     endif
   endif
-  # Find available RegEx library.  Prefer libpcreposix.
-  ifneq (,$(and $(call find_include,pcreposix),$(call find_include,pcre)))
+  # Find available RegEx library.  Prefer libpcreposix - except on OS X.
+  ifneq (,$(and $(call find_include,pcreposix),$(call find_include,pcre),$(subst Darwin,,$(OSTYPE))))
     ifneq (,$(and $(call find_lib,pcreposix),$(call find_lib,pcre)))
       OS_CCDEFS += -DHAVE_PCREPOSIX_H
       OS_LDFLAGS += -lpcreposix -lpcre
