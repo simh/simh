@@ -2521,6 +2521,11 @@ if (!sim_quiet) {
     show_version (stdout, NULL, NULL, 0, NULL);
     }
 show_version (stdnul, NULL, NULL, 1, NULL);             /* Quietly set SIM_OSTYPE */
+#if defined (HAVE_PCREPOSIX_H)
+setenv ("SIM_REGEX_TYPE", "PCREPOSIX", 1);              /* Publish regex type */
+#elif defined (HAVE_REGEX_H)
+setenv ("SIM_REGEX_TYPE", "REGEX", 1);                  /* Publish regex type */
+#endif
 if (((sim_dflt_dev->flags & DEV_DEBUG) == 0) &&         /* default device without debug? */
     (sim_dflt_dev->debflags == NULL)) {
     sim_dflt_dev->flags |= DEV_DEBUG;                   /* connect default event debugging */
