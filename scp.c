@@ -6184,156 +6184,6 @@ t_stat pwd_cmd (int32 flg, CONST char *cptr)
 return show_cmd (0, "DEFAULT");
 }
 
-#if defined (_WIN32)
-
-t_stat sim_dir_scan (const char *cptr, DIR_ENTRY_CALLBACK entry, void *context)
-{
-HANDLE hFind;
-WIN32_FIND_DATAA File;
-struct stat filestat;
-char WildName[PATH_MAX + 1];
-
-strlcpy (WildName, cptr, sizeof(WildName));
-cptr = WildName;
-sim_trim_endspc (WildName);
-if ((hFind =  FindFirstFileA (cptr, &File)) != INVALID_HANDLE_VALUE) {
-    t_int64 FileSize;
-    char DirName[PATH_MAX + 1], FileName[PATH_MAX + 1];
-    char *c;
-    const char *backslash = strchr (cptr, '\\');
-    const char *slash = strchr (cptr, '/');
-    const char *pathsep = (backslash && slash) ? MIN (backslash, slash) : (backslash ? backslash : slash);
-
-    GetFullPathNameA(cptr, sizeof(DirName), DirName, (char **)&c);
-    c = strrchr (DirName, '\\');
-    *c = '\0';                                  /* Truncate to just directory path */
-    if (!pathsep || (!strcmp (slash, "/*")))    /* Separator wasn't mentioned? */
-        pathsep = "\\";                         /* Default to Windows backslash */
-    if (*pathsep == '/') {                      /* If slash separator? */
-        while ((c = strchr (DirName, '\\')))
-            *c = '/';                           /* Convert backslash to slash */
-        }
-    sprintf (&DirName[strlen (DirName)], "%c", *pathsep);
-    do {
-        FileSize = (((t_int64)(File.nFileSizeHigh)) << 32) | File.nFileSizeLow;
-        sprintf (FileName, "%s%s", DirName, File.cFileName);
-        stat (FileName, &filestat);
-        entry (DirName, File.cFileName, FileSize, &filestat, context);
-        } while (FindNextFile (hFind, &File));
-    FindClose (hFind);
-    }
-else
-    return SCPE_ARG;
-return SCPE_OK;
-}
-
-#else /* !defined (_WIN32) */
-
-#if defined (HAVE_GLOB)
-#include <glob.h>
-#else /* !defined (HAVE_GLOB) */
-#include <dirent.h>
-#if defined (HAVE_FNMATCH)
-#include <fnmatch.h>
-#endif
-#endif /* defined (HAVE_GLOB) */
-
-t_stat sim_dir_scan (const char *cptr, DIR_ENTRY_CALLBACK entry, void *context)
-{
-#if defined (HAVE_GLOB)
-glob_t  paths;
-#else
-DIR *dir;
-#endif
-struct stat filestat;
-char *c;
-char DirName[PATH_MAX + 1], WholeName[PATH_MAX + 1], WildName[PATH_MAX + 1];
-
-memset (DirName, 0, sizeof(DirName));
-memset (WholeName, 0, sizeof(WholeName));
-strlcpy (WildName, cptr, sizeof(WildName));
-cptr = WildName;
-sim_trim_endspc (WildName);
-if ((*cptr != '/') || (0 == memcmp (cptr, "./", 2)) || (0 == memcmp (cptr, "../", 3))) {
-    sim_getcwd (WholeName, sizeof (WholeName)-1);
-    strlcat (WholeName, "/", sizeof (WholeName));
-    strlcat (WholeName, cptr, sizeof (WholeName));
-    sim_trim_endspc (WholeName);
-    }
-else
-    strlcpy (WholeName, cptr, sizeof (WholeName));
-while ((c = strstr (WholeName, "/./")))
-    memmove (c + 1, c + 3, 1 + strlen (c + 3));
-while ((c = strstr (WholeName, "//")))
-    memmove (c + 1, c + 2, 1 + strlen (c + 2));
-while ((c = strstr (WholeName, "/../"))) {
-    char *c1;
-    c1 = c - 1;
-    while ((c1 >= WholeName) && (*c1 != '/'))
-        c1 = c1 - 1;
-    memmove (c1, c + 3, 1 + strlen (c + 3));
-    while (0 == memcmp (WholeName, "/../", 4))
-        memmove (WholeName, WholeName+3, 1 + strlen (WholeName+3));
-    }
-c = strrchr (WholeName, '/');
-if (c) {
-    memmove (DirName, WholeName, 1+c-WholeName);
-    DirName[1+c-WholeName] = '\0';
-    }
-else {
-    sim_getcwd (WholeName, sizeof (WholeName)-1);
-    }
-cptr = WholeName;
-#if defined (HAVE_GLOB)
-memset (&paths, 0, sizeof (paths));
-if (0 == glob (cptr, 0, NULL, &paths)) {
-#else
-dir = opendir(DirName[0] ? DirName : "/.");
-if (dir) {
-    struct dirent *ent;
-#endif
-    t_offset FileSize;
-    char FileName[PATH_MAX + 1];
-    const char *MatchName = 1 + strrchr (cptr, '/');
-    char *p_name;
-    struct tm *local;
-#if defined (HAVE_GLOB)
-    size_t i;
-#endif
-
-#if defined (HAVE_GLOB)
-    for (i=0; i<paths.gl_pathc; i++) {
-        sprintf (FileName, "%s", paths.gl_pathv[i]);
-#else
-    while ((ent = readdir (dir))) {
-#if defined (HAVE_FNMATCH)
-        if (fnmatch(MatchName, ent->d_name, 0))
-            continue;
-#else
-        /* only match exact name without fnmatch support */
-        if (strcmp(MatchName, ent->d_name) != 0)
-            continue;
-#endif
-        sprintf (FileName, "%s%s", DirName, ent->d_name);
-#endif
-        p_name = FileName + strlen (DirName);
-        memset (&filestat, 0, sizeof (filestat));
-        (void)stat (FileName, &filestat);
-        FileSize = (t_offset)((filestat.st_mode & S_IFDIR) ? 0 : sim_fsize_name_ex (FileName));
-        entry (DirName, p_name, FileSize, &filestat, context);
-        }
-#if defined (HAVE_GLOB)
-    globfree (&paths);
-#else
-    closedir (dir);
-#endif
-    }
-else
-    return SCPE_ARG;
-return SCPE_OK;
-}
-#endif /* !defined(_WIN32) */
-
 typedef struct {
     char LastDir[PATH_MAX + 1];
     t_offset TotalBytes;
@@ -6404,24 +6254,31 @@ t_stat dir_cmd (int32 flg, CONST char *cptr)
 DIR_CTX dir_state;
 t_stat r;
 char WildName[PATH_MAX + 1];
-
+struct stat filestat;
 
 memset (&dir_state, 0, sizeof (dir_state));
 strlcpy (WildName, cptr, sizeof(WildName));
 cptr = WildName;
 sim_trim_endspc (WildName);
 if (*cptr == '\0')
-    cptr = "./*";
+    strlcpy (WildName, ".", sizeof (WildName));
 else {
-    struct stat filestat;
-
-    if ((!stat (WildName, &filestat)) && (filestat.st_mode & S_IFDIR))
-        strlcat (WildName, "/*", sizeof (WildName));
+    if ((WildName[strlen (WildName) - 1] == '/') ||
+        (WildName[strlen (WildName) - 1] == '\\'))
+        WildName[strlen (WildName) - 1] = '\0';
     }
+if ((!stat (WildName, &filestat)) && (filestat.st_mode & S_IFDIR))
+    strlcat (WildName, "/*", sizeof (WildName));
 r = sim_dir_scan (cptr, sim_dir_entry, &dir_state);
 sim_dir_entry (NULL, NULL, 0, NULL, &dir_state);    /* output summary */
-if (r != SCPE_OK)
-    return sim_messagef (SCPE_ARG, "File Not Found\n");
+if (r != SCPE_OK) {
+    char *cp = sim_filepath_parts (WildName, "p");
+
+    sim_printf ("\n Directory of %s\n\n", cp);
+    sim_printf ("File Not Found\n\n");
+    free (cp);
+    return SCPE_OK;
+    }
 return r;
 }
 

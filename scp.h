@@ -230,12 +230,6 @@ size_t sim_strlcpy (char *dst, const char *src, size_t size);
 #ifndef strcasecmp
 #define strcasecmp(str1, str2) sim_strcasecmp ((str1), (str2))
 #endif
-typedef void (*DIR_ENTRY_CALLBACK)(const char *directory, 
-                                   const char *filename,
-                                   t_offset FileSize,
-                                   const struct stat *filestat,
-                                   void *context);
-t_stat sim_dir_scan (const char *cptr, DIR_ENTRY_CALLBACK entry, void *context);
 CONST char *get_sim_opt (int32 opt, CONST char *cptr, t_stat *st);
 CONST char *get_sim_sw (CONST char *cptr);
 const char *put_switches (char *buf, size_t bufsize, uint32 sw);

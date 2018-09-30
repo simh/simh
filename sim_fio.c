@@ -71,6 +71,13 @@ t_bool sim_toffset_64;              /* Large File (>2GB) file I/O Support availa
 #undef fputc
 #endif
 
+#ifndef MAX
+#define MAX(a,b)  (((a) >= (b)) ? (a) : (b))
+#endif
+#ifndef MIN
+#define MIN(a,b)  (((a) <= (b)) ? (a) : (b))
+#endif
+
 /* OS-independent, endian independent binary I/O package
 
    For consistency, all binary data read and written by the simulator
@@ -737,16 +744,16 @@ return getcwd (buf, buf_size);
 /*
  * Parsing and expansion of file names.
  *
- *    %~I%        - expands the value of %I% removing any surrounding quotes (")
- *    %~fI%       - expands the value of %I% to a fully qualified path name
- *    %~pI%       - expands the value of %I% to a path only
- *    %~nI%       - expands the value of %I% to a file name only
- *    %~xI%       - expands the value of %I% to a file extension only
+ *    %~I%        - expands filepath value removing any surrounding quotes (" or ')
+ *    %~fI%       - expands filepath value to a fully qualified path name
+ *    %~pI%       - expands filepath value to a path only
+ *    %~nI%       - expands filepath value to a file name only
+ *    %~xI%       - expands filepath value to a file extension only
  *
  * The modifiers can be combined to get compound results:
  *
- *    %~pnI%      - expands the value of %I% to a path and name only
- *    %~nxI%      - expands the value of %I% to a file name and extension only
+ *    %~pnI%      - expands filepath value to a path and name only
+ *    %~nxI%      - expands filepath value to a file name and extension only
  *
  * In the above example above %I% can be replaced by other 
  * environment variables or numeric parameters to a DO command
@@ -804,25 +811,34 @@ else {
     }
 while ((c = strchr (fullpath, '\\')))           /* standardize on / directory separator */
        *c = '/';
+if ((fullpath[1] == ':') && islower (fullpath[0]))
+    fullpath[0] = toupper (fullpath[0]);
 while ((c = strstr (fullpath + 1, "//")))       /* strip out redundant / characters (leaving the option for a leading //) */
        memmove (c, c + 1, 1 + strlen (c + 1));
 while ((c = strstr (fullpath, "/./")))          /* strip out irrelevant /./ sequences */
        memmove (c, c + 2, 1 + strlen (c + 2));
 while ((c = strstr (fullpath, "/../"))) {       /* process up directory climbing */
-    char *cl = c -1;
+    char *cl = c - 1;
 
     while ((*cl != '/') && (cl > fullpath))
         --cl;
-    if (*cl == '/')
-        memmove (cl, c + 3, 1 + strlen (c + 3));
+    if ((cl <= fullpath) ||                      /* Digest Leading /../ sequences */
+        ((fullpath[1] == ':') && (c == fullpath + 2)))
+        memmove (c, c + 3, 1 + strlen (c + 3)); /* and removing intervening elements */
     else
-        break;
+        if (*cl == '/')
+            memmove (cl, c + 3, 1 + strlen (c + 3));/* and removing intervening elements */
+        else
+            break;
     }
 name = 1 + strrchr (fullpath, '/');
 ext = strrchr (name, '.');
 if (ext == NULL)
     ext = name + strlen (name);
-for (p = parts, tot_size = 0; *p; p++) {
+tot_size = 0;
+if (*parts == '\0')             /* empty part specifier means strip only quotes */
+    tot_size = strlen (tempfilepath);
+for (p = parts; *p; p++) {
     switch (*p) {
         case 'f':
             tot_size += strlen (fullpath);
@@ -840,6 +856,8 @@ for (p = parts, tot_size = 0; *p; p++) {
     }
 result = malloc (1 + tot_size);
 *result = '\0';
+if (*parts == '\0')             /* empty part specifier means strip only quotes */
+    strlcat (result, filepath, 1 + tot_size);
 for (p = parts; *p; p++) {
     switch (*p) {
         case 'f':
@@ -866,3 +884,135 @@ free (fullpath);
 free (tempfilepath);
 return result;
 }
+
+#if defined (_WIN32)
+
+t_stat sim_dir_scan (const char *cptr, DIR_ENTRY_CALLBACK entry, void *context)
+{
+HANDLE hFind;
+WIN32_FIND_DATAA File;
+struct stat filestat;
+char WildName[PATH_MAX + 1];
+
+strlcpy (WildName, cptr, sizeof(WildName));
+cptr = WildName;
+sim_trim_endspc (WildName);
+if ((hFind =  FindFirstFileA (cptr, &File)) != INVALID_HANDLE_VALUE) {
+    t_int64 FileSize;
+    char DirName[PATH_MAX + 1], FileName[PATH_MAX + 1];
+    char *c;
+    const char *backslash = strchr (cptr, '\\');
+    const char *slash = strchr (cptr, '/');
+    const char *pathsep = (backslash && slash) ? MIN (backslash, slash) : (backslash ? backslash : slash);
+
+    GetFullPathNameA(cptr, sizeof(DirName), DirName, (char **)&c);
+    c = strrchr (DirName, '\\');
+    *c = '\0';                                  /* Truncate to just directory path */
+    if (!pathsep || (!strcmp (slash, "/*")))    /* Separator wasn't mentioned? */
+        pathsep = "\\";                         /* Default to Windows backslash */
+    if (*pathsep == '/') {                      /* If slash separator? */
+        while ((c = strchr (DirName, '\\')))
+            *c = '/';                           /* Convert backslash to slash */
+        }
+    sprintf (&DirName[strlen (DirName)], "%c", *pathsep);
+    do {
+        FileSize = (((t_int64)(File.nFileSizeHigh)) << 32) | File.nFileSizeLow;
+        sprintf (FileName, "%s%s", DirName, File.cFileName);
+        stat (FileName, &filestat);
+        entry (DirName, File.cFileName, FileSize, &filestat, context);
+        } while (FindNextFile (hFind, &File));
+    FindClose (hFind);
+    }
+else
+    return SCPE_ARG;
+return SCPE_OK;
+}
+
+#else /* !defined (_WIN32) */
+
+#include <sys/stat.h>
+#if defined (HAVE_GLOB)
+#include <glob.h>
+#else /* !defined (HAVE_GLOB) */
+#include <dirent.h>
+#if defined (HAVE_FNMATCH)
+#include <fnmatch.h>
+#endif
+#endif /* defined (HAVE_GLOB) */
+
+t_stat sim_dir_scan (const char *cptr, DIR_ENTRY_CALLBACK entry, void *context)
+{
+#if defined (HAVE_GLOB)
+glob_t  paths;
+#else
+DIR *dir;
+#endif
+struct stat filestat;
+char *c;
+char DirName[PATH_MAX + 1], WholeName[PATH_MAX + 1], WildName[PATH_MAX + 1];
+
+memset (DirName, 0, sizeof(DirName));
+memset (WholeName, 0, sizeof(WholeName));
+strlcpy (WildName, cptr, sizeof(WildName));
+cptr = WildName;
+sim_trim_endspc (WildName);
+c = sim_filepath_parts (cptr, "f");
+strlcpy (WholeName, c, sizeof (WholeName));
+free (c);
+c = strrchr (WholeName, '/');
+if (c) {
+    memmove (DirName, WholeName, 1+c-WholeName);
+    DirName[1+c-WholeName] = '\0';
+    }
+else
+    DirName[0] = '\0';
+cptr = WholeName;
+#if defined (HAVE_GLOB)
+memset (&paths, 0, sizeof (paths));
+if (0 == glob (cptr, 0, NULL, &paths)) {
+#else
+dir = opendir(DirName[0] ? DirName : "/.");
+if (dir) {
+    struct dirent *ent;
+#endif
+    t_offset FileSize;
+    char FileName[PATH_MAX + 1];
+    const char *MatchName = 1 + strrchr (cptr, '/');
+    char *p_name;
+    struct tm *local;
+#if defined (HAVE_GLOB)
+    size_t i;
+#endif
+
+#if defined (HAVE_GLOB)
+    for (i=0; i<paths.gl_pathc; i++) {
+        sprintf (FileName, "%s", paths.gl_pathv[i]);
+#else
+    while ((ent = readdir (dir))) {
+#if defined (HAVE_FNMATCH)
+        if (fnmatch(MatchName, ent->d_name, 0))
+            continue;
+#else
+        /* only match exact name without fnmatch support */
+        if (strcmp(MatchName, ent->d_name) != 0)
+            continue;
+#endif
+        sprintf (FileName, "%s%s", DirName, ent->d_name);
+#endif
+        p_name = FileName + strlen (DirName);
+        memset (&filestat, 0, sizeof (filestat));
+        (void)stat (FileName, &filestat);
+        FileSize = (t_offset)((filestat.st_mode & S_IFDIR) ? 0 : sim_fsize_name_ex (FileName));
+        entry (DirName, p_name, FileSize, &filestat, context);
+        }
+#if defined (HAVE_GLOB)
+    globfree (&paths);
+#else
+    closedir (dir);
+#endif
+    }
+else
+    return SCPE_ARG;
+return SCPE_OK;
+}
+#endif /* !defined(_WIN32) */
