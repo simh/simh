@@ -414,8 +414,10 @@ for (i = 0; i < (int32) dibp->lnt; i = i + 2) {         /* create entries */
     if ((dibp->rd == NULL) && (dibp->wr == NULL) && (dibp->vnum == 0)) 
         iodibp[idx] = NULL;                         /* deregister DIB */
     else {
-        iodispR[idx] = dibp->rd;                    /* set rd dispatch */
-        iodispW[idx] = dibp->wr;                    /* set wr dispatch */
+        if (dibp->rd)
+            iodispR[idx] = dibp->rd;                /* set rd dispatch */
+        if (dibp->wr)
+            iodispW[idx] = dibp->wr;                /* set wr dispatch */
         iodibp[idx] = dibp;                         /* remember DIB */
         }
     }
