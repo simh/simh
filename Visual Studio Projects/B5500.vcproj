@@ -95,6 +95,8 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
+				Description="Running Available Tests"
+				CommandLine="Post-Build-Event.cmd B5500 &quot;$(TargetDir)$(TargetName).exe&quot;"
 			/>
 		</Configuration>
 		<Configuration
@@ -179,6 +181,8 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
+				Description="Running Available Tests"
+				CommandLine="Post-Build-Event.cmd B5500 &quot;$(TargetDir)$(TargetName).exe&quot;"
 			/>
 		</Configuration>
 	</Configurations>

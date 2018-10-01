@@ -95,6 +95,8 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
+				Description="Running Available Tests"
+				CommandLine="Post-Build-Event.cmd VAX &quot;$(TargetDir)$(TargetName).exe&quot; vax-diag_test"
 			/>
 		</Configuration>
 		<Configuration
@@ -183,6 +185,8 @@
 			/>
 			<Tool
 				Name="VCPostBuildEventTool"
+				Description="Running Available Tests"
+				CommandLine="Post-Build-Event.cmd VAX &quot;$(TargetDir)$(TargetName).exe&quot; vax-diag_test"
 			/>
 		</Configuration>
 	</Configurations>

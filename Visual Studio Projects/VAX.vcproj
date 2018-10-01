@@ -96,7 +96,7 @@
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="Copy result to Model based binary name (MicroVAX3900.exe)"
-				CommandLine="if exist &quot;$(TargetPath)&quot; copy &quot;$(TargetPath)&quot; &quot;$(TargetDir)MicroVAX3900$(TargetExt)&quot; "
+				CommandLine="if exist &quot;$(TargetPath)&quot; copy &quot;$(TargetPath)&quot; &quot;$(TargetDir)MicroVAX3900$(TargetExt)&quot; &#x0D;&#x0A;Post-Build-Event.cmd VAX &quot;$(TargetDir)$(TargetName).exe&quot; vax-diag_test"
 			/>
 		</Configuration>
 		<Configuration
@@ -186,7 +186,7 @@
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="Copy result to Model based binary name (MicroVAX3900.exe)"
-				CommandLine="if exist &quot;$(TargetPath)&quot; copy &quot;$(TargetPath)&quot; &quot;$(TargetDir)MicroVAX3900$(TargetExt)&quot; "
+				CommandLine="if exist &quot;$(TargetPath)&quot; copy &quot;$(TargetPath)&quot; &quot;$(TargetDir)MicroVAX3900$(TargetExt)&quot; &#x0D;&#x0A;Post-Build-Event.cmd VAX &quot;$(TargetDir)$(TargetName).exe&quot; vax-diag_test"
 			/>
 		</Configuration>
 	</Configurations>
