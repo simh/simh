@@ -170,7 +170,7 @@ uint32 int_req = 0;                     /* Interrupt request */
 int32 PCX;                              /* External view of PC */
 int32 PC;
 UNIT *uptr;
-uint32 port;                            //port used in any IN/OUT
+uint16 port;                            //port used in any IN/OUT
 
 /* function prototypes */
 void    set_cpuint(int32 int_num);
