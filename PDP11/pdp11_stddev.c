@@ -63,7 +63,9 @@
 
 #include "pdp11_defs.h"
 #include "sim_tmxr.h"
+#if defined(USE_DISPLAY)
 #include "display/display.h"
+#endif
 
 #define TTICSR_IMP      (CSR_DONE + CSR_IE)             /* terminal input */
 #define TTICSR_RW       (CSR_IE)
