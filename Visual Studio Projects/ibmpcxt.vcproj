@@ -95,7 +95,7 @@
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="Running Available Tests"
-				CommandLine="Post-Build-Event.cmd  &quot;$(TargetDir)$(TargetName).exe&quot;"
+				CommandLine="Post-Build-Event.cmd Intel-Systems\ibmpcxt &quot;$(TargetDir)$(TargetName).exe&quot;"
 			/>
 		</Configuration>
 		<Configuration
@@ -181,7 +181,7 @@
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="Running Available Tests"
-				CommandLine="Post-Build-Event.cmd  &quot;$(TargetDir)$(TargetName).exe&quot;"
+				CommandLine="Post-Build-Event.cmd Intel-Systems\ibmpcxt &quot;$(TargetDir)$(TargetName).exe&quot;"
 			/>
 		</Configuration>
 	</Configurations>
