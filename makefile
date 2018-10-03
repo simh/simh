@@ -1837,54 +1837,81 @@ pdp1 : ${BIN}pdp1${EXE}
 ${BIN}pdp1${EXE} : ${PDP1} ${SIM}
 	${MKDIRBIN}
 	${CC} ${PDP1} ${SIM} ${PDP1_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${PDP1D},pdp1))
+	$@ $(call find_test,${PDP1D},pdp1) $(TEST_ARG)
+endif
 
 pdp4 : ${BIN}pdp4${EXE}
 
 ${BIN}pdp4${EXE} : ${PDP18B} ${SIM}
 	${MKDIRBIN}
 	${CC} ${PDP18B} ${SIM} ${PDP4_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${PDP18BD},pdp4))
+	$@ $(call find_test,${PDP18BD},pdp4) $(TEST_ARG)
+endif
 
 pdp7 : ${BIN}pdp7${EXE}
 
 ${BIN}pdp7${EXE} : ${PDP18B} ${SIM}
 	${MKDIRBIN}
 	${CC} ${PDP18B} ${SIM} ${PDP7_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${PDP18BD},pdp7))
+	$@ $(call find_test,${PDP18BD},pdp7) $(TEST_ARG)
+endif
 
 pdp8 : ${BIN}pdp8${EXE}
 
 ${BIN}pdp8${EXE} : ${PDP8} ${SIM}
 	${MKDIRBIN}
 	${CC} ${PDP8} ${SIM} ${PDP8_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${PDP8D},pdp8))
+	$@ $(call find_test,${PDP8D},pdp8) $(TEST_ARG)
+endif
 
 pdp9 : ${BIN}pdp9${EXE}
 
 ${BIN}pdp9${EXE} : ${PDP18B} ${SIM}
 	${MKDIRBIN}
 	${CC} ${PDP18B} ${SIM} ${PDP9_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${PDP18BD},pdp9))
+	$@ $(call find_test,${PDP18BD},pdp9) $(TEST_ARG)
+endif
 
 pdp15 : ${BIN}pdp15${EXE}
 
 ${BIN}pdp15${EXE} : ${PDP18B} ${SIM}
 	${MKDIRBIN}
 	${CC} ${PDP18B} ${SIM} ${PDP15_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${PDP18BD},pdp15))
+	$@ $(call find_test,${PDP18BD},pdp15) $(TEST_ARG)
+endif
 
 pdp10 : ${BIN}pdp10${EXE}
 
 ${BIN}pdp10${EXE} : ${PDP10} ${SIM}
 	${MKDIRBIN}
 	${CC} ${PDP10} ${SIM} ${PDP10_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${PDP10D},pdp10))
+	$@ $(call find_test,${PDP10D},pdp10) $(TEST_ARG)
+endif
 
 pdp11 : ${BIN}BuildROMs${EXE} ${BIN}pdp11${EXE}
 
 ${BIN}pdp11${EXE} : ${PDP11} ${SIM}
 	${MKDIRBIN}
 	${CC} ${PDP11} ${SIM} ${PDP11_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${PDP11D},pdp11))
+	$@ $(call find_test,${PDP11D},pdp11) $(TEST_ARG)
+endif
 
 uc15 : ${BIN}uc15${EXE}
 
 ${BIN}uc15${EXE} : ${UC15} ${SIM}
 	${MKDIRBIN}
 	${CC} ${UC15} ${SIM} ${UC15_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${PDP11D},uc15))
+	$@ $(call find_test,${PDP11D},uc15) $(TEST_ARG)
+endif
 
 vax : microvax3900
 
@@ -1970,18 +1997,27 @@ nova : ${BIN}nova${EXE}
 ${BIN}nova${EXE} : ${NOVA} ${SIM}
 	${MKDIRBIN}
 	${CC} ${NOVA} ${SIM} ${NOVA_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${NOVAD},nova))
+	$@ $(call find_test,${NOVAD},nova) $(TEST_ARG)
+endif
 
 eclipse : ${BIN}eclipse${EXE}
 
 ${BIN}eclipse${EXE} : ${ECLIPSE} ${SIM}
 	${MKDIRBIN}
 	${CC} ${ECLIPSE} ${SIM} ${ECLIPSE_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${NOVAD},eclipse))
+	$@ $(call find_test,${NOVAD},eclipse) $(TEST_ARG)
+endif
 
 h316 : ${BIN}h316${EXE}
 
 ${BIN}h316${EXE} : ${H316} ${SIM}
 	${MKDIRBIN}
 	${CC} ${H316} ${SIM} ${H316_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${H316D},h316))
+	$@ $(call find_test,${H316D},h316) $(TEST_ARG)
+endif
 
 hp2100 : ${BIN}hp2100${EXE}
 
@@ -1989,6 +2025,9 @@ ${BIN}hp2100${EXE} : ${HP2100} ${SIM}
 ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
 	${MKDIRBIN}
 	${CC} ${HP2100} ${SIM} ${HP2100_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${HP2100D},hp2100))
+	$@ $(call find_test,${HP2100D},hp2100) $(TEST_ARG)
+endif
 else
 	$(info hp2100 can't be built using C++)
 endif
@@ -1999,6 +2038,9 @@ ${BIN}hp3000${EXE} : ${HP3000} ${SIM}
 ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
 	${MKDIRBIN}
 	${CC} ${HP3000} ${SIM} ${HP3000_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${HP3000D},hp3000))
+	$@ $(call find_test,${HP3000D},hp3000) $(TEST_ARG)
+endif
 else
 	$(info hp3000 can't be built using C++)
 endif
@@ -2008,18 +2050,27 @@ i1401 : ${BIN}i1401${EXE}
 ${BIN}i1401${EXE} : ${I1401} ${SIM}
 	${MKDIRBIN}
 	${CC} ${I1401} ${SIM} ${I1401_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${I1401D},i1401))
+	$@ $(call find_test,${I1401D},i1401) $(TEST_ARG)
+endif
 
 i1620 : ${BIN}i1620${EXE}
 
 ${BIN}i1620${EXE} : ${I1620} ${SIM}
 	${MKDIRBIN}
 	${CC} ${I1620} ${SIM} ${I1620_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${I1620D},i1620))
+	$@ $(call find_test,${I1620D},i1620) $(TEST_ARG)
+endif
 
 i7094 : ${BIN}i7094${EXE}
 
 ${BIN}i7094${EXE} : ${I7094} ${SIM}
 	${MKDIRBIN}
 	${CC} ${I7094} ${SIM} ${I7094_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${I7094D},i7094))
+	$@ $(call find_test,${I7094D},i7094) $(TEST_ARG)
+endif
 
 ibm1130 : ${BIN}ibm1130${EXE}
 
@@ -2032,6 +2083,9 @@ ifneq ($(WIN32),)
 	del BIN\ibm1130.o
 else
 	${CC} ${IBM1130} ${SIM} ${IBM1130_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${IBM1130D},ibm1130))
+	$@ $(call find_test,${IBM1130D},ibm1130) $(TEST_ARG)
+endif
 endif
 else
 	$(info ibm1130 can't be built using C++)
@@ -2042,126 +2096,189 @@ s3 : ${BIN}s3${EXE}
 ${BIN}s3${EXE} : ${S3} ${SIM}
 	${MKDIRBIN}
 	${CC} ${S3} ${SIM} ${S3_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${S3D},s3))
+	$@ $(call find_test,${S3D},s3) $(TEST_ARG)
+endif
 
 altair : ${BIN}altair${EXE}
 
 ${BIN}altair${EXE} : ${ALTAIR} ${SIM}
 	${MKDIRBIN}
 	${CC} ${ALTAIR} ${SIM} ${ALTAIR_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${ALTAIRD},altair))
+	$@ $(call find_test,${ALTAIRD},altair) $(TEST_ARG)
+endif
 
 altairz80 : ${BIN}altairz80${EXE}
 
 ${BIN}altairz80${EXE} : ${ALTAIRZ80} ${SIM}
 	${MKDIRBIN}
 	${CC} ${ALTAIRZ80} ${SIM} ${ALTAIRZ80_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${ALTAIRZ80D},altairz80))
+	$@ $(call find_test,${ALTAIRZ80D},altairz80) $(TEST_ARG)
+endif
 
 gri : ${BIN}gri${EXE}
 
 ${BIN}gri${EXE} : ${GRI} ${SIM}
 	${MKDIRBIN}
 	${CC} ${GRI} ${SIM} ${GRI_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${GRID},gri))
+	$@ $(call find_test,${GRID},gri) $(TEST_ARG)
+endif
 
 lgp : ${BIN}lgp${EXE}
 
 ${BIN}lgp${EXE} : ${LGP} ${SIM}
 	${MKDIRBIN}
 	${CC} ${LGP} ${SIM} ${LGP_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${LGPD},lgp))
+	$@ $(call find_test,${LGPD},lgp) $(TEST_ARG)
+endif
 
 id16 : ${BIN}id16${EXE}
 
 ${BIN}id16${EXE} : ${ID16} ${SIM}
 	${MKDIRBIN}
 	${CC} ${ID16} ${SIM} ${ID16_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${ID32D},id16))
+	$@ $(call find_test,${ID32D},id16) $(TEST_ARG)
+endif
 
 id32 : ${BIN}id32${EXE}
 
 ${BIN}id32${EXE} : ${ID32} ${SIM}
 	${MKDIRBIN}
 	${CC} ${ID32} ${SIM} ${ID32_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${ID32D},id32))
+	$@ $(call find_test,${ID32D},id32) $(TEST_ARG)
+endif
 
 sds : ${BIN}sds${EXE}
 
 ${BIN}sds${EXE} : ${SDS} ${SIM}
 	${MKDIRBIN}
 	${CC} ${SDS} ${SIM} ${SDS_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${SDSD},sds))
+	$@ $(call find_test,${SDSD},sds) $(TEST_ARG)
+endif
 
 swtp6800mp-a : ${BIN}BuildROMs${EXE} ${BIN}swtp6800mp-a${EXE}
 
 ${BIN}swtp6800mp-a${EXE} : ${SWTP6800MP-A} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${SWTP6800MP-A} ${SIM} ${SWTP6800_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${SWTP6800D},swtp6800mp-a))
+	$@ $(call find_test,${SWTP6800D},swtp6800mp-a) $(TEST_ARG)
+endif
 
 swtp6800mp-a2 : ${BIN}BuildROMs${EXE} ${BIN}swtp6800mp-a2${EXE}
 
 ${BIN}swtp6800mp-a2${EXE} : ${SWTP6800MP-A2} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${SWTP6800MP-A2} ${SIM} ${SWTP6800_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${SWTP6800D},swtp6800mp-a2))
+	$@ $(call find_test,${SWTP6800D},swtp6800mp-a2) $(TEST_ARG)
+endif
 
 isys8010: ${BIN}isys8010${EXE}
 
 ${BIN}isys8010${EXE} : ${ISYS8010} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${ISYS8010} ${SIM} ${ISYS8010_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${ISYS8010D},isys8010))
+	$@ $(call find_test,${ISYS8010D},isys8010) $(TEST_ARG)
+endif
 
 isys8020: ${BIN}isys8020${EXE}
 
 ${BIN}isys8020${EXE} : ${ISYS8020} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${ISYS8020} ${SIM} ${ISYS8020_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${ISYS8020D},isys8020))
+	$@ $(call find_test,${ISYS8020D},isys8020) $(TEST_ARG)
+endif
 
 isys8024: ${BIN}isys8024${EXE}
 
 ${BIN}isys8024${EXE} : ${ISYS8024} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${ISYS8024} ${SIM} ${ISYS8024_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${ISYS8024D},isys8024))
+	$@ $(call find_test,${ISYS8024D},isys8024) $(TEST_ARG)
+endif
 
 isys8030: ${BIN}isys8030${EXE}
 
 ${BIN}isys8030${EXE} : ${ISYS8030} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${ISYS8030} ${SIM} ${ISYS8030_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${ISYS8030D},isys8030))
+	$@ $(call find_test,${ISYS8030D},isys8030) $(TEST_ARG)
+endif
 
 imds-225: ${BIN}imds-225${EXE}
 
 ${BIN}imds-225${EXE} : ${IMDS-225} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${IMDS-225} ${SIM} ${IMDS-225_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${IMDS-225D},imds-225))
+	$@ $(call find_test,${IMDS-225D},imds-225) $(TEST_ARG)
+endif
 
 ibmpc: ${BIN}ibmpc${EXE}
 
 ${BIN}ibmpc${EXE} : ${IBMPC} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${IBMPC} ${SIM} ${IBMPC_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${IBMPCD},ibmpc))
+	$@ $(call find_test,${IBMPCD},ibmpc) $(TEST_ARG)
+endif
 
 ibmpcxt: ${BIN}ibmpcxt${EXE}
 
 ${BIN}ibmpcxt${EXE} : ${IBMPCXT} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${IBMPCXT} ${SIM} ${IBMPCXT_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${IBMPCXTD},ibmpcxt))
+	$@ $(call find_test,${IBMPCXTD},ibmpcxt) $(TEST_ARG)
+endif
 
 scelbi: ${BIN}scelbi${EXE}
 
 ${BIN}scelbi${EXE} : ${SCELBI} ${SIM}
 	${MKDIRBIN}
 	${CC} ${SCELBI} ${SIM} ${SCELBI_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${SCELBID},scelbi))
+	$@ $(call find_test,${SCELBID},scelbi) $(TEST_ARG)
+endif
 
 tx-0 : ${BIN}tx-0${EXE}
 
 ${BIN}tx-0${EXE} : ${TX0} ${SIM}
 	${MKDIRBIN}
 	${CC} ${TX0} ${SIM} ${TX0_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${TX0D},tx-0))
+	$@ $(call find_test,${TX0D},tx-0) $(TEST_ARG)
+endif
 
 ssem : ${BIN}ssem${EXE}
 
 ${BIN}ssem${EXE} : ${SSEM} ${SIM}
 	${MKDIRBIN}
 	${CC} ${SSEM} ${SIM} ${SSEM_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${SSEMD},ssem))
+	$@ $(call find_test,${SSEMD},ssem) $(TEST_ARG)
+endif
 
 cdc1700 : ${BIN}cdc1700${EXE}
 
 ${BIN}cdc1700${EXE} : ${CDC1700} ${SIM}
 	${MKDIRBIN}
 	${CC} ${CDC1700} ${SIM} ${CDC1700_OPT} ${CC_OUTSPEC} ${LDFLAGS}
+ifneq (,$(call find_test,${CDC1700D},cdc1700))
+	$@ $(call find_test,${CDC1700D},cdc1700) $(TEST_ARG)
+endif
 
 besm6 : ${BIN}besm6${EXE}
 
@@ -2169,6 +2286,9 @@ ${BIN}besm6${EXE} : ${BESM6} ${SIM}
 ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
 	${MKDIRBIN}
 	${CC} ${BESM6} ${SIM} ${BESM6_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${BESM6D},besm6))
+	$@ $(call find_test,${BESM6D},besm6) $(TEST_ARG)
+endif
 else
 	$(info besm6 can't be built using C++)
 endif
@@ -2178,78 +2298,117 @@ sigma : ${BIN}sigma${EXE}
 ${BIN}sigma${EXE} : ${SIGMA} ${SIM}
 	${MKDIRBIN}
 	${CC} ${SIGMA} ${SIM} ${SIGMA_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${SIGMAD},sigma))
+	$@ $(call find_test,${SIGMAD},sigma) $(TEST_ARG)
+endif
 
 alpha : ${BIN}alpha${EXE}
 
 ${BIN}alpha${EXE} : ${ALPHA} ${SIM}
 	${MKDIRBIN}
 	${CC} ${ALPHA} ${SIM} ${ALPHA_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${ALPHAD},alpha))
+	$@ $(call find_test,${ALPHAD},alpha) $(TEST_ARG)
+endif
 
 sage : ${BIN}sage${EXE}
 
 ${BIN}sage${EXE} : ${SAGE} ${SIM}
 	${MKDIRBIN}
 	${CC} ${SAGE} ${SIM} ${SAGE_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${SAGED},sage))
+	$@ $(call find_test,${SAGED},sage) $(TEST_ARG)
+endif
 
 pdq3 : ${BIN}pdq3${EXE}
 
 ${BIN}pdq3${EXE} : ${PDQ3} ${SIM}
 	${MKDIRBIN}
 	${CC} ${PDQ3} ${SIM} ${PDQ3_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${PDQ3D},pdq3))
+	$@ $(call find_test,${PDQ3D},pdq3) $(TEST_ARG)
+endif
 
 b5500 : $(BIN)b5500$(EXE)
 
 ${BIN}b5500${EXE} : ${B5500} ${SIM} 
 	${MKDIRBIN}
 	${CC} ${B5500} ${SIM} ${B5500_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${B5500D},b5500))
+	$@ $(call find_test,${B5500D},b5500) $(TEST_ARG)
+endif
 
 3b2 : ${BIN}BuildROMs${EXE} $(BIN)3b2$(EXE)
  
 ${BIN}3b2${EXE} : ${ATT3B2} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${ATT3B2} ${SIM} ${ATT3B2_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${ATT3B2D},3b2))
+	$@ $(call find_test,${ATT3B2D},3b2) $(TEST_ARG)
+endif
 
 i7090 : $(BIN)i7090$(EXE)
 
 ${BIN}i7090${EXE} : ${I7090} ${SIM} 
 	${MKDIRBIN}
 	${CC} ${I7090} ${SIM} ${I7090_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${I7000D},i7090))
+	$@ $(call find_test,${I7000D},i7090) $(TEST_ARG)
+endif
 
 i7080 : $(BIN)i7080$(EXE)
 
 ${BIN}i7080${EXE} : ${I7080} ${SIM} 
 	${MKDIRBIN}
 	${CC} ${I7080} ${SIM} ${I7080_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${I7080D},i7080))
+	$@ $(call find_test,${I7080D},i7080) $(TEST_ARG)
+endif
 
 i7070 : $(BIN)i7070$(EXE)
 
 ${BIN}i7070${EXE} : ${I7070} ${SIM} 
 	${MKDIRBIN}
 	${CC} ${I7070} ${SIM} ${I7070_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${I7070D},i7070))
+	$@ $(call find_test,${I7070D},i7070) $(TEST_ARG)
+endif
 
 i7010 : $(BIN)i7010$(EXE)
 
 ${BIN}i7010${EXE} : ${I7010} ${SIM} 
 	${MKDIRBIN}
 	${CC} ${I7010} ${SIM} ${I7010_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${I7010D},i7010))
+	$@ $(call find_test,${I7010D},i7010) $(TEST_ARG)
+endif
 
 i704 : $(BIN)i704$(EXE)
 
 ${BIN}i704${EXE} : ${I704} ${SIM} 
 	${MKDIRBIN}
 	${CC} ${I704} ${SIM} ${I704_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${I704D},i704))
+	$@ $(call find_test,${I704D},i704) $(TEST_ARG)
+endif
 
 i701 : $(BIN)i701$(EXE)
 
 ${BIN}i701${EXE} : ${I701} ${SIM} 
 	${MKDIRBIN}
 	${CC} ${I701} ${SIM} ${I701_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${I701D},i701))
+	$@ $(call find_test,${I701D},i701) $(TEST_ARG)
+endif
 
 i650 : $(BIN)i650$(EXE)
 
 ${BIN}i650${EXE} : ${I650} ${SIM} 
 	${MKDIRBIN}
 	${CC} ${I650} ${SIM} ${I650_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${I650D},i650))
+	$@ $(call find_test,${I650D},i650) $(TEST_ARG)
+endif
 
 # Front Panel API Demo/Test program
 
