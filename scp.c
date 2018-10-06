@@ -2788,7 +2788,6 @@ for (i=0; i<cmd_cnt; ++i) {
     }
 free (hlp_cmdp);
 fprintf (st, "\n");
-return;
 }
 
 static void fprint_header (FILE *st, t_bool *pdone, char *context)
@@ -4189,7 +4188,6 @@ for (; *ip && (op < oend); ) {
 sim_sub_instr_off[outstr_off] = 0;
 strcpy (instr, tmpbuf);
 free (tmpbuf);
-return;
 }
 
 t_stat shift_args (char *do_arg[], size_t arg_count)
@@ -7732,9 +7730,8 @@ else if ((flag == RU_STEP) ||
         if ((r != SCPE_OK) || (sim_step <= 0))          /* error? */
             return SCPE_ARG;
         }
-    else sim_step = 1;
-    if ((flag == RU_STEP) && (sim_switches & SWMASK ('T')))
-        sim_step = (int32)((sim_timer_inst_per_sec ()*sim_step)/1000000.0);
+    else
+        sim_step = 1;
     }
 else if (flag == RU_NEXT) {                             /* next */
     t_addr *addrs;
@@ -7822,10 +7819,14 @@ if (signal (SIGTERM, int_handler) == SIG_ERR) {         /* set WRU */
     sim_ttcmd ();
     return r;
     }
+if (sim_step) {                                         /* set step timer */
+    if (sim_switches & SWMASK ('T'))                    /* stepping for elapsed time? */
+        sim_activate_after (&sim_step_unit, (uint32)sim_step);/* wall clock based step */
+    else
+        sim_activate (&sim_step_unit, sim_step);        /* instruction based step */
+    }
 stop_cpu = FALSE;
 sim_is_running = TRUE;                                  /* flag running */
-if (sim_step)                                           /* set step timer */
-    sim_activate (&sim_step_unit, sim_step);
 fflush(stdout);                                         /* flush stdout */
 if (sim_log)                                            /* flush log if enabled */
     fflush (sim_log);
@@ -8014,7 +8015,6 @@ fprintf (st, "\n");
 void fprint_stopped (FILE *st, t_stat v)
 {
 fprint_stopped_gen (st, v, sim_PC, sim_dflt_dev);
-return;
 }
 
 /* Unit service for step timeout, originally scheduled by STEP n command
@@ -8045,7 +8045,6 @@ return sim_cancel (&sim_step_unit);
 void int_handler (int sig)
 {
 stop_cpu = TRUE;
-return;
 }
 
 /* Examine/deposit commands
@@ -10738,7 +10737,7 @@ else
 
 t_stat sim_activate_after_abs (UNIT *uptr, uint32 usec_delay)
 {
-return _sim_activate_after_abs (uptr, usec_delay);
+return _sim_activate_after_abs (uptr, (double)usec_delay);
 }
 
 t_stat sim_activate_after_abs_d (UNIT *uptr, double usec_delay)
@@ -12921,7 +12920,6 @@ topic->text = newt;
 memcpy (newt + topic->len, text, len);
 topic->len +=len;
 newt[topic->len] = '\0';
-return;
 }
 
 /* Release memory held by a topic and its children.
@@ -12940,7 +12938,6 @@ for (i = 0; i < topic->kids; i++) {
     free (child);
     }
 free (topic->children);
-return;
 }
 
 /* Build a help tree from a string.
@@ -13295,7 +13292,6 @@ fclose (tmp);
 remove (tmpnam);
 free (tmpnam);
 #endif
-return;
 }
 /* Flatten and display help for those who say they prefer it.
  */

@@ -2562,7 +2562,12 @@ if (usec_delay < 0.0) {
     sim_debug (DBG_QUE, &sim_timer_dev, "sim_timer_activate_after(%s, %.0f usecs) - surprising usec value\n", 
                sim_uname(uptr), usec_delay);
     }
-uptr->usecs_remaining = 0.0;
+if ((sim_is_running) || (tmr <= SIM_NTIMERS))
+    uptr->usecs_remaining = 0.0;
+else {                                      /* defer non timer wallclock activations until a calibrated timer is in effect */
+    uptr->usecs_remaining = usec_delay;
+    usec_delay = 0;
+    }
 /* 
  * Handle long delays by aligning with the calibrated timer's calibration
  * activities.  Delays which would expire prior to the next calibration
@@ -2576,6 +2581,8 @@ inst_per_usec = sim_timer_inst_per_sec () / 1000000.0;
 inst_delay_d = floor(inst_per_usec * usec_delay);
 inst_delay = (int32)inst_delay_d;
 if ((inst_delay == 0) && (usec_delay != 0))
+    inst_delay_d = inst_delay = 1;  /* Minimum non-zero delay is 1 instruction */
+if (uptr->usecs_remaining != 0.0)   /* No calibrated timer yet, wait one cycle */
     inst_delay_d = inst_delay = 1;  /* Minimum non-zero delay is 1 instruction */
 if ((sim_calb_tmr != -1) && (rtc_hz[sim_calb_tmr])) {       /* Calibrated Timer available? */
     int32 inst_til_tick = sim_activate_time (&sim_timer_units[sim_calb_tmr]) - 1;
