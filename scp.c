@@ -3501,8 +3501,10 @@ if (flag >= 0) {                                        /* Only bump nesting fro
     }
 
 sim_debug (SIM_DBG_DO, sim_dflt_dev, "do_cmd_label(%d, flag=%d, '%s', '%s')\n", sim_do_depth, flag, fcptr, label ? label : "");
-if (NULL == (c = sim_filepath_parts (cbuf, "f")))
-    return SCPE_MEM;
+if (NULL == (c = sim_filepath_parts (cbuf, "f"))) {
+    stat = SCPE_MEM;
+    goto Cleanup_Return;
+    }
 strlcpy( sim_do_filename[sim_do_depth], c, 
          sizeof (sim_do_filename[sim_do_depth]));       /* stash away full path of do file name for possible use by 'call' command */
 free (c);
