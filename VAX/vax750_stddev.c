@@ -656,12 +656,13 @@ void iccs_wr (int32 val)
 sim_debug_bits_hdr (TMR_DB_REG, &tmr_dev, "iccs_wr()", tmr_iccs_bits, tmr_iccs, val, TRUE);
 if ((val & TMR_CSR_RUN) == 0) {                         /* clearing run? */
     if (tmr_iccs & TMR_CSR_RUN) {                       /* run 1 -> 0? */
-        tmr_icr = icr_rd ();                            /* update itr */
+        tmr_icr = icr_rd ();                            /* update icr */
+        sim_debug (TMR_DB_REG, &tmr_dev, "iccs_wr() - stopped clock with remaining ICR=0x%08X\n", tmr_icr);
         sim_rtcn_calb (0, TMR_CLK);                     /* stop timer */
         }
     sim_cancel (&tmr_unit);                             /* cancel timer */
     }
-if (val & CSR_DONE)                                     /* Interrupt Acked? */
+if ((tmr_iccs & CSR_DONE) && (val & CSR_DONE))          /* Interrupt Acked? */
     sim_rtcn_tick_ack (20, TMR_CLK);                    /* Let timers know */
 tmr_iccs = tmr_iccs & ~(val & TMR_CSR_W1C);             /* W1C csr */
 tmr_iccs = (tmr_iccs & ~TMR_CSR_WR) |                   /* new r/w */
@@ -748,7 +749,7 @@ if (tmr_iccs & TMR_CSR_IE) {                        /* ie? set int req */
     }
 else
     tmr_int = 0;
-AIO_SET_INTERRUPT_LATENCY(tmr_poll*clk_tps);            /* set interrrupt latency */
+AIO_SET_INTERRUPT_LATENCY(tmr_poll*clk_tps);        /* set interrrupt latency */
 return SCPE_OK;
 }
 
@@ -921,9 +922,9 @@ TOY *toy = (TOY *)clk_unit.filebuf;
 struct timespec base, now, val;
 
 sim_rtcn_get_time(&now, TMR_CLK);                       /* get curr time */
-base.tv_sec = toy->toy_gmtbase;
+base.tv_sec = (time_t)toy->toy_gmtbase;
 base.tv_nsec = toy->toy_gmtbasemsec * 1000000;
-sim_timespec_diff (&val, &now, &base);
+sim_timespec_diff (&val, &now, &base);                  /* val = now - base */
 sim_debug (TMR_DB_TODR, &clk_dev, "todr_rd() - TODR=0x%X - %s\n", (int32)(val.tv_sec*100 + val.tv_nsec/10000000), todr_fmt_vms_todr ((int32)(val.tv_sec*100 + val.tv_nsec/10000000)));
 return (int32)(val.tv_sec*100 + val.tv_nsec/10000000);  /* 100hz Clock Ticks */
 }
@@ -938,7 +939,7 @@ time_t tbase;
    future read operations in "battery backed-up" state */
 
 sim_rtcn_get_time(&now, TMR_CLK);                       /* get curr time */
-val.tv_sec = ((uint32)data) / 100;
+val.tv_sec = (time_t)((uint32)data) / 100;
 val.tv_nsec = (((uint32)data) % 100) * 10000000;
 sim_timespec_diff (&base, &now, &val);                  /* base = now - data */
 toy->toy_gmtbase = (uint32)base.tv_sec;
