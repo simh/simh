@@ -138,6 +138,10 @@
 #define nice(n) ({})
 #endif
 
+#ifndef MIN
+#define MIN(a,b)  (((a) <= (b)) ? (a) : (b))
+#endif
+
 /* Forward Declaraations of Platform specific routines */
 
 static t_stat sim_os_poll_kbd (void);
@@ -2222,9 +2226,16 @@ t_stat sim_set_debon (int32 flag, CONST char *cptr)
 char gbuf[CBUFSIZE];
 t_stat r;
 time_t now;
+size_t buffer_size;
 
 if ((cptr == NULL) || (*cptr == 0))                     /* need arg */
     return SCPE_2FARG;
+if (sim_switches & SWMASK ('B')) {
+    cptr = get_glyph_nc (cptr, gbuf, 0);                /* buffer size */
+    buffer_size = (size_t)strtoul (gbuf, NULL, 10);
+    if ((buffer_size == 0) || (buffer_size > 1024))
+        return sim_messagef (SCPE_ARG, "Invalid debug memory buffersize %u MB\n", (unsigned int)buffer_size);
+    }
 cptr = get_glyph_nc (cptr, gbuf, 0);                    /* get file name */
 if (*cptr != 0)                                         /* now eol? */
     return SCPE_2MARG;
@@ -2233,7 +2244,11 @@ r = sim_open_logfile (gbuf, FALSE, &sim_deb, &sim_deb_ref);
 if (r != SCPE_OK)
     return r;
 
-sim_deb_switches = sim_switches;                        /* save debug switches */
+sim_deb_switches = sim_switches & 
+                   (SWMASK ('R') | SWMASK ('P') | 
+                    SWMASK ('T') | SWMASK ('A') | 
+                    SWMASK ('F') | SWMASK ('N') |
+                    SWMASK ('B'));                  /* save debug switches */
 if (sim_deb_switches & SWMASK ('R')) {
     struct tm loc_tm, gmt_tm;
     time_t time_t_now;
@@ -2247,24 +2262,32 @@ if (sim_deb_switches & SWMASK ('R')) {
     if (!(sim_deb_switches & (SWMASK ('A') | SWMASK ('T'))))
         sim_deb_switches |= SWMASK ('T');
     }
-if (!sim_quiet) {
-    sim_printf ("Debug output to \"%s\"\n", sim_logfile_name (sim_deb, sim_deb_ref));
-    if (sim_deb_switches & SWMASK ('P'))
-        sim_printf ("   Debug messages contain current PC value\n");
-    if (sim_deb_switches & SWMASK ('T'))
-        sim_printf ("   Debug messages display time of day as hh:mm:ss.msec%s\n", sim_deb_switches & SWMASK ('R') ? " relative to the start of debugging" : "");
-    if (sim_deb_switches & SWMASK ('A'))
-        sim_printf ("   Debug messages display time of day as seconds.msec%s\n", sim_deb_switches & SWMASK ('R') ? " relative to the start of debugging" : "");
-    if (sim_deb_switches & SWMASK ('F'))
-        sim_printf ("   Debug messages will not be filtered to summarize duplicate lines\n");
-    if (sim_deb_switches & SWMASK ('E'))
-        sim_printf ("   Debug messages containing blob data in EBCDIC will display in readable form\n");
-    time(&now);
-    fprintf (sim_deb, "Debug output to \"%s\" at %s", sim_logfile_name (sim_deb, sim_deb_ref), ctime(&now));
-    show_version (sim_deb, NULL, NULL, 0, NULL);
-    }
+sim_messagef (SCPE_OK, "Debug output to \"%s\"\n", sim_logfile_name (sim_deb, sim_deb_ref));
+if (sim_deb_switches & SWMASK ('P'))
+    sim_messagef (SCPE_OK, "   Debug messages contain current PC value\n");
+if (sim_deb_switches & SWMASK ('T'))
+    sim_messagef (SCPE_OK, "   Debug messages display time of day as hh:mm:ss.msec%s\n", sim_deb_switches & SWMASK ('R') ? " relative to the start of debugging" : "");
+if (sim_deb_switches & SWMASK ('A'))
+    sim_messagef (SCPE_OK, "   Debug messages display time of day as seconds.msec%s\n", sim_deb_switches & SWMASK ('R') ? " relative to the start of debugging" : "");
+if (sim_deb_switches & SWMASK ('F'))
+    sim_messagef (SCPE_OK, "   Debug messages will not be filtered to summarize duplicate lines\n");
+if (sim_deb_switches & SWMASK ('E'))
+    sim_messagef (SCPE_OK, "   Debug messages containing blob data in EBCDIC will display in readable form\n");
+if (sim_deb_switches & SWMASK ('B'))
+    sim_messagef (SCPE_OK, "   Debug messages will be written to a %u MB circular memory buffer\n", 
+                                (unsigned int)buffer_size);
+time(&now);
+fprintf (sim_deb, "Debug output to \"%s\" at %s", sim_logfile_name (sim_deb, sim_deb_ref), ctime(&now));
+show_version (sim_deb, NULL, NULL, 0, NULL);
 if (sim_deb_switches & SWMASK ('N'))
     sim_deb_switches &= ~SWMASK ('N');          /* Only process the -N flag initially */
+
+if (sim_deb_switches & SWMASK ('B')) {
+    sim_deb_buffer_size = (size_t)(1024 * 1024 * buffer_size);
+    sim_deb_buffer = realloc (sim_deb_buffer, sim_deb_buffer_size);
+    sim_debug_buffer_offset = sim_debug_buffer_inuse = 0;
+    memset (sim_deb_buffer, 0, sim_deb_buffer_size);
+    }
 
 return SCPE_OK;
 }
@@ -2277,6 +2300,25 @@ if (cptr && (*cptr != 0))                               /* now eol? */
     return SCPE_2MARG;
 if (sim_deb == NULL)                                    /* no debug? */
     return SCPE_OK;
+if (sim_deb_switches & SWMASK ('B')) {
+    size_t offset = (sim_debug_buffer_inuse == sim_deb_buffer_size) ? sim_debug_buffer_offset : 0;
+    const char *bufmsg = "Circular Buffer Contents follow here:\n\n";
+
+    fwrite (bufmsg, 1, strlen (bufmsg), sim_deb);
+
+    while (sim_debug_buffer_inuse > 0) {
+        size_t write_size = MIN (sim_deb_buffer_size - offset, sim_debug_buffer_inuse);
+
+        fwrite (sim_deb_buffer + offset, 1, write_size, sim_deb);
+        sim_debug_buffer_inuse -= write_size;
+        offset += write_size;
+        if (offset == sim_deb_buffer_size)
+            offset = 0;
+        }
+    free (sim_deb_buffer);
+    sim_deb_buffer = NULL;
+    sim_deb_buffer_size = sim_debug_buffer_offset = sim_debug_buffer_inuse = 0;
+    }
 sim_close_logfile (&sim_deb_ref);
 sim_deb = NULL;
 sim_deb_switches = 0;

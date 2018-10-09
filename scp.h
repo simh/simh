@@ -355,6 +355,10 @@ extern FILEREF *sim_log_ref;                            /* log file file referen
 extern FILE *sim_deb;                                   /* debug file */
 extern FILEREF *sim_deb_ref;                            /* debug file file reference */
 extern int32 sim_deb_switches;                          /* debug display flags */
+extern size_t sim_deb_buffer_size;                      /* debug memory buffer size */
+extern char *sim_deb_buffer;                            /* debug memory buffer */
+extern size_t sim_debug_buffer_offset;                  /* debug memory buffer insertion offset */
+extern size_t sim_debug_buffer_inuse;                   /* debug memory buffer inuse count */
 extern struct timespec sim_deb_basetime;                /* debug base time for relative time output */
 extern DEVICE **sim_internal_devices;
 extern uint32 sim_internal_device_count;

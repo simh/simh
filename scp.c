@@ -576,6 +576,10 @@ FILEREF *sim_log_ref = NULL;                            /* log file file referen
 FILE *sim_deb = NULL;                                   /* debug file */
 FILEREF *sim_deb_ref = NULL;                            /* debug file file reference */
 int32 sim_deb_switches = 0;                             /* debug switches */
+size_t sim_deb_buffer_size = 0;                         /* debug memory buffer size */
+char *sim_deb_buffer = NULL;                            /* debug memory buffer */
+size_t sim_debug_buffer_offset = 0;                     /* debug memory buffer insertion offset */
+size_t sim_debug_buffer_inuse = 0;                      /* debug memory buffer inuse count */
 struct timespec sim_deb_basetime;                       /* debug timestamp relative base time */
 char *sim_prompt = NULL;                                /* prompt string */
 static FILE *sim_gotofile;                              /* the currently open do file */
@@ -1224,6 +1228,13 @@ static const char simh_help[] =
       "5-E\n"
       " The -E switch causes data blob output to also display the data as\n"
       " EBCDIC characters.\n"
+      "5-B\n"
+      " The -B switch causes debug data output to be written to a circular\n"
+      " buffer in memory.   This avoids the potential delays for disk I/O to\n"
+      " and the disk storage that a long running debug might consume.\n"
+      " The size of the circular memory buffer that is used is specified on\n"
+      " the SET DEBUG command line, for example:\n\n"
+      "++SET DEBUG -B <sizeinMB> <debug-destination>\n\n"
 #define HLP_SET_BREAK  "*Commands SET Breakpoints"
       "3Breakpoints\n"
       "+SET BREAK <list>            set breakpoints\n"
@@ -12181,6 +12192,33 @@ size_t debug_line_bufsize = 0;
 size_t debug_line_offset = 0;
 size_t debug_line_count = 0;
 
+static void _debug_fwrite (const char *buf, size_t len)
+{
+size_t move_size;
+
+if (sim_deb_buffer == NULL) {
+    fwrite (buf, 1, len, sim_deb);              /* output now. */
+    return;
+    }
+if ((sim_deb == stdout) && (!sim_is_running))
+    fwrite (buf, 1, len, stdout);               /* output now. */
+while (len > 0) {
+    if (sim_debug_buffer_offset + len <= sim_deb_buffer_size)
+        move_size = len;
+    else
+        move_size = sim_deb_buffer_size - sim_debug_buffer_offset;
+    memcpy (sim_deb_buffer + sim_debug_buffer_offset, buf, move_size);
+    sim_debug_buffer_offset += move_size;
+    if (sim_debug_buffer_offset == sim_deb_buffer_size) {
+        sim_debug_buffer_offset = 0;
+        sim_debug_buffer_inuse = sim_deb_buffer_size;
+        }
+    if (sim_debug_buffer_inuse < sim_deb_buffer_size)
+        sim_debug_buffer_inuse += move_size;
+    len -= move_size;
+    }
+}
+
 /*
  * Optionally filter debug output to summarize duplicate debug lines
  */
@@ -12190,7 +12228,7 @@ char *eol;
 
 if (sim_deb_switches & SWMASK ('F')) {              /* filtering disabled? */
     if (len > 0)
-        fwrite (buf, 1, len, sim_deb);              /* output now. */
+        _debug_fwrite (buf, len);                   /* output now. */
     return;                                         /* done */
     }
 if (debug_line_offset + len + 1 > debug_line_bufsize) {
@@ -12207,20 +12245,20 @@ while ((eol = strchr (debug_line_buf, '\n')) || flush) {
 
     if ((0 != memcmp ("DBG(", debug_line_buf, 4)) || (endprefix == NULL)) {
         if (debug_line_count > 0)
-            fwrite (debug_line_buf_last, 1, strlen (debug_line_buf_last), sim_deb);
+            _debug_fwrite (debug_line_buf_last, strlen (debug_line_buf_last));
         if (debug_line_count > 1) {
             char countstr[32];
 
             sprintf (countstr, "same as above (%d time%s)\r\n", (int)(debug_line_count - 1), ((debug_line_count - 1) != 1) ? "s" : "");
-            fwrite (debug_line_last_prefix, 1, strlen (debug_line_last_prefix), sim_deb);
-            fwrite (countstr, 1, strlen (countstr), sim_deb);
+            _debug_fwrite (debug_line_last_prefix, strlen (debug_line_last_prefix));
+            _debug_fwrite (countstr, strlen (countstr));
             }
         if (flush) {
             linesize = debug_line_offset;
             flush = FALSE;              /* already flushed */
             }
         if (linesize)
-            fwrite (debug_line_buf, 1, linesize, sim_deb);
+            _debug_fwrite  (debug_line_buf, linesize);
         debug_line_count = 0;
         }
     else {
@@ -12239,13 +12277,13 @@ while ((eol = strchr (debug_line_buf, '\n')) || flush) {
                 debug_line_last_prefix[(endprefix - debug_line_buf) + 3] = '\0';
                 }
             else {
-                fwrite (debug_line_buf_last, 1, strlen (debug_line_buf_last), sim_deb);
+                _debug_fwrite (debug_line_buf_last, strlen (debug_line_buf_last));
                 if (debug_line_count > 1) {
                     char countstr[32];
 
                     sprintf (countstr, "same as above (%d time%s)\r\n", (int)(debug_line_count - 1), ((debug_line_count - 1) != 1) ? "s" : "");
-                    fwrite (debug_line_last_prefix, 1, strlen (debug_line_last_prefix), sim_deb);
-                    fwrite (countstr, 1, strlen (countstr), sim_deb);
+                    _debug_fwrite (debug_line_last_prefix, strlen (debug_line_last_prefix));
+                    _debug_fwrite (countstr, strlen (countstr));
                     }
                 debug_line_buf_last_endprefix_offset = endprefix - debug_line_buf;
                 memcpy (debug_line_buf_last, debug_line_buf, linesize);
@@ -12284,15 +12322,17 @@ if (sim_deb == sim_log) {                               /* debug is log */
     return SCPE_OK;
     }
 
-strcpy (saved_debug_filename, sim_logfile_name (sim_deb, sim_deb_ref));
+if (!(saved_deb_switches & SWMASK ('B'))) {
+    strcpy (saved_debug_filename, sim_logfile_name (sim_deb, sim_deb_ref));
 
-sim_quiet = 1;
-sim_set_deboff (0, NULL);
-sim_switches = saved_deb_switches;
-sim_set_debon (0, saved_debug_filename);
-sim_deb_basetime = saved_deb_basetime;
-sim_switches = saved_sim_switches;
-sim_quiet = saved_quiet;
+    sim_quiet = 1;
+    sim_set_deboff (0, NULL);
+    sim_switches = saved_deb_switches;
+    sim_set_debon (0, saved_debug_filename);
+    sim_deb_basetime = saved_deb_basetime;
+    sim_switches = saved_sim_switches;
+    sim_quiet = saved_quiet;
+    }
 return SCPE_OK;
 }
 
