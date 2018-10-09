@@ -1266,7 +1266,7 @@ static const char simh_help[] =
       " running in the simulator is doing nothing, and runs the simulator at full\n"
       " speed when there is work to do.  Throttling and idling are mutually\n"
       " exclusive.\n"
-#define HLP_SET_CLOCKS "*Commands SET Clocks"
+#define HLP_SET_CLOCK "*Commands SET Clock"
       "3Clock\n"
 #if defined (SIM_ASYNCH_CLOCKS)
       "+SET CLOCK asynch            enable asynchronous clocks\n"
@@ -1275,6 +1275,7 @@ static const char simh_help[] =
       "+SET CLOCK nocatchup         disable catchup clock ticks\n"
       "+SET CLOCK catchup           enable catchup clock ticks\n"
       "+SET CLOCK calib=n%%          specify idle calibration skip %%\n"
+      "+SET CLOCK calib=ALWAYS      specify calibration independent of idle\n"
       "+SET CLOCK stop=n            stop execution after n instructions\n\n"
       " The SET CLOCK STOP command allows execution to have a bound when\n"
       " execution starts with a BOOT, NEXT or CONTINUE command.\n"
@@ -2313,7 +2314,7 @@ static CTAB set_glob_tab[] = {
     { "NODEBUG",    &sim_set_deboff,            0, HLP_SET_DEBUG  },
     { "THROTTLE",   &sim_set_throt,             1, HLP_SET_THROTTLE },
     { "NOTHROTTLE", &sim_set_throt,             0, HLP_SET_THROTTLE },
-    { "CLOCKS",     &sim_set_timers,            1, HLP_SET_CLOCKS },
+    { "CLOCKS",     &sim_set_timers,            1, HLP_SET_CLOCK },
     { "ASYNCH",     &sim_set_asynch,            1, HLP_SET_ASYNCH },
     { "NOASYNCH",   &sim_set_asynch,            0, HLP_SET_ASYNCH },
     { "ENVIRONMENT", &sim_set_environment,      1, HLP_SET_ENVIRON },
