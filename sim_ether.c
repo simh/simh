@@ -2274,9 +2274,11 @@ else {
 
 namebuf[sizeof(namebuf)-1] = '\0';
 strlcpy (namebuf, savname, sizeof(namebuf));
-for (num = 0; (namebuf[num] != ':') && (namebuf[num] != '\0'); num++)
-    if (isupper (namebuf[num]))
-        namebuf[num] = tolower (namebuf[num]);
+if (strchr (namebuf, ':')) {
+    for (num = 0; (namebuf[num] != ':') && (namebuf[num] != '\0'); num++)
+        if (isupper (namebuf[num]))
+            namebuf[num] = tolower (namebuf[num]);
+    }
 savname = namebuf;
 r = _eth_open_port(namebuf, &dev->eth_api, &dev->handle, &dev->fd_handle, errbuf, NULL, (void *)dev, dptr, dbit);
 
