@@ -4394,7 +4394,7 @@ if (Exist || (*gbuf == '"') || (*gbuf == '\'')) {       /* quoted string compari
         if (!optr->op)
             return sim_messagef (SCPE_ARG, "Invalid operator: %s\n", op);
         cptr += strlen (optr->op);
-        if ((!isspace (*cptr)) && isalpha (optr->op[strlen (optr->op) - 1]) && isalnum (*cptr))
+        if ((!sim_isspace (*cptr)) && sim_isalpha (optr->op[strlen (optr->op) - 1]) && sim_isalnum (*cptr))
             return sim_messagef (SCPE_ARG, "Invalid operator: %s\n", op);
         while (sim_isspace (*cptr))                     /* skip spaces */
             ++cptr;
@@ -9017,7 +9017,7 @@ return ((c < 0) || (c >= 128)) ? 0 : isprint (c);
 
 int sim_isdigit (int c)
 {
-return ((c < 0) || (c >= 128)) ? 0 : isdigit (c);
+return ((c >= '0') && (c <= '9'));
 }
 
 int sim_isgraph (int c)
@@ -14108,10 +14108,10 @@ static const char BinaryDigits[] = "01";
 *stat = SCPE_OK;                            /* Assume Success */
 *buf = '\0';
 *oper = NULL;
-while (isspace (*cptr))
+while (sim_isspace (*cptr))
     ++cptr;
-if (isalpha (*cptr) || (*cptr == '_')) {
-    while (isalnum (*cptr) || (*cptr == '.') || (*cptr == '_'))
+if (sim_isalpha (*cptr) || (*cptr == '_')) {
+    while (sim_isalnum (*cptr) || (*cptr == '.') || (*cptr == '_'))
         *buf++ = *cptr++;
     *buf = '\0';
     }
@@ -14149,7 +14149,7 @@ else {
                     }
                 }
             }
-        if (isalpha (*cptr)) {              /* Numbers can't be followed by alpha character */
+        if (sim_isalpha (*cptr)) {          /* Numbers can't be followed by alpha character */
             *stat = SCPE_INVEXPR;
             return cptr;
             }
@@ -14161,7 +14161,7 @@ else {
             while (isdigit (*cptr))
                 *buf++ = *cptr++;
             *buf = '\0';
-            if (isalpha (*cptr)) {           /* Numbers can't be followed by alpha character */
+            if (sim_isalpha (*cptr)) {      /* Numbers can't be followed by alpha character */
                 *stat = SCPE_INVEXPR;
                 return cptr;
                 }
@@ -14189,7 +14189,7 @@ else {
             }
         }
     }
-while (isspace (*cptr))
+while (sim_isspace (*cptr))
     ++cptr;
 return cptr;
 }
@@ -14207,7 +14207,7 @@ Operator *op = NULL, *last_op;
 Stack *stack2 = new_Stack();        /* operator stack */
 char gbuf[CBUFSIZE];
 
-while (isspace(*cptr))              /* skip leading whitespace */
+while (sim_isspace(*cptr))              /* skip leading whitespace */
     ++cptr;
 if (parens_required && (*cptr != '(')) {
     delete_Stack (stack2);
@@ -14288,7 +14288,7 @@ static t_bool _value_of (const char *data, t_svalue *svalue, char *string, size_
 CONST char *gptr;
 size_t data_size = strlen (data);
 
-if (isalpha (*data) || (*data == '_')) {
+if (sim_isalpha (*data) || (*data == '_')) {
     REG *rptr = NULL;
     DEVICE *dptr = sim_dfdev;
     const char *dot;

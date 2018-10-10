@@ -166,9 +166,12 @@ int sim_islower (int c);
 #ifdef islower
 #undef islower
 #endif
-#ifndef IN_SCP_C
 #define islower(chr) sim_islower (chr)
+int sim_isupper (int c);
+#ifdef isupper
+#undef isupper
 #endif
+#define isupper(chr) sim_isupper (chr)
 int sim_isalpha (int c);
 #ifdef isalpha
 #undef isalpha
@@ -187,9 +190,7 @@ int sim_isdigit (int c);
 #ifdef isdigit
 #undef isdigit
 #endif
-#ifndef IN_SCP_C
 #define isdigit(chr) sim_isdigit (chr)
-#endif
 int sim_isgraph (int c);
 #ifdef isgraph
 #undef isgraph
