@@ -12232,6 +12232,7 @@ if (sim_deb_switches & SWMASK ('F')) {              /* filtering disabled? */
         _debug_fwrite (buf, len);                   /* output now. */
     return;                                         /* done */
     }
+AIO_LOCK;
 if (debug_line_offset + len + 1 > debug_line_bufsize) {
     debug_line_bufsize += MAX(1024, debug_line_offset + len + 1);
     debug_line_buf = (char *)realloc (debug_line_buf, debug_line_bufsize);
@@ -12298,6 +12299,7 @@ while ((eol = strchr (debug_line_buf, '\n')) || flush) {
         memmove (debug_line_buf, eol + 1, debug_line_offset);
     debug_line_buf[debug_line_offset] = '\0';
     }
+AIO_UNLOCK;
 }
 
 static void _sim_debug_write (const char *buf, size_t len)
