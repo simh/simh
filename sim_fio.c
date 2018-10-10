@@ -773,7 +773,7 @@ if (((*filepath == '\'') || (*filepath == '"')) &&
     (filepath[strlen (filepath) - 1] == *filepath)) {
     size_t temp_size = 1 + strlen (filepath);
 
-    tempfilepath = malloc (temp_size);
+    tempfilepath = (char *)malloc (temp_size);
     if (tempfilepath == NULL)
         return NULL;
     strlcpy (tempfilepath, 1 + filepath, temp_size);
@@ -784,7 +784,7 @@ if ((filepath[1] == ':')  ||
     (filepath[0] == '/')  || 
     (filepath[0] == '\\')){
         tot_len = 1 + strlen (filepath);
-        fullpath = malloc (tot_len);
+        fullpath = (char *)malloc (tot_len);
         if (fullpath == NULL) {
             free (tempfilepath);
             return NULL;
@@ -800,7 +800,7 @@ else {
         return NULL;
         }
     tot_len = 1 + strlen (filepath) + 1 + strlen (dir);
-    fullpath = malloc (tot_len);
+    fullpath = (char *)malloc (tot_len);
     if (fullpath == NULL) {
         free (tempfilepath);
         return NULL;
@@ -854,7 +854,7 @@ for (p = parts; *p; p++) {
             break;
         }
     }
-result = malloc (1 + tot_size);
+result = (char *)malloc (1 + tot_size);
 *result = '\0';
 if (*parts == '\0')             /* empty part specifier means strip only quotes */
     strlcat (result, filepath, 1 + tot_size);

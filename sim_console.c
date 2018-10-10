@@ -2284,7 +2284,7 @@ if (sim_deb_switches & SWMASK ('N'))
 
 if (sim_deb_switches & SWMASK ('B')) {
     sim_deb_buffer_size = (size_t)(1024 * 1024 * buffer_size);
-    sim_deb_buffer = realloc (sim_deb_buffer, sim_deb_buffer_size);
+    sim_deb_buffer = (char *)realloc (sim_deb_buffer, sim_deb_buffer_size);
     sim_debug_buffer_offset = sim_debug_buffer_inuse = 0;
     memset (sim_deb_buffer, 0, sim_deb_buffer_size);
     }
