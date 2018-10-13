@@ -81,8 +81,11 @@ UNIT ptr_unit = {
 REG ptr_reg[] = {
     { FLDATAD (BIN, ptr_mode, 0, "binary mode flag") },
     { DRDATAD (POS, ptr_unit.pos, T_ADDR_W, "position in the input file"), PV_LEFT },
-    { DRDATAD (TIME, ptr_unit.wait, 24, "reader character delay"), PV_LEFT },
+#if (SIM_MAJOR >= 4)
     { DRDATAD (CPS, ptr_unit.DEFIO_CPS, 24, "Character Input Rate"), PV_LEFT },
+#else
+    { DRDATAD (TIME, ptr_unit.wait, 24, "reader character delay"), PV_LEFT },
+#endif
     { NULL }
     };
 
@@ -108,8 +111,11 @@ UNIT ptp_unit = {
 REG ptp_reg[] = {
     { FLDATAD (BIN, ptp_mode, 0, "binary mode flag") },
     { DRDATAD (POS, ptp_unit.pos, T_ADDR_W, "position in the output file"), PV_LEFT },
-    { DRDATAD (TIME, ptp_unit.wait, 24, "punch character delay"), PV_LEFT },
+#if (SIM_MAJOR >= 4)
     { DRDATAD (CPS, ptp_unit.DEFIO_CPS, 24, "Character output rate"), PV_LEFT },
+#else
+    { DRDATAD (TIME, ptp_unit.wait, 24, "punch character delay"), PV_LEFT },
+#endif
     { NULL }
     };
 

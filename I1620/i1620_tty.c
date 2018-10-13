@@ -98,10 +98,13 @@ REG tty_reg[] = {
     { FLDATAD (UNLOCK, tti_unlock, 0, "keyboard unlocked flag") },
     { FLDATAD (FLAG, tti_flag, 0, "set flag on next input digit"), REG_HRO },
     { DRDATAD (COL, tto_col, 7, "current column") },
-    { DRDATAD (KTIME, tty_unit[UTTI].wait, 24, "keyboard polling interval"), REG_NZ + PV_LEFT },
-    { DRDATAD (TTIME, tty_unit[UTTO].wait, 24, "typewriter character delay"), REG_NZ + PV_LEFT },
+#if (SIM_MAJOR >= 4)
     { DRDATAD (CPS, tty_unit[UTTO].DEFIO_CPS, 24, "Character Output Rate"), PV_LEFT },
     { DRDATAD (ICPS, tty_unit[UTTI].DEFIO_CPS, 24, "Character Input Rate"), PV_LEFT },
+#else
+    { DRDATAD (KTIME, tty_unit[UTTI].wait, 24, "keyboard polling interval"), REG_NZ + PV_LEFT },
+    { DRDATAD (TTIME, tty_unit[UTTO].wait, 24, "typewriter character delay"), REG_NZ + PV_LEFT },
+#endif
     { NULL }
     };
 
@@ -502,7 +505,7 @@ return SCPE_OK;
 
 t_stat tty_reset (DEVICE *dptr)
 {
-sim_activate (&tty_unit[UTTI], tty_unit[UTTI].wait);    /* activate poll */
+DEFIO_ACTIVATE(&tty_unit[UTTI]);                        /* activate poll */
 sim_cancel (&tty_unit[UTTO]);                           /* cancel output */
 tti_unlock = tti_flag = 0;                              /* tty locked */
 tto_col = 1;
