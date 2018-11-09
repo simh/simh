@@ -2277,8 +2277,10 @@ if (sim_deb_switches & SWMASK ('B'))
     sim_messagef (SCPE_OK, "   Debug messages will be written to a %u MB circular memory buffer\n", 
                                 (unsigned int)buffer_size);
 time(&now);
-fprintf (sim_deb, "Debug output to \"%s\" at %s", sim_logfile_name (sim_deb, sim_deb_ref), ctime(&now));
-show_version (sim_deb, NULL, NULL, 0, NULL);
+if (!sim_quiet) {
+    fprintf (sim_deb, "Debug output to \"%s\" at %s", sim_logfile_name (sim_deb, sim_deb_ref), ctime(&now));
+    show_version (sim_deb, NULL, NULL, 0, NULL);
+    }
 if (sim_deb_switches & SWMASK ('N'))
     sim_deb_switches &= ~SWMASK ('N');          /* Only process the -N flag initially */
 
