@@ -136,8 +136,8 @@ if (sim_deb && dptr && (reason & dptr->dctrl)) {
                 }
             break;
         case DDCMP_DLE:   /* Maintenance Message */
-            sim_debug (reason, dptr, "Maintenance Message, Count: %d, Flags: %s, HDRCRC: %s, DATACRC: %s\n", (msg2 << 8)| msg[1], flag, 
-                                        (0 == ddcmp_crc16 (0, msg, DDCMP_HEADER_SIZE)) ? "OK" : "BAD", (0 == ddcmp_crc16 (0, msg+DDCMP_HEADER_SIZE, 2+((msg2 << 8)| msg[1]))) ? "OK" : "BAD");
+            sim_debug (reason, dptr, "Maintenance Message, Count: %d, Flags: %s, Addr: %d, HDRCRC: %s, DATACRC: %s\n", (msg2 << 8)|msg[1], flag, msg[5],
+                                        (0 == ddcmp_crc16 (0, msg, DDCMP_HEADER_SIZE)) ? "OK" : "BAD", (0 == ddcmp_crc16 (0, msg+DDCMP_HEADER_SIZE, 2+((msg2 << 8)|msg[1]))) ? "OK" : "BAD");
             break;
         }
     if (DDCMP_DBG_PDAT & dptr->dctrl) {
@@ -413,7 +413,7 @@ static void ddcmp_build_maintenance_packet (uint8 *buf, size_t size)
 {
 buf[0] = DDCMP_DLE;
 buf[1] = size & 0xFF;
-buf[2] = ((size >> 8) & 0x3F) | (DDCMP_FLAG_SELECT|DDCMP_FLAG_QSYNC << 6);
+buf[2] = ((size >> 8) & 0x3F) | ((DDCMP_FLAG_SELECT|DDCMP_FLAG_QSYNC) << 6);
 buf[3] = 0;
 buf[4] = 0;
 buf[5] = 1;

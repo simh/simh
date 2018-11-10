@@ -871,6 +871,7 @@ DDCMP_STATETABLE DDCMP_TABLE[] = {
     {41, Run,         {ddcmp_REPMessageSent},      Run,            {ddcmp_StartTimer}},
     {42, Maintenance, {ddcmp_ReceiveMaintMsg},     Maintenance,    {ddcmp_GiveBufferToUser}},
     {43, Maintenance, {ddcmp_UserSendMessage,
+                       ddcmp_LineConnected,
                        ddcmp_TransmitterIdle},     Maintenance,    {ddcmp_SendMaintMessage}},
     {44, All}           /* End of Table */
     };
