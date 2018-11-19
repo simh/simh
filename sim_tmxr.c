@@ -1358,7 +1358,7 @@ if ((lp->destination) && (!lp->serport)) {
     if ((!lp->modem_control) || (lp->modembits & TMXR_MDM_DTR)) {
         sprintf (msg, "tmxr_reset_ln_ex() - connecting to %s", lp->destination);
         tmxr_debug_connect_line (lp, msg);
-        lp->connecting = sim_connect_sock_ex (lp->datagram ? lp->port : NULL, lp->destination, "localhost", NULL, (lp->datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | (lp->mp->packet ? SIM_SOCK_OPT_NODELAY : 0));
+        lp->connecting = sim_connect_sock_ex (lp->datagram ? lp->port : NULL, lp->destination, "localhost", NULL, (lp->datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | (lp->packet ? SIM_SOCK_OPT_NODELAY : 0));
         }
     }
 tmxr_init_line (lp);                                /* initialize line state */
@@ -1648,7 +1648,7 @@ if (lp->mp && lp->modem_control) {                  /* This API ONLY works on mo
 
                 sprintf (msg, "tmxr_set_get_modem_bits() - establishing outgoing connection to: %s", lp->destination);
                 tmxr_debug_connect_line (lp, msg);
-                lp->connecting = sim_connect_sock_ex (lp->datagram ? lp->port : NULL, lp->destination, "localhost", NULL, (lp->datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | (lp->mp->packet ? SIM_SOCK_OPT_NODELAY : 0));
+                lp->connecting = sim_connect_sock_ex (lp->datagram ? lp->port : NULL, lp->destination, "localhost", NULL, (lp->datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | (lp->packet ? SIM_SOCK_OPT_NODELAY : 0));
                 }
             }
         }
