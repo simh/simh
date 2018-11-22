@@ -197,6 +197,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP11\pdp11_ch.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP11\pdp11_cis.c"
 				>
 			</File>
