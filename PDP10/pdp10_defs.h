@@ -711,6 +711,7 @@ typedef struct pdp_dib DIB;
 #define INT_V_CR        27                              /* CD20 (CD11) */
 #define INT_V_DUPRX     28                              /* DUP11 */
 #define INT_V_DUPTX     29
+#define INT_V_CH        30                              /* CH11 Chaosnet */
 
 #define INT_RP          (1u << INT_V_RP)
 #define INT_TU          (1u << INT_V_TU)
@@ -728,6 +729,7 @@ typedef struct pdp_dib DIB;
 #define INT_CR          (1u << INT_V_CD)
 #define INT_DUPRX       (1u << INT_V_DUPRX)
 #define INT_DUPTX       (1u << INT_V_DUPTX)
+#define INT_CH          (1u << INT_V_CH)
 
 #define IPL_RP          6                               /* int levels */
 #define IPL_TU          6

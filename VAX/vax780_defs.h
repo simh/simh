@@ -335,6 +335,7 @@ typedef struct {
 #define INT_V_DUPRX     11
 #define INT_V_DUPTX     12
 #define INT_V_RK        13
+#define INT_V_CH        14
 
 #define INT_V_LPT       0                               /* BR4 */
 #define INT_V_PTR       1
@@ -368,6 +369,7 @@ typedef struct {
 #define INT_RK          (1u << INT_V_RK)
 #define INT_TDRX        (1u << INT_V_TDRX)
 #define INT_TDTX        (1u << INT_V_TDTX)
+#define INT_CH          (1u << INT_V_CH)
 
 #define IPL_DTA         (0x16 - IPL_HMIN)
 #define IPL_CR          (0x16 - IPL_HMIN)
@@ -380,6 +382,7 @@ typedef struct {
 #define IPL_TS          (0x15 - IPL_HMIN)
 #define IPL_RY          (0x15 - IPL_HMIN)
 #define IPL_XU          (0x15 - IPL_HMIN)
+#define IPL_CH          (0x15 - IPL_HMIN)
 #define IPL_LPT         (0x14 - IPL_HMIN)
 #define IPL_PTR         (0x14 - IPL_HMIN)
 #define IPL_PTP         (0x14 - IPL_HMIN)

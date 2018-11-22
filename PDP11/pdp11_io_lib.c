@@ -777,6 +777,8 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
     { { NULL },          1,  2,  4, 8 },                /* DTC05, DECvoice */
     { { NULL },          1,  2,  8, 8 },                /* KWV32 (DSV11) */
     { { NULL },          1,  1, 64, 4 },                /* QZA */
+    { { "CH" },          1,  1,  0, 0, 
+        {04140}, {0270} },                              /* CH11 - CHAOS Net - fx CSR, fx VEC */
     { { NULL },         -1 }                            /* end table */
 };
 
