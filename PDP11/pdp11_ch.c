@@ -336,7 +336,7 @@ t_stat ch_rd (int32 *data, int32 PA, int32 access)
 
 void ch_clear (void)
 {
-  status = 0;
+  status = TXD;
   rx_count = 0;
   tx_count = 0;
 
