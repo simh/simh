@@ -5336,6 +5336,7 @@ int32 flag = flags & 1;
 t_bool uflag = ((flags & 2) != 0);
 char gbuf[CBUFSIZE];
 DEBTAB *dep;
+t_stat r = SCPE_OK;
 
 if ((dptr->flags & DEV_DEBUG) == 0)
     return SCPE_NOFNC;
@@ -5354,7 +5355,7 @@ if (cptr == NULL) {                                     /* no arguments? */
     return SCPE_OK;
     }
 if (dptr->debflags == NULL)                             /* must have table */
-    return SCPE_ARG;
+    return sim_messagef (SCPE_ARG, "The %s device doesn't have DEBUG options.\n", dptr->name);
 while (*cptr) {
     cptr = get_glyph (cptr, gbuf, ';');                 /* get debug flag */
     for (dep = dptr->debflags; dep->name != NULL; dep++) {
@@ -5373,9 +5374,9 @@ while (*cptr) {
             }
         }                                               /* end for */
     if (dep->mask == 0)                                 /* no match? */
-        return SCPE_ARG;
+        r = sim_messagef (SCPE_ARG, "Invalid DEBUG option '%s' for %s device\n", gbuf, dptr->name);
     }                                                   /* end while */
-return SCPE_OK;
+return r;
 }
 
 /* Show command */
