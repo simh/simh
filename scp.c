@@ -12874,18 +12874,19 @@ if (sim_mfile || (f == sim_deb)) {
         break;
         }
 
-    /* Store the formatted data */
+    /* Store the formatted data with priority to a 
+       memory file vs debug de-duplication*/
 
-    if (f == sim_deb) {
-        _sim_debug_write (buf, len);
-        }
-    else {
+    if (sim_mfile) {
         if (sim_mfile->pos + len > sim_mfile->size) {
             sim_mfile->size = sim_mfile->pos + 2 * MAX(bufsize, 512);
             sim_mfile->buf = (char *)realloc (sim_mfile->buf, sim_mfile->size);
             }
         memcpy (sim_mfile->buf + sim_mfile->pos, buf, len);
         sim_mfile->pos += len;
+        }
+    else {
+        _sim_debug_write (buf, len);
         }
 
     if (buf != stackbuf)
