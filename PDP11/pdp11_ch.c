@@ -448,7 +448,7 @@ t_stat ch_reset (DEVICE *dptr)
 
 t_stat ch_show_peer (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
-  fprintf (st, "peer=%s", peer);
+  fprintf (st, "peer=%s", peer[0] ? peer : "unspecified");
   return SCPE_OK;
 }
 
@@ -471,7 +471,10 @@ t_stat ch_set_peer (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 
 t_stat ch_show_node (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
-  fprintf (st, "node=%o", address);
+  if (address == -1)
+    fprintf (st, "node=unspecified");
+  else
+    fprintf (st, "node=%o", address);
   return SCPE_OK;
 }
 
