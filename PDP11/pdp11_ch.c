@@ -158,7 +158,7 @@ DEVICE ch_dev = {
     1, 8, 16, 1, 8, 16,
     NULL, NULL, &ch_reset,
     NULL, &ch_attach, &ch_detach,
-    &ch_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG,
+    &ch_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG | DEV_MUX,
     0, ch_debug, NULL, NULL, &ch_help, &ch_help_attach, NULL,
     &ch_description
   };
