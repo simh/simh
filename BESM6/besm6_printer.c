@@ -144,6 +144,7 @@ void printer_control (int num, uint32 cmd)
     case 1:         /* linefeed */
         READY &= ~(PRN1_LINEFEED >> num);
         offset_gost_write (num, u->fileref);
+        u->pos = ftell(u->fileref);
         dev->feed = LINEFEED_SYNC;
         break;
     case 4:         /* start */
