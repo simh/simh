@@ -55,6 +55,20 @@
 int ws_lp_x = -1;
 int ws_lp_y = -1;
 
+/* A device simulator can optionally set the vid_display_kb_event_process
+ * routine pointer to the address of a routine.
+ * Simulator code which uses the display library which processes window 
+ * keyboard data with code in display/sim_ws.c can use this routine to
+ * explicitly get access to keyboard events that arrive in the display 
+ * window.  This routine should return 0 if it has handled the event that
+ * was passed, and non zero if it didn't handle it.  If the routine address
+ * is not set or a non zero return value occurs, then the keyboard event
+ * will be processed by the display library which may then be handled as
+ * console character input if the device console code is implemented to 
+ * accept this.
+ */
+int (*vid_display_kb_event_process)(SIM_KEY_EVENT *kev) = NULL;
+
 static int xpixels, ypixels;
 static int pix_size = PIX_SIZE;
 static const char *window_name;
@@ -220,16 +234,19 @@ ws_poll(int *valp, int maxus)
         vid_set_cursor_position (mev.x_pos, mev.y_pos);
         }
     if (SCPE_OK == vid_poll_kb (&kev)) {
-        switch (kev.state) {
-            case SIM_KEYPRESS_DOWN:
-            case SIM_KEYPRESS_REPEAT:
-                display_keydown(map_key(kev.key));
-                break;
-            case SIM_KEYPRESS_UP:
-                display_keyup(map_key(kev.key));
-                break;
+        if ((vid_display_kb_event_process == NULL) || 
+            (vid_display_kb_event_process (&kev) != 0)) {
+            switch (kev.state) {
+                case SIM_KEYPRESS_DOWN:
+                case SIM_KEYPRESS_REPEAT:
+                    display_keydown(map_key(kev.key));
+                    break;
+                case SIM_KEYPRESS_UP:
+                    display_keyup(map_key(kev.key));
+                    break;
+                }
+            key_to_ascii (&kev);
             }
-        key_to_ascii (&kev);
         }
     return 1;
 }
