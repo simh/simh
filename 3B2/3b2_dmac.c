@@ -79,7 +79,7 @@ t_stat dmac_reset(DEVICE *dptr)
         dma_state.channels[i].addr = 0;
         dma_state.channels[i].wcount = 0;
         dma_state.channels[i].addr_c = 0;
-        dma_state.channels[i].wcount_c = 0;
+        dma_state.channels[i].wcount_c = -1;
         dma_state.channels[i].ptr = 0;
     }
 
@@ -282,7 +282,7 @@ void dmac_program(uint8 reg, uint8 val)
             dma_state.channels[i].addr = 0;
             dma_state.channels[i].wcount = 0;
             dma_state.channels[i].addr_c = 0;
-            dma_state.channels[i].wcount_c = 0;
+            dma_state.channels[i].wcount_c = -1;
             dma_state.channels[i].ptr = 0;
         }
         break;
@@ -372,7 +372,7 @@ void dmac_generic_dma(uint8 channel, uint32 service_address)
     uint32 addr;
     dma_channel *chan = &dma_state.channels[channel];
 
-    i = (int32) chan->wcount_c;
+    i = chan->wcount_c;
 
     /* TODO: This does not handle decrement-mode transfers,
        which don't seem to be used in SVR3 */
