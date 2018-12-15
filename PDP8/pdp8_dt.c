@@ -282,6 +282,7 @@ int32 dt77 (int32 IR, int32 AC);
 t_stat dt_svc (UNIT *uptr);
 t_stat dt_reset (DEVICE *dptr);
 t_stat dt_attach (UNIT *uptr, CONST char *cptr);
+const char *dt_description (DEVICE *dptr);
 void dt_flush (UNIT *uptr);
 t_stat dt_detach (UNIT *uptr);
 t_stat dt_boot (int32 unitno, DEVICE *dptr);
@@ -372,7 +373,8 @@ DEVICE dt_dev = {
     NULL, NULL, &dt_reset,
     &dt_boot, &dt_attach, &dt_detach,
     &dt_dib, DEV_DISABLE | DEV_DEBUG, 0,
-    dt_deb, NULL, NULL
+    dt_deb, NULL, NULL, NULL, NULL, NULL,
+    &dt_description
     };
 
 /* IOT routines */
@@ -1346,4 +1348,9 @@ uptr->filebuf = NULL;                                   /* clear buf ptr */
 uptr->flags = (uptr->flags | UNIT_8FMT) & ~UNIT_11FMT;  /* default fmt */
 uptr->capac = DT_CAPAC;                                 /* default size */
 return detach_unit (uptr);
+}
+
+const char *dt_description (DEVICE *dptr)
+{
+return "TC08/TU56 DECtape";
 }

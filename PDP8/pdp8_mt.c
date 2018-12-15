@@ -152,6 +152,7 @@ t_stat mt_svc (UNIT *uptr);
 t_stat mt_reset (DEVICE *dptr);
 t_stat mt_attach (UNIT *uptr, CONST char *cptr);
 t_stat mt_detach (UNIT *uptr);
+const char *mt_description (DEVICE *dptr);
 int32 mt_updcsta (UNIT *uptr);
 int32 mt_ixma (int32 xma);
 t_stat mt_map_err (UNIT *uptr, t_stat st);
@@ -216,7 +217,9 @@ DEVICE mt_dev = {
     MT_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &mt_reset,
     NULL, &mt_attach, &mt_detach,
-    &mt_dib, DEV_DISABLE | DEV_TAPE
+    &mt_dib, DEV_DISABLE | DEV_TAPE, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    &mt_description
     };
 
 /* IOT routines */
@@ -658,4 +661,9 @@ else uptr->USTAT = uptr->USTAT & ~STA_WLK;
 if (u == GET_UNIT (mt_cu))
     mt_updcsta (uptr);
 return SCPE_OK;
+}
+
+const char *mt_description (DEVICE *dptr)
+{
+return "TM8E/TU10 magtape";
 }

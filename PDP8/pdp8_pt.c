@@ -47,6 +47,8 @@ t_stat ptp_svc (UNIT *uptr);
 t_stat ptr_reset (DEVICE *dptr);
 t_stat ptp_reset (DEVICE *dptr);
 t_stat ptr_boot (int32 unitno, DEVICE *dptr);
+const char *ptr_description (DEVICE *dptr);
+const char *ptp_description (DEVICE *dptr);
 
 /* PTR data structures
 
@@ -83,7 +85,10 @@ DEVICE ptr_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &ptr_reset,
     &ptr_boot, NULL, NULL,
-    &ptr_dib, 0 };
+    &ptr_dib, 0, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    &ptr_description
+    };
 
 /* PTP data structures
 
@@ -119,7 +124,9 @@ DEVICE ptp_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &ptp_reset,
     NULL, NULL, NULL,
-    &ptp_dib, 0
+    &ptp_dib, 0, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    &ptp_description
     };
 
 /* Paper tape reader: IOT routine */
@@ -290,4 +297,14 @@ for (i = 0; i < BOOT_LEN; i++)
     M[BOOT_START + i] = boot_rom[i];
 cpu_set_bootpc (BOOT_START);
 return SCPE_OK;
+}
+
+const char *ptr_description (DEVICE *dptr)
+{
+return "PC8E paper tape reader";
+}
+
+const char *ptp_description (DEVICE *dptr)
+{
+return "PC8E paper tape punch";
 }

@@ -44,6 +44,7 @@ t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
 t_stat lpt_attach (UNIT *uptr, CONST char *cptr);
 t_stat lpt_detach (UNIT *uptr);
+const char *lpt_description (DEVICE *dptr);
 
 /* LPT data structures
 
@@ -82,7 +83,9 @@ DEVICE lpt_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &lpt_reset,
     NULL, &lpt_attach, &lpt_detach,
-    &lpt_dib, DEV_DISABLE
+    &lpt_dib, DEV_DISABLE, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    &lpt_description
     };
 
 /* IOT routine */
@@ -185,4 +188,9 @@ t_stat lpt_detach (UNIT *uptr)
 {
 lpt_err = 1;
 return detach_unit (uptr);
+}
+
+const char *lpt_description (DEVICE *dptr)
+{
+return "LP8E line printer";
 }

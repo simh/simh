@@ -62,6 +62,7 @@ extern int32 tsc_enb;                                   /* enable */
 
 int32 tsc (int32 IR, int32 AC);
 t_stat tsc_reset (DEVICE *dptr);
+const char *tsc_description (DEVICE *dptr);
 
 /* TSC data structures
 
@@ -94,7 +95,9 @@ DEVICE tsc_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &tsc_reset,
     NULL, NULL, NULL,
-    &tsc_dib, DEV_DISABLE | DEV_DIS
+    &tsc_dib, DEV_DISABLE | DEV_DIS, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    &tsc_description
     };
 
 /* IOT routine */
@@ -155,4 +158,9 @@ tsc_cdf = 0;
 tsc_enb = 0;
 int_req = int_req & ~INT_TSC;
 return SCPE_OK;
+}
+
+const char *tsc_description (DEVICE *dptr)
+{
+return "TSC8-75 option board";
 }

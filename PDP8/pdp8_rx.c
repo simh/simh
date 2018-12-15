@@ -147,6 +147,7 @@ void rx_cmd (void);
 void rx_done (int32 esr_flags, int32 new_ecode);
 t_stat rx_settype (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat rx_showtype (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+const char *rx_description (DEVICE *dptr);
 
 /* RX8E data structures
 
@@ -215,7 +216,9 @@ DEVICE rx_dev = {
     RX_NUMDR, 8, 20, 1, 8, 8,
     NULL, NULL, &rx_reset,
     &rx_boot, &rx_attach, NULL,
-    &rx_dib, DEV_DISABLE
+    &rx_dib, DEV_DISABLE, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    &rx_description
     };
 
 /* IOT routine */
@@ -751,4 +754,9 @@ else {
     cpu_set_bootpc (BOOT_ENTRY);
     }
 return SCPE_OK;
+}
+
+const char *rx_description (DEVICE *dptr)
+{
+return "RX8E/RX01, RX28/RX02 floppy disk";
 }

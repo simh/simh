@@ -208,6 +208,7 @@ int32 td_read (UNIT *uptr, int32 blk, int32 line);
 void td_write (UNIT *uptr, int32 blk, int32 line, int32 datb);
 int32 td_set_mtk (int32 code, int32 u, int32 k);
 t_stat td_show_pos (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+const char *td_description (DEVICE *dptr);
 
 extern uint16 M[];
 
@@ -267,7 +268,9 @@ DEVICE td_dev = {
     DT_NUMDR, 8, 24, 1, 8, 12,
     NULL, NULL, &td_reset,
     &td_boot, &td_attach, &td_detach,
-    &td_dib, DEV_DISABLE | DEV_DIS
+    &td_dib, DEV_DISABLE | DEV_DIS, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    &td_description
     };
 
 /* IOT routines */
@@ -953,3 +956,7 @@ else fprintf (st, "Forward end zone\n");                /* fwd end zone */
 return SCPE_OK;
 }
 
+const char *td_description (DEVICE *dptr)
+{
+return "TD8E/TU56 DECtape";
+}

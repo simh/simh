@@ -142,6 +142,7 @@ int32 rk (int32 IR, int32 AC);
 t_stat rk_svc (UNIT *uptr);
 t_stat rk_reset (DEVICE *dptr);
 t_stat rk_boot (int32 unitno, DEVICE *dptr);
+const char *rk_description (DEVICE *dptr);
 void rk_go (int32 function, int32 cylinder);
 
 /* RK-8E data structures
@@ -192,7 +193,9 @@ DEVICE rk_dev = {
     RK_NUMDR, 8, 24, 1, 8, 12,
     NULL, NULL, &rk_reset,
     &rk_boot, NULL, NULL,
-    &rk_dib, DEV_DISABLE
+    &rk_dib, DEV_DISABLE, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    &rk_description
     };
 
 /* IOT routine */
@@ -460,4 +463,9 @@ for (i = 0; i < BOOT_LEN; i++)
 M[BOOT_UNIT] = (unitno & RK_M_NUMDR) << 1;
 cpu_set_bootpc (BOOT_START);
 return SCPE_OK;
+}
+
+const char *rk_description (DEVICE *dptr)
+{
+return "RK8E/RK05 cartridge disk";
 }

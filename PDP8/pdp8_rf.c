@@ -127,6 +127,7 @@ t_stat rf_reset (DEVICE *dptr);
 t_stat rf_boot (int32 unitno, DEVICE *dptr);
 t_stat rf_attach (UNIT *uptr, CONST char *cptr);
 t_stat rf_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+const char *rf_description (DEVICE *dptr);
 
 /* RF08 data structures
 
@@ -177,7 +178,9 @@ DEVICE rf_dev = {
     1, 8, 20, 1, 8, 12,
     NULL, NULL, &rf_reset,
     &rf_boot, &rf_attach, NULL,
-    &rf_dib, DEV_DISABLE | DEV_DIS
+    &rf_dib, DEV_DISABLE | DEV_DIS, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    &rf_description
     };
 
 /* IOT routines */
@@ -445,4 +448,9 @@ if (uptr->flags & UNIT_ATT)
 uptr->capac = UNIT_GETP (val) * RF_DKSIZE;
 uptr->flags = uptr->flags & ~UNIT_AUTO;
 return SCPE_OK;
+}
+
+const char *rf_description (DEVICE *dptr)
+{
+return "RF08 fixed head disk";
 }

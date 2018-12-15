@@ -183,6 +183,7 @@ t_stat rl_boot (int32 unitno, DEVICE *dptr);
 t_stat rl_attach (UNIT *uptr, CONST char *cptr);
 t_stat rl_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat rl_set_bad (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+const char *rl_description (DEVICE *dptr);
 
 /* RL8A data structures
 
@@ -251,7 +252,9 @@ DEVICE rl_dev = {
     RL_NUMDR, 8, 24, 1, 8, 8,
     NULL, NULL, &rl_reset,
     &rl_boot, &rl_attach, NULL,
-    &rl_dib, DEV_DISABLE | DEV_DIS
+    &rl_dib, DEV_DISABLE | DEV_DIS, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    &rl_description
     };
 
 /* IOT routines */
@@ -700,4 +703,9 @@ for (i = 0; i < BOOT_LEN; i++)
     M[BOOT_START + i] = boot_rom[i];
 cpu_set_bootpc (BOOT_START);
 return SCPE_OK;
+}
+
+const char *rl_description (DEVICE *dptr)
+{
+return "RL8A cartridge disk";
 }

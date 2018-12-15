@@ -88,6 +88,8 @@ void ttx_new_flags (uint32 newi, uint32 newo, uint32 newe);
 t_stat ttx_reset (DEVICE *dptr);
 t_stat ttx_attach (UNIT *uptr, CONST char *cptr);
 t_stat ttx_detach (UNIT *uptr);
+const char *ttix_description (DEVICE *dptr);
+const char *ttox_description (DEVICE *dptr);
 void ttx_reset_ln (int32 i);
 t_stat ttx_vlines (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat ttx_show_devno (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
@@ -176,7 +178,8 @@ DEVICE ttix_dev = {
     &tmxr_ex, &tmxr_dep, &ttx_reset,
     NULL, &ttx_attach, &ttx_detach,
     &ttx_dib, DEV_MUX | DEV_DISABLE | DEV_DEBUG,
-    0, ttx_debug
+    0, ttx_debug, NULL, NULL, NULL, NULL, NULL,
+    &ttix_description
     };
 
 /* TTOx data structures
@@ -237,7 +240,8 @@ DEVICE ttox_dev = {
     NULL, NULL, &ttx_reset, 
     NULL, NULL, NULL,
     NULL, DEV_DISABLE | DEV_DEBUG,
-    0, ttx_debug
+    0, ttx_debug, NULL, NULL, NULL, NULL, NULL,
+    &ttox_description
     };
 
 /* Terminal input: IOT routine */
@@ -544,3 +548,12 @@ for (i = 0; i < ttx_lines; i++) {
 return SCPE_OK;
 }
 
+const char *ttix_description (DEVICE *dptr)
+{
+return "PT08/KL8JA terminal input";
+}
+
+const char *ttox_description (DEVICE *dptr)
+{
+return "PT08/KL8JA terminal output";
+}

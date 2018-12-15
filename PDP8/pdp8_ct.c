@@ -162,6 +162,7 @@ t_stat ct_reset (DEVICE *dptr);
 t_stat ct_attach (UNIT *uptr, CONST char *cptr);
 t_stat ct_detach (UNIT *uptr);
 t_stat ct_boot (int32 unitno, DEVICE *dptr);
+const char *ct_description (DEVICE *dptr);
 uint32 ct_updsta (UNIT *uptr);
 int32 ct_go_start (int32 AC);
 int32 ct_go_cont (UNIT *uptr, int32 AC);
@@ -225,7 +226,9 @@ DEVICE ct_dev = {
     CT_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &ct_reset,
     &ct_boot, &ct_attach, &ct_detach,
-    &ct_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_TAPE
+    &ct_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_TAPE,
+    0, NULL, NULL, NULL, NULL, NULL, NULL,
+    &ct_description
     };
 
 /* IOT routines */
@@ -726,4 +729,9 @@ for (i = 0; i < BOOT_LEN; i++)
     M[BOOT_START + i] = boot_rom[i];
 cpu_set_bootpc (BOOT_START);
 return SCPE_OK;
+}
+
+const char *ct_description (DEVICE *dptr)
+{
+return "TA8E/TU60 cassette tape";
 }

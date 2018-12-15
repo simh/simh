@@ -208,6 +208,7 @@ uint32 apt_read (uint32 ea);
 void apt_write (uint32 ea, uint32 val);
 t_stat fpp_svc (UNIT *uptr);
 t_stat fpp_reset (DEVICE *dptr);
+const char *fpp_description (DEVICE *dptr);
 
 /* FPP data structures
 
@@ -246,7 +247,9 @@ DEVICE fpp_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &fpp_reset,
     NULL, NULL, NULL,
-    &fpp_dib, DEV_DISABLE | DEV_DIS
+    &fpp_dib, DEV_DISABLE | DEV_DIS, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    &fpp_description
     };
 
 /* IOT routines */
@@ -1510,4 +1513,9 @@ else {
     }
 
 return SCPE_OK;
+}
+
+const char *fpp_description (DEVICE *dptr)
+{
+return "FPP8A floating point processor";
 }

@@ -49,6 +49,7 @@ t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
 t_stat clk_set_freq (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+const char *clk_description (DEVICE *dptr);
 
 /* CLK data structures
 
@@ -86,7 +87,9 @@ DEVICE clk_dev = {
     1, 0, 0, 0, 0, 0,
     NULL, NULL, &clk_reset,
     NULL, NULL, NULL,
-    &clk_dib, 0
+    &clk_dib, 0, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    &clk_description
     };
 
 /* IOT routine
@@ -180,4 +183,9 @@ t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, (clk_tps == 50)? "50Hz": "60Hz");
 return SCPE_OK;
+}
+
+const char *clk_description (DEVICE *dptr)
+{
+return "real time clock";
 }

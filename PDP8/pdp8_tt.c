@@ -55,6 +55,8 @@ t_stat tto_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
 t_stat tty_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+const char *tti_description (DEVICE *dptr);
+const char *tto_description (DEVICE *dptr);
 
 /* TTI data structures
 
@@ -92,7 +94,9 @@ DEVICE tti_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &tti_reset,
     NULL, NULL, NULL,
-    &tti_dib, 0
+    &tti_dib, 0, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    &tti_description
     };
 
 uint32 tti_buftime;                                     /* time input character arrived */
@@ -132,7 +136,9 @@ DEVICE tto_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &tto_reset, 
     NULL, NULL, NULL,
-    &tto_dib, 0
+    &tto_dib, 0, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    &tti_description
     };
 
 /* Terminal input: IOT routine */
@@ -282,4 +288,14 @@ t_stat tty_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 tti_unit.flags = (tti_unit.flags & ~TT_MODE) | val;
 tto_unit.flags = (tto_unit.flags & ~TT_MODE) | val;
 return SCPE_OK;
+}
+
+const char *tti_description (DEVICE *dptr)
+{
+return "console terminal input";
+}
+
+const char *tto_description (DEVICE *dptr)
+{
+return "console terminal output";
 }

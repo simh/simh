@@ -117,6 +117,7 @@ t_stat df_reset (DEVICE *dptr);
 t_stat df_boot (int32 unitno, DEVICE *dptr);
 t_stat df_attach (UNIT *uptr, CONST char *cptr);
 t_stat df_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+const char *df_description (DEVICE *dptr);
 
 /* DF32 data structures
 
@@ -164,7 +165,9 @@ DEVICE df_dev = {
     1, 8, 17, 1, 8, 12,
     NULL, NULL, &df_reset,
     &df_boot, &df_attach, NULL,
-    &df_dib, DEV_DISABLE
+    &df_dib, DEV_DISABLE,
+    0, NULL, NULL, NULL, NULL, NULL, NULL,
+    &df_description
     };
 
 /* IOT routines */
@@ -379,4 +382,9 @@ if (uptr->flags & UNIT_ATT)
 uptr->capac = UNIT_GETP (val) * DF_DKSIZE;
 uptr->flags = uptr->flags & ~UNIT_AUTO;
 return SCPE_OK;
+}
+
+const char *df_description (DEVICE *dptr)
+{
+return "DF32 fixed head disk";
 }
