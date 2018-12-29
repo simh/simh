@@ -44,6 +44,7 @@ extern DEVICE clk_dev;
 extern DEVICE dp_dev;
 extern DEVICE fhd_dev;
 extern DEVICE mt_dev;
+extern DEVICE plt_dev;
 #ifdef VM_IMPTIP
 extern DEVICE rtc_dev, wdt_dev, imp_dev;
 extern DEVICE mi1_dev, mi2_dev, mi3_dev, mi4_dev, mi5_dev;
@@ -78,6 +79,7 @@ DEVICE *sim_devices[] = {
     &clk_dev,
     &fhd_dev,
     &dp_dev,
+    &plt_dev,
 #ifdef VM_IMPTIP
     &wdt_dev,
     &rtc_dev,

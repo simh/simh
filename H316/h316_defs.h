@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   11-Feb-17    APW     Added PLT (plotter) support
    31-May-13    RLA     DIB - add second channel, interrupt and user parameter
    19-Nov-11    RMS     Removed XR macro, added XR_LOC macro (from Adrian Wise)
    22-May-10    RMS     Added check for 64b definitions
@@ -157,6 +158,7 @@ typedef struct h316_dib DIB;
 #define FHD             022                             /* fixed head disk */
 #define DMA             024                             /* DMA control */
 #define DP              025                             /* moving head disk */
+#define PLT             027                             /* incremental plotter */
 #define DEV_MAX         64
 
 /* Interrupt flags, definitions correspond to SMK bits */
@@ -164,6 +166,7 @@ typedef struct h316_dib DIB;
 #define INT_V_CLK       0                               /* clock */
 #define INT_V_MPE       1                               /* parity error */
 #define INT_V_LPT       2                               /* line printer */
+#define INT_V_PLT       3                               /* incremental plotter */
 #define INT_V_CDR       4                               /* card reader */
 #define INT_V_TTY       5                               /* teletype */
 #define INT_V_PTP       6                               /* paper tape punch */
@@ -189,6 +192,7 @@ typedef struct h316_dib DIB;
 #define INT_CLK         (1u << INT_V_CLK)
 #define INT_MPE         (1u << INT_V_MPE)
 #define INT_LPT         (1u << INT_V_LPT)
+#define INT_PLT         (1u << INT_V_PLT)
 #define INT_CDR         (1u << INT_V_CDR)
 #define INT_TTY         (1u << INT_V_TTY)
 #define INT_PTP         (1u << INT_V_PTP)
