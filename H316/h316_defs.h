@@ -224,4 +224,8 @@ t_stat io_set_dma (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat io_set_dmc (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat io_show_chan (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
+/* Rename of global PC variable to avoid namespace conflicts on some platforms */
+
+#define PC PC_Global
+
 #endif
