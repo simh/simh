@@ -3130,7 +3130,8 @@ if ((line < 0) || (line >= mp->lines))
 if (mp->ldsc[line].uptr)
     mp->ldsc[line].uptr->dynflags &= ~UNIT_TM_POLL;
 mp->ldsc[line].uptr = uptr_poll;
-mp->ldsc[line].uptr->dynflags |= UNIT_TM_POLL;
+if (uptr_poll->tmxr)                /* associated with a TMXR? */
+    mp->ldsc[line].uptr->dynflags |= UNIT_TM_POLL;
 return SCPE_OK;
 }
 
@@ -3164,7 +3165,8 @@ if ((line < 0) || (line >= mp->lines))
 if (mp->ldsc[line].o_uptr)
     mp->ldsc[line].o_uptr->dynflags &= ~UNIT_TM_POLL;
 mp->ldsc[line].o_uptr = uptr_poll;
-mp->ldsc[line].o_uptr->dynflags |= UNIT_TM_POLL;
+if (uptr_poll->tmxr)                /* associated with a TMXR? */
+    mp->ldsc[line].o_uptr->dynflags |= UNIT_TM_POLL;
 return SCPE_OK;
 }
 
