@@ -50,6 +50,7 @@ ty340word ty340_reset(void *);
 ty340word ty340_status(void);
 ty340word ty340_instruction(ty340word inst);
 void ty340_set_dac(ty340word addr);
+void ty342_set_grid(int, int);
 
 /*
  * calls from type340.c into host simulator
