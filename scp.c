@@ -3285,6 +3285,8 @@ if (*cptr) {
         UNIT *uptr;
         t_stat r;
 
+        if (0 == strcmp (gbuf, "DEVICE"))
+            cptr = get_glyph (cptr, gbuf, 0);
         dptr = find_unit (gbuf, &uptr);
         if (dptr == NULL) {
             dptr = find_dev (gbuf);
