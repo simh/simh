@@ -46,7 +46,7 @@ typedef unsigned int ty340word;
 /*
  * calls from host into type340.c
  */
-ty340word ty340_reset(void);
+ty340word ty340_reset(void *);
 ty340word ty340_status(void);
 ty340word ty340_instruction(ty340word inst);
 void ty340_set_dac(ty340word addr);

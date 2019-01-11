@@ -144,12 +144,12 @@ ty340_set_dac(ty340word addr)
 #endif
 
 ty340word
-ty340_reset(void)
+ty340_reset(void *dptr)
 {
     struct type340 *u = UNIT(0);
 #ifndef TY340_NODISPLAY
     if (!u->initialized) {
-        display_init(DIS_TYPE340, 1, u); /* XXX check return? */
+        display_init(DIS_TYPE340, 1, dptr); /* XXX check return? */
         u->initialized = 1;
     }
 #endif
