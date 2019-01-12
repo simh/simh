@@ -2901,10 +2901,6 @@ t_stat xq_attach(UNIT* uptr, CONST char* cptr)
     xq->var->must_poll = (SCPE_OK != eth_clr_async(xq->var->etherface));
   }
   if (SCPE_OK != eth_check_address_conflict (xq->var->etherface, &xq->var->mac)) {
-    char buf[32];
-
-    eth_mac_fmt(&xq->var->mac, buf);     /* format ethernet mac address */
-    sim_printf("%s: MAC Address Conflict on LAN for address %s, change the MAC address to a unique value\n", xq->dev->name, buf);
     eth_close(xq->var->etherface);
     free(tptr);
     free(xq->var->etherface);

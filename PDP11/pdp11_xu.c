@@ -1776,10 +1776,6 @@ t_stat xu_attach(UNIT* uptr, CONST char* cptr)
   }
   eth_set_throttle (xu->var->etherface, xu->var->throttle_time, xu->var->throttle_burst, xu->var->throttle_delay);
   if (SCPE_OK != eth_check_address_conflict (xu->var->etherface, &xu->var->mac)) {
-    char buf[32];
-
-    eth_mac_fmt(&xu->var->mac, buf);     /* format ethernet mac address */
-    sim_printf("%s: MAC Address Conflict on LAN for address %s\n", xu->dev->name, buf);
     eth_close(xu->var->etherface);
     free(tptr);
     free(xu->var->etherface);
