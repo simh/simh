@@ -226,6 +226,9 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       ACTUAL_GIT_COMMIT_ID=$(strip $(shell git log -1 --pretty="%H"))
       ifneq ($(CURRENT_GIT_COMMIT_ID),$(ACTUAL_GIT_COMMIT_ID))
         NEED_COMMIT_ID = need-commit-id
+        # make sure that the invalidly formatted .git-commit-id file wasn't generated
+        # by legacy git hooks which need to be removed.
+        $(shell rm -f .git/hooks/post-checkout .git/hooks/post-commit .git/hooks/post-merge)
       endif
     else
       NEED_COMMIT_ID = need-commit-id
