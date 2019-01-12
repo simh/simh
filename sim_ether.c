@@ -2458,6 +2458,13 @@ char mac_string[32];
 eth_mac_fmt(mac, mac_string);
 sim_debug(dev->dbit, dev->dptr, "Determining Address Conflict for MAC address: %s\n", mac_string);
 
+/* 00:00:00:00:00:00 or any address with a multi-cast address is invalid */
+if ((((*mac)[0] == 0) && ((*mac)[1] == 0) && ((*mac)[2] == 0) && 
+     ((*mac)[3] == 0) && ((*mac)[4] == 0) && ((*mac)[5] == 0)) ||
+     ((*mac)[0] & 1)) {
+  return sim_messagef (SCPE_ARG, "%s: Invalid NIC MAC Address: %s\n", sim_dname(dev->dptr), mac_string);
+  }
+
 /* The process of checking address conflicts is used in two ways:
    1) to determine the behavior of the currently running packet 
       delivery facility regarding whether it may receive copies 
@@ -2542,13 +2549,12 @@ status = _eth_write (dev, &send, NULL);
 if (status != SCPE_OK) {
   const char *msg;
   msg = (dev->eth_api == ETH_API_PCAP) ?
-      "Eth: Error Transmitting packet: %s\n"
+      "%s: Eth: Error Transmitting packet: %s\n"
         "You may need to run as root, or install a libpcap version\n"
         "which is at least 0.9 from your OS vendor or www.tcpdump.org\n" :
-      "Eth: Error Transmitting packet: %s\n"
+      "%s: Eth: Error Transmitting packet: %s\n"
         "You may need to run as root.\n";
-  sim_printf(msg, strerror(errno));
-  return status;
+  return sim_messagef (SCPE_ARG, msg, sim_dname (dev->dptr), strerror(errno));
   }
 
 sim_os_ms_sleep (300);   /* time for a conflicting host to respond */
@@ -2572,6 +2578,8 @@ do {
   } while (recv.len > 0);
 
 sim_debug(dev->dbit, dev->dptr, "Address Conflict = %d\n", responses);
+if (responses)
+  return sim_messagef (SCPE_ARG, "%s: MAC Address Conflict on LAN for address %s, change the MAC address to a unique value\n", sim_dname (dev->dptr), mac_string);
 return responses;
 }
 
