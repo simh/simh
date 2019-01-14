@@ -29,9 +29,11 @@
                         UNIT_BUFABLE | UNIT_MUSTBUF
 
 
-/* in u3 is device address */
 /* in u4 is current address */
 /* in u5       Bits 30-16 of W */
+#define ADDR     u4
+#define CMD      u5
+
 #define DR_CHAN         000003  /* Channel number */
 #define DR_RD           000004  /* Executing a read command */
 #define DR_WR           000010  /* Executing a write command */
@@ -94,17 +96,17 @@ t_stat drm_cmd(uint16 cmd, uint16 dev, uint8 chan, uint16 *wc, uint8 rd_flg)
     }
 
     /* Check if drive is ready to recieve a command */
-    if ((uptr->u5 & DR_RDY) == 0) 
+    if ((uptr->CMD & DR_RDY) == 0) 
         return SCPE_BUSY;
 
-    uptr->u5 = chan;
+    uptr->CMD = chan;
     if (rd_flg) 
-        uptr->u5 |= DR_RD;
+        uptr->CMD |= DR_RD;
     else
-        uptr->u5 |= DR_WR;
-    uptr->u4 = cmd << 3;
+        uptr->CMD |= DR_WR;
+    uptr->ADDR = cmd << 3;
     sim_debug(DEBUG_CMD, &drm_dev, "Drum access %s %06o\n\r",
-                (uptr->u5 & DR_RD) ? "read" : "write", uptr->u4);
+                (uptr->CMD & DR_RD) ? "read" : "write", uptr->ADDR);
     sim_activate(uptr, 100);
     return SCPE_OK;
 }
@@ -113,22 +115,22 @@ t_stat drm_cmd(uint16 cmd, uint16 dev, uint8 chan, uint16 *wc, uint8 rd_flg)
 /* Handle processing disk controller commands */
 t_stat drm_srv(UNIT * uptr)
 {
-    int                 chan = uptr->u5 & DR_CHAN;
-    uint8               *ch = &(((uint8 *)uptr->filebuf)[uptr->u4]);
+    int                 chan = uptr->CMD & DR_CHAN;
+    uint8               *ch = &(((uint8 *)uptr->filebuf)[uptr->ADDR]);
     
  
     /* Process for each unit */
-    if (uptr->u5 & DR_RD) {
+    if (uptr->CMD & DR_RD) {
         /* Transfer one Character */
         if (chan_write_drum(chan, ch, 0)) {
-                uptr->u5 = DR_RDY;
+                uptr->CMD = DR_RDY;
                 chan_set_end(chan);
                 return SCPE_OK;
         }
-        uptr->u4++;
-        if (uptr->u4 > ((int32)uptr->capac << 3)) {
+        uptr->ADDR++;
+        if (uptr->ADDR > ((int32)uptr->capac << 3)) {
                 sim_debug(DEBUG_CMD, &drm_dev, "Drum overrun\n\r");
-                uptr->u5 = DR_RDY;
+                uptr->CMD = DR_RDY;
                 chan_set_error(chan);
                 chan_set_end(chan);
                 return SCPE_OK;
@@ -137,17 +139,17 @@ t_stat drm_srv(UNIT * uptr)
     }
 
     /* Process for each unit */
-    if (uptr->u5 & DR_WR) {
+    if (uptr->CMD & DR_WR) {
         /* Transfer one Character */
         if (chan_read_drum(chan, ch, 0)) {
-                uptr->u5 = DR_RDY;
+                uptr->CMD = DR_RDY;
                 chan_set_end(chan);
                 return SCPE_OK;
         }
-        uptr->u4++;
-        if (uptr->u4 > ((int32)uptr->capac << 3)) {
+        uptr->ADDR++;
+        if (uptr->ADDR > ((int32)uptr->capac << 3)) {
                 sim_debug(DEBUG_CMD, &drm_dev, "Drum overrun\n\r");
-                uptr->u5 = DR_RDY;
+                uptr->CMD = DR_RDY;
                 chan_set_error(chan);
                 chan_set_end(chan);
                 return SCPE_OK;
@@ -178,7 +180,7 @@ drm_attach(UNIT * uptr, CONST char *file)
 
     if ((r = attach_unit(uptr, file)) != SCPE_OK)
         return r;
-    uptr->u5 |= DR_RDY; 
+    uptr->CMD |= DR_RDY; 
     uptr->hwmark = uptr->capac;
     if (u) 
         iostatus |= DRUM2_FLAG;
@@ -194,7 +196,7 @@ drm_detach(UNIT * uptr)
     int                 u = uptr - drm_unit;
     if ((r = detach_unit(uptr)) != SCPE_OK)
         return r;
-    uptr->u5 = 0;
+    uptr->CMD = 0;
     if (u) 
         iostatus &= ~DRUM2_FLAG;
     else 
@@ -225,7 +227,7 @@ set_auxmem(UNIT * uptr, int32 val, CONST char *cptr, void *desc) {
         uptr->filebuf = calloc(uptr->capac, 8);
         uptr->flags |= UNIT_BUF;
     }
-    uptr->u5 = DR_RDY; 
+    uptr->CMD = DR_RDY; 
     if (u) 
         iostatus |= DRUM2_FLAG;
     else 

@@ -29,6 +29,11 @@
 /* in u3 is device address */
 /* in u4 is current buffer position */
 /* in u5       Bits 30-16 of W */
+#define ESU      u3
+#define ADDR     u4
+#define CMD      u5
+#define POS      u6
+
 #define URCSTA_SKIP     000017  /* Skip mask */
 #define URCSTA_SINGLE   000020  /* Single space skip. */
 #define URCSTA_DOUBLE   000040  /* Double space skip */
@@ -153,31 +158,31 @@ t_stat dsk_cmd(uint16 cmd, uint16 dev, uint8 chan, uint16 *wc)
         return SCPE_NODEV;
 
     /* Check if drive is ready to recieve a command */
-    if ((uptr->u5 & DK_BSY)) 
+    if ((uptr->CMD & DK_BSY)) 
         return SCPE_BUSY;
 
-    uptr->u5 = chan|DK_BSY;
+    uptr->CMD = chan|DK_BSY;
     if (dev == DSK2_DEV)
-        uptr->u5 |= DK_CTRL;
-    uptr->u5 |= (cmd & 077) << 12;
+        uptr->CMD |= DK_CTRL;
+    uptr->CMD |= (cmd & 077) << 12;
     if (cmd & URCSTA_INHIBIT) 
-        uptr->u5 |= DK_RDCK;
+        uptr->CMD |= DK_RDCK;
     else if (cmd & URCSTA_READ) 
-        uptr->u5 |= DK_RD;
+        uptr->CMD |= DK_RD;
     else
-        uptr->u5 |= DK_WR;
+        uptr->CMD |= DK_WR;
     if (cmd & URCSTA_WC) {
-        uptr->u5 |= DK_WC;
+        uptr->CMD |= DK_WC;
         if (*wc == 0)
-           uptr->u5 |= DK_WCZERO;
+           uptr->CMD |= DK_WCZERO;
     }
     if (cmd & URCSTA_BINARY)
-        uptr->u5 |= DK_BIN;
+        uptr->CMD |= DK_BIN;
     if (loading) {
-        uptr->u4 = 1;
-        uptr->u3 = 0;
+        uptr->ADDR = 1;
+        uptr->ESU = 0;
     } else {
-        uptr->u5 |= DK_ADDR;
+        uptr->CMD |= DK_ADDR;
     }
     sim_activate(uptr, 100);
     return SCPE_OK;
@@ -187,7 +192,7 @@ t_stat dsk_cmd(uint16 cmd, uint16 dev, uint8 chan, uint16 *wc)
 /* Handle processing disk controller commands */
 t_stat dsk_srv(UNIT * uptr)
 {
-    int                 chan = uptr->u5 & DK_CHAN;
+    int                 chan = uptr->CMD & DK_CHAN;
     DEVICE              *dptr = find_dev_from_unit(uptr);
     int                 i;
     int                 addr;
@@ -196,13 +201,13 @@ t_stat dsk_srv(UNIT * uptr)
     int                 esu;
     UNIT                *eptr;
 
-    if ((uptr->u5 & DK_BSY) == 0)
+    if ((uptr->CMD & DK_BSY) == 0)
         return SCPE_OK;
 
     /* Read in first word, which a address. */
     /* Note special read routine since address is not included
         in the word count */
-    if (uptr->u5 & DK_ADDR) {
+    if (uptr->CMD & DK_ADDR) {
         /* Read in 8 characters which are the address */
         for (i = 0; i < 8; i++) {
             if (chan_read_disk(chan, &abuf[i], 0)) 
@@ -218,45 +223,45 @@ t_stat dsk_srv(UNIT * uptr)
         for (i = 2; i < 8; i++) {
            addr = (addr * 10) + abuf[i];
         }
-        uptr->u5 &= ~DK_ADDR;
-        uptr->u4 = addr;
+        uptr->CMD &= ~DK_ADDR;
+        uptr->ADDR = addr;
 
         /* Map to ESU */
         if (u && (dsk_unit[u].flags & DFX) == 0) 
            esu += 10;
         sim_debug(DEBUG_DETAIL, dptr, "Disk access %d %s %02o %d,%d\n\r", u,
-                (uptr->u5 & DK_RDCK) ? "rcheck" : 
-                (uptr->u5 & DK_RD) ? "read" :
-                (uptr->u5 & DK_WR)? "write" : "nop", (uptr->u5 >> 9) & 077,
+                (uptr->CMD & DK_RDCK) ? "rcheck" : 
+                (uptr->CMD & DK_RD) ? "read" :
+                (uptr->CMD & DK_WR)? "write" : "nop", (uptr->CMD >> 9) & 077,
                 esu, addr);
         
-        uptr->u3 = esu;
-        eptr = &esu_unit[uptr->u3];
+        uptr->ESU = esu;
+        eptr = &esu_unit[uptr->ESU];
         /* Check if valid */
         if ((eptr->flags & UNIT_DIS) || (eptr->flags & UNIT_ATT) == 0) {
            /* Set not ready and end channel */
            chan_set_notrdy(chan);
-           uptr->u5 = 0;
+           uptr->CMD = 0;
            return SCPE_OK;
         }
 
         /* Check if Read Check or Write Check */
-        if ((uptr->u5 & (DK_WCZERO|DK_WC|DK_SECMASK)) == (DK_WCZERO|DK_WC)) {
-            if (uptr->u4 >= eptr->wait) 
+        if ((uptr->CMD & (DK_WCZERO|DK_WC|DK_SECMASK)) == (DK_WCZERO|DK_WC)) {
+            if (uptr->ADDR >= eptr->wait) 
                 chan_set_eof(chan);
             
-            if (uptr->u5 & DK_WR) {
+            if (uptr->CMD & DK_WR) {
                 sim_debug(DEBUG_DETAIL, dptr, "Disk write int %d %d %o\n\r", 
-                      uptr->u3, uptr->u4, uptr->u5);
+                      uptr->ESU, uptr->ADDR, uptr->CMD);
             }
-            if (uptr->u5 & DK_RD) {
+            if (uptr->CMD & DK_RD) {
                 sim_debug(DEBUG_DETAIL, dptr, "Disk read int %d %d %o\n\r", 
-                      uptr->u3, uptr->u4, uptr->u5);
+                      uptr->ESU, uptr->ADDR, uptr->CMD);
                 if (eptr->flags & MODIB) 
                    chan_set_error(chan);
             }
             chan_set_end(chan);
-            uptr->u5 = 0;
+            uptr->CMD = 0;
             return SCPE_OK;
         }
 
@@ -265,21 +270,21 @@ t_stat dsk_srv(UNIT * uptr)
     } 
 
     /* Kick off actual transfer to ESU */
-    if (((uptr->u5 & DK_ADDR) == 0) && 
-                ((uptr->u5 & (DK_RDCK|DK_RD|DK_WR)) != 0)) {
-        eptr = &esu_unit[uptr->u3];
+    if (((uptr->CMD & DK_ADDR) == 0) && 
+                ((uptr->CMD & (DK_RDCK|DK_RD|DK_WR)) != 0)) {
+        eptr = &esu_unit[uptr->ESU];
 
         /* Wait until unit is ready for new access */
-        if ((eptr->u5 & DK_BSY) == 0) {
+        if ((eptr->CMD & DK_BSY) == 0) {
 
-            eptr->u3 = (uptr->u5 & DK_WR) ? 0 : DK_SEC_SIZE;
-            eptr->u4 = uptr->u4;        /* Disk address */
-            eptr->u5 = uptr->u5;        /* Command */
-            if (uptr->u5 & DK_RDCK) {
-                uptr->u5 = 0;
+            eptr->POS = (uptr->CMD & DK_WR) ? 0 : DK_SEC_SIZE;
+            eptr->ADDR = uptr->ADDR;        /* Disk address */
+            eptr->CMD = uptr->CMD;        /* Command */
+            if (uptr->CMD & DK_RDCK) {
+                uptr->CMD = 0;
                 chan_set_end(chan);
             } else 
-                uptr->u5 &= ~(DK_RDCK|DK_RD|DK_WR);
+                uptr->CMD &= ~(DK_RDCK|DK_RD|DK_WR);
             sim_activate(eptr, 8000);
             return SCPE_OK;
         }
@@ -289,51 +294,51 @@ t_stat dsk_srv(UNIT * uptr)
 }
 
 void esu_set_end(UNIT *uptr, int err) {
-        int             chan = uptr->u5 & DK_CHAN;
-        int             dsk = ((uptr->u5 & DK_CTRL) != 0);
+        int             chan = uptr->CMD & DK_CHAN;
+        int             dsk = ((uptr->CMD & DK_CTRL) != 0);
         DEVICE          *dptr = find_dev_from_unit(uptr);
 
-        sim_debug(DEBUG_DETAIL, dptr, "Disk done %d %d %o\n\r", uptr->u3,
-                 uptr->u4, uptr->u5);
+        sim_debug(DEBUG_DETAIL, dptr, "Disk done %d %d %o\n\r", uptr->POS,
+                 uptr->ADDR, uptr->CMD);
         if (err)
             chan_set_error(chan);
-        uptr->u5 = 0;
-        dsk_unit[dsk].u5 = 0;
+        uptr->CMD = 0;
+        dsk_unit[dsk].CMD = 0;
         chan_set_end(chan);
 }
         
 /* Handle processing esu controller commands */
 t_stat esu_srv(UNIT * uptr)
 {
-    int                 chan = uptr->u5 & DK_CHAN;
+    int                 chan = uptr->CMD & DK_CHAN;
     DEVICE              *dptr = find_dev_from_unit(uptr);
     int                 u = uptr - esu_unit;
-    int                 dsk = ((uptr->u5 & DK_CTRL) != 0);
+    int                 dsk = ((uptr->CMD & DK_CTRL) != 0);
     int                 wc;
     
  
     /* Process for each unit */
-    if (uptr->u5 & DK_RD) {
+    if (uptr->CMD & DK_RD) {
         /* Check if at start of segment */
-        if (uptr->u3 >= DK_SEC_SIZE) {
-            int         da = (uptr->u4 * DK_SEC_SIZE);
+        if (uptr->POS >= DK_SEC_SIZE) {
+            int         da = (uptr->ADDR * DK_SEC_SIZE);
 
             /* Check if end of operation */
-            if ((uptr->u5 & (DK_SECMASK)) == 0) {
+            if ((uptr->CMD & (DK_SECMASK)) == 0) {
                 esu_set_end(uptr, 0);
                 return SCPE_OK;
             }
 
             /* Check if over end of disk */
-            if (uptr->u4 >= uptr->wait) {
+            if (uptr->ADDR >= uptr->wait) {
                 sim_debug(DEBUG_DETAIL, dptr, "Disk read over %d %d %o\n\r",
-                                 uptr->u3, uptr->u4, uptr->u5);
+                                 uptr->POS, uptr->ADDR, uptr->CMD);
                 chan_set_eof(chan);
                 esu_set_end(uptr, 0);
                 return SCPE_OK;
             }
             sim_debug(DEBUG_DETAIL, dptr, "Disk read %d %d %d %o %d\n\r",
-                                 u,uptr->u3, uptr->u4, uptr->u5, da);
+                                 u,uptr->POS, uptr->ADDR, uptr->CMD, da);
         
             if (sim_fseek(uptr->fileref, da, SEEK_SET) < 0) {
                 esu_set_end(uptr, 1);
@@ -342,80 +347,80 @@ t_stat esu_srv(UNIT * uptr)
             wc = sim_fread(&dsk_buffer[dsk][0], 1, DK_SEC_SIZE,
                                  uptr->fileref);
             for (; wc < DK_SEC_SIZE; wc++) 
-                dsk_buffer[dsk][wc] = (uptr->u5 & DK_BIN) ? 0 :020;
-            uptr->u3 = 0;
-            uptr->u4++; /* Advance disk address */
-            uptr->u5 -= DK_SECT;
+                dsk_buffer[dsk][wc] = (uptr->CMD & DK_BIN) ? 0 :020;
+            uptr->POS = 0;
+            uptr->ADDR++; /* Advance disk address */
+            uptr->CMD -= DK_SECT;
         }
         /* Transfer one Character */
-        if (chan_write_char(chan, &dsk_buffer[dsk][uptr->u3], 0)) {
+        if (chan_write_char(chan, &dsk_buffer[dsk][uptr->POS], 0)) {
                 esu_set_end(uptr, 0);
                 return SCPE_OK;
         }
-        uptr->u3++;
+        uptr->POS++;
     }
 
-    if (uptr->u5 & DK_RDCK) {
-        if (uptr->u3 >= DK_SEC_SIZE) {
+    if (uptr->CMD & DK_RDCK) {
+        if (uptr->POS >= DK_SEC_SIZE) {
 
             /* Check if over end of disk */
-            if (uptr->u4 >= uptr->wait) {
+            if (uptr->ADDR >= uptr->wait) {
                 sim_debug(DEBUG_DETAIL, dptr, "Disk rdchk over %d %d %o\n\r",
-                         uptr->u3, uptr->u4, uptr->u5);
-                uptr->u5 = 0;
+                         uptr->POS, uptr->ADDR, uptr->CMD);
+                uptr->CMD = 0;
                 IAR |= IRQ_14 << dsk;
                 return SCPE_OK;
             }
             sim_debug(DEBUG_DETAIL, dptr, "Disk rdchk %d %d %d %o\n\r", u,
-                         uptr->u3, uptr->u4, uptr->u5);
+                         uptr->POS, uptr->ADDR, uptr->CMD);
         
-            uptr->u4++; /* Advance disk address */
-            uptr->u5 -= DK_SECT;
-            uptr->u3 = 0;
+            uptr->ADDR++; /* Advance disk address */
+            uptr->CMD -= DK_SECT;
+            uptr->POS = 0;
 
             /* Check if end of operation */
-            if ((uptr->u5 & (DK_SECMASK)) == 0) {
-                uptr->u5 = 0;
+            if ((uptr->CMD & (DK_SECMASK)) == 0) {
+                uptr->CMD = 0;
                 IAR |= IRQ_14 << dsk;
                 return SCPE_OK;
             }
         }
         /* Check if at end of segment */
-        uptr->u3++;
+        uptr->POS++;
     }
 
     /* Process for each unit */
-    if (uptr->u5 & DK_WR) {
+    if (uptr->CMD & DK_WR) {
         /* Check if end of operation */
-        if ((uptr->u5 & (DK_SECMASK)) == 0) {
+        if ((uptr->CMD & (DK_SECMASK)) == 0) {
             esu_set_end(uptr, 0);
             return SCPE_OK;
         }
 
         /* Transfer one Character */
-        if (chan_read_char(chan, &dsk_buffer[dsk][uptr->u3], 0)) {
-            if (uptr->u3 != 0) {
-                while (uptr->u3 < DK_SEC_SIZE) 
-                    dsk_buffer[dsk][uptr->u3++] = (uptr->u5 & DK_BIN) ? 0 :020;
+        if (chan_read_char(chan, &dsk_buffer[dsk][uptr->POS], 0)) {
+            if (uptr->POS != 0) {
+                while (uptr->POS < DK_SEC_SIZE) 
+                    dsk_buffer[dsk][uptr->POS++] = (uptr->CMD & DK_BIN) ? 0 :020;
             }
         } 
-        uptr->u3++;
+        uptr->POS++;
 
         /* Check if at end of segment */
-        if (uptr->u3 >= DK_SEC_SIZE) {
-           int  da = (uptr->u4 * DK_SEC_SIZE);
+        if (uptr->POS >= DK_SEC_SIZE) {
+           int  da = (uptr->ADDR * DK_SEC_SIZE);
 
            /* Check if over end of disk */
-           if (uptr->u4 >= uptr->wait) {
+           if (uptr->ADDR >= uptr->wait) {
                sim_debug(DEBUG_DETAIL, dptr, "Disk write over %d %d %o\n\r", 
-                           uptr->u3, uptr->u4, uptr->u5);
+                           uptr->POS, uptr->ADDR, uptr->CMD);
                chan_set_eof(chan);
                esu_set_end(uptr, 0);
                return SCPE_OK;
            }
         
            sim_debug(DEBUG_DETAIL, dptr, "Disk write %d %d %d %o %d\n\r",
-                            u, uptr->u3, uptr->u4, uptr->u5, da);
+                            u, uptr->POS, uptr->ADDR, uptr->CMD, da);
            if (sim_fseek(uptr->fileref, da, SEEK_SET) < 0) {
                esu_set_end(uptr, 1);
                return SCPE_OK;
@@ -427,9 +432,9 @@ t_stat esu_srv(UNIT * uptr)
                esu_set_end(uptr, 1);
                return SCPE_OK;
            }
-           uptr->u3 = 0;
-           uptr->u4++;  /* Advance disk address */
-           uptr->u5 -= DK_SECT;
+           uptr->POS = 0;
+           uptr->ADDR++;  /* Advance disk address */
+           uptr->CMD -= DK_SECT;
         } 
     }
     sim_activate(uptr, (uptr->flags & MODIB) ? 500 :300);
@@ -457,11 +462,11 @@ dsk_boot(int32 unit_num, DEVICE * dptr)
     int         i;
 
     for(i = 0; i < 20; i++) {
-        esu_unit[i].u5 = 0;
+        esu_unit[i].CMD = 0;
         sim_cancel(&esu_unit[i]);
     }
-    dsk_unit[0].u5 = 0;
-    dsk_unit[1].u5 = 0;
+    dsk_unit[0].CMD = 0;
+    dsk_unit[1].CMD = 0;
     sim_cancel(&dsk_unit[0]);
     sim_cancel(&dsk_unit[1]);
 

@@ -53,9 +53,11 @@
 /* Buffer wrong state = DEV_EOF D27 */
 /* Buffer Busy = DEV_ERROR D28 */
 /* DTC not ready or buffer, DEV_NOTRDY D30 */
-/* in u3 is device address */
 /* in u4 is current address */
 /* in u5 Line number */
+#define LINE   u4
+#define CMD    u5
+
 #define DTC_CHAN        000003  /* Channel number */
 #define DTC_RD          000004  /* Executing a read command */
 #define DTC_WR          000010  /* Executing a write command */
@@ -225,34 +227,34 @@ t_stat dtc_cmd(uint16 cmd, uint16 dev, uint8 chan, uint16 *wc)
         return SCPE_UNATT;
 
     /* Check if drive is ready to recieve a command */
-    if ((uptr->u5 & DTC_RDY) == 0)
+    if ((uptr->CMD & DTC_RDY) == 0)
         return SCPE_BUSY;
 
-    uptr->u5 = chan;
+    uptr->CMD = chan;
     ttu = (*wc & DTCSTA_TTU) >> 5;
     buf = (*wc & DTCSTA_BUF);
     /* Set the Terminal unit. */
     if (ttu == 0)
-        uptr->u4 = -1;
+        uptr->LINE = -1;
     else {
-        uptr->u4 = buf + ((ttu-1) * 15);
+        uptr->LINE = buf + ((ttu-1) * 15);
     }
     if (*wc & DTCSTA_GM)
-        uptr->u5 |= DTC_IGNGM;
+        uptr->CMD |= DTC_IGNGM;
     if (cmd & DTCSTA_READ)
-        uptr->u5 |= DTC_RD;
+        uptr->CMD |= DTC_RD;
     else if (cmd & DTCSTA_INHIBIT)
-        uptr->u5 |= DTC_INQ;
+        uptr->CMD |= DTC_INQ;
     else
-        uptr->u5 |= DTC_WR;
+        uptr->CMD |= DTC_WR;
 
     if (cmd & DTCSTA_BINARY)
-        uptr->u5 |= DTC_BIN;
+        uptr->CMD |= DTC_BIN;
 
     sim_debug(DEBUG_CMD, &dtc_dev, "Datacomm access %s %06o %d %04o\n",
-                (uptr->u5 & DTC_RD) ? "read" : ((uptr->u5 & DTC_INQ) ? "inq" :
-                  ((uptr->u5 & DTC_WR) ? "write" : "unknown")),
-                 uptr->u5, uptr->u4, *wc);
+                (uptr->CMD & DTC_RD) ? "read" : ((uptr->CMD & DTC_INQ) ? "inq" :
+                  ((uptr->CMD & DTC_WR) ? "write" : "unknown")),
+                 uptr->CMD, uptr->LINE, *wc);
     sim_activate(uptr, 5000);
     return SCPE_OK;
 }
@@ -261,16 +263,16 @@ t_stat dtc_cmd(uint16 cmd, uint16 dev, uint8 chan, uint16 *wc)
 /* Handle processing terminal controller commands */
 t_stat dtc_srv(UNIT * uptr)
 {
-    int                 chan = uptr->u5 & DTC_CHAN;
+    int                 chan = uptr->CMD & DTC_CHAN;
     uint8               ch;
     int                 ttu;
     int                 buf;
     int                 i;
-    int                 line = uptr->u4;
+    int                 line = uptr->LINE;
 
 
     /* Process interrage command */
-    if (uptr->u5 & DTC_INQ) {
+    if (uptr->CMD & DTC_INQ) {
         if (line == -1) {
             buf = -1;
             for(i = 0; i < DTC_MLINES; i++) {
@@ -333,7 +335,7 @@ t_stat dtc_srv(UNIT * uptr)
                 sim_debug(DEBUG_DETAIL, &dtc_dev, " abnormal ");
             }
             dtc_lstatus[line] &= ~BufIRQ;
-            chan_set_wc(uptr->u4, 0);
+            chan_set_wc(uptr->LINE, 0);
             chan_set_end(chan);
             sim_debug(DEBUG_DETAIL, &dtc_dev, " %03o ", dtc_lstatus[line]);
         }
@@ -345,18 +347,18 @@ t_stat dtc_srv(UNIT * uptr)
         }
         chan_set_wc(chan, (ttu << 5) | line);
         chan_set_end(chan);
-        uptr->u5 = DTC_RDY;
+        uptr->CMD = DTC_RDY;
         sim_debug(DEBUG_DETAIL, &dtc_dev, "Datacomm inqury %d %d\n",
                 ttu, line);
     }
     /* Process for each unit */
-    if (uptr->u5 & DTC_WR) {
+    if (uptr->CMD & DTC_WR) {
         if (line > dtc_desc.lines || line == -1 || dtc_lstatus[line] & BufDisco) {
             sim_debug(DEBUG_DETAIL, &dtc_dev, "Datacomm write invalid %d\n",
                          line);
             chan_set_notrdy(chan);
             chan_set_end(chan);
-            uptr->u5 = DTC_RDY;
+            uptr->CMD = DTC_RDY;
             return SCPE_OK;
         }
         /* Validate that we can send data to buffer */
@@ -375,7 +377,7 @@ t_stat dtc_srv(UNIT * uptr)
         case BufOutBusy:
                 chan_set_eof(chan);
                 chan_set_end(chan);
-                uptr->u5 = DTC_RDY;
+                uptr->CMD = DTC_RDY;
                 sim_debug(DEBUG_DETAIL, &dtc_dev, "Datacomm write busy %d %d\n",
                         line, i);
                 return SCPE_OK;
@@ -423,7 +425,7 @@ t_stat dtc_srv(UNIT * uptr)
                     line -= 15;
                 chan_set_wc(chan, (ttu << 5) | line);
                 chan_set_end(chan);
-                uptr->u5 = DTC_RDY;
+                uptr->CMD = DTC_RDY;
                 return SCPE_OK;
         } else {
               dtc_lstatus[line] = BufWrite;
@@ -434,13 +436,13 @@ t_stat dtc_srv(UNIT * uptr)
         sim_activate(uptr, 5000);
     }
 
-    if (uptr->u5 & DTC_RD) {
+    if (uptr->CMD & DTC_RD) {
         if (line > dtc_desc.lines || line == -1 || dtc_lstatus[line] & BufDisco) {
             sim_debug(DEBUG_DETAIL, &dtc_dev, "Datacomm read nothing %d\n",
                  line);
             chan_set_notrdy(chan);
             chan_set_end(chan);
-            uptr->u5 = DTC_RDY;
+            uptr->CMD = DTC_RDY;
             return SCPE_OK;
         }
         /* Validate that we can send data to buffer */
@@ -461,7 +463,7 @@ t_stat dtc_srv(UNIT * uptr)
         case BufWrite:
                 chan_set_eof(chan);
                 chan_set_end(chan);
-                uptr->u5 = DTC_RDY;
+                uptr->CMD = DTC_RDY;
                 sim_debug(DEBUG_DETAIL, &dtc_dev, "Datacomm read busy %d %d\n",
                          line, i);
                 return SCPE_OK;
@@ -500,7 +502,7 @@ t_stat dtc_srv(UNIT * uptr)
                     line -= 15;
                 chan_set_wc(chan, (ttu << 5) | line);
                 chan_set_end(chan);
-                uptr->u5 = DTC_RDY;
+                uptr->CMD = DTC_RDY;
                 IAR |= IRQ_12;
                 return SCPE_OK;
         } else {
@@ -771,7 +773,7 @@ dtc_attach(UNIT * uptr, CONST char *cptr)
     for (i = 0; i < DTC_MLINES; i++) {
         dtc_lstatus[i] = BufNotReady;   /* Device not connected */
     }
-    uptr->u5 = DTC_RDY;
+    uptr->CMD = DTC_RDY;
     iostatus |= DTC_FLAG;
     return SCPE_OK;
 }
@@ -788,7 +790,7 @@ dtc_detach(UNIT * uptr)
     for (i = 0; i < dtc_desc.lines; i++)
         dtc_ldsc[i].rcve = 0;   /* disable rcv */
     sim_cancel(uptr);           /* stop poll */
-    uptr->u5 = 0;
+    uptr->CMD = 0;
     iostatus &= ~DTC_FLAG;
     return r;
 }
