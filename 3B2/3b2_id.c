@@ -164,11 +164,11 @@ MTAB id_mod[] = {
 };
 
 DEVICE id_dev = {
-    "ID", id_unit, id_reg, id_mod,
+    "IDISK", id_unit, id_reg, id_mod,
     ID_NUM_UNITS, 16, 32, 1, 16, 8,
     NULL, NULL, &id_reset,
     NULL, &id_attach, &id_detach, NULL,
-    DEV_DEBUG|DEV_SECTORS, 0, sys_deb_tab,
+    DEV_DEBUG|DEV_DISK|DEV_SECTORS, 0, sys_deb_tab,
     NULL, NULL, &id_help, NULL, NULL,
     &id_description
 };
@@ -937,21 +937,21 @@ void id_after_dma()
 
 CONST char *id_description(DEVICE *dptr)
 {
-    return "MFM Hard Disk Controller";
+    return "Integrated Hard Disk";
 }
 
 t_stat id_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
-    fprintf(st, "Integrated Hard Disk (ID)\n\n");
-    fprintf(st, "The ID device implements the integrated MFM hard disk controller\n");
-    fprintf(st, "of the 3B2/400. Up to two drives are supported on a single controller.\n\n");
+    fprintf(st, "Integrated Hard Disk (IDISK)\n\n");
+    fprintf(st, "The IDISK device implements the integrated MFM hard disk of the\n");
+    fprintf(st, "3B2/400. Up to two drives are supported on a single controller.\n\n");
     fprintf(st, "Supported device types are:\n\n");
     fprintf(st, "  Name    Size    ID    Cyl  Head  Sec  Byte/Sec  Description\n");
     fprintf(st, "  ----  --------  --   ----  ----  ---  --------  ----------------------\n");
     fprintf(st, "  HD30   30.6 MB   3    697     5   18    512     CDC Wren 94155-36\n");
     fprintf(st, "  HD72   73.2 MB   5    925     9   18    512     CDC Wren II 94156-86\n");
     fprintf(st, "  HD72C  72.9 MB   8    754    11   18    512     Fujitsu M2243AS\n");
-    fprintf(st, "  HD135 135.0 MB  11   1024    15   18    512     Maxtor XT1190 (SVR2)\n\n");
+    fprintf(st, "  HD135 135.0 MB  11   1024    15   18    512     Maxtor XT1190 (SVR2)\n");
     fprintf(st, "  HD161 161.4 MB  11   1224    15   18    512     Maxtor XT1190 (SVR3+)\n\n");
     fprintf(st, "The drive ID and geometry values are used when low-level formatting a\n");
     fprintf(st, "drive using the AT&T 'idtools' utility.\n");

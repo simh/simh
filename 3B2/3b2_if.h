@@ -113,22 +113,27 @@ extern t_bool if_irq;
 /* Constants */
 
 #define IF_SIDES         2
+#define IF_SEC_COUNT     9
+#define IF_SEC_SIZE      512
 #define IF_TRACK_SIZE    4608
-#define IF_SECTOR_SIZE   512
 #define IF_TRACK_COUNT   80
 
 #define IF_STEP_IN_DIR    1
 #define IF_STEP_OUT_DIR  -1
 
-#define IF_DSK_SIZE      (IF_SIDES * IF_TRACK_SIZE * IF_TRACK_COUNT)
+#define IF_DSK_SIZE_SECS  (IF_SIDES * IF_TRACK_COUNT * IF_SEC_COUNT)
 
 /* Function prototypes */
 
 t_stat if_svc(UNIT *uptr);
 t_stat if_reset(DEVICE *dptr);
+t_stat if_attach(UNIT *uptr, CONST char *cptr);
+t_stat if_detach(UNIT *uptr);
 uint32 if_read(uint32 pa, size_t size);
 void if_write(uint32 pa, uint32 val, size_t size);
 void if_handle_command();
 void if_after_dma();
+CONST char *if_description(DEVICE *dptr);
+t_stat if_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 
 #endif
