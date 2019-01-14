@@ -122,6 +122,8 @@ static struct type340 {
     unsigned char intensity;    /* 3 bits */
 #if TYPE342
     unsigned char shift;        /* 1 bit */
+    unsigned char width;        /* character grid width */
+    unsigned char height;       /* character grid height */
 #endif
 #if TYPE347
     ty340word ASR;              /* Address Save Register */
@@ -167,6 +169,8 @@ ty340_reset(void *dptr)
     u->scale = 1;
 #if TYPE342
     u->shift = 0;
+    u->width = 6;
+    u->height = 9;
 #endif
 #if TYPE347
     u->SAVE_FF = 0;
@@ -709,6 +713,14 @@ static const unsigned char chars[128][6] = {
     { 0376, 0376, 0376, 0376, 0376, 0 }    /* 77 ??? */
 };
 
+void
+ty342_set_grid(int w, int h)
+{
+    struct type340 *u = UNIT(0);
+    u->width = w;
+    u->height = h;
+}
+
 /*
  * type 342 Character/Symbol generator for type 340 display
  * return true if ESCaped
@@ -725,7 +737,7 @@ character(int n, unsigned char c)
     flags = chars[c][5];
 
     if (flags & CH_LF) {                /* LF */
-        u->ypos -= u->12*s;
+        u->ypos -= u->height*s;
         if (u->ypos < 0) {
             u->status |= ST340_HEDGE;
             u->ypos = 0;
@@ -747,8 +759,8 @@ character(int n, unsigned char c)
     if (flags & CH_ESC) {               /* escape */
         return 1;
     }
-    if ((flags & CH_NSPC) && u->xpos >= u->7*s) {
-        u->xpos -= u->7*s;             /* non spacing character */
+    if ((flags & CH_NSPC) && u->xpos >= u->width*s) {
+        u->xpos -= u->width*s;          /* non spacing character */
     }
     /* plot character from character set selected by "shift" */
     for (x = 0; x < 5; x++) {           /* column: 0 to 4, left to right */
@@ -759,7 +771,7 @@ character(int n, unsigned char c)
             }
         }
     }
-    u->xpos += 7*s;
+    u->xpos += u->width*s;
     if (u->xpos > 1023) {
         u->xpos = 1023;
         u->status |= ST340_VEDGE;
