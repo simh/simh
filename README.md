@@ -1,4 +1,4 @@
-# SIMH v4.0 - Current
+# SIMH v4.0 - 19-01 Current
 
 [![Coverity Scan Build Status](https://scan.coverity.com/projects/11982/badge.svg)](https://scan.coverity.com/projects/simh)
 [![Build Status](https://travis-ci.org/simh/simh.svg)](https://travis-ci.org/simh/simh)
@@ -83,8 +83,6 @@
 
 #### Hans-Åke Lund has implemented an SCELBI (SCientic-ELectronics-BIology) simulator.
 
-#### Roberto Sancho has implemented an IBM 650 simulator.
-
 ### New Host Platform support - HP-UX and AIX
 
 ### Simulator Front Panel API
@@ -114,6 +112,7 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
     DMC11/DMR11 DDCMP DECnet device simulation.  Up to 8 DMC devices are supported.  Packet transport is via TCP or UDP connections.
     KDP11 on PDP11 for DECnet
     DUP11 on PDP11 for DECnet connectivity to talk to DMC, KDP or other DUP devices
+    CH11 on PDP11 and VAX780 for Chaosnet (from Lars Brinkhoff)
     DZ on Unibus systems can have up to 256 ports (default of 32), on 
         Qbus systems 128 port limit (default of 16).
     DZ devices optionally support full modem control (and port speed settings 
@@ -136,6 +135,7 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
 #### PDP10 Enhancements
     KDP11 (from Timothe Litt) for DECnet connectivity to simulators with DMC, DUP or KDP devices
     DMR11 for DECnet connectivity to simulators with DMC, DUP or KDP devices on TOPS10.
+    CH11 (from Lars Brinkhoff) Chaosnet interface.
 
 #### SDS 940 Enhancements
     Support for SDS internal ASCII character encoding during display and data entry.
