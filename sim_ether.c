@@ -2445,8 +2445,10 @@ if (!rand_initialized)
 return (rand() & 0xFF);
 }
 
-t_stat eth_check_address_conflict (ETH_DEV* dev, 
-                                   ETH_MAC* const mac)
+t_stat eth_check_address_conflict_ex (ETH_DEV* dev, 
+                                      ETH_MAC* const mac,
+                                      int *reflections,
+                                      t_bool silent)
 {
 ETH_PACK send, recv;
 t_stat status;
@@ -2455,6 +2457,8 @@ int responses = 0;
 uint32 offset, function;
 char mac_string[32];
 
+if (reflections)
+    *reflections = 0;
 eth_mac_fmt(mac, mac_string);
 sim_debug(dev->dbit, dev->dptr, "Determining Address Conflict for MAC address: %s\n", mac_string);
 
@@ -2578,13 +2582,23 @@ do {
   } while (recv.len > 0);
 
 sim_debug(dev->dbit, dev->dptr, "Address Conflict = %d\n", responses);
-if (responses)
+if (responses && !silent)
   return sim_messagef (SCPE_ARG, "%s: MAC Address Conflict on LAN for address %s, change the MAC address to a unique value\n", sim_dname (dev->dptr), mac_string);
-return responses;
+if (reflections)
+  *reflections = responses;
+return SCPE_OK;
+}
+
+t_stat eth_check_address_conflict (ETH_DEV* dev, 
+                                   ETH_MAC* const mac)
+{
+return eth_check_address_conflict_ex (dev, mac, NULL, FALSE);
 }
 
 t_stat eth_reflect(ETH_DEV* dev)
 {
+t_stat r;
+
 /* Test with an address no NIC should have. */
 /* We do this to avoid reflections from the wire, */
 /* in the event that a simulated NIC has a MAC address conflict. */
@@ -2592,11 +2606,12 @@ static ETH_MAC mac = {0xfe,0xff,0xff,0xff,0xff,0xfe};
 
 sim_debug(dev->dbit, dev->dptr, "Determining Reflections...\n");
 
-dev->reflections = 0;
-dev->reflections = eth_check_address_conflict (dev, &mac);
+r = eth_check_address_conflict_ex (dev, &mac, &dev->reflections, TRUE);
+if (r != SCPE_OK)
+  return sim_messagef (r, "eth: Error determining reflection count\n");
 
 sim_debug(dev->dbit, dev->dptr, "Reflections = %d\n", dev->reflections);
-return dev->reflections;
+return SCPE_OK;
 }
 
 static void
@@ -3643,7 +3658,7 @@ else
 /* test reflections.  This is done early in this routine since eth_reflect */
 /* calls eth_filter recursively and thus changes the state of the device. */
 if (dev->reflections == -1)
-  status = eth_reflect(dev);
+  eth_reflect(dev);
 
 /* set new filter addresses */
 for (i = 0; i < addr_count; i++)
