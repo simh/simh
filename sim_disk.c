@@ -4142,10 +4142,10 @@ VhdPathToHostPath (const char *szVhdPath,
 char *c;
 char *d = szHostPath;
 
-strncpy (szHostPath, szVhdPath, HostPathSize-1);
+memmove (szHostPath, szVhdPath, HostPathSize);
 szHostPath[HostPathSize-1] = '\0';
 #if defined(VMS)
-c = strchr (szVhdPath, ':');
+c = strchr (szHostPath, ':');
 if (*(c+1) != '\\')
     return NULL;
 *(c+1) = '[';

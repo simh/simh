@@ -291,40 +291,12 @@ return (t_offset)(ftell (st));
 
 int sim_fseeko (FILE *st, t_offset offset, int whence)
 {
-fpos_t fileaddr;
-struct _stati64 statb;
-
-switch (whence) {
-
-    case SEEK_SET:
-        fileaddr = (fpos_t)offset;
-        break;
-
-    case SEEK_END:
-        if (_fstati64 (_fileno (st), &statb))
-            return (-1);
-        fileaddr = statb.st_size + offset;
-        break;
-    case SEEK_CUR:
-        if (fgetpos (st, &fileaddr))
-            return (-1);
-        fileaddr = fileaddr + offset;
-        break;
-
-    default:
-        errno = EINVAL;
-        return (-1);
-        }
-
-return fsetpos (st, &fileaddr);
+return _fseeki64 (st, (__int64)offset, whence);
 }
 
 t_offset sim_ftell (FILE *st)
 {
-fpos_t fileaddr;
-if (fgetpos (st, &fileaddr))
-    return (-1);
-return (t_offset)fileaddr;
+return (t_offset)_ftelli64 (st);
 }
 
 #endif                                                  /* end Windows */
