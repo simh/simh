@@ -1572,6 +1572,9 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname)
         NULL};
 
     memset(command, 0, sizeof(command));
+    /* try to force an otherwise unused interface to be turned on */
+    snprintf(command, sizeof(command)-1, "ifconfig %s up", devname);
+    (void)system(command);
     for (i=0; patterns[i] && (0 == dev->have_host_nic_phy_addr); ++i) {
       snprintf(command, sizeof(command)-1, "ifconfig %s | %s  >NIC.hwaddr", devname, patterns[i]);
       (void)system(command);
@@ -2154,7 +2157,21 @@ else { /* !tap: */
       else { /* not udp:, so attempt to open the parameter as if it were an explicit device name */
 #if defined(HAVE_PCAP_NETWORK)
         *handle = (void*) pcap_open_live(savname, bufsz, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
-        if (!*handle)   /* can't open device */
+#if !defined(__CYGWIN__) && !defined(__VMS) && !defined(_WIN32)
+        if (!*handle) { /* can't open device */
+          if (strstr (errbuf, "That device is not up")) {
+            char command[1024];
+
+            /* try to force an otherwise unused interface to be turned on */
+            memset(command, 0, sizeof(command));
+            snprintf(command, sizeof(command)-1, "ifconfig %s up", savname);
+            (void)system(command);
+            errbuf[0] = '\0';
+            *handle = (void*) pcap_open_live(savname, bufsz, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
+            }
+          }
+#endif
+        if (!*handle)  /* can't open device */
           return sim_messagef (SCPE_OPENERR, "Eth: pcap_open_live error - %s\n", errbuf);
         *eth_api = ETH_API_PCAP;
 #if !defined(HAS_PCAP_SENDPACKET) && defined (xBSD) && !defined (__APPLE__)
