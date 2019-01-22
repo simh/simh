@@ -2609,6 +2609,11 @@ return SCPE_OK;
 t_stat eth_check_address_conflict (ETH_DEV* dev, 
                                    ETH_MAC* const mac)
 {
+char mac_string[32];
+
+eth_mac_fmt(mac, mac_string);
+if (0 == memcmp (mac, dev->host_nic_phy_hw_addr, sizeof *mac))
+    return sim_messagef (SCPE_OK, "Sharing the host NIC MAC address %s may cause unexpected behavior\n", mac_string);
 return eth_check_address_conflict_ex (dev, mac, NULL, FALSE);
 }
 
