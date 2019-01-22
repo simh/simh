@@ -437,9 +437,6 @@ DEBTAB cpu_deb[] = {
     { "FLTFAULT",  LOG_CPU_FAULT_FLT,   "floating fault activities" },
     { "CMODFAULT", LOG_CPU_FAULT_CMODE, "cmode fault activities" },
     { "MCHKFAULT", LOG_CPU_FAULT_MCHK,  "machine check fault activities" },
-    { "EVENT",     SIM_DBG_EVENT,       "event dispatch activities" },
-    { "ACTIVATE",  SIM_DBG_ACTIVATE,    "queue insertion activities" },
-    { "ASYNCH",    SIM_DBG_AIO_QUEUE,   "asynch queue activities" },
     { NULL, 0 }
     };
 

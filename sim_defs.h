@@ -855,14 +855,6 @@ struct DEBTAB {
 #define DEBUG_PRI(d,m)  (sim_deb && (d.dctrl & (m)))
 #define DEBUG_PRJ(d,m)  (sim_deb && ((d)->dctrl & (m)))
 
-#define SIM_DBG_EVENT       0x01000000      /* event dispatch activities */
-#define SIM_DBG_ACTIVATE    0x02000000      /* queue insertion activities */
-#define SIM_DBG_AIO_QUEUE   0x04000000      /* asynch event queue activities */
-#define SIM_DBG_EXP_STACK   0x08000000      /* expression stack activities */
-#define SIM_DBG_EXP_EVAL    0x10000000      /* expression evaluation activities */
-#define SIM_DBG_BRK_ACTION  0x20000000      /* action activities */
-#define SIM_DBG_DO          0x40000000      /* do activities */
-
 /* Open File Reference */
 struct FILEREF {
     char                name[CBUFSIZE];                 /* file name */
