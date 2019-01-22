@@ -889,7 +889,8 @@ if ((hFind =  FindFirstFileA (cptr, &File)) != INVALID_HANDLE_VALUE) {
     sprintf (&DirName[strlen (DirName)], "%c", *pathsep);
     do {
         FileSize = (((t_int64)(File.nFileSizeHigh)) << 32) | File.nFileSizeLow;
-        sprintf (FileName, "%s%s", DirName, File.cFileName);
+        strlcpy (FileName, DirName, sizeof (FileName));
+        strlcat (FileName, File.cFileName, sizeof (FileName));
         stat (FileName, &filestat);
         entry (DirName, File.cFileName, FileSize, &filestat, context);
         } while (FindNextFile (hFind, &File));

@@ -13062,10 +13062,9 @@ for (hblock = astrings; (htext = *hblock) != NULL; hblock++) {
                                 }
                             break;
                         case 'D':
-                            if (dptr) {
+                            if (dptr)
                                 appendText (topic, dptr->name, strlen (dptr->name));
-                                break;
-                                }
+                            break;
                         case 'S':
                             appendText (topic, sim_name, strlen (sim_name));
                             break;

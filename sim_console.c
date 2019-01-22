@@ -1570,6 +1570,7 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
                 case '\n':
                     if (rem->buf_ptr == 0)
                         break;
+                    /* fall through */
                 case '\r':
                     tmxr_linemsg (lp, "\r\n");
                     if (rem->buf_ptr+1 >= rem->buf_size) {
@@ -2580,7 +2581,8 @@ while (*cptr != 0) {                                    /* do all mods */
         if (serport != INVALID_HANDLE) {
             sim_close_serial (serport);
             if (r == SCPE_OK) {
-                char cbuf[CBUFSIZE];
+                char cbuf[CBUFSIZE+10];
+
                 if ((sim_con_tmxr.master) ||            /* already open? */
                     (sim_con_ldsc.serport))
                     sim_set_noserial (0, NULL);         /* close first */
@@ -2662,7 +2664,7 @@ else {
     if (!*pref)
         return SCPE_MEM;
     get_glyph_nc (filename, gbuf, 0);                   /* reparse */
-    strncpy ((*pref)->name, gbuf, sizeof((*pref)->name)-1);
+    strlcpy ((*pref)->name, gbuf, sizeof((*pref)->name));
     if (sim_switches & SWMASK ('N'))                    /* if a new log file is requested */
         *pf = sim_fopen (gbuf, (binary ? "w+b" : "w+"));/*   then open an empty file */
     else                                                /* otherwise */
@@ -3388,6 +3390,7 @@ ControlHandler(DWORD dwCtrlType)
         case CTRL_LOGOFF_EVENT:     // User is logging off
             if (!GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &Mode))
                 return TRUE;        // Not our User, so ignore
+            /* fall through */
         case CTRL_SHUTDOWN_EVENT:   // System is shutting down
             int_handler(0);
             return TRUE;

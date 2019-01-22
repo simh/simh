@@ -517,10 +517,10 @@ memset (lp->rbr, 0, lp->rxbsz);                         /* clear break status ar
 static void tmxr_report_connection (TMXR *mp, TMLN *lp)
 {
 int32 unwritten, psave;
-char cmsg[80];
+char cmsg[160];
 char dmsg[80] = "";
 char lmsg[80] = "";
-char msgbuf[256] = "";
+char msgbuf[512] = "";
 
 if ((!lp->notelnet) || (sim_switches & SWMASK ('V'))) {
     sprintf (cmsg, "\n\r\nConnected to the %s simulator ", sim_name);
@@ -2024,6 +2024,7 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
                             lp->telnet_sent_opts[tmp] |= TNOS_DONT;/* Record DONT sent */
                             }
                         }
+                    /* fall through */
                 case TNS_WONT:           /* IAC+WILL/WONT prev */
                     if (tmp == TN_BIN) {                /* BIN? */
                         if (lp->tsta == TNS_WILL) {
@@ -2103,6 +2104,7 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
                                 lp->telnet_sent_opts[tmp] |= TNOS_WONT;/* Record WONT sent */
                             }
                         }
+                    /* fall through */
                 case TNS_SKIP: default:                 /* skip char */
                     tmxr_rmvrc (lp, j);                 /* remove char */
                     lp->tsta = TNS_NORM;                /* next normal */
@@ -5389,6 +5391,7 @@ if ((dptr) && (dbits & dptr->dctrl)) {
                         i += (tmxr_buf_debug_telnet_options ((u_char *)(&buf[i]), bufsize-i) - 1);
                         break;
                         }
+                    /* fall through */
                 default:
                     if (isprint((u_char)buf[i]))
                         tmxr_buf_debug_char (buf[i]);
