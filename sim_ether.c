@@ -1191,7 +1191,7 @@ int load_pcap(void) {
 
       if ((lib_loaded == 1) && (!eth_show_active)) {
         /* log successful load */
-        sim_printf("%s\n", p_pcap_lib_version());
+        sim_messagef (SCPE_OK, "%s\n", p_pcap_lib_version());
       }
       break;
     default:                /* loaded or failed */
@@ -1937,8 +1937,7 @@ t_stat eth_set_async (ETH_DEV *dev, int latency)
 {
 #if !defined(USE_READER_THREAD) || !defined(SIM_ASYNCH_IO)
 char *msg = "Eth: can't operate asynchronously, must poll\n";
-sim_printf ("%s", msg);
-return SCPE_NOFNC;
+return sim_messagef (SCPE_NOFNC, "%s", msg);
 #else
 int wakeup_needed;
 
@@ -2306,7 +2305,7 @@ if (r != SCPE_OK)
 
 if (!strcmp (desc, "No description available"))
     strcpy (desc, "");
-sim_printf ("Eth: opened OS device %s%s%s\n", savname, desc[0] ? " - " : "", desc);
+sim_messagef (SCPE_OK, "Eth: opened OS device %s%s%s\n", savname, desc[0] ? " - " : "", desc);
 
 /* get the NIC's hardware MAC address */
 eth_get_nic_hw_addr(dev, savname);
@@ -2417,7 +2416,7 @@ ethq_destroy (&dev->read_queue);         /* release FIFO queue */
 #endif
 
 _eth_close_port (dev->eth_api, pcap, pcap_fd);
-sim_printf ("Eth: closed %s\n", dev->name);
+sim_messagef (SCPE_OK, "Eth: closed %s\n", dev->name);
 
 /* clean up the mess */
 free(dev->name);
