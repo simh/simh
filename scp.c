@@ -323,13 +323,13 @@
     else if ((sim_switch_number >= 2) && (sim_switch_number <= 36)) val = sim_switch_number; \
     else val = dft;
 
-#define SIM_DBG_EVENT       0x01000000      /* event dispatch activities */
-#define SIM_DBG_ACTIVATE    0x02000000      /* queue insertion activities */
-#define SIM_DBG_AIO_QUEUE   0x04000000      /* asynch event queue activities */
-#define SIM_DBG_EXP_STACK   0x08000000      /* expression stack activities */
-#define SIM_DBG_EXP_EVAL    0x10000000      /* expression evaluation activities */
-#define SIM_DBG_BRK_ACTION  0x20000000      /* action activities */
-#define SIM_DBG_DO          0x40000000      /* do activities */
+#define SIM_DBG_EVENT       0x02000000      /* event dispatch activities */
+#define SIM_DBG_ACTIVATE    0x04000000      /* queue insertion activities */
+#define SIM_DBG_AIO_QUEUE   0x08000000      /* asynch event queue activities */
+#define SIM_DBG_EXP_STACK   0x10000000      /* expression stack activities */
+#define SIM_DBG_EXP_EVAL    0x20000000      /* expression evaluation activities */
+#define SIM_DBG_BRK_ACTION  0x40000000      /* action activities */
+#define SIM_DBG_DO          0x80000000      /* do activities */
 
 static DEBTAB scp_debug[] = {
   {"EVENT",     SIM_DBG_EVENT,      "Event Dispatch Activities"},
@@ -6676,12 +6676,13 @@ return SCPE_OK;
 t_stat sim_add_debug_flags (DEVICE *dptr, DEBTAB *debflags)
 {
 dptr->flags |= DEV_DEBUG;
-if (!dptr->debflags)
-    dptr->debflags = debflags;
+if (!dptr->debflags)                /* Current flags available */
+    dptr->debflags = debflags;      /* No, so just use new flags table */
 else {
     DEBTAB *cdptr, *sdptr, *ndptr;
 
     for (sdptr = debflags; sdptr->name; sdptr++) {
+        /* Find a new mask value that isn't in the existing table yet */
         for (cdptr = dptr->debflags; cdptr->name; cdptr++) {
             if (sdptr->mask == cdptr->mask)
                 break;
@@ -6690,19 +6691,23 @@ else {
             int i, dcount = 0;
 
             for (cdptr = dptr->debflags; cdptr->name; cdptr++)
-                dcount++;
+                dcount++;                       /* Count current table size */
             for (cdptr = debflags; cdptr->name; cdptr++)
-                dcount++;
+                dcount++;                       /* Count new table size */
+            /* Allocate enough to hold both plus the list end */
             ndptr = (DEBTAB *)calloc (1 + dcount, sizeof (*ndptr));
+            /* Copy current table to new array */
             for (dcount = 0, cdptr = dptr->debflags; cdptr->name; cdptr++)
                 ndptr[dcount++] = *cdptr;
+            /* for each element of the new list */
             for (cdptr = debflags; cdptr->name; cdptr++) {
+                /* check if new mask value */
                 for (i = 0; i < dcount; i++) {
                     if (cdptr->mask == ndptr[i].mask)
                         break;
                     }
                 if (i == dcount)
-                    ndptr[dcount++] = *cdptr;
+                    ndptr[dcount++] = *cdptr;   /* add new value to list */
                 }
             dptr->debflags = ndptr;
             break;

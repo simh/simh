@@ -213,10 +213,10 @@ void vid_set_cursor_position (int32 x, int32 y);        /* cursor position (set 
  */
 extern int (*vid_display_kb_event_process)(SIM_KEY_EVENT *kev);
 
-#define SIM_VID_DBG_MOUSE   0x01000000
-#define SIM_VID_DBG_CURSOR  0x02000000
-#define SIM_VID_DBG_KEY     0x04000000
-#define SIM_VID_DBG_VIDEO   0x08000000
+#define SIM_VID_DBG_MOUSE   0x10000000
+#define SIM_VID_DBG_CURSOR  0x20000000
+#define SIM_VID_DBG_KEY     0x40000000
+#define SIM_VID_DBG_VIDEO   0x80000000
 
 #ifdef  __cplusplus
 }

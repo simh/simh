@@ -68,7 +68,7 @@ extern "C" {
 
 #define SIM_CARD_API    2               /* API Version */
 
-#define DEBUG_CARD      0x0000010       /* Show details */
+#define DEBUG_CARD      0x80000000      /* Show details */
 
 /* Flags for punch and reader. */
 #define UNIT_V_CARD_MODE  (UNIT_V_UF + 0)
