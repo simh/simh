@@ -1170,8 +1170,8 @@ static const char simh_help[] =
       "+SET CONSOLE WRU=value       specify console drop to simh character\n"
       "+SET CONSOLE BRK=value       specify console Break character\n"
       "+SET CONSOLE DEL=value       specify console delete character\n"
-#if (defined(__GNUC__) && !defined(__OPTIMIZE__))       /* Debug build? */
-      "+SET CONSOLE DEBUG=value     specify SIGINT character in debugger\n"
+#if (defined(__GNUC__) && !defined(__OPTIMIZE__) && !defined(_WIN32))/* Debug build? */
+      "+SET CONSOLE DBGINT=value    specify SIGINT character in debugger\n"
 #endif
       "+SET CONSOLE PCHAR=bitmask   bit mask of printable characters in\n"
       "++++++++                     range [31,0]\n"

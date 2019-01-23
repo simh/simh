@@ -303,19 +303,19 @@ return sim_set_notelnet (0, NULL);
 /* Set/show data structures */
 
 static CTAB set_con_tab[] = {
-    { "WRU",   &sim_set_kmap, KMAP_WRU    | KMAP_NZ },
-    { "BRK",   &sim_set_kmap, KMAP_BRK },
-    { "DEL",   &sim_set_kmap, KMAP_DEL    | KMAP_NZ },
-    { "DEBUG", &sim_set_kmap, KMAP_DBGINT | KMAP_NZ },
-    { "PCHAR", &sim_set_pchar, 0 },
-    { "SPEED", &sim_set_cons_speed, 0 },
-    { "TELNET", &sim_set_telnet, 0 },
+    { "WRU",     &sim_set_kmap, KMAP_WRU    | KMAP_NZ },
+    { "BRK",     &sim_set_kmap, KMAP_BRK },
+    { "DEL",     &sim_set_kmap, KMAP_DEL    | KMAP_NZ },
+    { "DBGINT",  &sim_set_kmap, KMAP_DBGINT | KMAP_NZ },
+    { "PCHAR",   &sim_set_pchar, 0 },
+    { "SPEED",   &sim_set_cons_speed, 0 },
+    { "TELNET",  &sim_set_telnet, 0 },
     { "NOTELNET", &sim_set_notelnet, 0 },
-    { "SERIAL", &sim_set_serial, 0 },
+    { "SERIAL",  &sim_set_serial, 0 },
     { "NOSERIAL", &sim_set_noserial, 0 },
-    { "LOG", &sim_set_logon, 0 },
-    { "NOLOG", &sim_set_logoff, 0 },
-    { "DEBUG", &sim_set_debon, 0 },
+    { "LOG",     &sim_set_logon, 0 },
+    { "NOLOG",   &sim_set_logoff, 0 },
+    { "DEBUG",   &sim_set_debon, 0 },
     { "NODEBUG", &sim_set_deboff, 0 },
 #define CMD_WANTSTR     0100000
     { "HALT", &sim_set_halt, 1 | CMD_WANTSTR },
@@ -341,8 +341,8 @@ static SHTAB show_con_tab[] = {
     { "WRU", &sim_show_kmap, KMAP_WRU },
     { "BRK", &sim_show_kmap, KMAP_BRK },
     { "DEL", &sim_show_kmap, KMAP_DEL },
-#if (defined(__GNUC__) && !defined(__OPTIMIZE__))       /* Debug build? */
-    { "DEBUG", &sim_show_kmap, KMAP_DBGINT },
+#if (defined(__GNUC__) && !defined(__OPTIMIZE__) && !defined(_WIN32))       /* Debug build? */
+    { "DBGINT", &sim_show_kmap, KMAP_DBGINT },
 #endif
     { "PCHAR", &sim_show_pchar, 0 },
     { "SPEED", &sim_show_cons_speed, 0 },
