@@ -965,9 +965,16 @@ else
   ifneq (,$(VIDEO_USEFUL))
     SDL_INCLUDE = $(word 1,$(shell dir /b /s ..\windows-build\libSDL\SDL.h))
     ifeq (SDL.h,$(findstring SDL.h,$(SDL_INCLUDE)))
-      VIDEO_CCDEFS += -DHAVE_LIBSDL -I$(abspath $(dir $(SDL_INCLUDE)))
-      VIDEO_LDFLAGS  += -lSDL2 -L$(abspath $(dir $(SDL_INCLUDE))\..\lib)
+      VIDEO_CCDEFS += -DHAVE_LIBSDL -DUSE_SIM_VIDEO -I$(abspath $(dir $(SDL_INCLUDE)))
+      ifneq ($(DEBUG),)
+        VIDEO_LDFLAGS  += $(abspath $(dir $(SDL_INCLUDE))\..\..\..\lib\lib-VC2008\Debug)/SDL2.lib
+      else
+        VIDEO_LDFLAGS  += $(abspath $(dir $(SDL_INCLUDE))\..\..\..\lib\lib-VC2008\Release)/SDL2.lib
+      endif
       VIDEO_FEATURES = - video capabilities provided by libSDL2 (Simple Directmedia Layer)
+      DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/sim_ws.c
+      DISPLAYVT = ${DISPLAYD}/vt11.c
+      DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
     else
       $(info ***********************************************************************)
       $(info ***********************************************************************)
@@ -991,6 +998,33 @@ else
   ifneq ($(USE_NETWORK),)
     NETWORK_OPT += -DUSE_SHARED
   endif
+  ifeq (git-repo,$(shell if exist .git echo git-repo))
+    GIT_PATH := $(shell where git)
+    ifeq (,$(GIT_PATH))
+      $(error building using a git repository, but git is not available)
+    endif
+    ifeq (commit-id-exists,$(shell if exist .git-commit-id echo commit-id-exists))
+      CURRENT_GIT_COMMIT_ID=$(shell for /F "tokens=2" %%i in ("$(shell findstr /C:"SIM_GIT_COMMIT_ID" .git-commit-id)") do echo %%i)
+      ACTUAL_GIT_COMMIT_ID=$(strip $(shell git log -1 --pretty=%H))
+      ifneq ($(CURRENT_GIT_COMMIT_ID),$(ACTUAL_GIT_COMMIT_ID))
+        NEED_COMMIT_ID = need-commit-id
+        # make sure that the invalidly formatted .git-commit-id file wasn't generated
+        # by legacy git hooks which need to be removed.
+        $(shell if exist .git\hooks\post-checkout del .git\hooks\post-checkout)
+        $(shell if exist .git\hooks\post-commit   del .git\hooks\post-commit)
+        $(shell if exist .git\hooks\post-merge    del .git\hooks\post-merge)
+      endif
+    else
+      NEED_COMMIT_ID = need-commit-id
+    endif
+    ifeq (need-commit-id,$(NEED_COMMIT_ID))
+      commit_id=$(shell git log -1 --pretty=%H)
+      isodate=$(shell git log -1 --pretty=%ai)
+      commit_time=$(word 1,$(isodate))T$(word 2,$(isodate))$(word 3,$(isodate))
+      $(shell echo SIM_GIT_COMMIT_ID $(commit_id)>.git-commit-id)
+      $(shell echo SIM_GIT_COMMIT_TIME $(commit_time)>>.git-commit-id)
+    endif
+  endif
   ifneq (,$(shell if exist .git-commit-id echo git-commit-id))
     GIT_COMMIT_ID=$(shell for /F "tokens=2" %%i in ("$(shell findstr /C:"SIM_GIT_COMMIT_ID" .git-commit-id)") do echo %%i)
     GIT_COMMIT_TIME=$(shell for /F "tokens=2" %%i in ("$(shell findstr /C:"SIM_GIT_COMMIT_TIME" .git-commit-id)") do echo %%i)
@@ -1001,32 +1035,15 @@ else
     endif
   endif
   ifneq (windows-build,$(shell if exist ..\windows-build\README.md echo windows-build))
-    $(info ***********************************************************************)
-    $(info ***********************************************************************)
-    $(info **  This build is operating without the required windows-build       **)
-    $(info **  components and therefore will produce less than optimal          **)
-    $(info **  simulator operation and features.                                **)
-    $(info **  Download the file:                                               **)
-    $(info **  https://github.com/simh/windows-build/archive/windows-build.zip  **)
-    $(info **  Extract the windows-build-windows-build folder it contains to    **)
-    $(info **  $(abspath ..\)                                                   **)
-    $(info ***********************************************************************)
-    $(info ***********************************************************************)
-    $(info .)
-  else
-    # Version check on windows-build
-    WINDOWS_BUILD = $(word 2,$(shell findstr WINDOWS-BUILD ..\windows-build\Windows-Build_Versions.txt))
-    ifeq (,$(WINDOWS_BUILD))
-      WINDOWS_BUILD = 00000000
-    endif
-    ifneq (,$(or $(shell if 20150412 GTR $(WINDOWS_BUILD) echo old-windows-build),$(and $(shell if 20171112 GTR $(WINDOWS_BUILD) echo old-windows-build),$(findstring pthreadGC2,$(PTHREADS_LDFLAGS)))))
-      $(info .)
-      $(info windows-build components at: $(abspath ..\windows-build))
-      $(info .)
+    ifneq (,$(GIT_PATH))
+      $(info Cloning the windows-build dependencies into $(abspath ..)/windows-build)
+      $(shell git clone https://github.com/simh/windows-build ../windows-build)
+    else
       $(info ***********************************************************************)
       $(info ***********************************************************************)
-      $(info **  This currently available windows-build components are out of     **)
-      $(info **  date.  For the most functional and stable features you shoud     **)
+      $(info **  This build is operating without the required windows-build       **)
+      $(info **  components and therefore will produce less than optimal          **)
+      $(info **  simulator operation and features.                                **)
       $(info **  Download the file:                                               **)
       $(info **  https://github.com/simh/windows-build/archive/windows-build.zip  **)
       $(info **  Extract the windows-build-windows-build folder it contains to    **)
@@ -1034,6 +1051,41 @@ else
       $(info ***********************************************************************)
       $(info ***********************************************************************)
       $(info .)
+    endif
+  else
+    # Version check on windows-build
+    WINDOWS_BUILD = $(word 2,$(shell findstr WINDOWS-BUILD ..\windows-build\Windows-Build_Versions.txt))
+    ifeq (,$(WINDOWS_BUILD))
+      WINDOWS_BUILD = 00000000
+    endif
+    ifneq (,$(or $(shell if 20190124 GTR $(WINDOWS_BUILD) echo old-windows-build),$(and $(shell if 20171112 GTR $(WINDOWS_BUILD) echo old-windows-build),$(findstring pthreadGC2,$(PTHREADS_LDFLAGS)))))
+      $(info .)
+      $(info windows-build components at: $(abspath ..\windows-build))
+      $(info .)
+      $(info ***********************************************************************)
+      $(info ***********************************************************************)
+      $(info **  This currently available windows-build components are out of     **)
+      ifneq (,$(GIT_PATH))
+        $(info **  date.  You need to update to the latest windows-build            **)
+        $(info **  dependencies by executing these commands:                        **)
+        $(info **                                                                   **)
+        $(info **    > cd ..\windows-build                                          **)
+        $(info **    > git pull                                                     **)
+        $(info **                                                                   **)
+        $(info ***********************************************************************)
+        $(info ***********************************************************************)
+        $(error .)
+      else
+        $(info **  date.  For the most functional and stable features you shoud     **)
+        $(info **  Download the file:                                               **)
+        $(info **  https://github.com/simh/windows-build/archive/windows-build.zip  **)
+        $(info **  Extract the windows-build-windows-build folder it contains to    **)
+        $(info **  $(abspath ..\)                                                   **)
+        $(info ***********************************************************************)
+        $(info ***********************************************************************)
+        $(info .)
+        $(error Update windows-build)
+      endif
     endif
     ifeq (pcre,$(shell if exist ..\windows-build\PCRE\include\pcre.h echo pcre))
       OS_CCDEFS += -DHAVE_PCREPOSIX_H -DPCRE_STATIC -I$(abspath ../windows-build/PCRE/include)
