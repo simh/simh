@@ -3740,12 +3740,15 @@ if (!dev->promiscuous) {
 if ((addr_count > 0) && (dev->reflections > 0)) {
   if (strlen(buf) > 0)
     sprintf(&buf[strlen(buf)], " and ");
+  else
+    if (dev->promiscuous)
+      sprintf(&buf[strlen(buf)], "(");
   sprintf (&buf[strlen(buf)], "not (");
   buf2 = &buf[strlen(buf)];
   for (i = 0; i < addr_count; i++) {
     if (dev->filter_address[i][0] & 0x01) continue; /* skip multicast addresses */
     eth_mac_fmt(&dev->filter_address[i], mac);
-    if (!strstr(buf2, mac))   /* eliminate duplicates */
+    if (!strstr(buf2, mac))   /* only process each address once */
       sprintf(&buf2[strlen(buf2)], "%s(ether src %s)", (*buf2) ? " or " : "", mac);
     }
   sprintf (&buf[strlen(buf)], ")");
@@ -3777,7 +3780,7 @@ if (strlen(buf) > 0)
 memset(dev->physical_addr, 0, sizeof(ETH_MAC));
 dev->loopback_self_sent = 0;
 /* check for physical address in filters */
-if ((addr_count) && (dev->reflections > 0)) {
+if ((!dev->promiscuous) && (addr_count) && (dev->reflections > 0)) {
   for (i = 0; i < addr_count; i++) {
     if (dev->filter_address[i][0]&1)
       continue;  /* skip all multicast addresses */
@@ -3815,12 +3818,33 @@ if (dev->eth_api == ETH_API_PCAP) {
     sim_printf("Eth: pcap_compile error: %s\n", errbuf);
     /* show erroneous BPF string */
     sim_printf ("Eth: BPF string is: |%s|\n", buf);
+    sim_printf ("Eth: Input to BPF string construction:\n");
+    sim_printf ("Eth: Reflections: %d\n", dev->reflections);
+    sim_printf ("Eth: Filter Set:\n");
+    for (i = 0; i < addr_count; i++) {
+      char mac[20];
+      eth_mac_fmt(&dev->filter_address[i], mac);
+      sim_printf ("Eth:   Addr[%d]: %s\n", i, mac);
+      }
+    if (dev->all_multicast)
+      sim_printf ("Eth: All Multicast\n");
+    if (dev->promiscuous)
+      sim_printf ("Eth: Promiscuous\n");
+    if (dev->hash_filter)
+      sim_printf ("Eth: Multicast Hash: %02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X\n",
+                  dev->hash[0], dev->hash[1], dev->hash[2], dev->hash[3], 
+                  dev->hash[4], dev->hash[5], dev->hash[6], dev->hash[7]);
+    if (dev->have_host_nic_phy_addr) {
+      eth_mac_fmt(&dev->host_nic_phy_hw_addr, mac);
+      sim_printf ("Eth: host_nic_phy_hw_addr: %s\n", mac);
+      }
     }
   else {
     /* apply compiled filter string */
     if ((status = pcap_setfilter((pcap_t*)dev->handle, &bpf)) < 0) {
       sprintf(errbuf, "%s", pcap_geterr((pcap_t*)dev->handle));
       sim_printf("Eth: pcap_setfilter error: %s\n", errbuf);
+      sim_printf ("Eth: BPF string is: |%s|\n", buf);
       }
     else {
       /* Save BPF filter string */
