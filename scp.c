@@ -14473,24 +14473,28 @@ DEVICE *dptr;
 t_stat stat = SCPE_OK;
 
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+    t_stat tstat = SCPE_OK;
+
     switch (DEV_TYPE(dptr)) {
 #if defined(USE_SIM_CARD)
         case DEV_CARD:
-            stat = sim_card_test (dptr);
+            tstat = sim_card_test (dptr);
             break;
 #endif
         case DEV_DISK:
-            stat = sim_disk_test (dptr);
+            tstat = sim_disk_test (dptr);
             break;
         case DEV_ETHER:
-            stat = sim_ether_test (dptr);
+            tstat = sim_ether_test (dptr);
             break;
         case DEV_TAPE:
-            stat = sim_tape_test (dptr);
+            tstat = sim_tape_test (dptr);
             break;
         default:
             break;
         }
+    if (tstat != SCPE_OK)
+        stat = tstat;
     }
 return stat;
 }
