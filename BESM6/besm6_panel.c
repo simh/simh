@@ -432,7 +432,7 @@ static void draw_brz_static (int left, int top)
 t_stat besm6_close_panel (UNIT *u, int32 val, CONST char *cptr, void *desc)
 {
     if (! screen)
-        return SCPE_NOTATT;
+        return SCPE_UNATT;
     if (font_big) TTF_CloseFont(font_big);
     if (font_small) TTF_CloseFont(font_small);
     TTF_Quit();
@@ -685,12 +685,12 @@ t_stat besm6_init_panel (UNIT *u, int32 val, CONST char *cptr, void *desc)
 
 t_stat besm6_close_panel (UNIT *u, int32 val, CONST char *cptr, void *desc)
 {
-    return SCPE_NOTATT;
+    return SCPE_UNATT;
 }
 
 t_stat besm6_show_panel (FILE *st, UNIT *up, int32 v, CONST void *dp)
 {
-    return SCPE_NOTATT;
+    return SCPE_UNATT;
 }
 
 void besm6_draw_panel (int force)

@@ -547,10 +547,11 @@ t_bool auto_format = FALSE;
 
 if (uptr == NULL)
     return SCPE_IERR;
+if (!(uptr->flags & UNIT_ATT))
+    return SCPE_UNATT;
+
 ctx = (struct tape_context *)uptr->tape_ctx;
 f = MT_GET_FMT (uptr);
-if ((ctx == NULL) || !(uptr->flags & UNIT_ATT))
-    return SCPE_IERR;
 
 if (uptr->io_flush)
     uptr->io_flush (uptr);                              /* flush buffered data */
