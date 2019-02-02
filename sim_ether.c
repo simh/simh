@@ -3646,6 +3646,98 @@ if (status < 0) {
 return status;
 }
 
+t_stat eth_bpf_filter (ETH_DEV* dev, int addr_count, ETH_MAC* const filter_address,
+                       ETH_BOOL all_multicast, ETH_BOOL promiscuous, 
+                       int reflections,
+                       ETH_MAC* physical_addr,
+                       ETH_MAC* host_nic_phy_hw_addr,
+                       ETH_MULTIHASH* const hash,
+                       char *buf)
+{
+int i;
+char mac[20];
+char *buf2;
+
+/* setup BPF filters and other fields to minimize packet delivery */
+strcpy(buf, "");
+
+/* construct destination filters - since the real ethernet interface was set
+   into promiscuous mode by eth_open(), we need to filter out the packets that
+   our simulated interface doesn't want. */
+if (!promiscuous) {
+  for (i = 0; i < addr_count; i++) {
+    eth_mac_fmt(&filter_address[i], mac);
+    if (!strstr(buf, mac))    /* eliminate duplicates */
+      sprintf(&buf[strlen(buf)], "%s(ether dst %s)", (*buf) ? " or " : "((", mac);
+    }
+  if (all_multicast || hash)
+    sprintf(&buf[strlen(buf)], "%s(ether multicast)", (*buf) ? " or " : "((");
+  if (strlen(buf) > 0)
+    sprintf(&buf[strlen(buf)], ")");
+  }
+
+/* construct source filters - this prevents packets from being reflected back 
+   by systems where WinPcap and libpcap cause packet reflections. Note that
+   some systems do not reflect packets at all. This *assumes* that the 
+   simulated NIC will not send out packets with multicast source fields. */
+if ((addr_count > 0) && (reflections > 0)) {
+  if (strlen(buf) > 0)
+    sprintf(&buf[strlen(buf)], " and ");
+  else
+    if (promiscuous)
+      sprintf(&buf[strlen(buf)], "(");
+  sprintf (&buf[strlen(buf)], "not (");
+  buf2 = &buf[strlen(buf)];
+  for (i = 0; i < addr_count; i++) {
+    if (filter_address[i][0] & 0x01) continue; /* skip multicast addresses */
+    eth_mac_fmt(&filter_address[i], mac);
+    if (!strstr(buf2, mac))   /* only process each address once */
+      sprintf(&buf2[strlen(buf2)], "%s(ether src %s)", (*buf2) ? " or " : "", mac);
+    }
+  sprintf (&buf[strlen(buf)], ")");
+  if (1 == strlen(buf2)) {          /* all addresses were multicast? */
+    buf[strlen(buf)-6] = '\0';      /* Remove "not ()" */
+    if (strlen(buf) > 0)
+        buf[strlen(buf)-5] = '\0';  /* remove " and " */
+    }
+  }
+if (strlen(buf) > 0)
+  sprintf(&buf[strlen(buf)], ")");
+/* When changing the Physical Address on a LAN interface, VMS sends out a 
+   loopback packet with the source and destination addresses set to the same 
+   value as the Physical Address which is being setup.  This packet is
+   designed to find and help diagnose MAC address conflicts (which also 
+   include DECnet address conflicts). Normally, this packet would not be 
+   seen by the sender, only by the other machine that has the same Physical 
+   Address (or possibly DECnet address). If the ethernet subsystem is 
+   reflecting packets, the network startup will fail to start if it sees the 
+   reflected packet, since it thinks another system is using this Physical 
+   Address (or DECnet address). We have to let these packets through, so 
+   that if another machine has the same Physical Address (or DECnet address)
+   that we can detect it. Both eth_write() and _eth_callback() help by 
+   checking the reflection count - eth_write() adds the reflection count to
+   dev->loopback_self_sent, and _eth_callback() check the value - if the
+   dev->loopback_self_sent count is zero, then the packet has come from 
+   another machine with the same address, and needs to be passed on to the 
+   simulated machine. */
+/* check for physical address in filters */
+if ((!promiscuous) && (addr_count) && (reflections > 0)) {
+  eth_mac_fmt(&physical_addr[0], mac);
+  if (strcmp(mac, "00:00:00:00:00:00") != 0) {
+    /* let packets through where dst and src are the same as our physical address */
+    sprintf (&buf[strlen(buf)], " or ((ether dst %s) and (ether src %s))", mac, mac);
+    if (host_nic_phy_hw_addr) {
+      eth_mac_fmt(&host_nic_phy_hw_addr[0], mac);
+      sprintf(&buf[strlen(buf)], " or ((ether dst %s) and (ether proto 0x9000))", mac);
+      }
+    }
+  }
+if ((0 == strlen(buf)) && (!promiscuous)) /* Empty filter means match nothing */
+  strcpy(buf, "ether host fe:ff:ff:ff:ff:ff"); /* this should be a good match nothing filter */
+sim_debug(dev->dbit, dev->dptr, "BPF string is: |%s|\n", buf);
+return SCPE_OK;
+}
+
 t_stat eth_filter(ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
                   ETH_BOOL all_multicast, ETH_BOOL promiscuous)
 {
@@ -3661,7 +3753,6 @@ t_stat eth_filter_hash(ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
 int i;
 char buf[116+66*ETH_FILTER_MAX];
 char mac[20];
-char* buf2;
 t_stat status;
 #ifdef USE_BPF
 struct bpf_program bpf;
@@ -3714,92 +3805,26 @@ if (dev->dptr->dctrl & dev->dbit) {
     sim_debug(dev->dbit, dev->dptr, "Promiscuous\n");
     }
   }
-
-/* setup BPF filters and other fields to minimize packet delivery */
-strcpy(buf, "");
-
-/* construct destination filters - since the real ethernet interface was set
-   into promiscuous mode by eth_open(), we need to filter out the packets that
-   our simulated interface doesn't want. */
-if (!dev->promiscuous) {
-  for (i = 0; i < addr_count; i++) {
-    eth_mac_fmt(&dev->filter_address[i], mac);
-    if (!strstr(buf, mac))    /* eliminate duplicates */
-      sprintf(&buf[strlen(buf)], "%s(ether dst %s)", (*buf) ? " or " : "((", mac);
-    }
-  if (dev->all_multicast || dev->hash_filter)
-    sprintf(&buf[strlen(buf)], "%s(ether multicast)", (*buf) ? " or " : "((");
-  if (strlen(buf) > 0)
-    sprintf(&buf[strlen(buf)], ")");
-  }
-
-/* construct source filters - this prevents packets from being reflected back 
-   by systems where WinPcap and libpcap cause packet reflections. Note that
-   some systems do not reflect packets at all. This *assumes* that the 
-   simulated NIC will not send out packets with multicast source fields. */
-if ((addr_count > 0) && (dev->reflections > 0)) {
-  if (strlen(buf) > 0)
-    sprintf(&buf[strlen(buf)], " and ");
-  else
-    if (dev->promiscuous)
-      sprintf(&buf[strlen(buf)], "(");
-  sprintf (&buf[strlen(buf)], "not (");
-  buf2 = &buf[strlen(buf)];
-  for (i = 0; i < addr_count; i++) {
-    if (dev->filter_address[i][0] & 0x01) continue; /* skip multicast addresses */
-    eth_mac_fmt(&dev->filter_address[i], mac);
-    if (!strstr(buf2, mac))   /* only process each address once */
-      sprintf(&buf2[strlen(buf2)], "%s(ether src %s)", (*buf2) ? " or " : "", mac);
-    }
-  sprintf (&buf[strlen(buf)], ")");
-  if (1 == strlen(buf2)) {          /* all addresses were multicast? */
-    buf[strlen(buf)-6] = '\0';      /* Remove "not ()" */
-    if (strlen(buf) > 0)
-        buf[strlen(buf)-5] = '\0';  /* remove " and " */
-    }
-  }
-if (strlen(buf) > 0)
-  sprintf(&buf[strlen(buf)], ")");
-/* When changing the Physical Address on a LAN interface, VMS sends out a 
-   loopback packet with the source and destination addresses set to the same 
-   value as the Physical Address which is being setup.  This packet is
-   designed to find and help diagnose MAC address conflicts (which also 
-   include DECnet address conflicts). Normally, this packet would not be 
-   seen by the sender, only by the other machine that has the same Physical 
-   Address (or possibly DECnet address). If the ethernet subsystem is 
-   reflecting packets, the network startup will fail to start if it sees the 
-   reflected packet, since it thinks another system is using this Physical 
-   Address (or DECnet address). We have to let these packets through, so 
-   that if another machine has the same Physical Address (or DECnet address)
-   that we can detect it. Both eth_write() and _eth_callback() help by 
-   checking the reflection count - eth_write() adds the reflection count to
-   dev->loopback_self_sent, and _eth_callback() check the value - if the
-   dev->loopback_self_sent count is zero, then the packet has come from 
-   another machine with the same address, and needs to be passed on to the 
-   simulated machine. */
+/* Set the desired physical address */
 memset(dev->physical_addr, 0, sizeof(ETH_MAC));
 dev->loopback_self_sent = 0;
-/* check for physical address in filters */
-if ((!dev->promiscuous) && (addr_count) && (dev->reflections > 0)) {
-  for (i = 0; i < addr_count; i++) {
-    if (dev->filter_address[i][0]&1)
-      continue;  /* skip all multicast addresses */
-    eth_mac_fmt(&dev->filter_address[i], mac);
-    if (strcmp(mac, "00:00:00:00:00:00") != 0) {
-      memcpy(dev->physical_addr, &dev->filter_address[i], sizeof(ETH_MAC));
-      /* let packets through where dst and src are the same as our physical address */
-      sprintf (&buf[strlen(buf)], " or ((ether dst %s) and (ether src %s))", mac, mac);
-      if (dev->have_host_nic_phy_addr) {
-        eth_mac_fmt(&dev->host_nic_phy_hw_addr, mac);
-        sprintf(&buf[strlen(buf)], " or ((ether dst %s) and (ether proto 0x9000))", mac);
-      }
-      break;
-      }
+/* Find desired physical address in filters */
+for (i = 0; i < addr_count; i++) {
+  if (dev->filter_address[i][0]&1)
+    continue;  /* skip all multicast addresses */
+  eth_mac_fmt(&dev->filter_address[i], mac);
+  if (strcmp(mac, "00:00:00:00:00:00") != 0) {
+    memcpy(dev->physical_addr, &dev->filter_address[i], sizeof(ETH_MAC));
+    break;
     }
   }
-if ((0 == strlen(buf)) && (!dev->promiscuous)) /* Empty filter means match nothing */
-  strcpy(buf, "ether host fe:ff:ff:ff:ff:ff"); /* this should be a good match nothing filter */
-sim_debug(dev->dbit, dev->dptr, "BPF string is: |%s|\n", buf);
+
+/* setup BPF filters and other fields to minimize packet delivery */
+eth_bpf_filter (dev, dev->addr_count, dev->filter_address, 
+                dev->all_multicast, dev->promiscuous, 
+                dev->reflections, &dev->physical_addr, 
+                dev->have_host_nic_phy_addr ? &dev->host_nic_phy_hw_addr: NULL,
+                &dev->hash, buf);
 
 /* get netmask, which is a required argument for compiling.  The value, 
    in our case isn't actually interesting since the filters we generate 
@@ -4086,8 +4111,184 @@ if (dev->eth_api == ETH_API_NAT)
 #endif
 }
 
+static
+t_stat eth_test_crc32 (DEVICE *dptr)
+{
+int errors = 0;
+int val;
+uint8 data[12];
+static uint32 valcrc32[] = {
+  0x7BD5C66F, 0x92C4D707, 0x7286E2FE, 0x9B97F396, 0x69738F4D, 0x80629E25, 0x6020ABDC, 0x8931BAB4,
+  0x5E99542B, 0xB7884543, 0x57CA70BA, 0xBEDB61D2, 0x4C3F1D09, 0xA52E0C61, 0x456C3998, 0xAC7D28F0,
+  0x314CE2E7, 0xD85DF38F, 0x381FC676, 0xD10ED71E, 0x23EAABC5, 0xCAFBBAAD, 0x2AB98F54, 0xC3A89E3C,
+  0x140070A3, 0xFD1161CB, 0x1D535432, 0xF442455A, 0x06A63981, 0xEFB728E9, 0x0FF51D10, 0xE6E40C78,
+  0xEEE78F7F, 0x07F69E17, 0xE7B4ABEE, 0x0EA5BA86, 0xFC41C65D, 0x1550D735, 0xF512E2CC, 0x1C03F3A4,
+  0xCBAB1D3B, 0x22BA0C53, 0xC2F839AA, 0x2BE928C2, 0xD90D5419, 0x301C4571, 0xD05E7088, 0x394F61E0,
+  0xA47EABF7, 0x4D6FBA9F, 0xAD2D8F66, 0x443C9E0E, 0xB6D8E2D5, 0x5FC9F3BD, 0xBF8BC644, 0x569AD72C,
+  0x813239B3, 0x682328DB, 0x88611D22, 0x61700C4A, 0x93947091, 0x7A8561F9, 0x9AC75400, 0x73D64568,
+  0x8AC0520E, 0x63D14366, 0x8393769F, 0x6A8267F7, 0x98661B2C, 0x71770A44, 0x91353FBD, 0x78242ED5,
+  0xAF8CC04A, 0x469DD122, 0xA6DFE4DB, 0x4FCEF5B3, 0xBD2A8968, 0x543B9800, 0xB479ADF9, 0x5D68BC91,
+  0xC0597686, 0x294867EE, 0xC90A5217, 0x201B437F, 0xD2FF3FA4, 0x3BEE2ECC, 0xDBAC1B35, 0x32BD0A5D,
+  0xE515E4C2, 0x0C04F5AA, 0xEC46C053, 0x0557D13B, 0xF7B3ADE0, 0x1EA2BC88, 0xFEE08971, 0x17F19819,
+  0x1FF21B1E, 0xF6E30A76, 0x16A13F8F, 0xFFB02EE7, 0x0D54523C, 0xE4454354, 0x040776AD, 0xED1667C5,
+  0x3ABE895A, 0xD3AF9832, 0x33EDADCB, 0xDAFCBCA3, 0x2818C078, 0xC109D110, 0x214BE4E9, 0xC85AF581,
+  0x556B3F96, 0xBC7A2EFE, 0x5C381B07, 0xB5290A6F, 0x47CD76B4, 0xAEDC67DC, 0x4E9E5225, 0xA78F434D,
+  0x7027ADD2, 0x9936BCBA, 0x79748943, 0x9065982B, 0x6281E4F0, 0x8B90F598, 0x6BD2C061, 0x82C3D109,
+  0x428FE8EC, 0xAB9EF984, 0x4BDCCC7D, 0xA2CDDD15, 0x5029A1CE, 0xB938B0A6, 0x597A855F, 0xB06B9437,
+  0x67C37AA8, 0x8ED26BC0, 0x6E905E39, 0x87814F51, 0x7565338A, 0x9C7422E2, 0x7C36171B, 0x95270673,
+  0x0816CC64, 0xE107DD0C, 0x0145E8F5, 0xE854F99D, 0x1AB08546, 0xF3A1942E, 0x13E3A1D7, 0xFAF2B0BF,
+  0x2D5A5E20, 0xC44B4F48, 0x24097AB1, 0xCD186BD9, 0x3FFC1702, 0xD6ED066A, 0x36AF3393, 0xDFBE22FB,
+  0xD7BDA1FC, 0x3EACB094, 0xDEEE856D, 0x37FF9405, 0xC51BE8DE, 0x2C0AF9B6, 0xCC48CC4F, 0x2559DD27,
+  0xF2F133B8, 0x1BE022D0, 0xFBA21729, 0x12B30641, 0xE0577A9A, 0x09466BF2, 0xE9045E0B, 0x00154F63,
+  0x9D248574, 0x7435941C, 0x9477A1E5, 0x7D66B08D, 0x8F82CC56, 0x6693DD3E, 0x86D1E8C7, 0x6FC0F9AF,
+  0xB8681730, 0x51790658, 0xB13B33A1, 0x582A22C9, 0xAACE5E12, 0x43DF4F7A, 0xA39D7A83, 0x4A8C6BEB,
+  0xB39A7C8D, 0x5A8B6DE5, 0xBAC9581C, 0x53D84974, 0xA13C35AF, 0x482D24C7, 0xA86F113E, 0x417E0056,
+  0x96D6EEC9, 0x7FC7FFA1, 0x9F85CA58, 0x7694DB30, 0x8470A7EB, 0x6D61B683, 0x8D23837A, 0x64329212,
+  0xF9035805, 0x1012496D, 0xF0507C94, 0x19416DFC, 0xEBA51127, 0x02B4004F, 0xE2F635B6, 0x0BE724DE,
+  0xDC4FCA41, 0x355EDB29, 0xD51CEED0, 0x3C0DFFB8, 0xCEE98363, 0x27F8920B, 0xC7BAA7F2, 0x2EABB69A,
+  0x26A8359D, 0xCFB924F5, 0x2FFB110C, 0xC6EA0064, 0x340E7CBF, 0xDD1F6DD7, 0x3D5D582E, 0xD44C4946,
+  0x03E4A7D9, 0xEAF5B6B1, 0x0AB78348, 0xE3A69220, 0x1142EEFB, 0xF853FF93, 0x1811CA6A, 0xF100DB02,
+  0x6C311115, 0x8520007D, 0x65623584, 0x8C7324EC, 0x7E975837, 0x9786495F, 0x77C47CA6, 0x9ED56DCE,
+  0x497D8351, 0xA06C9239, 0x402EA7C0, 0xA93FB6A8, 0x5BDBCA73, 0xB2CADB1B, 0x5288EEE2, 0xBB99FF8A};
+
+for (val=0; val <= 0xFF; val++) {
+  memset (data, val, sizeof (data));
+  if (valcrc32[val] != eth_crc32 (0, data, sizeof (data))) {
+    printf("Unexpected CRC for %d byte buffer containing 0x%02X. Expected %08X, got %08X\n",
+           (int)sizeof (data), val, valcrc32[val], eth_crc32 (0, data, sizeof (data)));
+    ++errors;
+    }
+  }
+return (errors == 0) ? SCPE_OK : SCPE_IERR;
+}
+
+static
+t_stat eth_test_bpf (DEVICE *dptr)
+{
+int errors = 0;
+#ifdef USE_BPF
+t_stat r;
+DEVICE eth_tst;
+ETH_DEV dev;
+int reflections, all_multicast, promiscuous;
+char buf[116+66*ETH_FILTER_MAX];
+char mac[20];
+ETH_MAC filter_address[3] = {
+    {0x04, 0x05, 0x06, 0x07, 0x08, 0x09},
+    {0x09, 0x00, 0x2B, 0x02, 0x01, 0x07},
+    {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
+  };
+int addr_count;
+ETH_MAC physical_addr = {0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
+ETH_MAC host_nic_phy_hw_addr = {0x02, 0x03, 0x04, 0x05, 0x06, 0x07};
+ETH_MAC *host_phy_addr_list[2] = {&host_nic_phy_hw_addr, NULL};
+int host_phy_addr_listindex;
+ETH_MULTIHASH hash = {0x01, 0x40, 0x00, 0x00, 0x48, 0x88, 0x40, 0x00};
+ETH_MULTIHASH *hash_list[2] = {&hash, NULL};
+int hash_listindex;
+int bpf_count = 0;
+int bpf_construct_error_count = 0;
+int bpf_compile_error_count = 0;
+int bpf_compile_skip_count = 0;
+#define SIM_PRINT_BPF_ARGUMENTS                                 \
+    if (1) {                                                    \
+      sim_printf ("Eth: Input to BPF string construction:\n");  \
+      sim_printf ("Eth: Reflections: %d\n", reflections);       \
+      sim_printf ("Eth: Filter Set:\n");                        \
+      for (i = 0; i < addr_count; i++) {                        \
+        eth_mac_fmt(&filter_address[i], mac);                   \
+        sim_printf ("Eth:   Addr[%d]: %s\n", i, mac);           \
+        }                                                       \
+      if (all_multicast)                                        \
+        sim_printf ("Eth: All Multicast\n");                    \
+      if (promiscuous)                                          \
+        sim_printf ("Eth: Promiscuous\n");                      \
+      if (hash_list[hash_listindex])                            \
+        sim_printf ("Eth: Multicast Hash: %02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X\n",\
+                    (*hash_list[hash_listindex])[0], (*hash_list[hash_listindex])[1], (*hash_list[hash_listindex])[2], (*hash_list[hash_listindex])[3], \
+                    (*hash_list[hash_listindex])[4], (*hash_list[hash_listindex])[5], (*hash_list[hash_listindex])[6], (*hash_list[hash_listindex])[7]);\
+      if (host_phy_addr_list[host_phy_addr_listindex]) {        \
+        eth_mac_fmt(host_phy_addr_list[host_phy_addr_listindex], mac);\
+        sim_printf ("Eth: host_nic_phy_hw_addr: %s\n", mac);    \
+        }                                                       \
+      }
+
+
+memset (&eth_tst, 0, sizeof(eth_tst));
+eth_open(&dev, "eth0", &eth_tst, 1);
+for (reflections=0; reflections<=1; reflections++) {
+  for (all_multicast=0; all_multicast<=1; all_multicast++) {
+    for (promiscuous=0; promiscuous<=1; promiscuous++) {
+      for (addr_count=1; addr_count<=2; addr_count++) {
+        for (hash_listindex=0; hash_listindex<=1; hash_listindex++) {
+          for (host_phy_addr_listindex=0; host_phy_addr_listindex<=1; host_phy_addr_listindex++) {
+            int i;
+            char errbuf[PCAP_ERRBUF_SIZE];
+
+            ++bpf_count;
+            r = eth_bpf_filter (&dev, addr_count, &filter_address[0], 
+                                all_multicast, promiscuous, reflections, 
+                                &filter_address[0], 
+                                host_phy_addr_list[host_phy_addr_listindex],
+                                hash_list[hash_listindex],
+                                buf);
+            if (r != SCPE_OK) {
+              ++bpf_construct_error_count;
+              sim_printf ("Eth: Error producing a BPF filter for:\n");
+              SIM_PRINT_BPF_ARGUMENTS;
+              }
+            else {
+              if (sim_switches & SWMASK('D')) {
+                SIM_PRINT_BPF_ARGUMENTS;
+                sim_printf ("Eth: BPF string is: |%s|\n", buf);
+                }
+              if (dev.eth_api == ETH_API_PCAP) {
+                struct bpf_program bpf;
+
+                if (pcap_compile ((pcap_t*)dev.handle, &bpf, buf, 1, (bpf_u_int32)0) < 0) {
+                  ++bpf_compile_error_count;
+                  sprintf(errbuf, "%s", pcap_geterr((pcap_t*)dev.handle));
+                  sim_printf("Eth: pcap_compile error: %s\n", errbuf);
+                  if (!(sim_switches & SWMASK('D'))) {
+                    /* show erroneous BPF string */
+                    SIM_PRINT_BPF_ARGUMENTS;
+                    sim_printf ("Eth: BPF string is: |%s|\n", buf);
+                    }
+                  }
+                pcap_freecode(&bpf);
+                }
+              else
+                ++bpf_compile_skip_count;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+eth_close(&dev);
+sim_printf ("BPF Filter Count:     %d\n", bpf_count);
+if (bpf_construct_error_count)
+  sim_printf ("BPF Construct Errors: %d\n", bpf_construct_error_count);
+if (bpf_compile_error_count)
+  sim_printf ("BPF Compile Errors:   %d\n", bpf_compile_error_count);
+if (bpf_compile_skip_count)
+  sim_printf ("BPF Compile Skipped:  %d\n", bpf_compile_skip_count);
+#endif /* USE_BPF */
+return (errors == 0) ? SCPE_OK : SCPE_IERR;
+}
+
+#include <setjmp.h>
+
 t_stat sim_ether_test (DEVICE *dptr)
 {
-return SCPE_OK;
+t_stat stat = SCPE_OK;
+SIM_TEST_INIT;
+
+sim_printf ("Testing %s device sim_ether APIs\n", dptr->name);
+
+SIM_TEST(eth_test_crc32 (dptr));
+SIM_TEST(eth_test_bpf (dptr));
+return stat;
 }
 #endif /* USE_NETWORK */
