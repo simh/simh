@@ -3205,7 +3205,7 @@ return SCPE_OK;
 
 t_stat help_cmd (int32 flag, CONST char *cptr)
 {
-char gbuf[CBUFSIZE];
+char gbuf[CBUFSIZE], gbuf2[CBUFSIZE];
 CTAB *cmdp;
 
 GET_SWITCHES (cptr);                                    /* get switches */
@@ -3244,8 +3244,6 @@ if (*cptr) {
                     }
                 return SCPE_ARG;
                 }
-            else
-                return SCPE_2MARG;
             }
         if (cmdp->help) {
             if (strcmp (cmdp->name, "HELP") == 0) {
@@ -3285,7 +3283,12 @@ if (*cptr) {
                             sim_dflt_dev->help (sim_log, sim_dflt_dev, sim_dflt_dev->units, 0, cmdp->name);
                     }
                 }
-            help_cmd_output (flag, cmdp->help, cmdp->help_base);
+            strlcpy (gbuf2, cmdp->help, sizeof (gbuf2));
+            if (*cptr) {
+                strlcat (gbuf2, " ", sizeof (gbuf2));
+                strlcat (gbuf2, cptr, sizeof (gbuf2));
+                }
+            help_cmd_output (flag, gbuf2, cmdp->help_base);
             }
         else { /* no help so it is likely a command alias */
             CTAB *cmdpa;
@@ -3304,14 +3307,18 @@ if (*cptr) {
         DEVICE *dptr;
         UNIT *uptr;
         t_stat r;
+        t_bool explicit_device = FALSE;
 
-        if (0 == strcmp (gbuf, "DEVICE"))
+        if (0 == strcmp (gbuf, "DEVICE")) {
+            explicit_device = TRUE;
             cptr = get_glyph (cptr, gbuf, 0);
+            }
         dptr = find_unit (gbuf, &uptr);
         if (dptr == NULL) {
             dptr = find_dev (gbuf);
             if (dptr == NULL)
-                return SCPE_ARG;
+                return sim_messagef (SCPE_ARG, "No HELP available for %s%s %s\n", 
+                                               explicit_device ? "DEVICE " : "", gbuf, cptr);
             if (dptr->flags & DEV_DISABLE)
                 sim_printf ("Device %s is currently disabled\n", dptr->name);
             }
@@ -13602,8 +13609,12 @@ while (TRUE) {
         free (pstring);
         }
 
-    if (!cptr)                              /* EOF, exit help */
+    if (!cptr) {                            /* EOF, exit help */
+#if !defined(_WIN32)
+        printf ("\n");
+#endif
         break;
+        }
 
     cptr = get_glyph (cptr, gbuf, 0);
     if (!strcmp (gbuf, "*")) {              /* Wildcard */
