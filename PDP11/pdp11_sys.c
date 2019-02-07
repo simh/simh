@@ -119,6 +119,7 @@ extern DEVICE uca_dev, ucb_dev;
 extern DEVICE rom_dev;
 extern DEVICE ch_dev;
 extern DEVICE ng_dev;
+extern DEVICE daz_dev;
 extern REG cpu_reg[];
 extern int32 saved_PC;
 
@@ -199,6 +200,7 @@ DEVICE *sim_devices[] = {
     &rom_dev,
     &ch_dev,
     &ng_dev,
+    &daz_dev,
 #else
     &clk_dev,
     &tti_dev,
