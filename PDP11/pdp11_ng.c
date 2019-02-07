@@ -29,6 +29,7 @@
 #include "display/display.h"
 #include "display/ng.h"
 #include "sim_video.h"
+#include "pdp11_11logo_rom.h"
 
 /* Run a NG cycle every this many PDP-11 "cycle" times. */
 #define NG_DELAY 1
@@ -42,6 +43,7 @@ t_stat ng_rd(int32 *data, int32 PA, int32 access);
 t_stat ng_wr(int32 data, int32 PA, int32 access);
 t_stat ng_svc(UNIT *uptr);
 t_stat ng_reset(DEVICE *dptr);
+t_stat ng_boot(int32 unit, DEVICE *dptr);
 t_stat ng_set_type(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat ng_show_type(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat ng_set_scale(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
@@ -103,7 +105,7 @@ DEVICE ng_dev = {
     "NG", &ng_unit, ng_reg, ng_mod,
     1, 8, 16, 1, 8, 16,
     NULL, NULL, &ng_reset,
-    NULL, NULL, NULL,
+    &ng_boot, NULL, NULL,
     &ng_dib, DEV_DIS | DEV_DISABLE | DEV_UBUS | DEV_DEBUG,
     0, ng_deb, NULL, NULL, NULL, &ng_help, NULL, 
     &ng_description
@@ -191,6 +193,40 @@ ng_reset(DEVICE *dptr)
   vid_register_quit_callback (&ng_quit_callback);
 
   return SCPE_OK;
+}
+
+t_stat
+ng_boot(int32 unit, DEVICE *dptr)
+{
+    t_stat r;
+
+    set_cmd (0, "CPU 56K");
+    set_cmd (0, "NG TYPE=LOGO");
+    set_cmd (0, "PCLK ENABLED");
+    set_cmd (0, "KE ENABLED");
+    set_cmd (0, "RF ENABLED");
+    attach_cmd (0, "RF dummy");
+    sim_set_memory_load_file (BOOT_CODE_ARRAY, BOOT_CODE_SIZE);
+    r = load_cmd (0, BOOT_CODE_FILENAME);
+    sim_set_memory_load_file (NULL, 0);
+    cpu_set_boot (0400);
+    sim_printf ("List of 11LOGO commands:\n");
+    sim_printf (
+"AND, BACK, BUTFIRST, BUTLAST, COUNT, CTF, DIFFERENCE, DISPLAY, DO,\n"
+"EDIT, ELSE, EMPTYP, END, EQUAL, ERASETRACE, FIRST, FORWARD, FPRINT,\n"
+"FPUT, GO, GREATER, HEADING, HERE, HIDETURTLE, HOME, IF, KILLDISPLAY,\n"
+"LAMPOFF, LAMPON, LAST, LEFT, LESS, LEVEL, LIST, LISTP, LPUT, MAKE,\n"
+"MOD, NEWSNAP, NUMBERP, OF, OUTPUT, PENDOWN, PENUP, PRINT, PRODUCT,\n"
+"QUOTIENT, REQUEST, RIGHT, RUG, SENTENCE, SETHEADING, SETTURTLE, SETX,\n"
+"SETXY, SETY, SHOW, SHOWTURTLE, SNAP, STARTDISPLAY, STF, STOP, SUM,\n"
+"THEN, TO, TOOT, TRACE, TYPE, VERSION, WIPE, WIPECLEAN, WORD, WORDP,\n"
+"XCOR, YCOR.\n\n");
+    sim_printf ("MIT AI memo 315 documents a later version of 11LOGO but may be helpful\n");
+    sim_printf ("in exploring the software.  It can currently be found here:\n");
+    sim_printf ("https://dspace.mit.edu/handle/1721.1/6228\n\n");
+    sim_printf ("To get started with turtle graphics, type STARTDISPLAY.\n\n\n");
+                
+    return r;
 }
 
 t_stat
@@ -288,6 +324,12 @@ t_stat ng_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr
   fprintf(st, "  sim> SET NG TYPE=LOGO\n\n");
   fprintf(st, "Set SCALE to one of 1, 2, 3, or 4 to select full size, half size,\n");
   fprintf(st, "quarter size, or eighth size.\n\n");
+
+  fprintf(st, "The primary software for the NG display was MIT's PDP-11 Logo, or 11LOGO.\n");
+  fprintf(st, "To run 11LOGO:\n\n\n");
+  fprintf(st, "   sim> set cpu 11/45\n");
+  fprintf(st, "   sim> set ng enabled\n");
+  fprintf(st, "   sim> boot ng\n\n");
 
   return SCPE_OK;
 }
