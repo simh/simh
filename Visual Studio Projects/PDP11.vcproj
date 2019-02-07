@@ -197,6 +197,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\display\ng.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP11\pdp11_ch.c"
 				>
 			</File>
@@ -214,6 +218,10 @@
 			</File>
 			<File
 				RelativePath="..\PDP11\pdp11_cr.c"
+				>
+			</File>
+			<File
+				RelativePath="..\PDP11\pdp11_daz.c"
 				>
 			</File>
 			<File
@@ -266,6 +274,10 @@
 			</File>
 			<File
 				RelativePath="..\PDP11\pdp11_lp.c"
+				>
+			</File>
+			<File
+				RelativePath="..\PDP11\pdp11_ng.c"
 				>
 			</File>
 			<File
@@ -618,6 +630,10 @@
 			>
 			<File
 				RelativePath="..\display\display.h"
+				>
+			</File>
+			<File
+				RelativePath="..\display\ng.h"
 				>
 			</File>
 			<File

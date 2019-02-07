@@ -10,6 +10,7 @@
 . . [New Functionality](#new-functionality)  
 . . . . [Remote Console Facility](#remote-console-facility)  
 . . . . [VAX/PDP11 Enhancements](#vaxpdp11-enhancements)  
+. . . . [PDP11 Specific Enhancements](#pdp11-specific-enhancements)  
 . . . . [PDP10 Enhancements](#pdp10-enhancements)  
 . . . . [SDS 940 Enhancements](#sds-940-enhancements)  
 . . . . [Terminal Multiplexer additions](#terminal-multiplexer-additions)  
@@ -131,6 +132,11 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
     MicroVAX 3900 has a SET CPU MODEL=(MicroVAX|VAXServer|VAXStation) command to change between system types
     MicroVAX I has a SET CPU MODEL=(MicroVAX|VAXSTATION) command to change between system types
     MicroVAX II has a SET CPU MODEL=(MicroVAX|VAXSTATION) command to change between system types
+
+#### PDP11 Specific Enhancements
+    ROM (from Lars Brinkhoff) I/O page ROM support
+    NG (from Lars Brinkhoff) Knight vector display
+    DAZ (from Lars Brinkhoff) Dazzle Dart Input device
 
 #### PDP10 Enhancements
     KDP11 (from Timothe Litt) for DECnet connectivity to simulators with DMC, DUP or KDP devices
