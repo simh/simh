@@ -123,6 +123,10 @@ static struct color color_p7 = { p7, ELEMENTS(p7), 125000 };
 static struct phosphor p29[] = {{0.0260, 1.0, 0.00121, 0.5, 0.025}};
 struct color color_p29 = { p29, ELEMENTS(p29), 25000 };
 
+/* green phosphor for Tek 611 */
+static struct phosphor p31[] = {{0.0, 1.0, 0.77, 0.5, .1}};
+struct color color_p31 = { p31, ELEMENTS(p31), 25000 };
+
 static struct phosphor p40[] = {
     /* P40 blue-white spot with yellow-green decay (.045s to 10%?) */
     {0.4, 0.2, 0.924, 0.5, 0.0135},
@@ -227,7 +231,17 @@ static struct display displays[] = {
      * 0,0 at lower left
      * 8 intensity levels
      */
-    { DIS_TYPE340, "Type 340", &color_p7, NULL, 1024, 1024 }
+    { DIS_TYPE340, "Type 340", &color_p7, NULL, 1024, 1024 },
+
+    /*
+     * NG display
+     * on PDP-11/45
+     *
+     * Tektronix 611
+     * 512x512, out of 800x600
+     * 0,0 at middle
+     */
+    { DIS_NG, "NG Display", &color_p31, NULL, 512, 512 }
 };
 
 /*

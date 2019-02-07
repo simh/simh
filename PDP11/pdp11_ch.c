@@ -442,6 +442,15 @@ t_stat ch_detach (UNIT *uptr)
 
 t_stat ch_reset (DEVICE *dptr)
 {
+  DEVICE *ng_dptr = find_dev ("NG");
+
+  if ((ng_dptr != NULL) && 
+      !(ng_dptr->flags & DEV_DIS) &&
+      !(dptr->flags & DEV_DIS)) {
+    dptr->flags |= DEV_DIS;
+    return sim_messagef (SCPE_ALATT, "CH device in conflict with NG.\n");
+  }
+
   ch_clear ();
   return auto_config (dptr->name, (dptr->flags & DEV_DIS)? 0 : 1);  /* auto config */
 }

@@ -323,6 +323,14 @@ vt_svc(UNIT *uptr)
 t_stat
 vt_reset(DEVICE *dptr)
 {
+    DEVICE *ng_dptr;
+
+    ng_dptr = find_dev ("NG");
+    if (!(dptr->flags & DEV_DIS) && 
+        (ng_dptr != NULL) && !(ng_dptr->flags & DEV_DIS)) {
+        dptr->flags |= DEV_DIS;
+        return sim_messagef (SCPE_NOFNC, "VT and NG device can't both be enabled\n");
+        }
     if (!(dptr->flags & DEV_DIS))
         vt11_reset(dptr, DEB_VT11);
     vid_register_quit_callback (&vt_quit_callback);
