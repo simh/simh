@@ -27,6 +27,7 @@
 
 #include "pdp11_defs.h"
 #include "sim_video.h"
+#include "pdp11_dazzle_dart_rom.h"
 
 #define TURN_RIGHT  0001
 #define TURN_LEFT   0002
@@ -40,6 +41,7 @@
 t_stat daz_rd(int32 *data, int32 PA, int32 access);
 t_stat daz_wr(int32 data, int32 PA, int32 access);
 t_stat daz_reset(DEVICE *dptr);
+t_stat daz_boot(int32 unit, DEVICE *dptr);
 t_stat daz_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *daz_description (DEVICE *dptr);
 
@@ -74,7 +76,7 @@ DEVICE daz_dev = {
   "DAZ", &daz_unit, daz_reg, daz_mod,
   1, 8, 16, 1, 8, 16,
   NULL, NULL, &daz_reset,
-  NULL, NULL, NULL,
+  &daz_boot, NULL, NULL,
   &daz_dib, DEV_DIS | DEV_DISABLE | DEV_UBUS,
   0, NULL, NULL, NULL, NULL, &daz_help, NULL, 
   &daz_description
@@ -193,6 +195,23 @@ daz_reset(DEVICE *dptr)
   return SCPE_OK;
 }
 
+/* Apologies to Wolfgang Petersen. */
+t_stat
+daz_boot(int32 unit, DEVICE *dptr)
+{
+    t_stat r;
+
+    set_cmd (0, "CPU 56K");
+    set_cmd (0, "NG TYPE=DAZZLE");
+    set_cmd (0, "PCLK ENABLED");
+    set_cmd (0, "KE ENABLED");
+    sim_set_memory_load_file (BOOT_CODE_ARRAY, BOOT_CODE_SIZE);
+    r = load_cmd (0, BOOT_CODE_FILENAME);
+    sim_set_memory_load_file (NULL, 0);
+    cpu_set_boot (03252);
+    return r;
+}
+
 const char *daz_description (DEVICE *dptr)
 {
   return "Input buttons for Dazzle Dart";
@@ -209,7 +228,13 @@ t_stat daz_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cpt
   fprintf(st, "PASS, and FIRE.\n\n");
   fprintf(st, "The first set is mapped from the keys 1-8.  The second set is mapped from\n");
   fprintf(st, "Q-I.  The first set is mapped from A-K.  The fourth set is mapped\n");
-  fprintf(st, "from Z-, (comma).\n");
+  fprintf(st, "from Z-, (comma).\n\n");
+
+  fprintf(st, "The only software for the DAZ was the Dazzle Dart game by\n");
+  fprintf(st, "Hal Abelson, Andy diSessa, and Nat Goodman.  To play the game:\n\n\n");
+  fprintf(st, "   sim> set daz enable\n");
+  fprintf(st, "   sim> boot daz\n\n");
+
   return SCPE_OK;
 }
 #else  /* USE_DISPLAY not defined */
