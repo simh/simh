@@ -65,6 +65,8 @@ static void verifyDiskInfo(const DISK_INFO *info, const char unitChar);
 #define HDSK_WRITE              3
 #define HDSK_PARAM              4
 #define HDSK_BOOT_ADDRESS       0x5c00
+#define HDSK_BOOT_ALTAIR_DISKS  0x5c3a          /* position where number of Altair disks is configured in the boot rom */
+#define SUB_INSTRUCTION         0xd6            /* op-code for SUB <8-bit-value> */
 #define DPB_NAME_LENGTH         15
 #define BOOTROM_SIZE_HDSK       256
 
@@ -624,7 +626,7 @@ static int32 bootrom_hdsk[BOOTROM_SIZE_HDSK] = {
     0x06, 0x20, 0x3e, 0x01, 0xd3, 0xfd, 0x05, 0xc2, /* 5c20-5c27 */
     0x24, 0x5c, 0x11, 0x08, 0x00, 0x21, 0x00, 0x00, /* 5c28-5c2f */
     0x0e, 0xb8, 0x3e, 0x02, 0xd3, 0xfd, 0x3a, 0x37, /* 5c30-5c37 */
-    0xff, 0xd6, 0x08, 0xd3, 0xfd, 0x7b, 0xd3, 0xfd, /* 5c38-5c3f */
+    0xff, 0xd6, 0x08, 0xd3, 0xfd, 0x7b, 0xd3, 0xfd, /* 5c38-5c3f, 5c3a has the number of Altair disks configured in CP/M */
     0x7a, 0xd3, 0xfd, 0xaf, 0xd3, 0xfd, 0x7d, 0xd3, /* 5c40-5c47 */
     0xfd, 0x7c, 0xd3, 0xfd, 0xdb, 0xfd, 0xb7, 0xca, /* 5c48-5c4f */
     0x53, 0x5c, 0x76, 0x79, 0x0e, 0x80, 0x09, 0x4f, /* 5c50-5c57 */
@@ -661,9 +663,10 @@ static t_stat hdsk_boot(int32 unitno, DEVICE *dptr) {
     }
     if (cpu_unit.flags & (UNIT_CPU_ALTAIRROM | UNIT_CPU_BANKED)) {
         /* check whether we are really modifying an LD A,<> instruction */
-        if (bootrom_dsk[UNIT_NO_OFFSET_1 - 1] == LDA_INSTRUCTION)
-            bootrom_dsk[UNIT_NO_OFFSET_1] = (unitno + NUM_OF_DSK) & 0xff;   /* LD A,<unitno> */
-        else { /* Attempt to modify non LD A,<> instructions is refused. */
+        if (bootrom_dsk[UNIT_NO_OFFSET_1 - 1] == LDA_INSTRUCTION) {
+            ASSURE((1 <= HDSK_BOOT_ALTAIR_DISKS - HDSK_BOOT_ADDRESS) && (HDSK_BOOT_ALTAIR_DISKS - HDSK_BOOT_ADDRESS < BOOTROM_SIZE_HDSK) && (bootrom_hdsk[HDSK_BOOT_ALTAIR_DISKS - HDSK_BOOT_ADDRESS - 1] == SUB_INSTRUCTION));
+            bootrom_dsk[UNIT_NO_OFFSET_1] = (unitno + bootrom_hdsk[HDSK_BOOT_ALTAIR_DISKS - HDSK_BOOT_ADDRESS]) & 0xff;   /* LD A,<unitno>, assumes that CP/M is configured with a number of Altair disks which is given in the HDSK boot ROM */
+        } else { /* Attempt to modify non LD A,<> instructions is refused. */
             sim_printf("Incorrect boot ROM offset detected.\n");
             return SCPE_IERR;
         }
