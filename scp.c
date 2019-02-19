@@ -5091,10 +5091,14 @@ if (sim_switches & SWMASK ('P')) {
     if (prompt[0] == '\0')
         return sim_messagef (SCPE_2FARG, "Missing Prompt and Environment Variable Name\n");
     if ((prompt[0] == '"') || (prompt[0] == '\'')) {
+        if (strlen (prompt) < 3)
+            return sim_messagef (SCPE_ARG, "Invalid Prompt\n");
         prompt[strlen (prompt) - 1] = '\0';
         memmove (prompt, prompt + 1, strlen (prompt));
         }
     deflt = get_glyph (cptr, varname, '=');             /* get environment variable name */
+    if (varname[0] == '\0')
+        return sim_messagef (SCPE_2FARG, "Missing Environment Variable Name\n");
     if (deflt == NULL)
         deflt = "";
     if (*deflt) {
