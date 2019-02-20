@@ -268,7 +268,7 @@ struct {
         { 1024, "MS750-CA M8750"},
         {  256, "MS750-AA M8728"}, 
         {    0, NULL}};
-int32 i, bd;
+int32 i, bd = 0;
 
 for (i=0; i<8; i++) {
     if (mcsr2&MCSR2_CS256) {

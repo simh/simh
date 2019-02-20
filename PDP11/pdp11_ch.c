@@ -403,7 +403,7 @@ t_stat ch_wr (int32 data, int32 PA, int32 access)
 t_stat ch_svc(UNIT *uptr)
 {
   sim_clock_coschedule (uptr, 1000);
-  tmxr_poll_conn (&ch_tmxr);
+  (void)tmxr_poll_conn (&ch_tmxr);
   if (ch_lines[0].conn)
     ch_receive ();
   return SCPE_OK;
@@ -474,7 +474,7 @@ t_stat ch_set_peer (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
   if (host[0] == '\0')
     return SCPE_ARG;
 
-  strncpy (peer, cptr, sizeof peer);
+  strlcpy (peer, cptr, sizeof peer);
   return SCPE_OK;
 }
 

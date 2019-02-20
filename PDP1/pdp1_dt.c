@@ -646,7 +646,7 @@ t_bool dt_setpos (UNIT *uptr)
 {
 uint32 new_time, ut, ulin, udelt;
 int32 mot = DTS_GETMOT (uptr->STATE);
-int32 unum, delta;
+int32 unum, delta = 0;
 
 new_time = sim_grtime ();                               /* current time */
 ut = new_time - uptr->LASTT;                            /* elapsed time */
