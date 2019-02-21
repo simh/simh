@@ -13923,7 +13923,7 @@ if (this_Stack == NULL)
 if (this_Stack->pointer == this_Stack->size) {  /* If necessary, grow stack */
     this_Stack->size += STACK_GROW_AMOUNT;
     this_Stack->elements = (Stack_Element *)realloc (this_Stack->elements, this_Stack->size * sizeof(*this_Stack->elements));
-    memset (&this_Stack->elements[this_Stack->size - STACK_GROW_AMOUNT], 0, STACK_GROW_AMOUNT * sizeof(*this_Stack->elements));
+    memset (this_Stack->elements + this_Stack->size - STACK_GROW_AMOUNT, 0, STACK_GROW_AMOUNT * sizeof(*this_Stack->elements));
     }
 
 this_Stack->elements[this_Stack->pointer].op = op;
