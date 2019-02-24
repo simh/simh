@@ -10654,6 +10654,7 @@ do {
     AIO_EVENT_COMPLETE(uptr, reason);
     bare_reason = SCPE_BARE_STATUS (reason);
     if ((bare_reason != SCPE_OK)     &&  /* Provide context for unexpected errors */
+        (bare_reason >= SCPE_BASE)   &&
         (bare_reason != SCPE_STOP)   && 
         (bare_reason != SCPE_STEP)   && 
         (bare_reason != SCPE_EXPECT) &&
