@@ -338,8 +338,8 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         else
           ifeq (cygwin,$(OSTYPE))
             # use 0readme_ethernet.txt documented Windows pcap build components
-            INCPATH += ../windows-build/winpcap/WpdPack/include
-            LIBPATH += ../windows-build/winpcap/WpdPack/lib
+            INCPATH += ../windows-build/winpcap/WpdPack/Include
+            LIBPATH += ../windows-build/winpcap/WpdPack/Lib
             PCAPLIB = wpcap
             LIBEXT = a
           else
