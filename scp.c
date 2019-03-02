@@ -10655,12 +10655,13 @@ do {
     bare_reason = SCPE_BARE_STATUS (reason);
     if ((bare_reason != SCPE_OK)     &&  /* Provide context for unexpected errors */
         (bare_reason >= SCPE_BASE)   &&
+        (bare_reason != SCPE_EXPECT) &&
+        (bare_reason != SCPE_REMOTE) &&
+        (bare_reason != SCPE_MTRLNT) && 
         (bare_reason != SCPE_STOP)   && 
         (bare_reason != SCPE_STEP)   && 
-        (bare_reason != SCPE_EXPECT) &&
-        (bare_reason != SCPE_EXIT)   && 
-        (bare_reason != SCPE_REMOTE))
-        reason = sim_messagef (SCPE_IERR, "\nUnexpected internal error while processing event for %s which returned %d - %s\n", sim_uname (uptr), reason, sim_error_text (reason));
+        (bare_reason != SCPE_EXIT))
+        sim_messagef (reason, "\nUnexpected internal error while processing event for %s which returned %d - %s\n", sim_uname (uptr), reason, sim_error_text (reason));
     } while ((reason == SCPE_OK) && 
              (sim_interval <= 0) && 
              (sim_clock_queue != QUEUE_LIST_END) &&
