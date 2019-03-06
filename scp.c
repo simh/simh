@@ -543,6 +543,7 @@ t_stat dep_addr (int32 flag, const char *cptr, t_addr addr, DEVICE *dptr,
 void fprint_fields (FILE *stream, t_value before, t_value after, BITFIELD* bitdefs);
 t_stat step_svc (UNIT *ptr);
 t_stat expect_svc (UNIT *ptr);
+t_stat flush_svc (UNIT *ptr);
 t_stat shift_args (char *do_arg[], size_t arg_count);
 t_stat set_on (int32 flag, CONST char *cptr);
 t_stat set_verify (int32 flag, CONST char *cptr);
@@ -557,6 +558,7 @@ t_stat sim_set_asynch (int32 flag, CONST char *cptr);
 static const char *_get_dbg_verb (uint32 dbits, DEVICE* dptr, UNIT *uptr);
 static t_stat sim_library_unit_tests (void);
 static t_stat _sim_debug_flush (void);
+static void sim_flush_buffered_files (void);
 
 /* Global data */
 
@@ -661,6 +663,7 @@ static const char *sim_int_expect_description (DEVICE *dptr)
 return "Expect facility";
 }
 
+#define FLUSH_INTERVAL 30*1000000           /* Flush I/O buffers every 30 seconds */
 static UNIT sim_expect_unit = { UDATA (&expect_svc, 0, 0) };
 DEVICE sim_expect_dev = {
     "INT-EXPECT", &sim_expect_unit, NULL, NULL, 
@@ -669,6 +672,20 @@ DEVICE sim_expect_dev = {
     NULL, DEV_NOSAVE, 0, 
     NULL, NULL, NULL, NULL, NULL, NULL,
     sim_int_expect_description};
+
+static const char *sim_int_flush_description (DEVICE *dptr)
+{
+return "Flush facility";
+}
+
+static UNIT sim_flush_unit = { UDATA (&flush_svc, UNIT_IDLE, 0) };
+DEVICE sim_flush_dev = {
+    "INT-FLUSH", &sim_flush_unit, NULL, NULL, 
+    1, 0, 0, 0, 0, 0, 
+    NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, DEV_NOSAVE, 0, 
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    sim_int_flush_description};
 
 #if defined USE_INT64
 static const char *sim_si64 = "64b data";
@@ -2529,6 +2546,7 @@ if (sim_timer_init ()) {
 sim_register_internal_device (&sim_scp_dev);
 sim_register_internal_device (&sim_expect_dev);
 sim_register_internal_device (&sim_step_dev);
+sim_register_internal_device (&sim_flush_dev);
 
 if ((stat = sim_ttinit ()) != SCPE_OK) {
     fprintf (stderr, "Fatal terminal initialization error\n%s\n",
@@ -7680,6 +7698,44 @@ if (warned)
 return r;
 }
 
+static
+void sim_flush_buffered_files (void)
+{
+uint32 i, j;
+DEVICE *dptr;
+UNIT *uptr;
+
+if (sim_log)                                            /* flush console log */
+    fflush (sim_log);
+if (sim_deb)                                            /* flush debug log */
+    _sim_debug_flush ();
+for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* flush attached files */
+    for (j = 0; j < dptr->numunits; j++) {              /* if not buffered in mem */
+        uptr = dptr->units + j;
+        if (uptr->flags & UNIT_ATT) {                   /* attached, */
+            if (uptr->io_flush)                         /* unit specific flush routine */
+                uptr->io_flush (uptr);                  /* call it */
+            else {
+                if (!(uptr->flags & UNIT_BUF) &&        /* not buffered, */
+                    (uptr->fileref) &&                  /* real file, */
+                    !(uptr->dynflags & UNIT_NO_FIO) &&  /* is FILE *, */
+                    !(uptr->flags & UNIT_RO))           /* not read only? */
+                    fflush (uptr->fileref);
+                }
+            }
+        }
+    }
+}
+
+t_stat
+flush_svc (UNIT *uptr)
+{
+sim_activate_after (uptr, FLUSH_INTERVAL);
+sim_flush_buffered_files ();
+return SCPE_OK;
+}
+
+
 /* Run, go, boot, cont, step, next commands
 
    ru[n] [new PC]       reset and start simulation
@@ -7870,6 +7926,7 @@ if (sim_step) {                                         /* set step timer */
     else
         sim_activate (&sim_step_unit, sim_step);        /* instruction based step */
     }
+sim_activate_after (&sim_flush_unit, FLUSH_INTERVAL);   /* Enable periodic buffer flushing */
 stop_cpu = FALSE;
 sim_is_running = TRUE;                                  /* flag running */
 fflush(stdout);                                         /* flush stdout */
@@ -7933,26 +7990,8 @@ sim_brk_clrall (BRK_TYP_DYN_STEPOVER);                  /* cancel any step/over 
 signal (SIGHUP, SIG_DFL);                               /* cancel WRU */
 #endif
 signal (SIGTERM, SIG_DFL);                              /* cancel WRU */
-if (sim_log)                                            /* flush console log */
-    fflush (sim_log);
-if (sim_deb)                                            /* flush debug log */
-    _sim_debug_flush ();
-for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* flush attached files */
-    for (j = 0; j < dptr->numunits; j++) {              /* if not buffered in mem */
-        uptr = dptr->units + j;
-        if (uptr->flags & UNIT_ATT) {                   /* attached, */
-            if (uptr->io_flush)                         /* unit specific flush routine */
-                uptr->io_flush (uptr);                  /* call it */
-            else {
-                if (!(uptr->flags & UNIT_BUF) &&        /* not buffered, */
-                    (uptr->fileref) &&                  /* real file, */
-                    !(uptr->dynflags & UNIT_NO_FIO) &&  /* is FILE *, */
-                    !(uptr->flags & UNIT_RO))           /* not read only? */
-                    fflush (uptr->fileref);
-                }
-            }
-        }
-    }
+sim_flush_buffered_files();
+sim_cancel (&sim_flush_unit);                           /* cancel flush timer */
 sim_cancel (&sim_step_unit);                            /* cancel step timer */
 sim_throt_cancel ();                                    /* cancel throttle */
 AIO_UPDATE_QUEUE;
