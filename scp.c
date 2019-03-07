@@ -7713,8 +7713,11 @@ for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* flush attached files 
     for (j = 0; j < dptr->numunits; j++) {              /* if not buffered in mem */
         uptr = dptr->units + j;
         if (uptr->flags & UNIT_ATT) {                   /* attached, */
-            if (uptr->io_flush)                         /* unit specific flush routine */
-                uptr->io_flush (uptr);                  /* call it */
+            if (uptr->io_flush) {                       /* unit specific flush routine? */
+                if (!sim_asynch_enabled ||              /* and asynch I/O not possible? */
+                    !sim_is_running)
+                    uptr->io_flush (uptr);              /* call it */
+                }
             else {
                 if (!(uptr->flags & UNIT_BUF) &&        /* not buffered, */
                     (uptr->fileref) &&                  /* real file, */
