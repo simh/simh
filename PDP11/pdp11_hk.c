@@ -1231,7 +1231,7 @@ switch (fnc) {                                          /* case on function */
         if (err != 0) {                                 /* error? */
             hk_err (CS1_ERR|CS1_DONE, 0, ER_PAR, drv);  /* set drive error */
             sim_perror ("HK I/O error");
-            clearerr (uptr->fileref);
+            sim_disk_clearerr (uptr);
             return SCPE_IOERR;
             }
 

@@ -970,7 +970,7 @@ rl_set_done (0);
 
 if (err != 0) {                                         /* error? */
     sim_perror ("RL I/O error");
-    clearerr (uptr->fileref);
+    sim_disk_clearerr (uptr);
     return SCPE_IOERR;
     }
 return SCPE_OK;
