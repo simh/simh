@@ -1656,9 +1656,9 @@ if (vid_flags & SIM_VID_INPUTCAPTURED) {
     char title[150];
 
     memset (title, 0, sizeof(title));
-    strncpy (title, vid_title, sizeof(title)-1);
-    strncat (title, "                                             ReleaseKey=", sizeof(title)-(1+strlen(title)));
-    strncat (title, vid_release_key, sizeof(title)-(1+strlen(title)));
+    strlcpy (title, vid_title, sizeof(title));
+    strlcat (title, "                                             ReleaseKey=", sizeof(title));
+    strlcat (title, vid_release_key, sizeof(title));
 #if SDL_MAJOR_VERSION == 1
     SDL_WM_SetCaption (title, title);
 #else

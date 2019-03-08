@@ -1489,8 +1489,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
         if (r == SCPE_OK) {
             created = TRUE;
             copied = TRUE;
-            tbuf[sizeof(tbuf)-1] = '\0';
-            strncpy (tbuf, gbuf, sizeof(tbuf)-1);
+            strlcpy (tbuf, gbuf, sizeof(tbuf)-1);
             cptr = tbuf;
             sim_disk_set_fmt (uptr, 0, "VHD", NULL);
             sim_switches = saved_sim_switches;
@@ -1564,7 +1563,7 @@ uptr->filename = (char *) calloc (CBUFSIZE, sizeof (char));/* alloc name buf */
 uptr->disk_ctx = ctx = (struct disk_context *)calloc(1, sizeof(struct disk_context));
 if ((uptr->filename == NULL) || (uptr->disk_ctx == NULL))
     return _err_return (uptr, SCPE_MEM);
-strncpy (uptr->filename, cptr, CBUFSIZE);               /* save name */
+strlcpy (uptr->filename, cptr, CBUFSIZE);               /* save name */
 ctx->sector_size = (uint32)sector_size;                 /* save sector_size */
 ctx->capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* save capacity units (word: 2, byte: 1) */
 ctx->xfer_element_size = (uint32)xfer_element_size;     /* save xfer_element_size */
@@ -3489,8 +3488,10 @@ if ((sDynamic) &&
                     if ((0 == memcmp (sDynamic->ParentUniqueID, sParentFooter.UniqueID, sizeof (sParentFooter.UniqueID))) &&
                         ((sDynamic->ParentTimeStamp == ParentModificationTime) ||
                          ((NtoHl(sDynamic->ParentTimeStamp)-NtoHl(ParentModificationTime)) == 3600) ||
-                         (sim_switches & SWMASK ('O'))))
-                         strncpy (szParentVHDPath, CheckPath, ParentVHDPathSize);
+                         (sim_switches & SWMASK ('O')))) {
+                         memset (szParentVHDPath, 0, ParentVHDPathSize);
+                         strlcpy (szParentVHDPath, CheckPath, ParentVHDPathSize);
+                        }
                     else {
                         if (0 != memcmp (sDynamic->ParentUniqueID, sParentFooter.UniqueID, sizeof (sParentFooter.UniqueID)))
                             sim_printf ("Error Invalid Parent VHD '%s' for Differencing VHD: %s\n", CheckPath, szVHDPath);
@@ -4092,7 +4093,7 @@ char *wd = getcwd(buffer, PATH_MAX);
 if ((szFileSpec[0] != '/') || (strchr (szFileSpec, ':')))
     snprintf (szFullFileSpecBuffer, BufferSize, "%s/%s", wd, szFileSpec);
 else
-    strncpy (szFullFileSpecBuffer, szFileSpec, BufferSize);
+    strlcpy (szFullFileSpecBuffer, szFileSpec, BufferSize);
 if ((c = strstr (szFullFileSpecBuffer, "]/")))
     memmove (c+1, c+2, strlen(c+2)+1);
 memset (szFullFileSpecBuffer + strlen (szFullFileSpecBuffer), 0, BufferSize - strlen (szFullFileSpecBuffer));
@@ -4106,7 +4107,8 @@ HostPathToVhdPath (const char *szHostPath,
 {
 char *c, *d;
 
-strncpy (szVhdPath, szHostPath, VhdPathSize-1);
+memset (szVhdPath, 0, VhdPathSize);
+strlcpy (szVhdPath, szHostPath, VhdPathSize-1);
 if ((szVhdPath[1] == ':') && islower(szVhdPath[0]))
     szVhdPath[0] = toupper(szVhdPath[0]);
 szVhdPath[VhdPathSize-1] = '\0';

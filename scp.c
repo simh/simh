@@ -2587,7 +2587,7 @@ setenv ("SIM_REGEX_TYPE", "REGEX", 1);                  /* Publish regex type */
 if (*argv[0]) {                                         /* sim name arg? */
     char *np;                                           /* "path.ini" */
 
-    strncpy (nbuf, argv[0], PATH_MAX + 1);              /* copy sim name */
+    strlcpy (nbuf, argv[0], PATH_MAX + 2);              /* copy sim name */
     if ((np = (char *)match_ext (nbuf, "EXE")))         /* remove .exe */
         *np = 0;
     np = strrchr (nbuf, '/');                           /* stript path and try again in cwd */
@@ -2618,7 +2618,7 @@ if (*cbuf)                                              /* cmd file arg? */
 else if (*argv[0]) {                                    /* sim name arg? */
     char *np;                                           /* "path.ini" */
     nbuf[0] = '"';                                      /* starting " */
-    strncpy (nbuf + 1, argv[0], PATH_MAX + 1);          /* copy sim name */
+    strlcpy (nbuf + 1, argv[0], PATH_MAX + 2);          /* copy sim name */
     if ((np = (char *)match_ext (nbuf, "EXE")))         /* remove .exe */
         *np = 0;
     strlcat (nbuf, ".ini\"", sizeof (nbuf));            /* add .ini" */
