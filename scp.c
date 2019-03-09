@@ -558,7 +558,6 @@ t_stat sim_set_asynch (int32 flag, CONST char *cptr);
 static const char *_get_dbg_verb (uint32 dbits, DEVICE* dptr, UNIT *uptr);
 static t_stat sim_library_unit_tests (void);
 static t_stat _sim_debug_flush (void);
-static void sim_flush_buffered_files (void);
 
 /* Global data */
 
@@ -7698,7 +7697,6 @@ if (warned)
 return r;
 }
 
-static
 void sim_flush_buffered_files (void)
 {
 uint32 i, j;

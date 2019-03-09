@@ -1412,6 +1412,7 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
             sim_is_running = FALSE;
             sim_rem_collect_all_registers ();
             sim_stop_timer_services ();
+            sim_flush_buffered_files ();
             if (rem->act == NULL) {
                 for (j=0; j < sim_rem_con_tmxr.lines; j++) {
                     TMLN *lpj = &sim_rem_con_tmxr.ldsc[j];
@@ -1437,6 +1438,7 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
                     sim_is_running = FALSE;
                     sim_rem_collect_all_registers ();
                     sim_stop_timer_services ();
+                    sim_flush_buffered_files ();
                     stat = SCPE_STOP;
                     _sim_rem_message ("RUN", stat);
                     _sim_rem_log_out (lp);

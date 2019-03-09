@@ -326,6 +326,7 @@ void _sim_debug_device (uint32 dbits, DEVICE* dptr, const char* fmt, ...) GCC_FM
 #define sim_debug(dbits, dptr, ...) do { if (sim_deb && dptr && ((dptr)->dctrl & (dbits))) _sim_debug_device (dbits, dptr, __VA_ARGS__);} while (0)
 #define sim_debug_unit(dbits, uptr, ...) do { if (sim_deb && uptr && (((uptr)->dctrl | (uptr)->dptr->dctrl) & (dbits))) _sim_debug_unit (dbits, uptr, __VA_ARGS__);} while (0)
 #endif
+void sim_flush_buffered_files (void);
 
 void fprint_stopped_gen (FILE *st, t_stat v, REG *pc, DEVICE *dptr);
 #define SCP_HELP_FLAT   (1u << 31)       /* Force flat help when prompting is not possible */
