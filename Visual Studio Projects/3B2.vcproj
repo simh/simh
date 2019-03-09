@@ -40,8 +40,8 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="../3B2/;../../windows-build/libSDL/SDL2-2.0.5/include;./;../;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include;../../windows-build/winpcap/Wpdpack/Include;../../windows-build/PCRE/include/;../../windows-build/pthreads;../../windows-build/libSDL/SDL2-2.0.8/include;../../windows-build/libpng-1.6.18"
-				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC;USE_INT64;USE_ADDR64"
+				AdditionalIncludeDirectories="../3B2/;./;../;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include;../../windows-build/winpcap/Wpdpack/Include;../../windows-build/PCRE/include/;../../windows-build/pthreads;../../windows-build/libSDL/SDL2-2.0.8/include;../../windows-build/libpng-1.6.18"
+				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC;USE_INT64;USE_ADDR64;USE_SHARED;PTW32_STATIC_LIB;SIM_ASYNCH_IO;USE_READER_THREAD;HAVE_SLIRP_NETWORK;USE_SIMH_SLIRP_DEBUG"
 				KeepComments="false"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="0"
@@ -125,8 +125,8 @@
 				InlineFunctionExpansion="1"
 				OmitFramePointers="true"
 				WholeProgramOptimization="true"
-				AdditionalIncludeDirectories="../3B2/;../../windows-build/libSDL/SDL2-2.0.5/include;./;../;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include;../../windows-build/winpcap/Wpdpack/Include;../../windows-build/PCRE/include/;../../windows-build/pthreads;../../windows-build/libSDL/SDL2-2.0.8/include;../../windows-build/libpng-1.6.18"
-				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC;USE_INT64;USE_ADDR64"
+				AdditionalIncludeDirectories="../3B2/;./;../;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include;../../windows-build/winpcap/Wpdpack/Include;../../windows-build/PCRE/include/;../../windows-build/pthreads;../../windows-build/libSDL/SDL2-2.0.8/include;../../windows-build/libpng-1.6.18"
+				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;HAVE_PCREPOSIX_H;PCRE_STATIC;USE_INT64;USE_ADDR64;USE_SHARED;PTW32_STATIC_LIB;SIM_ASYNCH_IO;USE_READER_THREAD;HAVE_SLIRP_NETWORK;USE_SIMH_SLIRP_DEBUG"
 				StringPooling="true"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"
@@ -225,6 +225,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\3B2\3b2_ni.c"
+				>
+			</File>
+			<File
 				RelativePath="..\3B2\3b2_ports.c"
 				>
 			</File>
@@ -235,6 +239,29 @@
 			<File
 				RelativePath="..\3B2\3b2_sysdev.c"
 				>
+			</File>
+			<File
+				RelativePath="..\..\windows-build\pthreads\pthread.c"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						PreprocessorDefinitions="HAVE_CONFIG_H;PTW32_BUILD_INLINED;PTW32_STATIC_LIB;__CLEANUP_C;$(NOINHERIT)"
+						CompileAs="1"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						WholeProgramOptimization="false"
+						PreprocessorDefinitions="HAVE_CONFIG_H;PTW32_BUILD_INLINED;PTW32_STATIC_LIB;__CLEANUP_C;$(NOINHERIT)"
+						CompileAs="1"
+					/>
+				</FileConfiguration>
 			</File>
 			<File
 				RelativePath="..\scp.c"
@@ -280,6 +307,170 @@
 				RelativePath="..\sim_video.c"
 				>
 			</File>
+			<Filter
+				Name="slirp"
+				>
+				<File
+					RelativePath="..\slirp\arp_table.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\bootp.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\bootp.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\cksum.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\debug.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\dnssearch.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp_glue\glib_qemu_stubs.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\if.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\if.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\ip.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\ip_icmp.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\ip_icmp.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\ip_input.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\ip_output.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\libslirp.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\main.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\mbuf.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\mbuf.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\misc.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\misc.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\sbuf.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\sbuf.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp_glue\sim_slirp.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\slirp.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\slirp.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\slirp_config.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\socket.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\socket.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcp.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcp_input.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcp_output.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcp_subr.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcp_timer.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcp_timer.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcp_var.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tcpip.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tftp.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\tftp.h"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\udp.c"
+					>
+				</File>
+				<File
+					RelativePath="..\slirp\udp.h"
+					>
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="Header Files"
@@ -319,6 +510,10 @@
 			</File>
 			<File
 				RelativePath="..\3B2\3b2_mmu.h"
+				>
+			</File>
+			<File
+				RelativePath="..\3B2\3b2_ni.h"
 				>
 			</File>
 			<File

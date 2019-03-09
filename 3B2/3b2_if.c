@@ -171,12 +171,10 @@ t_stat if_detach(UNIT *uptr)
 
 uint32 if_read(uint32 pa, size_t size) {
     uint8 reg, data;
-    uint32 pc;
     UNIT *uptr;
 
     uptr = &(if_dev.units[0]);
     reg = (uint8)(pa - IFBASE);
-    pc = R[NUM_PC];
 
     switch (reg) {
     case IF_STATUS_REG:

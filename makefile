@@ -108,7 +108,7 @@ ifneq (,$(findstring besm6,$(MAKECMDGOALS)))
   BESM6_BUILD = true
 endif
 # building the pdp11, pdp10, or any vax simulator could use networking support
-ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring pdp10,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS)),$(findstring all,$(MAKECMDGOALS))))
+ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring pdp10,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS)),$(findstring 3b2,$(MAKECMDGOALS))$(findstring all,$(MAKECMDGOALS))))
   NETWORK_USEFUL = true
   ifneq (,$(findstring all,$(MAKECMDGOALS)))
     BUILD_MULTIPLE = s
@@ -1842,8 +1842,8 @@ ATT3B2 = ${ATT3B2D}/3b2_cpu.c ${ATT3B2D}/3b2_mmu.c \
 	${ATT3B2D}/3b2_id.c ${ATT3B2D}/3b2_dmac.c \
 	${ATT3B2D}/3b2_sys.c ${ATT3B2D}/3b2_io.c \
 	${ATT3B2D}/3b2_ports.c ${ATT3B2D}/3b2_ctc.c \
-	${ATT3B2D}/3b2_sysdev.c
-ATT3B2_OPT = -I ${ATT3B2D} -DUSE_INT64 -DUSE_ADDR64
+	${ATT3B2D}/3b2_ni.c ${ATT3B2D}/3b2_sysdev.c
+ATT3B2_OPT = -DUSE_INT64 -DUSE_ADDR64 -I ${ATT3B2D} ${NETWORK_OPT}
 #
 # Build everything (not the unsupported/incomplete or experimental simulators)
 #

@@ -332,6 +332,9 @@ void   pwrite_b(uint32 pa, uint8 val);
 void   pwrite_h(uint32 pa, uint16 val);
 void   pwrite_w(uint32 pa, uint32 val);
 
+/* TODO: REMOVE AFTER DEBUGGING */
+uint32 safe_read_w(uint32 va);
+
 /* Virtual memory translation */
 uint32 mmu_xlate_addr(uint32 va, uint8 r_acc);
 t_stat mmu_decode_vaddr(uint32 vaddr, uint8 r_acc,

@@ -170,9 +170,10 @@ static DEBTAB cpu_deb_tab[] = {
     { "INIT",       INIT_MSG,       "Initialization"        },
     { "IRQ",        IRQ_MSG,        "Interrupt Handling"    },
     { "IO",         IO_DBG,         "I/O Dispatch"          },
+    { "CIO",        CIO_DBG,        "Common I/O Interface"  },
     { "TRACE",      TRACE_DBG,      "Call Trace"            },
     { "ERROR",      ERR_MSG,        "Error"                 },
-    { NULL,         0                                       }
+    { NULL,         0,              NULL                    }
 };
 
 UNIT cpu_unit = { UDATA (NULL, UNIT_FIX|UNIT_BINK|UNIT_IDLE, MAXMEMSIZE) };
@@ -180,9 +181,13 @@ UNIT cpu_unit = { UDATA (NULL, UNIT_FIX|UNIT_BINK|UNIT_IDLE, MAXMEMSIZE) };
 #define UNIT_V_EXHALT   (UNIT_V_UF + 0)                 /* halt to console */
 #define UNIT_EXHALT     (1u << UNIT_V_EXHALT)
 
+/*
+ * TODO: This works fine for now, but the moment we want to emulate
+ * SCSI (0x0100) or EPORTS (0x0102) we're in trouble!
+ */
 const char *cio_names[8] = {
-    "", "*VOID*", "*VOID*", "PORTS",
-    "*VOID*", "CTC", "*VOID*", "*VOID*"
+    "", "SBD", "NI", "PORTS",
+    "*VOID*", "CTC", "NAU", "*VOID*"
 };
 
 MTAB cpu_mod[] = {
@@ -1821,9 +1826,9 @@ t_stat sim_instr(void)
                 if (cio[i].intr &&
                     cio[i].ipl == cpu_int_ipl &&
                     cio[i].ivec == cpu_int_vec) {
-                    sim_debug(IO_DBG, &cpu_dev,
-                              "[%08x] [IRQ] Handling CIO interrupt for card %d\n",
-                              R[NUM_PC], i);
+                    sim_debug(CIO_DBG, &cpu_dev,
+                              "[%08x] [IRQ] Handling CIO interrupt for card %d ivec=%02x\n",
+                              R[NUM_PC], i, cpu_int_vec);
 
                     cio[i].intr = FALSE;
                 }

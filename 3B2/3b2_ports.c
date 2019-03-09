@@ -93,14 +93,14 @@ extern UNIT cio_unit;
 #define PORTS_DIAG_CRC2 0x77a1ea56
 #define PORTS_DIAG_CRC3 0x84cf938b
 
-#define LN(cid,port)   ((PORTS_LINES * ((cid) - base_cid)) + (port))
-#define LCID(ln)       (((ln) / PORTS_LINES) + base_cid)
+#define LN(cid,port)   ((PORTS_LINES * ((cid) - ports_base_cid)) + (port))
+#define LCID(ln)       (((ln) / PORTS_LINES) + ports_base_cid)
 #define LPORT(ln)      ((ln) % PORTS_LINES)
 
+int8    ports_base_cid;            /* First cid in our contiguous block */
+uint8   ports_int_cid;             /* Interrupting card ID   */
+uint8   ports_int_subdev;          /* Interrupting subdevice */
 t_bool  ports_conf = FALSE;  /* Have PORTS cards been configured? */
-int8    base_cid;            /* First cid in our contiguous block */
-uint8   int_cid;             /* Interrupting card ID   */
-uint8   int_subdev;          /* Interrupting subdevice */
 uint32  ports_crc;           /* CRC32 of downloaded memory */
 
 /* PORTS-specific state for each slot */
@@ -184,8 +184,8 @@ DEVICE ports_dev = {
 
 static void cio_irq(uint8 cid, uint8 dev, int32 delay)
 {
-    int_cid = cid;
-    int_subdev = dev & 0xf;
+    ports_int_cid = cid;
+    ports_int_subdev = dev & 0xf;
     sim_activate(&ports_unit[2], delay);
 }
 
@@ -268,13 +268,15 @@ static void ports_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data)
         for (i = 0; i < rentry->byte_count; i++) {
             ports_crc = cio_crc32_shift(ports_crc, pread_b(rentry->address + i));
         }
+        centry.address = rentry->address + rentry->byte_count;
         sim_debug(TRACE_DBG, &ports_dev,
                   "[%08x] [ports_cmd] CIO Download Memory: bytecnt=%04x "
                   "addr=%08x return_addr=%08x subdev=%02x (CRC=%08x)\n",
                   R[NUM_PC],
                   rentry->byte_count, rentry->address,
                   centry.address, centry.subdevice, ports_crc);
-        centry.address = rentry->address + rentry->byte_count;
+        /* We intentionally do not set the subdevice in
+         * the completion entry */
         cio_cexpress(cid, PPQESIZE, &centry, app_data);
         cio_irq(cid, rentry->subdevice, DELAY_DLM);
         break;
@@ -523,7 +525,7 @@ void ports_sysgen(uint8 cid)
     cio_cexpress(cid, PPQESIZE, &cqe, app_data);
     cio_cqueue(cid, CIO_STAT, PPQESIZE, &cqe, app_data);
 
-    int_cid = cid;
+    ports_int_cid = cid;
     sim_activate(&ports_unit[2], DELAY_STD);
 }
 
@@ -599,7 +601,7 @@ t_stat ports_reset(DEVICE *dptr)
         }
 
         /* Remember the base card slot */
-        base_cid = cid;
+        ports_base_cid = cid;
 
         end_slot = (cid + (ports_desc.lines/PORTS_LINES));
 
@@ -669,20 +671,20 @@ t_stat ports_cio_svc(UNIT *uptr)
 {
     sim_debug(TRACE_DBG, &ports_dev,
               "[ports_cio_svc] IRQ for board %d device %d\n",
-              int_cid, int_subdev);
+              ports_int_cid, ports_int_subdev);
 
-    if (cio[int_cid].ivec > 0) {
-        cio[int_cid].intr = TRUE;
+    if (cio[ports_int_cid].ivec > 0) {
+        cio[ports_int_cid].intr = TRUE;
     }
 
-    switch (cio[int_cid].op) {
+    switch (cio[ports_int_cid].op) {
     case PPC_CONN:
-        cio[int_cid].op = PPC_ASYNC;
-        ports_ldsc[LN(int_cid, int_subdev)].rcve = 1;
+        cio[ports_int_cid].op = PPC_ASYNC;
+        ports_ldsc[LN(ports_int_cid, ports_int_subdev)].rcve = 1;
         sim_activate(&ports_unit[2], DELAY_ASYNC);
         break;
     case PPC_ASYNC:
-        ports_update_conn(LN(int_cid, int_subdev));
+        ports_update_conn(LN(ports_int_cid, ports_int_subdev));
         break;
     default:
         break;

@@ -56,6 +56,7 @@ void cio_clear(uint8 cid)
     cio[cid].id = 0;
     cio[cid].exp_handler = NULL;
     cio[cid].full_handler = NULL;
+    cio[cid].reset_handler = NULL;
     cio[cid].sysgen = NULL;
     cio[cid].rqp = 0;
     cio[cid].cqp = 0;
@@ -101,7 +102,7 @@ void cio_sysgen(uint8 cid)
 
     sysgen_p = pread_w(SYSGEN_PTR);
 
-    sim_debug(IO_DBG, &cpu_dev,
+    sim_debug(CIO_DBG, &cpu_dev,
               "[%08x] [SYSGEN] Starting sysgen for card %d. sysgen_p=%08x\n",
               R[NUM_PC], cid, sysgen_p);
 
@@ -115,22 +116,22 @@ void cio_sysgen(uint8 cid)
     cio[cid].ivec = pread_b(sysgen_p + 10);
     cio[cid].no_rque = pread_b(sysgen_p + 11);
 
-    sim_debug(IO_DBG, &cpu_dev,
+    sim_debug(CIO_DBG, &cpu_dev,
               "[SYSGEN]  sysgen rqp = %08x\n",
               cio[cid].rqp);
-    sim_debug(IO_DBG, &cpu_dev,
+    sim_debug(CIO_DBG, &cpu_dev,
               "[SYSGEN]  sysgen cqp = %08x\n",
               cio[cid].cqp);
-    sim_debug(IO_DBG, &cpu_dev,
+    sim_debug(CIO_DBG, &cpu_dev,
               "[SYSGEN]  sysgen rqs = %02x\n",
               cio[cid].rqs);
-    sim_debug(IO_DBG, &cpu_dev,
+    sim_debug(CIO_DBG, &cpu_dev,
               "[SYSGEN]  sysgen cqs = %02x\n",
               cio[cid].cqs);
-    sim_debug(IO_DBG, &cpu_dev,
+    sim_debug(CIO_DBG, &cpu_dev,
               "[SYSGEN]  sysgen ivec = %02x\n",
               cio[cid].ivec);
-    sim_debug(IO_DBG, &cpu_dev,
+    sim_debug(CIO_DBG, &cpu_dev,
               "[SYSGEN]  sysgen no_rque = %02x\n",
               cio[cid].no_rque);
 
@@ -138,20 +139,19 @@ void cio_sysgen(uint8 cid)
     if (cio[cid].sysgen != NULL) {
         cio[cid].sysgen(cid);
     } else {
-        sim_debug(IO_DBG, &cpu_dev,
+        sim_debug(CIO_DBG, &cpu_dev,
                   "[%08x] [cio_sysgen] Not running custom sysgen.\n",
                   R[NUM_PC]);
     }
 }
 
-void cio_cexpress(uint8 cid, uint16 esize, cio_entry *cqe, uint8 *app_data)
+void cio_cexpress(uint8 cid, uint32 esize, cio_entry *cqe, uint8 *app_data)
 {
-    int32 i;
-    uint32 cqp;
+    uint32 i, cqp;
 
     cqp = cio[cid].cqp;
 
-    sim_debug(IO_DBG, &cpu_dev,
+    sim_debug(CIO_DBG, &cpu_dev,
               "[%08x] [cio_cexpress] cqp = %08x seqbit = %d\n",
               R[NUM_PC], cqp, cio[cid].seqbit);
 
@@ -170,12 +170,11 @@ void cio_cexpress(uint8 cid, uint16 esize, cio_entry *cqe, uint8 *app_data)
     }
 }
 
-void cio_cqueue(uint8 cid, uint8 cmd_stat, uint16 esize,
+void cio_cqueue(uint8 cid, uint8 cmd_stat, uint32 esize,
                 cio_entry *cqe, uint8 *app_data)
 {
-    int32 i;
-    uint32 cqp, top;
-    uint16 lp, ulp;
+    uint32 i, cqp, top;
+    uint16 lp;
 
     /* Apply the CMD/STAT bit */
     cqe->subdevice |= (cmd_stat << 7);
@@ -191,7 +190,6 @@ void cio_cqueue(uint8 cid, uint8 cmd_stat, uint16 esize,
     /* Get the load pointer. This is a 16-bit absolute offset
      * from the top of the queue to the start of the entry. */
     lp = pread_h(cqp + esize);
-    ulp = pread_h(cqp + esize + 2);
 
     /* Load the entry at the supplied address */
     pwrite_h(top + lp,     cqe->byte_count);
@@ -209,22 +207,17 @@ void cio_cqueue(uint8 cid, uint8 cmd_stat, uint16 esize,
      * start of the queue */
     if (cio[cid].cqs > 0) {
         lp = (lp + esize) % (esize * cio[cid].cqs);
-
         /* Store it back to the correct location */
         pwrite_h(cqp + esize, lp);
-    } else {
-        sim_debug(IO_DBG, &cpu_dev,
-                  "[%08x] [cio_cqueue] ERROR! Completion Queue Size is 0!",
-                  R[NUM_PC]);
     }
 }
 
 /*
  * Retrieve the Express Entry from the Request Queue
  */
-void cio_rexpress(uint8 cid, uint16 esize, cio_entry *rqe, uint8 *app_data)
+void cio_rexpress(uint8 cid, uint32 esize, cio_entry *rqe, uint8 *app_data)
 {
-    int32 i;
+    uint32 i;
     uint32 rqp;
 
     rqp = cio[cid].rqp;
@@ -247,12 +240,12 @@ void cio_rexpress(uint8 cid, uint16 esize, cio_entry *rqe, uint8 *app_data)
  * be serviced.
  *
  * Returns SCPE_OK on success, or SCPE_NXM if no entry was found.
+ *
  */
-t_stat cio_rqueue(uint8 cid, uint8 qnum, uint16 esize,
+t_stat cio_rqueue(uint8 cid, uint32 qnum, uint32 esize,
                   cio_entry *rqe, uint8 *app_data)
 {
-    int32 i;
-    uint32 rqp, top;
+    uint32 i, rqp, top;
     uint16 lp, ulp;
 
     /* Get the physical address of the request queue in main memory */
@@ -263,6 +256,8 @@ t_stat cio_rqueue(uint8 cid, uint8 qnum, uint16 esize,
     lp = pread_h(rqp);
     ulp = pread_h(rqp + 2);
 
+    /* Check to see if the request queue is empty. If it is, there's
+     * nothing to take. */
     if (lp == ulp) {
         return SCPE_NXM;
     }
@@ -294,7 +289,7 @@ t_stat cio_rqueue(uint8 cid, uint8 qnum, uint16 esize,
 /*
  * Return the Load Pointer for the given request queue
  */
-uint16 cio_r_lp(uint8 cid, uint8 qnum, uint16 esize)
+uint16 cio_r_lp(uint8 cid, uint32 qnum, uint32 esize)
 {
     uint32 rqp;
 
@@ -308,7 +303,7 @@ uint16 cio_r_lp(uint8 cid, uint8 qnum, uint16 esize)
 /*
  * Return the Unload Pointer for the given request queue
  */
-uint16 cio_r_ulp(uint8 cid, uint8 qnum, uint16 esize)
+uint16 cio_r_ulp(uint8 cid, uint32 qnum, uint32 esize)
 {
     uint32 rqp;
 
@@ -319,14 +314,14 @@ uint16 cio_r_ulp(uint8 cid, uint8 qnum, uint16 esize)
     return pread_h(rqp + 2);
 }
 
-uint16 cio_c_lp(uint8 cid, uint16 esize)
+uint16 cio_c_lp(uint8 cid, uint32 esize)
 {
     uint32 cqp;
     cqp = cio[cid].cqp + esize;
     return pread_h(cqp);
 }
 
-uint16 cio_c_ulp(uint8 cid, uint16 esize)
+uint16 cio_c_ulp(uint8 cid, uint32 esize)
 {
     uint32 cqp;
     cqp = cio[cid].cqp + esize;
@@ -337,7 +332,7 @@ uint16 cio_c_ulp(uint8 cid, uint16 esize)
  * Returns true if there is room in the completion queue
  * for a new entry.
  */
-t_bool cio_cqueue_avail(uint8 cid, uint16 esize)
+t_bool cio_cqueue_avail(uint8 cid, uint32 esize)
 {
     uint32 lp, ulp;
 
@@ -345,6 +340,21 @@ t_bool cio_cqueue_avail(uint8 cid, uint16 esize)
     ulp = pread_h(cio[cid].cqp + esize + 2);
 
     return(((lp + esize) % (cio[cid].cqs * esize)) != ulp);
+}
+
+t_bool cio_rqueue_avail(uint8 cid, uint32 qnum, uint32 esize)
+{
+    uint32 rqp, lp, ulp;
+
+    /* Get the physical address of the request queue in main memory */
+    rqp = cio[cid].rqp +
+        esize +
+        (qnum * (LUSIZE + (esize * cio[cid].rqs)));
+
+    lp = pread_h(rqp);
+    ulp = pread_h(rqp + 2);
+
+    return(lp != ulp);
 }
 
 uint32 io_read(uint32 pa, size_t size)
@@ -403,7 +413,7 @@ uint32 io_read(uint32 pa, size_t size)
             case CIO_INT_NONE: /* We've never seen an INT0 or INT1 */
             case CIO_INT0: /* We've seen an INT0 but not an INT1. */
                 cio[cid].sysgen_s |= CIO_INT0;
-                sim_debug(IO_DBG, &cpu_dev,
+                sim_debug(CIO_DBG, &cpu_dev,
                           "[READ] [%08x] (%d INT0) ID\n",
                           R[NUM_PC], cid);
                 /* Return the correct byte of our board ID */
@@ -415,7 +425,7 @@ uint32 io_read(uint32 pa, size_t size)
                 break;
             case CIO_INT1: /* We've seen an INT1 but not an INT0. Time to sysgen */
                 cio[cid].sysgen_s |= CIO_INT0;
-                sim_debug(IO_DBG, &cpu_dev,
+                sim_debug(CIO_DBG, &cpu_dev,
                           "[READ] [%08x] (%d INT0) SYSGEN\n",
                           R[NUM_PC], cid);
                 cio_sysgen(cid);
@@ -423,7 +433,7 @@ uint32 io_read(uint32 pa, size_t size)
                 break;
             case CIO_SYSGEN: /* We've already sysgen'ed */
                 cio[cid].sysgen_s |= CIO_INT0; /* This must come BEFORE the exp_handler */
-                sim_debug(IO_DBG, &cpu_dev,
+                sim_debug(CIO_DBG, &cpu_dev,
                           "[READ] [%08x] (%d INT0) EXPRESS JOB\n",
                           R[NUM_PC], cid);
                 cio[cid].exp_handler(cid);
@@ -432,7 +442,7 @@ uint32 io_read(uint32 pa, size_t size)
             default:
                 /* This should never happen */
                 stop_reason = STOP_ERR;
-                sim_debug(IO_DBG, &cpu_dev,
+                sim_debug(CIO_DBG, &cpu_dev,
                           "[READ] [%08x] (%d INT0) ERROR IN STATE MACHINE sysgen_s=%02x\n",
                           R[NUM_PC], cid, cio[cid].sysgen_s);
                 data = 0;
@@ -445,20 +455,20 @@ uint32 io_read(uint32 pa, size_t size)
             case CIO_INT_NONE: /* We've never seen an INT0 or INT1 */
             case CIO_INT1:     /* We've seen an INT1 but not an INT0 */
                 /* There's nothing to do in this instance */
-                sim_debug(IO_DBG, &cpu_dev,
+                sim_debug(CIO_DBG, &cpu_dev,
                           "[READ] [%08x] (%d INT1) IGNORED\n",
                           R[NUM_PC], cid);
                 cio[cid].sysgen_s |= CIO_INT1;
                 break;
             case CIO_INT0: /* We've seen an INT0 but not an INT1. Time to sysgen */
-                sim_debug(IO_DBG, &cpu_dev,
+                sim_debug(CIO_DBG, &cpu_dev,
                           "[READ] [%08x] (%d INT1) SYSGEN\n",
                           R[NUM_PC], cid);
                 cio[cid].sysgen_s |= CIO_INT1;
                 cio_sysgen(cid);
                 break;
             case CIO_SYSGEN: /* We've already sysgen'ed */
-                sim_debug(IO_DBG, &cpu_dev,
+                sim_debug(CIO_DBG, &cpu_dev,
                           "[READ] [%08x] (%d INT1) FULL\n",
                           R[NUM_PC], cid);
                 cio[cid].sysgen_s |= CIO_INT1; /* This must come BEFORE the full handler */
@@ -467,7 +477,7 @@ uint32 io_read(uint32 pa, size_t size)
             default:
                 /* This should never happen */
                 stop_reason = STOP_ERR;
-                sim_debug(IO_DBG, &cpu_dev,
+                sim_debug(CIO_DBG, &cpu_dev,
                           "[READ] [%08x] (%d INT1) ERROR IN STATE MACHINE sysgen_s=%02x\n",
                           R[NUM_PC], cid, cio[cid].sysgen_s);
                 break;
@@ -475,15 +485,18 @@ uint32 io_read(uint32 pa, size_t size)
 
             return 0; /* Data returned is arbitrary */
         case IOF_STAT:
-            sim_debug(IO_DBG, &cpu_dev,
+            sim_debug(CIO_DBG, &cpu_dev,
                       "[READ] [%08x] (%d RESET)\n",
                       R[NUM_PC], cid);
+            if (cio[cid].reset_handler) {
+                cio[cid].reset_handler(cid);
+            }
             cio[cid].sysgen_s = 0;
             return 0; /* Data returned is arbitrary */
         default:
             /* We should never reach here, but if we do, there's
              * nothing listening. */
-            sim_debug(IO_DBG, &cpu_dev,
+            sim_debug(CIO_DBG, &cpu_dev,
                       "[READ] [%08x] No card at cid=%d reg=%d\n",
                       R[NUM_PC], cid, reg);
             csr_data |= CSRTIMO;
@@ -520,7 +533,7 @@ void io_write(uint32 pa, uint32 val, size_t size)
 
         if (cio[cid].id == 0) {
             /* Nothing lives here */
-            sim_debug(IO_DBG, &cpu_dev,
+            sim_debug(CIO_DBG, &cpu_dev,
                       "[WRITE] [%08x] No card at cid=%d reg=%d\n",
                       R[NUM_PC], cid, reg);
             csr_data |= CSRTIMO;
@@ -540,20 +553,20 @@ void io_write(uint32 pa, uint32 val, size_t size)
             switch(cio[cid].sysgen_s) {
             case CIO_INT_NONE: /* We've never seen an INT0 or INT1 */
             case CIO_INT0:     /* We've seen an INT0 but not an INT1. */
-                sim_debug(IO_DBG, &cpu_dev,
+                sim_debug(CIO_DBG, &cpu_dev,
                           "[WRITE] [%08x] (%d INT0) ID\n",
                           R[NUM_PC], cid);
                 cio[cid].sysgen_s |= CIO_INT0;
                 break;
             case CIO_INT1: /* We've seen an INT1 but not an INT0. Time to sysgen */
-                sim_debug(IO_DBG, &cpu_dev,
+                sim_debug(CIO_DBG, &cpu_dev,
                           "[WRITE] [%08x] (%d INT0) SYSGEN\n",
                           R[NUM_PC], cid);
                 cio[cid].sysgen_s |= CIO_INT0;
                 cio_sysgen(cid);
                 break;
             case CIO_SYSGEN: /* We've already sysgen'ed */
-                sim_debug(IO_DBG, &cpu_dev,
+                sim_debug(CIO_DBG, &cpu_dev,
                           "[WRITE] [%08x] (%d INT0) EXPRESS JOB\n",
                           R[NUM_PC], cid);
                 cio[cid].sysgen_s |= CIO_INT0;
@@ -562,7 +575,7 @@ void io_write(uint32 pa, uint32 val, size_t size)
             default:
                 /* This should never happen */
                 stop_reason = STOP_ERR;
-                sim_debug(IO_DBG, &cpu_dev,
+                sim_debug(CIO_DBG, &cpu_dev,
                           "[WRITE] [%08x] (%d INT0) ERROR IN STATE MACHINE sysgen_s=%02x\n",
                           R[NUM_PC], cid, cio[cid].sysgen_s);
                 break;
@@ -574,20 +587,20 @@ void io_write(uint32 pa, uint32 val, size_t size)
             case CIO_INT_NONE: /* We've never seen an INT0 or INT1 */
             case CIO_INT1:     /* We've seen an INT1 but not an INT0 */
                 /* There's nothing to do in this instance */
-                sim_debug(IO_DBG, &cpu_dev,
+                sim_debug(CIO_DBG, &cpu_dev,
                           "[WRITE] [%08x] (%d INT1) IGNORED\n",
                           R[NUM_PC], cid);
                 cio[cid].sysgen_s |= CIO_INT1;
                 break;
             case CIO_INT0: /* We've seen an INT0 but not an INT1. Time to sysgen */
-                sim_debug(IO_DBG, &cpu_dev,
+                sim_debug(CIO_DBG, &cpu_dev,
                           "[WRITE] [%08x] (%d INT1) SYSGEN\n",
                           R[NUM_PC], cid);
                 cio[cid].sysgen_s |= CIO_INT1;
                 cio_sysgen(cid);
                 break;
             case CIO_SYSGEN: /* We've already sysgen'ed */
-                sim_debug(IO_DBG, &cpu_dev,
+                sim_debug(CIO_DBG, &cpu_dev,
                           "[WRITE] [%08x] (%d INT1) FULL\n",
                           R[NUM_PC], cid);
                 cio[cid].sysgen_s |= CIO_INT1;
@@ -596,7 +609,7 @@ void io_write(uint32 pa, uint32 val, size_t size)
             default:
                 /* This should never happen */
                 stop_reason = STOP_ERR;
-                sim_debug(IO_DBG, &cpu_dev,
+                sim_debug(CIO_DBG, &cpu_dev,
                           "[WRITE] [%08x] (%d INT1) ERROR IN STATE MACHINE sysgen_s=%02x\n",
                           R[NUM_PC], cid, cio[cid].sysgen_s);
                 break;
@@ -604,15 +617,18 @@ void io_write(uint32 pa, uint32 val, size_t size)
 
             return;
         case IOF_STAT:
-            sim_debug(IO_DBG, &cpu_dev,
+            sim_debug(CIO_DBG, &cpu_dev,
                       "[WRITE] [%08x] (%d RESET)\n",
                       R[NUM_PC], cid);
+            if (cio[cid].reset_handler) {
+                cio[cid].reset_handler(cid);
+            }
             cio[cid].sysgen_s = 0;
             return;
         default:
             /* We should never reach here, but if we do, there's
              * nothing listening. */
-            sim_debug(IO_DBG, &cpu_dev,
+            sim_debug(CIO_DBG, &cpu_dev,
                       "[WRITE] [%08x] No card at cid=%d reg=%d\n",
                       R[NUM_PC], cid, reg);
             csr_data |= CSRTIMO;
@@ -640,10 +656,18 @@ void io_write(uint32 pa, uint32 val, size_t size)
 
 /* For debugging only */
 void dump_entry(uint32 dbits, DEVICE *dev, CONST char *type,
-                uint16 esize, cio_entry *entry, uint8 *app_data)
+                uint32 esize, cio_entry *entry, uint8 *app_data)
 {
+    char appl[64];
+    uint32 i, c_offset;
+
+    for (i = 0, c_offset=0; i < (esize - QESIZE); i++) {
+        snprintf(appl + c_offset, 3, "%02x", app_data[i]);
+        c_offset += 2;
+    }
+
     sim_debug(dbits, dev,
-              "*** %s ENTRY: byte_count=%04x, subdevice=%02x, opcode=%d, address=%08x\n",
+              "*** %s ENTRY: byte_count=%04x, subdevice=%02x, opcode=%d, address=%08x, app_data=%s\n",
               type, entry->byte_count, entry->subdevice,
-              entry->opcode, entry->address);
+              entry->opcode, entry->address, appl);
 }
