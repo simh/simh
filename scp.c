@@ -6879,6 +6879,7 @@ return attach_unit (uptr, (CONST char *)cptr);          /* no, std routine */
 t_stat attach_unit (UNIT *uptr, CONST char *cptr)
 {
 DEVICE *dptr;
+t_bool open_rw = FALSE;
 
 if (!(uptr->flags & UNIT_ATTABLE))                      /* not attachable? */
     return SCPE_NOATT;
@@ -6932,6 +6933,8 @@ else {
                 sim_messagef (SCPE_OK, "%s: creating new file\n", sim_dname (dptr));
                 }
             }                                           /* end if null */
+        else
+            open_rw = TRUE;
         }                                               /* end else */
     }
 if (uptr->flags & UNIT_BUFABLE) {                       /* buffer? */
@@ -6947,6 +6950,12 @@ if (uptr->flags & UNIT_BUFABLE) {                       /* buffer? */
     }
 uptr->flags = uptr->flags | UNIT_ATT;
 uptr->pos = 0;
+if (open_rw &&                                      /* open for write in append mode? */
+    (sim_switches & SWMASK ('A')) &&
+    (uptr->flags & UNIT_SEQ) &&
+    (!(uptr->flags & UNIT_MUSTBUF)) &&
+    (0 == sim_fseek (uptr->fileref, 0, SEEK_END)))
+    uptr->pos = (t_addr)sim_ftell (uptr->fileref);  /* Position at end of file */
 return SCPE_OK;
 }
 
