@@ -146,6 +146,7 @@ typedef uint16          t_tpclnt;                       /* magtape rec lnt */
 #define MTSE_WRP        9                               /* write protected */
 #define MTSE_LEOT       10                              /* Logical End Of Tape */
 #define MTSE_RUNAWAY    11                              /* tape runaway */
+#define MTSE_MAX_ERR    11
 
 typedef void (*TAPE_PCALLBACK)(UNIT *unit, t_stat status);
 
