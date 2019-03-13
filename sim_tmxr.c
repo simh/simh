@@ -3913,7 +3913,7 @@ static DEBTAB tmxr_debug[] = {
 
 t_stat tmxr_add_debug (DEVICE *dptr)
 {
-if (!(dptr->flags & DEV_MUX))
+if (DEV_TYPE(dptr) != DEV_MUX)
     return SCPE_OK;
 return sim_add_debug_flags (dptr, tmxr_debug);
 }
