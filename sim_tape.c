@@ -104,13 +104,14 @@ struct sim_tape_fmt {
     const char          *name;                          /* name */
     int32               uflags;                         /* unit flags */
     t_addr              bot;                            /* bot test */
+    t_addr              eom_remnant;                    /* potentially unprocessed data */
     };
 
 static struct sim_tape_fmt fmts[MTUF_N_FMT] = {
-    { "SIMH", 0,       sizeof (t_mtrlnt) - 1 },
-    { "E11",  0,       sizeof (t_mtrlnt) - 1 },
-    { "TPC",  UNIT_RO, sizeof (t_tpclnt) - 1 },
-    { "P7B",  0,       0 },
+    { "SIMH", 0,       sizeof (t_mtrlnt) - 1,  sizeof (t_mtrlnt)},
+    { "E11",  0,       sizeof (t_mtrlnt) - 1,  sizeof (t_mtrlnt) },
+    { "TPC",  UNIT_RO, sizeof (t_tpclnt) - 1,  sizeof (t_tpclnt) },
+    { "P7B",  0,       0,                      0 },
 /*  { "TPF",  UNIT_RO, 0 }, */
     { NULL,   0,       0 }
     };
@@ -129,8 +130,7 @@ static const uint32 bpi [] = {                          /* tape density table, i
 static t_stat sim_tape_ioerr (UNIT *uptr);
 static t_stat sim_tape_wrdata (UNIT *uptr, uint32 dat);
 static uint32 sim_tape_tpc_map (UNIT *uptr, t_addr *map, uint32 mapsize);
-static t_stat sim_tape_simh_check (UNIT *uptr);
-static t_stat sim_tape_e11_check (UNIT *uptr);
+static t_stat sim_tape_scan_tape (UNIT *uptr);
 static t_addr sim_tape_tpc_fnd (UNIT *uptr, t_addr *map);
 static void sim_tape_data_trace (UNIT *uptr, const uint8 *data, size_t len, const char* txt, int detail, uint32 reason);
 static t_stat tape_erase_fwd (UNIT *uptr, t_mtrlnt gap_size);
@@ -458,7 +458,7 @@ DEVICE *dptr;
 
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return SCPE_NOATT;
-return sim_tape_attach_ex (uptr, cptr, ((dptr->flags & DEV_DEBUG) || (dptr->debflags)) ? 0xFFFFFFFF : 0, 0);
+return sim_tape_attach_ex (uptr, cptr, ((dptr->flags & DEV_DEBUG) || (dptr->debflags)) ? MTSE_DBG_API : 0, 0);
 }
 
 t_stat sim_tape_attach_ex (UNIT *uptr, const char *cptr, uint32 dbit, int completion_delay)
@@ -486,21 +486,13 @@ if (MT_GET_FMT (uptr) == MTUF_F_TPC)
 r = attach_unit (uptr, (CONST char *)cptr);             /* attach unit */
 if (r != SCPE_OK)                                       /* error? */
     return sim_messagef (r, "Can't open tape image: %s\n", cptr);
+
+uptr->tape_ctx = ctx = (struct tape_context *)calloc(1, sizeof(struct tape_context));
+ctx->dptr = dptr;                                       /* save DEVICE pointer */
+ctx->dbit = dbit;                                       /* save debug bit */
+ctx->auto_format = auto_format;                         /* save that we auto selected format */
+
 switch (MT_GET_FMT (uptr)) {                            /* case on format */
-
-    case MTUF_F_STD:                                    /* SIMH */
-        if (SCPE_OK != sim_tape_simh_check (uptr)) {
-            sim_tape_detach (uptr);
-            return SCPE_FMT;                            /* yes, complain */
-            }
-        break;
-
-    case MTUF_F_E11:                                    /* E11 */
-        if (SCPE_OK != sim_tape_e11_check (uptr)) {
-            sim_tape_detach (uptr);
-            return SCPE_FMT;                            /* yes, complain */
-            }
-        break;
 
     case MTUF_F_TPC:                                    /* TPC */
         objc = sim_tape_tpc_map (uptr, NULL, 0);        /* get # objects */
@@ -521,10 +513,7 @@ switch (MT_GET_FMT (uptr)) {                            /* case on format */
         break;
         }
 
-uptr->tape_ctx = ctx = (struct tape_context *)calloc(1, sizeof(struct tape_context));
-ctx->dptr = dptr;                                       /* save DEVICE pointer */
-ctx->dbit = dbit;                                       /* save debug bit */
-ctx->auto_format = auto_format;                         /* save that we auto selected format */
+sim_tape_scan_tape (uptr);
 
 sim_tape_rewind (uptr);
 
@@ -860,16 +849,20 @@ else switch (f) {                                       /* otherwise the read me
             MT_SET_PNU (uptr);                          /* pos not upd */
             status = sim_tape_ioerr (uptr);
             }
-        else if (feof (uptr->fileref)) {                /* eof? */
-            MT_SET_PNU (uptr);                          /* pos not upd */
-            status = MTSE_EOM;
-            }
         else {
-            uptr->pos = uptr->pos + sizeof (t_tpclnt);  /* spc over reclnt */
-            if (tpcbc == TPC_TMK)                       /* tape mark? */
-                status = MTSE_TMK;
-            else
-                uptr->pos = uptr->pos + ((tpcbc + 1) & ~1); /* spc over record */
+            if ((feof (uptr->fileref)) ||               /* eof? */
+                ((tpcbc == TPC_EOM) && 
+                 (sim_fsize (uptr->fileref) == (uint32)sim_ftell (uptr->fileref)))) {
+                MT_SET_PNU (uptr);                          /* pos not upd */
+                status = MTSE_EOM;
+                }
+            else {
+                uptr->pos = uptr->pos + sizeof (t_tpclnt);  /* spc over reclnt */
+                if (tpcbc == TPC_TMK)                       /* tape mark? */
+                    status = MTSE_TMK;
+                else
+                    uptr->pos = uptr->pos + ((tpcbc + 1) & ~1); /* spc over record */
+                }
             }
         break;
 
@@ -1077,8 +1070,8 @@ else switch (f) {                                       /* otherwise the read me
 
     case MTUF_F_TPC:
         ppos = sim_tape_tpc_fnd (uptr, (t_addr *) uptr->filebuf); /* find prev rec */
-        sim_fseek (uptr->fileref, ppos, SEEK_SET);      /* position */
-        sim_fread (&tpcbc, sizeof (t_tpclnt), 1, uptr->fileref);
+        (void)sim_fseek (uptr->fileref, ppos, SEEK_SET);/* position */
+        (void)sim_fread (&tpcbc, sizeof (t_tpclnt), 1, uptr->fileref);
         *bc = tpcbc;                                    /* save rec lnt */
 
         if (ferror (uptr->fileref))                     /* error? */
@@ -1090,14 +1083,14 @@ else switch (f) {                                       /* otherwise the read me
             if (*bc == MTR_TMK)                         /* tape mark? */
                 status = MTSE_TMK;
             else
-                sim_fseek (uptr->fileref, uptr->pos + sizeof (t_tpclnt), SEEK_SET);
+                (void)sim_fseek (uptr->fileref, uptr->pos + sizeof (t_tpclnt), SEEK_SET);
             }
         break;
 
     case MTUF_F_P7B:
         for (sbc = 1, all_eof = 1; (t_addr) sbc <= uptr->pos ; sbc++) {
-            sim_fseek (uptr->fileref, uptr->pos - sbc, SEEK_SET);
-            sim_fread (&c, sizeof (uint8), 1, uptr->fileref);
+            (void)sim_fseek (uptr->fileref, uptr->pos - sbc, SEEK_SET);
+            (void)sim_fread (&c, sizeof (uint8), 1, uptr->fileref);
 
             if (ferror (uptr->fileref)) {               /* error? */
                 status = sim_tape_ioerr (uptr);
@@ -1118,7 +1111,7 @@ else switch (f) {                                       /* otherwise the read me
         if (status == MTSE_OK) {
             uptr->pos = uptr->pos - sbc;                    /* update position */
             *bc = sbc;                                      /* save rec lnt */
-            sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); /* for read */
+            (void)sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); /* for next read */
             if (all_eof)                                    /* tape mark? */
                 status = MTSE_TMK;
             }
@@ -1308,7 +1301,8 @@ if (sim_tape_wrp (uptr))                                /* write prot? */
     return MTSE_WRP;
 if (sbc == 0)                                           /* nothing to do? */
     return MTSE_OK;
-sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);         /* set pos */
+if (sim_fseek (uptr->fileref, uptr->pos, SEEK_SET))     /* set pos */
+    return MTSE_IOERR;
 switch (f) {                                            /* case on format */
 
     case MTUF_F_STD:                                    /* standard */
@@ -1785,7 +1779,7 @@ if (gap_size == meta_size) {                            /* if the request is for
     if (sim_fseek (uptr->fileref, uptr->pos, SEEK_SET)) /* position the tape; if it fails */
         return sim_tape_ioerr (uptr);                   /*   then quit with I/O error status */
 
-    sim_fread (&metadatum, meta_size, 1, uptr->fileref);    /* read a metadatum */
+    (void)sim_fread (&metadatum, meta_size, 1, uptr->fileref);/* read a metadatum */
 
     if (ferror (uptr->fileref))                             /* if a file I/O error occurred */
         return sim_tape_ioerr (uptr);                       /*   then report the error and quit */
@@ -2520,7 +2514,7 @@ static uint32 sim_tape_tpc_map (UNIT *uptr, t_addr *map, uint32 mapsize)
 {
 t_addr tpos, leot;
 t_addr tape_size;
-t_tpclnt bc, last_bc = 0xFFFF;
+t_tpclnt bc, last_bc = TPC_EOM;
 uint32 had_double_tape_mark = 0;
 size_t i;
 uint32 objc, sizec;
@@ -2535,7 +2529,7 @@ recbuf = (uint8 *)malloc (65536);
 tape_size = (t_addr)sim_fsize (uptr->fileref);
 sim_debug (MTSE_DBG_STR, dptr, "tpc_map: tape_size: %" T_ADDR_FMT "u\n", tape_size);
 for (objc = 0, sizec = 0, tpos = 0;; ) {
-    sim_fseek (uptr->fileref, tpos, SEEK_SET);
+    (void)sim_fseek (uptr->fileref, tpos, SEEK_SET);
     i = sim_fread (&bc, sizeof (t_tpclnt), 1, uptr->fileref);
     if (i == 0)     /* past or at eof? */
         break;
@@ -2546,7 +2540,7 @@ for (objc = 0, sizec = 0, tpos = 0;; ) {
         map[objc] = tpos;
     if (bc) {
         sim_debug (MTSE_DBG_STR, dptr, "tpc_map: %d byte count at pos: %" T_ADDR_FMT "u\n", bc, tpos);
-        if (sim_deb && (dptr->dctrl & MTSE_DBG_STR)) {
+        if (map && sim_deb && (dptr->dctrl & MTSE_DBG_STR)) {
             sim_fread (recbuf, 1, bc, uptr->fileref);
             sim_data_trace(dptr, uptr, ((dptr->dctrl & MTSE_DBG_DAT) ? recbuf : NULL), "", bc, "Data Record", MTSE_DBG_STR);
             }
@@ -2570,13 +2564,13 @@ for (i=0; i<65535; i++) {
             sim_debug (MTSE_DBG_STR, dptr, "tpc_map: summary - %u %d byte record%s\n", countmap[i], (int)i, (countmap[i] > 1) ? "s" : "");
         }
     }
-if (((last_bc != 0xffff) && 
+if (((last_bc != TPC_EOM) && 
      (tpos > tape_size) &&
      (!had_double_tape_mark))    ||
     (!had_double_tape_mark)      ||
     ((objc == countmap[0]) && 
      (countmap[0] != 2))) {     /* Unreasonable format? */
-    if (last_bc != 0xffff)
+    if (last_bc != TPC_EOM)
         sim_debug (MTSE_DBG_STR, dptr, "tpc_map: ERROR unexpected EOT byte count: %d\n", last_bc);
     if (tpos > tape_size)
         sim_debug (MTSE_DBG_STR, dptr, "tpc_map: ERROR next record position %" T_ADDR_FMT "u beyond EOT: %" T_ADDR_FMT "u\n", tpos, tape_size);
@@ -2587,7 +2581,7 @@ if (((last_bc != 0xffff) &&
     return 0;
     }
 
-if ((last_bc != 0xffff) && (tpos > tape_size)) {
+if ((last_bc != TPC_EOM) && (tpos > tape_size)) {
     sim_debug (MTSE_DBG_STR, dptr, "tpc_map: WARNING unexpected EOT byte count: %d, double tape mark before %" T_ADDR_FMT "u provides logical EOT\n", last_bc, leot);
     objc = had_double_tape_mark;
     tpos = leot;
@@ -2600,17 +2594,153 @@ free (recbuf);
 return objc;
 }
 
-/* Check the basic structure of a SIMH format tape image */
-
-static t_stat sim_tape_simh_check (UNIT *uptr)
+static 
+const char *sim_tape_error_text (t_stat stat)
 {
-return SCPE_OK;
+const char *mtse_errors[] = {
+    "no error",
+    "tape mark",
+    "unattached",
+    "IO error",
+    "invalid rec lnt",
+    "invalid format",
+    "beginning of tape",
+    "end of medium",
+    "error in record",
+    "write protected",
+    "Logical End Of Tape",
+    "tape runaway"
+    };
+static char msgbuf[64];
+
+if (stat <= MTSE_MAX_ERR)
+    return mtse_errors[stat];
+sprintf(msgbuf, "Error %d", stat);
+return msgbuf;
 }
 
-/* Check the basic structure of a E11 format tape image */
-
-static t_stat sim_tape_e11_check (UNIT *uptr)
+static t_stat sim_tape_scan_tape (UNIT *uptr)
 {
+t_addr saved_pos = uptr->pos;
+uint32 record_in_file = 0;
+uint32 data_total = 0;
+uint32 tapemark_total = 0;
+uint32 tapemark_seen = 0;
+uint32 record_total = 0;
+uint32 unique_record_sizes = 0;
+t_stat r = SCPE_OK;
+uint8 *buf = NULL;
+uint32 *rec_sizes = NULL;
+t_mtrlnt bc;
+t_mtrlnt max = MTR_MAXLEN;
+
+if (!(uptr->flags & UNIT_ATT))
+    return SCPE_UNATT;
+buf = (uint8 *)malloc (max);
+if (buf == NULL)
+    return SCPE_MEM;
+rec_sizes = (uint32 *)calloc (max + 1, sizeof (*rec_sizes));
+if (rec_sizes == NULL) {
+    free (buf);
+    return SCPE_MEM;
+    }
+r = sim_tape_rewind (uptr);
+while (r == SCPE_OK) {
+    r = sim_tape_rdrecf (uptr, buf, &bc, max);
+    switch (r) {
+    case MTSE_OK:                                   /* no error */
+        ++record_total;
+        data_total += bc;
+        if (rec_sizes[bc] == 0)
+            ++unique_record_sizes;
+        ++rec_sizes[bc];
+        r = SCPE_OK;
+        break;
+    case MTSE_TMK:                                  /* tape mark */
+        ++tapemark_total;
+        r = SCPE_OK;
+        break;
+    case MTSE_INVRL:                                /* invalid rec lnt */
+    case MTSE_FMT:                                  /* invalid format */
+    case MTSE_BOT:                                  /* beginning of tape */
+    case MTSE_RECE:                                 /* error in record */
+    case MTSE_WRP:                                  /* write protected */
+    case MTSE_LEOT:                                 /* Logical End Of Tape */
+    case MTSE_RUNAWAY:                              /* tape runaway */
+    default:
+        break;
+    case MTSE_EOM:                                  /* end of medium */
+        break;
+        }
+    }
+if ((r != MTSE_EOM) || (sim_switches & SWMASK ('V')) || 
+    ((uint32)(sim_fsize_ex (uptr->fileref) - (t_offset)uptr->pos) > fmts[MT_GET_FMT (uptr)].eom_remnant) ||
+    (unique_record_sizes > 2 * tapemark_seen)) {
+    uint32 remaining_data = (uint32)(sim_fsize_ex (uptr->fileref) - (t_offset)uptr->pos);
+
+    sim_printf ("Tape Image '%s' scanned as %s format.\n", uptr->filename, fmts[MT_GET_FMT (uptr)].name);
+    if (r != MTSE_EOM)
+        sim_printf ("After processing ");
+    else
+        sim_printf ("contains ");
+    sim_printf ("%u bytes of tape data (%u records, %u tapemarks)\n",
+                data_total, record_total, tapemark_total);
+    if (record_total > 0) {
+        sim_printf ("Comprising:\n");
+        for (bc = 0; bc <= max; bc++) {
+            if (rec_sizes[bc])
+                sim_printf ("%8u %u byte records\n", rec_sizes[bc], (uint32)bc);
+            }
+        }
+    if (r != MTSE_EOM)
+        sim_printf ("Read Tape Record Returned Unexpected Status: %s\n", sim_tape_error_text (r));
+    if (remaining_data > fmts[MT_GET_FMT (uptr)].eom_remnant)
+        sim_printf ("%u bytes of unexamined data remain in the tape image file\n", remaining_data);
+    }
+/* Try again reading backwards */
+r = SCPE_OK;
+tapemark_seen = tapemark_total;
+while (r == SCPE_OK) {
+    r = sim_tape_rdrecr (uptr, buf, &bc, max);
+    switch (r) {
+    case MTSE_OK:                                   /* no error */
+        --record_total;
+        data_total -= bc;
+        --rec_sizes[bc];
+        r = SCPE_OK;
+        break;
+    case MTSE_TMK:                                  /* tape mark */
+        --tapemark_total;
+        r = SCPE_OK;
+        break;
+    case MTSE_BOT:                                  /* beginning of tape */
+        break;
+    case MTSE_INVRL:                                /* invalid rec lnt */
+    case MTSE_FMT:                                  /* invalid format */
+    case MTSE_RECE:                                 /* error in record */
+    case MTSE_WRP:                                  /* write protected */
+    case MTSE_LEOT:                                 /* Logical End Of Tape */
+    case MTSE_RUNAWAY:                              /* tape runaway */
+    default:
+        break;
+    case MTSE_EOM:                                  /* end of medium */
+        break;
+        }
+    }
+
+if ((record_total != 0) || 
+    (tapemark_total != 0) ||
+    (data_total != 0))
+    sim_printf ("Reverse read of the tape data is inconsistent with the forward read.\n");
+
+if (unique_record_sizes > 2 * tapemark_seen) {
+    sim_printf ("An unreasonable number of record sizes(%u) vs tape marks (%u) have been found\n", unique_record_sizes, tapemark_total);
+    sim_printf ("The tape format (%s) might not be correct for the '%s' tape image\n", fmts[MT_GET_FMT (uptr)].name, uptr->filename);
+    }
+
+free (buf);
+free (rec_sizes);
+uptr->pos = saved_pos;
 return SCPE_OK;
 }
 
@@ -2752,7 +2882,180 @@ else {                                                  /* otherwise get the den
 return SCPE_OK;
 }
 
+static DEBTAB tape_debug[] = {
+  {"TRACE",     MTSE_DBG_API,       "API Trace"},
+  {"DATA",      MTSE_DBG_DAT,       "Tape Data"},
+  {"POS",       MTSE_DBG_POS,       "Positioning Activities"},
+  {"STR",       MTSE_DBG_STR,       "Tape Structure"},
+  {0}
+};
+
+t_stat sim_tape_add_debug (DEVICE *dptr)
+{
+if (DEV_TYPE(dptr) != DEV_TAPE)
+    return SCPE_OK;
+return sim_add_debug_flags (dptr, tape_debug);
+}
+
+static t_bool p7b_parity_inited = FALSE;
+static uint8 p7b_odd_parity[64];
+static uint8 p7b_even_parity[64];
+
+static t_stat create_tape_files (UNIT *uptr, const char *filename, int files, int records)
+{
+FILE *fSIMH = NULL;
+FILE *fE11 = NULL;
+FILE *fTPC = NULL;
+FILE *fP7B = NULL;
+int i, j, k;
+t_tpclnt tpclnt;
+t_mtrlnt mtrlnt;
+char name[256];
+t_stat stat = SCPE_OPENERR;
+uint8 *buf = NULL;
+
+if (!p7b_parity_inited) {
+    for (i=0; i < 64; i++) {
+        int bit_count = 0;
+
+        for (j=0; j<6; j++) {
+            if (i & (1 << j))
+                ++bit_count;
+            }
+        p7b_odd_parity[i] = i | ((~bit_count & 1) << 6);
+        p7b_even_parity[i] = i | ((bit_count & 1) << 6);
+        }
+    p7b_parity_inited = TRUE;
+    }
+buf = (uint8 *)malloc (65536);
+if (buf == NULL)
+    return SCPE_MEM;
+sprintf (name, "%s.simh", filename);
+fSIMH = fopen (name, "wb");
+if (fSIMH  == NULL)
+    goto Done_Files;
+sprintf (name, "%s.e11", filename);
+fE11 = fopen (name, "wb");
+if (fE11  == NULL)
+    goto Done_Files;
+sprintf (name, "%s.tpc", filename);
+fTPC = fopen (name, "wb");
+if (fTPC  == NULL)
+    goto Done_Files;
+sprintf (name, "%s.p7b", filename);
+fP7B = fopen (name, "wb");
+if (fP7B  == NULL)
+    goto Done_Files;
+stat = SCPE_OK;
+for (i=0; i<files; i++) {
+    int rec_size = 1 + (rand () % 65535);
+
+    mtrlnt = tpclnt = rec_size;
+    for (j=0; j<records; j++) {
+        if (sim_switches & SWMASK ('V'))
+            sim_printf ("Writing %d byte record\n", rec_size);
+        for (k=0; k<rec_size; k++)
+            buf[k] = rand () & 0xFF;
+        (void)sim_fwrite (&mtrlnt, sizeof (mtrlnt), 1, fSIMH);
+        (void)sim_fwrite (&mtrlnt, sizeof (mtrlnt), 1, fE11);
+        (void)sim_fwrite (&tpclnt, sizeof (tpclnt), 1, fTPC);
+        (void)sim_fwrite (buf, 1, rec_size, fSIMH);
+        (void)sim_fwrite (buf, 1, rec_size, fE11);
+        (void)sim_fwrite (buf, 1, rec_size, fTPC);
+        if (rec_size & 1) {
+            (void)sim_fwrite (&tpclnt, 1, 1, fSIMH);
+            (void)sim_fwrite (&tpclnt, 1, 1, fTPC);
+            }
+        (void)sim_fwrite (&mtrlnt, sizeof (mtrlnt), 1, fSIMH);
+        (void)sim_fwrite (&mtrlnt, sizeof (mtrlnt), 1, fE11);
+        for (k=0; k<rec_size; k++)
+            buf[k] = p7b_odd_parity[buf[k] & 0x3F]; /* Only 6 data bits plus parity */
+        buf[0] |= P7B_SOR;
+        (void)sim_fwrite (buf, 1, rec_size, fP7B);
+        }
+    mtrlnt = tpclnt = 0;
+    (void)sim_fwrite (&mtrlnt, sizeof (mtrlnt), 1, fSIMH);
+    (void)sim_fwrite (&mtrlnt, sizeof (mtrlnt), 1, fE11);
+    (void)sim_fwrite (&tpclnt, sizeof (tpclnt), 1, fTPC);
+    buf[0] = P7B_SOR | P7B_EOF;
+    (void)sim_fwrite (buf, 1, 1, fP7B);
+    }
+mtrlnt = tpclnt = 0;
+(void)sim_fwrite (&mtrlnt, sizeof (mtrlnt), 1, fSIMH);
+(void)sim_fwrite (&mtrlnt, sizeof (mtrlnt), 1, fE11);
+(void)sim_fwrite (&tpclnt, sizeof (tpclnt), 1, fTPC);
+mtrlnt = 0xffffffff;
+tpclnt = 0xffff;
+(void)sim_fwrite (&mtrlnt, sizeof (mtrlnt), 1, fSIMH);
+(void)sim_fwrite (&mtrlnt, sizeof (mtrlnt), 1, fE11);
+(void)sim_fwrite (&tpclnt, sizeof (tpclnt), 1, fTPC);
+(void)sim_fwrite (buf, 1, 1, fP7B);
+Done_Files:
+if (fSIMH)
+    fclose (fSIMH);
+if (fE11)
+    fclose (fE11);
+if (fTPC)
+    fclose (fTPC);
+if (fP7B)
+    fclose (fP7B);
+free (buf);
+return stat;
+}
+
+static t_stat process_tape_file (UNIT *uptr, const char *filename, const char *format)
+{
+char args[256];
+t_stat stat;
+
+sprintf (args, "%s %s.%s", format, filename, format);
+sim_tape_detach (uptr);
+sim_switches |= SWMASK ('F') | SWMASK ('V');
+stat = sim_tape_attach_ex (uptr, args, 0, 0);
+if (stat != SCPE_OK)
+    return stat;
+sim_tape_detach (uptr);
+sim_switches = 0;
+return SCPE_OK;
+}
+
+static t_stat remove_tape_files (UNIT *uptr, const char *filename)
+{
+char name[256];
+
+sprintf (name, "%s.simh", filename);
+(void)remove (name);
+sprintf (name, "%s.e11", filename);
+(void)remove (name);
+sprintf (name, "%s.tpc", filename);
+(void)remove (name);
+sprintf (name, "%s.p7b", filename);
+(void)remove (name);
+return SCPE_OK;
+}
+
+#include <setjmp.h>
+
 t_stat sim_tape_test (DEVICE *dptr)
 {
+SIM_TEST_INIT;
+
+sim_printf ("\nTesting %s device sim_tape APIs\n", sim_uname(dptr->units));
+
+SIM_TEST(remove_tape_files (dptr->units, "TapeTestFile1"));
+
+//SIM_TEST(create_tape_files (dptr->units, "TapeTestFile1", 10, 500));
+SIM_TEST(create_tape_files (dptr->units, "TapeTestFile1", 7, 100));
+
+SIM_TEST(process_tape_file (dptr->units, "TapeTestFile1", "p7b"));
+
+SIM_TEST(process_tape_file (dptr->units, "TapeTestFile1", "tpc"));
+
+SIM_TEST(process_tape_file (dptr->units, "TapeTestFile1", "e11"));
+
+SIM_TEST(process_tape_file (dptr->units, "TapeTestFile1", "simh"));
+
+SIM_TEST(remove_tape_files (dptr->units, "TapeTestFile1"));
+
 return SCPE_OK;
 }

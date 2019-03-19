@@ -72,6 +72,7 @@ typedef uint16          t_tpclnt;                       /* magtape rec lnt */
 #define P7B_EOF         0x0F                            /* eof character */
 
 #define TPC_TMK         0x0000                          /* tape mark */
+#define TPC_EOM         0xFFFF                          /* end of medium */
 
 /* Unit flags */
 
@@ -152,6 +153,7 @@ typedef void (*TAPE_PCALLBACK)(UNIT *unit, t_stat status);
 
 /* Tape Internal Debug flags */
 
+#define MTSE_DBG_API   0x10000000                       /* API Trace */
 #define MTSE_DBG_DAT   0x20000000                       /* Debug Data */
 #define MTSE_DBG_POS   0x40000000                       /* Debug Positioning activities */
 #define MTSE_DBG_STR   0x80000000                       /* Debug Tape Structure */
@@ -211,6 +213,7 @@ t_stat sim_tape_show_dens (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat sim_tape_set_asynch (UNIT *uptr, int latency);
 t_stat sim_tape_clr_asynch (UNIT *uptr);
 t_stat sim_tape_test (DEVICE *dptr);
+t_stat sim_tape_add_debug (DEVICE *dptr);
 
 #ifdef  __cplusplus
 }

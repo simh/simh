@@ -205,9 +205,11 @@ t_offset pos, sz;
 if (fp == NULL)
     return 0;
 pos = sim_ftell (fp);
-sim_fseeko (fp, 0, SEEK_END);
+if (sim_fseeko (fp, 0, SEEK_END))
+    return 0;
 sz = sim_ftell (fp);
-sim_fseeko (fp, pos, SEEK_SET);
+if (sim_fseeko (fp, pos, SEEK_SET))
+    return 0;
 return sz;
 }
 
