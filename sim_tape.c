@@ -596,6 +596,8 @@ fprintf (st, "    -E          Must Exist (if not specified an attempt to create 
 fprintf (st, "                virtual tape will be attempted).\n");
 fprintf (st, "    -F          Open the indicated tape container in a specific format (default\n");
 fprintf (st, "                is SIMH, alternatives are E11, TPC and P7B)\n");
+fprintf (st, "    -V          Display some detailed information about the record structure\n");
+fprintf (st, "                contained in the tape structure.\n");
 return SCPE_OK;
 }
 
