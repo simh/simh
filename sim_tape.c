@@ -890,7 +890,7 @@ else switch (f) {                                       /* otherwise the read me
 
         if (status == MTSE_OK) {
             *bc = sbc;                                      /* save rec lnt */
-            sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); /* for read */
+            (void)sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); /* for read */
             uptr->pos = uptr->pos + sbc;                    /* spc over record */
             if (all_eof)                                    /* tape mark? */
                 status = MTSE_TMK;
@@ -1358,7 +1358,7 @@ if (ctx == NULL)                                        /* if not properly attac
     return sim_messagef (SCPE_IERR, "Bad Attach\n");    /*   that's a problem */
 if (sim_tape_wrp (uptr))                                /* write prot? */
     return MTSE_WRP;
-sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);         /* set pos */
+(void)sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);         /* set pos */
 sim_fwrite (&dat, sizeof (t_mtrlnt), 1, uptr->fileref);
 if (ferror (uptr->fileref)) {                           /* error? */
     MT_SET_PNU (uptr);
@@ -2543,7 +2543,7 @@ for (objc = 0, sizec = 0, tpos = 0;; ) {
     if (bc) {
         sim_debug (MTSE_DBG_STR, dptr, "tpc_map: %d byte count at pos: %" T_ADDR_FMT "u\n", bc, tpos);
         if (map && sim_deb && (dptr->dctrl & MTSE_DBG_STR)) {
-            sim_fread (recbuf, 1, bc, uptr->fileref);
+            (void)sim_fread (recbuf, 1, bc, uptr->fileref);
             sim_data_trace(dptr, uptr, ((dptr->dctrl & MTSE_DBG_DAT) ? recbuf : NULL), "", bc, "Data Record", MTSE_DBG_STR);
             }
         }
@@ -2708,6 +2708,8 @@ while (r == SCPE_OK) {
     case MTSE_OK:                                   /* no error */
         --record_total;
         data_total -= bc;
+        if (bc > max)
+            bc = max;
         --rec_sizes[bc];
         r = SCPE_OK;
         break;
