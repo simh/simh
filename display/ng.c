@@ -37,10 +37,16 @@
 static void *ng_dptr;
 static int ng_dbit;
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
 #define DEVICE void
 extern void _sim_debug_device (unsigned int dbits, DEVICE* dptr, const char* fmt, ...);
 
 #define DEBUGF(...) _sim_debug_device (ng_dbit, ng_dptr, ##  __VA_ARGS__)
+#if defined(__cplusplus)
+}
+#endif
 
 int ng_type = 0;
 int ng_scale = PIX_SCALE;
