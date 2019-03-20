@@ -41,7 +41,7 @@
    sim_finit         -       initialize package
    sim_fopen         -       open file
    sim_fread         -       endian independent read (formerly fxread)
-   sim_write         -       endian independent write (formerly fxwrite)
+   sim_fwrite        -       endian independent write (formerly fxwrite)
    sim_fseek         -       conditionally extended (>32b) seek (
    sim_fseeko        -       extended seek (>32b if available)
    sim_fsize         -       get file size

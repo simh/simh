@@ -14527,6 +14527,23 @@ return cptr;
 }
 
 /*
+ * To avoid Coverity complaints about the use of rand() we define the function locally
+ */
+
+static uint32 sim_rand_seed;
+
+void sim_srand (unsigned int seed)
+{
+sim_rand_seed = (uint32)seed;
+}
+
+int sim_rand ()
+{
+sim_rand_seed = sim_rand_seed * 214013 + 2531011;
+return (sim_rand_seed >> 16) & RAND_MAX;
+}
+
+/*
  * Compiled in unit tests for the various device oriented library 
  * modules: sim_card, sim_disk, sim_tape, sim_ether, sim_tmxr, etc.
  */

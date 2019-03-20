@@ -231,6 +231,12 @@ size_t sim_strlcpy (char *dst, const char *src, size_t size);
 #ifndef strcasecmp
 #define strcasecmp(str1, str2) sim_strcasecmp ((str1), (str2))
 #endif
+void sim_srand (unsigned int seed);
+int sim_rand (void);
+#ifdef RAND_MAX
+#undef RAND_MAX
+#endif
+#define RAND_MAX 32767
 CONST char *get_sim_opt (int32 opt, CONST char *cptr, t_stat *st);
 CONST char *get_sim_sw (CONST char *cptr);
 const char *put_switches (char *buf, size_t bufsize, uint32 sw);
