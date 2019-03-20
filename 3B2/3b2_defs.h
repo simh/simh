@@ -56,6 +56,9 @@ noret __libc_longjmp (jmp_buf buf, int val);
 #ifndef MIN
 #define MIN(x,y) ((x) < (y) ? (x) : (y))
 #endif
+#ifndef UNUSED
+#define UNUSED(x)  ((void)((x)))
+#endif
 
 /* -t flag: Translate a virtual address */
 #define EX_T_FLAG 1 << 19

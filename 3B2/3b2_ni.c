@@ -184,7 +184,8 @@ DEVICE ni_dev = {
     &ni_help,               /* help routine */
     NULL,                   /* attach help routine */
     NULL,                   /* help context */
-    &ni_description         /* device description */
+    &ni_description,        /* device description */
+    NULL,
 };
 
 #define CHAR(c)   ((((c) >= 0x20) && ((c) < 0x7f)) ? (c) : '.')
@@ -291,7 +292,7 @@ static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp
     uint16 hdrsize;
     t_stat status;
     int prot_info_offset;
-    cio_entry centry;
+    cio_entry centry = {0};
     uint8 app_data[4] = {rapp_data[0], rapp_data[1], rapp_data[2], rapp_data[3]};
 
     /* Assume some default values, but let the handlers below
@@ -527,6 +528,9 @@ t_stat ni_setmac(UNIT *uptr, int32 val, CONST char* cptr, void* desc)
 {
     t_stat status;
 
+    UNUSED(val);
+    UNUSED(desc);
+
     status = eth_mac_scan_ex(&ni.macs[NI_NIC_MAC], cptr, uptr);
 
     if (status == SCPE_OK) {
@@ -543,6 +547,10 @@ t_stat ni_showmac(FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
     char buffer[20];
 
+    UNUSED(uptr);
+    UNUSED(val);
+    UNUSED(desc);
+
     eth_mac_fmt(&ni.macs[NI_NIC_MAC], buffer);
     fprintf(st, "MAC=%s", buffer);
     return SCPE_OK;
@@ -552,6 +560,10 @@ t_stat ni_show_filters(FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
     char  buffer[20];
     int i;
+
+    UNUSED(uptr);
+    UNUSED(val);
+    UNUSED(desc);
 
     eth_mac_fmt(&ni.macs[NI_NIC_MAC], buffer);
     fprintf(st, "Physical Address=%s\n", buffer);
@@ -569,8 +581,8 @@ t_stat ni_show_filters(FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 
 void ni_sysgen(uint8 cid)
 {
-    cio_entry cqe;
-    uint8 app_data[4];
+    cio_entry cqe = {0};
+    uint8 app_data[4] = {0};
 
     ni_disable();
 
@@ -603,8 +615,8 @@ void ni_sysgen(uint8 cid)
  */
 void ni_express(uint8 cid)
 {
-    cio_entry rqe;
-    uint8 app_data[4];
+    cio_entry rqe = {0};
+    uint8 app_data[4] = {0};
 
     sim_debug(DBG_TRACE, &ni_dev,
               "[ni_express] Handling express CIO request.\n");
@@ -618,8 +630,8 @@ void ni_express(uint8 cid)
  */
 void ni_full(uint8 cid)
 {
-    cio_entry rqe;
-    uint8 app_data[4];
+    cio_entry rqe = {0};
+    uint8 app_data[4] = {0};
 
     sim_debug(DBG_TRACE, &ni_dev,
               "[ni_full] INT1 received. Handling full CIO request.\n");
@@ -635,6 +647,8 @@ void ni_full(uint8 cid)
  */
 void ni_cio_reset(uint8 cid)
 {
+    UNUSED(cid);
+
     ni_disable();
 }
 
@@ -735,6 +749,8 @@ t_stat ni_rcv_svc(UNIT *uptr)
 {
     t_stat status;
 
+    UNUSED(uptr);
+
     /* If a CIO interrupt is alrady pending, skip this read */
     if (!cio[ni.cid].intr) {
         /* Try to receive a packet */
@@ -764,8 +780,10 @@ t_stat ni_rcv_svc(UNIT *uptr)
 t_stat ni_rq_svc(UNIT *uptr)
 {
     int i, wp, no_rque;
-    cio_entry rqe;
-    uint8 slot[4];
+    cio_entry rqe = {0};
+    uint8 slot[4] = {0};
+
+    UNUSED(uptr);
 
     no_rque = cio[ni.cid].no_rque - 1;
 
@@ -819,8 +837,10 @@ t_stat ni_rq_svc(UNIT *uptr)
  */
 t_stat ni_sanity_svc(UNIT *uptr)
 {
-    cio_entry cqe;
-    uint8 app_data[4];
+    cio_entry cqe = {0};
+    uint8 app_data[4] = {0};
+
+    UNUSED(uptr);
 
     sim_debug(DBG_TRACE, &ni_dev,
               "[ni_sanity_svc] Firing sanity timer.\n");
@@ -839,6 +859,8 @@ t_stat ni_sanity_svc(UNIT *uptr)
 
 t_stat ni_cio_svc(UNIT *uptr)
 {
+    UNUSED(uptr);
+
     if (cio[ni.cid].ivec > 0) {
         sim_debug(DBG_TRACE, &ni_dev,
                   "[ni_cio_svc] Handling a CIO service (Setting Interrupt) for board %d\n", ni.cid);
@@ -854,8 +876,8 @@ void ni_process_packet()
     uint32 addr;
     uint8 slot;
     ETH_ITEM *item;
-    cio_entry centry;
-    uint8 capp_data[4];
+    cio_entry centry = {0};
+    uint8 capp_data[4] = {0};
     int len = 0;
     int que_num = 0;
     uint8 *rbuf;
@@ -937,6 +959,8 @@ void ni_process_packet()
  * in a queue and handle them in ni_rcv_svc.
  */
 void ni_recv_callback(int status) {
+    UNUSED(status);
+
     if (ni.enabled) {
         sim_debug(DBG_IO, &ni_dev,
                   "[ni_recv_callback] inserting packet of len=%d (used=%d) into read queue.\n",
@@ -1033,6 +1057,11 @@ t_stat ni_set_stats(UNIT* uptr, int32 val, CONST char* cptr, void* desc)
     int init, elements, i;
     uint32 *stats_array;
 
+    UNUSED(uptr);
+    UNUSED(val);
+    UNUSED(cptr);
+    UNUSED(desc);
+
     if (cptr) {
         init = atoi(cptr);
         stats_array = (uint32 *)&ni.stats;
@@ -1053,6 +1082,10 @@ t_stat ni_show_stats(FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
     const char *fmt = "  %-15s%d\n";
 
+    UNUSED(uptr);
+    UNUSED(val);
+    UNUSED(desc);
+
     fprintf(st, "NI Ethernet statistics:\n");
     fprintf(st, fmt, "Recv:",          ni.stats.rx_pkt);
     fprintf(st, fmt, "Recv Bytes:",    ni.stats.rx_bytes);
@@ -1068,6 +1101,10 @@ t_stat ni_show_stats(FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 
 t_stat ni_show_poll(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
+    UNUSED(uptr);
+    UNUSED(val);
+    UNUSED(desc);
+
     if (ni.poll_rate == NI_QPOLL_FAST) {
         fprintf(st, "polling=fast");
     } else {
@@ -1135,6 +1172,8 @@ t_stat ni_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 
 const char *ni_description(DEVICE *dptr)
 {
+    UNUSED(dptr);
+
     return "NI 10BASE5 Ethernet controller";
 }
 
@@ -1161,6 +1200,9 @@ static t_stat ni_show_queue_common(FILE *st, UNIT *uptr, int32 val,
     uint32 ptr, size, no_rque, i, j;
     uint16 lp, ulp;
     uint8  op, dev, seq, cmdstat;
+
+    UNUSED(uptr);
+    UNUSED(val);
 
     if (cptr) {
         cid = (uint8) get_uint(cptr, 10, 12, &result);
