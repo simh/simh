@@ -2240,7 +2240,7 @@ static const char simh_help[] =
       " Specifies a true (false {NOT}) condition if the file exists.\n"
       "5File Comparison Expressions\n"
       " Files can have their contents compared with:\n\n"
-      "++-D {NOT} \"<filespec1>\" == \"<filespec2>\" \n\n"
+      "++-F {NOT} \"<filespec1>\" == \"<filespec2>\" \n\n"
       " Specifies a true (false {NOT}) condition if the indicated files\n"
       " have the same contents.\n\n"
        /***************** 80 character line width template *************************/
@@ -2637,7 +2637,7 @@ else if (*argv[0]) {                                    /* sim name arg? */
 if (SCPE_BARE_STATUS(stat) == SCPE_OPENERR)             /* didn't exist/can't open? */
     stat = SCPE_OK;
 
-if (sim_switches & SWMASK ('T'))                        /* Command Line -T switch */
+if (sim_switches & SWMASK ('T'))                       /* Command Line -T switch */
     stat = sim_library_unit_tests ();                   /* run library unit tests */
 
 if (SCPE_BARE_STATUS(stat) != SCPE_EXIT)
@@ -4260,7 +4260,6 @@ for (i=1; i<arg_count-1; ++i)
 return SCPE_OK;
 }
 
-static
 int sim_cmp_string (const char *s1, const char *s2)
 {
 long int v1, v2;
@@ -12905,6 +12904,11 @@ if (sim_deb && ((dptr->dctrl | (uptr ? uptr->dctrl : 0)) & reason)) {
                         ebcdicbuf[eidx++] = '.';
                     }
                 }
+            for (; sidx<16; ++sidx) {
+                strbuf[soff+sidx] = ' ';
+                if (eidx)
+                    ebcdicbuf[eidx++] = ' ';
+                }
             outbuf[oidx] = '\0';
             strbuf[soff+sidx] = '\0';
             ebcdicbuf[eidx] = '\0';
@@ -14552,11 +14556,13 @@ static t_stat sim_library_unit_tests (void)
 {
 int i;
 DEVICE *dptr;
+int32 saved_switches = sim_switches & ~SWMASK ('T');
 t_stat stat = SCPE_OK;
 
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
     t_stat tstat = SCPE_OK;
 
+    sim_switches = saved_switches;
     switch (DEV_TYPE(dptr)) {
 #if defined(USE_SIM_CARD)
         case DEV_CARD:
