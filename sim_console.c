@@ -2242,6 +2242,21 @@ else
 return SCPE_OK;
 }
 
+/* Set debug switches */
+
+int32 sim_set_deb_switches (int32 switches)
+{
+int32 old_deb_switches = sim_deb_switches;
+
+sim_deb_switches = switches & 
+                   (SWMASK ('R') | SWMASK ('P') | 
+                    SWMASK ('T') | SWMASK ('A') | 
+                    SWMASK ('F') | SWMASK ('N') |
+                    SWMASK ('B') | SWMASK ('E') |
+                    SWMASK ('D') );                 /* save debug switches */
+return old_deb_switches;
+}
+
 /* Set debug routine */
 
 t_stat sim_set_debon (int32 flag, CONST char *cptr)
@@ -2267,12 +2282,8 @@ r = sim_open_logfile (gbuf, FALSE, &sim_deb, &sim_deb_ref);
 if (r != SCPE_OK)
     return r;
 
-sim_deb_switches = sim_switches & 
-                   (SWMASK ('R') | SWMASK ('P') | 
-                    SWMASK ('T') | SWMASK ('A') | 
-                    SWMASK ('F') | SWMASK ('N') |
-                    SWMASK ('B') | SWMASK ('E') |
-                    SWMASK ('D') );                 /* save debug switches */
+sim_set_deb_switches (sim_switches);
+
 if (sim_deb_switches & SWMASK ('R')) {
     struct tm loc_tm, gmt_tm;
     time_t time_t_now;

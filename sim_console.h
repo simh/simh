@@ -81,6 +81,7 @@ t_stat sim_set_serial (int32 flag, CONST char *cptr);
 t_stat sim_set_noserial (int32 flag, CONST char *cptr);
 t_stat sim_set_logon (int32 flag, CONST char *cptr);
 t_stat sim_set_logoff (int32 flag, CONST char *cptr);
+int32 sim_set_deb_switches (int32 switches);
 t_stat sim_set_debon (int32 flag, CONST char *cptr);
 t_stat sim_set_cons_debug (int32 flg, CONST char *cptr);
 t_stat sim_set_cons_buff (int32 flg, CONST char *cptr);
