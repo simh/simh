@@ -112,6 +112,7 @@ static struct sim_tape_fmt fmts[MTUF_N_FMT] = {
     { "E11",  0,       sizeof (t_mtrlnt) - 1,  sizeof (t_mtrlnt) },
     { "TPC",  UNIT_RO, sizeof (t_tpclnt) - 1,  sizeof (t_tpclnt) },
     { "P7B",  0,       0,                      0 },
+    { "AWS",  0,       0,                      0 },
 /*  { "TPF",  UNIT_RO, 0 }, */
     { NULL,   0,       0 }
     };
@@ -129,13 +130,13 @@ static const uint32 bpi [] = {                          /* tape density table, i
 
 static t_stat sim_tape_ioerr (UNIT *uptr);
 static t_stat sim_tape_wrdata (UNIT *uptr, uint32 dat);
+static t_stat sim_tape_aws_wrdata (UNIT *uptr, uint8 *buf, t_mtrlnt bc);
 static uint32 sim_tape_tpc_map (UNIT *uptr, t_addr *map, uint32 mapsize);
 static t_stat sim_tape_scan_tape (UNIT *uptr);
 static t_addr sim_tape_tpc_fnd (UNIT *uptr, t_addr *map);
 static void sim_tape_data_trace (UNIT *uptr, const uint8 *data, size_t len, const char* txt, int detail, uint32 reason);
 static t_stat tape_erase_fwd (UNIT *uptr, t_mtrlnt gap_size);
 static t_stat tape_erase_rev (UNIT *uptr, t_mtrlnt gap_size);
-
 
 struct tape_context {
     DEVICE              *dptr;              /* Device for unit (access to debug flags) */
@@ -469,6 +470,9 @@ DEVICE *dptr;
 char gbuf[CBUFSIZE];
 t_stat r;
 t_bool auto_format = FALSE;
+t_bool had_debug = (sim_deb != NULL);
+uint32 starting_dctrl = uptr->dctrl;
+int32 saved_switches = sim_switches;
 
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return SCPE_NOATT;
@@ -487,6 +491,15 @@ r = attach_unit (uptr, (CONST char *)cptr);             /* attach unit */
 if (r != SCPE_OK)                                       /* error? */
     return sim_messagef (r, "Can't open tape image: %s\n", cptr);
 
+if ((sim_switches & SWMASK ('D')) && !had_debug) {
+    sim_switches |= SWMASK ('E');
+    sim_switches &= ~(SWMASK ('D') | SWMASK ('R') | SWMASK ('F'));
+    sim_set_debon (0, "STDOUT");
+    sim_switches = saved_switches;
+    }
+if (sim_switches & SWMASK ('D'))
+    uptr->dctrl = MTSE_DBG_STR | MTSE_DBG_DAT;
+
 uptr->tape_ctx = ctx = (struct tape_context *)calloc(1, sizeof(struct tape_context));
 ctx->dptr = dptr;                                       /* save DEVICE pointer */
 ctx->dbit = dbit;                                       /* save debug bit */
@@ -498,12 +511,12 @@ switch (MT_GET_FMT (uptr)) {                            /* case on format */
         objc = sim_tape_tpc_map (uptr, NULL, 0);        /* get # objects */
         if (objc == 0) {                                /* tape empty? */
             sim_tape_detach (uptr);
-            return SCPE_FMT;                            /* yes, complain */
+            r = SCPE_FMT;                               /* yes, complain */
             }
         uptr->filebuf = calloc (objc + 1, sizeof (t_addr));
         if (uptr->filebuf == NULL) {                    /* map allocated? */
             sim_tape_detach (uptr);
-            return SCPE_MEM;                            /* no, complain */
+            r = SCPE_MEM;                               /* no, complain */
             }
         uptr->hwmark = objc + 1;                        /* save map size */
         sim_tape_tpc_map (uptr, (t_addr *) uptr->filebuf, objc);/* fill map */
@@ -513,16 +526,22 @@ switch (MT_GET_FMT (uptr)) {                            /* case on format */
         break;
         }
 
-sim_tape_scan_tape (uptr);
+if (r == SCPE_OK) {
+    sim_tape_scan_tape (uptr);
 
-sim_tape_rewind (uptr);
+    sim_tape_rewind (uptr);
 
 #if defined (SIM_ASYNCH_IO)
-sim_tape_set_async (uptr, completion_delay);
+    sim_tape_set_async (uptr, completion_delay);
 #endif
-uptr->io_flush = _sim_tape_io_flush;
+    uptr->io_flush = _sim_tape_io_flush;
+    }
 
-return SCPE_OK;
+if ((sim_switches & SWMASK ('D')) && !had_debug)
+    sim_set_deboff (0, "");
+if (sim_switches & SWMASK ('D'))
+    uptr->dctrl = starting_dctrl;
+return r;
 }
 
 /* Detach tape unit */
@@ -549,6 +568,7 @@ if (ctx)
 
 sim_tape_clr_async (uptr);
 
+MT_CLR_INMRK (uptr);                                    /* Not within an AWS tapemark */
 r = detach_unit (uptr);                                 /* detach unit */
 if (r != SCPE_OK)
     return r;
@@ -596,8 +616,10 @@ fprintf (st, "    -E          Must Exist (if not specified an attempt to create 
 fprintf (st, "                virtual tape will be attempted).\n");
 fprintf (st, "    -F          Open the indicated tape container in a specific format (default\n");
 fprintf (st, "                is SIMH, alternatives are E11, TPC and P7B)\n");
-fprintf (st, "    -V          Display some detailed information about the record structure\n");
+fprintf (st, "    -V          Display some summary information about the record structure\n");
 fprintf (st, "                contained in the tape structure.\n");
+fprintf (st, "    -D          Causes the internal tape structure information to be displayed\n");
+fprintf (st, "                while the tape image is scanned.\n");
 return SCPE_OK;
 }
 
@@ -607,7 +629,7 @@ struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 
 if (ctx == NULL)
     return;
-if (sim_deb && (ctx->dptr->dctrl & reason))
+if (sim_deb && ((uptr->dctrl | ctx->dptr->dctrl) & reason))
     sim_data_trace(ctx->dptr, uptr, (detail ? data : NULL), "", len, txt, reason);
 }
 
@@ -708,6 +730,8 @@ t_bool   all_eof;
 uint32   f = MT_GET_FMT (uptr);
 t_mtrlnt sbc;
 t_tpclnt tpcbc;
+t_awshdr awshdr;
+size_t   rdcnt;
 t_mtrlnt buffer [256];                                  /* local tape buffer */
 uint32   bufcntr, bufcap;                               /* buffer counter and capacity */
 int32    runaway_counter, sizeof_gap;                   /* bytes remaining before runaway and bytes per gap */
@@ -897,6 +921,35 @@ else switch (f) {                                       /* otherwise the read me
             }
         break;
 
+    case MTUF_F_AWS:
+        MT_CLR_INMRK (uptr);                        /* Not within an AWS tapemark */
+        memset (&awshdr, 0, sizeof (awshdr));
+        rdcnt = sim_fread (&awshdr, sizeof (t_awslnt), 3, uptr->fileref);
+        *bc = awshdr.nxtlen;                        /* save rec lnt */
+
+        if (ferror (uptr->fileref)) {               /* error? */
+            MT_SET_PNU (uptr);                      /* pos not upd */
+            status = sim_tape_ioerr (uptr);
+            break;
+            }
+        if ((feof (uptr->fileref)) ||               /* eof? */
+            (rdcnt < 3)) {
+            MT_SET_PNU (uptr);                      /* pos not upd */
+            status = MTSE_EOM;
+            break;
+            }
+        uptr->pos = uptr->pos + sizeof (t_awshdr);  /* spc over AWS header */
+        if (awshdr.rectyp == AWS_TMK)               /* tape mark? */
+            status = MTSE_TMK;
+        else
+            if (awshdr.rectyp == AWS_REC)           /* tape data record */
+                uptr->pos = uptr->pos + awshdr.nxtlen;  /* spc over record */
+            else {
+                MT_SET_PNU (uptr);                  /* pos not upd */
+                status = MTSE_INVRL;
+                }
+        break;
+
     default:
         status = MTSE_FMT;
     }
@@ -914,7 +967,7 @@ if (ctx == NULL)                                        /* if not properly attac
 
 status = sim_tape_rdlntf (uptr, bc);                    /* read the record length */
 
-sim_debug (MTSE_DBG_STR, ctx->dptr, "rd_lnt: st: %d, lnt: %d, pos: %" T_ADDR_FMT "u\n", status, *bc, uptr->pos);
+sim_debug_unit (MTSE_DBG_STR, uptr, "rd_lntf: st: %d, lnt: %d, pos: %" T_ADDR_FMT "u\n", status, *bc, uptr->pos);
 
 return status;
 }
@@ -965,6 +1018,8 @@ uint32   f = MT_GET_FMT (uptr);
 t_addr   ppos;
 t_mtrlnt sbc;
 t_tpclnt tpcbc;
+t_awshdr awshdr;
+size_t   rdcnt;
 t_mtrlnt buffer [256];                                  /* local tape buffer */
 uint32   bufcntr, bufcap;                               /* buffer counter and capacity */
 int32    runaway_counter, sizeof_gap;                   /* bytes remaining before runaway and bytes per gap */
@@ -1119,6 +1174,59 @@ else switch (f) {                                       /* otherwise the read me
             }
         break;
 
+    case MTUF_F_AWS:
+        sbc = 0;
+        while ((sbc == 0) && (status == MTSE_OK)) {
+            if (sim_tape_bot (uptr)) {                      /* if we start at BOT */
+                status = MTSE_BOT;                          /*   then we're done */
+                break;
+                }
+            (void)sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);/* position */
+            memset (&awshdr, 0, sizeof (awshdr));
+            rdcnt = sim_fread (&awshdr, sizeof (t_awslnt), 3, uptr->fileref);
+            *bc = awshdr.prelen;                            /* save rec lnt */
+
+            if (ferror (uptr->fileref)) {                   /* error? */
+                status = sim_tape_ioerr (uptr);
+                break;
+                }
+            if (feof (uptr->fileref)) {                 /* eof? */
+                status = MTSE_EOM;
+                if ((uptr->pos > sizeof (t_awshdr)) &&
+                    (uptr->pos >= sim_fsize (uptr->fileref)))
+                    uptr->pos -= sizeof (t_awshdr);
+                break;
+                }
+            if ((rdcnt != 3) || 
+                ((awshdr.rectyp != AWS_REC) && 
+                 (awshdr.rectyp != AWS_TMK))) {
+                status = MTSE_INVRL;
+                break;
+                }
+            sbc = *bc;                                  /* extract the record length */
+            if (MT_TST_INMRK (uptr))                    /* already in a tapemark? */
+                awshdr.rectyp = AWS_REC;
+            MT_CLR_INMRK (uptr);                        /* No longer in a tapemark */
+            if ((awshdr.rectyp != AWS_TMK) ||
+                (awshdr.prelen == 0)) {
+                uptr->pos -= sizeof (t_awshdr);         /* position to the start of the record */
+                uptr->pos -= awshdr.prelen;             /* Including the data length */
+
+                if (sim_fseek (uptr->fileref,           /* seek to the start of the data area; if it fails */
+                               uptr->pos + sizeof (t_awshdr),
+                               SEEK_SET)) {
+                    status = sim_tape_ioerr (uptr);     /* then return with I/O error status */
+                    break;
+                    }
+                }
+            if (awshdr.rectyp == AWS_TMK) {             /* tape mark? */
+                status = MTSE_TMK;
+                if (awshdr.prelen != 0)
+                    MT_SET_INMRK (uptr);                /* Flag processing a tapemark header */
+                }
+            }
+        break;
+
     default:
         status = MTSE_FMT;
         }
@@ -1136,7 +1244,7 @@ if (ctx == NULL)                                        /* if not properly attac
 
 status = sim_tape_rdlntr (uptr, bc);                    /* read the record length */
 
-sim_debug (MTSE_DBG_STR, ctx->dptr, "rd_lnt: st: %d, lnt: %d, pos: %" T_ADDR_FMT "u\n", status, *bc, uptr->pos);
+sim_debug_unit (MTSE_DBG_STR, uptr, "rd_lntr: st: %d, lnt: %d, pos: %" T_ADDR_FMT "u\n", status, *bc, uptr->pos);
 
 return status;
 }
@@ -1194,7 +1302,7 @@ for ( ; i < rbc; i++)                                   /* fill with 0's */
     buf[i] = 0;
 if (f == MTUF_F_P7B)                                    /* p7b? strip SOR */
     buf[0] = buf[0] & P7B_DPAR;
-sim_tape_data_trace(uptr, buf, rbc, "Record Read", ctx->dptr->dctrl & MTSE_DBG_DAT, MTSE_DBG_STR);
+sim_tape_data_trace(uptr, buf, rbc, "Record Read", (uptr->dctrl | ctx->dptr->dctrl) & MTSE_DBG_DAT, MTSE_DBG_STR);
 return (MTR_F (tbc)? MTSE_RECE: MTSE_OK);
 }
 
@@ -1254,7 +1362,7 @@ for ( ; i < rbc; i++)                                   /* fill with 0's */
     buf[i] = 0;
 if (f == MTUF_F_P7B)                                    /* p7b? strip SOR */
     buf[0] = buf[0] & P7B_DPAR;
-sim_tape_data_trace(uptr, buf, rbc, "Record Read Reverse", ctx->dptr->dctrl & MTSE_DBG_DAT, MTSE_DBG_STR);
+sim_tape_data_trace(uptr, buf, rbc, "Record Read Reverse", (uptr->dctrl | ctx->dptr->dctrl) & MTSE_DBG_DAT, MTSE_DBG_STR);
 return (MTR_F (tbc)? MTSE_RECE: MTSE_OK);
 }
 
@@ -1289,12 +1397,13 @@ t_stat sim_tape_wrrecf (UNIT *uptr, uint8 *buf, t_mtrlnt bc)
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 uint32 f = MT_GET_FMT (uptr);
 t_mtrlnt sbc;
+t_stat status = MTSE_OK;
 
 if (ctx == NULL)                                        /* if not properly attached? */
     return sim_messagef (SCPE_IERR, "Bad Attach\n");    /*   that's a problem */
 sim_debug_unit (ctx->dbit, uptr, "sim_tape_wrrecf(unit=%d, buf=%p, bc=%d)\n", (int)(uptr-ctx->dptr->units), buf, bc);
 
-sim_tape_data_trace(uptr, buf, bc, "Record Write", ctx->dptr->dctrl & MTSE_DBG_DAT, MTSE_DBG_STR);
+sim_tape_data_trace(uptr, buf, bc, "Record Write", (uptr->dctrl | ctx->dptr->dctrl) & MTSE_DBG_DAT, MTSE_DBG_STR);
 MT_CLR_PNU (uptr);
 sbc = MTR_L (bc);
 if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
@@ -1331,8 +1440,13 @@ switch (f) {                                            /* case on format */
             }
         uptr->pos = uptr->pos + sbc;                    /* move tape */
         break;
+    case MTUF_F_AWS:                                    /* AWS */
+        status = sim_tape_aws_wrdata (uptr, buf, bc);
+        if (status != MTSE_OK)
+            return status;
+        break;
         }
-sim_tape_data_trace(uptr, buf, sbc, "Record Written", ctx->dptr->dctrl & MTSE_DBG_DAT, MTSE_DBG_STR);
+sim_tape_data_trace(uptr, buf, sbc, "Record Written", (uptr->dctrl | ctx->dptr->dctrl) & MTSE_DBG_DAT, MTSE_DBG_STR);
 return MTSE_OK;
 }
 
@@ -1343,6 +1457,48 @@ AIO_CALLSETUP
     r = sim_tape_wrrecf (uptr, buf, bc);
 AIO_CALL(TOP_WREC, buf, 0, NULL, 0, bc, 0, 0, NULL, callback);
 return r;
+}
+
+/* Write AWS metadata (and possibly data) forward (internal routine) */
+
+static t_stat sim_tape_aws_wrdata (UNIT *uptr, uint8 *buf, t_mtrlnt bc)
+{
+t_awshdr awshdr;
+size_t   rdcnt;
+t_bool   replacing_record;
+
+memset (&awshdr, 0, sizeof (t_awshdr));
+if (sim_fseek (uptr->fileref, uptr->pos, SEEK_SET)) /* set pos */
+    return MTSE_IOERR;
+rdcnt = sim_fread (&awshdr, sizeof (t_awslnt), 3, uptr->fileref);
+if (ferror (uptr->fileref)) {               /* error? */
+    MT_SET_PNU (uptr);                      /* pos not upd */
+    return sim_tape_ioerr (uptr);
+    }
+if ((!sim_tape_bot (uptr)) && 
+    (((feof (uptr->fileref)) && (rdcnt < 3)) || /* eof? */
+     ((awshdr.rectyp != AWS_REC) && (awshdr.rectyp != AWS_TMK)))) {
+    MT_SET_PNU (uptr);                      /* pos not upd */
+    return MTSE_INVRL;
+    }
+if (sim_fseek (uptr->fileref, uptr->pos, SEEK_SET)) /* set pos */
+    return MTSE_IOERR;
+replacing_record = (awshdr.nxtlen == (t_awslnt)bc) && (awshdr.rectyp == (bc ? AWS_REC : AWS_TMK));
+awshdr.nxtlen = (t_awslnt)bc;
+awshdr.rectyp = (bc) ? AWS_REC : AWS_TMK;
+sim_fwrite (&awshdr, sizeof (t_awslnt), 3, uptr->fileref);
+if (bc)
+    sim_fwrite (buf, sizeof (uint8), bc, uptr->fileref);
+uptr->pos += sizeof (awshdr) + bc;
+if ((!replacing_record) | (bc == 0)) {
+    awshdr.prelen = bc;
+    awshdr.nxtlen = 0;
+    awshdr.rectyp = AWS_TMK;
+    sim_fwrite (&awshdr, sizeof (t_awslnt), 3, uptr->fileref);
+    if (!replacing_record)
+        sim_set_fsize (uptr->fileref, uptr->pos + sizeof (awshdr));
+    }
+return MTSE_OK;
 }
 
 /* Write metadata forward (internal routine) */
@@ -1364,7 +1520,7 @@ if (ferror (uptr->fileref)) {                           /* error? */
     MT_SET_PNU (uptr);
     return sim_tape_ioerr (uptr);
     }
-sim_debug (MTSE_DBG_STR, ctx->dptr, "wr_lnt: lnt: %d, pos: %" T_ADDR_FMT "u\n", dat, uptr->pos);
+sim_debug_unit (MTSE_DBG_STR, uptr, "wr_lnt: lnt: %d, pos: %" T_ADDR_FMT "u\n", dat, uptr->pos);
 uptr->pos = uptr->pos + sizeof (t_mtrlnt);              /* move tape */
 return MTSE_OK;
 }
@@ -1382,6 +1538,8 @@ if (MT_GET_FMT (uptr) == MTUF_F_P7B) {                  /* P7B? */
     uint8 buf = P7B_EOF;                                /* eof mark */
     return sim_tape_wrrecf (uptr, &buf, 1);             /* write char */
     }
+if (MT_GET_FMT (uptr) == MTUF_F_AWS)                    /* AWS? */
+    return sim_tape_aws_wrdata (uptr, NULL, 0);
 return sim_tape_wrdata (uptr, MTR_TMK);
 }
 
@@ -1404,12 +1562,19 @@ struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 if (ctx == NULL)                                        /* if not properly attached? */
     return sim_messagef (SCPE_IERR, "Bad Attach\n");    /*   that's a problem */
 sim_debug_unit (ctx->dbit, uptr, "sim_tape_wreom(unit=%d)\n", (int)(uptr-ctx->dptr->units));
+if (sim_tape_wrp (uptr))                                /* write prot? */
+    return MTSE_WRP;
 if (MT_GET_FMT (uptr) == MTUF_F_P7B)                    /* cant do P7B */
     return MTSE_FMT;
-
-result = sim_tape_wrdata (uptr, MTR_EOM);               /* write the EOM marker */
-
-uptr->pos = uptr->pos - sizeof (t_mtrlnt);              /* restore original tape position */
+if (MT_GET_FMT (uptr) == MTUF_F_AWS) {
+    sim_tape_aws_wrdata (uptr, NULL, 0);
+    sim_set_fsize (uptr->fileref, uptr->pos);
+    result = MTSE_OK;
+    }
+else {
+    result = sim_tape_wrdata (uptr, MTR_EOM);           /* write the EOM marker */
+    uptr->pos = uptr->pos - sizeof (t_mtrlnt);              /* restore original tape position */
+    }
 MT_SET_PNU (uptr);                                      /* indicate that position was not updated */
 
 return result;
@@ -1434,9 +1599,7 @@ t_stat r;
 if (ctx == NULL)                                        /* if not properly attached? */
     return sim_messagef (SCPE_IERR, "Bad Attach\n");    /*   that's a problem */
 sim_debug_unit (ctx->dbit, uptr, "sim_tape_wreomrw(unit=%d)\n", (int)(uptr-ctx->dptr->units));
-if (MT_GET_FMT (uptr) == MTUF_F_P7B)                    /* cant do P7B */
-    return MTSE_FMT;
-r = sim_tape_wrdata (uptr, MTR_EOM);
+r = sim_tape_wreom (uptr);
 if (r == MTSE_OK)
     r = sim_tape_rewind (uptr);
 return r;
@@ -2464,7 +2627,7 @@ return (uptr->capac && (uptr->pos >= uptr->capac))? TRUE: FALSE;
 
 t_bool sim_tape_wrp (UNIT *uptr)
 {
-return ((uptr->flags & MTUF_WRP) || (MT_GET_FMT (uptr) == MTUF_F_TPC))? TRUE: FALSE;
+return ((uptr->flags & MTUF_WRP) || (uptr->flags & UNIT_RO) || (MT_GET_FMT (uptr) == MTUF_F_TPC))? TRUE: FALSE;
 }
 
 /* Process I/O error */
@@ -2529,7 +2692,7 @@ if ((uptr == NULL) || (uptr->fileref == NULL))
 countmap = (uint32 *)calloc (65536, sizeof(*countmap));
 recbuf = (uint8 *)malloc (65536);
 tape_size = (t_addr)sim_fsize (uptr->fileref);
-sim_debug (MTSE_DBG_STR, dptr, "tpc_map: tape_size: %" T_ADDR_FMT "u\n", tape_size);
+sim_debug_unit (MTSE_DBG_STR, uptr, "tpc_map: tape_size: %" T_ADDR_FMT "u\n", tape_size);
 for (objc = 0, sizec = 0, tpos = 0;; ) {
     (void)sim_fseek (uptr->fileref, tpos, SEEK_SET);
     i = sim_fread (&bc, sizeof (t_tpclnt), 1, uptr->fileref);
@@ -2541,14 +2704,14 @@ for (objc = 0, sizec = 0, tpos = 0;; ) {
     if (map && (objc < mapsize))
         map[objc] = tpos;
     if (bc) {
-        sim_debug (MTSE_DBG_STR, dptr, "tpc_map: %d byte count at pos: %" T_ADDR_FMT "u\n", bc, tpos);
+        sim_debug_unit (MTSE_DBG_STR, uptr, "tpc_map: %d byte count at pos: %" T_ADDR_FMT "u\n", bc, tpos);
         if (map && sim_deb && (dptr->dctrl & MTSE_DBG_STR)) {
             (void)sim_fread (recbuf, 1, bc, uptr->fileref);
-            sim_data_trace(dptr, uptr, ((dptr->dctrl & MTSE_DBG_DAT) ? recbuf : NULL), "", bc, "Data Record", MTSE_DBG_STR);
+            sim_data_trace(dptr, uptr, (((uptr->dctrl | dptr->dctrl) & MTSE_DBG_DAT) ? recbuf : NULL), "", bc, "Data Record", MTSE_DBG_STR);
             }
         }
     else
-        sim_debug (MTSE_DBG_STR, dptr, "tpc_map: tape mark at pos: %" T_ADDR_FMT "u\n", tpos);
+        sim_debug_unit (MTSE_DBG_STR, uptr, "tpc_map: tape mark at pos: %" T_ADDR_FMT "u\n", tpos);
     objc++;
     tpos = tpos + ((bc + 1) & ~1) + sizeof (t_tpclnt);
     if ((bc == 0) && (last_bc == 0)) {  /* double tape mark? */
@@ -2557,13 +2720,13 @@ for (objc = 0, sizec = 0, tpos = 0;; ) {
         }
     last_bc = bc;
     }
-sim_debug (MTSE_DBG_STR, dptr, "tpc_map: objc: %u, different record sizes: %u\n", objc, sizec);
+sim_debug_unit (MTSE_DBG_STR, uptr, "tpc_map: objc: %u, different record sizes: %u\n", objc, sizec);
 for (i=0; i<65535; i++) {
     if (countmap[i]) {
         if (i == 0)
-            sim_debug (MTSE_DBG_STR, dptr, "tpc_map: summary - %u tape marks\n", countmap[i]);
+            sim_debug_unit (MTSE_DBG_STR, uptr, "tpc_map: summary - %u tape marks\n", countmap[i]);
         else
-            sim_debug (MTSE_DBG_STR, dptr, "tpc_map: summary - %u %d byte record%s\n", countmap[i], (int)i, (countmap[i] > 1) ? "s" : "");
+            sim_debug_unit (MTSE_DBG_STR, uptr, "tpc_map: summary - %u %d byte record%s\n", countmap[i], (int)i, (countmap[i] > 1) ? "s" : "");
         }
     }
 if (((last_bc != TPC_EOM) && 
@@ -2573,24 +2736,24 @@ if (((last_bc != TPC_EOM) &&
     ((objc == countmap[0]) && 
      (countmap[0] != 2))) {     /* Unreasonable format? */
     if (last_bc != TPC_EOM)
-        sim_debug (MTSE_DBG_STR, dptr, "tpc_map: ERROR unexpected EOT byte count: %d\n", last_bc);
+        sim_debug_unit (MTSE_DBG_STR, uptr, "tpc_map: ERROR unexpected EOT byte count: %d\n", last_bc);
     if (tpos > tape_size)
-        sim_debug (MTSE_DBG_STR, dptr, "tpc_map: ERROR next record position %" T_ADDR_FMT "u beyond EOT: %" T_ADDR_FMT "u\n", tpos, tape_size);
+        sim_debug_unit (MTSE_DBG_STR, uptr, "tpc_map: ERROR next record position %" T_ADDR_FMT "u beyond EOT: %" T_ADDR_FMT "u\n", tpos, tape_size);
     if (objc == countmap[0])
-        sim_debug (MTSE_DBG_STR, dptr, "tpc_map: ERROR tape cnly contains tape marks\n");
+        sim_debug_unit (MTSE_DBG_STR, uptr, "tpc_map: ERROR tape cnly contains tape marks\n");
     free (countmap);
     free (recbuf);
     return 0;
     }
 
 if ((last_bc != TPC_EOM) && (tpos > tape_size)) {
-    sim_debug (MTSE_DBG_STR, dptr, "tpc_map: WARNING unexpected EOT byte count: %d, double tape mark before %" T_ADDR_FMT "u provides logical EOT\n", last_bc, leot);
+    sim_debug_unit (MTSE_DBG_STR, uptr, "tpc_map: WARNING unexpected EOT byte count: %d, double tape mark before %" T_ADDR_FMT "u provides logical EOT\n", last_bc, leot);
     objc = had_double_tape_mark;
     tpos = leot;
     }
 if (map)
     map[objc] = tpos;
-sim_debug (MTSE_DBG_STR, dptr, "tpc_map: OK objc: %d\n", objc);
+sim_debug_unit (MTSE_DBG_STR, uptr, "tpc_map: OK objc: %d\n", objc);
 free (countmap);
 free (recbuf);
 return objc;
@@ -2635,6 +2798,7 @@ uint8 *buf = NULL;
 uint32 *rec_sizes = NULL;
 t_mtrlnt bc;
 t_mtrlnt max = MTR_MAXLEN;
+t_bool prior_was_tapemark = FALSE;
 
 if (!(uptr->flags & UNIT_ATT))
     return SCPE_UNATT;
@@ -2657,10 +2821,15 @@ while (r == SCPE_OK) {
             ++unique_record_sizes;
         ++rec_sizes[bc];
         r = SCPE_OK;
+        prior_was_tapemark = FALSE;
         break;
     case MTSE_TMK:                                  /* tape mark */
         ++tapemark_total;
-        r = SCPE_OK;
+        if (prior_was_tapemark)
+            r = MTSE_LEOT;
+        else
+            r = SCPE_OK;
+        prior_was_tapemark = TRUE;
         break;
     case MTSE_INVRL:                                /* invalid rec lnt */
     case MTSE_FMT:                                  /* invalid format */
@@ -2675,7 +2844,7 @@ while (r == SCPE_OK) {
         break;
         }
     }
-if ((r != MTSE_EOM) || (sim_switches & SWMASK ('V')) || 
+if (((r != MTSE_EOM) && (r != MTSE_LEOT)) || (sim_switches & SWMASK ('V')) || 
     ((uint32)(sim_fsize_ex (uptr->fileref) - (t_offset)uptr->pos) > fmts[MT_GET_FMT (uptr)].eom_remnant) ||
     (unique_record_sizes > 2 * tapemark_seen)) {
     uint32 remaining_data = (uint32)(sim_fsize_ex (uptr->fileref) - (t_offset)uptr->pos);
@@ -2694,7 +2863,7 @@ if ((r != MTSE_EOM) || (sim_switches & SWMASK ('V')) ||
                 sim_printf ("%8u %u byte records\n", rec_sizes[bc], (uint32)bc);
             }
         }
-    if (r != MTSE_EOM)
+    if ((r != MTSE_EOM) && (r != MTSE_LEOT))
         sim_printf ("Read Tape Record Returned Unexpected Status: %s\n", sim_tape_error_text (r));
     if (remaining_data > fmts[MT_GET_FMT (uptr)].eom_remnant)
         sim_printf ("%u bytes of unexamined data remain in the tape image file\n", remaining_data);
@@ -2728,6 +2897,7 @@ while (r == SCPE_OK) {
     default:
         break;
     case MTSE_EOM:                                  /* end of medium */
+        r = SCPE_OK;
         break;
         }
     }
@@ -2905,19 +3075,28 @@ static t_bool p7b_parity_inited = FALSE;
 static uint8 p7b_odd_parity[64];
 static uint8 p7b_even_parity[64];
 
-static t_stat create_tape_files (UNIT *uptr, const char *filename, int files, int records)
+static t_stat create_tape_files (UNIT *uptr, const char *filename, int files, int records, int max_size)
 {
 FILE *fSIMH = NULL;
 FILE *fE11 = NULL;
 FILE *fTPC = NULL;
 FILE *fP7B = NULL;
+FILE *fAWS = NULL;
 int i, j, k;
 t_tpclnt tpclnt;
 t_mtrlnt mtrlnt;
+t_awslnt awslnt;
+t_awslnt awslnt_last = 0;
+t_awslnt awsrec_typ = AWS_REC;
 char name[256];
 t_stat stat = SCPE_OPENERR;
 uint8 *buf = NULL;
+t_stat aws_stat;
+int32 saved_switches = sim_switches;
 
+srand (0);                      /* All devices use the same random sequence for file data */
+if (max_size == 0)
+    max_size = 65535;
 if (!p7b_parity_inited) {
     for (i=0; i < 64; i++) {
         int bit_count = 0;
@@ -2950,22 +3129,42 @@ sprintf (name, "%s.p7b", filename);
 fP7B = fopen (name, "wb");
 if (fP7B  == NULL)
     goto Done_Files;
+sprintf (name, "%s.aws", filename);
+fAWS = fopen (name, "wb");
+if (fAWS  == NULL)
+    goto Done_Files;
+sprintf (name, "aws %s.aws.tape", filename);
+(void)remove (name);
+sim_switches = SWMASK ('F') | (sim_switches & SWMASK ('D')) | SWMASK ('N');
+if (sim_switches & SWMASK ('D'))
+    uptr->dctrl = MTSE_DBG_STR | MTSE_DBG_DAT;
+aws_stat = sim_tape_attach_ex (uptr, name, (saved_switches & SWMASK ('D')) ? MTSE_DBG_STR | MTSE_DBG_DAT: 0, 0);
+sim_switches = saved_switches;
 stat = SCPE_OK;
 for (i=0; i<files; i++) {
-    int rec_size = 1 + (rand () % 65535);
+    int rec_size = 1 + (rand () % max_size);
 
-    mtrlnt = tpclnt = rec_size;
+    awslnt = mtrlnt = tpclnt = rec_size;
     for (j=0; j<records; j++) {
+        awsrec_typ = AWS_REC;
         if (sim_switches & SWMASK ('V'))
             sim_printf ("Writing %d byte record\n", rec_size);
         for (k=0; k<rec_size; k++)
             buf[k] = rand () & 0xFF;
-        (void)sim_fwrite (&mtrlnt, sizeof (mtrlnt), 1, fSIMH);
-        (void)sim_fwrite (&mtrlnt, sizeof (mtrlnt), 1, fE11);
-        (void)sim_fwrite (&tpclnt, sizeof (tpclnt), 1, fTPC);
+        (void)sim_fwrite (&mtrlnt,       sizeof (mtrlnt),       1, fSIMH);
+        (void)sim_fwrite (&mtrlnt,       sizeof (mtrlnt),       1, fE11);
+        (void)sim_fwrite (&tpclnt,       sizeof (tpclnt),       1, fTPC);
+        (void)sim_fwrite (&awslnt,       sizeof (awslnt),       1, fAWS);
+        (void)sim_fwrite (&awslnt_last,  sizeof (awslnt_last),  1, fAWS);
+        (void)sim_fwrite (&awsrec_typ,   sizeof (awsrec_typ),   1, fAWS);
+        awslnt_last = awslnt;
         (void)sim_fwrite (buf, 1, rec_size, fSIMH);
         (void)sim_fwrite (buf, 1, rec_size, fE11);
         (void)sim_fwrite (buf, 1, rec_size, fTPC);
+        (void)sim_fwrite (buf, 1, rec_size, fAWS);
+        stat = sim_tape_wrrecf (uptr, buf, rec_size);
+        if (MTSE_OK != stat)
+            goto Done_Files;
         if (rec_size & 1) {
             (void)sim_fwrite (&tpclnt, 1, 1, fSIMH);
             (void)sim_fwrite (&tpclnt, 1, 1, fTPC);
@@ -2977,17 +3176,31 @@ for (i=0; i<files; i++) {
         buf[0] |= P7B_SOR;
         (void)sim_fwrite (buf, 1, rec_size, fP7B);
         }
-    mtrlnt = tpclnt = 0;
+    awslnt_last = awslnt;
+    mtrlnt = tpclnt = awslnt = 0;
+    awsrec_typ = AWS_TMK;
     (void)sim_fwrite (&mtrlnt, sizeof (mtrlnt), 1, fSIMH);
     (void)sim_fwrite (&mtrlnt, sizeof (mtrlnt), 1, fE11);
     (void)sim_fwrite (&tpclnt, sizeof (tpclnt), 1, fTPC);
     buf[0] = P7B_SOR | P7B_EOF;
     (void)sim_fwrite (buf, 1, 1, fP7B);
+    (void)sim_fwrite (&awslnt,       sizeof (awslnt),       1, fAWS);
+    (void)sim_fwrite (&awslnt_last,  sizeof (awslnt_last),  1, fAWS);
+    (void)sim_fwrite (&awsrec_typ,   sizeof (awsrec_typ),   1, fAWS);
+    awslnt_last = 0;
+    stat = sim_tape_wrtmk (uptr);
+    if (MTSE_OK != stat)
+        goto Done_Files;
     }
 mtrlnt = tpclnt = 0;
 (void)sim_fwrite (&mtrlnt, sizeof (mtrlnt), 1, fSIMH);
 (void)sim_fwrite (&mtrlnt, sizeof (mtrlnt), 1, fE11);
 (void)sim_fwrite (&tpclnt, sizeof (tpclnt), 1, fTPC);
+awslnt_last = awslnt;
+awsrec_typ = AWS_TMK;
+(void)sim_fwrite (&awslnt,       sizeof (awslnt),       1, fAWS);
+(void)sim_fwrite (&awslnt_last,  sizeof (awslnt_last),  1, fAWS);
+(void)sim_fwrite (&awsrec_typ,   sizeof (awsrec_typ),   1, fAWS);
 mtrlnt = 0xffffffff;
 tpclnt = 0xffff;
 (void)sim_fwrite (&mtrlnt, sizeof (mtrlnt), 1, fSIMH);
@@ -3003,7 +3216,20 @@ if (fTPC)
     fclose (fTPC);
 if (fP7B)
     fclose (fP7B);
+if (fAWS)
+    fclose (fAWS);
 free (buf);
+sim_tape_detach (uptr);
+if (stat == SCPE_OK) {
+    char name1[CBUFSIZE], name2[CBUFSIZE];
+
+    sprintf (name1, "\"%s.aws\"", filename);
+    sprintf (name2, "\"%s.aws.tape\"", filename);
+    sim_switches = SWMASK ('F');
+    if (sim_cmp_string (name1, name2))
+        stat = 1;
+    }
+sim_switches = saved_switches;
 return stat;
 }
 
@@ -3035,6 +3261,8 @@ sprintf (name, "%s.tpc", filename);
 (void)remove (name);
 sprintf (name, "%s.p7b", filename);
 (void)remove (name);
+sprintf (name, "%s.aws", filename);
+(void)remove (name);
 return SCPE_OK;
 }
 
@@ -3042,21 +3270,28 @@ return SCPE_OK;
 
 t_stat sim_tape_test (DEVICE *dptr)
 {
+int32 saved_switches = sim_switches;
 SIM_TEST_INIT;
 
 sim_printf ("\nTesting %s device sim_tape APIs\n", sim_uname(dptr->units));
 
 SIM_TEST(remove_tape_files (dptr->units, "TapeTestFile1"));
 
-//SIM_TEST(create_tape_files (dptr->units, "TapeTestFile1", 10, 500));
-SIM_TEST(create_tape_files (dptr->units, "TapeTestFile1", 7, 100));
+SIM_TEST(create_tape_files (dptr->units, "TapeTestFile1", 2, 4, 4096));
 
+sim_switches = saved_switches;
+SIM_TEST(process_tape_file (dptr->units, "TapeTestFile1", "aws"));
+
+sim_switches = saved_switches;
 SIM_TEST(process_tape_file (dptr->units, "TapeTestFile1", "p7b"));
 
+sim_switches = saved_switches;
 SIM_TEST(process_tape_file (dptr->units, "TapeTestFile1", "tpc"));
 
+sim_switches = saved_switches;
 SIM_TEST(process_tape_file (dptr->units, "TapeTestFile1", "e11"));
 
+sim_switches = saved_switches;
 SIM_TEST(process_tape_file (dptr->units, "TapeTestFile1", "simh"));
 
 SIM_TEST(remove_tape_files (dptr->units, "TapeTestFile1"));

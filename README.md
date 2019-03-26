@@ -213,6 +213,9 @@ Host platforms which have libSDL available can leverage this functionality.
     RAW Disk Access (including CDROM)
     Virtual Disk Container files, including differencing disks
 
+#### Tape Extensions
+    AWS format tape support
+
 #### Embedded ROM support
     Simulators which have boot commands which load constant files as part of 
     booting have those files imbedded into the simulator executable.  The 

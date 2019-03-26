@@ -63,6 +63,10 @@ typedef uint32          t_mtrlnt;                       /* magtape rec lnt */
 
 typedef uint16          t_tpclnt;                       /* magtape rec lnt */
 
+#define TPC_TMK         0x0000                          /* tape mark */
+#define TPC_EOM         0xFFFF                          /* end of medium */
+
+
 /* P7B tape format */
 
 #define P7B_SOR         0x80                            /* start of record */
@@ -71,8 +75,15 @@ typedef uint16          t_tpclnt;                       /* magtape rec lnt */
 #define P7B_DPAR        (P7B_PAR|P7B_DATA)              /* data and parity */
 #define P7B_EOF         0x0F                            /* eof character */
 
-#define TPC_TMK         0x0000                          /* tape mark */
-#define TPC_EOM         0xFFFF                          /* end of medium */
+/* AWS tape format */
+typedef uint16          t_awslnt;                       /* magtape rec lnt */
+typedef struct {
+    t_awslnt    nxtlen;
+    t_awslnt    prelen;
+    t_awslnt    rectyp;
+#define AWS_TMK         0x0040
+#define AWS_REC         0x00A0
+    } t_awshdr;
 
 /* Unit flags */
 
@@ -86,7 +97,7 @@ typedef uint16          t_tpclnt;                       /* magtape rec lnt */
 #define MTUF_F_E11       1                              /* E11 format */
 #define MTUF_F_TPC       2                              /* TPC format */
 #define MTUF_F_P7B       3                              /* P7B format */
-#define MUTF_F_TDF       4                              /* TDF format */
+#define MTUF_F_AWS       4                              /* AWS format */
 #define MTUF_V_UF       (MTUF_V_FMT + MTUF_W_FMT)
 #define MTUF_PNU        (1u << MTUF_V_PNU)
 #define MTUF_WLK        (1u << MTUF_V_WLK)
@@ -97,11 +108,14 @@ typedef uint16          t_tpclnt;                       /* magtape rec lnt */
 #define MT_F_E11        (MTUF_F_E11 << MTUF_V_FMT)
 #define MT_F_TPC        (MTUF_F_TPC << MTUF_V_FMT)
 #define MT_F_P7B        (MTUF_F_P7B << MTUF_V_FMT)
-#define MT_F_TDF        (MTUF_F_TDF << MTUF_V_FMT)
+#define MT_F_AWS        (MTUF_F_AWS << MTUF_V_FMT)
 
 #define MT_SET_PNU(u)   (u)->flags = (u)->flags | MTUF_PNU
 #define MT_CLR_PNU(u)   (u)->flags = (u)->flags & ~MTUF_PNU
 #define MT_TST_PNU(u)   ((u)->flags & MTUF_PNU)
+#define MT_SET_INMRK(u) (u)->dynflags = (u)->dynflags | UNIT_TAPE_MRK
+#define MT_CLR_INMRK(u) (u)->dynflags = (u)->dynflags & ~UNIT_TAPE_MRK
+#define MT_TST_INMRK(u) ((u)->dynflags & UNIT_TAPE_MRK)
 #define MT_GET_FMT(u)   (((u)->flags >> MTUF_V_FMT) & MTUF_M_FMT)
 
 /* sim_tape_position Position Flags */

@@ -650,7 +650,8 @@ struct UNIT {
 #define UNIT_NO_FIO     0000004         /* fileref is NOT a FILE * */
 #define UNIT_DISK_CHK   0000010         /* disk data debug checking (sim_disk) */
 #define UNIT_TMR_UNIT   0000020         /* Unit registered as a calibrated timer */
-#define UNIT_V_DF_TAPE  6               /* Bit offset for Tape Density reservation */
+#define UNIT_TAPE_MRK   0000040         /* Tape Unit AWS Tapemark */
+#define UNIT_V_DF_TAPE  7               /* Bit offset for Tape Density reservation */
 #define UNIT_S_DF_TAPE  3               /* Bits Reserved for Tape Density */
 
 struct BITFIELD {
