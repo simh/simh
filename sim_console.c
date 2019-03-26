@@ -2271,7 +2271,8 @@ sim_deb_switches = sim_switches &
                    (SWMASK ('R') | SWMASK ('P') | 
                     SWMASK ('T') | SWMASK ('A') | 
                     SWMASK ('F') | SWMASK ('N') |
-                    SWMASK ('B'));                  /* save debug switches */
+                    SWMASK ('B') | SWMASK ('E') |
+                    SWMASK ('D') );                 /* save debug switches */
 if (sim_deb_switches & SWMASK ('R')) {
     struct tm loc_tm, gmt_tm;
     time_t time_t_now;
