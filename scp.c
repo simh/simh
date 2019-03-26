@@ -14559,6 +14559,11 @@ DEVICE *dptr;
 int32 saved_switches = sim_switches & ~SWMASK ('T');
 t_stat stat = SCPE_OK;
 
+if (sim_switches & SWMASK ('D')) {
+    sim_switches &= ~(SWMASK ('D') | SWMASK ('R') | SWMASK ('F') | SWMASK ('T'));
+    sim_set_debon (0, "STDOUT");
+    sim_switches = saved_switches;
+    }
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
     t_stat tstat = SCPE_OK;
 
