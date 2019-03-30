@@ -824,7 +824,7 @@ else switch (f) {                                       /* otherwise the read me
                 break;
                 }
 
-            uptr->pos = uptr->pos + sizeof (t_mtrlnt);  /* space over the marker */
+            uptr->pos += sizeof (t_mtrlnt);             /* space over the marker */
 
             if (*bc == MTR_TMK) {                       /* if the value is a tape mark */
                 status = MTSE_TMK;                      /*   then quit with tape mark status */
@@ -865,6 +865,34 @@ else switch (f) {                                       /* otherwise the read me
         if (runaway_counter <= 0)                       /* if a tape runaway occurred */
             status = MTSE_RUNAWAY;                      /*   then report it */
 
+        if (status == MTSE_OK) {                        /* Validate the reverse record size */
+            t_addr saved_pos = (t_addr)sim_ftell(uptr->fileref);
+            t_mtrlnt rev_lnt;
+
+            if (sim_fseek (uptr->fileref, uptr->pos - sizeof (t_mtrlnt), SEEK_SET)){  /*   then seek to the end of record size; if it fails */
+                status = sim_tape_ioerr (uptr);         /*     then quit with I/O error status */
+                break;
+                }
+
+            sim_fread (&rev_lnt,                        /* get the reverse length */
+                       sizeof (t_mtrlnt),
+                       1,
+                       uptr->fileref);
+
+            if (ferror (uptr->fileref)) {               /* if a file I/O error occurred */
+                status = sim_tape_ioerr (uptr);         /* report the error and quit */
+                break;
+                }
+            if (sim_fseek (uptr->fileref, saved_pos, SEEK_SET)){  /*   then seek back to the beginning of the data; if it fails */
+                status = sim_tape_ioerr (uptr);         /*     then quit with I/O error status */
+                break;
+                }
+            if (rev_lnt != *bc) {           /* size mismatch? */
+                status = MTSE_INVRL;
+                uptr->pos -= (sizeof (t_mtrlnt) + *bc + sizeof (t_mtrlnt));
+                MT_SET_PNU (uptr);                      /* pos not upd */
+                }
+            }
         break;                                          /* otherwise the operation succeeded */
 
     case MTUF_F_TPC:
@@ -925,7 +953,7 @@ else switch (f) {                                       /* otherwise the read me
         MT_CLR_INMRK (uptr);                        /* Not within an AWS tapemark */
         memset (&awshdr, 0, sizeof (awshdr));
         rdcnt = sim_fread (&awshdr, sizeof (t_awslnt), 3, uptr->fileref);
-        *bc = awshdr.nxtlen;                        /* save rec lnt */
+        *bc = 0;
 
         if (ferror (uptr->fileref)) {               /* error? */
             MT_SET_PNU (uptr);                      /* pos not upd */
@@ -938,15 +966,34 @@ else switch (f) {                                       /* otherwise the read me
             status = MTSE_EOM;
             break;
             }
-        uptr->pos = uptr->pos + sizeof (t_awshdr);  /* spc over AWS header */
-        if (awshdr.rectyp == AWS_TMK)               /* tape mark? */
+        uptr->pos += sizeof (t_awshdr);             /* spc over AWS header */
+        if (awshdr.rectyp == AWS_TMK) {             /* tape mark? */
             status = MTSE_TMK;
+            MT_SET_INMRK (uptr);                    /* within an AWS tapemark */
+            }
         else
-            if (awshdr.rectyp == AWS_REC)           /* tape data record */
-                uptr->pos = uptr->pos + awshdr.nxtlen;  /* spc over record */
-            else {
+            if (awshdr.rectyp != AWS_REC) {         /* Unknown record type */
                 MT_SET_PNU (uptr);                  /* pos not upd */
                 status = MTSE_INVRL;
+                }
+            else {                                  /* tape data record */
+                t_addr saved_pos;
+
+                *bc = awshdr.nxtlen;                /* save rec lnt */
+                uptr->pos += awshdr.nxtlen;         /* spc over record */
+                memset (&awshdr, 0, sizeof (t_awslnt));
+                saved_pos = (t_addr)sim_ftell (uptr->fileref);
+                (void)sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); /* for read */
+                (void)sim_fread (&awshdr, sizeof (t_awslnt), 3, uptr->fileref);
+                if (awshdr.rectyp == AWS_TMK)
+                    MT_SET_INMRK (uptr);            /* within an AWS tapemark */
+                if (awshdr.prelen != *bc) {
+                    status = MTSE_INVRL;
+                    uptr->pos = saved_pos - sizeof (t_awslnt);
+                    MT_CLR_INMRK (uptr);            /* not within an AWS tapemark */
+                    }
+                else
+                    (void)sim_fseek (uptr->fileref, saved_pos, SEEK_SET); /* Move back to the data */
                 }
         break;
 
@@ -1175,7 +1222,7 @@ else switch (f) {                                       /* otherwise the read me
         break;
 
     case MTUF_F_AWS:
-        sbc = 0;
+        *bc = sbc = 0;
         while ((sbc == 0) && (status == MTSE_OK)) {
             if (sim_tape_bot (uptr)) {                      /* if we start at BOT */
                 status = MTSE_BOT;                          /*   then we're done */
@@ -1184,18 +1231,22 @@ else switch (f) {                                       /* otherwise the read me
             (void)sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);/* position */
             memset (&awshdr, 0, sizeof (awshdr));
             rdcnt = sim_fread (&awshdr, sizeof (t_awslnt), 3, uptr->fileref);
-            *bc = awshdr.prelen;                            /* save rec lnt */
-
             if (ferror (uptr->fileref)) {                   /* error? */
                 status = sim_tape_ioerr (uptr);
                 break;
                 }
             if (feof (uptr->fileref)) {                 /* eof? */
-                status = MTSE_EOM;
                 if ((uptr->pos > sizeof (t_awshdr)) &&
-                    (uptr->pos >= sim_fsize (uptr->fileref)))
-                    uptr->pos -= sizeof (t_awshdr);
-                break;
+                    (uptr->pos >= sim_fsize (uptr->fileref))) {
+                    if (MT_TST_INMRK (uptr)) {
+                        status = MTSE_TMK;
+                        MT_CLR_INMRK (uptr);
+                        uptr->pos -= sizeof (awshdr);
+                        }
+                    else
+                        status = MTSE_EOM;                  /*   then we're done */
+                    break;
+                    }
                 }
             if ((rdcnt != 3) || 
                 ((awshdr.rectyp != AWS_REC) && 
@@ -1203,10 +1254,11 @@ else switch (f) {                                       /* otherwise the read me
                 status = MTSE_INVRL;
                 break;
                 }
-            sbc = *bc;                                  /* extract the record length */
             if (MT_TST_INMRK (uptr))                    /* already in a tapemark? */
                 awshdr.rectyp = AWS_REC;
             MT_CLR_INMRK (uptr);                        /* No longer in a tapemark */
+            *bc = (awshdr.rectyp == AWS_REC) ? awshdr.prelen : 0;/* save rec lnt */
+            sbc = *bc;                                  /* extract the record length */
             if ((awshdr.rectyp != AWS_TMK) ||
                 (awshdr.prelen == 0)) {
                 uptr->pos -= sizeof (t_awshdr);         /* position to the start of the record */
@@ -1284,8 +1336,10 @@ sim_debug_unit (ctx->dbit, uptr, "sim_tape_rdrecf(unit=%d, buf=%p, max=%d)\n", (
 
 opos = uptr->pos;                                       /* old position */
 st = sim_tape_rdrlfwd (uptr, &tbc);                     /* read rec lnt */
-if (st != MTSE_OK)
+if (st != MTSE_OK) {
+    *bc = 0;
     return st;
+    }
 *bc = rbc = MTR_L (tbc);                                /* strip error flag */
 if (rbc > max) {                                        /* rec out of range? */
     MT_SET_PNU (uptr);
@@ -1350,8 +1404,10 @@ if (ctx == NULL)                                        /* if not properly attac
 sim_debug_unit (ctx->dbit, uptr, "sim_tape_rdrecr(unit=%d, buf=%p, max=%d)\n", (int)(uptr-ctx->dptr->units), buf, max);
 
 st = sim_tape_rdrlrev (uptr, &tbc);                     /* read rec lnt */
-if (st != MTSE_OK)
+if (st != MTSE_OK) {
+    *bc = 0;
     return st;
+    }
 *bc = rbc = MTR_L (tbc);                                /* strip error flag */
 if (rbc > max)                                          /* rec out of range? */
     return MTSE_INVRL;
@@ -1490,7 +1546,7 @@ sim_fwrite (&awshdr, sizeof (t_awslnt), 3, uptr->fileref);
 if (bc)
     sim_fwrite (buf, sizeof (uint8), bc, uptr->fileref);
 uptr->pos += sizeof (awshdr) + bc;
-if ((!replacing_record) | (bc == 0)) {
+if ((!replacing_record) || (bc == 0)) {
     awshdr.prelen = bc;
     awshdr.nxtlen = 0;
     awshdr.rectyp = AWS_TMK;
@@ -1567,7 +1623,6 @@ if (sim_tape_wrp (uptr))                                /* write prot? */
 if (MT_GET_FMT (uptr) == MTUF_F_P7B)                    /* cant do P7B */
     return MTSE_FMT;
 if (MT_GET_FMT (uptr) == MTUF_F_AWS) {
-    sim_tape_aws_wrdata (uptr, NULL, 0);
     sim_set_fsize (uptr->fileref, uptr->pos);
     result = MTSE_OK;
     }
@@ -2766,8 +2821,8 @@ const char *mtse_errors[] = {
     "no error",
     "tape mark",
     "unattached",
-    "IO error",
-    "invalid rec lnt",
+    "I/O error",
+    "invalid record length",
     "invalid format",
     "beginning of tape",
     "end of medium",
@@ -2790,46 +2845,84 @@ t_addr saved_pos = uptr->pos;
 uint32 record_in_file = 0;
 uint32 data_total = 0;
 uint32 tapemark_total = 0;
-uint32 tapemark_seen = 0;
 uint32 record_total = 0;
 uint32 unique_record_sizes = 0;
 t_stat r = SCPE_OK;
-uint8 *buf = NULL;
+t_stat r_f;
+t_stat r_r;
+t_stat r_s;
+uint8 *buf_f = NULL;
+uint8 *buf_r = NULL;
 uint32 *rec_sizes = NULL;
+t_mtrlnt bc_f;
+t_mtrlnt bc_r;
+t_mtrlnt bc_s;
 t_mtrlnt bc;
+t_addr pos_f;
+t_addr pos_r;
 t_mtrlnt max = MTR_MAXLEN;
-t_bool prior_was_tapemark = FALSE;
 
 if (!(uptr->flags & UNIT_ATT))
     return SCPE_UNATT;
-buf = (uint8 *)malloc (max);
-if (buf == NULL)
+buf_f = (uint8 *)malloc (max);
+if (buf_f == NULL)
     return SCPE_MEM;
+buf_r = (uint8 *)malloc (max);
+if (buf_r == NULL) {
+    free (buf_f);
+    return SCPE_MEM;
+    }
 rec_sizes = (uint32 *)calloc (max + 1, sizeof (*rec_sizes));
 if (rec_sizes == NULL) {
-    free (buf);
+    free (buf_f);
+    free (buf_r);
     return SCPE_MEM;
     }
 r = sim_tape_rewind (uptr);
 while (r == SCPE_OK) {
-    r = sim_tape_rdrecf (uptr, buf, &bc, max);
-    switch (r) {
+    pos_f = uptr->pos;
+    r_f = sim_tape_rdrecf (uptr, buf_f, &bc_f, max);
+    switch (r_f) {
     case MTSE_OK:                                   /* no error */
-        ++record_total;
-        data_total += bc;
-        if (rec_sizes[bc] == 0)
-            ++unique_record_sizes;
-        ++rec_sizes[bc];
-        r = SCPE_OK;
-        prior_was_tapemark = FALSE;
-        break;
     case MTSE_TMK:                                  /* tape mark */
-        ++tapemark_total;
-        if (prior_was_tapemark)
-            r = MTSE_LEOT;
+        if (r_f == MTSE_OK)
+            ++record_total;
         else
-            r = SCPE_OK;
-        prior_was_tapemark = TRUE;
+            ++tapemark_total;
+        data_total += bc_f;
+        if (bc_f != 0) {
+            if (rec_sizes[bc_f] == 0)
+                ++unique_record_sizes;
+            ++rec_sizes[bc_f];
+            }
+        r_r = sim_tape_rdrecr (uptr, buf_r, &bc_r, max);
+        pos_r = uptr->pos;
+        if (r_r != r_f) {
+            sim_printf ("Forward Record Read returned: %s, Reverse read returned: %s\n", sim_tape_error_text (r_f), sim_tape_error_text (r_r));
+            break;
+            }
+        if (bc_f != bc_r) {
+            sim_printf ("Forward Record Read record lemgtj: %d, Reverse read record length: %d\n", bc_f, bc_r);
+            break;
+            }
+        if (0 != memcmp (buf_f, buf_r, bc_f)) {
+            sim_printf ("%d byte record contents differ when read forward amd backwards start from position %" T_ADDR_FMT "u\n", bc_f, pos_f);
+            break;
+            }
+        if (pos_f != pos_r) {
+            sim_printf ("Unexpected tape file position between forward and reverse record read: (%" T_ADDR_FMT "u, %" T_ADDR_FMT "u\n", pos_f, pos_r);
+            break;
+            }
+        r_s = sim_tape_sprecf (uptr, &bc_s);
+        if (r_s != r_f) {
+            sim_printf ("Unexpected Space Record Status: %s vs %s\n", sim_tape_error_text (r_s), sim_tape_error_text (r_f));
+            break;
+            }
+        if (bc_r != bc_r) {
+            sim_printf ("Unexpected Space Record Length: %d vs %d\n", bc_s, bc_f);
+            break;
+            }
+        r = SCPE_OK;
         break;
     case MTSE_INVRL:                                /* invalid rec lnt */
     case MTSE_FMT:                                  /* invalid format */
@@ -2839,14 +2932,16 @@ while (r == SCPE_OK) {
     case MTSE_LEOT:                                 /* Logical End Of Tape */
     case MTSE_RUNAWAY:                              /* tape runaway */
     default:
+        r = r_f;
         break;
     case MTSE_EOM:                                  /* end of medium */
+        r = r_f;
         break;
         }
     }
-if (((r != MTSE_EOM) && (r != MTSE_LEOT)) || (sim_switches & SWMASK ('V')) || 
+if ((r != MTSE_EOM) || (sim_switches & SWMASK ('V')) || 
     ((uint32)(sim_fsize_ex (uptr->fileref) - (t_offset)uptr->pos) > fmts[MT_GET_FMT (uptr)].eom_remnant) ||
-    (unique_record_sizes > 2 * tapemark_seen)) {
+    (unique_record_sizes > 2 * tapemark_total)) {
     uint32 remaining_data = (uint32)(sim_fsize_ex (uptr->fileref) - (t_offset)uptr->pos);
 
     sim_printf ("Tape Image '%s' scanned as %s format.\n", uptr->filename, fmts[MT_GET_FMT (uptr)].name);
@@ -2857,62 +2952,25 @@ if (((r != MTSE_EOM) && (r != MTSE_LEOT)) || (sim_switches & SWMASK ('V')) ||
     sim_printf ("%u bytes of tape data (%u records, %u tapemarks)\n",
                 data_total, record_total, tapemark_total);
     if (record_total > 0) {
-        sim_printf ("Comprising:\n");
+        sim_printf ("Comprising (in record size order):\n");
         for (bc = 0; bc <= max; bc++) {
             if (rec_sizes[bc])
                 sim_printf ("%8u %u byte records\n", rec_sizes[bc], (uint32)bc);
             }
         }
-    if ((r != MTSE_EOM) && (r != MTSE_LEOT))
+    if (r != MTSE_EOM)
         sim_printf ("Read Tape Record Returned Unexpected Status: %s\n", sim_tape_error_text (r));
     if (remaining_data > fmts[MT_GET_FMT (uptr)].eom_remnant)
         sim_printf ("%u bytes of unexamined data remain in the tape image file\n", remaining_data);
     }
 /* Try again reading backwards */
-r = SCPE_OK;
-tapemark_seen = tapemark_total;
-while (r == SCPE_OK) {
-    r = sim_tape_rdrecr (uptr, buf, &bc, max);
-    switch (r) {
-    case MTSE_OK:                                   /* no error */
-        --record_total;
-        data_total -= bc;
-        if (bc > max)
-            bc = max;
-        --rec_sizes[bc];
-        r = SCPE_OK;
-        break;
-    case MTSE_TMK:                                  /* tape mark */
-        --tapemark_total;
-        r = SCPE_OK;
-        break;
-    case MTSE_BOT:                                  /* beginning of tape */
-        break;
-    case MTSE_INVRL:                                /* invalid rec lnt */
-    case MTSE_FMT:                                  /* invalid format */
-    case MTSE_RECE:                                 /* error in record */
-    case MTSE_WRP:                                  /* write protected */
-    case MTSE_LEOT:                                 /* Logical End Of Tape */
-    case MTSE_RUNAWAY:                              /* tape runaway */
-    default:
-        break;
-    case MTSE_EOM:                                  /* end of medium */
-        r = SCPE_OK;
-        break;
-        }
-    }
-
-if ((record_total != 0) || 
-    (tapemark_total != 0) ||
-    (data_total != 0))
-    sim_printf ("Reverse read of the tape data is inconsistent with the forward read.\n");
-
-if (unique_record_sizes > 2 * tapemark_seen) {
+if (unique_record_sizes > 2 * tapemark_total) {
     sim_printf ("An unreasonable number of record sizes(%u) vs tape marks (%u) have been found\n", unique_record_sizes, tapemark_total);
     sim_printf ("The tape format (%s) might not be correct for the '%s' tape image\n", fmts[MT_GET_FMT (uptr)].name, uptr->filename);
     }
 
-free (buf);
+free (buf_f);
+free (buf_r);
 free (rec_sizes);
 uptr->pos = saved_pos;
 return SCPE_OK;
