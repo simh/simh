@@ -2918,7 +2918,7 @@ while (r == SCPE_OK) {
             sim_printf ("Unexpected Space Record Status: %s vs %s\n", sim_tape_error_text (r_s), sim_tape_error_text (r_f));
             break;
             }
-        if (bc_r != bc_r) {
+        if (bc_s != bc_f) {
             sim_printf ("Unexpected Space Record Length: %d vs %d\n", bc_s, bc_f);
             break;
             }
