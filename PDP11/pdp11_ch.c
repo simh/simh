@@ -429,7 +429,6 @@ t_stat ch_attach (UNIT *uptr, CONST char *cptr)
 
   uptr->filename = (char *)realloc (uptr->filename, 1 + strlen (cptr));
   strcpy (uptr->filename, cptr);
-  sim_clock_coschedule (uptr, 1000);
   return SCPE_OK;
 }
 
@@ -452,6 +451,10 @@ t_stat ch_reset (DEVICE *dptr)
   }
 
   ch_clear ();
+
+  if (dptr->units->flags & UNIT_ATT)
+    sim_clock_coschedule (dptr->units, 1000);   /* poll for connections */
+
   return auto_config (dptr->name, (dptr->flags & DEV_DIS)? 0 : 1);  /* auto config */
 }
 
