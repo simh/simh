@@ -874,10 +874,10 @@ else switch (f) {                                       /* otherwise the read me
                 break;
                 }
 
-            sim_fread (&rev_lnt,                        /* get the reverse length */
-                       sizeof (t_mtrlnt),
-                       1,
-                       uptr->fileref);
+            (void)sim_fread (&rev_lnt,                  /* get the reverse length */
+                             sizeof (t_mtrlnt),
+                             1,
+                             uptr->fileref);
 
             if (ferror (uptr->fileref)) {               /* if a file I/O error occurred */
                 status = sim_tape_ioerr (uptr);         /* report the error and quit */
@@ -896,7 +896,7 @@ else switch (f) {                                       /* otherwise the read me
         break;                                          /* otherwise the operation succeeded */
 
     case MTUF_F_TPC:
-        sim_fread (&tpcbc, sizeof (t_tpclnt), 1, uptr->fileref);
+        (void)sim_fread (&tpcbc, sizeof (t_tpclnt), 1, uptr->fileref);
         *bc = tpcbc;                                    /* save rec lnt */
 
         if (ferror (uptr->fileref)) {                   /* error? */
@@ -922,7 +922,7 @@ else switch (f) {                                       /* otherwise the read me
 
     case MTUF_F_P7B:
         for (sbc = 0, all_eof = 1; ; sbc++) {           /* loop thru record */
-            sim_fread (&c, sizeof (uint8), 1, uptr->fileref);
+            (void)sim_fread (&c, sizeof (uint8), 1, uptr->fileref);
 
             if (ferror (uptr->fileref)) {               /* error? */
                 MT_SET_PNU (uptr);                      /* pos not upd */
@@ -1476,9 +1476,9 @@ switch (f) {                                            /* case on format */
         sbc = MTR_L ((bc + 1) & ~1);                    /* pad odd length */
         /* fall through into the E11 handler */
     case MTUF_F_E11:                                    /* E11 */
-        sim_fwrite (&bc, sizeof (t_mtrlnt), 1, uptr->fileref);
-        sim_fwrite (buf, sizeof (uint8), sbc, uptr->fileref);
-        sim_fwrite (&bc, sizeof (t_mtrlnt), 1, uptr->fileref);
+        (void)sim_fwrite (&bc, sizeof (t_mtrlnt), 1, uptr->fileref);
+        (void)sim_fwrite (buf, sizeof (uint8), sbc, uptr->fileref);
+        (void)sim_fwrite (&bc, sizeof (t_mtrlnt), 1, uptr->fileref);
         if (ferror (uptr->fileref)) {                   /* error? */
             MT_SET_PNU (uptr);
             return sim_tape_ioerr (uptr);
@@ -1488,8 +1488,8 @@ switch (f) {                                            /* case on format */
 
     case MTUF_F_P7B:                                    /* Pierce 7B */
         buf[0] = buf[0] | P7B_SOR;                      /* mark start of rec */
-        sim_fwrite (buf, sizeof (uint8), sbc, uptr->fileref);
-        sim_fwrite (buf, sizeof (uint8), 1, uptr->fileref); /* delimit rec */
+        (void)sim_fwrite (buf, sizeof (uint8), sbc, uptr->fileref);
+        (void)sim_fwrite (buf, sizeof (uint8), 1, uptr->fileref); /* delimit rec */
         if (ferror (uptr->fileref)) {                   /* error? */
             MT_SET_PNU (uptr);
             return sim_tape_ioerr (uptr);
@@ -1542,15 +1542,15 @@ if (sim_fseek (uptr->fileref, uptr->pos, SEEK_SET)) /* set pos */
 replacing_record = (awshdr.nxtlen == (t_awslnt)bc) && (awshdr.rectyp == (bc ? AWS_REC : AWS_TMK));
 awshdr.nxtlen = (t_awslnt)bc;
 awshdr.rectyp = (bc) ? AWS_REC : AWS_TMK;
-sim_fwrite (&awshdr, sizeof (t_awslnt), 3, uptr->fileref);
+(void)sim_fwrite (&awshdr, sizeof (t_awslnt), 3, uptr->fileref);
 if (bc)
-    sim_fwrite (buf, sizeof (uint8), bc, uptr->fileref);
+    (void)sim_fwrite (buf, sizeof (uint8), bc, uptr->fileref);
 uptr->pos += sizeof (awshdr) + bc;
 if ((!replacing_record) || (bc == 0)) {
     awshdr.prelen = bc;
     awshdr.nxtlen = 0;
     awshdr.rectyp = AWS_TMK;
-    sim_fwrite (&awshdr, sizeof (t_awslnt), 3, uptr->fileref);
+    (void)sim_fwrite (&awshdr, sizeof (t_awslnt), 3, uptr->fileref);
     if (!replacing_record)
         sim_set_fsize (uptr->fileref, uptr->pos + sizeof (awshdr));
     }
@@ -1571,7 +1571,7 @@ if (ctx == NULL)                                        /* if not properly attac
 if (sim_tape_wrp (uptr))                                /* write prot? */
     return MTSE_WRP;
 (void)sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);         /* set pos */
-sim_fwrite (&dat, sizeof (t_mtrlnt), 1, uptr->fileref);
+(void)sim_fwrite (&dat, sizeof (t_mtrlnt), 1, uptr->fileref);
 if (ferror (uptr->fileref)) {                           /* error? */
     MT_SET_PNU (uptr);
     return sim_tape_ioerr (uptr);
