@@ -944,8 +944,10 @@ else switch (f) {                                       /* otherwise the read me
             *bc = sbc;                                      /* save rec lnt */
             (void)sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); /* for read */
             uptr->pos = uptr->pos + sbc;                    /* spc over record */
-            if (all_eof)                                    /* tape mark? */
+            if (all_eof) {                                  /* tape mark? */
                 status = MTSE_TMK;
+                *bc = 0;
+                }
             }
         break;
 
