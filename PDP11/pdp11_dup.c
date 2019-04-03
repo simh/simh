@@ -1040,7 +1040,7 @@ int32 dup, active, attached;
 
 sim_debug(DBG_TRC, DUPDPTR, "dup_poll_svc()\n");
 
-tmxr_poll_conn(&dup_desc);
+(void)tmxr_poll_conn(&dup_desc);
 tmxr_poll_rx (&dup_desc);
 tmxr_poll_tx (&dup_desc);
 for (dup=active=attached=0; dup < dup_desc.lines; dup++) {

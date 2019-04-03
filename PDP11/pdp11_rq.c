@@ -2709,7 +2709,7 @@ void rq_ring_int (MSC *cp, struct uq_ring *ring)
 uint32 iadr = cp->comm + ring->ioff;                    /* addr intr wd */
 uint16 flag = 1;
 
-Map_WriteW (iadr, 2, &flag);                            /* write flag */
+(void)Map_WriteW (iadr, 2, &flag);                      /* write flag */
 if (cp->s1dat & SA_S1H_VEC)                             /* if enb, intr */
     rq_setint (cp);
 return;

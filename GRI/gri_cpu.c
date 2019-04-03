@@ -509,6 +509,10 @@ while (reason == 0) {                                   /* loop until halted */
             case 07:                                    /* src > 0 */
                 jmp = (t != 0) && !(t & SIGN);
                 break;
+
+            default:                                    /* Impossible Case - Silence Coverity */
+                jmp = 0;
+                break;
             }
 
         if (jmp) {                                      /* jump taken? */

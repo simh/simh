@@ -2004,7 +2004,7 @@ void tq_ring_int (struct uq_ring *ring)
 uint32 iadr = tq_comm + ring->ioff;                     /* addr intr wd */
 uint16 flag = 1;
 
-Map_WriteW (iadr, 2, &flag);                            /* write flag */
+(void)Map_WriteW (iadr, 2, &flag);                      /* write flag */
 if (tq_dib.vec)                                         /* if enb, intr */
     SET_INT (TQ);
 return;

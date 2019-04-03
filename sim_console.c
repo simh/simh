@@ -873,7 +873,7 @@ int line = rem->line;
 
 if ((!sim_oline) && (sim_log)) {
     fflush (sim_log);
-    sim_fseeko (sim_log, sim_rem_cmd_log_start, SEEK_SET);
+    (void)sim_fseeko (sim_log, sim_rem_cmd_log_start, SEEK_SET);
     cbuf[sizeof(cbuf)-1] = '\0';
     while (fgets (cbuf, sizeof(cbuf)-1, sim_log))
         tmxr_linemsgf (lp, "%s", cbuf);

@@ -1822,7 +1822,9 @@ t_stat xq_process_turbo_rbdl(CTLR* xq)
       xq->var->ReadQ.loss = 0;          /* reset loss counter */
     }
 
-    Map_ReadW (rdra+(uint32)(((char *)(&xq->var->rring[xq->var->rbindx].rmd3))-((char *)&xq->var->rring)), sizeof(xq->var->rring[xq->var->rbindx].rmd3), (uint16 *)&xq->var->rring[xq->var->rbindx].rmd3);
+    status = Map_ReadW (rdra+(uint32)(((char *)(&xq->var->rring[xq->var->rbindx].rmd3))-((char *)&xq->var->rring)), sizeof(xq->var->rring[xq->var->rbindx].rmd3), (uint16 *)&xq->var->rring[xq->var->rbindx].rmd3);
+    if (status != SCPE_OK)
+      return xq_nxm_error(xq);
     if (xq->var->rring[xq->var->rbindx].rmd3 & XQ_RMD3_OWN)
       xq->var->rring[i].rmd2 |= XQ_RMD2_EOR;
 
