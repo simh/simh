@@ -236,7 +236,9 @@ int sim_rand (void);
 #ifdef RAND_MAX
 #undef RAND_MAX
 #endif
-#define RAND_MAX 32767
+#define RAND_MAX 2147483646
+#define rand sim_rand
+#define srand(seed) sim_srand(seed)
 CONST char *get_sim_opt (int32 opt, CONST char *cptr, t_stat *st);
 CONST char *get_sim_sw (CONST char *cptr);
 const char *put_switches (char *buf, size_t bufsize, uint32 sw);

@@ -8707,7 +8707,7 @@ for (i = 0, j = addr; i < sim_emax; i++, j = j + dptr->aincr) {
                 reason = SCPE_IOERR;
                 break;
                 }
-            sim_fread (&sim_eval[i], sz, 1, uptr->fileref);
+            (void)sim_fread (&sim_eval[i], sz, 1, uptr->fileref);
             if ((feof (uptr->fileref)) &&
                !(uptr->flags & UNIT_FIX)) {
                 reason = SCPE_EOF;
@@ -14534,19 +14534,32 @@ return cptr;
 
 /*
  * To avoid Coverity complaints about the use of rand() we define the function locally
+ * This implementation of Lehmer's minimal standard algorithm is derived 
+ * from the integer solution provided in:
+ " "Communications of the ACM, October 1988, Volume 31, Number 10, page 1195"
  */
 
-static uint32 sim_rand_seed;
+static int32 sim_rand_seed = 2;
 
 void sim_srand (unsigned int seed)
 {
-sim_rand_seed = (uint32)seed;
+/* Keep the seed within 1..RAND_MAX */
+sim_rand_seed = (int32)(seed % RAND_MAX) + 1;
 }
 
 int sim_rand ()
 {
-sim_rand_seed = sim_rand_seed * 214013 + 2531011;
-return (sim_rand_seed >> 16) & RAND_MAX;
+const int32 a = 16807;
+const int32 q = 127773;         /* (RAND_MAX + 1) / a */
+const int32 r = 2836;           /* (RAND_MAX + 1) % a */
+int32 lo, hi;
+
+hi = sim_rand_seed / q;
+lo = sim_rand_seed % q;
+sim_rand_seed = a * lo - r * hi;
+if (sim_rand_seed < 0)
+    sim_rand_seed += RAND_MAX + 1;
+return (sim_rand_seed - 1);
 }
 
 /*
