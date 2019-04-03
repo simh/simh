@@ -427,6 +427,7 @@ t_stat ch_attach (UNIT *uptr, CONST char *cptr)
     return sim_messagef (r, "Error Opening: %s\n", peer);
   }
 
+  sim_clock_coschedule (uptr, 1000);        /* make sure polling starts */
   uptr->filename = (char *)realloc (uptr->filename, 1 + strlen (cptr));
   strcpy (uptr->filename, cptr);
   return SCPE_OK;
