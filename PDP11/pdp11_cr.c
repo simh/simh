@@ -1447,12 +1447,13 @@ t_stat cr_reset (   DEVICE  *dptr    )
         for ( i = 0; i < NTRANS; i++ )
             size += strlen (transcodes[i].name)+1;
         translation_help = (char *)malloc (size );
-        strcpy(translation_help, trans_hlp);
+        strlcpy(translation_help, trans_hlp, size);
         for (i = 0; i < NTRANS; i++) {
-            strcat(translation_help, transcodes[i].name);
-            strcat(translation_help,"|");
+            strlcat(translation_help, transcodes[i].name, size);
+            strlcat(translation_help,"|", size);
         }
-        strcpy(translation_help+strlen(translation_help)-1, "}");
+        translation_help[strlen(translation_help)-1] = '\0';
+        strlcpy(translation_help, "}", size);
         for (i = 0; i < (sizeof cr_mod / sizeof cr_mod[0]); i++ ) 
             if (cr_mod[i].pstring && !strcmp(cr_mod[i].pstring, "TRANSLATION")) {
                 cr_mod[i].mstring = translation_help;
@@ -1556,7 +1557,6 @@ if (CR11_CTL (&cr_unit)) {
 else {
     SET_INT (CD);
     }
-return;
 }
 
 void cr_clr_int (void)
@@ -1567,7 +1567,6 @@ if (CR11_CTL (&cr_unit)) {
 else {
     CLR_INT (CD);
     }
-return;
 }
 
 
@@ -1809,7 +1808,7 @@ t_stat cr_show_trans (  FILE    *st,
  * This ugliness is more maintainable than a preprocessor mess.
  */
 
-static void cr_supported ( char *string, int32 *bits )
+static void cr_supported ( char *string, int32 *bits, size_t string_aize )
 {
 int32 crtypes = 0;
 #define MAXDESCRIP sizeof ("CR11/CD11/CD20/") /* sizeof includes \0 */
@@ -1827,17 +1826,15 @@ char devtype[MAXDESCRIP] = "";
 
 if (string) {
     if (crtypes & 1)
-        strcat (devtype, "CR11/");
+        strlcat (devtype, "CR11/", sizeof (devtype));
     if (crtypes & 2)
-        strcat (devtype, "CD11/");
+        strlcat (devtype, "CD11/", sizeof (devtype));
     if (crtypes & 4)
-        strcat (devtype, "CD20/");
-    devtype[strlen(devtype)-1] = '\0';
-    strcpy (string, devtype);
+        strlcat (devtype, "CD20/", sizeof (devtype));
+    strlcpy (string, devtype, string_aize);
 }
 if (bits)
     *bits = crtypes;
-return;
 }
 
 static t_stat cr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
@@ -1845,23 +1842,24 @@ static t_stat cr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const cha
 char devtype[MAXDESCRIP];
 int32 crtypes;
 
-cr_supported (devtype, &crtypes);
+cr_supported (devtype, &crtypes, sizeof (devtype));
 fprintf (st, "%s Card Reader (CR)\n\n", devtype);
 fprintf (st, "The card reader (CR) implements a single controller (the model(s) shown\n");
-fprintf (st, "above) and a card reader (e.g., Documation M200, GDI Model 100) by reading a\n");
-fprintf (st, "file and presenting lines or cards to the simulator.  Card decks may be\n");
+fprintf (st, "above) and a card reader (e.g., Documation M200, GDI Model 100) by reading\n");
+fprintf (st, "a file and presenting lines or cards to the simulator.  Card decks may be\n");
 fprintf (st, "represented by plain text ASCII files, card image files, or column binary\n");
 fprintf (st, "files.\n\n");
 
 fprintf (st, "The controller is also compatible with the CM11-F, CME11, and CMS11.\n\n");
 
 fprintf (st, "Card image files are a file format designed by Douglas W. Jones at the\n");
-fprintf (st, "University of Iowa to support the interchange of card deck data.  These files\n");
-fprintf (st, "have a much richer information carrying capacity than plain ASCII files.  Card\n");
-fprintf (st, "Image files can contain such interchange information as card-stock color,\n");
-fprintf (st, "corner cuts, special artwork, as well as the binary punch data representing all\n");
-fprintf (st, "12 columns.  Complete details on the format, as well as sample code, are\n");
-fprintf (st, "available at Prof. Jones's site: http://www.cs.uiowa.edu/~jones/cards/.\n\n");
+fprintf (st, "University of Iowa to support the interchange of card deck data.  These\n");
+fprintf (st, "files have a much richer information carrying capacity than plain ASCII\n");
+fprintf (st, "files.  Card Image files can contain such interchange information as\n");
+fprintf (st, "card-stock color, corner cuts, special artwork, as well as the binary\n");
+fprintf (st, "punch data representing all 12 columns.  Complete details on the format,\n");
+fprintf (st, "as well as sample code, are available at Prof. Jones's site:\n");
+fprintf (st, "       http://www.cs.uiowa.edu/~jones/cards/.\n\n");
 
 if ((crtypes & -crtypes) != crtypes) {
     fprintf (st, "The card reader device an be configured to emulate the following\n");
@@ -1873,12 +1871,12 @@ if ((crtypes & -crtypes) != crtypes) {
     if (crtypes & 4) {
         fprintf (st, "    SET CR CD20       set controller type to CD20\n");
 #if defined (AIECO_OK)
-        fprintf (st, "        SET CR AIECO  emulate the CD20 \"augmented image\" ECO\n");
+        fprintf (st, "    SET CR AIECO      emulate the CD20 \"augmented image\" ECO\n");
         fprintf (st, "                      default is %semulated.\n", (DFLT_AIECO? "":"not "));
 #endif
 }
-    fprintf (st, "\nThe controller type must be set before attaching a virtual card deck to the\n");
-    fprintf (st, "device.  You may NOT change controller type once a file is attached.\n\n");
+    fprintf (st, "\nThe controller type must be set before attaching a virtual card deck to\n");
+    fprintf (st, "the device.  You may NOT change controller type once a file is attached.\n\n");
     fprintf (st, "The primary differences between the controllers are summarized in the\n");
     fprintf (st, "table below.  By default, %s simulation is selected.\n\n", 
                     (DFLT_TYPE & UNIT_CD20)? "CD20": ((DFLT_TYPE & UNIT_CR11)? "CR11" : "CD11"));
@@ -1890,22 +1888,23 @@ if ((crtypes & -crtypes) != crtypes) {
     fprintf (st, "    hopper cap.     <= 1000         1000-2250\n");
     fprintf (st, "    cards           Mark-sense & punched only\n");
     fprintf (st, "                    punched\n\n");
-    fprintf (st, "The CD11 simulation includes the Rev. J modification to make the CDDB act as\n");
-    fprintf (st, "a second status register during non-data transfer periods.\n\n");
+    fprintf (st, "The CD11 simulation includes the Rev. J modification to make the CDDB act\n");
+    fprintf (st, "as a second status register during non-data transfer periods.\n\n");
 }
 if (crtypes & 1) {
-    fprintf (st, "Examples of the CR11 include the M8290 and M8291 (CMS11).  All card readers use\n");
-    fprintf (st, "a common vector at 0230 and CSR at 177160.  Even though the CR11 is normally\n");
-    fprintf (st, "configured as a BR6 device, it is configured for BR4 in this simulation.\n\n");
+    fprintf (st, "Examples of the CR11 include the M8290 and M8291 (CMS11).  All card readers\n");
+    fprintf (st, "use a common vector at 0230 and CSR at 177160.  Even though the CR11 is\n");
+    fprintf (st, "normally configured as a BR6 device, it is configured for BR4 in this\n");
+    fprintf (st, "simulation.\n\n");
 }
 fprintf (st, "The card reader supports ASCII, card image, and column binary format card\n");
-fprintf (st, "\"decks.\"  When reading plain ASCII files, lines longer than 80 characters are\n");
-fprintf (st, "silently truncated.  Card image support is included for 80 column Hollerith,\n");
-fprintf (st, "82 column Hollerith, and 40 column Hollerith (mark-sense) cards. \n");
+fprintf (st, "\"decks.\"  When reading plain ASCII files, lines longer than 80 characters\n");
+fprintf (st, "are silently truncated.  Card image support is included for 80 column\n");
+fprintf (st, "Hollerith, 82 column Hollerith, and 40 column Hollerith (mark-sense) cards.\n");
 fprintf (st, "Column binary supports 80 column card images only.\n");
 if (crtypes & 6) {
     fprintf (st, "The CD11/CD20 optionally check columns 0/81/41 for punches, which produce\n");
-    fprintf( st, "read check errors.  As verifiers may produce these, this can be controlled:\n");
+    fprintf( st, "read check errors.  As verifiers may produce these, this can be controlled:\n\n");
     fprintf( st, "    SET CR RDCHECK   - Enable read check errors (default)\n");
     fprintf( st, "    SET CR NORDCHECK - Disable read check errors\n\n");
 }
@@ -1914,70 +1913,77 @@ fprintf (st, "    ATTACH -A CR <file>           file is ASCII text\n");
 fprintf (st, "    ATTACH -B CR <file>           file is column binary\n");
 fprintf (st, "    ATTACH -I CR <file>           file is card image format\n\n");
 
-fprintf (st, "If no flags are given, the file extension is evaluated.  If the filename ends\n");
-fprintf (st, "in .TXT, the file is treated as ASCII text.  If the filename ends in .CBN, the\n");
-fprintf (st, "file is treated as column binary.  Otherwise, the CR driver looks for a card\n");
-fprintf (st, "image header.  If a correct header is found the file is treated as card image\n");
-fprintf (st, "format, otherwise it is treated as ASCII text.\n\n");
+fprintf (st, "If no flags are given, the file extension is evaluated.  If the filename\n");
+fprintf (st, "ends in .TXT, the file is treated as ASCII text.  If the filename ends in\n");
+fprintf (st, ".CBN, the file is treated as column binary.  Otherwise, the CR driver looks\n");
+fprintf (st, "for a card image header.  If a correct header is found the file is treated\n");
+fprintf (st, "as card image format, otherwise it is treated as ASCII text.\n\n");
 
-fprintf (st, "The correct character translation MUST be set if a plain text file is to be\n");
-fprintf (st, "used for card deck input.  The correct translation SHOULD be set to allow\n");
-fprintf (st, "correct ASCII debugging of a card image or column binary input deck.  Depending\n");
-fprintf (st, "upon the operating system in use, how it was generated, and how the card data\n");
-fprintf (st, "will be read and used, the translation must be set correctly so that the proper\n");
-fprintf (st, "character set is used by the driver.  Use the following command to explicitly\n");
-fprintf (st, "set the correct translation:\n\n");
+fprintf (st, "The correct character translation MUST be set if a plain text file is to\n");
+fprintf (st, "be used for card deck input.  The correct translation SHOULD be set to\n");
+fprintf (st, "allow correct ASCII debugging of a card image or column binary input deck.\n");
+fprintf (st, "Depending upon the operating system in use, how it was generated, and how\n");
+fprintf (st, "the card data will be read and used, the translation must be set correctly\n");
+fprintf (st, "so that the proper character set is used by the driver.  Use the following\n");
+fprintf (st, "command to explicitly set the correct translation:\n\n");
 fprintf (st, "    SET TRANSLATION={DEFAULT|026|026FTN|026DEC|026DECASCII|029|029DECASCII|EBCDIC}\n\n");
-fprintf (st, "This command should be given after a deck is attached to the simulator.  The\n");
-fprintf (st, "mappings above are completely described at\n");
+fprintf (st, "This command should be given after a deck is attached to the simulator.\n");
+fprintf (st, "The mappings above are completely described at\n");
 fprintf (st, "    http://www.cs.uiowa.edu/~jones/cards/codes.html.\n");
 fprintf (st, "Note that early DEC software typically used 029 or 026FTN mappings.\n");
-fprintf (st, "Later systems used the 026DECASCII and/or 029DECASCII mappings, which include all 7-bit ASCII characters\n");
-fprintf (st, "DEC operating systems used a variety of methods to determine the end of a deck\n");
-fprintf (st, "(recognizing that 'hopper empty' does not necessarily mean the end of a deck.\n");
-fprintf (st, "Below is a summary of the various operating system conventions for signaling\n");
-fprintf (st, "end of deck (or end of file with multi-file batch systems):\n\n");
+fprintf (st, "Later systems used the 026DECASCII and/or 029DECASCII mappings, which\n");
+fprintf (st, "include all 7-bit ASCII characters.\n\n");
+fprintf (st, "DEC operating systems used a variety of methods to determine the end of\n");
+fprintf (st, "a deck (recognizing that 'hopper empty' does not necessarily mean the\n");
+fprintf (st, "end of a deck.  Below is a summary of the various operating system\n");
+fprintf (st, "conventions for signaling end of deck (or end of file with multi-file\n");
+fprintf (st, "batch systems):\n\n");
 fprintf (st, "    RT-11:    12-11-0-1-6-7-8-9 punch in column 1\n");
 fprintf (st, "    RSTS/E:   12-11-0-1 or 12-11-0-1-6-7-8-9 punch in column 1\n");
 fprintf (st, "    RSX:      12-11-0-1-6-7-8-9 punch in first 8 columns\n");
 fprintf (st, "    VMS:      12-11-0-1-6-7-8-9 punch in first 8 columns\n");
 fprintf (st, "    TOPS:     12-11-0-1 or 12-11-0-1-6-7-8-9 punch in column 1\n\n");
-fprintf (st, "Using the AUTOEOF setting, the card reader can be set to automatically generate\n");
-fprintf (st, "an EOF card consisting of the 12-11-0-1-6-7-8-9 punch in columns 1-8.  ");
+fprintf (st, "Using the AUTOEOF setting, the card reader can be set to automatically\n");
+fprintf (st, "generate an EOF card consisting of the 12-11-0-1-6-7-8-9 punch in columns\n");
+fprintf (st, "1-8.\n\n");
 if (crtypes & 6) {
     fprintf (st, "When set,\nThe %s ", ((crtypes & 6) == 2)? "CD11": ((crtypes & 6) == 4)? "CD20": "CD11/CD20");
 
     fprintf (st,                    "will automatically set the EOF bit in the\n");
-    fprintf (st, "controller after the EOF card has been processed.  By default AUTOEOF is enabled.\n");
-    fprintf (st, "The controller also supports an EOF switch that will set the EOF bit when the\n");
-    fprintf (st, "hopper empties.  The switch resets each time the hopper empties.  The SET EOF command emulates this.\n");
+    fprintf (st, "controller after the EOF card has been processed.  By default AUTOEOF\n");
+    fprintf (st, "is enabled.  The controller also supports an EOF switch that will set\n");
+    fprintf (st, "the EOF bit when the hopper empties.  The switch resets each time the\n");
+    fprintf (st, "hopper empties.  The SET CR EOF command emulates this.\n");
     if (crtypes &1)
-        fprintf (st, "The CR11 does not support the EOF switch/bit.\n");
+        fprintf (st, "The CR11 does not support the EOF switch/bit.\n\n");
     else
         fprintf (st, "\n");
 }
-fprintf (st, "The default card reader rate for the ");
+fprintf (st, "The default card reader input rate for the ");
 if (crtypes & 4) {
-    fprintf (st,                                         "CD20 is 1200");
+    fprintf (st,                                         "CD20 is 1200 cpm");
     if (crtypes != 4)
-        fprintf (st, " and for the ");
+        fprintf (st, ", and for the\n");
+    else
+        fprintf (st, ".\n");
 }
 if (crtypes & 3)
-    fprintf (st,                                         "CR/CD11 is 285");
-fprintf (st, " cpm.\n");
-fprintf (st, "The reader rate can be set to its default value or to anywhere in the range\n");
-fprintf (st, "of 200 to 1200 cpm.This rate may be changed while the unit is attached.\n\n");
-fprintf (st, "It is standard operating procedure for operators to load a card deck and press\n");
-fprintf (st, "the momentary action RESET button to clear any error conditions and alert the\n");
-fprintf (st, "processor that a deck is available to read.  Use the SET CR RESET command to\n");
-fprintf (st, "simulate pressing the card reader RESET button.\n\n");
+    fprintf (st,                                         "CR/CD11 is 285 cpm.\n");
+fprintf (st, "The reader rate can be set to its default value or to anywhere in the\n");
+fprintf (st, "range of 200 to 1200 cpm.This rate may be changed while the unit is\n");
+fprintf (st, "attached.\n\n");
+fprintf (st, "It is standard operating procedure for operators to load a card deck and\n");
+fprintf (st, "press the momentary action RESET button to clear any error conditions and\n");
+fprintf (st, "alert the processor that a deck is available to read.  Use the:\n");
+fprintf (st, "    SET CR RESET\n");
+fprintf (st, "command to simulate pressing the card reader RESET button.\n\n");
 fprintf (st, "Another common control of physical card readers is the STOP button.  An\n");
-fprintf (st, "operator could use this button to finish the read operation for the current\n");
-fprintf (st, "card and terminate reading a deck early.  Use the SET CR STOP command to\n");
-fprintf (st, "simulate pressing the card reader STOP button.\n\n");
+fprintf (st, "operator could use this button to finish the read operation for the\n");
+fprintf (st, "current card and terminate reading a deck early.  Use the SET CR STOP\n");
+fprintf (st, "command to simulate pressing the card reader STOP button.\n\n");
 fprintf (st, "The simulator does not support the BOOT command.  The simulator does not\n");
-fprintf (st, "stop on file I/O errors.  Instead the controller signals a reader check to\n");
-fprintf (st, "the CPU.\n");
+fprintf (st, "stop on file I/O errors.  Instead the controller signals a reader check\n");
+fprintf (st, "to the CPU.\n");
 
 fprint_reg_help (st, dptr);
 return SCPE_OK;
@@ -1987,9 +1993,10 @@ const char *cr_description (DEVICE *dptr)
 {
   /* Not thread-safe, but malloc() would be leak. */
   static char desc[MAXDESCRIP+sizeof(" card reader")-1] = "";
+
   if (desc[0] == '\0') {
-      cr_supported (desc, NULL);
-      strcat (desc, " card reader");
+      cr_supported (desc, NULL, sizeof (desc));
+      strlcat (desc, " card reader", sizeof (desc));
   }
   return desc;
 }
