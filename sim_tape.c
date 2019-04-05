@@ -102,7 +102,7 @@
 
 struct sim_tape_fmt {
     const char          *name;                          /* name */
-    int32               uflags;                         /* unit flags */
+    int32          uflags;                         /* unit flags */
     t_addr              bot;                            /* bot test */
     t_addr              eom_remnant;                    /* potentially unprocessed data */
     };
@@ -1194,34 +1194,50 @@ else switch (f) {                                       /* otherwise the read me
         break;
 
     case MTUF_F_P7B:
-        for (sbc = 1, all_eof = 1; (t_addr) sbc <= uptr->pos ; sbc++) {
-            (void)sim_fseek (uptr->fileref, uptr->pos - sbc, SEEK_SET);
-            (void)sim_fread (&c, sizeof (uint8), 1, uptr->fileref);
+        if (1) {
+#define BUF_SZ 512
+            uint8 buf[BUF_SZ];
+            t_addr buf_offset;
+            size_t bytes_in_buf = 0;
+            size_t read_size;
 
-            if (ferror (uptr->fileref)) {               /* error? */
-                status = sim_tape_ioerr (uptr);
-                break;
-                }
-            else if (feof (uptr->fileref)) {            /* eof? */
-                status = MTSE_EOM;
-                break;
-                }
-            else {
+            for (sbc = 1, all_eof = 1; (t_addr) sbc <= uptr->pos ; sbc++) {
+                if (bytes_in_buf == 0) {        /* Need to Fill Buffer */
+                    if (uptr->pos < BUF_SZ) {
+                        buf_offset = 0;
+                        read_size = (size_t)uptr->pos;
+                        }
+                    else {
+                        buf_offset = uptr->pos - (sbc - 1 + BUF_SZ);
+                        read_size = BUF_SZ;
+                        }
+                    (void)sim_fseek (uptr->fileref, buf_offset, SEEK_SET);
+                    bytes_in_buf = sim_fread (buf, sizeof (uint8), read_size, uptr->fileref);
+                    if (ferror (uptr->fileref)) {               /* error? */
+                        status = sim_tape_ioerr (uptr);
+                        break;
+                        }
+                    if (feof (uptr->fileref)) {                 /* eof? */
+                        status = MTSE_EOM;
+                        break;
+                        }
+                    }
+                c = buf[--bytes_in_buf];
                 if ((c & P7B_DPAR) != P7B_EOF)
                     all_eof = 0;
                 if (c & P7B_SOR)                        /* start of record? */
                     break;
                 }
-            }
 
-        if (status == MTSE_OK) {
-            uptr->pos = uptr->pos - sbc;                    /* update position */
-            *bc = sbc;                                      /* save rec lnt */
-            (void)sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); /* for next read */
-            if (all_eof)                                    /* tape mark? */
-                status = MTSE_TMK;
+            if (status == MTSE_OK) {
+                uptr->pos = uptr->pos - sbc;                    /* update position */
+                *bc = sbc;                                      /* save rec lnt */
+                (void)sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); /* for next read */
+                if (all_eof)                                    /* tape mark? */
+                    status = MTSE_TMK;
+                }
+            break;
             }
-        break;
 
     case MTUF_F_AWS:
         *bc = sbc = 0;
@@ -2883,6 +2899,7 @@ if (rec_sizes == NULL) {
 r = sim_tape_rewind (uptr);
 while (r == SCPE_OK) {
     pos_f = uptr->pos;
+    memset (buf_f, 0, max);
     r_f = sim_tape_rdrecf (uptr, buf_f, &bc_f, max);
     switch (r_f) {
     case MTSE_OK:                                   /* no error */
@@ -2897,6 +2914,7 @@ while (r == SCPE_OK) {
                 ++unique_record_sizes;
             ++rec_sizes[bc_f];
             }
+        memset (buf_r, 0, max);
         r_r = sim_tape_rdrecr (uptr, buf_r, &bc_r, max);
         pos_r = uptr->pos;
         if (r_r != r_f) {
@@ -2904,7 +2922,7 @@ while (r == SCPE_OK) {
             break;
             }
         if (bc_f != bc_r) {
-            sim_printf ("Forward Record Read record lemgtj: %d, Reverse read record length: %d\n", bc_f, bc_r);
+            sim_printf ("Forward Record Read record length: %d, Reverse read record length: %d\n", bc_f, bc_r);
             break;
             }
         if (0 != memcmp (buf_f, buf_r, bc_f)) {
@@ -2965,7 +2983,6 @@ if ((r != MTSE_EOM) || (sim_switches & SWMASK ('V')) ||
     if (remaining_data > fmts[MT_GET_FMT (uptr)].eom_remnant)
         sim_printf ("%u bytes of unexamined data remain in the tape image file\n", remaining_data);
     }
-/* Try again reading backwards */
 if (unique_record_sizes > 2 * tapemark_total) {
     sim_printf ("An unreasonable number of record sizes(%u) vs tape marks (%u) have been found\n", unique_record_sizes, tapemark_total);
     sim_printf ("The tape format (%s) might not be correct for the '%s' tape image\n", fmts[MT_GET_FMT (uptr)].name, uptr->filename);
@@ -3116,6 +3133,45 @@ else {                                                  /* otherwise get the den
 return SCPE_OK;
 }
 
+/* list supported densities
+
+   translates the mask of supported densities to a string list in the form: 
+   
+           "(800|1600|6250)"
+
+   this string may be useful to construct a MTAB help string for a 
+   SET <unit> DENSITY= command.
+
+*/
+
+t_stat sim_tape_density_supported (char *string, size_t string_size, int32 valid_bits)
+{
+uint32 density;
+int32 count;
+
+strlcpy (string, "", string_size);
+if ((!valid_bits) || (valid_bits >> BPI_COUNT))
+    return SCPE_ARG;
+for (density = count = 0; density < BPI_COUNT; density++) {
+    if (valid_bits & (1 << density)) {
+        char density_str[20];
+
+        ++count;
+        if (count == 1)
+            strlcat (string, "{", string_size);
+        else
+            strlcat (string, "|", string_size);
+        sprintf (density_str, "%d", bpi[density]);
+        strlcat (string, density_str, string_size);
+        }
+    }
+if ((count == 1) && (string_size > 1))
+    memmove (string, string + 1, strlen (string));
+else
+    strlcat (string, "}", string_size);
+return SCPE_OK;
+}
+
 static DEBTAB tape_debug[] = {
   {"TRACE",     MTSE_DBG_API,       "API Trace"},
   {"DATA",      MTSE_DBG_DAT,       "Tape Data"},
@@ -3135,7 +3191,7 @@ static t_bool p7b_parity_inited = FALSE;
 static uint8 p7b_odd_parity[64];
 static uint8 p7b_even_parity[64];
 
-static t_stat create_tape_files (UNIT *uptr, const char *filename, int files, int records, int max_size)
+static t_stat sim_tape_test_create_tape_files (UNIT *uptr, const char *filename, int files, int records, int max_size)
 {
 FILE *fSIMH = NULL;
 FILE *fE11 = NULL;
@@ -3293,7 +3349,7 @@ sim_switches = saved_switches;
 return stat;
 }
 
-static t_stat process_tape_file (UNIT *uptr, const char *filename, const char *format)
+static t_stat sim_tape_test_process_tape_file (UNIT *uptr, const char *filename, const char *format)
 {
 char args[256];
 t_stat stat;
@@ -3309,7 +3365,7 @@ sim_switches = 0;
 return SCPE_OK;
 }
 
-static t_stat remove_tape_files (UNIT *uptr, const char *filename)
+static t_stat sim_tape_test_remove_tape_files (UNIT *uptr, const char *filename)
 {
 char name[256];
 
@@ -3326,6 +3382,38 @@ sprintf (name, "%s.aws", filename);
 return SCPE_OK;
 }
 
+static t_stat sim_tape_test_density_string (void)
+{
+char buf[128];
+int32 valid_bits = 0;
+t_stat stat;
+
+if ((SCPE_ARG != (stat = sim_tape_density_supported (buf, sizeof (buf), valid_bits))) ||
+    (strcmp (buf, "")))
+    return stat;
+valid_bits = MT_556_VALID;
+if ((SCPE_OK != (stat = sim_tape_density_supported (buf, sizeof (buf), valid_bits))) || 
+    (strcmp (buf, "556")))
+    return sim_messagef (SCPE_ARG, "stat was: %s, got string: %s\n", sim_error_text (stat), buf);
+valid_bits = MT_800_VALID | MT_1600_VALID;
+if ((SCPE_OK != (stat = sim_tape_density_supported (buf, sizeof (buf), valid_bits))) || 
+    (strcmp (buf, "{800|1600}")))
+    return sim_messagef (SCPE_ARG, "stat was: %s, got string: %s\n", sim_error_text (stat), buf);
+valid_bits = MT_800_VALID | MT_1600_VALID | MT_6250_VALID;
+if ((SCPE_OK != (stat = sim_tape_density_supported (buf, sizeof (buf), valid_bits))) || 
+    (strcmp (buf, "{800|1600|6250}")))
+    return sim_messagef (SCPE_ARG, "stat was: %s, got string: %s\n", sim_error_text (stat), buf);
+valid_bits = MT_200_VALID | MT_800_VALID | MT_1600_VALID | MT_6250_VALID;
+if ((SCPE_OK != (stat = sim_tape_density_supported (buf, sizeof (buf), valid_bits))) || 
+    (strcmp (buf, "{200|800|1600|6250}")))
+    return sim_messagef (SCPE_ARG, "stat was: %s, got string: %s\n", sim_error_text (stat), buf);
+valid_bits = MT_NONE_VALID | MT_800_VALID | MT_1600_VALID | MT_6250_VALID;
+if ((SCPE_OK != (stat = sim_tape_density_supported (buf, sizeof (buf), valid_bits))) || 
+    (strcmp (buf, "{0|800|1600|6250}")))
+    return sim_messagef (SCPE_ARG, "stat was: %s, got string: %s\n", sim_error_text (stat), buf);
+return SCPE_OK;
+}
+
 #include <setjmp.h>
 
 t_stat sim_tape_test (DEVICE *dptr)
@@ -3335,26 +3423,28 @@ SIM_TEST_INIT;
 
 sim_printf ("\nTesting %s device sim_tape APIs\n", sim_uname(dptr->units));
 
-SIM_TEST(remove_tape_files (dptr->units, "TapeTestFile1"));
+SIM_TEST(sim_tape_test_density_string ());
 
-SIM_TEST(create_tape_files (dptr->units, "TapeTestFile1", 2, 4, 4096));
+SIM_TEST(sim_tape_test_remove_tape_files (dptr->units, "TapeTestFile1"));
 
-sim_switches = saved_switches;
-SIM_TEST(process_tape_file (dptr->units, "TapeTestFile1", "aws"));
-
-sim_switches = saved_switches;
-SIM_TEST(process_tape_file (dptr->units, "TapeTestFile1", "p7b"));
+SIM_TEST(sim_tape_test_create_tape_files (dptr->units, "TapeTestFile1", 2, 5, 4096));
 
 sim_switches = saved_switches;
-SIM_TEST(process_tape_file (dptr->units, "TapeTestFile1", "tpc"));
+SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1", "aws"));
 
 sim_switches = saved_switches;
-SIM_TEST(process_tape_file (dptr->units, "TapeTestFile1", "e11"));
+SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1", "p7b"));
 
 sim_switches = saved_switches;
-SIM_TEST(process_tape_file (dptr->units, "TapeTestFile1", "simh"));
+SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1", "tpc"));
 
-SIM_TEST(remove_tape_files (dptr->units, "TapeTestFile1"));
+sim_switches = saved_switches;
+SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1", "e11"));
+
+sim_switches = saved_switches;
+SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1", "simh"));
+
+SIM_TEST(sim_tape_test_remove_tape_files (dptr->units, "TapeTestFile1"));
 
 return SCPE_OK;
 }
