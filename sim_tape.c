@@ -113,7 +113,7 @@ static struct sim_tape_fmt fmts[MTUF_N_FMT] = {
     { "TPC",  UNIT_RO, sizeof (t_tpclnt) - 1,  sizeof (t_tpclnt) },
     { "P7B",  0,       0,                      0 },
     { "AWS",  0,       0,                      0 },
-/*  { "TPF",  UNIT_RO, 0 }, */
+    { "TAR",  0,       0,                      0 },
     { NULL,   0,       0 }
     };
 
@@ -479,14 +479,31 @@ if ((dptr = find_dev_from_unit (uptr)) == NULL)
 if (sim_switches & SWMASK ('F')) {                      /* format spec? */
     cptr = get_glyph (cptr, gbuf, 0);                   /* get spec */
     if (*cptr == 0)                                     /* must be more */
-        return SCPE_2FARG;
+        return sim_messagef (SCPE_2FARG, "Missing Format specifier and filename to attach\n");
     if (sim_tape_set_fmt (uptr, 0, gbuf, NULL) != SCPE_OK)
         return sim_messagef (SCPE_ARG, "Invalid Tape Format: %s\n", gbuf);
     sim_switches = sim_switches & ~(SWMASK ('F'));      /* Record Format specifier already processed */
     auto_format = TRUE;
     }
-if (MT_GET_FMT (uptr) == MTUF_F_TPC)
-    sim_switches |= SWMASK ('R');                       /* Force ReadOnly attach for TPC tapes */
+if (MT_GET_FMT (uptr) == MTUF_F_TAR) {
+    if (sim_switches & SWMASK ('B')) {                  /* Record Size (blocking factor)? */
+        uint32 recsize;
+
+        cptr = get_glyph (cptr, gbuf, 0);                   /* get spec */
+        if (*cptr == 0)                                     /* must be more */
+            return sim_messagef (SCPE_2FARG, "Missing Record Size and filename to attach\n");
+        recsize = (uint32) get_uint (gbuf, 10, 65536, &r);
+        if ((r != SCPE_OK) || (recsize == 0))
+            return sim_messagef (SCPE_ARG, "Invalid Tape Record Size: %s\n", gbuf);
+        uptr->recsize = recsize;
+        sim_switches = sim_switches & ~(SWMASK ('B'));      /* Record Blocking Factor */
+        }
+    if (uptr->recsize == 0)
+        uptr->recsize = TAR_DFLT_RECSIZE;
+    }
+if ((MT_GET_FMT (uptr) == MTUF_F_TPC) ||
+    (MT_GET_FMT (uptr) == MTUF_F_TAR))
+    sim_switches |= SWMASK ('R');                       /* Force ReadOnly attach for TPC and TAR tapes */
 r = attach_unit (uptr, (CONST char *)cptr);             /* attach unit */
 if (r != SCPE_OK)                                       /* error? */
     return sim_messagef (r, "Can't open tape image: %s\n", cptr);
@@ -520,6 +537,10 @@ switch (MT_GET_FMT (uptr)) {                            /* case on format */
             }
         uptr->hwmark = objc + 1;                        /* save map size */
         sim_tape_tpc_map (uptr, (t_addr *) uptr->filebuf, objc);/* fill map */
+        break;
+
+    case MTUF_F_TAR:                                    /* TAR */
+        uptr->hwmark = (t_addr)sim_fsize (uptr->fileref);
         break;
 
     default:
@@ -568,7 +589,7 @@ if (ctx)
 
 sim_tape_clr_async (uptr);
 
-MT_CLR_INMRK (uptr);                                    /* Not within an AWS tapemark */
+MT_CLR_INMRK (uptr);                                    /* Not within an AWS or TAR tapemark */
 r = detach_unit (uptr);                                 /* detach unit */
 if (r != SCPE_OK)
     return r;
@@ -578,12 +599,13 @@ switch (f) {                                            /* case on format */
         if (uptr->filebuf)                              /* free map */
             free (uptr->filebuf);
         uptr->filebuf = NULL;
-        uptr->hwmark = 0;
         break;
 
     default:
         break;
         }
+uptr->hwmark = 0;
+uptr->recsize = 0;
 
 sim_tape_rewind (uptr);
 free (uptr->tape_ctx);
@@ -615,7 +637,11 @@ fprintf (st, "    -R          Attach Read Only.\n");
 fprintf (st, "    -E          Must Exist (if not specified an attempt to create the indicated\n");
 fprintf (st, "                virtual tape will be attempted).\n");
 fprintf (st, "    -F          Open the indicated tape container in a specific format (default\n");
-fprintf (st, "                is SIMH, alternatives are E11, TPC and P7B)\n");
+fprintf (st, "                is SIMH, alternatives are E11, TPC, P7B, AWS and TAR)\n");
+fprintf (st, "    -B          For TAR format tapes, the record size for data read from the\n");
+fprintf (st, "                specified file.  This record size will be used for all but\n");
+fprintf (st, "                possibly the last record which will be what remains unread.\n");
+fprintf (st, "                The default TAR record size is 10240.\n");
 fprintf (st, "    -V          Display some summary information about the record structure\n");
 fprintf (st, "                contained in the tape structure.\n");
 fprintf (st, "    -D          Causes the internal tape structure information to be displayed\n");
@@ -738,6 +764,7 @@ int32    runaway_counter, sizeof_gap;                   /* bytes remaining befor
 t_stat   status = MTSE_OK;
 
 MT_CLR_PNU (uptr);                                      /* clear the position-not-updated flag */
+*bc = 0;
 
 if ((uptr->flags & UNIT_ATT) == 0)                      /* if the unit is not attached */
     return MTSE_UNATT;                                  /*   then quit with an error */
@@ -955,7 +982,6 @@ else switch (f) {                                       /* otherwise the read me
         MT_CLR_INMRK (uptr);                        /* Not within an AWS tapemark */
         memset (&awshdr, 0, sizeof (awshdr));
         rdcnt = sim_fread (&awshdr, sizeof (t_awslnt), 3, uptr->fileref);
-        *bc = 0;
 
         if (ferror (uptr->fileref)) {               /* error? */
             MT_SET_PNU (uptr);                      /* pos not upd */
@@ -997,6 +1023,26 @@ else switch (f) {                                       /* otherwise the read me
                 else
                     (void)sim_fseek (uptr->fileref, saved_pos, SEEK_SET); /* Move back to the data */
                 }
+        break;
+
+    case MTUF_F_TAR:
+        if (uptr->pos < uptr->hwmark) {
+            if ((uptr->hwmark - uptr->pos) >= uptr->recsize)
+                *bc = uptr->recsize;                /* TAR record size */
+            else
+                *bc = uptr->hwmark - uptr->pos;     /* TAR remnant last record */
+            (void)sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); 
+            uptr->pos += *bc;
+            MT_CLR_INMRK (uptr);
+            }
+        else {
+            if (MT_TST_INMRK (uptr))
+                status = MTSE_EOM;
+            else {
+                status = MTSE_TMK;
+                MT_SET_INMRK (uptr);
+                }
+            }
         break;
 
     default:
@@ -1075,6 +1121,7 @@ int32    runaway_counter, sizeof_gap;                   /* bytes remaining befor
 t_stat   status = MTSE_OK;
 
 MT_CLR_PNU (uptr);                                      /* clear the position-not-updated flag */
+*bc = 0;
 
 if ((uptr->flags & UNIT_ATT) == 0)                      /* if the unit is not attached */
     return MTSE_UNATT;                                  /*   then quit with an error */
@@ -1297,7 +1344,28 @@ else switch (f) {                                       /* otherwise the read me
             }
         break;
 
-    default:
+     case MTUF_F_TAR:
+         if (uptr->pos == uptr->hwmark) {
+             if (MT_TST_INMRK (uptr)) {
+                 status = MTSE_TMK;
+                 MT_CLR_INMRK (uptr);
+                 }
+             else {
+                 if (uptr->hwmark % uptr->recsize)
+                     *bc = uptr->hwmark % uptr->recsize;
+                 else
+                     *bc = uptr->recsize;
+                 }
+             }
+         else
+             *bc = uptr->recsize;
+         if (*bc) {
+             uptr->pos -= *bc;
+             (void)sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); 
+             }
+        break;
+
+   default:
         status = MTSE_FMT;
         }
 
@@ -2585,6 +2653,7 @@ if (uptr->flags & UNIT_ATT) {
     }
 uptr->pos = 0;
 MT_CLR_PNU (uptr);
+MT_CLR_INMRK (uptr);                                    /* Not within an AWS or TAR tapemark */
 return MTSE_OK;
 }
 
@@ -3198,6 +3267,8 @@ FILE *fE11 = NULL;
 FILE *fTPC = NULL;
 FILE *fP7B = NULL;
 FILE *fAWS = NULL;
+FILE *fTAR = NULL;
+FILE *fTAR2 = NULL;
 int i, j, k;
 t_tpclnt tpclnt;
 t_mtrlnt mtrlnt;
@@ -3244,6 +3315,14 @@ if (fTPC  == NULL)
 sprintf (name, "%s.p7b", filename);
 fP7B = fopen (name, "wb");
 if (fP7B  == NULL)
+    goto Done_Files;
+sprintf (name, "%s.tar", filename);
+fTAR = fopen (name, "wb");
+if (fTAR  == NULL)
+    goto Done_Files;
+sprintf (name, "%s.2.tar", filename);
+fTAR2 = fopen (name, "wb");
+if (fTAR2  == NULL)
     goto Done_Files;
 sprintf (name, "%s.aws", filename);
 fAWS = fopen (name, "wb");
@@ -3323,6 +3402,13 @@ tpclnt = 0xffff;
 (void)sim_fwrite (&mtrlnt, sizeof (mtrlnt), 1, fE11);
 (void)sim_fwrite (&tpclnt, sizeof (tpclnt), 1, fTPC);
 (void)sim_fwrite (buf, 1, 1, fP7B);
+for (j=0; j<records; j++) {
+    memset (buf, j, 10240);
+    (void)sim_fwrite (buf, 1, 10240, fTAR);
+    (void)sim_fwrite (buf, 1, 10240, fTAR2);
+    }
+memset (buf, j, 10240);
+(void)sim_fwrite (buf, 1, 5120, fTAR2);
 Done_Files:
 if (fSIMH)
     fclose (fSIMH);
@@ -3334,6 +3420,10 @@ if (fP7B)
     fclose (fP7B);
 if (fAWS)
     fclose (fAWS);
+if (fTAR)
+    fclose (fTAR);
+if (fTAR2)
+    fclose (fTAR2);
 free (buf);
 sim_tape_detach (uptr);
 if (stat == SCPE_OK) {
@@ -3378,6 +3468,10 @@ sprintf (name, "%s.tpc", filename);
 sprintf (name, "%s.p7b", filename);
 (void)remove (name);
 sprintf (name, "%s.aws", filename);
+(void)remove (name);
+sprintf (name, "%s.tar", filename);
+(void)remove (name);
+sprintf (name, "%s.2.tar", filename);
 (void)remove (name);
 return SCPE_OK;
 }
@@ -3428,6 +3522,12 @@ SIM_TEST(sim_tape_test_density_string ());
 SIM_TEST(sim_tape_test_remove_tape_files (dptr->units, "TapeTestFile1"));
 
 SIM_TEST(sim_tape_test_create_tape_files (dptr->units, "TapeTestFile1", 2, 5, 4096));
+
+sim_switches = saved_switches;
+SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1", "tar"));
+
+sim_switches = saved_switches;
+SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1.2", "tar"));
 
 sim_switches = saved_switches;
 SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1", "aws"));
