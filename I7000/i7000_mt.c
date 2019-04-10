@@ -254,7 +254,7 @@ MTAB                mt_mod[] = {
 #endif
     {MTAB_XTD | MTAB_VUN, 0, "FORMAT", "FORMAT",
      &sim_tape_set_fmt, &sim_tape_show_fmt, NULL,
-       "Set/Display tape format (SIMH, E11, TPC, P7B)"},
+       "Set/Display tape format (SIMH, E11, TPC, P7B, AWS, TAR)" },
    {MTAB_XTD | MTAB_VUN, 0, "LENGTH", "LENGTH",
      &sim_tape_set_capac, &sim_tape_show_capac, NULL,
       "Set unit n capacity to arg MB (0 = unlimited)" },

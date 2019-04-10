@@ -57,7 +57,7 @@ typedef uint32          t_mtrlnt;                       /* magtape rec lnt */
 #define MTR_MAXLEN      0x00FFFFFF                      /* max len is 24b */
 #define MTR_ERF         0x80000000                      /* error flag */
 #define MTR_F(x)        ((x) & MTR_ERF)                 /* record error flg */
-#define MTR_L(x)        ((x) & ~MTR_ERF)                /* record length */
+#define MTR_L(x)        ((t_mtrlnt)((x) & ~MTR_ERF))    /* record length */
 
 /* TPC tape format */
 

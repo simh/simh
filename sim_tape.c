@@ -871,7 +871,7 @@ else switch (f) {                                       /* otherwise the read me
 
                 bufcntr = bufcap;                       /* mark the buffer as invalid to force a read */
 
-                *bc = MTR_GAP;                          /* reset the marker */
+                *bc = (t_mtrlnt)MTR_GAP;                /* reset the marker */
                 runaway_counter -= sizeof_gap / 2;      /*   and decrement the gap counter */
                 }
 
@@ -924,7 +924,7 @@ else switch (f) {                                       /* otherwise the read me
 
     case MTUF_F_TPC:
         (void)sim_fread (&tpcbc, sizeof (t_tpclnt), 1, uptr->fileref);
-        *bc = tpcbc;                                    /* save rec lnt */
+        *bc = (t_mtrlnt)tpcbc;                          /* save rec lnt */
 
         if (ferror (uptr->fileref)) {                   /* error? */
             MT_SET_PNU (uptr);                          /* pos not upd */
@@ -1007,7 +1007,7 @@ else switch (f) {                                       /* otherwise the read me
             else {                                  /* tape data record */
                 t_addr saved_pos;
 
-                *bc = awshdr.nxtlen;                /* save rec lnt */
+                *bc = (t_mtrlnt)awshdr.nxtlen;      /* save rec lnt */
                 uptr->pos += awshdr.nxtlen;         /* spc over record */
                 memset (&awshdr, 0, sizeof (t_awslnt));
                 saved_pos = (t_addr)sim_ftell (uptr->fileref);
@@ -1028,9 +1028,9 @@ else switch (f) {                                       /* otherwise the read me
     case MTUF_F_TAR:
         if (uptr->pos < uptr->hwmark) {
             if ((uptr->hwmark - uptr->pos) >= uptr->recsize)
-                *bc = uptr->recsize;                /* TAR record size */
+                *bc = (t_mtrlnt)uptr->recsize;              /* TAR record size */
             else
-                *bc = uptr->hwmark - uptr->pos;     /* TAR remnant last record */
+                *bc = (t_mtrlnt)(uptr->hwmark - uptr->pos); /* TAR remnant last record */
             (void)sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); 
             uptr->pos += *bc;
             MT_CLR_INMRK (uptr);
@@ -1197,7 +1197,7 @@ else switch (f) {                                       /* otherwise the read me
                 uptr->pos = uptr->pos + sizeof (t_mtrlnt) / 2;  /*     then position forward to resync */
                 bufcntr = 0;                                    /* mark the buffer as invalid to force a read */
 
-                *bc = MTR_GAP;                                  /* reset the marker */
+                *bc = (t_mtrlnt)MTR_GAP;                        /* reset the marker */
                 runaway_counter -= sizeof_gap / 2;              /*   and decrement the gap counter */
                 }
 
@@ -1225,7 +1225,7 @@ else switch (f) {                                       /* otherwise the read me
         ppos = sim_tape_tpc_fnd (uptr, (t_addr *) uptr->filebuf); /* find prev rec */
         (void)sim_fseek (uptr->fileref, ppos, SEEK_SET);/* position */
         (void)sim_fread (&tpcbc, sizeof (t_tpclnt), 1, uptr->fileref);
-        *bc = tpcbc;                                    /* save rec lnt */
+        *bc = (t_mtrlnt)tpcbc;                          /* save rec lnt */
 
         if (ferror (uptr->fileref))                     /* error? */
             status = sim_tape_ioerr (uptr);
@@ -1322,7 +1322,7 @@ else switch (f) {                                       /* otherwise the read me
             if (MT_TST_INMRK (uptr))                    /* already in a tapemark? */
                 awshdr.rectyp = AWS_REC;
             MT_CLR_INMRK (uptr);                        /* No longer in a tapemark */
-            *bc = (awshdr.rectyp == AWS_REC) ? awshdr.prelen : 0;/* save rec lnt */
+            *bc = (t_mtrlnt)((awshdr.rectyp == AWS_REC) ? awshdr.prelen : 0);/* save rec lnt */
             sbc = *bc;                                  /* extract the record length */
             if ((awshdr.rectyp != AWS_TMK) ||
                 (awshdr.prelen == 0)) {
@@ -1352,13 +1352,13 @@ else switch (f) {                                       /* otherwise the read me
                  }
              else {
                  if (uptr->hwmark % uptr->recsize)
-                     *bc = uptr->hwmark % uptr->recsize;
+                     *bc = (t_mtrlnt)(uptr->hwmark % uptr->recsize);
                  else
-                     *bc = uptr->recsize;
+                     *bc = (t_mtrlnt)uptr->recsize;
                  }
              }
          else
-             *bc = uptr->recsize;
+             *bc = (t_mtrlnt)uptr->recsize;
          if (*bc) {
              uptr->pos -= *bc;
              (void)sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); 

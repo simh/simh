@@ -186,8 +186,6 @@ MTAB ta_mod[] = {
         NULL, NULL, NULL, "Write enable tape drive" },
     { MTUF_WLK, MTUF_WLK, "write locked",  "LOCKED", 
         NULL, NULL, NULL, "Write lock tape drive"  },
-//    { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
-//      &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
     { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", NULL,
       NULL, &sim_tape_show_capac, NULL, "Display tape capacity" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 020, "ADDRESS", "ADDRESS",
