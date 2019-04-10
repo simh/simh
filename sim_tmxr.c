@@ -2125,23 +2125,23 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
 }
 
 
-int32 tmxr_rqln_bare (const TMLN *lp, t_bool speed)
+static int32 tmxr_rqln_bare (const TMLN *lp, t_bool speed)
 {
 if (speed) {
     if (lp->send.extoff < lp->send.insoff) {/* buffered SEND data? */
-        if (sim_gtime () < lp->send.next_time) 
+        if (sim_gtime () < lp->send.next_time) /* too soon? */
             return 0;
         else
-            return lp->send.delay ? 1 : (lp->send.insoff - lp->send.extoff);
+            return 1;
         }
     if (lp->rxbps) {                        /* consider speed and rate limiting? */
         if (sim_gtime () < lp->rxnexttime)  /* too soon? */
             return 0;
         else
-            return 1;
+            return ((lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? lp->rxbsz : 0)) > 0) ? 1 : 0;
         }
     }
-return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? lp->rxbsz: 0));
+return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? lp->rxbsz : 0));
 }
 
 /* Return count of available characters ready to be read for line */
