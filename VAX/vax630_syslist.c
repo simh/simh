@@ -66,6 +66,7 @@ extern DEVICE tq_dev;
 extern DEVICE dz_dev;
 extern DEVICE xq_dev, xqb_dev;
 extern DEVICE vh_dev;
+extern DEVICE va_dev;
 extern DEVICE vc_dev;
 extern DEVICE lk_dev;
 extern DEVICE vs_dev;
@@ -87,6 +88,7 @@ DEVICE *sim_devices[] = {
     &cr_dev,
     &lpt_dev,
 #if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
+    &va_dev,
     &vc_dev,
     &lk_dev,
     &vs_dev,

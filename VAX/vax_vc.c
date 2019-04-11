@@ -230,6 +230,8 @@ uint32 *vc_map;                                         /* Scanline map */
 uint32 *vc_buf = NULL;                                  /* Video memory */
 uint32 *vc_lines = NULL;                                /* Video Display Lines */
 uint8 vc_cur[256];                                      /* Cursor image */
+uint32 vc_palette[2];                                   /* Monochrome palette */
+t_bool vc_active = FALSE;
 
 t_stat vc_rd (int32 *data, int32 PA, int32 access);
 t_stat vc_wr (int32 data, int32 PA, int32 access);
@@ -673,7 +675,7 @@ uint32 rg = (pa >> 2) & 0xFFFF;
 if (!vc_buf)                                            /* QVSS disabled? */
     MACH_CHECK (MCHK_READ);                             /* Invalid memory reference */
 
-return vc_buf[rg];
+return (pa & 0x2) ? (vc_buf[rg] >> 16) : vc_buf[rg] & 0xFFFF;
 }
 
 void vc_mem_wr (int32 pa, int32 val, int32 lnt)
@@ -952,7 +954,7 @@ for (ln = 0; ln < VC_YSIZE; ln++) {
     if ((vc_map[ln] & VCMAP_VLD) == 0) {                /* line invalid? */
         off = vc_map[ln] * 32;                          /* get video buf offset */
         for (col = 0; col < VC_XSIZE; col++)  
-            vc_lines[ln*VC_XSIZE + col] = vid_mono_palette[(vc_buf[off + (col >> 5)] >> (col & 0x1F)) & 1];
+            vc_lines[ln*VC_XSIZE + col] = vc_palette[(vc_buf[off + (col >> 5)] >> (col & 0x1F)) & 1];
                                                         /* 1bpp to 32bpp */
         if (CUR_V &&                                    /* cursor visible && need to draw cursor? */
             (vc_input_captured || (vc_dev.dctrl & DBG_CURSOR))) {
@@ -962,9 +964,9 @@ for (ln = 0; ln < VC_YSIZE; ln++) {
                     if ((CUR_X + col) >= VC_XSIZE)      /* Part of cursor off screen? */
                         continue;                       /* Skip */
                     if (CUR_F)                          /* mask function */
-                        vc_lines[ln*VC_XSIZE + CUR_X + col] = vid_mono_palette[(vc_lines[ln*VC_XSIZE + CUR_X + col] == vid_mono_palette[1]) | (cur[col] & 1)];
+                        vc_lines[ln*VC_XSIZE + CUR_X + col] = vc_palette[(vc_lines[ln*VC_XSIZE + CUR_X + col] == vc_palette[1]) | (cur[col] & 1)];
                     else
-                        vc_lines[ln*VC_XSIZE + CUR_X + col] = vid_mono_palette[(vc_lines[ln*VC_XSIZE + CUR_X + col] == vid_mono_palette[1]) & (~cur[col] & 1)];
+                        vc_lines[ln*VC_XSIZE + CUR_X + col] = vc_palette[(vc_lines[ln*VC_XSIZE + CUR_X + col] == vc_palette[1]) & (~cur[col] & 1)];
                     }
                 }
             }
@@ -1016,13 +1018,18 @@ vc_crtc[CRTC_CSCS] = 0x20;                              /* hide cursor */
 vc_crtc_p = (CRTCP_LPF | CRTCP_VB);
 
 if (dptr->flags & DEV_DIS) {
-    free (vc_buf);
-    vc_buf = NULL;
-    free (vc_lines);
-    vc_lines = NULL;
-    free (vc_map);
-    vc_map = NULL;
-    return vid_close ();
+    if (vc_active) {
+        free (vc_buf);
+        vc_buf = NULL;
+        free (vc_lines);
+        vc_lines = NULL;
+        free (vc_map);
+        vc_map = NULL;
+        vc_active = FALSE;
+        return vid_close ();
+        }
+    else
+        return SCPE_OK;
     }
 
 if (!vid_active)  {
@@ -1048,6 +1055,9 @@ if (!vid_active)  {
         vid_close ();
         return SCPE_MEM;
         }
+    vc_palette[0] = vid_map_rgb (0x00, 0x00, 0x00);     /* black */
+    vc_palette[1] = vid_map_rgb (0xFF, 0xFF, 0xFF);     /* white */
+    vc_active = TRUE;
     sim_printf ("QVSS Display Created.  ");
     vc_show_capture (stdout, NULL, 0, NULL);
     if (sim_log)

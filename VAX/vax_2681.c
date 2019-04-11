@@ -100,7 +100,7 @@ switch (rg) {
 
             case 2:
                 ctx->port[PORT_A].cmd &= ~CMD_ERX;
-                ctx->port[PORT_A].sts &= ~STS_RXR;
+                ctx->port[PORT_A].sts &= ~(STS_RXR | STS_FFL);
                 break;
 
             case 3:
@@ -118,7 +118,7 @@ switch (rg) {
     case 3:                                             /* tx/rx buf A */
         if (((ctx->port[PORT_A].mode[1] >> MODE_V_CHM) & MODE_M_CHM) == 0x2) {   /* Maint */
             ctx->port[PORT_A].buf = data & 0xFF;
-            ctx->port[PORT_A].sts |= STS_RXR;
+            ctx->port[PORT_A].sts |= (STS_RXR | STS_FFL);
             ctx->ists |= ISTS_RAI;
             }
         else {
@@ -165,7 +165,7 @@ switch (rg) {
 
             case 2:
                 ctx->port[PORT_B].cmd &= ~CMD_ERX;
-                ctx->port[PORT_B].sts &= ~STS_RXR;
+                ctx->port[PORT_B].sts &= ~(STS_RXR | STS_FFL);
                 break;
 
             case 3:
@@ -183,7 +183,7 @@ switch (rg) {
     case 11:                                            /* tx/rx buf B (mouse) */
         if (((ctx->port[PORT_B].mode[1] >> MODE_V_CHM) & MODE_M_CHM) == 0x2) {   /* Maint */
             ctx->port[PORT_B].buf = data & 0xFF;
-            ctx->port[PORT_B].sts |= STS_RXR;
+            ctx->port[PORT_B].sts |= (STS_RXR | STS_FFL);
             ctx->ists |= ISTS_RBI;
             }
         else {
@@ -230,7 +230,7 @@ switch (rg) {
 
     case 3:                                             /* tx/rx buf A */
         data = ctx->port[PORT_A].buf | (ctx->port[PORT_A].sts << 8);
-        ctx->port[PORT_A].sts &= ~STS_RXR;
+        ctx->port[PORT_A].sts &= ~(STS_RXR | STS_FFL);
         ctx->ists &= ~ISTS_RAI;
         ua2681_update_rxi (ctx);
         break;
@@ -258,7 +258,7 @@ switch (rg) {
 
     case 11:                                            /* tx/rx buf B */
         data = ctx->port[PORT_B].buf | (ctx->port[PORT_B].sts << 8);
-        ctx->port[PORT_B].sts &= ~STS_RXR;
+        ctx->port[PORT_B].sts &= ~(STS_RXR | STS_FFL);
         ctx->ists &= ~ISTS_RBI;
         ua2681_update_rxi (ctx);
         break;
@@ -318,17 +318,17 @@ if (ctx->port[PORT_A].cmd & CMD_ERX) {
         r = ctx->port[PORT_A].get_char (&c);
         if (r == SCPE_OK) {
             ctx->port[PORT_A].buf = c;
-            ctx->port[PORT_A].sts |= STS_RXR;
+            ctx->port[PORT_A].sts |= (STS_RXR | STS_FFL);
             ctx->ists |= ISTS_RAI;
             }
         else {
-            ctx->port[PORT_A].sts &= ~STS_RXR;
+            ctx->port[PORT_A].sts &= ~(STS_RXR | STS_FFL);
             ctx->ists &= ~ISTS_RAI;
             }
         }
     }
 else {
-    ctx->port[PORT_A].sts &= ~STS_RXR;
+    ctx->port[PORT_A].sts &= ~(STS_RXR | STS_FFL);
     ctx->ists &= ~ISTS_RAI;
     }
 
@@ -338,17 +338,17 @@ if (ctx->port[PORT_B].cmd & CMD_ERX) {
         r = ctx->port[PORT_B].get_char (&c);
         if (r == SCPE_OK) {
             ctx->port[PORT_B].buf = c;
-            ctx->port[PORT_B].sts |= STS_RXR;
+            ctx->port[PORT_B].sts |= (STS_RXR | STS_FFL);
             ctx->ists |= ISTS_RBI;
             }
         else {
-            ctx->port[PORT_B].sts &= ~STS_RXR;
+            ctx->port[PORT_B].sts &= ~(STS_RXR | STS_FFL);
             ctx->ists &= ~ISTS_RBI;
             }
         }
     }
 else {
-    ctx->port[PORT_B].sts &= ~STS_RXR;
+    ctx->port[PORT_B].sts &= ~(STS_RXR | STS_FFL);
     ctx->ists &= ~ISTS_RBI;
     }
 

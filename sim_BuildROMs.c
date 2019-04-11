@@ -45,6 +45,7 @@ struct ROM_File_Descriptor {
    {"VAX/ka610.bin",                    "VAX/vax_ka610_bin.h",                      16384,            0xFFEF3312,        "vax_ka610_bin"},
    {"VAX/ka750_new.bin",                "VAX/vax_ka750_bin_new.h",                   1024,            0xFFFE7BE5,        "vax_ka750_bin_new", "From ROM set: E40A9, E41A9, E42A9, E43A9 (Boots: A=DD, B=DB, C=DU"},
    {"VAX/ka750_old.bin",                "VAX/vax_ka750_bin_old.h",                   1024,            0xFFFEBAA5,        "vax_ka750_bin_old", "From ROM set: 990A9, 948A9, 906A9, 905A9 (Boots: A=DD, B=DM, C=DL, D=DU"},
+   {"VAX/vcb02.bin",                    "VAX/vax_vcb02_bin.h",                      16384,            0xFFF1D2AD,        "vax_vcb02_bin"},
    {"VAX/vmb.exe",                      "VAX/vax_vmb_exe.h",                        44544,            0xFFC014BB,        "vax_vmb_exe"},
    {"PDP11/lunar11/lunar.lda",          "PDP11/pdp11_vt_lunar_rom.h",               13824   ,         0xFFF15D00,        "lunar_lda"},
    {"PDP11/dazzledart/dazzle.lda",      "PDP11/pdp11_dazzle_dart_rom.h",             6096,            0xFFF83848,        "dazzle_lda"},

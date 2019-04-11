@@ -123,7 +123,7 @@ CTAB vax630_cmd[] = {
 
 extern UNIT clk_unit;
 extern int32 tmr_poll;
-extern DEVICE vc_dev, lk_dev, vs_dev;
+extern DEVICE va_dev, vc_dev, lk_dev, vs_dev;
 
 uint32 *rom = NULL;                                     /* boot ROM */
 uint8 *nvr = NULL;                                     /* non-volatile mem */
@@ -165,8 +165,6 @@ extern int32 qbmap_rd (int32 pa);
 extern void qbmap_wr (int32 pa, int32 val, int32 lnt);
 extern int32 qbmem_rd (int32 pa);
 extern void qbmem_wr (int32 pa, int32 val, int32 lnt);
-extern int32 vc_mem_rd (int32 pa);
-extern void vc_mem_wr (int32 pa, int32 val, int32 lnt);
 extern int32 wtc_rd (int32 pa);
 extern void wtc_wr (int32 pa, int32 val, int32 lnt);
 extern void wtc_set_valid (void);
@@ -696,17 +694,15 @@ struct reglink {                                        /* register linkage */
     uint32      high;                                   /* high addr */
     int32       (*read)(int32 pa);                      /* read routine */
     void        (*write)(int32 pa, int32 val, int32 lnt); /* write routine */
+    int32      width;                                   /* data path width */
     };
 
 struct reglink regtable[] = {
-    { QBMAPBASE, QBMAPBASE+QBMAPSIZE, &qbmap_rd, &qbmap_wr },
-    { ROMBASE, ROMBASE+ROMSIZE+ROMSIZE, &rom_rd, NULL },
-    { NVRBASE, NVRBASE+NVRASIZE, &nvr_rd, &nvr_wr },
-    { KABASE, KABASE+KASIZE, &ka_rd, &ka_wr },
-#if !defined(VAX_620)
-    { QVMBASE, QVMBASE+QVMSIZE, &vc_mem_rd, &vc_mem_wr },
-#endif
-    { QBMBASE, QBMBASE+QBMSIZE, &qbmem_rd, &qbmem_wr },
+    { QBMAPBASE, QBMAPBASE+QBMAPSIZE, &qbmap_rd, &qbmap_wr, L_LONG },
+    { ROMBASE, ROMBASE+ROMSIZE+ROMSIZE, &rom_rd, NULL, L_LONG },
+    { NVRBASE, NVRBASE+NVRASIZE, &nvr_rd, &nvr_wr, L_LONG },
+    { KABASE, KABASE+KASIZE, &ka_rd, &ka_wr, L_LONG },
+    { QBMBASE, QBMBASE+QBMSIZE, &qbmem_rd, &qbmem_wr, L_WORD },
     { 0, 0, NULL, NULL }
     };
 
@@ -722,10 +718,18 @@ struct reglink regtable[] = {
 int32 ReadReg (uint32 pa, int32 lnt)
 {
 struct reglink *p;
+int32 val;
 
 for (p = &regtable[0]; p->low != 0; p++) {
-    if ((pa >= p->low) && (pa < p->high) && p->read)
-        return p->read (pa);
+    if ((pa >= p->low) && (pa < p->high) && p->read) {
+        val = p->read (pa);
+        if (p->width < L_LONG) {
+            if (lnt < L_LONG)
+                val = val << ((pa & 2)? 16: 0);
+            else val = (p->read (pa + 2) << 16) | val;
+            }
+        return val;
+        }
     }
 
 MACH_CHECK (MCHK_READ);
@@ -742,9 +746,27 @@ MACH_CHECK (MCHK_READ);
 
 int32 ReadRegU (uint32 pa, int32 lnt)
 {
-if (lnt == L_BYTE)
-    return ReadReg (pa & ~03, L_LONG);
-return (ReadReg (pa & ~03, L_WORD) & WMASK) | (ReadReg ((pa & ~03) + 2, L_WORD) & (WMASK << 16));
+struct reglink *p;
+int32 val;
+
+for (p = &regtable[0]; p->low != 0; p++) {
+    if ((pa >= p->low) && (pa < p->high) && p->read) {
+        if (p->width < L_LONG) {
+            val = p->read (pa);
+            if ((lnt + (pa & 1)) <= 2)
+                val = val << ((pa & 2)? 16: 0);
+            else val = (p->read (pa + 2) << 16) | val;
+            }
+        else {
+            if (lnt == L_BYTE)
+                val = p->read (pa & ~03);
+            else val = (p->read (pa & ~03) & WMASK) | (p->read ((pa & ~03) + 2) & (WMASK << 16));
+            }
+        return val;
+        }
+    }
+
+MACH_CHECK (MCHK_READ);
 }
 
 /* WriteReg - write register space
@@ -763,7 +785,11 @@ struct reglink *p;
 
 for (p = &regtable[0]; p->low != 0; p++) {
     if ((pa >= p->low) && (pa < p->high) && p->write) {
-        p->write (pa, val, lnt);  
+        if (lnt > p->width) {
+            p->write (pa, val & WMASK, L_WORD);
+            p->write (pa + 2, (val >> 16) & WMASK, L_WORD);
+            }
+        else p->write (pa, val, lnt);  
         return;
         }
     }
@@ -783,12 +809,48 @@ MACH_CHECK (MCHK_WRITE);
 
 void WriteRegU (uint32 pa, int32 val, int32 lnt)
 {
-int32 sc = (pa & 03) << 3;
-int32 dat = ReadReg (pa & ~03, L_LONG);
+struct reglink *p;
 
-dat = (dat & ~(insert[lnt] << sc)) | ((val & insert[lnt]) << sc);
-WriteReg (pa & ~03, dat, L_LONG);
-return;
+for (p = &regtable[0]; p->low != 0; p++) {
+    if ((pa >= p->low) && (pa < p->high) && p->write) {
+        if (p->width < L_LONG) {
+            switch (lnt) {
+            case L_BYTE:                                            /* byte */
+                p->write (pa, val & BMASK, L_BYTE);
+                break;
+
+            case L_WORD:                                            /* word */
+                if (pa & 1) {                                       /* odd addr? */
+                    p->write (pa, val & BMASK, L_BYTE);
+                    p->write (pa + 1, (val >> 8) & BMASK, L_BYTE);
+                    }
+                else p->write (pa, val & WMASK, L_WORD);
+                break;
+
+            case 3:                                                 /* tribyte */
+                if (pa & 1) {                                       /* odd addr? */
+                    p->write (pa, val & BMASK, L_BYTE);              /* byte then word */
+                    p->write (pa + 1, (val >> 8) & WMASK, L_WORD);
+                    }
+                else {                                              /* even */
+                    p->write (pa, val & WMASK, WRITE);               /* word then byte */
+                    p->write (pa + 2, (val >> 16) & BMASK, L_BYTE);
+                    }
+                break;
+                }
+            }
+        else if (p->read) {
+            int32 sc = (pa & 03) << 3;
+            int32 dat = p->read (pa & ~03);
+
+            dat = (dat & ~(insert[lnt] << sc)) | ((val & insert[lnt]) << sc);
+            p->write (pa & ~03, dat, L_LONG);
+            }
+        return;
+        }
+    }
+
+MACH_CHECK (MCHK_WRITE);
 }
 
 /* KA630 registers */
@@ -1012,6 +1074,7 @@ if (MATCH_CMD(gbuf, "MICROVAX") == 0) {
     sys_model = 0;
 #if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
     vc_dev.flags = vc_dev.flags | DEV_DIS;               /* disable QVSS */
+    va_dev.flags = va_dev.flags | DEV_DIS;               /* disable QDSS */
     lk_dev.flags = lk_dev.flags | DEV_DIS;               /* disable keyboard */
     vs_dev.flags = vs_dev.flags | DEV_DIS;               /* disable mouse */
 #endif
@@ -1022,12 +1085,26 @@ else if (MATCH_CMD(gbuf, "VAXSTATION") == 0) {
 #if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
     sys_model = 1;
     vc_dev.flags = vc_dev.flags & ~DEV_DIS;              /* enable QVSS */
+    va_dev.flags = va_dev.flags | DEV_DIS;               /* disable QDSS */
     lk_dev.flags = lk_dev.flags & ~DEV_DIS;              /* enable keyboard */
     vs_dev.flags = vs_dev.flags & ~DEV_DIS;              /* enable mouse */
     strcpy (sim_name, "VAXStation II (KA630)");
     reset_all (0);                                       /* reset everything */
 #else
     return sim_messagef(SCPE_ARG, "Simulator built without Graphic Device Support\n");
+#endif
+    }
+else if (MATCH_CMD(gbuf, "VAXSTATIONGPX") == 0) {
+#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
+    sys_model = 2;
+    vc_dev.flags = vc_dev.flags | DEV_DIS;               /* disable QVSS */
+    va_dev.flags = va_dev.flags & ~DEV_DIS;              /* enable QDSS */
+    lk_dev.flags = lk_dev.flags & ~DEV_DIS;              /* enable keyboard */
+    vs_dev.flags = vs_dev.flags & ~DEV_DIS;              /* enable mouse */
+    strcpy (sim_name, "VAXStation II/GPX (KA630)");
+    reset_all (0);                                       /* reset everything */
+#else
+    return sim_messagef(SCPE_ARG, "Simulator built without Graphic Device Support");
 #endif
     }
 else
@@ -1040,7 +1117,17 @@ t_stat cpu_print_model (FILE *st)
 #if defined(VAX_620)
 fprintf (st, "rtVAX 1000");
 #else
-fprintf (st, (sys_model ? "VAXstation II" : "MicroVAX II"));
+switch (sys_model) {
+    case 0:
+        fprintf (st, "MicroVAX II");
+        break;
+    case 1:
+        fprintf (st, "VAXstation II");
+        break;
+    case 2:
+        fprintf (st, "VAXstation II/GPX");
+        break;
+        }
 #endif
 return SCPE_OK;
 }

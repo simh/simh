@@ -74,6 +74,7 @@ int32 qb_map[QBNMAPR] = { 0 };                          /* map registers */
 int32 autcon_enb = 1;                                   /* autoconfig enable */
 
 extern int32 ka_mser;                                   /* KA630 mem sys err */
+extern int32 sys_model;
 
 t_stat dbl_rd (int32 *data, int32 addr, int32 access);
 t_stat dbl_wr (int32 data, int32 addr, int32 access);
@@ -89,6 +90,11 @@ t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat qba_show_virt (FILE *of, UNIT *uptr, int32 val, CONST void *desc);
 t_stat qba_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *qba_description (DEVICE *dptr);
+
+extern int32 va_mem_rd (int32 pa);
+extern void va_mem_wr (int32 pa, int32 val, int32 lnt);
+extern int32 vc_mem_rd (int32 pa);
+extern void vc_mem_wr (int32 pa, int32 val, int32 lnt);
 
 /* Qbus adapter data structures
 
@@ -460,8 +466,18 @@ int32 qbmem_rd (int32 pa)
 int32 qa = pa & QBMAMASK;                               /* Qbus addr */
 uint32 ma;
 
+#if !defined(VAX_620)
+if (sys_model == 1) {                                   /* VAXstation II? */
+    if ((pa >= QVMBASE) && (pa < QVMBASE+QVMSIZE))
+        return vc_mem_rd (pa);                          /* read QVSS */
+    }
+else if (sys_model == 2) {                              /* VAXstation II/GPX? */
+    if ((pa >= QDMBASE) && (pa < QDMBASE+QDMSIZE))
+        return va_mem_rd (pa);                          /* read QDSS */
+    }
+#endif
 if (qba_map_addr (qa, &ma)) {                           /* map addr */
-    return M[ma >> 2];
+    return ReadW (ma);
 }
 MACH_CHECK (MCHK_READ);                                 /* err? mcheck */
 return 0;
@@ -472,6 +488,18 @@ void qbmem_wr (int32 pa, int32 val, int32 lnt)
 int32 qa = pa & QBMAMASK;                               /* Qbus addr */
 uint32 ma;
 
+#if !defined(VAX_620)
+if (sys_model == 1) {                                   /* VAXstation II? */
+    if ((pa >= QVMBASE) && (pa < QVMBASE+QVMSIZE))
+        vc_mem_wr (pa, val, lnt);                       /* write QVSS */
+        return;
+    }
+else if (sys_model == 2) {                              /* VAXstation II/GPX? */
+    if ((pa >= QDMBASE) && (pa < QDMBASE+QDMSIZE))
+        va_mem_wr (pa, val, lnt);                       /* write QDSS */
+        return;
+    }
+#endif
 if (qba_map_addr (qa, &ma)) {                           /* map addr */
     if (lnt < L_LONG) {
         int32 sc = (pa & 3) << 3;
@@ -479,7 +507,7 @@ if (qba_map_addr (qa, &ma)) {                           /* map addr */
         int32 t = M[ma >> 2];
         val = ((val & mask) << sc) | (t & ~(mask << sc));
         }
-    M[ma >> 2] = val;
+    WriteW (ma, val);
     }
 else mem_err = 1;
 return;

@@ -183,6 +183,7 @@ t_stat vid_register_quit_callback (VID_QUIT_CALLBACK callback);
 t_stat vid_close (void);
 t_stat vid_poll_kb (SIM_KEY_EVENT *ev);
 t_stat vid_poll_mouse (SIM_MOUSE_EVENT *ev);
+uint32 vid_map_rgb (uint8 r, uint8 g, uint8 b);
 void vid_draw (int32 x, int32 y, int32 w, int32 h, uint32 *buf);
 void vid_beep (void);
 void vid_refresh (void);
@@ -196,7 +197,6 @@ t_stat vid_show (FILE* st, DEVICE *dptr,  UNIT* uptr, int32 val, CONST char* des
 t_stat vid_screenshot (const char *filename);
 
 extern t_bool vid_active;
-extern uint32 vid_mono_palette[2];
 void vid_set_cursor_position (int32 x, int32 y);        /* cursor position (set by calling code) */
 
 /* A device simulator can optionally set the vid_display_kb_event_process

@@ -349,6 +349,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\VAX\vax_gpx.c"
+				>
+			</File>
+			<File
 				RelativePath="..\VAX\vax_lk.c"
 				>
 			</File>
@@ -366,6 +370,10 @@
 			</File>
 			<File
 				RelativePath="..\VAX\vax_syscm.c"
+				>
+			</File>
+			<File
+				RelativePath="..\VAX\vax_va.c"
 				>
 			</File>
 			<File
@@ -639,6 +647,10 @@
 			</File>
 			<File
 				RelativePath="..\VAX\vax_defs.h"
+				>
+			</File>
+			<File
+				RelativePath="..\VAX\vax_gpx.h"
 				>
 			</File>
 			<File
