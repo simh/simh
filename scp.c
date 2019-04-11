@@ -4095,7 +4095,7 @@ return ap;
 
    Token "%0" represents the command file name.
 
-   The input sequence "\%" represents a literal "%", and "\\" represents a
+   The input sequence "%%" represents a literal "%", and "\\" represents a
    literal "\".  All other character combinations are rendered literally.
 
    Omitted parameters result in null-string substitutions.
@@ -4202,11 +4202,16 @@ for (; *ip && (op < oend); ) {
                     ++ip;
                     }
                 else {
-                    get_glyph_nc (ip, gbuf, '%');           /* get the literal name */
-                    ap = _sim_get_env_special (gbuf, rbuf, sizeof (rbuf));
-                    ip += strlen (gbuf);
-                    if (*ip == '%') 
-                        ++ip;
+                    if (*ip == '\0') {                  /* is this a bare % at end of line? */
+                        *op++ = '%';                    /* leave it there as a literal percent sign */
+                        }
+                    else {
+                        get_glyph_nc (ip, gbuf, '%');   /* get the literal name */
+                        ap = _sim_get_env_special (gbuf, rbuf, sizeof (rbuf));
+                        ip += strlen (gbuf);
+                        if (*ip == '%') 
+                            ++ip;
+                        }
                     }
                 }
             if (ap) {                                   /* non-null arg? */
