@@ -336,10 +336,10 @@ int tcp_fconnect(struct socket *so)
     int opt, s=so->s;
     struct sockaddr_in addr;
 
-    qemu_set_nonblock(s);
+    (void)qemu_set_nonblock(s);
     socket_set_fast_reuse(s);
     opt = 1;
-    qemu_setsockopt(s, SOL_SOCKET, SO_OOBINLINE, &opt, sizeof(opt));
+    (void)qemu_setsockopt(s, SOL_SOCKET, SO_OOBINLINE, &opt, sizeof(opt));
 
     addr.sin_family = AF_INET;
     if ((so->so_faddr.s_addr & slirp->vnetwork_mask.s_addr) ==
@@ -425,10 +425,10 @@ void tcp_connect(struct socket *inso)
         return;
     }
     qemu_set_nonblock(s);
-    socket_set_fast_reuse(s);
+    (void)socket_set_fast_reuse(s);
     opt = 1;
-    qemu_setsockopt(s, SOL_SOCKET, SO_OOBINLINE, &opt, sizeof(int));
-    socket_set_nodelay(s);
+    (void)qemu_setsockopt(s, SOL_SOCKET, SO_OOBINLINE, &opt, sizeof(int));
+    (void)socket_set_nodelay(s);
 
     so->so_fport = addr.sin_port;
     so->so_faddr = addr.sin_addr;

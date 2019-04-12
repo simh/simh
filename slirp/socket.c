@@ -354,7 +354,7 @@ sowrite(struct socket *so)
         DEBUG_ARG("so = %lx", (long)so);
 
         if (so->so_urgc) {
-                sosendoob(so);
+                (void)sosendoob(so);
                 if (sb->sb_cc == 0)
                         return 0;
         }
@@ -626,10 +626,10 @@ tcp_listen(Slirp *slirp, uint32_t haddr, u_int hport, uint32_t laddr,
         addr.sin_addr.s_addr = haddr;
         addr.sin_port = hport;
 
-        if (((s = qemu_socket(AF_INET,SOCK_STREAM,0)) < 0) ||
-            (socket_set_fast_reuse(s) < 0) ||
-            (bind(s,(struct sockaddr *)&addr, sizeof(addr)) < 0) ||
-            (listen(s,1) < 0)) {
+        if (((s = qemu_socket(AF_INET,SOCK_STREAM,0)) == SOCKET_ERROR) ||
+            (socket_set_fast_reuse(s) == SOCKET_ERROR) ||
+            (bind(s,(struct sockaddr *)&addr, sizeof(addr)) == SOCKET_ERROR) ||
+            (listen(s,1) == SOCKET_ERROR)) {
                 int tmperrno = errno; /* Don't clobber the real reason we failed */
 
                 closesocket(s);
@@ -643,9 +643,9 @@ tcp_listen(Slirp *slirp, uint32_t haddr, u_int hport, uint32_t laddr,
 #endif
                 return NULL;
         }
-        qemu_setsockopt(s, SOL_SOCKET, SO_OOBINLINE, &opt, sizeof(int));
+        (void)qemu_setsockopt(s, SOL_SOCKET, SO_OOBINLINE, &opt, sizeof(int));
 
-        getsockname(s,(struct sockaddr *)&addr,&addrlen);
+        (void)getsockname(s,(struct sockaddr *)&addr,&addrlen);
         so->so_fport = addr.sin_port;
         if (addr.sin_addr.s_addr == 0 || addr.sin_addr.s_addr == loopback_addr.s_addr)
            so->so_faddr = slirp->vhost_addr;

@@ -111,7 +111,7 @@ static int tftp_read_data(struct tftp_session *spt, uint32_t block_nr,
     }
 
     if (len) {
-        fseek(spt->f, block_nr * 512, SEEK_SET);
+        (void)fseek(spt->f, block_nr * 512, SEEK_SET);
 
         bytes_read = fread(buf, 1, len, spt->f);
     }

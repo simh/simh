@@ -297,7 +297,7 @@ void slirp_connection_info(Slirp *slirp, Monitor *mon)
         if (so->so_state & SS_HOSTFWD) {
             snprintf(buf, sizeof(buf), "  UDP[HOST_FORWARD]");
             src_len = sizeof(src);
-            getsockname(so->s, (struct sockaddr *)&src, &src_len);
+            (void)getsockname(so->s, (struct sockaddr *)&src, &src_len);
             dst_addr = so->so_laddr;
             dst_port = so->so_lport;
         } else {

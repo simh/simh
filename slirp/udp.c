@@ -368,13 +368,13 @@ udp_listen(Slirp *slirp, uint32_t haddr, u_int hport, uint32_t laddr,
         addr.sin_addr.s_addr = haddr;
         addr.sin_port = hport;
 
-        if (bind(so->s,(struct sockaddr *)&addr, addrlen) < 0) {
+        if (bind(so->s,(struct sockaddr *)&addr, addrlen) == SOCKET_ERROR) {
                 udp_detach(so);
                 return NULL;
         }
-        socket_set_fast_reuse(so->s);
+        (void)socket_set_fast_reuse(so->s);
 
-        getsockname(so->s,(struct sockaddr *)&addr,&addrlen);
+        (void)getsockname(so->s,(struct sockaddr *)&addr,&addrlen);
         so->so_fport = addr.sin_port;
         if (addr.sin_addr.s_addr == 0 ||
             addr.sin_addr.s_addr == loopback_addr.s_addr) {
