@@ -31,6 +31,8 @@
         MP02083     - VCB02 Field Maintenance Print Set
 */
 
+#if !defined(VAX_620)
+
 #include "vax_defs.h"
 #include "sim_video.h"
 #include "vax_gpx.h"
@@ -1224,3 +1226,7 @@ const char *va_description (DEVICE *dptr)
 {
 return "VCB02 Colour Graphics Adapter";
 }
+
+#else /* defined(VAX_620) */
+static const char *dummy_declaration = "Something to compile";
+#endif /* !defined(VAX_620) */

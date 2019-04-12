@@ -1104,7 +1104,7 @@ else if (MATCH_CMD(gbuf, "VAXSTATIONGPX") == 0) {
     strcpy (sim_name, "VAXStation II/GPX (KA630)");
     reset_all (0);                                       /* reset everything */
 #else
-    return sim_messagef(SCPE_ARG, "Simulator built without Graphic Device Support");
+    return sim_messagef(SCPE_ARG, "Simulator built without Graphic Device Support\n");
 #endif
     }
 else
