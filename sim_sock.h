@@ -90,8 +90,10 @@ extern "C" {
 #endif
 #define WSAEACCES       EACCES
 #define WSAEINTR        EINTR
-#define INVALID_SOCKET  ((SOCKET)-1) 
-#define SOCKET_ERROR    -1
+#define INVALID_SOCKET  ((SOCKET)-1)
+#if !defined(SOCKET_ERROR)
+#define SOCKET_ERROR    (-1)
+#endif
 #endif
 
 #if defined (VMS)                                       /* VMS unique */

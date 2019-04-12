@@ -8,6 +8,7 @@
 #include <winsock2.h>
 #else
 typedef int SOCKET;
+#define SOCKET_ERROR (-1)
 #endif
 
 #ifndef  __cplusplus
