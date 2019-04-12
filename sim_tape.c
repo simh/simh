@@ -643,7 +643,9 @@ fprintf (st, "                specified file.  This record size will be used for
 fprintf (st, "                possibly the last record which will be what remains unread.\n");
 fprintf (st, "                The default TAR record size is 10240.\n");
 fprintf (st, "    -V          Display some summary information about the record structure\n");
-fprintf (st, "                contained in the tape structure.\n");
+fprintf (st, "                contained in the tape image scan performed when it is attached.\n");
+fprintf (st, "    -S          Perform reverse reads and forward skips during the attach time\n");
+fprintf (st, "                tape image scan.\n");
 fprintf (st, "    -D          Causes the internal tape structure information to be displayed\n");
 fprintf (st, "                while the tape image is scanned.\n");
 return SCPE_OK;
@@ -759,6 +761,7 @@ t_tpclnt tpcbc;
 t_awshdr awshdr;
 size_t   rdcnt;
 t_mtrlnt buffer [256];                                  /* local tape buffer */
+t_addr saved_pos;
 uint32   bufcntr, bufcap;                               /* buffer counter and capacity */
 int32    runaway_counter, sizeof_gap;                   /* bytes remaining before runaway and bytes per gap */
 t_stat   status = MTSE_OK;
@@ -876,12 +879,7 @@ else switch (f) {                                       /* otherwise the read me
                 }
 
             else {                                                      /* otherwise it's a record marker */
-                if (bufcntr < bufcap                                    /* if the position is within the buffer */
-                  && sim_fseek (uptr->fileref, uptr->pos, SEEK_SET)) {  /*   then seek to the data area; if it fails */
-                    status = sim_tape_ioerr (uptr);                     /*     then quit with I/O error status */
-                    break;
-                    }
-
+                saved_pos = uptr->pos;                          /* Save data position */
                 sbc = MTR_L (*bc);                              /* extract the record length */
                 uptr->pos = uptr->pos + sizeof (t_mtrlnt)       /* position to the start */
                   + (f == MTUF_F_STD ? (sbc + 1) & ~1 : sbc);   /*   of the record */
@@ -893,7 +891,6 @@ else switch (f) {                                       /* otherwise the read me
             status = MTSE_RUNAWAY;                      /*   then report it */
 
         if (status == MTSE_OK) {                        /* Validate the reverse record size */
-            t_addr saved_pos = (t_addr)sim_ftell(uptr->fileref);
             t_mtrlnt rev_lnt;
 
             if (sim_fseek (uptr->fileref, uptr->pos - sizeof (t_mtrlnt), SEEK_SET)){  /*   then seek to the end of record size; if it fails */
@@ -2983,33 +2980,35 @@ while (r == SCPE_OK) {
                 ++unique_record_sizes;
             ++rec_sizes[bc_f];
             }
-        memset (buf_r, 0, max);
-        r_r = sim_tape_rdrecr (uptr, buf_r, &bc_r, max);
-        pos_r = uptr->pos;
-        if (r_r != r_f) {
-            sim_printf ("Forward Record Read returned: %s, Reverse read returned: %s\n", sim_tape_error_text (r_f), sim_tape_error_text (r_r));
-            break;
-            }
-        if (bc_f != bc_r) {
-            sim_printf ("Forward Record Read record length: %d, Reverse read record length: %d\n", bc_f, bc_r);
-            break;
-            }
-        if (0 != memcmp (buf_f, buf_r, bc_f)) {
-            sim_printf ("%d byte record contents differ when read forward amd backwards start from position %" T_ADDR_FMT "u\n", bc_f, pos_f);
-            break;
-            }
-        if (pos_f != pos_r) {
-            sim_printf ("Unexpected tape file position between forward and reverse record read: (%" T_ADDR_FMT "u, %" T_ADDR_FMT "u\n", pos_f, pos_r);
-            break;
-            }
-        r_s = sim_tape_sprecf (uptr, &bc_s);
-        if (r_s != r_f) {
-            sim_printf ("Unexpected Space Record Status: %s vs %s\n", sim_tape_error_text (r_s), sim_tape_error_text (r_f));
-            break;
-            }
-        if (bc_s != bc_f) {
-            sim_printf ("Unexpected Space Record Length: %d vs %d\n", bc_s, bc_f);
-            break;
+        if (sim_switches & SWMASK ('S')) {
+            memset (buf_r, 0, max);
+            r_r = sim_tape_rdrecr (uptr, buf_r, &bc_r, max);
+            pos_r = uptr->pos;
+            if (r_r != r_f) {
+                sim_printf ("Forward Record Read returned: %s, Reverse read returned: %s\n", sim_tape_error_text (r_f), sim_tape_error_text (r_r));
+                break;
+                }
+            if (bc_f != bc_r) {
+                sim_printf ("Forward Record Read record length: %d, Reverse read record length: %d\n", bc_f, bc_r);
+                break;
+                }
+            if (0 != memcmp (buf_f, buf_r, bc_f)) {
+                sim_printf ("%d byte record contents differ when read forward amd backwards start from position %" T_ADDR_FMT "u\n", bc_f, pos_f);
+                break;
+                }
+            if (pos_f != pos_r) {
+                sim_printf ("Unexpected tape file position between forward and reverse record read: (%" T_ADDR_FMT "u, %" T_ADDR_FMT "u\n", pos_f, pos_r);
+                break;
+                }
+            r_s = sim_tape_sprecf (uptr, &bc_s);
+            if (r_s != r_f) {
+                sim_printf ("Unexpected Space Record Status: %s vs %s\n", sim_tape_error_text (r_s), sim_tape_error_text (r_f));
+                break;
+                }
+            if (bc_s != bc_f) {
+                sim_printf ("Unexpected Space Record Length: %d vs %d\n", bc_s, bc_f);
+                break;
+                }
             }
         r = SCPE_OK;
         break;
@@ -3041,7 +3040,7 @@ if ((r != MTSE_EOM) || (sim_switches & SWMASK ('V')) ||
     sim_printf ("%u bytes of tape data (%u records, %u tapemarks)\n",
                 data_total, record_total, tapemark_total);
     if (record_total > 0) {
-        sim_printf ("Comprising (in record size order):\n");
+        sim_printf ("Comprising %d different sized records (in record size order):\n", unique_record_sizes);
         for (bc = 0; bc <= max; bc++) {
             if (rec_sizes[bc])
                 sim_printf ("%8u %u byte records\n", rec_sizes[bc], (uint32)bc);
