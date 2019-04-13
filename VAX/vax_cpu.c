@@ -253,6 +253,7 @@ int32 in_ie = 0;                                        /* in exc, int */
 int32 recq[6];                                          /* recovery queue */
 int32 recqptr;                                          /* recq pointer */
 int32 hlt_pin = 0;                                      /* HLT pin intr */
+int32 mxpr_cc_vc = 0;                                   /* cc V & C bits from mtpr/mfpr operations */
 int32 mem_err = 0;
 int32 crd_err = 0;
 int32 p1 = 0, p2 = 0;                                   /* fault parameters */
@@ -3068,14 +3069,18 @@ for ( ;; ) {
         break;
 
     case MTPR:
-        cc = (cc & CC_C) | op_mtpr (opnd);
+        mxpr_cc_vc = cc & CC_C;
+        cc = op_mtpr (opnd);
+        cc = cc | (mxpr_cc_vc & (CC_V|CC_C));
         SET_IRQL;                                       /* update intreq */
         break;
 
     case MFPR:
+        mxpr_cc_vc = cc & CC_C;
         r = op_mfpr (opnd);
         WRITE_L (r);
-        CC_IIZP_L (r);
+        CC_IIZZ_L (r);
+        cc = cc | (mxpr_cc_vc & (CC_V|CC_C));
         break;
 
 /* CIS or emulated instructions */
