@@ -69,6 +69,7 @@ void timer_write(uint32 pa, uint32 val, size_t size);
 t_stat timer0_svc(UNIT *uptr);
 t_stat timer1_svc(UNIT *uptr);
 t_stat timer2_svc(UNIT *uptr);
+t_stat timer_set_shutdown(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 /* CSR */
 t_stat csr_svc(UNIT *uptr);

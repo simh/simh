@@ -3455,7 +3455,7 @@ static void cpu_calc_ints()
         cpu_int_ipl = cpu_int_vec = CPU_ID_IF_IPL;
     } else if ((csr_data & CSRUART) || (csr_data & CSRDMA)) {
         cpu_int_ipl = cpu_int_vec = CPU_IU_DMA_IPL;
-    } else if (csr_data & CSRCLK) {
+    } else if ((csr_data & CSRCLK) || (csr_data & CSRTIMO)) {
         cpu_int_ipl = cpu_int_vec = CPU_TMR_IPL;
     } else {
         cpu_int_ipl = cpu_int_vec = 0;
