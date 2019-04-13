@@ -136,10 +136,15 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc
 #define ROMSIZE         (1u << ROMAWIDTH)               /* ROM length */
 #define ROMAMASK        (ROMSIZE - 1)                   /* ROM addr mask */
 #define ROMBASE         0x20040000                      /* ROM base */
+#if !defined(VAX_620)
 #define ADDR_IS_ROM(x)  (((((uint32) (x)) >= ROMBASE) && \
-                        (((uint32) (x)) < (ROMBASE + ROMSIZE + ROMSIZE))) || \
-                        ((((uint32) (x)) >= QDMBASE) && \
-                        (((uint32) (x)) < (QDMBASE + QDMSIZE + QDMSIZE))))
+                          (((uint32) (x)) < (ROMBASE + ROMSIZE + ROMSIZE))) || \
+                         ((((uint32) (x)) >= QDMBASE) && \
+                          (((uint32) (x)) < (QDMBASE + QDMSIZE))))
+#else
+#define ADDR_IS_ROM(x)  ((((uint32) (x)) >= ROMBASE) && \
+                         (((uint32) (x)) < (ROMBASE + ROMSIZE + ROMSIZE)))
+#endif
 
 /* KA630 board registers */
 
@@ -185,7 +190,8 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc
 #define QDMAWIDTH       16                              /* QDSS mem addr width */
 #define QDMSIZE         (1u << QDMAWIDTH)               /* QDSS mem length */
 #define QDMAMASK        (QDMSIZE - 1)                   /* QDSS mem addr mask */
-#define QDMBASE         0x303F0000                      /* QDSS mem base */
+#define QDMBASE         ((uint32)(0x30000000 + va_addr))/* QDSS mem base */
+extern uint32 va_addr;                                  /* QDSS memory offset */
 
 /* Other address spaces */
 

@@ -75,6 +75,7 @@ int32 autcon_enb = 1;                                   /* autoconfig enable */
 
 extern int32 ka_mser;                                   /* KA630 mem sys err */
 extern int32 sys_model;
+extern uint32 va_addr;                                  /* QDSS (VCB02) Qbus Memory Offset */
 
 t_stat dbl_rd (int32 *data, int32 addr, int32 access);
 t_stat dbl_wr (int32 data, int32 addr, int32 access);
@@ -468,11 +469,11 @@ uint32 ma;
 
 #if !defined(VAX_620)
 if (sys_model == 1) {                                   /* VAXstation II? */
-    if ((pa >= QVMBASE) && (pa < QVMBASE+QVMSIZE))
+    if (((uint32)pa >= QVMBASE) && ((uint32)pa < QVMBASE+QVMSIZE))
         return vc_mem_rd (pa);                          /* read QVSS */
     }
 else if (sys_model == 2) {                              /* VAXstation II/GPX? */
-    if ((pa >= QDMBASE) && (pa < QDMBASE+QDMSIZE))
+    if (((uint32)pa >= QDMBASE) && ((uint32)pa < QDMBASE+QDMSIZE))
         return va_mem_rd (pa);                          /* read QDSS */
     }
 #endif
@@ -490,12 +491,12 @@ uint32 ma;
 
 #if !defined(VAX_620)
 if (sys_model == 1) {                                   /* VAXstation II? */
-    if ((pa >= QVMBASE) && (pa < QVMBASE+QVMSIZE))
+    if (((uint32)pa >= QVMBASE) && ((uint32)pa < QVMBASE+QVMSIZE))
         vc_mem_wr (pa, val, lnt);                       /* write QVSS */
         return;
     }
 else if (sys_model == 2) {                              /* VAXstation II/GPX? */
-    if ((pa >= QDMBASE) && (pa < QDMBASE+QDMSIZE))
+    if (((uint32)pa >= QDMBASE) && ((uint32)pa < QDMBASE+QDMSIZE))
         va_mem_wr (pa, val, lnt);                       /* write QDSS */
         return;
     }

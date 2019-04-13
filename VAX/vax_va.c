@@ -164,6 +164,7 @@ t_bool va_active = FALSE;
 t_bool va_updated[VA_BYSIZE];
 t_bool va_input_captured = FALSE;                       /* Mouse and Keyboard input captured in video window */
 uint32 *va_buf = NULL;                                  /* Video memory */
+uint32 va_addr;                                         /* QDSS Qbus memory window address */
 uint32 *va_lines = NULL;                                /* Video Display Lines */
 uint32 va_palette[256];                                 /* Colour palette */
 
@@ -232,6 +233,7 @@ DEBTAB va_debug[] = {
     { "ADP",     DBG_ADP,            "Address Procesor (Adder) activity" },
     { "VDP",     DBG_VDP,            "Video Processor (Viper) activity" },
     { "ROP",     DBG_ROP,            "Raster operations" },
+    { "ROM",     DBG_ROM,            "ROM reads" },
     { "DGA",     DBG_DGA,            "DMA Gate Array activity" },
     { "INT",     DBG_INT,            "Interrupt activity" },
     { "CURSOR",  DBG_CURSOR,         "Cursor content, function and visibility activity"},
@@ -311,7 +313,7 @@ if (rg == 0) {
         *data = *data | CSR_OPT2;                             /* option 2 not present */
     }
 else *data = 0;
-sim_debug (DBG_REG, &va_dev, "va_rd: %d, %X at %08X\n", rg, *data, fault_PC);
+sim_debug (DBG_REG, &va_dev, "va_rd: %d, %X from PC %08X\n", rg, *data, fault_PC);
 return SCPE_OK;
 }
 
@@ -323,8 +325,9 @@ if (rg == 0) {
         sim_activate_abs (&va_unit[0], tmxr_poll);
     else
         sim_cancel (&va_unit[0]);
+    va_addr = ((uint32)data) << QDMAWIDTH;
     }
-sim_debug (DBG_REG, &va_dev, "va_wr: %d, %X at %08X\n", rg, data, fault_PC);
+sim_debug (DBG_REG, &va_dev, "va_wr: %d, %X from PC %08X\n", rg, data, fault_PC);
 return SCPE_OK;
 }
 
@@ -339,7 +342,7 @@ va_dga_fifo_sz = 0;                                     /* empty */
 
 void va_dga_fifo_wr (uint32 val)
 {
-sim_debug (DBG_DGA, &va_dev, "dga_fifo_wr: %d, %X (%d) at %08X\n", va_dga_fifo_wp, val, (va_dga_fifo_sz + 1), fault_PC);
+sim_debug (DBG_DGA, &va_dev, "dga_fifo_wr: %d, %X (%d) from PC %08X\n", va_dga_fifo_wp, val, (va_dga_fifo_sz + 1), fault_PC);
 #if 0
 if (va_dga_fifo_sz == VA_DGA_FIFOSIZE) {                /* writing full fifo? */
     if (va_dga_count > 0) {                             /* DMA in progress? */
@@ -398,7 +401,7 @@ if (va_dga_fifo_sz == 0) {                              /* reading empty fifo? *
     return 0;                                           /* should not get here */
     }
 val = va_ram[va_dga_fifo_rp++];                         /* get value */
-sim_debug (DBG_DGA, &va_dev, "dga_fifo_rd: %d, %X (%d) at %08X\n", (va_dga_fifo_rp - 1), val, va_dga_fifo_sz, fault_PC);
+sim_debug (DBG_DGA, &va_dev, "dga_fifo_rd: %d, %X (%d) from PC %08X\n", (va_dga_fifo_rp - 1), val, va_dga_fifo_sz, fault_PC);
 if (va_dga_fifo_rp == VA_DGA_FIFOSIZE)                  /* pointer wrap? */
     va_dga_fifo_rp = VA_FFO_OF;
 va_dga_fifo_sz--;
@@ -466,10 +469,10 @@ switch (rg) {
 
     default:
         data = 0;
-        sim_debug (DBG_DGA, &va_dev, "dga_rd: %X, %X at %08X\n", pa, data, fault_PC);
+        sim_debug (DBG_DGA, &va_dev, "dga_rd: %X, %X from PC %08X\n", pa, data, fault_PC);
         }
 if (rg <= DGA_MAXREG)
-    sim_debug (DBG_DGA, &va_dev, "dga_rd: %s, %X at %08X\n", va_dga_rgd[rg], data, fault_PC);
+    sim_debug (DBG_DGA, &va_dev, "dga_rd: %s, %X from PC %08X\n", va_dga_rgd[rg], data, fault_PC);
 
 return data;
 }
@@ -482,7 +485,7 @@ int32 rg = (pa >> 1) & 0xFF;
 uint32 addr = VA_FFO_OF;
 
 if (rg <= DGA_MAXREG)
-    sim_debug (DBG_DGA, &va_dev, "dga_wr: %s, %X at %08X\n", va_dga_rgd[rg], val, fault_PC);
+    sim_debug (DBG_DGA, &va_dev, "dga_wr: %s, %X from PC %08X\n", va_dga_rgd[rg], val, fault_PC);
 
 switch (rg) {
     case DGA_CSR:                                       /* CSR */
@@ -540,7 +543,7 @@ switch (rg) {
         break;
 
     default:
-        sim_debug (DBG_DGA, &va_dev, "dga_wr: %X, %X at %08X\n", pa, val, fault_PC);
+        sim_debug (DBG_DGA, &va_dev, "dga_wr: %X, %X from PC %08X\n", pa, val, fault_PC);
         break;
         }
 return;
@@ -559,31 +562,31 @@ if (rg >= VA_RSV_OF) {
 if (rg >= VA_GRN_OF) {                                  /* green colour map */
     rg = rg - VA_GRN_OF;
     data = va_grn_map[rg];
-    sim_debug (DBG_REG, &va_dev, "grn_map_rd: %d, %X at %08X\n", rg, data, fault_PC);
+    sim_debug (DBG_REG, &va_dev, "grn_map_rd: %d, %X from PC %08X\n", rg, data, fault_PC);
     return data;
     }
 if (rg >= VA_BLU_OF) {                                  /* blue colour map */
     rg = rg - VA_BLU_OF;
     data = va_blu_map[rg];
-    sim_debug (DBG_REG, &va_dev, "blu_map_rd: %d, %X at %08X\n", rg, data, fault_PC);
+    sim_debug (DBG_REG, &va_dev, "blu_map_rd: %d, %X from PC %08X\n", rg, data, fault_PC);
     return data;
     }
 if (rg >= VA_RED_OF) {                                  /* red colour map */
     rg = rg - VA_RED_OF;
     data = va_red_map[rg];
-    sim_debug (DBG_REG, &va_dev, "red_map_rd: %d, %X at %08X\n", rg, data, fault_PC);
+    sim_debug (DBG_REG, &va_dev, "red_map_rd: %d, %X from PC %08X\n", rg, data, fault_PC);
     return data;
     }
 if (rg >= VA_COM2_OF) {                                 /* video readback register */
     data = va_rdbk;
-    sim_debug (DBG_REG, &va_dev, "com2_rd: %X, %X at %08X\n", pa, data, fault_PC);
+    sim_debug (DBG_REG, &va_dev, "com2_rd: %X, %X from PC %08X\n", pa, data, fault_PC);
     return data;
     }
 if (rg >= VA_COM1_OF) {                                 /* DUART */
     rg = rg & 0xF;
     data = ua2681_rd (&va_uart, rg);
     SET_IRQL;
-    sim_debug (DBG_REG, &va_dev, "com1_rd: %X, %X at %08X\n", pa, data, fault_PC);
+    sim_debug (DBG_REG, &va_dev, "com1_rd: %X, %X from PC %08X\n", pa, data, fault_PC);
     return data;
     }
 if (rg >= VA_DGA_OF) {                                  /* DMA gate array */
@@ -600,12 +603,13 @@ if (rg >= VA_ADP_OF) {                                  /* address processor */
 if (rg >= VA_RAM_OF) {                                  /* RAM */
     rg = rg & RAM_MASK;
     data = va_ram[rg];
-    sim_debug (DBG_REG, &va_dev, "ram_rd: %X, %X at %08X\n", pa, data, fault_PC);
+    sim_debug (DBG_REG, &va_dev, "ram_rd: %X, %X from PC %08X\n", pa, data, fault_PC);
     return data;
     }
 rg = rg & 0x1FFF;                                       /* ROM */
 data = qr[rg];
 va_rom_poll = sim_grtime ();
+sim_debug (DBG_ROM, &va_dev, "rom_rd: %X, %X from PC %08X\n", pa, data, fault_PC);
 return sim_rom_read_with_delay (data);
 }
 
@@ -623,7 +627,7 @@ if (rg >= VA_GRN_OF) {                                  /* green colour map */
     rg = rg - VA_GRN_OF;
     va_grn_map[rg] = val & 0xFF;
     va_palette[rg] = vid_map_rgb (va_red_map[rg], va_grn_map[rg], va_blu_map[rg]);
-    sim_debug (DBG_REG, &va_dev, "grn_map_wr: %d, %X at %08X\n", rg, val, fault_PC);
+    sim_debug (DBG_REG, &va_dev, "grn_map_wr: %d, %X from PC %08X\n", rg, val, fault_PC);
     for (i = 0; i < VA_YSIZE; i++)
         va_updated[i] = TRUE;
     return;
@@ -632,7 +636,7 @@ if (rg >= VA_BLU_OF) {                                  /* blue colour map */
     rg = rg - VA_BLU_OF;
     va_blu_map[rg] = val & 0xFF;
     va_palette[rg] = vid_map_rgb (va_red_map[rg], va_grn_map[rg], va_blu_map[rg]);
-    sim_debug (DBG_REG, &va_dev, "blu_map_wr: %d, %X at %08X\n", rg, val, fault_PC);
+    sim_debug (DBG_REG, &va_dev, "blu_map_wr: %d, %X from PC %08X\n", rg, val, fault_PC);
     for (i = 0; i < VA_YSIZE; i++)
         va_updated[i] = TRUE;
     return;
@@ -641,19 +645,19 @@ if (rg >= VA_RED_OF) {                                  /* red colour map */
     rg = rg - VA_RED_OF;
     va_red_map[rg] = val & 0xFF;
     va_palette[rg] = vid_map_rgb (va_red_map[rg], va_grn_map[rg], va_blu_map[rg]);
-    sim_debug (DBG_REG, &va_dev, "red_map_wr: %d, %X at %08X\n", rg, val, fault_PC);
+    sim_debug (DBG_REG, &va_dev, "red_map_wr: %d, %X from PC %08X\n", rg, val, fault_PC);
     for (i = 0; i < VA_YSIZE; i++)
         va_updated[i] = TRUE;
     return;
     }
 if (rg >= VA_COM2_OF) {                                 /* memory CSR */
     va_mcsr = val;
-    sim_debug (DBG_REG, &va_dev, "com2_wr: %X, %X at %08X\n", pa, val, fault_PC);
+    sim_debug (DBG_REG, &va_dev, "com2_wr: %X, %X from PC %08X\n", pa, val, fault_PC);
     return;
     }
 if (rg >= VA_COM1_OF) {                                 /* DUART */
     rg = rg & 0xF;
-    sim_debug (DBG_REG, &va_dev, "com1_wr: %X, %X at %08X\n", pa, val, fault_PC);
+    sim_debug (DBG_REG, &va_dev, "com1_wr: %X, %X from PC %08X\n", pa, val, fault_PC);
     ua2681_wr (&va_uart, rg, val);
     SET_IRQL;
     return;
@@ -678,7 +682,7 @@ if (rg >= VA_RAM_OF) {                                  /* RAM */
         }
     else nval = val;
     va_ram[rg] = nval;
-    sim_debug (DBG_REG, &va_dev, "ram_wr: %X, %X at %08X\n", pa, val, fault_PC);
+    sim_debug (DBG_REG, &va_dev, "ram_wr: %X, %X from PC %08X\n", pa, val, fault_PC);
     return;
     }
 }

@@ -170,6 +170,7 @@
 #define DBG_ADP         0x0400                          /* adder activity */
 #define DBG_VDP         0x0800                          /* viper activity */
 #define DBG_ROP         0x1000                          /* raster operations */
+#define DBG_ROM         0x2000                          /* rom reads */
 
 /* Internal functions/data - implemented by vax_gpx.c */
 
