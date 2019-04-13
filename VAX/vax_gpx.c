@@ -24,6 +24,8 @@
    in this Software without prior written authorization from the author.
 */
 
+#if !defined(VAX_620)
+
 #include "vax_gpx.h"
 
 #define VA_FIFOSIZE     64
@@ -1853,3 +1855,7 @@ va_scroll ();
 
 return SCPE_OK;
 }
+
+#else /* defined(VAX_620) */
+static const char *dummy_declaration = "Something to compile";
+#endif /* !defined(VAX_620) */
