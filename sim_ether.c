@@ -1202,7 +1202,7 @@ int load_pcap(void) {
 
 /* define functions with dynamic revectoring */
 void pcap_close(pcap_t* a) {
-  if (load_pcap() != 0) {
+  if (a && (load_pcap() != 0)) {
     p_pcap_close(a);
   }
 }
@@ -1213,7 +1213,7 @@ int pcap_compile(pcap_t* a, struct bpf_program* b, char* c, int d, bpf_u_int32 e
 #else
 int pcap_compile(pcap_t* a, struct bpf_program* b, const char* c, int d, bpf_u_int32 e) {
 #endif
-  if (load_pcap() != 0) {
+  if (a && (load_pcap() != 0)) {
     return p_pcap_compile(a, b, c, d, e);
   } else {
     return 0;
@@ -1221,7 +1221,7 @@ int pcap_compile(pcap_t* a, struct bpf_program* b, const char* c, int d, bpf_u_i
 }
 
 int pcap_datalink(pcap_t* a) {
-  if (load_pcap() != 0) {
+  if (a && (load_pcap() != 0)) {
     return p_pcap_datalink(a);
   } else {
     return 0;
@@ -1229,7 +1229,7 @@ int pcap_datalink(pcap_t* a) {
 }
 
 int pcap_dispatch(pcap_t* a, int b, pcap_handler c, u_char* d) {
-  if (load_pcap() != 0) {
+  if (a && (load_pcap() != 0)) {
     return p_pcap_dispatch(a, b, c, d);
   } else {
     return 0;
@@ -1237,7 +1237,7 @@ int pcap_dispatch(pcap_t* a, int b, pcap_handler c, u_char* d) {
 }
 
 int pcap_findalldevs(pcap_if_t** a, char* b) {
-  if (load_pcap() != 0) {
+  if (a && (load_pcap() != 0)) {
     return p_pcap_findalldevs(a, b);
   } else {
     *a = 0;
@@ -1247,22 +1247,22 @@ int pcap_findalldevs(pcap_if_t** a, char* b) {
 }
 
 void pcap_freealldevs(pcap_if_t* a) {
-  if (load_pcap() != 0) {
+  if (a && (load_pcap() != 0)) {
     p_pcap_freealldevs(a);
   }
 }
 
 void pcap_freecode(struct bpf_program* a) {
-  if (load_pcap() != 0) {
+  if (a && (load_pcap() != 0)) {
     p_pcap_freecode(a);
   }
 }
 
 char* pcap_geterr(pcap_t* a) {
-  if (load_pcap() != 0) {
+  if (a && (load_pcap() != 0)) {
     return p_pcap_geterr(a);
   } else {
-    return (char*) 0;
+    return (char*) "";
   }
 }
 
@@ -1284,15 +1284,15 @@ pcap_t* pcap_open_live(const char* a, int b, int c, int d, char* e) {
 
 #ifdef _WIN32
 int pcap_setmintocopy(pcap_t* a, int b) {
-  if (load_pcap() != 0) {
+  if (a && (load_pcap() != 0)) {
     return p_pcap_setmintocopy(a, b);
   } else {
-    return 0;
+    return -1;
   }
 }
 
 HANDLE pcap_getevent(pcap_t* a) {
-  if (load_pcap() != 0) {
+  if (a && (load_pcap() != 0)) {
     return p_pcap_getevent(a);
   } else {
     return (HANDLE) 0;
@@ -1302,7 +1302,7 @@ HANDLE pcap_getevent(pcap_t* a) {
 #else
 #ifdef MUST_DO_SELECT
 int pcap_get_selectable_fd(pcap_t* a) {
-  if (load_pcap() != 0) {
+  if (a && (load_pcap() != 0)) {
     return p_pcap_get_selectable_fd(a);
   } else {
     return 0;
@@ -1311,7 +1311,7 @@ int pcap_get_selectable_fd(pcap_t* a) {
 #endif
 
 int pcap_fileno(pcap_t * a) {
-  if (load_pcap() != 0) {
+  if (a && (load_pcap() != 0)) {
     return p_pcap_fileno(a);
   } else {
     return 0;
@@ -1320,7 +1320,7 @@ int pcap_fileno(pcap_t * a) {
 #endif
 
 int pcap_sendpacket(pcap_t* a, const u_char* b, int c) {
-  if (load_pcap() != 0) {
+  if (a && (load_pcap() != 0)) {
     return p_pcap_sendpacket(a, b, c);
   } else {
     return 0;
@@ -1328,7 +1328,7 @@ int pcap_sendpacket(pcap_t* a, const u_char* b, int c) {
 }
 
 int pcap_setfilter(pcap_t* a, struct bpf_program* b) {
-  if (load_pcap() != 0) {
+  if (a && (load_pcap() != 0)) {
     return p_pcap_setfilter(a, b);
   } else {
     return 0;
@@ -1336,7 +1336,7 @@ int pcap_setfilter(pcap_t* a, struct bpf_program* b) {
 }
 
 int pcap_setnonblock(pcap_t* a, int nonblock, char *errbuf) {
-  if (load_pcap() != 0) {
+  if (a && (load_pcap() != 0)) {
     return p_pcap_setnonblock(a, nonblock, errbuf);
   } else {
     return 0;
@@ -2182,7 +2182,13 @@ else { /* !tap: */
           }
 #endif /* xBSD */
 #if defined(_WIN32)
-        pcap_setmintocopy ((pcap_t*)(*handle), 0);
+        if ((pcap_setmintocopy ((pcap_t*)(*handle), 0) == -1) ||
+            (pcap_getevent ((pcap_t*)(*handle)) == NULL)) {
+          pcap_close ((pcap_t*)(*handle));
+          errbuf[PCAP_ERRBUF_SIZE-1] = '\0';
+          snprintf (errbuf, PCAP_ERRBUF_SIZE-1, "pcap can't initialize API for interface: %s", savname);
+          return SCPE_OPENERR;
+          }
 #endif
 #if !defined (USE_READER_THREAD)
 #ifdef USE_SETNONBLOCK
@@ -4170,6 +4176,10 @@ int errors = 0;
 t_stat r;
 DEVICE eth_tst;
 ETH_DEV dev;
+int eth_num;
+int eth_opened;
+ETH_LIST  eth_list[ETH_MAX_DEVICE];
+int eth_device_count;
 int reflections, all_multicast, promiscuous;
 char buf[116+66*ETH_FILTER_MAX];
 char mac[20];
@@ -4215,59 +4225,83 @@ int bpf_compile_skip_count = 0;
 
 
 memset (&eth_tst, 0, sizeof(eth_tst));
-eth_open(&dev, "eth0", &eth_tst, 1);
-for (reflections=0; reflections<=1; reflections++) {
-  for (all_multicast=0; all_multicast<=1; all_multicast++) {
-    for (promiscuous=0; promiscuous<=1; promiscuous++) {
-      for (addr_count=1; addr_count<=2; addr_count++) {
-        for (hash_listindex=0; hash_listindex<=1; hash_listindex++) {
-          for (host_phy_addr_listindex=0; host_phy_addr_listindex<=1; host_phy_addr_listindex++) {
-            int i;
-            char errbuf[PCAP_ERRBUF_SIZE];
+eth_device_count = eth_devices(ETH_MAX_DEVICE, eth_list);
+eth_opened = 0;
+for (eth_num=0; eth_num<eth_device_count; eth_num++) {
+  char eth_name[10];
 
-            ++bpf_count;
-            r = eth_bpf_filter (&dev, addr_count, &filter_address[0], 
-                                all_multicast, promiscuous, reflections, 
-                                &filter_address[0], 
-                                host_phy_addr_list[host_phy_addr_listindex],
-                                hash_list[hash_listindex],
-                                buf);
-            if (r != SCPE_OK) {
-              ++bpf_construct_error_count;
-              sim_printf ("Eth: Error producing a BPF filter for:\n");
-              SIM_PRINT_BPF_ARGUMENTS;
-              }
-            else {
-              if (sim_switches & SWMASK('D')) {
+  if ((0 == memcmp (eth_list[eth_num].name, "nat:", 4)) ||
+      (0 == memcmp (eth_list[eth_num].name, "tap:", 4)) ||
+      (0 == memcmp (eth_list[eth_num].name, "vde:", 4)) ||
+      (0 == memcmp (eth_list[eth_num].name, "udp:", 4)))
+      continue;
+  eth_name[sizeof (eth_name)-1] = '\0';
+  snprintf (eth_name, sizeof (eth_name)-1, "eth%d", eth_num);
+  r = eth_open(&dev, eth_name, &eth_tst, 1);
+  if (r != SCPE_OK) {
+    sim_printf ("%s: Eth: Error opening eth%d: %s\n", dptr->name, eth_num, sim_error_text (r));
+    continue;
+    }
+  ++eth_opened;
+  for (reflections=0; reflections<=1; reflections++) {
+    for (all_multicast=0; all_multicast<=1; all_multicast++) {
+      for (promiscuous=0; promiscuous<=1; promiscuous++) {
+        for (addr_count=1; addr_count<=2; addr_count++) {
+          for (hash_listindex=0; hash_listindex<=1; hash_listindex++) {
+            for (host_phy_addr_listindex=0; host_phy_addr_listindex<=1; host_phy_addr_listindex++) {
+              int i;
+              char errbuf[PCAP_ERRBUF_SIZE];
+
+              ++bpf_count;
+              r = eth_bpf_filter (&dev, addr_count, &filter_address[0], 
+                                  all_multicast, promiscuous, reflections, 
+                                  &filter_address[0], 
+                                  host_phy_addr_list[host_phy_addr_listindex],
+                                  hash_list[hash_listindex],
+                                  buf);
+              if (r != SCPE_OK) {
+                ++bpf_construct_error_count;
+                sim_printf ("Eth: Error producing a BPF filter for:\n");
                 SIM_PRINT_BPF_ARGUMENTS;
-                sim_printf ("Eth: BPF string is: |%s|\n", buf);
                 }
-              if (dev.eth_api == ETH_API_PCAP) {
-                struct bpf_program bpf;
-
-                if (pcap_compile ((pcap_t*)dev.handle, &bpf, buf, 1, (bpf_u_int32)0) < 0) {
-                  ++bpf_compile_error_count;
-                  sprintf(errbuf, "%s", pcap_geterr((pcap_t*)dev.handle));
-                  sim_printf("Eth: pcap_compile error: %s\n", errbuf);
-                  if (!(sim_switches & SWMASK('D'))) {
-                    /* show erroneous BPF string */
-                    SIM_PRINT_BPF_ARGUMENTS;
-                    sim_printf ("Eth: BPF string is: |%s|\n", buf);
-                    }
+              else {
+                if (sim_switches & SWMASK('D')) {
+                  SIM_PRINT_BPF_ARGUMENTS;
+                  sim_printf ("Eth: BPF string is: |%s|\n", buf);
                   }
-                pcap_freecode(&bpf);
+                if (dev.eth_api == ETH_API_PCAP) {
+                  struct bpf_program bpf;
+
+                  if (pcap_compile ((pcap_t*)dev.handle, &bpf, buf, 1, (bpf_u_int32)0) < 0) {
+                    ++bpf_compile_error_count;
+                    sprintf(errbuf, "%s", pcap_geterr((pcap_t*)dev.handle));
+                    sim_printf("Eth: pcap_compile error: %s\n", errbuf);
+                    if (!(sim_switches & SWMASK('D'))) {
+                      /* show erroneous BPF string */
+                      SIM_PRINT_BPF_ARGUMENTS;
+                      sim_printf ("Eth: BPF string is: |%s|\n", buf);
+                      }
+                    }
+                  pcap_freecode(&bpf);
+                  }
+                else
+                  ++bpf_compile_skip_count;
                 }
-              else
-                ++bpf_compile_skip_count;
               }
             }
           }
         }
       }
     }
+  eth_close(&dev);
   }
-eth_close(&dev);
-sim_printf ("BPF Filter Count:     %d\n", bpf_count);
+
+if (eth_opened == 0) {
+  errors = 1;
+  sim_printf ("%s: No testable LAN interfaces found\n", dptr->name);
+  }
+if (bpf_count)
+  sim_printf ("BPF Filter Count:     %d\n", bpf_count);
 if (bpf_construct_error_count)
   sim_printf ("BPF Construct Errors: %d\n", bpf_construct_error_count);
 if (bpf_compile_error_count)
