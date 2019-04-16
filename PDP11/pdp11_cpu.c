@@ -3559,7 +3559,7 @@ for (k = 0; k < lnt; k++) {                             /* print specified */
     h = &hst[(di++) % hst_lnt];                         /* entry pointer */
     if (h->pc & HIST_VLD) {                             /* instruction? */
         ir = h->inst[0];
-        fprintf (st, "%06o %06o %06o|", h->pc & ~HIST_VLD, h->psw);
+        fprintf (st, "%06o %06o %06o|", h->pc & ~HIST_VLD, h->sp, h->psw);
         if (((ir & 0070000) != 0) ||                    /* dops, eis, fpp */
             ((ir & 0177000) == 0004000))                /* jsr */
             fprintf (st, "%06o %06o  ", h->src, h->dst);
