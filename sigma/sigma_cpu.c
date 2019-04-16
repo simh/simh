@@ -2676,7 +2676,7 @@ for (i = 0; i < RF_NUM; i++, rptr++)
 return;
 }
 
-/* Front panael alarm */
+/* Front panel alarm */
 
 t_stat cpu_set_alarm (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
