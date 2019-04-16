@@ -1,6 +1,6 @@
-/* hp2100_cpu6.c: HP 1000 RTE-6/VM OS instructions
+/* hp2100_cpu6.c: HP 1000 RTE-6/VM OS microcode simulator
 
-   Copyright (c) 2006-2017, J. David Bryan
+   Copyright (c) 2006-2018, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,8 +23,11 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the author.
 
-   CPU6         RTE-6/VM OS instructions
+   CPU6         RTE-6/VM Operating System instructions
 
+   02-Oct-18    JDB     Replaced DMASK with D16_MASK or R_MASK as appropriate
+   30-Jul-18    JDB     Replaced direct set of map mode with call to "meu_set_state"
+   14-Jun-18    JDB     Renamed PRO to MP
    22-Jul-17    JDB     Renamed "intaddr" to CIR
    10-Jul-17    JDB     Renamed the global routine "iogrp" to "cpu_iog"
    07-Jul-17    JDB     Changed "iotrap" from uint32 to t_bool
@@ -45,10 +48,11 @@
 
    Primary references:
      - HP 1000 M/E/F-Series Computers Technical Reference Handbook
-        (5955-0282, Mar-1980)
+         (5955-0282, March 1980)
      - HP 1000 M/E/F-Series Computers Engineering and Reference Documentation
-        (92851-90001, Mar-1981)
-     - Macro/1000 Reference Manual (92059-90001, Dec-1992)
+         (92851-90001, March 1981)
+     - Macro/1000 Reference Manual
+         (92059-90001, December 1992)
 
 
    The RTE-6/VM Operating System Instructions were added to accelerate certain
@@ -355,15 +359,13 @@
 
 
 
-#include <setjmp.h>
-
 #include "hp2100_defs.h"
 #include "hp2100_cpu.h"
-#include "hp2100_cpu1.h"
+#include "hp2100_cpu_dmm.h"
 
 
 
-/* Offsets to data and addresses within RTE. */
+/* Offsets to data and addresses within RTE */
 
 static const HP_WORD xi    = 0001647u;          /* XI address */
 static const HP_WORD intba = 0001654u;          /* INTBA address */
@@ -377,12 +379,6 @@ static const HP_WORD mptfl = 0001770u;          /* MPTFL address */
 static const HP_WORD eqt12 = 0001771u;          /* EQT12 address */
 static const HP_WORD eqt15 = 0001774u;          /* EQT15 address */
 static const HP_WORD vctr  = 0002000u;          /* VCTR address */
-
-static const HP_WORD CLC_0   = 0004700u;        /* CLC 0 instruction */
-static const HP_WORD STC_0   = 0000700u;        /* STC 0 instruction */
-static const HP_WORD CLF_0   = 0001100u;        /* CLF 0 instruction */
-static const HP_WORD STF_0   = 0000100u;        /* STF 0 instruction */
-static const HP_WORD SFS_0_C = 0003300u;        /* SFS 0,C instruction */
 
 
 /* RTE communication vector.
@@ -435,45 +431,44 @@ typedef enum {
    This routine is called from the trap cell interrupt handlers and from the
    $LIBX processor.  In the latter case, the privileged system interrupt
    handling is not required, so it is bypassed.  In either case, the current map
-   will be the system map when we are called.
+   will be the system map when we are called, and memory protect will be off.
 */
 
-static t_stat cpu_save_regs (t_bool iotrap)
+static void save_regs (t_bool int_ack)
 {
 HP_WORD save_area, priv_fence;
-t_stat reason = SCPE_OK;
 
 save_area = ReadW (xsusp);                              /* addr of PABEO save area */
 
 WriteW (save_area + 0, PR);                             /* save P */
 WriteW (save_area + 1, AR);                             /* save A */
 WriteW (save_area + 2, BR);                             /* save B */
-WriteW (save_area + 3, (E << 15) & SIGN | O & 1);       /* save E and O */
+WriteW (save_area + 3, (E << 15) & D16_SIGN | O & 1);   /* save E and O */
 
 save_area = ReadW (xi);                                 /* addr of XY save area */
 WriteWA (save_area + 0, XR);                            /* save X (in user map) */
 WriteWA (save_area + 1, YR);                            /* save Y (in user map) */
 
-if (iotrap) {                                           /* do priv setup only if IRQ */
+if (int_ack) {                                          /* do priv setup only if IAK */
     priv_fence = ReadW (dummy);                         /* get priv fence select code */
 
     if (priv_fence) {                                   /* privileged system? */
-        reason = cpu_iog (STC_0 + priv_fence, iotrap);  /* STC SC on priv fence */
-        reason = cpu_iog (CLC_0 + DMA1, iotrap);        /* CLC 6 to inh IRQ on DCPC 1 */
-        reason = cpu_iog (CLC_0 + DMA2, iotrap);        /* CLC 7 to inh IRQ on DCPC 2 */
-        reason = cpu_iog (STF_0, iotrap);               /* turn interrupt system back on */
+        io_control (priv_fence, iog_STC);               /* STC SC on priv fence */
+        io_control (DMA1,       iog_CLC);               /* CLC 6 to inh IRQ on DCPC 1 */
+        io_control (DMA2,       iog_CLC);               /* CLC 7 to inh IRQ on DCPC 2 */
+        io_control (CPU,        iog_STF);               /* turn interrupt system back on */
         }
     }
 
-return reason;
+return;
 }
 
 
 /* Save the machine state at interrupt.
 
-   This routine is called from each of the trap cell instructions.  Its purpose
-   is to save the complete state of the machine in preparation for interrupt
-   handling.
+   This routine is called from each of the trap cell instructions during an
+   interrupt acknowledgement.  Its purpose is to save the complete state of the
+   machine in preparation for interrupt handling.
 
    For the MP/DMS/PE interrupt, the interrupting device must not be cleared and
    the CPU registers must not be saved until it is established that the
@@ -486,33 +481,31 @@ return reason;
 
    Note that the trap cell instructions are dual-use and invoke this routine
    only when they are executed during interrupts.  Therefore, the current map
-   will always be the system map when we are called.
+   will always be the system map.
 */
 
-static t_stat cpu_save_state (uint32 iotrap)
+static void save_state (void)
 {
-HP_WORD vectors, saved_PR, int_sys_off;
-t_stat reason;
+HP_WORD vectors, int_sys_off;
 
-saved_PR = PR;                                          /* save current P register */
-reason = cpu_iog (SFS_0_C, iotrap);                     /* turn interrupt system off */
-int_sys_off = (HP_WORD) (PR == saved_PR);               /* set flag if already off */
-PR = saved_PR;                                          /* restore P in case it bumped */
+mp_disable ();                                          /* turn MP off */
+
+int_sys_off = (HP_WORD) ! io_control (CPU, iog_SFS_C);  /* set flag if interrupt system is already off */
 
 vectors = ReadW (vctr);                                 /* get address of vectors (in SMAP) */
 
-WriteW (vectors + dms_offset, dms_upd_sr ());           /* save DMS status (SSM) */
+WriteW (vectors + dms_offset, meu_update_status ());    /* save DMS status (SSM) */
 WriteW (vectors + int_offset, int_sys_off);             /* save int status */
 WriteW (vectors + sc_offset,  CIR);                     /* save select code */
 
 WriteW (mptfl, 1);                                      /* show MP is off */
 
-if (CIR != PRO) {                                       /* only if not MP interrupt */
-    reason = cpu_iog (CLF_0 + CIR, iotrap);             /* issue CLF to device */
-    cpu_save_regs (iotrap);                             /* save CPU registers */
+if (CIR != MPPE) {                                      /* only if not MP interrupt */
+    io_control (CIR, iog_CLF);                          /* issue CLF to device */
+    save_regs (TRUE);                                   /* save CPU registers */
     }
 
-return reason;
+return;
 }
 
 
@@ -621,8 +614,8 @@ else
        execution of the "dual use" instructions by testing the CPU flag.
        Interrupt vectoring sets the flag; a normal instruction fetch clears it.
        Under simulation, interrupt vectoring is indicated by the value of the
-       "iotrap" parameter (FALSE = normal instruction, TRUE = trap cell
-       instruction).
+       "int_ack" parameter (FALSE = normal instruction, TRUE = interrupt
+       acknowledge instruction).
 
     2. The operand patterns for .ENTN and .ENTC normally would be coded as
        "OP_A", as each takes a single address as a parameter.  However, because
@@ -640,10 +633,8 @@ else
 
     4. The microcode executes certain I/O instructions (e.g., CLF 0) by building
        the instruction in the IR and executing an IOG micro-order.  We simulate
-       this behavior by calling the "cpu_iog" handler with the appropriate
-       instruction, rather than manipulating the I/O system directly, so that we
-       will remain unaffected by any future changes to the underlying I/O
-       simulation structure.
+       this behavior by calling the "io_control" routine with the appropriate
+       I/O signal assertion.
 
     5. The $OTST and .DSPI microcode provides features (reading the RPL switches
        and boot loader ROM data, loading the display register) that are not
@@ -677,6 +668,11 @@ else
 
     8. The "%.0u" print specification in the trace call absorbs the zero "CIR"
        value parameter without printing when an interrupt is not pending.
+
+    9. The $LIBR microcode checks for memory protect on by reading the MEM
+       status register and checking the protected mode bit (bit 11).  In
+       simulation, we check for MP on with the "mp_is_on" routine, as the status
+       register is not global.
 */
 
 static const OP_PAT op_os [16] = {
@@ -686,12 +682,12 @@ static const OP_PAT op_os [16] = {
   OP_N,    OP_N,    OP_N,    OP_N                       /* .ENTN  $OTST  .ENTC  .DSPI  */
   };
 
-t_stat cpu_rte_os (uint32 IR, uint32 intrq, t_bool iotrap)
+t_stat cpu_rte_os (t_bool int_ack)
 {
-static const char *const no      [2] = { "",     "no " };
-static const char *const not     [2] = { "not ", ""    };
-static const char *const list    [3] = { "list error", "not found", "found" };
-static const char *const compare [3] = { "equal",      "less than", "greater than" };
+static const char * const no      [2] = { "",     "no " };
+static const char * const not     [2] = { "not ", ""    };
+static const char * const list    [3] = { "list error", "not found", "found" };
+static const char * const compare [3] = { "equal",      "less than", "greater than" };
 
 OPS     op;
 OP_PAT  pattern;
@@ -699,13 +695,14 @@ uint32  i, irq;
 HP_WORD entry, count, cp, sa, da, ma, eqta;
 HP_WORD vectors, save_area, priv_fence, eoreg, eqt, key;
 char    test [6], target [6];
+t_bool  mpv;
 t_stat  reason = SCPE_OK;
 
 entry = IR & 017;                                       /* mask to entry point */
 pattern = op_os [entry];                                /* get operand pattern */
 
 if (pattern != OP_N) {
-    reason = cpu_ops (pattern, op, intrq);              /* get instruction operands */
+    reason = cpu_ops (pattern, op);                     /* get instruction operands */
 
     if (reason != SCPE_OK)                              /* evaluation failed? */
         return reason;                                  /* return reason for failure */
@@ -714,44 +711,39 @@ if (pattern != OP_N) {
 switch (entry) {                                        /* decode IR<3:0> */
 
     case 000:                                           /* $LIBR 105340 (OP_A) */
-        if ((op[0].word != 0) ||                        /* reentrant call? */
-            (mp_control && (ReadW (dummy) != 0))) {     /* or priv call + MP on + priv sys? */
-            if (dms_ump) {                              /* called from user map? */
-                dms_viol (err_PC, MVI_PRV);             /* privilege violation */
-                }
+        if (op[0].word != 0                             /* reentrant call? */
+          || mp_is_on () && ReadW (dummy) != 0) {       /* or priv call + MP on + priv sys? */
+            meu_privileged (If_User_Map);               /* priv viol if called from user map */
 
-            dms_ump = SMAP;                             /* set system map */
+            meu_set_state (ME_Enabled, System_Map);     /* set system map */
 
             vectors = ReadW (vctr);                     /* get address of vectors (in SMAP) */
             PR = ReadW (vectors + mper_offset);         /* vector to $MPER for processing */
             }
 
         else {                                          /* privileged call */
-            if (mp_control) {                           /* memory protect on? */
-                mp_control = CLEAR;                     /* turn it off */
-                reason = cpu_iog (CLF_0, iotrap);       /* turn interrupt system off */
+            if (mp_is_on ()) {                          /* memory protect on? */
+                mp_disable ();                          /* turn it off */
+                io_control (CPU, iog_CLF);              /* turn interrupt system off */
                 WriteW (mptfl, 1);                      /* show MP is off */
-                save_area = ReadW (xsusp);              /* get addr of P save area */
 
-                if (dms_ump)                                /* user map current? */
-                    WriteWA (save_area, (PR - 2) & VAMASK); /* set point of suspension */
-                else                                        /* system map current */
-                    WriteW (save_area, (PR - 2) & VAMASK);  /* set point of suspension */
+                save_area = ReadW (xsusp);              /* get addr of P save area */
+                WriteS (save_area, PR - 2 & LA_MASK);   /* set point of suspension using the system map */
                 }
 
-            WriteW (pvcn, (ReadW (pvcn) + 1) & DMASK);  /* increment priv nest counter */
+            WriteW (pvcn, ReadW (pvcn) + 1 & D16_MASK); /* increment priv nest counter */
             }
         break;
 
 
     case 001:                                           /* $LIBX 105341 (OP_A) */
         PR = ReadW (op[0].word);                        /* set P to return point */
-        count = (ReadW (pvcn) - 1) & DMASK;             /* decrement priv nest counter */
+        count = ReadW (pvcn) - 1 & D16_MASK;            /* decrement priv nest counter */
         WriteW (pvcn, count);                           /* write it back */
 
         if (count == 0) {                               /* end of priv mode? */
-            dms_ump = SMAP;                             /* set system map */
-            reason = cpu_save_regs (iotrap);            /* save registers */
+            meu_set_state (ME_Enabled, System_Map);     /* set system map */
+            save_regs (FALSE);                          /* save registers */
             vectors = ReadW (vctr);                     /* get address of vectors */
             PR = ReadW (vectors + lxnd_offset);         /* vector to $LXND for processing */
             }
@@ -760,7 +752,7 @@ switch (entry) {                                        /* decode IR<3:0> */
 
     case 002:                                           /* .TICK 105342 (OP_N) */
         do {
-            eqt = (ReadW (AR) + 1) & DMASK;             /* bump timeout from EQT15 */
+            eqt = ReadW (AR) + 1 & D16_MASK;            /* bump timeout from EQT15 */
 
             if (eqt != 1) {                             /* was timeout active? */
                 WriteW (AR, eqt);                       /* yes, write it back */
@@ -769,25 +761,25 @@ switch (entry) {                                        /* decode IR<3:0> */
                     break;                              /* P+1 return for timeout */
                 }
 
-            AR = (AR + 15) & DMASK;                     /* point at next EQT15 */
-            BR = (BR - 1) & DMASK;                      /* decrement count of EQTs */
+            AR = AR + 15 & R_MASK;                      /* point at next EQT15 */
+            BR = BR - 1 & R_MASK;                       /* decrement count of EQTs */
         } while ((BR > 0) && (eqt != 0));               /* loop until timeout or done */
 
         if (BR == 0)                                    /* which termination condition? */
-            PR = (PR + 1) & VAMASK;                     /* P+2 return for no timeout */
+            PR = (PR + 1) & LA_MASK;                    /* P+2 return for no timeout */
 
         tprintf (cpu_dev, TRACE_OPND, OPND_FORMAT "  return location is P+%u (%stimeout)\n",
-                 PR, IR, PR - err_PC, no [PR - err_PC - 1]);
+                 PR, IR, PR - err_PR, no [PR - err_PR - 1]);
         break;
 
 
     case 003:                                           /* .TNAM 105343 (OP_N) */
         E = 1;                                          /* preset flag for not found */
-        cp = (BR << 1) & DMASK;                         /* form char addr (B is direct) */
+        cp = BR << 1 & D16_MASK;                        /* form char addr (B is direct) */
 
         for (i = 0; i < 5; i++) {                       /* copy target name */
             target[i] = (char) ReadB (cp);              /* name is only 5 chars */
-            cp = (cp + 1) & DMASK;
+            cp = cp + 1 & D16_MASK;
             }
 
         if ((target[0] == '\0') && (target[1] == '\0')) /* if name is null, */
@@ -796,27 +788,27 @@ switch (entry) {                                        /* decode IR<3:0> */
         key = ReadW (AR);                               /* get first keyword addr */
 
         while (key != 0) {                              /* end of keywords? */
-            cp = ((key + 12) << 1) & DMASK;             /* form char addr of name */
+            cp = key + 12 << 1 & D16_MASK;              /* form char addr of name */
 
             for (i = 0; i < 6; i++) {                   /* copy test name */
                 test[i] = (char) ReadB (cp);            /* name is only 5 chars */
-                cp = (cp + 1) & DMASK;                  /* but copy 6 to get flags */
+                cp = cp + 1 & D16_MASK;                 /* but copy 6 to get flags */
                 }
 
             if (strncmp (target, test, 5) == 0) {       /* names match? */
-                AR = (key + 15) & DMASK;                /* A = addr of IDSEG [15] */
+                AR = key + 15 & R_MASK;                 /* A = addr of IDSEG [15] */
                 BR = key;                               /* B = addr of IDSEG [0] */
                 E = (uint32) ((test[5] >> 4) & 1);      /* E = short ID segment bit */
-                PR = (PR + 1) & VAMASK;                 /* P+2 for found return */
+                PR = (PR + 1) & LA_MASK;                /* P+2 for found return */
                 break;
                 }
 
-            AR = (AR + 1) & DMASK;                      /* bump to next keyword */
+            AR = AR + 1 & R_MASK;                       /* bump to next keyword */
             key = ReadW (AR);                           /* get next keyword */
             };
 
         tprintf (cpu_dev, TRACE_OPND, OPND_FORMAT "  return location is P+%u (%sfound)\n",
-                 PR, IR, PR - err_PC, not [PR - err_PC - 1]);
+                 PR, IR, PR - err_PR, not [PR - err_PR - 1]);
         break;
 
 
@@ -827,17 +819,17 @@ switch (entry) {                                        /* decode IR<3:0> */
                  PR, IR, count);
 
         for (i = 0; i < count; i++) {
-            ma = ReadW (PR);                            /* get operand address */
+            MR = ReadW (PR);                            /* get operand address */
 
-            reason = resolve (ma, &ma, intrq);          /* resolve indirect */
+            reason = cpu_resolve_indirects (TRUE);      /* resolve indirects */
 
             if (reason != SCPE_OK) {                    /* resolution failed? */
-                PR = err_PC;                            /* IRQ restarts instruction */
+                PR = err_PR;                            /* IRQ restarts instruction */
                 break;
                 }
 
-            WriteW (ma, ReadW (ma) & ~I_DEVMASK | AR);  /* set SC into instruction */
-            PR = (PR + 1) & VAMASK;                     /* bump to next */
+            WriteW (MR, ReadW (MR) & ~SC_MASK | AR);    /* set SC into instruction */
+            PR = (PR + 1) & LA_MASK;                    /* bump to next */
             }
         break;
 
@@ -847,17 +839,17 @@ switch (entry) {                                        /* decode IR<3:0> */
             key = ReadW (BR);                           /* read a buffer word */
 
             if (key == AR) {                            /* does it match? */
-                PR = (PR + 1) & VAMASK;                 /* P+3 found return */
+                PR = (PR + 1) & LA_MASK;                /* P+3 found return */
                 break;
                 }
 
-            BR = (BR + op[0].word) & DMASK;             /* increment buffer ptr */
-            XR = (XR - 1) & DMASK;                      /* decrement remaining count */
+            BR = BR + op[0].word & R_MASK;              /* increment buffer ptr */
+            XR = XR - 1 & R_MASK;                       /* decrement remaining count */
             }
                                                         /* P+2 not found return */
 
         tprintf (cpu_dev, TRACE_OPND, OPND_FORMAT "  return location is P+%u (%sfound)\n",
-                 PR, IR, PR - err_PC, not [PR - err_PC - 2]);
+                 PR, IR, PR - err_PR, not [PR - err_PR - 2]);
         break;
 
 
@@ -877,29 +869,29 @@ switch (entry) {                                        /* decode IR<3:0> */
         XR = ReadWA (save_area + 0);                    /* restore X (from user map) */
         YR = ReadWA (save_area + 1);                    /* restore Y (from user map) */
 
-        reason = cpu_iog (CLF_0, iotrap);               /* turn interrupt system off */
+        io_control (CPU, iog_CLF);                      /* turn interrupt system off */
         WriteW (mptfl, 0);                              /* show MP is on */
 
         priv_fence = ReadW (dummy);                     /* get priv fence select code */
 
-        if (priv_fence) {                                   /* privileged system? */
-            reason = cpu_iog (CLC_0 + priv_fence, iotrap);  /* CLC SC on priv fence */
-            reason = cpu_iog (STF_0 + priv_fence, iotrap);  /* STF SC on priv fence */
+        if (priv_fence) {                               /* privileged system? */
+            io_control (priv_fence, iog_CLC);           /* CLC SC on priv fence */
+            io_control (priv_fence, iog_STF);           /* STF SC on priv fence */
 
-            if (cpu_get_intbl (DMA1) & SIGN)                /* DCPC 1 active? */
-                reason = cpu_iog (STC_0 + DMA1, iotrap);    /* STC 6 to enable IRQ on DCPC 1 */
+            if (cpu_get_intbl (DMA1) & D16_SIGN)        /* DCPC 1 active? */
+                io_control (DMA1, iog_STC);             /* STC 6 to enable IRQ on DCPC 1 */
 
-            if (cpu_get_intbl (DMA2) & SIGN)                /* DCPC 2 active? */
-                reason = cpu_iog (STC_0 + DMA2, iotrap);    /* STC 7 to enable IRQ on DCPC 2 */
+            if (cpu_get_intbl (DMA2) & D16_SIGN)        /* DCPC 2 active? */
+                io_control (DMA2, iog_STC);             /* STC 7 to enable IRQ on DCPC 2 */
             }
         break;
 
 
     case 007:                                           /* .LLS  105347 (OP_KK) */
-        AR = AR & ~SIGN;                                /* clear sign bit of A */
+        AR = AR & ~D16_SIGN;                            /* clear sign bit of A */
 
-        while ((AR != 0) && ((AR & SIGN) == 0)) {       /* end of list or bad list? */
-            key = ReadW ((AR + op[1].word) & VAMASK);   /* get key value */
+        while ((AR != 0) && ((AR & D16_SIGN) == 0)) {   /* end of list or bad list? */
+            key = ReadW ((AR + op[1].word) & LA_MASK);  /* get key value */
 
             if ((E == 0) && (key == op[0].word) ||      /* for E = 0, key = arg? */
                 (E != 0) && (key >  op[0].word))        /* for E = 1, key > arg? */
@@ -910,23 +902,21 @@ switch (entry) {                                        /* decode IR<3:0> */
             }
 
         if (AR == 0)                                    /* exhausted list? */
-            PR = (PR + 1) & VAMASK;                     /* P+4 arg not found */
+            PR = (PR + 1) & LA_MASK;                    /* P+4 arg not found */
 
-        else if ((AR & SIGN) == 0)                      /* good link? */
-            PR = (PR + 2) & VAMASK;                     /* P+5 arg found */
+        else if ((AR & D16_SIGN) == 0)                  /* good link? */
+            PR = (PR + 2) & LA_MASK;                    /* P+5 arg found */
 
         tprintf (cpu_dev, TRACE_OPND, OPND_FORMAT "  return location is P+%u (%s)\n",
-                 PR, IR, PR - err_PC, list [PR - err_PC - 3]);
+                 PR, IR, PR - err_PR, list [PR - err_PR - 3]);
         break;
 
 
     case 010:                                           /* .SIP  105350 (OP_N) */
-        reason = cpu_iog (STF_0, iotrap);               /* turn interrupt system on */
-        irq = calc_int ();                              /* check for interrupt requests */
-        reason = cpu_iog (CLF_0, iotrap);               /* turn interrupt system off */
+        irq = io_poll_interrupts (SET);                 /* check for interrupt requests */
 
         if (irq)                                        /* was interrupt pending? */
-            PR = (PR + 1) & VAMASK;                     /* P+2 return for pending IRQ */
+            PR = PR + 1 & R_MASK;                       /* P+2 return for pending IRQ */
 
         tprintf (cpu_dev, TRACE_OPND,
                  (irq ? OPND_FORMAT "  return location is P+2 (pending), CIR %02o\n"
@@ -937,20 +927,20 @@ switch (entry) {                                        /* decode IR<3:0> */
 
     case 011:                                           /* .YLD  105351 (OP_C) */
         PR = op[0].word;                                /* pick up point of resumption */
-        reason = cpu_iog (STF_0, iotrap);               /* turn interrupt system on */
-        ion_defer = FALSE;                              /* kill defer so irq occurs immed */
+        io_control (CPU, iog_STF);                      /* turn interrupt system on */
+        cpu_interrupt_enable = SET;                     /* enable so irq occurs immed */
         break;
 
 
     case 012:                                           /* .CPM  105352 (OP_KK) */
         if (INT16 (op[0].word) > INT16 (op[1].word))
-            PR = (PR + 2) & VAMASK;                     /* P+5 arg1 > arg2 */
+            PR = (PR + 2) & LA_MASK;                    /* P+5 arg1 > arg2 */
 
         else if (INT16 (op[0].word) < INT16 (op[1].word))
-            PR = (PR + 1) & VAMASK;                     /* P+4 arg1 < arg2 */
+            PR = (PR + 1) & LA_MASK;                    /* P+4 arg1 < arg2 */
 
         tprintf (cpu_dev, TRACE_OPND, OPND_FORMAT "  return location is P+%u (%s)\n",
-                 PR, IR, PR - err_PC, compare [PR - err_PC - 3]);
+                 PR, IR, PR - err_PR, compare [PR - err_PR - 3]);
         break;
 
 
@@ -959,48 +949,48 @@ switch (entry) {                                        /* decode IR<3:0> */
 
         if (AR != eqt) {                                /* already set up? */
             for (eqta = eqt1; eqta <= eqt11; eqta++)    /* init EQT1-EQT11 */
-                WriteW (eqta, AR++ & DMASK);
+                WriteW (eqta, AR++ & R_MASK);
             for (eqta = eqt12; eqta <= eqt15; eqta++)   /* init EQT12-EQT15 */
-                WriteW (eqta, AR++ & DMASK);            /* (not contig with EQT1-11) */
+                WriteW (eqta, AR++ & R_MASK);           /* (not contig with EQT1-11) */
             }
 
-        AR = AR & DMASK;                                /* ensure wraparound */
+        AR = AR & R_MASK;                               /* ensure wraparound */
         break;
 
 
     case 014:                                           /* .ENTN/$DCPC 105354 (OP_N) */
-        if (iotrap) {                                   /* in trap cell? */
-            reason = cpu_save_state (iotrap);           /* DMA interrupt */
-            AR = cpu_get_intbl (CIR) & ~SIGN;           /* get intbl value and strip sign */
+        if (int_ack) {                                  /* in trap cell? */
+            save_state ();                              /* DMA interrupt */
+            AR = cpu_get_intbl (CIR) & ~D16_SIGN;       /* get intbl value and strip sign */
             goto DEVINT;                                /* vector by intbl value */
             }
 
         else {                                          /* .ENTN instruction */
-            ma = (PR - 2) & VAMASK;                     /* get addr of entry point */
+            ma = (PR - 2) & LA_MASK;                    /* get addr of entry point */
 
         ENTX:                                           /* enter here from .ENTC */
-            reason = cpu_ops (OP_A, op, intrq);         /* get instruction operand */
+            reason = cpu_ops (OP_A, op);                /* get instruction operand */
             da = op[0].word;                            /* get addr of 1st formal */
             count = ma - da;                            /* get count of formals */
             sa = ReadW (ma);                            /* get addr of 1st actual */
-            WriteW (ma, (sa + count) & VAMASK);         /* adjust return point to skip actuals */
+            WriteW (ma, (sa + count) & LA_MASK);        /* adjust return point to skip actuals */
 
             tprintf (cpu_dev, TRACE_OPND, OPND_FORMAT "  parameter count is %u\n",
                      PR, IR, count);
 
             for (i = 0; i < count; i++) {               /* parameter loop */
-                ma = ReadW (sa);                        /* get addr of actual */
-                sa = (sa + 1) & VAMASK;                 /* increment address */
+                MR = ReadW (sa);                        /* get addr of actual */
+                sa = (sa + 1) & LA_MASK;                /* increment address */
 
-                reason = resolve (ma, &ma, intrq);      /* resolve indirect */
+                reason = cpu_resolve_indirects (TRUE);  /* resolve indirects */
 
                 if (reason != SCPE_OK) {                /* resolution failed? */
-                    PR = err_PC;                        /* irq restarts instruction */
+                    PR = err_PR;                        /* irq restarts instruction */
                     break;
                     }
 
-                WriteW (da, ma);                        /* put addr into formal */
-                da = (da + 1) & VAMASK;                 /* increment address */
+                WriteW (da, MR);                        /* put addr into formal */
+                da = (da + 1) & LA_MASK;                /* increment address */
                 }
 
             if (entry == 016)                           /* call was .ENTC? */
@@ -1010,26 +1000,20 @@ switch (entry) {                                        /* decode IR<3:0> */
 
 
     case 015:                                           /* $OTST/$MPV 105355 (OP_N) */
-        if (iotrap) {                                   /* in trap cell? */
-            tprintf (cpu_dev, TRACE_OPND, OPND_FORMAT "  entry is for a %s\n",
-                     PR, IR,
-                     (mp_viol & SIGN
-                       ? "parity error"
-                       : (mp_mevff == SET
-                           ? "dynamic mapping violation"
-                           : "memory protect violation")));
+        if (int_ack) {                                  /* in trap cell? */
+            mpv = mp_trace_violation ();                /* get MP/PE flag */
 
-            reason = cpu_save_state (iotrap);           /* MP/DMS/PE interrupt */
+            save_state ();                              /* MP/DMS/PE interrupt */
             vectors = ReadW (vctr);                     /* get address of vectors (in SMAP) */
 
-            if (mp_viol & SIGN) {                       /* parity error? */
-                WriteW (vectors + cic_offset, PR);      /* save point of suspension in $CIC */
-                PR = ReadW (vectors + perr_offset);     /* vector to $PERR for processing */
+            if (mpv) {                                  /* MP/DMS violation */
+                save_regs (TRUE);                       /* save registers */
+                PR = ReadW (vectors + rqst_offset);     /* vector to $RQST for processing */
                 }
 
-            else {                                      /* MP/DMS violation */
-                cpu_save_regs (iotrap);                 /* save CPU registers */
-                PR = ReadW (vectors + rqst_offset);     /* vector to $RQST for processing */
+            else {                                      /* parity error */
+                WriteW (vectors + cic_offset, PR);      /* save point of suspension in $CIC */
+                PR = ReadW (vectors + perr_offset);     /* vector to $PERR for processing */
                 }
             }
 
@@ -1037,7 +1021,7 @@ switch (entry) {                                        /* decode IR<3:0> */
             YR = 0000000;                               /* RPL switch (not implemented) */
             AR = 0000000;                               /* LDR [B] (not implemented) */
             SR = 0102077;                               /* test passed code */
-            PR = (PR + 1) & VAMASK;                     /* P+2 return for firmware OK */
+            PR = (PR + 1) & LA_MASK;                    /* P+2 return for firmware OK */
 
             if (cpu_dev.dctrl & DEBUG_NOOS)             /* if the OS debug flag is set */
                 XR = 0;                                 /*   then return rev 0 so that RTE won't use microcode */
@@ -1045,14 +1029,14 @@ switch (entry) {                                        /* decode IR<3:0> */
                 XR = 010;                               /*   return firmware revision code 10B */
 
             tprintf (cpu_dev, TRACE_OPND, OPND_FORMAT "  return location is P+%u (firmware %sinstalled)\n",
-                     PR, IR, PR - err_PC, not [PR - err_PC - 1]);
+                     PR, IR, PR - err_PR, not [PR - err_PR - 1]);
             }
         break;
 
 
     case 016:                                           /* .ENTC/$DEV 105356 (OP_N) */
-        if (iotrap) {                                   /* in trap cell? */
-            reason = cpu_save_state (iotrap);           /* device interrupt */
+        if (int_ack) {                                  /* in trap cell? */
+            save_state ();                              /* device interrupt */
             AR = cpu_get_intbl (CIR);                   /* get interrupt table value */
 
         DEVINT:
@@ -1069,15 +1053,15 @@ switch (entry) {                                        /* decode IR<3:0> */
             }
 
         else {                                          /* .ENTC instruction */
-            ma = (PR - 4) & VAMASK;                     /* get addr of entry point */
+            ma = (PR - 4) & LA_MASK;                    /* get addr of entry point */
             goto ENTX;                                  /* continue with common processing */
             }
         break;
 
 
     case 017:                                           /* .DSPI/$TBG 105357 (OP_N) */
-        if (iotrap) {                                   /* in trap cell? */
-            reason = cpu_save_state (iotrap);           /* TBG interrupt */
+        if (int_ack) {                                  /* in trap cell? */
+            save_state ();                              /* TBG interrupt */
             vectors = ReadW (vctr);                     /* get address of vectors (in SMAP) */
             PR = ReadW (vectors + clck_offset);         /* vector to $CLCK for processing */
             }

@@ -226,6 +226,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\HP2100\hp2100_cpu_fp.c"
+				>
+			</File>
+			<File
+				RelativePath="..\HP2100\hp2100_cpu_fpp.c"
+				>
+			</File>
+			<File
 				RelativePath="..\HP2100\hp2100_di.c"
 				>
 			</File>
@@ -235,6 +243,10 @@
 			</File>
 			<File
 				RelativePath="..\HP2100\hp2100_disclib.c"
+				>
+			</File>
+			<File
+				RelativePath="..\HP2100\hp2100_dma.c"
 				>
 			</File>
 			<File
@@ -254,14 +266,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\HP2100\hp2100_fp.c"
-				>
-			</File>
-			<File
-				RelativePath="..\HP2100\hp2100_fp1.c"
-				>
-			</File>
-			<File
 				RelativePath="..\HP2100\hp2100_ipl.c"
 				>
 			</File>
@@ -271,6 +275,14 @@
 			</File>
 			<File
 				RelativePath="..\HP2100\hp2100_lpt.c"
+				>
+			</File>
+			<File
+				RelativePath="..\HP2100\hp2100_mc.c"
+				>
+			</File>
+			<File
+				RelativePath="..\HP2100\hp2100_mem.c"
 				>
 			</File>
 			<File
@@ -294,11 +306,19 @@
 				>
 			</File>
 			<File
-				RelativePath="..\HP2100\hp2100_stddev.c"
+				RelativePath="..\HP2100\hp2100_pt.c"
 				>
 			</File>
 			<File
 				RelativePath="..\HP2100\hp2100_sys.c"
+				>
+			</File>
+			<File
+				RelativePath="..\HP2100\hp2100_tbg.c"
+				>
+			</File>
+			<File
+				RelativePath="..\HP2100\hp2100_tty.c"
 				>
 			</File>
 			<File
@@ -347,11 +367,15 @@
 				>
 			</File>
 			<File
-				RelativePath="..\HP2100\hp2100_cpu1.h"
+				RelativePath="..\HP2100\hp2100_cpu_dmm.h"
 				>
 			</File>
 			<File
-				RelativePath="hp2100_defs.h"
+				RelativePath="..\HP2100\hp2100_cpu_fp.h"
+				>
+			</File>
+			<File
+				RelativePath="..\HP2100\hp2100_defs.h"
 				>
 			</File>
 			<File
@@ -363,11 +387,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\HP2100\hp2100_fp.h"
-				>
-			</File>
-			<File
-				RelativePath="..\HP2100\hp2100_fp1.h"
+				RelativePath="..\HP2100\hp2100_io.h"
 				>
 			</File>
 			<File

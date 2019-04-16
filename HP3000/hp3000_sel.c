@@ -1,6 +1,6 @@
 /* hp3000_sel.c: HP 3000 30030C Selector Channel simulator
 
-   Copyright (c) 2016-2017, J. David Bryan
+   Copyright (c) 2016-2018, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +25,7 @@
 
    SEL          HP 3000 Series III Selector Channel
 
+   27-Dec-18    JDB     Revised fall through comments to comply with gcc 7
    05-Sep-17    JDB     Changed REG_A (permit any symbolic override) to REG_X
    10-Oct-16    JDB     Renumbered debug flags to start at 0
                         Added port_read_memory, port_write_memory macros
@@ -1005,7 +1006,7 @@ while (sel_request && cycles > 0) {                     /* execute as long as a 
 
             sequencer = Transfer_Sequence;              /* continue with the transfer sequence */
 
-        /* fall into the Transfer_Sequence */
+        /* fall through into the Transfer_Sequence */
 
 
         case Transfer_Sequence:

@@ -1,7 +1,7 @@
 /* hp2100_lps.c: HP 2100 12653A Line Printer Interface simulator
 
    Copyright (c) 1993-2016, Robert M. Supnik
-   Copyright (c) 2017,      J. David Bryan
+   Copyright (c) 2017-2018, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +26,8 @@
 
    LPS          HP 12653A Line Printer Interface
 
+   14-Nov-18    JDB     Diagnostic mode now uses GP Register jumper configuration
+   26-Jun-18    JDB     Revised I/O model
    03-Aug-17    JDB     Changed perror call for I/O errors to cprintf
    20-Jul-17    JDB     Removed "lps_stopioe" variable and register
    17-Mar-17    JDB     Added "-N" handling to the attach routine
@@ -64,8 +66,11 @@
    References:
      - 2767A Line Printer Operating and Service Manual
          (02767-90002, October 1973)
+     - 12653A Line Printer Interface Kit
+         (12653-90002, October 1971)
      - General Purpose Register Diagnostic Reference Manual
          (24391-90001, April 1982)
+
 
    The HP 12653A Line Printer Interface Kit connects the 2767A printer to the HP
    1000 family.  The subsystem consists of an interface card employing TTL-level
@@ -123,30 +128,18 @@
      3. Characters not in the print repertoire are replaced with blanks.
      4. The 81st and succeeding characters overprint the current line.
 
-   The "General Purpose Register Diagnostic Reference Manual" states that the
-   12653A is a "special microcircuit interface," suggesting that it is a
-   derivative of the 12566B Microcircuit Interface Kit.  No specific manual for
-   this interface kit has been found.
-
    A diagnostic mode is provided to simulate the installation of the 1251-0332
    loopback connecctor, modified to connect pins Z/22 to pins AA/23 as required
-   by the diagnostic.  This ties the output data lines to the input data lines
-   and the device command output to the device flag input.
-
-   Jumper settings depend on the CPU model.  For the 2114/15/16 CPUs, jumper W1
-   is installed in position B and jumper W2 in position C.  In these positions,
-   the card flag sets two instructions after the STC, allowing DMA to steal
-   every third cycle.  For the 2100 and 1000 CPUs, jumper W1 is installed in
-   position C and jumper W2 in position B.  In these positions, the card flag
-   sets one instruction after the STC, allowing DMA to steal every other cycle.
-   For all CPUs, jumpers W3 and W4 are installed in position B, W5-W8 are
-   installed, and W9 is installed in position A.
- */
+   by the General Purpose Register Diagnostic.  This ties the output data lines
+   to the input data lines and the device command output to the device flag
+   input.  Entering diagnostic mode also configures the jumpers correctly for
+   the diagnostic.
+*/
 
 
 
 #include "hp2100_defs.h"
-#include "hp2100_cpu.h"
+#include "hp2100_io.h"
 
 
 
@@ -158,38 +151,39 @@
 
 #define DATA_MASK           0177u               /* printer uses only 7 bits for data */
 
-#define LPS_ZONECNT     20                      /* zone char count */
-#define LPS_PAGECNT     80                      /* page char count */
-#define LPS_PAGELNT     60                      /* page line length */
-#define LPS_FORMLNT     66                      /* form line length */
+#define LPS_ZONECNT         20                  /* zone char count */
+#define LPS_PAGECNT         80                  /* page char count */
+#define LPS_PAGELNT         60                  /* page line length */
+#define LPS_FORMLNT         66                  /* form line length */
 
 /* Printer power states */
 
-#define LPS_ON          0                       /* power is on */
-#define LPS_OFF         1                       /* power is off */
-#define LPS_TURNING_ON  2                       /* power is turning on */
+#define LPS_ON              0                   /* power is on */
+#define LPS_OFF             1                   /* power is off */
+#define LPS_TURNING_ON      2                   /* power is turning on */
 
-#define LPS_BUSY        0000001                 /* busy status */
-#define LPS_NRDY        0100000                 /* not ready status */
-#define LPS_PWROFF      LPS_BUSY | LPS_NRDY     /* power-off status */
+#define LPS_BUSY            0000001             /* busy status */
+#define LPS_NRDY            0100000             /* not ready status */
+#define LPS_PWROFF          LPS_BUSY | LPS_NRDY /* power-off status */
 
-#define UNIT_V_DIAG     (UNIT_V_UF + 0)         /* diagnostic mode */
-#define UNIT_V_POWEROFF (UNIT_V_UF + 1)         /* unit powered off */
-#define UNIT_V_OFFLINE  (UNIT_V_UF + 2)         /* unit offline */
-#define UNIT_DIAG       (1 << UNIT_V_DIAG)
-#define UNIT_POWEROFF   (1 << UNIT_V_POWEROFF)
-#define UNIT_OFFLINE    (1 << UNIT_V_OFFLINE)
+#define UNIT_V_DIAG         (UNIT_V_UF + 0)     /* diagnostic mode */
+#define UNIT_V_POWEROFF     (UNIT_V_UF + 1)     /* unit powered off */
+#define UNIT_V_OFFLINE      (UNIT_V_UF + 2)     /* unit offline */
+
+#define UNIT_DIAG           (1 << UNIT_V_DIAG)
+#define UNIT_POWEROFF       (1 << UNIT_V_POWEROFF)
+#define UNIT_OFFLINE        (1 << UNIT_V_OFFLINE)
 
 static struct {
     FLIP_FLOP control;                          /* control flip-flop */
     FLIP_FLOP flag;                             /* flag flip-flop */
-    FLIP_FLOP flagbuf;                          /* flag buffer flip-flop */
+    FLIP_FLOP flag_buffer;                      /* flag buffer flip-flop */
     } lps = { CLEAR, CLEAR, CLEAR };
 
-static int32 lps_ccnt = 0;                      /* character count */
-static int32 lps_lcnt = 0;                      /* line count */
-static int32 lps_sta = 0;                       /* printer status */
-static int32 lps_timing = 1;                    /* timing type */
+static int32  lps_ccnt = 0;                     /* character count */
+static int32  lps_lcnt = 0;                     /* line count */
+static int32  lps_sta = 0;                      /* printer status */
+static t_bool lps_fast_timing = TRUE;           /* timing type */
 static uint32 lps_power = LPS_ON;               /* power state */
 
 /* Hardware timing:
@@ -219,16 +213,14 @@ static int32 lps_rtime = 0;                     /* power-on ready time */
 
 typedef int32 TIMESET[4];                       /* set of controller times */
 
-static int32 *const lps_timers[] = { &lps_ctime, &lps_ptime, &lps_stime, &lps_rtime };
+static int32 * const lps_timers[] = { &lps_ctime, &lps_ptime, &lps_stime, &lps_rtime };
 
 static const TIMESET lps_times[2] = {
     { 2, 55300, 17380, 158000 },                /* REALTIME */
     { 2,  1000,   1000,  1000 }                 /* FASTTIME */
     };
 
-DEVICE lps_dev;
-
-static IOHANDLER lpsio;
+static INTERFACE lps_interface;
 
 static t_stat lps_svc (UNIT *uptr);
 static t_stat lps_reset (DEVICE *dptr);
@@ -246,7 +238,12 @@ static t_stat lps_show_timing (FILE *st, UNIT *uptr, int32 val, CONST void *desc
    lps_reg      LPS register list
 */
 
-static DIB lps_dib = { &lpsio, LPS };
+static DIB lps_dib = {
+    &lps_interface,                             /* the device's I/O interface function pointer */
+    LPS,                                        /* the device's select code (02-77) */
+    0,                                          /* the card index */
+    "12653A Line Printer Interface",            /* the card description */
+    NULL };                                     /* the ROM description */
 
 static UNIT lps_unit = {
     UDATA (&lps_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_DISABLE+UNIT_TEXT, 0)
@@ -260,7 +257,7 @@ static REG lps_reg[] = {
     { ORDATA (POWER,  lps_power,               2),            REG_RO  },
     { FLDATA (CTL,    lps.control,                      0)            },
     { FLDATA (FLG,    lps.flag,                         0)            },
-    { FLDATA (FBF,    lps.flagbuf,                      0)            },
+    { FLDATA (FBF,    lps.flag_buffer,                  0)            },
     { DRDATA (CCNT,   lps_ccnt,                7),            PV_LEFT },
     { DRDATA (LCNT,   lps_lcnt,                7),            PV_LEFT },
     { DRDATA (POS,    lps_unit.pos,        T_ADDR_W),         PV_LEFT },
@@ -268,9 +265,10 @@ static REG lps_reg[] = {
     { DRDATA (PTIME,  lps_ptime,              24),            PV_LEFT },
     { DRDATA (STIME,  lps_stime,              24),            PV_LEFT },
     { DRDATA (RTIME,  lps_rtime,              24),            PV_LEFT },
-    { FLDATA (TIMING, lps_timing,                       0),   REG_HRO },
-    { ORDATA (SC,     lps_dib.select_code,     6),            REG_HRO },
-    { ORDATA (DEVNO,  lps_dib.select_code,     6),            REG_HRO },
+    { FLDATA (TIMING, lps_fast_timing,                  0),   REG_HRO },
+
+      DIB_REGS (lps_dib),
+
     { NULL }
     };
 
@@ -332,48 +330,52 @@ DEVICE lps_dev = {
     };
 
 
-/* I/O signal handler.
 
-   Implementation note:
+/* I/O signal handler */
 
-    1. The 211x DMA diagnostic expects that a programmed STC and CLC sequence
-       will set the card flag in two instructions, whereas a last-DMA-cycle
-       assertion of STC and CLC simultaneously will not.
-*/
-
-static uint32 lpsio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
+static SIGNALS_VALUE lps_interface (const DIB *dibptr, INBOUND_SET inbound_signals, HP_WORD inbound_value)
 {
-int32 current_line, current_char;
-IOSIGNAL signal;
-IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
+INBOUND_SIGNAL signal;
+INBOUND_SET    working_set = inbound_signals;
+SIGNALS_VALUE  outbound    = { ioNONE, 0 };
+t_bool         irq_enabled = FALSE;
+int32          current_line, current_char;
 
-while (working_set) {
-    signal = IONEXT (working_set);                      /* isolate next signal */
+while (working_set) {                                   /* while signals remain */
+    signal = IONEXTSIG (working_set);                   /*   isolate the next signal */
 
-    switch (signal) {                                   /* dispatch I/O signal */
+    switch (signal) {                                   /* dispatch the I/O signal */
 
-        case ioCLF:                                     /* clear flag flip-flop */
-            lps.flag = lps.flagbuf = CLEAR;
+        case ioCLF:                                     /* Clear Flag flip-flop */
+            lps.flag_buffer = CLEAR;                    /* reset the flag buffer */
+            lps.flag        = CLEAR;                    /*   and flag flip-flops */
             break;
 
 
-        case ioSTF:                                     /* set flag flip-flop */
-        case ioENF:                                     /* enable flag */
-            lps.flag = lps.flagbuf = SET;
+        case ioSTF:                                     /* Set Flag flip-flop */
+            lps.flag_buffer = SET;                      /* set the flag buffer flip-flop */
             break;
 
 
-        case ioSFC:                                     /* skip if flag is clear */
-            setstdSKF (lps);
+        case ioENF:                                     /* Enable Flag */
+            if (lps.flag_buffer == SET)                 /* if the flag buffer flip-flop is set */
+                lps.flag = SET;                         /*   then set the flag flip-flop */
             break;
 
 
-        case ioSFS:                                     /* skip if flag is set */
-            setstdSKF (lps);
+        case ioSFC:                                     /* Skip if Flag is Clear */
+            if (lps.flag == CLEAR)                      /* if the flag flip-flop is clear */
+                outbound.signals |= ioSKF;              /*   then assert the Skip on Flag signal */
             break;
 
 
-        case ioIOI:                                             /* I/O data input */
+        case ioSFS:                                     /* Skip if Flag is Set */
+            if (lps.flag == SET)                        /* if the flag flip-flop is set */
+                outbound.signals |= ioSKF;              /*   then assert the Skip on Flag signal */
+            break;
+
+
+        case ioIOI:                                             /* I/O Data Input */
             if ((lps_unit.flags & UNIT_DIAG) == 0) {            /* real lpt? */
                 if (lps_power == LPS_ON) {                      /* power on? */
                     if (((lps_unit.flags & UNIT_ATT) == 0) ||   /* paper out? */
@@ -388,48 +390,43 @@ while (working_set) {
                     lps_sta = LPS_PWROFF;
                 }
 
-            stat_data = IORETURN (SCPE_OK, lps_sta);    /* diag, rtn status */
+            outbound.value = lps_sta;
 
             tprintf (lps_dev, DEB_CPU, "Status %06o returned\n", lps_sta);
             break;
 
 
-        case ioIOO:                                     /* I/O data output */
-            lps_unit.buf = IODATA (stat_data);
+        case ioIOO:                                     /* I/O Data Output */
+            lps_unit.buf = inbound_value;
 
             tprintf (lps_dev, DEB_CPU, "Control %06o (%s) output\n",
                      lps_unit.buf, fmt_char (lps_unit.buf & DATA_MASK));
             break;
 
 
-        case ioPOPIO:                                   /* power-on preset to I/O */
-            lps.flag = lps.flagbuf = SET;               /* set flag and flag buffer */
-            lps_unit.buf = 0;                           /* clear output buffer */
+        case ioPOPIO:                                   /* Power-On Preset to I/O */
+            lps.flag_buffer = SET;                      /* set the flag buffer flip-flop */
+            lps_unit.buf = 0;                           /*   and clear the output register */
             break;
 
 
-        case ioCRS:                                     /* control reset */
-            lps.control = CLEAR;                        /* clear control */
-            sim_cancel (&lps_unit);                     /* deactivate unit */
+        case ioCRS:                                     /* Control Reset */
+            lps.control = CLEAR;                        /* clear the control flip-flop */
+            sim_cancel (&lps_unit);                     /*   and cancel any printing in progress */
             break;
 
 
-        case ioCLC:                                     /* clear control flip-flop */
-            lps.control = CLEAR;
+        case ioCLC:                                     /* Clear Control flip-flop */
+            lps.control = CLEAR;                        /* clear the control flip-flop */
             break;
 
 
-        case ioSTC:                                     /* set control flip-flop */
-            lps.control = SET;                          /* set control */
+        case ioSTC:                                     /* Set Control flip-flop */
+            lps.control = SET;                          /* set the control flip-flop */
 
             if (lps_unit.flags & UNIT_DIAG) {           /* diagnostic? */
                 lps_sta = lps_unit.buf;                 /* loop back data */
-
-                if (!(signal_set & ioCLC))                  /* CLC not asserted simultaneously? */
-                    if (UNIT_CPU_TYPE == UNIT_TYPE_211X)    /* 2114/15/16 CPU? */
-                        sim_activate (&lps_unit, 3);        /* schedule flag after two instructions */
-                    else                                    /* 2100 or 1000 */
-                        sim_activate (&lps_unit, 2);        /* schedule flag after next instruction */
+                sim_activate_abs (&lps_unit, 1);        /*   and set the flag after the next instruction */
                 }
 
             else {                                      /* real lpt, sched */
@@ -478,26 +475,48 @@ while (working_set) {
             break;
 
 
-        case ioSIR:                                     /* set interrupt request */
-            setstdPRL (lps);                            /* set standard PRL signal */
-            setstdIRQ (lps);                            /* set standard IRQ signal */
-            setstdSRQ (lps);                            /* set standard SRQ signal */
+        case ioSIR:                                     /* Set Interrupt Request */
+            if (lps.control & lps.flag)                 /* if the control and flag flip-flops are set */
+                outbound.signals |= cnVALID;            /*   then deny PRL */
+            else                                        /* otherwise */
+                outbound.signals |= cnPRL | cnVALID;    /*   conditionally assert PRL */
+
+            if (lps.control & lps.flag & lps.flag_buffer)   /* if the control, flag, and flag buffer flip-flops are set */
+                outbound.signals |= cnIRQ | cnVALID;        /*   then conditionally assert IRQ */
+
+            if (lps.flag == SET)                        /* if the flag flip-flop is set */
+                outbound.signals |= ioSRQ;              /*   then assert SRQ */
             break;
 
 
-        case ioIAK:                                     /* interrupt acknowledge */
-            lps.flagbuf = CLEAR;
+        case ioIAK:                                     /* Interrupt Acknowledge */
+            lps.flag_buffer = CLEAR;                    /* clear the flag buffer flip-flop */
             break;
 
 
-        default:                                        /* all other signals */
-            break;                                      /*   are ignored */
+        case ioIEN:                                     /* Interrupt Enable */
+            irq_enabled = TRUE;                         /* permit IRQ to be asserted */
+            break;
+
+
+        case ioPRH:                                         /* Priority High */
+            if (irq_enabled && outbound.signals & cnIRQ)    /* if IRQ is enabled and conditionally asserted */
+                outbound.signals |= ioIRQ | ioFLG;          /*   then assert IRQ and FLG */
+
+            if (!irq_enabled || outbound.signals & cnPRL)   /* if IRQ is disabled or PRL is conditionally asserted */
+                outbound.signals |= ioPRL;                  /*   then assert it unconditionally */
+            break;
+
+
+        case ioEDT:                                     /* not used by this interface */
+        case ioPON:                                     /* not used by this interface */
+            break;
         }
 
-    working_set = working_set & ~signal;                /* remove current signal from set */
+    IOCLEARSIG (working_set, signal);                   /* remove the current signal from the set */
     }
 
-return stat_data;
+return outbound;                                        /* return the outbound signals and value */
 }
 
 
@@ -519,14 +538,16 @@ if (lps_power == LPS_TURNING_ON) {                      /* printer warmed up? */
     }
 
 if (uptr->flags & UNIT_DIAG) {                          /* diagnostic? */
-    lpsio (&lps_dib, ioENF, 0);                         /* set flag */
+    lps.flag_buffer = SET;
+    io_assert (&lps_dev, ioa_ENF);                      /* set flag */
     return SCPE_OK;                                     /* done */
     }
 
 if ((uptr->flags & (UNIT_ATT | UNIT_OFFLINE | UNIT_POWEROFF)) != UNIT_ATT)  /* not ready? */
     return SCPE_OK;
 
-lpsio (&lps_dib, ioENF, 0);                             /* set flag */
+lps.flag_buffer = SET;
+io_assert (&lps_dev, ioa_ENF);                          /* set flag */
 
 if (((c < ' ') || (c > '_')) &&                         /* non-printing char? */
     (c != FF) && (c != LF) && (c != CR)) {
@@ -576,10 +597,10 @@ static t_stat lps_reset (DEVICE *dptr)
 {
 if (sim_switches & SWMASK ('P')) {                      /* power-on reset? */
     lps_power = LPS_ON;                                 /* power is on */
-    lps_set_timing (NULL, lps_timing, NULL, NULL);      /* init timing set */
+    lps_set_timing (NULL, lps_fast_timing, NULL, NULL); /* init timing set */
     }
 
-IOPRESET (&lps_dib);                                    /* PRESET device (does not use PON) */
+io_assert (dptr, ioa_POPIO);                            /* PRESET the device */
 
 lps_sta = 0;                                            /* clear status */
 sim_cancel (&lps_unit);                                 /* deactivate unit */
@@ -604,7 +625,7 @@ return SCPE_OK;
 static t_stat lps_restart (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 if (lps.control && !sim_is_active (uptr))
-    sim_activate (uptr, 0);                             /* reschedule I/O */
+    sim_activate (uptr, 1);                             /* reschedule I/O */
 return SCPE_OK;
 }
 
@@ -677,19 +698,25 @@ return result;
 /* Set printer timing
 
    Realistic timing is factored, depending on CPU model, to account for the
-   timing method employed by the diagnostic. */
+   timing method employed by the diagnostic.  In realistic timing mode, the
+   diagnostic executes fewer instructions per interval if the CPU is not a 1000
+   E or F series machine.
+*/
 
 static t_stat lps_set_timing (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-uint32 i, factor = 1;
+uint32 i, factor;
 
-lps_timing = (val != 0);                                /* determine choice */
-if ((lps_timing == 0) &&                                /* calc speed factor */
-    (UNIT_CPU_MODEL != UNIT_1000_E) &&
-    (UNIT_CPU_MODEL != UNIT_1000_F))
-    factor = 4;
-for (i = 0; i < (sizeof (lps_timers) / sizeof (lps_timers[0])); i++)
-    *lps_timers[i] = lps_times[lps_timing][i] / factor; /* assign times */
+lps_fast_timing = (val != 0);                           /* determine choice */
+
+if (lps_fast_timing                                     /* if optimized timing is used */
+  || cpu_configuration & (CPU_1000_E | CPU_1000_F))     /*   or this is a 1000 E or F CPU */
+    factor = 1;                                         /*     then no time correction is needed */
+else                                                    /* otherwise */
+    factor = 4;                                         /*   the times will be slower */
+
+for (i = 0; i < (sizeof (lps_timers) / sizeof (lps_timers [0])); i++)
+    *lps_timers [i] = lps_times [lps_fast_timing] [i] / factor; /* assign times */
 return SCPE_OK;
 }
 
@@ -697,7 +724,9 @@ return SCPE_OK;
 
 static t_stat lps_show_timing (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
-if (lps_timing) fputs ("fast timing", st);
-else fputs ("realistic timing", st);
+if (lps_fast_timing)
+    fputs ("fast timing", st);
+else
+    fputs ("realistic timing", st);
 return SCPE_OK;
 }

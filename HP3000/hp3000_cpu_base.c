@@ -1,6 +1,6 @@
 /* hp3000_cpu_base.c: HP 3000 CPU base set instruction simulator
 
-   Copyright (c) 2016-2017, J. David Bryan
+   Copyright (c) 2016-2018, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -23,6 +23,7 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   27-Dec-18    JDB     Revised fall through comments to comply with gcc 7
    08-Jan-17    JDB     Fixed bug in SCAL 0/PCAL 0 if a stack overflow occurs
    07-Nov-16    JDB     SETR doesn't set cpu_base_changed if no register change;
                         renamed cpu_byte_to_word_ea to cpu_byte_ea
@@ -3335,7 +3336,7 @@ switch (operation) {                                    /* dispatch the move or 
                     break;
                     }
 
-            /* fall into the LOCK executor */
+            /* fall through into the LOCK executor */
 
             case 001:                                   /* LOCK (none; MODE) */
                 if (UNIT_CPU_MODEL == UNIT_SERIES_II) { /* if the CPU is a Series II */
@@ -3358,7 +3359,7 @@ switch (operation) {                                    /* dispatch the move or 
                     break;
                     }
 
-            /* fall into the PCN executor */
+            /* fall through into the PCN executor */
 
             case 002:                                       /* PCN (none; STOV, MODE) */
                 cpu_push ();                                /* push the stack down */
@@ -3382,7 +3383,7 @@ switch (operation) {                                    /* dispatch the move or 
                     break;
                     }                                   /* otherwise fall into the UNLK executor */
 
-            /* fall into the UNLK executor */
+            /* fall through into the UNLK executor */
 
             case 003:                                   /* UNLK (none; MODE) */
                 if (UNIT_CPU_MODEL == UNIT_SERIES_II) { /* if the CPU is a Series II */
@@ -3712,7 +3713,7 @@ switch (operation) {                                    /* dispatch the I/O or c
                     break;
                     }
 
-            /* fall into the PSDB executor */
+            /* fall through into the PSDB executor */
 
             case 001:                                   /* PSDB (none; MODE) */
                 cpu_read_memory (absolute, ICS_Q,       /* read the ICS stack marker pointer value */
@@ -3737,7 +3738,7 @@ switch (operation) {                                    /* dispatch the I/O or c
                     break;
                     }
 
-            /* fall into the DISP executor */
+            /* fall through into the DISP executor */
 
             case 002:                                   /* DISP (CCx; MODE, CSTV, TRACE, ABS CST, BNDV) */
                 cpu_read_memory (absolute, ICS_Q,       /* read the stack marker initial value */
@@ -3771,7 +3772,7 @@ switch (operation) {                                    /* dispatch the I/O or c
                     break;
                     }
 
-            /* fall into the PSEB executor */
+            /* fall through into the PSEB executor */
 
             case 003:                                   /* PSEB (CCx; MODE, CSTV, TRACE, ABS CST, BNDV) */
                 cpu_read_memory (absolute, ICS_Q,       /* read the stack marker initial value */

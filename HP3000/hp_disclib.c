@@ -1,6 +1,6 @@
 /* hp_disclib.c: HP MAC/ICD disc controller simulator library
 
-   Copyright (c) 2011-2017, J. David Bryan
+   Copyright (c) 2011-2018, J. David Bryan
    Copyright (c) 2004-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   27-Dec-18    JDB     Revised fall through comments to comply with gcc 7
    22-Apr-17    JDB     A failed sim_fseek call now causes a drive fault
    10-Oct-16    JDB     Moved "hp3000_defs.h" inclusion from "hp_disclib.h"
    03-Aug-16    JDB     "fmt_bitset" now allows multiple concurrent calls
@@ -1816,12 +1817,12 @@ else {                                                  /* otherwise the command
             cvptr->verify = FALSE;                      /* do not verify until a track is crossed */
             inbound_data &= ~CM_SPD_MASK;               /* clear the SPD bits to avoid changing the state */
 
-        /* fall into the Initialize case */
+        /* fall through into the Initialize case */
 
         case Initialize:
             cvptr->spd_unit |= CM_SPD (inbound_data);   /* merge the SPD flags with the unit */
 
-        /* fall into the read/write cases */
+        /* fall through into the read/write cases */
 
         case Read:
         case Read_Full_Sector:
@@ -2268,7 +2269,7 @@ switch (phase) {                                        /* dispatch the phase */
             case Cold_Load_Read:
                 cvptr->file_mask = CM_SPARE_EN;             /* enable sparing in surface mode without auto-seek */
 
-            /* fall into the default case */
+            /* fall through into the default case */
 
             default:                                        /* a command was waiting on seek completion */
                 set_rotation (cvptr, uptr);                 /*   so set up the rotation phase and latency */

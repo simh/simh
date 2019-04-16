@@ -1,7 +1,7 @@
 /* hp2100_mt.c: HP 2100 12559C 9-Track Magnetic Tape Unit Interface
 
    Copyright (c) 1993-2016, Robert M. Supnik
-   Copyright (c) 2017,      J. David Bryan
+   Copyright (c) 2017-2019, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +26,9 @@
 
    MT           12559C 9-Track Magnetic Tape Unit Interface
 
+   01-Feb-19    JDB     Remap sim_tape_attach to avoid unwanted debug output
+   24-Jan-19    JDB     Removed DEV_TAPE from DEVICE flags
+   11-Jul-18    JDB     Revised I/O model
    20-Jul-17    JDB     Removed "mtc_stopioe" variable and register
    13-Mar-17    JDB     Deprecated LOCKED/WRITEENABLED for ATTACH -R
    13-May-16    JDB     Modified for revised SCP API function parameter types
@@ -91,102 +94,135 @@
 
 
 #include "hp2100_defs.h"
+#include "hp2100_io.h"
+
 #include "sim_tape.h"
 
 
 
-#define DB_V_SIZE       16                              /* max data buf */
-#define DBSIZE          (1 << DB_V_SIZE)                /* max data cmd */
+/* Remap tape attach in 4.x to avoid unwanted debug output */
+
+#if (SIM_MAJOR >= 4)
+  #define sim_tape_attach(a,b) sim_tape_attach_ex (a, b, 0, 0)
+#endif
+
+
+
+#define DB_V_SIZE       16                      /* max data buf */
+#define DBSIZE          (1 << DB_V_SIZE)        /* max data cmd */
 
 /* Command - mtc_fnc */
 
-#define FNC_CLR         0300                            /* clear */
-#define FNC_WC          0031                            /* write */
-#define FNC_RC          0023                            /* read */
-#define FNC_GAP         0011                            /* write gap */
-#define FNC_FSR         0003                            /* forward space */
-#define FNC_BSR         0041                            /* backward space */
-#define FNC_REW         0201                            /* rewind */
-#define FNC_RWS         0101                            /* rewind and offline */
-#define FNC_WFM         0035                            /* write file mark */
+#define FNC_CLR         0300                    /* clear */
+#define FNC_WC          0031                    /* write */
+#define FNC_RC          0023                    /* read */
+#define FNC_GAP         0011                    /* write gap */
+#define FNC_FSR         0003                    /* forward space */
+#define FNC_BSR         0041                    /* backward space */
+#define FNC_REW         0201                    /* rewind */
+#define FNC_RWS         0101                    /* rewind and offline */
+#define FNC_WFM         0035                    /* write file mark */
 
 /* Status - stored in mtc_sta, (d) = dynamic */
 
-#define STA_LOCAL       0400                            /* local (d) */
-#define STA_EOF         0200                            /* end of file */
-#define STA_BOT         0100                            /* beginning of tape */
-#define STA_EOT         0040                            /* end of tape */
-#define STA_TIM         0020                            /* timing error */
-#define STA_REJ         0010                            /* programming error */
-#define STA_WLK         0004                            /* write locked (d) */
-#define STA_PAR         0002                            /* parity error */
-#define STA_BUSY        0001                            /* busy (d) */
+#define STA_LOCAL       0400                    /* local (d) */
+#define STA_EOF         0200                    /* end of file */
+#define STA_BOT         0100                    /* beginning of tape */
+#define STA_EOT         0040                    /* end of tape */
+#define STA_TIM         0020                    /* timing error */
+#define STA_REJ         0010                    /* programming error */
+#define STA_WLK         0004                    /* write locked (d) */
+#define STA_PAR         0002                    /* parity error */
+#define STA_BUSY        0001                    /* busy (d) */
 
-struct {
-    FLIP_FLOP flag;                                     /* flag flip-flop */
-    FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
-    } mtd = { CLEAR, CLEAR };
+/* Interface state */
 
-struct {
-    FLIP_FLOP control;                                  /* control flip-flop */
-    FLIP_FLOP flag;                                     /* flag flip-flop */
-    FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
-    } mtc = { CLEAR, CLEAR, CLEAR };
+typedef struct {
+    FLIP_FLOP  control;                         /* control flip-flop */
+    FLIP_FLOP  flag;                            /* flag flip-flop */
+    FLIP_FLOP  flag_buffer;                     /* flag buffer flip-flop */
+    } CARD_STATE;
 
-int32 mtc_fnc = 0;                                      /* function */
-int32 mtc_sta = 0;                                      /* status register */
-int32 mtc_dtf = 0;                                      /* data xfer flop */
-int32 mtc_1st = 0;                                      /* first svc flop */
-int32 mtc_ctime = 40;                                   /* command wait */
-int32 mtc_gtime = 1000;                                 /* gap stop time */
-int32 mtc_xtime = 15;                                   /* data xfer time */
-uint8 mtxb[DBSIZE] = { 0 };                             /* data buffer */
-t_mtrlnt mt_ptr = 0, mt_max = 0;                        /* buffer ptrs */
+static CARD_STATE mtd;                          /* data per-card state */
+static CARD_STATE mtc;                          /* command per-card state */
+
+
+/* Interface local SCP support routines */
+
+static INTERFACE mtd_interface;
+static INTERFACE mtc_interface;
+
+
+static int32 mtc_fnc = 0;                       /* function */
+static int32 mtc_sta = 0;                       /* status register */
+static int32 mtc_dtf = 0;                       /* data xfer flop */
+static int32 mtc_1st = 0;                       /* first svc flop */
+static int32 mtc_ctime = 40;                    /* command wait */
+static int32 mtc_gtime = 1000;                  /* gap stop time */
+static int32 mtc_xtime = 15;                    /* data xfer time */
+static uint8 mtxb[DBSIZE] = { 0 };              /* data buffer */
+static t_mtrlnt mt_ptr = 0, mt_max = 0;         /* buffer ptrs */
 static const uint32 mtc_cmd[] = {
- FNC_WC, FNC_RC, FNC_GAP, FNC_FSR, FNC_BSR, FNC_REW, FNC_RWS, FNC_WFM };
+    FNC_WC, FNC_RC, FNC_GAP, FNC_FSR, FNC_BSR, FNC_REW, FNC_RWS, FNC_WFM };
 static const uint32 mtc_cmd_count = sizeof (mtc_cmd) / sizeof (mtc_cmd[0]);
 
-DEVICE mtd_dev, mtc_dev;
+static t_stat mtc_svc (UNIT *uptr);
+static t_stat mt_reset (DEVICE *dptr);
+static t_stat mtc_attach (UNIT *uptr, CONST char *cptr);
+static t_stat mtc_detach (UNIT *uptr);
+static t_stat mt_map_err (UNIT *uptr, t_stat st);
+static t_stat mt_clear (void);
 
-IOHANDLER mtdio;
-IOHANDLER mtcio;
+/* Device information blocks */
 
-t_stat mtc_svc (UNIT *uptr);
-t_stat mt_reset (DEVICE *dptr);
-t_stat mtc_attach (UNIT *uptr, CONST char *cptr);
-t_stat mtc_detach (UNIT *uptr);
-t_stat mt_map_err (UNIT *uptr, t_stat st);
-t_stat mt_clear (void);
+static DIB mt_dib [] = {
+    { &mtd_interface,                                                   /* the device's I/O interface function pointer */
+      MTD,                                                              /* the device's select code (02-77) */
+      0,                                                                /* the card index */
+      "12559C 9-Track Magnetic Tape Unit Interface Data Channel",       /* the card description */
+      NULL },                                                           /* the ROM description */
 
-/* MTD data structures
-
-   mtd_dev      MTD device descriptor
-   mtd_unit     MTD unit list
-   mtd_reg      MTD register list
-*/
-
-DIB mt_dib[] = {
-    { &mtdio, MTD },
-    { &mtcio, MTC }
+    { &mtc_interface,                                                   /* the device's I/O interface function pointer */
+      MTC,                                                              /* the device's select code (02-77) */
+      0,                                                                /* the card index */
+      "12559C 9-Track Magnetic Tape Unit Interface Command Channel",    /* the card description */
+      NULL }                                                            /* the ROM description */
     };
 
-#define mtd_dib mt_dib[0]
-#define mtc_dib mt_dib[1]
+#define mtd_dib             mt_dib [0]
+#define mtc_dib             mt_dib [1]
 
-UNIT mtd_unit = { UDATA (NULL, 0, 0) };
 
-REG mtd_reg[] = {
+/* Data card SCP data structures */
+
+
+/* Unit list */
+
+static UNIT mtd_unit [] = {
+/*           Event Routine  Unit Flags  Capacity  Delay */
+/*           -------------  ----------  --------  ----- */
+    { UDATA (NULL,              0,         0)           }
+    };
+
+
+/* Register list */
+
+static REG mtd_reg [] = {
     { FLDATA (FLG, mtd.flag,    0) },
-    { FLDATA (FBF, mtd.flagbuf, 0) },
+    { FLDATA (FBF, mtd.flag_buffer, 0) },
     { BRDATA (DBUF, mtxb, 8, 8, DBSIZE) },
     { DRDATA (BPTR, mt_ptr, DB_V_SIZE + 1) },
     { DRDATA (BMAX, mt_max, DB_V_SIZE + 1) },
-    { ORDATA (SC, mtd_dib.select_code, 6), REG_HRO },
-    { ORDATA (DEVNO, mtd_dib.select_code, 6), REG_HRO },
+
+      DIB_REGS (mtd_dib),
+
     { NULL }
     };
 
-MTAB mtd_mod[] = {
+
+/* Modifier list */
+
+static MTAB mtd_mod [] = {
 /*    Entry Flags          Value  Print String  Match String  Validation    Display        Descriptor       */
 /*    -------------------  -----  ------------  ------------  ------------  -------------  ---------------- */
     { MTAB_XDV,              2u,  "SC",         "SC",         &hp_set_dib,  &hp_show_dib,  (void *) &mt_dib },
@@ -194,41 +230,78 @@ MTAB mtd_mod[] = {
     { 0 }
     };
 
-DEVICE mtd_dev = {
-    "MTD", &mtd_unit, mtd_reg, mtd_mod,
-    1, 10, 16, 1, 8, 8,
-    NULL, NULL, &mt_reset,
-    NULL, NULL, NULL,
-    &mtd_dib, DEV_DISABLE | DEV_DIS
+
+/* Debugging trace list */
+
+static DEBTAB mt_deb [] = {
+    { "IOBUS", TRACE_IOBUS },                   /* trace I/O bus signals and data words received and returned */
+    { NULL,    0           }
     };
 
-/* MTC data structures
 
-   mtc_dev      MTC device descriptor
-   mtc_unit     MTC unit list
-   mtc_reg      MTC register list
-   mtc_mod      MTC modifier list
-*/
+/* Device descriptor */
 
-UNIT mtc_unit = { UDATA (&mtc_svc, UNIT_ATTABLE + UNIT_ROABLE, 0) };
+DEVICE mtd_dev = {
+    "MTD",                                      /* device name */
+    mtd_unit,                                   /* unit array */
+    mtd_reg,                                    /* register array */
+    mtd_mod,                                    /* modifier array */
+    1,                                          /* number of units */
+    10,                                         /* address radix */
+    16,                                         /* address width */
+    1,                                          /* address increment */
+    8,                                          /* data radix */
+    8,                                          /* data width */
+    NULL,                                       /* examine routine */
+    NULL,                                       /* deposit routine */
+    &mt_reset,                                  /* reset routine */
+    NULL,                                       /* boot routine */
+    NULL,                                       /* attach routine */
+    NULL,                                       /* detach routine */
+    &mtd_dib,                                   /* device information block pointer */
+    DEV_DISABLE | DEV_DIS | DEV_DEBUG,          /* device flags */
+    0,                                          /* debug control flags */
+    mt_deb,                                     /* debug flag name array */
+    NULL,                                       /* memory size change routine */
+    NULL                                        /* logical device name */
+    };
 
-REG mtc_reg[] = {
+
+/* Command card SCP data structures */
+
+
+/* Unit list */
+
+#define UNIT_FLAGS          (UNIT_ATTABLE | UNIT_ROABLE)
+
+static UNIT mtc_unit [] = {
+/*           Event Routine  Unit Flags  Capacity  Delay */
+/*           -------------  ----------  --------  ----- */
+    { UDATA (&mtc_svc,      UNIT_FLAGS,    0)           },
+    };
+
+
+/* Register list */
+
+static REG mtc_reg [] = {
     { ORDATA (FNC, mtc_fnc, 8) },
     { ORDATA (STA, mtc_sta, 9) },
-    { ORDATA (BUF, mtc_unit.buf, 8) },
+    { ORDATA (BUF, mtc_unit [0].buf, 8) },
     { FLDATA (CTL, mtc.control, 0) },
     { FLDATA (FLG, mtc.flag,    0) },
-    { FLDATA (FBF, mtc.flagbuf, 0) },
+    { FLDATA (FBF, mtc.flag_buffer, 0) },
     { FLDATA (DTF, mtc_dtf, 0) },
     { FLDATA (FSVC, mtc_1st, 0) },
-    { DRDATA (POS, mtc_unit.pos, T_ADDR_W), PV_LEFT },
+    { DRDATA (POS, mtc_unit [0].pos, T_ADDR_W), PV_LEFT },
     { DRDATA (CTIME, mtc_ctime, 24), REG_NZ + PV_LEFT },
     { DRDATA (GTIME, mtc_gtime, 24), REG_NZ + PV_LEFT },
     { DRDATA (XTIME, mtc_xtime, 24), REG_NZ + PV_LEFT },
-    { ORDATA (SC, mtc_dib.select_code, 6), REG_HRO },
-    { ORDATA (DEVNO, mtc_dib.select_code, 6), REG_HRO },
+
+      DIB_REGS (mtc_dib),
+
     { NULL }
     };
+
 
 /* Modifier list.
 
@@ -251,7 +324,7 @@ REG mtc_reg[] = {
        requiring SHOW MTC0 FORMAT.
 */
 
-MTAB mtc_mod [] = {
+static MTAB mtc_mod [] = {
 /*    Mask Value     Match Value    Print String      Match String     Validation    Display  Descriptor */
 /*    -------------  -------------  ----------------  ---------------  ------------  -------  ---------- */
     { UNIT_RO,       0,             "write ring",     NULL,            NULL,         NULL,    NULL       },
@@ -269,16 +342,37 @@ MTAB mtc_mod [] = {
     { 0 }
     };
 
+
+/* Device descriptor */
+
 DEVICE mtc_dev = {
-    "MTC", &mtc_unit, mtc_reg, mtc_mod,
-    1, 10, 31, 1, 8, 8,
-    NULL, NULL, &mt_reset,
-    NULL, &mtc_attach, &mtc_detach,
-    &mtc_dib, DEV_DISABLE | DEV_DIS | DEV_TAPE
+    "MTC",                                      /* device name */
+    mtc_unit,                                   /* unit array */
+    mtc_reg,                                    /* register array */
+    mtc_mod,                                    /* modifier array */
+    1,                                          /* number of units */
+    10,                                         /* address radix */
+    31,                                         /* address width */
+    1,                                          /* address increment */
+    8,                                          /* data radix */
+    8,                                          /* data width */
+    NULL,                                       /* examine routine */
+    NULL,                                       /* deposit routine */
+    &mt_reset,                                  /* reset routine */
+    NULL,                                       /* boot routine */
+    &mtc_attach,                                /* attach routine */
+    &mtc_detach,                                /* detach routine */
+    &mtc_dib,                                   /* device information block pointer */
+    DEV_DISABLE | DEV_DIS | DEV_DEBUG,          /* device flags */
+    0,                                          /* debug control flags */
+    mt_deb,                                     /* debug flag name array */
+    NULL,                                       /* memory size change routine */
+    NULL                                        /* logical device name */
     };
 
 
-/* Data channel I/O signal handler
+
+/* Data channel interface.
 
    The 12559A data channel interface has a number of non-standard features:
 
@@ -295,67 +389,98 @@ DEVICE mtc_dev = {
        so the flag buffer serves no other purpose.
 */
 
-uint32 mtdio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
+static SIGNALS_VALUE mtd_interface (const DIB *dibptr, INBOUND_SET inbound_signals, HP_WORD inbound_value)
 {
-IOSIGNAL signal;
-IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
+INBOUND_SIGNAL signal;
+INBOUND_SET    working_set = inbound_signals;
+SIGNALS_VALUE  outbound    = { ioNONE, 0 };
 
-while (working_set) {
-    signal = IONEXT (working_set);                      /* isolate next signal */
+while (working_set) {                                   /* while signals remain */
+    signal = IONEXTSIG (working_set);                   /*   isolate the next signal */
 
-    switch (signal) {                                   /* dispatch I/O signal */
+    switch (signal) {                                   /* dispatch the I/O signal */
 
-        case ioCLF:                                     /* clear flag flip-flop */
-            mtd.flag = mtd.flagbuf = CLEAR;
+        case ioCLF:                                     /* Clear Flag flip-flop */
+            mtd.flag_buffer = CLEAR;                    /* reset the flag buffer */
+            mtd.flag        = CLEAR;                    /*   and flag flip-flops */
             break;
 
-        case ioSTF:                                     /* set flag flip-flop */
-        case ioENF:                                     /* enable flag */
-            mtd.flag = mtd.flagbuf = SET;
+
+        case ioSTF:                                     /* Set Flag flip-flop */
+            mtd.flag_buffer = SET;                      /* set the flag buffer flip-flop */
             break;
 
-        case ioSFC:                                     /* skip if flag is clear */
-            setstdSKF (mtd);
+
+        case ioENF:                                     /* Enable Flag */
+            if (mtd.flag_buffer == SET)                 /* if the flag buffer flip-flop is set */
+                mtd.flag = SET;                         /*   then set the flag flip-flop */
             break;
 
-        case ioSFS:                                     /* skip if flag is set */
-            setstdSKF (mtd);
+
+        case ioSFC:                                     /* Skip if Flag is Clear */
+            if (mtd.flag == CLEAR)                      /* if the flag flip-flop is clear */
+                outbound.signals |= ioSKF;              /*   then assert the Skip on Flag signal */
             break;
 
-        case ioIOI:                                         /* I/O data input */
-            stat_data = IORETURN (SCPE_OK, mtc_unit.buf);   /* merge in return status */
+
+        case ioSFS:                                     /* Skip if Flag is Set */
+            if (mtd.flag == SET)                        /* if the flag flip-flop is set */
+                outbound.signals |= ioSKF;              /*   then assert the Skip on Flag signal */
             break;
+
+
+        case ioIOI:                                     /* I/O data input */
+            outbound.value = mtc_unit [0].buf;          /* merge in return status */
+            break;
+
 
         case ioIOO:                                     /* I/O data output */
-            mtc_unit.buf = IODATA (stat_data) & DMASK8; /* store data */
+            mtc_unit [0].buf = inbound_value & D8_MASK; /* store data */
             break;
 
-        case ioPOPIO:                                   /* power-on preset to I/O */
+
+        case ioPOPIO:                                   /* Power-On Preset to I/O */
             mt_clear ();                                /* issue CLR to controller */
-            mtd.flag = mtd.flagbuf = CLEAR;             /* clear flag and flag buffer */
+            mtd.flag_buffer = CLEAR;                    /* clear the flag buffer flip-flop */
             break;
 
-        case ioCLC:                                     /* clear control flip-flop */
+
+        case ioCLC:                                     /* Clear Control flip-flop */
+            mtd.flag_buffer = CLEAR;                    /* reset the flag buffer */
+            mtd.flag        = CLEAR;                    /*   and flag flip-flops */
+
             mtc_dtf = 0;                                /* clr xfer flop */
-            mtd.flag = mtd.flagbuf = CLEAR;             /* clear flag and flag buffer */
             break;
 
-        case ioSIR:                                     /* set interrupt request */
-            setstdSRQ (mtd);                            /* set standard SRQ signal */
+
+        case ioSIR:                                     /* Set Interrupt Request */
+            if (mtd.flag == SET)                        /* if the flag flip-flop is set */
+                outbound.signals |= ioSRQ;              /*   then assert SRQ */
             break;
 
-        default:                                        /* all other signals */
-            break;                                      /*   are ignored */
+
+        case ioPRH:                                         /* Priority High */
+            outbound.signals |= ioPRL | cnPRL | cnVALID;    /* PRL is tied to PRH */
+            break;
+
+
+        case ioSTC:                                     /* not used by this interface */
+        case ioCRS:                                     /* not used by this interface */
+        case ioIAK:                                     /* not used by this interface */
+        case ioIEN:                                     /* not used by this interface */
+        case ioEDT:                                     /* not used by this interface */
+        case ioPON:                                     /* not used by this interface */
+            break;
         }
 
-    working_set = working_set & ~signal;                /* remove current signal from set */
-    }
+    IOCLEARSIG (working_set, signal);                   /* remove the current signal from the set */
+    }                                                   /*   and continue until all signals are processed */
 
-return stat_data;
+return outbound;                                        /* return the outbound signals and value */
 }
 
 
-/* Command channel I/O signal handler.
+/* Command channel interface.
 
    The 12559A command interface is reasonably standard, although POPIO clears,
    rather than sets, the flag and flag buffer flip-flops.  One unusual feature
@@ -377,66 +502,74 @@ return stat_data;
        complete immediately, and the BUSY bit never sets..
 */
 
-uint32 mtcio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
+static SIGNALS_VALUE mtc_interface (const DIB *dibptr, INBOUND_SET inbound_signals, HP_WORD inbound_value)
 {
-uint16 data;
-uint32 i;
-int32 valid;
-IOSIGNAL signal;
-IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
+uint32         i, data;
+int32          valid;
+INBOUND_SIGNAL signal;
+INBOUND_SET    working_set = inbound_signals;
+SIGNALS_VALUE  outbound    = { ioNONE, 0 };
+t_bool         irq_enabled = FALSE;
 
-while (working_set) {
-    signal = IONEXT (working_set);                      /* isolate next signal */
+while (working_set) {                                   /* while signals remain */
+    signal = IONEXTSIG (working_set);                   /*   isolate the next signal */
 
-    switch (signal) {                                   /* dispatch I/O signal */
+    switch (signal) {                                   /* dispatch the I/O signal */
 
-        case ioCLF:                                     /* clear flag flip-flop */
-            mtc.flag = mtc.flagbuf = CLEAR;
+        case ioCLF:                                     /* Clear Flag flip-flop */
+            mtc.flag_buffer = CLEAR;                    /* reset the flag buffer */
+            mtc.flag        = CLEAR;                    /*   and flag flip-flops */
             break;
 
 
-        case ioSTF:                                     /* set flag flip-flop */
-        case ioENF:                                     /* enable flag */
-            mtc.flag = mtc.flagbuf = SET;
+        case ioSTF:                                     /* Set Flag flip-flop */
+            mtc.flag_buffer = SET;                      /* set the flag buffer flip-flop */
             break;
 
 
-        case ioSFC:                                     /* skip if flag is clear */
-            setstdSKF (mtc);
+        case ioENF:                                     /* Enable Flag */
+            if (mtc.flag_buffer == SET)                 /* if the flag buffer flip-flop is set */
+                mtc.flag = SET;                         /*   then set the flag flip-flop */
             break;
 
 
-        case ioSFS:                                     /* skip if flag is set */
-            setstdSKF (mtc);
+        case ioSFC:                                     /* Skip if Flag is Clear */
+            if (mtc.flag == CLEAR)                      /* if the flag flip-flop is clear */
+                outbound.signals |= ioSKF;              /*   then assert the Skip on Flag signal */
+            break;
+
+
+        case ioSFS:                                     /* Skip if Flag is Set */
+            if (mtc.flag == SET)                        /* if the flag flip-flop is set */
+                outbound.signals |= ioSKF;              /*   then assert the Skip on Flag signal */
             break;
 
 
         case ioIOI:                                     /* I/O data input */
-            data = mtc_sta & ~(STA_LOCAL | STA_WLK | STA_BUSY);
+            outbound.value = mtc_sta & ~(STA_LOCAL | STA_WLK | STA_BUSY);
 
-            if (mtc_unit.flags & UNIT_ATT) {            /* construct status */
-                if (sim_is_active (&mtc_unit))
-                    data = data | STA_BUSY;
+            if (mtc_unit [0].flags & UNIT_ATT) {        /* construct status */
+                if (sim_is_active (mtc_unit))
+                    outbound.value |= STA_BUSY;
 
-                if (sim_tape_wrp (&mtc_unit))
-                    data = data | STA_WLK;
+                if (sim_tape_wrp (mtc_unit))
+                    outbound.value |= STA_WLK;
                 }
-            else
-                data = data | STA_BUSY | STA_LOCAL;
 
-            stat_data = IORETURN (SCPE_OK, data);       /* merge in return status */
+            else
+                outbound.value |= STA_BUSY | STA_LOCAL;
             break;
 
 
         case ioIOO:                                         /* I/O data output */
-            data = IODATA (stat_data) & DMASK8;
+            data = inbound_value & D8_MASK;                 /* only the lower 8 bits are connected */
             mtc_sta = mtc_sta & ~STA_REJ;                   /* clear reject */
 
             if (data == FNC_CLR) {                          /* clear? */
                 mt_clear ();                                /* send CLR to controller */
 
-                mtd.flag = mtd.flagbuf = CLEAR;             /* clear data flag and flag buffer */
-                mtc.flag = mtc.flagbuf = SET;               /* set command flag and flag buffer */
+                mtd.flag_buffer = mtd.flag = CLEAR;         /* clear data flag buffer and flag */
+                mtc.flag_buffer = mtc.flag = SET;           /* set command flag buffer and flag */
                 break;                                      /* command completes immediately */
                 }
 
@@ -446,20 +579,20 @@ while (working_set) {
                     break;
                     }
 
-            if (!valid || sim_is_active (&mtc_unit) ||      /* is cmd valid? */
+            if (!valid || sim_is_active (mtc_unit) ||       /* is cmd valid? */
                ((mtc_sta & STA_BOT) && (data == FNC_BSR)) ||
-               (sim_tape_wrp (&mtc_unit) &&
+               (sim_tape_wrp (mtc_unit) &&
                  ((data == FNC_WC) || (data == FNC_GAP) || (data == FNC_WFM))))
                 mtc_sta = mtc_sta | STA_REJ;
 
             else {
-                sim_activate (&mtc_unit, mtc_ctime);        /* start tape */
+                sim_activate (mtc_unit, mtc_ctime);         /* start tape */
                 mtc_fnc = data;                             /* save function */
                 mtc_sta = STA_BUSY;                         /* unit busy */
                 mt_ptr = 0;                                 /* init buffer ptr */
 
-                mtcio (&mtc_dib, ioCLF, 0);                 /* clear flags */
-                mtcio (&mtd_dib, ioCLF, 0);
+                mtd.flag_buffer = mtd.flag = CLEAR;         /* clear data flag buffer and flag */
+                mtc.flag_buffer = mtc.flag = CLEAR;         /*   and command flag buffer and flag */
 
                 mtc_1st = 1;                                /* set 1st flop */
                 mtc_dtf = 1;                                /* set xfer flop */
@@ -467,41 +600,69 @@ while (working_set) {
             break;
 
 
-        case ioPOPIO:                                   /* power-on preset to I/O */
-            mtc.flag = mtc.flagbuf = CLEAR;             /* clear flag and flag buffer */
+        case ioPOPIO:                                   /* Power-On Preset to I/O */
+            mtc.flag_buffer = CLEAR;                    /* clear the flag buffer flip-flop */
+            mtc.flag        = CLEAR;                    /*   and flag flip-flops */
             break;
 
 
-        case ioCRS:                                     /* control reset */
-        case ioCLC:                                     /* clear control flip-flop */
+        case ioCRS:                                     /* Control Reset */
+            mtc.control = CLEAR;                        /* clear the control flip-flop */
+            break;
+
+
+        case ioCLC:                                     /* Clear Control flip-flop */
             mtc.control = CLEAR;
             break;
 
 
-        case ioSTC:                                     /* set control flip-flop */
+        case ioSTC:                                     /* Set Control flip-flop */
             mtc.control = SET;
             break;
 
 
-        case ioSIR:                                     /* set interrupt request */
-            setstdPRL (mtc);                            /* set standard PRL signal */
-            setstdIRQ (mtc);                            /* set standard IRQ signal */
-            setstdSRQ (mtc);                            /* set standard SRQ signal */
+        case ioSIR:                                     /* Set Interrupt Request */
+            if (mtc.control & mtc.flag)                 /* if the control and flag flip-flops are set */
+                outbound.signals |= cnVALID;            /*   then deny PRL */
+            else                                        /* otherwise */
+                outbound.signals |= cnPRL | cnVALID;    /*   conditionally assert PRL */
+
+            if (mtc.control & mtc.flag & mtc.flag_buffer)   /* if the control, flag, and flag buffer flip-flops are set */
+                outbound.signals |= cnIRQ | cnVALID;        /*   then conditionally assert IRQ */
+
+            if (mtc.flag == SET)                        /* if the flag flip-flop is set */
+                outbound.signals |= ioSRQ;              /*   then assert SRQ */
             break;
 
-        case ioIAK:                                     /* interrupt acknowledge */
-            mtc.flagbuf = CLEAR;
+
+        case ioIAK:                                     /* Interrupt Acknowledge */
+            mtc.flag_buffer = CLEAR;                    /* clear the flag buffer flip-flop */
             break;
 
 
-        default:                                        /* all other signals */
-            break;                                      /*   are ignored */
+        case ioIEN:                                     /* Interrupt Enable */
+            irq_enabled = TRUE;                         /* permit IRQ to be asserted */
+            break;
+
+
+        case ioPRH:                                         /* Priority High */
+            if (irq_enabled && outbound.signals & cnIRQ)    /* if IRQ is enabled and conditionally asserted */
+                outbound.signals |= ioIRQ | ioFLG;          /*   then assert IRQ and FLG */
+
+            if (!irq_enabled || outbound.signals & cnPRL)   /* if IRQ is disabled or PRL is conditionally asserted */
+                outbound.signals |= ioPRL;                  /*   then assert it unconditionally */
+            break;
+
+
+        case ioEDT:                                     /* not used by this interface */
+        case ioPON:                                     /* not used by this interface */
+            break;
         }
 
-    working_set = working_set & ~signal;                /* remove current signal from set */
-    }
+    IOCLEARSIG (working_set, signal);                   /* remove the current signal from the set */
+    }                                                   /*   and continue until all signals are processed */
 
-return stat_data;
+return outbound;                                        /* return the outbound signals and value */
 }
 
 
@@ -518,9 +679,12 @@ t_stat mtc_svc (UNIT *uptr)
 t_mtrlnt tbc;
 t_stat st, r = SCPE_OK;
 
-if ((mtc_unit.flags & UNIT_ATT) == 0) {                 /* offline? */
+if ((mtc_unit [0].flags & UNIT_ATT) == 0) {             /* offline? */
     mtc_sta = STA_LOCAL | STA_REJ;                      /* rejected */
-    mtcio (&mtc_dib, ioENF, 0);                         /* set cch flg */
+
+    mtc.flag_buffer = SET;                              /* set the flag buffer */
+    io_assert (&mtc_dev, ioa_ENF);                      /*   and flag flip-flops */
+
     return SCPE_OK;
     }
 
@@ -578,8 +742,11 @@ switch (mtc_fnc) {                                      /* case on function */
             }
         if (mtc_dtf && (mt_ptr < mt_max)) {             /* more chars? */
             if (mtd.flag) mtc_sta = mtc_sta | STA_TIM;
-            mtc_unit.buf = mtxb[mt_ptr++];              /* fetch next */
-            mtdio (&mtd_dib, ioENF, 0);                 /* set dch flg */
+            mtc_unit [0].buf = mtxb [mt_ptr++];         /* fetch next */
+
+            mtd.flag_buffer = SET;                      /* set the flag buffer */
+            io_assert (&mtd_dev, ioa_ENF);              /*   and flag flip-flops */
+
             sim_activate (uptr, mtc_xtime);             /* re-activate */
             return SCPE_OK;
             }
@@ -591,13 +758,15 @@ switch (mtc_fnc) {                                      /* case on function */
         if (mtc_1st) mtc_1st = 0;                       /* no xfr on first */
         else {
             if (mt_ptr < DBSIZE) {                      /* room in buffer? */
-                mtxb[mt_ptr++] = (uint8) mtc_unit.buf;
+                mtxb[mt_ptr++] = (uint8) mtc_unit [0].buf;
                 mtc_sta = mtc_sta & ~STA_BOT;           /* clear BOT */
                 }
             else mtc_sta = mtc_sta | STA_PAR;
             }
         if (mtc_dtf) {                                  /* xfer flop set? */
-            mtdio (&mtd_dib, ioENF, 0);                 /* set dch flg */
+            mtd.flag_buffer = SET;                      /* set the flag buffer */
+            io_assert (&mtd_dev, ioa_ENF);              /*   and flag flip-flops */
+
             sim_activate (uptr, mtc_xtime);             /* re-activate */
             return SCPE_OK;
             }
@@ -616,7 +785,8 @@ switch (mtc_fnc) {                                      /* case on function */
         break;
         }
 
-mtcio (&mtc_dib, ioENF, 0);                             /* set cch flg */
+mtc.flag_buffer = SET;                                  /* set the flag buffer */
+io_assert (&mtc_dev, ioa_ENF);                          /*   and flag flip-flops */
 mtc_sta = mtc_sta & ~STA_BUSY;                          /* not busy */
 return r;
 }
@@ -630,6 +800,8 @@ switch (st) {
     case MTSE_FMT:                                      /* illegal fmt */
     case MTSE_UNATT:                                    /* unattached */
         mtc_sta = mtc_sta | STA_REJ;                    /* reject */
+        return SCPE_IERR;                               /* never get here! */
+
     case MTSE_OK:                                       /* no error */
         return SCPE_IERR;                               /* never get here! */
 
@@ -670,15 +842,15 @@ t_stat mt_clear (void)
 {
 t_stat st;
 
-if (sim_is_active (&mtc_unit) &&                        /* write in prog? */
+if (sim_is_active (mtc_unit) &&                         /* write in prog? */
     (mtc_fnc == FNC_WC) && (mt_ptr > 0)) {              /* yes, bad rec */
-    st = sim_tape_wrrecf (&mtc_unit, mtxb, mt_ptr | MTR_ERF);
+    st = sim_tape_wrrecf (mtc_unit, mtxb, mt_ptr | MTR_ERF);
     if (st != MTSE_OK)
-        mt_map_err (&mtc_unit, st);
+        mt_map_err (mtc_unit, st);
     }
 
-if (((mtc_fnc == FNC_REW) || (mtc_fnc == FNC_RWS)) && sim_is_active (&mtc_unit))
-    sim_cancel (&mtc_unit);
+if (((mtc_fnc == FNC_REW) || (mtc_fnc == FNC_RWS)) && sim_is_active (mtc_unit))
+    sim_cancel (mtc_unit);
 
 mtc_1st = mtc_dtf = 0;
 mtc_sta = mtc_sta & STA_BOT;
@@ -691,22 +863,20 @@ return SCPE_OK;
 
 t_stat mt_reset (DEVICE *dptr)
 {
-DIB *dibptr = (DIB *) dptr->ctxt;                       /* DIB pointer */
-
 hp_enbdis_pair (dptr,                                   /* make pair cons */
     (dptr == &mtd_dev) ? &mtc_dev : &mtd_dev);
 
-IOPRESET (dibptr);                                      /* PRESET device (does not use PON) */
+io_assert (dptr, ioa_POPIO);                            /* PRESET the device */
 
 mtc_fnc = 0;
 mtc_1st = mtc_dtf = 0;
 
-sim_cancel (&mtc_unit);                                 /* cancel activity */
-sim_tape_reset (&mtc_unit);
+sim_cancel (mtc_unit);                                  /* cancel activity */
+sim_tape_reset (mtc_unit);
 
-if (mtc_unit.flags & UNIT_ATT)
-    mtc_sta = (sim_tape_bot (&mtc_unit)? STA_BOT: 0) |
-              (sim_tape_wrp (&mtc_unit)? STA_WLK: 0);
+if (mtc_unit [0].flags & UNIT_ATT)
+    mtc_sta = (sim_tape_bot (mtc_unit)? STA_BOT: 0) |
+              (sim_tape_wrp (mtc_unit)? STA_WLK: 0);
 else
     mtc_sta = STA_LOCAL | STA_BUSY;
 

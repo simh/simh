@@ -25,6 +25,7 @@
 
    DA           12821A Disc Interface with Amigo disc drives
 
+   11-Jul-18    JDB     Revised I/O model, changed global scope of variables to local
    21-Feb-18    JDB     ATTACH -N now creates a full-size disc image
    11-Jul-17    JDB     Renamed "ibl_copy" to "cpu_ibl"
    15-Mar-17    JDB     Changed DEBUG_PRI calls to tprintfs
@@ -350,7 +351,7 @@
 
 
 #include "hp2100_defs.h"
-#include "hp2100_cpu.h"
+#include "hp2100_io.h"
 #include "hp2100_di.h"
 #include "hp2100_disclib.h"
 
@@ -358,30 +359,30 @@
 
 /* Program constants */
 
-#define DA_UNITS        4                               /* number of addressable disc units */
+#define DA_UNITS        4                       /* number of addressable disc units */
 
 
 /* Interface states */
 
 typedef enum {
-    idle = 0,                                           /* idle = default for reset */
-    opcode_wait,                                        /* waiting for opcode reception */
-    parameter_wait,                                     /* waiting for parameter reception */
-    read_wait,                                          /* waiting for send read data secondary */
-    write_wait,                                         /* waiting for receive write data secondary */
-    status_wait,                                        /* waiting for send status secondary */
-    command_exec,                                       /* executing an interface command */
-    command_wait,                                       /* waiting for command completion */
-    read_xfer,                                          /* sending read data or status */
-    write_xfer,                                         /* receiving write data */
-    error_source,                                       /* sending bytes for error recovery */
-    error_sink                                          /* receiving bytes for error recovery */
+    idle = 0,                                   /* idle = default for reset */
+    opcode_wait,                                /* waiting for opcode reception */
+    parameter_wait,                             /* waiting for parameter reception */
+    read_wait,                                  /* waiting for send read data secondary */
+    write_wait,                                 /* waiting for receive write data secondary */
+    status_wait,                                /* waiting for send status secondary */
+    command_exec,                               /* executing an interface command */
+    command_wait,                               /* waiting for command completion */
+    read_xfer,                                  /* sending read data or status */
+    write_xfer,                                 /* receiving write data */
+    error_source,                               /* sending bytes for error recovery */
+    error_sink                                  /* receiving bytes for error recovery */
     } IF_STATE;
 
 
 /* Interface state names */
 
-static const char *if_state_name [] = {
+static const char * const if_state_name [] = {
     "idle",
     "opcode wait",
     "parameter wait",
@@ -400,51 +401,51 @@ static const char *if_state_name [] = {
 /* Next interface state after command recognition */
 
 static const IF_STATE next_state [] = {
-    read_wait,                                          /* cold load read */
-    command_exec,                                       /* recalibrate */
-    command_exec,                                       /* seek */
-    status_wait,                                        /* request status */
-    status_wait,                                        /* request sector address */
-    read_wait,                                          /* read */
-    read_wait,                                          /* read full sector */
-    command_exec,                                       /* verify */
-    write_wait,                                         /* write */
-    write_wait,                                         /* write full sector */
-    command_exec,                                       /* clear */
-    write_wait,                                         /* initialize */
-    command_exec,                                       /* address record */
-    idle,                                               /* request syndrome */
-    read_wait,                                          /* read with offset */
-    command_exec,                                       /* set file mask */
-    idle,                                               /* invalid */
-    idle,                                               /* invalid */
-    read_wait,                                          /* read without verify */
-    idle,                                               /* load TIO register */
-    status_wait,                                        /* request disc address */
-    command_exec,                                       /* end */
-    idle                                                /* wakeup */
+    read_wait,                                  /* cold load read */
+    command_exec,                               /* recalibrate */
+    command_exec,                               /* seek */
+    status_wait,                                /* request status */
+    status_wait,                                /* request sector address */
+    read_wait,                                  /* read */
+    read_wait,                                  /* read full sector */
+    command_exec,                               /* verify */
+    write_wait,                                 /* write */
+    write_wait,                                 /* write full sector */
+    command_exec,                               /* clear */
+    write_wait,                                 /* initialize */
+    command_exec,                               /* address record */
+    idle,                                       /* request syndrome */
+    read_wait,                                  /* read with offset */
+    command_exec,                               /* set file mask */
+    idle,                                       /* invalid */
+    idle,                                       /* invalid */
+    read_wait,                                  /* read without verify */
+    idle,                                       /* load TIO register */
+    status_wait,                                /* request disc address */
+    command_exec,                               /* end */
+    idle                                        /* wakeup */
     };
 
 
 /* Interface commands */
 
 typedef enum {
-    invalid = 0,                                        /* invalid = default for reset */
-    disc_command,                                       /* MLA 08 */
-    crc_listen,                                         /* MLA 09 */
-    amigo_clear,                                        /* MLA 10 */
-    write_loopback,                                     /* MLA 1E */
-    initiate_self_test,                                 /* MLA 1F */
-    crc_talk,                                           /* MTA 09 */
-    device_specified_jump,                              /* MTA 10 */
-    read_loopback,                                      /* MTA 1E */
-    return_self_test_result,                            /* MTA 1F */
-    amigo_identify                                      /* UNT MSA */
+    invalid = 0,                                /* invalid = default for reset */
+    disc_command,                               /* MLA 08 */
+    crc_listen,                                 /* MLA 09 */
+    amigo_clear,                                /* MLA 10 */
+    write_loopback,                             /* MLA 1E */
+    initiate_self_test,                         /* MLA 1F */
+    crc_talk,                                   /* MTA 09 */
+    device_specified_jump,                      /* MTA 10 */
+    read_loopback,                              /* MTA 1E */
+    return_self_test_result,                    /* MTA 1F */
+    amigo_identify                              /* UNT MSA */
     } IF_COMMAND;
 
 /* Interface command names */
 
-static const char *if_command_name [] = {
+static const char * const if_command_name [] = {
     "invalid",
     "disc command",
     "CRC listen",
@@ -462,29 +463,31 @@ static const char *if_command_name [] = {
 
 /* Amigo disc state variables */
 
-static uint16 buffer [DL_BUFSIZE];                      /* command/status/sector buffer */
+static uint16 buffer [DL_BUFSIZE];              /* command/status/sector buffer */
 
-static uint8      if_dsj     [DA_UNITS];                /* ICD controller DSJ values */
-static IF_STATE   if_state   [DA_UNITS];                /* ICD controller state */
-static IF_COMMAND if_command [DA_UNITS];                /* ICD controller command */
+static uint8      if_dsj     [DA_UNITS];        /* ICD controller DSJ values */
+static IF_STATE   if_state   [DA_UNITS];        /* ICD controller state */
+static IF_COMMAND if_command [DA_UNITS];        /* ICD controller command */
 
-static CNTLR_VARS icd_cntlr [DA_UNITS] =                /* ICD controllers: */
-    { { CNTLR_INIT (ICD, buffer, NULL) },               /*   unit 0 controller */
-      { CNTLR_INIT (ICD, buffer, NULL) },               /*   unit 1 controller */
-      { CNTLR_INIT (ICD, buffer, NULL) },               /*   unit 2 controller */
-      { CNTLR_INIT (ICD, buffer, NULL) } };             /*   unit 3 controller */
+static CNTLR_VARS icd_cntlr [DA_UNITS] =        /* ICD controllers: */
+    { { CNTLR_INIT (ICD, buffer, NULL) },       /*   unit 0 controller */
+      { CNTLR_INIT (ICD, buffer, NULL) },       /*   unit 1 controller */
+      { CNTLR_INIT (ICD, buffer, NULL) },       /*   unit 2 controller */
+      { CNTLR_INIT (ICD, buffer, NULL) } };     /*   unit 3 controller */
 
 
 
-/* Amigo disc global VM routines */
+/* Amigo disc local VM routines */
 
-t_stat da_reset   (DEVICE *dptr);
-t_stat da_attach  (UNIT   *uptr, CONST char *cptr);
-t_stat da_detach  (UNIT   *uptr);
+static t_stat da_reset   (DEVICE *dptr);
+static t_stat da_boot    (int32  unitno, DEVICE *dptr);
+static t_stat da_attach  (UNIT   *uptr, CONST char *cptr);
+static t_stat da_detach  (UNIT   *uptr);
 
-/* Amigo disc global SCP routines */
+/* Amigo disc local SCP routines */
 
-t_stat da_load_unload (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat da_service     (UNIT *uptr);
+static t_stat da_load_unload (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 
 /* Amigo disc local utility routines */
 
@@ -533,18 +536,24 @@ static t_stat activate_unit     (UNIT   *uptr);
 
 DEVICE da_dev;
 
-DIB da_dib = { &di_io, DI_DA, da };
+static DIB da_dib = {
+    &di_interface,                              /* the device's I/O interface function pointer */
+    DI_DA,                                      /* the device's select code (02-77) */
+    da,                                         /* the card index */
+    "12821A Disc Interface",                    /* the card description */
+    "12992H 7906H/7920H/7925H/9895 Disc Loader" /* the ROM description */
+    };
 
 #define UNIT_FLAGS  (UNIT_FIX | UNIT_ATTABLE | UNIT_ROABLE | UNIT_DISABLE | UNIT_UNLOAD)
 
-UNIT da_unit [] = {
+static UNIT da_unit [] = {
     { UDATA (&da_service, UNIT_FLAGS | MODEL_7906 | SET_BUSADR (0), D7906_WORDS) }, /* drive unit 0 */
     { UDATA (&da_service, UNIT_FLAGS | MODEL_7906 | SET_BUSADR (1), D7906_WORDS) }, /* drive unit 1 */
     { UDATA (&da_service, UNIT_FLAGS | MODEL_7906 | SET_BUSADR (2), D7906_WORDS) }, /* drive unit 2 */
     { UDATA (&da_service, UNIT_FLAGS | MODEL_7906 | SET_BUSADR (3), D7906_WORDS) }  /* drive unit 3 */
     };
 
-REG da_reg [] = {
+static REG da_reg [] = {
     DI_REGS (da),
 
     { BRDATA (BUFFER, buffer,      8, 16,       DL_BUFSIZE)                              },
@@ -558,7 +567,7 @@ REG da_reg [] = {
     { NULL }
     };
 
-MTAB da_mod [] = {
+static MTAB da_mod [] = {
     DI_MODS (da_dev, da_dib),
 
 /*    Mask Value    Match Value   Print String       Match String     Validation        Display  Descriptor */
@@ -583,28 +592,28 @@ MTAB da_mod [] = {
     };
 
 DEVICE da_dev = {
-    "DA",                                               /* device name */
-    da_unit,                                            /* unit array */
-    da_reg,                                             /* register array */
-    da_mod,                                             /* modifier array */
-    DA_UNITS,                                           /* number of units */
-    10,                                                 /* address radix */
-    26,                                                 /* address width */
-    1,                                                  /* address increment */
-    8,                                                  /* data radix */
-    16,                                                 /* data width */
-    NULL,                                               /* examine routine */
-    NULL,                                               /* deposit routine */
-    &da_reset,                                          /* reset routine */
-    &da_boot,                                           /* boot routine */
-    &da_attach,                                         /* attach routine */
-    &da_detach,                                         /* detach routine */
-    &da_dib,                                            /* device information block */
-    DEV_DEBUG | DEV_DISABLE,                            /* device flags */
-    0,                                                  /* debug control flags */
-    di_deb,                                             /* debug flag name table */
-    NULL,                                               /* memory size change routine */
-    NULL                                                /* logical device name */
+    "DA",                                       /* device name */
+    da_unit,                                    /* unit array */
+    da_reg,                                     /* register array */
+    da_mod,                                     /* modifier array */
+    DA_UNITS,                                   /* number of units */
+    10,                                         /* address radix */
+    26,                                         /* address width */
+    1,                                          /* address increment */
+    8,                                          /* data radix */
+    16,                                         /* data width */
+    NULL,                                       /* examine routine */
+    NULL,                                       /* deposit routine */
+    &da_reset,                                  /* reset routine */
+    &da_boot,                                   /* boot routine */
+    &da_attach,                                 /* attach routine */
+    &da_detach,                                 /* detach routine */
+    &da_dib,                                    /* device information block */
+    DEV_DISABLE | DEV_DEBUG,                    /* device flags */
+    0,                                          /* debug control flags */
+    di_deb,                                     /* debug flag name table */
+    NULL,                                       /* memory size change routine */
+    NULL                                        /* logical device name */
     };
 
 
@@ -750,7 +759,7 @@ DEVICE da_dev = {
        assert NRFD if the LSTN control bit is clear).
 */
 
-t_stat da_service (UNIT *uptr)
+static t_stat da_service (UNIT *uptr)
 {
 uint8 data;
 CNTLR_CLASS command_class;
@@ -764,7 +773,7 @@ switch (if_state [unit]) {                                  /* dispatch the inte
     case command_wait:                                      /* command is waiting */
         release_interface = TRUE;                           /* release the interface at then end if it's idle */
 
-        /* fall into the command_exec handler to process the current command */
+    /* fall through into the command_exec handler to process the current command */
 
     case command_exec:                                      /* command is executing */
         switch (if_command [unit]) {                        /* dispatch the interface command */
@@ -1023,7 +1032,7 @@ return result;                                              /* return the result
    next byte sourced to the bus finds no acceptors.
 */
 
-t_stat da_reset (DEVICE *dptr)
+static t_stat da_reset (DEVICE *dptr)
 {
 uint32 unit;
 t_stat status;
@@ -1101,7 +1110,7 @@ return status;
        offset from the start of the file to the last byte and seek there.
 */
 
-t_stat da_attach (UNIT *uptr, CONST char *cptr)
+static t_stat da_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat      result;
 t_addr      offset;
@@ -1135,7 +1144,7 @@ return result;                                          /* return the result of 
    the detach is successful.
 */
 
-t_stat da_detach (UNIT *uptr)
+static t_stat da_detach (UNIT *uptr)
 {
 t_stat result;
 const int32 unit = uptr - da_unit;                      /* calculate the unit number */
@@ -1182,7 +1191,7 @@ static const LOADER_ARRAY da_loaders = {
       { 0102501,                    /*   77700:  START LIA 1         GET SWITCH REGISTER SETTING */
         0100044,                    /*   77701:        LSL 4         SHIFT A LEFT 4 */
         0006111,                    /*   77702:        CLE,SLB,RSS   SR BIT 12 SET FOR MANUAL BOOT? */
-        0100041,                    /*   77703:        LSL 1         NO. SHIFT HEAD # FOR RPL BOOT */
+        0100041,                    /*   77703:        LSL 1         NO, SHIFT HEAD # FOR RPL BOOT */
         0001424,                    /*   77704:        ALR,ALR       SHIFT HEAD 2, CLEAR SIGN */
         0033744,                    /*   77705:        IOR HDSEC     SET EOI BIT */
         0073744,                    /*   77706:        STA HDSEC     PLACE IN COMMAND BUFFER */
@@ -1248,8 +1257,8 @@ static const LOADER_ARRAY da_loaders = {
 /* Device boot routine.
 
    This routine is called directly by the BOOT DA and LOAD DA commands to copy
-   the device bootstrap into the upper 64 words of the logical address space. It
-   is also called indirectly by a BOOT CPU or LOAD CPU command when the
+   the device bootstrap into the upper 64 words of the logical address space.
+   It is also called indirectly by a BOOT CPU or LOAD CPU command when the
    specified HP 1000 loader ROM socket contains a 12992H ROM.
 
    When called in response to a BOOT DA or LOAD DA command, the "unitno"
@@ -1263,8 +1272,8 @@ static const LOADER_ARRAY da_loaders = {
    When called for a BOOT/LOAD CPU command, the "unitno" parameter indicates the
    select code to be used for configuration, and "dptr" will be NULL.  As above,
    the 12992H loader ROM will be copied into memory and configured for the
-   specified select code. The S register is assumed to be set correctly on entry
-   and is not modified.
+   specified select code.  The S register is assumed to be set correctly on
+   entry and is not modified.
 
    The loader expects the S register to be is set as follows:
 
@@ -1284,21 +1293,27 @@ static const LOADER_ARRAY da_loaders = {
    than 0 is desired.
 */
 
-t_stat da_boot (int32 unitno, DEVICE *dptr)
+static t_stat da_boot (int32 unitno, DEVICE *dptr)
 {
 static const HP_WORD da_preserved   = 0000073u;             /* S-register bits 5-3 and 1-0 are preserved */
 static const HP_WORD da_manual_boot = 0010000u;             /* S-register bit 12 set for a manual boot */
+uint32 status;
 
 if (dptr == NULL)                                           /* if we are being called for a BOOT/LOAD CPU */
-    return cpu_copy_loader (da_loaders, unitno,             /*   then copy the boot loader to memory */
-                            IBL_S_NOCLEAR, IBL_S_NOSET);    /*     but do not alter the S register */
+    status = cpu_copy_loader (da_loaders, unitno,           /*   then copy the boot loader to memory */
+                              IBL_S_NOCLEAR, IBL_S_NOSET);  /*     but do not alter the S register */
 
 else if (GET_BUSADR (da_unit [unitno].flags) != 0)          /* otherwise BOOT DA is supported on bus address 0 only */
     return SCPE_NOFNC;                                      /*   so reject other addresses as unsupported */
 
 else                                                            /* otherwise this is a BOOT/LOAD DA */
-    return cpu_copy_loader (da_loaders, da_dib.select_code,     /*   so copy the boot loader to memory */
-                            da_preserved, da_manual_boot);      /*     and configure the S register if 1000 CPU */
+    status = cpu_copy_loader (da_loaders, da_dib.select_code,   /*   so copy the boot loader to memory */
+                              da_preserved, da_manual_boot);    /*     and configure the S register if 1000 CPU */
+
+if (status == 0)                                        /* if the copy failed */
+    return SCPE_NOFNC;                                  /*   then reject the command */
+else                                                    /* otherwise */
+    return SCPE_OK;                                     /*   the boot loader was successfully copied */
 }
 
 
@@ -1335,7 +1350,7 @@ else                                                            /* otherwise thi
        we match the diagnostic expectation below.
 */
 
-t_stat da_load_unload (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+static t_stat da_load_unload (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 const int32 unit = uptr - da_unit;                          /* calculate the unit number */
 const t_bool load = (value != UNIT_UNLOAD);                 /* true if the heads are loading */
@@ -1832,7 +1847,7 @@ else {                                                      /* it is bus data (A
             if (icd_cntlr [unit].length > 0)                /* if there is more to transfer */
                 put_buffer_byte (&icd_cntlr [unit], data);  /*   then add the byte to the buffer */
 
-            /* fall into error_sink handler */
+        /* fall through into the error_sink handler */
 
         case error_sink:                                        /* sinking data after an error */
             if (TRACING (da_dev, DEB_XFER))

@@ -1,6 +1,6 @@
-/* hp2100_mpx.c: HP 2100 12792C 8-Channel Asynchronous Multiplexer
+/* hp2100_mpx.c: HP 12792C 8-Channel Asynchronous Multiplexer
 
-   Copyright (c) 2008-2017, J. David Bryan
+   Copyright (c) 2008-2019, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    MPX          12792C 8-Channel Asynchronous Multiplexer
 
+   23-Jan-19    JDB     Removed DEV_MUX to avoid TMXR debug flags
+   10-Jul-18    JDB     Revised I/O model
    01-Nov-17    JDB     Fixed serial output buffer overflow handling
    26-Jul-17    JDB     Changed BITFIELD macros to field constructors
    22-Apr-17    JDB     Corrected missing compound statements
@@ -158,6 +160,7 @@
 #include <ctype.h>
 
 #include "hp2100_defs.h"
+#include "hp2100_io.h"
 
 #include "sim_tmxr.h"
 
@@ -658,7 +661,7 @@
    unsolicited inputs to the host until they are enabled again.  The host reads
    the status with an LIA/B and acknowledges the unsolicited input with an
    Acknowledge command.  In response, the card outputs the second word of status
-   and sets the flag again. The host reads the second word with an LIA/B.
+   and sets the flag again.  The host reads the second word with an LIA/B.
 
    The format of the unsolicited input is:
 
@@ -827,11 +830,13 @@ static  int32 mpx_iolen   = 0;                  /* length of current I/O xfer */
 static t_bool mpx_uien   = FALSE;               /* unsolicited interrupts enabled */
 static uint32 mpx_uicode = 0;                   /* unsolicited interrupt reason and port */
 
-static struct {
-    FLIP_FLOP control;                          /* control flip-flop */
-    FLIP_FLOP flag;                             /* flag flip-flop */
-    FLIP_FLOP flagbuf;                          /* flag buffer flip-flop */
-    } mpx = { CLEAR, CLEAR, CLEAR };
+typedef struct {
+    FLIP_FLOP  control;                         /* control flip-flop */
+    FLIP_FLOP  flag;                            /* flag flip-flop */
+    FLIP_FLOP  flag_buffer;                     /* flag buffer flip-flop */
+    } CARD_STATE;
+
+static CARD_STATE mpx;                          /* per-card state */
 
 
 /* Multiplexer per-line state */
@@ -859,7 +864,7 @@ typedef enum {                                  /* buffer selectors */
     put
     } BUF_SELECT;
 
-static const char *const io_op [] = {           /* operation names, indexed by IO_OPER */
+static const char * const io_op [] = {          /* operation names, indexed by IO_OPER */
     "read",
     "write"
     };
@@ -887,7 +892,10 @@ static uint8 mpx_wbuf [MPX_PORTS] [WR_BUF_SIZE];        /* write buffer */
 
 /* Multiplexer local SCP support routines */
 
-static IOHANDLER mpx_io;
+static INTERFACE mpx_interface;
+
+
+/* Multiplexer local SCP support routines */
 
 static t_stat cntl_service  (UNIT   *uptr);
 static t_stat line_service  (UNIT   *uptr);
@@ -924,10 +932,10 @@ static uint32 buf_avail  (IO_OPER rw, uint32 port);
 /* Multiplexer SCP data structures */
 
 
-/* Terminal multiplexer library structures */
+/* Terminal multiplexer library descriptors */
 
 static int32 mpx_order [MPX_PORTS] = {          /* line connection order */
-    -1
+    -1                                          /*   use the default order */
     };
 
 static TMLN mpx_ldsc [MPX_PORTS] = {            /* line descriptors */
@@ -935,21 +943,23 @@ static TMLN mpx_ldsc [MPX_PORTS] = {            /* line descriptors */
     };
 
 static TMXR mpx_desc = {                        /* multiplexer descriptor */
-    MPX_PORTS,                                  /* number of terminal lines */
-    0,                                          /* listening port (reserved) */
-    0,                                          /* master socket  (reserved) */
-    mpx_ldsc,                                   /* line descriptors */
-    mpx_order,                                  /* line connection order */
-    NULL                                        /* multiplexer device (derived internally) */
+    MPX_PORTS,                                  /*   number of terminal lines */
+    0,                                          /*   listening port (reserved) */
+    0,                                          /*   master socket  (reserved) */
+    mpx_ldsc,                                   /*   line descriptors */
+    mpx_order,                                  /*   line connection order */
+    NULL                                        /*   multiplexer device (derived internally) */
     };
 
 
 /* Device information block */
 
 static DIB mpx_dib = {
-    &mpx_io,                                    /* device interface */
-    MPX,                                        /* select code */
-    0                                           /* card index */
+    &mpx_interface,                                     /* the device's I/O interface function pointer */
+    MPX,                                                /* the device's select code (02-77) */
+    0,                                                  /* the card index */
+    "12792C 8-Channel Asynchronous Multiplexer",        /* the card description */
+    NULL                                                /* the ROM description */
     };
 
 
@@ -1031,11 +1041,12 @@ static REG mpx_reg [] = {
 
     { FLDATA (CTL,      mpx.control,                              0)                                                  },
     { FLDATA (FLG,      mpx.flag,                                 0)                                                  },
-    { FLDATA (FBF,      mpx.flagbuf,                              0)                                                  },
-    { ORDATA (SC,       mpx_dib.select_code,          6),                                             REG_HRO         },
-    { ORDATA (DEVNO,    mpx_dib.select_code,          6),                                             REG_HRO         },
+    { FLDATA (FBF,      mpx.flag_buffer,                          0)                                                  },
 
     { BRDATA (CONNORD,  mpx_order,            10,    32,                    MPX_PORTS),               REG_HRO         },
+
+      DIB_REGS (mpx_dib),
+
     { NULL }
     };
 
@@ -1056,7 +1067,7 @@ static MTAB mpx_mod [] = {
     { MTAB_XUN | MTAB_NC,    0,   "LOG",        "LOG",         &tmxr_set_log,     &tmxr_show_log,     (void *) &mpx_desc },
     { MTAB_XUN | MTAB_NC,    0,   NULL,         "NOLOG",       &tmxr_set_nolog,   NULL,               (void *) &mpx_desc },
 
-    { MTAB_XDV,              0,   "REV",        NULL,          &set_revision,     &show_revision,     NULL },
+    { MTAB_XDV,              0,   "REV",        NULL,          &set_revision,     &show_revision,     NULL               },
     { MTAB_XDV | MTAB_NMO,   0,   "LINEORDER",  "LINEORDER",   &tmxr_set_lnorder, &tmxr_show_lnorder, (void *) &mpx_desc },
 
     { MTAB_XDV,              0,   "",            NULL,         NULL,              &show_status,       (void *) &mpx_desc },
@@ -1103,7 +1114,7 @@ DEVICE mpx_dev = {
     &mpx_attach,                                /* attach routine */
     &mpx_detach,                                /* detach routine */
     &mpx_dib,                                   /* device information block */
-    DEV_DEBUG | DEV_DISABLE | DEV_MUX,          /* device flags */
+    DEV_DISABLE | DEV_DEBUG,                    /* device flags */
     0,                                          /* debug control flags */
     mpx_deb,                                    /* debug flag name table */
     NULL,                                       /* memory size change routine */
@@ -1173,48 +1184,58 @@ DEVICE mpx_dev = {
        is reset.
 */
 
-static uint32 mpx_io (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
+static SIGNALS_VALUE mpx_interface (const DIB *dibptr, INBOUND_SET inbound_signals, HP_WORD inbound_value)
 {
-static const char *output_state [] = { "Command", "Command override", "Parameter", "Data" };
-static const char *input_state  [] = { "Status",  "Invalid status",   "Parameter", "Data" };
-const char *hold_or_clear = (signal_set & ioCLF ? ",C" : "");
-int32    delay;
-IOSIGNAL signal;
-IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
+static const char * const output_state [] = { "Command", "Command override", "Parameter", "Data" };
+static const char * const input_state  [] = { "Status",  "Invalid status",   "Parameter", "Data" };
+const char * const hold_or_clear = (inbound_signals & ioCLF ? ",C" : "");
+int32  delay;
 
-while (working_set) {
-    signal = IONEXT (working_set);                      /* isolate next signal */
+INBOUND_SIGNAL signal;
+INBOUND_SET    working_set = inbound_signals;
+SIGNALS_VALUE  outbound    = { ioNONE, 0 };
+t_bool         irq_enabled = FALSE;
 
-    switch (signal) {                                   /* dispatch I/O signal */
+while (working_set) {                                   /* while signals remain */
+    signal = IONEXTSIG (working_set);                   /*   isolate the next signal */
 
-        case ioCLF:                                     /* clear flag flip-flop */
-            mpx.flag = mpx.flagbuf = CLEAR;             /* clear flag and flag buffer */
+    switch (signal) {                                   /* dispatch the I/O signal */
+
+        case ioCLF:                                     /* Clear Flag flip-flop */
+            mpx.flag_buffer = CLEAR;                    /* reset the flag buffer */
+            mpx.flag        = CLEAR;                    /*   and flag flip-flops */
 
             tprintf (mpx_dev, DEB_CMDS, "[CLF] Flag cleared\n");
             break;
 
 
-        case ioSTF:                                     /* set flag flip-flop */
+        case ioSTF:                                     /* Set Flag flip-flop */
+            mpx.flag_buffer = SET;                      /* set the flag buffer flip-flop */
+
             tprintf (mpx_dev, DEB_CMDS, "[STF] Flag set\n");
-                                                        /* fall into ENF */
-
-        case ioENF:                                     /* enable flag */
-            mpx.flag = mpx.flagbuf = SET;               /* set flag and flag buffer */
             break;
 
 
-        case ioSFC:                                     /* skip if flag is clear */
-            setstdSKF (mpx);
+        case ioENF:                                     /* Enable Flag */
+            if (mpx.flag_buffer == SET)                 /* if the flag buffer flip-flop is set */
+                mpx.flag = SET;                         /*   then set the flag flip-flop */
             break;
 
 
-        case ioSFS:                                     /* skip if flag is set */
-            setstdSKF (mpx);
+        case ioSFC:                                     /* Skip if Flag is Clear */
+            if (mpx.flag == CLEAR)                      /* if the flag flip-flop is clear */
+                outbound.signals |= ioSKF;              /*   then assert the Skip on Flag signal */
+            break;
+
+
+        case ioSFS:                                     /* Skip if Flag is Set */
+            if (mpx.flag == SET)                        /* if the flag flip-flop is set */
+                outbound.signals |= ioSKF;              /*   then assert the Skip on Flag signal */
             break;
 
 
         case ioIOI:                                     /* I/O data input */
-            stat_data = IORETURN (SCPE_OK, mpx_ibuf);   /* return info */
+            outbound.value = mpx_ibuf;                  /* return info */
 
             tprintf (mpx_dev, DEB_CPU, "[LIx%s] %s = %06o\n",
                      hold_or_clear, input_state [mpx_state], mpx_ibuf);
@@ -1225,7 +1246,7 @@ while (working_set) {
 
 
         case ioIOO:                                     /* I/O data output */
-            mpx_obuf = IODATA (stat_data);              /* save word */
+            mpx_obuf = (uint16) inbound_value;          /* save word */
 
             tprintf (mpx_dev, DEB_CPU, "[OTx%s] %s = %06o\n",
                      hold_or_clear, output_state [mpx_state], mpx_obuf);
@@ -1242,26 +1263,26 @@ while (working_set) {
             break;
 
 
-        case ioCRS:                                     /* control reset */
+        case ioCRS:                                     /* Control Reset */
             controller_reset ();                        /* reset firmware to power-on defaults */
             mpx_obuf = 0;                               /* clear output buffer */
 
-            mpx.control = CLEAR;                        /* clear control */
-            mpx.flagbuf = CLEAR;                        /* clear flag buffer */
-            mpx.flag    = CLEAR;                        /* clear flag */
+            mpx.control     = CLEAR;                    /* clear control */
+            mpx.flag_buffer = CLEAR;                    /* clear flag buffer */
+            mpx.flag        = CLEAR;                    /* clear flag */
 
             tprintf (mpx_dev, DEB_CMDS, "[CRS] Controller reset\n");
             break;
 
 
-        case ioCLC:                                     /* clear control flip-flop */
+        case ioCLC:                                     /* Clear Control flip-flop */
             mpx.control = CLEAR;                        /* clear control */
 
             tprintf (mpx_dev, DEB_CMDS, "[CLC%s] Control cleared\n", hold_or_clear);
             break;
 
 
-        case ioSTC:                                     /* set control flip-flop */
+        case ioSTC:                                     /* Set Control flip-flop */
             mpx.control = SET;                          /* set control */
 
             if (mpx_cmd == CMD_BINARY_READ)             /* executing fast binary read? */
@@ -1292,26 +1313,48 @@ while (working_set) {
             break;
 
 
-        case ioSIR:                                     /* set interrupt request */
-            setstdPRL (mpx);                            /* set standard PRL signal */
-            setstdIRQ (mpx);                            /* set standard IRQ signal */
-            setstdSRQ (mpx);                            /* set standard SRQ signal */
+        case ioSIR:                                     /* Set Interrupt Request */
+            if (mpx.control & mpx.flag)                 /* if the control and flag flip-flops are set */
+                outbound.signals |= cnVALID;            /*   then deny PRL */
+            else                                        /* otherwise */
+                outbound.signals |= cnPRL | cnVALID;    /*   conditionally assert PRL */
+
+            if (mpx.control & mpx.flag & mpx.flag_buffer)   /* if the control, flag, and flag buffer flip-flops are set */
+                outbound.signals |= cnIRQ | cnVALID;        /*   then conditionally assert IRQ */
+
+            if (mpx.flag == SET)                        /* if the flag flip-flop is set */
+                outbound.signals |= ioSRQ;              /*   then assert SRQ */
             break;
 
 
-        case ioIAK:                                     /* interrupt acknowledge */
-            mpx.flagbuf = CLEAR;                        /* clear flag buffer */
+        case ioIAK:                                     /* Interrupt Acknowledge */
+            mpx.flag_buffer = CLEAR;                    /* clear the flag buffer flip-flop */
             break;
 
 
-        default:                                        /* all other signals */
-            break;                                      /*   are ignored */
+        case ioIEN:                                     /* Interrupt Enable */
+            irq_enabled = TRUE;                         /* permit IRQ to be asserted */
+            break;
+
+
+        case ioPRH:                                         /* Priority High */
+            if (irq_enabled && outbound.signals & cnIRQ)    /* if IRQ is enabled and conditionally asserted */
+                outbound.signals |= ioIRQ | ioFLG;          /*   then assert IRQ and FLG */
+
+            if (!irq_enabled || outbound.signals & cnPRL)   /* if IRQ is disabled or PRL is conditionally asserted */
+                outbound.signals |= ioPRL;                  /*   then assert it unconditionally */
+            break;
+
+
+        case ioPON:                                     /* not used by this interface */
+        case ioPOPIO:                                   /* not used by this interface */
+            break;
         }
 
-    working_set = working_set & ~signal;                /* remove current signal from set */
-    }
+    IOCLEARSIG (working_set, signal);                   /* remove the current signal from the set */
+    }                                                   /*   and continue until all signals are processed */
 
-return stat_data;
+return outbound;                                        /* return the outbound signals and value */
 }
 
 
@@ -1397,7 +1440,7 @@ t_bool add_crlf;
 t_bool set_flag = TRUE;
 STATE last_state = mpx_state;
 
-static const char *cmd_state [] = { "complete", "internal error!", "waiting for parameter", "executing" };
+static const char * const cmd_state [] = { "complete", "internal error!", "waiting for parameter", "executing" };
 
 
 switch (mpx_state) {                                                /* dispatch on current state */
@@ -1615,7 +1658,8 @@ if (TRACING (mpx_dev, DEB_CMDS)                             /* debug print? */
                  mpx_cmd, cmd_state [mpx_state]);
 
 if (set_flag) {
-    mpx_io (&mpx_dib, ioENF, 0);                        /* set device flag */
+    mpx.flag_buffer = SET;                              /* set the flag buffer */
+    io_assert (&mpx_dev, ioa_ENF);                      /*   and flag flip-flops */
 
     tprintf (mpx_dev, DEB_CMDS, "Flag set\n");
     }
@@ -2020,16 +2064,17 @@ if (fast_binary_read) {                                     /* fast binary read 
 
         if (chx && !(mpx_flags [0] & FL_HAVEBUF)) {         /* character ready and buffer empty? */
             if (mpx_flags [0] & FL_WANTBUF) {               /* second character? */
-                mpx_ibuf = mpx_ibuf | (chx & DMASK8);       /* merge it into word */
+                mpx_ibuf = mpx_ibuf | LOWER_BYTE (chx);     /* merge it into word */
                 mpx_flags [0] |= FL_HAVEBUF;                /* mark buffer as ready */
 
-                mpx_io (&mpx_dib, ioENF, 0);                /* set device flag */
+                mpx.flag_buffer = SET;                      /* set the flag buffer */
+                io_assert (&mpx_dev, ioa_ENF);              /*   and flag flip-flops */
 
                 tprintf (mpx_dev, DEB_CMDS, "Flag and SRQ set\n");
                 }
 
             else                                            /* first character */
-                mpx_ibuf = (uint16) ((chx & DMASK8) << 8);  /* put in top half of word */
+                mpx_ibuf = TO_WORD (chx, 0);                /* put in top half of word */
 
             mpx_flags [0] ^= FL_WANTBUF;                    /* toggle byte flag */
             }
@@ -2097,9 +2142,9 @@ for (i = 0; i < MPX_PORTS; i++) {                           /* check lines */
     }
 
 if (uptr->wait == POLL_FIRST)                               /* first poll? */
-    uptr->wait = sync_poll (INITIAL);                       /* initial synchronization */
+    uptr->wait = hp_sync_poll (INITIAL);                    /* initial synchronization */
 else                                                        /* not first */
-    uptr->wait = sync_poll (SERVICE);                       /* continue synchronization */
+    uptr->wait = hp_sync_poll (SERVICE);                    /* continue synchronization */
 
 sim_activate (uptr, uptr->wait);                            /* continue polling */
 
@@ -2145,7 +2190,7 @@ if (sim_switches & SWMASK ('P')) {                      /* power-on reset? */
     filling_flags  [iowrite] = FL_WRFILL;
     }
 
-IOPRESET (&mpx_dib);                                    /* PRESET device (does not use PON) */
+io_assert (dptr, ioa_POPIO);                            /* PRESET the device */
 
 mpx_ibuf = 0;                                           /* clear input buffer */
 
@@ -2164,11 +2209,11 @@ return SCPE_OK;
 
    We are called by the ATTACH MPX <port> command to attach the multiplexer to
    the listening port indicated by <port>.  Logically, it is the multiplexer
-   device that is attached; however, SIMH only allows units to be attached. This
-   makes sense for devices such as tape drives, where the attached media is a
-   property of a specific drive.  In our case, though, the listening port is a
-   property of the multiplexer card, not of any given line.  As ATTACH MPX is
-   equivalent to ATTACH MPX0, the port would, by default, be attached to the
+   device that is attached; however, SIMH only allows units to be attached.
+   This makes sense for devices such as tape drives, where the attached medium
+   is a property of a specific drive.  In our case, though, the listening port
+   is a property of the multiplexer card, not of any given line.  As ATTACH MPX
+   is equivalent to ATTACH MPX0, the port would, by default, be attached to the
    first line and be reported there in a SHOW MPX command.
 
    To preserve the logical picture, we attach the listening port to the poll

@@ -504,7 +504,7 @@ date above.
 
      CAUSE:  DMA termination before the end-of-record is not being handled
      properly by the 7970E simulator.  The RTE driver sets up DMA control word 1
-     with the STC bit (bit 15) clear and the CLC bit (bit 13) set. The DMA
+     with the STC bit (bit 15) clear and the CLC bit (bit 13) set.  The DMA
      transfer proceeds apace until DMA control word 3 (word count) goes to zero.
      At this point, the last cycle logic in "dma_cycle" (hp2100_cpu.c, lines
      2477-2480) issues a CLC to the mag tape data channel.  In "msdio"
@@ -697,7 +697,7 @@ date above.
 
      CAUSE:  To perform a disc read, the TSB disc driver issues a seek command
      but does not wait for seek completion before issuing the read command to the
-     interface.  This is allowed by the interface manual. The eventual interrupt
+     interface.  This is allowed by the interface manual.  The eventual interrupt
      signifies the completion of both the seek and the read commands.
 
      However, the "drive attention" flag that is normally generated at the end of
@@ -3560,7 +3560,7 @@ date above.
 
      The diagnostic sets up a one-word output with STC and CLC specified in the
      control word.  At the end of the transfer, "dma_cycle" (hp2100_cpu.c)
-     correctly sends LPS a STC,C followed by a CLC,C. The STC,C starts a
+     correctly sends LPS a STC,C followed by a CLC,C.  The STC,C starts a
      transfer and therefore schedules an I/O event for completion in one
      instruction.  The CLC,C clears the control flip-flop and the device flag,
      but because "sim_cancel" is not called, the I/O event remains.  When it
@@ -4145,10 +4145,10 @@ date above.
 
      OBSERVATION:  After reaching a map-specific breakpoint (e.g., a system-map
      breakpoint to debug a device driver), the most common action is to examine
-     memory locations and set another breakpoint farther ahead in the code. That
-     breakpoint will, of course, be set in the same mapping mode as the one just
-     reached, i.e., in the current DMS mapping mode.  Therefore, defaulting to
-     "the same map as is currently enabled" leads to the most-used cases not
+     memory locations and set another breakpoint farther ahead in the code.
+     That breakpoint will, of course, be set in the same mapping mode as the one
+     just reached, i.e., in the current DMS mapping mode.  Therefore, defaulting
+     to "the same map as is currently enabled" leads to the most-used cases not
      requiring additional switches (and therefore the chance of operator error).
 
      RESOLUTION:  Before exiting "sim_instr" (hp2100_cpu.c), set "sim_brk_dflt"
@@ -5413,7 +5413,7 @@ date above.
 
      RESOLUTION:  Modify the instruction execution loop (hp2100_cpu.c) to
      recalculate SRQ requests after each DMA cycle, and if a request is still
-     pending, skip instruction execution. This allows consecutive DMA cycles
+     pending, skip instruction execution.  This allows consecutive DMA cycles
      without intervening instruction executions if SRQ is asserted continuously.
 
      STATUS:  Fixed in version 3.9-0.
@@ -6714,7 +6714,7 @@ date above.
      initialized to NULL and can be overridden by the VM, and, if overridden,
      call it after printing the message string and before printing the program
      counter.  If the VM printer returns TRUE, print the comma and the program
-     counter as before. If the VM routine returns FALSE, print just the
+     counter as before.  If the VM routine returns FALSE, print just the
      terminating newline.
 
      STATUS:  Fixed in version 4.0-0.

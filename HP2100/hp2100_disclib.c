@@ -1,6 +1,6 @@
 /* hp2100_disclib.c: HP MAC/ICD disc controller simulator library
 
-   Copyright (c) 2011-2017, J. David Bryan
+   Copyright (c) 2011-2018, J. David Bryan
    Copyright (c) 2004-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -24,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   30-Sep-18    JDB     Replaced DMASK with D16_MASK
    03-Aug-17    JDB     Changed perror call for I/O errors to cprintf
    22-Apr-17    JDB     A failed sim_fseek call now causes a drive fault
    09-Mar-17    JDB     Added the simulator name to the "perror" message.
@@ -512,7 +513,7 @@ typedef enum {
 
 static const char invalid_name [] = "invalid";
 
-static const char *opcode_name [] = {
+static const char * const opcode_name [] = {
     "cold load read",                                   /* 00 */
     "recalibrate",                                      /* 01 */
     "seek",                                             /* 02 */
@@ -540,7 +541,7 @@ static const char *opcode_name [] = {
 
 /* Controller phase names */
 
-static const char *phase_name [] = {
+static const char * const phase_name [] = {
     "start",
     "data",
     "end"
@@ -1211,7 +1212,7 @@ switch ((CNTLR_PHASE) uptr->PHASE) {                    /* dispatch the phase */
 
             case Verify:
                 cvptr->verify_count =                   /* decrement the count */
-                  (cvptr->verify_count - 1) & DMASK;    /*   modulo 65536 */
+                  (cvptr->verify_count - 1) & D16_MASK; /*   modulo 65536 */
 
                 if (cvptr->verify_count == 0)           /* are there more sectors to verify? */
                     cvptr->eod = SET;                   /* no, so terminate the command cleanly */
@@ -1979,7 +1980,7 @@ if (uptr->flags & UNIT_UNLOAD) {                        /* if the drive is not r
 
 if (cvptr->index < DL_WPSEC + offset) {                 /* was a partial sector transferred? */
     if (cvptr->type == ICD)                             /* an ICD controller */
-        pad = DMASK;                                    /*   pads the sector with -1 */
+        pad = D16_UMAX;                                 /*   pads the sector with -1 */
     else                                                /* a MAC controller */
         pad = cvptr->buffer [cvptr->index - 1];         /*   pads with the last word written */
 
@@ -2066,9 +2067,9 @@ uint32 model = GET_MODEL (uptr->flags);
 if (cvptr->eoc == SET)                                          /* are we at the end of a cylinder? */
     if (cvptr->file_mask & DL_FAUTSK) {                         /* is an auto-seek allowed? */
         if (cvptr->file_mask & DL_FDECR)                        /* is a decremental seek requested? */
-            cvptr->cylinder = (cvptr->cylinder - 1) & DMASK;    /* decrease the cylinder address with wraparound */
+            cvptr->cylinder = cvptr->cylinder - 1 & D16_MASK;   /* decrease the cylinder address with wraparound */
         else                                                    /* an incremental seek is requested */
-            cvptr->cylinder = (cvptr->cylinder + 1) & DMASK;    /* increase the cylinder address with wraparound */
+            cvptr->cylinder = cvptr->cylinder + 1 & D16_MASK;   /* increase the cylinder address with wraparound */
 
         start_seek (cvptr, uptr,                                /* start the auto-seek */
                    (CNTLR_OPCODE) uptr->OP,                     /*   with the current operation */

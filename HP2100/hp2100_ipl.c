@@ -26,6 +26,7 @@
 
    IPLI, IPLO   12875A Processor Interconnect
 
+   11-Jul-18    JDB     Revised I/O model
    22-May-18    JDB     Added process synchronization commands
    01-May-18    JDB     Removed ioCRS counter, as consecutive ioCRS calls are no longer made
    26-Mar-18    JDB     Converted from socket to shared memory connections
@@ -72,8 +73,7 @@
    References:
      - 12875A Processor Interconnect Kit Operating and Service Manual
          (12875-90002, January 1974)
-     - 12566B, 12566B-001, 12566B-002, 12566B-003 Microcircuit Interface Kits
-       Operating and Service Manual
+     - 12566B[-001/2/3] Microcircuit Interface Kits Operating and Service Manual
          (12566-90015,  April 1976)
 
    The 12875A Processor Interconnect Kit consists four 12566A Microcircuit
@@ -99,7 +99,7 @@
 #include <signal.h>
 
 #include "hp2100_defs.h"
-#include "hp2100_cpu.h"
+#include "hp2100_io.h"
 
 #include "sim_timer.h"
 
@@ -114,16 +114,29 @@
 /* Process synchronization definitions */
 
 
-/* Windows process synchronization */
+/* Windows process synchronization.
+
+
+   Implementation notes:
+
+    1. SIMH and the HP2100 simulator define the CONST and INTERFACE macros,
+       respectively.  Including "windows.h" here redefines these two symbols, so
+       we save and then restore their simulator definitions when including the
+       Windows header file.
+*/
 
 #if defined (_WIN32)
 
 #pragma push_macro("CONST")
+#pragma push_macro("INTERFACE")
+
 #undef CONST
+#undef INTERFACE
 
 #include <windows.h>
 
 #pragma pop_macro("CONST")
+#pragma pop_macro("INTERFACE")
 
 
 typedef HANDLE              EVENT;              /* the event type */
@@ -210,7 +223,7 @@ typedef struct {
     FLIP_FLOP  command;                         /* command flip-flop */
     FLIP_FLOP  control;                         /* control flip-flop */
     FLIP_FLOP  flag;                            /* flag flip-flop */
-    FLIP_FLOP  flagbuf;                         /* flag buffer flip-flop */
+    FLIP_FLOP  flag_buffer;                     /* flag buffer flip-flop */
     } CARD_STATE;
 
 static CARD_STATE ipl [CARD_COUNT];             /* per-card state */
@@ -384,7 +397,10 @@ static SHMEM  *memory_region = NULL;            /* a pointer to the shared memor
 
 /* IPL local SCP support routines */
 
-static IOHANDLER ipl_interface;
+static INTERFACE ipl_interface;
+
+
+/* IPL local SCP support routines */
 
 static t_stat ipl_set_diag (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat ipl_set_sync (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
@@ -417,13 +433,17 @@ static uint32 signal_event       (EVENT event);
 /* Device information blocks */
 
 static DIB ipl_dib [CARD_COUNT] = {
-    { &ipl_interface,                           /*   the device's I/O interface function pointer */
-      IPLI,                                     /*   the device's select code (02-77) */
-      0 },                                      /*   the card index if multiple interfaces are supported */
+    { &ipl_interface,                                   /* the device's I/O interface function pointer */
+      IPLI,                                             /* the device's select code (02-77) */
+      0,                                                /* the card index */
+      "12875A Processor Interconnect Lower Data PCA",   /* the card description */
+      "12992K Processor Interconnect Loader" },         /* the ROM description */
 
-    { &ipl_interface,                           /*   the device's I/O interface function pointer */
-      IPLO,                                     /*   the device's select code (02-77) */
-      1 }                                       /*   the card index if multiple interfaces are supported */
+    { &ipl_interface,                                   /* the device's I/O interface function pointer */
+      IPLO,                                             /* the device's select code (02-77) */
+      1,                                                /* the card index */
+      "12875A Processor Interconnect Upper Data PCA",   /* the card description */
+      NULL }                                            /* the ROM description */
     };
 
 
@@ -444,12 +464,13 @@ static REG ipli_reg [] = {
     { ORDATA (OBUF,     ipl [ipli].output_word,  16)                                },
     { FLDATA (CTL,      ipl [ipli].control,              0)                         },
     { FLDATA (FLG,      ipl [ipli].flag,                 0)                         },
-    { FLDATA (FBF,      ipl [ipli].flagbuf,              0)                         },
+    { FLDATA (FBF,      ipl [ipli].flag_buffer,          0)                         },
     { DRDATA (TIME,     poll_wait,               24),          PV_LEFT              },
     { DRDATA (EDTDELAY, edt_delay,               32),          PV_LEFT | REG_HIDDEN },
     { DRDATA (EVTERR,   event_error,             32),          PV_LEFT | REG_HRO    },
-    { ORDATA (SC,       ipli_dib.select_code,     6),                    REG_HRO    },
-    { ORDATA (DEVNO,    ipli_dib.select_code,     6),                    REG_HRO    },
+
+      DIB_REGS (ipli_dib),
+
     { NULL }
     };
 
@@ -460,10 +481,11 @@ static REG iplo_reg [] = {
     { ORDATA (OBUF,     ipl [iplo].output_word,  16)                                },
     { FLDATA (CTL,      ipl [iplo].control,              0)                         },
     { FLDATA (FLG,      ipl [iplo].flag,                 0)                         },
-    { FLDATA (FBF,      ipl [iplo].flagbuf,              0)                         },
+    { FLDATA (FBF,      ipl [iplo].flag_buffer,          0)                         },
     { DRDATA (TIME,     poll_wait,               24),          PV_LEFT              },
-    { ORDATA (SC,       iplo_dib.select_code,     6),                    REG_HRO    },
-    { ORDATA (DEVNO,    iplo_dib.select_code,     6),                    REG_HRO    },
+
+      DIB_REGS (iplo_dib),
+
     { NULL }
     };
 
@@ -480,6 +502,7 @@ static MTAB ipl_mod [] = {
 /*    --------------------  -----  ------------  ------------  --------------  -------------  ----------------- */
     { MTAB_XDV,               0u,  NULL,         "WAIT",       &ipl_set_sync,  NULL,          NULL              },
     { MTAB_XDV,               1u,  NULL,         "SIGNAL",     &ipl_set_sync,  NULL,          NULL              },
+
     { MTAB_XDV,               2u,  "SC",         "SC",         &hp_set_dib,    &hp_show_dib,  (void *) &ipl_dib },
     { MTAB_XDV | MTAB_NMO,   ~2u,  "DEVNO",      "DEVNO",      &hp_set_dib,    &hp_show_dib,  (void *) &ipl_dib },
     { 0 }
@@ -557,7 +580,7 @@ static DEVICE *dptrs [CARD_COUNT] = {
 
 
 
-/* I/O signal handler for the IPLI and IPLO devices.
+/* Microcircuit interface.
 
    In the link mode, the IPLI and IPLO devices are linked via a shared memory
    region to the corresponding cards in another CPU instance.  If only one or
@@ -596,7 +619,7 @@ static DEVICE *dptrs [CARD_COUNT] = {
        In hardware, the two CPUs are essentially interlocked by the DMA
        transfer, and DMA completion interrupts occur almost simultaneously.
        Therefore, the STC/CLC in the SP is guaranteed to occur before the STC,C
-       in the IOP. Under simulation, and especially on multiprocessor hosts,
+       in the IOP.  Under simulation, and especially on multiprocessor hosts,
        that guarantee does not hold.  If the STC/CLC occurs after the STC,C,
        then the IOP starts a second device table DMA transfer, which the SP is
        not expecting.  The IOP never processes the subsequent "start
@@ -622,44 +645,53 @@ static DEVICE *dptrs [CARD_COUNT] = {
        intrusive.
 */
 
-static uint32 ipl_interface (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
+static SIGNALS_VALUE ipl_interface (const DIB *dibptr, INBOUND_SET inbound_signals, HP_WORD inbound_value)
 {
-const char *iotype [] = { "Status", "Command" };
+const char * const iotype [] = { "Status", "Command" };
 const CARD_INDEX card = (CARD_INDEX) dibptr->card_index;    /* set card selector */
-UNIT *const uptr = &(ipl_unit [card]);                      /* associated unit pointer */
-IOSIGNAL signal;
-IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
+UNIT * const uptr = &(ipl_unit [card]);                     /* associated unit pointer */
 
-while (working_set) {
-    signal = IONEXT (working_set);                      /* isolate next signal */
+INBOUND_SIGNAL signal;
+INBOUND_SET    working_set = inbound_signals;
+SIGNALS_VALUE  outbound    = { ioNONE, 0 };
+t_bool         irq_enabled = FALSE;
 
-    switch (signal) {                                   /* dispatch I/O signal */
+while (working_set) {                                   /* while signals remain */
+    signal = IONEXTSIG (working_set);                   /*   isolate the next signal */
 
-        case ioCLF:                                     /* clear flag flip-flop */
-            ipl [card].flag    = CLEAR;
-            ipl [card].flagbuf = CLEAR;
+    switch (signal) {                                   /* dispatch the I/O signal */
+
+        case ioCLF:                                     /* Clear Flag flip-flop */
+            ipl [card].flag_buffer = CLEAR;             /* reset the flag buffer */
+            ipl [card].flag        = CLEAR;             /*   and flag flip-flops */
             break;
 
 
-        case ioSTF:                                     /* set flag flip-flop */
-        case ioENF:                                     /* enable flag */
-            ipl [card].flag    = SET;
-            ipl [card].flagbuf = SET;
+        case ioSTF:                                     /* Set Flag flip-flop */
+            ipl [card].flag_buffer = SET;               /* set the flag buffer flip-flop */
             break;
 
 
-        case ioSFC:                                     /* skip if flag is clear */
-            setstdSKF (ipl [card]);
+        case ioENF:                                     /* Enable Flag */
+            if (ipl [card].flag_buffer == SET)          /* if the flag buffer flip-flop is set */
+                ipl [card].flag = SET;                  /*   then set the flag flip-flop */
             break;
 
 
-        case ioSFS:                                     /* skip if flag is set */
-            setstdSKF (ipl [card]);
+        case ioSFC:                                     /* Skip if Flag is Clear */
+            if (ipl [card].flag == CLEAR)                       /* if the flag flip-flop is clear */
+                outbound.signals |= ioSKF;              /*   then assert the Skip on Flag signal */
+            break;
+
+
+        case ioSFS:                                     /* Skip if Flag is Set */
+            if (ipl [card].flag == SET)                         /* if the flag flip-flop is set */
+                outbound.signals |= ioSKF;              /*   then assert the Skip on Flag signal */
             break;
 
 
         case ioIOI:                                     /* I/O data input */
-            stat_data = IORETURN (SCPE_OK, ipl [card].input_word); /* get return data */
+            outbound.value = ipl [card].input_word;     /* get return data */
 
             tpprintf (dptrs [card], TRACE_CSRW, "%s input word is %06o\n",
                       iotype [card ^ 1], ipl [card].input_word);
@@ -667,7 +699,7 @@ while (working_set) {
 
 
         case ioIOO:                                         /* I/O data output */
-            ipl [card].output_word = IODATA (stat_data);    /* clear supplied status */
+            ipl [card].output_word = inbound_value;         /* clear supplied status */
 
             io_ptrs [card].output->data_out = ipl [card].output_word;
 
@@ -676,23 +708,26 @@ while (working_set) {
             break;
 
 
-        case ioPOPIO:                                   /* power-on preset to I/O */
-            ipl [card].flag        = SET;               /* set flag buffer and flag */
-            ipl [card].flagbuf     = SET;
-            ipl [card].output_word = 0;                 /* clear output buffer */
+        case ioPOPIO:                                   /* Power-On Preset to I/O */
+            ipl [card].flag_buffer = SET;               /* set the flag buffer flip-flop */
+            ipl [card].output_word = 0;                 /*   and clear the output register */
 
             io_ptrs [card].output->data_out = 0;
             break;
 
 
-        case ioCRS:                                     /* control reset */
-        case ioCLC:                                     /* clear control flip-flop */
-            ipl [card].control = CLEAR;                 /* clear ctl */
+        case ioCRS:                                     /* Control Reset */
+            ipl [card].control = CLEAR;                 /* clear the control flip-flop */
             break;
 
 
-        case ioSTC:                                     /* set control flip-flop */
-            ipl [card].control = SET;                   /* set ctl */
+        case ioCLC:                                     /* Clear Control flip-flop */
+            ipl [card].control = CLEAR;                 /* clear the control flip-flop */
+            break;
+
+
+        case ioSTC:                                             /* Set Control flip-flop */
+            ipl [card].control = SET;                           /* set the control flip-flop */
 
             io_ptrs [card].output->device_command_out = TRUE;   /* assert Device Command */
 
@@ -714,7 +749,7 @@ while (working_set) {
 
         case ioEDT:                                     /* end data transfer */
             if (cpu_is_iop                              /* if this is the IOP instance */
-              && signal_set & ioIOO                     /*   and the card is doing output */
+              && inbound_signals & ioIOO                /*   and the card is doing output */
               && card == ipli) {                        /*     on the input card */
 
                 tprintf (ipli_dev, TRACE_CMD, "Delaying DMA completion interrupt for %d msec\n",
@@ -725,26 +760,48 @@ while (working_set) {
             break;
 
 
-        case ioSIR:                                     /* set interrupt request */
-            setstdPRL (ipl [card]);
-            setstdIRQ (ipl [card]);
-            setstdSRQ (ipl [card]);
+        case ioSIR:                                     /* Set Interrupt Request */
+            if (ipl [card].control & ipl [card].flag)   /* if the control and flag flip-flops are set */
+                outbound.signals |= cnVALID;            /*   then deny PRL */
+            else                                        /* otherwise */
+                outbound.signals |= cnPRL | cnVALID;    /*   conditionally assert PRL */
+
+            if (ipl [card].control & ipl [card].flag    /* if the control and flag */
+              & ipl [card].flag_buffer)                 /*   and flag buffer flip-flops are set */
+                outbound.signals |= cnIRQ | cnVALID;    /*     then conditionally assert IRQ */
+
+            if (ipl [card].flag == SET)                 /* if the flag flip-flop is set */
+                outbound.signals |= ioSRQ;              /*   then assert SRQ */
             break;
 
 
-        case ioIAK:                                     /* interrupt acknowledge */
-            ipl [card].flagbuf = CLEAR;
+        case ioIAK:                                     /* Interrupt Acknowledge */
+            ipl [card].flag_buffer = CLEAR;             /* clear the flag buffer flip-flop */
             break;
 
 
-        default:                                        /* all other signals */
-            break;                                      /*   are ignored */
+        case ioIEN:                                     /* Interrupt Enable */
+            irq_enabled = TRUE;                         /* permit IRQ to be asserted */
+            break;
+
+
+        case ioPRH:                                         /* Priority High */
+            if (irq_enabled && outbound.signals & cnIRQ)    /* if IRQ is enabled and conditionally asserted */
+                outbound.signals |= ioIRQ | ioFLG;          /*   then assert IRQ and FLG */
+
+            if (!irq_enabled || outbound.signals & cnPRL)   /* if IRQ is disabled or PRL is conditionally asserted */
+                outbound.signals |= ioPRL;                  /*   then assert it unconditionally */
+            break;
+
+
+        case ioPON:                                     /* not used by this interface */
+            break;
         }
 
-    working_set = working_set & ~signal;                /* remove current signal from set */
-    }
+    IOCLEARSIG (working_set, signal);                   /* remove the current signal from the set */
+    }                                                   /*   and continue until all signals are processed */
 
-return stat_data;
+return outbound;                                        /* return the outbound signals and value */
 }
 
 
@@ -769,7 +826,8 @@ if (io_ptrs [card].input->device_flag_in == TRUE) {     /* if the Device Flag is
     tpprintf (dptrs [card], TRACE_XFER, "Word %06o delta %u received from link\n",
               ipl [card].input_word, delta [card]);
 
-    ipl_interface (&ipl_dib [card], ioENF, 0);          /* set the flag */
+    ipl [card].flag_buffer = SET;                       /* set the flag buffer */
+    io_assert (dptrs [card], ioa_ENF);                  /*   and flag flip-flops */
 
     io_ptrs [card].output->device_command_out = FALSE;  /* reset Device Command */
 
@@ -784,10 +842,8 @@ else {                                                  /* otherwise Device Flag
         uptr->wait = poll_wait;                         /*   then limit it to the maximum */
 
     if (io_ptrs [card].input->cable_connected == FALSE  /* if the interconnecting cable is not present */
-      && cpu_ss_ioerr != SCPE_OK) {                     /*   and the I/O error stop is enabled */
-        cpu_ioerr_uptr = uptr;                          /*     then save the failing unit */
-        status = STOP_NOCONN;                           /*       and report the disconnection */
-        }
+      && cpu_io_stop (uptr))                            /*   and the I/O error stop is enabled */
+        status = STOP_NOCONN;                           /*     then report the disconnection */
     }
 
 if (uptr->flags & UNIT_ATT)                             /* if the link is active */
@@ -824,7 +880,7 @@ if (sim_switches & SWMASK ('P')) {                      /* initialization reset?
         ipli_dev.lname = strdup ("IPLI");               /* allocate and initialize the name */
     }
 
-IOPRESET (dibptr);                                      /* PRESET device (does not use PON) */
+io_assert (dptr, ioa_POPIO);                            /* PRESET the device */
 
 if (uptr->flags & UNIT_ATT) {                           /* if the link is active */
     uptr->wait = poll_wait;                             /*   then continue to poll for input */
@@ -1497,7 +1553,7 @@ static const HP_WORD ipl_ptx = 074u;                    /* the index of the poin
 static const HP_WORD ptr_ptx = 075u;                    /* the index of the pointer to the PTR select code */
 static const HP_WORD ipl_scx = 076u;                    /* the index of the IPL select code */
 static const HP_WORD ptr_scx = 077u;                    /* the index of the PTR select code */
-t_stat status;
+uint32 start;
 uint32 ptr_sc, ipl_sc;
 DEVICE *ptr_dptr;
 
@@ -1513,17 +1569,22 @@ if (dptr == NULL)                                       /* if we are being calle
 else                                                    /* otherwise */
     ipl_sc = ipli_dib.select_code;                      /*   use the device select code from the DIB */
 
-status = cpu_copy_loader (ipl_loaders, ipl_sc,          /* copy the boot loader to memory */
-                          IBL_S_NOCLEAR, IBL_S_NOSET);  /*   but do not alter the S register */
+start = cpu_copy_loader (ipl_loaders, ipl_sc,           /* copy the boot loader to memory */
+                         IBL_S_NOCLEAR, IBL_S_NOSET);   /*   but do not alter the S register */
 
-if (status == SCPE_OK && mem_examine (PR + ptr_scx) <= MAXDEV) {    /* if the copy succeeded and is the special BBL */
-    mem_deposit (PR + ipl_ptx, (HP_WORD) PR + ipl_scx);             /*   then configure */
-    mem_deposit (PR + ptr_ptx, (HP_WORD) PR + ptr_scx);             /*     the pointers */
-    mem_deposit (PR + ipl_scx, (HP_WORD) ipli_dib.select_code);     /*       and select codes */
-    mem_deposit (PR + ptr_scx, (HP_WORD) ptr_sc);                   /*         for the loader */
+if (start == 0)                                         /* if the copy failed */
+    return SCPE_NOFNC;                                  /*   then reject the command */
+
+else {                                                                  /* otherwise */
+    if (mem_examine (start + ptr_scx) <= SC_MAX) {                      /*   if this is the special BBL */
+        mem_deposit (start + ipl_ptx, (HP_WORD) start + ipl_scx);       /*     then configure */
+        mem_deposit (start + ptr_ptx, (HP_WORD) start + ptr_scx);       /*       the pointers */
+        mem_deposit (start + ipl_scx, (HP_WORD) ipli_dib.select_code);  /*         and select codes */
+        mem_deposit (start + ptr_scx, (HP_WORD) ptr_sc);                /*           for the loader */
+        }
+
+    return SCPE_OK;                                     /* the boot loader was successfully copied */
     }
-
-return status;                                          /* return the result of the boot configuration */
 }
 
 
@@ -1679,7 +1740,7 @@ else                                                    /* otherwise the signal 
 
      If [the] name begins with the <slash> character, then processes calling
      sem_open() with the same value of name shall refer to the same semaphore
-     object, as long as that name has not been removed. If name does not begin
+     object, as long as that name has not been removed.  If name does not begin
      with the <slash> character, the effect is implementation-defined.
 
    Therefore, event names passed to this routine should begin with a slash

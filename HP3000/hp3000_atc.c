@@ -1,6 +1,6 @@
 /* hp3000_atc.c: HP 3000 30032B Asynchronous Terminal Controller simulator
 
-   Copyright (c) 2014-2017, J. David Bryan
+   Copyright (c) 2014-2018, J. David Bryan
    Copyright (c) 2002-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -26,6 +26,7 @@
 
    ATCD,ATCC    HP 30032B Asynchronous Terminal Controller
 
+   30-Apr-18    JDB     Corrected typo in "store" routine comment
    18-Dec-17    JDB     Return event time instead of status from "activate_unit"
    11-Dec-17    JDB     Reschedule "line_service" if receive buffer has data
    26-Oct-17    JDB     Call "tmxr_poll_tx" if transmit buffer is full

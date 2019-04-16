@@ -1,6 +1,6 @@
 /* hp_tapelib.c: HP magnetic tape controller simulator library
 
-   Copyright (c) 2013-2017, J. David Bryan
+   Copyright (c) 2013-2018, J. David Bryan
    Copyright (c) 2004-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   27-Dec-18    JDB     Revised fall through comments to comply with gcc 7
    22-Apr-17    JDB     Corrected status_name array element count
    10-Oct-16    JDB     Moved "hp3000_defs.h" inclusion from "hp_tapelib.h"
    01-Jul-16    JDB     Changed tl_attach to reset the event delay times pointer
@@ -2146,7 +2147,7 @@ switch (phase) {                                        /* dispatch the phase */
             case Write_Record_without_Parity:
                 outbound = RQSRV;                               /* request the first data word from the channel */
 
-            /* fall into the Write_File_Mark case */
+            /* fall through into the Write_File_Mark case */
 
             case Write_File_Mark:
                 if ((cvptr->device->flags & DEV_REALTIME) == 0  /* if fast timing is enabled */
@@ -2156,7 +2157,7 @@ switch (phase) {                                        /* dispatch the phase */
                     break;
                     }                                           /* otherwise an initial gap is needed */
 
-            /* fall into the Write_Gap case */
+            /* fall through into the Write_Gap case */
 
             case Write_Gap:
                 outbound |=                                     /* erase the gap */
@@ -2214,7 +2215,7 @@ switch (phase) {                                        /* dispatch the phase */
             case Rewind_Offline:
                 uptr->flags |= UNIT_OFFLINE;            /* set the unit offline immediately */
 
-            /* fall into the Rewind case */
+            /* fall through into the Rewind case */
 
             case Rewind:
                 outbound = end_command (cvptr, uptr);   /* release the controller */
@@ -2469,7 +2470,7 @@ switch (phase) {                                        /* dispatch the phase */
                     break;                                  /*           after the motion stops */
                     }
 
-            /* otherwise fall into the Backspace_File case */
+            /* otherwise fall through into the Backspace_File case */
 
             case Backspace_File:
                 uptr->PHASE = Start_Phase;                  /* set up to space over the next record */
@@ -2550,7 +2551,7 @@ switch (phase) {                                        /* dispatch the phase */
                   && cvptr->length & 1)                 /*   and the record length is odd */
                     cvptr->status |= CST_ODDLEN;        /*     then set the corresponding status */
 
-            /* fall into the Write_File_Mark case */
+            /* fall through into the Write_File_Mark case */
 
             case Write_File_Mark:
             case Write_Gap:
@@ -2842,7 +2843,7 @@ switch (cvptr->call_status) {                           /* dispatch on the call 
     case MTSE_RECE:                                     /* record data in error */
         cvptr->status |= CST_DATAERR;                   /* report as a data error */
 
-    /* fall into the MTSE_OK case */
+    /* fall through into the MTSE_OK case */
 
     case MTSE_OK:                                       /* operation succeeded */
         if (cvptr->length > 0)                          /* if data is present */
@@ -2854,7 +2855,7 @@ switch (cvptr->call_status) {                           /* dispatch on the call 
     case MTSE_TMK:                                      /* tape mark encountered */
         cvptr->gaplen -= sizeof (t_mtrlnt);             /* reduce the gap length by the metadata marker size */
 
-    /* fall into the MTSE_EOM case */
+    /* fall through into the MTSE_EOM case */
 
     case MTSE_EOM:                                      /* end of medium encountered */
         cvptr->status |= CST_EOF;                       /* set the EOF status */
@@ -2862,7 +2863,7 @@ switch (cvptr->call_status) {                           /* dispatch on the call 
         if (cvptr->type == HP_13181)                    /* the HP 1000 NRZI controller */
             cvptr->status |= CST_ODDLEN;                /*   also sets odd length status for a tape mark */
 
-    /* fall into the MTSE_BOT case */
+    /* fall through into the MTSE_BOT case */
 
     case MTSE_BOT:                                      /* beginning of tape encountered */
         cvptr->state = End_State;                       /* indicate a device end condition */

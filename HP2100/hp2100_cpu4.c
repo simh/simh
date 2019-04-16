@@ -1,6 +1,6 @@
-/* hp2100_cpu4.c: HP 1000 FPP/SIS
+/* hp2100_cpu4.c: HP 1000 FPP and SIS microcode simulator
 
-   Copyright (c) 2006-2017, J. David Bryan
+   Copyright (c) 2006-2018, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,7 +24,9 @@
    in this Software without prior written authorization from the author.
 
    CPU4         Floating Point Processor and Scientific Instruction Set
+                instructions
 
+   28-Jul-18    JDB     Renamed hp2100_fp1.h to hp2100_cpu_fp.h
    07-Sep-17    JDB     Replaced "uint16" cast with "HP_WORD" for FPK assignment
    05-Aug-16    JDB     Renamed the P register from "PC" to "PR"
    24-Dec-14    JDB     Added casts for explicit downward conversions
@@ -36,24 +38,27 @@
    01-Dec-06    JDB     Substitutes FPP for firmware FP if HAVE_INT64
 
    Primary references:
-   - HP 1000 M/E/F-Series Computers Technical Reference Handbook
-        (5955-0282, Mar-1980)
-   - HP 1000 M/E/F-Series Computers Engineering and Reference Documentation
-        (92851-90001, Mar-1981)
-   - Macro/1000 Reference Manual (92059-90001, Dec-1992)
+     - HP 1000 M/E/F-Series Computers Technical Reference Handbook
+         (5955-0282, March 1980)
+     - HP 1000 M/E/F-Series Computers Engineering and Reference Documentation
+         (92851-90001, March 1981)
+     - Macro/1000 Reference Manual
+         (92059-90001, December 1992)
 
    Additional references are listed with the associated firmware
    implementations, as are the HP option model numbers pertaining to the
    applicable CPUs.
 */
 
+
+
 #include "hp2100_defs.h"
 #include "hp2100_cpu.h"
-#include "hp2100_cpu1.h"
+#include "hp2100_cpu_dmm.h"
 
 #if defined (HAVE_INT64)                                /* int64 support available */
 
-#include "hp2100_fp1.h"
+#include "hp2100_cpu_fp.h"
 
 
 /* Floating-Point Processor.
@@ -248,7 +253,7 @@ static const OP_PAT op_fpp[96] = {
   OP_N,    OP_N,    OP_N,    OP_N                       /* .DDIR   ---    ---    ---  */
   };
 
-t_stat cpu_fpp (uint32 IR, uint32 intrq)
+t_stat cpu_fpp (HP_WORD IR)
 {
 OP fpop;
 OPS op;
@@ -258,7 +263,7 @@ uint16 opcode;
 uint32 entry;
 t_stat reason = SCPE_OK;
 
-if (UNIT_CPU_MODEL == UNIT_1000_F)                      /* F-Series? */
+if (cpu_configuration & CPU_1000_F)                     /* F-Series? */
     opcode = (uint16) (IR & 0377);                      /* yes, use full opcode */
 else
     opcode = (uint16) (IR & 0160);                      /* no, use 6 SP FP opcodes */
@@ -266,7 +271,7 @@ else
 entry = opcode & 0177;                                  /* map to <6:0> */
 
 if (op_fpp [entry] != OP_N) {
-    reason = cpu_ops (op_fpp [entry], op, intrq);       /* get instruction operands */
+    reason = cpu_ops (op_fpp [entry], op);              /* get instruction operands */
 
     if (reason != SCPE_OK)                              /* evaluation failed? */
         return reason;                                  /* return reason for failure */
@@ -305,11 +310,11 @@ switch (entry) {                                        /* decode IR<6:0> */
     case 0004:                                          /* [tst] 105004 (OP_N) */
         XR = 3;                                         /* firmware revision */
         SR = 0102077;                                   /* test passed code */
-        PR = (PR + 1) & VAMASK;                         /* P+2 return for firmware w/DBI */
+        PR = (PR + 1) & LA_MASK;                        /* P+2 return for firmware w/DBI */
         break;
 
     case 0005:                                          /* [xpd] 105005 (OP_C) */
-        return cpu_fpp (op[0].word | 0200, intrq);      /* set bit 7, execute instr */
+        return cpu_fpp (op[0].word | 0200);             /* set bit 7, execute instr */
 
     case 0006:                                          /* [rst] 105006 (OP_N) */
         break;                                          /* do nothing for FPP reset */
@@ -320,18 +325,18 @@ switch (entry) {                                        /* decode IR<6:0> */
         rtn_addr = op[0].word;                          /* save return address */
 
         while (TRUE) {
-            PR = ReadW (stk_ptr) & VAMASK;              /* point at next instruction set */
-            stk_ptr = (stk_ptr + 1) & VAMASK;
+            PR = ReadW (stk_ptr) & LA_MASK;             /* point at next instruction set */
+            stk_ptr = (stk_ptr + 1) & LA_MASK;
 
-            reason = cpu_ops (OP_CCACACCA, op, intrq);  /* get instruction set */
+            reason = cpu_ops (OP_CCACACCA, op);         /* get instruction set */
 
             if (reason) {
-                PR = err_PC;                            /* irq restarts */
+                PR = err_PR;                            /* irq restarts */
                 break;
                 }
 
             if (op[0].word == 0) {                      /* opcode = NOP? */
-                PR = (rtn_addr + 1) & VAMASK;           /* bump to good return */
+                PR = (rtn_addr + 1) & LA_MASK;          /* bump to good return */
                 break;                                  /* done */
                 }
 
@@ -378,16 +383,16 @@ switch (entry) {                                        /* decode IR<6:0> */
         break;
 
     case 0014:                                          /* .DAD 105014 (OP_N) */
-        return cpu_dbi (0105321, intrq);                /* remap to double int handler */
+        return cpu_dbi (0105321u);                      /* remap to double int handler */
 
     case 0034:                                          /* .DSB 105034 (OP_N) */
-        return cpu_dbi (0105327, intrq);                /* remap to double int handler */
+        return cpu_dbi (0105327u);                      /* remap to double int handler */
 
     case 0054:                                          /* .DMP 105054 (OP_N) */
-        return cpu_dbi (0105322, intrq);                /* remap to double int handler */
+        return cpu_dbi (0105322u);                      /* remap to double int handler */
 
     case 0074:                                          /* .DDI 105074 (OP_N) */
-        return cpu_dbi (0105325, intrq);                /* remap to double int handler */
+        return cpu_dbi (0105325u);                      /* remap to double int handler */
 
     case 0100:                                          /*  FIX  105100 (OP_R) */
     case 0101:                                          /* .XFXS 105101 (OP_X) */
@@ -402,12 +407,12 @@ switch (entry) {                                        /* decode IR<6:0> */
     case 0106:                                          /* .TFXD 105106 (OP_T) */
     case 0107:                                          /* .EFXD 105107 (OP_E) */
         O = fp_exec (opcode, &fpop, op[0], NOP);        /* fix to integer */
-        AR = (fpop.dword >> 16) & DMASK;                /* save result */
-        BR = fpop.dword & DMASK;                        /* in A and B */
+        AR = UPPER_WORD (fpop.dword);                   /* save result */
+        BR = LOWER_WORD (fpop.dword);                   /* in A and B */
         break;
 
     case 0114:                                          /* .DSBR 105114 (OP_N) */
-        return cpu_dbi (0105334, intrq);                /* remap to double int handler */
+        return cpu_dbi (0105334u);                      /* remap to double int handler */
 
     case 0120:                                          /*  FLT  105120 (OP_I) */
     case 0124:                                          /* .FLTD 105124 (OP_J) */
@@ -428,7 +433,7 @@ switch (entry) {                                        /* decode IR<6:0> */
         break;
 
     case 0134:                                          /* .DDIR 105134 (OP_N) */
-        return cpu_dbi (0105326, intrq);                /* remap to double int handler */
+        return cpu_dbi (0105326u);                      /* remap to double int handler */
 
     default:                                            /* others unimplemented */
         reason = STOP (cpu_ss_unimpl);
@@ -536,7 +541,7 @@ return overflow;
 }
 
 
-/* SIS dispatcher. */
+/* SIS dispatcher */
 
 static const OP_PAT op_sis[16] = {
   OP_R,       OP_R,       OP_R,       OP_R,             /* TAN    SQRT   ALOG   ATAN  */
@@ -545,7 +550,7 @@ static const OP_PAT op_sis[16] = {
   OP_IIF,     OP_IAT,     OP_N,       OP_N              /* .FPWR  .TPWR   ---   [tst] */
   };
 
-t_stat cpu_sis (uint32 IR, uint32 intrq)
+t_stat cpu_sis (HP_WORD IR)
 {
 OPS op;
 OP arg, coeff, pwr, product, count, result;
@@ -608,7 +613,7 @@ static const OP t_one  = { { 0040000, 0000000, 0000000, 0000002 } };   /* DEY 1.
 entry = IR & 017;                                       /* mask to entry point */
 
 if (op_sis [entry] != OP_N) {
-    reason = cpu_ops (op_sis [entry], op, intrq);       /* get instruction operands */
+    reason = cpu_ops (op_sis [entry], op);              /* get instruction operands */
 
     if (reason != SCPE_OK)                              /* evaluation failed? */
         return reason;                                  /* return reason for failure */
@@ -636,7 +641,7 @@ switch (entry) {                                        /* decode IR<3:0> */
         if (multiple & 0002)                            /* multiple * 2 odd? */
             fp_exec (0064, &op[0], minus_1, NOP);       /* res = -1.0 / acc */
 
-        PR = (PR + 1) & VAMASK;                         /* normal return is P+2 */
+        PR = (PR + 1) & LA_MASK;                        /* normal return is P+2 */
         break;
 
 
@@ -644,7 +649,7 @@ switch (entry) {                                        /* decode IR<3:0> */
         O = 0;                                          /* clear overflow */
 
         if (op[0].fpk[0] == 0) {                        /* arg = 0? */
-            PR = (PR + 1) & VAMASK;                     /* normal return is P+2 */
+            PR = (PR + 1) & LA_MASK;                    /* normal return is P+2 */
             break;
             }
 
@@ -691,7 +696,7 @@ switch (entry) {                                        /* decode IR<3:0> */
                 fp_pack (&op[0], op[1], exponent, fp_f);/* repack result */
             }
 
-        PR = (PR + 1) & VAMASK;                         /* normal return is P+2 */
+        PR = (PR + 1) & LA_MASK;                        /* normal return is P+2 */
         break;
 
 
@@ -731,7 +736,7 @@ switch (entry) {                                        /* decode IR<3:0> */
         if (entry == 007)                               /* ALOGT? */
             fp_exec (0050, &op[0], NOP, log_e);         /* res = acc * log(e) */
 
-        PR = (PR + 1) & VAMASK;                         /* normal return is P+2 */
+        PR = (PR + 1) & LA_MASK;                        /* normal return is P+2 */
         break;
 
 
@@ -815,7 +820,7 @@ switch (entry) {                                        /* decode IR<3:0> */
         if (multiple & 0002)                            /* multiple * 2 odd? */
             fp_pcom (&op[0], fp_f);                     /* make negative */
 
-        PR = (PR + 1) & VAMASK;                         /* normal return is P+2 */
+        PR = (PR + 1) & LA_MASK;                        /* normal return is P+2 */
         break;
 
 
@@ -836,7 +841,7 @@ switch (entry) {                                        /* decode IR<3:0> */
             op[0].fpk[0] = 0;                           /* result is zero */
             op[0].fpk[1] = 0;
             O = 0;                                      /* clear for underflow */
-            PR = (PR + 1) & VAMASK;                     /* normal return is P+2 */
+            PR = (PR + 1) & LA_MASK;                    /* normal return is P+2 */
             break;
             }
 
@@ -874,7 +879,7 @@ switch (entry) {                                        /* decode IR<3:0> */
                 }
             }
 
-        PR = (PR + 1) & VAMASK;                         /* normal return is P+2 */
+        PR = (PR + 1) & LA_MASK;                        /* normal return is P+2 */
         break;
 
 
@@ -898,8 +903,8 @@ switch (entry) {                                        /* decode IR<3:0> */
 
         else {                                          /* 0.5 <= abs (arg) < 8.0 */
             BR = BR + 2;                                /* arg = arg * 2.0 */
-            cpu_sis (0105326, intrq);                   /* calc exp (arg) */
-            PR = (PR - 1) & VAMASK;                     /* correct P (always good rtn) */
+            cpu_sis (0105326u);                         /* calc exp (arg) */
+            PR = (PR - 1) & LA_MASK;                    /* correct P (always good rtn) */
 
             op[0].fpk[0] = AR;                          /* save value */
             op[0].fpk[1] = BR;
@@ -925,13 +930,13 @@ switch (entry) {                                        /* decode IR<3:0> */
             fp_exec (0042, &arg, op[2], op[2]);         /* arg = X ^ 2 */
 
         coeff = ReadOp (op[3].word, fp_t);              /* get first coefficient */
-        op[3].word = (op[3].word + 4) & VAMASK;         /* point at next */
+        op[3].word = (op[3].word + 4) & LA_MASK;        /* point at next */
         fp_accum (&coeff, fp_t);                        /* acc = coeff */
 
         for (i = 0; i < op[4].word; i++) {              /* compute numerator */
             fp_exec (0052, ACCUM, NOP, arg);            /* acc = P[m] * arg */
             coeff = ReadOp (op[3].word, fp_t);          /* get next coefficient */
-            op[3].word = (op[3].word + 4) & VAMASK;     /* point at next */
+            op[3].word = (op[3].word + 4) & LA_MASK;    /* point at next */
             fp_exec (0012, ACCUM, NOP, coeff);          /* acc = acc + P[m-1] */
             }
 
@@ -947,7 +952,7 @@ switch (entry) {                                        /* decode IR<3:0> */
             for (i = 0; i < op[5].word; i++) {          /* compute denominator */
                 fp_exec (0052, ACCUM, NOP, arg);        /* acc = P[m] * arg */
                 coeff = ReadOp (op[3].word, fp_t);      /* get next coefficient */
-                op[3].word = (op[3].word + 4) & VAMASK; /* point at next */
+                op[3].word = (op[3].word + 4) & LA_MASK;/* point at next */
                 fp_exec (0012, ACCUM, NOP, coeff);      /* acc = acc + P[m-1] */
                 }
 
@@ -998,7 +1003,7 @@ switch (entry) {                                        /* decode IR<3:0> */
             if ((f < 0) || (f == 2) || (f == 6) ||      /* EXP, TANH, or COS? */
                 (exponent - rsltexp < 5)) {             /* bits lost < 5? */
                 WriteOp (op[0].word, result, fp_t);     /* write result */
-                PR = (PR + 1) & VAMASK;                 /* P+2 return for good result */
+                PR = (PR + 1) & LA_MASK;                /* P+2 return for good result */
                 op[0].fpk[1] = BR;                      /* return LSBs of N in B */
                 break;                                  /* all done! */
                 }
@@ -1028,7 +1033,7 @@ switch (entry) {                                        /* decode IR<3:0> */
         if ((int32) op[6].dword >= 0)                   /* nearest even integer */
             op[6].dword = op[6].dword + 1;
         op[6].dword = op[6].dword & ~1;
-        BR = op[6].dword & DMASK;                       /* save LSBs of N */
+        BR = LOWER_WORD (op[6].dword);                  /* save LSBs of N */
 
         O = fp_exec (0126, ACCUM, op[6], NOP);          /* acc = flt (op6) */
 
@@ -1043,14 +1048,14 @@ switch (entry) {                                        /* decode IR<3:0> */
         fp_exec (0052, ACCUM, NOP, coeff);              /* acc = (x - xu) * c */
         fp_exec (0012, &op[5], NOP, op[7]);             /* op5 = acc + (cu * xu - n) */
 
-        op[1].word = (op[1].word + 4) & VAMASK;         /* point at second coefficient */
+        op[1].word = (op[1].word + 4) & LA_MASK;        /* point at second coefficient */
         coeff = ReadOp (op[1].word, fp_t);              /* get coefficient (CL) */
 
         fp_exec (0042, ACCUM, op[4], coeff);            /* acc = xu * cl */
         fp_exec (0012, &result, NOP, op[5]);            /* result = acc + (x - xu) * c + (cu * xu - n) */
 
         WriteOp (op[0].word, result, fp_t);             /* write result */
-        PR = (PR + 1) & VAMASK;                         /* P+2 return for good result */
+        PR = (PR + 1) & LA_MASK;                        /* P+2 return for good result */
         op[0].fpk[1] = BR;                              /* return LSBs of N in B */
         break;
 
@@ -1078,7 +1083,7 @@ switch (entry) {                                        /* decode IR<3:0> */
             fp_exec (0120, &pwr, op[0], NOP);           /* float power */
 
             sign = ((int16) pwr.fpk[0] < 0);            /* save sign of power */
-            i = (pwr.fpk[0] << 2) & DMASK;              /* clear it */
+            i = (pwr.fpk[0] << 2) & D16_MASK;           /* clear it */
 
             fp_unpack (NULL, &exponent, pwr, fp_f);     /* unpack exponent */
 
@@ -1092,7 +1097,7 @@ switch (entry) {                                        /* decode IR<3:0> */
                 O = O | fp_exec ((uint16) (0054 | p),   /* square acc */
                                  ACCUM, NOP, NOP);
 
-                if (i & SIGN)
+                if (i & D16_SIGN)
                     O = O | fp_exec ((uint16) (0050 | p),   /* acc = acc * arg */
                                      ACCUM, NOP, op[2]);
                 i = i << 1;
@@ -1115,7 +1120,7 @@ switch (entry) {                                        /* decode IR<3:0> */
     case 017:                                           /* [tst] 105337 (OP_N) */
         XR = 4;                                         /* firmware revision */
         SR = 0102077;                                   /* test passed code */
-        PR = (PR + 1) & VAMASK;                         /* P+2 return for firmware w/DPOLY */
+        PR = (PR + 1) & LA_MASK;                        /* P+2 return for firmware w/DPOLY */
         return reason;
 
 

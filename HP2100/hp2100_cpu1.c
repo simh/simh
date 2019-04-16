@@ -1,7 +1,7 @@
-/* hp2100_cpu1.c: HP 2100/1000 EAU simulator and UIG dispatcher
+/* hp2100_cpu1.c: HP 2100/1000 EAU/FP/IOP microcode simulator
 
    Copyright (c) 2005-2016, Robert M. Supnik
-   Copyright (c) 2017       J. David Bryan
+   Copyright (c) 2017-2019, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -24,8 +24,14 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
-   CPU1         Extended arithmetic and optional microcode dispatchers
+   CPU1         Extended Arithmetic Unit, Floating Point, and I/O Processor
+                instructions
 
+   23-Jan-19    JDB     Moved fmt_ab to hp2100_cpu5.c
+   02-Oct-18    JDB     Replaced DMASK with D16_MASK or R_MASK as appropriate
+   02-Aug-18    JDB     Moved UIG dispatcher to hp2100_cpu0.c
+                        Moved FP and IOP dispatchers from hp2100_cpu2.c
+   25-Jul-18    JDB     Use cpu_configuration instead of cpu_unit.flags for tests
    07-Sep-17    JDB     Removed unnecessary "uint16" casts
    01-Aug-17    JDB     Changed TIMER and RRR 16 to test for undefined stops
    07-Jul-17    JDB     Changed "iotrap" from uint32 to t_bool
@@ -56,90 +62,39 @@
    15-Jan-05    RMS     Cloned from hp2100_cpu.c
 
    Primary references:
-   - HP 1000 M/E/F-Series Computers Technical Reference Handbook
-        (5955-0282, Mar-1980)
-   - HP 1000 M/E/F-Series Computers Engineering and Reference Documentation
-        (92851-90001, Mar-1981)
-   - Macro/1000 Reference Manual (92059-90001, Dec-1992)
-   - HP 93585A Double Integer Firmware Package Installation and Programming
-        Manual (93585-90007, Feb-1984)
+     - HP 1000 M/E/F-Series Computers Technical Reference Handbook
+         (5955-0282, March 1980)
+     - HP 1000 M/E/F-Series Computers Engineering and Reference Documentation
+         (92851-90001, March 1981)
+     - Macro/1000 Reference Manual
+         (92059-90001, December 1992)
 
    Additional references are listed with the associated firmware
    implementations, as are the HP option model numbers pertaining to the
    applicable CPUs.
 
 
-   This source file contains the Extended Arithmetic Unit simulator and the User
-   Instruction Group (a.k.a. "Macro") dispatcher for the 2100 and 1000 (21MX)
-   CPUs.  The UIG simulators reside in separate source files, due to the large
-   number of firmware options available for these machines.  Unit flags indicate
-   which options are present in the current system.
+   This source file contains the Extended Arithmetic Unit simulator, the
+   single-precision floating-pointer simulator, and the HP 2000 I/O Processor
+   instructions simulator.
 
-   This module also provides generalized instruction operand processing.
-
-   The 2100 and 1000 machines were microprogrammable; the 2116/15/14 machines
-   were not.  Both user- and HP-written microprograms were supported.  The
-   microcode address space of the 2100 encompassed four modules of 256 words
-   each.  The 1000 M-series expanded that to sixteen modules, and the 1000
-   E/F-series expanded that still further to sixty-four modules.  Each CPU had
-   its own microinstruction set, although the micromachines of the various 1000
-   models were similar internally.
-
-   The UIG instructions were divided into ranges assigned to HP firmware
-   options, reserved for future HP use, and reserved for user microprograms.
-   User microprograms could occupy any range not already used on a given
-   machine, but in practice, some effort was made to avoid the HP-reserved
-   ranges.
-
-   User microprogram simulation is supported by routing any UIG instruction not
-   allocated to an installed firmware option to a user-firmware dispatcher.
-   Site-specific microprograms may be simulated there.  In the absence of such a
-   simulation, an unimplemented instruction stop will occur.
-
-   Regarding option instruction sets, there was some commonality across CPU
-   types.  EAU instructions were identical across all models, and the floating
-   point set was the same on the 2100 and 1000.  Other options implemented
-   proper instruction supersets (e.g., the Fast FORTRAN Processor from 2100 to
-   1000-M to 1000-E to 1000-F) or functional equivalence with differing code
-   points (the 2000 I/O Processor from 2100 to 1000, and the extended-precision
-   floating-point instructions from 1000-E to 1000-F).
-
-   The 2100 decoded the EAU and UIG sets separately in hardware and supported
-   only the UIG 0 code points.  Bits 7-4 of a UIG instruction decoded one of
-   sixteen entry points in the lowest-numbered module after module 0.  Those
-   entry points could be used directly (as for the floating-point instructions),
-   or additional decoding based on bits 3-0 could be implemented.
-
-   The 1000 generalized the instruction decoding to a series of microcoded
-   jumps, based on the bits in the instruction.  Bits 15-8 indicated the group
-   of the current instruction: EAU (200, 201, 202, 210, and 211), UIG 0 (212),
-   or UIG 1 (203 and 213).  UIG 0, UIG 1, and some EAU instructions were decoded
-   further by selecting one of sixteen modules within the group via bits 7-4.
-   Finally, each UIG module decoded up to sixteen instruction entry points via
-   bits 3-0.  Jump tables for all firmware options were contained in the base
-   set, so modules needed only to be concerned with decoding their individual
-   entry points within the module.
-
-   While the 2100 and 1000 hardware decoded these instruction sets differently,
-   the decoding mechanism of the simulation follows that of the 1000 E/F-series.
-   Where needed, CPU type- or model-specific behavior is simulated.
-
-   The design of the 1000 microinstruction set was such that executing an
-   instruction for which no microcode was present (e.g., executing a FFP
-   instruction when the FFP firmware was not installed) resulted in a NOP.
-   Under simulation, such execution causes an unimplemented instruction stop if
-   "STOP (cpu_ss_unimpl)" is non-zero and a no-operation otherwise.
 */
 
 
 
 #include "hp2100_defs.h"
 #include "hp2100_cpu.h"
-#include "hp2100_cpu1.h"
+#include "hp2100_cpu_dmm.h"
+
+#if !defined (HAVE_INT64)                               /* int64 support unavailable */
+
+  #include "hp2100_cpu_fp.h"
+
+#endif
 
 
 
-/* EAU
+/* EAU.
 
    The Extended Arithmetic Unit (EAU) adds ten instructions with double-word
    operands, including multiply, divide, shifts, and rotates.  Option
@@ -218,14 +173,14 @@
        arithmetic shifts explicitly.
 */
 
-t_stat cpu_eau (uint32 IR, uint32 intrq)
+t_stat cpu_eau (void)
 {
 t_stat reason = SCPE_OK;
 OPS op;
 uint32 rs, qs, v1, v2, operand, fill, mask, shift;
 int32 sop1, sop2;
 
-if ((cpu_unit.flags & UNIT_EAU) == 0)                   /* if the EAU is not installed */
+if (!(cpu_configuration & CPU_EAU))                     /* if the EAU is not installed */
     return STOP (cpu_ss_unimpl);                        /*   then the instructions execute as NOPs */
 
 if (IR & 017)                                           /* if the shift count is 1-15 */
@@ -238,11 +193,10 @@ switch ((IR >> 8) & 0377) {                             /* decode IR<15:8> */
     case 0200:                                          /* EAU group 0 */
         switch ((IR >> 4) & 017) {                      /* decode IR<7:4> */
 
-            case 000:                                   /* DIAG 100000 */
-                if (UNIT_CPU_MODEL != UNIT_1000_E       /* if the CPU is not an E-series */
-                  && UNIT_CPU_MODEL != UNIT_1000_F)     /*   or an F-series */
-                    return STOP (cpu_ss_undef);         /*     then the instruction is undefined */
-                break;                                  /*       and executes as NOP */
+            case 000:                                       /* DIAG 100000 */
+                if (!(cpu_configuration & CPU_1000_E_F))    /* if the CPU is not an E- or F-series */
+                    return STOP (cpu_ss_undef);             /*   then the instruction is undefined */
+                break;                                      /*     and executes as NOP */
 
 
             case 001:                                   /* ASL 100020-100037 */
@@ -284,12 +238,11 @@ switch ((IR >> 8) & 0377) {                             /* decode IR<15:8> */
 
 
             case 003:                                   /* TIMER 100060 */
-                if (UNIT_CPU_MODEL == UNIT_1000_E       /* if the CPU is an E-series */
-                  || UNIT_CPU_MODEL == UNIT_1000_F) {   /*   or an F-series */
-                    BR = BR + 1 & R_MASK;               /*     then increment B */
+                if (cpu_configuration & CPU_1000_E_F) { /* if the CPU is an E- or F-series */
+                    BR = BR + 1 & R_MASK;               /*   then increment B */
 
                     if (BR != 0)                        /* if B did not roll over */
-                        PR = err_PC;                    /*   then repeat the instruction */
+                        PR = err_PR;                    /*   then repeat the instruction */
                     break;
                     }
 
@@ -297,14 +250,14 @@ switch ((IR >> 8) & 0377) {                             /* decode IR<15:8> */
                     reason = STOP (cpu_ss_undef);       /*   and the instruction is undefined */
 
                     if (reason != SCPE_OK               /* if a stop is indicated */
-                      || UNIT_CPU_MODEL != UNIT_1000_M) /*   or the CPU is a 21xx */
+                      || cpu_configuration & CPU_21XX)  /*   or the CPU is a 21xx */
                         break;                          /*     then the instruction executes as NOP */
                     }
 
-            /* fall into the MPY case if 1000 M-Series */
+            /* fall through into the MPY case if 1000 M-Series */
 
             case 010:                                   /* MPY 100200 (OP_K) */
-                reason = cpu_ops (OP_K, op, intrq);     /* get operand */
+                reason = cpu_ops (OP_K, op);            /* get operand */
 
                 if (reason == SCPE_OK) {                /* successful eval? */
                     sop1 = SEXT16 (AR);                 /* sext AR */
@@ -325,23 +278,23 @@ switch ((IR >> 8) & 0377) {                             /* decode IR<15:8> */
 
 
     case 0201:                                          /* DIV 100400 (OP_K) */
-        reason = cpu_ops (OP_K, op, intrq);             /* get operand */
+        reason = cpu_ops (OP_K, op);                    /* get operand */
 
         if (reason != SCPE_OK)                          /* eval failed? */
             break;
 
-        rs = qs = BR & SIGN;                            /* save divd sign */
+        rs = qs = BR & D16_SIGN;                        /* save divd sign */
 
         if (rs) {                                       /* neg? */
-            AR = (~AR + 1) & DMASK;                     /* make B'A pos */
-            BR = (~BR + (AR == 0)) & DMASK;             /* make divd pos */
+            AR = (~AR + 1) & R_MASK;                    /* make B'A pos */
+            BR = (~BR + (AR == 0)) & R_MASK;            /* make divd pos */
             }
 
         v2 = op[0].word;                                /* divr = mem */
 
-        if (v2 & SIGN) {                                /* neg? */
-            v2 = (~v2 + 1) & DMASK;                     /* make divr pos */
-            qs = qs ^ SIGN;                             /* sign of quotient */
+        if (v2 & D16_SIGN) {                            /* neg? */
+            v2 = (~v2 + 1) & D16_MASK;                  /* make divr pos */
+            qs = qs ^ D16_SIGN;                         /* sign of quotient */
             }
 
         if (BR >= v2)                                   /* if the divisor is too small */
@@ -350,14 +303,14 @@ switch ((IR >> 8) & 0377) {                             /* decode IR<15:8> */
         else {                                          /* maybe... */
             O = 0;                                      /* assume ok */
             v1 = (BR << 16) | AR;                       /* 32b divd */
-            AR = (v1 / v2) & DMASK;                     /* quotient */
-            BR = (v1 % v2) & DMASK;                     /* remainder */
+            AR = (v1 / v2) & R_MASK;                    /* quotient */
+            BR = (v1 % v2) & R_MASK;                    /* remainder */
 
             if (AR) {                                   /* quotient > 0? */
                 if (qs)                                 /* apply quo sign */
                     AR = NEG16 (AR);
 
-                if ((AR ^ qs) & SIGN)                   /* still wrong? ovflo */
+                if ((AR ^ qs) & D16_SIGN)               /* still wrong? ovflo */
                     O = 1;
                 }
 
@@ -412,7 +365,7 @@ switch ((IR >> 8) & 0377) {                             /* decode IR<15:8> */
 
 
     case 0210:                                          /* DLD 104200 (OP_D) */
-        reason = cpu_ops (OP_D, op, intrq);             /* get operand */
+        reason = cpu_ops (OP_D, op);                    /* get operand */
 
         if (reason == SCPE_OK) {                        /* successful eval? */
             AR = UPPER_WORD (op[0].dword);              /* load AR */
@@ -422,11 +375,11 @@ switch ((IR >> 8) & 0377) {                             /* decode IR<15:8> */
 
 
     case 0211:                                          /* DST 104400 (OP_A) */
-        reason = cpu_ops (OP_A, op, intrq);             /* get operand */
+        reason = cpu_ops (OP_A, op);                    /* get operand */
 
         if (reason == SCPE_OK) {                        /* successful eval? */
             WriteW (op[0].word, AR);                    /* store AR */
-            WriteW ((op[0].word + 1) & VAMASK, BR);     /* store BR */
+            WriteW ((op[0].word + 1) & LA_MASK, BR);    /* store BR */
             }
         break;
 
@@ -439,509 +392,368 @@ return reason;
 }
 
 
-/* UIG 0
 
-   The first User Instruction Group (UIG) encodes firmware options for the 2100
-   and 1000.  Instruction codes 105000-105377 are assigned to microcode options
-   as follows:
+#if !defined (HAVE_INT64)                               /* int64 support unavailable */
 
-     Instructions   Option Name                  2100   1000-M  1000-E  1000-F
-     -------------  --------------------------  ------  ------  ------  ------
-     105000-105362  2000 I/O Processor           opt      -       -       -
-     105000-105137  Floating Point               opt     std     std     std
-     105200-105237  Fast FORTRAN Processor       opt     opt     opt     std
-     105240-105257  RTE-IVA/B Extended Memory     -       -      opt     opt
-     105240-105257  RTE-6/VM Virtual Memory       -       -      opt     opt
-     105300-105317  Distributed System            -       -      opt     opt
-     105320-105337  Double Integer                -       -      opt      -
-     105320-105337  Scientific Instruction Set    -       -       -      std
-     105340-105357  RTE-6/VM Operating System     -       -      opt     opt
+/* Single-Precision Floating Point Instructions.
 
-   If the 2100 IOP is installed, the only valid UIG instructions are IOP
-   instructions, as the IOP used the full 2100 microcode addressing space.  The
-   IOP dispatcher remaps the 2100 codes to 1000 codes for execution.
+   The 2100 and 1000 CPUs share the single-precision (two word) floating-point
+   instruction codes.  Floating-point firmware was an option on the 2100 and was
+   standard on the 1000-M and E.  The 1000-F had a standard hardware Floating
+   Point Processor that executed these six instructions and added extended- and
+   double-precision floating- point instructions, as well as double-integer
+   instructions (the FPP is simulated separately).
 
-   The F-Series moved the three-word extended real instructions from the FFP
-   range to the base floating-point range and added four-word double real and
-   two-word double integer instructions.  The double integer instructions
-   occupied some of the vacated extended real instruction codes in the FFP, with
-   the rest assigned to the floating-point range.  Consequently, many
-   instruction codes for the F-Series are different from the E-Series.
+   Option implementation by CPU was as follows:
 
-   Implementation notes:
+      2114    2115    2116    2100   1000-M  1000-E  1000-F
+     ------  ------  ------  ------  ------  ------  ------
+      N/A     N/A     N/A    12901A   std     std     N/A
 
-    1. Product 93585A, available from the "Specials" group, added double integer
-       microcode to the E-Series.  The instruction codes were different from
-       those in the F-Series to avoid conflicting with the E-Series FFP.
+   The instruction codes for the 2100 and 1000-M/E systems are mapped to
+   routines as follows:
 
-    2. To run the double-integer instructions diagnostic in the absence of
-       64-bit integer support (and therefore of F-Series simulation), a special
-       DBI dispatcher may be enabled by defining ENABLE_DIAG during compilation.
-       This dispatcher will remap the F-Series DBI instructions to the E-Series
-       codes, so that the F-Series diagnostic may be run.  Because several of
-       the F-Series DBI instruction codes replace M/E-Series FFP codes, this
-       dispatcher will only operate if FFP is disabled.
+     Instr.  2100/1000-M/E   Description
+     ------  -------------  -----------------------------------
+     105000       FAD       Single real add
+     105020       FSB       Single real subtract
+     105040       FMP       Single real multiply
+     105060       FDV       Single real divide
+     105100       FIX       Single integer to single real fix
+     105120       FLT       Single real to single integer float
 
-       Note that enabling the dispatcher will produce non-standard FP behavior.
-       For example, any code in the range 105000-105017 normally would execute a
-       FAD instruction.  With the dispatcher enabled, 105014 would execute a
-       .DAD, while the other codes would execute a FAD.  Therefore, ENABLE_DIAG
-       should only be used to run the diagnostic and is not intended for general
-       use.
+   Bits 3-0 are not decoded by these instructions, so FAD (e.g.) would be
+   executed by any instruction in the range 105000-105017.
 
-    3. Any instruction not claimed by an installed option will be sent to the
-       user microcode dispatcher.
+   Implementation note: rather than have two simulators that each executes the
+   single-precision FP instruction set, we compile conditionally, based on the
+   availability of 64-bit integer support in the host compiler.  64-bit integers
+   are required for the FPP, so if they are available, then the FPP is used to
+   handle the six single-precision instructions for the 2100 and M/E-Series, and
+   this function is omitted.  If support is unavailable, this function is used
+   instead.
+
+   Implementation note: the operands to FAD, etc. are floating-point values, so
+   OP_F would normally be used.  However, the firmware FP support routines want
+   floating-point operands as 32-bit integer values, so OP_D is used to achieve
+   this.
 */
 
-t_stat cpu_uig_0 (uint32 IR, uint32 intrq, t_bool iotrap)
+static const OP_PAT op_fp[8] = {
+  OP_D,    OP_D,    OP_D,    OP_D,                      /*  FAD    FSB    FMP    FDV  */
+  OP_N,    OP_N,    OP_N,    OP_N                       /*  FIX    FLT    ---    ---  */
+  };
+
+t_stat cpu_fp (void)
 {
-if ((cpu_unit.flags & UNIT_IOP) &&                      /* I/O Processor? */
-    (UNIT_CPU_TYPE == UNIT_TYPE_2100))                  /*   and 2100 CPU? */
-    return cpu_iop (IR, intrq);                         /* dispatch to IOP */
+t_stat reason = SCPE_OK;
+OPS op;
+uint32 entry;
 
+entry = (IR >> 4) & 017;                                /* mask to entry point */
 
-#if !defined (HAVE_INT64) && defined (ENABLE_DIAG)      /* special DBI diagnostic dispatcher */
+if (op_fp [entry] != OP_N) {
+    reason = cpu_ops (op_fp [entry], op);               /* get instruction operands */
 
-if (((cpu_unit.flags & UNIT_FFP) == 0) &&               /* FFP absent? */
-    (cpu_unit.flags & UNIT_DBI))                        /*   and DBI present? */
-    switch (IR & 0377) {
-        case 0014:                                      /* .DAD 105014 */
-            return cpu_dbi (0105321, intrq);
-
-        case 0034:                                      /* .DSB 105034 */
-            return cpu_dbi (0105327, intrq);
-
-        case 0054:                                      /* .DMP 105054 */
-            return cpu_dbi (0105322, intrq);
-
-        case 0074:                                      /* .DDI 105074 */
-            return cpu_dbi (0105325, intrq);
-
-        case 0114:                                      /* .DSBR 105114 */
-            return cpu_dbi (0105334, intrq);
-
-        case 0134:                                      /* .DDIR 105134 */
-            return cpu_dbi (0105326, intrq);
-
-        case 0203:                                      /* .DNG 105203 */
-            return cpu_dbi (0105323, intrq);
-
-        case 0204:                                      /* .DCO 105204 */
-            return cpu_dbi (0105324, intrq);
-
-        case 0210:                                      /* .DIN 105210 */
-            return cpu_dbi (0105330, intrq);
-
-        case 0211:                                      /* .DDE 105211 */
-            return cpu_dbi (0105331, intrq);
-
-        case 0212:                                      /* .DIS 105212 */
-            return cpu_dbi (0105332, intrq);
-
-        case 0213:                                      /* .DDS 105213 */
-            return cpu_dbi (0105333, intrq);
-        }                                               /* otherwise, continue */
-
-#endif                                                  /* end of special DBI dispatcher */
-
-
-switch ((IR >> 4) & 017) {                              /* decode IR<7:4> */
-
-    case 000:                                           /* 105000-105017 */
-    case 001:                                           /* 105020-105037 */
-    case 002:                                           /* 105040-105057 */
-    case 003:                                           /* 105060-105077 */
-    case 004:                                           /* 105100-105117 */
-    case 005:                                           /* 105120-105137 */
-        if (cpu_unit.flags & UNIT_FP)                   /* FP option installed? */
-#if defined (HAVE_INT64)                                /* int64 support available */
-            return cpu_fpp (IR, intrq);                 /* Floating Point Processor */
-#else                                                   /* int64 support unavailable */
-            return cpu_fp (IR, intrq);                  /* Firmware Floating Point */
-#endif                                                  /* end of int64 support */
-        else
-            break;
-
-    case 010:                                           /* 105200-105217 */
-    case 011:                                           /* 105220-105237 */
-        if (cpu_unit.flags & UNIT_FFP)                  /* FFP option installed? */
-            return cpu_ffp (IR, intrq);                 /* Fast FORTRAN Processor */
-        else
-            break;
-
-    case 012:                                           /* 105240-105257 */
-        if (cpu_unit.flags & UNIT_VMAOS)                /* VMA/OS option installed? */
-            return cpu_rte_vma (IR, intrq);             /* RTE-6 VMA */
-        else if (cpu_unit.flags & UNIT_EMA)             /* EMA option installed? */
-            return cpu_rte_ema (IR, intrq);             /* RTE-4 EMA */
-        else
-            break;
-
-    case 014:                                           /* 105300-105317 */
-        if (cpu_unit.flags & UNIT_DS)                   /* DS option installed? */
-            return cpu_ds (IR, intrq);                  /* Distributed System */
-        else
-            break;
-
-    case 015:                                           /* 105320-105337 */
-#if defined (HAVE_INT64)                                /* int64 support available */
-        if (UNIT_CPU_MODEL == UNIT_1000_F)              /* F-series? */
-            return cpu_sis (IR, intrq);                 /* Scientific Instruction is standard */
-        else                                            /* M/E-series */
-#endif                                                  /* end of int64 support */
-        if (cpu_unit.flags & UNIT_DBI)                  /* DBI option installed? */
-            return cpu_dbi (IR, intrq);                 /* Double integer */
-        else
-            break;
-
-    case 016:                                           /* 105340-105357 */
-        if (cpu_unit.flags & UNIT_VMAOS)                /* VMA/OS option installed? */
-            return cpu_rte_os (IR, intrq, iotrap);      /* RTE-6 OS */
-        else
-            break;
+    if (reason != SCPE_OK)                              /* evaluation failed? */
+        return reason;                                  /* return reason for failure */
     }
 
-return cpu_user (IR, intrq);                            /* try user microcode */
-}
+switch (entry) {                                        /* decode IR<7:4> */
 
+    case 000:                                           /* FAD 105000 (OP_D) */
+        O = f_as (op[0].dword, 0);                      /* add, upd ovflo */
+        break;
 
-/* UIG 1
+    case 001:                                           /* FSB 105020 (OP_D) */
+        O = f_as (op[0].dword, 1);                      /* sub, upd ovflo */
+        break;
 
-   The second User Instruction Group (UIG) encodes firmware options for the
-   1000.  Instruction codes 101400-101777 and 105400-105777 are assigned to
-   microcode options as follows ("x" is "1" or "5" below):
+    case 002:                                           /* FMP 105040 (OP_D) */
+        O = f_mul (op[0].dword);                        /* mul, upd ovflo */
+        break;
 
-     Instructions   Option Name                   1000-M  1000-E  1000-F
-     -------------  ----------------------------  ------  ------  ------
-     10x400-10x437  2000 IOP                       opt     opt      -
-     10x460-10x477  2000 IOP                       opt     opt      -
-     10x460-10x477  Vector Instruction Set          -       -      opt
-     10x520-10x537  Distributed System             opt      -       -
-     10x600-10x617  SIGNAL/1000 Instruction Set     -       -      opt
-     10x700-10x737  Dynamic Mapping System         opt     opt     std
-     10x740-10x777  Extended Instruction Group     std     std     std
+    case 003:                                           /* FDV 105060 (OP_D) */
+        O = f_div (op[0].dword);                        /* div, upd ovflo */
+        break;
 
-   Only 1000 systems execute these instructions.
+    case 004:                                           /* FIX 105100 (OP_N) */
+        O = f_fix ();                                   /* fix, upd ovflo */
+        break;
 
-   Implementation notes:
+    case 005:                                           /* FLT 105120 (OP_N) */
+        O = f_flt ();                                   /* float, upd ovflo */
+        break;
 
-    1. The Distributed System (DS) microcode was mapped to different instruction
-       ranges for the M-Series and the E/F-Series.  The sequence of instructions
-       was identical, though, so we remap the former range to the latter before
-       dispatching.
-
-    2. Any instruction not claimed by an installed option will be sent to the
-       user microcode dispatcher.
-*/
-
-t_stat cpu_uig_1 (uint32 IR, uint32 intrq, t_bool iotrap)
-{
-if (UNIT_CPU_TYPE != UNIT_TYPE_1000)                    /* if the CPU is not a 1000 */
-    return STOP (cpu_ss_unimpl);                        /*   the the instruction is unimplemented */
-
-switch ((IR >> 4) & 017) {                              /* decode IR<7:4> */
-
-    case 000:                                           /* 105400-105417 */
-    case 001:                                           /* 105420-105437 */
-        if (cpu_unit.flags & UNIT_IOP)                  /* IOP option installed? */
-            return cpu_iop (IR, intrq);                 /* 2000 I/O Processor */
-        else
-            break;
-
-    case 003:                                           /* 105460-105477 */
-#if defined (HAVE_INT64)                                /* int64 support available */
-        if (cpu_unit.flags & UNIT_VIS)                  /* VIS option installed? */
-            return cpu_vis (IR, intrq);                 /* Vector Instruction Set */
-        else
-#endif                                                  /* end of int64 support */
-        if (cpu_unit.flags & UNIT_IOP)                  /* IOP option installed? */
-            return cpu_iop (IR, intrq);                 /* 2000 I/O Processor */
-        else
-            break;
-
-    case 005:                                           /* 105520-105537 */
-        if (cpu_unit.flags & UNIT_DS) {                 /* DS option installed? */
-            IR = IR ^ 0000620;                          /* remap to 105300-105317 */
-            return cpu_ds (IR, intrq);                  /* Distributed System */
-            }
-        else
-            break;
-
-#if defined (HAVE_INT64)                                /* int64 support available */
-    case 010:                                           /* 105600-105617 */
-        if (cpu_unit.flags & UNIT_SIGNAL)               /* SIGNAL option installed? */
-            return cpu_signal (IR, intrq);              /* SIGNAL/1000 Instructions */
-        else
-            break;
-#endif                                                  /* end of int64 support */
-
-    case 014:                                           /* 105700-105717 */
-    case 015:                                           /* 105720-105737 */
-        if (cpu_unit.flags & UNIT_DMS)                  /* DMS option installed? */
-            return cpu_dms (IR, intrq);                 /* Dynamic Mapping System */
-        else
-            break;
-
-    case 016:                                           /* 105740-105757 */
-    case 017:                                           /* 105760-105777 */
-        return cpu_eig (IR, intrq);                     /* Extended Instruction Group */
-    }
-
-return cpu_user (IR, intrq);                            /* try user microcode */
-}
-
-
-/* Read a multiple-precision operand value. */
-
-OP ReadOp (HP_WORD va, OPSIZE precision)
-{
-OP operand;
-uint32 i;
-
-if (precision == in_s)
-    operand.word = ReadW (va);                          /* read single integer */
-
-else if (precision == in_d)
-    operand.dword = ReadW (va) << 16 |                  /* read double integer */
-                    ReadW ((va + 1) & VAMASK);          /* merge high and low words */
-
-else
-    for (i = 0; i < (uint32) precision; i++) {          /* read fp 2 to 5 words */
-        operand.fpk[i] = ReadW (va);
-        va = (va + 1) & VAMASK;
-        }
-return operand;
-}
-
-/* Write a multiple-precision operand value. */
-
-void WriteOp (HP_WORD va, OP operand, OPSIZE precision)
-{
-uint32 i;
-
-if (precision == in_s)
-    WriteW (va, operand.word);                          /* write single integer */
-
-else if (precision == in_d) {
-    WriteW (va, (operand.dword >> 16) & DMASK);         /* write double integer */
-    WriteW ((va + 1) & VAMASK, operand.dword & DMASK);  /* high word, then low word */
-    }
-
-else
-    for (i = 0; i < (uint32) precision; i++) {          /* write fp 2 to 5 words */
-        WriteW (va, operand.fpk[i]);
-        va = (va + 1) & VAMASK;
-        }
-return;
-}
-
-
-/* Get instruction operands.
-
-   Operands for a given instruction are specifed by an "operand pattern"
-   consisting of flags indicating the types and storage methods.  The pattern
-   directs how each operand is to be retrieved and whether the operand value or
-   address is returned in the operand array.
-
-   Typically, a microcode simulation handler will define an OP_PAT array, with
-   each element containing an operand pattern corresponding to the simulated
-   instruction.  Operand patterns are defined in the header file accompanying
-   this source file.  After calling this function with the appropriate operand
-   pattern and a pointer to an array of OPs, operands are decoded and stored
-   sequentially in the array.
-
-   The following operand encodings are defined:
-
-      Code   Operand Description                         Example    Return
-     ------  ----------------------------------------  -----------  ------------
-     OP_NUL  No operand present                           [inst]    None
-
-     OP_IAR  Integer constant in A register                LDA I    Value of I
-                                                          [inst]
-                                                           ...
-                                                        I  DEC 0
-
-     OP_JAB  Double integer constant in A/B registers      DLD J    Value of J
-                                                          [inst]
-                                                           ...
-                                                        J  DEC 0,0
-
-     OP_FAB  2-word FP constant in A/B registers           DLD F    Value of F
-                                                          [inst]
-                                                           ...
-                                                        F  DEC 0.0
-
-     OP_CON  Inline 1-word constant                       [inst]    Value of C
-                                                        C  DEC 0
-                                                           ...
-
-     OP_VAR  Inline 1-word variable                       [inst]    Address of V
-                                                        V  BSS 1
-                                                           ...
-
-     OP_ADR  Inline address                               [inst]    Address of A
-                                                           DEF A
-                                                           ...
-                                                        A  EQU *
-
-     OP_ADK  Address of integer constant                  [inst]    Value of K
-                                                           DEF K
-                                                           ...
-                                                        K  DEC 0
-
-     OP_ADD  Address of double integer constant           [inst]    Value of D
-                                                           DEF D
-                                                           ...
-                                                        D  DEC 0,0
-
-     OP_ADF  Address of 2-word FP constant                [inst]    Value of F
-                                                           DEF F
-                                                           ...
-                                                        F  DEC 0.0
-
-     OP_ADX  Address of 3-word FP constant                [inst]    Value of X
-                                                           DEF X
-                                                           ...
-                                                        X  DEX 0.0
-
-     OP_ADT  Address of 4-word FP constant                [inst]    Value of T
-                                                           DEF T
-                                                           ...
-                                                        T  DEY 0.0
-
-     OP_ADE  Address of 5-word FP constant                [inst]    Value of E
-                                                           DEF E
-                                                           ...
-                                                        E  DEC 0,0,0,0,0
-
-   Address operands, i.e., those having a DEF to the operand, will be resolved
-   to direct addresses.  If an interrupt is pending and more than three levels
-   of indirection are used, the routine returns without completing operand
-   retrieval (the instruction will be retried after interrupt servicing).
-   Addresses are always resolved in the current DMS map.
-
-   An operand pattern consists of one or more operand encodings, corresponding
-   to the operands required by a given instruction.  Values are returned in
-   sequence to the operand array.
-
-
-   Implementation notes:
-
-    1. The reads of address operand words that follow an instruction (e.g., the
-       DEFs above) are classified as instruction fetches.  The reads of the
-       operands themselves are classified as data accesses.
-*/
-
-t_stat cpu_ops (OP_PAT pattern, OPS op, uint32 irq)
-{
-OP_PAT  flags;
-uint32  i;
-HP_WORD MA, address;
-t_stat  reason = SCPE_OK;
-
-for (i = 0; i < OP_N_F; i++) {
-    flags = pattern & OP_M_FLAGS;                       /* get operand pattern */
-
-    if (flags >= OP_ADR) {                              /* address operand? */
-        address = ReadF (PR);                           /* get the pointer */
-
-        reason = resolve (address, &MA, irq);           /* resolve indirects */
-        if (reason != SCPE_OK)                          /* resolution failed? */
-            return reason;
+    default:                                            /* should be impossible */
+        return SCPE_IERR;
         }
 
-    switch (flags) {
-        case OP_NUL:                                    /* null operand */
-            return reason;                              /* no more, so quit */
-
-        case OP_IAR:                                    /* int in A */
-            (*op++).word = AR;                          /* get one-word value */
-            break;
-
-        case OP_JAB:                                    /* dbl-int in A/B */
-            (*op++).dword = (AR << 16) | BR;            /* get two-word value */
-            break;
-
-        case OP_FAB:                                    /* 2-word FP in A/B */
-            (*op).fpk[0] = AR;                          /* get high FP word */
-            (*op++).fpk[1] = BR;                        /* get low FP word */
-            break;
-
-        case OP_CON:                                    /* inline constant operand */
-            *op++ = ReadOp (PR, in_s);                  /* get value */
-            break;
-
-        case OP_VAR:                                    /* inline variable operand */
-            (*op++).word = PR;                          /* get pointer to variable */
-            break;
-
-        case OP_ADR:                                    /* inline address operand */
-            (*op++).word = MA;                          /* get address (set by "resolve" above) */
-            break;
-
-        case OP_ADK:                                    /* address of int constant */
-            *op++ = ReadOp (MA, in_s);                  /* get value */
-            break;
-
-        case OP_ADD:                                    /* address of dbl-int constant */
-            *op++ = ReadOp (MA, in_d);                  /* get value */
-            break;
-
-        case OP_ADF:                                    /* address of 2-word FP const */
-            *op++ = ReadOp (MA, fp_f);                  /* get value */
-            break;
-
-        case OP_ADX:                                    /* address of 3-word FP const */
-            *op++ = ReadOp (MA, fp_x);                  /* get value */
-            break;
-
-        case OP_ADT:                                    /* address of 4-word FP const */
-            *op++ = ReadOp (MA, fp_t);                  /* get value */
-            break;
-
-        case OP_ADE:                                    /* address of 5-word FP const */
-            *op++ = ReadOp (MA, fp_e);                  /* get value */
-            break;
-
-        default:
-            return SCPE_IERR;                           /* not implemented */
-        }
-
-    if (flags >= OP_CON)                                /* operand after instruction? */
-        PR = (PR + 1) & VAMASK;                         /* yes, so bump to next */
-    pattern = pattern >> OP_N_FLAGS;                    /* move next pattern into place */
-    }
 return reason;
 }
 
+#endif                                                  /* int64 support unavailable */
 
-/* Format an error code in the A and B registers.
 
-   This routine conditionally formats the contents of the A and B registers into
-   an error message.  If the supplied "success" flag is 0, the A and B registers
-   contain a four-character error code (e.g., "EM82"), with the leading
-   characters in the B register.  The characters are moved into the error
-   message, and a pointer to the message is returned.  If "success" is non-zero,
-   then a pointer to the message reporting normal execution is returned.
 
-   The routine is typically called from an instructio executor during operand
-   tracing.
+/* HP 2000 I/O Processor.
+
+   The IOP accelerates certain operations of the HP 2000 Time-Share BASIC system
+   I/O processor.  Most 2000 systems were delivered with 2100 CPUs, although IOP
+   microcode was developed for the 1000-M and 1000-E.  As the I/O processors
+   were specific to the 2000 system, general compatibility with other CPU
+   microcode options was unnecessary, and indeed no other options were possible
+   for the 2100.
+
+   Option implementation by CPU was as follows:
+
+      2114    2115    2116    2100   1000-M  1000-E  1000-F
+     ------  ------  ------  ------  ------  ------  ------
+      N/A     N/A     N/A    13206A  13207A  22702A   N/A
+
+   The routines are mapped to instruction codes as follows:
+
+     Instr.     2100      1000-M/E   Description
+     ------  ----------  ----------  --------------------------------------------
+     SAI     105060-117  101400-037  Store A indexed by B (+/- offset in IR<4:0>)
+     LAI     105020-057  105400-037  Load A indexed by B (+/- offset in IR<4:0>)
+     CRC     105150      105460      Generate CRC
+     REST    105340      105461      Restore registers from stack
+     READF   105220      105462      Read F register (stack pointer)
+     INS       --        105463      Initialize F register (stack pointer)
+     ENQ     105240      105464      Enqueue
+     PENQ    105257      105465      Priority enqueue
+     DEQ     105260      105466      Dequeue
+     TRSLT   105160      105467      Translate character
+     ILIST   105000      105470      Indirect address list (similar to $SETP)
+     PRFEI   105222      105471      Power fail exit with I/O
+     PRFEX   105223      105472      Power fail exit
+     PRFIO   105221      105473      Power fail I/O
+     SAVE    105362      105474      Save registers to stack
+
+     MBYTE   105120      105765      Move bytes (MBT)
+     MWORD   105200      105777      Move words (MVW)
+     SBYTE   105300      105764      Store byte (SBT)
+     LBYTE   105320      105763      Load byte (LBT)
+
+   The INS instruction was not required in the 2100 implementation because the
+   stack pointer was actually the memory protect fence register and so could be
+   loaded directly with an OTA/B 05.  Also, the 1000 implementation did not
+   offer the MBYTE, MWORD, SBYTE, and LBYTE instructions because the equivalent
+   instructions from the standard Extended Instruction Group were used instead.
+
+   Note that the 2100 MBYTE and MWORD instructions operate slightly differently
+   from the 1000 MBT and MVW instructions.  Specifically, the move count is
+   signed on the 2100 and unsigned on the 1000.  A negative count on the 2100
+   results in a NOP.
+
+   The simulator remaps the 2100 instructions to the 1000 codes.  The four EIG
+   equivalents are dispatched to the EIG simulator.  The rest are handled here.
+
+   Additional reference:
+     - HP 2000 Computer System Sources and Listings Documentation
+         (22687-90020, undated), section 3, pages 2-74 through 2-91
+
+
+   Implementation notes:
+
+    1. The SAVE and RESTR instructions use the (otherwise unused) SP register on
+       the 1000 as the stack pointer.  On the 2100, there is no SP register, so
+       the instructions use the memory protect fence register as the stack
+       pointer.  We update the 2100 fence because it could affect CPU operation
+       if MP is turned on (although, in practice, the 2100 IOP does not use
+       memory protect and so never enables it).
 */
 
-const char *fmt_ab (t_bool success)
+static const OP_PAT op_iop[16] = {
+  OP_V,    OP_N,    OP_N,    OP_N,                      /* CRC    RESTR  READF  INS   */
+  OP_N,    OP_N,    OP_N,    OP_V,                      /* ENQ    PENQ   DEQ    TRSLT */
+  OP_AC,   OP_CVA,  OP_A,    OP_CV,                     /* ILIST  PRFEI  PRFEX  PRFIO */
+  OP_N,    OP_N,    OP_N,    OP_N                       /* SAVE    ---    ---    ---  */
+  };
+
+t_stat cpu_iop (uint32 intrq)
 {
-static const char good  [] = "normal";
-static       char error [] = "error ....";
+t_stat reason = SCPE_OK;
+OPS op;
+uint8 byte;
+uint32 entry, i;
+HP_WORD hp, tp, t, wc, MA;
 
-if (success)                                            /* if the instruction succeeded */
-    return good;                                        /*   then report a normal completion */
+if (cpu_configuration & CPU_2100) {                     /* 2100 IOP? */
+    if ((IR >= 0105020) && (IR <= 0105057))             /* remap LAI */
+        IR = 0105400 | (IR - 0105020);
+    else if ((IR >= 0105060) && (IR <= 0105117))        /* remap SAI */
+        IR = 0101400 | (IR - 0105060);
+    else {
+        switch (IR) {                                   /* remap others */
+        case 0105000: IR = 0105470; break;              /* ILIST */
+        case 0105120: return cpu_eig (0105765, intrq);  /* MBYTE (maps to MBT) */
+        case 0105150: IR = 0105460; break;              /* CRC   */
+        case 0105160: IR = 0105467; break;              /* TRSLT */
+        case 0105200: return cpu_eig (0105777, intrq);  /* MWORD (maps to MVW) */
+        case 0105220: IR = 0105462; break;              /* READF */
+        case 0105221: IR = 0105473; break;              /* PRFIO */
+        case 0105222: IR = 0105471; break;              /* PRFEI */
+        case 0105223: IR = 0105472; break;              /* PRFEX */
+        case 0105240: IR = 0105464; break;              /* ENQ   */
+        case 0105257: IR = 0105465; break;              /* PENQ  */
+        case 0105260: IR = 0105466; break;              /* DEQ   */
+        case 0105300: return cpu_eig (0105764, intrq);  /* SBYTE (maps to SBT) */
+        case 0105320: return cpu_eig (0105763, intrq);  /* LBYTE (maps to LBT) */
+        case 0105340: IR = 0105461; break;              /* REST  */
+        case 0105362: IR = 0105474; break;              /* SAVE  */
 
-else {                                                  /* otherwise */
-    error [6] = UPPER_BYTE (BR);                        /*   format the */
-    error [7] = LOWER_BYTE (BR);                        /*     error code */
-    error [8] = UPPER_BYTE (AR);                        /*       into the */
-    error [9] = LOWER_BYTE (AR);                        /*         error message */
-
-    return error;                                       /* report an abnormal completion */
+        default:                                        /* all others invalid */
+            return STOP (cpu_ss_unimpl);
+            }
+        }
     }
+
+entry = IR & 077;                                       /* mask to entry point */
+
+if (entry <= 037) {                                     /* LAI/SAI 10x400-437 */
+    MA = ((entry - 020) + BR) & LA_MASK;                /* +/- offset */
+
+    if (IR & AB_MASK)                                   /* if this is an LAI instruction */
+        AR = ReadW (MA);                                /*   then load the A register */
+    else                                                /* otherwise */
+        WriteW (MA, AR);                                /*   store the A register */
+
+    return reason;
+    }
+
+else if (entry <= 057)                                  /* IR = 10x440-457? */
+    return STOP (cpu_ss_unimpl);                        /* not part of IOP */
+
+entry = entry - 060;                                    /* offset 10x460-477 */
+
+if (op_iop [entry] != OP_N) {
+    reason = cpu_ops (op_iop [entry], op);              /* get instruction operands */
+
+    if (reason != SCPE_OK)                              /* evaluation failed? */
+        return reason;                                  /* return reason for failure */
+    }
+
+switch (entry) {                                        /* decode IR<5:0> */
+
+    case 000:                                           /* CRC 105460 (OP_V) */
+        t = ReadW (op[0].word) ^ (AR & 0377);           /* xor prev CRC and char */
+        for (i = 0; i < 8; i++) {                       /* apply polynomial */
+            t = (t >> 1) | ((t & 1) << 15);             /* rotate right */
+            if (t & D16_SIGN) t = t ^ 020001;           /* old t<0>? xor */
+            }
+        WriteW (op[0].word, t);                         /* rewrite CRC */
+        break;
+
+    case 001:                                           /* RESTR 105461 (OP_N) */
+        SPR = (SPR - 1) & LA_MASK;                      /* decr stack ptr */
+        t = ReadW (SPR);                                /* get E and O */
+        O = ((t >> 1) ^ 1) & 1;                         /* restore O */
+        E = t & 1;                                      /* restore E */
+        SPR = (SPR - 1) & LA_MASK;                      /* decr sp */
+        BR = ReadW (SPR);                               /* restore B */
+        SPR = (SPR - 1) & LA_MASK;                      /* decr sp */
+        AR = ReadW (SPR);                               /* restore A */
+        if (cpu_configuration & CPU_2100)               /* 2100 keeps sp in MP FR */
+            mp_fence = SPR;                             /*   (in case MP is turned on) */
+        break;
+
+    case 002:                                           /* READF 105462 (OP_N) */
+        AR = SPR;                                       /* copy stk ptr */
+        break;
+
+    case 003:                                           /* INS 105463 (OP_N) */
+        SPR = AR;                                       /* init stk ptr */
+        break;
+
+    case 004:                                           /* ENQ 105464 (OP_N) */
+        hp = ReadW (AR & LA_MASK);                      /* addr of head */
+        tp = ReadW ((AR + 1) & LA_MASK);                /* addr of tail */
+        WriteW ((BR - 1) & LA_MASK, 0);                 /* entry link */
+        WriteW ((tp - 1) & LA_MASK, BR);                /* tail link */
+        WriteW ((AR + 1) & LA_MASK, BR);                /* queue tail */
+        if (hp != 0) PR = (PR + 1) & LA_MASK;           /* q not empty? skip */
+        break;
+
+    case 005:                                           /* PENQ 105465 (OP_N) */
+        hp = ReadW (AR & LA_MASK);                      /* addr of head */
+        WriteW ((BR - 1) & LA_MASK, hp);                /* becomes entry link */
+        WriteW (AR & LA_MASK, BR);                      /* queue head */
+        if (hp == 0)                                    /* q empty? */
+            WriteW ((AR + 1) & LA_MASK, BR);            /* queue tail */
+        else PR = (PR + 1) & LA_MASK;                   /* skip */
+        break;
+
+    case 006:                                           /* DEQ 105466 (OP_N) */
+        BR = ReadW (AR & LA_MASK);                      /* addr of head */
+        if (BR) {                                       /* queue not empty? */
+            hp = ReadW ((BR - 1) & LA_MASK);            /* read hd entry link */
+            WriteW (AR & LA_MASK, hp);                  /* becomes queue head */
+            if (hp == 0)                                /* q now empty? */
+                WriteW ((AR + 1) & LA_MASK, (AR + 1) & R_MASK);
+            PR = (PR + 1) & LA_MASK;                    /* skip */
+            }
+        break;
+
+    case 007:                                           /* TRSLT 105467 (OP_V) */
+        wc = ReadW (op[0].word);                        /* get count */
+        if (wc & D16_SIGN) break;                       /* cnt < 0? */
+        while (wc != 0) {                               /* loop */
+            MA = (AR + AR + ReadB (BR)) & LA_MASK;
+            byte = ReadB (MA);                          /* xlate */
+            WriteB (BR, byte);                          /* store char */
+            BR = (BR + 1) & R_MASK;                     /* incr ptr */
+            wc = (wc - 1) & D16_MASK;                   /* decr cnt */
+            if (wc && intrq) {                          /* more and intr? */
+                WriteW (op[0].word, wc);                /* save count */
+                PR = err_PR;                            /* stop for now */
+                break;
+                }
+            }
+        break;
+
+    case 010:                                           /* ILIST 105470 (OP_AC) */
+        do {                                            /* for count */
+            WriteW (op[0].word, AR);                    /* write AR to mem */
+            AR = (AR + 1) & R_MASK;                     /* incr AR */
+            op[0].word = (op[0].word + 1) & LA_MASK;    /* incr MA */
+            op[1].word = (op[1].word - 1) & D16_MASK;   /* decr count */
+            }
+        while (op[1].word != 0);
+        break;
+
+    case 011:                                           /* PRFEI 105471 (OP_CVA) */
+        WriteW (op[1].word, 1);                         /* set flag */
+        reason = cpu_iog (op[0].word);                  /* execute I/O instr */
+        op[0].word = op[2].word;                        /* set rtn and fall through */
+
+    case 012:                                           /* PRFEX 105472 (OP_A) */
+        PCQ_ENTRY;
+        PR = ReadW (op[0].word) & LA_MASK;              /* jump indirect */
+        WriteW (op[0].word, 0);                         /* clear exit */
+        break;
+
+    case 013:                                           /* PRFIO 105473 (OP_CV) */
+        WriteW (op[1].word, 1);                         /* set flag */
+        reason = cpu_iog (op[0].word);                  /* execute instr */
+        break;
+
+    case 014:                                           /* SAVE 105474 (OP_N) */
+        WriteW (SPR, AR);                               /* save A */
+        SPR = (SPR + 1) & LA_MASK;                      /* incr stack ptr */
+        WriteW (SPR, BR);                               /* save B */
+        SPR = (SPR + 1) & LA_MASK;                      /* incr stack ptr */
+        t = (HP_WORD) ((O ^ 1) << 1 | E);               /* merge E and O */
+        WriteW (SPR, t);                                /* save E and O */
+        SPR = (SPR + 1) & LA_MASK;                      /* incr stack ptr */
+        if (cpu_configuration & CPU_2100)               /* 2100 keeps sp in MP FR */
+            mp_fence = SPR;                             /*   (in case MP is turned on) */
+        break;
+
+    default:                                            /* instruction unimplemented */
+        return STOP (cpu_ss_unimpl);
+        }
+
+return reason;
 }

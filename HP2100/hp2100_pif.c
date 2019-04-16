@@ -1,6 +1,6 @@
 /* hp2100_pif.c: HP 12620A/12936A Privileged Interrupt Fence simulator
 
-   Copyright (c) 2008-2017, J. David Bryan
+   Copyright (c) 2008-2018, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    PIF          12620A/12936A Privileged Interrupt Fence
 
+   11-Jun-18    JDB     Revised I/O model
    15-Mar-17    JDB     Trace flags are now global
    11-Mar-17    JDB     Revised the trace outputs
    17-Jan-17    JDB     Changed "hp_---sc" and "hp_---dev" to "hp_---_dib"
@@ -100,6 +101,7 @@
 
 
 #include "hp2100_defs.h"
+#include "hp2100_io.h"
 
 
 
@@ -110,34 +112,47 @@
 #define DEV_12936       (1 << DEV_V_12936)
 
 
-/* PIF state variables */
+/* Interface state */
 
-struct {
-    FLIP_FLOP control;                                  /* control flip-flop */
-    FLIP_FLOP flag;                                     /* flag flip-flop */
-    FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
-    } pif = { CLEAR, CLEAR, CLEAR };
+typedef struct {
+    FLIP_FLOP  control;                         /* control flip-flop */
+    FLIP_FLOP  flag;                            /* flag flip-flop */
+    FLIP_FLOP  flag_buffer;                     /* flag buffer flip-flop */
+    } CARD_STATE;
 
-
-/* PIF global routines */
-
-IOHANDLER pif_io;
-
-t_stat pif_reset     (DEVICE *dptr);
-t_stat pif_set_card  (UNIT   *uptr, int32  val,  CONST char *cptr, void *desc);
-t_stat pif_show_card (FILE   *st,   UNIT  *uptr, int32 val,        CONST void *desc);
+static CARD_STATE pif;                          /* per-card state */
 
 
-/* PIF data structures.
+/* Interface local SCP support routines */
 
-   pif_dib     PIF device information block
-   pif_unit    PIF unit list
-   pif_reg     PIF register list
-   pif_mod     PIF modifier list
-   pif_deb     PIF debug list
-   pif_dev     PIF device descriptor
+static INTERFACE pif_interface;
 
-   Implementation note:
+
+/* Interface local SCP support routines */
+
+static t_stat pif_reset     (DEVICE *dptr);
+static t_stat pif_set_card  (UNIT   *uptr, int32  val,  CONST char *cptr, void *desc);
+static t_stat pif_show_card (FILE   *st,   UNIT  *uptr, int32 val,        CONST void *desc);
+
+
+/* Interface SCP data structures */
+
+
+/* Device information block */
+
+static DIB pif_dib = {
+    &pif_interface,                             /* the device's I/O interface function pointer */
+    PIF,                                        /* the device's select code (02-77) */
+    0,                                          /* the card index */
+    "12620A/12936A Privileged Interrupt Fence", /* the card description */
+    NULL                                        /* the ROM description */
+    };
+
+
+/* Unit list.
+
+
+   Implementation notes:
 
     1. The SIMH developer's manual says that a device's unit list may be NULL.
        However, if this is done, the register state cannot be examined or
@@ -145,24 +160,29 @@ t_stat pif_show_card (FILE   *st,   UNIT  *uptr, int32 val,        CONST void *d
        that is not used otherwise.
 */
 
-DEVICE pif_dev;
-
-DIB pif_dib = { &pif_io, PIF };
-
-UNIT pif_unit = {
-    UDATA (NULL, 0, 0)                                  /* dummy unit */
+static UNIT pif_unit [] = {
+    { UDATA (NULL, 0, 0) }
     };
 
-REG pif_reg [] = {
-    { FLDATA (CTL,   pif.control,         0)  },
-    { FLDATA (FLG,   pif.flag,            0)  },
-    { FLDATA (FBF,   pif.flagbuf,         0)  },
-    { ORDATA (SC,    pif_dib.select_code, 6), REG_HRO },
-    { ORDATA (DEVNO, pif_dib.select_code, 6), REG_HRO },
+
+/* Register list */
+
+static REG pif_reg [] = {
+/*    Macro   Name    Location             Offset */
+/*    ------  ------  -------------------  ------ */
+    { FLDATA (CTL,    pif.control,           0)   },
+    { FLDATA (FLG,    pif.flag,              0)   },
+    { FLDATA (FBF,    pif.flag_buffer,       0)   },
+
+      DIB_REGS (pif_dib),
+
     { NULL }
     };
 
-MTAB pif_mod [] = {
+
+/* Modifier list */
+
+static MTAB pif_mod [] = {
 /*    Entry Flags          Value  Print String  Match String  Validation      Display         Descriptor        */
 /*    -------------------  -----  ------------  ------------  --------------  --------------  ----------------- */
     { MTAB_XDV,              0,   NULL,         "12620A",     &pif_set_card, NULL,            NULL              },
@@ -174,6 +194,7 @@ MTAB pif_mod [] = {
     { 0 }
     };
 
+
 /* Debugging trace list */
 
 static DEBTAB pif_deb [] = {
@@ -183,32 +204,39 @@ static DEBTAB pif_deb [] = {
     };
 
 
+/* Device descriptor */
+
 DEVICE pif_dev = {
-    "PIF",                                  /* device name */
-    &pif_unit,                              /* unit array */
-    pif_reg,                                /* register array */
-    pif_mod,                                /* modifier array */
-    1,                                      /* number of units */
-    10,                                     /* address radix */
-    31,                                     /* address width */
-    1,                                      /* address increment */
-    8,                                      /* data radix */
-    8,                                      /* data width */
-    NULL,                                   /* examine routine */
-    NULL,                                   /* deposit routine */
-    &pif_reset,                             /* reset routine */
-    NULL,                                   /* boot routine */
-    NULL,                                   /* attach routine */
-    NULL,                                   /* detach routine */
-    &pif_dib,                               /* device information block */
-    DEV_DEBUG | DEV_DISABLE,                /* device flags */
-    0,                                      /* debug control flags */
-    pif_deb,                                /* debug flag name table */
-    NULL,                                   /* memory size change routine */
-    NULL };                                 /* logical device name */
+    "PIF",                                      /* device name */
+    pif_unit,                                   /* unit array */
+    pif_reg,                                    /* register array */
+    pif_mod,                                    /* modifier array */
+    1,                                          /* number of units */
+    10,                                         /* address radix */
+    31,                                         /* address width */
+    1,                                          /* address increment */
+    8,                                          /* data radix */
+    8,                                          /* data width */
+    NULL,                                       /* examine routine */
+    NULL,                                       /* deposit routine */
+    &pif_reset,                                 /* reset routine */
+    NULL,                                       /* boot routine */
+    NULL,                                       /* attach routine */
+    NULL,                                       /* detach routine */
+    &pif_dib,                                   /* device information block */
+    DEV_DISABLE | DEV_DEBUG,                    /* device flags */
+    0,                                          /* debug control flags */
+    pif_deb,                                    /* debug flag name table */
+    NULL,                                       /* memory size change routine */
+    NULL };                                     /* logical device name */
 
 
-/* I/O signal handler.
+
+/* Interface local SCP support routines */
+
+
+
+/* Privileged interrupt fence interface.
 
    Operation of the 12620A and the 12936A is different.  The I/O responses of
    the two cards are summarized below:
@@ -233,61 +261,75 @@ DEVICE pif_dev = {
    Note that PRL and IRQ are non-standard for the 12936A.
 */
 
-uint32 pif_io (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
+static SIGNALS_VALUE pif_interface (const DIB *dibptr, INBOUND_SET inbound_signals, HP_WORD inbound_value)
 {
-const t_bool is_rte_pif = (pif_dev.flags & DEV_12936) == 0;
-IOSIGNAL signal;
-IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
+const t_bool   is_rte_pif  = (pif_dev.flags & DEV_12936) == 0;  /* TRUE if 12620A card */
+INBOUND_SIGNAL signal;
+INBOUND_SET    working_set = inbound_signals;
+SIGNALS_VALUE  outbound    = { ioNONE, 0 };
+t_bool         irq_enabled = FALSE;
 
 while (working_set) {
-    signal = IONEXT (working_set);                      /* isolate next signal */
+    signal = IONEXTSIG (working_set);                   /* isolate the next signal */
 
     switch (signal) {                                   /* dispatch I/O signal */
 
         case ioCLF:                                     /* clear flag flip-flop */
-            pif.flag = pif.flagbuf = CLEAR;             /* clear flag buffer and flag */
+            pif.flag_buffer = CLEAR;                    /* clear flag buffer and flag */
+            pif.flag        = CLEAR;
             break;
 
 
         case ioSTF:                                     /* set flag flip-flop */
             if (is_rte_pif)                             /* RTE PIF? */
-                pif.flag = pif.flagbuf = SET;           /* set flag buffer and flag */
+                pif.flag_buffer = SET;                  /* set flag buffer */
+            break;
 
+
+        case ioENF:                                     /* enable flag */
+            if (pif.flag_buffer == SET)                 /* if the flag buffer flip-flop is set */
+                pif.flag = SET;                         /*   then set the flag flip-flop */
             break;
 
 
         case ioSFC:                                     /* skip if flag is clear */
-            if (is_rte_pif)                             /* RTE PIF? */
-                setstdSKF (pif);                        /* card responds to SFC */
+            if (is_rte_pif && pif.flag == CLEAR)        /* only the 12620A card */
+                outbound.signals |= ioSKF;              /*   responds to SFC */
             break;
 
 
         case ioSFS:                                     /* skip if flag is set */
-            if (is_rte_pif)                             /* RTE PIF? */
-                setstdSKF (pif);                        /* card responds to SFS */
+            if (is_rte_pif && pif.flag == SET)          /* only the 12620A card */
+                outbound.signals |= ioSKF;              /*   responds to SFS */
             break;
 
 
         case ioIOO:                                     /* I/O data output */
-            if (!is_rte_pif) {                          /* DOS PIF? */
-                pif.flag = pif.flagbuf = SET;           /* set flag buffer and flag */
-                working_set = working_set | ioSIR;      /* set SIR (not normally done for IOO) */
+            if (is_rte_pif == FALSE) {                  /* DOS PIF? */
+                pif.flag_buffer = SET;                  /* set flag buffer */
+                working_set |= ioENF | ioSIR;           /* set ENF and SIR (not normally done for IOO) */
                 }
             break;
 
 
         case ioPOPIO:                                   /* power-on preset to I/O */
-            pif.flag = pif.flagbuf =                    /* set or clear flag and flag buffer */
-                (is_rte_pif ? SET : CLEAR);
+            if (is_rte_pif)
+                pif.flag_buffer = SET;
+
+            else {
+                pif.flag_buffer = CLEAR;
+                pif.flag        = CLEAR;
+                }
 
             tprintf (pif_dev, TRACE_CMD, "Power-on reset\n");
             break;
 
 
         case ioCRS:                                     /* control reset */
+            pif.control = CLEAR;                        /* clear control */
             tprintf (pif_dev, TRACE_CMD, "Control reset\n");
+            break;
 
-        /* fall into ioCLC handler */
 
         case ioCLC:                                     /* clear control flip-flop */
             pif.control = CLEAR;                        /* clear control */
@@ -300,46 +342,68 @@ while (working_set) {
 
 
         case ioSIR:                                         /* set interrupt request */
-            if (is_rte_pif) {                               /* RTE PIF? */
-                setstdPRL (pif);                            /* set standard PRL signal */
-                setstdIRQ (pif);                            /* set standard IRQ signal */
-                setstdSRQ (pif);                            /* set standard SRQ signal */
-                }
+            if (is_rte_pif & pif.control & pif.flag         /* if control and flag are set (12620A) */
+              || !is_rte_pif & (pif.control | pif.flag))    /*   or control or flag are clear (12936A) */
+                outbound.signals |= cnVALID;                /*     then deny PRL */
+            else                                            /*   otherwise */
+                outbound.signals |= cnPRL | cnVALID;        /*     conditionally assert PRL */
 
-            else {                                          /* DOS PIF */
-                setPRL (dibptr->select_code, !(pif.control | pif.flag));
-                setIRQ (dibptr->select_code, !pif.control & pif.flag & pif.flagbuf);
-                }
+            if (~(is_rte_pif ^ pif.control)                 /* if control is set (12620A) or clear (12936A) */
+              & pif.flag & pif.flag_buffer)                 /*   and flag and flag buffer are set */
+                outbound.signals |= cnIRQ | cnVALID;        /*     then conditionally assert IRQ */
+
+            if (is_rte_pif && pif.flag == SET)              /* if 12620A and flag is set */
+                outbound.signals |= ioSRQ;                  /*   then assert SRQ */
 
             tprintf (pif_dev, TRACE_CMD, "Fence %s%s lower-priority interrupts\n",
-                     (IRQ (dibptr->select_code) ? "requests an interrupt and " : ""),
-                     (PRL (dibptr->select_code) ? "allows" : "inhibits"));
+                     (outbound.signals & cnIRQ ? "requests an interrupt and " : ""),
+                     (outbound.signals & cnPRL ? "allows" : "inhibits"));
             break;
 
 
         case ioIAK:                                     /* interrupt acknowledge */
-            pif.flagbuf = CLEAR;
+            pif.flag_buffer = CLEAR;
             break;
 
 
-        default:                                        /* all other signals */
-            break;                                      /*   are ignored */
+        case ioIEN:                                     /* interrupt enable */
+            irq_enabled = TRUE;
+            break;
+
+
+        case ioPRH:                                         /* priority high */
+            if (irq_enabled && outbound.signals & cnIRQ)    /* if IRQ is enabled and conditionally asserted */
+                outbound.signals |= ioIRQ | ioFLG;          /*   then assert IRQ and FLG */
+
+            if (!irq_enabled || outbound.signals & cnPRL)   /* if IRQ is disabled or PRL is conditionally asserted */
+                outbound.signals |= ioPRL;                  /*   then assert it unconditionally */
+            break;
+
+
+        case ioIOI:                                     /* not used by this interface */
+        case ioEDT:                                     /* not used by this interface */
+        case ioPON:                                     /* not used by this interface */
+            break;
         }
 
-    working_set = working_set & ~signal;                /* remove current signal from set */
+    IOCLEARSIG (working_set, signal);                   /* remove the current signal from the set */
     }
 
-return stat_data;
+return outbound;                                        /* return the outbound signals and value */
 }
 
 
 /* Simulator reset routine */
 
-t_stat pif_reset (DEVICE *dptr)
+static t_stat pif_reset (DEVICE *dptr)
 {
-IOPRESET (&pif_dib);                                    /* PRESET device (does not use PON) */
+io_assert (dptr, ioa_POPIO);                            /* PRESET the device */
 return SCPE_OK;
 }
+
+
+
+/* Privileged interrupt fence local utility routines */
 
 
 /* Set card type.
@@ -348,7 +412,7 @@ return SCPE_OK;
    val == 1 --> set to 12620A (RTE PIF)
 */
 
-t_stat pif_set_card (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+static t_stat pif_set_card (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if ((val < 0) || (val > 1) || (cptr != NULL))           /* sanity check */
     return SCPE_ARG;                                    /* bad argument */
@@ -364,7 +428,7 @@ return SCPE_OK;
 
 /* Show card type */
 
-t_stat pif_show_card (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+static t_stat pif_show_card (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 if (pif_dev.flags & DEV_12936)
     fputs ("12936A", st);

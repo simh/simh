@@ -1,6 +1,6 @@
 /* hp_tapelib.h: HP magnetic tape controller simulator library declarations
 
-   Copyright (c) 2013-2017, J. David Bryan
+   Copyright (c) 2013-2019, J. David Bryan
    Copyright (c) 2004-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,6 +24,7 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the authors.
 
+   01-Feb-19    JDB     Remap sim_tape_attach to avoid unwanted debug output
    05-Sep-17    JDB     Changed REG_A (permit any symbolic override) to REG_X
    10-Oct-16    JDB     Moved "hp3000_defs.h" inclusion to "hp_tapelib.c"
    13-May-16    JDB     Modified for revised SCP API function parameter types
@@ -41,6 +42,14 @@
 
 
 #include "sim_tape.h"
+
+
+
+/* Remap tape attach in 4.x to avoid unwanted debug output */
+
+#if (SIM_MAJOR >= 4)
+  #define sim_tape_attach(a,b) sim_tape_attach_ex (a, b, 0, 0)
+#endif
 
 
 

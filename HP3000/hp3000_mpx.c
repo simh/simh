@@ -363,7 +363,6 @@ extern DEVICE iop_dev;                          /* I/O Processor */
        state RAM" command.
 
     3. State "parity" is 1 for an illegal state and 0 for a valid state.
-
 */
 
 #define INTRF_COUNT         (SRNO_MAX + 1)      /* count of interfaces handled by the multiplexer channel */

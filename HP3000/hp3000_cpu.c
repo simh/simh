@@ -1,6 +1,6 @@
 /* hp3000_cpu.c: HP 3000 Central Processing Unit simulator
 
-   Copyright (c) 2016-2017, J. David Bryan
+   Copyright (c) 2016-2019, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +25,11 @@
 
    CPU          HP 3000 Series III Central Processing Unit
 
+   21-Feb-19    JDB     Resuming into PAUS with pending IRQ now sets P correctly
+                        Moved "debug_save" from global to "sim_instr" local
+   12-Feb-19    JDB     Worked around idle problem (SIMH issue 622)
+   06-Feb-19    JDB     Corrected trace report for simulation stop
+   27-Dec-18    JDB     Revised fall through comments to comply with gcc 7
    05-Sep-17    JDB     Removed the -B (binary display) option; use -2 instead
                         Changed REG_A (permit any symbolic override) to REG_X
    19-Jan-17    JDB     Added comments describing the OPND and EXEC trace options
@@ -718,6 +723,13 @@
        Both implementations were mocked up and timing measurements made.  The
        results were that copying values is much faster than mapping via array
        index values, so this is the implementation chosen.
+
+    4. Idling with 4.x simulator framework versions after June 14, 2018 (git
+       commit ID d3986466) loses system clock ticks.  This causes the MPE clock
+       to run slowly, losing about one second per minute.  A workaround is to
+       prevent "sim_interval" from going negative on return from "sim_idle".
+       Issue 622 on the SIMH site describes the same problem with the HP 2100
+       simulator.
 */
 
 
@@ -727,6 +739,17 @@
 #include "hp3000_cpu_ims.h"
 #include "hp3000_mem.h"
 #include "hp3000_io.h"
+
+
+
+/* Lost time workaround */
+
+#if (SIM_MAJOR >= 4)
+  #define sim_idle(timer,decrement) \
+            if (sim_idle (timer, decrement) == TRUE     /* [workaround] idle the simulator; if idling occurred */ \
+              && sim_interval < 0)                      /* [workaround]   and the time interval is negative */ \
+                sim_interval = 0                        /* [workaround]     then reset it to zero */
+#endif
 
 
 
@@ -869,7 +892,6 @@ static uint32  sim_stops      = 0;              /* the current simulation stop f
 static uint32  cpu_speed      = 1;              /* the CPU speed, expressed as a multiplier of a real machine */
 static uint32  pclk_increment = 1;              /* the process clock increment per event service */
 static uint32  dump_control   = 0002006u;       /* the cold dump control word (default CNTL = 4, DEVNO = 6 */
-static uint32  debug_save     = 0;              /* the current debug trace flag settings */
 static HP_WORD exec_mask      = 0;              /* the current instruction execution trace mask */
 static HP_WORD exec_match     = D16_UMAX;       /* the current instruction execution trace matching value */
 
@@ -1095,11 +1117,11 @@ static MTAB cpu_mod [] = {
     { UNIT_CIS,     UNIT_CIS,        "CIS",               "CIS",        &set_option, NULL,    NULL       },
     { UNIT_CIS,     0,               "no CIS",            "NOCIS",      NULL,        NULL,    NULL       },
 
-    { UNIT_PFARS,     UNIT_PFARS,    "auto-restart",      "ARS",        &set_pfars,  NULL,    NULL       },
-    { UNIT_PFARS,              0,    "no auto-restart",   "NOARS",      &set_pfars,  NULL,    NULL       },
+    { UNIT_PFARS,   UNIT_PFARS,      "auto-restart",      "ARS",        &set_pfars,  NULL,    NULL       },
+    { UNIT_PFARS,   0,               "no auto-restart",   "NOARS",      &set_pfars,  NULL,    NULL       },
 
     { UNIT_CALTIME, UNIT_CALTIME,    "calibrated timing", "CALTIME",    NULL,        NULL,    NULL       },
-    { UNIT_CALTIME,            0,    "realistic timing",  "REALTIME",   NULL,        NULL,    NULL       },
+    { UNIT_CALTIME, 0,               "realistic timing",  "REALTIME",   NULL,        NULL,    NULL       },
 
 /*    Entry Flags             Value     Print String  Match String  Validation     Display         Descriptor */
 /*    -------------------  -----------  ------------  ------------  -------------  --------------  ---------- */
@@ -1402,6 +1424,7 @@ int        abortval;
 HP_WORD    label, parameter;
 TRAP_CLASS trap;
 t_bool     exec_test;
+volatile   uint32  debug_save;
 volatile   HP_WORD device;
 volatile   t_stat  status = SCPE_OK;
 
@@ -1465,13 +1488,13 @@ if (abortval) {                                         /* if a microcode abort 
             if (STT_SEGMENT (parameter) <= ISR_SEGMENT) /* if the trap occurred in segment 1 */
                 MICRO_ABORT (trap_SysHalt_CSTV_1);      /*   then the failure is fatal */
 
-        /* fall into the next trap handler */
+        /* fall through into the next trap handler */
 
         case trap_STT_Violation:
             if (STT_SEGMENT (parameter) <= ISR_SEGMENT) /* if the trap occurred in segment 1 */
                 MICRO_ABORT (trap_SysHalt_STTV_1);      /*   then the failure is fatal */
 
-        /* fall into the next trap handler */
+        /* fall through into the next trap handler */
 
         case trap_Unimplemented:
         case trap_DST_Violation:
@@ -1480,13 +1503,13 @@ if (abortval) {                                         /* if a microcode abort 
         case trap_Bounds_Violation:
             parameter = label;                          /* the label is the parameter for these traps */
 
-        /* fall into the next trap handler */
+        /* fall through into the next trap handler */
 
         case trap_DS_Absent:
             cpu_flush ();                               /* flush the TOS registers to memory */
             cpu_mark_stack ();                          /*   and then write a stack marker */
 
-        /* fall into the next trap handler */
+        /* fall through into the next trap handler */
 
         case trap_Uncallable:
             break;                                      /* set up the trap handler */
@@ -1524,7 +1547,7 @@ if (abortval) {                                         /* if a microcode abort 
         case trap_Cold_Load:                            /* this trap executes on the ICS */
             status = STOP_CLOAD;                        /* report that the cold load is complete */
 
-        /* fall into trap_Stack_Overflow */
+        /* fall through into trap_Stack_Overflow */
 
         case trap_Stack_Overflow:                           /* this trap executes on the ICS */
             if (CPX1 & cpx1_ICSFLAG)                        /*   so if the trap occurred while on the ICS */
@@ -1708,7 +1731,9 @@ if (cpu_power_state == power_failing                    /* if power is failing *
     cpu_power_state = power_off;                        /*     then power will be off when we return */
 
 dprintf (cpu_dev, cpu_dev.dctrl, BOV_FORMAT "simulation stop: %s\n",
-         PBANK, P, STA, sim_error_text (status));
+         PBANK, P, STA,
+         status >= SCPE_BASE ? sim_error_text (status)
+                             : sim_stop_messages [status]);
 
 return status;                                          /* return the reason for the stop */
 }
@@ -1964,20 +1989,47 @@ return status;                                          /* return the operation 
 
        If an interrupt occurs while PAUS is executing, the interrupt handler
        will return to the instruction following the PAUS, as though HALT and RUN
-       had been pressed.  This occurs because P normally points two instructions
-       beyond the current instruction, so stacking the value P - 1 during the
-       interrupt will return to the next instruction to be executed.  When
-       resuming the PAUS instruction from a simulation stop with an interrupt
-       pending, though, P is set so that P - 1 points to the PAUS instruction,
-       which is (correctly) the next instruction to execute on resumption.
-       Stacking the usual P - 1 value, therefore, will cause the interrupt
-       handler to return to the PAUS instruction instead of to the instruction
-       following, as would have occurred had a simulation stop not been
-       involved.
+       had been pressed.  This occurs because the P register normally points two
+       instructions past the instruction currently executing.  When an interrupt
+       occurs, P is decremented to point at the instruction after the current
+       instruction, which is the correct point of return after the interrupt
+       service routine completes.
 
-       Therefore, this case is detected when a PAUS instruction is in the CIR
-       but the micromachine state is "running" instead of "paused", and P is
-       incremented so that the return will be to the instruction following PAUS.
+       When the simulator is stopped, P is backed up to point at the next
+       instruction to execute.  In the case of a PAUS instruction, the "next
+       instruction" is the same PAUS instruction.  When simulation resumes, the
+       PAUS instruction is fetched into the NIR, and P is incremented.  If no
+       interrupt is pending, the main instruction execution loop copies the NIR
+       into the CIR, prefetches the instruction following the PAUS into the NIR,
+       and increments P again, so that it points two instructions beyond the
+       current instruction.  At this point, everything is set up properly as
+       before the simulation stop.
+
+       However, if an interrupt is pending when simulation resumes, this routine
+       is called before the NIR-to-CIR operation is performed, so P still points
+       one instruction beyond the PAUS.  Stacking the usual P - 1 value would
+       cause the interrupt handler to return to the PAUS instruction instead of
+       to the instruction following, as would have occurred had a simulation
+       stop not been involved.
+
+       Therefore, when resuming from a simulator stop, the SS_PAUSE_RESUMED flag
+       is set in the "cpu_stop_flags" variable by the "halt_mode_interrupt"
+       routine if a PAUS instruction is in the NIR after reloading.  If an
+       interrupt is pending, this routine will be entered with the flag set, and
+       we then increment P so that it is correctly set to point two instructions
+       beyond the PAUS before handling the interrupt.  If an interrupt is not
+       pending on resumption, the P adjustment is performed as described above,
+       and P will be set properly when the next interrupt occurs.
+
+       A special case occurs when resuming into a PAUS from a simulator stop if
+       a higher-priority interrupt occurs immediately after handling a pending
+       lower-priority interrupt.  In this case, this routine will be entered a
+       second time before the instruction execution loop performs the NIR-to-CIR
+       operation.  Although the PAUS is still in the CIR, we must not increment
+       P a second time, because the instruction now being interrupted is not the
+       PAUS but is the first instruction of the lower-priority interrupt routine
+       that never had a chance to execute.  Wo do this by clearing the
+       SS_PAUSE_RESUMED flag after the first increment.
 */
 
 void cpu_run_mode_interrupt (HP_WORD device_number)
@@ -1985,11 +2037,12 @@ void cpu_run_mode_interrupt (HP_WORD device_number)
 HP_WORD   request_set, request_count, parameter;
 IRQ_CLASS class;
 
-if (cpu_micro_state == running                          /* if we are resuming from a sim stop */
-  && (CIR & PAUS_MASK) == PAUS)                         /*   into a PAUS instruction */
-    P = P + 1 & R_MASK;                                 /*     then return is to the instruction following */
-else                                                    /* otherwise the micromachine may be paused */
-    cpu_micro_state = running;                          /*   but is no longer */
+if (cpu_stop_flags & SS_PAUSE_RESUMED) {                /* if we are resuming into a PAUS instruction */
+    P = P + 1 & R_MASK;                                 /*   then set the return to the instruction following */
+    cpu_stop_flags &= ~SS_PAUSE_RESUMED;                /*     and clear the flag in case of back-to-back interrupts */
+    }
+
+cpu_micro_state = running;                              /* the micromachine may be paused but is no longer */
 
 request_set = CPX1 & CPX1_IRQ_SET;                      /* get the set of active interrupt requests */
 
@@ -2845,7 +2898,7 @@ void cpu_setup_ics_irq (IRQ_CLASS class, TRAP_CLASS trap)
 {
 HP_WORD delta_q, stack_db;
 
-if (class != irq_Trap                                   /* if this is not  */
+if (class != irq_Trap                                   /* if this is not */
   || trap != trap_Cold_Load && trap != trap_Power_On) { /*   a cold load or power on trap entry */
     cpu_flush ();                                       /*     then flush the TOS registers to memory */
     cpu_mark_stack ();                                  /*       and write a four-word stack marker */
@@ -3294,9 +3347,8 @@ return;
    examined from the SCP command prompt.
 
    The simulation console is normally hosted by, and therefore polled by, the
-   ATC on channel 0.  If the console is not hosted by the ATC, due either to a
-   SET ATC NOCONSOLE or a SET ATC DISABLED command, the process clock assumes
-   polling control over the console.
+   ATC on channel 0.  If the console is not hosted by the ATC, due to a SET ATC
+   DISABLED command, the process clock assumes polling control over the console.
 
 
    Implementation notes:
@@ -3962,10 +4014,10 @@ return SCPE_OK;                                         /*   and report success 
 
    Implementation notes:
 
-    1. After RUN switch processing and return to the instruction loop, if no
-       interrupt is present, and the R-bit in the status register is clear, then
-       CIR will be set from NIR, and NIR will be reloaded.  If the R-bit is set,
-       then CIR and NIR will not be changed, i.e., the NEXT action will be
+    1. After processing the RUN switch and returning to the instruction loop, if
+       no interrupt is present, and the R-bit in the status register is clear,
+       then CIR will be set from NIR, and NIR will be reloaded.  If the R-bit is
+       set, then CIR and NIR will not be changed, i.e., the NEXT action will be
        skipped, so we perform it here.  If an interrupt is pending, then the
        interrupt will be processed using the old value of the CIR, and the
        instruction in the NIR will become the first instruction executed after
@@ -4003,6 +4055,9 @@ if (CPX2 & cpx2_RUNSWCH) {                              /* if the RUN switch is 
 
     cpu_read_memory (fetch, P, &NIR);                   /* load the next instruction to execute */
     P = P + 1 & R_MASK;                                 /*   and point to the following instruction */
+
+    if ((NIR & PAUS_MASK) == PAUS)                      /* if resuming into a PAUS instruction */
+        cpu_stop_flags |= SS_PAUSE_RESUMED;             /*   then defer any interrupt until after PAUS is executed */
 
     if ((NIR & SUBOP_MASK) != 0)                        /* if the instruction is not a stack instruction */
         STA &= ~STATUS_R;                               /*   then clear the R-bit in case it had been set */
