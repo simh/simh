@@ -4228,7 +4228,7 @@ memset (&eth_tst, 0, sizeof(eth_tst));
 eth_device_count = eth_devices(ETH_MAX_DEVICE, eth_list);
 eth_opened = 0;
 for (eth_num=0; eth_num<eth_device_count; eth_num++) {
-  char eth_name[10];
+  char eth_name[32];
 
   if ((0 == memcmp (eth_list[eth_num].name, "nat:", 4)) ||
       (0 == memcmp (eth_list[eth_num].name, "tap:", 4)) ||
