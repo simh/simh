@@ -1,6 +1,6 @@
 /* sim_tape.c: simulator tape support library
 
-   Copyright (c) 1993-2017, Robert M Supnik
+   Copyright (c) 1993-2018, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    Ultimately, this will be a place to hide processing of various tape formats,
    as well as OS-specific direct hardware access.
 
+   27-Dec-18    JDB     Added missing fall through comment in sim_tape_wrrecf
    03-May-17    JDB     Added support for erasing tape marks to sim_tape_errec[fr]
    02-May-17    JDB     Added error checks to sim_fseek calls
    18-Jul-16    JDB     Added sim_tape_errecf, sim_tape_errecr functions
@@ -109,13 +110,10 @@ static const uint32 bpi [] = {                          /* tape density table, i
 
 #define BPI_COUNT       (sizeof (bpi) / sizeof (bpi [0]))   /* count of density table entries */
 
-extern int32 sim_switches;
-
-t_stat sim_tape_ioerr (UNIT *uptr);
-t_stat sim_tape_wrdata (UNIT *uptr, uint32 dat);
-uint32 sim_tape_tpc_map (UNIT *uptr, t_addr *map);
-t_addr sim_tape_tpc_fnd (UNIT *uptr, t_addr *map);
-
+static t_stat sim_tape_ioerr (UNIT *uptr);
+static t_stat sim_tape_wrdata (UNIT *uptr, uint32 dat);
+static uint32 sim_tape_tpc_map (UNIT *uptr, t_addr *map);
+static t_addr sim_tape_tpc_fnd (UNIT *uptr, t_addr *map);
 static t_stat tape_erase_fwd (UNIT *uptr, t_mtrlnt gap_size);
 static t_stat tape_erase_rev (UNIT *uptr, t_mtrlnt gap_size);
 
@@ -290,7 +288,7 @@ t_tpclnt tpcbc;
 t_mtrlnt buffer [256];                                  /* local tape buffer */
 uint32   bufcntr, bufcap;                               /* buffer counter and capacity */
 int32    runaway_counter, sizeof_gap;                   /* bytes remaining before runaway and bytes per gap */
-t_stat   status = SCPE_OK;
+t_stat   status = MTSE_OK;
 
 MT_CLR_PNU (uptr);                                      /* clear the position-not-updated flag */
 
@@ -463,7 +461,7 @@ else switch (f) {                                       /* otherwise the read me
                 all_eof = 0;
             }
 
-        if (status == SCPE_OK) {
+        if (status == MTSE_OK) {
             *bc = sbc;                                      /* save rec lnt */
             sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); /* for read */
             uptr->pos = uptr->pos + sbc;                    /* spc over record */
@@ -515,7 +513,6 @@ return status;
 
     2. See the notes at "sim_tape_rdlntf" and "tape_erase_fwd" regarding tape
        runaway and the erase gap implementation, respectively.
-
 */
 
 static t_stat sim_tape_rdlntr (UNIT *uptr, t_mtrlnt *bc)
@@ -529,7 +526,7 @@ t_tpclnt tpcbc;
 t_mtrlnt buffer [256];                                  /* local tape buffer */
 uint32   bufcntr, bufcap;                               /* buffer counter and capacity */
 int32    runaway_counter, sizeof_gap;                   /* bytes remaining before runaway and bytes per gap */
-t_stat   status = SCPE_OK;
+t_stat   status = MTSE_OK;
 
 MT_CLR_PNU (uptr);                                      /* clear the position-not-updated flag */
 
@@ -671,7 +668,7 @@ else switch (f) {                                       /* otherwise the read me
                 }
             }
 
-        if (status == SCPE_OK) {
+        if (status == MTSE_OK) {
             uptr->pos = uptr->pos - sbc;                    /* update position */
             *bc = sbc;                                      /* save rec lnt */
             sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); /* for read */
@@ -716,7 +713,8 @@ t_addr opos;
 t_stat st;
 
 opos = uptr->pos;                                       /* old position */
-if (st = sim_tape_rdlntf (uptr, &tbc))                  /* read rec lnt */
+st = sim_tape_rdlntf (uptr, &tbc);                      /* read rec lnt */
+if (st != MTSE_OK)
     return st;
 *bc = rbc = MTR_L (tbc);                                /* strip error flag */
 if (rbc > max) {                                        /* rec out of range? */
@@ -724,7 +722,7 @@ if (rbc > max) {                                        /* rec out of range? */
     uptr->pos = opos;
     return MTSE_INVRL;
     }
-i = sim_fread (buf, sizeof (uint8), rbc, uptr->fileref);/* read record */
+i = (t_mtrlnt) sim_fread (buf, sizeof (uint8), rbc, uptr->fileref); /* read record */
 if (ferror (uptr->fileref)) {                           /* error? */
     MT_SET_PNU (uptr);
     uptr->pos = opos;
@@ -765,12 +763,13 @@ uint32 f = MT_GET_FMT (uptr);
 t_mtrlnt i, rbc, tbc;
 t_stat st;
 
-if (st = sim_tape_rdlntr (uptr, &tbc))                  /* read rec lnt */
+st = sim_tape_rdlntr (uptr, &tbc);                      /* read rec lnt */
+if (st != MTSE_OK)
     return st;
 *bc = rbc = MTR_L (tbc);                                /* strip error flag */
 if (rbc > max)                                          /* rec out of range? */
     return MTSE_INVRL;
-i = sim_fread (buf, sizeof (uint8), rbc, uptr->fileref);/* read record */
+i = (t_mtrlnt) sim_fread (buf, sizeof (uint8), rbc, uptr->fileref); /* read record */
 if (ferror (uptr->fileref))                             /* error? */
     return sim_tape_ioerr (uptr);
 for ( ; i < rbc; i++)                                   /* fill with 0's */
@@ -815,6 +814,9 @@ switch (f) {                                            /* case on format */
 
     case MTUF_F_STD:                                    /* standard */
         sbc = MTR_L ((bc + 1) & ~1);                    /* pad odd length */
+    
+    /* fall through into the E11 handler */
+    
     case MTUF_F_E11:                                    /* E11 */
         sim_fwrite (&bc, sizeof (t_mtrlnt), 1, uptr->fileref);
         sim_fwrite (buf, sizeof (uint8), sbc, uptr->fileref);
@@ -843,7 +845,7 @@ return MTSE_OK;
 
 /* Write metadata forward (internal routine) */
 
-t_stat sim_tape_wrdata (UNIT *uptr, uint32 dat)
+static t_stat sim_tape_wrdata (UNIT *uptr, uint32 dat)
 {
 MT_CLR_PNU (uptr);
 if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
@@ -1360,7 +1362,23 @@ else                                                    /* otherwise */
     return tape_erase_rev (uptr, gap_size);             /*   erase the requested gap */
 }
 
-/* Space record forward */
+/* Space record forward
+
+   Inputs:
+        uptr    =       pointer to tape unit
+        bc      =       pointer to size of record skipped
+   Outputs:
+        status  =       operation status
+
+   exit condition       position
+
+   unit unattached      unchanged
+   read error           unchanged, PNU set
+   end of file/medium   unchanged, PNU set
+   tape mark            updated
+   data record          updated
+   data record error    updated
+*/
 
 t_stat sim_tape_sprecf (UNIT *uptr, t_mtrlnt *bc)
 {
@@ -1371,7 +1389,24 @@ st = sim_tape_rdlntf (uptr, bc);                        /* get record length */
 return st;
 }
 
-/* Space record reverse */
+/* Space record reverse
+
+   Inputs:
+        uptr    =       pointer to tape unit
+        bc      =       pointer to size of records skipped
+   Outputs:
+        status  =       operation status
+
+   exit condition       position
+
+   unit unattached      unchanged
+   beginning of tape    unchanged
+   read error           unchanged
+   end of file          unchanged
+   end of medium        updated
+   tape mark            updated
+   data record          updated
+*/
 
 t_stat sim_tape_sprecr (UNIT *uptr, t_mtrlnt *bc)
 {
@@ -1424,12 +1459,12 @@ return (uptr->capac && (uptr->pos >= uptr->capac))? TRUE: FALSE;
 
 t_bool sim_tape_wrp (UNIT *uptr)
 {
-return (uptr->flags & MTUF_WRP)? TRUE: FALSE;
+return ((uptr->flags & MTUF_WRP) || (MT_GET_FMT (uptr) == MTUF_F_TPC))? TRUE: FALSE;
 }
 
 /* Process I/O error */
 
-t_stat sim_tape_ioerr (UNIT *uptr)
+static t_stat sim_tape_ioerr (UNIT *uptr)
 {
 perror ("Magtape library I/O error");
 clearerr (uptr->fileref);
@@ -1442,10 +1477,10 @@ t_stat sim_tape_set_fmt (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 uint32 f;
 
-if (uptr->flags & UNIT_ATT)
-    return SCPE_ALATT;
 if (uptr == NULL)
     return SCPE_IERR;
+if (uptr->flags & UNIT_ATT)
+    return SCPE_ALATT;
 if (cptr == NULL)
     return SCPE_ARG;
 for (f = 0; f < MTUF_N_FMT; f++) {
@@ -1472,7 +1507,7 @@ return SCPE_OK;
 
 /* Map a TPC format tape image */
 
-uint32 sim_tape_tpc_map (UNIT *uptr, t_addr *map)
+static uint32 sim_tape_tpc_map (UNIT *uptr, t_addr *map)
 {
 t_addr tpos;
 t_tpclnt bc;
@@ -1496,7 +1531,7 @@ return objc;
 
 /* Find the preceding record in a TPC file */
 
-t_addr sim_tape_tpc_fnd (UNIT *uptr, t_addr *map)
+static t_addr sim_tape_tpc_fnd (UNIT *uptr, t_addr *map)
 {
 uint32 lo, hi, p;
 

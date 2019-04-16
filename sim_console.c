@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   27-Dec-18    JDB     Added missing fall through comment in ControlHandler
    18-Mar-18    RMS     Fixed deboff not to close stdout or stderr (Dave Bryan)
    31-Mar-15    RMS     Backported parity feature from GitHub master
    10-Nov-14    JDB     Added -N option to SET CONSOLE LOG and SET CONSOLE DEBUG
@@ -770,6 +771,8 @@ ControlHandler(DWORD dwCtrlType)
         case CTRL_LOGOFF_EVENT:     // User is logging off
             if (!GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &Mode))
                 return TRUE;        // Not our User, so ignore
+        /* fall through into simulation termination */
+
         case CTRL_SHUTDOWN_EVENT:   // System is shutting down
             int_handler(0);
             return TRUE;

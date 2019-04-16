@@ -1,6 +1,6 @@
 /* sim_fio.c: simulator file I/O library
 
-   Copyright (c) 1993-2015, Robert M Supnik
+   Copyright (c) 1993-2018, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   28-Dec-18    JDB     Modify sim_fseeko, sim_ftell for mingwrt 5.2 compatibility
    02-Apr-15    RMS     Backported from GitHub master
    28-Jun-07    RMS     Added VMS IA64 support (from Norm Lastovica)
    10-Jul-06    RMS     Fixed linux conditionalization (from Chaskiel Grundman)
@@ -233,42 +234,29 @@ return (t_offset)(ftell (st));
 #define S_SIM_IO_FSEEK_EXT_ 1
 #include <sys/stat.h>
 
+/* [JDB] The previous Win32 versions of sim_fseeko and sim_ftell attempted to
+   use fsetpos and fgetpos by manipulating an fpos_t value as though it were a
+   64-bit integer.  This worked with version 5.0 of the mingw runtime library,
+   which declared an fpos_t to be a long long int.  With version 5.2, fpos_t is
+   now a union containing a long long int, so that it cannot be manipulated.
+   The manipulation was always suspect, as the MSVC++ 2008 documentation says,
+   "The [fpos_t] value is stored in an internal format and is intended for use
+   only by fgetpos and fsetpos."  It worked, but only because VC++ declared it
+   as an __int64 value.  If that changes, the original code would break, as it
+   now does for mingw.
+
+   Therefore, we now simply call _fseeki64 and _ftelli64, which are provided by
+   both mingw and VC++ and work as expected without manipulation.
+*/
+
 int sim_fseeko (FILE *st, t_offset offset, int whence)
 {
-fpos_t fileaddr;
-struct _stati64 statb;
-
-switch (whence) {
-
-    case SEEK_SET:
-        fileaddr = (fpos_t)offset;
-        break;
-
-    case SEEK_END:
-        if (_fstati64 (_fileno (st), &statb))
-            return (-1);
-        fileaddr = statb.st_size + offset;
-        break;
-    case SEEK_CUR:
-        if (fgetpos (st, &fileaddr))
-            return (-1);
-        fileaddr = fileaddr + offset;
-        break;
-
-    default:
-        errno = EINVAL;
-        return (-1);
-        }
-
-return fsetpos (st, &fileaddr);
+return _fseeki64 (st, offset, whence);
 }
 
 t_offset sim_ftell (FILE *st)
 {
-fpos_t fileaddr;
-if (fgetpos (st, &fileaddr))
-    return (-1);
-return (t_offset)fileaddr;
+return (t_offset) _ftelli64 (st);
 }
 
 #endif                                                  /* end Windows */
