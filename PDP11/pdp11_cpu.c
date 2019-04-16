@@ -258,6 +258,8 @@ typedef struct {
     uint16              psw;
     uint16              src;
     uint16              dst;
+    uint16              sp;
+    uint16              pad;
     uint16              inst[HIST_ILNT];
     } InstHistory;
 
@@ -840,6 +842,7 @@ while (reason == 0)  {
             SWMASK ('U') | SWMASK ('V'), SWMASK ('U') | SWMASK ('V')
             };
         hst[hst_p].pc = PC | HIST_VLD;
+        hst[hst_p].sp = SP;
         hst[hst_p].psw = get_PSW ();
         hst[hst_p].src = R[srcspec & 07];
         hst[hst_p].dst = R[dstspec & 07];
@@ -3147,12 +3150,12 @@ else lnt = hst_lnt;
 di = hst_p - lnt;                                       /* work forward */
 if (di < 0)
     di = di + hst_lnt;
-fprintf (st, "PC     PSW     src    dst     IR\n\n");
+fprintf (st, "PC     SP     PSW     src    dst     IR\n\n");
 for (k = 0; k < lnt; k++) {                             /* print specified */
     h = &hst[(di++) % hst_lnt];                         /* entry pointer */
     if (h->pc & HIST_VLD) {                             /* instruction? */
         ir = h->inst[0];
-        fprintf (st, "%06o %06o|", h->pc & ~HIST_VLD, h->psw);
+        fprintf (st, "%06o %06o %06o|", h->pc & ~HIST_VLD, h->sp, h->psw);
         if (((ir & 0070000) != 0) ||                    /* dops, eis, fpp */
             ((ir & 0177000) == 0004000))                /* jsr */
             fprintf (st, "%06o %06o  ", h->src, h->dst);
