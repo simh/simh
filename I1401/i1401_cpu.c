@@ -326,7 +326,7 @@ const int32 op_table[64] = {
     L1 | L2 | L4 | L5,                                  /* write and read */
     L1 | L2 | L4 | L5,                                  /* punch */
     L1 | L4,                                            /* read and punch */
-    L1 | L2 | L4 | L5,                                  /* write and read */
+    L1 | L2 | L4 | L5,                                  /* write and punch */
     L1 | L2 | L4 | L5,                                  /* write, read, punch */
     L1,                                                 /* 10: read feed */
     L1,                                                 /* punch feed */
