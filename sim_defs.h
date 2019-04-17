@@ -591,7 +591,8 @@ struct UNIT {
     uint16              us9;                            /* device specific */
     uint16              us10;                           /* device specific */
     void                *tmxr;                          /* TMXR linkage */
-    uint32              recsize;                        /* Tape info */
+    uint32              recsize;                        /* Tape specific info */
+    t_addr              tape_eom;                       /* Tape specific info */
     t_bool              (*cancel)(UNIT *);
     double              usecs_remaining;                /* time balance for long delays */
     char                *uname;                         /* Unit name */
