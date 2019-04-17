@@ -811,7 +811,7 @@ if (bits_to_clear&TMXR_MDM_RTS)
         }
 if (incoming_bits) {
     DWORD ModemStat;
-    if (GetCommModemStatus (port->hPort, &ModemStat)) {
+    if (!GetCommModemStatus (port->hPort, &ModemStat)) {
         sim_error_serial ("GetCommModemStatus", (int) GetLastError ());
         return SCPE_IOERR;
         }
