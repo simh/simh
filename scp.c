@@ -2825,6 +2825,11 @@ for (cmdp = cmd_table; cmdp && (cmdp->name != NULL); cmdp++) {
             max_cmdname_size = strlen(cmdp->name);
         }
     }
+fprintf (st, "Help is available for devices\n\n");
+fprintf (st, "   HELP dev\n");
+fprintf (st, "   HELP dev SET\n");
+fprintf (st, "   HELP dev SHOW\n");
+fprintf (st, "   HELP dev REGISTERS\n\n");
 fprintf (st, "Help is available for the following commands:\n\n    ");
 qsort (hlp_cmdp, cmd_cnt, sizeof(*hlp_cmdp), _cmd_name_compare);
 line_offset = 4;
@@ -3224,121 +3229,120 @@ t_stat help_cmd (int32 flag, CONST char *cptr)
 {
 char gbuf[CBUFSIZE], gbuf2[CBUFSIZE];
 CTAB *cmdp;
+DEVICE *dptr;
+UNIT *uptr;
+t_stat r;
+t_bool explicit_device = FALSE;
 
 GET_SWITCHES (cptr);                                    /* get switches */
 if (sim_switches & SWMASK ('F'))
     flag = flag | SCP_HELP_FLAT;
 if (*cptr) {
     cptr = get_glyph (cptr, gbuf, 0);
-    if ((cmdp = find_cmd (gbuf))) {
-        if (*cptr) {
-            if ((cmdp->action == &set_cmd) || (cmdp->action == &show_cmd)) {
-                DEVICE *dptr;
-                UNIT *uptr;
-                t_stat r;
 
-                cptr = get_glyph (cptr, gbuf, 0);
-                dptr = find_unit (gbuf, &uptr);
-                if (dptr == NULL)
-                    dptr = find_dev (gbuf);
-                if (dptr != NULL) {
-                    r = help_dev_help (stdout, dptr, uptr, flag, (cmdp->action == &set_cmd) ? "SET" : "SHOW");
-                    if (sim_log)
-                        help_dev_help (sim_log, dptr, uptr, flag | SCP_HELP_FLAT, (cmdp->action == &set_cmd) ? "SET" : "SHOW");
-                    return r;
-                    }
-                if (cmdp->action == &set_cmd) { /* HELP SET xxx (not device or unit) */
-                    if ((cmdp = find_ctab (set_glob_tab, gbuf)) &&
-                         (cmdp->help))
-                        return help_cmd_output (flag, cmdp->help, cmdp->help_base);
-                    }
-                else { /* HELP SHOW xxx (not device or unit) */
-                    SHTAB *shptr = find_shtab (show_glob_tab, gbuf);
+    if (0 == strcmp (gbuf, "DEVICE")) {
+        explicit_device = TRUE;
+        cptr = get_glyph (cptr, gbuf, 0);
+        }
+    dptr = find_unit (gbuf, &uptr);
+    if ((dptr == NULL) && 
+        ((dptr = find_dev (gbuf)) == NULL)) {
+        if (explicit_device)
+            return sim_messagef (SCPE_ARG, "No such device %s\n", gbuf);
+        if ((cmdp = find_cmd (gbuf))) {
+            if (*cptr) {
+                if ((cmdp->action == &set_cmd) || (cmdp->action == &show_cmd)) {
+                    DEVICE *dptr;
+                    UNIT *uptr;
+                    t_stat r;
 
-                    if ((shptr == NULL) || (shptr->help == NULL) || (*shptr->help == '\0'))
-                        return SCPE_ARG;
-                    return help_cmd_output (flag, shptr->help, NULL);
+                    cptr = get_glyph (cptr, gbuf, 0);
+                    dptr = find_unit (gbuf, &uptr);
+                    if (dptr == NULL)
+                        dptr = find_dev (gbuf);
+                    if (dptr != NULL) {
+                        r = help_dev_help (stdout, dptr, uptr, flag, (cmdp->action == &set_cmd) ? "SET" : "SHOW");
+                        if (sim_log)
+                            help_dev_help (sim_log, dptr, uptr, flag | SCP_HELP_FLAT, (cmdp->action == &set_cmd) ? "SET" : "SHOW");
+                        return r;
+                        }
+                    if (cmdp->action == &set_cmd) { /* HELP SET xxx (not device or unit) */
+                        if ((cmdp = find_ctab (set_glob_tab, gbuf)) &&
+                             (cmdp->help))
+                            return help_cmd_output (flag, cmdp->help, cmdp->help_base);
+                        }
+                    else { /* HELP SHOW xxx (not device or unit) */
+                        SHTAB *shptr = find_shtab (show_glob_tab, gbuf);
+
+                        if ((shptr == NULL) || (shptr->help == NULL) || (*shptr->help == '\0'))
+                            return SCPE_ARG;
+                        return help_cmd_output (flag, shptr->help, NULL);
+                        }
+                    return SCPE_ARG;
                     }
-                return SCPE_ARG;
                 }
-            }
-        if (cmdp->help) {
-            if (strcmp (cmdp->name, "HELP") == 0) {
-                DEVICE *dptr;
-                int i;
+            if (cmdp->help) {
+                if (strcmp (cmdp->name, "HELP") == 0) {
+                    DEVICE *dptr;
+                    int i;
 
-                for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
-                    if (dptr->help)
-                        sim_printf ("h{elp} %-17s display help for device %s\n", dptr->name, dptr->name);
-                    if (dptr->attach_help || 
-                        (DEV_TYPE(dptr) == DEV_MUX) ||
-                        (DEV_TYPE(dptr) == DEV_DISK) ||
-                        (DEV_TYPE(dptr) == DEV_TAPE)) {
-                        sim_printf ("h{elp} %s ATTACH\t display help for device %s ATTACH command\n", dptr->name, dptr->name);
-                        }
-                    if (dptr->registers) {
-                        if (dptr->registers->name != NULL)
-                            sim_printf ("h{elp} %s REGISTERS\t display help for device %s register variables\n", dptr->name, dptr->name);
-                        }
-                    if (dptr->modifiers) {
-                        MTAB *mptr;
+                    for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+                        if (dptr->help)
+                            sim_printf ("h{elp} %-17s display help for device %s\n", dptr->name, dptr->name);
+                        if (dptr->attach_help || 
+                            (DEV_TYPE(dptr) == DEV_MUX) ||
+                            (DEV_TYPE(dptr) == DEV_DISK) ||
+                            (DEV_TYPE(dptr) == DEV_TAPE)) {
+                            sim_printf ("h{elp} %s ATTACH\t display help for device %s ATTACH command\n", dptr->name, dptr->name);
+                            }
+                        if (dptr->registers) {
+                            if (dptr->registers->name != NULL)
+                                sim_printf ("h{elp} %s REGISTERS\t display help for device %s register variables\n", dptr->name, dptr->name);
+                            }
+                        if (dptr->modifiers) {
+                            MTAB *mptr;
 
-                        for (mptr = dptr->modifiers; mptr->pstring != NULL; mptr++) {
-                            if (mptr->help) {
-                                sim_printf ("h{elp} %s SET\t\t display help for device %s SET commands (modifiers)\n", dptr->name, dptr->name);
-                                break;
+                            for (mptr = dptr->modifiers; mptr->pstring != NULL; mptr++) {
+                                if (mptr->help) {
+                                    sim_printf ("h{elp} %s SET\t\t display help for device %s SET commands (modifiers)\n", dptr->name, dptr->name);
+                                    break;
+                                    }
                                 }
                             }
                         }
                     }
-                }
-            else {
-                if (((cmdp->action == &exdep_cmd) || (0 == strcmp(cmdp->name, "BOOT"))) &&
-                    sim_dflt_dev->help) {
-                        sim_dflt_dev->help (stdout, sim_dflt_dev, sim_dflt_dev->units, 0, cmdp->name);
-                        if (sim_log)
-                            sim_dflt_dev->help (sim_log, sim_dflt_dev, sim_dflt_dev->units, 0, cmdp->name);
+                else {
+                    if (((cmdp->action == &exdep_cmd) || (0 == strcmp(cmdp->name, "BOOT"))) &&
+                        sim_dflt_dev->help) {
+                            sim_dflt_dev->help (stdout, sim_dflt_dev, sim_dflt_dev->units, 0, cmdp->name);
+                            if (sim_log)
+                                sim_dflt_dev->help (sim_log, sim_dflt_dev, sim_dflt_dev->units, 0, cmdp->name);
+                        }
                     }
+                strlcpy (gbuf2, cmdp->help, sizeof (gbuf2));
+                if (*cptr) {
+                    strlcat (gbuf2, " ", sizeof (gbuf2));
+                    strlcat (gbuf2, cptr, sizeof (gbuf2));
+                    }
+                help_cmd_output (flag, gbuf2, cmdp->help_base);
                 }
-            strlcpy (gbuf2, cmdp->help, sizeof (gbuf2));
-            if (*cptr) {
-                strlcat (gbuf2, " ", sizeof (gbuf2));
-                strlcat (gbuf2, cptr, sizeof (gbuf2));
-                }
-            help_cmd_output (flag, gbuf2, cmdp->help_base);
-            }
-        else { /* no help so it is likely a command alias */
-            CTAB *cmdpa;
+            else { /* no help so it is likely a command alias */
+                CTAB *cmdpa;
 
-            for (cmdpa=cmd_table; cmdpa->name != NULL; cmdpa++)
-                if ((cmdpa->action == cmdp->action) && (cmdpa->help)) {
-                    sim_printf ("%s is an alias for the %s command:\n%s", 
-                                cmdp->name, cmdpa->name, cmdpa->help);
-                    break;
-                    }
-            if (cmdpa->name == NULL)                /* not found? */
-                sim_printf ("No help available for the %s command\n", cmdp->name);
+                for (cmdpa=cmd_table; cmdpa->name != NULL; cmdpa++)
+                    if ((cmdpa->action == cmdp->action) && (cmdpa->help)) {
+                        sim_printf ("%s is an alias for the %s command:\n%s", 
+                                    cmdp->name, cmdpa->name, cmdpa->help);
+                        break;
+                        }
+                if (cmdpa->name == NULL)                /* not found? */
+                    sim_printf ("No help available for the %s command\n", cmdp->name);
+                }
             }
         }
-    else { 
-        DEVICE *dptr;
-        UNIT *uptr;
-        t_stat r;
-        t_bool explicit_device = FALSE;
-
-        if (0 == strcmp (gbuf, "DEVICE")) {
-            explicit_device = TRUE;
-            cptr = get_glyph (cptr, gbuf, 0);
-            }
-        dptr = find_unit (gbuf, &uptr);
-        if (dptr == NULL) {
-            dptr = find_dev (gbuf);
-            if (dptr == NULL)
-                return sim_messagef (SCPE_ARG, "No HELP available for %s%s %s\n", 
-                                               explicit_device ? "DEVICE " : "", gbuf, cptr);
-            if (dptr->flags & DEV_DISABLE)
-                sim_printf ("Device %s is currently disabled\n", dptr->name);
-            }
+    else {
+        if (dptr->flags & DEV_DISABLE)
+            sim_printf ("Device %s is currently disabled\n", dptr->name);
         r = help_dev_help (stdout, dptr, uptr, flag, cptr);
         if (sim_log)
             help_dev_help (sim_log, dptr, uptr, flag | SCP_HELP_FLAT, cptr);
