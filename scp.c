@@ -600,6 +600,7 @@ static double sim_time;
 static uint32 sim_rtime;
 static int32 noqueue_time;
 volatile t_bool stop_cpu = FALSE;
+volatile t_bool sigterm_received = FALSE;
 static unsigned int sim_stop_sleep_ms = 250;
 static char **sim_argv;
 static int sim_exit_status = EXIT_SUCCESS;              /* optionally set by EXIT command */
@@ -757,6 +758,7 @@ const struct scp_error {
          {"AMBREG",  "Ambiguous register name"},
          {"REMOTE",  "remote console command"},
          {"INVEXPR", "invalid expression"},
+         {"SIGTERM", "SIGTERM received"},
     };
 
 const size_t size_map[] = { sizeof (int8),
@@ -1811,7 +1813,7 @@ static const char simh_help[] =
       "++NOPARAM, ALATT, TIMER, SIGERR, TTYERR, SUB, NOFNC, UDIS,\n"
       "++NORO, INVSW, MISVAL, 2FARG, 2MARG, NXDEV, NXUN, NXREG,\n"
       "++NXPAR, NEST, IERR, MTRLNT, LOST, TTMO, STALL, AFAIL,\n"
-      "++AMBREG\n\n"
+      "++AMBREG, SIGTERM\n\n"
       " These values can be indicated by name or by their internal\n"
       " numeric value (not recommended).\n"
       /***************** 80 character line width template *************************/
@@ -1831,6 +1833,15 @@ static const char simh_help[] =
       "+ON CONTROL_C trap handler.\n"
       " Note 2: The ON CONTROL_C trapping is not affected by the SET ON and\n"
       "+SET NOON commands.\n"
+      "3SIGTERM Trapping\n"
+      " A special ON trap is available to describe action(s) to be taken\n"
+      " when a SIGTERM (or a Windows Shutdown) signal is delivered during\n"
+      " simulator instruction execution.  After a SIGTERM has been delivered\n"
+      " to a simulator process, instruction execution will stop and control\n"
+      " will return to either the invoking do command procedure with a SIGTERM\n"
+      " status (and thus take SIGTERM ON condition) or if execution was\n"
+      " explicitly started from a sim> prompt, the program will exit\n"
+
 #define HLP_PROCEED     "*Commands Executing_Command_Files PROCEED"
 #define HLP_IGNORE      "*Commands Executing_Command_Files PROCEED"
        /***************** 80 character line width template *************************/
@@ -2667,7 +2678,8 @@ stat = SCPE_BARE_STATUS(stat);                          /* remove possible flag 
 while (stat != SCPE_EXIT) {                             /* in case exit */
     if (stop_cpu) {                                     /* SIGINT happened? */
         stop_cpu = FALSE;
-        if (!sim_ttisatty()) {
+        if ((!sim_ttisatty()) || 
+            sigterm_received) {
             stat = SCPE_EXIT;
             break;
             }
@@ -8004,6 +8016,10 @@ do {
         sim_activate (&sim_step_unit, sim_step);
     } while (1);
 
+if ((SCPE_BARE_STATUS(r) == SCPE_STOP) &&
+    sigterm_received)
+    r = SCPE_SIGTERM;
+
 if ((SCPE_BARE_STATUS(r) == SCPE_STOP) &&               /* WRU exit from sim_instr() */
     (sim_on_actions[sim_do_depth][SCPE_STOP] == NULL) &&/* without a handler for a STOP condition */
     (sim_on_actions[sim_do_depth][0] == NULL))
@@ -8155,6 +8171,8 @@ return sim_cancel (&sim_step_unit);
 void int_handler (int sig)
 {
 stop_cpu = TRUE;
+if (sig == SIGTERM)
+    sigterm_received = TRUE;
 }
 
 /* Examine/deposit commands

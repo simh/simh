@@ -3388,6 +3388,8 @@ static DWORD saved_output_mode;
          console terminal is a useful character to be passed to the 
          simulator.  This code does nothing to disable or affect that. */
 
+#include <signal.h>
+
 static BOOL WINAPI
 ControlHandler(DWORD dwCtrlType)
     {
@@ -3398,7 +3400,7 @@ ControlHandler(DWORD dwCtrlType)
         {
         case CTRL_BREAK_EVENT:      // Use CTRL-Break or CTRL-C to simulate 
         case CTRL_C_EVENT:          // SERVICE_CONTROL_STOP in debug mode
-            int_handler(0);
+            int_handler(SIGINT);
             return TRUE;
         case CTRL_CLOSE_EVENT:      // Window is Closing
         case CTRL_LOGOFF_EVENT:     // User is logging off
@@ -3406,7 +3408,7 @@ ControlHandler(DWORD dwCtrlType)
                 return TRUE;        // Not our User, so ignore
             /* fall through */
         case CTRL_SHUTDOWN_EVENT:   // System is shutting down
-            int_handler(0);
+            int_handler(SIGTERM);
             return TRUE;
         }
     return FALSE;
