@@ -31,7 +31,9 @@
 
 /* FIXME - Some or all of these should be dynamic */
 
+#ifndef VA_PLANES
 #define VA_PLANES       4
+#endif
 #define VA_BPP          (1u << VA_PLANES)
 #define VA_PLANE_MASK   (VA_BPP - 1)
 

@@ -390,8 +390,11 @@ int32 nvr_rd (int32 pa)
 int32 rg = (pa + 1 - NVRBASE) >> 1;
 int32 result;
 
-if (rg < 14)                                             /* watch chip */
-    result = wtc_rd (pa);
+if (rg < 14) {                                           /* watch chip */
+    result = wtc_rd (rg);
+    if (rg & 1)
+        result = (result << 16);                         /* word aligned */
+    }
 else {
     result = (nvr[rg] & WMASK) | (((uint32)nvr[rg]) << 16);
     if (pa & 1)
@@ -408,7 +411,7 @@ void nvr_wr (int32 pa, int32 val, int32 lnt)
 int32 rg = (pa + 1 - NVRBASE) >> 1;
 
 if (rg < 14)                                             /* watch chip */
-    wtc_wr (pa, val, lnt);
+    wtc_wr (rg, val, lnt);
 else {
     int32 orig_nvr = (int32)nvr[rg];
 

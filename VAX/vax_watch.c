@@ -157,9 +157,8 @@ static const char *wtc_regs[] =
 
 
 
-int32 wtc_rd (int32 pa)
+int32 wtc_rd (int32 rg)
 {
-int32 rg = (pa >> 1) & 0xF;
 int32 val = 0;
 time_t curr;
 struct timespec now;
@@ -239,21 +238,18 @@ switch(rg) {
 
     case 13:                                            /* CSR D */
         val = wtc_csrd & WTC_CSRD_RD;
+        wtc_set_valid ();
         break;
         }
 
-sim_debug(DBG_REG, &wtc_dev, "wtc_rd(pa=0x%08X [%s], data=0x%X) ", pa, wtc_regs[rg], val);
+sim_debug(DBG_REG, &wtc_dev, "wtc_rd(rg=%d [%s], data=0x%X) ", rg, wtc_regs[rg], val);
 sim_debug_bits(DBG_REG, &wtc_dev, wtc_bitdefs[rg], (uint32)val, (uint32)val, TRUE);
-
-if (rg & 1)
-    val = (val << 16);                                  /* word aligned? */
 
 return val;
 }
 
-void wtc_wr (int32 pa, int32 val, int32 lnt)
+void wtc_wr (int32 rg, int32 val)
 {
-int32 rg = (pa >> 1) & 0xF;
 int32 new_val = val;
 
 val = val & 0xFF;
@@ -279,7 +275,7 @@ switch(rg) {
         break;
         }
 
-sim_debug(DBG_REG, &wtc_dev, "wtc_wr(pa=0x%08X [%s], data=0x%X) ", pa, wtc_regs[rg], val);
+sim_debug(DBG_REG, &wtc_dev, "wtc_wr(rg=%d [%s], data=0x%X) ", rg, wtc_regs[rg], val);
 sim_debug_bits(DBG_REG, &wtc_dev, wtc_bitdefs[rg], (uint32)new_val, (uint32)new_val, TRUE);
 
 }

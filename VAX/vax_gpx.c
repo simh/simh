@@ -1802,8 +1802,12 @@ for (val = 0;;) {
 sim_debug (DBG_ROP, gpx_dev, "BTP Complete\n");
 /* FIXME - This is a temporary workaround for the QDSS. Address output complete
    should not be set until the FIFO is empty */
+#if defined(VAX_630)
 uptr->CMD = 0;
 va_adpstat (ADPSTAT_AC | ADPSTAT_RC, 0);
+#else
+va_adpstat (ADPSTAT_RC, 0);
+#endif
 return SCPE_OK;
 }
 

@@ -60,7 +60,19 @@
     MicroVAX I & VAXStation I
     MicroVAX II & VAXStation II & VAXStation II GPX
     rtVAX 1000 (or Industrial VAX 620)
-    
+    MicroVAX 2000 & VAXstation 2000
+    MicroVAX 3100 M10/M20
+    MicroVAX 3100 M10e/M20e
+    InfoServer 100
+    InfoServer 150 VXT
+    VAXstation 3100 M30
+    VAXstation 3100 M38
+    VAXstation 3100 M76
+    VAXstation 4000 VLC
+    VAXstation 4000 M60
+    MicroVAX 3100 M80
+    InfoServer 1000
+
 #### Howard Harte has implemented a Lincoln Labs TX-0 simulator.
 
 #### Gerardo Ospina has implemented a Manchester University SSEM (Small Scale Experimental Machine) simulator.
