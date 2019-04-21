@@ -55,9 +55,10 @@
 
     VAX/11 730
     VAX/11 750
+    VAX 8200
     VAX 8600/8650
     MicroVAX I & VAXStation I
-    MicroVAX II & VAXStation II
+    MicroVAX II & VAXStation II & VAXStation II GPX
     rtVAX 1000 (or Industrial VAX 620)
     
 #### Howard Harte has implemented a Lincoln Labs TX-0 simulator.
