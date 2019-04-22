@@ -66,8 +66,14 @@ REG mctl_reg[] = {
     { NULL }
     };
 
+MTAB mctl_mod[] = {
+    { MTAB_XTD|MTAB_VDV, 010, "ADDRESS", "ADDRESS",
+        NULL, &show_addr, NULL, "Bus address" },
+    { 0 }
+    };
+
 DEVICE mctl_dev = {
-    "MCTL", &mctl_unit, mctl_reg, NULL,
+    "MCTL", &mctl_unit, mctl_reg, mctl_mod,
     1, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &mctl_reset,
     NULL, NULL, NULL,
