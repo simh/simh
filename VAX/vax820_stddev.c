@@ -776,6 +776,10 @@ if (clk_unit.filebuf == NULL) {                         /* make sure the TODR is
         return SCPE_MEM;
     }
 todr_resync ();
+if (clk_unit.flags & UNIT_ATT)              /* battery backup hooked up? */
+    wtc_set_valid ();
+else
+    wtc_set_invalid ();
 return SCPE_OK;
 }
 
@@ -843,6 +847,8 @@ if (r != SCPE_OK)
 else {
     TOY *toy = (TOY *)uptr->filebuf;
 
+    wtc_set_valid ();
+    wtc_set (NULL, 0, "STD", NULL);
     uptr->hwmark = (uint32) uptr->capac;
     if ((toy->toy_endian_plus2 < 2) || (toy->toy_endian_plus2 > 3))
         memset (uptr->filebuf, 0, (size_t)uptr->capac);

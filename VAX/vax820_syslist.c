@@ -43,6 +43,7 @@ extern DEVICE ka_dev[KA_NUM];
 extern DEVICE mctl_dev[MCTL_NUM];
 extern DEVICE uba_dev;
 extern DEVICE clk_dev;
+extern DEVICE wtc_dev;
 extern DEVICE tmr_dev;
 extern DEVICE tti_dev, tto_dev;
 extern DEVICE fl_dev;
@@ -77,6 +78,7 @@ DEVICE *sim_devices[] = {
     &mctl_dev[1],
     &uba_dev,
     &clk_dev,
+    &wtc_dev,
     &tmr_dev,
     &tti_dev,
     &tto_dev,

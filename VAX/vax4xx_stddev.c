@@ -31,7 +31,6 @@
 */
 
 #include "vax_defs.h"
-#include <time.h>
 
 #define UNIT_V_NODELAY  (UNIT_V_UF + 0)                 /* ROM access equal to RAM access */
 #define UNIT_NODELAY    (1u << UNIT_V_NODELAY)
@@ -69,10 +68,6 @@ t_stat clk_reset (DEVICE *dptr);
 const char *clk_description (DEVICE *dptr);
 
 extern int32 sysd_hlt_enb (void);
-extern int32 wtc_rd (int32 rg);
-extern void wtc_wr (int32 rg, int32 val);
-extern void wtc_set_valid (void);
-extern void wtc_set_invalid (void);
 
 /* ROM data structures
 

@@ -106,6 +106,7 @@ int32 wtc_csrb = 0;
 int32 wtc_csrc = 0;
 int32 wtc_csrd = 0;
 int32 wtc_mode = WTC_MODE_VMS;
+uint8 wtc_ram[64];
 
 t_stat wtc_set (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat wtc_show (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
@@ -123,6 +124,7 @@ REG wtc_reg[] = {
     { HRDATADF (CSRC, wtc_csrc, 8, "CSRC", wtc_csrc_bits) },
     { HRDATADF (CSRD, wtc_csrd, 8, "CSRD", wtc_csrd_bits) },
     { HRDATADF (MODE, wtc_mode, 8, "Watch Mode", wtc_mode_bits) },
+    { BRDATAD  (RAM,  wtc_ram,  8, 8, sizeof (wtc_ram), "RAM") },
     { NULL }
     };
 
@@ -153,7 +155,7 @@ static const char *wtc_regs[] =
     {"SEC ", "SECA", "MIN ", "MINA", 
      "HR  ", "HRA ", "DOW ", "DOM ", 
      "MON ", "YEAR", "CSRA", "CSRB", 
-     "CSRC", "CSRD" };
+     "CSRC", "CSRD"};
 
 
 
@@ -191,61 +193,71 @@ if (rg < 10) {                                          /* time reg? */
         }
     }
 
-switch(rg) {
+val = wtc_ram[rg];                                      /* start with RAM data */
 
-    case 0:                                             /* seconds */
-        val = ctm->tm_sec;
-        break;
+if (rg < 14) {
+    switch(rg) {
 
-    case 2:                                             /* minutes */
-        val = ctm->tm_min;
-        break;
+        case 0:                                         /* seconds */
+            val = ctm->tm_sec;
+            break;
 
-    case 4:                                             /* hours */
-        val = ctm->tm_hour;
-        break;
+        case 2:                                         /* minutes */
+            val = ctm->tm_min;
+            break;
 
-    case 6:                                             /* day of week */
-        val = ctm->tm_wday;
-        break;
+        case 4:                                         /* hours */
+            val = ctm->tm_hour;
+            break;
 
-    case 7:                                             /* day of month */
-        val = ctm->tm_mday;
-        break;
+        case 6:                                         /* day of week */
+            val = ctm->tm_wday;
+            break;
 
-    case 8:                                             /* month */
-        val = ctm->tm_mon + 1;
-        break;
+        case 7:                                         /* day of month */
+            val = ctm->tm_mday;
+            break;
 
-    case 9:                                             /* year */
-        if (wtc_mode == WTC_MODE_VMS)
-            val = 82;                                   /* always 1982 for VMS */
-        else
-            val = (int32)(ctm->tm_year % 100);
-        break;
+        case 8:                                         /* month */
+            val = ctm->tm_mon + 1;
+            break;
 
-    case 10:                                            /* CSR A */
-        val = wtc_csra;
-        break;
+        case 9:                                         /* year */
+            if (wtc_mode == WTC_MODE_VMS)
+                val = 82;                               /* always 1982 for VMS */
+            else
+                val = (int32)(ctm->tm_year % 100);
+            break;
 
-    case 11:                                            /* CSR B */
-        val = wtc_csrb;
-        break;
+        case 10:                                        /* CSR A */
+            val = wtc_csra;
+            break;
 
-    case 12:                                            /* CSR C */
-        val = wtc_csrc;
-        break;
+        case 11:                                        /* CSR B */
+            val = wtc_csrb;
+            break;
 
-    case 13:                                            /* CSR D */
-        val = wtc_csrd & WTC_CSRD_RD;
-        wtc_set_valid ();
-        break;
-        }
+        case 12:                                        /* CSR C */
+            val = wtc_csrc;
+            break;
 
-sim_debug(DBG_REG, &wtc_dev, "wtc_rd(rg=%d [%s], data=0x%X) ", rg, wtc_regs[rg], val);
-sim_debug_bits(DBG_REG, &wtc_dev, wtc_bitdefs[rg], (uint32)val, (uint32)val, TRUE);
+        case 13:                                        /* CSR D */
+            val = wtc_csrd & WTC_CSRD_RD;
+            wtc_set_valid ();
+            break;
+            }
+    sim_debug(DBG_REG, &wtc_dev, "wtc_rd(rg=%d [%s], data=0x%X) ", rg, wtc_regs[rg], val);
+    sim_debug_bits(DBG_REG, &wtc_dev, wtc_bitdefs[rg], (uint32)val, (uint32)val, TRUE);
+    }
+else
+    sim_debug(DBG_REG, &wtc_dev, "wtc_rd(rg=%d [RAM], data=0x%X)\n", rg, val);
 
 return val;
+}
+
+int32 wtc_rd_pa (int32 pa)
+{
+return wtc_rd ((pa & (sizeof (wtc_ram) - 1)) >> 1);
 }
 
 void wtc_wr (int32 rg, int32 val)
@@ -254,7 +266,8 @@ int32 new_val = val;
 
 val = val & 0xFF;
 
-switch(rg) {
+wtc_ram[rg] = val;                                      /* Save data in RAM */
+switch(rg) {                                            /* register behaviors */
 
     case 10:                                            /* CSR A */
         val = val & WTC_CSRA_WR;
@@ -275,9 +288,19 @@ switch(rg) {
         break;
         }
 
-sim_debug(DBG_REG, &wtc_dev, "wtc_wr(rg=%d [%s], data=0x%X) ", rg, wtc_regs[rg], val);
-sim_debug_bits(DBG_REG, &wtc_dev, wtc_bitdefs[rg], (uint32)new_val, (uint32)new_val, TRUE);
+if (rg < 14) {
+    sim_debug(DBG_REG, &wtc_dev, "wtc_wr(rg=%d [%s], data=0x%X) ", rg, wtc_regs[rg], val);
+    sim_debug_bits(DBG_REG, &wtc_dev, wtc_bitdefs[rg], (uint32)new_val, (uint32)new_val, TRUE);
+    }
+else
+    sim_debug(DBG_REG, &wtc_dev, "wtc_wr(rg=%d [RAM], data=0x%X)\n", rg, val);
+}
 
+void wtc_wr_pa (int32 pa, int32 val, int32 lnt)
+{
+wtc_wr ((pa & (sizeof (wtc_ram) - 1)) >> 1, val);
+if (lnt == 4)
+    wtc_wr (((pa + 2) & (sizeof (wtc_ram) - 1)) >> 1, val);
 }
 
 t_stat wtc_reset (DEVICE *dptr)
@@ -294,8 +317,21 @@ return SCPE_OK;
 
 t_stat wtc_set (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-if (cptr != NULL)
-    wtc_mode = ((strcmp(cptr, "STD") != 0) ? WTC_MODE_VMS : WTC_MODE_STD);
+char gbuf[CBUFSIZE];
+
+if (cptr != NULL) {
+    cptr = get_glyph (cptr, gbuf, 0);
+    if (*cptr)
+        return SCPE_2MARG;
+    if (strcmp (gbuf, "STD") == 0)
+        wtc_mode = WTC_MODE_STD;
+    else {
+        if (strcmp (gbuf, "VMS") == 0)
+            wtc_mode = WTC_MODE_VMS;
+        else
+            return SCPE_ARG;
+        }
+    }
 return SCPE_OK;
 }
 

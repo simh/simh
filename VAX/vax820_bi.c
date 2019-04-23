@@ -88,8 +88,6 @@ t_stat cpu_boot (int32 unitno, DEVICE *dptr);
 
 extern void uba_eval_int (void);
 extern int32 uba_get_ubvector (int32 lvl);
-extern void wtc_set_valid (void);
-extern void wtc_set_invalid (void);
 extern int32 iccs_rd (void);
 extern int32 nicr_rd (void);
 extern int32 icr_rd (void);
@@ -98,7 +96,6 @@ extern int32 rxcs_rd (void);
 extern int32 rxdb_rd (void);
 extern int32 txcs_rd (void);
 extern int32 rxcd_rd (void);
-extern int32 wtc_rd (int32 pa);
 extern int32 pcsr_rd (int32 pa);
 extern int32 fl_rd (int32 pa);
 extern void iccs_wr (int32 dat);
@@ -108,7 +105,6 @@ extern void rxcs_wr (int32 dat);
 extern void txcs_wr (int32 dat);
 extern void txdb_wr (int32 dat);
 extern void rxcd_wr (int32 val);
-extern void wtc_wr (int32 pa, int32 val, int32 lnt);
 extern void pcsr_wr (int32 pa, int32 val, int32 lnt);
 extern void fl_wr (int32 pa, int32 val, int32 lnt);
 extern void init_ubus_tab (void);
@@ -488,7 +484,7 @@ struct reglink {                                        /* register linkage */
     };
 
 struct reglink regtable[] = {
-    { WATCHBASE, WATCHBASE+WATCHSIZE, &wtc_rd, &wtc_wr },
+    { WATCHBASE, WATCHBASE+WATCHSIZE, &wtc_rd_pa, &wtc_wr_pa },
     { 0x20088000, 0x20088004, &pcsr_rd, &pcsr_wr },
     { 0x200B0000, 0x200B0020, &fl_rd, &fl_wr },
     { 0, 0, NULL, NULL }

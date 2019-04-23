@@ -934,6 +934,8 @@ extern void rom_wr_B (int32 pa, int32 val);
 #define CPU_MODEL_MODIFIERS             /* No model specific CPU modifiers */
 #endif
 
+#include "vax_watch.h"                  /* Watch chip definitions */
+
 #ifdef DONT_USE_INTERNAL_ROM
 #define BOOT_CODE_ARRAY NULL
 #define BOOT_CODE_SIZE 0
