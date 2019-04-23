@@ -25,6 +25,7 @@
 
    cpu          VAX central processor
 
+   23-Apr-19    RMS     Added hook for unpredictable indexed immediate .aw
    14-Apr-19    RMS     Added hook for non-standard MxPR CC's
    31-Mar-17    RMS     Fixed uninitialized variable on FPD path (COVERITY)
    13-Mar-17    RMS     Fixed dangling else in show_opnd (COVERITY)
@@ -886,20 +887,11 @@ for ( ;; ) {
 
             case AIN|VB:
             case AIN|WB: case AIN|WW: case AIN|WL: case AIN|WQ: case AIN|WO:
-/*              CHECK_FOR_PC; */
                 opnd[j++] = OP_MEM;
             case AIN|AB: case AIN|AW: case AIN|AL: case AIN|AQ: case AIN|AO:
                 va = opnd[j++] = R[rn];
                 if (rn == nPC) {
-                    if (DR_LNT (disp) >= L_QUAD) {
-                        GET_ISTR (temp, L_LONG);
-                        GET_ISTR (temp, L_LONG);
-                        if (DR_LNT (disp) == L_OCTA) {
-                            GET_ISTR (temp, L_LONG);
-                            GET_ISTR (temp, L_LONG);
-                            }
-                        }
-                    else GET_ISTR (temp, DR_LNT (disp));
+                    SETPC (PC + DR_LNT (disp));
                     }
                 else {
                     R[rn] = R[rn] + DR_LNT (disp);
@@ -1410,10 +1402,15 @@ for ( ;; ) {
                     break;
 
                 case AIN:
-                    CHECK_FOR_PC;
                     index = index + R[rn];
-                    R[rn] = R[rn] + DR_LNT (disp);
-                    recq[recqptr++] = RQ_REC (AIN | (disp & DR_LNMASK), rn);
+                    if (rn == nPC) {
+                        IDX_IMM_TEST;
+                        SETPC (PC + DR_LNT (disp));
+                        }
+                    else {
+                        R[rn] = R[rn] + DR_LNT (disp);
+                        recq[recqptr++] = RQ_REC (AIN | (disp & DR_LNMASK), rn);
+                        }
                     break;
 
                 case AID:

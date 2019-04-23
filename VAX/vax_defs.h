@@ -602,7 +602,7 @@ enum opcodes {
 #define STR_GETDPC(x)   (((x) >> STR_V_DPC) & STR_M_DPC)
 #define STR_GETCHR(x)   (((x) >> STR_V_CHR) & STR_M_CHR)
 #define STR_PACK(m,x)   ((((PC - fault_PC) & STR_M_DPC) << STR_V_DPC) | \
-                    (((m) & STR_M_CHR) << STR_V_CHR) | ((x) & STR_LNMASK))
+                        (((m) & STR_M_CHR) << STR_V_CHR) | ((x) & STR_LNMASK))
 
 /* Read and write */
 

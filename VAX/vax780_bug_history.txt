@@ -61,7 +61,7 @@ Bugs Found And Fixed During Simulator Debug
 58. POLYx: add step <does> require truncation (proved by AXE tests).
 59. Unaligned references to IO space: incorrect on CVAX.
 60. REI to compatibility mode: PSL<dv,fu,iv> were not checked for mbz.
-
+61. Indexed immediate not does fault.
 
 
 

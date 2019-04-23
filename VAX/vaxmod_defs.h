@@ -1,6 +1,6 @@
 /* vaxmod_defs.h: VAX model-specific definitions file
 
-   Copyright (c) 1998-2017, Robert M Supnik
+   Copyright (c) 1998-2019, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   23-Apr-19    RMS     Added hook for unpredictable indexed immediate .aw
    18-May-17    RMS     Added model-specific AST validation test
    29-Mar-15    RMS     Added model-specific IPR max
    20-Dec-13    RMS     Added prototypes for unaligned IO and register handling
@@ -217,6 +218,7 @@
 #define LP_AST_TEST(r)
 #define LP_MBZ84_TEST(r)
 #define LP_MBZ92_TEST(r)
+#define IDX_IMM_TEST    RSVD_ADDR_FAULT                 /* fault on indexed imm */
 
 #define MT_AST_TEST(r)  if ((r) > AST_MAX) RSVD_OPND_FAULT
 
