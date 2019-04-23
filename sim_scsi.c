@@ -33,11 +33,13 @@
 #define CMD_TESTRDY     0x00                            /* test unit ready */
 #define CMD_INQUIRY     0x12                            /* inquiry */
 #define CMD_REQSENSE    0x03                            /* request sense */
+#define CMD_RDBLKLIM    0x05                            /* read block limits */
 #define CMD_MODESEL6    0x15                            /* mode select (6 bytes) */
 #define CMD_MODESEL10   0x55                            /* mode select (10 bytes) */
 #define CMD_MODESENSE6  0x1A                            /* mode sense (6 bytes) */
 #define CMD_MODESENSE10 0x5A                            /* mode sense (10 bytes) */
 #define CMD_STARTSTOP   0x1B                            /* start/stop unit */
+#define CMD_LOADUNLOAD  0x1B                            /* load/unload unit */
 #define CMD_PREVALLOW   0x1E                            /* prevent/allow medium removal */
 #define CMD_RDCAP       0x25                            /* read capacity */
 #define CMD_READ6       0x08                            /* read (6 bytes) */
@@ -931,6 +933,47 @@ else if (bus->phase == SCSI_DATO) {
     }
 }
 
+/* Command - Write (6 byte command), tape version */
+
+void scsi_write6_tape (SCSI_BUS *bus, uint8 *data, uint32 len)
+{
+UNIT *uptr = bus->dev[bus->target];
+SCSI_DEV *dev = (SCSI_DEV *)uptr->up7;
+t_seccnt sects;
+t_stat r;
+
+if (bus->phase == SCSI_CMD) {
+    sim_debug (SCSI_DBG_CMD, bus->dptr,
+        "Write(6) - CMD\n");
+    memcpy (&bus->cmd[0], &data[0], 6);                 /* save current cmd */
+    sects = GETW (bus->cmd, 3) | (bus->cmd[2] << 16);
+    if (data[1] & 0x1)                                  /* FIXED */
+        sects = sects * dev->block_size;
+    bus->buf_b = sects;
+    scsi_set_phase (bus, SCSI_DATO);                    /* data out phase next */
+    scsi_set_req (bus);                                 /* request data */
+    }
+else if (bus->phase == SCSI_DATO) {
+    sects = GETW (bus->cmd, 3) | (bus->cmd[2] << 16);
+    if (data[1] & 0x1)                                  /* FIXED */
+        sects = sects * dev->block_size;
+    sim_debug (SCSI_DBG_CMD, bus->dptr,
+        "Write(6) - DATO, bytes %d\n", sects);
+
+    if (uptr->flags & UNIT_ATT) {
+        r = sim_tape_wrrecf (uptr, &bus->buf[0], sects);
+        sim_debug (SCSI_DBG_CMD, bus->dptr,
+            "Write(6) - DATO, r = %d\n", r);
+        scsi_tape_status (bus, r);                      /* translate status */
+        }
+    else
+        scsi_status_deferred (bus, STS_OK, KEY_OK, ASC_OK);
+
+    memset (&bus->cmd[0], 0, 10);                       /* clear current cmd */
+    scsi_status (bus, bus->status, bus->sense_key, bus->sense_code);
+    }
+}
+
 /* Command - Write (10 byte command), disk version */
 
 void scsi_write10_disk (SCSI_BUS *bus, uint8 *data, uint32 len)
@@ -1093,6 +1136,39 @@ scsi_set_phase (bus, SCSI_STS);                         /* status phase next */
 scsi_set_req (bus);                                     /* request to send data */
 }
 
+/* Command - Read Block Limits */
+
+void scsi_read_blklim (SCSI_BUS *bus, uint8 *data, uint32 len)
+{
+sim_debug (SCSI_DBG_CMD, bus->dptr, "Read Block Limits\n");
+
+bus->buf[bus->buf_b++] = 0x00;                          /* reserved */
+bus->buf[bus->buf_b++] = (MTR_MAXLEN >> 16) & 0xFF;     /* max block length (23:16) */
+bus->buf[bus->buf_b++] = (MTR_MAXLEN >> 8) & 0xFF;      /* max block length (15:8) */
+bus->buf[bus->buf_b++] = MTR_MAXLEN & 0xFF;             /* max block length (7:0) */
+bus->buf[bus->buf_b++] = 0x00;                          /* min block length (15:8) */
+bus->buf[bus->buf_b++] = 0x01;                          /* min block length (7:0) */
+scsi_set_phase (bus, SCSI_DATI);                        /* data in phase next */
+scsi_set_req (bus);                                     /* request to send data */
+}
+
+/* Command Load/Unload Unit */
+
+void scsi_load_unload (SCSI_BUS *bus, uint8 *data, uint32 len)
+{
+UNIT *uptr = bus->dev[bus->target];
+
+sim_debug (SCSI_DBG_CMD, bus->dptr, "Load/Unload\n");
+
+if ((data[4] & 0x5) == 0x5) {                           /* EOT & Load? */
+    scsi_status (bus, STS_CHK, KEY_ILLREQ, ASC_INVCDB); /* invalid combination */
+    return;
+    }
+if ((data[4] & 0x1) == 0)
+    sim_tape_detach (uptr);                             /* unload */
+scsi_status (bus, STS_OK, KEY_OK, ASC_OK);              /* GOOD status */
+}
+
 /* Process a SCSI command for a direct-access device */
 
 void scsi_disk_command (SCSI_BUS *bus, uint8 *data, uint32 len)
@@ -1218,7 +1294,9 @@ switch (data[0]) {
         scsi_read6_tape (bus, data, len);
         break;
 
-    /* FIXME: READ BLOCK LIMITS */
+    case CMD_RDBLKLIM:                                  /* mandatory */
+        scsi_read_blklim (bus, data, len);
+        break;
 
     case CMD_RELEASE:                                   /* mandatory */
         scsi_release_unit (bus, data, len);
@@ -1244,11 +1322,17 @@ switch (data[0]) {
         scsi_space (bus, data, len);
         break;
 
+    case CMD_LOADUNLOAD:                                /* optional */
+        scsi_load_unload (bus, data, len);
+        break;
+
     case CMD_TESTRDY:                                   /* mandatory */
         scsi_test_ready (bus, data, len);
         break;
 
-    /* FIXME: WRITE6 */
+    case CMD_WRITE6:                                    /* mandatory */
+        scsi_write6_tape (bus, data, len);
+        break;
 
     case CMD_WRFMARK:                                   /* mandatory */
         scsi_wrfmark (bus, data, len);
@@ -1256,6 +1340,83 @@ switch (data[0]) {
 
     default:
         sim_printf ("SCSI: unknown tape command %02X\n", data[0]);
+        scsi_status (bus, STS_CHK, KEY_ILLREQ, ASC_INVCOM);
+        break;
+        }
+}
+
+/* Process a SCSI command for a CD-ROM device */
+
+void scsi_cdrom_command (SCSI_BUS *bus, uint8 *data, uint32 len)
+{
+switch (data[0]) {
+
+    case CMD_INQUIRY:                                   /* mandatory */
+        scsi_inquiry (bus, data, len);
+        break;
+
+    case CMD_MODESEL6:                                  /* optional */
+        scsi_mode_sel6 (bus, data, len);
+        break;
+
+    case CMD_MODESEL10:                                 /* optional */
+        scsi_mode_sel10 (bus, data, len);
+        break;
+
+    case CMD_MODESENSE6:                                /* optional */
+        scsi_mode_sense6 (bus, data, len);
+        break;
+
+    case CMD_MODESENSE10:                               /* optional */
+        scsi_mode_sense10 (bus, data, len);
+        break;
+
+    case CMD_PREVALLOW:                                 /* optional */
+        scsi_prev_allow (bus, data, len);
+        break;
+
+    case CMD_READ6:                                     /* optional */
+        scsi_read6_disk (bus, data, len);
+        break;
+
+    case CMD_READ10:                                    /* mandatory */
+        scsi_read10_disk (bus, data, len);
+        break;
+
+    case CMD_RDCAP:                                     /* mandatory */
+        scsi_read_capacity (bus, data, len);
+        break;
+
+    case CMD_RDLONG:                                    /* optional */
+        scsi_read_long (bus, data, len);
+        break;
+
+    case CMD_RELEASE:                                   /* mandatory */
+        scsi_release_unit (bus, data, len);
+        break;
+
+    case CMD_REQSENSE:                                  /* mandatory */
+        scsi_req_sense (bus, data, len);
+        break;
+
+    case CMD_RESERVE:                                   /* mandatory */
+        scsi_reserve_unit (bus, data, len);
+        break;
+
+    case CMD_SNDDIAG:                                   /* mandatory */
+        scsi_send_diag (bus, data, len);
+        break;
+
+    case CMD_STARTSTOP:                                 /* optional */
+        scsi_start_stop (bus, data, len);
+        break;
+
+    case CMD_TESTRDY:                                   /* mandatory */
+        scsi_test_ready (bus, data, len);
+        break;
+
+    default:
+        sim_printf ("SCSI: unknown CD-ROM command %02X\n", data[0]);
         scsi_status (bus, STS_CHK, KEY_ILLREQ, ASC_INVCOM);
         break;
         }
@@ -1278,13 +1439,18 @@ bus->status = STS_OK;
 switch (dev->devtype) {
 
     case SCSI_DISK:
+    case SCSI_WORM:                                     /* same as disk for now */
         scsi_disk_command (bus, data, len);
         break;
 
     case SCSI_TAPE:
         scsi_tape_command (bus, data, len);
         break;
-        
+
+    case SCSI_CDROM:
+        scsi_cdrom_command (bus, data, len);
+        break;
+
     default:
         sim_printf ("SCSI: commands unimplemented for device type %d\n", dev->devtype);
         break;
