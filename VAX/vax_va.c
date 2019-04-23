@@ -190,7 +190,6 @@ const char *va_dga_rgd[] = {                            /* DMA gate array regist
     "Interrupt Register"
     };
 
-DEVICE va_dev;
 t_stat va_rd (int32 *data, int32 PA, int32 access);
 t_stat va_wr (int32 data, int32 PA, int32 access);
 t_stat va_svc (UNIT *uptr);
@@ -953,7 +952,7 @@ for (ln = 0; ln < VA_YSIZE; ln++) {
                 plna = &va_ram[(CUR_PLNA + ln - CUR_Y)];/* get plane A base */
                 plnb = &va_ram[(CUR_PLNB + ln - CUR_Y)];/* get plane B base */
                 for (col = 0; col < 16; col++) {
-                    if ((CUR_X + col) < 0)              /* Part of cursor off screen? */
+                    if ((CUR_X + (int32)col) < 0)       /* Part of cursor off screen? */
                         continue;                       /* Skip */
                     if ((CUR_X + col) >= VA_XSIZE)      /* Part of cursor off screen? */
                         continue;                       /* Skip */
