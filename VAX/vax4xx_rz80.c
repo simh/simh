@@ -809,6 +809,7 @@ return SCPE_OK;
 
 t_stat rz_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
+CTLR *rz = rz_ctxmap[uptr->cnum];
 uint32 cap;
 uint32 max = sim_toffset_64? RZU_EMAXC: RZU_MAXC;
 t_stat r;
@@ -827,6 +828,8 @@ if (cptr) {
     }
 uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (val << UNIT_V_DTYPE);
 uptr->capac = (t_addr)rzdev_tab[val].lbn;
+scsi_set_unit (&rz->bus, uptr, &rzdev_tab[val]);
+scsi_reset_unit (uptr);
 return SCPE_OK;
 }
 

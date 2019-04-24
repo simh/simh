@@ -182,6 +182,18 @@ MTAB rz_mod[] = {
       &rz_set_type, NULL, NULL, "Set RRD40 Disk Type" },
     { MTAB_XTD|MTAB_VUN, RRD42_DTYPE, NULL, "RRD42",
       &rz_set_type, NULL, NULL, "Set RRD42 Disk Type" },
+    { MTAB_XTD|MTAB_VUN, RRD42_DTYPE, NULL, "RRW11",
+      &rz_set_type, NULL, NULL, "Set RRW11 Disk Type" },
+    { MTAB_XTD|MTAB_VUN, RRW11_DTYPE, NULL, "RRW11",
+      &rz_set_type, NULL, NULL, "Set RRW11 Disk Type" },
+    { MTAB_XTD|MTAB_VUN, CDW900_DTYPE, NULL, "CDW900",
+      &rz_set_type, NULL, NULL, "Set SONY CDW-900E Disk Type" },
+    { MTAB_XTD|MTAB_VUN, XR1001_DTYPE, NULL, "XR1001",
+      &rz_set_type, NULL, NULL, "Set JVC XR-W1001 Disk Type" },
+    { MTAB_XTD|MTAB_VUN, TZK50_DTYPE, NULL, "TZK50",
+      &rz_set_type, NULL, NULL, "Set DEC TZK50 Tape Type" },
+    { MTAB_XTD|MTAB_VUN, TZ30_DTYPE, NULL, "TZ30",
+      &rz_set_type, NULL, NULL, "Set DEC TZ30 Tape Type" },
     { MTAB_XTD|MTAB_VUN|MTAB_VALR, RZU_DTYPE, NULL, "RZUSER",
       &rz_set_type, NULL, NULL, "Set RZUSER=size Disk Type" },
     { MTAB_XTD|MTAB_VUN, 0, "TYPE", NULL,
@@ -823,6 +835,8 @@ if (cptr) {
     }
 uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (val << UNIT_V_DTYPE);
 uptr->capac = (t_addr)rzdev_tab[val].lbn;
+scsi_set_unit (&rz_bus, uptr, &rzdev_tab[val]);
+scsi_reset_unit (uptr);
 return SCPE_OK;
 }
 
