@@ -1829,7 +1829,7 @@ if ((cptr == NULL) || (!*cptr))
 cptr = get_glyph (cptr, gbuf, 0);
 if (MATCH_CMD(gbuf, "VAXSERVER") == 0) {
     sys_model = 0;
-    strcpy (sim_name, "VAXServer 3900 (KA655)");
+    strcpy (sim_name, "VAXserver 3900 (KA655)");
     }
 else if (MATCH_CMD(gbuf, "MICROVAX") == 0) {
     sys_model = 1;
@@ -1843,7 +1843,7 @@ else if (MATCH_CMD(gbuf, "MICROVAX") == 0) {
     }
 else if (MATCH_CMD(gbuf, "VAXSTATION") == 0) {
 #if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
-    strcpy (sim_name, "VAXStation 3900 (KA655)");
+    strcpy (sim_name, "VAXstation 3900 (KA655)");
     sys_model = 1;
     vc_dev.flags = vc_dev.flags & ~DEV_DIS;              /* enable QVSS */
     lk_dev.flags = lk_dev.flags & ~DEV_DIS;              /* enable keyboard */
@@ -1860,7 +1860,7 @@ return SCPE_OK;
 
 t_stat cpu_print_model (FILE *st)
 {
-fprintf (st, "%s 3900 (KA655)", (sys_model ? "MicroVAX" : "VAXServer"));
+fprintf (st, "%s 3900 (KA655)", (sys_model ? "MicroVAX" : "VAXserver"));
 return SCPE_OK;
 }
 

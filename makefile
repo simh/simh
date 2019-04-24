@@ -99,7 +99,7 @@ endif
 BUILD_SINGLE := $(MAKECMDGOALS) $(BLANK_SUFFIX)
 BUILD_MULTIPLE_VERB = is
 # building the pdp1, pdp11, tx-0, or any microvax simulator could use video support
-ifneq (,$(or $(findstring XXpdp1XX,$(addsuffix XX,$(addprefix XX,$(MAKECMDGOALS)))),$(findstring pdp11,$(MAKECMDGOALS)),$(findstring tx-0,$(MAKECMDGOALS)),$(findstring microvax1,$(MAKECMDGOALS)),$(findstring microvax2,$(MAKECMDGOALS)),$(findstring microvax3900,$(MAKECMDGOALS)),$(findstring vax41,$(MAKECMDGOALS)),$(findstring vax42,$(MAKECMDGOALS)),$(findstring microvax3100m76,$(MAKECMDGOALS)),$(findstring XXvaxXX,$(addsuffix XX,$(addprefix XX,$(MAKECMDGOALS))))))
+ifneq (,$(or $(findstring XXpdp1XX,$(addsuffix XX,$(addprefix XX,$(MAKECMDGOALS)))),$(findstring pdp11,$(MAKECMDGOALS)),$(findstring tx-0,$(MAKECMDGOALS)),$(findstring microvax1,$(MAKECMDGOALS)),$(findstring microvax2,$(MAKECMDGOALS)),$(findstring microvax3900,$(MAKECMDGOALS)),$(findstring microvax2000,$(MAKECMDGOALS)),$(findstring vaxstation3100,$(MAKECMDGOALS)),$(findstring XXvaxXX,$(addsuffix XX,$(addprefix XX,$(MAKECMDGOALS))))))
   VIDEO_USEFUL = true
 endif
 # building the besm6 needs both video support and fontfile support
@@ -1928,8 +1928,8 @@ ATT3B2_OPT = -DUSE_INT64 -DUSE_ADDR64 -I ${ATT3B2D} ${NETWORK_OPT}
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	vax microvax3900 microvax1 rtvax1000 microvax2 vax730 vax750 vax780 \
 	vax8200 vax8600 \
-	microvax2000 infoserver100 infoserver150vtx microvax3100 microvax3100e \
-	vaxstation3100m30 vaxstation3100m38 microvax3100m76 vaxstation4000m60 \
+	microvax2000 infoserver100 infoserver150vxt microvax3100 microvax3100e \
+	vaxstation3100m30 vaxstation3100m38 vaxstation3100m76 vaxstation4000m60 \
 	microvax3100m80 vaxstation4000vlc infoserver1000 \
 	nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 cdc1700 \
@@ -2081,9 +2081,9 @@ ${BIN}infoserver100${EXE} : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX420} ${SCSI} ${SIM} ${VAX411_OPT} -o $@ ${LDFLAGS}
 
-infoserver150vtx : ${BIN}BuildROMs${EXE} ${BIN}infoserver150vtx${EXE}
+infoserver150vxt : ${BIN}BuildROMs${EXE} ${BIN}infoserver150vxt${EXE}
 
-${BIN}infoserver150vtx${EXE} : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
+${BIN}infoserver150vxt${EXE} : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX420} ${SCSI} ${SIM} ${VAX412_OPT} -o $@ ${LDFLAGS}
 
@@ -2111,9 +2111,9 @@ ${BIN}vaxstation3100m38${EXE} : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX420} ${SCSI} ${SIM} ${VAX42B_OPT} -o $@ ${LDFLAGS}
 
-microvax3100m76 : ${BIN}BuildROMs${EXE} ${BIN}microvax3100m76${EXE}
+vaxstation3100m76 : ${BIN}BuildROMs${EXE} ${BIN}vaxstation3100m76${EXE}
 
-${BIN}microvax3100m76${EXE} : ${VAX43} ${SCSI} ${SIM} ${BUILD_ROMS}
+${BIN}vaxstation3100m76${EXE} : ${VAX43} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX43} ${SCSI} ${SIM} ${VAX43_OPT} -o $@ ${LDFLAGS}
 

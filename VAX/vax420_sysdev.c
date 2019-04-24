@@ -1123,9 +1123,9 @@ if (MATCH_CMD(gbuf, "MICROVAX") == 0) {
 else if (MATCH_CMD(gbuf, "VAXSERVER") == 0) {
     sys_model = 1;
 #if defined (VAX_41A)
-    strcpy (sim_name, "VAXServer 3100 M10/M20 (KA41-A)");
+    strcpy (sim_name, "VAXserver 3100 M10/M20 (KA41-A)");
 #else   /* VAX_41D */
-    strcpy (sim_name, "VAXServer 3100 M10e/M20e (KA41-D)");
+    strcpy (sim_name, "VAXserver 3100 M10e/M20e (KA41-D)");
 #endif
     reset_all (0);                                       /* reset everything */
     }
@@ -1159,9 +1159,9 @@ else if (MATCH_CMD(gbuf, "VAXSTATION") == 0) {
     lk_dev.flags = lk_dev.flags & ~DEV_DIS;              /* enable keyboard */
     vs_dev.flags = vs_dev.flags & ~DEV_DIS;              /* enable mouse */
 #if defined (VAX_42A)
-    strcpy (sim_name, "VAXStation 3100 M30 (KA42-A)");
+    strcpy (sim_name, "VAXstation 3100 M30 (KA42-A)");
 #else   /* VAX_42B */
-    strcpy (sim_name, "VAXStation 3100 M38 (KA42-B)");
+    strcpy (sim_name, "VAXstation 3100 M38 (KA42-B)");
 #endif
     reset_all (0);                                       /* reset everything */
 #else
@@ -1177,9 +1177,9 @@ else if (MATCH_CMD(gbuf, "VAXSTATIONGPX") == 0) {
     lk_dev.flags = lk_dev.flags & ~DEV_DIS;              /* enable keyboard */
     vs_dev.flags = vs_dev.flags & ~DEV_DIS;              /* enable mouse */
 #if defined (VAX_42A)
-    strcpy (sim_name, "VAXStation GPX 3100 M30 (KA42-A)");
+    strcpy (sim_name, "VAXstation GPX 3100 M30 (KA42-A)");
 #else   /* VAX_42B */
-    strcpy (sim_name, "VAXStation GPX 3100 M38 (KA42-B)");
+    strcpy (sim_name, "VAXstation GPX 3100 M38 (KA42-B)");
 #endif
     reset_all (0);                                       /* reset everything */
 #else
@@ -1195,9 +1195,9 @@ else if (MATCH_CMD(gbuf, "VAXSTATIONSPX") == 0) {
     lk_dev.flags = lk_dev.flags & ~DEV_DIS;              /* enable keyboard */
     vs_dev.flags = vs_dev.flags & ~DEV_DIS;              /* enable mouse */
 #if defined (VAX_42A)
-    strcpy (sim_name, "VAXStation SPX 3100 M30 (KA42-A)");
+    strcpy (sim_name, "VAXstation SPX 3100 M30 (KA42-A)");
 #else   /* VAX_42B */
-    strcpy (sim_name, "VAXStation SPX 3100 M38 (KA42-B)");
+    strcpy (sim_name, "VAXstation SPX 3100 M38 (KA42-B)");
 #endif
     reset_all (0);                                       /* reset everything */
 #else

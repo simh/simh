@@ -710,7 +710,7 @@ else if (DZ_L3C) {                                      /* no, MicroVAX */
     dz_lnorder[2] = 2;
     dz_lnorder[3] = 0;                                  /* only 3 connections */
     }
-else {                                                  /* Infoserver */
+else {                                                  /* InfoServer */
     dz_func[0] = DZ_CONSOLE;
     dz_func[1] = DZ_TMXR;
     dz_func[2] = DZ_TMXR;

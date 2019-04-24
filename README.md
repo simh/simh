@@ -53,12 +53,12 @@
 
 #### Matt Burke has implemented new VAX model simulators:
 
-    VAX/11 730
-    VAX/11 750
-    VAX 8200
+    VAX-11/730
+    VAX-11/750
+    VAX 8200/8250
     VAX 8600/8650
-    MicroVAX I & VAXStation I
-    MicroVAX II & VAXStation II & VAXStation II GPX
+    MicroVAX I & VAXstation I
+    MicroVAX II & VAXstation II & VAXstation II/GPX
     rtVAX 1000 (or Industrial VAX 620)
     MicroVAX 2000 & VAXstation 2000
     MicroVAX 3100 M10/M20
@@ -142,7 +142,7 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
         when packets arrive too fast.
     MicroVAX 3900 has QVSS (VCB01) board available.
     MicroVAX 3900 and MicroVAX II have SET CPU AUTOBOOT option
-    MicroVAX 3900 has a SET CPU MODEL=(MicroVAX|VAXServer|VAXStation) command to change between system types
+    MicroVAX 3900 has a SET CPU MODEL=(MicroVAX|VAXserver|VAXstation) command to change between system types
     MicroVAX I has a SET CPU MODEL=(MicroVAX|VAXSTATION) command to change between system types
     MicroVAX II has a SET CPU MODEL=(MicroVAX|VAXSTATION) command to change between system types
 
