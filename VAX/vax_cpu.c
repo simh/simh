@@ -1,6 +1,6 @@
 /* vax_cpu.c: VAX CPU
 
-   Copyright (c) 1998-2017, Robert M Supnik
+   Copyright (c) 1998-2019, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    cpu          VAX central processor
 
+   23-Apr-19    RMS     Added hook for unpredictable indexed immediate .aw
+   14-Apr-19    RMS     Added hook for non-standard MxPR CC's
    31-Mar-17    RMS     Fixed uninitialized variable on FPD path (COVERITY)
    13-Mar-17    RMS     Fixed dangling else in show_opnd (COVERITY)
    20-Sep-11    MP      Fixed idle conditions for various versions of Ultrix, 
@@ -253,11 +255,11 @@ int32 in_ie = 0;                                        /* in exc, int */
 int32 recq[6];                                          /* recovery queue */
 int32 recqptr;                                          /* recq pointer */
 int32 hlt_pin = 0;                                      /* HLT pin intr */
-int32 mxpr_cc_vc = 0;                                   /* cc V & C bits from mtpr/mfpr operations */
 int32 mem_err = 0;
 int32 crd_err = 0;
 int32 p1 = 0, p2 = 0;                                   /* fault parameters */
 int32 fault_PC;                                         /* fault PC */
+int32 mxpr_cc_vc = 0;                                   /* MxPR V,C bits */
 int32 pcq_p = 0;                                        /* PC queue ptr */
 int32 badabo = 0;
 int32 cpu_astop = 0;
@@ -902,20 +904,11 @@ for ( ;; ) {
 
             case AIN|VB:
             case AIN|WB: case AIN|WW: case AIN|WL: case AIN|WQ: case AIN|WO:
-/*              CHECK_FOR_PC; */
                 opnd[j++] = OP_MEM;
             case AIN|AB: case AIN|AW: case AIN|AL: case AIN|AQ: case AIN|AO:
                 va = opnd[j++] = R[rn];
                 if (rn == nPC) {
-                    if (DR_LNT (disp) >= L_QUAD) {
-                        GET_ISTR (temp, L_LONG);
-                        GET_ISTR (temp, L_LONG);
-                        if (DR_LNT (disp) == L_OCTA) {
-                            GET_ISTR (temp, L_LONG);
-                            GET_ISTR (temp, L_LONG);
-                            }
-                        }
-                    else GET_ISTR (temp, DR_LNT (disp));
+                    SETPC (PC + DR_LNT (disp));
                     }
                 else {
                     R[rn] = R[rn] + DR_LNT (disp);
@@ -1426,10 +1419,15 @@ for ( ;; ) {
                     break;
 
                 case AIN:
-                    CHECK_FOR_PC;
                     index = index + R[rn];
-                    R[rn] = R[rn] + DR_LNT (disp);
-                    recq[recqptr++] = RQ_REC (AIN | (disp & DR_LNMASK), rn);
+                    if (rn == nPC) {
+                        IDX_IMM_TEST;
+                        SETPC (PC + DR_LNT (disp));
+                        }
+                    else {
+                        R[rn] = R[rn] + DR_LNT (disp);
+                        recq[recqptr++] = RQ_REC (AIN | (disp & DR_LNMASK), rn);
+                        }
                     break;
 
                 case AID:
@@ -3069,18 +3067,18 @@ for ( ;; ) {
         break;
 
     case MTPR:
-        mxpr_cc_vc = cc & CC_C;
+        mxpr_cc_vc = cc & CC_C;                         /* std: V=0, C unchgd */
         cc = op_mtpr (opnd);
-        cc = cc | (mxpr_cc_vc & (CC_V|CC_C));
+        cc = cc | (mxpr_cc_vc & (CC_V|CC_C));           /* or in V,C */
         SET_IRQL;                                       /* update intreq */
         break;
 
     case MFPR:
-        mxpr_cc_vc = cc & CC_C;
+        mxpr_cc_vc = cc & CC_C;                         /* std: V=0, C unchgd */
         r = op_mfpr (opnd);
         WRITE_L (r);
-        CC_IIZZ_L (r);
-        cc = cc | (mxpr_cc_vc & (CC_V|CC_C));
+        CC_IIZZ_L (r);                                  /* set NV, clr VC */
+        cc = cc | (mxpr_cc_vc & (CC_V|CC_C));           /* or in V,C */
         break;
 
 /* CIS or emulated instructions */

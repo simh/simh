@@ -38,7 +38,11 @@
 */
 
 #ifndef FULL_VAX
-#define FULL_VAX        1
+#define FULL_VAX        1           /* Full Instruction Set Implemented */
+#endif
+
+#ifndef CMPM_VAX
+#define CMPM_VAX        1           /* Compatibility Mode Implemented */
 #endif
 
 #ifndef VAX_730_DEFS_H_
@@ -118,6 +122,7 @@
 
 #define MT_AST_TEST(r)  r = (r) & 07; \
                         if ((r) > AST_MAX) RSVD_OPND_FAULT
+#define IDX_IMM_TEST
 
 /* Memory */
 

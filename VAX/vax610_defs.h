@@ -36,8 +36,16 @@
       2000 2000 - 3FFF FFFF             reserved
 */
 
-#ifdef FULL_VAX                                         /* subset VAX */
+#ifdef FULL_VAX                     /* subset VAX */
 #undef FULL_VAX
+#endif
+
+#ifdef CMPM_VAX
+#undef CMPM_VAX                     /* No Compatibility Mode */
+#endif
+
+#ifndef NOEXS_VAX
+#define NOEXS_VAX       1           /* No Extra String Instructions Implemented */
 #endif
 
 #ifndef VAX_610_DEFS_H_
@@ -87,7 +95,7 @@
 
 #define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0, "LEDS", NULL,                               \
                               NULL, &cpu_show_leds, NULL, "Display the CPU LED values" },       \
-                            { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL={MicroVAX|VAXstation}",     \
+                            { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL={MicroVAX|VAXStation}",     \
                               &cpu_set_model, &cpu_show_model, NULL, "Set/Show the simulator CPU Model" }
 
 /* QVSS memory space */
@@ -143,6 +151,7 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc
 #define LP_MBZ92_TEST(r)
 
 #define MT_AST_TEST(r)  if ((r) > AST_MAX) RSVD_OPND_FAULT
+#define IDX_IMM_TEST
 
 /* Qbus I/O modes */
 

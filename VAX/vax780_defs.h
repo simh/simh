@@ -1,6 +1,6 @@
 /* vax780_defs.h: VAX 780 model-specific definitions file
 
-   Copyright (c) 2004-2017, Robert M Supnik
+   Copyright (c) 2004-2019, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   23-Apr-19    RMS     Added hook for unpredictable indexed immediate .aw
    18-May-17    RMS     Added model-specific AST validation test
    19-Jan-17    RMS     Moved CR to BR6 (Mark Pizzolato)
    29-Mar-15    RMS     Added model specific IPR max
@@ -54,7 +55,11 @@
 */
 
 #ifndef FULL_VAX
-#define FULL_VAX        1
+#define FULL_VAX        1           /* Full Instruction Set Implemented */
+#endif
+
+#ifndef CMPM_VAX
+#define CMPM_VAX        1           /* Compatibility Mode Implemented */
 #endif
 
 #ifndef VAX_780_DEFS_H_
@@ -157,6 +162,7 @@
 
 #define MT_AST_TEST(r)  r = (r) & 07; \
                         if ((r) > AST_MAX) RSVD_OPND_FAULT
+#define IDX_IMM_TEST
 
 /* Memory */
 

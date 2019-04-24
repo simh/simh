@@ -40,7 +40,7 @@
 
 #include "vax_defs.h"
 
-#if defined (FULL_VAX)
+#if defined (CMPM_VAX)
 
 #define RdMemB(a)       Read (a, L_BYTE, RA)
 #define RdMemMB(a)      Read (a, L_BYTE, WA)
