@@ -28,9 +28,9 @@
 #include "vax_defs.h"
 
 #if defined (VAX_411)
-char sim_name[64] = "Infoserver 100 (KA41-1)";
+char sim_name[64] = "InfoServer 100 (KA41-1)";
 #elif defined (VAX_412)
-char sim_name[64] = "Infoserver 150 VXT (KA41-2)";
+char sim_name[64] = "InfoServer 150 VXT (KA41-2)";
 #elif defined (VAX_41A)
 char sim_name[64] = "MicroVAX 3100 M10/M20 (KA41-A)";
 #elif defined (VAX_41D)
@@ -44,9 +44,9 @@ char sim_name[64] = "VAXstation 3100 M38 (KA42-B)";
 void vax_init(void)
 {
 #if defined (VAX_411)
-sim_savename = "Infoserver 100 (KA41-1)";
+sim_savename = "InfoServer 100 (KA41-1)";
 #elif defined (VAX_412)
-sim_savename = "Infoserver 150 VXT (KA41-2)";
+sim_savename = "InfoServer 150 VXT (KA41-2)";
 #elif defined (VAX_41A)
 sim_savename = "MicroVAX 3100 M10/M20 (KA41-A)";
 #elif defined (VAX_41D)
