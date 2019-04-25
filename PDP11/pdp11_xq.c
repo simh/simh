@@ -2718,10 +2718,10 @@ t_stat xq_system_id (CTLR* xq, const ETH_MAC dest, uint16 receipt_id)
   memcpy (&msg[34], xq->var->mac, sizeof(ETH_MAC)); /* ROM address */
 
                                           /* DEVICE TYPE */
-  msg[40] = 37;                           /* type */
+  msg[40] = 100;                          /* type */
   msg[41] = 0x00;                         /* type */
   msg[42] = 0x01;                         /* length */
-  msg[43] = 0x11;                         /* value (0x11=DELQA) */
+  msg[43] = 0x25;                         /* value (0x25(37)=DELQA) */
   if (xq->var->type == XQ_T_DELQA_PLUS)   /* DELQA-T has different Device ID */
     msg[43] = 0x4B;                       /* value (0x4B(75)=DELQA-T) */
 
