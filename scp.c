@@ -5700,9 +5700,12 @@ if ((dptr->dwidth / dptr->aincr) > 8)
     width = "W";
 else 
     width = "B";
-if (psize < (kval * 10))
+if ((psize < (kval * 10)) &&
+    (0 != (psize % kval))) {
     scale = "";
-else if (psize < (mval * 10)) {
+    }
+else if ((psize < (mval * 10)) &&
+         (0 != (psize % mval))){
     scale = "K";
     psize = psize / kval;
     }
