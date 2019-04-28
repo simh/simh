@@ -262,6 +262,7 @@ extern int32 sys_model;
 #define XS_READW(ba,bc,buf)    Map_ReadW(ba, bc, buf, FALSE)
 #define XS_WRITEB(ba,bc,buf)   Map_WriteB(ba, bc, buf, FALSE)
 #define XS_WRITEW(ba,bc,buf)   Map_WriteW(ba, bc, buf, FALSE)
+#define XS_ADRMBO       (0)
 
 /* Function prototypes for I/O */
 

@@ -344,8 +344,9 @@ while (xs->var->ReadQ.count > 0) {
         }
 
     /* set buffer length and address */
-    slen = (uint16)(xs->var->rxhdr[2] * -1);     /* 2s Complement */
+    slen = (uint16)(xs->var->rxhdr[2] * -1);            /* 2s Complement */
     segb = xs->var->rxhdr[0] + ((xs->var->rxhdr[1] & RXR_HADR) << 16);
+    segb |= XS_ADRMBO;                                  /* set system specific bits */
 
     /* get first packet from receive queue */
     if (!item) {
@@ -472,8 +473,9 @@ for (;;) {
         break;
 
     /* set buffer length and address */
-    slen = (uint16)(xs->var->txhdr[2] * -1);             /* 2s complement */
+    slen = (uint16)(xs->var->txhdr[2] * -1);            /* 2s complement */
     segb = xs->var->txhdr[0] + ((xs->var->txhdr[1] & TXR_HADR) << 16);
+    segb |= XS_ADRMBO;                                  /* set system specific bits */
     wlen = slen;
 
     sim_debug(DBG_TRC, xs->dev, "Using transmit descriptor=0x%X, slen=0x%04X(%d), segb=0x%04X, ", ba, slen, slen, segb);
@@ -587,6 +589,7 @@ ethq_clear (&xs->var->ReadQ);
 memset (&xs->var->setup, 0, sizeof(struct xs_setup));
 
 xs->var->inbb = ((xs->var->csr2 & 0xFF) << 16) | (xs->var->csr1 & 0xFFFE);
+xs->var->inbb |= XS_ADRMBO;                             /* set system specific bits */
 sim_debug (DBG_REG, &xs_dev, "xs_inbb = %04X\n", xs->var->inbb);
 
 if (XS_READB (xs->var->inbb, 0x18, &inb[0])) {
@@ -610,6 +613,7 @@ w1 = GETW (inb, 0x10);
 w2 = GETW (inb, 0x12);
 
 xs->var->rdrb = ((w2 << 16) | w1) & 0xFFFFF8;
+xs->var->rdrb |= XS_ADRMBO;                             /* set system specific bits */
 xs->var->rrlen = (w2 >> 13) & 0x7;
 xs->var->rrlen = (1u << xs->var->rrlen);
 xs->var->relen = 4;
@@ -621,6 +625,7 @@ w1 = GETW (inb, 0x14);
 w2 = GETW (inb, 0x16);
 
 xs->var->tdrb = ((w2 << 16) | w1) & 0xFFFFF8;
+xs->var->tdrb |= XS_ADRMBO;                             /* set system specific bits */
 xs->var->trlen = (w2 >> 13) & 0x7;
 xs->var->trlen = (1u << xs->var->trlen);
 xs->var->telen = 4;

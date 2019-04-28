@@ -381,6 +381,11 @@ extern int32 sys_model;
 #define XS_READW        Map_ReadW
 #define XS_WRITEB       Map_WriteB
 #define XS_WRITEW       Map_WriteW
+#if (defined (VAX_411) || defined (VAX_412))            /* InfoServer? */
+#define XS_ADRMBO       (0)
+#else
+#define XS_ADRMBO       ((MEMSIZE -1) & 0xFF000000)     /* bits 31:24 have pull-ups */
+#endif
 
 /* Function prototypes for I/O */
 

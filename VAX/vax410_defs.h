@@ -337,6 +337,7 @@ extern int32 sys_model;
 #define XS_READW        Map_ReadW
 #define XS_WRITEB       Map_WriteB
 #define XS_WRITEW       Map_WriteW
+#define XS_ADRMBO       (0)
 
 
 /* Function prototypes for I/O */
