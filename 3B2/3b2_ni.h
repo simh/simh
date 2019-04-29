@@ -121,6 +121,8 @@
 #define DBG_ERR   0x10
 #define DBG_ETH   0x20
 
+#define CHAR(c)   ((((c) >= 0x20) && ((c) < 0x7f)) ? (c) : '.')
+
 #define NI_CACHE_HAS_SPACE(i) (((ni.job_cache[(i)].wp + 1) % NI_CACHE_LEN) != ni.job_cache[(i)].rp)
 
 /*

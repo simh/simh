@@ -188,8 +188,6 @@ DEVICE ni_dev = {
     NULL,
 };
 
-#define CHAR(c)   ((((c) >= 0x20) && ((c) < 0x7f)) ? (c) : '.')
-
 static void dump_packet(const char *direction, ETH_PACK *pkt)
 {
     char dumpline[82];
@@ -436,6 +434,32 @@ static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp
                   "[ni_cmd] NI SEND Operation (opcode=%d)\n",
                   rentry->opcode);
 
+        /* TODO: Why is this always 4 for a send? */
+        centry.subdevice = 4;
+
+        /* TODO: On the real 3B2, this appears to be some sort of
+         * checksum. Perhaps the packet checksum? I'm not sure. I need
+         * to run Wireshark on the real 3B2 and investigate.
+         *
+         * However, we're in luck: The driver code doesn't seem to
+         * validate it or check against it in any way, so we can
+         * put anything in there.
+         */
+        centry.address = rentry->address;
+        centry.byte_count = rentry->byte_count;
+
+
+        /* If the interface is not attached, we can't actually send
+         * any packets. */
+        if (!(rcv_unit->flags & UNIT_ATT)) {
+            ni.stats.tx_fail++;
+            centry.opcode = CIO_FAILURE;
+            sim_debug(DBG_TRACE, &ni_dev,
+                      "[ni_cmd] NI SEND failure. Not attached. tx_fail=%d\n",
+                      ni.stats.tx_fail);
+            break;
+        }
+
         /* Reset the write packet */
         ni.wr_buf.len = 0;
         ni.wr_buf.oversize = NULL;
@@ -484,21 +508,6 @@ static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp
             centry.opcode = CIO_FAILURE;
         }
 
-        /* TODO: On the real 3B2, this appears to be some sort of
-         * checksum. Perhaps the packet checksum? I'm not sure. I need
-         * to run Wireshark on the real 3B2 and investigate.
-         *
-         * However, we're in luck: The driver code doesn't seem to
-         * validate it or check against it in any way, so we can
-         * put anything in there.
-         */
-        centry.address = rentry->address;
-
-        /* TODO: Why is this always 4 for a send? */
-        centry.subdevice = 4;
-
-        centry.byte_count = rentry->byte_count;
-
         /* Weird behavior seen on the real 3B2's completion queue: If
          * the byte count value is < 0xff, shift it! I really wish I
          * understood this card... */
@@ -531,6 +540,7 @@ t_stat ni_setmac(UNIT *uptr, int32 val, CONST char* cptr, void* desc)
     UNUSED(val);
     UNUSED(desc);
 
+    status = SCPE_OK;
     status = eth_mac_scan_ex(&ni.macs[NI_NIC_MAC], cptr, uptr);
 
     if (status == SCPE_OK) {
@@ -704,17 +714,14 @@ t_stat ni_reset(DEVICE *dptr)
               "[ni_reset] Resetting NI device\n");
 
     /* Initial setup that should only ever be done once. */
-    if (!ni.initialized) {
-        memset(&ni, 0, sizeof(NI_STATE));
-
-        snprintf(uname, 16, "%s-RCV", dptr->name);
-        sim_set_uname(rcv_unit, uname);
-        snprintf(uname, 16, "%s-SANITY", dptr->name);
-        sim_set_uname(sanity_unit, uname);
-        snprintf(uname, 16, "%s-RQ", dptr->name);
-        sim_set_uname(rq_unit, uname);
-        snprintf(uname, 16, "%s-CIO", dptr->name);
-        sim_set_uname(cio_unit, uname);
+    if (!(dptr->flags & DEV_DIS) && !ni.initialized) {
+        /* Autoconfiguration will select the correct backplane slot
+         * for the device, and enable CIO routines. This should only
+         * be done once. */
+        status = ni_autoconfig();
+        if (status != SCPE_OK) {
+            return status;
+        }
 
         /* Set an initial MAC address in the AT&T NI range */
         ni_setmac(ni_dev.units, 0, "80:00:10:03:00:00/32", NULL);
@@ -722,11 +729,22 @@ t_stat ni_reset(DEVICE *dptr)
         /* Initialize the receive queue one time only */
         status = ethq_init(&ni.readq, NI_QUE_MAX);
         if (status != SCPE_OK) {
+            sim_debug(DBG_TRACE, &ni_dev,
+                      "[ni_reset] Failure: ethq_init status=%d", status);
             return status;
         }
 
         ni.initialized = TRUE;
     }
+
+    snprintf(uname, 16, "%s-RCV", dptr->name);
+    sim_set_uname(rcv_unit, uname);
+    snprintf(uname, 16, "%s-SANITY", dptr->name);
+    sim_set_uname(sanity_unit, uname);
+    snprintf(uname, 16, "%s-RQ", dptr->name);
+    sim_set_uname(rq_unit, uname);
+    snprintf(uname, 16, "%s-CIO", dptr->name);
+    sim_set_uname(cio_unit, uname);
 
     /* Ensure that the broadcast address is configured, and that we
      * have a minmimum of two filters set. */
@@ -752,7 +770,7 @@ t_stat ni_rcv_svc(UNIT *uptr)
     UNUSED(uptr);
 
     /* If a CIO interrupt is alrady pending, skip this read */
-    if (!cio[ni.cid].intr) {
+    if ((rcv_unit->flags & UNIT_ATT) && !cio[ni.cid].intr) {
         /* Try to receive a packet */
         do {
             status = eth_read(ni.eth, &ni.rd_buf, ni.callback);
@@ -760,13 +778,13 @@ t_stat ni_rcv_svc(UNIT *uptr)
 
         /* Attempt to process a packet from the queue */
         ni_process_packet();
+    }
 
-        /* Re-schedule the next poll */
-        if (sim_idle_enab) {
-            sim_clock_coschedule(rcv_unit, tmxr_poll);
-        } else {
-            sim_activate_after(rcv_unit, NI_RCV_POLL_US);
-        }
+    /* Re-schedule the next poll */
+    if (sim_idle_enab) {
+        sim_clock_coschedule(rcv_unit, tmxr_poll);
+    } else {
+        sim_activate_after(rcv_unit, NI_RCV_POLL_US);
     }
 
     return SCPE_OK;
@@ -978,12 +996,6 @@ t_stat ni_attach(UNIT *uptr, CONST char *cptr)
 
     sim_debug(DBG_TRACE, &ni_dev, "ni_attach()\n");
 
-    /* Run autoconfig on the device */
-    status = ni_autoconfig();
-    if (status != SCPE_OK) {
-        return status;
-    }
-
     tptr = (char *) malloc(strlen(cptr) + 1);
     if (tptr == NULL) {
         return SCPE_MEM;
@@ -1022,13 +1034,14 @@ t_stat ni_attach(UNIT *uptr, CONST char *cptr)
         eth_close(ni.eth);
         free(tptr);
         free(ni.eth);
+        uptr->filename = NULL;
         uptr->flags &= ~UNIT_ATT;
         return status;
     }
 
     eth_filter(ni.eth, ni.filter_count, ni.macs, 0, 0);
 
-    ni_reset(&ni_dev);
+    /* ni_reset(&ni_dev); */
 
     return SCPE_OK;
 }
@@ -1038,8 +1051,8 @@ t_stat ni_detach(UNIT *uptr)
     sim_debug(DBG_TRACE, &ni_dev, "ni_detach()\n");
 
     if (uptr->flags & UNIT_ATT) {
-        ni_disable();
-
+        /* TODO: Do we really want to disable here? Or is that ONLY FCF's job? */
+        /* ni_disable(); */
         eth_close(ni.eth);
         free(ni.eth);
         ni.eth = NULL;
@@ -1047,7 +1060,6 @@ t_stat ni_detach(UNIT *uptr)
         uptr->filename = NULL;
         uptr->flags &= ~UNIT_ATT;
     }
-
 
     return SCPE_OK;
 }
