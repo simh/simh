@@ -89,8 +89,6 @@ CTAB is1000_cmd[] = {
 #define DMANMAPR        32768                           /* number of map reg */
 #define DMAMAP_VLD      0x80000000                      /* valid */
 #define DMAMAP_PAG      0x0000FFFF                      /* mem page */
-#define DMAMAP_RD       (QBMAP_VLD | QBMAP_PAG)
-#define DMAMAP_WR       (QBMAP_VLD | QBMAP_PAG)
 
 #define CSR_XDONE       0x01
 #define CSR_RDONE       0x02

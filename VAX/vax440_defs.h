@@ -113,6 +113,7 @@
 #define INITMEMSIZE     (1 << 24)                       /* initial memory size */
 #define MEMSIZE         (cpu_unit.capac)
 #define ADDR_IS_MEM(x)  (((uint32) (x)) < MEMSIZE)
+#if defined (VAX_46) || defined (VAX_47)
 #define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size }, \
                         { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size }, \
                         { UNIT_MSIZE, (1u << 24) + (1u << 23), NULL, "24M", &cpu_set_size }, \
@@ -122,7 +123,12 @@
                         { UNIT_MSIZE, (1u << 25) + (1u << 24) + (1u << 23), NULL, "56M", &cpu_set_size }, \
                         { UNIT_MSIZE, (1u << 26) + (1u << 23), NULL, "72M", &cpu_set_size }, \
                         { UNIT_MSIZE, (1u << 26) + (1u << 24), NULL, "80M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 26) + (1u << 25) + (1u << 24), NULL, "104M", &cpu_set_size }
+                        { UNIT_MSIZE, (1u << 26) + (1u << 25) + (1u << 23), NULL, "104M", &cpu_set_size }
+#elif defined (VAX_48)
+#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 24) + (1u << 23), NULL, "24M", &cpu_set_size }
+#endif
 
 /* DMA map */
 

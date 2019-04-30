@@ -123,9 +123,11 @@ CTAB vax460_cmd[] = {
 
 #define DMANMAPR        32768                           /* number of map reg */
 #define DMAMAP_VLD      0x80000000                      /* valid */
+#if defined (VAX_46) || defined (VAX_47)
+#define DMAMAP_PAG      0x0003FFFF                      /* mem page */
+#elif defined (VAX_48)
 #define DMAMAP_PAG      0x0000FFFF                      /* mem page */
-#define DMAMAP_RD       (QBMAP_VLD | QBMAP_PAG)
-#define DMAMAP_WR       (QBMAP_VLD | QBMAP_PAG)
+#endif
 
 extern int32 tmr_int;
 extern DEVICE lk_dev, vs_dev;
@@ -429,7 +431,6 @@ uint32 sc;
 
 #if defined (VAX_46) || defined (VAX_47)
 mem -= (1u << 23);                                      /* 8MB on system board */
-#endif
 for (sc = 0; mem > 0; sc+=2) {
     if (mem >= (1u << 25)) {
         val |= (0x3 << sc);                             /* add two 16MB SIMMs */
@@ -438,9 +439,17 @@ for (sc = 0; mem > 0; sc+=2) {
         }
     else {
         val |= (0x3 << sc);                             /* add two 4MB SIMMs */
+        val = (val & ~CFGT_SIM) | ((val & CFGT_SIM) << 2); /* must be installed before 16MB SIMMs */
         mem -= (1u << 23);
         }
     }
+#elif defined (VAX_48)
+val |= 0x1;                                             /* bit zero always set */
+for (sc = 1; mem > 0; sc++) {
+    val |= (0x1 << sc);                                 /* add two 4MB SIMMs */
+    mem -= (1u << 23);
+    }
+#endif
 return val;
 }
 
