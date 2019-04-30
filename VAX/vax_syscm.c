@@ -72,7 +72,7 @@ static const int32 masks[] = {
  0177000
  };
 
-static const char *opcode[] = {
+static const char *cm_opcode[] = {
 "HALT","WAIT","RTI","BPT",
 "IOT","RESET","RTT","MFPT",
 "JMP","RTS","SPL",
@@ -303,55 +303,55 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
         switch (j) {                                    /* case on class */
 
             case I_V_NPN: case I_V_CCC: case I_V_CCS:   /* no operands */
-                fprintf (of, "%s", opcode[i]);
+                fprintf (of, "%s", cm_opcode[i]);
                 break;
 
             case I_V_REG:                               /* reg */
-                fprintf (of, "%s %-s", opcode[i], rname[dstr]);
+                fprintf (of, "%s %-s", cm_opcode[i], rname[dstr]);
                 break;
 
             case I_V_SOP:                               /* sop */
-                fprintf (of, "%s ", opcode[i]);
+                fprintf (of, "%s ", cm_opcode[i]);
                 wd1 = fprint_spec (of, addr, dstm, val[1]);
                 break;
 
             case I_V_3B:                                /* 3b */
-                fprintf (of, "%s %-X", opcode[i], dstr);
+                fprintf (of, "%s %-X", cm_opcode[i], dstr);
                 break;
 
             case I_V_6B:                                /* 6b */
-                fprintf (of, "%s %-X", opcode[i], dstm);
+                fprintf (of, "%s %-X", cm_opcode[i], dstm);
                 break;
 
             case I_V_BR:                                /* cond branch */
-                fprintf (of, "%s ", opcode[i]);
+                fprintf (of, "%s ", cm_opcode[i]);
                 brdisp = (l8b + l8b + ((l8b & 0200)? 0177002: 2)) & 0177777;
                 fprintf (of, "%-X", (int32)((addr + brdisp) & 0177777));
                 break;
 
             case I_V_8B:                                /* 8b */
-                fprintf (of, "%s %-X", opcode[i], l8b);
+                fprintf (of, "%s %-X", cm_opcode[i], l8b);
                 break;
 
             case I_V_SOB:                               /* sob */
-                fprintf (of, "%s %s,", opcode[i], rname[srcr]);
+                fprintf (of, "%s %s,", cm_opcode[i], rname[srcr]);
                 brdisp = (dstm * 2) - 2;
                 fprintf (of, "%-X", (int32)((addr - brdisp) & 0177777));
                 break;
 
             case I_V_RSOP:                              /* rsop */
-                fprintf (of, "%s %s,", opcode[i], rname[srcr]);
+                fprintf (of, "%s %s,", cm_opcode[i], rname[srcr]);
                 wd1 = fprint_spec (of, addr, dstm, val[1]);
                 break;
 
             case I_V_SOPR:                              /* sopr */
-                fprintf (of, "%s ", opcode[i]);
+                fprintf (of, "%s ", cm_opcode[i]);
                 wd1 = fprint_spec (of, addr, dstm, val[1]);
                 fprintf (of, ",%s", rname[srcr]);
                 break;
 
             case I_V_DOP:                               /* dop */
-                fprintf (of, "%s ", opcode[i]);
+                fprintf (of, "%s ", cm_opcode[i]);
                 wd1 = fprint_spec (of, addr, srcm, val[1]);
                 fprintf (of, ",");
                 wd1 += fprint_spec (of, addr - wd1 - wd1, dstm,
@@ -575,8 +575,8 @@ if (!(sw & SWMASK ('P')) || (ad32 & 1) || (ad32 > WMASK))
 
 cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
 n1 = n2 = pflag = 0;
-for (i = 0; (opcode[i] != NULL) && (strcmp (opcode[i], gbuf) != 0) ; i++) ;
-if (opcode[i] == NULL)
+for (i = 0; (cm_opcode[i] != NULL) && (strcmp (cm_opcode[i], gbuf) != 0) ; i++) ;
+if (cm_opcode[i] == NULL)
     return SCPE_ARG;
 val[0] = opc_val[i] & 0177777;                          /* get value */
 j = (opc_val[i] >> I_V_CL) & I_M_CL;                    /* get class */
@@ -666,10 +666,10 @@ switch (j) {                                            /* case on class */
     case I_V_CCC: case I_V_CCS:                         /* cond code oper */
         for (cptr = get_glyph (cptr, gbuf, 0); gbuf[0] != 0;
             cptr = get_glyph (cptr, gbuf, 0)) {
-            for (i = 0; (opcode[i] != NULL) &&
-                (strcmp (opcode[i], gbuf) != 0) ; i++) ;
+            for (i = 0; (cm_opcode[i] != NULL) &&
+                (strcmp (cm_opcode[i], gbuf) != 0) ; i++) ;
             if ((((opc_val[i] >> I_V_CL) & I_M_CL) != j) ||
-                (opcode[i] == NULL))
+                (cm_opcode[i] == NULL))
                 return SCPE_ARG;
             val[0] = val[0] | (opc_val[i] & 0177777);
             }

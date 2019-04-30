@@ -98,10 +98,9 @@
 #if defined (VAX_46) || defined (VAX_48)
 #define CPU_MODEL_MODIFIERS \
                         { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL={MICROVAX|VAXSTATION}", \
-                          cpu_set_model, &cpu_show_model, NULL, "Set/Show the simulator CPU Model" }
+                          cpu_set_model, &cpu_show_model, NULL, "Set/Show the simulator CPU Model" },
 #else
-#define CPU_MODEL_MODIFIERS \
-                        { 0 }
+#define CPU_MODEL_MODIFIERS
 #endif
 
 /* Memory */
@@ -210,7 +209,7 @@
 #define LP_MBZ84_TEST(r)
 #define LP_MBZ92_TEST(r)
 
-#define MT_AST_TEST(r)  if ((r) > AST_MAX) RSVD_OPND_FAULT
+#define MT_AST_TEST(r)  if ((r) > AST_MAX) RSVD_OPND_FAULT(MT_AST_TEST)
 
 /* Common CSI flags */
 

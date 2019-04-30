@@ -312,7 +312,7 @@ if (sel == TXDB_MISC) {                                 /* misc function? */
     }
 else
     if (sel != 0)
-        RSVD_OPND_FAULT;
+        RSVD_OPND_FAULT(txdb_func);
 
 }
 

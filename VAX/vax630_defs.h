@@ -108,7 +108,7 @@
                             { MTAB_XTD|MTAB_VDV|MTAB_NMO, 1, "NOAUTOBOOT", "NOAUTOBOOT",                    \
                               &sysd_set_halt, &sysd_show_halt, NULL, "Disable autoboot (Enable Halt)" },    \
                             { MTAB_XTD|MTAB_VDV, 0,          "LEDS", NULL,                                  \
-                              NULL,           &sysd_show_leds, NULL, "Display the CPU LED values" }
+                              NULL,           &sysd_show_leds, NULL, "Display the CPU LED values" },
 
 /* Memory */
 
@@ -215,7 +215,7 @@ extern uint32 va_addr;                                  /* QDSS memory offset */
 #define LP_MBZ84_TEST(r)
 #define LP_MBZ92_TEST(r)
 
-#define MT_AST_TEST(r)  if ((r) > AST_MAX) RSVD_OPND_FAULT
+#define MT_AST_TEST(r)  if ((r) > AST_MAX) RSVD_OPND_FAULT(MT_AST_TEST)
 
 /* Qbus I/O modes */
 

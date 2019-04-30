@@ -433,7 +433,7 @@ switch (opc) {
         break;
 
     default:
-        RSVD_INST_FAULT;
+        RSVD_INST_FAULT(opc);
         }
 
 return cc;
@@ -449,7 +449,7 @@ int32 op_tsth (int32 val)
 if (val & H_EXP)                                        /* non-zero? */
     return val;
 if (val & FPSIGN)                                       /* reserved? */
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_tsth);
 return 0;                                               /* clean 0 */
 }
 
@@ -620,7 +620,7 @@ int32 ptr = opnd[5];
 int32 i, wd[4], res[4];
 
 if (deg > 31)                                           /* deg > 31? fault */
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_polyh);
 h_unpackh (&opnd[0], &a);                               /* unpack arg */
 wd[0] = Read (ptr, L_LONG, RD);                         /* get C0 */
 wd[1] = Read (ptr + 4, L_LONG, RD);
@@ -1013,7 +1013,7 @@ r->exp = FD_GETEXP (hi);                                /* get exponent */
 r->frac.f0 = r->frac.f1 = 0;                            /* low bits 0 */
 if (r->exp == 0) {                                      /* exp = 0? */
     if (r->sign)                                        /* if -, rsvd op */
-        RSVD_OPND_FAULT;
+        RSVD_OPND_FAULT(h_unpackfd);
     r->frac.f2 = r->frac.f3 = 0;                        /* else 0 */
     return;
     }
@@ -1030,7 +1030,7 @@ r->exp = G_GETEXP (hi);                                 /* get exponent */
 r->frac.f0 = r->frac.f1 = 0;                            /* low bits 0 */
 if (r->exp == 0) {                                      /* exp = 0? */
     if (r->sign)                                        /* if -, rsvd op */
-        RSVD_OPND_FAULT;
+        RSVD_OPND_FAULT(h_unpackg);
     r->frac.f2 = r->frac.f3 = 0;                        /* else 0 */
     return;
     }
@@ -1046,7 +1046,7 @@ r->sign = hflt[0] & FPSIGN;                             /* get sign */
 r->exp = H_GETEXP (hflt[0]);                            /* get exponent */
 if (r->exp == 0) {                                      /* exp = 0? */
     if (r->sign)                                        /* if -, rsvd op */
-        RSVD_OPND_FAULT;
+        RSVD_OPND_FAULT(h_unpackh);
     r->frac.f0 = r->frac.f1 = 0;                        /* else 0 */
     r->frac.f2 = r->frac.f3 = 0;
     return;
@@ -1261,7 +1261,7 @@ return;
 
 int32 op_octa (int32 *opnd, int32 cc, int32 opc, int32 acc, int32 spec, int32 va, InstHistory *hst)
 {
-RSVD_INST_FAULT;
+RSVD_INST_FAULT(opc);
 return cc;
 }
 

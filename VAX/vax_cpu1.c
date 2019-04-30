@@ -109,7 +109,7 @@ int32 by;
 
 if (rn != OP_MEM) {                                     /* register? */
     if (((uint32) pos) > 31)                            /* pos > 31? fault */
-        RSVD_OPND_FAULT;
+        RSVD_OPND_FAULT(op_bb_n);
     return (R[rn] >> pos) & 1;                          /* get bit */
     }
 ea = opnd[2] + (pos >> 3);                              /* base byte addr */
@@ -127,7 +127,7 @@ int32 by, bit;
 
 if (rn != OP_MEM) {                                     /* register? */
     if (((uint32) pos) > 31)                            /* pos > 31? fault */
-        RSVD_OPND_FAULT;
+        RSVD_OPND_FAULT(op_bb_x);
     bit = (R[rn] >> pos) & 1;                           /* get bit */
     R[rn] = newb? (R[rn] | (1u << pos)): (R[rn] & ~(1u << pos));
     return bit;
@@ -162,10 +162,10 @@ int32 ba, wd1 = 0;
 if (size == 0)                                          /* size 0? field = 0 */
     return 0;
 if (size > 32)                                          /* size > 32? fault */
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_extv);
 if (rn != OP_MEM) {                                     /* register? */
     if (((uint32) pos) > 31)                            /* pos > 31? fault */
-        RSVD_OPND_FAULT;
+        RSVD_OPND_FAULT(op_extv);
     if (((pos + size) > 32) && (rn >= nSP))             /* span 2 reg, PC? */
         RSVD_ADDR_FAULT;                                /* fault */
     if (pos)
@@ -206,10 +206,10 @@ int32 val, mask, ba, wd, wd1;
 if (size == 0)                                          /* size = 0? done */
     return;
 if (size > 32)                                          /* size > 32? fault */
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_insv);
 if (rn != OP_MEM) {                                     /* in registers? */
     if (((uint32) pos) > 31)                            /* pos > 31? fault */
-        RSVD_OPND_FAULT;
+        RSVD_OPND_FAULT(op_insv);
     if ((pos + size) > 32) {                            /* span two reg? */
         if (rn >= nSP)                                  /* if PC, fault */
             RSVD_ADDR_FAULT;
@@ -341,7 +341,7 @@ int32 mask, stklen, tsp, wd;
 
 mask = Read (addr, L_WORD, RA);                         /* get proc mask */
 if (mask & CALL_MBZ)                                    /* test mbz */
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_call);
 stklen = rcnt[mask & 077] + rcnt[(mask >> 6) & 077] + (gs? 24: 20);
 Read (SP - stklen, L_BYTE, WA);                         /* wchk stk */
 if (gs) {
@@ -386,7 +386,7 @@ int32 tsp = FP;
 
 spamask = Read (tsp + 4, L_LONG, RA);                   /* spa/s/mask/psw */
 if (spamask & PSW_MBZ)                                  /* test mbz */
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_ret);
 stklen = rcnt[(spamask >> CALL_V_MASK) & 077] +
     rcnt[(spamask >> (CALL_V_MASK + 6)) & 077] + ((spamask & CALL_S)? 23: 19);
 Read (tsp + stklen, L_BYTE, RA);                        /* rchk stk end */
@@ -603,11 +603,11 @@ int32 a;
 int32 t;
 
 if ((h == d) || ((h | d) & 07))                         /* h, d quad align? */
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_insqhi);
 Read (d, L_BYTE, WA);                                   /* wchk ent */
 a = Read (h, L_LONG, WA);                               /* a <- (h), wchk */
 if (a & 06)                                             /* chk quad align */
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_insqhi);
 if (a & 01)                                             /* busy, cc = 0001 */
     return CC_C;
 Write (h, a | 1, L_LONG, WA);                           /* get interlock */
@@ -629,20 +629,20 @@ int32 a, c;
 int32 t;
 
 if ((h == d) || ((h | d) & 07))                         /* h, d quad align? */
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_insqti);
 Read (d, L_BYTE, WA);                                   /* wchk ent */
 a = Read (h, L_LONG, WA);                               /* a <- (h), wchk */
 if (a == 0)                                             /* if empty, ins hd */
     return op_insqhi (opnd, acc);
 if (a & 06)                                             /* chk quad align */
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_insqti);
 if (a & 01)                                             /* busy, cc = 0001 */
     return CC_C;
 Write (h, a | 1, L_LONG, WA);                           /* acquire interlock */
 c = Read (h + 4, L_LONG, RA) + h;                       /* c <- (h+4) + h */
 if (c & 07) {                                           /* c quad aligned? */
     Write (h, a, L_LONG, WA);                           /* release interlock */
-    RSVD_OPND_FAULT;                                    /* fault */
+    RSVD_OPND_FAULT(op_insqti);                         /* fault */
     }
 if (Test (c, WA, &t) < 0)                               /* wtst c, rls if err */
     Write (h, a, L_LONG, WA);
@@ -687,15 +687,15 @@ int32 ar, a, b;
 int32 t;
 
 if (h & 07)                                             /* h quad aligned? */
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_remqhi);
 if (opnd[1] == OP_MEM) {                                /* mem destination? */
     if (h == opnd[2])                                   /* hdr = dst? */
-        RSVD_OPND_FAULT;
+        RSVD_OPND_FAULT(op_remqhi);
     Read (opnd[2], L_LONG, WA);                         /* wchk dst */
     }
 ar = Read (h, L_LONG, WA);                              /* ar <- (h) */
 if (ar & 06)                                            /* a quad aligned? */
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_remqhi);
 if (ar & 01)                                            /* busy, cc = 0011 */
     return CC_V | CC_C;
 a = ar + h;                                             /* abs addr of a */
@@ -706,7 +706,7 @@ if (ar) {                                               /* queue not empty? */
     b = Read (a, L_LONG, RA) + a;                       /* b <- (a)+a, flt ok */
     if (b & 07) {                                       /* b quad aligned? */
         Write (h, ar, L_LONG, WA);                      /* release interlock */
-        RSVD_OPND_FAULT;                                /* fault */
+        RSVD_OPND_FAULT(op_remqhi);                                /* fault */
         }
     if (Test (b, WA, &t) < 0)                           /* write test b */
         Write (h, ar, L_LONG, WA);                      /* release if err */
@@ -728,15 +728,15 @@ int32 ar, b, c;
 int32 t;
 
 if (h & 07)                                             /* h quad aligned? */
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_remqti);
 if (opnd[1] == OP_MEM) {                                /* mem destination? */
     if (h == opnd[2])                                   /* hdr = dst? */
-        RSVD_OPND_FAULT;
+        RSVD_OPND_FAULT(op_remqti);
     Read (opnd[2], L_LONG, WA);                         /* wchk dst */
     }
 ar = Read (h, L_LONG, WA);                              /* a <- (h) */
 if (ar & 06)                                            /* a quad aligned? */
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_remqti);
 if (ar & 01)                                            /* busy, cc = 0011 */
     return CC_V | CC_C;
 if (ar) {                                               /* queue not empty */
@@ -748,7 +748,7 @@ if (ar) {                                               /* queue not empty */
         }
     if (c & 07) {                                       /* c quad aligned? */
         Write (h, ar, L_LONG, WA);                      /* release interlock */
-        RSVD_OPND_FAULT;                                /* fault */
+        RSVD_OPND_FAULT(op_remqti);                                /* fault */
         }
     c = c + h;                                          /* abs addr of c */
     if (Test (c + 4, RA, &t) < 0)                       /* read test c+4 */
@@ -756,7 +756,7 @@ if (ar) {                                               /* queue not empty */
     b = Read (c + 4, L_LONG, RA) + c;                   /* b <- (c+4)+c, flt ok */
     if (b & 07) {                                       /* b quad aligned? */
         Write (h, ar, L_LONG, WA);                      /* release interlock */
-        RSVD_OPND_FAULT;                                /* fault */
+        RSVD_OPND_FAULT(op_remqti);                                /* fault */
         }
     if (Test (b, WA, &t) < 0)                           /* write test b */
         Write (h, ar, L_LONG, WA);                      /* release if error */
@@ -919,7 +919,7 @@ switch (R[5] & MVC_M_STATE) {                           /* case on state */
         break;
 
     default:                                            /* bad state */
-        RSVD_OPND_FAULT;                                /* you lose */
+        RSVD_OPND_FAULT(op_movc);                       /* you lose */
         }
 
 PSL = PSL & ~PSL_FPD;                                   /* clear FPD */
@@ -1131,8 +1131,9 @@ if (ei > 0) {                                           /* if int, new IPL */
 else 
     PSL = newpsl |                                      /* exc, old IPL/1F */
         ((newpc & 1)? PSL_IPL1F: (oldpsl & PSL_IPL)) | (oldcur << PSL_V_PRV);
-sim_debug (LOG_CPU_I, &cpu_dev, "PC=%08x, PSL=%08x, SP=%08x, VEC=%08x, nPSL=%08x, nSP=%08x\n",
+sim_debug (LOG_CPU_I, &cpu_dev, "PC=%08x, PSL=%08x, SP=%08x, VEC=%08x, nPSL=%08x, nSP=%08x ",
              PC, oldpsl, oldsp, vec, PSL, SP);
+sim_debug_bits(LOG_CPU_I, &cpu_dev, cpu_psl_bits, oldpsl, PSL, 1);
 acc = ACC_MASK (KERN);                                  /* new mode is kernel */
 Write (SP - 4, oldpsl, L_LONG, WA);                     /* push old PSL */
 Write (SP - 8, PC, L_LONG, WA);                         /* push old PC */
@@ -1202,9 +1203,9 @@ Rule    SRM formulation                     Comment
 */
 
 #define REI_RSVD_FAULT(desc) do {                                                                                   \
-        sim_debug (LOG_CPU_FAULT_RSVD, &cpu_dev, "PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x - %s\n",\
+        sim_debug (LOG_CPU_FAULT_RSVD, &cpu_dev, "REI Operand: PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x - %s\n",\
                      PC, PSL, SP - 8, newpc, newpsl, ((newpsl & IS)? IS: STK[newcur]), desc);                       \
-        RSVD_OPND_FAULT; } while (0)
+        RSVD_OPND_FAULT(REI); } while (0)
 
 int32 op_rei (int32 acc)
 {
@@ -1242,8 +1243,9 @@ if (PSL & PSL_IS)                                       /* save stack */
     IS = SP;
 else 
     STK[oldcur] = SP;
-sim_debug (LOG_CPU_R, &cpu_dev, "PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x\n",
+sim_debug (LOG_CPU_R, &cpu_dev, "PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x ",
              PC, PSL, SP - 8, newpc, newpsl, ((newpsl & IS)? IS: STK[newcur]));
+sim_debug_bits(LOG_CPU_R, &cpu_dev, cpu_psl_bits, PSL, newpsl, 1);
 PSL = (PSL & PSL_TP) | (newpsl & ~CC_MASK);             /* set PSL */
 if (PSL & PSL_IS)                                       /* set new stack */
     SP = IS;
@@ -1265,7 +1267,7 @@ void op_ldpctx (int32 acc)
 uint32 newpc, newpsl, pcbpa, t;
 
 if (PSL & PSL_CUR)                                      /* must be kernel */
-    RSVD_INST_FAULT;
+    RSVD_INST_FAULT(LDPCTX);
 pcbpa = PCBB & PAMASK;                                  /* phys address */
 KSP = ReadLP (pcbpa);                                   /* restore stk ptrs */
 ESP = ReadLP (pcbpa + 4);
@@ -1327,7 +1329,7 @@ void op_svpctx (int32 acc)
 int32 savpc, savpsl, pcbpa;
 
 if (PSL & PSL_CUR)                                      /* must be kernel */
-    RSVD_INST_FAULT;
+    RSVD_INST_FAULT(SVPCTX);
 savpc = Read (SP, L_LONG, RA);                          /* pop PC, PSL */
 savpsl = Read (SP + 4, L_LONG, RA);
 sim_debug (LOG_CPU_P, &cpu_dev, ">>SVP: PC=%08x, PSL=%08x, SP=%08x, oPC=%08x, oPSL=%08x\n",
@@ -1429,9 +1431,9 @@ uint32 prn = (uint32)opnd[1];
 int32 cc;
 
 if (PSL & PSL_CUR)                                      /* must be kernel */
-    RSVD_INST_FAULT;
+    RSVD_INST_FAULT(MTPR);
 if (prn > MT_MAX)                                       /* reg# > max? fault */
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_mtpr);
 CC_IIZZ_L (val);                                        /* set cc's */
 switch (prn) {                                          /* case on reg # */
 
@@ -1560,9 +1562,9 @@ uint32 prn = (uint32)opnd[0];
 int32 val;
 
 if (PSL & PSL_CUR)                                      /* must be kernel */
-    RSVD_INST_FAULT;
+    RSVD_INST_FAULT(MFPR);
 if (prn > MT_MAX)                                       /* reg# > max? fault */
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_mtpr);
 switch (prn) {                                          /* case on reg# */
 
     case MT_KSP:                                        /* KSP */
@@ -1633,7 +1635,7 @@ switch (prn) {                                          /* case on reg# */
     case MT_TBIA:
     case MT_TBIS:
     case MT_TBCHK:
-        RSVD_OPND_FAULT;                                /* write only */
+        RSVD_OPND_FAULT(op_mfpr);                       /* write only */
 
     default:                                            /* others */
         val = ReadIPR (prn);                            /* read from SSC */

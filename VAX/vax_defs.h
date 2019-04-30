@@ -79,24 +79,47 @@
 #define ABORT_TNV       (-SCB_TNV)                      /* transl not vaid */
 #define ABORT(x)        longjmp (save_env, (x))         /* abort */
 extern jmp_buf save_env;
-#define RSVD_INST_FAULT ABORT (ABORT_RESIN)
+#define RSVD_INST_FAULT(opc) do {                                                                       \
+        char op_num[20];                                                                                \
+        char const *opcd = opcode[opc];                                                                 \
+                                                                                                        \
+        if (sim_deb && !opcd) {                                                                         \
+            opcd = op_num;                                                                              \
+            sprintf (op_num, "Opcode 0x%X", opc);                                                              \
+            sim_debug (LOG_CPU_FAULT_RSVD, &cpu_dev, "%s fault_PC=%08x, PSL=%08x, SP=%08x, PC=%08x\n",  \
+                                                     opcd, fault_PC, PSL, SP, PC);                      \
+            }                                                                                           \
+        ABORT (ABORT_RESIN); } while (0)
 #define RSVD_ADDR_FAULT ABORT (ABORT_RESAD)
-#define RSVD_OPND_FAULT ABORT (ABORT_RESOP)
+#define RSVD_OPND_FAULT(opc) do {                                                                       \
+        sim_debug (LOG_CPU_FAULT_RSVD, &cpu_dev, #opc " fault_PC=%08x, PSL=%08x, SP=%08x, PC=%08x\n",   \
+                                                 fault_PC, PSL, SP, PC);                                \
+        ABORT (ABORT_RESOP); } while (0)
 #define FLT_OVFL_FAULT  p1 = FLT_OVRFLO, ABORT (ABORT_ARITH)
 #define FLT_DZRO_FAULT  p1 = FLT_DIVZRO, ABORT (ABORT_ARITH)
 #define FLT_UNFL_FAULT  p1 = FLT_UNDFLO, ABORT (ABORT_ARITH)
-#define CMODE_FAULT(cd) p1 = (cd), ABORT (ABORT_CMODE)
-#define MACH_CHECK(cd)  p1 = (cd), ABORT (ABORT_MCHK)
+#define CMODE_FAULT(cd) do {                                                                            \
+        sim_debug (LOG_CPU_FAULT_CMODE, &cpu_dev, #cd " fault_PC=%08x, PSL=%08x, SP=%08x, PC=%08x\n",   \
+                                                 fault_PC, PSL, SP, PC);                                \
+        p1 = (cd);                                                                                      \
+        ABORT (ABORT_CMODE); } while (0)
+#define MACH_CHECK(cd)  do {                                                                            \
+        sim_debug (LOG_CPU_FAULT_MCHK, &cpu_dev, #cd " fault_PC=%08x, PSL=%08x, SP=%08x, PC=%08x\n",    \
+                                                 fault_PC, PSL, SP, PC);                                \
+        p1 = (cd);                                                                                      \
+        ABORT (ABORT_MCHK); } while (0)
 
 /* Logging */
 
 #define LOG_CPU_I           0x001                       /* intexc */
 #define LOG_CPU_R           0x002                       /* REI */
-#define LOG_CPU_P           0x004                       /* process context */
-#define LOG_CPU_FAULT_RSVD  0x008                       /* reserved faults */
-#define LOG_CPU_FAULT_FLT   0x010                       /* floating faults*/
-#define LOG_CPU_FAULT_CMODE 0x020                       /* cmode faults */
-#define LOG_CPU_FAULT_MCHK  0x040                       /* machine check faults */
+#define LOG_CPU_A           0x004                       /* Abort */
+#define LOG_CPU_P           0x008                       /* process context */
+#define LOG_CPU_FAULT_RSVD  0x010                       /* reserved faults */
+#define LOG_CPU_FAULT_FLT   0x020                       /* floating faults*/
+#define LOG_CPU_FAULT_CMODE 0x040                       /* cmode faults */
+#define LOG_CPU_FAULT_MCHK  0x080                       /* machine check faults */
+#define LOG_CPU_FAULT_EMUL  0x100                       /* emulated instruction fault */
 
 /* Recovery queue */
 
@@ -424,6 +447,37 @@ extern jmp_buf save_env;
 #define RB_R5  (13 << DR_V_RESMASK)     /* Regs R0-R5  */
 #define RB_SP  (14 << DR_V_RESMASK)     /* @SP         */
 #define DR_GETRES(x)    (((x) >> DR_V_RESMASK) & DR_M_RESMASK)
+
+/* Extra bits in the opcode flag word of the Decode ROM array 
+   to identify instruction group */
+
+#define DR_V_IGMASK     12
+#define DR_M_IGMASK    0x0007
+#define IG_RSVD     (0 << DR_V_IGMASK)  /* Reserved Opcode */
+#define IG_BASE     (1 << DR_V_IGMASK)  /* Base Instruction Group       */
+#define IG_BSGFL    (2 << DR_V_IGMASK)  /*   Base subgroup G-Float      */
+#define IG_BSDFL    (3 << DR_V_IGMASK)  /*   Base subgroup D-Float      */
+#define IG_PACKD    (4 << DR_V_IGMASK)  /* packed-decimal-string group  */
+#define IG_EXTAC    (5 << DR_V_IGMASK)  /* extended-accuracy group      */
+#define IG_EMONL    (6 << DR_V_IGMASK)  /* emulated-only group          */
+#define IG_VECTR    (7 << DR_V_IGMASK)  /* vector-processing group      */
+#define IG_MAX_GRP  7                   /* Maximum Instruction groups */
+#define DR_GETIGRP(x)    (((x) >> DR_V_IGMASK) & DR_M_IGMASK)
+
+#define VAX_FULL_BASE ((1 << DR_GETIGRP(IG_BASE))  | \
+                       (1 << DR_GETIGRP(IG_BSGFL)) | \
+                       (1 << DR_GETIGRP(IG_BSDFL)))
+#define VAX_BASE   (1 << DR_GETIGRP(IG_BASE))
+#define VAX_GFLOAT (1 << DR_GETIGRP(IG_BSGFL))
+#define VAX_DFLOAT (1 << DR_GETIGRP(IG_BSDFL))
+#define VAX_PACKED (1 << DR_GETIGRP(IG_PACKD))
+#define VAX_EXTAC  (1 << DR_GETIGRP(IG_EXTAC))
+#define VAX_EMONL  (1 << DR_GETIGRP(IG_EMONL))
+#define VAX_VECTR  (1 << DR_GETIGRP(IG_VECTR))
+#define FULL_INSTRUCTION_SET (VAX_BASE                    | \
+                              (1 << DR_GETIGRP(IG_PACKD)) | \
+                              (1 << DR_GETIGRP(IG_EXTAC)) | \
+                              (1 << DR_GETIGRP(IG_EMONL)))
 
 /* Decode ROM: specifier entry */
 
@@ -785,6 +839,9 @@ enum opcodes {
 #define VAX_IDLE_ELN        0x40    /* VAXELN */
 extern uint32 cpu_idle_mask;        /* idle mask */
 extern int32 extra_bytes;           /* bytes referenced by current string instruction */
+extern BITFIELD cpu_psl_bits[];
+extern char const * const opcode[];
+extern const uint16 drom[NUM_INST][MAX_SPEC + 1];
 void cpu_idle (void);
 
 /* Instruction History */
@@ -941,8 +998,19 @@ extern void rom_wr_B (int32 pa, int32 val);
 #else /* VAX 3900 */
 #include "vaxmod_defs.h"
 #endif
+#ifndef CPU_INSTRUCTION_SET
+#if defined (FULL_VAX)
+#define CPU_INSTRUCTION_SET FULL_INSTRUCTION_SET
+#else
+#define CPU_INSTRUCTION_SET VAX_FULL_BASE
+#endif
+#endif
 #ifndef CPU_MODEL_MODIFIERS
 #define CPU_MODEL_MODIFIERS             /* No model specific CPU modifiers */
+#endif
+#ifndef CPU_INST_MODIFIERS
+#define CPU_INST_MODIFIERS  { MTAB_XTD|MTAB_VDV, 0, "INSTRUCTIONS", "INSTRUCTIONS={F-FLOAT|D-FLOAT}",     \
+                              &cpu_set_instruction_set, &cpu_show_instruction_set, NULL, "Set/Show the CPU Instruction Set" },
 #endif
 #ifndef IDX_IMM_TEST
 #define IDX_IMM_TEST RSVD_ADDR_FAULT

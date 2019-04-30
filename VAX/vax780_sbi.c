@@ -387,7 +387,7 @@ switch (rg) {
         break;
 
     default:
-        RSVD_OPND_FAULT;
+        RSVD_OPND_FAULT(ReadIPR);
         }
 
 return val;
@@ -466,7 +466,7 @@ switch (rg) {
 
     case MT_SBIQC:                                      /* SBIQC */
         if (val & SBIQC_MBZ) {
-            RSVD_OPND_FAULT;
+            RSVD_OPND_FAULT(WriteIPR);
             }
         WriteLP (val, 0);
         WriteLP (val + 4, 0);
@@ -477,7 +477,7 @@ switch (rg) {
         break;
 
     default:
-        RSVD_OPND_FAULT;
+        RSVD_OPND_FAULT(WriteIPR);
         }
 
 return;

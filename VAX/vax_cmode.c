@@ -1308,7 +1308,7 @@ return TRUE;                                            /* always bad */
 
 int32 op_cmode (int32 cc)
 {
-RSVD_INST_FAULT;
+RSVD_INST_FAULT(0);
 return cc;
 }
 

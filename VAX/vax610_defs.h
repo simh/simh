@@ -96,7 +96,12 @@
 #define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0, "LEDS", NULL,                               \
                               NULL, &cpu_show_leds, NULL, "Display the CPU LED values" },       \
                             { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL={MicroVAX|VAXStation}",     \
-                              &cpu_set_model, &cpu_show_model, NULL, "Set/Show the simulator CPU Model" }
+                              &cpu_set_model, &cpu_show_model, NULL, "Set/Show the simulator CPU Model" },
+#define CPU_INSTRUCTION_SET (VAX_BASE | VAX_GFLOAT)
+#define CPU_INST_MODIFIERS  { MTAB_XTD|MTAB_VDV|MTAB_VALR|MTAB_NMO, 0, "INSTRUCTIONS", "INSTRUCTIONS={G-FLOAT|NOG-FLOAT|D-FLOAT|NOD-FLOAT}", \
+                              &cpu_set_instruction_set, NULL, NULL,                      "Set the CPU Instruction Set" },                    \
+                            { MTAB_XTD|MTAB_VDV, 0, "INSTRUCTIONS", NULL,                                                                    \
+                              NULL,                     &cpu_show_instruction_set, NULL, "Show the CPU Instruction Set (SHOW -V)" },
 
 /* QVSS memory space */
 
@@ -150,7 +155,7 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc
 #define LP_MBZ84_TEST(r)
 #define LP_MBZ92_TEST(r)
 
-#define MT_AST_TEST(r)  if ((r) > AST_MAX) RSVD_OPND_FAULT
+#define MT_AST_TEST(r)  if ((r) > AST_MAX) RSVD_OPND_FAULT(MT_AST_TEST)
 #define IDX_IMM_TEST
 
 /* Qbus I/O modes */

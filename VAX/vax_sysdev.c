@@ -979,7 +979,7 @@ switch (rg) {
     case MT_SID:
     case MT_CONPC:
     case MT_CONPSL:                                     /* halt reg */
-        RSVD_OPND_FAULT;
+        RSVD_OPND_FAULT(WriteIPR);
 
     default:
         ssc_bto = ssc_bto | SSCBTO_BTO;                 /* set BTO */

@@ -196,12 +196,12 @@ t_uint64 n1, n2;
 
 if ((h1 & FD_EXP) == 0) {
     if (h1 & FPSIGN)
-        RSVD_OPND_FAULT;
+        RSVD_OPND_FAULT(op_cmpfd);
     h1 = l1 = 0;
     }
 if ((h2 & FD_EXP) == 0) {
     if (h2 & FPSIGN)
-        RSVD_OPND_FAULT;
+        RSVD_OPND_FAULT(op_cmpfd);
     h2 = l2 = 0;
     }
 if ((h1 ^ h2) & FPSIGN)
@@ -219,12 +219,12 @@ t_uint64 n1, n2;
 
 if ((h1 & G_EXP) == 0) {
     if (h1 & FPSIGN)
-        RSVD_OPND_FAULT;
+        RSVD_OPND_FAULT(op_cmpg);
     h1 = l1 = 0;
     }
 if ((h2 & G_EXP) == 0) {
     if (h2 & FPSIGN)
-        RSVD_OPND_FAULT;
+        RSVD_OPND_FAULT(op_cmpg);
     h2 = l2 = 0;
     }
 if ((h1 ^ h2) & FPSIGN)
@@ -508,7 +508,7 @@ r->sign = hi & FPSIGN;                                  /* get sign */
 r->exp = FD_GETEXP (hi);                                /* get exponent */
 if (r->exp == 0) {                                      /* exp = 0? */
     if (r->sign)                                        /* if -, rsvd op */
-        RSVD_OPND_FAULT;
+        RSVD_OPND_FAULT(unpackf);
     r->frac = 0;                                        /* else 0 */
     return;
     }
@@ -523,7 +523,7 @@ r->sign = hi & FPSIGN;                                  /* get sign */
 r->exp = FD_GETEXP (hi);                                /* get exponent */
 if (r->exp == 0) {                                      /* exp = 0? */
     if (r->sign)                                        /* if -, rsvd op */
-        RSVD_OPND_FAULT;
+        RSVD_OPND_FAULT(unpackd);
     r->frac = 0;                                        /* else 0 */
     return;
     }
@@ -538,7 +538,7 @@ r->sign = hi & FPSIGN;                                  /* get sign */
 r->exp = G_GETEXP (hi);                                 /* get exponent */
 if (r->exp == 0) {                                      /* exp = 0? */
     if (r->sign)                                        /* if -, rsvd op */
-        RSVD_OPND_FAULT;
+        RSVD_OPND_FAULT(unpackg);
     r->frac = 0;                                        /* else 0 */
     return;
     }
@@ -1327,7 +1327,7 @@ int32 op_movfd (int32 val)
 if (val & FD_EXP)
     return val;
 if (val & FPSIGN)
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_movfd);
 return 0;
 }
 
@@ -1336,7 +1336,7 @@ int32 op_mnegfd (int32 val)
 if (val & FD_EXP)
     return (val ^ FPSIGN);
 if (val & FPSIGN)
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_mnegfd);
 return 0;
 }
 
@@ -1345,7 +1345,7 @@ int32 op_movg (int32 val)
 if (val & G_EXP)
     return val;
 if (val & FPSIGN)
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_movg);
 return 0;
 }
 
@@ -1354,7 +1354,7 @@ int32 op_mnegg (int32 val)
 if (val & G_EXP)
     return (val ^ FPSIGN);
 if (val & FPSIGN)
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_mnegg);
 return 0;
 }
 
@@ -1504,7 +1504,7 @@ int32 ptr = opnd[2];
 int32 i, wd, res;
 
 if (deg > 31)                                           /* degree > 31? fault */
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_polyf);
 unpackf (opnd[0], &a);                                  /* unpack arg */
 wd = Read (ptr, L_LONG, RD);                            /* get C0 */
 ptr = ptr + 4;
@@ -1533,7 +1533,7 @@ int32 ptr = opnd[3];
 int32 i, wd, wd1, res, resh;
 
 if (deg > 31)                                           /* degree > 31? fault */
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_polyd);
 unpackd (opnd[0], opnd[1], &a);                         /* unpack arg */
 wd = Read (ptr, L_LONG, RD);                            /* get C0 */
 wd1 = Read (ptr + 4, L_LONG, RD);
@@ -1567,7 +1567,7 @@ int32 ptr = opnd[3];
 int32 i, wd, wd1, res, resh;
 
 if (deg > 31)                                           /* degree > 31? fault */
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(op_polyg);
 unpackg (opnd[0], opnd[1], &a);                         /* unpack arg */
 wd = Read (ptr, L_LONG, RD);                            /* get C0 */
 wd1 = Read (ptr + 4, L_LONG, RD);

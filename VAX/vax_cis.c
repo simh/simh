@@ -418,7 +418,7 @@ switch (opc) {                                          /* case on opcode */
 
     case MOVP:
         if ((PSL & PSL_FPD) || (op[0] > 31))
-            RSVD_OPND_FAULT;
+            RSVD_OPND_FAULT(MOVP);
         ReadDstr (op[0], op[1], &dst, acc);             /* read source */
         cc = WriteDstr (op[0], op[2], &dst, 0, acc) |   /* write dest */
             (cc & CC_C);                                /* preserve C */
@@ -456,7 +456,7 @@ switch (opc) {                                          /* case on opcode */
     case ADDP6: case SUBP6:
         if ((PSL & PSL_FPD) || (op[0] > 31) ||
             (op[2] > 31) || (op[4] > 31))
-            RSVD_OPND_FAULT;
+            RSVD_OPND_FAULT(ADDP-SUBP);
         ReadDstr (op[0], op[1], &src1, acc);            /* get src1 */
         ReadDstr (op[2], op[3], &src2, acc);            /* get src2 */
         if (opc & 2)                                    /* sub? invert sign */
@@ -510,7 +510,7 @@ switch (opc) {                                          /* case on opcode */
     case MULP:
         if ((PSL & PSL_FPD) || (op[0] > 31) ||
             (op[2] > 31) || (op[4] > 31))
-            RSVD_OPND_FAULT;
+            RSVD_OPND_FAULT(MULP);
         dst = Dstr_zero;                                /* clear result */
         if (ReadDstr (op[0], op[1], &src1, acc) &&      /* read src1, src2 */
             ReadDstr (op[2], op[3], &src2, acc)) {      /* if both > 0 */
@@ -560,7 +560,7 @@ switch (opc) {                                          /* case on opcode */
     case DIVP:
         if ((PSL & PSL_FPD) || (op[0] > 31) ||
             (op[2] > 31) || (op[4] > 31))
-            RSVD_OPND_FAULT;
+            RSVD_OPND_FAULT(DIVP);
         ldivr = ReadDstr (op[0], op[1], &src1, acc);    /* get divisor */
         if (ldivr == 0) {                               /* divisor = 0? */
             SET_TRAP (TRAP_FLTDIV);                     /* dec div trap */
@@ -624,7 +624,7 @@ switch (opc) {                                          /* case on opcode */
         op[2] = op[0];
     case CMPP4:
         if ((PSL & PSL_FPD) || (op[0] > 31) || (op[2] > 31))
-            RSVD_OPND_FAULT;
+            RSVD_OPND_FAULT(CMPP);
         ReadDstr (op[0], op[1], &src1, acc);            /* get src1 */
         ReadDstr (op[2], op[3], &src2, acc);            /* get src2 */
         cc = 0;
@@ -664,7 +664,7 @@ switch (opc) {                                          /* case on opcode */
 
     case ASHP:
         if ((PSL & PSL_FPD) || (op[1] > 31) || (op[4] > 31))
-            RSVD_OPND_FAULT;
+            RSVD_OPND_FAULT(ASHP);
         ReadDstr (op[1], op[2], &src1, acc);            /* get source */
         V = 0;                                          /* init V */
         shift = op[0];                                  /* get shift count */
@@ -710,7 +710,7 @@ switch (opc) {                                          /* case on opcode */
 
     case CVTPL:
         if ((PSL & PSL_FPD) || (op[0] > 31))
-            RSVD_OPND_FAULT;
+            RSVD_OPND_FAULT(CVTPL);
         ReadDstr (op[0], op[1], &src1, acc);            /* get source */
         V = result = 0;                                 /* clear V, result */
         for (i = (DSTRLNT * 8) - 1; i > 0; i--) {       /* loop thru digits */
@@ -759,7 +759,7 @@ switch (opc) {                                          /* case on opcode */
 
     case CVTLP:
         if ((PSL & PSL_FPD) || (op[1] > 31))
-            RSVD_OPND_FAULT;
+            RSVD_OPND_FAULT(CVTLP);
         dst = Dstr_zero;                                /* clear result */
         result = op[0];
         if ((result & LSIGN) != 0) {
@@ -797,17 +797,17 @@ switch (opc) {                                          /* case on opcode */
 
     case CVTSP:
         if ((PSL & PSL_FPD) || (op[0] > 31) || (op[2] > 31))
-            RSVD_OPND_FAULT;
+            RSVD_OPND_FAULT(CVTSP);
         dst = Dstr_zero;                                /* clear result */
         t = Read (op[1], L_BYTE, RA);                   /* read source sign */
         if (t == C_MINUS)                               /* sign -, */
             dst.sign = 1;
         else if ((t != C_PLUS) && (t != C_SPACE))       /* + or blank? */
-            RSVD_OPND_FAULT;
+            RSVD_OPND_FAULT(CVTSP);
         for (i = 1; i <= op[0]; i++) {                  /* loop thru chars */
             c = Read ((op[1] + op[0] + 1 - i) & LMASK, L_BYTE, RA);
             if ((c < C_ZERO) || (c > C_NINE))           /* [0:9]? */
-                RSVD_OPND_FAULT;
+                RSVD_OPND_FAULT(CVTSP);
             d = c & 0xF;
             dst.val[i / 8] = dst.val[i / 8] | (d << ((i % 8) * 4));
             }
@@ -838,7 +838,7 @@ switch (opc) {                                          /* case on opcode */
 
     case CVTPS:
         if ((PSL & PSL_FPD) || (op[0] > 31) || (op[2] > 31))
-            RSVD_OPND_FAULT;
+            RSVD_OPND_FAULT(CVTPS);
         lenl = ReadDstr (op[0], op[1], &dst, acc);      /* get source, lw len */
         lenp = LntDstr (&dst, lenl);                    /* get exact nz src len */
         ProbeDstr (op[2], op[3], WA);                   /* test dst write */
@@ -879,13 +879,13 @@ switch (opc) {                                          /* case on opcode */
 
     case CVTTP:
         if ((PSL & PSL_FPD) || (op[0] > 31) || (op[3] > 31))
-            RSVD_OPND_FAULT;
+            RSVD_OPND_FAULT(CVTTP);
         dst = Dstr_zero;                                /* clear result */
         for (i = 1; i <= op[0]; i++) {                  /* loop thru char */
             c = Read ((op[1] + op[0] - i) & LMASK, L_BYTE, RA); /* read char */
             if (i != 1) {                               /* normal byte? */
                 if ((c < C_ZERO) || (c > C_NINE))       /* valid digit? */
-                    RSVD_OPND_FAULT;
+                    RSVD_OPND_FAULT(CVTTP);
                 d = c & 0xF;
                 }
             else {                                      /* highest byte */
@@ -893,7 +893,7 @@ switch (opc) {                                          /* case on opcode */
                 d = (t >> 4) & 0xF;                     /* digit */
                 t = t & 0xF;                            /* sign */
                 if ((d > 0x9) || (t < 0xA))
-                    RSVD_OPND_FAULT;
+                    RSVD_OPND_FAULT(CVTTP);
                 if ((t == 0xB) || (t == 0xD))
                     dst.sign = 1;
                 }
@@ -927,7 +927,7 @@ switch (opc) {                                          /* case on opcode */
 
     case CVTPT:
         if ((PSL & PSL_FPD) || (op[0] > 31) || (op[3] > 31))
-            RSVD_OPND_FAULT;
+            RSVD_OPND_FAULT(CVTPT);
         lenl = ReadDstr (op[0], op[1], &dst, acc);      /* get source, lw len */
         lenp = LntDstr (&dst, lenl);                    /* get exact src len */
         ProbeDstr (op[3], op[4], WA);                   /* test writeability */
@@ -1007,7 +1007,7 @@ switch (opc) {                                          /* case on opcode */
             }
         else {                                          /* new instr */
             if (op[0] > 31)                             /* lnt > 31? */
-                RSVD_OPND_FAULT;
+                RSVD_OPND_FAULT(EDITPC);
             t = Read ((op[1] + (op[0] / 2)) & LMASK, L_BYTE, RA) & 0xF;
             if ((t == 0xB) || (t == 0xD)) {
                 cc = CC_N | CC_Z;
@@ -1034,7 +1034,7 @@ switch (opc) {                                          /* case on opcode */
             if (pop & EO_RPT_FLAG) {                    /* repeat class? */
                 rpt = pop & EO_RPT_MASK;                /* isolate count */
                 if (rpt == 0)                           /* can't be zero */
-                    RSVD_OPND_FAULT;
+                    RSVD_OPND_FAULT(EDITPC);
                 pop = pop & ~EO_RPT_MASK;               /* isolate op */
                 }
             switch (pop) {                              /* case on op */
@@ -1093,7 +1093,7 @@ switch (opc) {                                          /* case on opcode */
             case EO_BLANK_ZERO:                         /* blank zero */
                 t = Read ((R[3] + 1) & LMASK, L_BYTE, RA);
                 if (t == 0)
-                    RSVD_OPND_FAULT;
+                    RSVD_OPND_FAULT(EDITPC);
                 if (cc & CC_Z) {                        /* zero? */
                     do {                                /* repeat and blank */
                         Write ((R[5] - t) & LMASK, fill, L_BYTE, WA);
@@ -1105,7 +1105,7 @@ switch (opc) {                                          /* case on opcode */
             case EO_REPL_SIGN:                          /* replace sign */
                 t = Read ((R[3] + 1) & LMASK, L_BYTE, RA);
                 if (t == 0)
-                    RSVD_OPND_FAULT;
+                    RSVD_OPND_FAULT(EDITPC);
                 if (cc & CC_Z)
                     Write ((R[5] - t) & LMASK, fill, L_BYTE, WA);
                 R[3]++;                                 /* now fault safe */
@@ -1114,7 +1114,7 @@ switch (opc) {                                          /* case on opcode */
             case EO_ADJUST_LNT:                         /* adjust length */
                 t = Read ((R[3] + 1) & LMASK, L_BYTE, RA);
                 if ((t == 0) || (t > 31))
-                    RSVD_OPND_FAULT;
+                    RSVD_OPND_FAULT(EDITPC);
                 R[0] = R[0] & WMASK;                    /* clr old ld zero */
                 if (R[0] > t) {                         /* decrease */
                     for (i = 0; i < (R[0] - t); i++) {  /* loop thru src */
@@ -1162,7 +1162,7 @@ switch (opc) {                                          /* case on opcode */
                 break;
 
             default:                                    /* undefined */
-                RSVD_OPND_FAULT;
+                RSVD_OPND_FAULT(EDITPC);
                 }                                       /* end case pattern */
 
             R[3] = (R[3] + 1) & LMASK;                  /* next pattern byte */
@@ -1170,7 +1170,7 @@ switch (opc) {                                          /* case on opcode */
             }                                           /* end for pattern */
 
         if (R[0])                                       /* pattern too short */
-            RSVD_OPND_FAULT;
+            RSVD_OPND_FAULT(EDITPC);
         PSL = PSL & ~PSL_FPD;                           /* clear FPD */
         if (cc & CC_Z)                                  /* zero? clear n */
             cc = cc & ~CC_N;
@@ -1182,7 +1182,7 @@ switch (opc) {                                          /* case on opcode */
         return cc;
 
     default:
-        RSVD_INST_FAULT;
+        RSVD_INST_FAULT(opc);
         }
                                                         /* end case op */
 return cc;
@@ -1614,7 +1614,7 @@ r1 = (R[1] + (inc / 2) + ((~R[0] & inc) & 1)) & LMASK;  /* eff addr */
 r0 = (R[0] - inc) & 0x1F;                               /* eff lnt left */
 if (r0 == 0) {                                          /* nothing left? */
     R[0] = -1;                                          /* out of input */
-    RSVD_OPND_FAULT;
+    RSVD_OPND_FAULT(edit_read_src);
     }
 c = Read (r1, L_BYTE, RA);
 return (((r0 & 1)? (c >> 4): c) & 0xF);
@@ -1646,49 +1646,19 @@ return sign;
 
 #else
 
+extern int32 cpu_emulate_exception (int32 *opnd, int32 cc, int32 opc, int32 acc);
+
 /* CIS instructions - invoke emulator interface
 
         opnd[0:5] =     six operands to be pushed (if PSL<fpd> = 0)
         cc      =       condition codes
         opc     =       opcode
 
-   If FPD is set, push old PC and PSL on stack, vector thru SCB.
-   If FPD is clear, push opcode, old PC, operands, new PC, and PSL
-        on stack, vector thru SCB.
-   In both cases, the exception occurs in the current mode.
 */
 
 int32 op_cis (int32 *opnd, int32 cc, int32 opc, int32 acc)
 {
-int32 vec;
-
-if (PSL & PSL_FPD) {                                    /* FPD set? */
-    Read (SP - 1, L_BYTE, WA);                          /* wchk stack */
-    Write (SP - 8, fault_PC, L_LONG, WA);               /* push old PC */       
-    Write (SP - 4, PSL | cc, L_LONG, WA);               /* push PSL */
-    SP = SP - 8;                                        /* decr stk ptr */
-    vec = ReadLP ((SCBB + SCB_EMULFPD) & PAMASK);
-    }
-else {
-    if (opc == CVTPL)                                   /* CVTPL? .wl */
-        opnd[2] = (opnd[2] >= 0)? ~opnd[2]: opnd[3];
-    Read (SP - 1, L_BYTE, WA);                          /* wchk stack */
-    Write (SP - 48, opc, L_LONG, WA);                   /* push opcode */
-    Write (SP - 44, fault_PC, L_LONG, WA);              /* push old PC */
-    Write (SP - 40, opnd[0], L_LONG, WA);               /* push operands */
-    Write (SP - 36, opnd[1], L_LONG, WA);
-    Write (SP - 32, opnd[2], L_LONG, WA);
-    Write (SP - 28, opnd[3], L_LONG, WA);
-    Write (SP - 24, opnd[4], L_LONG, WA);
-    Write (SP - 20, opnd[5], L_LONG, WA);
-    Write (SP - 8, PC, L_LONG, WA);                     /* push cur PC */
-    Write (SP - 4, PSL | cc, L_LONG, WA);               /* push PSL */
-    SP = SP - 48;                                       /* decr stk ptr */
-    vec = ReadLP ((SCBB + SCB_EMULATE) & PAMASK);
-    }
-PSL = PSL & ~(PSL_TP | PSL_FPD | PSW_DV | PSW_FU | PSW_IV | PSW_T);
-JUMP (vec & ~03);                                       /* set new PC */
-return 0;                                               /* set new cc's */
+return cpu_emulate_exception (opnd, cc, opc, acc);
 }
 
 #endif
