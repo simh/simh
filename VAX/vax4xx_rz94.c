@@ -182,8 +182,6 @@ MTAB rz_mod[] = {
       &rz_set_type, NULL, NULL, "Set RRD40 Disk Type" },
     { MTAB_XTD|MTAB_VUN, RRD42_DTYPE, NULL, "RRD42",
       &rz_set_type, NULL, NULL, "Set RRD42 Disk Type" },
-    { MTAB_XTD|MTAB_VUN, RRD42_DTYPE, NULL, "RRW11",
-      &rz_set_type, NULL, NULL, "Set RRW11 Disk Type" },
     { MTAB_XTD|MTAB_VUN, RRW11_DTYPE, NULL, "RRW11",
       &rz_set_type, NULL, NULL, "Set RRW11 Disk Type" },
     { MTAB_XTD|MTAB_VUN, CDW900_DTYPE, NULL, "CDW900",
