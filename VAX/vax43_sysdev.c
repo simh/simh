@@ -1058,7 +1058,8 @@ char gbuf[CBUFSIZE];
 if ((cptr == NULL) || (!*cptr))
     return SCPE_ARG;
 cptr = get_glyph (cptr, gbuf, 0);
-if (MATCH_CMD(gbuf, "MICROVAX") == 0) {
+if ((MATCH_CMD(gbuf, "VAXSERVER") == 0) ||
+    (MATCH_CMD(gbuf, "MICROVAX") == 0)) {                /* needed by VC,VE */
     sys_model = 0;
 #if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
     vc_dev.flags = vc_dev.flags | DEV_DIS;               /* disable MVO */
@@ -1066,7 +1067,7 @@ if (MATCH_CMD(gbuf, "MICROVAX") == 0) {
     lk_dev.flags = lk_dev.flags | DEV_DIS;               /* disable keyboard */
     vs_dev.flags = vs_dev.flags | DEV_DIS;               /* disable mouse */
 #endif
-    strcpy (sim_name, "MicroVAX 3100 M76 (KA43-A)");
+    strcpy (sim_name, "VAXserver 3100 M76 (KA43-A)");
     reset_all (0);                                       /* reset everything */
     }
 else if (MATCH_CMD(gbuf, "VAXSTATION") == 0) {

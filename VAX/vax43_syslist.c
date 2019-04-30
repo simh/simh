@@ -27,11 +27,11 @@
 
 #include "vax_defs.h"
 
-char sim_name[64] = "MicroVAX 3100 M76 (KA43-A)";
+char sim_name[64] = "VAXstation 3100 M76 (KA43-A)";
 
 void vax_init(void)
 {
-sim_savename = "MicroVAX 3100 M76 (KA43-A)";
+sim_savename = "VAXstation 3100 M76 (KA43-A)";
 }
 
 WEAK void (*sim_vm_init) (void) = &vax_init;

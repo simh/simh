@@ -1134,7 +1134,7 @@ else
 #endif
 #if defined (VAX_42A) || defined (VAX_42B)
 if ((MATCH_CMD(gbuf, "VAXSERVER") == 0) ||
-    (MATCH_CMD(gbuf, "MICROVAX") == 0)) {
+    (MATCH_CMD(gbuf, "MICROVAX") == 0)) {                /* needed by VA,VC,VE */
     sys_model = 0;
 #if defined (USE_SIM_VIDEO) && defined (HAVE_LIBSDL)
     va_dev.flags = vc_dev.flags | DEV_DIS;               /* disable GPX */
@@ -1144,9 +1144,9 @@ if ((MATCH_CMD(gbuf, "VAXSERVER") == 0) ||
     vs_dev.flags = vs_dev.flags | DEV_DIS;               /* disable mouse */
 #endif
 #if defined (VAX_42A)
-    strcpy (sim_name, "MicroVAX 3100 M30 (KA42-A)");
+    strcpy (sim_name, "VAXserver 3100 M30 (KA42-A)");
 #else   /* VAX_42B */
-    strcpy (sim_name, "MicroVAX 3100 M38 (KA42-B)");
+    strcpy (sim_name, "VAXserver 3100 M38 (KA42-B)");
 #endif
     reset_all (0);                                       /* reset everything */
     }
@@ -1177,9 +1177,9 @@ else if (MATCH_CMD(gbuf, "VAXSTATIONGPX") == 0) {
     lk_dev.flags = lk_dev.flags & ~DEV_DIS;              /* enable keyboard */
     vs_dev.flags = vs_dev.flags & ~DEV_DIS;              /* enable mouse */
 #if defined (VAX_42A)
-    strcpy (sim_name, "VAXstation GPX 3100 M30 (KA42-A)");
+    strcpy (sim_name, "VAXstation 3100 M30/GPX (KA42-A)");
 #else   /* VAX_42B */
-    strcpy (sim_name, "VAXstation GPX 3100 M38 (KA42-B)");
+    strcpy (sim_name, "VAXstation 3100 M38/GPX (KA42-B)");
 #endif
     reset_all (0);                                       /* reset everything */
 #else
@@ -1195,9 +1195,9 @@ else if (MATCH_CMD(gbuf, "VAXSTATIONSPX") == 0) {
     lk_dev.flags = lk_dev.flags & ~DEV_DIS;              /* enable keyboard */
     vs_dev.flags = vs_dev.flags & ~DEV_DIS;              /* enable mouse */
 #if defined (VAX_42A)
-    strcpy (sim_name, "VAXstation SPX 3100 M30 (KA42-A)");
+    strcpy (sim_name, "VAXstation 3100 M30/SPX (KA42-A)");
 #else   /* VAX_42B */
-    strcpy (sim_name, "VAXstation SPX 3100 M38 (KA42-B)");
+    strcpy (sim_name, "VAXstation 3100 M38/SPX (KA42-B)");
 #endif
     reset_all (0);                                       /* reset everything */
 #else
