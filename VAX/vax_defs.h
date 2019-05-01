@@ -474,7 +474,7 @@ extern jmp_buf save_env;
 #define VAX_EXTAC  (1 << DR_GETIGRP(IG_EXTAC))
 #define VAX_EMONL  (1 << DR_GETIGRP(IG_EMONL))
 #define VAX_VECTR  (1 << DR_GETIGRP(IG_VECTR))
-#define FULL_INSTRUCTION_SET (VAX_BASE                    | \
+#define FULL_INSTRUCTION_SET (VAX_FULL_BASE               | \
                               (1 << DR_GETIGRP(IG_PACKD)) | \
                               (1 << DR_GETIGRP(IG_EXTAC)) | \
                               (1 << DR_GETIGRP(IG_EMONL)))
@@ -1011,8 +1011,10 @@ extern int32 cpu_instruction_set;
 #define CPU_MODEL_MODIFIERS             /* No model specific CPU modifiers */
 #endif
 #ifndef CPU_INST_MODIFIERS
-#define CPU_INST_MODIFIERS  { MTAB_XTD|MTAB_VDV, 0, "INSTRUCTIONS", "INSTRUCTIONS={F-FLOAT|D-FLOAT}",     \
-                              &cpu_set_instruction_set, &cpu_show_instruction_set, NULL, "Set/Show the CPU Instruction Set" },
+#define CPU_INST_MODIFIERS  { MTAB_XTD|MTAB_VDV|MTAB_VALR|MTAB_NMO, 0, "INSTRUCTIONS", "INSTRUCTIONS={{NO}G-FLOAT|{NO}D-FLOAT|{NO}PACKED|{NO}EXTENDED|{NO}EMULATED}", \
+                              &cpu_set_instruction_set, NULL, NULL,                 "Set the CPU Instruction Set" },                    \
+                            { MTAB_XTD|MTAB_VDV, 0, "INSTRUCTIONS", NULL,                                                                    \
+                              NULL,                     &cpu_show_instruction_set, NULL, "Show the CPU Instruction Set (SHOW -V)" },
 #endif
 #ifndef IDX_IMM_TEST
 #define IDX_IMM_TEST RSVD_ADDR_FAULT

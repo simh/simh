@@ -3829,7 +3829,7 @@ fprintf (st, "Implementing: ");
 if ((cpu_instruction_set & FULL_INSTRUCTION_SET) == FULL_INSTRUCTION_SET) {
     fprintf (st, "All standard VAX instructions");
 #if defined(CMPM_VAX)
-    fprintf (st, "and Compatibility mode");
+    fprintf (st, " and Compatibility mode");
 #endif
     if (sim_switches & SWMASK ('V'))
         cpu_show_instruction_group (st, cpu_instruction_set);
