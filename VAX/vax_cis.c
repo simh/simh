@@ -107,10 +107,10 @@ t_stat r;
 DSTR accum, src1, src2, dst;
 DSTR mptable[10];
 
-if (((IG_PACKD == DR_GETIGRP(drom[opc][0])) && 
-    (cpu_instruction_set & VAX_PACKED))         || 
-    ((IG_EMONL == DR_GETIGRP(drom[opc][0])) && 
-     (cpu_instruction_set & VAX_EMONL))) {      /* Emulated? */
+if (((DR_GETIGRP(IG_PACKD) == DR_GETIGRP(drom[opc][0])) && 
+     (!(cpu_instruction_set & VAX_PACKED)))    || 
+    ((DR_GETIGRP(IG_EMONL) == DR_GETIGRP(drom[opc][0])) && 
+     (!(cpu_instruction_set & VAX_EMONL)))) {      /* Emulated? */
         /* CIS and emulate only instructions - invoke emulator interface
             opnd[0:5] =     six operands to be pushed (if PSL<fpd> = 0)
             cc      =       condition codes
