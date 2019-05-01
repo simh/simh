@@ -50,11 +50,13 @@
 #define UBACSR_BDP      0x01000000                      /* bad buffered datapath */
 #define UBACSR_EIE      0x00100000                      /* error interrupt en */
 #define UBACSR_UPI      0x00020000                      /* unibus power init */
-#define UBACSR_RD       0x00010000                      /* register dump */
-#define UBACSR_ONE      0x00008000                      /* must be one */
+#define UBACSR_DMP      0x00010000                      /* register dump */
+#define UBACSR_MBO      0x00008000                      /* must be one */
 #define UBACSR_IEN      0x000000FF                      /* internal error - NI */
 #define UBACSR_WR       (UBACSR_EIE)
 #define UBACSR_W1C      (UBACSR_BIF | UBACSR_TO | UBACSR_UIE | \
+                         UBACSR_IMR | UBACSR_BDP)
+#define UBACSR_ERRS     (UBACSR_BIF | UBACSR_TO | UBACSR_UIE | \
                          UBACSR_IMR | UBACSR_BDP)
 
 /* Vector offset register */
@@ -318,7 +320,9 @@ switch (ofs) {                                          /* case on offset */
         break;
 
     case UBACSR_OF:                                     /* CSR */
-        *val = uba_csr | UBACSR_ONE;
+        *val = uba_csr | UBACSR_MBO;
+        if (uba_csr & UBACSR_ERRS)                      /* any errors? */
+            *val |= UBACSR_ERR;                         /* yes, set logical OR bit */
         break;
 
     case UBAVO_OF:                                      /* VO */

@@ -349,13 +349,11 @@ int32 pcsr_rd (int32 pa)
 int32 data;
 int32 ip_int = (ipir >> cur_cpu) & 0x1;
 data = ka_pcsr[cur_cpu] | (rxcd_int << PCSR_V_CONINT) | (ip_int << PCSR_V_IPINT);
-printf ("pcsr_rd: %08X\n", data);
 return data;
 }
 
 void pcsr_wr (int32 pa, int32 val, int32 lnt)
 {
-printf ("pcsr_wr: %08X\n", val);
 ka_pcsr[cur_cpu] &= ~(val & PCSR_W1C);
 ka_pcsr[cur_cpu] &= ~(PCSR_WR) | (val & PCSR_WR);
 if (val & PCSR_CONCLR)
