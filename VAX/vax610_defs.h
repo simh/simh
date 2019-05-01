@@ -54,7 +54,7 @@
 /* Microcode constructs */
 
 #define VAX610_SID      (7 << 24)                       /* system ID */
-#define VAX610_FLOAT    (1 << 16)                       /* floating point type */
+#define VAX610_FLOAT    (1 << 16)                       /* floating point type D=1, G=0 */
 #define VAX610_MREV     (5 << 8)                        /* microcode revision */
 #define VAX610_HWREV    1                               /* hardware revision */
 #define CON_HLTPIN      0x0200                          /* external CPU halt */
@@ -98,10 +98,11 @@
                             { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL={MicroVAX|VAXStation}",     \
                               &cpu_set_model, &cpu_show_model, NULL, "Set/Show the simulator CPU Model" },
 #define CPU_INSTRUCTION_SET (VAX_BASE | VAX_GFLOAT)
-#define CPU_INST_MODIFIERS  { MTAB_XTD|MTAB_VDV|MTAB_VALR|MTAB_NMO, 0, "INSTRUCTIONS", "INSTRUCTIONS={G-FLOAT|NOG-FLOAT|D-FLOAT|NOD-FLOAT}", \
-                              &cpu_set_instruction_set, NULL, NULL,                      "Set the CPU Instruction Set" },                    \
+#define CPU_INST_MODIFIERS  { MTAB_XTD|MTAB_VDV|MTAB_VALR|MTAB_NMO, 0, "INSTRUCTIONS", "INSTRUCTIONS={G-FLOAT|D-FLOAT}", \
+                              &vax610_set_instruction_set, NULL, NULL,                 "Set the CPU Instruction Set" },                    \
                             { MTAB_XTD|MTAB_VDV, 0, "INSTRUCTIONS", NULL,                                                                    \
                               NULL,                     &cpu_show_instruction_set, NULL, "Show the CPU Instruction Set (SHOW -V)" },
+t_stat vax610_set_instruction_set (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 
 /* QVSS memory space */
 

@@ -53,8 +53,6 @@
 
 #include "vax_defs.h"
 
-#if defined (FULL_VAX)
-
 /* Decimal string structure */
 
 #define DSTRLNT         4
@@ -108,6 +106,18 @@ uint32 nc, d, result;
 t_stat r;
 DSTR accum, src1, src2, dst;
 DSTR mptable[10];
+
+if (!(((IG_PACKD == DR_GETIGRP(drom[opc][0])) && 
+      (cpu_instruction_set & VAX_PACKED))         || 
+     ((IG_EMONL == DR_GETIGRP(drom[opc][0]))  && 
+      (cpu_instruction_set & VAX_EMONL)))) {         /* Emulated? */
+        /* CIS and emulate only instructions - invoke emulator interface
+            opnd[0:5] =     six operands to be pushed (if PSL<fpd> = 0)
+            cc      =       condition codes
+            opc     =       opcode
+         */
+    return cpu_emulate_exception (op, cc, opc, acc);
+    }
 
 switch (opc) {                                          /* case on opcode */
 
@@ -1643,22 +1653,3 @@ sign = Read ((R[3] + 1) & LMASK, L_BYTE, RA);           /* read */
 R[2] = ED_PUTSIGN (R[2], sign);                         /* now fault safe */
 return sign;
 }
-
-#else
-
-extern int32 cpu_emulate_exception (int32 *opnd, int32 cc, int32 opc, int32 acc);
-
-/* CIS instructions - invoke emulator interface
-
-        opnd[0:5] =     six operands to be pushed (if PSL<fpd> = 0)
-        cc      =       condition codes
-        opc     =       opcode
-
-*/
-
-int32 op_cis (int32 *opnd, int32 cc, int32 opc, int32 acc)
-{
-return cpu_emulate_exception (opnd, cc, opc, acc);
-}
-
-#endif

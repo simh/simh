@@ -156,7 +156,7 @@ switch (rg) {
         break;
 
     case MT_SID:                                        /* SID */
-        val = (VAX610_SID | VAX610_FLOAT | VAX610_MREV | VAX610_HWREV);
+        val = (VAX610_SID | ((cpu_instruction_set & VAX_DFLOAT) ? VAX610_FLOAT: 0) | VAX610_MREV | VAX610_HWREV);
         break;
 
     case MT_NICR:                                       /* NICR */
@@ -512,6 +512,21 @@ if (r != SCPE_OK)
 SP = PC = 512;
 AP = 1;
 return SCPE_OK;
+}
+
+t_stat vax610_set_instruction_set (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+char gbuf[CBUFSIZE];
+
+if (!cptr || !*cptr)
+    return SCPE_ARG;
+
+get_glyph (cptr, gbuf, 0);
+if (MATCH_CMD(gbuf, "G-FLOAT") == 0)
+    return cpu_set_instruction_set (uptr, val, "G-FLOAT;NOD-FLOAT", NULL);
+if (MATCH_CMD(gbuf, "D-FLOAT") == 0)
+    return cpu_set_instruction_set (uptr, val, "D-FLOAT;NOG-FLOAT", NULL);
+return sim_messagef (SCPE_ARG, "Unknown/Unsupported instruction set: %s\n", gbuf);
 }
 
 /* SYSD reset */

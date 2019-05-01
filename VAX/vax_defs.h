@@ -842,6 +842,7 @@ extern int32 extra_bytes;           /* bytes referenced by current string instru
 extern BITFIELD cpu_psl_bits[];
 extern char const * const opcode[];
 extern const uint16 drom[NUM_INST][MAX_SPEC + 1];
+extern int32 cpu_emulate_exception (int32 *opnd, int32 cc, int32 opc, int32 acc);
 void cpu_idle (void);
 
 /* Instruction History */
@@ -970,6 +971,7 @@ extern int32 con_halt (int32 code, int32 cc);
 extern t_stat cpu_boot (int32 unitno, DEVICE *dptr);
 extern t_stat build_dib_tab (void);
 extern void rom_wr_B (int32 pa, int32 val);
+extern int32 cpu_instruction_set;
 
 #if defined (VAX_780)
 #include "vax780_defs.h"
@@ -1027,6 +1029,8 @@ extern t_stat cpu_load_bootcode (const char *filename, const unsigned char *buil
 extern t_stat cpu_print_model (FILE *st);
 extern t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern t_stat cpu_set_model (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+extern t_stat cpu_show_instruction_set (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+extern t_stat cpu_set_instruction_set (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 extern t_stat cpu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 extern t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 extern const uint32 byte_mask[33];

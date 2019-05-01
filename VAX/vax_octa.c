@@ -46,8 +46,6 @@
 
 #include "vax_defs.h"
 
-#if defined (FULL_VAX)
-
 #define WORDSWAP(x)     ((((x) & WMASK) << 16) | (((x) >> 16) & WMASK))
 
 typedef struct {
@@ -116,6 +114,11 @@ int32 op_octa (int32 *opnd, int32 cc, int32 opc, int32 acc, int32 spec, int32 va
 {
 int32 r, rh, temp, flg;
 int32 r_octa[4];
+
+if ((cpu_instruction_set & VAX_EXTAC) == 0) {      /* Implemented? */
+    RSVD_INST_FAULT(opc);
+    return cc;
+    }
 
 switch (opc) {
 
@@ -1256,13 +1259,3 @@ else {
     }
 return;
 }
-
-#else
-
-int32 op_octa (int32 *opnd, int32 cc, int32 opc, int32 acc, int32 spec, int32 va, InstHistory *hst)
-{
-RSVD_INST_FAULT(opc);
-return cc;
-}
-
-#endif

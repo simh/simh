@@ -736,12 +736,12 @@ for ( ;; ) {
 #endif
 #if defined(VAX_610)
     /* 
-     * This case is formally UNPREDICTABLE, but how the MicroVAX I CPU 
-     * worked.  Instructions without the DR_F in their drom table entry
-     * are specifically uninterruptible instructions, so this would not
-     * ever happen during normal execution, but the MicroVAX I HCORE 
-     * diagnostic contrives this as a test and expects thost cases to 
-     * be ignored.
+     * This case is formally UNPREDICTABLE, but it is how the MicroVAX I 
+     * CPU worked.  Instructions without the DR_F in their drom table 
+     * entry are specifically uninterruptible instructions, so this 
+     * would not ever happen during normal execution, but the MicroVAX I
+     * HCORE diagnostic contrives this as a test and expects thost cases
+     * to be ignored.
      */
     if ((PSL & PSL_FPD) && (numspec & DR_F)) {
 #else
