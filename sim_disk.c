@@ -2583,6 +2583,12 @@ if (ReadFile ((HANDLE)(uptr->fileref), buf, sects * ctx->sector_size, (LPDWORD)s
         *sectsread /= ctx->sector_size;
     return SCPE_OK;
     }
+if (ERROR_HANDLE_EOF == GetLastError ()) {  /* Return 0's for reads past EOF */
+    memset (buf, 0, sects * ctx->sector_size);
+    if (sectsread)
+        *sectsread = sects;
+    return SCPE_OK;
+    }
 _set_errno_from_status (GetLastError ());
 return SCPE_IOERR;
 }
