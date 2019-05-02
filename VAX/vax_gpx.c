@@ -283,7 +283,8 @@ switch (rg) {
         break;
 
     default:
-        data = va_adp[rg];
+        if (rg <= ADP_MAXREG)
+            data = va_adp[rg];
         }
 
 if (rg <= ADP_MAXREG)
@@ -378,22 +379,23 @@ switch (rg) {
         break;
 
     default:
-        va_adp[rg] = val;
+        if (rg <= ADP_MAXREG)
+            va_adp[rg] = val;
         }
-return;
 }
 
 void va_vdp_wr (uint32 cn, uint32 rg, uint32 val)
 {
 VDP *vptr = &va_vdp[cn];
 
-if (rg <= VDP_MAXREG)
+if (rg <= VDP_MAXREG) {
     sim_debug (DBG_VDP, gpx_dev, "vdp_wr: [%d], %s, %X at %08X\n", cn, va_vdp_rgd[rg], val, fault_PC);
+    vptr->rg[rg] = val;
+    if (rg == VDP_MSK1)
+        vptr->rg[VDP_MSK2] = val;
+    }
 else
     sim_debug (DBG_VDP, gpx_dev, "vdp_wr: [%d], %X, %X at %08X\n", cn, rg, val, fault_PC);
-vptr->rg[rg] = val;
-if (rg == VDP_MSK1)
-    vptr->rg[VDP_MSK2] = val;
 }
 
 /* Initialise line drawing */
@@ -868,12 +870,12 @@ for (;;) {
 
     if ((va_adp[ADP_MDE] & 3) == 2) {                   /* linear pattern mode? */
         if (cmd & 0x800)                                /* source 1 enabled? */
-            va_line_step (&s1_fast);                    /* step fast vector */
+            (void)va_line_step (&s1_fast);              /* step fast vector */
         if (va_line_step (&dst_fast)) {                 /* fast vector exhausted? */
             if (va_line_step (&dst_slow))               /* slow vector exhausted? */
                 break;                                  /* finished */
             if (cmd & 0x800) {                          /* source 1 enabled? */
-                va_line_step (&s1_slow);                /* step slow vector */
+                (void)va_line_step (&s1_slow);          /* step slow vector */
                 s1_fast.pix = s1_slow.pix;
                 s1_fast.spix = s1_slow.pix;
                 }
