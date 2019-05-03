@@ -1045,6 +1045,8 @@ return;
 
 void h_unpackh (int32 *hflt, UFPH *r)
 {
+int32 thflt0;
+
 r->sign = hflt[0] & FPSIGN;                             /* get sign */
 r->exp = H_GETEXP (hflt[0]);                            /* get exponent */
 if (r->exp == 0) {                                      /* exp = 0? */
@@ -1054,7 +1056,8 @@ if (r->exp == 0) {                                      /* exp = 0? */
     r->frac.f2 = r->frac.f3 = 0;
     return;
     }
-r->frac.f3 = WORDSWAP ((hflt[0] & ~(FPSIGN | H_EXP)) | H_HB);
+thflt0 = ((hflt[0] & ~(FPSIGN | H_EXP)) | H_HB);
+r->frac.f3 = WORDSWAP (thflt0);
 r->frac.f2 = WORDSWAP (hflt[1]);
 r->frac.f1 = WORDSWAP (hflt[2]);
 r->frac.f0 = WORDSWAP (hflt[3]);

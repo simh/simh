@@ -463,6 +463,7 @@ switch (opc) {                                          /* case on opcode */
     case ADDP4: case SUBP4:
         op[4] = op[2];                                  /* copy dst */
         op[5] = op[3];
+        /* fall through */
     case ADDP6: case SUBP6:
         if ((PSL & PSL_FPD) || (op[0] > 31) ||
             (op[2] > 31) || (op[4] > 31))
@@ -632,6 +633,7 @@ switch (opc) {                                          /* case on opcode */
     case CMPP3:
         op[3] = op[2];                                  /* reposition ops */
         op[2] = op[0];
+        /* fall through */
     case CMPP4:
         if ((PSL & PSL_FPD) || (op[0] > 31) || (op[2] > 31))
             RSVD_OPND_FAULT(CMPP);
