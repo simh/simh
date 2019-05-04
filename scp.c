@@ -1093,6 +1093,11 @@ static const char simh_help[] =
       " as paper-tape readers, and devices with write lock switches, such as disks\n"
       " and tapes, support read only operation; other devices do not.  If a file is\n"
       " attached read only, its contents can be examined but not modified.\n"
+      "5-a\n"
+      " If the -a switch is specified, and the device being attached is a\n"
+      " sequential output only device (like a line printer, paper tape punch,\n"
+      " etc.), the file being attached will be opened in append mode thus adding\n"
+      " to any existing file data beyond what may have already been there.\n"
       "5-q\n"
       " If the -q switch is specified when creating a new file (-n) or opening one\n"
       " read only (-r), any messages announcing these facts will be suppressed.\n"
@@ -13505,8 +13510,9 @@ if (!strcmp (token, "*"))
 
 match = 0;
 for (i = 0; i < topic->kids; i++) {
-    strcpy (cbuf,topic->children[i]->title +
-            ((topic->children[i]->flags & HLP_MAGIC_TOPIC)? 1 : 0));
+    strlcpy (cbuf,topic->children[i]->title +
+            ((topic->children[i]->flags & HLP_MAGIC_TOPIC)? 1 : 0),
+            sizeof (cbuf));
     cptr = cbuf;
     while (*cptr) {
         if (blankch (*cptr)) {
@@ -13673,8 +13679,9 @@ while (TRUE) {
 
         fprintf (st, "\n    Additional information available:\n\n");
         for (i = 0; i < topic->kids; i++) {
-            strcpy (tbuf, topic->children[i]->title + 
-                    ((topic->children[i]->flags & HLP_MAGIC_TOPIC)? 1 : 0));
+            strlcpy (tbuf, topic->children[i]->title + 
+                    ((topic->children[i]->flags & HLP_MAGIC_TOPIC)? 1 : 0),
+                    sizeof (tbuf));
             for (p = tbuf; *p; p++) {
                 if (blankch (*p))
                     *p = '_';
