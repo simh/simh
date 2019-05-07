@@ -52,22 +52,12 @@ CTAB vax43a_cmd[] = {
 
 /* KA43A configuration & test register */
 
-#define CFGT_MEM        0x0007                          /* memory option */
 #define CFGT_VID        0x0008                          /* video option present */
 #define CFGT_CUR        0x0010                          /* cursor test */
 #define CFGT_L3C        0x0020                          /* line 3 console */
-#define CFGT_NET        0x0040                          /* network option present */
-#define CFGT_TYP        0x0080                          /* system type */
-#define CFGT_V_DSK      8
-#define CFGT_M_DSK      0xF
-#define CFGT_DSK        (CFGT_M_DSK << CFGT_V_DSK)      /* disk mask */
-#define CFGT_RX23       0x1000                          /* 0 = RX23, 1 = RX33 */
-#define CFGT_V_STC      14
-#define CFGT_M_STC      0x3
-#define CFGT_STC        (CFGT_M_STC << CFGT_V_STC)      /* storage controller */
-
-#define STC_SCSI        0                               /* SCSI/SCSI controller */
-#define STC_ST506       1                               /* ST506/SCSI controller */
+#define CFGT_V_SIM      16
+#define CFGT_M_SIM      0xFF
+#define CFGT_SIM        (CFGT_M_SIM << CFGT_V_SIM)      /* SIMM present */
 
 /* KA43A Memory system error register */
 
@@ -77,7 +67,7 @@ CTAB vax43a_cmd[] = {
 #define MSER_MCD0       0x00000100                      /* Mem Code 0 */
 #define MSER_MBZ        0xFFFFFEBC
 #define MSER_RD         (MSER_PE | MSER_WWP | MSER_PER | \
-                         MSER_PER | MSER_MCD0)
+                         MSER_MCD0)
 #define MSER_WR         (MSER_PE | MSER_WWP)
 #define MSER_RS         (MSER_PER)
 
@@ -95,7 +85,6 @@ extern UNIT clk_unit;
 extern int32 tmr_poll;
 extern uint32 vc_sel, vc_org;
 extern DEVICE vc_dev, ve_dev, lk_dev, vs_dev;
-extern DEVICE xs_dev;
 extern uint32 *rom;
 
 uint32 *ddb = NULL;                                     /* 128k disk buffer */
@@ -111,7 +100,6 @@ int32 int_req[IPL_HLVL] = { 0 };                        /* interrupt requests */
 int32 int_mask = 0;                                     /* interrupt mask */
 uint32 tmr_tir = 0;                                     /* curr interval */
 t_bool tmr_inst = FALSE;                                /* wait instructions vs usecs */
-uint32 diag[128] = { 0 };
 int32 cdg_dat[CDASIZE >> 2];                            /* cache data */
 int32 ctg_dat[CTGSIZE >> 2];                            /* cache tags */
 
@@ -456,8 +444,8 @@ void ddb_wr (int32 pa, int32 val, int32 lnt)
 {
 int32 rg = ((pa - D128BASE) >> 2);
 rg = rg & 0x7FFF;
-if (lnt < L_LONG) {                                 /* byte or word? */
-    int32 sc = (pa & 3) << 3;                       /* merge */
+if (lnt < L_LONG) {                                     /* byte or word? */
+    int32 sc = (pa & 3) << 3;                           /* merge */
     int32 mask = (lnt == L_WORD)? 0xFFFF: 0xFF;
     ddb[rg] = ((val & mask) << sc) | (ddb[rg] & ~(mask << sc));
     }
@@ -522,7 +510,15 @@ return;
 
 int32 cfg_rd (int32 pa)
 {
-return ka_cfgtst;
+int32 val = ka_cfgtst | (CFGT_M_SIM << CFGT_V_SIM);
+t_addr mem = MEMSIZE;
+uint32 sc;
+
+for (sc = CFGT_V_SIM; mem > 0; sc++) {
+    val &= ~(0x1 << sc);                               /* add 4MB SIMM */
+    mem -= (1u << 22);
+    }
+return val;
 }
 
 void ioreset_wr (int32 pa, int32 val, int32 lnt)
@@ -1013,12 +1009,9 @@ t_stat sysd_reset (DEVICE *dptr)
 sim_cancel (&sysd_unit);
 ka_mser = 0;
 ka_mear = 0;
-ka_cfgtst = (CFGT_TYP | CFGT_CUR);
-ka_cfgtst |= ((MEMSIZE >> 22) - 1);                     /* memory option */
+ka_cfgtst = CFGT_CUR;
 if ((ve_dev.flags & DEV_DIS) == 0)                      /* video option present? */
     ka_cfgtst |= CFGT_VID;
-if ((xs_dev.flags & DEV_DIS) == 0)                      /* network option present? */
-    ka_cfgtst |= CFGT_NET;
 if (DZ_L3C && (sys_model == 0))                         /* line 3 console */
     ka_cfgtst |= CFGT_L3C;
 tmr_tir = 0;

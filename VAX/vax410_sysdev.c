@@ -66,7 +66,7 @@ CTAB vax410_cmd[] = {
 #define MSER_MCD0       0x00000100                      /* Mem Code 0 */
 #define MSER_MBZ        0xFFFFFEBC
 #define MSER_RD         (MSER_PE | MSER_WWP | MSER_PER | \
-                         MSER_PER | MSER_MCD0)
+                         MSER_MCD0)
 #define MSER_WR         (MSER_PE | MSER_WWP)
 #define MSER_RS         (MSER_PER)
 
