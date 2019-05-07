@@ -102,6 +102,7 @@ typedef struct {
 #define MTUF_F_P7B       3                              /* P7B format */
 #define MTUF_F_AWS       4                              /* AWS format */
 #define MTUF_F_TAR       5                              /* TAR format */
+#define MTUF_F_ANSI      6                              /* ANSIFILES format */
 #define MTUF_V_UF       (MTUF_V_FMT + MTUF_W_FMT)
 #define MTUF_PNU        (1u << MTUF_V_PNU)
 #define MTUF_WLK        (1u << MTUF_V_WLK)

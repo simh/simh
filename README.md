@@ -229,6 +229,7 @@ Host platforms which have libSDL available can leverage this functionality.
 #### Tape Extensions
     AWS format tape support
     TAR format tape support
+    ANSIFILES format tape support
 
 #### Embedded ROM support
     Simulators which have boot commands which load constant files as part of 
