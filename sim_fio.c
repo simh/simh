@@ -882,7 +882,8 @@ if ((hFind =  FindFirstFileA (cptr, &File)) != INVALID_HANDLE_VALUE) {
     GetFullPathNameA(cptr, sizeof(DirName), DirName, (char **)&c);
     c = strrchr (DirName, '\\');
     *c = '\0';                                  /* Truncate to just directory path */
-    if (!pathsep || (!strcmp (slash, "/*")))    /* Separator wasn't mentioned? */
+    if (!pathsep ||                             /* Separator wasn't mentioned? */
+        (slash && (0 == strcmp (slash, "/*")))) 
         pathsep = "\\";                         /* Default to Windows backslash */
     if (*pathsep == '/') {                      /* If slash separator? */
         while ((c = strchr (DirName, '\\')))
