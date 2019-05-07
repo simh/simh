@@ -107,6 +107,7 @@ REG xs_reg[] = {
     { BRDATA  ( RXHDR,  xs_var.rxhdr,    DEV_RDX, 16, 4), REG_HRO },
     { BRDATA  ( TXHDR,  xs_var.txhdr,    DEV_RDX, 16, 4), REG_HRO },
     { FLDATAD ( INT,    int_req[IPL_XS1], INT_V_XS1, "interrupt pending flag") },
+    { NULL }
     };
 
 DEBTAB xs_debug[] = {
