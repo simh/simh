@@ -1022,9 +1022,6 @@ if (*rom == 0) {                                        /* no boot? */
 #if defined (VAX_41A) || defined (VAX_41D)
 rom_wr_B (ROMBASE+4, sys_model ? 2 : 1);                /* Set Magic Byte to determine system type */
 #endif
-#if defined (VAX_41A)
-rom_wr_B (ROMBASE+7, 8);                                /* ROM goes into endless loop without this? */
-#endif
 for (i = 0; i < OR_COUNT; i++)                          /* unmap all option ROMs */
     or_unmap (i);
 for (i = 0; (cdptr = sim_devices[i]) != NULL; i++) {    /* loop over all devices */
