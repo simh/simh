@@ -2351,7 +2351,12 @@ if (1) {
   }
 #endif /* defined (USE_READER_THREAD */
 _eth_add_to_open_list (dev);
-return SCPE_OK;
+/* 
+ * install a total filter on a newly opened interface and let the device
+ * simulator install an appropriate filter that reflects the device's
+ * configuration.
+ */
+return eth_filter_hash (dev, 0, NULL, FALSE, FALSE, NULL);
 }
 
 static t_stat _eth_close_port(int eth_api, pcap_t *pcap, SOCKET pcap_fd)
@@ -3771,7 +3776,8 @@ if (!dev) return SCPE_UNATT;
 if ((addr_count < 0) || (addr_count > ETH_FILTER_MAX))
   return SCPE_ARG;
 else
-  if (!addresses) return SCPE_ARG;
+  if (!addresses && (addr_count != 0)) 
+     return SCPE_ARG;
 
 /* test reflections.  This is done early in this routine since eth_reflect */
 /* calls eth_filter recursively and thus changes the state of the device. */
@@ -3830,7 +3836,7 @@ eth_bpf_filter (dev, dev->addr_count, dev->filter_address,
                 dev->all_multicast, dev->promiscuous, 
                 dev->reflections, &dev->physical_addr, 
                 dev->have_host_nic_phy_addr ? &dev->host_nic_phy_hw_addr: NULL,
-                &dev->hash, buf);
+                (dev->hash_filter ? &dev->hash : NULL), buf);
 
 /* get netmask, which is a required argument for compiling.  The value, 
    in our case isn't actually interesting since the filters we generate 
