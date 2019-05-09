@@ -12,7 +12,7 @@ rem    4   Optional parameters to invoke the specified script with
 rem
 rem
 
-if exist "%2" goto _check_script
+if exist %2 goto _check_script
 echo error: Missing simulator binary: %2
 exit /B 1
 
@@ -26,4 +26,4 @@ echo No tests found for %_binary_name% simulator.
 exit /B 0
 
 :_got_script
-"%2" "%_script_path%" "%4"
+%2 "%_script_path%" "%4"
