@@ -1474,12 +1474,13 @@ for (part = 0; part < RT11_MAXPARTITIONS; part++) {
           break;
         }
 Next_Partition:
+    ;
     }
 
 Return_Cleanup:
 if (partitions) {
     if (!sim_quiet) {
-        char *parttype = "???";
+        const char *parttype = "???";
 
         switch (version) {
             case HB_C_SYSVER_V3A:
