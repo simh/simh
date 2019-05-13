@@ -152,17 +152,17 @@ t_stat sysd_reset (DEVICE *dptr);
 t_stat sysd_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *sysd_description (DEVICE *dptr);
 
-int32 rom_rd (int32 pa);
-int32 nvr_rd (int32 pa);
+int32 rom_rd (int32 pa, int32 lnt);
+int32 nvr_rd (int32 pa, int32 lnt);
 void nvr_wr (int32 pa, int32 val, int32 lnt);
-int32 ka_rd (int32 pa);
+int32 ka_rd (int32 pa, int32 lnt);
 void ka_wr (int32 pa, int32 val, int32 lnt);
 t_stat sysd_powerup (void);
 int32 con_halt (int32 code, int32 cc);
 
-extern int32 qbmap_rd (int32 pa);
+extern int32 qbmap_rd (int32 pa, int32 lnt);
 extern void qbmap_wr (int32 pa, int32 val, int32 lnt);
-extern int32 qbmem_rd (int32 pa);
+extern int32 qbmem_rd (int32 pa, int32 lnt);
 extern void qbmem_wr (int32 pa, int32 val, int32 lnt);
 extern int32 iccs_rd (void);
 extern int32 todr_rd (void);
@@ -290,7 +290,7 @@ DEVICE sysd_dev = {
    issues with the embedded timing loops.  
 */
 
-int32 rom_rd (int32 pa)
+int32 rom_rd (int32 pa, int32 lnt)
 {
 int32 rg = ((pa - ROMBASE) & ROMAMASK) >> 2;
 int32 val = rom[rg];
@@ -380,7 +380,7 @@ return "read-only memory";
 
 /* NVR: non-volatile RAM - stored in a buffered file */
 
-int32 nvr_rd (int32 pa)
+int32 nvr_rd (int32 pa, int32 lnt)
 {
 int32 rg = (pa + 1 - NVRBASE) >> 1;
 int32 result;
@@ -690,17 +690,15 @@ return;
 struct reglink {                                        /* register linkage */
     uint32      low;                                    /* low addr */
     uint32      high;                                   /* high addr */
-    int32       (*read)(int32 pa);                      /* read routine */
-    void        (*write)(int32 pa, int32 val, int32 lnt); /* write routine */
-    int32      width;                                   /* data path width */
+    int32       (*read)(int32 pa, int32 lnt);           /* read routine */
+    void        (*write)(int32 pa, int32 val, int32 lnt);/* write routine */
     };
 
 struct reglink regtable[] = {
-    { QBMAPBASE, QBMAPBASE+QBMAPSIZE, &qbmap_rd, &qbmap_wr, L_LONG },
-    { ROMBASE, ROMBASE+ROMSIZE+ROMSIZE, &rom_rd, NULL, L_LONG },
-    { NVRBASE, NVRBASE+NVRASIZE, &nvr_rd, &nvr_wr, L_LONG },
-    { KABASE, KABASE+KASIZE, &ka_rd, &ka_wr, L_LONG },
-    { QBMBASE, QBMBASE+QBMSIZE, &qbmem_rd, &qbmem_wr, L_WORD },
+    { QBMAPBASE, QBMAPBASE+QBMAPSIZE, &qbmap_rd, &qbmap_wr },
+    { ROMBASE, ROMBASE+ROMSIZE+ROMSIZE, &rom_rd, NULL },
+    { NVRBASE, NVRBASE+NVRASIZE, &nvr_rd, &nvr_wr },
+    { KABASE, KABASE+KASIZE, &ka_rd, &ka_wr },
     { 0, 0, NULL, NULL }
     };
 
@@ -716,18 +714,10 @@ struct reglink regtable[] = {
 int32 ReadReg (uint32 pa, int32 lnt)
 {
 struct reglink *p;
-int32 val;
 
 for (p = &regtable[0]; p->low != 0; p++) {
-    if ((pa >= p->low) && (pa < p->high) && p->read) {
-        val = p->read (pa);
-        if (p->width < L_LONG) {
-            if (lnt < L_LONG)
-                val = val << ((pa & 2)? 16: 0);
-            else val = (p->read (pa + 2) << 16) | val;
-            }
-        return val;
-        }
+    if ((pa >= p->low) && (pa < p->high) && p->read)
+        return p->read (pa, lnt);
     }
 
 MACH_CHECK (MCHK_READ);
@@ -749,17 +739,10 @@ int32 val;
 
 for (p = &regtable[0]; p->low != 0; p++) {
     if ((pa >= p->low) && (pa < p->high) && p->read) {
-        if (p->width < L_LONG) {
-            val = p->read (pa);
-            if ((lnt + (pa & 1)) <= 2)
-                val = val << ((pa & 2)? 16: 0);
-            else val = (p->read (pa + 2) << 16) | val;
-            }
-        else {
-            if (lnt == L_BYTE)
-                val = p->read (pa & ~03);
-            else val = (p->read (pa & ~03) & WMASK) | (p->read ((pa & ~03) + 2) & (WMASK << 16));
-            }
+        if (lnt == L_BYTE)
+            val = p->read (pa & ~03, L_LONG);
+        else
+            val = (p->read (pa & ~03, L_LONG) & WMASK) | (p->read ((pa & ~03) + 2, L_LONG) & (WMASK << 16));
         return val;
         }
     }
@@ -783,11 +766,7 @@ struct reglink *p;
 
 for (p = &regtable[0]; p->low != 0; p++) {
     if ((pa >= p->low) && (pa < p->high) && p->write) {
-        if (lnt > p->width) {
-            p->write (pa, val & WMASK, L_WORD);
-            p->write (pa + 2, (val >> 16) & WMASK, L_WORD);
-            }
-        else p->write (pa, val, lnt);  
+        p->write (pa, val, lnt);  
         return;
         }
     }
@@ -807,53 +786,16 @@ MACH_CHECK (MCHK_WRITE);
 
 void WriteRegU (uint32 pa, int32 val, int32 lnt)
 {
-struct reglink *p;
+int32 sc = (pa & 03) << 3;
+int32 dat = ReadReg (pa & ~03, L_LONG);
 
-for (p = &regtable[0]; p->low != 0; p++) {
-    if ((pa >= p->low) && (pa < p->high) && p->write) {
-        if (p->width < L_LONG) {
-            switch (lnt) {
-            case L_BYTE:                                            /* byte */
-                p->write (pa, val & BMASK, L_BYTE);
-                break;
-
-            case L_WORD:                                            /* word */
-                if (pa & 1) {                                       /* odd addr? */
-                    p->write (pa, val & BMASK, L_BYTE);
-                    p->write (pa + 1, (val >> 8) & BMASK, L_BYTE);
-                    }
-                else p->write (pa, val & WMASK, L_WORD);
-                break;
-
-            case 3:                                                 /* tribyte */
-                if (pa & 1) {                                       /* odd addr? */
-                    p->write (pa, val & BMASK, L_BYTE);              /* byte then word */
-                    p->write (pa + 1, (val >> 8) & WMASK, L_WORD);
-                    }
-                else {                                              /* even */
-                    p->write (pa, val & WMASK, WRITE);               /* word then byte */
-                    p->write (pa + 2, (val >> 16) & BMASK, L_BYTE);
-                    }
-                break;
-                }
-            }
-        else if (p->read) {
-            int32 sc = (pa & 03) << 3;
-            int32 dat = p->read (pa & ~03);
-
-            dat = (dat & ~(insert[lnt] << sc)) | ((val & insert[lnt]) << sc);
-            p->write (pa & ~03, dat, L_LONG);
-            }
-        return;
-        }
-    }
-
-MACH_CHECK (MCHK_WRITE);
+dat = (dat & ~(insert[lnt] << sc)) | ((val & insert[lnt]) << sc);
+WriteReg (pa & ~03, dat, L_LONG);
 }
 
 /* KA630 registers */
 
-int32 ka_rd (int32 pa)
+int32 ka_rd (int32 pa, int32 lnt)
 {
 int32 rg = (pa - KABASE) >> 2;
 

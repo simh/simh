@@ -135,7 +135,7 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc
 #define IOPAGESIZE      (1u << IOPAGEAWIDTH)            /* IO page length */
 #define IOPAGEMASK      (IOPAGESIZE - 1)                /* IO addr mask */
 #define IOPAGEBASE      0x20000000                      /* IO page base */
-#define ADDR_IS_IO(x)   ((((uint32) (x)) >= IOPAGEBASE) && \
+#define ADDR_IS_IOP(x)  ((((uint32) (x)) >= IOPAGEBASE) && \
                         (((uint32) (x)) < (IOPAGEBASE + IOPAGESIZE)))
 
 /* Read only memory - appears twice */
@@ -186,12 +186,20 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc
 #define ADDR_IS_QBM(x)  ((((uint32) (x)) >= QBMBASE) && \
                         (((uint32) (x)) < (QBMBASE + QBMSIZE)))
 
+/* Reflect to IO on either IO space or Qbus memory */
+
+#define ADDR_IS_IO(x)   (ADDR_IS_IOP(x) || ADDR_IS_QBM(x))
+
 /* QVSS memory space */
 
 #define QVMAWIDTH       18                              /* QVSS mem addr width */
 #define QVMSIZE         (1u << QVMAWIDTH)               /* QVSS mem length */
 #define QVMAMASK        (QVMSIZE - 1)                   /* QVSS mem addr mask */
 #define QVMBASE         0x303C0000                      /* QVSS mem base */
+#define ADDR_IS_QVM(x)  (vc_buf &&                      \
+                         (((uint32) (x)) >= QVMBASE) && \
+                         (((uint32) (x)) < (QVMBASE + QVMSIZE)))
+extern uint32 *vc_buf;
 
 /* QDSS memory space */
 
@@ -199,6 +207,10 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc
 #define QDMSIZE         (1u << QDMAWIDTH)               /* QDSS mem length */
 #define QDMAMASK        (QDMSIZE - 1)                   /* QDSS mem addr mask */
 #define QDMBASE         ((uint32)(0x30000000 + va_addr))/* QDSS mem base */
+#define ADDR_IS_QDM(x)  (va_buf &&                      \
+                         (((uint32) (x)) >= QDMBASE) && \
+                         (((uint32) (x)) < (QDMBASE + QDMSIZE)))
+extern uint32 *va_buf;
 extern uint32 va_addr;                                  /* QDSS memory offset */
 
 /* Other address spaces */

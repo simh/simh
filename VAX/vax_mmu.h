@@ -153,7 +153,8 @@ if (mapen && ((uint32)(off + lnt) > VA_PAGSIZE)) {      /* cross page? */
         xpte = fill (va + lnt, lnt, acc, NULL);         /* fill if needed */
     pa1 = ((xpte.pte & TLB_PFN) | VA_GETOFF (va + 4)) & ~03;
     }
-else pa1 = ((pa + 4) & PAMASK) & ~03;                   /* not cross page */
+else
+    pa1 = ((pa + 4) & PAMASK) & ~03;                   /* not cross page */
 bo = pa & 3;
 if (lnt >= L_LONG) {                                    /* lw unaligned? */
     sc = bo << 3;
@@ -205,9 +206,12 @@ else {
 if ((pa & (lnt - 1)) == 0) {                            /* aligned? */
     if (lnt >= L_LONG)                                  /* long, quad? */
         WriteL (pa, val);
-    else if (lnt == L_WORD)                             /* word? */
-        WriteW (pa, val);
-    else WriteB (pa, val);                              /* byte */
+    else {
+        if (lnt == L_WORD)                             /* word? */
+            WriteW (pa, val);
+        else
+            WriteB (pa, val);                              /* byte */
+        }
     return;
     }
 if (mapen && ((uint32)(off + lnt) > VA_PAGSIZE)) {
@@ -219,7 +223,8 @@ if (mapen && ((uint32)(off + lnt) > VA_PAGSIZE)) {
         xpte = fill (va + lnt, lnt, acc, NULL);
     pa1 = ((xpte.pte & TLB_PFN) | VA_GETOFF (va + 4)) & ~03;
     }
-else pa1 = ((pa + 4) & PAMASK) & ~03;
+else
+    pa1 = ((pa + 4) & PAMASK) & ~03;
 bo = pa & 3;
 if (lnt >= L_LONG) {
     sc = bo << 3;
@@ -253,7 +258,8 @@ if (mapen) {                                            /* mapping on? */
     xpte = fill (va, L_BYTE, acc, status);              /* fill TB */
     if (*status == PR_OK)
         return (xpte.pte & TLB_PFN) | off;
-    else return -1;
+    else
+        return -1;
     }
 return va & PAMASK;                                     /* ret phys addr */
 }
@@ -276,7 +282,8 @@ else {
     mchk_ref = REF_V;
     if (ADDR_IS_IO (pa))
         dat = ReadIO (pa, L_BYTE);
-    else dat = ReadReg (pa, L_BYTE);
+    else
+        dat = ReadReg (pa, L_BYTE);
     }
 return ((dat >> ((pa & 3) << 3)) & BMASK);
 }
@@ -291,7 +298,8 @@ else {
     mchk_ref = REF_V;
     if (ADDR_IS_IO (pa))
         dat = ReadIO (pa, L_WORD);
-    else dat = ReadReg (pa, L_WORD);
+    else 
+        dat = ReadReg (pa, L_WORD);
     }
 return ((dat >> ((pa & 2)? 16: 0)) & WMASK);
 }
@@ -336,7 +344,8 @@ else {
     mchk_ref = REF_V;
     if (ADDR_IS_IO (pa))
         dat = ReadIOU (pa, lnt);
-    else dat = ReadRegU (pa, lnt);
+    else
+        dat = ReadRegU (pa, lnt);
     }
 return ((dat >> sc) & insert[lnt]);
 }
@@ -362,7 +371,8 @@ else {
     mchk_ref = REF_V;
     if (ADDR_IS_IO (pa))
         WriteIO (pa, val, L_BYTE);
-    else WriteReg (pa, val, L_BYTE);
+    else
+        WriteReg (pa, val, L_BYTE);
     }
 return;
 }
@@ -378,7 +388,8 @@ else {
     mchk_ref = REF_V;
     if (ADDR_IS_IO (pa))
         WriteIO (pa, val, L_WORD);
-    else WriteReg (pa, val, L_WORD);
+    else
+        WriteReg (pa, val, L_WORD);
     }
 return;
 }
@@ -391,7 +402,8 @@ else {
     mchk_ref = REF_V;
     if (ADDR_IS_IO (pa))
         WriteIO (pa, val, L_LONG);
-    else WriteReg (pa, val, L_LONG);
+    else
+        WriteReg (pa, val, L_LONG);
     }
 return;
 }
@@ -405,7 +417,8 @@ else {
     mchk_ref = REF_P;
     if (ADDR_IS_IO (pa))
         WriteIO (pa, val, L_LONG);
-    else WriteReg (pa, val, L_LONG);
+    else
+        WriteReg (pa, val, L_LONG);
     }
 return;
 }
@@ -431,7 +444,8 @@ else {
     mchk_ref = REF_V;
     if ADDR_IS_IO (pa)
         WriteIOU (pa, val, lnt);
-    else WriteRegU (pa, val, lnt);
+    else
+        WriteRegU (pa, val, lnt);
     }
 return;
 }

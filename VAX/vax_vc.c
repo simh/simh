@@ -672,31 +672,22 @@ int32 vc_mem_rd (int32 pa)
 {
 uint32 rg = (pa >> 2) & 0xFFFF;
 
-if (!vc_buf)                                            /* QVSS disabled? */
-    MACH_CHECK (MCHK_READ);                             /* Invalid memory reference */
-
-return (pa & 0x2) ? (vc_buf[rg] >> 16) : vc_buf[rg] & 0xFFFF;
+return (pa & 0x2) ? (vc_buf[rg] >> 16) : vc_buf[rg] & WMASK;
 }
 
-void vc_mem_wr (int32 pa, int32 val, int32 lnt)
+void vc_mem_wr (int32 pa, int32 val, int32 mode)
 {
 uint32 rg = (pa >> 2) & 0xFFFF;
-uint32 nval;
+uint32 nval, t;
+int32 lnt = (mode == WRITE) ? 2 : 1;
 int32 i;
-int32 sc;
+int32 sc = (pa & 3) << 3;
 uint32 scrln, bufln;
 uint32 idx;
+uint32 mask = (mode == WRITE)? WMASK : BMASK;
 
-if (!vc_buf)                                            /* QVSS disabled? */
-    MACH_CHECK (MCHK_WRITE);                            /* Invalid memory reference */
-
-if (lnt < L_LONG) {
-    uint32 mask = (lnt == L_WORD)? 0xFFFF: 0xFF;
-    uint32 t = vc_buf[rg];
-    sc = (pa & 3) << 3;
-    nval = ((val & mask) << sc) | (t & ~(mask << sc));
-    }
-else nval = (uint32)val;
+t = vc_buf[rg];
+nval = ((val & mask) << sc) | (t & ~(mask << sc));
 
 if (rg >= 0xFFF8) {                                     /* cursor image */
     idx = (pa << 3) & 0xFF;                             /* get byte index */

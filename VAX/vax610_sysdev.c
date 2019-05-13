@@ -66,8 +66,6 @@ const char *sysd_description (DEVICE *dptr);
 t_stat vax610_boot (int32 flag, CONST char *ptr);
 t_stat vax610_boot_parse (int32 flag, const char *ptr);
 
-extern int32 vc_mem_rd (int32 pa);
-extern void vc_mem_wr (int32 pa, int32 val, int32 lnt);
 extern int32 iccs_rd (void);
 extern int32 todr_rd (void);
 extern int32 rxcs_rd (void);
@@ -265,12 +263,11 @@ return;
 struct reglink {                                        /* register linkage */
     uint32      low;                                    /* low addr */
     uint32      high;                                   /* high addr */
-    int32       (*read)(int32 pa);                      /* read routine */
+    int32       (*read)(int32 pa, int32 lnt);           /* read routine */
     void        (*write)(int32 pa, int32 val, int32 lnt); /* write routine */
     };
 
 struct reglink regtable[] = {
-    { QVMBASE, QVMBASE+QVMSIZE, &vc_mem_rd, &vc_mem_wr },
     { 0, 0, NULL, NULL }
     };
 
@@ -289,7 +286,7 @@ struct reglink *p;
 
 for (p = &regtable[0]; p->low != 0; p++) {
     if ((pa >= p->low) && (pa < p->high) && p->read)
-        return p->read (pa);
+        return p->read (pa, lnt);
     }
 MACH_CHECK (MCHK_READ);
 }

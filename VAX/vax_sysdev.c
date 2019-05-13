@@ -1,6 +1,6 @@
 /* vax_sysdev.c: VAX 3900 system-specific logic
 
-   Copyright (c) 1998-2013, Robert M Supnik
+   Copyright (c) 1998-2019, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -33,6 +33,7 @@
    cmctl        memory controller
    sysd         system devices (SSC miscellany)
 
+   05-May-19    RMS     Removed Qbus memory space from register space
    20-Dec-13    RMS     Added unaligned register space access routines
    23-Dec-10    RMS     Added power clear call to boot routine (Mark Pizzolato)
    25-Oct-05    RMS     Automated CMCTL extended memory
@@ -309,8 +310,6 @@ extern int32 cqipc_rd (int32 pa);
 extern void cqipc_wr (int32 pa, int32 val, int32 lnt);
 extern int32 cqbic_rd (int32 pa);
 extern void cqbic_wr (int32 pa, int32 val, int32 lnt);
-extern int32 cqmem_rd (int32 pa);
-extern void cqmem_wr (int32 pa, int32 val, int32 lnt);
 extern int32 iccs_rd (void);
 extern int32 todr_rd (void);
 extern int32 rxcs_rd (void);
@@ -1010,7 +1009,6 @@ struct reglink regtable[] = {
     { KABASE, KABASE+KASIZE, &ka_rd, &ka_wr },
     { CQBICBASE, CQBICBASE+CQBICSIZE, &cqbic_rd, &cqbic_wr },
     { CQIPCBASE, CQIPCBASE+CQIPCSIZE, &cqipc_rd, &cqipc_wr },
-    { CQMBASE, CQMBASE+CQMSIZE, &cqmem_rd, &cqmem_wr },
     { CDGBASE, CDGBASE+CDGSIZE, &cdg_rd, &cdg_wr },
     { 0, 0, NULL, NULL }
     };
@@ -1263,7 +1261,7 @@ for ( ; val != 0; val = val >> 1) {
 return odd;
 }
 
-/* SSC registers - byte/word merges done in WriteReg */
+/* SSC registers - byte/word merges done in ssc_wr */
 
 int32 ssc_rd (int32 pa)
 {
