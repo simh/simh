@@ -2273,7 +2273,7 @@ static const char simh_help[] =
       " Simulators with Video devices display the simulated video in a window\n"
       " on the local system.  The contents of that display can be saved in a\n"
       " file with the SCREENSHOT command:\n\n"
-      " +SCREENSHOT screenshotfile\n\n"
+      "++SCREENSHOT screenshotfile\n\n"
 #if defined(HAVE_LIBPNG)
       " which will create a screen shot file called screenshotfile.png\n"
 #else
@@ -3405,7 +3405,7 @@ return status;
 t_stat screenshot_cmd (int32 flag, CONST char *cptr)
 {
 if ((cptr == NULL) || (strlen (cptr) == 0))
-    return SCPE_ARG;
+    return sim_messagef (SCPE_ARG, "Missing screen shot filename\n");
 #if defined (USE_SIM_VIDEO)
 return vid_screenshot (cptr);
 #else
