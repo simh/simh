@@ -877,8 +877,8 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     endif
     NETWORK_OPT = $(NETWORK_CCDEFS)
   endif
-  ifneq (binexists,$(shell if $(TEST) -e BIN; then echo binexists; fi))
-    MKDIRBIN = mkdir -p BIN
+  ifneq (binexists,$(shell if $(TEST) -e BIN/buildtools; then echo binexists; fi))
+    MKDIRBIN = mkdir -p BIN/buildtools
   endif
   ifeq (commit-id-exists,$(shell if $(TEST) -e .git-commit-id; then echo commit-id-exists; fi))
     GIT_COMMIT_ID=$(shell grep 'SIM_GIT_COMMIT_ID' .git-commit-id | awk '{ print $$2 }')
@@ -994,8 +994,8 @@ else
   OS_CCDEFS += -fms-extensions $(PTHREADS_CCDEFS)
   OS_LDFLAGS += -lm -lwsock32 -lwinmm $(PTHREADS_LDFLAGS)
   EXE = .exe
-  ifneq (binexists,$(shell if exist BIN echo binexists))
-    MKDIRBIN = if not exist BIN mkdir BIN
+  ifneq (binexists,$(shell if exist BIN\buildtools echo binexists))
+    MKDIRBIN = if not exist BIN mkdir BIN\buildtools
   endif
   ifneq ($(USE_NETWORK),)
     NETWORK_OPT += -DUSE_SHARED
@@ -1203,7 +1203,7 @@ endif
 ifneq ($(DONT_USE_ROMS),)
   ROMS_OPT = -DDONT_USE_INTERNAL_ROM
 else
-  BUILD_ROMS = ${BIN}BuildROMs${EXE}
+  BUILD_ROMS = ${BIN}buildtools/BuildROMs${EXE}
 endif
 ifneq ($(DONT_USE_READER_THREAD),)
   NETWORK_OPT += -DDONT_USE_READER_THREAD
@@ -1945,28 +1945,19 @@ experimental : $(EXPERIMENTAL)
 
 clean :
 ifeq ($(WIN32),)
-	${RM} -r ${BIN}
+	${RM} -rf ${BIN}
 else
-	if exist BIN\*.exe del /q BIN\*.exe
-	if exist BIN rmdir BIN
+	if exist BIN rmdir /s /q BIN
 endif
 
-${BIN}BuildROMs${EXE} :
+${BUILD_ROMS} : 
 	${MKDIRBIN}
-ifeq (agcc,$(findstring agcc,$(firstword $(CC))))
-	gcc $(wordlist 2,1000,${CC}) sim_BuildROMs.c $(CC_OUTSPEC)
-else
-	${CC} sim_BuildROMs.c $(CC_OUTSPEC)
-endif
 ifeq ($(WIN32),)
-	$@
-	${RM} $@
-  ifeq (Darwin,$(OSTYPE)) # remove Xcode's debugging symbols folder too
-	${RM} -rf $@.dSYM
-  endif
+	@if $(TEST) \( ! -e $@ \) -o \( sim_BuildROMs.c -nt $@ \) ; then ${CC} sim_BuildROMs.c $(CC_OUTSPEC); fi
+	@$@
 else
+	if not exist $@ ${CC} sim_BuildROMs.c $(CC_OUTSPEC)
 	$(@D)\$(@F)
-#	del $(@D)\$(@F)
 endif
 
 #
@@ -2035,7 +2026,7 @@ ifneq (,$(call find_test,${PDP10D},pdp10))
 	$@ $(call find_test,${PDP10D},pdp10) $(TEST_ARG)
 endif
 
-pdp11 : ${BIN}BuildROMs${EXE} ${BIN}pdp11${EXE}
+pdp11 : ${BIN}pdp11${EXE}
 
 ${BIN}pdp11${EXE} : ${PDP11} ${SIM}
 	${MKDIRBIN}
@@ -2055,7 +2046,7 @@ endif
 
 vax : microvax3900
 
-microvax3900 : ${BIN}BuildROMs${EXE} ${BIN}microvax3900${EXE}
+microvax3900 : ${BIN}microvax3900${EXE}
 
 ${BIN}microvax3900${EXE} : ${VAX} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
@@ -2069,79 +2060,79 @@ ifneq (,$(call find_test,$(VAXD),vax-diag))
 	$@ $(call find_test,$(VAXD),vax-diag) $(TEST_ARG)
 endif
 
-microvax2000 : ${BIN}BuildROMs${EXE} ${BIN}microvax2000${EXE}
+microvax2000 : ${BIN}microvax2000${EXE}
 
 ${BIN}microvax2000${EXE} : ${VAX410} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX410} ${SCSI} ${SIM} ${VAX410_OPT} -o $@ ${LDFLAGS}
 
-infoserver100 : ${BIN}BuildROMs${EXE} ${BIN}infoserver100${EXE}
+infoserver100 : ${BIN}infoserver100${EXE}
 
 ${BIN}infoserver100${EXE} : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX420} ${SCSI} ${SIM} ${VAX411_OPT} -o $@ ${LDFLAGS}
 
-infoserver150vxt : ${BIN}BuildROMs${EXE} ${BIN}infoserver150vxt${EXE}
+infoserver150vxt : ${BIN}infoserver150vxt${EXE}
 
 ${BIN}infoserver150vxt${EXE} : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX420} ${SCSI} ${SIM} ${VAX412_OPT} -o $@ ${LDFLAGS}
 
-microvax3100 : ${BIN}BuildROMs${EXE} ${BIN}microvax3100${EXE}
+microvax3100 : ${BIN}microvax3100${EXE}
 
 ${BIN}microvax3100${EXE} : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX420} ${SCSI} ${SIM} ${VAX41A_OPT} -o $@ ${LDFLAGS}
 
-microvax3100e : ${BIN}BuildROMs${EXE} ${BIN}microvax3100e${EXE}
+microvax3100e : ${BIN}microvax3100e${EXE}
 
 ${BIN}microvax3100e${EXE} : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX420} ${SCSI} ${SIM} ${VAX41D_OPT} -o $@ ${LDFLAGS}
 
-vaxstation3100m30 : ${BIN}BuildROMs${EXE} ${BIN}vaxstation3100m30${EXE}
+vaxstation3100m30 : ${BIN}vaxstation3100m30${EXE}
 
 ${BIN}vaxstation3100m30${EXE} : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX420} ${SCSI} ${SIM} ${VAX42A_OPT} -o $@ ${LDFLAGS}
 
-vaxstation3100m38 : ${BIN}BuildROMs${EXE} ${BIN}vaxstation3100m38${EXE}
+vaxstation3100m38 : ${BIN}vaxstation3100m38${EXE}
 
 ${BIN}vaxstation3100m38${EXE} : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX420} ${SCSI} ${SIM} ${VAX42B_OPT} -o $@ ${LDFLAGS}
 
-vaxstation3100m76 : ${BIN}BuildROMs${EXE} ${BIN}vaxstation3100m76${EXE}
+vaxstation3100m76 : ${BIN}vaxstation3100m76${EXE}
 
 ${BIN}vaxstation3100m76${EXE} : ${VAX43} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX43} ${SCSI} ${SIM} ${VAX43_OPT} -o $@ ${LDFLAGS}
 
-vaxstation4000m60 : ${BIN}BuildROMs${EXE} ${BIN}vaxstation4000m60${EXE}
+vaxstation4000m60 : ${BIN}vaxstation4000m60${EXE}
 
 ${BIN}vaxstation4000m60${EXE} : ${VAX440} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX440} ${SCSI} ${SIM} ${VAX46_OPT} -o $@ ${LDFLAGS}
 
-microvax3100m80 : ${BIN}BuildROMs${EXE} ${BIN}microvax3100m80${EXE}
+microvax3100m80 : ${BIN}microvax3100m80${EXE}
 
 ${BIN}microvax3100m80${EXE} : ${VAX440} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX440} ${SCSI} ${SIM} ${VAX47_OPT} -o $@ ${LDFLAGS}
 
-vaxstation4000vlc : ${BIN}BuildROMs${EXE} ${BIN}vaxstation4000vlc${EXE}
+vaxstation4000vlc : ${BIN}vaxstation4000vlc${EXE}
 
 ${BIN}vaxstation4000vlc${EXE} : ${VAX440} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX440} ${SCSI} ${SIM} ${VAX48_OPT} -o $@ ${LDFLAGS}
 
-infoserver1000 : ${BIN}BuildROMs${EXE} ${BIN}infoserver1000${EXE}
+infoserver1000 : ${BIN}infoserver1000${EXE}
 
 ${BIN}infoserver1000${EXE} : ${IS1000} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${IS1000} ${SCSI} ${SIM} ${IS1000_OPT} -o $@ ${LDFLAGS}
 
-microvax1 : ${BIN}BuildROMs${EXE} ${BIN}microvax1${EXE}
+microvax1 : ${BIN}microvax1${EXE}
 
 ${BIN}microvax1${EXE} : ${VAX610} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
@@ -2150,7 +2141,7 @@ ifneq (,$(call find_test,$(VAXD),vax-diag))
 	$@ $(call find_test,$(VAXD),vax-diag) $(TEST_ARG)
 endif
 
-rtvax1000 : ${BIN}BuildROMs${EXE} ${BIN}rtvax1000${EXE}
+rtvax1000 : ${BIN}rtvax1000${EXE}
 
 ${BIN}rtvax1000${EXE} : ${VAX630} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
@@ -2159,7 +2150,7 @@ ifneq (,$(call find_test,$(VAXD),vax-diag))
 	$@ $(call find_test,$(VAXD),vax-diag) $(TEST_ARG)
 endif
 
-microvax2 : ${BIN}BuildROMs${EXE} ${BIN}microvax2${EXE}
+microvax2 : ${BIN}microvax2${EXE}
 
 ${BIN}microvax2${EXE} : ${VAX630} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
@@ -2168,7 +2159,7 @@ ifneq (,$(call find_test,$(VAXD),vax-diag))
 	$@ $(call find_test,$(VAXD),vax-diag) $(TEST_ARG)
 endif
 
-vax730 : ${BIN}BuildROMs${EXE} ${BIN}vax730${EXE}
+vax730 : ${BIN}vax730${EXE}
 
 ${BIN}vax730${EXE} : ${VAX730} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
@@ -2177,7 +2168,7 @@ ifneq (,$(call find_test,$(VAXD),vax-diag))
 	$@ $(call find_test,$(VAXD),vax-diag) $(TEST_ARG)
 endif
 
-vax750 : ${BIN}BuildROMs${EXE} ${BIN}vax750${EXE}
+vax750 : ${BIN}vax750${EXE}
 
 ${BIN}vax750${EXE} : ${VAX750} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
@@ -2186,7 +2177,7 @@ ifneq (,$(call find_test,$(VAXD),vax-diag))
 	$@ $(call find_test,$(VAXD),vax-diag) $(TEST_ARG)
 endif
 
-vax780 : ${BIN}BuildROMs${EXE} ${BIN}vax780${EXE}
+vax780 : ${BIN}vax780${EXE}
 
 ${BIN}vax780${EXE} : ${VAX780} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
@@ -2204,7 +2195,7 @@ ifneq (,$(call find_test,$(VAXD),vax-diag))
 	$@ $(call find_test,$(VAXD),vax-diag) $(TEST_ARG)
 endif
 
-vax8600 : ${BIN}BuildROMs${EXE} ${BIN}vax8600${EXE}
+vax8600 : ${BIN}vax8600${EXE}
 
 ${BIN}vax8600${EXE} : ${VAX8600} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
@@ -2384,7 +2375,7 @@ ifneq (,$(call find_test,${SDSD},sds))
 	$@ $(call find_test,${SDSD},sds) $(TEST_ARG)
 endif
 
-swtp6800mp-a : ${BIN}BuildROMs${EXE} ${BIN}swtp6800mp-a${EXE}
+swtp6800mp-a : ${BIN}swtp6800mp-a${EXE}
 
 ${BIN}swtp6800mp-a${EXE} : ${SWTP6800MP-A} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
@@ -2393,7 +2384,7 @@ ifneq (,$(call find_test,${SWTP6800D},swtp6800mp-a))
 	$@ $(call find_test,${SWTP6800D},swtp6800mp-a) $(TEST_ARG)
 endif
 
-swtp6800mp-a2 : ${BIN}BuildROMs${EXE} ${BIN}swtp6800mp-a2${EXE}
+swtp6800mp-a2 : ${BIN}swtp6800mp-a2${EXE}
 
 ${BIN}swtp6800mp-a2${EXE} : ${SWTP6800MP-A2} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
@@ -2559,7 +2550,7 @@ ifneq (,$(call find_test,${B5500D},b5500))
 	$@ $(call find_test,${B5500D},b5500) $(TEST_ARG)
 endif
 
-3b2 : ${BIN}BuildROMs${EXE} $(BIN)3b2$(EXE)
+3b2 : $(BIN)3b2$(EXE)
  
 ${BIN}3b2${EXE} : ${ATT3B2} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}

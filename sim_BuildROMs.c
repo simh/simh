@@ -61,7 +61,7 @@ struct ROM_File_Descriptor {
    {"VAX/ka4xx_4pln.bin",               "VAX/vax_ka4xx_4pln_bin.h",                 65536,            0xFF9CD286,        "vax_ka4xx_4pln_bin"},
    {"VAX/ka4xx_8pln.bin",               "VAX/vax_ka4xx_8pln_bin.h",                 65536,            0xFFA2FF59,        "vax_ka4xx_8pln_bin"},
    {"VAX/ka4xx_dz.bin",                 "VAX/vax_ka4xx_dz_bin.h",                   32768,            0xFFD84C02,        "vax_ka4xx_dz_bin"},
-   {"VAX/ka4xx_spx.bin"            ,    "VAX/vax_ka4xx_spx_bin.h",                 131072,            0xFF765752,        "vax_ka4xx_spx_bin"},
+   {"VAX/ka4xx_spx.bin",                "VAX/vax_ka4xx_spx_bin.h",                 131072,            0xFF765752,        "vax_ka4xx_spx_bin"},
    {"VAX/ka750_new.bin",                "VAX/vax_ka750_bin_new.h",                   1024,            0xFFFE7BE5,        "vax_ka750_bin_new", "From ROM set: E40A9, E41A9, E42A9, E43A9 (Boots: A=DD, B=DB, C=DU"},
    {"VAX/ka750_old.bin",                "VAX/vax_ka750_bin_old.h",                   1024,            0xFFFEBAA5,        "vax_ka750_bin_old", "From ROM set: 990A9, 948A9, 906A9, 905A9 (Boots: A=DD, B=DM, C=DL, D=DU"},
    {"VAX/vcb02.bin",                    "VAX/vax_vcb02_bin.h",                      16384,            0xFFF1D2AD,        "vax_vcb02_bin"},
