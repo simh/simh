@@ -648,14 +648,21 @@ struct UNIT {
 
 /* These flags are only set dynamically */
 
-#define UNIT_ATTMULT    0000001         /* Allow multiple attach commands */
-#define UNIT_TM_POLL    0000002         /* TMXR Polling unit */
-#define UNIT_NO_FIO     0000004         /* fileref is NOT a FILE * */
-#define UNIT_DISK_CHK   0000010         /* disk data debug checking (sim_disk) */
-#define UNIT_TMR_UNIT   0000020         /* Unit registered as a calibrated timer */
-#define UNIT_TAPE_MRK   0000040         /* Tape Unit AWS Tapemark */
-#define UNIT_V_DF_TAPE  7               /* Bit offset for Tape Density reservation */
-#define UNIT_S_DF_TAPE  3               /* Bits Reserved for Tape Density */
+#define UNIT_ATTMULT        0000001         /* Allow multiple attach commands */
+#define UNIT_TM_POLL        0000002         /* TMXR Polling unit */
+#define UNIT_NO_FIO         0000004         /* fileref is NOT a FILE * */
+#define UNIT_DISK_CHK       0000010         /* disk data debug checking (sim_disk) */
+#define UNIT_TMR_UNIT       0000200         /* Unit registered as a calibrated timer */
+#define UNIT_TAPE_MRK       0000400         /* Tape Unit AWS Tapemark */
+#define UNIT_TAPE_PNU       0001000         /* Tape Unit Position Not Updated */
+#define UNIT_V_DF_TAPE      10              /* Bit offset for Tape Density reservation */
+#define UNIT_S_DF_TAPE      3               /* Bits Reserved for Tape Density */
+#define UNIT_V_TAPE_FMT     13              /* Bit offset for Tape Format */
+#define UNIT_S_TAPE_FMT     3               /* Bits Reserved for Tape Format */
+#define UNIT_M_TAPE_FMT     (((1 << UNIT_S_TAPE_FMT) - 1) << UNIT_V_TAPE_FMT)
+#define UNIT_V_TAPE_ANSI    16              /* Bit offset for ANSI Tape Type */
+#define UNIT_S_TAPE_ANSI    4               /* Bits Reserved for ANSI Tape Type */
+#define UNIT_M_TAPE_ANSI    (((1 << UNIT_S_TAPE_ANSI) - 1) << UNIT_V_TAPE_ANSI)
 
 struct BITFIELD {
     const char      *name;                              /* field name */

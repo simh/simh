@@ -100,22 +100,20 @@
 #include <pthread.h>
 #endif
 
-struct sim_tape_fmt {
+static struct sim_tape_fmt {
     const char          *name;                          /* name */
-    int32          uflags;                         /* unit flags */
+    int32               uflags;                         /* unit flags */
     t_addr              bot;                            /* bot test */
     t_addr              eom_remnant;                    /* potentially unprocessed data */
-    };
-
-static struct sim_tape_fmt fmts[MTUF_N_FMT] = {
-    { "SIMH",       0, sizeof (t_mtrlnt) - 1,  sizeof (t_mtrlnt) },
-    { "E11",        0, sizeof (t_mtrlnt) - 1,  sizeof (t_mtrlnt) },
-    { "TPC",  UNIT_RO, sizeof (t_tpclnt) - 1,  sizeof (t_tpclnt) },
-    { "P7B",        0,                     0,                  0 },
-    { "AWS",        0,                     0,                  0 },
-    { "TAR",        0,                     0,                  0 },
-    { "ANSIFILES",  0,                     0,                  0 },
-    { NULL,         0,                     0,                  0 }
+    } fmts[] = {
+    { "SIMH",       0,       sizeof (t_mtrlnt) - 1, sizeof (t_mtrlnt) },
+    { "E11",        0,       sizeof (t_mtrlnt) - 1, sizeof (t_mtrlnt) },
+    { "TPC",        UNIT_RO, sizeof (t_tpclnt) - 1, sizeof (t_tpclnt) },
+    { "P7B",        0,       0,                     0                 },
+    { "AWS",        0,       0,                     0                 },
+    { "TAR",        UNIT_RO, 0,                     0                 },
+    { "ANSI",       UNIT_RO, 0,                     0                 },
+    { NULL,         0,       0,                     0                 }
     };
 
 static const uint32 bpi [] = {                          /* tape density table, indexed by MT_DENS constants */
@@ -411,7 +409,9 @@ typedef struct HDR2 {       /* Also EOF2, EOV2 */
     char record_format;         /* F(fixed)|D(variable)|S(spanned) */
     char block_length[5];       /* label ident */
     char record_length[5];      /*  */
-    char reserved_os[35];       /* */
+    char reserved_os1[21];      /* */
+    char carriage_control;      /* A - Fortran CC, M - Record contained CC, space - CR/LF to be added */
+    char reserved_os2[13];      /* */
     char buffer_offset[2];      /* */
     char reserved_std[28];      /* */
     } HDR2;
@@ -442,15 +442,68 @@ typedef struct TAPE_RECORD {
     } TAPE_RECORD;
 
 typedef struct ANSI_TAPE {
-    uint32 file_count;
-    uint32 record_count;
-    uint32 array_size;
-    uint32 block_size;
+    uint32 ansi_type;       /* ANSI-VMS, ANSI-RT11, ANSI-RSTS, ANSI-RSX11 */
+    uint32 file_count;      /* number of labeled files */
+    uint32 record_count;    /* number of entries in the record array */
+    uint32 array_size;      /* allocated size of records array */
+    uint32 block_size;      /* tape block size */
     TAPE_RECORD **records;
     VOL1 vol1;
     } ANSI_TAPE;
 
-static ANSI_TAPE *ansi_create_tape (const char *label, uint32 block_size);
+const char HDR3_RMS_STREAM[] = "HDR3020002040000" 
+                               "0000000100000000" 
+                               "0000000002000000" 
+                               "0000000000000000" 
+                               "0000            ";
+const char HDR3_RMS_STMLF[] =  "HDR3020002050000" 
+                               "0000000100000000" 
+                               "0000000002000000" 
+                               "0000000000000000" 
+                               "0000            ";
+const char HDR3_RMS_VAR[] =    "HDR3005C02020000" 
+                               "0000000100000000" 
+                               "0000000000000000" 
+                               "0000000000000000" 
+                               "0000            ";
+const char HDR3_RMS_FIXED[] =  "HDR3020000010000" 
+                               "0000000100000000" 
+                               "0000000002000000" 
+                               "0000000000000000" 
+                               "0000            ";
+const char HDR3_RMS_VARRSX[] = "HDR300000A020000" 
+                               "0000000100000000" 
+                               "0000000000000000" 
+                               "0000000000000000" 
+                               "0000            ";
+const char HDR3_RMS_FIXRSX[] = "HDR3020008010000" 
+                               "0000000100000000" 
+                               "0000000000000000" 
+                               "0000000000000000" 
+                               "0000            ";
+
+static struct ansi_tape_parameters {
+    const char          *name;                  /* operating system */
+    const char          *system_code;           /* */
+    t_bool              nohdr2;                 /* no HDR2 records */
+    t_bool              nohdr3;                 /* no HDR2 records */
+    t_bool              fixed_text;             /*  */
+    char                vol1_standard;          /* 3 or 4 */
+    const char          *hdr3_fixed;            /* HDR3 template for Fixed format files */
+    const char          *hdr3_lf_line_endings;  /* HDR3 template for text with LF line ending files */
+    const char          *hdr3_crlf_line_endings;/* HDR3 template for text with CRLF line ending files */
+    int                 skip_lf_line_endings;
+    int                 skip_crlf_line_endings;
+    } ansi_args[] = {     /* code       nohdr2 nohdr3 fixed_text lvl hdr3 fir fuxed    hdr3 fir lf      hdr3 for crlf */
+        {"ANSI-VMS"      , "DECFILE11A", FALSE, FALSE, FALSE,    '3', HDR3_RMS_FIXED,  HDR3_RMS_STMLF,  HDR3_RMS_STREAM, 0, 0},
+        {"ANSI-RSX11"    , "DECFILE11A", FALSE, FALSE, FALSE,    '4', HDR3_RMS_FIXRSX, HDR3_RMS_VARRSX, HDR3_RMS_VARRSX, 1, 2},
+        {"ANSI-RT11"     , "DECRT11A",   TRUE,  TRUE,  TRUE,     '3', NULL,            NULL,            NULL,            0, 0},
+        {"ANSI-RSTS"     , "DECRSTS/E",  FALSE, TRUE,  TRUE,     '3', NULL,            NULL,            NULL,            0, 0},
+        {NULL}
+    };
+
+
+static ANSI_TAPE *ansi_create_tape (const char *label, uint32 block_size, uint32 ansi_type);
 static int ansi_free_tape (void *vtape);
 static void sim_tape_add_ansi_entry (const char *directory, 
                                      const char *filename,
@@ -532,7 +585,7 @@ sim_tape_clr_async (uptr);
 if (sim_asynch_enabled)
     sim_tape_set_async (uptr, ctx->asynch_io_latency);
 #endif
-if (MT_GET_FMT (uptr) != MTUF_F_ANSI)
+if (MT_GET_FMT (uptr) < MTUF_F_ANSI)
     fflush (uptr->fileref);
 }
 
@@ -553,6 +606,7 @@ struct tape_context *ctx;
 uint32 objc;
 DEVICE *dptr;
 char gbuf[CBUFSIZE];
+uint32 recsize = 0;
 t_stat r;
 t_bool auto_format = FALSE;
 t_bool had_debug = (sim_deb != NULL);
@@ -564,37 +618,43 @@ if ((dptr = find_dev_from_unit (uptr)) == NULL)
 if (sim_switches & SWMASK ('F')) {                      /* format spec? */
     cptr = get_glyph (cptr, gbuf, 0);                   /* get spec */
     if (*cptr == 0)                                     /* must be more */
-        return sim_messagef (SCPE_2FARG, "Missing Format specifier and filename to attach\n");
+        return sim_messagef (SCPE_2FARG, "Missing Format specifier and/or filename to attach\n");
     if (sim_tape_set_fmt (uptr, 0, gbuf, NULL) != SCPE_OK)
         return sim_messagef (SCPE_ARG, "Invalid Tape Format: %s\n", gbuf);
     sim_switches = sim_switches & ~(SWMASK ('F'));      /* Record Format specifier already processed */
     auto_format = TRUE;
     }
-if (MT_GET_FMT (uptr) == MTUF_F_TAR) {
-    if (sim_switches & SWMASK ('B')) {                  /* Record Size (blocking factor)? */
-        uint32 recsize;
-
-        cptr = get_glyph (cptr, gbuf, 0);                   /* get spec */
-        if (*cptr == 0)                                     /* must be more */
-            return sim_messagef (SCPE_2FARG, "Missing Record Size and filename to attach\n");
-        recsize = (uint32) get_uint (gbuf, 10, 65536, &r);
-        if ((r != SCPE_OK) || (recsize == 0))
-            return sim_messagef (SCPE_ARG, "Invalid Tape Record Size: %s\n", gbuf);
-        uptr->recsize = recsize;
-        sim_switches = sim_switches & ~(SWMASK ('B'));      /* Record Blocking Factor */
-        }
-    if (uptr->recsize == 0)
-        uptr->recsize = TAR_DFLT_RECSIZE;
+if (sim_switches & SWMASK ('B')) {                  /* Record Size (blocking factor)? */
+    cptr = get_glyph (cptr, gbuf, 0);                   /* get spec */
+    if (*cptr == 0)                                     /* must be more */
+        return sim_messagef (SCPE_2FARG, "Missing Record Size and filename to attach\n");
+    recsize = (uint32) get_uint (gbuf, 10, 65536, &r);
+    if ((r != SCPE_OK) || (recsize == 0))
+        return sim_messagef (SCPE_ARG, "Invalid Tape Record Size: %s\n", gbuf);
+    uptr->recsize = recsize;
+    sim_switches = sim_switches & ~(SWMASK ('B'));      /* Record Blocking Factor */
     }
 if ((MT_GET_FMT (uptr) == MTUF_F_TPC) ||
     (MT_GET_FMT (uptr) == MTUF_F_TAR) ||
     (MT_GET_FMT (uptr) == MTUF_F_ANSI))
-    sim_switches |= SWMASK ('R');                       /* Force ReadOnly attach for TPC, TAR and ANSIFILES tapes */
+    sim_switches |= SWMASK ('R');                       /* Force ReadOnly attach for TPC, TAR and ANSI tapes */
 if (MT_GET_FMT (uptr) == MTUF_F_ANSI) {
     const char *ocptr = cptr;
     char label[CBUFSIZE] = "simh";
+    ANSI_TAPE *tape;
 
-    uptr->fileref = (FILE *)ansi_create_tape (label, 2048);
+    if ((MT_GET_ANSI_TYP (uptr) == MTAT_F_RT11)  ||
+        (MT_GET_ANSI_TYP (uptr) == MTAT_F_RSX11) ||
+        (MT_GET_ANSI_TYP (uptr) == MTAT_F_RSTS))
+        uptr->recsize = 512;
+    if (uptr->recsize == 0)
+        uptr->recsize = 2048;
+    else {
+        if ((uptr->recsize < 512) || (uptr->recsize % 512))
+            return sim_messagef (SCPE_ARG, "Block size of %u is below or not a multiple of the required minimum ANSI size of 512.\n", uptr->recsize); 
+        }
+    tape = ansi_create_tape (label, uptr->recsize, MT_GET_ANSI_TYP (uptr));
+    uptr->fileref = (FILE *)tape;
     if (!uptr->fileref)
         return SCPE_MEM;
     while (*cptr != 0) {                                    /* do all mods */
@@ -603,7 +663,7 @@ if (MT_GET_FMT (uptr) == MTUF_F_ANSI) {
         }
     if (((ANSI_TAPE *)uptr->fileref)->file_count > 0) {
         r = SCPE_OK;
-        ansi_tape_add_block ((ANSI_TAPE *)uptr->fileref, NULL, 0);
+        ansi_tape_add_block ((ANSI_TAPE *)uptr->fileref, NULL, 0);  /* Tape Mark */
         uptr->flags |= UNIT_ATT;
         uptr->filename = (char *)malloc (strlen (ocptr) + 1);
         strcpy (uptr->filename, ocptr);
@@ -757,9 +817,10 @@ fprintf (st, "    -R          Attach Read Only.\n");
 fprintf (st, "    -E          Must Exist (if not specified an attempt to create the indicated\n");
 fprintf (st, "                virtual tape will be attempted).\n");
 fprintf (st, "    -F          Open the indicated tape container in a specific format (default\n");
-fprintf (st, "                is SIMH, alternatives are E11, TPC, P7B, AWS, TAR and ANSIFILES)\n");
-fprintf (st, "    -B          For TAR format tapes, the record size for data read from the\n");
-fprintf (st, "                specified file.  This record size will be used for all but\n");
+fprintf (st, "                is SIMH, alternatives are E11, TPC, P7B, AWS, TAR, ANSI-VMS,\n");
+fprintf (st, "                ANSI-RT11, ANSI-RSX11 or ANSI-RSTS)\n");
+fprintf (st, "    -B          For TAR format tapes, the record size for data read from the \n");
+fprintf (st, "                specified file.  This record size will be used for all but \n");
 fprintf (st, "                possibly the last record which will be what remains unread.\n");
 fprintf (st, "                The default TAR record size is 10240.\n");
 fprintf (st, "    -V          Display some summary information about the record structure\n");
@@ -769,12 +830,15 @@ fprintf (st, "                validation pass\n");
 fprintf (st, "                contained in the tape image scan performed when it is attached.\n");
 fprintf (st, "    -D          Causes the internal tape structure information to be displayed\n");
 fprintf (st, "                while the tape image is scanned.\n\n");
-fprintf (st, "Notes:  ANSIFILES format allows one or several files to be presented to as a\n");
-fprintf (st, "        read only ANSI Level 3 labeled tape with file labels that make each\n");
-fprintf (st, "        individual file accessible directly as files on the tape.\n\n");
+fprintf (st, "Notes:  ANSI-VMS, ANSI-RT11, ANSI-RSTS, ANSI-RSX11 formats allows one or several\n");
+fprintf (st, "        files to be presented to as a read only ANSI Level 3 labeled tape with\n");
+fprintf (st, "        file labels that make each individual file accessible directly as files\n");
+fprintf (st, "        on the tape.\n\n");
 fprintf (st, "Examples:\n\n");
-fprintf (st, "  sim> ATTACH -F %s ANSIFILES Hobbyist-USE-ONLY-VA.TXT\n\n", dptr->name);
-fprintf (st, "  sim> ATTACH -F %s ANSIFILES *.TXT,*.ini,*.exe\n", dptr->name);
+fprintf (st, "  sim> ATTACH -F %s ANSI-VMS Hobbyist-USE-ONLY-VA.TXT\n\n", dptr->name);
+fprintf (st, "  sim> ATTACH -F %s ANSI-RSX11 *.TXT,*.ini,*.exe\n", dptr->name);
+fprintf (st, "  sim> ATTACH -F %s ANSI-RSTS *.TXT,*.SAV\n", dptr->name);
+fprintf (st, "  sim> ATTACH -F %s ANSI-RT11 *.TXT,*.TSK\n", dptr->name);
 return SCPE_OK;
 }
 
@@ -790,14 +854,14 @@ if (sim_deb && ((uptr->dctrl | ctx->dptr->dctrl) & reason))
 
 static int sim_tape_seek (UNIT *uptr, t_addr pos)
 {
-if (MT_GET_FMT (uptr) != MTUF_F_ANSI)
+if (MT_GET_FMT (uptr) < MTUF_F_ANSI)
     return sim_fseek (uptr->fileref, pos, SEEK_SET);
 return 0;
 }
 
 static t_offset sim_tape_size (UNIT *uptr)
 {
-if (MT_GET_FMT (uptr) != MTUF_F_ANSI)
+if (MT_GET_FMT (uptr) < MTUF_F_ANSI)
     return sim_fsize_ex (uptr->fileref);
 return uptr->tape_eom;
 }
@@ -1524,7 +1588,7 @@ else switch (f) {                                       /* otherwise the read me
              }
         break;
 
-     case MTUF_F_ANSI:
+    case MTUF_F_ANSI:
         if (1) {
             ANSI_TAPE *tape = (ANSI_TAPE *)uptr->fileref;
 
@@ -1603,7 +1667,7 @@ if (rbc > max) {                                        /* rec out of range? */
     uptr->pos = opos;
     return MTSE_INVRL;
     }
-if (f != MTUF_F_ANSI) {
+if (f < MTUF_F_ANSI) {
     i = (t_mtrlnt) sim_fread (buf, sizeof (uint8), rbc, uptr->fileref); /* read record */
     if (ferror (uptr->fileref)) {                           /* error? */
         MT_SET_PNU (uptr);
@@ -1676,7 +1740,7 @@ if (st != MTSE_OK) {
 *bc = rbc = MTR_L (tbc);                                /* strip error flag */
 if (rbc > max)                                          /* rec out of range? */
     return MTSE_INVRL;
-if (f != MTUF_F_ANSI) {
+if (f < MTUF_F_ANSI) {
     i = (t_mtrlnt) sim_fread (buf, sizeof (uint8), rbc, uptr->fileref); /* read record */
     if (ferror (uptr->fileref))                             /* error? */
         return sim_tape_ioerr (uptr);
@@ -2989,14 +3053,27 @@ if (uptr->flags & UNIT_ATT)
     return SCPE_ALATT;
 if (cptr == NULL)
     return SCPE_ARG;
-for (f = 0; f < MTUF_N_FMT; f++) {
-    if (fmts[f].name && (strcmp (cptr, fmts[f].name) == 0)) {
-        uptr->flags = (uptr->flags & ~MTUF_FMT) |
-            (f << MTUF_V_FMT) | fmts[f].uflags;
+for (f = 0; fmts[f].name; f++) {
+    if (MATCH_CMD(fmts[f].name, cptr) == 0) {
+        uint32 a = 0;
+
+        if (f == MTUF_F_ANSI) {
+            for (a = 0; ansi_args[a].name; a++)
+                if (MATCH_CMD(ansi_args[a].name, cptr) == 0)
+                    break;
+            if (ansi_args[a].name == NULL)
+                return sim_messagef (SCPE_ARG, "Unknown ANSI tape format: %s\n", cptr);
+            }
+        uptr->flags &= ~UNIT_RO;
+        uptr->flags |= fmts[f].uflags;
+        uptr->dynflags &= ~UNIT_M_TAPE_FMT;
+        uptr->dynflags |= (f << UNIT_V_TAPE_FMT);
+        uptr->dynflags &= ~UNIT_M_TAPE_ANSI;
+        uptr->dynflags |= (a << UNIT_V_TAPE_ANSI);
         return SCPE_OK;
         }
     }
-return SCPE_ARG;
+return sim_messagef (SCPE_ARG, "Unknown tape format: %s\n", cptr);
 }
 
 /* Show tape format */
@@ -3005,9 +3082,10 @@ t_stat sim_tape_show_fmt (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 f = MT_GET_FMT (uptr);
 
-if (fmts[f].name)
+if (f == MTUF_F_ANSI)
+    fprintf (st, "%s format", ansi_args[MT_GET_ANSI_TYP (uptr)].name);
+else
     fprintf (st, "%s format", fmts[f].name);
-else fprintf (st, "invalid format");
 return SCPE_OK;
 }
 
@@ -3233,7 +3311,7 @@ if ((!stop_cpu) &&
      ((uint32)(sim_tape_size (uptr) - (t_offset)uptr->pos) > fmts[MT_GET_FMT (uptr)].eom_remnant) ||
      (unique_record_sizes > 2 * tapemark_total))) {
     remaining_data = (uint32)(sim_tape_size (uptr) - (t_offset)uptr->tape_eom);
-    sim_printf ("Tape Image %s'%s' scanned as %s format.\n", ((MT_GET_FMT (uptr) == MTUF_F_ANSI) ? "made from " : ""), uptr->filename, fmts[MT_GET_FMT (uptr)].name);
+    sim_printf ("Tape Image %s'%s' scanned as %s format.\n", ((MT_GET_FMT (uptr) == MTUF_F_ANSI) ? "made from " : ""), uptr->filename, (MT_GET_FMT (uptr) == MTUF_F_ANSI) ? ansi_args[MT_GET_ANSI_TYP (uptr)].name : fmts[MT_GET_FMT (uptr)].name);
     if (r != MTSE_EOM)
         sim_printf ("After processing ");
     else
@@ -3762,27 +3840,6 @@ SIM_TEST(sim_tape_test_remove_tape_files (dptr->units, "TapeTestFile1"));
 return SCPE_OK;
 }
 
-const char HDR3_RMS_STREAM[] = "HDR3020002040000" 
-                               "0000000100000000" 
-                               "0000000002000000" 
-                               "0000000000000000" 
-                               "0000            ";
-const char HDR3_RMS_STMLF[] =  "HDR3020002050000" 
-                               "0000000100000000" 
-                               "0000000002000000" 
-                               "0000000000000000" 
-                               "0000            ";
-const char HDR3_RMS_VAR[] =    "HDR3005C02020000" 
-                               "0000000100000000" 
-                               "0000000000000000" 
-                               "0000000000000000" 
-                               "0000            ";
-const char HDR3_RMS_FIXED[] =  "HDR3020000010000" 
-                               "0000000100000000" 
-                               "0000000002000000" 
-                               "0000000000000000" 
-                               "0000            ";
-
 static void ansi_date (time_t datetime, char date[6])
     {
     struct tm *lt;
@@ -3795,6 +3852,11 @@ static void ansi_date (time_t datetime, char date[6])
     memcpy (date, buf, 6);
     }
 
+/* 
+ * This isn't quite ANSI 'a' since several ANSI allowed characters
+ * are either illegal file names on many DEC systems or are confusing
+ * to OS file name parsers.
+ */
 static void to_ansi_a (char *out, const char *in, size_t size)
     {
     memset (out, ' ', size);
@@ -3809,7 +3871,7 @@ static void to_ansi_a (char *out, const char *in, size_t size)
                 ++in;
                 }
             else {
-                if (strchr ("-.$_", *in))
+                if (strchr ("-.$_/", *in))
                     *(out++) = *in++;
                 else
                     ++in;
@@ -3818,16 +3880,16 @@ static void to_ansi_a (char *out, const char *in, size_t size)
         }
     }
 
-static void ansi_make_VOL1 (VOL1 *vol, const char *ident)
+static void ansi_make_VOL1 (VOL1 *vol, const char *ident, uint32 ansi_type)
     {
     memset (vol, ' ', sizeof (*vol));
     memcpy (vol->type, "VOL", 3);
     vol->num = '1';
-    vol->standard = '3';
     to_ansi_a (vol->ident, ident, sizeof (vol->ident));
+    vol->standard = ansi_args[ansi_type].vol1_standard;
     }
 
-static void ansi_make_HDR1 (HDR1 *hdr1, VOL1 *vol, HDR4 *hdr4, const char *filename)
+static void ansi_make_HDR1 (HDR1 *hdr1, VOL1 *vol, HDR4 *hdr4, const char *filename, uint32 ansi_type)
     {
     const char *fn;
     struct stat statb;
@@ -3867,11 +3929,11 @@ static void ansi_make_HDR1 (HDR1 *hdr1, VOL1 *vol, HDR4 *hdr4, const char *filen
     ansi_date (statb.st_mtime, hdr1->creation_date);
     memcpy (hdr1->expiration_date, " 00000", 6);
     memcpy (hdr1->block_count, "000000", 6);
-    to_ansi_a (hdr1->system_code, "DECFILE11A", sizeof (hdr1->system_code));
+    to_ansi_a (hdr1->system_code, ansi_args[ansi_type].system_code, sizeof (hdr1->system_code));
     free (fn_cpy);
     }
 
-static void ansi_make_HDR2 (HDR2 *hdr, t_bool fixed_record, size_t block_size, size_t record_size)
+static void ansi_make_HDR2 (HDR2 *hdr, t_bool fixed_record, size_t block_size, size_t record_size, uint32 ansi_type)
     {
     char size[12];
 
@@ -3883,31 +3945,68 @@ static void ansi_make_HDR2 (HDR2 *hdr, t_bool fixed_record, size_t block_size, s
     memcpy (hdr->block_length, size, sizeof (hdr->block_length));
     sprintf (size, "%05d", (int)record_size);
     memcpy (hdr->record_length, size, sizeof (hdr->record_length));
+    hdr->carriage_control = fixed_record ? 'M' : ' ';
     memcpy (hdr->buffer_offset, "00", 2);
+    if (ansi_type == MTAT_F_RSTS) {
+        hdr->record_format = 'U';
+        memcpy (hdr->record_length, "00000", sizeof (hdr->record_length));
+        hdr->carriage_control = 'M';
+        }
     }
 
-static void ansi_fill_text_buffer (FILE *f, char *buf, size_t bufsize)
+static void ansi_fill_text_buffer (FILE *f, char *buf, size_t buf_size, size_t record_skip_ending, t_bool fixed_text)
     {
     long start;
-    char *tmp = (char *)calloc (1 + bufsize, sizeof (*buf));
+    char *tmp = (char *)calloc (2 + buf_size, sizeof (*buf));
     size_t offset = 0;
 
     while (1) {
-        int rec_size;
+        size_t rec_size;
+        char rec_size_str[16];
 
         start = ftell (f);
-        if (!fgets (tmp, bufsize, f))
+        if (!fgets (tmp, buf_size, f))
             break;
         rec_size = strlen (tmp);
-        if ((rec_size + 4) > (int)(bufsize - offset)) { /* room for record? */
-            fseek (f, start, SEEK_SET);
-            break;
+        if (!fixed_text) {
+            if (rec_size >= record_skip_ending)
+                rec_size -= record_skip_ending;
+            if ((rec_size + 4) > (int)(buf_size - offset)) { /* room for record? */
+                fseek (f, start, SEEK_SET);
+                break;
+                }
+            sprintf (rec_size_str, "%04u", (int)(rec_size + 4));
+            memcpy (buf + offset, rec_size_str, 4);
+            memcpy (buf + offset + 4, tmp, rec_size);
+            offset += 4 + rec_size;
             }
-        sprintf (buf + offset, "%04d%*.*s", rec_size + 4, rec_size, rec_size, tmp);
-        offset += 4 + rec_size;
+        else {
+            size_t move_size;
+
+            if ((tmp[rec_size - 2] != '\r') &&
+                (tmp[rec_size - 1] == '\n')) {
+                memcpy (&tmp[rec_size - 1], "\r\n", 3);
+                rec_size += 1;
+                }
+            if (offset + rec_size < buf_size)
+                move_size = rec_size;
+            else
+                move_size = buf_size - offset;
+            /* We've got a line that stradles a block boundary */
+            memcpy (buf + offset, tmp, move_size);
+            offset += move_size;
+            if (offset == buf_size) {
+                fseek (f, start + move_size, SEEK_SET);
+                break;
+                }
+            }
         }
-    if (bufsize > offset)
-        memset (buf + offset, '^', bufsize - offset);
+    if (buf_size > offset) {
+        if (fixed_text)
+            memset (buf + offset, 0, buf_size - offset);
+        else
+            memset (buf + offset, '^', buf_size - offset);
+        }
     free (tmp);
     }
 
@@ -3947,12 +4046,15 @@ free (tape);
 return 0;
 }
 
-ANSI_TAPE *ansi_create_tape (const char *label, uint32 block_size)
+ANSI_TAPE *ansi_create_tape (const char *label, uint32 block_size, uint32 ansi_type)
 {
 ANSI_TAPE *tape = (ANSI_TAPE *)calloc (1, sizeof (*tape));
 
+if (NULL == tape)
+    return tape;
 tape->block_size = block_size;
-ansi_make_VOL1 (&tape->vol1, label);
+tape->ansi_type = ansi_type;
+ansi_make_VOL1 (&tape->vol1, label, ansi_type);
 ansi_tape_add_block (tape, (uint8 *)&tape->vol1, sizeof (tape->vol1));
 return tape;
 }
@@ -3974,7 +4076,7 @@ long crlf_lines = 0;
 rewind (f);
 while (EOF != (chr = fgetc (f))) {
     ++pos;
-    if (!isprint (chr) && (!(chr == '\r')) && (!(chr == '\n')))
+    if (!isprint (chr) && (!(chr == '\r')) && (!(chr == '\n')) && (!(chr == '\t')))
         ++non_print_chars;
     if (chr == '\r')
         last_cr = pos;
@@ -4016,6 +4118,7 @@ return 0;
 static int ansi_add_file_to_tape (ANSI_TAPE *tape, const char *filename)
 {
 FILE *f;
+struct ansi_tape_parameters *ansi = &ansi_args[tape->ansi_type];
 uint8 *block = NULL;
 size_t max_record_size;
 t_bool lf_line_endings;
@@ -4035,30 +4138,40 @@ if (f == NULL) {
     return errno;
     }
 ansi_classify_file_contents (f, &max_record_size, &lf_line_endings, &crlf_line_endings);
-ansi_make_HDR1 (&hdr1, &tape->vol1, &hdr4, filename);
+ansi_make_HDR1 (&hdr1, &tape->vol1, &hdr4, filename, tape->ansi_type);
 sprintf (file_sequence, "%04d", 1 + tape->file_count);
 memcpy (hdr1.file_sequence, file_sequence, sizeof (hdr1.file_sequence));
-ansi_make_HDR2 (&hdr2, !lf_line_endings && !crlf_line_endings, tape->block_size, max_record_size);
-if (!lf_line_endings && !crlf_line_endings)
-    memcpy (&hdr3, HDR3_RMS_FIXED, sizeof (hdr3));
-else {
-    if (lf_line_endings)
-        memcpy (&hdr3, HDR3_RMS_STMLF, sizeof (hdr3));
-    else
-        memcpy (&hdr3, HDR3_RMS_STREAM, sizeof (hdr3));
+if (ansi->fixed_text)
+    max_record_size = 512;
+ansi_make_HDR2 (&hdr2, !lf_line_endings && !crlf_line_endings, tape->block_size, (tape->ansi_type > MTUF_F_ANSI) ? 512 : max_record_size, tape->ansi_type);
+
+if (!ansi->nohdr3) {               /* Need HDR3? */
+    if (!lf_line_endings && !crlf_line_endings)         /* Binary File? */
+        memcpy (&hdr3, ansi->hdr3_fixed, sizeof (hdr3));
+    else {                                              /* Text file */
+        if ((lf_line_endings) && !(ansi->fixed_text))
+            memcpy (&hdr3, ansi->hdr3_lf_line_endings, sizeof (hdr3));
+        else
+            memcpy (&hdr3, ansi->hdr3_crlf_line_endings, sizeof (hdr3));
+        }
     }
 ansi_tape_add_block (tape, (uint8 *)&hdr1, sizeof (hdr1));
-ansi_tape_add_block (tape, (uint8 *)&hdr2, sizeof (hdr2));
-ansi_tape_add_block (tape, (uint8 *)&hdr3, sizeof (hdr3));
-ansi_tape_add_block (tape, (uint8 *)&hdr4, sizeof (hdr4));
-ansi_tape_add_block (tape, NULL, 0);
+if (!ansi->nohdr2)
+    ansi_tape_add_block (tape, (uint8 *)&hdr2, sizeof (hdr2));
+if (!ansi->nohdr3)
+    ansi_tape_add_block (tape, (uint8 *)&hdr3, sizeof (hdr3));
+if ((0 != memcmp (hdr4.extra_name_used, "00", 2)) && !ansi->nohdr3 && !ansi->nohdr2)
+    ansi_tape_add_block (tape, (uint8 *)&hdr4, sizeof (hdr4));
+ansi_tape_add_block (tape, NULL, 0);        /* Tape Mark */
 rewind (f);
-block = (uint8 *)malloc (tape->block_size);
+block = (uint8 *)calloc (tape->block_size, 1);
 while (!feof(f) && !error) {
     size_t data_read = tape->block_size;
 
-    if (lf_line_endings || crlf_line_endings)
-        ansi_fill_text_buffer (f, (char *)block, tape->block_size);
+    if (lf_line_endings || crlf_line_endings)       /* text file? */
+        ansi_fill_text_buffer (f, (char *)block, tape->block_size, 
+                               crlf_line_endings ? ansi->skip_crlf_line_endings : ansi->skip_lf_line_endings, 
+                               ansi->fixed_text);
     else
         data_read = fread (block, 1, tape->block_size, f);
     if (data_read > 0)
@@ -4068,7 +4181,7 @@ while (!feof(f) && !error) {
     }
 fclose (f);
 free (block);
-ansi_tape_add_block (tape, NULL, 0);
+ansi_tape_add_block (tape, NULL, 0);        /* Tape Mark */
 memcpy (hdr1.type, "EOF", sizeof (hdr1.type));
 memcpy (hdr2.type, "EOF", sizeof (hdr2.type));
 memcpy (hdr3.type, "EOF", sizeof (hdr3.type));
@@ -4076,10 +4189,13 @@ memcpy (hdr4.type, "EOF", sizeof (hdr4.type));
 sprintf (block_count_string, "%06d", block_count);
 memcpy (hdr1.block_count, block_count_string, sizeof (hdr1.block_count));
 ansi_tape_add_block (tape, (uint8 *)&hdr1, sizeof (hdr1));
-ansi_tape_add_block (tape, (uint8 *)&hdr2, sizeof (hdr2));
-ansi_tape_add_block (tape, (uint8 *)&hdr3, sizeof (hdr3));
-ansi_tape_add_block (tape, (uint8 *)&hdr4, sizeof (hdr4));
-ansi_tape_add_block (tape, NULL, 0);
+if (!ansi->nohdr2)
+    ansi_tape_add_block (tape, (uint8 *)&hdr2, sizeof (hdr2));
+if (!ansi->nohdr3)
+    ansi_tape_add_block (tape, (uint8 *)&hdr3, sizeof (hdr3));
+if ((0 != memcmp (hdr4.extra_name_used, "00", 2)) && !ansi->nohdr3 && !ansi->nohdr2)
+    ansi_tape_add_block (tape, (uint8 *)&hdr4, sizeof (hdr4));
+ansi_tape_add_block (tape, NULL, 0);        /* Tape Mark */
 if (sim_switches & SWMASK ('V'))
     sim_messagef (SCPE_OK, "%17.17s%62.62s\n\t%d blocks of data\n", hdr1.file_ident, hdr4.extra_name, block_count);
 ++tape->file_count;
