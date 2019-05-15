@@ -494,11 +494,15 @@ static struct ansi_tape_parameters {
     const char          *hdr3_crlf_line_endings;/* HDR3 template for text with CRLF line ending files */
     int                 skip_lf_line_endings;
     int                 skip_crlf_line_endings;
+    t_bool              y2k_date_bug;
+    t_bool              zero_record_length;
+    char                record_format;
+    char                carriage_control;
     } ansi_args[] = {     /* code       nohdr2 nohdr3 fixed_text lvl hdr3 fir fuxed    hdr3 fir lf      hdr3 for crlf */
-        {"ANSI-VMS"      , "DECFILE11A", FALSE, FALSE, FALSE,    '3', HDR3_RMS_FIXED,  HDR3_RMS_STMLF,  HDR3_RMS_STREAM, 0, 0},
-        {"ANSI-RSX11"    , "DECFILE11A", FALSE, FALSE, FALSE,    '4', HDR3_RMS_FIXRSX, HDR3_RMS_VARRSX, HDR3_RMS_VARRSX, 1, 2},
-        {"ANSI-RT11"     , "DECRT11A",   TRUE,  TRUE,  TRUE,     '3', NULL,            NULL,            NULL,            0, 0},
-        {"ANSI-RSTS"     , "DECRSTS/E",  FALSE, TRUE,  TRUE,     '3', NULL,            NULL,            NULL,            0, 0},
+        {"ANSI-VMS"      , "DECFILE11A", FALSE, FALSE, FALSE,    '3', HDR3_RMS_FIXED,  HDR3_RMS_STMLF,  HDR3_RMS_STREAM, 0, 0, FALSE, FALSE, 0,   0},
+        {"ANSI-RSX11"    , "DECFILE11A", FALSE, FALSE, FALSE,    '4', HDR3_RMS_FIXRSX, HDR3_RMS_VARRSX, HDR3_RMS_VARRSX, 1, 2, FALSE, FALSE, 0,   0},
+        {"ANSI-RT11"     , "DECRT11A",   TRUE,  TRUE,  TRUE,     '3', NULL,            NULL,            NULL,            0, 0, FALSE, FALSE, 0,   0},
+        {"ANSI-RSTS"     , "DECRSTS/E",  FALSE, TRUE,  TRUE,     '3', NULL,            NULL,            NULL,            0, 0, TRUE,  TRUE,  'U', 'M'},
         {NULL}
     };
 
@@ -3840,15 +3844,20 @@ SIM_TEST(sim_tape_test_remove_tape_files (dptr->units, "TapeTestFile1"));
 return SCPE_OK;
 }
 
-static void ansi_date (time_t datetime, char date[6])
+static void ansi_date (time_t datetime, char date[6], t_bool y2k_date_bug)
     {
     struct tm *lt;
     char buf[20];
 
     lt = localtime (&datetime);
-    sprintf (buf, "%c%02d%03d", (lt->tm_year < 100) ? ' ' : '0' + (lt->tm_year/100 - 1), 
-                                lt->tm_year % 100, 
-                                lt->tm_yday + 1);
+    if (y2k_date_bug)
+        sprintf (buf, " %c%c%03d", '0' + (lt->tm_year / 10), 
+                                   '0' + (lt->tm_year % 10), 
+                                   lt->tm_yday + 1);
+    else
+        sprintf (buf, "%c%02d%03d", (lt->tm_year < 100) ? ' ' : '0' + (lt->tm_year/100 - 1), 
+                                    lt->tm_year % 100, 
+                                    lt->tm_yday + 1);
     memcpy (date, buf, 6);
     }
 
@@ -3926,7 +3935,7 @@ static void ansi_make_HDR1 (HDR1 *hdr1, VOL1 *vol, HDR4 *hdr4, const char *filen
     memcpy (hdr1->file_sequence, "0001", 4);
     memcpy (hdr1->generation_number, "0001", 4);    /* generation_number and version_number */
     memcpy (hdr1->version_number, "00", 2);         /* combine to produce VMS version # ;1 here */
-    ansi_date (statb.st_mtime, hdr1->creation_date);
+    ansi_date (statb.st_mtime, hdr1->creation_date, ansi_args[ansi_type].y2k_date_bug);
     memcpy (hdr1->expiration_date, " 00000", 6);
     memcpy (hdr1->block_count, "000000", 6);
     to_ansi_a (hdr1->system_code, ansi_args[ansi_type].system_code, sizeof (hdr1->system_code));
@@ -3936,22 +3945,18 @@ static void ansi_make_HDR1 (HDR1 *hdr1, VOL1 *vol, HDR4 *hdr4, const char *filen
 static void ansi_make_HDR2 (HDR2 *hdr, t_bool fixed_record, size_t block_size, size_t record_size, uint32 ansi_type)
     {
     char size[12];
+    struct ansi_tape_parameters *ansi = &ansi_args[ansi_type];
 
     memset (hdr, ' ', sizeof (*hdr));
     memcpy (hdr->type, "HDR", 3);
     hdr->num = '2';
-    hdr->record_format = (fixed_record ? 'F' : 'D');
+    hdr->record_format = ansi->record_format ? ansi->record_format : (fixed_record ? 'F' : 'D');
     sprintf (size, "%05d", (int)block_size);
     memcpy (hdr->block_length, size, sizeof (hdr->block_length));
-    sprintf (size, "%05d", (int)record_size);
+    sprintf (size, "%05d", (ansi->zero_record_length)? 0 : (int)record_size);
     memcpy (hdr->record_length, size, sizeof (hdr->record_length));
-    hdr->carriage_control = fixed_record ? 'M' : ' ';
+    hdr->carriage_control = ansi->carriage_control ? ansi->carriage_control : (fixed_record ? 'M' : ' ');
     memcpy (hdr->buffer_offset, "00", 2);
-    if (ansi_type == MTAT_F_RSTS) {
-        hdr->record_format = 'U';
-        memcpy (hdr->record_length, "00000", sizeof (hdr->record_length));
-        hdr->carriage_control = 'M';
-        }
     }
 
 static void ansi_fill_text_buffer (FILE *f, char *buf, size_t buf_size, size_t record_skip_ending, t_bool fixed_text)
@@ -4076,7 +4081,7 @@ long crlf_lines = 0;
 rewind (f);
 while (EOF != (chr = fgetc (f))) {
     ++pos;
-    if (!isprint (chr) && (!(chr == '\r')) && (!(chr == '\n')) && (!(chr == '\t')))
+    if (!isprint (chr) && (chr != '\r') && (chr != '\n') && (chr != '\t') && (chr != '\f'))
         ++non_print_chars;
     if (chr == '\r')
         last_cr = pos;
