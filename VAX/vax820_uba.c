@@ -258,8 +258,7 @@ if (ofs >= UBAMAP_OF) {                                 /* map? */
     if (idx >= UBA_NMAPR)                               /* valid? */
         return SCPE_NXM;
     *val = uba_map[idx] & UBAMAP_RD;
-    if (DEBUG_PRI (uba_dev, UBA_DEB_MRD))
-        fprintf (sim_deb, ">>UBA: map %d read, value = %X, PC = %X\n", idx, *val, fault_PC);
+    sim_debug (UBA_DEB_MRD, &uba_dev, "map %d read, value = %X, PC = %X\n", idx, *val, fault_PC);
     return SCPE_OK;
     }
 
@@ -364,8 +363,7 @@ switch (ofs) {                                          /* case on offset */
         return SCPE_NXM;
         }
 
-if (DEBUG_PRI (uba_dev, UBA_DEB_RRD))
-    fprintf (sim_deb, ">>UBA: reg %d read, value = %X\n", ofs, *val);
+sim_debug (UBA_DEB_RRD, &uba_dev, "reg %d read, value = %X, PC = %X\n", ofs, *val, fault_PC);
 return SCPE_OK;
 }
 
@@ -384,8 +382,7 @@ if (ofs >= UBAMAP_OF) {                                 /* map? */
     if (idx >= UBA_NMAPR)                               /* valid? */
         return SCPE_NXM;
     uba_map[idx] = val & UBAMAP_WR;
-    if (DEBUG_PRI (uba_dev, UBA_DEB_MWR))
-        fprintf (sim_deb, ">>UBA: map %d write, value = %X, PC = %X\n", idx, val, fault_PC);
+    sim_debug (UBA_DEB_MWR, &uba_dev, "map %d write, value = %X, PC = %X\n", idx, val, fault_PC);
     return SCPE_OK;
     }
 
@@ -452,8 +449,7 @@ switch (ofs) {                                          /* case on offset */
         return SCPE_NXM;
         }
 
-if (DEBUG_PRI (uba_dev, UBA_DEB_RWR))
-    fprintf (sim_deb, ">>UBA: reg %d write, value = %X\n", ofs, val);
+sim_debug (UBA_DEB_RWR, &uba_dev, "reg %d write, value = %X, PC = %X\n", ofs, val, fault_PC);
 return SCPE_OK;
 }
 
@@ -616,8 +612,7 @@ for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
     pbc = VA_PAGSIZE - VA_GETOFF (ma);                  /* left in page */
     if (pbc > (bc - i))                                  /* limit to rem xfr */
         pbc = bc - i;
-    if (DEBUG_PRI (uba_dev, UBA_DEB_XFR))
-        fprintf (sim_deb, ">>UBA: 8b read, ma = %X, bc = %X\n", ma, pbc);
+    sim_debug (UBA_DEB_XFR, &uba_dev, "8b read, ba = %X, ma = %X, bc = %X\n", ba, ma, pbc);
     if ((ma | pbc) & 3) {                               /* aligned LW? */
         for (j = 0; j < pbc; ma++, j++) {               /* no, do by bytes */
             *buf++ = ReadB (ma);
@@ -649,8 +644,7 @@ for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
     pbc = VA_PAGSIZE - VA_GETOFF (ma);                  /* left in page */
     if (pbc > (bc - i))                                 /* limit to rem xfr */
         pbc = bc - i;
-    if (DEBUG_PRI (uba_dev, UBA_DEB_XFR))
-        fprintf (sim_deb, ">>UBA: 16b read, ba = %X, ma = %X, bc = %X\n", ba, ma, pbc);
+    sim_debug (UBA_DEB_XFR, &uba_dev, "16b read, ba = %X, ma = %X, bc = %X\n", ba, ma, pbc);
     if ((ma | pbc) & 1) {                               /* aligned word? */
         for (j = 0; j < pbc; ma++, j++) {               /* no, do by bytes */
             if ((i + j) & 1) {                          /* odd byte? */
@@ -688,8 +682,7 @@ for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
     pbc = VA_PAGSIZE - VA_GETOFF (ma);                  /* left in page */
     if (pbc > (bc - i))                                 /* limit to rem xfr */
         pbc = bc - i;
-    if (DEBUG_PRI (uba_dev, UBA_DEB_XFR))
-        fprintf (sim_deb, ">>UBA: 8b write, ma = %X, bc = %X\n", ma, pbc);
+    sim_debug (UBA_DEB_XFR, &uba_dev, "8b write, ba = %X, ma = %X, bc = %X\n", ba, ma, pbc);
     if ((ma | pbc) & 3) {                               /* aligned LW? */
         for (j = 0; j < pbc; ma++, j++) {               /* no, do by bytes */
             WriteB (ma, *buf);
@@ -722,8 +715,7 @@ for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
     pbc = VA_PAGSIZE - VA_GETOFF (ma);                  /* left in page */
     if (pbc > (bc - i))                                 /* limit to rem xfr */
         pbc = bc - i;
-    if (DEBUG_PRI (uba_dev, UBA_DEB_XFR))
-        fprintf (sim_deb, ">>UBA: 16b write, ma = %X, bc = %X\n", ma, pbc);
+    sim_debug (UBA_DEB_XFR, &uba_dev, "16b write, ba = %X, ma = %X, bc = %X\n", ba, ma, pbc);
     if ((ma | pbc) & 1) {                               /* aligned word? */
         for (j = 0; j < pbc; ma++, j++) {               /* no, bytes */
             if ((i + j) & 1) {
@@ -818,7 +810,7 @@ if ((uba_csr & UBACSR_TO) == 0) {
     uba_adap_set_int ();
     }
 sim_debug (UBA_DEB_ERR, &uba_dev,
-    ">>UBA: nxm error, ua = %X, PC = %X\n", ua, fault_PC);
+    "nxm error, ua = %X, PC = %X\n", ua, fault_PC);
 return;
 }
 
@@ -830,7 +822,7 @@ if ((uba_biic.ber & BIBER_BTO) == 0) {
     uba_adap_set_int ();
     }
 sim_debug (UBA_DEB_ERR, &uba_dev,
-    ">>UBA: BI nxm error, ba = %X, PC = %X\n", ba, fault_PC);
+    "BI nxm error, ba = %X, PC = %X\n", ba, fault_PC);
 return;
 }
 
@@ -841,7 +833,7 @@ if ((uba_csr & UBACSR_IMR) == 0) {
     uba_adap_set_int ();
     }
 sim_debug (UBA_DEB_ERR, &uba_dev,
-    ">>UBA: inv map error, ublk = %X\n", ublk);
+    "inv map error, ublk = %X\n", ublk);
 return;
 }
 
@@ -886,7 +878,7 @@ void uba_adap_set_int ()
 if (uba_csr & UBACSR_EIE) {
     uba_int = 1;
     sim_debug (UBA_DEB_ERR, &uba_dev,
-        ">>UBA: adapter int req, csr = %X\n", uba_csr);
+        "adapter int req, csr = %X\n", uba_csr);
     }
 return;
 }
