@@ -932,12 +932,11 @@ while (reason == 0)  {
 
     reg_mods = 0;
     inst_pc = PC;
-    /* Save PSW also because condition codes need to be preserved.
-       We just save the whole PSW because that is sufficient (that
-       representation is up to date at this point).  If restoring is
-       needed, both the PSW and the components that need to be restored
-       are handled explicitly.  */
-    inst_psw = PSW;
+    /* Save PSW also because condition codes need to be preserved.  We
+       just save the whole PSW because that is sufficient.  If
+       restoring is needed, both the PSW and the components that need
+       to be restored are handled explicitly.  */
+    inst_psw = get_PSW ();
     saved_sim_interval = sim_interval;
     if (BPT_SUMM_PC) {                                  /* possible breakpoint */
         t_addr pa = relocR (PC | isenable);             /* relocate PC */
