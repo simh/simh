@@ -125,6 +125,26 @@
 #define BIID_RW         0x0000FFFF
 #define BIID_RD         BIID_RW
 
+/* VAXBI BCI control and status register */
+
+#define BIBCI_BE        0x00020000                      /* burst enable */
+#define BIBCI_IPI       0x00010000                      /* IPINTR/STOP */
+#define BIBCI_MCS       0x00008000                      /* multicast enable */
+#define BIBCI_BDC       0x00004000                      /* BDCST enable */
+#define BIBCI_STP       0x00002000                      /* STOP enable */
+#define BIBCI_RSE       0x00001000                      /* RESERVED enable */
+#define BIBCI_IDE       0x00000800                      /* IDENT enable */
+#define BIBCI_IVE       0x00000400                      /* INVAL enable */
+#define BIBCI_WRI       0x00000200                      /* WRITE invalidate enable */
+#define BIBCI_UCE       0x00000100                      /* user CSR space enable */
+#define BIBCI_BIE       0x00000080                      /* BIIC CSR space enable */
+#define BIBCI_INE       0x00000040                      /* INTR enable */
+#define BIBCI_IPE       0x00000020                      /* IPINTR enable */
+#define BIBCI_PEN       0x00000010                      /* pipeline next enable */
+#define BIBCI_RTO       0x00000008                      /* RTO EV enable */
+#define BIBCI_RW        0x0003FFF8
+#define BIBCI_RD        (BIBCI_RW)
+
 /* VAXBI user interface interrupt control register */
 
 #define BIICR_ABO       0xF0000000                      /* interrupt abort */

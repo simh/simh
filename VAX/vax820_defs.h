@@ -181,6 +181,7 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, CONST void* desc
 /* Node window space */
 
 #define WINAWIDTH       18                              /* VAXBI node window width */
+#define WINSIZE         (1u << WINAWIDTH)               /* VAXBI node window length */
 #define WINBASE         0x20400000                      /* VAXBI node window base */
 #define WINADDR(n)      (WINBASE + (n << WINAWIDTH))    /* node -> window addr */
 

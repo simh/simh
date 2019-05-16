@@ -291,17 +291,15 @@ switch (ofs) {                                          /* case on offset */
         break;
 
     case BI_SA:
-        *val = UBADDRBASE;
-        //*val = uba_biic.sa;
+        *val = uba_biic.sa;
         break;
 
     case BI_EA:
-        *val = UBADDRBASE + 0x40000;
-        //*val = uba_biic.ea;
+        *val = uba_biic.ea;
         break;
 
     case BI_BCIC:
-        *val = uba_biic.bcic;
+        *val = uba_biic.bcic & BIBCI_RD;
         break;
 
     case BI_UIIC:
@@ -389,11 +387,8 @@ if (ofs >= UBAMAP_OF) {                                 /* map? */
 switch (ofs) {                                          /* case on offset */
 
     case BI_CSR:
-        if (val & BICSR_RST) {                          /* unibus power init */
+        if (val & BICSR_RST)                            /* unibus power init */
             uba_reset (&uba_dev);                       /* reset adapter */
-            uba_aiip = 1;                               /* set init in prog */
-            uba_ubpdn (uba_aitime);                     /* power fail UB */
-            }
         uba_biic.csr = (uba_biic.csr & ~BICSR_RW) | (val & BICSR_RW);
         break;
 
@@ -408,6 +403,10 @@ switch (ofs) {                                          /* case on offset */
 
     case BI_IDEST:
         uba_biic.idest = val & BIID_RW;
+        break;
+
+    case BI_BCIC:
+        uba_biic.bcic = val & BIBCI_RW;
         break;
 
     case BI_UIIC:
@@ -468,7 +467,6 @@ if (ADDR_IS_IOP (pa)) {                                 /* iopage,!init */
     }
 uba_biic.ber = uba_biic.ber | BIBER_RDS;
 uba_ub_nxm (pa);                                        /* UB nxm */
-//MACH_CHECK (MCHK_BIERR);                               /* machine check */
 return 0;
 }
 
@@ -916,6 +914,8 @@ uba_biic.csr = (1u << BICSR_V_IF) | BICSR_STS | (TR_UBA & BICSR_NODE);
 uba_biic.ber = 0;
 uba_biic.eicr = 0;
 uba_biic.idest = 0;
+uba_biic.sa = UBADDRBASE;
+uba_biic.ea = UBADDRBASE + WINSIZE;
 uba_biic.uiic = BIICR_EXV;
 uba_biic.gpr0 = BIGPR0_UPU;
 return SCPE_OK;
