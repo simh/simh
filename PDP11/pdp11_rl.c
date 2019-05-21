@@ -1017,11 +1017,13 @@ t_stat rl_attach (UNIT *uptr, CONST char *cptr)
 {
 t_offset p;
 t_stat r;
+static const char *drives[] = {"RL01", "RL02", NULL};
 
 uptr->capac = (uptr->flags & UNIT_RL02)? RL02_SIZE: RL01_SIZE;
-r = sim_disk_attach (uptr, cptr, RL_NUMWD * sizeof (uint16), 
-                     sizeof (uint16), TRUE, 0, 
-                     (uptr->capac == RL02_SIZE) ? "RL02" : "RL01", RL_NUMSC, 0);
+r = sim_disk_attach_ex (uptr, cptr, RL_NUMWD * sizeof (uint16), 
+                        sizeof (uint16), TRUE, 0, 
+                        (uptr->capac == RL02_SIZE) ? "RL02" : "RL01", RL_NUMSC, 0,
+                        (uptr->flags & UNIT_AUTO) ? drives : NULL);
 if (r != SCPE_OK)                                       /* error? */
     return r;
 /*

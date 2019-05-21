@@ -759,6 +759,7 @@ const struct scp_error {
          {"REMOTE",  "remote console command"},
          {"INVEXPR", "invalid expression"},
          {"SIGTERM", "SIGTERM received"},
+         {"FSSIZE",  "File System size larger than disk size"},
     };
 
 const size_t size_map[] = { sizeof (int8),

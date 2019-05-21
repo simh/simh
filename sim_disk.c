@@ -1444,7 +1444,7 @@ for (part = 0; part < RT11_MAXPARTITIONS; part++) {
 
             dir_sec = Home.hb_w_firstdir + ((dir_seg - 1) * 2);
 
-            if (sim_disk_rdsect(uptr, (base + dir_sec) * (512 / ctx->sector_size), sector_buf, &sects_read, 1024 / ctx->sector_size) ||
+            if ((sim_disk_rdsect(uptr, (base + dir_sec) * (512 / ctx->sector_size), sector_buf, &sects_read, 1024 / ctx->sector_size)) ||
                 (sects_read != (1024 / ctx->sector_size)))
                 goto Return_Cleanup;
 
@@ -1544,6 +1544,12 @@ return ret_val;
 
 t_stat sim_disk_attach (UNIT *uptr, const char *cptr, size_t sector_size, size_t xfer_element_size, t_bool dontautosize,
                         uint32 dbit, const char *dtype, uint32 pdp11tracksize, int completion_delay)
+{
+return sim_disk_attach_ex (uptr, cptr, sector_size, xfer_element_size, dontautosize, dbit, dtype, pdp11tracksize, completion_delay, NULL);
+}
+
+t_stat sim_disk_attach_ex (UNIT *uptr, const char *cptr, size_t sector_size, size_t xfer_element_size, t_bool dontautosize,
+                           uint32 dbit, const char *dtype, uint32 pdp11tracksize, int completion_delay, const char **drivetypes)
 {
 struct disk_context *ctx;
 DEVICE *dptr;
@@ -1976,16 +1982,34 @@ if (container_size && (container_size != (t_offset)-1)) {
     if (dontautosize) {
         t_addr saved_capac = uptr->capac;
 
-        if ((filesystem_size != (t_offset)-1) &&
-            (filesystem_size > current_unit_size)) {
-            if (!sim_quiet) {
-                uptr->capac = (t_addr)(filesystem_size/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
-                sim_printf ("%s%d: The file system on the disk %s is larger than simulated device (%s > ", sim_dname (dptr), (int)(uptr-dptr->units), cptr, sprint_capac (dptr, uptr));
-                uptr->capac = saved_capac;
-                sim_printf ("%s)\n", sprint_capac (dptr, uptr));
+        if (filesystem_size != (t_offset)-1) {
+            const char *drive_type = NULL;
+
+            while ((filesystem_size > current_unit_size) &&
+                   ((drivetypes ? *drivetypes : NULL) != NULL)) {
+                char cmd[CBUFSIZE];
+                t_stat st;
+
+                uptr->flags &= ~UNIT_ATT;   /* temporarily mark as un-attached */
+                drive_type = *drivetypes;
+                sprintf (cmd, "%s %s", sim_uname (uptr), *drivetypes);
+                st = set_cmd (0, cmd);
+                uptr->flags |= UNIT_ATT;    /* restore attached indicator */
+                if (st == SCPE_OK) {
+                    current_unit_size = ((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1);
+                    ++drivetypes;                           /* next type */
+                    }
                 }
-            sim_disk_detach (uptr);
-            return SCPE_OPENERR;
+            if (filesystem_size > current_unit_size) {
+                if (!sim_quiet) {
+                    uptr->capac = (t_addr)(filesystem_size/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
+                    sim_printf ("%s%d: The file system on the disk %s is larger than simulated device (%s > ", sim_dname (dptr), (int)(uptr-dptr->units), cptr, sprint_capac (dptr, uptr));
+                    uptr->capac = saved_capac;
+                    sim_printf ("%s)\n", sprint_capac (dptr, uptr));
+                    }
+                sim_disk_detach (uptr);
+                return SCPE_FSSIZE;
+                }
             }
         if ((container_size < current_unit_size) && 
             ((DKUF_F_VHD == DK_GET_FMT (uptr)) || (0 != (uptr->flags & UNIT_RO)))) {

@@ -1497,11 +1497,13 @@ uint32 drv;
 t_offset p;
 t_stat r;
 int32 old_hkds;
+static const char *drives[] = {"RK06", "RK07", NULL};
 
 uptr->capac = HK_SIZE (uptr);
-r = sim_disk_attach (uptr, cptr, HK_NUMWD * sizeof (uint16), 
-                     sizeof (uint16), TRUE, 0, 
-                     (uptr->capac == RK06_SIZE) ? "RK06" : "RK07", HK_NUMSC, 0);
+r = sim_disk_attach_ex (uptr, cptr, HK_NUMWD * sizeof (uint16), 
+                        sizeof (uint16), TRUE, 0, 
+                        (uptr->capac == RK06_SIZE) ? "RK06" : "RK07", HK_NUMSC, 0,
+                        (uptr->flags & UNIT_AUTO) ? drives : NULL);
 if (r != SCPE_OK)                                       /* error? */
     return r;
 drv = (uint32) (uptr - hk_dev.units);                   /* get drv number */
