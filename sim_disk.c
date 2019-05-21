@@ -1119,13 +1119,15 @@ ODS2_SCB Scb;
 uint16 CheckSum1, CheckSum2;
 uint32 ScbLbn = 0;
 t_offset ret_val = (t_offset)-1;
+t_seccnt sects_read;
 
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return ret_val;
 capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* save capacity units (word: 2, byte: 1) */
 saved_capac = uptr->capac;
 uptr->capac = (t_addr)(temp_capac/(capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
-if (sim_disk_rdsect (uptr, 512 / ctx->sector_size, (uint8 *)&Home, NULL, sizeof (Home) / ctx->sector_size))
+if ((sim_disk_rdsect (uptr, 512 / ctx->sector_size, (uint8 *)&Home, &sects_read, sizeof (Home) / ctx->sector_size)) ||
+    (sects_read != (sizeof (Home) / ctx->sector_size)))
     goto Return_Cleanup;
 CheckSum1 = ODSChecksum (&Home, (uint16)((((char *)&Home.hm2_w_checksum1)-((char *)&Home.hm2_l_homelbn))/2));
 CheckSum2 = ODSChecksum (&Home, (uint16)((((char *)&Home.hm2_w_checksum2)-((char *)&Home.hm2_l_homelbn))/2));
@@ -1145,8 +1147,9 @@ if ((Home.hm2_l_homelbn == 0) ||
     (Home.hm2_w_checksum1 != CheckSum1) ||
     (Home.hm2_w_checksum2 != CheckSum2))
     goto Return_Cleanup;
-if (sim_disk_rdsect (uptr, (Home.hm2_l_ibmaplbn+Home.hm2_w_ibmapsize+1) * (512 / ctx->sector_size), 
-                           (uint8 *)&Header, NULL, sizeof (Header) / ctx->sector_size))
+if ((sim_disk_rdsect (uptr, (Home.hm2_l_ibmaplbn+Home.hm2_w_ibmapsize+1) * (512 / ctx->sector_size), 
+                            (uint8 *)&Header, &sects_read, sizeof (Header) / ctx->sector_size)) || 
+    (sects_read != (sizeof (Header) / ctx->sector_size)))
     goto Return_Cleanup;
 CheckSum1 = ODSChecksum (&Header, 255);
 if (CheckSum1 != *(((uint16 *)&Header)+255)) /* Verify Checksum on BITMAP.SYS file header */
@@ -1168,7 +1171,8 @@ switch (Retr->fm2_r_word0_bits.fm2_v_format)
         break;
     }
 Retr = (ODS2_Retreval *)(((uint16 *)Retr)+Retr->fm2_r_word0_bits.fm2_v_format+1);
-if (sim_disk_rdsect (uptr, ScbLbn * (512 / ctx->sector_size), (uint8 *)&Scb, NULL, sizeof (Scb) / ctx->sector_size))
+if ((sim_disk_rdsect (uptr, ScbLbn * (512 / ctx->sector_size), (uint8 *)&Scb, &sects_read, sizeof (Scb) / ctx->sector_size)) ||
+    (sects_read != (sizeof (Scb) / ctx->sector_size)))
     goto Return_Cleanup;
 CheckSum1 = ODSChecksum (&Scb, 255);
 if (CheckSum1 != *(((uint16 *)&Scb)+255)) /* Verify Checksum on Storage Control Block */
@@ -1203,13 +1207,15 @@ ODS1_SCB *Scb = (ODS1_SCB *)scb_buf;
 uint16 CheckSum1, CheckSum2;
 uint32 ScbLbn;
 t_offset ret_val = (t_offset)-1;
+t_seccnt sects_read;
 
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return ret_val;
 capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* save capacity units (word: 2, byte: 1) */
 saved_capac = uptr->capac;
 uptr->capac = (t_addr)(temp_capac/(capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
-if (sim_disk_rdsect (uptr, 512 / ctx->sector_size, (uint8 *)&Home, NULL, sizeof (Home) / ctx->sector_size))
+if ((sim_disk_rdsect (uptr, 512 / ctx->sector_size, (uint8 *)&Home, &sects_read, sizeof (Home) / ctx->sector_size)) ||
+    (sects_read != (sizeof (Home) / ctx->sector_size)))
     goto Return_Cleanup;
 CheckSum1 = ODSChecksum (&Home, (uint16)((((char *)&Home.hm1_w_checksum1)-((char *)&Home.hm1_w_ibmapsize))/2));
 CheckSum2 = ODSChecksum (&Home, (uint16)((((char *)&Home.hm1_w_checksum2)-((char *)&Home.hm1_w_ibmapsize))/2));
@@ -1222,8 +1228,9 @@ if ((Home.hm1_w_ibmapsize == 0) ||
     (Home.hm1_w_checksum1 != CheckSum1) ||
     (Home.hm1_w_checksum2 != CheckSum2))
     goto Return_Cleanup;
-if (sim_disk_rdsect (uptr, (((Home.hm1_l_ibmaplbn << 16) + ((Home.hm1_l_ibmaplbn >> 16) & 0xFFFF)) + Home.hm1_w_ibmapsize + 1) * (512 / ctx->sector_size),
-                           (uint8 *)&Header, NULL, sizeof (Header) / ctx->sector_size))
+if ((sim_disk_rdsect (uptr, (((Home.hm1_l_ibmaplbn << 16) + ((Home.hm1_l_ibmaplbn >> 16) & 0xFFFF)) + Home.hm1_w_ibmapsize + 1) * (512 / ctx->sector_size),
+                            (uint8 *)&Header, &sects_read, sizeof (Header) / ctx->sector_size)) ||
+    (sects_read != (sizeof (Header) / ctx->sector_size)))
     goto Return_Cleanup;
 CheckSum1 = ODSChecksum (&Header, 255);
 if (CheckSum1 != *(((uint16 *)&Header)+255)) /* Verify Checksum on BITMAP.SYS file header */
@@ -1231,7 +1238,8 @@ if (CheckSum1 != *(((uint16 *)&Header)+255)) /* Verify Checksum on BITMAP.SYS fi
 
 Retr = (ODS1_Retreval *)(((uint16*)(&Header))+Header.fh1_b_mpoffset);
 ScbLbn = (Retr->fm1_pointers[0].fm1_s_fm1def1.fm1_b_highlbn<<16)+Retr->fm1_pointers[0].fm1_s_fm1def1.fm1_w_lowlbn;
-if (sim_disk_rdsect (uptr, ScbLbn * (512 / ctx->sector_size), (uint8 *)Scb, NULL, 512 / ctx->sector_size))
+if ((sim_disk_rdsect (uptr, ScbLbn * (512 / ctx->sector_size), (uint8 *)Scb, &sects_read, 512 / ctx->sector_size)) ||
+    (sects_read != (512 / ctx->sector_size)))
     goto Return_Cleanup;
 if (Scb->scb_b_bitmapblks < 127)
     ret_val = (((t_offset)Scb->scb_r_blocks[Scb->scb_b_bitmapblks].scb_w_freeblks << 16) + Scb->scb_r_blocks[Scb->scb_b_bitmapblks].scb_w_freeptr) * 512;
@@ -1273,13 +1281,15 @@ ultrix_disklabel *Label = (ultrix_disklabel *)(sector_buf + sizeof (sector_buf) 
 t_offset ret_val = (t_offset)-1;
 int i;
 uint32 max_lbn = 0, max_lbn_partnum = 0;
+t_seccnt sects_read;
 
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return ret_val;
 capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* save capacity units (word: 2, byte: 1) */
 saved_capac = uptr->capac;
 uptr->capac = (t_addr)(temp_capac/(capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
-if (sim_disk_rdsect (uptr, 31 * (512 / ctx->sector_size), sector_buf, NULL, 512 / ctx->sector_size))
+if ((sim_disk_rdsect (uptr, 31 * (512 / ctx->sector_size), sector_buf, &sects_read, 512 / ctx->sector_size)) ||
+    (sects_read != (512 / ctx->sector_size)))
     goto Return_Cleanup;
 
 if ((Label->pt_magic != PT_MAGIC) || 
@@ -1387,6 +1397,7 @@ t_offset temp_capac = 512 * (t_offset)0xFFFFFFFFu;
 uint32 capac_factor;
 uint8 sector_buf[1024];
 RT11_HomeBlock Home;
+t_seccnt sects_read;
 RT11_DirHeader *dir_hdr = (RT11_DirHeader *)sector_buf;
 int partitions = 0;
 int part;
@@ -1408,7 +1419,8 @@ for (part = 0; part < RT11_MAXPARTITIONS; part++) {
 
     base = part << 16;
 
-    if (sim_disk_rdsect(uptr, (base + RT11_HOME) * (512 / ctx->sector_size), (uint8 *)&Home, NULL, 512 / ctx->sector_size))
+    if (sim_disk_rdsect(uptr, (base + RT11_HOME) * (512 / ctx->sector_size), (uint8 *)&Home, &sects_read, 512 / ctx->sector_size) ||
+        (sects_read != (512 / ctx->sector_size)))
         goto Return_Cleanup;
 
     type = rt11_get_partition_type(&Home, part);
@@ -1432,7 +1444,8 @@ for (part = 0; part < RT11_MAXPARTITIONS; part++) {
 
             dir_sec = Home.hb_w_firstdir + ((dir_seg - 1) * 2);
 
-            if (sim_disk_rdsect(uptr, (base + dir_sec) * (512 / ctx->sector_size), sector_buf, NULL, 1024 / ctx->sector_size))
+            if (sim_disk_rdsect(uptr, (base + dir_sec) * (512 / ctx->sector_size), sector_buf, &sects_read, 1024 / ctx->sector_size) ||
+                (sects_read != (1024 / ctx->sector_size)))
                 goto Return_Cleanup;
 
             if (dir_seg == 1) {
@@ -1615,20 +1628,25 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
             return SCPE_MEM;
             }
         for (lba = 0; (lba < total_sectors) && (r == SCPE_OK); lba += sects) {
+            t_seccnt sects_read;
+
             sim_messagef (SCPE_OK, "%s%d: Copied %dMB.  %d%% complete.\r", sim_dname (dptr), (int)(uptr-dptr->units), (int)((((float)lba)*sector_size)/1000000), (int)((((float)lba)*100)/total_sectors));
             sects = sectors_per_buffer;
             if (lba + sects > total_sectors)
                 sects = total_sectors - lba;
-            r = sim_disk_rdsect (uptr, lba, copy_buf, NULL, sects);
-            if (r == SCPE_OK) {
+            r = sim_disk_rdsect (uptr, lba, copy_buf, &sects_read, sects);
+            if ((r == SCPE_OK) && (sects_read > 0)) {
                 uint32 saved_unit_flags = uptr->flags;
                 FILE *save_unit_fileref = uptr->fileref;
+                t_seccnt sects_written;
 
                 sim_disk_set_fmt (uptr, 0, "VHD", NULL);
                 uptr->fileref = vhd;
-                r = sim_disk_wrsect (uptr, lba, copy_buf, NULL, sects);
+                r = sim_disk_wrsect (uptr, lba, copy_buf, &sects_written, sects_read);
                 uptr->fileref = save_unit_fileref;
                 uptr->flags = saved_unit_flags;
+                if (sects_read != sects_written)
+                    r = SCPE_IOERR;
                 }
             }
         if (r == SCPE_OK)
@@ -2818,7 +2836,7 @@ _set_errno_from_status (GetLastError ());
 return SCPE_IOERR;
 }
 
-#elif defined (__linux) || defined (__linux__) || defined (__sun) || defined (__sun__) || defined (__hpux) || defined (_AIX)
+#elif defined (__linux) || defined (__linux__) || defined (__APPLE__)|| defined (__sun) || defined (__sun__) || defined (__hpux) || defined (_AIX)
 
 #include <sys/types.h>
 #include <sys/stat.h>
