@@ -632,7 +632,7 @@ tcp_listen(Slirp *slirp, uint32_t haddr, u_int hport, uint32_t laddr,
             (listen(s,1) == SOCKET_ERROR)) {
                 int tmperrno = errno; /* Don't clobber the real reason we failed */
 
-                if (s != -1)
+                if (s != SOCKET_ERROR)
                     closesocket(s);
                 sofree(so);
                 fprintf (stderr, "Socket Error %d", tmperrno);
