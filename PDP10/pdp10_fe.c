@@ -191,8 +191,9 @@ t_stat fei_svc (UNIT *uptr)
 {
 int32 temp;
 
+temp = sim_poll_kbd ();                                 /* get possible char or error? */
 sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
-if ((temp = sim_poll_kbd ()) < SCPE_KFLAG)              /* no char or error? */
+if (temp < SCPE_KFLAG)                                  /* no char or error? */
     return temp;
 if (temp & SCPE_BREAK)                                  /* ignore break */
     return SCPE_OK;
@@ -288,7 +289,7 @@ return SCPE_OK;
 
 t_stat fe_reset (DEVICE *dptr)
 {
-tmxr_set_console_units (&fe_unit[0], &fe_unit[1]);
+tmxr_set_console_units (&fei_unit, &feo_unit);
 fei_unit.buf = feo_unit.buf = 0;
 
 M[FE_CTYIN] = M[FE_CTYOUT] = 0;
