@@ -3284,6 +3284,21 @@ void cpu_idle (void)
 sim_idle (TMR_CLK, TRUE);
 }
 
+/*
+ * This sequence of instructions is a mix that mimics
+ * a resonable instruction set that is a close estimate
+ * to the calibrated result without a direct "loop to 
+ * self" instruction that would halt simulation.
+ */
+
+static const char *vax_clock_precalibrate_commands[] = {
+    "-m 100 INCL  120",
+    "-m 103 INCL  124",
+    "-m 106 MULL3 120,124,128",
+    "-m 10D BRW   100",
+    "PC 100",
+    NULL};
+
 /* Reset */
 
 t_stat cpu_reset (DEVICE *dptr)
@@ -3299,6 +3314,7 @@ FLUSH_ISTR;                             /* init I-stream */
 if (M == NULL) {                        /* first time init? */
     sim_brk_types = sim_brk_dflt = SWMASK ('E');
     sim_vm_is_subroutine_call = cpu_is_pc_a_subroutine_call;
+    sim_clock_precalibrate_commands = vax_clock_precalibrate_commands;
     pcq_r = find_reg ("PCQ", NULL, dptr);
     if (pcq_r == NULL)
         return SCPE_IERR;

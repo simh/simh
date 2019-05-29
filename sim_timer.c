@@ -788,6 +788,7 @@ t_stat sim_throt_svc (UNIT *uptr);
 t_stat sim_timer_tick_svc (UNIT *uptr);
 t_stat sim_timer_stop_svc (UNIT *uptr);
 
+
 #define DBG_IDL       TIMER_DBG_IDLE        /* idling */
 #define DBG_QUE       TIMER_DBG_QUEUE       /* queue activities */
 #define DBG_MUX       TIMER_DBG_MUX         /* tmxr queue activities */
@@ -3208,4 +3209,48 @@ return sim_rom_delay;
 void sim_set_rom_delay_factor (uint32 delay)
 {
 sim_rom_delay = delay;
+}
+
+/* sim_timer_precalibrate_execution_rate
+ *
+ * The point of this routine is to run a bunch of simulator provided
+ * instructions that don't do anything, but run in an effective loop.
+ * That loop is run for some 5 million instructions and based on 
+ * the time those 5 million instructions take to execute the effective
+ * execution rate.  That rate is used to avoid the initial 3 to 5 
+ * seconds that normal clock calibration takes.
+ *
+ */
+void sim_timer_precalibrate_execution_rate (void)
+{
+const char **cmd = sim_clock_precalibrate_commands;
+uint32 start, end;
+double ips_rate;
+int32 saved_switches = sim_switches;
+int32 tmr;
+UNIT precalib_unit = { UDATA (&sim_timer_stop_svc, 0, 0) };
+
+if (cmd == NULL)
+    return;
+sim_run_boot_prep (RU_GO);
+while (sim_clock_queue != QUEUE_LIST_END)
+    sim_cancel (sim_clock_queue);
+while (*cmd)
+     exdep_cmd (EX_D, *(cmd++));
+sim_switches = saved_switches;
+sim_cancel (&SIM_INTERNAL_UNIT);
+sim_activate (&precalib_unit, SIM_INITIAL_IPS);
+start = sim_os_msec();
+sim_instr();
+end = sim_os_msec();
+ips_rate = 1000.0 * (SIM_INITIAL_IPS / (double)(end - start));
+
+for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
+    if (rtc_hz[tmr])
+        rtc_initd[tmr] = rtc_currd[tmr] = (int32)(ips_rate / rtc_hz[tmr]);
+    }
+reset_all_p (0);
+sim_run_boot_prep (RU_GO);
+if (sim_switches & SWMASK ('V'))
+    sim_printf ("Pre-Calibrate execution rate: %s cycles/sec\n", sim_fmt_numeric (ips_rate));
 }

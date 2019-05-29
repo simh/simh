@@ -3338,6 +3338,19 @@ else if (CPUT (HAS_STKLR)) {                            /* register limit? */
 return;                                                 /* no stack limit */
 }
 
+/*
+ * This sequence of instructions is a mix that mimics
+ * a resonable instruction set that is a close estimate
+ * to the normal calibrated result.
+ */
+
+static const char *pdp11_clock_precalibrate_commands[] = {
+    "-m 100 INC 120",
+    "-m 104 INC 122",
+    "-m 110 BR  100",
+    "PC 100",
+    NULL};
+
 /* Reset routine */
 
 t_stat cpu_reset (DEVICE *dptr)
@@ -3365,6 +3378,7 @@ if (M == NULL) {                    /* First time init */
                     SWMASK ('W')|SWMASK ('X');
     sim_brk_type_desc = cpu_breakpoints;
     sim_vm_is_subroutine_call = &cpu_is_pc_a_subroutine_call;
+    sim_clock_precalibrate_commands = pdp11_clock_precalibrate_commands;
     auto_config(NULL, 0);           /* do an initial auto configure */
     }
 pcq_r = find_reg ("PCQ", NULL, dptr);

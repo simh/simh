@@ -2347,6 +2347,19 @@ pi_eval ();                                             /* eval pi system */
 return;
 }
 
+/*
+ * This sequence of instructions is a mix that hopefully
+ * represents a resonable instruction set that is a close 
+ * estimate to the normal calibrated result.
+ */
+
+static const char *pdp10_clock_precalibrate_commands[] = {
+    "-m 100 ADDM 0,110",
+    "-m 101 ADDI 0,1",
+    "-m 102 JRST 100",
+    "PC 100",
+    NULL};
+
 /* Reset routine */
 
 t_stat cpu_reset (DEVICE *dptr)
@@ -2368,10 +2381,12 @@ if (M == NULL)
     return SCPE_MEM;
 sim_vm_pc_value = &pdp10_pc_value;
 sim_vm_is_subroutine_call = &cpu_is_pc_a_subroutine_call;
+sim_clock_precalibrate_commands = pdp10_clock_precalibrate_commands;
 pcq_r = find_reg ("PCQ", NULL, dptr);
 if (pcq_r)
     pcq_r->qptr = 0;
-else return SCPE_IERR;
+else
+    return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
 }

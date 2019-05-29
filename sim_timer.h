@@ -76,7 +76,7 @@ int clock_gettime(int clock_id, struct timespec *tp);
 #define SIM_NTIMERS     8                           /* # timers */
 #define SIM_TMAX        500                         /* max timer makeup */
 
-#define SIM_INITIAL_IPS 500000                      /* uncalibrated assumption */
+#define SIM_INITIAL_IPS 5000000                     /* uncalibrated assumption */
                                                     /* about instructions per second */
 
 #define SIM_IDLE_CAL    10                          /* ms to calibrate */
@@ -145,6 +145,7 @@ t_stat sim_clock_coschedule_abs (UNIT *uptr, int32 interval);
 t_stat sim_clock_coschedule_tmr (UNIT *uptr, int32 tmr, int32 ticks);
 t_stat sim_clock_coschedule_tmr_abs (UNIT *uptr, int32 tmr, int32 ticks);
 double sim_timer_inst_per_sec (void);
+void sim_timer_precalibrate_execution_rate (void);
 int32 sim_rtcn_tick_size (int32 tmr);
 int32 sim_rtcn_calibrated_tmr (void);
 t_bool sim_timer_idle_capable (uint32 *host_ms_sleep_1, uint32 *host_tick_ms);

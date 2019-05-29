@@ -451,6 +451,8 @@ t_addr (*sim_vm_parse_addr) (DEVICE *dptr, CONST char *cptr, CONST char **tptr) 
 t_value (*sim_vm_pc_value) (void) = NULL;
 t_bool (*sim_vm_is_subroutine_call) (t_addr **ret_addrs) = NULL;
 t_bool (*sim_vm_fprint_stopped) (FILE *st, t_stat reason) = NULL;
+const char **sim_clock_precalibrate_commands = NULL;
+
 
 /* Prototypes */
 
@@ -2594,6 +2596,7 @@ if (!sim_quiet) {
     printf ("\n");
     show_version (stdout, NULL, NULL, 0, NULL);
     }
+sim_timer_precalibrate_execution_rate ();
 show_version (stdnul, NULL, NULL, 1, NULL);             /* Quietly set SIM_OSTYPE */
 #if defined (HAVE_PCREPOSIX_H)
 setenv ("SIM_REGEX_TYPE", "PCREPOSIX", 1);              /* Publish regex type */
