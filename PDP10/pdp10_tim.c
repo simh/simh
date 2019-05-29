@@ -340,10 +340,10 @@ if (cpu_unit.flags & UNIT_KLAD) {                       /* diags? */
     sim_activate (uptr, tmr_poll);                          /* reactivate unit */
     }
 else {
-    tmr_poll = sim_rtc_calb (clk_tps);                  /* else calibrate */
     sim_activate_after (uptr, 1000000/clk_tps);         /* reactivate unit */
+    tmr_poll = sim_activate_time (uptr) - 1;
     }
-tmxr_poll = tmr_poll * tim_mult;                        /* set mux poll */
+tmxr_poll = (int32)(sim_timer_inst_per_sec () / clk_tps);/* set mux poll */
 tim_incr_base (tim_base, tim_period);                   /* incr time base based on period of expired interval */
 tim_period = tim_new_period;                            /* If interval has changed, update period */
 apr_flg = apr_flg | APRF_TIM;                           /* request interrupt */
@@ -373,7 +373,6 @@ return;
 static t_stat tim_reset (DEVICE *dptr)
 {
 sim_debug (DEB_TRC, &tim_dev, "tim_reset()\n");
-sim_register_clock_unit (&tim_unit);                    /* declare clock unit */
 
 tim_base[0] = tim_base[1] = 0;                          /* clear timebase (HW does) */
 /* HW does not initialize the interval timer, so the rate at which the timer flag
@@ -391,10 +390,10 @@ tim_interval = 0;
 clk_tps = 60;
 sim_debug (DEB_TPS, &tim_dev, "tim_reset() - clk_tps set to %d\n", clk_tps);
 update_interval(17*4096);
+tmr_poll = (int32)(20000 * ((double)sim_rand () / (double)RAND_MAX));
 
 apr_flg = apr_flg & ~APRF_TIM;                          /* clear interrupt */
 
-tmr_poll = sim_rtc_init (tim_unit.wait);                /* init timer */
 sim_activate (&tim_unit, tmr_poll);                     /* activate unit */
 tmxr_poll = tmr_poll * tim_mult;                        /* set mux poll */
 return SCPE_OK;
