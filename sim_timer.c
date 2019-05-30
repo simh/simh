@@ -972,18 +972,20 @@ if (delta_rtime > 30000) {                              /* gap too big? */
     sim_debug (DBG_CAL, &sim_timer_dev, "gap too big: delta = %d - result: %d\n", delta_rtime, rtc_currd[tmr]);
     return rtc_currd[tmr];                              /* can't calibr */
     }
-if (delta_rtime == 0)                                   /* avoid divide by zero  */
-    last_idle_pct = 0;                                  /* force calibration */
-else
-    last_idle_pct = MIN(100, (uint32)(100.0 * (((double)(rtc_clock_time_idled[tmr] - rtc_clock_time_idled_last[tmr])) / ((double)delta_rtime))));
-rtc_clock_time_idled_last[tmr] = rtc_clock_time_idled[tmr];
-if (last_idle_pct > (100 - sim_idle_calib_pct)) {
-    rtc_rtime[tmr] = new_rtime;                         /* save wall time */
-    rtc_vtime[tmr] = rtc_vtime[tmr] + 1000;             /* adv sim time */
-    rtc_gtime[tmr] = sim_gtime();                       /* save instruction time */
-    ++rtc_clock_calib_skip_idle[tmr];
-    sim_debug (DBG_CAL, &sim_timer_dev, "skipping calibration due to idling (%d%%) - result: %d\n", last_idle_pct, rtc_currd[tmr]);
-    return rtc_currd[tmr];                              /* avoid calibrating idle checks */
+if (tmr != SIM_NTIMERS) {
+    if (delta_rtime == 0)                               /* avoid divide by zero  */
+        last_idle_pct = 0;                              /* force calibration */
+    else
+        last_idle_pct = MIN(100, (uint32)(100.0 * (((double)(rtc_clock_time_idled[tmr] - rtc_clock_time_idled_last[tmr])) / ((double)delta_rtime))));
+    rtc_clock_time_idled_last[tmr] = rtc_clock_time_idled[tmr];
+    if (last_idle_pct > (100 - sim_idle_calib_pct)) {
+        rtc_rtime[tmr] = new_rtime;                     /* save wall time */
+        rtc_vtime[tmr] = rtc_vtime[tmr] + 1000;         /* adv sim time */
+        rtc_gtime[tmr] = sim_gtime();                   /* save instruction time */
+        ++rtc_clock_calib_skip_idle[tmr];
+        sim_debug (DBG_CAL, &sim_timer_dev, "skipping calibration due to idling (%d%%) - result: %d\n", last_idle_pct, rtc_currd[tmr]);
+        return rtc_currd[tmr];                          /* avoid calibrating idle checks */
+        }
     }
 new_gtime = sim_gtime();
 if ((last_idle_pct == 0) && (delta_rtime != 0)) {
