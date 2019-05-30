@@ -226,7 +226,7 @@ void iccs_wr (int32 data)
 {
 if ((data & CSR_IE) == 0)
     CLR_INT (CLK);
-if ((clk_csr & CSR_DONE) && (data & CSR_DONE))          /* Interrupt Acked? */
+if (data & CSR_DONE)                                    /* Interrupt Acked? */
     sim_rtcn_tick_ack (20, TMR_CLK);                    /* Let timers know */
 clk_csr = (clk_csr & ~CLKCSR_RW) | (data & CLKCSR_RW);
 return;

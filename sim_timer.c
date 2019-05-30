@@ -1548,7 +1548,7 @@ if ((!sim_idle_enab)                             ||     /* idling disabled */
     sim_interval -= sin_cyc;
     return FALSE;
     }
-if (_rtcn_tick_catchup_check(tmr, 0)) {
+if (_rtcn_tick_catchup_check (tmr, -1)) {
     sim_debug (DBG_CAL, &sim_timer_dev, "sim_idle(tmr=%d, sin_cyc=%d) - rescheduling catchup tick for %s\n", tmr, sin_cyc, sim_uname (sim_clock_unit[tmr]));
     sim_interval -= sin_cyc;
     return FALSE;
@@ -2104,6 +2104,9 @@ clock_gettime (CLOCK_REALTIME, now);
  *
  * catchup ticks are only scheduled (eligible to happen) under these 
  * conditions after at least one tick has been acknowledged.
+ *
+ * The clock tick UNIT that will be scheduled to run for catchup ticks
+ * must be specified with sim_rtcn_init_unit().
  */
 
 /* _rtcn_tick_catchup_check - idle simulator until next event or for specified interval
@@ -2120,8 +2123,7 @@ static t_bool _rtcn_tick_catchup_check (int32 tmr, int32 time)
 if ((!sim_catchup_ticks) || 
     ((tmr < 0) || (tmr >= SIM_NTIMERS)))
     return FALSE;
-if ((rtc_hz[tmr] > sim_os_tick_hz) &&           /* faster than host tick */
-    (!rtc_clock_catchup_eligible[tmr]) &&       /* not eligible yet? */
+if ((!rtc_clock_catchup_eligible[tmr]) &&       /* not eligible yet? */
     (time != -1)) {                             /* called from ack? */
     rtc_clock_catchup_base_time[tmr] = sim_timenow_double();
     rtc_clock_ticks_tot[tmr] += rtc_clock_ticks[tmr];
