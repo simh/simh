@@ -738,28 +738,28 @@ else
 
 /* OS independent clock calibration package */
 
-static int32 rtc_ticks[SIM_NTIMERS+1] = { 0 };            /* ticks */
-static uint32 rtc_hz[SIM_NTIMERS+1] = { 0 };              /* tick rate */
-static uint32 rtc_last_hz[SIM_NTIMERS+1] = { 0 };         /* prior tick rate */
-static uint32 rtc_rtime[SIM_NTIMERS+1] = { 0 };           /* real time */
-static uint32 rtc_vtime[SIM_NTIMERS+1] = { 0 };           /* virtual time */
-static double rtc_gtime[SIM_NTIMERS+1] = { 0 };           /* instruction time */
-static uint32 rtc_nxintv[SIM_NTIMERS+1] = { 0 };          /* next interval */
-static int32 rtc_based[SIM_NTIMERS+1] = { 0 };            /* base delay */
-static int32 rtc_currd[SIM_NTIMERS+1] = { 0 };            /* current delay */
-static int32 rtc_initd[SIM_NTIMERS+1] = { 0 };            /* initial delay */
-static uint32 rtc_elapsed[SIM_NTIMERS+1] = { 0 };         /* sec since init */
-static uint32 rtc_calibrations[SIM_NTIMERS+1] = { 0 };    /* calibration count */
-static double rtc_clock_skew_max[SIM_NTIMERS+1] = { 0 };  /* asynchronous max skew */
-static double rtc_clock_start_gtime[SIM_NTIMERS+1] = { 0 };/* reference instruction time for clock */
-static double rtc_clock_tick_size[SIM_NTIMERS+1] = { 0 }; /* 1/hz */
+static int32 rtc_ticks[SIM_NTIMERS+1] = { 0 };              /* ticks */
+static uint32 rtc_hz[SIM_NTIMERS+1] = { 0 };                /* tick rate */
+static uint32 rtc_last_hz[SIM_NTIMERS+1] = { 0 };           /* prior tick rate */
+static uint32 rtc_rtime[SIM_NTIMERS+1] = { 0 };             /* real time (usecs) */
+static uint32 rtc_vtime[SIM_NTIMERS+1] = { 0 };             /* virtual time (usecs) */
+static double rtc_gtime[SIM_NTIMERS+1] = { 0 };             /* instruction time */
+static uint32 rtc_nxintv[SIM_NTIMERS+1] = { 0 };            /* next interval */
+static int32 rtc_based[SIM_NTIMERS+1] = { 0 };              /* base delay */
+static int32 rtc_currd[SIM_NTIMERS+1] = { 0 };              /* current delay */
+static int32 rtc_initd[SIM_NTIMERS+1] = { 0 };              /* initial delay */
+static uint32 rtc_elapsed[SIM_NTIMERS+1] = { 0 };           /* seconds since init */
+static uint32 rtc_calibrations[SIM_NTIMERS+1] = { 0 };      /* calibration count */
+static double rtc_clock_skew_max[SIM_NTIMERS+1] = { 0 };    /* asynchronous max skew */
+static double rtc_clock_start_gtime[SIM_NTIMERS+1] = { 0 }; /* reference instruction time for clock */
+static double rtc_clock_tick_size[SIM_NTIMERS+1] = { 0 };   /* 1/hz */
 static uint32 rtc_calib_initializations[SIM_NTIMERS+1] = { 0 };/* Initialization Count */
-static double rtc_calib_tick_time[SIM_NTIMERS+1] = { 0 }; /* ticks time */
+static double rtc_calib_tick_time[SIM_NTIMERS+1] = { 0 };   /* ticks time */
 static double rtc_calib_tick_time_tot[SIM_NTIMERS+1] = { 0 };/* ticks time - total*/
-static uint32 rtc_calib_ticks_acked[SIM_NTIMERS+1] = { 0 };/* ticks Acked */
+static uint32 rtc_calib_ticks_acked[SIM_NTIMERS+1] = { 0 }; /* ticks Acked */
 static uint32 rtc_calib_ticks_acked_tot[SIM_NTIMERS+1] = { 0 };/* ticks Acked - total */
-static uint32 rtc_clock_ticks[SIM_NTIMERS+1] = { 0 };/* ticks delivered since catchup base */
-static uint32 rtc_clock_ticks_tot[SIM_NTIMERS+1] = { 0 };/* ticks delivered since catchup base - total */
+static uint32 rtc_clock_ticks[SIM_NTIMERS+1] = { 0 };       /* ticks delivered since catchup base */
+static uint32 rtc_clock_ticks_tot[SIM_NTIMERS+1] = { 0 };   /* ticks delivered since catchup base - total */
 static double rtc_clock_init_base_time[SIM_NTIMERS+1] = { 0 };/* reference time for clock initialization */
 static double rtc_clock_tick_start_time[SIM_NTIMERS+1] = { 0 };/* reference time when ticking started */
 static double rtc_clock_catchup_base_time[SIM_NTIMERS+1] = { 0 };/* reference time for catchup ticks */
@@ -767,14 +767,14 @@ static uint32 rtc_clock_catchup_ticks[SIM_NTIMERS+1] = { 0 };/* Record of catchu
 static uint32 rtc_clock_catchup_ticks_tot[SIM_NTIMERS+1] = { 0 };/* Record of catchups - total */
 static t_bool rtc_clock_catchup_pending[SIM_NTIMERS+1] = { 0 };/* clock tick catchup pending */
 static t_bool rtc_clock_catchup_eligible[SIM_NTIMERS+1] = { 0 };/* clock tick catchup eligible */
-static uint32 rtc_clock_time_idled[SIM_NTIMERS+1] = { 0 };/* total time idled */
+static uint32 rtc_clock_time_idled[SIM_NTIMERS+1] = { 0 };  /* total time idled */
 static uint32 rtc_clock_time_idled_last[SIM_NTIMERS+1] = { 0 };/* total time idled */
 static uint32 rtc_clock_calib_skip_idle[SIM_NTIMERS+1] = { 0 };/* Calibrations skipped due to idling */
 static uint32 rtc_clock_calib_gap2big[SIM_NTIMERS+1] = { 0 };/* Calibrations skipped Gap Too Big */
 static uint32 rtc_clock_calib_backwards[SIM_NTIMERS+1] = { 0 };/* Calibrations skipped Clock Running Backwards */
-static uint32 sim_idle_cyc_ms = 0;                      /* Cycles per millisecond while not idling */
-static uint32 sim_idle_cyc_sleep = 0;                   /* Cycles per minimum sleep interval */
-static double sim_idle_end_time = 0.0;                  /* Time when last idle completed */
+static uint32 sim_idle_cyc_ms = 0;                          /* Cycles per millisecond while not idling */
+static uint32 sim_idle_cyc_sleep = 0;                       /* Cycles per minimum sleep interval */
+static double sim_idle_end_time = 0.0;                      /* Time when last idle completed */
 
 UNIT sim_timer_units[SIM_NTIMERS+1];                    /* Clock assist units                         */
                                                         /* one for each timer and one for an internal */
@@ -939,7 +939,7 @@ if (!rtc_avail)                                         /* no timer? */
     return rtc_currd[tmr];
 if (sim_calb_tmr != tmr) {
     rtc_currd[tmr] = (int32)(sim_timer_inst_per_sec()/ticksper);
-    sim_debug (DBG_CAL, &sim_timer_dev, "calibrated tmr=%d against internal system tmr=%d, tickper=%d (result: %d)\n", tmr, sim_calb_tmr, ticksper, rtc_currd[tmr]);
+    sim_debug (DBG_CAL, &sim_timer_dev, "sim_rtcn_calb(tmr=%d) calibrated against internal system tmr=%d, tickper=%d (result: %d)\n", tmr, sim_calb_tmr, ticksper, rtc_currd[tmr]);
     return rtc_currd[tmr];
     }
 new_rtime = sim_os_msec ();                             /* wall time */
@@ -1029,7 +1029,7 @@ if (rtc_based[tmr] <= 0)                                /* never negative or zer
     rtc_based[tmr] = 1;
 if (rtc_currd[tmr] <= 0)                                /* never negative or zero! */
     rtc_currd[tmr] = 1;
-sim_debug (DBG_CAL, &sim_timer_dev, "calibrated tmr=%d, tickper=%d (delta_rtime=%d, delta_vtime=%d, base=%d, nxintv=%u, result: %d)\n", 
+sim_debug (DBG_CAL, &sim_timer_dev, "sim_rtcn_calb(calibrated tmr=%d, tickper=%d) (delta_rtime=%d, delta_vtime=%d, base=%d, nxintv=%u, result: %d)\n", 
                                     tmr, ticksper, (int)delta_rtime, (int)delta_vtime, rtc_based[tmr], rtc_nxintv[tmr], rtc_currd[tmr]);
 /* Adjust calibration for other timers which depend on this timer's calibration */
 for (itmr=0; itmr<=SIM_NTIMERS; itmr++)
@@ -2146,9 +2146,13 @@ if ((rtc_hz[tmr] > 0) &&
     double tnow = sim_timenow_double();
 
     if (tnow > (rtc_clock_catchup_base_time[tmr] + (rtc_calib_tick_time[tmr] + rtc_clock_tick_size[tmr]))) {
-        sim_debug (DBG_QUE, &sim_timer_dev, "_rtcn_tick_catchup_check(%d) - scheduling catchup tick for %s which is behind %s\n", time, sim_uname (sim_clock_unit[tmr]), sim_fmt_secs (tnow > (rtc_clock_catchup_base_time[tmr] + (rtc_calib_tick_time[tmr] + rtc_clock_tick_size[tmr]))));
-        rtc_clock_catchup_pending[tmr] = TRUE;
-        sim_activate_abs (&sim_timer_units[tmr], (time < 0) ? 0 : time);
+        if (!rtc_clock_catchup_pending[tmr]) {
+            sim_debug (DBG_CAL, &sim_timer_dev, "_rtcn_tick_catchup_check(%d) - scheduling catchup tick for %s which is behind %s\n", time, sim_uname (sim_clock_unit[tmr]), sim_fmt_secs ((rtc_clock_catchup_base_time[tmr] + (rtc_calib_tick_time[tmr] + rtc_clock_tick_size[tmr]))- tnow));
+            rtc_clock_catchup_pending[tmr] = TRUE;
+            sim_activate_abs (&sim_timer_units[tmr], (time < 0) ? 0 : time);
+            }
+        else
+            sim_debug (DBG_CAL, &sim_timer_dev, "_rtcn_tick_catchup_check(%d) - already pending catchup tick for %s which is behind %s\n", time, sim_uname (sim_clock_unit[tmr]), sim_fmt_secs ((rtc_clock_catchup_base_time[tmr] + (rtc_calib_tick_time[tmr] + rtc_clock_tick_size[tmr]))- tnow));
         return TRUE;
         }
     }
@@ -2434,16 +2438,18 @@ for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
     if (rtc_hz[tmr]) {                  /* calibrated clock running? */
         rtc_rtime[tmr] += sim_prompt_time;
         rtc_vtime[tmr] += sim_prompt_time;
-        sim_debug (DBG_TRC, &sim_timer_dev, "sim_start_timer_services(tmr=%d) - adjusting calibration real time by %d ms\n", tmr, (int)sim_prompt_time);
+        sim_debug (DBG_CAL, &sim_timer_dev, "sim_start_timer_services(tmr=%d) - adjusting calibration real time by %d ms\n", tmr, (int)sim_prompt_time);
+        if (rtc_clock_catchup_eligible[tmr])
+            rtc_clock_catchup_base_time[tmr] += (((double)sim_prompt_time) / 1000.0);
         }
     }
 if (sim_calb_tmr == -1) {
-    sim_debug (DBG_TRC, &sim_timer_dev, "sim_start_timer_services() - starting from scratch\n");
+    sim_debug (DBG_CAL, &sim_timer_dev, "sim_start_timer_services() - starting from scratch\n");
     _rtcn_configure_calibrated_clock (sim_calb_tmr);
     }
 else {
     if (sim_calb_tmr == SIM_NTIMERS) {
-        sim_debug (DBG_TRC, &sim_timer_dev, "sim_start_timer_services() - restarting internal timer after %d cycles\n", sim_internal_timer_time);
+        sim_debug (DBG_CAL, &sim_timer_dev, "sim_start_timer_services() - restarting internal timer after %d cycles\n", sim_internal_timer_time);
         sim_activate (&SIM_INTERNAL_UNIT, sim_internal_timer_time);
         }
     }
