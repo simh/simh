@@ -174,7 +174,7 @@ ty340_reset(void *dptr)
 #if TYPE342
     u->shift = 0;
     u->width = 6;
-    u->height = 9;
+    u->height = 11;
 #endif
 #if TYPE347
     u->SAVE_FF = 0;
