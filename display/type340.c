@@ -101,14 +101,17 @@ enum mode { PARAM=0, POINT, SLAVE, CHAR, VECTOR, VCONT, INCR, SUBR };
 
 enum jump_type { DJP=2, DJS=3, DDS=1 }; /* type 347 */
 
-/* Flags for special characters. */
+/* Codes for special characters. */
 #define CH_LF     0001   /* Line feed. */
 #define CH_CR     0002   /* Carriage return. */
-#define CH_UC     0004   /* Shift in. */
-#define CH_LC     0010   /* Shift out. */
-#define CH_ESC    0020   /* Escape to parameter mode. */
-#define CH_NSPC   0040   /* Non spacing. */
-#define CH_D      0100   /* Descender. */
+#define CH_UC     0003   /* Shift in. */
+#define CH_LC     0004   /* Shift out. */
+#define CH_ESC    0005   /* Escape to parameter mode. */
+#define CH_NSPC   0006   /* Non spacing. */
+#define CH_D      0007   /* Descender. */
+#define CH_BS     0010   /* Backspace. */
+#define CH_SUB    0011   /* Subscript. */
+#define CH_SUP    0012   /* Superscript. */
 
 /* put all the state in a struct "just in case" */
 static struct type340 {
@@ -692,7 +695,7 @@ static const unsigned char chars[128][6] = {
     { 0040, 0100, 0376, 0100, 0040, 0 },   /* 46 up arrow */
     { 0020, 0020, 0124, 0070, 0020, 0 },   /* 47 left arrow */
     { 0010, 0004, 0376, 0004, 0010, 0 },   /* 50 down arrow */
-    { 0020, 0070, 0124, 0020, 0020, 0 },   /* 47 right arrow */
+    { 0020, 0070, 0124, 0020, 0020, 0 },   /* 51 right arrow */
     { 0100, 0040, 0020, 0010, 0004, 0 },   /* 52 \ */
     { 0000, 0376, 0202, 0202, 0000, 0 },   /* 53 [ */
     { 0000, 0202, 0202, 0376, 0000, 0 },   /* 54 ] */
@@ -709,12 +712,12 @@ static const unsigned char chars[128][6] = {
     { 0040, 0100, 0200, 0100, 0040, CH_NSPC },  /* 67 ^ */
     { 0376, 0376, 0376, 0376, 0376, 0 },   /* 70 ??? */
     { 0376, 0376, 0376, 0376, 0376, 0 },   /* 71 block? */
-    { 0376, 0376, 0376, 0376, 0376, 0 },   /* 72 ??? */
-    { 0376, 0376, 0376, 0376, 0376, 0 },   /* 73 ??? */
+    { 0000, 0000, 0000, 0000, 0000, CH_BS },  /* 72 backspace */
+    { 0376, 0376, 0376, 0376, 0376, CH_SUB }, /* 73 subscript */
     { 0376, 0376, 0376, 0376, 0376, 0 },   /* 74 ??? */
     { 0376, 0376, 0376, 0376, 0376, 0 },   /* 75 ??? */
     { 0376, 0376, 0376, 0376, 0376, 0 },   /* 76 ??? */
-    { 0376, 0376, 0376, 0376, 0376, 0 }    /* 77 ??? */
+    { 0376, 0376, 0376, 0376, 0376, CH_SUP } /* 77 superscript */
 };
 
 void
@@ -740,7 +743,7 @@ character(int n, unsigned char c)
     c |= u->shift;
     flags = chars[c][5];
 
-    if (flags & CH_LF) {                /* LF */
+    if (flags == CH_LF) {               /* LF */
         u->ypos -= u->height*s;
         if (u->ypos < 0) {
             u->status |= ST340_HEDGE;
@@ -748,26 +751,34 @@ character(int n, unsigned char c)
         }
         return 0;
     }
-    if (flags & CH_CR) {                /* CR */
+    if (flags == CH_CR) {               /* CR */
         u->xpos = 0;
         return 0;
     }
-    if (flags & CH_UC) {                /* "SHIFT IN (HORIZ)" */
+    if (flags == CH_UC) {               /* "SHIFT IN (HORIZ)" */
         u->shift = 0;                   /* upper case in SPCWAR 163 */
         return 0;
     }
-    if (flags & CH_LC) {                /* "SHIFT OUT (VERT)" */
+    if (flags == CH_LC) {               /* "SHIFT OUT (VERT)" */
         u->shift = 0100;                /* lower case in SPCWAR 163 */
         return 0;
     }
-    if (flags & CH_ESC) {               /* escape */
+    if (flags == CH_ESC) {              /* escape */
         return 1;
     }
-    if ((flags & CH_NSPC) && u->xpos >= u->width*s) {
+    if ((flags == CH_NSPC) && u->xpos >= u->width*s) {
         u->xpos -= u->width*s;          /* non spacing character */
     }
-    if (flags & CH_D) {                 /* descender */
+    if (flags == CH_D) {                /* descender */
         u->ypos -= 2*s;
+    }
+    if (flags == CH_SUB) {              /* subscript */
+        u->ypos -= u->width*s/2;
+        return 0;
+    }
+    if (flags == CH_SUP) {              /* superscript */
+        u->ypos += u->width*s/2;
+        return 0;
     }
     /* plot character from character set selected by "shift" */
     for (x = 0; x < 5; x++) {           /* column: 0 to 4, left to right */
@@ -778,8 +789,12 @@ character(int n, unsigned char c)
             }
         }
     }
-    u->xpos += u->width*s;
-    if (flags & CH_D) {                 /* undo descender */
+    if (flags == CH_BS) {               /* backspace */
+        u->xpos -= u->width*s;
+    } else {
+        u->xpos += u->width*s;
+    }
+    if (flags == CH_D) {                /* undo descender */
         u->ypos += 2*s;
     }
     if (u->xpos > 1023) {
