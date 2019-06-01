@@ -8081,11 +8081,10 @@ t_stat sim_run_boot_prep (int32 flag)
 {
 t_stat r;
 
-sim_interval = 0;                                       /* reset queue */
-sim_time = sim_rtime = 0;
-noqueue_time = 0;                                       /* reset queue */
+/* reset queue */
 while (sim_clock_queue != QUEUE_LIST_END)
     sim_cancel (sim_clock_queue);
+sim_time = sim_rtime = 0;
 noqueue_time = sim_interval = 0;
 r = reset_all (0);
 if ((r == SCPE_OK) && (flag == RU_RUN)) {
@@ -10960,7 +10959,8 @@ if (!uptr->next)
 uptr->usecs_remaining = 0;
 if (sim_clock_queue != QUEUE_LIST_END)
     sim_interval = sim_clock_queue->time;
-else sim_interval = noqueue_time = NOQUEUE_WAIT;
+else
+    sim_interval = noqueue_time = NOQUEUE_WAIT;
 if (uptr->next) {
     sim_printf ("Cancel failed for %s\n", sim_uname(uptr));
     if (sim_deb)
