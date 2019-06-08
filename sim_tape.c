@@ -790,8 +790,9 @@ switch (f) {                                            /* case on format */
 uptr->hwmark = 0;
 uptr->recsize = 0;
 uptr->tape_eom = 0;
-
-sim_tape_rewind (uptr);
+uptr->pos = 0;
+MT_CLR_PNU (uptr);
+MT_CLR_INMRK (uptr);                                    /* Not within an AWS or TAR tapemark */
 free (uptr->tape_ctx);
 uptr->tape_ctx = NULL;
 uptr->io_flush = NULL;
@@ -1472,19 +1473,19 @@ else switch (f) {                                       /* otherwise the read me
         if (1) {
 #define BUF_SZ 512
             uint8 buf[BUF_SZ];
-            t_addr buf_offset;
+            t_addr buf_offset = uptr->pos;
             size_t bytes_in_buf = 0;
             size_t read_size;
 
             for (sbc = 1, all_eof = 1; (t_addr) sbc <= uptr->pos ; sbc++) {
                 if (bytes_in_buf == 0) {        /* Need to Fill Buffer */
-                    if (uptr->pos < BUF_SZ) {
+                    if (buf_offset < BUF_SZ) {
+                        read_size = (size_t)buf_offset;
                         buf_offset = 0;
-                        read_size = (size_t)uptr->pos;
                         }
                     else {
-                        buf_offset = uptr->pos - (sbc - 1 + BUF_SZ);
                         read_size = BUF_SZ;
+                        buf_offset -= BUF_SZ;
                         }
                     (void)sim_tape_seek (uptr, buf_offset);
                     bytes_in_buf = sim_fread (buf, sizeof (uint8), read_size, uptr->fileref);
@@ -3905,7 +3906,8 @@ static void ansi_make_HDR1 (HDR1 *hdr1, VOL1 *vol, HDR4 *hdr4, const char *filen
     char extra_name_used[3] = "00";
     char *fn_cpy, *c, *ext;
 
-    stat (filename, &statb);
+    memset (&statb, 0, sizeof (statb));
+    (void)stat (filename, &statb);
     if (!(fn = strrchr (filename, '/')) && !(fn = strrchr (filename, '\\')))
         fn = filename;
     else
@@ -3915,7 +3917,8 @@ static void ansi_make_HDR1 (HDR1 *hdr1, VOL1 *vol, HDR4 *hdr4, const char *filen
     fn = fn_cpy;
     ext = strrchr (fn_cpy, '.');
     if (ext) {
-        while ((c = strchr (fn_cpy, '.')) != ext)
+        while (((c = strchr (fn_cpy, '.')) != NULL) && 
+               (c != ext))
             *c = '_';                              /* translate extra .'s to _ */
         }
     memset (hdr1, ' ', sizeof (*hdr1));
@@ -3970,6 +3973,8 @@ static void ansi_fill_text_buffer (FILE *f, char *buf, size_t buf_size, size_t r
         char rec_size_str[16];
 
         start = ftell (f);
+        if (start < 0)
+            break;
         if (!fgets (tmp, buf_size, f))
             break;
         rec_size = strlen (tmp);
