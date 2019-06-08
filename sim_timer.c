@@ -212,10 +212,11 @@ typedef struct RTC {
     double clock_catchup_base_time; /* reference time for catchup ticks */
     uint32 clock_catchup_ticks;     /* Record of catchups */
     uint32 clock_catchup_ticks_tot; /* Record of catchups - total */
+    uint32 clock_catchup_ticks_curr;/* Record of catchups in this second */
     t_bool clock_catchup_pending;   /* clock tick catchup pending */
     t_bool clock_catchup_eligible;  /* clock tick catchup eligible */
     uint32 clock_time_idled;        /* total time idled */
-    uint32 clock_time_idled_last;   /* total time idled */
+    uint32 clock_time_idled_last;   /* total time idled as of the previous second */
     uint32 clock_calib_skip_idle;   /* Calibrations skipped due to idling */
     uint32 clock_calib_gap2big;     /* Calibrations skipped Gap Too Big */
     uint32 clock_calib_backwards;   /* Calibrations skipped Clock Running Backwards */
@@ -899,6 +900,7 @@ rtc->clock_catchup_pending = FALSE;
 rtc->clock_catchup_eligible = FALSE;
 rtc->clock_catchup_ticks_tot += rtc->clock_catchup_ticks;
 rtc->clock_catchup_ticks = 0;
+rtc->clock_catchup_ticks_curr = 0;
 rtc->calib_ticks_acked_tot += rtc->calib_ticks_acked;
 rtc->calib_ticks_acked = 0;
 ++rtc->calib_initializations;
@@ -916,7 +918,7 @@ return sim_rtcn_calb (rtc->hz, tmr);
 
 int32 sim_rtcn_calb (int32 ticksper, int32 tmr)
 {
-uint32 new_rtime, delta_rtime, last_idle_pct;
+uint32 new_rtime, delta_rtime, last_idle_pct, catchup_ticks_curr;
 int32 delta_vtime;
 double new_gtime;
 int32 new_currd;
@@ -957,21 +959,24 @@ if (rtc->clock_unit == NULL) {                      /* Not using TIMER units? */
     }
 if (rtc->clock_catchup_pending) {                   /* catchup tick? */
     ++rtc->clock_catchup_ticks;                     /* accumulating which were catchups */
+    ++rtc->clock_catchup_ticks_curr;
     rtc->clock_catchup_pending = FALSE;
     }
 rtc->ticks += 1;                                    /* count ticks */
 if (rtc->ticks < ticksper)                          /* 1 sec yet? */
     return rtc->currd;
+catchup_ticks_curr = rtc->clock_catchup_ticks_curr;
+rtc->clock_catchup_ticks_curr = 0;
 rtc->ticks = 0;                                     /* reset ticks */
 rtc->elapsed += 1;                                  /* count sec */
-if (!rtc_avail)                                         /* no timer? */
+if (!rtc_avail)                                     /* no timer? */
     return rtc->currd;
 if (sim_calb_tmr != tmr) {
     rtc->currd = (int32)(sim_timer_inst_per_sec()/ticksper);
     sim_debug (DBG_CAL, &sim_timer_dev, "sim_rtcn_calb(tmr=%d) calibrated against internal system tmr=%d, tickper=%d (result: %d)\n", tmr, sim_calb_tmr, ticksper, rtc->currd);
     return rtc->currd;
     }
-new_rtime = sim_os_msec ();                             /* wall time */
+new_rtime = sim_os_msec ();                         /* wall time */
 ++rtc->calibrations;                                /* count calibrations */
 sim_debug (DBG_TRC, &sim_timer_dev, "sim_rtcn_calb(ticksper=%d, tmr=%d)\n", ticksper, tmr);
 if (new_rtime < rtc->rtime) {                       /* time running backwards? */
@@ -980,7 +985,7 @@ if (new_rtime < rtc->rtime) {                       /* time running backwards? *
     /* for 49 days approximately every 49 days thereafter. */
     ++rtc->clock_calib_backwards;                   /* Count statistic */
     sim_debug (DBG_CAL, &sim_timer_dev, "time running backwards - OldTime: %u, NewTime: %u, result: %d\n", rtc->rtime, new_rtime, rtc->currd);
-    rtc->vtime = rtc->rtime = new_rtime;        /* reset wall time */
+    rtc->vtime = rtc->rtime = new_rtime;            /* reset wall time */
     rtc->nxintv = 1000;
     if (rtc->clock_catchup_eligible) {
         rtc->clock_catchup_base_time = sim_timenow_double();
@@ -991,7 +996,7 @@ if (new_rtime < rtc->rtime) {                       /* time running backwards? *
 delta_rtime = new_rtime - rtc->rtime;               /* elapsed wtime */
 rtc->rtime = new_rtime;                             /* adv wall time */
 rtc->vtime += 1000;                                 /* adv sim time */
-if (delta_rtime > 30000) {                              /* gap too big? */
+if (delta_rtime > 30000) {                          /* gap too big? */
     /* This simulator process has somehow been suspended for a significant */
     /* amount of time.  This will certainly happen if the host system has  */
     /* slept or hibernated.  It also might happen when a simulator         */
@@ -999,7 +1004,7 @@ if (delta_rtime > 30000) {                              /* gap too big? */
     /* breakpoint).  To accomodate this, we set the calibration state to   */
     /* ignore what happened and proceed from here.                         */
     ++rtc->clock_calib_gap2big;                     /* Count statistic */
-    rtc->vtime = rtc->rtime;                    /* sync virtual and real time */
+    rtc->vtime = rtc->rtime;                        /* sync virtual and real time */
     rtc->nxintv = 1000;                             /* reset next interval */
     rtc->gtime = sim_gtime();                       /* save instruction time */
     if (rtc->clock_catchup_eligible)
@@ -1007,13 +1012,11 @@ if (delta_rtime > 30000) {                              /* gap too big? */
     sim_debug (DBG_CAL, &sim_timer_dev, "gap too big: delta = %d - result: %d\n", delta_rtime, rtc->currd);
     return rtc->currd;                              /* can't calibr */
     }
+last_idle_pct = 0;                                  /* normally force calibration */
 if (tmr != SIM_NTIMERS) {
-    if (delta_rtime == 0)                               /* avoid divide by zero  */
-        last_idle_pct = 0;                              /* force calibration */
-    else
+    if (delta_rtime != 0)                           /* avoid divide by zero  */
         last_idle_pct = MIN(100, (uint32)(100.0 * (((double)(rtc->clock_time_idled - rtc->clock_time_idled_last)) / ((double)delta_rtime))));
     rtc->clock_time_idled_last = rtc->clock_time_idled;
-#if defined (SIM_TIME_IDLE_PCT)
     if (last_idle_pct > sim_idle_calib_pct) {
         rtc->rtime = new_rtime;                     /* save wall time */
         rtc->vtime += 1000;                         /* adv sim time */
@@ -1023,7 +1026,6 @@ if (tmr != SIM_NTIMERS) {
         sim_debug (DBG_CAL, &sim_timer_dev, "skipping calibration due to idling (%d%%) - result: %d\n", last_idle_pct, rtc->currd);
         return rtc->currd;                          /* avoid calibrating idle checks */
         }
-#endif
     }
 new_gtime = sim_gtime();
 if ((last_idle_pct == 0) && (delta_rtime != 0)) {
@@ -1047,17 +1049,17 @@ if (sim_asynch_timer) {
     sim_debug (DBG_CAL, &sim_timer_dev, "asynch calibration result: %d\n", rtc->currd);
     return rtc->currd;                          /* calibrated result */
     }
-rtc->gtime = new_gtime;                             /* save instruction time */
+rtc->gtime = new_gtime;                         /* save instruction time */
 /* This self regulating algorithm depends directly on the assumption */
 /* that this routine is called back after processing the number of */
 /* instructions which was returned the last time it was called. */
-if (delta_rtime == 0)                                   /* gap too small? */
+if (delta_rtime == 0)                           /* gap too small? */
     rtc->based = rtc->based * ticksper;         /* slew wide */
 else
     rtc->based = (int32) (((double) rtc->based * (double) rtc->nxintv) /
                                 ((double) delta_rtime));/* new base rate */
 delta_vtime = rtc->vtime - rtc->rtime;          /* gap */
-if (delta_vtime > SIM_TMAX)                             /* limit gap */
+if (delta_vtime > SIM_TMAX)                     /* limit gap */
     delta_vtime = SIM_TMAX;
 else {
     if (delta_vtime < -SIM_TMAX)
@@ -1065,13 +1067,13 @@ else {
     }
 rtc->nxintv = 1000 + delta_vtime;                   /* next wtime */
 rtc->currd = (int32) (((double) rtc->based * (double) rtc->nxintv) /
-    1000.0);                                            /* next delay */
+    1000.0);                                        /* next delay */
 if (rtc->based <= 0)                                /* never negative or zero! */
     rtc->based = 1;
 if (rtc->currd <= 0)                                /* never negative or zero! */
     rtc->currd = 1;
-sim_debug (DBG_CAL, &sim_timer_dev, "sim_rtcn_calb(calibrated tmr=%d, tickper=%d) (delta_rtime=%d, delta_vtime=%d, base=%d, nxintv=%u, result: %d)\n", 
-                                    tmr, ticksper, (int)delta_rtime, (int)delta_vtime, rtc->based, rtc->nxintv, rtc->currd);
+sim_debug (DBG_CAL, &sim_timer_dev, "sim_rtcn_calb(calibrated tmr=%d, tickper=%d) (delta_rtime=%d, delta_vtime=%d, base=%d, nxintv=%u, catchups=%u, idle=%d%%, result: %d)\n", 
+                                    tmr, ticksper, (int)delta_rtime, (int)delta_vtime, rtc->based, rtc->nxintv, catchup_ticks_curr, last_idle_pct, rtc->currd);
 /* Adjust calibration for other timers which depend on this timer's calibration */
 for (itmr=0; itmr<=SIM_NTIMERS; itmr++) {
     RTC *irtc = &rtcs[itmr];
@@ -1246,6 +1248,8 @@ for (tmr=clocks=0; tmr<=SIM_NTIMERS; ++tmr) {
         fprintf (st, "  Total Tick Time:           %s\n",   sim_fmt_secs (rtc->calib_tick_time_tot+rtc->calib_tick_time));
     if (rtc->clock_catchup_ticks)
         fprintf (st, "  Catchup Ticks Sched:       %s\n",   sim_fmt_numeric ((double)rtc->clock_catchup_ticks));
+    if (rtc->clock_catchup_ticks_curr)
+        fprintf (st, "  Catchup Ticks this second: %s\n",   sim_fmt_numeric ((double)rtc->clock_catchup_ticks_curr));
     if (rtc->clock_catchup_ticks_tot+rtc->clock_catchup_ticks != rtc->clock_catchup_ticks)
         fprintf (st, "  Total Catchup Ticks Sched: %s\n",   sim_fmt_numeric ((double)(rtc->clock_catchup_ticks_tot+rtc->clock_catchup_ticks)));
     if (rtc->clock_init_base_time) {
@@ -1415,7 +1419,6 @@ t_stat r = SCPE_OK;
 
 if (cptr == NULL)
     return SCPE_ARG;
-#if defined (SIM_TIME_IDLE_PCT)
 if (1) {
     int32 newpct;
     char gbuf[CBUFSIZE];
@@ -1436,9 +1439,6 @@ if (1) {
     sim_idle_calib_pct = (uint32)newpct;
     }
 return SCPE_OK;
-#else
-return sim_messagef (SCPE_NOFNC, "Calibration Idle Threshold %% is not implemented\n");
-#endif
 }
 
 /* Set stop time */
@@ -1596,7 +1596,7 @@ if (rtc->hz == 0)                                       /* specified timer is no
     tmr = sim_calb_tmr;                                 /* use calibrated timer instead */
 rtc = &rtcs[tmr];
 if (rtc->clock_catchup_pending) {                       /* Catchup clock tick pending? */
-    sim_debug (DBG_CAL, &sim_timer_dev, "sim_idle(tmr=%d, sin_cyc=%d) - accelerating pending catch-up tick before idling %s\n", tmr, sin_cyc, sim_uname (rtc->clock_unit));
+    sim_debug (DBG_TIK, &sim_timer_dev, "sim_idle(tmr=%d, sin_cyc=%d) - accelerating pending catch-up tick before idling %s\n", tmr, sin_cyc, sim_uname (rtc->clock_unit));
     sim_activate_abs (&sim_timer_units[tmr], 0);
     sim_interval -= sin_cyc;
     return FALSE;
@@ -1615,7 +1615,7 @@ if ((!sim_idle_enab)                             ||     /* idling disabled */
     return FALSE;
     }
 if (_rtcn_tick_catchup_check (tmr, -1)) {
-    sim_debug (DBG_CAL, &sim_timer_dev, "sim_idle(tmr=%d, sin_cyc=%d) - rescheduling catchup tick %d for %s\n", tmr, sin_cyc, 1 + rtc->ticks, sim_uname (rtc->clock_unit));
+    sim_debug (DBG_TIK, &sim_timer_dev, "sim_idle(tmr=%d, sin_cyc=%d) - rescheduling catchup tick %d for %s\n", tmr, sin_cyc, 1 + rtc->ticks, sim_uname (rtc->clock_unit));
     sim_interval -= sin_cyc;
     return FALSE;
     }
