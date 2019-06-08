@@ -1404,7 +1404,7 @@ int part;
 uint32 base;
 uint32 dir_sec;
 uint16 dir_seg;
-uint16 version;
+uint16 version = 0;
 t_offset ret_val = (t_offset)-1;
 
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
@@ -1480,7 +1480,7 @@ for (part = 0; part < RT11_MAXPARTITIONS; part++) {
                 goto Next_Partition;
             } while (dir_seg != 0);
 
-        ret_val = (t_offset)((base + highest) * 512);
+        ret_val = (t_offset)((base + highest) * (t_offset)512);
         version = Home.hb_w_sysver;
 
         if (type == RT11_SINGLEPART)
@@ -1493,7 +1493,7 @@ Next_Partition:
 Return_Cleanup:
 if (partitions) {
     if (!sim_quiet) {
-        const char *parttype = "???";
+        const char *parttype;
 
         switch (version) {
             case HB_C_SYSVER_V3A:
@@ -1506,6 +1506,10 @@ if (partitions) {
 
             case HB_C_SYSVER_V05:
                 parttype = "V05";
+                break;
+
+            default:
+                parttype = "???";
                 break;
             }
         sim_printf ("%s%d: '%s' Contains RT11 partitions\n", sim_dname (dptr), (int)(uptr-dptr->units), uptr->filename);
