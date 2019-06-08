@@ -840,6 +840,11 @@ return sim_rtcn_init_unit (NULL, time, tmr);
 
 int32 sim_rtcn_init_unit (UNIT *uptr, int32 time, int32 tmr)
 {
+return sim_rtcn_init_unit_ticks (uptr, time, tmr, 0);
+}
+
+int32 sim_rtcn_init_unit_ticks (UNIT *uptr, int32 time, int32 tmr, int32 ticksper)
+{
 if (time == 0)
     time = 1;
 if (tmr == SIM_INTERNAL_CLK)
@@ -851,7 +856,7 @@ else {
 /*
  * If we'd previously succeeded in calibrating a tick value, then use that
  * delay as a better default to setup when we're re-initialized.
- * Re-initializing happens on any boot or after any breakpoint/continue.
+ * Re-initializing happens on any boot.
  */
 if (rtc_currd[tmr])
     time = rtc_currd[tmr];
@@ -888,6 +893,11 @@ rtc_calib_ticks_acked[tmr] = 0;
 rtc_clock_init_base_time[tmr] = sim_timenow_double ();
 _rtcn_configure_calibrated_clock (tmr);
 return time;
+}
+
+int32 sim_rtcn_calb_tick (int32 tmr)
+{
+return sim_rtcn_calb (rtc_hz[tmr], tmr);
 }
 
 int32 sim_rtcn_calb (int32 ticksper, int32 tmr)
@@ -1181,11 +1191,11 @@ for (tmr=clocks=0; tmr<=SIM_NTIMERS; ++tmr) {
         if (sim_idle_calib_pct && (sim_idle_calib_pct != 100))
             fprintf (st, "  Calib Skip when Idle >:    %u%%\n",   sim_idle_calib_pct);
         if (rtc_clock_calib_skip_idle[tmr])
-            fprintf (st, "  Calibs Skip While Idle:    %u\n",   rtc_clock_calib_skip_idle[tmr]);
+            fprintf (st, "  Calibs Skip While Idle:    %s\n",   sim_fmt_numeric ((double)rtc_clock_calib_skip_idle[tmr]));
         if (rtc_clock_calib_backwards[tmr])
-            fprintf (st, "  Calibs Skip Backwards:     %u\n",   rtc_clock_calib_backwards[tmr]);
+            fprintf (st, "  Calibs Skip Backwards:     %s\n",   sim_fmt_numeric ((double)rtc_clock_calib_backwards[tmr]));
         if (rtc_clock_calib_gap2big[tmr])
-            fprintf (st, "  Calibs Skip Gap Too Big:   %u\n",   rtc_clock_calib_gap2big[tmr]);
+            fprintf (st, "  Calibs Skip Gap Too Big:   %s\n",   sim_fmt_numeric ((double)rtc_clock_calib_gap2big[tmr]));
         }
     if (rtc_gtime[tmr])
         fprintf (st, "  Instruction Time:          %.0f\n", rtc_gtime[tmr]);
@@ -3290,4 +3300,9 @@ for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
     }
 reset_all_p (0);
 sim_run_boot_prep (RU_GO);
+for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
+    if (rtc_calib_initializations[tmr])
+        rtc_calib_initializations[tmr] = 1;
+    }
+sim_inst_per_sec_last = sim_precalibrate_ips;
 }

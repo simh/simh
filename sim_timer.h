@@ -108,10 +108,12 @@ void sim_timespec_diff (struct timespec *diff, struct timespec *min, struct time
 double sim_timenow_double (void);
 int32 sim_rtcn_init (int32 time, int32 tmr);
 int32 sim_rtcn_init_unit (UNIT *uptr, int32 time, int32 tmr);
+int32 sim_rtcn_init_unit_ticks (UNIT *uptr, int32 time, int32 tmr, int32 ticksper);
 void sim_rtcn_get_time (struct timespec *now, int tmr);
 t_stat sim_rtcn_tick_ack (uint32 time, int32 tmr);
 void sim_rtcn_init_all (void);
 int32 sim_rtcn_calb (int32 ticksper, int32 tmr);
+int32 sim_rtcn_calb_tick (int32 tmr);
 int32 sim_rtc_init (int32 time);
 int32 sim_rtc_calb (int32 ticksper);
 t_stat sim_set_timers (int32 arg, CONST char *cptr);
