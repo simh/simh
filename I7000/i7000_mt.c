@@ -254,7 +254,7 @@ MTAB                mt_mod[] = {
 #endif
     {MTAB_XTD | MTAB_VUN, 0, "FORMAT", "FORMAT",
      &sim_tape_set_fmt, &sim_tape_show_fmt, NULL,
-       "Set/Display tape format (SIMH, E11, TPC, P7B, AWS, TAR)" },
+       "Set/Display tape format (SIMH, E11, TPC, P7B)"},
    {MTAB_XTD | MTAB_VUN, 0, "LENGTH", "LENGTH",
      &sim_tape_set_capac, &sim_tape_show_capac, NULL,
       "Set unit n capacity to arg MB (0 = unlimited)" },
@@ -604,12 +604,14 @@ uint32 mt_cmd(UNIT * uptr, uint16 cmd, uint16 dev)
     case IO_SDL:
         uptr->u5 |= MT_RDY;     /* Command is quick */
         uptr->flags |= MTUF_LDN;
+        sim_tape_set_dens (uptr, MT_DENS_200, NULL, NULL);
         sim_debug(DEBUG_CMD, dptr, "SDN unit=%d low\n", unit);
         return SCPE_OK;
 
     case IO_SDH:
         uptr->u5 |= MT_RDY;     /* Command is quick */
         uptr->flags &= ~MTUF_LDN;
+        sim_tape_set_dens (uptr, MT_DENS_556, NULL, NULL);
         sim_debug(DEBUG_CMD, dptr, "SDN unit=%d high\n", unit);
         return SCPE_OK;
 
@@ -1334,21 +1336,13 @@ mt_ini(UNIT * uptr, t_bool f)
 t_stat
 mt_reset(DEVICE * dptr)
 {
-    UNIT        *uptr = dptr->units;
-    uint32       i;
-    for (i = 0; i < dptr->numunits; i++) {
-       sim_tape_set_dens (uptr,
-              ((uptr->flags & MTUF_LDN) ? MT_DENS_200 : MT_DENS_556),
-              NULL, NULL);
-       uptr++;
-    }
     return SCPE_OK;
 }
 
 t_stat
 mt_tape_density(UNIT * uptr, int32 val, CONST char *cptr, void *desc)
 {
-    return SCPE_OK;
+return sim_tape_set_dens(uptr, (val == MTUF_LDN) ? MT_DENS_200 : MT_DENS_556, NULL, NULL);
 }
 
 t_stat
@@ -1361,8 +1355,6 @@ mt_attach(UNIT * uptr, CONST char *file)
     uptr->u3 = 0;
     uptr->u5 |= MT_RDY;
     uptr->flags |= MTUF_ONLINE;
-    uptr->dynflags = MT_200_VALID | MT_556_VALID |
-           (((uptr->flags & MTUF_LDN) ? MT_556_VALID : MT_200_VALID) < UNIT_V_DF_TAPE);
     return SCPE_OK;
 }
 

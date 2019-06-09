@@ -170,8 +170,8 @@ sim_load(FILE * fileref, CONST char *cptr, CONST char *fnam, int flag)
             }
         }
     } else if (match_ext(fnam, "oct")) {
-        while (fgets(&buf[0], 160, fileref) != 0) {
-             for(p = &buf[0]; *p == ' ' || *p == '\t'; p++);
+        while (fgets((char *)buf, 80, fileref) != 0) {
+             for(p = (char *)buf; *p == ' ' || *p == '\t'; p++);
             /* Grab address */
              for(addr = 0; *p >= '0' && *p <= '7'; p++)
                 addr = (addr << 3) + *p - '0';
@@ -184,8 +184,8 @@ sim_load(FILE * fileref, CONST char *cptr, CONST char *fnam, int flag)
              }
         }
     } else if (match_ext(fnam, "txt")) {
-        while (fgets(&buf[0], 160, fileref) != 0) {
-             for(p = &buf[0]; *p == ' ' || *p == '\t'; p++);
+        while (fgets((char *)buf, 80, fileref) != 0) {
+             for(p = (char *)buf; *p == ' ' || *p == '\t'; p++);
              /* Grab address */
              for(addr = 0; *p >= '0' && *p <= '7'; p++)
                 addr = (addr << 3) + *p - '0';
@@ -413,31 +413,31 @@ parse_sym(CONST char *cptr, t_addr addr, UNIT * uptr, t_value * val, int32 sw)
     if (sw & SWMASK('M')) {
         t_opcode           *op;
 
-        do {
-            i = 0;
-            sign = 0;
-            f = 0;
-            if (*cptr == ',') {
-                d <<= 18;
-                cptr++;
-            }
-            /* Skip blanks */
-            while (isspace(*cptr))
-                cptr++;
-            /* Grab opcode */
-            cptr = get_glyph(cptr, opcode, ',');
+        i = 0;
+        sign = 0;
+        f = 0;
+next:
+        /* Skip blanks */
+        while (isspace(*cptr))
+            cptr++;
+        /* Grab opcode */
+        cptr = get_glyph(cptr, opcode, ',');
 
-            if ((op = find_opcode(opcode, base_ops)) != 0) {
-                d |= (t_uint64) op->opbase << 12;
-            } else {
-                return STOP_UUO;
-            }
+        if ((op = find_opcode(opcode, base_ops)) != 0) {
+            d |= (t_uint64) op->opbase << 12;
+        } else {
+            return STOP_UUO;
+        }
 
-            cptr = get_glyph(cptr, opcode, ',');
-            tag = parse_addr(&cpu_dev, opcode, &arg);
-            if (*arg != opcode[0])
-                d += (t_value)tag;
-        } while (*cptr == ',');
+        cptr = get_glyph(cptr, opcode, ',');
+        tag = parse_addr(&cpu_dev, opcode, &arg);
+        if (*arg != opcode[0])
+            d += (t_value)tag;
+        if (*cptr == ',') {
+            d <<= 18;
+            cptr++;
+            goto next;
+        }
         if (*cptr != '\0')
             return STOP_UUO;
         *val = d;
