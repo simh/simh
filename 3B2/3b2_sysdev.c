@@ -460,7 +460,7 @@ t_stat timer_reset(DEVICE *dptr) {
 
     for (i = 0; i < 3; i++) {
         timer_unit[i].tmrnum = i;
-        timer_unit[i].tmr = &TIMERS[i];
+        timer_unit[i].tmr = (void *)&TIMERS[i];
     }
 
     /* Timer 1 gate is always active */
@@ -476,7 +476,7 @@ t_stat timer_reset(DEVICE *dptr) {
 
 t_stat timer_set_shutdown(UNIT *uptr, int32 val, CONST char* cptr, void* desc)
 {
-    struct timer_ctr *sanity = timer_unit[0].tmr;
+    struct timer_ctr *sanity = (struct timer_ctr *)timer_unit[0].tmr;
 
     sim_debug(EXECUTE_MSG, &timer_dev,
               "[%08x] Setting sanity timer to 0 for shutdown.\n", R[NUM_PC]);
