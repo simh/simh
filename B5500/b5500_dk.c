@@ -129,6 +129,10 @@ MTAB                dsk_mod[] = {
     {0}
 };
 
+REG                 dsk_reg[] = {
+    {BRDATA(BUFF, dsk_buffer, 16, 8, sizeof(dsk_buffer)), REG_HRO},
+    {0}
+};
 
 UNIT                dsk_unit[] = {
     {UDATA(&dsk_srv, UNIT_DISABLE, 0)}, /* DKA */
@@ -136,7 +140,7 @@ UNIT                dsk_unit[] = {
 };
 
 DEVICE              dsk_dev = {
-    "DK", dsk_unit, NULL, dsk_mod,
+    "DK", dsk_unit, dsk_reg, dsk_mod,
     NUM_DEVS_DSK, 8, 15, 1, 8, 8,
     NULL, NULL, NULL, &dsk_boot, NULL, NULL,
     NULL, DEV_DISABLE | DEV_DEBUG, 0, dev_debug,

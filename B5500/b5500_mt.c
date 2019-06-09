@@ -89,11 +89,6 @@ t_stat              mt_reset(DEVICE *);
 t_stat              mt_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 const char         *mt_description(DEVICE *dptr);
 
-/* Channel level activity */
-uint8               mt_chan[NUM_CHAN];
-
-uint16              mt_busy = 0;        /* Busy bits */
-
 /* One buffer per channel */
 uint8               mt_buffer[NUM_CHAN][BUFFSIZE];
 
@@ -125,6 +120,11 @@ UNIT                mt_unit[] = {
 #endif
 };
 
+REG                 mt_reg[] = {
+    {BRDATA(BUFF, mt_buffer, 16, 8, sizeof(mt_buffer)), REG_HRO},
+    {0}
+};
+
 MTAB                mt_mod[] = {
     {MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL, NULL, NULL,
      "Write ring in place"},
@@ -143,7 +143,7 @@ MTAB                mt_mod[] = {
 
 
 DEVICE              mt_dev = {
-    "MT", mt_unit, NULL, mt_mod,
+    "MT", mt_unit, mt_reg, mt_mod,
     NUM_DEVS_MT, 8, 15, 1, 8, 8,
     NULL, NULL, &mt_reset, NULL, &mt_attach, &mt_detach,
     NULL, DEV_DISABLE | DEV_DEBUG | DEV_TAPE, 0, dev_debug,
@@ -575,7 +575,8 @@ mt_attach(UNIT * uptr, CONST char *file)
 
     if ((r = sim_tape_attach_ex(uptr, file, 0, 0)) != SCPE_OK)
         return r;
-    uptr->CMD |= MT_LOADED|MT_BOT;
+    if ((sim_switches & SIM_SW_REST) == 0)
+        uptr->CMD |= MT_LOADED|MT_BOT;
     sim_activate(uptr, 50000);
     return SCPE_OK;
 }
@@ -599,7 +600,6 @@ mt_reset(DEVICE *dptr)
        at later. Also disconnect all devices no
        longer connected. */
     for ( i = 0; i < NUM_DEVS_MT; i++) {
-        mt_unit[i].dynflags = MT_DENS_556 << UNIT_V_DF_TAPE;
         if ((mt_unit[i].flags & UNIT_ATT) == 0)
             iostatus &= ~(1 << i);
         else if (mt_unit[i].CMD & (MT_LOADED|MT_RDY)) {

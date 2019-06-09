@@ -180,7 +180,8 @@ drm_attach(UNIT * uptr, CONST char *file)
 
     if ((r = attach_unit(uptr, file)) != SCPE_OK)
         return r;
-    uptr->CMD |= DR_RDY; 
+    if ((sim_switches & SIM_SW_REST) == 0)
+        uptr->CMD |= DR_RDY; 
     uptr->hwmark = uptr->capac;
     if (u) 
         iostatus |= DRUM2_FLAG;

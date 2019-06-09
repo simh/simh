@@ -58,6 +58,8 @@ REG                 chan_reg[] = {
     {BRDATA(D, D, 8, 48, NUM_CHAN), REG_RO},
     {BRDATA(CC, CC, 7, 6, NUM_CHAN), REG_RO},
     {BRDATA(W, W, 8, 48, NUM_CHAN), REG_RO},
+    {BRDATA(status, status, 8, 8, NUM_CHAN), REG_HRO},
+    {ORDATA(cstatus, cstatus, 8), REG_HRO},
     {NULL}
 };
 

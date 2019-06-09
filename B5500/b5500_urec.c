@@ -40,7 +40,6 @@
 #define LINENUM    u3
 #define POS        u4
 #define CMD        u5
-#define CARDIMG    up7
 
 
 /* std devices. data structures
@@ -91,6 +90,7 @@ t_stat              cdr_attach(UNIT *, CONST char *);
 t_stat              cdr_detach(UNIT *);
 t_stat              cdr_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 const char         *cdr_description(DEVICE *dptr);
+uint16              cdr_buffer[NUM_DEVS_CDR][80];
 #endif
 
 #if NUM_DEVS_CDP > 0
@@ -100,15 +100,10 @@ t_stat              cdp_attach(UNIT *, CONST char *);
 t_stat              cdp_detach(UNIT *);
 t_stat              cdp_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 const char         *cdp_description(DEVICE *dptr);
+uint16              cdp_buffer[NUM_DEVS_CDP][80];
 #endif
 
 #if NUM_DEVS_LPR  > 0
-struct _lpr_data
-{
-    uint8               lbuff[145];     /* Output line buffer */
-}
-lpr_data[NUM_DEVS_LPR];
-
 t_stat              lpr_ini(DEVICE *);
 t_stat              lpr_srv(UNIT *);
 t_stat              lpr_attach(UNIT *, CONST char *);
@@ -117,6 +112,7 @@ t_stat              lpr_setlpp(UNIT *, int32, CONST char *, void *);
 t_stat              lpr_getlpp(FILE *, UNIT *, int32, CONST void *);
 t_stat              lpr_help(FILE *, DEVICE *, UNIT *, int32, const char *);
 const char         *lpr_description(DEVICE *dptr);
+uint8               lpr_buffer[NUM_DEVS_LPR][145];   /* Output line buffer */
 #endif
 
 #if NUM_DEVS_CON  > 0
@@ -153,8 +149,13 @@ MTAB                cdr_mod[] = {
     {0}
 };
 
+REG                 cdr_reg[] = {
+    {BRDATA(BUFF, cdr_buffer, 16, 16, sizeof(cdr_buffer)), REG_HRO},
+    {0}
+};  
+
 DEVICE              cdr_dev = {
-    "CR", cdr_unit, NULL, cdr_mod,
+    "CR", cdr_unit, cdr_reg, cdr_mod,
     NUM_DEVS_CDR, 8, 15, 1, 8, 8,
     NULL, NULL, &cdr_ini, &cdr_boot, &cdr_attach, &cdr_detach,
     NULL, DEV_DISABLE | DEV_DEBUG | DEV_CARD, 0, cdr_debug,
@@ -175,8 +176,13 @@ MTAB                cdp_mod[] = {
     {0}
 };
 
+REG                 cdp_reg[] = {
+    {BRDATA(BUFF, cdp_buffer, 16, 16, sizeof(cdp_buffer)), REG_HRO},
+    {0}
+};  
+
 DEVICE              cdp_dev = {
-    "CP", cdp_unit, NULL, cdp_mod,
+    "CP", cdp_unit, cdp_reg, cdp_mod,
     NUM_DEVS_CDP, 8, 15, 1, 8, 8,
     NULL, NULL, &cdp_ini, NULL, &cdp_attach, &cdp_detach,
     NULL, DEV_DISABLE | DEV_DEBUG | DEV_CARD, 0, cdr_debug,
@@ -201,8 +207,13 @@ MTAB                lpr_mod[] = {
     {0}
 };
 
+REG                 lpr_reg[] = {
+    {BRDATA(BUFF, lpr_buffer, 16, 8, sizeof(lpr_buffer)), REG_HRO},
+    {0}
+};  
+
 DEVICE              lpr_dev = {
-    "LP", lpr_unit, NULL, lpr_mod,
+    "LP", lpr_unit, lpr_reg, lpr_mod,
     NUM_DEVS_LPR, 8, 15, 1, 8, 8,
     NULL, NULL, &lpr_ini, NULL, &lpr_attach, &lpr_detach,
     NULL, DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
@@ -216,8 +227,13 @@ UNIT                con_unit[] = {
     {UDATA(con_srv, UNIT_IDLE, 0), 0},  /* A */
 };
 
+REG                 con_reg[] = {
+    {BRDATA(BUFF, con_data, 16, 8, sizeof(con_data)), REG_HRO},
+    {0}
+};  
+
 DEVICE              con_dev = {
-    "CON", con_unit, NULL, NULL,
+    "CON", con_unit, con_reg, NULL,
     NUM_DEVS_CON, 8, 15, 1, 8, 8,
     NULL, NULL, &con_ini, NULL, NULL, NULL,
     NULL, DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
@@ -318,7 +334,7 @@ t_stat
 cdr_srv(UNIT *uptr) {
     int                 chan = URCSTA_CHMASK & uptr->CMD;
     int                 u = (uptr - cdr_unit);
-    uint16              *image = (uint16 *)(uptr->CARDIMG);
+    uint16              *image = &cdr_buffer[u][0];
 
     if (uptr->CMD & URCSTA_EOF) {
         sim_debug(DEBUG_DETAIL, &cdr_dev, "cdr %d %d unready\n", u, chan);
@@ -475,10 +491,6 @@ cdr_attach(UNIT * uptr, CONST char *file)
 
     if ((r = sim_card_attach(uptr, file)) != SCPE_OK)
         return r;
-    if (uptr->CARDIMG == 0) 
-        uptr->CARDIMG = malloc(sizeof(uint16)*80);
-    uptr->CMD &= URCSTA_BUSY;
-    uptr->POS = 0;
     iostatus |= (CARD1_FLAG << u);
     return SCPE_OK;
 }
@@ -488,9 +500,6 @@ cdr_detach(UNIT * uptr)
 {
     int                 u = uptr-cdr_unit;
 
-    if (uptr->CARDIMG != 0)
-        free(uptr->CARDIMG);
-    uptr->CARDIMG = 0;
     iostatus &= ~(CARD1_FLAG << u);
     return sim_card_detach(uptr);
 }
@@ -535,7 +544,7 @@ t_stat
 cdp_srv(UNIT *uptr) {
     int                 chan = URCSTA_CHMASK & uptr->CMD;
     int                 u = (uptr - cdp_unit);
-    uint16              *image = (uint16 *)(uptr->CARDIMG);
+    uint16              *image = &cdp_buffer[u][0];
 
     if (uptr->CMD & URCSTA_BUSY) {
         /* Done waiting, punch card */
@@ -609,24 +618,18 @@ cdp_attach(UNIT * uptr, CONST char *file)
 
     if ((r = sim_card_attach(uptr, file)) != SCPE_OK)
         return r;
-    if (uptr->CARDIMG == 0) {
-        uptr->CARDIMG = calloc(80, sizeof(uint16));
-        uptr->CMD = 0;
-        iostatus |= PUNCH_FLAG;
-    }
+    iostatus |= PUNCH_FLAG;
     return SCPE_OK;
 }
 
 t_stat
 cdp_detach(UNIT * uptr)
 {
-    uint16              *image = (uint16 *)(uptr->CARDIMG);
+    int                 u = uptr-cdr_unit;
+    uint16              *image = &cdp_buffer[u][0];
 
     if (uptr->CMD & URCSTA_FULL)
         sim_punch_card(uptr, image);
-    if (uptr->CARDIMG != 0)
-        free(uptr->CARDIMG);
-    uptr->CARDIMG = 0;
     iostatus &= ~PUNCH_FLAG;
     return sim_card_detach(uptr);
 }
@@ -716,7 +719,7 @@ print_line(UNIT * uptr, int unit)
 
         /* Scan each column */
         for (i = 0; i < uptr->POS; i++) {
-            int                 bcd = lpr_data[unit].lbuff[i] & 077;
+            int                 bcd = lpr_buffer[unit][i] & 077;
 
             out[i] = con_to_ascii[bcd];
         }
@@ -868,10 +871,10 @@ lpr_srv(UNIT *uptr) {
 
     /* Copy next column over */
     if ((uptr->CMD & URCSTA_BUSY) != 0) {
-        if(chan_read_char(chan, &lpr_data[u].lbuff[uptr->POS], 0)) {
+        if(chan_read_char(chan, &lpr_buffer[u][uptr->POS], 0)) {
             /* Done waiting, print line */
             print_line(uptr, u);
-            memset(&lpr_data[u].lbuff[0], 0, 144);
+            memset(&lpr_buffer[u][0], 0, 144);
             uptr->CMD |= URCSTA_FULL;
             uptr->CMD &= ~URCSTA_BUSY;
             chan_set_wc(chan, (uptr->POS/8));
@@ -880,7 +883,7 @@ lpr_srv(UNIT *uptr) {
             return SCPE_OK;
         } else {
             sim_debug(DEBUG_DATA, &lpr_dev, "lpr %d: Char < %02o\n", u,
-                        lpr_data[u].lbuff[uptr->POS]);
+                        lpr_buffer[u][uptr->POS]);
             uptr->POS++;
         }
         sim_activate(uptr, 50);
@@ -896,9 +899,11 @@ lpr_attach(UNIT * uptr, CONST char *file)
 
     if ((r = attach_unit(uptr, file)) != SCPE_OK)
         return r;
-    uptr->CMD = 0;
-    uptr->LINENUM = 0;
-    uptr->POS = 0;
+    if ((sim_switches & SIM_SW_REST) == 0) {
+        uptr->CMD = 0;
+        uptr->LINENUM = 0;
+        uptr->POS = 0;
+    }
     iostatus |= PRT1_FLAG << u;
     return SCPE_OK;
 }

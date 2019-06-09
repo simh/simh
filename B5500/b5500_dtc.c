@@ -192,6 +192,17 @@ MTAB                dtc_mod[] = {
     {0}
 };
 
+REG                 dtc_reg[] = {
+    {ORDATAD(BUFSIZE, dtc_bufsize, 8, "Buffer size"), REG_HRO},
+    {ORDATAD(NLINES, dtc_desc.lines, 8, "Buffer size"), REG_HRO},
+    {BRDATA(BUF, dtc_buf, 16, 8, sizeof(dtc_buf)), REG_HRO},
+    {BRDATA(LSTAT, dtc_lstatus, 16, 8, sizeof(dtc_lstatus)), REG_HRO},
+    {BRDATA(BUFPTR, dtc_bufptr, 16, 16, sizeof(dtc_bufptr)), REG_HRO},
+    {BRDATA(BUFSIZ, dtc_bsize, 16, 16, sizeof(dtc_bsize)), REG_HRO},
+    {BRDATA(BUFLIM, dtc_blimit, 16, 16, sizeof(dtc_blimit)), REG_HRO},
+    {0}
+};
+
 
 UNIT                dtc_unit[] = {
     {UDATA(&dtc_srv, UNIT_DTC, 0)},                   /* DTC */
@@ -199,7 +210,7 @@ UNIT                dtc_unit[] = {
 };
 
 DEVICE              dtc_dev = {
-    "DTC", dtc_unit, NULL, dtc_mod,
+    "DTC", dtc_unit, dtc_reg, dtc_mod,
     2, 8, 15, 1, 8, 64,
     NULL, NULL, &dtc_reset, NULL, &dtc_attach, &dtc_detach,
     NULL, DEV_DISABLE | DEV_DEBUG | DEV_MUX, 0, dev_debug,
