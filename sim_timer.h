@@ -112,10 +112,10 @@ int32 sim_rtcn_init_unit_ticks (UNIT *uptr, int32 time, int32 tmr, int32 tickspe
 void sim_rtcn_get_time (struct timespec *now, int tmr);
 t_stat sim_rtcn_tick_ack (uint32 time, int32 tmr);
 void sim_rtcn_init_all (void);
-int32 sim_rtcn_calb (int32 ticksper, int32 tmr);
+int32 sim_rtcn_calb (uint32 ticksper, int32 tmr);
 int32 sim_rtcn_calb_tick (int32 tmr);
 int32 sim_rtc_init (int32 time);
-int32 sim_rtc_calb (int32 ticksper);
+int32 sim_rtc_calb (uint32 ticksper);
 t_stat sim_set_timers (int32 arg, CONST char *cptr);
 t_stat sim_show_timers (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST char* desc);
 t_stat sim_show_clock_queues (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
