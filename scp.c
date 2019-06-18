@@ -2619,6 +2619,10 @@ if (*argv[0]) {                                         /* sim name arg? */
     setenv ("SIM_BIN_PATH", argv[0], 1);
     }
 sim_argv = argv;
+
+if (sim_switches & SWMASK ('T'))                       /* Command Line -T switch */
+    stat = sim_library_unit_tests ();                   /* run library unit tests */
+
 cptr = getenv("HOME");
 if (cptr == NULL) {
     cptr = getenv("HOMEPATH");
@@ -2656,9 +2660,6 @@ else if (*argv[0]) {                                    /* sim name arg? */
     }
 if (SCPE_BARE_STATUS(stat) == SCPE_OPENERR)             /* didn't exist/can't open? */
     stat = SCPE_OK;
-
-if (sim_switches & SWMASK ('T'))                       /* Command Line -T switch */
-    stat = sim_library_unit_tests ();                   /* run library unit tests */
 
 if (SCPE_BARE_STATUS(stat) != SCPE_EXIT)
     process_stdin_commands (SCPE_BARE_STATUS(stat), argv);
