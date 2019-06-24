@@ -2986,15 +2986,15 @@ if (!plugs_inited ) {
     char uname[16];
 
     plugs_inited  = TRUE;
-    dptr->units[RQ_TIMER].action = &rq_tmrsvc;
-    dptr->units[RQ_TIMER].flags = UNIT_IDLE|UNIT_DIS;
-    sprintf (uname, "%s-TIMER", dptr->name);
-    sim_set_uname (&dptr->units[RQ_TIMER], uname);
-    dptr->units[RQ_QUEUE].action = &rq_quesvc;
-    dptr->units[RQ_QUEUE].flags = UNIT_DIS;
-    sprintf (uname, "%s-QUESVC", dptr->name);
-    sim_set_uname (&dptr->units[RQ_QUEUE], uname);
     for (i = 0; i < RQ_NUMCT; i++) {
+        rq_devmap[i]->units[RQ_TIMER].action = &rq_tmrsvc;
+        rq_devmap[i]->units[RQ_TIMER].flags = UNIT_IDLE|UNIT_DIS;
+        sprintf (uname, "%s-TIMER", rq_devmap[i]->name);
+        sim_set_uname (&rq_devmap[i]->units[RQ_TIMER], uname);
+        rq_devmap[i]->units[RQ_QUEUE].action = &rq_quesvc;
+        rq_devmap[i]->units[RQ_QUEUE].flags = UNIT_DIS;
+        sprintf (uname, "%s-QUESVC", rq_devmap[i]->name);
+        sim_set_uname (&rq_devmap[i]->units[RQ_QUEUE], uname);
         for (d = 0; d < rq_devmap[i]->numunits - 2; d++) {
             if (d >= RQ_NUMDR) {
                 rq_devmap[i]->units[d] = rq_devmap[i]->units[0];
@@ -3005,9 +3005,8 @@ if (!plugs_inited ) {
 #if defined (VM_VAX)
                 d;          /* VAX default units */
 #else           
-                u;          /* PDP11 unique unit numbers */
+                (d < RQ_NUMDR) ? u++ : d;          /* PDP11 unique unit numbers */
 #endif
-            ++u;
             }
         }
     }
