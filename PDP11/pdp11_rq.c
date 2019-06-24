@@ -148,7 +148,8 @@ extern int32 MMR2;
 #define RQ_SVER         3                               /* software version */
 #define RQ_DHTMO        60                              /* def host timeout */
 #define RQ_DCTMO        120                             /* def ctrl timeout */
-#define RQ_NUMDR        4                               /* # drives */
+#define RQ_NUMDR        4                               /* def # drives */
+#define RQ_MAXDR        254                             /* max # drives */
 #define RQ_NUMBY        512                             /* bytes per block */
 #define RQ_MAXFR        (1 << 16)                       /* max xfer */
 #define RQ_MAPXFER      (1u << 31)                      /* mapped xfer */
@@ -193,8 +194,8 @@ extern int32 MMR2;
 #define ERR             0                               /* must be SCPE_OK! */
 #define OK              1
 
-#define RQ_TIMER        (RQ_NUMDR)
-#define RQ_QUEUE        (RQ_TIMER + 1)
+#define RQ_TIMER        (RQ_MAXDR)
+#define RQ_QUEUE        (RQ_MAXDR + 1)
 
 /* Internal packet management.  The real RQDX3 manages its packets as true
    linked lists.  However, use of actual addresses in structures won't work
@@ -879,6 +880,7 @@ t_stat rq_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat rq_set_ctype (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat rq_set_plug (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat rq_show_plug (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat rq_set_drives (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat rq_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat rq_show_ctype (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat rq_show_wlk (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
@@ -946,7 +948,7 @@ DIB rq_dib = {
     1, IVCL (RQ), 0, { &rq_inta }, IOLN_RQ
     };
 
-UNIT rq_unit[] = {
+UNIT rq_unit[RQ_MAXDR + 2] = {
     { UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
     { UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
@@ -955,8 +957,6 @@ UNIT rq_unit[] = {
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
     { UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
             (RX50_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RX50)) },
-    { UDATA (&rq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
-    { UDATA (&rq_quesvc, UNIT_DIS, 0) }
     };
 
 REG rq_reg[] = {
@@ -1084,6 +1084,8 @@ MTAB rq_mod[] = {
       NULL, &rq_show_type, NULL, "Display device type" },
     { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "UNIT", "UNIT=val (0-65534)",
       &rq_set_plug, &rq_show_plug, NULL, "Set/Display Unit plug value" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, NULL, "DRIVES=val (4-254)",
+      &rq_set_drives, NULL, NULL, "Set Number of Drives" },
     { UNIT_NOAUTO, UNIT_NOAUTO, "noautosize", "NOAUTOSIZE", NULL, NULL, NULL, "Disables disk autosize on attach" },
     { UNIT_NOAUTO,           0, "autosize",   "AUTOSIZE",   NULL, NULL, NULL, "Enables disk autosize on attach" },
     { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "FORMAT", "FORMAT={SIMH|VHD|RAW}",
@@ -1106,7 +1108,7 @@ MTAB rq_mod[] = {
 
 DEVICE rq_dev = {
     "RQ", rq_unit, rq_reg, rq_mod,
-    RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
+    RQ_MAXDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
     &rq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK | DEV_SECTORS,
@@ -1129,7 +1131,7 @@ DIB rqb_dib = {
     1, IVCL (RQ), 0, { &rq_inta }, IOLN_RQ
     };
 
-UNIT rqb_unit[] = {
+UNIT rqb_unit[RQ_MAXDR + 2] = {
     { UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
     { UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
@@ -1138,8 +1140,6 @@ UNIT rqb_unit[] = {
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
     { UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
-    { UDATA (&rq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
-    { UDATA (&rq_quesvc, UNIT_DIS, 0) }
     };
 
 REG rqb_reg[] = {
@@ -1181,7 +1181,7 @@ REG rqb_reg[] = {
 
 DEVICE rqb_dev = {
     "RQB", rqb_unit, rqb_reg, rq_mod,
-    RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
+    RQ_MAXDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
     &rqb_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK | DEV_SECTORS,
@@ -1204,7 +1204,7 @@ DIB rqc_dib = {
     1, IVCL (RQ), 0, { &rq_inta }, IOLN_RQ
     };
 
-UNIT rqc_unit[] = {
+UNIT rqc_unit[RQ_MAXDR + 2] = {
     { UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
     { UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
@@ -1213,8 +1213,6 @@ UNIT rqc_unit[] = {
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
     { UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
-    { UDATA (&rq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
-    { UDATA (&rq_quesvc, UNIT_DIS, 0) }
     };
 
 REG rqc_reg[] = {
@@ -1256,7 +1254,7 @@ REG rqc_reg[] = {
 
 DEVICE rqc_dev = {
     "RQC", rqc_unit, rqc_reg, rq_mod,
-    RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
+    RQ_MAXDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
     &rqc_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK | DEV_SECTORS,
@@ -1279,7 +1277,7 @@ DIB rqd_dib = {
     1, IVCL (RQ), 0, { &rq_inta }, IOLN_RQ
     };
 
-UNIT rqd_unit[] = {
+UNIT rqd_unit[RQ_MAXDR + 2] = {
     { UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
     { UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
@@ -1288,8 +1286,6 @@ UNIT rqd_unit[] = {
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
     { UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
-    { UDATA (&rq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
-    { UDATA (&rq_quesvc, UNIT_DIS, 0) }
     };
 
 REG rqd_reg[] = {
@@ -1331,7 +1327,7 @@ REG rqd_reg[] = {
 
 DEVICE rqd_dev = {
     "RQD", rqd_unit, rqd_reg, rq_mod,
-    RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
+    RQ_MAXDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
     &rqd_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK | DEV_SECTORS,
@@ -2866,6 +2862,43 @@ uptr->unit_plug = plug;
 return SCPE_OK;
 }
 
+/* Set number of drives */
+
+t_stat rq_set_drives (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+uint32 new_drives;
+uint32 i;
+t_stat r;
+DEVICE *dptr = find_dev_from_unit (uptr);
+uint32 old_drives = 0;
+
+if ((cptr == NULL) || (*cptr == '\0'))
+    return sim_messagef (SCPE_ARG, "Must specify DRIVES=value\n");
+for (i=0; i < dptr->numunits; i++) {
+    if (dptr->units[i].flags & UNIT_DISABLE)
+        ++old_drives;
+    }
+new_drives = (int32) get_uint (cptr, 10, RQ_MAXDR, &r);
+if ((r != SCPE_OK) || (new_drives > RQ_MAXDR) || (new_drives < RQ_NUMDR))
+    return sim_messagef (SCPE_ARG, "Invalid Number of Drives: %s\n", cptr);
+if (old_drives == new_drives)
+    return SCPE_OK;                         /* Nothing to do */
+for (i=new_drives; i < old_drives; i++) {
+    if (dptr->units[i].flags & UNIT_ATT)
+        return sim_messagef (SCPE_ALATT, "Can't change number of drives on %s with %s attached to %s.\n", 
+                                         dptr->name, sim_uname (&dptr->units[i]), dptr->units[i].filename);
+    }
+for (i=old_drives; i < new_drives; i++) {
+    dptr->units[i].flags &= ~UNIT_DIS;
+    dptr->units[i].flags |= UNIT_DISABLE;
+    }
+for (i=new_drives; i < old_drives; i++) {
+    dptr->units[i].flags |= UNIT_DIS;
+    dptr->units[i].flags &= ~UNIT_DISABLE;
+    }
+return SCPE_OK;
+}
+
 /* Show unit type */
 
 t_stat rq_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
@@ -2952,13 +2985,22 @@ if (!plugs_inited ) {
     uint32 d, u = 0;
     char uname[16];
 
-    sprintf (uname, "%s-TIMER", dptr->name);
-    sim_set_uname (&dptr->units[4], uname);
-    sprintf (uname, "%s-QUESVC", dptr->name);
-    sim_set_uname (&dptr->units[5], uname);
     plugs_inited  = TRUE;
+    dptr->units[RQ_TIMER].action = &rq_tmrsvc;
+    dptr->units[RQ_TIMER].flags = UNIT_IDLE|UNIT_DIS;
+    sprintf (uname, "%s-TIMER", dptr->name);
+    sim_set_uname (&dptr->units[RQ_TIMER], uname);
+    dptr->units[RQ_QUEUE].action = &rq_quesvc;
+    dptr->units[RQ_QUEUE].flags = UNIT_DIS;
+    sprintf (uname, "%s-QUESVC", dptr->name);
+    sim_set_uname (&dptr->units[RQ_QUEUE], uname);
     for (i = 0; i < RQ_NUMCT; i++) {
         for (d = 0; d < rq_devmap[i]->numunits - 2; d++) {
+            if (d >= RQ_NUMDR) {
+                rq_devmap[i]->units[d] = rq_devmap[i]->units[0];
+                rq_devmap[i]->units[d].flags |= UNIT_DIS;
+                rq_devmap[i]->units[d].flags &= ~UNIT_DISABLE;
+                }
             rq_devmap[i]->units[d].unit_plug = 
 #if defined (VM_VAX)
                 d;          /* VAX default units */
@@ -3008,7 +3050,7 @@ for (i = 0; i < (RQ_NUMDR + 2); i++) {                  /* init units */
         return SCPE_MEM;
     }
 for (i=cp->max_plug=0; i<RQ_NUMDR; i++)
-    if (dptr->units[i].unit_plug > cp->max_plug)
+    if ((0 == (dptr->units[i].flags & UNIT_DIS)) && (dptr->units[i].unit_plug > cp->max_plug))
         cp->max_plug = (uint16)dptr->units[i].unit_plug;
 return auto_config (0, 0);                              /* run autoconfig */
 }
@@ -3197,7 +3239,8 @@ t_stat rq_show_ctrl (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 MSC *cp = rq_ctxmap[uptr->cnum];
 DEVICE *dptr = rq_devmap[uptr->cnum];
-int32 i, pkt;
+uint32 i;
+int32 pkt;
 
 if (cp->csta != CST_UP) {
     fprintf (st, "Controller is not initialized\n");
@@ -3235,8 +3278,9 @@ if (val & RQ_SH_RS) {
     else fprintf (st, "Response queue is empty\n");
     }
 if (val & RQ_SH_UN) {
-    for (i = 0; i < RQ_NUMDR; i++)
-        rq_show_unitq (st, dptr->units + i, 0, desc);
+    for (i = 0; i < (dptr->numunits - 2); i++)
+        if (0 == (dptr->units[i].flags & UNIT_DIS)) 
+            rq_show_unitq (st, &dptr->units[i], 0, desc);
     }
 return SCPE_OK;
 }
