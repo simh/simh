@@ -2962,7 +2962,8 @@ return SCPE_OK;
 
 t_stat rq_reset (DEVICE *dptr)
 {
-int32 i, j, cidx;
+uint32 i;
+int32 j, cidx;
 UNIT *uptr;
 MSC *cp;
 static t_bool plugs_inited = FALSE;
@@ -3017,7 +3018,8 @@ dibp->vec = 0;                                          /* no vector */
 cp->comm = 0;                                           /* no comm region */
 if (UNIBUS)                                             /* Unibus? */
     cp->sa = SA_S1 | SA_S1C_DI | SA_S1C_MP;
-else cp->sa = SA_S1 | SA_S1C_Q22 | SA_S1C_DI | SA_S1C_MP; /* init SA val */
+else
+    cp->sa = SA_S1 | SA_S1C_Q22 | SA_S1C_DI | SA_S1C_MP;/* init SA val */
 cp->cflgs = CF_RPL;                                     /* ctrl flgs off */
 cp->htmo = RQ_DHTMO;                                    /* default timeout */
 cp->hat = cp->htmo;                                     /* default timer */
@@ -3036,8 +3038,8 @@ cp->rspq = 0;                                           /* no q'd rsp pkts */
 cp->pbsy = 0;                                           /* all pkts free */
 cp->pip = 0;                                            /* not polling */
 rq_clrint (cp);                                         /* clr intr req */
-for (i = 0; i < (RQ_NUMDR + 2); i++) {                  /* init units */
-    uptr = dptr->units + i;
+for (i = 0; i < dptr->numunits; i++) {                  /* init units */
+    uptr = &dptr->units[i];
     sim_cancel (uptr);                                  /* clr activity */
     sim_disk_reset (uptr);
     uptr->cnum = cidx;                                  /* set ctrl index */
@@ -3048,7 +3050,7 @@ for (i = 0; i < (RQ_NUMDR + 2); i++) {                  /* init units */
     if (uptr->rqxb == NULL)
         return SCPE_MEM;
     }
-for (i=cp->max_plug=0; i<RQ_NUMDR; i++)
+for (i=cp->max_plug = 0; i < (dptr->numunits - 2); i++)
     if ((0 == (dptr->units[i].flags & UNIT_DIS)) && (dptr->units[i].unit_plug > cp->max_plug))
         cp->max_plug = (uint16)dptr->units[i].unit_plug;
 return auto_config (0, 0);                              /* run autoconfig */
