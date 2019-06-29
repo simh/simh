@@ -38,6 +38,7 @@
 #include "3b2_ctc.h"
 #include "3b2_ports.h"
 #include "3b2_ni.h"
+#include "3b2_mau.h"
 #include "3b2_sysdev.h"
 
 char sim_name[] = "AT&T 3B2 Model 400";
@@ -53,6 +54,7 @@ extern instr *cpu_instr;
 DEVICE *sim_devices[] = {
     &cpu_dev,
     &mmu_dev,
+    &mau_dev,
     &timer_dev,
     &tod_dev,
     &nvram_dev,
@@ -86,6 +88,7 @@ const char *sim_stop_messages[] = {
 void full_reset()
 {
     cpu_reset(&cpu_dev);
+    mau_reset(&mau_dev);
     tti_reset(&tti_dev);
     contty_reset(&contty_dev);
     iu_timer_reset(&iu_timer_dev);

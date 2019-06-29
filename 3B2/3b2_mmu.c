@@ -52,11 +52,32 @@ REG mmu_reg[] = {
 };
 
 DEVICE mmu_dev = {
-    "MMU", &mmu_unit, mmu_reg, NULL,
-    1, 16, 8, 4, 16, 32,
-    NULL, NULL, &mmu_init,
-    NULL, NULL, NULL, NULL,
-    DEV_DEBUG, 0, sys_deb_tab
+    "MMU",                          /* name */
+    &mmu_unit,                      /* units */
+    mmu_reg,                        /* registers */
+    NULL,                           /* modifiers */
+    1,                              /* #units */
+    16,                             /* address radix */
+    8,                              /* address width */
+    4,                              /* address incr */
+    16,                             /* data radix */
+    32,                             /* data width */
+    NULL,                           /* examine routine */
+    NULL,                           /* deposit routine */
+    &mmu_init,                      /* reset routine */
+    NULL,                           /* boot routine */
+    NULL,                           /* attach routine */
+    NULL,                           /* detach routine */
+    NULL,                           /* context */
+    DEV_DEBUG,                      /* flags */
+    0,                              /* debug control flags */
+    sys_deb_tab,                    /* debug flag names */
+    NULL,                           /* memory size change */
+    NULL,                           /* logical name */
+    NULL,                           /* help routine */
+    NULL,                           /* attach help routine */
+    NULL,                           /* help context */
+    &mmu_description                /* device description */
 };
 
 /*
@@ -1082,4 +1103,9 @@ void write_h(uint32 va, uint16 val)
 void write_w(uint32 va, uint32 val)
 {
     pwrite_w(mmu_xlate_addr(va, ACC_W), val);
+}
+
+CONST char *mmu_description(DEVICE *dptr)
+{
+    return "WE32101";
 }

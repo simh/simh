@@ -221,6 +221,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\3B2\3b2_mau.c"
+				>
+			</File>
+			<File
 				RelativePath="..\3B2\3b2_mmu.c"
 				>
 			</File>
@@ -506,6 +510,10 @@
 			</File>
 			<File
 				RelativePath="..\3B2\3b2_iu.h"
+				>
+			</File>
+			<File
+				RelativePath="..\3B2\3b2_mau.h"
 				>
 			</File>
 			<File

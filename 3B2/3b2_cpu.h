@@ -377,7 +377,7 @@ typedef struct _operand {
  * An inst is a combination of a decoded instruction and
  * 0 to 4 operands. Also used for history record keeping.
  */
-typedef struct _instr {
+typedef struct {
     mnemonic *mn;
     uint32 psw;
     uint32 sp;
@@ -401,6 +401,7 @@ t_stat cpu_show_cio(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat cpu_set_halt(UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_clear_halt(UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_boot(int32 unit_num, DEVICE *dptr);
+CONST char *cpu_description(DEVICE *dptr);
 
 t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs);
 

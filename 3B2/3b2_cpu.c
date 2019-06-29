@@ -178,9 +178,6 @@ static DEBTAB cpu_deb_tab[] = {
 
 UNIT cpu_unit = { UDATA (NULL, UNIT_FIX|UNIT_BINK|UNIT_IDLE, MAXMEMSIZE) };
 
-#define UNIT_V_EXHALT   (UNIT_V_UF + 0)                 /* halt to console */
-#define UNIT_EXHALT     (1u << UNIT_V_EXHALT)
-
 /*
  * TODO: This works fine for now, but the moment we want to emulate
  * SCSI (0x0100) or EPORTS (0x0102) we're in trouble!
@@ -236,7 +233,11 @@ DEVICE cpu_dev = {
     0,                   /* Debug control flags */
     cpu_deb_tab,         /* Debug flag names */
     &cpu_set_size,       /* Memory size change */
-    NULL                 /* Logical names */
+    NULL,                /* Logical names */
+    NULL,                /* Help routine */
+    NULL,                /* Attach Help Routine */
+    NULL,                /* Help Context */
+    &cpu_description     /* Device Description */
 };
 
 #define HWORD_OP_COUNT 11
@@ -259,12 +260,12 @@ mnemonic hword_ops[HWORD_OP_COUNT] = {
 mnemonic ops[256] = {
     {0x00,  0, OP_NONE, NA, "halt",   -1, -1, -1, -1},
     {0x01, -1, OP_NONE, NA, "???",    -1, -1, -1, -1},
-    {0x02,  2, OP_COPR, WD, "SPOPRD", -1, -1, -1, -1},
-    {0x03,  3, OP_COPR, WD, "SPOPD2", -1, -1, -1, -1},
+    {0x02,  2, OP_COPR, WD, "SPOPRD",  1, -1, -1, -1},
+    {0x03,  3, OP_COPR, WD, "SPOPD2",  1, -1, -1,  2},
     {0x04,  2, OP_DESC, WD, "MOVAW",   0, -1, -1,  1},
     {0x05, -1, OP_NONE, NA, "???",    -1, -1, -1, -1},
-    {0x06,  2, OP_COPR, WD, "SPOPRT", -1, -1, -1, -1},
-    {0x07,  3, OP_COPR, WD, "SPOPT2", -1, -1, -1, -1},
+    {0x06,  2, OP_COPR, WD, "SPOPRT",  1, -1, -1, -1},
+    {0x07,  3, OP_COPR, WD, "SPOPT2",  1, -1, -1,  2},
     {0x08,  0, OP_NONE, NA, "RET",    -1, -1, -1, -1},
     {0x09, -1, OP_NONE, NA, "???",    -1, -1, -1, -1},
     {0x0a, -1, OP_NONE, NA, "???",    -1, -1, -1, -1},
@@ -276,11 +277,11 @@ mnemonic ops[256] = {
     {0x10,  1, OP_DESC, WD, "SAVE",    0, -1, -1, -1},
     {0x11, -1, OP_NONE, NA, "???",    -1, -1, -1, -1},
     {0x12, -1, OP_NONE, NA, "???",    -1, -1, -1, -1},
-    {0x13,  2, OP_COPR, WD, "SPOPWD", -1, -1, -1, -1},
+    {0x13,  2, OP_COPR, WD, "SPOPWD", -1, -1, -1,  1},
     {0x14,  1, OP_BYTE, NA, "EXTOP",  -1, -1, -1, -1},
     {0x15, -1, OP_NONE, NA, "???",    -1, -1, -1, -1},
     {0x16, -1, OP_NONE, NA, "???",    -1, -1, -1, -1},
-    {0x17,  2, OP_COPR, WD, "SPOPWT", -1, -1, -1, -1},
+    {0x17,  2, OP_COPR, WD, "SPOPWT", -1, -1, -1,  1},
     {0x18,  1, OP_DESC, WD, "RESTORE", 0, -1, -1, -1},
     {0x19, -1, OP_NONE, NA, "???",    -1, -1, -1, -1},
     {0x1a, -1, OP_NONE, NA, "???",    -1, -1, -1, -1},
@@ -291,8 +292,8 @@ mnemonic ops[256] = {
     {0x1f,  1, OP_DESC, BT, "SWAPBI", -1, -1, -1,  0}, /* 3-122 252 */
     {0x20,  1, OP_DESC, WD, "POPW",   -1, -1, -1,  0},
     {0x21, -1, OP_NONE, NA, "???",    -1, -1, -1, -1},
-    {0x22,  2, OP_COPR, WD, "SPOPRS", -1, -1, -1, -1},
-    {0x23,  3, OP_COPR, WD, "SPOPS2", -1, -1, -1, -1},
+    {0x22,  2, OP_COPR, WD, "SPOPRS",  1, -1, -1, -1},
+    {0x23,  3, OP_COPR, WD, "SPOPS2",  1, -1, -1,  2},
     {0x24,  1, OP_DESC, NA, "JMP",    -1, -1, -1,  0},
     {0x25, -1, OP_NONE, NA, "???",    -1, -1, -1, -1},
     {0x26, -1, OP_NONE, NA, "???",    -1, -1, -1, -1},
@@ -308,7 +309,7 @@ mnemonic ops[256] = {
     {0x30, -1, OP_NONE, NA, "???",    -1, -1, -1, -1}, /* Two-byte instructions */
     {0x31, -1, OP_NONE, NA, "???",    -1, -1, -1, -1},
     {0x32,  1, OP_COPR, WD, "SPOP",   -1, -1, -1, -1},
-    {0x33,  2, OP_COPR, WD, "SPOPWS", -1, -1, -1, -1},
+    {0x33,  2, OP_COPR, WD, "SPOPWS", -1, -1, -1,  1},
     {0x34,  1, OP_DESC, WD, "JSB",    -1, -1, -1,  0},
     {0x35, -1, OP_NONE, NA, "???",    -1, -1, -1, -1},
     {0x36,  1, OP_HALF, NA, "BSBH",   -1, -1, -1,  0},
@@ -1709,6 +1710,9 @@ t_stat sim_instr(void)
     /* Generic index */
     uint32   i;
 
+    /* Used by oprocessor instructions */
+    uint32   coprocessor_word;
+
     operand *src1, *src2, *src3, *dst;
 
     stop_reason = 0;
@@ -1867,6 +1871,11 @@ t_stat sim_instr(void)
         /*
          * Operate on the decoded instruction.
          */
+
+        /* Special case for coprocessor instructions */
+        if (cpu_instr->mn->mode == OP_COPR) {
+            coprocessor_word = cpu_instr->operands[0].embedded.w;
+        }
 
         /* Get the operands */
         if (cpu_instr->mn->src_op1 >= 0) {
@@ -2834,18 +2843,40 @@ t_stat sim_instr(void)
             pc_incr = 0;
             break;
         case SPOP:
+            sim_debug(TRACE_DBG, &cpu_dev, "SPOP\n");
+            /* Memory fault is signaled when no support processor is
+               active */
+            if (mau_broadcast(coprocessor_word, 0, 0) != SCPE_OK) {
+                cpu_abort(NORMAL_EXCEPTION, EXTERNAL_MEMORY_FAULT);
+            }
+            break;
         case SPOPD2:
         case SPOPS2:
         case SPOPT2:
+            sim_debug(TRACE_DBG, &cpu_dev, "SPOP{D|S|T}2\n");
+            a = cpu_effective_address(src1);
+            b = cpu_effective_address(dst);
+            if (mau_broadcast(coprocessor_word, a, b) != SCPE_OK) {
+                cpu_abort(NORMAL_EXCEPTION, EXTERNAL_MEMORY_FAULT);
+            }
+            break;
         case SPOPRD:
         case SPOPRS:
         case SPOPRT:
+            sim_debug(TRACE_DBG, &cpu_dev, "SPOPR{D|S|T}\n");
+            a = cpu_effective_address(src1);
+            if (mau_broadcast(coprocessor_word, a, 0) != SCPE_OK) {
+                cpu_abort(NORMAL_EXCEPTION, EXTERNAL_MEMORY_FAULT);
+            }
+            break;
         case SPOPWD:
         case SPOPWS:
         case SPOPWT:
-            /* Memory fault is signaled when no support processor is
-               active */
-            cpu_abort(NORMAL_EXCEPTION, EXTERNAL_MEMORY_FAULT);
+            sim_debug(TRACE_DBG, &cpu_dev, "SPOPW{D|S|T}\n");
+            a = cpu_effective_address(dst);
+            if (mau_broadcast(coprocessor_word, 0, a) != SCPE_OK) {
+                cpu_abort(NORMAL_EXCEPTION, EXTERNAL_MEMORY_FAULT);
+            }
             break;
         case SUBW2:
         case SUBH2:
@@ -3682,20 +3713,19 @@ static SIM_INLINE void add(t_uint64 a, t_uint64 b, operand *dst)
 void cpu_abort(uint8 et, uint8 isc)
 {
     /* We don't trap Integer Overflow if the OE bit is not set */
-    if ((R[NUM_PSW] & PSW_OE_MASK) || isc != INTEGER_OVERFLOW) {
-        R[NUM_PSW] &= ~(PSW_ET_MASK);  /* Clear ET  */
-        R[NUM_PSW] &= ~(PSW_ISC_MASK); /* Clear ISC */
-        R[NUM_PSW] |= et;                         /* Set ET    */
-        R[NUM_PSW] |= (uint32) (isc << PSW_ISC);  /* Set ISC   */
-
-        /* TODO: We no longer use ABORT_TRAP or ABORT_EXC, so
-         * it would be nice to clean this up. */
-        if (et == 3 && (isc == BREAKPOINT_TRAP ||
-                        isc == INTEGER_OVERFLOW ||
-                        isc == TRACE_TRAP)) {
-            longjmp(save_env, ABORT_TRAP);
-        } else {
-            longjmp(save_env, ABORT_EXC);
-        }
+    if ((R[NUM_PSW] & PSW_OE_MASK) == 0 && isc == INTEGER_OVERFLOW) {
+        return;
     }
+
+    R[NUM_PSW] &= ~(PSW_ET_MASK);  /* Clear ET  */
+    R[NUM_PSW] &= ~(PSW_ISC_MASK); /* Clear ISC */
+    R[NUM_PSW] |= et;                         /* Set ET    */
+    R[NUM_PSW] |= (uint32) (isc << PSW_ISC);  /* Set ISC   */
+
+    longjmp(save_env, ABORT_EXC);
+}
+
+CONST char *cpu_description(DEVICE *dptr)
+{
+    return "WE32100";
 }

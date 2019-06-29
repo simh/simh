@@ -60,6 +60,9 @@ noret __libc_longjmp (jmp_buf buf, int val);
 #define UNUSED(x)  ((void)((x)))
 #endif
 
+#define UNIT_V_EXHALT   (UNIT_V_UF + 0)
+#define UNIT_EXHALT     (1u << UNIT_V_EXHALT)
+
 /* -t flag: Translate a virtual address */
 #define EX_T_FLAG 1 << 19
 /* -v flag for examine routine */
@@ -163,6 +166,7 @@ noret __libc_longjmp (jmp_buf buf, int val);
 #define PKT_DBG      0x0400
 #define ERR_MSG      0x0800
 #define CACHE_DBG    0x1000
+#define DECODE_DBG   0x2000
 
 /* Data types operated on by instructions. NB: These integer values
    have meaning when decoding instructions, so this is not just an
@@ -405,6 +409,11 @@ extern uint32 read_w(uint32 va, uint8 acc);
 extern void write_b(uint32 va, uint8 val);
 extern void write_h(uint32 va, uint16 val);
 extern void write_w(uint32 va, uint32 val);
+extern void pwrite_w(uint32 pa, uint32 val);
+extern uint32 pread_w(uint32 pa);
+
+/* global symbols from the MAU */
+extern t_stat mau_broadcast(uint32 cmd, uint32 src, uint32 dst);
 
 /* Globally scoped CPU functions */
 extern void cpu_abort(uint8 et, uint8 isc);

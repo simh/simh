@@ -322,6 +322,7 @@ extern DEVICE mmu_dev;
 t_stat mmu_init(DEVICE *dptr);
 uint32 mmu_read(uint32 pa, size_t size);
 void mmu_write(uint32 pa, uint32 val, size_t size);
+CONST char *mmu_description(DEVICE *dptr);
 
 /* Physical memory read/write */
 uint8  pread_b(uint32 pa);
