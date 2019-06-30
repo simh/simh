@@ -3690,19 +3690,29 @@ static SIM_INLINE void add(t_uint64 a, t_uint64 b, operand *dst)
 
     switch(op_type(dst)) {
     case WD:
+        cpu_set_c_flag(result > WORD_MASK);
+        cpu_set_v_flag(((a ^ ~b) & (a ^ result)) & WD_MSB);
+        break;
     case UW:
         cpu_set_c_flag(result > WORD_MASK);
-        cpu_set_v_flag(!! (((a ^ ~b) & (a ^ result)) & WD_MSB));
+        cpu_set_v_flag(result > WORD_MASK);
         break;
     case HW:
-    case UH:
         cpu_set_c_flag(result > HALF_MASK);
         cpu_set_v_flag(((a ^ ~b) & (a ^ result)) & HW_MSB);
         break;
+    case UH:
+        cpu_set_c_flag(result > HALF_MASK);
+        cpu_set_v_flag(result > HALF_MASK);
+        break;
     case BT:
+        cpu_set_c_flag(result > BYTE_MASK);
+        cpu_set_v_flag(result > BYTE_MASK);
+        break;
     case SB:
         cpu_set_c_flag(result > BYTE_MASK);
         cpu_set_v_flag(((a ^ ~b) & (a ^ result)) & BT_MSB);
+        break;
     }
 }
 
