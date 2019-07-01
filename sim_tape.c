@@ -515,6 +515,7 @@ static void sim_tape_add_ansi_entry (const char *directory,
                                      const struct stat *filestat,
                                      void *context);
 static t_bool ansi_tape_add_block (ANSI_TAPE *tape, uint8 *block, uint32 size);
+static t_stat sim_export_tape (UNIT *uptr, const char *export_file);
 
 
 /* Enable asynchronous operation */
@@ -610,6 +611,7 @@ struct tape_context *ctx;
 uint32 objc;
 DEVICE *dptr;
 char gbuf[CBUFSIZE];
+char export_file[CBUFSIZE] = "";
 uint32 recsize = 0;
 t_stat r;
 t_bool auto_format = FALSE;
@@ -646,6 +648,8 @@ if ((MT_GET_FMT (uptr) == MTUF_F_TPC) ||
     (MT_GET_FMT (uptr) == MTUF_F_TAR) ||
     (MT_GET_FMT (uptr) == MTUF_F_ANSI))
     sim_switches |= SWMASK ('R');                       /* Force ReadOnly attach for TPC, TAR and ANSI tapes */
+if (sim_switches & SWMASK ('X'))
+    cptr = get_glyph_nc (cptr, export_file, 0);         /* get export file spec */
 if (MT_GET_FMT (uptr) == MTUF_F_ANSI) {
     const char *ocptr = cptr;
     char label[CBUFSIZE] = "simh";
@@ -667,15 +671,15 @@ if (MT_GET_FMT (uptr) == MTUF_F_ANSI) {
         return SCPE_MEM;
     while (*cptr != 0) {                                    /* do all mods */
         cptr = get_glyph_nc (cptr, gbuf, ',');              /* get filename */
-        sim_dir_scan (gbuf, sim_tape_add_ansi_entry, uptr->fileref);
+        sim_dir_scan (gbuf, sim_tape_add_ansi_entry, tape);
         }
-    if (((ANSI_TAPE *)uptr->fileref)->file_count > 0) {
+    if (tape->file_count > 0) {
         r = SCPE_OK;
-        ansi_tape_add_block ((ANSI_TAPE *)uptr->fileref, NULL, 0);  /* Tape Mark */
+        ansi_tape_add_block (tape, NULL, 0);  /* Tape Mark */
         uptr->flags |= UNIT_ATT;
         uptr->filename = (char *)malloc (strlen (ocptr) + 1);
         strcpy (uptr->filename, ocptr);
-        uptr->tape_eom = ((ANSI_TAPE *)uptr->fileref)->record_count;
+        uptr->tape_eom = tape->record_count;
         }
     else {
         r = SCPE_ARG;
@@ -743,6 +747,8 @@ if ((sim_switches & SWMASK ('D')) && !had_debug)
     sim_set_deboff (0, "");
 if (sim_switches & SWMASK ('D'))
     uptr->dctrl = starting_dctrl;
+if ((r == SCPE_OK) && (sim_switches & SWMASK ('X')))
+    r = sim_export_tape (uptr, export_file);
 return r;
 }
 
@@ -838,16 +844,18 @@ fprintf (st, "    -L          Display detailed record size counts observed durin
 fprintf (st, "                validation pass\n");
 fprintf (st, "                contained in the tape image scan performed when it is attached.\n");
 fprintf (st, "    -D          Causes the internal tape structure information to be displayed\n");
-fprintf (st, "                while the tape image is scanned.\n\n");
+fprintf (st, "                while the tape image is scanned.\n");
+fprintf (st, "    -X          Extract a copy of the attached tape and convert it to a SIMH\n");
+fprintf (st, "                format tape image.\n\n");
 fprintf (st, "Notes:  ANSI-VMS, ANSI-RT11, ANSI-RSTS, ANSI-RSX11 formats allows one or several\n");
 fprintf (st, "        files to be presented to as a read only ANSI Level 3 labeled tape with\n");
 fprintf (st, "        file labels that make each individual file accessible directly as files\n");
 fprintf (st, "        on the tape.\n\n");
 fprintf (st, "Examples:\n\n");
-fprintf (st, "  sim> ATTACH -F %s ANSI-VMS Hobbyist-USE-ONLY-VA.TXT\n\n", dptr->name);
-fprintf (st, "  sim> ATTACH -F %s ANSI-RSX11 *.TXT,*.ini,*.exe\n", dptr->name);
-fprintf (st, "  sim> ATTACH -F %s ANSI-RSTS *.TXT,*.SAV\n", dptr->name);
-fprintf (st, "  sim> ATTACH -F %s ANSI-RT11 *.TXT,*.TSK\n", dptr->name);
+fprintf (st, "  sim> ATTACH %s -F ANSI-VMS Hobbyist-USE-ONLY-VA.TXT\n", dptr->name);
+fprintf (st, "  sim> ATTACH %s -F ANSI-RSX11 *.TXT,*.ini,*.exe\n", dptr->name);
+fprintf (st, "  sim> ATTACH %s -FX ANSI-RSTS RSTS.tap *.TXT,*.SAV\n", dptr->name);
+fprintf (st, "  sim> ATTACH %s -F ANSI-RT11 *.TXT,*.TSK\n\n", dptr->name);
 return SCPE_OK;
 }
 
@@ -3330,29 +3338,25 @@ if ((!stop_cpu) &&
      ((uint32)(sim_tape_size (uptr) - (t_offset)uptr->pos) > fmts[MT_GET_FMT (uptr)].eom_remnant) ||
      (unique_record_sizes > 2 * tapemark_total))) {
     remaining_data = (uint32)(sim_tape_size (uptr) - (t_offset)uptr->tape_eom);
-    sim_printf ("Tape Image %s'%s' scanned as %s format.\n", ((MT_GET_FMT (uptr) == MTUF_F_ANSI) ? "made from " : ""), uptr->filename, (MT_GET_FMT (uptr) == MTUF_F_ANSI) ? ansi_args[MT_GET_ANSI_TYP (uptr)].name : fmts[MT_GET_FMT (uptr)].name);
-    if (r != MTSE_EOM)
-        sim_printf ("After processing ");
-    else
-        sim_printf ("contains ");
-    sim_printf ("%u bytes of tape data (%u records, %u tapemarks)\n",
-                data_total, record_total, tapemark_total);
+    sim_messagef (SCPE_OK, "Tape Image %s'%s' scanned as %s format.\n", ((MT_GET_FMT (uptr) == MTUF_F_ANSI) ? "made from " : ""), uptr->filename, (MT_GET_FMT (uptr) == MTUF_F_ANSI) ? ansi_args[MT_GET_ANSI_TYP (uptr)].name : fmts[MT_GET_FMT (uptr)].name);
+    sim_messagef (SCPE_OK, "%s %u bytes of tape data (%u records, %u tapemarks)\n",
+                           (r != MTSE_EOM) ? "After processing" : "contains", data_total, record_total, tapemark_total);
     if ((record_total > 0) && (sim_switches & SWMASK ('L'))) {
-        sim_printf ("Comprising %d different sized records (in record size order):\n", unique_record_sizes);
+        sim_messagef (SCPE_OK, "Comprising %d different sized records (in record size order):\n", unique_record_sizes);
         for (bc = 0; bc <= max; bc++) {
             if (rec_sizes[bc])
-                sim_printf ("%8u %u byte records\n", rec_sizes[bc], (uint32)bc);
+                sim_messagef (SCPE_OK, "%8u %u byte records\n", rec_sizes[bc], (uint32)bc);
             }
         }
     if (r != MTSE_EOM)
-        sim_printf ("Read Tape Record Returned Unexpected Status: %s\n", sim_tape_error_text (r));
+        sim_messagef (SCPE_OK, "Read Tape Record Returned Unexpected Status: %s\n", sim_tape_error_text (r));
     if (remaining_data > fmts[MT_GET_FMT (uptr)].eom_remnant)
-        sim_printf ("%u bytes of unexamined data remain in the tape image file\n", remaining_data);
+        sim_messagef (SCPE_OK, "%u bytes of unexamined data remain in the tape image file\n", remaining_data);
     }
 if ((!stop_cpu) && 
     (unique_record_sizes > 2 * tapemark_total)) {
-    sim_printf ("A potentially unreasonable number of record sizes(%u) vs tape marks (%u) have been found\n", unique_record_sizes, tapemark_total);
-    sim_printf ("The tape format (%s) might not be correct for the '%s' tape image\n", fmts[MT_GET_FMT (uptr)].name, uptr->filename);
+    sim_messagef (SCPE_OK, "A potentially unreasonable number of record sizes(%u) vs tape marks (%u) have been found\n", unique_record_sizes, tapemark_total);
+    sim_messagef (SCPE_OK, "The tape format (%s) might not be correct for the '%s' tape image\n", fmts[MT_GET_FMT (uptr)].name, uptr->filename);
     }
 
 free (buf_f);
@@ -4297,4 +4301,59 @@ char FullPath[PATH_MAX + 1];
 sprintf (FullPath, "%s%s", directory, filename);
 
 (void)ansi_add_file_to_tape (tape, FullPath);
+}
+
+/* export an existing tape to a SIMH tape image */
+static t_stat sim_export_tape (UNIT *uptr, const char *export_file)
+{
+t_stat r;
+FILE *f;
+t_addr saved_pos = uptr->pos;
+uint8 *buf = NULL;
+t_mtrlnt bc, sbc;
+t_mtrlnt max = MTR_MAXLEN;
+
+if ((export_file == NULL) || (*export_file == '\0'))
+    return sim_messagef (SCPE_ARG, "Missing tape export file specification\n");
+f = fopen (export_file, "wb");
+if (f == NULL)
+    return sim_messagef (SCPE_OPENERR, "Can't open SIMH tape image file: %s - %s\n", export_file, strerror (errno));
+
+buf = (uint8 *)calloc (max, 1);
+if (buf == NULL) {
+    fclose (f);
+    return SCPE_MEM;
+    }
+r = sim_tape_rewind (uptr);
+while (r == SCPE_OK) {
+    r = sim_tape_rdrecf (uptr, buf, &bc, max);
+    switch (r) {
+        case MTSE_OK:
+            sbc = ((bc + 1) & ~1);              /* word alignment for SIMH format data */
+            if ((1   != sim_fwrite (&bc, sizeof (bc),   1, f)) ||
+                (sbc != sim_fwrite (buf, 1,           sbc, f))         ||
+                (1   != sim_fwrite (&bc, sizeof (bc),   1, f)))
+                r = sim_messagef (SCPE_IOERR, "Error writing file: %s - %s\n", export_file, strerror (errno));
+            else
+                r = SCPE_OK;
+            break;
+
+        case MTSE_TMK:
+            bc = 0;
+            if (1 != sim_fwrite (&bc, sizeof (bc), 1, f))
+                r = sim_messagef (SCPE_IOERR, "Error writing file: %s - %s\n", export_file, strerror (errno));
+            else
+                r = SCPE_OK;
+            break;
+
+        default:
+            break;
+        }
+    }
+if (r == MTSE_EOM)
+    r = SCPE_OK;
+free (buf);
+fclose (f);
+uptr->pos = saved_pos;
+return r;
 }
