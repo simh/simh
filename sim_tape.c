@@ -443,7 +443,7 @@ typedef struct TAPE_RECORD {
     } TAPE_RECORD;
 
 typedef struct MEMORY_TAPE {
-    uint32 ansi_type;       /* ANSI-VMS, ANSI-RT11, ANSI-RSTS, ANSI-RSX11 */
+    uint32 ansi_type;       /* ANSI-VMS, ANSI-RT11, ANSI-RSTS, ANSI-RSX11, etc. */
     uint32 file_count;      /* number of labeled files */
     uint32 record_count;    /* number of entries in the record array */
     uint32 array_size;      /* allocated size of records array */
@@ -499,11 +499,12 @@ static struct ansi_tape_parameters {
     t_bool              zero_record_length;
     char                record_format;
     char                carriage_control;
-    } ansi_args[] = {     /* code       nohdr2 nohdr3 fixed_text lvl hdr3 fir fuxed    hdr3 fir lf      hdr3 for crlf */
-        {"ANSI-VMS"      , "DECFILE11A", FALSE, FALSE, FALSE,    '3', HDR3_RMS_FIXED,  HDR3_RMS_STMLF,  HDR3_RMS_STREAM, 0, 0, FALSE, FALSE, 0,   0},
-        {"ANSI-RSX11"    , "DECFILE11A", FALSE, FALSE, FALSE,    '4', HDR3_RMS_FIXRSX, HDR3_RMS_VARRSX, HDR3_RMS_VARRSX, 1, 2, FALSE, FALSE, 0,   0},
-        {"ANSI-RT11"     , "DECRT11A",   TRUE,  TRUE,  TRUE,     '3', NULL,            NULL,            NULL,            0, 0, FALSE, FALSE, 0,   0},
-        {"ANSI-RSTS"     , "DECRSTS/E",  FALSE, TRUE,  TRUE,     '3', NULL,            NULL,            NULL,            0, 0, TRUE,  TRUE,  'U', 'M'},
+    } ansi_args[] = {     /* code       nohdr2 nohdr3 fixed_text lvl hdr3 fir fuxed    hdr3 fir lf      hdr3 for crlf  skLF CRLF Y2KDT  0RecLnt RFM  CC*/
+        {"ANSI-VMS"      , "DECFILE11A", FALSE, FALSE, FALSE,    '3', HDR3_RMS_FIXED,  HDR3_RMS_STMLF,  HDR3_RMS_STREAM, 0,   0, FALSE, FALSE,   0,   0},
+        {"ANSI-RSX11"    , "DECFILE11A", FALSE, FALSE, FALSE,    '4', HDR3_RMS_FIXRSX, HDR3_RMS_VARRSX, HDR3_RMS_VARRSX, 1,   2, FALSE, FALSE,   0,   0},
+        {"ANSI-RT11"     , "DECRT11A",   TRUE,  TRUE,  TRUE,     '3', NULL,            NULL,            NULL,            0,   0, FALSE, FALSE,   0,   0},
+        {"ANSI-RSTS"     , "DECRSTS/E",  FALSE, TRUE,  TRUE,     '3', NULL,            NULL,            NULL,            0,   0, TRUE,  TRUE,  'U', 'M'},
+        {"ANSI-VAR"      , "DECRSTS/E",  FALSE, TRUE,  FALSE,    '3', NULL,            NULL,            NULL,            1,   2, TRUE,  FALSE, 'D', ' '},
         {NULL}
     };
 
@@ -942,37 +943,41 @@ else
     fprintf (st, "  sim> ATTACH {switches} %s tapefile\n\n", dptr->name);
 fprintf (st, "Attach command switches\n");
 fprintf (st, "    -R          Attach Read Only.\n");
-fprintf (st, "    -E          Must Exist (if not specified an attempt to create the indicated\n");
-fprintf (st, "                virtual tape will be attempted).\n");
-fprintf (st, "    -F          Open the indicated tape container in a specific format (default\n");
-fprintf (st, "                is SIMH, alternatives are E11, TPC, P7B, AWS, TAR, ANSI-VMS,\n");
-fprintf (st, "                ANSI-RT11, ANSI-RSX11, ANSI-RSTS, FIXED)\n");
-fprintf (st, "    -B          For TAR format tapes, the record size for data read from the \n");
+fprintf (st, "    -E          Must Exist (if not specified, the default behavior is to\n");
+fprintf (st, "                attempt to create the indicated virtual tape file).\n");
+fprintf (st, "    -F          Open the indicated tape container in a specific format\n");
+fprintf (st, "                (default is SIMH, alternatives are E11, TPC, P7B, AWS, TAR,\n");
+fprintf (st, "                ANSI-VMS, ANSI-RT11, ANSI-RSX11, ANSI-RSTS, ANSI-VAR, FIXED)\n");
+fprintf (st, "    -B          For TAR format tapes, the record size for data read from the\n");
 fprintf (st, "                specified file.  This record size will be used for all but \n");
 fprintf (st, "                possibly the last record which will be what remains unread.\n");
 fprintf (st, "                The default TAR record size is 10240.  For FIXED format tapes\n");
 fprintf (st, "                -B specifies the record size for binary data or the maximum \n");
 fprintf (st, "                record size for text data\n");
 fprintf (st, "    -V          Display some summary information about the record structure\n");
-fprintf (st, "                contained in the tape image scan performed when it is attached.\n");
+fprintf (st, "                observed in the tape image observed during the attach\n");
+fprintf (st, "                validation pass\n");
 fprintf (st, "    -L          Display detailed record size counts observed during attach\n");
 fprintf (st, "                validation pass\n");
-fprintf (st, "                contained in the tape image scan performed when it is attached.\n");
 fprintf (st, "    -D          Causes the internal tape structure information to be displayed\n");
 fprintf (st, "                while the tape image is scanned.\n");
-fprintf (st, "    -C          Causes FIXED format tape data sets derived from text files to be\n");
-fprintf (st, "                converted from ASCII to EBCDIC.\n");
+fprintf (st, "    -C          Causes FIXED format tape data sets derived from text files to\n");
+fprintf (st, "                be converted from ASCII to EBCDIC.\n");
 fprintf (st, "    -X          Extract a copy of the attached tape and convert it to a SIMH\n");
 fprintf (st, "                format tape image.\n\n");
-fprintf (st, "Notes:  ANSI-VMS, ANSI-RT11, ANSI-RSTS, ANSI-RSX11 formats allows one or several\n");
-fprintf (st, "        files to be presented to as a read only ANSI Level 3 labeled tape with\n");
-fprintf (st, "        file labels that make each individual file accessible directly as files\n");
-fprintf (st, "        on the tape.\n\n");
+fprintf (st, "Notes:  ANSI-VMS, ANSI-RT11, ANSI-RSTS, ANSI-RSX11, ANSI-VAR formats allows\n");
+fprintf (st, "        one or several files to be presented to as a read only ANSI Level 3\n");
+fprintf (st, "        labeled tape with file labels that make each individual file\n");
+fprintf (st, "        accessible directly as files on the tape.\n\n");
+fprintf (st, "        FIXED format will present the contents of a file (text or binary) as\n");
+fprintf (st, "        fixed sized records/blocks with ascii text data optionally converted\n");
+fprintf (st, "        to EBCDIC.\n\n");
 fprintf (st, "Examples:\n\n");
 fprintf (st, "  sim> ATTACH %s -F ANSI-VMS Hobbyist-USE-ONLY-VA.TXT\n", dptr->name);
 fprintf (st, "  sim> ATTACH %s -F ANSI-RSX11 *.TXT,*.ini,*.exe\n", dptr->name);
 fprintf (st, "  sim> ATTACH %s -FX ANSI-RSTS RSTS.tap *.TXT,*.SAV\n", dptr->name);
-fprintf (st, "  sim> ATTACH %s -F ANSI-RT11 *.TXT,*.TSK\n\n", dptr->name);
+fprintf (st, "  sim> ATTACH %s -F ANSI-RT11 *.TXT,*.TSK\n", dptr->name);
+fprintf (st, "  sim> ATTACH %s -FB FIXED 80 SOMEFILE.TXT\n\n", dptr->name);
 return SCPE_OK;
 }
 
@@ -3928,7 +3933,10 @@ if (recsize) {
     sim_switches |= SWMASK ('B');
     sprintf (str_recsize, " %d", (int)recsize);
     }
-sprintf (args, "%s%s %s.%s", format, str_recsize, filename, format);
+if (NULL == strchr (filename, '*'))
+    sprintf (args, "%s%s %s.%s", format, str_recsize, filename, format);
+else
+    sprintf (args, "%s%s %s", format, str_recsize, filename);
 sim_tape_detach (uptr);
 sim_switches |= SWMASK ('F') | SWMASK ('L');    /* specific-format and detailed record report */
 stat = sim_tape_attach_ex (uptr, args, 0, 0);
@@ -4022,6 +4030,21 @@ SIM_TEST(sim_tape_test_remove_tape_files (dptr->units, "TapeTestFile1"));
 SIM_TEST(sim_tape_test_create_tape_files (dptr->units, "TapeTestFile1", 2, 5, 4096));
 
 sim_switches = saved_switches;
+SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1.*", "ansi-vms", 0));
+
+sim_switches = saved_switches;
+SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1.*", "ansi-rsx11", 0));
+
+sim_switches = saved_switches;
+SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1.*", "ansi-rt11", 0));
+
+sim_switches = saved_switches;
+SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1.*", "ansi-rsts", 0));
+
+sim_switches = saved_switches;
+SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1.*", "ansi-var", 0));
+
+sim_switches = saved_switches;
 SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1", "tar", 0));
 
 sim_switches = saved_switches;
@@ -4032,8 +4055,6 @@ SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1.3", "aws",
 
 sim_switches = saved_switches;
 SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1.2", "aws", 0));
-
-sim_switches = saved_switches;
 
 sim_switches = saved_switches;
 SIM_TEST(sim_tape_test_process_tape_file (dptr->units, "TapeTestFile1.2", "tar", 0));
