@@ -99,6 +99,7 @@ typedef struct {
 #define MTUF_F_AWS      4                               /* AWS format */
 #define MTUF_F_TAR      5                               /* TAR format */
 #define MTUF_F_ANSI     6                               /* ANSI format */
+#define MTUF_F_FIXED    7                               /* FIXED format */
 
 #define MTAT_F_VMS      0                               /* VMS ANSI type */
 #define MTAT_F_RSX11    1                               /* RSX-11 ANSI type */
