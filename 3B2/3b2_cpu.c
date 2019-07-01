@@ -179,6 +179,67 @@ static DEBTAB cpu_deb_tab[] = {
 UNIT cpu_unit = { UDATA (NULL, UNIT_FIX|UNIT_BINK|UNIT_IDLE, MAXMEMSIZE) };
 
 /*
+ * The following commands deposit a small calibration program into
+ * mainstore at 0x2000000 and then set the program counter to the
+ * start address. Simulator calibration will execute this program to
+ * establish a baseline execution rate.
+ *
+ * Program:
+ *   84 01 46        MOVW    &0x1,%r6
+ *   84 46 47        MOVW    %r6,%r7
+ *   84 47 48        MOVW    %r7,%r8
+ *   90 48           INCW    %r8
+ *   28 48           TSTW    %r8
+ *   4f 0b           BLEB    0xb
+ *   e4 07 48 40     MODW3   &0x7,%r8,%r0
+ *   84 40 47        MOVW    %r0,%r7
+ *   7b 0b           BRB     0xb
+ *   8c 48 40        MNEGW   %r8,%r0
+ *   a4 07 40        MODW2   &0x7,%r0
+ *   84 40 47        MOVW    %r0,%r7
+ *   e8 47 48 40     MULW3   %r7,%r8,%r0
+ *   9c 07 40        ADDW2   &0x7,%r0
+ *   84 40 46        MOVW    %r0,%r6
+ *   28 48           TSTW    %r8
+ *   4f 05           BLEB    0x5
+ *   a8 03 47        MULW2   &0x3,%r7
+ *   d0 01 46 46     LLSW3   &0x1,%r6,%r6
+ *   28 46           TSTW    %r6
+ *   4f 09           BLEB    0x9
+ *   ec 46 47 40     DIVW3   %r6,%r7,%r0
+ *   84 40 48        MOVW    %r0,%r8
+ *   d4 01 47 47     LRSW3   &0x1,%r7,%r7
+ *   3c 48 47        CMPW    %r8,%r7
+ *   4f 05           BLEB    0x5
+ *   bc 48 47        SUBW2   %r8,%r7
+ *   7b bc           BRB     -0x44
+ */
+static const char *att3b2_clock_precalibrate_commands[] = {
+    "-v 2000000 84014684",
+    "-v 2000004 46478447",
+    "-v 2000008 48904828",
+    "-v 200000c 484f0be4",
+    "-v 2000010 07484084",
+    "-v 2000014 40477b0b",
+    "-v 2000018 8c4840a4",
+    "-v 200001c 07408440",
+    "-v 2000020 47e84748",
+    "-v 2000024 409c0740",
+    "-v 2000028 84404628",
+    "-v 200002c 484f05a8",
+    "-v 2000030 0347d001",
+    "-v 2000034 46462846",
+    "-v 2000038 4f09ec46",
+    "-v 200003c 47408440",
+    "-v 2000040 48d40147",
+    "-v 2000044 473c4847",
+    "-v 2000048 4f05bc48",
+    "-v 200004c 477bbc00",
+    "PC 2000000",
+    NULL
+};
+
+/*
  * TODO: This works fine for now, but the moment we want to emulate
  * SCSI (0x0100) or EPORTS (0x0102) we're in trouble!
  */
@@ -720,6 +781,9 @@ t_stat cpu_reset(DEVICE *dptr)
     /* Link in our special "boot" command so we can boot with both
      * "BO{OT}" and "BO{OT} CPU" */
     sim_vm_cmd = sys_cmd;
+
+    /* Set up the pre-calibration routine */
+    sim_clock_precalibrate_commands = att3b2_clock_precalibrate_commands;
 
     if (!sim_is_running) {
         /* Clear registers */
