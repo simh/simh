@@ -1175,6 +1175,9 @@ ifneq (3,$(GCC_MAJOR_VERSION))
   ifneq (,$(findstring -Wunused-result,$(shell $(GCC_WARNINGS_CMD))))
     CFLAGS_O += -Wno-unused-result
   endif
+  ifneq (,$(findstring -Wformat-truncation,$(shell $(GCC_WARNINGS_CMD))))
+    CFLAGS_O += -Wno-format-truncation
+  endif
 endif
 ifneq (clean,$(MAKECMDGOALS))
   BUILD_FEATURES := $(BUILD_FEATURES). $(COMPILER_NAME)
