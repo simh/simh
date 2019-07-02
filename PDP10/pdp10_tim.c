@@ -391,7 +391,11 @@ else {
     sim_activate_after (uptr, tick_in_usecs);           /* reactivate unit */
     tmr_poll = sim_activate_time (uptr) - 1;
     }
-tmxr_poll = (int32)(sim_timer_inst_per_sec () / clk_tps);/* set mux poll */
+
+/* tmxr is polled every tim_mult clks.  Compute the divisor matching the target. */
+tim_mult = (clk_tps <= TIM_TMXR_FREQ) ? 1 : (clk_tps / TIM_TMXR_FREQ) ;
+   
+tmxr_poll = tim_mult * (int32)(sim_timer_inst_per_sec () / clk_tps);/* set mux poll */
 tim_incr_base (tim_base, tim_period);                   /* incr time base based on period of expired interval */
 tim_period = tim_new_period;                            /* If interval has changed, update period */
 apr_flg = apr_flg | APRF_TIM;                           /* request interrupt */
