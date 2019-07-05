@@ -2159,7 +2159,7 @@ if (!vid_active) {
     return SCPE_UDIS | SCPE_NOMESSAGE;
     }
 fullname = (char *)malloc (strlen(filename) + 5);
-if (!filename)
+if (!fullname)
     return SCPE_MEM;
 #if SDL_MAJOR_VERSION == 1
 #if defined(HAVE_LIBPNG)
