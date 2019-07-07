@@ -2202,13 +2202,14 @@ sim_set_logoff (0, NULL);                               /* close cur log */
 r = sim_open_logfile (gbuf, FALSE, &sim_log, &sim_log_ref); /* open log */
 if (r != SCPE_OK)                                       /* error? */
     return r;
-if (!sim_quiet)
+if ((!sim_quiet) && (!(sim_switches & SWMASK ('Q'))))
     fprintf (stdout, "Logging to file \"%s\"\n", 
              sim_logfile_name (sim_log, sim_log_ref));
 fprintf (sim_log, "Logging to file \"%s\"\n", 
              sim_logfile_name (sim_log, sim_log_ref));  /* start of log */
 time(&now);
-fprintf (sim_log, "Logging to file \"%s\" at %s", sim_logfile_name (sim_log, sim_log_ref), ctime(&now));
+if ((!sim_quiet) && (!(sim_switches & SWMASK ('Q'))))
+    fprintf (sim_log, "Logging to file \"%s\" at %s", sim_logfile_name (sim_log, sim_log_ref), ctime(&now));
 return SCPE_OK;
 }
 
@@ -2220,7 +2221,7 @@ if (cptr && (*cptr != 0))                               /* now eol? */
     return SCPE_2MARG;
 if (sim_log == NULL)                                    /* no log? */
     return SCPE_OK;
-if (!sim_quiet)
+if ((!sim_quiet) && (!(sim_switches & SWMASK ('Q'))))
     fprintf (stdout, "Log file closed\n");
 fprintf (sim_log, "Log file closed\n");
 sim_close_logfile (&sim_log_ref);                       /* close log */
