@@ -1186,6 +1186,14 @@ static const char simh_help[] =
 #define HLP_CP          "*Commands Copying_Files CP"
       "3CP\n"
       "++CP sfile dfile            copies a file\n"
+      "2Creating Directories\n"
+#define HLP_MKDIR       "*Commands Creating_Directories MKDIR"
+      "3MKDIR\n"
+      "++MKDIR path                creates a directory\n"
+      "2Deleting Directories\n"
+#define HLP_RMDIR       "*Commands Deleting_Directories RMDIR"
+      "3RMDIR\n"
+      "++RMDIR path                deleting a directory\n"
 #define HLP_SET         "*Commands SET"
       "2SET\n"
        /***************** 80 character line width template *************************/
@@ -2334,6 +2342,8 @@ static CTAB cmd_table[] = {
     { "RM",         &delete_cmd,    0,          HLP_RM,         NULL, NULL },
     { "COPY",       &copy_cmd,      0,          HLP_COPY,       NULL, NULL },
     { "CP",         &copy_cmd,      0,          HLP_CP,         NULL, NULL },
+    { "MKDIR",      &mkdir_cmd,     0,          HLP_MKDIR,      NULL, NULL },
+    { "RMDIR",      &rmdir_cmd,     0,          HLP_RMDIR,      NULL, NULL },
     { "SET",        &set_cmd,       0,          HLP_SET,        NULL, NULL },
     { "SHOW",       &show_cmd,      0,          HLP_SHOW,       NULL, NULL },
     { "DO",         &do_cmd,        1,          HLP_DO,         NULL, NULL },
@@ -6546,6 +6556,59 @@ stat = sim_dir_scan (sname, sim_copy_entry, &copy_state);
 if ((stat == SCPE_OK) && (copy_state.count))
     return sim_messagef (SCPE_OK, "      %3d file(s) copied\n", copy_state.count);
 return copy_state.stat;
+}
+
+t_stat mkdir_cmd (int32 flg, CONST char *cptr)
+{
+char path[CBUFSIZE];
+char *c;
+struct stat filestat;
+
+if ((!cptr) || (*cptr == '\0'))
+    return sim_messagef (SCPE_2FARG, "Must specify a directory path\n");
+strlcpy (path, cptr, sizeof (path));
+while ((c = strchr (path, '\\')))
+    *c = '/';
+c = path;
+while ((c = strchr (c, '/'))) {
+    *c = '\0';
+    if (!stat (path, &filestat)) {
+        if (filestat.st_mode & S_IFDIR) {
+            *c = '/';   /* restore / */
+            ++c;
+            continue;
+            }
+        return sim_messagef (SCPE_ARG, "%s is not a directory\n", path);
+        }
+    if (
+#if defined(_MSC_VER)
+        mkdir (path)
+#else
+        mkdir (path, 0777)
+#endif
+                          )
+        return sim_messagef (SCPE_ARG, "Can't create directory: %s - %s\n", path, strerror (errno));
+    *c = '/';   /* restore / */
+    ++c;
+    }
+if (
+#if defined(_MSC_VER)
+    mkdir (path)
+#else
+    mkdir (path, 0777)
+#endif
+                      )
+    return sim_messagef (SCPE_ARG, "Can't create directory: %s - %s\n", path, strerror (errno));
+return SCPE_OK;
+}
+
+t_stat rmdir_cmd (int32 flg, CONST char *cptr)
+{
+if ((!cptr) || (*cptr == '\0'))
+    return sim_messagef (SCPE_2FARG, "Must specify a directory\n");
+if (rmdir (cptr))
+    return sim_messagef (SCPE_ARG, "Can't remove directory: %s - %s\n", cptr, strerror (errno));
+return SCPE_OK;
 }
 
 /* Debug command */
