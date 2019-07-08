@@ -1518,7 +1518,7 @@ if (partitions) {
     }
 uptr->capac = saved_capac;
 return ret_val;
-};
+}
 
 typedef t_offset (*FILESYSTEM_CHECK)(UNIT *uptr);
 
