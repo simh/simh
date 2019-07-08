@@ -790,7 +790,7 @@ t_stat dp_rdtrk (UNIT *uptr, uint16 *buf, uint32 c, uint32 h)
 uint32 da = ((c * dp_tab[dp_ctype].surf) + h) * DP_TRKLEN;
 int32 l;
 
-fseek (uptr->fileref, da * sizeof (uint16), SEEK_SET);
+(void)fseek (uptr->fileref, da * sizeof (uint16), SEEK_SET);
 l = fxread (buf, sizeof (uint16), DP_TRKLEN, uptr->fileref);
 for ( ; l < DP_TRKLEN; l++)
     buf[l] = 0;
@@ -809,7 +809,7 @@ t_stat dp_wrtrk (UNIT *uptr, uint16 *buf, uint32 c, uint32 h)
 {
 uint32 da = ((c * dp_tab[dp_ctype].surf) + h) * DP_TRKLEN;
 
-fseek (uptr->fileref, da * sizeof (uint16), SEEK_SET);
+(void)fseek (uptr->fileref, da * sizeof (uint16), SEEK_SET);
 fxwrite (buf, sizeof (uint16), DP_TRKLEN, uptr->fileref);
 if (ferror (uptr->fileref)) {
     sim_perror ("DP I/O error");

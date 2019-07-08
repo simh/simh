@@ -402,7 +402,7 @@ DEVICE cpu_dev = {
 
 t_stat sim_instr (void)
 {
-int32 AR, BR, MB, Y, t1, t2, t3, skip, dev;
+int32 AR, BR, MB, Y = 0, t1, t2, t3, skip, dev;
 uint32 ut;
 t_bool iack;                                            // [RLA] TRUE if an interrupt was taken this cycle
 t_stat reason;

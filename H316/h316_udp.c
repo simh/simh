@@ -286,9 +286,9 @@ t_stat udp_create (DEVICE *dptr, const char *premote, int32 *pln)
   udp_links[link].used = TRUE;  *pln = link;
   udp_lines[link].dptr = udp_links[link].dptr = dptr;      // save device
   udp_tmxr.uptr = dptr->units;
-  udp_tmxr.last_poll_time = 1;          // h316'a use of TMXR doesn't poll periodically for connects
-  tmxr_poll_conn (&udp_tmxr);           // force connection initialization now
-  udp_tmxr.last_poll_time = 1;          // h316'a use of TMXR doesn't poll periodically for connects
+  udp_tmxr.last_poll_time = 1;          // h316's use of TMXR doesn't poll periodically for connects
+  (void)tmxr_poll_conn (&udp_tmxr);     // force connection initialization now
+  udp_tmxr.last_poll_time = 1;          // h316's use of TMXR doesn't poll periodically for connects
   sim_debug(IMP_DBG_UDP, dptr, "link %d - listening on port %s and sending to %s\n", link, udp_links[link].lport, udp_links[link].rhostport);
   return SCPE_OK;
 }
