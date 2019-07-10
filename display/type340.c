@@ -115,7 +115,9 @@ enum jump_type { DJP=2, DJS=3, DDS=1 }; /* type 347 */
 
 /* put all the state in a struct "just in case" */
 static struct type340 {
-/*  ty340word DAC;              /* Display Address Counter */
+#ifdef NOTYET
+    ty340word DAC;              /* Display Address Counter */
+#endif
     ty340word status;           /* see ST340_XXX in type340.h */
     signed short xpos, ypos;    /* 10 bits, signed (for OOB checks) */
     char initialized;           /* 0 before display_init */
