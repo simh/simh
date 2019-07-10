@@ -38,10 +38,13 @@
 #            NOVA              Just Build The Data General Nova.
 #            PDP1              Just Build The DEC PDP-1.
 #            PDP4              Just Build The DEC PDP-4.
-#            PDP7              Just Build The DEC PDP-7.
-#            PDP8              Just Build The DEC PDP-8.
-#            PDP9              Just Build The DEC PDP-9.
-#            PDP10             Just Build The DEC PDP-10.
+#            PDP6            Just Build The DEC PDP-6.
+#            PDP7            Just Build The DEC PDP-7.
+#            PDP8            Just Build The DEC PDP-8.
+#            PDP9            Just Build The DEC PDP-9.
+#            PDP10           Just Build The DEC PDP-10.
+#            PDP10-KA        Just Build The DEC PDP-10 KA10.
+#            PDP10-KI        Just Build The DEC PDP-10 KI10.
 #            PDP11             Just Build The DEC PDP-11.
 #            PDP15             Just Build The DEC PDP-15.
 #            S3                Just Build The IBM System 3.
@@ -612,6 +615,68 @@ PDP11_SOURCE2 = $(PDP11_DIR)PDP11_TM.C,$(PDP11_DIR)PDP11_TS.C,\
                $(PDP11_DIR)PDP11_ROM.C,$(PDP11_DIR)PDP11_CH.C
 PDP11_OPTIONS = /INCL=($(SIMH_DIR),$(PDP11_DIR)$(PCAP_INC))\
                 /DEF=($(CC_DEFS),"VM_PDP11=1"$(PCAP_DEFS))
+
+#
+# Digital Equipment PDP-6 Simulator Definitions.
+#
+PDP6_DIR = SYS$DISK:[.PDP10]
+PDP6_LIB = $(LIB_DIR)PDP6-$(ARCH).OLB
+PDP6_SOURCE = $(PDP6_DIR)KX10_CPU.C,\
+               $(PDP6_DIR)KX10_SYS.C,$(PDP6_DIR)KX10_CTY.C,\
+               $(PDP6_DIR)KX10_LP.C,$(PDP6_DIR)KX10_PT.C,\
+               $(PDP6_DIR)KX10_CR.C,$(PDP6_DIR)KX10_CP.C,\
+               $(PDP6_DIR)PDP6_DCT.C,$(PDP6_DIR)PDP6_DTC.C,\
+               $(PDP6_DIR)PDP6_MTC.C,$(PDP6_DIR)PDP6_DSK.C,\
+               $(PDP6_DIR)PDP6_DCS.C,$(PDP6_DIR)KX10_DPY.C,\
+               $(SIMH_DIR)SIM_CARD.C
+PDP6_OPTIONS = /INCL=($(SIMH_DIR),$(PDP6_DIR))\
+                /DEF=($(CC_DEFS),"PDP6=1","USE_INT64=1","USE_SIM_CARD=1"$(PCAP_DEFS))
+
+#
+# Digital Equipment PDP-10-KA Simulator Definitions.
+#
+KA10_DIR = SYS$DISK:[.PDP10]
+KA10_LIB = $(LIB_DIR)KA10-$(ARCH).OLB
+KA10_SOURCE = $(KA10_DIR)KX10_CPU.C,\
+               $(KA10_DIR)KX10_SYS.C,$(KA10_DIR)KX10_DF.C,\
+               $(KA10_DIR)KX10_DP.C,$(KA10_DIR)KX10_MT.C,\
+               $(KA10_DIR)KX10_CTY.C,$(KA10_DIR)KX10_LP.C,\
+               $(KA10_DIR)KX10_PT.C,$(KA10_DIR)KX10_DC.C,\
+               $(KA10_DIR)KX10_RP.C,$(KA10_DIR)KX10_RC.C,\
+               $(KA10_DIR)KX10_DT.C,$(KA10_DIR)KX10_DK.C,\
+               $(KA10_DIR)KX10_CR.C,$(KA10_DIR)KX10_CP.C,\
+               $(KA10_DIR)KX10_TU.C,$(KA10_DIR)KX10_RS.C,\
+               $(KA10_DIR)KA10_PD.C,$(KA10_DIR)KX10_IMP.C,\
+               $(KA10_DIR)KA10_TK10.C,$(KA10_DIR)KA10_MTY.C,\
+               $(KA10_DIR)KA10_IMX.C,$(KA10_DIR)KA10_CH10.C,\
+               $(KA10_DIR)KA10_STK.C,$(KA10_DIR)KA10_TEN11.C,\
+               $(KA10_DIR)KA10_AUXCPU.C,$(KA10_DIR)KA10_PMP.C,\
+               $(KA10_DIR)KA10_DKB.C,$(KA10_DIR)PDP6_DCT.C,\
+               $(KA10_DIR)PDP6_DTC.C,$(KA10_DIR)PDP6_MTC.C,\
+               $(KA10_DIR)PDP6_DSK.C,$(KA10_DIR)PDP6_DCS.C,\
+               $(KA10_DIR)KA10_DPK.C,$(KA10_DIR)KX10_DPY.C,\
+               $(SIMH_DIR)SIM_CARD.C
+KA10_OPTIONS = /INCL=($(SIMH_DIR),$(KA10_DIR))\
+                /DEF=($(CC_DEFS),"KA=1","USE_INT64=1","USE_SIM_CARD=1"$(PCAP_DEFS))
+
+#
+# Digital Equipment PDP-10-KI Simulator Definitions.
+#
+KI10_DIR = SYS$DISK:[.PDP10]
+KI10_LIB = $(LIB_DIR)KI10-$(ARCH).OLB
+KI10_SOURCE = $(KI10_DIR)KX10_CPU.C,\
+               $(KI10_DIR)KX10_SYS.C,$(KI10_DIR)KX10_DF.C,\
+               $(KI10_DIR)KX10_DP.C,$(KI10_DIR)KX10_MT.C,\
+               $(KI10_DIR)KX10_CTY.C,$(KI10_DIR)KX10_LP.C,\
+               $(KI10_DIR)KX10_PT.C,$(KI10_DIR)KX10_DC.C,\
+               $(KI10_DIR)KX10_RP.C,$(KI10_DIR)KX10_RC.C,\
+               $(KI10_DIR)KX10_DT.C,$(KI10_DIR)KX10_DK.C,\
+               $(KI10_DIR)KX10_CR.C,$(KI10_DIR)KX10_CP.C,\
+               $(KI10_DIR)KX10_TU.C,$(KI10_DIR)KX10_RS.C,\
+               $(KI10_DIR)KX10_IMP.C,$(KI10_DIR)KX10_DPY.C,\
+              $(SIMH_DIR)SIM_CARD.C
+KI10_OPTIONS = /INCL=($(SIMH_DIR),$(KI10_DIR))\
+                /DEF=($(CC_DEFS),"KI=1","USE_INT64=1","USE_SIM_CARD=1"$(PCAP_DEFS))
 
 #
 # Digital Equipment PDP-10 Simulator Definitions.
@@ -1340,7 +1405,8 @@ ALL : ALTAIR ALTAIRZ80 CDC1700 ECLIPSE GRI LGP H316 HP2100 HP3000 I1401 I1620 \
       MICROVAX3100 MICROVAX3100E VAXSTATION3100M30 \
       VAXSTATION3100M38 VAXSTATION3100M76 VAXSTATION4000M60 \
       VAXSTATION3100M80 VAXSTATION4000VLC INFOSERVER1000 \
-      VAX8200 VAX8600 SDS I7094 SWTP6800MP-A SWTP6800MP-A2 SSEM BESM6 B5500
+      VAX8200 VAX8600 SDS I7094 SWTP6800MP-A SWTP6800MP-A2 SSEM BESM6 B5500 \
+      PDP6 PDP10-KA PDP10-KI
         $! No further actions necessary
 .ELSE
 #
@@ -1707,7 +1773,7 @@ $(PDP9_LIB) : $(PDP18B_SOURCE)
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 #
-# If Not On VAX, Build The PDP-10 Library.
+# If Not On VAX, Build The PDP-10, PDP-6, PDP-10-KA, PDP-10-KI Simulator.
 #
 .IFDEF ALPHA_OR_IA64
 $(PDP10_LIB) : $(PDP10_SOURCE)
@@ -1720,11 +1786,56 @@ $(PDP10_LIB) : $(PDP10_SOURCE)
              LIBRARY/CREATE $(MMS$TARGET)
         $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
+$(PDP6_LIB) : $(PDP6_SOURCE)
+        $!
+        $! Building The $(PDP10_LIB) Library.
+        $!
+        $ $(CC)$(PDP6_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
+$(KA10_LIB) : $(KA10_SOURCE)
+        $!
+        $! Building The $(KA10_LIB) Library.
+        $!
+        $ $(CC)$(KA10_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
+$(KI10_LIB) : $(KI10_SOURCE)
+        $!
+        $! Building The $(KI10_LIB) Library.
+        $!
+        $ $(CC)$(KI10_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 .ELSE
 #
 # We Are On VAX And Due To The Use of INT64 We Can't Build It.
 #
 $(PDP10_LIB) : 
+        $! Due To The Use Of INT64 We Can't Build The
+        $! $(MMS$TARGET) Library On VAX.
+
+$(PDP6_LIB) : 
+        $! Due To The Use Of INT64 We Can't Build The
+        $! $(MMS$TARGET) Library On VAX.
+
+$(KA10_LIB) : 
+        $! Due To The Use Of INT64 We Can't Build The
+        $! $(MMS$TARGET) Library On VAX.
+
+$(KI10_LIB) : 
         $! Due To The Use Of INT64 We Can't Build The
         $! $(MMS$TARGET) Library On VAX.
 .ENDIF
@@ -2672,7 +2783,7 @@ $(BIN_DIR)PDP9-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(PDP9_LIB)
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 #
-# If Not On VAX, Build The PDP-10 Simulator.
+# If Not On VAX, Build The PDP-10, PDP-6, PDP-10-KA, PDP-10-KI Simulator.
 #
 .IFDEF ALPHA_OR_IA64
 PDP10 : $(BIN_DIR)PDP10-$(ARCH).EXE
@@ -2686,6 +2797,42 @@ $(BIN_DIR)PDP10-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(PCAP_LIBD) $(PDP1
         $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)PDP10-$(ARCH).EXE -
                $(BLD_DIR)SCP.OBJ,$(PDP10_LIB)/LIBRARY,$(SIMH_NONET_LIB)/LIBRARY$(PCAP_LIBR)
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
+PDP6 : $(BIN_DIR)PDP6-$(ARCH).EXE
+        $! PDP6 done
+
+$(BIN_DIR)PDP6-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(PCAP_LIBD) $(PDP6_LIB) $(PCAP_EXECLET)
+        $!
+        $! Building The $(BIN_DIR)PDP6-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(PDP6_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)PDP6-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(PDP6_LIB)/LIBRARY,$(SIMH_NONET_LIB)/LIBRARY$(PCAP_LIBR)
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
+PDP10-KA : $(BIN_DIR)PDP10-KA-$(ARCH).EXE
+        $! PDP10-KA done
+
+$(BIN_DIR)PDP10-KA-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(PCAP_LIBD) $(KA10_LIB) $(PCAP_EXECLET)
+        $!
+        $! Building The $(BIN_DIR)PDP10-KA-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(KA10_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)PDP10-KA-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(KA10_LIB)/LIBRARY,$(SIMH_NONET_LIB)/LIBRARY$(PCAP_LIBR)
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
+PDP10-KI : $(BIN_DIR)PDP10-KI-$(ARCH).EXE
+        $! PDP10-KI done
+
+$(BIN_DIR)PDP10-KI-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(PCAP_LIBD) $(KI10_LIB) $(PCAP_EXECLET)
+        $!
+        $! Building The $(BIN_DIR)PDP10-KI-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(KI10_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)PDP10-KI-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(KI10_LIB)/LIBRARY,$(SIMH_NONET_LIB)/LIBRARY$(PCAP_LIBR)
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 .ELSE
 #
 # Else We Are On VAX And Tell The User We Can't Build On VAX
@@ -2693,6 +2840,18 @@ $(BIN_DIR)PDP10-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(PCAP_LIBD) $(PDP1
 #
 PDP10 : 
         $! Sorry, Can't Build $(BIN_DIR)PDP10-$(ARCH).EXE Simulator
+        $! Because It Requires The Use Of INT64.
+
+PDP6 : 
+        $! Sorry, Can't Build $(BIN_DIR)PDP6-$(ARCH).EXE Simulator
+        $! Because It Requires The Use Of INT64.
+
+PDP10-KA : 
+        $! Sorry, Can't Build $(BIN_DIR)PDP10-KA-$(ARCH).EXE Simulator
+        $! Because It Requires The Use Of INT64.
+
+PDP10-KI : 
+        $! Sorry, Can't Build $(BIN_DIR)PDP10-KI-$(ARCH).EXE Simulator
         $! Because It Requires The Use Of INT64.
 .ENDIF
 
