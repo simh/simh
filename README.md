@@ -81,6 +81,8 @@
 
 #### Richard Cornwell has implemented the IBM 701, IBM 704, IBM 7010/1410, IBM 7070/7074, IBM 7080/702/705/7053 and IBM 7090/7094/709/704 simulators.
 
+#### Richard Cornwell has implemented the PDP6, PDP10-KA, and PDP10-KI simulators.
+
 #### Dave Bryan has implemented an HP-3000 Series III simulator.
 
 #### Updated AltairZ80 simulator from Peter Schorn.
