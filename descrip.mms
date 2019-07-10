@@ -38,13 +38,13 @@
 #            NOVA              Just Build The Data General Nova.
 #            PDP1              Just Build The DEC PDP-1.
 #            PDP4              Just Build The DEC PDP-4.
-#            PDP6            Just Build The DEC PDP-6.
-#            PDP7            Just Build The DEC PDP-7.
-#            PDP8            Just Build The DEC PDP-8.
-#            PDP9            Just Build The DEC PDP-9.
-#            PDP10           Just Build The DEC PDP-10.
-#            PDP10-KA        Just Build The DEC PDP-10 KA10.
-#            PDP10-KI        Just Build The DEC PDP-10 KI10.
+#            PDP6              Just Build The DEC PDP-6.
+#            PDP7              Just Build The DEC PDP-7.
+#            PDP8              Just Build The DEC PDP-8.
+#            PDP9              Just Build The DEC PDP-9.
+#            PDP10             Just Build The DEC PDP-10 KS10.
+#            PDP10-KA          Just Build The DEC PDP-10 KA10.
+#            PDP10-KI          Just Build The DEC PDP-10 KI10.
 #            PDP11             Just Build The DEC PDP-11.
 #            PDP15             Just Build The DEC PDP-15.
 #            S3                Just Build The IBM System 3.
