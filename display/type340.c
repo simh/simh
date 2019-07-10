@@ -151,7 +151,7 @@ ty340_set_dac(ty340word addr)
     DEBUGF(("set DAC %06o\r\n", u->DAC));
 
     /* XXX only when reset? */
-    u->mode = 0;
+    u->mode = PARAM;
     u->status = 0;               /* XXX just clear stopped? */
     ty340_rfd();                 /* ready for data */
 }
@@ -168,7 +168,7 @@ ty340_reset(void *dptr)
     }
 #endif
     u->xpos = u->ypos = 0;
-    u->mode = 0;
+    u->mode = PARAM;
     u->status = 0;
     u->scale = 1;
 #if TYPE342
@@ -834,7 +834,7 @@ ty340_instruction(ty340word inst)
         }
 
         /* READ TO MODE: */
-        u->mode = GETFIELD(inst, 2, 4);
+        u->mode = (enum mode)GETFIELD(inst, 2, 4);
         if (TESTBIT(inst, 5)) {         /* load l.p. enable */
             u->lp_ena = TESTBIT(inst,6);
             DEBUGF(("type340 lp_ena %d\r\n", u->lp_ena));
@@ -862,7 +862,7 @@ ty340_instruction(ty340word inst)
         break;
 
     case POINT:
-        u->mode = GETFIELD(inst, 2, 4);
+        u->mode = (enum mode)GETFIELD(inst, 2, 4);
 
         if (TESTBIT(inst, 5)) {         /* load l.p. enable */
             u->lp_ena = TESTBIT(inst,6);
@@ -885,7 +885,7 @@ ty340_instruction(ty340word inst)
 
     case SLAVE:
         DEBUGF(("type340 slave %06o\r\n", inst));
-        u->mode = GETFIELD(inst, 2, 4);
+        u->mode = (enum mode)GETFIELD(inst, 2, 4);
 #if TYPE343
         /* control multiple windows???? */
 #else
@@ -943,7 +943,7 @@ ty340_instruction(ty340word inst)
 #if TYPE347
         /* type 347 Display Subroutine Option? */
 
-        u->mode = GETFIELD(inst, 2, 4);
+        u->mode = (enum mode)GETFIELD(inst, 2, 4);
         addr = GETFIELD(inst, 5, 17);
 
         switch (GETFIELD(inst, 0, 1)) {
