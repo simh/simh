@@ -887,7 +887,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     NETWORK_OPT = $(NETWORK_CCDEFS)
   endif
   ifneq (binexists,$(shell if $(TEST) -e BIN/buildtools; then echo binexists; fi))
-    MKDIRBIN = mkdir -p BIN/buildtools
+    MKDIRBIN = @mkdir -p BIN/buildtools
   endif
   ifeq (commit-id-exists,$(shell if $(TEST) -e .git-commit-id; then echo commit-id-exists; fi))
     GIT_COMMIT_ID=$(shell grep 'SIM_GIT_COMMIT_ID' .git-commit-id | awk '{ print $$2 }')
@@ -1003,8 +1003,10 @@ else
   OS_CCDEFS += -fms-extensions $(PTHREADS_CCDEFS)
   OS_LDFLAGS += -lm -lwsock32 -lwinmm $(PTHREADS_LDFLAGS)
   EXE = .exe
-  ifneq (binexists,$(shell if exist BIN\buildtools echo binexists))
-    MKDIRBIN = if not exist BIN mkdir BIN\buildtools
+  ifneq (clean,$(MAKECMDGOALS))
+    ifneq (buildtoolsexists,$(shell if exist BIN\buildtools (echo buildtoolsexists) else (mkdir BIN\buildtools)))
+      MKDIRBIN=
+    endif
   endif
   ifneq ($(USE_NETWORK),)
     NETWORK_OPT += -DUSE_SHARED
@@ -2022,11 +2024,10 @@ ${BUILD_ROMS} :
 	${MKDIRBIN}
 ifeq ($(WIN32),)
 	@if $(TEST) \( ! -e $@ \) -o \( sim_BuildROMs.c -nt $@ \) ; then ${CC} sim_BuildROMs.c $(CC_OUTSPEC); fi
-	@$@
 else
-	if not exist $@ ${CC} sim_BuildROMs.c $(CC_OUTSPEC)
-	$(@D)\$(@F)
+	@if not exist $@ ${CC} sim_BuildROMs.c $(CC_OUTSPEC)
 endif
+	@$@
 
 #
 # Individual builds

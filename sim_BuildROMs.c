@@ -66,7 +66,7 @@ struct ROM_File_Descriptor {
    {"VAX/ka750_old.bin",                "VAX/vax_ka750_bin_old.h",                   1024,            0xFFFEBAA5,        "vax_ka750_bin_old", "From ROM set: 990A9, 948A9, 906A9, 905A9 (Boots: A=DD, B=DM, C=DL, D=DU"},
    {"VAX/vcb02.bin",                    "VAX/vax_vcb02_bin.h",                      16384,            0xFFF1D2AD,        "vax_vcb02_bin"},
    {"VAX/vmb.exe",                      "VAX/vax_vmb_exe.h",                        44544,            0xFFC014BB,        "vax_vmb_exe"},
-   {"PDP11/lunar11/lunar.lda",          "PDP11/pdp11_vt_lunar_rom.h",               13824   ,         0xFFF15D00,        "lunar_lda"},
+   {"PDP11/lunar11/lunar.lda",          "PDP11/pdp11_vt_lunar_rom.h",               13824,            0xFFF15D00,        "lunar_lda"},
    {"PDP11/dazzledart/dazzle.lda",      "PDP11/pdp11_dazzle_dart_rom.h",             6096,            0xFFF83848,        "dazzle_lda"},
    {"PDP11/11logo/11logo.lda",          "PDP11/pdp11_11logo_rom.h",                 26009,            0xFFDD77F7,        "logo_lda"},
    {"swtp6800/swtp6800/swtbug.bin",     "swtp6800/swtp6800/swtp_swtbug_bin.h",       1024,            0xFFFE4FBC,        "swtp_swtbug_bin"},
@@ -83,6 +83,7 @@ struct ROM_File_Descriptor {
 #include <sys/utime.h>
 #define utimbuf _utimbuf 
 #define utime _utime
+#define snprintf _snprintf
 #else
 #include <utime.h>
 #endif
@@ -206,11 +207,12 @@ if ((c = strchr (array_name, '.')))
     *c = '_';
 if ((c = strchr (array_name, '/')))
     *c = '_';
-sprintf (include_filename, "%s.h", cleaned_rom_filename);
+include_filename[sizeof (include_filename) - 1] = '\0';
+snprintf (include_filename, sizeof (include_filename) - 1, "%s.h", cleaned_rom_filename);
 if ((c = strrchr (include_filename, '/')))
     sprintf (c+1, "%s.h", array_name);
 else
-    sprintf (include_filename, "%s.h", array_name);
+    snprintf (include_filename, sizeof (include_filename) - 1, "%s.h", array_name);
 printf ("The ROMs array entry for this new ROM image file should look something like:\n");
 printf ("{\"%s\",    \"%s\",     %d,  0x%08X, \"%s\"}\n",
         rom_filename, include_filename, (int)(statb.st_size), checksum, array_name);
