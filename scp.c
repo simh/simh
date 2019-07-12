@@ -6581,7 +6581,7 @@ while ((c = strchr (c, '/'))) {
         return sim_messagef (SCPE_ARG, "%s is not a directory\n", path);
         }
     if (
-#if defined(_MSC_VER)
+#if defined(_WIN32)
         mkdir (path)
 #else
         mkdir (path, 0777)
@@ -6592,7 +6592,7 @@ while ((c = strchr (c, '/'))) {
     ++c;
     }
 if (
-#if defined(_MSC_VER)
+#if defined(_WIN32)
     mkdir (path)
 #else
     mkdir (path, 0777)
