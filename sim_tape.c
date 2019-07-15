@@ -4240,7 +4240,7 @@ static void ansi_fill_text_buffer (FILE *f, char *buf, size_t buf_size, size_t r
             memcpy (buf + offset, tmp, move_size);
             offset += move_size;
             if (offset == buf_size) {
-                fseek (f, start + move_size, SEEK_SET);
+                (void)fseek (f, start + move_size, SEEK_SET);
                 break;
                 }
             }
