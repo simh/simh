@@ -223,23 +223,23 @@ t_stat udp_parse_remote (int32 link, const char *premote)
   // Handle the llll::rrrr case first
   if (2 == sscanf (premote, "%d::%d", &lport, &rport)) {
     if ((lport < 1) || (lport >65535) || (rport < 1) || (rport >65535)) return SCPE_ARG;
-    sprintf (udp_links[link].lport, "%d", lport);
-    sprintf (udp_links[link].rhostport, "localhost:%d", rport);
+    snprintf (udp_links[link].lport, sizeof (udp_links[link].lport) - 1, "%d", lport);
+    snprintf (udp_links[link].rhostport, sizeof (udp_links[link].rhostport) - 1, "localhost:%d", rport);
     return SCPE_OK;
   }
 
   // Look for the local port number and save it away.
   lport = strtoul(premote, &end, 10);
   if ((*end == ':') && (lport > 0)) {
-    sprintf (udp_links[link].lport, "%d", lport);
+    snprintf (udp_links[link].lport, sizeof (udp_links[link].lport) - 1, "%d", lport);
     premote = end+1;
   }
 
   if (sim_parse_addr (premote, host, sizeof(host), "localhost", port, sizeof(port), NULL, NULL))
     return SCPE_ARG;
-  sprintf (udp_links[link].rhostport, "%s:%s", host, port);
+  snprintf (udp_links[link].rhostport, sizeof (udp_links[link].rhostport) - 1, "%s:%s", host, port);
   if (udp_links[link].lport[0] == '\0')
-    strcpy (udp_links[link].lport, port);
+    strlcpy (udp_links[link].lport, port, sizeof (udp_links[link].lport));
 
   if ((strcmp (udp_links[link].lport, port) == 0) && 
       (strcmp ("localhost", host) == 0))
