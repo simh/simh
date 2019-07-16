@@ -203,13 +203,8 @@ char msgbuf[80];
 
 if (trollHungerLevel == 0)
     return FALSE;
-#if defined(_POSIX_VERSION) || defined (_XOPEN_VERSION)
-r = (double)random();
-rmax = (double)0x7fffffff;
-#else
 r = rand();
 rmax = (double)RAND_MAX;
-#endif
 if (msg[0] == DDCMP_ENQ) {
     int eat =  0 + (int) (2000.0 * (r / (rmax + 1.0)));
     
