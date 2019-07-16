@@ -13568,7 +13568,7 @@ return SCPE_OK;
 #define HLP_MATCH_AMBIGUOUS (~0u)
 #define HLP_MATCH_WILDCARD  (~1U)
 #define HLP_MATCH_NONE      0
-static int matchHelpTopicName (TOPIC *topic, const char *token)
+static size_t matchHelpTopicName (TOPIC *topic, const char *token)
 {
 size_t i, match;
 char cbuf[CBUFSIZE], *cptr;
