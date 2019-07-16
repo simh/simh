@@ -54,7 +54,7 @@ extern int32 sio0d(const int32 port, const int32 io, const int32 data);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 
-static char ansibuf[10];
+static char ansibuf[32];
 
 #define FW2_MAX_BOARDS          4
 #define UNIT_V_FW2_VERBOSE      (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
