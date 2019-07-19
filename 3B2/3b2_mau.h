@@ -283,13 +283,21 @@ typedef enum {
 } op_spec;
 
 /*
+ * 128-bit value
+ */
+typedef struct {
+    t_uint64 low;
+    t_uint64 high;
+} t_mau_128;
+
+/*
  * Not-a-Number Type
  */
 typedef struct {
     t_bool sign;
     t_uint64 high;
     t_uint64 low;
-} NAN_T;
+} T_NAN;
 
 /*
  * Extended Precision (80 bits).

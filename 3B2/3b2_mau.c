@@ -103,26 +103,21 @@ static uint8 leading_zeros_64(t_int64 val);
 static void shift_right_32_jamming(uint32 val, int16 count, uint32 *result);
 static void shift_right_64_jamming(t_uint64 val, int16 count, t_uint64 *result);
 static void shift_right_extra_64_jamming(t_uint64 val_a, t_uint64 val_b, int16 count,
-                                         t_uint64 *result_a, t_uint64 *result_b);
+                                         t_uint64 *r_a, t_uint64 *r_b);
 static void shift_right_128_jamming(t_uint64 val_a, t_uint64 val_b, int16 count,
-                                    t_uint64 *result_a, t_uint64 *result_b);
+                                    t_uint64 *r_a, t_uint64 *r_b);
 static void short_shift_left_128(t_uint64 val_a, t_uint64 val_b, int16 count,
-                                 t_uint64 *result_a, t_uint64 *result_b);
+                                 t_uint64 *r_a, t_uint64 *r_b);
 static void shift_right_128(t_uint64 val_a, t_uint64 val_b, int16 count,
-                            t_uint64 *result_a, t_uint64 *result_b);
+                            t_uint64 *r_a, t_uint64 *r_b);
 static void add_128(t_uint64 a0, t_uint64 a1,
                     t_uint64 b0, t_uint64 b1,
                     t_uint64 *r_low, t_uint64 *r_high);
 static void sub_128(t_uint64 a0, t_uint64 a1,
                     t_uint64 b0, t_uint64 b1,
                     t_uint64 *r_low, t_uint64 *r_high);
-static void add_192(t_uint64 a0, t_uint64 a1, t_uint64 a2,
-                    t_uint64 b0, t_uint64 b1, t_uint64 b2,
-                    t_uint64 *z0, t_uint64 *z1, t_uint64 *z2);
-static void sub_192(t_uint64 a0, t_uint64 a1, t_uint64 a2,
-                    t_uint64 b0, t_uint64 b1, t_uint64 b2,
-                    t_uint64 *z0, t_uint64 *z1, t_uint64 *z2);
 static void mul_64_to_128(t_uint64 a, t_uint64 b, t_uint64 *r_low, t_uint64 *r_high);
+static void mul_64_by_shifted_32_to_128(t_uint64 a, uint32 b, t_mau_128 *result);
 static t_uint64 estimate_div_128_to_64(t_uint64 a0, t_uint64 a1, t_uint64 b);
 static uint32 estimate_sqrt_32(int16 a_exp, uint32 a);
 
@@ -139,6 +134,7 @@ static void round_pack_xfp(t_bool sign, int32 exp,
                            t_uint64 frac_a, t_uint64 frac_b,
                            RM rounding_mode, XFP *result);
 static void propagate_xfp_nan(XFP *a, XFP *b, XFP *result);
+static void propagate_xfp_nan_128(XFP* a, XFP* b, t_mau_128* result);
 static void normalize_round_pack_xfp(t_bool sign, int32 exp,
                                      t_uint64 frac_0, t_uint64 frac_1,
                                      RM rounding_mode, XFP *result);
@@ -146,12 +142,12 @@ static void normalize_sfp_subnormal(uint32 in_frac, int16 *out_exp, uint32 *out_
 static void normalize_dfp_subnormal(t_uint64 in_frac, int16 *out_exp, t_uint64 *out_frac);
 static void normalize_xfp_subnormal(t_uint64 in_frac, int32 *out_exp, t_uint64 *out_frac);
 
-static NAN_T sfp_to_common_nan(SFP val);
-static NAN_T dfp_to_common_nan(DFP val);
-static NAN_T xfp_to_common_nan(XFP *val);
-static SFP common_nan_to_sfp(NAN_T nan);
-static DFP common_nan_to_dfp(NAN_T nan);
-static void common_nan_to_xfp(NAN_T nan, XFP *result);
+static T_NAN sfp_to_common_nan(SFP val);
+static T_NAN dfp_to_common_nan(DFP val);
+static T_NAN xfp_to_common_nan(XFP *val);
+static SFP common_nan_to_sfp(T_NAN nan);
+static DFP common_nan_to_dfp(T_NAN nan);
+static void common_nan_to_xfp(T_NAN nan, XFP *result);
 
 static void sfp_to_xfp(SFP val, XFP *result);
 static void dfp_to_xfp(DFP val, XFP *result);
@@ -634,7 +630,7 @@ static void shift_right_64_jamming(t_uint64 val, int16 count, t_uint64 *result)
  * Derived from the SoftFloat 2c package (see copyright notice above)
  */
 static void shift_right_extra_64_jamming(t_uint64 val_a, t_uint64 val_b, int16 count,
-                                         t_uint64 *result_a, t_uint64 *result_b)
+                                         t_uint64 *r_a, t_uint64 *r_b)
 {
     t_uint64 a, b;
     int8 neg_count = (-count) & 63;
@@ -654,8 +650,8 @@ static void shift_right_extra_64_jamming(t_uint64 val_a, t_uint64 val_b, int16 c
         a = 0;
     }
 
-    *result_a = a;
-    *result_b = b;
+    *r_a = a;
+    *r_b = b;
 }
 
 /*
@@ -665,7 +661,7 @@ static void shift_right_extra_64_jamming(t_uint64 val_a, t_uint64 val_b, int16 c
  * Derived from the SoftFloat 2c package (see copyright notice above)
  */
 static void shift_right_128_jamming(t_uint64 val_a, t_uint64 val_b, int16 count,
-                                    t_uint64 *result_a, t_uint64 *result_b)
+                                    t_uint64 *r_a, t_uint64 *r_b)
 {
     t_uint64 tmp_a, tmp_b;
     int8 neg_count = (-count) & 63;
@@ -685,8 +681,8 @@ static void shift_right_128_jamming(t_uint64 val_a, t_uint64 val_b, int16 count,
         tmp_a = 0;
     }
 
-    *result_a = tmp_a;
-    *result_b = tmp_b;
+    *r_a = tmp_a;
+    *r_b = tmp_b;
 }
 
 /*
@@ -696,13 +692,13 @@ static void shift_right_128_jamming(t_uint64 val_a, t_uint64 val_b, int16 count,
  * Derived from the SoftFloat 2c package (see copyright notice above)
  */
 static void short_shift_left_128(t_uint64 val_a, t_uint64 val_b, int16 count,
-                                 t_uint64 *result_a, t_uint64 *result_b)
+                                 t_uint64 *r_a, t_uint64 *r_b)
 {
-    *result_b = val_b << count;
+    *r_b = val_b << count;
     if (count == 0) {
-        *result_a = val_a;
+        *r_a = val_a;
     } else {
-        *result_a = (val_a << count) | (val_b >> ((-count) & 63));
+        *r_a = (val_a << count) | (val_b >> ((-count) & 63));
     }
 }
 
@@ -713,7 +709,7 @@ static void short_shift_left_128(t_uint64 val_a, t_uint64 val_b, int16 count,
  * Derived from the SoftFloat 2c package (see copyright notice above)
  */
 static void shift_right_128(t_uint64 val_a, t_uint64 val_b, int16 count,
-                            t_uint64 *result_a, t_uint64 *result_b)
+                            t_uint64 *r_a, t_uint64 *r_b)
 {
     t_uint64 tmp_a, tmp_b;
     int8 neg_count;
@@ -731,8 +727,8 @@ static void shift_right_128(t_uint64 val_a, t_uint64 val_b, int16 count,
         tmp_b = (count < 128) ? (val_a >> (count & 63)) : 0;
     }
 
-    *result_a = tmp_a;
-    *result_b = tmp_b;
+    *r_a = tmp_a;
+    *r_b = tmp_b;
 }
 
 /*
@@ -762,48 +758,6 @@ static void sub_128(t_uint64 a0, t_uint64 a1,
 {
     *r_high = a1 - b1;
     *r_low = a0 - b0 - (a1 < b1);
-}
-
-/*
- * Add two 192-bit values.
- *
- * Derived from the SoftFloat 2c package (see copyright notice above)
- */
-static void add_192(t_uint64 a0, t_uint64 a1, t_uint64 a2,
-                    t_uint64 b0, t_uint64 b1, t_uint64 b2,
-                    t_uint64 *z0, t_uint64 *z1, t_uint64 *z2)
-{
-    int8 carry_0, carry_1;
-
-    *z2 = a2 + b2;
-    carry_1 = (*z2 < a2);
-    *z1 = a1 + b1;
-    carry_0 = (*z1 < a1);
-    *z0 = a0 + b0;
-    *z1 += carry_1;
-    *z0 += (*z1 < (t_uint64) carry_1);
-    *z0 += carry_0;
-}
-
-/*
- * Subtract two 192-bit values.
- *
- * Derived from the SoftFloat 2c package (see copyright notice above)
- */
-static void sub_192(t_uint64 a0, t_uint64 a1, t_uint64 a2,
-                    t_uint64 b0, t_uint64 b1, t_uint64 b2,
-                    t_uint64 *z0, t_uint64 *z1, t_uint64 *z2)
-{
-    int8 borrow_0, borrow_1;
-
-    *z2 = a2 - b2;
-    borrow_1 = (a2 < b2);
-    *z1 = a1 - b1;
-    borrow_0 = (a1 < b1);
-    *z0 = a0 - b0;
-    *z0 -= (*z1 < (t_uint64) borrow_1);
-    *z1 -= borrow_1;
-    *z2 -= borrow_0;
 }
 
 /*
@@ -837,6 +791,18 @@ static void mul_64_to_128(t_uint64 a, t_uint64 b, t_uint64 *r_low, t_uint64 *r_h
 
     *r_high = rh;
     *r_low = rl;
+}
+
+/*
+ * Derived from the SoftFloat 2c package (see copyright notice above)
+ */
+static void mul_64_by_shifted_32_to_128(t_uint64 a, uint32 b, t_mau_128 *result)
+{
+    t_uint64 mid;
+
+    mid = (t_uint64)(uint32) a * b;
+    result->low = mid << 32;
+    result->high = (t_uint64)(uint32)(a >> 32) * b + (mid >> 32);
 }
 
 /*
@@ -910,6 +876,41 @@ static uint32 estimate_sqrt_32(int16 a_exp, uint32 a)
     }
 
     return ((uint32) ((((t_uint64) a )<<31 ) / z)) + (z >> 1);
+}
+
+static uint32 approx_recip_sqrt_32(uint32 oddExpA, uint32 a)
+{
+    int index;
+    uint16 eps, r0;
+    uint32 ESqrR0;
+    uint32 sigma0;
+    uint32 r;
+    uint32 sqrSigma0;
+
+    static const uint16 softfloat_approxRecipSqrt_1k0s[16] = {
+        0xB4C9, 0xFFAB, 0xAA7D, 0xF11C, 0xA1C5, 0xE4C7, 0x9A43, 0xDA29,
+        0x93B5, 0xD0E5, 0x8DED, 0xC8B7, 0x88C6, 0xC16D, 0x8424, 0xBAE1
+    };
+    static const uint16 softfloat_approxRecipSqrt_1k1s[16] = {
+        0xA5A5, 0xEA42, 0x8C21, 0xC62D, 0x788F, 0xAA7F, 0x6928, 0x94B6,
+        0x5CC7, 0x8335, 0x52A6, 0x74E2, 0x4A3E, 0x68FE, 0x432B, 0x5EFD
+    };
+
+    index = (a>>27 & 0xE) + oddExpA;
+    eps = (uint16) (a>>12);
+    r0 = softfloat_approxRecipSqrt_1k0s[index]
+             - ((softfloat_approxRecipSqrt_1k1s[index] * (uint32) eps)
+                    >>20);
+    ESqrR0 = (uint32) r0 * r0;
+    if ( ! oddExpA ) ESqrR0 <<= 1;
+    sigma0 = ~(uint32) (((uint32) ESqrR0 * (t_uint64) a)>>23);
+    r = ((uint32) r0<<16) + ((r0 * (t_uint64) sigma0)>>25);
+    sqrSigma0 = ((t_uint64) sigma0 * sigma0)>>32;
+    r += ((uint32) ((r>>1) + (r>>3) - ((uint32) r0<<14))
+              * (t_uint64) sqrSigma0)
+             >>48;
+    if ( ! (r & 0x80000000) ) r = 0x80000000;
+    return r;
 }
 
 /*
@@ -1051,7 +1052,7 @@ static SFP round_pack_sfp(t_bool sign, int16 exp, uint32 frac, RM rounding_mode)
 
     round_bits = frac & 0x7f;
 
-    if (0xfd < (uint16) exp) {
+    if (0xfd <= (uint16) exp) {
         if ((0xfd < exp) ||
             (exp == 0xfd && (int32)(frac + round_increment) < 0)) {
             mau_exc(MAU_ASR_OS, MAU_ASR_OM);
@@ -1252,6 +1253,52 @@ static void propagate_xfp_nan(XFP *a, XFP *b, XFP *result)
 }
 
 /*
+ * Derived from the SoftFloat 2c package (see copyright notice above)
+ */
+static void propagate_xfp_nan_128(XFP* a, XFP* b, t_mau_128* result)
+{
+    t_bool is_sig_nan_a, is_sig_nan_b;
+    t_uint64 non_frac_a_low, non_frac_b_low;
+    uint16 mag_a, mag_b;
+
+    is_sig_nan_a = XFP_IS_TRAPPING_NAN(a);
+    is_sig_nan_b = XFP_IS_TRAPPING_NAN(b);
+
+    non_frac_a_low = a->frac & 0xC000000000000000ull;
+    non_frac_b_low = b->frac & 0xC000000000000000ull;
+
+    if (is_sig_nan_a | is_sig_nan_b) {
+        /* Invalid */
+        mau_exc(MAU_ASR_IS, MAU_ASR_IM);
+        if (is_sig_nan_a) {
+            if (is_sig_nan_b) goto return_larger_mag;
+            if (XFP_IS_NAN(b)) goto return_b;
+            goto return_a;
+        } else {
+            if (XFP_IS_NAN(a)) goto return_a;
+            goto return_b;
+        }
+    }
+
+ return_larger_mag:
+    mag_a = a->frac & 0x7fff;
+    mag_b = b->frac & 0x7fff;
+    if (mag_a < mag_b) goto return_b;
+    if (mag_b < mag_a) goto return_a;
+    if (a->frac < b->frac) goto return_b;
+    if (b->frac < a->frac) goto return_a;
+    if (a->sign_exp < b->sign_exp) goto return_a;
+ return_b:
+    result->high = b->sign_exp;
+    result->low = non_frac_b_low;
+    return;
+ return_a:
+    result->high = a->sign_exp;
+    result->low = non_frac_a_low;
+    return;
+}
+
+/*
  * Normalize and round an extended-precision floating point value.
  *
  * Partially derived from the SoftFloat 2c package (see copyright
@@ -1288,6 +1335,14 @@ static void normalize_sfp_subnormal(uint32 in_frac, int16 *out_exp, uint32 *out_
     int8 shift_count;
 
     shift_count = leading_zeros(in_frac) - 8;
+
+    if (shift_count < 0) {
+        /* There was invalid input, there's nothing we can do. */
+        *out_frac = in_frac;
+        *out_exp = 0;
+        return;
+    }
+
     *out_frac = in_frac << shift_count;
     *out_exp = (uint16)(1 - shift_count);
 }
@@ -1303,6 +1358,14 @@ static void normalize_dfp_subnormal(t_uint64 in_frac, int16 *out_exp, t_uint64 *
     int8 shift_count;
 
     shift_count = leading_zeros_64(in_frac) - 11;
+
+    if (shift_count < 0) {
+        /* There was invalid input, there's nothing we can do. */
+        *out_frac = in_frac;
+        *out_exp = 0;
+        return;
+    }
+
     *out_frac = in_frac << shift_count;
     *out_exp = 1 - shift_count;
 }
@@ -1328,9 +1391,9 @@ static void normalize_xfp_subnormal(t_uint64 in_frac, int32 *out_exp, t_uint64 *
  *
  * Derived from the SoftFloat 2c package (see copyright notice above)
  */
-static NAN_T sfp_to_common_nan(SFP val)
+static T_NAN sfp_to_common_nan(SFP val)
 {
-    NAN_T nan = {0};
+    T_NAN nan = {0};
 
     if (SFP_IS_TRAPPING_NAN(val)) {
         mau_state.trapping_nan = TRUE;
@@ -1349,9 +1412,9 @@ static NAN_T sfp_to_common_nan(SFP val)
  *
  * Derived from the SoftFloat 2c package (see copyright notice above)
  */
-static NAN_T dfp_to_common_nan(DFP val)
+static T_NAN dfp_to_common_nan(DFP val)
 {
-    NAN_T nan = {0};
+    T_NAN nan = {0};
 
     if (DFP_IS_TRAPPING_NAN(val)) {
         mau_state.trapping_nan = TRUE;
@@ -1370,9 +1433,9 @@ static NAN_T dfp_to_common_nan(DFP val)
  *
  * Derived from the SoftFloat 2c package (see copyright notice above)
  */
-static NAN_T xfp_to_common_nan(XFP *val)
+static T_NAN xfp_to_common_nan(XFP *val)
 {
-    NAN_T nan = {0};
+    T_NAN nan = {0};
 
     if (XFP_IS_TRAPPING_NAN(val)) {
         mau_state.trapping_nan = TRUE;
@@ -1391,7 +1454,7 @@ static NAN_T xfp_to_common_nan(XFP *val)
  *
  * Derived from the SoftFloat 2c package (see copyright notice above)
  */
-static SFP common_nan_to_sfp(NAN_T nan)
+static SFP common_nan_to_sfp(T_NAN nan)
 {
     return ((((uint32)nan.sign) << 31)
             | 0x7fc00000
@@ -1404,7 +1467,7 @@ static SFP common_nan_to_sfp(NAN_T nan)
  *
  * Derived from the SoftFloat 2c package (see copyright notice above)
  */
-static DFP common_nan_to_dfp(NAN_T nan)
+static DFP common_nan_to_dfp(T_NAN nan)
 {
     return ((((t_uint64)nan.sign) << 63)
             | 0x7ff8000000000000ull
@@ -1417,7 +1480,7 @@ static DFP common_nan_to_dfp(NAN_T nan)
  *
  * Derived from the SoftFloat 2c package (see copyright notice above)
  */
-static void common_nan_to_xfp(NAN_T nan, XFP *result)
+static void common_nan_to_xfp(T_NAN nan, XFP *result)
 {
     result->frac = 0xc000000000000000ull | (nan.high >> 1);
     result->sign_exp = (((uint16)nan.sign) << 15) | 0x7fff;
@@ -1662,6 +1725,8 @@ void mau_int_to_xfp(int32 val, XFP *result)
 
 /*
  * Convert a floating point value to a 64-bit integer.
+ *
+ * Derived from the SoftFloat 2c package (see copyright notice above)
  */
 t_int64 xfp_to_int64(XFP *val, RM rounding_mode)
 {
@@ -1762,7 +1827,7 @@ void xfp_to_decimal(XFP *a, DEC *d, RM rounding_mode)
 /*
  * Convert a decimal value to a float value.
  */
-void mau_decimal_to_xfp(DEC *d, XFP *a, RM rounding_mode)
+void mau_decimal_to_xfp(DEC *d, XFP *a)
 {
     int i;
     t_bool sign;
@@ -1771,7 +1836,7 @@ void mau_decimal_to_xfp(DEC *d, XFP *a, RM rounding_mode)
     t_uint64 tmp;
     t_int64 signed_tmp;
 
-        sim_debug(TRACE_DBG, &mau_dev,
+    sim_debug(TRACE_DBG, &mau_dev,
               "[%08x] [mau_decimal_to_xfp] DEC input: %08x %08x %08x\n",
               R[NUM_PC], d->h, (uint32)(d->l >> 32), (uint32)(d->l));
 
@@ -1836,6 +1901,8 @@ void mau_decimal_to_xfp(DEC *d, XFP *a, RM rounding_mode)
 
 /*
  * Convert a floating point value to a 32-bit integer.
+ *
+ * Derived from the SoftFloat 2c package (see copyright notice above)
  */
 uint32 xfp_to_int(XFP *val, RM rounding_mode)
 {
@@ -1915,7 +1982,7 @@ void mau_round_xfp_to_int(XFP *val, XFP *result, RM rounding_mode)
             }
             return;
         default:
-            // do nothing
+            /* Do nothing */
             break;
         }
         PACK_XFP(sign, 0, 0, result);
@@ -1955,10 +2022,13 @@ void mau_round_xfp_to_int(XFP *val, XFP *result, RM rounding_mode)
  * Math Functions
  ****************************************************************************/
 
+/*
+ * Derived from the SoftFloat 2c package (see copyright notice above)
+ */
 static void xfp_add_fracs(XFP *a, XFP *b, t_bool sign, XFP *result, RM rounding_mode)
 {
-    int32 a_exp, b_exp, result_exp;
-    t_uint64 a_frac, b_frac, result_frac_0, result_frac_1;
+    int32 a_exp, b_exp, r_exp;
+    t_uint64 a_frac, b_frac, r_frac_0, r_frac_1;
     int32 exp_diff;
 
     sim_debug(TRACE_DBG, &mau_dev,
@@ -1986,8 +2056,8 @@ static void xfp_add_fracs(XFP *a, XFP *b, t_bool sign, XFP *result, RM rounding_
         if (b_exp == 0) {
             --exp_diff;
         }
-        shift_right_extra_64_jamming(b_frac, 0, exp_diff, &b_frac, &result_frac_1);
-        result_exp = a_exp;
+        shift_right_extra_64_jamming(b_frac, 0, exp_diff, &b_frac, &r_frac_1);
+        r_exp = a_exp;
     } else if (exp_diff < 0) {
         if (b_exp == 0x7fff) {
             if ((t_uint64) (b_frac << 1)) {
@@ -2001,8 +2071,8 @@ static void xfp_add_fracs(XFP *a, XFP *b, t_bool sign, XFP *result, RM rounding_
             ++exp_diff;
         }
 
-        shift_right_extra_64_jamming(a_frac, 0, -exp_diff, &a_frac, &result_frac_1);
-        result_exp = b_exp;
+        shift_right_extra_64_jamming(a_frac, 0, -exp_diff, &a_frac, &r_frac_1);
+        r_exp = b_exp;
     } else {
         if (a_exp == 0x7fff) {
             if ((t_uint64)((a_frac | b_frac) << 1)) {
@@ -2013,37 +2083,40 @@ static void xfp_add_fracs(XFP *a, XFP *b, t_bool sign, XFP *result, RM rounding_
             result->frac = a->frac;
             return;
         }
-        result_frac_1 = 0;
-        result_frac_0 = a_frac + b_frac;
+        r_frac_1 = 0;
+        r_frac_0 = a_frac + b_frac;
         if (a_exp == 0) {
-            normalize_xfp_subnormal(result_frac_0, &result_exp, &result_frac_0);
+            normalize_xfp_subnormal(r_frac_0, &r_exp, &r_frac_0);
 
-            round_pack_xfp(sign, result_exp, result_frac_0, result_frac_1, rounding_mode, result);
+            round_pack_xfp(sign, r_exp, r_frac_0, r_frac_1, rounding_mode, result);
             return;
         }
-        result_exp = a_exp;
-        shift_right_extra_64_jamming(result_frac_0, result_frac_1, 1, &result_frac_0, &result_frac_1);
-        result_frac_0 |= 0x8000000000000000ull;
-        ++result_exp;
-        round_pack_xfp(sign, result_exp, result_frac_0, result_frac_1, rounding_mode, result);
+        r_exp = a_exp;
+        shift_right_extra_64_jamming(r_frac_0, r_frac_1, 1, &r_frac_0, &r_frac_1);
+        r_frac_0 |= 0x8000000000000000ull;
+        ++r_exp;
+        round_pack_xfp(sign, r_exp, r_frac_0, r_frac_1, rounding_mode, result);
         return;
     }
-    result_frac_0 = a_frac + b_frac;
-    if (((t_int64) result_frac_0) < 0) {
-        round_pack_xfp(sign, result_exp, result_frac_0, result_frac_1, rounding_mode, result);
+    r_frac_0 = a_frac + b_frac;
+    if (((t_int64) r_frac_0) < 0) {
+        round_pack_xfp(sign, r_exp, r_frac_0, r_frac_1, rounding_mode, result);
         return;
     }
-    shift_right_extra_64_jamming(result_frac_0, result_frac_1, 1, &result_frac_0, &result_frac_1);
-    result_frac_0 |= 0x8000000000000000ull;
-    ++result_exp;
-    round_pack_xfp(sign, result_exp, result_frac_0, result_frac_1, rounding_mode, result);
+    shift_right_extra_64_jamming(r_frac_0, r_frac_1, 1, &r_frac_0, &r_frac_1);
+    r_frac_0 |= 0x8000000000000000ull;
+    ++r_exp;
+    round_pack_xfp(sign, r_exp, r_frac_0, r_frac_1, rounding_mode, result);
     return;
 }
 
+/*
+ * Derived from the SoftFloat 2c package (see copyright notice above)
+ */
 static void xfp_sub_fracs(XFP *a, XFP *b, t_bool sign, XFP *result, RM rounding_mode)
 {
-    int32 a_exp, b_exp, result_exp;
-    t_uint64 a_frac, b_frac, result_frac_0, result_frac_1;
+    int32 a_exp, b_exp, r_exp;
+    t_uint64 a_frac, b_frac, r_frac_0, r_frac_1;
     int32 exp_diff;
 
     a_exp = XFP_EXP(a);
@@ -2066,12 +2139,12 @@ static void xfp_sub_fracs(XFP *a, XFP *b, t_bool sign, XFP *result, RM rounding_
         if (b_exp == 0) {
             --exp_diff;
         }
-        shift_right_128_jamming(b_frac, 0, exp_diff, &b_frac, &result_frac_1);
+        shift_right_128_jamming(b_frac, 0, exp_diff, &b_frac, &r_frac_1);
         /* aBigger */
-        sub_128(a_frac, 0, b_frac, result_frac_1, &result_frac_0, &result_frac_1);
-        result_exp = a_exp;
+        sub_128(a_frac, 0, b_frac, r_frac_1, &r_frac_0, &r_frac_1);
+        r_exp = a_exp;
         /* normalizeRoundAndPack */
-        normalize_round_pack_xfp(sign, result_exp, result_frac_0, result_frac_1, rounding_mode, result);
+        normalize_round_pack_xfp(sign, r_exp, r_frac_0, r_frac_1, rounding_mode, result);
         return;
     }
     if (exp_diff < 0) {
@@ -2087,14 +2160,14 @@ static void xfp_sub_fracs(XFP *a, XFP *b, t_bool sign, XFP *result, RM rounding_
         if (a_exp == 0) {
             ++exp_diff;
         }
-        shift_right_128_jamming(a_frac, 0, -exp_diff, &a_frac, &result_frac_1);
+        shift_right_128_jamming(a_frac, 0, -exp_diff, &a_frac, &r_frac_1);
         /* bBigger */
-        sub_128(b_frac, 0, a_frac, result_frac_1, &result_frac_0, &result_frac_1);
-        result_exp = b_exp;
+        sub_128(b_frac, 0, a_frac, r_frac_1, &r_frac_0, &r_frac_1);
+        r_exp = b_exp;
         sign = sign ? 0 : 1;
         /* normalizeRoundAndPack */
-        normalize_round_pack_xfp(sign, result_exp,
-                                 result_frac_0, result_frac_1,
+        normalize_round_pack_xfp(sign, r_exp,
+                                 r_frac_0, r_frac_1,
                                  rounding_mode, result);
         return;
     }
@@ -2112,26 +2185,26 @@ static void xfp_sub_fracs(XFP *a, XFP *b, t_bool sign, XFP *result, RM rounding_
         a_exp = 1;
         b_exp = 1;
     }
-    result_frac_1 = 0;
+    r_frac_1 = 0;
     if (b_frac < a_frac) {
         /* aBigger */
-        sub_128(a_frac, 0, b_frac, result_frac_1, &result_frac_0, &result_frac_1);
-        result_exp = a_exp;
+        sub_128(a_frac, 0, b_frac, r_frac_1, &r_frac_0, &r_frac_1);
+        r_exp = a_exp;
         /* normalizeRoundAndPack */
-        normalize_round_pack_xfp(sign, result_exp,
-                                 result_frac_0, result_frac_1,
+        normalize_round_pack_xfp(sign, r_exp,
+                                 r_frac_0, r_frac_1,
                                  rounding_mode, result);
         return;
     }
     if (a_frac < b_frac) {
         /* bBigger */
-        sub_128(b_frac, 0, a_frac, result_frac_1, &result_frac_0, &result_frac_1);
-        result_exp = b_exp;
+        sub_128(b_frac, 0, a_frac, r_frac_1, &r_frac_0, &r_frac_1);
+        r_exp = b_exp;
         sign ^= 1;
 
         /* normalizeRoundAndPack */
-        normalize_round_pack_xfp(sign, result_exp,
-                                 result_frac_0, result_frac_1,
+        normalize_round_pack_xfp(sign, r_exp,
+                                 r_frac_0, r_frac_1,
                                  rounding_mode, result);
         return;
     }
@@ -2147,6 +2220,8 @@ static void xfp_sub_fracs(XFP *a, XFP *b, t_bool sign, XFP *result, RM rounding_
 
 /*
  * Set condition flags based on comparison of the two values A and B.
+ *
+ * Derived from the SoftFloat 2c package (see copyright notice above)
  */
 static void xfp_cmp(XFP *a, XFP *b)
 {
@@ -2281,11 +2356,14 @@ static void xfp_sub(XFP *a, XFP *b, XFP *result, RM rounding_mode)
     }
 }
 
+/*
+ * Derived from the SoftFloat 2c package (see copyright notice above)
+ */
 static void xfp_mul(XFP *a, XFP *b, XFP *result, RM rounding_mode)
 {
-    uint32 a_sign, b_sign, result_sign;
-    int32 a_exp, b_exp, result_exp;
-    t_uint64 a_frac, b_frac, result_frac_0, result_frac_1;
+    uint32 a_sign, b_sign, r_sign;
+    int32 a_exp, b_exp, r_exp;
+    t_uint64 a_frac, b_frac, r_frac_0, r_frac_1;
 
     sim_debug(TRACE_DBG, &mau_dev,
               "[%08x] [MUL] op1=%04x%016llx  op2=%04x%016llx\n",
@@ -2300,7 +2378,7 @@ static void xfp_mul(XFP *a, XFP *b, XFP *result, RM rounding_mode)
     b_exp = XFP_EXP(b);
     b_frac = XFP_FRAC(b);
 
-    result_sign = a_sign ^ b_sign;
+    r_sign = a_sign ^ b_sign;
 
     if (a_exp == 0x7fff) {
         if ((t_uint64)(a_frac << 1) || ((b_exp == 0x7fff) && (t_uint64)(b_frac << 1))) {
@@ -2314,7 +2392,7 @@ static void xfp_mul(XFP *a, XFP *b, XFP *result, RM rounding_mode)
             result->frac = DEFAULT_XFP_NAN_FRAC;
             return;
         }
-        PACK_XFP(result_sign, 0x7fff, 0x8000000000000000ull, result);
+        PACK_XFP(r_sign, 0x7fff, 0x8000000000000000ull, result);
         return;
     }
 
@@ -2330,13 +2408,13 @@ static void xfp_mul(XFP *a, XFP *b, XFP *result, RM rounding_mode)
             result->frac = DEFAULT_XFP_NAN_FRAC;
             return;
         }
-        PACK_XFP(result_sign, 0x7fff, 0x8000000000000000ull, result);
+        PACK_XFP(r_sign, 0x7fff, 0x8000000000000000ull, result);
         return;
     }
 
     if (a_exp == 0) {
         if (a_frac == 0) {
-            PACK_XFP(result_sign, 0, 0, result);
+            PACK_XFP(r_sign, 0, 0, result);
             return;
         }
         normalize_xfp_subnormal(a_frac, &a_exp, &a_frac);
@@ -2344,24 +2422,27 @@ static void xfp_mul(XFP *a, XFP *b, XFP *result, RM rounding_mode)
 
     if (b_exp == 0) {
         if (b_frac == 0) {
-            PACK_XFP(result_sign, 0, 0, result);
+            PACK_XFP(r_sign, 0, 0, result);
             return;
         }
         normalize_xfp_subnormal(b_frac, &b_exp, &b_frac);
     }
 
-    result_exp = a_exp + b_exp - 0x3ffe;
-    mul_64_to_128(a_frac, b_frac, &result_frac_0, &result_frac_1);
-    if (0 < (t_int64)result_frac_0) {
-        short_shift_left_128(result_frac_0, result_frac_1, 1,
-                             &result_frac_0, &result_frac_1);
-        --result_exp;
+    r_exp = a_exp + b_exp - 0x3ffe;
+    mul_64_to_128(a_frac, b_frac, &r_frac_0, &r_frac_1);
+    if (0 < (t_int64)r_frac_0) {
+        short_shift_left_128(r_frac_0, r_frac_1, 1,
+                             &r_frac_0, &r_frac_1);
+        --r_exp;
     }
 
-    round_pack_xfp(result_sign, result_exp, result_frac_0,
-                   result_frac_1, rounding_mode, result);
+    round_pack_xfp(r_sign, r_exp, r_frac_0,
+                   r_frac_1, rounding_mode, result);
 }
 
+/*
+ * Derived from the SoftFloat 2c package (see copyright notice above)
+ */
 static void xfp_div(XFP *a, XFP *b, XFP *result, RM rounding_mode)
 {
     t_bool a_sign, b_sign, r_sign;
@@ -2471,30 +2552,38 @@ static void xfp_div(XFP *a, XFP *b, XFP *result, RM rounding_mode)
     round_pack_xfp(r_sign, r_exp, r_frac0, r_frac1, rounding_mode, result);
 }
 
+/*
+ * Derived from the SoftFloat 2c package (see copyright notice above)
+ */
 static void xfp_sqrt(XFP *a, XFP *result, RM rounding_mode)
 {
-    uint32 a_sign;
-    int32 a_exp, result_exp;
-    t_uint64 a_frac_0, a_frac_1, result_frac_0, result_frac_1, double_result_frac_0;
-    t_uint64 rem_0, rem_1, rem_2, rem_3, term_0, term_1, term_2, term_3;
+    XFP zero = {0, 0, 0};
+    t_bool a_sign;
+    int32 a_exp, norm_exp, r_exp;
+    uint32 a_frac_32, sqrt_recip_32, r_frac_32;
+    t_uint64 a_frac, norm_frac, q, x64, z_frac, z_frac_extra;
+    t_mau_128 nan_128, rem, y, term;
+
+    sim_debug(TRACE_DBG, &mau_dev,
+              "[%08x] [SQRT] op1=%04x%016llx\n",
+              R[NUM_PC], a->sign_exp, a->frac);
 
     a_sign = XFP_SIGN(a);
-    a_exp = XFP_EXP(a);
-    a_frac_0 = XFP_FRAC(a);
+    a_exp  = XFP_EXP(a);
+    a_frac  = XFP_FRAC(a);
 
     if (a_exp == 0x7fff) {
-        if ((t_uint64)(a_frac_0 << 1)) {
-            propagate_xfp_nan(a, a, result);
+        if ( a_frac & 0x7fffffffffffffffull ) {
+            propagate_xfp_nan_128(a, &zero, &nan_128);
+            result->sign_exp = nan_128.high;
+            result->frac = nan_128.low;
             return;
         }
-
-        if (!a_sign) {
+        if ( ! a_sign ) {
             result->sign_exp = a->sign_exp;
             result->frac = a->frac;
-            return;
         }
-
-        /* invalid */
+        /* Invalid */
         mau_exc(MAU_ASR_IS, MAU_ASR_IM);
         result->sign_exp = DEFAULT_XFP_NAN_SIGN_EXP;
         result->frac = DEFAULT_XFP_NAN_FRAC;
@@ -2502,74 +2591,98 @@ static void xfp_sqrt(XFP *a, XFP *result, RM rounding_mode)
     }
 
     if (a_sign) {
-        if ((a_exp | a_frac_0) == 0) {
-            result->sign_exp = a->sign_exp;
-            result->frac = a->frac;
+        if (!a_frac) {
+            PACK_XFP(a_sign, 0, 0, result);
             return;
         }
-
-        /* invalid */
         mau_exc(MAU_ASR_IS, MAU_ASR_IM);
         result->sign_exp = DEFAULT_XFP_NAN_SIGN_EXP;
         result->frac = DEFAULT_XFP_NAN_FRAC;
         return;
     }
 
-    if (a_exp == 0) {
-        if (a_frac_0 == 0) {
-            PACK_XFP(0, 0, 0, result);
+    if (!a_exp) {
+        a_exp = 1;
+    }
+
+    if (!(a_frac & 0x8000000000000000ull)) {
+        if (!a_frac) {
+            PACK_XFP(a_sign, 0, 0, result);
             return;
         }
-
-        normalize_xfp_subnormal(a_frac_0, &a_exp, &a_frac_0);
+        normalize_xfp_subnormal(a->frac, &norm_exp, &norm_frac);
+        a_exp += norm_exp;
+        a_frac = norm_frac;
     }
 
-    result_exp = ((a_exp - 0x3fff) >> 1) + 0x3fff;
-    result_frac_0 = estimate_sqrt_32(a_exp, a_frac_0 >> 32);
-    shift_right_128(a_frac_0, 0, 2 + (a_exp & 1), &a_frac_0, &a_frac_1);
-    result_frac_0 = estimate_div_128_to_64(a_frac_0, a_frac_1, result_frac_0 << 32)
-        + (result_frac_0 << 30);
-    double_result_frac_0 = result_frac_0 << 1;
-    mul_64_to_128(result_frac_0, result_frac_0, &term_0, &term_1);
-    sub_128(a_frac_0, a_frac_1, term_0, term_1, &rem_0, &rem_1);
-    while ((t_int64) rem_0 < 0) {
-        --result_frac_0;
-        double_result_frac_0 -= 2;
-        add_128(rem_0, rem_1, result_frac_0 >> 63,
-                double_result_frac_0 | 1, &rem_0, &rem_1);
+    /*
+     * r_frac_32 is guaranteed to be a lower bound on the square root of
+     * a_frac_32, which makes r_frac_32 also a lower bound on the square
+     * root of `a_frac'.
+     */
+    r_exp = ((a_exp - 0x3FFF) >> 1) + 0x3FFF;
+    a_exp &= 1;
+    a_frac_32 = a_frac >> 32;
+    sqrt_recip_32 = approx_recip_sqrt_32(a_exp, a_frac_32);
+    r_frac_32 = ((t_uint64) a_frac_32 * sqrt_recip_32) >> 32;
+
+    if (a_exp) {
+        r_frac_32 >>= 1;
+        short_shift_left_128(0, a_frac, 61, &rem.high, &rem.low);
+    } else {
+        short_shift_left_128(0, a_frac, 62, &rem.high, &rem.low);
     }
 
-    result_frac_1 = estimate_div_128_to_64(rem_0, 0, double_result_frac_0);
+    rem.high -= (t_uint64) r_frac_32 * r_frac_32;
 
-    if ((result_frac_1 & 0x3fffffffffffffff) <= 5) {
-        if (result_frac_1 == 0) {
-            result_frac_1 = 1;
+    q = ((uint32) (rem.high >> 2) * (t_uint64) sqrt_recip_32) >> 32;
+    x64 = (t_uint64) r_frac_32 << 32;
+    z_frac = x64 + (q<<3);
+    short_shift_left_128(rem.high, rem.low, 29, &y.high, &y.low);
+
+    /* Repeating this loop is a rare occurrence. */
+    while(1) {
+        mul_64_by_shifted_32_to_128(x64 + z_frac, q, &term);
+        sub_128(y.high, y.low, term.high, term.low, &rem.high, &rem.low);
+        if (!(rem.high & 0x8000000000000000ull)) {
+            break;
         }
-        mul_64_to_128(double_result_frac_0, result_frac_1, &term_1, &term_2);
-        sub_128(rem_1, 0, term_1, term_2, &rem_1, &rem_2);
-        mul_64_to_128(result_frac_1, result_frac_1, &term_2, &term_3);
-        sub_192(rem_1, rem_2, 0, 0, term_2, term_3, &rem_1, &rem_2, &rem_3);
-        while ((t_int64) rem_1 < 0) {
-            --result_frac_1;
-            short_shift_left_128(0, result_frac_1, 1, &term_2, &term_3);
-            term_3 |= 1;
-            term_2 |= double_result_frac_0;
-            add_192(rem_1, rem_2, rem_3,
-                    0, term_2, term_3,
-                    &rem_1, &rem_2, &rem_3);
-        }
-        result_frac_1 |= ((rem_1 | rem_2 | rem_3) != 0);
+        --q;
+        z_frac -= 1<<3;
     }
-    short_shift_left_128(0, result_frac_1, 1, &result_frac_0, &result_frac_1);
-    result_frac_0 |= double_result_frac_0;
 
-    round_pack_xfp(0, result_exp, result_frac_0, result_frac_1,
-                   rounding_mode, result);
+    q = (((rem.high>>2) * sqrt_recip_32)>>32) + 2;
+    x64 = z_frac;
+    z_frac = (z_frac<<1) + (q>>25);
+    z_frac_extra = (t_uint64) (q<<39);
+
+    if ( (q & 0xffffff) <= 2 ) {
+        q &= ~(t_uint64) 0xffff;
+        z_frac_extra = (t_uint64) (q<<39);
+        mul_64_by_shifted_32_to_128(x64 + (q >> 27), q, &term);
+        x64 = (uint32) (q<<5) * (t_uint64) (uint32) q;
+        add_128(term.high, term.low, 0, x64, &term.high, &term.low);
+        short_shift_left_128(rem.high, rem.low, 28, &rem.high, &rem.low);
+        sub_128(rem.high, rem.low, term.high, term.low, &rem.high, &rem.low);
+        if (rem.high & 0x8000000000000000ull) {
+            if (!z_frac_extra ) {
+                --z_frac;
+            }
+            --z_frac_extra;
+        } else {
+            if (rem.high | rem.low) {
+                z_frac_extra |= 1;
+            }
+        }
+    }
+
+    round_pack_xfp(0, r_exp, z_frac, z_frac_extra, rounding_mode,result);
+    return;
 }
 
 static void xfp_remainder(XFP *a, XFP *b, XFP *result, RM rounding_mode)
 {
-    uint32 a_sign, b_sign, result_sign;
+    uint32 a_sign, b_sign, r_sign;
     int32 a_exp, b_exp, exp_diff;
     t_uint64 a_frac_0, a_frac_1, b_frac;
     t_uint64 q, term_0, term_1, alt_a_frac_0, alt_a_frac_1;
@@ -2624,7 +2737,7 @@ static void xfp_remainder(XFP *a, XFP *b, XFP *result, RM rounding_mode)
     }
 
     b_frac |= 0x8000000000000000ull;
-    result_sign = a_sign;
+    r_sign = a_sign;
     exp_diff = a_exp - b_exp;
     a_frac_1 = 0;
     if (exp_diff < 0) {
@@ -2679,10 +2792,10 @@ static void xfp_remainder(XFP *a, XFP *b, XFP *result, RM rounding_mode)
          (q & 1))) {
         a_frac_0 = alt_a_frac_0;
         a_frac_1 = alt_a_frac_1;
-        result_sign = result_sign ? 0 : 1;
+        r_sign = r_sign ? 0 : 1;
     }
 
-    normalize_round_pack_xfp(result_sign, b_exp + exp_diff,
+    normalize_round_pack_xfp(r_sign, b_exp + exp_diff,
                              a_frac_0, a_frac_1,
                              rounding_mode, result);
 }
@@ -2810,6 +2923,57 @@ static void store_op3_decimal(DEC *d)
     mau_state.dr.frac = ((t_uint64)d->l >> 32) | (t_uint64)d->l;
 }
 
+static void store_op3_reg(XFP *xfp, XFP *reg)
+{
+    DFP dfp;
+    SFP sfp;
+    XFP xfp_r;
+
+    if (mau_state.ntnan) {
+        reg->sign_exp = GEN_NONTRAPPING_NAN.sign_exp;
+        reg->frac = GEN_NONTRAPPING_NAN.frac;
+    } else {
+        switch(mau_state.op3) {
+        case M_OP3_F0_SINGLE:
+        case M_OP3_F1_SINGLE:
+        case M_OP3_F2_SINGLE:
+        case M_OP3_F3_SINGLE:
+            sfp = xfp_to_sfp(xfp, MAU_RM);
+            sfp_to_xfp(sfp, &xfp_r);
+            reg->sign_exp = xfp_r.sign_exp;
+            reg->frac = xfp_r.frac;
+            reg->s = xfp_r.s;
+            break;
+        case M_OP3_F0_DOUBLE:
+        case M_OP3_F1_DOUBLE:
+        case M_OP3_F2_DOUBLE:
+        case M_OP3_F3_DOUBLE:
+            dfp = xfp_to_dfp(xfp, MAU_RM);
+            dfp_to_xfp(dfp, &xfp_r);
+            reg->sign_exp = xfp_r.sign_exp;
+            reg->frac = xfp_r.frac;
+            reg->s = xfp_r.s;
+            break;
+        case M_OP3_F0_TRIPLE:
+        case M_OP3_F1_TRIPLE:
+        case M_OP3_F2_TRIPLE:
+        case M_OP3_F3_TRIPLE:
+            reg->sign_exp = xfp->sign_exp;
+            reg->frac = xfp->frac;
+            reg->s = xfp->s;
+            break;
+        }
+    }
+    if (set_nz()) {
+        if (XFP_SIGN(xfp)) {
+            mau_state.asr |= MAU_ASR_N;
+        }
+        if (XFP_EXP(xfp) == 0 && XFP_FRAC(xfp) == 0) {
+            mau_state.asr |= MAU_ASR_Z;
+        }
+    }
+}
+
 static void store_op3(XFP *xfp)
 {
     DFP dfp;
@@ -2837,78 +3001,22 @@ static void store_op3(XFP *xfp)
     case M_OP3_F0_SINGLE:
     case M_OP3_F0_DOUBLE:
     case M_OP3_F0_TRIPLE:
-        if (mau_state.ntnan) {
-            mau_state.f0.sign_exp = GEN_NONTRAPPING_NAN.sign_exp;
-            mau_state.f0.frac = GEN_NONTRAPPING_NAN.frac;
-        } else {
-            mau_state.f0.sign_exp = xfp->sign_exp;
-            mau_state.f0.frac = xfp->frac;
-        }
-        if (set_nz()) {
-            if (XFP_SIGN(xfp)) {
-                mau_state.asr |= MAU_ASR_N;
-            }
-            if (XFP_EXP(xfp) == 0 && XFP_FRAC(xfp) == 0) {
-                mau_state.asr |= MAU_ASR_Z;
-            }
-        }
+        store_op3_reg(xfp, &mau_state.f0);
         break;
     case M_OP3_F1_SINGLE:
     case M_OP3_F1_DOUBLE:
     case M_OP3_F1_TRIPLE:
-        if (mau_state.ntnan) {
-            mau_state.f1.sign_exp = GEN_NONTRAPPING_NAN.sign_exp;
-            mau_state.f1.frac = GEN_NONTRAPPING_NAN.frac;
-        } else {
-            mau_state.f1.sign_exp = xfp->sign_exp;
-            mau_state.f1.frac = xfp->frac;
-        }
-        if (set_nz()) {
-            if (XFP_SIGN(xfp)) {
-                mau_state.asr |= MAU_ASR_N;
-            }
-            if (XFP_EXP(xfp) == 0 && XFP_FRAC(xfp) == 0) {
-                mau_state.asr |= MAU_ASR_Z;
-            }
-        }
+        store_op3_reg(xfp, &mau_state.f1);
         break;
     case M_OP3_F2_SINGLE:
     case M_OP3_F2_DOUBLE:
     case M_OP3_F2_TRIPLE:
-        if (mau_state.ntnan) {
-            mau_state.f2.sign_exp = GEN_NONTRAPPING_NAN.sign_exp;
-            mau_state.f2.frac = GEN_NONTRAPPING_NAN.frac;
-        } else {
-            mau_state.f2.sign_exp = xfp->sign_exp;
-            mau_state.f2.frac = xfp->frac;
-        }
-        if (set_nz()) {
-            if (XFP_SIGN(xfp)) {
-                mau_state.asr |= MAU_ASR_N;
-            }
-            if (XFP_EXP(xfp) == 0 && XFP_FRAC(xfp) == 0) {
-                mau_state.asr |= MAU_ASR_Z;
-            }
-        }
+        store_op3_reg(xfp, &mau_state.f2);
         break;
     case M_OP3_F3_SINGLE:
     case M_OP3_F3_DOUBLE:
     case M_OP3_F3_TRIPLE:
-        if (mau_state.ntnan) {
-            mau_state.f3.sign_exp = GEN_NONTRAPPING_NAN.sign_exp;
-            mau_state.f3.frac = GEN_NONTRAPPING_NAN.frac;
-        } else {
-            mau_state.f3.sign_exp = xfp->sign_exp;
-            mau_state.f3.frac = xfp->frac;
-        }
-        if (set_nz()) {
-            if (XFP_SIGN(xfp)) {
-                mau_state.asr |= MAU_ASR_N;
-            }
-            if (XFP_EXP(xfp) == 0 && XFP_FRAC(xfp) == 0) {
-                mau_state.asr |= MAU_ASR_Z;
-            }
-        }
+        store_op3_reg(xfp, &mau_state.f3);
         break;
     case M_OP3_MEM_SINGLE:
         if (mau_state.ntnan) {
@@ -3164,7 +3272,7 @@ static void mau_dtof()
     XFP result;
 
     load_op1_decimal(&d);
-    mau_decimal_to_xfp(&d, &result, MAU_RM);
+    mau_decimal_to_xfp(&d, &result);
     store_op3(&result);
 }
 
