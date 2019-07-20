@@ -15,4 +15,4 @@ env:
   - SIM="uc15"
 sudo: required
 install: sh -ex .travis/deps.sh
-script: make $SIM
+script: make --jobs=4 $SIM
