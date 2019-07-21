@@ -2575,7 +2575,7 @@ static void xfp_sqrt(XFP *a, XFP *result, RM rounding_mode)
     if (a_exp == 0x7fff) {
         if ( a_frac & 0x7fffffffffffffffull ) {
             propagate_xfp_nan_128(a, &zero, &nan_128);
-            result->sign_exp = nan_128.high;
+            result->sign_exp = (uint32) nan_128.high;
             result->frac = nan_128.low;
             return;
         }
@@ -2642,7 +2642,7 @@ static void xfp_sqrt(XFP *a, XFP *result, RM rounding_mode)
 
     /* Repeating this loop is a rare occurrence. */
     while(1) {
-        mul_64_by_shifted_32_to_128(x64 + z_frac, q, &term);
+        mul_64_by_shifted_32_to_128(x64 + z_frac, (uint32) q, &term);
         sub_128(y.high, y.low, term.high, term.low, &rem.high, &rem.low);
         if (!(rem.high & 0x8000000000000000ull)) {
             break;
@@ -2659,7 +2659,7 @@ static void xfp_sqrt(XFP *a, XFP *result, RM rounding_mode)
     if ( (q & 0xffffff) <= 2 ) {
         q &= ~(t_uint64) 0xffff;
         z_frac_extra = (t_uint64) (q<<39);
-        mul_64_by_shifted_32_to_128(x64 + (q >> 27), q, &term);
+        mul_64_by_shifted_32_to_128(x64 + (q >> 27), (uint32) q, &term);
         x64 = (uint32) (q<<5) * (t_uint64) (uint32) q;
         add_128(term.high, term.low, 0, x64, &term.high, &term.low);
         short_shift_left_128(rem.high, rem.low, 28, &rem.high, &rem.low);
