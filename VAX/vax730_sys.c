@@ -1,3 +1,5 @@
+#error Word size too small.
+
 /* vax730_sys.c: VAX 11/730 system-specific logic
 
    Copyright (c) 2010-2011, Matt Burke
