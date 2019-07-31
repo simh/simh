@@ -73,7 +73,7 @@ struct ndev {
 /* Structure to define operation codes */
 
 struct opdef {
-    char    op[6];                                      /* Mnemonic for op */
+    const char op[6];                                   /* Mnemonic for op */
     int32   opmask;                                     /* Bits set on in opcode */
     int32   q;                                          /* Qbyte */
     int32   form;                                       /* Forms are:

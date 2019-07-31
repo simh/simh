@@ -203,7 +203,7 @@ int32 regcode[15] = {   0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01,
             0x80, 0xC0, 0xA0, 0x90, 0x88, 0x84, 0x82, 0x81
 };
             
-char regname[15][8] =  {    "(P2IAR)",
+const char regname[15][8] =  {    "(P2IAR)",
                 "(P1IAR)",
                 "(IAR)",
                 "(ARR)",
@@ -276,6 +276,8 @@ char bld[128], bldaddr[32], boperand[32], aoperand[32];
 int32 blk[16], blt[16];
 int32 blkadd;
 
+memset (bld, 0, sizeof (bld));
+memset (bldaddr, 0, sizeof (bldaddr));
 c1 = val[0] & 0xff;
 if (sw & SWMASK ('A')) {
     for (i = 0; i < 16; i++) {
@@ -376,24 +378,24 @@ if (i >= nopcode) {
 
     /* Extract the addresses into aaddr and baddr */
 
-    strcpy(aoperand, "ERROR");
-    strcpy(boperand, "ERROR");
+    strlcpy(aoperand, "ERROR", sizeof (aoperand));
+    strlcpy(boperand, "ERROR", sizeof (boperand));
     vpos = 2;
     aaddr = baddr = 0;
     switch (len1) {
         case 0:
             baddr = ((val[vpos] << 8) & 0xff00) | (val[vpos + 1] & 0x00ff);
-            sprintf(boperand, "%04X", baddr);
+            snprintf(boperand, sizeof (boperand) - 1, "%04X", baddr);
             vpos = 4;
             break;
         case 1:
             baddr = val[vpos] & 255;
-            sprintf(boperand, "(%02X,XR1)", baddr);
+            snprintf(boperand, sizeof (boperand) - 1, "(%02X,XR1)", baddr);
             vpos = 3;
             break;
         case 2:
             baddr = val[vpos] & 255;
-            sprintf(boperand, "(%02X,XR2)", baddr);
+            snprintf(boperand, sizeof (boperand) - 1, "(%02X,XR2)", baddr);
             vpos = 3;
             break;
         default:
@@ -404,23 +406,23 @@ if (i >= nopcode) {
         case 0:
             aaddr = ((val[vpos] << 8) & 0xff00) | (val[vpos + 1] & 0x00ff);
             if (group == 0x0C || group == 0x0D || group == 0x0E)
-                sprintf(boperand, "%04X", aaddr);
+                    snprintf(boperand, sizeof (boperand) - 1, "%04X", aaddr);
                 else
-                sprintf(aoperand, "%04X", aaddr);
+                    snprintf(aoperand, sizeof (aoperand) - 1, "%04X", aaddr);
             break;  
         case 1:
             aaddr = val[vpos] & 255;
             if (group == 0x0C || group == 0x0D || group == 0x0E)
-                sprintf(boperand, "(%02X,XR1)", aaddr);
+                    snprintf(boperand, sizeof (boperand) - 1, "(%02X,XR1)", aaddr);
                 else
-                sprintf(aoperand, "(%02X,XR1)", aaddr);
+                    snprintf(aoperand, sizeof (aoperand) - 1, "(%02X,XR1)", aaddr);
             break;
         case 2:
             aaddr = val[vpos] & 255;
             if (group == 0x0C || group == 0x0D || group == 0x0E)
-                sprintf(boperand, "(%02X,XR2)", aaddr);
+                    snprintf(boperand, sizeof (boperand) - 1, "(%02X,XR2)", aaddr);
                 else
-                sprintf(aoperand, "(%02X,XR2)", aaddr);
+                    snprintf(aoperand, sizeof (aoperand) - 1, "(%02X,XR2)", aaddr);
             break;
         default:
             aaddr = 0;
@@ -435,7 +437,7 @@ if (i >= nopcode) {
 
     switch (opcode[i].form) {
         case 0:
-            sprintf(bldaddr, "%02X,%02X", qbyte, val[2]);
+            snprintf(bldaddr, sizeof (bldaddr) - 1, "%02X,%02X", qbyte, val[2]);
             break;
         case 1:
             if (inst == 2 || inst == 4 || inst == 5 || inst == 6) {
@@ -444,43 +446,43 @@ if (i >= nopcode) {
                         break;
                 }
                 if (i < 16) {
-                    sprintf(bldaddr, "%s,%s", regname[i], boperand);
+                    snprintf(bldaddr, sizeof (bldaddr) - 1, "%s,%s", regname[i], boperand);
                 } else {
-                    sprintf(bldaddr, "%02X,%s", qbyte, boperand);
+                    snprintf(bldaddr, sizeof (bldaddr) - 1, "%02X,%s", qbyte, boperand);
                 }           
             } else {
-                sprintf(bldaddr, "%02X,%s", qbyte, boperand);
+                snprintf(bldaddr, sizeof (bldaddr) - 1, "%02X,%s", qbyte, boperand);
             }
             break;
         case 2:
             if (inst > 9 || inst == 4 || inst == 6 || inst == 7)
                  qbyte++;                               /* special +1 for length display */
-            sprintf(bldaddr, "%s,%s,%d", boperand, aoperand, qbyte);
+            snprintf(bldaddr, sizeof (bldaddr) - 1, "%s,%s,%d", boperand, aoperand, qbyte);
             break;
         case 3:
             if (strcmp(opcode[i].op, "JC") == 0) {
-                sprintf(bldaddr, "%04X,%02X", addr+oplen+val[2], qbyte);
+                snprintf(bldaddr, sizeof (bldaddr) - 1, "%04X,%02X", addr+oplen+val[2], qbyte);
             } else {    
-                sprintf(bldaddr, "%s,%02X", boperand, qbyte);
+                snprintf(bldaddr, sizeof (bldaddr) - 1, "%s,%02X", boperand, qbyte);
             }   
             break;
         case 4: 
-            sprintf(bldaddr, "%d,%d,%d", da, m, n);
+            snprintf(bldaddr, sizeof (bldaddr) - 1, "%d,%d,%d", da, m, n);
             break;
         case 5:
-            sprintf(bldaddr, "%d,%d,%d,%02X", da, m, n, val[2]);
+            snprintf(bldaddr, sizeof (bldaddr) - 1, "%d,%d,%d,%02X", da, m, n, val[2]);
             break;
         case 6:
-            sprintf(bldaddr, "%d,%d,%d,%s", da, m, n, boperand);
+            snprintf(bldaddr, sizeof (bldaddr) - 1, "%d,%d,%d,%s", da, m, n, boperand);
             break;
         case 7:
-            sprintf(bldaddr, "%04X", addr+oplen+val[2]);
+            snprintf(bldaddr, sizeof (bldaddr) - 1, "%04X", addr+oplen+val[2]);
             break;
         case 8:
-            sprintf(bldaddr, "%s", boperand);   
+            snprintf(bldaddr, sizeof (bldaddr) - 1, "%s", boperand);   
             break;
         default:
-            sprintf(bldaddr, "%s,%s", boperand, aoperand);
+            snprintf(bldaddr, sizeof (bldaddr) - 1, "%s,%s", boperand, aoperand);
             break;
     }                                               
     sprintf(strg, "%s%s", bld, bldaddr);
