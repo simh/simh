@@ -104,6 +104,7 @@ static char tmp_key_name[40];
  */
 #include <SDL.h>
 #include <png.h>
+#include <zlib.h>
 
 #define SUCCESS 0
 #define ERROR -1
@@ -1835,7 +1836,7 @@ return 0;
 
 const char *vid_version(void)
 {
-static char SDLVersion[80];
+static char SDLVersion[160];
 SDL_version compiled, running;
 
 #if SDL_MAJOR_VERSION == 1
@@ -1848,15 +1849,34 @@ SDL_GetVersion(&running);
 #endif
 SDL_VERSION(&compiled);
 
+SDLVersion[sizeof (SDLVersion) - 1] = '\0';
 if ((compiled.major == running.major) &&
     (compiled.minor == running.minor) &&
     (compiled.patch == running.patch))
-    sprintf(SDLVersion, "SDL Version %d.%d.%d", 
+    snprintf(SDLVersion, sizeof (SDLVersion) - 1, "SDL Version %d.%d.%d", 
                         compiled.major, compiled.minor, compiled.patch);
 else
-    sprintf(SDLVersion, "SDL Version (Compiled: %d.%d.%d, Runtime: %d.%d.%d)", 
+    snprintf(SDLVersion, sizeof (SDLVersion) - 1, "SDL Version (Compiled: %d.%d.%d, Runtime: %d.%d.%d)", 
                         compiled.major, compiled.minor, compiled.patch,
                         running.major, running.minor, running.patch);
+#if defined (HAVE_LIBPNG)
+if (1) {
+    png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+
+    if (strcmp (PNG_LIBPNG_VER_STRING, png_get_libpng_ver (png)))
+        snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
+                            ", PNG Version (Compiled: %s, Runtime: %s)", 
+                            PNG_LIBPNG_VER_STRING, png_get_libpng_ver (png));
+    else
+        snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
+                            ", PNG Version %s", PNG_LIBPNG_VER_STRING);
+    png_destroy_read_struct(&png, NULL, NULL);
+#if defined (HAVE_ZLIB)
+    snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
+                        ", zlib: %s", zlibVersion());
+#endif
+    }
+#endif
 return (const char *)SDLVersion;
 }
 
