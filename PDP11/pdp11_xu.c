@@ -159,7 +159,7 @@ MTAB xu_mod[] = {
     &set_addr, &show_addr, NULL },
   { MTAB_XTD|MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
     &set_addr_flt, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", NULL,
+  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
     &set_vec, &show_vec, NULL },
 #else
   { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
