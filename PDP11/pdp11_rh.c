@@ -226,9 +226,9 @@ REG mba0_reg[] = {
     };
 
 MTAB mba0_mod[] = {
-    { MTAB_XTD|MTAB_VDV, 0100, "ADDRESS", "ADDRESS",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0100, "ADDRESS", "ADDRESS",
       &set_addr, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
       &set_vec, &show_vec, NULL },
     { 0 }
     };
@@ -259,9 +259,9 @@ REG mba1_reg[] = {
     };
 
 MTAB mba1_mod[] = {
-    { MTAB_XTD|MTAB_VDV, 0040, "ADDRESS", "ADDRESS",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0040, "ADDRESS", "ADDRESS",
       &set_addr, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
       &set_vec, &show_vec, NULL },
     { 0 }
     };
@@ -292,9 +292,9 @@ REG mba2_reg[] = {
     };
 
 MTAB mba2_mod[] = {
-    { MTAB_XTD|MTAB_VDV, 0040, "ADDRESS", "ADDRESS",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0040, "ADDRESS", "ADDRESS",
       &set_addr, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
       &set_vec, &show_vec, NULL },
     { 0 }
     };

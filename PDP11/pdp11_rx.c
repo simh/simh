@@ -188,9 +188,9 @@ MTAB rx_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
       &set_vec, &show_vec, NULL },
 #else
-    { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
+    { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", NULL,
       NULL, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
+    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
       NULL, &show_vec, NULL },
 #endif
     { 0 }

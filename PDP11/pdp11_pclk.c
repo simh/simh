@@ -223,7 +223,7 @@ MTAB pclk_mod[] = {
     { MTAB_XTD|MTAB_VDV,         0, "FREQUENCY",            NULL,   NULL, &pclk_show_freq, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
       NULL, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
       &set_vec, &show_vec, NULL },
     { 0 }
     };
