@@ -609,7 +609,7 @@ static REG kmc_reg[] = {
 MTAB kmc_mod[] = {
     { MTAB_XTD|MTAB_VDV, 010, "ADDRESS", "ADDRESS",
         &set_addr, &show_addr, NULL, "Bus address" },
-    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "ADDRESS",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
         &set_vec, &show_vec, NULL, "Interrupt vector" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR|MTAB_NMO, 0, "SPEED", "SPEED=dup=bps",
         &kmc_setLineSpeed, &kmc_showLineSpeed, NULL, "Line speed (bps)" },
