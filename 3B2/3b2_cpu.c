@@ -3018,14 +3018,11 @@ t_stat sim_instr(void)
             break;
         case STRCPY:
             a = 0;
-            b = 0;
-
-            do {
-                b = read_b(R[0] + a, ACC_AF);
-                write_b(R[1] + a, (uint8) b);
-                a++;
-            } while (b != '\0');
-
+            while ((a = read_b(R[0], ACC_AF)) != '\0') {
+                write_b(R[1], (uint8) a);
+                R[0]++;
+                R[1]++;
+            }
             break;
         case TSTW:
             a = cpu_read_op(src1);
