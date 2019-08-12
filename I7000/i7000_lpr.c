@@ -220,8 +220,10 @@ print_line(UNIT * uptr, int chan, int unit)
     sim_debug(DEBUG_DETAIL, &lpr_dev, "WRS unit=%d [%s]\n", unit, &out[0]);
 
     /* Print out buffer */
-    if (uptr->flags & UNIT_ATT)
+    if (uptr->flags & UNIT_ATT) {
         sim_fwrite(&out, 1, i, uptr->fileref);
+        uptr->pos += i;
+    }
     if (uptr->flags & ECHO) {
         int                 j = 0;
 
@@ -236,14 +238,18 @@ print_line(UNIT * uptr, int chan, int unit)
     if (uptr->u5 & URCSTA_SKIPAFT) {
         i = (uptr->u5 >> 12) & 0x7f;
         if (i == 0) {
-            if (uptr->flags & UNIT_ATT)
+            if (uptr->flags & UNIT_ATT) {
                 sim_fwrite("\r\n", 1, 2, uptr->fileref);
+                uptr->pos += 2;
+            }
             if (uptr->flags & ECHO)
                 sim_putchar('\r');
         } else {
             for (; i > 1; i--) {
-                if (uptr->flags & UNIT_ATT)
+                if (uptr->flags & UNIT_ATT) {
                     sim_fwrite("\r\n", 1, 2, uptr->fileref);
+                    uptr->pos += 2;
+                }
                 if (uptr->flags & ECHO) {
                     sim_putchar('\r');
                     sim_putchar('\n');
@@ -331,8 +337,10 @@ uint32 lpr_cmd(UNIT * uptr, uint16 cmd, uint16 dev)
              break;
         case 040: /* Space before */
              for (i = dev & 03; i > 1; i--) {
-                if (uptr->flags & UNIT_ATT)
+                if (uptr->flags & UNIT_ATT) {
                     sim_fwrite("\r\n", 1, 2, uptr->fileref);
+                    uptr->pos += 2;
+                }
                 if (uptr->flags & ECHO) {
                     sim_putchar('\r');
                     sim_putchar('\n');
@@ -358,8 +366,10 @@ uint32 lpr_cmd(UNIT * uptr, uint16 cmd, uint16 dev)
                 break;
              }
              for (; i > 0; i--) {
-                if (uptr->flags & UNIT_ATT)
+                if (uptr->flags & UNIT_ATT) {
                     sim_fwrite("\r\n", 1, 2, uptr->fileref);
+                    uptr->pos += 2;
+                }
                 if (uptr->flags & ECHO) {
                     sim_putchar('\r');
                     sim_putchar('\n');
