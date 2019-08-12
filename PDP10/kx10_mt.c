@@ -240,6 +240,8 @@ t_stat mt_devio(uint32 dev, uint64 *data) {
           res |= ((uint64)wr_eor) << 21;
           if (dptr->flags & MTDF_TYPEB)
              res |= 7LL;  /* Force DATA PIA to 7 on type B */
+          if (cpu_unit[0].flags & UNIT_ITSPAGE)
+             res |= SMASK;
           *data = res;
           sim_debug(DEBUG_CONI, dptr, "MT CONI %03o status %06o %o %o PC=%06o\n",
                       dev, (uint32)res, mt_sel_unit, mt_pia, PC);
@@ -613,7 +615,7 @@ t_stat mt_srv(UNIT * uptr)
             if (uptr->flags & MTUF_7TRK) {
                 cc = 6 * (5 - uptr->CPOS);
                 ch = mt_buffer[uptr->BPOS];
-                if ((((uptr->CNTRL & ODD_PARITY) ? 0x40 : 0) ^
+                if ((((uptr->CNTRL & ODD_PARITY) ? 0x40 : 0) ^ (ch & 0x40) ^
                       parity_table[ch & 0x3f]) != 0) {
                       mt_status |= PARITY_ERR;
                 }
@@ -692,8 +694,8 @@ t_stat mt_srv(UNIT * uptr)
          if ((uptr->CNTRL & MT_BRFUL) != 0) {
             if (uptr->flags & MTUF_7TRK) {
                 ch = mt_buffer[uptr->BPOS];
-                if ((((uptr->CNTRL & ODD_PARITY) ? 0x40 : 0) ^
-                      parity_table[ch & 0x3f]) != (ch & 0x40)) {
+                if ((((uptr->CNTRL & ODD_PARITY) ? 0x40 : 0) ^ (ch & 0x40) ^
+                      parity_table[ch & 0x3f]) != 0) {
                       mt_status |= PARITY_ERR;
                 }
                 mt_buffer[uptr->BPOS] &= 0x3f;
@@ -869,16 +871,22 @@ t_stat mt_srv(UNIT * uptr)
 }
 
 void mt_read_word(UNIT *uptr) {
-     int i, cc, ch;
+     int i, cc, ch, cc_max;
 
      mt_df10.buf = 0;
-     for(i = 0; i <= 4; i++) {
-        cc = (8 * (3 - i)) + 4;
+     cc_max = (uptr->flags & MTUF_7TRK) ? 5: 4;
+     for(i = 0; i <= cc_max; i++) {
         ch = mt_buffer[uptr->BPOS];
-        if (cc < 0)
-            mt_df10.buf |=  (uint64)(ch & 0x3f);
-        else
-            mt_df10.buf |= (uint64)(ch & 0xff) << cc;
+        if (uptr->flags & MTUF_7TRK) {
+           cc = 6 * (5 - i);
+           mt_df10.buf |= (uint64)(ch & 0x3f) << cc;
+        } else {
+           cc = (8 * (3 - i)) + 4;
+           if (cc < 0)
+               mt_df10.buf |=  (uint64)(ch & 0x3f);
+           else
+               mt_df10.buf |= (uint64)(ch & 0xff) << cc;
+        }
         uptr->BPOS++;
      }
 }

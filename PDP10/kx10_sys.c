@@ -188,6 +188,9 @@ DEVICE *sim_devices[] = {
 #if NUM_DEVS_DPK > 0
     &dpk_dev,
 #endif
+#if NUM_DEVS_AI > 0
+    &ai_dev,
+#endif
     NULL
     };
 
@@ -385,14 +388,16 @@ t_stat load_sblk (FILE *fileref)
        and then comes the data.  Last is a checksum word.  */
     while (get_evac (fileref, &word) == 0 && (word & SMASK)) {
         check = word;
-        count = (int)((((word >> 18) ^ RMASK) + 1) & RMASK);
+        count = (word >> 18) & RMASK;
         addr = word & RMASK;
-        while (count-- > 0) {
+        while (count != 0) {
             if (get_evac (fileref, &word))
                 return SCPE_FMT;
             M[addr++] = word;
             check = (check << 1) + (check >> 35) + word;
             check &= FMASK;
+            count++;
+            count &= RMASK;
         }
         if (get_evac (fileref, &word))
             return SCPE_FMT;

@@ -262,7 +262,11 @@ static int read_word (int addr, int *data)
   build (request, (addr >> 8) & 0377);
   build (request, (addr) & 0377);
 
-  transaction (request, response);
+  if (transaction (request, response) == -1) {
+    /* Network error. */
+    *data = 0;
+    return 0;
+  }
 
   switch (response[0])
     {

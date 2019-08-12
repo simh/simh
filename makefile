@@ -1915,7 +1915,8 @@ KA10 = ${KA10D}/kx10_cpu.c ${KA10D}/kx10_sys.c ${KA10D}/kx10_df.c \
 	${KA10D}/ka10_ten11.c ${KA10D}/ka10_auxcpu.c $(KA10D)/ka10_pmp.c \
 	${KA10D}/ka10_dkb.c ${KA10D}/pdp6_dct.c ${KA10D}/pdp6_dtc.c \
 	${KA10D}/pdp6_mtc.c ${KA10D}/pdp6_dsk.c ${KA10D}/pdp6_dcs.c \
-	${KA10D}/ka10_dpk.c ${KA10D}/kx10_dpy.c ${DISPLAYL} $(DISPLAY340)
+	${KA10D}/ka10_dpk.c ${KA10D}/kx10_dpy.c  ${PDP10D}/ka10_ai.c \
+	${DISPLAYL} $(DISPLAY340)
 KA10_OPT = -DKA=1 -DUSE_INT64 -I $(KA10D) -DUSE_SIM_CARD ${NETWORK_OPT} $(DISPLAY_OPT) $(KA10_DISPLAY_OPT)
 ifneq ($(PANDA_LIGHTS),)
 # ONLY for Panda display.
