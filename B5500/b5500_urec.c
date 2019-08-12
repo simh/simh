@@ -741,6 +741,7 @@ print_line(UNIT * uptr, int unit)
 
         /* Print out buffer */
         sim_fwrite(&out, 1, i, uptr->fileref);
+        uptr->pos += i;
         uptr->CMD &= ~URCSTA_EOF;
     }
 
@@ -758,6 +759,7 @@ print_line(UNIT * uptr, int unit)
         if ((uptr->LINENUM & 1) == 1) {
             sim_fwrite("\r", 1, 1, uptr->fileref);
             sim_fwrite("\n", 1, 1, uptr->fileref);
+            uptr->pos += 2;
             uptr->LINENUM++;
             uptr->CMD &= ~URCSTA_EOF;
         }
@@ -766,6 +768,7 @@ print_line(UNIT * uptr, int unit)
         if ((uptr->LINENUM & 1) == 0) {
             sim_fwrite("\r", 1, 1, uptr->fileref);
             sim_fwrite("\n", 1, 1, uptr->fileref);
+            uptr->pos += 2;
             uptr->LINENUM++;
             uptr->CMD &= ~URCSTA_EOF;
         }
@@ -775,6 +778,7 @@ print_line(UNIT * uptr, int unit)
               (uptr->LINENUM != (uptr->capac))) {
             sim_fwrite("\r", 1, 1, uptr->fileref);
             sim_fwrite("\n", 1, 1, uptr->fileref);
+            uptr->pos += 2;
             uptr->LINENUM++;
             if (((uint32)uptr->LINENUM) > uptr->capac) {
                 uptr->LINENUM = 1;
@@ -790,6 +794,7 @@ print_line(UNIT * uptr, int unit)
               (uptr->LINENUM != (uptr->capac))) {
             sim_fwrite("\r", 1, 1, uptr->fileref);
             sim_fwrite("\n", 1, 1, uptr->fileref);
+            uptr->pos += 2;
             uptr->LINENUM++;
             if (((uint32)uptr->LINENUM) > uptr->capac) {
                 uptr->LINENUM = 1;
@@ -805,6 +810,7 @@ print_line(UNIT * uptr, int unit)
     case 11:
         sim_fwrite("\r", 1, 1, uptr->fileref);
         sim_fwrite("\n", 1, 1, uptr->fileref);
+        uptr->pos += 2;
         uptr->LINENUM++;
         break;
     }
@@ -814,6 +820,7 @@ print_line(UNIT * uptr, int unit)
         uptr->LINENUM = 1;
         uptr->CMD |= URCSTA_EOF;
         sim_fwrite("\f", 1, 1, uptr->fileref);
+        uptr->pos ++;
         sim_fseek(uptr->fileref, 0, SEEK_CUR);
         sim_debug(DEBUG_DETAIL, &lpr_dev, "lpr %d page\n", unit);
     }
