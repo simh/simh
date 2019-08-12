@@ -107,7 +107,7 @@ const char *dc_description (DEVICE *dptr);
 DIB dc_dib = { DC_DEVNUM, 1, &dc_devio, NULL };
 
 UNIT dc_unit = {
-    UDATA (&dc_svc, TT_MODE_7B+UNIT_IDLE+UNIT_ATTABLE, 0), KBD_POLL_WAIT
+    UDATA (&dc_svc, TT_MODE_7B+UNIT_IDLE+UNIT_DISABLE+UNIT_ATTABLE, 0), KBD_POLL_WAIT
     };
 
 REG dc_reg[] = {

@@ -40,6 +40,8 @@
 #define POS      u5
 #define LINE     u6
 
+#define MARGIN   6
+
 #define UNIT_V_CT    (UNIT_V_UF + 0)
 #define UNIT_UC      (1 << UNIT_V_CT)
 #define UNIT_UTF8    (2 << UNIT_V_CT)
@@ -62,6 +64,10 @@ t_stat          lpt_svc (UNIT *uptr);
 t_stat          lpt_reset (DEVICE *dptr);
 t_stat          lpt_attach (UNIT *uptr, CONST char *cptr);
 t_stat          lpt_detach (UNIT *uptr);
+t_stat          lpt_setlpp(UNIT *, int32, CONST char *, void *);
+t_stat          lpt_getlpp(FILE *, UNIT *, int32, CONST void *);
+t_stat          lpt_setdev(UNIT *, int32, CONST char *, void *);
+t_stat          lpt_getdev(FILE *, UNIT *, int32, CONST void *);
 t_stat          lpt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag,
                          const char *cptr);
 const char     *lpt_description (DEVICE *dptr);
@@ -79,7 +85,7 @@ uint8           lpt_chbuf[5];             /* Read in Character buffers */
 DIB lpt_dib = { LP_DEVNUM, 1, &lpt_devio, NULL };
 
 UNIT lpt_unit = {
-    UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_TEXT, 0), 100
+    UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_TEXT, 66), 100
     };
 
 REG lpt_reg[] = {
@@ -94,6 +100,10 @@ MTAB lpt_mod[] = {
     {UNIT_CT, 0, "Lower case", "LC", NULL},
     {UNIT_CT, UNIT_UC, "Upper case", "UC", NULL},
     {UNIT_CT, UNIT_UTF8, "UTF8 ouput", "UTF8", NULL},
+    {MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "LINESPERPAGE", "LINESPERPAGE",
+        &lpt_setlpp, &lpt_getlpp, NULL, "Number of lines per page"},
+    {MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "DEV", "DEV",
+        &lpt_setdev, &lpt_getdev, NULL, "Device address of printer defualt 124"},
     { 0 }
 };
 
@@ -174,11 +184,19 @@ lpt_printline(UNIT *uptr, int nl) {
     /* Stick a carraige return and linefeed as needed */
     if (uptr->COL != 0 || trim)
         lpt_buffer[uptr->POS++] = '\r';
-    if (nl) {
+    if (nl != 0) {
         lpt_buffer[uptr->POS++] = '\n';
         uptr->LINE++;
     }
+    if (nl > 0 && uptr->LINE >= ((int32)uptr->capac - MARGIN)) {
+        lpt_buffer[uptr->POS++] = '\f';
+        uptr->LINE = 0;
+    } else if (nl < 0 && uptr->LINE >= (int32)uptr->capac) {
+        uptr->LINE = 0;
+    }
+       
     sim_fwrite(&lpt_buffer, 1, uptr->POS, uptr->fileref);
+    uptr->pos += uptr->POS;
     uptr->COL = 0;
     uptr->POS = 0;
     if (ferror (uptr->fileref)) {                           /* error? */
@@ -231,6 +249,8 @@ lpt_output(UNIT *uptr, char c) {
 
     if (c == 0)
        return;
+    if (uptr->COL == 132)
+        lpt_printline(uptr, 1);
     if ((uptr->flags & UNIT_UC) && (c & 0140) == 0140)
         c &= 0137;
     if ((uptr->flags & UNIT_UTF8) && c < 040) {
@@ -250,8 +270,6 @@ lpt_output(UNIT *uptr, char c) {
         lpt_buffer[uptr->POS++] = c;
         uptr->COL++;
     }
-    if (uptr->COL == 132)
-        lpt_printline(uptr, 1);
     return;
 }
 
@@ -265,6 +283,7 @@ t_stat lpt_svc (UNIT *uptr)
         set_interrupt(LP_DEVNUM, uptr->STATUS);
         return SCPE_OK;
     }
+
     if ((uptr->flags & UNIT_ATT) == 0) {
         uptr->STATUS |= ERR_FLG;
         set_interrupt(LP_DEVNUM, (uptr->STATUS >> 3));
@@ -300,45 +319,47 @@ t_stat lpt_svc (UNIT *uptr)
                       break;
             case 012:     /* Line feed, print line, space one line */
                       lpt_printline(uptr, 1);
-                      uptr->LINE++;
                       break;
             case 014:     /* Form feed, skip to top of page */
                       lpt_printline(uptr, 0);
                       sim_fwrite("\014", 1, 1, uptr->fileref);
+                      uptr->pos++;
                       uptr->LINE = 0;
                       break;
             case 013:     /* Vertical tab, Skip mod 20 */
                       lpt_printline(uptr, 1);
                       while((uptr->LINE % 20) != 0) {
                           sim_fwrite("\r\n", 1, 2, uptr->fileref);
+                          uptr->pos+=2;
                           uptr->LINE++;
                       }
                       break;
-            case 020:     /* Skip even lines */
+            case 020:     /* Skip half page */
+                      lpt_printline(uptr, 1);
+                      while((uptr->LINE % 30) != 0) {
+                          sim_fwrite("\r\n", 1, 2, uptr->fileref);
+                          uptr->pos+=2;
+                          uptr->LINE++;
+                      }
+                      break;
+            case 021:     /* Skip even lines */
                       lpt_printline(uptr, 1);
                       while((uptr->LINE % 2) != 0) {
                           sim_fwrite("\r\n", 1, 2, uptr->fileref);
+                          uptr->pos+=2;
                           uptr->LINE++;
                       }
                       break;
-            case 021:     /* Skip third lines */
+            case 022:     /* Skip triple lines */
                       lpt_printline(uptr, 1);
                       while((uptr->LINE % 3) != 0) {
                           sim_fwrite("\r\n", 1, 2, uptr->fileref);
+                          uptr->pos+=2;
                           uptr->LINE++;
                       }
                       break;
-            case 022:     /* Skip one line */
-                      lpt_printline(uptr, 1);
-                      sim_fwrite("\r\n", 1, 2, uptr->fileref);
-                      uptr->LINE+=2;
-                      break;
-            case 023:     /* Skip every 10 lines */
-                      lpt_printline(uptr, 1);
-                      while((uptr->LINE % 10) != 0) {
-                          sim_fwrite("\r\n", 1, 2, uptr->fileref);
-                          uptr->LINE++;
-                      }
+            case 023:     /* Skip one line */
+                      lpt_printline(uptr, -1);
                       break;
             default:      /* Ignore */
                       break;
@@ -388,12 +409,74 @@ t_stat lpt_detach (UNIT *uptr)
     return detach_unit (uptr);
 }
 
+/*
+ * Line printer routines
+ */
+
+t_stat
+lpt_setlpp(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+    t_value   i;
+    t_stat    r;
+    if (cptr == NULL)
+        return SCPE_ARG;
+    if (uptr == NULL)
+        return SCPE_IERR;
+    i = get_uint (cptr, 10, 100, &r);
+    if (r != SCPE_OK)
+        return SCPE_ARG;
+    uptr->capac = (t_addr)i;
+    uptr->LINE = 0;
+    return SCPE_OK;
+}
+
+t_stat
+lpt_getlpp(FILE *st, UNIT *uptr, int32 v, CONST void *desc)
+{
+    if (uptr == NULL)
+        return SCPE_IERR;
+    fprintf(st, "linesperpage=%d", uptr->capac);
+    return SCPE_OK;
+}
+
+t_stat
+lpt_setdev(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+    t_value   i;
+    t_stat    r;
+    if (cptr == NULL)
+        return SCPE_ARG;
+    if (uptr == NULL)
+        return SCPE_IERR;
+    i = get_uint (cptr, 8, 01000, &r);
+    if (r != SCPE_OK)
+        return SCPE_ARG;
+    if ((i & 03) != 0)
+        return SCPE_ARG;
+    lpt_dib.dev_num = (int)i;
+    return SCPE_OK;
+}
+
+t_stat
+lpt_getdev(FILE *st, UNIT *uptr, int32 v, CONST void *desc)
+{
+    if (uptr == NULL)
+        return SCPE_IERR;
+    fprintf(st, "dev=%03o", lpt_dib.dev_num);
+    return SCPE_OK;
+}
+
 t_stat lpt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 fprintf (st, "Line Printer (LPT)\n\n");
 fprintf (st, "The line printer (LPT) writes data to a disk file.  The POS register specifies\n");
 fprintf (st, "the number of the next data item to be written.  Thus, by changing POS, the\n");
 fprintf (st, "user can backspace or advance the printer.\n");
+fprintf (st, "The Line printer can be configured to any number of lines per page with the:\n");
+fprintf (st, "        sim> SET %s0 LINESPERPAGE=n\n\n", dptr->name);
+fprintf (st, "The default is 66 lines per page.\n\n");
+fprintf (st, "The device address of the Line printer can be changed\n");
+fprintf (st, "        sim> SET %s0 DEV=n\n\n", dptr->name);
 fprint_set_help (st, dptr);
 fprint_show_help (st, dptr);
 fprint_reg_help (st, dptr);

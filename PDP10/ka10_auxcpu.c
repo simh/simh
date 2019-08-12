@@ -54,12 +54,15 @@
 
 static int pia = 0;
 static int status = 0;
+t_value auxcpu_base = 03000000;
 
 static t_stat auxcpu_devio(uint32 dev, t_uint64 *data);
 static t_stat auxcpu_svc (UNIT *uptr);
 static t_stat auxcpu_reset (DEVICE *dptr);
 static t_stat auxcpu_attach (UNIT *uptr, CONST char *ptr);
 static t_stat auxcpu_detach (UNIT *uptr);
+static t_stat auxcpu_set_base (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat auxcpu_show_base (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat auxcpu_attach_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 static const char *auxcpu_description (DEVICE *dptr);
 
@@ -73,6 +76,8 @@ static REG auxcpu_reg[] = {
 };
 
 static MTAB auxcpu_mod[] = {
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "base address", "BASE",
+          &auxcpu_set_base, &auxcpu_show_base },
     { 0 }
 };
 
@@ -387,6 +392,28 @@ t_stat auxcpu_devio(uint32 dev, t_uint64 *data)
         break;
     }
 
+    return SCPE_OK;
+}
+
+static t_stat auxcpu_set_base (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+    t_stat r;
+    t_value x;
+
+    if (cptr == NULL || *cptr == 0)
+        return SCPE_ARG;
+
+    x = get_uint (cptr, 8, 03777777, &r);
+    if (r != SCPE_OK)
+        return SCPE_ARG;
+
+    auxcpu_base = x;
+    return SCPE_OK;
+}
+
+static t_stat auxcpu_show_base (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    fprintf (st, "Base: %llo", auxcpu_base);
     return SCPE_OK;
 }
 #endif

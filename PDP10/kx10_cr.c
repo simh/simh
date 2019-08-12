@@ -34,7 +34,7 @@
 #include "sim_defs.h"
 #if (NUM_DEVS_CR > 0)
 
-#define UNIT_CDR        UNIT_ATTABLE | UNIT_RO | UNIT_DISABLE | MODE_029
+#define UNIT_CDR        UNIT_ATTABLE | UNIT_RO | UNIT_DISABLE | MODE_029 | MODE_LOWER
 
 #define CR_DEVNUM        0150
 
@@ -94,7 +94,7 @@ uint16              cr_buffer[80];
 DIB cr_dib = { CR_DEVNUM, 1, cr_devio, NULL};
 
 UNIT                cr_unit = {
-   UDATA(cr_srv, UNIT_CDR, 0), 300,
+   UDATA(cr_srv, UNIT_CDR, 0), 2000,
 };
 
 MTAB                cr_mod[] = {
@@ -136,7 +136,7 @@ t_stat cr_devio(uint32 dev, uint64 *data) {
 
     case CONO:
          clr_interrupt(dev);
-         sim_debug(DEBUG_CONO, &cr_dev, "CR: CONO %012llo\n", *data);
+         sim_debug(DEBUG_CONO, &cr_dev, "CR: CONO %012llo PC=%06o\n", *data, PC);
          if (*data & CLR_READER) {
              uptr->STATUS = 0;
              if (!CARD_RDY(uptr))
@@ -171,7 +171,9 @@ t_stat cr_devio(uint32 dev, uint64 *data) {
     case DATAI:
          clr_interrupt(dev);
          if (uptr->STATUS & DATA_RDY) {
-             *data = uptr->DATA;
+             *data = uptr->DATA & ~RSIGN;
+             if (uptr->DATA & RSIGN)
+                 *data |= SMASK;
              sim_debug(DEBUG_DATAIO, &cr_dev, "CR: DATAI %012llo\n", *data);
              uptr->STATUS &= ~DATA_RDY;
          } else
@@ -215,7 +217,7 @@ cr_srv(UNIT *uptr) {
         case CDSE_EMPTY:
          sim_debug(DEBUG_EXP, &cr_dev, "CR: card empty\n");
              uptr->STATUS &= ~(CARD_IN_READ|READING);
-             uptr->STATUS |= HOPPER_EMPTY|TROUBLE|STOP;
+             uptr->STATUS |= HOPPER_EMPTY|TROUBLE;
              if (uptr->STATUS & TROUBLE_EN)
                  set_interrupt(CR_DEVNUM, uptr->STATUS);
              return SCPE_OK;
@@ -238,14 +240,43 @@ cr_srv(UNIT *uptr) {
 
     /* Copy next column over */
     if (uptr->STATUS & CARD_IN_READ) {
+        uint32     data;
+        int        i;
         if (uptr->COL >= 80) {
              uptr->STATUS &= ~(CARD_IN_READ|READING);
+             if (sim_card_input_hopper_count(uptr) == 0)
+                uptr->STATUS |= HOPPER_EMPTY;
              uptr->STATUS |= END_CARD;
              set_interrupt(CR_DEVNUM, uptr->STATUS);
              sim_activate(uptr, uptr->wait);
              return SCPE_OK;
         }
-        uptr->DATA = cr_buffer[uptr->COL++];
+        data = cr_buffer[uptr->COL++];
+        switch(data) {
+        case 0x482: data = 0x806; break;  /* ! - 12 8 7 */
+        case 0xA00: data = 0x882; break;  /* [ - 12 8 2 */
+        case 0x882: data = 0x482; break;  /* ] - 11 8 2 */
+        case 0x405: data = 0xa00; break;  /* { - 12 0   */
+        case 0x600: data = 0xc00; break;  /* | - 12 11  */
+        case 0x805: data = 0x600; break;  /* } - 11 0   */
+        case 0x806: data = 0x700; break;  /* ~ - 11 0 1 */
+        }
+        uptr->DATA = data;
+        /* Generate upper 18 bits of data */
+        uptr->DATA |= ((data & 0x001) << 25) |
+                      ((data & 0xe00) << 13) |
+                      ((data & 0x002) << 20);
+        for (i = 1; i <= 7; i++) {
+             if (data & 0x100) {
+                /* Set flag it more then one punch */
+                if ((uptr->DATA & 07000000) != 0){
+                    uptr->DATA |= (int32)RSIGN;
+                    break;
+                }
+                uptr->DATA |= i << 18;
+             }
+             data <<= 1;
+        }
         if (uptr->STATUS & DATA_RDY) {
             uptr->STATUS |= DATA_MISS;
         }
