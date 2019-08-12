@@ -6,7 +6,7 @@ produces resulting executables in the BIN/NT/Win32-Debug or
 BIN/NT/Win32-Release directories (depending on whether you target a Debug 
 or Release build).
 
-These projects, when used with Visual Studio 2008 will produce Release 
+These projects, when used with Visual Studio 2008, will produce Release 
 build binaries that will run on Windows versions from XP onward.  Building
 with later versions of Visual Studio will have different Windows version
 compatibility.
@@ -37,7 +37,8 @@ but have this directory properly located.
 Network devices are capable of using pthreads to enhance their performance.  
 To realize these benefits, you must build the desire simulator with 
 USE_READER_THREAD defined.  The relevant simulators which have network 
-support are all of the VAX simulators and the PDP11 simulator.
+support are all of the VAX simulators, the PDP11 simulator and the various
+PDP10 simulators.
 
 Additionally, simulators which contain devices that use the asynchronous
 APIs in sim_disk.c and sim_tape.c can also achieve greater performance by

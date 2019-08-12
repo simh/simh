@@ -181,9 +181,9 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
     Input character rates reflect the natural character arrival time based on the line speed.
 
 #### Video Display Capabilities
-Added support for monochrome displays with optional keyboards and mice.  
-The VAXstation QVSS device (VCB01) simulation uses this capability.
-Host platforms which have libSDL available can leverage this functionality.
+Added support for monochrome and color displays with optional keyboards and mice.  
+The VAXstation QVSS device (VCB01) and QDSS device (VCB02) simulations use these capabilities.
+Host platforms which have libSDL2 available can leverage this functionality.
 
 #### Asynchronous I/O
     * Disk and Tape I/O can be asynchronous.  Asynchronous support exists 
@@ -506,7 +506,15 @@ The makefile provided requires GNU make, which is the default make facility for 
 
 ##### Build Dependencies
 
-Some simulators depend on external packages to provide the full scope of functionality they may be simulating.  These additional external packages may or may not be included in as part of the standard Operating System distributions.  
+Some simulators depend on external packages to provide the full scope of 
+functionality they may be simulating.  These additional external packages 
+may or may not be included in as part of the standard Operating System 
+distributions.  If simulators are being built that could provide more 
+functionality than the currently installed packages will provide, the build
+will succeed with reduced functionality (i.e. limited network or no video
+support), but suggestions will be provided as to what could provide full 
+functionality.
+
 
 ###### OS X - Dependencies
 
