@@ -2976,10 +2976,8 @@ step6:
         Next(MA);
         sim_interval --;        /* count down */
         cr2 = AC[tsac];
-        if (cr2 == 0) {
-            smt = 1;            /* Check usage here */
-            break;              /* goto step6; */
-        }
+        if (cr2 == 0)
+            goto step6;
         if (at) {
             cr1 &= 017;
             at = 0;

@@ -1263,7 +1263,7 @@ chan_cmd(uint16 dev, uint16 dcmd)
         if ((chan_flags[chan] & (DEV_WRITE)) == (DEV_WRITE) ||
             (chan_flags[chan] & (DEV_FULL)) == (DEV_FULL))
             chan_flags[chan] |= DEV_DISCO | DEV_WEOR;
-	return SCPE_BUSY;
+        return SCPE_BUSY;
     }
     /* Unit is busy doing something, wait */
     if (chan_flags[chan] & (DEV_SEL | DEV_DISCO | STA_TWAIT | STA_WAIT))

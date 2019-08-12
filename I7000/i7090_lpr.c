@@ -174,8 +174,10 @@ print_line(UNIT * uptr, int chan, int unit)
         return SCPE_UNATT;      /* attached? */
 
     if (outsel & PRINT_3) {
-        if (uptr->flags & UNIT_ATT)
+        if (uptr->flags & UNIT_ATT) {
             sim_fwrite("\r\n", 1, 2, uptr->fileref);
+            uptr->pos += 2;
+        }
         if (uptr->flags & ECHO) {
             sim_putchar('\r');
             sim_putchar('\n');
@@ -185,8 +187,10 @@ print_line(UNIT * uptr, int chan, int unit)
     }
 
     if (outsel & PRINT_4) {
-        if (uptr->flags & UNIT_ATT)
+        if (uptr->flags & UNIT_ATT) {
             sim_fwrite("\r\n\r\n", 1, 4, uptr->fileref);
+            uptr->pos += 4;
+        }
         if (uptr->flags & ECHO) {
             sim_putchar('\r');
             sim_putchar('\n');
@@ -226,14 +230,18 @@ print_line(UNIT * uptr, int chan, int unit)
             j = 0;
 
         for (i = j; i < 72; i++) {
-            if (uptr->flags & UNIT_ATT)
+            if (uptr->flags & UNIT_ATT) {
                 sim_fwrite(" ", 1, 1, uptr->fileref);
+                uptr->pos += 1;
+            }
             if (uptr->flags & ECHO)
                 sim_putchar(' ');
         }
     } else {
-        if (uptr->flags & UNIT_ATT)
+        if (uptr->flags & UNIT_ATT) {
             sim_fwrite("\n\r", 1, 2, uptr->fileref);
+            uptr->pos += 2;
+        }
         if (uptr->flags & ECHO) {
             sim_putchar('\n');
             sim_putchar('\r');
@@ -265,8 +273,10 @@ print_line(UNIT * uptr, int chan, int unit)
     for (j = 71; j > 0 && lpr_data[unit].lbuff[j] == ' '; j--) ;
 
     /* Print out buffer */
-    if (uptr->flags & UNIT_ATT)
+    if (uptr->flags & UNIT_ATT) {
         sim_fwrite(lpr_data[unit].lbuff, 1, j+1, uptr->fileref);
+        uptr->pos += j+1;
+    }
     if (uptr->flags & ECHO) {
         for(i = 0; i <= j; i++)
             sim_putchar(lpr_data[unit].lbuff[i]);
@@ -280,8 +290,10 @@ print_line(UNIT * uptr, int chan, int unit)
 
     /* Space printer */
     if (outsel & PRINT_2) {
-        if (uptr->flags & UNIT_ATT)
+        if (uptr->flags & UNIT_ATT) {
             sim_fwrite("\r\n", 1, 2, uptr->fileref);
+            uptr->pos += 2;
+        }
         if (uptr->flags & ECHO) {
             sim_putchar('\r');
             sim_putchar('\n');
@@ -291,8 +303,10 @@ print_line(UNIT * uptr, int chan, int unit)
 
     if (outsel & PRINT_1) {
         while (uptr->u4 < (int32)uptr->capac) {
-            if (uptr->flags & UNIT_ATT)
+            if (uptr->flags & UNIT_ATT) {
                 sim_fwrite("\r\n", 1, 2, uptr->fileref);
+                uptr->pos += 2;
+            }
             if (uptr->flags & ECHO) {
                 sim_putchar('\r');
                 sim_putchar('\n');
