@@ -3510,7 +3510,7 @@ static char *do_position(void)
 {
 static char cbuf[CBUFSIZE];
 
-sprintf (cbuf, "%s%s%s-%d", sim_do_filename[sim_do_depth], sim_do_label[sim_do_depth] ? "::" : "", sim_do_label[sim_do_depth] ? sim_do_label[sim_do_depth] : "", sim_goto_line[sim_do_depth]);
+snprintf (cbuf, sizeof (cbuf), "%s%s%s-%d", sim_do_filename[sim_do_depth], sim_do_label[sim_do_depth] ? "::" : "", sim_do_label[sim_do_depth] ? sim_do_label[sim_do_depth] : "", sim_goto_line[sim_do_depth]);
 return cbuf;
 }
 
@@ -4952,7 +4952,7 @@ const char *cptr;
 if (NULL == sim_gotofile) return SCPE_UNK;              /* only valid inside of do_cmd */
 cptr = get_glyph (fcptr, gbuf, 0);
 if ('\0' == gbuf[0]) return SCPE_ARG;                   /* unspecified goto target */
-sprintf(cbuf, "%s %s", sim_do_filename[sim_do_depth], cptr);
+snprintf(cbuf, sizeof (cbuf), "%s %s", sim_do_filename[sim_do_depth], cptr);
 sim_switches |= SWMASK ('O');                           /* inherit ON state and actions */
 return do_cmd_label (flag, cbuf, gbuf);
 }
