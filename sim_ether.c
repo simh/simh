@@ -750,7 +750,6 @@ static char*   (*p_pcap_lib_version) (void);
 
 static ETH_DEV **eth_open_devices = NULL;
 static int eth_open_device_count = 0;
-static t_bool eth_show_active = FALSE;
 
 #if defined (USE_NETWORK) || defined (USE_SHARED)
 static void _eth_add_to_open_list (ETH_DEV* dev)
@@ -778,7 +777,6 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
   ETH_LIST  list[ETH_MAX_DEVICE];
   int number;
 
-  eth_show_active = TRUE;
   number = eth_devices(ETH_MAX_DEVICE, list);
   fprintf(st, "ETH devices:\n");
   if (number == -1)
@@ -794,9 +792,6 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
       for (i=0; i<number; i++)
         fprintf(st," eth%d\t%-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
     }
-  if (p_pcap_lib_version) {
-    fprintf(st, "%s\n", p_pcap_lib_version());
-    }
   if (eth_open_device_count) {
     int i;
     char desc[ETH_DEV_DESC_MAX], *d;
@@ -811,7 +806,6 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
       eth_show_dev (st, eth_open_devices[i]);
       }
     }
-  eth_show_active = FALSE;
   return SCPE_OK;
 }
 
@@ -964,6 +958,8 @@ t_stat eth_filter_hash (ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
   {return SCPE_NOFNC;}
 int eth_devices (int max, ETH_LIST* dev)
   {return -1;}
+const char *eth_version (void)
+  {return NULL;}
 void eth_show_dev (FILE* st, ETH_DEV* dev)
   {}
 static int _eth_get_system_id (char *buf, size_t buf_size)
@@ -1188,11 +1184,6 @@ int load_pcap(void) {
       load_function("pcap_setfilter",    (_func *) &p_pcap_setfilter);
       load_function("pcap_setnonblock",  (_func *) &p_pcap_setnonblock);
       load_function("pcap_lib_version",  (_func *) &p_pcap_lib_version);
-
-      if ((lib_loaded == 1) && (!eth_show_active)) {
-        /* log successful load */
-        sim_messagef (SCPE_OK, "%s\n", p_pcap_lib_version());
-      }
       break;
     default:                /* loaded or failed */
       break;
@@ -1217,6 +1208,14 @@ int pcap_compile(pcap_t* a, struct bpf_program* b, const char* c, int d, bpf_u_i
     return p_pcap_compile(a, b, c, d, e);
   } else {
     return 0;
+  }
+}
+
+const char *pcap_lib_version(void) {
+  if ((load_pcap() != 0) && (p_pcap_lib_version != NULL)) {
+    return p_pcap_lib_version();
+  } else {
+    return NULL;
   }
 }
 
@@ -1903,6 +1902,8 @@ sim_debug(dev->dbit, dev->dptr, "Writer Thread Starting\n");
 pthread_mutex_lock (&dev->writer_lock);
 while (dev->handle) {
   pthread_cond_wait (&dev->writer_cond, &dev->writer_lock);
+  if (dev->handle == NULL)      /* Shutting down? */
+      break;
   while (NULL != (request = dev->write_requests)) {
     /* Pull buffer off request list */
     dev->write_requests = request->next;
@@ -2435,6 +2436,11 @@ free(dev->bpf_filter);
 eth_zero(dev);
 _eth_remove_from_open_list (dev);
 return SCPE_OK;
+}
+
+const char *eth_version (void)
+{
+return pcap_lib_version();
 }
 
 t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
