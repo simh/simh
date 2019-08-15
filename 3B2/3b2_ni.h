@@ -88,9 +88,6 @@
 #define NI_QPOLL_FAST          100
 #define NI_QPOLL_SLOW          50000
 
-#define NI_DIAG_CRC1           0x795268a4
-#define NI_DIAG_CRC2           0xfab1057c
-#define NI_DIAG_CRC3           0x10ca00cd
 #define NI_PUMP_CRC1           0xfab1057c
 #define NI_PUMP_CRC2           0xf6744bed
 

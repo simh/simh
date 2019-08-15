@@ -82,6 +82,7 @@ const char *sim_stop_messages[] = {
     "Exception Stack Too Deep",
     "Unimplemented MMU Feature",
     "System Powered Off",
+    "Infinite Loop",
     "Simulator Error"
 };
 

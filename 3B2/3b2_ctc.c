@@ -262,10 +262,11 @@ static void ctc_cmd(uint8 cid,
                     cio_entry *cqe, uint8 *capp_data)
 {
     uint32 vtoc_addr, pdinfo_addr, ctjob_addr;
-    uint32 maxpass, blkno, delay;
-    uint8  dev;
+    uint32 maxpass, blkno, delay, last_byte;
+    uint8  dev, c;
     uint8  sec_buf[512];
     int32  b, i, j;
+    int32 block_count, read_bytes, remainder, dest;
     t_seccnt secrw = 0;
     struct vtoc vtoc = {{0}};
     struct pdinfo pdinfo = {0};
@@ -417,6 +418,7 @@ static void ctc_cmd(uint8 cid,
         delay = DELAY_OPEN;
 
         ctc_state[dev].time = 0;  /* Opening always resets session time to 0 */
+        ctc_state[dev].bytnum = 0;
 
         vtoc_addr = rqe->address;
         pdinfo_addr = ATOW(rapp_data, 4);
@@ -522,6 +524,7 @@ static void ctc_cmd(uint8 cid,
         cqe->byte_count = rqe->byte_count;
         cqe->subdevice = rqe->subdevice;
         cqe->address = ATOW(rapp_data, 4);
+        dest = rqe->address;
 
         if (dev == XMF_DEV) {
             cqe->opcode = CTC_NOTREADY;
@@ -533,19 +536,70 @@ static void ctc_cmd(uint8 cid,
             break;
         }
 
+        /*
+         * This read routine supports both streaming and block
+         * oriented modes.
+         *
+         * Read requests from the host give a block number, and a
+         * number of bytes to read. In streaming mode, however, there
+         * is no requirement that the number of bytes to read has to
+         * be block-aligned, so we must support reading an arbitrary
+         * number of bytes from the tape stream and remembering the
+         * current position in the byte stream.
+         *
+         */
+
+        /* The block number to begin reading from is supplied in the
+         * request queue entry's APP_DATA field. */
         blkno = ATOW(rapp_data, 0);
 
-        for (b = 0; b < rqe->byte_count / 512; b++) {
+        /* Since we may start reading from the data stream at an
+         * arbitrary location, we compute the offset of the last byte
+         * to be read, and use that to figure out how many bytes will
+         * be left over to read from an "extra" block */
+        last_byte = ctc_state[dev].bytnum + rqe->byte_count;
+        remainder = last_byte % 512;
+
+        /* The number of blocks we have to read in total is computed
+         * by looking at the byte count, PLUS any remainder that will
+         * be left after crossing a block boundary */
+        block_count = rqe->byte_count / 512;
+        if (((rqe->byte_count % 512) > 0 || remainder > 0)) {
+            block_count++;
+        }
+
+        /* Now step over each block, and start reading from the
+         * necessary location. */
+        for (b = 0; b < block_count; b++) {
+            uint32 start_byte;
+            /* Add some read time to the read time counter */
             ctc_state[dev].time += 10;
+            start_byte = ctc_state[dev].bytnum % 512;
             lba = blkno + b;
             result = sim_disk_rdsect(&ctc_unit, lba, sec_buf, &secrw, 1);
             if (result == SCPE_OK) {
-                sim_debug(TRACE_DBG, &ctc_dev,
-                          "[ctc_cmd] ... CTC_READ: 512 bytes from block %d (0x%x)\n",
-                          lba, lba);
-                for (j = 0; j < 512; j++) {
+                /* If this is the last "extra" block, we will only
+                 * read the remainder of bytes from it. Otherwise, we
+                 * need to consume the whole block. */
+                if (b == (block_count - 1) && remainder > 0) {
+                    read_bytes = remainder;
+                } else {
+                    read_bytes = 512 - start_byte;
+                }
+                for (j = 0; j < read_bytes; j++) {
+                    uint32 offset;
                     /* Drain the buffer */
-                    pwrite_b(rqe->address + (b * 512) + j, sec_buf[j]);
+                    if (b == 0 && start_byte != 0) {
+                        /* This is a partial read of the first block,
+                         * continuing to read from a previous partial
+                         * block read. */
+                        offset = j + start_byte;
+                    } else {
+                        offset = j;
+                    }
+                    c = sec_buf[offset];
+                    pwrite_b(dest++, c);
+                    ctc_state[dev].bytnum++;
                 }
             } else {
                 sim_debug(TRACE_DBG, &ctc_dev,

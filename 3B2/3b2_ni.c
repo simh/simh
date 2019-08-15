@@ -113,6 +113,21 @@ static t_stat ni_show_rqueue(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat ni_show_cqueue(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 /*
+ * When the NI card is pumped, its CRC depends on what slot it is
+ * installed in and what version of driver has been installed.
+ */
+#define NI_DIAG_CRCS_LEN 7
+static const uint32 NI_DIAG_CRCS[] = {
+    0x795268a4,
+    0xfab1057c,
+    0x10ca00cd,
+    0x9b3ddeda,
+    0x267b19a0,
+    0x123f36c0,
+    0xc04ca0ab,
+};
+
+/*
  * Unit 0: Packet reception.
  * Unit 1: Sanity timer.
  * Unit 2: Request Queue poller.
@@ -331,14 +346,15 @@ static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp
         /* If the currently running program is a diagnostics program,
          * we are expected to write results into memory at address
          * 0x200f000 */
-        if (ni.crc == NI_DIAG_CRC1 ||
-            ni.crc == NI_DIAG_CRC2 ||
-            ni.crc == NI_DIAG_CRC3) {
-            pwrite_h(0x200f000, 0x1);   /* Test success */
-            pwrite_h(0x200f002, 0x0);   /* Test Number */
-            pwrite_h(0x200f004, 0x0);   /* Actual */
-            pwrite_h(0x200f006, 0x0);   /* Expected */
-            pwrite_b(0x200f008, 0x1);   /* Success flag again */
+        for (i = 0; i < NI_DIAG_CRCS_LEN; i++) {
+            if (ni.crc == NI_DIAG_CRCS[i]) {
+                pwrite_h(0x200f000, 0x1);   /* Test success */
+                pwrite_h(0x200f002, 0x0);   /* Test Number */
+                pwrite_h(0x200f004, 0x0);   /* Actual */
+                pwrite_h(0x200f006, 0x0);   /* Expected */
+                pwrite_b(0x200f008, 0x1);   /* Success flag again */
+                break;
+            }
         }
 
         /* Store the sequence byte we were sent for later reply. */
@@ -364,8 +380,8 @@ static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp
         sim_debug(DBG_TRACE, &ni_dev,
                   "[ni_cmd] Determine Sub-Devices.\n");
 
-        /* The system wants us to write sub-device structures
-         * at the supplied address */
+        /* The system wants us to write sub-device structures at the
+         * supplied address */
         pwrite_h(rentry->address, 0x0);
 
         if (is_exp) {
@@ -666,7 +682,7 @@ t_stat ni_autoconfig()
 {
     uint8 cid;
 
-    /* Clear the CIO table of PORTS cards */
+    /* Clear the CIO table of NI cards */
     for (cid = 0; cid < CIO_SLOTS; cid++) {
         if (cio[cid].id == NI_ID) {
             cio[cid].id = 0;

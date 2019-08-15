@@ -139,6 +139,7 @@ struct pdinfo {
 
 typedef struct {
     uint32 time;        /* Time used during a tape session (in 25ms chunks) */
+    uint32 bytnum;      /* Byte number, for streaming mode */
 } CTC_STATE;
 
 extern DEVICE ctc_dev;
