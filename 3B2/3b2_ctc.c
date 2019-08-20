@@ -336,9 +336,10 @@ static void ctc_cmd(uint8 cid,
                   "[ctc_cmd] CTC_DSD (%d)\n",
                   rqe->opcode);
         delay = DELAY_DSD;
-        /* The system wants us to write sub-device structures at the
-         * supplied address, but we have nothing to write. */
-        pwrite_h(rqe->address, 0x0);
+        /* Write subdevice information to the host. */
+        pwrite_h(rqe->address, CTC_NUM_SD);
+        pwrite_h(rqe->address + 2, CTC_SD_FT25);
+        pwrite_h(rqe->address + 4, CTC_SD_FD5);
         cqe->opcode = CTC_SUCCESS;
         break;
     case CTC_FORMAT:

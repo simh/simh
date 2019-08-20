@@ -84,6 +84,10 @@
 #define VTOC_PART       16          /* Number of "partitions" on tape */
 #define VTOC_VALID      0x600DDEEE  /* Magic number for valid VTOC */
 
+#define CTC_NUM_SD      2
+#define CTC_SD_FT25     4
+#define CTC_SD_FD5      1
+
 /* Physical Device Info (pdinfo) values */
 #define PD_VALID        0xCA5E600D  /* Magic number for valid PDINFO */
 #define PD_DRIVEID      5
