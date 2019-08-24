@@ -456,6 +456,10 @@ int sim_slirp_send (SLIRP *slirp, const char *msg, size_t len, int flags)
 struct slirp_write_request *request;
 int wake_needed = 0;
 
+if (!slirp) {
+    errno = EBADF;
+    return 0;
+    }
 /* Get a buffer */
 pthread_mutex_lock (&slirp->write_buffer_lock);
 if (NULL != (request = slirp->write_buffers))

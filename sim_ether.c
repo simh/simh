@@ -1902,9 +1902,9 @@ sim_debug(dev->dbit, dev->dptr, "Writer Thread Starting\n");
 pthread_mutex_lock (&dev->writer_lock);
 while (dev->handle) {
   pthread_cond_wait (&dev->writer_cond, &dev->writer_lock);
-  if (dev->handle == NULL)      /* Shutting down? */
-      break;
   while (NULL != (request = dev->write_requests)) {
+    if (dev->handle == NULL)      /* Shutting down? */
+      break;
     /* Pull buffer off request list */
     dev->write_requests = request->next;
     pthread_mutex_unlock (&dev->writer_lock);
