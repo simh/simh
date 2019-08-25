@@ -2995,13 +2995,18 @@ DEBTAB *dep;
 t_bool found = FALSE;
 t_bool deb_desc_available = FALSE;
 char buf[CBUFSIZE], header[CBUFSIZE];
+uint32 enabled_units = dptr->numunits;
+uint32 unit;
 
 sprintf (header, "\n%s device SET commands:\n\n", dptr->name);
+for (unit=0; unit < dptr->numunits; unit++)
+    if (dptr->units[unit].flags & UNIT_DIS)
+        --enabled_units;
 if (dptr->modifiers) {
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
         if (!MODMASK(mptr,MTAB_VDV) && MODMASK(mptr,MTAB_VUN) && (dptr->numunits != 1))
             continue;                                       /* skip unit only extended modifiers */
-        if ((dptr->numunits != 1) && !(mptr->mask & MTAB_XTD))
+        if ((enabled_units != 1) && !(mptr->mask & MTAB_XTD))
             continue;                                       /* skip unit only simple modifiers */
         if (mptr->mstring) {
             fprint_header (st, &found, header);
@@ -3042,7 +3047,7 @@ if ((dptr->flags & DEV_DEBUG) || (dptr->debflags)) {
         fprintf (st,  "%-30s\tDisables specific debugging for device %s\n", buf, sim_dname (dptr));
         }
     }
-if ((dptr->modifiers) && (dptr->units) && (dptr->numunits != 1)) {
+if ((dptr->modifiers) && (dptr->units) && (enabled_units != 1)) {
     if (dptr->units->flags & UNIT_DISABLE) {
         fprint_header (st, &found, header);
         sprintf (buf, "set %sn ENABLE", sim_dname (dptr));
@@ -3104,13 +3109,18 @@ void fprint_show_help_ex (FILE *st, DEVICE *dptr, t_bool silent)
 MTAB *mptr;
 t_bool found = FALSE;
 char buf[CBUFSIZE], header[CBUFSIZE];
+uint32 enabled_units = dptr->numunits;
+uint32 unit;
 
 sprintf (header, "\n%s device SHOW commands:\n\n", dptr->name);
+for (unit=0; unit < dptr->numunits; unit++)
+    if (dptr->units[unit].flags & UNIT_DIS)
+        --enabled_units;
 if (dptr->modifiers) {
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
         if (!MODMASK(mptr,MTAB_VDV) && MODMASK(mptr,MTAB_VUN) && (dptr->numunits != 1))
             continue;                                       /* skip unit only extended modifiers */
-        if ((dptr->numunits != 1) && !(mptr->mask & MTAB_XTD))
+        if ((enabled_units != 1) && !(mptr->mask & MTAB_XTD))
             continue;                                       /* skip unit only simple modifiers */
         if ((!mptr->disp) || (!mptr->pstring) || !(*mptr->pstring))
             continue;
@@ -3124,7 +3134,7 @@ if ((dptr->flags & DEV_DEBUG) || (dptr->debflags)) {
     sprintf (buf, "show %s DEBUG", sim_dname (dptr));
     fprintf (st, "%-30s\tDisplays debugging status for device %s\n", buf, sim_dname (dptr));
     }
-if ((dptr->modifiers) && (dptr->units) && (dptr->numunits != 1)) {
+if ((dptr->modifiers) && (dptr->units) && (enabled_units != 1)) {
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
         if ((!MODMASK(mptr,MTAB_VUN)) && MODMASK(mptr,MTAB_XTD))
             continue;                                           /* skip device only modifiers */
