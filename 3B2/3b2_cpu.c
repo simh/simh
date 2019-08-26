@@ -1861,6 +1861,8 @@ t_stat sim_instr(void)
             cpu_exception_stack_depth--;
         }
 
+        AIO_CHECK_EVENT;
+
         if (sim_interval-- <= 0) {
             if ((stop_reason = sim_process_event())) {
                 break;

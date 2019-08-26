@@ -135,8 +135,8 @@ static const uint32 NI_DIAG_CRCS[] = {
  */
 UNIT ni_unit[] = {
     { UDATA(&ni_rcv_svc, UNIT_IDLE|UNIT_ATTABLE, 0) },
-    { UDATA(&ni_sanity_svc, UNIT_DIS, 0) },
-    { UDATA(&ni_rq_svc, UNIT_DIS, 0) },
+    { UDATA(&ni_sanity_svc, UNIT_IDLE|UNIT_DIS, 0) },
+    { UDATA(&ni_rq_svc, UNIT_IDLE|UNIT_DIS, 0) },
     { UDATA(&ni_cio_svc, UNIT_DIS, 0) },
     { 0 }
 };
@@ -262,8 +262,6 @@ static void ni_enable()
     sim_debug(DBG_TRACE, &ni_dev,
               "[ni_enable] Enabling the interface.\n");
 
-    ni.callback = ni_recv_callback;
-
     /* Reset Statistics */
     memset(&ni.stats, 0, sizeof(ni_stat_info));
 
@@ -273,10 +271,10 @@ static void ni_enable()
     /* Enter fast polling mode */
     ni.poll_rate = NI_QPOLL_FAST;
 
-    /* Schedule the queue poller in fast poll mode */
+    /* Start the queue poller in fast poll mode */
     sim_activate_abs(rq_unit, NI_QPOLL_FAST);
 
-    /* Schedule the sanity timer */
+    /* Start the sanity timer */
     sim_activate_after(sanity_unit, NI_SANITY_INTERVAL_US);
 
     /* Enable the interface */
@@ -287,7 +285,6 @@ static void ni_disable()
 {
     sim_debug(DBG_TRACE, &ni_dev,
               "[ni_disable] Disabling the interface.\n");
-    ethq_clear(&ni.readq);
     ni.enabled = FALSE;
     cio[ni.cid].intr = FALSE;
     sim_cancel(ni_unit);
@@ -295,7 +292,6 @@ static void ni_disable()
     sim_cancel(rq_unit);
     sim_cancel(cio_unit);
     sim_cancel(sanity_unit);
-    ni.callback = NULL;
 }
 
 static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp)
@@ -316,7 +312,7 @@ static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp
 
     cio[cid].op = rentry->opcode;
 
-    delay = NI_INT_DELAY_US;
+    delay = NI_INT_DELAY;
 
     switch(rentry->opcode) {
     case CIO_DLM:
@@ -426,12 +422,6 @@ static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp
         sim_debug(DBG_TRACE, &ni_dev,
                   "[ni_cmd] NI TURNON Operation\n");
 
-        if (sim_idle_enab) {
-            sim_clock_coschedule(rcv_unit, tmxr_poll);
-        } else {
-            sim_activate_after(rcv_unit, NI_RCV_POLL_US);
-        }
-
         ni_enable();
 
         cio_cqueue(cid, CIO_STAT, NIQESIZE, &centry, app_data);
@@ -531,9 +521,9 @@ static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp
             centry.byte_count <<= 8;
         }
 
-        delay = 0;
-
         cio_cqueue(cid, CIO_STAT, NIQESIZE, &centry, app_data);
+
+        delay = 0;
 
         break;
     default:
@@ -546,7 +536,7 @@ static void ni_cmd(uint8 cid, cio_entry *rentry, uint8 *rapp_data, t_bool is_exp
         break;
     }
 
-    sim_activate_after(cio_unit, delay);
+    sim_activate_abs(cio_unit, delay);
 }
 
 t_stat ni_setmac(UNIT *uptr, int32 val, CONST char* cptr, void* desc)
@@ -633,7 +623,7 @@ void ni_sysgen(uint8 cid)
      * sysgen'ed again later. */
     ni.crc = 0;
 
-    sim_activate_after(cio_unit, NI_INT_DELAY_US);
+    sim_activate_abs(cio_unit, NI_INT_DELAY);
 }
 
 /*
@@ -742,17 +732,10 @@ t_stat ni_reset(DEVICE *dptr)
         /* Set an initial MAC address in the AT&T NI range */
         ni_setmac(ni_dev.units, 0, "80:00:10:03:00:00/32", NULL);
 
-        /* Initialize the receive queue one time only */
-        status = ethq_init(&ni.readq, NI_QUE_MAX);
-        if (status != SCPE_OK) {
-            sim_debug(DBG_TRACE, &ni_dev,
-                      "[ni_reset] Failure: ethq_init status=%d", status);
-            return status;
-        }
-
         ni.initialized = TRUE;
     }
 
+    /* Set up unit names */
     snprintf(uname, 16, "%s-RCV", dptr->name);
     sim_set_uname(rcv_unit, uname);
     snprintf(uname, 16, "%s-SANITY", dptr->name);
@@ -781,26 +764,21 @@ t_stat ni_reset(DEVICE *dptr)
 
 t_stat ni_rcv_svc(UNIT *uptr)
 {
-    t_stat status;
+    t_stat read_succ;
 
     UNUSED(uptr);
 
-    /* If a CIO interrupt is alrady pending, skip this read */
-    if ((rcv_unit->flags & UNIT_ATT) && !cio[ni.cid].intr) {
-        /* Try to receive a packet */
-        do {
-            status = eth_read(ni.eth, &ni.rd_buf, ni.callback);
-        } while (status);
-
-        /* Attempt to process a packet from the queue */
+    /* Since we cannot know which queue (large packet or small packet
+     * queue) will have room for the next packet that we read, for
+     * safety reasons we will not call eth_read() until we're certain
+     * there's room available in BOTH queues. */
+    while (ni.enabled && NI_BUFFERS_AVAIL) {
+        read_succ = eth_read(ni.eth, &ni.rd_buf, NULL);
+        if (!read_succ) {
+            break;
+        }
+        /* Attempt to process the packet that was received. */
         ni_process_packet();
-    }
-
-    /* Re-schedule the next poll */
-    if (sim_idle_enab) {
-        sim_clock_coschedule(rcv_unit, tmxr_poll);
-    } else {
-        sim_activate_after(rcv_unit, NI_RCV_POLL_US);
     }
 
     return SCPE_OK;
@@ -810,15 +788,16 @@ t_stat ni_rcv_svc(UNIT *uptr)
  * Service used by the card to poll for available request queue
  * entries.
  */
-
 t_stat ni_rq_svc(UNIT *uptr)
 {
+    t_bool rq_taken;
     int i, wp, no_rque;
     cio_entry rqe = {0};
     uint8 slot[4] = {0};
 
     UNUSED(uptr);
 
+    rq_taken = FALSE;
     no_rque = cio[ni.cid].no_rque - 1;
 
     for (i = 0; i < no_rque; i++) {
@@ -835,6 +814,7 @@ t_stat ni_rq_svc(UNIT *uptr)
             ni.job_cache[i].req[wp].slot = slot[3];
             ni.job_cache[i].wp = (wp + 1) % NI_CACHE_LEN;
             ni.stats.rq_taken++;
+            rq_taken = TRUE;
         }
     }
 
@@ -845,6 +825,13 @@ t_stat ni_rq_svc(UNIT *uptr)
         ni.poll_rate = NI_QPOLL_SLOW;
     }
 
+    /* If any receive jobs were found, schedule a packet read right
+       away */
+    if (rq_taken) {
+        sim_activate_abs(rcv_unit, 0);
+    }
+
+    /* Reactivate the poller. */
     if (ni.poll_rate == NI_QPOLL_FAST) {
         sim_activate_abs(rq_unit, NI_QPOLL_FAST);
     } else {
@@ -904,46 +891,31 @@ t_stat ni_cio_svc(UNIT *uptr)
     return SCPE_OK;
 }
 
+/*
+ * Do the work of trying to process the most recently received packet
+ */
 void ni_process_packet()
 {
     int i, rp;
     uint32 addr;
     uint8 slot;
-    ETH_ITEM *item;
     cio_entry centry = {0};
     uint8 capp_data[4] = {0};
     int len = 0;
     int que_num = 0;
     uint8 *rbuf;
 
-    /* If a CIO interrupt is alrady pending, the card is disabled, or
-       if there's nothing to do, abort */
-    if (cio[ni.cid].intr || !ni.enabled || ni.readq.count == 0) {
-        return;
-    }
-
-    item = &ni.readq.item[ni.readq.head];
-
-    len = item->packet.len;
-    rbuf = item->packet.msg;
-    que_num = len > SM_PKT_MAX ? 1 : 0;
+    len = ni.rd_buf.len;
+    rbuf = ni.rd_buf.msg;
+    que_num = len > SM_PKT_MAX ? LG_QUEUE : SM_QUEUE;
 
     sim_debug(DBG_IO, &ni_dev,
               "[ni_process_packet] Receiving a packet of size %d (0x%x)\n",
               len, len);
 
-    /*
-     * Consult the cache for a job.
-     */
-    if (ni.job_cache[que_num].rp == ni.job_cache[que_num].wp) {
-        sim_debug(DBG_ERR, &ni_dev,
-                  "Job cache is empty.\n");
-        return;
-    }
-
-    /*
-     * Now that we know we have a job available, take it.
-     */
+    /* Availability of a job in the job cache was checked before
+     * calling ni_process_packet(), so there is no need to check it
+     * again. */
     rp = ni.job_cache[que_num].rp;
     addr = ni.job_cache[que_num].req[rp].addr;
     slot = ni.job_cache[que_num].req[rp].slot;
@@ -962,8 +934,9 @@ void ni_process_packet()
     }
 
     if (ni_dev.dctrl & DBG_DAT) {
-        dump_packet("RCV", &item->packet);
+        dump_packet("RCV", &ni.rd_buf);
     }
+
     ni.stats.rx_pkt++;
     ni.stats.rx_bytes += len;
 
@@ -977,31 +950,9 @@ void ni_process_packet()
     /* TODO: We should probably also check status here. */
     cio_cqueue(ni.cid, CIO_STAT, NIQESIZE, &centry, capp_data);
 
-    /* Take the packet just processed off the queue */
-    ethq_remove(&ni.readq);
-
-    /* And interrupt */
+    /* Trigger an interrupt */
     if (cio[ni.cid].ivec > 0) {
         cio[ni.cid].intr = TRUE;
-    }
-}
-
-/*
- * Called when the eth_read is complete.
- *
- * We can receive packets faster than we can process them, so we just put them
- * in a queue and handle them in ni_rcv_svc.
- */
-void ni_recv_callback(int status) {
-    UNUSED(status);
-
-    if (ni.enabled) {
-        sim_debug(DBG_IO, &ni_dev,
-                  "[ni_recv_callback] inserting packet of len=%d (used=%d) into read queue.\n",
-                  ni.rd_buf.len, ni.rd_buf.used);
-        ethq_insert(&ni.readq, ETH_ITM_NORMAL, &ni.rd_buf, SCPE_OK);
-    } else {
-        sim_debug(DBG_IO, &ni_dev, "[ni_recv_callback] Disabled. Ignoring packet.\n");
     }
 }
 
@@ -1029,6 +980,7 @@ t_stat ni_attach(UNIT *uptr, CONST char *cptr)
         sim_debug(DBG_ERR, &ni_dev, "ni_attach failure: open\n");
         free(tptr);
         free(ni.eth);
+        ni.eth = NULL;
         return status;
     }
 
@@ -1038,26 +990,26 @@ t_stat ni_attach(UNIT *uptr, CONST char *cptr)
         eth_close(ni.eth);
         free(tptr);
         free(ni.eth);
+        ni.eth = NULL;
+        return status;
+    }
+
+    /* Ensure the ethernet device is in async mode */
+    /* TODO: Determine best latency */
+    status = eth_set_async(ni.eth, 1000);
+    if (status != SCPE_OK) {
+        sim_debug(DBG_ERR, &ni_dev, "ni_attach failure: eth_set_async\n");
+        eth_close(ni.eth);
+        free(tptr);
+        free(ni.eth);
+        ni.eth = NULL;
         return status;
     }
 
     uptr->filename = tptr;
     uptr->flags |= UNIT_ATT;
 
-    status = ethq_init(&ni.readq, NI_QUE_MAX);
-    if (status != SCPE_OK) {
-        sim_debug(DBG_ERR, &ni_dev, "ni_attach failure: ethq init\n");
-        eth_close(ni.eth);
-        free(tptr);
-        free(ni.eth);
-        uptr->filename = NULL;
-        uptr->flags &= ~UNIT_ATT;
-        return status;
-    }
-
     eth_filter(ni.eth, ni.filter_count, ni.macs, 0, 0);
-
-    /* ni_reset(&ni_dev); */
 
     return SCPE_OK;
 }
@@ -1117,7 +1069,6 @@ t_stat ni_show_stats(FILE* st, UNIT* uptr, int32 val, CONST void* desc)
     fprintf(st, "NI Ethernet statistics:\n");
     fprintf(st, fmt, "Recv:",          ni.stats.rx_pkt);
     fprintf(st, fmt, "Recv Bytes:",    ni.stats.rx_bytes);
-    fprintf(st, fmt, "Dropped:",       ni.stats.rx_dropped + ni.readq.loss);
     fprintf(st, fmt, "Xmit:",          ni.stats.tx_pkt);
     fprintf(st, fmt, "Xmit Bytes:",    ni.stats.tx_bytes);
     fprintf(st, fmt, "Xmit Fail:",     ni.stats.tx_fail);
