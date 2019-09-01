@@ -2220,30 +2220,31 @@ t_stat sim_instr(void)
             cpu_set_v_flag(0);
             break;
         case CMPW:
-            a = cpu_read_op(src1);
-            b = cpu_read_op(src2);
-
-            cpu_set_z_flag((uint32)b == (uint32)a);
-            cpu_set_n_flag((int32)b < (int32)a);
-            cpu_set_c_flag((uint32)b < (uint32)a);
-            cpu_set_v_flag(0);
-            break;
         case CMPH:
-            a = cpu_read_op(src1);
-            b = cpu_read_op(src2);
-
-            cpu_set_z_flag((uint16)b == (uint16)a);
-            cpu_set_n_flag((int16)b < (int16)a);
-            cpu_set_c_flag((uint16)b < (uint16)a);
-            cpu_set_v_flag(0);
-            break;
         case CMPB:
             a = cpu_read_op(src1);
             b = cpu_read_op(src2);
 
-            cpu_set_z_flag((uint8)b == (uint8)a);
-            cpu_set_n_flag((int8)b < (int8)a);
-            cpu_set_c_flag((uint8)b < (uint8)a);
+            switch(op_type(src2)) {
+            case WD:
+            case UW:
+                cpu_set_n_flag((int32)b < (int32)a);
+                break;
+            case HW:
+            case UH:
+                cpu_set_n_flag((int16)b < (int16)a);
+                break;
+            case BT:
+            case SB:
+                cpu_set_n_flag((int8)b < (int8)a);
+                break;
+            default:
+                /* Unreachable */
+                break;
+            }
+
+            cpu_set_z_flag(b == a);
+            cpu_set_c_flag(b < a);
             cpu_set_v_flag(0);
             break;
         case DECW:
