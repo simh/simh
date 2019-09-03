@@ -2440,7 +2440,11 @@ return SCPE_OK;
 
 const char *eth_version (void)
 {
+#if defined(HAVE_PCAP_NETWORK)
 return pcap_lib_version();
+#else
+return NULL;
+#endif
 }
 
 t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
