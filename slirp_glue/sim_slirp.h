@@ -8,7 +8,7 @@ typedef struct sim_slirp SLIRP;
 
 typedef void (*packet_callback)(void *opaque, const unsigned char *buf, int len);
 
-SLIRP *sim_slirp_open (const char *args, void *opaque, packet_callback callback, DEVICE *dptr, uint32 dbit);
+SLIRP *sim_slirp_open (const char *args, void *opaque, packet_callback callback, DEVICE *dptr, uint32 dbit, char *errbuf, size_t errbuf_size);
 void sim_slirp_close (SLIRP *slirp);
 int sim_slirp_send (SLIRP *slirp, const char *msg, size_t len, int flags);
 int sim_slirp_select (SLIRP *slirp, int ms_timeout);

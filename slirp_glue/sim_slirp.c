@@ -172,7 +172,7 @@ uint32 slirp_dbit;
 }
 #endif
 
-SLIRP *sim_slirp_open (const char *args, void *opaque, packet_callback callback, DEVICE *dptr, uint32 dbit)
+SLIRP *sim_slirp_open (const char *args, void *opaque, packet_callback callback, DEVICE *dptr, uint32 dbit, char *errbuf, size_t errbuf_size)
 {
 SLIRP *slirp = (SLIRP *)g_malloc0(sizeof(*slirp));
 char *targs = g_strdup (args);
@@ -191,6 +191,7 @@ slirp->maskbits = 24;
 slirp->dhcpmgmt = 1;
 slirp->db_chime = INVALID_SOCKET;
 inet_aton(DEFAULT_IP_ADDR,&slirp->vgateway);
+pthread_mutex_init (&slirp->write_buffer_lock, NULL);
 
 err = 0;
 while (*tptr && !err) {
@@ -209,7 +210,7 @@ while (*tptr && !err) {
         if (cptr && *cptr)
             slirp->tftp_path = g_strdup (cptr);
         else {
-            sim_printf ("Missing TFTP Path\n");
+            strlcpy (errbuf, "Missing TFTP Path", errbuf_size);
             err = 1;
             }
         continue;
@@ -218,7 +219,7 @@ while (*tptr && !err) {
         if (cptr && *cptr)
             slirp->boot_file = g_strdup (cptr);
         else {
-            sim_printf ("Missing DHCP Boot file name\n");
+            strlcpy (errbuf, "Missing DHCP Boot file name", errbuf_size);
             err = 1;
             }
         continue;
@@ -228,7 +229,7 @@ while (*tptr && !err) {
         if (cptr && *cptr)
             inet_aton (cptr, &slirp->vnameserver);
         else {
-            sim_printf ("Missing nameserver\n");
+            strlcpy (errbuf, "Missing nameserver", errbuf_size);
             err = 1;
             }
         continue;
@@ -253,7 +254,7 @@ while (*tptr && !err) {
                 } while (name && *name);
             }
         else {
-            sim_printf ("Missing DNS search list\n");
+            strlcpy (errbuf, "Missing DNS search list", errbuf_size);
             err = 1;
             }
         continue;
@@ -266,7 +267,7 @@ while (*tptr && !err) {
             inet_aton (abuf, &slirp->vgateway);
             }
         else {
-            sim_printf ("Missing host\n");
+            strlcpy (errbuf, "Missing host", errbuf_size);
             err = 1;
             }
         continue;
@@ -279,7 +280,7 @@ while (*tptr && !err) {
             inet_aton (abuf, &slirp->vnetwork);
             }
         else {
-            sim_printf ("Missing network\n");
+            strlcpy (errbuf, "Missing network", errbuf_size);
             err = 1;
             }
         continue;
@@ -292,7 +293,7 @@ while (*tptr && !err) {
         if (cptr && *cptr)
             err = _parse_redirect_port (&slirp->rtcp, cptr, IS_UDP);
         else {
-            sim_printf ("Missing UDP port mapping\n");
+            strlcpy (errbuf, "Missing UDP port mapping", errbuf_size);
             err = 1;
             }
         continue;
@@ -301,12 +302,12 @@ while (*tptr && !err) {
         if (cptr && *cptr)
             err = _parse_redirect_port (&slirp->rtcp, cptr, IS_TCP);
         else {
-            sim_printf ("Missing TCP port mapping\n");
+            strlcpy (errbuf, "Missing TCP port mapping", errbuf_size);
             err = 1;
             }
         continue;
         }
-    sim_printf ("Unexpected NAT argument: %s\n", gbuf);
+    snprintf (errbuf, errbuf_size - 1, "Unexpected NAT argument: %s", gbuf);
     err = 1;
     }
 if (err) {
@@ -337,7 +338,6 @@ else {
     GPollFD pfd;
     int64_t rnd_val = qemu_clock_get_ns ((QEMUClockType)0) / 1000000;
 
-    pthread_mutex_init (&slirp->write_buffer_lock, NULL);
     slirp->gpollfds = g_array_new(FALSE, FALSE, sizeof(GPollFD));
     /* setup transmit packet wakeup doorbell */
     do {
