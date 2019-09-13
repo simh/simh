@@ -1,0 +1,13 @@
+platform:
+  - x86
+cache:
+  - ../windows-build
+skip_commits:
+  files:
+    - doc/*
+    - '**/*.md'
+    - '**/*.txt'
+before_build:
+  "\"C:\\Program Files (x86)\\Microsoft Visual Studio 9.0\\VC\\vcvarsall.bat\""
+build_script:
+  cmd: cd "Visual Studio Projects" & vcbuild /M%NUMBER_OF_PROCESSORS% /useenv /rebuild Simh.sln "Release|Win32"

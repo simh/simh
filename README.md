@@ -2,6 +2,7 @@
 
 [![Coverity Scan Build Status](https://scan.coverity.com/projects/11982/badge.svg)](https://scan.coverity.com/projects/simh)
 [![Build Status](https://travis-ci.org/simh/simh.svg)](https://travis-ci.org/simh/simh)
+[![AppVeyor](https://ci.appveyor.com/api/projects/status/github/simh/simh)](https://ci.appveyor.com/project/simh/simh/history)
 
 ## Table of Contents:
 [WHAT'S NEW since simh v3.9](#whats-new-since-simh-v39)  
