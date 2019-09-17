@@ -54,7 +54,7 @@ const char *ng_description (DEVICE *dptr);
 #define IOLN_NG   4
 DIB ng_dib = {
   IOBA_AUTO, IOLN_NG, &ng_rd, &ng_wr,
-  4, IVCL(NG), VEC_AUTO, {NULL}, IOLN_NG
+  1, IVCL(NG), VEC_AUTO, {NULL}, IOLN_NG
 };
 
 UNIT ng_unit = {
