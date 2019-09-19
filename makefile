@@ -114,6 +114,10 @@ endif
 ifneq (,$(or $(findstring pdp10-ka,$(MAKECMDGOALS)),$(findstring pdp10-ki,$(MAKECMDGOALS))))
   NETWORK_USEFUL = true
 endif
+# building the PDP-7 needs video support
+ifneq (,$(findstring pdp7,$(MAKECMDGOALS)))
+  VIDEO_USEFUL = true
+endif
 # building the pdp11, pdp10, or any vax simulator could use networking support
 ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring pdp10,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS)),$(findstring 3b2,$(MAKECMDGOALS))$(findstring all,$(MAKECMDGOALS))))
   NETWORK_USEFUL = true
@@ -1283,8 +1287,12 @@ PDP18B = ${PDP18BD}/pdp18b_dt.c ${PDP18BD}/pdp18b_drm.c ${PDP18BD}/pdp18b_cpu.c 
 	${PDP18BD}/pdp18b_rb.c ${PDP18BD}/pdp18b_tt1.c ${PDP18BD}/pdp18b_fpp.c \
 	${PDP18BD}/pdp18b_g2tty.c ${PDP18BD}/pdp18b_dr15.c
 
+ifneq (,$(DISPLAY_OPT))
+  PDP7_DISPLAY_OPT = -DDISPLAY_TYPE=DIS_TYPE30 -DPIX_SCALE=RES_HALF
+endif
+
 PDP4_OPT = -DPDP4 -I ${PDP18BD}
-PDP7_OPT = -DPDP7 -I ${PDP18BD}
+PDP7_OPT = -DPDP7 -I ${PDP18BD} $(DISPLAY_OPT) $(PDP7_DISPLAY_OPT)
 PDP9_OPT = -DPDP9 -I ${PDP18BD}
 PDP15_OPT = -DPDP15 -I ${PDP18BD}
 
@@ -2062,9 +2070,9 @@ endif
 
 pdp7 : ${BIN}pdp7${EXE}
 
-${BIN}pdp7${EXE} : ${PDP18B} ${SIM}
+${BIN}pdp7${EXE} : ${PDP18B} ${PDP18BD}/pdp18b_dpy.c ${DISPLAYL} $(DISPLAY340) ${SIM}
 	${MKDIRBIN}
-	${CC} ${PDP18B} ${SIM} ${PDP7_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+	${CC} ${PDP18B} ${PDP18BD}/pdp18b_dpy.c ${DISPLAYL} $(DISPLAY340) ${SIM} ${PDP7_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 ifneq (,$(call find_test,${PDP18BD},pdp7))
 	$@ $(call find_test,${PDP18BD},pdp7) $(TEST_ARG)
 endif

@@ -149,6 +149,9 @@
 #define DRM             0                               /* drum */
 #define RB              0                               /* fixed head disk */
 #define GRAPHICS2       0                               /* BTL display */
+#ifdef USE_DISPLAY
+#define TYPE340         0                               /* Type 340 display */
+#endif
 #elif defined (PDP9)
 #define ADDRSIZE        15
 #define TYPE647         0                               /* sixbit printer */
@@ -284,6 +287,7 @@ typedef struct {
 #define DEV_PTP         002                             /* paper tape punch */
 #define DEV_TTI         003                             /* console input */
 #define DEV_TTO         004                             /* console output */
+#define DEV_DPY         005                             /* Type 340 */
 #define DEV_TTI1        041                             /* extra terminals */
 #define DEV_TTO1        040
 #define DEV_DRM         060                             /* drum */
