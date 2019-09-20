@@ -3383,7 +3383,7 @@ if (*cptr) {
             }
         }
     else {
-        if (dptr->flags & DEV_DISABLE)
+        if (dptr->flags & DEV_DIS)
             sim_printf ("Device %s is currently disabled\n", dptr->name);
         r = help_dev_help (stdout, dptr, uptr, flag, cptr);
         if (sim_log)
