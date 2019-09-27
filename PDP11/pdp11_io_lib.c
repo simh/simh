@@ -896,6 +896,8 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
         {04040}, {0270} },                              /* NG - vector display */
     { { "DAZ" },         1,  1,  0, 0, 
         {00104} },                                      /* DAZ */
+    { { "TV" },          1,  0,  0, 0, 
+        {04100} },                                      /* TV - raster display */
     { { NULL },         -1 }                            /* end table */
 };
 
