@@ -1390,6 +1390,18 @@ while (reason == 0) {                                   /* loop until halted */
    700042       ION             ION             ION             ION
    700024       undefined       undefined       undefined       LDMM (XVM)
    700062       undefined       ITON            undefined       undefined
+   700501       undefined       IDVE            undefined       undefined
+   700601       undefined       IDSI            undefined       undefined
+   700701       undefined       IDSP            undefined       undefined
+   701001       undefined       IDHE            undefined       undefined
+   700504       undefined       IDRS            undefined       undefined
+   700512       undefined       IDRA            undefined       undefined
+   700606       undefined       IDLA            undefined       undefined
+   700614       undefined       IDRD            undefined       undefined
+   700704       undefined       IDCF            undefined       undefined
+   700712       undefined       IDRC            undefined       undefined
+   701012       undefined       IDSC            undefined       undefined
+   701014       undefined       IDRP            undefined       undefined
    701701       undefined       undefined       MPSK            MPSK
    701741       undefined       undefined       MPSNE           MPSNE
    701702       undefined       undefined       MPCV            MPCV

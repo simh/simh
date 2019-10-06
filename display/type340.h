@@ -49,7 +49,13 @@ typedef unsigned int ty340word;
 ty340word ty340_reset(void *);
 ty340word ty340_status(void);
 ty340word ty340_instruction(ty340word inst);
+ty340word ty340_get_dac(void);
+ty340word ty340_get_asr(void);
+ty340word ty340_sense(ty340word);
 void ty340_set_dac(ty340word addr);
+void ty340_clear(ty340word addr);
+void ty340_cycle(void);
+void ty340_set_status(ty340word);
 void ty342_set_grid(int, int);
 
 /*

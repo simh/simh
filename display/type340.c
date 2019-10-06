@@ -115,9 +115,7 @@ enum jump_type { DJP=2, DJS=3, DDS=1 }; /* type 347 */
 
 /* put all the state in a struct "just in case" */
 static struct type340 {
-#ifdef NOTYET
     ty340word DAC;              /* Display Address Counter */
-#endif
     ty340word status;           /* see ST340_XXX in type340.h */
     signed short xpos, ypos;    /* 10 bits, signed (for OOB checks) */
     char initialized;           /* 0 before display_init */
@@ -143,7 +141,6 @@ static struct type340 {
 #define UNIT(N) (u340+(N))
 #endif
 
-#if 0
 /* NOT USED WITH PDP-6 Type 344 Interface!! */
 void
 ty340_set_dac(ty340word addr)
@@ -157,7 +154,50 @@ ty340_set_dac(ty340word addr)
     u->status = 0;               /* XXX just clear stopped? */
     ty340_rfd();                 /* ready for data */
 }
+
+void
+ty340_cycle(void)
+{
+    struct type340 *u = UNIT(0);
+
+    if (u->status == 0) {
+        ty340word insn = ty340_fetch(u->DAC);
+        u->status = ty340_instruction (insn);
+        u->DAC = (u->DAC + 1) & 07777;
+    }
+}
+
+ty340word
+ty340_get_dac(void)
+{
+    struct type340 *u = UNIT(0);
+    return u->DAC;
+}
+
+ty340word
+ty340_get_asr(void)
+{
+#if TYPE347
+    struct type340 *u = UNIT(0);
+    return u->ASR;
+#else
+    return 0;
 #endif
+}
+
+ty340word
+ty340_sense(ty340word flags)
+{
+    struct type340 *u = UNIT(0);
+    return u->status & flags;
+}
+
+void
+ty340_clear(ty340word flags)
+{
+    struct type340 *u = UNIT(0);
+    u->status &= ~flags;
+}
 
 ty340word
 ty340_reset(void *dptr)

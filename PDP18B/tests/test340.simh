@@ -1,0 +1,27 @@
+set g2out disabled
+
+set debug stdout
+set dpy enabled
+set dpy debug
+
+# Small test program.
+dep -m 100 law 1000
+dep -m 101 idla
+dep -m 102 idsi
+dep -m 103 jmp 102
+dep -m 104 jmp 100
+
+# Small display list.
+#Go to point mode, set scale, set intensity.
+dep 1000 020117
+#Stay in point mode, set x=1000.
+dep 1001 021000
+#Go to vector mode, set y=1000.
+dep 1002 301000
+#Escape, intensify, delta x=100.
+dep 1003 600100
+#Stop.
+dep 1004 003000
+
+dep pc 100
+# Ready to go or single step.
