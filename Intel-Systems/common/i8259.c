@@ -35,28 +35,21 @@
 
 #include "system_defs.h"                /* system header in system dir */
 
-#define  DEBUG   0
-
 /* function prototypes */
 
-uint8 i8259a(t_bool io, uint8 data);
-uint8 i8259b(t_bool io, uint8 data);
+t_stat i8259_cfg(uint8 base, uint8 devnum);
+uint8 i8259a(t_bool io, uint8 data, uint8 devnum);
+uint8 i8259b(t_bool io, uint8 data, uint8 devnum);
 void i8259_dump(uint8 devnum);
-t_stat i8259_reset (DEVICE *dptr, uint16 baseport);
-uint8 i8259_get_dn(void);
+t_stat i8259_reset (DEVICE *dptr);
 
 /* external globals */
 
-extern uint16 port;                     //port called in dev_table[port]
-
 /* external function prototypes */
 
-extern uint16 reg_dev(uint8 (*routine)(t_bool, uint8), uint16, uint8);
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
 
 /* globals */
-
-int32 i8259_devnum = 0;                 //actual number of 8259 instances + 1
-uint16 i8259_port[4];                   //baseport port registered to each instance
 
 /* these bytes represent the input and output to/from a port instance */
 
@@ -113,11 +106,11 @@ DEBTAB i8259_debug[] = {
 /* address width is set to 16 bits to use devices in 8086/8088 implementations */
 
 DEVICE i8259_dev = {
-    "I8259",             //name
+    "I8259",            //name
     i8259_unit,         //units
     i8259_reg,          //registers
     NULL,               //modifiers
-    1,                  //numunits
+    I8259_NUM,          //numunits
     16,                 //aradix
     16,                 //awidth
     1,                  //aincr
@@ -125,8 +118,7 @@ DEVICE i8259_dev = {
     8,                  //dwidth
     NULL,               //examine
     NULL,               //deposit
-//    &i8259_reset,       //reset
-    NULL,               //reset
+    i8259_reset,        //reset
     NULL,               //boot
     NULL,               //attach
     NULL,               //detach
@@ -142,116 +134,98 @@ DEVICE i8259_dev = {
     IN or OUT instruction is issued.
 */
 
-/* Reset routine */
+// i8259 configuration
 
-t_stat i8259_reset (DEVICE *dptr, uint16 baseport)
+t_stat i8259_cfg(uint8 base, uint8 devnum)
 {
-    if (i8259_devnum >= I8259_NUM) {
-        sim_printf("i8255_reset: too many devices!\n");
-        return SCPE_MEM;
-    }
-    sim_printf("      8259-%d: Reset\n", i8259_devnum);
-    sim_printf("      8259-%d: Registered at %04X\n", i8259_devnum, baseport);
-    i8259_port[i8259_devnum] = baseport;
-    reg_dev(i8259a, baseport, i8259_devnum); 
-    reg_dev(i8259b, baseport + 1, i8259_devnum); 
-    i8259_unit[i8259_devnum].u3 = 0x00; /* IRR */
-    i8259_unit[i8259_devnum].u4 = 0x00; /* ISR */
-    i8259_unit[i8259_devnum].u5 = 0x00; /* IMR */
-    i8259_devnum++;
+    reg_dev(i8259a, base, devnum); 
+    reg_dev(i8259b, base + 1, devnum); 
+    sim_printf("    i8259[%d]: at base port 0%02XH\n",
+        devnum, base & 0xFF);
     return SCPE_OK;
 }
 
-uint8 i8259_get_dn(void)
-{
-    int i;
+/* Reset routine */
 
-    for (i=0; i<I8259_NUM; i++)
-        if (port >= i8259_port[i] && port <= i8259_port[i] + 1)
-            return i;
-    sim_printf("i8259_get_dn: port %04X not in 8259 device table\n", port);
-    return 0xFF;
+t_stat i8259_reset (DEVICE *dptr)
+{
+    uint8 devnum;
+    
+    for (devnum=0; devnum<I8259_NUM; devnum++) {
+        i8259_unit[devnum].u3 = 0x00; /* IRR */
+        i8259_unit[devnum].u4 = 0x00; /* ISR */
+        i8259_unit[devnum].u5 = 0x00; /* IMR */
+    }
+    return SCPE_OK;
 }
 
 /* i8259 functions */
 
-uint8 i8259a(t_bool io, uint8 data)
+uint8 i8259a(t_bool io, uint8 data, uint8 devnum)
 {
-    uint8 devnum;
-
-    if ((devnum = i8259_get_dn()) != 0xFF) {
-        if (io == 0) {                      /* read data port */
-            if ((i8259_ocw3[devnum] & 0x03) == 0x02)
-                return (i8259_unit[devnum].u3);  /* IRR */
-            if ((i8259_ocw3[devnum] & 0x03) == 0x03)
-                return (i8259_unit[devnum].u4);  /* ISR */
-        } else {                            /* write data port */
-            if (data & 0x10) {
-                icw_num0 = 1;
-            }
-            if (icw_num0 == 1) {
-                i8259_icw1[devnum] = data;       /* ICW1 */
-                i8259_unit[devnum].u5 = 0x00;    /* clear IMR */
-                i8259_ocw3[devnum] = 0x02;       /* clear OCW3, Sel IRR */
-            } else {
-                switch (data & 0x18) {
-                case 0:                     /* OCW2 */
-                    i8259_ocw2[devnum] = data;
-                    break;
-                case 8:                     /* OCW3 */
-                    i8259_ocw3[devnum] = data;
-                    break;
-                default:
-                    sim_printf("8259a-%d: OCW Error %02X\n", devnum, data);
-                    break;
-                }
-            }
-            if (DEBUG)
-                sim_printf("   8259-%d: A data = %02X\n", devnum, data);
-            icw_num0++;             /* step ICW number */
+    if (io == 0) {                      /* read data port */
+        if ((i8259_ocw3[devnum] & 0x03) == 0x02)
+            return (i8259_unit[devnum].u3);  /* IRR */
+        if ((i8259_ocw3[devnum] & 0x03) == 0x03)
+            return (i8259_unit[devnum].u4);  /* ISR */
+    } else {                            /* write data port */
+        if (data & 0x10) {
+            icw_num0 = 1;
         }
-//        i8259_dump(devnum);
+        if (icw_num0 == 1) {
+            i8259_icw1[devnum] = data;       /* ICW1 */
+            i8259_unit[devnum].u5 = 0x00;    /* clear IMR */
+            i8259_ocw3[devnum] = 0x02;       /* clear OCW3, Sel IRR */
+        } else {
+            switch (data & 0x18) {
+            case 0:                     /* OCW2 */
+                i8259_ocw2[devnum] = data;
+                break;
+            case 8:                     /* OCW3 */
+                i8259_ocw3[devnum] = data;
+                break;
+            default:
+                sim_printf("8259a-%d: OCW Error %02X\n", devnum, data);
+                break;
+            }
+        }
+        icw_num0++;             /* step ICW number */
     }
+//        i8259_dump(devnum);
     return 0;
 }
 
-uint8 i8259b(t_bool io, uint8 data)
+uint8 i8259b(t_bool io, uint8 data, uint8 devnum)
 {
-    uint8 devnum;
-
-    if ((devnum = i8259_get_dn()) != 0xFF) {
-        if (io == 0) {                      /* read data port */
-            if ((i8259_ocw3[devnum] & 0x03) == 0x02)
-                return (i8259_unit[devnum].u3);  /* IRR */
-            if ((i8259_ocw3[devnum] & 0x03) == 0x03)
-                return (i8259_unit[devnum].u4);  /* ISR */
-        } else {                            /* write data port */
-            if (data & 0x10) {
-                icw_num1 = 1;
-            }
-            if (icw_num1 == 1) {
-                i8259_icw1[devnum] = data;       /* ICW1 */
-                i8259_unit[devnum].u5 = 0x00;    /* clear IMR */
-                i8259_ocw3[devnum] = 0x02;       /* clear OCW3, Sel IRR */
-            } else {
-                switch (data & 0x18) {
-                case 0:                     /* OCW2 */
-                    i8259_ocw2[devnum] = data;
-                    break;
-                case 8:                     /* OCW3 */
-                    i8259_ocw3[devnum] = data;
-                    break;
-                default:
-                    sim_printf("8259b-%d: OCW Error %02X\n", devnum, data);
-                    break;
-                }
-            }
-            if (DEBUG)
-                sim_printf("   8259-%d: B data = %02X\n", devnum, data);
-            icw_num1++;                     /* step ICW number */
+    if (io == 0) {                      /* read data port */
+        if ((i8259_ocw3[devnum] & 0x03) == 0x02)
+            return (i8259_unit[devnum].u3);  /* IRR */
+        if ((i8259_ocw3[devnum] & 0x03) == 0x03)
+            return (i8259_unit[devnum].u4);  /* ISR */
+    } else {                            /* write data port */
+        if (data & 0x10) {
+            icw_num1 = 1;
         }
-//        i8259_dump(devnum);
+        if (icw_num1 == 1) {
+            i8259_icw1[devnum] = data;       /* ICW1 */
+            i8259_unit[devnum].u5 = 0x00;    /* clear IMR */
+            i8259_ocw3[devnum] = 0x02;       /* clear OCW3, Sel IRR */
+        } else {
+            switch (data & 0x18) {
+            case 0:                     /* OCW2 */
+                i8259_ocw2[devnum] = data;
+                break;
+            case 8:                     /* OCW3 */
+                i8259_ocw3[devnum] = data;
+                break;
+            default:
+                sim_printf("8259b-%d: OCW Error %02X\n", devnum, data);
+                break;
+            }
+        }
+        icw_num1++;                     /* step ICW number */
     }
+//        i8259_dump(devnum);
     return 0;
 }
 

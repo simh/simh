@@ -77,35 +77,28 @@
 
 #include "system_defs.h"                /* system header in system dir */
 
-#define  DEBUG   0
-
-/* external globals */
-
-extern uint16 port;                     //port called in dev_table[port]
-
 /* internal function prototypes */
 
-t_stat i8255_reset (DEVICE *dptr, uint16 baseport);
-uint8 i8255_get_dn(void);
-uint8 i8255a(t_bool io, uint8 data);
-uint8 i8255b(t_bool io, uint8 data);
-uint8 i8255c(t_bool io, uint8 data);
-uint8 i8255s(t_bool io, uint8 data);
+t_stat i8255_cfg(uint8 base, uint8 devnum);
+t_stat i8255_reset (DEVICE *dptr);
+uint8 i8255a(t_bool io, uint8 data, uint8 devnum);
+uint8 i8255b(t_bool io, uint8 data, uint8 devnum);
+uint8 i8255c(t_bool io, uint8 data, uint8 devnum);
+uint8 i8255s(t_bool io, uint8 data, uint8 devnum);
 
 /* external function prototypes */
 
-extern uint16 reg_dev(uint8 (*routine)(t_bool, uint8), uint16, uint8);
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
 
 /* globals */
-
-int32 i8255_devnum = 0;                 //actual number of 8255 instances + 1
-uint16 i8255_port[4];                   //baseport port registered to each instance
 
 /* these bytes represent the input and output to/from a port instance */
 
 uint8 i8255_A[4];                       //port A byte I/O
 uint8 i8255_B[4];                       //port B byte I/O
 uint8 i8255_C[4];                       //port C byte I/O
+
+/* external globals */
 
 /* i8255 Standard I/O Data Structures */
 /* up to 4 i8255 devices */
@@ -162,8 +155,7 @@ DEVICE i8255_dev = {
     8,                  //dwidth
     NULL,               //examine
     NULL,               //deposit
-//    i8255_reset2(),     //reset
-    NULL,       //reset
+    i8255_reset,        //reset
     NULL,               //boot
     NULL,               //attach
     NULL,               //detach
@@ -175,38 +167,32 @@ DEVICE i8255_dev = {
     NULL                //lname
 };
 
-/* Reset routine */
+// i8255 configuration
 
-t_stat i8255_reset (DEVICE *dptr, uint16 baseport)
+t_stat i8255_cfg(uint8 base, uint8 devnum)
 {
-    if (i8255_devnum > I8255_NUM) {
-        sim_printf("i8255_reset: too many devices!\n");
-        return SCPE_MEM;
-    }
-    sim_printf("      8255-%d: Reset\n", i8255_devnum);
-    sim_printf("      8255-%d: Registered at %04X\n", i8255_devnum, baseport);
-    i8255_port[i8255_devnum] = baseport;
-    reg_dev(i8255a, baseport, i8255_devnum); 
-    reg_dev(i8255b, baseport + 1, i8255_devnum); 
-    reg_dev(i8255c, baseport + 2, i8255_devnum); 
-    reg_dev(i8255s, baseport + 3, i8255_devnum); 
-    i8255_unit[i8255_devnum].u3 = 0x9B; /* control */
-    i8255_A[i8255_devnum] = 0xFF; /* Port A */
-    i8255_B[i8255_devnum] = 0xFF; /* Port B */
-    i8255_C[i8255_devnum] = 0xFF; /* Port C */
-    i8255_devnum++;
+    reg_dev(i8255a, base, devnum); 
+    reg_dev(i8255b, base + 1, devnum); 
+    reg_dev(i8255c, base + 2, devnum); 
+    reg_dev(i8255s, base + 3, devnum); 
+    sim_printf("    i8255[%d]: at base port 0%02XH\n",
+        devnum, base & 0xFF);
     return SCPE_OK;
 }
 
-uint8 i8255_get_dn(void)
-{
-    int i;
+/* Reset routine */
 
-    for (i=0; i<I8255_NUM; i++)
-        if (port >=i8255_port[i] && port <= i8255_port[i] + 3)
-            return i;
-    sim_printf("i8255_get_dn: port %04X not in 8255 device table\n", port);
-    return 0xFF;
+t_stat i8255_reset (DEVICE *dptr)
+{
+    uint8 devnum;
+    
+    for (devnum = 0; devnum < I8255_NUM; devnum++) {
+        i8255_unit[devnum].u3 = 0x9B; /* control */
+        i8255_A[devnum] = 0xFF; /* Port A */
+        i8255_B[devnum] = 0xFF; /* Port B */
+        i8255_C[devnum] = 0xFF; /* Port C */
+    }
+    return SCPE_OK;
 }
 
 /*  I/O instruction handlers, called from the CPU module when an
@@ -215,79 +201,69 @@ uint8 i8255_get_dn(void)
 
 /* i8255 functions */
 
-uint8 i8255s(t_bool io, uint8 data)
+uint8 i8255s(t_bool io, uint8 data, uint8 devnum)
 {
     uint8 bit;
-    uint8 devnum;
-
-    if ((devnum = i8255_get_dn()) != 0xFF) {
-        if (io == 0) {                      /* read status port */
-            return 0xFF;                    //undefined
-        } else {                            /* write status port */
-            if (data & 0x80) {              /* mode instruction */
-                i8255_unit[devnum].u3 = data;
-                if (DEBUG)
-                    sim_printf("   8255-%d: Mode Instruction=%02X\n", devnum, data);
-                if (data & 0x64)
-                    sim_printf("   Mode 1 and 2 not yet implemented\n");
-            } else {                        /* bit set */
-                bit = (data & 0x0E) >> 1;   /* get bit number */
-                if (data & 0x01) {          /* set bit */
-                    i8255_C[devnum] |= (0x01 << bit);
-                } else {                    /* reset bit */
-                    i8255_C[devnum] &= ~(0x01 << bit);
-                }
+    
+    if (io == 0) {                      /* read status port */
+        return 0xFF;                    //undefined
+    } else {                            /* write status port */
+        if (data & 0x80) {              /* mode instruction */
+            i8255_unit[devnum].u3 = data;
+            if (data & 0x64)
+                sim_printf("   Mode 1 and 2 not yet implemented\n");
+        } else {                        /* bit set */
+            bit = (data & 0x0E) >> 1;   /* get bit number */
+            if (data & 0x01) {          /* set bit */
+                i8255_C[devnum] |= (0x01 << bit);
+            } else {                    /* reset bit */
+                i8255_C[devnum] &= ~(0x01 << bit);
             }
         }
     }
     return 0;
 }
 
-uint8 i8255a(t_bool io, uint8 data)
+uint8 i8255a(t_bool io, uint8 data, uint8 devnum)
 {
-    uint8 devnum;
-
-    if ((devnum = i8255_get_dn()) != 0xFF) {
-        if (io == 0) {                      /* read data port */
-            //return (i8255_unit[devnum].u4);
-            return (i8255_A[devnum]);
-        } else {                            /* write data port */
-            i8255_A[devnum] = data;
-            if (DEBUG)
-                sim_printf("   8255-%d: Port A = %02X\n", devnum, data);
-        }
+    if (io == 0) {                      /* read data port */
+        return (i8255_A[devnum]);
+    } else {                            /* write data port */
+        i8255_A[devnum] = data;
     }
     return 0;
 }
 
-uint8 i8255b(t_bool io, uint8 data)
+uint8 i8255b(t_bool io, uint8 data, uint8 devnum)
 {
-    uint8 devnum;
-
-    if ((devnum = i8255_get_dn()) != 0xFF) {
-        if (io == 0) {                      /* read data port */
-            return (i8255_B[devnum]);
-        } else {                            /* write data port */
-            i8255_B[devnum] = data;
-            if (DEBUG)
-                sim_printf("   8255-%d: Port B = %02X\n", devnum, data);
-        }
+    if (io == 0) {                      /* read data port */
+        return (i8255_B[devnum]);
+    } else {                            /* write data port */
+        i8255_B[devnum] = data;
     }
     return 0;
 }
 
-uint8 i8255c(t_bool io, uint8 data)
+uint8 i8255c(t_bool io, uint8 data, uint8 devnum)
 {
-    uint8 devnum;
-
-    if ((devnum = i8255_get_dn()) != 0xFF) {
-        if (io == 0) {                      /* read data port */
-            return (i8255_C[devnum]);
-        } else {                            /* write data port */
-            i8255_C[devnum] = data;
-            if (DEBUG)
-                sim_printf("   8255-%d: Port C = %02X\n", devnum, data);
+    if (io == 0) {                      /* read data port */
+        return (i8255_C[devnum]);
+    } else {                            /* write data port */
+        if (devnum == 0) {
+            if((i8255_C[devnum] & 0x80) != (data & 0x80)) { //change in ROM enable
+                if (data & 0x80) 
+                    sim_printf("Onboard EPROM: Enabled\n");
+                else
+                    sim_printf("Onboard EPROM: Disabled\n");
+            }
+            if((i8255_C[devnum] & 0x20) != (data & 0x20)) { //change in RAM enable
+                if (data & 0x20) 
+                    sim_printf("Onboard RAM: Enabled\n");
+                else
+                    sim_printf("Onboard RAM: Disabled\n");
+            }
         }
+        i8255_C[devnum] = data;
     }
     return 0;
 }

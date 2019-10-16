@@ -38,8 +38,11 @@ extern DEVICE RAM_dev;
 extern DEVICE multibus_dev;
 extern DEVICE isbc201_dev;
 extern DEVICE isbc202_dev;
+extern DEVICE isbc206_dev;
+extern DEVICE isbc208_dev;
 extern DEVICE zx200a_dev;
 extern DEVICE isbc064_dev;
+extern DEVICE isbc464_dev;
 
 /* SCP data structures
 
@@ -64,8 +67,11 @@ DEVICE *sim_devices[] = {
     &i8255_dev,
     &multibus_dev,
     &isbc064_dev,
+    &isbc464_dev,
     &isbc201_dev,
     &isbc202_dev,
+    &isbc206_dev,
+    &isbc208_dev,
     &zx200a_dev,
     NULL
 };
@@ -77,6 +83,7 @@ const char *sim_stop_messages[] = {
     "Breakpoint",
     "Invalid Opcode",
     "Invalid Memory",
-    "XACK Error"
+    "XACK Error",
+    NULL
 };
 

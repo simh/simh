@@ -95,9 +95,9 @@
       Thus, only writes need be checked against actual memory size.
 
    4. Adding I/O devices.  These modules must be modified:
-        i8080.c - add I/O service routines to dev_table
-        isys80XX_sys.c - add pointer to data structures in sim_devices
-        system_defs.h - to define devices and addresses assigned to devices
+      i8080.c - add I/O service routines to dev_table
+      isys80XX_sys.c - add pointer to data structures in sim_devices
+      system_defs.h - to define devices and addresses assigned to devices
 
     ?? ??? 11 - Original file.
     16 Dec 12 - Modified to use isbc_80_10.cfg file to set base and size.
@@ -117,6 +117,8 @@
 #define UNIT_8085       (1 << UNIT_V_8085)
 #define UNIT_V_TRACE    (UNIT_V_UF+2)   /*  Trace switch */
 #define UNIT_TRACE      (1 << UNIT_V_TRACE)
+#define UNIT_V_XACK     (UNIT_V_UF+3)   /*  XACK switch */
+#define UNIT_XACK       (1 << UNIT_V_XACK)
 
 /* Flag values to set proper positions in PSW */
 #define CF      0x01
@@ -164,15 +166,20 @@ uint32 HL = 0;                          /* HL register pair */
 uint32 SP = 0;                          /* Stack pointer */
 uint32 saved_PC = 0;                    /* program counter */
 uint32 IM = 0;                          /* Interrupt Mask Register */
-uint8 xack = 0;                         /* XACK signal */
+uint8  xack = 0;                        /* XACK signal */
 uint32 int_req = 0;                     /* Interrupt request */
-
+uint8 INTA = 0;                         // interrupt acknowledge
 int32 PCX;                              /* External view of PC */
+int32 PCY;                              /* Internal view of PC */
 int32 PC;
 UNIT *uptr;
 uint16 port;                            //port used in any IN/OUT
+uint16 addr;                            //addr used for operand fetch
+uint32 IR;
+uint16 devnum = 0;
 
 /* function prototypes */
+
 void    set_cpuint(int32 int_num);
 void    dumpregs(void);
 int32   fetch_byte(int32 flag);
@@ -204,10 +211,9 @@ extern void put_mword(uint16 addr, uint16 val);
 extern int32 sim_int_char;
 extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 
-
 struct idev {
-    uint8 (*routine)(t_bool, uint8);
-    uint16 port;
+    uint8 (*routine)(t_bool, uint8, uint8);
+    uint8 port;
     uint8 devnum;
 };
 
@@ -249,6 +255,8 @@ MTAB i8080_mod[] = {
     { UNIT_OPSTOP, UNIT_OPSTOP, "NOITRAP", "NOITRAP", NULL },
     { UNIT_TRACE, 0, "NOTRACE", "NOTRACE", NULL },
     { UNIT_TRACE, UNIT_TRACE, "TRACE", "TRACE", NULL },
+    { UNIT_XACK, 0, "NOXACK", "NOXACK", NULL },
+    { UNIT_XACK, UNIT_XACK, "XACK", "XACK", NULL },
     { 0 }
 };
 
@@ -277,12 +285,11 @@ DEVICE i8080_dev = {
     8,                                  //dwidth
     &i8080_ex,                          //examine 
     &i8080_dep,                         //deposit 
-//    &i8080_reset,                       //reset
-    NULL,                       //reset
+    NULL,                               //reset
     NULL,                               //boot
     NULL,                               //attach 
     NULL,                               //detach
-    NULL,                               //ctxt
+    NULL,                               //context
     DEV_DEBUG,                          //flags 
     0,                                  //dctrl 
     i8080_debug,                        //debflags
@@ -356,7 +363,7 @@ const char *opcode[] = {
 "CP ", "PUSH PSW", "ORI ", "RST 6",
 "RM", "SPHL", "JM ", "EI",
 "CM ", "???", "CPI ", "RST 7",
- };
+};
 
 int32 oplen[256] = {
 1,3,1,1,1,1,2,1,0,1,1,1,1,1,2,1,
@@ -374,7 +381,8 @@ int32 oplen[256] = {
 1,1,3,3,3,1,2,1,1,1,3,0,3,3,2,1,
 1,1,3,2,3,1,2,1,1,0,3,2,3,0,2,1,
 1,1,3,1,3,1,2,1,1,1,3,1,3,0,2,1,
-1,1,3,1,3,1,2,1,1,1,3,1,3,0,2,1 };
+1,1,3,1,3,1,2,1,1,1,3,1,3,0,2,1 
+};
 
 void set_cpuint(int32 int_num)
 {
@@ -383,19 +391,24 @@ void set_cpuint(int32 int_num)
 
 
 /* instruction simulator */
-int32 sim_instr (void)
+int32 sim_instr(void)
 {
     extern int32 sim_interval;
-    uint32 IR, OP, DAR, reason, adr;
+    uint32 OP, DAR, reason, adr, onetime = 0;
 
     PC = saved_PC & WORD_R;             /* load local PC */
     reason = 0;
 
     uptr = i8080_dev.units;
-    if (uptr->flags & UNIT_8085)
-        sim_printf("CPU = 8085\n");
-    else
-        sim_printf("CPU = 8080\n");
+
+    if (onetime++ == 0) {
+        if (uptr->flags & UNIT_8085)
+            sim_printf("CPU = 8085\n");
+        else
+            sim_printf("CPU = 8080\n");
+        sim_printf("    i8080:\n");
+    }
+    
     /* Main instruction fetch/decode loop */
 
     while (reason == 0) {               /* loop until halted */
@@ -437,9 +450,11 @@ int32 sim_instr (void)
                 } 
             } else {                    /* 8080 */
                 if (IM & IE) {          /* enabled? */
-                    push_word(PC);      /* do an RST 7 */
-                    PC = 0x0038;
-                    int_req &= ~INT_R;
+                    INTA = 1;
+                    push_word(PC);      /* do an RST 2 */
+                    PC = 0x0010;
+                    int_req = 0;
+//                    sim_printf("8080 Interrupt\n");
                 }
             }
         }                               /* end interrupt */
@@ -450,20 +465,22 @@ int32 sim_instr (void)
             break;
         }
 
-        sim_interval--;                 /* countdown clock */
-        PCX = PC;
-
         if (uptr->flags & UNIT_TRACE) {
             dumpregs();
-            sim_printf("\n");
+//            sim_printf("\n");
         }
+
+        sim_interval--;                 /* countdown clock */
+        PCY = PCX = PC;
+        
         IR = OP = fetch_byte(0);        /* instruction fetch */
 
-        if (GET_XACK(1) == 0) {         /* no XACK for instruction fetch */
+        if (GET_XACK(1) == 0) {         // no XACK for instruction fetch
 //            reason = STOP_XACK;
-            sim_printf("Stopped for XACK-1 PC=%04X\n", PC);
+        if (uptr->flags & UNIT_XACK) 
+            sim_printf("Failed XACK for Instruction Fetch from %04X\n", PCX);
 //            continue;
-        }
+         }
 
         // first instruction decode
         if (OP == 0x76) {               /* HLT Instruction*/
@@ -509,6 +526,7 @@ int32 sim_instr (void)
             DAR = A;
             DAR -= getreg(OP & 0x07);
             setarith(DAR);
+            A &= BYTE_R;                //required ***
             goto loop_end;
         }
 
@@ -589,6 +607,7 @@ int32 sim_instr (void)
             DAR = getreg((OP >> 3) & 0x07);
             DAR++;
             setinc(DAR);
+            DAR &= BYTE_R;              //required
             putreg((OP >> 3) & 0x07, DAR);
             goto loop_end;
         }
@@ -597,6 +616,7 @@ int32 sim_instr (void)
             DAR = getreg((OP >> 3) & 0x07);
             DAR--;
             setinc(DAR);
+            DAR &= BYTE_R;              //required
             putreg((OP >> 3) & 0x07, DAR);
             goto loop_end;
         }
@@ -604,6 +624,7 @@ int32 sim_instr (void)
         if ((OP & 0xCF) == 0x03) {      /* INX */
             DAR = getpair((OP >> 4) & 0x03);
             DAR++;
+            DAR &= WORD_R;              //required
             putpair((OP >> 4) & 0x03, DAR);
             goto loop_end;
         }
@@ -611,6 +632,7 @@ int32 sim_instr (void)
         if ((OP & 0xCF) == 0x0B) {      /* DCX */
             DAR = getpair((OP >> 4) & 0x03);
             DAR--;
+            DAR &= WORD_R;              //required
             putpair((OP >> 4) & 0x03, DAR);
             goto loop_end;
         }
@@ -767,7 +789,6 @@ int32 sim_instr (void)
             if (GET_FLAG(CF))
                 A--;
             A &= BYTE_R;            //required
-            A &= BYTE_R;
             break;
 
         case 0x27:                  /* DAA */
@@ -788,41 +809,47 @@ int32 sim_instr (void)
             COND_SET_FLAG(DAR & 0x10, CF);
             COND_SET_FLAG(A & 0x80, SF);
             COND_SET_FLAG((A & 0xFF) == 0, ZF);
+            A &= BYTE_R;            //required
             parity(A);
             break;
 
         case 0x07:                  /* RLC */
             COND_SET_FLAG(A & 0x80, CF);
-            A = (A << 1) & 0xFF;
+            A = A << 1;
             if (GET_FLAG(CF))
                 A |= 0x01;
+            A &= BYTE_R;            //required
             break;
 
         case 0x0F:                  /* RRC */
             COND_SET_FLAG(A & 0x01, CF);
-            A = (A >> 1) & 0xFF;
+            A = A >> 1;
             if (GET_FLAG(CF))
                 A |= 0x80;
+            A &= BYTE_R;            //required
             break;
 
         case 0x17:                  /* RAL */
             DAR = GET_FLAG(CF);
             COND_SET_FLAG(A & 0x80, CF);
-            A = (A << 1) & 0xFF;
+            A = A << 1;
             if (DAR)
                 A |= 0x01;
+            A &= BYTE_R;            //required
             break;
 
         case 0x1F:                  /* RAR */
             DAR = GET_FLAG(CF);
             COND_SET_FLAG(A & 0x01, CF);
-            A = (A >> 1) & 0xFF;
+            A = A >> 1;
             if (DAR)
                 A |= 0x80;
+            A &= BYTE_R;            //required
             break;
 
         case 0x2F:                  /* CMA */
             A = ~A;
+            A &= BYTE_R;            //required
             break;
 
         case 0x3F:                  /* CMC */
@@ -857,15 +884,13 @@ int32 sim_instr (void)
             break;
 
         case 0xDB:                  /* IN */
-            DAR = fetch_byte(1);
-            port = DAR;
-            A = dev_table[DAR].routine(0, 0);
+            port = fetch_byte(1);
+            A = dev_table[port].routine(0, 0, dev_table[port].devnum);
             break;
 
         case 0xD3:                  /* OUT */
-            DAR = fetch_byte(1);
-            port = DAR;
-            dev_table[DAR].routine(1, A);
+            port = fetch_byte(1);
+            dev_table[port].routine(1, A, dev_table[port].devnum);
             break;
 
         default:                    /* undefined opcode */ 
@@ -876,10 +901,17 @@ int32 sim_instr (void)
             break;
         }
 loop_end:
-        if (GET_XACK(1) == 0) {     /* no XACK for instruction fetch */
+
+        if (GET_XACK(1) == 0) {     // no XACK for operand fetch
 //            reason = STOP_XACK;
-//            sim_printf("Stopped for XACK-2 PC=%04X\n", PC);
+            if (OP == 0xD3 || OP == 0xDB) {
+                if (uptr->flags & UNIT_XACK) 
+                    sim_printf("Failed XACK for Port %02X Fetch from %04X\n", port, PCX);
+            } else {
+                if (uptr->flags & UNIT_XACK) 
+                    sim_printf("Failed XACK for Operand %04X Fetch from %04X\n", addr, PCX);
 //            continue;
+            }
         }
     }
 
@@ -892,33 +924,25 @@ loop_end:
 /* dump the registers */
 void dumpregs(void)
 {
-    sim_printf("  A=%02X BC=%04X DE=%04X HL=%04X SP=%04X IM=%02X XACK=%d\n",
-    A, BC, DE, HL, SP, IM, xack);
-    sim_printf("    CF=%d ZF=%d AF=%d SF=%d PF=%d\n", 
+    sim_printf("  PC=%04X A=%02X BC=%04X DE=%04X HL=%04X SP=%04X IM=%02X XACK=%d",
+        PCY, A, BC, DE, HL, SP, IM, xack);
+    sim_printf(" IR=%02X addr=%04X", IR, addr);
+    sim_printf(" CF=%d ZF=%d AF=%d SF=%d PF=%d\n", 
     GET_FLAG(CF) ? 1 : 0,
     GET_FLAG(ZF) ? 1 : 0,
     GET_FLAG(AF) ? 1 : 0,
     GET_FLAG(SF) ? 1 : 0,
     GET_FLAG(PF) ? 1 : 0);
 }
+
 /* fetch an instruction or byte */
 int32 fetch_byte(int32 flag)
 {
     uint32 val;
 
     val = get_mbyte(PC) & 0xFF;         /* fetch byte */
-    if (i8080_dev.dctrl & DEBUG_asm || uptr->flags & UNIT_TRACE) {  /* display source code */
-        switch (flag) {
-        case 0:                     /* opcode fetch */
-            sim_printf("OP=%02X        %04X %s", val,  PC, opcode[val]);
-            break;
-        case 1:                     /* byte operand fetch */
-            sim_printf("0%02XH", val);
-            break;
-        }
-    }
     PC = (PC + 1) & ADDRMASK;           /* increment PC */
-    val &= BYTE_R;
+    addr = val & 0xff;
     return val;
 }
 
@@ -929,10 +953,11 @@ int32 fetch_word(void)
 
     val = get_mbyte(PC) & BYTE_R;       /* fetch low byte */
     val |= get_mbyte(PC + 1) << 8;      /* fetch high byte */
-    if (i8080_dev.dctrl & DEBUG_asm || uptr->flags & UNIT_TRACE)   /* display source code */
-        sim_printf("0%04XH", val);
+//    if (i8080_dev.dctrl & DEBUG_asm || uptr->flags & UNIT_TRACE)   /* display source code */
+//        sim_printf("0%04XH", val);
     PC = (PC + 2) & ADDRMASK;           /* increment PC */
     val &= WORD_R;
+    addr = val;
     return val;
 }
 
@@ -1039,7 +1064,7 @@ void parity(int32 reg)
         SET_FLAG(PF);
 }
 
-/* Set the <S>ign, <Z>ero amd <P>arity flags following
+/* Set the <S>ign, <Z>ero and <P>arity flags following
    an INR/DCR operation on 'reg'.
 */
 
@@ -1156,7 +1181,7 @@ int32 getpush(int32 reg)
 
 
 /* Place data into the indicated register pair, in PUSH
-   format where 3 means A& flags, not SP */
+   format where 3 means A & flags, not SP */
 void putpush(int32 reg, int32 data)
 {
     switch (reg) {
@@ -1210,8 +1235,8 @@ t_stat i8080_reset (DEVICE *dptr)
     saved_PC = 0;
     int_req = 0;
     IM = 0;
+    INTA = 0;
     sim_brk_types = sim_brk_dflt = SWMASK ('E');
-    sim_printf("   8080: Reset\n");
     return SCPE_OK;
 }
 
@@ -1245,14 +1270,25 @@ int32 sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
     int32 i, addr = 0, cnt = 0;
 
-    if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
-    addr = saved_PC;
-    while ((i = getc (fileref)) != EOF) {
-        put_mbyte(addr, i);
-        addr++;
-        cnt++;
-    }                                   /* end while */
-    sim_printf ("%d Bytes loaded.\n", cnt);
+    if ((*cptr != 0)) return SCPE_ARG;
+    if (flag == 0) {                     //load
+//        addr = saved_PC;
+        while ((i = getc (fileref)) != EOF) {
+            put_mbyte(addr, i);
+            addr++;
+            cnt++;
+        }                               /* end while */
+        sim_printf ("%d Bytes loaded.\n", cnt);
+        return (SCPE_OK);
+    } else {                            //dump
+//        addr = saved_PC;
+        while (addr <= 0xffff) {
+            i = get_mbyte(addr);
+            putc(i, fileref);
+            addr++;
+            cnt++;
+        }
+    }
     return (SCPE_OK);
 }
 

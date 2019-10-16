@@ -33,12 +33,14 @@ extern DEVICE i8080_dev;
 extern REG i8080_reg[];
 extern DEVICE i8259_dev;
 extern DEVICE i8251_dev;
+extern DEVICE i8253_dev;
 extern DEVICE i8255_dev;
 extern DEVICE EPROM_dev;
 extern DEVICE RAM_dev;
 extern DEVICE multibus_dev;
 extern DEVICE isbc201_dev;
 extern DEVICE isbc202_dev;
+extern DEVICE isbc208_dev;
 extern DEVICE isbc064_dev;
 
 /* SCP data structures
@@ -62,11 +64,13 @@ DEVICE *sim_devices[] = {
     &RAM_dev,
     &i8259_dev,
     &i8251_dev,
+    &i8253_dev,
     &i8255_dev,
     &multibus_dev,
     &isbc064_dev,
     &isbc201_dev,
     &isbc202_dev,
+    &isbc208_dev,
     NULL
 };
 

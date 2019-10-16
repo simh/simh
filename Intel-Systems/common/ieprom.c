@@ -26,36 +26,37 @@
     MODIFICATIONS:
 
         ?? ??? 10 - Original file.
-        16 Dec 12 - Modified to use isbc_80_10.cfg file to set base and size.
-        24 Apr 15 -- Modified to use simh_debug
 
     NOTES:
 
         These functions support a simulated ROM devices on an iSBC-80/XX SBCs.
         This allows the attachment of the device to a binary file containing the EPROM
         code image.  Unit will support a single 2708, 2716, 2732, or 2764 type EPROM.
-        These functions also support bit 1 of 8255 number 1, port B, to enable/
+        These functions also support bit 0x80 of 8255 number 0, port C, to enable/
         disable the onboard ROM.
 */
 
 #include "system_defs.h"
 
-#define DEBUG   0
-
 /* function prototypes */
 
+t_stat EPROM_cfg(uint16 base, uint16 size);
 t_stat EPROM_attach (UNIT *uptr, CONST char *cptr);
-t_stat EPROM_reset (DEVICE *dptr, uint16 size);
+t_stat EPROM_reset (DEVICE *dptr);
 uint8 EPROM_get_mbyte(uint16 addr);
 
 /* external function prototypes */
 
-//extern uint8 i8255_C[4];                    //port c byte I/O
-extern uint8 xack;                          /* XACK signal */
+/* external globals */
+
+extern uint8 xack;                   /* XACK signal */
+extern uint8 i8255_C[4];                    //port C byte I/O
+
+/* globals */
 
 /* SIMH EPROM Standard I/O Data Structures */
 
-UNIT EPROM_unit = {
+UNIT EPROM_unit[] = {
     UDATA (NULL, UNIT_ATTABLE+UNIT_BINK+UNIT_ROABLE+UNIT_RO+UNIT_BUFABLE+UNIT_MUSTBUF, 0), 0
 };
 
@@ -72,7 +73,7 @@ DEBTAB EPROM_debug[] = {
 
 DEVICE EPROM_dev = {
     "EPROM",            //name
-    &EPROM_unit,        //units
+    EPROM_unit,         //units
     NULL,               //registers
     NULL,               //modifiers
     1,                  //numunits
@@ -83,8 +84,7 @@ DEVICE EPROM_dev = {
     8,                  //dwidth
     NULL,               //examine
     NULL,               //deposit
-//    &EPROM_reset,       //reset
-    NULL,                               //reset
+    EPROM_reset,        //reset
     NULL,               //boot
     &EPROM_attach,      //attach
     NULL,               //detach
@@ -96,62 +96,54 @@ DEVICE EPROM_dev = {
     NULL                //lname
 };
 
-/* global variables */
-
 /* EPROM functions */
+
+// EPROM configuration
+
+t_stat EPROM_cfg(uint16 base, uint16 size)
+{
+    EPROM_unit->capac = size;        /* set EPROM size */
+    EPROM_unit->u3 = base & 0xFFFF;  /* set EPROM base */
+    sim_printf("    EPROM: 0%04XH bytes at base 0%04XH\n",
+        EPROM_unit->capac, EPROM_unit->u3);
+    return SCPE_OK;
+}
 
 /* EPROM reset */
 
-t_stat EPROM_reset (DEVICE *dptr, uint16 size)
+t_stat EPROM_reset (DEVICE *dptr)
 {
-    sim_debug (DEBUG_flow, &EPROM_dev, "   EPROM_reset: base=0000 size=%04X\n", size);
-    if ((EPROM_unit.flags & UNIT_ATT) == 0) { /* if unattached */
-        EPROM_unit.capac = size;           /* set EPROM size to 0 */
-        sim_printf("      EPROM: Configured, Not attached\n");
-        sim_debug (DEBUG_flow, &EPROM_dev, "Done1\n");
-    } else {
-        sim_printf("      EPROM: Configured %d bytes, Attached to %s\n",
-            EPROM_unit.capac, EPROM_unit.filename);
-    }
-    sim_debug (DEBUG_flow, &EPROM_dev, "Done2\n");
     return SCPE_OK;
 }
 
 /* EPROM attach  */
 
-t_stat EPROM_attach (UNIT *uptr, CONST char *cptr)
+t_stat EPROM_attach (UNIT *uptr, CONST char *cptr) 
 {
     t_stat r;
 
-    sim_debug (DEBUG_flow, &EPROM_dev, "EPROM_attach: cptr=%s\n", cptr);
     if ((r = attach_unit (uptr, cptr)) != SCPE_OK) {
-        sim_debug (DEBUG_flow, &EPROM_dev, "EPROM_attach: Error\n");
+        sim_printf ("EPROM_attach: Error %d\n", r);
         return r;
     }
-    sim_debug (DEBUG_read, &EPROM_dev, "\tClose file\n");
-    sim_printf("   EPROM: Configured %d bytes, Attached to %s\n",
-        EPROM_unit.capac, EPROM_unit.filename);
-    sim_debug (DEBUG_flow, &EPROM_dev, "EPROM_attach: Done\n");
     return SCPE_OK;
 }
 
-/*  get a byte from memory */
+/*  get a byte from memory */ 
 
 uint8 EPROM_get_mbyte(uint16 addr)
 {
     uint8 val;
 
-    sim_debug (DEBUG_read, &EPROM_dev, "EPROM_get_mbyte: addr=%04X\n", addr);
-    if (addr < EPROM_unit.capac) {
+    if ((addr >= EPROM_unit->u3) && ((uint32) addr <= (EPROM_unit->u3 + EPROM_unit->capac))) {
         SET_XACK(1);                /* good memory address */
-        sim_debug (DEBUG_xack, &EPROM_dev, "EPROM_get_mbyte: Set XACK for %04X\n", addr); 
-        val = *((uint8 *)EPROM_unit.filebuf + addr);
-        sim_debug (DEBUG_read, &EPROM_dev, " val=%04X\n", val);
-        return (val & 0xFF);
+        val = *((uint8 *)EPROM_unit->filebuf + (addr - EPROM_unit->u3));
+        val &= 0xFF;
+        return val;
     } else {
-        sim_debug (DEBUG_read, &EPROM_dev, " Out of range\n");
-        return 0;
+        sim_printf("EPROM:  Out of range\n");
     }
+    return 0;
 }
 
 /* end of iEPROM.c */

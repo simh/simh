@@ -37,6 +37,7 @@
 
 /* function prototypes */
 
+t_stat SBC_config(void);
 uint8 get_mbyte(uint16 addr);
 uint16 get_mword(uint16 addr);
 void put_mbyte(uint16 addr, uint8 val);
@@ -53,39 +54,74 @@ extern int32 PCX;                           /* External view of PC */
 extern uint8 multibus_get_mbyte(uint16 addr);
 extern void  multibus_put_mbyte(uint16 addr, uint8 val);
 extern t_stat i8080_reset (DEVICE *dptr);   /* reset the 8080 emulator */
-extern int32 i8251_devnum;
-extern t_stat i8251_reset (DEVICE *dptr, uint16 base);
-extern int32 i8253_devnum;
-extern t_stat i8253_reset (DEVICE *dptr, uint16 base);
-extern int32 i8255_devnum;
-extern t_stat i8255_reset (DEVICE *dptr, uint16 base);
-extern int32 i8259_devnum;
-extern t_stat i8259_reset (DEVICE *dptr, uint16 base);
+extern DEVICE *i8080_dev;
+extern t_stat i8251_reset (DEVICE *dptr);
+extern uint8 i8251s(t_bool io, uint8 data, uint8 devnum);
+extern uint8 i8251d(t_bool io, uint8 data, uint8 devnum);
+extern DEVICE *i8251_dev;
+extern t_stat i8253_reset (DEVICE *dptr);
+extern uint8 i8253t0(t_bool io, uint8 data, uint8 devnum);
+extern uint8 i8253t1(t_bool io, uint8 data, uint8 devnum);
+extern uint8 i8253t2(t_bool io, uint8 data, uint8 devnum);
+extern uint8 i8253c(t_bool io, uint8 data, uint8 devnum);
+extern DEVICE *i8253_dev;
+extern t_stat i8255_reset (DEVICE *dptr);
+extern uint8 i8255a(t_bool io, uint8 data, uint8 devnum);
+extern uint8 i8255b(t_bool io, uint8 data, uint8 devnum);
+extern uint8 i8255c(t_bool io, uint8 data, uint8 devnum);
+extern uint8 i8255s(t_bool io, uint8 data, uint8 devnum);
+extern DEVICE *i8255_dev;
+extern t_stat i8259_reset (DEVICE *dptr);
+extern uint8 i8259a(t_bool io, uint8 data, uint8 devnum);
+extern uint8 i8259b(t_bool io, uint8 data, uint8 devnum);
+extern DEVICE *i8259_dev;
 extern uint8 EPROM_get_mbyte(uint16 addr);
 extern UNIT EPROM_unit;
-extern t_stat EPROM_reset (DEVICE *dptr, uint16 size);
+extern t_stat EPROM_reset (DEVICE *dptr, uint16 base, uint16 size);
 extern uint8 RAM_get_mbyte(uint16 addr);
 extern void RAM_put_mbyte(uint16 addr, uint8 val);
 extern UNIT RAM_unit;
 extern t_stat RAM_reset (DEVICE *dptr, uint16 base, uint16 size);
+extern t_stat i8251_cfg(uint8 base, uint8 devnum);
+extern t_stat i8253_cfg(uint8 base, uint8 devnum);
+extern t_stat i8255_cfg(uint8 base, uint8 devnum);
+extern t_stat i8259_cfg(uint8 base, uint8 devnum);
+extern t_stat RAM_cfg(uint16 base, uint16 size);
+extern t_stat EPROM_cfg(uint16 base, uint16 size);
+extern t_stat multibus_cfg();   
+
+// globals
+
+int onetime = 0;
+
+t_stat SBC_config(void)
+{
+    sim_printf("Configuring iSBC-80/24 SBC\n  Onboard Devices:\n");
+    i8251_cfg(I8251_BASE, 0);
+    i8253_cfg(I8253_BASE, 0);
+    i8255_cfg(I8255_BASE_0, 0);
+    i8255_cfg(I8255_BASE_1, 1);
+    i8259_cfg(I8259_BASE, 0);
+    EPROM_cfg(ROM_BASE, ROM_SIZE);
+    RAM_cfg(RAM_BASE, RAM_SIZE);
+    return SCPE_OK;
+}
 
 /*  SBC reset routine */
 
 t_stat SBC_reset (DEVICE *dptr)
 {    
-    sim_printf("Initializing iSBC-80/24 SBC\n   Onboard Devices:\n");
-    i8080_reset (NULL);
-    i8251_devnum = 0;
-    i8251_reset (NULL, I8251_BASE);
-    i8253_devnum = 0;
-    i8253_reset (NULL, I8253_BASE);
-    i8255_devnum = 0;
-    i8255_reset (NULL, I8255_BASE_0);
-    i8255_reset (NULL, I8255_BASE_1);
-    i8259_devnum = 0;
-    i8259_reset (NULL, I8259_BASE);
-    EPROM_reset (NULL, ROM_SIZE);
-    RAM_reset (NULL, RAM_BASE, RAM_SIZE);
+    if (onetime == 0) {
+        SBC_config();
+        multibus_cfg();   
+        onetime++;
+    }
+    i8080_reset(i8080_dev);
+    i8251_reset(i8251_dev);
+    i8253_reset(i8253_dev);
+    i8255_reset(i8255_dev);
+    i8255_reset(i8255_dev);
+    i8259_reset(i8259_dev);
     return SCPE_OK;
 }
 

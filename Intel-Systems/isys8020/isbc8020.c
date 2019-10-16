@@ -1,4 +1,4 @@
-/*  iSBC80-20.c: Intel iSBC 80/20 Processor simulator
+/*  iSBC8020.c: Intel iSBC 80/20 Processor simulator
 
     Copyright (c) 2010, William A. Beech
 
@@ -31,8 +31,11 @@
 
 #include "system_defs.h"
 
+int flag = 1;
+
 /* function prototypes */
 
+t_stat SBC_config(void);
 uint8 get_mbyte(uint16 addr);
 uint16 get_mword(uint16 addr);
 void put_mbyte(uint16 addr, uint8 val);
@@ -48,33 +51,76 @@ extern uint8 i8255_C[4];                    //port C byte I/O
 extern uint8 multibus_get_mbyte(uint16 addr);
 extern void  multibus_put_mbyte(uint16 addr, uint8 val);
 extern t_stat i8080_reset (DEVICE *dptr);   /* reset the 8080 emulator */
-extern int32 i8251_devnum;
-extern t_stat i8251_reset (DEVICE *dptr, uint16 base);
-extern int32 i8255_devnum;
-extern t_stat i8255_reset (DEVICE *dptr, uint16 base);
-extern int32 i8259_devnum;
-extern t_stat i8259_reset (DEVICE *dptr, uint16 base);
+extern DEVICE *i8080_dev;
+extern t_stat i8251_reset (DEVICE *dptr);
+extern uint8 i8251s(t_bool io, uint8 data, uint8 devnum);
+extern uint8 i8251d(t_bool io, uint8 data, uint8 devnum);
+extern DEVICE *i8251_dev;
+extern t_stat i8253_reset (DEVICE *dptr);
+extern uint8 i8253t0(t_bool io, uint8 data, uint8 devnum);
+extern uint8 i8253t1(t_bool io, uint8 data, uint8 devnum);
+extern uint8 i8253t2(t_bool io, uint8 data, uint8 devnum);
+extern uint8 i8253c(t_bool io, uint8 data, uint8 devnum);
+extern DEVICE *i8253_dev;
+extern t_stat i8255_reset (DEVICE *dptr);
+extern uint8 i8255a(t_bool io, uint8 data, uint8 devnum);
+extern uint8 i8255b(t_bool io, uint8 data, uint8 devnum);
+extern uint8 i8255c(t_bool io, uint8 data, uint8 devnum);
+extern uint8 i8255s(t_bool io, uint8 data, uint8 devnum);
+extern DEVICE *i8255_dev;
+extern t_stat i8259_reset (DEVICE *dptr);
+extern uint8 i8259a(t_bool io, uint8 data, uint8 devnum);
+extern uint8 i8259b(t_bool io, uint8 data, uint8 devnum);
+extern DEVICE *i8259_dev;
 extern uint8 EPROM_get_mbyte(uint16 addr);
 extern UNIT EPROM_unit;
-extern t_stat EPROM_reset (DEVICE *dptr, uint16 size);
+extern t_stat EPROM_reset (DEVICE *dptr);
 extern uint8 RAM_get_mbyte(uint16 addr);
 extern void RAM_put_mbyte(uint16 addr, uint8 val);
 extern UNIT RAM_unit;
-extern t_stat RAM_reset (DEVICE *dptr, uint16 base, uint16 size);
+extern t_stat RAM_reset (DEVICE *dptr);
+extern t_stat i8251_cfg(uint8 base, uint8 devnum);
+extern t_stat i8253_cfg(uint8 base, uint8 devnum);
+extern t_stat i8255_cfg(uint8 base, uint8 devnum);
+extern t_stat i8259_cfg(uint8 base, uint8 devnum);
+extern t_stat RAM_cfg(uint16 base, uint16 size);
+extern t_stat EPROM_cfg(uint16 base, uint16 size);
+extern t_stat multibus_cfg();   
+extern uint16 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
+
+// globals
+
+int onetime = 0;
+
+t_stat SBC_config(void)
+{
+    sim_printf("Configuring iSBC-80/20 SBC\n  Onboard Devices:\n");
+    i8251_cfg(I8251_BASE, 0);
+    i8253_cfg(I8253_BASE, 0);
+    i8255_cfg(I8255_BASE_0, 0);
+    i8255_cfg(I8255_BASE_1, 1);
+    i8259_cfg(I8259_BASE, 0);
+    EPROM_cfg(ROM_BASE, ROM_SIZE);
+    RAM_cfg(RAM_BASE, RAM_SIZE);
+    return SCPE_OK;
+}
 
 /*  CPU reset routine 
     put here to cause a reset of the entire iSBC system */
 
 t_stat SBC_reset (DEVICE *dptr)
-{    
-    sim_printf("Initializing iSBC-80/20\n");
-    i8080_reset(NULL);
-    i8251_reset(NULL, I8251_BASE);
-    i8255_reset(NULL, I8255_BASE_0);
-    i8255_reset(NULL, I8255_BASE_1);
-    i8259_reset(NULL, I8259_BASE);
-    EPROM_reset(NULL, ROM_SIZE);
-    RAM_reset(NULL, RAM_BASE, RAM_SIZE);
+{
+    if (onetime == 0) {
+        SBC_config();
+        multibus_cfg();   
+        onetime++;
+    }
+    i8080_reset(i8080_dev);
+    i8251_reset(i8251_dev);
+    i8253_reset(i8253_dev);
+    i8255_reset(i8255_dev);
+    i8255_reset(i8255_dev);
+    i8259_reset(i8259_dev);
     return SCPE_OK;
 }
 
@@ -84,11 +130,11 @@ uint8 get_mbyte(uint16 addr)
 {
     /* if local EPROM handle it */
     if ((ROM_DISABLE && (i8255_C[0] & 0x20)) || (ROM_DISABLE == 0)) { /* EPROM enabled */
-        if ((addr >= EPROM_unit.u3) && (addr < (EPROM_unit.u3 + EPROM_unit.capac)))
+        if ((addr >= EPROM_unit.u3) && ((uint16)addr < (EPROM_unit.u3 + EPROM_unit.capac)))
             return EPROM_get_mbyte(addr);
     } /* if local RAM handle it */
     if ((RAM_DISABLE && (i8255_C[0] & 0x20)) || (RAM_DISABLE == 0)) { /* RAM enabled */
-        if ((addr >= RAM_unit.u3) && (addr < (RAM_unit.u3 + RAM_unit.capac)))
+        if ((addr >= RAM_unit.u3) && ((uint16)addr < (RAM_unit.u3 + RAM_unit.capac)))
             return RAM_get_mbyte(addr);
     } /* otherwise, try the multibus */
     return multibus_get_mbyte(addr);
@@ -111,13 +157,13 @@ void put_mbyte(uint16 addr, uint8 val)
 {
     /* if local EPROM handle it */
     if ((ROM_DISABLE && (i8255_C[0] & 0x20)) || (ROM_DISABLE == 0)) { /* EPROM enabled */
-        if ((addr >= EPROM_unit.u3) && (addr <= (EPROM_unit.u3 + EPROM_unit.capac))) {
+        if ((addr >= EPROM_unit.u3) && ((uint16)addr <= (EPROM_unit.u3 + EPROM_unit.capac))) {
             sim_printf("Write to R/O memory address %04X - ignored\n", addr);
             return;
         }
     } /* if local RAM handle it */
     if ((RAM_DISABLE && (i8255_C[0] & 0x20)) || (RAM_DISABLE == 0)) { /* RAM enabled */
-        if ((addr >= RAM_unit.u3) && (addr <= (RAM_unit.u3 + RAM_unit.capac))) {
+        if ((addr >= RAM_unit.u3) && ((uint16)addr <= (RAM_unit.u3 + RAM_unit.capac))) {
             RAM_put_mbyte(addr, val);
             return;
         }
@@ -133,4 +179,4 @@ void put_mword(uint16 addr, uint16 val)
     put_mbyte(addr+1, val >> 8);
 }
 
-/* end of iSBC80-20.c */
+/* end of iSBC8020.c */

@@ -1,6 +1,6 @@
-/*  ipc.c: Intel IPC Processor simulator
+/*  ipb.c: Intel IPB Processor simulator
 
-    Copyright (c) 2010, William A. Beech
+    Copyright (c) 2017, William A. Beech
 
         Permission is hereby granted, free of charge, to any person obtaining a
         copy of this software and associated documentation files (the "Software"),
@@ -23,15 +23,10 @@
         used in advertising or otherwise to promote the sale, use or other dealings
         in this Software without prior written authorization from William A. Beech.
 
-        This software was written by Bill Beech, Dec 2010, to allow emulation of Multibus
-        Computer Systems.
-
-    07 Jun 16 - Original file.
+    01 Mar 18 - Original file.
 */
 
 #include "system_defs.h"
-
-#define DEBUG   0
 
 /* function prototypes */
 
@@ -44,52 +39,84 @@ t_stat SBC_reset (DEVICE *dptr);
 /* external function prototypes */
 
 extern t_stat i8080_reset (DEVICE *dptr);   /* reset the 8080 emulator */
-//extern uint8 multibus_get_mbyte(uint16 addr);
-//extern void  multibus_put_mbyte(uint16 addr, uint8 val);
+extern uint8 multibus_get_mbyte(uint16 addr);
+extern void  multibus_put_mbyte(uint16 addr, uint8 val);
 extern uint8 EPROM_get_mbyte(uint16 addr);
 extern uint8 RAM_get_mbyte(uint16 addr);
 extern void RAM_put_mbyte(uint16 addr, uint8 val);
+extern t_stat i8251_cfg(uint8 base, uint8 devnum);
+extern t_stat i8251_reset(DEVICE *dptr);
+extern t_stat i8253_cfg(uint8 base, uint8 devnum);
+extern t_stat i8253_reset(DEVICE *dptr);
+extern t_stat i8255_cfg(uint8 base, uint8 devnum);
+extern t_stat i8255_reset(DEVICE *dptr);
+extern t_stat i8259_cfg(uint8 base, uint8 devnum);
+extern t_stat i8259_reset(DEVICE *dptr);
+extern t_stat EPROM_reset(DEVICE *dptr);
+extern t_stat RAM_reset(DEVICE *dptr);
+extern t_stat ipc_cont_reset(DEVICE *dptr);
+extern t_stat ipc_cont_cfg(uint8 base, uint8 devnum); 
+extern t_stat ioc_cont_reset(DEVICE *dptr);
+extern t_stat ioc_cont_cfg(uint8 base, uint8 devnum); 
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
+extern t_stat EPROM_cfg(uint16 base, uint16 size);
+extern t_stat RAM_cfg(uint16 base, uint16 size);
+extern t_stat multibus_cfg();   
+
+/* globals */
+
+int onetime = 0;
+
+/* extern globals */
+
+extern uint32 PCX;                    /* program counter */
 extern UNIT i8255_unit;
 extern UNIT EPROM_unit;
 extern UNIT RAM_unit;
 extern UNIT ipc_cont_unit;
 extern UNIT ioc_cont_unit;
-extern int32 i8251_devnum;
-extern t_stat i8251_reset(DEVICE *dptr, uint16 base);
-extern int32 i8253_devnum;
-extern t_stat i8253_reset(DEVICE *dptr, uint16 base);
-extern int32 i8255_devnum;
-extern t_stat i8255_reset(DEVICE *dptr, uint16 base);
-extern int32 i8259_devnum;
-extern t_stat i8259_reset(DEVICE *dptr, uint16 base);
-extern t_stat EPROM_reset(DEVICE *dptr, uint16 size);
-extern t_stat RAM_reset(DEVICE *dptr, uint16 base, uint16 size);
-extern t_stat ipc_cont_reset(DEVICE *dptr, uint16 base);
-extern t_stat ioc_cont_reset(DEVICE *dptr, uint16 base);
-extern uint32 PCX;                    /* program counter */
+extern DEVICE *i8080_dev;
+extern DEVICE *i8251_dev;
+extern DEVICE *i8253_dev;
+extern DEVICE *i8255_dev;
+extern DEVICE *i8259_dev;
+extern DEVICE *ipc_cont_dev;
+extern DEVICE *ioc_cont_dev;
+
+t_stat SBC_config(void)
+{
+    sim_printf("Configuring IPB SBC\n  Onboard Devices:\n");
+    i8251_cfg(I8251_BASE_0, 0); 
+    i8251_cfg(I8251_BASE_1, 1); 
+    i8253_cfg(I8253_BASE, 0); 
+    i8255_cfg(I8255_BASE_0, 0); 
+    i8255_cfg(I8255_BASE_1, 1); 
+    i8259_cfg(I8259_BASE_0, 0); 
+    i8259_cfg(I8259_BASE_1, 0); 
+    ipc_cont_cfg(ICONT_BASE, 0); 
+    ioc_cont_cfg(DBB_BASE, 0); 
+    EPROM_cfg(ROM_BASE, ROM_SIZE);
+    RAM_cfg(RAM_BASE, RAM_SIZE);
+    return SCPE_OK;
+}
 
 /*  CPU reset routine 
     put here to cause a reset of the entire IPC system */
 
 t_stat SBC_reset (DEVICE *dptr)
 {    
-    sim_printf("Initializing MDS-225\n   Onboard Devices:\n");
-    i8080_reset(NULL);
-    i8251_devnum = 0;
-    i8251_reset(NULL, I8251_BASE_0);
-    i8251_reset(NULL, I8251_BASE_1);
-    i8253_devnum = 0;
-    i8253_reset(NULL, I8253_BASE);
-    i8255_devnum = 0;
-    i8255_reset(NULL, I8255_BASE_0);
-    i8255_reset(NULL, I8255_BASE_1);
-    i8259_devnum = 0;
-    i8259_reset(NULL, I8259_BASE_0);
-    i8259_reset(NULL, I8259_BASE_1);
-    EPROM_reset(NULL, ROM_SIZE);
-    RAM_reset(NULL, RAM_BASE, RAM_SIZE);
-    ipc_cont_reset(NULL, ICONT_BASE);
-    ioc_cont_reset(NULL, DBB_BASE);
+    if (onetime == 0) {
+        SBC_config();   
+        multibus_cfg();   
+        onetime++;
+    }
+    i8080_reset(i8080_dev);
+    i8251_reset(i8251_dev);
+    i8253_reset(i8253_dev);
+    i8255_reset(i8255_dev);
+    i8259_reset(i8259_dev);
+    ipc_cont_reset(ipc_cont_dev);
+    ioc_cont_reset(ioc_cont_dev);
     return SCPE_OK;
 }
 
@@ -101,12 +128,15 @@ uint8 get_mbyte(uint16 addr)
         return EPROM_get_mbyte(addr - 0xF000); //top half of EPROM
     }
     if ((addr < 0x1000) && ((ipc_cont_unit.u3 & 0x04) == 0)) { //startup
-        return EPROM_get_mbyte(addr);
+        return EPROM_get_mbyte(addr);   //top half of EPROM for boot
     }
     if ((addr >= 0xE800) && (addr < 0xF000) && ((ipc_cont_unit.u3 & 0x10) == 0)) { //diagnostic ROM
-        return EPROM_get_mbyte(addr - 0xE800);
+        return EPROM_get_mbyte(addr - 0xE800); //bottom half of EPROM
     }
-    return RAM_get_mbyte(addr);
+    if (addr < 0x8000)                  //IPB RAM
+        return RAM_get_mbyte(addr);
+    else
+        return multibus_get_mbyte(addr); //check multibus cards
 }
 
 /*  get a word from memory */
@@ -125,21 +155,19 @@ uint16 get_mword(uint16 addr)
 void put_mbyte(uint16 addr, uint8 val)
 {
     if (addr >= 0xF800) {               //monitor ROM - always there
-        if (DEBUG)
-            sim_printf("Write to R/O memory address %04X from PC=%04X - ignored\n", addr, PCX);
         return;
     } 
     if ((addr < 0x1000) && ((ipc_cont_unit.u3 & 0x04) == 0)) { //startup
-        if (DEBUG)
-            sim_printf("Write to R/O memory address %04X from PC=%04X - ignored\n", addr, PCX);
         return;
     }
     if ((addr >= 0xE800) && (addr < 0xF000) && ((ipc_cont_unit.u3 & 0x10) == 0)) { //diagnostic ROM
-        if (DEBUG)
-            sim_printf("Write to R/O memory address %04X from PC=%04X - ignored\n", addr, PCX);
         return;
     }
-    RAM_put_mbyte(addr, val);
+    if (addr < 0x8000) {
+        RAM_put_mbyte(addr, val);       //IPB RAM
+        return;
+    }
+    multibus_put_mbyte(addr, val);      //check multibus cards
 }
 
 /*  put a word to memory */
@@ -150,4 +178,4 @@ void put_mword(uint16 addr, uint16 val)
     put_mbyte(addr+1, val >> 8);
 }
 
-/* end of ipc.c */
+/* end of ipb.c */

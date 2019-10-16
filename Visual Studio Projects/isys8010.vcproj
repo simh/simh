@@ -224,7 +224,15 @@
 				>
 			</File>
 			<File
+				RelativePath="..\Intel-Systems\common\isbc206.c"
+				>
+			</File>
+			<File
 				RelativePath="..\Intel-Systems\common\isbc208.c"
+				>
+			</File>
+			<File
+				RelativePath="..\Intel-Systems\common\isbc464.c"
 				>
 			</File>
 			<File

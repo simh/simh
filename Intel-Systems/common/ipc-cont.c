@@ -33,16 +33,15 @@
 
 #include "system_defs.h"                /* system header in system dir */
 
-#define DEBUG   0
-
 /* function prototypes */
 
-uint8 ipc_cont(t_bool io, uint8 data);    /* ipc_cont*/
-t_stat ipc_cont_reset (DEVICE *dptr, uint16 baseport);
+t_stat ipc_cont_cfg(uint8 base, uint8 devnum);
+uint8 ipc_cont(t_bool io, uint8 data, uint8 devnum);	/* ipc_cont*/
+t_stat ipc_cont_reset (DEVICE *dptr);
 
 /* external function prototypes */
 
-extern uint16 reg_dev(uint8 (*routine)(t_bool, uint8), uint16, uint8);
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
 
 /* globals */
 
@@ -69,9 +68,9 @@ DEBTAB ipc_cont_debug[] = {
 /* address width is set to 16 bits to use devices in 8086/8088 implementations */
 
 DEVICE ipc_cont_dev = {
-    "IPC-CONT",             //name
-    ipc_cont_unit,         //units
-    ipc_cont_reg,          //registers
+    "IPC-CONT",			//name
+    ipc_cont_unit,		//units
+    ipc_cont_reg,		//registers
     NULL,               //modifiers
     1,                  //numunits
     16,                 //aradix
@@ -81,27 +80,33 @@ DEVICE ipc_cont_dev = {
     8,                  //dwidth
     NULL,               //examine
     NULL,               //deposit
-//    &ipc_cont_reset,       //reset
-    NULL,       //reset
+    NULL,				//reset
     NULL,               //boot
     NULL,               //attach
     NULL,               //detach
     NULL,               //ctxt
     0,                  //flags
     0,                  //dctrl
-    ipc_cont_debug,        //debflags
+    ipc_cont_debug,		//debflags
     NULL,               //msize
     NULL                //lname
 };
 
+// ipc_cont configuration
+
+t_stat ipc_cont_cfg(uint8 base, uint8 devnum)
+{
+    sim_printf("    ipc-cont[%d]: at base 0%02XH\n",
+        devnum, base & 0xFF);
+    reg_dev(ipc_cont, base, devnum); 
+    return SCPE_OK;
+}
+
 /* Reset routine */
 
-t_stat ipc_cont_reset(DEVICE *dptr, uint16 baseport)
+t_stat ipc_cont_reset(DEVICE *dptr)
 {
-    sim_printf("      ipc_cont[%d]: Reset\n", 0);
-    sim_printf("      ipc_cont[%d]: Registered at %04X\n", 0, baseport);
-    reg_dev(ipc_cont, baseport, 0); 
-    ipc_cont_unit[0].u3 = 0x00; /* ipc reset */
+    ipc_cont_unit[0].u3 = 0x00;			/* ipc reset */
     return SCPE_OK;
 }
 
@@ -111,12 +116,9 @@ t_stat ipc_cont_reset(DEVICE *dptr, uint16 baseport)
 
 /* IPC control port functions */
 
-uint8 ipc_cont(t_bool io, uint8 data)
+uint8 ipc_cont(t_bool io, uint8 data, uint8 devnum)
 {
     if (io == 0) {                      /* read status port */
-        if (DEBUG)
-            sim_printf("   ipc_cont: read data=%02X ipc_cont_unit[%d].u3=%02X\n", 
-                ipc_cont_unit[0].u3, 0, ipc_cont_unit[0].u3);
         return ipc_cont_unit[0].u3;
     } else {                            /* write control port */
         //this simulates an 74LS259 register 
@@ -155,8 +157,6 @@ uint8 ipc_cont(t_bool io, uint8 data)
             default:
                 break;
         }
-        if (DEBUG)
-            sim_printf("   ipc_cont: write data=%02X ipc_cont_unit[%d].u3=%02X\n", data, 0, ipc_cont_unit[0].u3);
     }
     return 0;
 }

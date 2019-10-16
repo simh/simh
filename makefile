@@ -1731,7 +1731,9 @@ ISYS8010 = ${ISYS8010C}/i8080.c ${ISYS8010D}/isys8010_sys.c \
 	${ISYS8010C}/ieprom.c ${ISYS8010C}/iram8.c \
 	${ISYS8010C}/multibus.c ${ISYS8010D}/isbc8010.c \
 	${ISYS8010C}/isbc064.c ${ISYS8010C}/isbc202.c \
-	${ISYS8010C}/isbc201.c ${ISYS8010C}/zx200a.c
+	${ISYS8010C}/isbc201.c ${ISYS8010C}/zx200a.c \
+	${ISYS8010C}/isbc206.c ${ISYS8010C}/isbc464.c \
+	${ISYS8010C}/isbc208.c
 ISYS8010_OPT = -I ${ISYS8010D}
 
 
@@ -1742,8 +1744,10 @@ ISYS8020 = ${ISYS8020C}/i8080.c ${ISYS8020D}/isys8020_sys.c \
 	${ISYS8020C}/ieprom.c ${ISYS8020C}/iram8.c \
 	${ISYS8020C}/multibus.c ${ISYS8020D}/isbc8020.c \
 	${ISYS8020C}/isbc064.c ${ISYS8020C}/i8259.c \
-	${ISYS8010C}/isbc202.c ${ISYS8010C}/isbc201.c \
-	${ISYS8010C}/zx200a.c
+	${ISYS8020C}/isbc202.c ${ISYS8020C}/isbc201.c \
+	${ISYS8020C}/isbc206.c ${ISYS8020C}/isbc464.c \
+	${ISYS8020C}/zx200a.c ${ISYS8020C}/i8253.c \
+	${ISYS8020C}/isbc208.c
 ISYS8020_OPT = -I ${ISYS8020D}
 
 
@@ -1755,8 +1759,9 @@ ISYS8024 = ${ISYS8024C}/i8080.c ${ISYS8024D}/isys8024_sys.c \
 	${ISYS8024C}/ieprom.c ${ISYS8024C}/iram8.c \
 	${ISYS8024C}/multibus.c ${ISYS8024D}/isbc8024.c \
 	${ISYS8024C}/isbc064.c ${ISYS8024C}/isbc208.c \
-	${ISYS8010C}/isbc202.c ${ISYS8010C}/isbc201.c \
-	${ISYS8010C}/zx200a.c
+	${ISYS8024C}/isbc202.c ${ISYS8024C}/isbc201.c \
+	${ISYS8024C}/isbc206.c ${ISYS8024C}/isbc464.c \
+	${ISYS8024C}/zx200a.c
 ISYS8024_OPT = -I ${ISYS8024D}
 
 
@@ -1767,9 +1772,39 @@ ISYS8030 = ${ISYS8030C}/i8080.c ${ISYS8030D}/isys8030_sys.c \
 	${ISYS8030C}/i8259.c ${ISYS8030C}/i8253.c \
 	${ISYS8030C}/ieprom.c ${ISYS8030C}/iram8.c \
 	${ISYS8030C}/multibus.c ${ISYS8030D}/isbc8030.c \
-	${ISYS8010C}/isbc202.c ${ISYS8010C}/isbc201.c \
-	${ISYS8030C}/isbc064.c ${ISYS8010C}/zx200a.c
+	${ISYS8030C}/isbc202.c ${ISYS8030C}/isbc201.c \
+	${ISYS8030C}/isbc206.c ${ISYS8030C}/isbc464.c \
+	${ISYS8030C}/isbc064.c ${ISYS8030C}/zx200a.c \
+	${ISYS8010C}/isbc208.c
 ISYS8030_OPT = -I ${ISYS8030D}
+
+
+IMDS-210D = Intel-Systems/imds-210
+IMDS-210C = Intel-Systems/common
+IMDS-210 = ${IMDS-210C}/i8080.c ${IMDS-210D}/imds-210_sys.c \
+	${IMDS-210C}/i8251.c ${IMDS-210C}/i8255.c \
+	${IMDS-210C}/i8259.c ${IMDS-210C}/i8253.c \
+	${IMDS-210C}/ieprom.c ${IMDS-210C}/iram8.c \
+	${IMDS-210C}/ipbmultibus.c ${IMDS-210C}/ipb.c \
+	${IMDS-210C}/ipc-cont.c ${IMDS-210C}/ioc-cont.c \
+	${IMDS-210C}/isbc202.c ${IMDS-210C}/isbc201.c \
+	${IMDS-210C}/isbc206.c ${IMDS-210C}/isbc464.c \
+	${IMDS-210C}/zx200a.c ${IMDS-210C}/isbc064.c
+IMDS-210_OPT = -I ${IMDS-210D}
+
+
+IMDS-220D = Intel-Systems/imds-220
+IMDS-220C = Intel-Systems/common
+IMDS-220 = ${IMDS-220C}/i8080.c ${IMDS-220D}/imds-220_sys.c \
+	${IMDS-220C}/i8251.c ${IMDS-220C}/i8255.c \
+	${IMDS-220C}/i8259.c ${IMDS-220C}/i8253.c \
+	${IMDS-220C}/ieprom.c ${IMDS-220C}/iram8.c \
+	${IMDS-220C}/ipbmultibus.c ${IMDS-220C}/ipb.c \
+	${IMDS-220C}/ipc-cont.c ${IMDS-220C}/ioc-cont.c \
+	${IMDS-220C}/isbc202.c ${IMDS-220C}/isbc201.c \
+	${IMDS-220C}/isbc206.c ${IMDS-220C}/isbc464.c \
+	${IMDS-220C}/zx200a.c ${IMDS-220C}/isbc064.c
+IMDS-220_OPT = -I ${IMDS-220D}
 
 
 IMDS-225D = Intel-Systems/imds-225
@@ -1778,11 +1813,52 @@ IMDS-225 = ${IMDS-225C}/i8080.c ${IMDS-225D}/imds-225_sys.c \
 	${IMDS-225C}/i8251.c ${IMDS-225C}/i8255.c \
 	${IMDS-225C}/i8259.c ${IMDS-225C}/i8253.c \
 	${IMDS-225C}/ieprom.c ${IMDS-225C}/iram8.c \
-	${IMDS-225C}/ipcmultibus.c ${IMDS-225D}/ipc.c \
+	${IMDS-225C}/ipcmultibus.c ${IMDS-225C}/ipc.c \
 	${IMDS-225C}/ipc-cont.c ${IMDS-225C}/ioc-cont.c \
 	${IMDS-225C}/isbc202.c ${IMDS-225C}/isbc201.c \
-	${IMDS-225C}/zx200a.c
+	${IMDS-225C}/zx200a.c ${IMDS-225C}/isbc464.c \
+	${IMDS-225C}/isbc206.c
 IMDS-225_OPT = -I ${IMDS-225D}
+
+
+IMDS-230D = Intel-Systems/imds-230
+IMDS-230C = Intel-Systems/common
+IMDS-230 = ${IMDS-230C}/i8080.c ${IMDS-230D}/imds-230_sys.c \
+	${IMDS-230C}/i8251.c ${IMDS-230C}/i8255.c \
+	${IMDS-230C}/i8259.c ${IMDS-230C}/i8253.c \
+	${IMDS-230C}/ieprom.c ${IMDS-230C}/iram8.c \
+	${IMDS-230C}/ipbmultibus.c ${IMDS-230C}/ipb.c \
+	${IMDS-230C}/ipc-cont.c ${IMDS-230C}/ioc-cont.c \
+	${IMDS-230C}/isbc202.c ${IMDS-230C}/isbc201.c \
+	${IMDS-230C}/isbc206.c ${IMDS-230C}/isbc464.c \
+	${IMDS-230C}/zx200a.c ${IMDS-230C}/isbc064.c
+IMDS-230_OPT = -I ${IMDS-230D}
+
+
+IMDS-800D = Intel-Systems/imds-800
+IMDS-800C = Intel-Systems/common
+IMDS-800 = ${IMDS-800C}/i8080.c ${IMDS-800D}/imds-800_sys.c \
+        ${IMDS-800D}/cpu.c ${IMDS-800D}/front_panel.c \
+        ${IMDS-800D}/monitor.c ${IMDS-800C}/ieprom1.c \
+	${IMDS-800C}/i8251.c ${IMDS-800C}/ieprom.c \
+	${IMDS-800C}/m800multibus.c ${IMDS-800C}/isbc064.c \
+	${IMDS-800C}/isbc202.c ${IMDS-800C}/isbc201.c \
+	${IMDS-800C}/zx200a.c ${IMDS-800C}/isbc464.c \
+	${IMDS-800C}/isbc206.c ${IMDS-800C}/i3214.c
+IMDS-800_OPT = -I ${IMDS-800D}
+
+
+IMDS-810D = Intel-Systems/imds-810
+IMDS-810C = Intel-Systems/common
+IMDS-810 = ${IMDS-800C}/i8080.c ${IMDS-810D}/imds-810_sys.c \
+        ${IMDS-810D}/cpu.c ${IMDS-810D}/front_panel.c \
+        ${IMDS-810D}/monitor.c ${IMDS-810C}/ieprom1.c \
+	${IMDS-810C}/i8251.c ${IMDS-810C}/ieprom.c \
+	${IMDS-810C}/m800multibus.c ${IMDS-810C}/isbc064.c \
+	${IMDS-810C}/isbc202.c ${IMDS-810C}/isbc201.c \
+	${IMDS-810C}/zx200a.c ${IMDS-810C}/isbc464.c \
+	${IMDS-810C}/isbc206.c ${IMDS-800C}/i3214.c
+IMDS-810_OPT = -I ${IMDS-810D}
 
 
 IBMPCD = Intel-Systems/ibmpc
@@ -2022,7 +2098,8 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 cdc1700 \
 	swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 isys8010 isys8020 \
-	isys8030 isys8024 imds-225 scelbi 3b2 i701 i704 i7010 i7070 i7080 i7090 \
+	isys8030 isys8024 imds-210 imds-220 imds-225 imds-230 imds-800 imds-810 \
+	scelbi 3b2 i701 i704 i7010 i7070 i7080 i7090 \
 	sigma uc15 pdp10-ka pdp10-ki pdp6
 
 all : ${ALL}
@@ -2516,6 +2593,24 @@ ifneq (,$(call find_test,${ISYS8030D},isys8030))
 	$@ $(call find_test,${ISYS8030D},isys8030) $(TEST_ARG)
 endif
 
+imds-210: ${BIN}imds-210${EXE}
+
+${BIN}imds-210${EXE} : ${IMDS-210} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${IMDS-210} ${SIM} ${IMDS-210_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${IMDS-210D},imds-210))
+	$@ $(call find_test,${IMDS-210D},imds-210) $(TEST_ARG)
+endif
+
+imds-220: ${BIN}imds-220${EXE}
+
+${BIN}imds-220${EXE} : ${IMDS-220} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${IMDS-220} ${SIM} ${IMDS-220_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${IMDS-220D},imds-220))
+	$@ $(call find_test,${IMDS-220D},imds-220) $(TEST_ARG)
+endif
+
 imds-225: ${BIN}imds-225${EXE}
 
 ${BIN}imds-225${EXE} : ${IMDS-225} ${SIM} ${BUILD_ROMS}
@@ -2523,6 +2618,33 @@ ${BIN}imds-225${EXE} : ${IMDS-225} ${SIM} ${BUILD_ROMS}
 	${CC} ${IMDS-225} ${SIM} ${IMDS-225_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 ifneq (,$(call find_test,${IMDS-225D},imds-225))
 	$@ $(call find_test,${IMDS-225D},imds-225) $(TEST_ARG)
+endif
+
+imds-230: ${BIN}imds-230${EXE}
+
+${BIN}imds-230${EXE} : ${IMDS-230} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${IMDS-230} ${SIM} ${IMDS-230_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${IMDS-230D},imds-230))
+	$@ $(call find_test,${IMDS-230D},imds-230) $(TEST_ARG)
+endif
+
+imds-800: ${BIN}imds-800${EXE}
+
+${BIN}imds-800${EXE} : ${IMDS-800} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${IMDS-800} ${SIM} ${IMDS-800_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${IMDS-800D},imds-800))
+	$@ $(call find_test,${IMDS-800D},imds-800) $(TEST_ARG)
+endif
+
+imds-810: ${BIN}imds-810${EXE}
+
+${BIN}imds-810${EXE} : ${IMDS-810} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${IMDS-810} ${SIM} ${IMDS-810_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifneq (,$(call find_test,${IMDS-810D},imds-810))
+	$@ $(call find_test,${IMDS-810D},imds-810) $(TEST_ARG)
 endif
 
 ibmpc: ${BIN}ibmpc${EXE}

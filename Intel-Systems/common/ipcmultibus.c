@@ -26,7 +26,6 @@
     MODIFICATIONS:
 
         ?? ??? 10 - Original file.
-        16 Dec 12 - Modified to use isbc_80_10.cfg file to set base and size.
         24 Apr 15 -- Modified to use simh_debug
 
     NOTES:
@@ -41,15 +40,16 @@
 #define SET_XACK(VAL)       (xack = VAL)
 
 int32   mbirq = 0;                      /* set no multibus interrupts */
+int32 flag = 0;
 
 /* function prototypes */
 
+t_stat multibus_cfg(void);
 t_stat multibus_svc(UNIT *uptr);
 t_stat multibus_reset(DEVICE *dptr);
 void set_irq(int32 int_num);
 void clr_irq(int32 int_num);
-uint8 nulldev(t_bool io, uint8 data);
-extern uint16 reg_dev(uint8 (*routine)(t_bool, uint8), uint16, uint8);
+uint8 nulldev(t_bool flag, uint8 data, uint8 devnum);
 t_stat multibus_reset (DEVICE *dptr);
 uint8 multibus_get_mbyte(uint16 addr);
 uint16 multibus_get_mword(uint16 addr);
@@ -60,19 +60,38 @@ void multibus_put_mword(uint16 addr, uint16 val);
 
 extern t_stat SBC_reset(DEVICE *dptr);      /* reset the IPC simulator */
 extern void set_cpuint(int32 int_num);
-extern t_stat zx200a_reset(DEVICE *dptr, uint16 base);
-extern t_stat isbc201_reset (DEVICE *dptr, uint16);
-extern t_stat isbc202_reset (DEVICE *dptr, uint16);
+extern t_stat isbc064_reset (DEVICE *dptr);
+extern t_stat isbc464_reset (DEVICE *dptr);
+extern t_stat zx200a_reset(DEVICE *dptr);
+extern t_stat isbc201_reset (DEVICE *dptr);
+extern t_stat isbc202_reset (DEVICE *dptr);
+extern t_stat isbc206_reset (DEVICE *dptr);
+extern t_stat isbc208_reset (DEVICE *dptr);
 extern uint8 RAM_get_mbyte(uint16 addr);
 extern void RAM_put_mbyte(uint16 addr, uint8 val);
+extern uint8 isbc464_get_mbyte(uint16 addr);
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
+extern t_stat isbc064_cfg(uint16 base, uint16 size);
+extern t_stat isbc464_cfg(uint16 base, uint16 size);
+extern t_stat isbc201_cfg(uint8 base);
+extern t_stat isbc202_cfg(uint8 base);
+extern t_stat isbc206_cfg(uint8 base);
+extern t_stat isbc208_cfg(uint8 base);
+extern t_stat zx200a_cfg(uint8 base);
+extern t_stat RAM_cfg(uint16 base, uint16 size);
+extern t_stat EPROM_cfg(uint16 base, uint16 size);
 
 /* external globals */
 
 extern uint8 xack;                          /* XACK signal */
 extern int32 int_req;                       /* i8080 INT signal */
-extern int32 isbc201_fdcnum;
-extern int32 isbc202_fdcnum;
-extern int32 zx200a_fdcnum;
+extern DEVICE isbc064_dev;
+extern DEVICE isbc464_dev;
+extern DEVICE isbc201_dev;
+extern DEVICE isbc202_dev;
+extern DEVICE isbc206_dev;
+extern DEVICE isbc208_dev;
+extern DEVICE zx200a_dev;
 
 /* multibus Standard SIMH Device Data Structures */
 
@@ -82,7 +101,8 @@ UNIT multibus_unit = {
 
 REG multibus_reg[] = { 
     { HRDATA (MBIRQ, mbirq, 32) }, 
-    { HRDATA (XACK, xack, 8) }
+    { HRDATA (XACK, xack, 8) },
+    { NULL }
 };
 
 DEBTAB multibus_debug[] = {
@@ -122,6 +142,21 @@ DEVICE multibus_dev = {
 
 /* Service routines to handle simulator functions */
 
+// multibus_cfg
+
+t_stat multibus_cfg(void)
+{
+    sim_printf("Configuring Multibus Devices\n");
+    if (SBC064_NUM) isbc064_cfg(SBC064_BASE, SBC064_SIZE);
+    if (SBC464_NUM) isbc464_cfg(SBC464_BASE, SBC464_SIZE);
+    if (SBC201_NUM) isbc201_cfg(SBC201_BASE);
+    if (SBC202_NUM) isbc202_cfg(SBC202_BASE);
+    if (SBC206_NUM) isbc206_cfg(SBC206_BASE);
+    if (SBC208_NUM) isbc208_cfg(SBC208_BASE);
+    if (ZX200A_NUM) zx200a_cfg(ZX200A_BASE);
+    return SCPE_OK;
+}
+
 /* service routine - actually does the simulated interrupts */
 
 t_stat multibus_svc(UNIT *uptr)
@@ -146,16 +181,42 @@ t_stat multibus_svc(UNIT *uptr)
 
 t_stat multibus_reset(DEVICE *dptr)
 {
-    SBC_reset(NULL); 
-    sim_printf("   Multibus: Reset\n");
-    zx200a_fdcnum = 0;
-    zx200a_reset(NULL, ZX200A_BASE);
-    isbc201_fdcnum = 0;
-    isbc201_reset(NULL, SBC201_BASE); 
-    isbc202_fdcnum = 0;
-    isbc202_reset(NULL, SBC202_BASE); 
-    sim_activate (&multibus_unit, multibus_unit.wait); /* activate unit */
-    return SCPE_OK;
+    if (SBC_reset(NULL) == 0) { 
+        sim_printf("  Multibus: Reset\n");
+        if (SBC064_NUM) {          //device installed
+            isbc064_reset(&isbc064_dev);
+            sim_printf("    Multibus: SBC064 reset\n");
+        }
+        if (SBC464_NUM) { //unit enabled
+            isbc464_reset(&isbc464_dev);
+            sim_printf("    Multibus: SBC464 reset\n");
+            }
+        if (SBC201_NUM) { //unit enabled
+            isbc201_reset(&isbc201_dev);
+            sim_printf("    Multibus: SBC201 reset\n");
+            }
+        if (SBC202_NUM) { //unit enabled
+            isbc202_reset(&isbc202_dev);
+            sim_printf("    Multibus: SBC202 reset\n");
+            }
+        if (SBC206_NUM) { //unit enabled
+            isbc206_reset(&isbc206_dev);
+            sim_printf("    Multibus: SBC206 reset\n");
+            }
+        if (SBC208_NUM) { //unit enabled
+            isbc208_reset(&isbc208_dev);
+            sim_printf("    Multibus: SBC208 reset\n");
+            }
+        if (ZX200A_NUM) { //unit enabled
+            zx200a_reset(&zx200a_dev);
+            sim_printf("    Multibus: ZX200A reset\n");
+            }
+        sim_activate (&multibus_unit, multibus_unit.wait); /* activate unit */
+        return SCPE_OK;
+    } else {
+        sim_printf("   Multibus: SBC not selected\n");
+        return SCPE_OK;
+    }
 }
 
 void set_irq(int32 int_num)
@@ -167,7 +228,6 @@ void set_irq(int32 int_num)
 void clr_irq(int32 int_num)
 {
     mbirq &= ~int_num;
-//    sim_printf("clr_irq: int_num=%04X mbirq=%04X\n", int_num, mbirq);
 }
 
 /* This is the I/O configuration table.  There are 256 possible
@@ -175,7 +235,8 @@ device addresses, if a device is plugged to a port it's routine
 address is here, 'nulldev' means no device has been registered.
 */
 struct idev {
-    uint8 (*routine)(t_bool io, uint8 data);
+    uint8 (*routine)(t_bool io, uint8 data, uint8 devnum);
+    uint8 port;
     uint8 devnum;
 };
 
@@ -246,19 +307,21 @@ struct idev dev_table[256] = {
 {&nulldev}, {&nulldev}, {&nulldev}, {&nulldev}          /* 0FCH */
 };
 
-uint8 nulldev(t_bool flag, uint8 data)
+uint8 nulldev(t_bool flag, uint8 data, uint8 devnum)
 {
     SET_XACK(0);                        /* set no XACK */
-//    return 0xFF;
-    return 0;
+    return 0;                           //should be 0xff, but ISIS won't boot if not 0!
 }
 
-uint16 reg_dev(uint8 (*routine)(t_bool io, uint8 data), uint16 port, uint8 devnum)
+uint8 reg_dev(uint8 (*routine)(t_bool io, uint8 data, uint8 devnum), uint8 port, uint8 devnum)
 {
     if (dev_table[port].routine != &nulldev) {  /* port already assigned */
-        sim_printf("         Multibus: I/O Port %04X is already assigned\n", port);
+        if (dev_table[port].routine != routine) {  /* different device? */
+            sim_printf("         Multibus: I/O Port %02X is already assigned to different device\n", port);
+            return 1;
+        } else
+            return 0;
     } else {
-        sim_printf("         Port %04X is assigned\n", port);
         dev_table[port].routine = routine;
         dev_table[port].devnum = devnum;
     }
@@ -269,9 +332,16 @@ uint16 reg_dev(uint8 (*routine)(t_bool io, uint8 data), uint16 port, uint8 devnu
 
 uint8 multibus_get_mbyte(uint16 addr)
 {
+    uint8 val = 0;
+
     SET_XACK(0);                        /* set no XACK */
-//    sim_printf("multibus_get_mbyte: Cleared XACK for %04X\n", addr); 
-    return RAM_get_mbyte(addr);
+    if ((isbc464_dev.flags & DEV_DIS) == 0) { //ROM is enabled
+        if (addr >= SBC464_BASE && addr <= (SBC464_BASE + SBC464_SIZE))
+            return(isbc464_get_mbyte(addr));
+    }
+    if (xack == 0)
+        val = RAM_get_mbyte(addr);
+    return val;
 }
 
 /*  get a word from memory */
@@ -290,9 +360,7 @@ uint16 multibus_get_mword(uint16 addr)
 void multibus_put_mbyte(uint16 addr, uint8 val)
 {
     SET_XACK(0);                        /* set no XACK */
-//    sim_printf("multibus_put_mbyte: Cleared XACK for %04X\n", addr); 
     RAM_put_mbyte(addr, val);
-//    sim_printf("multibus_put_mbyte: Done XACK=%dX\n", XACK); 
 }
 
 /*  put a word to memory */

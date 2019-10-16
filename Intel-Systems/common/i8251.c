@@ -111,50 +111,60 @@
 
 #include "system_defs.h"
 
-#define  DEBUG   0
-
-/* external globals */
-
-extern uint16 port;                     //port called in dev_table[port]
-
 #define UNIT_V_ANSI (UNIT_V_UF + 0)     /* ANSI mode */
 #define UNIT_ANSI   (1 << UNIT_V_ANSI)
+
+// 8251 status bits
 
 #define TXR         0x01
 #define RXR         0x02
 #define TXE         0x04
 #define SD          0x40
 
+/* external globals */
+
 /* external function prototypes */
 
-extern uint16 reg_dev(uint8 (*routine)(t_bool, uint8), uint16, uint8);
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
 
 /* globals */
 
-int32 i8251_devnum = 0;                 //actual number of 8251 instances + 1
-uint16 i8251_port[4];                   //baseport port registered to each instance
-
 /* function prototypes */
 
+t_stat i8251_cfg(uint8 base, uint8 devnum);
 t_stat i8251_svc (UNIT *uptr);
-t_stat i8251_reset (DEVICE *dptr, uint16 baseport);
-uint8 i8251_get_dn(void);
-uint8 i8251s(t_bool io, uint8 data);
-uint8 i8251d(t_bool io, uint8 data);
-void i8251_reset1(uint8 devnum);
+t_stat i8251_reset (DEVICE *dptr);
+uint8 i8251s(t_bool io, uint8 data, uint8 devnum);
+uint8 i8251d(t_bool io, uint8 data, uint8 devnum);
+void i8251_reset_dev(uint8 devnum);
 
 /* i8251 Standard I/O Data Structures */
-/* up to 1 i8251 devices */
+/* up to 4 i8251 devices */
 
-UNIT i8251_unit = { 
-    UDATA (&i8251_svc, 0, 0), KBD_POLL_WAIT 
+UNIT i8251_unit[4] = { 
+    { UDATA (&i8251_svc, 0, 0), KBD_POLL_WAIT },
+    { UDATA (&i8251_svc, 0, 0), KBD_POLL_WAIT },
+    { UDATA (&i8251_svc, 0, 0), KBD_POLL_WAIT },
+    { UDATA (&i8251_svc, 0, 0), KBD_POLL_WAIT }
 };
 
 REG i8251_reg[] = {
-    { HRDATA (DATA, i8251_unit.buf, 8) },
-    { HRDATA (STAT, i8251_unit.u3, 8) },
-    { HRDATA (MODE, i8251_unit.u4, 8) },
-    { HRDATA (CMD, i8251_unit.u5, 8) },
+    { HRDATA (DATA0, i8251_unit[0].buf, 8) },
+    { HRDATA (STAT0, i8251_unit[0].u3, 8) },
+    { HRDATA (MODE0, i8251_unit[0].u4, 8) },
+    { HRDATA (CMD0, i8251_unit[0].u5, 8) },
+    { HRDATA (DATA1, i8251_unit[1].buf, 8) },
+    { HRDATA (STAT1, i8251_unit[1].u3, 8) },
+    { HRDATA (MODE1, i8251_unit[1].u4, 8) },
+    { HRDATA (CMD1, i8251_unit[1].u5, 8) },
+    { HRDATA (DATA2, i8251_unit[2].buf, 8) },
+    { HRDATA (STAT2, i8251_unit[2].u3, 8) },
+    { HRDATA (MODE2, i8251_unit[2].u4, 8) },
+    { HRDATA (CMD2, i8251_unit[2].u5, 8) },
+    { HRDATA (DATA3, i8251_unit[3].buf, 8) },
+    { HRDATA (STAT3, i8251_unit[3].u3, 8) },
+    { HRDATA (MODE3, i8251_unit[3].u4, 8) },
+    { HRDATA (CMD3, i8251_unit[3].u5, 8) },
     { NULL }
 };
 
@@ -179,10 +189,10 @@ MTAB i8251_mod[] = {
 
 DEVICE i8251_dev = {
     "I8251",            //name
-    &i8251_unit,        //units
+    i8251_unit,         //units
     i8251_reg,          //registers
     i8251_mod,          //modifiers
-    1,                  //numunits
+    I8251_NUM,          //numunits
     16,                 //aradix
     16,                 //awidth
     1,                  //aincr
@@ -190,8 +200,7 @@ DEVICE i8251_dev = {
     8,                  //dwidth
     NULL,               //examine
     NULL,               //deposit
-//    &i8251_reset,       //reset
-    NULL,               //reset
+    &i8251_reset,       //reset
     NULL,               //boot
     NULL,               //attach
     NULL,               //detach
@@ -203,6 +212,17 @@ DEVICE i8251_dev = {
     NULL                //lname
 };
 
+// i8251 configuration
+
+t_stat i8251_cfg(uint8 base, uint8 devnum)
+{
+    sim_printf("    i8251[%d]: at base port 0%02XH\n",
+        devnum, base & 0xFF);
+    reg_dev(i8251d, base, devnum); 
+    reg_dev(i8251s, base + 1, devnum); 
+    return SCPE_OK;
+}
+
 /* Service routines to handle simulator functions */
 
 /* i8251_svc - actually gets char & places in buffer */
@@ -211,100 +231,69 @@ t_stat i8251_svc (UNIT *uptr)
 {
     int32 temp;
 
-    sim_activate (&i8251_unit, i8251_unit.wait); /* continue poll */
+    sim_activate (uptr, uptr->wait); /* continue poll */
     if ((temp = sim_poll_kbd ()) < SCPE_KFLAG)
         return temp;                    /* no char or error? */
-    i8251_unit.buf = temp & 0xFF;       /* Save char */
-    i8251_unit.u3 |= RXR;               /* Set status */
+    uptr->buf = temp & 0xFF;       /* Save char */
+    uptr->u3 |= RXR;               /* Set status */
 
     /* Do any special character handling here */
 
-    i8251_unit.pos++;
+    uptr->pos++;
     return SCPE_OK;
 }
 
 /* Reset routine */
 
-t_stat i8251_reset (DEVICE *dptr, uint16 baseport)
+t_stat i8251_reset (DEVICE *dptr)
 {
-    if (i8251_devnum >= I8251_NUM) {
-        sim_printf("i8251_reset: too many devices!\n");
-        return SCPE_MEM;
+    uint8 devnum;
+    
+    for (devnum=0; devnum<I8251_NUM; devnum++) {
+        i8251_reset_dev(devnum);
+        sim_activate (&i8251_unit[devnum], i8251_unit[devnum].wait); /* activate unit */
     }
-    sim_printf("      8251-%d: Hardware Reset\n", i8251_devnum);
-    sim_printf("      8251-%d: Registered at %04X\n", i8251_devnum, baseport);
-    i8251_port[i8251_devnum] = baseport;
-    reg_dev(i8251d, baseport, i8251_devnum); 
-    reg_dev(i8251s, baseport + 1, i8251_devnum); 
-    i8251_reset1(i8251_devnum);
-    sim_activate (&i8251_unit, i8251_unit.wait); /* activate unit */
-    i8251_devnum++;
     return SCPE_OK;
 }
 
-void i8251_reset1(uint8 devnum)
+void i8251_reset_dev(uint8 devnum)
 {
-    i8251_unit.u3 = TXR + TXE;          /* status */
-    i8251_unit.u4 = 0;                  /* mode instruction */
-    i8251_unit.u5 = 0;                  /* command instruction */
-    i8251_unit.u6 = 0;
-    i8251_unit.buf = 0;
-    i8251_unit.pos = 0;
-    sim_printf("      8251-%d: Software Reset\n", devnum);
-}
-
-uint8 i8251_get_dn(void)
-{
-    int i;
-
-    for (i=0; i<I8251_NUM; i++)
-        if (port >= i8251_port[i] && port <= i8251_port[i] + 1)
-            return i;
-    sim_printf("i8251_get_dn: port %04X not in 8251 device table\n", port);
-    return 0xFF;
+    i8251_unit[devnum].u3 = TXR + TXE;          /* status */
+    i8251_unit[devnum].u4 = 0;                  /* mode instruction */
+    i8251_unit[devnum].u5 = 0;                  /* command instruction */
+    i8251_unit[devnum].u6 = 0;
+    i8251_unit[devnum].buf = 0;
+    i8251_unit[devnum].pos = 0;
 }
 
 /*  I/O instruction handlers, called from the CPU module when an
     IN or OUT instruction is issued.
 */
 
-uint8 i8251s(t_bool io, uint8 data)
+uint8 i8251s(t_bool io, uint8 data, uint8 devnum)
 {
-    uint8 devnum;
-
-    if ((devnum = i8251_get_dn()) != 0xFF) {
-    //    sim_printf("\nio=%d data=%04X\n", io, data);
-        if (io == 0) {                      /* read status port */
-            return i8251_unit.u3;
-        } else {                            /* write status port */
-            if (i8251_unit.u6) {            /* if mode, set cmd */
-                i8251_unit.u5 = data;
-                if (DEBUG)
-                    sim_printf("   8251-%d: Command Instruction=%02X\n", devnum, data);
-                if (data & SD)              /* reset port! */
-                    i8251_reset1(devnum);
-            } else {                        /* set mode */
-                i8251_unit.u4 = data;
-                if (DEBUG)
-                    sim_printf("   8251-%d: Mode Instruction=%02X\n", devnum, data);
-                i8251_unit.u6 = 1;          /* set cmd received */
-            }
+    if (io == 0) {                      /* read status port */
+        return i8251_unit[devnum].u3;
+    } else {                            /* write status port */
+        if (i8251_unit[devnum].u4) {    /* if mode, set cmd */
+            i8251_unit[devnum].u5 = data;
+            if (data & SD)              /* reset port! */
+                i8251_reset_dev(devnum);
+        } else {                        /* set mode */
+            i8251_unit[devnum].u4 = data;
+            i8251_unit[devnum].u6 = 1;  /* set cmd received */
         }
     }
     return 0;
 }
 
-uint8 i8251d(t_bool io, uint8 data)
+uint8 i8251d(t_bool io, uint8 data, uint8 devnum)
 {
-    uint8 devnum;
-
-    if ((devnum = i8251_get_dn()) != 0xFF) {
-        if (io == 0) {                      /* read data port */
-            i8251_unit.u3 &= ~RXR;
-            return (i8251_unit.buf);
-        } else {                            /* write data port */
-            sim_putchar(data);
-        }
+    if (io == 0) {                      /* read data port */
+        i8251_unit[devnum].u3 &= ~RXR;
+        return (i8251_unit[devnum].buf);
+    } else {                            /* write data port */
+        sim_putchar(data);
     }
     return 0;
 }

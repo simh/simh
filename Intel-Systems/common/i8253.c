@@ -35,30 +35,23 @@
 
 #include "system_defs.h"
 
-#define  DEBUG   0
-
 /* external globals */
-
-extern uint16 port;                     //port called in dev_table[port]
 
 /* external function prototypes */
 
-extern uint16 reg_dev(uint8 (*routine)(t_bool, uint8), uint16, uint8);
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
 
 /* globals */
 
-int32 i8253_devnum = 0;                 //actual number of 8253 instances + 1
-uint16 i8253_port[4];                   //baseport port registered to each instance
-
 /* function prototypes */
 
+t_stat i8253_cfg(uint8 base, uint8 devnum);
 t_stat i8253_svc (UNIT *uptr);
-t_stat i8253_reset (DEVICE *dptr, uint16 baseport);
-uint8 i8253_get_dn(void);
-uint8 i8253t0(t_bool io, uint8 data);
-uint8 i8253t1(t_bool io, uint8 data);
-uint8 i8253t2(t_bool io, uint8 data);
-uint8 i8253c(t_bool io, uint8 data);
+t_stat i8253_reset (DEVICE *dptr);
+uint8 i8253t0(t_bool io, uint8 data, uint8 devnum);
+uint8 i8253t1(t_bool io, uint8 data, uint8 devnum);
+uint8 i8253t2(t_bool io, uint8 data, uint8 devnum);
+uint8 i8253c(t_bool io, uint8 data, uint8 devnum);
 
 /* i8253 Standard I/O Data Structures */
 /* up to 4 i8253 devices */
@@ -99,20 +92,19 @@ MTAB i8253_mod[] = {
 /* address width is set to 16 bits to use devices in 8086/8088 implementations */
 
 DEVICE i8253_dev = {
-    "I8251",             //name
-    i8253_unit,        //units
+    "I8253",            //name
+    i8253_unit,         //units
     i8253_reg,          //registers
     i8253_mod,          //modifiers
-    1,                  //numunits
+    I8253_NUM,          //numunits
     16,                 //aradix
-    16,                  //awidth
+    16,                 //awidth
     1,                  //aincr
     16,                 //dradix
     8,                  //dwidth
     NULL,               //examine
     NULL,               //deposit
-//    &i8253_reset,       //reset
-    NULL,       //reset
+    i8253_reset,        //reset
     NULL,               //boot
     NULL,               //attach
     NULL,               //detach
@@ -126,6 +118,19 @@ DEVICE i8253_dev = {
 
 /* Service routines to handle simulator functions */
 
+// i8253 configuration
+
+t_stat i8253_cfg(uint8 base, uint8 devnum)
+{
+    sim_printf("    i8253[%d]: at base port 0%02XH\n",
+        devnum, base & 0xFF);
+    reg_dev(i8253t0, base, devnum); 
+    reg_dev(i8253t1, base + 1, devnum); 
+    reg_dev(i8253t2, base + 2, devnum); 
+    reg_dev(i8253c, base + 3, devnum); 
+    return SCPE_OK;
+}
+
 /* i8253_svc - actually gets char & places in buffer */
 
 t_stat i8253_svc (UNIT *uptr)
@@ -136,57 +141,31 @@ t_stat i8253_svc (UNIT *uptr)
 
 /* Reset routine */
 
-t_stat i8253_reset (DEVICE *dptr, uint16 baseport)
+t_stat i8253_reset (DEVICE *dptr)
 {
-    if (i8253_devnum > I8253_NUM) {
-        sim_printf("i8253_reset: too many devices!\n");
-        return SCPE_MEM;
+    uint8 devnum;
+    
+    for (devnum=0; devnum<I8251_NUM; devnum++) {
+        i8253_unit[devnum].u3 = 0;        /* status */
+        i8253_unit[devnum].u4 = 0;        /* mode instruction */
+        i8253_unit[devnum].u5 = 0;        /* command instruction */
+        i8253_unit[devnum].u6 = 0;
     }
-    sim_printf("      8253-%d: Reset\n", i8253_devnum);
-    sim_printf("      8253-%d: Registered at %04X\n", i8253_devnum, baseport);
-    i8253_port[i8253_devnum] = baseport;
-    reg_dev(i8253t0, baseport, i8253_devnum); 
-    reg_dev(i8253t1, baseport + 1, i8253_devnum); 
-    reg_dev(i8253t2, baseport + 2, i8253_devnum); 
-    reg_dev(i8253c, baseport + 3, i8253_devnum); 
-    i8253_unit[i8253_devnum].u3 = 0;        /* status */
-    i8253_unit[i8253_devnum].u4 = 0;        /* mode instruction */
-    i8253_unit[i8253_devnum].u5 = 0;        /* command instruction */
-    i8253_unit[i8253_devnum].u6 = 0;
-//    sim_activate (&i8253_unit[i8253_devnum], i8253_unit[i8253_devnum].wait); /* activate unit */
-    i8253_devnum++;
     return SCPE_OK;
-}
-
-uint8 i8253_get_dn(void)
-{
-    int i;
-
-    for (i=0; i<I8253_NUM; i++)
-        if (port >= i8253_port[i] && port <= i8253_port[i] + 3)
-            return i;
-    sim_printf("i8253_get_dn: port %04X not in 8253 device table\n", port);
-    return 0xFF;
 }
 
 /*  I/O instruction handlers, called from the CPU module when an
     IN or OUT instruction is issued.
 */
 
-uint8 i8253t0(t_bool io, uint8 data)
+uint8 i8253t0(t_bool io, uint8 data, uint8 devnum)
 {
-    uint8 devnum;
-
-    if ((devnum = i8253_get_dn()) != 0xFF) {
-        if (io == 0) {                  /* read data port */
-            return i8253_unit[devnum].u3;
-        } else {                        /* write data port */
-            if (DEBUG)
-                sim_printf("   8253-%d: Timer 0=%02X\n", devnum, data);
-            i8253_unit[devnum].u3 = data;
-            //sim_activate_after (&i8253_unit[devnum], );
-            return 0;
-        }
+    if (io == 0) {                  /* read data port */
+        return i8253_unit[devnum].u3;
+    } else {                        /* write data port */
+        i8253_unit[devnum].u3 = data;
+        //sim_activate_after (&i8253_unit[devnum], );
+        return 0;
     }
     return 0;
 }
@@ -194,53 +173,35 @@ uint8 i8253t0(t_bool io, uint8 data)
 //read routine:
 //sim_activate_time(&i8253_unit[devnum])/sim_inst_per_second()
 
-uint8 i8253t1(t_bool io, uint8 data)
+uint8 i8253t1(t_bool io, uint8 data, uint8 devnum)
 {
-    uint8 devnum;
-
-    if ((devnum = i8253_get_dn()) != 0xFF) {
-        if (io == 0) {                  /* read data port */
-            return i8253_unit[devnum].u4;
-        } else {                        /* write data port */
-            if (DEBUG)
-                sim_printf("   8253-%d: Timer 1=%02X\n", devnum, data);
-            i8253_unit[devnum].u4 = data;
-            return 0;
-        }
+    if (io == 0) {                  /* read data port */
+        return i8253_unit[devnum].u4;
+    } else {                        /* write data port */
+        i8253_unit[devnum].u4 = data;
+        return 0;
     }
     return 0;
 }
 
-uint8 i8253t2(t_bool io, uint8 data)
+uint8 i8253t2(t_bool io, uint8 data, uint8 devnum)
 {
-    uint8 devnum;
-
-    if ((devnum = i8253_get_dn()) != 0xFF) {
-        if (io == 0) {                  /* read data port */
-            return i8253_unit[devnum].u5;
-        } else {                        /* write data port */
-            if (DEBUG)
-                sim_printf("   8253-%d: Timer 2=%02X\n", devnum, data);
-            i8253_unit[devnum].u5 = data;
-            return 0;
-        }
+    if (io == 0) {                  /* read data port */
+        return i8253_unit[devnum].u5;
+    } else {                        /* write data port */
+        i8253_unit[devnum].u5 = data;
+        return 0;
     }
     return 0;
 }
 
-uint8 i8253c(t_bool io, uint8 data)
+uint8 i8253c(t_bool io, uint8 data, uint8 devnum)
 {
-    uint8 devnum;
-
-    if ((devnum = i8253_get_dn()) != 0xFF) {
-        if (io == 0) {                  /* read status port */
-            return i8253_unit[devnum].u6;
-        } else {                        /* write data port */
-            i8253_unit[devnum].u6 = data;
-            if (DEBUG)
-                sim_printf("   8253-%d: Mode Instruction=%02X\n", devnum, data);
-            return 0;
-        }
+    if (io == 0) {                  /* read status port */
+        return i8253_unit[devnum].u6;
+    } else {                        /* write data port */
+        i8253_unit[devnum].u6 = data;
+        return 0;
     }
     return 0;
 }

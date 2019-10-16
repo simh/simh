@@ -228,7 +228,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\Intel-Systems\imds-225\ipc.c"
+				RelativePath="..\Intel-Systems\common\ipc.c"
 				>
 			</File>
 			<File
@@ -240,11 +240,27 @@
 				>
 			</File>
 			<File
+				RelativePath="..\Intel-Systems\common\isbc064.c"
+				>
+			</File>
+			<File
 				RelativePath="..\Intel-Systems\common\isbc201.c"
 				>
 			</File>
 			<File
 				RelativePath="..\Intel-Systems\common\isbc202.c"
+				>
+			</File>
+			<File
+				RelativePath="..\Intel-Systems\common\isbc206.c"
+				>
+			</File>
+			<File
+				RelativePath="..\Intel-Systems\common\isbc208.c"
+				>
+			</File>
+			<File
+				RelativePath="..\Intel-Systems\common\isbc464.c"
 				>
 			</File>
 			<File

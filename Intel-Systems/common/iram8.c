@@ -26,8 +26,6 @@
     MODIFICATIONS:
 
         ?? ??? 11 - Original file.
-        16 Dec 12 - Modified to use isbc_80_10.cfg file to set base and size.
-        24 Apr 15 -- Modified to use simh_debug
 
     NOTES:
 
@@ -38,17 +36,15 @@
 
 #include "system_defs.h"
 
-#define DEBUG   0
-
 /* function prototypes */
 
-t_stat RAM_reset (DEVICE *dptr, uint16 base, uint16 size);
+t_stat RAM_cfg(uint16 base, uint16 size);
+t_stat RAM_reset (DEVICE *dptr);
 uint8 RAM_get_mbyte(uint16 addr);
 void RAM_put_mbyte(uint16 addr, uint8 val);
 
-/* external function prototypes */
+/* external globals */
 
-extern uint8 i8255_B[4];                    //port B byte I/O
 extern uint8 xack;                          /* XACK signal */
 
 /* SIMH RAM Standard I/O Data Structures */
@@ -79,8 +75,7 @@ DEVICE RAM_dev = {
     8,                  //dwidth
     NULL,               //examine
     NULL,               //deposit
-//    &RAM_reset,         //reset
-    NULL,               //reset
+    RAM_reset,          //reset
     NULL,               //boot
     NULL,               //attach
     NULL,               //detach
@@ -94,27 +89,26 @@ DEVICE RAM_dev = {
 
 /* RAM functions */
 
+// RAM configuration
+
+t_stat RAM_cfg(uint16 base, uint16 size)
+{
+    RAM_unit.capac = size & 0xFFFF;        /* set RAM size */
+    RAM_unit.u3 = base & 0xFFFF;  /* set RAM base */
+    RAM_unit.filebuf = (uint8 *)malloc(size * sizeof(uint8));
+    if (RAM_unit.filebuf == NULL) {
+        sim_printf ("    RAM: Malloc error\n");
+        return SCPE_MEM;
+    }
+    sim_printf("    RAM: 0%04XH bytes at base 0%04XH\n",
+        size, base & 0xFFFF);
+    return SCPE_OK;
+}
+
 /* RAM reset */
 
-t_stat RAM_reset (DEVICE *dptr, uint16 base, uint16 size)
+t_stat RAM_reset (DEVICE *dptr)
 {
-    sim_debug (DEBUG_flow, &RAM_dev, "      RAM_reset: base=%04X size=%04X\n", base, size-1);
-    if (RAM_unit.capac == 0) {          /* if undefined */
-        RAM_unit.capac = size;
-        RAM_unit.u3 = base;
-    }
-    if (RAM_unit.filebuf == NULL) {     /* no buffer allocated */
-        RAM_unit.filebuf = malloc(RAM_unit.capac);
-        if (RAM_unit.filebuf == NULL) {
-            sim_debug (DEBUG_flow, &RAM_dev, "RAM_set_size: Malloc error\n");
-            return SCPE_MEM;
-        }
-    }
-    if (DEBUG)
-        sim_printf("      RAM: Available [%04X-%04XH]\n", 
-            RAM_unit.u3,
-            RAM_unit.u3 + RAM_unit.capac - 1);
-    sim_debug (DEBUG_flow, &RAM_dev, "RAM_reset: Done\n");
     return SCPE_OK;
 }
 
@@ -124,33 +118,26 @@ uint8 RAM_get_mbyte(uint16 addr)
 {
     uint8 val;
 
-    sim_debug (DEBUG_read, &RAM_dev, "RAM_get_mbyte: addr=%04X\n", addr);
     if ((addr >= RAM_unit.u3) && ((uint32) addr < (RAM_unit.u3 + RAM_unit.capac))) {
         SET_XACK(1);                /* good memory address */
-        sim_debug (DEBUG_xack, &RAM_dev, "RAM_get_mbyte: Set XACK for %04X\n", addr); 
         val = *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3));
-        sim_debug (DEBUG_read, &RAM_dev, " val=%04X\n", val); 
         return (val & 0xFF);
     } else {
-        sim_debug (DEBUG_read, &RAM_dev, " Out of range\n");
         return 0xFF;
     }
 }
 
-/*  put a byte to memory */
+/*  put a byte into memory */
 
 void RAM_put_mbyte(uint16 addr, uint8 val)
 {
-    sim_debug (DEBUG_write, &RAM_dev, "RAM_put_mbyte: addr=%04X, val=%02X\n", addr, val);
     if ((addr >= RAM_unit.u3) && ((uint32)addr < RAM_unit.u3 + RAM_unit.capac)) {
         SET_XACK(1);                /* good memory address */
-        sim_debug (DEBUG_xack, &RAM_dev, "RAM_put_mbyte: Set XACK for %04X\n", addr);  
         *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3)) = val & 0xFF;
-        sim_debug (DEBUG_write, &RAM_dev, "\n");
         return;
     } else {
-        sim_debug (DEBUG_write, &RAM_dev, " Out of range\n");
         return;
+        
     }
 }
 
