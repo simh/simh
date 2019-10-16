@@ -3490,7 +3490,7 @@ if ((!stop_cpu) &&
                 sim_messagef (SCPE_OK, "%8u %u byte record%s\n", rec_sizes[bc], (uint32)bc, (rec_sizes[bc] != 1) ? "s" : "");
             }
         if (gaps)
-            sim_messagef (SCPE_OK, "%8u gap%s totalling %u bytes were seen\n", gaps, (gaps != 1) ? "s" : "", gap_bytes);
+            sim_messagef (SCPE_OK, "%8u gap%s totalling %u bytes %s seen\n", gaps, (gaps != 1) ? "s" : "", gap_bytes, (gaps != 1) ? "were" : "was");
         }
     if (r != MTSE_EOM)
         sim_messagef (SCPE_OK, "Read Tape Record Returned Unexpected Status: %s\n", sim_tape_error_text (r));
