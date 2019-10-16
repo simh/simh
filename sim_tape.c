@@ -3353,6 +3353,8 @@ uint32 tapemark_total = 0;
 uint32 record_total = 0;
 uint32 unique_record_sizes = 0;
 uint32 remaining_data = 0;
+uint32 gaps = 0;
+uint32 gap_bytes = 0;
 uint32 *rec_sizes = NULL;
 t_stat r = SCPE_OK;
 t_stat r_f;
@@ -3429,9 +3431,15 @@ while (r == SCPE_OK) {
         memset (buf_f, 0, bc_f);
         memset (buf_r, 0, bc_r);
         if (pos_f != pos_r) {
-            sim_printf ("Unexpected tape file position between forward and reverse record read: (%" T_ADDR_FMT "u, %" T_ADDR_FMT "u)\n", pos_f, pos_r);
-            r = MTSE_RECE;
-            break;
+            if (MT_GET_FMT (uptr) == MTUF_F_STD) {
+                ++gaps;
+                gap_bytes += (uint32)(pos_r - pos_f);
+                }
+            else {
+                sim_printf ("Unexpected tape file position between forward and reverse record read: (%" T_ADDR_FMT "u, %" T_ADDR_FMT "u)\n", pos_f, pos_r);
+                r = MTSE_RECE;
+                break;
+                }
             }
         r_s = sim_tape_sprecf (uptr, &bc_s);
         pos_sa = uptr->pos;
@@ -3479,8 +3487,10 @@ if ((!stop_cpu) &&
         sim_messagef (SCPE_OK, "Comprising %d different sized records (in record size order):\n", unique_record_sizes);
         for (bc = 0; bc <= max; bc++) {
             if (rec_sizes[bc])
-                sim_messagef (SCPE_OK, "%8u %u byte records\n", rec_sizes[bc], (uint32)bc);
+                sim_messagef (SCPE_OK, "%8u %u byte record%s\n", rec_sizes[bc], (uint32)bc, (rec_sizes[bc] != 1) ? "s" : "");
             }
+        if (gaps)
+            sim_messagef (SCPE_OK, "%8u gap%s totalling %u bytes were seen\n", gaps, (gaps != 1) ? "s" : "", gap_bytes);
         }
     if (r != MTSE_EOM)
         sim_messagef (SCPE_OK, "Read Tape Record Returned Unexpected Status: %s\n", sim_tape_error_text (r));
@@ -3848,6 +3858,12 @@ for (i=0; i<files; i++) {
     stat = sim_tape_wrtmk (uptr);
     if (MTSE_OK != stat)
         goto Done_Files;
+    if (i == 0) {
+        mtrlnt = MTR_GAP;
+        for (j=0; j<rec_size; j++)
+            (void)sim_fwrite (&mtrlnt, sizeof (mtrlnt), 1, fSIMH);
+        mtrlnt = 0;
+        }
     }
 mtrlnt = tpclnt = 0;
 (void)sim_fwrite (&mtrlnt, sizeof (mtrlnt), 1, fSIMH);
