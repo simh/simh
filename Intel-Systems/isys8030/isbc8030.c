@@ -47,22 +47,22 @@ t_stat SBC_reset (DEVICE *dptr);
 /* external globals */
 
 extern uint8 i8255_C[4];                    //port C byte I/O
-extern  int32   PCX;
+extern uint16   PCX;
 
 /* external function prototypes */
 
 extern uint8 multibus_get_mbyte(uint16 addr);
 extern void  multibus_put_mbyte(uint16 addr, uint8 val);
 extern t_stat i8080_reset (DEVICE *dptr);   /* reset the 8080 emulator */
-extern DEVICE *i8080_dev;
+extern DEVICE i8080_dev;
 extern t_stat i8251_reset (DEVICE *dptr);
-extern DEVICE *i8251_dev;
+extern DEVICE i8251_dev;
 extern t_stat i8253_reset (DEVICE *dptr);
-extern DEVICE *i8253_dev;
+extern DEVICE i8253_dev;
 extern t_stat i8255_reset (DEVICE *dptr);
-extern DEVICE *i8255_dev;
+extern DEVICE i8255_dev;
 extern t_stat i8259_reset (DEVICE *dptr);
-extern DEVICE *i8259_dev;
+extern DEVICE i8259_dev;
 extern uint8 EPROM_get_mbyte(uint16 addr);
 extern UNIT EPROM_unit;
 extern t_stat EPROM_reset (DEVICE *dptr, uint16 base, uint16 size);
@@ -103,11 +103,11 @@ t_stat SBC_reset (DEVICE *dptr)
         multibus_cfg();   
         onetime++;
     }
-    i8080_reset(i8080_dev);
-    i8251_reset(i8251_dev);
-    i8253_reset(i8253_dev);
-    i8255_reset(i8255_dev);
-    i8259_reset(i8259_dev);
+    i8080_reset(&i8080_dev);
+    i8251_reset(&i8251_dev);
+    i8253_reset(&i8253_dev);
+    i8255_reset(&i8255_dev);
+    i8259_reset(&i8259_dev);
     return SCPE_OK;
 }
 

@@ -48,8 +48,8 @@ extern uint8 i3214_monitor_do_boot(t_bool io, uint8 data, uint8 devnum);
 // external globals
 
 extern uint32 PCX;                    /* program counter */
-extern DEVICE *i8251_dev;
-extern DEVICE *EPROM1_dev;
+extern DEVICE i8251_dev;
+extern DEVICE EPROM1_dev;
 extern uint8 monitor_boot;
 
 // globals
@@ -69,8 +69,8 @@ t_stat monitor_cfg(void)
 t_stat monitor_reset (void)
 {    
     monitor_boot = 0x00;
-    i8251_reset(i8251_dev);
-    EPROM1_reset(EPROM1_dev);
+    i8251_reset(&i8251_dev);
+    EPROM1_reset(&EPROM1_dev);
     return SCPE_OK;
 }
 

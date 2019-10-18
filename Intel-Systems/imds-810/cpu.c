@@ -62,7 +62,7 @@ extern t_stat multibus_cfg(void);
 
 // external globals
 
-extern uint32 PCX;                    /* program counter */
+extern uint16 PCX;                    /* program counter */
 extern DEVICE i3214_dev;
 extern DEVICE i8080_dev;
 extern uint8 EPROM_enable;

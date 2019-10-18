@@ -45,7 +45,7 @@ extern t_stat EPROM_cfg(uint16 base, uint16 size);
 // external globals
 
 extern UNIT EPROM_unit;                 //1702 EPROM
-extern uint32 PCX;                    /* program counter */
+extern uint16 PCX;                    /* program counter */
 
 // fp configuration
 

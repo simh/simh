@@ -128,7 +128,7 @@ uint16 i8272_port[4];                   //base port registered to each instance
 /* external globals */
 
 extern uint16   port;                   //port called in dev_table[port]
-extern int32    PCX;
+extern uint16    PCX;
 
 /* internal function prototypes */
 

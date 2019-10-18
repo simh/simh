@@ -49,10 +49,10 @@ extern t_stat i8251_cfg(uint8 base, uint8 size);
 
 // external globals
 
-extern uint32 PCX;                    /* program counter */
+extern uint16 PCX;                    /* program counter */
 extern UNIT EPROM1_unit;                 //8316 PROM
-extern DEVICE *i8251_dev;
-extern DEVICE *EPROM1_dev;
+extern DEVICE i8251_dev;
+extern DEVICE EPROM1_dev;
 
 // globals
 
@@ -75,8 +75,8 @@ t_stat monitor_cfg(void)
 t_stat monitor_reset (void)
 {    
     monitor_boot = 0x00;
-    i8251_reset(i8251_dev);
-    EPROM1_reset(EPROM1_dev);
+    i8251_reset(&i8251_dev);
+    EPROM1_reset(&EPROM1_dev);
     return SCPE_OK;
 }
 

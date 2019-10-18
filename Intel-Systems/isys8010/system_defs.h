@@ -76,7 +76,7 @@
 /* set the base I/O address for the iSBC 208 */
 #define SBC208_BASE     0x40
 #define SBC208_INT      INT_2
-#define SBC208_NUM      1
+#define SBC208_NUM      0
 
 /* set the base for the zx-200a disk controller */
 #define ZX200A_BASE     0x78

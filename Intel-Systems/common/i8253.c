@@ -145,7 +145,7 @@ t_stat i8253_reset (DEVICE *dptr)
 {
     uint8 devnum;
     
-    for (devnum=0; devnum<I8251_NUM; devnum++) {
+    for (devnum=0; devnum<I8253_NUM; devnum++) {
         i8253_unit[devnum].u3 = 0;        /* status */
         i8253_unit[devnum].u4 = 0;        /* mode instruction */
         i8253_unit[devnum].u5 = 0;        /* command instruction */

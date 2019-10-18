@@ -43,7 +43,7 @@ extern t_stat EPROM_cfg(uint16 base, uint16 size);
 
 /* external globals */
 
-extern DEVICE *EPROM_dev;
+extern DEVICE EPROM_dev;
 
 t_stat fp_cfg(void)
 {
@@ -57,7 +57,7 @@ t_stat fp_cfg(void)
 
 t_stat fp_reset (void)
 {    
-    EPROM_reset(EPROM_dev);
+    EPROM_reset(&EPROM_dev);
     return SCPE_OK;
 }
 

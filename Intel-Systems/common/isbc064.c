@@ -56,7 +56,7 @@ void isbc064_put_mbyte(uint16 addr, uint8 val);
 
 /* external globals */
 
-extern uint32 PCX;                    /* program counter */
+extern uint16 PCX;                    /* program counter */
 extern uint8 xack;
 
 /* isbc064 Standard SIMH Device Data Structures */

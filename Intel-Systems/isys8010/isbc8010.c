@@ -48,12 +48,12 @@ void put_mword(uint16 addr, uint16 val);
 /* external globals */
  
 extern uint8 i8255_C[4];                    //port C byte I/O
-extern DEVICE *i8080_dev;
-extern DEVICE *i8251_dev;
-extern DEVICE *i8255_dev;
-extern DEVICE *EPROM_dev;
+extern DEVICE i8080_dev;
+extern DEVICE i8251_dev;
+extern DEVICE i8255_dev;
+extern DEVICE EPROM_dev;
 extern UNIT EPROM_unit;
-extern DEVICE *RAM_dev;
+extern DEVICE RAM_dev;
 extern UNIT RAM_unit;
 
 /* external function prototypes */
@@ -99,9 +99,9 @@ t_stat SBC_reset (DEVICE *dptr)
         multibus_cfg();   
         onetime++;
     }
-    i8080_reset(i8080_dev);
-    i8251_reset(i8251_dev);
-    i8255_reset(i8255_dev);
+    i8080_reset(&i8080_dev);
+    i8251_reset(&i8251_dev);
+    i8255_reset(&i8255_dev);
     return SCPE_OK;
 }
 

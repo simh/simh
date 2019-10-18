@@ -510,7 +510,7 @@ extern int32 multibus_get_mbyte(uint16 addr);
  
 /* external globals */
 
-extern int32    PCX;
+extern uint16   PCX;
 
 /* 8237 physical register definitions */
 uint16 i8237_r0;                        // 8237 ch 0 address register

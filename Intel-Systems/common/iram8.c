@@ -95,7 +95,7 @@ t_stat RAM_cfg(uint16 base, uint16 size)
 {
     RAM_unit.capac = size & 0xFFFF;        /* set RAM size */
     RAM_unit.u3 = base & 0xFFFF;  /* set RAM base */
-    RAM_unit.filebuf = (uint8 *)malloc(size * sizeof(uint8));
+    RAM_unit.filebuf = (uint8 *)calloc(size, size * sizeof(uint8));
     if (RAM_unit.filebuf == NULL) {
         sim_printf ("    RAM: Malloc error\n");
         return SCPE_MEM;

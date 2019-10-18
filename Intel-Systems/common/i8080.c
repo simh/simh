@@ -169,9 +169,9 @@ uint32 IM = 0;                          /* Interrupt Mask Register */
 uint8  xack = 0;                        /* XACK signal */
 uint32 int_req = 0;                     /* Interrupt request */
 uint8 INTA = 0;                         // interrupt acknowledge
-int32 PCX;                              /* External view of PC */
-int32 PCY;                              /* Internal view of PC */
-int32 PC;
+uint16 PCX;                              /* External view of PC */
+uint16 PCY;                              /* Internal view of PC */
+uint16 PC;
 UNIT *uptr;
 uint16 port;                            //port used in any IN/OUT
 uint16 addr;                            //addr used for operand fetch

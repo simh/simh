@@ -184,7 +184,7 @@
 
 /* external globals */
 
-extern int32    PCX;
+extern uint16    PCX;
 
 /* external function prototypes */
 

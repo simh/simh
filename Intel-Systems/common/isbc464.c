@@ -53,7 +53,7 @@ extern uint8 xack;                         /* XACK signal */
 
 /* isbc464 Standard I/O Data Structures */
 
-UNIT isbc464_unit[] = {
+UNIT isbc464_unit = {
     UDATA (NULL, UNIT_ATTABLE+UNIT_BINK+UNIT_ROABLE+UNIT_RO+UNIT_BUFABLE+UNIT_MUSTBUF, 0), 0
 };
 
@@ -70,7 +70,7 @@ DEBTAB isbc464_debug[] = {
 
 DEVICE isbc464_dev = {
     "SBC464",           //name
-    isbc464_unit,       //units
+    &isbc464_unit,      //units
     NULL,               //registers
     NULL,               //modifiers
     1,                  //numunits
@@ -101,8 +101,8 @@ t_stat isbc464_cfg(uint16 base, uint16 size)
 {
     sim_printf("    sbc464: 0%04XH bytes at base 0%04XH\n",
         size, base);
-    isbc464_unit->capac = size;          //set size
-    isbc464_unit->u3 = base;             //and base
+    isbc464_unit.capac = size;          //set size
+    isbc464_unit.u3 = base;             //and base
     return SCPE_OK;
 }
 
@@ -135,9 +135,9 @@ uint8 isbc464_get_mbyte(uint16 addr)
     uint8 *fbuf;
 
     if ((isbc464_dev.flags & DEV_DIS) == 0) {
-        org = isbc464_unit->u3;
-        len = isbc464_unit->capac;
-        fbuf = (uint8 *) isbc464_unit->filebuf;
+        org = isbc464_unit.u3;
+        len = isbc464_unit.capac;
+        fbuf = (uint8 *) isbc464_unit.filebuf;
         if ((addr >= org) && (addr < (org + len))) {
             SET_XACK(1);                /* good memory address */
             val = *(fbuf + (addr - org));
@@ -158,8 +158,8 @@ void isbc464_put_mbyte(uint16 addr, uint8 val)
     uint32 org, len;
 
     if ((isbc464_dev.flags & DEV_DIS) == 0) {
-        org = isbc464_unit->u3;
-        len = isbc464_unit->capac;
+        org = isbc464_unit.u3;
+        len = isbc464_unit.capac;
         if ((addr >= org) && (addr < (org + len))) {
 //            SET_XACK(1);                /* good memory address */
             sim_printf ("isbc464_put_mbyte: Read-only Memory\n");

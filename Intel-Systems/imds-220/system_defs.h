@@ -60,19 +60,19 @@
 
 /* set the base and size for the EPROM on the MDS 220 */
 #define ROM_BASE        0x0000
-#define ROM_SIZE        0x1000
+#define ROM_SIZE        0x0FFF
 #define ROM_DISABLE     1
 #define EPROM_NUM       1
 
 /* set the base and size for the RAM on the MDS 220 */
 #define RAM_BASE        0x0000
-#define RAM_SIZE        0x8000 
+#define RAM_SIZE        0x7FFF 
 
 //board definitions for the multibus
 /* set the base I/O address for the iSBC 201 */
-#define SBC201_BASE     0x78
+#define SBC201_BASE     0x88
 #define SBC201_INT      INT_2
-#define SBC201_NUM      0
+#define SBC201_NUM      1
 
 /* set the base I/O address for the iSBC 202 */
 #define SBC202_BASE     0x78
@@ -92,16 +92,16 @@
 /* set the base for the zx-200a disk controller */
 #define ZX200A_BASE     0x78
 #define ZX200A_INT      INT_2
-#define ZX200A_NUM      1
+#define ZX200A_NUM      0
 
 /* set the base and size for the iSBC 064 RAM*/
 #define SBC064_BASE     0x8000
-#define SBC064_SIZE     0x8000
+#define SBC064_SIZE     0x7FFF
 #define SBC064_NUM      1
 
 /* set the base and size for the iSBC 464 ROM */
 #define SBC464_BASE     0xA800
-#define SBC464_SIZE     0x4800
+#define SBC464_SIZE     0x47FF
 #define SBC464_NUM      0
 
 /* set INTR for CPU */

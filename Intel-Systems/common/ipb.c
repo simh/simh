@@ -69,19 +69,19 @@ int onetime = 0;
 
 /* extern globals */
 
-extern uint32 PCX;                    /* program counter */
+extern uint16 PCX;                    /* program counter */
 extern UNIT i8255_unit;
 extern UNIT EPROM_unit;
 extern UNIT RAM_unit;
 extern UNIT ipc_cont_unit;
 extern UNIT ioc_cont_unit;
-extern DEVICE *i8080_dev;
-extern DEVICE *i8251_dev;
-extern DEVICE *i8253_dev;
-extern DEVICE *i8255_dev;
-extern DEVICE *i8259_dev;
-extern DEVICE *ipc_cont_dev;
-extern DEVICE *ioc_cont_dev;
+extern DEVICE i8080_dev;
+extern DEVICE i8251_dev;
+extern DEVICE i8253_dev;
+extern DEVICE i8255_dev;
+extern DEVICE i8259_dev;
+extern DEVICE ipc_cont_dev;
+extern DEVICE ioc_cont_dev;
 
 t_stat SBC_config(void)
 {
@@ -110,13 +110,13 @@ t_stat SBC_reset (DEVICE *dptr)
         multibus_cfg();   
         onetime++;
     }
-    i8080_reset(i8080_dev);
-    i8251_reset(i8251_dev);
-    i8253_reset(i8253_dev);
-    i8255_reset(i8255_dev);
-    i8259_reset(i8259_dev);
-    ipc_cont_reset(ipc_cont_dev);
-    ioc_cont_reset(ioc_cont_dev);
+    i8080_reset(&i8080_dev);
+    i8251_reset(&i8251_dev);
+    i8253_reset(&i8253_dev);
+    i8255_reset(&i8255_dev);
+    i8259_reset(&i8259_dev);
+    ipc_cont_reset(&ipc_cont_dev);
+    ioc_cont_reset(&ioc_cont_dev);
     return SCPE_OK;
 }
 

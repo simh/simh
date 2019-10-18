@@ -198,7 +198,7 @@ extern void multibus_put_mbyte(uint16 addr, uint8 val);
 
 /* external globals */
 
-extern int32    PCX;
+extern uint16    PCX;
 
 /* internal function prototypes */
 

@@ -264,7 +264,7 @@ uint8 i8237_rFx(t_bool io, uint8 data);
 
 /* external function prototypes */
 
-extern uint16 reg_dev(uint8 (*routine)(t_bool, uint8), uint16);
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8);
 
 /* globals */
 
@@ -429,7 +429,7 @@ t_stat i8237_svc(UNIT *uptr)
 
 /* Reset routine */
 
-t_stat i8237_reset(DEVICE *dptr, uint16 base)
+t_stat i8237_reset(DEVICE *dptr)
 {
      if (i8237_devnum > I8237_NUM) {
         sim_printf("i8237_reset: too many devices!\n");

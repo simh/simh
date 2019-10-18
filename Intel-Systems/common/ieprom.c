@@ -56,7 +56,7 @@ extern uint8 i8255_C[4];                    //port C byte I/O
 
 /* SIMH EPROM Standard I/O Data Structures */
 
-UNIT EPROM_unit[] = {
+UNIT EPROM_unit = {
     UDATA (NULL, UNIT_ATTABLE+UNIT_BINK+UNIT_ROABLE+UNIT_RO+UNIT_BUFABLE+UNIT_MUSTBUF, 0), 0
 };
 
@@ -73,7 +73,7 @@ DEBTAB EPROM_debug[] = {
 
 DEVICE EPROM_dev = {
     "EPROM",            //name
-    EPROM_unit,         //units
+    &EPROM_unit,        //units
     NULL,               //registers
     NULL,               //modifiers
     1,                  //numunits
@@ -102,10 +102,10 @@ DEVICE EPROM_dev = {
 
 t_stat EPROM_cfg(uint16 base, uint16 size)
 {
-    EPROM_unit->capac = size;        /* set EPROM size */
-    EPROM_unit->u3 = base & 0xFFFF;  /* set EPROM base */
+    EPROM_unit.capac = size;        /* set EPROM size */
+    EPROM_unit.u3 = base & 0xFFFF;  /* set EPROM base */
     sim_printf("    EPROM: 0%04XH bytes at base 0%04XH\n",
-        EPROM_unit->capac, EPROM_unit->u3);
+        EPROM_unit.capac, EPROM_unit.u3);
     return SCPE_OK;
 }
 
@@ -135,9 +135,9 @@ uint8 EPROM_get_mbyte(uint16 addr)
 {
     uint8 val;
 
-    if ((addr >= EPROM_unit->u3) && ((uint32) addr <= (EPROM_unit->u3 + EPROM_unit->capac))) {
+    if ((addr >= EPROM_unit.u3) && ((uint32) addr <= (EPROM_unit.u3 + EPROM_unit.capac))) {
         SET_XACK(1);                /* good memory address */
-        val = *((uint8 *)EPROM_unit->filebuf + (addr - EPROM_unit->u3));
+        val = *((uint8 *)EPROM_unit.filebuf + (addr - EPROM_unit.u3));
         val &= 0xFF;
         return val;
     } else {

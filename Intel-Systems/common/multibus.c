@@ -77,7 +77,7 @@ int32   mbirq = 0;                      /* set no multibus interrupts */
 
 extern uint8 xack;                      /* XACK signal */
 extern int32 int_req;                   /* i8080 INT signal */
-extern int32 PCX;
+extern uint16 PCX;
 extern DEVICE isbc064_dev;
 extern DEVICE isbc464_dev;
 extern DEVICE isbc201_dev;

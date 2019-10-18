@@ -28,7 +28,7 @@
 
 #include <stdio.h>
 #include <ctype.h>
-#include "sim_defs.h"		        /* simulator defns */
+#include "sim_defs.h"                   /* simulator defns */
 
 /* set the base I/O address and device count for the 8237 */
 #define I8237_BASE_0    0x000
@@ -82,11 +82,11 @@
 
 #define ADDRMASK16          0xFFFF
 #define ADDRMASK20          0xFFFFF
-#define MAXMEMSIZE20        0xFFFFF	        /* 8080 max memory size */
+#define MAXMEMSIZE20        0xFFFFF             /* 8080 max memory size */
 
-#define MEMSIZE		    (i8088_unit.capac)  /* 8088 actual memory size */
-#define ADDRMASK	    (MAXMEMSIZE - 1)    /* 8088 address mask */
-#define MEM_ADDR_OK(x)	    (((uint32) (x)) < MEMSIZE)
+#define MEMSIZE             (i8088_unit.capac)  /* 8088 actual memory size */
+#define ADDRMASK            (MAXMEMSIZE - 1)    /* 8088 address mask */
+#define MEM_ADDR_OK(x)      (((uint32) (x)) < MEMSIZE)
 
 /* debug definitions */
 
@@ -101,10 +101,10 @@
 
 /* Simulator stop codes */
 
-#define STOP_RSRV	1			    /* must be 1 */
-#define STOP_HALT	2			    /* HALT */
-#define STOP_IBKPT	3		            /* breakpoint */
-#define STOP_OPCODE	4                           /* Invalid Opcode */
-#define STOP_IO 	5                           /* I/O error */
-#define STOP_MEM 	6                           /* Memory error */
+#define STOP_RSRV       1                           /* must be 1 */
+#define STOP_HALT       2                           /* HALT */
+#define STOP_IBKPT      3                           /* breakpoint */
+#define STOP_OPCODE     4                           /* Invalid Opcode */
+#define STOP_IO         5                           /* I/O error */
+#define STOP_MEM        6                           /* Memory error */
 
