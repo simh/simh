@@ -248,16 +248,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "imds-225", "imds-225.vcproj
 		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ibmpc", "ibmpc.vcproj", "{76EF8599-7AB0-4C8D-997B-AAEEE724A5D0}"
-	ProjectSection(ProjectDependencies) = postProject
-		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
-	EndProjectSection
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ibmpcxt", "ibmpcxt.vcproj", "{0026A4C2-655A-4C03-B6CA-B1EAF79FA4D1}"
-	ProjectSection(ProjectDependencies) = postProject
-		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
-	EndProjectSection
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "scelbi", "scelbi.vcproj", "{1E92CC4B-9ED5-4CD4-BD35-061F25126523}"
 	ProjectSection(ProjectDependencies) = postProject
 		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
@@ -384,14 +374,29 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PDP10-KI", "PDP10-KI.vcproj
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "imds-210", "imds-210.vcproj", "{1BCAB163-8041-48C3-9A5C-73649D69ED5C}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "imds-220", "imds-220.vcproj", "{2532CA88-7206-44F0-97EB-927F7E7820F2}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "imds-230", "imds-230.vcproj", "{C81A7EA9-8043-45F9-AFBB-578A6DB98174}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "imds-800", "imds-800.vcproj", "{17ADE01C-7EDC-4F11-974D-52A9F90FE1D8}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "imds-810", "imds-810.vcproj", "{0720F164-692E-4C07-BE69-41C4302062E5}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -599,14 +604,6 @@ Global
 		{A66F0D85-174F-4AFE-A44E-7FAE3D3727BC}.Debug|Win32.Build.0 = Debug|Win32
 		{A66F0D85-174F-4AFE-A44E-7FAE3D3727BC}.Release|Win32.ActiveCfg = Release|Win32
 		{A66F0D85-174F-4AFE-A44E-7FAE3D3727BC}.Release|Win32.Build.0 = Release|Win32
-		{76EF8599-7AB0-4C8D-997B-AAEEE724A5D0}.Debug|Win32.ActiveCfg = Debug|Win32
-		{76EF8599-7AB0-4C8D-997B-AAEEE724A5D0}.Debug|Win32.Build.0 = Debug|Win32
-		{76EF8599-7AB0-4C8D-997B-AAEEE724A5D0}.Release|Win32.ActiveCfg = Release|Win32
-		{76EF8599-7AB0-4C8D-997B-AAEEE724A5D0}.Release|Win32.Build.0 = Release|Win32
-		{0026A4C2-655A-4C03-B6CA-B1EAF79FA4D1}.Debug|Win32.ActiveCfg = Debug|Win32
-		{0026A4C2-655A-4C03-B6CA-B1EAF79FA4D1}.Debug|Win32.Build.0 = Debug|Win32
-		{0026A4C2-655A-4C03-B6CA-B1EAF79FA4D1}.Release|Win32.ActiveCfg = Release|Win32
-		{0026A4C2-655A-4C03-B6CA-B1EAF79FA4D1}.Release|Win32.Build.0 = Release|Win32
 		{1E92CC4B-9ED5-4CD4-BD35-061F25126523}.Debug|Win32.ActiveCfg = Debug|Win32
 		{1E92CC4B-9ED5-4CD4-BD35-061F25126523}.Debug|Win32.Build.0 = Debug|Win32
 		{1E92CC4B-9ED5-4CD4-BD35-061F25126523}.Release|Win32.ActiveCfg = Release|Win32
