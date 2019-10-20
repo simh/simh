@@ -215,6 +215,7 @@
 #define PACK_XFP(SIGN,EXP,FRAC,V)    do {               \
         (V)->frac = (FRAC);                             \
         (V)->sign_exp = ((uint16)(SIGN) << 15) + (EXP); \
+        (V)->s = FALSE;                                 \
     } while (0)
 
 #define PACK_XFP_S(SIGN,EXP,FRAC,S,V)   do {             \
