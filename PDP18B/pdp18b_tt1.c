@@ -44,9 +44,7 @@
 */
 
 #include "pdp18b_defs.h"
-#include "sim_sock.h"
 #include "sim_tmxr.h"
-#include <ctype.h>
 
 #if defined (PDP15)
 #define TTX_MAXL        16                              /* max number of lines */
@@ -67,7 +65,6 @@ TMXR ttx_desc = { 1, 0, 0, ttx_ldsc };                  /* mux descriptor */
 extern int32 int_hwre[API_HLVL+1];
 extern int32 api_vec[API_HLVL][32];
 extern int32 tmxr_poll;
-extern int32 stop_inst;
 
 DEVICE ttix_dev, ttox_dev;
 int32 ttix (int32 dev, int32 pulse, int32 dat);
@@ -226,22 +223,21 @@ int32 ln, c, temp;
 
 if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
     return SCPE_OK;
-sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
 ln = tmxr_poll_conn (&ttx_desc);                        /* look for connect */
 if (ln >= 0)                                            /* got one? rcv enab */
     ttx_ldsc[ln].rcve = 1;
 tmxr_poll_rx (&ttx_desc);                               /* poll for input */
 for (ln = 0; ln < ttx_lines; ln++) {                    /* loop thru lines */
-    if (ttx_ldsc[ln].conn) {                            /* connected? */
-        if ((temp = tmxr_getc_ln (&ttx_ldsc[ln]))) {    /* get char */
-            if (temp & SCPE_BREAK)                      /* break? */
-                c = 0;
-            else c = sim_tt_inpcvt (temp, TT_GET_MODE (ttox_unit[ln].flags) | TTUF_KSR);
-            ttix_buf[ln] = c;
-            ttix_set_done (ln);
-            }
+    if ((temp = tmxr_getc_ln (&ttx_ldsc[ln]))) {        /* get char */
+        if (temp & SCPE_BREAK)                          /* break? */
+            c = 0;
+        else
+            c = sim_tt_inpcvt (temp, TT_GET_MODE (ttox_unit[ln].flags) | TTUF_KSR);
+        ttix_buf[ln] = c;
+        ttix_set_done (ln);
         }
     }
+sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
 return SCPE_OK;
 }
 
