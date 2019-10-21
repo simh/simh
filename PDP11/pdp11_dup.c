@@ -1058,16 +1058,17 @@ for (dup=active=attached=0; dup < dup_desc.lines; dup++) {
     if (!(dup_rxcsr[dup] & RXCSR_M_RXACT)) {
         const uint8 *buf;
         uint16 size;
+        t_stat r;
 
         if (dup_parcsr[dup] & PARCSR_M_DECMODE)
-            ddcmp_tmxr_get_packet_ln (lp, &buf, &size, dup_corruption[dup]);
+            r = ddcmp_tmxr_get_packet_ln (lp, &buf, &size, dup_corruption[dup]);
         else {
             size_t size_t_size;
 
-            tmxr_get_packet_ln (lp, &buf, &size_t_size);
+            r = tmxr_get_packet_ln (lp, &buf, &size_t_size);
             size = (uint16)size_t_size;
             }
-        if (buf) {
+        if ((r == SCPE_OK) && (buf)) {
             if (dup_rcvpksize[dup] < size) {
                 dup_rcvpksize[dup] = size;
                 dup_rcvpacket[dup] = (uint8 *)realloc (dup_rcvpacket[dup], dup_rcvpksize[dup]);
