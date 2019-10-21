@@ -643,7 +643,8 @@ uint32 i;
 uint16 c;
 
 if (hd <= 2) {
-    memset (&rd_xb[0], 0, 8);                           /* 8 bytes of zero */
+    memset (rd_xb, 0, sizeof(*rd_xb) * 256);            /* fill sector buffer with 0's */
+    /* rd_xb[0]-rd_xb[3] */                             /* 8 bytes of zero */
     rd_xb[4] = 0x3600;
     rd_xb[5] = drv_tab[dtype].xbn & WMASK;              /* number of XBNs */
     rd_xb[6] = (drv_tab[dtype].xbn >> 16) & WMASK;
@@ -672,9 +673,9 @@ if (hd <= 2) {
     rd_xb[29] = 5;                                      /* size of GAP 2 in the MFM format */
     rd_xb[30] = 40;                                     /* size of GAP 3 in the MFM format */
     rd_xb[31] = 13;                                     /* sync value used when formatting */
-    memset (&rd_xb[32], 0, 32);                         /* reserved for use by the RQDX formatter */
+    /* rd_xb[32]-rd_xb[47] */                           /* 32 bytes of zero - reserved for use by the RQDX formatter */
     rd_xb[48] = 0x3039;                                 /* serial number */
-    memset (&rd_xb[49], 0, 414);                        /* Filler bytes to the end of the block */
+    /* rd_xb[49]-rd_xb[255] */                          /* 414 bytes of zero - Filler bytes to the end of the block */
     for (i = c = 0; i < 256; i++)
         c = c + rd_xb[i];
     rd_xb[255] = c;                                     /* checksum */
