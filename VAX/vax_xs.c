@@ -304,7 +304,7 @@ void xs_process_receive(CTLR* xs)
 {
 uint8 b0, b1, b2, b3;
 uint32 segb, ba;
-int slen, wlen, off;
+int slen, wlen, off = 0;
 t_stat rstatus, wstatus;
 ETH_ITEM* item = 0;
 int no_buffers = xs->var->csr0 & CSR0_MISS;
@@ -458,6 +458,7 @@ t_stat rstatus, wstatus;
 
 /* sim_debug(DBG_TRC, xs->dev, "xs_process_transmit()\n"); */
 
+off = giant = runt = 0;
 for (;;) {
 
     /* get next transmit buffer */
@@ -734,8 +735,10 @@ if (tptr == NULL)
 strcpy(tptr, cptr);
 
 xs->var->etherface = (ETH_DEV *) malloc(sizeof(ETH_DEV));
-if (!xs->var->etherface)
+if (!xs->var->etherface) {
+    free(tptr);
     return SCPE_MEM;
+    }
 
 status = eth_open(xs->var->etherface, cptr, xs->dev, DBG_ETH);
 if (status != SCPE_OK) {
