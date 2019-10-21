@@ -988,7 +988,7 @@ return SCPE_OK;
 int32 fl_rd (int32 pa)
 {
 int32 rg = (pa >> 1) & 0xF;
-int32 val;
+int32 val = 0;
 
 switch (rg) {
 
@@ -1031,10 +1031,6 @@ switch (rg) {
             sim_activate (&fl_unit[1], fl_cwait);       /* start operation */
         else                                            /* no, disk 0 */
             sim_activate (&fl_unit[0], fl_cwait);       /* start operation */
-        break;
-
-    default:
-        val = 0;
         break;
         }
 sim_debug (FL_DB_REG, &fl_dev, "fl_rd(%s) data=0x%02X\n", fl_regnames[rg], val);

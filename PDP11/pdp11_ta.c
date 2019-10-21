@@ -301,8 +301,9 @@ if ((fnc != TACS_REW) && !(flg & OP_WRI)) {             /* spc/read cmd? */
         }
     if ((old_ust ^ uptr->UST) == (UST_REV|UST_GAP)) {   /* reverse in gap? */
         if (uptr->UST)                                  /* skip file gap */
-            sim_tape_rdrecr (uptr, ta_xb, &t, TA_MAXFR);
-        else sim_tape_rdrecf (uptr, ta_xb, &t, TA_MAXFR);
+            (void)sim_tape_rdrecr (uptr, ta_xb, &t, TA_MAXFR);
+        else 
+            (void)sim_tape_rdrecf (uptr, ta_xb, &t, TA_MAXFR);
         if (DEBUG_PRS (ta_dev))
             fprintf (sim_deb, ">>TA skip gap: op=%o, old_sta = %o, pos=%d\n",
                      fnc, uptr->UST, uptr->pos);

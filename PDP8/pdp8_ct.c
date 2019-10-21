@@ -329,8 +329,9 @@ if ((ct_sra & SRA_ENAB) && (uptr->flags & UNIT_ATT)) {  /* enabled, att? */
                 ">>CT skip gap: op=%o, old_sta = %o, pos=%d\n",
                 fnc, uptr->UST, uptr->pos);
             if (uptr->UST)                              /* skip file gap */
-                sim_tape_rdrecr (uptr, ct_xb, &t, CT_MAXFR);
-            else sim_tape_rdrecf (uptr, ct_xb, &t, CT_MAXFR);
+                (void)sim_tape_rdrecr (uptr, ct_xb, &t, CT_MAXFR);
+            else
+                (void)sim_tape_rdrecf (uptr, ct_xb, &t, CT_MAXFR);
             }
         }
     else uptr->UST = 0;
