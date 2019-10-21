@@ -1192,8 +1192,8 @@ sim_debug (DBG_ROP, &ve_dev, "stream_data: xs = %d, xe = %d, ys = %d, ye = %d, d
 if (tbc_csr & TBC_CSR_STRDIR) {                         /* write */
     while (tbc_fifo[0].count < FIFO_LEN) {
         ve_get_fifo (0, &data);
-        sim_debug (DBG_REG, &ve_dev, "buffer[%X] = %X\n", ((spx_stry * 1280) + spx_strx + dstpix), ((data >> (i << 3)) &  0xFF));
         for (i = 0; i < 4; i++) {
+            sim_debug (DBG_REG, &ve_dev, "buffer[%X] = %X\n", ((spx_stry * 1280) + spx_strx + dstpix), ((data >> (i << 3)) &  0xFF));
             ve_buf[((spx_stry * 1280) + spx_strx + dstpix)] = ((data >> (i << 3)) & 0xFF);
             spx_strx++;
             if (spx_stry < VE_YSIZE)
