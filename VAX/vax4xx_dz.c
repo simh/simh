@@ -240,7 +240,7 @@ t_stat dz_attach (UNIT *uptr, CONST char *cptr);
 t_stat dz_detach (UNIT *uptr);
 t_stat dz_clear (t_bool flag);
 uint16 dz_getc (void);
-void dz_putc (int32 line, uint16 data);
+t_stat dz_putc (int32 line, uint16 data);
 void dz_update_rcvi (void);
 void dz_update_xmti (void);
 t_stat dz_set_log (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
@@ -458,8 +458,7 @@ switch ((pa >> 2) & 03) {                               /* case on PA<2:1> */
                 sim_debug(DBG_REG, &dz_dev, "maint char for line %d : %X\n", line, dz_char[line]);
                 break;
                 }
-            dz_putc (line, dz_tdr);
-            sim_activate (&dz_unit[1], dz_unit[1].wait);
+            sim_activate (&dz_unit[1], 0);
             }
         break;
         }
@@ -504,15 +503,23 @@ return SCPE_OK;
 
 t_stat dz_xmt_svc (UNIT *uptr)
 {
-tmxr_poll_tx (&dz_desc);                                /* poll output */
-dz_update_xmti ();                                      /* update int */
+int32 line;
+
+line = CSR_GETTL (dz_csr);
+if (SCPE_STALL != dz_putc (line, dz_tdr)) {             /* sent ok? */
+    tmxr_poll_tx (&dz_desc);                            /* poll output */
+    dz_update_xmti ();                                  /* update int */
+    }
+else
+    sim_activate (uptr, dz_unit[1].wait);               /* come back later */
 return SCPE_OK;
 }
 
 /* Put a character to the specified line */
 
-void dz_putc (int32 line, uint16 data)
+t_stat dz_putc (int32 line, uint16 data)
 {
+t_stat r = SCPE_OK;
 int32 c;
 TMLN *lp;
 
@@ -527,7 +534,7 @@ switch (dz_func[line]) {
     case DZ_CONSOLE:
         c = sim_tt_outcvt (data, TT_GET_MODE (dz_unit[0].flags));
         if (c >= 0)
-            sim_putchar_s (c);                          /* send to console */
+            r = sim_putchar_s (c);                      /* send to console */
         break;
 
     case DZ_KEYBOARD:
@@ -538,7 +545,7 @@ switch (dz_func[line]) {
         vs_wr ((uint8)data);                            /* send to mouse */
         break;
         }
-return;
+return r;
 }
 
 /* Get first available character for mux, if any */
