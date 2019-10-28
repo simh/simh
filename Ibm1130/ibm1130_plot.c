@@ -573,8 +573,7 @@ static t_stat plot_detach (UNIT *uptr)
         gdFree(buf);                /* free up the memory of GIF format */
     }
     else {                          /* make a copy of the filename so we can delete it after detach */
-        if ((fname = malloc(strlen(uptr->filename)+1)) != NULL)
-            strcpy(fname, uptr->filename);
+        fname = strdup (uptr->filename);
     }
 
     if (image != NULL) {
