@@ -1651,6 +1651,8 @@ static const char simh_help[] =
       "++%%~pI%%    - expands the value of %%I%% to a path only\n"
       "++%%~nI%%    - expands the value of %%I%% to a file name only\n"
       "++%%~xI%%    - expands the value of %%I%% to a file extension only\n\n"
+      "++%%~tI%%    - expands the value of %%I%% to date/time of file\n\n"
+      "++%%~zI%%    - expands the value of %%I%% to size of file\n\n"
       " The modifiers can be combined to get compound results:\n\n"
       "++%%~pnI%%   - expands the value of %%I%% to a path and name only\n"
       "++%%~nxI%%   - expands the value of %%I%% to a file name and extension only\n\n"
@@ -4210,7 +4212,7 @@ for (; *ip && (op < oend); ) {
             if (*ip == '~') {
                 expand_it = TRUE;
                 ++ip;
-                for (i=0; (i < (sizeof (parts) - 1)) && (strchr ("fpnx", *ip)); i++, ip++) {
+                for (i=0; (i < (sizeof (parts) - 1)) && (strchr ("fpnxtz", *ip)); i++, ip++) {
                     parts[i] = *ip;
                     parts[i + 1] = '\0';
                     }
