@@ -749,8 +749,8 @@ struct MTAB {
     t_stat              (*disp)(FILE *st, UNIT *up, int32 v, CONST void *dp);
                                                         /* display routine */
     void                *desc;                          /* value descriptor */
-                                                        /* REG * if MTAB_VAL */
-                                                        /* int * if not */
+                                                        /* pointer to something needed by */
+                                                        /* the validation and/or display routines */
     const char          *help;                          /* help string */
     };
 
