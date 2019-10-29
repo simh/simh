@@ -14,3 +14,8 @@ env:
 sudo: required
 install: sh -ex .travis/deps.sh
 script: make $SIM
+notifications:
+  email:
+    recipients:
+      - Mark@infocomm.com
+      - lars@nocrew.org
