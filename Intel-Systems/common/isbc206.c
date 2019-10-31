@@ -395,13 +395,8 @@ uint8 isbc206r1(t_bool io, uint8 data, uint8 devnum)
     if (io == 0) {                  /* read data port */
         hdc206.intff = 0;           //clear interrupt FF
         hdc206.stat &= ~(HDCINT + 0x80);
-        if (hdc206.rdychg) {
-            hdc206.rtype = ROK;
-            return hdc206.rtype;
-        } else {
-            hdc206.rtype = ROK;
-            return hdc206.rtype;
-        }
+        hdc206.rtype = ROK;
+        return hdc206.rtype;
     } else {                        /* write data port */
         hdc206.iopb = data;
     }

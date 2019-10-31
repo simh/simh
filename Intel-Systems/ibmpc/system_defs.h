@@ -59,11 +59,11 @@
 
 /* set the base and size for the EPROM on the IBM PC */
 #define ROM_BASE        0xFE000
-#define ROM_SIZE        0x02000
+#define ROM_SIZE        0x01FFF
 
 /* set the base and size for the RAM on the IBM PC */
 #define RAM_BASE        0x00000
-#define RAM_SIZE        0x40000
+#define RAM_SIZE        0x3FFFF
 
 /* set INTR for CPU on the 8088 */
 #define INT_R           INT_1  

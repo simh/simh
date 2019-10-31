@@ -64,13 +64,13 @@ extern void RAM_put_mbyte(uint32 addr, uint8 val);
 extern UNIT i8255_unit[];
 extern UNIT EPROM_unit;
 extern UNIT RAM_unit;
-extern t_stat i8237_reset (DEVICE *dptr, uint16 base);
-extern t_stat i8253_reset (DEVICE *dptr, uint16 base);
-extern t_stat i8255_reset (DEVICE *dptr, uint16 base);
-extern t_stat i8259_reset (DEVICE *dptr, uint16 base);
-extern t_stat EPROM_reset (DEVICE *dptr, uint32 base, uint32 size);
-extern t_stat RAM_reset (DEVICE *dptr, uint32 base, uint32 size);
-extern uint16 reg_dev(uint8 (*routine)(t_bool, uint8), uint16);
+extern t_stat i8237_reset (DEVICE *dptr);
+extern t_stat i8253_reset (DEVICE *dptr);
+extern t_stat i8255_reset (DEVICE *dptr);
+extern t_stat i8259_reset (DEVICE *dptr);
+extern t_stat EPROM_reset (DEVICE *dptr);
+extern t_stat RAM_reset (DEVICE *dptr);
+extern uint16 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint16, uint8);
 
 /*  SBC reset routine */
 
@@ -158,12 +158,12 @@ uint8 enbnmi(t_bool io, uint8 data)
 uint8 get_mbyte(uint32 addr)
 {
     /* if local EPROM handle it */
-    if ((addr >= (uint32)EPROM_unit.u3) && (addr < (uint32)(EPROM_unit.u3 + EPROM_unit.capac))) {
+    if ((addr >= (uint32)EPROM_unit.u3) && (addr <= (uint32)(EPROM_unit.u3 + EPROM_unit.capac))) {
 //        sim_printf("Write to R/O memory address %05X - ignored\n", addr);
         return EPROM_get_mbyte(addr);
     }
     /* if local RAM handle it */
-    if ((addr >= (uint32)RAM_unit.u3) && (addr < (uint32)(RAM_unit.u3 + RAM_unit.capac))) {
+    if ((addr >= (uint32)RAM_unit.u3) && (addr <= (uint32)(RAM_unit.u3 + RAM_unit.capac))) {
         return RAM_get_mbyte(addr);
     }
     /* otherwise, try the pcbus */

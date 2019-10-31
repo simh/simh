@@ -237,39 +237,34 @@
 
 /* external globals */
 
-extern uint16 port;                     //port called in dev_table[port]
-
 /* internal function prototypes */
 
 t_stat i8237_svc (UNIT *uptr);
-t_stat i8237_reset (DEVICE *dptr, uint16 base);
-void i8237_reset1 (void);
+t_stat i8237_reset (DEVICE *dptr);
+void i8237_reset_dev (uint8 devnum);
 t_stat i8237_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-uint8 i8237_r0x(t_bool io, uint8 data);
-uint8 i8237_r1x(t_bool io, uint8 data);
-uint8 i8237_r2x(t_bool io, uint8 data);
-uint8 i8237_r3x(t_bool io, uint8 data);
-uint8 i8237_r4x(t_bool io, uint8 data);
-uint8 i8237_r5x(t_bool io, uint8 data);
-uint8 i8237_r6x(t_bool io, uint8 data);
-uint8 i8237_r7x(t_bool io, uint8 data);
-uint8 i8237_r8x(t_bool io, uint8 data);
-uint8 i8237_r9x(t_bool io, uint8 data);
-uint8 i8237_rAx(t_bool io, uint8 data);
-uint8 i8237_rBx(t_bool io, uint8 data);
-uint8 i8237_rCx(t_bool io, uint8 data);
-uint8 i8237_rDx(t_bool io, uint8 data);
-uint8 i8237_rEx(t_bool io, uint8 data);
-uint8 i8237_rFx(t_bool io, uint8 data);
+uint8 i8237_r0x(t_bool io, uint8 data, uint8 devnum);
+uint8 i8237_r1x(t_bool io, uint8 data, uint8 devnum);
+uint8 i8237_r2x(t_bool io, uint8 data, uint8 devnum);
+uint8 i8237_r3x(t_bool io, uint8 data, uint8 devnum);
+uint8 i8237_r4x(t_bool io, uint8 data, uint8 devnum);
+uint8 i8237_r5x(t_bool io, uint8 data, uint8 devnum);
+uint8 i8237_r6x(t_bool io, uint8 data, uint8 devnum);
+uint8 i8237_r7x(t_bool io, uint8 data, uint8 devnum);
+uint8 i8237_r8x(t_bool io, uint8 data, uint8 devnum);
+uint8 i8237_r9x(t_bool io, uint8 data, uint8 devnum);
+uint8 i8237_rAx(t_bool io, uint8 data, uint8 devnum);
+uint8 i8237_rBx(t_bool io, uint8 data, uint8 devnum);
+uint8 i8237_rCx(t_bool io, uint8 data, uint8 devnum);
+uint8 i8237_rDx(t_bool io, uint8 data, uint8 devnum);
+uint8 i8237_rEx(t_bool io, uint8 data, uint8 devnum);
+uint8 i8237_rFx(t_bool io, uint8 data, uint8 devnum);
 
 /* external function prototypes */
 
-extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8);
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
 
 /* globals */
-
-int32 i8237_devnum = 0;                 //actual number of 8253 instances + 1
-uint16 i8237_port[4];                   //base port registered to each instance
 
 /* 8237 physical register definitions */
 
@@ -405,7 +400,7 @@ DEVICE i8237_dev = {
     8,                          //dwidth
     NULL,                       //examine  
     NULL,                       //deposit  
-    NULL,                       //reset
+    i8237_reset,                //reset
     NULL,                       //boot
     NULL,                       //attach
     NULL,                       //detach
@@ -419,6 +414,30 @@ DEVICE i8237_dev = {
 
 /* Service routines to handle simulator functions */
 
+// i8251 configuration
+
+t_stat i8237_cfg(uint8 base, uint8 devnum)
+{
+    sim_printf("    i8237[%d]: at base port 0%02XH\n",
+        devnum, base & 0xFF);
+    reg_dev(i8237_r1x, base + 1, devnum); 
+    reg_dev(i8237_r2x, base + 2, devnum); 
+    reg_dev(i8237_r3x, base + 3, devnum); 
+    reg_dev(i8237_r4x, base + 4, devnum); 
+    reg_dev(i8237_r5x, base + 5, devnum); 
+    reg_dev(i8237_r6x, base + 6, devnum); 
+    reg_dev(i8237_r7x, base + 7, devnum); 
+    reg_dev(i8237_r8x, base + 8, devnum); 
+    reg_dev(i8237_r9x, base + 9, devnum); 
+    reg_dev(i8237_rAx, base + 10, devnum); 
+    reg_dev(i8237_rBx, base + 11, devnum); 
+    reg_dev(i8237_rCx, base + 12, devnum); 
+    reg_dev(i8237_rDx, base + 13, devnum); 
+    reg_dev(i8237_rEx, base + 14, devnum); 
+    reg_dev(i8237_rFx, base + 15, devnum); 
+    return SCPE_OK;
+}
+
 /* service routine - actually does the simulated DMA */
 
 t_stat i8237_svc(UNIT *uptr)
@@ -431,52 +450,20 @@ t_stat i8237_svc(UNIT *uptr)
 
 t_stat i8237_reset(DEVICE *dptr)
 {
-     if (i8237_devnum > I8237_NUM) {
-        sim_printf("i8237_reset: too many devices!\n");
-        return SCPE_MEM;
+    uint8 devnum;
+    
+    for (devnum=0; devnum<I8237_NUM; devnum++) {
+        i8237_reset_dev(devnum);
+        sim_activate (&i8237_unit[devnum], i8237_unit[devnum].wait); /* activate unit */
     }
-    i8237_port[i8237_devnum] = reg_dev(i8237_r0x, base); 
-    reg_dev(i8237_r1x, base + 1); 
-    reg_dev(i8237_r2x, base + 2); 
-    reg_dev(i8237_r3x, base + 3); 
-    reg_dev(i8237_r4x, base + 4); 
-    reg_dev(i8237_r5x, base + 5); 
-    reg_dev(i8237_r6x, base + 6); 
-    reg_dev(i8237_r7x, base + 7); 
-    reg_dev(i8237_r8x, base + 8); 
-    reg_dev(i8237_r9x, base + 9); 
-    reg_dev(i8237_rAx, base + 10); 
-    reg_dev(i8237_rBx, base + 11); 
-    reg_dev(i8237_rCx, base + 12); 
-    reg_dev(i8237_rDx, base + 13); 
-    reg_dev(i8237_rEx, base + 14); 
-    reg_dev(i8237_rFx, base + 15); 
-    sim_printf("   8237 Reset\n");
-    sim_printf("   8237: Registered at %03X\n", base);
-    sim_activate (&i8237_unit[i8237_devnum], i8237_unit[i8237_devnum].wait); /* activate unit */
-    if ((i8237_dev.flags & DEV_DIS) == 0) 
-        i8237_reset1();
-    i8237_devnum++;
     return SCPE_OK;
 }
 
-uint8 i8237_get_dn(void)
-{
-    int i;
-
-    for (i=0; i<I8237_NUM; i++)
-        if (port >=i8237_port[i] && port <= i8237_port[i] + 16)
-            return i;
-    sim_printf("i8237_get_dn: port %03X not in 8237 device table\n", port);
-    return 0xFF;
-}
-
-void i8237_reset1(void)
+void i8237_reset_dev(uint8 devnum)
 {
     int32 i;
     UNIT *uptr;
     static int flag = 1;
-    uint8 devnum;
 
     for (i = 0; i < 1; i++) {     /* handle all units */
         uptr = i8237_dev.units + i;
@@ -525,411 +512,331 @@ t_stat i8237_set_mode(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     to the device.
 */
 
-uint8 i8237_r0x(t_bool io, uint8 data)
+uint8 i8237_r0x(t_bool io, uint8 data, uint8 devnum)
 {
-    uint8 devnum;
-
-    if ((devnum = i8237_get_dn()) != 0xFF) {
-        if (io == 0) {                      /* read current address CH 0 */
-            if (i8237_rD[devnum]) {                 /* high byte */
-                i8237_rD[devnum] = 0;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r0[devnum](H) read as %04X\n", i8237_r0[devnum]);
-                return (i8237_r0[devnum] >> 8);
-            } else {                        /* low byte */
-                i8237_rD[devnum]++;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r0[devnum](L) read as %04X\n", i8237_r0[devnum]);
-                return (i8237_r0[devnum] & 0xFF);
-            }
-        } else {                            /* write base & current address CH 0 */
-            if (i8237_rD[devnum]) {                 /* high byte */
-                i8237_rD[devnum] = 0;
-                i8237_r0[devnum] |= (data << 8);
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r0[devnum](H) set to %04X\n", i8237_r0[devnum]);
-            } else {                        /* low byte */
-                i8237_rD[devnum]++;
-                i8237_r0[devnum] = data & 0xFF;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r0[devnum](L) set to %04X\n", i8237_r0[devnum]);
-            }
-            return 0;
-        }
-    }
-    return 0;
-}
-
-uint8 i8237_r1x(t_bool io, uint8 data)
-{
-    uint8 devnum;
-
-    if ((devnum = i8237_get_dn()) != 0xFF) {
-        if (io == 0) {                      /* read current word count CH 0 */
-            if (i8237_rD[devnum]) {                 /* high byte */
-                i8237_rD[devnum] = 0;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r1[devnum](H) read as %04X\n", i8237_r1[devnum]);
-                return (i8237_r1[devnum] >> 8);
-            } else {                        /* low byte */
-                i8237_rD[devnum]++;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r1[devnum](L) read as %04X\n", i8237_r1[devnum]);
-                return (i8237_r1[devnum] & 0xFF);
-            }
-        } else {                            /* write base & current address CH 0 */
-            if (i8237_rD[devnum]) {                 /* high byte */
-                i8237_rD[devnum] = 0;
-                i8237_r1[devnum] |= (data << 8);
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r1[devnum](H) set to %04X\n", i8237_r1[devnum]);
-            } else {                        /* low byte */
-                i8237_rD[devnum]++;
-                i8237_r1[devnum] = data & 0xFF;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r1[devnum](L) set to %04X\n", i8237_r1[devnum]);
-            }
-            return 0;
-        }
-    }
-    return 0;
-}
-
-uint8 i8237_r2x(t_bool io, uint8 data)
-{
-    uint8 devnum;
-
-    if ((devnum = i8237_get_dn()) != 0xFF) {
-        if (io == 0) {                      /* read current address CH 1 */
-            if (i8237_rD[devnum]) {                 /* high byte */
-                i8237_rD[devnum] = 0;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r2[devnum](H) read as %04X\n", i8237_r2[devnum]);
-                return (i8237_r2[devnum] >> 8);
-            } else {                        /* low byte */
-                i8237_rD[devnum]++;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r2[devnum](L) read as %04X\n", i8237_r2[devnum]);
-                return (i8237_r2[devnum] & 0xFF);
-            }
-        } else {                            /* write base & current address CH 1 */
-            if (i8237_rD[devnum]) {                 /* high byte */
-                i8237_rD[devnum] = 0;
-                i8237_r2[devnum] |= (data << 8);
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r2[devnum](H) set to %04X\n", i8237_r2[devnum]);
-            } else {                        /* low byte */
-                i8237_rD[devnum]++;
-                i8237_r2[devnum] = data & 0xFF;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r2[devnum](L) set to %04X\n", i8237_r2[devnum]);
-            }
-            return 0;
-        }
-    }
-    return 0;
-}
-
-uint8 i8237_r3x(t_bool io, uint8 data)
-{
-    uint8 devnum;
-
-    if ((devnum = i8237_get_dn()) != 0xFF) {
-        if (io == 0) {                      /* read current word count CH 1 */
-            if (i8237_rD[devnum]) {                 /* high byte */
-                i8237_rD[devnum] = 0;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r3[devnum](H) read as %04X\n", i8237_r3[devnum]);
-                return (i8237_r3[devnum] >> 8);
-            } else {                        /* low byte */
-                i8237_rD[devnum]++;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r3[devnum](L) read as %04X\n", i8237_r3[devnum]);
-                return (i8237_r3[devnum] & 0xFF);
-            }
-        } else {                            /* write base & current address CH 1 */
-            if (i8237_rD[devnum]) {                 /* high byte */
-                i8237_rD[devnum] = 0;
-                i8237_r3[devnum] |= (data << 8);
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r3[devnum](H) set to %04X\n", i8237_r3[devnum]);
-            } else {                        /* low byte */
-                i8237_rD[devnum]++;
-                i8237_r3[devnum] = data & 0xFF;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r3[devnum](L) set to %04X\n", i8237_r3[devnum]);
-            }
-            return 0;
-        }
-    }
-    return 0;
-}
-
-uint8 i8237_r4x(t_bool io, uint8 data)
-{
-    uint8 devnum;
-
-    if ((devnum = i8237_get_dn()) != 0xFF) {
-        if (io == 0) {                      /* read current address CH 2 */
-            if (i8237_rD[devnum]) {                 /* high byte */
-                i8237_rD[devnum] = 0;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r4[devnum](H) read as %04X\n", i8237_r4[devnum]);
-                return (i8237_r4[devnum] >> 8);
-            } else {                        /* low byte */
-                i8237_rD[devnum]++;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r4[devnum](L) read as %04X\n", i8237_r4[devnum]);
-                return (i8237_r4[devnum] & 0xFF);
-            }
-        } else {                            /* write base & current address CH 2 */
-            if (i8237_rD[devnum]) {                 /* high byte */
-                i8237_rD[devnum] = 0;
-                i8237_r4[devnum] |= (data << 8);
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r4[devnum](H) set to %04X\n", i8237_r4[devnum]);
-            } else {                        /* low byte */
-                i8237_rD[devnum]++;
-                i8237_r4[devnum] = data & 0xFF;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r4[devnum](L) set to %04X\n", i8237_r4[devnum]);
-            }
-            return 0;
-        }
-    }
-    return 0;
-}
-
-uint8 i8237_r5x(t_bool io, uint8 data)
-{
-    uint8 devnum;
-
-    if ((devnum = i8237_get_dn()) != 0xFF) {
-        if (io == 0) {                      /* read current word count CH 2 */
-            if (i8237_rD[devnum]) {                 /* high byte */
-                i8237_rD[devnum] = 0;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r5[devnum](H) read as %04X\n", i8237_r5[devnum]);
-                return (i8237_r5[devnum] >> 8);
-            } else {                        /* low byte */
-                i8237_rD[devnum]++;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r5[devnum](L) read as %04X\n", i8237_r5[devnum]);
-                return (i8237_r5[devnum] & 0xFF);
-            }
-        } else {                            /* write base & current address CH 2 */
-            if (i8237_rD[devnum]) {                 /* high byte */
-                i8237_rD[devnum] = 0;
-                i8237_r5[devnum] |= (data << 8);
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r5[devnum](H) set to %04X\n", i8237_r5[devnum]);
-            } else {                        /* low byte */
-                i8237_rD[devnum]++;
-                i8237_r5[devnum] = data & 0xFF;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r5[devnum](L) set to %04X\n", i8237_r5[devnum]);
-            }
-            return 0;
-        }
-    }
-    return 0;
-}
-
-uint8 i8237_r6x(t_bool io, uint8 data)
-{
-    uint8 devnum;
-
-    if ((devnum = i8237_get_dn()) != 0xFF) {
-        if (io == 0) {                      /* read current address CH 3 */
-            if (i8237_rD[devnum]) {                 /* high byte */
-                i8237_rD[devnum] = 0;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r6[devnum](H) read as %04X\n", i8237_r6[devnum]);
-                return (i8237_r6[devnum] >> 8);
-            } else {                        /* low byte */
-                i8237_rD[devnum]++;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r6[devnum](L) read as %04X\n", i8237_r6[devnum]);
-                return (i8237_r6[devnum] & 0xFF);
-            }
-        } else {                            /* write base & current address CH 3 */
-            if (i8237_rD[devnum]) {                 /* high byte */
-                i8237_rD[devnum] = 0;
-                i8237_r6[devnum] |= (data << 8);
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r6[devnum](H) set to %04X\n", i8237_r6[devnum]);
-            } else {                        /* low byte */
-                i8237_rD[devnum]++;
-                i8237_r6[devnum] = data & 0xFF;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r6[devnum](L) set to %04X\n", i8237_r6[devnum]);
-            }
-            return 0;
-        }
-    }
-    return 0;
-}
-
-uint8 i8237_r7x(t_bool io, uint8 data)
-{
-    uint8 devnum;
-
-    if ((devnum = i8237_get_dn()) != 0xFF) {
-        if (io == 0) {                      /* read current word count CH 3 */
-            if (i8237_rD[devnum]) {                 /* high byte */
-                i8237_rD[devnum] = 0;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r7[devnum](H) read as %04X\n", i8237_r7[devnum]);
-                return (i8237_r7[devnum] >> 8);
-            } else {                        /* low byte */
-                i8237_rD[devnum]++;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r7[devnum](L) read as %04X\n", i8237_r7[devnum]);
-                return (i8237_r7[devnum] & 0xFF);
-            }
-        } else {                            /* write base & current address CH 3 */
-            if (i8237_rD[devnum]) {                 /* high byte */
-                i8237_rD[devnum] = 0;
-                i8237_r7[devnum] |= (data << 8);
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r7[devnum](H) set to %04X\n", i8237_r7[devnum]);
-            } else {                        /* low byte */
-                i8237_rD[devnum]++;
-                i8237_r7[devnum] = data & 0xFF;
-                sim_debug (DEBUG_reg, &i8237_dev, "i8237_r7[devnum](L) set to %04X\n", i8237_r7[devnum]);
-            }
-            return 0;
-        }
-    }
-    return 0;
-}
-
-uint8 i8237_r8x(t_bool io, uint8 data)
-{
-    uint8 devnum;
-
-    if ((devnum = i8237_get_dn()) != 0xFF) {
-        if (io == 0) {                      /* read status register */
-            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r8[devnum] (status) read as %02X\n", i8237_r8[devnum]);
-            return (i8237_r8[devnum]);
-        } else {                            /* write command register */
-            i8237_r9[devnum] = data & 0xFF;
-            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r9[devnum] (command) set to %02X\n", i8237_r9[devnum]);
-            return 0;
-        }
-    }
-    return 0;
-}
-
-uint8 i8237_r9x(t_bool io, uint8 data)
-{
-    uint8 devnum;
-
-    if ((devnum = i8237_get_dn()) != 0xFF) {
-        if (io == 0) {
-            sim_debug (DEBUG_reg, &i8237_dev, "Illegal read of i8237_r9[devnum]\n");
-            return 0;
-        } else {                            /* write request register */
-            i8237_rC[devnum] = data & 0xFF;
-            sim_debug (DEBUG_reg, &i8237_dev, "i8237_rC[devnum] (request) set to %02X\n", i8237_rC[devnum]);
-            return 0;
-        }
-    }
-    return 0;
-}
-
-uint8 i8237_rAx(t_bool io, uint8 data)
-{
-    uint8 devnum;
-
-    if ((devnum = i8237_get_dn()) != 0xFF) {
-        if (io == 0) {
-            sim_debug (DEBUG_reg, &i8237_dev, "Illegal read of i8237_rA[devnum]\n");
-            return 0;
-        } else {                            /* write single mask register */
-            switch(data & 0x03) {
-            case 0:
-                if (data & 0x04)
-                    i8237_rB[devnum] |= 1;
-                else
-                    i8237_rB[devnum] &= ~1;
-                break;
-            case 1:
-                if (data & 0x04)
-                    i8237_rB[devnum] |= 2;
-                else
-                    i8237_rB[devnum] &= ~2;
-                break;
-            case 2:
-                if (data & 0x04)
-                    i8237_rB[devnum] |= 4;
-                else
-                    i8237_rB[devnum] &= ~4;
-                break;
-            case 3:
-                if (data & 0x04)
-                    i8237_rB[devnum] |= 8;
-                else
-                    i8237_rB[devnum] &= ~8;
-                break;
-            }
-            sim_debug (DEBUG_reg, &i8237_dev, "i8237_rB[devnum] (mask) set to %02X\n", i8237_rB[devnum]);
-            return 0;
-        }
-    }
-    return 0;
-}
-
-uint8 i8237_rBx(t_bool io, uint8 data)
-{
-    uint8 devnum;
-
-    if ((devnum = i8237_get_dn()) != 0xFF) {
-        if (io == 0) {
-            sim_debug (DEBUG_reg, &i8237_dev, "Illegal read of i8237_rB[devnum]\n");
-            return 0;
-        } else {                            /* write mode register */
-            i8237_rA[devnum] = data & 0xFF;
-            sim_debug (DEBUG_reg, &i8237_dev, "i8237_rA[devnum] (mode) set to %02X\n", i8237_rA[devnum]);
-            return 0;
-        }
-    }
-    return 0;
-}
-
-uint8 i8237_rCx(t_bool io, uint8 data)
-{
-    uint8 devnum;
-
-    if ((devnum = i8237_get_dn()) != 0xFF) {
-        if (io == 0) {
-            sim_debug (DEBUG_reg, &i8237_dev, "Illegal read of i8237_rC[devnum]\n");
-            return 0;
-        } else {                            /* clear byte pointer FF */
+    if (io == 0) {                      /* read current address CH 0 */
+        if (i8237_rD[devnum]) {                 /* high byte */
             i8237_rD[devnum] = 0;
-            sim_debug (DEBUG_reg, &i8237_dev, "i8237_rD[devnum] (FF) cleared\n");
-            return 0;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r0[devnum](H) read as %04X\n", i8237_r0[devnum]);
+            return (i8237_r0[devnum] >> 8);
+        } else {                        /* low byte */
+            i8237_rD[devnum]++;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r0[devnum](L) read as %04X\n", i8237_r0[devnum]);
+            return (i8237_r0[devnum] & 0xFF);
+        }
+    } else {                            /* write base & current address CH 0 */
+        if (i8237_rD[devnum]) {                 /* high byte */
+            i8237_rD[devnum] = 0;
+            i8237_r0[devnum] |= (data << 8);
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r0[devnum](H) set to %04X\n", i8237_r0[devnum]);
+        } else {                        /* low byte */
+            i8237_rD[devnum]++;
+            i8237_r0[devnum] = data & 0xFF;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r0[devnum](L) set to %04X\n", i8237_r0[devnum]);
         }
     }
     return 0;
 }
 
-uint8 i8237_rDx(t_bool io, uint8 data)
+uint8 i8237_r1x(t_bool io, uint8 data, uint8 devnum)
 {
-    uint8 devnum;
-
-    if ((devnum = i8237_get_dn()) != 0xFF) {
-        if (io == 0) {                      /* read temporary register */
-            sim_debug (DEBUG_reg, &i8237_dev, "Illegal read of i8237_rD[devnum]\n");
-            return 0;
-        } else {                            /* master clear */
-            i8237_reset1();
-            sim_debug (DEBUG_reg, &i8237_dev, "i8237 master clear\n");
-            return 0;
+    if (io == 0) {                      /* read current word count CH 0 */
+        if (i8237_rD[devnum]) {                 /* high byte */
+            i8237_rD[devnum] = 0;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r1[devnum](H) read as %04X\n", i8237_r1[devnum]);
+            return (i8237_r1[devnum] >> 8);
+        } else {                        /* low byte */
+            i8237_rD[devnum]++;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r1[devnum](L) read as %04X\n", i8237_r1[devnum]);
+            return (i8237_r1[devnum] & 0xFF);
+        }
+    } else {                            /* write base & current address CH 0 */
+        if (i8237_rD[devnum]) {                 /* high byte */
+            i8237_rD[devnum] = 0;
+            i8237_r1[devnum] |= (data << 8);
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r1[devnum](H) set to %04X\n", i8237_r1[devnum]);
+        } else {                        /* low byte */
+            i8237_rD[devnum]++;
+            i8237_r1[devnum] = data & 0xFF;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r1[devnum](L) set to %04X\n", i8237_r1[devnum]);
         }
     }
     return 0;
 }
 
-uint8 i8237_rEx(t_bool io, uint8 data)
+uint8 i8237_r2x(t_bool io, uint8 data, uint8 devnum)
 {
-    uint8 devnum;
-
-    if ((devnum = i8237_get_dn()) != 0xFF) {
-        if (io == 0) {
-            sim_debug (DEBUG_reg, &i8237_dev, "Illegal read of i8237_rE[devnum]\n");
-            return 0;
-        } else {                            /* clear mask register */
-            i8237_rB[devnum] = 0;
-            sim_debug (DEBUG_reg, &i8237_dev, "i8237_rB[devnum] (mask) cleared\n");
-            return 0;
+    if (io == 0) {                      /* read current address CH 1 */
+        if (i8237_rD[devnum]) {                 /* high byte */
+            i8237_rD[devnum] = 0;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r2[devnum](H) read as %04X\n", i8237_r2[devnum]);
+            return (i8237_r2[devnum] >> 8);
+        } else {                        /* low byte */
+            i8237_rD[devnum]++;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r2[devnum](L) read as %04X\n", i8237_r2[devnum]);
+            return (i8237_r2[devnum] & 0xFF);
+        }
+    } else {                            /* write base & current address CH 1 */
+        if (i8237_rD[devnum]) {                 /* high byte */
+            i8237_rD[devnum] = 0;
+            i8237_r2[devnum] |= (data << 8);
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r2[devnum](H) set to %04X\n", i8237_r2[devnum]);
+        } else {                        /* low byte */
+            i8237_rD[devnum]++;
+            i8237_r2[devnum] = data & 0xFF;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r2[devnum](L) set to %04X\n", i8237_r2[devnum]);
         }
     }
     return 0;
 }
 
-uint8 i8237_rFx(t_bool io, uint8 data)
+uint8 i8237_r3x(t_bool io, uint8 data, uint8 devnum)
 {
-    uint8 devnum;
-
-    if ((devnum = i8237_get_dn()) != 0xFF) {
-        if (io == 0) {
-            sim_debug (DEBUG_reg, &i8237_dev, "Illegal read of i8237_rF[devnum]\n");
-            return 0;
-        } else {                            /* write all mask register bits */
-            i8237_rB[devnum] = data & 0x0F;
-            sim_debug (DEBUG_reg, &i8237_dev, "i8237_rB[devnum] (mask) set to %02X\n", i8237_rB[devnum]);
-            return 0;
+    if (io == 0) {                      /* read current word count CH 1 */
+        if (i8237_rD[devnum]) {                 /* high byte */
+            i8237_rD[devnum] = 0;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r3[devnum](H) read as %04X\n", i8237_r3[devnum]);
+            return (i8237_r3[devnum] >> 8);
+        } else {                        /* low byte */
+            i8237_rD[devnum]++;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r3[devnum](L) read as %04X\n", i8237_r3[devnum]);
+            return (i8237_r3[devnum] & 0xFF);
         }
+    } else {                            /* write base & current address CH 1 */
+        if (i8237_rD[devnum]) {                 /* high byte */
+            i8237_rD[devnum] = 0;
+            i8237_r3[devnum] |= (data << 8);
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r3[devnum](H) set to %04X\n", i8237_r3[devnum]);
+        } else {                        /* low byte */
+            i8237_rD[devnum]++;
+            i8237_r3[devnum] = data & 0xFF;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r3[devnum](L) set to %04X\n", i8237_r3[devnum]);
+        }
+    }
+    return 0;
+}
+
+uint8 i8237_r4x(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {                      /* read current address CH 2 */
+        if (i8237_rD[devnum]) {                 /* high byte */
+            i8237_rD[devnum] = 0;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r4[devnum](H) read as %04X\n", i8237_r4[devnum]);
+            return (i8237_r4[devnum] >> 8);
+        } else {                        /* low byte */
+            i8237_rD[devnum]++;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r4[devnum](L) read as %04X\n", i8237_r4[devnum]);
+            return (i8237_r4[devnum] & 0xFF);
+        }
+    } else {                            /* write base & current address CH 2 */
+        if (i8237_rD[devnum]) {                 /* high byte */
+            i8237_rD[devnum] = 0;
+            i8237_r4[devnum] |= (data << 8);
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r4[devnum](H) set to %04X\n", i8237_r4[devnum]);
+        } else {                        /* low byte */
+            i8237_rD[devnum]++;
+            i8237_r4[devnum] = data & 0xFF;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r4[devnum](L) set to %04X\n", i8237_r4[devnum]);
+        }
+    }
+    return 0;
+}
+
+uint8 i8237_r5x(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {                      /* read current word count CH 2 */
+        if (i8237_rD[devnum]) {                 /* high byte */
+            i8237_rD[devnum] = 0;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r5[devnum](H) read as %04X\n", i8237_r5[devnum]);
+            return (i8237_r5[devnum] >> 8);
+        } else {                        /* low byte */
+            i8237_rD[devnum]++;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r5[devnum](L) read as %04X\n", i8237_r5[devnum]);
+            return (i8237_r5[devnum] & 0xFF);
+        }
+    } else {                            /* write base & current address CH 2 */
+        if (i8237_rD[devnum]) {                 /* high byte */
+            i8237_rD[devnum] = 0;
+            i8237_r5[devnum] |= (data << 8);
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r5[devnum](H) set to %04X\n", i8237_r5[devnum]);
+        } else {                        /* low byte */
+            i8237_rD[devnum]++;
+            i8237_r5[devnum] = data & 0xFF;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r5[devnum](L) set to %04X\n", i8237_r5[devnum]);
+        }
+    }
+    return 0;
+}
+
+uint8 i8237_r6x(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {                      /* read current address CH 3 */
+        if (i8237_rD[devnum]) {                 /* high byte */
+            i8237_rD[devnum] = 0;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r6[devnum](H) read as %04X\n", i8237_r6[devnum]);
+            return (i8237_r6[devnum] >> 8);
+        } else {                        /* low byte */
+            i8237_rD[devnum]++;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r6[devnum](L) read as %04X\n", i8237_r6[devnum]);
+            return (i8237_r6[devnum] & 0xFF);
+        }
+    } else {                            /* write base & current address CH 3 */
+        if (i8237_rD[devnum]) {                 /* high byte */
+            i8237_rD[devnum] = 0;
+            i8237_r6[devnum] |= (data << 8);
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r6[devnum](H) set to %04X\n", i8237_r6[devnum]);
+        } else {                        /* low byte */
+            i8237_rD[devnum]++;
+            i8237_r6[devnum] = data & 0xFF;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r6[devnum](L) set to %04X\n", i8237_r6[devnum]);
+        }
+    }
+    return 0;
+}
+
+uint8 i8237_r7x(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {                      /* read current word count CH 3 */
+        if (i8237_rD[devnum]) {                 /* high byte */
+            i8237_rD[devnum] = 0;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r7[devnum](H) read as %04X\n", i8237_r7[devnum]);
+            return (i8237_r7[devnum] >> 8);
+        } else {                        /* low byte */
+            i8237_rD[devnum]++;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r7[devnum](L) read as %04X\n", i8237_r7[devnum]);
+            return (i8237_r7[devnum] & 0xFF);
+        }
+    } else {                            /* write base & current address CH 3 */
+        if (i8237_rD[devnum]) {                 /* high byte */
+            i8237_rD[devnum] = 0;
+            i8237_r7[devnum] |= (data << 8);
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r7[devnum](H) set to %04X\n", i8237_r7[devnum]);
+        } else {                        /* low byte */
+            i8237_rD[devnum]++;
+            i8237_r7[devnum] = data & 0xFF;
+            sim_debug (DEBUG_reg, &i8237_dev, "i8237_r7[devnum](L) set to %04X\n", i8237_r7[devnum]);
+        }
+    }
+    return 0;
+}
+
+uint8 i8237_r8x(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {                      /* read status register */
+        sim_debug (DEBUG_reg, &i8237_dev, "i8237_r8[devnum] (status) read as %02X\n", i8237_r8[devnum]);
+        return (i8237_r8[devnum]);
+    } else {                            /* write command register */
+        i8237_r9[devnum] = data & 0xFF;
+        sim_debug (DEBUG_reg, &i8237_dev, "i8237_r9[devnum] (command) set to %02X\n", i8237_r9[devnum]);
+    }
+    return 0;
+}
+
+uint8 i8237_r9x(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {
+        sim_debug (DEBUG_reg, &i8237_dev, "Illegal read of i8237_r9[devnum]\n");
+        return 0;
+    } else {                            /* write request register */
+        i8237_rC[devnum] = data & 0xFF;
+        sim_debug (DEBUG_reg, &i8237_dev, "i8237_rC[devnum] (request) set to %02X\n", i8237_rC[devnum]);
+    }
+    return 0;
+}
+
+uint8 i8237_rAx(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {
+        sim_debug (DEBUG_reg, &i8237_dev, "Illegal read of i8237_rA[devnum]\n");
+        return 0;
+    } else {                            /* write single mask register */
+        switch(data & 0x03) {
+        case 0:
+            if (data & 0x04)
+                i8237_rB[devnum] |= 1;
+            else
+                i8237_rB[devnum] &= ~1;
+            break;
+        case 1:
+            if (data & 0x04)
+                i8237_rB[devnum] |= 2;
+            else
+                i8237_rB[devnum] &= ~2;
+            break;
+        case 2:
+            if (data & 0x04)
+                i8237_rB[devnum] |= 4;
+            else
+                i8237_rB[devnum] &= ~4;
+            break;
+        case 3:
+            if (data & 0x04)
+                i8237_rB[devnum] |= 8;
+            else
+                i8237_rB[devnum] &= ~8;
+            break;
+        }
+        sim_debug (DEBUG_reg, &i8237_dev, "i8237_rB[devnum] (mask) set to %02X\n", i8237_rB[devnum]);
+    }
+    return 0;
+}
+
+uint8 i8237_rBx(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {
+        sim_debug (DEBUG_reg, &i8237_dev, "Illegal read of i8237_rB[devnum]\n");
+        return 0;
+    } else {                            /* write mode register */
+        i8237_rA[devnum] = data & 0xFF;
+        sim_debug (DEBUG_reg, &i8237_dev, "i8237_rA[devnum] (mode) set to %02X\n", i8237_rA[devnum]);
+    }
+    return 0;
+}
+
+uint8 i8237_rCx(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {
+        sim_debug (DEBUG_reg, &i8237_dev, "Illegal read of i8237_rC[devnum]\n");
+        return 0;
+    } else {                            /* clear byte pointer FF */
+        i8237_rD[devnum] = 0;
+        sim_debug (DEBUG_reg, &i8237_dev, "i8237_rD[devnum] (FF) cleared\n");
+    }
+    return 0;
+}
+
+uint8 i8237_rDx(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {                      /* read temporary register */
+        sim_debug (DEBUG_reg, &i8237_dev, "Illegal read of i8237_rD[devnum]\n");
+        return 0;
+    } else {                            /* master clear */
+        i8237_reset_dev(devnum);
+        sim_debug (DEBUG_reg, &i8237_dev, "i8237 master clear\n");
+    }
+    return 0;
+}
+
+uint8 i8237_rEx(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {
+        sim_debug (DEBUG_reg, &i8237_dev, "Illegal read of i8237_rE[devnum]\n");
+        return 0;
+    } else {                            /* clear mask register */
+        i8237_rB[devnum] = 0;
+        sim_debug (DEBUG_reg, &i8237_dev, "i8237_rB[devnum] (mask) cleared\n");
+    }
+    return 0;
+}
+
+uint8 i8237_rFx(t_bool io, uint8 data, uint8 devnum)
+{
+    if (io == 0) {
+        sim_debug (DEBUG_reg, &i8237_dev, "Illegal read of i8237_rF[devnum]\n");
+        return 0;
+    } else {                            /* write all mask register bits */
+        i8237_rB[devnum] = data & 0x0F;
+        sim_debug (DEBUG_reg, &i8237_dev, "i8237_rB[devnum] (mask) set to %02X\n", i8237_rB[devnum]);
     }
     return 0;
 }

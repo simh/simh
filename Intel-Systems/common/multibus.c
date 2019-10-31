@@ -334,7 +334,7 @@ void multibus_put_mbyte(uint16 addr, uint8 val)
 {
     SET_XACK(0);                        /* set no XACK */
     if ((isbc064_dev.flags & DEV_DIS) == 0) { //device is enabled
-        if (addr >= SBC064_BASE && addr <= (SBC064_BASE + SBC064_SIZE - 1))
+        if ((addr >= SBC064_BASE) && (addr <= (SBC064_BASE + SBC064_SIZE - 1)))
             isbc064_put_mbyte(addr, val);
     } else {
         return;

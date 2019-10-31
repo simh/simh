@@ -159,10 +159,12 @@ uint8 isbc064_get_mbyte(uint16 addr)
                   return (val & 0xFF);
         } else {
             sim_printf("isbc064_get_mbyte: Read-Enabled Out of range addr=%04X PC=%04X\n", addr, PCX);
+            SET_XACK(0);                /* bad memory address */
             return 0xff;                /* multibus has active high pullups and inversion */
         }
     } //device is disabled/not installed
     sim_printf ("isbc064_get_mbyte: Read-Disabled addr=%04X PC=%04X\n", addr, PCX);
+    SET_XACK(0);                        /* bad memory address */
     return 0xff;                        /* multibus has active high pullups and inversion */
 }
 
@@ -171,16 +173,18 @@ uint8 isbc064_get_mbyte(uint16 addr)
 void isbc064_put_mbyte(uint16 addr, uint8 val)
 {
        if ((isbc064_dev.flags & DEV_DIS) == 0) { //device is enabled
-        if ((addr >= isbc064_unit.u3) && (addr < (isbc064_unit.u3 + isbc064_unit.capac))) {
+        if ((addr >= isbc064_unit.u3) && (addr <= (isbc064_unit.u3 + isbc064_unit.capac))) {
             SET_XACK(1);                /* good memory address */
             *((uint8 *)isbc064_unit.filebuf + (addr - isbc064_unit.u3)) = val & 0xFF;
             return;
         } else {
             sim_printf("isbc064_put_mbyte: Write Out of range addr=%04X PC=%04X\n", addr, PCX);
+            SET_XACK(0);                /* bad memory address */
             return;
         }
     } //device is disabled/not installed
     sim_printf ("isbc064_put_mbyte: Write-Disabled addr=%04X PC=%04X\n", addr, PCX);
+    SET_XACK(0);                        /* bad memory address */
 }
 
 /* end of isbc064.c */

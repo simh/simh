@@ -475,12 +475,14 @@ int32 sim_instr(void)
         
         IR = OP = fetch_byte(0);        /* instruction fetch */
 
+        /*
         if (GET_XACK(1) == 0) {         // no XACK for instruction fetch
-//            reason = STOP_XACK;
-        if (uptr->flags & UNIT_XACK) 
+            reason = STOP_XACK;
+//        if (uptr->flags & UNIT_XACK) 
             sim_printf("Failed XACK for Instruction Fetch from %04X\n", PCX);
-//            continue;
+            continue;
          }
+         */
 
         // first instruction decode
         if (OP == 0x76) {               /* HLT Instruction*/
@@ -886,11 +888,13 @@ int32 sim_instr(void)
         case 0xDB:                  /* IN */
             port = fetch_byte(1);
             A = dev_table[port].routine(0, 0, dev_table[port].devnum);
+            SET_XACK(1);                /* good I/O address */
             break;
 
         case 0xD3:                  /* OUT */
             port = fetch_byte(1);
             dev_table[port].routine(1, A, dev_table[port].devnum);
+            SET_XACK(1);                /* good I/O address */
             break;
 
         default:                    /* undefined opcode */ 
@@ -902,17 +906,19 @@ int32 sim_instr(void)
         }
 loop_end:
 
+        /*
         if (GET_XACK(1) == 0) {     // no XACK for operand fetch
-//            reason = STOP_XACK;
+            reason = STOP_XACK;
             if (OP == 0xD3 || OP == 0xDB) {
-                if (uptr->flags & UNIT_XACK) 
+//                if (uptr->flags & UNIT_XACK) 
                     sim_printf("Failed XACK for Port %02X Fetch from %04X\n", port, PCX);
             } else {
-                if (uptr->flags & UNIT_XACK) 
+//                if (uptr->flags & UNIT_XACK) 
                     sim_printf("Failed XACK for Operand %04X Fetch from %04X\n", addr, PCX);
-//            continue;
+            continue;
             }
         }
+        */;
     }
 
 /* Simulation halted */

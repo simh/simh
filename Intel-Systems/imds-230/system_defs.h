@@ -71,7 +71,7 @@
 /* set the base I/O address for the iSBC 201 */
 #define SBC201_BASE     0x78
 #define SBC201_INT      INT_2
-#define SBC201_NUM      1
+#define SBC201_NUM      0
 
 /* set the base I/O address for the iSBC 202 */
 #define SBC202_BASE     0x78
@@ -91,11 +91,11 @@
 /* set the base for the zx-200a disk controller */
 #define ZX200A_BASE     0x78
 #define ZX200A_INT      INT_2
-#define ZX200A_NUM      1
+#define ZX200A_NUM      0
 
 /* set the base and size for the iSBC 464 ROM */
 #define SBC464_BASE     0xA800
-#define SBC464_SIZE     0x4800
+#define SBC464_SIZE     0x47FF
 #define SBC464_NUM      0
 
 /* set the base and size for the iSBC 064 RAM */
@@ -126,10 +126,10 @@
 
 /* Memory */
 
-#define MAXMEMSIZE          0x10000             /* 8080 max memory size */
+#define MAXMEMSIZE          0x0FFFF             /* 8080 max memory size */
 #define MEMSIZE             (i8080_unit.capac)  /* 8080 actual memory size */
-#define ADDRMASK            (MAXMEMSIZE - 1)    /* 8080 address mask */
-#define MEM_ADDR_OK(x)      (((uint32) (x)) < MEMSIZE)
+#define ADDRMASK            (MAXMEMSIZE)        /* 8080 address mask */
+#define MEM_ADDR_OK(x)      (((uint16) (x)) <= MEMSIZE)
 
 /* debug definitions */
 

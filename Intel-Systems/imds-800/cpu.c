@@ -104,13 +104,13 @@ uint8 get_mbyte(uint16 addr)
 {
     uint8 val;
 
-    if (((monitor_boot & 0x04) == 0) && (addr >= ROM0_BASE && addr <= ROM0_BASE + ROM0_SIZE)) 
+    if (((monitor_boot & 0x04) == 0) && (addr >= ROM0_BASE) && (addr <= (ROM0_BASE + ROM0_SIZE)))
         val = EPROM_get_mbyte(addr); 
-    else if (ROM1_SIZE && addr >= ROM1_BASE && addr <= ROM1_BASE + ROM1_SIZE)
+    else if (ROM1_SIZE && (addr >= ROM1_BASE) && (addr <= (ROM1_BASE + ROM1_SIZE)))
         val = EPROM1_get_mbyte(addr);
     else val = multibus_get_mbyte(addr);
     val &= 0xFF;
-    return(val);
+    return val;
 }
 
 /*  get a word from memory */

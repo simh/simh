@@ -118,11 +118,12 @@ uint8 RAM_get_mbyte(uint16 addr)
 {
     uint8 val;
 
-    if ((addr >= RAM_unit.u3) && ((uint32) addr < (RAM_unit.u3 + RAM_unit.capac))) {
+    if ((addr >= RAM_unit.u3) && ((uint32) addr <= (RAM_unit.u3 + RAM_unit.capac))) {
         SET_XACK(1);                /* good memory address */
         val = *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3));
         return (val & 0xFF);
     } else {
+        SET_XACK(0);                /* bad memory address */
         return 0xFF;
     }
 }
@@ -131,11 +132,12 @@ uint8 RAM_get_mbyte(uint16 addr)
 
 void RAM_put_mbyte(uint16 addr, uint8 val)
 {
-    if ((addr >= RAM_unit.u3) && ((uint32)addr < RAM_unit.u3 + RAM_unit.capac)) {
+    if ((addr >= RAM_unit.u3) && ((uint32)addr <= RAM_unit.u3 + RAM_unit.capac)) {
         SET_XACK(1);                /* good memory address */
         *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3)) = val & 0xFF;
         return;
     } else {
+        SET_XACK(0);                /* bad memory address */
         return;
         
     }

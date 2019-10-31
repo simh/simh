@@ -94,7 +94,7 @@ t_stat SBC_config(void)
     i8255_cfg(I8255_BASE_0, 0); 
     i8255_cfg(I8255_BASE_1, 1); 
     i8259_cfg(I8259_BASE_0, 0); 
-    i8259_cfg(I8259_BASE_1, 0); 
+    i8259_cfg(I8259_BASE_1, 1); 
     ipc_cont_cfg(ICONT_BASE, 0); 
     ioc_cont_cfg(DBB_BASE, 0); 
     EPROM_cfg(ROM_BASE, ROM_SIZE);

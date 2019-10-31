@@ -840,7 +840,7 @@ t_stat isbc208_svc (UNIT *uptr)
             } else {                // get image addr for this d, h, c, s    
                 if (fddst[uptr->u6] & TS)
                     imgadr = (cyl * bpc) /*+ (h * bpt)*/ + ((sec - 1) * ssize);
-                else
+                else {
                     imgadr = (cyl * bpt) + ((sec - 1) * ssize);
                     for (i=0; i<=i8237_r1; i++) { /* copy selected sector to memory */
                         data = *(fbuf + (imgadr + i));
@@ -860,6 +860,7 @@ t_stat isbc208_svc (UNIT *uptr)
                 if (h) {            // on head one?
                     i8272_w2++;     // yes, step cylinder
                     h = 0;          // back to head 0
+                    }
                 }
             }
             i8272_w5 = secn;
@@ -893,7 +894,7 @@ t_stat isbc208_svc (UNIT *uptr)
             } else {                // get image addr for this d, h, c, s    
                 if (fddst[uptr->u6] == TS)
                     imgadr = (cyl * bpc) /*+ (h * bpt)*/ + ((sec - 1) * ssize);
-                else
+                else {
                     imgadr = (cyl * bpt) + ((sec - 1) * ssize);
                     for (i=0; i<=i8237_r1; i++) { /* copy selected memory to image */
                         data = multibus_get_mbyte(i8237_r0 + i);
@@ -909,6 +910,7 @@ t_stat isbc208_svc (UNIT *uptr)
                 fclose(fp);
                 */
 //*** need to step return results IAW table 3-11 in 143078-001
+                }
                 i8272_w2 = cyl;     /* generate a current address mark */
                 i8272_w3 = hed >> 2;
                 i8272_w4 = ++sec;   /* next sector */

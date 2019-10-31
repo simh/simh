@@ -421,13 +421,8 @@ uint8 isbc202r1(t_bool io, uint8 data, uint8 devnum)
     if (io == 0) {                  /* read data port */
         fdc202.intff = 0;           //clear interrupt FF
         fdc202.stat &= ~FDCINT;
-        if (fdc202.rdychg) {
-            fdc202.rtype = ROK;
-            return fdc202.rtype;
-        } else {
-            fdc202.rtype = ROK;
-            return fdc202.rtype;
-        }
+        fdc202.rtype = ROK;
+        return fdc202.rtype;
     } else {                        /* write data port */
         fdc202.iopb = data;
     }
