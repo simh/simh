@@ -84,6 +84,11 @@ extern int display_scale(void);
 extern int display_age(int,int);
 
 /*
+ * Return true if the display is blank.
+ */
+extern int display_is_blank(void);
+
+/*
  * display intensity levels.
  * always at least 8 (for VT11/VS60) -- may be mapped internally
  */

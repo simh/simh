@@ -430,8 +430,8 @@ t_stat ch10_attach (UNIT *uptr, CONST char *cptr)
   if (peer[0] == '\0')
     return sim_messagef (SCPE_2FARG, "Must set Chaosnet PEER \"SET CH PEER=host:port\"\n");
 
-  snprintf (linkinfo, sizeof(linkinfo), "Buffer=%d,UDP,%s,PACKET,Connect=%s,Line=0",
-           (int)sizeof tx_buffer, cptr, peer);
+  snprintf (linkinfo, sizeof(linkinfo), "Buffer=%d,UDP,%s,PACKET,Connect=%.*s,Line=0",
+           (int)sizeof tx_buffer, cptr, (int)(sizeof(linkinfo) - (45 + strlen(cptr))), peer);
   r = tmxr_attach (&ch10_tmxr, uptr, linkinfo);
   if (r != SCPE_OK) {
     sim_debug (DBG_ERR, &ch10_dev, "TMXR error opening master\n");

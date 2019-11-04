@@ -1,6 +1,6 @@
 /* ka10_ten11.c: Rubin 10-11 interface.
 
-   Copyright (c) 2018, Lars Brinkhoff
+   Copyright (c) 2018-2019, Lars Brinkhoff
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -32,12 +32,7 @@
 
 #if (NUM_DEVS_TEN11 > 0)
 #include <fcntl.h>
-//#include <unistd.h>
 #include <sys/types.h>
-//#include <sys/socket.h>
-//#include <netinet/in.h>
-//#include <netinet/tcp.h>
-//#include <arpa/inet.h>
 
 /* Rubin 10-11 pager. */
 static uint64 ten11_pager[256];
@@ -73,7 +68,7 @@ static t_stat ten11_attach_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag,
 static const char *ten11_description (DEVICE *dptr);
 
 UNIT ten11_unit[1] = {
-  { UDATA (&ten11_svc,        UNIT_IDLE|UNIT_ATTABLE, 0), 1000 },
+  { UDATA (&ten11_svc, UNIT_IDLE|UNIT_ATTABLE, 0), 1000 },
 };
 
 static REG ten11_reg[] = {
@@ -128,7 +123,7 @@ static t_stat ten11_reset (DEVICE *dptr)
   ten11_desc.buffered = 2048;
 
   if (ten11_unit[0].flags & UNIT_ATT)
-    sim_activate (&ten11_unit[0], 1000);
+    sim_activate_abs (&ten11_unit[0], 0);
   else
     sim_cancel (&ten11_unit[0]);
 
@@ -147,7 +142,7 @@ static t_stat ten11_attach (UNIT *uptr, CONST char *cptr)
   if (r != SCPE_OK)                                       /* error? */
     return r;
   sim_debug(DBG_TRC, &ten11_dev, "activate connection\n");
-  sim_activate (uptr, 10);    /* start poll */
+  sim_activate_abs (uptr, 0);    /* start poll */
   uptr->flags |= UNIT_ATT;
   return SCPE_OK;
 }
@@ -184,7 +179,7 @@ static t_stat ten11_svc (UNIT *uptr)
     ten11_ldsc.rcve = 1;
     uptr->wait = TEN11_POLL;
   }
-  sim_activate (uptr, uptr->wait);
+  sim_clock_coschedule (uptr, uptr->wait);
   return SCPE_OK;
 }
 

@@ -181,6 +181,11 @@ t_stat cty_reset (DEVICE *dptr)
 
 t_stat cty_stop_os (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
+#if ITS
+    if (cpu_unit[0].flags & UNIT_ITSPAGE)
+        M[037] = FMASK;
+    else
+#endif
     M[CTY_SWITCH] = 1;                                 /* tell OS to stop */
     return SCPE_OK;
 }
@@ -196,7 +201,13 @@ t_stat cty_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cpt
 {
 fprintf (st, "To stop the cpu use the command:\n\n");
 fprintf (st, "    sim> SET CTY STOP\n\n");
+#if ITS
+fprintf (st, "If the CPU is in standard mode, this will write 1 to location\n\n");
+fprintf (st, "%03o, causing TOPS10 to stop.  If the CPU is in ITS mode, this\n\n", CTY_SWITCH);
+fprintf (st, "will write -1 to location 037, causing ITS to stop.\n\n");
+#else
 fprintf (st, "This will write a 1 to location %03o, causing TOPS10 to stop\n\n", CTY_SWITCH);
+#endif
 fprintf (st, "The additional terminals can be set to one of four modes: UC, 7P, 7B, or 8B.\n\n");
 fprintf (st, "  mode  input characters        output characters\n\n");
 fprintf (st, "  UC    lower case converted    lower case converted to upper case,\n");

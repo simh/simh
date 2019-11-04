@@ -125,7 +125,7 @@ t_stat lpt_devio(uint32 dev, uint64 *data) {
          *data = uptr->STATUS & (PI_DONE|PI_ERROR|DONE_FLG|BUSY_FLG|ERR_FLG);
          if ((uptr->flags & UNIT_UC) == 0)
              *data |= C96;
-         if ((uptr->flags & UNIT_UTF8) == 0)
+         if ((uptr->flags & UNIT_UTF8) != 0)
              *data |= C128;
          if ((uptr->flags & UNIT_ATT) == 0)
              *data |= ERR_FLG;
@@ -266,7 +266,7 @@ lpt_output(UNIT *uptr, char c) {
             lpt_buffer[uptr->POS++] = u & 0x7f;
         }
         uptr->COL++;
-    } else if (c >= 040) {
+    } else if (c >= 040 && c < 0177) {
         lpt_buffer[uptr->POS++] = c;
         uptr->COL++;
     }
@@ -283,7 +283,6 @@ t_stat lpt_svc (UNIT *uptr)
         set_interrupt(LP_DEVNUM, uptr->STATUS);
         return SCPE_OK;
     }
-
     if ((uptr->flags & UNIT_ATT) == 0) {
         uptr->STATUS |= ERR_FLG;
         set_interrupt(LP_DEVNUM, (uptr->STATUS >> 3));

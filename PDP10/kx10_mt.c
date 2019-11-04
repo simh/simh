@@ -280,7 +280,7 @@ t_stat mt_devio(uint32 dev, uint64 *data) {
                      uptr->CNTRL &= ~MT_BUSY;
                      wr_eor = 0;
                      mt_status |= NEXT_UNIT;
-                     if (cmd & 010) {
+                     if ((cmd & 010) != 0 || (mt_pia & NEXT_UNIT_ENAB) != 0) {
                          mt_status |= JOB_DONE;
                          set_interrupt(MT_DEVNUM+4, mt_pia >> 3);
                      } else {

@@ -246,6 +246,8 @@ t_stat dpy_devio(uint32 dev, uint64 *data) {
             dpy_update_status( uptr, ty340_reset(&dpy_dev), 1);
         sim_debug(DEBUG_CONO, &dpy_dev, "DPY %03o CONO %06o PC=%06o %06o\n",
                   dev, (uint32)*data, PC, uptr->STAT_REG & ~STAT_VALID);
+        if (!sim_is_active(uptr))
+            sim_activate_after(uptr, DPY_CYCLE_US);
         break;
 
     case DATAO:
@@ -262,6 +264,8 @@ t_stat dpy_devio(uint32 dev, uint64 *data) {
             inst = (uint32)RRZ(*data);
             dpy_update_status(uptr, ty340_instruction(inst), 1);
         }
+        if (!sim_is_active(uptr))
+            sim_activate_after(uptr, DPY_CYCLE_US);
         break;
 
     case DATAI:
@@ -276,7 +280,8 @@ t_stat dpy_devio(uint32 dev, uint64 *data) {
 /* Timer service - */
 t_stat dpy_svc (UNIT *uptr)
 {
-    sim_activate_after(uptr, DPY_CYCLE_US); /* requeue! */
+    if (!display_is_blank() || uptr->INT_COUNTDOWN > 0)
+        sim_activate_after(uptr, DPY_CYCLE_US); /* requeue! */
 
     display_age(DPY_CYCLE_US, 0);       /* age the display */
 

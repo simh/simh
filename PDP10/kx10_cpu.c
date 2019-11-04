@@ -2649,7 +2649,8 @@ if ((reason = build_dev_tab ()) != SCPE_OK)            /* build, chk dib_tab */
   watch_stop = 0;
 
   while ( reason == 0) {                                /* loop until ABORT */
-    if (sim_interval <= 0) {                           /* check clock queue */
+    AIO_CHECK_EVENT;                                    /* queue async events */
+    if (sim_interval <= 0) {                            /* check clock queue */
          if ((reason = sim_process_event()) != SCPE_OK) {/* error?  stop sim */
 #if ITS
              if (QITS)
@@ -2748,6 +2749,7 @@ no_fetch:
               if (Mem_read(pi_cycle | uuo_cycle, 1, 0))
                  goto last;
          /* Handle events during a indirect loop */
+         AIO_CHECK_EVENT;           /* queue async events */
          if (sim_interval-- <= 0) {
               if ((reason = sim_process_event()) != SCPE_OK) {
                   return reason;
@@ -2796,8 +2798,9 @@ st_pi:
 #endif
 
     /* Check if possible idle loop */
-    if (sim_idle_enab && (FLAGS & USER) != 0 && PC < 020 && AB < 020 &&
-           (IR & 0760) == 0340) {
+    if (sim_idle_enab && 
+          (((FLAGS & USER) != 0 && PC < 020 && AB < 020 && (IR & 0760) == 0340) ||
+           (uuo_cycle && (IR & 0740) == 0 && IA == 041))) {
        sim_idle (TMR_RTC, FALSE);
     }
 
@@ -4765,6 +4768,7 @@ left:
     case 0251: /* BLT */
               BR = AB;
               do {
+                  AIO_CHECK_EVENT;          /* queue async events */
                   if (sim_interval <= 0) {
                        sim_process_event();
                   }
@@ -6009,6 +6013,19 @@ qua_srv(UNIT * uptr)
 #endif
 
 
+/*
+ * This sequence of instructions is a mix that hopefully
+ * represents a resonable instruction set that is a close 
+ * estimate to the normal calibrated result.
+ */
+
+static const char *pdp10_clock_precalibrate_commands[] = {
+    "-m 100 ADDM 0,110",
+    "-m 101 ADDI 0,1",
+    "-m 102 JRST 100",
+    "PC 100",
+    NULL};
+
 /* Reset routine */
 
 t_stat cpu_reset (DEVICE *dptr)
@@ -6043,6 +6060,7 @@ exec_map = 0;
 for(i=0; i < 128; dev_irq[i++] = 0);
 sim_brk_types = SWMASK('E') | SWMASK('W') | SWMASK('R');
 sim_brk_dflt = SWMASK ('E');
+sim_clock_precalibrate_commands = pdp10_clock_precalibrate_commands;
 sim_rtcn_init_unit (&cpu_unit[0], cpu_unit[0].wait, TMR_RTC);
 sim_activate(&cpu_unit[0], 10000);
 #if MPX_DEV

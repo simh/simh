@@ -440,6 +440,15 @@ queue_point(struct point *p)
 }
 
 /*
+ * Return true if the display is blank, i.e. no active points in list.
+ */
+int
+display_is_blank(void)
+{
+    return head->next == head;
+}
+
+/*
  * here to to dynamically adjust interval for examination
  * of elapsed vs. simulated time, and fritter away
  * any extra wall-clock time without eating CPU

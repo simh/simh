@@ -69,7 +69,7 @@ TMXR tk10_desc = { TK10_LINES, 0, 0, tk10_ldsc };
 static uint64 status = 0;
 
 UNIT                tk10_unit[] = {
-    {UDATA(tk10_svc, TT_MODE_7B|UNIT_ATTABLE|UNIT_DISABLE, 0)},  /* 0 */
+    {UDATA(tk10_svc, TT_MODE_7B|UNIT_IDLE|UNIT_ATTABLE, 0)},  /* 0 */
 };
 DIB tk10_dib = {TK10_DEVNUM, 1, &tk10_devio, NULL};
 
@@ -115,9 +115,6 @@ static t_stat tk10_devio(uint32 dev, uint64 *data)
             status &= ~TK10_ODONE;
             if (!(status & TK10_IDONE))
                 status &= ~TK10_INT;
-            /* Set txdone so future calls to tmxr_txdone_ln will
-               return -1 rather than 1. */
-            tk10_ldsc[(status & TK10_TYO) >> 12].txdone = 1;
             sim_debug(DEBUG_CMD, &tk10_dev, "Clear output done port %lld\n",
                       (status & TK10_TYO) >> 12);
         }
@@ -144,13 +141,11 @@ static t_stat tk10_devio(uint32 dev, uint64 *data)
         port = (status & TK10_TYO) >> 12;
         sim_debug(DEBUG_DATAIO, &tk10_dev, "DATAO port %d -> %012llo\n",
                   port, *data);
-        lp = &tk10_ldsc[port];
-        ch = sim_tt_outcvt(*data & 0377, TT_GET_MODE (tk10_unit[0].flags));
-        if (!tk10_ldsc[port].conn)
-            /* If the port isn't connected, clear txdone to force
-               tmxr_txdone_ln to return 1 rather than -1. */
-            tk10_ldsc[port].txdone = 0;
-        tmxr_putc_ln (lp, ch);
+        if (tk10_ldsc[port].conn) {
+            lp = &tk10_ldsc[port];
+            ch = sim_tt_outcvt(*data & 0377, TT_GET_MODE (tk10_unit[0].flags));
+            tmxr_putc_ln (lp, ch);
+        }
         status &= ~TK10_ODONE;
         if (!(status & TK10_IDONE)) {
             status &= ~TK10_INT;
@@ -185,16 +180,13 @@ static t_stat tk10_svc (UNIT *uptr)
     int i;
 
     /* Slow hardware only supported 300 baud teletypes. */
-    sim_activate_after (uptr, 2083);
+    sim_clock_coschedule (uptr, 2083);
 
     i = tmxr_poll_conn (&tk10_desc);
     if (i >= 0) {
         tk10_ldsc[i].conn = 1;
         tk10_ldsc[i].rcve = 1;
         tk10_ldsc[i].xmte = 1;
-        /* Set txdone so tmxr_txdone_ln will not return return 1 on
-           the first call after a new connection. */
-        tk10_ldsc[i].txdone = 1;
         sim_debug(DEBUG_CMD, &tk10_dev, "Connect %d\n", i);
     }
 
@@ -244,6 +236,8 @@ static t_stat tk10_svc (UNIT *uptr)
 
 static t_stat tk10_reset (DEVICE *dptr)
 {
+    int i;
+
     sim_debug(DEBUG_CMD, &tk10_dev, "Reset\n");
     if (tk10_unit->flags & UNIT_ATT)
         sim_activate (tk10_unit, tmxr_poll);
@@ -252,6 +246,11 @@ static t_stat tk10_reset (DEVICE *dptr)
 
     status = 0;
     clr_interrupt(TK10_DEVNUM);
+
+    for (i = 0; i < TK10_LINES; i++) {
+        tmxr_set_line_unit (&tk10_desc, i, tk10_unit);
+        tmxr_set_line_output_unit (&tk10_desc, i, tk10_unit);
+    }
 
     return SCPE_OK;
 }
@@ -265,9 +264,6 @@ static t_stat tk10_attach (UNIT *uptr, CONST char *cptr)
     for (i = 0; i < TK10_LINES; i++) {
         tk10_ldsc[i].rcve = 0;
         tk10_ldsc[i].xmte = 0;
-        /* Set txdone so tmxr_txdone_ln will not return return 1 on
-           the first call. */
-        tk10_ldsc[i].txdone = 1;
     }
     if (stat == SCPE_OK) {
         status = TK10_GO;

@@ -86,7 +86,7 @@ static int dpk_ird = 0;
 static int dpk_iwr = 0;
 
 UNIT                dpk_unit[] = {
-    {UDATA(dpk_svc, TT_MODE_8B|UNIT_ATTABLE|UNIT_DISABLE, 0)},  /* 0 */
+    {UDATA(dpk_svc, TT_MODE_8B|UNIT_IDLE|UNIT_ATTABLE, 0)},  /* 0 */
 };
 DIB dpk_dib = {DPK_DEVNUM, 1, &dpk_devio, NULL};
 
@@ -249,8 +249,10 @@ static int dpk_output (int port, TMLN *lp)
     }
 
     ch = ildb (&M[dpk_base + 2*port + 1]);
-    ch = sim_tt_outcvt(ch & 0377, TT_GET_MODE (dpk_unit[0].flags));
-    tmxr_putc_ln (lp, ch);
+    if (lp->conn) {
+        ch = sim_tt_outcvt(ch & 0377, TT_GET_MODE (dpk_unit[0].flags));
+        tmxr_putc_ln (lp, ch);
+    }
             
     count = M[dpk_base + 2*port] - 1;
     M[dpk_base + 2*port] = count & 0777777777777LL;
@@ -264,7 +266,7 @@ static t_stat dpk_svc (UNIT *uptr)
     int i;
 
     /* 16 ports at 4800 baud, rounded up. */
-    sim_activate_after (uptr, 200);
+    sim_clock_coschedule (uptr, 200);
 
     i = tmxr_poll_conn (&dpk_desc);
     if (i >= 0) {
@@ -308,6 +310,8 @@ static t_stat dpk_svc (UNIT *uptr)
 
 static t_stat dpk_reset (DEVICE *dptr)
 {
+    int i;
+
     sim_debug(DEBUG_CMD, &dpk_dev, "Reset\n");
     if (dpk_unit->flags & UNIT_ATT)
         sim_activate (dpk_unit, tmxr_poll);
@@ -321,6 +325,11 @@ static t_stat dpk_reset (DEVICE *dptr)
     memset (dpk_port, 0, sizeof dpk_port);
     clr_interrupt(DPK_DEVNUM);
 
+    for (i = 0; i < DPK_LINES; i++) {
+        tmxr_set_line_unit (&dpk_desc, i, dpk_unit);
+        tmxr_set_line_output_unit (&dpk_desc, i, dpk_unit);
+    }
+
     return SCPE_OK;
 }
 
@@ -333,9 +342,6 @@ static t_stat dpk_attach (UNIT *uptr, CONST char *cptr)
     for (i = 0; i < DPK_LINES; i++) {
         dpk_ldsc[i].rcve = 0;
         dpk_ldsc[i].xmte = 0;
-        /* Clear txdone so tmxr_txdone_ln will not return return true
-           on the first call. */
-        dpk_ldsc[i].txdone = 0;
     }
     if (stat == SCPE_OK)
         sim_activate (uptr, tmxr_poll);
