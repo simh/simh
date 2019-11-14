@@ -284,41 +284,34 @@ if (hostname) {
         (0 == strcmp("255.255.255.255", hostname))) {
         fixed[0] = &ipaddr;
         fixed[1] = NULL;
+        if ((hints->ai_flags & AI_CANONNAME) && !(hints->ai_flags & AI_NUMERICHOST)) {
+            he = gethostbyaddr((char *)&ipaddr, 4, AF_INET);
+            if (NULL != he)
+                cname = he->h_name;
+            else
+                cname = hostname;
+            }
+        ips = fixed;
         }
     else {
-        if ((0xffffffff != (ipaddr.s_addr = inet_addr(hostname))) || 
-            (0 == strcmp("255.255.255.255", hostname))) {
-            fixed[0] = &ipaddr;
-            fixed[1] = NULL;
-            if ((hints->ai_flags & AI_CANONNAME) && !(hints->ai_flags & AI_NUMERICHOST)) {
-                he = gethostbyaddr((char *)&ipaddr, 4, AF_INET);
-                if (NULL != he)
-                    cname = he->h_name;
-                else
-                    cname = hostname;
-                }
-            ips = fixed;
+        if (hints->ai_flags & AI_NUMERICHOST)
+            return EAI_NONAME;
+        he = gethostbyname(hostname);
+        if (he) {
+            ips = (struct in_addr **)he->h_addr_list;
+            if (hints->ai_flags & AI_CANONNAME)
+                cname = he->h_name;
             }
         else {
-            if (hints->ai_flags & AI_NUMERICHOST)
-                return EAI_NONAME;
-            he = gethostbyname(hostname);
-            if (he) {
-                ips = (struct in_addr **)he->h_addr_list;
-                if (hints->ai_flags & AI_CANONNAME)
-                    cname = he->h_name;
-                }
-            else {
-                switch (h_errno)
-                    {
-                    case HOST_NOT_FOUND:
-                    case NO_DATA:
-                        return EAI_NONAME;
-                    case TRY_AGAIN:
-                        return EAI_AGAIN;
-                    default:
-                        return EAI_FAIL;
-                    }
+            switch (h_errno)
+                {
+                case HOST_NOT_FOUND:
+                case NO_DATA:
+                    return EAI_NONAME;
+                case TRY_AGAIN:
+                    return EAI_AGAIN;
+                default:
+                    return EAI_FAIL;
                 }
             }
         }
