@@ -821,7 +821,7 @@ if (strchr (parts, 't') || strchr (parts, 'z')) {
     memset (&filestat, 0, sizeof (filestat));
     (void)stat (fullpath, &filestat);
     if (sizeof (filestat.st_size) == 4)
-        sprintf (filesizebuf, "%ld ", filestat.st_size);
+        sprintf (filesizebuf, "%ld ", (long)filestat.st_size);
     else
         sprintf (filesizebuf, "%" LL_FMT "d ", (LL_TYPE)filestat.st_size);
     tm = localtime (&filestat.st_mtime);
