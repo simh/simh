@@ -12886,6 +12886,14 @@ if (sim_deb && dptr && ((dptr->dctrl | (uptr ? uptr->dctrl : 0)) & dbits)) {
                 }
             j = i + 1;
             }
+        else {
+            if (buf[i] == 0) {      /* Imbedded \0 character in formatted result? */
+                fprintf (stderr, "sim_debug() formatted result: '%s'\r\n"
+                                 "            has an imbedded \\0 character.\r\n"
+                                 "DON'T DO THAT!\r\n", buf);
+                abort();
+                }
+            }
         }
     if (i > j) {
         if (!debug_unterm)                          /* print prefix when required */
