@@ -3383,6 +3383,9 @@ if (*cptr) {
                     sim_printf ("No help available for the %s command\n", cmdp->name);
                 }
             }
+        else {
+            sim_printf ("No such command or device %s\n", gbuf);
+            }
         }
     else {
         if (dptr->flags & DEV_DIS)
