@@ -2745,8 +2745,10 @@ while (*tptr) {
                 else
                     if (0 == MATCH_CMD (cptr, "TELNET"))
                         listennotelnet = FALSE;
-                    else
-                        return sim_messagef (SCPE_ARG, "Invalid Specifier: %s\n", tptr);
+                    else {
+                        if (*tptr)
+                            return sim_messagef (SCPE_ARG, "Invalid Specifier: %s\n", tptr);
+                        }
                 }
             cptr = init_cptr;
             }
