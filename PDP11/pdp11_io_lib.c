@@ -127,9 +127,9 @@ if (dptr == NULL)
 dibp = (DIB *) dptr->ctxt;
 if ((dibp == NULL) || (dibp->ba <= IOPAGEBASE))
     return SCPE_IERR;
-if (sim_switches & SWMASK ('H'))
+if ((sim_switches & SWMASK('H')) || (sim_switch_number == 16))
     radix = 16;
-if (sim_switches & SWMASK ('O'))
+if ((sim_switches & SWMASK('O')) || (sim_switch_number == 8))
     radix = 8;
 fprintf (st, "address=");
 fprint_val (st, (t_value) dibp->ba, DEV_RDX, 32, PV_LEFT);
@@ -221,9 +221,9 @@ if (dptr == NULL)
 dibp = (DIB *) dptr->ctxt;
 if (dibp == NULL)
     return SCPE_IERR;
-if (sim_switches & SWMASK ('H'))
+if ((sim_switches & SWMASK('H')) || (sim_switch_number == 16))
     radix = 16;
-if (sim_switches & SWMASK ('O'))
+if ((sim_switches & SWMASK('O')) || (sim_switch_number == 8))
     radix = 8;
 vec = dibp->vec;
 if (arg)
@@ -434,13 +434,16 @@ DIB *dibp;
 uint32 maxaddr, maxname, maxdev;
 int32 maxvec, vecwid;
 int32 brbase = 0;
+uint32 rdx = DEV_RDX;
 char valbuf[40];
+char *vec_fmt = NULL;
+char vec_fmt_buf[16];
 
-#if defined DEV_RDX && DEV_RDX == 16
-#define VEC_FMT "X"
-#else
-#define VEC_FMT "o"
-#endif
+if ((sim_switches & SWMASK('O')) || (sim_switch_number == 8))
+    rdx = 8;
+if ((sim_switches & SWMASK('H')) || (sim_switch_number == 16))
+    rdx = 16;
+vec_fmt = (rdx == 16) ? "X" : "o";
 
 if (build_dib_tab ())                                   /* build IO page */
     return SCPE_OK;
@@ -471,8 +474,9 @@ for (i = 0, dibp = NULL; i < (IOPAGESIZE >> 1); i++) {  /* loop thru entries */
             maxdev = j;
         }                                               /* end if */
     }                                                   /* end for i */
-maxaddr = fprint_val (NULL, (t_value) dibp->ba, DEV_RDX, 32, PV_LEFT);
-sprintf (valbuf, "%03" VEC_FMT, maxvec);
+maxaddr = fprint_val (NULL, (t_value) dibp->ba, rdx, 32, PV_LEFT);
+sprintf (vec_fmt_buf, "%s%s", "%03", vec_fmt);
+sprintf (valbuf, vec_fmt_buf, maxvec);
 vecwid = maxvec = (int32) strlen (valbuf);
 if (vecwid < 3)
     vecwid = 3;
@@ -522,19 +526,22 @@ for (i = 0, dibp = NULL; i < (IOPAGESIZE >> 1); i++) {  /* loop thru entries */
     if (iodibp[i] && (iodibp[i] != dibp)) {             /* new block? */
         dibp = iodibp[i];                               /* DIB for block */
         dptr = dibp->dptr;                              /* locate device */
-        fprint_val (st, (t_value) dibp->ba, DEV_RDX, 32, PV_LEFT);
+        fprint_val (st, (t_value) dibp->ba, rdx, 32, PV_LEFT);
         fprintf (st, " - ");
-        fprint_val (st, (t_value) dibp->ba + dibp->lnt - 1, DEV_RDX, 32, PV_LEFT);
+        fprint_val (st, (t_value) dibp->ba + dibp->lnt - 1, rdx, 32, PV_LEFT);
         fprintf (st, "%c ",                        /* print block entry */
             (dibp->ba < IOPAGEBASE + AUTO_CSRBASE + AUTO_CSRMAX)? '*': ' ');
         if (dibp->vec == 0)
             fprintf (st, "%*s", ((vecwid*2)+1+1), " ");
         else {
-            fprintf (st, "%0*" VEC_FMT, vecwid, dibp->vec);
-            if (dibp->vnum > 1)
-                fprintf (st, "-%0*" VEC_FMT, vecwid, dibp->vec + (4 *
+            sprintf (vec_fmt_buf, "%s%s", "%0*", vec_fmt);
+            fprintf (st, vec_fmt_buf, vecwid, dibp->vec);
+            if (dibp->vnum > 1) {
+                sprintf (vec_fmt_buf, "%s%s", "-%0*", vec_fmt);
+                fprintf (st, vec_fmt_buf, vecwid, dibp->vec + (4 *
                 (dibp->ulnt? dibp->lnt/dibp->ulnt:
                                             (dptr? dptr->numunits: 1)) * dibp->vnum) - 4);
+                }
             else
                 fprintf (st, " %*s", vecwid, " ");
             fprintf (st, "%1s", (dibp->vnum >= AUTO_VECBASE)? "*": " ");
@@ -549,7 +556,6 @@ for (i = 0, dibp = NULL; i < (IOPAGESIZE >> 1); i++) {  /* loop thru entries */
         }                                               /* end if */
     }                                                   /* end for i */
 return SCPE_OK;
-#undef VEC_FMT
 }
 
 /* Autoconfiguration
