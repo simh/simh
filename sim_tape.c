@@ -4232,7 +4232,7 @@ static void ansi_fill_text_buffer (FILE *f, char *buf, size_t buf_size, size_t r
             if (rec_size >= record_skip_ending)
                 rec_size -= record_skip_ending;
             if ((rec_size + 4) > (int)(buf_size - offset)) { /* room for record? */
-                fseek (f, start, SEEK_SET);
+                (void)fseek (f, start, SEEK_SET);
                 break;
                 }
             sprintf (rec_size_str, "%04u", (int)(rec_size + 4));

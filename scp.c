@@ -2865,7 +2865,8 @@ fprintf (st, "   HELP dev SET\n");
 fprintf (st, "   HELP dev SHOW\n");
 fprintf (st, "   HELP dev REGISTERS\n\n");
 fprintf (st, "Help is available for the following commands:\n\n    ");
-qsort (hlp_cmdp, cmd_cnt, sizeof(*hlp_cmdp), _cmd_name_compare);
+if (hlp_cmdp)
+    qsort (hlp_cmdp, cmd_cnt, sizeof(*hlp_cmdp), _cmd_name_compare);
 line_offset = 4;
 for (i=0; i<cmd_cnt; ++i) {
     fputs (hlp_cmdp[i]->name, st);
