@@ -598,6 +598,16 @@ if (MT_GET_FMT (uptr) < MTUF_F_ANSI)
     fflush (uptr->fileref);
 }
 
+static const char *_sim_tape_format_name (UNIT *uptr)
+{
+int32 f = MT_GET_FMT (uptr);
+
+if (f == MTUF_F_ANSI)
+    return ansi_args[MT_GET_ANSI_TYP (uptr)].name;
+else
+    return fmts[f].name;
+}
+
 /* Attach tape unit */
 
 t_stat sim_tape_attach (UNIT *uptr, CONST char *cptr)
@@ -662,6 +672,7 @@ switch (MT_GET_FMT (uptr)) {
         if (1) {
             const char *ocptr = cptr;
             char label[CBUFSIZE] = "simh";
+            int file_errors = 0;
 
             if ((MT_GET_ANSI_TYP (uptr) == MTAT_F_RT11)  ||
                 (MT_GET_ANSI_TYP (uptr) == MTAT_F_RSX11) ||
@@ -678,10 +689,16 @@ switch (MT_GET_FMT (uptr)) {
             if (!uptr->fileref)
                 return SCPE_MEM;
             while (*cptr != 0) {                                    /* do all mods */
+                uint32 initial_file_count = tape->file_count;
+
                 cptr = get_glyph_nc (cptr, gbuf, ',');              /* get filename */
-                sim_dir_scan (gbuf, sim_tape_add_ansi_entry, tape);
+                r = sim_dir_scan (gbuf, sim_tape_add_ansi_entry, tape);
+                if (r != SCPE_OK)
+                    sim_messagef (SCPE_ARG, "file not found: %s\n", gbuf);
+                if (tape->file_count == initial_file_count)
+                    ++file_errors;
                 }
-            if (tape->file_count > 0) {
+            if ((tape->file_count > 0) && (file_errors == 0)) {
                 r = SCPE_OK;
                 memory_tape_add_block (tape, NULL, 0);  /* Tape Mark */
                 uptr->flags |= UNIT_ATT;
@@ -693,6 +710,7 @@ switch (MT_GET_FMT (uptr)) {
                 r = SCPE_ARG;
                 memory_free_tape (uptr->fileref);
                 uptr->fileref = NULL;
+                cptr = ocptr;
                 }
             }
         break;
@@ -798,11 +816,12 @@ switch (MT_GET_FMT (uptr)) {
         break;
     }
 if (r != SCPE_OK) {                                     /* error? */
+    r = sim_messagef (r, "Can't open %s format tape image: %s\n", _sim_tape_format_name (uptr), cptr);
     if (auto_format)    /* format was specified at attach time? */
         sim_tape_set_fmt (uptr, 0, "SIMH", NULL);   /* restore default format */
     uptr->recsize = 0;
     uptr->tape_eom = 0;
-    return sim_messagef (r, "Can't open tape image: %s\n", cptr);
+    return r;
     }
 
 if ((sim_switches & SWMASK ('D')) && !had_debug) {
@@ -3220,12 +3239,7 @@ return sim_messagef (SCPE_ARG, "Unknown tape format: %s\n", cptr);
 
 t_stat sim_tape_show_fmt (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
-int32 f = MT_GET_FMT (uptr);
-
-if (f == MTUF_F_ANSI)
-    fprintf (st, "%s format", ansi_args[MT_GET_ANSI_TYP (uptr)].name);
-else
-    fprintf (st, "%s format", fmts[f].name);
+fprintf (st, "%s format", _sim_tape_format_name (uptr));
 return SCPE_OK;
 }
 
@@ -4387,6 +4401,7 @@ return tape;
 static int ansi_add_file_to_tape (MEMORY_TAPE *tape, const char *filename)
 {
 FILE *f;
+struct stat statb;
 struct ansi_tape_parameters *ansi = &ansi_args[tape->ansi_type];
 uint8 *block = NULL;
 size_t max_record_size;
@@ -4401,9 +4416,22 @@ HDR2 hdr2;
 HDR3 hdr3;
 HDR4 hdr4;
 
+memset (&statb, 0, sizeof (statb));
+if (stat (filename, &statb)) {
+    sim_printf ("Can't stat: %s\n", filename);
+    return -1;
+    }
+if (S_IFDIR & statb.st_mode) {
+    sim_printf ("Can't put a directory on tape: %s\n", filename);
+    return -1;
+    }
+if (!(S_IFREG & statb.st_mode)) {
+    sim_printf ("Can't put a non regular file on tape: %s\n", filename);
+    return -1;
+    }
 f = fopen (filename, "rb");
 if (f == NULL) {
-    fprintf (stderr, "Can't open: %s - %s\n", filename, strerror(errno));
+    sim_printf ("Can't open: %s - %s\n", filename, strerror(errno));
     return errno;
     }
 tape_classify_file_contents (f, &max_record_size, &lf_line_endings, &crlf_line_endings);
