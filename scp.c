@@ -5714,9 +5714,10 @@ return SCPE_OK;
 
 const char *sprint_capac (DEVICE *dptr, UNIT *uptr)
 {
-static char capac_buf[((CHAR_BIT * sizeof (t_value) * 4 + 3)/3) + 8];
+static char capac_buf[((CHAR_BIT * sizeof (t_value) * 4 + 3)/3) + 12];
 t_addr kval = (uptr->flags & UNIT_BINK)? 1024: 1000;
 t_addr mval;
+double remfrac;
 t_addr psize = uptr->capac;
 const char *scale, *width;
 
@@ -5731,18 +5732,28 @@ else
     width = "B";
 if ((psize < (kval * 10)) &&
     (0 != (psize % kval))) {
+    remfrac = 0.0;
     scale = "";
     }
 else if ((psize < (mval * 10)) &&
          (0 != (psize % mval))){
     scale = "K";
+    remfrac = ((double)(psize % kval))/kval;
     psize = psize / kval;
     }
 else {
     scale = "M";
+    remfrac = ((double)(psize % mval))/mval;
     psize = psize / mval;
     }
 sprint_val (capac_buf, (t_value) psize, 10, T_ADDR_W, PV_LEFT);
+if ((remfrac != 0.0) && (sim_switches & SWMASK ('R'))) {
+    char *plast_char = &capac_buf[strlen (capac_buf) - 1];
+    char save_char = *plast_char;
+
+    sprintf (plast_char, "%0.3f", remfrac);
+    *plast_char = save_char;
+    }
 sprintf (&capac_buf[strlen (capac_buf)], "%s%s", scale, width);
 return capac_buf;
 }
