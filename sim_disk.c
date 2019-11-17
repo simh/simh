@@ -1110,7 +1110,7 @@ static t_offset get_ods2_filesystem_size (UNIT *uptr)
 DEVICE *dptr;
 t_addr saved_capac;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
-t_offset temp_capac = 512 * (t_offset)0xFFFFFFFFu;  /* Make sure we can access the largest sector */
+t_addr temp_capac = (sim_toffset_64 ? (t_addr)0xFFFFFFFFu : (t_addr)0x7FFFFFFFu);  /* Make sure we can access the largest sector */
 uint32 capac_factor;
 ODS2_HomeBlock Home;
 ODS2_FileHeader Header;
@@ -1125,7 +1125,7 @@ if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return ret_val;
 capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* save capacity units (word: 2, byte: 1) */
 saved_capac = uptr->capac;
-uptr->capac = (t_addr)(temp_capac/(capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
+uptr->capac = (t_addr)(temp_capac/(capac_factor*((dptr->flags & DEV_SECTORS) ? 1 : 512)));
 if ((sim_disk_rdsect (uptr, 512 / ctx->sector_size, (uint8 *)&Home, &sects_read, sizeof (Home) / ctx->sector_size)) ||
     (sects_read != (sizeof (Home) / ctx->sector_size)))
     goto Return_Cleanup;
@@ -1197,7 +1197,7 @@ static t_offset get_ods1_filesystem_size (UNIT *uptr)
 DEVICE *dptr;
 t_addr saved_capac;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
-t_offset temp_capac = 512 * (t_offset)0xFFFFFFFFu;  /* Make sure we can access the largest sector */
+t_addr temp_capac = (sim_toffset_64 ? (t_addr)0xFFFFFFFFu : (t_addr)0x7FFFFFFFu);  /* Make sure we can access the largest sector */
 uint32 capac_factor;
 ODS1_HomeBlock Home;
 ODS1_FileHeader Header;
@@ -1213,7 +1213,7 @@ if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return ret_val;
 capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* save capacity units (word: 2, byte: 1) */
 saved_capac = uptr->capac;
-uptr->capac = (t_addr)(temp_capac/(capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
+uptr->capac = (t_addr)(temp_capac/(capac_factor*((dptr->flags & DEV_SECTORS) ? 1 : 512)));
 if ((sim_disk_rdsect (uptr, 512 / ctx->sector_size, (uint8 *)&Home, &sects_read, sizeof (Home) / ctx->sector_size)) ||
     (sects_read != (sizeof (Home) / ctx->sector_size)))
     goto Return_Cleanup;
@@ -1274,7 +1274,7 @@ static t_offset get_ultrix_filesystem_size (UNIT *uptr)
 DEVICE *dptr;
 t_addr saved_capac;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
-t_offset temp_capac = 512 * (t_offset)0xFFFFFFFFu;  /* Make sure we can access the largest sector */
+t_addr temp_capac = (sim_toffset_64 ? (t_addr)0xFFFFFFFFu : (t_addr)0x7FFFFFFFu);  /* Make sure we can access the largest sector */
 uint32 capac_factor;
 uint8 sector_buf[512];
 ultrix_disklabel *Label = (ultrix_disklabel *)(sector_buf + sizeof (sector_buf) - sizeof (ultrix_disklabel));
@@ -1287,7 +1287,7 @@ if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return ret_val;
 capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* save capacity units (word: 2, byte: 1) */
 saved_capac = uptr->capac;
-uptr->capac = (t_addr)(temp_capac/(capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
+uptr->capac = (t_addr)(temp_capac/(capac_factor*((dptr->flags & DEV_SECTORS) ? 1 : 512)));
 if ((sim_disk_rdsect (uptr, 31 * (512 / ctx->sector_size), sector_buf, &sects_read, 512 / ctx->sector_size)) ||
     (sects_read != (512 / ctx->sector_size)))
     goto Return_Cleanup;
@@ -1393,7 +1393,7 @@ static t_offset get_rt11_filesystem_size (UNIT *uptr)
 DEVICE *dptr;
 t_addr saved_capac;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
-t_offset temp_capac = 512 * (t_offset)0xFFFFFFFFu;
+t_addr temp_capac = (sim_toffset_64 ? (t_addr)0xFFFFFFFFu : (t_addr)0x7FFFFFFFu);  /* Make sure we can access the largest sector */
 uint32 capac_factor;
 uint8 sector_buf[1024];
 RT11_HomeBlock Home;
@@ -1411,7 +1411,7 @@ if ((dptr = find_dev_from_unit (uptr)) == NULL)
      return ret_val;
 capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1;
 saved_capac = uptr->capac;
-uptr->capac = (t_addr)(temp_capac / (capac_factor * ((dptr->flags & DEV_SECTORS) ? 512 : 1)));
+uptr->capac = (t_addr)(temp_capac / (capac_factor * ((dptr->flags & DEV_SECTORS) ? 1 : 512)));
 
 for (part = 0; part < RT11_MAXPARTITIONS; part++) {
     uint16 seg_highest;
