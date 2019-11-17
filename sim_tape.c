@@ -816,7 +816,16 @@ switch (MT_GET_FMT (uptr)) {
         break;
     }
 if (r != SCPE_OK) {                                     /* error? */
-    r = sim_messagef (r, "Can't open %s format tape image: %s\n", _sim_tape_format_name (uptr), cptr);
+    switch (MT_GET_FMT (uptr)) {
+        case MTUF_F_ANSI:
+        case MTUF_F_TAR:
+        case MTUF_F_FIXED:
+            r = sim_messagef (r, "Error opening %s format internal tape image generated from: %s\n", _sim_tape_format_name (uptr), cptr);
+            break;
+        default:
+            r = sim_messagef (r, "Error opening %s format tape image: %s - %s\n", _sim_tape_format_name (uptr), cptr, strerror(errno));
+            break;
+        }
     if (auto_format)    /* format was specified at attach time? */
         sim_tape_set_fmt (uptr, 0, "SIMH", NULL);   /* restore default format */
     uptr->recsize = 0;
@@ -4416,23 +4425,26 @@ HDR2 hdr2;
 HDR3 hdr3;
 HDR4 hdr4;
 
-memset (&statb, 0, sizeof (statb));
-if (stat (filename, &statb)) {
-    sim_printf ("Can't stat: %s\n", filename);
-    return -1;
-    }
-if (S_IFDIR & statb.st_mode) {
-    sim_printf ("Can't put a directory on tape: %s\n", filename);
-    return -1;
-    }
-if (!(S_IFREG & statb.st_mode)) {
-    sim_printf ("Can't put a non regular file on tape: %s\n", filename);
-    return -1;
-    }
 f = fopen (filename, "rb");
 if (f == NULL) {
     sim_printf ("Can't open: %s - %s\n", filename, strerror(errno));
     return errno;
+    }
+memset (&statb, 0, sizeof (statb));
+if (fstat (fileno (f), &statb)) {
+    sim_printf ("Can't stat: %s\n", filename);
+    fclose (f);
+    return -1;
+    }
+if (S_IFDIR & statb.st_mode) {
+    sim_printf ("Can't put a directory on tape: %s\n", filename);
+    fclose (f);
+    return -1;
+    }
+if (!(S_IFREG & statb.st_mode)) {
+    sim_printf ("Can't put a non regular file on tape: %s\n", filename);
+    fclose (f);
+    return -1;
     }
 tape_classify_file_contents (f, &max_record_size, &lf_line_endings, &crlf_line_endings);
 ansi_make_HDR1 (&hdr1, &tape->vol1, &hdr4, filename, tape->ansi_type);
