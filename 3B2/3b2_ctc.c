@@ -590,9 +590,7 @@ static void ctc_cmd(uint8 cid,
                 for (j = 0; j < read_bytes; j++) {
                     uint32 offset;
                     /* Drain the buffer */
-                    if (b == 0 &&
-                        start_byte > 0 &&
-                        (j + start_byte) < VTOC_SECSZ) {
+                    if (b == 0 && (j + start_byte) < VTOC_SECSZ) {
                         /* This is a partial read of the first block,
                          * continuing to read from a previous partial
                          * block read. */
