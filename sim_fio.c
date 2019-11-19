@@ -782,7 +782,9 @@ else {
         return NULL;
         }
     strlcpy (fullpath, dir, tot_len);
-    strlcat (fullpath, "/", tot_len);
+    if ((dir[strlen (dir) - 1] != '/') &&       /* if missing a trailing directory separator? */
+        (dir[strlen (dir) - 1] != '\\'))
+        strlcat (fullpath, "/", tot_len);       /*  then add one */
     strlcat (fullpath, filepath, tot_len);
     }
 while ((c = strchr (fullpath, '\\')))           /* standardize on / directory separator */
