@@ -104,7 +104,7 @@ int32 rpackfd (UFP *a, int32 *rh);
 int32 rpackg (UFP *a, int32 *rh);
 void vax_fadd (UFP *a, UFP *b, uint32 mhi, uint32 mlo);
 void vax_fmul (UFP *a, UFP *b, t_bool qd, int32 bias, uint32 mhi, uint32 mlo);
-void vax_fdiv (UFP *b, UFP *a, int32 prec, int32 bias);
+void vax_fdiv (UFP *a, UFP *b, int32 prec, int32 bias);
 void vax_fmod (UFP *a, int32 bias, int32 *intgr, int32 *flg);
 
 /* Quadword arithmetic shift
@@ -648,7 +648,7 @@ int32 rpackg (UFP *a, int32 *rh);
 void vax_fadd (UFP *a, UFP *b, uint32 mhi, uint32 mlo);
 void vax_fmul (UFP *a, UFP *b, t_bool qd, int32 bias, uint32 mhi, uint32 mlo);
 void vax_fmod (UFP *a, int32 bias, int32 *intgr, int32 *flg);
-void vax_fdiv (UFP *b, UFP *a, int32 prec, int32 bias);
+void vax_fdiv (UFP *a, UFP *b, int32 prec, int32 bias);
 void dp_add (UDP *a, UDP *b);
 void dp_inc (UDP *a);
 void dp_sub (UDP *a, UDP *b);
