@@ -130,7 +130,7 @@ if "%1" neq "reset" goto GitAddNew
 :GitSetup
 if exist .git rmdir/q/s .git
 if exist *.zip del *.zip
-copy /y "%~p0README.md" .\
+copy /y "%~p0Win32-Development-Binaries-README.md" .\README.md
 git init
 git add README.md
 git commit -m "Initializing the Windows Binary repository"
