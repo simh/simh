@@ -3274,8 +3274,10 @@ tape_size = (t_addr)sim_fsize (uptr->fileref);
 sim_debug_unit (MTSE_DBG_STR, uptr, "tpc_map: tape_size: %" T_ADDR_FMT "u\n", tape_size);
 for (objc = 0, sizec = 0, tpos = 0;; ) {
     (void)sim_tape_seek (uptr, tpos);
-    i = sim_fread (&bc, sizeof (t_tpclnt), 1, uptr->fileref);
+    i = sim_fread (&bc, sizeof (bc), 1, uptr->fileref);
     if (i == 0)     /* past or at eof? */
+        break;
+    if (bc > 65535) /* Range check length value to satisfy Coverity */
         break;
     if (countmap[bc] == 0)
         sizec++;
