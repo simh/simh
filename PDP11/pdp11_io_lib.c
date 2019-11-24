@@ -436,7 +436,7 @@ int32 maxvec, vecwid;
 int32 brbase = 0;
 uint32 rdx = DEV_RDX;
 char valbuf[40];
-char *vec_fmt = NULL;
+const char *vec_fmt = NULL;
 char vec_fmt_buf[16];
 
 if ((sim_switches & SWMASK('O')) || (sim_switch_number == 8))
