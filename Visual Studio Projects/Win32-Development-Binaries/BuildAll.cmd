@@ -8,7 +8,7 @@ rem
 rem  We're using a github repository for this purpose since github no longer
 rem  supports a Download files facility since some folks were using it to 
 rem  contain large binary files.  The typical set of simh windows binaries
-rem  is under 10MB in size and the plan is to delete and recreate the whole
+rem  is about 35MB in size and the plan is to delete and recreate the whole
 rem  Win32-Development-Binaries repository at least every few months.
 rem
 rem  If this script is invoked with a single parameter "reset", the local
@@ -97,7 +97,7 @@ rem  This procedure must be located in the "Visual Studio Projects\Win32-Develop
 rem  The git repository directory (.git) is located relative to that directory.
 cd %~p0
 SET GIT_COMMIT_ID=
-if not exist ..\..\.git\hooks\post-commit copy /y ..\git-hooks\post* ..\..\.git\hooks\ > NUL 2>&1
+SET GIT_COMMIT_TIME=
 pushd ..\..
 git checkout -q master
 git fetch -q origin master
@@ -109,6 +109,10 @@ for /F "usebackq tokens=2" %%i in (`findstr /C:SIM_GIT_COMMIT_TIME ..\.git-commi
 for /F "tokens=1 delims=-T" %%i in ("%GIT_COMMIT_TIME%") do set D_YYYY=%%i
 for /F "tokens=2 delims=-T" %%i in ("%GIT_COMMIT_TIME%") do set D_MM=%%i
 for /F "tokens=3 delims=-T" %%i in ("%GIT_COMMIT_TIME%") do set D_DD=%%i
+set _SIM_MAJOR=
+set _SIM_MINOR=
+set _SIM_PATCH=
+set _SIM_VERSION_MODE=
 for /F "usebackq tokens=3" %%i in (`findstr/C:"#define SIM_MAJOR" ..\sim_rev.h`) do set _SIM_MAJOR=%%i
 for /F "usebackq tokens=3" %%i in (`findstr/C:"#define SIM_MINOR" ..\sim_rev.h`) do set _SIM_MINOR=%%i
 for /F "usebackq tokens=3" %%i in (`findstr/C:"#define SIM_PATCH" ..\sim_rev.h`) do set _SIM_PATCH=-%%i
@@ -125,6 +129,7 @@ pushd ..\%_ZipPath%
 if "%1" neq "reset" goto GitAddNew
 :GitSetup
 if exist .git rmdir/q/s .git
+if exist *.zip del *.zip
 copy /y "%~p0README.md" .\
 git init
 git add README.md
@@ -136,7 +141,15 @@ git push -u origin %BIN_REPO%
 :GitAddNew
 if not exist .git git clone "%REMOTE_REPO%" ./
 git pull
+set _BINARIES_ALREADY_BUILT=
+for /F "usebackq" %%i in (`git log ^| findstr %GIT_COMMIT_ID%`) do set _BINARIES_ALREADY_BUILT=1
+if "%_BINARIES_ALREADY_BUILT%" == "" goto DoBuild
+:AlreadyBuilt
+popd
+echo Git Commit: %GIT_COMMIT_ID% - %GIT_COMMIT_TIME% has already been published
+goto :EOF
 
+:DoBuild
 pushd %~p0\..
 set _SIM_PARALLEL=8
 if %_SIM_PARALLEL% GTR %NUMBER_OF_PROCESSORS% set _SIM_PARALLEL=%NUMBER_OF_PROCESSORS%
