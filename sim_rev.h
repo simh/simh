@@ -28,21 +28,39 @@
 #define _SIM_REV_H_     0
 
 #define SIM_MAJOR       3
-#define SIM_MINOR       10
+#define SIM_MINOR       11
 #define SIM_PATCH       0
 #define SIM_DELTA       0
+
+/* V3.11 revision history
+
+   V3.11 incorporates SCP additions and extensions by Dave Bryan to support his
+   HP simulators.
+
+patch   date            module(s) and fix(es)
+
+  0     01-Dec-2019     scp.c and supporting libraries
+                        - new features and extensions to support the HP simulators
+
+                        sim_sock.c
+                        - latest bug fixes from V4.x
+
+                        VAX
+                        - added hook for unpredictable indexed immediate in .aw flows
+                        - revamped Qbus memory simulation to behave as a Qbus peripheral
 
 /* V3.10 revision history
 
    V3.10 backports an significant number of modules and features from
-   the SimH 4.x master branch, as well as some unique new features.
+   the SimH 4.x branch, as well as some unique new features.
 
 patch   date            module(s) and fix(es)
 
-  0     tbd             scp.c and supporting libraries
+  0     24-Feb-2019     scp.c and supporting libraries
                         - added sim_printf
                         - added ATTACH -N switch
                         - added v4 compatibility macros
+                        - integration with HP features
 
                         All simulator families
                         - revised to use sim_printf
@@ -55,8 +73,8 @@ patch   date            module(s) and fix(es)
                         - added extended interrupts from Bob Armstrong
                         - numerous fixes from Bob Armstrong
 
-                        HP2100
-                        - latest version from Dave Bryan
+                        HP2100/HP3000
+                        - split to separate source tree
 
                         i1401
                         - read cards from and output line printer to the console window

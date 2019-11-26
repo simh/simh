@@ -1,6 +1,6 @@
 /* sim_tmxr.c: Telnet terminal multiplexor library
 
-   Copyright (c) 2001-2018, Robert M Supnik
+   Copyright (c) 2001-2019, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,10 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   19-Mar-19    JDB     Added tmxr_read, tmxr_write, tmxr_show, tmxr_close
+                        global hooks and associated local hook routines;
+                        added tmxr_init_line, tmxr_report_connection,
+                        and tmxr_disconnect_line global routines
    06-Mar-18    RMS     Revised for new IP address format in sim_sock
    08-Jul-17    JDB     Corrected misleading indentation in tmxr_poll_tx
    06-Aug-15    JDB     [4.0] Added modem control functions
@@ -81,6 +85,9 @@
    tmxr_tqln    -       number of buffered characters for line
    tmxr_set_lnorder -   set line connection order
    tmxr_show_lnorder -  show line connection order
+   tmxr_init_line -     initialize the line data
+   tmxr_report_connection - report a line connection to the port
+   tmxr_disconnect_line - disconnect a line
 
    All routines are OS-independent.
 */
@@ -132,11 +139,19 @@
 #define TNS_DO          006                             /* DO request pending rejection */
 
 void tmxr_rmvrc (TMLN *lp, int32 p);
-int32 tmxr_send_buffered_data (TMLN *lp);
-TMLN *tmxr_find_ldsc (UNIT *uptr, int32 val, TMXR *mp);
 
 extern char sim_name[];
 extern uint32 sim_os_msec (void);
+
+static int32 tmxr_local_read  (TMLN *lp, int32 length);
+static int32 tmxr_local_write (TMLN *lp, int32 length);
+static void  tmxr_local_show  (TMLN *lp, FILE *stream);
+static void  tmxr_local_close (TMLN *lp);
+
+int32 (*tmxr_read)  (TMLN *lp, int32 length) = tmxr_local_read;
+int32 (*tmxr_write) (TMLN *lp, int32 length) = tmxr_local_write;
+void  (*tmxr_show)  (TMLN *lp, FILE *stream) = tmxr_local_show;
+void  (*tmxr_close) (TMLN *lp)               = tmxr_local_close;
 
 /* Poll for new connection
 
@@ -193,33 +208,9 @@ if (newsock != INVALID_SOCKET) {                        /* got a live one? */
         lp->conn = newsock;                             /* record connection */
         lp->ipad = ipaddr;                              /* ip address */
         lp->cnms = sim_os_msec ();                      /* time of conn */
-        lp->rxbpr = lp->rxbpi = 0;                      /* init buf pointers */
-        lp->txbpr = lp->txbpi = 0;
-        lp->rxcnt = lp->txcnt = 0;                      /* init counters */
-        lp->tsta = 0;                                   /* init telnet state */
-        lp->xmte = 1;                                   /* enable transmit */
-        lp->dstb = 0;                                   /* default bin mode */
+        tmxr_init_line (lp);                            /* initialize the line */
         sim_write_sock (newsock, mantra, sizeof (mantra));
-        tmxr_linemsg (lp, "\n\r\nConnected to the ");
-        tmxr_linemsg (lp, sim_name);
-        tmxr_linemsg (lp, " simulator ");
-
-        if (mp->dptr) {                                 /* device defined? */
-            tmxr_linemsg (lp, sim_dname (mp->dptr));    /* report device name */
-            tmxr_linemsg (lp, " device");
-
-            if (mp->lines > 1) {                        /* more than one line? */
-                char line[20];
-
-                tmxr_linemsg (lp, ", line ");           /* report the line number */
-                sprintf (line, "%i", i);
-                tmxr_linemsg (lp, line);
-                }
-            }
-
-        tmxr_linemsg (lp, "\r\n\n");
-
-        tmxr_poll_tx (mp);                              /* flush output */
+        tmxr_report_connection (mp, lp, i);             /* report the connection */
         return i;
         }
     }                                                   /* end if newsock */
@@ -235,12 +226,9 @@ if (lp->txlog)                                          /* dump log */
 tmxr_send_buffered_data (lp);                           /* send buffered data */
 free (lp->ipad);
 lp->ipad = NULL;
-sim_close_sock (lp->conn);                              /* reset conn */
-lp->conn = lp->tsta = 0;                                /* reset state */
-lp->rxbpr = lp->rxbpi = 0;
-lp->txbpr = lp->txbpi = 0;
-lp->xmte = 1;
-lp->dstb = 0;
+tmxr_close (lp);                                        /* reset the connection */
+tmxr_init_line (lp);                                    /* initialize the line */
+lp->conn = 0;                                           /*   and clear the connection */
 return;
 }
 
@@ -339,8 +327,10 @@ if (lp->conn && lp->rcve) {                             /* conn & enb? */
     if (j) {                                            /* any? */
         tmp = lp->rxb[lp->rxbpr];                       /* get char */
         val = TMXR_VALID | (tmp & 0377);                /* valid + chr */
-        if (lp->rbr[lp->rxbpr])                         /* break? */
+        if (lp->rbr[lp->rxbpr]) {                       /* break? */
+            lp->rbr[lp->rxbpr] = 0;                     /* clear status */
             val = val | SCPE_BREAK;
+            }
         lp->rxbpr = lp->rxbpr + 1;                      /* adv pointer */
         }
     }                                                   /* end if conn */
@@ -368,20 +358,22 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
 
     nbytes = 0;
     if (lp->rxbpi == 0)                                 /* need input? */
-        nbytes = sim_read_sock (lp->conn,               /* yes, read */
-            &(lp->rxb[lp->rxbpi]),                      /* leave spc for */
-            TMXR_MAXBUF - TMXR_GUARD);                  /* Telnet cruft */
+        nbytes = tmxr_read (lp,                         /* yes, read */
+            TMXR_MAXBUF - TMXR_GUARD);                  /* leave spc for Telnet cruft */
     else if (lp->tsta)                                  /* in Telnet seq? */
-        nbytes = sim_read_sock (lp->conn,               /* yes, read to end */
-            &(lp->rxb[lp->rxbpi]),
+        nbytes = tmxr_read (lp,                         /* yes, read to end */
             TMXR_MAXBUF - lp->rxbpi);
     if (nbytes < 0)                                     /* closed? reset ln */
         tmxr_reset_ln (lp);
     else if (nbytes > 0) {                              /* if data rcvd */
         j = lp->rxbpi;                                  /* start of data */
-        memset (&lp->rbr[j], 0, nbytes);                /* clear status */
         lp->rxbpi = lp->rxbpi + nbytes;                 /* adv pointers */
         lp->rxcnt = lp->rxcnt + nbytes;
+
+        if (lp->exptr != NULL)                          /* if the line is extended */
+            continue;                                   /*   then skip the Telnet processing */
+
+        memset (&lp->rbr[j], 0, nbytes);                /* clear status */
 
 /* Examine new data, remove TELNET cruft before making input available */
 
@@ -512,6 +504,7 @@ for ( ; p < lp->rxbpi; p++) {
     lp->rxb[p] = lp->rxb[p + 1];
     lp->rbr[p] = lp->rbr[p + 1];
     }
+lp->rbr[p] = 0;                                         /* clear potential break from vacated slot */
 lp->rxbpi = lp->rxbpi - 1;
 return;
 }
@@ -589,11 +582,11 @@ int32 nbytes, sbytes;
 nbytes = tmxr_tqln(lp);                                 /* avail bytes */
 if (nbytes) {                                           /* >0? write */
     if (lp->txbpr < lp->txbpi)                          /* no wrap? */
-        sbytes = sim_write_sock (lp->conn,              /* write all data */
-            &(lp->txb[lp->txbpr]), nbytes);
-    else sbytes = sim_write_sock (lp->conn,             /* write to end buf */
-            &(lp->txb[lp->txbpr]), TMXR_MAXBUF - lp->txbpr);
-    if (sbytes != SOCKET_ERROR) {                       /* ok? */
+        sbytes = tmxr_write (lp, nbytes);               /* write all data */
+    else
+        sbytes = tmxr_write (lp, TMXR_MAXBUF - lp->txbpr);  /* write to end buf */
+
+    if (sbytes > 0) {                                   /* ok? */
         lp->txbpr = (lp->txbpr + sbytes);               /* update remove ptr */
         if (lp->txbpr >= TMXR_MAXBUF)                   /* wrap? */
             lp->txbpr = 0;
@@ -601,8 +594,8 @@ if (nbytes) {                                           /* >0? write */
         nbytes = nbytes - sbytes;
         }
     if (nbytes && (lp->txbpr == 0))     {               /* more data and wrap? */
-        sbytes = sim_write_sock (lp->conn, lp->txb, nbytes);
-        if (sbytes != SOCKET_ERROR) {                   /* ok */
+        sbytes = tmxr_write (lp, nbytes);
+        if (sbytes > 0) {                               /* ok */
             lp->txbpr = (lp->txbpr + sbytes);           /* update remove ptr */
             if (lp->txbpr >= TMXR_MAXBUF)               /* wrap? */
                 lp->txbpr = 0;
@@ -641,12 +634,11 @@ mp->port = port;                                        /* save port */
 mp->master = sock;                                      /* save master socket */
 for (i = 0; i < mp->lines; i++) {                       /* initialize lines */
     lp = mp->ldsc + i;
-    lp->conn = lp->tsta = 0;
-    lp->rxbpi = lp->rxbpr = 0;
-    lp->txbpi = lp->txbpr = 0;
-    lp->rxcnt = lp->txcnt = 0;
-    lp->xmte = 1;
-    lp->dstb = 0;
+
+    if (lp->exptr == NULL) {                            /* if the line is not extended */
+        tmxr_init_line (lp);                            /*   then initialize the line */
+        lp->conn = 0;                                   /*     and clear the connection */
+        }
     }
 return SCPE_OK;
 }
@@ -685,12 +677,9 @@ TMLN *lp;
 
 for (i = 0; i < mp->lines; i++) {                       /* loop thru conn */
     lp = mp->ldsc + i;
-    if (lp->conn) {
-        tmxr_linemsg (lp, "\r\nDisconnected from the ");
-        tmxr_linemsg (lp, sim_name);
-        tmxr_linemsg (lp, " simulator\r\n\n");
-        tmxr_reset_ln (lp);
-        }                                               /* end if conn */
+
+    if (lp->exptr == NULL && lp->conn)                  /* if the line is not extended but is connected */
+        tmxr_disconnect_line (lp);                      /*   then disconnect it */
     }                                                   /* end for */
 sim_close_sock (mp->master);                            /* close master socket */
 mp->master = 0;
@@ -754,7 +743,7 @@ if (lp->conn) {
     hr = ctime / 3600;
     mn = (ctime / 60) % 60;
     sc = ctime % 60;
-    fprintf (st, "IP address %s", lp->ipad);
+    tmxr_show (lp, st);                                 /* display the port connection */
     if (ctime)
         fprintf (st, ", connected %02d:%02d:%02d\n", hr, mn, sc);
     }
@@ -1122,3 +1111,166 @@ fprintf (st, "lines=%d", mp->lines);
 return SCPE_OK;
 }
 
+
+
+/* Global utility routines */
+
+
+/* Initialize the line state.
+
+   Reset the line state to represent an idle line.  Note that we do not clear
+   all of the line structure members, so a connected line remains connected
+   after this call.
+
+   Because a line break is represented by a flag in the "receive break status"
+   array, we must zero that array in order to clear any leftover break
+   indications.
+*/
+
+void tmxr_init_line (TMLN *lp)
+{
+lp->tsta = 0;                                           /* clear the Telnet negotiation state */
+lp->xmte = 1;                                           /* enable transmission */
+lp->dstb = 0;                                           /* default to binary data mode */
+lp->rxbpr = lp->rxbpi = lp->rxcnt = 0;                  /* clear the receive indexes */
+lp->txbpr = lp->txbpi = lp->txcnt = 0;                  /* clear the transmit indexes */
+
+memset (lp->rbr, 0, TMXR_MAXBUF);                       /* clear the break status array */
+
+return;
+}
+
+
+/* Report a connection to a line.
+
+   This routine sends a notification of the form:
+
+      Connected to the <sim> simulator <dev> device, line <n>
+
+   ...to the line number specified by the "line" parameter of the multiplexer
+   associated with the line descriptor pointer "lp" and the mux descriptor
+   pointer "mp".  If the device has only one line, the "line <n>" part is
+   omitted.  If the device has not been defined, the "<dev> device" part is
+   omitted.
+*/
+
+void tmxr_report_connection (TMXR *mp, TMLN *lp, int32 line)
+{
+int32 buffer_count;
+char  line_number [20];
+
+tmxr_linemsg (lp, "\n\r\nConnected to the ");           /* report the connection */
+tmxr_linemsg (lp, sim_name);                            /*   to the simulator */
+tmxr_linemsg (lp, " simulator ");
+
+if (mp->dptr) {                                         /* if the device pointer has been set */
+    tmxr_linemsg (lp, sim_dname (mp->dptr));            /*   then report the name */
+    tmxr_linemsg (lp, " device");                       /*     of the connected device */
+
+    if (mp->lines > 1) {                                /* if the multiplexer has more than one line */
+        tmxr_linemsg (lp, ", line ");                   /*   then report the line number */
+        sprintf (line_number, "%i", line);              /*     of the connection */
+        tmxr_linemsg (lp, line_number);
+        }
+    }
+
+tmxr_linemsg (lp, "\r\n\n");
+
+buffer_count = tmxr_send_buffered_data (lp);            /* write the message */
+
+if (buffer_count == 0)                                  /* if the write buffer is now empty */
+    lp->xmte = 1;                                       /*   then reenable transmission if it was paused */
+
+return;
+}
+
+
+/* Report a disconnection from a line.
+
+   This routine sends a notification of the form:
+
+      Disconnected from the <sim> simulator
+
+   ...to the line number associated with the line descriptor pointer "lp" and
+   then disconnects the line.
+
+
+   Implementation notes:
+
+    1. We do not write the buffer here, because the disconnect routine will do
+       that for us.
+*/
+
+void tmxr_disconnect_line (TMLN *lp)
+{
+tmxr_linemsg (lp, "\r\nDisconnected from the ");        /* report the disconnection */
+tmxr_linemsg (lp, sim_name);                            /*   from the simulator */
+tmxr_linemsg (lp, " simulator\r\n\n");
+
+tmxr_reset_ln (lp);                                     /* disconnect the line */
+
+return;
+}
+
+
+
+/* Local hook routines */
+
+
+/* Read from a line.
+
+   This routine reads up to "length" bytes into the buffer associated with line
+   "lp".  The actual number of bytes read is returned.  If no bytes are
+   available, 0 is returned.  If an error occurred while reading, -1 is
+   returned.
+*/
+
+static int32 tmxr_local_read (TMLN *lp, int32 length)
+{
+return sim_read_sock (lp->conn, &(lp->rxb [lp->rxbpi]), length);
+}
+
+
+/* Write to a line.
+
+   This routine writes up to "length" bytes from the buffer associated with
+   "lp".  The actual number of bytes written is returned.  If an error occurred
+   while writing, -1 is returned.
+*/
+
+static int32 tmxr_local_write (TMLN *lp, int32 length)
+{
+int32 written;
+
+written = sim_write_sock (lp->conn, &(lp->txb [lp->txbpr]), length);
+
+if (written == SOCKET_ERROR)                        /* did an error occur? */
+    return -1;                                      /* return error indication */
+else
+    return written;
+}
+
+
+/* Show a line.
+
+   This routine writes the port description to the file indicated by the
+   "stream" parameter.
+*/
+
+static void tmxr_local_show (TMLN *lp, FILE *stream)
+{
+fprintf (stream, "IP address %s", lp->ipad);
+return;
+}
+
+
+/* Close a line.
+
+   This routine closes the line indicated by the "lp" parameter.
+*/
+
+static void tmxr_local_close (TMLN *lp)
+{
+sim_close_sock (lp->conn);                              /* reset conn */
+return;
+}

@@ -1,6 +1,6 @@
 /* scp.h: simulator control program headers
 
-   Copyright (c) 1993-2018, Robert M Supnik
+   Copyright (c) 1993-2019, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,11 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   09-Oct-19    JDB     Added "detach_all" global declaration
+   19-Jul-19    JDB     Added "sim_get_radix" extension hook
+   13-Apr-19    JDB     Added extension hooks
+                        Added "sim_prog_name" and "sim_ref_type" global variables
+                        Added global routine declarations
    19-Mar-18    RMS     Added sim_trim_endspc
    06-Mar-18    RMS     Moved switch routine declaration from scp.c
                         Removed get_ipaddr declaration
@@ -73,6 +78,12 @@
 #define CMD_OPT_SCH     004                             /* search */
 #define CMD_OPT_DFT     010                             /* defaults */
 
+/* sim_ref_type flags */
+
+#define REF_NONE        000                             /* no reference type */
+#define REF_DEVICE      001                             /* device reference */
+#define REF_UNIT        002                             /* unit reference */
+
 /* Command processors */
 
 t_stat reset_cmd (int32 flag, char *ptr);
@@ -110,6 +121,7 @@ uint32 sim_grtime (void);
 int32 sim_qcount (void);
 t_stat attach_unit (UNIT *uptr, char *cptr);
 t_stat detach_unit (UNIT *uptr);
+t_stat detach_all (int32 start_device, t_bool shutdown);
 t_stat assign_device (DEVICE *dptr, char *cptr);
 t_stat deassign_device (DEVICE *dptr);
 t_stat reset_all (uint32 start_device);
@@ -169,6 +181,10 @@ void fprint_stopped_gen (FILE *st, t_stat v, REG *pc, DEVICE *dptr);
 void sim_printf (const char *fmt, ...);
 t_stat sim_messagef (t_stat stat, const char *fmt, ...);
 char *get_sim_sw(char *cptr);
+t_stat sim_brk_clr (t_addr loc, int32 sw);
+void sim_brk_clract (void);
+char *sim_brk_getact (char *buf, int32 size);
+char *read_line (char *ptr, int32 size, FILE *stream);
 
 /* Global data */
 
@@ -186,6 +202,15 @@ extern volatile int32 stop_cpu;
 extern uint32 sim_brk_types;                            /* breakpoint info */
 extern uint32 sim_brk_dflt;
 extern uint32 sim_brk_summ;
+extern char *sim_brk_act;                               /* breakpoint actions pointer */
+extern char *sim_prog_name;                             /* executable program name */
+extern uint32 sim_ref_type;                             /* reference type */
+
+/* Extension interface */
+
+extern char *sim_vm_release;
+extern void (*sub_args) (char *iptr, char *optr, int32 len, char *args []);
+extern int32 (*sim_get_radix) (const char *cptr, int32 switches, int32 default_radix);
 
 /* VM interface */
 

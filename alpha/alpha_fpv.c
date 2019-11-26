@@ -82,7 +82,7 @@ uint32 sign = FPR_GETSIGN (op)? F_SIGN: 0;
 uint32 frac = (uint32) (op >> F_V_FRAC);
 uint32 exp = FPR_GETEXP (op);
 
-if (exp != 0) exp = exp + F_BIAS - G_BIAS;              /* zero? */	
+if (exp != 0) exp = exp + F_BIAS - G_BIAS;              /* zero? */
 exp = (exp & F_M_EXP) << F_V_EXP;
 return (t_uint64) (sign | exp | (SWAP_VAXF (frac) & ~(F_SIGN|F_EXP)));
 }

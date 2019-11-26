@@ -1,6 +1,6 @@
 /* vax_cis.c: VAX CIS instructions
 
-   Copyright (c) 2004-2016, Robert M Supnik
+   Copyright (c) 2004-2019, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    On a full VAX, this module simulates the VAX commercial instruction set (CIS).
    On a subset VAX, this module implements the emulated instruction fault.
 
+   03-May-19    RMS     Documnted fall through cases (COVERITY)
    30-May-16    RMS     Fixed WordLshift FOR REAL
    16-Oct-08    RMS     Fixed bug in ASHP left overflow calc (Word/NibbleLshift)
                         Fixed bug in DIVx (LntDstr calculation)
@@ -460,7 +461,7 @@ switch (opc) {                                          /* case on opcode */
 
     case ADDP4: case SUBP4:
         op[4] = op[2];                                  /* copy dst */
-        op[5] = op[3];
+        op[5] = op[3];                                  /* fall through */
     case ADDP6: case SUBP6:
         if ((PSL & PSL_FPD) || (op[0] > 31) ||
             (op[2] > 31) || (op[4] > 31))
@@ -629,7 +630,7 @@ switch (opc) {                                          /* case on opcode */
 
     case CMPP3:
         op[3] = op[2];                                  /* reposition ops */
-        op[2] = op[0];
+        op[2] = op[0];                                  /* fall through */
     case CMPP4:
         if ((PSL & PSL_FPD) || (op[0] > 31) || (op[2] > 31))
             RSVD_OPND_FAULT;

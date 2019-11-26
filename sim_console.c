@@ -1,6 +1,6 @@
 /* sim_console.c: simulator console I/O library
 
-   Copyright (c) 1993-2018, Robert M Supnik
+   Copyright (c) 1993-2019, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Jun-19    JDB     Fixed argument passing in "sim_show_console"
+   01-Mar-19    JDB     SET CONSOLE LOG now closes prior log before opening
    27-Dec-18    JDB     Added missing fall through comment in ControlHandler
    18-Mar-18    RMS     Fixed deboff not to close stdout or stderr (Dave Bryan)
    31-Mar-15    RMS     Backported parity feature from GitHub master
@@ -191,7 +193,7 @@ if (*cptr == 0) {                                       /* show all */
 while (*cptr != 0) {
     cptr = get_glyph (cptr, gbuf, ',');                 /* get modifier */
     if ((shptr = find_shtab (show_con_tab, gbuf)))
-        shptr->action (st, dptr, uptr, shptr->arg, cptr);
+        shptr->action (st, dptr, uptr, shptr->arg, NULL);
     else return SCPE_NOPARAM;
     }
 return SCPE_OK;
@@ -269,6 +271,8 @@ if ((cptr == NULL) || (*cptr == 0))                     /* need arg */
 cptr = get_glyph_nc (cptr, gbuf, 0);                    /* get file name */
 if (*cptr != 0)                                         /* now eol? */
     return SCPE_2MARG;
+
+sim_set_logoff (0, NULL);                               /* close the current log, if any */
 
 if (sim_switches & SWMASK ('N'))                        /* if a new log file is requested */
     sim_log = sim_fopen (gbuf, "w");                    /*   then open an empty file for writing */
@@ -511,7 +515,6 @@ int32 sim_tt_inpcvt (int32 c, uint32 mode)
 uint32 md = mode & TTUF_M_MODE;
 
 if (md != TTUF_MODE_8B) {
-    uint32 par_bit = 0;
     uint32 par_mode = (mode >> TTUF_W_MODE) & TTUF_M_PAR;
     static int32 nibble_even_parity = 0x699600;   /* bit array indicating the even parity for each index (offset by 8) */
 

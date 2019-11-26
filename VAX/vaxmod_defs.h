@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-May-19    RMS     Added Qbus memory space to ADDR_IS_IO test
    23-Apr-19    RMS     Added hook for unpredictable indexed immediate .aw
    18-May-17    RMS     Added model-specific AST validation test
    29-Mar-15    RMS     Added model-specific IPR max
@@ -147,7 +148,7 @@
 #define IOPAGESIZE      (1u << IOPAGEAWIDTH)            /* IO page length */
 #define IOPAGEMASK      (IOPAGESIZE - 1)                /* IO addr mask */
 #define IOPAGEBASE      0x20000000                      /* IO page base */
-#define ADDR_IS_IO(x)   ((((uint32) (x)) >= IOPAGEBASE) && \
+#define ADDR_IS_IOP(x)  ((((uint32) (x)) >= IOPAGEBASE) && \
                         (((uint32) (x)) < (IOPAGEBASE + IOPAGESIZE)))
 
 /* Read only memory - appears twice */
@@ -208,6 +209,13 @@
 #define CQMSIZE         (1u << CQMAWIDTH)               /* Qmem length */
 #define CQMAMASK        (CQMSIZE - 1)                   /* Qmem addr mask */
 #define CQMBASE         0x30000000                      /* Qmem base */
+#define ADDR_IS_CQM(x)  ((((uint32) (x)) >= CQMBASE) && \
+                        (((uint32) (x)) < (CQMBASE + CQMSIZE)))
+
+/* Reflect to IO on either IO space or Qbus memory */
+
+#define ADDR_IS_IO(x)   (ADDR_IS_IOP(x) || ADDR_IS_CQM(x))
+
 
 /* Machine specific reserved operand tests (mostly NOPs) */
 

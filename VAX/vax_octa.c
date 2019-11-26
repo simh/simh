@@ -1,6 +1,6 @@
 /* vax_octa.c - VAX octaword and h_floating instructions
 
-   Copyright (c) 2004-2011, Robert M Supnik
+   Copyright (c) 2004-2019, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    This module simulates the VAX h_floating instruction set.
 
+   03-May-19    RMS     Fixed COVERITY complaint in h_unpackh
    15-Sep-11    RMS     Fixed integer overflow bug in EMODH
                         Fixed POLYH normalizing before add mask bug
                         (Camiel Vanderhoeven)
@@ -1059,7 +1060,8 @@ if (r->exp == 0) {                                      /* exp = 0? */
     r->frac.f2 = r->frac.f3 = 0;
     return;
     }
-r->frac.f3 = WORDSWAP ((hflt[0] & ~(FPSIGN | H_EXP)) | H_HB);
+r->frac.f3 = (hflt[0] & ~(FPSIGN | H_EXP)) | H_HB;      /* del sign, exp, add hb */
+r->frac.f3 = WORDSWAP (r->frac.f3);
 r->frac.f2 = WORDSWAP (hflt[1]);
 r->frac.f1 = WORDSWAP (hflt[2]);
 r->frac.f0 = WORDSWAP (hflt[3]);

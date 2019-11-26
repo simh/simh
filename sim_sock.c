@@ -1,6 +1,6 @@
 /* sim_sock.c: OS-dependent socket routines
 
-   Copyright (c) 2001-2010, Robert M Supnik
+   Copyright (c) 2001-2019, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Nov-19    MP      Latest 4.X changes
    15-Oct-12    MP      Added definitions needed to detect possible tcp 
                         connect failures
    25-Sep-12    MP      Reworked for RFC3493 interfaces supporting IPv6 and IPv4
@@ -284,41 +285,34 @@ if (hostname) {
         (0 == strcmp("255.255.255.255", hostname))) {
         fixed[0] = &ipaddr;
         fixed[1] = NULL;
+        if ((hints->ai_flags & AI_CANONNAME) && !(hints->ai_flags & AI_NUMERICHOST)) {
+            he = gethostbyaddr((char *)&ipaddr, 4, AF_INET);
+            if (NULL != he)
+                cname = he->h_name;
+            else
+                cname = hostname;
+            }
+        ips = fixed;
         }
     else {
-        if ((0xffffffff != (ipaddr.s_addr = inet_addr(hostname))) || 
-            (0 == strcmp("255.255.255.255", hostname))) {
-            fixed[0] = &ipaddr;
-            fixed[1] = NULL;
-            if ((hints->ai_flags & AI_CANONNAME) && !(hints->ai_flags & AI_NUMERICHOST)) {
-                he = gethostbyaddr((char *)&ipaddr, 4, AF_INET);
-                if (NULL != he)
-                    cname = he->h_name;
-                else
-                    cname = hostname;
-                }
-            ips = fixed;
+        if (hints->ai_flags & AI_NUMERICHOST)
+            return EAI_NONAME;
+        he = gethostbyname(hostname);
+        if (he) {
+            ips = (struct in_addr **)he->h_addr_list;
+            if (hints->ai_flags & AI_CANONNAME)
+                cname = he->h_name;
             }
         else {
-            if (hints->ai_flags & AI_NUMERICHOST)
-                return EAI_NONAME;
-            he = gethostbyname(hostname);
-            if (he) {
-                ips = (struct in_addr **)he->h_addr_list;
-                if (hints->ai_flags & AI_CANONNAME)
-                    cname = he->h_name;
-                }
-            else {
-                switch (h_errno)
-                    {
-                    case HOST_NOT_FOUND:
-                    case NO_DATA:
-                        return EAI_NONAME;
-                    case TRY_AGAIN:
-                        return EAI_AGAIN;
-                    default:
-                        return EAI_FAIL;
-                    }
+            switch (h_errno)
+                {
+                case HOST_NOT_FOUND:
+                case NO_DATA:
+                    return EAI_NONAME;
+                case TRY_AGAIN:
+                    return EAI_AGAIN;
+                default:
+                    return EAI_FAIL;
                 }
             }
         }
@@ -1045,7 +1039,7 @@ int keepalive = 1;
     defined (__APPLE__) || defined (__OpenBSD__) || \
     defined(__NetBSD__) || defined(__FreeBSD__) || \
     (defined(__hpux) && defined(_XOPEN_SOURCE_EXTENDED)) || \
-    defined (__HAIKU__)
+    defined (__HAIKU__) || defined(__CYGWIN__)
 socklen_t size;
 #elif defined (_WIN32) || defined (__EMX__) || \
      (defined (__ALPHA) && defined (__unix__)) || \
@@ -1111,7 +1105,7 @@ struct sockaddr_storage peername;
     defined (__APPLE__) || defined (__OpenBSD__) || \
     defined(__NetBSD__) || defined(__FreeBSD__) || \
     (defined(__hpux) && defined(_XOPEN_SOURCE_EXTENDED)) || \
-    defined (__HAIKU__)
+    defined (__HAIKU__) || defined(__CYGWIN__)
 socklen_t peernamesize = (socklen_t)sizeof(peername);
 #elif defined (_WIN32) || defined (__EMX__) || \
      (defined (__ALPHA) && defined (__unix__)) || \
@@ -1147,7 +1141,7 @@ static int _sim_getaddrname (struct sockaddr *addr, size_t addrsize, char *hostn
     defined (__APPLE__) || defined (__OpenBSD__) || \
     defined(__NetBSD__) || defined(__FreeBSD__) || \
     (defined(__hpux) && defined(_XOPEN_SOURCE_EXTENDED)) || \
-    defined (__HAIKU__)
+    defined (__HAIKU__) || defined(__CYGWIN__)
 socklen_t size = (socklen_t)addrsize;
 #elif defined (_WIN32) || defined (__EMX__) || \
      (defined (__ALPHA) && defined (__unix__)) || \
@@ -1181,7 +1175,7 @@ struct sockaddr_storage sockname, peername;
     defined (__APPLE__) || defined (__OpenBSD__) || \
     defined(__NetBSD__) || defined(__FreeBSD__) || \
     (defined(__hpux) && defined(_XOPEN_SOURCE_EXTENDED)) || \
-    defined (__HAIKU__)
+    defined (__HAIKU__) || defined(__CYGWIN__)
 socklen_t socknamesize = (socklen_t)sizeof(sockname);
 socklen_t peernamesize = (socklen_t)sizeof(peername);
 #elif defined (_WIN32) || defined (__EMX__) || \

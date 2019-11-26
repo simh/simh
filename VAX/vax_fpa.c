@@ -1,6 +1,6 @@
 /* vax_fpa.c - VAX f_, d_, g_floating instructions
 
-   Copyright (c) 1998-2012, Robert M Supnik
+   Copyright (c) 1998-2019, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   20-Nov-19    RMS     Fixed argument ordering in vax_fdiv declaration (Mark Pizzolata)
    23-Mar-12    RMS     Fixed missing arguments in 32b floating add (Mark Pizzolato)
    15-Sep-11    RMS     Fixed integer overflow bug in EMODx
                         Fixed POLYx normalizing before add mask bug
@@ -109,7 +110,7 @@ int32 rpackfd (UFP *a, int32 *rh);
 int32 rpackg (UFP *a, int32 *rh);
 void vax_fadd (UFP *a, UFP *b, uint32 mhi, uint32 mlo);
 void vax_fmul (UFP *a, UFP *b, t_bool qd, int32 bias, uint32 mhi, uint32 mlo);
-void vax_fdiv (UFP *b, UFP *a, int32 prec, int32 bias);
+void vax_fdiv (UFP *a, UFP *b, int32 prec, int32 bias);
 void vax_fmod (UFP *a, int32 bias, int32 *intgr, int32 *flg);
 
 /* Quadword arithmetic shift
@@ -653,7 +654,7 @@ int32 rpackg (UFP *a, int32 *rh);
 void vax_fadd (UFP *a, UFP *b, uint32 mhi, uint32 mlo);
 void vax_fmul (UFP *a, UFP *b, t_bool qd, int32 bias, uint32 mhi, uint32 mlo);
 void vax_fmod (UFP *a, int32 bias, int32 *intgr, int32 *flg);
-void vax_fdiv (UFP *b, UFP *a, int32 prec, int32 bias);
+void vax_fdiv (UFP *a, UFP *b, int32 prec, int32 bias);
 void dp_add (UDP *a, UDP *b);
 void dp_inc (UDP *a);
 void dp_sub (UDP *a, UDP *b);

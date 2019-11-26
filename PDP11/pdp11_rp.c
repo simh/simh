@@ -312,9 +312,6 @@
 #define RP07_DEV        020042
 #define RP07_SIZE       (RP07_SECT * RP07_SURF * RP07_CYL * RP_NUMWD)
 
-#define RP_CTRL         0
-#define RM_CTRL         1
-
 struct drvtyp {
     int32       sect;                                   /* sectors */
     int32       surf;                                   /* surfaces */

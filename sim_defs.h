@@ -1,6 +1,6 @@
 /* sim_defs.h: simulator definitions
 
-   Copyright (c) 1993-2017, Robert M Supnik
+   Copyright (c) 1993-2019, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   26-Oct-19    RMS     Removed MTAB_VAL definition
    23-Jun-17    RMS     Added #include sim_rev.h (Mark Pizzolato)
    25-Sep-16    RMS     Removed KBD_WAIT and friends
    08-Mar-16    RMS     Added shutdown invisible switch
@@ -489,15 +490,13 @@ struct sim_mtab {
     t_stat              (*disp)(FILE *st, struct sim_unit *up, int32 v, void *dp);
                                                         /* display routine */
     void                *desc;                          /* value descriptor */
-                                                        /* REG * if MTAB_VAL */
-                                                        /* int * if not */
     void                *help;                          /* [4.0] help */
     };
 
 #define MTAB_XTD        (1u << UNIT_V_RSV)              /* ext entry flag */
 #define MTAB_VDV        001                             /* valid for dev */
 #define MTAB_VUN        002                             /* valid for unit */
-#define MTAB_VAL        004                             /* takes a value */
+// #define MTAB_VAL        004                             /* REMOVED */
 #define MTAB_NMO        010                             /* only if named */
 #define MTAB_NC         020                             /* no UC conversion */
 #define MTAB_SHP        040                             /* show takes parameter */

@@ -692,31 +692,6 @@ H316 = ${H316D}/h316_stddev.c ${H316D}/h316_lp.c ${H316D}/h316_cpu.c \
 H316_OPT = -I ${H316D}
 
 
-HP2100D = HP2100
-HP2100 = ${HP2100D}/hp2100_baci.c ${HP2100D}/hp2100_cpu.c ${HP2100D}/hp2100_cpu_fp.c \
-	${HP2100D}/hp2100_cpu_fpp.c ${HP2100D}/hp2100_cpu0.c ${HP2100D}/hp2100_cpu1.c \
-	${HP2100D}/hp2100_cpu2.c ${HP2100D}/hp2100_cpu3.c ${HP2100D}/hp2100_cpu4.c \
-	${HP2100D}/hp2100_cpu5.c ${HP2100D}/hp2100_cpu6.c ${HP2100D}/hp2100_cpu7.c \
-	${HP2100D}/hp2100_di.c ${HP2100D}/hp2100_di_da.c ${HP2100D}/hp2100_disclib.c \
-	${HP2100D}/hp2100_dma.c ${HP2100D}/hp2100_dp.c ${HP2100D}/hp2100_dq.c \
-	${HP2100D}/hp2100_dr.c ${HP2100D}/hp2100_ds.c ${HP2100D}/hp2100_ipl.c \
-	${HP2100D}/hp2100_lps.c ${HP2100D}/hp2100_lpt.c ${HP2100D}/hp2100_mc.c \
-	${HP2100D}/hp2100_mem.c ${HP2100D}/hp2100_mpx.c ${HP2100D}/hp2100_ms.c \
-	${HP2100D}/hp2100_mt.c ${HP2100D}/hp2100_mux.c ${HP2100D}/hp2100_pif.c \
-	${HP2100D}/hp2100_pt.c ${HP2100D}/hp2100_sys.c ${HP2100D}/hp2100_tbg.c \
-	${HP2100D}/hp2100_tty.c
-HP2100_OPT = -DHAVE_INT64 -I ${HP2100D}
-
-HP3000D = HP3000
-HP3000 = ${HP3000D}/hp_disclib.c ${HP3000D}/hp_tapelib.c ${HP3000D}/hp3000_atc.c \
-	${HP3000D}/hp3000_clk.c ${HP3000D}/hp3000_cpu.c ${HP3000D}/hp3000_cpu_base.c \
-	${HP3000D}/hp3000_cpu_fp.c ${HP3000D}/hp3000_cpu_cis.c ${HP3000D}/hp3000_ds.c \
-	${HP3000D}/hp3000_iop.c ${HP3000D}/hp3000_lp.c ${HP3000D}/hp3000_mem.c \
-	${HP3000D}/hp3000_mpx.c ${HP3000D}/hp3000_ms.c ${HP3000D}/hp3000_scmb.c \
-	${HP3000D}/hp3000_sel.c ${HP3000D}/hp3000_sys.c
-HP3000_OPT = -I ${HP3000D}
-
-
 I1401D = I1401
 I1401 = ${I1401D}/i1401_lp.c ${I1401D}/i1401_cpu.c ${I1401D}/i1401_iq.c \
 	${I1401D}/i1401_cd.c ${I1401D}/i1401_mt.c ${I1401D}/i1401_dp.c \
@@ -807,7 +782,7 @@ ALPHA_OPT = -I ${ALPHAD} -DUSE_ADDR64 -DUSE_INT64
 # Build everything
 #
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
-	vax vax780 nova eclipse hp2100 hp3000 i1401 i1620 s3 \
+	vax vax780 nova eclipse i1401 i1620 s3 \
 	altair gri i7094 id16 uc15 \
 	id32 sds lgp h316 sigma
 
@@ -908,23 +883,7 @@ ${BIN}h316${EXE} : ${H316} ${SIM}
 	${MKDIRBIN}
 	${CC} ${H316} ${SIM} ${H316_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
-hp2100 : ${BIN}hp2100${EXE}
-
-${BIN}hp2100${EXE} : ${HP2100} ${SIM}
-	${MKDIRBIN}
-	${CC} ${HP2100} ${SIM} ${HP2100_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
 i1401 : ${BIN}i1401${EXE}
-
-hp3000 : ${BIN}hp3000${EXE}
-
-${BIN}hp3000${EXE} : ${HP3000} ${SIM}
-ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
-	${MKDIRBIN}
-	${CC} ${HP3000} ${SIM} ${HP3000_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-else
-	$(info hp3000 can't be built using C++)
-endif
 
 ${BIN}i1401${EXE} : ${I1401} ${SIM}
 	${MKDIRBIN}

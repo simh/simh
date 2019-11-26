@@ -1,6 +1,6 @@
 /* scp.c: simulator control program
 
-   Copyright (c) 1993-2018, Robert M Supnik
+   Copyright (c) 1993-2019, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,10 +23,21 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   26-Oct-19    RMS     Removed commented out MTAB_VAL code
+   09-Oct-19    JDB     Corrected "sim_ref_type" use for RESTORE and DETACH ALL
+   19-Jul-19    JDB     Added "sim_get_radix" extension hook
+   13-Apr-19    JDB     Added extension hooks
+                        Added "sim_prog_name" and "sim_ref_type" global variables
+                        Added global routine declarations
+   12-Apr-19    JDB     Permit quoted action lists in "sim_brk_getact"
+                        Propagate -V through DO command levels
+                        Use DO command replacement consistently
+                        Add memory checking to the ASSERT command
    26-Mar-18    RMS     Modified DETACH for static use of UNIT_RO (Mark Pizzolato)
    19-Mar-18    RMS     Removed redundant declarations
    06-Mar-18    RMS     Moved switch routine declaration to scp.h
                         Removed get_ipaddr
+   06-Dec-17    JDB     Prevent a disabled unit from being attached
    10-Mar-17    MP      Fixed "noise" bugs (COVERITY)
    08-Mar-16    RMS     Added shutdown flag for detach_all
    28-Mar-15    RMS     Added sim_printf from GitHub master (Mark Pizzolato)
@@ -263,10 +274,7 @@
 #define GET_SWITCHES(cp) \
     if ((cp = get_sim_sw (cp)) == NULL) return SCPE_INVSW
 #define GET_RADIX(val,dft) \
-    if (sim_switches & SWMASK ('O')) val = 8; \
-    else if (sim_switches & SWMASK ('D')) val = 10; \
-    else if (sim_switches & SWMASK ('H')) val = 16; \
-    else val = dft;
+    val = sim_get_radix (NULL, sim_switches, dft);
 
 /* The per-simulator init routine is a weak global that defaults to NULL
    The other per-simulator pointers can be overrriden by the init routine */
@@ -361,7 +369,14 @@ t_stat ex_addr (FILE *ofile, int32 flag, t_addr addr, DEVICE *dptr, UNIT *uptr);
 t_stat dep_addr (int32 flag, char *cptr, t_addr addr, DEVICE *dptr,
     UNIT *uptr, int32 dfltinc);
 t_stat step_svc (UNIT *ptr);
-void sub_args (char *instr, char *tmpbuf, int32 maxstr, char *do_arg[]);
+void sub_args_local (char *instr, char *tmpbuf, int32 maxstr, char *do_arg[]);
+int32 get_radix_local (const char *cptr, int32 switches, int32 default_radix);
+
+/* Extension interface */
+
+char *sim_vm_release;
+void (*sub_args) (char *iptr, char *optr, int32 len, char *args []) = sub_args_local;
+int32 (*sim_get_radix) (const char *cptr, int32 switches, int32 default_radix) = get_radix_local;
 
 /* Global data */
 
@@ -395,6 +410,8 @@ t_value *sim_eval = NULL;
 FILE *sim_log = NULL;                                   /* log file */
 FILE *sim_deb = NULL;                                   /* debug file */
 static SCHTAB sim_stab;
+char *sim_prog_name;                                    /* pointer to the executable name */
+uint32 sim_ref_type = REF_NONE;                         /* reference type */
 
 static UNIT sim_step_unit = { UDATA (&step_svc, 0, 0)  };
 #if defined USE_INT64
@@ -665,7 +682,7 @@ static SHTAB show_unit_tab[] = {
 
 int main (int argc, char *argv[])
 {
-char cbuf[CBUFSIZE], gbuf[CBUFSIZE], *cptr;
+char cbuf[CBUFSIZE], gbuf[CBUFSIZE], *cptr, *cmdargs[10] = { NULL };
 int32 i, sw;
 t_bool lookswitch;
 t_stat stat;
@@ -678,9 +695,12 @@ argc = ccommand (&argv);
 *cbuf = 0;                                              /* init arg buffer */
 sim_switches = 0;                                       /* init switches */
 lookswitch = TRUE;
+sim_prog_name = cmdargs [0] = argv [0];                 /* save a pointer to the program name */
 for (i = 1; i < argc; i++) {                            /* loop thru args */
     if (argv[i] == NULL)                                /* paranoia */
         continue;
+    else                                                /* if not null */
+        cmdargs[i] = argv[i];                           /*   then set the corresponding argument pointer */
     if ((*argv[i] == '-') && lookswitch) {              /* switch? */
         if ((sw = get_switches (argv[i])) < 0) {
             fprintf (stderr, "Invalid switch %s\n", argv[i]);
@@ -744,7 +764,7 @@ if (sim_dflt_dev == NULL)                               /* if no default */
     sim_dflt_dev = sim_devices[0];
 
 if (*cbuf)                                              /* cmd file arg? */
-    stat = do_cmd (0, cbuf);                            /* proc cmd file */
+    stat = find_cmd ("DO")->action (0, cbuf);           /* proc cmd file */
 else if (*argv[0]) {                                    /* sim name arg? */
     char nbuf[PATH_MAX + 7], *np;                       /* "path.ini" */
     nbuf[0] = '"';                                      /* starting " */
@@ -752,7 +772,7 @@ else if (*argv[0]) {                                    /* sim name arg? */
     if (np = match_ext (nbuf, "EXE"))                   /* remove .exe */
         *np = 0;
     strcat (nbuf, ".ini\"");                            /* add .ini" */
-    stat = do_cmd (-1, nbuf);                           /* proc cmd file */
+    stat = find_cmd ("DO")->action (-1, nbuf);          /* proc cmd file */
     }
 
 while (stat != SCPE_EXIT) {                             /* in case exit */
@@ -767,6 +787,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         continue;
     if (*cptr == 0)                                     /* ignore blank */
         continue;
+    sub_args (cbuf, gbuf, CBUFSIZE, cmdargs);           /* substitute arguments */
     if (sim_log)                                        /* log cmd */
         fprintf (sim_log, "sim> %s\n", cptr);
     cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
@@ -902,6 +923,13 @@ return SCPE_OK;
          0      =   command line file
          1      =   "DO" command
         >1      =   nested "DO" command
+
+
+   Implementation notes:
+
+    1. The "SWMASK ('V')" flag is 010000000, so we use that as an upper bit flag
+       to propagate echo status to sub-DOs.  This does not interfere with the
+       level count in the lower bits of the "flag" parameter.
 */
 
 #define SCPE_DOFAILED   0040000                         /* fail in DO, not subproc */
@@ -924,6 +952,9 @@ if (interactive) {                                      /* get switches */
     }
 echo = sim_switches & SWMASK ('V');                     /* -v means echo */
 errabort = sim_switches & SWMASK ('E');                 /* -e means abort on error */
+
+if (flag >= 0)                                          /* if this is not the initialization file */
+    echo = echo | flag & ~0377;                         /*   then propagate the echo flag to the current level */
 
 c = fcptr;
 for (nargs = 0; nargs < 10; ) {                         /* extract arguments */
@@ -968,16 +999,16 @@ do {
     if (*cptr == 0)                                     /* ignore blank */
         continue;
     if (echo)                                           /* echo if -v */
-        sim_printf("do> %s\n", cptr);
+        sim_printf("%s> %s\n", do_arg[0], cptr);        /* include command filename in echo */
     cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
     sim_switches = 0;                                   /* init switches */
     isdo = FALSE;
     if (cmdp = find_cmd (gbuf)) {                       /* lookup command */
-        isdo = (cmdp->action == &do_cmd);
+        isdo = (MATCH_CMD (gbuf, "DO") == 0);
         if (isdo) {                                     /* DO command? */
             if (flag >= DO_NEST_LVL)                    /* nest too deep? */
                 stat = SCPE_NEST;
-            else stat = do_cmd (flag + 1, cptr);        /* exec DO cmd */
+            else stat = cmdp->action (echo | flag + 1, cptr); /* exec DO cmd and propagate echo flag */
             }
         else stat = cmdp->action (cmdp->arg, cptr);     /* exec other cmd */
         }
@@ -1020,7 +1051,7 @@ return stat;
    Omitted parameters result in null-string substitutions.
 */
 
-void sub_args (char *instr, char *tmpbuf, int32 maxstr, char *do_arg[])
+void sub_args_local (char *instr, char *tmpbuf, int32 maxstr, char *do_arg[])
 {
 char *ip, *op, *ap, *oend = tmpbuf + maxstr - 2;
 
@@ -1046,13 +1077,23 @@ strcpy (instr, tmpbuf);
 return;
 }
 
-/* Assert command
+/* ASSERT command.
    
-   Syntax: ASSERT {<dev>} <reg>{<logical-op><value>}<conditional-op><value>
+   The ASSERT command tests the value of a device register or memory location.
+   The syntax is:
+   
+     ASSERT {<dev>} <reg/addr>{<logical-op><value>}<conditional-op><value>
 
-   If <dev> is not specified, CPU is assumed.  <value> is expressed in the radix
-   specified for <reg>.  <logical-op> and <conditional-op> are the same as that
-   allowed for examine and deposit search specifications. */
+   If <dev> is not specified, CPU is assumed.  If a register is specified, the
+   <values> are expressed in the radix specified by the register.  If a memory
+   address is specified, it is expressed in the device's address radix, and the
+   <value>s are expressed in the device's data radix.  The <logical-op> and
+   <conditional-op> are the same as those allowed for examine and deposit search
+   specifications.
+
+   If the assertion is true, the command returns SCPE_OK.  If it is false,
+   SCPE_AFAIL is returned.
+*/
 
 t_stat assert_cmd (int32 flag, char *cptr)
 {
@@ -1061,39 +1102,73 @@ REG *rptr;
 uint32 idx;
 t_value val;
 t_stat r;
+t_addr addr = 0;                                        /* quiet uninitialized warning */
 
 cptr = get_sim_opt (CMD_OPT_SW|CMD_OPT_DFT, cptr, &r);  /* get sw, default */
+sim_stab.boolop = -1;                                   /* no relational op dflt */
 if (*cptr == 0)                                         /* must be more */
     return SCPE_2FARG;
 cptr = get_glyph (cptr, gbuf, 0);                       /* get register */
 rptr = find_reg (gbuf, &gptr, sim_dfdev);               /* parse register */
-if (!rptr)                                              /* not there */
-    return SCPE_NXREG;
-if (*gptr == '[') {                                     /* subscript? */
-    if (rptr->depth <= 1)                               /* array register? */
-        return SCPE_ARG;
-    idx = (uint32) strtotv (++gptr, &tptr, 10);         /* convert index */
-    if ((gptr == tptr) || (*tptr++ != ']'))
-        return SCPE_ARG;
-    gptr = tptr;                                        /* update */
+
+if (rptr == NULL) {                                                 /* if the test is not a register */
+    if (sim_vm_parse_addr != NULL)                                  /*   then if a VM address parser is present */
+        addr = sim_vm_parse_addr (sim_dfdev, gbuf, &gptr);          /*     then call it to parse the address */
+    else                                                            /*   otherwise */
+        addr = (t_addr) strtotv (gbuf, &gptr, sim_dfdev->aradix);   /*     parse a numeric address */
+
+    if (gbuf == gptr)                                   /* if neither a register nor an address is found */
+        return SCPE_NXREG;                              /*   then fail with an error */
     }
-else idx = 0;                                           /* not array */
-if (idx >= rptr->depth)                                 /* validate subscript */
-    return SCPE_SUB;
+
+else {                                                  /* otherwise a valid register was given */
+    if (*gptr == '[') {                                 /* subscript? */
+        if (rptr->depth <= 1)                           /* array register? */
+            return SCPE_ARG;
+        idx = (uint32) strtotv (++gptr, &tptr, 10);     /* convert index */
+        if ((gptr == tptr) || (*tptr++ != ']'))
+            return SCPE_ARG;
+        gptr = tptr;                                    /* update */
+        }
+    else
+        idx = 0;                                        /* not array */
+    if (idx >= rptr->depth)                             /* validate subscript */
+        return SCPE_SUB;
+    }
+
 if (*gptr != 0)                                         /* more? must be search */
     get_glyph (gptr, gbuf, 0);
 else {
     if (*cptr == 0)                                     /* must be more */
-            return SCPE_2FARG;
+        return SCPE_2FARG;
     cptr = get_glyph (cptr, gbuf, 0);                   /* get search cond */
     }
 if (*cptr != 0)                                         /* must be done */
     return SCPE_2MARG;
-if (!get_search (gbuf, rptr->radix, &sim_stab))         /* parse condition */
-    return SCPE_MISVAL;
-val = get_rval (rptr, idx);                             /* get register value */
-if (test_search (val, &sim_stab))                       /* test condition */
-    return SCPE_OK;
+
+if (rptr == NULL) {                                         /* if this is a memory test */
+    if (!get_search (gbuf, sim_dfdev->dradix, &sim_stab)    /*   then parse the test condition; if it fails */
+      || (sim_stab.boolop == -1))                           /*     or if there is no test operator */
+        return SCPE_MISVAL;                                 /*       then report that the tested value is missing */
+
+    r = get_aval (addr, sim_dfdev, sim_dfunit);         /* get the memory data into sim_eval */
+
+    if (r != SCPE_OK)                                   /* if the access failed */
+        return r;                                       /*   then report the reason */
+
+    if (test_search (sim_eval [0], &sim_stab))          /* test the condition; if it succeeds */
+        return SCPE_OK;                                 /*   then return success */
+    }
+
+else {                                                  /* otherwise this is a register test */
+    if (!get_search (gbuf, rptr->radix, &sim_stab)      /*   so parse the test condition; if it fails */
+      || (sim_stab.boolop == -1))                       /*     or if there is no test operator */
+        return SCPE_MISVAL;                             /*       then report that the tested value is missing */
+    val = get_rval (rptr, idx);                         /* get register value */
+    if (test_search (val, &sim_stab))                   /* test condition */
+        return SCPE_OK;
+    }
+
 return SCPE_AFAIL;                                      /* condition fails */
 }
 
@@ -1101,7 +1176,7 @@ return SCPE_AFAIL;                                      /* condition fails */
 
 t_stat set_cmd (int32 flag, char *cptr)
 {
-int32 lvl;
+int32 lvl, radix;
 t_stat r;
 char gbuf[CBUFSIZE], *cvptr, *svptr;
 DEVICE *dptr;
@@ -1156,11 +1231,6 @@ while (*cptr != 0) {                                    /* do all mods */
                     }
                 else if (!mptr->desc)                   /* value desc? */
                     break;
-//                else if (mptr->mask & MTAB_VAL) {     /* take a value? */
-//                    if (!cvptr) return SCPE_MISVAL;   /* none? error */
-//                    r = dep_reg (0, cvptr, (REG *) mptr->desc, 0);
-//                    if (r != SCPE_OK) return r;
-//                    }
                 else if (cvptr)                         /* = value? */
                     return SCPE_ARG;
                 else *((int32 *) mptr->desc) = mptr->match;
@@ -1184,6 +1254,12 @@ while (*cptr != 0) {                                    /* do all mods */
             r = glbr->action (dptr, uptr, glbr->arg, cvptr);    /* do global */
             if (r != SCPE_OK)
                 return r;
+            }
+        else if (lvl == MTAB_VDV                            /* otherwise if this is a SET <dev> command */
+          && (radix = sim_get_radix (gbuf, 0, 0))) {        /*   and a radix extension keyword was supplied */
+            r = set_dev_radix (dptr, uptr, radix, cvptr);   /*     then set the requested radix default */
+            if (r != SCPE_OK)                               /* if the set failed */
+                return r;                                   /*   then report the error */
             }
         else if (!dptr->modifiers)                      /* no modifiers? */
             return SCPE_NOPARAM;
@@ -1375,12 +1451,7 @@ while (*cptr != 0) {                                    /* do all mods */
         if (((mptr->mask & MTAB_XTD)?                   /* right level? */
             (mptr->mask & lvl): (MTAB_VUN & lvl)) && 
             ((mptr->disp && mptr->pstring &&            /* named disp? */
-            (MATCH_CMD (gbuf, mptr->pstring) == 0))
- //           ||
- //           ((mptr->mask & MTAB_VAL) &&                 /* named value? */
- //           mptr->mstring &&
- //           (MATCH_CMD (gbuf, mptr->mstring) == 0)))
-            )) {
+            (MATCH_CMD (gbuf, mptr->pstring) == 0)))) {
             if (cvptr && !(mptr->mask & MTAB_SHP))
                 return SCPE_ARG;
             show_one_mod (ofile, dptr, uptr, mptr, cvptr, 1);
@@ -1511,6 +1582,8 @@ int32 vmaj = SIM_MAJOR, vmin = SIM_MINOR, vpat = SIM_PATCH, vdelt = SIM_DELTA;
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 fprintf (st, "%s simulator V%d.%d-%d", sim_name, vmaj, vmin, vpat);
+if (sim_vm_release != NULL)                             /* if a release string is defined */
+    fprintf (st, " Release %s", sim_vm_release);        /*   then display it */
 if (vdelt)
     fprintf (st, "(%d)", vdelt);
 if (flag)
@@ -2141,6 +2214,7 @@ t_stat r;
 
 if ((start < 0) || (start > 1))
     return SCPE_IERR;
+sim_ref_type = REF_NONE;                                /* use no references */
 if (shutdown)
     sim_switches = sim_switches | SIM_SW_SHUT;          /* flag shutdown */
 for (i = start; (dptr = sim_devices[i]) != NULL; i++) { /* loop thru dev */
@@ -2457,6 +2531,7 @@ REG *rptr;
 #define READ_I(xx) if (sim_fread (&xx, sizeof (xx), 1, rfile) == 0) \
     return SCPE_IOERR;
 
+sim_ref_type = REF_NONE;                                /* use no references */
 READ_S (buf);                                           /* [V2.5+] read version */
 v35 = v32 = FALSE;
 if (strcmp (buf, save_vercur) == 0)                     /* version 3.5? */
@@ -2764,6 +2839,8 @@ for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* flush attached files 
 #if defined (VMS)
 sim_printf ("\n");
 #endif
+if (r == SCPE_OK)                                       /* if no stop reason is given */
+    return SCPE_OK;                                     /*   then return quietly */
 fprint_stopped (stdout, r);                             /* print msg */
 if (sim_log)                                            /* log if enabled */
     fprint_stopped (sim_log, r);
@@ -2861,6 +2938,22 @@ void int_handler (int sig)
 {
 stop_cpu = 1;
 return;
+}
+
+/* Get radix from switches or keyword */
+
+int32 get_radix_local (const char *cptr, int32 switches, int32 default_radix)
+{
+if (cptr != NULL)                                       /* if this is a SET radix keyword request */
+    return 0;                                           /*   then report that it is invalid */
+else if (switches & SWMASK ('O'))                       /* otherwise if the O switch is present */
+    return 8;                                           /*   then use base 8 */
+else if (switches & SWMASK ('D'))                       /* otherwise if the D switch is present */
+    return 10;                                          /*   then use base 10 */
+else if (switches & SWMASK ('H'))                       /* otherwise if the H switch is present */
+    return 16;                                          /*   then use base 16 */
+else                                                    /* otherwise */
+    return default_radix;                               /*   use the supplied default */
 }
 
 /* Examine/deposit commands
@@ -3913,6 +4006,9 @@ return NULL;
    Outputs:
         result  =       pointer to device (null if no dev)
         *iptr   =       pointer to unit (null if nx unit)
+
+   The "sim_ref_type" global is set to the type of reference specified by cptr
+   (device or unit).
 */
 
 DEVICE *find_unit (char *cptr, UNIT **uptr)
@@ -3922,9 +4018,11 @@ char *nptr, *tptr;
 t_stat r;
 DEVICE *dptr;
 
+sim_ref_type = REF_NONE;                                /* start with no reference type */
 if (uptr == NULL)                                       /* arg error? */
     return NULL;
 if (dptr = find_dev (cptr)) {                           /* exact match? */
+    sim_ref_type = REF_DEVICE;                          /* indicate a device reference */
     if (qdisable (dptr))                                /* disabled? */
         return NULL;
     *uptr = dptr->units;                                /* unit 0 */
@@ -3939,6 +4037,7 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* base + unit#? */
           (strncmp (cptr, nptr, strlen (nptr)) == 0)))) {
         tptr = cptr + strlen (nptr);
         if (isdigit (*tptr)) {
+            sim_ref_type = REF_UNIT;                    /* indicate a unit reference */
             if (qdisable (dptr))                        /* disabled? */
                 return NULL;
             u = (uint32) get_uint (tptr, 10, dptr->numunits - 1, &r);
@@ -4942,30 +5041,132 @@ sim_brk_pend[spc] = FALSE;
 return 0;
 }
 
-/* Get next pending action, if any */
+/* Get the next pending action command, if any.
+
+   This routine copies the next pending action command to the buffer designated
+   by "buf" of maximum size "size".  It returns the "buf" pointer if a command
+   is pending and NULL if one is not.  Pending actions are optionally set as
+   part of BREAK commands.
+
+   On entry, the "sim_brk_act" global variable points at the current set of
+   pending action commands or is NULL if no commands are pending.  If the set
+   contains more than one command, they are separated by semicolons.  On exit,
+   the next command is copied to "buf", and "sim_brk_act" is advanced to point
+   at the succeeding command.  If no command remains after copying,
+   "sim_brk_act" is set to NULL.
+
+   Searching for command separators is complicated by the potential inclusion of
+   semicolons within single commands.  For example, the SET DEBUG command
+   separates its parameters with semicolons.  So this command:
+
+     BREAK 100 ; SET CPU DEBUG=INSTR;DATA
+
+   ...would fail if the second semicolon is interpreted as a command separator.
+   Therefore, context must be considered when searching for separators.
+
+   To resolve the ambiguity, an action command may be entirely enclosed by
+   quotation marks or apostrophes, e.g.:
+
+     BREAK 100 ; 'SET CPU DEBUG=INSTR;DATA'
+
+   ...that are stripped off by this routine.  This ensures that the SET command
+   is processed in its entirety.
+
+   The general rule employed is that semicolons within quoted strings are not
+   separators.  This yields four possible parsing cases for the "sim_brk_act"
+   command string when this routine is called:
+
+     1. There are no semicolons in the string.
+
+     2. A semicolon is present outside of a quoted string.
+
+     3. A semicolon is present within a quoted string that does not encompass
+        the entire command (i.e., the command does not start with a quote).
+
+     4. A semicolon is present within a command that is quoted.
+
+   For case 1, the command encompasses the entire string, which is simply
+   copied to the output buffer before setting "sim_brk_act" to NULL.  For case
+   2, the command up to the semicolon is copied, and the pointer is advanced to
+   point at the remainder of the string after the semicolon.
+
+   For cases 3 and 4, the quoted string is skipped, and then another search for
+   a semicolon is made.  Depending on the result of that second search, the
+   string is handled as one of the four cases above.  In addition, case 4
+   adjusts the command pointer and length to omit the surrounding quotes.
+
+
+   Implementation notes:
+
+    1. The buffer pointed to by "sim_brk_act" must be considered to be
+       read-only, so we cannot remove the quotes surrounding an entire command
+       by replacing them with blanks.  For breakpoint actions, the variable is
+       set to the "act" field of a BRKTAB structure.  Modifying the buffer would
+       mean that the command would not be quoted on the second and subsequent
+       breakpoint occurrences.  Therefore, we must remove the quotes by copying
+       the command to the output buffer without them.
+
+    2. If a command separator is surrounded by blanks, this routine will exit
+       with "sim_brk_act" pointing at leading blanks.  Therefore, we strip
+       leading blanks on entry.
+*/
 
 char *sim_brk_getact (char *buf, int32 size)
 {
-char *ep;
-size_t lnt;
+char   quote, *ep;
+size_t cmd_len = 0;                                     /* the length of the next command */
+t_bool quoted_cmd = FALSE;                              /* TRUE if the next command is quoted */
 
-if (sim_brk_act == NULL)                                /* any action? */
-    return NULL;
-while (isspace (*sim_brk_act))                          /* skip spaces */
-    sim_brk_act++;
-if (*sim_brk_act == 0)                              /* now empty? */
-    return (sim_brk_act = NULL);
-if (ep = strchr (sim_brk_act, ';')) {                   /* cmd delimiter? */
-    lnt = ep - sim_brk_act;                             /* cmd length */
-    memcpy (buf, sim_brk_act, lnt + 1);                 /* copy with ; */
-    buf[lnt] = 0;                                       /* erase ; */
-    sim_brk_act = sim_brk_act + lnt + 1;                /* adv ptr */
+if (sim_brk_act == NULL)                                /* if no action is pending */
+    return NULL;                                        /*   then we are done */
+
+while (isspace (*sim_brk_act))                          /* skip any leading blanks */
+    sim_brk_act++;                                      /*   in the next command */
+
+if (*sim_brk_act == '\0') {                             /* if the next action was entirely blank */
+    sim_brk_act = NULL;                                 /*   then clear the action pointer */
+    return NULL;                                        /*     and we are done */
     }
-else {
-    strncpy (buf, sim_brk_act, size);                   /* copy action */
-    sim_brk_act = NULL;                                 /* no more */
+
+ep = strpbrk (sim_brk_act, ";\"'");                     /* search for a semicolon or single or double quote */
+
+while (ep != NULL && (*ep == '\'' || *ep == '"')) {     /* if a quoted string is present */
+    quoted_cmd = (ep == sim_brk_act);                   /*   then check whether the entire command is quoted */
+
+    quote = *ep++;                                      /* save the opening quotation mark */
+
+    while (ep [0] != '\0' && ep [0] != quote)           /* while characters remain within the quotes */
+        if (ep [0] == '\\' && ep [1] == quote)          /*   if an escaped quote sequence follows */
+            ep = ep + 2;                                /*     then skip over the pair */
+        else                                            /*   otherwise */
+            ep = ep + 1;                                /*     skip the non-quote character */
+
+    if (quoted_cmd && *ep == quote) {                   /* if the entire command is quoted */
+        sim_brk_act++;                                  /*   then skip the leading quote */
+        cmd_len = (size_t) (ep - sim_brk_act);          /*     and set the size to trim the trailing quote */
+        }
+
+    ep = strpbrk (++ep, ";\"'");                        /* search for the next semicolon or single or double quote */
     }
-return buf;
+
+if (cmd_len == 0)                                       /* if the command length has not been set */
+    if (ep == NULL)                                     /*   then if no semicolon is present */
+        cmd_len = strlen (sim_brk_act);                 /*     then only a single, non-quoted command remains */
+    else                                                /*   otherwise */
+        cmd_len = (size_t) (ep - sim_brk_act);          /*     the command extends to the semicolon */
+
+if (cmd_len > (size_t) size - 1)                        /* if the command length won't fit in the buffer */
+    cmd_len = (size_t) size - 1;                        /*   then copy only as much as will fit */
+
+memcpy (buf, sim_brk_act, cmd_len);                     /* copy the next action command */
+buf [cmd_len] = '\0';                                   /*   and terminate it */
+
+if (ep == NULL)                                         /* if the line does not contain a semicolon */
+    sim_brk_act = NULL;                                 /*   then this is the last command */
+else                                                    /* otherwise */
+    sim_brk_act = ep + 1;                               /*   skip the semicolon and point at the next command */
+
+return buf;                                             /* return a pointer to the command to execute */
 }
 
 /* Clear pending actions */

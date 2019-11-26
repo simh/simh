@@ -1,6 +1,6 @@
 /* sim_tmxr.h: terminal multiplexor definitions
 
-   Copyright (c) 2001-2015, Robert M Supnik
+   Copyright (c) 2001-2019, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,10 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   19-Mar-19    JDB     Added extension pointer to TMLN structure;
+                        added tmxr_read, tmxr_write, tmxr_show, tmxr_close global hooks;
+                        added tmxr_find_ldsc, tmxr_send_buffered_data, tmxr_init_line,
+                        tmxr_report_connection, and tmxr_disconnect_line globals
    06-Aug-15    JDB     [4.0] Added modem control bits and functions
    14-Dec-14    JDB     [4.0] Added include of "sim_sock.h" for SOCKET, etc.
    20-Nov-08    RMS     Added three new standardized SHOW routines
@@ -82,6 +86,7 @@ struct tmln {
     char                rxb[TMXR_MAXBUF];               /* rcv buffer */
     char                rbr[TMXR_MAXBUF];               /* rcv break */
     char                txb[TMXR_MAXBUF];               /* xmt buffer */
+    void                *exptr;                         /* extension pointer */
     };
 
 typedef struct tmln TMLN;
@@ -126,6 +131,18 @@ t_stat tmxr_show_lnorder (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_show_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_show_cstat (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_show_lines (FILE *st, UNIT *uptr, int32 val, void *desc);
+TMLN *tmxr_find_ldsc (UNIT *uptr, int32 val, TMXR *mp);
+int32 tmxr_send_buffered_data (TMLN *lp);
+void tmxr_init_line (TMLN *lp);
+void tmxr_report_connection (TMXR *mp, TMLN *lp, int32 line);
+void tmxr_disconnect_line (TMLN *lp);
+
+/* Extension interface */
+
+extern int32 (*tmxr_read)  (TMLN *lp, int32 length);
+extern int32 (*tmxr_write) (TMLN *lp, int32 length);
+extern void  (*tmxr_show)  (TMLN *lp, FILE *stream);
+extern void  (*tmxr_close) (TMLN *lp);
 
 /* V4.X shims */
 

@@ -133,7 +133,7 @@ uint32 frac = ((uint32) (op >> S_V_FRAC)) & M32;
 uint32 exp = FPR_GETEXP (op);
 
 if (exp == FPR_NAN) exp = S_NAN;                        /* inf or NaN? */
-else if (exp != 0) exp = exp + S_BIAS - T_BIAS;         /* non-zero? */	
+else if (exp != 0) exp = exp + S_BIAS - T_BIAS;         /* non-zero? */
 exp = (exp & S_M_EXP) << S_V_EXP;
 return (t_uint64) (sign | exp | (frac & ~(S_SIGN|S_EXP)));
 }
