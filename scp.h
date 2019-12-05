@@ -95,6 +95,7 @@ t_stat dir_cmd (int32 flg, CONST char *cptr);
 t_stat type_cmd (int32 flg, CONST char *cptr);
 t_stat delete_cmd (int32 flg, CONST char *cptr);
 t_stat copy_cmd (int32 flg, CONST char *cptr);
+t_stat rename_cmd (int32 flg, CONST char *cptr);
 t_stat mkdir_cmd (int32 flg, CONST char *cptr);
 t_stat rmdir_cmd (int32 flg, CONST char *cptr);
 t_stat brk_cmd (int32 flag, CONST char *ptr);
