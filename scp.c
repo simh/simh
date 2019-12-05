@@ -7352,8 +7352,10 @@ if (*cptr == 0)                                         /* must be more */
 gbuf[sizeof(gbuf)-1] = '\0';
 strlcpy (gbuf, cptr, sizeof(gbuf));
 sim_trim_endspc (gbuf);
-if ((sfile = sim_fopen (gbuf, "wb")) == NULL)
-    return SCPE_OPENERR;
+if ((sfile = sim_fopen (gbuf, "r+b")) == NULL) {    /* try existing file */
+    if ((sfile = sim_fopen (gbuf, "wb")) == NULL)   /* create new empty file */
+        return SCPE_OPENERR;
+    }
 r = sim_save (sfile);
 fclose (sfile);
 return r;
@@ -7490,6 +7492,8 @@ for (i = 0; i < (device_count + sim_internal_device_count); i++) {/* loop thru d
     fputc ('\n', sfile);                                /* end registers */
     }
 fputc ('\n', sfile);                                    /* end devices */
+if (!ferror (sfile))
+    sim_set_fsize (sfile, (t_addr)sim_ftell (sfile));   /* truncate the save file */
 return (ferror (sfile))? SCPE_IOERR: SCPE_OK;           /* error during save? */
 }
 
