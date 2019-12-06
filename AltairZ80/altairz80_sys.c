@@ -66,6 +66,8 @@ extern DEVICE switchcpu_dev;
 extern DEVICE adcs6_dev;
 extern DEVICE hdc1001_dev;
 
+extern DEVICE tarbell_dev;
+
 extern DEVICE cromfdc_dev;
 extern DEVICE wd179x_dev;
 extern DEVICE n8vem_dev;
@@ -115,6 +117,8 @@ DEVICE      *sim_devices[]  = {
     &mdsa_dev, &mdsad_dev,
     /* Seattle Computer Products Devices */
     &scp300f_dev,
+    /* Tarbell Devices */
+    &tarbell_dev,
     /* Vector Graphic Devices */
     &fw2_dev, &vfdhd_dev,
     /* Single-Board Computers */
