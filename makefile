@@ -2103,7 +2103,7 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	scelbi 3b2 i701 i704 i7010 i7070 i7080 i7090 \
 	sigma uc15 pdp10-ka pdp10-ki pdp6
 
-all : altairz80
+all : ${ALL}
 
 EXPERIMENTAL = cdc1700 
 
