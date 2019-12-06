@@ -101,9 +101,6 @@ typedef struct {
 #define FD1771_STAT_BUSY       0x01
 
 typedef struct {
-} TARBELL_DRIVE_STATUS;
-
-typedef struct {
     PNP_INFO  pnp;            /* Plug and Play */
     uint8     promEnabled;    /* PROM is enabled */
     uint8     writeProtect;   /* Write Protect is enabled */
