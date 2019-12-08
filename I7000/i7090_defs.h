@@ -29,6 +29,7 @@
 #define ReadP(x)        (M[x])
 #define WriteP(x,y)     if (MEM_ADDR_OK (x)) M[x] = y
 extern t_uint64         M[MAXMEMSIZE];
+extern t_uint64         assembly[NUM_CHAN];
 
 /* Processor specific masks */
 #define ONEBIT          00200000000000LL

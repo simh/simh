@@ -64,7 +64,7 @@ uint8               cmd[NUM_CHAN];              /* Current command */
 uint16              irqdev[NUM_CHAN];           /* Device to generate interupts
                                                    for channel */
 uint32              chunit[NUM_CHAN];           /* Channel unit */
-uint32              assembly[NUM_CHAN];         /* Assembly register */
+uint8               assembly[NUM_CHAN];         /* Assembly register */
 uint32              chan_flags[NUM_CHAN];       /* Unit status */
 extern uint8        chan_io_status[NUM_CHAN];
 extern uint8        inquiry;
