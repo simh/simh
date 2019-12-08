@@ -182,8 +182,8 @@ static void TARBELL_HeadLoad(UNIT *uptr, FD1771_REG *pFD1771, uint8 load);
 static uint8 TARBELL_Read(const uint32 Addr);
 static uint8 TARBELL_Write(const uint32 Addr, int32 data);
 static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, const int32 data);
-static uint32 TARBELL_ReadSector(UNIT *uptr, uint16 track, uint16 sector, uint8 *buffer);
-static uint32 TARBELL_WriteSector(UNIT *uptr, uint16 track, uint16 sector, uint8 *buffer);
+static uint32 TARBELL_ReadSector(UNIT *uptr, uint8 track, uint8 sector, uint8 *buffer);
+static uint32 TARBELL_WriteSector(UNIT *uptr, uint8 track, uint8 sector, uint8 *buffer);
 static const char* tarbell_description(DEVICE *dptr);
 static void showdata(int32 isRead);
 static void showregs(FD1771_REG *pFD1771);
@@ -311,7 +311,7 @@ t_stat tarbell_reset(DEVICE *dptr)
     pInfo->writeProtect = FALSE;
 
     /* Reset Registers and Interface Controls */
-    for (int i=0; i < TARBELL_MAX_DRIVES; i++) {
+    for (i=0; i < TARBELL_MAX_DRIVES; i++) {
         pInfo->FD1771[i].track = 0;
         pInfo->FD1771[i].sector = 1;
         pInfo->FD1771[i].command = 0;
@@ -753,7 +753,7 @@ static uint8 TARBELL_Write(const uint32 Addr, const int32 Data)
     return(cData);
 }
 
-static uint32 TARBELL_ReadSector(UNIT *uptr, uint16 track, uint16 sector, uint8 *buffer)
+static uint32 TARBELL_ReadSector(UNIT *uptr, uint8 track, uint8 sector, uint8 *buffer)
 {
     uint32 sec_offset;
     uint32 rtn = 0;
@@ -778,7 +778,7 @@ static uint32 TARBELL_ReadSector(UNIT *uptr, uint16 track, uint16 sector, uint8 
 }
 
 
-static uint32 TARBELL_WriteSector(UNIT *uptr, uint16 track, uint16 sector, uint8 *buffer)
+static uint32 TARBELL_WriteSector(UNIT *uptr, uint8 track, uint8 sector, uint8 *buffer)
 {
     uint32 sec_offset;
     uint32 rtn = 0;
