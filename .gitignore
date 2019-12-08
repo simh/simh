@@ -46,4 +46,16 @@ ipch/
 !Visual Studio Projects/0ReadMe_Projects.txt
 Visual Studio Projects/*
 
+# CMake artifacts
+cmake-*
+!cmake-builder.ps1
+build
 
+# VS Code stuff...
+simh.code-workspace
+.vscode
+
+# GNU Global (useful with VSCode's Intellisense module.)
+GPATH
+GRTAGS
+GTAGS

@@ -1,19 +1,109 @@
 platform:
   - x86
+
 cache:
   - ../windows-build
+
+shallow_clone: true
+clone_depth: 1
+
+environment:
+  DIST_DIR: '%APPVEYOR_BUILD_FOLDER%\dist'
+  CMAKE_DIST_DIR: C:/projects/simh/dist
+
+  matrix:
+    ## simh-maintained MSVC solution:
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2013
+      VCVARSALL: "%ProgramFiles(x86)%\\Microsoft Visual Studio 9.0\\VC\\vcvarsall.bat"
+
+    ## CMake-based builds:
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      SIMH_BUILD_FLAVOR: 2019
+
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+      SIMH_BUILD_FLAVOR: mingw
+      MINGW: C:\\msys64\\mingw32\\bin
+
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+      SIMH_BUILD_FLAVOR: 2017
+
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+      SIMH_BUILD_FLAVOR: 2015
+
+    ## Do not use VS2013 image: Appveyor image has CMake 3.12.x; pthreads4w requires
+    ## CMake >= 3.14. Might be able to get Chocolatey to install an updated
+    ## version.
+    # - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2013
+    #   SIMH_BUILD_FLAVOR: 2013
+
+matrix:
+  ## Bail if a job fails, don't start new ones.
+  fast_finish: true
+
 skip_commits:
   files:
     - doc/*
     - '**/*.md'
     - '**/*.txt'
+
+configuration:
+  - Debug
+  - Release
+
+build:
+  parallel: true                  # enable MSBuild parallel builds
+  verbosity: minimal
+
 before_build:
-  "\"C:\\Program Files (x86)\\Microsoft Visual Studio 9.0\\VC\\vcvarsall.bat\""
+  ## Use PS to install Scoop. Scoop is not strictly needed. Added it here for "show and tell."
+  # - ps: Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
+  # - ps: scoop install winflexbison
+
+  ## Npcap install
+  ## Answer: Don't. If we could disable the Npcap installer's GUI (silent mode),
+  ## then uncomment the next three lines. Same problem likely applies to wpcap.
+  # - ps: (New-Object System.Net.WebClient).DownloadFile('https://nmap.org/npcap/dist/npcap-0.9986.exe',
+  #       'npcap-installer.exe')
+  # - npcap-installer /loopback_support=no /dot11_support=no /admin_only=no
+
 build_script:
-  cmd: cd "Visual Studio Projects" & vcbuild /M%NUMBER_OF_PROCESSORS% /useenv /rebuild Simh.sln "Release|Win32"
-notifications:
-  - provider: Email
-    to:
-      - Mark@infocomm.com
-      - lars@nocrew.org
-    on_build_success: false
+  ## Remove Git's MSYS from PATH, otherwise CMake borks.
+  # - set PATH=%PATH:C:\Program Files (x86)\Git\bin;=% 
+  # - set PATH=%PATH:C:\Program Files\Git\bin;=% 
+  - set PATH=%PATH:C:\Program Files\Git\usr\bin;=% 
+  - if defined MINGW set PATH=%MINGW%;%PATH%
+
+  # VCVARSALL is only defined for the simh-maintained solution:
+  - if defined VCVARSALL (
+      if not exist ..\windows-build (
+          mkdir ..\windows-build &
+          git clone https://github.com/simh/windows-build.git ..\windows-build
+      ) &
+      call "%VCVARSALL%" %BUILD_ARCH% &
+      cd "Visual Studio Projects" & 
+      vcbuild /M%NUMBER_OF_PROCESSORS% /useenv /rebuild Simh.sln "%CONFIGURATION%|Win32"
+    )
+
+  # SIMH_BUILD_FLAVOR is always defined for the CMake-based builds.
+  - if defined SIMH_BUILD_FLAVOR ( 
+      powershell .\cmake-builder.ps1 -clean -nonetwork -notest -config %CONFIGURATION% %SIMH_BUILD_FLAVOR%
+    )
+
+test_script:
+  - ps: if (!([string]::IsNullOrEmpty($env:SIMH_BUILD_FLAVOR))) {
+          $subdirPrefix = "vs";
+          if ($env:SIMH_BUILD_FLAVOR -eq "mingw") { $subdirPrefix = "" };
+          $buildStagePath = "$(Get-Location)\cmake-${subdirPrefix}${env:SIMH_BUILD_FLAVOR}";
+          $buildStageBin = [System.IO.Path]::GetFullPath("${buildStagePath}\build-stage\bin");
+          $env:PATH =  "${buildStageBin};${env:PATH}";
+          push-location $buildStagePath;
+          ctest -C ${env:CONFIGURATION};
+          pop-location
+        }
+
+# notifications:
+#   - provider: Email
+#     to:
+#       - Mark@infocomm.com
+#       - lars@nocrew.org
+#     on_build_success: false
