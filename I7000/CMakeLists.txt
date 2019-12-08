@@ -1,0 +1,127 @@
+## IBM I700 simulators:
+
+add_simulator(i7090
+    SOURCES
+	i7090_cpu.c
+	i7090_sys.c
+	i7090_chan.c
+	i7090_cdr.c
+	i7090_cdp.c
+	i7090_lpr.c
+	i7000_chan.c
+	i7000_mt.c
+	i7090_drum.c
+	i7090_hdrum.c
+	i7000_chron.c
+	i7000_dsk.c
+	i7000_com.c
+	i7000_ht.c
+    DEFINES
+	I7090
+	USE_SIM_CARD
+    INCLUDES
+	${CMAKE_SOURCE_DIR}/I7000
+    INT64)
+
+add_simulator(i7080
+    SOURCES
+	i7080_cpu.c 
+	i7080_sys.c 
+	i7080_chan.c
+	i7080_drum.c 
+	i7000_cdp.c 
+	i7000_cdr.c
+	i7000_con.c 
+	i7000_chan.c 
+	i7000_lpr.c
+	i7000_mt.c 
+	i7000_chron.c 
+	i7000_dsk.c
+	i7000_com.c 
+	i7000_ht.c
+    DEFINES
+	I7080
+	USE_SIM_CARD
+    INCLUDES
+	${CMAKE_SOURCE_DIR}/I7000
+    INT64)
+
+add_simulator(i7070
+    SOURCES
+	i7070_cpu.c
+	i7070_sys.c 
+	i7070_chan.c
+	i7000_cdp.c 
+	i7000_cdr.c 
+	i7000_con.c
+	i7000_chan.c 
+	i7000_lpr.c 
+	i7000_mt.c
+	i7000_chron.c 
+	i7000_dsk.c 
+	i7000_com.c
+	i7000_ht.c
+    DEFINES
+	I7070
+	USE_SIM_CARD
+    INCLUDES
+	${CMAKE_SOURCE_DIR}/I7000
+    INT64)
+
+add_simulator(i7010
+    SOURCES
+	i7010_cpu.c 
+	i7010_sys.c 
+	i7010_chan.c
+	i7000_cdp.c 
+	i7000_cdr.c 
+	i7000_con.c
+	i7000_chan.c 
+	i7000_lpr.c 
+	i7000_mt.c
+	i7000_chron.c 
+	i7000_dsk.c 
+	i7000_com.c
+	i7000_ht.c
+    DEFINES
+	I7010
+	USE_SIM_CARD
+    INCLUDES
+	${CMAKE_SOURCE_DIR}/I7000
+    INT64)
+
+add_simulator(i704
+    SOURCES
+	i7090_cpu.c 
+	i7090_sys.c 
+	i7090_chan.c
+	i7090_cdr.c 
+	i7090_cdp.c 
+	i7090_lpr.c
+	i7000_mt.c 
+	i7090_drum.c 
+	i7000_chan.c
+    DEFINES
+	I704
+	USE_SIM_CARD
+    INCLUDES
+	${CMAKE_SOURCE_DIR}/I7000
+    INT64)
+
+add_simulator(i701
+    SOURCES
+	i701_cpu.c 
+	i701_sys.c 
+	i701_chan.c
+	i7090_cdr.c 
+	i7090_cdp.c 
+	i7090_lpr.c
+	i7000_mt.c 
+	i7090_drum.c 
+	i7000_chan.c
+    DEFINES
+	I701
+	USE_SIM_CARD
+    INCLUDES
+	${CMAKE_SOURCE_DIR}/I7000
+    INT64)
