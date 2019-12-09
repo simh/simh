@@ -20,9 +20,9 @@
     IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
     CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-    Except as contained in this notice, the name of Peter Schorn shall not
+    Except as contained in this notice, the name of Patrick Linstruth shall not
     be used in advertising or otherwise to promote the sale, use or other dealings
-    in this Software without prior written authorization from Peter Schorn.
+    in this Software without prior written authorization from Patrick Linstruth.
 */
 
 /* #define DBG_MSG */
@@ -127,7 +127,6 @@ static TARBELL_INFO tarbell_info_data = { { TARBELL_PNP_MEMBASE, TARBELL_PNP_MEM
 static TARBELL_INFO *tarbell_info = &tarbell_info_data;
 
 static uint8 sdata[TARBELL_SECTOR_LEN];
-static uint32 stepCleared = TRUE;   /* true when step bit has returned to zero */
 
 /* Tarbell Registers */
 #define TARBELL_REG_STATUS         0x00
@@ -192,17 +191,17 @@ static t_stat tarbell_detach(UNIT *uptr);
 static t_stat tarbell_boot(int32 unitno, DEVICE *dptr);
 static t_stat tarbell_set_prom(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static void TARBELL_HeadLoad(UNIT *uptr, FD1771_REG *pFD1771, uint8 load);
-static uint8 TARBELL_Read(const uint32 Addr);
-static uint8 TARBELL_Write(const uint32 Addr, int32 data);
-static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, const int32 data);
+static uint8 TARBELL_Read(uint32 Addr);
+static uint8 TARBELL_Write(uint32 Addr, int32 data);
+static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 data);
 static uint32 TARBELL_ReadSector(UNIT *uptr, uint8 track, uint8 sector, uint8 *buffer);
 static uint32 TARBELL_WriteSector(UNIT *uptr, uint8 track, uint8 sector, uint8 *buffer);
 static const char* tarbell_description(DEVICE *dptr);
 static void showdata(int32 isRead);
 static void showregs(FD1771_REG *pFD1771);
 
-static int32 tarbelldev(const int32 Addr, const int32 rw, const int32 data);
-static int32 tarbellprom(const int32 Addr, const int32 rw, const int32 data);
+static int32 tarbelldev(int32 Addr, int32 rw, int32 data);
+static int32 tarbellprom(int32 Addr, int32 rw, int32 data);
 
 static UNIT tarbell_unit[TARBELL_MAX_DRIVES] = {
     { UDATA (tarbell_svc, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, TARBELL_CAPACITY), 10000 },
@@ -301,7 +300,6 @@ DEVICE tarbell_dev = {
 t_stat tarbell_reset(DEVICE *dptr)
 {
     uint8 i;
-    PNP_INFO *pnp = (PNP_INFO *)dptr->ctxt;
     TARBELL_INFO *pInfo = (TARBELL_INFO *)dptr->ctxt;
 
     if(dptr->flags & DEV_DIS) { /* Disconnect I/O Ports */
@@ -488,7 +486,7 @@ static t_stat tarbell_boot(int32 unitno, DEVICE *dptr)
     return SCPE_OK;
 }
 
-static int32 tarbelldev(const int32 Addr, const int32 rw, const int32 data)
+static int32 tarbelldev(int32 Addr, int32 rw, int32 data)
 {
     if (rw == 0) { /* Read */
         return(TARBELL_Read(Addr));
@@ -548,17 +546,17 @@ static void TARBELL_HeadLoad(UNIT *uptr, FD1771_REG *pFD1771, uint8 load)
     pFD1771->headLoaded = load;
 }
 
-static uint8 TARBELL_Read(const uint32 Addr)
+static uint8 TARBELL_Read(uint32 Addr)
 {
     uint8 cData;
     uint8 driveNum;
     FD1771_REG *pFD1771;
     UNIT *uptr;
-    int32 rtn;
 
     cData = 0;
-    uptr = tarbell_info->uptr[tarbell_info->currentDrive];
-    pFD1771 = &tarbell_info->FD1771[tarbell_info->currentDrive];
+    driveNum = tarbell_info->currentDrive;
+    uptr = tarbell_info->uptr[driveNum];
+    pFD1771 = &tarbell_info->FD1771[driveNum];
 
     switch(Addr & 0x07) {
         case TARBELL_REG_STATUS:
@@ -633,7 +631,7 @@ static uint8 TARBELL_Read(const uint32 Addr)
     return (cData);
 }
 
-static uint8 TARBELL_Write(const uint32 Addr, const int32 Data)
+static uint8 TARBELL_Write(uint32 Addr, int32 Data)
 {
     uint8 cData;
     uint8 driveNum;
@@ -644,8 +642,9 @@ static uint8 TARBELL_Write(const uint32 Addr, const int32 Data)
     DBG_PRINT(("TARBELL: WRITE Address %02x Data %02x" NLP, Addr & 0xFF, Data & 0xFF));
 
     cData = 0;
-    uptr = tarbell_info->uptr[tarbell_info->currentDrive];
-    pFD1771 = &tarbell_info->FD1771[tarbell_info->currentDrive];
+    driveNum = tarbell_info->currentDrive;
+    uptr = tarbell_info->uptr[driveNum];
+    pFD1771 = &tarbell_info->FD1771[driveNum];
 
     switch(Addr & 0x07) {
         case TARBELL_REG_COMMAND:
@@ -816,7 +815,7 @@ static uint32 TARBELL_WriteSector(UNIT *uptr, uint8 track, uint8 sector, uint8 *
 }
 
 
-static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, const int32 Data)
+static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
 {
     uint8 cData;
     uint8 newTrack;
@@ -1141,7 +1140,7 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, const int32 Data)
     return(cData);
 }
 
-static int32 tarbellprom(const int32 Addr, const int32 rw, const int32 Data)
+static int32 tarbellprom(int32 Addr, int32 rw, int32 Data)
 {
     /*
     ** The Tarbell controller overlays the first 32 bytes of RAM with a PROM.
