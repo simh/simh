@@ -45,11 +45,6 @@
 
 /*#define DBG_MSG */
 #include "altairz80_defs.h"
-
-#if defined (_WIN32)
-#include <windows.h>
-#endif
-
 #include "sim_defs.h"   /* simulator definitions */
 #include "wd179x.h"
 
