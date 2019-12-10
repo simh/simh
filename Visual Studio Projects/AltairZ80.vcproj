@@ -344,6 +344,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\AltairZ80\s100_tarbell.c"
+				>
+			</File>
+			<File
 				RelativePath="..\scp.c"
 				>
 			</File>
