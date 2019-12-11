@@ -182,6 +182,13 @@ int32 sim_del_char = '\b';                              /* delete character */
 #else
 int32 sim_del_char = 0177;
 #endif
+t_bool sim_signaled_int_char                            /* WRU character detected by signal while running */
+#if defined (_WIN32) || defined (_VMS) || defined (__CYGWIN__)
+                             = FALSE;
+#else
+                             = TRUE;
+#endif
+uint32 sim_last_poll_kbd_time;                          /* time when sim_poll_kbd was called */
 extern TMLN *sim_oline;                                 /* global output socket */
 
 static t_stat sim_con_poll_svc (UNIT *uptr);                /* console connection poll routine */
@@ -2835,6 +2842,7 @@ t_stat sim_poll_kbd (void)
 {
 t_stat c;
 
+sim_last_poll_kbd_time = sim_os_msec ();                    /* record when this poll happened */
 if (sim_send_poll_data (&sim_con_send, &c))                 /* injected input characters available? */
     return c;
 if (!sim_rem_master_mode) {
