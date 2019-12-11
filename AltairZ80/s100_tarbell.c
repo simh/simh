@@ -51,7 +51,7 @@ extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_typ
 #define TARBELL_BYTES_PER_TRACK   ((TARBELL_SECTORS_PER_TRACK * 186) + 73 + 247)
 #define TARBELL_TRACKS            77
 #define TARBELL_CAPACITY          (256256)    /* Default Tarbell Disk Capacity */
-#define TARBELL_ROTATION_MS       50
+#define TARBELL_ROTATION_MS       100
 #define TARBELL_HEAD_TIMEOUT      (TARBELL_ROTATION_MS * 2)
 
 #define TARBELL_PROM_SIZE         32
@@ -60,6 +60,8 @@ extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_typ
 #define TARBELL_RAM_MASK          (TARBELL_RAM_SIZE-1)
 #define TARBELL_PROM_READ         FALSE
 #define TARBELL_PROM_WRITE        TRUE
+
+#define	TARBELL_HEAD_TIMER        1000000
 
 /* Tarbell PROM is 32 bytes */
 static uint8 tarbell_prom[TARBELL_PROM_SIZE] = {
@@ -364,7 +366,7 @@ static t_stat tarbell_svc(UNIT *uptr)
     now = sim_os_msec();
 
     if (now < pFD1771->headUnlTime) {
-        sim_activate(uptr, 100000);  /* restart timer */
+        sim_activate(uptr, TARBELL_HEAD_TIMER);  /* restart timer */
     }
     else if (pFD1771->headLoaded == TRUE) {
         TARBELL_HeadLoad(uptr, pFD1771, FALSE);
@@ -538,7 +540,7 @@ static void TARBELL_HeadLoad(UNIT *uptr, FD1771_REG *pFD1771, uint8 load)
 
     if (load) {
         pFD1771->headUnlTime = sim_os_msec() + TARBELL_HEAD_TIMEOUT;
-        sim_activate(uptr, 100000);  /* activate timer */
+        sim_activate(uptr, TARBELL_HEAD_TIMER);  /* activate timer */
     }
 
     if (load == TRUE && pFD1771->headLoaded == FALSE) {
@@ -550,6 +552,12 @@ static void TARBELL_HeadLoad(UNIT *uptr, FD1771_REG *pFD1771, uint8 load)
     }
 
     pFD1771->headLoaded = load;
+
+    /*
+    ** Update head loaded status bit
+    */
+    pFD1771->status &= ~FD1771_STAT_HEADLOAD;
+    pFD1771->status |= (pFD1771->headLoaded) ? FD1771_STAT_HEADLOAD : 0x00;
 }
 
 static uint8 TARBELL_Read(uint32 Addr)
@@ -895,15 +903,16 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
 
             if (newTrack < TARBELL_TRACKS-1) {
                 pFD1771->track = newTrack;
+
+                if (Data & TARBELL_FLAG_H) {
+                    TARBELL_HeadLoad(uptr, pFD1771, TRUE);
+                }
+
                 sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": SEEK       track=%03d" NLP, pFD1771->track);
             }
             else {
                 pFD1771->status |= FD1771_STAT_SEEKERROR;
                 sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": SEEK ERR   track=%03d" NLP, newTrack);
-            }
-
-            if (Data & TARBELL_FLAG_H) {
-                TARBELL_HeadLoad(uptr, pFD1771, TRUE);
             }
 
             pFD1771->status &= ~FD1771_STAT_BUSY;
@@ -945,15 +954,16 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
                 if (Data & TARBELL_FLAG_U) {
                     pFD1771->track++;
                 }
+
+                if (Data & TARBELL_FLAG_H) {
+                    TARBELL_HeadLoad(uptr, pFD1771, TRUE);
+                }
+
                 sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPIN      track=%03d" NLP, pFD1771->track);
             }
             else {
                 pFD1771->status |= FD1771_STAT_SEEKERROR;
                 sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPIN ERR  track=%03d" NLP, pFD1771->track+1);
-            }
-
-            if (Data & TARBELL_FLAG_H) {
-                TARBELL_HeadLoad(uptr, pFD1771, TRUE);
             }
 
             pFD1771->stepDir = 1;
@@ -970,15 +980,16 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
                 if (Data & TARBELL_FLAG_U) {
                     pFD1771->track--;
                 }
+
+                if (Data & TARBELL_FLAG_H) {
+                    TARBELL_HeadLoad(uptr, pFD1771, TRUE);
+                }
+
                 sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPOUT     track=%03d" NLP, pFD1771->track);
             }
             else {
                 pFD1771->status |= FD1771_STAT_SEEKERROR;
                 sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPOUT ERR track=%03d" NLP, pFD1771->track-1);
-            }
-
-            if (Data & TARBELL_FLAG_H) {
-                TARBELL_HeadLoad(uptr, pFD1771, TRUE);
             }
 
             pFD1771->stepDir = -1;
@@ -1102,6 +1113,7 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
         case TARBELL_CMD_STEPOUTU:
         case TARBELL_CMD_FORCE_INTR:
             if (statusUpdate) {
+                pFD1771->status &= ~FD1771_STAT_HEADLOAD;
                 pFD1771->status &= ~FD1771_STAT_WRITEPROT;
                 pFD1771->status &= ~FD1771_STAT_CRCERROR;
                 pFD1771->status &= ~FD1771_STAT_TRACK0;
