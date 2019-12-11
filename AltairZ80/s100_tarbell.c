@@ -356,10 +356,6 @@ static t_stat tarbell_svc(UNIT *uptr)
     FD1771_REG *pFD1771;
     uint32 now;
 
-    if (uptr == NULL) {
-        return SCPE_IERR;
-    }
-
     pFD1771 = &tarbell_info->FD1771[tarbell_info->currentDrive];
 
     /*
@@ -383,10 +379,6 @@ t_stat tarbell_attach(UNIT *uptr, CONST char *cptr)
     char header[4];
     t_stat r;
     unsigned int i = 0;
-
-    if (uptr == NULL) {
-        return SCPE_IERR;
-    }
 
     r = attach_unit(uptr, cptr);    /* attach unit  */
     if(r != SCPE_OK) {              /* error?       */
@@ -444,10 +436,6 @@ t_stat tarbell_detach(UNIT *uptr)
 {
     t_stat r;
     int8 i;
-
-    if (uptr == NULL) {
-        return SCPE_IERR;
-    }
 
     for (i = 0; i < TARBELL_MAX_DRIVES; i++) {
         if(tarbell_dev.units[i].fileref == uptr->fileref) {
