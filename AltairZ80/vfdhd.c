@@ -43,11 +43,6 @@
 #define USE_VGI     /* Use 275-byte VGI-format sectors (includes all metadata) */
 
 #include "altairz80_defs.h"
-
-#if defined (_WIN32)
-#include <windows.h>
-#endif
-
 #include "sim_imd.h"
 
 /* #define DBG_MSG */

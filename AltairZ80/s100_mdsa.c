@@ -16,10 +16,6 @@
 #include "altairz80_defs.h"
 #include "sim_imd.h"
 
-#if defined (_WIN32)
-#include <windows.h>
-#endif
-
 #ifdef DBG_MSG
 #define DBG_PRINT(args) printf args
 #else

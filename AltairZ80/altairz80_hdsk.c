@@ -190,7 +190,7 @@ static int32 mits[SPT32]                = { 0,  17, 2,  19, 4,  21, 6,  23,
 static DPB dpb[] = {
 /*      name    capac           spt     bsh     blm     exm     dsm     drm
         al0     al1     cks     off     psh     phm     ss      off skew                                                */
-    { "HDSK",   HDSK_CAPACITY,  32,     0x05,   0x1F,   0x01,   0x07f9, 0x03FF,
+    { "HDSK",   HDSK_CAPACITY,  32,     0x05,   0x1F,   0x01,   0x07F9, 0x03FF,
         0xFF,   0x00,   0x0000, 0x0006, 0x00,   0x00,   0,      0,  NULL },             /* AZ80 HDSK                    */
 
     { "CPM68K", (1 << 24),      (1<<17),0,      0,      0,      0,      0,
@@ -284,7 +284,7 @@ static DPB dpb[] = {
      dw     40              ;#128 byte records/track
      db     4,0fh           ;block shift mask (2K)
      db     1               ;extent  mask
-     dw     194             ;maximun  block number
+     dw     194             ;maximum  block number
      dw     127             ;max number of dir entry - 1
      db     0C0H,00h        ;alloc vector for directory
      dw     0020h           ;checksum size

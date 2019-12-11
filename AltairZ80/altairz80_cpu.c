@@ -29,17 +29,12 @@
 
 #include "m68k.h"
 #include <ctype.h>
+
 #define SWITCHCPU_DEFAULT 0xfd
 
 /* Debug flags */
 #define IN_MSG          (1 << 0)
 #define OUT_MSG         (1 << 1)
-
-#if defined (_WIN32)
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
 
 #define PCQ_SIZE        64                      /* must be 2**n                     */
 #define PCQ_SIZE_LOG2   6                       /* log2 of PCQ_SIZE                 */
@@ -2088,7 +2083,7 @@ static t_stat sim_instr_mmu (void) {
     tStates = 0;
     if (rtc_avail) {
         startTime = sim_os_msec();
-        tStatesInSlice = sliceLength*clockFrequency;
+        tStatesInSlice = sliceLength * clockFrequency;
     }
     else /* make sure that sim_os_msec() is not called later */
         clockFrequency = startTime = tStatesInSlice = 0;
@@ -2107,7 +2102,7 @@ static t_stat sim_instr_mmu (void) {
                 tStates = 0;
                 if (rtc_avail) {
                     startTime = sim_os_msec();
-                    tStatesInSlice = sliceLength*clockFrequency;
+                    tStatesInSlice = sliceLength * clockFrequency;
                 }
                 else /* make sure that sim_os_msec() is not called later */
                     clockFrequency = startTime = tStatesInSlice = 0;
@@ -2120,13 +2115,8 @@ static t_stat sim_instr_mmu (void) {
                 /* clockFrequency != 0 implies that real time clock is available */
                 startTime += sliceLength;
                 tStates -= tStatesInSlice;
-                if (startTime > (now = sim_os_msec())) {
-#if defined (_WIN32)
-                    Sleep(startTime - now);
-#else
-                    usleep(1000 * (startTime - now));
-#endif
-                }
+                if (startTime > (now = sim_os_msec()))
+                    sim_os_ms_sleep(startTime - now);
             }
 
             if (timerInterrupt && (IFF_S & 1)) {
@@ -2163,7 +2153,7 @@ static t_stat sim_instr_mmu (void) {
 
             if (sim_brk_summ) {
                 if (sim_brk_test(PC, (2u << SIM_BKPT_V_SPC) | SWMASK('E'))) {           /* breakpoint?              */
-                    reason = STOP_IBKPT;                        /* stop simulation  */
+                    reason = STOP_IBKPT;                                                /* stop simulation          */
                     break;
                 }
                 if (sim_brk_test(GetBYTE(PC), (1u << SIM_BKPT_V_SPC) | SWMASK('I'))) {  /* instruction breakpoint?  */
@@ -6121,7 +6111,6 @@ static t_stat sim_instr_mmu (void) {
 
         case 0xfe:          /* CP nn */
             tStates += 7;   /* CPI nn 7 */
-            FALSE;
             temp = RAM_PP(PC);
             AF = (AF & ~0x28) | (temp & 0x28);
             acu = HIGH_REGISTER(AF);

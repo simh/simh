@@ -204,13 +204,11 @@ static int32 getStopWatchDeltaPos   = 0;        /* determines the state for rece
 static uint32 stopWatchNow          = 0;        /* stores starting time of stop watch                           */
 static int32 markTimeSP             = 0;        /* stack pointer for timer stack                                */
 
-                                                /* default time in microseconds to sleep for SIMHSleepCmd       */
-#if defined (_WIN32)
-static uint32 SIMHSleep             = 1000;     /* Sleep uses milliseconds                                      */
-#elif defined (__MWERKS__) && defined (macintosh)
+                                                /* default time in milliseconds to sleep for SIMHSleepCmd       */
+#if defined (__MWERKS__) && defined (macintosh)
 static uint32 SIMHSleep             = 0;        /* no sleep on Macintosh OS9                                    */
 #else
-static uint32 SIMHSleep             = 100;      /* on other platforms 100 micro seconds is good enough          */
+static uint32 SIMHSleep             = 1;        /* default value is one millisecond                             */
 #endif
 static uint32 sleepAllowedCounter   = 0;        /* only sleep on no character available when == 0               */
 static uint32 sleepAllowedStart     = SLEEP_ALLOWED_START_DEFAULT;  /* default start for above counter          */
@@ -472,7 +470,7 @@ static REG simh_reg[] = {
     { DRDATAD (STDP,     setTimerDeltaPos,       8,
                "Status register for receiving the timer delta"), REG_RO                             },
     { DRDATAD (SLEEP,    SIMHSleep,              32,
-               "Sleep time in milliseconds after SIO status check (when enabled)")                                 },
+               "Sleep time in milliseconds after SIO status check (when enabled)")                  },
     { DRDATAD (VOSLP,    sleepAllowedStart,      32,
                "Only sleep when this many unsuccessful SIO status checks have been made")           },
 
@@ -483,7 +481,7 @@ static REG simh_reg[] = {
     { DRDATAD (STPNW,    stopWatchNow,           32,
                "Starting time of stop watch"), REG_RO                                               },
     { DRDATAD (MTSP,     markTimeSP,             8,
-               "Stack pointer of timer stack"), REG_RO                                             },
+               "Stack pointer of timer stack"), REG_RO                                              },
 
     { DRDATAD (VPOS,     versionPos,             8,
                "Status register for sending version information"), REG_RO                           },
@@ -1207,7 +1205,7 @@ enum simhPseudoDeviceCommands { /* do not change order or remove commands, add o
     setTimerInterruptAdrCmd,    /* 24 set the address to call by timer interrupts                       */
     resetStopWatchCmd,          /* 25 reset the millisecond stop watch                                  */
     readStopWatchCmd,           /* 26 read the millisecond stop watch                                   */
-    SIMHSleepCmd,               /* 27 let SIMH sleep for SIMHSleep microseconds                         */
+    SIMHSleepCmd,               /* 27 let SIMH sleep for SIMHSleep milliseconds                         */
     getHostOSPathSeparatorCmd,  /* 28 obtain the file path separator of the OS under which SIMH runs    */
     getHostFilenamesCmd,        /* 29 perform wildcard expansion and obtain list of file names          */
     readURLCmd,                 /* 30 read the contents of an URL                                       */
@@ -1603,13 +1601,8 @@ void do_SIMH_sleep(void) {
      Otherwise there is the possibility that such interrupts are skipped. */
     if ((simh_unit.flags & UNIT_SIMH_TIMERON) && rtc_avail && (sim_os_msec() + 1 >= timeOfNextInterrupt))
         return;
-#if defined (_WIN32)
-    if ((SIMHSleep / 1000) && !sio_unit.u4) /* time to sleep and SIO not attached to a file */
-        Sleep(SIMHSleep / 1000);
-#else
-    if (SIMHSleep && !sio_unit.u4)          /* time to sleep and SIO not attached to a file */
-        usleep(SIMHSleep);
-#endif
+    if (SIMHSleep && !sio_unit.u4)  /* time to sleep and SIO not attached to a file */
+        sim_os_ms_sleep(SIMHSleep);
 }
 
 static int32 simh_out(const int32 port, const int32 data) {

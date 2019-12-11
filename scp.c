@@ -1186,6 +1186,15 @@ static const char simh_help[] =
 #define HLP_CP          "*Commands Copying_Files CP"
       "3CP\n"
       "++CP sfile dfile            copies a file\n"
+      "2Renaming Files\n"
+#define HLP_RENAME      "*Commands Renaming_Files RENAME"
+      "3RENAME\n"
+      "++RENAME origname newname   renames a file\n"
+#define HLP_MOVE        "*Commands Renaming_Files MOVE"
+      "3MOVE\n"
+      "++MOVE origname newname     renames a file\n"
+      "+or\n"
+      "++MV   origname newname     renames a file\n"
       "2Creating Directories\n"
 #define HLP_MKDIR       "*Commands Creating_Directories MKDIR"
       "3MKDIR\n"
@@ -2344,6 +2353,9 @@ static CTAB cmd_table[] = {
     { "RM",         &delete_cmd,    0,          HLP_RM,         NULL, NULL },
     { "COPY",       &copy_cmd,      0,          HLP_COPY,       NULL, NULL },
     { "CP",         &copy_cmd,      0,          HLP_CP,         NULL, NULL },
+    { "RENAME",     &rename_cmd,    0,          HLP_RENAME,     NULL, NULL },
+    { "MOVE",       &rename_cmd,    0,          HLP_MOVE,       NULL, NULL },
+    { "MV",         &rename_cmd,    0,          HLP_MOVE,       NULL, NULL },
     { "MKDIR",      &mkdir_cmd,     0,          HLP_MKDIR,      NULL, NULL },
     { "RMDIR",      &rmdir_cmd,     0,          HLP_RMDIR,      NULL, NULL },
     { "SET",        &set_cmd,       0,          HLP_SET,        NULL, NULL },
@@ -6574,6 +6586,21 @@ if ((stat == SCPE_OK) && (copy_state.count))
 return copy_state.stat;
 }
 
+t_stat rename_cmd (int32 flg, CONST char *cptr)
+{
+char sname[CBUFSIZE], dname[CBUFSIZE];
+
+if ((!cptr) || (*cptr == 0))
+    return SCPE_2FARG;
+cptr = get_glyph_quoted (cptr, sname, 0);
+if ((!cptr) || (*cptr == 0))
+    return SCPE_2FARG;
+cptr = get_glyph_quoted (cptr, dname, 0);
+if (0 == rename (sname, dname))
+    return SCPE_OK;
+return sim_messagef (SCPE_ARG, "Can't rename '%s' to '%s': %s\n\n", sname, dname, strerror (errno));
+}
+
 t_stat mkdir_cmd (int32 flg, CONST char *cptr)
 {
 char path[CBUFSIZE];
@@ -7325,8 +7352,10 @@ if (*cptr == 0)                                         /* must be more */
 gbuf[sizeof(gbuf)-1] = '\0';
 strlcpy (gbuf, cptr, sizeof(gbuf));
 sim_trim_endspc (gbuf);
-if ((sfile = sim_fopen (gbuf, "wb")) == NULL)
-    return SCPE_OPENERR;
+if ((sfile = sim_fopen (gbuf, "r+b")) == NULL) {    /* try existing file */
+    if ((sfile = sim_fopen (gbuf, "wb")) == NULL)   /* create new empty file */
+        return SCPE_OPENERR;
+    }
 r = sim_save (sfile);
 fclose (sfile);
 return r;
@@ -7463,6 +7492,8 @@ for (i = 0; i < (device_count + sim_internal_device_count); i++) {/* loop thru d
     fputc ('\n', sfile);                                /* end registers */
     }
 fputc ('\n', sfile);                                    /* end devices */
+if (!ferror (sfile))
+    sim_set_fsize (sfile, (t_addr)sim_ftell (sfile));   /* truncate the save file */
 return (ferror (sfile))? SCPE_IOERR: SCPE_OK;           /* error during save? */
 }
 

@@ -43,11 +43,6 @@
 /*#define DBG_MSG */
 
 #include "altairz80_defs.h"
-
-#if defined (_WIN32)
-#include <windows.h>
-#endif
-
 #include <time.h>
 
 #ifdef DBG_MSG

@@ -269,7 +269,6 @@ extern DEBTAB crd_debug[];
 #define UNIT_V_SET      (UNIT_V_UF + 5)
 #define CHAN_SET        (1 << UNIT_V_SET)
 
-extern t_value  assembly[NUM_CHAN];             /* Assembly register */
 /* I/O routine functions */
 /* Channel half of controls */
 /* Channel status */
