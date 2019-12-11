@@ -893,7 +893,7 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
 
             pFD1771->status &= ~FD1771_STAT_SEEKERROR;
 
-            if (newTrack < TARBELL_TRACKS) {
+            if (newTrack < TARBELL_TRACKS-1) {
                 pFD1771->track = newTrack;
                 sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": SEEK       track=%03d" NLP, pFD1771->track);
             }
@@ -941,7 +941,7 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
         case TARBELL_CMD_STEPINU:
             pFD1771->status &= ~FD1771_STAT_SEEKERROR;
 
-            if (pFD1771->track < TARBELL_TRACKS) {
+            if (pFD1771->track < TARBELL_TRACKS-1) {
                 if (Data & TARBELL_FLAG_U) {
                     pFD1771->track++;
                 }
