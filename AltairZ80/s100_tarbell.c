@@ -317,7 +317,7 @@ t_stat tarbell_reset(DEVICE *dptr)
         }
     }
 
-    /* Enable PROM */
+    pInfo->currentDrive = 0;
     pInfo->promEnabled = TRUE;
     pInfo->writeProtect = FALSE;
 
@@ -339,8 +339,10 @@ t_stat tarbell_reset(DEVICE *dptr)
         pInfo->FD1771[i].writeTrkActive = FALSE;
         pInfo->FD1771[i].addrActive = FALSE;
         pInfo->FD1771[i].headLoaded = FALSE;
-        pInfo->FD1771[i].driveNotReady = TRUE;
+        pInfo->FD1771[i].driveNotReady = ((pInfo->uptr[i] == NULL) || (pInfo->uptr[i]->fileref == NULL)) ? TRUE : FALSE;
     }
+
+    sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": reset controller." NLP);
 
     return SCPE_OK;
 }
