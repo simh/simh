@@ -323,6 +323,10 @@ t_stat tarbell_reset(DEVICE *dptr)
 
     /* Reset Registers and Interface Controls */
     for (i=0; i < TARBELL_MAX_DRIVES; i++) {
+        if (tarbell_info->uptr[i] == NULL) {
+            tarbell_info->uptr[i] = &tarbell_dev.units[i];
+        }
+
         pInfo->FD1771[i].track = 0;
         pInfo->FD1771[i].sector = 1;
         pInfo->FD1771[i].command = 0;
@@ -352,6 +356,10 @@ static t_stat tarbell_svc(UNIT *uptr)
     FD1771_REG *pFD1771;
     uint32 now;
 
+    if (uptr == NULL) {
+        return SCPE_IERR;
+    }
+
     pFD1771 = &tarbell_info->FD1771[tarbell_info->currentDrive];
 
     /*
@@ -376,6 +384,10 @@ t_stat tarbell_attach(UNIT *uptr, CONST char *cptr)
     t_stat r;
     unsigned int i = 0;
 
+    if (uptr == NULL) {
+        return SCPE_IERR;
+    }
+
     r = attach_unit(uptr, cptr);    /* attach unit  */
     if(r != SCPE_OK) {              /* error?       */
         sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": ATTACH error=%d" NLP, r);
@@ -390,10 +402,6 @@ t_stat tarbell_attach(UNIT *uptr, CONST char *cptr)
     }
 
     DBG_PRINT(("TARBELL: ATTACH uptr->capac=%d" NLP, uptr->capac));
-
-    for (i = 0; i < TARBELL_MAX_DRIVES; i++) {
-        tarbell_info->uptr[i] = &tarbell_dev.units[i];
-    }
 
     for (i = 0; i < TARBELL_MAX_DRIVES; i++) {
         if(tarbell_dev.units[i].fileref == uptr->fileref) {
@@ -436,6 +444,10 @@ t_stat tarbell_detach(UNIT *uptr)
 {
     t_stat r;
     int8 i;
+
+    if (uptr == NULL) {
+        return SCPE_IERR;
+    }
 
     for (i = 0; i < TARBELL_MAX_DRIVES; i++) {
         if(tarbell_dev.units[i].fileref == uptr->fileref) {
@@ -530,6 +542,10 @@ static uint32 calculate_tarbell_sec_offset(uint8 track, uint8 sector)
 
 static void TARBELL_HeadLoad(UNIT *uptr, FD1771_REG *pFD1771, uint8 load)
 {
+    if (uptr == NULL) {
+        return;
+    }
+
     sim_cancel(uptr);            /* cancel timer */
 
     if (load) {
@@ -641,7 +657,7 @@ static uint8 TARBELL_Write(uint32 Addr, int32 Data)
     UNIT *uptr;
     FD1771_REG *pFD1771;
 
-    DBG_PRINT(("TARBELL: WRITE Address %02x Data %02x" NLP, Addr & 0xFF, Data & 0xFF));
+    sim_debug(CMD_MSG, &tarbell_dev, TARBELL_SNAME ": OUT %02x Data %02x" NLP, Addr & 0xFF, Data & 0xFF);
 
     cData = 0;
     driveNum = tarbell_info->currentDrive;
@@ -772,6 +788,10 @@ static uint32 TARBELL_ReadSector(UNIT *uptr, uint8 track, uint8 sector, uint8 *b
     uint32 sec_offset;
     uint32 rtn = 0;
 
+    if (uptr == NULL) {
+        return rtn;
+    }
+
     if (uptr->fileref == NULL) {
         sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": READSEC uptr.fileref is NULL!" NLP);
         return 0;
@@ -796,6 +816,10 @@ static uint32 TARBELL_WriteSector(UNIT *uptr, uint8 track, uint8 sector, uint8 *
 {
     uint32 sec_offset;
     uint32 rtn = 0;
+
+    if (uptr == NULL) {
+        return rtn;
+    }
 
     if (uptr->fileref == NULL) {
         sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": READSEC uptr.fileref is NULL!" NLP);
@@ -827,6 +851,10 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
     cData = 0;
     rtn=0;
     statusUpdate = TRUE;
+
+    if (uptr == NULL) {
+        return cData;
+    }
 
     pFD1771->command = (Data & 0xF0);
 
