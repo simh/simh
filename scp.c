@@ -6612,6 +6612,12 @@ if ((!cptr) || (*cptr == '\0'))
 strlcpy (path, cptr, sizeof (path));
 while ((c = strchr (path, '\\')))
     *c = '/';
+if (path[strlen (path) - 1] == '/')     /* trim any trailing / from the path */
+    path[strlen (path) - 1] = '\0';
+while ((c = strstr (path, "//")))        
+    memmove (c, c + 1, strlen (c + 1) + 1); /* clean out any empty directories // */
+if ((!stat (path, &filestat)) && (filestat.st_mode & S_IFDIR))
+    return sim_messagef (SCPE_OK, "directory %s already exists\n", path);
 c = path;
 while ((c = strchr (c, '/'))) {
     *c = '\0';
