@@ -12314,6 +12314,12 @@ memcpy(snd->buffer+snd->insoff, data, size);
 snd->insoff += size;
 snd->delay = (sim_switches & SWMASK ('T')) ? (uint32)((sim_timer_inst_per_sec()*delay)/1000000.0) : delay;
 snd->after = (sim_switches & SWMASK ('T')) ? (uint32)((sim_timer_inst_per_sec()*after)/1000000.0) : after;
+if (sim_switches & SWMASK ('T'))
+    sim_debug (snd->dbit, snd->dptr, "%d bytes queued for output. Delay %d usecs = %d insts, After %d usecs = %d insts\n", 
+                                     (int)size, (int)delay, (int)snd->delay, (int)after, (int)snd->after);
+else
+    sim_debug (snd->dbit, snd->dptr, "%d bytes queued for output. Delay=%d, After=%d\n", 
+                                     (int)size, (int)delay, (int)after);
 snd->next_time = sim_gtime() + snd->after;
 return SCPE_OK;
 }
