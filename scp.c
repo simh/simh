@@ -3424,6 +3424,7 @@ return SCPE_OK;
 t_stat spawn_cmd (int32 flag, CONST char *cptr)
 {
 t_stat status;
+
 if ((cptr == NULL) || (strlen (cptr) == 0))
     cptr = getenv("SHELL");
 if ((cptr == NULL) || (strlen (cptr) == 0))
@@ -6609,6 +6610,7 @@ char path[CBUFSIZE];
 char *c;
 struct stat filestat;
 
+GET_SWITCHES (cptr);                                    /* get switches */
 if ((!cptr) || (*cptr == '\0'))
     return sim_messagef (SCPE_2FARG, "Must specify a directory path\n");
 strlcpy (path, cptr, sizeof (path));
@@ -6655,6 +6657,7 @@ return SCPE_OK;
 
 t_stat rmdir_cmd (int32 flg, CONST char *cptr)
 {
+GET_SWITCHES (cptr);                                    /* get switches */
 if ((!cptr) || (*cptr == '\0'))
     return sim_messagef (SCPE_2FARG, "Must specify a directory\n");
 if (rmdir (cptr))
@@ -12317,10 +12320,10 @@ snd->insoff += size;
 snd->delay = (sim_switches & SWMASK ('T')) ? (uint32)((sim_timer_inst_per_sec()*delay)/1000000.0) : delay;
 snd->after = (sim_switches & SWMASK ('T')) ? (uint32)((sim_timer_inst_per_sec()*after)/1000000.0) : after;
 if (sim_switches & SWMASK ('T'))
-    sim_debug (snd->dbit, snd->dptr, "%d bytes queued for output. Delay %d usecs = %d insts, After %d usecs = %d insts\n", 
+    sim_debug (snd->dbit, snd->dptr, "%d bytes queued for input. Delay %d usecs = %d insts, After %d usecs = %d insts\n", 
                                      (int)size, (int)delay, (int)snd->delay, (int)after, (int)snd->after);
 else
-    sim_debug (snd->dbit, snd->dptr, "%d bytes queued for output. Delay=%d, After=%d\n", 
+    sim_debug (snd->dbit, snd->dptr, "%d bytes queued for input. Delay=%d, After=%d\n", 
                                      (int)size, (int)delay, (int)after);
 snd->next_time = sim_gtime() + snd->after;
 return SCPE_OK;
