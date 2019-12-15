@@ -4742,9 +4742,9 @@ delay = get_default_env_parameter (dev_name, "SIM_SEND_DELAY", SEND_DEFAULT_DELA
 after = get_default_env_parameter (dev_name, "SIM_SEND_AFTER", delay);
 while (*cptr) {
     if ((!strncmp(gbuf, "DELAY=", 6)) && (gbuf[6])) {
-        delay = (uint32)get_uint (&gbuf[6], 10, 10000000, &r);
+        delay = (uint32)get_uint (&gbuf[6], 10, 2000000000, &r);
         if (r != SCPE_OK)
-            return sim_messagef (SCPE_ARG, "Invalid Delay Value\n");
+            return sim_messagef (SCPE_ARG, "Invalid Delay Value: %s\n", &gbuf[6]);
         cptr = tptr;
         tptr = get_glyph (cptr, gbuf, ',');
         delay_set = TRUE;
@@ -4753,9 +4753,9 @@ while (*cptr) {
         continue;
         }
     if ((!strncmp(gbuf, "AFTER=", 6)) && (gbuf[6])) {
-        after = (uint32)get_uint (&gbuf[6], 10, 10000000, &r);
+        after = (uint32)get_uint (&gbuf[6], 10, 2000000000, &r);
         if (r != SCPE_OK)
-            return sim_messagef (SCPE_ARG, "Invalid After Value\n");
+            return sim_messagef (SCPE_ARG, "Invalid After Value: %s\n", &gbuf[6]);
         cptr = tptr;
         tptr = get_glyph (cptr, gbuf, ',');
         after_set = TRUE;
@@ -11818,9 +11818,9 @@ if (*cptr == '[') {
     }
 tptr = get_glyph (cptr, gbuf, ',');
 if ((!strncmp(gbuf, "HALTAFTER=", 10)) && (gbuf[10])) {
-    after = (uint32)get_uint (&gbuf[10], 10, 100000000, &r);
+    after = (uint32)get_uint (&gbuf[10], 10, 2000000000, &r);
     if (r != SCPE_OK)
-        return sim_messagef (SCPE_ARG, "Invalid Halt After Value\n");
+        return sim_messagef (SCPE_ARG, "Invalid Halt After Value: %s\n", &gbuf[10]);
     cptr = tptr;
     after_set = TRUE;
     }
