@@ -2034,7 +2034,9 @@ static const char simh_help[] =
       " Data which is output prior to the definition of an expect rule is not\n"
       " eligible to be matched against.\n\n"
       " The NOEXPECT command removes a previously defined EXPECT command for the\n"
-      " console or a specific multiplexer line.\n\n"
+      " console or a specific multiplexer line.  A NOEXPECT command, without a\n"
+      " specific mention of a particular EXPECT match string, will remove all\n"
+      " currently defined EXPECT match rules.\n\n"
       " The SHOW EXPECT command displays all of the pending EXPECT state for\n"
       " the console or a specific multiplexer line.\n"
        /***************** 80 character line width template *************************/
