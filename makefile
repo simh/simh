@@ -576,8 +576,13 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   endif
   ifneq (,$(call find_include,sys/mman))
     ifneq (,$(shell grep shm_open $(call find_include,sys/mman)))
-      OS_CCDEFS += -DHAVE_SHM_OPEN
-      $(info using mman: $(call find_include,sys/mman))
+      # some Linux installs have been known to have the include, but are
+      # missing librt (where the shm_ APIs are implemented on Linux)
+      # other OSes seem have these APIs implemented elsewhere
+      ifneq (,$(if $(findstring Linux,$(OSTYPE)),$(call find_lib,rt),OK))
+        OS_CCDEFS += -DHAVE_SHM_OPEN
+        $(info using mman: $(call find_include,sys/mman))
+      endif
     endif
   endif
   ifneq (,$(VIDEO_USEFUL))
