@@ -1975,6 +1975,8 @@ static const char simh_help[] =
       " which don't specify an explicit DELAY parameter along with a string\n"
       " If a SEND command is processed and no DELAY value has been specified,\n"
       " the default value of the delay parameter is 1000.\n"
+      " The value n can be specified with a suffix of k or m which indicates\n"
+      " a multiplier of 1000 or 1000000 respectively\n"
        /***************** 80 character line width template *************************/
       "4After\n"
       " Specifies an integer (>=0) representing a minimal number of instructions\n"
@@ -1985,6 +1987,8 @@ static const char simh_help[] =
       " which don't specify an explicit AFTER parameter along with a string\n"
       " If a SEND command is processed and no AFTER value has been specified,\n"
       " the default value of the delay parameter is the DELAY parameter value.\n"
+      " The value n can be specified with a suffix of k or m which indicates\n"
+      " a multiplier of 1000 or 1000000 respectively\n"
       "4Escaping String Data\n"
       " The following character escapes are explicitly supported:\n"
       "++\\r  Sends the ASCII Carriage Return character (Decimal value 13)\n"
@@ -2120,6 +2124,8 @@ static const char simh_help[] =
       " enough for more than one expect rule to match before an earlier haltafter\n"
       " delay has expired, only a single EXPECT rule can be defined if a non-zero\n"
       " HaltAfter parameter has been set.\n"
+      " The value n can be specified with a suffix of k or m which indicates\n"
+      " a multiplier of 1000 or 1000000 respectively\n"
       /***************** 80 character line width template *************************/
 #define HLP_SLEEP       "*Commands Executing_Command_Files Pausing_Command_Execution"
       "3Pausing Command Execution\n"
@@ -9440,7 +9446,17 @@ if ((cptr == tptr) || (val > max))
     *status = SCPE_ARG;
 else {
     while (sim_isspace (*tptr)) tptr++;
-    if (*tptr != 0)
+    if (sim_toupper (*tptr) == 'K') {
+        val *= 1000;
+        ++tptr;
+        }
+    else {
+        if (sim_toupper (*tptr) == 'M') {
+            val *= 1000000;
+            ++tptr;
+            }
+        }
+    if ((*tptr != 0) || (val > max))
         *status = SCPE_ARG;
     }
 return val;
