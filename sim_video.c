@@ -1871,9 +1871,13 @@ if (1) {
         snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
                             ", PNG Version %s", PNG_LIBPNG_VER_STRING);
     png_destroy_read_struct(&png, NULL, NULL);
-#if defined (HAVE_ZLIB)
-    snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
-                        ", zlib: %s", zlibVersion());
+#if defined (ZLIB_VERSION)
+    if (strcmp (ZLIB_VERSION, zlibVersion ()))
+        snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
+                            ", zlib: (Compiled: %s, Runtime: %s)", ZLIB_VERSION, zlibVersion ());
+    else
+        snprintf(&SDLVersion[strlen (SDLVersion)], sizeof (SDLVersion) - (strlen (SDLVersion) + 1), 
+                            ", zlib: %s", ZLIB_VERSION);
 #endif
     }
 #endif
