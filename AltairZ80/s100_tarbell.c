@@ -868,7 +868,7 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
         return cData;
     }
 
-    pFD1771->command = (Data & 0xF0);
+    pFD1771->command = Data;
 
     /*
     ** Type II-IV Command
@@ -893,7 +893,7 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
 
     pFD1771->intrq = FALSE;
 
-    switch(pFD1771->command) {
+    switch(pFD1771->command & 0xf0) {
         case TARBELL_CMD_RESTORE:
             pFD1771->track = 0;
 
@@ -1099,6 +1099,7 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
         default:
             cData=0xFF;
             sim_debug(ERROR_MSG, &tarbell_dev, "TARBELL: UNRECOGNIZED CMD %02X" NLP, pFD1771->command);
+            pFD1771->intrq = TRUE;
             break;
     }
 
@@ -1108,7 +1109,7 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
 
     pFD1771->status |= (pFD1771->driveNotReady) ? FD1771_STAT_NOTREADY : 0x00;
 
-    switch(pFD1771->command) {
+    switch(pFD1771->command & 0xf0) {
         case TARBELL_CMD_RESTORE:
         case TARBELL_CMD_SEEK:
         case TARBELL_CMD_STEP:
