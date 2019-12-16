@@ -987,6 +987,11 @@ if (sim_calb_tmr != tmr) {
     return rtc->currd;
     }
 new_rtime = sim_os_msec ();                         /* wall time */
+if (!sim_signaled_int_char && 
+    ((new_rtime - sim_last_poll_kbd_time) > 500)) {
+    sim_debug (DBG_CAL, &sim_timer_dev, "sim_rtcn_calb(tmr=%d) gratuitious keyboard poll after %d msecs\n", tmr, (int)(new_rtime - sim_last_poll_kbd_time));
+    (void)sim_poll_kbd ();
+    }
 ++rtc->calibrations;                                /* count calibrations */
 sim_debug (DBG_TRC, &sim_timer_dev, "sim_rtcn_calb(ticksper=%d, tmr=%d)\n", ticksper, tmr);
 if (new_rtime < rtc->rtime) {                       /* time running backwards? */
