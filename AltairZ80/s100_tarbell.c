@@ -50,8 +50,8 @@ extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_typ
 #define TARBELL_SECTORS_PER_TRACK 26
 #define TARBELL_BYTES_PER_TRACK   ((TARBELL_SECTORS_PER_TRACK * 186) + 73 + 247)
 #define TARBELL_TRACKS            77
-#define TARBELL_CAPACITY          (256256)    /* Default Tarbell Disk Capacity */
-#define TARBELL_ROTATION_MS       100
+#define TARBELL_CAPACITY          (256256)    	/* Default Tarbell Disk Capacity */
+#define TARBELL_ROTATION_MS       (166*1000)	/* 166 milliseconds per revolution */
 #define TARBELL_HEAD_TIMEOUT      (TARBELL_ROTATION_MS * 2)
 
 #define TARBELL_PROM_SIZE         32
@@ -60,8 +60,6 @@ extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_typ
 #define TARBELL_RAM_MASK          (TARBELL_RAM_SIZE-1)
 #define TARBELL_PROM_READ         FALSE
 #define TARBELL_PROM_WRITE        TRUE
-
-#define	TARBELL_HEAD_TIMER        100
 
 /* Tarbell PROM is 32 bytes */
 static uint8 tarbell_prom[TARBELL_PROM_SIZE] = {
@@ -93,7 +91,6 @@ typedef struct {
     uint8   addrActive;     /* Address Active */
     uint8   driveNotReady;  /* Drive Not Ready */
     uint8   headLoaded;     /* Head Loaded */
-    uint32  headUnlTime;    /* Time to unload head */
 } FD1771_REG;
 
 #define FD1771_STAT_NOTREADY   0x80
@@ -356,19 +353,13 @@ t_stat tarbell_reset(DEVICE *dptr)
 static t_stat tarbell_svc(UNIT *uptr)
 {
     FD1771_REG *pFD1771;
-    uint32 now;
+
+    printf("timer!" NLP);
 
     pFD1771 = &tarbell_info->FD1771[tarbell_info->currentDrive];
 
-    /*
-    ** Get current msec time
-    */
-    now = sim_os_msec();
-
-    if (now < pFD1771->headUnlTime) {
-        sim_activate(uptr, TARBELL_HEAD_TIMER);  /* restart timer */
-    }
-    else if (pFD1771->headLoaded == TRUE) {
+    if (pFD1771->headLoaded == TRUE) {
+        printf("head unloaded" NLP);
         TARBELL_HeadLoad(uptr, pFD1771, FALSE);
     }
 
@@ -537,16 +528,16 @@ static void TARBELL_HeadLoad(UNIT *uptr, FD1771_REG *pFD1771, uint8 load)
     }
 
     if (load) {
-        pFD1771->headUnlTime = sim_os_msec() + TARBELL_HEAD_TIMEOUT;
-        sim_cancel(uptr);            /* cancel timer */
-        sim_activate(uptr, TARBELL_HEAD_TIMER);  /* activate timer */
-    }
+        printf("starting timer" NLP);
+        sim_activate_after_abs(uptr, TARBELL_HEAD_TIMEOUT);  /* activate timer */
 
-    if (load == TRUE && pFD1771->headLoaded == FALSE) {
-        sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": Drive %d head Loaded." NLP, tarbell_info->currentDrive);
+        if (pFD1771->headLoaded == FALSE) {
+            sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": Drive %d head Loaded." NLP, tarbell_info->currentDrive);
+        }
     }
 
     if (load == FALSE && pFD1771->headLoaded == TRUE) {
+        printf("stopping timer" NLP);
         sim_cancel(uptr);            /* cancel timer */
         sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": Drive %d head Unloaded." NLP, tarbell_info->currentDrive);
     }
