@@ -2,10 +2,10 @@ platform:
   - x86
 
 cache:
-  - ../windows-build
+  - ../windows-build -> appveyor.yml
 
-shallow_clone: true
-clone_depth: 1
+# shallow_clone: true
+# clone_depth: 1
 
 environment:
   DIST_DIR: '%APPVEYOR_BUILD_FOLDER%\dist'
@@ -66,6 +66,16 @@ before_build:
   #       'npcap-installer.exe')
   # - npcap-installer /loopback_support=no /dot11_support=no /admin_only=no
 
+  ## Create/Update the windows-build libraries
+  - if not exist ..\windows-build (
+      mkdir ..\windows-build &
+      git clone https://github.com/simh/windows-build.git ..\windows-build
+    ) else (
+      pushd ..\windows-build &
+      git pull https://github.com/simh/windows-build.git ..\windows-build &
+      popd
+    )
+
 build_script:
   ## Remove Git's MSYS from PATH, otherwise CMake borks.
   # - set PATH=%PATH:C:\Program Files (x86)\Git\bin;=% 
@@ -75,10 +85,6 @@ build_script:
 
   # VCVARSALL is only defined for the simh-maintained solution:
   - if defined VCVARSALL (
-      if not exist ..\windows-build (
-          mkdir ..\windows-build &
-          git clone https://github.com/simh/windows-build.git ..\windows-build
-      ) &
       call "%VCVARSALL%" %BUILD_ARCH% &
       cd "Visual Studio Projects" & 
       vcbuild /M%NUMBER_OF_PROCESSORS% /useenv /rebuild Simh.sln "%CONFIGURATION%|Win32"
