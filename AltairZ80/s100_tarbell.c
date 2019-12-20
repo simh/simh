@@ -50,9 +50,9 @@ extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_typ
 #define TARBELL_SECTORS_PER_TRACK 26
 #define TARBELL_BYTES_PER_TRACK   ((TARBELL_SECTORS_PER_TRACK * 186) + 73 + 247)
 #define TARBELL_TRACKS            77
-#define TARBELL_CAPACITY          (256256)    /* Default Tarbell Disk Capacity */
-#define TARBELL_ROTATION_MS       50
-#define TARBELL_HEAD_TIMEOUT      (TARBELL_ROTATION_MS * 2)
+#define TARBELL_CAPACITY          (256256)      /* Default Tarbell Disk Capacity */
+#define TARBELL_ROTATION_MS       (166)	        /* 166 milliseconds per revolution */
+#define TARBELL_HEAD_TIMEOUT      (TARBELL_ROTATION_MS * 1000 * 2)   /* usec * 2 revolutions */
 
 #define TARBELL_PROM_SIZE         32
 #define TARBELL_PROM_MASK         (TARBELL_PROM_SIZE-1)
@@ -91,7 +91,6 @@ typedef struct {
     uint8   addrActive;     /* Address Active */
     uint8   driveNotReady;  /* Drive Not Ready */
     uint8   headLoaded;     /* Head Loaded */
-    uint32  headUnlTime;    /* Time to unload head */
 } FD1771_REG;
 
 #define FD1771_STAT_NOTREADY   0x80
@@ -111,6 +110,7 @@ typedef struct {
 
 typedef struct {
     PNP_INFO  pnp;            /* Plug and Play */
+    uint32    headTimeout;    /* Head unload timer value */
     uint8     promEnabled;    /* PROM is enabled */
     uint8     writeProtect;   /* Write Protect is enabled */
     uint8     currentDrive;   /* currently selected drive */
@@ -221,10 +221,21 @@ static const char* tarbell_description(DEVICE *dptr) {
     return TARBELL_NAME;
 }
 
+/*
+** These definitions should probably be in s100_tarbell.h
+** so they can be included in other modules.
+*/
 #define UNIT_V_TARBELL_VERBOSE      (UNIT_V_UF + 0)                      /* VERBOSE / QUIET */
 #define UNIT_TARBELL_VERBOSE        (1 << UNIT_V_TARBELL_VERBOSE)
 #define UNIT_V_TARBELL_WPROTECT     (UNIT_V_UF + 1)                      /* WRTENB / WRTPROT */
 #define UNIT_TARBELL_WPROTECT       (1 << UNIT_V_TARBELL_WPROTECT)
+
+/*
+** These definitions should probably be in altairz80_sio.h
+** so they can be included in other modules, like this one.
+*/
+#define UNIT_V_SIO_SLEEP    (UNIT_V_UF + 7)     /* sleep after keyboard status check            */
+#define UNIT_SIO_SLEEP      (1 << UNIT_V_SIO_SLEEP)
 
 static MTAB tarbell_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                      "IOBASE",  "IOBASE",
@@ -301,6 +312,8 @@ t_stat tarbell_reset(DEVICE *dptr)
 {
     uint8 i;
     TARBELL_INFO *pInfo = (TARBELL_INFO *)dptr->ctxt;
+    DEVICE *sio_dptr;
+    UNIT *sio_uptr;
 
     if(dptr->flags & DEV_DIS) { /* Disconnect I/O Ports */
         sim_map_resource(pInfo->pnp.mem_base, pInfo->pnp.mem_size, RESOURCE_TYPE_MEMORY, &tarbellprom, TRUE);
@@ -323,6 +336,10 @@ t_stat tarbell_reset(DEVICE *dptr)
 
     /* Reset Registers and Interface Controls */
     for (i=0; i < TARBELL_MAX_DRIVES; i++) {
+        if (tarbell_info->uptr[i] == NULL) {
+            tarbell_info->uptr[i] = &tarbell_dev.units[i];
+        }
+
         pInfo->FD1771[i].track = 0;
         pInfo->FD1771[i].sector = 1;
         pInfo->FD1771[i].command = 0;
@@ -342,6 +359,18 @@ t_stat tarbell_reset(DEVICE *dptr)
         pInfo->FD1771[i].driveNotReady = ((pInfo->uptr[i] == NULL) || (pInfo->uptr[i]->fileref == NULL)) ? TRUE : FALSE;
     }
 
+    /*
+    ** If the SIO device sleeps during checks, the SCP usec timer
+    ** is no longer accurate and our wait time has to be adjusted
+    */
+    pInfo->headTimeout = TARBELL_HEAD_TIMEOUT; /* usec timeout */
+
+    sio_dptr = find_unit("SIO0", &sio_uptr);
+
+    if(sio_uptr != NULL && sio_uptr->flags & UNIT_SIO_SLEEP) {
+        pInfo->headTimeout = TARBELL_ROTATION_MS * 2 * 3; /* compensate for 1ms SIO sleep */
+    }
+
     sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": reset controller." NLP);
 
     return SCPE_OK;
@@ -350,19 +379,10 @@ t_stat tarbell_reset(DEVICE *dptr)
 static t_stat tarbell_svc(UNIT *uptr)
 {
     FD1771_REG *pFD1771;
-    uint32 now;
 
     pFD1771 = &tarbell_info->FD1771[tarbell_info->currentDrive];
 
-    /*
-    ** Get current msec time
-    */
-    now = sim_os_msec();
-
-    if (now < pFD1771->headUnlTime) {
-        sim_activate(uptr, 100000);  /* restart timer */
-    }
-    else if (pFD1771->headLoaded == TRUE) {
+    if (pFD1771->headLoaded == TRUE) {
         TARBELL_HeadLoad(uptr, pFD1771, FALSE);
     }
 
@@ -390,10 +410,6 @@ t_stat tarbell_attach(UNIT *uptr, CONST char *cptr)
     }
 
     DBG_PRINT(("TARBELL: ATTACH uptr->capac=%d" NLP, uptr->capac));
-
-    for (i = 0; i < TARBELL_MAX_DRIVES; i++) {
-        tarbell_info->uptr[i] = &tarbell_dev.units[i];
-    }
 
     for (i = 0; i < TARBELL_MAX_DRIVES; i++) {
         if(tarbell_dev.units[i].fileref == uptr->fileref) {
@@ -530,18 +546,23 @@ static uint32 calculate_tarbell_sec_offset(uint8 track, uint8 sector)
 
 static void TARBELL_HeadLoad(UNIT *uptr, FD1771_REG *pFD1771, uint8 load)
 {
-    sim_cancel(uptr);            /* cancel timer */
-
-    if (load) {
-        pFD1771->headUnlTime = sim_os_msec() + TARBELL_HEAD_TIMEOUT;
-        sim_activate(uptr, 100000);  /* activate timer */
+    /*
+    ** If no disk has been attached, uptr will be NULL - return
+    */
+    if (uptr == NULL) {
+        return;
     }
 
-    if (load == TRUE && pFD1771->headLoaded == FALSE) {
-        sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": Drive %d head Loaded." NLP, tarbell_info->currentDrive);
+    if (load) {
+        sim_activate_after_abs(uptr, tarbell_info->headTimeout);  /* activate timer */
+
+        if (pFD1771->headLoaded == FALSE) {
+            sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": Drive %d head Loaded." NLP, tarbell_info->currentDrive);
+        }
     }
 
     if (load == FALSE && pFD1771->headLoaded == TRUE) {
+        sim_cancel(uptr);            /* cancel timer */
         sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": Drive %d head Unloaded." NLP, tarbell_info->currentDrive);
     }
 
@@ -587,6 +608,25 @@ static uint8 TARBELL_Read(uint32 Addr)
                     showregs(pFD1771);
                 }
                 else {
+                    pFD1771->status |= FD1771_STAT_DRQ; /* Another byte is ready */
+                }
+
+                TARBELL_HeadLoad(uptr, pFD1771, TRUE);
+            }
+            else if (pFD1771->readTrkActive) {
+                cData = 0xe5;
+
+                /* If we reached the end of the track data, terminate command and set INTRQ */
+                if (pFD1771->trkCount == TARBELL_BYTES_PER_TRACK) {
+                    pFD1771->readTrkActive = FALSE;
+                    pFD1771->status = 0x00;
+                    pFD1771->intrq = TRUE;
+
+                    showregs(pFD1771);
+                }
+                else {
+                    pFD1771->trkCount++;
+
                     pFD1771->status |= FD1771_STAT_DRQ; /* Another byte is ready */
                 }
 
@@ -641,7 +681,7 @@ static uint8 TARBELL_Write(uint32 Addr, int32 Data)
     UNIT *uptr;
     FD1771_REG *pFD1771;
 
-    DBG_PRINT(("TARBELL: WRITE Address %02x Data %02x" NLP, Addr & 0xFF, Data & 0xFF));
+    sim_debug(CMD_MSG, &tarbell_dev, TARBELL_SNAME ": OUT %02x Data %02x" NLP, Addr & 0xFF, Data & 0xFF);
 
     cData = 0;
     driveNum = tarbell_info->currentDrive;
@@ -702,9 +742,12 @@ static uint8 TARBELL_Write(uint32 Addr, int32 Data)
 
                         if (rtn != TARBELL_SECTOR_LEN) {
                             pFD1771->status |= FD1771_STAT_WRITEFAULT;
+                            sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": WRITE ERROR could not write track %03d sector %03d" NLP, pFD1771->track, pFD1771->sector);
                         }
 
-                        pFD1771->sector++;
+                        if(pFD1771->sector < TARBELL_SECTORS_PER_TRACK) {
+                            pFD1771->sector++;
+                        }
                         pFD1771->dataCount = 0;
                         pFD1771->status &= ~FD1771_STAT_BUSY;  /* Clear BUSY Bit */
 
@@ -720,7 +763,7 @@ static uint8 TARBELL_Write(uint32 Addr, int32 Data)
                 else {
                     pFD1771->status = 0x00;  /* Clear Status Bits */
                     pFD1771->intrq = TRUE;   /* Simulate reaching index hole */
-                    sim_debug(WR_DATA_MSG, &tarbell_dev, TARBELL_SNAME ": WRITE TRACK track=%03d sector=%03d trkcount=%d datacount=%d data=%02X status=%02X" NLP, pFD1771->track, pFD1771->sector, pFD1771->trkCount, pFD1771->dataCount, pFD1771->data, pFD1771->status);
+                    sim_debug(WR_DATA_MSG, &tarbell_dev, TARBELL_SNAME ": WRITE TRACK COMPLETE track=%03d sector=%03d trkcount=%d datacount=%d data=%02X status=%02X" NLP, pFD1771->track, pFD1771->sector, pFD1771->trkCount, pFD1771->dataCount, pFD1771->data, pFD1771->status);
                 }
 
                 TARBELL_HeadLoad(uptr, pFD1771, TRUE);
@@ -828,10 +871,11 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
     rtn=0;
     statusUpdate = TRUE;
 
-    pFD1771->command = (Data & 0xF0);
+    if (uptr == NULL) {
+        return cData;
+    }
 
-    pFD1771->status |= FD1771_STAT_BUSY;
-    pFD1771->intrq = FALSE;
+    pFD1771->command = Data;
 
     /*
     ** Type II-IV Command
@@ -850,19 +894,19 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
     /*
     ** Set BUSY for all but Force Interrupt
     */
-    if ((pFD1771->command & TARBELL_CMD_FORCE_INTR) == TARBELL_CMD_FORCE_INTR) {
+    if ((pFD1771->command & TARBELL_CMD_FORCE_INTR) != TARBELL_CMD_FORCE_INTR) {
         pFD1771->status |= FD1771_STAT_BUSY;
     }
 
-    switch(pFD1771->command) {
+    pFD1771->intrq = FALSE;
+
+    switch(pFD1771->command & 0xf0) {
         case TARBELL_CMD_RESTORE:
             pFD1771->track = 0;
 
             sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": RESTORE track=%03d" NLP, pFD1771->track);
 
-            if (Data & TARBELL_FLAG_H) {
-                TARBELL_HeadLoad(uptr, pFD1771, TRUE);
-            }
+            TARBELL_HeadLoad(uptr, pFD1771, (Data & TARBELL_FLAG_H) ? TRUE : FALSE);
 
             pFD1771->status &= ~FD1771_STAT_SEEKERROR;
             pFD1771->status &= ~FD1771_STAT_BUSY;
@@ -879,15 +923,14 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
 
             if (newTrack < TARBELL_TRACKS) {
                 pFD1771->track = newTrack;
+
+                TARBELL_HeadLoad(uptr, pFD1771, (Data & TARBELL_FLAG_H) ? TRUE : FALSE);
+
                 sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": SEEK       track=%03d" NLP, pFD1771->track);
             }
             else {
                 pFD1771->status |= FD1771_STAT_SEEKERROR;
                 sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": SEEK ERR   track=%03d" NLP, newTrack);
-            }
-
-            if (Data & TARBELL_FLAG_H) {
-                TARBELL_HeadLoad(uptr, pFD1771, TRUE);
             }
 
             pFD1771->status &= ~FD1771_STAT_BUSY;
@@ -901,7 +944,7 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
 
             newTrack = pFD1771->track + pFD1771->stepDir;
 
-            if (newTrack < TARBELL_TRACKS-1) {
+            if (newTrack < TARBELL_TRACKS) {
                 if (Data & TARBELL_FLAG_U) {
                     pFD1771->track = newTrack;
                 }
@@ -912,9 +955,7 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
                 sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEP ERR    track=%03d" NLP, newTrack);
             }
 
-            if (Data & TARBELL_FLAG_H) {
-                TARBELL_HeadLoad(uptr, pFD1771, TRUE);
-            }
+            TARBELL_HeadLoad(uptr, pFD1771, (Data & TARBELL_FLAG_H) ? TRUE : FALSE);
 
             pFD1771->status &= ~FD1771_STAT_BUSY;
             pFD1771->status &= ~FD1771_STAT_DRQ;
@@ -925,19 +966,18 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
         case TARBELL_CMD_STEPINU:
             pFD1771->status &= ~FD1771_STAT_SEEKERROR;
 
-            if (pFD1771->track < TARBELL_TRACKS) {
+            if (pFD1771->track < TARBELL_TRACKS-1) {
                 if (Data & TARBELL_FLAG_U) {
                     pFD1771->track++;
                 }
+
+                TARBELL_HeadLoad(uptr, pFD1771, (Data & TARBELL_FLAG_H) ? TRUE : FALSE);
+
                 sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPIN      track=%03d" NLP, pFD1771->track);
             }
             else {
                 pFD1771->status |= FD1771_STAT_SEEKERROR;
                 sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPIN ERR  track=%03d" NLP, pFD1771->track+1);
-            }
-
-            if (Data & TARBELL_FLAG_H) {
-                TARBELL_HeadLoad(uptr, pFD1771, TRUE);
             }
 
             pFD1771->stepDir = 1;
@@ -954,15 +994,14 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
                 if (Data & TARBELL_FLAG_U) {
                     pFD1771->track--;
                 }
+
+                TARBELL_HeadLoad(uptr, pFD1771, (Data & TARBELL_FLAG_H) ? TRUE : FALSE);
+
                 sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPOUT     track=%03d" NLP, pFD1771->track);
             }
             else {
                 pFD1771->status |= FD1771_STAT_SEEKERROR;
                 sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPOUT ERR track=%03d" NLP, pFD1771->track-1);
-            }
-
-            if (Data & TARBELL_FLAG_H) {
-                TARBELL_HeadLoad(uptr, pFD1771, TRUE);
             }
 
             pFD1771->stepDir = -1;
@@ -974,9 +1013,9 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
         case TARBELL_CMD_READ:
 
             if ((uptr == NULL) || (uptr->fileref == NULL)) {
-                DBG_PRINT(("TARBELL: " ADDRESS_FORMAT
+                sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": " ADDRESS_FORMAT
                           " Drive: %d not attached - read ignored." NLP,
-                          PCX, tarbell_info->currentDrive));
+                          PCX, tarbell_info->currentDrive);
 
                 pFD1771->status &= ~FD1771_STAT_BUSY;
 
@@ -1000,6 +1039,17 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
             break;
 
         case TARBELL_CMD_WRITE:
+            /*
+            ** If no disk in drive, return
+            */
+            if ((uptr == NULL) || (uptr->fileref == NULL)) {
+                sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": " ADDRESS_FORMAT
+                          " Drive: %d not attached - write ignored." NLP,
+                          PCX, tarbell_info->currentDrive);
+
+                pFD1771->status &= ~FD1771_STAT_BUSY;
+            }
+
             if ((uptr->flags & UNIT_TARBELL_WPROTECT) || tarbell_info->writeProtect) {
                 DBG_PRINT((TARBELL_SNAME ": Disk write protected. uptr->flags=%04x writeProtect=%04x" NLP, uptr->flags & UNIT_TARBELL_WPROTECT, tarbell_info->writeProtect));
                 pFD1771->intrq = TRUE;
@@ -1055,6 +1105,7 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
 
             /* Reset Status */
             pFD1771->dataCount = 0;
+            pFD1771->trkCount = 0;
             pFD1771->readActive = FALSE;
             pFD1771->readTrkActive = FALSE;
             pFD1771->writeActive = FALSE;
@@ -1066,6 +1117,7 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
         default:
             cData=0xFF;
             sim_debug(ERROR_MSG, &tarbell_dev, "TARBELL: UNRECOGNIZED CMD %02X" NLP, pFD1771->command);
+            pFD1771->intrq = TRUE;
             break;
     }
 
@@ -1075,7 +1127,7 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
 
     pFD1771->status |= (pFD1771->driveNotReady) ? FD1771_STAT_NOTREADY : 0x00;
 
-    switch(pFD1771->command) {
+    switch(pFD1771->command & 0xf0) {
         case TARBELL_CMD_RESTORE:
         case TARBELL_CMD_SEEK:
         case TARBELL_CMD_STEP:
@@ -1086,13 +1138,14 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
         case TARBELL_CMD_STEPOUTU:
         case TARBELL_CMD_FORCE_INTR:
             if (statusUpdate) {
+                pFD1771->status &= ~FD1771_STAT_HEADLOAD;
                 pFD1771->status &= ~FD1771_STAT_WRITEPROT;
                 pFD1771->status &= ~FD1771_STAT_CRCERROR;
                 pFD1771->status &= ~FD1771_STAT_TRACK0;
                 pFD1771->status |= ((uptr->flags & UNIT_TARBELL_WPROTECT) || tarbell_info->writeProtect) ? FD1771_STAT_WRITEPROT : 0x00;
                 pFD1771->status |= (pFD1771->track) ? 0x00 : FD1771_STAT_TRACK0;
                 pFD1771->status |= (pFD1771->headLoaded) ? FD1771_STAT_HEADLOAD : 0x00;
-                pFD1771->status |= FD1771_STAT_INDEX;    /* Always set Index Flag if Drive Ready */
+                pFD1771->status |= (pFD1771->driveNotReady) ? 0x00 : FD1771_STAT_INDEX;    /* Always set Index Flag if Drive Ready */
             }
             break;
 
@@ -1131,7 +1184,6 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
             pFD1771->status &= ~0x10;
             pFD1771->status &= ~FD1771_STAT_WRITEPROT;
             pFD1771->status &= ~FD1771_STAT_LOSTDATA;
-            pFD1771->status &= ~FD1771_STAT_WRITEFAULT;
             pFD1771->status |= ((uptr->flags & UNIT_TARBELL_WPROTECT) || tarbell_info->writeProtect) ? FD1771_STAT_WRITEPROT : 0x00;
             break;
     }
