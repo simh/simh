@@ -39,8 +39,8 @@
 . . . . . . . . . . [Linux - Dependencies](#linux---dependencies)  
 . . . . . . [Windows](#windows)  
 . . . . . . . . [Required related files](#required-related-files)  
-. . . . . . . . [Visual Studio (Standard or Express) 2008, 2010, 2012, 2013 or Visual Studio Community 2015](#visual-studio-standard-or-express-2008-2010-2012-2013-or-visual-studio-community-2015)  
-. . . . . . . . [MinGW](#mingw)  
+. . . . . . . . [Visual Studio (Standard or Express) 2008, 2010, 2012, 2013 or Visual Studio Community 2015, 2017, 2019](#visual-studio-standard-or-express-2008-2010-2012-2013-or-visual-studio-community-2015-2017-2019)  
+. . . . . . . . [MinGW32](#mingw32)  
 . . . . . . [VMS](#vms)  
 . . [Problem Reports](#problem-reports)  
 
@@ -551,13 +551,13 @@ Compiling on windows is supported with recent versions of Microsoft Visual Studi
 ##### Required related files
 The file https://github.com/simh/simh/blob/master/Visual%20Studio%20Projects/0ReadMe_Projects.txt
 
-##### Visual Studio (Standard or Express) 2008, 2010, 2012, 2013 or Visual Studio Community 2015
+##### Visual Studio (Standard or Express) 2008, 2010, 2012, 2013 or Visual Studio Community 2015, 2017, 2019
 
 The file https://github.com/simh/simh/blob/master/Visual%20Studio%20Projects/0ReadMe_Projects.txt describes the required steps to use the setup your environment to build using Visual Studio.
 
-##### MinGW
+##### MinGW32
 
-The file https://github.com/simh/simh/blob/master/Visual%20Studio%20Projects/0ReadMe_Projects.txt describes the required steps to use the setup your environment to build using MinGW.
+The file https://github.com/simh/simh/blob/master/Visual%20Studio%20Projects/0ReadMe_Projects.txt describes the required steps to use the setup your environment to build using MinGW32.
 
 #### VMS
 

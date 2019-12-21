@@ -26,7 +26,10 @@ For Example, the directory structure should look like:
     .../simh/windows-build/winpcap/WpdPack/Include/pcap.h
     .../simh/windows-build/libSDL/SDL2-2.0.3/include/SDL.h
 
-The contents of the windows-build directory can be downloaded from:
+If you have a command line version of git installed in your environment
+then the windows-build repository will be downloaded and updated 
+automatically.  If not, then the contents of the windows-build directory 
+can be downloaded from:
 
     https://github.com/simh/windows-build/archive/windows-build.zip
 
@@ -61,3 +64,7 @@ If you are using a version of Visual Studio beyond Visual Studio 2008, then
 your later version of Visual Studio will automatically convert the Visual 
 Studio 2008 project files.  You should ignore any warnings produced by the 
 conversion process.
+
+If you have a version of Visual Studio installed and want to build all the
+simulators from a command prompt, the file build_vstudio.bat in the root
+of the simh source tree will do that without any furthur interaction.
