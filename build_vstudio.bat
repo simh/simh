@@ -1,4 +1,4 @@
-@echo off
+::@echo off
 :: Rebuild all of SIMH simulators using Visual Studio
 ::
 :: If this procedure is not invoked from a Developer command prompt
@@ -14,13 +14,34 @@
 :: will cause Debug binaries to be build rather than the Release 
 :: binaries which is the default.
 ::
+:: The default is to build all simulators mentioned in the simh solution.
+:: Optionally, individual simulators may be built by listing the specific
+:: simulator names on the command line invoking this procedure.
+::
 :: Individual simulator sources are in .\simulator_name
 :: Individual simulator executables are produced in .\BIN\NT\Win32-{Debug or Release}\
 ::
 ::
 
+:: Initialize target variables
 set _BUILD_CONFIG=Release
-if /i "%1" == "Debug" set _BUILD_CONFIG=Debug
+set _BUILD_PROJECTS=
+set _BUILD_PROJECT_DIR=%~dp0\Visual Studio Projects\
+:_CheckArg
+if "%1" == "" goto _DoneArgs
+if /i "%1" == "Debug" set _BUILD_CONFIG=Debug& shift & goto _CheckArg
+if /i "%1" == "Release" set _BUILD_CONFIG=Release& shift & goto _CheckArg
+if exist "%_BUILD_PROJECT_DIR%%1.vcproj" set _BUILD_PROJECTS=%_BUILD_PROJECTS%;%1& shift & goto _CheckArg
+echo ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR
+echo ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR
+echo **
+echo ** No such project: %1
+echo **
+echo ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR
+echo ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR ** ERROR
+exit /b 1
+
+:_DoneArgs
 set _VC_VER=
 call :FindVCVersion _VC_VER
 if not "%_VC_VER%" == "" goto GotVC
@@ -121,10 +142,31 @@ exit /B 0
 
 :GotVC
 SET _X_SLN_VERSION=
-for /F "usebackq tokens=8" %%a in (`findstr /C:"Microsoft Visual Studio Solution File, Format Version" ".\Visual Studio Projects\simh.sln"`) do SET _X_SLN_VERSION=%%a
-if "%_VC_VER%" == "9" cd "Visual Studio Projects" & vcbuild /M4 /useenv /rebuild Simh.sln "%_BUILD_CONFIG%|Win32" & goto :EOF
-if not "%_X_SLN_VERSION%" == "10.00" cd "Visual Studio Projects" & echo Converting the VS2008 projects to VS%_VC_VER%, this will take several (3-5) minutes & DevEnv /Upgrade "simh.sln"
-pushd "Visual Studio Projects"
-MSBuild simh.sln /maxCpuCount:4" -Target:Rebuild /Property:Configuration=%_BUILD_CONFIG% /Property:Platform=Win32
-popd
+for /F "usebackq tokens=8" %%a in (`findstr /C:"Microsoft Visual Studio Solution File, Format Version" "%_BUILD_PROJECT_DIR%Simh.sln"`) do SET _X_SLN_VERSION=%%a
 
+if not "%_VC_VER%" == "9" goto _DoMSBuild
+if "%_BUILD_PROJECTS%" == "" vcbuild /M4 /useenv /rebuild "%_BUILD_PROJECT_DIR%Simh.sln" "%_BUILD_CONFIG%|Win32" & goto :EOF
+
+set _BUILD_PROJECTS=%_BUILD_PROJECTS:~1%
+:_NextProject
+set _BUILD_PROJECT=
+for /f "tokens=1* delims=;" %%a in ("%_BUILD_PROJECTS%") do set _BUILD_PROJECT=%%a& set _BUILD_PROJECTS=%%b
+if "%_BUILD_PROJECT%" == "" goto :EOF
+echo
+echo Building %_BUILD_PROJECT%
+vcbuild /useenv /rebuild "%_BUILD_PROJECT_DIR%%_BUILD_PROJECT%.vcproj" "%_BUILD_CONFIG%|Win32" 
+goto _NextProject
+
+:_DoMSBuild
+if "%_X_SLN_VERSION%" == "10.00" echo Converting the VS2008 projects to VS%_VC_VER%, this will take several (3-5) minutes & DevEnv /Upgrade "%_BUILD_PROJECT_DIR%Simh.sln"
+if "%_BUILD_PROJECTS%" == "" MSBuild "%_BUILD_PROJECT_DIR%Simh.sln" /maxCpuCount:4 /Target:Rebuild /Property:Configuration=%_BUILD_CONFIG% /Property:Platform=Win32 & goto :EOF
+
+set _BUILD_PROJECTS=%_BUILD_PROJECTS:~1%
+:_NextXProject
+set _BUILD_PROJECT=
+for /f "tokens=1* delims=;" %%a in ("%_BUILD_PROJECTS%") do set _BUILD_PROJECT=%%a& set _BUILD_PROJECTS=%%b
+if "%_BUILD_PROJECT%" == "" goto :EOF
+echo
+echo Building %_BUILD_PROJECT%
+MSBuild "%_BUILD_PROJECT_DIR%%_BUILD_PROJECT%.vcxproj" /Target:Rebuild /Property:Configuration=%_BUILD_CONFIG% /Property:Platform=Win32
+goto _NextXProject
