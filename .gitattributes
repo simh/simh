@@ -1,20 +1,20 @@
-*     text=auto
-*.bat text eol=crlf
-*.bin binary
-*.cmd text eol=crlf
-*.doc binary
-*.docx binary
-*.dsk binary
-*.exe binary
-*.imd binary
-*.jpg binary
-*.lda binary
-*.pdf binary
-*.png binary
-*.ps1 text eol=crlf
-*.rim binary
-*.sln binary
-*.tap binary
-*.vcproj binary
-*.vhd binary
+*         text=auto
+*.bat     text eol=crlf
+*.bin     -text
+*.cmd     text eol=crlf
+*.doc     -text
+*.docx    -text
+*.dsk     -text
+*.exe     -text
+*.imd     -text
+*.jpg     -text
+*.lda     -text
+*.pdf     -text
+*.png     -text
+*.ps1     text eol=crlf
+*.rim     -text
+*.sln     -text
+*.tap     -text
+*.vcproj  -text
+*.vhd     -text
 sim_rev.h export-subst
