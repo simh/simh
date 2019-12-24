@@ -2059,12 +2059,12 @@ static const char simh_help[] =
       " as a regular expression applied to the output data stream.  This regular\n"
       " expression may contain parentheses delimited sub-groups.\n\n"
        /***************** 80 character line width template *************************/
-#if defined (HAVE_PCREPOSIX_H)
+#if defined(HAVE_PCREPOSIX_H) || defined(HAVE_PCRE2_POSIX_H)
       " The syntax of the regular expressions available are those supported by\n"
       " the Perl Compatible Regular Expression package (aka PCRE).  As the name\n"
       " implies, the syntax is generally the same as Perl regular expressions.\n"
       " See http://perldoc.perl.org/perlre.html for more details\n"
-#elif defined (HAVE_REGEX_H)
+#elif defined(HAVE_REGEX_H)
       " The syntax of the regular expressions available are those supported by\n"
       " your local system's Regular Expression library using the Extended POSIX\n"
       " Regular Expressiona\n"
@@ -2630,9 +2630,9 @@ if (!sim_quiet) {
     }
 sim_timer_precalibrate_execution_rate ();
 show_version (stdnul, NULL, NULL, 1, NULL);             /* Quietly set SIM_OSTYPE */
-#if defined (HAVE_PCREPOSIX_H)
+#if defined(HAVE_PCREPOSIX_H) || defined(HAVE_PCRE2_POSIX_H)
 setenv ("SIM_REGEX_TYPE", "PCREPOSIX", 1);              /* Publish regex type */
-#elif defined (HAVE_REGEX_H)
+#elif defined(HAVE_REGEX_H)
 setenv ("SIM_REGEX_TYPE", "REGEX", 1);                  /* Publish regex type */
 #endif
 if (*argv[0]) {                                         /* sim name arg? */
@@ -5898,9 +5898,11 @@ if (flag) {
     fprintf (st, "\n        Memory Pointer Size: %d bits", (int)sizeof(dptr)*8);
     fprintf (st, "\n        %s", sim_toffset_64 ? "Large File (>2GB) support" : "No Large File support");
     fprintf (st, "\n        SDL Video support: %s", vid_version());
-#if defined (HAVE_PCREPOSIX_H)
+#if defined(HAVE_PCREPOSIX_H)
     fprintf (st, "\n        PCRE RegEx (Version %s) support for EXPECT commands", pcre_version());
-#elif defined (HAVE_REGEX_H)
+#elif defined(HAVE_PCRE2_POSIX_H)
+    fprintf (st, "\n        PCRE2 RegEx (Version %d.%d) support for EXPECT commands", PCRE2_MAJOR, PCRE2_MINOR);
+#elif defined(HAVE_REGEX_H)
     fprintf (st, "\n        RegEx support for EXPECT commands");
 #else
     fprintf (st, "\n        No RegEx support for EXPECT commands");

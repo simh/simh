@@ -150,6 +150,12 @@ extern int sim_vax_snprintf(char *buf, size_t buf_size, const char *fmt, ...);
 #include <pcreposix.h>
 #include <pcre.h>
 #define USE_REGEX 1
+#elif defined(HAVE_PCRE2_POSIX_H)
+#define PCRE2_STATIC
+#define PCRE2_CODE_UNIT_WIDTH 8
+#include <pcre2posix.h>
+#include <pcre2.h>
+#define USE_REGEX 1
 #elif defined(HAVE_REGEX_H)
 #include <regex.h>
 #define USE_REGEX 1
