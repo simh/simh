@@ -714,7 +714,7 @@ dtco_srv(UNIT * uptr)
                     c1 = '\n';          /* LF */
                     break;
                  case 076:      /* < */
-                    c1 = 0;             /* X-ON */
+                    c1 = 021;           /* X-ON */
                     break;
                  case 016:      /* > */
                     c1 = 0;             /* DEL */
@@ -728,8 +728,9 @@ dtco_srv(UNIT * uptr)
                     continue;   /* On to next line */
                  }
                  sim_debug(DEBUG_DATA, &dtc_dev,
-                        "Datacomm transmit %d %02o %c\n", ln, c&077, c1);
-                 tmxr_putc_ln(&dtc_ldsc[ln], c1);
+                        "Datacomm transmit %d %02o %c\n", ln, c, isprint(c1)?c1:'?');
+                 if (c1 != 0)
+                     tmxr_putc_ln(&dtc_ldsc[ln], c1);
                  if (c1 == '\n') {
                      tmxr_putc_ln(&dtc_ldsc[ln], '\r');
                  }
