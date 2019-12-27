@@ -727,7 +727,8 @@ dtco_srv(UNIT * uptr)
                     t = 0;
                     continue;   /* On to next line */
                  }
-                 sim_debug(DEBUG_DATA, &dtc_dev,
+                 if (c1 != 0)
+                     sim_debug(DEBUG_DATA, &dtc_dev,
                         "Datacomm transmit %d %02o %c\n", ln, c&077, c1);
                  tmxr_putc_ln(&dtc_ldsc[ln], c1);
                  if (c1 == '\n') {
