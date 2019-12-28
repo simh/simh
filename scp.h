@@ -388,7 +388,8 @@ extern uint32 sim_brk_dflt;
 extern uint32 sim_brk_summ;
 extern uint32 sim_brk_match_type;
 extern t_addr sim_brk_match_addr;
-extern BRKTYPTAB *sim_brk_type_desc;                      /* type descriptions */
+extern BRKTYPTAB *sim_brk_type_desc;                    /* type descriptions */
+extern const char *sim_prog_name;                       /* executable program name */
 extern FILE *stdnul;
 extern t_bool sim_asynch_enabled;
 #if defined(SIM_ASYNCH_IO)

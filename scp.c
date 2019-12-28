@@ -563,6 +563,7 @@ static t_stat _sim_debug_flush (void);
 
 /* Global data */
 
+const char *sim_prog_name = NULL;                       /* pointer to the executable name */
 DEVICE *sim_dflt_dev = NULL;
 UNIT *sim_clock_queue = QUEUE_LIST_END;
 int32 sim_interval = 0;
@@ -2546,6 +2547,7 @@ set_prompt (0, "sim>");                                 /* start with set standa
 sim_switches = 0;                                       /* init switches */
 lookswitch = TRUE;
 stdnul = fopen(NULL_DEVICE,"wb");
+sim_prog_name = argv [0];                               /* save a pointer to the program name */
 for (i = 1; i < argc; i++) {                            /* loop thru args */
     if (argv[i] == NULL)                                /* paranoia */
         continue;
