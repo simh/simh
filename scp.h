@@ -400,6 +400,7 @@ void sim_aio_activate (ACTIVATE_API caller, UNIT *uptr, int32 event_time);
 /* VM interface */
 
 extern char sim_name[64];
+extern const char *sim_vm_release;
 extern DEVICE *sim_devices[];
 extern REG *sim_PC;
 extern const char *sim_stop_messages[SCPE_BASE];

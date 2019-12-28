@@ -451,6 +451,7 @@ t_addr (*sim_vm_parse_addr) (DEVICE *dptr, CONST char *cptr, CONST char **tptr) 
 t_value (*sim_vm_pc_value) (void) = NULL;
 t_bool (*sim_vm_is_subroutine_call) (t_addr **ret_addrs) = NULL;
 t_bool (*sim_vm_fprint_stopped) (FILE *st, t_stat reason) = NULL;
+const char *sim_vm_release = NULL;
 const char **sim_clock_precalibrate_commands = NULL;
 
 
@@ -5805,6 +5806,10 @@ setenv ("SIM_MINOR", vmin_s, 1);
 sprintf (vpat_s, "%d", vpat);
 setenv ("SIM_PATCH", vpat_s, 1);
 fprintf (st, "%s simulator V%d.%d-%d", sim_name, vmaj, vmin, vpat);
+if (sim_vm_release != NULL) {                           /* if a release string is defined */
+    setenv ("SIM_VM_RELEASE", sim_vm_release, 1);
+    fprintf (st, " Release %s", sim_vm_release);        /*   then display it */
+    }
 if (vdelt) {
     sprintf (vdelt_s, "%d", vdelt);
     setenv ("SIM_DELTA", vdelt_s, 1);
