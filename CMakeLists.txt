@@ -13,6 +13,8 @@ endif ()
 
 include(CheckCSourceCompiles)
 include(CheckCCompilerFlag)
+include (ExternalProject)
+find_package(PkgConfig)
 
 cmake_minimum_required(VERSION 3.10)
 
@@ -169,8 +171,10 @@ endif (WITH_VIDEO)
 
 if (WITH_NETWORK)
     include(network-deps)
+    set(BUILD_WITH_NETWORK TRUE)
 else (WITH_NETWORK)
     set(NETWORK_PKG_STATUS "skipped")
+    set(BUILD_WITH_NETWORK FALSE)
 endif (WITH_NETWORK)
 
 set(CPPCHECK_STATUS "disabled.")
@@ -210,7 +214,7 @@ message(STATUS "  Packet Capture (PCAP) ........... ${NETWORK_PKG_STATUS}")
 message(STATUS "")
 message(STATUS "Build options:")
 message(STATUS "  Video/graphics support ....... ${BUILD_WITH_VIDEO}")
-message(STATUS "  Networking ................... ${WITH_NETWORK}")
+message(STATUS "  Networking ................... ${BUILD_WITH_NETWORK}")
 message(STATUS "  Asynchronous I/O ............. ${WITH_ASYNC}")
 if (DONT_SET_ROMS)
     set(ROM_STATUS "No")

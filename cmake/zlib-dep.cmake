@@ -6,16 +6,21 @@
 #~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
 
 include (FindZLIB)
+if (NOT ZLIB_FOUND AND PKG_CONFIG_FOUND)
+    pkg_check_modules(ZLIB IMPORTED_TARGET zlib)
+endif (NOT ZLIB_FOUND AND PKG_CONFIG_FOUND)
 
 add_library(zlib_lib INTERFACE)
 
 if (ZLIB_FOUND)
-    if (DEFINED ZLIB::ZLIB)
+    if (TARGET ZLIB::ZLIB)
         target_link_libraries(zlib_lib INTERFACE ZLIB::ZLIB)
-    else (DEFINED ZLIB::ZLIB)
+    elseif (TARGET PkgConfig::ZLIB)
+	target_link_libraries(zlib_lib INTERFACE PkgConfig::ZLIB)
+    else (TARGET ZLIB::ZLIB)
         target_compile_definitions(zlib_lib INTERFACE ${ZLIB_INCLUDE_DIRS})
         target_link_libraries(zlib_lib INTERFACE ${ZLIB_LIBRARIES})
-    endif (DEFINED ZLIB::ZLIB)
+    endif (TARGET ZLIB::ZLIB)
 
     set(ZLIB_PKG_STATUS "installed ZLIB")
 else (ZLIB_FOUND)

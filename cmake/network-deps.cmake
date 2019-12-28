@@ -1,5 +1,5 @@
 #~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
-# Manage the freetype, SDL2, SDL2_ttf dependencies
+# Manage the networking dependencies
 #
 # (a) Try to locate the system's installed libraries.
 # (b) Build source libraries, if not found.

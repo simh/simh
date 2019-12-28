@@ -5,24 +5,34 @@
 # (b) If system they aren't available, build pcre as an external project.
 #~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=
 
-
 add_library(regexp_lib INTERFACE)
 
 include (FindPCRE)
+if (NOT PCRE_FOUND AND NOT PCRE2_FOUND AND PKG_CONFIG_FOUND)
+    ## simh only needs the 8-bit PCRE2 library
+    pkg_check_modules(PCRE2 IMPORTED_TARGET libpng2-8)
+endif (NOT PCRE_FOUND AND NOT PCRE2_FOUND AND PKG_CONFIG_FOUND)
+
 if (PCRE_FOUND OR PCRE2_FOUND)
-    if (PCRE_FOUND)
+    ## Prefer pcre2 over pcre -- pcre2 is the better maintained version. pcre itself
+    ## faces deprecation.
+    if (PCRE2_FOUND)
+	target_compile_definitions(regexp_lib INTERFACE HAVE_PCRE2_POSIX_H)
+	if (TARGET PkgConfig::PCRE2)
+	    target_link_libraries(regexp_lib INTERFACE PkgConfig::PCRE2)
+	else (TARGET PkgConfig::PCRE2)
+	    target_include_directories(regexp_lib INTERFACE ${PCRE2_INCLUDE_DIRS})
+	    target_link_libraries(regexp_lib INTERFACE ${PCRE2_POSIX_LIBRARY} ${PCRE2_LIBRARY})
+	endif (TARGET PkgConfig::PCRE2)
+
+	set(PCRE_PKG_STATUS "installed pcre2")
+    elseif (PCRE_FOUND)
 	target_compile_definitions(regexp_lib INTERFACE HAVE_PCREPOSIX_H PCRE_STATIC)
 	target_include_directories(regexp_lib INTERFACE ${PCRE_INCLUDE_DIRS})
 	target_link_libraries(regexp_lib INTERFACE ${PCREPOSIX_LIBRARY} ${PCRE_LIBRARY})
 
 	set(PCRE_PKG_STATUS "installed pcre")
-    elseif (PCRE2_FOUND)
-	target_compile_definitions(regexp_lib INTERFACE HAVE_PCRE2_POSIX_H)
-	target_include_directories(regexp_lib INTERFACE ${PCRE2_INCLUDE_DIRS})
-	target_link_libraries(regexp_lib INTERFACE ${PCRE2_POSIX_LIBRARY} ${PCRE2_LIBRARY})
-
-	set(PCRE_PKG_STATUS "installed pcre2")
-    endif (PCRE_FOUND)
+    endif (PCRE2_FOUND)
 else (PCRE_FOUND OR PCRE2_FOUND)
     include(ExternalProject)
 
