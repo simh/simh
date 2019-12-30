@@ -953,6 +953,7 @@ glob_t  paths;
 #else
 DIR *dir;
 #endif
+int found_count = 0;
 struct stat filestat;
 char *c;
 char DirName[PATH_MAX + 1], WholeName[PATH_MAX + 1], WildName[PATH_MAX + 1];
@@ -982,7 +983,7 @@ if (dir) {
     struct dirent *ent;
 #endif
     t_offset FileSize;
-    char FileName[PATH_MAX + 1];
+    char *FileName;
     const char *MatchName = 1 + strrchr (cptr, '/');
     char *p_name;
     struct tm *local;
@@ -992,24 +993,29 @@ if (dir) {
 
 #if defined (HAVE_GLOB)
     for (i=0; i<paths.gl_pathc; i++) {
+        FileName = (char *)malloc (1 + strlen (paths.gl_pathv[i]));
         sprintf (FileName, "%s", paths.gl_pathv[i]);
-#else
+#else /* !defined (HAVE_GLOB) */
     while ((ent = readdir (dir))) {
 #if defined (HAVE_FNMATCH)
         if (fnmatch(MatchName, ent->d_name, 0))
             continue;
-#else
-        /* only match exact name without fnmatch support */
-        if (strcmp(MatchName, ent->d_name) != 0)
+#else /* !defined (HAVE_FNMATCH) */
+        /* only match all names or exact name without fnmatch support */
+        if ((strcmp(MatchName, "*") != 0) &&
+            (strcmp(MatchName, ent->d_name) != 0))
             continue;
-#endif
+#endif /* defined (HAVE_FNMATCH) */
+        FileName = (char *)malloc (1 + strlen (DirName) + strlen (ent->d_name));
         sprintf (FileName, "%s%s", DirName, ent->d_name);
-#endif
+#endif /* defined (HAVE_GLOB) */
         p_name = FileName + strlen (DirName);
         memset (&filestat, 0, sizeof (filestat));
         (void)stat (FileName, &filestat);
         FileSize = (t_offset)((filestat.st_mode & S_IFDIR) ? 0 : sim_fsize_name_ex (FileName));
         entry (DirName, p_name, FileSize, &filestat, context);
+        free (FileName);
+        ++found_count;
         }
 #if defined (HAVE_GLOB)
     globfree (&paths);
@@ -1019,6 +1025,9 @@ if (dir) {
     }
 else
     return SCPE_ARG;
-return SCPE_OK;
+if (found_count)
+    return SCPE_OK;
+else
+    return SCPE_ARG;
 }
 #endif /* !defined(_WIN32) */
