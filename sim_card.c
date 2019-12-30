@@ -1318,7 +1318,7 @@ sim_card_attach(UNIT * uptr, CONST char *cptr)
                 sprintf (uptr->filename, "%s-F %s %s", (eof)?"-E ": "", fmt, cptr);
             }
             r = sim_messagef(SCPE_OK, "%s: %d card Deck Loaded from %s\n",
-                       sim_uname(uptr), data->hopper_cards - previous_cards, cptr);
+                       sim_uname(uptr), (int)(data->hopper_cards - previous_cards), cptr);
         } else {
             if (uptr->dynflags & UNIT_ATTMULT)
                 uptr->flags |= UNIT_ATT;
@@ -1430,22 +1430,22 @@ sprintf (cmd, "%s -S -E File40.deck", dptr->name);
 SIM_TEST(attach_cmd (0, cmd));
 sprintf (saved_filename, "%s %s", dptr->name, dptr->units->filename);
 show_cmd (0, dptr->name);
-sim_printf ("Input Hopper Count:  %d\n", sim_card_input_hopper_count(dptr->units));
-sim_printf ("Output Hopper Count: %d\n", sim_card_output_hopper_count(dptr->units));
+sim_printf ("Input Hopper Count:  %d\n", (int)sim_card_input_hopper_count(dptr->units));
+sim_printf ("Output Hopper Count: %d\n", (int)sim_card_output_hopper_count(dptr->units));
 while (!sim_card_eof (dptr->units))
     SIM_TEST(sim_read_card (dptr->units, card_image));
-sim_printf ("Input Hopper Count:  %d\n", sim_card_input_hopper_count(dptr->units));
-sim_printf ("Output Hopper Count: %d\n", sim_card_output_hopper_count(dptr->units));
+sim_printf ("Input Hopper Count:  %d\n", (int)sim_card_input_hopper_count(dptr->units));
+sim_printf ("Output Hopper Count: %d\n", (int)sim_card_output_hopper_count(dptr->units));
 sim_printf ("Detaching %s\n", dptr->name);
 SIM_TEST(detach_cmd (0, dptr->name));
 show_cmd (0, dptr->name);
-sim_printf ("Input Hopper Count:  %d\n", sim_card_input_hopper_count(dptr->units));
-sim_printf ("Output Hopper Count: %d\n", sim_card_output_hopper_count(dptr->units));
+sim_printf ("Input Hopper Count:  %d\n", (int)sim_card_input_hopper_count(dptr->units));
+sim_printf ("Output Hopper Count: %d\n", (int)sim_card_output_hopper_count(dptr->units));
 sim_printf ("Attaching Saved Filenames: %s\n", saved_filename + strlen(dptr->name));
 SIM_TEST(attach_cmd (0, saved_filename));
 show_cmd (0, dptr->name);
-sim_printf ("Input Hopper Count:  %d\n", sim_card_input_hopper_count(dptr->units));
-sim_printf ("Output Hopper Count: %d\n", sim_card_output_hopper_count(dptr->units));
+sim_printf ("Input Hopper Count:  %d\n", (int)sim_card_input_hopper_count(dptr->units));
+sim_printf ("Output Hopper Count: %d\n", (int)sim_card_output_hopper_count(dptr->units));
 SIM_TEST(detach_cmd (0, dptr->name));
 (void)remove ("file10.deck");
 (void)remove ("file20.deck");
