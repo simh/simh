@@ -172,7 +172,7 @@ unsigned int checksum = 0;
 char *c;
 int i;
 char cleaned_rom_filename[512];
-char include_filename[512];
+char *include_filename;
 char array_name[512];
 
 if (NULL == (rFile = fopen (rom_filename, "rb"))) {
@@ -207,15 +207,16 @@ if ((c = strchr (array_name, '.')))
     *c = '_';
 if ((c = strchr (array_name, '/')))
     *c = '_';
-include_filename[sizeof (include_filename) - 1] = '\0';
-snprintf (include_filename, sizeof (include_filename) - 1, "%s.h", cleaned_rom_filename);
+include_filename = (char *)calloc (3 + strlen (cleaned_rom_filename), sizeof (*include_filename));
+sprintf (include_filename, "%s.h", cleaned_rom_filename);
 if ((c = strrchr (include_filename, '/')))
     sprintf (c+1, "%s.h", array_name);
 else
-    snprintf (include_filename, sizeof (include_filename) - 1, "%s.h", array_name);
+    sprintf (include_filename, "%s.h", array_name);
 printf ("The ROMs array entry for this new ROM image file should look something like:\n");
 printf ("{\"%s\",    \"%s\",     %d,  0x%08X, \"%s\"}\n",
         rom_filename, include_filename, (int)(statb.st_size), checksum, array_name);
+free (include_filename);
 free (ROMData);
 return 1;
 }
