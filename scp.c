@@ -13618,7 +13618,7 @@ rewind (tmp);
 /* Discard leading blank lines/redundant titles */
 
 for (i =0; i < skiplines; i++)
-    fgets (tbuf, sizeof (tbuf), tmp);
+    if (fgets (tbuf, sizeof (tbuf), tmp)) {};
 
 while (fgets (tbuf, sizeof (tbuf), tmp)) {
     if (tbuf[0] != '\n')

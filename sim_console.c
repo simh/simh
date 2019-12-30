@@ -4219,7 +4219,7 @@ static t_stat sim_os_putchar (int32 out)
 char c;
 
 c = out;
-(void)write (1, &c, 1);
+if (write (1, &c, 1)) {};
 return SCPE_OK;
 }
 

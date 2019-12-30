@@ -417,7 +417,7 @@ t_stat eth_mac_scan_ex (ETH_MAC* mac, const char* strmac, UNIT *uptr)
   memset (&state, 0, sizeof(state));
   _eth_get_system_id (state.system_id, sizeof(state.system_id));
   strlcpy (state.sim, sim_name, sizeof(state.sim));
-  getcwd (state.cwd, sizeof(state.cwd));
+  if (getcwd (state.cwd, sizeof(state.cwd))) {};
   if (uptr)
     strlcpy (state.uname, sim_uname (uptr), sizeof(state.uname));
   cptr = strchr (strmac, '>');
@@ -426,7 +426,7 @@ t_stat eth_mac_scan_ex (ETH_MAC* mac, const char* strmac, UNIT *uptr)
     strlcpy (state.file, cptr + 1, sizeof(state.file));
     if ((f = fopen (state.file, "r"))) {
       filebuf[sizeof(filebuf)-1] = '\0';
-      fgets (filebuf, sizeof(filebuf)-1, f);
+      if (fgets (filebuf, sizeof(filebuf)-1, f)) {};
       strmac = filebuf;
       fclose (f);
       strcpy (state.file, "");  /* avoid saving */
@@ -1573,10 +1573,10 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname)
     memset(command, 0, sizeof(command));
     /* try to force an otherwise unused interface to be turned on */
     snprintf(command, sizeof(command)-1, "ifconfig %.*s up", (int)(sizeof(command) - 14), devname);
-    (void)system(command);
+    if (system(command)) {};
     for (i=0; patterns[i] && (0 == dev->have_host_nic_phy_addr); ++i) {
       snprintf(command, sizeof(command)-1, "ifconfig %.*s | %s  >NIC.hwaddr", (int)(sizeof(command) - (26 + strlen(patterns[i]))), devname, patterns[i]);
-      (void)system(command);
+      if (system(command)) {};
       if (NULL != (f = fopen("NIC.hwaddr", "r"))) {
         while (0 == dev->have_host_nic_phy_addr) {
           if (fgets(command, sizeof(command)-1, f)) {
@@ -1662,12 +1662,12 @@ FILE *f;
 
 memset (buf, 0, buf_size);
 if ((f = fopen ("/etc/machine-id", "r"))) {
-  fread (buf, 1, buf_size, f);
+  if (fread (buf, 1, buf_size - 1, f)) {};
   fclose (f);
   }
 else {
   if ((f = popen ("hostname", "r"))) {
-    fread (buf, 1, buf_size, f);
+    if (fread (buf, 1, buf_size - 1, f)) {};
     pclose (f);
     }
   }
@@ -2165,7 +2165,7 @@ else { /* !tap: */
             /* try to force an otherwise unused interface to be turned on */
             memset(command, 0, sizeof(command));
             snprintf(command, sizeof(command)-1, "ifconfig %s up", savname);
-            (void)system(command);
+            if (system(command)) {};
             errbuf[0] = '\0';
             *handle = (void*) pcap_open_live(savname, bufsz, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
             }
