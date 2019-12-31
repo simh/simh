@@ -150,7 +150,7 @@
 //   One of these blocks is allocated for every simulated modem link. 
 struct _UDP_LINK {
   t_bool  used;                 // TRUE if this UDP_LINK is in use
-  char    rhostport[64];        // Remote host:port
+  char    rhostport[90];        // Remote host:port
   char    lport[64];            // Local port 
   uint32  rxsequence;           // next message sequence number for receive
   uint32  txsequence;           // next message sequence number for transmit
@@ -217,6 +217,7 @@ t_stat udp_parse_remote (int32 link, const char *premote)
   // If the host name/IP is omitted then it defaults to "localhost".
   char *end;  int32 lport, rport;
   char host[64], port[16];
+
   if (*premote == '\0') return SCPE_2FARG;
   memset (udp_links[link].lport, 0, sizeof(udp_links[link].lport));
   memset (udp_links[link].rhostport, 0, sizeof(udp_links[link].rhostport));

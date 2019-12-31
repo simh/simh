@@ -161,7 +161,7 @@ static uint32 sca_state  = SCA_STATE_IDLE;
 static uint8  sichar     = 0;                               /* sync/idle character */
 static uint8  rcvd_char  = 0;                               /* most recently received character */
 static uint8  sca_frame  = 8;
-static char sca_port[CBUFSIZE];                             /* listening port */
+static char sca_port[3*CBUFSIZE];                             /* listening port */
 static int32  sca_keepalive = 0;                            /* keepalive SYN packet period in msec, default = 0 (disabled) */
 static SCA_TIMER_STATE sca_timer_state[3];                  /* current timer state */
 static int    sca_timer_endtime[3];                         /* clocktime when timeout is to occur if state is RUNNING */
@@ -295,7 +295,7 @@ char *mstring (const char *str)
 
 static void sca_socket_error (void)
 {
-    char name[100];
+    char name[4*CBUFSIZE];
 
     /* print diagnostic? */
     printf("SCA socket error, closing connection\n");
@@ -452,7 +452,7 @@ static t_stat sca_attach (UNIT *uptr, CONST char *cptr)
 {
     char host[CBUFSIZE], port[CBUFSIZE];
     t_bool do_listen;
-    char name[CBUFSIZE];
+    char name[4*CBUFSIZE];
     t_stat r;
 
     do_listen = sim_switches & SWMASK('L');     /* -l means listen mode */

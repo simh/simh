@@ -272,7 +272,7 @@ int32 printf_sym (FILE *of, char *strg, t_addr addr, uint32 *val,
 {
 int32 c1, c2, group, len1, len2, inst, aaddr, baddr;
 int32 oplen, groupno, i, j, vpos, qbyte, da, m, n;
-char bld[128], bldaddr[32], boperand[32], aoperand[32];
+char bld[128], bldaddr[96], boperand[32], aoperand[32];
 int32 blk[16], blt[16];
 int32 blkadd;
 
