@@ -304,7 +304,7 @@ if (mod) {
         rbuf[i] = fgetc(cdr_unit.fileref);              /* Read EBCDIC */
     }   
 } else {    
-    fgets (rbuf, CBUFSIZE, cdr_unit.fileref);           /* read Ascii */
+    if (fgets (rbuf, CBUFSIZE, cdr_unit.fileref)) {};   /* read Ascii */
 }   
 if (feof (cdr_unit.fileref)) {                          /* eof? */
     notready = 1;

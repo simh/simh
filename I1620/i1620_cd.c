@@ -345,7 +345,7 @@ if ((cdr_unit.flags & UNIT_ATT) == 0)                   /* attached? */
 
 for (i = 0; i < CD_LEN + 2; i++)                        /* clear buffer */
     cdr_buf[i] = ' ';
-fgets (cdr_buf, CD_LEN + 2, cdr_unit.fileref);          /* read card */
+if (fgets (cdr_buf, CD_LEN + 2, cdr_unit.fileref)) {};  /* read card */
 if (feof (cdr_unit.fileref))                            /* eof? */
     return STOP_NOCD;
 if (ferror (cdr_unit.fileref)) {                        /* error? */

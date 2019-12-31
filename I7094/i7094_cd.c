@@ -215,8 +215,8 @@ switch (cdr_sta) {                                      /* case on state */
             cdr_cbuf[i] = ' ';
         cdr_sta = CDS_DATA;                             /* data state */
         cdr_bptr = 0;                                   /* init buf ptr */
-        fgets (cdr_cbuf, (uptr->flags & UNIT_CBN)? (2 * CD_CHRLNT) + 2: CD_CHRLNT + 2,
-            uptr->fileref);                             /* read card */
+        if (fgets (cdr_cbuf, (uptr->flags & UNIT_CBN)? (2 * CD_CHRLNT) + 2: CD_CHRLNT + 2,
+            uptr->fileref)) {};                         /* read card */
         if (feof (uptr->fileref))                       /* eof? */
             return ch6_err_disc (CH_A, U_CDR, CHF_EOF); /* set EOF, disc */
         if (ferror (uptr->fileref)) {                   /* error? */
