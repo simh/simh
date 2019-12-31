@@ -123,7 +123,7 @@ if (1) {
     static HANDLE out = NULL;
     static CONSOLE_SCREEN_BUFFER_INFO info;
     static COORD origin = {0, 0};
-    int written;
+    DWORD written;
 
     if (out == NULL)
         out = GetStdHandle (STD_OUTPUT_HANDLE);
