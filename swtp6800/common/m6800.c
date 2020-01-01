@@ -318,11 +318,11 @@ t_stat sim_instr (void)
         if (sim_interval <= 0)          /* check clock queue */
             if ((reason = sim_process_event ()))
                 break;
-            if (mem_fault) {            /* memory fault? */
-                mem_fault = 0;          /* reset fault flag */
-                reason = STOP_MEMORY;
-                break;
-            }
+        if (mem_fault) {            /* memory fault? */
+            mem_fault = 0;          /* reset fault flag */
+            reason = STOP_MEMORY;
+            break;
+        }
         if (int_req > 0) {              /* interrupt? */
         /* 6800 interrupts not implemented yet.  None were used,
            on a standard SWTP 6800. All I/O is programmed. */
