@@ -1730,9 +1730,9 @@ SWTP6800MP-A2 = ${SWTP6800C}/mp-a2.c ${SWTP6800C}/m6800.c ${SWTP6800C}/m6810.c \
 	${SWTP6800C}/mp-b2.c ${SWTP6800C}/mp-8m.c ${SWTP6800C}/i2716.c
 SWTP6800_OPT = -I ${SWTP6800D}
 
-
-ISYS8010D = Intel-Systems/isys8010
-ISYS8010C = Intel-Systems/common
+INTELSYSD = Intel-Systems
+ISYS8010D = ${INTELSYSD}/isys8010
+ISYS8010C = ${INTELSYSD}/common
 ISYS8010 = ${ISYS8010C}/i8080.c ${ISYS8010D}/isys8010_sys.c \
 	${ISYS8010C}/i8251.c ${ISYS8010C}/i8255.c \
 	${ISYS8010C}/ieprom.c ${ISYS8010C}/iram8.c \
@@ -1744,8 +1744,8 @@ ISYS8010 = ${ISYS8010C}/i8080.c ${ISYS8010D}/isys8010_sys.c \
 ISYS8010_OPT = -I ${ISYS8010D}
 
 
-ISYS8020D = Intel-Systems/isys8020
-ISYS8020C = Intel-Systems/common
+ISYS8020D = ${INTELSYSD}/isys8020
+ISYS8020C = ${INTELSYSD}/common
 ISYS8020 = ${ISYS8020C}/i8080.c ${ISYS8020D}/isys8020_sys.c \
 	${ISYS8020C}/i8251.c ${ISYS8020C}/i8255.c \
 	${ISYS8020C}/ieprom.c ${ISYS8020C}/iram8.c \
@@ -1758,8 +1758,8 @@ ISYS8020 = ${ISYS8020C}/i8080.c ${ISYS8020D}/isys8020_sys.c \
 ISYS8020_OPT = -I ${ISYS8020D}
 
 
-ISYS8024D = Intel-Systems/isys8024
-ISYS8024C = Intel-Systems/common
+ISYS8024D = ${INTELSYSD}/isys8024
+ISYS8024C = ${INTELSYSD}/common
 ISYS8024 = ${ISYS8024C}/i8080.c ${ISYS8024D}/isys8024_sys.c \
 	${ISYS8024C}/i8251.c ${ISYS8024C}/i8253.c \
 	${ISYS8024C}/i8255.c ${ISYS8024C}/i8259.c \
@@ -1772,8 +1772,8 @@ ISYS8024 = ${ISYS8024C}/i8080.c ${ISYS8024D}/isys8024_sys.c \
 ISYS8024_OPT = -I ${ISYS8024D}
 
 
-ISYS8030D = Intel-Systems/isys8030
-ISYS8030C = Intel-Systems/common
+ISYS8030D = ${INTELSYSD}/isys8030
+ISYS8030C = ${INTELSYSD}/common
 ISYS8030 = ${ISYS8030C}/i8080.c ${ISYS8030D}/isys8030_sys.c \
 	${ISYS8030C}/i8251.c ${ISYS8030C}/i8255.c \
 	${ISYS8030C}/i8259.c ${ISYS8030C}/i8253.c \
@@ -1786,8 +1786,8 @@ ISYS8030 = ${ISYS8030C}/i8080.c ${ISYS8030D}/isys8030_sys.c \
 ISYS8030_OPT = -I ${ISYS8030D}
 
 
-IMDS-210D = Intel-Systems/imds-210
-IMDS-210C = Intel-Systems/common
+IMDS-210D = ${INTELSYSD}/imds-210
+IMDS-210C = ${INTELSYSD}/common
 IMDS-210 = ${IMDS-210C}/i8080.c ${IMDS-210D}/imds-210_sys.c \
 	${IMDS-210C}/i8251.c ${IMDS-210C}/i8255.c \
 	${IMDS-210C}/i8259.c ${IMDS-210C}/i8253.c \
@@ -1800,8 +1800,8 @@ IMDS-210 = ${IMDS-210C}/i8080.c ${IMDS-210D}/imds-210_sys.c \
 IMDS-210_OPT = -I ${IMDS-210D}
 
 
-IMDS-220D = Intel-Systems/imds-220
-IMDS-220C = Intel-Systems/common
+IMDS-220D = ${INTELSYSD}/imds-220
+IMDS-220C = ${INTELSYSD}/common
 IMDS-220 = ${IMDS-220C}/i8080.c ${IMDS-220D}/imds-220_sys.c \
 	${IMDS-220C}/i8251.c ${IMDS-220C}/i8255.c \
 	${IMDS-220C}/i8259.c ${IMDS-220C}/i8253.c \
@@ -1814,8 +1814,8 @@ IMDS-220 = ${IMDS-220C}/i8080.c ${IMDS-220D}/imds-220_sys.c \
 IMDS-220_OPT = -I ${IMDS-220D}
 
 
-IMDS-225D = Intel-Systems/imds-225
-IMDS-225C = Intel-Systems/common
+IMDS-225D = ${INTELSYSD}/imds-225
+IMDS-225C = ${INTELSYSD}/common
 IMDS-225 = ${IMDS-225C}/i8080.c ${IMDS-225D}/imds-225_sys.c \
 	${IMDS-225C}/i8251.c ${IMDS-225C}/i8255.c \
 	${IMDS-225C}/i8259.c ${IMDS-225C}/i8253.c \
@@ -1828,8 +1828,8 @@ IMDS-225 = ${IMDS-225C}/i8080.c ${IMDS-225D}/imds-225_sys.c \
 IMDS-225_OPT = -I ${IMDS-225D}
 
 
-IMDS-230D = Intel-Systems/imds-230
-IMDS-230C = Intel-Systems/common
+IMDS-230D = ${INTELSYSD}/imds-230
+IMDS-230C = ${INTELSYSD}/common
 IMDS-230 = ${IMDS-230C}/i8080.c ${IMDS-230D}/imds-230_sys.c \
 	${IMDS-230C}/i8251.c ${IMDS-230C}/i8255.c \
 	${IMDS-230C}/i8259.c ${IMDS-230C}/i8253.c \
@@ -1842,8 +1842,8 @@ IMDS-230 = ${IMDS-230C}/i8080.c ${IMDS-230D}/imds-230_sys.c \
 IMDS-230_OPT = -I ${IMDS-230D}
 
 
-IMDS-800D = Intel-Systems/imds-800
-IMDS-800C = Intel-Systems/common
+IMDS-800D = ${INTELSYSD}/imds-800
+IMDS-800C = ${INTELSYSD}/common
 IMDS-800 = ${IMDS-800C}/i8080.c ${IMDS-800D}/imds-800_sys.c \
         ${IMDS-800D}/cpu.c ${IMDS-800D}/front_panel.c \
         ${IMDS-800D}/monitor.c ${IMDS-800C}/ieprom1.c \
@@ -1855,8 +1855,8 @@ IMDS-800 = ${IMDS-800C}/i8080.c ${IMDS-800D}/imds-800_sys.c \
 IMDS-800_OPT = -I ${IMDS-800D}
 
 
-IMDS-810D = Intel-Systems/imds-810
-IMDS-810C = Intel-Systems/common
+IMDS-810D = ${INTELSYSD}/imds-810
+IMDS-810C = ${INTELSYSD}/common
 IMDS-810 = ${IMDS-800C}/i8080.c ${IMDS-810D}/imds-810_sys.c \
         ${IMDS-810D}/cpu.c ${IMDS-810D}/front_panel.c \
         ${IMDS-810D}/monitor.c ${IMDS-810C}/ieprom1.c \
@@ -1868,8 +1868,8 @@ IMDS-810 = ${IMDS-800C}/i8080.c ${IMDS-810D}/imds-810_sys.c \
 IMDS-810_OPT = -I ${IMDS-810D}
 
 
-IBMPCD = Intel-Systems/ibmpc
-IBMPCC = Intel-Systems/common
+IBMPCD = ${INTELSYSD}/ibmpc
+IBMPCC = ${INTELSYSD}/common
 IBMPC =	${IBMPCC}/i8255.c ${IBMPCD}/ibmpc.c \
 	${IBMPCC}/i8088.c ${IBMPCD}/ibmpc_sys.c \
 	${IBMPCC}/i8253.c ${IBMPCC}/i8259.c \
@@ -1878,8 +1878,8 @@ IBMPC =	${IBMPCC}/i8255.c ${IBMPCD}/ibmpc.c \
 IBMPC_OPT = -I ${IBMPCD}
 
 
-IBMPCXTD = Intel-Systems/ibmpcxt
-IBMPCXTC = Intel-Systems/common
+IBMPCXTD = ${INTELSYSD}/ibmpcxt
+IBMPCXTC = ${INTELSYSD}/common
 IBMPCXT = ${IBMPCXTC}/i8088.c ${IBMPCXTD}/ibmpcxt_sys.c \
 	${IBMPCXTC}/i8253.c ${IBMPCXTC}/i8259.c \
 	${IBMPCXTC}/i8255.c ${IBMPCXTD}/ibmpcxt.c \
@@ -1888,8 +1888,8 @@ IBMPCXT = ${IBMPCXTC}/i8088.c ${IBMPCXTD}/ibmpcxt_sys.c \
 IBMPCXT_OPT = -I ${IBMPCXTD}
 
 
-SCELBID = Intel-Systems/scelbi
-SCELBIC = Intel-Systems/common
+SCELBID = ${INTELSYSD}/scelbi
+SCELBIC = ${INTELSYSD}/common
 SCELBI = ${SCELBIC}/i8008.c ${SCELBID}/scelbi_sys.c ${SCELBID}/scelbi_io.c
 SCELBI_OPT = -I ${SCELBID}
 
@@ -2035,6 +2035,16 @@ KI10 += ${KA10D}/ka10_lights.c
 KI10_LDFLAGS = -lusb-1.0
 endif
 
+ATT3B2D = 3B2
+ATT3B2 = ${ATT3B2D}/3b2_cpu.c ${ATT3B2D}/3b2_mmu.c \
+	${ATT3B2D}/3b2_iu.c ${ATT3B2D}/3b2_if.c \
+	${ATT3B2D}/3b2_id.c ${ATT3B2D}/3b2_dmac.c \
+	${ATT3B2D}/3b2_sys.c ${ATT3B2D}/3b2_io.c \
+	${ATT3B2D}/3b2_ports.c ${ATT3B2D}/3b2_ctc.c \
+	${ATT3B2D}/3b2_ni.c ${ATT3B2D}/3b2_mau.c \
+	${ATT3B2D}/3b2_sysdev.c
+ATT3B2_OPT = -DUSE_INT64 -DUSE_ADDR64 -I ${ATT3B2D} ${NETWORK_OPT}
+
 ###
 ### Experimental simulators
 ###
@@ -2082,16 +2092,6 @@ PDQ3D = PDQ-3
 PDQ3 = ${PDQ3D}/pdq3_cpu.c ${PDQ3D}/pdq3_sys.c ${PDQ3D}/pdq3_stddev.c \
     ${PDQ3D}/pdq3_mem.c ${PDQ3D}/pdq3_debug.c ${PDQ3D}/pdq3_fdc.c 
 PDQ3_OPT = -I ${PDQ3D} -DUSE_SIM_IMD
-
-ATT3B2D = 3B2
-ATT3B2 = ${ATT3B2D}/3b2_cpu.c ${ATT3B2D}/3b2_mmu.c \
-	${ATT3B2D}/3b2_iu.c ${ATT3B2D}/3b2_if.c \
-	${ATT3B2D}/3b2_id.c ${ATT3B2D}/3b2_dmac.c \
-	${ATT3B2D}/3b2_sys.c ${ATT3B2D}/3b2_io.c \
-	${ATT3B2D}/3b2_ports.c ${ATT3B2D}/3b2_ctc.c \
-	${ATT3B2D}/3b2_ni.c ${ATT3B2D}/3b2_mau.c \
-	${ATT3B2D}/3b2_sysdev.c
-ATT3B2_OPT = -DUSE_INT64 -DUSE_ADDR64 -I ${ATT3B2D} ${NETWORK_OPT}
 
 #
 # Build everything (not the unsupported/incomplete or experimental simulators)
@@ -2236,72 +2236,108 @@ microvax2000 : ${BIN}microvax2000${EXE}
 ${BIN}microvax2000${EXE} : ${VAX410} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX410} ${SCSI} ${SIM} ${VAX410_OPT} -o $@ ${LDFLAGS}
+ifneq (,$(call find_test,$(VAXD),vax-diag))
+	$@ $(call find_test,$(VAXD),vax-diag) $(TEST_ARG)
+endif
 
 infoserver100 : ${BIN}infoserver100${EXE}
 
 ${BIN}infoserver100${EXE} : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX420} ${SCSI} ${SIM} ${VAX411_OPT} -o $@ ${LDFLAGS}
+ifneq (,$(call find_test,$(VAXD),vax-diag))
+	$@ $(call find_test,$(VAXD),vax-diag) $(TEST_ARG)
+endif
 
 infoserver150vxt : ${BIN}infoserver150vxt${EXE}
 
 ${BIN}infoserver150vxt${EXE} : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX420} ${SCSI} ${SIM} ${VAX412_OPT} -o $@ ${LDFLAGS}
+ifneq (,$(call find_test,$(VAXD),vax-diag))
+	$@ $(call find_test,$(VAXD),vax-diag) $(TEST_ARG)
+endif
 
 microvax3100 : ${BIN}microvax3100${EXE}
 
 ${BIN}microvax3100${EXE} : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX420} ${SCSI} ${SIM} ${VAX41A_OPT} -o $@ ${LDFLAGS}
+ifneq (,$(call find_test,$(VAXD),vax-diag))
+	$@ $(call find_test,$(VAXD),vax-diag) $(TEST_ARG)
+endif
 
 microvax3100e : ${BIN}microvax3100e${EXE}
 
 ${BIN}microvax3100e${EXE} : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX420} ${SCSI} ${SIM} ${VAX41D_OPT} -o $@ ${LDFLAGS}
+ifneq (,$(call find_test,$(VAXD),vax-diag))
+	$@ $(call find_test,$(VAXD),vax-diag) $(TEST_ARG)
+endif
 
 vaxstation3100m30 : ${BIN}vaxstation3100m30${EXE}
 
 ${BIN}vaxstation3100m30${EXE} : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX420} ${SCSI} ${SIM} ${VAX42A_OPT} -o $@ ${LDFLAGS}
+ifneq (,$(call find_test,$(VAXD),vax-diag))
+	$@ $(call find_test,$(VAXD),vax-diag) $(TEST_ARG)
+endif
 
 vaxstation3100m38 : ${BIN}vaxstation3100m38${EXE}
 
 ${BIN}vaxstation3100m38${EXE} : ${VAX420} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX420} ${SCSI} ${SIM} ${VAX42B_OPT} -o $@ ${LDFLAGS}
+ifneq (,$(call find_test,$(VAXD),vax-diag))
+	$@ $(call find_test,$(VAXD),vax-diag) $(TEST_ARG)
+endif
 
 vaxstation3100m76 : ${BIN}vaxstation3100m76${EXE}
 
 ${BIN}vaxstation3100m76${EXE} : ${VAX43} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX43} ${SCSI} ${SIM} ${VAX43_OPT} -o $@ ${LDFLAGS}
+ifneq (,$(call find_test,$(VAXD),vax-diag))
+	$@ $(call find_test,$(VAXD),vax-diag) $(TEST_ARG)
+endif
 
 vaxstation4000m60 : ${BIN}vaxstation4000m60${EXE}
 
 ${BIN}vaxstation4000m60${EXE} : ${VAX440} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX440} ${SCSI} ${SIM} ${VAX46_OPT} -o $@ ${LDFLAGS}
+ifneq (,$(call find_test,$(VAXD),vax-diag))
+	$@ $(call find_test,$(VAXD),vax-diag) $(TEST_ARG)
+endif
 
 microvax3100m80 : ${BIN}microvax3100m80${EXE}
 
 ${BIN}microvax3100m80${EXE} : ${VAX440} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX440} ${SCSI} ${SIM} ${VAX47_OPT} -o $@ ${LDFLAGS}
+ifneq (,$(call find_test,$(VAXD),vax-diag))
+	$@ $(call find_test,$(VAXD),vax-diag) $(TEST_ARG)
+endif
 
 vaxstation4000vlc : ${BIN}vaxstation4000vlc${EXE}
 
 ${BIN}vaxstation4000vlc${EXE} : ${VAX440} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX440} ${SCSI} ${SIM} ${VAX48_OPT} -o $@ ${LDFLAGS}
+ifneq (,$(call find_test,$(VAXD),vax-diag))
+	$@ $(call find_test,$(VAXD),vax-diag) $(TEST_ARG)
+endif
 
 infoserver1000 : ${BIN}infoserver1000${EXE}
 
 ${BIN}infoserver1000${EXE} : ${IS1000} ${SCSI} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${IS1000} ${SCSI} ${SIM} ${IS1000_OPT} -o $@ ${LDFLAGS}
+ifneq (,$(call find_test,$(VAXD),vax-diag))
+	$@ $(call find_test,$(VAXD),vax-diag) $(TEST_ARG)
+endif
 
 microvax1 : ${BIN}microvax1${EXE}
 
