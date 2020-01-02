@@ -493,14 +493,14 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       endif
     endif
   endif
-  # Find available RegEx library.  Prefer libpcreposix - except on OS X.
-  ifneq (,$(and $(call find_include,pcreposix),$(call find_include,pcre),$(subst Darwin,,$(OSTYPE))))
-    ifneq (,$(and $(call find_lib,pcreposix),$(call find_lib,pcre)))
-      OS_CCDEFS += -DHAVE_PCREPOSIX_H
-      OS_LDFLAGS += -lpcreposix -lpcre
-      $(info using libpcreposix: $(call find_lib,pcreposix) $(call find_lib,pcre) $(call find_include,pcreposix) $(call find_include,pcre))
-      ifeq ($(LD_SEARCH_NEEDED),$(call need_search,pcreposix))
-        OS_LDFLAGS += -L$(dir $(call find_lib,pcreposix))
+  # Find PCRE RegEx library.
+  ifneq (,$(call find_include,pcre))
+    ifneq (,$(call find_lib,pcre))
+      OS_CCDEFS += -DHAVE_PCRE_H
+      OS_LDFLAGS += -lpcre
+      $(info using libpcre: $(call find_lib,pcre) $(call find_include,pcre))
+      ifeq ($(LD_SEARCH_NEEDED),$(call need_search,pcre))
+        OS_LDFLAGS += -L$(dir $(call find_lib,pcre))
       endif
     endif
   endif

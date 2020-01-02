@@ -2633,10 +2633,8 @@ if (!sim_quiet) {
     }
 sim_timer_precalibrate_execution_rate ();
 show_version (stdnul, NULL, NULL, 1, NULL);             /* Quietly set SIM_OSTYPE */
-#if defined (HAVE_PCREPOSIX_H)
-setenv ("SIM_REGEX_TYPE", "PCREPOSIX", 1);              /* Publish regex type */
-#elif defined (HAVE_REGEX_H)
-setenv ("SIM_REGEX_TYPE", "REGEX", 1);                  /* Publish regex type */
+#if defined (HAVE_PCRE_H)
+setenv ("SIM_REGEX_TYPE", "PCRE", 1);                   /* Publish regex type */
 #endif
 if (*argv[0]) {                                         /* sim name arg? */
     char *np;                                           /* "path.ini" */
@@ -11906,7 +11904,7 @@ free (ep->match_pattern);                               /* deallocate the displa
 free (ep->act);                                         /* deallocate action */
 #if defined(USE_REGEX)
 if (ep->switches & EXP_TYP_REGEX)
-    regfree (&ep->regex);                               /* release compiled regex */
+    pcre_free (ep->regex);                              /* release compiled regex */
 #endif
 exp->size -= 1;                                         /* decrement count */
 for (i=ep-exp->rules; i<exp->size; i++)                 /* shuffle up remaining rules */
@@ -11941,7 +11939,7 @@ for (i=0; i<exp->size; i++) {
     free (exp->rules[i].act);                           /* deallocate action */
 #if defined(USE_REGEX)
     if (exp->rules[i].switches & EXP_TYP_REGEX)
-        regfree (&exp->rules[i].regex);                               /* release compiled regex */
+        pcre_free (exp->rules[i].regex);                /* release compiled regex */
 #endif
     }
 free (exp->rules);
@@ -11973,25 +11971,21 @@ if (switches & EXP_TYP_REGEX) {
     return sim_messagef (SCPE_ARG, "RegEx support not available\n");
     }
 #else   /* USE_REGEX */
-    int res;
-    regex_t re;
+    pcre *re;
+    const char *errmsg;
+    int erroffset, re_nsub;
 
-    memset (&re, 0, sizeof(re));
     memcpy (match_buf, match+1, strlen(match)-2);       /* extract string without surrounding quotes */
     match_buf[strlen(match)-2] = '\0';
-    res = regcomp (&re, (char *)match_buf, REG_EXTENDED | ((switches & EXP_TYP_REGEX_I) ? REG_ICASE : 0));
-    if (res) {
-        size_t err_size = regerror (res, &re, NULL, 0);
-        char *err_buf = (char *)calloc (err_size+1, 1);
-
-        regerror (res, &re, err_buf, err_size);
-        sim_messagef (SCPE_ARG, "Regular Expression Error: %s\n", err_buf);
-        free (err_buf);
+    re = pcre_compile (match_buf, (switches & EXP_TYP_REGEX_I) ? PCRE_CASELESS : 0, &errmsg, &erroffset, NULL);
+    if (re == NULL) {
+        sim_messagef (SCPE_ARG, "Regular Expression Error: %s\n", errmsg);
         free (match_buf);
         return SCPE_ARG|SCPE_NOMESSAGE;
         }
-    sim_debug (exp->dbit, exp->dptr, "Expect Regular Expression: \"%s\" has %d sub expressions\n", match_buf, (int)re.re_nsub);
-    regfree (&re);
+    (void)pcre_fullinfo(re, NULL, PCRE_INFO_CAPTURECOUNT, &re_nsub);
+    sim_debug (exp->dbit, exp->dptr, "Expect Regular Expression: \"%s\" has %d sub expressions\n", match_buf, re_nsub);
+    pcre_free (re);
     }
 #endif
 else {
@@ -12031,9 +12025,13 @@ if ((match_buf == NULL) || (ep->match_pattern == NULL)) {
     }
 if (switches & EXP_TYP_REGEX) {
 #if defined(USE_REGEX)
+    const char *errmsg;
+    int erroffset;
+
     memcpy (match_buf, match+1, strlen(match)-2);      /* extract string without surrounding quotes */
     match_buf[strlen(match)-2] = '\0';
-    regcomp (&ep->regex, (char *)match_buf, REG_EXTENDED);
+    ep->regex = pcre_compile ((char *)match_buf, (switches & EXP_TYP_REGEX_I) ? PCRE_CASELESS : 0, &errmsg, &erroffset, NULL);
+    (void)pcre_fullinfo(ep->regex, NULL, PCRE_INFO_CAPTURECOUNT, &ep->re_nsub);
 #endif
     free (match_buf);
     match_buf = NULL;
@@ -12168,7 +12166,8 @@ for (i=0; i < exp->size; i++) {
     ep = &exp->rules[i];
     if (ep->switches & EXP_TYP_REGEX) {
 #if defined (USE_REGEX)
-        regmatch_t *matches;
+        int *ovector = NULL;
+        int rc;
         char *cbuf = (char *)exp->buf;
         static size_t sim_exp_match_sub_count = 0;
 
@@ -12186,23 +12185,24 @@ for (i=0; i < exp->size; i++) {
                 }
             }
         ++regex_checks;
-        matches = (regmatch_t *)calloc ((ep->regex.re_nsub + 1), sizeof(*matches));
+        ovector = (int *)malloc (3 * (ep->re_nsub + 1) * sizeof (*ovector));
         if (sim_deb && exp->dptr && (exp->dptr->dctrl & exp->dbit)) {
             char *estr = sim_encode_quoted_string (exp->buf, exp->buf_ins);
             sim_debug (exp->dbit, exp->dptr, "Checking String: %s\n", estr);
             sim_debug (exp->dbit, exp->dptr, "Against RegEx Match Rule: %s\n", ep->match_pattern);
             free (estr);
             }
-        if (!regexec (&ep->regex, cbuf, ep->regex.re_nsub + 1, matches, REG_NOTBOL)) {
+        rc = pcre_exec (ep->regex, NULL, cbuf, exp->buf_ins, 0, PCRE_NOTBOL, ovector, 3 * (ep->re_nsub + 1));
+        if (rc >= 0) {
             size_t j;
             char *buf = (char *)malloc (1 + exp->buf_ins);
 
-            for (j=0; j<ep->regex.re_nsub + 1; j++) {
+            for (j=0; j < (size_t)rc; j++) {
                 char env_name[32];
 
                 sprintf (env_name, "_EXPECT_MATCH_GROUP_%d", (int)j);
-                memcpy (buf, &cbuf[matches[j].rm_so], matches[j].rm_eo-matches[j].rm_so);
-                buf[matches[j].rm_eo-matches[j].rm_so] = '\0';
+                memcpy (buf, &cbuf[ovector[2 * j]], ovector[2 * j + 1] - ovector[2 * j]);
+                buf[ovector[2 * j + 1] - ovector[2 * j]] = '\0';
                 setenv (env_name, buf, 1);      /* Make the match and substrings available as environment variables */
                 sim_debug (exp->dbit, exp->dptr, "%s=%s\n", env_name, buf);
                 }
@@ -12212,12 +12212,13 @@ for (i=0; i < exp->size; i++) {
                 sprintf (env_name, "_EXPECT_MATCH_GROUP_%d", (int)j);
                 setenv (env_name, "", 1);      /* Remove previous extra environment variables */
                 }
-            sim_exp_match_sub_count = ep->regex.re_nsub;
-            free (matches);
+            sim_exp_match_sub_count = ep->re_nsub;
+            free (ovector);
+            ovector = NULL;
             free (buf);
             break;
             }
-        free (matches);
+        free (ovector);
 #endif
         }
     else {

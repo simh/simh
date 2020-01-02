@@ -146,8 +146,7 @@ extern int sim_vax_snprintf(char *buf, size_t buf_size, const char *fmt, ...);
 #ifdef USE_REGEX
 #undef USE_REGEX
 #endif
-#if defined(HAVE_PCREPOSIX_H)
-#include <pcreposix.h>
+#if defined(HAVE_PCRE_H)
 #include <pcre.h>
 #define USE_REGEX 1
 #endif
@@ -815,7 +814,8 @@ struct EXPTAB {
 #define EXP_TYP_REGEX_I         (SWMASK ('I'))      /* regular expression pattern matching should be case independent */
 #define EXP_TYP_TIME            (SWMASK ('T'))      /* halt delay is in microseconds instead of instructions */
 #if defined(USE_REGEX)
-    regex_t             regex;                          /* compiled regular expression */
+    pcre                *regex;                         /* compiled regular expression */
+    int                 re_nsub;                        /* regular expression sub expression count */
 #endif
     char                *act;                           /* action string */
     };
