@@ -504,16 +504,6 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       endif
     endif
   endif
-  ifeq (,$(findstring DHAVE_PCREPOSIX_H,$(OS_CCDEFS)))
-    # If libpcreposix isn't available, fall back to the local regex.h 
-    # Presume that the local regex support is available in the C runtime 
-    # without a specific reference to a library.  This may not be true on
-    # some platforms.
-    ifneq (,$(call find_include,regex))
-      OS_CCDEFS += -DHAVE_REGEX_H
-      $(info using regex: $(call find_include,regex))
-    endif
-  endif
   # Find available ncurses library.
   ifneq (,$(call find_include,ncurses))
     ifneq (,$(call find_lib,ncurses))
