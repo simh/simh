@@ -680,7 +680,7 @@ void besm6_draw_panel (int force)
 #else /* HAVE_LIBSDL */
 t_stat besm6_init_panel (UNIT *u, int32 val, CONST char *cptr, void *desc)
 {
-    return sim_messagef(SCPE_OPENERR, "Need SDL and SDLttf libraries");
+    return sim_messagef(SCPE_OPENERR, "Need SDL and SDLttf libraries\n");
 }
 
 t_stat besm6_close_panel (UNIT *u, int32 val, CONST char *cptr, void *desc)
