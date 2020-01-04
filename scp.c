@@ -2061,15 +2061,11 @@ static const char simh_help[] =
       " as a regular expression applied to the output data stream.  This regular\n"
       " expression may contain parentheses delimited sub-groups.\n\n"
        /***************** 80 character line width template *************************/
-#if defined (HAVE_PCREPOSIX_H)
+#if defined (HAVE_PCRE_H)
       " The syntax of the regular expressions available are those supported by\n"
       " the Perl Compatible Regular Expression package (aka PCRE).  As the name\n"
       " implies, the syntax is generally the same as Perl regular expressions.\n"
       " See http://perldoc.perl.org/perlre.html for more details\n"
-#elif defined (HAVE_REGEX_H)
-      " The syntax of the regular expressions available are those supported by\n"
-      " your local system's Regular Expression library using the Extended POSIX\n"
-      " Regular Expressiona\n"
 #else
       " Regular expression support is not currently available on your environment.\n"
       " This simulator could use regular expression support provided by the\n"
@@ -5903,10 +5899,8 @@ if (flag) {
     fprintf (st, "\n        Memory Pointer Size: %d bits", (int)sizeof(dptr)*8);
     fprintf (st, "\n        %s", sim_toffset_64 ? "Large File (>2GB) support" : "No Large File support");
     fprintf (st, "\n        SDL Video support: %s", vid_version());
-#if defined (HAVE_PCREPOSIX_H)
+#if defined (HAVE_PCRE_H)
     fprintf (st, "\n        PCRE RegEx (Version %s) support for EXPECT commands", pcre_version());
-#elif defined (HAVE_REGEX_H)
-    fprintf (st, "\n        RegEx support for EXPECT commands");
 #else
     fprintf (st, "\n        No RegEx support for EXPECT commands");
 #endif
@@ -11977,7 +11971,7 @@ if (switches & EXP_TYP_REGEX) {
 
     memcpy (match_buf, match+1, strlen(match)-2);       /* extract string without surrounding quotes */
     match_buf[strlen(match)-2] = '\0';
-    re = pcre_compile (match_buf, (switches & EXP_TYP_REGEX_I) ? PCRE_CASELESS : 0, &errmsg, &erroffset, NULL);
+    re = pcre_compile ((char *)match_buf, (switches & EXP_TYP_REGEX_I) ? PCRE_CASELESS : 0, &errmsg, &erroffset, NULL);
     if (re == NULL) {
         sim_messagef (SCPE_ARG, "Regular Expression Error: %s\n", errmsg);
         free (match_buf);
