@@ -228,7 +228,7 @@ t_stat i8272_attach(UNIT *uptr, CONST char *cptr)
     chip->drive[i].ready = 0;
 
     if(uptr->capac > 0) {
-        fgets(header, 4, uptr->fileref);
+        if (fgets(header, 4, uptr->fileref)) {};
         if(strncmp(header, "IMD", 3)) {
             sim_printf("I8272: Only IMD disk images are supported\n");
             chip->drive[i].uptr = NULL;

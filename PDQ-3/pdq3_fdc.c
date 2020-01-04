@@ -286,7 +286,7 @@ t_stat fdc_attach(UNIT *uptr, CONST char *cptr) {
   fdc_drv[i].dr_ready = 0;
   
   if (uptr->capac > 0) {
-    fgets(header, 4, uptr->fileref);
+    if (fgets(header, 4, uptr->fileref)) {};
     if (strncmp(header, "IMD", 3) != 0) {
       sim_printf("FDC: Only IMD disk images are supported\n");
       fdc_drv[i].dr_unit = NULL;
@@ -1116,7 +1116,7 @@ t_stat pdq3_diskCreate(FILE *fileref, const char *ctlr_comment) {
     remaining = MAX_COMMENT_LEN;
     do {
         sim_printf("IMD> ");
-        fgets(curptr, remaining - 3, stdin);
+        if (fgets(curptr, remaining - 3, stdin)) {};
         if (strcmp(curptr, ".\n") == 0) {
             remaining = 0;
         } else {

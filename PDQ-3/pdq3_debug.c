@@ -67,7 +67,7 @@ static void dbg_opdbginit() {
   for (i=DEBUG_MINOPCODE; i<DEBUG_MAXOPCODE; i++)
       opdebug[i-DEBUG_MINOPCODE] = DEBUG_PRE|DEBUG_POST;
   while (!feof(fd)) {
-    fgets(line,100,fd);
+    if (fgets(line,100,fd)) {};
     sscanf(line,"%x %d", &i, &f);
     ASSURE(i >= DEBUG_MINOPCODE && i < DEBUG_MAXOPCODE);
     opdebug[i-DEBUG_MINOPCODE] = f;
