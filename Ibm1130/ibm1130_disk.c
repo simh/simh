@@ -651,7 +651,7 @@ static t_stat phdebug_cmd (int32 flag, CONST char *ptr)
 {
     int val1, val2;
 
-    if (strcmpi(ptr, "off") == 0)
+    if (sim_strcmpi(ptr, "off") == 0)
         phdebug_lo = phdebug_hi = -1;
     else {
         switch(sscanf(ptr, "%x%x", &val1, &val2)) {

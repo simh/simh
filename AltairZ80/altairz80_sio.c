@@ -267,7 +267,7 @@ static void processDirEntry (const char *directory,
                              void *context) {
     if (filename != NULL) {
         NameNode_t *top = (NameNode_t *)malloc(sizeof(NameNode_t));
-        top -> name = strdup(filename);
+        top -> name = sim_strdup(filename);
         top -> next = nameListHead;
         nameListHead = top;
     }

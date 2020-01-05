@@ -1321,7 +1321,7 @@ static t_bool nextdeck (void)
         if (*buf == '#' || *buf == '*' || *buf == ';')
             continue;                       /* comment */
 
-        if (strnicmp(buf, "!BREAK", 6) == 0) {  /* stop the simulation */
+        if (sim_strnicmp(buf, "!BREAK", 6) == 0) {  /* stop the simulation */
             break_simulation(STOP_DECK_BREAK);
             continue;
         }
@@ -1366,7 +1366,7 @@ static t_bool nextdeck (void)
 
             if (*tempfile == '\0') {                        /* first time, construct unique name */
                 strcpy(tempfile, "tempXXXXXX");             /* make a modifiable copy of the template */
-                if (mktemp(tempfile) == NULL) {
+                if (sim_mktemp(tempfile) == NULL) {
                     printf("Cannot create temporary card file name\n");
                     break_simulation(STOP_DECK_BREAK);
                     return 0;
@@ -1395,7 +1395,7 @@ static t_bool nextdeck (void)
                 fpos = ftell(deckfile);
                 if (fgets(buf, sizeof(buf), deckfile) == NULL)
                     break;                          /* oops, end of file */
-                if (buf[0] != '!' || strnicmp(buf, "!BREAK", 6) == 0)
+                if (buf[0] != '!' || sim_strnicmp(buf, "!BREAK", 6) == 0)
                     break;
                 alltrim(buf);
             }

@@ -1665,7 +1665,7 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
             int32 save_quiet = sim_quiet;
 
             sim_quiet = 1;
-            sprintf (sim_rem_con_temp_name, "sim_remote_console_%d.temporary_log", (int)getpid());
+            sprintf (sim_rem_con_temp_name, "sim_remote_console_%d.temporary_log", (int)sim_getpid());
             sim_set_logon (0, sim_rem_con_temp_name);
             sim_quiet = save_quiet;
             sim_log_temp = TRUE;

@@ -4433,7 +4433,7 @@ if (f == NULL) {
     return errno;
     }
 memset (&statb, 0, sizeof (statb));
-if (fstat (fileno (f), &statb)) {
+if (fstat (sim_fileno (f), &statb)) {
     sim_printf ("Can't stat: %s\n", filename);
     fclose (f);
     return -1;

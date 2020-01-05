@@ -709,9 +709,13 @@ return 0;
 char *sim_getcwd (char *buf, size_t buf_size)
 {
 #if defined (VMS)
-return getcwd (buf, buf_size, 0);
+return sim_getcwd (buf, buf_size, 0);
+#elif defined(USE_ISO_NAMES)
+ /* Can't use a #define to rename because the rename is the same as the
+    function name. */
+ return _getcwd(buf, buf_size);
 #else
-return getcwd (buf, buf_size);
+ return getcwd (buf, buf_size);
 #endif
 }
 

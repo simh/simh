@@ -1436,7 +1436,7 @@ t_stat cpu_set_type (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
     is_1800 = (value & UNIT_1800) != 0;                 /* set is_1800 mode flag */
 
     for (r = cpu_reg; r->name != NULL; r++) {           /* unhide or hide 1800-specific registers & state */
-        if (strnicmp(r->name, "XR", 2) == 0) {
+        if (sim_strnicmp(r->name, "XR", 2) == 0) {
             if (value & UNIT_1800)
                 CLRBIT(r->flags, REG_HIDDEN|REG_RO);
             else

@@ -3600,7 +3600,7 @@ if (!File) {
     goto Return_Cleanup;
     }
 if (ModifiedTimeStamp) {
-    if (fstat (fileno (File), &statb)) {
+    if (fstat (sim_fileno (File), &statb)) {
         Return = errno;
         goto Return_Cleanup;
         }
