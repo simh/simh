@@ -405,6 +405,7 @@ Device simulator authors can easily schedule their device polling activities to 
     RUN UNTIL "output-string" ...    Establish the specified "output-string" as an EXPECT and run until it is encountered.
     GO UNTIL breakpoint              Establish the breakpoint specified and go until it is encountered
     GO UNTIL "output-string" ...     Establish the specified "output-string" as an EXPECT and go until it is encountered.
+    RUNLIMIT						 Bound simulator execution time
 
 #### Command Processing Enhancements
 

@@ -413,8 +413,9 @@ typedef uint32          t_addr;
 #define SCPE_INVEXPR    (SCPE_BASE + 47)                /* invalid expression */
 #define SCPE_SIGTERM    (SCPE_BASE + 48)                /* SIGTERM has been received */
 #define SCPE_FSSIZE     (SCPE_BASE + 49)                /* File System size larger than disk size */
+#define SCPE_RUNTIME    (SCPE_BASE + 50)                /* Run Time Limit Exhausted */
 
-#define SCPE_MAX_ERR    (SCPE_BASE + 49)                /* Maximum SCPE Error Value */
+#define SCPE_MAX_ERR    (SCPE_BASE + 50)                /* Maximum SCPE Error Value */
 #define SCPE_KFLAG      0x10000000                      /* tti data flag */
 #define SCPE_BREAK      0x20000000                      /* tti break flag */
 #define SCPE_NOMESSAGE  0x40000000                      /* message display supression flag */
