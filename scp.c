@@ -5895,6 +5895,15 @@ if (flag) {
 #undef S_xstr
 #endif
 #endif
+#if defined (SIM_BUILD_TOOL)
+#define S_xstr(a) S_str(a)
+#define S_str(a) #a
+    fprintf (st, "\n        Build Tool: %s", S_xstr(SIM_BUILD_TOOL));
+#undef S_str
+#undef S_xstr
+#else
+    fprintf (st, "\n        Build Tool: undefined (probably cmake)");
+#endif
     fprintf (st, "\n        Memory Access: %s Endian", sim_end ? "Little" : "Big");
     fprintf (st, "\n        Memory Pointer Size: %d bits", (int)sizeof(dptr)*8);
     fprintf (st, "\n        %s", sim_toffset_64 ? "Large File (>2GB) support" : "No Large File support");
