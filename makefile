@@ -319,6 +319,9 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
         endif
         ifneq (lib,$(findstring lib,$(UNSUPPORTED_BUILD)))
           ifeq (Android,$(shell uname -o))
+            ifneq (,$(shell if ${TEST} -d ${PREFIX}/lib; then echo prefixlib; fi))
+              LIBPATH += ${PREFIX}/lib
+            endif
             ifneq (,$(shell if ${TEST} -d /system/lib; then echo systemlib; fi))
               LIBPATH += /system/lib
             endif
@@ -1191,12 +1194,6 @@ endif
 ifneq (3,$(GCC_MAJOR_VERSION))
   ifeq (,$(GCC_WARNINGS_CMD))
     GCC_WARNINGS_CMD = ${GCC} --help=warnings
-  endif
-  ifneq (,$(findstring -Wunused-result,$(shell $(GCC_WARNINGS_CMD))))
-    CFLAGS_O += -Wno-unused-result
-  endif
-  ifneq (,$(findstring -Wformat-truncation,$(shell $(GCC_WARNINGS_CMD))))
-    CFLAGS_O += -Wno-format-truncation
   endif
 endif
 ifneq (clean,${MAKECMDGOALS})
