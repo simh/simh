@@ -229,6 +229,7 @@ extern int32 cur_cpu;
 t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tmr_svc (UNIT *uptr);
+t_stat clk_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
 t_stat clk_reset (DEVICE *dptr);
@@ -329,7 +330,7 @@ DEVICE tto_dev = {
 
 /* TODR and TMR data structures */
 
-UNIT clk_unit = { UDATA (NULL, UNIT_FIX, sizeof(TOY))};
+UNIT clk_unit = { UDATA (&clk_svc, UNIT_FIX, sizeof(TOY))};
 
 REG clk_reg[] = {
     { DRDATAD (TIME,                   clk_unit.wait,  24, "initial poll interval"), REG_NZ + PV_LEFT },
@@ -656,10 +657,8 @@ void iccs_wr (int32 val)
 {
 sim_debug_bits_hdr (TMR_DB_REG, &tmr_dev, "iccs_wr()", tmr_iccs_bits, tmr_iccs, val, TRUE);
 if ((val & TMR_CSR_RUN) == 0) {                         /* clearing run? */
-    if (tmr_iccs & TMR_CSR_RUN) {                       /* run 1 -> 0? */
+    if (tmr_iccs & TMR_CSR_RUN)                         /* run 1 -> 0? */
         tmr_icr = icr_rd ();                            /* update itr */
-        sim_rtcn_calb (0, TMR_CLK);                     /* stop timer */
-        }
     sim_cancel (&tmr_unit);                             /* cancel timer */
     }
 if (val & CSR_DONE)                                     /* Interrupt Acked? */
@@ -672,10 +671,8 @@ if (val & TMR_CSR_XFR)                                  /* xfr set? */
 if (val & TMR_CSR_RUN)  {                               /* run? */
     if (val & TMR_CSR_XFR)                              /* new tir? */
         sim_cancel (&tmr_unit);                         /* stop prev */
-    if (!sim_is_active (&tmr_unit)) {                   /* not running? */
-        sim_rtcn_init_unit (&tmr_unit, CLK_DELAY, TMR_CLK);  /* init timer */
+    if (!sim_is_active (&tmr_unit))                     /* not running? */
         tmr_sched (tmr_icr);                            /* activate */
-        }
     }
 else {
     if (val & TMR_CSR_XFR)                              /* xfr set? */
@@ -759,10 +756,7 @@ void tmr_sched (uint32 nicr)
 {
 uint32 usecs = (nicr) ? (~nicr + 1) : 0xFFFFFFFF;
 
-clk_tps = (int32)((1000000.0 / usecs) + 0.5);
-
 sim_debug (TMR_DB_SCHED, &tmr_dev, "tmr_sched(nicr=0x%08X-usecs=0x%08X) - tps=%d\n", nicr, usecs, clk_tps);
-tmr_poll = sim_rtcn_calb (clk_tps, TMR_CLK);
 sim_activate_after (&tmr_unit, usecs);
 }
 
@@ -780,6 +774,16 @@ if (clk_unit.flags & UNIT_ATT)              /* battery backup hooked up? */
     wtc_set_valid ();
 else
     wtc_set_invalid ();
+sim_activate_after (&clk_unit, 10000);
+tmr_poll = sim_rtcn_init_unit (&clk_unit, CLK_DELAY, TMR_CLK);  /* init timer */
+return SCPE_OK;
+}
+
+t_stat clk_svc (UNIT *uptr)
+{
+sim_activate_after (uptr, 10000);
+tmr_poll = sim_rtcn_calb (100, TMR_CLK);
+tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
 return SCPE_OK;
 }
 
@@ -881,8 +885,6 @@ return r;
 
 t_stat tmr_reset (DEVICE *dptr)
 {
-tmr_poll = sim_rtcn_init_unit (&tmr_unit, CLK_DELAY, TMR_CLK);  /* init timer */
-tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
 tmr_iccs = 0;
 tmr_nicr = 0;
 tmr_int = 0;
