@@ -661,7 +661,8 @@ if ((val & TMR_CSR_RUN) == 0) {                         /* clearing run? */
         tmr_icr = icr_rd ();                            /* update itr */
     sim_cancel (&tmr_unit);                             /* cancel timer */
     }
-if (val & CSR_DONE)                                     /* Interrupt Acked? */
+if ((val & CSR_DONE) &&                                 /* Interrupt Acked? */
+    (10000 == (tmr_nicr) ? (~tmr_nicr + 1) : 0xFFFFFFFF))/* of 10ms tick */
     sim_rtcn_tick_ack (20, TMR_CLK);                    /* Let timers know */
 tmr_iccs = tmr_iccs & ~(val & TMR_CSR_W1C);             /* W1C csr */
 tmr_iccs = (tmr_iccs & ~TMR_CSR_WR) |                   /* new r/w */
@@ -757,7 +758,10 @@ void tmr_sched (uint32 nicr)
 uint32 usecs = (nicr) ? (~nicr + 1) : 0xFFFFFFFF;
 
 sim_debug (TMR_DB_SCHED, &tmr_dev, "tmr_sched(nicr=0x%08X-usecs=0x%08X) - tps=%d\n", nicr, usecs, clk_tps);
-sim_activate_after (&tmr_unit, usecs);
+if (usecs == 10000)
+    sim_clock_coschedule_tmr (&tmr_unit, TMR_CLK, 1);
+else
+    sim_activate_after (&tmr_unit, usecs);
 }
 
 /* 100Hz TODR reset */
