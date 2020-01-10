@@ -480,6 +480,7 @@ t_stat show_version (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char 
 t_stat show_default (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat show_break (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat show_on (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
+t_stat show_runlimit (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat sim_show_send (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat sim_show_expect (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat show_device (FILE *st, DEVICE *dptr, int32 flag);
@@ -558,6 +559,7 @@ t_stat sim_show_asynch (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST ch
 t_stat do_cmd_label (int32 flag, CONST char *cptr, CONST char *label);
 void int_handler (int signal);
 t_stat set_prompt (int32 flag, CONST char *cptr);
+t_stat set_runlimit (int32 flag, CONST char *cptr);
 t_stat sim_set_asynch (int32 flag, CONST char *cptr);
 static const char *_get_dbg_verb (uint32 dbits, DEVICE* dptr, UNIT *uptr);
 static t_stat sim_library_unit_tests (void);
@@ -598,7 +600,9 @@ int32 sim_brk_ins = 0;
 int32 sim_quiet = 0;
 int32 sim_step = 0;
 int32 sim_runlimit = 0;
+int32 sim_runlimit_initial = 0;
 double sim_runlimit_d = 0.0;
+double sim_runlimit_d_initial = 0.0;
 int32 sim_runlimit_switches = 0;
 t_bool sim_runlimit_enabled = FALSE;
 char *sim_sub_instr = NULL;         /* Copy of pre-substitution buffer contents */
@@ -1112,6 +1116,11 @@ static const char simh_help[] =
       " limit execution.\n\n"
       "++RUNLIMIT n {CYCLES|MICROSECONDS|SECONDS|MINUTES|HOURS}\n"
       "++NORUNLIMIT\n\n"
+      "  Equivalently:\n\n"
+      "++SET RUNLIMIT n {CYCLES|MICROSECONDS|SECONDS|MINUTES|HOURS}\n"
+      "++SET NORUNLIMIT\n\n"
+      " The run limit state can be examined with:\n\n"
+      "++SHOW RUNLIMIT\n\n"
       " If the units of the run limit are not specified, the default units are\n"
       " cycles.  Once an execution run limit has beenn reached, any subsequent\n"
       " GO, RUN, CONTINUE, STEP or BOOT commands will cause the simulator to\n"
@@ -1530,6 +1539,7 @@ static const char simh_help[] =
       "+sh{ow} clocks               show calibrated timer information\n"
       "+sh{ow} throttle             show throttle info\n"
       "+sh{ow} on                   show on condition actions\n"
+      "+sh{ow} runlimit             show execution limit states\n"
       "+h{elp} <dev> show           displays the device specific show commands\n"
       "++++++++                     available\n"
 #define HLP_SHOW_CONFIG         "*Commands SHOW"
@@ -1555,6 +1565,7 @@ static const char simh_help[] =
 #define HLP_SHOW_VIDEO          "*Commands SHOW"
 #define HLP_SHOW_CLOCKS         "*Commands SHOW"
 #define HLP_SHOW_ON             "*Commands SHOW"
+#define HLP_SHOW_RUNLIMIT       "*Commands SHOW"
 #define HLP_SHOW_SEND           "*Commands SHOW"
 #define HLP_SHOW_EXPECT         "*Commands SHOW"
 #define HLP_HELP                "*Commands HELP"
@@ -2470,6 +2481,8 @@ static CTAB set_glob_tab[] = {
     { "QUIET",      &set_quiet,                 1, HLP_SET_QUIET },
     { "NOQUIET",    &set_quiet,                 0, HLP_SET_QUIET },
     { "PROMPT",     &set_prompt,                0, HLP_SET_PROMPT },
+    { "RUNLIMIT",   &set_runlimit,              1, HLP_RUNLIMIT },
+    { "NORUNLIMIT", &set_runlimit,              0, HLP_RUNLIMIT },
     { NULL,         NULL,                       0 }
     };
 
@@ -2523,6 +2536,7 @@ static SHTAB show_glob_tab[] = {
     { "SEND",           &sim_show_send,             0, HLP_SHOW_SEND },
     { "EXPECT",         &sim_show_expect,           0, HLP_SHOW_EXPECT },
     { "ON",             &show_on,                   0, HLP_SHOW_ON },
+    { "RUNLIMIT",       &show_runlimit,             0, HLP_SHOW_RUNLIMIT },
     { NULL,             NULL,                       0 }
     };
 
@@ -6107,7 +6121,6 @@ t_stat show_queue (FILE *st, DEVICE *dnotused, UNIT *unotused, int32 flag, CONST
 {
 DEVICE *dptr;
 UNIT *uptr;
-int32 accum;
 MEMFILE buf;
 
 memset (&buf, 0, sizeof (buf));
@@ -6122,7 +6135,6 @@ else {
 
     fprintf (st, "%s event queue status, time = %.0f, executing %s instructions/sec\n",
              sim_name, sim_time, sim_fmt_numeric (inst_per_sec));
-    accum = 0;
     for (uptr = sim_clock_queue; uptr != QUEUE_LIST_END; uptr = uptr->next) {
         if (uptr == &sim_step_unit)
             fprintf (st, "  Step timer");
@@ -6138,16 +6150,15 @@ else {
                 else
                     fprintf (st, "  Unknown");
         if (inst_per_sec != 0.0)
-            tim = sim_fmt_secs(((accum + uptr->time) / sim_timer_inst_per_sec ()) + (uptr->usecs_remaining / 1000000.0));
+            tim = sim_fmt_secs(((_sim_activate_queue_time (uptr) - 1) / sim_timer_inst_per_sec ()) + (uptr->usecs_remaining / 1000000.0));
         if (uptr->usecs_remaining)
-            fprintf (st, " at %d plus %.0f usecs%s%s%s%s\n", accum + uptr->time, uptr->usecs_remaining,
+            fprintf (st, " at %d plus %.0f usecs%s%s%s%s\n", _sim_activate_queue_time (uptr) - 1, uptr->usecs_remaining,
                                             (*tim) ? " (" : "", tim, (*tim) ? " total)" : "",
                                             (uptr->flags & UNIT_IDLE) ? " (Idle capable)" : "");
         else
-            fprintf (st, " at %d%s%s%s%s\n", accum + uptr->time, 
+            fprintf (st, " at %d%s%s%s%s\n", _sim_activate_queue_time (uptr) - 1, 
                                             (*tim) ? " (" : "", tim, (*tim) ? ")" : "",
                                             (uptr->flags & UNIT_IDLE) ? " (Idle capable)" : "");
-        accum = accum + uptr->time;
         }
     }
 sim_show_clock_queues (st, dnotused, unotused, flag, cptr);
@@ -6900,7 +6911,8 @@ num = (int32) get_uint (gbuf, 10, INT_MAX, &r);
 if ((r != SCPE_OK) || (num == 0))               /* error? */
     return sim_messagef (SCPE_ARG, "Invalid argument: %s\n", gbuf);
 cptr = get_glyph (cptr, gbuf, 0);               /* get next glyph */
-if (MATCH_CMD (gbuf, "CYCLES") == 0)
+if ((gbuf[0] == '\0') ||
+    (MATCH_CMD (gbuf, "CYCLES") == 0))
     sim_switches &= ~SWMASK ('T');
 else {
     int i;
@@ -6931,13 +6943,51 @@ sim_runlimit_enabled = TRUE;
 sim_cancel (&sim_runlimit_unit);
 sim_runlimit_switches = sim_switches;
 if (sim_runlimit_switches & SWMASK ('T')) {
-    sim_runlimit_d = num * usec_factor;
+    sim_runlimit_d_initial = sim_runlimit_d = num * usec_factor;
     return sim_activate_after_d (&sim_runlimit_unit, sim_runlimit_d);
     }
 else {
-    sim_runlimit = num;
+    sim_runlimit_initial = sim_runlimit = num;
     return sim_activate (&sim_runlimit_unit, sim_runlimit);
     }
+}
+
+t_stat set_runlimit (int32 flag, CONST char *cptr)
+{
+return runlimit_cmd (flag, cptr);
+}
+
+t_stat show_runlimit (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr)
+{
+if (sim_runlimit_enabled) {
+    if (sim_runlimit_switches & SWMASK ('T')) {
+        double inst_per_sec = sim_timer_inst_per_sec ();
+
+        if (sim_runlimit_d_initial != sim_runlimit_d) {
+            fprintf (st, "%s initially, ", sim_fmt_secs (sim_runlimit_d_initial / 1000000.0));
+            if (sim_is_active (&sim_runlimit_unit))
+                fprintf (st, "and %s remaining\n", sim_fmt_secs (sim_runlimit_d / 1000000.0));
+            else
+                fprintf (st, "expired now\n");
+            }
+        else
+            fprintf (st, "%s\n", sim_fmt_secs (sim_runlimit_d_initial / 1000000.0));
+        }
+    else {
+        if (sim_runlimit_initial != sim_runlimit) {
+            fprintf (st, "%d cycles initially, ", sim_runlimit_initial);
+            if (sim_is_active (&sim_runlimit_unit))
+                fprintf (st, "and %d cycles remaining\n", sim_activate_time (&sim_runlimit_unit));
+            else
+                fprintf (st, "expired now\n");
+            }
+        else
+            fprintf (st, "%d cycles\n", sim_runlimit_initial);
+        }
+    }
+else
+    fprintf (st, "Run Limit Disabled\n");
+return SCPE_OK;
 }
 
 /* Reset devices start..end
@@ -8290,7 +8340,7 @@ if (sim_runlimit_enabled) {
     if (sim_runlimit_switches & SWMASK ('T'))
         sim_runlimit_d = sim_activate_time_usecs (&sim_runlimit_unit);
     else
-        sim_runlimit = sim_activate_time (&sim_runlimit_unit);
+        sim_runlimit = sim_activate_time (&sim_runlimit_unit) - 1;
     }
 
 if ((SCPE_BARE_STATUS(r) == SCPE_STOP) &&               /* WRU exit from sim_instr() */
@@ -11273,7 +11323,7 @@ return (((uptr->next) || AIO_IS_ACTIVE(uptr) || ((uptr->dynflags & UNIT_TMR_UNIT
         result =        absolute activation time + 1, 0 if inactive
 */
 
-int32 _sim_activate_time (UNIT *uptr)
+int32 _sim_activate_queue_time (UNIT *uptr)
 {
 UNIT *cptr;
 int32 accum;
@@ -11287,8 +11337,17 @@ for (cptr = sim_clock_queue; cptr != QUEUE_LIST_END; cptr = cptr->next) {
     else
         accum = accum + cptr->time;
     if (cptr == uptr)
-        return accum + 1 + (int32)((uptr->usecs_remaining * sim_timer_inst_per_sec ()) / 1000000.0);
+        return accum + 1;
     }
+return 0;
+}
+
+int32 _sim_activate_time (UNIT *uptr)
+{
+int32 accum = _sim_activate_queue_time (uptr);
+
+if (accum)
+    return accum + (int32)((uptr->usecs_remaining * sim_timer_inst_per_sec ()) / 1000000.0);
 return 0;
 }
 
