@@ -2203,17 +2203,17 @@ ifneq (,$(call find_test,${PDP11D},uc15))
 	$@ $(call find_test,${PDP11D},uc15) ${TEST_ARG}
 endif
 
-vax : microvax3900
+microvax3900 : vax
 
-microvax3900 : ${BIN}microvax3900${EXE}
+vax : ${BIN}vax${EXE}
 
-${BIN}microvax3900${EXE} : ${VAX} ${SIM} ${BUILD_ROMS}
+${BIN}vax${EXE} : ${VAX} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX} ${SIM} ${VAX_OPT} ${CC_OUTSPEC} ${LDFLAGS}
 ifeq (${WIN32},)
-	cp ${BIN}microvax3900${EXE} ${BIN}vax${EXE}
+	cp ${BIN}vax${EXE} ${BIN}microvax3900${EXE}
 else
-	copy $(@D)\microvax3900${EXE} $(@D)\vax${EXE}
+	copy $(@D)\vax${EXE} $(@D)\microvax3900${EXE}
 endif
 ifneq (,$(call find_test,${VAXD},vax-diag))
 	$@ $(call find_test,${VAXD},vax-diag) ${TEST_ARG}
