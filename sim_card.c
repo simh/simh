@@ -931,9 +931,9 @@ _sim_read_deck(UNIT * uptr, int eof)
         if (data->hopper_cards >= data->hopper_size) {
             data->hopper_size += DECK_SIZE;
             data->images = (uint16 (*)[1][80])realloc(data->images,
-                       data->hopper_size * sizeof(*(data->images)));
+                       (size_t)data->hopper_size * sizeof(*(data->images)));
             memset(&data->images[data->hopper_cards], 0,
-                       (data->hopper_size - data->hopper_cards) *
+                       (size_t)(data->hopper_size - data->hopper_cards) *
                              sizeof(*(data->images)));
         }
 
@@ -961,9 +961,9 @@ _sim_read_deck(UNIT * uptr, int eof)
           if (data->hopper_cards >= data->hopper_size) {
               data->hopper_size += DECK_SIZE;
               data->images = (uint16 (*)[1][80])realloc(data->images,
-                         data->hopper_size * sizeof(*(data->images)));
+                         (size_t)data->hopper_size * sizeof(*(data->images)));
               memset(&data->images[data->hopper_cards], 0,
-                         (data->hopper_size - data->hopper_cards) *
+                         (size_t)(data->hopper_size - data->hopper_cards) *
                                sizeof(*(data->images)));
           }
 
