@@ -32,6 +32,10 @@
 # installed, gmake should be invoked with LPATH=/usr/lib:/usr/local/lib 
 # defined (adjusted as needed depending on where they may be installed).
 #
+# In the unlikely event that someone wants to build network capable 
+# simulators without networking support, invoking GNU make with 
+# NONETWORK=1 will do the trick.
+#
 # The default build will build compiler optimized binaries.
 # If debugging is desired, then GNU make can be invoked with
 # DEBUG=1 on the command line.
@@ -107,11 +111,12 @@ ifneq (,$(findstring besm6,${MAKECMDGOALS}))
   VIDEO_USEFUL = true
   BESM6_BUILD = true
 endif
-# building the KA10 needs video support
+# building the PDP6, KA10 or KI10 needs video support
 ifneq (,$(or $(findstring pdp6,${MAKECMDGOALS}),$(findstring pdp10-ka,${MAKECMDGOALS}),$(findstring pdp10-ki,${MAKECMDGOALS})))
   VIDEO_USEFUL = true
 endif
-ifneq (,$(or $(findstring pdp10-ka,${MAKECMDGOALS}),$(findstring pdp10-ki,${MAKECMDGOALS})))
+# building the KA10, KI10 or KL10 networking can be used.
+ifneq (,$(or $(findstring pdp10-ka,${MAKECMDGOALS}),$(findstring pdp10-ki,${MAKECMDGOALS},$(findstring pdp10-kl,${MAKECMDGOALS}))))
   NETWORK_USEFUL = true
 endif
 # building the PDP-7 needs video support
@@ -141,6 +146,10 @@ else
     BUILD_SINGLE := all $(BUILD_SINGLE)
     BESM6_BUILD = true
   endif
+endif
+# someone may want to explicitly build simulators without network support
+ifneq ($(NONETWORK),)
+  NETWORK_USEFUL =
 endif
 find_exe = $(abspath $(strip $(firstword $(foreach dir,$(strip $(subst :, ,${PATH})),$(wildcard $(dir)/$(1))))))
 find_lib = $(abspath $(strip $(firstword $(foreach dir,$(strip ${LIBPATH}),$(wildcard $(dir)/lib$(1).${LIBEXT})))))
@@ -655,14 +664,12 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
         endif
       else
         ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
-          $(info *** Info *** Install the development components of libSDL or libSDL2)
-          $(info *** Info *** packaged for your operating system distribution for)
-          $(info *** Info *** your Linux system:)
+          $(info *** Info *** Install the development components of libSDL2 packaged for)
+          $(info *** Info *** your operating system distribution for your Linux)
+          $(info *** Info *** system:)
           $(info *** Info ***        $$ sudo apt-get install libsdl2-dev libpng-dev)
-          $(info *** Info ***    or)
-          $(info *** Info ***        $$ sudo apt-get install libsdl-dev)
         else
-          $(info *** Info *** Install the development components of libSDL packaged by your)
+          $(info *** Info *** Install the development components of libSDL2 packaged by your)
           $(info *** Info *** operating system distribution and rebuild your simulator to)
           $(info *** Info *** enable this extra functionality.)
         endif
@@ -2023,6 +2030,14 @@ KI10 += ${KA10D}/ka10_lights.c
 KI10_LDFLAGS = -lusb-1.0
 endif
 
+KL10D = PDP10
+KL10 = ${KL10D}/kx10_cpu.c ${KL10D}/kx10_sys.c ${KL10D}/kx10_df.c \
+	${KL10D}/kx10_mt.c ${KL10D}/kx10_dc.c ${KL10D}/kx10_rh.c \
+	${KL10D}/kx10_rp.c ${KL10D}/kx10_tu.c ${KL10D}/kx10_rs.c \
+	${KL10D}/kx10_imp.c ${KL10D}/kl10_fe.c ${KL10D}/ka10_pd.c \
+	${KL10D}/ka10_ch10.c ${KL10D}/kx10_lp.c 
+KL10_OPT = -DKL=1 -DUSE_INT64 -I $(KL10D) -DUSE_SIM_CARD ${NETWORK_OPT} 
+
 ATT3B2D = ${SIMHD}/3B2
 ATT3B2 = ${ATT3B2D}/3b2_cpu.c ${ATT3B2D}/3b2_mmu.c \
 	${ATT3B2D}/3b2_iu.c ${ATT3B2D}/3b2_if.c \
@@ -2892,6 +2907,15 @@ ifneq (,$(call find_test,${PDP10D},ki10))
 	$@ $(call find_test,${PDP10D},ki10) ${TEST_ARG}
 endif
 
+pdp10-kl : ${BIN}pdp10-kl${EXE}
+
+${BIN}pdp10-kl${EXE} : ${KL10} ${SIM}
+	#cmake:ignore-target
+	${MKDIRBIN}
+	${CC} ${KL10} ${SIM} ${KL10_OPT} ${CC_OUTSPEC} ${LDFLAGS}
+ifneq (,$(call find_test,${PDP10D},kl10))
+	$@ $(call find_test,${PDP10D},kl10) ${TEST_ARG}
+endif
 
 # Front Panel API Demo/Test program
 
