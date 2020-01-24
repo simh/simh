@@ -379,6 +379,7 @@
 
 /* Internal routines - forward declarations */
 static int _eth_get_system_id (char *buf, size_t buf_size);
+static int _eth_devices (int max, ETH_LIST* dev);   /* get ethernet devices on host */
 
 /*============================================================================*/
 /*                  OS-independant ethernet routines                          */
@@ -657,10 +658,10 @@ void eth_packet_trace_detail(ETH_DEV* dev, const uint8 *msg, int len, const char
   eth_packet_trace_ex(dev, msg, len, txt, 1     , dev->dbit);
 }
 
-const char* eth_getname(int number, char* name, char *desc)
+static const char* _eth_getname(int number, char* name, char *desc)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
-  int count = eth_devices(ETH_MAX_DEVICE, list);
+  int count = _eth_devices(ETH_MAX_DEVICE, list);
 
   if ((number < 0) || (count <= number))
       return NULL;
@@ -677,7 +678,7 @@ const char* eth_getname(int number, char* name, char *desc)
 const char* eth_getname_bydesc(const char* desc, char* name, char *ndesc)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
-  int count = eth_devices(ETH_MAX_DEVICE, list);
+  int count = _eth_devices(ETH_MAX_DEVICE, list);
   int i;
   size_t j=strlen(desc);
 
@@ -703,7 +704,7 @@ const char* eth_getname_bydesc(const char* desc, char* name, char *ndesc)
 char* eth_getname_byname(const char* name, char* temp, char *desc)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
-  int count = eth_devices(ETH_MAX_DEVICE, list);
+  int count = _eth_devices(ETH_MAX_DEVICE, list);
   size_t n;
   int i, found;
 
@@ -723,7 +724,7 @@ char* eth_getname_byname(const char* name, char* temp, char *desc)
 char* eth_getdesc_byname(char* name, char* temp)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
-  int count = eth_devices(ETH_MAX_DEVICE, list);
+  int count = _eth_devices(ETH_MAX_DEVICE, list);
   size_t n;
   int i, found;
 
@@ -777,7 +778,7 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
   ETH_LIST  list[ETH_MAX_DEVICE];
   int number;
 
-  number = eth_devices(ETH_MAX_DEVICE, list);
+  number = _eth_devices(ETH_MAX_DEVICE, list);
   fprintf(st, "ETH devices:\n");
   if (number == -1)
     fprintf(st, "  network support not available in simulator\n");
@@ -956,8 +957,6 @@ t_stat eth_filter (ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
 t_stat eth_filter_hash (ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
                    ETH_BOOL all_multicast, ETH_BOOL promiscuous, ETH_MULTIHASH* const hash)
   {return SCPE_NOFNC;}
-int eth_devices (int max, ETH_LIST* dev)
-  {return -1;}
 const char *eth_version (void)
   {return NULL;}
 void eth_show_dev (FILE* st, ETH_DEV* dev)
@@ -1062,22 +1061,28 @@ static HINSTANCE hLib = NULL;               /* handle to DLL */
 static void *hLib = 0;                      /* handle to Library */
 #endif
 static int lib_loaded = 0;                  /* 0=not loaded, 1=loaded, 2=library load failed, 3=Func load failed */
+
+#define __STR_QUOTE(tok) #tok
+#define __STR(tok) __STR_QUOTE(tok)
 static const char* lib_name =
 #if defined(_WIN32) || defined(__CYGWIN__)
                           "wpcap.dll";
 #elif defined(__APPLE__)
                           "/usr/lib/libpcap.A.dylib";
 #else
-#define __STR_QUOTE(tok) #tok
-#define __STR(tok) __STR_QUOTE(tok)
                           "libpcap." __STR(HAVE_DLOPEN);
 #endif
-static const char* no_pcap = 
+
+static char no_pcap[PCAP_ERRBUF_SIZE] =
 #if defined(_WIN32) || defined(__CYGWIN__)
-                          "wpcap load failure";
+    "wpcap.dll failed to load, install Npcap or WinPcap 4.x to use pcap networking";
+#elif defined(__APPLE__)
+    "/usr/lib/libpcap.A.dylib failed to load, install libpcap to use pcap networking";
 #else
-                          "libpcap load failure";
+    "libpcap." __STR(HAVE_DLOPEN) " failed to load, install libpcap to use pcap networking";
 #endif
+#undef __STR
+#undef __STR_QUOTE
 
 /* define pointers to pcap functions needed */
 static void    (*p_pcap_close) (pcap_t *);
@@ -1147,12 +1152,6 @@ int load_pcap(void) {
 #endif
       if (hLib == 0) {
         /* failed to load DLL */
-        sim_printf ("Eth: Failed to load %s\n", lib_name);
-#ifdef _WIN32
-        sim_printf ("Eth: You must install Npcap or WinPcap 4.x to use networking\n");
-#else
-        sim_printf ("Eth: You must install libpcap to use networking\n");
-#endif
         lib_loaded = 2;
         break;
       } else {
@@ -1212,10 +1211,19 @@ int pcap_compile(pcap_t* a, struct bpf_program* b, const char* c, int d, bpf_u_i
 }
 
 const char *pcap_lib_version(void) {
+  static char buf[256];
+
   if ((load_pcap() != 0) && (p_pcap_lib_version != NULL)) {
     return p_pcap_lib_version();
   } else {
-    return NULL;
+    sprintf (buf, "%s not installed",
+#if defined(_WIN32)
+        "npcap or winpcap"
+#else
+        "libpcap"
+#endif
+        );
+    return buf;
   }
 }
 
@@ -1241,6 +1249,7 @@ int pcap_findalldevs(pcap_if_t** a, char* b) {
   } else {
     *a = 0;
     strcpy(b, no_pcap);
+    no_pcap[0] = '\0';
     return -1;
   }
 }
@@ -2278,7 +2287,7 @@ if ((strlen(name) == 4)
     && isdigit(name[3])
    ) {
   num = atoi(&name[3]);
-  savname = eth_getname(num, temp, desc);
+  savname = _eth_getname(num, temp, desc);
   if (savname == NULL) /* didn't translate */
     return SCPE_OPENERR;
   }
@@ -3934,7 +3943,7 @@ return SCPE_OK;
      returned by pcap_findalldevs.
 
 */
-int eth_host_devices(int used, int max, ETH_LIST* list)
+static int eth_host_devices(int used, int max, ETH_LIST* list)
 {
 pcap_t* conn = NULL;
 int i, j, datalink = 0;
@@ -4037,7 +4046,7 @@ if (used < max) {
 return used;
 }
 
-int eth_devices(int max, ETH_LIST* list)
+static int _eth_devices(int max, ETH_LIST* list)
 {
 int i = 0;
 char errbuf[PCAP_ERRBUF_SIZE] = "";
@@ -4049,7 +4058,8 @@ memset(list, 0, max*sizeof(*list));
 errbuf[0] = '\0';
 /* retrieve the device list */
 if (pcap_findalldevs(&alldevs, errbuf) == -1) {
-  sim_printf ("Eth: error in pcap_findalldevs: %s\n", errbuf);
+  if (errbuf[0])
+    sim_printf ("Eth: %s\n", errbuf);
   }
 else {
   /* copy device list into the passed structure */
@@ -4241,7 +4251,7 @@ int bpf_compile_skip_count = 0;
 
 
 memset (&eth_tst, 0, sizeof(eth_tst));
-eth_device_count = eth_devices(ETH_MAX_DEVICE, eth_list);
+eth_device_count = _eth_devices(ETH_MAX_DEVICE, eth_list);
 eth_opened = 0;
 for (eth_num=0; eth_num<eth_device_count; eth_num++) {
   char eth_name[32];
