@@ -957,6 +957,8 @@ t_stat eth_filter (ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
 t_stat eth_filter_hash (ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
                    ETH_BOOL all_multicast, ETH_BOOL promiscuous, ETH_MULTIHASH* const hash)
   {return SCPE_NOFNC;}
+int _eth_devices (int max, ETH_LIST* dev)
+  {return -1;}
 const char *eth_version (void)
   {return NULL;}
 void eth_show_dev (FILE* st, ETH_DEV* dev)
