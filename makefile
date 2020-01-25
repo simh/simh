@@ -70,12 +70,6 @@
 # Internal ROM support can be disabled if GNU make is invoked with
 # DONT_USE_ROMS=1 on the command line.
 #
-# The use of pthreads for various things can be disabled if GNU make is 
-# invoked with NOPTHREADS=1 on the command line.
-#
-# Asynchronous I/O support can be disabled if GNU make is invoked with
-# NOASYNCH=1 on the command line.
-#
 # For linting (or other code analyzers) make may be invoked similar to:
 #
 #   make GCC=cppcheck CC_OUTSPEC= LDFLAGS= CFLAGS_G="--enable=all --template=gcc" CC_STD=--std=c99
@@ -261,10 +255,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
   LTO_EXCLUDE_VERSIONS = 
   PCAPLIB = pcap
   ifeq (agcc,$(findstring agcc,${GCC})) # Android target build?
-    OS_CCDEFS = -D_GNU_SOURCE
-    ifeq (,$(NOASYNCH))
-      OS_CCDEFS += -DSIM_ASYNCH_IO 
-    endif
+    OS_CCDEFS = -D_GNU_SOURCE -DSIM_ASYNCH_IO 
     OS_LDFLAGS = -lm
   else # Non-Android (or Native Android) Builds
     ifeq (,$(INCLUDES)$(LIBRARIES))
@@ -471,38 +462,25 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     OS_LDFLAGS += -lrt
     $(info using librt: $(call find_lib,rt))
   endif
-  ifneq (,$(NOPTHREADS))
-    OS_CCDEFS += -DDONT_USE_READER_THREAD
-  else
-    ifneq (,$(call find_include,pthread))
+  ifneq (,$(call find_include,pthread))
+    ifneq (,$(call find_lib,pthread))
+      OS_CCDEFS += -DUSE_READER_THREAD -DSIM_ASYNCH_IO 
+      OS_LDFLAGS += -lpthread
+      $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
+    else
+      LIBEXTSAVE := ${LIBEXT}
+      LIBEXT = a
       ifneq (,$(call find_lib,pthread))
-        OS_CCDEFS += -DUSE_READER_THREAD
-        ifeq (,$(NOASYNCH))
-          OS_CCDEFS += -DSIM_ASYNCH_IO 
-        endif
+        OS_CCDEFS += -DUSE_READER_THREAD -DSIM_ASYNCH_IO 
         OS_LDFLAGS += -lpthread
         $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
       else
-        LIBEXTSAVE := ${LIBEXT}
-        LIBEXT = a
-        ifneq (,$(call find_lib,pthread))
-          OS_CCDEFS += -DUSE_READER_THREAD
-          ifeq (,$(NOASYNCH))
-            OS_CCDEFS += -DSIM_ASYNCH_IO 
-          endif
-          OS_LDFLAGS += -lpthread
-          $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
-        else
-          ifneq (,$(findstring Haiku,$(OSTYPE)))
-            OS_CCDEFS += -DUSE_READER_THREAD
-            ifeq (,$(NOASYNCH))
-              OS_CCDEFS += -DSIM_ASYNCH_IO 
-            endif
-            $(info using libpthread: $(call find_include,pthread))
-          endif
+        ifneq (,$(findstring Haiku,$(OSTYPE)))
+          OS_CCDEFS += -DUSE_READER_THREAD -DSIM_ASYNCH_IO 
+          $(info using libpthread: $(call find_include,pthread))
         endif
-        LIBEXT = $(LIBEXTSAVE)
       endif
+      LIBEXT = $(LIBEXTSAVE)
     endif
   endif
   # Find PCRE RegEx library.
@@ -963,17 +941,11 @@ else
   $(info include paths are: ${INCPATH})
   # Give preference to any MinGW provided threading (if available)
   ifneq (,$(call find_include,pthread))
-    PTHREADS_CCDEFS = -DUSE_READER_THREAD
-    ifeq (,$(NOASYNCH))
-      PTHREADS_CCDEFS += -DSIM_ASYNCH_IO 
-    endif
+    PTHREADS_CCDEFS = -DUSE_READER_THREAD -DSIM_ASYNCH_IO
     PTHREADS_LDFLAGS = -lpthread
   else
     ifeq (pthreads,$(shell if exist ..\windows-build\pthreads\Pre-built.2\include\pthread.h echo pthreads))
-      PTHREADS_CCDEFS = -DUSE_READER_THREAD -DPTW32_STATIC_LIB -D_POSIX_C_SOURCE -I../windows-build/pthreads/Pre-built.2/include
-      ifeq (,$(NOASYNCH))
-        PTHREADS_CCDEFS += -DSIM_ASYNCH_IO 
-      endif
+      PTHREADS_CCDEFS = -DUSE_READER_THREAD -DPTW32_STATIC_LIB -D_POSIX_C_SOURCE -I../windows-build/pthreads/Pre-built.2/include -DSIM_ASYNCH_IO
       PTHREADS_LDFLAGS = -lpthreadGC2 -L..\windows-build\pthreads\Pre-built.2\lib
     endif
   endif
