@@ -1884,10 +1884,36 @@ BESM6 = ${BESM6D}/besm6_cpu.c ${BESM6D}/besm6_sys.c ${BESM6D}/besm6_mmu.c \
         ${BESM6D}/besm6_punch.c ${BESM6D}/besm6_punchcard.c
 
 ifneq (,$(BESM6_BUILD))
+    BESM6_OPT = -I ${BESM6D} -DUSE_INT64 $(BESM6_PANEL_OPT)
     ifneq (,$(and ${SDLX_CONFIG},${VIDEO_LDFLAGS}, $(or $(and $(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)), $(and $(call find_include,SDL/SDL_ttf),$(call find_lib,SDL_ttf)))))
         FONTPATH += /usr/share/fonts /Library/Fonts /usr/lib/jvm /System/Library/Frameworks/JavaVM.framework/Versions C:/Windows/Fonts
         FONTPATH := $(dir $(foreach dir,$(strip $(FONTPATH)),$(wildcard $(dir)/.)))
         FONTNAME += DejaVuSans.ttf LucidaSansRegular.ttf FreeSans.ttf AppleGothic.ttf tahoma.ttf
+#cmake-insert:set(BESM6_FONT)
+#cmake-insert:foreach (fdir IN ITEMS
+#cmake-insert:            "/usr/share/fonts" "/Library/Fonts" "/usr/lib/jvm"
+#cmake-insert:            "/System/Library/Frameworks/JavaVM.framework/Versions"
+#cmake-insert:            "$ENV{WINDIR}/Fonts")
+#cmake-insert:    foreach (font IN ITEMS
+#cmake-insert:                "DejaVuSans.ttf" "LucidaSansRegular.ttf" "FreeSans.ttf" "AppleGothic.ttf" "tahoma.ttf")
+#cmake-insert:        if (EXISTS ${fdir})
+#cmake-insert:            file(GLOB_RECURSE found_font ${fdir}/${font})
+#cmake-insert:            if (found_font)
+#cmake-insert:                get_filename_component(fontfile ${found_font} ABSOLUTE)
+#cmake-insert:                list(APPEND BESM6_FONT ${fontfile})
+#cmake-insert:            endif ()
+#cmake-insert:        endif ()
+#cmake-insert:    endforeach()
+#cmake-insert:endforeach()
+#cmake-insert:
+#cmake-insert:if (NOT BESM6_FONT)
+#cmake-insert:    message("No font file available, BESM-6 video panel disabled")
+#cmake-insert:    set(BESM6_PANEL_OPT)
+#cmake-insert:endif ()
+#cmake-insert:
+#cmake-insert:if (BESM6_FONT AND WITH_VIDEO)
+#cmake-insert:    list(GET BESM6_FONT 0 BESM6_FONT)
+#cmake-insert:endif ()
         $(info font paths are: $(FONTPATH))
         $(info font names are: $(FONTNAME))
         find_fontfile = $(strip $(firstword $(foreach dir,$(strip $(FONTPATH)),$(wildcard $(dir)/$(1))$(wildcard $(dir)/*/$(1))$(wildcard $(dir)/*/*/$(1))$(wildcard $(dir)/*/*/*/$(1)))))
@@ -1937,13 +1963,11 @@ ifneq (,$(BESM6_BUILD))
     else ifneq (,$(and $(findstring sdl2,${VIDEO_LDFLAGS}),$(call find_include,SDL2/SDL_ttf),$(call find_lib,SDL2_ttf)))
         $(info using libSDL2_ttf: $(call find_lib,SDL2_ttf) $(call find_include,SDL2/SDL_ttf))
         $(info ***)
-        BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL2_ttf
+        BESM6_PANEL_OPT = -DFONTFILE=${FONTFILE} ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL2_ttf
     else ifneq (,$(and $(call find_include,SDL/SDL_ttf),$(call find_lib,SDL_ttf)))
         $(info using libSDL_ttf: $(call find_lib,SDL_ttf) $(call find_include,SDL/SDL_ttf))
         $(info ***)
-        BESM6_OPT = -I ${BESM6D} -DFONTFILE=${FONTFILE} -DUSE_INT64 ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL_ttf
-    else
-        BESM6_OPT = -I ${BESM6D} -DUSE_INT64 
+        BESM6_PANEL_OPT = -DFONTFILE=${FONTFILE} ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL_ttf
     endif
 endif
 
@@ -2726,7 +2750,7 @@ besm6 : ${BIN}besm6${EXE}
 ${BIN}besm6${EXE} : ${BESM6} ${SIM}
 ifneq (1,${CPP_BUILD}${CPP_FORCE})
 	${MKDIRBIN}
-	${CC} ${BESM6} ${SIM} ${BESM6_OPT} ${CC_OUTSPEC} ${LDFLAGS}
+	${CC} ${BESM6} ${SIM} ${BESM6_OPT} ${BESM6_PANEL_OPT} ${CC_OUTSPEC} ${LDFLAGS}
 ifneq (,$(call find_test,${BESM6D},besm6))
 	$@ $(call find_test,${BESM6D},besm6) ${TEST_ARG}
 endif
