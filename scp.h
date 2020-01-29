@@ -417,7 +417,7 @@ extern t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val
 /* The per-simulator init routine is a weak global that defaults to NULL
    The other per-simulator pointers can be overrriden by the init routine */
 
-WEAK extern void (*sim_vm_init) (void);
+extern void (*sim_vm_init) (void);
 extern char *(*sim_vm_read) (char *ptr, int32 size, FILE *stream);
 extern void (*sim_vm_post) (t_bool from_scp);
 extern CTAB *sim_vm_cmd;

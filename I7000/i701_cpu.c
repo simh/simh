@@ -764,6 +764,9 @@ store:
 t_stat
 cpu_reset(DEVICE * dptr)
 {
+    extern void sys_init(void);
+
+    sys_init();
     AC = 0;
     MQ = 0;
     dualcore = 0;

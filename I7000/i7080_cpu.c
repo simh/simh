@@ -231,7 +231,6 @@ int32               hst_lnt = 0;                /* History length */
 struct InstHistory *hst = NULL;                 /* History stack */
 extern uint32       drum_addr;
 extern UNIT         chan_unit[];
-void (*sim_vm_init) (void) = &mem_init;
 
 
 /* CPU data structures
@@ -3174,6 +3173,12 @@ cpu_reset(DEVICE * dptr)
 {
     int                 i;
     int                 n,p,h;
+    static int          initialized;
+
+    if (initialized == 0) {
+        initialized = 1;
+        mem_init();
+    }
 
     /* Set next and previous address arrays based on CPU type */
     if (CPU_MODEL == CPU_702) {

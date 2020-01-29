@@ -301,8 +301,6 @@ void sys_init(void) {
         sim_vm_parse_addr = &parse_addr;
 }
 
-void (*sim_vm_init) (void) = &sys_init;
-
 /* Symbolic decode
 
    Inputs:

@@ -3315,6 +3315,7 @@ ASTLVL = 4;
 mapen = 0;
 FLUSH_ISTR;                             /* init I-stream */
 if (M == NULL) {                        /* first time init? */
+    vax_init();
     sim_brk_types = sim_brk_dflt = SWMASK ('E');
     sim_vm_is_subroutine_call = cpu_is_pc_a_subroutine_call;
     sim_clock_precalibrate_commands = vax_clock_precalibrate_commands;

@@ -343,7 +343,9 @@ void cpu_finishAutoload() {
 
 /* CPU reset */
 t_stat cpu_reset (DEVICE *dptr) {
-//  sim_printf("CPU RESET\n");
+  extern void pdq3_vm_init (void);
+  pdq3_vm_init();
+  //  sim_printf("CPU RESET\n");
   sim_brk_types = SWMASK('E')|SWMASK('R')|SWMASK('W');
   sim_brk_dflt = SWMASK('E');
   

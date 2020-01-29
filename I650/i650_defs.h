@@ -57,6 +57,7 @@ extern int              IAS_TimingRing;
 extern int WriteAddr(int AR, t_int64 d, int NegZero);
 extern int ReadAddr(int AR, t_int64 * d, int * NegZero);
 extern CONST char * DecodeOpcode(t_int64 d, int * opcode, int * DA, int * IA);
+extern void vm_init(void);
 
 
 /* digits contants */

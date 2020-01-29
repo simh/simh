@@ -6159,7 +6159,10 @@ static t_stat sim_instr_mmu (void) {
 
 static t_stat cpu_reset(DEVICE *dptr) {
     int32 i;
-    sim_vm_is_subroutine_call = cpu_is_pc_a_subroutine_call;
+    if (sim_vm_is_subroutine_call == NULL) { /* First time reset? */
+        sim_vm_is_subroutine_call = cpu_is_pc_a_subroutine_call;
+        altairz80_init();
+    }
     AF_S = AF1_S = 0;
     BC_S = DE_S = HL_S = 0;
     BC1_S = DE1_S = HL1_S = 0;
@@ -6801,8 +6804,6 @@ void altairz80_init(void) {
     sim_vm_pc_value = &altairz80_pc_value;
 /* altairz80_print_tables(); */
 }
-
-WEAK void (*sim_vm_init) (void) = &altairz80_init;
 
 /*  This is the binary loader. The input file is considered to be a string of
     literal bytes with no special format. The load starts at the current value

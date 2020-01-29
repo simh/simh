@@ -31,6 +31,11 @@
 
 char sim_name[] = "VAX 11/750";
 
+void vax_init(void)
+{
+sim_savename = "VAX750";
+}
+
 extern DEVICE cpu_dev;
 extern DEVICE tlb_dev;
 extern DEVICE cmi_dev;

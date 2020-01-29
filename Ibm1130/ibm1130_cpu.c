@@ -162,9 +162,6 @@ static void cgi_start(void);
 static void cgi_stop(t_stat reason);
 static int simh_status_to_stopcode (int status);
 
-/* hook pointers from scp.c */
-void (*sim_vm_init) (void) = &sim_init;
-
 /* space to store extra simulator-specific commands */
 #define MAX_EXTRA_COMMANDS 10
 CTAB x_cmds[MAX_EXTRA_COMMANDS];
@@ -1317,6 +1314,7 @@ void break_simulation (t_stat stopreason)
 
 t_stat cpu_reset (DEVICE *dptr)
 {
+    sim_init();
     wait_state = 0;                     /* cancel wait */
     wait_lamp  = TRUE;                  /* but keep the wait lamp lit on the GUI */
 

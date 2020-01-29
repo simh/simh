@@ -132,7 +132,6 @@ int                 cycle_time = 20;            /* Cycle time of 12us */
 int32               hst_p = 0;                  /* History pointer */
 int32               hst_lnt = 0;                /* History length */
 struct InstHistory *hst = NULL;                 /* History stack */
-void (*sim_vm_init) (void) = &mem_init;
 
 
 /* CPU data structures
@@ -2775,6 +2774,12 @@ mem_init() {
 t_stat
 cpu_reset(DEVICE * dptr)
 {
+    static int  initialized = 0;
+
+    if (initialized == 0) {
+        initialized = 1;
+        mem_init();
+    }
 
     AC[1] = PSIGN;
     AC[2] = PSIGN;

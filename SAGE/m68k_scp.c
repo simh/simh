@@ -31,7 +31,6 @@
 #include <ctype.h>
 
 static t_bool symtrace = TRUE;
-static void m68k_sim_init(void);
 static t_stat hdump_cmd(int32 arg, CONST char* buf);
 static t_stat symset_cmd(int32 arg, CONST char* buf);
 static t_stat symclr_cmd(int32 arg, CONST char* buf);
@@ -55,8 +54,6 @@ static CTAB m68k_sim_cmds[] = {
          "nosymt{race}               disable symbolic tracing\n"},
         {0,0,0,0}
 };
-
-WEAK void (*sim_vm_init)(void) = &m68k_sim_init;
 
 typedef struct _symhash {
     struct _symhash* nnext;
@@ -87,7 +84,7 @@ static void sym_clearall(void)
     return;
 }
 
-static void m68k_sim_init(void)
+void m68k_sim_init(void)
 {
     int i;
     sim_vm_cmd = m68k_sim_cmds;

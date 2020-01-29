@@ -34,7 +34,6 @@
 #include <ctype.h>
 
 t_stat parse_sym_m (char *cptr, t_value *val, int32 sw);
-void pdq3_vm_init (void);
 static t_stat pdq3_cmd_exstack(int32 arg, CONST char *buf);
 static t_stat pdq3_cmd_exmscw(int32 arg, CONST char *buf);
 static t_stat pdq3_cmd_extib(int32 arg, CONST char *buf);
@@ -93,8 +92,6 @@ CTAB pdq3_cmds[] = {
   { "NAME", &pdq3_cmd_namealias, 0, "Define a name" },
   { NULL, NULL, 0, NULL }
 };
-
-WEAK void (*sim_vm_init)(void) = &pdq3_vm_init;
 
 /* Loader proper */
 t_stat sim_load (FILE *fi, CONST char *cptr, CONST char *fnam, int flag)

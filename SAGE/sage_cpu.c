@@ -130,6 +130,10 @@ static void sage_trapcallback(DEVICE* dptr,int trapnum)
 static t_stat sagecpu_reset(DEVICE* dptr) 
 {
     t_stat rc;
+    extern void m68k_sim_init(void);
+
+
+    m68k_sim_init();
 
     /* set CPU pointers */
     m68kcpu_dev = &sagecpu_dev;

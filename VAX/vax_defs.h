@@ -1035,6 +1035,7 @@ extern t_stat cpu_show_instruction_set (FILE *st, UNIT *uptr, int32 val, CONST v
 extern t_stat cpu_set_instruction_set (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 extern t_stat cpu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 extern t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+extern void vax_init();
 extern const uint32 byte_mask[33];
 extern int32 autcon_enb;                                /* autoconfig enable */
 extern int32 int_req[IPL_HLVL];                         /* intr, IPL 14-17 */

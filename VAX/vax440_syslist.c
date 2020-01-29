@@ -46,8 +46,6 @@ sim_savename = "VAXstation 4000-VLC (KA48)";
 #endif
 }
 
-WEAK void (*sim_vm_init) (void) = &vax_init;
-
 extern DEVICE cpu_dev;
 extern DEVICE tlb_dev;
 extern DEVICE rom_dev;

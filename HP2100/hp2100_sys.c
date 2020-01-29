@@ -1874,7 +1874,7 @@ char sim_name [] = "HP 2100";                   /* the simulator name */
 
 int32 sim_emax = MAX_INSTR_LENGTH;              /* the maximum number of words in any instruction */
 
-void (*sim_vm_init) (void) = &one_time_init;    /* a pointer to the one-time initializer */
+WEAK void (*sim_vm_init) (void) = &one_time_init;    /* a pointer to the one-time initializer */
 
 DEVICE *sim_devices [] = {                      /* an array of pointers to the simulated devices */
     &cpu_dev,                                   /*   CPU (must be first) */

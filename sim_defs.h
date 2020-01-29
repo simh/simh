@@ -322,12 +322,16 @@ typedef uint32          t_addr;
 #define WEAK __attribute__((weak))
 #elif defined(_MSC_VER)
 #define WEAK __declspec(selectany) 
-#else
-#define WEAK extern 
-#endif
-#else
-#define WEAK 
-#endif
+#else   /* !defined(__GNUC__) && !defined(_MSC_VER)  */
+#define WEAK
+#endif  /* __GNUC__ */
+#else   /* !defined(__cplusplus) */
+#if defined(__GNUC__)
+#define WEAK __attribute__((common))
+#else   /* !defined(__GNUC__) */
+#define WEAK
+#endif  /* defined(__GNUC__) */
+#endif  /* defined(__cplusplus) */
 
 /* System independent definitions */
 

@@ -177,6 +177,11 @@ uint16          ascii_to_hol[128] = {
 void
 vm_init(void) {
     int i;
+    static int initialized = 0;
+
+    if (initialized)
+        return;
+    initialized = 1;
     // Initialize vm memory to all plus zero 
     for(i = 0; i < MAXDRUMSIZE; i++) DRUM[i] = DRUM_NegativeZeroFlag[i] = 0;
     for(i = 0; i < 60; i++) IAS[i] = IAS_NegativeZeroFlag[i] = 0;
@@ -185,8 +190,6 @@ vm_init(void) {
     sim_vm_cmd = aux_cmds;                       /* set up the auxiliary command table */
 }
 
-
-void (*sim_vm_init) (void) = &vm_init;
 
 /* Load a card image file into memory.  */
 

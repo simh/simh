@@ -37,8 +37,6 @@ void vax_init(void)
 sim_savename = "VAX";
 }
 
-WEAK void (*sim_vm_init) (void) = &vax_init;
-
 extern DEVICE cpu_dev;
 extern DEVICE tlb_dev;
 extern DEVICE rom_dev;
