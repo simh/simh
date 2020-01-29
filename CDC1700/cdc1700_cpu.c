@@ -171,6 +171,7 @@ extern int disassem(char *, uint16, t_bool, t_bool, t_bool);
 
 extern enum IOstatus doIO(t_bool, DEVICE **);
 extern void fw_init(void);
+extern void VMinit(void);
 extern void rebuildPending(void);
 
 extern void dev1Interrupts(char *);
@@ -400,6 +401,8 @@ t_stat cpu_reset(DEVICE *dptr)
    */
   for (i = 0; i < 16; i++)
     CharAddrMode[i] = 0;
+
+  VMinit();
 
   return SCPE_OK;
 }

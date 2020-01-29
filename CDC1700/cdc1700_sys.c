@@ -145,22 +145,15 @@ static void printAddress(FILE *st, DEVICE *dptr, t_addr addr)
 }
 
 /*
- * Once-only VM initialization
+ * VM initialization
  */
-static void VMinit(void)
+void VMinit(void)
 {
   sim_vm_sprint_addr = &sprintAddress;
   sim_vm_fprint_addr = &printAddress;
   sim_vm_post = &postUpdate;
   sim_vm_cmd = cdc1700_cmd;
-
-  /*
-   * Initialize the "CPU" device to make sure the data structures are
-   * correctly initialized.
-   */
-  (cpu_dev.reset)(&cpu_dev);
 }
-void (*sim_vm_init)(void) = &VMinit;
 
 /*
  * Check for duplicate equipment addresses.
