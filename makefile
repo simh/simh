@@ -1136,10 +1136,14 @@ else
   ifneq (3,$(GCC_MAJOR_VERSION))
     ifeq (,$(GCC_OPTIMIZERS_CMD))
       GCC_OPTIMIZERS_CMD = ${GCC} --help=optimizers
+      GCC_COMMON_CMD = ${GCC} --help=common
     endif
   endif
   ifneq (,$(GCC_OPTIMIZERS_CMD))
     GCC_OPTIMIZERS = $(shell $(GCC_OPTIMIZERS_CMD))
+  endif
+  ifneq (,$(GCC_COMMON_CMD))
+    GCC_OPTIMIZERS += $(shell $(GCC_COMMON_CMD))
   endif
   ifneq (,$(findstring $(GCC_VERSION),$(LTO_EXCLUDE_VERSIONS)))
     NO_LTO = 1
@@ -1161,6 +1165,9 @@ else
   endif
   ifneq (,$(findstring -fstrict-overflow,$(GCC_OPTIMIZERS)))
     CFLAGS_O += -fno-strict-overflow
+  endif
+  ifneq (,$(findstring -fcommon,$(GCC_OPTIMIZERS))$(findstring -fno-common,$(GCC_OPTIMIZERS)))
+    CFLAGS_O += -fcommon
   endif
   ifeq (,$(NO_LTO))
     ifneq (,$(findstring -flto,$(GCC_OPTIMIZERS)))
