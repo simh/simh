@@ -1940,7 +1940,14 @@ while (dev->handle) {
     /* Put buffer on free buffer list */
     request->next = dev->write_buffers;
     dev->write_buffers = request;
+    request = NULL;
     }
+  }
+/* If we exited these loops with a request allocated, */
+/* avoid buffer leaking by putting it on free buffer list */
+if (request) {
+  request->next = dev->write_buffers;
+  dev->write_buffers = request;
   }
 pthread_mutex_unlock (&dev->writer_lock);
 
