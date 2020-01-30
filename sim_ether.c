@@ -1194,7 +1194,7 @@ int load_pcap(void) {
 
 /* define functions with dynamic revectoring */
 void pcap_close(pcap_t* a) {
-  if (a && (load_pcap() != 0)) {
+  if (load_pcap() != 0) {
     p_pcap_close(a);
   }
 }
@@ -1205,7 +1205,7 @@ int pcap_compile(pcap_t* a, struct bpf_program* b, char* c, int d, bpf_u_int32 e
 #else
 int pcap_compile(pcap_t* a, struct bpf_program* b, const char* c, int d, bpf_u_int32 e) {
 #endif
-  if (a && (load_pcap() != 0)) {
+  if (load_pcap() != 0) {
     return p_pcap_compile(a, b, c, d, e);
   } else {
     return 0;
@@ -1230,7 +1230,7 @@ const char *pcap_lib_version(void) {
 }
 
 int pcap_datalink(pcap_t* a) {
-  if (a && (load_pcap() != 0)) {
+  if (load_pcap() != 0) {
     return p_pcap_datalink(a);
   } else {
     return 0;
@@ -1238,7 +1238,7 @@ int pcap_datalink(pcap_t* a) {
 }
 
 int pcap_dispatch(pcap_t* a, int b, pcap_handler c, u_char* d) {
-  if (a && (load_pcap() != 0)) {
+  if (load_pcap() != 0) {
     return p_pcap_dispatch(a, b, c, d);
   } else {
     return 0;
@@ -1246,7 +1246,7 @@ int pcap_dispatch(pcap_t* a, int b, pcap_handler c, u_char* d) {
 }
 
 int pcap_findalldevs(pcap_if_t** a, char* b) {
-  if (a && (load_pcap() != 0)) {
+  if (load_pcap() != 0) {
     return p_pcap_findalldevs(a, b);
   } else {
     *a = 0;
@@ -1257,19 +1257,19 @@ int pcap_findalldevs(pcap_if_t** a, char* b) {
 }
 
 void pcap_freealldevs(pcap_if_t* a) {
-  if (a && (load_pcap() != 0)) {
+  if (load_pcap() != 0) {
     p_pcap_freealldevs(a);
   }
 }
 
 void pcap_freecode(struct bpf_program* a) {
-  if (a && (load_pcap() != 0)) {
+  if (load_pcap() != 0) {
     p_pcap_freecode(a);
   }
 }
 
 char* pcap_geterr(pcap_t* a) {
-  if (a && (load_pcap() != 0)) {
+  if (load_pcap() != 0) {
     return p_pcap_geterr(a);
   } else {
     return (char*) "";
@@ -1294,7 +1294,7 @@ pcap_t* pcap_open_live(const char* a, int b, int c, int d, char* e) {
 
 #ifdef _WIN32
 int pcap_setmintocopy(pcap_t* a, int b) {
-  if (a && (load_pcap() != 0)) {
+  if (load_pcap() != 0) {
     return p_pcap_setmintocopy(a, b);
   } else {
     return -1;
@@ -1302,7 +1302,7 @@ int pcap_setmintocopy(pcap_t* a, int b) {
 }
 
 HANDLE pcap_getevent(pcap_t* a) {
-  if (a && (load_pcap() != 0)) {
+  if (load_pcap() != 0) {
     return p_pcap_getevent(a);
   } else {
     return (HANDLE) 0;
@@ -1312,7 +1312,7 @@ HANDLE pcap_getevent(pcap_t* a) {
 #else
 #ifdef MUST_DO_SELECT
 int pcap_get_selectable_fd(pcap_t* a) {
-  if (a && (load_pcap() != 0)) {
+  if (load_pcap() != 0) {
     return p_pcap_get_selectable_fd(a);
   } else {
     return 0;
@@ -1321,7 +1321,7 @@ int pcap_get_selectable_fd(pcap_t* a) {
 #endif
 
 int pcap_fileno(pcap_t * a) {
-  if (a && (load_pcap() != 0)) {
+  if (load_pcap() != 0) {
     return p_pcap_fileno(a);
   } else {
     return 0;
@@ -1330,7 +1330,7 @@ int pcap_fileno(pcap_t * a) {
 #endif
 
 int pcap_sendpacket(pcap_t* a, const u_char* b, int c) {
-  if (a && (load_pcap() != 0)) {
+  if (load_pcap() != 0) {
     return p_pcap_sendpacket(a, b, c);
   } else {
     return 0;
@@ -1338,7 +1338,7 @@ int pcap_sendpacket(pcap_t* a, const u_char* b, int c) {
 }
 
 int pcap_setfilter(pcap_t* a, struct bpf_program* b) {
-  if (a && (load_pcap() != 0)) {
+  if (load_pcap() != 0) {
     return p_pcap_setfilter(a, b);
   } else {
     return 0;
@@ -1346,7 +1346,7 @@ int pcap_setfilter(pcap_t* a, struct bpf_program* b) {
 }
 
 int pcap_setnonblock(pcap_t* a, int nonblock, char *errbuf) {
-  if (a && (load_pcap() != 0)) {
+  if (load_pcap() != 0) {
     return p_pcap_setnonblock(a, nonblock, errbuf);
   } else {
     return 0;
@@ -1616,7 +1616,7 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname)
             break;
           }
         fclose(f);
-        remove("NIC.hwaddr");
+        (void)remove("NIC.hwaddr");
         }
       }
     }
@@ -1673,13 +1673,17 @@ FILE *f;
 
 memset (buf, 0, buf_size);
 if ((f = fopen ("/etc/machine-id", "r"))) {
-  if (fread (buf, 1, buf_size - 1, f)) {};
-  fclose (f);
+  if (fread (buf, 1, buf_size - 1, f))
+    fclose (f);
+  else
+    fclose (f);
   }
 else {
   if ((f = popen ("hostname", "r"))) {
-    if (fread (buf, 1, buf_size - 1, f)) {};
-    pclose (f);
+    if (fread (buf, 1, buf_size - 1, f))
+      pclose (f);
+    else
+      pclose (f);
     }
   }
 while ((strlen (buf) > 0) && sim_isspace(buf[strlen (buf) - 1]))
@@ -2020,7 +2024,7 @@ if (0 == strncmp("tap:", savname, 4)) {
 
     memset(&ifr, 0, sizeof(ifr));
     /* Set up interface flags */
-    strcpy(ifr.ifr_name, devname);
+    strlcpy(ifr.ifr_name, devname, sizeof(ifr.ifr_name));
     ifr.ifr_flags = IFF_TAP|IFF_NO_PI;
 
     /* Send interface requests to TUN/TAP driver. */
@@ -2028,9 +2032,10 @@ if (0 == strncmp("tap:", savname, 4)) {
       if (ioctl(tun, FIONBIO, &on)) {
         strlcpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE);
         close(tun);
+        tun = -1;
         }
       else {
-        *fd_handle = tun;
+        *fd_handle = (SOCKET)tun;
         strcpy(savname, ifr.ifr_name);
         }
       }
@@ -2039,6 +2044,10 @@ if (0 == strncmp("tap:", savname, 4)) {
     }
   else
     strlcpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE);
+  if ((tun >= 0) && (errbuf[0] != 0)) {
+    close(tun);
+    tun = -1;
+    }
 #elif defined(HAVE_BSDTUNTAP) && defined(HAVE_TAP_NETWORK)
   if (1) {
     char dev_name[64] = "";
@@ -2050,9 +2059,10 @@ if (0 == strncmp("tap:", savname, 4)) {
       if (ioctl(tun, FIONBIO, &on)) {
         strlcpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE);
         close(tun);
+        tun = -1;
         }
       else {
-        *fd_handle = tun;
+        *fd_handle = (SOCKET)tun;
         strcpy(savname, devname);
         }
 #if defined (__APPLE__)
@@ -2069,6 +2079,7 @@ if (0 == strncmp("tap:", savname, 4)) {
             if (ioctl(s, SIOCSIFFLAGS, (caddr_t)&ifr)) {
               strlcpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE);
               close(tun);
+              tun = -1;
               }
             }
           close(s);
@@ -2078,7 +2089,11 @@ if (0 == strncmp("tap:", savname, 4)) {
       }
     else
       strlcpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE);
-  }
+    if ((tun >= 0) && (errbuf[0] != 0)) {
+      close(tun);
+      tun = -1;
+      }
+    }
 #else
   strlcpy(errbuf, "No support for tap: devices", PCAP_ERRBUF_SIZE);
 #endif /* !defined(__linux) && !defined(HAVE_BSDTUNTAP) */
@@ -2116,7 +2131,7 @@ else { /* !tap: */
       strlcpy(errbuf, strerror(errno), PCAP_ERRBUF_SIZE);
     else {
       *eth_api = ETH_API_VDE;
-      *fd_handle = vde_datafd((VDECONN*)(*handle));
+      *fd_handle = (SOCKET)vde_datafd((VDECONN*)(*handle));
       }
 #else
     strlcpy(errbuf, "No support for vde: network devices", PCAP_ERRBUF_SIZE);
