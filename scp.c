@@ -7680,8 +7680,13 @@ for (i = 0; i < (device_count + sim_internal_device_count); i++) {/* loop thru d
     fputc ('\n', sfile);                                /* end registers */
     }
 fputc ('\n', sfile);                                    /* end devices */
-if (!ferror (sfile))
-    sim_set_fsize (sfile, (t_addr)sim_ftell (sfile));   /* truncate the save file */
+if (!ferror (sfile)) {
+    t_offset pos = sim_ftell (sfile);                   /* get current position */
+
+    if (pos < 0)                                        /* error? */
+        return SCPE_IOERR;                              /* done! */
+    sim_set_fsize (sfile, (t_addr)pos);                 /* truncate the save file */
+    }
 return (ferror (sfile))? SCPE_IOERR: SCPE_OK;           /* error during save? */
 }
 
