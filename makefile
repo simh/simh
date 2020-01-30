@@ -1166,9 +1166,6 @@ else
   ifneq (,$(findstring -fstrict-overflow,$(GCC_OPTIMIZERS)))
     CFLAGS_O += -fno-strict-overflow
   endif
-  ifneq (,$(findstring -fcommon,$(GCC_OPTIMIZERS))$(findstring -fno-common,$(GCC_OPTIMIZERS)))
-    CFLAGS_O += -fcommon
-  endif
   ifeq (,$(NO_LTO))
     ifneq (,$(findstring -flto,$(GCC_OPTIMIZERS)))
       CFLAGS_O += -flto -fwhole-program
