@@ -417,6 +417,10 @@ t_stat tarbell_attach(UNIT *uptr, CONST char *cptr)
         }
     }
 
+    if (i >= TARBELL_MAX_DRIVES) {
+        return SCPE_ARG;
+    }
+
     /* Default for new file is DSK */
     uptr->u3 = IMAGE_TYPE_DSK;
 
@@ -614,8 +618,6 @@ static uint8 TARBELL_Read(uint32 Addr)
                 TARBELL_HeadLoad(uptr, pFD1771, TRUE);
             }
             else if (pFD1771->readTrkActive) {
-                cData = 0xe5;
-
                 /* If we reached the end of the track data, terminate command and set INTRQ */
                 if (pFD1771->trkCount == TARBELL_BYTES_PER_TRACK) {
                     pFD1771->readTrkActive = FALSE;
