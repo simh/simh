@@ -581,6 +581,7 @@ cdp_srv(UNIT *uptr) {
         } else {
             hol = 0;
             switch (ch & 077) {
+            case 000:  hol = 0x206; break;  /* ? */
             case 015:  hol = 0x082; break;  /* : */
             case 016:  hol = 0x20A; break;  /* > */
             case 017:  hol = 0x805; break;  /* } */
