@@ -3088,15 +3088,22 @@ cksum += (cksum >> 16);
 return (uint16)(~cksum);
 }
 
+/* 
+ * src_addr and dest_addr are presented in network byte order
+ */
+
 static uint16 
-pseudo_checksum(uint16 len, uint16 proto, uint16 *src_addr, uint16 *dest_addr, uint8 *buff)
+pseudo_checksum(uint16 len, uint16 proto, void *nsrc_addr, void *ndest_addr, uint8 *buff)
 {
 uint32 sum;
+uint16 *src_addr = (uint16 *)nsrc_addr;
+uint16 *dest_addr = (uint16 *)ndest_addr;
 
 /* Sum the data first */
 sum = 0xffff&(~ip_checksum((uint16 *)buff, len));
 
-/* add the pseudo header which contains the IP source and destinationn addresses */
+/* add the pseudo header which contains the IP source and 
+   destination addresses already in network byte order */
 sum += src_addr[0];
 sum += src_addr[1];
 sum += dest_addr[0];
@@ -3157,7 +3164,7 @@ switch (IP->proto) {
       break; /* UDP Checksums are disabled */
     orig_checksum = UDP->checksum;
     UDP->checksum = 0;
-    UDP->checksum = pseudo_checksum(ntohs(UDP->length), IPPROTO_UDP, (uint16 *)(&IP->source_ip), (uint16 *)(&IP->dest_ip), (uint8 *)UDP);
+    UDP->checksum = pseudo_checksum(ntohs(UDP->length), IPPROTO_UDP, &IP->source_ip, &IP->dest_ip, (uint8 *)UDP);
     if (orig_checksum != UDP->checksum)
       eth_packet_trace (dev, msg, len, "reading jumbo UDP header Checksum Fixed");
     break;
@@ -3266,7 +3273,7 @@ switch (IP->proto) {
       IP->checksum = 0;
       IP->checksum = ip_checksum((uint16 *)IP, IP_HLEN(IP));
       TCP->checksum = 0;
-      TCP->checksum = pseudo_checksum(ntohs(IP->total_len)-IP_HLEN(IP), IPPROTO_TCP, (uint16 *)(&IP->source_ip), (uint16 *)(&IP->dest_ip), (uint8 *)TCP);
+      TCP->checksum = pseudo_checksum(ntohs(IP->total_len)-IP_HLEN(IP), IPPROTO_TCP, &IP->source_ip, &IP->dest_ip, (uint8 *)TCP);
       header.caplen = header.len = 14 + ntohs(IP->total_len);
       eth_packet_trace_ex (dev, ((u_char *)IP)-14, header.len, "reading TCP segment", 1, dev->dbit);
 #if ETH_MIN_JUMBO_FRAME < ETH_MAX_PACKET
@@ -3338,7 +3345,7 @@ switch (IP->proto) {
       return; /* UDP Checksums are disabled */
     orig_checksum = UDP->checksum;
     UDP->checksum = 0;
-    UDP->checksum = pseudo_checksum(ntohs(UDP->length), IPPROTO_UDP, (uint16 *)(&IP->source_ip), (uint16 *)(&IP->dest_ip), (uint8 *)UDP);
+    UDP->checksum = pseudo_checksum(ntohs(UDP->length), IPPROTO_UDP, &IP->source_ip, &IP->dest_ip, (uint8 *)UDP);
     if (orig_checksum != UDP->checksum)
       eth_packet_trace (dev, msg, len, "reading UDP header Checksum Fixed");
     break;
@@ -3346,7 +3353,7 @@ switch (IP->proto) {
     TCP = (struct TCPHeader *)(((char *)IP)+IP_HLEN(IP));
     orig_checksum = TCP->checksum;
     TCP->checksum = 0;
-    TCP->checksum = pseudo_checksum(ntohs(IP->total_len)-IP_HLEN(IP), IPPROTO_TCP, (uint16 *)(&IP->source_ip), (uint16 *)(&IP->dest_ip), (uint8 *)TCP);
+    TCP->checksum = pseudo_checksum(ntohs(IP->total_len)-IP_HLEN(IP), IPPROTO_TCP, &IP->source_ip, &IP->dest_ip, (uint8 *)TCP);
     if (orig_checksum != TCP->checksum)
       eth_packet_trace (dev, msg, len, "reading TCP header Checksum Fixed");
     break;
