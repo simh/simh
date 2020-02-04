@@ -538,8 +538,9 @@ t_stat sim_instr (void)
                 PC = CPU_BD_get_mword(0xFFFB) & ADDRMASK;
                 break;
             case 0x40:                  /* NEG A */
+                op1 = A;
                 A = (0 - A) & 0xFF;
-                COND_SET_FLAG_V(A & 0x80);
+                condevalVa(A, op1);
                 COND_SET_FLAG(A,CF);
                 COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
@@ -621,8 +622,9 @@ t_stat sim_instr (void)
                 SET_FLAG(ZF);
                 break;
             case 0x50:                  /* NEG B */
+                op1 = B;
                 B = (0 - B) & 0xFF;
-                COND_SET_FLAG_V(B & 0x80);
+                condevalVa(B, op1);
                 COND_SET_FLAG(B,CF);
                 COND_SET_FLAG_N(B);
                 COND_SET_FLAG_Z(B);
@@ -706,9 +708,10 @@ t_stat sim_instr (void)
                 break;
             case 0x60:                  /* NEG ind */
                 DAR = get_indir_addr();
-                lo = (0 - CPU_BD_get_mbyte(DAR)) & 0xFF;
+                op1 = CPU_BD_get_mbyte(DAR);
+                lo = (0 - op1) & 0xFF;
                 CPU_BD_put_mbyte(DAR, lo);
-                COND_SET_FLAG_V(lo & 0x80);
+                condevalVs(lo, op1);
                 COND_SET_FLAG(lo,CF);
                 COND_SET_FLAG_N(lo);
                 COND_SET_FLAG_Z(lo);
@@ -816,9 +819,10 @@ t_stat sim_instr (void)
                 break;
             case 0x70:                  /* NEG ext */
                 DAR = get_ext_addr();
-                lo = (0 - CPU_BD_get_mbyte(DAR)) & 0xFF;
+                op1 = CPU_BD_get_mbyte(DAR);
+                lo = (0 - op1) & 0xFF;
                 CPU_BD_put_mbyte(DAR, lo);
-                COND_SET_FLAG_V(lo & 0x80);
+                condevalVs(lo, op1);
                 CLR_FLAG(CF);
                 if (lo)
                     SET_FLAG(CF);
