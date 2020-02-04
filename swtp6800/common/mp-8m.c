@@ -187,7 +187,7 @@ void mp_8m_put_mbyte(int32 addr, int32 val)
         uptr = mp_8m_dev.units + i;
         org = uptr->u3;
         len = uptr->capac - 1;
-        if ((addr >= org) && (addr < org + len)) {
+        if ((addr >= org) && (addr <= org + len)) {
             *((uint8 *)(uptr->filebuf) + (addr - org)) = val & 0xFF;
             sim_debug (DEBUG_write, &mp_8m_dev, "\n");
             return;
