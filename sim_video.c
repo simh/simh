@@ -1691,16 +1691,16 @@ while (vid_active) {
 
             case SDL_KEYDOWN:
             case SDL_KEYUP:
-                vid_key ((SDL_KeyboardEvent*)&event);
+                vid_key (&event.key);
                 break;
 
             case SDL_MOUSEBUTTONDOWN:
             case SDL_MOUSEBUTTONUP:
-                vid_mouse_button ((SDL_MouseButtonEvent*)&event);
+                vid_mouse_button (&event.button);
                 break;
 
             case SDL_MOUSEMOTION:
-                vid_mouse_move ((SDL_MouseMotionEvent*)&event);
+                vid_mouse_move (&event.motion);
                 break;
 #if SDL_MAJOR_VERSION != 1
             case SDL_WINDOWEVENT:
