@@ -30,7 +30,6 @@
 #include <ctype.h>
 #include "sim_defs.h"                   /* simulator defns */
 
-#define IPC     0
 #define SET_XACK(VAL)   (xack = VAL)
 
 /* set the base for the DBB ports */
@@ -72,12 +71,12 @@
 /* set the base I/O address for the iSBC 201 */
 #define SBC201_BASE     0x88
 #define SBC201_INT      INT_2
-#define SBC201_NUM      1
+#define SBC201_NUM      0
 
 /* set the base I/O address for the iSBC 202 */
 #define SBC202_BASE     0x78
 #define SBC202_INT      INT_2
-#define SBC202_NUM      1
+#define SBC202_NUM      0
 
 /* set the base I/O address for the iSBC 206 */
 #define SBC206_BASE     0x68
@@ -97,7 +96,7 @@
 /* set the base and size for the iSBC 064 RAM*/
 #define SBC064_BASE     0x8000
 #define SBC064_SIZE     0x7FFF
-#define SBC064_NUM      1
+#define SBC064_NUM      0
 
 /* set the base and size for the iSBC 464 ROM */
 #define SBC464_BASE     0xA800

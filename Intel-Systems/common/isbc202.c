@@ -189,8 +189,8 @@ extern uint16    PCX;
 /* external function prototypes */
 
 extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
-extern uint8 multibus_get_mbyte(uint16 addr);
-extern void multibus_put_mbyte(uint16 addr, uint8 val);
+extern uint8 get_mbyte(uint16 addr);
+extern void put_mbyte(uint16 addr, uint8 val);
 
 /* function prototypes */
 
@@ -483,18 +483,18 @@ void isbc202_diskio(void)
     uint8 *fbuf;
 
     //parse the IOPB 
-    cw = multibus_get_mbyte(fdc202.iopb);
-    di = multibus_get_mbyte(fdc202.iopb + 1);
-    nr = multibus_get_mbyte(fdc202.iopb + 2);
-    ta = multibus_get_mbyte(fdc202.iopb + 3);
-    sa = multibus_get_mbyte(fdc202.iopb + 4);
-    ba = multibus_get_mbyte(fdc202.iopb + 5);
-    ba |= (multibus_get_mbyte(fdc202.iopb + 6) << 8);
+    cw = get_mbyte(fdc202.iopb);
+    di = get_mbyte(fdc202.iopb + 1);
+    nr = get_mbyte(fdc202.iopb + 2);
+    ta = get_mbyte(fdc202.iopb + 3);
+    sa = get_mbyte(fdc202.iopb + 4);
+    ba = get_mbyte(fdc202.iopb + 5);
+    ba |= (get_mbyte(fdc202.iopb + 6) << 8);
     fddnum = (di & 0x30) >> 4;
     uptr = isbc202_dev.units + fddnum;
     fbuf = (uint8 *) uptr->filebuf;
     //check for not ready
-    switch(fddnum) {
+     switch(fddnum) {
         case 0:
             if ((fdc202.stat & RDY0) == 0) {
                 fdc202.rtype = ROK;
@@ -581,7 +581,7 @@ void isbc202_diskio(void)
                 sim_printf("\n   SBC202: FDD %d - Write protect error DFMT", fddnum);
                 return;
             }
-            fmtb = multibus_get_mbyte(ba); //get the format byte
+            fmtb = get_mbyte(ba); //get the format byte
             //calculate offset into disk image
             dskoff = ((ta * MAXSECDD) + (sa - 1)) * SECSIZ;
             for(i=0; i<=((uint32)(MAXSECDD) * SECSIZ); i++) {
@@ -599,7 +599,7 @@ void isbc202_diskio(void)
                 //copy sector from disk image to RAM
                 for (i=0; i<SECSIZ; i++) { 
                     data = *(fbuf + (dskoff + i));
-                    multibus_put_mbyte(ba + i, data);
+                    put_mbyte(ba + i, data);
                 }
                 sa++;
                 ba+=0x80;
@@ -624,7 +624,7 @@ void isbc202_diskio(void)
                 dskoff = ((ta * MAXSECDD) + (sa - 1)) * SECSIZ;
                 //copy sector from RAM to disk image
                 for (i=0; i<SECSIZ; i++) { 
-                    data = multibus_get_mbyte(ba + i);
+                    data = get_mbyte(ba + i);
                     *(fbuf + (dskoff + i)) = data;
                 }
                 sa++;

@@ -39,7 +39,6 @@ t_stat isbc064_cfg(uint16 base, uint16 size);
 t_stat isbc464_reset (DEVICE *dptr);
 t_stat isbc464_attach (UNIT *uptr, CONST char *cptr);
 uint8 isbc464_get_mbyte(uint16 addr);
-void isbc464_put_mbyte(uint16 addr, uint8 val);
 
 /* external function prototypes */
 
@@ -132,46 +131,11 @@ uint8 isbc464_get_mbyte(uint16 addr)
     uint32 val, org, len;
     uint8 *fbuf;
 
-    if ((isbc464_dev.flags & DEV_DIS) == 0) {
-        org = isbc464_unit.u3;
-        len = isbc464_unit.capac;
-        fbuf = (uint8 *) isbc464_unit.filebuf;
-        if ((addr >= org) && (addr < (org + len))) {
-            SET_XACK(1);                /* good memory address */
-            val = *(fbuf + (addr - org));
-            return (val & 0xFF);
-        } else {
-            sim_printf("isbc464_get_mbyte: Out of range\n");
-            SET_XACK(0);                /* bad memory address */
-            return 0;                   /* multibus has active high pullups and inversion */
-        }
-    }
-    sim_printf ("isbc464_put_mbyte: Write-Disabled addr=%04X\n", addr);
-    SET_XACK(0);                /* bad memory address */
-    return 0;                           /* multibus has active high pullups and inversion */
-}
-
-/*  put a byte into memory */
-
-void isbc464_put_mbyte(uint16 addr, uint8 val)
-{
-    uint32 org, len;
-
-    if ((isbc464_dev.flags & DEV_DIS) == 0) {
-        org = isbc464_unit.u3;
-        len = isbc464_unit.capac;
-        if ((addr >= org) && (addr < (org + len))) {
-            SET_XACK(0);                /* bad memory address */
-            sim_printf ("isbc464_put_mbyte: Read-only Memory\n");
-            return;
-        } else {
-            sim_printf ("isbc464_put_mbyte: Out of range\n");
-            SET_XACK(0);                /* bad memory address */
-            return;
-        }
-    }
-    sim_printf ("isbc464_put_mbyte: Disabled\n");
-    SET_XACK(0);                /* bad memory address */
+    org = isbc464_unit.u3;
+    len = isbc464_unit.capac;
+    fbuf = (uint8 *) isbc464_unit.filebuf;
+    val = *(fbuf + (addr - org));
+    return (val & 0xFF);
 }
 
 /* end of isbc464.c */

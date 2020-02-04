@@ -30,11 +30,12 @@
 
 /* function prototypes */
 
+t_stat SBC_config(void);
+t_stat SBC_reset (DEVICE *dptr);
 uint8 get_mbyte(uint16 addr);
 uint16 get_mword(uint16 addr);
 void put_mbyte(uint16 addr, uint8 val);
 void put_mword(uint16 addr, uint16 val);
-t_stat SBC_reset (DEVICE *dptr);
 
 /* external function prototypes */
 
@@ -69,7 +70,8 @@ int onetime = 0;
 
 /* extern globals */
 
-extern uint16 PCX;                    /* program counter */
+extern uint16 PCX;                      /* program counter */
+extern uint8 xack;                      /* XACK signal */
 extern UNIT i8255_unit;
 extern UNIT EPROM_unit;
 extern UNIT RAM_unit;
@@ -124,6 +126,7 @@ t_stat SBC_reset (DEVICE *dptr)
 
 uint8 get_mbyte(uint16 addr)
 {
+    SET_XACK(1);                        /* set no XACK */
     if (addr >= 0xF800) {               //monitor ROM - always there
         return EPROM_get_mbyte(addr - 0xF000); //top half of EPROM
     }
@@ -133,10 +136,11 @@ uint8 get_mbyte(uint16 addr)
     if ((addr >= 0xE800) && (addr < 0xF000) && ((ipc_cont_unit.u3 & 0x10) == 0)) { //diagnostic ROM
         return EPROM_get_mbyte(addr - 0xE800); //bottom half of EPROM
     }
-    if (addr < 0x8000)                  //IPB RAM
+    if (addr < 0x8000) {                //IPB RAM
         return RAM_get_mbyte(addr);
-    else
-        return multibus_get_mbyte(addr); //check multibus cards
+    }
+    SET_XACK(0);                        /* set no XACK */
+    return multibus_get_mbyte(addr);    //check multibus cards
 }
 
 /*  get a word from memory */
@@ -154,6 +158,7 @@ uint16 get_mword(uint16 addr)
 
 void put_mbyte(uint16 addr, uint8 val)
 {
+    SET_XACK(0);                        /* set no XACK */
     if (addr >= 0xF800) {               //monitor ROM - always there
         return;
     } 

@@ -1763,11 +1763,12 @@ IMDS210 = ${IMDS210C}/i8080.c ${IMDS210D}/imds-210_sys.c \
 	${IMDS210C}/i8251.c ${IMDS210C}/i8255.c \
 	${IMDS210C}/i8259.c ${IMDS210C}/i8253.c \
 	${IMDS210C}/ieprom.c ${IMDS210C}/iram8.c \
-	${IMDS210C}/ipbmultibus.c ${IMDS210C}/ipb.c \
+	${IMDS210C}/multibus.c ${IMDS210C}/ipb.c \
 	${IMDS210C}/ipc-cont.c ${IMDS210C}/ioc-cont.c \
 	${IMDS210C}/isbc202.c ${IMDS210C}/isbc201.c \
-	${IMDS210C}/isbc206.c ${IMDS210C}/isbc464.c \
-	${IMDS210C}/zx200a.c ${IMDS210C}/isbc064.c
+	${IMDS210C}/isbc206.c ${IMDS210C}/isbc208.c \
+	${IMDS210C}/isbc464.c ${IMDS210C}/zx200a.c \
+	${IMDS210C}/isbc064.c
 IMDS210_OPT = -I ${IMDS210D}
 
 
@@ -1777,11 +1778,12 @@ IMDS220 = ${IMDS220C}/i8080.c ${IMDS220D}/imds-220_sys.c \
 	${IMDS220C}/i8251.c ${IMDS220C}/i8255.c \
 	${IMDS220C}/i8259.c ${IMDS220C}/i8253.c \
 	${IMDS220C}/ieprom.c ${IMDS220C}/iram8.c \
-	${IMDS220C}/ipbmultibus.c ${IMDS220C}/ipb.c \
+	${IMDS220C}/multibus.c ${IMDS220C}/ipb.c \
 	${IMDS220C}/ipc-cont.c ${IMDS220C}/ioc-cont.c \
 	${IMDS220C}/isbc202.c ${IMDS220C}/isbc201.c \
-	${IMDS220C}/isbc206.c ${IMDS220C}/isbc464.c \
-	${IMDS220C}/zx200a.c ${IMDS220C}/isbc064.c
+	${IMDS220C}/isbc206.c ${IMDS210C}/isbc208.c \
+	${IMDS220C}/isbc464.c ${IMDS220C}/zx200a.c \
+	${IMDS220C}/isbc064.c
 IMDS220_OPT = -I ${IMDS220D}
 
 
@@ -1791,11 +1793,12 @@ IMDS225 = ${IMDS225C}/i8080.c ${IMDS225D}/imds-225_sys.c \
 	${IMDS225C}/i8251.c ${IMDS225C}/i8255.c \
 	${IMDS225C}/i8259.c ${IMDS225C}/i8253.c \
 	${IMDS225C}/ieprom.c ${IMDS225C}/iram8.c \
-	${IMDS225C}/ipcmultibus.c ${IMDS225C}/ipc.c \
+	${IMDS225C}/multibus.c ${IMDS225C}/ipc.c \
 	${IMDS225C}/ipc-cont.c ${IMDS225C}/ioc-cont.c \
 	${IMDS225C}/isbc202.c ${IMDS225C}/isbc201.c \
 	${IMDS225C}/zx200a.c ${IMDS225C}/isbc464.c \
-	${IMDS225C}/isbc206.c
+	${IMDS225C}/isbc206.c ${IMDS225C}/isbc208.c \
+	${IMDS220C}/isbc064.c
 IMDS225_OPT = -I ${IMDS225D}
 
 
@@ -1805,11 +1808,12 @@ IMDS230 = ${IMDS230C}/i8080.c ${IMDS230D}/imds-230_sys.c \
 	${IMDS230C}/i8251.c ${IMDS230C}/i8255.c \
 	${IMDS230C}/i8259.c ${IMDS230C}/i8253.c \
 	${IMDS230C}/ieprom.c ${IMDS230C}/iram8.c \
-	${IMDS230C}/ipbmultibus.c ${IMDS230C}/ipb.c \
+	${IMDS230C}/multibus.c ${IMDS230C}/ipb.c \
 	${IMDS230C}/ipc-cont.c ${IMDS230C}/ioc-cont.c \
 	${IMDS230C}/isbc202.c ${IMDS230C}/isbc201.c \
-	${IMDS230C}/isbc206.c ${IMDS230C}/isbc464.c \
-	${IMDS230C}/zx200a.c ${IMDS230C}/isbc064.c
+	${IMDS230C}/isbc206.c ${IMDS230C}/isbc208.c \
+	${IMDS230C}/isbc464.c ${IMDS230C}/zx200a.c \
+	${IMDS230C}/isbc064.c
 IMDS230_OPT = -I ${IMDS230D}
 
 
@@ -1819,7 +1823,7 @@ IMDS800 = ${IMDS800C}/i8080.c ${IMDS800D}/imds-800_sys.c \
         ${IMDS800D}/cpu.c ${IMDS800D}/front_panel.c \
         ${IMDS800D}/monitor.c ${IMDS800C}/ieprom1.c \
 	${IMDS800C}/i8251.c ${IMDS800C}/ieprom.c \
-	${IMDS800C}/m800multibus.c ${IMDS800C}/isbc064.c \
+	${IMDS800C}/multibus.c ${IMDS800C}/isbc064.c \
 	${IMDS800C}/isbc202.c ${IMDS800C}/isbc201.c \
 	${IMDS800C}/zx200a.c ${IMDS800C}/isbc464.c \
 	${IMDS800C}/isbc206.c ${IMDS800C}/i3214.c
@@ -1832,7 +1836,7 @@ IMDS810 = ${IMDS800C}/i8080.c ${IMDS810D}/imds-810_sys.c \
         ${IMDS810D}/cpu.c ${IMDS810D}/front_panel.c \
         ${IMDS810D}/monitor.c ${IMDS810C}/ieprom1.c \
 	${IMDS810C}/i8251.c ${IMDS810C}/ieprom.c \
-	${IMDS810C}/m800multibus.c ${IMDS810C}/isbc064.c \
+	${IMDS810C}/multibus.c ${IMDS810C}/isbc064.c \
 	${IMDS810C}/isbc202.c ${IMDS810C}/isbc201.c \
 	${IMDS810C}/zx200a.c ${IMDS810C}/isbc464.c \
 	${IMDS810C}/isbc206.c ${IMDS800C}/i3214.c

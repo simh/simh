@@ -110,7 +110,7 @@
 
 /* Memory */
 
-#define MAXMEMSIZE          0x0FFFF             /* 8080 max memory size */
+#define MAXMEMSIZE          0xFFFF             /* 8080 max memory size */
 #define MEMSIZE             (i8080_unit.capac)  /* 8080 actual memory size */
 #define ADDRMASK            (MAXMEMSIZE)        /* 8080 address mask */
 #define MEM_ADDR_OK(x)      (((uint16) (x)) <= MEMSIZE)

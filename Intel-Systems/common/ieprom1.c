@@ -136,15 +136,9 @@ uint8 EPROM1_get_mbyte(uint16 addr)
 {
     uint8 val;
 
-    if ((addr >= EPROM1_unit->u3) && ((uint16) addr <= (EPROM1_unit->u3 + EPROM1_unit->capac))) {
-        SET_XACK(1);                /* good memory address */
-        val = *((uint8 *)EPROM1_unit->filebuf + (addr - EPROM1_unit->u3));
-        val &= 0xFF;
-        return val;
-    } else {
-        sim_printf("EPROM1: Out of range\n");
-    }
-    return 0;
+    val = *((uint8 *)EPROM1_unit->filebuf + (addr - EPROM1_unit->u3));
+    val &= 0xFF;
+    return val;
 }
 
 /* end of iEPROM1.c */

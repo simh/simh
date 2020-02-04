@@ -45,8 +45,6 @@ void RAM_put_mbyte(uint16 addr, uint8 val);
 
 /* external globals */
 
-extern uint8 xack;                          /* XACK signal */
-
 /* SIMH RAM Standard I/O Data Structures */
 
 UNIT RAM_unit = { UDATA (NULL, UNIT_BINK, 0), KBD_POLL_WAIT };
@@ -93,15 +91,15 @@ DEVICE RAM_dev = {
 
 t_stat RAM_cfg(uint16 base, uint16 size)
 {
-    RAM_unit.capac = size & 0xFFFF;        /* set RAM size */
-    RAM_unit.u3 = base & 0xFFFF;  /* set RAM base */
-    RAM_unit.filebuf = (uint8 *)calloc(size, size * sizeof(uint8));
+    RAM_unit.capac = size;              /* set RAM size */
+    RAM_unit.u3 = base;                 /* set RAM base */
+    RAM_unit.filebuf = (uint8 *)calloc(size, sizeof(uint8));
     if (RAM_unit.filebuf == NULL) {
-        sim_printf ("    RAM: Malloc error\n");
+        sim_printf ("    RAM: Calloc error\n");
         return SCPE_MEM;
     }
     sim_printf("    RAM: 0%04XH bytes at base 0%04XH\n",
-        size, base & 0xFFFF);
+        size, base);
     return SCPE_OK;
 }
 
@@ -118,29 +116,16 @@ uint8 RAM_get_mbyte(uint16 addr)
 {
     uint8 val;
 
-    if ((addr >= RAM_unit.u3) && ((uint32) addr <= (RAM_unit.u3 + RAM_unit.capac))) {
-        SET_XACK(1);                /* good memory address */
-        val = *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3));
-        return (val & 0xFF);
-    } else {
-        SET_XACK(0);                /* bad memory address */
-        return 0xFF;
-    }
+    val = *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3));
+    return (val & 0xFF);
 }
 
 /*  put a byte into memory */
 
 void RAM_put_mbyte(uint16 addr, uint8 val)
 {
-    if ((addr >= RAM_unit.u3) && ((uint32)addr <= RAM_unit.u3 + RAM_unit.capac)) {
-        SET_XACK(1);                /* good memory address */
-        *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3)) = val & 0xFF;
-        return;
-    } else {
-        SET_XACK(0);                /* bad memory address */
-        return;
-        
-    }
+    *((uint8 *)RAM_unit.filebuf + (addr - RAM_unit.u3)) = val & 0xFF;
+    return;
 }
 
 /* end of iRAM8.c */

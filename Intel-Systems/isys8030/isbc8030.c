@@ -117,12 +117,12 @@ uint8 get_mbyte(uint16 addr)
 {
     /* if local EPROM handle it */
     if ((ROM_DISABLE && (i8255_C[0] & 0x80)) || (ROM_DISABLE == 0)) { /* EPROM enabled */
-        if ((addr >= EPROM_unit.u3) && ((uint16)addr < (EPROM_unit.u3 + EPROM_unit.capac))) {
+        if ((addr >= EPROM_unit.u3) && ((uint16)addr <= (EPROM_unit.u3 + EPROM_unit.capac))) {
             return EPROM_get_mbyte(addr);
         }
     } /* if local RAM handle it */
     if ((RAM_DISABLE && (i8255_C[0] & 0x20)) || (RAM_DISABLE == 0)) { /* RAM enabled */
-        if ((addr >= RAM_unit.u3) && ((uint16)addr < (RAM_unit.u3 + RAM_unit.capac))) {
+        if ((addr >= RAM_unit.u3) && ((uint16)addr <= (RAM_unit.u3 + RAM_unit.capac))) {
             return RAM_get_mbyte(addr);
         }
     } /* otherwise, try the multibus */
@@ -148,13 +148,13 @@ void put_mbyte(uint16 addr, uint8 val)
     if ((ROM_DISABLE && (i8255_C[0] & 0x80)) || (ROM_DISABLE == 0)) { /* EPROM enabled */
         if ((addr >= EPROM_unit.u3) && ((uint16)addr <= (EPROM_unit.u3 + EPROM_unit.capac))) {
             sim_printf("Write to R/O memory address %04X from %04X - ignored\n", addr, PCX);
-        return;
+            return;
         }
     } /* if local RAM handle it */
     if ((RAM_DISABLE && (i8255_C[0] & 0x20)) || (RAM_DISABLE == 0)) { /* RAM enabled */
         if ((addr >= RAM_unit.u3) && ((uint16)addr <= (RAM_unit.u3 + RAM_unit.capac))) {
             RAM_put_mbyte(addr, val);
-        return;
+            return;
         }
     } /* otherwise, try the multibus */
     multibus_put_mbyte(addr, val);

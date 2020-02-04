@@ -225,7 +225,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\Intel-Systems\common\ipbmultibus.c"
+				RelativePath="..\Intel-Systems\common\multibus.c"
 				>
 			</File>
 			<File

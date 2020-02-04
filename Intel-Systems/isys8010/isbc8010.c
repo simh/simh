@@ -48,6 +48,7 @@ void put_mword(uint16 addr, uint16 val);
 /* external globals */
  
 extern uint8 i8255_C[4];                    //port C byte I/O
+extern uint16 PCX;                          /* External view of PC */
 extern DEVICE i8080_dev;
 extern DEVICE i8251_dev;
 extern DEVICE i8255_dev;
@@ -111,12 +112,12 @@ uint8 get_mbyte(uint16 addr)
 {
     /* if local EPROM handle it */
     if ((ROM_DISABLE && (i8255_C[0] & 0x80)) || (ROM_DISABLE == 0)) { /* EPROM enabled */
-        if ((addr >= EPROM_unit.u3) && ((uint16)addr < (EPROM_unit.u3 + EPROM_unit.capac))) {
+        if ((addr >= EPROM_unit.u3) && ((uint16)addr <= (EPROM_unit.u3 + EPROM_unit.capac))) {
             return EPROM_get_mbyte(addr);
         }
     } /* if local RAM handle it */
     if ((RAM_DISABLE && (i8255_C[0] & 0x20)) || (RAM_DISABLE == 0)) { /* RAM enabled */
-        if ((addr >= RAM_unit.u3) && ((uint16)addr < (RAM_unit.u3 + RAM_unit.capac))) {
+        if ((addr >= RAM_unit.u3) && ((uint16)addr <= (RAM_unit.u3 + RAM_unit.capac))) {
             return RAM_get_mbyte(addr);
         }
     } /* otherwise, try the multibus */
@@ -140,15 +141,15 @@ void put_mbyte(uint16 addr, uint8 val)
 {
     /* if local EPROM handle it */
     if ((ROM_DISABLE && (i8255_C[0] & 0x80)) || (ROM_DISABLE == 0)) { /* EPROM enabled */
-        if ((addr >= EPROM_unit.u3) && ((uint16)addr < (EPROM_unit.u3 + EPROM_unit.capac))) {
-            sim_printf("Write to R/O memory address %04X - ignored\n", addr);
-        return;
+        if ((addr >= EPROM_unit.u3) && ((uint16)addr <= (EPROM_unit.u3 + EPROM_unit.capac))) {
+            sim_printf("Write to R/O memory address %04X from PC=%04X - ignored\n", addr, PCX);
+            return;
         }
     } /* if local RAM handle it */
     if ((RAM_DISABLE && (i8255_C[0] & 0x20)) || (RAM_DISABLE == 0)) { /* RAM enabled */
-        if ((addr >= RAM_unit.u3) && ((uint16)addr < (RAM_unit.u3 + RAM_unit.capac))) {
+        if ((addr >= RAM_unit.u3) && ((uint16)addr <= (RAM_unit.u3 + RAM_unit.capac))) {
             RAM_put_mbyte(addr, val);
-        return;
+            return;
         }
     } /* otherwise, try the multibus */
     multibus_put_mbyte(addr, val);

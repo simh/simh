@@ -225,10 +225,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\Intel-Systems\common\ipbmultibus.c"
-				>
-			</File>
-			<File
 				RelativePath="..\Intel-Systems\common\ipc-cont.c"
 				>
 			</File>
@@ -253,7 +249,15 @@
 				>
 			</File>
 			<File
+				RelativePath="..\Intel-Systems\common\isbc208.c"
+				>
+			</File>
+			<File
 				RelativePath="..\Intel-Systems\common\isbc464.c"
+				>
+			</File>
+			<File
+				RelativePath="..\Intel-Systems\common\multibus.c"
 				>
 			</File>
 			<File

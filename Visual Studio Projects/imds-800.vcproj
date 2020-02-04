@@ -245,7 +245,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\Intel-Systems\common\m800multibus.c"
+				RelativePath="..\Intel-Systems\common\multibus.c"
 				>
 			</File>
 			<File

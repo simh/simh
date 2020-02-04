@@ -33,12 +33,12 @@
 
 /* function prototypes */
 
+t_stat SBC_config(void);
 t_stat SBC_reset (DEVICE *dptr);
 uint8 get_mbyte(uint16 addr);
 uint16 get_mword(uint16 addr);
 void put_mbyte(uint16 addr, uint8 val);
 void put_mword(uint16 addr, uint16 val);
-t_stat SBC_config(void);
 
 // globals
 
