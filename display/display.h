@@ -65,6 +65,11 @@ enum display_type {
  */
 extern int display_init(enum display_type, int scale, void *dptr);
 
+/*
+ * close display
+ */
+extern void display_close(void *dptr);
+
 /* return size of virtual display */
 extern int display_xpoints(void);
 extern int display_ypoints(void);

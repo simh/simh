@@ -975,6 +975,18 @@ display_init(enum display_type type, int sf, void *dptr)
     fprintf(stderr, "Display initialization failed\r\n");
     return 0;
 }
+
+void
+display_close(void *dptr)
+{
+    if (!initialized)
+        return;
+
+    free (points);
+    ws_shutdown();
+
+    initialized = 0;
+}
 
 void
 display_reset(void)
