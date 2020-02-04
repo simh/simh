@@ -37,11 +37,50 @@ t_bool vid_mouse_b1 = FALSE;
 t_bool vid_mouse_b2 = FALSE;
 t_bool vid_mouse_b3 = FALSE;
 static VID_QUIT_CALLBACK vid_quit_callback = NULL;
+static VID_GAMEPAD_CALLBACK motion_callback[10];
+static VID_GAMEPAD_CALLBACK button_callback[10];
+static int vid_gamepad_inited = 0;
+static int vid_gamepad_ok = 0; /* Or else just joysticks. */
 
 t_stat vid_register_quit_callback (VID_QUIT_CALLBACK callback)
 {
 vid_quit_callback = callback;
 return SCPE_OK;
+}
+
+static t_stat register_callback (void **array, int n, void *callback)
+{
+    int i, j = -1;
+
+    if (!vid_gamepad_inited) {
+        return SCPE_NOATT;
+        }
+
+    for (i = 0; i < n; i++) {
+        if (array[i] == callback)
+            return SCPE_ALATT;
+        if (array[i] == NULL)
+            j = i;
+        }
+
+    if (j != -1) {
+        array[j] = callback;
+        return SCPE_OK;
+        }
+
+    return SCPE_NXM;
+}
+
+t_stat vid_register_gamepad_motion_callback (VID_GAMEPAD_CALLBACK callback)
+{
+    int n = sizeof (motion_callback) / sizeof (callback);
+    return register_callback ((void **)motion_callback, n, (void *)callback);
+}
+
+t_stat vid_register_gamepad_button_callback (VID_GAMEPAD_CALLBACK callback)
+{
+    int n = sizeof (button_callback) / sizeof (callback);
+    return register_callback ((void **)button_callback, n, (void *)callback);
 }
 
 t_stat vid_show (FILE* st, DEVICE *dptr,  UNIT* uptr, int32 val, CONST char* desc)
@@ -510,6 +549,64 @@ return SCPE_OK;
 }
 #endif
 
+static t_stat vid_init_controllers (void)
+{
+    SDL_Joystick *y;
+    SDL_version ver;
+    int i, n;
+
+    if (vid_gamepad_inited)
+        return SCPE_OK;
+
+    /* Chech that the SDL_GameControllerFromInstanceID function is
+       available at run time. */
+    SDL_GetVersion(&ver);
+    vid_gamepad_ok = (ver.major > 2 ||
+                      (ver.major == 2 && (ver.minor > 0 || ver.patch >= 4)));
+
+    SDL_InitSubSystem(SDL_INIT_JOYSTICK);
+    if (vid_gamepad_ok)
+        SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER);
+
+    if (SDL_JoystickEventState (SDL_ENABLE) < 0) {
+        SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
+        SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
+        return SCPE_IOERR;
+        }
+
+    if (vid_gamepad_ok && SDL_GameControllerEventState (SDL_ENABLE) < 0) {
+        SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
+        SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
+        return SCPE_IOERR;
+        }
+
+    n = SDL_NumJoysticks();
+
+    for (i = 0; i < n; i++) {
+        if (vid_gamepad_ok && SDL_IsGameController (i)) {
+            SDL_GameController *x = SDL_GameControllerOpen (i);
+            if (x != NULL) {
+                sim_debug (SIM_VID_DBG_VIDEO, vid_dev,
+                "Game controller: %s\n", SDL_GameControllerNameForIndex(i));
+                }
+            }
+        else {
+            y = SDL_JoystickOpen (i);
+            if (y != NULL) {
+                sim_debug (SIM_VID_DBG_VIDEO, vid_dev,
+                "Joystick: %s\n", SDL_JoystickNameForIndex(i));
+                sim_debug (SIM_VID_DBG_VIDEO, vid_dev,
+                "Number of axes: %d, buttons: %d\n",
+                SDL_JoystickNumAxes(y),
+                SDL_JoystickNumButtons(y));
+                }
+            }
+        }
+
+    vid_gamepad_inited = 1;
+    return SCPE_OK;
+}
+
 t_stat vid_open (DEVICE *dptr, const char *title, uint32 width, uint32 height, int flags)
 {
 if (!vid_active) {
@@ -538,9 +635,17 @@ if (!vid_active) {
 
     vid_dev = dptr;
 
+    memset (motion_callback, 0, sizeof motion_callback);
+    memset (button_callback, 0, sizeof button_callback);
+
     stat = vid_create_window ();
     if (stat != SCPE_OK)
         return stat;
+
+    if (vid_init_controllers () != SCPE_OK) {
+        sim_debug (SIM_VID_DBG_VIDEO, vid_dev,
+                   "vid_open() - Failed initializing game controllers\n");
+        }
 
     sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE, vid_dev, "vid_open() - Success\n");
     }
@@ -552,6 +657,12 @@ t_stat vid_close (void)
 if (vid_active) {
     SDL_Event user_event;
     int status;
+
+    vid_gamepad_inited = 0;
+    memset (motion_callback, 0, sizeof motion_callback);
+    memset (button_callback, 0, sizeof button_callback);
+    SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
+    SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
 
     vid_active = FALSE;
     if (vid_ready) {
@@ -1149,6 +1260,60 @@ switch (key) {
         }
 }
 
+void vid_joy_motion (SDL_JoyAxisEvent *event)
+{
+    int n = sizeof motion_callback / sizeof (VID_GAMEPAD_CALLBACK);
+    int i;
+
+    for (i = 0; i < n; i++) {
+        if (motion_callback[i]) {
+            motion_callback[i](event->which, event->axis, event->value);
+            }
+        }
+}
+
+void vid_joy_button (SDL_JoyButtonEvent *event)
+{
+    int n = sizeof button_callback / sizeof (VID_GAMEPAD_CALLBACK);
+    int i;
+
+    for (i = 0; i < n; i++) {
+        if (button_callback[i]) {
+            button_callback[i](event->which, event->button, event->state);
+            }
+        }
+}
+
+void vid_controller_motion (SDL_ControllerAxisEvent *event)
+{
+    SDL_JoyAxisEvent e;
+    e.which = event->which;
+    e.axis = event->axis;
+    e.value = event->value;
+    vid_joy_motion (&e);
+}
+
+void vid_controller_button (SDL_ControllerButtonEvent *event)
+{
+    /* SDL_GameControllerFromInstanceID is only available from SDL
+       version 2.0.4, so check the version at compile time.  The
+       version is also checked at run time. */
+#if (SDL_MAJOR_VERSION > 2) || (SDL_MAJOR_VERSION == 2 && \
+    (SDL_MINOR_VERSION > 0) || (SDL_PATCHLEVEL >= 4))
+
+    SDL_JoyButtonEvent e;
+    SDL_GameControllerButtonBind b;
+    SDL_GameController *c;
+
+    c = SDL_GameControllerFromInstanceID (event->which);
+    b = SDL_GameControllerGetBindForButton (c, event->button);
+    e.which = event->which;
+    e.button = b.value.button;
+    e.state = event->state;
+    vid_joy_button (&e);
+#endif
+}
+
 void vid_key (SDL_KeyboardEvent *event)
 {
 SIM_KEY_EVENT ev;
@@ -1702,6 +1867,25 @@ while (vid_active) {
             case SDL_MOUSEMOTION:
                 vid_mouse_move (&event.motion);
                 break;
+
+            case SDL_JOYAXISMOTION:
+                vid_joy_motion (&event.jaxis);
+                break;
+
+            case SDL_JOYBUTTONUP:
+            case SDL_JOYBUTTONDOWN:
+                vid_joy_button (&event.jbutton);
+                break;
+
+            case SDL_CONTROLLERAXISMOTION:
+                vid_controller_motion (&event.caxis);
+                break;
+
+            case SDL_CONTROLLERBUTTONUP:
+            case SDL_CONTROLLERBUTTONDOWN:
+                vid_controller_button (&event.cbutton);
+                break;
+
 #if SDL_MAJOR_VERSION != 1
             case SDL_WINDOWEVENT:
                 if (event.window.windowID == vid_windowID) {
