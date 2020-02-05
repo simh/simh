@@ -505,13 +505,8 @@ uint8 zx200ar1DD(t_bool io, uint8 data, uint8 devnum)
         zx200a.intff = 0;               //clear interrupt FF
         if (zx200a.intff)
             zx200a.DDstat &= ~FDCINT;
-        if (zx200a.rdychg) {
-            zx200a.rtype = ROK;
-            return zx200a.rtype;
-        } else {
-            zx200a.rtype = ROK;
-            return zx200a.rtype;
-        }
+        zx200a.rtype = ROK;
+        return zx200a.rtype;
     } else {                            /* write control port */
         zx200a.iopb = data;
     }
