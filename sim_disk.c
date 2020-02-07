@@ -1241,12 +1241,10 @@ if (Scb->scb_b_bitmapblks < 127)
     ret_val = (((t_offset)Scb->scb_r_blocks[Scb->scb_b_bitmapblks].scb_w_freeblks << 16) + Scb->scb_r_blocks[Scb->scb_b_bitmapblks].scb_w_freeptr) * 512;
 else
     ret_val = (((t_offset)Scb->scb_r_blocks[0].scb_w_freeblks << 16) + Scb->scb_r_blocks[0].scb_w_freeptr) * 512;
-if (!sim_quiet) {
-    sim_printf ("%s%d: '%s' Contains an ODS1 File system\n", sim_dname (dptr), (int)(uptr-dptr->units), uptr->filename);
-    sim_printf ("%s%d: Volume Name: %12.12s ", sim_dname (dptr), (int)(uptr-dptr->units), Home.hm1_t_volname);
-    sim_printf ("Format: %12.12s ", Home.hm1_t_format);
-    sim_printf ("Sectors In Volume: %u\n", (uint32)(ret_val / 512));
-    }
+sim_messagef (SCPE_OK, "%s%d: '%s' Contains an ODS1 File system\n", sim_dname (dptr), (int)(uptr-dptr->units), uptr->filename);
+sim_messagef (SCPE_OK, "%s%d: Volume Name: %12.12s ", sim_dname (dptr), (int)(uptr-dptr->units), Home.hm1_t_volname);
+sim_messagef (SCPE_OK, "Format: %12.12s ", Home.hm1_t_format);
+sim_messagef (SCPE_OK, "Sectors In Volume: %u\n", (uint32)(ret_val / 512));
 
 Return_Cleanup:
 uptr->capac = saved_capac;
@@ -1297,13 +1295,480 @@ for (i = 0; i < 8; i++) {
         max_lbn_partnum = i;
         }
     }
-if (!sim_quiet) {
-    sim_printf ("%s%d: '%s' Contains Ultrix partitions\n", sim_dname (dptr), (int)(uptr-dptr->units), uptr->filename);
-    sim_printf ("Partition with highest sector: %c, Sectors On Disk: %u\n", 'a' + max_lbn_partnum, max_lbn);
-    }
+sim_messagef (SCPE_OK, "%s%d: '%s' Contains Ultrix partitions\n", sim_dname (dptr), (int)(uptr-dptr->units), uptr->filename);
+sim_messagef (SCPE_OK, "Partition with highest sector: %c, Sectors On Disk: %u\n", 'a' + max_lbn_partnum, max_lbn);
 ret_val = ((t_offset)max_lbn) * 512;
 
 Return_Cleanup:
+uptr->capac = saved_capac;
+return ret_val;
+}
+
+#pragma pack(push,1)
+/*
+ * The first logical block of device cluster 1 is either:
+ *      1. MFD label entry (RSTS versions through 7.x)
+ *      2. Disk Pack label (RSTS version 8.0 and later)
+ */
+typedef struct _RSTS_MFDLABEL {
+    uint16  ml_ulnk;
+    uint16  ml_mbm1;
+    uint16  ml_reserved1;
+    uint16  ml_reserved2;
+    uint16  ml_pcs;
+    uint16  ml_pstat;
+    uint16  ml_packid[2];
+    } RSTS_MFDLABEL;
+
+typedef struct _RSTS_PACKLABEL {
+    uint16  pk_mb01;
+    uint16  pk_mbm1;
+    uint16  pk_mdcn;
+    uint16  pk_plvl;
+#define PK_LVL0         0000
+#define PK_LVL11        0401
+#define PK_LVL12        0402
+    uint16  pk_ppcs;
+    uint16  pk_pstat;
+#define PK_UC_NEW       0020000
+    uint16  pk_packid[2];
+    uint16  pk_tapgvn[2];
+    uint16  pk_bckdat;
+    uint16  pk_bcktim;
+    } RSTS_PACKLABEL;
+
+typedef union _RSTS_ROOT {
+    RSTS_MFDLABEL  rt_mfd;
+    RSTS_PACKLABEL rt_pack;
+    uint8          rt_block[512];
+    } RSTS_ROOT;
+
+typedef struct _RSTS_MFDBLOCKETTE {
+    uint16  mb_ulnk;
+    uint16  mb_mbm1;
+    uint16  mb_reserved1;
+    uint16  mb_reserved2;
+    uint16  mb_reserved3;
+    uint16  mb_malnk;
+    uint16  mb_lppn;
+    uint16  mb_lid;
+#define MB_ID           0051064
+    } RSTS_MFDBLOCKETTE;
+#define IS_VALID_RSTS_MFD(b) \
+     ((((b)->mb_ulnk == 0) || ((b)->mb_ulnk == 1)) &&                         \
+      ((b)->mb_mbm1 == 0177777) &&                                            \
+      ((b)->mb_reserved1 == 0) &&                                             \
+      ((b)->mb_reserved2 == 0) &&                                             \
+      ((b)->mb_reserved3 == 0) &&                                             \
+      ((b)->mb_lppn == 0177777) &&                                            \
+      ((b)->mb_lid == MB_ID))
+
+typedef struct _RSTS_GFDBLOCKETTE {
+    uint16  gb_ulnk;
+    uint16  gb_mbm1;
+    uint16  gb_reserved1;
+    uint16  gb_reserved2;
+    uint16  gb_reserved3;
+    uint16  gb_reserved4;
+    uint16  gb_lppn;
+    uint16  gb_lid;
+#define GB_ID           0026264
+    } RSTS_GFDBLOCKETTE;
+#define IS_VALID_RSTS_GFD(b, g) \
+     ((((b)->gb_ulnk == 0) || ((b)->gb_ulnk == 1)) &&                         \
+      ((b)->gb_mbm1 == 0177777) &&                                            \
+      ((b)->gb_reserved1 == 0) &&                                             \
+      ((b)->gb_reserved2 == 0) &&                                             \
+      ((b)->gb_reserved3 == 0) &&                                             \
+      ((b)->gb_reserved4 == 0) &&                                             \
+      ((b)->gb_lppn == (((g) << 8) | 0377)) &&                                \
+      ((b)->gb_lid == GB_ID))
+
+typedef struct _RSTS_UFDBLOCKETTE {
+    uint16  ub_ulnk;
+    uint16  ub_mbm1;
+    uint16  ub_reserved1;
+    uint16  ub_reserved2;
+    uint16  ub_reserved3;
+    uint16  ub_reserved4;
+    uint16  ub_lppn;
+    uint16  ub_lid;
+#define UB_ID           0102064
+    } RSTS_UFDBLOCKETTE;
+#define IS_VALID_RSTS_UFD(b, g, u) \
+     (((b)->ub_mbm1 == 0177777) &&                                            \
+      ((b)->ub_reserved1 == 0) &&                                             \
+      ((b)->ub_reserved2 == 0) &&                                             \
+      ((b)->ub_reserved3 == 0) &&                                             \
+      ((b)->ub_reserved4 == 0) &&                                             \
+      ((b)->ub_lppn == (((g) << 8) | (u))) &&                                 \
+      ((b)->ub_lid == UB_ID))
+
+typedef struct _RSTS_UNAME {
+    uint16  un_ulnk;
+    uint16  un_unam;
+    uint16  un_reserved1;
+    uint16  un_reserved2;
+    uint16  un_ustat;
+    uint16  un_uacnt;
+    uint16  un_uaa;
+    uint16  un_uar;
+    } RSTS_UNAME;
+
+typedef struct _RSTS_FNAME {
+    uint16  fn_ulnk;
+    uint16  fn_unam[3];
+    uint16  fn_ustat;
+    uint16  fn_uacnt;
+    uint16  fn_uaa;
+    uint16  fn_uar;
+    } RSTS_FNAME;
+
+typedef struct _RSTS_ACNT {
+    uint16  ac_ulnk;
+    uint16  ac_udla;
+    uint16  ac_usiz;
+    uint16  ac_udc;
+    uint16  ac_utc;
+    uint16  ac_urts[2];
+    uint16  ac_uclus;
+    } RSTS_ACNT;
+
+typedef struct _RSTS_RETR {
+    uint16  rt_ulnk;
+    uint16  rt_uent[7];
+#define RT_ENTRIES      7
+    } RSTS_RETR;
+
+typedef struct _RSTS_DCMAP {
+    uint16  dc_clus;
+#define DC_MASK         0077777
+    uint16  dc_map[7];
+    }  RSTS_DCMAP;
+
+/*
+ * Directory link definitions
+ */
+#define DL_USE          0000001
+#define DL_BAD          0000002
+#define DL_CHE          0000004
+#define DL_CLN          0000010
+#define DL_ENO          0000760
+#define DL_CLO          0007000
+#define DL_BLO          0170000
+
+#define DLSH_ENO         4
+#define DLSH_CLO         9
+#define DLSH_BLO        12
+
+#define BLOCKETTE_SZ    (8 * sizeof(uint16))
+#define MAP_OFFSET      (31 * BLOCKETTE_SZ)
+
+#define SATT0           0073374
+#define SATT1           0076400
+#define SATT2           0075273
+
+#pragma pack(pop)
+
+typedef struct _rstsContext {
+    UNIT        *uptr;
+    int         dcshift;
+    int         pcs;
+    char        packid[8];
+    t_seccnt    sects;
+    RSTS_DCMAP  map;
+} rstsContext;
+
+static char rad50[] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ$.%0123456789";
+
+static void r50Asc(uint16 val, char *buf)
+{
+buf[2] = rad50[val % 050];
+val /= 050;
+buf[1] = rad50[val % 050];
+buf[0] = rad50[val / 050];
+}
+
+static t_stat rstsReadBlock(rstsContext *context, uint16 cluster, uint16 block, void *buf)
+{
+t_lba blk = (cluster << context->dcshift) + block;
+t_seccnt sects_read;
+
+if ((sim_disk_rdsect(context->uptr, blk * context->sects, (uint8 *)buf, &sects_read, context->sects) == SCPE_OK) &&
+    (sects_read == context->sects))
+    return SCPE_OK;
+
+return SCPE_IOERR;
+}
+
+static t_stat rstsReadBlockette(rstsContext *context, uint16 link, void *buf)
+{
+uint16 block = (link & DL_BLO) >> DLSH_BLO;
+uint16 dcn = (link & DL_CLO) >> DLSH_CLO;
+uint16 blockette = (link & DL_ENO) >> DLSH_ENO;
+uint8 temp[512];
+
+if ((dcn != 7) && (blockette != 31) &&
+    (block <= (context->map.dc_clus & DC_MASK))) {
+    if (rstsReadBlock(context, context->map.dc_map[dcn], block, temp) == SCPE_OK) {
+        memcpy(buf, &temp[blockette * BLOCKETTE_SZ], BLOCKETTE_SZ);
+        return SCPE_OK;
+        }
+    }
+return SCPE_IOERR;
+}
+
+static t_stat rstsFind01UFD(rstsContext *context, uint16 *ufd, uint16 *level)
+{
+uint16 dcs = 1 << context->dcshift;
+RSTS_ROOT root;
+uint16 buf[256];
+
+if (rstsReadBlock(context, 1, 0, &root) == SCPE_OK) {
+    /*
+     * First validate fields which are common to both the MFD label and
+     * Pack label - we'll use Pack label offsets here.
+     */
+    if ((root.rt_pack.pk_mbm1 == 0177777) && (root.rt_pack.pk_ppcs >= dcs)) {
+        char ch, *tmp = &context->packid[1];
+        uint16 mfd, gfd;
+
+        context->pcs = root.rt_pack.pk_ppcs;
+
+        r50Asc(root.rt_pack.pk_packid[0], &context->packid[0]);
+        r50Asc(root.rt_pack.pk_packid[1], &context->packid[3]);
+        context->packid[6] = '\0';
+
+        /*
+         * The Pack ID must consist of 1 - 6 alphanumeric characters
+         * padded at the end with spaces.
+         */
+        if (!isalnum(context->packid[0]))
+            return SCPE_IOERR;
+
+        while ((ch = *tmp++) != 0) {
+            if (!isalnum(ch)) {
+                if (ch != ' ')
+                    return SCPE_IOERR;
+
+                while (*tmp)
+                    if (*tmp++ != ' ')
+                        return SCPE_IOERR;
+                break;
+                }
+            }
+
+        /*
+         * Determine the pack revision level and, therefore, the path to
+         * [0,1]satt.sys which will allow us to determine the size of the
+         * pack used by RSTS.
+         */
+        if ((root.rt_pack.pk_pstat & PK_UC_NEW) == 0) {
+            uint16 link = root.rt_mfd.ml_ulnk;
+            RSTS_UNAME uname;
+
+            /*
+             * Old format used by RSTS up through V07.x
+             */
+            if (dcs > 16)
+                return SCPE_IOERR;
+
+            *level = PK_LVL0;
+
+            memcpy(&context->map, &root.rt_block[MAP_OFFSET], BLOCKETTE_SZ);
+
+            /*
+             * Scan the MFD name entries looking for [0,1]. Note there will
+             * always be at least 1 entry.
+             */
+            do {
+                if (rstsReadBlockette(context, link, &uname) != SCPE_OK)
+                    break;
+
+                if (uname.un_unam == ((0 << 8) | 1)) {
+                    *ufd = uname.un_uar;
+                    return SCPE_OK;
+                    }
+                } while ((link = uname.un_ulnk) != 0);
+            }
+        else {
+            /*
+             * New format used by RSTS V08 and later
+             */
+            switch (root.rt_pack.pk_plvl) {
+                case PK_LVL11:
+                    if (dcs > 16)
+                        return SCPE_IOERR;
+                    break;
+
+                case PK_LVL12:
+                    if (dcs > 64)
+                        return SCPE_IOERR;
+                    break;
+
+                default:
+                    return SCPE_IOERR;
+                }
+            *level = root.rt_pack.pk_plvl;
+
+            mfd = root.rt_pack.pk_mdcn;
+
+            if (rstsReadBlock(context, mfd, 0, buf) == SCPE_OK) {
+                if (IS_VALID_RSTS_MFD((RSTS_MFDBLOCKETTE *)buf)) {
+                    if (rstsReadBlock(context, mfd, 1, buf) == SCPE_OK)
+                        if ((gfd = buf[0]) != 0)
+                            if (rstsReadBlock(context, gfd, 0, buf) == SCPE_OK)
+                                if (IS_VALID_RSTS_GFD((RSTS_GFDBLOCKETTE *)buf, 0)) {
+                                    if (rstsReadBlock(context, gfd, 1, buf) == SCPE_OK)
+                                        if ((*ufd = buf[1]) != 0)
+                                            return SCPE_OK;
+                                    }
+                    }
+                }
+            }
+        }
+    }
+return SCPE_IOERR;
+}
+
+static t_stat rstsLoadAndScanSATT(rstsContext *context, uint16 uaa, uint16 uar, t_offset *result)
+{
+t_offset blocks = 0;
+uint8 bitmap[8192];
+int i, j;
+RSTS_ACNT acnt;
+RSTS_RETR retr;
+
+if (uar != 0) {
+    if (rstsReadBlockette(context, uaa, &acnt) == SCPE_OK) {
+        uint16 blocks = acnt.ac_usiz;
+        uint16 offset = 0;
+
+        memset(bitmap, 0xFF, sizeof(bitmap));
+
+        if (blocks != 0) {
+            do {
+                int i, j;
+                uint16 fcl;
+
+                if (rstsReadBlockette(context, uar, &retr) != SCPE_OK)
+                    return SCPE_IOERR;
+
+                for (i = 0; i < RT_ENTRIES; i++) {
+                    if ((fcl = retr.rt_uent[i]) == 0)
+                        goto scanBitmap;
+
+                    for (j = 0; j < acnt.ac_uclus; j++) {
+                        if ((blocks == 0) || (offset >= sizeof(bitmap)))
+                            goto scanBitmap;
+
+                        if (rstsReadBlock(context, fcl, j, &bitmap[offset]) != SCPE_OK)
+                            return SCPE_IOERR;
+
+                        offset += 512;
+                        blocks--;
+                        }
+                    }
+                } while ((uar = retr.rt_ulnk) != 0);
+
+        scanBitmap:
+            for (i = sizeof(bitmap) - 1; i != 0; i--)
+                if (bitmap[i] != 0xFF) {
+                    blocks = i * 8;
+                    for (j = 7; j >= 0; j--)
+                        if ((bitmap[i] & (1 << j)) == 0) {
+                            blocks += j + 1;
+                            goto scanDone;
+                            }
+                    }
+        scanDone:
+            *result = (blocks + 1) * context->pcs;
+            return SCPE_OK;
+            }
+        }
+    }
+return SCPE_IOERR;
+}
+
+static t_offset get_rsts_filesystem_size (UNIT *uptr)
+{
+DEVICE *dptr;
+t_addr saved_capac;
+struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
+t_addr temp_capac = (sim_toffset_64 ? (t_addr)0xFFFFFFFFu : (t_addr)0x7FFFFFFFu);  /* Make sure we can access the largest sector */
+uint8 buf[512];
+t_offset ret_val = (t_offset)-1;
+rstsContext context;
+
+if ((dptr = find_dev_from_unit (uptr)) == NULL)
+    return ret_val;
+saved_capac = uptr->capac;
+uptr->capac = temp_capac;
+
+context.uptr = uptr;
+context.sects = 512 / ctx->sector_size;
+
+/*
+ * Check all possible device cluster sizes
+ */
+for (context.dcshift = 0; context.dcshift < 8; context.dcshift++) {
+    uint16 ufd, level;
+
+    /*
+     * We need to find [0,1]SATT.SYS to compute the actual size of the disk.
+     * First find the DCN of the [0,1] UFD.
+     */
+    if (rstsFind01UFD(&context, &ufd, &level) == SCPE_OK) {
+        if (rstsReadBlock(&context, ufd, 0, buf) == SCPE_OK) {
+            if (IS_VALID_RSTS_UFD((RSTS_UFDBLOCKETTE *)buf, 0, 1)) {
+                uint16 link = ((RSTS_UFDBLOCKETTE *)buf)->ub_ulnk;
+                RSTS_FNAME fname;
+
+                memcpy(&context.map, &buf[MAP_OFFSET], BLOCKETTE_SZ);
+
+                /*
+                 * Scan the UFD looking for SATT.SYS - the allocation bitmap
+                 */
+                do {
+                    if (rstsReadBlockette(&context, link, &fname) != SCPE_OK)
+                        break;
+
+                    if ((fname.fn_unam[0] == SATT0) &&
+                        (fname.fn_unam[1] == SATT1) &&
+                        (fname.fn_unam[2] == SATT2)) {
+                        if (rstsLoadAndScanSATT(&context, fname.fn_uaa, fname.fn_uar, &ret_val) == SCPE_OK) {
+                            const char *fmt = "???";
+
+                            ret_val *= 512;
+
+                            switch (level) {
+                                case PK_LVL0:
+                                    fmt = "0.0";
+                                    break;
+
+                                case PK_LVL11:
+                                    fmt = "1.1";
+                                    break;
+
+                                case PK_LVL12:
+                                    fmt = "1.2";
+                                    break;
+                                }
+
+                            sim_messagef(SCPE_OK, "%s%d: '%s' Contains a RSTS File system\n", sim_dname (dptr), (int)(uptr-dptr->units), uptr->filename);
+                            sim_messagef(SCPE_OK, "%s%d: Pack ID: %6.6s ", sim_dname (dptr), (int)(uptr-dptr->units), context.packid);
+                            sim_messagef(SCPE_OK, "Revision Level: %3s ", fmt);
+                            sim_messagef(SCPE_OK, "Pack Clustersize: %d\n", context.pcs);
+                            sim_messagef(SCPE_OK, "%s%d: Last Unallocated Sector In File System: %u\n", sim_dname (dptr), (int)(uptr-dptr->units), (uint32)(ret_val / 512));
+                            goto cleanup_done;
+                            }
+                        }
+                    } while ((link = fname.fn_ulnk) != 0);
+                }
+            }
+        }
+    }
+cleanup_done:
 uptr->capac = saved_capac;
 return ret_val;
 }
@@ -1484,29 +1949,27 @@ Next_Partition:
 
 Return_Cleanup:
 if (partitions) {
-    if (!sim_quiet) {
-        const char *parttype;
+    const char *parttype;
 
-        switch (version) {
-            case HB_C_SYSVER_V3A:
-                parttype = "V3A";
-                break;
+    switch (version) {
+        case HB_C_SYSVER_V3A:
+            parttype = "V3A";
+            break;
 
-            case HB_C_SYSVER_V04:
-                parttype = "V04";
-                break;
+        case HB_C_SYSVER_V04:
+            parttype = "V04";
+            break;
 
-            case HB_C_SYSVER_V05:
-                parttype = "V05";
-                break;
+        case HB_C_SYSVER_V05:
+            parttype = "V05";
+            break;
 
-            default:
-                parttype = "???";
-                break;
-            }
-        sim_printf ("%s%d: '%s' Contains RT11 partitions\n", sim_dname (dptr), (int)(uptr-dptr->units), uptr->filename);
-        sim_printf ("%d valid partition%s, Type: %s, Sectors On Disk: %u\n", partitions, partitions == 1 ? "" : "s", parttype, (uint32)(ret_val / 512));
+        default:
+            parttype = "???";
+            break;
         }
+    sim_messagef (SCPE_OK, "%s%d: '%s' Contains RT11 partitions\n", sim_dname (dptr), (int)(uptr-dptr->units), uptr->filename);
+    sim_messagef (SCPE_OK, "%d valid partition%s, Type: %s, Sectors On Disk: %u\n", partitions, partitions == 1 ? "" : "s", parttype, (uint32)(ret_val / 512));
     }
 uptr->capac = saved_capac;
 return ret_val;
@@ -1520,6 +1983,7 @@ static FILESYSTEM_CHECK checks[] = {
     &get_ods2_filesystem_size,
     &get_ods1_filesystem_size,
     &get_ultrix_filesystem_size,
+    &get_rsts_filesystem_size,
     &get_rt11_filesystem_size,          /* This should be the last entry
                                            in the table to reduce the
                                            possibility of matching an RT-11
