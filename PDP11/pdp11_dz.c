@@ -535,7 +535,6 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             c = sim_tt_outcvt (dz_tdr[dz], TT_GET_MODE (dz_unit[0].flags));
             if (c >= 0) {                               /* store char */
                 tmxr_putc_ln (lp, c);
-                dz_update_xmti ();
                 sim_activate_after_abs (&dz_unit[1], lp->txdeltausecs);
                 }
             }
@@ -669,7 +668,7 @@ for (dz = 0; dz < dz_desc.lines/DZ_LINES; dz++) {       /* loop thru muxes */
         j = (j + 1) & DZ_LNOMASK;                       /* next line */
         line = (dz * DZ_LINES) + j;                     /* get line num */
         if ((linemask & (1 << j)) &&                    /* if enabled && */
-            (1 == tmxr_txdone_ln (&dz_ldsc[line]))) {   /*    done just now */
+            tmxr_txdone_ln (&dz_ldsc[line])) {          /*    done */
             CSR_PUTTL (dz_csr[dz], j);                  /* put ln in csr */
             dz_csr[dz] |= CSR_TRDY;                     /* set xmt rdy */
             break;
@@ -723,7 +722,8 @@ void dz_clr_txint (int32 dz)
 dz_txi = dz_txi & ~(1 << dz);                           /* clr mux xmt int */
 if (dz_txi == 0)                                        /* all clr? */
     CLR_INT (DZTX);
-else SET_INT (DZTX);                                    /* no, set intr */
+else
+    SET_INT (DZTX);                                     /* no, set intr */
 return;
 }
 
@@ -731,7 +731,8 @@ void dz_set_txint (int32 dz)
 {
 dz_txi = dz_txi | (1 << dz);                            /* set mux xmt int */
 SET_INT (DZTX);                                         /* set master intr */
-sim_debug(DBG_INT, &dz_dev, "dz_set_txint(dz=%d)\n", dz);
+sim_debug(DBG_INT, &dz_dev, "dz_set_txint(dz=%d) CSR: ", dz);
+sim_debug_bits(DBG_INT, &dz_dev, dz_csr_bits, dz_csr[dz], dz_csr[dz], TRUE);
 return;
 }
 
