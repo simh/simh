@@ -2595,11 +2595,32 @@ fprintf (st, "size can be automatically be configured.\n\n");
 
 if (0 == (uptr-dptr->units)) {
     if (dptr->numunits > 1) {
-        uint32 i;
+        uint32 i, attachable_count = 0, out_count = 0, skip_count;
 
         for (i=0; i < dptr->numunits; ++i)
-            if (dptr->units[i].flags & UNIT_ATTABLE)
+            if ((dptr->units[i].flags & UNIT_ATTABLE) &&
+                !(dptr->units[i].flags & UNIT_DIS))
+                ++attachable_count;
+        for (i=0; (i < dptr->numunits) && (out_count < 2); ++i)
+            if ((dptr->units[i].flags & UNIT_ATTABLE) &&
+                !(dptr->units[i].flags & UNIT_DIS)) {
                 fprintf (st, "  sim> ATTACH {switches} %s%d diskfile\n", dptr->name, i);
+                ++out_count;
+                }
+        if (attachable_count > 4) {
+            fprintf (st, "       .\n");
+            fprintf (st, "       .\n");
+            fprintf (st, "       .\n");
+            }
+        skip_count = attachable_count - 2;
+        for (i=0; i < dptr->numunits; ++i)
+            if ((dptr->units[i].flags & UNIT_ATTABLE) &&
+                !(dptr->units[i].flags & UNIT_DIS)) {
+                if (skip_count == 0)
+                    fprintf (st, "  sim> ATTACH {switches} %s%d diskfile\n", dptr->name, i);
+                else
+                    --skip_count;
+                }
         }
     else
         fprintf (st, "  sim> ATTACH {switches} %s diskfile\n", dptr->name);
@@ -2647,9 +2668,7 @@ fprintf (st, "  sim> att rq2 -f vhd RA92.vhd\n");
 fprintf (st, "  RQ2: creating new file\n");
 fprintf (st, "  sim> sho rq2\n");
 fprintf (st, "  RQ2, 1505MB, attached to RA92.vhd, write enabled, RA92, autosize, VHD format\n");
-fprintf (st, "  sim> ! dir RA92.vhd\n");
-fprintf (st, "   Volume in drive H is New Volume\n");
-fprintf (st, "   Volume Serial Number is F8DE-510C\n\n");
+fprintf (st, "  sim> dir RA92.vhd\n");
 fprintf (st, "   Directory of H:\\Data\n\n");
 fprintf (st, "  04/14/2011  12:57 PM             5,120 RA92.vhd\n");
 fprintf (st, "                 1 File(s)          5,120 bytes\n");
@@ -2660,9 +2679,7 @@ fprintf (st, "  RQ3: Copied 1505MB.  99%% complete.\n");
 fprintf (st, "  RQ3: Copied 1505MB. Done.\n");
 fprintf (st, "  sim> sh rq3\n");
 fprintf (st, "  RQ3, 1505MB, attached to RA92-1.vhd, write enabled, RA92, autosize, VHD format\n");
-fprintf (st, "  sim>  ! dir RA92*\n");
-fprintf (st, "   Volume in drive H is New Volume\n");
-fprintf (st, "   Volume Serial Number is F8DE-510C\n\n");
+fprintf (st, "  sim> dir RA92*\n");
 fprintf (st, "   Directory of H:\\Data\n\n");
 fprintf (st, "  04/14/2011  01:12 PM             5,120 RA92-1.vhd\n");
 fprintf (st, "  04/14/2011  12:58 PM             5,120 RA92.vhd\n");
