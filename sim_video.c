@@ -1304,9 +1304,10 @@ void vid_controller_button (SDL_ControllerButtonEvent *event)
     SDL_JoyButtonEvent e;
     SDL_GameControllerButtonBind b;
     SDL_GameController *c;
+    SDL_GameControllerButton button = (SDL_GameControllerButton)event->button;
 
     c = SDL_GameControllerFromInstanceID (event->which);
-    b = SDL_GameControllerGetBindForButton (c, event->button);
+    b = SDL_GameControllerGetBindForButton (c, button);
     e.which = event->which;
     e.button = b.value.button;
     e.state = event->state;
