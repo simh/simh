@@ -520,6 +520,8 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             }
         dz_tcr[dz] = data;
         tmxr_poll_tx (&dz_desc);                        /* poll output */
+        if (0 == (data & (1 << CSR_GETTL (dz_csr[dz]))))/* Line being disabled */
+            dz_csr[dz] &= ~CSR_TRDY;                    /*    clear TRDY */
         dz_update_xmti ();                              /* update int */
         break;
 
@@ -535,7 +537,7 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             c = sim_tt_outcvt (dz_tdr[dz], TT_GET_MODE (dz_unit[0].flags));
             if (c >= 0) {                               /* store char */
                 tmxr_putc_ln (lp, c);
-                sim_activate_after_abs (&dz_unit[1], lp->txdeltausecs);
+                sim_activate_abs (&dz_unit[1], 0);
                 }
             }
         break;
@@ -661,17 +663,18 @@ void dz_update_xmti (void)
 int32 dz, linemask, i, j, line;
 
 for (dz = 0; dz < dz_desc.lines/DZ_LINES; dz++) {       /* loop thru muxes */
-    linemask = dz_tcr[dz] & DZ_LMASK;                   /* enabled lines */
-    dz_csr[dz] &= ~CSR_TRDY;                            /* assume not rdy */
-    j = CSR_GETTL (dz_csr[dz]);                         /* start at current */
-    for (i = 0; i < DZ_LINES; i++) {                    /* loop thru lines */
-        j = (j + 1) & DZ_LNOMASK;                       /* next line */
-        line = (dz * DZ_LINES) + j;                     /* get line num */
-        if ((linemask & (1 << j)) &&                    /* if enabled && */
-            tmxr_txdone_ln (&dz_ldsc[line])) {          /*    done */
-            CSR_PUTTL (dz_csr[dz], j);                  /* put ln in csr */
-            dz_csr[dz] |= CSR_TRDY;                     /* set xmt rdy */
-            break;
+    if (0 == (dz_csr[dz] & CSR_TRDY)) {                 /* if not ready then check */
+        linemask = dz_tcr[dz] & DZ_LMASK;               /* enabled lines */
+        j = CSR_GETTL (dz_csr[dz]);                     /* start at current */
+        for (i = 0; i < DZ_LINES; i++) {                /* loop thru lines */
+            j = (j + 1) & DZ_LNOMASK;                   /* next line */
+            line = (dz * DZ_LINES) + j;                 /* get line num */
+            if ((linemask & (1 << j)) &&                /* if enabled && */
+                tmxr_txdone_ln (&dz_ldsc[line])) {      /*    done */
+                CSR_PUTTL (dz_csr[dz], j);              /* put ln in csr */
+                dz_csr[dz] |= CSR_TRDY;                 /* set xmt rdy */
+                break;
+                }
             }
         }
     if ((dz_csr[dz] & CSR_TIE) && (dz_csr[dz] & CSR_TRDY)) /* ready plus int? */
