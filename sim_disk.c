@@ -2593,40 +2593,36 @@ fprintf (st, "was created.  This metadata is therefore available whenever that V
 fprintf (st, "attached to an emulated disk device in the future so the device type and\n");
 fprintf (st, "size can be automatically be configured.\n\n");
 
-if (0 == (uptr-dptr->units)) {
-    if (dptr->numunits > 1) {
-        uint32 i, attachable_count = 0, out_count = 0, skip_count;
+if (dptr->numunits > 1) {
+    uint32 i, attachable_count = 0, out_count = 0, skip_count;
 
-        for (i=0; i < dptr->numunits; ++i)
-            if ((dptr->units[i].flags & UNIT_ATTABLE) &&
-                !(dptr->units[i].flags & UNIT_DIS))
-                ++attachable_count;
-        for (i=0; (i < dptr->numunits) && (out_count < 2); ++i)
-            if ((dptr->units[i].flags & UNIT_ATTABLE) &&
-                !(dptr->units[i].flags & UNIT_DIS)) {
-                fprintf (st, "  sim> ATTACH {switches} %s%d diskfile\n", dptr->name, i);
-                ++out_count;
-                }
-        if (attachable_count > 4) {
-            fprintf (st, "       .\n");
-            fprintf (st, "       .\n");
-            fprintf (st, "       .\n");
+    for (i=0; i < dptr->numunits; ++i)
+        if ((dptr->units[i].flags & UNIT_ATTABLE) &&
+            !(dptr->units[i].flags & UNIT_DIS))
+            ++attachable_count;
+    for (i=0; (i < dptr->numunits) && (out_count < 2); ++i)
+        if ((dptr->units[i].flags & UNIT_ATTABLE) &&
+            !(dptr->units[i].flags & UNIT_DIS)) {
+            fprintf (st, "  sim> ATTACH {switches} %s%d diskfile\n", dptr->name, i);
+            ++out_count;
             }
-        skip_count = attachable_count - 2;
-        for (i=0; i < dptr->numunits; ++i)
-            if ((dptr->units[i].flags & UNIT_ATTABLE) &&
-                !(dptr->units[i].flags & UNIT_DIS)) {
-                if (skip_count == 0)
-                    fprintf (st, "  sim> ATTACH {switches} %s%d diskfile\n", dptr->name, i);
-                else
-                    --skip_count;
-                }
+    if (attachable_count > 4) {
+        fprintf (st, "       .\n");
+        fprintf (st, "       .\n");
+        fprintf (st, "       .\n");
         }
-    else
-        fprintf (st, "  sim> ATTACH {switches} %s diskfile\n", dptr->name);
+    skip_count = attachable_count - 2;
+    for (i=0; i < dptr->numunits; ++i)
+        if ((dptr->units[i].flags & UNIT_ATTABLE) &&
+            !(dptr->units[i].flags & UNIT_DIS)) {
+            if (skip_count == 0)
+                fprintf (st, "  sim> ATTACH {switches} %s%d diskfile\n", dptr->name, i);
+            else
+                --skip_count;
+            }
     }
 else
-    fprintf (st, "  sim> ATTACH {switches} %s diskfile\n\n", dptr->name);
+    fprintf (st, "  sim> ATTACH {switches} %s diskfile\n", dptr->name);
 fprintf (st, "\n%s attach command switches\n", dptr->name);
 fprintf (st, "    -R          Attach Read Only.\n");
 fprintf (st, "    -E          Must Exist (if not specified an attempt to create the indicated\n");
