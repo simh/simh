@@ -153,14 +153,46 @@ t_stat dpy_svc (UNIT *uptr)
     return SCPE_OK;
 }
 
+static void dpy_joy_motion (int device, int axis, int value)
+{
+    if (device < 2 && axis < 1) {
+        int mask = 0;
+        int shift = 14 * device;
+        if (value < -10000)
+            mask = 010;
+        else if (value > 1000)
+            mask = 004;
+        spacewar_switches &= ~(014 << shift);
+        spacewar_switches |= mask << shift;
+        }
+}
+
+static void dpy_joy_button (int device, int button, int state)
+{
+    if (device < 2 && button < 2) {
+        /* Button 0 is fire, 1 is thrust. */
+        int mask = 1 << button;
+        mask <<= 14 * device;
+        if (state)
+            spacewar_switches |= mask;
+        else
+            spacewar_switches &= ~mask;
+        }
+}
+
 /* Reset routine */
 
 t_stat dpy_reset (DEVICE *dptr)
 {
-    if (!(dptr->flags & DEV_DIS)) {
+    if (dptr->flags & DEV_DIS) {
+        display_close(dptr);
+        }
+    else {
         display_init(DISPLAY_TYPE, PIX_SCALE, dptr);
         display_reset();
         vid_register_quit_callback (&dpy_quit_callback);
+        vid_register_gamepad_motion_callback (dpy_joy_motion);
+        vid_register_gamepad_button_callback (dpy_joy_button);
         cpls = cpls & ~CPLS_DPY;
         iosta = iosta & ~(IOS_PNT | IOS_SPC); /* clear flags */
         }
