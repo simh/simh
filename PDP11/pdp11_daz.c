@@ -165,6 +165,49 @@ int daz_keyboard (SIM_KEY_EVENT *kev)
   return 0;
 }
 
+static void daz_joy_motion (int device, int axis, int value)
+{
+    if (device < 4 && axis < 4) {
+        int mask = 0;
+        switch (axis) {
+            case 0:
+                buttons[device] |= GO_LEFT | GO_RIGHT;
+                if (value < -10000)
+                    mask = GO_LEFT;
+                else if (value > 1000)
+                    mask = GO_RIGHT;
+                break;
+            case 1:
+                buttons[device] |= GO_UP | GO_DOWN;
+                if (value < -10000)
+                    mask = GO_DOWN;
+                else if (value > 1000)
+                    mask = GO_UP;
+                break;
+            case 2: /* Some gamepads have these mixed up. */
+            case 3:
+                buttons[device] |= TURN_LEFT | TURN_RIGHT;
+                if (value < -10000)
+                    mask = TURN_LEFT;
+                else if (value > 1000)
+                    mask = TURN_RIGHT;
+                break;
+            }
+        buttons[device] &= ~mask;
+        }
+}
+
+static void daz_joy_button (int device, int button, int state)
+{
+    if (device < 4 && button < 2) {
+        int mask = (button == 0 ? FIRE : PASS);
+        if (state)
+            buttons[device] &= ~mask;
+        else
+            buttons[device] |= mask;
+        }
+}
+
 t_stat
 daz_reset(DEVICE *dptr)
 {
@@ -192,6 +235,8 @@ daz_reset(DEVICE *dptr)
     return r;
 
   vid_display_kb_event_process = &daz_keyboard;
+  vid_register_gamepad_motion_callback (daz_joy_motion);
+  vid_register_gamepad_button_callback (daz_joy_button);
   return SCPE_OK;
 }
 
