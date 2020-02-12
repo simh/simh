@@ -536,6 +536,7 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             lp = &dz_ldsc[line];                        /* get line desc */
             c = sim_tt_outcvt (dz_tdr[dz], TT_GET_MODE (dz_unit[0].flags));
             if (c >= 0) {                               /* store char */
+                dz_csr[dz] &= ~CSR_TRDY;                /* clear TRDY for now */
                 tmxr_putc_ln (lp, c);
                 sim_activate_abs (&dz_unit[1], 0);
                 }
