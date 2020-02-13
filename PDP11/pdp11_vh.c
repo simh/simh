@@ -874,9 +874,12 @@ static int32 dq_tx_report ( int32   vh  )
     return (data & 0177777);
 }
 
-static void q_tx_report (   int32   vh,
-                int32   data    )
+static void q_tx_report ( TMLX    *lp,
+                          int32   extra_data )
 {
+    int32   vh = (lp - vh_parm) / VH_LINES;
+    int32   data = (((lp - vh_parm) - (vh * VH_LINES)) << CSR_V_TX_LINE) | extra_data;
+
     if (vh_csr[vh] & CSR_TXIE)
         vh_set_txint (vh);
     if (txq_idx[vh] >= TXQ_SIZE) {
@@ -1166,7 +1169,7 @@ static t_stat vh_wr (   int32   ldata,
             if (lp->txchar & TXCHAR_TX_DATA_VALID) {
                 if (lp->tbuf2 & TB2_TX_ENA) {
                     tx_fifo_put (lp, TXCHAR_TX_DATA_VALID | (data & 0377));
-                    sim_debug (DBG_XMTSCH, &vh_dev, "VH-%d PIO Scheduling Start - 0x%X\n", (int)(lp - vh_parm), lp->txchar & 0xFF);
+                    sim_debug (DBG_XMTSCH, &vh_dev, "VH-%d PIO Scheduling Start - 0x%X '%c'\n", (int)(lp - vh_parm), lp->txchar & 0xFF, isprint (lp->txchar & 0xFF) ? lp->txchar & 0xFF : '.');
                     sim_activate_abs (vh_xmit_unit, 0);
                 }
             }
@@ -1219,7 +1222,8 @@ static t_stat vh_wr (   int32   ldata,
                 break;
             tx_fifo_put (lp, TXCHAR_TX_DATA_VALID | (data & 0377));
             if (lp->txfifo_cnt == 1) {
-                sim_debug (DBG_XMTSCH, &vh_dev, "VH-%d PIO Scheduling Start - 0x%X %s 0x%X\n", (int)(lp - vh_parm), data & 0xFF, (access == WRITEB) ? "" : "Extra Byte", data >> 8);
+                sim_debug (DBG_XMTSCH, &vh_dev, "VH-%d PIO Scheduling Start - 0x%X '%c' %s 0x%X '%c'\n", (int)(lp - vh_parm), data & 0xFF, isprint (data & 0xFF) ? data & 0xFF : '.', 
+                                                                                                         (access == WRITEB) ? "" : "Extra Byte", data >> 8, isprint (data >> 8) ? data >> 8 : '.' );
                 sim_activate_abs (vh_xmit_unit, 0);
                 }
             if (access != WRITEB)                       /* second character */
@@ -1246,12 +1250,12 @@ static t_stat vh_wr (   int32   ldata,
             if ((lp->tbuf2 & TB2_TX_ENA) &&
                 (lp->tbuf2 & TB2_TX_DMA_START)) {
                 lp->tbuf2 &= ~TB2_TX_DMA_START;
-                q_tx_report (vh, CSR_GETCHAN (vh_csr[vh]) << CSR_V_TX_LINE);
+                q_tx_report (lp, 0);
             }
             if ((lp->tbuf2 & TB2_TX_ENA) &&
                 (lp->txfifo_cnt != 0)) {
                 lp->txfifo_idx = lp->txfifo_cnt = 0;
-                q_tx_report (vh, CSR_GETCHAN (vh_csr[vh]) << CSR_V_TX_LINE);
+                q_tx_report (lp, 0);
             }
         }
         /* Implement program-initiated flow control */
@@ -1381,7 +1385,7 @@ static void doDMA ( int32   vh,
 
         pa = lp->tbuf1;
         pa |= (lp->tbuf2 & TB2_M_TBUFFAD) << 16;
-        status = chan << CSR_V_TX_LINE;
+        status = 0;
         while (lp->tbuffct) {
             uint8   buf;
             if (Map_ReadB (pa, 1, &buf)) {
@@ -1405,7 +1409,7 @@ static void doDMA ( int32   vh,
              (lp->tbuffct == 0)) || 
             (!lp->tmln->conn)) {
             lp->tbuf2 &= ~TB2_TX_DMA_START;
-            q_tx_report (vh, status);
+            q_tx_report (lp, status);
             lp->txstate = TXS_IDLE;
         } else
             lp->txstate = TXS_DMA_PENDING;
@@ -1517,14 +1521,15 @@ static t_stat vh_xmt_svc (  UNIT    *uptr   )
             /* process any pending programmed output */
             if (lp->txfifo_cnt) {
                 if (lp->tbuf2 & TB2_TX_ENA) {
-                    sim_debug (DBG_XMTSCH, &vh_dev, "VH-%d PIO: %s - 0x%X\n", (int)(lp - vh_parm), (lp->txstate == TXS_PIO_PENDING) ? "Pending" : ((lp->txstate == TXS_PIO_START) ? "Starting" : ((lp->txstate == TXS_IDLE) ? "Idle" : "Unknown")), lp->txfifo[lp->txfifo_idx] & 0xFF);
+                    sim_debug (DBG_XMTSCH, &vh_dev, "VH-%d PIO: %s - 0x%X '%c'\n", (int)(lp - vh_parm), 
+                                                                              (lp->txstate == TXS_PIO_PENDING) ? "Pending" : ((lp->txstate == TXS_PIO_START) ? "Starting" : ((lp->txstate == TXS_IDLE) ? "Idle" : "Unknown")), 
+                                                                              lp->txfifo[lp->txfifo_idx] & 0xFF, isprint (lp->txfifo[lp->txfifo_idx] & 0xFF) ? lp->txfifo[lp->txfifo_idx] & 0xFF : '.');
                     switch (lp->txstate) {
                         case TXS_PIO_PENDING:
                             if (0 == tmxr_txdone_ln (lp->tmln))     /* actually done? */
                                 break;
                             tx_fifo_get (lp);
-                            q_tx_report (vh,
-                                CSR_GETCHAN (vh_csr[vh]) << CSR_V_TX_LINE);
+                            q_tx_report (lp, 0);
                             lp->txstate = TXS_IDLE;
                             if (lp->txfifo_cnt == 0) 
                                 break;
