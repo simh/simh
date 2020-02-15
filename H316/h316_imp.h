@@ -36,7 +36,8 @@
 #define MI_MAX_MSG      256     // longest possible modem message (words!)
 #define HI_MAX_MSG      256     // longest possible host message (words!)
 #define MI_RXPOLL       100     // RX polling delay for UDP messages
-#define MI_TXBPS      56000UL   // default TX speed (bits per second)
+#define MI_TXBPS      56000UL   // default modem TX speed (bits per second)
+#define HI_TXBPS     100000UL   // default host TX speed (bits per second)
 #define HI_POLL_DELAY  1000     // polling delay for messages
 
 // Modem interface, line #1 ...
@@ -158,16 +159,21 @@ typedef struct _MIDB MIDB;
 //   One of these is allocated to every host interface ...
 struct _HIDB {
   // Receiver (HOST -> IMP) data ...
+  t_bool      rxpending;        // TRUE if a read is pending on this line
+  t_bool      rxerror;          // TRUE if any modem error detected
   uint32      rxtotal;          // total host messages received
   // Transmitter (IMP -> HOST) data ...
+  uint32      txdelay;          // RTC ticks until TX done interrupt
   uint32      txtotal;          // total host messages sent
   // Other data ...
-  t_bool      lloop;            // local loop back enabled
+  t_bool      iloop;            // local loop back enabled
   t_bool      enabled;          // TRUE if the host is enabled
   t_bool      error;            // TRUE for any host error
   t_bool      ready;            // TRUE if the host is ready
   t_bool      full;             // TRUE if the host buffer is full
   t_bool      eom;              // TRUE when end of message is reached
+  int32       link;             // h316_udp link number
+  uint32      bps;              // simulated line speed or COM port baud rate
 };
 typedef struct _HIDB HIDB;
 
@@ -186,6 +192,16 @@ typedef struct _HIDB HIDB;
 // modem transmitter timing exactly right!
 extern uint32 rtc_interval;
 extern t_stat mi_tx_service (uint32 quantum);
+
+//   This constant determines the longest possible IMP data payload that can be
+// sent. Most IMP messages are trivially small - 68 words or so - but, when one
+// IMP asks for a reload the neighbor IMP sends the entire memory image in a
+// single message!  That message is about 14K words long.
+//   The next thing you should worry about is whether the underlying IP network
+// can actually send a UDP packet of this size.  It turns out that there's no
+// simple answer to that - it'll be fragmented for sure, but as long as all
+// the fragments arrive intact then the destination should reassemble them.
+#define MAXDATA      16384      // longest possible IMP packet (in H316 words)
 
 // Prototypes for UDP modem/host interface emulation routines ...
 #define NOLINK  (-1)

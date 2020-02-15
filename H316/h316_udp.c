@@ -136,15 +136,6 @@
 
 // Local constants ...
 #define MAXLINKS        10      // maximum number of simultaneous connections
-//   This constant determines the longest possible IMP data payload that can be
-// sent. Most IMP messages are trivially small - 68 words or so - but, when one
-// IMP asks for a reload the neighbor IMP sends the entire memory image in a
-// single message!  That message is about 14K words long.
-//   The next thing you should worry about is whether the underlying IP network
-// can actually send a UDP packet of this size.  It turns out that there's no
-// simple answer to that - it'll be fragmented for sure, but as long as all
-// the fragments arrive intact then the destination should reassemble them.
-#define MAXDATA      16384      // longest possible IMP packet (in H316 words)
 
 // UDP connection data structure ...
 //   One of these blocks is allocated for every simulated modem link. 
@@ -336,6 +327,11 @@ t_stat udp_send (DEVICE *dptr, int32 link, uint16 *pdata, uint16 count)
 
   // Send it and we're outta here ...
   iret = tmxr_put_packet_ln (&udp_lines[link], (const uint8 *)&pkt, (size_t)pktlen);
+  if (iret == 111)
+    {
+      fprintf (stderr, "link %d got connection refused\n", link);
+      return SCPE_OK;
+    }
   if (iret != SCPE_OK) return udp_error(link, "tmxr_put_packet_ln()");
   sim_debug(IMP_DBG_UDP, dptr, "link %d - packet sent (sequence=%d, length=%d)\n", link, ntohl(pkt.sequence), ntohs(pkt.count));
   return SCPE_OK;
