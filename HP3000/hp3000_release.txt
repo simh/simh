@@ -1,6 +1,6 @@
                            SIMH/HP 3000 RELEASE NOTES
                            ==========================
-                             Last update: 2018-01-12
+                             Last update: 2019-02-21
 
 
 This file documents the release history of the Hewlett-Packard 3000 simulator.
@@ -13,11 +13,17 @@ simulator code base is available at:
 ...and may be downloaded at any time.  A code snapshot is identified by the "git
 commit ID" that is displayed in the simulator welcome banner.
 
-Therefore, HP 3000 releases are simply documentation checkpoints that describe
-the changes that have occurred since the last checkpoint.  Generally, a release
-is written when one or more major changes have been incorporated.  Minor bug
-fixes will be available immediately from the repository but only noted as part
-of the next release document.
+An HP 3000 "release" replaces the HP portion of the SIMH code base and is made
+when one or more major changes have been incorporated.  Each release is
+documented below and describes the changes (new features and corrected errors)
+that have occurred since the prior release.  A revised "HP 3000 Simulator User's
+Guide" accompanies every release where user-visible changes were made.
+
+A "release update" is made to fix minor errors that do not affect normal user
+operation.  Examples of updates might be expansion or correction of source file
+comments, minor algorithm improvements, or rewording of error messages.  Updates
+are not documented here, although every change is reported in the change logs
+that appear at the beginning of all HP 3000 source files.
 
 
 
@@ -104,9 +110,9 @@ the MPE version used:
 
  - After a cold load from tape (COLDSTART/RELOAD/UPDATE), if a non-HP terminal
    such as the simulation console is used as the system console, MPE prints DATE
-   (M/D/Y)? and then WED, NOV  1, 1972, 12:00 AM, as though RETURN had been
-   entered, but it wasn't.  If an HP terminal emulator is used instead, MPE
-   waits for the user to enter the date before proceeding.
+   (M/D/Y)? and then WED, NOV  1, 1972, 12:00 AM, as though the RETURN key had
+   been pressed.  If an HP terminal emulator is used instead, MPE waits for the
+   user to enter the date before proceeding.
 
    The problem is incorrect coding in the SPEEDSENSE procedure in module
    INITIAL.  As a result, the console baud rate is set to an invalid value, so
@@ -118,11 +124,16 @@ the MPE version used:
    does not seem to have survived.  A simple workaround is to set local ENQ/ACK
    processing on ATC channel 0 (SET ATCD0 LOCALACK) when the system console is
    not an HP terminal.  This is the default setting, so the bug only manifests
-   itself when SET ATCD0 REMOTEACK is done before booting.  An alternate
-   workaround that does not depend on the ATC setting is to set memory location
-   01.112247 to octal value 021360.  This changes the "LOAD P+22,I,X"
-   instruction at that location to "LDI 360" to set the detected speed to 2400
-   baud unconditionally.
+   itself when SET ATCD0 REMOTEACK is done before booting.
+
+   An alternate workaround that does not depend on the ATC configuration is to
+   set memory location 01.112247 to octal value 021360 after cold loading is
+   complete.  This changes the "LOAD P+22,I,X" instruction at that location to
+   "LDI 360" to set the detected speed to 2400 baud unconditionally.  This
+   workaround is present in the "mpe-1-reload.sim" simulator command file
+   provided with the MPE-V/R Operating System Software Kit mentioned above.
+   However, the correction is applied only to the in-memory copy of MPE; the
+   disc and tape images supplied in the kit are unaltered.
 
 
  - If a SHUTDOWN is performed while a logon read is pending on the system
@@ -134,7 +145,7 @@ the MPE version used:
    SHUTDOWN command or because the read timed out, the message is printed
    normally.
 
-   The problem is that while the message is being send to the ATC character-by-
+   The problem is that while the message is being sent to the ATC character-by-
    character, the I/O abort issued to cancel the logon read also cancels the
    message write.  The timing is such that only the first few characters of the
    message are printed before the rest of the output is cancelled.
@@ -156,8 +167,9 @@ the MPE version used:
    (LOAD ERR 33)" error.  This is because MPE defaults to an 8K code segment
    size limit, and DPAN4 has three segments between 8K and 12K in size.  If the
    limit is subsequently raised via a SYSDUMP and COLDSTART reconfiguration,
-   running DPAN4 produces a "FILE IS NOT A VALID PROGRAM FILE" error.  However,
-   if the reconfiguration is done before running DPAN4, it will run properly
+   running DPAN4 produces a "FILE IS NOT A VALID PROGRAM FILE" error, which
+   will persist until DPAN4.PUB.SYS is restored from the FOS tape.  However, if
+   the reconfiguration is done before running DPAN4, it will run properly
    thereafter.
 
    The problem is that MPE incorrectly modifies the executable file's Segment
@@ -170,9 +182,151 @@ the MPE version used:
 
    No SSB KPR has been located, but a later MPE version ensures that code
    segment size aborts occur before any of the STTs are modified, so the program
-   file remains internally consistent.  A memory patch is impossible, but
-   workarounds are to increase the code segment limit before running DPAN4 and
-   to restore DPAN4.PUB.SYS from the FOS tape if it has been damaged.
+   file remains internally consistent.  A memory patch is impossible, but a
+   workaround is to increase the code segment limit before running DPAN4.  This
+   is done by the "mpe-3-sysdump.sim" simulator command file provided with the
+   MPE-V/R Operating System Software Kit mentioned above, and the supplied disc
+   image contains the increased limit.
+
+
+
+=====================
+Release 8, 2019-02-19
+=====================
+
+This release of the HP 3000 simulator does not add any new features.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - Comments marking the locations where "switch" statement executions fall
+   through from one case label to the following case now comply with the
+   requirements of the GNU C compiler to avoid warnings when the compiler option
+   "-Wimplicit-fallthrough" is used.
+
+ - A workaround for the MPE system clock losing time with simulator framework
+   versions after June 14, 2018 (git commit ID d3986466) has been implemented.
+   It will be removed when the framework issue has been corrected.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  Simulation stops are reported improperly in CPU traces.
+
+     VERSION:  Release 7.
+
+     OBSERVATION:  A simulation stop that occurs while CPU tracing is enabled
+     reports the cause of the stop in the trace log.  However, stop reasons
+     specific to the HP simulator are not reported properly.  For example,
+     tracing a halt instruction reports "simulation stop: Error 5" instead of
+     "simulation stop: Programmed halt".
+
+     CAUSE:  The "sim_error_text" routine called to obtain the error translation
+     does not return simulator-specific messages.  Instead, the routine returns
+     the generic message, "Error <n>", where <n> is the value of the simulator-
+     specific stop code.
+
+     RESOLUTION:  Modify the simulation stop trace at the end of the instruction
+     postlude in "sim_instr" (hp2100_cpu.c) to call "sim_error_text" for SCP
+     errors and to obtain HP-specific messages from the "sim_stop_messages"
+     array.
+
+     STATUS:  Fixed in Release 8.
+
+
+  2. PROBLEM:  "Non-configured device" error when mounting a magnetic tape.
+
+     VERSION:  Release 7.
+
+     OBSERVATION:  Occasionally, resuming simulation after mounting a magnetic
+     tape produces this message on the system console:
+
+       18:05/3/Interrupt received for non-configured device on DRT 6. Check I/O
+       configuration.
+
+     ...instead of the expected:
+
+       17:59/10/Vol (unlabelled) mounted on LDEV# 7
+
+     However, the I/O map produced as part of a system reload shows that all
+     four magnetic tape units are configured properly.
+
+     Tracing CPU execution after resumption shows that the error occurs when the
+     mag tape controller interrupt (a result of the offline-to-online transition
+     when the tape is mounted) is immediately followed by a system clock
+     interrupt.  The wrong return address is stacked by the second interrupt, so
+     the first instruction of the mag tape interrupt service routine (a TIO
+     instruction for DRT 6) is skipped when the clock interrupt routine exits.
+     As a result, the stack alignment is wrong, so the test for a configured
+     device fails, resulting in the error message observed.
+
+     CAUSE:  MPE executes a PAUS instruction to wait for an interrupt while
+     idle.  The mag tape interrupt stacks a return address that points to the
+     instruction after the PAUS, which is correct.  But before the mag tape
+     interrupt handler can execute its first instruction, the higher-priority
+     clock interrupt occurs.  This should stack a return address that points to
+     the first instruction of the mag tape interrupt handler, which has not yet
+     been executed.  But instead, the return address points to the second
+     instruction.  Consequently, the first instruction will be skipped when the
+     clock handler completes.
+
+     The problem occurs because the "cpu_run_mode_interrupt" routine in
+     "hp3000_cpu.c" must adjust the program counter (P register) when resuming
+     from a simulation stop that occurred while a PAUS instruction was
+     executing.
+
+     Because of the Series III's two-stage instruction pipeline, the P register
+     normally points two instructions past the instruction currently executing.
+     When an interrupt occurs, P is decremented to point at the instruction
+     after the current instruction, which is the correct point of return after
+     the interrupt service routine completes.
+
+     When the simulator is stopped, P is backed up to point at the next
+     instruction to execute.  In the case of a PAUS instruction, the "next
+     instruction" is the same PAUS instruction.  When simulation resumes, the
+     PAUS instruction is fetched into the NIR (Next Instruction Register), and P
+     is incremented.  If no interrupt is pending, the main instruction execution
+     loop copies the NIR into the CIR (Current Instruction Register), prefetches
+     the instruction following the PAUS into the NIR, and increments P again, so
+     that it points two instructions beyond the current instruction.  At this
+     point, everything is set up properly as before the simulation stop.
+
+     However, in the error case, the tape controller has requested an interrupt
+     that is pending when simulation is resumed.  Interrupts are checked before
+     each instruction executes, so when the interrupt is acknowledged, P is
+     still pointing to the next instruction instead of two instructions ahead.
+     For things to work as expected, P needs to be advanced one more instruction
+     before the interrupt is serviced.  So, in the special case of a PAUS
+     instruction present in the CIR after resuming a simulator stop with an
+     interrupt pending, the "cpu_run_mode_interrupt" routine increments P again
+     before stacking the return address.
+
+     That code does just what it is supposed to...except in the case of a higher
+     priority device that immediately interrupts a lower priority device while a
+     PAUS instruction is in the CIR.  In this case, the second interrupt causes
+     a second entry into the "cpu_run_mode_interrupt" routine, and because it
+     still sees the PAUS instruction in the CIR, P is incremented again.  This
+     is wrong, because the instruction now being interrupted is not the PAUS but
+     is the first instruction of the lower-priority interrupt routine, which
+     never had a chance to execute.  The result is that when the lower-priority
+     routine is resumed, the first instruction of that routine is skipped
+     because P was incremented a second time.
+
+     The problem does not occur if the higher-priority interrupt is delayed by
+     one instruction, or if the higher-priority interrupt occurs before the
+     lower-priority interrupt, or if the CPU is executing something other than a
+     PAUS instruction when it was stopped.
+
+     RESOLUTION:  Modify "cpu_run_mode_interrupt" (hp3000_cpu.c) to test a flag
+     that is set in "halt_mode_interrupt" when resuming into a PAUS instruction.
+     If the flag is set, increment P and clear it, so that a second entry will
+     not increment P twice.
+
+     STATUS:  Fixed in Release 8.
 
 
 
@@ -394,7 +548,7 @@ Bugs Fixed
 
      VERSION:  Release 4.
 
-     OBSERVATION:  The EDIT instruction is interruptible between operations. If
+     OBSERVATION:  The EDIT instruction is interruptible between operations.  If
      an interrupt is detected, two words are pushed onto the stack before the
      interrupt handler is called.  These words hold the current significance
      trigger, loop count, float character, and fill character.  This allows the

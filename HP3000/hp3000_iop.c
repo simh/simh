@@ -1,6 +1,6 @@
 /* hp3000_iop.c: HP 3000 30003B I/O Processor simulator
 
-   Copyright (c) 2016, J. David Bryan
+   Copyright (c) 2016-2019, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +25,7 @@
 
    IOP          HP 3000 Series III I/O Processor
 
+   18-Feb-19    JDB     Continue iop_poll if first interface returns INTPOLLOUT
    10-Oct-16    JDB     Renumbered debug flags to start at bit 0
    03-Sep-16    JDB     Added "iop_assert_PFWARN" to warn devices of power loss
    01-Aug-16    JDB     Added "iop_reset" to initialize the IOP
@@ -496,7 +497,8 @@ return IOA;
    However, if some condition has occurred between the time of the original
    request and this poll, the interface will assert INTPOLLOUT.  In response,
    the IOP will clear IOA and the associated bit in the poll set to cancel the
-   request.
+   request.  If any other interfaces are asserting INTREQ, the poll continues
+   with the next-highest-priority interface in the chain.
 
    In either case, the associated bit in the request set is cleared.
 
@@ -507,6 +509,12 @@ return IOA;
        This prevents a second interrupt from changing IOA until the microcode
        signals its readiness by clearing EXTINT.  In simulation, entry with
        cpx1_EXTINTR set returns IOA in lieu of conducting a poll.
+
+    2. An interface that asserted INTREQ should respond to an INTPOLL by
+       asserting either INTACK or INTPOLLOUT.  If it does neither, then the
+       interface is inhibiting lower-priority interrupts but not performing an
+       interrupt itself.  We simulate this by clearing the request set bit but
+       not the poll set bit.
 */
 
 uint32 iop_poll (void)
@@ -518,38 +526,54 @@ uint32       ipn, priority_mask, request_granted;
 if (CPX1 & cpx1_EXTINTR)                                /* if an external interrupt has been requested */
     return IOA;                                         /*   then return the device number in lieu of polling */
 
-priority_mask   = IOPRIORITY (interrupt_poll_set);              /* calculate the priority mask */
-request_granted = priority_mask & iop_interrupt_request_set;    /*   and determine the request to grant */
+else do {                                               /* otherwise poll for an interrupt request */
+    priority_mask   = IOPRIORITY (interrupt_poll_set);              /* calculate the priority mask */
+    request_granted = priority_mask & iop_interrupt_request_set;    /*   and determine the request to grant */
 
-if (request_granted == 0)                               /* if no request has been granted */
-    return 0;                                           /*   then return */
+    if (request_granted == 0)                           /* if no request was granted */
+        return 0;                                       /*   then return */
+    else                                                /* otherwise */
+        iop_interrupt_request_set &= ~priority_mask;    /*   clear the request */
 
-for (ipn = 0; !(request_granted & 1); ipn++)            /* determine the interrupt priority number */
-    request_granted = request_granted >> 1;             /*   by counting the bits until the set bit is reached */
+    for (ipn = 0; !(request_granted & 1); ipn++)        /* determine the interrupt priority number */
+        request_granted = request_granted >> 1;         /*   by counting the bits until the set bit is reached */
 
-dibptr = irqs [ipn];                                    /* get the DIB pointer for the request */
+    dibptr = irqs [ipn];                                /* get the DIB pointer for the request */
 
-outbound = dibptr->io_interface (dibptr, INTPOLLIN, 0); /* poll the interface that requested the interrupt */
+    outbound = dibptr->io_interface (dibptr, INTPOLLIN, 0); /* poll the interface that requested the interrupt */
 
-if (outbound & INTACK) {                                /* if the interface acknowledged the interrupt */
-    IOA = IODATA (outbound);                            /*   then save the returned device number */
-    CPX1 |= cpx1_EXTINTR;                               /*     and tell the CPU */
+    if (outbound & INTACK) {                            /* if the interface acknowledged the interrupt */
+        IOA = IODATA (outbound);                        /*   then save the returned device number */
+        CPX1 |= cpx1_EXTINTR;                           /*     and tell the CPU */
 
-    dprintf (iop_dev, FILTER (dibptr->device_number) ? DEB_IRQ : 0,
-             "Device number %u acknowledged interrupt request at priority %u\n",
-             dibptr->device_number, ipn);
+        dprintf (iop_dev, FILTER (dibptr->device_number) ? DEB_IRQ : 0,
+                 "Device number %u acknowledged interrupt request at priority %u\n",
+                 dibptr->device_number, ipn);
+
+        break;                                          /* stop the poll at this interface */
+        }
+
+    else if (outbound & INTPOLLOUT) {                   /* otherwise if the interface cancelled the request */
+        IOA = 0;                                        /*   then clear the device number */
+        interrupt_poll_set &= ~priority_mask;           /*     and the associated bit in the poll set */
+
+        dprintf (iop_dev, FILTER (dibptr->device_number) ? DEB_IRQ : 0,
+                 "Device number %u canceled interrupt request at priority %u\n",
+                 dibptr->device_number, ipn);
+        }
+
+    else {                                              /* otherwise the interface inhibited the poll */
+        IOA = 0;                                        /*   so clear the device number */
+
+        dprintf (iop_dev, FILTER (dibptr->device_number) ? DEB_IRQ : 0,
+                 "Device number %u inhibited INTPOLLIN at priority %u\n",
+                 dibptr->device_number, ipn);
+
+        break;                                          /* stop the poll at this interface */
+        }
     }
 
-else if (outbound & INTPOLLOUT) {                       /* otherwise if the interface cancelled the request */
-    IOA = 0;                                            /*   then clear the device number */
-    interrupt_poll_set &= ~priority_mask;               /*     and the associated bit in the poll set */
-
-    dprintf (iop_dev, FILTER (dibptr->device_number) ? DEB_IRQ : 0,
-             "Device number %u canceled interrupt request at priority %u\n",
-             dibptr->device_number, ipn);
-    }
-
-iop_interrupt_request_set &= ~priority_mask;            /* clear the request */
+while (iop_interrupt_request_set != 0);                 /* continue polling while requests remain */
 
 return IOA;                                             /* return the interrupting device number */
 }

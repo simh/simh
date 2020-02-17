@@ -1,6 +1,6 @@
 /* hp3000_io.h: HP 3000 device-to-IOP/MPX/SEL interface declarations
 
-   Copyright (c) 2016, J. David Bryan
+   Copyright (c) 2016-2018, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -23,6 +23,7 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   30-Sep-18    JDB     Corrected typo in I/O macro comments
    12-Sep-16    JDB     Added the DIB_REGS macro
    02-Sep-16    JDB     Added the iop_assert_PFWARN routine
    11-Jun-16    JDB     Bit mask constants are now unsigned
@@ -187,7 +188,7 @@ typedef uint32              SIGNALS_DATA;       /* a combined outbound signal se
 
    A priority set is an unsigned value, where each bit represents an assertion
    of some nature (e.g., I/O signals, interrupt requests, etc.), and the
-   position of the bit represents its priority, which increases from LSB to MSB.
+   position of the bit represents its priority, which decreases from LSB to MSB.
    The IOPRIORITY macro isolates the highest-priority bit from the set.  It does
    this by ANDing the value with its two's complement; only the lowest-order bit
    will differ.  For example (bits are numbered here from the LSB):

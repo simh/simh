@@ -25,6 +25,7 @@
 
    MEM          HP 3000 Series III Main Memory
 
+   27-Dec-18    JDB     Revised fall through comments to comply with gcc 7
    21-May-18    JDB     Changed "access" to "mem_access" to avoid clashing
    10-Oct-16    JDB     Created
 
@@ -549,7 +550,7 @@ else {                                                  /* otherwise the access 
             if (offset > SM && offset <= SM + SR && bank == SBANK)  /* if the offset is within the TOS */
                 TR [SM + SR - offset] = value;                      /*   then write the value to a TOS register */
 
-        /* fall into checked cases */
+        /* fall through into checked cases */
 
         case data_checked:
             if (DL <= offset && offset <= SM + SR || PRIV)          /* if the offset is within bounds or is privileged */

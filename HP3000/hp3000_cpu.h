@@ -1,6 +1,6 @@
 /* hp3000_cpu.h: HP 3000 CPU declarations
 
-   Copyright (c) 2016, J. David Bryan
+   Copyright (c) 2016-2019, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -23,6 +23,8 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   18-Feb-19    JDB     Added SS_PAUSE_RESUMED simulation stop condition
+   25-Jul-18    JDB     Fixed typo in "cpu_setup_code_segment" declaration
    07-Nov-16    JDB     Added SETR and SETR_X for SETR executor use;
                         renamed cpu_byte_to_word_ea to cpu_byte_ea
    03-Nov-16    JDB     Added LABEL_LOCAL for PARC/XBR/ENDP executor use
@@ -105,6 +107,8 @@
 #define SS_PAUSE            (1u << 1)           /* stop on PAUS instruction */
 #define SS_UNDEF            (1u << 2)           /* stop on undefined instruction */
 #define SS_UNIMPL           (1u << 3)           /* stop on unimplemented instruction */
+
+#define SS_PAUSE_RESUMED    (1u << 30)          /* stop resumes into a PAUS instruction */
 #define SS_BYPASSED         (1u << 31)          /* stops are bypassed for this instruction */
 
 
@@ -1092,7 +1096,7 @@ extern uint32 cpu_byte_ea (ACCESS_CLASS class, uint32 byte_offset, uint32 block_
 extern void cpu_setup_irq_handler  (IRQ_CLASS class, HP_WORD parameter);
 extern void cpu_setup_ics_irq      (IRQ_CLASS class, TRAP_CLASS trap);
 extern void cpu_run_mode_interrupt (HP_WORD device_number);
-extern void cpu_setup_code_segment (HP_WORD label, HP_WORD* status, HP_WORD *entry_0);
+extern void cpu_setup_code_segment (HP_WORD label, HP_WORD *status, HP_WORD *entry_0);
 extern void cpu_setup_data_segment (HP_WORD segment_number, HP_WORD *bank, HP_WORD *address);
 extern void cpu_call_procedure     (HP_WORD label, HP_WORD offset);
 extern void cpu_exit_procedure     (HP_WORD new_q, HP_WORD new_sm, HP_WORD parameter);

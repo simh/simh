@@ -1,6 +1,6 @@
 /* hp3000_lp.c: HP 3000 30209A Line Printer Interface simulator
 
-   Copyright (c) 2016-2017, J. David Bryan
+   Copyright (c) 2016-2018, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +25,7 @@
 
    LP           HP 30209A Line Printer Interface
 
+   27-Dec-18    JDB     Revised fall through comments to comply with gcc 7
    07-Sep-17    JDB     Changed PCHR and UPCHR registers to PUNCHR and UNPCHR
                         Changed PRTBUF, OVPCHR, PUNCHR, and UNPCHR to REG_A
    05-Sep-17    JDB     Changed REG_A (permit any symbolic override) to REG_X
@@ -1437,7 +1438,7 @@ while (working_set) {
             if (! J2W1_INSTALLED)                       /* if W1 (SR set by Device Status) is not installed */
                 device_sr = SET;                        /*   then set the device service request flip-flop */
 
-        /* fall into the DCONTSTB case */
+        /* fall through into the DCONTSTB case */
 
         case DCONTSTB:
             dprintf (lp_dev, DEB_CSRW,

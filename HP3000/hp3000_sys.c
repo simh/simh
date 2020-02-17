@@ -23,6 +23,8 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   27-Dec-18    JDB     Revised fall through comments to comply with gcc 7
+   29-May-18    JDB     Added a check for the "alternate" flag to "fmt_bitset"
    05-Sep-17    JDB     Removed the -B (binary display) option; use -2 instead
                         Rewrote "fprint_sym" for better coverage
    11-May-17    JDB     Corrected comment in "fprint_value"
@@ -79,6 +81,14 @@
 #include "hp3000_io.h"
 
 
+
+/* Global release string */
+
+const char *sim_vm_release = "8";               /* HP 3000 simulator release number */
+const char *sim_vm_release_message = 
+   "This is the last version of this simulator which is API compatible\n"
+   "with the 4.x version of the simh framework.  A supported version of\n"
+   "this simulator can be found at: http://simh.trailing-edge.com/hp\n";
 
 /* External I/O data structures */
 
@@ -1072,7 +1082,7 @@ char sim_name [] = "HP 3000";                   /* the simulator name */
 
 int32 sim_emax = 2;                             /* the maximum number of words in any instruction */
 
-WEAK void (*sim_vm_init) (void) = &one_time_init;    /* a pointer to the one-time initializer */
+void (*sim_vm_init) (void) = &one_time_init;    /* a pointer to the one-time initializer */
 
 DEVICE *sim_devices [] = {                      /* an array of pointers to the simulated devices */
     &cpu_dev,                                   /*   CPU (must be first) */
@@ -1958,7 +1968,7 @@ switch (opcode) {                                       /* dispatch by the exten
         else                                            /* otherwise */
             operand = NEG8 (operand);                   /*   negate the operand for display */
 
-    /* fall into the BRIS case */
+    /* fall through into the BRIS case */
 
     case 011:                                           /* BRIS - branch if significance */
         if (operand & D8_SIGN) {                        /* if the displacement is negative */
@@ -3490,7 +3500,7 @@ switch (ops [op_index].operand) {                       /* dispatch by the opera
         index = (instruction & X_FLAG) != 0;            /* save the index condition */
         indirect = (instruction & I_FLAG_BIT_5) != 0;   /*   and the indirect condition */
 
-    /* fall into the P-relative displacement case */
+    /* fall through into the P-relative displacement case */
 
     /* P +/- displacement range 0-255 */
 
@@ -3597,7 +3607,7 @@ switch (ops [op_index].operand) {                       /* dispatch by the opera
             break;
             }
 
-    /* otherwise the displacement is not P-relative, so fall into the data-relative handler */
+    /* otherwise the displacement is not P-relative, so fall through into the data-relative handler */
 
     /* DB+/Q+/Q-/S- displacements, indirect bit 5, index bit 4 */
 
@@ -3624,7 +3634,7 @@ switch (ops [op_index].operand) {                       /* dispatch by the opera
 
         indirect = (instruction & I_FLAG_BIT_5) != 0;       /* save the indirect condition */
 
-    /* fall into the index case */
+    /* fall through into the index case */
 
     /* index bit 4 */
 
@@ -3639,7 +3649,7 @@ switch (ops [op_index].operand) {                       /* dispatch by the opera
         index = (instruction & X_FLAG) != 0;            /* save the index condition */
         op_value = op_value & DISPL_63_MASK;            /*   and mask to the operand value */
 
-    /* fall into the unsigned value case */
+    /* fall through into the unsigned value case */
 
     /* unsigned value range 0-63 */
 
@@ -3686,7 +3696,7 @@ switch (ops [op_index].operand) {                       /* dispatch by the opera
     case opSU2:
         op_value = op_value >> EIS_SDEC_SHIFT;          /* align the S decrement value */
 
-    /* fall into the unsigned operand case */
+    /* fall through into the unsigned operand case */
 
     /* unsigned value range 0-1 */
     /* unsigned value range 0-255 */

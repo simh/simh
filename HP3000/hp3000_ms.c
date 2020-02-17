@@ -1,6 +1,6 @@
 /* hp3000_ms.c: HP 3000 30215A Magnetic Tape Controller Interface simulator
 
-   Copyright (c) 2016-2017, J. David Bryan
+   Copyright (c) 2016-2018, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +25,7 @@
 
    MS           HP 30215A Magnetic Tape Controller Interface
 
+   27-Dec-18    JDB     Revised fall through comments to comply with gcc 7
    05-Sep-17    JDB     Changed REG_A (permit any symbolic override) to REG_X
    12-Sep-16    JDB     Changed DIB register macro usage from SRDATA to DIB_REG
    09-Jun-16    JDB     Added casts for ptrdiff_t to int32 values
@@ -1315,7 +1316,7 @@ while (command_set) {                                   /* process the set of re
             unit_interrupt = SET;                       /* set the unit interrupt flip-flop */
             attention_unit = TLIBUS (result);           /*   and save the number of the requesting unit */
 
-        /* fall into the STINT case */
+        /* fall through into the STINT case */
 
         case STINT:                                     /* Set Interrupt */
             flags = NO_FLAGS;                           /* clear the interface transfer flags and INTOK */

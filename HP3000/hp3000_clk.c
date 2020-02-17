@@ -693,7 +693,7 @@ while (working_set) {
 
 
         case DRESETINT:
-            dibptr->interrupt_active  = CLEAR;          /* clear the Interrupt Active flip-flop */
+            dibptr->interrupt_active = CLEAR;           /* clear the Interrupt Active flip-flop */
 
             if ((limit_irq == SET || lost_tick_irq == SET)  /* if the limit or lost tick flip-flops are set */
               && control_word & CN_IRQ_ENABLE)              /*   and interrupts are enabled */

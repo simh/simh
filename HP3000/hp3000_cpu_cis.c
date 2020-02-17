@@ -157,7 +157,7 @@
    numbers with an even number of digits will not use the upper four bits of the
    first byte.  Digits are represented by four-bit values from 0-9 (i.e., in
    Binary-Coded Decimal or BCD), with the most-significant digit first and the
-   least-significant digit last. The sign is given by one of these encodings:
+   least-significant digit last.  The sign is given by one of these encodings:
 
      1100 - the number is positive
      1101 - the number is negative
