@@ -1389,7 +1389,7 @@ struct _PACKET_OID_DATA {
 }; 
 typedef struct _PACKET_OID_DATA PACKET_OID_DATA, *PPACKET_OID_DATA;
 typedef void **LPADAPTER;
-#define OID_802_3_CURRENT_ADDRESS               0x01010102 /* Extracted from ntddmdis.h */
+#define OID_802_3_CURRENT_ADDRESS               0x01010102 /* Extracted from ntddndis.h */
 
 static int pcap_mac_if_win32(const char *AdapterName, unsigned char MACAddress[6])
 {
