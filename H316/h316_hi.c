@@ -268,7 +268,7 @@ void hi_link_error (uint16 line)
   //   Any physical I/O error, either for the UDP link or a COM port, prints a
   // message and detaches the modem.  It's up to the user to decide what to do
   // after that...
-  fprintf(stderr,"HI%d - UNRECOVERABLE I/O ERROR!\n", line);
+  sim_printf("HI%d - UNRECOVERABLE I/O ERROR!\n", line);
   hi_reset_rx(line);  hi_reset_tx(line);
   sim_cancel(PUNIT(line));  hi_detach(PUNIT(line));
   PHIDB(line)->link = NOLINK;
@@ -344,7 +344,6 @@ void hi_start_tx (uint16 line, uint16 flags)
     tmp [0] = flags;
     for (i = 0; i < count; i ++)
       tmp [i + 1] = M [next+i];
-    //ret = udp_send(PDEVICE(line), PHIDB(line)->link, &M[next], count);
     ret = udp_send(PDEVICE(line), PHIDB(line)->link, tmp, count);
     free (tmp);
     if (ret != SCPE_OK && ret != 66) hi_link_error(line);
@@ -359,8 +358,7 @@ void hi_start_tx (uint16 line, uint16 flags)
   // DLE, STX, ETX and checksum bytes, that would be added to the packet.
   nbits = (((uint32) count)*2UL + 12UL) * 8UL;
   PHIDB(line)->txdelay = (nbits * 1000000UL) / (PHIDB(line)->bps * rtc_interval);
-  //fprintf(stderr,"HI%d - transmit packet, length=%d, bits=%ld, interval=%ld, delay=%ld\n", line, count, nbits, rtc_interval, PHIDB(line)->txdelay);
-
+  sim_debug(IMP_DBG_IOT, PDEVICE(line), "HI%d - transmit packet, length=%d, bits=%ld, interval=%ld, delay=%ld\n", line, count, nbits, rtc_interval, PHIDB(line)->txdelay);
   // That's it - we're done until it's time for the TX done interrupt ...
   CLR_TX_IRQ(line);
 }
@@ -425,7 +423,6 @@ void hi_poll_rx (uint16 line)
   // Read the packet into a temp buffer for disassembly.
   tmp = (uint16 *)malloc (MAXDATA * sizeof (*tmp));
 
-  //count = udp_receive(PDEVICE(line), PHIDB(line)->link, pdata, maxbuf);
   count = udp_receive(PDEVICE(line), PHIDB(line)->link, tmp, maxbuf+1);
   if (count == 0) {free (tmp); return; }
   if (count < 0) {free (tmp); hi_link_error(line); return; }
@@ -533,7 +530,7 @@ int32 hi_io (uint16 host, int32 inst, int32 fnc, int32 dat, int32 dev)
         udp_set_link_loopback (PDEVICE(host), PHIDB(host)->link, FALSE);
         return dat;
       case 005:
-//fprintf (stderr, "HnENAB unimp.\r\n");
+        sim_printf("HnENAB unimp.\n");
         // HnENAB - enable ...
         sim_debug(IMP_DBG_IOT, PDEVICE(host), "enable host (PC=%06o)\n", PC-1);
         return dat;
@@ -550,7 +547,7 @@ int32 hi_io (uint16 host, int32 inst, int32 fnc, int32 dat, int32 dev)
       case 001:
         // HnRDY - skip on host ready ...
         //sim_debug(IMP_DBG_IOT, PDEVICE(host), "skip on ready (PC=%06o %s)\n", PC-1, PHIDB(host)->ready ? "SKIP" : "NOSKIP");
-//fprintf (stderr, "HnRDY unimpl.; always ready\r\n");
+        sim_printf("HnRDY unimpl.; always ready\n");
         return  PHIDB(host)->ready ? IOSKIP(dat) : dat;
       case 002:
         // HnEOM - skip on end of message ...
@@ -559,7 +556,7 @@ int32 hi_io (uint16 host, int32 inst, int32 fnc, int32 dat, int32 dev)
         return dat;
       case 005:
         // HnFULL - skip on host buffer full ...
-fprintf (stderr, "HnFULL unimp.\r\n");
+        sim_printf("HnFULL unimp.\n");
         sim_debug(IMP_DBG_IOT, PDEVICE(host), "skip on buffer full (PC=%06o %s)\n", PC-1, "NOSKIP");
         return dat;
     }
@@ -635,10 +632,8 @@ t_stat hi_attach (UNIT *uptr, CONST char *cptr)
   if ((uptr->flags & UNIT_ATT) != 0) detach_unit(uptr);
 
   // The physical (COM port) attach isn't implemented yet ...
-  if (fport) {
-    fprintf(stderr,"HI%d - physical COM support is not yet implemented\n", host);
-    return SCPE_ARG;
-  }
+  if (fport)
+    return sim_messagef(SCPE_ARG,"HI%d - physical COM support is not yet implemented\n", host);
 
   //   Make a copy of the "file name" argument.  udp_create() actually modifies
   // the string buffer we give it, so we make a copy now so we'll have something

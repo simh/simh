@@ -136,7 +136,6 @@
 
 // Local constants ...
 #define MAXLINKS        10      // maximum number of simultaneous connections
-
 // UDP connection data structure ...
 //   One of these blocks is allocated for every simulated modem link. 
 struct _UDP_LINK {
@@ -235,16 +234,9 @@ t_stat udp_parse_remote (int32 link, const char *premote)
 
   if ((strcmp (udp_links[link].lport, port) == 0) && 
       (strcmp ("localhost", host) == 0))
-    fprintf(stderr,"WARNING - use different transmit and receive ports!\n");
+    return sim_messagef (SCPE_ARG, "WARNING - use different transmit and receive ports!\n");
 
   return SCPE_OK;
-}
-
-t_stat udp_error (int32 link, const char *msg)
-{
-  // This routine is called whenever a SOCKET_ERROR is returned for any I/O.
-  fprintf(stderr,"UDP%d - %s failed with error %d\n", link, msg, WSAGetLastError());
-  return SCPE_IOERR;
 }
 
 t_stat udp_create (DEVICE *dptr, const char *premote, int32 *pln)
@@ -327,12 +319,7 @@ t_stat udp_send (DEVICE *dptr, int32 link, uint16 *pdata, uint16 count)
 
   // Send it and we're outta here ...
   iret = tmxr_put_packet_ln (&udp_lines[link], (const uint8 *)&pkt, (size_t)pktlen);
-  if (iret == 111)
-    {
-      fprintf (stderr, "link %d got connection refused\n", link);
-      return SCPE_OK;
-    }
-  if (iret != SCPE_OK) return udp_error(link, "tmxr_put_packet_ln()");
+  if (iret != SCPE_OK) return sim_messagef(iret, "UDP%d - tmxr_put_packet_ln() failed with error %s\n", link, sim_error_text(iret));
   sim_debug(IMP_DBG_UDP, dptr, "link %d - packet sent (sequence=%d, length=%d)\n", link, ntohl(pkt.sequence), ntohs(pkt.count));
   return SCPE_OK;
 }
@@ -366,7 +353,7 @@ int32 udp_receive_packet (int32 link, UDP_PACKET *ppkt)
   ret = tmxr_get_packet_ln (&udp_lines[link], &pbuf, &pktsiz);
   udp_lines[link].rcve = FALSE;          // Disable receiver
   if (ret != SCPE_OK) {
-    udp_error(link, "tmxr_get_packet_ln()");
+    sim_messagef (ret, "UDP%d - tmxr_get_packet_ln() failed with error %s\n", link, sim_error_text(ret));
     return NOLINK;
   }
   if (pbuf == NULL) return 0;

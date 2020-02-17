@@ -365,10 +365,8 @@ t_stat wdt_set_delay (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
   if (cptr == NULL) return SCPE_ARG;
   newint = get_uint (cptr, 10, 65535, &ret);
   if (ret != SCPE_OK) return ret;
-  if (newint != 0) {
-    fprintf(stderr,"WDT - timeout not yet implemented\n");
-    return SCPE_IERR;
-  }
+  if (newint != 0)
+    return sim_messagef(SCPE_IERR, "WDT - timeout not yet implemented\n");
   wdt_delay = newint;
 // TBA add calculations here???
   return SCPE_OK;
