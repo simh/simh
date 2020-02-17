@@ -1,6 +1,6 @@
-/* hp2100_fp1.c: HP 1000 multiple-precision floating point routines
+/* hp2100_cpu_fpp.c: HP 1000 Floating-Point Processor simulator
 
-   Copyright (c) 2005-2017, J. David Bryan
+   Copyright (c) 2005-2018, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   28-Jul-18    JDB     Renamed source file from hp2100_fp1.c
    07-Sep-17    JDB     Replaced "uint16" casts with "HP_WORD" for OP assignments
    16-May-16    JDB     Reformulated the definitions of op_mask
    24-Dec-14    JDB     Added casts for explicit downward conversions
@@ -38,12 +39,12 @@
                         Added F-Series ..TCM FFP helpers
 
    Primary references:
-   - HP 1000 M/E/F-Series Computers Engineering and Reference Documentation
-       (92851-90001, Mar-1981)
-   - HP 1000 M/E/F-Series Computers Technical Reference Handbook
-        (5955-0282, Mar-1980)
-   - DOS/RTE Relocatable Library Reference Manual
-        (24998-90001, Oct-1981)
+     - HP 1000 M/E/F-Series Computers Engineering and Reference Documentation
+         (92851-90001, March 1981)
+     - HP 1000 M/E/F-Series Computers Technical Reference Handbook
+         (5955-0282, March 1980)
+     - DOS/RTE Relocatable Library Reference Manual
+         (24998-90001, October 1981)
 
 
    This module implements multiple-precision floating-point operations to
@@ -73,64 +74,66 @@
    F-Series units after date code 1920 also provided two-word double-integer
    instructions in firmware, as well as double-integer fix and float operations.
 
-   The original 32-bit floating-point format is as follows:
+   Three floating-point precisions are defined, varying only in the length of
+   the mantissa and consequently the number of words occupied.  Single-precision
+   format has a 23-bit mantissa occupying two words.  Extended-precision format
+   has a 39-bit mantissa occupying three words.  Double-precision format has a
+   55-bit mantissa occupying four words.
 
-      15 14                                         0
-     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-     |MS|              mantissa high                 | : M
-     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-     |     mantissa low      |      exponent      |XS| : M + 1
-     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-      15                    8  7                 1  0
+   The floating-point formats are:
 
-   Both 23-bit mantissa and 7-bit exponent are in twos-complement form.  The
-   exponent sign bit has been rotated into the LSB of the second word.
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | M |                      signed mantissa                      | M
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |        signed mantissa        |      signed exponent      | E | M + 1
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
-   The extended-precision floating-point format is a 48-bit extension of the
-   32-bit format used for single precision.  A packed extended-precision value
-   consists of a 39-bit mantissa and a 7-bit exponent.  The format is as
-   follows:
 
-      15 14                                         0
-     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-     |MS|              mantissa high                 | : M
-     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-     |                 mantissa middle               | : M + 1
-     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-     |     mantissa low      |      exponent      |XS| : M + 2
-     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-      15                    8  7                 1  0
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | M |                      signed mantissa                      | M
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |                        signed mantissa                        | M + 1
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |        signed mantissa        |      signed exponent      | E | M + 2
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
-   The double-precision floating-point format is similar to the 48-bit
-   extended-precision format, although with a 55-bit mantissa:
 
-      15 14                                         0
-     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-     |MS|              mantissa high                 | : M
-     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-     |             mantissa middle high              | : M + 1
-     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-     |             mantissa middle low               | : M + 2
-     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-     |     mantissa low      |      exponent      |XS| : M + 3
-     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-      15                    8  7                 1  0
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | M |                      signed mantissa                      | M
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |                        signed mantissa                        | M + 1
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |                        signed mantissa                        | M + 2
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |        signed mantissa        |      signed exponent      | E | M + 3
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Where:
+
+     M = Mantissa sign
+     E = Exponent sign
+
+   The mantissas and exponents are in twos-complement form, and the signs
+   indicate the polarity (0 = positive, 1 = negative).  The exponent signs have
+   been rotated into the LSBs of the last words.
 
    The FPP also supports a special five-word expanded-exponent format:
 
-      15 14                                         0
-     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-     |MS|              mantissa high                 | : M
-     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-     |             mantissa middle high              | : M + 1
-     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-     |             mantissa middle low               | : M + 2
-     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-     |                mantissa low                   | : M + 3
-     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-     |                   exponent                 |XS| : M + 4
-     +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-      15                    8  7                 1  0
+      15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | M |                      signed mantissa                      | M
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |                        signed mantissa                        | M + 1
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |                        signed mantissa                        | M + 2
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |                        signed mantissa                        | M + 3
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |                      signed exponent                      | E | M + 4
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
    The exponent is a full 16-bit twos-complement value, but the allowed range is
    only 10 bits, i.e., -512 to +511.
@@ -182,26 +185,31 @@
    the FPP hardware.  As with the hardware, "fp_exec" retains the last result
    in an internal accumulator that may be referenced in subsequent operations.
 
-   NOTE: this module also provides the floating-point support for the firmware
-   single-precision 1000-M/E base set and extended-precision FFP instructions.
-   Because the firmware and hardware implementations returned slightly different
-   results, particularly with respect to round-off, conditional checks are
-   implemented in the arithmetic routines.  In some cases, entirely different
-   algorithms are used to ensure fidelity with the real machines.  Functionally,
-   this means that the 2100/1000-M/E and 1000-F floating-point diagnostics are
-   not interchangeable, and failures are to be expected if a diagnostic is run
-   on the wrong machine.
+
+   Implementation notes:
+
+    1. This module also provides the floating-point support for the firmware
+       single-precision 1000-M/E base set and extended-precision FFP
+       instructions.  Because the firmware and hardware implementations return
+       slightly different results, particularly with respect to round-off,
+       conditional checks are implemented in the arithmetic routines.  In some
+       cases, entirely different algorithms are used to ensure fidelity with the
+       real machines.  Functionally, this means that the 2100/1000-M/E and
+       1000-F floating-point diagnostics are not interchangeable, and failures
+       are to be expected if a diagnostic is run on the wrong machine.
 */
+
+
 
 #include "hp2100_defs.h"
 #include "hp2100_cpu.h"
-#include "hp2100_cpu1.h"
-#include "hp2100_fp1.h"
+#include "hp2100_cpu_fp.h"
+
 
 
 #if defined (HAVE_INT64)                                /* we need int64 support */
 
-/* Field widths. */
+/* Field widths */
 
 #define IN_W_SIGN        1
 #define IN_W_SMAGN      15
@@ -216,7 +224,7 @@
 #define FP_W_EXP         7
 #define FP_W_ESIGN       1
 
-/* Starting bit numbers. */
+/* Starting bit numbers */
 
 #define IN_V_SIGN       (64 - IN_W_SIGN)
 #define IN_V_SNUM       (64 - IN_W_SIGN - IN_W_SMAGN)
@@ -235,7 +243,7 @@
 #define FP_V_EXP         1
 #define FP_V_ESIGN       0
 
-/* Right-aligned field masks. */
+/* Right-aligned field masks */
 
 #define IN_M_SIGN       (((t_uint64) 1 << IN_W_SIGN)  - 1)
 #define IN_M_SMAGN      (((t_uint64) 1 << IN_W_SMAGN) - 1)
@@ -251,7 +259,7 @@
 #define FP_M_EXP        ((1 << FP_W_EXP) - 1)
 #define FP_M_ESIGN      ((1 << FP_W_ESIGN) - 1)
 
-/* In-place field masks. */
+/* In-place field masks */
 
 #define IN_SIGN         (IN_M_SIGN << IN_V_SIGN)
 #define IN_SMAGN        (IN_M_SMAGN << IN_V_SNUM)
@@ -265,7 +273,7 @@
 #define FP_EXP          (FP_M_EXP   << FP_V_EXP)
 #define FP_ESIGN        (FP_M_ESIGN << FP_V_ESIGN)
 
-/* In-place record masks. */
+/* In-place record masks */
 
 #define IN_SSMAGN       (IN_SIGN | IN_SMAGN)
 #define IN_SDMAGN       (IN_SIGN | IN_DMAGN)
@@ -276,7 +284,7 @@
 #define FP_SEMANT       (FP_MSIGN | FP_EMANT)
 #define FP_SEXP         (FP_ESIGN | FP_EXP)
 
-/* Minima and maxima. */
+/* Minima and maxima */
 
 #define FP_ONEHALF      ((t_int64) 1 << (FP_V_MSIGN - 1))   /* mantissa = 0.5 */
 #define FP_MAXPMANT     ((t_int64) FP_EMANT)                /* maximum pos mantissa */
@@ -284,14 +292,14 @@
 #define FP_MAXPEXP      (FP_M_EXPANDEXP)                    /* maximum pos expanded exponent */
 #define FP_MAXNEXP      (-(FP_MAXPEXP + 1))                 /* maximum neg expanded exponent */
 
-/* Floating-point helpers. */
+/* Floating-point helpers */
 
 #define DENORM(x)       ((((x) ^ (x) << 1) & FP_MSIGN) == 0)
 
 #define TO_EXP(e)       (int8) ((e >> FP_V_EXP & FP_M_EXP) | \
                                 (e & FP_M_ESIGN ? ~FP_M_EXP : 0))
 
-/* Property constants. */
+/* Property constants */
 
 static const t_int64 p_half_lsb[6] = { ((t_int64) 1 << IN_V_SNUM) - 1,     /* different than FP! */
                                        ((t_int64) 1 << IN_V_DNUM) - 1,     /* different than FP! */
@@ -339,7 +347,7 @@ static const uint32  int_p_max[2]  = { IN_M_SMAGN,
                                        IN_M_DMAGN };
 
 
-/* Internal unpacked floating-point representation. */
+/* Internal unpacked floating-point representation */
 
 typedef struct {
     t_int64     mantissa;
@@ -349,7 +357,7 @@ typedef struct {
 
 
 
-/* Low-level helper routines. */
+/* Low-level helper routines */
 
 
 /* Arithmetic shift right for mantissa only.
@@ -362,7 +370,7 @@ static t_bool asr (FPU *operand, int32 shift)
 t_uint64 mask;
 t_bool bits_lost;
 
-if (UNIT_CPU_MODEL == UNIT_1000_F) {                    /* F-series? */
+if (cpu_configuration & CPU_1000_F) {                   /* F-Series? */
     mask = ((t_uint64) 1 << shift) - 1;                 /* mask for lost bits */
     bits_lost = ((operand->mantissa & mask) != 0);      /* flag if any lost */
     }
@@ -385,7 +393,7 @@ static t_bool lsrx (FPU *operand, int32 shift)
 t_uint64 mask;
 t_bool bits_lost;
 
-if (UNIT_CPU_MODEL == UNIT_1000_F) {                    /* F-series? */
+if (cpu_configuration & CPU_1000_F) {                   /* F-Series? */
     mask = ((t_uint64) 1 << shift) - 1;                 /* mask for lost bits */
     bits_lost = ((operand->mantissa & mask) != 0);      /* flag if any lost */
     }
@@ -458,7 +466,7 @@ switch (precision) {
     case fp_e:
         unpacked.exponent =                             /* unpack expanded exponent */
             (int16) (packed.fpk[4] >> FP_V_EXP |        /* rotate sign into place */
-                     (packed.fpk[4] & 1 ? SIGN : 0));
+                     (packed.fpk[4] & 1 ? D16_SIGN : 0));
         break;
 
     case fp_a:                                          /* no action for value in accum */
@@ -473,7 +481,7 @@ return unpacked;
 }
 
 
-/* Pack a long integer into an operand. */
+/* Pack a long integer into an operand */
 
 static OP pack_int (t_int64 unpacked, OPSIZE precision)
 {
@@ -481,17 +489,17 @@ int32 i;
 OP packed;
 
 if (precision == in_s)
-    packed.word = (HP_WORD) (unpacked >> 48) & DMASK;   /* pack single integer */
+    packed.word = (HP_WORD) (unpacked >> 48) & D16_MASK; /* pack single integer */
 
 else if (precision == in_d)
-    packed.dword = (uint32) (unpacked >> 32) & DMASK32; /* pack double integer */
+    packed.dword = (uint32) (unpacked >> 32) & D32_MASK; /* pack double integer */
 
 else {
     if (precision == fp_e)                              /* five word operand? */
         precision = fp_t;                               /* only four mantissa words */
 
     for (i = 3; i >= 0; i--) {                          /* pack fp 2 to 4 words */
-        packed.fpk[i] = (HP_WORD) unpacked & DMASK;
+        packed.fpk[i] = (HP_WORD) unpacked & D16_MASK;
         unpacked = unpacked >> 16;
         }
     }
@@ -627,7 +635,7 @@ else if (unpacked->exponent >                           /* result overflow? */
          (FP_MAXPEXP >> (expand ? 0 : 2))) {
     if (sign &&                                         /* negative value? */
         (unpacked->precision == fp_x) &&                /* extended precision? */
-        (UNIT_CPU_MODEL != UNIT_1000_F)) {              /* not F-series? */
+        !(cpu_configuration & CPU_1000_F)) {            /* not F-Series? */
         unpacked->mantissa = FP_MAXNMANT;               /* return negative infinity */
         unpacked->exponent = FP_MAXPEXP & FP_M_EXP;
         }
@@ -644,7 +652,7 @@ return overflow;
 }
 
 
-/* Normalize, round, and pack an unpacked floating-point number. */
+/* Normalize, round, and pack an unpacked floating-point number */
 
 static uint32 nrpack (OP *packed, FPU unpacked, t_bool expand)
 {
@@ -659,10 +667,10 @@ return overflow;
 
 
 
-/* Low-level arithmetic routines. */
+/* Low-level arithmetic routines */
 
 
-/* Complement an unpacked number. */
+/* Complement an unpacked number */
 
 static void complement (FPU *result)
 {
@@ -833,7 +841,7 @@ if ((multiplicand.mantissa == 0) ||                     /* 0 * X = 0 */
     product->mantissa = product->exponent = 0;
 
 else {
-    firmware = (UNIT_CPU_MODEL != UNIT_1000_F);         /* set firmware flag */
+    firmware = !(cpu_configuration & CPU_1000_F);       /* set firmware flag */
 
     if (!firmware || (product->precision != fp_f)) {    /* hardware? */
         if (multiplicand.mantissa < 0) {                /* negative? */
@@ -850,15 +858,15 @@ else {
         multiplicand.exponent + multiplier.exponent + 1;
 
     ah = (uint32) (multiplicand.mantissa >> 32);        /* split multiplicand */
-    al = (uint32) (multiplicand.mantissa & DMASK32);    /* into high and low parts */
+    al = (uint32) (multiplicand.mantissa & D32_MASK);   /* into high and low parts */
     bh = (uint32) (multiplier.mantissa >> 32);          /* split multiplier */
-    bl = (uint32) (multiplier.mantissa & DMASK32);      /* into high and low parts */
+    bl = (uint32) (multiplier.mantissa & D32_MASK);     /* into high and low parts */
 
     if (firmware && (product->precision == fp_f)) {     /* single-precision firmware? */
-        ch = (int16) (ah >> 16) & DMASK;                /* split 32-bit multiplicand */
-        cl = (int16) (ah & 0xfffe);                     /* into high and low parts */
-        dh = (int16) (bh >> 16) & DMASK;                /* split 32-bit multiplier */
-        dl = (int16) (bh & 0xfffe);                     /* into high and low parts */
+        ch = (int16) UPPER_WORD (ah);                   /* split 32-bit multiplicand */
+        cl = (int16) LOWER_WORD (ah) & ~LSB;            /* into high and low parts */
+        dh = (int16) UPPER_WORD (bh);                   /* split 32-bit multiplier */
+        dl = (int16) LOWER_WORD (bh) & ~LSB;            /* into high and low parts */
 
         hh = (t_uint64) (((int32) ch * dh) & ~1);       /* form cross products */
         hl = (t_uint64) (((t_int64) ch * (t_int64) (uint16) dl +
@@ -946,7 +954,7 @@ else if (dividend.mantissa == 0)                        /* dividend zero? */
     quotient->mantissa = quotient->exponent = 0;        /* yes; result is zero */
 
 else {
-    firmware = (UNIT_CPU_MODEL != UNIT_1000_F);         /* set firmware flag */
+    firmware = !(cpu_configuration & CPU_1000_F);       /* set firmware flag */
 
     if (!firmware || (quotient->precision != fp_f)) {   /* hardware or FFP? */
         if (dividend.mantissa < 0) {                    /* negative? */
@@ -963,7 +971,7 @@ else {
         dividend.exponent - divisor.exponent;
 
     bh = divisor.mantissa >> 32;                        /* split divisor */
-    bl = divisor.mantissa & DMASK32;                    /* into high and low parts */
+    bl = divisor.mantissa & D32_MASK;                   /* into high and low parts */
 
     if (firmware && (quotient->precision == fp_f)) {    /* single-precision firmware? */
         quotient->exponent = quotient->exponent + 1;    /* fix exponent */
@@ -1097,7 +1105,7 @@ return;
 
 
 
-/* High-level floating-point routines. */
+/* High-level floating-point routines */
 
 
 /* Determine operand precisions.
@@ -1216,7 +1224,7 @@ FPU uoperand_l, uoperand_r;
 OPSIZE op_l_prec, op_r_prec, rslt_prec;
 uint32 overflow;
 
-if (opcode & SIGN) {                                    /* accumulator mode? */
+if (opcode & D16_SIGN) {                                /* accumulator mode? */
     rslt_prec = (OPSIZE) (opcode & 0017);               /* get operation precision */
 
     if (result) {                                       /* get accumulator? */
@@ -1285,7 +1293,7 @@ switch (opcode & 0160) {                                /* dispatch operation */
         return 0;
     }
 
-if (UNIT_CPU_MODEL != UNIT_1000_F)                      /* firmware implementation? */
+if (!(cpu_configuration & CPU_1000_F))                  /* firmware implementation? */
     accumulator.mantissa = accumulator.mantissa &       /* mask to precision */
                            op_mask[accumulator.precision];
 
@@ -1315,7 +1323,7 @@ return overflow;
 OP fp_accum (const OP *operand, OPSIZE precision)
 {
 OP result = NOP;
-uint16 opcode = (uint16) precision | SIGN;              /* add special mode bit */
+uint16 opcode = (uint16) precision | D16_SIGN;          /* add special mode bit */
 
 if (operand)
     fp_exec (opcode, NULL, *operand, NOP);              /* set accum */
@@ -1409,7 +1417,7 @@ return (uint16) unpacked.exponent;                      /* return exponent incre
 }
 
 
-/* Complement a floating-point number. */
+/* Complement a floating-point number */
 
 uint32 fp_pcom (OP *packed, OPSIZE precision)
 {
@@ -1421,7 +1429,7 @@ return nrpack (packed, unpacked, FALSE);                /* and norm/rnd/pack */
 }
 
 
-/* Truncate a floating-point number. */
+/* Truncate a floating-point number */
 
 uint32 fp_trun (OP *result, OP source, OPSIZE precision)
 {
@@ -1448,7 +1456,7 @@ return 0;                                               /* clear overflow on ret
 }
 
 
-/* Convert a floating-point number from one precision to another. */
+/* Convert a floating-point number from one precision to another */
 
 uint32 fp_cvt (OP *result, OPSIZE source_precision, OPSIZE dest_precision)
 {

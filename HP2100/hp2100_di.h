@@ -1,6 +1,6 @@
 /* hp2100_di.h: HP 12821A HP-IB Disc Interface simulator declarations
 
-   Copyright (c) 2010-2017, J. David Bryan
+   Copyright (c) 2010-2018, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    DI           12821A Disc Interface
 
+   11-Jul-18    JDB     Revised I/O model
    15-Mar-17    JDB     Trace flags are now global
    09-Mar-17    JDB     Changed the DIAG option to DIAGNOSTIC
    10-Jan-17    JDB     Moved byte accessors to hp2100_defs.h
@@ -134,7 +135,7 @@ typedef enum {
 typedef struct {
     FLIP_FLOP     control;                      /* control flip-flop */
     FLIP_FLOP     flag;                         /* flag flip-flop */
-    FLIP_FLOP     flagbuf;                      /* flag buffer flip-flop */
+    FLIP_FLOP     flag_buffer;                  /* flag buffer flip-flop */
     FLIP_FLOP     srq;                          /* SRQ flip-flop */
     FLIP_FLOP     edt;                          /* EDT flip-flop */
     FLIP_FLOP     eor;                          /* EOR flip-flop */
@@ -187,12 +188,12 @@ typedef struct {
     { GRDATA (PPR,    di [dev].poll_response, 2, 8, 0), REG_FIT },                 \
     { GRDATA (BUSCTL, di [dev].bus_cntl,      2, 8, 0), REG_FIT },                 \
                                                                                    \
-    { FLDATA (CTL, di [dev].control, 0) },                                         \
-    { FLDATA (FLG, di [dev].flag,    0) },                                         \
-    { FLDATA (FBF, di [dev].flagbuf, 0) },                                         \
-    { FLDATA (SRQ, di [dev].srq,     0) },                                         \
-    { FLDATA (EDT, di [dev].edt,     0) },                                         \
-    { FLDATA (EOR, di [dev].eor,     0) },                                         \
+    { FLDATA (CTL, di [dev].control,     0) },                                     \
+    { FLDATA (FLG, di [dev].flag,        0) },                                     \
+    { FLDATA (FBF, di [dev].flag_buffer, 0) },                                     \
+    { FLDATA (SRQ, di [dev].srq,         0) },                                     \
+    { FLDATA (EDT, di [dev].edt,         0) },                                     \
+    { FLDATA (EOR, di [dev].eor,         0) },                                     \
                                                                                    \
     { BRDATA (TMR, &di [dev].ifc_timer, 10, CHAR_BIT, sizeof (double)), REG_HRO }, \
                                                                                    \
@@ -231,7 +232,7 @@ extern DEBTAB   di_deb [];
 
 /* Disc interface global VM routines */
 
-extern IOHANDLER di_io;
+extern INTERFACE di_interface;
 extern t_stat    di_reset (DEVICE *dptr);
 
 /* Disc interface global SCP routines */
@@ -249,26 +250,11 @@ extern void   di_bus_control   (CARD_ID card, uint32 unit, uint8 assert, uint8 d
 extern void   di_poll_response (CARD_ID card, uint32 unit, FLIP_FLOP response);
 
 
-/* Amigo disc global VM routines */
-
-extern t_stat da_service (UNIT  *uptr);
-extern t_stat da_boot    (int32 unitno, DEVICE *dptr);
-
 /* Amigo disc global bus routines */
 
 extern ACCEPTOR  da_bus_accept;
 extern RESPONDER da_bus_respond;
 
-
-/* Amigo mag tape global VM routines */
-
-extern t_stat ma_service (UNIT  *uptr);
-extern t_stat ma_boot    (int32 unitno, DEVICE *dptr);
-
-/* Amigo mag tape global SCP routines */
-
-extern t_stat ma_set_timing  (UNIT *uptr, int32 val,   CONST char *cptr, void *desc);
-extern t_stat ma_show_timing (FILE *st,   UNIT  *uptr, int32 val,        CONST void *desc);
 
 /* Amigo mag tape global bus routines */
 

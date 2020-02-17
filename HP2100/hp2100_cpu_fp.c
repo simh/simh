@@ -1,7 +1,7 @@
-/* hp2100_fp.c: HP 2100 floating point instructions
+/* hp2100_cpu_fp.c: HP 2100 firmware floating point instructions
 
    Copyright (c) 2002-2015, Robert M. Supnik
-   Copyright (c) 2017       J. David Bryan
+   Copyright (c) 2017-2018, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   30-Sep-18    JDB     Replaced explicit complements/increments with NEG16 and NEG32
+   28-Jul-18    JDB     Renamed source file from hp2100_fp1.c
    26-Jun-17    JDB     Replaced SEXT with SEXT16
    03-Jan-15    JDB     Made the utility routines static
    21-Jan-08    JDB     Corrected fp_unpack mantissa high-word return
@@ -85,10 +87,13 @@
        floating-point support.
 */
 
+
+
 #include "hp2100_defs.h"
 #include "hp2100_cpu.h"
-#include "hp2100_cpu1.h"
-#include "hp2100_fp.h"
+#include "hp2100_cpu_fp.h"
+
+
 
 #if !defined (HAVE_INT64)                               /* int64 support unavailable */
 
@@ -123,9 +128,9 @@ struct ufp {                                            /* unpacked fp */
 /* Fraction shift; 0 < shift < 32 */
 
 #define FR_ARS(v,s)     (((v) >> (s)) | (((v) & FP_SIGN)? \
-                        (((uint32) DMASK32) << (32 - (s))): 0)) & DMASK32
+                        (((uint32) D32_MASK) << (32 - (s))): 0)) & D32_MASK
 
-#define FR_NEG(v)       ((~(v) + 1) & DMASK32)
+#define FR_NEG(v)       ((~(v) + 1) & D32_MASK)
 
 /* Utility routines */
 
@@ -153,11 +158,11 @@ if (fop.exp > 15) {                                     /* exp > 15? */
     }
 if (fop.exp < 15) {                                     /* if not aligned */
     res = FR_ARS (fop.fr, 15 - fop.exp);                /* shift right */
-    AR = (res >> 16) & DMASK;                           /* AR gets result */
+    AR = UPPER_WORD (res);                              /* AR gets result */
     }
 BR = AR;
-if ((AR & SIGN) && ((fop.fr | res) & DMASK))            /* any low bits lost? */
-    AR = (AR + 1) & DMASK;                              /* round up */
+if ((AR & D16_SIGN) && ((fop.fr | res) & D16_MASK))     /* any low bits lost? */
+    AR = AR + 1 & R_MASK;                               /* round up */
 return 0;
 }
 
@@ -237,7 +242,7 @@ if (fop1.fr && fop2.fr) {                               /* if both != 0 */
     t3 = t1 + t2;                                       /* cross product */
     t4 = (shi1 * shi2) & ~1;                            /* mpy hi * mpc hi */
     t5 = SEXT16 (UPPER_WORD (t3)) << 1;                 /* add in cross */
-    res.fr = (t4 + t5) & DMASK32;                       /* bit<0> is lost */
+    res.fr = (t4 + t5) & D32_MASK;                      /* bit<0> is lost */
     }
 return StoreFP (&res);                                  /* store */
 }
@@ -250,13 +255,13 @@ int32 sdvd = 0, sdvr = 0;
 uint32 q, r;
 
 if (ba & FP_SIGN) sdvd = 1;                             /* 32b/16b signed dvd */
-if (dvr & SIGN) sdvr = 1;                               /* use old-fashioned */
-if (sdvd) ba = (~ba + 1) & DMASK32;                     /* unsigned divides, */
-if (sdvr) dvr = (~dvr + 1) & DMASK;                     /* as results may ovflo */
+if (dvr & D16_SIGN) sdvr = 1;                           /* use old-fashioned */
+if (sdvd) ba = NEG32 (ba);                              /* unsigned divides, */
+if (sdvr) dvr = NEG16 (dvr);                            /* as results may ovflo */
 q = ba / dvr;
 r = ba % dvr;
-if (sdvd ^ sdvr) q = (~q + 1) & DMASK;
-if (sdvd) r = (~r + 1) & DMASK;
+if (sdvd ^ sdvr) q = NEG16 (q);
+if (sdvd) r = NEG16 (r);
 if (rem) *rem = r;
 return q;
 }
@@ -269,7 +274,7 @@ uint32 ba, q0, q1, q2, dvrh;
 
 UnpackFP (&fop1, FPAB);                                 /* unpack A-B */
 UnpackFP (&fop2, opnd);                                 /* unpack op */
-dvrh = (fop2.fr >> 16) & DMASK;                         /* high divisor */
+dvrh = UPPER_WORD (fop2.fr);                            /* high divisor */
 if (dvrh == 0) {                                        /* div by zero? */
     AR = 0077777;                                       /* return most pos */
     BR = 0177776;
@@ -286,8 +291,8 @@ if (fop1.fr) {                                          /* dvd != 0? */
     q2 = divx (ba, dvrh, NULL);                         /* dvrl / dvrh */
     ba = - SEXT16 (LOWER_WORD (q2)) * SEXT16 (LOWER_WORD (q0)); /* -Q0 * Q2 */
     ba = (ba >> 16) & 0xFFFF;                           /* save ms half */
-    if (q1 & SIGN) quo.fr = quo.fr - 0x00010000;        /* Q1 < 0? -1 */
-    if (ba & SIGN) quo.fr = quo.fr - 0x00010000;        /* -Q0*Q2 < 0? */
+    if (q1 & D16_SIGN) quo.fr = quo.fr - 0x00010000;    /* Q1 < 0? -1 */
+    if (ba & D16_SIGN) quo.fr = quo.fr - 0x00010000;    /* -Q0*Q2 < 0? */
     quo.fr = quo.fr + ((ba << 2) & 0xFFFF) + q1;        /* rest prod, add Q1 */
     quo.fr = quo.fr << 1;                               /* shift result */
     quo.fr = quo.fr + (q0 << 16);                       /* add Q0 */
@@ -356,15 +361,15 @@ else if (fop->exp > FP_M_EXP) {                         /* overflow? */
     ov = 1;
     }
 else hi = PackFP (fop);                                 /* pack mant and exp */
-AR = (hi >> 16) & DMASK;
-BR = hi & DMASK;
+AR = UPPER_WORD (hi);
+BR = LOWER_WORD (hi);
 return ov;
 }
 
 
-/* Single-precision Fast FORTRAN Processor helpers. */
+/* Single-precision Fast FORTRAN Processor helpers */
 
-/* Pack mantissa and exponent and return fp value. */
+/* Pack mantissa and exponent and return fp value */
 
 uint32 fp_pack (OP *result, OP mantissa, int32 exponent, OPSIZE precision)
 {
@@ -379,7 +384,7 @@ result->fpk[1] = LOWER_WORD (val);
 return 0;
 }
 
-/* Normalize, round, and pack mantissa and exponent and return fp value. */
+/* Normalize, round, and pack mantissa and exponent and return fp value */
 
 uint32 fp_nrpack (OP *result, OP mantissa, int32 exponent, OPSIZE precision)
 {
@@ -394,7 +399,7 @@ result->fpk[1] = BR;
 return ovf;
 }
 
-/* Unpack fp number in into mantissa and exponent. */
+/* Unpack fp number in into mantissa and exponent */
 
 uint32 fp_unpack (OP *mantissa, int32 *exponent, OP packed, OPSIZE precision)
 {

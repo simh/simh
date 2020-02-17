@@ -1,7 +1,7 @@
 /* hp2100_lpt.c: HP 2100 12845B Line Printer Interface simulator
 
    Copyright (c) 1993-2016, Robert M. Supnik
-   Copyright (c) 2017,      J. David Bryan
+   Copyright (c) 2017-2018, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +26,7 @@
 
    LPT          HP 12845B Line Printer Interface
 
+   26-Jun-18    JDB     Revised I/O model
    16-May-17    JDB     Changed REG_A to REG_X
    07-Feb-17    JDB     Passes the 2613/17/18 diagnostic (DSN 145103)
    04-Feb-17    JDB     Rewrote to add the HP 2613/17/18 line printers
@@ -270,6 +271,7 @@
 
 
 #include "hp2100_defs.h"
+#include "hp2100_io.h"
 
 
 
@@ -514,17 +516,18 @@ static const BITSET_FORMAT prt_status_format =          /* names, offset, direct
 
 /* Interface state */
 
-static HP_WORD output_word = 0;                 /* output data word */
-static HP_WORD status_word = 0;                 /* input status word */
+typedef struct {
+    HP_WORD      output_word;                   /* output data register */
+    HP_WORD      status_word;                   /* input data register */
+    FLIP_FLOP    command;                       /* command flip-flop */
+    FLIP_FLOP    control;                       /* control flip-flop */
+    FLIP_FLOP    flag;                          /* flag flip-flop */
+    FLIP_FLOP    flag_buffer;                   /* flag buffer flip-flop */
+    t_bool       strobe;                        /* STROBE signal to the printer */
+    t_bool       demand;                        /* DEMAND signal from the printer */
+    } CARD_STATE;
 
-static t_bool strobe = FALSE;                   /* STROBE signal to the printer */
-static t_bool demand = FALSE;                   /* DEMAND signal from the printer */
-
-static struct {
-    FLIP_FLOP control;                          /* control flip-flop */
-    FLIP_FLOP flag;                             /* flag flip-flop */
-    FLIP_FLOP flagbuf;                          /* flag buffer flip-flop */
-    } lpt = { CLEAR, CLEAR, CLEAR };
+static CARD_STATE lpt;                          /* per-card state */
 
 
 /* Printer state */
@@ -549,9 +552,10 @@ static const DELAY_PROPS *dlyptr = &fast_times; /* pointer to the event delay ti
 
 /* Interface local SCP support routines */
 
-static IOHANDLER lp_interface;
-static t_stat    lp_service   (UNIT   *uptr);
-static t_stat    lp_reset     (DEVICE *dptr);
+static INTERFACE lp_interface;
+
+static t_stat lp_service (UNIT   *uptr);
+static t_stat lp_reset   (DEVICE *dptr);
 
 
 /* Interface local utility routines */
@@ -585,21 +589,23 @@ static int32  lp_read_line    (FILE *vf,   char *line, uint32 size);
 /* Interface SCP data structures */
 
 
-/* Device information block */
-
-static DIB lpt_dib = {
-    &lp_interface,                              /* device interface */
-    LPT,                                        /* select code */
-    0                                           /* card index */
-    };
-
-
 /* Unit list */
 
 #define UNIT_FLAGS          (UNIT_ATTABLE | UNIT_SEQ | UNIT_EXPAND | UNIT_OFFLINE)
 
 static UNIT lpt_unit [] = {
     { UDATA (&lp_service, UNIT_FLAGS | UNIT_2607, 0), 0 }
+    };
+
+
+/* Device information block */
+
+static DIB lpt_dib = {
+    &lp_interface,                              /* the device's I/O interface function pointer */
+    LPT,                                        /* the device's select code (02-77) */
+    0,                                          /* the card index */
+    "12845B Line Printer Interface",            /* the card description */
+    NULL                                        /* the ROM description */
     };
 
 
@@ -610,13 +616,13 @@ static REG lpt_reg [] = {
 /*    ------  ------  ------------------------  -----  ------------  ------  -------------  ----------------- */
     { FLDATA (DEVCTL, lpt.control,                                     0)                                     },
     { FLDATA (DEVFLG, lpt.flag,                                        0)                                     },
-    { FLDATA (DEVFBF, lpt.flagbuf,                                     0)                                     },
+    { FLDATA (DEVFBF, lpt.flag_buffer,                                 0)                                     },
 
-    { FLDATA (STROBE, strobe,                                          0)                                     },
-    { FLDATA (DEMAND, demand,                                          0)                                     },
+    { FLDATA (STROBE, lpt.strobe,                                      0)                                     },
+    { FLDATA (DEMAND, lpt.demand,                                      0)                                     },
 
-    { ORDATA (OUTPUT, output_word,                         16),                             PV_RZRO | REG_X   },
-    { ORDATA (STATUS, status_word,                         16),                             PV_RZRO           },
+    { ORDATA (OUTPUT, lpt.output_word,                     16),                             PV_RZRO | REG_X   },
+    { ORDATA (STATUS, lpt.status_word,                     16),                             PV_RZRO           },
 
     { FLDATA (PFAULT, paper_fault,                                     0)                                     },
     { FLDATA (TFAULT, tape_fault,                                      0)                                     },
@@ -757,89 +763,101 @@ DEVICE lpt_dev = {
        simulated, as it effectively sets and clears within one CPU instruction.
 */
 
-static uint32 lp_interface (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
+static SIGNALS_VALUE lp_interface (const DIB *dibptr, INBOUND_SET inbound_signals, HP_WORD inbound_value)
 {
-HP_WORD  data;
-IOSIGNAL signal;
-IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
+INBOUND_SIGNAL signal;
+INBOUND_SET    working_set = inbound_signals;
+SIGNALS_VALUE  outbound    = { ioNONE, 0 };
+t_bool         irq_enabled = FALSE;
 
-while (working_set) {
-    signal = IONEXT (working_set);                      /* isolate the next signal */
+while (working_set) {                                   /* while signals remain */
+    signal = IONEXTSIG (working_set);                   /*   isolate the next signal */
 
-    switch (signal) {                                   /* dispatch an I/O signal */
+    switch (signal) {                                   /* dispatch the I/O signal */
 
-        case ioCLF:
-            lpt.flag    = CLEAR;                        /* clear the flag */
-            lpt.flagbuf = CLEAR;                        /*   and flag buffer flip-flops */
+        case ioCLF:                                     /* Clear Flag flip-flop */
+            lpt.flag_buffer = CLEAR;                    /* reset the flag buffer */
+            lpt.flag        = CLEAR;                    /*   and flag flip-flops */
             break;
 
 
-        case ioSTF:
-        case ioENF:
-            lpt.flag    = SET;                          /* set the flag */
-            lpt.flagbuf = SET;                          /*   and flag buffer flip-flops */
+        case ioSTF:                                     /* Set Flag flip-flop */
+            lpt.flag_buffer = SET;                      /* set the flag buffer flip-flop */
             break;
 
 
-        case ioSFC:
-            setstdSKF (lpt);                            /* skip if the flag is clear */
+        case ioENF:                                     /* Enable Flag */
+            if (lpt.flag_buffer == SET)                 /* if the flag buffer flip-flop is set */
+                lpt.flag = SET;                         /*   then set the flag flip-flop */
             break;
 
 
-        case ioSFS:
-            setstdSKF (lpt);                            /* skip if the flag is set */
+        case ioSFC:                                     /* Skip if Flag is Clear */
+            if (lpt.flag == CLEAR)                      /* if the flag flip-flop is clear */
+                outbound.signals |= ioSKF;              /*   then assert the Skip on Flag signal */
+            break;
+
+
+        case ioSFS:                                     /* Skip if Flag is Set */
+            if (lpt.flag == SET)                        /* if the flag flip-flop is set */
+                outbound.signals |= ioSKF;              /*   then assert the Skip on Flag signal */
             break;
 
 
         case ioIOI:
             if (lpt_unit [0].flags & UNIT_POWEROFF)     /* if the printer power is off */
-                data = ST_POWEROFF;                     /*   then return the power-off status */
+                outbound.value = ST_POWEROFF;           /*   then return the power-off status */
 
-            else if (demand)                            /* otherwise if DEMAND is asserted */
-                data = status_word | ST_DEMAND;         /*   then reflect it in the status word */
+            else if (lpt.demand)                                /* otherwise if DEMAND is asserted */
+                outbound.value = lpt.status_word | ST_DEMAND;   /*   then reflect it in the status word */
 
             else                                        /* otherwise return */
-                data = status_word;                     /*   the (static) status */
-
-            stat_data = IORETURN (SCPE_OK, data);       /* merge in the return status */
+                outbound.value = lpt.status_word;       /*   the (static) status */
 
             tprintf (lpt_dev, TRACE_CSRW, "Status is %s\n",
-                     fmt_bitset (data, prt_status_format));
+                     fmt_bitset (outbound.value, prt_status_format));
             break;
 
 
         case ioIOO:
             tprintf (lpt_dev, TRACE_CSRW, "Control is %s | %s\n",
-                     fmt_bitset (stat_data, prt_control_format),
-                     fmt_char (IODATA (stat_data)));
+                     fmt_bitset (inbound_value, prt_control_format),
+                     fmt_char (inbound_value));
 
-            output_word = IODATA (stat_data);           /* save the character or format word */
+            lpt.output_word = inbound_value;             /* save the character or format word */
             break;
 
 
-        case ioPOPIO:
-            lpt.flag    = SET;                          /* set the flag */
-            lpt.flagbuf = SET;                          /*   and flag buffer flip-flops */
-            output_word = 0;                            /*     and clear the output buffer */
+        case ioPOPIO:                                   /* Power-On Preset to I/O */
+            lpt.flag_buffer = SET;                      /* set the flag buffer flip-flop */
+            lpt.output_word = 0;                        /*   and clear the output register */
             break;
 
 
-        case ioCRS:
+        case ioCRS:                                     /* Control Reset */
             lp_master_clear (lpt_unit);                 /* CRS asserts MASTER CLEAR to the printer */
 
-        /* fall into the ioCLC case */
-
-        case ioCLC:
             lpt.control = CLEAR;                        /* clear the control flip-flop */
-            strobe = FALSE;                             /*   and deny STROBE to the printer */
+            lpt.command = CLEAR;                        /*   and the command flip-flop */
+            lpt.strobe = FALSE;                         /*     and deny STROBE to the printer */
+
+            sim_cancel (lpt_unit);                      /* cancel any operation in progress */
             break;
 
 
-        case ioSTC:
-            lpt.control = SET;                          /* set the control flip-flop */
+        case ioCLC:                                     /* Clear Control flip-flop */
+            lpt.control = CLEAR;                        /* clear the control flip-flop */
+            lpt.command = CLEAR;                        /*   and the command flip-flop */
+            lpt.strobe = FALSE;                         /*     and deny STROBE to the printer */
+            break;
 
-            if (status_word & ST_ONLINE) {              /* if the printer is online */
-                strobe = TRUE;                          /*   then assert STROBE to the printer */
+
+        case ioSTC:                                     /* Set Control flip-flop */
+            lpt.control = SET;                          /* set the control flip-flop */
+            lpt.command = SET;                          /*   and the command flip-flop */
+
+            if (lpt.status_word & ST_ONLINE) {          /* if the printer is online */
+                lpt.strobe = TRUE;                      /*   then assert STROBE to the printer */
 
                 lpt_unit [0].wait = 0;                  /* set for immediate service entry */
                 activate_unit (lpt_unit);               /*   and call the service routine */
@@ -847,26 +865,48 @@ while (working_set) {
             break;
 
 
-        case ioSIR:
-            setstdPRL (lpt);                            /* set the standard PRL signal */
-            setstdIRQ (lpt);                            /* set the standard IRQ signal */
-            setstdSRQ (lpt);                            /* set the standard SRQ signal */
+        case ioSIR:                                     /* Set Interrupt Request */
+            if (lpt.control & lpt.flag)                 /* if the control and flag flip-flops are set */
+                outbound.signals |= cnVALID;            /*   then deny PRL */
+            else                                        /* otherwise */
+                outbound.signals |= cnPRL | cnVALID;    /*   conditionally assert PRL */
+
+            if (lpt.control & lpt.flag & lpt.flag_buffer)   /* if the control, flag, and flag buffer flip-flops are set */
+                outbound.signals |= cnIRQ | cnVALID;        /*   then conditionally assert IRQ */
+
+            if (lpt.flag == SET)                        /* if the flag flip-flop is set */
+                outbound.signals |= ioSRQ;              /*   then assert SRQ */
             break;
 
 
-        case ioIAK:
-            lpt.flagbuf = CLEAR;                        /* clear the flag buffer flip-flop */
+        case ioIAK:                                     /* Interrupt Acknowledge */
+            lpt.flag_buffer = CLEAR;                     /* clear the flag buffer flip-flop */
             break;
 
 
-        default:                                        /* all other signals */
-            break;                                      /*   are ignored */
+        case ioIEN:                                     /* Interrupt Enable */
+            irq_enabled = TRUE;                         /* permit IRQ to be asserted */
+            break;
+
+
+        case ioPRH:                                         /* Priority High */
+            if (irq_enabled && outbound.signals & cnIRQ)    /* if IRQ is enabled and conditionally asserted */
+                outbound.signals |= ioIRQ | ioFLG;          /*   then assert IRQ and FLG */
+
+            if (!irq_enabled || outbound.signals & cnPRL)   /* if IRQ is disabled or PRL is conditionally asserted */
+                outbound.signals |= ioPRL;                  /*   then assert it unconditionally */
+            break;
+
+
+        case ioEDT:                                     /* not used by this interface */
+        case ioPON:                                     /* not used by this interface */
+            break;
         }
 
-    working_set = working_set & ~signal;                /* remove the current signal from the set */
-    }
+    IOCLEARSIG (working_set, signal);                   /* remove the current signal from the set */
+    }                                                   /*   and continue until all signals are processed */
 
-return stat_data;                                       /* return the outbound status and data */
+return outbound;                                        /* return the outbound signals and value */
 }
 
 
@@ -1015,9 +1055,9 @@ return stat_data;                                       /* return the outbound s
 
 static t_stat lp_service (UNIT *uptr)
 {
-const PRINTER_TYPE model = GET_MODEL (uptr->flags);             /* the printer model number */
-const t_bool       printing = ((output_word & CN_FORMAT) != 0); /* TRUE if a print command was received */
-static uint32      overprint_index = 0;                         /* the "high-water" mark while overprinting */
+const PRINTER_TYPE model = GET_MODEL (uptr->flags);                 /* the printer model number */
+const t_bool       printing = ((lpt.output_word & CN_FORMAT) != 0); /* TRUE if a print command was received */
+static uint32      overprint_index = 0;                             /* the "high-water" mark while overprinting */
 uint8              data_byte, format_byte;
 uint16             channel;
 uint32             line_count, slew_count;
@@ -1027,7 +1067,7 @@ tprintf (lpt_dev, TRACE_SERV, "Printer service entered\n");
 if (uptr->flags & UNIT_POWEROFF)                        /* if the printer power is off */
     return SCPE_OK;                                     /*   then no action is taken */
 
-else if (strobe == FALSE) {                             /* otherwise if STROBE has denied */
+else if (lpt.strobe == FALSE) {                         /* otherwise if STROBE has denied */
     if (printing) {                                     /*   then if printing occurred */
         buffer_index = 0;                               /*     then clear the buffer */
 
@@ -1049,17 +1089,18 @@ else if (strobe == FALSE) {                             /* otherwise if STROBE h
             }
         }
 
-    demand = TRUE;                                      /* assert DEMAND to complete the handshake */
+    lpt.demand = TRUE;                                  /* assert DEMAND to complete the handshake */
     uptr->wait = 0;                                     /*   and request immediate entry when STROBE next asserts */
 
-    lp_interface (&lpt_dib, ioENF, 0);                  /* the flag buffer flip-flop sets on DEMAND assertion */
+    lpt.flag_buffer = SET;                              /* set the flag buffer */
+    io_assert (&lpt_dev, ioa_ENF);                      /*   and flag flip-flops on DEMAND assertion */
     }
 
-else if (demand == TRUE) {                              /* otherwise if STROBE has asserted while DEMAND is asserted */
-    demand = FALSE;                                     /*   then deny DEMAND */
-    strobe = FALSE;                                     /*     which resets STROBE */
+else if (lpt.demand == TRUE) {                          /* otherwise if STROBE has asserted while DEMAND is asserted */
+    lpt.demand = FALSE;                                 /*   then deny DEMAND */
+    lpt.strobe = FALSE;                                 /*     which resets STROBE */
 
-    data_byte = (uint8) (output_word & DATA_MASK);      /* only the lower 7 bits are sent to the printer */
+    data_byte = (uint8) (lpt.output_word & DATA_MASK);  /* only the lower 7 bits are sent to the printer */
 
     if (printing == FALSE) {                            /* if loading the print buffer */
         if (data_byte > '_'                             /*   then if the character is "lowercase" */
@@ -1230,14 +1271,14 @@ else if (demand == TRUE) {                              /* otherwise if STROBE h
             overprint_index = 0;                        /* clear any existing overprint index */
             }
 
-        status_word &= ~(ST_VFU_9 | ST_VFU_12);         /* assume no punches for channels 9 and 12 */
+        lpt.status_word &= ~(ST_VFU_9 | ST_VFU_12);     /* assume no punches for channels 9 and 12 */
 
         if (print_props [model].vfu_channels > 8) {     /* if the printer VFU has more than 8 channels */
             if (VFU [current_line] & VFU_CHANNEL_9)     /*   then if channel 9 is punched for this line */
-                status_word |= ST_VFU_9;                /*     then report it in the device status */
+                lpt.status_word |= ST_VFU_9;            /*     then report it in the device status */
 
             if (VFU [current_line] & VFU_CHANNEL_12)    /* if channel 12 is punched for this line */
-                status_word |= ST_VFU_12;               /*   then report it in the device status */
+                lpt.status_word |= ST_VFU_12;           /*   then report it in the device status */
             }
 
         if (format_byte == FORMAT_VFU_CHAN_1)           /* if a TOF request was performed */
@@ -1277,9 +1318,9 @@ return SCPE_OK;                                         /* return event service 
 
 static t_stat lp_reset (DEVICE *dptr)
 {
-UNIT *const uptr = dptr->units;                         /* a pointer to the printer unit */
+UNIT * const uptr = dptr->units;                        /* a pointer to the printer unit */
 
-IOPRESET (&lpt_dib);                                    /* PRESET the device (asserts MASTER CLEAR) */
+io_assert (dptr, ioa_POPIO);                            /* PRESET the device (asserts MASTER CLEAR) */
 
 if (sim_switches & SWMASK ('P')) {                      /* if this is a power-on reset */
     fast_times.buffer_load = LP_BUFFER_LOAD;            /*   then reset the per-character transfer time, */
@@ -1380,7 +1421,7 @@ result = hp_attach (uptr, cptr);                        /* attach the specified 
 
 if (result == SCPE_OK                                   /* if the attach was successful */
   && (sim_switches & SIM_SW_REST) == 0) {               /*   and we are not being called during a RESTORE command */
-    status_word &= ~ST_NOT_READY;                       /*     then clear not-ready status */
+    lpt.status_word &= ~ST_NOT_READY;                   /*     then clear not-ready status */
     current_line = 1;                                   /*       and reset the line counter to the top of the form */
 
     tprintf (lpt_dev, TRACE_CMD, "Printer paper loaded\n");
@@ -1443,7 +1484,7 @@ else {
     if (sim_switches & (SWMASK ('F') | SIM_SW_SHUT)) {  /* if this is a forced detach or shut down request */
         current_line = 1;                               /*   then reset the printer to TOF to enable the detach */
         sim_cancel (uptr);                              /*     and terminate */
-        strobe = FALSE;                                 /*       any print action in progress */
+        lpt.strobe = FALSE;                             /*       any print action in progress */
         }
 
     if ((print_props [model].fault_at_eol               /* otherwise if the printer faults at the end of any line */
@@ -1738,8 +1779,8 @@ const PRINTER_TYPE model = GET_MODEL (uptr->flags);     /* the printer model num
 
 sim_cancel (uptr);                                      /* deactivate the unit */
 
-strobe = FALSE;                                         /* deny STROBE to the printer */
-demand = FALSE;                                         /*   and assume that DEMAND is also denied */
+lpt.strobe = FALSE;                                     /* deny STROBE to the printer */
+lpt.demand = FALSE;                                     /*   and assume that DEMAND is also denied */
 
 buffer_index = 0;                                       /* clear the buffer without printing */
 
@@ -1754,15 +1795,15 @@ if (sim_is_active (uptr)) {                             /* if the event service 
     }
 
 if (! (uptr->flags & UNIT_POWEROFF)) {                  /* if the printer power is on */
-    status_word = 0;                                    /*   then prepare to set the printer status */
+    lpt.status_word = 0;                                /*   then prepare to set the printer status */
 
     if (paper_fault && print_props [model].not_ready)   /* if paper is out and the printer reports it separately */
-        status_word |= ST_NOT_READY;                    /*   then add not-ready status */
+        lpt.status_word |= ST_NOT_READY;                /*   then add not-ready status */
 
     if (! (uptr->flags & UNIT_OFFLINE)) {               /* if the printer is online */
-        demand = TRUE;                                  /*   then DEMAND is asserted */
+        lpt.demand = TRUE;                              /*   then DEMAND is asserted */
 
-        status_word |= ST_ONLINE;                       /* set ONLINE status */
+        lpt.status_word |= ST_ONLINE;                   /* set ONLINE status */
         }
     }
 
@@ -1791,7 +1832,7 @@ const PRINTER_TYPE model = GET_MODEL (uptr->flags);     /* the printer model num
 
 if (lp_set_locality (uptr, Offline)) {                  /* if the printer went offline */
     if (print_props [model].not_ready)                  /*   then if the printer reports ready status separately */
-        status_word |= ST_NOT_READY;                    /*     then add not-ready status */
+        lpt.status_word |= ST_NOT_READY;                /*     then add not-ready status */
 
     return TRUE;                                        /* return completion success */
     }
@@ -1824,9 +1865,9 @@ if (printer_state == Offline) {                         /* if the printer is goi
       && sim_is_active (uptr) == FALSE) {               /*     and the printer is idle */
         uptr->flags |= UNIT_OFFLINE;                    /*       then set the printer offline now */
 
-        status_word &= ~ST_ONLINE;                      /* update the printer status */
+        lpt.status_word &= ~ST_ONLINE;                  /* update the printer status */
 
-        demand = FALSE;                                 /* DEMAND denies while the printer is not ready */
+        lpt.demand = FALSE;                             /* DEMAND denies while the printer is not ready */
         }
 
     else {                                              /*   otherwise the request must wait */
@@ -1841,12 +1882,14 @@ else {                                                  /* otherwise the printer
     paper_fault = FALSE;                                /* clear any paper fault */
     tape_fault  = FALSE;                                /*   and any tape fault */
 
-    status_word = status_word & ~ST_NOT_READY | ST_ONLINE;  /* update the printer status */
+    lpt.status_word = lpt.status_word & ~ST_NOT_READY | ST_ONLINE;  /* update the printer status */
 
-    demand = TRUE;                                      /* DEMAND asserts when the printer is online */
+    lpt.demand = TRUE;                                  /* DEMAND asserts when the printer is online */
 
-    if (lpt.flag == CLEAR)                              /* if the flag flip-flop is clear */
-        lp_interface (&lpt_dib, ioENF, 0);              /*   then DEMAND assertion sets the flag buffer flip-flop */
+    if (lpt.flag == CLEAR) {                            /* if the flag flip-flop is clear */
+        lpt.flag_buffer = SET;                          /* then DEMAND assertion sets the flag buffer */
+        io_assert (&lpt_dev, ioa_ENF);                  /*   and flag flip-flops */
+        }
     }
 
 tprintf (lpt_dev, TRACE_CMD, "Printer set %s\n",
@@ -2093,14 +2136,14 @@ memcpy (VFU, tape, sizeof VFU);                         /* copy the tape buffer 
 
 current_line = 1;                                       /* reset the line counter to the top of the form */
 
-status_word &= ~(ST_VFU_9 | ST_VFU_12);                 /* assume no punches for channels 9 and 12 */
+lpt.status_word &= ~(ST_VFU_9 | ST_VFU_12);             /* assume no punches for channels 9 and 12 */
 
 if (print_props [model].vfu_channels > 8) {             /* if the printer VFU has more than 8 channels */
     if (VFU [1] & VFU_CHANNEL_9)                        /*   then if channel 9 is punched for this line */
-        status_word |= ST_VFU_9;                        /*     then report it in the device status */
+        lpt.status_word |= ST_VFU_9;                    /*     then report it in the device status */
 
     if (VFU [1] & VFU_CHANNEL_12)                       /* if channel 12 is punched for this line */
-        status_word |= ST_VFU_12;                       /*   then report it in the device status */
+        lpt.status_word |= ST_VFU_12;                   /*   then report it in the device status */
     }
 
 return SCPE_OK;                                         /* the VFU was successfully loaded */

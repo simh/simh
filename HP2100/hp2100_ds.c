@@ -3,22 +3,22 @@
    Copyright (c) 2004-2012, Robert M. Supnik
    Copyright (c) 2012-2018  J. David Bryan
 
-   Permission is hereby granted, free of charge, to any person obtaining a
-   copy of this software and associated documentation files (the "Software"),
-   to deal in the Software without restriction, including without limitation
-   the rights to use, copy, modify, merge, publish, distribute, sublicense,
-   and/or sell copies of the Software, and to permit persons to whom the
-   Software is furnished to do so, subject to the following conditions:
+   Permission is hereby granted, free of charge, to any person obtaining a copy
+   of this software and associated documentation files (the "Software"), to deal
+   in the Software without restriction, including without limitation the rights
+   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   copies of the Software, and to permit persons to whom the Software is
+   furnished to do so, subject to the following conditions:
 
    The above copyright notice and this permission notice shall be included in
    all copies or substantial portions of the Software.
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
+   AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+   ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
    Except as contained in this notice, the names of the authors shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
@@ -26,6 +26,7 @@
 
    DS           13037D/13175D disc controller/interface
 
+   13-Jun-18    JDB     Revised I/O model
    07-May-18    JDB     Removed "dl_clear_controller" status return
    27-Feb-18    JDB     Added the BMDL
    21-Feb-18    JDB     ATTACH -N now creates a full-size disc image
@@ -65,10 +66,14 @@
    01-Mar-05    JDB     Added SET UNLOAD/LOAD
 
    References:
-   - 13037 Disc Controller Technical Information Package (13037-90902, Aug-1980)
-   - 7925D Disc Drive Service Manual (07925-90913, Apr-1984)
-   - HP 12992 Loader ROMs Installation Manual (12992-90001, Apr-1986)
-   - DVR32 RTE Moving Head Driver source (92084-18711, Revision 5000)
+     - 13037 Disc Controller Technical Information Package
+         (13037-90902, August 1980)
+     - 7925D Disc Drive Service Manual
+         (07925-90913, April 1984)
+     - HP 12992 Loader ROMs Installation Manual
+         (12992-90001, April 1986)
+     - DVR32 RTE Moving Head Driver source
+         (92084-18711, Revision 5000)
 
 
    The 13037D multiple-access (MAC) disc controller supports from one to eight
@@ -130,7 +135,7 @@
 
 
 #include "hp2100_defs.h"
-#include "hp2100_cpu.h"
+#include "hp2100_io.h"
 #include "hp2100_disclib.h"
 
 
@@ -154,16 +159,16 @@
 /* Per-card state variables */
 
 typedef struct {
-    FLIP_FLOP control;                                  /* control flip-flop */
-    FLIP_FLOP flag;                                     /* flag flip-flop */
-    FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
-    FLIP_FLOP srq;                                      /* SRQ flip-flop */
-    FLIP_FLOP edt;                                      /* EDT flip-flop */
-    FLIP_FLOP cmfol;                                    /* command follows flip-flop */
-    FLIP_FLOP cmrdy;                                    /* command ready flip-flop */
-    uint16    fifo [FIFO_SIZE];                         /* FIFO buffer */
-    uint32    fifo_count;                               /* FIFO occupancy counter */
-    REG      *fifo_reg;                                 /* FIFO register pointer */
+    FLIP_FLOP    control;                       /* control flip-flop */
+    FLIP_FLOP    flag;                          /* flag flip-flop */
+    FLIP_FLOP    flag_buffer;                   /* flag buffer flip-flop */
+    FLIP_FLOP    srq;                           /* SRQ flip-flop */
+    FLIP_FLOP    edt;                           /* EDT flip-flop */
+    FLIP_FLOP    cmfol;                         /* command follows flip-flop */
+    FLIP_FLOP    cmrdy;                         /* command ready flip-flop */
+    uint16       fifo [FIFO_SIZE];              /* FIFO buffer */
+    uint32       fifo_count;                    /* FIFO occupancy counter */
+    REG          *fifo_reg;                     /* FIFO register pointer */
     } CARD_STATE;
 
 
@@ -180,20 +185,22 @@ static CNTLR_VARS mac_cntlr =                           /* MAC controller */
 
 
 
-/* MAC disc global VM routines */
+/* Interface local SCP support routines */
 
-IOHANDLER ds_io;
-t_stat    ds_service_drive      (UNIT   *uptr);
-t_stat    ds_service_controller (UNIT   *uptr);
-t_stat    ds_service_timer      (UNIT   *uptr);
-t_stat    ds_reset              (DEVICE *dptr);
-t_stat    ds_attach             (UNIT   *uptr,  CONST char *cptr);
-t_stat    ds_detach             (UNIT   *uptr);
-t_stat    ds_boot               (int32  unitno, DEVICE *dptr);
+static INTERFACE ds_interface;
 
-/* MAC disc global SCP routines */
 
-t_stat ds_load_unload (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+/* Interface local SCP support routines */
+
+static t_stat ds_service_drive      (UNIT   *uptr);
+static t_stat ds_service_controller (UNIT   *uptr);
+static t_stat ds_service_timer      (UNIT   *uptr);
+static t_stat ds_reset              (DEVICE *dptr);
+static t_stat ds_attach             (UNIT   *uptr,  CONST char *cptr);
+static t_stat ds_detach             (UNIT   *uptr);
+static t_stat ds_boot               (int32  unitno, DEVICE *dptr);
+static t_stat ds_load_unload        (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+
 
 /* MAC disc local utility routines */
 
@@ -206,15 +213,94 @@ static void   fifo_clear        (void);
 static t_stat activate_unit     (UNIT *uptr);
 
 
+/* Interface SCP data structures */
 
-/* MAC disc VM data structures.
 
-   ds_dib       DS device information block
-   ds_unit      DS unit list
-   ds_reg       DS register list
-   ds_mod       DS modifier list
-   ds_deb       DS debug table
-   ds_dev       DS device descriptor
+/* Device information block */
+
+static DIB ds_dib = {
+    &ds_interface,                              /* the device's I/O interface function pointer */
+    DS,                                         /* the device's select code (02-77) */
+    0,                                          /* the card index */
+    "13175D Disc Controller Interface",         /* the card description */
+    "12992B 7905/7906/7920/7925 Disc Loader"    /* the ROM description */
+    };
+
+
+/* Units list */
+
+#define UNIT_FLAGS  (UNIT_FIX | UNIT_ATTABLE | UNIT_ROABLE | UNIT_DISABLE | UNIT_UNLOAD)
+
+static UNIT ds_unit [] = {
+    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 0 */
+    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 1 */
+    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 2 */
+    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 3 */
+    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 4 */
+    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 5 */
+    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 6 */
+    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 7 */
+    { UDATA (&ds_service_controller, UNIT_DIS,                0)           },   /* controller unit */
+    { UDATA (&ds_service_timer,      UNIT_DIS,                0)           }    /* timer unit */
+    };
+
+
+/* Register list */
+
+static REG ds_reg [] = {
+/*    Macro   Name    Location                  Radix   Width     Offset      Depth            Flags       */
+/*    ------  ------  ------------------------  ----- ----------  ------  -------------  ----------------- */
+    { FLDATA (CMFOL,  ds.cmfol,                                      0)                                    },
+    { FLDATA (CMRDY,  ds.cmrdy,                                      0)                                    },
+    { DRDATA (FCNT,   ds.fifo_count,                     5)                                                },
+    { BRDATA (FIFO,   ds.fifo,                    8,    16,               FIFO_SIZE),    REG_CIRC          },
+    { ORDATA (FREG,   ds.fifo_reg,                      32),                             REG_HRO           },
+
+    { ORDATA (CNTYPE, mac_cntlr.type,                    2),                             REG_HRO           },
+    { ORDATA (STATE,  mac_cntlr.state,                   2)                                                },
+    { ORDATA (OPCODE, mac_cntlr.opcode,                  6)                                                },
+    { ORDATA (STATUS, mac_cntlr.status,                  6)                                                },
+    { FLDATA (EOC,    mac_cntlr.eoc,                                 0)                                    },
+    { FLDATA (EOD,    mac_cntlr.eod,                                 0)                                    },
+    { ORDATA (SPDU,   mac_cntlr.spd_unit,               16)                                                },
+    { ORDATA (FLMASK, mac_cntlr.file_mask,               4)                                                },
+    { ORDATA (RETRY,  mac_cntlr.retry,                   4),                             REG_HRO           },
+    { ORDATA (CYL,    mac_cntlr.cylinder,               16)                                                },
+    { ORDATA (HEAD,   mac_cntlr.head,                    6)                                                },
+    { ORDATA (SECTOR, mac_cntlr.sector,                  8)                                                },
+    { ORDATA (VFYCNT, mac_cntlr.verify_count,           16)                                                },
+    { ORDATA (LASPOL, mac_cntlr.poll_unit,               3)                                                },
+    { HRDATA (BUFPTR, mac_cntlr.buffer,                 32),                             REG_HRO           },
+    { BRDATA (BUFFER, buffer,                     8,    16,               DL_BUFSIZE)                      },
+    { DRDATA (INDEX,  mac_cntlr.index,                   8)                                                },
+    { DRDATA (LENGTH, mac_cntlr.length,                  8)                                                },
+    { HRDATA (AUXPTR, mac_cntlr.aux,                    32),                             REG_HRO           },
+    { DRDATA (STIME,  mac_cntlr.seek_time,              24),                             PV_LEFT | REG_NZ  },
+    { DRDATA (ITIME,  mac_cntlr.sector_time,            24),                             PV_LEFT | REG_NZ  },
+    { DRDATA (CTIME,  mac_cntlr.cmd_time,               24),                             PV_LEFT | REG_NZ  },
+    { DRDATA (DTIME,  mac_cntlr.data_time,              24),                             PV_LEFT | REG_NZ  },
+    { DRDATA (WTIME,  mac_cntlr.wait_time,              31),                             PV_LEFT | REG_NZ  },
+
+    { FLDATA (CTL,    ds.control,                                    0)                                    },
+    { FLDATA (FLG,    ds.flag,                                       0)                                    },
+    { FLDATA (FBF,    ds.flag_buffer,                                0)                                    },
+    { FLDATA (SRQ,    ds.srq,                                        0)                                    },
+    { FLDATA (EDT,    ds.edt,                                        0)                                    },
+
+    { URDATA (UCYL,   ds_unit[0].CYL,            10,    10,          0,   DS_UNITS,      PV_LEFT)          },
+    { URDATA (UOP,    ds_unit[0].OP,              8,     6,          0,   DS_UNITS,      PV_RZRO)          },
+    { URDATA (USTAT,  ds_unit[0].STAT,            2,     8,          0,   DS_UNITS,      PV_RZRO)          },
+    { URDATA (UPHASE, ds_unit[0].PHASE,           8,     3,          0,   DS_UNITS,      PV_RZRO)          },
+    { URDATA (UPOS,   ds_unit[0].pos,             8,  T_ADDR_W,      0,   DS_UNITS,      PV_LEFT)          },
+    { URDATA (UWAIT,  ds_unit[0].wait,            8,    32,          0,   DS_UNITS,      PV_LEFT)          },
+
+      DIB_REGS (ds_dib),
+
+    { NULL }
+    };
+
+
+/* Modifier list.
 
    For the drive models, the modifiers provide this SHOW behavior:
 
@@ -232,76 +318,6 @@ static t_stat activate_unit     (UNIT *uptr);
     2. The modifier DEVNO is deprecated in favor of SC but is retained for
        compatibility.
 */
-
-
-DEVICE ds_dev;
-
-static DIB ds_dib = { &ds_io, DS };
-
-#define UNIT_FLAGS  (UNIT_FIX | UNIT_ATTABLE | UNIT_ROABLE | UNIT_DISABLE | UNIT_UNLOAD)
-
-static UNIT ds_unit [] = {
-    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 0 */
-    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 1 */
-    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 2 */
-    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 3 */
-    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 4 */
-    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 5 */
-    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 6 */
-    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 7 */
-    { UDATA (&ds_service_controller, UNIT_DIS,                0)           },   /* controller unit */
-    { UDATA (&ds_service_timer,      UNIT_DIS,                0)           }    /* timer unit */
-    };
-
-static REG ds_reg [] = {
-    { FLDATA (CMFOL,  ds.cmfol,                0)                           },
-    { FLDATA (CMRDY,  ds.cmrdy,                0)                           },
-    { DRDATA (FCNT,   ds.fifo_count,           5)                           },
-    { BRDATA (FIFO,   ds.fifo,                 8, 16, FIFO_SIZE), REG_CIRC  },
-    { ORDATA (FREG,   ds.fifo_reg,            32), REG_HRO                  },
-
-    { ORDATA (CNTYPE, mac_cntlr.type,          2), REG_HRO                  },
-    { ORDATA (STATE,  mac_cntlr.state,         2)                           },
-    { ORDATA (OPCODE, mac_cntlr.opcode,        6)                           },
-    { ORDATA (STATUS, mac_cntlr.status,        6)                           },
-    { FLDATA (EOC,    mac_cntlr.eoc,           0)                           },
-    { FLDATA (EOD,    mac_cntlr.eod,           0)                           },
-    { ORDATA (SPDU,   mac_cntlr.spd_unit,     16)                           },
-    { ORDATA (FLMASK, mac_cntlr.file_mask,     4)                           },
-    { ORDATA (RETRY,  mac_cntlr.retry,         4), REG_HRO                  },
-    { ORDATA (CYL,    mac_cntlr.cylinder,     16)                           },
-    { ORDATA (HEAD,   mac_cntlr.head,          6)                           },
-    { ORDATA (SECTOR, mac_cntlr.sector,        8)                           },
-    { ORDATA (VFYCNT, mac_cntlr.verify_count, 16)                           },
-    { ORDATA (LASPOL, mac_cntlr.poll_unit,     3)                           },
-    { HRDATA (BUFPTR, mac_cntlr.buffer,       32), REG_HRO                  },
-    { BRDATA (BUFFER, buffer,              8, 16, DL_BUFSIZE)               },
-    { DRDATA (INDEX,  mac_cntlr.index,         8)                           },
-    { DRDATA (LENGTH, mac_cntlr.length,        8)                           },
-    { HRDATA (AUXPTR, mac_cntlr.aux,          32), REG_HRO                  },
-    { DRDATA (STIME,  mac_cntlr.seek_time,    24), PV_LEFT | REG_NZ         },
-    { DRDATA (ITIME,  mac_cntlr.sector_time,  24), PV_LEFT | REG_NZ         },
-    { DRDATA (CTIME,  mac_cntlr.cmd_time,     24), PV_LEFT | REG_NZ         },
-    { DRDATA (DTIME,  mac_cntlr.data_time,    24), PV_LEFT | REG_NZ         },
-    { DRDATA (WTIME,  mac_cntlr.wait_time,    31), PV_LEFT | REG_NZ         },
-
-    { FLDATA (CTL,    ds.control,              0)                           },
-    { FLDATA (FLG,    ds.flag,                 0)                           },
-    { FLDATA (FBF,    ds.flagbuf,              0)                           },
-    { FLDATA (SRQ,    ds.srq,                  0)                           },
-    { FLDATA (EDT,    ds.edt,                  0)                           },
-
-    { URDATA (UCYL,   ds_unit[0].CYL,   10, 10,       0, DS_UNITS, PV_LEFT) },
-    { URDATA (UOP,    ds_unit[0].OP,     8,  6,       0, DS_UNITS, PV_RZRO) },
-    { URDATA (USTAT,  ds_unit[0].STAT,   2,  8,       0, DS_UNITS, PV_RZRO) },
-    { URDATA (UPHASE, ds_unit[0].PHASE,  8,  3,       0, DS_UNITS, PV_RZRO) },
-    { URDATA (UPOS,   ds_unit[0].pos,    8, T_ADDR_W, 0, DS_UNITS, PV_LEFT) },
-    { URDATA (UWAIT,  ds_unit[0].wait,   8, 32,       0, DS_UNITS, PV_LEFT) },
-
-    { ORDATA (SC,     ds_dib.select_code, 6), REG_HRO },
-    { ORDATA (DEVNO,  ds_dib.select_code, 6), REG_HRO },
-    { NULL }
-    };
 
 static MTAB ds_mod [] = {
 /*    Mask Value    Match Value   Print String       Match String     Validation        Display  Descriptor */
@@ -338,6 +354,9 @@ static MTAB ds_mod [] = {
     { 0 }
     };
 
+
+/* Debugging trace list */
+
 static DEBTAB ds_deb [] = {
     { "RWSC",  DEB_RWSC    },
     { "CMDS",  DEB_CMDS    },
@@ -348,37 +367,41 @@ static DEBTAB ds_deb [] = {
     { NULL,    0           }
     };
 
+
+/* Device descriptor */
+
 DEVICE ds_dev = {
-    "DS",                                               /* device name */
-    ds_unit,                                            /* unit array */
-    ds_reg,                                             /* register array */
-    ds_mod,                                             /* modifier array */
-    DS_UNITS,                                           /* number of units */
-    8,                                                  /* address radix */
-    27,                                                 /* address width = 128 MB */
-    1,                                                  /* address increment */
-    8,                                                  /* data radix */
-    16,                                                 /* data width */
-    NULL,                                               /* examine routine */
-    NULL,                                               /* deposit routine */
-    &ds_reset,                                          /* reset routine */
-    &ds_boot,                                           /* boot routine */
-    &ds_attach,                                         /* attach routine */
-    &ds_detach,                                         /* detach routine */
-    &ds_dib,                                            /* device information block */
-    DEV_DEBUG | DEV_DISABLE,                            /* device flags */
-    0,                                                  /* debug control flags */
-    ds_deb,                                             /* debug flag name table */
-    NULL,                                               /* memory size change routine */
-    NULL                                                /* logical device name */
+    "DS",                                       /* device name */
+    ds_unit,                                    /* unit array */
+    ds_reg,                                     /* register array */
+    ds_mod,                                     /* modifier array */
+    DS_UNITS,                                   /* number of units */
+    8,                                          /* address radix */
+    27,                                         /* address width = 128 MB */
+    1,                                          /* address increment */
+    8,                                          /* data radix */
+    16,                                         /* data width */
+    NULL,                                       /* examine routine */
+    NULL,                                       /* deposit routine */
+    &ds_reset,                                  /* reset routine */
+    &ds_boot,                                   /* boot routine */
+    &ds_attach,                                 /* attach routine */
+    &ds_detach,                                 /* detach routine */
+    &ds_dib,                                    /* device information block */
+    DEV_DISABLE | DEV_DEBUG,                    /* device flags */
+    0,                                          /* debug control flags */
+    ds_deb,                                     /* debug flag name table */
+    NULL,                                       /* memory size change routine */
+    NULL                                        /* logical device name */
     };
 
 
 
-/* MAC disc global VM routines */
+/* Interface local SCP support routines */
 
 
-/* I/O signal handler.
+
+/* Disc interface.
 
    The 13175D disc interface data path consists of an input multiplexer/latch
    and a 16-word FIFO buffer.  The FIFO source may be either the CPU's I/O
@@ -433,54 +456,59 @@ DEVICE ds_dev = {
        interface from the current command operation and phase.
 */
 
-uint32 ds_io (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
+static SIGNALS_VALUE ds_interface (const DIB *dibptr, INBOUND_SET inbound_signals, HP_WORD inbound_value)
 {
 static const char * const output_state [] = { "Data", "Command" };
-const char * const hold_or_clear = (signal_set & ioCLF ? ",C" : "");
-
-uint16   data;
-IOSIGNAL signal;
-IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
-t_bool   command_issued = FALSE;
-t_bool   interrupt_enabled = FALSE;
+const char * const hold_or_clear = (inbound_signals & ioCLF ? ",C" : "");
+INBOUND_SIGNAL signal;
+INBOUND_SET    working_set = inbound_signals;
+SIGNALS_VALUE  outbound    = { ioNONE, 0 };
+t_bool         irq_enabled = FALSE;
+t_bool         command_issued = FALSE;
+t_bool         interrupt_enabled = FALSE;
 
 while (working_set) {
-    signal = IONEXT (working_set);                      /* isolate the next signal */
+    signal = IONEXTSIG (working_set);                   /* isolate the next signal */
 
     switch (signal) {                                   /* dispatch the I/O signal */
 
         case ioCLF:                                     /* clear flag flip-flop */
-            ds.flag = CLEAR;                            /* clear the flag */
-            ds.flagbuf = CLEAR;                         /*   and flag buffer */
+            ds.flag_buffer = CLEAR;                     /* clear the flag buffer */
+            ds.flag        = CLEAR;                     /*   and flag */
 
             tprintf (ds_dev, DEB_CMDS, "[CLF] Flag cleared\n");
             break;
 
 
         case ioSTF:                                     /* set flag flip-flop */
-        case ioENF:                                     /* enable flag */
-            ds.flag = SET;                              /* set the flag */
-            ds.flagbuf = SET;                           /*   and flag buffer */
+            ds.flag_buffer = SET;                       /* set the flag buffer */
 
             tprintf (ds_dev, DEB_CMDS, "[STF] Flag set\n");
             break;
 
 
+        case ioENF:                                     /* enable flag */
+            if (ds.flag_buffer == SET)
+                ds.flag = SET;
+            break;
+
+
         case ioSFC:                                     /* skip if flag is clear */
-            setSKF (mac_cntlr.state != cntlr_busy);     /* skip if the controller is not busy */
+            if (mac_cntlr.state != cntlr_busy)          /* skip if the controller is not busy */
+                outbound.signals |= ioSKF;
             break;
 
 
         case ioSFS:                                     /* skip if flag is set */
-            setstdSKF (ds);                             /* assert SKF if the flag is set */
+            if (ds.flag == SET)                         /* assert SKF if the flag is set */
+                outbound.signals |= ioSKF;
             break;
 
 
         case ioIOI:                                         /* I/O data input */
-            data = fifo_unload ();                          /* unload the next word from the FIFO */
-            stat_data = IORETURN (SCPE_OK, data);           /* merge in the return status */
+            outbound.value = fifo_unload ();                /* unload the next word from the FIFO */
 
-            tprintf (ds_dev, DEB_CPU, "[LIx%s] Data = %06o\n", hold_or_clear, data);
+            tprintf (ds_dev, DEB_CPU, "[LIx%s] Data = %06o\n", hold_or_clear, outbound.value);
 
             if (FIFO_EMPTY) {                               /* is the FIFO now empty? */
                 if (ds.srq == SET)
@@ -497,12 +525,10 @@ while (working_set) {
 
 
         case ioIOO:                                         /* I/O data output */
-            data = IODATA (stat_data);                      /* mask to just the data word */
-
             tprintf (ds_dev, DEB_CPU, "[OTx%s] %s = %06o\n",
-                     hold_or_clear, output_state [ds.cmfol], data);
+                     hold_or_clear, output_state [ds.cmfol], inbound_value);
 
-            fifo_load (data);                               /* load the word into the FIFO */
+            fifo_load ((uint16) inbound_value);             /* load the word into the FIFO */
 
             if (ds.cmfol == SET) {                          /* are we expecting a command? */
                 ds.cmfol = CLEAR;                           /* clear the command follows flip-flop */
@@ -527,9 +553,8 @@ while (working_set) {
 
 
         case ioPOPIO:                                   /* power-on preset to I/O */
-            ds.flag = SET;                              /* set the flag */
-            ds.flagbuf = SET;                           /*   and flag buffer */
-            ds.cmrdy = CLEAR;                           /* clear the command ready flip-flop */
+            ds.flag_buffer = SET;                       /* set flag buffer */
+            ds.cmrdy       = CLEAR;                     /* clear the command ready flip-flop */
 
             tprintf (ds_dev, DEB_CMDS, "[POPIO] Flag set\n");
             break;
@@ -579,22 +604,43 @@ while (working_set) {
 
 
         case ioSIR:                                     /* set interrupt request */
-            setstdPRL (ds);                             /* set the standard PRL signal */
-            setstdIRQ (ds);                             /* set the standard IRQ signal */
-            setSRQ (dibptr->select_code, ds.srq);       /* set the SRQ signal */
+            if (ds.control & ds.flag)                   /* if control and flag are set */
+                outbound.signals |= cnVALID;            /*   then deny PRL */
+            else                                        /* otherwise */
+                outbound.signals |= cnPRL | cnVALID;    /*   conditionally assert PRL */
+
+            if (ds.control & ds.flag & ds.flag_buffer)  /* if control and flag and flag buffer are set */
+                outbound.signals |= cnIRQ | cnVALID;    /*   then conditionally assert IRQ */
+
+            if (ds.srq == SET)                          /* if the SRQ flip-flop is set */
+                outbound.signals |= ioSRQ;              /*   then assert SRQ */
             break;
 
 
         case ioIAK:                                     /* interrupt acknowledge */
-            ds.flagbuf = CLEAR;                         /* clear the flag */
+            ds.flag_buffer = CLEAR;
             break;
 
 
-        default:                                        /* all other signals */
-            break;                                      /*   are ignored */
+        case ioIEN:                                     /* interrupt enable */
+            irq_enabled = TRUE;
+            break;
+
+
+        case ioPRH:                                         /* priority high */
+            if (irq_enabled && outbound.signals & cnIRQ)    /* if IRQ is enabled and conditionally asserted */
+                outbound.signals |= ioIRQ | ioFLG;          /*   then assert IRQ and FLG */
+
+            if (!irq_enabled || outbound.signals & cnPRL)   /* if IRQ is disabled or PRL is conditionally asserted */
+                outbound.signals |= ioPRL;                  /*   then assert it unconditionally */
+            break;
+
+
+        case ioPON:                                     /* not used by this interface */
+            break;
         }
 
-    working_set = working_set & ~signal;                /* remove the current signal from the set */
+    IOCLEARSIG (working_set, signal);                   /* remove the current signal from the set */
     }
 
 
@@ -603,7 +649,7 @@ if (command_issued)                                     /* was a command receive
 else if (interrupt_enabled)                             /* were interrupts enabled? */
     poll_drives ();                                     /* poll the drives for Attention */
 
-return stat_data;
+return outbound;                                        /* return the outbound signals and value */
 }
 
 
@@ -692,7 +738,7 @@ return stat_data;
        drained.
 */
 
-t_stat ds_service_drive (UNIT *uptr)
+static t_stat ds_service_drive (UNIT *uptr)
 {
 t_stat result;
 t_bool seek_completion;
@@ -722,7 +768,7 @@ if ((CNTLR_PHASE) uptr->PHASE == data_phase)            /* is the drive in the d
                 fifo_load (buffer [mac_cntlr.index++]);     /* load the next word into the FIFO */
                 mac_cntlr.length--;                         /* count it */
                 ds.srq = SET;                               /* ask DCPC to pick it up */
-                ds_io (&ds_dib, ioSIR, 0);                  /*   and recalculate the interrupts */
+                io_assert (&ds_dev, ioa_SIR);               /*   and assert SRQ */
                 uptr->wait = mac_cntlr.data_time;           /* schedule the next data transfer */
                 }
 
@@ -732,9 +778,9 @@ if ((CNTLR_PHASE) uptr->PHASE == data_phase)            /* is the drive in the d
         case Write:                                     /* write operations */
         case Write_Full_Sector:
         case Initialize:
-            if (entry_phase == start_phase) {           /* is this the phase transition? */
-                ds.srq = SET;                           /* start the DCPC transfer */
-                ds_io (&ds_dib, ioSIR, 0);              /*   and recalculate the interrupts */
+            if (entry_phase == start_phase) {               /* is this the phase transition? */
+                ds.srq = SET;                               /* start the DCPC transfer */
+                io_assert (&ds_dev, ioa_SIR);               /*   and assert SRQ */
                 }
 
             else if (FIFO_EMPTY)                            /* is the FIFO empty? */
@@ -755,7 +801,7 @@ if ((CNTLR_PHASE) uptr->PHASE == data_phase)            /* is the drive in the d
                 else {
                     if (ds.edt == CLEAR) {              /* if DCPC is still transferring */
                         ds.srq = SET;                   /*   then request the next word */
-                        ds_io (&ds_dib, ioSIR, 0);      /*   and recalculate the interrupts */
+                        io_assert (&ds_dev, ioa_SIR);   /*     and assert SRQ */
                         }
 
                     uptr->wait = mac_cntlr.data_time;   /* schedule the next data transfer */
@@ -779,9 +825,11 @@ if (uptr->wait)                                             /* was service reque
 
 seek_completion = ~entry_status & uptr->STAT & DL_S2ATN;    /* seek is complete when Attention sets */
 
-if (mac_cntlr.state != cntlr_busy) {                        /* is the command complete? */
-    if (mac_cntlr.state == cntlr_wait && !seek_completion)  /* is it command but not seek completion? */
-        ds_io (&ds_dib, ioENF, 0);                          /* set the data flag to interrupt the CPU */
+if (mac_cntlr.state != cntlr_busy) {                            /* is the command complete? */
+    if (mac_cntlr.state == cntlr_wait && !seek_completion) {    /* is it command but not seek completion? */
+        ds.flag_buffer = SET;                                   /* set the data flag */
+        io_assert (&ds_dev, ioa_ENF);                           /*   to interrupt the CPU */
+        }
 
     poll_interface ();                                      /* poll the interface for the next command */
     poll_drives ();                                         /* poll the drives for Attention */
@@ -832,7 +880,7 @@ return result;                                              /* return the result
        In simulation, the flag is set as soon as the parameter is received.
 */
 
-t_stat ds_service_controller (UNIT *uptr)
+static t_stat ds_service_controller (UNIT *uptr)
 {
 t_stat result;
 const CNTLR_OPCODE opcode = (CNTLR_OPCODE) uptr->OP;
@@ -858,7 +906,8 @@ switch ((CNTLR_PHASE) uptr->PHASE) {                    /* dispatch the current 
             case Clear:
             case Set_File_Mask:
             case Wakeup:
-                ds_io (&ds_dib, ioENF, 0);              /* complete the operation and set the flag */
+                ds.flag_buffer = SET;                   /* complete the operation */
+                io_assert (&ds_dev, ioa_ENF);           /*   and set the flag */
                 break;
 
 
@@ -880,14 +929,18 @@ switch ((CNTLR_PHASE) uptr->PHASE) {                    /* dispatch the current 
                 buffer [mac_cntlr.index++] = fifo_unload ();    /* unload the next word from the FIFO */
                 mac_cntlr.length--;                             /* count it */
 
-                if (mac_cntlr.length)                           /* are there more words to transfer? */
-                    ds_io (&ds_dib, ioENF, 0);                  /* set the flag to request the next one */
+                if (mac_cntlr.length) {                         /* are there more words to transfer? */
+                    ds.flag_buffer = SET;                       /* set the flag */
+                    io_assert (&ds_dev, ioa_ENF);               /*   to request the next one */
+                    }
 
                 else {                                          /* all parameters have been received */
                     uptr->PHASE = end_phase;                    /* set the end phase */
 
-                    if (opcode == Read_With_Offset)             /* a Read With Offset command sets the flag */
-                        ds_io (&ds_dib, ioENF, 0);              /*   to indicate that offsetting is complete */
+                    if (opcode == Read_With_Offset) {           /* a Read With Offset command sets the flag */
+                        ds.flag_buffer = SET;                   /*   to indicate that offsetting */
+                        io_assert (&ds_dev, ioa_ENF);           /*     is complete */
+                        }
 
                     start_command ();                           /* the command is now ready to execute */
                     }
@@ -902,7 +955,8 @@ switch ((CNTLR_PHASE) uptr->PHASE) {                    /* dispatch the current 
                     fifo_load (buffer [mac_cntlr.index++]);     /* load the next word into the FIFO */
                     mac_cntlr.length--;                         /* count it */
 
-                    ds_io (&ds_dib, ioENF, 0);                  /* set the flag to request pickup by the CPU */
+                    ds.flag_buffer = SET;               /* set the data flag */
+                    io_assert (&ds_dev, ioa_ENF);       /*   to request pickup by the CPU */
                     }
 
                 else {                                  /* all parameters have been sent */
@@ -946,7 +1000,7 @@ return result;                                          /* return the result of 
    polled for Attention status.
 */
 
-t_stat ds_service_timer (UNIT *uptr)
+static t_stat ds_service_timer (UNIT *uptr)
 {
 t_stat result;
 
@@ -979,7 +1033,7 @@ return result;                                          /* return the result of 
        interface is not selected.
 */
 
-t_stat ds_reset (DEVICE *dptr)
+static t_stat ds_reset (DEVICE *dptr)
 {
 uint32 unit;
 
@@ -1001,7 +1055,7 @@ if (sim_switches & SWMASK ('P')) {                      /* is this a power-on re
         }
     }
 
-IOPRESET (&ds_dib);                                     /* PRESET the device */
+io_assert (dptr, ioa_POPIO);                            /* PRESET the device */
 ds.srq = CLEAR;                                         /* clear SRQ */
 
 return SCPE_OK;
@@ -1029,7 +1083,7 @@ return SCPE_OK;
        offset from the start of the file to the last byte and seek there.
 */
 
-t_stat ds_attach (UNIT *uptr, CONST char *cptr)
+static t_stat ds_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat      result;
 t_addr      offset;
@@ -1063,7 +1117,7 @@ return result;                                          /* return the result of 
    the drive is now offline.
 */
 
-t_stat ds_detach (UNIT *uptr)
+static t_stat ds_detach (UNIT *uptr)
 {
 t_stat result;
 
@@ -1277,7 +1331,7 @@ static const LOADER_ARRAY ds_loaders = {
    When called for a BOOT/LOAD CPU command, the "unitno" parameter indicates the
    select code to be used for configuration, and "dptr" will be NULL.  As above,
    the BMDL or 12992B loader ROM will be copied into memory and configured for
-   the specified select code. The S register is assumed to be set correctly on
+   the specified select code.  The S register is assumed to be set correctly on
    entry and is not modified.
 
    In either case, if the CPU is a 21xx model, the paper tape portion of the
@@ -1314,21 +1368,27 @@ static const LOADER_ARRAY ds_loaders = {
        field, resulting in a Recalibrate command.
 */
 
-t_stat ds_boot (int32 unitno, DEVICE *dptr)
+static t_stat ds_boot (int32 unitno, DEVICE *dptr)
 {
 static const HP_WORD ds_preserved   = 0000073u;             /* S-register bits 5-3 and 1-0 are preserved */
 static const HP_WORD ds_manual_boot = 0010000u;             /* S-register bit 12 set for a manual boot */
+uint32 start;
 
 if (dptr == NULL)                                           /* if we are being called for a BOOT/LOAD CPU */
-    return cpu_copy_loader (ds_loaders, unitno,             /*   then copy the boot loader to memory */
-                            IBL_S_NOCLEAR, IBL_S_NOSET);    /*     but do not alter the S register */
+    start = cpu_copy_loader (ds_loaders, unitno,            /*   then copy the boot loader to memory */
+                             IBL_S_NOCLEAR, IBL_S_NOSET);   /*     but do not alter the S register */
 
 else if (unitno != 0)                                       /* otherwise a BOOT DS for a non-zero unit */
     return SCPE_NOFNC;                                      /*   is rejected as unsupported */
 
-else                                                        /* otherwise this is a BOOT/LOAD DS */
-    return cpu_copy_loader (ds_loaders, ds_dib.select_code, /*   so copy the boot loader to memory */
-                            ds_preserved, ds_manual_boot);  /*     and configure the S register if 1000 CPU */
+else                                                            /* otherwise this is a BOOT/LOAD DS */
+    start = cpu_copy_loader (ds_loaders, ds_dib.select_code,    /*   so copy the boot loader to memory */
+                             ds_preserved, ds_manual_boot);     /*     and configure the S register if 1000 CPU */
+
+if (start == 0)                                         /* if the copy failed */
+    return SCPE_NOFNC;                                  /*   then reject the command */
+else                                                    /* otherwise */
+    return SCPE_OK;                                     /*   the boot loader was successfully copied */
 }
 
 
@@ -1348,7 +1408,7 @@ else                                                        /* otherwise this is
    status.
 */
 
-t_stat ds_load_unload (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+static t_stat ds_load_unload (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
 const t_bool load = (value != UNIT_UNLOAD);             /* true if the heads are loading */
 
@@ -1436,8 +1496,10 @@ if (uptr) {                                             /* did the command start
                  uptr - ds_unit, uptr->pos, dl_opcode_name (MAC, mac_cntlr.opcode));
     }
 
-else                                                    /* the command failed to start */
-    ds_io (&ds_dib, ioENF, 0);                          /*   so set the flag to notify the CPU */
+else {                                                  /* the command failed to start */
+    ds.flag_buffer = SET;                               /*   so set the data flag */
+    io_assert (&ds_dev, ioa_ENF);                       /*     to notify the CPU */
+    }
 
 return;
 }
@@ -1460,14 +1522,19 @@ if (ds.cmrdy == SET && mac_cntlr.state != cntlr_busy) {     /* are the interface
     buffer [0] = fifo_unload ();                            /* unload the command into the buffer */
 
     if (dl_prepare_command (&mac_cntlr, ds_unit, DL_MAXDRIVE)) {    /* prepare the command; did it succeed? */
-        if (mac_cntlr.length)                                       /* does the command require parameters? */
-            ds_io (&ds_dib, ioENF, 0);                              /* set the flag to request the first one */
+        if (mac_cntlr.length) {                                     /* does the command require parameters? */
+            ds.flag_buffer = SET;                                   /* set the data flag */
+            io_assert (&ds_dev, ioa_ENF);                           /*   to request the first one */
+            }
+
         else                                                        /* if not waiting for parameters */
             start_command ();                                       /*   start the command */
         }
 
-    else                                                /* preparation failed */
-        ds_io (&ds_dib, ioENF, 0);                      /*   so set the flag to notify the CPU */
+    else {                                              /* preparation failed */
+        ds.flag_buffer = SET;                           /*   so set the data flag */
+        io_assert (&ds_dev, ioa_ENF);                   /*     to notify the CPU */
+        }
 
     ds.cmrdy = CLEAR;                                   /* flush the command from the interface */
     }
@@ -1487,9 +1554,11 @@ return;
 
 static void poll_drives (void)
 {
-if (mac_cntlr.state == cntlr_idle && ds.control == SET)     /* is the controller idle and interrupts are allowed? */
-    if (dl_poll_drives (&mac_cntlr, ds_unit, DL_MAXDRIVE))  /* poll the drives; was Attention seen? */
-        ds_io (&ds_dib, ioENF, 0);                          /* request an interrupt */
+if (mac_cntlr.state == cntlr_idle && ds.control == SET)         /* is the controller idle and interrupts are allowed? */
+    if (dl_poll_drives (&mac_cntlr, ds_unit, DL_MAXDRIVE)) {    /* poll the drives; was Attention seen? */
+        ds.flag_buffer = SET;                                   /* set the data flag */
+        io_assert (&ds_dev, ioa_ENF);                           /*   to request an interrupt */
+        }
 return;
 }
 

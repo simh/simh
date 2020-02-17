@@ -1,6 +1,6 @@
                            SIMH/HP 2100 RELEASE NOTES
                            ==========================
-                             Last update: 2018-05-23
+                             Last update: 2019-02-22
 
 
 This file documents the release history of the simulator for the Hewlett-Packard
@@ -14,11 +14,17 @@ simulator code base is available at:
 ...and may be downloaded at any time.  A code snapshot is identified by the "git
 commit ID" that is displayed in the simulator welcome banner.
 
-Therefore, HP 2100 releases are simply documentation checkpoints that describe
-the changes that have occurred since the last checkpoint.  Generally, a release
-is written when one or more major changes have been incorporated.  Minor bug
-fixes will be available immediately from the repository but only noted as part
-of the next release document.
+An HP 2100 "release" replaces the HP portion of the SIMH code base and is made
+when one or more major changes have been incorporated.  Each release is
+documented below and describes the changes (new features and corrected errors)
+that have occurred since the prior release.  A revised "HP 2100 Simulator User's
+Guide" accompanies every release where user-visible changes were made.
+
+A "release update" is made to fix minor errors that do not affect normal user
+operation.  Examples of updates might be expansion or correction of source file
+comments, minor algorithm improvements, or rewording of error messages.  Updates
+are not documented here, although every change is reported in the change logs
+that appear at the beginning of all HP 2100 source files.
 
 
 
@@ -79,6 +85,18 @@ TSB has run successfully on SIMH for many years, but the advent of multi-core
 host machines has increased the difficulty in getting the two SIMH instances to
 coordinate properly.  The paper presents some configuration guidelines that
 improve the probability of successfully running TSB.
+
+A paper entitled "The Evolution of the HP 21xx/1000 I/O Simulation" is available
+at:
+
+  http://simh.trailing-edge.com/docs/hp_1000_io_simulation.pdf
+
+This monograph describes the several I/O simulation designs that have been
+employed in the simulator as it has evolved to accommodate the widening range of
+I/O device interfaces.  It also describes in detail the current design and its
+tradeoffs, and serves as a tutorial for those intending to write their own HP
+interface simulations.
+
 
 
 ------------------
@@ -175,6 +193,280 @@ Revision 5010:
 
    A corrected version of $BALC is present on cartridge GF of the disc image
    supplied with the RTE-IVB software kit at the HP Computer Museum.
+
+
+
+======================
+Release 29, 2019-02-09
+======================
+
+This release of the HP 2100 simulator adds the following features:
+
+ - The 12731A Memory Expansion Module has been separated from the CPU simulator
+   and assigned to its own device ("MEM").  The MEM registers are now displayed
+   and altered with the EXAMINE MEM <reg> and DEPOSIT MEM <reg> commands and
+   have been renamed, with the map registers separated into the four functional
+   sets.  Enabling and disabling the device is performed indirectly by the SET
+   CPU DMS and SET CPU NODMS firmware-installation commands, rather than by the
+   typical SET MEM ENABLED/DISABLED commands.  The CPU feature table in Section
+   3.1 of the HP2100 User's Guide has been corrected to show that the MEM is an
+   option for the 1000 M/E/F-Series machines, and 1000 systems without memory
+   expansion may be simulated by disabling the DMS instruction set.
+
+ - Two instances of the 12566B Microcircuit Interface have been added; the
+   device designations are MC1 and MC2.  These devices simulate only the
+   interface cards and do not have attached peripherals.  They are intended as
+   interrupt and data loopback targets for several HP diagnostic programs and,
+   as such, are disabled by default.
+
+ - An internal "Keyboard Poll" device has been added to coordinate keyboard
+   input polling.  This device has no modifiers or registers and cannot be
+   disabled.
+
+ - The TTY device may now be disabled, as its input poll coordination
+   responsibilities have been transferred to the internal keyboard poll device.
+   This permits correct I/O configuration for systems that do not use a keyboard
+   device (e.g., the I/O Processor in an HP 2000 Time-Shared BASIC system) or
+   for RTE systems that use the BACI as the system console device.  Previously,
+   the TTY device would have remained enabled but been assigned a high select
+   code "out of the way" of the correctly configured set of I/O devices.
+
+ - A new SHOW CPU IOCAGE command has been added to display the set of I/O device
+   interfaces currently installed in the CPU card cage.  The devices appear in
+   select code order, beginning with select code 10 and ending with the last
+   occupied select code.  This makes checking select code assignments and
+   identifying conflicts much easier than using the SHOW DEVICES command.
+
+ - The SHOW CPU ROMS command has been extended to add descriptions of the
+   bootstrap loader ROMs installed in HP 1000 CPUs.
+
+ - The list of the simulated devices displayed by the SHOW DEVICES command has
+   been rearranged to this order: CPU, CPU devices, I/O devices alphabetically,
+   and the internal keyboard poll device.  The prior order was essentially
+   random, making it difficult to locate specific devices.
+
+ - New SET <dev> REALTIME and SET <dev> FASTTIME commands have been added to the
+   TTY, PTR, and PTP devices.  The optimized timing values used may be altered
+   via the corresponding register interfaces.
+
+ - The SET PTR DIAGNOSTIC command has been enhanced to provide a second
+   diagnostic mode.  If a paper tape image file is not attached, then the new
+   mode simulates the installation of a loopback connector in place of the
+   reader cable, permitting the General Purpose Register Diagnostic to test the
+   interface.  If a file is attached, then the existing mode converts the
+   attached paper tape image into a continuous loop by logically joining the
+   ends of the tape, which is needed by the High-Speed Tape Reader/Punch
+   Diagnostic.
+
+ - The new SET PTP DIAGNOSTIC command installs a loopback connector in place of
+   the paper tape punch cable to run the General Purpose Register Diagnostic on
+   the interface.  The new SET PTP PUNCH command reinstalls the punch cable and
+   restores normal punch operation.
+
+ - Configurable debug tracing has been added to the TTY, PTR, and PTP devices.
+
+ - All I/O devices that had not supported debug tracing previously now provide
+   an IOBUS option to trace data and signals sent and received across the I/O
+   backplane bus.  All peripheral devices now support at least minimal tracing.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - The SHOW CPU ROMS command is now rejected if the CPU is not a 1000.
+
+ - The ION and ION_DEFER CPU registers have been renamed to INTSYS and INTEN,
+   respectively, to match the names used in the HP engineering documentation.
+   Note that the sense of INTEN is now reversed: a value of 0 indicates that
+   interrupts are not enabled (i.e., are deferred), while 1 indicates that
+   interrupts are enabled (not deferred).
+
+ - The TTY KTIME register has been removed.  This register was intended to allow
+   the user to set the keyboard polling interval, but it never worked; instead,
+   the keyboard poll rate was (and is) always fixed at 100 Hz.
+
+ - The TTY TTIME register had been described as the "Time from I/O initiation to
+   interrupt" but it actually sets the optimized (FASTTIME) time for Teletype
+   print/punch operations.
+
+ - The I/O system simulation has been rewritten to model the actual hardware
+   more closely.  This has no user-visible impact, except that IOBUS tracing now
+   accurately reflects the hardware I/O bus signals.  For example, the PRH and
+   PRL signals now appear in IOBUS traces and show the I/O priority settings.
+   Any user-written device interfaces will have to be changed to use the new I/O
+   structure; the Microcircuit Interface in hp2100_mc.c is a simple example that
+   may be used as a model for the changes needed.
+
+ - The hp2100_stddev.c source file has been split into hp2100_pt.c (PTR and
+   PTP), hp2100_tty.c (TTY) and hp2100_tbg.c (TBG).
+
+ - hp2100_cpu.c has been split into hp2100_cpu.c (CPU and I/O), hp2100_mem.c
+   (main memory, MP, and MEM), and hp2100_dma.c (DMA1 and DMA2).  A new
+   hp2100_cpu_dmm.h file contains the interface declarations for these three
+   modules.
+
+ - hp2100_fp.c and hp2100_fp1.c have been renamed to hp2100_cpu_fp.c and
+   hp2100_cpu_fpp.c, respectively, and hp2100_fp.h and hp2100_fp1.h have been
+   combined into hp2100_cpu_fp.h.
+
+ - hp2100_cpu1.h has been retired; its declarations have been moved into
+   hp2100_cpu.h.
+
+ - A workaround for the TBG losing time with simulator framework versions after
+   June 14, 2018 (git commit ID d3986466) has been implemented.  It will be
+   removed when the framework issue has been corrected.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  The multiplexer upper data card status trace is incorrect.
+
+     VERSION:  Release 28.
+
+     OBSERVATION:  Tracing status on the upper data card of the 12920A
+     Asynchronous Multiplexer Interface with the SET MUX DEBUG=CSRW command
+     produces incorrect results.  For example:
+
+       >>MUX  csrw: Status is channel 17 | seeking | breaklost | receive
+       >>MUX iobus: Returned data 042012 with signals (none)
+
+     Given the status word 042012 octal, the correct status interpretation is
+     "channel 17 | diagnose | lost | receive".
+
+     CAUSE:  A comma is missing after the "break" string constant in the
+     "upper_status_names" array initializer.  This causes the "break" and "lost"
+     strings to be concatenated and used for bit 1.  As a result, the "diagnose"
+     and "seeking" strings are used for bits 2 and 14 instead of 3 and 15.
+
+     RESOLUTION:  Modify the "upper_status_names" initializer (hp2100_mux.c) to
+     use the correct set of status names.
+
+     STATUS:  Fixed in Release 29.
+
+
+  2. PROBLEM:  Tracing the $MPV instruction prints the wrong mnemonic.
+
+     VERSION:  Release 28.
+
+     OBSERVATION:  Tracing memory protect interrupts on an RTE-6/VM system
+     displays the trap cell instruction mnemonic as "ostst" (the firmware test
+     instruction):
+
+       >>CPU instr: U 0170 26072  000005  interrupt
+       >>CPU fetch: S 0000 00005  105355    instruction fetch
+       >>CPU instr: S 0000 00005  105355  ostst
+       >>CPU  opnd: * **** 26072  105355    entry is for a memory protect violation
+
+     ...instead of the expected "$MPV" (memory protect violation instruction):
+
+       >>CPU instr: U 0170 26072  000005  interrupt
+       >>CPU fetch: S 0000 00005  105355    instruction fetch
+       >>CPU instr: S 0000 00005  105355  $MPV
+       >>CPU  opnd: * **** 26072  105355    entry is for a memory protect violation
+
+     CAUSE:  The RTE-6/VM OS firmware designates four instruction opcodes as
+     "dual-use."  Opcodes 105354-105357 take different actions, depending on
+     whether or not they are executed from a trap cell during an interrupt.  The
+     routine that formats these instructions for trace output determines the
+     mnemonic table to use by the address in which the instruction is stored.
+
+     The address value is also used to communicate to the "fprint_instruction"
+     routine whether or not the value array containing the instruction word(s)
+     has been loaded.  For a CPU instruction trace, only the first word of the
+     array is loaded (as part of the instruction fetch), so the address value
+     has an upper bit set to indicate this condition.  However, the trap cell
+     check is not masking this bit off, so instructions executing from trap
+     cells are treated as though they are executing from high memory.
+
+     RESOLUTION:  Modify "fprint_cpu" (hp2100_sys.c) to mask the target address
+     before checking the location when printing "dual-use" instructions.
+
+     STATUS:  Fixed in Release 29.
+
+
+  3. PROBLEM:  DIAGNOSTIC mode of the 12653A Line Printer Interface is not
+     modeled correctly.
+
+     VERSION:  Release 28.
+
+     OBSERVATION:  The 12653A Line Printer Interface used with the HP 2767A line
+     printer (LPS device) is a modified 12566B Microcircuit Interface.  Setting
+     the card for DIAGNOSTIC mode simulates the installation of an HP 1251-0332
+     diagnostic test (loopback) connector in place of the printer cable and the
+     alteration of the jumper configurations to match those required by the
+     diagnostics that target this interface.
+
+     When the Direct Memory Access Diagnostic for the 2115/2116 computer (DSN
+     101105) was first run, Test 17, which tests character unpacking during
+     output, failed.  It was originally thought that the 12578A DMA card for the
+     2115 and 2116 had a one-cycle startup latency that did not exist in the
+     12607B, 12895A, and 12897B DMA cards for the 2114, 2100, and 1000-series
+     CPUs.  This latency was added to the simulation in version 3.7-0, and the
+     diagnostic passed.
+
+     Sometime later, the schematic for the 12578A card was studied more closely,
+     revealing that the first DMA cycle occurred immediately upon activation
+     when SRQ (Service Request) was already asserted, as it was in the
+     diagnostic, so the latency counter was removed.  In its place, the LPS
+     device was modified to change SRQ assertion timing for 211x CPUs.
+
+     With the loopback connector in place, asserting STC caused the flag to set
+     and SRQ to assert after a delay of one instruction.  The 12578A diagnostic
+     required different jumper settings on the 12653A card than were used by the
+     other diagnostics, and it was assumed that this caused the card to assert
+     SRQ after a delay of two instructions.  These changes were made in version
+     3.9-0.
+
+     A copy of the 12653A interface manual was obtained recently, and studying
+     the schematic revealed that the unusual jumper settings still resulted in
+     SRQ assertion after a one-instruction delay.  Restoring the simulation to
+     the correct delay caused diagnostic test 17 to fail again.
+
+     CAUSE:  Timing analysis of the response to DMA cycles on 2115 and 2116
+     machines shows that the jumper settings employed by the diagnostic suppress
+     setting of the Flag Buffer flip-flop, so no SRQ assertion occurs.  The STC
+     and CLF signal assertions that start an I/O operation are coincident and
+     one T-period in duration (200 ns) in all combinations of CPU models and
+     cycle types EXCEPT when asserted for a 211x DMA cycle, where they are two
+     T-periods in duration (400 ns) and CLF lags STC by one T-period.  With the
+     DMA diagnostic strapping, the Flag Buffer flip-flop is set by the STC and
+     then cleared by the lagging CLF in the same DMA cycle.  This inhibits SRQ,
+     so DMA pauses until the diagnostic can examine the DMA state and then issue
+     a programmed STC/CLF to assert SRQ.  This permits test 17 to succeed.
+
+     RESOLUTION: Create a new 12566B Microcircuit Interface simulator
+     (hp2100_mc.c) to implement the three different strapping behaviors required
+     by the various DMA diagnostics.  Simplify "lps_interface" (hp2100_lps.c) to
+     operate in the manner expected by the General Purpose Register Diagnostic
+     when the card is in DIAGNOSTIC mode.
+
+     STATUS:  Fixed in Release 29.
+
+
+  4. PROBLEM:  Simulation stops are reported improperly in CPU traces.
+
+     VERSION:  Release 28.
+
+     OBSERVATION:  A simulation stop that occurs while CPU tracing is enabled
+     reports the cause of the stop in the trace log.  However, stop reasons
+     specific to the HP simulator are not reported properly.  For example,
+     tracing a halt instruction reports "simulation stop: Error 5" instead of
+     "simulation stop: Programmed halt".
+
+     CAUSE:  The "sim_error_text" routine called to obtain the error translation
+     does not return simulator-specific messages.  Instead, the routine returns
+     the generic message, "Error <n>", where <n> is the value of the simulator-
+     specific stop code.
+
+     RESOLUTION:  Modify the simulation stop trace at the end of the instruction
+     postlude in "sim_instr" (hp2100_cpu.c) to call "sim_error_text" for SCP
+     errors and to obtain HP-specific messages from the "sim_stop_messages"
+     array.
+
+     STATUS:  Fixed in Release 29.
 
 
 

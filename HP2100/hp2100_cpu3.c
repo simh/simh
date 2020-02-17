@@ -1,6 +1,6 @@
-/* hp2100_cpu3.c: HP 2100/1000 FFP/DBI instructions
+/* hp2100_cpu3.c: HP 2100/1000 FFP and DBI microcode simulator
 
-   Copyright (c) 2005-2017, J. David Bryan
+   Copyright (c) 2005-2018, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,8 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the author.
 
-   CPU3         Fast FORTRAN and Double Integer instructions
+   CPU3         Fast FORTRAN Processor and Double Integer instructions
 
+   28-Jul-18    JDB     Renamed hp2100_fp1.h to hp2100_cpu_fp.h
    24-Aug-17    JDB     op_ffp_f definition is now conditional on HAVE_INT64
    27-Mar-17    JDB     Improved the comments for the FFP instructions
    05-Aug-16    JDB     Renamed the P register from "PC" to "PR"
@@ -59,18 +60,15 @@
          (93585-18002 Rev. 2005)
      - 93585A Double Integer Instructions Installation and Reference Manual
          (93585-90007, February 1984)
-
 */
+
+
 
 #include "hp2100_defs.h"
 #include "hp2100_cpu.h"
-#include "hp2100_cpu1.h"
+#include "hp2100_cpu_dmm.h"
+#include "hp2100_cpu_fp.h"
 
-#if defined (HAVE_INT64)                                /* int64 support available */
-#include "hp2100_fp1.h"
-#else                                                   /* int64 support unavailable */
-#include "hp2100_fp.h"
-#endif                                                  /* end of int64 support */
 
 
 /* Fast FORTRAN Processor.
@@ -184,7 +182,7 @@ static const OP_PAT op_ffp_e [32] = {                   /* patterns for 2100/M/E
   OP_N,    OP_N,    OP_N,    OP_N                       /*  ---    ---    ---    ---  */
   };
 
-t_stat cpu_ffp (uint32 IR, uint32 intrq)
+t_stat cpu_ffp (uint32 intrq)
 {
 OP fpop;
 OPS op, op2;
@@ -201,9 +199,9 @@ int32 i;
 
 entry = IR & 037;                                       /* mask to entry point */
 
-if (UNIT_CPU_MODEL != UNIT_1000_F) {                    /* 2100/M/E-Series? */
+if (!(cpu_configuration & CPU_1000_F)) {                /* 2100/M/E-Series? */
     if (op_ffp_e [entry] != OP_N) {
-        reason = cpu_ops (op_ffp_e [entry], op, intrq); /* get instruction operands */
+        reason = cpu_ops (op_ffp_e [entry], op);        /* get instruction operands */
 
         if (reason != SCPE_OK)                          /* evaluation failed? */
             return reason;                              /* return reason for failure */
@@ -214,7 +212,7 @@ if (UNIT_CPU_MODEL != UNIT_1000_F) {                    /* 2100/M/E-Series? */
 
 else {                                                  /* F-Series */
     if (op_ffp_f [entry] != OP_N) {
-        reason = cpu_ops (op_ffp_f [entry], op, intrq); /* get instruction operands */
+        reason = cpu_ops (op_ffp_f [entry], op);        /* get instruction operands */
 
         if (reason != SCPE_OK)                          /* evaluation failed? */
             return reason;                              /* return reason for failure */
@@ -227,14 +225,14 @@ else {                                                  /* F-Series */
             SR = 0102077;                               /* test passed code */
             AR = 0;                                     /* test clears A/B */
             BR = 0;
-            PR = (PR + 1) & VAMASK;                     /* P+2 return for firmware w/DBI */
+            PR = (PR + 1) & LA_MASK;                    /* P+2 return for firmware w/DBI */
             return reason;
 
         case 003:                                       /* .DNG 105203 (OP_N) */
-            return cpu_dbi (0105323, intrq);            /* remap to double int handler */
+            return cpu_dbi (0105323u);                  /* remap to double int handler */
 
         case 004:                                       /* .DCO 105204 (OP_N) */
-            return cpu_dbi (0105324, intrq);            /* remap to double int handler */
+            return cpu_dbi (0105324u);                  /* remap to double int handler */
 
         case 007:                                       /* .BLE 105207 (OP_AAF) */
             O = fp_cvt (&op[2], fp_f, fp_t);            /* convert value and clear overflow */
@@ -242,16 +240,16 @@ else {                                                  /* F-Series */
             return reason;
 
         case 010:                                       /* .DIN 105210 (OP_N) */
-            return cpu_dbi (0105330, intrq);            /* remap to double int handler */
+            return cpu_dbi (0105330u);                  /* remap to double int handler */
 
         case 011:                                       /* .DDE 105211 (OP_N) */
-            return cpu_dbi (0105331, intrq);            /* remap to double int handler */
+            return cpu_dbi (0105331u);                  /* remap to double int handler */
 
         case 012:                                       /* .DIS 105212 (OP_N) */
-            return cpu_dbi (0105332, intrq);            /* remap to double int handler */
+            return cpu_dbi (0105332u);                  /* remap to double int handler */
 
         case 013:                                       /* .DDS 105213 (OP_N) */
-            return cpu_dbi (0105333, intrq);            /* remap to double int handler */
+            return cpu_dbi (0105333u);                  /* remap to double int handler */
 
         case 014:                                       /* .NGL 105214 (OP_AT) */
             O = fp_cvt (&op[1], fp_t, fp_f);            /* convert value */
@@ -280,7 +278,7 @@ switch (entry) {                                        /* decode IR<4:0> */
 /* FFP module 1 */
 
     case 000:                                           /* [nop] 105200 (OP_N) */
-        if (UNIT_CPU_TYPE != UNIT_TYPE_1000)            /* must be 1000 M/E-series */
+        if (!(cpu_configuration & CPU_1000))            /* must be 1000 M/E-series */
             return STOP (cpu_ss_unimpl);                /* trap if not */
         break;
 
@@ -315,11 +313,11 @@ switch (entry) {                                        /* decode IR<4:0> */
 #if defined (HAVE_INT64)                                /* int64 support available */
 
     case 006:                                           /* .XPAK 105206 (OP_A) */
-        if (UNIT_CPU_TYPE != UNIT_TYPE_1000)            /* must be 1000 */
+        if (!(cpu_configuration & CPU_1000))            /* must be 1000 */
             return STOP (cpu_ss_unimpl);                /* trap if not */
 
         if (intrq) {                                    /* interrupt pending? */
-            PR = err_PC;                                /* restart instruction */
+            PR = err_PR;                                /* restart instruction */
             break;
             }
 
@@ -332,7 +330,7 @@ switch (entry) {                                        /* decode IR<4:0> */
         i = 1;                                          /* params start at op[1] */
     XADD:                                               /* enter here from .XADD */
         if (intrq) {                                    /* interrupt pending? */
-            PR = err_PC;                                /* restart instruction */
+            PR = err_PR;                                /* restart instruction */
             break;
             }
 
@@ -344,7 +342,7 @@ switch (entry) {                                        /* decode IR<4:0> */
         i = 1;                                          /* params start at op[1] */
     XSUB:                                               /* enter here from .XSUB */
         if (intrq) {                                    /* interrupt pending? */
-            PR = err_PC;                                /* restart instruction */
+            PR = err_PR;                                /* restart instruction */
             break;
             }
 
@@ -356,7 +354,7 @@ switch (entry) {                                        /* decode IR<4:0> */
         i = 1;                                          /* params start at op[1] */
     XMPY:                                               /* enter here from .XMPY */
         if (intrq) {                                    /* interrupt pending? */
-            PR = err_PC;                                /* restart instruction */
+            PR = err_PR;                                /* restart instruction */
             break;
             }
 
@@ -368,7 +366,7 @@ switch (entry) {                                        /* decode IR<4:0> */
         i = 1;                                          /* params start at op[1] */
      XDIV:                                              /* enter here from .XDIV */
         if (intrq) {                                    /* interrupt pending? */
-            PR = err_PC;                                /* restart instruction */
+            PR = err_PR;                                /* restart instruction */
             break;
             }
 
@@ -385,7 +383,7 @@ switch (entry) {                                        /* decode IR<4:0> */
         goto XSUB;                                      /* process as XSUB */
 
     case 015:                                           /* .XCOM 105215 (OP_A) */
-        if (UNIT_CPU_TYPE != UNIT_TYPE_1000)            /* must be 1000 */
+        if (!(cpu_configuration & CPU_1000))            /* must be 1000 */
             return STOP (cpu_ss_unimpl);                /* trap if not */
 
         fpop = ReadOp (op[0].word, fp_x);               /* read unpacked */
@@ -394,11 +392,11 @@ switch (entry) {                                        /* decode IR<4:0> */
         break;
 
     case 016:                                           /* ..DCM 105216 (OP_A) */
-        if (UNIT_CPU_TYPE != UNIT_TYPE_1000)            /* must be 1000 */
+        if (!(cpu_configuration & CPU_1000))            /* must be 1000 */
             return STOP (cpu_ss_unimpl);                /* trap if not */
 
         if (intrq) {                                    /* interrupt pending? */
-            PR = err_PC;                                /* restart instruction */
+            PR = err_PR;                                /* restart instruction */
             break;
             }
 
@@ -408,11 +406,11 @@ switch (entry) {                                        /* decode IR<4:0> */
         break;
 
     case 017:                                           /* DDINT 105217 (OP_AAX) */
-        if (UNIT_CPU_TYPE != UNIT_TYPE_1000)            /* must be 1000 */
+        if (!(cpu_configuration & CPU_1000))            /* must be 1000 */
             return STOP (cpu_ss_unimpl);                /* trap if not */
 
         if (intrq) {                                    /* interrupt pending? */
-            PR = err_PC;                                /* restart instruction */
+            PR = err_PR;                                /* restart instruction */
             break;
             }
 
@@ -425,8 +423,8 @@ switch (entry) {                                        /* decode IR<4:0> */
 /* FFP module 2 */
 
     case 020:                                           /* .XFER 105220 (OP_N) */
-        if (UNIT_CPU_TYPE == UNIT_TYPE_2100)
-            PR = (PR + 1) & VAMASK;                     /* 2100 .XFER returns to P+2 */
+        if (cpu_configuration & CPU_2100)
+            PR = (PR + 1) & LA_MASK;                    /* 2100 .XFER returns to P+2 */
     XFER:                                               /* enter here from .DFER */
         sc = 3;                                         /* set count for 3-wd xfer */
         goto CFER;                                      /* do transfer */
@@ -439,16 +437,17 @@ switch (entry) {                                        /* decode IR<4:0> */
         if (sa >= op[0].word)                           /* must be <= last target */
             sa = op[0].word - 1;
 
-        da = ReadW (sa);                                /* get jump target */
-        reason = resolve (da, &MA, intrq);              /* resolve indirects */
+        MR = ReadW (sa);                                /* get jump target */
+        reason = cpu_resolve_indirects (TRUE);          /* resolve indirects */
+
         if (reason != SCPE_OK) {                        /* resolution failed? */
-            PR = err_PC;                                /* irq restarts instruction */
+            PR = err_PR;                                /* irq restarts instruction */
             break;
             }
 
-        mp_dms_jmp (MA, 2);                             /* validate jump addr */
+        mp_check_jmp (MR, 2);                           /* validate jump addr */
         PCQ_ENTRY;                                      /* record last P */
-        PR = MA;                                        /* jump */
+        PR = MR;                                        /* jump */
         BR = op[0].word;                                /* (for 2100 FFP compat) */
         break;
 
@@ -459,9 +458,9 @@ switch (entry) {                                        /* decode IR<4:0> */
             op[1].word = op[1].word +                   /* compute element offset */
                          (op[2].word - 1) * op[3].word;
         else {                                          /* 3-dim access */
-            reason = cpu_ops (OP_KK, op2, intrq);       /* get 1st, 2nd ranges */
+            reason = cpu_ops (OP_KK, op2);              /* get 1st, 2nd ranges */
             if (reason != SCPE_OK) {                    /* evaluation failed? */
-                PR = err_PC;                            /* irq restarts instruction */
+                PR = err_PR;                            /* irq restarts instruction */
                 break;
                 }
             op[1].word = op[1].word +                   /* offset */
@@ -485,13 +484,15 @@ switch (entry) {                                        /* decode IR<4:0> */
             sc = dc;
 
         for (j = 0; j < sc; j++) {
-            MA = ReadW (sa++);                          /* get addr of actual */
-            reason = resolve (MA, &MA, intrq);          /* resolve indirect */
+            MR = ReadW (sa++);                          /* get addr of actual */
+            reason = cpu_resolve_indirects (TRUE);      /* resolve indirects */
+
             if (reason != SCPE_OK) {                    /* resolution failed? */
-                PR = err_PC;                            /* irq restarts instruction */
+                PR = err_PR;                            /* irq restarts instruction */
                 break;
                 }
-            WriteW (da++, MA);                          /* put addr into formal */
+
+            WriteW (da++, MR);                          /* put addr into formal */
             }
 
         AR = (HP_WORD) ra;                              /* return address */
@@ -503,7 +504,7 @@ switch (entry) {                                        /* decode IR<4:0> */
         goto ENTR;
 
     case 025:                                           /* .PWR2 105225 (OP_RK) */
-        if (UNIT_CPU_TYPE != UNIT_TYPE_1000)            /* must be 1000 */
+        if (!(cpu_configuration & CPU_1000))            /* must be 1000 */
             return STOP (cpu_ss_unimpl);                /* trap if not */
 
         fp_unpack (&fpop, &expon, op[0], fp_f);         /* unpack value */
@@ -514,7 +515,7 @@ switch (entry) {                                        /* decode IR<4:0> */
         break;
 
     case 026:                                           /* .FLUN 105226 (OP_R) */
-        if (UNIT_CPU_TYPE != UNIT_TYPE_1000)            /* must be 1000 */
+        if (!(cpu_configuration & CPU_1000))            /* must be 1000 */
             return STOP (cpu_ss_unimpl);                /* trap if not */
 
         fp_unpack (&fpop, &expon, op[0], fp_f);         /* unpack value */
@@ -526,17 +527,17 @@ switch (entry) {                                        /* decode IR<4:0> */
         j = sa = AR;                                    /* save initial value */
         sb = BR;                                        /* save initial address */
         AR = 0;                                         /* AR will return = 0 */
-        BR = BR & VAMASK;                               /* addr must be direct */
+        BR = BR & LA_MASK;                              /* addr must be direct */
 
         do {
             WriteW (BR, j);                             /* write value to address */
             j = (j + 1) & D16_MASK;                     /* incr value */
-            BR = (BR + 1) & VAMASK;                     /* incr address */
+            BR = (BR + 1) & LA_MASK;                    /* incr address */
             op[0].word = op[0].word - 1;                /* decr count */
             if (op[0].word && intrq) {                  /* more and intr? */
                 AR = sa;                                /* restore A */
                 BR = sb;                                /* restore B */
-                PR = err_PC;                            /* restart instruction */
+                PR = err_PR;                            /* restart instruction */
                 break;
                 }
             }
@@ -544,7 +545,7 @@ switch (entry) {                                        /* decode IR<4:0> */
         break;
 
     case 030:                                           /* .PACK 105230 (OP_RC) */
-        if (UNIT_CPU_TYPE != UNIT_TYPE_1000)            /* must be 1000 */
+        if (!(cpu_configuration & CPU_1000))            /* must be 1000 */
             return STOP (cpu_ss_unimpl);                /* trap if not */
 
         O = fp_nrpack (&fpop, op[0],                    /* nrm/rnd/pack value */
@@ -554,8 +555,7 @@ switch (entry) {                                        /* decode IR<4:0> */
         break;
 
     case 031:                                           /* .CFER 105231 (OP_AA) */
-        if ((UNIT_CPU_MODEL != UNIT_1000_E) &&          /* must be 1000 E-series */
-            (UNIT_CPU_MODEL != UNIT_1000_F))            /* or 1000 F-series */
+        if (!(cpu_configuration & CPU_1000_E_F))        /* must be 1000 E- or F-series */
             return STOP (cpu_ss_unimpl);                /* trap if not */
 
         BR = op[0].word;                                /* get destination address */
@@ -564,15 +564,15 @@ switch (entry) {                                        /* decode IR<4:0> */
     CFER:                                               /* enter here from .XFER */
         for (j = 0; j < sc; j++) {                      /* xfer loop */
             WriteW (BR, ReadW (AR));                    /* transfer word */
-            AR = (AR + 1) & VAMASK;                     /* bump source addr */
-            BR = (BR + 1) & VAMASK;                     /* bump destination addr */
+            AR = (AR + 1) & LA_MASK;                    /* bump source addr */
+            BR = (BR + 1) & LA_MASK;                    /* bump destination addr */
             }
 
         E = 0;                                          /* routine clears E */
 
-        if (UNIT_CPU_TYPE == UNIT_TYPE_2100) {          /* 2100 (and .DFER/.XFER)? */
-            AR = (AR + 1) & VAMASK;                     /* 2100 FFP returns X+4, Y+4 */
-            BR = (BR + 1) & VAMASK;
+        if (cpu_configuration & CPU_2100) {             /* 2100 (and .DFER/.XFER)? */
+            AR = (AR + 1) & LA_MASK;                    /* 2100 FFP returns X+4, Y+4 */
+            BR = (BR + 1) & LA_MASK;
             }
         break;
 
@@ -655,7 +655,7 @@ static const OP_PAT op_dbi[16] = {
   OP_JD,   OP_N,    OP_N,    OP_N                       /* .DSBR   ---    ---    ---  */
   };
 
-t_stat cpu_dbi (uint32 IR, uint32 intrq)
+t_stat cpu_dbi (HP_WORD IR)
 {
 OP din;
 OPS op;
@@ -665,7 +665,7 @@ t_stat reason = SCPE_OK;
 entry = IR & 017;                                       /* mask to entry point */
 
 if (op_dbi[entry] != OP_N) {
-    reason = cpu_ops (op_dbi [entry], op, intrq);       /* get instruction operands */
+    reason = cpu_ops (op_dbi [entry], op);              /* get instruction operands */
     if (reason != SCPE_OK)                              /* evaluation failed? */
         return reason;                                  /* return reason for failure */
     }
@@ -676,7 +676,7 @@ switch (entry) {                                        /* decode IR<3:0> */
         XR = 2;                                         /* set revision */
         BR = 0377;                                      /* side effect of microcode */
         SR = 0102077;                                   /* set "pass" code */
-        PR = (PR + 1) & VAMASK;                         /* return to P+1 */
+        PR = (PR + 1) & LA_MASK;                        /* return to P+1 */
         t = (AR << 16) | BR;                            /* set t for return */
         break;
 
@@ -684,7 +684,7 @@ switch (entry) {                                        /* decode IR<3:0> */
         t = op[0].dword + op[1].dword;                  /* add values */
         E = E | (t < op[0].dword);                      /* carry if result smaller */
         O = (((~op[0].dword ^ op[1].dword) &            /* overflow if sign wrong */
-              (op[0].dword ^ t) & SIGN32) != 0);
+              (op[0].dword ^ t) & D32_SIGN) != 0);
         break;
 
     case 002:                                           /* .DMP 105322 (OP_JD) */
@@ -699,7 +699,7 @@ switch (entry) {                                        /* decode IR<3:0> */
             O = ((t64 < -(t_int64) 0x80000000) ||       /* overflow if out of range */
                  (t64 >  (t_int64) 0x7FFFFFFF));
             if (O)
-                t = ~SIGN32;                            /* if overflow, rtn max pos */
+                t = D32_SMAX;                           /* if overflow, rtn max pos */
             else
                 t = (uint32) (t64 & D32_MASK);          /* else lower 32 bits of result */
 
@@ -737,7 +737,7 @@ switch (entry) {                                        /* decode IR<3:0> */
                 }
 
             if (O)                                      /* if overflow occurred */
-                t = ~SIGN32;                            /*   then return the largest positive number */
+                t = D32_SMAX;                           /*   then return the largest positive number */
             else if (sign)                              /* otherwise if the result is negative */
                 t = ~t + 1;                             /*   then return the twos complement (set if O = 0 above) */
 
@@ -748,7 +748,7 @@ switch (entry) {                                        /* decode IR<3:0> */
 
     case 003:                                           /* .DNG 105323 (OP_J) */
         t = ~op[0].dword + 1;                           /* negate value */
-        O = (op[0].dword == SIGN32);                    /* overflow if max neg */
+        O = (op[0].dword == D32_SIGN);                  /* overflow if max neg */
         if (op[0].dword == 0)                           /* borrow if result zero */
             E = 1;
         break;
@@ -756,18 +756,18 @@ switch (entry) {                                        /* decode IR<3:0> */
     case 004:                                           /* .DCO 105324 (OP_JD) */
         t = op[0].dword;                                /* copy for later store */
         if ((int32) op[0].dword < (int32) op[1].dword)
-            PR = (PR + 1) & VAMASK;                     /* < rtns to P+2 */
+            PR = (PR + 1) & LA_MASK;                    /* < rtns to P+2 */
         else if ((int32) op[0].dword > (int32) op[1].dword)
-            PR = (PR + 2) & VAMASK;                     /* > rtns to P+3 */
+            PR = (PR + 2) & LA_MASK;                    /* > rtns to P+3 */
         break;                                          /* = rtns to P+1 */
 
     case 005:                                           /* .DDI 105325 (OP_JD) */
     DDI:
         O = ((op[1].dword == 0) ||                      /* overflow if div 0 */
-             ((op[0].dword == SIGN32) &&                /*   or max neg div -1 */
+             ((op[0].dword == D32_SMIN) &&              /*   or max neg div -1 */
               ((int32) op[1].dword == -1)));
         if (O)
-            t = ~SIGN32;                                /* rtn max pos for ovf */
+            t = D32_SMAX;                               /* rtn max pos for ovf */
         else
             t = (uint32) (INT32 (op[0].dword) /         /* else return quotient */
                           INT32 (op[1].dword));
@@ -784,19 +784,19 @@ switch (entry) {                                        /* decode IR<3:0> */
         t = op[0].dword - op[1].dword;                  /* subtract values */
         E = E | (op[0].dword < op[1].dword);            /* borrow if minu < subtr */
         O = (((op[0].dword ^ op[1].dword) &             /* overflow if sign wrong */
-              (op[0].dword ^ t) & SIGN32) != 0);
+              (op[0].dword ^ t) & D32_SIGN) != 0);
         break;
 
     case 010:                                           /* .DIN 105330 (OP_J) */
         t = op[0].dword + 1;                            /* increment value */
-        O = (t == SIGN32);                              /* overflow if sign flipped */
+        O = (t == D32_SMIN);                            /* overflow if sign flipped */
         if (t == 0)
             E = 1;                                      /* carry if result zero */
         break;
 
     case 011:                                           /* .DDE 105331 (OP_J) */
         t = op[0].dword - 1;                            /* decrement value */
-        O = (t == ~SIGN32);                             /* overflow if sign flipped */
+        O = (t == D32_SMAX);                            /* overflow if sign flipped */
         if ((int32) t == -1)
             E = 1;                                      /* borrow if result -1 */
         break;
@@ -806,7 +806,7 @@ switch (entry) {                                        /* decode IR<3:0> */
         t = din.dword = din.dword + 1;                  /* increment value */
         WriteOp (op[0].word, din, in_d);                /* store it back */
         if (t == 0)
-            PR = (PR + 1) & VAMASK;                     /* skip if result zero */
+            PR = (PR + 1) & LA_MASK;                    /* skip if result zero */
         break;
 
     case 013:                                           /* .DDS 105333 (OP_A) */
@@ -814,7 +814,7 @@ switch (entry) {                                        /* decode IR<3:0> */
         t = din.dword = din.dword - 1;                  /* decrement value */
         WriteOp (op[0].word, din, in_d);                /* write it back */
         if (t == 0)
-            PR = (PR + 1) & VAMASK;                     /* skip if result zero */
+            PR = (PR + 1) & LA_MASK;                    /* skip if result zero */
         break;
 
     case 014:                                           /* .DSBR 105334 (OP_JD) */
