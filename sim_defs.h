@@ -1090,7 +1090,11 @@ extern int32 sim_asynch_latency;
 extern int32 sim_asynch_inst_latency;
 
 /* Thread local storage */
-#if defined(__GNUC__) && !defined(__APPLE__) && !defined(__hpux) && !defined(__OpenBSD__) && !defined(_AIX)
+#if defined(thread_local)
+#define AIO_TLS thread_local
+#elif (__STDC_VERSION__ >= 201112) && !(defined(__STDC_NO_THREADS__))
+#define AIO_TLS _Thread_local
+#elif defined(__GNUC__) && !defined(__APPLE__) && !defined(__hpux) && !defined(__OpenBSD__) && !defined(_AIX)
 #define AIO_TLS __thread
 #elif defined(_MSC_VER)
 #define AIO_TLS __declspec(thread)
@@ -1255,7 +1259,11 @@ extern int32 sim_asynch_inst_latency;
         sim_asynch_queue = uptr;                                       \
       }                                                                \
       if (sim_idle_wait) {                                             \
-        sim_debug (TIMER_DBG_IDLE, &sim_timer_dev, "waking due to event on %s after %d instructions\n", sim_uname(uptr), event_time);\
+        if (sim_deb) {  /* only while debug do lock/unlock overhead */ \
+          AIO_UNLOCK;                                                  \
+          sim_debug (TIMER_DBG_IDLE, &sim_timer_dev, "waking due to event on %s after %d instructions\n", sim_uname(uptr), event_time);\
+          AIO_LOCK;                                                    \
+          }                                                            \
         pthread_cond_signal (&sim_asynch_wake);                        \
         }                                                              \
       AIO_UNLOCK;                                                      \
