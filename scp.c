@@ -451,7 +451,8 @@ t_addr (*sim_vm_parse_addr) (DEVICE *dptr, CONST char *cptr, CONST char **tptr) 
 t_value (*sim_vm_pc_value) (void) = NULL;
 t_bool (*sim_vm_is_subroutine_call) (t_addr **ret_addrs) = NULL;
 t_bool (*sim_vm_fprint_stopped) (FILE *st, t_stat reason) = NULL;
-const char *sim_vm_release = NULL;
+const char *sim_vm_release;
+const char *sim_vm_release_message;
 const char **sim_clock_precalibrate_commands = NULL;
 
 
@@ -6072,6 +6073,8 @@ fprintf (st, "%sBuild: %s", flag ? "\n        " : "        ", S_xstr(SIM_BUILD))
 #undef S_xstr
 #endif
 fprintf (st, "\n");
+if (sim_vm_release_message != NULL)                    /* if a release message string is defined */
+    fprintf (st, "\n%s", sim_vm_release_message);      /*   then display it */
 return SCPE_OK;
 }
 
