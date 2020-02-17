@@ -870,6 +870,8 @@ static int32 dq_tx_report ( int32   vh  )
     txq_idx[vh] -= 1;
     for (i = 0; i < txq_idx[vh]; i++)
         vh_txq[vh][i] = vh_txq[vh][i + 1];
+    if ((txq_idx[vh] > 0) && (vh_csr[vh] & CSR_TXIE))
+        vh_set_txint (vh);
     /* txq_idx[vh] -= 1; */
     return (data & 0177777);
 }
@@ -1248,11 +1250,6 @@ static t_stat vh_wr (   int32   ldata,
         if (!(lp->lnctrl & LNCTRL_TX_ABORT) &&
              (data & LNCTRL_TX_ABORT)) {
             if ((lp->tbuf2 & TB2_TX_ENA) &&
-                (lp->tbuf2 & TB2_TX_DMA_START)) {
-                lp->tbuf2 &= ~TB2_TX_DMA_START;
-                q_tx_report (lp, 0);
-            }
-            if ((lp->tbuf2 & TB2_TX_ENA) &&
                 (lp->txfifo_cnt != 0)) {
                 lp->txfifo_idx = lp->txfifo_cnt = 0;
                 q_tx_report (lp, 0);
@@ -1388,6 +1385,11 @@ static void doDMA ( int32   vh,
         status = 0;
         while (lp->tbuffct) {
             uint8   buf;
+            if (lp->lnctrl & LNCTRL_TX_ABORT) {
+                lp->tbuf2 &= ~TB2_TX_DMA_START;
+                q_tx_report (lp, 0);
+                break;
+            }
             if (Map_ReadB (pa, 1, &buf)) {
                 status |= CSR_TX_DMA_ERR;
                 lp->tbuffct = 0;
@@ -1399,6 +1401,7 @@ static void doDMA ( int32   vh,
             /* pa = (pa + 1) & PAMASK; */
             pa = (pa + 1) & ((1 << 22) - 1);
             lp->tbuffct--;
+            break;
         }
         lp->tbuf1 = pa & 0177777;
         lp->tbuf2 = (lp->tbuf2 & ~TB2_M_TBUFFAD) |
