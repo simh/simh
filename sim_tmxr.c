@@ -4405,6 +4405,9 @@ if (single_line) {          /* Single Line Multiplexer */
         }
     fprintf (st, "A Telnet listening port can be configured with:\n\n");
     fprintf (st, "   sim> ATTACH %s {interface:}port\n\n", dptr->name);
+    fprintf (st, "The -U switch can be specified on the attach command that specifies\n");
+    fprintf (st, "a listening port.  This will allow a listening port to be reused if\n");
+    fprintf (st, "some prior connections haven't completely shutdown.\n\n");
     fprintf (st, "Line buffering can be enabled for the %s device with:\n\n", dptr->name);
     fprintf (st, "   sim> ATTACH %s Buffer{=bufsize}\n\n", dptr->name);
     fprintf (st, "Line buffering can be disabled for the %s device with:\n\n", dptr->name);
@@ -4431,6 +4434,9 @@ else {
     fprintf (st, "   sim> ATTACH %s Line=n,NoModem\n\n", dptr->name);
     fprintf (st, "A Telnet listening port can be configured with:\n\n");
     fprintf (st, "   sim> ATTACH %s {interface:}port\n\n", dptr->name);
+    fprintf (st, "The -U switch can be specified on the attach command that specifies\n");
+    fprintf (st, "a listening port.  This will allow a listening port to be reused if\n");
+    fprintf (st, "some prior connections haven't completely shutdown.\n\n");
     if (mux)
         fprintf (st, "Line buffering for all %d lines on the %s device can be configured with:\n\n", mux->lines, dptr->name);
     else
