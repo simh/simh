@@ -809,7 +809,10 @@ while ((c = strstr (fullpath, "/../"))) {       /* process up directory climbing
         else
             break;
     }
-name = 1 + strrchr (fullpath, '/');
+if (!strrchr (fullpath, '/'))
+    name = fullpath + strlen (fullpath);
+else
+    name = 1 + strrchr (fullpath, '/');
 ext = strrchr (name, '.');
 if (ext == NULL)
     ext = name + strlen (name);
