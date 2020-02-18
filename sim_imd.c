@@ -164,7 +164,7 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
         sim_fread(&imd, 1, 5, myDisk->file);
         if (feof(myDisk->file))
             break;
-        sectorSize = 128 << imd.sectsize;
+        sectorSize = 128 << (imd.sectsize & 0x1f);
         sectorHeadwithFlags = imd.head; /*AGN save the head and flags */
         imd.head &= 1 ; /*AGN mask out flag bits to head 0 or 1 */
 

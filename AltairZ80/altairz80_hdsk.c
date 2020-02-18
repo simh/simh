@@ -449,8 +449,10 @@ static t_stat hdsk_attach(UNIT *uptr, CONST char *cptr) {
         hdsk_imd[thisUnitIndex] = diskOpenEx(uptr -> fileref,
                                              sim_deb && (hdsk_dev.dctrl & VERBOSE_MSG),
                                              &hdsk_dev, VERBOSE_MSG, VERBOSE_MSG);
-        if (hdsk_imd[thisUnitIndex] == NULL)
+        if (hdsk_imd[thisUnitIndex] == NULL) {
+            detach_unit(uptr);
             return SCPE_IOERR;
+        }
         verifyDiskInfo(hdsk_imd[thisUnitIndex], '0' + thisUnitIndex);
         uptr -> HDSK_NUMBER_OF_TRACKS = hdsk_imd[thisUnitIndex] -> ntracks;
         uptr -> HDSK_SECTORS_PER_TRACK = hdsk_imd[thisUnitIndex] -> track[1][0].nsects;
