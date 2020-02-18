@@ -1383,7 +1383,7 @@ static void doDMA ( int32   vh,
         pa = lp->tbuf1;
         pa |= (lp->tbuf2 & TB2_M_TBUFFAD) << 16;
         status = 0;
-        while (lp->tbuffct) {
+        while (tmxr_txdone_ln (lp->tmln) && (lp->tbuffct > 0)) {
             uint8   buf;
             if (lp->lnctrl & LNCTRL_TX_ABORT) {
                 lp->tbuf2 &= ~TB2_TX_DMA_START;
