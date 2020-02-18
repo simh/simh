@@ -1489,6 +1489,22 @@ buf[1] = rad50[val % 050];
 buf[0] = rad50[val / 050];
 }
 
+static t_stat rstsValidateClusterSize(uint16 size, uint16 minSize)
+{
+int i;
+
+/*
+ * Check that the cluster size is a power of 2 and greater than or equal
+ * to some location dependent value.
+ */
+if (size >= minSize)
+    for (i = 0; i < 16; i++)
+        if (size == (1 << i))
+            return SCPE_OK;
+
+return SCPE_IOERR;
+}
+
 static t_stat rstsReadBlock(rstsContext *context, uint16 cluster, uint16 block, void *buf)
 {
 t_lba blk = (cluster << context->dcshift) + block;
@@ -1529,7 +1545,8 @@ if (rstsReadBlock(context, 1, 0, &root) == SCPE_OK) {
      * First validate fields which are common to both the MFD label and
      * Pack label - we'll use Pack label offsets here.
      */
-    if ((root.rt_pack.pk_mbm1 == 0177777) && (root.rt_pack.pk_ppcs >= dcs)) {
+    if ((root.rt_pack.pk_mbm1 == 0177777) &&
+        (rstsValidateClusterSize(root.rt_pack.pk_ppcs, dcs) == SCPE_OK)) {
         char ch, *tmp = &context->packid[1];
         uint16 mfd, gfd;
 
@@ -1644,6 +1661,10 @@ if (uar != 0) {
         uint16 blocks = acnt.ac_usiz;
         uint16 offset = 0;
 
+        if ((rstsValidateClusterSize(acnt.ac_uclus, context->pcs) != SCPE_OK) ||
+            (blocks > 16))
+            return SCPE_IOERR;
+
         memset(bitmap, 0xFF, sizeof(bitmap));
 
         if (blocks != 0) {
@@ -1682,7 +1703,7 @@ if (uar != 0) {
                             }
                     }
         scanDone:
-            *result = (blocks + 1) * context->pcs;
+            *result = (t_offset)(blocks + 1) * context->pcs;
             return SCPE_OK;
             }
         }
