@@ -358,7 +358,7 @@ void hi_start_tx (uint16 line, uint16 flags)
   // DLE, STX, ETX and checksum bytes, that would be added to the packet.
   nbits = (((uint32) count)*2UL + 12UL) * 8UL;
   PHIDB(line)->txdelay = (nbits * 1000000UL) / (PHIDB(line)->bps * rtc_interval);
-  sim_debug(IMP_DBG_IOT, PDEVICE(line), "HI%d - transmit packet, length=%d, bits=%ld, interval=%ld, delay=%ld\n", line, count, nbits, rtc_interval, PHIDB(line)->txdelay);
+  sim_debug(IMP_DBG_IOT, PDEVICE(line), "HI%d - transmit packet, length=%d, bits=%u, interval=%u, delay=%u\n", line, count, nbits, rtc_interval, PHIDB(line)->txdelay);
   // That's it - we're done until it's time for the TX done interrupt ...
   CLR_TX_IRQ(line);
 }
