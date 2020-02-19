@@ -1077,7 +1077,7 @@ static const char* lib_name =
 
 static char no_pcap[PCAP_ERRBUF_SIZE] =
 #if defined(_WIN32) || defined(__CYGWIN__)
-    "wpcap.dll failed to load, install Npcap or WinPcap 4.x to use pcap networking";
+    "wpcap.dll failed to load, install Npcap or WinPcap 4.1.3 to use pcap networking";
 #elif defined(__APPLE__)
     "/usr/lib/libpcap.A.dylib failed to load, install libpcap to use pcap networking";
 #else
@@ -2474,7 +2474,15 @@ return SCPE_OK;
 const char *eth_version (void)
 {
 #if defined(HAVE_PCAP_NETWORK)
-return pcap_lib_version();
+static char version[256];
+
+if (!version[0]) {
+  if (memcmp(pcap_lib_version(), "Npcap", 5))
+    strlcpy(version, pcap_lib_version(), sizeof(version));
+  else
+    snprintf(version, sizeof(version), "Unsupported - %s", pcap_lib_version());
+  }
+return version;
 #else
 return NULL;
 #endif
