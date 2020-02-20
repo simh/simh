@@ -33,18 +33,17 @@
 # No Asynch I/O support for now.
 NOASYNCH = 1
 BUILD_SINGLE := $(MAKECMDGOALS) $(BLANK_PREFIX)
-ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS)),$(findstring all,$(MAKECMDGOALS))))
-  NETWORK_USEFUL = true
-  ifneq (,$(findstring all,$(MAKECMDGOALS))$(word 2,$(MAKECMDGOALS)))
-    BUILD_MULTIPLE = s
-  endif
+ifneq (,$(findstring all,$(MAKECMDGOALS)))
+  BUILD_MULTIPLE = s
 else
   ifeq ($(MAKECMDGOALS),)
     # default target is all
-    NETWORK_USEFUL = true
     BUILD_MULTIPLE = s
     BUILD_SINGLE := all $(BLANK_PREFIX)
   endif
+endif
+ifeq ($(findstring Windows,$(OS)),Windows)
+  WIN32 = 1
 endif
 ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   ifeq ($(GCC),)
@@ -206,9 +205,9 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         else
           ifeq (cygwin,$(OSTYPE))
             # use 0readme_ethernet.txt documented Windows pcap build components
-            INCPATH += ../windows-build/winpcap/WpdPack/include
-            LIBPATH += ../windows-build/winpcap/WpdPack/lib
-            PCAPLIB = wpcap
+#            INCPATH += ../windows-build/winpcap/WpdPack/include
+#            LIBPATH += ../windows-build/winpcap/WpdPack/lib
+#            PCAPLIB = wpcap
             LIBEXT = a
           else
             ifneq (,$(findstring AIX,$(OSTYPE)))
@@ -318,12 +317,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   endif
   ifneq (,$(call find_lib,pthread))
     ifneq (,$(call find_include,pthread))
-      OS_CCDEFS += -DUSE_READER_THREAD
+#      OS_CCDEFS += -DUSE_READER_THREAD
       ifeq (,$(NOASYNCH))
         OS_CCDEFS += -DSIM_ASYNCH_IO 
       endif
-      OS_LDFLAGS += -lpthread
-      $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
+#      OS_LDFLAGS += -lpthread
+#      $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
     endif
   endif
   ifneq (,$(call find_include,semaphore))
@@ -445,49 +444,21 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     endif
     NETWORK_OPT = $(NETWORK_CCDEFS)
   endif
-  ifneq (binexists,$(shell if $(TEST) -e BIN; then echo binexists; fi))
-    MKDIRBIN = if $(TEST) ! -e BIN; then mkdir BIN; fi
-  endif
+#  ifneq (binexists,$(shell if $(TEST) -e BIN; then echo binexists; fi))
+#    MKDIRBIN = if $(TEST) ! -e BIN; then mkdir BIN; fi
+#  endif
 else
   #Win32 Environments (via MinGW32)
   GCC = gcc
-  GCC_Path := $(dir $(shell where gcc.exe))
+#  GCC_Path := $(dir $(shell where gcc.exe))
   GCC_VERSION = $(word 3,$(shell $(GCC) --version))
   LTO_EXCLUDE_VERSIONS = 4.5.2
-  ifeq (pthreads,$(shell if exist ..\windows-build\pthreads\Pre-built.2\include\pthread.h echo pthreads))
-    PTHREADS_CCDEFS = -DUSE_READER_THREAD -DPTW32_STATIC_LIB -D_POSIX_C_SOURCE -I../windows-build/pthreads/Pre-built.2/include
-    ifeq (,$(NOASYNCH))
-      PTHREADS_CCDEFS += -DSIM_ASYNCH_IO 
-    endif
-    PTHREADS_LDFLAGS = -lpthreadGC2 -L..\windows-build\pthreads\Pre-built.2\lib
-  else
-    ifeq (pthreads,$(shell if exist $(dir $(GCC_Path))..\include\pthread.h echo pthreads))
-      PTHREADS_CCDEFS = -DUSE_READER_THREAD
-      ifeq (,$(NOASYNCH))
-        PTHREADS_CCDEFS += -DSIM_ASYNCH_IO 
-      endif
-      PTHREADS_LDFLAGS = -lpthread
-    endif
-  endif
-  ifeq (pcap,$(shell if exist ..\windows-build\winpcap\Wpdpack\include\pcap.h echo pcap))
-    PCAP_CCDEFS = -I../windows-build/winpcap/Wpdpack/include -I$(GCC_Path)..\include\ddk -DUSE_SHARED
-    NETWORK_LDFLAGS =
-    NETWORK_OPT = -DUSE_SHARED
-    NETWORK_FEATURES = - dynamic networking support using windows-build provided libpcap components
-  else
-    ifeq (pcap,$(shell if exist $(dir $(GCC_Path))..\include\pcap.h echo pcap))
-      PCAP_CCDEFS = -DUSE_SHARED -I$(GCC_Path)..\include\ddk
-      NETWORK_LDFLAGS =
-      NETWORK_OPT = -DUSE_SHARED
-      NETWORK_FEATURES = - dynamic networking support using libpcap components found in the MinGW directories
-    endif
-  endif
   OS_CCDEFS =  -fms-extensions $(PTHREADS_CCDEFS) $(PCAP_CCDEFS)
   OS_LDFLAGS = -lm -lwsock32 -lwinmm $(PTHREADS_LDFLAGS)
   EXE = .exe
-  ifneq (binexists,$(shell if exist BIN echo binexists))
-    MKDIRBIN = if not exist BIN mkdir BIN
-  endif
+#  ifneq (binexists,$(shell if exist BIN echo binexists))
+#    MKDIRBIN = if not exist BIN mkdir BIN
+#  endif
   ifneq ($(USE_NETWORK),)
     NETWORK_OPT = -DUSE_SHARED
   endif
@@ -560,6 +531,14 @@ ifneq ($(DONT_USE_READER_THREAD),)
   NETWORK_OPT += -DDONT_USE_READER_THREAD
 endif
 
+
+# Shut up annoying clang default warnings.
+
+ifeq ($(GCC),clang)
+  OS_CCDEFS += -Wno-parentheses -Wno-bitwise-op-parentheses -Wno-dangling-else
+endif
+
+
 CC_STD = -std=c99
 CC_OUTSPEC = -o $@
 CC = $(GCC) $(CC_STD) -U__STRICT_ANSI__ $(CFLAGS_G) $(CFLAGS_O) -I . $(OS_CCDEFS) $(ROMS_OPT)
@@ -568,390 +547,75 @@ LDFLAGS = $(OS_LDFLAGS) $(NETWORK_LDFLAGS) $(LDFLAGS_O)
 #
 # Common Libraries
 #
-BIN = BIN/
+BIN = ..
 SIM = scp.c sim_console.c sim_fio.c sim_timer.c sim_sock.c \
-	sim_tmxr.c sim_ether.c sim_tape.c sim_shmem.c
+	sim_tmxr.c sim_tape.c sim_shmem.c sim_extension.c sim_serial.c
 
 
 #
 # Emulator source files and compile time options
 #
-PDP1D = PDP1
-PDP1 = ${PDP1D}/pdp1_lp.c ${PDP1D}/pdp1_cpu.c ${PDP1D}/pdp1_stddev.c \
-	${PDP1D}/pdp1_sys.c ${PDP1D}/pdp1_dt.c ${PDP1D}/pdp1_drm.c \
-	${PDP1D}/pdp1_clk.c ${PDP1D}/pdp1_dcs.c
-PDP1_OPT = -I ${PDP1D}
+HP2100D = HP2100
+HP2100 = ${HP2100D}/hp2100_baci.c ${HP2100D}/hp2100_cpu.c ${HP2100D}/hp2100_cpu_fp.c \
+	${HP2100D}/hp2100_cpu_fpp.c ${HP2100D}/hp2100_cpu0.c ${HP2100D}/hp2100_cpu1.c \
+	${HP2100D}/hp2100_cpu2.c ${HP2100D}/hp2100_cpu3.c ${HP2100D}/hp2100_cpu4.c \
+	${HP2100D}/hp2100_cpu5.c ${HP2100D}/hp2100_cpu6.c ${HP2100D}/hp2100_cpu7.c \
+	${HP2100D}/hp2100_di.c ${HP2100D}/hp2100_di_da.c ${HP2100D}/hp2100_disclib.c \
+	${HP2100D}/hp2100_dma.c ${HP2100D}/hp2100_dp.c ${HP2100D}/hp2100_dq.c \
+	${HP2100D}/hp2100_dr.c ${HP2100D}/hp2100_ds.c ${HP2100D}/hp2100_ipl.c \
+	${HP2100D}/hp2100_lps.c ${HP2100D}/hp2100_lpt.c ${HP2100D}/hp2100_mc.c \
+	${HP2100D}/hp2100_mem.c ${HP2100D}/hp2100_mpx.c ${HP2100D}/hp2100_ms.c \
+	${HP2100D}/hp2100_mt.c ${HP2100D}/hp2100_mux.c ${HP2100D}/hp2100_pif.c \
+	${HP2100D}/hp2100_pt.c ${HP2100D}/hp2100_sys.c ${HP2100D}/hp2100_tbg.c \
+	${HP2100D}/hp2100_tty.c
+HP2100_OPT = -D HAVE_INT64 -I ${HP2100D}
 
+HP3000D = HP3000
+HP3000 = ${HP3000D}/hp_disclib.c ${HP3000D}/hp_tapelib.c ${HP3000D}/hp3000_atc.c \
+	${HP3000D}/hp3000_clk.c ${HP3000D}/hp3000_cpu.c ${HP3000D}/hp3000_cpu_base.c \
+	${HP3000D}/hp3000_cpu_fp.c ${HP3000D}/hp3000_cpu_cis.c ${HP3000D}/hp3000_ds.c \
+	${HP3000D}/hp3000_iop.c ${HP3000D}/hp3000_lp.c ${HP3000D}/hp3000_mem.c \
+	${HP3000D}/hp3000_mpx.c ${HP3000D}/hp3000_ms.c ${HP3000D}/hp3000_scmb.c \
+	${HP3000D}/hp3000_sel.c ${HP3000D}/hp3000_sys.c
+HP3000_OPT = -I ${HP3000D}
 
-NOVAD = NOVA
-NOVA = ${NOVAD}/nova_sys.c ${NOVAD}/nova_cpu.c ${NOVAD}/nova_dkp.c \
-	${NOVAD}/nova_dsk.c ${NOVAD}/nova_lp.c ${NOVAD}/nova_mta.c \
-	${NOVAD}/nova_plt.c ${NOVAD}/nova_pt.c ${NOVAD}/nova_clk.c \
-	${NOVAD}/nova_tt.c ${NOVAD}/nova_tt1.c ${NOVAD}/nova_qty.c
-NOVA_OPT = -I ${NOVAD}
-
-
-ECLIPSE = ${NOVAD}/eclipse_cpu.c ${NOVAD}/eclipse_tt.c ${NOVAD}/nova_sys.c \
-	${NOVAD}/nova_dkp.c ${NOVAD}/nova_dsk.c ${NOVAD}/nova_lp.c \
-	${NOVAD}/nova_mta.c ${NOVAD}/nova_plt.c ${NOVAD}/nova_pt.c \
-	${NOVAD}/nova_clk.c ${NOVAD}/nova_tt1.c ${NOVAD}/nova_qty.c
-ECLIPSE_OPT = -I ${NOVAD} -DECLIPSE
-
-
-PDP18BD = PDP18B
-PDP18B = ${PDP18BD}/pdp18b_dt.c ${PDP18BD}/pdp18b_drm.c ${PDP18BD}/pdp18b_cpu.c \
-	${PDP18BD}/pdp18b_lp.c ${PDP18BD}/pdp18b_mt.c ${PDP18BD}/pdp18b_rf.c \
-	${PDP18BD}/pdp18b_rp.c ${PDP18BD}/pdp18b_stddev.c ${PDP18BD}/pdp18b_sys.c \
-	${PDP18BD}/pdp18b_rb.c ${PDP18BD}/pdp18b_tt1.c ${PDP18BD}/pdp18b_fpp.c \
-	${PDP18BD}/pdp18b_g2tty.c ${PDP18BD}/pdp18b_dr15.c
-PDP4_OPT = -DPDP4 -I ${PDP18BD}
-PDP7_OPT = -DPDP7 -I ${PDP18BD}
-PDP9_OPT = -DPDP9 -I ${PDP18BD}
-PDP15_OPT = -DPDP15 -I ${PDP18BD}
-
-
-PDP11D = PDP11
-PDP11 = ${PDP11D}/pdp11_fp.c ${PDP11D}/pdp11_cpu.c ${PDP11D}/pdp11_dz.c \
-	${PDP11D}/pdp11_cis.c ${PDP11D}/pdp11_lp.c ${PDP11D}/pdp11_rk.c \
-	${PDP11D}/pdp11_rl.c ${PDP11D}/pdp11_rp.c ${PDP11D}/pdp11_rx.c \
-	${PDP11D}/pdp11_stddev.c ${PDP11D}/pdp11_sys.c ${PDP11D}/pdp11_tc.c \
-	${PDP11D}/pdp11_tm.c ${PDP11D}/pdp11_ts.c ${PDP11D}/pdp11_io.c \
-	${PDP11D}/pdp11_rq.c ${PDP11D}/pdp11_tq.c ${PDP11D}/pdp11_pclk.c \
-	${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_pt.c ${PDP11D}/pdp11_hk.c \
-	${PDP11D}/pdp11_xq.c ${PDP11D}/pdp11_xu.c ${PDP11D}/pdp11_vh.c \
-	${PDP11D}/pdp11_rh.c ${PDP11D}/pdp11_tu.c ${PDP11D}/pdp11_cpumod.c \
-	${PDP11D}/pdp11_cr.c ${PDP11D}/pdp11_rf.c ${PDP11D}/pdp11_dl.c \
-	${PDP11D}/pdp11_ta.c ${PDP11D}/pdp11_rc.c ${PDP11D}/pdp11_kg.c \
-	${PDP11D}/pdp11_ke.c ${PDP11D}/pdp11_dc.c ${PDP11D}/pdp11_rs.c \
-	${PDP11D}/pdp11_io_lib.c
-PDP11_OPT = -DVM_PDP11 -I ${PDP11D} ${NETWORK_OPT}
-
-
-UC15D = PDP11
-UC15 = ${UC15D}/pdp11_cis.c ${UC15D}/pdp11_cpu.c \
-	${UC15D}/pdp11_cpumod.c ${UC15D}/pdp11_cr.c \
-	${UC15D}/pdp11_fp.c ${UC15D}/pdp11_io.c \
-	${UC15D}/pdp11_io_lib.c ${UC15D}/pdp11_lp.c \
-	${UC15D}/pdp11_rh.c ${UC15D}/pdp11_rk.c \
-	${UC15D}/pdp11_stddev.c ${UC15D}/pdp11_sys.c \
-	${UC15D}/pdp11_uc15.c
-UC15_OPT = -DVM_PDP11 -DUC15 -I ${UC15D} -I ${PDP18BD} ${NETWORK_OPT}
-
-
-VAXD = VAX
-VAX = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c ${VAXD}/vax_io.c \
-	${VAXD}/vax_cis.c ${VAXD}/vax_octa.c  ${VAXD}/vax_cmode.c \
-	${VAXD}/vax_mmu.c ${VAXD}/vax_stddev.c ${VAXD}/vax_sysdev.c \
-	${VAXD}/vax_sys.c  ${VAXD}/vax_syscm.c ${VAXD}/vax_syslist.c \
-	${PDP11D}/pdp11_rl.c ${PDP11D}/pdp11_rq.c ${PDP11D}/pdp11_ts.c \
-	${PDP11D}/pdp11_dz.c ${PDP11D}/pdp11_lp.c ${PDP11D}/pdp11_tq.c \
-	${PDP11D}/pdp11_xq.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_vh.c \
-	${PDP11D}/pdp11_cr.c ${PDP11D}/pdp11_io_lib.c
-VAX_OPT = -DVM_VAX -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
-
-
-VAX780 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
-	${VAXD}/vax_cis.c ${VAXD}/vax_octa.c  ${VAXD}/vax_cmode.c \
-	${VAXD}/vax_mmu.c ${VAXD}/vax_sys.c  ${VAXD}/vax_syscm.c \
-	${VAXD}/vax780_stddev.c ${VAXD}/vax780_sbi.c \
-	${VAXD}/vax780_mem.c ${VAXD}/vax780_uba.c ${VAXD}/vax780_mba.c \
-	${VAXD}/vax780_fload.c ${VAXD}/vax780_syslist.c \
-	${PDP11D}/pdp11_rl.c ${PDP11D}/pdp11_rq.c ${PDP11D}/pdp11_ts.c \
-	${PDP11D}/pdp11_dz.c ${PDP11D}/pdp11_lp.c ${PDP11D}/pdp11_tq.c \
-	${PDP11D}/pdp11_xu.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_cr.c \
-	${PDP11D}/pdp11_rp.c ${PDP11D}/pdp11_tu.c ${PDP11D}/pdp11_hk.c \
-	${PDP11D}/pdp11_io_lib.c
-VAX780_OPT = -DVM_VAX -DVAX_780 -DUSE_INT64 -DUSE_ADDR64 -I VAX -I ${PDP11D} ${NETWORK_OPT}
-
-
-PDP10D = PDP10
-PDP10 = ${PDP10D}/pdp10_fe.c ${PDP11D}/pdp11_dz.c ${PDP10D}/pdp10_cpu.c \
-	${PDP10D}/pdp10_ksio.c ${PDP10D}/pdp10_lp20.c ${PDP10D}/pdp10_mdfp.c \
-	${PDP10D}/pdp10_pag.c ${PDP10D}/pdp10_rp.c ${PDP10D}/pdp10_sys.c \
-	${PDP10D}/pdp10_tim.c ${PDP10D}/pdp10_tu.c ${PDP10D}/pdp10_xtnd.c \
-	${PDP11D}/pdp11_pt.c ${PDP11D}/pdp11_ry.c \
-	${PDP11D}/pdp11_cr.c
-PDP10_OPT = -DVM_PDP10 -DUSE_INT64 -I ${PDP10D} -I ${PDP11D}
-
-
-
-PDP8D = PDP8
-PDP8 = ${PDP8D}/pdp8_cpu.c ${PDP8D}/pdp8_clk.c ${PDP8D}/pdp8_df.c \
-	${PDP8D}/pdp8_dt.c ${PDP8D}/pdp8_lp.c ${PDP8D}/pdp8_mt.c \
-	${PDP8D}/pdp8_pt.c ${PDP8D}/pdp8_rf.c ${PDP8D}/pdp8_rk.c \
-	${PDP8D}/pdp8_rx.c ${PDP8D}/pdp8_sys.c ${PDP8D}/pdp8_tt.c \
-	${PDP8D}/pdp8_ttx.c ${PDP8D}/pdp8_rl.c ${PDP8D}/pdp8_tsc.c \
-	${PDP8D}/pdp8_td.c ${PDP8D}/pdp8_ct.c ${PDP8D}/pdp8_fpp.c
-PDP8_OPT = -I ${PDP8D}
-
-
-H316D = H316
-H316 = ${H316D}/h316_stddev.c ${H316D}/h316_lp.c ${H316D}/h316_cpu.c \
-	${H316D}/h316_sys.c ${H316D}/h316_mt.c ${H316D}/h316_fhd.c \
-	${H316D}/h316_dp.c
-H316_OPT = -I ${H316D}
-
-
-I1401D = I1401
-I1401 = ${I1401D}/i1401_lp.c ${I1401D}/i1401_cpu.c ${I1401D}/i1401_iq.c \
-	${I1401D}/i1401_cd.c ${I1401D}/i1401_mt.c ${I1401D}/i1401_dp.c \
-	${I1401D}/i1401_sys.c
-I1401_OPT = -I ${I1401D}
-
-
-I1620D = I1620
-I1620 = ${I1620D}/i1620_cd.c ${I1620D}/i1620_dp.c ${I1620D}/i1620_pt.c \
-	${I1620D}/i1620_tty.c ${I1620D}/i1620_cpu.c ${I1620D}/i1620_lp.c \
-	${I1620D}/i1620_fp.c ${I1620D}/i1620_sys.c
-I1620_OPT = -I ${I1620D}
-
-
-I7094D = I7094
-I7094 = ${I7094D}/i7094_cpu.c ${I7094D}/i7094_cpu1.c ${I7094D}/i7094_io.c \
-	${I7094D}/i7094_cd.c ${I7094D}/i7094_clk.c ${I7094D}/i7094_com.c \
-	${I7094D}/i7094_drm.c ${I7094D}/i7094_dsk.c ${I7094D}/i7094_sys.c \
-	${I7094D}/i7094_lp.c ${I7094D}/i7094_mt.c ${I7094D}/i7094_binloader.c
-I7094_OPT = -DUSE_INT64 -I ${I7094D}
-
-
-ID16D = Interdata
-ID16 = ${ID16D}/id16_cpu.c ${ID16D}/id16_sys.c ${ID16D}/id_dp.c \
-	${ID16D}/id_fd.c ${ID16D}/id_fp.c ${ID16D}/id_idc.c ${ID16D}/id_io.c \
-	${ID16D}/id_lp.c ${ID16D}/id_mt.c ${ID16D}/id_pas.c ${ID16D}/id_pt.c \
-	${ID16D}/id_tt.c ${ID16D}/id_uvc.c ${ID16D}/id16_dboot.c ${ID16D}/id_ttp.c
-ID16_OPT = -I ${ID16D}
-
-
-ID32D = Interdata
-ID32 = ${ID32D}/id32_cpu.c ${ID32D}/id32_sys.c ${ID32D}/id_dp.c \
-	${ID32D}/id_fd.c ${ID32D}/id_fp.c ${ID32D}/id_idc.c ${ID32D}/id_io.c \
-	${ID32D}/id_lp.c ${ID32D}/id_mt.c ${ID32D}/id_pas.c ${ID32D}/id_pt.c \
-	${ID32D}/id_tt.c ${ID32D}/id_uvc.c ${ID32D}/id32_dboot.c ${ID32D}/id_ttp.c
-ID32_OPT = -I ${ID32D}
-
-
-S3D = S3
-S3 = ${S3D}/s3_cd.c ${S3D}/s3_cpu.c ${S3D}/s3_disk.c ${S3D}/s3_lp.c \
-	${S3D}/s3_pkb.c ${S3D}/s3_sys.c
-S3_OPT = -I ${S3D}
-
-
-ALTAIRD = ALTAIR
-ALTAIR = ${ALTAIRD}/altair_sio.c ${ALTAIRD}/altair_cpu.c ${ALTAIRD}/altair_dsk.c \
-	${ALTAIRD}/altair_sys.c
-ALTAIR_OPT = -I ${ALTAIRD}
-
-
-GRID = GRI
-GRI = ${GRID}/gri_cpu.c ${GRID}/gri_stddev.c ${GRID}/gri_sys.c
-GRI_OPT = -I ${GRID}
-
-
-LGPD = LGP
-LGP = ${LGPD}/lgp_cpu.c ${LGPD}/lgp_stddev.c ${LGPD}/lgp_sys.c
-LGP_OPT = -I ${LGPD}
-
-
-SDSD = SDS
-SDS = ${SDSD}/sds_cpu.c ${SDSD}/sds_drm.c ${SDSD}/sds_dsk.c ${SDSD}/sds_io.c \
-	${SDSD}/sds_lp.c ${SDSD}/sds_mt.c ${SDSD}/sds_mux.c ${SDSD}/sds_rad.c \
-	${SDSD}/sds_stddev.c ${SDSD}/sds_sys.c
-SDS_OPT = -I ${SDSD}
-
-SIGMAD = sigma
-SIGMA = ${SIGMAD}/sigma_cpu.c ${SIGMAD}/sigma_sys.c ${SIGMAD}/sigma_cis.c \
-	${SIGMAD}/sigma_coc.c ${SIGMAD}/sigma_dk.c ${SIGMAD}/sigma_dp.c \
-	${SIGMAD}/sigma_fp.c ${SIGMAD}/sigma_io.c ${SIGMAD}/sigma_lp.c \
-	${SIGMAD}/sigma_map.c ${SIGMAD}/sigma_mt.c ${SIGMAD}/sigma_pt.c \
-    ${SIGMAD}/sigma_rad.c ${SIGMAD}/sigma_rtc.c ${SIGMAD}/sigma_tt.c
-SIGMA_OPT = -I ${SIGMAD}
-
-###
-### Unsupported/Incomplete simulators
-###
-
-ALPHAD = alpha
-ALPHA = ${ALPHAD}/alpha_500au_syslist.c ${ALPHAD}/alpha_cpu.c \
-    ${ALPHAD}/alpha_ev5_cons.c ${ALPHAD}/alpha_ev5_pal.c \
-    ${ALPHAD}/alpha_ev5_tlb.c ${ALPHAD}/alpha_fpi.c \
-    ${ALPHAD}/alpha_fpv.c ${ALPHAD}/alpha_io.c \
-    ${ALPHAD}/alpha_mmu.c ${ALPHAD}/alpha_sys.c
-ALPHA_OPT = -I ${ALPHAD} -DUSE_ADDR64 -DUSE_INT64
 
 #
 # Build everything
 #
-ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
-	vax vax780 nova eclipse i1401 i1620 s3 \
-	altair gri i7094 id16 uc15 \
-	id32 sds lgp h316 sigma
+ALL = hp2100 hp3000
 
 all : ${ALL}
 
 clean :
 ifeq ($(WIN32),)
-	${RM} -r ${BIN}
+	${RM} $(addprefix ${BIN}/,$(addsuffix ${EXE},${ALL}))
 else
-	if exist BIN\*.exe del /q BIN\*.exe
-	if exist BIN rmdir BIN
+	if exist ${BIN}\hp*.exe del /q ${BIN}\hp*.exe
+#	if exist BIN rmdir BIN
 endif
 
 #
 # Individual builds
 #
-pdp1 : ${BIN}pdp1${EXE}
 
-${BIN}pdp1${EXE} : ${PDP1} ${SIM}
-	${MKDIRBIN}
-	${CC} ${PDP1} ${SIM} ${PDP1_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+hp2100 : ${BIN}/hp2100${EXE}
 
-pdp4 : ${BIN}pdp4${EXE}
+${BIN}/hp2100${EXE} : ${HP2100} ${SIM}
+ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
+#	${MKDIRBIN}
+	${CC} ${HP2100} ${SIM} ${HP2100_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+else
+	$(info hp2100 can't be built using C++)
+endif
 
-${BIN}pdp4${EXE} : ${PDP18B} ${SIM}
-	${MKDIRBIN}
-	${CC} ${PDP18B} ${SIM} ${PDP4_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
-pdp7 : ${BIN}pdp7${EXE}
+hp3000 : ${BIN}/hp3000${EXE}
 
-${BIN}pdp7${EXE} : ${PDP18B} ${SIM}
-	${MKDIRBIN}
-	${CC} ${PDP18B} ${SIM} ${PDP7_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-pdp8 : ${BIN}pdp8${EXE}
-
-${BIN}pdp8${EXE} : ${PDP8} ${SIM}
-	${MKDIRBIN}
-	${CC} ${PDP8} ${SIM} ${PDP8_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-pdp9 : ${BIN}pdp9${EXE}
-
-${BIN}pdp9${EXE} : ${PDP18B} ${SIM}
-	${MKDIRBIN}
-	${CC} ${PDP18B} ${SIM} ${PDP9_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-pdp15 : ${BIN}pdp15${EXE}
-
-${BIN}pdp15${EXE} : ${PDP18B} ${SIM} 
-	${MKDIRBIN}
-	${CC} ${PDP18B} ${SIM} ${PDP15_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-pdp10 : ${BIN}pdp10${EXE}
-
-${BIN}pdp10${EXE} : ${PDP10} ${SIM}
-	${MKDIRBIN}
-	${CC} ${PDP10} ${SIM} ${PDP10_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-pdp11 : ${BIN}pdp11${EXE}
-
-${BIN}pdp11${EXE} : ${PDP11} ${SIM}
-	${MKDIRBIN}
-	${CC} ${PDP11} ${SIM} ${PDP11_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-uc15 : ${BIN}uc15${EXE}
-
-${BIN}uc15${EXE} : ${UC15} ${SIM}
-	${MKDIRBIN}
-	${CC} ${UC15} ${SIM} ${UC15_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-vax : ${BIN}vax${EXE}
-
-${BIN}vax${EXE} : ${VAX} ${SIM}
-	${MKDIRBIN}
-	${CC} ${VAX} ${SIM} ${VAX_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-vax780 : ${BIN}vax780${EXE}
-
-${BIN}vax780${EXE} : ${VAX780} ${SIM}
-	${MKDIRBIN}
-	${CC} ${VAX780} ${SIM} ${VAX780_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-nova : ${BIN}nova${EXE}
-
-${BIN}nova${EXE} : ${NOVA} ${SIM}
-	${MKDIRBIN}
-	${CC} ${NOVA} ${SIM} ${NOVA_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-eclipse : ${BIN}eclipse${EXE}
-
-${BIN}eclipse${EXE} : ${ECLIPSE} ${SIM}
-	${MKDIRBIN}
-	${CC} ${ECLIPSE} ${SIM} ${ECLIPSE_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-h316 : ${BIN}h316${EXE}
-
-${BIN}h316${EXE} : ${H316} ${SIM}
-	${MKDIRBIN}
-	${CC} ${H316} ${SIM} ${H316_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-i1401 : ${BIN}i1401${EXE}
-
-${BIN}i1401${EXE} : ${I1401} ${SIM}
-	${MKDIRBIN}
-	${CC} ${I1401} ${SIM} ${I1401_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-i1620 : ${BIN}i1620${EXE}
-
-${BIN}i1620${EXE} : ${I1620} ${SIM}
-	${MKDIRBIN}
-	${CC} ${I1620} ${SIM} ${I1620_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-i7094 : ${BIN}i7094${EXE}
-
-${BIN}i7094${EXE} : ${I7094} ${SIM}
-	${MKDIRBIN}
-	${CC} ${I7094} ${SIM} ${I7094_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-s3 : ${BIN}s3${EXE}
-
-${BIN}s3${EXE} : ${S3} ${SIM}
-	${MKDIRBIN}
-	${CC} ${S3} ${SIM} ${S3_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-altair : ${BIN}altair${EXE}
-
-${BIN}altair${EXE} : ${ALTAIR} ${SIM}
-	${MKDIRBIN}
-	${CC} ${ALTAIR} ${SIM} ${ALTAIR_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-gri : ${BIN}gri${EXE}
-
-${BIN}gri${EXE} : ${GRI} ${SIM}
-	${MKDIRBIN}
-	${CC} ${GRI} ${SIM} ${GRI_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-lgp : ${BIN}lgp${EXE}
-
-${BIN}lgp${EXE} : ${LGP} ${SIM}
-	${MKDIRBIN}
-	${CC} ${LGP} ${SIM} ${LGP_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-id16 : ${BIN}id16${EXE}
-
-${BIN}id16${EXE} : ${ID16} ${SIM}
-	${MKDIRBIN}
-	${CC} ${ID16} ${SIM} ${ID16_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-id32 : ${BIN}id32${EXE}
-
-${BIN}id32${EXE} : ${ID32} ${SIM}
-	${MKDIRBIN}
-	${CC} ${ID32} ${SIM} ${ID32_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-sds : ${BIN}sds${EXE}
-
-${BIN}sds${EXE} : ${SDS} ${SIM}
-	${MKDIRBIN}
-	${CC} ${SDS} ${SIM} ${SDS_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-sigma : ${BIN}sigma${EXE}
-
-${BIN}sigma${EXE} : ${SIGMA} ${SIM}
-	${MKDIRBIN}
-	${CC} ${SIGMA} ${SIM} ${SIGMA_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-alpha : ${BIN}alpha${EXE}
-
-${BIN}alpha${EXE} : ${ALPHA} ${SIM}
-	${MKDIRBIN}
-	${CC} ${ALPHA} ${SIM} ${ALPHA_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
+${BIN}/hp3000${EXE} : ${HP3000} ${SIM}
+ifneq (1,$(CPP_BUILD)$(CPP_FORCE))
+#	${MKDIRBIN}
+	${CC} ${HP3000} ${SIM} ${HP3000_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+else
+	$(info hp3000 can't be built using C++)
+endif

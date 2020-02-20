@@ -48,6 +48,7 @@ patch   date            module(s) and fix(es)
                         VAX
                         - added hook for unpredictable indexed immediate in .aw flows
                         - revamped Qbus memory simulation to behave as a Qbus peripheral
+*/
 
 /* V3.10 revision history
 

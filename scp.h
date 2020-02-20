@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   08-Dec-19    JDB     Added "sim_vm_unit_name" extension hook
    09-Oct-19    JDB     Added "detach_all" global declaration
    19-Jul-19    JDB     Added "sim_get_radix" extension hook
    13-Apr-19    JDB     Added extension hooks
@@ -211,6 +212,7 @@ extern uint32 sim_ref_type;                             /* reference type */
 extern char *sim_vm_release;
 extern void (*sub_args) (char *iptr, char *optr, int32 len, char *args []);
 extern int32 (*sim_get_radix) (const char *cptr, int32 switches, int32 default_radix);
+extern char * (*sim_vm_unit_name) (const UNIT *uptr);
 
 /* VM interface */
 

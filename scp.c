@@ -1,6 +1,6 @@
 /* scp.c: simulator control program
 
-   Copyright (c) 1993-2019, Robert M Supnik
+   Copyright (c) 1993-2020, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   13-Feb-20    RMS     Spelled out CONTINUE in command table (Dave Bryan)
+   09-Jan-20    JDB     Added "sim_vm_unit_name" extension hook
    26-Oct-19    RMS     Removed commented out MTAB_VAL code
    09-Oct-19    JDB     Corrected "sim_ref_type" use for RESTORE and DETACH ALL
    19-Jul-19    JDB     Added "sim_get_radix" extension hook
@@ -377,6 +379,7 @@ int32 get_radix_local (const char *cptr, int32 switches, int32 default_radix);
 char *sim_vm_release;
 void (*sub_args) (char *iptr, char *optr, int32 len, char *args []) = sub_args_local;
 int32 (*sim_get_radix) (const char *cptr, int32 switches, int32 default_radix) = get_radix_local;
+char * (*sim_vm_unit_name) (const UNIT *uptr) = NULL;
 
 /* Global data */
 
@@ -531,7 +534,7 @@ static CTAB cmd_table[] = {
       "go {new PC}              start simulation\n" }, 
     { "STEP", &run_cmd, RU_STEP,
       "s{tep} {n}               simulate n instructions\n" },
-    { "CONT", &run_cmd, RU_CONT,
+    { "CONTINUE", &run_cmd, RU_CONT,
       "c{ont}                   continue simulation\n" },
     { "BOOT", &run_cmd, RU_BOOT,
       "b{oot} <unit>            bootstrap unit\n" },
@@ -1631,6 +1634,7 @@ t_stat show_queue (FILE *st, DEVICE *dnotused, UNIT *unotused, int32 flag, char 
 DEVICE *dptr;
 UNIT *uptr;
 int32 accum;
+char *vptr;
 
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
@@ -1645,6 +1649,8 @@ accum = 0;
 for (uptr = sim_clock_queue; uptr != NULL; uptr = uptr->next) {
     if (uptr == &sim_step_unit)
         fprintf (st, "  Step timer");
+    else if (sim_vm_unit_name && (vptr = sim_vm_unit_name (uptr)))
+        fprintf (st, "  %s", vptr);
     else if ((dptr = find_dev_from_unit (uptr)) != NULL) {
         fprintf (st, "  %s", sim_dname (dptr));
         if (dptr->numunits > 1)

@@ -26,6 +26,7 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   19-Dec-19    JDB     Added tmxr_is_extended global hook
    19-Mar-19    JDB     Added extension pointer to TMLN structure;
                         added tmxr_read, tmxr_write, tmxr_show, tmxr_close global hooks;
                         added tmxr_find_ldsc, tmxr_send_buffered_data, tmxr_init_line,
@@ -139,10 +140,11 @@ void tmxr_disconnect_line (TMLN *lp);
 
 /* Extension interface */
 
-extern int32 (*tmxr_read)  (TMLN *lp, int32 length);
-extern int32 (*tmxr_write) (TMLN *lp, int32 length);
-extern void  (*tmxr_show)  (TMLN *lp, FILE *stream);
-extern void  (*tmxr_close) (TMLN *lp);
+extern int32  (*tmxr_read)        (TMLN *lp, int32 length);
+extern int32  (*tmxr_write)       (TMLN *lp, int32 length);
+extern void   (*tmxr_show)        (TMLN *lp, FILE *stream);
+extern void   (*tmxr_close)       (TMLN *lp);
+extern t_bool (*tmxr_is_extended) (TMLN *lp);
 
 /* V4.X shims */
 
