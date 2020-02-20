@@ -1,0 +1,1287 @@
+                           SIMH/HP 3000 RELEASE NOTES
+                        ================================
+                        J. David Bryan <jdbryan@acm.org>
+                             Last update: 2020-02-14
+
+
+This file documents the release history of the simulator for the Hewlett-Packard
+3000 Series III machine.
+
+The home page for the HP simulators is:
+
+  http://simh.trailing-edge.com/hp/
+
+An HP 3000 "release" is made when one or more major changes have been
+incorporated.  Each release is documented below and describes the changes (new
+features and corrected errors) that have occurred since the prior release.  A
+revised "HP 3000 Simulator User's Guide" accompanies every release where
+user-visible changes were made.
+
+A "release update" is made to fix minor errors that do not affect normal user
+operation.  Examples of updates might be expansion or correction of source file
+comments, minor algorithm improvements, or rewording of error messages.  Updates
+are not documented here, although every change is reported in the change logs
+that appear at the beginning of all HP 3000 source files.
+
+The HP simulators were previously associated with the "SIMH 4.0" project here:
+
+  https://github.com/simh/simh
+
+...but are no longer.  Any simulator reporting itself as "V4.x" is not
+authorized and not supported by your HP maintainer.  Regression testing with the
+original HP diagnostics suites is performed only on the simulators available
+from the trailing-edge site.  See the notes below for more information on this
+transition.
+
+
+
+===============================
+Reporting Bugs in the Simulator
+===============================
+
+If you find a bug in the HP 3000 simulator, please report it directly to your HP
+maintainer at the address shown at the top of these notes.  Please attach a
+console log that shows the simulator version and contains a reproducible test
+case that illustrates the problem.  See the SET CONSOLE LOG command in the
+"Console Options" section of the "SIMH Users' Guide" for details on how to
+enable logging and the SHOW VERSION command in the "Displaying Parameters and
+Status" section.
+
+
+
+=============================
+The 4.x to 3.x SCP Transition
+=============================
+
+Internally, a SIMH simulator consists of a "front end," designated the Simulator
+Control Program (SCP), and a "back end" that provides the machine-specific
+personality.  SCP provides the simulator prompt, console commands such as ATTACH
+and RUN, and common library modules for magnetic tape, terminal, and other
+device support.  SCP manages command file execution, cooperates with the back
+end to configure the CPU and I/O devices, and relinquishes control to the back
+end to execute machine instructions when a RUN, GO, or CONTINUE command is
+entered.
+
+The SIMH project was created and led by Bob Supnik through SCP version 3.9.
+Mark Pizzolato then assumed stewardship and substantially extended SCP for
+version 4.0.  Recently, Bob has produced SCP version 3.10, which adopts some,
+but not all, of the new features provided with version 4.0.  It also has a
+markedly simpler internal structure compared to 4.0.
+
+The HP 3000 simulator had been written for SCP 4.0, but the rapid development
+cycle and greatly increased complexity introduced a number of errors and
+incompatibilities that made it very difficult to ensure stable HP simulator
+operation.  Regression testing became problematic; often the SCP would change
+between simulator testing and code release.  This has led to an untenable
+support situation.
+
+Therefore, starting with Release 8, the simulator has been retargeted to SCP
+3.10 and its successors, which will be used for all future releases.  This does
+not affect machine execution, i.e., once a RUN or GO command is given, but it
+does have consequences for user-written command files, as SCP 3.10 does not
+implement all of the new-for-4.0 commands.
+
+The HP simulators provide a superset of the SCP 3.10 commands.  These are
+documented in the "SIMH Users' Guide Supplement" that is provided in PDF format
+in the "doc" subdirectory of the distribution archive.  Those with existing
+user-written command files should consult this document for the ramifications of
+the SCP transition.
+
+
+
+===================
+General Information
+===================
+
+The simulator passes the HP 32230 offline diagnostic suite with some expected
+failures due to unimplemented features.  For example, the disc diagnostic
+error-correction logic tests and the tape diagnostic CRCC and LRCC tests fail,
+as these features are not simulated.  However, all features that are required
+for MPE operation pass their respective diagnostic tests.
+
+The simulator has been tested with MPE-V/R version E.01.00.  Specifically:
+
+ - MPE can be RELOADed to generate a new disc-based system from a FOS tape.
+
+ - MPE can be COOLSTARTed to run from a previously generated disc.
+
+ - The MPE system console operates (by default) through the simulation console,
+   and additional sessions may be connected to the ATC via Telnet or host
+   serial ports.
+
+ - MPE FOS programs (EDITOR, QUERY) and SUBSYS programs (SPL, BASIC, BASICOMP)
+   run properly.
+
+ - The SYSDUMP program produces a valid tape image, and the system may be
+   COLDSTARTed from it.
+
+ - The operator and system manager can be logged in and out, and MPE can be
+   SHUTDOWN through to a HALT 17.
+
+The user's manual for the simulator is provided in PDF format in the "doc"
+subdirectory of the distribution archive.
+
+
+-----------------------
+Compiling the Simulator
+-----------------------
+
+Compilation instructions are documented in Section 1 of the "SIMH Users' Guide
+Supplement" that is provided in PDF format in the "doc" subdirectory of the
+distribution archive.
+
+
+------------------
+Available Software
+------------------
+
+A ready-to-run MPE-V/R software kit is available from the "Software Kits"
+section of the simulator site listed above.  The kit contains bootable disc and
+tape images and associated command files that automate the system startup
+process.  The disc image is preconfigured with the Fundamental Operating
+Software (FOS), selected SUBSYS language processors (BASIC, BASICOMP, COBOL,
+COBOLII, FORTRAN, PASCAL, RPG, and SPL), and example programs.  Command files to
+perform new system generations are also included.  Refer to the site for
+specifics.
+
+QCTerm, a free HP 700 terminal emulator for Microsoft Windows, is available from
+the HP Computer Museum at:
+
+  http://www.hpmuseum.net/display_item.php?sw=585
+
+Manuals describing MPE operation are available from Bitsavers at:
+
+  http://www.bitsavers.org/pdf/hp/3000/
+
+HP created MPE-V/R-specific manuals.  However, very few of them survive.  In
+general, the MPE-IV manuals describe a subset of MPE-V/R commands, whereas the
+MPE-V/E manuals describe a superset.  Relying on the MPE-IV manuals and the
+online help available within MPE for those commands that do not appear in the
+manuals is perhaps the best compromise.
+
+
+-----------------------
+Bugs in MPE V/R E.01.00
+-----------------------
+
+Testing during simulator development revealed the presence of several bugs in
+the MPE version used:
+
+ - After a cold load from tape (COLDSTART/RELOAD/UPDATE), if a non-HP terminal
+   such as the simulation console is used as the system console, MPE prints DATE
+   (M/D/Y)? and then WED, NOV  1, 1972, 12:00 AM, as though the RETURN key had
+   been pressed.  If an HP terminal emulator is used instead, MPE waits for the
+   user to enter the date before proceeding.
+
+   The problem is incorrect coding in the SPEEDSENSE procedure in module
+   INITIAL.  As a result, the console baud rate is set to an invalid value, so
+   console reads fail.  The resulting zero-length read is interpreted as though
+   RETURN had been entered.
+
+   This is MPE V/R SSB KPR Number 5000187104, "Foreign devices as SIII system
+   consoles do not work correctly on V/R."  HP issued a patch for this, but it
+   does not seem to have survived.  A simple workaround is to set local ENQ/ACK
+   processing on ATC channel 0 (SET ATCD0 LOCALACK) when the system console is
+   not an HP terminal.  This is the default setting, so the bug only manifests
+   itself when SET ATCD0 REMOTEACK is done before booting.
+
+   An alternate workaround that does not depend on the ATC configuration is to
+   set memory location 01.112247 to octal value 021360 after cold loading is
+   complete.  This changes the "LOAD P+22,I,X" instruction at that location to
+   "LDI 360" to set the detected speed to 2400 baud unconditionally.  This
+   workaround is present in the "mpe-1-reload.sim" simulator command file
+   provided with the MPE-V/R Operating System Software Kit mentioned above.
+   However, the correction is applied only to the in-memory copy of MPE; the
+   disc and tape images supplied in the kit are unaltered.
+
+
+ - If a SHUTDOWN is performed while a logon read is pending on the system
+   console, e.g., by pressing RETURN to obtain the colon prompt after logging
+   OPERATOR.SYS off, the expected "ALL JOBS LOGGED OFF" message does not print.
+   Instead, the first few characters of the message (which begins with the
+   current time) are printed, followed as expected by SHUT and a HALT %17.  If
+   no read is pending, either because RETURN was not pressed before entering the
+   SHUTDOWN command or because the read timed out, the message is printed
+   normally.
+
+   The problem is that while the message is being sent to the ATC character-by-
+   character, the I/O abort issued to cancel the logon read also cancels the
+   message write.  The timing is such that only the first few characters of the
+   message are printed before the rest of the output is cancelled.
+
+   No SSB KPR has been located, but a later MPE version inserts an ABORTIO call
+   for the system console immediately before logging all sessions off.  This
+   clears any logon read that might exist, and therefore an abort will not be
+   performed after the "ALL JOBS LOGGED OFF" message is output.  It is
+   impossible to patch memory to add this call, so the only workarounds when
+   shutting down are to avoid requesting the logon prompt, wait until the logon
+   timeout expires (nominally two minutes), log on and then back off again,
+   enter "=ABORTIO 20" to abort the read before entering SHUTDOWN, or accept
+   that the message will be truncated.  The only consequence of this bug is the
+   partial message; MPE shuts down properly otherwise, so it may be safely
+   ignored.
+
+
+ - After a RELOAD, running DPAN4.PUB.SYS produces a "CODE SEGMENT TOO LARGE
+   (LOAD ERR 33)" error.  This is because MPE defaults to an 8K code segment
+   size limit, and DPAN4 has three segments between 8K and 12K in size.  If the
+   limit is subsequently raised via a SYSDUMP and COLDSTART reconfiguration,
+   running DPAN4 produces a "FILE IS NOT A VALID PROGRAM FILE" error, which
+   will persist until DPAN4.PUB.SYS is restored from the FOS tape.  However, if
+   the reconfiguration is done before running DPAN4, it will run properly
+   thereafter.
+
+   The problem is that MPE incorrectly modifies the executable file's Segment
+   Transfer Tables when it encounters a code segment that is larger than the
+   configured limit.  This leaves the file in an inconsistent state, leading to
+   the "NOT A VALID PROGRAM FILE" message after reconfiguration to raise the
+   segment size limit.  If the limit is raised before running DPAN4, the file is
+   internally consistent when the STTs are patched, and each segment's load
+   succeeds, allowing the program to run.
+
+   No SSB KPR has been located, but a later MPE version ensures that code
+   segment size aborts occur before any of the STTs are modified, so the program
+   file remains internally consistent.  A memory patch is impossible, but a
+   workaround is to increase the code segment limit before running DPAN4.  This
+   is done by the "mpe-3-sysdump.sim" simulator command file provided with the
+   MPE-V/R Operating System Software Kit mentioned above, and the supplied disc
+   image contains the increased limit.
+
+
+
+=====================
+Release 8, 2020-02-15
+=====================
+
+This release of the HP 3000 simulator adds the following features:
+
+ - A new CONCURRENT option has been added to the SET CONSOLE command.  Entering
+   CTRL+E with concurrent mode enabled allows the simulator to continue to run
+   while presenting an "scp>" prompt for command entry.  This permits SCP
+   commands, such as an ATTACH of a magnetic tape image, to be performed without
+   causing the simulated system clock to lose time and without disturbing
+   command file execution.
+
+   Concurrent mode is enabled by default.  If the prior mode where CTRL+E stops
+   the simulator is desired, a SET CONSOLE NOCONCURRENT command may be placed in
+   the "simh.ini" global initialization file that is read automatically at
+   startup.  See the "SIMH Users' Guide Supplement" for details.
+
+ - The -N (new file) option to the ATTACH command for disc devices now creates a
+   full-size image file, equivalent to formatting the new disc before use.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - The change from SCP 4.0 to 3.x may affect user-written command files.  Be
+   sure to review Section 3, "SCP 4.x-to-3.x Conversion," of the "SIMH Users'
+   Guide Supplement."
+
+ - The DO command now executes more quietly by default.  Specifically, the
+   "Breakpoint" and "Step expired" messages that normally result from BREAK, GO
+   UNTIL, and STEP command completions are suppressed, as are the informational
+   messages from ATTACH and DETACH, such as "Creating new file."  This provides
+   a cleaner console display log when automated prompts and responses are used.
+   Adding the -A switch to the DO invocation will restore the previous noisier
+   behavior.  See the "DO Command" section of the Supplement for details.
+
+ - The previous behavior of the "ATTACH -N" command for disc devices, i.e.,
+   creating a new zero-length image file, may be emulated by first deleting the
+   file and then attaching it without specifying the -N switch.  For instance,
+   the "DELETE <file>" and "ATTACH <unit> <file>" commands produce a new
+   zero-length file as "ATTACH -N <unit> <file>" did before this change.  The
+   "ATTACH -N" behavior of other devices, e.g., magnetic tape drives and
+   printers, did not change; a zero-length file is still created.
+
+ - Comments marking the locations where "switch" statement executions fall
+   through from one case label to the following case now comply with the
+   requirements of the GNU C compiler to avoid warnings when the compiler option
+   "-Wimplicit-fallthrough" is used.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  Simulation stops are reported improperly in CPU traces.
+
+     VERSION:  Release 7.
+
+     OBSERVATION:  A simulation stop that occurs while CPU tracing is enabled
+     reports the cause of the stop in the trace log.  However, stop reasons
+     specific to the HP simulator are not reported properly.  For example,
+     tracing a halt instruction reports "simulation stop: Error 5" instead of
+     "simulation stop: Programmed halt".
+
+     CAUSE:  The "sim_error_text" routine called to obtain the error translation
+     does not return simulator-specific messages.  Instead, the routine returns
+     the generic message, "Error <n>", where <n> is the value of the simulator-
+     specific stop code.
+
+     RESOLUTION:  Modify the simulation stop trace at the end of the instruction
+     postlude in "sim_instr" (hp3000_cpu.c) to call "sim_error_text" for SCP
+     errors and to obtain HP-specific messages from the "sim_stop_messages"
+     array.
+
+     STATUS:  Fixed in Release 8.
+
+
+  2. PROBLEM:  "Non-configured device" prints when mounting a magnetic tape.
+
+     VERSION:  Release 7.
+
+     OBSERVATION:  Occasionally, resuming simulation after mounting a magnetic
+     tape produces this message on the system console:
+
+       18:05/3/Interrupt received for non-configured device on DRT 6. Check I/O
+       configuration.
+
+     ...instead of the expected:
+
+       17:59/10/Vol (unlabelled) mounted on LDEV# 7
+
+     However, the I/O map produced as part of a system reload shows that all
+     four magnetic tape units are configured properly.
+
+     Tracing CPU execution after resumption shows that the error occurs when the
+     mag tape controller interrupt (a result of the offline-to-online transition
+     when the tape is mounted) is immediately followed by a system clock
+     interrupt.  The wrong return address is stacked by the second interrupt, so
+     the first instruction of the mag tape interrupt service routine (a TIO
+     instruction for DRT 6) is skipped when the clock interrupt routine exits.
+     As a result, the stack alignment is wrong, so the test for a configured
+     device fails, resulting in the error message observed.
+
+     CAUSE:  MPE executes a PAUS instruction to wait for an interrupt while
+     idle.  The mag tape interrupt stacks a return address that points to the
+     instruction after the PAUS, which is correct.  But before the mag tape
+     interrupt handler can execute its first instruction, the higher-priority
+     clock interrupt occurs.  This should stack a return address that points to
+     the first instruction of the mag tape interrupt handler, which has not yet
+     been executed.  But instead, the return address points to the second
+     instruction.  Consequently, the first instruction will be skipped when the
+     clock handler completes.
+
+     The problem occurs because the "cpu_run_mode_interrupt" routine in
+     "hp3000_cpu.c" must adjust the program counter (P register) when resuming
+     from a simulation stop that occurred while a PAUS instruction was
+     executing.
+
+     Because of the Series III's two-stage instruction pipeline, the P register
+     normally points two instructions past the instruction currently executing.
+     When an interrupt occurs, P is decremented to point at the instruction
+     after the current instruction, which is the correct point of return after
+     the interrupt service routine completes.
+
+     When the simulator is stopped, P is backed up to point at the next
+     instruction to execute.  In the case of a PAUS instruction, the "next
+     instruction" is the same PAUS instruction.  When simulation resumes, the
+     PAUS instruction is fetched into the NIR (Next Instruction Register), and P
+     is incremented.  If no interrupt is pending, the main instruction execution
+     loop copies the NIR into the CIR (Current Instruction Register), prefetches
+     the instruction following the PAUS into the NIR, and increments P again, so
+     that it points two instructions beyond the current instruction.  At this
+     point, everything is set up properly as before the simulation stop.
+
+     However, in the error case, the tape controller has requested an interrupt
+     that is pending when simulation is resumed.  Interrupts are checked before
+     each instruction executes, so when the interrupt is acknowledged, P is
+     still pointing to the next instruction instead of two instructions ahead.
+     For things to work as expected, P needs to be advanced one more instruction
+     before the interrupt is serviced.  So, in the special case of a PAUS
+     instruction present in the CIR after resuming a simulator stop with an
+     interrupt pending, the "cpu_run_mode_interrupt" routine increments P again
+     before stacking the return address.
+
+     That code does just what it is supposed to...except in the case of a higher
+     priority device that immediately interrupts a lower priority device while a
+     PAUS instruction is in the CIR.  In this case, the second interrupt causes
+     a second entry into the "cpu_run_mode_interrupt" routine, and because it
+     still sees the PAUS instruction in the CIR, P is incremented again.  This
+     is wrong, because the instruction now being interrupted is not the PAUS but
+     is the first instruction of the lower-priority interrupt routine, which
+     never had a chance to execute.  The result is that when the lower-priority
+     routine is resumed, the first instruction of that routine is skipped
+     because P was incremented a second time.
+
+     The problem does not occur if the higher-priority interrupt is delayed by
+     one instruction, or if the higher-priority interrupt occurs before the
+     lower-priority interrupt, or if the CPU is executing something other than a
+     PAUS instruction when it was stopped.
+
+     RESOLUTION:  Modify "cpu_run_mode_interrupt" (hp3000_cpu.c) to test a flag
+     that is set in "halt_mode_interrupt" when resuming into a PAUS instruction.
+     If the flag is set, increment P and clear it, so that a second entry will
+     not increment P twice.
+
+     STATUS:  Fixed in Release 8.
+
+
+  3. PROBLEM:  DETACH -F LP will not detach if the print buffer is not empty.
+
+     VERSION:  Release 7.
+
+     OBSERVATION:  The 2607/13/17/18 line printers do not allow the operator to
+     take the printer offline if unprinted characters remain in the print
+     buffer.  Instead, the request is deferred until printing completes.
+
+     The LP simulator follows this hardware behavior when processing a DETACH
+     LP command, which simulates running out of paper.  If printing is still
+     pending or, for the 2607 only, the paper position is not at the
+     top-of-form, the message "Command not completed" is printed, and the detach
+     is deferred until a print command empties the print buffer and paper
+     movement ceases.
+
+     A "force" option is provided to detach the printer paper image file
+     immediately, regardless of the printer condition.  DETACH -F LP works if
+     the paper position is not at the TOF.  However, it does not work if the
+     print buffer contains unprinted characters; "Command not completed" is
+     displayed instead.
+
+     Entering RESET LP followed by DETACH LP works, but the partial print buffer
+     is discarded rather than flushed to the output file.
+
+     CAUSE:  The "lp_detach" routine sets TOF status if the -F switch is
+     specified, but it does not alter the buffer state.
+
+     RESOLUTION:  Modify "lp_detach" (hp3000_lp.c) to write a partial line to
+     the output file before detaching when the -F option is specified.
+
+     STATUS:  Fixed in Release 8.
+
+
+
+=====================
+Release 7, 2018-01-12
+=====================
+
+This release of the HP 3000 simulator adds the following features:
+
+ - Reading and writing to terminal sessions connected to the ATC have been
+   improved significantly.  File uploads via Telnet using the Reflection
+   terminal emulator are now over 100 times faster than before, e.g., the
+   transfer time for a one-megabyte file has decreased from 69 minutes to 30
+   seconds.  Block mode reads show similar speed improvements.  Copy-and-paste
+   into the terminal window, Reflection file downloads, and output to the
+   terminal window in REMOTEACK mode show speed improvements of five to fifteen
+   times.  Output in LOCALACK mode has been improved by around 50%.
+
+ - Information regarding Reflection file transfers and serial port disconnection
+   options has been added to Section 4.1.1, "Terminal Data Interface," of the HP
+   3000 Simulator User's Guide.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - File transfer using the Reflection terminal emulator requires an 8-bit data
+   path.  To achieve this, the session must use MPE terminal type 12 (this may
+   be configured either during a system reload or by specifying the TERM=12
+   parameter when logging on with :HELLO), and the channel must be set to 8B,
+   REMOTEACK, and NOCAPSLOCK modes.  Note that MPE's default terminal type 10
+   writes 7-bit data with odd parity, and characters with the parity bit on may
+   be displayed by the terminal emulator as extended characters in the Roman-8
+   symbol set.  To avoid a garbled display when using the TERM=12 parameter to
+   override the default, the channel should be set to 8B mode after logging on
+   and back to 7B after logging off.
+
+ - The MPE-V/R software kit has been updated to increase the number of terminal
+   buffers per port from 3 to 5.  Using the default of 3 may cause the system
+   to report "MPE Table TBUF has overflowed!!!" to the system console while
+   performing Reflection file uploads.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  Serial port output stalls are not handled properly.
+
+     VERSION:  Release 6.
+
+     OBSERVATION:  The ATCD device supports I/O via host serial ports as well as
+     via Telnet connections.  While output via Telnet works correctly, output
+     via serial ports fails.  Attempting to output to the ATCD results in a few
+     characters written, and then the line hangs.  Sometimes pressing ENTER at
+     the system console (ATCD channel 0) causes a few more characters to appear
+     on the serial terminal.  Eventually, the line hangs permanently.
+
+     CAUSE:  The terminal multiplexer library (sim_tmxr.c, part of the SIMH
+     framework) had provided a 256-byte output buffer for each line, independent
+     of the connection type (Telnet or serial).  The library was changed to
+     reduce the serial buffer size to one byte.  If the library output routine
+     receives the second character before the first one has been written to the
+     serial port, it returns SCPE_STALL status to indicate a buffer overflow.
+     The ATCD simulation correctly responds to this status by rescheduling the
+     output attempt.  However, it fails to call the "tmxr_poll_tx" routine to
+     write to the serial port, so the rescheduled attempt fails as well.
+
+     RESOLUTION:  Modify "line_service" (hp3000_atc.c) to call "tmxr_poll_tx" if
+     a buffer overflow occurs.
+
+     STATUS:  Fixed in Release 7.
+
+
+
+=====================
+Release 6, 2017-09-07
+=====================
+
+This release of the HP 3000 simulator adds the following features:
+
+ - The new "-F" switch to the DETACH LP command forces an immediate detach,
+   regardless of the current paper position.  This is the simulation equivalent
+   of physically removing the paper from the printer.  Without the switch,
+   detaching is the equivalent of running out of paper, which permits printing
+   to continue to the end of the line (2613/17/18) or the page (2607) before the
+   printer goes offline.
+
+ - The HP 3000 Simulator User's Guide has been revised to add a new section
+   describing the simulator commands corresponding to hardware actions and to
+   rewrite the "Realistic, Calibrated, and Optimized Timing" section to describe
+   the three timing modes more clearly.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - The LP device's PCHR (punched channel character) and UPCHR (unpunched channel
+   character) registers have been renamed to PUNCHR and UNPCHR, respectively,
+   for compatibility with the HP 2100 simulator's LPT device.
+
+ - The manual clarifies that the display radix for shift counts, bit positions,
+   starting bits and counts, and the CIR values for the PAUS and HALT
+   instructions may be overridden with command-line switches.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  Cancelling a deferred detach with ATTACH LP is rejected.
+
+     VERSION:  Release 5.
+
+     OBSERVATION:  The line printer "Unit Options" section of the HP 3000
+     Simulator User's Guide states that a DETACH LP command will be deferred if
+     there are characters in the print buffer.  It further states that entering
+     ATTACH LP without specifying a filename will cancel the action.  This does
+     not work.  Entering ATTACH LP prints "Too few arguments" and does not alter
+     a pending detach.
+
+     CAUSE:  The SCP routine "attach_cmd" checks for the presence of a filename
+     before calling the line printer simulator's "lp_attach" routine.  If the
+     filename is omitted, "lp_attach" is never called to cancel the pending
+     detach.
+
+     RESOLUTION:  Modify "lp_set_on_offline" (hp3000_lp.c) to cancel a deferred
+     detach, and modify the User's Guide to state that SET LP ONLINE is used to
+     cancel both the deferred offline and deferred detach actions.
+
+     STATUS:  Fixed in Release 6.
+
+
+  2. PROBLEM:  Changing printer models does not change the REALTIME delays.
+
+     VERSION:  Release 5.
+
+     OBSERVATION:  In REALTIME mode, the line printer simulator attempts to
+     model the print buffer load and print-and-space operation delays inherent
+     in the physical hardware.  However, after setting a different model, the
+     buffer load, print, and paper advance times have not been changed.
+
+     CAUSE:  The "lp_set_model" routine that is called in response to a "SET
+     LP <model>" command sets the realistic times to those of the current model
+     rather than those of the new model.
+
+     RESOLUTION:  Modify "lp_set_model" (hp3000_lp.c) to use the new model value
+     to index into the realistic times array.
+
+     STATUS:  Fixed in Release 6.
+
+
+  3. PROBLEM:  Paper cannot be removed from a 2607 printer except at the TOF.
+
+     VERSION:  Release 5.
+
+     OBSERVATION:  Printing a few lines on a 2607 and then attempting to remove
+     the paper with the DETACH LP command displays "Command not completed" on
+     the simulation console.  The file remains attached and therefore cannot be
+     manipulated externally.
+
+     CAUSE:  The DETACH command simulates both running out of paper and removing
+     the paper from the printer.  For the former, the 2607 continues to print
+     until the current form is complete (i.e., the top of what would be the next
+     form is reached).  For the latter, the paper may be physically removed by
+     the operator while at any print position.  The simulator incorrectly
+     forbids the latter operation unless the paper is positioned at the TOF.
+
+     RESOLUTION:  Modify "lp_detach" (hp3000_lp.c) to add a "forced detach"
+     option ("DETACH -F LP") to detach the printer regardless of print position.
+
+     STATUS:  Fixed in Release 6.
+
+
+
+=====================
+Release 5, 2017-04-30
+=====================
+
+This release of the HP 3000 simulator does not add any new features.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - The 2607 line printer simulation now defers an out-of-paper alarm until the
+   paper reaches the top-of-form position, consistent with the hardware
+   behavior.  The 2613/17/18 printers continue to defer only until the current
+   line is printed.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  Host file system seek errors are not caught.
+
+     VERSION:  Release 4.
+
+     OBSERVATION:  The MAC/ICD disc library checks for host file system read or
+     write errors and returns Uncorrectable Data Error status if an error is
+     indicated.  However, host file system seeks are simply assumed to succeed;
+     no indication of an error is given if a call fails.  A failed seek should
+     be detected, and a Drive Fault (positioner error) should be returned.
+
+     CAUSE:  Oversight.
+
+     RESOLUTION:  Modify "position_sector" (hp_disclib.c) to test the
+     "sim_fseek" call for error status and to simulate a Drive Fault (AGC error)
+     if the call fails.
+
+     STATUS:  Fixed in Release 5.
+
+
+  2. PROBLEM:  An interrupted EDIT instruction does not resume properly.
+
+     VERSION:  Release 4.
+
+     OBSERVATION:  The EDIT instruction is interruptible between operations.  If
+     an interrupt is detected, two words are pushed onto the stack before the
+     interrupt handler is called.  These words hold the current significance
+     trigger, loop count, float character, and fill character.  This allows the
+     instruction to resume from the point of suspension.  However, the
+     significance trigger is not preserved properly; it is always clear after an
+     interrupt.
+
+     CAUSE:  The significance trigger is preserved in the MSB of the upper byte
+     of the word pushed onto the stack, but a 16-bit value with the MSB set is
+     used to set the upper byte.  As only the lower 8 bits of the value are used
+     to set the byte, the MSB is lost.
+
+     RESOLUTION:  Modify "edit" (hp3000_cpu_cis.c) to use the full 16-bit value
+     when storing the significance trigger.
+
+     STATUS:  Fixed in Release 5.
+
+
+  3. PROBLEM:  Tracing a tape runaway error prints gibberish in the log file.
+
+     VERSION:  Release 4.
+
+     OBSERVATION:  Tracing tape controller commands or command initiations and
+     completions reports the success or failure of calls to the simulator tape
+     library, e.g., "write failed with no write ring."  A call that fails with
+     Tape Runaway status, such as a read across a long erase gap, should report
+     that the operation "failed with tape runaway."  Instead, it reports
+     gibberish.
+
+     CAUSE:  The descriptive lookup table is missing an entry for the MTSE_LEOT
+     status that precedes MTSE_RUNAWAY.  Attempting to look up the description
+     for MTSE_RUNAWAY indexes beyond the end of the table.
+
+     RESOLUTION:  Modify the "status_name" array (hp_tapelib.c) to include
+     descriptions for all of the possible simulator tape library status returns.
+
+     STATUS:  Fixed in Release 5.
+
+
+  4. PROBLEM: Commanding a VFU channel that is not punched causes a simulator
+     stop.
+
+     VERSION:  Release 4.
+
+     OBSERVATION:  A format command that specifies a slew to a VFU channel that
+     is not punched causes a tape fault, and the printer goes offline.  However,
+     the simulator then incorrectly stops with a "System halt" message, rather
+     than reflecting the "not ready" status back to MPE.
+
+     CAUSE:  The return value from the "lp_set_alarm" routine is being passed
+     back as the status of the "lp_service" call.  However, the return value is
+     a Boolean and is TRUE if the printer successfully went offline.  When
+     interpreted as a service status return value, TRUE is seen as STOP_SYSHALT
+     and causes a system halt simulator stop.
+
+     RESOLUTION:  Modify "lp_service" (hp3000_lp.c) to return SCPE_OK after the
+     tape fault alarm is set, allowing the simulation to continue.
+
+     STATUS:  Fixed in Release 5.
+
+
+  5. PROBLEM:  The 2613/17/18 printers do not ignore characters exceeding the
+     line length.
+
+     VERSION:  Release 4.
+
+     OBSERVATION:  When characters are output in excess of the defined line
+     length, the printer performs an automatic print-and-space operation and
+     prints the excess characters on the following line.  This operation is
+     correct for the 2607 printer but not for the 2613/17/18 printers, which
+     ignore output that exceeds the line length.
+
+     CAUSE:  Excess character handling should be, but is not, model-specific.
+
+     RESOLUTION:  Modify the "print_props" table (hp3000_lp.c) to add a field
+     for automatic printing, and modify "lp_service" to check the field to
+     decide if excess characters are printed or ignored.
+
+     STATUS:  Fixed in Release 5.
+
+
+
+=====================
+Release 4, 2017-01-08
+=====================
+
+This release of the HP 3000 simulator adds the following features:
+
+  - The HP 32234A COBOL II Extended Instruction Set firmware is now available.
+    The new SET CPU CIS option enables the firmware.
+
+  - Subprograms in memory associated with the EDIT instruction may be examined
+    symbolically with the -E switch.
+
+  - The new CPU "OPND" trace option traces memory byte operands.
+
+  - The new CPU "EXEC" trace option turns on full tracing for instructions
+    that match a value specified by the new "SET CPU EXEC=<match>{;<mask>}"
+    command.
+
+  - The diagnostics coverage is extended to the COBOL II firmware.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - The MPE-V/R software kit has been updated to add the COBOL II runtime
+   routines to the system SL and COBOL example programs to the OPERATOR.SYS
+   account.  The startup command files also enable the COBOL II instruction set.
+
+ - If you are using a custom MPE configuration and want to run COBOL II
+   programs, you must perform a SYSDUMP/COLDSTART to replace the three existing
+   COBLIB segments in your SL.PUB.SYS with their COBOL II replacements.  The
+   U00U232A.USL.SYS and COB68LIB.PUB.SYS files on the disc image from the
+   software kit contain the replacement segments.  See Usage Note 6 in the
+   "readme.txt" file and the "mpe-3-sysdump.log" file in the kit for details.
+
+ - New "hp3000_cpu_cis.c" and "hp3000_mem.c" modules have been added.
+
+ - For this release, checking for interrupts is not performed during execution
+   of the COBOL II EDIT, TR, CMPS, and CMPT instructions.  A future release will
+   add interruptibility to these instructions to comply with their hardware
+   behavior.
+
+ - The new OPND trace option does not currently trace byte operands for
+   instructions in the base set (e.g., MOVB or CMPB).  Operands for the
+   COBOL II firmware instructions are fully covered.
+
+ - The command-line switch for the EXAMINE command to request display in
+   status-register format has been changed from "-S" to "-T" to avoid conflict
+   with the "-S" switch used to indicate an address offset from SBANK.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  SETR prints a base register trace when values are not changed.
+
+     VERSION:  Release 3
+
+     OBSERVATION:  The SETR instruction may be used to change any combination of
+     the SBANK, DB, DL, Z, STA, X, Q, and SM register values.  If the REG trace
+     is active, the base register values will be printed after the instruction
+     completes.  This occurs whether or not the base register values were
+     actually changed.  In particular, the CPU diagnostic uses the SETR
+     instruction to flush the stack to memory without changing any base
+     registers.  The REG trace in this case is unnecessary.
+
+     CAUSE:  The "cpu_base_changed" flag is set unconditionally when the
+     instruction completes.  It should be set only if the SETR instruction
+     specifies one or more base registers to change.
+
+     RESOLUTION:  Modify "cpu_move_spec_fw_imm_field_reg_op" (hp3000_cpu_base.c)
+     to set the "cpu_base_changed" flag only if one or more base register change
+     bits are set in the instruction operand field.
+
+     STATUS:  Fixed in Release 4.
+
+
+  2. PROBLEM:  Invalid bank and offset values are accepted for address entry.
+
+     VERSION:  Release 3
+
+     OBSERVATION:  Bank-offset addresses with out-of-range the bank or offset
+     values, e.g., EXAMINE 30.0 and EXAMINE 0.1777777, are accepted without
+     complaint.  The bank value is taken modulo 20, and the higher order bits of
+     the offset value are merged into the bank number.  Values out of range
+     should be rejected with errors.
+
+     CAUSE:  Incomplete range verification.
+
+     RESOLUTION:  Modify "parse_addr" (hp3000_sys.c) to check the parsed bank
+     and offset values against their respective maximums and return an "Invalid
+     argument" error if either is exceeded.
+
+     STATUS:  Fixed in Release 4.
+
+
+  3. PROBLEM:  The "-S" (SBANK-offset) switch displays values in status-register
+     format.
+
+     VERSION:  Release 3
+
+     OBSERVATION:  The HP 3000 User's Manual states that adding the "-S" switch
+     to the EXAMINE command implies that the offset is from the bank number in
+     the SBANK register.  The example given, "EXAMINE -S <sbank-offset>", should
+     display the memory data value at the address <SBANK-number>.<offset> in
+     octal format.  Instead, it displays the value in status-register format.
+
+     CAUSE:  The "-S" switch is used for both SBANK and STA formats.  Section
+     2.1.3 says that -S means that "The implied bank number is obtained from
+     SBANK."  Section 2.1.2 says that -S means that "A CPU status mnemonic" is
+     being displayed.  For EXAMINE -S, the latter interpretation causes the
+     expected octal value to be displayed in status-register format.
+
+     RESOLUTION:  Modify "fprint_sym" (hp3000_sys.c) to use the "-T" switch to
+     designate status-register format.  Modify hp3000_sys.c, hp3000_cpu.c, and
+     hp3000_defs.h to rename the "REG_S" format indicator to "REG_T" for
+     consistency with the switch change.
+
+     STATUS:  Fixed in Release 4.
+
+
+  4. PROBLEM:  SCAL 0 and PCAL 0 instructions fail when a stack overflow occurs.
+
+     VERSION:  Release 3
+
+     OBSERVATION:  The SCAL 0 and PCAL 0 instructions transfer control via
+     subroutine or procedure calls, respectively, through program labels
+     residing on the top of the stack.  If a stack overflow occurs during
+     instruction execution, the stack overflow trap handler is called to enlarge
+     the stack, and the instruction is reexecuted.  However, the program label
+     has been lost, so control transfers to a random location.
+
+     CAUSE:  The instructions obtain the labels and then delete the TOS, flush
+     the rest of the stack registers to memory, and then check that SM <= Z,
+     i.e., that the current top of the stack in memory does not exceed the
+     stack limit.  If SM > Z, a stack overflow has occurred, and the trap
+     handler is called.  However, the label has not been restored to the stack,
+     so when the instruction is reexecuted after the stack is enlarged, the
+     wrong value is pulled from the TOS.
+
+     RESOLUTION:  Modify "cpu_io_cntl_prog_imm_mem_op" SCAL and PCAL executors
+     (hp3000_cpu_base.c) to push the label back onto the stack before taking the
+     stack overflow trap.
+
+     STATUS:  Fixed in Release 4.
+
+
+
+=====================
+Release 3, 2016-09-20
+=====================
+
+This release of the HP 3000 simulator adds the following features:
+
+  - Cold dump is now available.  Entering the DUMP command simulates pressing
+    the ENABLE and DUMP front panel buttons.  The contents of main memory are
+    written to an attached magnetic tape in a format suitable for analyzing with
+    the DPAN4 program.  The new SET CPU DUMPDEV and SET CPU DUMPCTL options
+    specify the default device number and control byte for the dump.
+
+  - The SHOW LP VFU command now displays the VFU channel definitions in
+    addition to the VFU tape title.
+
+  - The POWER FAIL and POWER RESTORE commands have been added to simulate losing
+    and regaining system power.
+
+  - The SET CPU ARS and SET CPU NOARS options have been added to simulate the
+    power-fail/auto-restart switch on the back of the system front panel.
+
+  - The CMD instruction has been implemented and passes section 4 of the CPU
+    diagnostic.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - In hardware, MPE execution cannot continue after a DUMP is performed.  This
+   is because a cold dump performs an I/O reset before writing the contents of
+   memory to the tape, and this clears the I/O device controllers to their
+   initial power-on states.  However, execution can be continued if a SAVE is
+   done to record the simulator state before the dump and a RESTORE is done
+   after the dump completes.  This permits taking a "snapshot" of MPE operation
+   without disturbing MPE.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  An SIO READ or WRITE order with a 4K count displays as zero.
+
+     VERSION:  Release 2
+
+     OBSERVATION:  SIO READ and WRITE orders define bits 4-15 as the negative
+     word count of the transfer.  If bits 4-15 are zero, the transfer is 4096
+     words long.  However, an EXAMINE -I command displays the word count as
+     zero.
+
+     CAUSE:  The display value is being calculated incorrectly.
+
+     RESOLUTION:  Modify "IOCW_COUNT" (hp3000_cpu_ims.h) to sign-extend the
+     12-bit count correctly to 16 bits, and modify "fprint_order" (hp3000_sys.c)
+     to negate the values to display the counts as positive.  Also modify
+     "mpx_interface" (hp3000_mpx.c) to display the correct count in the debug
+     trace for the DREADSTB operation.
+
+     STATUS:  Fixed in Release 3.
+
+
+  2. PROBLEM:  An I/O reset does not clear a pending external interrupt.
+
+     VERSION:  Release 2
+
+     OBSERVATION:  A cold load begins with a CPU reset and an I/O reset.  A cold
+     dump begins with an I/O reset only to preserve the CPU state for the dump
+     operation.  The external interrupt flip-flop on the IOP is cleared by an
+     I/O reset, which should clear the external interrupt bit in the CPX1
+     register.  However, this does not occur, causing the interrupt generated by
+     placing the tape drive online to be misinterpreted as the SIO program
+     completion interrupt.  Because the SIO pointer is not set as expected, the
+     cold dump microcode assumes that a tape error occurred and performs a
+     retry.  This writes an erase gap at the beginning of the tape but otherwise
+     produces a valid tape.
+
+     CAUSE:  Oversight.
+
+     RESOLUTION:  Add a new "iop_reset" routine (hp3000_iop.c) that is called
+     during an I/O reset and that clears the external interrupt bit of the CPX1
+     register.
+
+     STATUS:  Fixed in Release 3.
+
+
+  3. PROBLEM:  RESTORE of a file SAVEd with a different executable may abort the
+     simulator.
+
+     VERSION:  Release 2
+
+     OBSERVATION:  Entering SAVE to save the simulator state on an executable
+     compiled with one set of compiler options or compiler version and then
+     entering RESTORE to restore the state on an executable compiled with a
+     different set of compiler options or compiler version succeeds.  However,
+     attempting to resume execution results in an access exception.
+
+     CAUSE:  The simulator's internal Device Information Blocks contain pointers
+     to the devices' I/O interface handlers, which are saved as part of the DIB
+     structure in the simulator state file.  When restoring the state, the
+     interface handler pointers are restored.  However, the addresses of one or
+     more routines may have changed, due to differing memory layouts, so the
+     restored values are no longer correct.  If they are not, and I/O is
+     performed to the affected device(s), control transfers to an invalid code
+     location.
+
+     RESOLUTION:  Modify hp3000_io.h to add a new REG_DIB macro that defines the
+     register entries needed to save the DIB state, and modify hp3000_atc.c,
+     hp3000_clk.c, hp3000_ds.c, hp3000_lp.c, hp3000_mpx.c, hp3000_ms.c, and
+     hp3000_scmb.c to change the REG entries referencing the DIB structures to
+     use the REG_DIB macro.
+
+     STATUS:  Fixed in Release 3.
+
+
+  4. PROBLEM:  The LOAD command does not report "Cold load complete".
+
+     VERSION:  Release 2
+
+     OBSERVATION:  The LOAD command should report success after completion of a
+     cold load operation, but it doesn't.  Instead, the SCP prompt returns with
+     no indication of whether the command succeeded or failed.  Using the
+     equivalent BOOT CPU command does print the expected "Cold load complete"
+     message.
+
+     CAUSE:  The "Cold load complete" message is printed by the simulator's
+     "fprint_stopped" routine that is called via the "sim_vm_fprint_stopped"
+     pointer from the "run_cmd_message" routine in SCP.  The latter is invoked
+     via the "message" field of the command table.  The LOAD, DUMP, and POWER
+     commands all invoke "sim_instr" via "run_cmd" but do not specify routine
+     pointers for their message fields, so no completion messages are reported.
+
+     RESOLUTION:  Modify "one_time_init" (hp3000_sys.c) to set the "message"
+     fields of the LOAD, DUMP, and POWER commands to point at the same routine
+     as is used by the system "CONTINUE" command.
+
+     STATUS:  Fixed in Release 3.
+
+
+  5. PROBLEM:  RESTOREing with the ATCD attached cancels active line services.
+
+     VERSION:  Release 2
+
+     OBSERVATION:  Doing a SAVE while the ATCD has line services scheduled,
+     e.g., while outputting characters, and then following immediately with a
+     RESTORE cancels the line services.  For example, after a SAVE, a SHOW QUEUE
+     command prints:
+
+       HP 3000 event queue status, time = 907247803
+         CLK at 0
+         ATCD unit 0 at 241
+         CPU at 27917
+         ATCD unit 16 at 27918
+         DS unit 8 at 612615
+
+     Entering RESTORE and then SHOW QUEUE prints:
+
+       HP 3000 event queue status, time = 907247803
+         CLK at 0
+         CPU at 27917
+         ATCD unit 16 at 27918
+         DS unit 8 at 612615
+
+     Note that ATCD unit 0 is no longer scheduled.
+
+     CAUSE:  The "atcd_detach" routine is called during RESTORE if the listening
+     port is currently attached in preparation for reattaching to the port
+     specified in the SAVE file.  The routine detaches the listening port and
+     then cancels each line to terminate any transfers in progress.  This is
+     appropriate for DETACH ATCD and DETACH ALL, but not for RESTORE, as the
+     terminal channels have already been rescheduled as indicated in the SAVE
+     file, and canceling them hangs the channels.
+
+     RESOLUTION:  Modify "atcd_detach" (hp3000_atc.c) to skip the channel
+     termination loop if the SIM_SW_REST flag is set to indicate a RESTORE in
+     progress.
+
+     STATUS:  Fixed in Release 3.
+
+
+
+=====================
+Release 2, 2016-07-05
+=====================
+
+This release of the HP 3000 simulator adds the following device simulation:
+
+  - 30209A Line Printer Controller with One 2607/13/17/18 Line Printer
+
+The simulation supports the use of custom VFU tape images, as well as the
+built-in HP-standard VFU tape.  The simulated device name is "LP".  The full set
+of configurable options is detailed in a new section of the HP 3000 Simulator
+User's Guide.
+
+In addition, the preconfigured MPE-V/R disc image has been updated to add the
+following features:
+
+  - The MPE cold load command files attach the line printer to the "lp.txt"
+    output file and specify the "-n" option to clear the file before use.
+
+  - Preinstalled User-Defined Commands (UDCs) provide access to the COBOL 74
+    compiler with the MPE-V/E :COBOLII, :COBOLIIPREP, and :COBOLIIGO commands,
+    and to the COBOL 85 compiler with :COBOLIIX, :COBOLIIXPREP, and :COBOLIIXGO.
+    However, see the implementation note below.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - MPE requires a line printer, so it is recommended that the MPE startup
+   simulator command file include an ATTACH LP <filename> command to load paper
+   into the printer before cold loading.  If the printer is not attached, it
+   will appear to MPE to be out of paper.
+
+ - The line printer terminates each print line with an HP-standard CR/LF pair.
+   If the output file is to be retained as a text file on a Unix system, removal
+   of the carriage returns, e.g., via the "dos2unix" utility, may be desirable.
+
+ - The simulator currently does not provide the HP 32234A COBOL II firmware
+   instructions, so programs generated by the COBOLII compiler will abort at run
+   time with an "ILLEGAL INSTRUCTION" error.  Programs generated by the COBOL
+   compiler do not use these instructions and therefore are not affected.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  The effective address of a byte pointer with a negative index is
+     calculated incorrectly.
+
+     VERSION:  Release 1
+
+     OBSERVATION:  Defining a :WELCOME message in MPE appears to work, but when
+     the next logon attempts to print the message, an infinite number of CRLFs
+     are printed instead.
+
+     CAUSE:  The welcome message is stored in an extra data segment.  The format
+     for each message line is a line length stored in the lower byte of the word
+     preceding the message string.  The code defines BYTE POINTER NEXTLINE and
+     points NEXTLINE to the first message character.  The line length is set
+     with NEXTLINE(-1) := IOCOUNT.  This generates a LOAD <IOCOUNT> ; LDXN 1 ;
+     STB <NEXTLINE>,I,X sequence.
+
+     In the "cpu_ea" routine, the indexing adds the X register value (-1) to the
+     byte pointer (NEXTLINE).  This causes an overflow that is not masked to 16
+     bits.  For a word access, this displacement is added to the base register
+     and then masked to 16 bits, which gives the correct value.  However, for
+     byte accesses, the displacement is divided by 2 and then added, and the sum
+     is masked.  Dividing by 2 shifts the overflow bit into the MSB, causing the
+     addition result to be off by 32K.  The STB goes to the wrong location, the
+     original zero in the length byte location is retained, and when the welcome
+     message is printed, a zero-length line is printed, and the byte pointer is
+     incremented by zero, so the null line is printed forever.
+
+     RESOLUTION:  Modify "cpu_ea" (hp3000_cpu.c) to mask indexed displacements
+     to 16 bits after adding the X register value.
+
+     STATUS:  Fixed in Release 2.
+
+
+  2. PROBLEM:  An SMSK instruction may clear the interrupt mask flip-flop of a
+     device that specifies that it is should be "always enabled."
+
+     VERSION:  Release 1
+
+     OBSERVATION:  If the TOS word is zero, an SMSK instruction will clear the
+     interrupt mask flip-flop of a device whose mask jumper is set to "E"
+     (always enabled).
+
+     CAUSE:  In response to a DSETMASK signal, device interfaces set their
+     interrupt mask flip-flops by "anding" the incoming data word with the
+     interrupt mask jumper setting.  The jumper setting value for "always
+     enabled" is %177777, which sets the mask flip-flop in all cases, except
+     when the data word is zero.
+
+     RESOLUTION:  Modify hp3000_atc.c, hp3000_ds.c, and hp3000_ms.c to set their
+     mask flip-flops unconditionally if the jumper setting is "E".
+
+     STATUS:  Fixed in Release 2.
+
+
+  3. PROBLEM:  The "SET <dev> INTMASK=<n>" command sets the wrong bit in the
+     device interface's interrupt mask jumper setting.
+
+     VERSION:  Release 1
+
+     OBSERVATION:  The interrupt mask jumper on a device interface is set by
+     specifying the mask bit number in a "SET <dev> INTMASK=<n>" command.  This
+     sets a bit in the device's interrupt mask jumper word corresponding to the
+     bit number requested.  However, the bit numbering is incorrect; setting the
+     jumper for bit 15, for example, sets bit 0 of the jumper word.  Therefore,
+     the interface's mask flip-flop is not set as expected when an SMSK
+     instruction is executed.
+
+     CAUSE:  The bit numbers were counted from the wrong end of the word.
+
+     RESOLUTION:  Modify "hp_set_dib" and "hp_show_dib" (hp3000_sys.c) to number
+     the bits from the MSB instead of the LSB.
+
+     STATUS:  Fixed in Release 2.
+
+
+  4. PROBLEM:  The Multiplexer Channel is not generating the ACKSR signal
+     correctly.
+
+     VERSION:  Release 1
+
+     OBSERVATION:  The line printer controller hangs when an SIO chained write
+     is performed.  The first programmed write completes normally, but the
+     second does not start.  The channel is waiting for a service request that
+     does not occur.
+
+     CAUSE:  The service request from the last write of the first block transfer
+     is being cleared by an ACKSR generated by the Multiplexer Channel when it
+     performs the IOCW fetch in State A for the second write request.  The
+     channel should omit this ACKSR when the previous I/O order was a chained
+     read or write.  However, the simulator is testing the order just fetched
+     (Write) instead of the order that has just completed (Write Chained).
+
+     RESOLUTION:  Modify "mpx_service" (hp3000_mpx.c) to test the correct I/O
+     order in State A.
+
+     STATUS:  Fixed in Release 2.
+
+
+
+=====================
+Release 1, 2016-03-07
+=====================
+
+This is the initial release of the HP 3000 simulator.  The following devices are
+currently simulated:
+
+  - 30003B Series III computer with up to 1024 KW of memory
+  - 30003B I/O Processor
+  - 30036B Multiplexer Channel
+  - 30030C Selector Channel
+  - 30033A Selector Channel Maintenance Board
+  - 30032B Asynchronous Terminal Controller data interface
+  - 30061B Asynchronous Terminal Controller control interface
+  - 30135A System Clock/Fault Logging Interface
+  - 30215A Tape Controller with four 7970B/E drives
+  - 30229B Disc Controller with eight 7905/7906/7920/7925 drives
+
+The "HP 3000 Simulator User's Guide" manual describes the configuration and
+operation of each of these devices in detail.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - IMPORTANT: There is no line printer simulation.  MPE cannot be configured to
+   run without a printer; attempting to delete LDEV 6 produces "ERROR #115
+   UNDEFINED CLASS LP USED AS OUTPUT DEVICE", and class LP cannot be deleted.
+   With LDEV 6 present, MPE will boot and run, but doing, e.g., :STOPSPOOL 6
+   causes "NON-RESPONDING DRT #14" and "SYSTEM FAILURE #201" when the printer
+   doesn't respond.  Entering :OUTFENCE 14 at the console operator's session
+   immediately after bootup is a workaround.  The LP simulator should be present
+   in the next release.
+
+ - The CPU is a hybrid of the Series II instruction set microcode and the Series
+   III memory size and hardware behavior, because the Series III microcode is
+   not available.
+
+ - The CPU is currently missing a few "difficult" instructions (the CMD
+   instruction, the Series II LOCK and UNLK instructions, and the entire
+   Extended Instruction Set).  Although the EIS is not present, MPE has a
+   software emulator for these instructions that is invoked transparently by the
+   Unimplemented Instruction traps that occur when attempted execution of EIS
+   instructions occurs.
+
+ - The main memory Fault Logging Interface section of the 30135A is currently
+   not simulated.  Although fault-control memory was standard on the Series II
+   and later, the memory fault logger is smart enough to realize that the FLI is
+   not there, so MPE will run without it.
+
+ - Symbolic entry of CPU instructions, CPU status, and I/O instructions are not
+   currently supported.
