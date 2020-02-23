@@ -943,9 +943,9 @@ if (rtc->hz != ticksper) {                          /* changing tick rate? */
         (rtc->last_hz != ticksper) && 
         (ticksper != 0))
         rtc->currd = (int32)(sim_timer_inst_per_sec () / ticksper);
+    _rtcn_configure_calibrated_clock (tmr);
     rtc->last_hz = rtc->hz;
     rtc->hz = ticksper;
-    _rtcn_configure_calibrated_clock (tmr);
     if (ticksper != 0) {
         RTC *crtc = &rtcs[sim_calb_tmr];
 
@@ -2451,6 +2451,16 @@ return SCPE_OK;
   clock with an appropriate tick rate, an internal clock is run that meets 
   this requirement, OR when asynch clocks are enabled, the internal clock
   is always run.
+
+  Some simulators have clocks that have dynamically programmable tick 
+  rates. Such a clock is only a reliable candidate to be the calibrated 
+  clock if it uses a single tick rate rather than changing the tick rate 
+  on the fly.  Generally most systems like this, under normal conditions
+  don't change their tick rates unless they're running something that is
+  examining the behavior of the clock system (like a diagnostic).  Under 
+  these conditions this clock is removed from the potential selection as
+  "the" calibrated clock all others are relative to and if necessary, an
+  internal calibrated clock is selected.
  */
 static void _rtcn_configure_calibrated_clock (int32 newtmr)
 {
@@ -2463,7 +2473,8 @@ for (tmr=0; tmr<SIM_NTIMERS; tmr++) {
     rtc = &rtcs[tmr];
     if ((rtc->hz) &&
         (rtc->hz <= (uint32)sim_os_tick_hz) &&
-        (rtc->clock_unit))
+        (rtc->clock_unit) &&
+        ((rtc->last_hz == 0) || (rtc->last_hz == rtc->hz)))
         break;
     }
 if (tmr == SIM_NTIMERS) {                   /* None found? */
@@ -2499,7 +2510,7 @@ if (tmr == SIM_NTIMERS) {                   /* None found? */
         SIM_INTERNAL_UNIT.action = &sim_timer_clock_tick_svc;
         SIM_INTERNAL_UNIT.flags = UNIT_IDLE;
         sim_register_internal_device (&sim_int_timer_dev);      /* Register Internal timer device */
-        sim_rtcn_init_unit (&SIM_INTERNAL_UNIT, (int32)((CLK_INIT*CLK_TPS)/sim_int_clk_tps), SIM_INTERNAL_CLK);
+        sim_rtcn_init_unit_ticks (&SIM_INTERNAL_UNIT, (int32)((CLK_INIT*CLK_TPS)/sim_int_clk_tps), SIM_INTERNAL_CLK, sim_int_clk_tps);
         SIM_INTERNAL_UNIT.action (&SIM_INTERNAL_UNIT);          /* Force tick to activate timer */
         }
     return;
