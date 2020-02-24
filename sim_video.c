@@ -564,19 +564,24 @@ static t_stat vid_init_controllers (void)
     vid_gamepad_ok = (ver.major > 2 ||
                       (ver.major == 2 && (ver.minor > 0 || ver.patch >= 4)));
 
-    SDL_InitSubSystem(SDL_INIT_JOYSTICK);
     if (vid_gamepad_ok)
         SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER);
+    else
+        SDL_InitSubSystem(SDL_INIT_JOYSTICK);
 
     if (SDL_JoystickEventState (SDL_ENABLE) < 0) {
-        SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
-        SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
+        if (vid_gamepad_ok)
+            SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
+        else
+            SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
         return SCPE_IOERR;
         }
 
     if (vid_gamepad_ok && SDL_GameControllerEventState (SDL_ENABLE) < 0) {
-        SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
-        SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
+        if (vid_gamepad_ok)
+            SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
+        else
+            SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
         return SCPE_IOERR;
         }
 
@@ -661,8 +666,10 @@ if (vid_active) {
     vid_gamepad_inited = 0;
     memset (motion_callback, 0, sizeof motion_callback);
     memset (button_callback, 0, sizeof button_callback);
-    SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
-    SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
+    if (vid_gamepad_ok)
+        SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
+    else
+        SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
 
     vid_active = FALSE;
     if (vid_ready) {
