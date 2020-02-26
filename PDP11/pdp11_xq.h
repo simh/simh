@@ -268,7 +268,7 @@ struct xq_device {
   uint32            throttle_time;                      /* ms burst time window */
   uint32            throttle_burst;                     /* packets passed with throttle_time which trigger throttling */
   uint32            throttle_delay;                     /* ms to delay when throttling.  0 disables throttling */
-  uint16            startup_delay;                      /* instructions to delay when starting the receiver */
+  uint32            startup_delay;                      /* instructions to delay when starting the receiver */
                                                         /*- initialized values - DO NOT MOVE */
 
                                                         /* I/O register storage */

@@ -994,7 +994,7 @@ REG rq_reg[] = {
     { URDATAD (PKTQ,    rq_unit[0].pktq, 10, 5, 0, RQ_NUMDR, 0, "packet queue, units 0 to 3") },
     { URDATAD (UFLG,    rq_unit[0].uf,  DEV_RDX, 16, 0, RQ_NUMDR, 0, "unit flags, units 0 to 3") },
     { URDATA  (CAPAC,   rq_unit[0].capac, 10, T_ADDR_W, 0, RQ_NUMDR, PV_LEFT | REG_HRO) },
-    { URDATAD (PLUG,    rq_unit[0].unit_plug, 10, T_ADDR_W, 0, RQ_NUMDR, PV_LEFT | REG_RO, "unit plug value, units 0 to 3") },
+    { URDATAD (PLUG,    rq_unit[0].unit_plug, 10, 32, 0, RQ_NUMDR, PV_LEFT | REG_RO, "unit plug value, units 0 to 3") },
     { GRDATA  (DEVADDR, rq_dib.ba,      DEV_RDX, 32, 0), REG_HRO },
     { GRDATA  (DEVVEC,  rq_dib.vec,     DEV_RDX, 16, 0), REG_HRO },
     { DRDATA  (DEVLBN,  drv_tab[RA8U_DTYPE].lbn, 22), REG_HRO },
@@ -1173,7 +1173,7 @@ REG rqb_reg[] = {
     { URDATAD (PKTQ,    rqb_unit[0].pktq, 10, 5, 0, RQ_NUMDR, 0, "packet queue, units 0 to 3") },
     { URDATAD (UFLG,    rqb_unit[0].uf,  DEV_RDX, 16, 0, RQ_NUMDR, 0, "unit flags, units 0 to 3") },
     { URDATA  (CAPAC,   rqb_unit[0].capac, 10, T_ADDR_W, 0, RQ_NUMDR, PV_LEFT | REG_HRO) },
-    { URDATAD (PLUG,    rqb_unit[0].unit_plug, 10, T_ADDR_W, 0, RQ_NUMDR, PV_LEFT | REG_RO, "unit plug value, units 0 to 3") },
+    { URDATAD (PLUG,    rqb_unit[0].unit_plug, 10, 32, 0, RQ_NUMDR, PV_LEFT | REG_RO, "unit plug value, units 0 to 3") },
     { GRDATA  (DEVADDR, rqb_dib.ba,      DEV_RDX, 32, 0), REG_HRO },
     { GRDATA  (DEVVEC,  rqb_dib.vec,     DEV_RDX, 16, 0), REG_HRO },
     { NULL }
@@ -1246,7 +1246,7 @@ REG rqc_reg[] = {
     { URDATAD (PKTQ,    rqc_unit[0].pktq, 10, 5, 0, RQ_NUMDR, 0, "packet queue, units 0 to 3") },
     { URDATAD (UFLG,    rqc_unit[0].uf,  DEV_RDX, 16, 0, RQ_NUMDR, 0, "unit flags, units 0 to 3") },
     { URDATA  (CAPAC,   rqc_unit[0].capac, 10, T_ADDR_W, 0, RQ_NUMDR, PV_LEFT | REG_HRO) },
-    { URDATAD (PLUG,    rqc_unit[0].unit_plug, 10, T_ADDR_W, 0, RQ_NUMDR, PV_LEFT | REG_RO, "unit plug value, units 0 to 3") },
+    { URDATAD (PLUG,    rqc_unit[0].unit_plug, 10, 32, 0, RQ_NUMDR, PV_LEFT | REG_RO, "unit plug value, units 0 to 3") },
     { GRDATA  (DEVADDR, rqc_dib.ba,      DEV_RDX, 32, 0), REG_HRO },
     { GRDATA  (DEVVEC,  rqc_dib.vec,     DEV_RDX, 16, 0), REG_HRO },
     { NULL }
@@ -1319,7 +1319,7 @@ REG rqd_reg[] = {
     { URDATAD (PKTQ,    rqd_unit[0].pktq, 10, 5, 0, RQ_NUMDR, 0, "packet queue, units 0 to 3") },
     { URDATAD (UFLG,    rqd_unit[0].uf,  DEV_RDX, 16, 0, RQ_NUMDR, 0, "unit flags, units 0 to 3") },
     { URDATA  (CAPAC,   rqd_unit[0].capac, 10, T_ADDR_W, 0, RQ_NUMDR, PV_LEFT | REG_HRO) },
-    { URDATAD (PLUG,    rqd_unit[0].unit_plug, 10, T_ADDR_W, 0, RQ_NUMDR, PV_LEFT | REG_RO, "unit plug value, units 0 to 3") },
+    { URDATAD (PLUG,    rqd_unit[0].unit_plug, 10, 32, 0, RQ_NUMDR, PV_LEFT | REG_RO, "unit plug value, units 0 to 3") },
     { GRDATA  (DEVADDR, rqd_dib.ba,      DEV_RDX, 32, 0), REG_HRO },
     { GRDATA  (DEVVEC,  rqd_dib.vec,     DEV_RDX, 16, 0), REG_HRO },
     { NULL }
