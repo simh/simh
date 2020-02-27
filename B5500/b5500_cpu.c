@@ -307,7 +307,7 @@ REG                 cpu_reg[] = {
     {BRDATAD(R, r_reg, 8,15,2,   "PRT pointer/Tally")},
     {BRDATAD(P, p_reg, 8,48,2,   "Last code word cache")},
     {BRDATAD(T, t_reg, 8,12,2,   "Current instruction")},
-    {BRDATAD(Q, q_reg, 8,9,2,    "Error condition")},
+    {BRDATAD(Q, q_reg, 8,8,2,    "Error condition")},
     {BRDATA(AROF, arof_reg, 2,1,2)},
     {BRDATA(BROF, brof_reg, 2,1,2)},
     {BRDATA(PROF, prof_reg, 2,1,2)},
