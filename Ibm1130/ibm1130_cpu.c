@@ -292,12 +292,12 @@ REG cpu_reg[] = {
     { ORDATA (WRU, sim_int_char, 8) },
     { FLDATA (IntRun, tbit, 1) },
 
-    { HRDATA (ILSW0, ILSW[0], 32), REG_RO },
-    { HRDATA (ILSW1, ILSW[1], 32), REG_RO },
-    { HRDATA (ILSW2, ILSW[2], 32), REG_RO },
-    { HRDATA (ILSW3, ILSW[3], 32), REG_RO },
-    { HRDATA (ILSW4, ILSW[4], 32), REG_RO },
-    { HRDATA (ILSW5, ILSW[5], 32), REG_RO },
+    { HRDATA (ILSW0, ILSW[0], 16), REG_RO },
+    { HRDATA (ILSW1, ILSW[1], 16), REG_RO },
+    { HRDATA (ILSW2, ILSW[2], 16), REG_RO },
+    { HRDATA (ILSW3, ILSW[3], 16), REG_RO },
+    { HRDATA (ILSW4, ILSW[4], 16), REG_RO },
+    { HRDATA (ILSW5, ILSW[5], 16), REG_RO },
 
 #ifdef ENABLE_1800_SUPPORT
     { HRDATA (IS_1800, is_1800, 32), REG_RO|REG_HIDDEN},        /* is_1800 flag is part of state, but hidden */
