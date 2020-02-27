@@ -303,7 +303,7 @@ static REG dsk_reg[] = {
     { BRDATAD (CURSECTOR,   current_sector,     10, 32, NUM_OF_DSK,
                "Selected sector register array"), REG_CIRC + REG_RO                         },
     { BRDATAD (CURBYTE, current_byte,           10, 32, NUM_OF_DSK,
-               "Current byte register arrayr"), REG_CIRC + REG_RO                           },
+               "Current byte register array"), REG_CIRC + REG_RO                           },
     { BRDATAD (CURFLAG, current_flag,           10, 32, NUM_OF_DSK,
                "Current flag register array"), REG_CIRC + REG_RO                            },
     { BRDATAD (TRACKS,      tracks,             10, 8,  NUM_OF_DSK,
