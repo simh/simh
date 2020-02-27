@@ -197,7 +197,7 @@ MTAB                mt_mod[] = {
 };
 
 REG                 mt_reg[] = {
-    {BRDATA(BUFF, &mt_buffer[0], 16, 64, BUFFSIZE), REG_HRO},
+    {BRDATA(BUFF, &mt_buffer[0], 16, 8, BUFFSIZE), REG_HRO},
     {ORDATA(PIA, mt_pia, 3)},
     {ORDATA(UNIT, mt_sel_unit, 3)},
     {ORDATA(NUNIT, mt_next_unit, 3)},

@@ -400,7 +400,7 @@ REG cpu_reg[] = {
     { ORDATAD (FAULT_ADDR, fault_addr, 18, "Fault address"), REG_RO},
     { ORDATAD (OPC, opc, 36, "Saved PC and flags")},
     { ORDATAD (MAR, mar, 18, "Memory address register")},
-    { ORDATAD (QUA_TIME, qua_time, 36, "Quantum timer"), REG_RO},
+    { ORDATAD (QUA_TIME, qua_time, 32, "Quantum timer"), REG_RO},
 #endif
     { NULL }
     };
