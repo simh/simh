@@ -425,11 +425,11 @@ UNIT *timer_clk_unit = &timer_unit[1];
 
 REG timer_reg[] = {
     { HRDATAD(DIVA,  TIMERS[0].divider, 16, "Divider A") },
-    { HRDATAD(STA,   TIMERS[0].mode,    16, "Mode A")   },
+    { HRDATAD(STA,   TIMERS[0].mode,    8,  "Mode A")   },
     { HRDATAD(DIVB,  TIMERS[1].divider, 16, "Divider B") },
-    { HRDATAD(STB,   TIMERS[1].mode,    16, "Mode B")   },
+    { HRDATAD(STB,   TIMERS[1].mode,    8,  "Mode B")   },
     { HRDATAD(DIVC,  TIMERS[2].divider, 16, "Divider C") },
-    { HRDATAD(STC,   TIMERS[2].mode,    16, "Mode C")   },
+    { HRDATAD(STC,   TIMERS[2].mode,    8,  "Mode C")   },
     { NULL }
 };
 
