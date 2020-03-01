@@ -95,7 +95,7 @@ extern DEVICE ptr_dev;
 REG ptr_reg[] = {
     { GRDATAD (BUF,     ptr_unit.buf, DEV_RDX,  8, 0, "last data item processed") },
     { GRDATAD (CSR,          ptr_csr, DEV_RDX, 16, 0, "control/status register") },
-    { FLDATAD (INT,          int_req, INT_V_PTR,      "interrupt pending flag") },
+    { FLDATAD (INT,       IREQ (PTR), INT_V_PTR,      "interrupt pending flag") },
     { FLDATAD (ERR,          ptr_csr, CSR_V_ERR,      "error flag (CSR<15>)") },
     { FLDATAD (BUSY,         ptr_csr, CSR_V_BUSY,     "busy flag (CSR<11>)") },
     { FLDATAD (DONE,         ptr_csr, CSR_V_DONE,     "device done flag (CSR<7>)") },
@@ -148,7 +148,7 @@ UNIT ptp_unit = {
 REG ptp_reg[] = {
     { GRDATAD (BUF,     ptp_unit.buf, DEV_RDX,  8, 0, "last data item processed") },
     { GRDATAD (CSR,          ptp_csr, DEV_RDX, 16, 0, "control/status register") },
-    { FLDATAD (INT,          int_req, INT_V_PTP,      "interrupt pending flag") },
+    { FLDATAD (INT,       IREQ (PTP), INT_V_PTP,      "interrupt pending flag") },
     { FLDATAD (ERR,          ptp_csr, CSR_V_ERR,      "error flag (CSR<15>)") },
     { FLDATAD (DONE,         ptp_csr, CSR_V_DONE,     "device done flag (CSR<7>)") },
     { FLDATAD (IE,           ptp_csr, CSR_V_IE,       "interrupt enable flag (CSR<6>)") },
