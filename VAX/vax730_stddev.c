@@ -386,8 +386,6 @@ REG td_reg[] = {
     { DRDATAD (STIME,  td_regval,24, "seek, per block"), PV_LEFT },
     { DRDATAD (XTIME,  td_regval,24, "tr set time"), PV_LEFT },
     { DRDATAD (ITIME,  td_regval,24, "init time"), PV_LEFT },
-    { BRDATAD (IBUF,   &td_regval,16, 8, 512, "input buffer"), },
-    { BRDATAD (OBUF,   &td_regval,16, 8, 512, "output buffer"), },
     { NULL }
     };
 
