@@ -321,7 +321,7 @@ REG cpu_reg[] = {
     { FLDATA (VAXF, vax_flag, 0) },
     { FLDATA (PALMODE, pal_mode, 0) },
     { HRDATA (PALTYPE, pal_type, 2), REG_HRO },
-    { HRDATA (DMAPEN, dmapen, 0) },
+    { FLDATA (DMAPEN, dmapen, 0) },
     { HRDATA (AMASK, arch_mask, 13), REG_RO },
     { HRDATA (IMPLV, impl_ver, 2), REG_RO },
     { BRDATA (PCQ, pcq, 16, 32, PCQ_SIZE), REG_RO+REG_CIRC },
