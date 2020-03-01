@@ -1032,8 +1032,8 @@ static REG mpx_reg [] = {
     { BRDATA (ACKWAIT,  mpx_ack_wait,         10,    10,                    MPX_PORTS)                                },
     { BRDATA (PFLAGS,   mpx_flags,             2,    12,                    MPX_PORTS)                                },
 
-    { BRDATA (RBUF,     mpx_rbuf,              8,     8,                    MPX_PORTS * RD_BUF_SIZE), REG_A           },
-    { BRDATA (WBUF,     mpx_wbuf,              8,     8,                    MPX_PORTS * WR_BUF_SIZE), REG_A           },
+    { BRDATA (RBUF,     &mpx_rbuf,             8,     8,                    MPX_PORTS * RD_BUF_SIZE), REG_A           },
+    { BRDATA (WBUF,     &mpx_wbuf,             8,     8,                    MPX_PORTS * WR_BUF_SIZE), REG_A           },
 
     { BRDATA (GET,      mpx_get,              10,    10,                    MPX_PORTS * 2)                            },
     { BRDATA (SEP,      mpx_sep,              10,    10,                    MPX_PORTS * 2)                            },

@@ -562,7 +562,7 @@ static REG da_reg [] = {
     { BRDATA (ISTATE, if_state,   10, sizeof (IF_STATE) * CHAR_BIT,   DA_UNITS), PV_LEFT },
     { BRDATA (ICMD,   if_command, 10, sizeof (IF_COMMAND) * CHAR_BIT, DA_UNITS), PV_LEFT },
 
-    { BRDATA (CNVARS, icd_cntlr,  10, CHAR_BIT, sizeof (CNTLR_VARS) * DA_UNITS), REG_HRO },
+    { BRDATA (CNVARS, &icd_cntlr, 10, CHAR_BIT, sizeof (CNTLR_VARS) * DA_UNITS), REG_HRO },
 
     { NULL }
     };

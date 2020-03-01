@@ -99,13 +99,13 @@ REG tlb_reg[] = {
     { HRDATA (IASN, itlb_asn, ITB_ASN_WIDTH) },
     { HRDATA (INLU, itlb_nlu, ITLB_WIDTH) },
     { BRDATA (IMINI, &i_mini_tlb, 16, 32, TLB_ESIZE) },
-    { BRDATA (ITLB, itlb, 16, 32, ITLB_SIZE*TLB_ESIZE) },
+    { BRDATA (ITLB, &itlb, 16, 32, ITLB_SIZE*TLB_ESIZE) },
     { HRDATA (DCM, dtlb_cm, 2) },
     { HRDATA (DSPAGE, dtlb_spage, 2), REG_HRO },
     { HRDATA (DASN, dtlb_asn, DTB_ASN_WIDTH) },
     { HRDATA (DNLU, dtlb_nlu, DTLB_WIDTH) },
     { BRDATA (DMINI, &d_mini_tlb, 16, 32, TLB_ESIZE) },
-    { BRDATA (DTLB, dtlb, 16, 32, DTLB_SIZE*TLB_ESIZE) },
+    { BRDATA (DTLB, &dtlb, 16, 32, DTLB_SIZE*TLB_ESIZE) },
     { NULL }
     };
 
