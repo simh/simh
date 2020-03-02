@@ -1,6 +1,6 @@
 /* alpha_cpu.c: Alpha CPU simulator
 
-   Copyright (c) 2003-2017, Robert M Supnik
+   Copyright (c) 2003-2020, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   03-Mar-2020  RMS     Fixed DMAPEN register declaration (Mark Pizzolato)
    05-Oct-2017  RMS     Fixed reversed definitions of FTOIS, FTOIT (Maurice Marks)
    27-May-2017  RMS     Fixed MIN/MAXx4 iteration counts (Mark Pizzolato)
    26-May-2017  RMS     Fixed other reversed definitions in opcode 12
@@ -326,7 +327,7 @@ REG cpu_reg[] = {
     { FLDATA (VAXF, vax_flag, 0) },
     { FLDATA (PALMODE, pal_mode, 0) },
     { HRDATA (PALTYPE, pal_type, 2), REG_HRO },
-    { HRDATA (DMAPEN, dmapen, 0) },
+    { FLDATA (DMAPEN, dmapen, 0) },
     { HRDATA (AMASK, arch_mask, 13), REG_RO },
     { HRDATA (IMPLV, impl_ver, 2), REG_RO },
     { BRDATA (PCQ, pcq, 16, 32, PCQ_SIZE), REG_RO+REG_CIRC },
