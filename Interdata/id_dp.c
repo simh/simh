@@ -1,6 +1,6 @@
 /* id_dp.c: Interdata 2.5MB/10MB cartridge disk simulator
 
-   Copyright (c) 2001-2008, Robert M. Supnik
+   Copyright (c) 2001-2020, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dp           M46-421 2.5MB/10MB cartridge disk
 
+   01-Mar-20    RMS     Fixed xTIME register declarations (Mark Pizzolato)
    18-Mar-05    RMS     Added attached test to detach routine
    25-Jan-04    RMS     Revised for device debug support
    25-Apr-03    RMS     Revised for extended file support
@@ -206,9 +207,9 @@ REG dp_reg[] = {
     { GRDATA (IREQ, int_req[l_DPC], 16, DP_NUMDR + 1, i_DPC) },
     { GRDATA (IENB, int_enb[l_DPC], 16, DP_NUMDR + 1, i_DPC) },
     { BRDATA (IARM, dpd_arm, 16, 1, DP_NUMDR) },
-    { DRDATA (RTIME, dp_rtime, 0), PV_LEFT | REG_NZ },
-    { DRDATA (STIME, dp_stime, 0), PV_LEFT | REG_NZ },
-    { DRDATA (WTIME, dp_wtime, 0), PV_LEFT | REG_NZ },
+    { DRDATA (RTIME, dp_rtime, 24), PV_LEFT | REG_NZ },
+    { DRDATA (STIME, dp_stime, 24), PV_LEFT | REG_NZ },
+    { DRDATA (WTIME, dp_wtime, 24), PV_LEFT | REG_NZ },
     { URDATA (UCYL, dp_unit[0].CYL, 16, 9, 0,
               DP_NUMDR, REG_RO) },
     { URDATA (UST, dp_unit[0].STD, 16, 8, 0,
