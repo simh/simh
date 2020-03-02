@@ -1,6 +1,6 @@
 /* scp.c: simulator control program
 
-   Copyright (c) 1993-2019, Robert M Supnik
+   Copyright (c) 1993-2020, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   13-Feb-20    RMS     Spelled out CONTINUE in command table (Dave Bryan)
    26-Oct-19    RMS     Removed commented out MTAB_VAL code
    09-Oct-19    JDB     Corrected "sim_ref_type" use for RESTORE and DETACH ALL
    19-Jul-19    JDB     Added "sim_get_radix" extension hook
@@ -531,7 +532,7 @@ static CTAB cmd_table[] = {
       "go {new PC}              start simulation\n" }, 
     { "STEP", &run_cmd, RU_STEP,
       "s{tep} {n}               simulate n instructions\n" },
-    { "CONT", &run_cmd, RU_CONT,
+    { "CONTINUE", &run_cmd, RU_CONT,
       "c{ont}                   continue simulation\n" },
     { "BOOT", &run_cmd, RU_BOOT,
       "b{oot} <unit>            bootstrap unit\n" },

@@ -41,13 +41,18 @@ patch   date            module(s) and fix(es)
 
   0     01-Dec-2019     scp.c and supporting libraries
                         - new features and extensions to support the HP simulators
+                        - lengthened CONT to CONTNIUE for V4.x compatibility
 
                         sim_sock.c
                         - latest bug fixes from V4.x
 
+                        PDP-11
+                        - fixed race condition in DZ11 (Mark Pizzolato)
+
                         VAX
                         - added hook for unpredictable indexed immediate in .aw flows
                         - revamped Qbus memory simulation to behave as a Qbus peripheral
+*/
 
 /* V3.10 revision history
 
