@@ -47,11 +47,11 @@ simulation work and for Dave Bryan's HP simulators.
 
 1.7 HP3000
 
-- New release (from Dave Bryan).
+- New release (from Dave Bryan). Moved to its own subsite.
 
 1.8 HP2100
 
-- New release (from Dave Bryan).
+- New release (from Dave Bryan). Move to its own subsite.
 
 1.9 AltairZ80, IBM 1130, SWTP 6800
 
