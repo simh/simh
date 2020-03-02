@@ -1,6 +1,6 @@
 /* pdp11_pt.c: PC11 paper tape reader/punch simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2020, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    ptr          paper tape reader
    ptp          paper tape punch
 
+   01-Mar-05    RMS     Fixed INT register definitions (Mark Pizzolato)
    07-Jul-05    RMS     Removed extraneous externs
    19-May-03    RMS     Revised for new conditional compilation scheme
    25-Apr-03    RMS     Revised for extended file support
@@ -91,7 +92,7 @@ UNIT ptr_unit = {
 REG ptr_reg[] = {
     { GRDATA (BUF, ptr_unit.buf, DEV_RDX, 8, 0) },
     { GRDATA (CSR, ptr_csr, DEV_RDX, 16, 0) },
-    { FLDATA (INT, int_req, INT_V_PTR) },
+    { FLDATA (INT, IREQ (PTR), INT_V_PTR) },
     { FLDATA (ERR, ptr_csr, CSR_V_ERR) },
     { FLDATA (BUSY, ptr_csr, CSR_V_BUSY) },
     { FLDATA (DONE, ptr_csr, CSR_V_DONE) },
@@ -139,7 +140,7 @@ UNIT ptp_unit = {
 REG ptp_reg[] = {
     { GRDATA (BUF, ptp_unit.buf, DEV_RDX, 8, 0) },
     { GRDATA (CSR, ptp_csr, DEV_RDX, 16, 0) },
-    { FLDATA (INT, int_req, INT_V_PTP) },
+    { FLDATA (INT, IREQ (PTP), INT_V_PTP) },
     { FLDATA (ERR, ptp_csr, CSR_V_ERR) },
     { FLDATA (DONE, ptp_csr, CSR_V_DONE) },
     { FLDATA (IE, ptp_csr, CSR_V_IE) },
