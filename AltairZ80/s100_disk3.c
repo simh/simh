@@ -224,7 +224,7 @@ static REG disk3_reg[] = {
                "Link address for next IOPB"),                   },
     { HRDATAD (DMA_ADDR,   disk3_info_data.dma_addr,  32,
                "DMA address for the current IOPB"),             },
-    { BRDATAD (IOPB,       &disk3_info_data.iopb[DISK3_IOPB_CMD],  16, 8, 16,
+    { BRDATAD (IOPB,       &disk3_info_data.iopb,     16, 8, 16,
                "IOPB command register"), }                      ,
     { NULL }
 };
