@@ -105,12 +105,12 @@ static uint8 if3_risr[IF3_MAX_BOARDS] = { 0, 0, 0, 0 };
 static uint8 if3_tisr[IF3_MAX_BOARDS] = { 0, 0, 0, 0 };
 
 static REG if3_reg[] = {
-    { HRDATAD (USER,     if3_user,       3, "IF3 user register"), },
-    { HRDATAD (BOARD,    if3_board,      2, "IF3 board register"), },
-    { BRDATAD (RIMR,     &if3_rimr,      16, 8, 4, "IF3 RIMR register array"), },
-    { BRDATAD (RISR,     &if3_risr,      16, 8, 4, "IF3 RISR register array"), },
-    { BRDATAD (TIMR,     &if3_timr,      16, 8, 4, "IF3 TIMR register array"), },
-    { BRDATAD (TISR,     &if3_tisr,      16, 8, 4, "IF3 TISR register array"), },
+    { HRDATAD (USER,    if3_user,   3,                      "IF3 user register"),       },
+    { HRDATAD (BOARD,   if3_board,  2,                      "IF3 board register"),      },
+    { BRDATAD (RIMR,    &if3_rimr,  16, 8, IF3_MAX_BOARDS,  "IF3 RIMR register array"), },
+    { BRDATAD (RISR,    &if3_risr,  16, 8, IF3_MAX_BOARDS,  "IF3 RISR register array"), },
+    { BRDATAD (TIMR,    &if3_timr,  16, 8, IF3_MAX_BOARDS,  "IF3 TIMR register array"), },
+    { BRDATAD (TISR,    &if3_tisr,  16, 8, IF3_MAX_BOARDS,  "IF3 TISR register array"), },
     { NULL }
 };
 
