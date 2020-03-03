@@ -1369,7 +1369,7 @@ static void setClockZSDOS(void) {
     newTime.tm_min  = fromBCD(GetBYTEWrapper(setClockZSDOSAdr + 4));
     newTime.tm_sec  = fromBCD(GetBYTEWrapper(setClockZSDOSAdr + 5));
     newTime.tm_isdst = 0;
-    ClockZSDOSDelta = mktime(&newTime) - time(NULL);
+    ClockZSDOSDelta = (int32)(mktime(&newTime) - time(NULL));
 }
 
 #define SECONDS_PER_MINUTE  60
@@ -1404,7 +1404,7 @@ static void setClockCPM3(void) {
     targetDate.tm_hour = fromBCD(GetBYTEWrapper(setClockCPM3Adr + 2));
     targetDate.tm_min = fromBCD(GetBYTEWrapper(setClockCPM3Adr + 3));
     targetDate.tm_sec = fromBCD(GetBYTEWrapper(setClockCPM3Adr + 4));
-    ClockCPM3Delta = mktime(&targetDate) - time(NULL);
+    ClockCPM3Delta = (int32)(mktime(&targetDate) - time(NULL));
 }
 
 static int32 simh_in(const int32 port) {
