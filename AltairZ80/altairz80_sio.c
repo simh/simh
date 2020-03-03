@@ -178,13 +178,13 @@ static DEBTAB generic_dt[] = {
 
 /* SIMH pseudo device status registers                                                                          */
 /* ZSDOS clock definitions                                                                                      */
-static time_t ClockZSDOSDelta       = 0;        /* delta between real clock and Altair clock                    */
+static int32 ClockZSDOSDelta        = 0;        /* delta between real clock and Altair clock                    */
 static int32 setClockZSDOSPos       = 0;        /* determines state for receiving address of parameter block    */
 static int32 setClockZSDOSAdr       = 0;        /* address in M of 6 byte parameter block for setting time      */
 static int32 getClockZSDOSPos       = 0;        /* determines state for sending clock information               */
 
 /* CPM3 clock definitions                                                                                       */
-static time_t ClockCPM3Delta        = 0;        /* delta between real clock and Altair clock                    */
+static int32 ClockCPM3Delta         = 0;        /* delta between real clock and Altair clock                    */
 static int32 setClockCPM3Pos        = 0;        /* determines state for receiving address of parameter block    */
 static int32 setClockCPM3Adr        = 0;        /* address in M of 5 byte parameter block for setting time      */
 static int32 getClockCPM3Pos        = 0;        /* determines state for sending clock information               */
@@ -1369,7 +1369,7 @@ static void setClockZSDOS(void) {
     newTime.tm_min  = fromBCD(GetBYTEWrapper(setClockZSDOSAdr + 4));
     newTime.tm_sec  = fromBCD(GetBYTEWrapper(setClockZSDOSAdr + 5));
     newTime.tm_isdst = 0;
-    ClockZSDOSDelta = mktime(&newTime) - time(NULL);
+    ClockZSDOSDelta = (int32)(mktime(&newTime) - time(NULL));
 }
 
 #define SECONDS_PER_MINUTE  60
@@ -1404,7 +1404,7 @@ static void setClockCPM3(void) {
     targetDate.tm_hour = fromBCD(GetBYTEWrapper(setClockCPM3Adr + 2));
     targetDate.tm_min = fromBCD(GetBYTEWrapper(setClockCPM3Adr + 3));
     targetDate.tm_sec = fromBCD(GetBYTEWrapper(setClockCPM3Adr + 4));
-    ClockCPM3Delta = mktime(&targetDate) - time(NULL);
+    ClockCPM3Delta = (int32)(mktime(&targetDate) - time(NULL));
 }
 
 static int32 simh_in(const int32 port) {
