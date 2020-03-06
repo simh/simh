@@ -173,27 +173,27 @@ static UNIT ss1_unit[] = {
 };
 
 static REG ss1_reg[] = {
-    { HRDATAD (MPIC_IMR,   ss1_pic[MASTER_PIC].IMR,            8, "Master IMR register"),       },
-    { HRDATAD (MPIC_IRR,   ss1_pic[MASTER_PIC].IRR,            8, "Master IRR register"),       },
-    { HRDATAD (MPIC_ISR,   ss1_pic[MASTER_PIC].ISR,            8, "Master ISR register"),       },
-    { HRDATAD (MPIC_OCW2,  ss1_pic[MASTER_PIC].OCW2,           8, "Master OCW2 register"),      },
-    { HRDATAD (MPIC_OCW3,  ss1_pic[MASTER_PIC].OCW3,           8, "Master OCW3 register"),      },
+    { HRDATAD (MPIC_IMR,   ss1_pic[MASTER_PIC].IMR,     8,  "Master IMR register"),     },
+    { HRDATAD (MPIC_IRR,   ss1_pic[MASTER_PIC].IRR,     8,  "Master IRR register"),     },
+    { HRDATAD (MPIC_ISR,   ss1_pic[MASTER_PIC].ISR,     8,  "Master ISR register"),     },
+    { HRDATAD (MPIC_OCW2,  ss1_pic[MASTER_PIC].OCW2,    8,  "Master OCW2 register"),    },
+    { HRDATAD (MPIC_OCW3,  ss1_pic[MASTER_PIC].OCW3,    8,  "Master OCW3 register"),    },
 
-    { HRDATAD (SPIC_IMR,   ss1_pic[SLAVE_PIC].IMR,             8, "Slave IMR register"),        },
-    { HRDATAD (SPIC_IRR,   ss1_pic[SLAVE_PIC].IRR,             8, "Slave IRR register"),        },
-    { HRDATAD (SPIC_ISR,   ss1_pic[SLAVE_PIC].ISR,             8, "Slave ISR register"),        },
-    { HRDATAD (SPIC_OCW2,  ss1_pic[SLAVE_PIC].OCW2,            8, "Slave OCW2 register"),       },
-    { HRDATAD (SPIC_OCW3,  ss1_pic[SLAVE_PIC].OCW3,            8, "Slave OCW3 register"),       },
+    { HRDATAD (SPIC_IMR,   ss1_pic[SLAVE_PIC].IMR,      8,  "Slave IMR register"),      },
+    { HRDATAD (SPIC_IRR,   ss1_pic[SLAVE_PIC].IRR,      8,  "Slave IRR register"),      },
+    { HRDATAD (SPIC_ISR,   ss1_pic[SLAVE_PIC].ISR,      8,  "Slave ISR register"),      },
+    { HRDATAD (SPIC_OCW2,  ss1_pic[SLAVE_PIC].OCW2,     8,  "Slave OCW2 register"),     },
+    { HRDATAD (SPIC_OCW3,  ss1_pic[SLAVE_PIC].OCW3,     8,  "Slave OCW3 register"),     },
 
-    { HRDATAD (T0_MODE,    ss1_tc[0].mode,                     3, "Timer 0 mode register"),     },
-    { HRDATAD (T0_COUNT,   ss1_tc[0].count,                    16, "Timer 0 count register"),   },
-    { HRDATAD (T1_MODE,    ss1_tc[1].mode,                     3, "Timer 1 mode register"),     },
-    { HRDATAD (T1_COUNT,   ss1_tc[1].count,                    16, "Timer 1 count register"),   },
-    { HRDATAD (T2_MODE,    ss1_tc[2].mode,                     3, "Timer 2 mode register"),     },
-    { HRDATAD (T2_COUNT,   ss1_tc[2].count,                    16, "Timer 2 count register"),   },
+    { HRDATAD (T0_MODE,    ss1_tc[0].mode[0],           3,  "Timer 0 mode register"),   },
+    { HRDATAD (T0_COUNT,   ss1_tc[0].count[0],          16, "Timer 0 count register"),  },
+    { HRDATAD (T1_MODE,    ss1_tc[0].mode[1],           3,  "Timer 1 mode register"),   },
+    { HRDATAD (T1_COUNT,   ss1_tc[0].count[1],          16, "Timer 1 count register"),  },
+    { HRDATAD (T2_MODE,    ss1_tc[0].mode[2],           3,  "Timer 2 mode register"),   },
+    { HRDATAD (T2_COUNT,   ss1_tc[0].count[2],          16, "Timer 2 count register"),  },
 
-    { HRDATAD (RTC_DIGIT,  ss1_rtc[0].digit_sel,               4, "Digit selector register"),   },
-    { HRDATAD (RTC_FLAGS,  ss1_rtc[0].flags,                   4, "Flags register"),            },
+    { HRDATAD (RTC_DIGIT,  ss1_rtc[0].digit_sel,        4,  "Digit selector register"), },
+    { HRDATAD (RTC_FLAGS,  ss1_rtc[0].flags,            4,  "Flags register"),          },
 
     { NULL }
 };

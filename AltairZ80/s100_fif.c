@@ -93,7 +93,7 @@ static REG fif_reg[] = {
                "Current selected disk")                                                     },
     { DRDATAD (DSKWL,        warnLevelDSK, 32,
                "Warn level register")                                                       },
-    { BRDATAD (WARNATTACHED, &warnAttached,  10, 32, NUM_OF_DSK,
+    { BRDATAD (WARNATTACHED, warnAttached,  10, 32, NUM_OF_DSK,
                "Count for selection of unattached disk register array"), REG_CIRC + REG_RO  },
     { DRDATAD (WARNDSK11,    warnDSK11, 4,
                "Count of IN/OUT(9) on unattached disk register"), REG_RO                    },

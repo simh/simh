@@ -429,7 +429,7 @@ REG cpu_reg[] = {
         REG_RO              }, /* 77 */
     { HRDATAD (PREVCAP,  previousCapacity,   32, "Previous size of RAM pseudo register"),
         REG_RO              }, /* 78 */
-    { BRDATAD (PCQ,      &pcq, 16, 16, PCQ_SIZE, "Program counter circular buffer for 8080 /Z80 pseudo register"),
+    { BRDATAD (PCQ,      pcq, 16, 16, PCQ_SIZE, "Program counter circular buffer for 8080 /Z80 pseudo register"),
         REG_RO + REG_CIRC   }, /* 79 */
     { DRDATAD (PCQP,     pcq_p,          PCQ_SIZE_LOG2, "Circular buffer head for 8080 / Z80 pseudo register"),
         REG_HRO             }, /* 80 */
