@@ -3840,7 +3840,7 @@ else
 /* test reflections.  This is done early in this routine since eth_reflect */
 /* calls eth_filter recursively and thus changes the state of the device. */
 if (dev->reflections == -1)
-  eth_reflect(dev);
+  status = eth_reflect(dev);
 
 /* set new filter addresses */
 for (i = 0; i < addr_count; i++)
