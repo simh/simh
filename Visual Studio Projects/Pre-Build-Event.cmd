@@ -62,8 +62,8 @@ goto _next_arg
 pushd ..
 if "%_X_ROM%" == "" goto _done_rom
 SET _BLD=
-if exist BIN\NT\Win32-Debug\BuildROMs.exe SET _BLD=BIN\NT\Win32-Debug\BuildROMs.exe
-if exist BIN\NT\Win32-Release\BuildROMs.exe SET _BLD=BIN\NT\Win32-Release\BuildROMs.exe
+if exist BIN\NT\Win32-Debug\BuildTools\BuildROMs.exe SET _BLD=BIN\NT\Win32-Debug\BuildTools\BuildROMs.exe
+if exist BIN\NT\Win32-Release\BuildTools\BuildROMs.exe SET _BLD=BIN\NT\Win32-Release\BuildTools\BuildROMs.exe
 if "%_BLD%" == "" echo ************************************************
 if "%_BLD%" == "" echo ************************************************
 if "%_BLD%" == "" echo **  Project dependencies are not correct.     **
@@ -74,8 +74,8 @@ if "%_BLD%" == "" echo error: Review the Output Tab for more details.
 if "%_BLD%" == "" exit 1
 %_BLD%
 if not errorlevel 1 goto _done_rom
-if not exist "BIN\NT\Win32-Release\BuildROMs.exe" exit 1
-del "BIN\NT\Win32-Release\BuildROMs.exe"
+if not exist "BIN\NT\Win32-Release\BuildTools\BuildROMs.exe" exit 1
+del "BIN\NT\Win32-Release\BuildTools\BuildROMs.exe"
 popd
 goto _do_rom
 :_done_rom

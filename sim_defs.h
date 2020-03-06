@@ -951,6 +951,13 @@ struct MEMFILE {
     _REGDATANF(#nm,loc,rdx,wd,0,dep,desc,NULL,0,0)
 #define BRDATADF(nm,loc,rdx,wd,dep,desc,flds) \
     _REGDATANF(#nm,loc,rdx,wd,0,dep,desc,flds,0,0)
+/* Range of memory whose data is successive scalar values accessed like an array Register */
+#define VBRDATA(nm,loc,rdx,wd,dep) \
+    _REGDATANF(#nm,&(loc),rdx,wd,0,dep,NULL,NULL,0,0)
+#define VBRDATAD(nm,loc,rdx,wd,dep,desc) \
+    _REGDATANF(#nm,&(loc),rdx,wd,0,dep,desc,NULL,0,0)
+#define VBRDATADF(nm,loc,rdx,wd,dep,desc,flds) \
+    _REGDATANF(#nm,&(loc),rdx,wd,0,dep,desc,flds,0,0)
 /* Arrayed register whose data is part of the UNIT structure */
 #define URDATA(nm,loc,rdx,wd,off,dep,fl) \
     _REGDATANF(#nm,&(loc),rdx,wd,off,dep,NULL,NULL,0,0),((fl) | REG_UNIT)
@@ -965,6 +972,9 @@ struct MEMFILE {
     _REGDATANF(#nm,&(loc),rdx,wd,off,dep,desc,NULL,0,siz),((fl) | REG_STRUCT)
 #define STRDATADF(nm,loc,rdx,wd,off,dep,siz,fl,desc,flds) \
     _REGDATANF(#nm,&(loc),rdx,wd,off,dep,desc,flds,0,siz),((fl) | REG_STRUCT)
+/* Hidden Blob of Data - Only used for SAVE/RESTORE */
+#define SAVEDATA(nm,loc) \
+    _REGDATANF(#nm,&(loc),0,8,0,sizeof(loc),NULL,NULL,0,sizeof(loc)),(REG_HRO)
 #define BIT(nm)              {#nm, 0xffffffff, 1,  NULL, NULL}  /* Single Bit definition */
 #define BITNC                {"",  0xffffffff, 1,  NULL, NULL}  /* Don't care Bit definition */
 #define BITF(nm,sz)          {#nm, 0xffffffff, sz, NULL, NULL}  /* Bit Field definition */
@@ -1028,6 +1038,13 @@ struct MEMFILE {
     _REGDATANF("nm",loc,rdx,wd,0,dep,desc,NULL,0,0)
 #define BRDATADF(nm,loc,rdx,wd,dep,desc,flds) \
     _REGDATANF("nm",loc,rdx,wd,0,dep,desc,flds,0,0)
+/* Range of memory whose data is successive scalar values accessed like an array Register */
+#define VBRDATA(nm,loc,rdx,wd,dep) \
+    _REGDATANF("nm",&(loc),rdx,wd,0,dep,NULL,NULL,0,0)
+#define VBRDATAD(nm,loc,rdx,wd,dep,desc) \
+    _REGDATANF("nm",&(loc),rdx,wd,0,dep,desc,NULL,0,0)
+#define VBRDATADF(nm,loc,rdx,wd,dep,desc,flds) \
+    _REGDATANF("nm",&(loc),rdx,wd,0,dep,desc,flds,0,0)
 /* Arrayed register whose data is part of the UNIT structure */
 #define URDATA(nm,loc,rdx,wd,off,dep,fl) \
     _REGDATANF("nm",&(loc),rdx,wd,off,dep,NULL,NULL,0,0),((fl) | REG_UNIT)
@@ -1042,6 +1059,9 @@ struct MEMFILE {
     _REGDATANF("nm",&(loc),rdx,wd,off,dep,desc,NULL,0,siz),((fl) | REG_STRUCT)
 #define STRDATADF(nm,loc,rdx,wd,off,dep,siz,fl,desc,flds) \
     _REGDATANF("nm",&(loc),rdx,wd,off,dep,desc,flds,0,siz),((fl) | REG_STRUCT)
+/* Hidden Blob of Data - Only used for SAVE/RESTORE */
+#define SAVEDATA(nm,loc) \
+    _REGDATANF("nm",&(loc),0,8,0,sizeof(loc),NULL,NULL,0,sizeof(loc)),(REG_HRO)
 #define BIT(nm)              {"nm", 0xffffffff, 1,  NULL, NULL} /* Single Bit definition */
 #define BITNC                {"",   0xffffffff, 1,  NULL, NULL} /* Don't care Bit definition */
 #define BITF(nm,sz)          {"nm", 0xffffffff, sz, NULL, NULL} /* Bit Field definition */

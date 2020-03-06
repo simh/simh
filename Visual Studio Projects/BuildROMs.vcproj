@@ -18,7 +18,7 @@
 	<Configurations>
 		<Configuration
 			Name="Debug|Win32"
-			OutputDirectory="..\BIN\NT\$(PlatformName)-$(ConfigurationName)"
+			OutputDirectory="..\BIN\NT\$(PlatformName)-$(ConfigurationName)\BuildTools"
 			IntermediateDirectory="..\BIN\NT\Project\simh\$(ProjectName)\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
 			CharacterSet="0"
@@ -99,7 +99,7 @@
 		</Configuration>
 		<Configuration
 			Name="Release|Win32"
-			OutputDirectory="..\BIN\NT\$(PlatformName)-$(ConfigurationName)"
+			OutputDirectory="..\BIN\NT\$(PlatformName)-$(ConfigurationName)\BuildTools"
 			IntermediateDirectory="..\BIN\NT\Project\simh\$(ProjectName)\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
 			CharacterSet="0"

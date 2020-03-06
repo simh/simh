@@ -563,6 +563,7 @@ t_stat set_prompt (int32 flag, CONST char *cptr);
 t_stat set_runlimit (int32 flag, CONST char *cptr);
 t_stat sim_set_asynch (int32 flag, CONST char *cptr);
 static const char *_get_dbg_verb (uint32 dbits, DEVICE* dptr, UNIT *uptr);
+static t_stat sim_sanity_check_register_declarations (void);
 static t_stat sim_library_unit_tests (void);
 static t_stat _sim_debug_flush (void);
 
@@ -2592,6 +2593,7 @@ char nbuf[PATH_MAX + 7];
 char **targv = NULL;
 int32 i, sw;
 t_bool lookswitch;
+t_bool register_check = FALSE;
 t_stat stat = SCPE_OK;
 
 #if defined (__MWERKS__) && defined (macintosh)
@@ -2609,6 +2611,15 @@ sim_switches = 0;                                       /* init switches */
 lookswitch = TRUE;
 stdnul = fopen(NULL_DEVICE,"wb");
 sim_prog_name = argv [0];                               /* save a pointer to the program name */
+if (argc > 1) {                                         /* Check for special argument to invoke register test */
+    if (sim_strcasecmp (argv[1], "RegisterSanityCheck") == 0) {
+        register_check = TRUE;
+        --argc;                                         /* Remove special argument to avoid confusion later */
+        for (i = 1; i < argc; i++)
+            argv[i] = argv[i+1];
+        argv[i+1] = NULL;
+        }
+    }
 for (i = 1; i < argc; i++) {                            /* loop thru args */
     if (argv[i] == NULL)                                /* paranoia */
         continue;
@@ -2632,9 +2643,24 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
         lookswitch = FALSE;                             /* no more switches */
         }
     }                                                   /* end for */
+if (*argv[0]) {                                         /* sim name arg? */
+    char *np;                                           /* "path.ini" */
+
+    strlcpy (nbuf, argv[0], PATH_MAX + 2);              /* copy sim name */
+    if ((np = (char *)match_ext (nbuf, "EXE")))         /* remove .exe */
+        *np = 0;
+    np = strrchr (nbuf, '/');                           /* stript path and try again in cwd */
+    if (np == NULL)
+        np = strrchr (nbuf, '\\');                      /* windows path separator */
+    if (np == NULL)
+        np = strrchr (nbuf, ']');                       /* VMS path separator */
+    if (np != NULL)
+        setenv ("SIM_BIN_NAME", np+1, 1);               /* Publish simulator binary name */
+    setenv ("SIM_BIN_PATH", argv[0], 1);
+    }
+
 sim_quiet = sim_switches & SWMASK ('Q');                /* -q means quiet */
 sim_on_inherit = sim_switches & SWMASK ('O');           /* -o means inherit on state */
-
 
 sim_init_sock ();                                       /* init socket capabilities */
 AIO_INIT;                                               /* init Asynch I/O */
@@ -2665,12 +2691,14 @@ sim_register_internal_device (&sim_runlimit_dev);
 if ((stat = sim_ttinit ()) != SCPE_OK) {
     fprintf (stderr, "Fatal terminal initialization error\n%s\n",
         sim_error_text (stat));
-    read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
+    if (sim_ttisatty())
+        read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
     return EXIT_FAILURE;
     }
 if ((sim_eval = (t_value *) calloc (sim_emax, sizeof (t_value))) == NULL) {
     fprintf (stderr, "Unable to allocate examine buffer\n");
-    read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
+    if (sim_ttisatty())
+        read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
     return EXIT_FAILURE;
     };
 if (sim_dflt_dev == NULL)                               /* if no default */
@@ -2678,15 +2706,48 @@ if (sim_dflt_dev == NULL)                               /* if no default */
 if ((stat = reset_all_p (0)) != SCPE_OK) {
     fprintf (stderr, "Fatal simulator initialization error\n%s\n",
         sim_error_text (stat));
+    if (sim_ttisatty())
+        read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
+    return EXIT_FAILURE;
+    }
+if (register_check) {
+    /* This test is explicitly run after the above reset_all_p() so that any devices 
+       which dynamically manipulate their register lists have already done that. */
+    sim_printf (" Running internal register sanity checks on %s simulator.\n", sim_name);
+    if ((stat = sim_sanity_check_register_declarations ()) != SCPE_OK) {
+        sim_printf ("Simulator device register sanity check error\n");
+        if (sim_ttisatty())
+            read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
+        return EXIT_FAILURE;
+        }
+    sim_printf ("*** Good Registers in %s simulator.\n", sim_name);
+    if (argc < 2)                                   /* No remaining command arguments? */
+        return EXIT_SUCCESS;                        /* then we're done */
+    }
+if (sim_timer_init ()) {
+    fprintf (stderr, "Fatal timer initialization error\n");
     read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
+    return EXIT_FAILURE;
+    }
+/* Invoke power reset again in case some devices depend on timer 
+   initialization having occurred */
+if ((stat = reset_all_p (0)) != SCPE_OK) {
+    fprintf (stderr, "Fatal simulator initialization error\n%s\n",
+        sim_error_text (stat));
+    if (sim_ttisatty())
+        read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
     return EXIT_FAILURE;
     }
 if ((stat = sim_brk_init ()) != SCPE_OK) {
     fprintf (stderr, "Fatal breakpoint table initialization error\n%s\n",
         sim_error_text (stat));
-    read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
+    if (sim_ttisatty())
+        read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
     return EXIT_FAILURE;
     }
+/* always check for register definition problems */
+sim_sanity_check_register_declarations ();
+
 signal (SIGINT, int_handler);
 if (!sim_quiet) {
     printf ("\n");
@@ -2697,21 +2758,6 @@ show_version (stdnul, NULL, NULL, 1, NULL);             /* Quietly set SIM_OSTYP
 #if defined (HAVE_PCRE_H)
 setenv ("SIM_REGEX_TYPE", "PCRE", 1);                   /* Publish regex type */
 #endif
-if (*argv[0]) {                                         /* sim name arg? */
-    char *np;                                           /* "path.ini" */
-
-    strlcpy (nbuf, argv[0], PATH_MAX + 2);              /* copy sim name */
-    if ((np = (char *)match_ext (nbuf, "EXE")))         /* remove .exe */
-        *np = 0;
-    np = strrchr (nbuf, '/');                           /* stript path and try again in cwd */
-    if (np == NULL)
-        np = strrchr (nbuf, '\\');                      /* windows path separator */
-    if (np == NULL)
-        np = strrchr (nbuf, ']');                       /* VMS path separator */
-    if (np != NULL)
-        setenv ("SIM_BIN_NAME", np+1, 1);               /* Publish simulator binary name */
-    setenv ("SIM_BIN_PATH", argv[0], 1);
-    }
 sim_argv = argv;
 
 if (sim_switches & SWMASK ('T'))                       /* Command Line -T switch */
@@ -5051,7 +5097,7 @@ const char *cptr;
 if (NULL == sim_gotofile) return SCPE_UNK;              /* only valid inside of do_cmd */
 cptr = get_glyph (fcptr, gbuf, 0);
 if ('\0' == gbuf[0]) return SCPE_ARG;                   /* unspecified goto target */
-snprintf(cbuf, sizeof (cbuf), "%s %s", sim_do_filename[sim_do_depth], cptr);
+snprintf (cbuf, sizeof (cbuf), "%s %s", sim_do_filename[sim_do_depth], cptr);
 sim_switches |= SWMASK ('O');                           /* inherit ON state and actions */
 return do_cmd_label (flag, cbuf, gbuf);
 }
@@ -14971,6 +15017,186 @@ if (sim_rand_seed < 0)
 return (sim_rand_seed - 1);
 }
 
+
+typedef struct MFILE {
+    char *buf;
+    size_t pos;
+    size_t size;
+    } MFILE;
+
+static int Mprintf (MFILE *f, const char* fmt, ...)
+{
+    va_list arglist;
+    int len;
+
+    while (f) {
+        size_t buf_space = (f->size - f->pos);
+
+        va_start (arglist, fmt);
+#if defined(NO_vsnprintf)
+        len = vsprintf (f->buf + f->pos, fmt, arglist);
+#else                                                   /* !defined(NO_vsnprintf) */
+        len = vsnprintf (f->buf + f->pos, buf_space, fmt, arglist);
+#endif                                                  /* NO_vsnprintf */
+        va_end (arglist);
+
+        if ((len < 0) || (len >= (int)buf_space)) {
+            f->size *= 2;
+            buf_space = (f->size - f->pos);
+            if ((int)buf_space < len + 2)
+                f->size += len + 2;
+            f->buf = (char *)realloc (f->buf, f->size + 1);
+            if (f->buf == NULL)            /* out of memory */
+                return -1;
+            f->buf[f->size-1] = '\0';
+            continue;
+            }
+        f->pos += len;
+        break;
+    }
+return 0;
+}
+
+static MFILE *
+MOpen ()
+{
+return (MFILE *)calloc (1, sizeof (MFILE));
+}
+
+void
+MFlush (MFILE *f)
+{
+f->pos = 0;
+}
+
+static int
+FMwrite (FILE *fout, MFILE *fdata)
+{
+int ret = fwrite (fdata->buf, 1, fdata->pos, fout);
+
+MFlush (fdata);
+return ret;
+}
+
+static void
+MClose (MFILE *f)
+{
+free (f->buf);
+free (f);
+}
+
+/*
+ * This sanity check walks through the all of simulator's device registers
+ * to verify that each contains a reasonable description of a method to 
+ * access the devices simulator data and that description stays within the 
+ * device state variables it is supposed to reference.
+ */
+
+static t_stat sim_sanity_check_register_declarations (void)
+{
+t_stat stat = SCPE_OK;
+#if 0       /* Disabled for now */
+int i;
+DEVICE *dptr;
+MFILE *f = MOpen ();
+
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+    REG *rptr;
+
+    for (rptr = dptr->registers; (rptr != NULL) && (rptr->name != NULL); rptr++) {
+        uint32 bytes = 1;
+        uint32 rsz = SZ_R(rptr);
+        uint32 memsize = ((rptr->flags & REG_FIT) || (rptr->depth > 1)) ? rptr->depth * rsz : 4;
+        DEVICE *udptr = NULL;
+        t_bool Bad;
+
+        while ((bytes << 3) < rptr->offset + rptr->width)
+            bytes <<= 1;
+
+        if (rptr->depth > 1)
+            bytes = rptr->ele_size;
+
+        if (rptr->flags & REG_UNIT) {
+            DEVICE **d;
+
+            for (d = sim_devices; *d != NULL; d++) {
+                if (((UNIT *)rptr->loc >= (*d)->units) &&
+                    ((UNIT *)rptr->loc < (*d)->units + (*d)->numunits)) {
+                    udptr = *d;
+                    break;
+                    }
+                }
+            }
+        if (((rptr->width + rptr->offset + CHAR_BIT - 1) / CHAR_BIT) >= sizeof(size_map) / sizeof(size_map[0])) {
+            Bad = TRUE;
+            rsz = 0;
+            }
+        else {
+            Bad = FALSE;
+            rsz = SZ_R(rptr);
+            }
+
+        if (sim_switches & SWMASK ('R'))            /* Debug output */
+            sim_printf ("%5s:%-9.9s %s(rdx=%u, wd=%u, off=%u, dep=%u, strsz=%u, objsz=%u, elesz=%u, rsz=%u, %s %s%s%s membytes=%u)\n", dptr->name, rptr->name, rptr->macro, 
+                        rptr->radix, rptr->width, rptr->offset, rptr->depth, (uint32)rptr->str_size, (uint32)rptr->obj_size, (uint32)rptr->ele_size, rsz, rptr->desc ? rptr->desc : "",
+                        (rptr->flags & REG_FIT) ? "REG_FIT" : "", (rptr->flags & REG_VMIO) ? " REG_VMIO" : "", (rptr->flags & REG_STRUCT) ? " REG_STRUCT" : "",
+                        memsize);
+
+        MFlush (f);
+        if (rptr->depth == 1) {
+            if (rptr->offset)
+                Mprintf (f, "%s %s:%s used the %s macro to describe a %u bit%s wide field at offset %u\n", sim_name, dptr->name, rptr->name, rptr->macro, rptr->width, (rptr->width == 1) ? "" : "s", rptr->offset);
+            else
+                Mprintf (f, "%s %s:%s used the %s macro to describe a %u bit wide field\n", sim_name, dptr->name, rptr->name, rptr->macro, rptr->width);
+            }
+        else
+            Mprintf (f, "%s %s:%s used the %s macro to describe a %u bit%s wide and %u elements deep array\n", sim_name, dptr->name, rptr->name, rptr->macro, rptr->width, (rptr->width == 1) ? "" : "s", rptr->depth);
+        if (rsz > sizeof (t_value)) {
+            Bad = TRUE;
+            Mprintf (f, "%u bits at offset %u is wider than the maximum allowed width of %u bits\n", rptr->width, rptr->offset, (uint32)(8 * sizeof(t_value)));
+            }
+        if ((rptr->obj_size != 0) && (rptr->ele_size != 0) && (rptr->depth != 0) && (rptr->macro != NULL)) {
+            if (rptr->flags & REG_UNIT) {
+                if (rptr->depth > udptr->numunits) {
+                    Bad = TRUE;
+                    Mprintf (f, "\tthe depth of the UNIT array exceeds the number of units on the %s device which is %u\n", dptr->name, udptr->numunits);
+                    }
+                if (rptr->obj_size > sizeof (t_value)) {
+                    Bad = TRUE;
+                    Mprintf (f, "\t%u is larger than the size of the t_value type (%u)\n", (uint32)rptr->obj_size, (uint32)sizeof (t_value));
+                    }
+                }
+            else {
+                bytes *= rptr->depth;
+                if (!Bad) 
+                    if ((rsz * rptr->depth == rptr->obj_size)                                       ||
+                        ((rptr->flags & REG_STRUCT) && (rsz <= rptr->obj_size))                     ||
+                        ((rptr->depth == 1) && 
+                         ((rptr->obj_size == sizeof (t_value)) || (rsz < rptr->obj_size)))          ||
+                        ((rptr->depth != 1) && (bytes == rptr->obj_size))                           ||
+                        ((rptr->depth != 1) && (rptr->offset == 0) && (rptr->width == 8) &&
+                         ((rptr->depth == rptr->obj_size) || (rptr->depth == rptr->obj_size - 1)))  ||
+                        ((rptr->depth != 1) && (rptr->offset == 0) && (rptr->obj_size == rptr->ele_size)))
+                    continue;
+                Bad = TRUE;
+                Mprintf (f, "\ttherefore SAVE/RESTORE operations will affect %u byte%s of memory\n", bytes, (bytes != 1) ? "s" : "");
+                Mprintf (f, "\twhile the variable lives in %u bytes of memory\n", (uint32)rptr->obj_size);
+                }
+            }
+        else
+            Mprintf (f, "\tthis register entry is not properly initialized\n");
+        if (Bad) {
+            FMwrite (stdout, f);
+            stat = SCPE_IERR;
+            }
+        }
+    }
+MClose (f);
+#endif
+return stat;
+}
+
+
 /*
  * Compiled in unit tests for the various device oriented library 
  * modules: sim_card, sim_disk, sim_tape, sim_ether, sim_tmxr, etc.
@@ -14979,6 +15205,7 @@ return (sim_rand_seed - 1);
 static t_stat sim_library_unit_tests (void)
 {
 int i;
+int bad_regs = 0;
 DEVICE *dptr;
 int32 saved_switches = sim_switches & ~SWMASK ('T');
 t_stat stat = SCPE_OK;
