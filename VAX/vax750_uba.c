@@ -137,7 +137,7 @@ REG uba_reg[] = {
     { HRDATAD (CSR3,             uba_csr3,     32, "Control/Status register for BDP #3") },
     { FLDATAD (INT,               uba_int,      0, "Interrupt pending") },
     { FLDATAD (NEXINT, nexus_req[IPL_UBA], TR_UBA, "Nexus interrupt pending") },
-    { BRDATAD (MAP,               uba_map, 16, 32, 496, "Unibus map registers") },
+    { BRDATAD (MAP,               uba_map, 16, 32, UBA_NMAPR, "Unibus map registers") },
     { FLDATA  (AUTOCON,        autcon_enb, 0), REG_HRO },
     { NULL }
     };

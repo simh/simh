@@ -198,7 +198,7 @@ REG uba_reg[] = {
     { HRDATA (BISRC, uba_biic.isrc, 32) },
     { HRDATA (BIMSK, uba_biic.imsk, 32) },
     { HRDATA (BIUIIC, uba_biic.uiic, 32) },
-    { BRDATA (DPR, uba_dpr, 16, 32, 16) },
+    { BRDATA (DPR, uba_dpr, 16, 32, UBA_NDPATH) },
     { BRDATA (MAP, uba_map, 16, 32, UBA_NMAPR) },
     { FLDATA (AUTOCON, autcon_enb, 0), REG_HRO },
     { NULL }
