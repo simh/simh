@@ -195,7 +195,7 @@ typedef struct {
     { FLDATA (EDT, di [dev].edt,         0) },                                     \
     { FLDATA (EOR, di [dev].eor,         0) },                                     \
                                                                                    \
-    { BRDATA (TMR, &di [dev].ifc_timer, 10, CHAR_BIT, sizeof (double)), REG_HRO }, \
+    { VBRDATA (TMR, di [dev].ifc_timer, 10, CHAR_BIT, sizeof (double)), REG_HRO }, \
                                                                                    \
     { ORDATA (SC, dev##_dib.select_code, 6), REG_HRO }
 

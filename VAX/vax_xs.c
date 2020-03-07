@@ -88,7 +88,7 @@ REG xs_reg[] = {
     { GRDATA  ( SA4,    xs_var.mac[4],        16,  8, 0), REG_RO|REG_FIT },
     { GRDATA  ( SA5,    xs_var.mac[5],        16,  8, 0), REG_RO|REG_FIT },
     { FLDATA  ( INT,    xs_var.irq, 0) },
-    { BRDATA  ( SETUP,  &xs_var.setup,   DEV_RDX,  8, sizeof(xs_var.setup)), REG_HRO },
+    { SAVEDATA  ( SETUP,  xs_var.setup) },
     { GRDATA  ( CSR0,   xs_var.csr0,     DEV_RDX, 16, 0), REG_FIT },
     { GRDATA  ( CSR1,   xs_var.csr1,     DEV_RDX, 16, 0), REG_FIT },
     { GRDATA  ( CSR2,   xs_var.csr2,     DEV_RDX, 16, 0), REG_FIT },

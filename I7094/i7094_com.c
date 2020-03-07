@@ -316,7 +316,7 @@ REG com_reg[] = {
     { URDATA (NEEDID, coml_unit[0].NEEDID, 8, 1, 0, COM_TLINES, 0) },
     { URDATA (NOECHO, coml_unit[0].NOECHO, 8, 1, 0, COM_TLINES, 0) },
     { URDATA (INPP, coml_unit[0].INPP, 8, 1, 0, COM_TLINES, 0) },
-    { BRDATA (FREEQ, &com_free, 10, 16, 2) },
+    { VBRDATA (FREEQ, com_free, 10, 16, 2) },
     { BRDATA (INPQ, com_inpq, 10, 16, 2 * COM_TLINES) },
     { BRDATA (OUTQ, com_outq, 10, 16, 2 * COM_TLINES) },
     { BRDATA (PKTB, com_pkt, 10, 16, 2 * COM_PKTSIZ) },
