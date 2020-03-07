@@ -386,7 +386,7 @@ if (AIO_QUEUE_VAL != QUEUE_LIST_END) {  /* List !Empty */
         q = AIO_QUEUE_VAL;
         } while (q != AIO_QUEUE_SET(QUEUE_LIST_END, q));
     while (q != QUEUE_LIST_END) {       /* List !Empty */
-        sim_debug (SIM_DBG_AIO_QUEUE, &sim_scp_dev, "Migrating Asynch event for %s after %d instructions\n", sim_uname(q), q->a_event_time);
+        sim_debug (SIM_DBG_AIO_QUEUE, &sim_scp_dev, "Migrating Asynch event for %s after %d %s\n", sim_uname(q), q->a_event_time, sim_vm_interval_units);
         ++migrated;
         uptr = q;
         q = q->a_next;
@@ -414,7 +414,7 @@ return migrated;
 void sim_aio_activate (ACTIVATE_API caller, UNIT *uptr, int32 event_time)
 {
 AIO_ILOCK;
-sim_debug (SIM_DBG_AIO_QUEUE, &sim_scp_dev, "Queueing Asynch event for %s after %d instructions\n", sim_uname(uptr), event_time);
+sim_debug (SIM_DBG_AIO_QUEUE, &sim_scp_dev, "Queueing Asynch event for %s after %d %s\n", sim_uname(uptr), event_time, sim_vm_interval_units);
 if (uptr->a_next) {
     uptr->a_activate_call = sim_activate_abs;
     }
@@ -430,7 +430,7 @@ else {
 AIO_IUNLOCK;
 sim_asynch_check = 0;                             /* try to force check */
 if (sim_idle_wait) {
-    sim_debug (TIMER_DBG_IDLE, &sim_timer_dev, "waking due to event on %s after %d instructions\n", sim_uname(uptr), event_time);
+    sim_debug (TIMER_DBG_IDLE, &sim_timer_dev, "waking due to event on %s after %d %s\n", sim_uname(uptr), event_time, sim_vm_interval_units);
     pthread_cond_signal (&sim_asynch_wake);
     }
 }
@@ -573,6 +573,8 @@ const char *sim_prog_name = NULL;                       /* pointer to the execut
 DEVICE *sim_dflt_dev = NULL;
 UNIT *sim_clock_queue = QUEUE_LIST_END;
 int32 sim_interval = 0;
+const char *sim_vm_interval_units = "instructions";     /* Simulator can change to "cycles" as needed */
+const char *sim_vm_step_unit = "instruction";           /* Simulator can change */
 int32 sim_switches = 0;
 int32 sim_switch_number = 0;
 FILE *sim_ofile = NULL;
@@ -1031,11 +1033,11 @@ static const char simh_help[] =
 #define HLP_STEP        "*Commands Running_A_Simulated_Program STEP"
       "3STEP\n"
       " The STEP command (abbreviated S) resumes execution at the current PC for\n"
-      " the number of instructions given by its argument.  If no argument is\n"
-      " supplied, one instruction is executed.\n"
+      " the number of %Is given by its argument.  If no argument is\n"
+      " supplied, one %I is executed.\n"
       "4Switches\n"
       " If the STEP command is invoked with the -T switch, the step command will\n"
-      " cause execution to run for microseconds rather than instructions.\n"
+      " cause execution to run for microseconds rather than %I.\n"
 #define HLP_NEXT        "*Commands Running_A_Simulated_Program NEXT"
       "3NEXT\n"
       " The NEXT command (abbreviated N) resumes execution at the current PC for\n"
@@ -1330,7 +1332,7 @@ static const char simh_help[] =
       "+SET NODEBUG                 disables any currently active debug output\n"
       "4Switches\n"
       " Debug message output contains a timestamp which indicates the number of\n"
-      " simulated instructions which have been executed prior to the debug event.\n\n"
+      " simulated %C which have been executed prior to the debug event.\n\n"
       " Debug message output can be enhanced to contain additional, potentially\n"
       " useful information.\n"
       "5-T\n"
@@ -1374,17 +1376,17 @@ static const char simh_help[] =
       "3Throttle\n"
       " Simulator instruction execution rate can be controlled by specifying\n"
       " one of the following throttle commands:\n\n"
-      "+SET THROTTLE xM             execute x million instructions per second\n"
-      "+SET THROTTLE xK             execute x thousand instructions per second\n"
+      "+SET THROTTLE xM             execute x million %C per second\n"
+      "+SET THROTTLE xK             execute x thousand %C per second\n"
       "+SET THROTTLE x%%             occupy x percent of the host capacity\n"
       "++++++++executing instructions\n"
       "+SET THROTTLE x/t            sleep for t milliseconds after executing x\n"
-      "++++++++instructions\n\n"
+      "++++++++%C\n\n"
       "+SET NOTHROTTLE              set simulation rate to maximum\n\n"
       " Throttling is only available on host systems that implement a precision\n"
       " real-time delay function.\n\n"
       " xM, xK and x%% modes require the simulator to execute sufficient\n"
-      " instructions to actually calibrate the desired execution rate relative\n"
+      " %C to actually calibrate the desired execution rate relative\n"
       " to wall clock time.  Very short running programs may complete before\n"
       " calibration completes and therefore before the simulated execution rate\n"
       " can match the desired rate.\n\n"
@@ -1406,7 +1408,7 @@ static const char simh_help[] =
       "+SET CLOCK catchup           enable catchup clock ticks\n"
       "+SET CLOCK calib=n%%          specify idle calibration skip %%\n"
       "+SET CLOCK calib=ALWAYS      specify calibration independent of idle\n"
-      "+SET CLOCK stop=n            stop execution after n instructions\n\n"
+      "+SET CLOCK stop=n            stop execution after n %C\n\n"
       " The SET CLOCK STOP command allows execution to have a bound when\n"
       " execution starts with a BOOT, NEXT or CONTINUE command.\n"
 #define HLP_SET_ASYNCH "*Commands SET Asynch"
@@ -2041,7 +2043,7 @@ static const char simh_help[] =
       " a multiplier of 1000 or 1000000 respectively\n"
        /***************** 80 character line width template *************************/
       "4After\n"
-      " Specifies an integer (>=0) representing a minimal number of instructions\n"
+      " Specifies an integer (>=0) representing a minimal number of %C\n"
       " which must execute before the first character in the string is sent.\n"
       " The after parameter value can be set by itself with:\n\n"
       "++SEND AFTER=n\n\n"
@@ -2072,7 +2074,7 @@ static const char simh_help[] =
       " Switches can be used to influence the behavior of SEND commands\n\n"
       "5-t\n"
       " The -t switch indicates that the Delay and After values are in\n"
-      " units of microseconds rather than instructions.\n"
+      " units of microseconds rather than %C.\n"
        /***************** 80 character line width template *************************/
 #define HLP_EXPECT      "*Commands Executing_Command_Files Reacting_To_Console_Output"
        /***************** 80 character line width template *************************/
@@ -2138,7 +2140,7 @@ static const char simh_help[] =
       " The -i switch is only valid for regular expression expect rules.\n"
       "5-t\n"
       " The -t switch indicates that the value specified by the HaltAfter\n"
-      " parameter are in units of microseconds rather than instructions.\n"
+      " parameter are in units of microseconds rather than %C.\n"
       "4Determining Which Output Matched\n"
       " When an expect rule matches data in the output stream, the rule which\n"
       " matched is recorded in the environment variable _EXPECT_MATCH_PATTERN.\n"
@@ -2168,7 +2170,7 @@ static const char simh_help[] =
       " and hext character values of the form:\n"
       "++\\xh{h} where each h is a hex digit (0-9A-Fa-f)\n"
       "4HaltAfter\n"
-      " Specifies the number of instructions which should be executed before\n"
+      " Specifies the number of %C which should be executed before\n"
       " simulator instruction execution should stop.  The default is to stop\n"
       " executing instructions immediately (i.e. HALTAFTER=0).\n"
       " The default HaltAfter delay, once set, persists for all expect behaviors\n"
@@ -6176,14 +6178,14 @@ memset (&buf, 0, sizeof (buf));
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 if (sim_clock_queue == QUEUE_LIST_END)
-    fprintf (st, "%s event queue empty, time = %.0f, executing %s instructios/sec\n",
-             sim_name, sim_time, sim_fmt_numeric (sim_timer_inst_per_sec ()));
+    fprintf (st, "%s event queue empty, time = %.0f, executing %s %s/sec\n",
+             sim_name, sim_time, sim_fmt_numeric (sim_timer_inst_per_sec ()), sim_vm_interval_units);
 else {
     const char *tim = "";
     double inst_per_sec = sim_timer_inst_per_sec ();
 
-    fprintf (st, "%s event queue status, time = %.0f, executing %s instructions/sec\n",
-             sim_name, sim_time, sim_fmt_numeric (inst_per_sec));
+    fprintf (st, "%s event queue status, time = %.0f, executing %s %s/sec\n",
+             sim_name, sim_time, sim_fmt_numeric (inst_per_sec), sim_vm_interval_units);
     for (uptr = sim_clock_queue; uptr != QUEUE_LIST_END; uptr = uptr->next) {
         if (uptr == &sim_step_unit)
             fprintf (st, "  Step timer");
@@ -6229,7 +6231,7 @@ else {
         }
     }
 fprintf (st, "asynch latency: %d nanoseconds\n", sim_asynch_latency);
-fprintf (st, "asynch instruction latency: %d instructions\n", sim_asynch_inst_latency);
+fprintf (st, "asynch instruction latency: %d %s\n", sim_asynch_inst_latency, sim_vm_interval_units);
 pthread_mutex_unlock (&sim_asynch_lock);
 sim_mfile = NULL;
 fprintf (st, "%*.*s", (int)buf.pos, (int)buf.pos, buf.buf);
@@ -12365,7 +12367,7 @@ if (exp->buf_size) {
     fprintf (st, "  Buffer Insert Offset: %d\n", exp->buf_ins);
     fprintf (st, "  Buffer Contents: %s\n", bstr);
     if (default_haltafter)
-        fprintf (st, "  Default HaltAfter: %u instructions\n", (unsigned)default_haltafter);
+        fprintf (st, "  Default HaltAfter: %u %s\n", (unsigned)default_haltafter, sim_vm_interval_units);
     free (bstr);
     }
 if (exp->dptr && (exp->dbit & exp->dptr->dctrl))
@@ -12629,19 +12631,19 @@ else
     fprintf (st, "  No Pending Input Data\n");
 if ((snd->next_time - sim_gtime()) > 0) {
     if (((snd->next_time - sim_gtime()) > (sim_timer_inst_per_sec()/1000000.0)) && ((sim_timer_inst_per_sec()/1000000.0) > 0.0))
-        fprintf (st, "  Minimum of %d instructions (%d microseconds) before sending first character\n", (int)(snd->next_time - sim_gtime()),
+        fprintf (st, "  Minimum of %d %s (%d microseconds) before sending first character\n", (int)(snd->next_time - sim_gtime()), sim_vm_interval_units,
                                                         (int)((snd->next_time - sim_gtime())/(sim_timer_inst_per_sec()/1000000.0)));
     else
-        fprintf (st, "  Minimum of %d instructions before sending first character\n", (int)(snd->next_time - sim_gtime()));
+        fprintf (st, "  Minimum of %d %s before sending first character\n", (int)(snd->next_time - sim_gtime()), sim_vm_interval_units);
     }
 if ((snd->delay > (sim_timer_inst_per_sec()/1000000.0)) && ((sim_timer_inst_per_sec()/1000000.0) > 0.0))
-    fprintf (st, "  Minimum of %d instructions (%d microseconds) between characters\n", (int)snd->delay, (int)(snd->delay/(sim_timer_inst_per_sec()/1000000.0)));
+    fprintf (st, "  Minimum of %d %s (%d microseconds) between characters\n", (int)snd->delay, sim_vm_interval_units, (int)(snd->delay/(sim_timer_inst_per_sec()/1000000.0)));
 else
-    fprintf (st, "  Minimum of %d instructions between characters\n", (int)snd->delay);
+    fprintf (st, "  Minimum of %d %s between characters\n", (int)snd->delay, sim_vm_interval_units);
 if (after)
-    fprintf (st, "  Default delay before first character input is %u instructions\n", after);
+    fprintf (st, "  Default delay before first character input is %u %s\n", after, sim_vm_interval_units);
 if (delay)
-    fprintf (st, "  Default delay between character input is %u instructions\n", after);
+    fprintf (st, "  Default delay between character input is %u %s\n", after, sim_vm_interval_units);
 if (snd->dptr && (snd->dbit & snd->dptr->dctrl))
     fprintf (st, "  Send Debugging via: SET %s DEBUG%s%s\n", sim_dname(snd->dptr), snd->dptr->debflags ? "=" : "", snd->dptr->debflags ? _get_dbg_verb (snd->dbit, snd->dptr, NULL) : "");
 return SCPE_OK;
@@ -13604,6 +13606,12 @@ for (hblock = astrings; (htext = *hblock) != NULL; hblock++) {
                             break;
                         case 'S':
                             appendText (topic, sim_name, strlen (sim_name));
+                            break;
+                        case 'C':
+                            appendText (topic, sim_vm_interval_units, strlen (sim_vm_interval_units));
+                            break;
+                        case 'I':
+                            appendText (topic, sim_vm_step_unit, strlen (sim_vm_step_unit));
                             break;
                         case '%':
                             appendText (topic, "%", 1);

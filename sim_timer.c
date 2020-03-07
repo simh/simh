@@ -1706,9 +1706,9 @@ if (w_ms > 1000)                                        /* too long a wait (runa
     sim_debug (DBG_TIK, &sim_timer_dev, "waiting too long: w_ms=%d usecs, w_idle=%d usecs, sim_interval=%d, rtc->currd=%d\n", w_ms, w_idle, sim_interval, rtc->currd);
 in_nowait = FALSE;
 if (sim_clock_queue == QUEUE_LIST_END)
-    sim_debug (DBG_IDL, &sim_timer_dev, "sleeping for %d ms - pending event in %d instructions\n", w_ms, sim_interval);
+    sim_debug (DBG_IDL, &sim_timer_dev, "sleeping for %d ms - pending event in %d %s\n", w_ms, sim_interval, sim_vm_interval_units);
 else
-    sim_debug (DBG_IDL, &sim_timer_dev, "sleeping for %d ms - pending event on %s in %d instructions\n", w_ms, sim_uname(sim_clock_queue), sim_interval);
+    sim_debug (DBG_IDL, &sim_timer_dev, "sleeping for %d ms - pending event on %s in %d %s\n", w_ms, sim_uname(sim_clock_queue), sim_interval, sim_vm_interval_units);
 cyc_since_idle = sim_gtime() - sim_idle_end_time;       /* time since prior idle */
 act_ms = sim_idle_ms_sleep (w_ms);                      /* wait */
 rtc->clock_time_idled += act_ms;
@@ -1720,9 +1720,9 @@ else
 sim_interval = sim_interval - act_cyc;                  /* count down sim_interval to reflect idle period */
 sim_idle_end_time = sim_gtime();                        /* save idle completed time */
 if (sim_clock_queue == QUEUE_LIST_END)
-    sim_debug (DBG_IDL, &sim_timer_dev, "slept for %d ms - pending event in %d instructions\n", act_ms, sim_interval);
+    sim_debug (DBG_IDL, &sim_timer_dev, "slept for %d ms - pending event in %d %s\n", act_ms, sim_interval, sim_vm_interval_units);
 else
-    sim_debug (DBG_IDL, &sim_timer_dev, "slept for %d ms - pending event on %s in %d instructions\n", act_ms, sim_uname(sim_clock_queue), sim_interval);
+    sim_debug (DBG_IDL, &sim_timer_dev, "slept for %d ms - pending event on %s in %d %s\n", act_ms, sim_uname(sim_clock_queue), sim_interval, sim_vm_interval_units);
 return TRUE;
 }
 
@@ -1976,8 +1976,8 @@ switch (sim_throt_state) {
                 sim_set_throt (0, NULL);                /* disable throttling */
                 return SCPE_OK;
                 }
-            sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc() Not enough time.  %d ms executing %.f instructions.\n", 
-                                (int)delta_ms, delta_inst);
+            sim_debug (DBG_THR, &sim_timer_dev, "sim_throt_svc() Not enough time.  %d ms executing %.f %s.\n", 
+                                (int)delta_ms, delta_inst, sim_vm_interval_units);
             sim_throt_wait = (int32)(delta_inst * SIM_THROT_WMUL);
             sim_throt_inst_start = sim_gtime();
             sim_idle_ms_sleep (sim_idle_rate_ms);       /* start on a tick boundart to calibrate */
@@ -1997,8 +1997,8 @@ switch (sim_throt_state) {
                                                     a_cps, d_cps);
                 sim_throt_state = SIM_THROT_STATE_INIT;
                 sim_printf ("*********** WARNING ***********\n");
-                sim_printf ("Host CPU is too slow to simulate %s instructions per second\n", sim_fmt_numeric(d_cps));
-                sim_printf ("Host CPU can only simulate %s instructions per second\n", sim_fmt_numeric(sim_throt_peak_cps));
+                sim_printf ("Host CPU is too slow to simulate %s %s per second\n", sim_fmt_numeric(d_cps), sim_vm_interval_units);
+                sim_printf ("Host CPU can only simulate %s %s per second\n", sim_fmt_numeric(sim_throt_peak_cps), sim_vm_interval_units);
                 sim_printf ("Throttling disabled.\n");
                 sim_set_throt (0, NULL);
                 return SCPE_OK;
@@ -2993,7 +2993,7 @@ else {
     }
 rtc = &rtcs[tmr];
 if ((NULL == rtc->clock_unit) || (rtc->hz == 0)) {
-    sim_debug (DBG_TIM, &sim_timer_dev, "sim_clock_coschedule_tmr(%s, tmr=%d, ticks=%d) - no clock activating after %d instructions\n", sim_uname (uptr), tmr, ticks, ticks * (rtc->currd ? rtc->currd : rtcs[sim_rtcn_calibrated_tmr ()].currd));
+    sim_debug (DBG_TIM, &sim_timer_dev, "sim_clock_coschedule_tmr(%s, tmr=%d, ticks=%d) - no clock activating after %d %s\n", sim_uname (uptr), tmr, ticks, ticks * (rtc->currd ? rtc->currd : rtcs[sim_rtcn_calibrated_tmr ()].currd), sim_vm_interval_units);
     return sim_activate (uptr, ticks * (rtc->currd ? rtc->currd : rtcs[sim_rtcn_calibrated_tmr ()].currd));
     }
 else {

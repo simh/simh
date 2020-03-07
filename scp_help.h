@@ -47,6 +47,8 @@
  *     * %D    - Inserts the name of the device     (e.g. "DTA").
  *     * %U    - Inserts the name of the unit       (e.g. "DTA0").
  *     * %S    - Inserts the current simulator name (e.g. "PDP-10")
+ *     * %C    - Inserts the current value of the sim_vm_interval_units string
+ *     * %I    - Inserts the current value of the sim_vm_step_units string
  *     * %#s   - Inserts the string suppled in the "#"th optional argument to the help
  *               routine.  # starts with 1.  Any embedded newlines will cause following
  *               text to be indented.
