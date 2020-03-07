@@ -1124,12 +1124,18 @@ int tmr;
 uint32 clock_start, clock_last, clock_now;
 
 sim_debug (DBG_TRC, &sim_timer_dev, "sim_timer_init()\n");
+/* Clear the event queue before initializing the timer subsystem */
+while (sim_clock_queue != QUEUE_LIST_END)
+    sim_cancel (sim_clock_queue);
 for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
     RTC *rtc = &rtcs[tmr];
 
     rtc->timer_unit = &sim_timer_units[tmr];
     rtc->timer_unit->action = &sim_timer_tick_svc;
     rtc->timer_unit->flags = UNIT_DIS | UNIT_IDLE;
+    if (rtc->clock_cosched_queue)
+        while (rtc->clock_cosched_queue != QUEUE_LIST_END)
+            sim_cancel (rtc->clock_cosched_queue);
     rtc->clock_cosched_queue = QUEUE_LIST_END;
     }
 sim_stop_unit.action = &sim_timer_stop_svc;
