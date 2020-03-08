@@ -51,7 +51,7 @@
 
 #include "sim_defs.h"                                   /* simulator defns */
 
-#if defined(USE_INT64) || defined(USE_ADDR64)
+#if (defined(USE_INT64) && !defined(ECLIPSE)) || defined(USE_ADDR64)
 #error "Nova does not support 64b values!"
 #endif
 
