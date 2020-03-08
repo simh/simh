@@ -2584,7 +2584,7 @@ return 0;
 }
 #endif
 
-t_stat process_stdin_commands (t_stat stat, char *argv[]);
+t_stat process_stdin_commands (t_stat stat, char *argv[], t_bool do_called);
 
 /* Main command loop */
 
@@ -2791,7 +2791,7 @@ if (SCPE_BARE_STATUS(stat) == SCPE_OPENERR)             /* didn't exist/can't op
     stat = SCPE_OK;
 
 if (SCPE_BARE_STATUS(stat) != SCPE_EXIT)
-    process_stdin_commands (SCPE_BARE_STATUS(stat), argv);
+    process_stdin_commands (SCPE_BARE_STATUS(stat), argv, FALSE);
 
 detach_all (0, TRUE);                                   /* close files */
 sim_set_deboff (0, NULL);                               /* close debug */
@@ -2806,7 +2806,7 @@ free (targv);                                           /* release any argv copy
 return sim_exit_status;
 }
 
-t_stat process_stdin_commands (t_stat stat, char *argv[])
+t_stat process_stdin_commands (t_stat stat, char *argv[], t_bool do_called)
 {
 char cbuf[4*CBUFSIZE], gbuf[CBUFSIZE];
 CONST char *cptr;
@@ -2862,8 +2862,11 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         }
     cptr = get_glyph_cmd (cptr, gbuf);                  /* get command glyph */
     sim_switches = 0;                                   /* init switches */
-    if ((cmdp = find_cmd (gbuf)))                       /* lookup command */
+    if ((cmdp = find_cmd (gbuf))) {                     /* lookup command */
+        if (do_called && (cmdp->action == &return_cmd)) /* RETURN command? */
+            break;
         stat = cmdp->action (cmdp->arg, cptr);          /* if found, exec */
+        }
     else
         stat = SCPE_UNK;
     stat_nomessage = stat & SCPE_NOMESSAGE;             /* extract possible message supression flag */
@@ -2880,6 +2883,14 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
     if (sim_vm_post != NULL)
         (*sim_vm_post) (TRUE);
     }                                                   /* end while */
+if (do_called && cmdp && 
+    (cmdp->action == &return_cmd) && (0 != *cptr)) {    /* return command with argument? */
+    sim_string_to_stat (cptr, &stat);
+    sim_last_cmd_stat = stat;                           /* save explicit status as command error status */
+    if (sim_switches & SWMASK ('Q'))
+        stat |= SCPE_NOMESSAGE;                         /* suppress error message display (in caller) if requested */
+    return stat;                                        /* return with explicit return status */
+    }
 return stat;
 }
 
@@ -3652,7 +3663,7 @@ t_stat do_cmd_label (int32 flag, CONST char *fcptr, CONST char *label)
 {
 char cbuf[4*CBUFSIZE], gbuf[CBUFSIZE], abuf[4*CBUFSIZE], quote, *c, *do_arg[11];
 CONST char *cptr;
-FILE *fpin;
+FILE *fpin = NULL;
 CTAB *cmdp = NULL;
 int32 echo, nargs, errabort, i;
 int32 saved_sim_do_echo = sim_do_echo, 
@@ -3695,7 +3706,8 @@ for (nargs = 0; nargs < 10; ) {                         /* extract arguments */
 
 if (do_arg [0] == NULL)                                 /* need at least 1 */
     return SCPE_2FARG;
-if ((fpin = fopen (do_arg[0], "r")) == NULL) {          /* file failed to open? */
+if ((strcasecmp (do_arg[0], "<stdin>") != 0) &&
+    ((fpin = fopen (do_arg[0], "r")) == NULL)) {        /* file failed to open? */
     strlcpy (cbuf, do_arg[0], sizeof (cbuf));           /* try again with .sim extension */
     strlcat (cbuf, ".sim", sizeof (cbuf));
     if ((fpin = fopen (cbuf, "r")) == NULL) {           /* failed a second time? */
@@ -3753,6 +3765,11 @@ if (label) {
     }
 if (errabort)                                           /* -e flag? */
     set_on (1, NULL);                                   /* equivalent to ON ERROR RETURN */
+
+if (strcasecmp (do_arg[0], "<stdin>") == 0) {
+    stat = process_stdin_commands (SCPE_OK, do_arg, TRUE);
+    goto Cleanup_Return;
+    }
 
 do {
     if (stop_cpu) {                                     /* SIGINT? */
@@ -3868,7 +3885,8 @@ do {
         (*sim_vm_post) (TRUE);
     } while (staying);
 Cleanup_Return:
-fclose (fpin);                                          /* close file */
+if (fpin)
+    fclose (fpin);                                      /* close file */
 sim_gotofile = NULL;
 if (flag >= 0) {
     sim_do_echo = saved_sim_do_echo;                    /* restore echo state we entered with */
