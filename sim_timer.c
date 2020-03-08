@@ -1644,10 +1644,10 @@ if ((!sim_idle_enab)                             ||     /* idling disabled */
     ((sim_clock_queue != QUEUE_LIST_END) &&             /* or clock queue not empty */
      ((sim_clock_queue->flags & UNIT_IDLE) == 0))||     /*   and event not idle-able? */
     (rtc->elapsed < sim_idle_stable)) {             /* or calibrated timer not stable? */
-    sim_debug (DBG_IDL, &sim_timer_dev, "Can't idle: %s - elapsed: %d.%03d\n", !sim_idle_enab ? "idle disabled" : 
+    sim_debug (DBG_IDL, &sim_timer_dev, "Can't idle: %s - elapsed: %d and %d/%d\n", !sim_idle_enab ? "idle disabled" : 
                                                                              ((rtc->elapsed < sim_idle_stable) ? "not stable" : 
                                                                                                                      ((sim_clock_queue != QUEUE_LIST_END) ? sim_uname (sim_clock_queue) : 
-                                                                                                                                                            "")), rtc->elapsed, rtc->ticks);
+                                                                                                                                                            "")), rtc->elapsed, rtc->ticks, rtc->hz);
     sim_interval -= sin_cyc;
     return FALSE;
     }
@@ -2577,7 +2577,7 @@ return SCPE_OK;
 void sim_start_timer_services (void)
 {
 int32 tmr;
-uint32 sim_prompt_time = sim_os_msec () - sim_stop_time;
+uint32 sim_prompt_time = (sim_gtime () > 0) ? (sim_os_msec () - sim_stop_time) : 0;
 int32 registered_units = 0;
 
 sim_time_at_sim_prompt +=  (((double)sim_prompt_time) / 1000.0);
