@@ -15090,7 +15090,6 @@ free (f);
 static t_stat sim_sanity_check_register_declarations (void)
 {
 t_stat stat = SCPE_OK;
-#if 0       /* Disabled for now */
 int i;
 DEVICE *dptr;
 MFILE *f = MOpen ();
@@ -15193,7 +15192,6 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
         }
     }
 MClose (f);
-#endif
 return stat;
 }
 
