@@ -1194,7 +1194,7 @@ fprintf (st, "Minimum Host Sleep Time:        %d ms (%dHz)\n", sim_os_sleep_min_
 if (sim_os_sleep_min_ms != sim_os_sleep_inc_ms)
     fprintf (st, "Minimum Host Sleep Incr Time:   %d ms\n", sim_os_sleep_inc_ms);
 fprintf (st, "Host Clock Resolution:          %d ms\n", sim_os_clock_resoluton_ms);
-fprintf (st, "Execution Rate:                 %s cycles/sec\n", sim_fmt_numeric (inst_per_sec));
+fprintf (st, "Execution Rate:                 %s %s/sec\n", sim_fmt_numeric (inst_per_sec), sim_vm_interval_units);
 if (sim_idle_enab) {
     fprintf (st, "Idling:                         Enabled\n");
     fprintf (st, "Time before Idling starts:      %d seconds\n", sim_idle_stable);
@@ -1844,21 +1844,21 @@ else {
     switch (sim_throt_type) {
 
     case SIM_THROT_MCYC:
-        fprintf (st, "Throttle:                      %d megacycles\n", sim_throt_val);
+        fprintf (st, "Throttle:                      %d mega%s\n", sim_throt_val, sim_vm_interval_units);
         if (sim_throt_wait)
-            fprintf (st, "Throttling by sleeping for:    %d ms every %d cycles\n", sim_throt_sleep_time, sim_throt_wait);
+            fprintf (st, "Throttling by sleeping for:    %d ms every %d %s\n", sim_throt_sleep_time, sim_throt_wait, sim_vm_interval_units);
         break;
 
     case SIM_THROT_KCYC:
-        fprintf (st, "Throttle:                      %d kilocycles\n", sim_throt_val);
+        fprintf (st, "Throttle:                      %d kilo%s\n", sim_throt_val, sim_vm_interval_units);
         if (sim_throt_wait)
-            fprintf (st, "Throttling by sleeping for:    %d ms every %d cycles\n", sim_throt_sleep_time, sim_throt_wait);
+            fprintf (st, "Throttling by sleeping for:    %d ms every %d %s\n", sim_throt_sleep_time, sim_throt_wait, sim_vm_interval_units);
         break;
 
     case SIM_THROT_PCT:
         if (sim_throt_wait) {
-            fprintf (st, "Throttle:                      %d%% of %s cycles per second\n", sim_throt_val, sim_fmt_numeric (sim_throt_peak_cps));
-            fprintf (st, "Throttling by sleeping for:    %d ms every %d cycles\n", sim_throt_sleep_time, sim_throt_wait);
+            fprintf (st, "Throttle:                      %d%% of %s %s per second\n", sim_throt_val, sim_fmt_numeric (sim_throt_peak_cps), sim_vm_interval_units);
+            fprintf (st, "Throttling by sleeping for:    %d ms every %d %s\n", sim_throt_sleep_time, sim_throt_wait, sim_vm_interval_units);
             }
         else
             fprintf (st, "Throttle:                      %d%%\n", sim_throt_val);
@@ -1866,7 +1866,7 @@ else {
 
     case SIM_THROT_SPC:
         fprintf (st, "Throttle:                      %d/%d\n", sim_throt_val, sim_throt_sleep_time);
-        fprintf (st, "Throttling by sleeping for:    %d ms every %d cycles\n", sim_throt_sleep_time, sim_throt_val);
+        fprintf (st, "Throttling by sleeping for:    %d ms every %d %s\n", sim_throt_sleep_time, sim_throt_val, sim_vm_interval_units);
         break;
 
     default:
@@ -2477,10 +2477,11 @@ RTC *rtc, *crtc;
 sim_int_clk_tps = MIN(CLK_TPS, sim_os_tick_hz);
 for (tmr=0; tmr<SIM_NTIMERS; tmr++) {
     rtc = &rtcs[tmr];
-    if ((rtc->hz) &&
-        (rtc->hz <= (uint32)sim_os_tick_hz) &&
-        (rtc->clock_unit) &&
-        ((rtc->last_hz == 0) || (rtc->last_hz == rtc->hz)))
+    if ((rtc->hz) &&                        /* is calibrated AND */
+        (rtc->hz <= (uint32)sim_os_tick_hz) && /* slower than OS tick rate AND */
+        (rtc->clock_unit) &&                /* clock has been registered AND */
+        ((rtc->last_hz == 0) ||             /* first calibration call OR */
+         (rtc->last_hz == rtc->hz)))        /* subsequent calibration call with an unchanged tick rate */
         break;
     }
 if (tmr == SIM_NTIMERS) {                   /* None found? */
@@ -2602,7 +2603,8 @@ if (sim_calb_tmr == -1) {
     }
 else {
     if (sim_calb_tmr == SIM_NTIMERS) {
-        sim_debug (DBG_CAL, &sim_timer_dev, "sim_start_timer_services() - restarting internal timer after %d cycles\n", sim_internal_timer_time);
+        sim_debug (DBG_CAL, &sim_timer_dev, "sim_start_timer_services() - restarting internal timer after %d %s\n", 
+                                            sim_internal_timer_time, sim_vm_interval_units);
         sim_activate (&SIM_INTERNAL_UNIT, sim_internal_timer_time);
         }
     }
@@ -2930,7 +2932,7 @@ if (NULL == uptr) {                         /* deregistering? */
     sim_cancel (rtc->timer_unit);
     return SCPE_OK;
     }
-if (NULL == rtc->clock_unit)
+if (rtc->clock_unit == NULL)
     rtc->clock_cosched_queue = QUEUE_LIST_END;
 rtc->clock_unit = uptr;
 uptr->dynflags |= UNIT_TMR_UNIT;

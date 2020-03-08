@@ -1118,7 +1118,7 @@ static const char simh_help[] =
       " diagnostic which didn't achieve explicit success or failure within\n"
       " some user specified time.  The RUNLIMIT command provides ways to\n"
       " limit execution.\n\n"
-      "++RUNLIMIT n {CYCLES|MICROSECONDS|SECONDS|MINUTES|HOURS}\n"
+      "++RUNLIMIT n {%C|MICROSECONDS|SECONDS|MINUTES|HOURS}\n"
       "++NORUNLIMIT\n\n"
       "  Equivalently:\n\n"
       "++SET RUNLIMIT n {CYCLES|MICROSECONDS|SECONDS|MINUTES|HOURS}\n"
@@ -1126,7 +1126,7 @@ static const char simh_help[] =
       " The run limit state can be examined with:\n\n"
       "++SHOW RUNLIMIT\n\n"
       " If the units of the run limit are not specified, the default units are\n"
-      " cycles.  Once an execution run limit has beenn reached, any subsequent\n"
+      " %C.  Once an execution run limit has beenn reached, any subsequent\n"
       " GO, RUN, CONTINUE, STEP or BOOT commands will cause the simulator to\n"
       " exit.  A previously defined RUNLIMIT can be cleared with the NORUNLIMIT\n"
       " command or the establishment of a new run limit.\n"
@@ -6968,7 +6968,7 @@ if ((r != SCPE_OK) || (num == 0))               /* error? */
     return sim_messagef (SCPE_ARG, "Invalid argument: %s\n", gbuf);
 cptr = get_glyph (cptr, gbuf, 0);               /* get next glyph */
 if ((gbuf[0] == '\0') ||
-    (MATCH_CMD (gbuf, "CYCLES") == 0))
+    (MATCH_CMD (gbuf, sim_vm_interval_units) == 0))
     sim_switches &= ~SWMASK ('T');
 else {
     int i;
@@ -7031,14 +7031,14 @@ if (sim_runlimit_enabled) {
         }
     else {
         if (sim_runlimit_initial != sim_runlimit) {
-            fprintf (st, "%d cycles initially, ", sim_runlimit_initial);
+            fprintf (st, "%d %s initially, ", sim_runlimit_initial, sim_vm_interval_units);
             if (sim_is_active (&sim_runlimit_unit))
-                fprintf (st, "and %d cycles remaining\n", sim_activate_time (&sim_runlimit_unit));
+                fprintf (st, "and %d %s remaining\n", sim_activate_time (&sim_runlimit_unit), sim_vm_interval_units);
             else
                 fprintf (st, "expired now\n");
             }
         else
-            fprintf (st, "%d cycles\n", sim_runlimit_initial);
+            fprintf (st, "%d %s\n", sim_runlimit_initial, sim_vm_interval_units);
         }
     }
 else

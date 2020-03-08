@@ -639,9 +639,9 @@ for (i=connections=0; i<sim_rem_con_tmxr.lines; i++) {
         DEVICE *dptr = NULL;
 
         if (rem->smp_sample_dither_pct)
-            fprintf (st, "Register Bit Sampling is occurring every %d cycles (dithered %d percent)\n", rem->smp_sample_interval, rem->smp_sample_dither_pct);
+            fprintf (st, "Register Bit Sampling is occurring every %d %s (dithered %d percent)\n", rem->smp_sample_interval, sim_vm_interval_units, rem->smp_sample_dither_pct);
         else
-            fprintf (st, "Register Bit Sampling is occurring every %d cycles\n", rem->smp_sample_interval);
+            fprintf (st, "Register Bit Sampling is occurring every %d %s\n", rem->smp_sample_interval, sim_vm_interval_units);
         fprintf (st, " Registers being sampled are: ");
         for (reg = 0; reg < rem->smp_reg_count; reg++) {
             if (rem->smp_regs[reg].indirect)
