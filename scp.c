@@ -2681,7 +2681,8 @@ if (sim_emax <= 0)
     sim_emax = 1;
 if (sim_timer_init ()) {
     fprintf (stderr, "Fatal timer initialization error\n");
-    read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
+    if (sim_ttisatty())
+        read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
     return EXIT_FAILURE;
     }
 sim_register_internal_device (&sim_scp_dev);
@@ -2725,20 +2726,6 @@ if (register_check) {
     sim_printf ("*** Good Registers in %s simulator.\n", sim_name);
     if (argc < 2)                                   /* No remaining command arguments? */
         return EXIT_SUCCESS;                        /* then we're done */
-    }
-if (sim_timer_init ()) {
-    fprintf (stderr, "Fatal timer initialization error\n");
-    read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
-    return EXIT_FAILURE;
-    }
-/* Invoke power reset again in case some devices depend on timer 
-   initialization having occurred */
-if ((stat = reset_all_p (0)) != SCPE_OK) {
-    fprintf (stderr, "Fatal simulator initialization error\n%s\n",
-        sim_error_text (stat));
-    if (sim_ttisatty())
-        read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
-    return EXIT_FAILURE;
     }
 if ((stat = sim_brk_init ()) != SCPE_OK) {
     fprintf (stderr, "Fatal breakpoint table initialization error\n%s\n",
@@ -15165,13 +15152,19 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
             }
         if ((rptr->obj_size != 0) && (rptr->ele_size != 0) && (rptr->depth != 0) && (rptr->macro != NULL)) {
             if (rptr->flags & REG_UNIT) {
-                if (rptr->depth > udptr->numunits) {
+                if (udptr == NULL) {
                     Bad = TRUE;
-                    Mprintf (f, "\tthe depth of the UNIT array exceeds the number of units on the %s device which is %u\n", dptr->name, udptr->numunits);
+                    Mprintf (f, "\tthe indicated UNIT can't be found for this $u depth array\n", rptr->depth);
                     }
-                if (rptr->obj_size > sizeof (t_value)) {
-                    Bad = TRUE;
-                    Mprintf (f, "\t%u is larger than the size of the t_value type (%u)\n", (uint32)rptr->obj_size, (uint32)sizeof (t_value));
+                else {
+                    if (rptr->depth > udptr->numunits) {
+                        Bad = TRUE;
+                        Mprintf (f, "\tthe depth of the UNIT array exceeds the number of units on the %s device which is %u\n", dptr->name, udptr->numunits);
+                        }
+                    if (rptr->obj_size > sizeof (t_value)) {
+                        Bad = TRUE;
+                        Mprintf (f, "\t%u is larger than the size of the t_value type (%u)\n", (uint32)rptr->obj_size, (uint32)sizeof (t_value));
+                        }
                     }
                 }
             else {
