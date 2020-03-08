@@ -83,7 +83,7 @@ REG cdr_reg[] = {
     { FLDATA (S2, s2sel, 0) },
     { DRDATA (POS, cdr_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, cdr_unit.wait, 24), PV_LEFT },
-    { BRDATA (BUF, rbuf, 8, 8, CDR_WIDTH) },
+    { BRDATA (BUF, rbuf, 8, 8, sizeof (rbuf)) },
     { NULL }
 };
 

@@ -669,7 +669,7 @@ static REG muxl_reg [] = {
     { BRDATA (XBUF,  mux_xbuf,               8,    16,           SEND_CHAN_COUNT), REG_A             },
     { BRDATA (RCHP,  mux_rchp,               8,     1,           RECV_CHAN_COUNT)                    },
     { BRDATA (XDON,  mux_xdon,               8,     1,           SEND_CHAN_COUNT)                    },
-    { BRDATA (BDFR,  mux_defer,              8,     1,           TERM_COUNT)                         },
+    { BRDATA (BDFR,  mux_defer,              8,     1,           sizeof (mux_defer))                 },
     { URDATA (TIME,  muxl_unit[0].wait,     10,    24,     0,    TERM_COUNT,       REG_NZ | PV_LEFT) },
 
       DIB_REGS (muxl_dib),
