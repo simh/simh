@@ -104,7 +104,7 @@ MTAB                cr_mod[] = {
 };
 
 REG                 cr_reg[] = {
-    {BRDATA(BUFF, cr_buffer, 16, 16, sizeof(cr_buffer)), REG_HRO},
+    {BRDATA(BUFF, cr_buffer, 16, 16, sizeof(cr_buffer)/sizeof(uint16)), REG_HRO},
     {0}
 };
 

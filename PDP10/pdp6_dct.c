@@ -71,8 +71,8 @@ DIB                 dct_dib[] = {
 };
 
 REG                 dct_reg[] = {
-    {BRDATA(BUFF, &dct_buf[0], 16, 36, NUM_DEVS_DCT), REG_HRO},
-    {BRDATA(BUFF, &dct_acc[0], 16, 36, NUM_DEVS_DCT), REG_HRO},
+    {BRDATA(BUFF, dct_buf, 16, 36, NUM_DEVS_DCT), REG_HRO},
+    {BRDATA(BUFF, dct_acc, 16, 36, NUM_DEVS_DCT), REG_HRO},
     {0}
 };
 

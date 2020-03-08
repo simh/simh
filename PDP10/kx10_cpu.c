@@ -323,9 +323,9 @@ REG cpu_reg[] = {
     { ORDATA (FM16, FM[016], 36) },
     { ORDATA (FM17, FM[017], 36) },
 #if KI
-    { BRDATA (FM, &FM[0], 8, 36, 64)},
+    { BRDATA (FM, FM, 8, 36, 64)},
 #else
-    { BRDATA (FM, &FM[0], 8, 36, 16)},
+    { BRDATA (FM, FM, 8, 36, 16)},
 #endif
     { ORDATAD (PIR, PIR, 8, "Priority Interrupt Request") },
     { ORDATAD (PIH, PIH, 8, "Priority Interrupt Hold") },

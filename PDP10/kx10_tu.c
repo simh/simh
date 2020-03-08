@@ -290,7 +290,7 @@ REG                 tua_reg[] = {
     {ORDATA(BUF, tu_df10[0].buf, 36), REG_HRO},
     {ORDATA(NXM, tu_df10[0].nxmerr, 8), REG_HRO},
     {ORDATA(COMP, tu_df10[0].ccw_comp, 8), REG_HRO},
-    {BRDATA(BUFF, &tu_buf[0][0], 16, 8, TU_NUMFR), REG_HRO},
+    {BRDATA(BUFF, tu_buf[0], 16, 8, TU_NUMFR), REG_HRO},
     {0}
 };  
 

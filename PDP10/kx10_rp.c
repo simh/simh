@@ -420,7 +420,7 @@ REG                 rpa_reg[] = {
     {ORDATA(BUF, rp_df10[0].buf, 36), REG_HRO},
     {ORDATA(NXM, rp_df10[0].nxmerr, 8), REG_HRO},
     {ORDATA(COMP, rp_df10[0].ccw_comp, 8), REG_HRO},
-    {BRDATA(BUFF, &rp_buf[0][0], 16, 64, RP_NUMWD), REG_HRO},
+    {BRDATA(BUFF, rp_buf[0], 16, 64, RP_NUMWD), REG_HRO},
     {0}
 };  
 
@@ -450,7 +450,7 @@ REG                 rpb_reg[] = {
     {ORDATA(BUF, rp_df10[1].buf, 36), REG_HRO},
     {ORDATA(NXM, rp_df10[1].nxmerr, 8), REG_HRO},
     {ORDATA(COMP, rp_df10[1].ccw_comp, 8), REG_HRO},
-    {BRDATA(BUFF, &rp_buf[1][0], 16, 64, RP_NUMWD), REG_HRO},
+    {BRDATA(BUFF, rp_buf[1], 16, 64, RP_NUMWD), REG_HRO},
     {0}
 };  
 
@@ -480,7 +480,7 @@ REG                 rpc_reg[] = {
     {ORDATA(BUF, rp_df10[2].buf, 36), REG_HRO},
     {ORDATA(NXM, rp_df10[2].nxmerr, 8), REG_HRO},
     {ORDATA(COMP, rp_df10[2].ccw_comp, 8), REG_HRO},
-    {BRDATA(BUFF, &rp_buf[2][0], 16, 64, RP_NUMWD), REG_HRO},
+    {BRDATA(BUFF, rp_buf[2], 16, 64, RP_NUMWD), REG_HRO},
     {0}
 };  
 
@@ -510,7 +510,7 @@ REG                 rpd_reg[] = {
     {ORDATA(BUF, rp_df10[3].buf, 36), REG_HRO},
     {ORDATA(NXM, rp_df10[3].nxmerr, 8), REG_HRO},
     {ORDATA(COMP, rp_df10[3].ccw_comp, 8), REG_HRO},
-    {BRDATA(BUFF, &rp_buf[3][0], 16, 64, RP_NUMWD), REG_HRO},
+    {BRDATA(BUFF, rp_buf[3], 16, 64, RP_NUMWD), REG_HRO},
     {0}
 };  
 

@@ -305,7 +305,7 @@ REG                 rsa_reg[] = {
     {ORDATA(BUF, rs_df10[0].buf, 36), REG_HRO},
     {ORDATA(NXM, rs_df10[0].nxmerr, 8), REG_HRO},
     {ORDATA(COMP, rs_df10[0].ccw_comp, 8), REG_HRO},
-    {BRDATA(BUFF, &rs_buf[0][0], 16, 64, RS_NUMWD), REG_HRO},
+    {BRDATA(BUFF, rs_buf[0], 16, 64, RS_NUMWD), REG_HRO},
     {0}
 };  
 

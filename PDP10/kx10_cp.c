@@ -101,7 +101,7 @@ MTAB                cp_mod[] = {
 };
 
 REG                 cp_reg[] = {
-    {BRDATA(BUFF, cp_buffer, 16, 16, sizeof(cp_buffer)), REG_HRO},
+    {BRDATA(BUFF, cp_buffer, 16, 16, sizeof(cp_buffer)/sizeof(uint16)), REG_HRO},
     {0}
 };
 

@@ -172,7 +172,7 @@ MTAB                dsk_mod[] = {
 };
 
 REG                 dsk_reg[] = {
-    {BRDATA(BUFF, &dsk_buf[0], 16, 64, DSK_WDS), REG_HRO},
+    {BRDATA(BUFF, dsk_buf, 16, 64, DSK_WDS), REG_HRO},
     {0}
 };
 

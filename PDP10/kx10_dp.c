@@ -275,8 +275,8 @@ MTAB                dp_mod[] = {
 };
 
 REG                 dpa_reg[] = {
-    {BRDATA(BUFF, &dp_buf[0][0], 16, 64, RP_NUMWD), REG_HRO},
-    {BRDATA(UNIT, &dp_cur_unit[0], 16, 8, 1), REG_HRO},
+    {BRDATA(BUFF, dp_buf[0], 16, 64, RP_NUMWD), REG_HRO},
+    {HRDATA(UNIT, dp_cur_unit[0], 32), REG_HRO},
     {FLDATA(READIN, readin_flag, 0), REG_HRO},
     {ORDATA(STATUS, dp_df10[0].status, 18), REG_RO},
     {ORDATA(CIA, dp_df10[0].cia, 18)},
@@ -300,8 +300,8 @@ DEVICE              dpa_dev = {
 
 #if (NUM_DEVS_DP > 1)
 REG                 dpb_reg[] = {
-    {BRDATA(BUFF, &dp_buf[1][0], 16, 64, RP_NUMWD), REG_HRO},
-    {BRDATA(DF10, &dp_cur_unit[1], 16, 8, 1), REG_HRO},
+    {BRDATA(BUFF, dp_buf[1], 16, 64, RP_NUMWD), REG_HRO},
+    {HRDATA(UNIT, dp_cur_unit[1], 32), REG_HRO},
     {ORDATA(STATUS, dp_df10[1].status, 18), REG_RO},
     {ORDATA(CIA, dp_df10[1].cia, 18)},
     {ORDATA(CCW, dp_df10[1].ccw, 18)},
@@ -324,7 +324,7 @@ DEVICE              dpb_dev = {
 
 #if (NUM_DEVS_DP > 2)
 REG                 dpc_reg[] = {
-    {BRDATA(BUFF, &dp_buf[2][0], 16, 64, RP_NUMWD), REG_HRO},
+    {BRDATA(BUFF, dp_buf[2], 16, 64, RP_NUMWD), REG_HRO},
     {BRDATA(DF10, &dp_cur_unit[2], 16, 8, 1), REG_HRO},
     {ORDATA(STATUS, dp_df10[2].status, 18), REG_RO},
     {ORDATA(CIA, dp_df10[2].cia, 18)},
@@ -348,7 +348,7 @@ DEVICE              dpc_dev = {
 
 #if (NUM_DEVS_DP > 3)
 REG                 dpd_reg[] = {
-    {BRDATA(BUFF, &dp_buf[3][0], 16, 64, RP_NUMWD), REG_HRO},
+    {BRDATA(BUFF, dp_buf[3], 16, 64, RP_NUMWD), REG_HRO},
     {BRDATA(DF10, &dp_cur_unit[3], 16, 8, 1), REG_HRO},
     {ORDATA(STATUS, dp_df10[3].status, 18), REG_RO},
     {ORDATA(CIA, dp_df10[3].cia, 18)},
