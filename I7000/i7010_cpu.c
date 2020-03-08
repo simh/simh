@@ -194,7 +194,7 @@ REG                 cpu_reg[] = {
     {DRDATAD(G, caddr[2], 18, "Channel 2 address"), REG_FIT},
     {DRDATAD(H, caddr[3], 18, "Channel 3 address"), REG_FIT},
     {FLDATAD(ASTRISK, astmode, 1, "Asterix Mode"), REG_FIT},
-    {BRDATAD(SW, &SW, 2, 7, 1, "Sense Switch register"), REG_FIT},
+    {BINRDATAD(SW, SW, 7, "Sense Switch register"), REG_FIT},
     {FLDATAD(SW1, SW, 0, "Sense Switch 0"), REG_FIT},
     {FLDATAD(SW2, SW, 1, "Sense Switch 1"), REG_FIT},
     {FLDATAD(SW3, SW, 2, "Sense Switch 2"), REG_FIT},
