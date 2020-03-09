@@ -2811,7 +2811,7 @@ t_stat process_stdin_commands (t_stat stat, char *argv[], t_bool do_called)
 char cbuf[4*CBUFSIZE], gbuf[CBUFSIZE];
 CONST char *cptr;
 t_stat stat_nomessage;
-CTAB *cmdp;
+CTAB *cmdp = NULL;
 
 stat = SCPE_BARE_STATUS(stat);                          /* remove possible flag */
 while (stat != SCPE_EXIT) {                             /* in case exit */
@@ -15171,7 +15171,7 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
             if (rptr->flags & REG_UNIT) {
                 if (udptr == NULL) {
                     Bad = TRUE;
-                    Mprintf (f, "\tthe indicated UNIT can't be found for this $u depth array\n", rptr->depth);
+                    Mprintf (f, "\tthe indicated UNIT can't be found for this %u depth array\n", rptr->depth);
                     }
                 else {
                     if (rptr->depth > udptr->numunits) {
