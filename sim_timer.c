@@ -888,7 +888,7 @@ rtc->vtime = rtc->rtime;
 rtc->nxintv = 1000;
 rtc->ticks = 0;
 rtc->last_hz = rtc->hz;
-rtc->hz = 0;
+rtc->hz = ticksper;
 rtc->based = time;
 rtc->currd = time;
 rtc->initd = time;
@@ -943,9 +943,9 @@ if (rtc->hz != ticksper) {                          /* changing tick rate? */
         (rtc->last_hz != ticksper) && 
         (ticksper != 0))
         rtc->currd = (int32)(sim_timer_inst_per_sec () / ticksper);
-    _rtcn_configure_calibrated_clock (tmr);
     rtc->last_hz = rtc->hz;
     rtc->hz = ticksper;
+    _rtcn_configure_calibrated_clock (tmr);
     if (ticksper != 0) {
         RTC *crtc = &rtcs[sim_calb_tmr];
 
