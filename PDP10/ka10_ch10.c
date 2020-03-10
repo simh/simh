@@ -335,8 +335,6 @@ void ch10_command (uint32 data)
 
 t_stat ch10_devio(uint32 dev, uint64 *data)
 {
-    DEVICE *dptr = &imx_dev;
-
     switch(dev & 07) {
     case CONO:
         sim_debug (DBG_REG, &ch10_dev, "CONO %012llo %012llo \n", *data, ch10_status);

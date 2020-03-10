@@ -387,7 +387,8 @@ t_stat stk_devio(uint32 dev, uint64 *data)
 
 static t_stat stk_reset (DEVICE *dptr)
 {
-    vid_display_kb_event_process = stk_keyboard;
+    if ((stk_dev.flags & DEV_DIS) == 0)
+        vid_display_kb_event_process = stk_keyboard;
     return SCPE_OK;
 }
 

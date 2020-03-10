@@ -31,9 +31,6 @@
 #endif
 
 #if NUM_DEVS_AUXCPU > 0
-#include <fcntl.h>
-//#include <unistd.h>
-#include <sys/types.h>
 
 /* External bus interface. */
 #define DATO            1
@@ -51,12 +48,11 @@
 
 #define AUXCPU_POLL        1000
 
+#define PIA         u3
+#define STATUS      u4
+t_addr auxcpu_base = 03000000;
 
-static int pia = 0;
-static int status = 0;
-int auxcpu_base = 03000000;
-
-static t_stat auxcpu_devio(uint32 dev, t_uint64 *data);
+static t_stat auxcpu_devio(uint32 dev, uint64 *data);
 static t_stat auxcpu_svc (UNIT *uptr);
 static t_stat auxcpu_reset (DEVICE *dptr);
 static t_stat auxcpu_attach (UNIT *uptr, CONST char *ptr);
@@ -144,7 +140,6 @@ static t_stat auxcpu_attach (UNIT *uptr, CONST char *cptr)
     return r;
   sim_debug(DBG_TRC, &auxcpu_dev, "activate connection\n");
   sim_activate (uptr, 10);    /* start poll */
-  uptr->flags |= UNIT_ATT;
   return SCPE_OK;
 }
 
@@ -156,8 +151,6 @@ static t_stat auxcpu_detach (UNIT *uptr)
     return SCPE_OK;
   sim_cancel (uptr);
   r = tmxr_detach (&auxcpu_desc, uptr);
-  uptr->flags &= ~UNIT_ATT;
-  free (uptr->filename);
   uptr->filename = NULL;
   return r;
 }
@@ -176,9 +169,9 @@ static t_stat auxcpu_svc (UNIT *uptr)
     tmxr_reset_ln (&auxcpu_ldsc);
   }
 
-  /* If incoming interrput => status |= 010 */
-  if (status & 010)
-    set_interrupt(AUXCPU_DEVNUM, pia);
+  /* If incoming interrput => uptr->STATUS |= 010 */
+  if (uptr->STATUS & 010)
+    set_interrupt(AUXCPU_DEVNUM, uptr->PIA);
   else
     clr_interrupt(AUXCPU_DEVNUM);
 
@@ -187,6 +180,7 @@ static t_stat auxcpu_svc (UNIT *uptr)
     auxcpu_ldsc.rcve = 1;
     uptr->wait = AUXCPU_POLL;
   }
+
   sim_clock_coschedule (uptr, uptr->wait);
   return SCPE_OK;
 }
@@ -239,24 +233,17 @@ static int transaction (unsigned char *request, unsigned char *response)
     stat = tmxr_get_packet_ln (&auxcpu_ldsc, &auxcpu_request, &size);
   } while (stat != SCPE_OK || size == 0);
 
-  if (size > 7)
+  if (size > 9)
     return error ("Malformed transaction");
 
   memcpy (response, auxcpu_request, size);
   return 0;
 }
 
-int auxcpu_read (int addr, t_uint64 *data)
+int auxcpu_read (t_addr addr, uint64 *data)
 {
   unsigned char request[12];
   unsigned char response[12];
-
-  sim_interval -= AUXCPU_MEM_CYCLE;
-
-  if ((auxcpu_unit[0].flags & UNIT_ATT) == 0) {
-      *data = 0;
-      return 0;
-  }
 
   addr &= 037777;
 
@@ -271,11 +258,11 @@ int auxcpu_read (int addr, t_uint64 *data)
   switch (response[0])
     {
     case ACK:
-      *data = (t_uint64)response[1];
-      *data |= (t_uint64)response[2] << 8;
-      *data |= (t_uint64)response[3] << 16;
-      *data |= (t_uint64)response[4] << 24;
-      *data |= (t_uint64)response[5] << 32;
+      *data = (uint64)response[1];
+      *data |= (uint64)response[2] << 8;
+      *data |= (uint64)response[3] << 16;
+      *data |= (uint64)response[4] << 24;
+      *data |= (uint64)response[5] << 32;
       break;
     case ERR:
       fprintf (stderr, "AUXCPU: Read error %06o\r\n", addr);
@@ -286,22 +273,17 @@ int auxcpu_read (int addr, t_uint64 *data)
       *data = 0;
       break;
     default:
+      fprintf (stderr, "AUXCPU: recieved %o\r\n", response[0]);
       return error ("Protocol error");
     }
 
   return 0;
 }
 
-int auxcpu_write (int addr, t_uint64 data)
+int auxcpu_write (t_addr addr, uint64 data)
 {
   unsigned char request[12];
   unsigned char response[12];
-
-  sim_interval -= AUXCPU_MEM_CYCLE;
-
-  if ((ten11_unit[0].flags & UNIT_ATT) == 0) {
-      return 0;
-  }
 
   addr &= 037777;
 
@@ -318,8 +300,7 @@ int auxcpu_write (int addr, t_uint64 data)
 
   transaction (request, response);
 
-  switch (response[0])
-    {
+  switch (response[0]) {
     case ACK:
       break;
     case ERR:
@@ -329,9 +310,9 @@ int auxcpu_write (int addr, t_uint64 data)
       fprintf (stderr, "AUXCPU: Write timeout %06o\r\n", addr);
       break;
     default:
+      fprintf (stderr, "AUXCPU: recieved %o\r\n", response[0]);
       return error ("Protocol error");
     }
-
   return 0;
 }
 
@@ -362,25 +343,26 @@ static int auxcpu_interrupt (void)
   return 0;
 }
 
-t_stat auxcpu_devio(uint32 dev, t_uint64 *data)
+t_stat auxcpu_devio(uint32 dev, uint64 *data)
 {
     DEVICE *dptr = &auxcpu_dev;
+    UNIT   *uptr = &auxcpu_unit[0];
 
     switch(dev & 07) {
     case CONO:
         sim_debug(DEBUG_CONO, &auxcpu_dev, "CONO %012llo\n", *data);
-        pia = *data & 7;
+        uptr->PIA = *data & 7;
         if (*data & 010)
           {
             // Clear interrupt from the PDP-6.
-            status &= ~010;
+            uptr->STATUS &= ~010;
             clr_interrupt(AUXCPU_DEVNUM);
           }
         if (*data & 020)
           auxcpu_interrupt ();
         break;
     case CONI:
-        *data = (status & 010) | pia;
+        *data = (uptr->STATUS & 010) | uptr->PIA;
         sim_debug(DEBUG_CONI, &auxcpu_dev, "CONI %012llo\n", *data);
         break;
     case DATAI:
@@ -407,13 +389,14 @@ static t_stat auxcpu_set_base (UNIT *uptr, int32 val, CONST char *cptr, void *de
     if (r != SCPE_OK)
         return SCPE_ARG;
 
-    auxcpu_base = (int)x;
+    auxcpu_base = (t_addr)(x&03777777);
     return SCPE_OK;
 }
 
 static t_stat auxcpu_show_base (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
-    fprintf (st, "Base: %06o", auxcpu_base);
+    fprintf (st, "Base: %011o", auxcpu_base);
     return SCPE_OK;
 }
 #endif
+

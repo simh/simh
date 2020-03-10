@@ -279,7 +279,7 @@ DEVICE ai_dev = {
     AI_NAME, ai_unit, ai_reg, ai_mod,
     NUM_UNITS, 8, 18, 1, 8, 36,
     NULL, NULL, &ai_reset, NULL, &ai_attach, &ai_detach,
-    &ai_dib, DEV_DISABLE | DEV_DEBUG, 0, ai_debug,
+    &ai_dib, DEV_DISABLE | DEV_DEBUG | DEV_DIS, 0, ai_debug,
     NULL, NULL, &ai_help, NULL, NULL, &ai_description
 };
 
@@ -997,7 +997,7 @@ t_stat ai_attach (UNIT *uptr, CONST char *cptr)
     DIB *dib;
 
     r = attach_unit (uptr, cptr);
-    if (r != SCPE_OK)
+    if (r != SCPE_OK || (sim_switches & SIM_SW_REST) != 0)
         return r;
     rptr = find_dev_from_unit(uptr);
     if (rptr == 0)

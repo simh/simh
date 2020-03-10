@@ -246,6 +246,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP10\pdp6_slave.c"
+				>
+			</File>
+			<File
 				RelativePath="..\..\windows-build\pthreads\pthread.c"
 				>
 				<FileConfiguration

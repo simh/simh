@@ -1,9 +1,9 @@
-/* ka10_sys.c: PDP-10 simulator interface
+/* kx10_sys.c: PDP-10 simulator interface
    Derived from Bob Supnik's pdp10_sys.c
 
 
    Copyright (c) 2005-2009, Robert M Supnik
-   Copyright (c) 2011-2018, Richard Cornwell
+   Copyright (c) 2011-2020, Richard Cornwell
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -42,11 +42,8 @@
    sim_load             binary loader
 */
 
-#if KLB
-char sim_name[] = "KL-10B";
-#endif
-#if KLA
-char sim_name[] = "KL-10A";
+#if KL
+char sim_name[] = "KL-10";
 #endif
 #if KI
 char sim_name[] = "KI-10";
@@ -68,12 +65,18 @@ DEVICE *sim_devices[] = {
 #if PDP6 | KA | KI
     &cty_dev,
 #endif
+#if KL
+    &dte_dev,
+#endif
 #if (NUM_DEVS_PT > 0)
     &ptp_dev,
     &ptr_dev,
 #endif
 #if (NUM_DEVS_LP > 0)
     &lpt_dev,
+#endif
+#if (NUM_DEVS_LP20 > 0)
+    &lp20_dev,
 #endif
 #if (NUM_DEVS_CR > 0)
     &cr_dev,
@@ -141,6 +144,9 @@ DEVICE *sim_devices[] = {
 #if (NUM_DEVS_DC > 0)
     &dc_dev,
 #endif
+#if (NUM_DEVS_TTY > 0)
+    &tty_dev,
+#endif
 #if (NUM_DEVS_DCS > 0)
     &dcs_dev,
 #endif
@@ -155,9 +161,18 @@ DEVICE *sim_devices[] = {
 #if (NUM_DEVS_WCNSLS > 0)
     &wcnsls_dev,
 #endif
+#if (NUM_DEVS_OCNSLS > 0)
+    &ocnsls_dev,
+#endif
+#endif
+#if (NUM_DEVS_III > 0)
+    &iii_dev,
 #endif
 #if NUM_DEVS_IMP > 0
     &imp_dev,
+#endif
+#if NUM_DEVS_NIA > 0
+    &nia_dev,
 #endif
 #if NUM_DEVS_CH10 > 0
     &ch10_dev,
@@ -182,6 +197,9 @@ DEVICE *sim_devices[] = {
 #if NUM_DEVS_AUXCPU > 0
     &auxcpu_dev,
 #endif
+#if NUM_DEVS_SLAVE > 0
+    &slave_dev,
+#endif
 #if NUM_DEVS_DKB > 0
     &dkb_dev,
 #endif
@@ -197,7 +215,11 @@ DEVICE *sim_devices[] = {
 const char *sim_stop_messages[] = {
     "Unknown error",
     "HALT instruction",
-    "Breakpoint"
+    "Breakpoint",
+    "Invalid access",
+#if MAGIC_SWITCH
+    "No magic"
+#endif
      };
 
 /* Simulator debug controls */
@@ -232,6 +254,7 @@ DEBTAB              crd_debug[] = {
 #define FMT_E   3                                       /* EXE */
 #define FMT_D   4                                       /* WAITS DMP */
 #define FMT_I   5                                       /* ITS SBLK */
+#define FMT_B   6                                       /* EXB format */
 
 #define EXE_DIR 01776                                   /* EXE directory */
 #define EXE_VEC 01775                                   /* EXE entry vec */
@@ -510,19 +533,28 @@ return SCPE_OK;
 }
 
 
-int get_word(FILE *fileref, uint64 *word)
+int get_word(FILE *fileref, uint64 *word, int ftype)
 {
-   char cbuf[5];
+    char cbuf[5];
 
-   if (sim_fread(cbuf, 1, 5, fileref) != 5)
+    if (sim_fread(cbuf, 1, 5, fileref) != 5)
        return 1;
-   *word = ((uint64)(cbuf[0]) << 29) |
-           ((uint64)(cbuf[1]) << 22) |
-           ((uint64)(cbuf[2]) << 15) |
-           ((uint64)(cbuf[3]) << 8) |
-           ((uint64)(cbuf[4] & 0177) << 1) |
-           ((uint64)(cbuf[4] & 0200) >> 7);
-    return 0;
+    if (ftype) {
+       *word = ((uint64)(cbuf[0] & 0177) << 29) |
+               ((uint64)(cbuf[1] & 0177) << 22) |
+               ((uint64)(cbuf[2] & 0177) << 15) |
+               ((uint64)(cbuf[3] & 0177) << 8) |
+               ((uint64)(cbuf[4] & 0177) << 1);
+       if (cbuf[4] & 0200)
+           *word |= 1;
+   } else {
+       *word = ((uint64)(cbuf[0] & 0377) << 28) |
+               ((uint64)(cbuf[1] & 0377) << 20) |
+               ((uint64)(cbuf[2] & 0377) << 12) |
+               ((uint64)(cbuf[3] & 0377) << 4) |
+               (uint64)(cbuf[4] & 017);
+   }
+   return 0;
 }
 
 /* SAV file loader
@@ -538,14 +570,14 @@ int get_word(FILE *fileref, uint64 *word)
         JRST start
 */
 
-t_stat load_sav (FILE *fileref)
+t_stat load_sav (FILE *fileref, int ftype)
 {
     uint64 data;
     uint32 pa;
     int32 wc;
 
     for ( ;; ) {                                        /* loop */
-        if (get_word(fileref, &data))
+        if (get_word(fileref, &data, ftype))
             return SCPE_OK;
         wc = (int32)(data >> 18);
         pa = (uint32) (data & RMASK);
@@ -559,7 +591,7 @@ t_stat load_sav (FILE *fileref)
             pa &= RMASK;
             wc++;
             wc &= RMASK;
-            if (get_word(fileref, &data))
+            if (get_word(fileref, &data, ftype))
                return SCPE_FMT;
             M[pa] = data;
         }                                              /* end if  count*/
@@ -594,7 +626,7 @@ t_stat load_sav (FILE *fileref)
 #define PAG_V_PN 9
 #define DIRSIZ  (2 * PAG_SIZE)
 
-t_stat load_exe (FILE *fileref)
+t_stat load_exe (FILE *fileref, int ftype)
 {
 uint64 data, dirbuf[DIRSIZ], pagbuf[PAG_SIZE], entbuf[2];
 int32 ndir, entvec, i, j, k, cont, bsz, bty, rpt, wc;
@@ -604,8 +636,9 @@ uint32 ma;
 ndir = entvec = 0;                                      /* no dir, entvec */
 cont = 1;
 do {
-    wc = sim_fread (&data, sizeof (uint64), 1, fileref);/* read blk hdr */
-    if (wc == 0)                                        /* error? */
+    
+    wc = get_word(fileref, &data, ftype);
+    if (wc != 0)                                        /* error? */
         return SCPE_FMT;
     bsz = (int32) ((data & RMASK) - 1);                 /* get count */
     if (bsz < 0)                                        /* zero? */
@@ -616,9 +649,11 @@ do {
     case EXE_DIR:                                       /* directory */
         if (ndir != 0)                                  /* got one */
             return SCPE_FMT;
-        ndir = sim_fread (dirbuf, sizeof (uint64), bsz, fileref);
-        if (ndir < bsz)                                 /* error */
-            return SCPE_FMT;
+        for (i = 0; i < bsz; i++) {
+             if (get_word(fileref, &dirbuf[i], ftype))
+                 return SCPE_FMT;
+        }
+        ndir = bsz;
         break;
 
     case EXE_PDV:                                       /* optional */
@@ -628,9 +663,11 @@ do {
     case EXE_VEC:                                       /* entry vec */
         if (bsz != 2)                                   /* must be 2 wds */
             return SCPE_FMT;
-        entvec = sim_fread (entbuf, sizeof (uint64), bsz, fileref);
-        if (entvec < 2)                                 /* error? */
-            return SCPE_FMT;
+        for (i = 0; i < bsz; i++) {
+             if (get_word(fileref, &entbuf[i], ftype))
+                 return SCPE_FMT;
+        }
+        entvec = bsz;
         cont = 0;                                       /* stop */
         break;
 
@@ -651,10 +688,11 @@ for (i = 0; i < ndir; i = i + 2) {                      /* loop thru dir */
     rpt = ((int32) ((dirbuf[i + 1] >> 27) + 1)) & 0777; /* repeat count */
     for (j = 0; j < rpt; j++, mpage++) {                /* loop thru rpts */
         if (fpage) {                                    /* file pages? */
-            (void)sim_fseek (fileref, (fpage << PAG_V_PN) * sizeof (uint64), SEEK_SET);
-            wc = sim_fread (pagbuf, sizeof (uint64), PAG_SIZE, fileref);
-            if (wc < PAG_SIZE)
-                return SCPE_FMT;
+            (void)sim_fseek (fileref, (fpage << PAG_V_PN) * 5, SEEK_SET);
+            for (k = 0; k < PAG_SIZE; k++) {
+                 if (get_word(fileref, &pagbuf[k], ftype))
+                     break;
+            }
             fpage++;
             }
         ma = mpage << PAG_V_PN;                         /* mem addr */
@@ -667,7 +705,88 @@ for (i = 0; i < ndir; i = i + 2) {                      /* loop thru dir */
     }                                                   /* end directory */
 if (entvec && entbuf[1])
     PC = (int32) (entbuf[1] & RMASK);               /* start addr */
+else if (entvec == 0)
+    PC = (int32) (M[0120] & RMASK);
 return SCPE_OK;
+}
+
+static int     exb_pos = -1;
+int get_exb_byte (FILE *fileref, int *byt, int ftype)
+{
+    static uint64  word;
+
+    exb_pos++;
+    switch(exb_pos & 3) {
+    case 0:   if (get_word(fileref, &word, ftype))
+                  return 1;
+              *byt = ((word >> 18) & 0377);
+              break;
+    case 1:   *byt = ((word >> 26) & 0377);
+              break;
+    case 2:   *byt = ((word >> 0) & 0377);
+              break;
+    case 3:   *byt = ((word >> 8) & 0377);
+              break;
+    }
+    return 0;
+}
+
+t_stat load_exb (FILE *fileref, int ftype)
+{
+    int     odd = 0;
+    int     pos = 0;
+    int     wc;
+    int     byt;
+    uint64  word;
+    t_addr  addr;
+
+    exb_pos = -1;
+    for ( ;; ) {
+        /* All records start on even byte */
+        if (odd && get_exb_byte (fileref, &byt, ftype))
+            return SCPE_FMT;
+        if (get_exb_byte(fileref, &byt, ftype))
+            return SCPE_FMT;
+        wc = byt;
+        if (get_exb_byte(fileref, &byt, ftype))
+            return SCPE_FMT;
+        wc |= byt << 8;
+        wc -= 4;
+        odd = wc & 1;
+        if (get_exb_byte(fileref, &byt, ftype))
+            return SCPE_FMT;
+        addr = byt;
+        if (get_exb_byte(fileref, &byt, ftype))
+            return SCPE_FMT;
+        addr |= byt << 8;
+        if (get_exb_byte(fileref, &byt, ftype))
+            return SCPE_FMT;
+        addr |= byt << 16; 
+        if (get_exb_byte(fileref, &byt, ftype))
+            return SCPE_FMT;
+        addr |= byt << 24; 
+        /* Empty record gives start address */
+        if (wc == 0) {
+            PC = addr;
+            return SCPE_OK;
+        }
+        pos = 0;
+        for (; wc > 0; wc--, pos++) {
+            if (get_exb_byte(fileref, &byt, ftype))
+                return SCPE_FMT;
+            switch(pos) {
+            case 0: word = ((uint64)byt); break;
+            case 1: word |= ((uint64)byt) << 8; break;
+            case 2: word |= ((uint64)byt) << 16; break;
+            case 3: word |= ((uint64)byt) << 24; break;
+            case 4: word |= ((uint64)(byt & 017)) << 32;
+                    M[addr++] = word;
+                    pos = -1;
+                    break;
+            }
+        }
+    }
+    return SCPE_FMT;
 }
 
 /* Master loader */
@@ -676,9 +795,13 @@ t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 uint64 data;
 int32 wc, fmt;
+int ftype;
 extern int32 sim_switches;
 
 fmt = 0;                                                /* no fmt */
+ftype = 0;
+if (sim_switches & SWMASK ('C'))                        /* -c? core dump */
+    ftype = 1;
 if (sim_switches & SWMASK ('R'))                        /* -r? */
     fmt = FMT_R;
 else if (sim_switches & SWMASK ('S'))                   /* -s? */
@@ -689,12 +812,16 @@ else if (sim_switches & SWMASK ('D'))                   /* -d? */
     fmt = FMT_D;
 else if (sim_switches & SWMASK ('I'))                   /* -i? */
     fmt = FMT_I;
+else if (sim_switches & SWMASK ('B'))                   /* -b? */
+    fmt = FMT_B;
 else if (match_ext (fnam, "RIM"))                       /* .RIM? */
     fmt = FMT_R;
 else if (match_ext (fnam, "SAV"))                       /* .SAV? */
     fmt = FMT_S;
 else if (match_ext (fnam, "EXE"))                       /* .EXE? */
     fmt = FMT_E;
+else if (match_ext (fnam, "EXB"))                       /* .EXB? */
+    fmt = FMT_B;
 else if (match_ext (fnam, "DMP"))                       /* .DMP? */
     fmt = FMT_D;
 else if (match_ext (fnam, "BIN"))                       /* .BIN? */
@@ -716,16 +843,19 @@ switch (fmt) {                                          /* case fmt */
         return load_rim (fileref);
 
     case FMT_S:                                         /* SAV */
-        return load_sav (fileref);
+        return load_sav (fileref, ftype);
 
     case FMT_E:                                         /* EXE */
-        return load_exe (fileref);
+        return load_exe (fileref, ftype);
 
     case FMT_D:                                         /* DMP */
         return load_dmp (fileref);
 
     case FMT_I:                                         /* SBLK */
         return load_sblk (fileref);
+
+    case FMT_B:                                         /* EXB */
+        return load_exb  (fileref, ftype);
         }
 
 printf ("Can't determine load file format\n");
@@ -759,13 +889,22 @@ static const char *opcode[] = {
 "LUUO10", "LUUO11", "LUUO12", "LUUO13", "LUUO14", "LUUO15", "LUUO16", "LUUO17",
 "LUUO20", "LUUO21", "LUUO22", "LUUO23", "LUUO24", "LUUO25", "LUUO26", "LUUO27",
 "LUUO30", "LUUO31", "LUUO32", "LUUO33", "LUUO34", "LUUO35", "LUUO36", "LUUO37",
-"MUUO40", "MUUO41", "MUUO42", "MUUO43", "MUUO44", "MUUO45", "MUUO46", "MUUO47",
-"MUUO50", "MUUO51", "MUUO52", "MUUO53", "MUUO54", "MUUO55", "MUUO56", "MUUO57",
-"MUUO60", "MUUO61", "MUUO62", "MUUO63", "MUUO64", "MUUO65", "MUUO66", "MUUO67",
-"MUUO70", "MUUO71", "MUUO72", "MUUO73", "MUUO74", "MUUO75", "MUUO76", "MUUO77",
+"CALL",   "INITI",  "MUUO42", "MUUO43", "MUUO44", "MUUO45", "MUUO46", "CALLI",
+#if KL
+"OPEN",   "TTCALL", "PMOVE",  "PMOVEM", "MUUO54", "RENAME", "IN",     "OUT",
+#else
+"OPEN",   "TTCALL", "MUUO52", "MUUO53", "MUUO54", "RENAME", "IN",     "OUT",
+#endif
+"SETSTS", "STATO",  "STATUS", "GETSTS", "INBUF",  "OUTBUF", "INPUT",  "OUTPUT",
+"CLOSE",  "RELEAS", "MTAPE",  "UGETF",  "USETI", "USETO",  "LOOKUP",  "ENTER",
 
-"UJEN",   "MUUO101", "MUUO102", "JSYS", "MUUO104", "MUUO105", "MUUO106",
+#if KL
+"UJEN",         "GFAD", "GFSB", "JSYS", "ADJSP", "GFMP", "GFDV ",
 "DFAD", "DFSB", "DFMP", "DFDV", "DADD", "DSUB", "DMUL", "DDIV",
+#else
+"UJEN", "MUUO101", "MUUO102", "JSYS", "MUUO104", "MUUO105", "MUUO106",
+"DFAD", "DFSB", "DFMP", "DFDV", "MUUO114", "MUUO115", "MUUO116", "MUUO117",
+#endif
 "DMOVE", "DMOVN", "FIX", "EXTEND", "DMOVEM", "DMOVNM", "FIXR", "FLTR",
 "UFA", "DFN", "FSC", "ADJBP", "ILDB", "LDB", "IDPB", "DPB",
 "FAD", "FADL", "FADM", "FADB", "FADR", "FADRL", "FADRM", "FADRB",

@@ -47,8 +47,6 @@
 #define PIA_FLG         07
 #define CLK_IRQ         010
 
-#define TMR_PD          3
-
 int pd_tps =            60;
 
 t_stat         pd_devio(uint32 dev, uint64 *data);
@@ -126,9 +124,6 @@ t_stat pd_devio(uint32 dev, uint64 *data)
 t_stat
 pd_srv(UNIT * uptr)
 {
-    int32 t;
-
-    t = sim_rtcn_calb (pd_tps, TMR_PD);
     sim_activate_after(uptr, 1000000/pd_tps);
     if (uptr->PIA_CH & PIA_FLG) {
         uptr->PIA_CH |= CLK_IRQ;
@@ -138,7 +133,6 @@ pd_srv(UNIT * uptr)
 
     return SCPE_OK;
 }
-
 
 const char *pd_description (DEVICE *dptr)
 {
