@@ -315,6 +315,21 @@ typedef uint32          t_addr;
 #define SIM_NOINLINE
 #endif
 
+/* Packed structure support */
+
+#ifdef _MSC_VER
+# define PACKED_BEGIN __pragma( pack(push, 1) )
+# define PACKED_END __pragma( pack(pop) )
+#else
+# define PACKED_BEGIN
+#if defined(_WIN32)
+# define PACKED_END __attribute__((gcc_struct, packed))
+#else
+# define PACKED_END __attribute__((packed))
+#endif
+#endif
+
+
 /* Storage class modifier for weak link definition for sim_vm_init() */
 
 #if defined(__cplusplus)
