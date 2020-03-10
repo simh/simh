@@ -1,6 +1,6 @@
 /* ka10_dpk.c: Systems Concepts DK-10, Datapoint kludge.
 
-   Copyright (c) 2018-2019, Lars Brinkhoff
+   Copyright (c) 2018-2020, Lars Brinkhoff
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -65,7 +65,8 @@
 #define PORT_INPUT    2
 
 static t_stat       dpk_devio(uint32 dev, uint64 *data);
-static t_stat       dpk_svc (UNIT *uptr);
+static t_stat       dpk_input_svc (UNIT *uptr);
+static t_stat       dpk_output_svc (UNIT *uptr);
 static t_stat       dpk_reset (DEVICE *dptr);
 static t_stat       dpk_attach (UNIT *uptr, CONST char *cptr);
 static t_stat       dpk_detach (UNIT *uptr);
@@ -84,9 +85,11 @@ static int dpk_port[16];
 static int dpk_ibuf[16];
 static int dpk_ird = 0;
 static int dpk_iwr = 0;
+static int dpk_port_done = 0;
 
 UNIT                dpk_unit[] = {
-    {UDATA(dpk_svc, TT_MODE_8B|UNIT_IDLE|UNIT_ATTABLE, 0)},  /* 0 */
+    {UDATA(dpk_input_svc, TT_MODE_8B|UNIT_IDLE|UNIT_ATTABLE, 0)},
+    {UDATA(dpk_output_svc, UNIT_DIS|UNIT_IDLE, 0)},
 };
 DIB dpk_dib = {DPK_DEVNUM, 1, &dpk_devio, NULL};
 
@@ -107,14 +110,26 @@ MTAB dpk_mod[] = {
 
 DEVICE dpk_dev = {
     DPK_NAME, dpk_unit, NULL, dpk_mod,
-    1, 8, 0, 1, 8, 36,
+    2, 8, 0, 1, 8, 36,
     NULL, NULL, dpk_reset, NULL, dpk_attach, dpk_detach,
     &dpk_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG, 0, dev_debug,
     NULL, NULL, dpk_help, NULL, NULL, dpk_description
 };
 
+static void dpk_set_ospeed (int port, uint64 data)
+{
+    static const char *map[] =
+        { "134", "600", "110", "150", "300", "1200", "2400", "4800" };
+    static const char *speed;
+    speed = map[(data & DPK_SPEED) >> 9];
+    sim_debug(DEBUG_CMD, &dpk_dev, "Set port %d output speed %s\n",
+              port, speed);
+    tmxr_set_line_speed(&dpk_ldsc[port], speed);
+}
+
 static t_stat dpk_devio(uint32 dev, uint64 *data)
 {
+    static int scan = 0;
     DEVICE *dptr = &dpk_dev;
     int port;
 
@@ -138,22 +153,27 @@ static t_stat dpk_devio(uint32 dev, uint64 *data)
             break;
         case DPK_OSTART:
             dpk_port[port] |= PORT_OUTPUT;
-            dpk_status &= ~DPK_ODONE;
+            dpk_port_done &= ~(1 << port);
+            if (dpk_port_done == 0)
+              dpk_status &= ~DPK_ODONE;
+            sim_activate_abs (&dpk_unit[1], 0);
             break;
         case DPK_ISTOP:
             dpk_port[port] &= ~PORT_INPUT;
             break;
         case DPK_ISTART:
-            dpk_port[port] |= PORT_OUTPUT;
+            dpk_port[port] |= PORT_INPUT;
             break;
         case DPK_OSTOP:
             dpk_port[port] &= ~PORT_OUTPUT;
-            dpk_status &= ~DPK_ODONE;
+            dpk_port_done &= ~(1 << port);
+            if (dpk_port_done == 0)
+              dpk_status &= ~DPK_ODONE;
             break;
         case DPK_OSPEED:
-            sim_debug(DEBUG_CMD, &dpk_dev, "Set port %d output speed %lld\n",
-                      port, (*data & DPK_SPEED) >> 9);
+            dpk_set_ospeed (port, *data);
             dpk_port[port] |= PORT_OUTPUT;
+            sim_activate_abs (&dpk_unit[1], 0);
             break;
         case DPK_ISPEED_STOP:
             dpk_port[port] &= ~PORT_INPUT;
@@ -173,13 +193,20 @@ static t_stat dpk_devio(uint32 dev, uint64 *data)
         dpk_status |= *data & DPK_PIA;
         break;
     case CONI|4:
+        dpk_status &= ~DPK_OLINE;
+        for (port = 0; port < DPK_LINES; port++) {
+          scan = (scan + 1) & 017;
+          if (dpk_port_done & (1 << scan)) {
+            dpk_status |= scan << 18;
+            break;
+          }
+        }
         *data = dpk_status & DPK_CONI_BITS;
         sim_debug(DEBUG_CONI, &dpk_dev, "%07llo\n", *data);
         break;
     case DATAO|4:
         dpk_base = *data & 03777777;
-        if (*data & DPK_IEN)
-          dpk_ien = 1;
+        dpk_ien = ((*data & DPK_IEN) != 0);
         sim_debug(DEBUG_DATAIO, &dpk_dev, "DATAO %06llo\n", *data);
         break;
     case DATAI|4:
@@ -230,73 +257,60 @@ static int ildb (uint64 *pointer)
     return ch;
 }
 
-static int dpk_output (int port, TMLN *lp)
+static void dpk_output (int port, TMLN *lp)
 {
     uint64 count;
     int ch;
 
     if ((dpk_port[port] & PORT_OUTPUT) == 0)
-        return 0;
+        return;
+
+    if (tmxr_txdone_ln (lp) == 0)
+        return;
 
     if (M[dpk_base + 2*port] == 0777777777777LL) {
         dpk_port[port] &= ~PORT_OUTPUT;
-        dpk_status &= ~DPK_OLINE;
-        dpk_status |= port << 18;
         dpk_status |= DPK_ODONE;
+        dpk_port_done |= 1 << port;
         if (dpk_ien)
             set_interrupt(DPK_DEVNUM, dpk_status & DPK_PIA);
-        return 0;
+        return;
     }
 
     ch = ildb (&M[dpk_base + 2*port + 1]);
-    if (lp->conn) {
-        ch = sim_tt_outcvt(ch & 0377, TT_GET_MODE (dpk_unit[0].flags));
-        tmxr_putc_ln (lp, ch);
-    }
+    ch = sim_tt_outcvt(ch & 0377, TT_GET_MODE (dpk_unit[0].flags));
+    tmxr_putc_ln (lp, ch);
             
     count = M[dpk_base + 2*port] - 1;
     M[dpk_base + 2*port] = count & 0777777777777LL;
-
-    return 1;
 }
 
-static t_stat dpk_svc (UNIT *uptr)
+static t_stat dpk_input_svc (UNIT *uptr)
 {
     static int scan = 0;
+    int32 ch;
     int i;
 
-    /* 16 ports at 4800 baud, rounded up. */
-    sim_clock_coschedule (uptr, 200);
+    sim_clock_coschedule (uptr, 1000);
 
     i = tmxr_poll_conn (&dpk_desc);
     if (i >= 0) {
-        dpk_ldsc[i].conn = 1;
         dpk_ldsc[i].rcve = 1;
         dpk_ldsc[i].xmte = 1;
         sim_debug(DEBUG_CMD, &dpk_dev, "Connect %d\n", i);
     }
 
     tmxr_poll_rx (&dpk_desc);
-    tmxr_poll_tx (&dpk_desc);
 
     for (i = 0; i < DPK_LINES; i++) {
         /* Round robin scan 16 lines. */
         scan = (scan + 1) & 017;
 
-        /* 1 means the line became ready since the last check.  Ignore
-           -1 which means "still ready". */
-        if (tmxr_txdone_ln (&dpk_ldsc[scan])) {
-            if (dpk_output (scan, &dpk_ldsc[scan]))
-                break;
-        }
-
-        if (!dpk_ldsc[scan].conn)
-            continue;
-
-        if (tmxr_input_pending_ln (&dpk_ldsc[scan])) {
+        ch = tmxr_getc_ln(&dpk_ldsc[scan]);
+        if (ch & TMXR_VALID) {
             if ((dpk_port[scan] & PORT_INPUT) == 0)
                 continue;
-            dpk_ibuf[dpk_iwr++] = (scan << 18) | (tmxr_getc_ln (&dpk_ldsc[scan]) & 0177);
+            dpk_ibuf[dpk_iwr++] = (scan << 18) | (ch & 0177);
             dpk_iwr &= 15;
             dpk_status |= DPK_IDONE;
             if (dpk_ien)
@@ -308,26 +322,42 @@ static t_stat dpk_svc (UNIT *uptr)
     return SCPE_OK;
 }
 
+static t_stat dpk_output_svc (UNIT *uptr)
+{
+    int i;
+
+    for (i = 0; i < DPK_LINES; i++) {
+        dpk_output (i, &dpk_ldsc[i]);
+    }
+
+    tmxr_poll_tx (&dpk_desc);
+    sim_activate_after (uptr, 1000000);
+    return SCPE_OK;
+}
+
 static t_stat dpk_reset (DEVICE *dptr)
 {
     int i;
 
     sim_debug(DEBUG_CMD, &dpk_dev, "Reset\n");
     if (dpk_unit->flags & UNIT_ATT)
-        sim_activate (dpk_unit, tmxr_poll);
-    else
-        sim_cancel (dpk_unit);
+        sim_activate (&dpk_unit[0], tmxr_poll);
+    else {
+        sim_cancel (&dpk_unit[0]);
+        sim_cancel (&dpk_unit[1]);
+    }
 
     dpk_ien = 0;
     dpk_base = 0;
     dpk_status = 0;
     dpk_ird = dpk_iwr = 0;
     memset (dpk_port, 0, sizeof dpk_port);
+    dpk_port_done = 0;
     clr_interrupt(DPK_DEVNUM);
 
     for (i = 0; i < DPK_LINES; i++) {
-        tmxr_set_line_unit (&dpk_desc, i, dpk_unit);
-        tmxr_set_line_output_unit (&dpk_desc, i, dpk_unit);
+        tmxr_set_line_unit (&dpk_desc, i, &dpk_unit[0]);
+        tmxr_set_line_output_unit (&dpk_desc, i, &dpk_unit[1]);
     }
 
     return SCPE_OK;
@@ -358,7 +388,8 @@ static t_stat dpk_detach (UNIT *uptr)
         dpk_ldsc[i].xmte = 0;
     }
     dpk_status = 0;
-    sim_cancel (uptr);
+    sim_cancel (&dpk_unit[0]);
+    sim_cancel (&dpk_unit[1]);
 
     return stat;
 }

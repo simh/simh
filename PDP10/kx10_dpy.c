@@ -85,6 +85,7 @@
  */
 
 #include "kx10_defs.h"
+#include "sim_video.h"
 #include <time.h>
 
 #ifndef NUM_DEVS_DPY
@@ -296,13 +297,40 @@ t_stat dpy_svc (UNIT *uptr)
     return SCPE_OK;
 }
 
+#define JOY_MAX_UNITS     4
+#define JOY_MAX_AXES      4
+#define JOY_MAX_BUTTONS   4
+
+static int joy_axes[JOY_MAX_UNITS * JOY_MAX_AXES];
+static int joy_buttons[JOY_MAX_UNITS * JOY_MAX_BUTTONS];
+
+static void dpy_joy_motion(int which, int axis, int value)
+{
+  int result = FALSE;
+  if (which < JOY_MAX_UNITS && axis < JOY_MAX_AXES) {
+    joy_axes[which * JOY_MAX_AXES + axis] = value;
+  }
+}
+
+static void dpy_joy_button(int which, int button, int state)
+{
+  int result = FALSE;
+  if (which < JOY_MAX_UNITS && button < JOY_MAX_BUTTONS) {
+    joy_buttons[which * JOY_MAX_UNITS + button] = state;
+  }
+}
+
 /* Reset routine */
 
 t_stat dpy_reset (DEVICE *dptr)
 {
-    if (!(dptr->flags & DEV_DIS)) {
+    if (dptr->flags & DEV_DIS) {
+        display_close(dptr);
+    } else {
         display_reset();
         ty340_reset(dptr);
+        vid_register_gamepad_motion_callback (dpy_joy_motion);
+        vid_register_gamepad_button_callback (dpy_joy_button);
     }
     sim_cancel (&dpy_unit[0]);             /* deactivate unit */
     return SCPE_OK;
@@ -367,17 +395,25 @@ cpu_set_switches(unsigned long w1, unsigned long w2) {
 #if NUM_DEVS_WCNSLS > 0
 #define WCNSLS_DEVNUM 0420
 
+#define UNIT_JOY      (1 << DEV_V_UF)
+
 t_stat wcnsls_devio(uint32 dev, uint64 *data);
 const char *wcnsls_description (DEVICE *dptr);
 
 DIB wcnsls_dib[] = {
     { WCNSLS_DEVNUM, 1, &wcnsls_devio, NULL }};
 
+MTAB wcnsls_mod[] = {
+    { UNIT_JOY, UNIT_JOY, "JOYSTICK", "JOYSTICK", NULL, NULL, NULL,
+      "Use USB joysticks"},
+    { 0 }
+    };
+
 UNIT wcnsls_unit[] = {
     { UDATA (NULL, UNIT_IDLE, 0) }};
 
 DEVICE wcnsls_dev = {
-    "WCNSLS", wcnsls_unit, NULL, NULL,
+    "WCNSLS", wcnsls_unit, NULL, wcnsls_mod,
     NUM_DEVS_WCNSLS, 0, 0, 0, 0, 0,
     NULL, NULL, NULL,
     NULL, NULL, NULL,
@@ -390,33 +426,87 @@ const char *wcnsls_description (DEVICE *dptr)
     return "MIT Spacewar Consoles";
 }
 
-t_stat wcnsls_devio(uint32 dev, uint64 *data) {
-    uint64 switches;
-
-    switch (dev & 3) {
-    case CONO:
-        /* CONO WCNSLS,40       ;enable spacewar consoles */
-        break;
-
-    case DATAI:
-        switches = 0777777777777LL;     /* 1 is off */
-
 /*
  * map 32-bit "spacewar_switches" value to what PDP-6/10 game expects
  * (four 9-bit bytes)
  */
 /* bits inside the bytes */
-#define CCW     0400                    /* counter clockwise (L) */
-#define CW      0200                    /* clockwise (R) */
-#define THRUST  0100
-#define HYPER   040
-#define FIRE    020
+#define CCW     0400LL                  /* counter clockwise (L) */
+#define CW      0200LL                  /* clockwise (R) */
+#define THRUST  0100LL
+#define HYPER   040LL
+#define FIRE    020LL
 
 /* shift values for the players' bytes */
 #define UR      0               /* upper right: enterprise "top plug" */
 #define LR      9               /* lower right: klingon "second plug" */
 #define LL      18              /* lower left: thin ship "third plug" */
 #define UL      27              /* upper left: fat ship "bottom plug" */
+
+#define JOY_TRIG   5000
+#define JOY0       (JOY_MAX_AXES*0)
+#define JOY1       (JOY_MAX_AXES*1)
+#define JOY2       (JOY_MAX_AXES*2)
+#define JOY3       (JOY_MAX_AXES*3)
+#define BUT0       (JOY_MAX_BUTTONS*0)
+#define BUT1       (JOY_MAX_BUTTONS*1)
+#define BUT2       (JOY_MAX_BUTTONS*2)
+#define BUT3       (JOY_MAX_BUTTONS*3)
+
+static uint64 joystick_switches (void)
+{
+  uint64 switches = 0777777777777LL;
+
+  if (joy_axes[JOY0] > JOY_TRIG)
+    switches &= ~(CCW << UR);
+  else if (joy_axes[JOY0] < -JOY_TRIG)
+    switches &= ~(CW << UR);
+  if (joy_axes[JOY0+1] < -JOY_TRIG)
+    switches &= ~(THRUST << UR);
+  if (joy_buttons[BUT0])
+    switches &= ~(FIRE << UR);
+  if (joy_buttons[BUT0+1])
+    switches &= ~(HYPER << UR);
+
+  if (joy_axes[JOY1] > JOY_TRIG)
+    switches &= ~(CCW << LR);
+  else if (joy_axes[JOY1] < -JOY_TRIG)
+    switches &= ~(CW << LR);
+  if (joy_axes[JOY1+1] < -JOY_TRIG)
+    switches &= ~(THRUST << LR);
+  if (joy_buttons[BUT1])
+    switches &= ~(FIRE << LR);
+  if (joy_buttons[BUT1+1])
+    switches &= ~(HYPER << LR);
+
+  if (joy_axes[JOY2] > JOY_TRIG)
+    switches &= ~(CCW << LL);
+  else if (joy_axes[JOY2] < -JOY_TRIG)
+    switches &= ~(CW << LL);
+  if (joy_axes[JOY2+1] < -JOY_TRIG)
+    switches &= ~(THRUST << LL);
+  if (joy_buttons[BUT2])
+    switches &= ~(FIRE << LL);
+  if (joy_buttons[BUT2+1])
+    switches &= ~(HYPER << LL);
+
+  if (joy_axes[JOY3] > JOY_TRIG)
+    switches &= ~((uint64)CCW << UL);
+  else if (joy_axes[JOY3] < -JOY_TRIG)
+    switches &= ~((uint64)CW << UL);
+  if (joy_axes[JOY3+1] < -JOY_TRIG)
+    switches &= ~((uint64)THRUST << UL);
+  if (joy_buttons[BUT3])
+    switches &= ~((uint64)FIRE << UL);
+  if (joy_buttons[BUT3+1])
+    switches &= ~(HYPER << UL);
+
+  return switches;
+}
+
+static uint64 keyboard_switches (void)
+{
+    uint64 switches = 0777777777777LL;    /* 1 is off */
 
 #if 1
 #define DEBUGSW(X) (void)0
@@ -433,15 +523,118 @@ t_stat wcnsls_devio(uint32 dev, uint64 *data) {
         SPACEWAR_SWITCHES;
 #undef SWSW
 
-        if (spacewar_switches)
-            DEBUGSW(("in %#lo out %#llo\r\n", spacewar_switches, switches));
+    if (spacewar_switches)
+        DEBUGSW(("in %#lo out %#llo\r\n", spacewar_switches, switches));
 
-        *data = switches;
+
+    return switches;
+}
+
+t_stat wcnsls_devio(uint32 dev, uint64 *data) {
+    switch (dev & 3) {
+    case CONO:
+        /* CONO WCNSLS,40       ;enable spacewar consoles */
+        break;
+
+    case DATAI:
+        if (wcnsls_unit->flags & UNIT_JOY) {
+          *data = joystick_switches ();
+        } else {
+          *data = keyboard_switches ();
+        }
+
         sim_debug(DEBUG_DATAIO, &wcnsls_dev, "WCNSLS %03o DATI %012llo PC=%06o\n",
-                  dev, switches, PC);
+                  dev, *data, PC);
         break;
     }
     return SCPE_OK;
 }
+
+/*
+ * Old MIT Spacewar console switches
+ */
+#if NUM_DEVS_OCNSLS > 0
+#define OCNSLS_DEVNUM 0724
+
+t_stat ocnsls_devio(uint32 dev, uint64 *data);
+const char *ocnsls_description (DEVICE *dptr);
+
+DIB ocnsls_dib[] = {
+    { OCNSLS_DEVNUM, 1, &ocnsls_devio, NULL }};
+
+UNIT ocnsls_unit[] = {
+    { UDATA (NULL, UNIT_IDLE, 0) }};
+
+DEVICE ocnsls_dev = {
+    "OCNSLS", ocnsls_unit, NULL, NULL,
+    NUM_DEVS_OCNSLS, 0, 0, 0, 0, 0,
+    NULL, NULL, NULL,
+    NULL, NULL, NULL,
+    &ocnsls_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG, 0, NULL,
+    NULL, NULL, NULL, NULL, NULL, &ocnsls_description
+    };
+
+const char *ocnsls_description (DEVICE *dptr)
+{
+    return "Old MIT Spacewar Consoles";
+}
+
+#define OHYPER  0004LL          /* Hyperspace. */
+#define OFIRE   0010LL          /* Fire torpedo. */
+#define OCW     0020LL          /* Turn clockwise. */
+#define OCCW    0040LL          /* Turn counter clockwise. */
+#define SLOW    0100LL          /* Weak thrust. */
+#define FAST    0200LL          /* Strong thrust. */
+#define BEACON  020000LL        /* Aiming beacon. */
+
+static uint64 old_switches (void)
+{
+  uint64 switches = 0;
+
+  if (joy_axes[JOY0] > JOY_TRIG)
+    switches |= OCCW;
+  else if (joy_axes[JOY0] < -JOY_TRIG)
+    switches |= OCW;
+  if (joy_axes[JOY0+1] < -JOY_TRIG)
+    switches |= FAST;
+  if (joy_axes[JOY0+1] > JOY_TRIG)
+    switches |= SLOW;
+  if (joy_buttons[BUT0])
+    switches |= OFIRE;
+  if (joy_buttons[BUT0+1])
+    switches |= OHYPER;
+  if (joy_buttons[BUT0+2])
+    switches |= BEACON;
+
+  if (joy_axes[JOY1] > JOY_TRIG)
+    switches |= OCCW << 18;
+  else if (joy_axes[JOY1] < -JOY_TRIG)
+    switches |= OCW << 18;
+  if (joy_axes[JOY1+1] < -JOY_TRIG)
+    switches |= FAST << 18;
+  if (joy_axes[JOY1+1] > JOY_TRIG)
+    switches |= SLOW << 18;
+  if (joy_buttons[BUT1])
+    switches |= OFIRE << 18;
+  if (joy_buttons[BUT1+1])
+    switches |= OHYPER << 18;
+  if (joy_buttons[BUT1+2])
+    switches |= BEACON << 18;
+
+  return switches;
+}
+
+t_stat ocnsls_devio(uint32 dev, uint64 *data) {
+    switch (dev & 3) {
+    case DATAI:
+        *data = old_switches ();
+        break;
+    case CONI:
+        *data = 0;
+        break;
+    }
+    return SCPE_OK;
+}
+#endif
 #endif
 #endif

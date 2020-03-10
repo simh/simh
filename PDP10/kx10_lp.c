@@ -1,6 +1,6 @@
-/* ka10_lp.c: PDP-10 line printer simulator
+/* kx10_lp.c: PDP-10 line printer simulator
 
-   Copyright (c) 2011-2017, Richard Cornwell
+   Copyright (c) 2011-2020, Richard Cornwell
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -394,6 +394,8 @@ t_stat lpt_attach (UNIT *uptr, CONST char *cptr)
     t_stat reason;
 
     reason = attach_unit (uptr, cptr);
+    if (sim_switches & SIM_SW_REST)
+        return reason;
     uptr->STATUS &= ~ERR_FLG;
     clr_interrupt(LP_DEVNUM);
     return reason;

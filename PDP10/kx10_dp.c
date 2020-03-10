@@ -1,6 +1,6 @@
-/* ka10_dp.c: Dec Data Products Disk Drive.
+/* kx10_dp.c: Dec Data Products Disk Drive.
 
-   Copyright (c) 2013-2017, Richard Cornwell
+   Copyright (c) 2013-2020, Richard Cornwell
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -22,6 +22,7 @@
 */
 
 #include "kx10_defs.h"
+#include "kx10_disk.h"
 
 #ifndef NUM_DEVS_DP
 #define NUM_DEVS_DP 0
@@ -39,13 +40,10 @@
 /* Flags in the unit flags word */
 
 #define DEV_WHDR        (1 << DEV_V_UF)                /* Enable write headers */
-#define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
 #define UNIT_V_DTYPE    (UNIT_V_UF + 1)                 /* disk type */
 #define UNIT_M_DTYPE    3
-#define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
 #define GET_DTYPE(x)    (((x) >> UNIT_V_DTYPE) & UNIT_M_DTYPE)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
 
 /* Parameters in the unit descriptor */
 
@@ -271,6 +269,7 @@ MTAB                dp_mod[] = {
     {UNIT_DTYPE, (RP03_DTYPE << UNIT_V_DTYPE), "RP03", "RP03", &dp_set_type },
     {UNIT_DTYPE, (RP02_DTYPE << UNIT_V_DTYPE), "RP02", "RP02", &dp_set_type },
     {UNIT_DTYPE, (RP01_DTYPE << UNIT_V_DTYPE), "RP01", "RP01", &dp_set_type },
+    {MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT", NULL, &disk_show_fmt }, 
     {0},
 };
 
@@ -301,7 +300,7 @@ DEVICE              dpa_dev = {
 #if (NUM_DEVS_DP > 1)
 REG                 dpb_reg[] = {
     {BRDATA(BUFF, dp_buf[1], 16, 64, RP_NUMWD), REG_HRO},
-    {HRDATA(UNIT, dp_cur_unit[1], 32), REG_HRO},
+    {HRDATA(DF10, dp_cur_unit[1], 32), REG_HRO},
     {ORDATA(STATUS, dp_df10[1].status, 18), REG_RO},
     {ORDATA(CIA, dp_df10[1].cia, 18)},
     {ORDATA(CCW, dp_df10[1].ccw, 18)},
@@ -325,7 +324,7 @@ DEVICE              dpb_dev = {
 #if (NUM_DEVS_DP > 2)
 REG                 dpc_reg[] = {
     {BRDATA(BUFF, dp_buf[2], 16, 64, RP_NUMWD), REG_HRO},
-    {BRDATA(DF10, &dp_cur_unit[2], 16, 8, 1), REG_HRO},
+    {HRDATA(DF10, dp_cur_unit[2], 32), REG_HRO},
     {ORDATA(STATUS, dp_df10[2].status, 18), REG_RO},
     {ORDATA(CIA, dp_df10[2].cia, 18)},
     {ORDATA(CCW, dp_df10[2].ccw, 18)},
@@ -348,8 +347,8 @@ DEVICE              dpc_dev = {
 
 #if (NUM_DEVS_DP > 3)
 REG                 dpd_reg[] = {
-    {BRDATA(BUFF, dp_buf[3], 16, 64, RP_NUMWD), REG_HRO},
-    {BRDATA(DF10, &dp_cur_unit[3], 16, 8, 1), REG_HRO},
+    {BRDATA(BUFF, &dp_buf[3][0], 16, 64, RP_NUMWD), REG_HRO},
+    {BRDATA(DF10, dp_cur_unit[3], 32), REG_HRO},
     {ORDATA(STATUS, dp_df10[3].status, 18), REG_RO},
     {ORDATA(CIA, dp_df10[3].cia, 18)},
     {ORDATA(CCW, dp_df10[3].ccw, 18)},
@@ -423,7 +422,6 @@ t_stat dp_devio(uint32 dev, uint64 *data) {
          if (*data & BUSY) {
              /* Stop controller */
              sim_cancel(uptr);
-             uptr->STATUS &= ~BUSY;
              df10_finish_op(df10, 0);
          }
          /* Clear flags */
@@ -603,7 +601,7 @@ t_stat dp_svc (UNIT *uptr)
    int         cyl   = (uptr->UFLAGS >> 20) & 0777;
    DEVICE      *dptr = dp_devs[ctlr];
    struct df10 *df10 = &dp_df10[ctlr];
-   int diff, diffs, wc;
+   int diff, diffs;
    int         r;
    sect &= 017;
 
@@ -647,12 +645,8 @@ t_stat dp_svc (UNIT *uptr)
                 if (cmd != WR) {
                     /* Read the block */
                     int da = ((cyl * dp_drv_tab[dtype].surf + surf)
-                                   * dp_drv_tab[dtype].sect + sect) * RP_NUMWD;
-                    (void)sim_fseek(uptr->fileref, da * sizeof(uint64), SEEK_SET);
-                    wc = sim_fread (&dp_buf[ctlr][0], sizeof(uint64), RP_NUMWD,
-                           uptr->fileref);
-                    for (; wc < RP_NUMWD; wc++)
-                        dp_buf[ctlr][wc] = 0;
+                                   * dp_drv_tab[dtype].sect + sect);
+                    (void)disk_read(uptr, &dp_buf[ctlr][0], da, RP_NUMWD);
                     uptr->hwmark = RP_NUMWD;
                     uptr->DATAPTR = 0;
                     sect = sect + 1;
@@ -695,13 +689,11 @@ t_stat dp_svc (UNIT *uptr)
            if (uptr->DATAPTR >= RP_NUMWD || r == 0 ) {
                if (cmd == WR) {
                     int da = ((cyl * dp_drv_tab[dtype].surf + surf)
-                                   * dp_drv_tab[dtype].sect + sect) * RP_NUMWD;
+                                   * dp_drv_tab[dtype].sect + sect);
                     /* write block the block */
                     for (; uptr->DATAPTR < RP_NUMWD; uptr->DATAPTR++)
                         dp_buf[ctlr][uptr->DATAPTR] = 0;
-                    (void)sim_fseek(uptr->fileref, da * sizeof(uint64), SEEK_SET);
-                    wc = sim_fwrite(&dp_buf[ctlr][0],sizeof(uint64), RP_NUMWD,
-                           uptr->fileref);
+                    (void)disk_write(uptr, &dp_buf[ctlr][0], da, RP_NUMWD);
                     uptr->STATUS |= SRC_DONE;
                     sect = sect + 1;
                     if (sect >= dp_drv_tab[dtype].sect) {
@@ -722,7 +714,7 @@ t_stat dp_svc (UNIT *uptr)
                 CLR_BUF(uptr);
            }
            if (r)
-               sim_activate(uptr, 25);
+               sim_activate(uptr, 40);
            else {
                uptr->STATUS &= ~(SRC_DONE|END_CYL|BUSY);
                uptr->UFLAGS |= DONE;
@@ -780,13 +772,11 @@ t_stat dp_svc (UNIT *uptr)
                 uptr->DATAPTR++;
                 if (uptr->DATAPTR >= RP_NUMWD || r == 0 ) {
                      int da = ((cyl * dp_drv_tab[dtype].surf + surf)
-                                    * dp_drv_tab[dtype].sect + sect) * RP_NUMWD;
+                                    * dp_drv_tab[dtype].sect + sect);
                      /* write block the block */
                      for (; uptr->DATAPTR < RP_NUMWD; uptr->DATAPTR++)
                          dp_buf[ctlr][uptr->DATAPTR] = 0;
-                     (void)sim_fseek(uptr->fileref, da * sizeof(uint64), SEEK_SET);
-                     wc = sim_fwrite(&dp_buf[ctlr][0],sizeof(uint64), RP_NUMWD,
-                            uptr->fileref);
+                     (void)disk_write(uptr, &dp_buf[ctlr][0], da, RP_NUMWD);
                      uptr->STATUS |= SRC_DONE;
                      sect = sect + 1;
                      if (sect >= dp_drv_tab[dtype].sect) {
@@ -931,8 +921,7 @@ dp_boot(int32 unit_num, DEVICE * dptr)
 
     addr = (MEMSIZE - 512) & RMASK;
     for (sect = 4; sect <= 7; sect++) {
-        (void)sim_fseek(uptr->fileref, (sect * RP_NUMWD) * sizeof(uint64), SEEK_SET);
-        (void)sim_fread (&dp_buf[0][0], sizeof(uint64), RP_NUMWD, uptr->fileref);
+        (void)disk_read(uptr, &dp_buf[0][0], sect, RP_NUMWD);
         ptr = 0;
         for(wc = RP_NUMWD; wc > 0; wc--)
             M[addr++] = dp_buf[0][ptr++];
@@ -950,10 +939,10 @@ t_stat dp_attach (UNIT *uptr, CONST char *cptr)
     DIB *dib;
     int ctlr;
 
-    uptr->capac = dp_drv_tab[GET_DTYPE (uptr->flags)].size;
-    r = attach_unit (uptr, cptr);
-    if (r != SCPE_OK)
+    r = disk_attach (uptr, cptr);
+    if (r != SCPE_OK || (sim_switches & SIM_SW_REST) != 0)
         return r;
+    uptr->capac = dp_drv_tab[GET_DTYPE (uptr->flags)].size;
     dptr = find_dev_from_unit(uptr);
     if (dptr == 0)
         return SCPE_OK;
@@ -962,7 +951,7 @@ t_stat dp_attach (UNIT *uptr, CONST char *cptr)
     uptr->CUR_CYL = 0;
     uptr->UFLAGS = (NO << 3) | SEEK_DONE | (ctlr >> 2);
     dp_df10[ctlr].status |= PI_ENABLE;
-    set_interrupt(DP_DEVNUM + (ctlr), dp_df10[ctlr >> 2].status);
+    set_interrupt(DP_DEVNUM + (ctlr), dp_df10[ctlr].status);
     return SCPE_OK;
 }
 
@@ -974,7 +963,7 @@ t_stat dp_detach (UNIT *uptr)
         return SCPE_OK;
     if (sim_is_active (uptr))                              /* unit active? */
         sim_cancel (uptr);                                  /* cancel operation */
-    return detach_unit (uptr);
+    return disk_detach (uptr);
 }
 
 t_stat dp_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
@@ -983,6 +972,7 @@ fprintf (st, "RP10 RP01/2/3  Disk Pack Drives (DP)\n\n");
 fprintf (st, "The DP controller implements the RP10 disk drives.  RP\n");
 fprintf (st, "options include the ability to set units write enabled or write locked, to\n");
 fprintf (st, "set the drive type to one of three disk types.\n");
+disk_attach_help(st, dptr, uptr, flag, cptr);
 fprint_set_help (st, dptr);
 fprint_show_help (st, dptr);
 fprintf (st, "\nThe type options can be used only when a unit is not attached to a file.\n");

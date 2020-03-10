@@ -2,6 +2,9 @@
 
    Copyright (c) 2017 Richard Cornwell
 
+   Based on PDP18B/pdp18b_dt.c by:
+   Copyright (c) 1993-2017, Robert M Supnik
+
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
    to deal in the Software without restriction, including without limitation
@@ -18,6 +21,10 @@
    RICHARD CORNWELL BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+   Except as contained in this notice, the name of Robert M Supnik shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
+   in this Software without prior written authorization from Robert M Supnik.
 
    Except as contained in this notice, the name of Richard Cornwell shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
@@ -228,6 +235,8 @@
 
 #define DT_WRDTIM       15000
 
+#define WRITTEN     u6
+
 int32 dtc_dtsa = 0;                           /* status A */
 int32 dtc_dtsb = 0;                           /* status B */
 int   dtc_dct = 0;
@@ -239,6 +248,7 @@ t_stat         dtc_set_dct (UNIT *, int32, CONST char *, void *);
 t_stat         dtc_show_dct (FILE *, UNIT *, int32, CONST void *);
 t_stat         dtc_reset (DEVICE *dptr);
 t_stat         dtc_attach (UNIT *uptr, CONST char *cptr);
+void           dtc_flush (UNIT *uptr);
 t_stat         dtc_detach (UNIT *uptr);
 
 /* DT data structures
@@ -495,7 +505,6 @@ dtc_svc (UNIT *uptr)
              case DTC_FEND:                           /* Tape in endzone */
                   /* Set stop */
                   sim_debug(DEBUG_DETAIL, &dtc_dev, "DTC %o rev forward end\n", u);
-                  uptr->u6 = 0;
                   dtc_dtsb |= DTB_EOT|DTB_NULL;
                   dtc_dtsb &= ~(DTB_REQ|DTB_ACT);
                   if (uptr->CMD & DTC_ETF)
@@ -607,7 +616,6 @@ dtc_svc (UNIT *uptr)
                       uptr->DSTATE &= ~(DTC_M_WORD << DTC_V_WORD);
                       uptr->DSTATE |= (word - 1) << DTC_V_WORD;
                   }
-                  uptr->u6-=2;
                   if ((dtc_dtsb & DTB_DLY) || (dtc_dtsb & DTB_ACT) == 0)
                       break;
                   switch (DTC_GETFNC(uptr->CMD)) {
@@ -636,6 +644,7 @@ dtc_svc (UNIT *uptr)
                        }
                        fbuf[off] = (data >> 18) & RMASK;
                        fbuf[off+1] = data & RMASK;
+                       uptr->WRITTEN = 1;
                        uptr->hwmark = uptr->capac;
                        break;
                   }
@@ -749,7 +758,6 @@ dtc_svc (UNIT *uptr)
                   sim_debug(DEBUG_DETAIL, &dtc_dev, "DTC %o forward end\n", u);
                   /* Move to first block */
                   uptr->DSTATE = DTC_FBLK | (uptr->DSTATE & DTC_MOTMASK);
-                  uptr->u6 = 0;
                   break;
 
              case DTC_FBLK:                           /* In forward block number */
@@ -887,6 +895,7 @@ dtc_svc (UNIT *uptr)
                           dtc_dtsb |= DTB_DONE;
                        fbuf[off] = (data >> 18) & RMASK;
                        fbuf[off+1] = data & RMASK;
+                       uptr->WRITTEN = 1;
                        uptr->hwmark = uptr->capac;
                        break;
                   case FNC_WMRK:
@@ -1169,22 +1178,24 @@ dtc_attach (UNIT *uptr, CONST char *cptr)
                 uptr->flags = uptr->flags | UNIT_8FMT;
             else if (sz == D11_FILSIZ)
                 uptr->flags = uptr->flags | UNIT_11FMT;
-            }
         }
+    }
     uptr->capac = DTU_CAPAC (uptr);                         /* set capacity */
     uptr->filebuf = calloc (uptr->capac, sizeof (uint32));
     if (uptr->filebuf == NULL) {                            /* can't alloc? */
         detach_unit (uptr);
         return SCPE_MEM;
-        }
+    }
     fbuf = (uint32 *) uptr->filebuf;                        /* file buffer */
-    printf ("%s%d: ", sim_dname (&dtc_dev), u);
+    sim_printf ("%s%d: ", sim_dname (&dtc_dev), u);
     if (uptr->flags & UNIT_8FMT)
-        printf ("12b format");
+        sim_printf ("12b format");
     else if (uptr->flags & UNIT_11FMT)
-        printf ("16b format");
-    else printf ("18b/36b format");
-    printf (", buffering file in memory\n");
+        sim_printf ("16b format");
+    else sim_printf ("18b/36b format");
+    sim_printf (", buffering file in memory\n");
+    uptr->WRITTEN = 0;
+    uptr->io_flush = dtc_flush;
     if (uptr->flags & UNIT_8FMT) {                          /* 12b? */
         for (ba = 0; ba < uptr->capac; ) {                  /* loop thru file */
             k = fxread (pdp8b, sizeof (uint16), D8_NBSIZE, uptr->fileref);
@@ -1198,11 +1209,10 @@ dtc_attach (UNIT *uptr, CONST char *cptr)
                 fbuf[ba + 1] = ((uint32) (pdp8b[k + 1] & 077) << 12) |
                     ((uint32) pdp8b[k + 2] & 07777);
                 ba = ba + 2;                                /* end blk loop */
-                }
-            }                                               /* end file loop */
+            }
+        }                                                   /* end file loop */
         uptr->hwmark = ba;
-            }                                               /* end if */
-    else if (uptr->flags & UNIT_11FMT) {                    /* 16b? */
+    } else if (uptr->flags & UNIT_11FMT) {                  /* 16b? */
         for (ba = 0; ba < uptr->capac; ) {                  /* loop thru file */
             k = fxread (pdp11b, sizeof (uint16), D18_BSIZE, uptr->fileref);
             if (k == 0)
@@ -1211,10 +1221,9 @@ dtc_attach (UNIT *uptr, CONST char *cptr)
                 pdp11b[k] = 0;
             for (k = 0; k < D18_BSIZE; k++)
                 fbuf[ba++] = pdp11b[k];
-                }
+        }
         uptr->hwmark = ba;
-        }                                                   /* end elif */
-    else uptr->hwmark = fxread (uptr->filebuf, sizeof (uint32),
+    } else uptr->hwmark = fxread (uptr->filebuf, sizeof (uint32),
         uptr->capac, uptr->fileref);
     uptr->flags = uptr->flags | UNIT_BUF;                   /* set buf flag */
     uptr->pos = DT_EZLIN;                                   /* beyond leader */
@@ -1230,23 +1239,15 @@ dtc_attach (UNIT *uptr, CONST char *cptr)
    Deallocate buffer
 */
 
-t_stat
-dtc_detach (UNIT* uptr)
+void
+dtc_flush (UNIT* uptr)
 {
     uint16 pdp8b[D8_NBSIZE];
     uint16 pdp11b[D18_BSIZE];
     uint32 ba, k, *fbuf;
-    int32 u = uptr - dtc_dev.units;
     
-    if (!(uptr->flags & UNIT_ATT))
-        return SCPE_OK;
-    if (sim_is_active (uptr)) {
-        sim_cancel (uptr);
-        uptr->CMD = uptr->pos = 0;
-        }
-    fbuf = (uint32 *) uptr->filebuf;                        /* file buffer */
-    if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */
-        printf ("%s%d: writing buffer to file\n", sim_dname (&dtc_dev), u);
+    if (uptr->WRITTEN && uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */
+        fbuf = (uint32 *) uptr->filebuf;                        /* file buffer */
         rewind (uptr->fileref);                             /* start of file */
         if (uptr->flags & UNIT_8FMT) {                      /* 12b? */
             for (ba = 0; ba < uptr->hwmark; ) {             /* loop thru file */
@@ -1256,26 +1257,42 @@ dtc_detach (UNIT* uptr)
                         ((fbuf[ba + 1] >> 12) & 077);
                     pdp8b[k + 2] = fbuf[ba + 1] & 07777;
                     ba = ba + 2;
-                                    }                                                /* end loop blk */
+                }                                           /* end loop blk */
                 fxwrite (pdp8b, sizeof (uint16), D8_NBSIZE, uptr->fileref);
                 if (ferror (uptr->fileref))
                     break;
-                }                                           /* end loop file */
-            }                                               /* end if 12b */
-        else if (uptr->flags & UNIT_11FMT) {                /* 16b? */
+            }                                               /* end loop file */
+        } else if (uptr->flags & UNIT_11FMT) {              /* 16b? */
             for (ba = 0; ba < uptr->hwmark; ) {             /* loop thru file */
                 for (k = 0; k < D18_BSIZE; k++)             /* loop blk */
                     pdp11b[k] = fbuf[ba++] & 0177777;
                 fxwrite (pdp11b, sizeof (uint16), D18_BSIZE, uptr->fileref);
                 if (ferror (uptr->fileref))
                     break;
-                }                                           /* end loop file */
-            }                                               /* end if 16b */
-        else fxwrite (uptr->filebuf, sizeof (uint32),       /* write file */
+            }                                              /* end loop file */
+        } else fxwrite (uptr->filebuf, sizeof (uint32),    /* write file */
             uptr->hwmark, uptr->fileref);
         if (ferror (uptr->fileref))
-            perror ("I/O error");
-        }                                                   /* end if hwmark */
+            sim_perror ("I/O error");
+        uptr->WRITTEN = 0;
+    }                                                   /* end if hwmark */
+}
+
+t_stat
+dtc_detach (UNIT* uptr)
+{
+    int32 u = uptr - dtc_dev.units;
+    
+    if (!(uptr->flags & UNIT_ATT))
+        return SCPE_OK;
+    if (sim_is_active (uptr)) {
+        sim_cancel (uptr);
+        uptr->CMD = uptr->pos = 0;
+    }
+    if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */
+        sim_printf ("%s%d: writing buffer to file\n", sim_dname (&dtc_dev), u);
+        dtc_flush (uptr);
+    }                                                       /* end if hwmark */
     free (uptr->filebuf);                                   /* release buf */
     uptr->flags = uptr->flags & ~UNIT_BUF;                  /* clear buf flag */
     uptr->filebuf = NULL;                                   /* clear buf ptr */
