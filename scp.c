@@ -267,7 +267,7 @@
 #define SCH_GE          6
 #define SCH_LE          7
 
-#define MAX_DO_NEST_LVL 20                              /* DO cmd nesting level */
+#define MAX_DO_NEST_LVL 20                              /* DO cmd nesting level limit */
 #define SRBSIZ          1024                            /* save/restore buffer */
 #define SIM_BRK_INILNT  4096                            /* bpt tbl length */
 #define SIM_BRK_ALLTYP  0xFFFFFFFB
@@ -481,6 +481,7 @@ t_stat show_version (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char 
 t_stat show_default (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat show_break (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat show_on (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
+t_stat show_do (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat show_runlimit (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat sim_show_send (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
 t_stat sim_show_expect (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr);
@@ -1543,6 +1544,7 @@ static const char simh_help[] =
       "+sh{ow} clocks               show calibrated timer information\n"
       "+sh{ow} throttle             show throttle info\n"
       "+sh{ow} on                   show on condition actions\n"
+      "+sh{ow} do                   show do nesting state\n"
       "+sh{ow} runlimit             show execution limit states\n"
       "+h{elp} <dev> show           displays the device specific show commands\n"
       "++++++++                     available\n"
@@ -1569,6 +1571,7 @@ static const char simh_help[] =
 #define HLP_SHOW_VIDEO          "*Commands SHOW"
 #define HLP_SHOW_CLOCKS         "*Commands SHOW"
 #define HLP_SHOW_ON             "*Commands SHOW"
+#define HLP_SHOW_DO             "*Commands SHOW"
 #define HLP_SHOW_RUNLIMIT       "*Commands SHOW"
 #define HLP_SHOW_SEND           "*Commands SHOW"
 #define HLP_SHOW_EXPECT         "*Commands SHOW"
@@ -2539,7 +2542,8 @@ static SHTAB show_glob_tab[] = {
     { "CLOCKS",         &sim_show_timers,           0, HLP_SHOW_CLOCKS },
     { "SEND",           &sim_show_send,             0, HLP_SHOW_SEND },
     { "EXPECT",         &sim_show_expect,           0, HLP_SHOW_EXPECT },
-    { "ON",             &show_on,                   0, HLP_SHOW_ON },
+    { "ON",             &show_on,                  -1, HLP_SHOW_ON },
+    { "DO",             &show_do,                   0, HLP_SHOW_DO },
     { "RUNLIMIT",       &show_runlimit,             0, HLP_SHOW_RUNLIMIT },
     { NULL,             NULL,                       0 }
     };
@@ -2825,7 +2829,8 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         if (sim_on_actions[sim_do_depth][ON_SIGINT_ACTION])
             sim_brk_setact (sim_on_actions[sim_do_depth][ON_SIGINT_ACTION]);
         }
-    if ((cptr = sim_brk_getact (cbuf, sizeof(cbuf)))) { /* pending action? */
+    sim_do_ocptr[sim_do_depth] = cptr = sim_brk_getact (cbuf, sizeof(cbuf)); /* get bkpt action */
+    if (sim_do_ocptr[sim_do_depth]) {                   /* pending action? */
         if (sim_do_echo)
             printf ("%s+ %s\n", sim_prompt, cptr);      /* echo */
         sim_cptr_is_action[sim_do_depth] = TRUE;
@@ -2837,6 +2842,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
             }
         else
             cptr = read_line_p (sim_prompt, cbuf, sizeof(cbuf), stdin);/* read with prompt*/
+        sim_do_ocptr[sim_do_depth] = cptr;
         sim_cptr_is_action[sim_do_depth] = FALSE;
         }
     if (cptr == NULL) {                                 /* EOF? or SIGINT? */
@@ -2855,13 +2861,13 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         fprintf (sim_log, "%s%s\n", sim_prompt, cptr);
     if (sim_deb && (sim_deb != sim_log) && (sim_deb != stdout))
         fprintf (sim_deb, "%s%s\n", sim_prompt, cptr);
+    cptr = get_glyph_cmd (cptr, gbuf);                  /* get command glyph */
+    sim_switches = 0;                                   /* init switches */
     if (!sim_cptr_is_action[sim_do_depth]) {
         sim_if_cmd_last[sim_do_depth] = sim_if_cmd[sim_do_depth];
         sim_if_result_last[sim_do_depth] = sim_if_result[sim_do_depth];
         sim_if_result[sim_do_depth] = sim_if_cmd[sim_do_depth] = FALSE;
         }
-    cptr = get_glyph_cmd (cptr, gbuf);                  /* get command glyph */
-    sim_switches = 0;                                   /* init switches */
     if ((cmdp = find_cmd (gbuf))) {                     /* lookup command */
         if (do_called && (cmdp->action == &return_cmd)) /* RETURN command? */
             break;
@@ -3747,7 +3753,7 @@ if (NULL == (c = sim_filepath_parts (cbuf, "f"))) {
     stat = SCPE_MEM;
     goto Cleanup_Return;
     }
-strlcpy( sim_do_filename[sim_do_depth], c, 
+strlcpy( sim_do_filename[sim_do_depth], strcasecmp (cbuf, "<stdin>") ? c : cbuf, 
          sizeof (sim_do_filename[sim_do_depth]));       /* stash away full path of do file name for possible use by 'call' command */
 free (c);
 sim_do_label[sim_do_depth] = label;                     /* stash away do label for possible use in messages */
@@ -5033,7 +5039,10 @@ long fpos;
 int32 saved_do_echo = sim_do_echo;
 int32 saved_goto_line = sim_goto_line[sim_do_depth];
 
-if (NULL == sim_gotofile) return SCPE_UNK;              /* only valid inside of do_cmd */
+if ((NULL == sim_gotofile) || 
+    (0 == strcasecmp (sim_do_filename[sim_do_depth], "<stdin>")))
+    return SCPE_UNK;                                    /* only valid inside of do_cmd */
+
 get_glyph (fcptr, gbuf1, 0);
 if ('\0' == gbuf1[0])                                   /* unspecified goto target */
     return sim_messagef (SCPE_ARG, "Missing goto target\n");
@@ -5075,7 +5084,7 @@ return sim_messagef (SCPE_ARG, "goto target '%s' not found\n", gbuf1);
 
 t_stat return_cmd (int32 flag, CONST char *fcptr)
 {
-return SCPE_UNK;                                        /* only valid inside of do_cmd */
+return sim_messagef (SCPE_UNK, "Invalid Command\n"); /* only valid inside of do_cmd */
 }
 
 /* Shift command */
@@ -6329,32 +6338,78 @@ if ((dptr->flags & DEV_DEBUG) || (dptr->debflags)) {
 else return SCPE_NOFNC;
 }
 
-/* Show On actions */
+/* Show On actions for one level (default current level) */
 
 t_stat show_on (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr)
 {
 int32 lvl, i;
 
 if (cptr && (*cptr != 0)) return SCPE_2MARG;            /* now eol? */
-for (lvl=sim_do_depth; lvl >= 0; --lvl) {
+if (flag < 0)
+    lvl = sim_do_depth;
+else
+    if (flag > sim_do_depth)
+        return SCPE_ARG;
+    else
+        lvl = flag;
+if (flag == -1) {
     if (lvl > 0)
         fprintf(st, "On Processing at Do Nest Level: %d", lvl);
     else
         fprintf(st, "On Processing for input commands");
-    fprintf(st, " is %s\n", (sim_on_check[lvl]) ? "enabled" : "disabled");
-    for (i=1; i<SCPE_BASE; ++i) {
-        if (sim_on_actions[lvl][i])
-            fprintf(st, "    on %6d    %s\n", i, sim_on_actions[lvl][i]); }
-    for (i=SCPE_BASE; i<=SCPE_MAX_ERR; ++i) {
-        if (sim_on_actions[lvl][i])
-            fprintf(st, "    on %-6s    %s\n", scp_errors[i-SCPE_BASE].code, sim_on_actions[lvl][i]); }
-    if (sim_on_actions[lvl][0])
-        fprintf(st, "    on ERROR     %s\n", sim_on_actions[lvl][0]);
-    if (sim_on_actions[lvl][ON_SIGINT_ACTION]) {
-        fprintf(st, "CONTROL+C/SIGINT Handling:\n");
-        fprintf(st, "    on CONTROL_C %s\n", sim_on_actions[lvl][ON_SIGINT_ACTION]);
+    }
+else
+    fprintf(st, "On Processing");
+fprintf(st, " is %s\n", (sim_on_check[lvl]) ? "enabled" : "disabled");
+for (i=1; i<SCPE_BASE; ++i) {
+    if (sim_on_actions[lvl][i])
+        fprintf(st, "    on %6d    %s\n", i, sim_on_actions[lvl][i]); }
+for (i=SCPE_BASE; i<=SCPE_MAX_ERR; ++i) {
+    if (sim_on_actions[lvl][i])
+        fprintf(st, "    on %-6s    %s\n", scp_errors[i-SCPE_BASE].code, sim_on_actions[lvl][i]); }
+if (sim_on_actions[lvl][0])
+    fprintf(st, "    on ERROR     %s\n", sim_on_actions[lvl][0]);
+if (sim_on_actions[lvl][ON_SIGINT_ACTION]) {
+    fprintf(st, "CONTROL+C/SIGINT Handling:\n");
+    fprintf(st, "    on CONTROL_C %s\n", sim_on_actions[lvl][ON_SIGINT_ACTION]);
+    }
+fprintf(st, "\n");
+if ((flag < 0) && sim_on_inherit)
+    fprintf(st, "on state and actions are inherited by nested do commands and subroutines\n");
+return SCPE_OK;
+}
+
+t_stat show_do (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr)
+{
+int32 lvl;
+
+if (cptr && (*cptr != 0)) return SCPE_2MARG;            /* now eol? */
+for (lvl=sim_do_depth; lvl >= 0; --lvl) {
+    if (lvl > 0)
+        fprintf(st, "Do Nest Level: %d\n", lvl);
+    else {
+        if (sim_do_filename[lvl][0])
+            fprintf(st, "Initial Input ");
+        else
+            fprintf(st, "Console Input commands\n");
         }
-    fprintf(st, "\n");
+    if (sim_do_filename[lvl][0]) {
+        fprintf (st, "File: %s\n", sim_do_filename[lvl]);
+        if (strcasecmp (sim_do_filename[lvl], "<stdin>"))
+            fprintf (st, "Line: %d\n", sim_goto_line[lvl]);
+        }
+    if (sim_if_cmd[lvl])
+        fprintf (st, "Processing IF command\n");
+    if (sim_if_cmd_last[lvl])
+        fprintf (st, "IF command last\n");
+    if (sim_if_result[lvl])
+        fprintf (st, "IF result\n");
+    if (sim_if_result_last[lvl])
+        fprintf (st, "IF result last\n");
+    if (sim_cptr_is_action[lvl])
+        fprintf (st, "Command is Action\n");
+    fprintf (st, "Command is: %s\n", sim_do_ocptr[lvl]);
+    show_on (st, dptr, uptr, lvl, cptr);
     }
 if (sim_on_inherit)
     fprintf(st, "on state and actions are inherited by nested do commands and subroutines\n");
