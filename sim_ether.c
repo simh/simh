@@ -1958,7 +1958,8 @@ return NULL;
 t_stat eth_set_async (ETH_DEV *dev, int latency)
 {
 #if !defined(USE_READER_THREAD) || !defined(SIM_ASYNCH_IO)
-char *msg = "Eth: can't operate asynchronously, must poll\n";
+char *msg = "Eth: Can't operate asynchronously, must poll.\n"
+            " *** Build with USE_READER_THREAD defined and link with pthreads for asynchronous operation. ***\n";
 return sim_messagef (SCPE_NOFNC, "%s", msg);
 #else
 int wakeup_needed;
