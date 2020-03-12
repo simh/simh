@@ -130,21 +130,6 @@
 #define ILEN       u6    /* Size of input buffer in bits */
 
 
-#ifdef _MSC_VER
-# define PACKED_BEGIN __pragma( pack(push, 1) )
-# define PACKED_END __pragma( pack(pop) )
-# define QEMU_PACKED
-#else
-# define PACKED_BEGIN
-#if defined(_WIN32)
-# define PACKED_END __attribute__((gcc_struct, packed))
-# define QEMU_PACKED __attribute__((gcc_struct, packed))
-#else
-# define PACKED_END __attribute__((packed))
-# define QEMU_PACKED __attribute__((packed))
-#endif
-#endif
-
 #define IMP_ARPTAB_SIZE        64
 #define IMP_ARP_MAX_AGE        100
 
