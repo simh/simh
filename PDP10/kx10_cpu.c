@@ -5929,6 +5929,8 @@ unasign:
                       MB = AR;
                       if (Mem_write(0, 0))
                           goto last;
+                      if ((IR & 04) == 0)
+                          break;
                       goto ld_ptr;
                   }
 #endif
@@ -7715,7 +7717,6 @@ jrstf:
                   sect = pc_sect;
 #endif
               AR = AOB(AR);
-              AB = AR & RMASK;
               if (AR & C1) {
 #if KI | KL
                  if (!pi_cycle)
@@ -7728,6 +7729,7 @@ jrstf:
 #if KL
               }
 #endif
+              AB = AR & RMASK;
               MB = BR;
               if (hst_lnt)
                   hst[hst_p].mb = MB;
@@ -7741,6 +7743,7 @@ jrstf:
               flag1 = glb_sect;
               glb_sect = 0;
               sect = pc_sect;
+              /* Decide if our stack pointer is global or local */
               if (QKLB && t20_page) {
                   if ((xct_flag & 1) != 0)
                      sect = prev_sect;
@@ -7750,11 +7753,14 @@ jrstf:
                   }
               }
 #endif
+              /* Fetch top of stack */
               AB = AR & RMASK;
               if (Mem_read(0, 0, 0))
                   goto last;
               if (hst_lnt)
                   hst[hst_p].mb = MB;
+
+              /* Save in location */
               AB = BR & RMASK;
 #if KL
               BYF5 = 0;   /* Now back to data */
@@ -7766,6 +7772,8 @@ jrstf:
               if (Mem_write(0, 0))
                   goto last;
 #if KL
+              /* Determine if we had globabl stack pointer or not */
+              sect = pc_sect;
               if (QKLB && t20_page) {
                   if ((xct_flag & 1) != 0)
                      sect = prev_sect;
@@ -8647,6 +8655,12 @@ last:
 #if KL
     /* Handle page fault and traps */
     if (page_enable && page_fault) {
+        if (hst_lnt) {
+            hst_p = hst_p + 1;
+            if (hst_p >= hst_lnt) {
+                    hst_p = 0;
+            }
+        }
         page_fault = 0;
         BYF5 = 0;
 #if KL_ITS
