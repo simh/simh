@@ -1,6 +1,6 @@
 /* sigma_io.c: XDS Sigma IO simulator
 
-   Copyright (c) 2007-2017, Robert M Supnik
+   Copyright (c) 2007-2020, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-Mar-2020  RMS     Fixed s5x0_ireg size declaration (Mark Pizzolato)
    09-Mar-2017  RMS     Fixed unspecified return value in HIO (COVERITY)
 */
 
@@ -38,7 +39,7 @@ uint32 ei_bmax = EIGRP_DFLT;                            /* ext int grps */
 uint32 s9_snap = 0;
 uint32 s9_marg = 0;
 uint32 chan_num = CHAN_DFLT;                            /* num chan */
-uint32 s5x0_ireg[] = { 0 };
+uint32 s5x0_ireg[32] = { 0 };
 uint16 int_arm[INTG_MAX];                               /* int grps: arm */
 uint16 int_enb[INTG_MAX];                               /* enable */
 uint16 int_req[INTG_MAX];                               /* request */
