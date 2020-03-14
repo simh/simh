@@ -26,6 +26,7 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   19-Dec-19    JDB     Added tmxr_is_extended global hook
    19-Mar-19    JDB     Added tmxr_read, tmxr_write, tmxr_show, tmxr_close
                         global hooks and associated local hook routines;
                         added tmxr_init_line, tmxr_report_connection,
@@ -148,10 +149,11 @@ static int32 tmxr_local_write (TMLN *lp, int32 length);
 static void  tmxr_local_show  (TMLN *lp, FILE *stream);
 static void  tmxr_local_close (TMLN *lp);
 
-int32 (*tmxr_read)  (TMLN *lp, int32 length) = tmxr_local_read;
-int32 (*tmxr_write) (TMLN *lp, int32 length) = tmxr_local_write;
-void  (*tmxr_show)  (TMLN *lp, FILE *stream) = tmxr_local_show;
-void  (*tmxr_close) (TMLN *lp)               = tmxr_local_close;
+int32  (*tmxr_read)        (TMLN *lp, int32 length) = tmxr_local_read;
+int32  (*tmxr_write)       (TMLN *lp, int32 length) = tmxr_local_write;
+void   (*tmxr_show)        (TMLN *lp, FILE *stream) = tmxr_local_show;
+void   (*tmxr_close)       (TMLN *lp)               = tmxr_local_close;
+t_bool (*tmxr_is_extended) (TMLN *lp)               = NULL;
 
 /* Poll for new connection
 
@@ -370,8 +372,9 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
         lp->rxbpi = lp->rxbpi + nbytes;                 /* adv pointers */
         lp->rxcnt = lp->rxcnt + nbytes;
 
-        if (lp->exptr != NULL)                          /* if the line is extended */
-            continue;                                   /*   then skip the Telnet processing */
+        if (tmxr_is_extended != NULL                    /* if the line */
+          && tmxr_is_extended (lp) == TRUE)             /*   is extended */
+            continue;                                   /*     then skip the Telnet processing */
 
         memset (&lp->rbr[j], 0, nbytes);                /* clear status */
 
@@ -635,9 +638,10 @@ mp->master = sock;                                      /* save master socket */
 for (i = 0; i < mp->lines; i++) {                       /* initialize lines */
     lp = mp->ldsc + i;
 
-    if (lp->exptr == NULL) {                            /* if the line is not extended */
-        tmxr_init_line (lp);                            /*   then initialize the line */
-        lp->conn = 0;                                   /*     and clear the connection */
+    if (tmxr_is_extended == NULL                        /* if the line  */
+      || tmxr_is_extended (lp) == FALSE) {              /*   is not extended */
+        tmxr_init_line (lp);                            /*     then initialize the line */
+        lp->conn = 0;                                   /*       and clear the connection */
         }
     }
 return SCPE_OK;
@@ -678,8 +682,10 @@ TMLN *lp;
 for (i = 0; i < mp->lines; i++) {                       /* loop thru conn */
     lp = mp->ldsc + i;
 
-    if (lp->exptr == NULL && lp->conn)                  /* if the line is not extended but is connected */
-        tmxr_disconnect_line (lp);                      /*   then disconnect it */
+    if (lp->conn                                        /* if the line is connected */
+      && (tmxr_is_extended == NULL                      /*   and the line  */
+      || tmxr_is_extended (lp) == FALSE))               /*     is not extended */
+        tmxr_disconnect_line (lp);                      /*       then disconnect it */
     }                                                   /* end for */
 sim_close_sock (mp->master);                            /* close master socket */
 mp->master = 0;
