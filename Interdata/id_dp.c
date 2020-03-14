@@ -25,7 +25,7 @@
 
    dp           M46-421 2.5MB/10MB cartridge disk
 
-   01-Mar-20    RMS     Fixed xTIME register declarations (Mark Pizzolato)
+   01-Mar-20    RMS     Fixed xTIME register definitions (Mark Pizzolato)
    18-Mar-05    RMS     Added attached test to detach routine
    25-Jan-04    RMS     Revised for device debug support
    25-Apr-03    RMS     Revised for extended file support

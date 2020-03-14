@@ -29,13 +29,37 @@
 
 #define SIM_MAJOR       3
 #define SIM_MINOR       11
-#define SIM_PATCH       0
+#define SIM_PATCH       1
 #define SIM_DELTA       0
 
 /* V3.11 revision history
 
    V3.11 incorporates SCP additions and extensions by Dave Bryan to support his
    HP simulators.
+
+patch   date            module(s) and fix(es)
+
+  1     06-Mar-2020     scp.c and sim_tmxr_c
+                        - new extensions to support HP simulators
+
+                        sim_ether library
+                        - imported latest V4 revision
+
+                        Alpha
+                        - fixed DMAPEN register definition
+
+                        Interdata
+                        - fixed DP xTIME register definitions
+
+                        PDP-11
+                        - fixed PT INT definition
+                        - disabled VH11 (temporarily) because of multiline race condition
+
+                        Sigma
+                        - fixed incorrect 550 interrupt register array declaration
+
+                        VAX
+                        - disabled VH11 (temporarily) because of multiline race condition
 
 patch   date            module(s) and fix(es)
 

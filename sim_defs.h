@@ -116,6 +116,9 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
+#if defined(_MSC_VER) && (_MSC_VER < 1900)
+#define snprintf _snprintf      /* poor man's snprintf which will work most of the time but has different return value */
+#endif
 #include <stdarg.h>
 #include <string.h>
 #include <errno.h>
@@ -542,6 +545,9 @@ struct sim_debtab {
 #define FLDATA(nm,loc,pos) #nm, &(loc), 2, 1, (pos), 1
 #define GRDATA(nm,loc,rdx,wd,pos) #nm, &(loc), (rdx), (wd), (pos), 1
 #define BRDATA(nm,loc,rdx,wd,dep) #nm, (loc), (rdx), (wd), 0, (dep)
+#define VBRDATA(nm,loc,rdx,wd,dep) #nm, (loc), (rdx), (wd), 0, (dep)
+#define SAVEDATA(nm,loc) \
+    #nm, &(loc), 8, 8, 0, sizeof(loc), REG_HRO
 #define URDATA(nm,loc,rdx,wd,off,dep,fl) \
     #nm, &(loc), (rdx), (wd), (off), (dep), ((fl) | REG_UNIT)
 #else
@@ -551,6 +557,9 @@ struct sim_debtab {
 #define FLDATA(nm,loc,pos) "nm", &(loc), 2, 1, (pos), 1
 #define GRDATA(nm,loc,rdx,wd,pos) "nm", &(loc), (rdx), (wd), (pos), 1
 #define BRDATA(nm,loc,rdx,wd,dep) "nm", (loc), (rdx), (wd), 0, (dep)
+#define VBRDATA(nm,loc,rdx,wd,dep) "nm", (loc), (rdx), (wd), 0, (dep)
+#define SAVEDATA(nm,loc) \
+    "nm", &(loc), 8, 8, 0, sizeof(loc), REG_HRO
 #define URDATA(nm,loc,rdx,wd,off,dep,fl) \
     "nm", &(loc), (rdx), (wd), (off), (dep), ((fl) | REG_UNIT)
 #endif
