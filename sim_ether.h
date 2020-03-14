@@ -349,7 +349,7 @@ t_stat eth_filter_hash (ETH_DEV* dev, int addr_count,   /* set filter on incomin
                         ETH_MULTIHASH* const hash);
 t_stat eth_check_address_conflict (ETH_DEV* dev, 
                                    ETH_MAC* const address);
-int eth_devices   (int max, ETH_LIST* dev);             /* get ethernet devices on host */
+const char *eth_version (void);                         /* Version of dynamically loaded library (pcap) */
 void eth_setcrc   (ETH_DEV* dev, int need_crc);         /* enable/disable CRC mode */
 t_stat eth_set_async (ETH_DEV* dev, int latency);       /* set read behavior to be async */
 t_stat eth_clr_async (ETH_DEV* dev);                    /* set read behavior to be not async */
@@ -378,8 +378,13 @@ void ethq_insert_data(ETH_QUE* que, int32 type,         /* insert item into FIFO
                   const uint8 *data, int used, size_t len, 
                   size_t crc_len, const uint8 *crc_data, int32 status);
 t_stat ethq_destroy(ETH_QUE* que);                      /* release FIFO queue */
-
 const char *eth_capabilities(void);
+t_stat sim_ether_test (DEVICE *dptr);                   /* unit test routine */
+
+#if !defined(SIM_TEST_INIT)    	/* Need stubs for test APIs */
+#define SIM_TEST_INIT
+#define SIM_TEST(xxx)
+#endif
 
 #ifdef  __cplusplus
 }
