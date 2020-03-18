@@ -1,7 +1,7 @@
 /* pdp11_ch.c: CH11 Chaosnet interface.
   ------------------------------------------------------------------------------
 
-   Copyright (c) 2018, Lars Brinkhoff.
+   Copyright (c) 2018, 2002, Lars Brinkhoff.
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -101,11 +101,13 @@ t_stat ch_help (FILE *, DEVICE *, UNIT *, int32, const char *);
 t_stat ch_help_attach (FILE *, DEVICE *, UNIT *, int32, const char *);
 const char *ch_description (DEVICE *);
 
+#define CH11_NO_ADDRESS 0XFFFF
+
 static char peer[256];
-static int status;
-static int address = -1;
-static int rx_count;
-static int tx_count;
+static uint16 status;
+static uint16 address = CH11_NO_ADDRESS;
+static uint16 rx_count;
+static uint16 tx_count;
 static uint8 rx_buffer[512+100];
 static uint8 tx_buffer[512+100];
 
@@ -117,11 +119,11 @@ UNIT ch_unit[] = {
 };
 
 REG ch_reg[] = {
-  { GRDATADF(CSR,   status,     16, 16, 0, "Control and status", ch_csr_bits), REG_FIT },
-  { GRDATAD(RXCNT,  rx_count,   16, 16, 0, "Receive word count"), REG_FIT|REG_RO},
-  { GRDATAD(TXCNT,  tx_count,   16, 16, 0, "Transmit word count"), REG_FIT|REG_RO},
-  { BRDATAD(RXBUF,  rx_buffer,  16,  8, sizeof rx_buffer, "Receive packet buffer"), REG_FIT},
-  { BRDATAD(TXBUF,  tx_buffer,  16,  8, sizeof tx_buffer, "Transmit packet buffer"), REG_FIT},
+  { GRDATADF(CSR,   status,     16, 16, 0, "Control and status", ch_csr_bits), 0 },
+  { GRDATAD(RXCNT,  rx_count,   16, 16, 0, "Receive word count"), REG_RO},
+  { GRDATAD(TXCNT,  tx_count,   16, 16, 0, "Transmit word count"), REG_RO},
+  { BRDATAD(RXBUF,  rx_buffer,  16,  8, sizeof rx_buffer, "Receive packet buffer"), 0},
+  { BRDATAD(TXBUF,  tx_buffer,  16,  8, sizeof tx_buffer, "Transmit packet buffer"), 0},
   { BRDATAD(PEER,   peer,       16,  8, sizeof peer, "Network peer"), REG_HRO},
   { GRDATAD(NODE,   address,    16, 16, 0, "Node address"), REG_HRO},
   { NULL }  };
@@ -414,7 +416,7 @@ t_stat ch_attach (UNIT *uptr, CONST char *cptr)
   char *linkinfo;
   t_stat r;
 
-  if (address == -1)
+  if (address == CH11_NO_ADDRESS)
     return sim_messagef (SCPE_2FARG, "Must set Chaosnet NODE address first \"SET CH NODE=val\"\n");
   if (peer[0] == '\0')
     return sim_messagef (SCPE_2FARG, "Must set Chaosnet PEER \"SET CH PEER=host:port\"\n");
@@ -488,7 +490,7 @@ t_stat ch_set_peer (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 
 t_stat ch_show_node (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
 {
-  if (address == -1)
+  if (address == CH11_NO_ADDRESS)
     fprintf (st, "node=unspecified");
   else
     fprintf (st, "node=%o", address);

@@ -45,8 +45,8 @@ typedef unsigned int uint32;
 #ifndef PIX_SCALE
 #define PIX_SCALE RES_FULL
 #endif
-extern int ng_type;
-extern int ng_scale;
+extern int32 ng_type;
+extern int32 ng_scale;
 
 extern int32 ng_get_csr(void);
 extern int32 ng_get_reloc(void);
