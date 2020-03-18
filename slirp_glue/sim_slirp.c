@@ -344,7 +344,7 @@ else {
         if ((rnd_val & 0xFFFF) == 0)
             ++rnd_val;
         sprintf (db_host, "localhost:%d", (int)(rnd_val & 0xFFFF));
-        slirp->db_chime  = sim_connect_sock_ex (db_host, db_host, NULL, NULL, SIM_SOCK_OPT_DATAGRAM);
+        slirp->db_chime  = sim_connect_sock_ex (db_host, db_host, NULL, NULL, SIM_SOCK_OPT_DATAGRAM | SIM_SOCK_OPT_BLOCKING);
         } while (slirp->db_chime == INVALID_SOCKET);
     memset (&pfd, 0, sizeof (pfd));
     pfd.fd = slirp->db_chime;

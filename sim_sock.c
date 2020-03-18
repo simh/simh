@@ -917,7 +917,7 @@ if (sta == SOCKET_ERROR)                                /* bind error? */
 if (!(opt_flags & SIM_SOCK_OPT_BLOCKING)) {
     sta = sim_setnonblock (newsock);                    /* set nonblocking */
     if (sta == SOCKET_ERROR)                            /* fcntl error? */
-        return sim_err_sock (newsock, "fcntl");
+        return sim_err_sock (newsock, "setnonblock");
     }
 sta = listen (newsock, 1);                              /* listen on socket */
 if (sta == SOCKET_ERROR)                                /* listen error? */
@@ -989,7 +989,7 @@ if (!(opt_flags & SIM_SOCK_OPT_BLOCKING)) {
     sta = sim_setnonblock (newsock);                    /* set nonblocking */
     if (sta == SOCKET_ERROR) {                          /* fcntl error? */
         p_freeaddrinfo (result);
-        return sim_err_sock (newsock, "fcntl");
+        return sim_err_sock (newsock, "setnonblock");
         }
     }
 if ((!(opt_flags & SIM_SOCK_OPT_DATAGRAM)) && (opt_flags & SIM_SOCK_OPT_NODELAY)) {
@@ -1006,6 +1006,11 @@ if (!(opt_flags & SIM_SOCK_OPT_DATAGRAM)) {
     sta = setsockopt (newsock, SOL_SOCKET, SO_KEEPALIVE, (char *)&keepalive, sizeof(keepalive));
     if (sta == -1) 
         return sim_err_sock (newsock, "setsockopt KEEPALIVE");
+    }
+if (!(opt_flags & SIM_SOCK_OPT_BLOCKING)) {
+    sta = sim_setnonblock (newsock);                    /* set nonblocking */
+    if (sta == SOCKET_ERROR)                            /* fcntl error? */
+        return sim_err_sock (newsock, "setnonblock");
     }
 sta = connect (newsock, result->ai_addr, result->ai_addrlen);
 p_freeaddrinfo (result);
@@ -1076,7 +1081,7 @@ if (connectaddr != NULL) {
 if (!(opt_flags & SIM_SOCK_OPT_BLOCKING)) {
     sta = sim_setnonblock (newsock);                    /* set nonblocking */
     if (sta == SOCKET_ERROR)                            /* fcntl error? */
-        return sim_err_sock (newsock, "fcntl");
+        return sim_err_sock (newsock, "setnonblock");
     }
 
 if ((opt_flags & SIM_SOCK_OPT_NODELAY)) {

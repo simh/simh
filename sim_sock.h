@@ -120,7 +120,7 @@ int sim_parse_addr_ex (const char *cptr, char *host, size_t hostlen, const char 
 SOCKET sim_master_sock_ex (const char *hostport, int *parse_status, int opt_flags);
 #define sim_master_sock(hostport, parse_status) sim_master_sock_ex(hostport, parse_status, ((sim_switches & SWMASK ('U')) ? SIM_SOCK_OPT_REUSEADDR : 0))
 SOCKET sim_connect_sock_ex (const char *sourcehostport, const char *hostport, const char *default_host, const char *default_port, int opt_flags);
-#define sim_connect_sock(hostport, default_host, default_port) sim_connect_sock_ex(NULL, hostport, default_host, default_port, 0)
+#define sim_connect_sock(hostport, default_host, default_port) sim_connect_sock_ex(NULL, hostport, default_host, default_port, SIM_SOCK_OPT_BLOCKING)
 SOCKET sim_accept_conn_ex (SOCKET master, char **connectaddr, int opt_flags);
 #define sim_accept_conn(master, connectaddr) sim_accept_conn_ex(master, connectaddr, 0)
 int sim_check_conn (SOCKET sock, int rd);
