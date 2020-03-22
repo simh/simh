@@ -458,6 +458,7 @@ ptr_leader = PTR_LEADER;                                /* set up leader */
 if (sim_switches & SWMASK ('A'))
     uptr->flags = uptr->flags | UNIT_ASCII;
 else uptr->flags = uptr->flags & ~UNIT_ASCII;
+sim_switches |= SWMASK ('R');
 return attach_unit (uptr, cptr);
 }
 

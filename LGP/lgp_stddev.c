@@ -618,6 +618,8 @@ t_stat tap_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
 
+if (strcmp ("PTR", sim_uname (uptr)) == 0)
+    sim_switches |= SWMASK ('R');           /* PTR is read only */
 if ((r = attach_unit (uptr,cptr)) != SCPE_OK)
     return r;
 if ((sim_switches & SWMASK ('F')) ||

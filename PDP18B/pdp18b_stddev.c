@@ -651,6 +651,7 @@ t_stat ptr_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
 
+sim_switches |= SWMASK ('R');
 reason = attach_unit (uptr, cptr);
 if (reason != SCPE_OK)
     return reason;

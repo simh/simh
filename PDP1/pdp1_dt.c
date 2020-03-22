@@ -1023,6 +1023,7 @@ else if (uptr->flags & UNIT_11FMT)
     sim_printf ("16b format");
 else sim_printf ("18b/36b format");
 sim_printf (", buffering file in memory\n");
+sim_fseek (uptr->fileref, 0, SEEK_SET);                 /* start at the beginning of file */
 if (uptr->flags & UNIT_8FMT) {                          /* 12b? */
     for (ba = 0; ba < uptr->capac; ) {                  /* loop thru file */
         k = fxread (pdp8b, sizeof (uint16), D8_NBSIZE, uptr->fileref);

@@ -424,6 +424,8 @@ t_stat r;
 
 if (!(uptr->flags & UNIT_ATTABLE))                      /* not tti,tto */
     return SCPE_NOFNC;
+if (strcmp ("PTR", sim_uname (uptr)) == 0)              /* PTR is read only */
+    sim_switches |= SWMASK ('R');
 if ((r = attach_unit (uptr, cptr)))
     return r;
 if (sim_switches & SWMASK ('A'))                        /* -a? ASCII */
