@@ -3467,3 +3467,11 @@ for (tmr=0; tmr<=SIM_NTIMERS; tmr++) {
 sim_inst_per_sec_last = sim_precalibrate_ips;
 sim_idle_stable = 0;
 }
+
+double 
+sim_host_speed_factor (void)
+{
+if (sim_precalibrate_ips > SIM_INITIAL_IPS)
+    return 1.0;
+return (double)SIM_INITIAL_IPS / (double)sim_precalibrate_ips;
+}

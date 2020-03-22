@@ -158,6 +158,7 @@ t_stat sim_os_set_thread_priority (int below_normal_above);
 uint32 sim_get_rom_delay_factor (void);
 void sim_set_rom_delay_factor (uint32 delay);
 int32 sim_rom_read_with_delay (int32 val);
+double sim_host_speed_factor (void);
 
 extern t_bool sim_idle_enab;                        /* idle enabled flag */
 extern volatile t_bool sim_idle_wait;               /* idle waiting flag */

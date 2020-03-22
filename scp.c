@@ -7005,6 +7005,8 @@ char gbuf[CBUFSIZE];
 int32 num;
 t_stat r;
 double usec_factor = 1.0;
+const char *units = "";
+char runlimit[32];
 
 GET_SWITCHES (cptr);                                    /* get switches */
 if (0 == flag) {
@@ -7014,6 +7016,8 @@ if (0 == flag) {
     sim_runlimit_switches = 0;
     sim_runlimit_enabled = FALSE;
     sim_cancel (&sim_runlimit_unit);
+    unsetenv ("SIM_RUNLIMIT");
+    unsetenv ("SIM_RUNLIMIT_UNITS");
     return SCPE_OK;
     }
 
@@ -7023,8 +7027,10 @@ if ((r != SCPE_OK) || (num == 0))               /* error? */
     return sim_messagef (SCPE_ARG, "Invalid argument: %s\n", gbuf);
 cptr = get_glyph (cptr, gbuf, 0);               /* get next glyph */
 if ((gbuf[0] == '\0') ||
-    (MATCH_CMD (gbuf, sim_vm_interval_units) == 0))
+    (MATCH_CMD (gbuf, sim_vm_interval_units) == 0)) {
     sim_switches &= ~SWMASK ('T');
+    units = sim_vm_interval_units;
+    }
 else {
     int i;
     struct {
@@ -7042,6 +7048,7 @@ else {
         if (MATCH_CMD (gbuf, time_units[i].name) == 0) {
             sim_switches |= SWMASK ('T');
             usec_factor = time_units[i].usec_factor;
+            units = time_units[i].name;
             break;
             }
         }
@@ -7054,11 +7061,19 @@ sim_runlimit_enabled = TRUE;
 sim_cancel (&sim_runlimit_unit);
 sim_runlimit_switches = sim_switches;
 if (sim_runlimit_switches & SWMASK ('T')) {
-    sim_runlimit_d_initial = sim_runlimit_d = num * usec_factor;
+    sim_runlimit_d_initial = sim_runlimit_d = num * usec_factor * sim_host_speed_factor ();
+    if (sim_host_speed_factor () > 1.0)
+        sim_messagef (SCPE_OK, "Slow host - adjusting RUNLIMIT from %d %s to %.1f %s\n", num, units, num * sim_host_speed_factor (), units);
+    snprintf (runlimit, sizeof (runlimit), "%.f", num * sim_host_speed_factor ());
+    setenv ("SIM_RUNLIMIT", runlimit, 1);
+    setenv ("SIM_RUNLIMIT_UNITS", units, 1);
     return sim_activate_after_d (&sim_runlimit_unit, sim_runlimit_d);
     }
 else {
     sim_runlimit_initial = sim_runlimit = num;
+    snprintf (runlimit, sizeof (runlimit), "%d", num);
+    setenv ("SIM_RUNLIMIT", runlimit, 1);
+    setenv ("SIM_RUNLIMIT_UNITS", units, 1);
     return sim_activate (&sim_runlimit_unit, sim_runlimit);
     }
 }
