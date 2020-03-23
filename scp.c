@@ -14778,8 +14778,34 @@ else {
                     *buf = '\0';
                     }
                 else {                      /* Decimal Number */
-                    while (isdigit (*cptr))
-                        *buf++ = *cptr++;
+                    int digits = 0;
+                    int commas = 0;
+                    const char *cp = cptr;
+
+                    /* Ignore commas in decimal numbers */
+                    while (isdigit (*cp) || (*cp == ',')) {
+                        if (*cp == ',')
+                            ++commas;
+                        else
+                            ++digits;
+                        ++cp;
+                        }
+                    if ((commas > 0) && (commas != (digits - 1)/3)) {
+                        *stat = SCPE_INVEXPR;
+                        return cptr;
+                        }
+                    while (commas--) {
+                        cp -= 4;
+                        if (*cp != ',') {
+                            *stat = SCPE_INVEXPR;
+                            return cptr;
+                            }
+                        }
+                    while (isdigit (*cptr) || (*cptr == ',')) {
+                        if (*cptr != ',')
+                            *buf++ = *cptr;
+                        ++cptr;
+                        }
                     *buf = '\0';
                     }
                 }
