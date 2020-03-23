@@ -1378,9 +1378,11 @@ return reason;
  */
 
 static const char *pdp8_clock_precalibrate_commands[] = {
-    "-m 100 ISZ 110",
-    "-m 101 JMP 100",
-    "-m 102 JMP 100",
+    "106 100"
+    "-m 100 MQL MQA"
+    "-m 101 ISZ 112",
+    "-m 102 JMP I 106",
+    "-m 103 JMP I 106",
     "PC 100",
     NULL};
 
@@ -1398,6 +1400,7 @@ if (pcq_r)
 else 
     return SCPE_IERR;
 sim_clock_precalibrate_commands = pdp8_clock_precalibrate_commands;
+sim_vm_initial_ips = 10 * SIM_INITIAL_IPS;
 sim_brk_types = SWMASK ('E') | SWMASK('I');
 sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;

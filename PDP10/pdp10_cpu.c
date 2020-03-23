@@ -2380,6 +2380,7 @@ if (M == NULL)
 sim_vm_pc_value = &pdp10_pc_value;
 sim_vm_is_subroutine_call = &cpu_is_pc_a_subroutine_call;
 sim_clock_precalibrate_commands = pdp10_clock_precalibrate_commands;
+sim_vm_initial_ips = 2 * SIM_INITIAL_IPS;
 pcq_r = find_reg ("PCQ", NULL, dptr);
 if (pcq_r)
     pcq_r->qptr = 0;

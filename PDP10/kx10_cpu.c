@@ -10108,6 +10108,7 @@ for(i=0; i < 128; dev_irq[i++] = 0);
 sim_brk_types = SWMASK('E') | SWMASK('W') | SWMASK('R');
 sim_brk_dflt = SWMASK ('E');
 sim_clock_precalibrate_commands = pdp10_clock_precalibrate_commands;
+sim_vm_initial_ips = 4 * SIM_INITIAL_IPS;
 sim_rtcn_init_unit (&cpu_unit[0], cpu_unit[0].wait, TMR_RTC);
 sim_activate(&cpu_unit[0], 10000);
 #if MPX_DEV
