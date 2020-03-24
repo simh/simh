@@ -1194,7 +1194,6 @@ dtc_attach (UNIT *uptr, CONST char *cptr)
         sim_printf ("16b format");
     else sim_printf ("18b/36b format");
     sim_printf (", buffering file in memory\n");
-    (void)sim_fseek (uptr->fileref, 0, SEEK_SET);           /* start at the beginning of file */
     uptr->WRITTEN = 0;
     uptr->io_flush = dtc_flush;
     if (uptr->flags & UNIT_8FMT) {                          /* 12b? */

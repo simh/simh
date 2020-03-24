@@ -1248,7 +1248,6 @@ else if (uptr->flags & UNIT_11FMT)
     sim_printf ("16b format");
 else sim_printf ("18b/36b format");
 sim_printf (", buffering file in memory\n");
-(void)sim_fseek (uptr->fileref, 0, SEEK_SET);           /* start at the beginning of file */
 uptr->io_flush = dt_flush;
 if (uptr->flags & UNIT_8FMT)                            /* 12b? */
     uptr->hwmark = fxread (uptr->filebuf, sizeof (uint16),
