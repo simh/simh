@@ -535,7 +535,7 @@ t_stat sim_instr (void)
                 push_byte(B);
                 push_byte(CCR);
                 SET_FLAG(IF);
-                PC = CPU_BD_get_mword(0xFFFB) & ADDRMASK;
+                PC = CPU_BD_get_mword(0xFFFA) & ADDRMASK;
                 break;
             case 0x40:                  /* NEG A */
                 op1 = A;
