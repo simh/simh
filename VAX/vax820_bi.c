@@ -811,7 +811,7 @@ return SCPE_OK;
 
 t_stat cpu_print_model (FILE *st)
 {
-fprintf (st, "model=%s", (sys_model ? "8250" : "8200"));
+fprintf (st, "VAX %s", (sys_model ? "8250" : "8200"));
 return SCPE_OK;
 }
 
