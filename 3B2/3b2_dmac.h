@@ -31,46 +31,37 @@
 #ifndef _3B2_DMAC_H_
 #define _3B2_DMAC_H_
 
-#include "3b2_sysdev.h"
-#include "3b2_id.h"
-#include "3b2_if.h"
-
-/* DMA Controller */
-#define DMACBASE         0x48000
-#define DMACSIZE         0x11
-
-/* DMA integrated disk page buffer */
-#define DMAIDBASE        0x45000
-#define DMAIDSIZE        0x5
-
-/* DMA integrated uart A page buffer */
-#define DMAIUABASE       0x46000
-#define DMAIUASIZE       0x5
-
-/* DMA integrated uart B page buffer */
-#define DMAIUBBASE       0x47000
-#define DMAIUBSIZE       0x5
-
-/* DMA integrated floppy page buffer */
-#define DMAIFBASE        0x4E000
-#define DMAIFSIZE        0x5
-
-#define DMA_ID_CHAN      0
-#define DMA_IF_CHAN      1
-#define DMA_IUA_CHAN     2
-#define DMA_IUB_CHAN     3
-
-#define DMA_ID           0x45
-#define DMA_IUA          0x46
-#define DMA_IUB          0x47
-#define DMA_C            0x48
-#define DMA_IF           0x4E
+#include "sim_defs.h"
 
 #define DMA_MODE_VERIFY  0
 #define DMA_MODE_WRITE   1     /* Write to memory from device */
 #define DMA_MODE_READ    2     /* Read from memory to device  */
 
 #define DMA_IF_READ      (IFBASE + IF_DATA_REG)
+
+typedef struct {
+    uint8  page;
+    uint16 addr;     /* Original addr       */
+    uint16 wcount;   /* Original wcount     */
+    uint16 addr_c;   /* Current addr        */
+    int32  wcount_c; /* Current word-count  */
+    uint16 ptr;      /* Pointer into memory */
+} dma_channel;
+
+typedef struct {
+    /* Byte (high/low) flip-flop */
+    uint8 bff;
+
+    /* Address and count registers for channels 0-3 */
+    dma_channel channels[4];
+
+    /* DMAC programmable registers */
+    uint8 command;
+    uint8 mode;
+    uint8 request;
+    uint8 mask;
+    uint8 status;
+} DMA_STATE;
 
 typedef struct {
     uint8  channel;
@@ -86,5 +77,6 @@ uint32 dmac_read(uint32 pa, size_t size);
 void dmac_write(uint32 pa, uint32 val, size_t size);
 void dmac_service_drqs();
 void dmac_generic_dma(uint8 channel, uint32 service_address);
+uint32 dma_address(uint8 channel, uint32 offset, t_bool r);
 
 #endif

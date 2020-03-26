@@ -1,4 +1,4 @@
-/* 3b2_mmu.c: AT&T 3B2 Model 400 MMU (WE32101) Implementation
+/* 3b2_400_mmu.c: AT&T 3B2 Model 400 MMU (WE32101) Implementation
 
    Copyright (c) 2017, Seth J. Morabito
 
@@ -28,7 +28,8 @@
    from the author.
 */
 
-#include "3b2_mmu.h"
+#include "3b2_defs.h"
+#include "3b2_400_mmu.h"
 
 UNIT mmu_unit = { UDATA(NULL, 0, 0) };
 

@@ -31,8 +31,8 @@
 #ifndef __3B2_IU_H__
 #define __3B2_IU_H__
 
-#include "3b2_defs.h"
-#include "3b2_sysdev.h"
+#include "sim_defs.h"
+#include "sim_tmxr.h"
 
 #define CMD_ERX         0x01              /* Enable receiver */
 #define CMD_DRX         0x02              /* Disable receiver */
@@ -135,11 +135,6 @@
 
 #define IU_MODE(x)    ((x & UM_MASK) >> UM_SHIFT)
 
-extern DEVICE tti_dev;
-extern DEVICE tto_dev;
-extern DEVICE contty_dev;
-extern DEVICE iu_timer_dev;
-
 #define IUBASE            0x49000
 #define IUSIZE            0x100
 
@@ -189,9 +184,6 @@ typedef struct iu_timer_state {
     t_bool c_en;
 } IU_TIMER_STATE;
 
-extern IU_PORT  iu_console;
-extern IU_PORT  iu_contty;
-
 /* Function prototypes */
 t_stat contty_attach(UNIT *uptr, CONST char *cptr);
 t_stat contty_detach(UNIT *uptr);
@@ -212,5 +204,7 @@ void iu_txrdy_a_irq();
 void iu_txrdy_b_irq();
 void iu_dma_console(uint8 channel, uint32 service_address);
 void iu_dma_contty(uint8 channel, uint32 service_address);
+void increment_modep_a();
+void increment_modep_b();
 
 #endif

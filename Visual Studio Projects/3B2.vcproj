@@ -192,7 +192,7 @@
 			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm"
 			>
 			<File
-				RelativePath="..\3B2\3b2_cpu.c"
+				RelativePath="..\3B2\3b2_400_cpu.c"
 				>
 			</File>
 			<File
@@ -220,11 +220,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_mau.c"
+				RelativePath="..\3B2\3b2_400_mau.c"
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_mmu.c"
+				RelativePath="..\3B2\3b2_400_mmu.c"
 				>
 			</File>
 			<File
@@ -236,11 +236,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_sys.c"
+				RelativePath="..\3B2\3b2_400_sys.c"
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_sysdev.c"
+				RelativePath="..\3B2\3b2_400_stddev.c"
 				>
 			</File>
 			<File

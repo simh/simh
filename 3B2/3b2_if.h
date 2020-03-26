@@ -1,4 +1,4 @@
-/* 3b2_cpu.h: AT&T 3B2 Model 400 Floppy (TMS2797NL) Header
+/* 3b2_if.h: AT&T 3B2 Model Floppy Controller (TMS2797NL) Header
 
    Copyright (c) 2017, Seth J. Morabito
 
@@ -31,9 +31,7 @@
 #ifndef __3B2_IF_H__
 #define __3B2_IF_H__
 
-#include "3b2_defs.h"
-#include "3b2_sysdev.h"
-#include "3b2_sys.h"
+#include "sim_defs.h"
 
 typedef struct {
     uint8 data;
@@ -47,21 +45,6 @@ typedef struct {
     int8  step_dir;
     t_bool drq;
 } IF_STATE;
-
-
-extern DEVICE if_dev;
-extern DEBTAB sys_deb_tab[];
-extern IF_STATE if_state;
-extern t_bool if_irq;
-
-#define IFBASE 0x4d000
-#define IFSIZE 0x10
-
-#define IF_STATUS_REG    0
-#define IF_CMD_REG       0
-#define IF_TRACK_REG     1
-#define IF_SECTOR_REG    2
-#define IF_DATA_REG      3
 
 /* Status Bits */
 #define IF_BUSY          0x01

@@ -42,14 +42,12 @@
  *
  */
 
+#include "3b2_defs.h"
 #include "3b2_ports.h"
 
 /* Static function declarations */
 static t_stat ports_show_queue_common(FILE *st, UNIT *uptr, int32 val,
                                       CONST void *desc, t_bool rq);
-
-extern CIO_STATE cio[CIO_SLOTS];
-extern UNIT cio_unit;
 
 /* Device and units for PORTS cards
  * --------------------------------

@@ -45,8 +45,7 @@
 #ifndef _3B2_PORTS_H_
 #define _3B2_PORTS_H_
 
-#include "3b2_defs.h"
-#include "3b2_io.h"
+#include "sim_defs.h"
 
 #define PORTS_ID        0x0003
 #define PORTS_IPL       10
@@ -215,8 +214,6 @@ typedef struct {
     uint8  pad2;
     uint16 pad3;
 } PORTS_OPTIONS;
-
-extern DEVICE ports_dev;
 
 t_stat ports_reset(DEVICE *dptr);
 t_stat ports_setnl(UNIT *uptr, int32 val, CONST char *cptr, void *desc);

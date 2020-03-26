@@ -1,4 +1,4 @@
-/* 3b2_cpu.h: AT&T 3B2 Model 400 Hard Disk (uPD7261) Implementation
+/* 3b2_d.h: AT&T 3B2 Model 400 Hard Disk (uPD7261) Implementation
 
    Copyright (c) 2017, Seth J. Morabito
 
@@ -42,6 +42,7 @@
  *   HD135      11   1224    15   18    512     Maxtor XT1190
  */
 
+#include "3b2_defs.h"
 #include "3b2_id.h"
 
 #define ID_SEEK_WAIT        50

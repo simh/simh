@@ -1,4 +1,4 @@
-/* 3b2_cpu.h: AT&T 3B2 Model 400 Hard Disk (uPD7261) Header
+/* 3b2_id.h: AT&T 3B2 Model 400 Hard Disk (uPD7261) Header
 
    Copyright (c) 2017, Seth J. Morabito
 
@@ -31,16 +31,12 @@
 #ifndef __3B2_ID_H__
 #define __3B2_ID_H__
 
-#include "3b2_defs.h"
-#include "3b2_sysdev.h"
+#include "sim_defs.h"
 #include "sim_disk.h"
 
 #define ID0             0
 #define ID1             1
 #define ID_CTLR         2
-
-#define ID_DATA_REG     0
-#define ID_CMD_STAT_REG 1
 
 /* Command Codes (bits 3-7 of command byte) */
 
@@ -157,15 +153,7 @@
 
 #define DMA_ID_SVC     IDBASE+ID_DATA_REG
 
-extern DEVICE id_dev;
-extern DEBTAB sys_deb_tab[];
-extern t_bool id_drq;
-extern t_bool id_int();
-
-#define IDBASE 0x4a000
-#define IDSIZE 0x2
-
-#define CMD_NUM      ((id_cmd >> 4) & 0xf)
+#define CMD_NUM       ((id_cmd >> 4) & 0xf)
 
 /* Function prototypes */
 

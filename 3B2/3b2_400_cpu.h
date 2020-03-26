@@ -1,4 +1,4 @@
-/* 3b2_cpu.h: AT&T 3B2 Model 400 CPU (WE32100) Header
+/* 3b2_400_cpu.h: AT&T 3B2 Model 400 CPU (WE32100) Header
 
    Copyright (c) 2017, Seth J. Morabito
 
@@ -31,14 +31,146 @@
 #ifndef _3B2_CPU_H_
 #define _3B2_CPU_H_
 
-#include "3b2_defs.h"
-#include "3b2_io.h"
+#include "sim_defs.h"
 
 /* Execution Modes */
 #define EX_LVL_KERN           0
 #define EX_LVL_EXEC           1
 #define EX_LVL_SUPR           2
 #define EX_LVL_USER           3
+
+#define MAX_HIST_SIZE         10000000
+#define MIN_HIST_SIZE         64
+#define MEM_SIZE              (cpu_unit.capac)
+
+#define UNIT_V_MSIZE          (UNIT_V_UF)
+#define UNIT_MSIZE            (1 << UNIT_V_MSIZE)
+
+#define WD_MSB                0x80000000
+#define HW_MSB                0x8000
+#define BT_MSB                0x80
+#define WORD_MASK             0xffffffff
+#define HALF_MASK             0xffffu
+#define BYTE_MASK             0xff
+
+/* Exception Types */
+#define RESET_EXCEPTION       0
+#define PROCESS_EXCEPTION     1
+#define STACK_EXCEPTION       2
+#define NORMAL_EXCEPTION      3
+
+/* Reset Exceptions */
+#define OLD_PCB_FAULT         0
+#define SYSTEM_DATA_FAULT     1
+#define INTERRUPT_STACK_FAULT 2
+#define EXTERNAL_RESET        3
+#define NEW_PCB_FAULT         4
+#define GATE_VECTOR_FAULT     6
+
+/* Processor Exceptions */
+#define GATE_PCB_FAULT        1
+
+/* Stack Exceptions */
+#define STACK_BOUND           0
+#define STACK_FAULT           1
+#define INTERRUPT_ID_FETCH    3
+
+/* Normal Exceptions */
+#define INTEGER_ZERO_DIVIDE   0
+#define TRACE_TRAP            1
+#define ILLEGAL_OPCODE        2
+#define RESERVED_OPCODE       3
+#define INVALID_DESCRIPTOR    4
+#define EXTERNAL_MEMORY_FAULT 5
+#define N_GATE_VECTOR         6
+#define ILLEGAL_LEVEL_CHANGE  7
+#define RESERVED_DATATYPE     8
+#define INTEGER_OVERFLOW      9
+#define PRIVILEGED_OPCODE     10
+#define BREAKPOINT_TRAP       14
+#define PRIVILEGED_REGISTER   15
+
+#define PSW_ET                0
+#define PSW_TM                2u
+#define PSW_ISC               3u
+#define PSW_I                 7
+#define PSW_R                 8
+#define PSW_PM                9
+#define PSW_CM                11
+#define PSW_IPL               13
+#define PSW_TE                17
+#define PSW_C                 18
+#define PSW_V                 19
+#define PSW_Z                 20
+#define PSW_N                 21
+#define PSW_OE                22
+#define PSW_CD                23
+#define PSW_QIE               24
+#define PSW_CFD               25
+
+#define PSW_ET_MASK           3u
+#define PSW_TM_MASK           (1u << PSW_TM)
+#define PSW_ISC_MASK          (15u << PSW_ISC)
+#define PSW_I_MASK            (1u << PSW_I)
+#define PSW_R_MASK            (1u << PSW_R)
+#define PSW_PM_MASK           (3u << PSW_PM)
+#define PSW_CM_MASK           (3u << PSW_CM)
+#define PSW_IPL_MASK          (15u << PSW_IPL)
+#define PSW_TE_MASK           (1u << PSW_TE)
+#define PSW_C_MASK            (1u << PSW_C)
+#define PSW_V_MASK            (1u << PSW_V)
+#define PSW_N_MASK            (1u << PSW_N)
+#define PSW_Z_MASK            (1u << PSW_Z)
+#define PSW_OE_MASK           (1u << PSW_OE)
+#define PSW_CD_MASK           (1u << PSW_CD)
+#define PSW_QIE_MASK          (1u << PSW_QIE)
+#define PSW_CFD_MASK          (1u << PSW_CFD)
+#define PSW_CUR_IPL           (((R[NUM_PSW] & PSW_IPL_MASK) >> PSW_IPL) & 0xf)
+
+/* Exceptional conditions handled within the instruction loop */
+#define ABORT_EXC             1 /* CPU exception  */
+
+/* Contexts for aborts */
+#define C_NONE                0 /* No context. Normal handling. */
+#define C_NORMAL_GATE_VECTOR  1
+#define C_PROCESS_GATE_PCB    2
+#define C_PROCESS_OLD_PCB     3
+#define C_PROCESS_NEW_PCB     4
+#define C_RESET_GATE_VECTOR   5
+#define C_RESET_INT_STACK     6
+#define C_RESET_NEW_PCB       7
+#define C_RESET_SYSTEM_DATA   8
+#define C_STACK_FAULT         9
+
+/* Register numbers */
+#define NUM_FP                9
+#define NUM_AP                10
+#define NUM_PSW               11
+#define NUM_SP                12
+#define NUM_PCBP              13
+#define NUM_ISP               14
+#define NUM_PC                15
+
+/* System board interrupt priority levels */
+#define CPU_PIR8_IPL          8
+#define CPU_PIR9_IPL          9
+#define CPU_ID_IF_IPL         11
+#define CPU_IU_DMA_IPL        13
+#define CPU_TMR_IPL           15
+
+#define CPU_CM                (cpu_km ? L_KERNEL : ((R[NUM_PSW] >> PSW_CM) & 3))
+
+/* Data types operated on by instructions. NB: These integer values
+   have meaning when decoding instructions, so this is not just an
+   enum. Please don't change them. */
+#define UW                    0 /* Unsigned Word */
+#define UH                    2 /* Unsigned Halfword */
+#define BT                    3 /* Unsigned Byte */
+#define WD                    4 /* Signed Word */
+#define HW                    6 /* Signed Halfword */
+#define SB                    7 /* Signed Byte */
+
+#define NA                   -1
 
 /* Processor Version Number */
 #define WE32100_VER           0x1A
@@ -112,7 +244,7 @@ typedef enum {
     CALL    = 0x2C,
     BPT     = 0x2E,
     WAIT    = 0x2F,
-    EMB     = 0x30, // Multi-byte
+    EMB     = 0x30, /* Multi-byte */
     SPOP    = 0x32,
     SPOPWS  = 0x33,
     JSB     = 0x34,
@@ -137,14 +269,14 @@ typedef enum {
     BLEH    = 0x4E,
     BLEB    = 0x4F,
     RGEQU   = 0x50,
-    BGEUH   = 0x52,  // Also BCCH
-    BGEUB   = 0x53,  // Also BCCB
+    BGEUH   = 0x52,
+    BGEUB   = 0x53,
     RGTRU   = 0x54,
     BGUH    = 0x56,
     BGUB    = 0x57,
-    BLSSU   = 0x58,  // Also BCS
-    BLUH    = 0x5A,  // Also BCSH
-    BLUB    = 0x5B,  // Also BCSB
+    BLSSU   = 0x58,
+    BLUH    = 0x5A,
+    BLUB    = 0x5B,
     RLEQU   = 0x5C,
     BLEUH   = 0x5E,
     BLEUB   = 0x5F,
@@ -152,14 +284,14 @@ typedef enum {
     BVCH    = 0x62,
     BVCB    = 0x63,
     RNEQU   = 0x64,
-    BNEH_D  = 0x66, // Duplicate of 0x76
-    BNEB_D  = 0x67, // Duplicate of 0x77
+    BNEH_D  = 0x66,
+    BNEB_D  = 0x67,
     RVS     = 0x68,
     BVSH    = 0x6A,
     BVSB    = 0x6B,
     REQLU   = 0x6C,
-    BEH_D   = 0x6E, // Duplicate of 0x7E
-    BEB_D   = 0x6F, // Duplicate of 0x7F
+    BEH_D   = 0x6E,
+    BEB_D   = 0x6F,
     NOP     = 0x70,
     NOP3    = 0x72,
     NOP2    = 0x73,
@@ -176,9 +308,9 @@ typedef enum {
     CLRW    = 0x80,
     CLRH    = 0x82,
     CLRB    = 0x83,
-    MOVW    = 0x84, /* done */
-    MOVH    = 0x86, /* done */
-    MOVB    = 0x87, /* done */
+    MOVW    = 0x84,
+    MOVH    = 0x86,
+    MOVB    = 0x87,
     MCOMW   = 0x88,
     MCOMH   = 0x8A,
     MCOMB   = 0x8B,
@@ -268,33 +400,6 @@ typedef enum {
     CALLPS  = 0x30ac,
     RETPS   = 0x30c8
 } opcode;
-
-typedef enum {
-    DECODE_SUCCESS,
-    DECODE_ERROR
-} decode_result;
-
-/* Addressing Mode enum */
-typedef enum {
-    ABS,              // Absolute
-    ABS_DEF,          // Absolute Deferred
-    BYTE_DISP,        // Byte Displacement
-    BYTE_DISP_DEF,    // Byte Displacement Deferred
-    HFWD_DISP,        // Halfword Displacement
-    HFWD_DISP_DEF,    // Halfword Displacement Deferred
-    WORD_DISP,        // Word Displacement
-    WORD_DISP_DEF,    // Word Displacement Deferred
-    AP_SHORT_OFF,     // AP Short Offset
-    FP_SHORT_OFF,     // FP Short Offset
-    BYTE_IMM,         // Byte Immediate
-    HFWD_IMM,         // Halfword Immediate
-    WORD_IMM,         // Word Immediate
-    POS_LIT,          // Positive Literal
-    NEG_LIT,          // Negative Literal
-    REGISTER,         // Register
-    REGISTER_DEF,     // Register Deferred
-    EXP               // Expanded-operand type
-} addr_mode;
 
 /*
  * Each instruction expects operands of a certain type.
@@ -401,6 +506,7 @@ t_stat cpu_show_cio(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat cpu_set_halt(UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_clear_halt(UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_boot(int32 unit_num, DEVICE *dptr);
+t_stat cpu_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 CONST char *cpu_description(DEVICE *dptr);
 
 t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs);
@@ -414,6 +520,9 @@ instr *cpu_next_instruction(void);
 
 uint8 decode_instruction(instr *instr);
 void cpu_on_interrupt(uint16 vec);
+void cpu_abort(uint8 et, uint8 isc);
+void cpu_set_irq(uint8 ipl, uint8 id, uint16 csr_flags);
+void cpu_clear_irq(uint8 ipl, uint16 csr_flags);
 
 /* Helper macros */
 

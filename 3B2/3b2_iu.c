@@ -28,8 +28,8 @@
    from the author.
 */
 
+#include "3b2_defs.h"
 #include "3b2_iu.h"
-#include "sim_tmxr.h"
 
 /* Static function declarations */
 static SIM_INLINE void iu_w_cmd(uint8 portno, uint8 val);
@@ -72,8 +72,6 @@ IU_TIMER_STATE iu_timer_state;
 /* Flags for incrementing mode pointers */
 t_bool iu_increment_a = FALSE;
 t_bool iu_increment_b = FALSE;
-
-extern uint16 csr_data;
 
 BITFIELD sr_bits[] = {
     BIT(RXRDY),

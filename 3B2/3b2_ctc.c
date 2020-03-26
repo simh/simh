@@ -28,10 +28,8 @@
    from the author.
 */
 
+#include "3b2_defs.h"
 #include "3b2_ctc.h"
-
-extern CIO_STATE cio[CIO_SLOTS];
-extern UNIT cio_unit;
 
 #define CTQRESIZE     20
 #define CTQCESIZE     16

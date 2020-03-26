@@ -1,4 +1,4 @@
-/* 3b2_sys.h: AT&T 3B2 Model 400 system-specific logic headers
+/* 3b2_400_sys.h: AT&T 3B2 Model 400 system-specific logic headers
 
    Copyright (c) 2017, Seth J. Morabito
 
@@ -28,16 +28,10 @@
    from the author.
 */
 
-#ifndef _3B2_SYS_H
-#define _3B2_SYS_H
+#ifndef _3B2_400_SYS_H_
+#define _3B2_400_SYS_H_
 
-#include "3b2_defs.h"
-
-extern uint32 R[16];
-extern char sim_name[];
-extern REG *sim_PC;
-extern int32 sim_emax;
-extern DEVICE *sim_devices[];
+#include "sim_defs.h"
 
 void full_reset();
 t_stat sim_load(FILE *fileref, CONST char *cptr, CONST char *fnam, int flag);
@@ -45,4 +39,4 @@ t_stat parse_sym(CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val,
                   int32 sw);
 t_stat fprint_sym(FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw);
 
-#endif
+#endif /* _3B2_400_SYS_H_ */

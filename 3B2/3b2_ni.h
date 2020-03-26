@@ -31,8 +31,7 @@
 #ifndef _3B2_NI_H_
 #define _3B2_NI_H_
 
-#include "3b2_defs.h"
-#include "3b2_io.h"
+#include "sim_defs.h"
 #include "sim_ether.h"
 
 #define NI_ID                  0x0002
@@ -187,8 +186,6 @@ typedef struct {
     int             filter_count;           /* Number of filters available */
     ETH_PCALLBACK   callback;
 } NI_STATE;
-
-extern DEVICE ni_dev;
 
 void ni_recv_callback(int status);
 t_stat ni_reset(DEVICE *dptr);

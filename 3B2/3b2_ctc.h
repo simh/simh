@@ -51,7 +51,7 @@
 #ifndef _3B2_CTC_H_
 #define _3B2_CTC_H_
 
-#include "3b2_defs.h"
+#include "sim_defs.h"
 #include "3b2_io.h"
 
 #define UNIT_V_WLK    (DKUF_V_UF + 0)     /* Write-locked tape */
@@ -145,8 +145,6 @@ typedef struct {
     uint32 time;        /* Time used during a tape session (in 25ms chunks) */
     uint32 bytnum;      /* Byte number, for streaming mode */
 } CTC_STATE;
-
-extern DEVICE ctc_dev;
 
 t_stat ctc_reset(DEVICE *dptr);
 t_stat ctc_svc(UNIT *uptr);

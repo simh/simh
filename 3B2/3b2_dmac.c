@@ -28,6 +28,7 @@
    from the author.
 */
 
+#include "3b2_defs.h"
 #include "3b2_dmac.h"
 
 DMA_STATE dma_state;

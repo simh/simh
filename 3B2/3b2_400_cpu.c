@@ -1,4 +1,4 @@
- /* 3b2_cpu.c: AT&T 3B2 Model 400 CPU (WE32100) Implementation
+/* 3b2_400_cpu.c: AT&T 3B2 Model 400 CPU (WE32100) Implementation
 
    Copyright (c) 2017, Seth J. Morabito
 
@@ -28,8 +28,10 @@
    from the author.
 */
 
-#include "3b2_cpu.h"
+#include "3b2_defs.h"
+#include "3b2_400_cpu.h"
 #include "rom_400_bin.h"
+#include <sim_defs.h>
 
 #define MAX_SUB_RETURN_SKIP 9
 
@@ -96,8 +98,6 @@ t_bool cpu_in_wait = FALSE;
 volatile size_t cpu_exception_stack_depth = 0;
 volatile int32 stop_reason;
 volatile uint32 abort_reason;
-
-extern uint16 csr_data;
 
 /* Register data */
 uint32 R[16];
@@ -295,7 +295,7 @@ DEVICE cpu_dev = {
     cpu_deb_tab,         /* Debug flag names */
     &cpu_set_size,       /* Memory size change */
     NULL,                /* Logical names */
-    NULL,                /* Help routine */
+    &cpu_help,           /* Help routine */
     NULL,                /* Attach Help Routine */
     NULL,                /* Help Context */
     &cpu_description     /* Device Description */
@@ -874,43 +874,6 @@ t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs)
     }
 }
 
-
-t_stat cpu_set_hist(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
-{
-    uint32 i, size;
-    t_stat result;
-
-    if (cptr == NULL) {
-        /* Disable the feature */
-        if (INST != NULL) {
-            for (i = 0; i < cpu_hist_size; i++) {
-                INST[i].valid = FALSE;
-            }
-        }
-        cpu_hist_size = 0;
-        cpu_hist_p = 0;
-        return SCPE_OK;
-    }
-    size = (uint32) get_uint(cptr, 10, MAX_HIST_SIZE, &result);
-    if ((result != SCPE_OK) || (size < MIN_HIST_SIZE)) {
-        return SCPE_ARG;
-    }
-    cpu_hist_p = 0;
-    if (size > 0) {
-        if (INST != NULL) {
-            free(INST);
-        }
-        INST = (instr *)calloc(size, sizeof(instr));
-        if (INST == NULL) {
-            return SCPE_MEM;
-        }
-        memset(INST, 0, sizeof(instr) * size);
-        cpu_hist_size = size;
-    }
-
-    return SCPE_OK;
-}
-
 t_stat fprint_sym_m(FILE *of, t_addr addr, t_value *val)
 {
     uint8 desc, mode, reg, etype;
@@ -1151,6 +1114,55 @@ t_stat cpu_show_virt(FILE *of, UNIT *uptr, int32 val, CONST void *desc)
     return SCPE_ARG;
 }
 
+t_stat cpu_set_hist(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+    uint32 i, size;
+    t_stat result;
+
+    /* Clear the history buffer if no argument */
+    if (cptr == NULL) {
+        for (i = 0; i < cpu_hist_size; i++) {
+            INST[i].valid = FALSE;
+        }
+        return SCPE_OK;
+    }
+
+    /* Otherwise, get the new length */
+    size = (uint32) get_uint(cptr, 10, MAX_HIST_SIZE, &result);
+
+    /* If no length was provided, give up */
+    if (result != SCPE_OK) {
+        return SCPE_ARG;
+    }
+
+    /* Legnth 0 is a special flag that means disable the feature. */
+    if (size == 0) {
+        if (INST != NULL) {
+            for (i = 0; i < cpu_hist_size; i++) {
+                INST[i].valid = FALSE;
+            }
+        }
+        cpu_hist_size = 0;
+        cpu_hist_p = 0;
+        return SCPE_OK;
+    }
+
+    /* Reinitialize the new history ring bufer */
+    cpu_hist_p = 0;
+    if (size > 0) {
+        if (INST != NULL) {
+            free(INST);
+        }
+        INST = (instr *)calloc(size, sizeof(instr));
+        if (INST == NULL) {
+            return SCPE_MEM;
+        }
+        memset(INST, 0, sizeof(instr) * size);
+        cpu_hist_size = size;
+    }
+
+    return SCPE_OK;
+}
 
 t_stat cpu_show_hist(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
@@ -3809,5 +3821,44 @@ void cpu_abort(uint8 et, uint8 isc)
 
 CONST char *cpu_description(DEVICE *dptr)
 {
-    return "WE32100";
+    return "3B2/400 CPU (WE 32100)";
+}
+
+t_stat cpu_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+    fprintf(st, "3B2/400 CPU Help\n\n");
+    fprintf(st, "The 3B2/400 CPU simulates a WE 32100 at 10 MHz.\n\n");
+    fprintf(st, "CPU options include the size of main memory.\n\n");
+    if (dptr->modifiers) {
+        MTAB *mptr;
+        for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
+            if (mptr->valid == &cpu_set_size) {
+                fprintf(st, "   sim> SET CPU %4s             set memory size = %sB\n",
+                        mptr->mstring, mptr->mstring);
+            }
+        }
+        fprintf(st, "\n");
+    }
+    fprintf(st, "The CPU also implements a command to display a virtual to physical address\n");
+    fprintf(st, "translation:\n\n");
+    fprintf(st, "   sim> SHOW CPU VIRTUAL=n       show translation for address n\n\n");
+    fprintf(st, "The CPU attempts to detect when the simulator is idle.  When idle, the\n");
+    fprintf(st, "simulator does not use any resources on the host system.  Idle detetion is\n");
+    fprintf(st, "controlled by the SET CPU IDLE and SET CPU NOIDLE commands:\n\n");
+    fprintf(st, "   sim> SET CPU IDLE             enable idle detection\n");
+    fprintf(st, "   sim> SET CPU NOIDLE           disable idle detection\n\n");
+    fprintf(st, "Idle detection is disabled by default.\n\n");
+    fprintf(st, "The CPU can maintain a history of the most recently executed instructions.\n");
+    fprintf(st, "This is controlled by the SET CPU HISTORY and SHOW CPU HISTORY commands:\n\n");
+
+    fprintf(st, "   sim> SET CPU HISTORY          clear history buffer\n");
+    fprintf(st, "   sim> SET CPU HISTORY=0        disable history\n");
+    fprintf(st, "   sim> SET CPU HISTORY=n        enable history, length = n\n");
+    fprintf(st, "   sim> SHOW CPU HISTORY         print CPU history\n");
+    fprintf(st, "   sim> SHOW CPU HISTORY=n       print last n entries of CPU history\n\n");
+    
+    fprintf(st, "Additional docuentation for the 3B2/400 Simulator is available on the web:\n\n");
+    fprintf(st, "   https://loomcom.com/3b2/emulator.html\n\n");
+
+    return SCPE_OK;
 }

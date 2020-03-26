@@ -1,4 +1,4 @@
-/* 3b2_mmu.c: AT&T 3B2 Model 400 MMU (WE32101) Header
+/* 3b2_400_mmu.c: AT&T 3B2 Model 400 MMU (WE32101) Header
 
    Copyright (c) 2017, Seth J. Morabito
 
@@ -28,11 +28,11 @@
    from the author.
 */
 
-#ifndef _3B2_MMU_H
-#define _3B2_MMU_H
+#ifndef _3B2_400_MMU_H_
+#define _3B2_400_MMU_H_
 
-#include "3b2_defs.h"
-
+#include "sim_defs.h"
+#include "3b2_400_defs.h"
 
 /************************************************************************
  *
@@ -203,6 +203,23 @@
 #define MMU_F_ACC                0x0d
 #define MMU_F_SEG_OFFSET         0x0e
 
+/* Access Request types */
+#define ACC_MT   0  /* Move Translated */
+#define ACC_SPW  1  /* Support processor write */
+#define ACC_SPF  3  /* Support processor fetch */
+#define ACC_IR   7  /* Interlocked read */
+#define ACC_AF   8  /* Address fetch */
+#define ACC_OF   9  /* Operand fetch */
+#define ACC_W    10 /* Write */
+#define ACC_IFAD 12 /* Instruction fetch after discontinuity */
+#define ACC_IF   13 /* Instruction fetch */
+
+/* Memory access levels */
+#define L_KERNEL 0
+#define L_EXEC   1
+#define L_SUPER  2
+#define L_USER   3
+
 /* Pluck out Virtual Address fields */
 #define SID(va)           (((va) >> 30) & 3)
 #define SSL(va)           (((va) >> 17) & 0x1fff)
@@ -314,11 +331,6 @@ typedef struct _mmu_state {
 
 } MMU_STATE;
 
-extern MMU_STATE mmu_state;
-
-extern volatile int32 stop_reason;
-extern DEVICE mmu_dev;
-
 t_stat mmu_init(DEVICE *dptr);
 uint32 mmu_read(uint32 pa, size_t size);
 void mmu_write(uint32 pa, uint32 val, size_t size);
@@ -341,22 +353,22 @@ uint32 mmu_xlate_addr(uint32 va, uint8 r_acc);
 t_stat mmu_decode_vaddr(uint32 vaddr, uint8 r_acc,
                         t_bool fc, uint32 *pa);
 
-#define SHOULD_CACHE_PD(pd) \
+#define SHOULD_CACHE_PD(pd)                     \
     (fc && PD_PRESENT(pd))
 
-#define SHOULD_CACHE_SD(sd)                                 \
+#define SHOULD_CACHE_SD(sd)                     \
     (fc && SD_VALID(sd) && SD_PRESENT(sd))
 
 #define SHOULD_UPDATE_SD_R_BIT(sd)              \
     (MMU_CONF_R && !((sd) & SD_R_MASK))
 
-#define SHOULD_UPDATE_SD_M_BIT(sd)                              \
+#define SHOULD_UPDATE_SD_M_BIT(sd)                          \
     (MMU_CONF_M && r_acc == ACC_W && !((sd) & SD_M_MASK))
 
 #define SHOULD_UPDATE_PD_R_BIT(pd)              \
     (!((pd) & PD_R_MASK))
 
-#define SHOULD_UPDATE_PD_M_BIT(pd)                              \
+#define SHOULD_UPDATE_PD_M_BIT(pd)              \
     (r_acc == ACC_W && !((pd) & PD_M_MASK))
 
 /* Special functions for reading operands and examining memory
@@ -378,4 +390,8 @@ t_bool addr_is_rom(uint32 pa);
 t_bool addr_is_mem(uint32 pa);
 t_bool addr_is_io(uint32 pa);
 
-#endif
+t_stat mmu_decode_va(uint32 va, uint8 r_acc, t_bool fc, uint32 *pa);
+void   mmu_enable();
+void   mmu_disable();
+
+#endif /* _3B2_400_MMU_H_ */

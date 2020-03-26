@@ -1,4 +1,4 @@
-/* 3b2_mmu.c: AT&T 3B2 Model 400 Math Acceleration Unit (WE32106 MAU)
+/* 3b2_400_mau.c: AT&T 3B2 Model 400 Math Acceleration Unit (WE32106 MAU)
    Implementation
 
    Copyright (c) 2019, Seth J. Morabito
@@ -83,7 +83,8 @@
 
 #include <math.h>
 
-#include "3b2_mau.h"
+#include "3b2_defs.h"
+#include "3b2_400_mau.h"
 
 #define   MAU_ID   0        /* Coprocessor ID of MAU */
 
@@ -198,8 +199,6 @@ static void mau_itof();
 static void mau_remainder();
 
 static void mau_execute();
-
-extern volatile int32 stop_reason;
 
 UNIT mau_unit = { UDATA(NULL, 0, 0) };
 
