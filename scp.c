@@ -3242,7 +3242,7 @@ if (enabled_units) {
             (dptr->units[unit].flags & UNIT_SEQ) && 
             (!(dptr->units[unit].flags & UNIT_MUSTBUF))) {
             sprintf (buf, "set %s%s APPEND", sim_uname (&dptr->units[unit]), (enabled_units > 1) ? "n" : "");
-            fprintf (st,  "%-30s\tSets %s position to EOF\n", buf, sim_uname (&dptr->units[unit]), (enabled_units > 1) ? "n" : "");
+            fprintf (st,  "%-30s\tSets %s%s position to EOF\n", buf, sim_uname (&dptr->units[unit]), (enabled_units > 1) ? "n" : "");
             break;
             }
     }
