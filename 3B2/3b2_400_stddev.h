@@ -34,18 +34,23 @@
 #include "sim_defs.h"
 
 /* Timer definitions */
-#define TMR_CLK 0   /* The clock responsible for IPL 15 interrupts */
-#define TPS_CLK 100 /* 100 ticks per second */
-#define TIMER_REG_DIVA  0x03
-#define TIMER_REG_DIVB  0x07
-#define TIMER_REG_DIVC  0x0b
-#define TIMER_REG_CTRL  0x0f
-#define TIMER_CLR_LATCH 0x13
+#define TMR_CLK           0   /* The clock responsible for IPL 15 interrupts */
+#define TPS_CLK           100 /* 100 ticks per second */
 
-#define CLK_RW  0x30
-#define CLK_LSB 0x10
-#define CLK_MSB 0x20
-#define CLK_LMB 0x30
+#define TIMER_STP_US      1
+#define tmrnum            u3
+#define tmr               up7
+
+#define TIMER_REG_DIVA    0x03
+#define TIMER_REG_DIVB    0x07
+#define TIMER_REG_DIVC    0x0b
+#define TIMER_REG_CTRL    0x0f
+#define TIMER_CLR_LATCH   0x13
+
+#define CLK_RW            0x30
+#define CLK_LSB           0x10
+#define CLK_MSB           0x20
+#define CLK_LMB           0x30
 
 struct timer_ctr {
     uint16 divider;

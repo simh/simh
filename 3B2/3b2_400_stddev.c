@@ -445,12 +445,6 @@ DEVICE timer_dev = {
     DEV_DEBUG, 0, sys_deb_tab
 };
 
-#define TIMER_STP_US      10       /* 10 us delay per timer step */
-
-#define tmrnum            u3
-#define tmr               up7
-
-
 t_stat timer_reset(DEVICE *dptr) {
     int32 i, t;
 
