@@ -28,18 +28,8 @@
    from the author.
 */
 
-#include "3b2_sys.h"
-
-#include "3b2_cpu.h"
-#include "3b2_iu.h"
-#include "3b2_if.h"
-#include "3b2_id.h"
-#include "3b2_mmu.h"
-#include "3b2_ctc.h"
-#include "3b2_ports.h"
-#include "3b2_ni.h"
-#include "3b2_mau.h"
-#include "3b2_sysdev.h"
+#include "3b2_defs.h"
+#include "3b2_400_sys.h"
 
 char sim_name[] = "AT&T 3B2 Model 400";
 
@@ -48,8 +38,6 @@ REG *sim_PC = &cpu_reg[0];
 /* All opcodes are 1 or 2 bytes. Operands may be up to 6 bytes, and
    there may be up to 3 operands, for a maximum of 20 bytes */
 int32 sim_emax = 20;
-
-extern instr *cpu_instr;
 
 DEVICE *sim_devices[] = {
     &cpu_dev,

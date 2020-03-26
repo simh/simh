@@ -1,4 +1,4 @@
-/* 3b2_cpu.h: AT&T 3B2 Model 400 System Devices (Header)
+/* 3b2_400_stddev.h: AT&T 3B2 Model 400 System Devices (Header)
 
    Copyright (c) 2017, Seth J. Morabito
 
@@ -31,15 +31,26 @@
 #ifndef _3B2_SYSDEV_H_
 #define _3B2_SYSDEV_H_
 
-#include "3b2_defs.h"
-#include "3b2_sys.h"
-#include "3b2_cpu.h"
+#include "sim_defs.h"
 
-extern DEVICE nvram_dev;
-extern DEVICE timer_dev;
-extern DEVICE csr_dev;
-extern DEVICE tod_dev;
-extern DEBTAB sys_deb_tab[];
+/* Timer definitions */
+#define TMR_CLK           0   /* The clock responsible for IPL 15 interrupts */
+#define TPS_CLK           100 /* 100 ticks per second */
+
+#define TIMER_STP_US      1
+#define tmrnum            u3
+#define tmr               up7
+
+#define TIMER_REG_DIVA    0x03
+#define TIMER_REG_DIVB    0x07
+#define TIMER_REG_DIVC    0x0b
+#define TIMER_REG_CTRL    0x0f
+#define TIMER_CLR_LATCH   0x13
+
+#define CLK_RW            0x30
+#define CLK_LSB           0x10
+#define CLK_MSB           0x20
+#define CLK_LMB           0x30
 
 struct timer_ctr {
     uint16 divider;

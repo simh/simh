@@ -1,4 +1,4 @@
-/* 3b2_cpu.h: AT&T 3B2 Model 400 System Devices implementation
+/* 3b2_400_stddev.h: AT&T 3B2 Model 400 System Devices implementation
 
    Copyright (c) 2017, Seth J. Morabito
 
@@ -40,8 +40,8 @@
 
 #include <time.h>
 
-#include "3b2_sysdev.h"
-#include "3b2_iu.h"
+#include "3b2_defs.h"
+#include "3b2_400_stddev.h"
 
 DEBTAB sys_deb_tab[] = {
     { "INIT",       INIT_MSG,       "Init"              },
@@ -56,8 +56,6 @@ DEBTAB sys_deb_tab[] = {
 struct timer_ctr TIMERS[3];
 
 uint32 *NVRAM = NULL;
-
-extern DEVICE cpu_dev;
 
 int32 tmxr_poll = 16667;
 
@@ -446,12 +444,6 @@ DEVICE timer_dev = {
     NULL, NULL, NULL, NULL,
     DEV_DEBUG, 0, sys_deb_tab
 };
-
-#define TIMER_STP_US      10       /* 10 us delay per timer step */
-
-#define tmrnum            u3
-#define tmr               up7
-
 
 t_stat timer_reset(DEVICE *dptr) {
     int32 i, t;

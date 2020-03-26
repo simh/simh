@@ -1,4 +1,4 @@
-/* 3b2_cpu.h: AT&T 3B2 Model 400 IO dispatch (Header)
+/* 3b2_io.h: AT&T 3B2 Model 400 IO dispatch (Header)
 
    Copyright (c) 2017, Seth J. Morabito
 
@@ -111,14 +111,20 @@
 #ifndef _3B2_IO_H_
 #define _3B2_IO_H_
 
-#include "3b2_sysdev.h"
-#include "3b2_iu.h"
-#include "3b2_if.h"
-#include "3b2_id.h"
-#include "3b2_dmac.h"
-#include "3b2_mmu.h"
-
+#include "sim_defs.h"
 #include "sim_tmxr.h"
+
+#define CRC_POLYNOMIAL  0xEDB88320
+
+#define CIO_SLOTS       12
+
+/* IO area */
+#define IO_BOTTOM       0x40000
+#define IO_TOP          0x50000
+
+/* CIO area */
+#define CIO_BOTTOM      0x200000
+#define CIO_TOP         0x2000000
 
 #define IOF_ID          0
 #define IOF_VEC         1
@@ -219,10 +225,6 @@ typedef struct {
     uint32 retcode;
 } pump;
 
-extern t_bool cio_skip_seqbit;
-extern uint16 cio_ints;
-extern CIO_STATE cio[CIO_SLOTS];
-
 t_stat cio_reset(DEVICE *dptr);
 t_stat cio_svc(UNIT *uptr);
 
@@ -239,6 +241,9 @@ uint16 cio_r_ulp(uint8 cid, uint32 qnum, uint32 esize);
 uint16 cio_c_lp(uint8 cid, uint32 esize);
 uint16 cio_c_ulp(uint8 cid, uint32 esize);
 void cio_sysgen(uint8 cid);
+
+uint32 io_read(uint32 pa, size_t size);
+void io_write(uint32 pa, uint32 val, size_t size);
 
 void dump_entry(uint32 dbits, DEVICE *dev, CONST char *type,
                 uint32 esize, cio_entry *entry, uint8 *app_data);

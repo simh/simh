@@ -1,4 +1,4 @@
-/* 3b2_cpu.h: AT&T 3B2 Model 400 IO and  CIO feature cards
+/* 3b2_io.c: AT&T 3B2 Model 400 IO and  CIO feature cards
 
    Copyright (c) 2017, Seth J. Morabito
 
@@ -28,9 +28,8 @@
    from the author.
 */
 
+#include "3b2_defs.h"
 #include "3b2_io.h"
-
-#define CRC_POLYNOMIAL 0xEDB88320
 
 CIO_STATE  cio[CIO_SLOTS] = {{0}};
 

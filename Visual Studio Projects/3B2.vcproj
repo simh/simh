@@ -192,7 +192,7 @@
 			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm"
 			>
 			<File
-				RelativePath="..\3B2\3b2_cpu.c"
+				RelativePath="..\3B2\3b2_400_cpu.c"
 				>
 			</File>
 			<File
@@ -220,11 +220,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_mau.c"
+				RelativePath="..\3B2\3b2_400_mau.c"
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_mmu.c"
+				RelativePath="..\3B2\3b2_400_mmu.c"
 				>
 			</File>
 			<File
@@ -236,11 +236,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_sys.c"
+				RelativePath="..\3B2\3b2_400_sys.c"
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_sysdev.c"
+				RelativePath="..\3B2\3b2_400_stddev.c"
 				>
 			</File>
 			<File
@@ -480,7 +480,7 @@
 			Filter="h;hpp;hxx;hm;inl;inc"
 			>
 			<File
-				RelativePath="..\3B2\3b2_cpu.h"
+				RelativePath="..\3B2\3b2_400_cpu.h"
 				>
 			</File>
 			<File
@@ -489,6 +489,10 @@
 			</File>
 			<File
 				RelativePath="..\3B2\3b2_defs.h"
+				>
+			</File>
+			<File
+				RelativePath="..\3B2\3b2_400_defs.h"
 				>
 			</File>
 			<File
@@ -512,11 +516,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_mau.h"
+				RelativePath="..\3B2\3b2_400_mau.h"
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_mmu.h"
+				RelativePath="..\3B2\3b2_400_mmu.h"
 				>
 			</File>
 			<File
@@ -528,11 +532,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_sys.h"
+				RelativePath="..\3B2\3b2_400_sys.h"
 				>
 			</File>
 			<File
-				RelativePath="..\3B2\3b2_sysdev.h"
+				RelativePath="..\3B2\3b2_400_stddev.h"
 				>
 			</File>
 			<File

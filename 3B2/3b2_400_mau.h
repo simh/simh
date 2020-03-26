@@ -1,4 +1,4 @@
-/* 3b2_mmu.c: AT&T 3B2 Model 400 Math Acceleration Unit (WE32106 MAU)
+/* 3b2_400_mau.c: AT&T 3B2 Model 400 Math Acceleration Unit (WE32106 MAU)
    Header
 
    Copyright (c) 2019, Seth J. Morabito
@@ -139,10 +139,10 @@
 
 */
 
-#ifndef _3B2_MAU_H
-#define _3B2_MAU_H
+#ifndef _3B2_400_MAU_H_
+#define _3B2_400_MAU_H_
 
-#include "3b2_defs.h"
+#include "sim_defs.h"
 
 #define SRC_LEN_INVALID   0
 #define SRC_LEN_SINGLE    1
@@ -373,12 +373,11 @@ typedef struct {
     XFP      f3;
 } MAU_STATE;
 
-extern DEVICE mau_dev;
-
 t_stat mau_reset(DEVICE *dptr);
 t_stat mau_attach(UNIT *uptr, CONST char *cptr);
 t_stat mau_detach(UNIT *uptr);
 t_stat mau_broadcast(uint32 cmd, uint32 src, uint32 dst);
 CONST char *mau_description(DEVICE *dptr);
+t_stat mau_broadcast(uint32 cmd, uint32 src, uint32 dst);
 
-#endif
+#endif /* _3B2_400_MAU_H_ */
