@@ -489,8 +489,8 @@ struct df10 {
 
 /* RH10/RH20 Interface */
 struct rh_if {
-      void           (*dev_write)(DEVICE *dptr, struct rh_if *rh, int reg, uint32 data);
-      uint32         (*dev_read)(DEVICE *dptr, struct rh_if *rh, int reg);
+      int            (*dev_write)(DEVICE *dptr, struct rh_if *rh, int reg, uint32 data);
+      int            (*dev_read)(DEVICE *dptr, struct rh_if *rh, int reg, uint32 *data);
       void           (*dev_reset)(DEVICE *dptr);
       t_uint64       buf;        /* Data buffer */
       uint32         status;     /* DF10 status word */

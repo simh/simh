@@ -173,8 +173,8 @@ struct drvtyp rs_drv_tab[] = {
 
 
 uint64        rs_buf[NUM_DEVS_RS][RS_NUMWD];
-void          rs_write(DEVICE *dptr, struct rh_if *rhc, int reg, uint32 data);
-uint32        rs_read(DEVICE *dptr, struct rh_if *rhc, int reg);
+int           rs_write(DEVICE *dptr, struct rh_if *rhc, int reg, uint32 data);
+int           rs_read(DEVICE *dptr, struct rh_if *rhc, int reg, uint32 *data);
 void          rs_rst(DEVICE *dptr);
 t_stat        rs_svc(UNIT *);
 t_stat        rs_boot(int32, DEVICE *);
@@ -273,15 +273,17 @@ rs_rst(DEVICE *dptr)
    }
 }
 
-void
+int
 rs_write(DEVICE *dptr, struct rh_if *rhc, int reg, uint32 data) {
     int            i;
     int            unit = rhc->drive;
     UNIT          *uptr = &dptr->units[unit];
  
+    if ((uptr->flags & UNIT_DIS) != 0)
+        return 1;
     if ((uptr->CMD & CS1_GO) && reg != 04) {
         uptr->CMD |= (ER1_RMR << 16)|DS_ERR;
-        return;
+        return 0;
     }
     switch(reg) {
     case  000:  /* control */
@@ -293,14 +295,14 @@ rs_write(DEVICE *dptr, struct rh_if *rhc, int reg, uint32 data) {
         if ((uptr->CMD & DS_DRY) == 0) {
            uptr->CMD |= (ER1_RMR << 16)|DS_ERR;
            sim_debug(DEBUG_DETAIL, dptr, "%s%o busy\n", dptr->name, unit);
-           return;
+           return 0;
         }
         /* Check if GO bit set */
         if ((data & 1) == 0) {
            uptr->CMD &= ~076;
            uptr->CMD |= data & 076;
            sim_debug(DEBUG_DETAIL, dptr, "%s%o no go\n", dptr->name, unit);
-           return;                           /* No, nop */
+           return 0;                           /* No, nop */
         }
         uptr->CMD &= DS_ATA|DS_VV|DS_DPR|DS_MOL|DS_WRL;
         uptr->CMD |= data & 076;
@@ -343,7 +345,7 @@ rs_write(DEVICE *dptr, struct rh_if *rhc, int reg, uint32 data) {
         if (uptr->CMD & CS1_GO)
             sim_activate(uptr, 100);
         sim_debug(DEBUG_DETAIL, dptr, "%s%o AStatus=%06o\n", dptr->name, unit, uptr->CMD);
-        return;
+        return 0;
     case  001:  /* status */
         break;
     case  002:  /* error register 1 */
@@ -373,16 +375,20 @@ rs_write(DEVICE *dptr, struct rh_if *rhc, int reg, uint32 data) {
         uptr->CMD |= (ER1_ILR<<16)|DS_ERR;
         rhc->rae |= 1 << unit;
     }
+    return 0;
 }
 
-uint32
-rs_read(DEVICE *dptr, struct rh_if *rhc, int reg) {
+int
+rs_read(DEVICE *dptr, struct rh_if *rhc, int reg, uint32 *data) {
     int            unit = rhc->drive;
     UNIT          *uptr = &dptr->units[unit];
     uint32        temp = 0;
     int           i;
 
+    if ((uptr->flags & UNIT_DIS) != 0)
+        return 1;
     if ((uptr->flags & UNIT_ATT) == 0 && reg != 04) {       /* not attached? */
+        *data = 0;
         return 0;
     }
 
@@ -420,7 +426,8 @@ rs_read(DEVICE *dptr, struct rh_if *rhc, int reg) {
         uptr->CMD |= (ER1_ILR<<16);
         rhc->rae |= 1 << unit;
     }
-    return temp;
+    *data = temp;
+    return 0;
 }
 
 

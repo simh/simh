@@ -24,6 +24,7 @@
 #include "kx10_defs.h"
 
 
+
 /* CONI Flags */
 #define IADR_ATTN       0000000000040LL   /* Interrupt on attention */
 #define IARD_RAE        0000000000100LL   /* Interrupt on register access error */
@@ -182,6 +183,7 @@ t_stat rh_devio(uint32 dev, uint64 *data) {
      DEVICE        *dptr = NULL;
      struct rh_if  *rhc = NULL;
      int            drive;
+     uint32         drdat;
 
      for (drive = 0; rh[drive].dev_num != 0; drive++) {
         if (rh[drive].dev_num == (dev & 0774)) {
@@ -220,8 +222,10 @@ t_stat rh_devio(uint32 dev, uint64 *data) {
                  rhc->status &= ~(RH20_SBAR|RH20_SCR_FULL);
               if (*data & (RH20_RCLP|RH20_CLR_MBC))
                  rhc->cia = eb_ptr | (rhc->devnum - 0540);
-              if (*data & (RH20_CLR_RAE|RH20_CLR_MBC))
+              if (*data & (RH20_CLR_RAE|RH20_CLR_MBC)) {
                  rhc->rae = 0;
+              }
+              rhc->status &= ~RH20_DR_RESP;
               if (*data & PI_ENABLE)
                  rhc->status &= ~PI_ENABLE;
               if (((rhc->status & IADR_ATTN) != 0 && rhc->attn != 0)
@@ -239,7 +243,9 @@ t_stat rh_devio(uint32 dev, uint64 *data) {
               }
               if (rhc->reg < 040) {
                   int parity;
-                  *data = (uint64)(rhc->dev_read(dptr, rhc, rhc->reg) & 0177777);
+                  if (rhc->dev_read(dptr, rhc, rhc->reg, &drdat))
+                      rhc->status |= RH20_DR_RESP;
+                  *data = (uint64)(drdat & 0177777);
                   parity = (int)((*data >> 8) ^ *data);
                   parity = (parity >> 4) ^ parity;
                   parity = (parity >> 2) ^ parity;
@@ -282,7 +288,8 @@ t_stat rh_devio(uint32 dev, uint64 *data) {
                          set_interrupt(rhc->devnum, rhc->status);
                          return SCPE_OK;
                      }
-                     rhc->dev_write(dptr, rhc, rhc->reg & 037, (int)(*data & 0777777));
+                     if (rhc->dev_write(dptr, rhc, rhc->reg & 037, (int)(*data & 0777777)))
+                          rhc->status |= RH20_DR_RESP;
                      if (((rhc->status & IADR_ATTN) != 0 && rhc->attn != 0)
                              || (rhc->status & PI_ENABLE))
                          set_interrupt(rhc->devnum, rhc->status);
@@ -293,7 +300,7 @@ t_stat rh_devio(uint32 dev, uint64 *data) {
                          rhc->rae &= ~(1 << rhc->drive);
                   } else if ((rhc->reg & 070) != 070) {
                       if ((*data & BIT9) == 0) {
-                          rhc->rae = (1 << rhc->drive);
+                          rhc->rae |= 1 << rhc->drive;
                           set_interrupt(rhc->devnum, rhc->status);
                       }
                   } else {
@@ -329,8 +336,11 @@ t_stat rh_devio(uint32 dev, uint64 *data) {
         *data = rhc->status & ~(IADR_ATTN|IARD_RAE);
         if (rhc->attn != 0 && (rhc->status & IADR_ATTN))
            *data |= IADR_ATTN;
-        if (rhc->rae != 0 && (rhc->status & IARD_RAE))
+        if (rhc->rae != 0 && (rhc->status & IARD_RAE)) {
            *data |= IARD_RAE;
+            if (rhc->rae & (1 << rhc->drive))
+                *data |= CXR_SD_RAE;
+        }
 #if KI_22BIT
         *data |= B22_FLAG;
 #endif
@@ -343,8 +353,10 @@ t_stat rh_devio(uint32 dev, uint64 *data) {
          rhc->status &= ~(07LL|IADR_ATTN|IARD_RAE);
          rhc->status |= *data & (07LL|IADR_ATTN|IARD_RAE);
          /* Clear flags */
-         if (*data & CONT_RESET && rhc->dev_reset != NULL)
+         if (*data & CONT_RESET && rhc->dev_reset != NULL) {
             rhc->dev_reset(dptr);
+            rhc->status &= (07LL|IADR_ATTN|IARD_RAE);
+         }
          if (*data & (DBPE_CLR|DR_EXC_CLR|CHN_CLR))
             rhc->status &= ~(*data & (DBPE_CLR|DR_EXC_CLR|CHN_CLR));
          if (*data & OVER_CLR)
@@ -353,6 +365,8 @@ t_stat rh_devio(uint32 dev, uint64 *data) {
             rhc->status &= ~(DIB_CBOV);
          if (*data & CXR_ILC)
             rhc->status &= ~(CXR_ILFC|CXR_SD_RAE);
+         if (*data & DRE_CLR)
+            rhc->status &= ~(CR_DRE);
          if (*data & WRT_CW)
             rh_writecw(rhc, 0);
          if (*data & PI_ENABLE)
@@ -372,7 +386,9 @@ t_stat rh_devio(uint32 dev, uint64 *data) {
             return SCPE_OK;
         }
         if (rhc->reg == 040) {
-              *data = (uint64)(rhc->dev_read(dptr, rhc, 0) & 077);
+              if (rhc->dev_read(dptr, rhc, 0, &drdat))
+                  rhc->status |= CR_DRE;
+              *data = (uint64)(drdat & 077);
               *data |= ((uint64)(rhc->cia)) << 6;
               *data |= ((uint64)(rhc->xfer_drive)) << 18;
         } else if (rhc->reg == 044) {
@@ -385,7 +401,11 @@ t_stat rh_devio(uint32 dev, uint64 *data) {
                 *data = (uint64)(rhc->rae);
         } else if ((rhc->reg & 040) == 0) {
               int parity;
-              *data = (uint64)(rhc->dev_read(dptr, rhc, rhc->reg) & 0177777);
+              if (rhc->dev_read(dptr, rhc, rhc->reg, &drdat)) {
+                  rhc->rae |= 1 << rhc->drive;
+                  rhc->status |= CR_DRE;
+              }
+              *data = (uint64)(drdat & 0177777);
               parity = (int)((*data >> 8) ^ *data);
               parity = (parity >> 4) ^ parity;
               parity = (parity >> 2) ^ parity;
@@ -432,7 +452,9 @@ t_stat rh_devio(uint32 dev, uint64 *data) {
                 /* Start command */
                 rh_setup(rhc, (uint32)(*data >> 6));
                 rhc->xfer_drive = (int)(*data >> 18) & 07;
-                rhc->dev_write(dptr, rhc, 0, (uint32)(*data & 077));
+                if (rhc->dev_write(dptr, rhc, 0, (uint32)(*data & 077))) {
+                    rhc->status |= CR_DRE;
+                }
                 sim_debug(DEBUG_DATAIO, dptr,
                     "%s %03o command %012llo, %d PC=%06o %06o\n",
                     dptr->name, dev, *data, rhc->drive, PC, rhc->status);
@@ -453,7 +475,8 @@ t_stat rh_devio(uint32 dev, uint64 *data) {
                 if (rhc->rae & (1 << rhc->drive)) {
                     return SCPE_OK;
                 }
-                rhc->dev_write(dptr, rhc, rhc->reg & 037, (int)(*data & 0777777));
+                if (rhc->dev_write(dptr, rhc, rhc->reg & 037, (uint32)(*data & 0777777)))
+                    rhc->status |= CR_DRE;
              }
          }
          clr_interrupt(dev);
@@ -506,7 +529,6 @@ int rh_blkend(struct rh_if *rhc)
 {
 #if KL
      if (rhc->imode == 2) {
-//fprintf(stderr, "RH blkend %o\n\r", rhc->cia);
          rhc->cia = (rhc->cia + 1) & 01777;
          if (rhc->cia == 0) {
             rhc->status |= RH20_XEND;
@@ -564,7 +586,6 @@ void rh_writecw(struct rh_if *rhc, int nxm) {
                                 ((uint64)(rhc->cda) & AMASK);
              (void)Mem_write_word(chan+1, &wrd1, 1);
              (void)Mem_write_word(chan+2, &wrd2, 1);
-//fprintf(stderr, "RH20 final %012llo %012llo %06o\n\r", wrd1, wrd2, wc);
          }
          return;
      }
@@ -619,7 +640,7 @@ void rh20_setup(struct rh_if *rhc)
      if (rhc->status & RH20_SBAR) {
          rhc->drive = (rhc->pbar >> 18) & 07;
          if (rhc->dev_write != NULL)
-             rhc->dev_write(dptr, rhc, 5, (rhc->pbar & 0177777));
+             (void)rhc->dev_write(dptr, rhc, 5, (rhc->pbar & 0177777));
          rhc->status &= ~RH20_SBAR;
      }
      if (rhc->ptcr & BIT7) {  /* If RCPL reset I/O pointers */
@@ -630,11 +651,10 @@ void rh20_setup(struct rh_if *rhc)
      rhc->drive = (rhc->ptcr >> 18) & 07;
      rhc->cia = (rhc->ptcr >> 6) & 01777;
      if (rhc->dev_write != NULL)
-         rhc->dev_write(dptr, rhc, 0, (rhc->ptcr & 077));
+         (void)rhc->dev_write(dptr, rhc, 0, (rhc->ptcr & 077));
      rhc->cop = 0;
      rhc->wcr = 0;
      rhc->status &= ~RH20_CHAN_RDY;
-//fprintf(stderr, "RH setup %06o %06o %o\n\r", rhc->ptcr, rhc->ccw, rhc->cia);
 }
 #endif
 
