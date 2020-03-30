@@ -2061,7 +2061,7 @@ ATT3B2M400 = ${ATT3B2D}/3b2_400_cpu.c ${ATT3B2D}/3b2_400_sys.c \
 	${ATT3B2D}/3b2_dmac.c ${ATT3B2D}/3b2_io.c \
 	${ATT3B2D}/3b2_ports.c ${ATT3B2D}/3b2_ctc.c \
 	${ATT3B2D}/3b2_ni.c
-ATT3B2_OPT = -DUSE_INT64 -DUSE_ADDR64 -I ${ATT3B2M400B2D} ${NETWORK_OPT}
+ATT3B2_OPT = -DUSE_INT64 -DUSE_ADDR64 -I ${ATT3B2D} ${NETWORK_OPT}
 
 ###
 ### Experimental simulators
