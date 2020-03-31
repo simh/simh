@@ -262,6 +262,7 @@ if (service) {
     char *c;
 
     port = strtoul(service, &c, 10);
+    port = htons((unsigned short)port);
     if ((port == 0) || (*c != '\0')) {
         switch (hints->ai_socktype)
             {
@@ -430,6 +431,10 @@ return 0;
 
 #if !defined(IPV6_V6ONLY)           /* Older XP environments may not define IPV6_V6ONLY */
 #define IPV6_V6ONLY           27    /* Treat wildcard bind as AF_INET6-only. */
+#endif
+#if defined(TEST_INFO_STUBS)
+#undef IPV6_V6ONLY
+#undef AF_INET6
 #endif
 /* Dynamic DLL load variables */
 #ifdef _WIN32
@@ -737,6 +742,12 @@ load_ws2 ();
 #endif                                                  /* endif _WIN32 */
 #if defined (SIGPIPE)
 signal (SIGPIPE, SIG_IGN);                              /* no pipe signals */
+#endif
+#if defined(TEST_INFO_STUBS)
+/* force use of stubs */
+p_getaddrinfo = (getaddrinfo_func)s_getaddrinfo;
+p_getnameinfo = (getnameinfo_func)s_getnameinfo;
+p_freeaddrinfo = (freeaddrinfo_func)s_freeaddrinfo;
 #endif
 }
 
@@ -1068,14 +1079,10 @@ if (newsock == INVALID_SOCKET) {                        /* error? */
     }
 if (connectaddr != NULL) {
     *connectaddr = (char *)calloc(1, NI_MAXHOST+1);
-#ifdef AF_INET6
     p_getnameinfo((struct sockaddr *)&clientname, size, *connectaddr, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
     if (0 == memcmp("::ffff:", *connectaddr, 7))        /* is this a IPv4-mapped IPv6 address? */
         memmove(*connectaddr, 7+*connectaddr,           /* prefer bare IPv4 address */
                 strlen(*connectaddr) - 7 + 1);          /* length to include terminating \0 */
-#else
-    strcpy(*connectaddr, inet_ntoa(((struct sockaddr_in *)&connectaddr)->s_addr));
-#endif
     }
 
 if (!(opt_flags & SIM_SOCK_OPT_BLOCKING)) {
@@ -1156,7 +1163,6 @@ size_t size = addrsize;
 #endif
 int ret = 0;
 
-#ifdef AF_INET6
 *hostnamebuf = '\0';
 *portnamebuf = '\0';
 ret = p_getnameinfo(addr, size, hostnamebuf, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
@@ -1165,10 +1171,6 @@ if (0 == memcmp("::ffff:", hostnamebuf, 7))        /* is this a IPv4-mapped IPv6
             strlen(hostnamebuf) + 7 - 1);          /* length to include terminating \0 */
 if (!ret)
     ret = p_getnameinfo(addr, size, NULL, 0, portnamebuf, NI_MAXSERV, NI_NUMERICSERV);
-#else
-strcpy(hostnamebuf, inet_ntoa(((struct sockaddr_in *)addr)->s_addr));
-sprintf(portnamebuf, "%d", (int)ntohs(((struct sockaddr_in *)addr)->s_port)));
-#endif
 return ret;
 }
 
