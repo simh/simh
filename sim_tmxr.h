@@ -307,6 +307,7 @@ const char *tmxr_send_line_name (const SEND *snd);
 const char *tmxr_expect_line_name (const EXPECT *exp);
 t_stat tmxr_startup (void);
 t_stat tmxr_shutdown (void);
+t_stat tmxr_sock_test (DEVICE *dptr);
 t_stat tmxr_start_poll (void);
 t_stat tmxr_stop_poll (void);
 void _tmxr_debug (uint32 dbits, TMLN *lp, const char *msg, char *buf, int bufsize);

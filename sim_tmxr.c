@@ -1038,7 +1038,8 @@ if (mp->last_poll_time == 0) {                          /* first poll initializa
         }
     }
 
-if ((poll_time - mp->last_poll_time) < mp->poll_interval*1000)
+if (sim_is_running && 
+    ((poll_time - mp->last_poll_time) < mp->poll_interval*1000))
     return -1;                                          /* too soon to try */
 
 srand((unsigned int)poll_time);
@@ -5446,4 +5447,49 @@ if ((dptr) && (dbits & dptr->dctrl)) {
         sim_debug (dbits, dptr, "\n");
         }
     }
+}
+
+/* Testing of sim_sock and tmxr */
+
+#include <setjmp.h>
+
+t_stat tmxr_sock_test (DEVICE *dptr)
+{
+char cmd[CBUFSIZE];
+int line;
+TMXR *tmxr;
+TMLN *ln;
+t_stat stat = SCPE_OK;
+SOCKET sock_mux = INVALID_SOCKET;
+SOCKET sock_line = INVALID_SOCKET;
+SIM_TEST_INIT;
+
+sim_printf ("Testing %s:\n", dptr->name);
+dptr->dctrl = 0xFFFFFFFF;
+dptr->dctrl &= ~TMXR_DBG_TRC;
+sprintf (cmd, "%s -u localhost:65500", dptr->name);
+SIM_TEST(attach_cmd (0, cmd));
+tmxr = (TMXR *)dptr->units->tmxr;
+ln = &tmxr->ldsc[tmxr->lines - 1];
+SIM_TEST(detach_cmd (0, dptr->name));
+if (tmxr->lines > 1) {
+    tmxr->modem_control = FALSE;
+    for (line=0; line < tmxr->lines; line++)
+        tmxr->ldsc[line].modem_control = FALSE;
+    snprintf (cmd + strlen (cmd), sizeof (cmd) - strlen (cmd), ",Line=%d,localhost:65501", tmxr->lines - 1);
+    SIM_TEST(attach_cmd (0, cmd));
+    sock_line = sim_connect_sock_ex (NULL, "localhost:65501", NULL, NULL, 0);
+    sim_os_ms_sleep (100);
+    SIM_TEST((tmxr_poll_conn (tmxr) == tmxr->lines - 1) ? SCPE_OK : SCPE_IERR);
+    sock_mux = sim_connect_sock ("", "localhost", "65500");
+    sim_os_ms_sleep (100);
+    SIM_TEST((tmxr_poll_conn (tmxr) == 0) ? SCPE_OK : SCPE_IERR);
+    show_cmd (0, "MUX");
+    sim_close_sock (sock_mux);
+    sock_mux = INVALID_SOCKET;
+    sim_close_sock (sock_line);
+    sock_line = INVALID_SOCKET;
+    SIM_TEST(detach_cmd (0, dptr->name));
+    }
+return stat;
 }
