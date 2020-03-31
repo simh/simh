@@ -491,7 +491,7 @@ DEVICE tty_dev = {
     "TTY", tty_unit, tty_reg, tty_mod,
     27, 2, 1, 1, 2, 1,
     NULL, NULL, &tty_reset, NULL, &tty_attach, &tty_detach,
-    NULL, DEV_NET|DEV_DEBUG
+    NULL, DEV_MUX|DEV_DEBUG
 };
 
 void tty_send (uint32 mask)

@@ -861,7 +861,7 @@ DEVICE  alm_dev =
         1, 10, 31, 1, 8, 8,
         NULL, NULL, &alm_reset,
         NULL, &qty_attach, &qty_detach,
-        &alm_dib, (DEV_DISABLE | DEV_NET)
+        &alm_dib, (DEV_DISABLE | DEV_MUX)
         } ;
 
 int alm_section     = -1 ;      /*  current line "section" (0 = RCV, 1 = XMT)  */
