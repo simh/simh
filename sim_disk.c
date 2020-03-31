@@ -53,6 +53,14 @@ Public routines:
    sim_disk_data_trace       debug support
    sim_disk_test             unit test routine
 
+   Guest-specific routines for PDP-10 which uses 1024 byte sectors and
+   requires mapping functions to allow access to the underlying 512 byte
+   sectors provided by the sim_disk routines
+
+   sim_disk_pdp10_attach     attach disk unit
+   sim_disk_pdp10_rdsect     read PDP-10 disk sectors
+   sim_disk_pdp10_wrsect     write PDP-10 disk sectors
+
 Internal routines:
 
    sim_os_disk_open_raw      platform specific open raw device
@@ -89,7 +97,7 @@ struct disk_context {
     DEVICE              *dptr;              /* Device for unit (access to debug flags) */
     uint32              dbit;               /* debugging bit */
     uint32              sector_size;        /* Disk Sector Size (of the pseudo disk) */
-    uint32              capac_factor;       /* Units of Capacity (2 = word, 1 = byte) */
+    uint32              capac_factor;       /* Units of Capacity (8 = quadword, 2 = word, 1 = byte) */
     uint32              xfer_element_size;  /* Disk Bus Transfer size (1 - byte, 2 - word, 4 - longword) */
     uint32              storage_sector_size;/* Sector size of the containing storage */
     uint32              removable;          /* Removable device flag */
@@ -692,7 +700,7 @@ sim_debug_unit (ctx->dbit, uptr, "sim_disk_wrsect(unit=%d, lba=0x%X, sects=%d)\n
 
 if (uptr->dynflags & UNIT_DISK_CHK) {
     DEVICE *dptr = find_dev_from_unit (uptr);
-    uint32 capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* capacity units (word: 2, byte: 1) */
+    uint32 capac_factor = ((dptr->dwidth / dptr->aincr) >= 32) ? 8 : ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* capacity units (quadword: 8, word: 2, byte: 1) */
     t_lba total_sectors = (t_lba)((uptr->capac*capac_factor)/(ctx->sector_size/((dptr->flags & DEV_SECTORS) ? 512 : 1)));
     t_lba sect;
 
@@ -2012,7 +2020,7 @@ static FILESYSTEM_CHECK checks[] = {
                                            filesystem */
     NULL
     };
-t_offset ret_val;
+t_offset ret_val = (t_offset)-1;
 int i;
 
 for (i = 0; checks[i] != NULL; i++) {
@@ -2097,7 +2105,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
         return sim_messagef (r, "Can't open source VHD: %s\n", cptr);
         }
     sim_messagef (SCPE_OK, "%s%d: creating new virtual disk '%s'\n", sim_dname (dptr), (int)(uptr-dptr->units), gbuf);
-    capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* capacity units (word: 2, byte: 1) */
+    capac_factor = ((dptr->dwidth / dptr->aincr) >= 32) ? 8 : ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* capacity units (quadword: 8, word: 2, byte: 1) */
     vhd = sim_vhd_disk_create (gbuf, ((t_offset)uptr->capac)*capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1));
     if (!vhd) {
         return sim_messagef (r, "%s%d: can't create virtual disk '%s'\n", sim_dname (dptr), (int)(uptr-dptr->units), gbuf);
@@ -2274,7 +2282,7 @@ if ((uptr->filename == NULL) || (uptr->disk_ctx == NULL))
     return _err_return (uptr, SCPE_MEM);
 strlcpy (uptr->filename, cptr, CBUFSIZE);               /* save name */
 ctx->sector_size = (uint32)sector_size;                 /* save sector_size */
-ctx->capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* save capacity units (word: 2, byte: 1) */
+ctx->capac_factor = ((dptr->dwidth / dptr->aincr) >= 32) ? 8 : ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* save capacity units (quadword: 8, word: 2, byte: 1) */
 ctx->xfer_element_size = (uint32)xfer_element_size;     /* save xfer_element_size */
 ctx->dptr = dptr;                                       /* save DEVICE pointer */
 ctx->dbit = dbit;                                       /* save debug bit */
@@ -2372,7 +2380,7 @@ if ((created) && (!copied)) {
     if (sim_switches & SWMASK ('I')) {                  /* Initialize To Sector Address */
         uint8 *init_buf = (uint8*) malloc (1024*1024);
         t_lba lba, sect;
-        uint32 capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* capacity units (word: 2, byte: 1) */
+        uint32 capac_factor = ((dptr->dwidth / dptr->aincr) >= 32) ? 8 : ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* capacity units (quadword: 8, word: 2, byte: 1) */
         t_seccnt sectors_per_buffer = (t_seccnt)((1024*1024)/sector_size);
         t_lba total_sectors = (t_lba)((uptr->capac*capac_factor)/(sector_size/((dptr->flags & DEV_SECTORS) ? 512 : 1)));
         t_seccnt sects = sectors_per_buffer;
@@ -2410,7 +2418,7 @@ if ((created) && (!copied)) {
 if (sim_switches & SWMASK ('K')) {
     t_stat r = SCPE_OK;
     t_lba lba, sect;
-    uint32 capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* capacity units (word: 2, byte: 1) */
+    uint32 capac_factor = ((dptr->dwidth / dptr->aincr) >= 32) ? 8 : ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* capacity units (word: 2, byte: 1) */
     t_seccnt sectors_per_buffer = (t_seccnt)((1024*1024)/sector_size);
     t_lba total_sectors = (t_lba)((uptr->capac*capac_factor)/(sector_size/((dptr->flags & DEV_SECTORS) ? 512 : 1)));
     t_seccnt sects = sectors_per_buffer;
@@ -2869,6 +2877,36 @@ if (sim_deb && (dptr->dctrl & reason)) {
     }
 }
 
+/* Guest specific Disk I/O support */
+#define PDP10_SECTORS   2               /* PDP-10 sectors are 1024 bytes */
+
+t_stat sim_disk_pdp10_attach (UNIT *uptr, const char *cptr, size_t sector_size, size_t xfer_element_size, t_bool dontautosize,
+                           uint32 dbit, const char *dtype, int completion_delay, const char **drivetypes)
+{
+return sim_disk_attach_ex (uptr, cptr, sector_size / PDP10_SECTORS, xfer_element_size, dontautosize, dbit, dtype, 0, completion_delay, drivetypes);
+}
+
+t_stat sim_disk_pdp10_rdsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread, t_seccnt sects)
+{
+t_seccnt sectors;
+t_stat r = sim_disk_rdsect (uptr, lba * PDP10_SECTORS, buf, &sectors, sects * PDP10_SECTORS);
+
+if (sectsread)
+    *sectsread = sectors / PDP10_SECTORS;
+
+return r;
+}
+
+t_stat sim_disk_pdp10_wrsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectswritten, t_seccnt sects)
+{
+t_seccnt sectors;
+t_stat r = sim_disk_wrsect (uptr, lba * PDP10_SECTORS, buf, &sectors, sects * PDP10_SECTORS);
+
+if (sectswritten)
+    *sectswritten = sectors / PDP10_SECTORS;
+ 
+return r;
+}
 
 /* OS Specific RAW Disk I/O support */
 

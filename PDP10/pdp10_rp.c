@@ -70,6 +70,7 @@
 */
 
 #include "pdp10_defs.h"
+#include "sim_disk.h"
 #include <math.h>
 
 #define RP_NUMDR        8                               /* #drives */
@@ -83,13 +84,13 @@
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
-#define UNIT_V_DTYPE    (UNIT_V_UF + 1)                 /* disk type */
+#define UNIT_V_WLK      (DKUF_V_UF + 0)                 /* write locked */
+#define UNIT_V_DTYPE    (DKUF_V_UF + 1)                 /* disk type */
 #define UNIT_M_DTYPE    7
-#define UNIT_V_AUTO     (UNIT_V_UF + 4)                 /* autosize */
-#define UNIT_V_UTS      (UNIT_V_UF + 5)                 /* Up to speed */
+#define UNIT_V_AUTO     (DKUF_V_UF + 4)                 /* autosize */
+#define UNIT_V_UTS      (DKUF_V_UF + 5)                 /* Up to speed */
 #define UNIT_UTS        (1u << UNIT_V_UTS)
-#define UNIT_V_DUMMY    (UNIT_V_UF + 6)                 /* dummy flag */
+#define UNIT_V_DUMMY    (DKUF_V_UF + 6)                 /* dummy flag */
 #define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
 #define UNIT_AUTO       (1 << UNIT_V_AUTO)
@@ -318,18 +319,25 @@ struct drvtyp {
     int32       size;                                   /* #blocks */
     int32       devtype;                                /* device type */
     int32       ctrl;                                   /* ctrl type */
+    const char  *name;                                  /* device type name */
     };
 
 struct drvtyp drv_tab[] = {
-    { RM03_SECT, RM03_SURF, RM03_CYL, RM03_SIZE, RM03_DEV, MBA_RM_CTRL },
-    { RP04_SECT, RP04_SURF, RP04_CYL, RP04_SIZE, RP04_DEV, MBA_RP_CTRL },
-    { RM80_SECT, RM80_SURF, RM80_CYL, RM80_SIZE, RM80_DEV, MBA_RM_CTRL },
-    { RP06_SECT, RP06_SURF, RP06_CYL, RP06_SIZE, RP06_DEV, MBA_RP_CTRL },
-    { RM05_SECT, RM05_SURF, RM05_CYL, RM05_SIZE, RM05_DEV, MBA_RM_CTRL },
-    { RP07_SECT, RP07_SURF, RP07_CYL, RP07_SIZE, RP07_DEV, MBA_RM_CTRL },
+    { RM03_SECT, RM03_SURF, RM03_CYL, RM03_SIZE, RM03_DEV, MBA_RM_CTRL, "RM03" },
+    { RP04_SECT, RP04_SURF, RP04_CYL, RP04_SIZE, RP04_DEV, MBA_RP_CTRL, "RP04" },
+    { RM80_SECT, RM80_SURF, RM80_CYL, RM80_SIZE, RM80_DEV, MBA_RM_CTRL, "RM80" },
+    { RP06_SECT, RP06_SURF, RP06_CYL, RP06_SIZE, RP06_DEV, MBA_RP_CTRL, "RP06" },
+    { RM05_SECT, RM05_SURF, RM05_CYL, RM05_SIZE, RM05_DEV, MBA_RM_CTRL, "RM05" },
+    { RP07_SECT, RP07_SURF, RP07_CYL, RP07_SIZE, RP07_DEV, MBA_RM_CTRL, "RP07" },
     { 0 }
     };
 
+#define DBG_DSK 0x0001                                  /* display sim_disk activities */
+
+DEBTAB rp_debug[] = {
+    {"DISK",    DBG_DSK, "display sim_disk activities" },
+    {0}
+};
 extern int32 ubmap[UBANUM][UMAP_MEMSIZE];               /* Unibus maps */
 extern int32 ubcs[UBANUM];
 extern uint32 fe_bootrh;
@@ -373,6 +381,8 @@ void set_rper (int16 flag, int32 drv);
 void update_rpcs (int32 flags, int32 drv);
 void rp_go (int32 drv, int32 fnc);
 t_stat rp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat rp_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *rp_description (DEVICE *dptr);
 
 /* RP data structures
 
@@ -388,21 +398,21 @@ DIB rp_dib = {
     };
 
 UNIT rp_unit[] = {
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
              UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
              UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
              UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
              UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
              UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
              UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
              UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) },
-    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+    { UDATA (&rp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_AUTO+
              UNIT_ROABLE+(RP06_DTYPE << UNIT_V_DTYPE), RP06_SIZE) }
     };
 
@@ -439,8 +449,10 @@ REG rp_reg[] = {
     };
 
 MTAB rp_mod[] = {
-    { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
+    { UNIT_WLK, 0, "write enabled", "WRITEENABLED",
+      NULL, NULL, NULL, "Write enable disk drive" },
+    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED",
+      NULL, NULL, NULL, "Write lock disk drive" },
     { (UNIT_DTYPE+UNIT_ATT), (RM03_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
       "RM03", NULL, NULL },
     { (UNIT_DTYPE+UNIT_ATT), (RP04_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
@@ -466,19 +478,24 @@ MTAB rp_mod[] = {
     { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (RP07_DTYPE << UNIT_V_DTYPE),
       "RP07", NULL, NULL },
     { (UNIT_AUTO+UNIT_ATT), UNIT_AUTO, "autosize", NULL, NULL },
-    { UNIT_AUTO, UNIT_AUTO, NULL, "AUTOSIZE", NULL },
+    { UNIT_AUTO, UNIT_AUTO, NULL, "AUTOSIZE", NULL, NULL, NULL,
+      "Enables disk autosize on attach" },
+    { UNIT_AUTO, 0, NULL, "NOAUTOSIZE", NULL, NULL, NULL,
+      "Disables disk autosize on attach" },
+    { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "FORMAT", "FORMAT={SIMH|VHD|RAW}",
+      &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Set/Display disk container format" },
     { (UNIT_AUTO+UNIT_DTYPE), (RM03_DTYPE << UNIT_V_DTYPE),
-      NULL, "RM03", &rp_set_size },
+      NULL, "RM03", &rp_set_size, NULL, NULL, "Set RP04 Disk Type" },
     { (UNIT_AUTO+UNIT_DTYPE), (RP04_DTYPE << UNIT_V_DTYPE),
-      NULL, "RP04", &rp_set_size }, 
+      NULL, "RP04", &rp_set_size, NULL, NULL, "Set RP04 Disk Type" }, 
     { (UNIT_AUTO+UNIT_DTYPE), (RM80_DTYPE << UNIT_V_DTYPE),
-      NULL, "RM80", &rp_set_size },
+      NULL, "RM80", &rp_set_size, NULL, NULL, "Set RM80 Disk Type" },
     { (UNIT_AUTO+UNIT_DTYPE), (RP06_DTYPE << UNIT_V_DTYPE),
-      NULL, "RP06", &rp_set_size },
+      NULL, "RP06", &rp_set_size, NULL, NULL, "Set RP06 Disk Type" },
     { (UNIT_AUTO+UNIT_DTYPE), (RM05_DTYPE << UNIT_V_DTYPE),
-      NULL, "RM05", &rp_set_size },
+      NULL, "RM05", &rp_set_size, NULL, NULL, "Set RM05 Disk Type" },
     { (UNIT_AUTO+UNIT_DTYPE), (RP07_DTYPE << UNIT_V_DTYPE),
-      NULL, "RP07", &rp_set_size },
+      NULL, "RP07", &rp_set_size, NULL, NULL, "Set RP07 Disk Type" },
     { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
       NULL, &show_addr, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
@@ -491,7 +508,9 @@ DEVICE rp_dev = {
     RP_NUMDR, 8, 30, 1, 8, 36,
     NULL, NULL, &rp_reset,
     &rp_boot, &rp_attach, &rp_detach,
-    &rp_dib, DEV_UBUS
+    &rp_dib, DEV_UBUS | DEV_DEBUG,
+    0, rp_debug, NULL, NULL, &rp_help, sim_disk_attach_help, NULL,
+    &rp_description
     };
 
 /* I/O dispatch routines, I/O addresses 17776700 - 17776776 */
@@ -875,11 +894,12 @@ return;
 
 t_stat rp_svc (UNIT *uptr)
 {
-int32 i, dtype, drv, err;
+int32 i, dtype, drv;
 int32 ba, da, vpn;
 a10 pa10, mpa10;
 int32 wc10, twc10, awc10, fc10;
 static d10 dbuf[RP_MAXFR];
+t_stat r;
 
 dtype = GET_DTYPE (uptr->flags);                        /* get drive type */
 drv = (int32) (uptr - rp_dev.units);                    /* get drv number */
@@ -946,7 +966,6 @@ switch (uptr->FUNC) {                                   /* case on function */
                 wc10 = drv_tab[dtype].size - da;
             }
 
-        err = fseek (uptr->fileref, da * sizeof (d10), SEEK_SET);
         if (uptr->FUNC == FNC_WRITE) {                  /* write? */
             for (twc10 = 0; twc10 < wc10; twc10++) {
                 pa10 = ba >> 2;
@@ -972,12 +991,15 @@ switch (uptr->FUNC) {                                   /* case on function */
                 for (i = 0; i < fc10; i++)
                     dbuf[twc10 + i] = 0;
                 }
-            fxwrite (dbuf, sizeof (d10), twc10 + fc10, uptr->fileref);
-            err = ferror (uptr->fileref);
+            r = sim_disk_pdp10_wrsect (uptr, da/RP_NUMWD, (uint8 *)dbuf,
+                                       NULL, (twc10 + fc10 + RP_NUMWD - 1)/RP_NUMWD);
             }                                           /* end if */
         else {                                          /* read, wchk, readh */
-            awc10 = fxread (dbuf, sizeof (d10), wc10, uptr->fileref);
-            err = ferror (uptr->fileref);
+            t_seccnt sectsread;
+
+            r = sim_disk_pdp10_rdsect (uptr, da/RP_NUMWD, (uint8 *)dbuf,
+                                       &sectsread, (wc10 + RP_NUMWD - 1)/RP_NUMWD);
+            awc10 = sectsread * RP_NUMWD;
             for ( ; awc10 < wc10; awc10++)
                 dbuf[awc10] = 0;
             for (twc10 = 0; twc10 < wc10; twc10++) {
@@ -1019,11 +1041,10 @@ switch (uptr->FUNC) {                                   /* case on function */
         rpda[drv] = (uint16)(rpda[drv] | ((da % drv_tab[dtype].surf) << DA_V_SF));
         rpdc[drv] = (uint16)(da / drv_tab[dtype].surf);
 
-        if (err != 0) {                                 /* error? */
+        if (r != SCPE_OK) {                             /* error? */
             set_rper (ER1_PAR, drv);                    /* set drive error */
             update_rpcs (CS1_DONE | CS1_TRE, drv);      /* set done, err */
-            sim_perror ("RP I/O error");
-            clearerr (uptr->fileref);
+            sim_printf ("RP I/O error");
             return SCPE_IOERR;
             }
         /* fall through */
@@ -1153,9 +1174,13 @@ t_stat rp_attach (UNIT *uptr, CONST char *cptr)
 {
 int32 i, p;
 t_stat r;
+static const char *drives[] = {"RM03", "RP04", "RM80", "RP06", "RM05", "RP07", NULL};
 
 uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;
-r = attach_unit (uptr, cptr);
+r = sim_disk_pdp10_attach (uptr, cptr, RP_NUMWD * sizeof (d10), sizeof (d10),
+                           (uptr->flags & UNIT_AUTO) == 0, DBG_DSK,
+                           drv_tab[GET_DTYPE (uptr->flags)].name,
+                           0, (uptr->flags & UNIT_AUTO) ? drives : NULL);
 if (r != SCPE_OK)
     return r;
 sim_cancel (uptr);
@@ -1163,8 +1188,7 @@ uptr->flags &= ~UNIT_UTS;
 sim_activate_after (uptr, SPINUP_DLY);
 if ((uptr->flags & UNIT_AUTO) == 0)                     /* autosize? */
     return SCPE_OK;
-if ((p = sim_fsize (uptr->fileref)) == 0)
-    return SCPE_OK;
+p = (int32)sim_disk_size (uptr);
 for (i = 0; drv_tab[i].sect != 0; i++) {
     if (p <= (drv_tab[i].size * (int) sizeof (d10))) {
         uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (i << UNIT_V_DTYPE);
@@ -1197,7 +1221,7 @@ if (sim_is_active (uptr)) {                             /* unit active? */
     }
 uptr->flags &= ~UNIT_UTS;
 update_rpcs (0, drv);                                  /* request intr */
-return detach_unit (uptr);
+return sim_disk_detach (uptr);
 }
 
 /* Set size command validation routine */
@@ -1374,4 +1398,35 @@ for (i = 0; i < BOOT_LEN; i++)
     M[BOOT_START + i] = Q_ITS? boot_rom_its[i]: boot_rom_dec[i];
 saved_PC = BOOT_START;
 return SCPE_OK;
+}
+
+t_stat rp_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+  fprintf (st, "RP04/05/06/07, RM02/03/05/80 Disk Pack Drives (RP)\n\n");
+  fprintf (st, "The RP controller implements the Massbus family of large disk dri\
+ves.  RP\n");
+  fprintf (st, "options include the ability to set units write enabled or write locked, to\n");
+  fprintf (st, "set the drive type to one of six disk types or autosize, and to write a DEC\n");
+  fprintf (st, "standard 044 compliant bad block table on the last track.\n\n");
+  fprint_set_help (st, dptr);
+  fprint_show_help (st, dptr);
+  fprintf (st, "\nThe type options can be used only when a unit is not attached to a file.\n");
+  fprintf (st, "The bad block option can be used only when a unit is attached to a file.\n");
+  fprintf (st, "The RP device supports the BOOT command.\n");
+  fprint_reg_help (st, dptr);
+  fprintf (st, "\nError handling is as follows:\n\n");
+  fprintf (st, "    error         STOP_IOE   processed as\n");
+  fprintf (st, "    not attached  1          report error and stop\n");
+  fprintf (st, "                  0          disk not ready\n\n");
+  fprintf (st, "    end of file   x          assume rest of disk is zero\n");
+  fprintf (st, "    OS I/O error  x          report error and stop\n");
+  fprintf (st, "\nDisk drives on the %s device can be attacbed to simulated storage in the\n", dptr->name);
+  fprintf (st, "following ways:\n\n");
+  sim_disk_attach_help (st, dptr, uptr, flag, cptr);
+  return SCPE_OK;
+}
+
+const char *rp_description (DEVICE *dptr)
+{
+  return "RP04/05/06/07 RM02/03/05/80 Massbus disk controller";
 }
