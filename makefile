@@ -595,32 +595,6 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
           endif
         endif
       endif
-    else
-      ifneq (,$(call find_include,SDL/SDL))
-        ifneq (,$(call find_lib,SDL))
-          ifneq (,$(findstring Haiku,$(OSTYPE)))
-            ifneq (,$(shell which sdl-config))
-              SDLX_CONFIG = sdl-config
-            endif
-          else
-            SDLX_CONFIG = $(realpath $(dir $(call find_include,SDL/SDL))../../bin/sdl-config)
-          endif
-          ifneq (,$(SDLX_CONFIG))
-            VIDEO_CCDEFS += -DHAVE_LIBSDL -DUSE_SIM_VIDEO `$(SDLX_CONFIG) --cflags`
-            VIDEO_LDFLAGS += `$(SDLX_CONFIG) --libs`
-            VIDEO_FEATURES = - video capabilities provided by libSDL (Simple Directmedia Layer)
-            DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/sim_ws.c
-            DISPLAYVT = ${DISPLAYD}/vt11.c
-            DISPLAY340 = ${DISPLAYD}/type340.c
-            DISPLAYNG = ${DISPLAYD}/ng.c
-            DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
-            $(info using libSDL: $(call find_include,SDL/SDL))
-            ifeq (Darwin,$(OSTYPE))
-              VIDEO_CCDEFS += -DSDL_MAIN_AVAILABLE
-            endif
-          endif
-        endif
-      endif
     endif
     ifeq (cygwin,$(OSTYPE))
       LIBEXT = $(LIBEXTSAVE)
