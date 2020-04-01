@@ -97,8 +97,8 @@ t_bool sim_disk_vhd_support (void);
 t_bool sim_disk_raw_support (void);
 void sim_disk_data_trace (UNIT *uptr, const uint8 *data, size_t lba, size_t len, const char* txt, int detail, uint32 reason);
 t_stat sim_disk_test (DEVICE *dptr);
-t_stat sim_disk_pdp10_attach (UNIT *uptr, const char *cptr, size_t sector_size, size_t xfer_element_size, t_bool dontautosize,
-                                 uint32 dbit, const char *dtype, int completion_delay, const char **drivetypes);
+t_stat sim_disk_pdp10_attach (UNIT *uptr, const char *cptr, t_bool dontautosize, uint32 dbit, 
+                              const char *dtype, int completion_delay, const char **drivetypes);
 t_stat sim_disk_pdp10_rdsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread, t_seccnt sects);
 t_stat sim_disk_pdp10_wrsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectswritten, t_seccnt sects);
 

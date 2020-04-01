@@ -1177,8 +1177,7 @@ t_stat r;
 static const char *drives[] = {"RM03", "RP04", "RM80", "RP06", "RM05", "RP07", NULL};
 
 uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;
-r = sim_disk_pdp10_attach (uptr, cptr, RP_NUMWD * sizeof (d10), sizeof (d10),
-                           (uptr->flags & UNIT_AUTO) == 0, DBG_DSK,
+r = sim_disk_pdp10_attach (uptr, cptr, (uptr->flags & UNIT_AUTO) == 0, DBG_DSK,
                            drv_tab[GET_DTYPE (uptr->flags)].name,
                            0, (uptr->flags & UNIT_AUTO) ? drives : NULL);
 if (r != SCPE_OK)
