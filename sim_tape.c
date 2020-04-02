@@ -114,6 +114,7 @@ static struct sim_tape_fmt {
     { "TAR",        UNIT_RO, 0,                     0                 },
     { "ANSI",       UNIT_RO, 0,                     0                 },
     { "FIXED",      UNIT_RO, 0,                     0                 },
+    { "DOS11",      UNIT_RO, 0,                     0                 },
     { NULL,         0,       0,                     0                 }
     };
 
@@ -518,7 +519,26 @@ static void sim_tape_add_ansi_entry (const char *directory,
                                      const struct stat *filestat,
                                      void *context);
 static t_bool memory_tape_add_block (MEMORY_TAPE *tape, uint8 *block, uint32 size);
+
+typedef struct DOS11_HDR {
+    uint16 fname[2];        /* File name (RAD50 - 6 characters) */
+    uint16 ext;             /* Extension (RAD50 - 3 characters) */
+    uint8  prog;            /* Programmer # */
+    uint8  proj;            /* Project # */
+    uint16 prot;            /* Protection */
+    uint16 date;            /* (year - 1970) * 1000 + day of year */
+    uint16 fname3;          /* File name (RAD50 - 3 characters) */
+    } DOS11_HDR;
+#define DOS11_PROT      0233
+
+static void sim_tape_add_dos11_entry (const char *directory,
+                                      const char *filename,
+                                      t_offset FileSize,
+                                      const struct stat *filestat,
+                                      void *context);
+
 static t_stat sim_export_tape (UNIT *uptr, const char *export_file);
+static FILE *tape_open_and_check_file(const char *filename);
 static int tape_classify_file_contents (FILE *f, size_t *max_record_size, t_bool *lf_line_endings, t_bool *crlf_line_endings);
 
 
@@ -659,8 +679,6 @@ else {
     if ((MT_GET_FMT (uptr) == MTUF_F_TAR) && (uptr->recsize == 0))
         uptr->recsize = TAR_DFLT_RECSIZE;
     }
-if (sim_switches & SWMASK ('X'))
-    cptr = get_glyph_nc (cptr, export_file, 0);     /* get spec */
 if ((MT_GET_FMT (uptr) == MTUF_F_TPC) ||
     (MT_GET_FMT (uptr) == MTUF_F_TAR) ||
     (MT_GET_FMT (uptr) >= MTUF_F_ANSI))
@@ -807,6 +825,48 @@ switch (MT_GET_FMT (uptr)) {
             }
         break;
 
+    case MTUF_F_DOS11:
+        if (1) {
+            const char *ocptr = cptr;
+            int file_errors = 0;
+
+            uptr->recsize = 512;
+
+            tape = memory_create_tape();
+            tape->block_size = uptr->recsize;
+            uptr->fileref = (FILE *)tape;
+            if (!uptr->fileref)
+                return SCPE_MEM;
+
+            while (*cptr != 0) {
+                uint32 initial_file_count = tape->file_count;
+
+                cptr = get_glyph_nc (cptr, gbuf, ',');   /* Get filename */
+                r = sim_dir_scan (gbuf, sim_tape_add_dos11_entry, tape);
+                if (r != SCPE_OK)
+                    sim_messagef (SCPE_ARG, "file not found: %s\n", gbuf);
+                if (tape->file_count == initial_file_count)
+                    ++file_errors;
+                }
+
+            if ((tape->file_count > 0) && (file_errors == 0)) {
+                r = SCPE_OK;
+                memory_tape_add_block (tape, NULL, 0); /* Tape Mark */
+                memory_tape_add_block (tape, NULL, 0); /* Tape Mark */
+                uptr->flags |= UNIT_ATT;
+                uptr->filename = (char *)malloc (strlen (ocptr) + 1);
+                strcpy (uptr->filename, ocptr);
+                uptr->tape_eom = tape->record_count;
+                }
+            else {
+                r = SCPE_ARG;
+                memory_free_tape (uptr->fileref);
+                uptr->fileref = NULL;
+                cptr = ocptr;
+                }
+            }
+        break;
+
     case MTUF_F_TAR:
         if (uptr->recsize == 0)
             uptr->recsize = TAR_DFLT_RECSIZE;       /* Apply default block size */
@@ -820,6 +880,7 @@ if (r != SCPE_OK) {                                     /* error? */
         case MTUF_F_ANSI:
         case MTUF_F_TAR:
         case MTUF_F_FIXED:
+        case MTUF_F_DOS11:
             r = sim_messagef (r, "Error opening %s format internal tape image generated from: %s\n", _sim_tape_format_name (uptr), cptr);
             break;
         default:
@@ -975,7 +1036,8 @@ fprintf (st, "    -E          Must Exist (if not specified, the default behavior
 fprintf (st, "                attempt to create the indicated virtual tape file).\n");
 fprintf (st, "    -F          Open the indicated tape container in a specific format\n");
 fprintf (st, "                (default is SIMH, alternatives are E11, TPC, P7B, AWS, TAR,\n");
-fprintf (st, "                ANSI-VMS, ANSI-RT11, ANSI-RSX11, ANSI-RSTS, ANSI-VAR, FIXED)\n");
+fprintf (st, "                ANSI-VMS, ANSI-RT11, ANSI-RSX11, ANSI-RSTS, ANSI-VAR, FIXED,\n");
+fprintf (st, "                DOS11)\n");
 fprintf (st, "    -B          For TAR format tapes, the record size for data read from the\n");
 fprintf (st, "                specified file.  This record size will be used for all but \n");
 fprintf (st, "                possibly the last record which will be what remains unread.\n");
@@ -1000,12 +1062,23 @@ fprintf (st, "        accessible directly as files on the tape.\n\n");
 fprintf (st, "        FIXED format will present the contents of a file (text or binary) as\n");
 fprintf (st, "        fixed sized records/blocks with ascii text data optionally converted\n");
 fprintf (st, "        to EBCDIC.\n\n");
+fprintf (st, "        DOS11 format will present the contents of a file preceeded by a DOS11\n");
+fprintf (st, "        14-byte header. All files will be owned by [1,1], have a default\n");
+fprintf (st, "        protection of <233> and a date in the range 1972 - 1999 with the\n");
+fprintf (st, "        month/day layout as the current year. The file name on the tape\n");
+fprintf (st, "        will be sanitized to contain only alphanumeric characters from the\n");
+fprintf (st, "        original source file name. Characters 7 - 9 of the file name will be\n");
+fprintf (st, "        placed in an otherwise unused word in the header which some DEC\n");
+fprintf (st, "        operating systems will be able to process. If the resulting\n");
+fprintf (st, "        filename is NULL, a filename in the range 000000 - 999999 will be\n");
+fprintf (st, "        generated based of the file position on the tape.\n\n");
 fprintf (st, "Examples:\n\n");
 fprintf (st, "  sim> ATTACH %s -F ANSI-VMS Hobbyist-USE-ONLY-VA.TXT\n", dptr->name);
 fprintf (st, "  sim> ATTACH %s -F ANSI-RSX11 *.TXT,*.ini,*.exe\n", dptr->name);
 fprintf (st, "  sim> ATTACH %s -FX ANSI-RSTS RSTS.tap *.TXT,*.SAV\n", dptr->name);
 fprintf (st, "  sim> ATTACH %s -F ANSI-RT11 *.TXT,*.TSK\n", dptr->name);
-fprintf (st, "  sim> ATTACH %s -FB FIXED 80 SOMEFILE.TXT\n\n", dptr->name);
+fprintf (st, "  sim> ATTACH %s -FB FIXED 80 SOMEFILE.TXT\n", dptr->name);
+fprintf (st, "  sim> ATTACH %s -F DOS11 *.LDA,*.TXT\n\n", dptr->name);
 return SCPE_OK;
 }
 
@@ -1422,6 +1495,7 @@ switch (f) {                                       /* otherwise the read method 
 
     case MTUF_F_ANSI:
     case MTUF_F_FIXED:
+    case MTUF_F_DOS11:
         if (1) {
             MEMORY_TAPE *tape = (MEMORY_TAPE *)uptr->fileref;
 
@@ -1757,6 +1831,7 @@ switch (f) {                                            /* otherwise the read me
 
     case MTUF_F_ANSI:
     case MTUF_F_FIXED:
+    case MTUF_F_DOS11:
         if (1) {
             MEMORY_TAPE *tape = (MEMORY_TAPE *)uptr->fileref;
 
@@ -4340,6 +4415,203 @@ tape->ansi_type = -1;
 return tape;
 }
 
+static const char rad50[] = " ABCDEFGHIJKLMNOPQRSTUVWXYZ%.%0123456789";
+
+static uint16 dos11_ascR50(char *inbuf)
+{
+uint16 value;
+
+value = (strchr (rad50, *inbuf++) - rad50) * 03100;
+value += (strchr (rad50, *inbuf++) - rad50) * 050;
+value += (strchr (rad50, *inbuf++) - rad50);
+
+return value;
+}
+
+/*
+ * Sanitize a filename to generate a DOS-11 compatible version. Ignore
+ * non-alphanumerics, upper case lower case characters and terminate on '.'
+ */
+static void dos11_sanitize(char *buf, int len, const char *inbuf)
+{
+    while ((len != 0) && (*inbuf != '\0') && (*inbuf !='.')) {
+    char ch = toupper (*inbuf++);
+
+    if (isalnum(ch)) {
+        *buf++ = ch;
+        len--;
+        }
+    }
+}
+
+static int dos11_copy_ascii_file(FILE *f, MEMORY_TAPE *tape, char *buf, size_t bufSize)
+{
+char ch, tmp[512];
+t_bool crlast = FALSE;
+int error = 0;
+size_t i, data_read, offset = 0;
+
+memset (buf, 0, bufSize);
+
+while (!feof (f) && !error) {
+    data_read = fread (tmp, 1, sizeof (tmp), f);
+    if (data_read > 0)
+        for (i = 0; i < data_read; i++) {
+            ch = tmp[i];
+            if (ch == '\n') {
+                if (!crlast) {
+                    buf[offset++] = '\r';
+                    if (offset == bufSize) {
+                        error = memory_tape_add_block (tape, (uint8 *)buf, bufSize);
+                        offset = 0;
+                        memset (buf, 0, bufSize);
+                        }
+                    }
+                buf[offset++] = ch;
+                if (offset == bufSize) {
+                    error = memory_tape_add_block (tape, (uint8 *)buf, bufSize);
+                    offset = 0;
+                    memset (buf, 0, bufSize);
+                    }
+                crlast = FALSE;
+                }
+            else {
+                crlast = ch == '\r';
+
+                buf[offset++] = ch;
+                if (offset == bufSize) {
+                    error = memory_tape_add_block (tape, (uint8 *)buf, bufSize);
+                    offset = 0;
+                    memset (buf, 0, bufSize);
+                    }
+                }
+            }
+    }
+    if (offset != 0)
+        error = memory_tape_add_block (tape, (uint8 *)buf, bufSize);
+
+return error;
+}
+
+static void sim_tape_add_dos11_entry (const char *directory,
+                                      const char *filename,
+                                      t_offset FileSize,
+                                      const struct stat *filestat,
+                                      void *context)
+{
+MEMORY_TAPE *tape = (MEMORY_TAPE *)context;
+char FullPath[PATH_MAX + 1];
+FILE *f;
+size_t max_record_size;
+t_bool lf_line_endings;
+t_bool crlf_line_endings;
+uint8 *block = NULL;
+int error = 0;
+DOS11_HDR hdr;
+char fname[9], ext[3];
+const char *ptr;
+struct tm *tm;
+time_t now = time (NULL);
+uint16 today;
+int year;
+
+/*
+ * Compute a suitable year for file creation date. This year will have the
+ * same calendar as the current year but will be in the 20th century so that
+ * DOS/BATCH-11 will be able to interpret it correctly.
+ */
+tm = localtime (&now);
+year = tm->tm_year + 1900;
+while (year >= 2000)
+    year -= 28;
+
+today = ((year - 70) * 1000) + tm->tm_yday + 1;
+
+sprintf (FullPath, "%s%s", directory, filename);
+f = tape_open_and_check_file(FullPath);
+ if (f == NULL)
+    return;
+
+tape_classify_file_contents (f, &max_record_size, &lf_line_endings, &crlf_line_endings);
+
+memset (&hdr, 0, sizeof (hdr));
+memset (fname, ' ', sizeof (fname));
+memset (ext, ' ', sizeof (ext));
+
+dos11_sanitize (fname, sizeof (fname), filename);
+ptr = strchr (filename, '.');
+if (ptr != NULL)
+    dos11_sanitize (ext, sizeof (ext), ++ptr);
+
+/*
+ * If we were unable to generate a valid DOS11 filename, generate one based
+ * on the file number on the tape (000000 - 999999).
+ */
+if (fname[0] == ' ') {
+  char temp[10];
+
+  sprintf(temp, "%06u   ", tape->file_count % 100000);
+  memcpy(fname, temp, sizeof(fname));
+}
+
+hdr.fname[0] = dos11_ascR50 (&fname[0]);
+hdr.fname[1] = dos11_ascR50 (&fname[3]);
+hdr.ext = dos11_ascR50 (&ext[0]);
+hdr.prog = 1;
+hdr.proj = 1;
+hdr.prot = DOS11_PROT;
+hdr.date = today;
+hdr.fname3 = dos11_ascR50 (&fname[6]);
+
+memory_tape_add_block (tape, (uint8 *)&hdr, sizeof (hdr));
+
+rewind (f);
+block = (uint8 *)calloc (tape->block_size, 1);
+
+if (lf_line_endings || crlf_line_endings)
+    error = dos11_copy_ascii_file (f, tape, (char *)block, tape->block_size);
+else {
+    size_t data_read;
+
+    while (!feof (f) && !error) {
+        data_read = fread (block, 1, tape->block_size, f);
+        if (data_read > 0)
+            error = memory_tape_add_block (tape, block, data_read);
+        }
+    } 
+
+fclose (f);
+free (block);
+memory_tape_add_block (tape, NULL, 0);
+++tape->file_count;
+}
+
+static FILE *tape_open_and_check_file(const char *filename)
+{
+FILE *file = fopen(filename, "rb");
+
+if (file != NULL) {
+    struct stat statb;
+
+    memset (&statb, 0, sizeof (statb));
+    if (fstat (fileno (file), &statb) == 0) {
+        if (((S_IFDIR | S_IFREG) & statb.st_mode) == S_IFREG)
+            return file;
+
+        sim_printf ("Can't put a %s on tape: %s\n",
+                    statb.st_mode & S_IFREG ? "directory" : "non regular file",
+                    filename);
+        fclose (file);
+        return NULL;
+        }
+    sim_printf ("Can't stat: %s\n", filename);
+    fclose (file);
+    return NULL;
+    }
+sim_printf ("Can't open: %s - %s\n", filename, strerror (errno));
+return NULL;
+}
+
 static int tape_classify_file_contents (FILE *f, size_t *max_record_size, t_bool *lf_line_endings, t_bool *crlf_line_endings)
 {
 long pos = -1;
@@ -4412,7 +4684,6 @@ return tape;
 static int ansi_add_file_to_tape (MEMORY_TAPE *tape, const char *filename)
 {
 FILE *f;
-struct stat statb;
 struct ansi_tape_parameters *ansi = &ansi_args[tape->ansi_type];
 uint8 *block = NULL;
 size_t max_record_size;
@@ -4427,27 +4698,10 @@ HDR2 hdr2;
 HDR3 hdr3;
 HDR4 hdr4;
 
-f = fopen (filename, "rb");
-if (f == NULL) {
-    sim_printf ("Can't open: %s - %s\n", filename, strerror(errno));
-    return errno;
-    }
-memset (&statb, 0, sizeof (statb));
-if (fstat (fileno (f), &statb)) {
-    sim_printf ("Can't stat: %s\n", filename);
-    fclose (f);
-    return -1;
-    }
-if (S_IFDIR & statb.st_mode) {
-    sim_printf ("Can't put a directory on tape: %s\n", filename);
-    fclose (f);
-    return -1;
-    }
-if (!(S_IFREG & statb.st_mode)) {
-    sim_printf ("Can't put a non regular file on tape: %s\n", filename);
-    fclose (f);
-    return -1;
-    }
+f = tape_open_and_check_file(filename);
+if (f == NULL)
+    return TRUE;
+
 tape_classify_file_contents (f, &max_record_size, &lf_line_endings, &crlf_line_endings);
 ansi_make_HDR1 (&hdr1, &tape->vol1, &hdr4, filename, tape->ansi_type);
 sprintf (file_sequence, "%04d", 1 + tape->file_count);

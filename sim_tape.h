@@ -100,6 +100,7 @@ typedef struct {
 #define MTUF_F_TAR      5                               /* TAR format */
 #define MTUF_F_ANSI     6                               /* ANSI format */
 #define MTUF_F_FIXED    7                               /* FIXED format */
+#define MTUF_F_DOS11    8                               /* DOS11 format */
 
 #define MTAT_F_VMS      0                               /* VMS ANSI type */
 #define MTAT_F_RSX11    1                               /* RSX-11 ANSI type */
