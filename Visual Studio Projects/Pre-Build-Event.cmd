@@ -205,7 +205,7 @@ echo ** windows-build repository from:                  **
 echo **                                                 **
 echo **    https://github.com/simh/windows-build        **
 echo **                                                 **
-echo ** This may take a minute or si.  Please wait...   **
+echo ** This may take a minute or so.  Please wait...   **
 echo **                                                 **
 echo *****************************************************
 echo *****************************************************
