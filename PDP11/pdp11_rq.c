@@ -1086,8 +1086,8 @@ MTAB rq_mod[] = {
       &rq_set_plug, &rq_show_plug, NULL, "Set/Display Unit plug value" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, NULL, "DRIVES=val (4-254)",
       &rq_set_drives, NULL, NULL, "Set Number of Drives" },
-    { UNIT_NOAUTO, UNIT_NOAUTO, "noautosize", "NOAUTOSIZE", NULL, NULL, NULL, "Disables disk autosize on attach" },
-    { UNIT_NOAUTO,           0, "autosize",   "AUTOSIZE",   NULL, NULL, NULL, "Enables disk autosize on attach" },
+    { UNIT_NOAUTO, UNIT_NOAUTO, "noautosize", "NOAUTOSIZE", NULL, NULL, NULL, "Disable disk autosize on attach" },
+    { UNIT_NOAUTO,           0, "autosize",   "AUTOSIZE",   NULL, NULL, NULL, "Enable disk autosize on attach" },
     { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "FORMAT", "FORMAT={SIMH|VHD|RAW}",
       &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Set/Display disk format" },
 #if defined (VM_PDP11)

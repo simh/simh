@@ -68,10 +68,25 @@ typedef void (*DISK_PCALLBACK)(UNIT *unit, t_stat status);
 
 /* Prototypes */
 
-t_stat sim_disk_attach (UNIT *uptr, const char *cptr, size_t sector_size, size_t xfer_element_size, t_bool dontautosize, 
-                        uint32 debugbit, const char *drivetype, uint32 pdp11_tracksize, int completion_delay);
-t_stat sim_disk_attach_ex (UNIT *uptr, const char *cptr, size_t sector_size, size_t xfer_element_size, t_bool dontautosize,
-                           uint32 dbit, const char *dtype, uint32 pdp11tracksize, int completion_delay, const char **drivetypes);
+t_stat sim_disk_attach (UNIT *uptr, 
+                        const char *cptr, 
+                        size_t sector_size, size_t xfer_element_size, 
+                        t_bool dontchangecapac, 
+                        uint32 debugbit, 
+                        const char *drivetype, 
+                        uint32 pdp11_tracksize, 
+                        int completion_delay);
+t_stat sim_disk_attach_ex (UNIT *uptr, 
+                           const char *cptr, 
+                           size_t sector_size, 
+                           size_t xfer_element_size, 
+                           t_bool dontchangecapac,      /* if false just change uptr->capac as needed */
+                           uint32 dbit,                 /* debug bit */
+                           const char *dtype,           /* drive type */
+                           uint32 pdp11tracksize,       /* BAD144 track */
+                           int completion_delay,        /* Minimum Delay for asynch I/O completion */
+                           const char **drivetypes);    /* list of drive types (from smallest to largest) */
+                                                        /* to try and fit the container/file system into */
 t_stat sim_disk_detach (UNIT *uptr);
 t_stat sim_disk_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 t_stat sim_disk_rdsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread, t_seccnt sects);
@@ -97,10 +112,6 @@ t_bool sim_disk_vhd_support (void);
 t_bool sim_disk_raw_support (void);
 void sim_disk_data_trace (UNIT *uptr, const uint8 *data, size_t lba, size_t len, const char* txt, int detail, uint32 reason);
 t_stat sim_disk_test (DEVICE *dptr);
-t_stat sim_disk_pdp10_attach (UNIT *uptr, const char *cptr, t_bool dontautosize, uint32 dbit, 
-                              const char *dtype, int completion_delay, const char **drivetypes);
-t_stat sim_disk_pdp10_rdsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread, t_seccnt sects);
-t_stat sim_disk_pdp10_wrsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectswritten, t_seccnt sects);
 
 #ifdef  __cplusplus
 }

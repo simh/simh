@@ -578,7 +578,8 @@ void rp_set_er (int16 flg, int32 drv);
 void rp_clr_as (int32 mask);
 void rp_update_ds (uint16 flg, int32 drv);
 t_stat rp_go (int32 drv);
-t_stat rp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat rp_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat rp_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat rp_set_bad (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 int32 rp_abort (void);
 t_stat rp_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
@@ -621,7 +622,7 @@ REG rp_reg[] = {
     { BRDATADF (DA,                rpda, DEV_RDX, 16, RP_NUMDR, "desired surface, sector", rp_da_bits) },
     { BRDATADF (DS,                rpds, DEV_RDX, 16, RP_NUMDR, "drive status", rp_ds_bits) },
     { BRDATADF (ER1,              rper1, DEV_RDX, 16, RP_NUMDR, "drive errors", rp_er1_bits) },
-    { BRDATAD (HR,                rmhr, DEV_RDX, 16, RP_NUMDR, "holding register") },
+    { BRDATAD  (HR,                rmhr, DEV_RDX, 16, RP_NUMDR, "holding register") },
     { BRDATADF (OF,                rpof, DEV_RDX, 16, RP_NUMDR, "offset", rp_of_bits) },
     { BRDATADF (DC,                rpdc, DEV_RDX, 16, RP_NUMDR, "desired cylinder", rp_dc_bits) },
     { BRDATADF (ER2,              rper2, DEV_RDX, 16, RP_NUMDR, "error status 2", rp_er2_bits) },
@@ -629,13 +630,13 @@ REG rp_reg[] = {
     { BRDATADF (EC1,              rpec1, DEV_RDX, 16, RP_NUMDR, "ECC syndrome 1", rp_ec1_bits) },
     { BRDATADF (EC2,              rpec2, DEV_RDX, 16, RP_NUMDR, "ECC syndrome 2", rp_ec2_bits) },
     { BRDATADF (MR,                rpmr, DEV_RDX, 16, RP_NUMDR, "maintenance register", rp_mr_bits) },
-    { BRDATAD (MR2,              rmmr2, DEV_RDX, 16, RP_NUMDR, "maintenance register 2 (RM only)") },
-    { DRDATAD (STIME,         rp_swait, 24,                    "seek time, per cylinder"), REG_NZ + PV_LEFT },
-    { DRDATAD (RTIME,         rp_rwait, 24,                    "rotational delay"), REG_NZ + PV_LEFT },
-    { URDATA  (CAPAC, rp_unit[0].capac, 10, T_ADDR_W, 0,
+    { BRDATAD  (MR2,              rmmr2, DEV_RDX, 16, RP_NUMDR, "maintenance register 2 (RM only)") },
+    { DRDATAD  (STIME,         rp_swait, 24,                    "seek time, per cylinder"), REG_NZ + PV_LEFT },
+    { DRDATAD  (RTIME,         rp_rwait, 24,                    "rotational delay"), REG_NZ + PV_LEFT },
+    { URDATA   (CAPAC, rp_unit[0].capac, 10, T_ADDR_W, 0, 
               RP_NUMDR, PV_LEFT | REG_HRO) },
-    { FLDATAD (STOP_IOE,    rp_stopioe, 0,                     "stop on I/O error") },
-    { GRDATA  (CTRLTYPE,    rp_dib.lnt, DEV_RDX, 16, 0), REG_HRO },
+    { FLDATAD  (STOP_IOE,    rp_stopioe, 0,                     "stop on I/O error") },
+    { GRDATA   (CTRLTYPE,    rp_dib.lnt, DEV_RDX, 16, 0), REG_HRO },
     { NULL }
     };
 
@@ -648,47 +649,26 @@ MTAB rp_mod[] = {
         NULL, NULL, NULL, "Write lock disk drive"  },
     { UNIT_DUMMY,      0, NULL,            "BADBLOCK", 
         &rp_set_bad, NULL, NULL, "write bad block table on last track" },
+    { MTAB_XTD|MTAB_VUN, RM03_DTYPE, NULL, "RM03",
+      &rp_set_type, NULL, NULL, "Set RM03 Disk Type" },
+    { MTAB_XTD|MTAB_VUN, RP04_DTYPE, NULL, "RP04",
+      &rp_set_type, NULL, NULL, "Set RP04 Disk Type" },
+    { MTAB_XTD|MTAB_VUN, RM80_DTYPE, NULL, "RM80",
+      &rp_set_type, NULL, NULL, "Set RM80 Disk Type" },
+    { MTAB_XTD|MTAB_VUN, RP06_DTYPE, NULL, "RP06",
+      &rp_set_type, NULL, NULL, "Set RP06 Disk Type" },
+    { MTAB_XTD|MTAB_VUN, RM05_DTYPE, NULL, "RM05",
+      &rp_set_type, NULL, NULL, "Set RM05 Disk Type" },
+    { MTAB_XTD|MTAB_VUN, RP07_DTYPE, NULL, "RP07",
+      &rp_set_type, NULL, NULL, "Set RP07 Disk Type" },
+    { MTAB_XTD|MTAB_VUN, 0, "TYPE", NULL,
+      NULL, &rp_show_type, NULL, "Display device type" },
+    { UNIT_AUTO, UNIT_AUTO, "autosize", "AUTOSIZE", 
+      NULL, NULL, NULL, "Set type based on file size at attach" },
+    { UNIT_AUTO,         0, "noautosize",   "NOAUTOSIZE",   
+      NULL, NULL, NULL, "Disable disk autosize on attach" },
     { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "FORMAT", "FORMAT={SIMH|VHD|RAW}",
-      &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Display disk format" },
-    { (UNIT_DTYPE+UNIT_ATT), (RM03_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
-      "RM03", NULL, NULL },
-    { (UNIT_DTYPE+UNIT_ATT), (RP04_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
-      "RP04", NULL, NULL },
-    { (UNIT_DTYPE+UNIT_ATT), (RM80_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
-      "RM80", NULL, NULL },
-    { (UNIT_DTYPE+UNIT_ATT), (RP06_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
-      "RP06", NULL, NULL },
-    { (UNIT_DTYPE+UNIT_ATT), (RM05_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
-      "RM05", NULL, NULL },
-    { (UNIT_DTYPE+UNIT_ATT), (RP07_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
-      "RP07", NULL, NULL },
-    { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (RM03_DTYPE << UNIT_V_DTYPE),
-      "RM03", NULL, NULL },
-    { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (RP04_DTYPE << UNIT_V_DTYPE),
-      "RP04", NULL, NULL },
-    { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (RM80_DTYPE << UNIT_V_DTYPE),
-      "RM80", NULL, NULL },
-    { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (RP06_DTYPE << UNIT_V_DTYPE),
-      "RP06", NULL, NULL },
-    { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (RM05_DTYPE << UNIT_V_DTYPE),
-      "RM05", NULL, NULL },
-    { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), (RP07_DTYPE << UNIT_V_DTYPE),
-      "RP07", NULL, NULL },
-    { (UNIT_AUTO+UNIT_ATT), UNIT_AUTO, "autosize", NULL, NULL },
-    { UNIT_AUTO,            UNIT_AUTO, NULL,       "AUTOSIZE", 
-        NULL, NULL, NULL, "set type based on file size at ATTACH" },
-    { (UNIT_AUTO+UNIT_DTYPE), (RM03_DTYPE << UNIT_V_DTYPE), NULL, "RM03",
-        &rp_set_size, NULL, NULL, "Set type to RM03" }, 
-    { (UNIT_AUTO+UNIT_DTYPE), (RP04_DTYPE << UNIT_V_DTYPE), NULL, "RP04", 
-        &rp_set_size, NULL, NULL, "Set type to RP04" }, 
-    { (UNIT_AUTO+UNIT_DTYPE), (RM80_DTYPE << UNIT_V_DTYPE), NULL, "RM80",
-        &rp_set_size, NULL, NULL, "Set type to RM80" }, 
-    { (UNIT_AUTO+UNIT_DTYPE), (RP06_DTYPE << UNIT_V_DTYPE), NULL, "RP06",
-        &rp_set_size, NULL, NULL, "Set type to RP06" }, 
-    { (UNIT_AUTO+UNIT_DTYPE), (RM05_DTYPE << UNIT_V_DTYPE), NULL, "RM05",
-        &rp_set_size, NULL, NULL, "Set type to RM05" }, 
-    { (UNIT_AUTO+UNIT_DTYPE), (RP07_DTYPE << UNIT_V_DTYPE), NULL, "RP07",
-        &rp_set_size, NULL, NULL, "Set type to RP07" }, 
+      &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Set/Display disk format" },
     { 0 }
     };
 
@@ -1418,15 +1398,26 @@ if (!sim_is_running)                                    /* from console? */
 return sim_disk_detach (uptr);
 }
 
-/* Set size command validation routine */
+/* Set type command validation routine */
 
-t_stat rp_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+t_stat rp_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 dtype = GET_DTYPE (val);
 
+if ((val < 0) || (cptr && *cptr))
+    return SCPE_ARG;
 if (uptr->flags & UNIT_ATT)
     return SCPE_ALATT;
-uptr->capac = drv_tab[dtype].size;
+uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (val << UNIT_V_DTYPE);
+uptr->capac = (t_addr)drv_tab[val].size;
+return SCPE_OK;
+}
+
+/* Show unit type */
+
+t_stat rp_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+fprintf (st, "%s", drv_tab[GET_DTYPE (uptr->flags)].name);
 return SCPE_OK;
 }
 

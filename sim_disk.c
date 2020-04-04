@@ -53,14 +53,6 @@ Public routines:
    sim_disk_data_trace       debug support
    sim_disk_test             unit test routine
 
-   Guest-specific routines for PDP-10 which uses 1024 byte sectors and
-   requires mapping functions to allow access to the underlying 512 byte
-   sectors provided by the sim_disk routines
-
-   sim_disk_pdp10_attach     attach disk unit
-   sim_disk_pdp10_rdsect     read PDP-10 disk sectors
-   sim_disk_pdp10_wrsect     write PDP-10 disk sectors
-
 Internal routines:
 
    sim_os_disk_open_raw      platform specific open raw device
@@ -282,8 +274,8 @@ static t_offset sim_vhd_disk_size (FILE *f);
 static t_stat sim_vhd_disk_rdsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread, t_seccnt sects);
 static t_stat sim_vhd_disk_wrsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectswritten, t_seccnt sects);
 static t_stat sim_vhd_disk_clearerr (UNIT *uptr);
-static t_stat sim_vhd_disk_set_dtype (FILE *f, const char *dtype);
-static const char *sim_vhd_disk_get_dtype (FILE *f);
+static t_stat sim_vhd_disk_set_dtype (FILE *f, const char *dtype, uint32 SectorSize, uint32 xfer_element_size);
+static const char *sim_vhd_disk_get_dtype (FILE *f, uint32 *SectorSize, uint32 *xfer_element_size);
 static t_stat sim_os_disk_implemented_raw (void);
 static FILE *sim_os_disk_open_raw (const char *rawdevicename, const char *openmode);
 static int sim_os_disk_close_raw (FILE *f);
@@ -306,11 +298,11 @@ struct sim_disk_fmt {
     };
 
 static struct sim_disk_fmt fmts[] = {
-    { "AUTO", 0, DKUF_F_AUTO, NULL},
-    { "SIMH", 0, DKUF_F_STD,  NULL},
-    { "RAW",  0, DKUF_F_RAW,  sim_os_disk_implemented_raw},
-    { "VHD",  0, DKUF_F_VHD,  sim_vhd_disk_implemented},
-    { NULL,   0, 0,           NULL}
+    { "AUTO detect", 0, DKUF_F_AUTO, NULL},
+    { "SIMH",        0, DKUF_F_STD,  NULL},
+    { "RAW",         0, DKUF_F_RAW,  sim_os_disk_implemented_raw},
+    { "VHD",         0, DKUF_F_VHD,  sim_vhd_disk_implemented},
+    { NULL,          0, 0,           NULL}
     };
 
 /* Set disk format */
@@ -321,10 +313,10 @@ uint32 f;
 
 if (uptr == NULL)
     return SCPE_IERR;
-if (cptr == NULL)
+if ((cptr == NULL) || (*cptr == '\0'))
     return SCPE_ARG;
 for (f = 0; fmts[f].name; f++) {
-    if (fmts[f].name && (strcmp (cptr, fmts[f].name) == 0)) {
+    if (fmts[f].name && (MATCH_CMD (cptr, fmts[f].name) == 0)) {
         if ((fmts[f].impl_fnc) && (fmts[f].impl_fnc() != SCPE_OK))
             return SCPE_NOFNC;
         uptr->flags = (uptr->flags & ~DKUF_FMT) |
@@ -2031,13 +2023,13 @@ for (i = 0; checks[i] != NULL; i++) {
 return ret_val;
 }
 
-t_stat sim_disk_attach (UNIT *uptr, const char *cptr, size_t sector_size, size_t xfer_element_size, t_bool dontautosize,
+t_stat sim_disk_attach (UNIT *uptr, const char *cptr, size_t sector_size, size_t xfer_element_size, t_bool dontchangecapac,
                         uint32 dbit, const char *dtype, uint32 pdp11tracksize, int completion_delay)
 {
-return sim_disk_attach_ex (uptr, cptr, sector_size, xfer_element_size, dontautosize, dbit, dtype, pdp11tracksize, completion_delay, NULL);
+return sim_disk_attach_ex (uptr, cptr, sector_size, xfer_element_size, dontchangecapac, dbit, dtype, pdp11tracksize, completion_delay, NULL);
 }
 
-t_stat sim_disk_attach_ex (UNIT *uptr, const char *cptr, size_t sector_size, size_t xfer_element_size, t_bool dontautosize,
+t_stat sim_disk_attach_ex (UNIT *uptr, const char *cptr, size_t sector_size, size_t xfer_element_size, t_bool dontchangecapac,
                            uint32 dbit, const char *dtype, uint32 pdp11tracksize, int completion_delay, const char **drivetypes)
 {
 struct disk_context *ctx;
@@ -2079,7 +2071,7 @@ if (sim_switches & SWMASK ('D')) {                      /* create difference dis
     vhd = sim_vhd_disk_create_diff (gbuf, cptr);
     if (vhd) {
         sim_vhd_disk_close (vhd);
-        return sim_disk_attach (uptr, gbuf, sector_size, xfer_element_size, dontautosize, dbit, dtype, pdp11tracksize, completion_delay);
+        return sim_disk_attach (uptr, gbuf, sector_size, xfer_element_size, dontchangecapac, dbit, dtype, pdp11tracksize, completion_delay);
         }
     return sim_messagef (SCPE_ARG, "Unable to create differencing VHD: %s\n", gbuf);
     }
@@ -2098,7 +2090,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
     sim_switches |= SWMASK ('R') | SWMASK ('E');
     sim_quiet = TRUE;
     /* First open the source of the copy operation */
-    r = sim_disk_attach (uptr, cptr, sector_size, xfer_element_size, dontautosize, dbit, dtype, pdp11tracksize, completion_delay);
+    r = sim_disk_attach (uptr, cptr, sector_size, xfer_element_size, dontchangecapac, dbit, dtype, pdp11tracksize, completion_delay);
     sim_quiet = saved_sim_quiet;
     if (r != SCPE_OK) {
         sim_switches = saved_sim_switches;
@@ -2228,7 +2220,7 @@ else
             t_stat r;
 
             sim_vhd_disk_close (vhd);
-            r = sim_disk_attach (uptr, Parent, sector_size, xfer_element_size, dontautosize, dbit, dtype, pdp11tracksize, completion_delay);
+            r = sim_disk_attach (uptr, Parent, sector_size, xfer_element_size, dontchangecapac, dbit, dtype, pdp11tracksize, completion_delay);
             free (Parent);
             return r;
             }
@@ -2328,13 +2320,27 @@ else {                                                  /* normal */
         }                                               /* end if null */
     }                                                   /* end else */
 if (DK_GET_FMT (uptr) == DKUF_F_VHD) {
-    if ((created) && dtype)
-        sim_vhd_disk_set_dtype (uptr->fileref, dtype);
-    if (dtype && strcmp (dtype, sim_vhd_disk_get_dtype (uptr->fileref))) {
-        char cmd[32];
+    uint32 sector_size, xfer_element_size;
 
-        sprintf (cmd, "%s%d %s", dptr->name, (int)(uptr-dptr->units), sim_vhd_disk_get_dtype (uptr->fileref));
-        set_cmd (0, cmd);
+    if ((created) && dtype)
+        sim_vhd_disk_set_dtype (uptr->fileref, dtype, ctx->sector_size, ctx->xfer_element_size);
+    if (dtype && strcmp (dtype, sim_vhd_disk_get_dtype (uptr->fileref, &sector_size, &xfer_element_size))) {
+        char cmd[32];
+        t_stat r = SCPE_OK;
+
+        if (((sector_size == 0) || (sector_size == ctx->sector_size)) &&
+            ((xfer_element_size == 0) || (xfer_element_size == ctx->xfer_element_size))) {
+            sprintf (cmd, "%s%d %s", dptr->name, (int)(uptr-dptr->units), sim_vhd_disk_get_dtype (uptr->fileref, NULL, NULL));
+            r = set_cmd (0, cmd);
+            if (r != SCPE_OK)
+                r = sim_messagef (r, "Can't set %s%d to drive type %s\n", dptr->name, (int)(uptr-dptr->units), sim_vhd_disk_get_dtype (uptr->fileref, NULL, NULL));
+            }
+        else
+            r = sim_messagef (SCPE_INCOMPVHD, "VHD incompatible with %s simulator\n", sim_name);
+        if (r != SCPE_OK) {
+            sim_disk_detach (uptr);                         /* report error now */
+            return r;
+            }
         }
     }
 uptr->flags = uptr->flags | UNIT_ATT;
@@ -2468,9 +2474,11 @@ filesystem_size = get_filesystem_size (uptr);
 container_size = size_function (uptr->fileref);
 current_unit_size = ((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1);
 if (container_size && (container_size != (t_offset)-1)) {
-    if (dontautosize) {
+    if (dontchangecapac) {
         t_addr saved_capac = uptr->capac;
 
+        if (filesystem_size == (t_offset)-1)    /* No file system found? */
+            filesystem_size = container_size;   /* Assume full container */
         if (filesystem_size != (t_offset)-1) {
             const char *drive_type = NULL;
 
@@ -2610,22 +2618,43 @@ static struct example_fields {
     const char *dsize3;
     const char *dtype4;
     const char *dsize4;
-    } ex_data[2] = {
-        {"RQ", "RD54",     "159MB", "RX50",    "409KB", "RA81", "456MB", "RA92", "1505MB"},
-        {"RP", "autosize", "39MW",  "autosize", "39MW", "RP07", "110MW", "RM03", "15MW"},
+    } ex_data[] = {
+        {"RQ", "RD54", "159MB", "RX50", "409KB", "RA81", "456MB", "RA92", "1505MB"},
+        {"RP", "RM03",  "33MW", "RM03",  "33MW", "RP07", "258MW", "RM03",  "15MW"},
+        {"RP", "RM03",  "39MW", "RM03",  "39MW", "RP07", "110MW", "RM03",  "15MW"},
     };
 struct example_fields *ex = &ex_data[0];
 
+if (strcmp (dptr->name, "RP") == 0)
+    ex = &ex_data[1];
+if (strstr (sim_name, "-10")) {
+    ex = &ex_data[2];
+    if (strstr (sim_name, "PDP") == NULL)
+        ex->dname = "RPA";
+    }
+
 fprintf (st, "%s Disk Attach Help\n\n", dptr->name);
 
-fprintf (st, "Disk container files can be one of 3 different types:\n\n");
-fprintf (st, "    SIMH   A disk is an unstructured binary file of the size appropriate\n");
-fprintf (st, "           for the disk drive being simulated\n");
-fprintf (st, "    VHD    Virtual Disk format which is described in the \"Microsoft\n");
-fprintf (st, "           Virtual Hard Disk (VHD) Image Format Specification\".  The\n");
-fprintf (st, "           VHD implementation includes support for 1) Fixed (Preallocated)\n");
-fprintf (st, "           disks, 2) Dynamically Expanding disks, and 3) Differencing disks.\n");
-fprintf (st, "    RAW    platform specific access to physical disk or CDROM drives\n\n");
+fprintf (st, "Disk container files can be one of several different types:\n\n");
+if (strstr (sim_name, "-10") == NULL) {
+    fprintf (st, "    SIMH   A disk is an unstructured binary file of the size appropriate\n");
+    fprintf (st, "           for the disk drive being simulated accessed by C runtime APIs\n");
+    fprintf (st, "    VHD    Virtual Disk format which is described in the \"Microsoft\n");
+    fprintf (st, "           Virtual Hard Disk (VHD) Image Format Specification\".  The\n");
+    fprintf (st, "           VHD implementation includes support for 1) Fixed (Preallocated)\n");
+    fprintf (st, "           disks, 2) Dynamically Expanding disks, and 3) Differencing disks.\n");
+    fprintf (st, "    RAW    platform specific access to physical disk or CDROM drives\n\n");
+    }
+else {
+    fprintf (st, "    SIMH   A disk is an unstructured binary file of 64bit integers\n"
+                 "           access by C runtime APIs\n");
+    fprintf (st, "    VHD    A disk is an unstructured binary file of 64bit integers\n"
+                 "           contained in a VHD container\n");
+    fprintf (st, "    RAW    A disk is an unstructured binary file of 64bit integers\n"
+                 "           accessed by direct read/write APIs\n");
+    fprintf (st, "    DBD9   Compatible with KLH10 is a packed big endian word\n");
+    fprintf (st, "    DLD9   Compatible with KLH10 is a packed little endian word\n\n");
+    }
 fprintf (st, "Virtual (VHD) Disks  supported conform to \"Virtual Hard Disk Image Format\n");
 fprintf (st, "Specification\", Version 1.0 October 11, 2006.\n");
 fprintf (st, "Dynamically expanding disks never change their \"Virtual Size\", but they don't\n");
@@ -2692,23 +2721,17 @@ fprintf (st, "    -M          Merge a Differencing VHD into its parent VHD disk\
 fprintf (st, "    -O          Override consistency checks when attaching differencing disks\n");
 fprintf (st, "                which have unexpected parent disk GUID or timestamps\n\n");
 fprintf (st, "    -U          Fix inconsistencies which are overridden by the -O switch\n");
-if (strstr (sim_name, "PDP10") == NULL) {
+if (strstr (sim_name, "-10") == NULL) {
     fprintf (st, "    -Y          Answer Yes to prompt to overwrite last track (on disk create)\n");
     fprintf (st, "    -N          Answer No to prompt to overwrite last track (on disk create)\n");
     }
-if (strstr (sim_name, "PDP10-")) {
-    ex = &ex_data[1];
-    ex->dname = "RPA";
-    }
-if (strcmp (dptr->name, "RP") == 0)
-    ex = &ex_data[1];
 fprintf (st, "Examples:\n");
 fprintf (st, "  sim> show %s\n", ex->dname);
 fprintf (st, "    %s, address=20001468-2000146B*, no vector, 4 units\n", ex->dname);
-fprintf (st, "    %s0, %s, not attached, write enabled, %s, autosize, SIMH format\n", ex->dname, ex->dsize, ex->dtype);
-fprintf (st, "    %s1, %s, not attached, write enabled, %s, autosize, SIMH format\n", ex->dname, ex->dsize, ex->dtype);
-fprintf (st, "    %s2, %s, not attached, write enabled, %s, autosize, SIMH format\n", ex->dname, ex->dsize, ex->dtype);
-fprintf (st, "    %s3, %s, not attached, write enabled, %s, autosize, SIMH format\n", ex->dname, ex->dsize2, ex->dtype2);
+fprintf (st, "    %s0, %s, not attached, write enabled, %s, autosize, AUTO detect format\n", ex->dname, ex->dsize, ex->dtype);
+fprintf (st, "    %s1, %s, not attached, write enabled, %s, autosize, AUTO detect format\n", ex->dname, ex->dsize, ex->dtype);
+fprintf (st, "    %s2, %s, not attached, write enabled, %s, autosize, AUTO detect format\n", ex->dname, ex->dsize, ex->dtype);
+fprintf (st, "    %s3, %s, not attached, write enabled, %s, autosize, AUTO detect format\n", ex->dname, ex->dsize2, ex->dtype2);
 fprintf (st, "  sim> # attach an existing VHD and determine its size and type automatically\n");
 fprintf (st, "  sim> attach %s0 %s.vhd\n", ex->dname, ex->dtype3);
 fprintf (st, "  sim> show %s0\n", ex->dname);
@@ -2719,7 +2742,7 @@ fprintf (st, "  sim> attach %s2 -f vhd %s.vhd\n", ex->dname, ex->dtype4);
 fprintf (st, "  %s2: creating new file\n", ex->dname);
 fprintf (st, "  sim> show %s2\n", ex->dname);
 fprintf (st, "  %s2, %s, attached to %s.vhd, write enabled, %s, autosize, VHD format\n", ex->dname, ex->dsize4, ex->dtype4, ex->dtype4);
-fprintf (st, "  sim> # examine the size consumed by the %s VHD file", ex->dsize4);
+fprintf (st, "  sim> # examine the size consumed by the %s VHD file\n", ex->dsize4);
 fprintf (st, "  sim> dir %s.vhd\n", ex->dtype4);
 fprintf (st, "   Directory of H:\\Data\n\n");
 fprintf (st, "  04/14/2011  12:57 PM             5,120 %s.vhd\n", ex->dtype4);
@@ -2728,15 +2751,15 @@ fprintf (st, "  sim> # create a differencing vhd (%s-1-Diff.vhd) with %s.vhd as 
 fprintf (st, "  sim> attach %s3 -d %s-1-Diff.vhd %s.vhd\n", ex->dname, ex->dtype4, ex->dtype4);
 fprintf (st, "  sim> # create a VHD (%s-1.vhd) which is a copy of an existing disk\n", ex->dtype4);
 fprintf (st, "  sim> attach %s3 -c %s-1.vhd %s.vhd\n", ex->dname, ex->dtype4, ex->dtype4);
-fprintf (st, "  %s3: creating new virtual disk '%s-1.vhd'\n", ex->dname, ex->dsize4);
+fprintf (st, "  %s3: creating new virtual disk '%s-1.vhd'\n", ex->dname, ex->dtype4);
 fprintf (st, "  %s3: Copied %s.  99%% complete.\n", ex->dname, ex->dsize4);
 fprintf (st, "  %s3: Copied %s. Done.\n", ex->dname, ex->dsize4);
 fprintf (st, "  sim> show %s3\n", ex->dname);
-fprintf (st, "  %s3, %s, attached to %s-1.vhd, write enabled, %s, autosize, VHD format\n", ex->dname, ex->dsize3, ex->dtype3, ex->dtype3);
-fprintf (st, "  sim> dir %s*\n", ex->dtype3);
+fprintf (st, "  %s3, %s, attached to %s-1.vhd, write enabled, %s, autosize, VHD format\n", ex->dname, ex->dsize4, ex->dtype4, ex->dtype4);
+fprintf (st, "  sim> dir %s*\n", ex->dtype4);
 fprintf (st, "   Directory of H:\\Data\n\n");
-fprintf (st, "  04/14/2011  01:12 PM             5,120 %s-1.vhd\n", ex->dtype3);
-fprintf (st, "  04/14/2011  12:58 PM             5,120 %s.vhd\n", ex->dtype3);
+fprintf (st, "  04/14/2011  01:12 PM             5,120 %s-1.vhd\n", ex->dtype4);
+fprintf (st, "  04/14/2011  12:58 PM             5,120 %s.vhd\n", ex->dtype4);
 fprintf (st, "                 2 File(s)         10,240 bytes\n");
 fprintf (st, "  sim> show %s2\n", ex->dname);
 fprintf (st, "  %s2, %s, not attached, write enabled, %s, autosize, VHD format\n", ex->dname, ex->dsize4, ex->dtype4);
@@ -2905,37 +2928,6 @@ if (sim_deb && (dptr->dctrl & reason)) {
     sprintf (pos, "lbn: %08X ", (unsigned int)lba);
     sim_data_trace(dptr, uptr, (detail ? data : NULL), pos, len, txt, reason);
     }
-}
-
-/* Guest specific Disk I/O support */
-#define PDP10_SECTORS   2               /* PDP-10 sectors are 1024 bytes */
-
-t_stat sim_disk_pdp10_attach (UNIT *uptr, const char *cptr, t_bool dontautosize,
-                           uint32 dbit, const char *dtype, int completion_delay, const char **drivetypes)
-{
-return sim_disk_attach_ex (uptr, cptr, 512 * PDP10_SECTORS, sizeof (t_uint64), dontautosize, dbit, dtype, 0, completion_delay, drivetypes);
-}
-
-t_stat sim_disk_pdp10_rdsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread, t_seccnt sects)
-{
-t_seccnt sectors;
-t_stat r = sim_disk_rdsect (uptr, lba * PDP10_SECTORS, buf, &sectors, sects * PDP10_SECTORS);
-
-if (sectsread)
-    *sectsread = sectors / PDP10_SECTORS;
-
-return r;
-}
-
-t_stat sim_disk_pdp10_wrsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectswritten, t_seccnt sects)
-{
-t_seccnt sectors;
-t_stat r = sim_disk_wrsect (uptr, lba * PDP10_SECTORS, buf, &sectors, sects * PDP10_SECTORS);
-
-if (sectswritten)
-    *sectswritten = sectors / PDP10_SECTORS;
- 
-return r;
 }
 
 /* OS Specific RAW Disk I/O support */
@@ -3888,10 +3880,12 @@ typedef struct _VHD_Footer {
     name as a nul terminated string.
     */
     uint8 DriveType[16];
+    uint32 DriveSectorSize;
+    uint32 DriveTransferElementSize;
     /*
-    This field contains zeroes. It is 400 bytes in size.
+    This field contains zeroes. It is 392 bytes in size.
     */
-    uint8 Reserved[400];
+    uint8 Reserved[392];
     } VHD_Footer;
 
 /*
@@ -4361,13 +4355,15 @@ static t_stat sim_vhd_disk_implemented (void)
 return SCPE_OK;
 }
 
-static t_stat sim_vhd_disk_set_dtype (FILE *f, const char *dtype)
+static t_stat sim_vhd_disk_set_dtype (FILE *f, const char *dtype, uint32 SectorSize, uint32 xfer_element_size)
 {
 VHDHANDLE hVHD  = (VHDHANDLE)f;
 int Status = 0;
 
 memset (hVHD->Footer.DriveType, '\0', sizeof hVHD->Footer.DriveType);
 memcpy (hVHD->Footer.DriveType, dtype, ((1+strlen (dtype)) < sizeof (hVHD->Footer.DriveType)) ? (1+strlen (dtype)) : sizeof (hVHD->Footer.DriveType));
+hVHD->Footer.DriveSectorSize = NtoHl (SectorSize);
+hVHD->Footer.DriveTransferElementSize = NtoHl (xfer_element_size);
 hVHD->Footer.Checksum = 0;
 hVHD->Footer.Checksum = NtoHl (CalculateVhdFooterChecksum (&hVHD->Footer, sizeof(hVHD->Footer)));
 
@@ -4413,10 +4409,14 @@ if (Status)
 return SCPE_OK;
 }
 
-static const char *sim_vhd_disk_get_dtype (FILE *f)
+static const char *sim_vhd_disk_get_dtype (FILE *f, uint32 *SectorSize, uint32 *xfer_element_size)
 {
 VHDHANDLE hVHD  = (VHDHANDLE)f;
 
+if (SectorSize)
+    *SectorSize = NtoHl (hVHD->Footer.DriveSectorSize);
+if (xfer_element_size)
+    *xfer_element_size = NtoHl (hVHD->Footer.DriveTransferElementSize);
 return (char *)(&hVHD->Footer.DriveType[0]);
 }
 
@@ -5082,6 +5082,8 @@ hVHD->Dynamic.Checksum = NtoHl (CalculateVhdFooterChecksum (&hVHD->Dynamic, size
 hVHD->Footer.Checksum = 0;
 hVHD->Footer.DiskType = NtoHl (VHD_DT_Differencing);
 memcpy (hVHD->Footer.DriveType, ParentFooter.DriveType, sizeof (hVHD->Footer.DriveType));
+hVHD->Footer.DriveSectorSize = ParentFooter.DriveSectorSize;
+hVHD->Footer.DriveTransferElementSize = ParentFooter.DriveTransferElementSize;
 hVHD->Footer.Checksum = NtoHl (CalculateVhdFooterChecksum (&hVHD->Footer, sizeof(hVHD->Footer)));
 
 if (WriteFilePosition (hVHD->File,
