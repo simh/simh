@@ -46,7 +46,7 @@ t_stat daz_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cpt
 const char *daz_description (DEVICE *dptr);
 
 static uint16 devadd = 0;
-static uint16 buttons[4] = { ~0, ~0, ~0, ~0 };
+static uint16 buttons[4] = { 0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF };
 
 #define IOLN_DAZ  4
 DIB daz_dib = {
