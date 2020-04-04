@@ -377,7 +377,7 @@ uptr->USTAT = uptr->USTAT & (STA_WLK | STA_ONL);        /* clear status */
 tm_sta = 0;                                             /* clear errors */
 if (f == MTC_UNLOAD) {                                  /* unload? */
     uptr->USTAT = (uptr->USTAT | STA_REW) & ~STA_ONL;
-    detach_unit (uptr);                                 /* set offline */
+    sim_tape_detach (uptr);                             /* set offline */
     }
 else if (f == MTC_REWIND)                               /* rewind */
     uptr->USTAT = uptr->USTAT | STA_REW;                /* rewinding */

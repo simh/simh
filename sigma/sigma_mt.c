@@ -366,7 +366,7 @@ switch (cmd) {                                          /* case on command */
         break;
 
     case MCM_RWU:                                       /* rewind unload */
-        r = detach_unit (uptr);
+        r = sim_tape_detach (uptr);
         break;
 
     case MCM_REW:                                       /* rewind */

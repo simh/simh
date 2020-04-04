@@ -694,7 +694,7 @@ switch (fnc) {                                          /* case on function */
             set_tuer (ER_UNS);
             break;
             }
-        detach_unit (uptr);
+        sim_tape_detach (uptr);
         uptr->USTAT = FS_REW;
         sim_activate (uptr, tu_time);
         tucs1 = tucs1 & ~CS1_GO;

@@ -275,7 +275,7 @@ switch (IR & 07) {                                      /* decode IR<9:11> */
             }
         uptr->USTAT = uptr->USTAT & STA_WLK;            /* clear status */
         if (f == FN_UNLOAD) {                           /* unload? */
-            detach_unit (uptr);                         /* set offline */
+            sim_tape_detach (uptr);                     /* set offline */
             uptr->USTAT = STA_REW | STA_REM;            /* rewinding, off */
             mt_set_done ();                             /* set done */
             }

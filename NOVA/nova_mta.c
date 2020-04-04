@@ -295,7 +295,7 @@ switch (pulse) {                                        /* decode IR<8:9> */
                 ~(STA_BOT | STA_EOF | STA_EOT | STA_RDY)) | STA_REW);
             sim_activate (uptr, mta_rwait);             /* start IO */
             if (c == CU_UNLOAD)
-                detach_unit (uptr);
+                sim_tape_detach (uptr);
             }
         else {
             mta_sta = 0;                                /* clear errors */
