@@ -33,6 +33,7 @@
 Public routines:
 
    sim_disk_attach           attach disk unit
+   sim_disk_attach_ex        attach disk unit extended parameters
    sim_disk_detach           detach disk unit
    sim_disk_attach_help      help routine for attaching disks
    sim_disk_rdsect           read disk sectors
@@ -2479,23 +2480,21 @@ if (container_size && (container_size != (t_offset)-1)) {
 
         if (filesystem_size == (t_offset)-1)    /* No file system found? */
             filesystem_size = container_size;   /* Assume full container */
-        if (filesystem_size != (t_offset)-1) {
-            const char *drive_type = NULL;
-
-            while ((filesystem_size > current_unit_size) &&
-                   ((drivetypes ? *drivetypes : NULL) != NULL)) {
+        if (drivetypes != NULL) {
+            /* Walk through all potential drive types until we find one the right size */
+            while (*drivetypes != NULL) {
                 char cmd[CBUFSIZE];
                 t_stat st;
 
                 uptr->flags &= ~UNIT_ATT;   /* temporarily mark as un-attached */
-                drive_type = *drivetypes;
                 sprintf (cmd, "%s %s", sim_uname (uptr), *drivetypes);
                 st = set_cmd (0, cmd);
                 uptr->flags |= UNIT_ATT;    /* restore attached indicator */
-                if (st == SCPE_OK) {
+                if (st == SCPE_OK)
                     current_unit_size = ((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1);
-                    ++drivetypes;                           /* next type */
-                    }
+                if (current_unit_size >= filesystem_size)
+                    break;
+                ++drivetypes;
                 }
             if (filesystem_size > current_unit_size) {
                 if (!sim_quiet) {
@@ -3882,10 +3881,11 @@ typedef struct _VHD_Footer {
     uint8 DriveType[16];
     uint32 DriveSectorSize;
     uint32 DriveTransferElementSize;
+    uint8 CreatingSimulator[64];
     /*
-    This field contains zeroes. It is 392 bytes in size.
+    This field contains zeroes. It is 328 bytes in size.
     */
-    uint8 Reserved[392];
+    uint8 Reserved[328];
     } VHD_Footer;
 
 /*
@@ -4364,6 +4364,7 @@ memset (hVHD->Footer.DriveType, '\0', sizeof hVHD->Footer.DriveType);
 memcpy (hVHD->Footer.DriveType, dtype, ((1+strlen (dtype)) < sizeof (hVHD->Footer.DriveType)) ? (1+strlen (dtype)) : sizeof (hVHD->Footer.DriveType));
 hVHD->Footer.DriveSectorSize = NtoHl (SectorSize);
 hVHD->Footer.DriveTransferElementSize = NtoHl (xfer_element_size);
+strncpy (hVHD->Footer.CreatingSimulator, sim_name, sizeof (hVHD->Footer.CreatingSimulator));
 hVHD->Footer.Checksum = 0;
 hVHD->Footer.Checksum = NtoHl (CalculateVhdFooterChecksum (&hVHD->Footer, sizeof(hVHD->Footer)));
 
