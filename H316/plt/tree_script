@@ -1,0 +1,5 @@
+ATTACH -B PTR tree.slst
+BOOT PTR
+ATTACH -B PLT tree.plt
+RUN 01000
+Q
