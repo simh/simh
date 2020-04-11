@@ -805,7 +805,7 @@ const struct scp_error {
          {"SIGTERM",   "SIGTERM received"},
          {"FSSIZE",    "File System size larger than disk size"},
          {"RUNTIME",   "Run time limit exhausted"},
-         {"INCOMPVHD", "Incompatible VHD Container"},
+         {"INCOMPDSK", "Incompatible Disk Container"},
     };
 
 const size_t size_map[] = { sizeof (int8),
