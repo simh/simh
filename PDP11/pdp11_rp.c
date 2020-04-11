@@ -1352,7 +1352,7 @@ return SCPE_OK;
 
 t_stat rp_attach (UNIT *uptr, CONST char *cptr)
 {
-int32 drv, i, p;
+int32 drv;
 t_stat r;
 DEVICE *dptr = find_dev_from_unit (uptr);
 static const char *drives[] = {"RM03", "RP04", "RM80", "RP06", "RM05", "RP07", NULL};
@@ -1368,17 +1368,6 @@ rpds[drv] = DS_MOL | DS_RDY | DS_DPR |                  /* upd drv status */
     ((uptr->flags & UNIT_WPRT)? DS_WRL: 0);
 rper1[drv] = 0;
 rp_update_ds (DS_ATA, drv);                             /* upd ctlr status */
-
-if ((uptr->flags & UNIT_AUTO) == 0)                     /* autosize? */
-    return SCPE_OK;
-p = (int32)sim_disk_size (uptr);
-for (i = 0; drv_tab[i].sect != 0; i++) {
-    if (p <= (drv_tab[i].size * (int) sizeof (int16))) {
-        uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (i << UNIT_V_DTYPE);
-        uptr->capac = drv_tab[i].size;
-        return SCPE_OK;
-        }
-    }
 return SCPE_OK;
 }
 
