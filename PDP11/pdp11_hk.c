@@ -82,6 +82,20 @@ extern uint32 cpu_opt;
 #define HK_CYL(x)       (((x)->flags & UNIT_DTYPE)? HK_NUMCY7: HK_NUMCY6)
 #define HK_MAXFR        (1 << 16)
 
+struct drvtyp {
+    int32       sect;                                   /* sectors */
+    int32       surf;                                   /* surfaces */
+    int32       cyl;                                    /* cylinders */
+    int32       size;                                   /* #blocks */
+    const char  *name;                                  /* device type name */
+    };
+
+static struct drvtyp drv_tab[] = {
+    { HK_NUMSC, HK_NUMSF, HK_NUMCY6, RK06_SIZE, "RK06" },
+    { HK_NUMSC, HK_NUMSF, HK_NUMCY7, RK07_SIZE, "RK07" },
+    { 0 }
+    };
+
 /* Flags in the unit flags word */
 
 #define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
@@ -95,6 +109,7 @@ extern uint32 cpu_opt;
 #define UNIT_AUTO       (1 << UNIT_V_AUTO)
 #define UNIT_DUMMY      (1 << UNIT_V_DUMMY)
 #define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write prot */
+#define GET_DTYPE(x)    (((x) >> UNIT_V_DTYPE) & 1)
 
 /* Parameters in the unit descriptor */
 
@@ -569,7 +584,8 @@ void update_hkcs (int32 flags, int32 drv);
 void update_hkds (int32 drv);
 void hk_err (int32 cs1e, int32 cs2e, int32 drve, int32 drv);
 void hk_go (int32 drv);
-t_stat hk_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat hk_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat hk_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat hk_set_bad (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat hk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *hk_description (DEVICE *dptr);
@@ -654,23 +670,18 @@ MTAB hk_mod[] = {
         NULL, NULL, NULL, "Write lock disk drive"  },
     { UNIT_DUMMY,      0, NULL,            "BADBLOCK", 
         &hk_set_bad, NULL, NULL, "write bad block table on last track" },
+    { MTAB_XTD|MTAB_VUN, 0, NULL, "RK06",
+      &hk_set_type, NULL, NULL, "Set RK06 Disk Type" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "RK07",
+      &hk_set_type, NULL, NULL, "Set RK07 Disk Type" },
+    { MTAB_XTD|MTAB_VUN, 0, "TYPE", NULL,
+      NULL, &hk_show_type, NULL, "Display device type" },
+    { UNIT_AUTO, UNIT_AUTO, "autosize", "AUTOSIZE", 
+      NULL, NULL, NULL, "Set type based on file size at attach" },
+    { UNIT_AUTO,         0, "noautosize",   "NOAUTOSIZE",   
+      NULL, NULL, NULL, "Disable disk autosize on attach" },
     { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "FORMAT", "FORMAT={SIMH|VHD|RAW}",
-      &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Display disk format" },
-    { (UNIT_DTYPE+UNIT_ATT), UNIT_RK06 + UNIT_ATT,
-      "RK06", NULL, NULL },
-    { (UNIT_DTYPE+UNIT_ATT), UNIT_RK07 + UNIT_ATT,
-      "RK07", NULL, NULL },
-    { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), UNIT_RK06,
-      "RK06", NULL, NULL },
-    { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), UNIT_RK07,
-      "RK07", NULL, NULL },
-    { (UNIT_AUTO+UNIT_ATT), UNIT_AUTO, "autosize", NULL},
-    { UNIT_AUTO,            UNIT_AUTO, NULL,       "AUTOSIZE",
-        NULL, NULL, NULL, "set type based on file size at ATTACH" },
-    { (UNIT_AUTO+UNIT_DTYPE), UNIT_RK06, NULL, "RK06", 
-        &hk_set_size, NULL, NULL, "Set type to RK06" }, 
-    { (UNIT_AUTO+UNIT_DTYPE), UNIT_RK07, NULL, "RK07", 
-        &hk_set_size, NULL, NULL, "Set type to RK07" }, 
+      &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Set/Display disk format" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0040, "ADDRESS", "ADDRESS",
       &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR,    0, "VECTOR", "VECTOR",
@@ -1494,7 +1505,6 @@ return auto_config (0, 0);
 t_stat hk_attach (UNIT *uptr, CONST char *cptr)
 {
 uint32 drv;
-t_offset p;
 t_stat r;
 int32 old_hkds;
 static const char *drives[] = {"RK06", "RK07", NULL};
@@ -1517,18 +1527,6 @@ hk_dif[drv] = 0;
 uptr->CYL = 0;
 if ((old_hkds & DS_ATA) == 0)                           /* ATN transition? */
     update_hkcs (CS1_DI, drv);                          /* upd ctlr status */
-
-p = sim_disk_size (uptr);                               /* get file size */
-if ((uptr->flags & UNIT_AUTO) == 0)                     /* autosize? */
-    return SCPE_OK;
-if (p > (RK06_SIZE * sizeof (uint16))) {
-    uptr->flags = uptr->flags | UNIT_RK07;
-    uptr->capac = RK07_SIZE;
-    }
-else {
-    uptr->flags = uptr->flags & ~UNIT_RK07;
-    uptr->capac = RK06_SIZE;
-    }
 return SCPE_OK;
 }
 
@@ -1555,13 +1553,26 @@ if ((old_hkds & DS_ATA) == 0)                           /* ATN transition? */
 return sim_disk_detach (uptr);
 }
 
-/* Set size command validation routine */
+/* Set type command validation routine */
 
-t_stat hk_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+t_stat hk_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
+int32 dtype = GET_DTYPE (val);
+
+if ((val < 0) || (cptr && *cptr))
+    return SCPE_ARG;
 if (uptr->flags & UNIT_ATT)
     return SCPE_ALATT;
-uptr->capac = val? RK07_SIZE: RK06_SIZE;
+uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (val << UNIT_V_DTYPE);
+uptr->capac = (t_addr)drv_tab[val].size;
+return SCPE_OK;
+}
+
+/* Show unit type */
+
+t_stat hk_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+fprintf (st, "%s", drv_tab[GET_DTYPE (uptr->flags)].name);
 return SCPE_OK;
 }
 
