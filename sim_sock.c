@@ -688,7 +688,7 @@ return 0;
         port    =       pointer to buffer for IP port (may be NULL), 0 = none
         localport
                 =       pointer to buffer for local IP port (may be NULL), 0 = none
-        result  =       status (SCPE_OK on complete success or SCPE_ARG if 
+        result  =       status (0 on complete success or -1 if 
                         parsing can't happen due to bad syntax, a value is 
                         out of range, a result can't fit into a result buffer, 
                         a service name doesn't exist, or a validation name 
@@ -1017,11 +1017,6 @@ if (!(opt_flags & SIM_SOCK_OPT_DATAGRAM)) {
     sta = setsockopt (newsock, SOL_SOCKET, SO_KEEPALIVE, (char *)&keepalive, sizeof(keepalive));
     if (sta == -1) 
         return sim_err_sock (newsock, "setsockopt KEEPALIVE");
-    }
-if (!(opt_flags & SIM_SOCK_OPT_BLOCKING)) {
-    sta = sim_setnonblock (newsock);                    /* set nonblocking */
-    if (sta == SOCKET_ERROR)                            /* fcntl error? */
-        return sim_err_sock (newsock, "setnonblock");
     }
 sta = connect (newsock, result->ai_addr, result->ai_addrlen);
 p_freeaddrinfo (result);
