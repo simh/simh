@@ -15380,6 +15380,10 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
     t_stat tstat = SCPE_OK;
     t_bool was_disabled = ((dptr->flags & DEV_DIS) != 0);
 
+    if (DEV_TYPE(dptr) == 0) {
+        sim_printf ("Skipping %s - non library device type\n", dptr->name);
+        continue;                       /* skip unspecified devices */
+        }
     sim_switches = saved_switches;
     if (was_disabled)
         tstat = set_dev_enbdis (dptr, NULL, 1, NULL);
@@ -15405,11 +15409,21 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
             default:
                 break;
             }
+        if (was_disabled)
+            set_dev_enbdis (dptr, NULL, 0, NULL);
         }
-    if (was_disabled)
-        set_dev_enbdis (dptr, NULL, 0, NULL);
-    if (tstat != SCPE_OK)
+    else
+        tstat = SCPE_OK;        /* can't enable, just skip device */
+    if (tstat != SCPE_OK) {
         stat = tstat;
+        sim_printf ("%s device tests returned: %d - %s\n", dptr->name, tstat, sim_error_text (tstat));
+        if (sim_ttisatty()) {
+            if (get_yn ("Continue with additional tests? [N]", SCPE_STOP) == SCPE_STOP)
+                break;
+            }
+        else
+            break;
+        }
     }
 return stat;
 }
