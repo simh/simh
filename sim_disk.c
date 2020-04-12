@@ -2111,6 +2111,10 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_VHD:                                    /* VHD format */
         memcpy (f->Signature, "simh", 4);
         strncpy ((char *)f->DriveType, sim_vhd_disk_get_dtype (uptr->fileref, &f->SectorSize, &f->TransferElementSize, (char *)f->CreatingSimulator), sizeof (f->DriveType));
+        if (f->SectorCount == 0) {  /* Old format VHD footer */
+            sim_vhd_disk_set_dtype (uptr->fileref, f->DriveType, ctx->sector_size, ctx->xfer_element_size);
+            sim_vhd_disk_get_dtype (uptr->fileref, &f->SectorSize, &f->TransferElementSize, (char *)f->CreatingSimulator), sizeof (f->DriveType);
+            }
         container_size = sim_vhd_disk_size (uptr->fileref);
         f->SectorCount = (uint32)(container_size / f->SectorSize);
         f->Checksum = NtoHl (eth_crc32 (0, f, sizeof (*f) - sizeof (f->Checksum)));
