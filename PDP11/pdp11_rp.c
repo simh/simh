@@ -1359,7 +1359,7 @@ static const char *drives[] = {"RM03", "RP04", "RM80", "RP06", "RM05", "RP07", N
 
 uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;
 r = sim_disk_attach_ex (uptr, cptr, RP_NUMWD * sizeof (uint16), 
-                        sizeof (uint16), TRUE, 0, 
+                        sizeof (uint16), TRUE, DBG_DSK, 
                         drv_tab[GET_DTYPE (uptr->flags)].name, drv_tab[GET_DTYPE (uptr->flags)].sect, 0, (uptr->flags & UNIT_AUTO) ? drives : NULL);
 if (r != SCPE_OK)                                       /* error? */
     return r;

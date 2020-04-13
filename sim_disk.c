@@ -394,17 +394,21 @@ return sim_messagef (SCPE_ARG, "Unknown disk format: %s\n", cptr);
 
 /* Show disk format */
 
-t_stat sim_disk_show_fmt (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+static const char *sim_disk_fmt (UNIT *uptr)
 {
 int32 f = DK_GET_FMT (uptr);
 size_t i;
 
 for (i = 0; fmts[i].name; i++)
     if (fmts[i].fmtval == f) {
-        fprintf (st, "%s format", fmts[i].name);
-        return SCPE_OK;
+        return fmts[i].name;
         }
-fprintf (st, "invalid format");
+return "invalid";
+}
+
+t_stat sim_disk_show_fmt (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+fprintf (st, "%s format", sim_disk_fmt (uptr));
 return SCPE_OK;
 }
 
@@ -2089,6 +2093,7 @@ uint32 bytesread;
 
 if (f == NULL)
     return SCPE_MEM;
+sim_debug_unit (ctx->dbit, uptr, "get_disk_footer(%s)\n", sim_uname (uptr));
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_STD:                                    /* SIMH format */
         container_size = sim_fsize_ex (uptr->fileref);
@@ -2109,27 +2114,49 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
         f = NULL;
         break;
     case DKUF_F_VHD:                                    /* VHD format */
+        /* Construct a pseudo simh disk footer*/
         memcpy (f->Signature, "simh", 4);
         strncpy ((char *)f->DriveType, sim_vhd_disk_get_dtype (uptr->fileref, &f->SectorSize, &f->TransferElementSize, (char *)f->CreatingSimulator), sizeof (f->DriveType));
-        if (f->SectorCount == 0) {  /* Old format VHD footer */
-            sim_vhd_disk_set_dtype (uptr->fileref, f->DriveType, ctx->sector_size, ctx->xfer_element_size);
-            sim_vhd_disk_get_dtype (uptr->fileref, &f->SectorSize, &f->TransferElementSize, (char *)f->CreatingSimulator), sizeof (f->DriveType);
+        f->SectorSize = NtoHl (f->SectorSize);
+        f->TransferElementSize = NtoHl (f->TransferElementSize);
+        if ((f->SectorSize == 0) || (NtoHl (f->SectorSize) == 0x00020000)) {  /* Old or mangled format VHD footer */
+            sim_vhd_disk_set_dtype (uptr->fileref, (char *)f->DriveType, ctx->sector_size, ctx->xfer_element_size);
+            sim_vhd_disk_get_dtype (uptr->fileref, &f->SectorSize, &f->TransferElementSize, (char *)f->CreatingSimulator);
+            f->SectorSize = NtoHl (f->SectorSize);
+            f->TransferElementSize = NtoHl (f->TransferElementSize);
             }
         container_size = sim_vhd_disk_size (uptr->fileref);
-        f->SectorCount = (uint32)(container_size / f->SectorSize);
+        f->SectorCount = NtoHl ((uint32)(container_size / NtoHl (f->SectorSize)));
+        container_size += sizeof (*f);      /* Adjust since it is removed below */
+        f->AccessFormat = DKUF_F_VHD;
+        strncpy ((char *)f->CreationTime, "\n", sizeof (f->CreationTime));
         f->Checksum = NtoHl (eth_crc32 (0, f, sizeof (*f) - sizeof (f->Checksum)));
         break;
     }
 if (f) {
     if (f->Checksum != NtoHl (eth_crc32 (0, f, sizeof (*f) - sizeof (f->Checksum)))) {
+        sim_debug_unit (ctx->dbit, uptr, "No footer found on %s format container: %s\n", sim_disk_fmt (uptr), uptr->filename);
         free (f);
         f = NULL;
         }
     else {
         ctx->footer = f;
         container_size -= sizeof (*f);
+        sim_debug_unit (ctx->dbit, uptr, "Footer: %s - %s\n"
+            "   Simulator:           %s\n"
+            "   DriveType:           %s\n"
+            "   SectorSize:          %u\n"
+            "   SectorCount:         %u\n"
+            "   TransferElementSize: %u\n"
+            "   FooterVersion:       %u\n"
+            "   AccessFormat:        %u\n"
+            "   CreationTime:        %s",
+            sim_uname (uptr), uptr->filename,
+            f->CreatingSimulator, f->DriveType, NtoHl(f->SectorSize), NtoHl (f->SectorCount), 
+            NtoHl (f->TransferElementSize), f->FooterVersion, f->AccessFormat, f->CreationTime);
         }
     }
+sim_debug_unit (ctx->dbit, uptr, "Container Size: %u sectors %u bytes each\n", (uint32)(container_size/ctx->sector_size), ctx->sector_size);
 ctx->container_size = container_size;
 return SCPE_OK;
 }
