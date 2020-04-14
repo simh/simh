@@ -290,7 +290,7 @@ void ch_receive (void)
     count -= CHUDP_HEADER;
     count = (count + 1) & 0776;
     memcpy (rx_buffer + (512 - count), p + CHUDP_HEADER, count);
-    rx_count = count >> 1;
+    rx_count = (uint16)(count >> 1);
     sim_debug (DBG_TRC, &ch_dev, "Rx count, %d\n", rx_count);
     ch_validate (p + CHUDP_HEADER, count);
     status |= RXD;
