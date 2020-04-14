@@ -1648,8 +1648,7 @@ if (lp->mp && lp->modem_control) {                  /* This API ONLY works on mo
                 sprintf (msg, "tmxr_set_get_modem_bits() - establishing outgoing connection to: %s", lp->destination);
                 tmxr_debug_connect_line (lp, msg);
                 lp->connecting = sim_connect_sock_ex (lp->datagram ? lp->port : NULL, lp->destination, "localhost", NULL, (lp->datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | 
-                                                                                                                          (lp->packet ? SIM_SOCK_OPT_NODELAY : 0)    |
-                                                                                                                          SIM_SOCK_OPT_BLOCKING);
+                                                                                                                          (lp->packet ? SIM_SOCK_OPT_NODELAY : 0));
                 }
             }
         }
@@ -2805,8 +2804,7 @@ while (*tptr) {
                         return sim_messagef (SCPE_ARG, "Unexpected specifier: %s\n", eptr);
                 }
             sock = sim_connect_sock_ex (NULL, hostport, "localhost", NULL, (datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | 
-                                                                           (packet ? SIM_SOCK_OPT_NODELAY : 0)    |
-                                                                           SIM_SOCK_OPT_BLOCKING);
+                                                                           (packet ? SIM_SOCK_OPT_NODELAY : 0));
             if (sock != INVALID_SOCKET)
                 sim_close_sock (sock);
             else
@@ -2959,8 +2957,7 @@ while (*tptr) {
                     }
                 lp->packet = packet;
                 sock = sim_connect_sock_ex (datagram ? listen : NULL, hostport, "localhost", NULL, (datagram ? SIM_SOCK_OPT_DATAGRAM : 0) | 
-                                                                                                   (packet ? SIM_SOCK_OPT_NODELAY : 0)    | 
-                                                                                                   SIM_SOCK_OPT_BLOCKING);
+                                                                                                   (packet ? SIM_SOCK_OPT_NODELAY : 0));
                 if (sock != INVALID_SOCKET) {
                     _mux_detach_line (lp, FALSE, TRUE);
                     lp->destination = (char *)malloc(1+strlen(hostport));
