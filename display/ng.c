@@ -257,7 +257,7 @@ void delta (uint16 inst)
   int delta = inst & 01777;
 
   if (inst & 01000)
-    delta |= -1 << 10;
+    delta |= ~0u << 10;
 
   switch (inst & 014000) {
   case 000000:
