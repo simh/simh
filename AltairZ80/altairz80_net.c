@@ -171,7 +171,7 @@ static t_stat net_attach(UNIT *uptr, CONST char *cptr) {
     }
     else {
         net_unit.wait = NET_INIT_POLL_CLIENT;
-        serviceDescriptor[0].ioSocket = sim_connect_sock(cptr, "localhost", "3000");
+        serviceDescriptor[0].ioSocket = sim_connect_sock_ex(NULL, cptr, "localhost", "3000", SIM_SOCK_OPT_NODELAY);
         if (serviceDescriptor[0].ioSocket == INVALID_SOCKET)
             return SCPE_IOERR;
     }
