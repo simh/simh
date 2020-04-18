@@ -30,6 +30,29 @@
  * for PDP-6 described in
  * http://www.bitsavers.org/pdf/dec/graphics/H-340_Type_340_Precision_Incremental_CRT_System_Nov64.pdf
  *
+ * The MIT file .INFO.;340 INFO says:
+ *    ;CONI BITS OF THE 340 ARE:
+ *            ;2.9-2.7        MODE
+ *            ;2.4            VECT CONT LP(????)
+ *            ;2.3            VERTICAL EDGE HIT
+ *            ;2.2            LIGHT PEN HIT
+ *            ;2.1            HORIZONTAL EDGE HIT
+ *            ;1.9            STOP
+ *            ;1.8            DONE (CAUSES DATA INTERUPT)
+ *            ;1.6-1.4        SPECIAL PIA
+ *            ;1.3-1.1        DATA PIA
+ *    ;340 CONO BITS ARE:
+ *            ;2.3            CLEAR NO INK MODE
+ *            ;2.2            SET NO INK MODE (IN NO INK MODE, NO INTENSIFICATION CAN \
+ *     OCCUR)
+ *            ;2.1            CLEAR HALF WORD MODE
+ *            ;1.9            SET HALF WORD MODE
+ *            ;1.8            RESUME DISPLAY (TO CONTINUE AFTER A SPECIAL INTERUPT)
+ *            ;1.7            INTIALIZE
+ *            ;1.6-1.4        SPECIAL PIA
+ *            ;1.3-1.1        DATA PIA
+ * ITS uses the "resume display" bit, so it has been implemented here.
+ *
  * 340C was used in the PDP-10 VB10C display system
  * http://bitsavers.informatik.uni-stuttgart.de/pdf/dec/pdp10/periph/VB10C_Interactive_Graphics_Terminal_Jul70.pdf
  *      "The basic hardware system consists of a 340/C display connected
@@ -55,7 +78,7 @@
  *           7 PI channel?
  *   DISCON = CHAN + 140 (continue?)
  * *NO* DATAO or BLKO to device 130!
- *    
+ *
  * It appears that the reloc/protect mechanism is on I/O device 134.
  * (referred to by number, not symbol!)
  * DATAO sets reloc/protect, start addr
@@ -138,6 +161,7 @@ extern uint64 SW;        /* switch register */
 #define CONI_INT_HE     0001000         /* I- b26: HOR EDGE */
 #define CONI_INT_SI     0000400         /* I- b27: STOP INT */
 #define CONI_INT_DONE   0000200         /* I- b28: done with second half */
+#define CONO_RESUME     0000200         /* -O b28: resume after special int */
 #define CONO_INIT       0000100         /* -O b29: init display */
 #define CONX_SC         0000070         /* IO special channel */
 #define CONX_DC         0000007         /* IO data channel */
@@ -169,7 +193,7 @@ DEVICE dpy_dev = {
     NUM_DEVS_DPY, 0, 0, 0, 0, 0,
     NULL, NULL, dpy_reset,
     NULL, NULL, NULL,
-    &dpy_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG, 0, NULL,      
+    &dpy_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_DISPLAY, 0, NULL,
     NULL, NULL, NULL, NULL, NULL, &dpy_description
     };
 
@@ -253,6 +277,13 @@ t_stat dpy_devio(uint32 dev, uint64 *data) {
         uptr->STAT_REG |= *data & CONO_MASK;
         if (*data & CONO_INIT)
             dpy_update_status( uptr, ty340_reset(&dpy_dev), 1);
+        if (*data & CONO_RESUME) {
+            /* This bit is not documented in "H-340 Type 340 Precision
+               Incremental CRT System".  It is in the MIT file .INFO.;
+               340 INFO, and ITS does depend on it. */
+            ty340_clear(CONI_INT_VE | CONI_INT_LP | CONI_INT_HE);
+            dpy_update_status( uptr, ty340_status(), 0);
+        }
         sim_debug(DEBUG_CONO, &dpy_dev, "DPY %03o CONO %06o PC=%06o %06o\n",
                   dev, (uint32)*data, PC, uptr->STAT_REG & ~STAT_VALID);
         if (!sim_is_active(uptr))
@@ -266,7 +297,7 @@ t_stat dpy_devio(uint32 dev, uint64 *data) {
         /* if fed using BLKO from interrupt vector, PC will be wrong! */
         sim_debug(DEBUG_DATAIO, &dpy_dev, "DPY %03o DATO %012llo PC=%06o\n",
                   dev, *data, PC);
-        
+
         inst = (uint32)LRZ(*data);
         if (dpy_update_status(uptr, ty340_instruction(inst), 0)) {
             /* still running */

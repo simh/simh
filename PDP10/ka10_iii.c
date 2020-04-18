@@ -320,7 +320,7 @@ DEVICE iii_dev = {
     "III", iii_unit, NULL, iii_mod,
     2, 10, 31, 1, 8, 8,
     NULL, NULL, iii_reset,
-    NULL, NULL, NULL, &iii_dib, DEV_DEBUG | DEV_DISABLE | DEV_DIS, 0, dev_debug,
+    NULL, NULL, NULL, &iii_dib, DEV_DEBUG | DEV_DISABLE | DEV_DIS | DEV_DISPLAY, 0, dev_debug,
     NULL, NULL, &iii_help, NULL, NULL, &iii_description
     };
 

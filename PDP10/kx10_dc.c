@@ -147,7 +147,7 @@ DEVICE dc_dev = {
     1, 10, 31, 1, 8, 8,
     &tmxr_ex, &tmxr_dep, &dc_reset,
     NULL, &dc_attach, &dc_detach,
-    &dc_dib, DEV_NET | DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
+    &dc_dib, DEV_MUX | DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
     NULL, NULL, &dc_help, NULL, NULL, &dc_description
     };
 
@@ -433,18 +433,18 @@ t_stat dc_setnl (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
         return r;
     if (newln > dc_modem)
         return SCPE_ARG;
-    if ((newln == 0) || (newln >= DC10_MLINES) || (newln % 8) != 0)
+    if ((newln == 0) || (newln > DC10_MLINES) || (newln % 8) != 0)
         return SCPE_ARG;
     if (newln < dc_desc.lines) {
-        for (i = newln, t = 0; i < dc_desc.lines; i++)
+        for (i = newln - 1, t = 0; i < dc_desc.lines; i++)
             t = t | dc_ldsc[i].conn;
         if (t && !get_yn ("This will disconnect users; proceed [N]?", FALSE))
             return SCPE_OK;
-        for (i = newln; i < dc_desc.lines; i++) {
+        for (i = newln - 1; i < dc_desc.lines; i++) {
             if (dc_ldsc[i].conn) {
                 tmxr_linemsg (&dc_ldsc[i], "\r\nOperator disconnected line\r\n");
                 tmxr_send_buffered_data (&dc_ldsc[i]);
-                }
+            }
             tmxr_detach_ln (&dc_ldsc[i]);               /* completely reset line */
         }
     }
@@ -468,7 +468,7 @@ t_stat dc_set_log (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     if ((cptr == NULL) || (*cptr == 0) || (gbuf[0] == 0))
         return SCPE_ARG;
     ln = (int32) get_uint (gbuf, 10, dc_desc.lines, &r);
-    if ((r != SCPE_OK) || (ln >= dc_desc.lines))
+    if ((r != SCPE_OK) || (ln > dc_desc.lines))
         return SCPE_ARG;
     return tmxr_set_log (NULL, ln, cptr, desc);
 }
@@ -483,7 +483,7 @@ t_stat dc_set_nolog (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     if (cptr == NULL)
         return SCPE_ARG;
     ln = (int32) get_uint (cptr, 10, dc_desc.lines, &r);
-    if ((r != SCPE_OK) || (ln >= dc_desc.lines))
+    if ((r != SCPE_OK) || (ln > dc_desc.lines))
         return SCPE_ARG;
     return tmxr_set_nolog (NULL, ln, NULL, desc);
 }

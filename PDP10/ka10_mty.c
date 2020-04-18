@@ -94,7 +94,7 @@ DEVICE mty_dev = {
     MTY_NAME, mty_unit, NULL, mty_mod,
     2, 8, 0, 1, 8, 36,
     NULL, NULL, mty_reset, NULL, mty_attach, mty_detach,
-    &mty_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG, 0, dev_debug,
+    &mty_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_MUX, 0, dev_debug,
     NULL, NULL, mty_help, NULL, NULL, mty_description
 };
 

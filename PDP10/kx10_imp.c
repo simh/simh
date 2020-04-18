@@ -563,7 +563,7 @@ DEVICE imp_dev = {
     "IMP", imp_unit, imp_reg, imp_mod,
     3, 8, 0, 1, 8, 36,
     NULL, NULL, &imp_reset, NULL, &imp_attach, &imp_detach,
-    &imp_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG, 0, imp_debug,
+    &imp_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_ETHER, 0, imp_debug,
     NULL, NULL, &imp_help, NULL, NULL, &imp_description
 };
 #define IMP_OCHN     0000007

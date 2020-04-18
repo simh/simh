@@ -423,6 +423,7 @@ t_stat dp_devio(uint32 dev, uint64 *data) {
              /* Stop controller */
              sim_cancel(uptr);
              df10_finish_op(df10, 0);
+             uptr->STATUS &= ~(BUSY);
          }
          /* Clear flags */
          uptr->STATUS &= ~(*data & CLRMSK);

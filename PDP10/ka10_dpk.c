@@ -112,7 +112,7 @@ DEVICE dpk_dev = {
     DPK_NAME, dpk_unit, NULL, dpk_mod,
     2, 8, 0, 1, 8, 36,
     NULL, NULL, dpk_reset, NULL, dpk_attach, dpk_detach,
-    &dpk_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG, 0, dev_debug,
+    &dpk_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_MUX, 0, dev_debug,
     NULL, NULL, dpk_help, NULL, NULL, dpk_description
 };
 

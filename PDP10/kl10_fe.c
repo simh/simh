@@ -554,7 +554,7 @@ DEVICE tty_dev = {
     2, 10, 31, 1, 8, 8,
     &tmxr_ex, &tmxr_dep, &tty_reset,
     NULL, &tty_attach, &tty_detach,
-    NULL, DEV_NET | DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
+    NULL, DEV_MUX | DEV_DISABLE | DEV_DEBUG, 0, dev_debug,
     NULL, NULL, &tty_help, NULL, NULL, &tty_description
     };
 #endif

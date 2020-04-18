@@ -419,7 +419,7 @@ DEVICE nia_dev = {
     "NI", nia_unit, nia_reg, nia_mod,
     3, 8, 0, 1, 8, 36,
     NULL, NULL, &nia_reset, NULL, &nia_attach, &nia_detach,
-    &nia_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG, 0, nia_debug,
+    &nia_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_ETHER, 0, nia_debug,
     NULL, NULL, &nia_help, NULL, NULL, &nia_description
 };
 

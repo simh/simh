@@ -92,7 +92,7 @@ DEVICE tk10_dev = {
     TK10_NAME, tk10_unit, NULL, tk10_mod,
     1, 8, 0, 1, 8, 36,
     NULL, NULL, tk10_reset, NULL, tk10_attach, tk10_detach,
-    &tk10_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG, 0, dev_debug,
+    &tk10_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_MUX, 0, dev_debug,
     NULL, NULL, tk10_help, NULL, NULL, tk10_description
 };
 
