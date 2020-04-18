@@ -566,7 +566,6 @@ t_stat set_runlimit (int32 flag, CONST char *cptr);
 t_stat sim_set_asynch (int32 flag, CONST char *cptr);
 static const char *_get_dbg_verb (uint32 dbits, DEVICE* dptr, UNIT *uptr);
 static t_stat sim_sanity_check_register_declarations (void);
-static t_stat sim_library_unit_tests (void);
 static t_stat _sim_debug_flush (void);
 
 /* Global data */
@@ -838,7 +837,9 @@ const t_value width_mask[] = { 0,
 #endif
     };
 
-static const char simh_help[] =
+static char *simh_help = ""; /* First invocation of HELP command appends the help pieces */
+
+static const char simh_help1[] =
        /***************** 80 character line width template *************************/
       "1Commands\n"
 #define HLP_RESET       "*Commands Resetting Devices"
@@ -1511,8 +1512,9 @@ static const char simh_help[] =
       "+SET <unit> DISABLED         disable unit\n"
       "+SET <unit> arg{,arg...}     set unit parameters (see show modifiers)\n"
       "+HELP <dev> SET              displays the device specific set commands\n"
-      "++++++++                     available\n"
-       /***************** 80 character line width template *************************/
+      "++++++++                     available\n";
+static const char simh_help2[] =
+      /***************** 80 character line width template *************************/
 #define HLP_SHOW        "*Commands SHOW"
       "2SHOW\n"
       "+sh{ow} {-c} br{eak} <list>  show breakpoints\n"
@@ -2388,7 +2390,28 @@ static const char simh_help[] =
       " launch the host operating system's command shell.\n"
       " The exit status from the command which was executed is set as the command\n"
       " completion status for the ! command.  This may influence any enabled ON\n"
-      " condition traps\n";
+      " condition traps\n"
+#define HLP_TESTLIB     "*Commands Testing_Device_Libraries"
+      "2Testing Device Libraries\n"
+      " A simulator developer may need to invoke the simh internal device library\n"
+      " test routines that exercise the various libraries used by different devices.\n\n"
+      " There are library test routines for devices which use:\n\n"
+      "++sim_disk  - Disk devices\n"
+      "++sim_tape  - Tape devices\n"
+      "++sim_ether - Ethernet devices\n"
+      "++sim_card  - Card Reader/Punch Devices\n"
+      "++sim_tmxr  - Terminal Multiplexor Devices\n\n"
+      " The TESTLIB command by itself will invoke library tests for all devices in the\n"
+      " current simulator.\n\n"
+      " The library tests for a specific device can be invoked by specifying the device\n"
+      " name as an argument to the TESTLIB command:\n\n"
+      "++TESTLIB {device}           test a specific or all devices\n\n"
+       /***************** 80 character line width template *************************/
+      "3Switches\n"
+      " Switches can be used to influence the behavior of the TESTLIB command\n\n"
+      "4-d\n"
+      " Many tests are capable of producing various amounts of debug output\n"
+      " during their execution.  The -d switch enables that output\n";
 
 
 static CTAB cmd_table[] = {
@@ -2462,6 +2485,7 @@ static CTAB cmd_table[] = {
 #endif
     { "RUNLIMIT",   &runlimit_cmd,  1,          HLP_RUNLIMIT,   NULL, NULL },
     { "NORUNLIMIT", &runlimit_cmd,  0,          HLP_RUNLIMIT,   NULL, NULL },
+    { "TESTLIB",    &test_lib_cmd,  0,          HLP_TESTLIB,    NULL, NULL },
     { NULL,         NULL,           0,          NULL,           NULL, NULL }
     };
 
@@ -2763,8 +2787,8 @@ setenv ("SIM_REGEX_TYPE", "PCRE", 1);                   /* Publish regex type */
 #endif
 sim_argv = argv;
 
-if (sim_switches & SWMASK ('T'))                       /* Command Line -T switch */
-    stat = sim_library_unit_tests ();                   /* run library unit tests */
+if (sim_switches & SWMASK ('T'))                        /* Command Line -T switch */
+    stat = test_lib_cmd (0, "ALL");                     /* run library unit tests */
 
 cptr = getenv("HOME");
 if (cptr == NULL) {
@@ -3431,8 +3455,15 @@ CTAB *cmdp;
 DEVICE *dptr;
 UNIT *uptr;
 t_stat r;
+static t_bool help_initialized = FALSE;
 t_bool explicit_device = FALSE;
 
+if (!help_initialized) {
+    simh_help = (char *)malloc (1 + strlen (simh_help1) + strlen (simh_help2));
+    strcpy (simh_help, simh_help1);
+    strcat (simh_help, simh_help2);
+    help_initialized = TRUE;
+    }
 GET_SWITCHES (cptr);                                    /* get switches */
 if (sim_switches & SWMASK ('F'))
     flag = flag | SCP_HELP_FLAT;
@@ -15363,14 +15394,18 @@ return stat;
  * modules: sim_card, sim_disk, sim_tape, sim_ether, sim_tmxr, etc.
  */
 
-static t_stat sim_library_unit_tests (void)
+t_stat test_lib_cmd (int32 flag, CONST char *cptr)
 {
 int i;
 int bad_regs = 0;
 DEVICE *dptr;
 int32 saved_switches = sim_switches & ~SWMASK ('T');
 t_stat stat = SCPE_OK;
+char gbuf[CBUFSIZE];
 
+cptr = get_glyph (cptr, gbuf, 0);
+if (gbuf[0] == '\0')
+    strcpy (gbuf, "ALL");
 if (sim_switches & SWMASK ('D')) {
     sim_switches &= ~(SWMASK ('D') | SWMASK ('R') | SWMASK ('F') | SWMASK ('T'));
     sim_set_debon (0, "STDOUT");
@@ -15380,6 +15415,8 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
     t_stat tstat = SCPE_OK;
     t_bool was_disabled = ((dptr->flags & DEV_DIS) != 0);
 
+    if ((strcmp (gbuf, "ALL") != 0) && (strcmp (gbuf, dptr->name) != 0))
+        continue;
     if (DEV_TYPE(dptr) == 0) {
         sim_printf ("Skipping %s - non library device type\n", dptr->name);
         continue;                       /* skip unspecified devices */

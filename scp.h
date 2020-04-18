@@ -117,6 +117,7 @@ t_stat echo_cmd (int32 flag, CONST char *ptr);
 t_stat echof_cmd (int32 flag, CONST char *ptr);
 t_stat debug_cmd (int32 flag, CONST char *ptr);
 t_stat runlimit_cmd (int32 flag, CONST char *ptr);
+t_stat test_lib_cmd (int32 flag, CONST char *ptr);
 
 /* Allow compiler to help validate printf style format arguments */
 #if !defined __GNUC__
