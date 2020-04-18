@@ -138,7 +138,7 @@ extern uint8        chan_io_status[NUM_CHAN];   /* Channel status */
 #endif
 
 /* Channel level activity */
-uint8               mt_chan[NUM_DEVS];
+uint8               mt_chan[NUM_CHAN];
 
 /* One buffer per channel */
 uint8               mt_buffer[NUM_DEVS][BUFFSIZE];
