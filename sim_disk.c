@@ -2461,6 +2461,16 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
         size_function = sim_fsize_ex;
         break;
     case DKUF_F_STD:                                    /* SIMH format */
+        if (NULL != (uptr->fileref = sim_vhd_disk_open (cptr, "rb"))) { /* Try VHD first */
+            sim_disk_set_fmt (uptr, 0, "VHD", NULL);    /* set file format to VHD */
+            sim_vhd_disk_close (uptr->fileref);         /* close vhd file*/
+            uptr->fileref = NULL;
+            open_function = sim_vhd_disk_open;
+            size_function = sim_vhd_disk_size;
+            storage_function = sim_vhd_disk_info;
+            auto_format = TRUE;
+            break;
+            }
         open_function = sim_fopen;
         size_function = sim_fsize_ex;
         break;
@@ -2471,6 +2481,16 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
         storage_function = sim_os_disk_info_raw;
         break;
     case DKUF_F_RAW:                                    /* Raw Physical Disk Access */
+        if (NULL != (uptr->fileref = sim_vhd_disk_open (cptr, "rb"))) { /* Try VHD first */
+            sim_disk_set_fmt (uptr, 0, "VHD", NULL);    /* set file format to VHD */
+            sim_vhd_disk_close (uptr->fileref);         /* close vhd file*/
+            uptr->fileref = NULL;
+            open_function = sim_vhd_disk_open;
+            size_function = sim_vhd_disk_size;
+            storage_function = sim_vhd_disk_info;
+            auto_format = TRUE;
+            break;
+            }
         open_function = sim_os_disk_open_raw;
         size_function = sim_os_disk_size_raw;
         storage_function = sim_os_disk_info_raw;
@@ -2513,18 +2533,18 @@ else {                                                  /* normal */
             if (uptr->fileref == NULL)                  /* open fail? */
                 return _err_return (uptr, SCPE_OPENERR);/* yes, error */
             uptr->flags = uptr->flags | UNIT_RO;        /* set rd only */
-            sim_messagef (SCPE_OK, "%s%d: unit is read only\n", sim_dname (dptr), (int)(uptr-dptr->units));
+            sim_messagef (SCPE_OK, "%s: unit is read only\n", sim_uname (uptr));
             }
         else {                                          /* doesn't exist */
             if (sim_switches & SWMASK ('E'))            /* must exist? */
-                return _err_return (uptr, SCPE_OPENERR); /* yes, error */
+                return sim_messagef (_err_return (uptr, SCPE_OPENERR), "%s: File not found: %s\n", sim_uname (uptr), cptr);
             if (create_function)
                 uptr->fileref = create_function (cptr, ((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1));/* create new file */
             else
                 uptr->fileref = open_function (cptr, "wb+");/* open new file */
             if (uptr->fileref == NULL)                  /* open fail? */
-                return _err_return (uptr, SCPE_OPENERR);/* yes, error */
-            sim_messagef (SCPE_OK, "%s%d: creating new file\n", sim_dname (dptr), (int)(uptr-dptr->units));
+                return sim_messagef (_err_return (uptr, SCPE_OPENERR), "%s: Can't create file: %s\n", sim_uname (uptr), cptr);
+            sim_messagef (SCPE_OK, "%s: creating new file: %s\n", sim_uname (uptr), cptr);
             created = TRUE;
             }
         }                                               /* end if null */
