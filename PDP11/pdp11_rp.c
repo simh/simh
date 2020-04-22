@@ -667,7 +667,7 @@ MTAB rp_mod[] = {
       NULL, NULL, NULL, "Set type based on file size at attach" },
     { UNIT_AUTO,         0, "noautosize",   "NOAUTOSIZE",   
       NULL, NULL, NULL, "Disable disk autosize on attach" },
-    { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "FORMAT", "FORMAT={SIMH|VHD|RAW}",
+    { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "FORMAT", "FORMAT={AUTO|SIMH|VHD|RAW}",
       &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Set/Display disk format" },
     { 0 }
     };
