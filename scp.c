@@ -837,7 +837,7 @@ const t_value width_mask[] = { 0,
 #endif
     };
 
-static char *simh_help = ""; /* First invocation of HELP command appends the help pieces */
+static char *simh_help = NULL;  /* First invocation of HELP command appends the help pieces */
 
 static const char simh_help1[] =
        /***************** 80 character line width template *************************/
