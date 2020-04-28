@@ -393,6 +393,7 @@ t_stat lpt_attach (UNIT *uptr, CONST char *cptr)
 {
     t_stat reason;
 
+    sim_switches |= SWMASK ('A');   /* Position to EOF */
     reason = attach_unit (uptr, cptr);
     if (sim_switches & SIM_SW_REST)
         return reason;

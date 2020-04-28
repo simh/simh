@@ -209,6 +209,7 @@ t_stat ptp_attach (UNIT *uptr, CONST char *cptr)
 {
     t_stat reason;
 
+    sim_switches |= SWMASK ('A');       /* Default to Append to existing file */
     reason = attach_unit (uptr, cptr);
     uptr->STATUS &= ~NO_TAPE_PP;
     return reason;
@@ -409,6 +410,7 @@ fprintf (st, "Paper Tape Punch (PTP)\n\n");
 fprintf (st, "The paper tape punch (PTP) writes data to a disk file.  The POS register\n");
 fprintf (st, "specifies the number of the next data item to be written.  Thus, by changing\n");
 fprintf (st, "POS, the user can backspace or advance the punch.\n");
+fprintf (st, "A new file can be created if you attach with the -N switch\n\n");
 fprint_set_help (st, dptr);
 fprint_show_help (st, dptr);
 fprint_reg_help (st, dptr);
