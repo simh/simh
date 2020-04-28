@@ -26,6 +26,7 @@
     MODIFICATIONS:
 
         23 Apr 15 -- Modified to use simh_debug
+        21 Apr 20 -- Richard Brinegar numerous fixes for flag errors
 
     NOTES:
        cpu                  Motorola M6800 CPU
@@ -65,10 +66,10 @@
             Invalid mamory address (if MTRAP is set on CPU)
 
        2. Interrupts.
-          There are 4 types of interrupt, and in effect they do a 
+          There are 4 types of interrupt, and in effect they do a
           hardware CALL instruction to one of 4 possible high memory addresses.
 
-       3. Non-existent memory.  
+       3. Non-existent memory.
             On the SWTP 6800, reads to non-existent memory
             return 0FFH, and writes are ignored.
 */
@@ -146,6 +147,7 @@ int32 get_ext_addr(void);
 int32 get_flag(int32 flag);
 void condevalVa(int32 op1, int32 op2);
 void condevalVs(int32 op1, int32 op2);
+void condevalHa(int32 op1, int32 op2);
 
 /* external routines */
 
@@ -343,7 +345,7 @@ t_stat sim_instr (void)
             case 0x01:                  /* NOP */
                 break;
             case 0x06:                  /* TAP */
-                CCR = A;
+                CCR = A | CCR_ALWAYS_ON;
                 break;
             case 0x07:                  /* TPA */
                 A = CCR;
@@ -377,18 +379,19 @@ t_stat sim_instr (void)
             case 0x10:                  /* SBA */
                 op1 = A;
                 A = A - B;
+                COND_SET_FLAG_C(A);
+                A &= 0xFF;
                 COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
-                COND_SET_FLAG_C(A);
-                condevalVs(B, op1);
-                A &= 0xFF;
+                condevalVs(op1, B);
                 break;
             case 0x11:                  /* CBA */
                 lo = A - B;
+                COND_SET_FLAG_C(lo);
+                lo &= 0xFF ;
                 COND_SET_FLAG_N(lo);
                 COND_SET_FLAG_Z(lo);
-                COND_SET_FLAG_C(lo);
-                condevalVs(B, A);
+                condevalVs(A, B);
                 break;
             case 0x16:                  /* TAB */
                 B = A;
@@ -398,42 +401,36 @@ t_stat sim_instr (void)
                 break;
             case 0x17:                  /* TBA */
                 A = B;
-                COND_SET_FLAG_N(B);
-                COND_SET_FLAG_Z(B);
+                COND_SET_FLAG_N(A);
+                COND_SET_FLAG_Z(A);
                 CLR_FLAG(VF);
                 break;
             case 0x19:                  /* DAA */
                 DAR = A & 0x0F;
-                op1 = get_flag(CF);
-                if (DAR > 9 || get_flag(CF)) {
-                    DAR += 6;
-                    A &= 0xF0;
-                    A |= (DAR & 0x0F);
-                    COND_SET_FLAG(DAR & 0x10,CF);
+                if ((DAR > 9) || get_flag(HF)) {
+                    DAR += 6 ;
+                    A = (A & 0xF0) + DAR;
+                    COND_SET_FLAG(DAR & 0x10, HF);
                 }
                 DAR = (A >> 4) & 0x0F;
-                if (DAR > 9 || get_flag(CF)) {
-                    DAR += 6;
-                    if (get_flag(CF)) 
-                        DAR++;
-                    A &= 0x0F;
-                    A |= (DAR << 4);
+                if ((DAR > 9) || get_flag(CF)) {
+                    DAR =+ 6;
+                    A = (A & 0x0F) | (DAR << 4) | 0x100;
                 }
-                COND_SET_FLAG(op1,CF);
-                if ((DAR << 4) & 0x100)
-                    SET_FLAG(CF);
+                COND_SET_FLAG_C(A);
+                A &= 0xFF;
                 COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
-                A &= 0xFF;
                 break;
             case 0x1B:                  /* ABA */
+                op1 = A ;
                 A += B;
-                COND_SET_FLAG_H(A);
+                COND_SET_FLAG_C(A);
+                A &= 0xFF;
+                condevalHa(op1, B);
                 COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
-                COND_SET_FLAG_C(A);
-                condevalVa(A, B);
-                A &= 0xFF;
+                condevalVa(op1, B);
                 break;
             case 0x20:                  /* BRA rel */
                 go_rel(1);
@@ -538,10 +535,10 @@ t_stat sim_instr (void)
                 PC = CPU_BD_get_mword(0xFFFA) & ADDRMASK;
                 break;
             case 0x40:                  /* NEG A */
-                op1 = A;
-                A = (0 - A) & 0xFF;
-                condevalVa(A, op1);
-                COND_SET_FLAG(A,CF);
+                COND_SET_FLAG_V(A == 0x80);
+                A = (0 - A);
+                COND_SET_FLAG_C(A);
+                A &= 0xFF;
                 COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
                 break;
@@ -573,7 +570,7 @@ t_stat sim_instr (void)
                 COND_SET_FLAG(A & 0x01,CF);
                 lo = A & 0x80;
                 A = (A >> 1) & 0xFF;
-                A |= lo; 
+                A |= lo;
                 COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
                 COND_SET_FLAG_V(get_flag(NF) ^ get_flag(CF));
@@ -622,10 +619,10 @@ t_stat sim_instr (void)
                 SET_FLAG(ZF);
                 break;
             case 0x50:                  /* NEG B */
-                op1 = B;
-                B = (0 - B) & 0xFF;
-                condevalVa(B, op1);
-                COND_SET_FLAG(B,CF);
+                COND_SET_FLAG_V(B == 0x80);
+                B = (0 - B);
+                COND_SET_FLAG_C(B);
+                B &= 0xFF;
                 COND_SET_FLAG_N(B);
                 COND_SET_FLAG_Z(B);
                 break;
@@ -658,7 +655,7 @@ t_stat sim_instr (void)
                 COND_SET_FLAG(B & 0x01,CF);
                 lo = B & 0x80;
                 B = (B >> 1) & 0xFF;
-                B |= lo; 
+                B |= lo;
                 COND_SET_FLAG_N(B);
                 COND_SET_FLAG_Z(B);
                 COND_SET_FLAG_V(get_flag(NF) ^ get_flag(CF));
@@ -709,10 +706,11 @@ t_stat sim_instr (void)
             case 0x60:                  /* NEG ind */
                 DAR = get_indir_addr();
                 op1 = CPU_BD_get_mbyte(DAR);
-                lo = (0 - op1) & 0xFF;
+                COND_SET_FLAG_V(op1 == 0x80);
+                lo = (0 - op1);
+                COND_SET_FLAG_C(lo);
+                lo &= 0xFF;
                 CPU_BD_put_mbyte(DAR, lo);
-                condevalVs(lo, op1);
-                COND_SET_FLAG(lo,CF);
                 COND_SET_FLAG_N(lo);
                 COND_SET_FLAG_Z(lo);
                 break;
@@ -763,7 +761,7 @@ t_stat sim_instr (void)
                 DAR = get_indir_addr();
                 lo = CPU_BD_get_mbyte(DAR);
                 COND_SET_FLAG(lo & 0x80,CF);
-                lo <<= 1;
+                lo = (lo << 1) & 0xFF;
                 CPU_BD_put_mbyte(DAR, lo);
                 COND_SET_FLAG_N(lo);
                 COND_SET_FLAG_Z(lo);
@@ -774,9 +772,8 @@ t_stat sim_instr (void)
                 lo = CPU_BD_get_mbyte(DAR);
                 hi = get_flag(CF);
                 COND_SET_FLAG(lo & 0x80,CF);
-                lo <<= 1;
-                if (hi)
-                    lo |= 0x01;
+                lo = (lo << 1) &0xFF;
+                if (hi) lo |= 0x01;
                 CPU_BD_put_mbyte(DAR, lo);
                 COND_SET_FLAG_N(lo);
                 COND_SET_FLAG_Z(lo);
@@ -820,12 +817,10 @@ t_stat sim_instr (void)
             case 0x70:                  /* NEG ext */
                 DAR = get_ext_addr();
                 op1 = CPU_BD_get_mbyte(DAR);
+                COND_SET_FLAG_V(op1 == 0x80) ;
+                COND_SET_FLAG(op1 != 0, CF);
                 lo = (0 - op1) & 0xFF;
                 CPU_BD_put_mbyte(DAR, lo);
-                condevalVs(lo, op1);
-                CLR_FLAG(CF);
-                if (lo)
-                    SET_FLAG(CF);
                 COND_SET_FLAG_N(lo);
                 COND_SET_FLAG_Z(lo);
                 break;
@@ -878,7 +873,7 @@ t_stat sim_instr (void)
                 DAR = get_ext_addr();
                 lo = CPU_BD_get_mbyte(DAR);
                 COND_SET_FLAG(lo & 0x80,CF);
-                lo <<= 1;
+                lo = (lo << 1) & 0xFF;
                 CPU_BD_put_mbyte(DAR, lo);
                 COND_SET_FLAG_N(lo);
                 COND_SET_FLAG_Z(lo);
@@ -889,9 +884,8 @@ t_stat sim_instr (void)
                 lo = CPU_BD_get_mbyte(DAR);
                 hi = get_flag(CF);
                 COND_SET_FLAG(lo & 0x80,CF);
-                lo <<= 1;
-                if (hi)
-                    lo |= 0x01;
+                lo = (lo << 1) & 0xFF;
+                if (hi) lo |= 0x01;
                 CPU_BD_put_mbyte(DAR, lo);
                 COND_SET_FLAG_N(lo);
                 COND_SET_FLAG_Z(lo);
@@ -934,31 +928,33 @@ t_stat sim_instr (void)
                 SET_FLAG(ZF);
                 break;
             case 0x80:                  /* SUB A imm */
-                op1 = get_dir_addr();
-                A = A - op1;
-                COND_SET_FLAG_N(A);
+                lo = get_dir_addr();
+                op1 = A;
+                A = A - lo;
                 COND_SET_FLAG_C(A);
-                condevalVs(A, op1);
                 A &= 0xFF;
+                COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
+                condevalVs(op1, lo);
                 break;
             case 0x81:                  /* CMP A imm */
                 op1 = get_dir_addr();
                 lo = A - op1;
-                COND_SET_FLAG_N(lo);
                 COND_SET_FLAG_C(lo);
-                condevalVs(lo, op1);
                 lo &= 0xFF;
+                COND_SET_FLAG_N(lo);
                 COND_SET_FLAG_Z(lo);
+                condevalVs(A, op1);
                 break;
             case 0x82:                  /* SBC A imm */
-                op1 = get_dir_addr();
-                A = A - op1 - get_flag(CF);
-                COND_SET_FLAG_N(A);
+                lo = get_dir_addr() + get_flag(CF);
+                op1 = A;
+                A = A - lo;
                 COND_SET_FLAG_C(A);
-                condevalVs(A, op1);
                 A &= 0xFF;
+                COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
+                condevalVs(op1, lo);
                 break;
             case 0x84:                  /* AND A imm */
                 A = (A & get_dir_addr()) & 0xFF;
@@ -985,14 +981,15 @@ t_stat sim_instr (void)
                 COND_SET_FLAG_Z(A);
                 break;
             case 0x89:                  /* ADC A imm */
-                op1 = get_dir_addr();
-                A = A + op1 + get_flag(CF);
-                COND_SET_FLAG_H(A);
-                COND_SET_FLAG_N(A);
+                lo = get_dir_addr() + get_flag(CF);
+                op1 = A;
+                A = A + lo;
                 COND_SET_FLAG_C(A);
-                condevalVa(A, op1);
                 A &= 0xFF;
+                condevalHa(op1, lo);
+                COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
+                condevalVa(op1, lo);
                 break;
             case 0x8A:                  /* ORA A imm */
                 A = (A | get_dir_addr()) & 0xFF;
@@ -1001,14 +998,15 @@ t_stat sim_instr (void)
                 COND_SET_FLAG_Z(A);
                 break;
             case 0x8B:                  /* ADD A imm */
-                op1 = get_dir_addr();
-                A = A + op1;
-                COND_SET_FLAG_H(A);
-                COND_SET_FLAG_N(A);
+                lo = get_dir_addr();
+                op1 = A;
+                A = A + lo;
                 COND_SET_FLAG_C(A);
-                condevalVa(A, op1);
                 A &= 0xFF;
+                condevalHa(op1, lo);
+                COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
+                condevalVa(op1, lo);
                 break;
             case 0x8C:                  /* CPX imm */
                 op1 = IX - get_ext_addr();
@@ -1029,13 +1027,14 @@ t_stat sim_instr (void)
                 CLR_FLAG(VF);
                 break;
             case 0x90:                  /* SUB A dir */
-                op1 = get_dir_val();
-                A = A - op1;
-                COND_SET_FLAG_N(A);
+                lo = get_dir_val();
+                op1 = A;
+                A = A - lo;
                 COND_SET_FLAG_C(A);
-                condevalVs(A, op1);
                 A &= 0xFF;
+                COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
+                condevalVs(op1, lo);
                 break;
             case 0x91:                  /* CMP A dir */
                 op1 = get_dir_val();
@@ -1047,13 +1046,13 @@ t_stat sim_instr (void)
                 COND_SET_FLAG_Z(lo);
                 break;
             case 0x92:                  /* SBC A dir */
-                op1 = get_dir_val();
-                A = A - op1 - get_flag(CF);
-                COND_SET_FLAG_N(A);
+                lo = get_dir_val() + get_flag(CF);
+                A = A - lo;
                 COND_SET_FLAG_C(A);
-                condevalVs(A, op1);
                 A &= 0xFF;
+                COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
+                condevalVs(op1, lo);
                 break;
             case 0x94:                  /* AND A dir */
                 A = (A & get_dir_val()) & 0xFF;
@@ -1086,14 +1085,15 @@ t_stat sim_instr (void)
                 COND_SET_FLAG_Z(A);
                 break;
             case 0x99:                  /* ADC A dir */
-                op1 = get_dir_val();
-                A = A + op1 + get_flag(CF);
-                COND_SET_FLAG_H(A);
-                COND_SET_FLAG_N(A);
+                lo = get_dir_val() + get_flag(CF);
+                op1 = A;
+                A = A + lo;
                 COND_SET_FLAG_C(A);
-                condevalVa(A, op1);
                 A &= 0xFF;
+                condevalHa(op1, lo);
+                COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
+                condevalVa(op1, lo);
                 break;
             case 0x9A:                  /* ORA A dir */
                 A = (A | get_dir_val()) & 0xFF;
@@ -1102,14 +1102,15 @@ t_stat sim_instr (void)
                 COND_SET_FLAG_Z(A);
                 break;
             case 0x9B:                  /* ADD A dir */
-                op1 = get_dir_val();
-                A = A + op1;
-                COND_SET_FLAG_H(A);
-                COND_SET_FLAG_N(A);
+                lo = get_dir_val();
+                op1 = A;
+                A = A + lo;
                 COND_SET_FLAG_C(A);
-                condevalVa(A, op1);
                 A &= 0xFF;
+                condevalHa(op1, lo);
+                COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
+                condevalVa(op1, lo);
                 break;
             case 0x9C:                  /* CPX dir */
                 op1 = IX - CPU_BD_get_mword(get_dir_addr());
@@ -1130,13 +1131,14 @@ t_stat sim_instr (void)
                 CLR_FLAG(VF);
                 break;
             case 0xA0:                  /* SUB A ind */
-                op1 = get_indir_val();
-                A = A - op1;
-                COND_SET_FLAG_N(A);
+                lo = get_indir_val();
+                op1 = A;
+                A = A - lo;
                 COND_SET_FLAG_C(A);
-                condevalVs(A, op1);
                 A &= 0xFF;
+                COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
+                condevalVs(op1, lo);
                 break;
             case 0xA1:                  /* CMP A ind */
                 op1 = get_indir_val();
@@ -1148,13 +1150,13 @@ t_stat sim_instr (void)
                 COND_SET_FLAG_Z(lo);
                 break;
             case 0xA2:                  /* SBC A ind */
-                op1 = get_indir_val();
-                A = A - op1 - get_flag(CF);
-                COND_SET_FLAG_N(A);
+                lo = get_indir_val() + get_flag(CF);
+                A = A - lo;
                 COND_SET_FLAG_C(A);
-                condevalVs(A, op1);
                 A &= 0xFF;
+                COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
+                condevalVs(op1, lo);
                 break;
             case 0xA4:                  /* AND A ind */
                 A = (A & get_indir_val()) & 0xFF;
@@ -1187,14 +1189,15 @@ t_stat sim_instr (void)
                 COND_SET_FLAG_Z(A);
                 break;
             case 0xA9:                  /* ADC A ind */
-                op1 = get_indir_val();
-                A = A + op1 + get_flag(CF);
-                COND_SET_FLAG_H(A);
-                COND_SET_FLAG_N(A);
+                lo = get_indir_val() + get_flag(CF);
+                op1 = A;
+                A = A + lo;
                 COND_SET_FLAG_C(A);
-                condevalVa(A, op1);
                 A &= 0xFF;
+                condevalHa(op1, lo);
+                COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
+                condevalVa(op1, lo);
                 break;
             case 0xAA:                  /* ORA A ind */
                 A = (A | get_indir_val()) & 0xFF;
@@ -1203,14 +1206,15 @@ t_stat sim_instr (void)
                 COND_SET_FLAG_Z(A);
                 break;
             case 0xAB:                  /* ADD A ind */
-                op1 = get_indir_val();
-                A = A + op1;
-                COND_SET_FLAG_H(A);
-                COND_SET_FLAG_N(A);
+                lo = get_indir_val();
+                op1 = A;
+                A = A + lo;
                 COND_SET_FLAG_C(A);
-                condevalVa(A, op1);
                 A &= 0xFF;
+                condevalHa(op1, lo);
+                COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
+                condevalVa(op1, lo);
                 break;
             case 0xAC:                  /* CPX ind */
                 op1 = (IX - get_indir_addr()) & ADDRMASK;
@@ -1236,13 +1240,14 @@ t_stat sim_instr (void)
                 CLR_FLAG(VF);
                 break;
             case 0xB0:                  /* SUB A ext */
-                op1 = get_ext_val();
-                A = A - op1;
-                COND_SET_FLAG_N(A);
+                lo = get_ext_val();
+                op1 = A;
+                A = A - lo;
                 COND_SET_FLAG_C(A);
-                condevalVs(A, op1);
                 A &= 0xFF;
+                COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
+                condevalVs(op1, lo);
                 break;
             case 0xB1:                  /* CMP A ext */
                 op1 = get_ext_val();
@@ -1254,13 +1259,14 @@ t_stat sim_instr (void)
                 COND_SET_FLAG_Z(lo);
                 break;
             case 0xB2:                  /* SBC A ext */
-                op1 = get_ext_val();
-                A = A - op1 - get_flag(CF);
-                COND_SET_FLAG_N(A);
+                lo = get_ext_val() + get_flag(CF);
+                op1 = A;
+                A = A - lo;
                 COND_SET_FLAG_C(A);
-                condevalVs(A, op1);
                 A &= 0xFF;
+                COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
+                condevalVs(op1, lo);
                 break;
             case 0xB4:                  /* AND A ext */
                 A = (A & get_ext_val()) & 0xFF;
@@ -1293,14 +1299,15 @@ t_stat sim_instr (void)
                 COND_SET_FLAG_Z(A);
                 break;
             case 0xB9:                  /* ADC A ext */
-                op1 = get_ext_val();
-                A = A + op1 + get_flag(CF);
-                COND_SET_FLAG_H(A);
-                COND_SET_FLAG_N(A);
+                lo = get_ext_val() + get_flag(CF);
+                op1 = A;
+                A = A + lo;
                 COND_SET_FLAG_C(A);
-                condevalVa(A, op1);
                 A &= 0xFF;
+                condevalHa(op1, lo);
+                COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
+                condevalVa(op1, lo);
                 break;
             case 0xBA:                  /* ORA A ext */
                 A = (A | get_ext_val()) & 0xFF;
@@ -1309,14 +1316,15 @@ t_stat sim_instr (void)
                 COND_SET_FLAG_Z(A);
                 break;
             case 0xBB:                  /* ADD A ext */
-                op1 = get_ext_val();
-                A = A + op1;
-                COND_SET_FLAG_H(A);
-                COND_SET_FLAG_N(A);
+                lo = get_ext_val();
+                op1 = A;
+                A = A + lo;
                 COND_SET_FLAG_C(A);
-                condevalVa(A, op1);
                 A &= 0xFF;
+                condevalHa(op1, lo);
+                COND_SET_FLAG_N(A);
                 COND_SET_FLAG_Z(A);
+                condevalVa(op1, lo);
                 break;
             case 0xBC:                  /* CPX ext */
                 op1 = (IX - CPU_BD_get_mword(get_ext_addr()));// & ADDRMASK;
@@ -1342,13 +1350,14 @@ t_stat sim_instr (void)
                 CLR_FLAG(VF);
                 break;
             case 0xC0:                  /* SUB B imm */
-                op1 = get_dir_addr();
-                B = B - op1;
-                COND_SET_FLAG_N(B);
+                lo = get_dir_addr();
+                op1 = B;
+                B = B - lo;
                 COND_SET_FLAG_C(B);
-                condevalVs(B, op1);
                 B &= 0xFF;
+                COND_SET_FLAG_N(B);
                 COND_SET_FLAG_Z(B);
+                condevalVs(op1, lo);
                 break;
             case 0xC1:                  /* CMP B imm */
                 op1 = get_dir_addr();
@@ -1360,13 +1369,13 @@ t_stat sim_instr (void)
                 COND_SET_FLAG_Z(lo);
                 break;
             case 0xC2:                  /* SBC B imm */
-                op1 = get_dir_addr();
-                B = B - op1 - get_flag(CF);
-                COND_SET_FLAG_N(B);
+                lo = get_dir_addr() + get_flag(CF);
+                B = B - lo;
                 COND_SET_FLAG_C(B);
-                condevalVs(B, op1);
                 B &= 0xFF;
+                COND_SET_FLAG_N(B);
                 COND_SET_FLAG_Z(B);
+                condevalVs(op1, lo);
                 break;
             case 0xC4:                  /* AND B imm */
                 B = (B & get_dir_addr()) & 0xFF;
@@ -1393,14 +1402,14 @@ t_stat sim_instr (void)
                 COND_SET_FLAG_Z(B);
                 break;
             case 0xC9:                  /* ADC B imm */
-                op1 = get_dir_addr();
-                B = B + op1 + get_flag(CF);
-                COND_SET_FLAG_H(B);
-                COND_SET_FLAG_N(B);
+                lo = get_dir_addr() + get_flag(CF);
+                B = B + lo;
                 COND_SET_FLAG_C(B);
-                condevalVa(B, op1);
                 B &= 0xFF;
+                condevalHa(op1, lo);
+                COND_SET_FLAG_N(B);
                 COND_SET_FLAG_Z(B);
+                condevalVa(op1, lo);
                 break;
             case 0xCA:                  /* ORA B imm */
                 B = (B | get_dir_addr()) & 0xFF;
@@ -1409,14 +1418,15 @@ t_stat sim_instr (void)
                 COND_SET_FLAG_Z(B);
                 break;
             case 0xCB:                  /* ADD B imm */
-                op1 = get_dir_addr();
-                B = B + op1;
-                COND_SET_FLAG_H(B);
-                COND_SET_FLAG_N(B);
+                lo = get_dir_addr();
+                op1 = B;
+                B = B + lo;
                 COND_SET_FLAG_C(B);
-                condevalVa(B, op1);
                 B &= 0xFF;
+                condevalHa(op1, lo);
+                COND_SET_FLAG_N(B);
                 COND_SET_FLAG_Z(B);
+                condevalVa(op1, lo);
                 break;
             case 0xCE:                  /* LDX imm */
                 IX = get_ext_addr();
@@ -1425,30 +1435,32 @@ t_stat sim_instr (void)
                 CLR_FLAG(VF);
                 break;
             case 0xD0:                  /* SUB B dir */
-                op1 = get_dir_val();
-                B = B - op1;
-                COND_SET_FLAG_N(B);
+                lo = get_dir_val();
+                op1 = B;
+                B = B - lo;
                 COND_SET_FLAG_C(B);
-                condevalVs(B, op1);
                 B &= 0xFF;
+                COND_SET_FLAG_N(B);
                 COND_SET_FLAG_Z(B);
+                condevalVs(op1, lo);
                 break;
             case 0xD1:                  /* CMP B dir */
-                op1 = get_dir_val();
-                lo = B - op1;
-                COND_SET_FLAG_N(lo);
-                COND_SET_FLAG_Z(lo);
-                COND_SET_FLAG_C(lo);
-                condevalVs(B, op1);
+                lo = get_dir_val();
+                op1 = B - lo;
+                COND_SET_FLAG_C(op1);
+                op1 &= 0xFF;
+                COND_SET_FLAG_N(op1);
+                COND_SET_FLAG_Z(op1);
+                condevalVs(B, lo);
                 break;
             case 0xD2:                  /* SBC B dir */
-                op1 = get_dir_val();
-                B = B - op1 - get_flag(CF);
-                COND_SET_FLAG_N(B);
+                lo = get_dir_val() + get_flag(CF);
+                B = B - lo;
                 COND_SET_FLAG_C(B);
-                condevalVs(B, op1);
                 B &= 0xFF;
+                COND_SET_FLAG_N(B);
                 COND_SET_FLAG_Z(B);
+                condevalVs(op1, lo);
                 break;
             case 0xD4:                  /* AND B dir */
                 B = (B & get_dir_val()) & 0xFF;
@@ -1481,14 +1493,15 @@ t_stat sim_instr (void)
                 COND_SET_FLAG_Z(B);
                 break;
             case 0xD9:                  /* ADC B dir */
-                op1 = get_dir_val();
-                B = B + op1 + get_flag(CF);
-                COND_SET_FLAG_H(B);
-                COND_SET_FLAG_N(B);
+                lo = get_dir_val() + get_flag(CF);
+                op1 = B;
+                B = B + lo;
                 COND_SET_FLAG_C(B);
-                condevalVa(B, op1);
                 B &= 0xFF;
+                condevalHa(op1, lo);
+                COND_SET_FLAG_N(B);
                 COND_SET_FLAG_Z(B);
+                condevalVa(op1, lo);
                 break;
             case 0xDA:                  /* ORA B dir */
                 B = (B | get_dir_val()) & 0xFF;
@@ -1497,14 +1510,15 @@ t_stat sim_instr (void)
                 COND_SET_FLAG_Z(B);
                 break;
             case 0xDB:                  /* ADD B dir */
-                op1 = get_dir_val();
-                B = B + op1;
-                COND_SET_FLAG_H(B);
-                COND_SET_FLAG_N(B);
+                lo = get_dir_val();
+                op1 = B;
+                B = B + lo;
                 COND_SET_FLAG_C(B);
-                condevalVa(B, op1);
                 B &= 0xFF;
+                condevalHa(op1, lo);
+                COND_SET_FLAG_N(B);
                 COND_SET_FLAG_Z(B);
+                condevalVa(op1, lo);
                 break;
             case 0xDE:                  /* LDX dir */
                 IX = CPU_BD_get_mword(get_dir_addr());
@@ -1519,13 +1533,14 @@ t_stat sim_instr (void)
                 CLR_FLAG(VF);
                 break;
             case 0xE0:                  /* SUB B ind */
-                op1 = get_indir_val();
-                B = B - op1;
-                COND_SET_FLAG_N(B);
+                lo = get_indir_val();
+                op1 = B;
+                B = B - lo;
                 COND_SET_FLAG_C(B);
-                condevalVs(B, op1);
                 B &= 0xFF;
+                COND_SET_FLAG_N(B);
                 COND_SET_FLAG_Z(B);
+                condevalVs(op1, lo);
                 break;
             case 0xE1:                  /* CMP B ind */
                 op1 = get_indir_val();
@@ -1537,13 +1552,14 @@ t_stat sim_instr (void)
                 COND_SET_FLAG_Z(lo);
                 break;
             case 0xE2:                  /* SBC B ind */
-                op1 = get_indir_val();
-                B = B - op1 - get_flag(CF);
-                COND_SET_FLAG_N(B);
+                lo = get_indir_val() + get_flag(CF);
+                op1 = B;
+                B = B - lo;
                 COND_SET_FLAG_C(B);
-                condevalVs(B, op1);
                 B &= 0xFF;
+                COND_SET_FLAG_N(B);
                 COND_SET_FLAG_Z(B);
+                condevalVs(op1, lo);
                 break;
             case 0xE4:                  /* AND B ind */
                 B = (B & get_indir_val()) & 0xFF;
@@ -1576,14 +1592,15 @@ t_stat sim_instr (void)
                 COND_SET_FLAG_Z(B);
                 break;
             case 0xE9:                  /* ADC B ind */
-                op1 = get_indir_val();
-                B = B + op1 + get_flag(CF);
-                COND_SET_FLAG_H(B);
-                COND_SET_FLAG_N(B);
+                lo = get_indir_val() + get_flag(CF);
+                op1 = B;
+                B = B + lo;
                 COND_SET_FLAG_C(B);
-                condevalVa(B, op1);
                 B &= 0xFF;
+                condevalHa(op1, lo);
+                COND_SET_FLAG_N(B);
                 COND_SET_FLAG_Z(B);
+                condevalVa(op1, lo);
                 break;
             case 0xEA:                  /* ORA B ind */
                 B = (B | get_indir_val()) & 0xFF;
@@ -1592,14 +1609,15 @@ t_stat sim_instr (void)
                 COND_SET_FLAG_Z(B);
                 break;
             case 0xEB:                  /* ADD B ind */
-                op1 = get_indir_val();
-                B = B + op1;
-                COND_SET_FLAG_H(B);
-                COND_SET_FLAG_N(B);
+                lo = get_indir_val();
+                op1 = B;
+                B = B + lo;
                 COND_SET_FLAG_C(B);
-                condevalVa(B, op1);
                 B &= 0xFF;
+                condevalHa(op1, lo);
+                COND_SET_FLAG_N(B);
                 COND_SET_FLAG_Z(B);
+                condevalVa(op1, lo);
                 break;
             case 0xEE:                  /* LDX ind */
                 IX = CPU_BD_get_mword(get_indir_addr());
@@ -1614,13 +1632,14 @@ t_stat sim_instr (void)
                 CLR_FLAG(VF);
                 break;
             case 0xF0:                  /* SUB B ext */
-                op1 = get_ext_val();
-                B = B - op1;
-                COND_SET_FLAG_N(B);
+                lo = get_ext_val();
+                op1 = B;
+                B = B - lo;
                 COND_SET_FLAG_C(B);
-                condevalVs(B, op1);
                 B &= 0xFF;
+                COND_SET_FLAG_N(B);
                 COND_SET_FLAG_Z(B);
+                condevalVs(op1, lo);
                 break;
             case 0xF1:                  /* CMP B ext */
                 op1 = get_ext_val();
@@ -1632,13 +1651,13 @@ t_stat sim_instr (void)
                 COND_SET_FLAG_Z(lo);
                 break;
             case 0xF2:                  /* SBC B ext */
-                op1 = get_ext_val();
-                B = B - op1 - get_flag(CF);
-                COND_SET_FLAG_N(B);
+                lo = get_ext_val() + get_flag(CF);
+                B = B - lo;
                 COND_SET_FLAG_C(B);
-                condevalVs(B, op1);
                 B &= 0xFF;
+                COND_SET_FLAG_N(B);
                 COND_SET_FLAG_Z(B);
+                condevalVs(op1, lo);
                 break;
             case 0xF4:                  /* AND B ext */
                 B = (B & get_ext_val()) & 0xFF;
@@ -1671,14 +1690,15 @@ t_stat sim_instr (void)
                 COND_SET_FLAG_Z(B);
                 break;
             case 0xF9:                  /* ADC B ext */
-                op1 = get_ext_val();
-                B = B + op1 + get_flag(CF);
-                COND_SET_FLAG_H(B);
-                COND_SET_FLAG_N(B);
+                lo = get_ext_val() + get_flag(CF);
+                op1 = B;
+                B = B + lo;
                 COND_SET_FLAG_C(B);
-                condevalVa(B, op1);
                 B &= 0xFF;
+                condevalHa(op1, lo);
+                COND_SET_FLAG_N(B);
                 COND_SET_FLAG_Z(B);
+                condevalVa(op1, lo);
                 break;
             case 0xFA:                  /* ORA B ext */
                 B = (B | get_ext_val()) & 0xFF;
@@ -1687,14 +1707,15 @@ t_stat sim_instr (void)
                 COND_SET_FLAG_Z(B);
                 break;
             case 0xFB:                  /* ADD B ext */
-                op1 = get_ext_val();
-                B = B + op1;
-                COND_SET_FLAG_H(B);
-                COND_SET_FLAG_N(B);
+                lo = get_ext_val();
+                op1 = B;
+                B = B + lo;
                 COND_SET_FLAG_C(B);
-                condevalVa(B, op1);
                 B &= 0xFF;
+                condevalHa(op1, lo);
+                COND_SET_FLAG_N(B);
                 COND_SET_FLAG_Z(B);
+                condevalVa(op1, lo);
                 break;
             case 0xFE:                  /* LDX ext */
                 IX = CPU_BD_get_mword(get_ext_addr());
@@ -1856,7 +1877,7 @@ int32 get_indir_val(void)
 int32 get_indir_addr(void)
 {
     int32 temp;
-    
+
     temp = (fetch_byte(1) + IX) & ADDRMASK;
     return temp;
 }
@@ -1892,18 +1913,32 @@ int32 get_flag(int32 flg)
 
 void condevalVa(int32 op1, int32 op2)
 {
-    if (get_flag(CF)) {
-        COND_SET_FLAG_V((op1 & op2 & 0x80) || (((op1 | op2) & 0x80) == 0));
-    }
+    if (((op1 & 0x80) == (op2 & 0x80)) &&
+        (((op1 + op2) & 0x80) != (op1 & 0x80))) 
+        SET_FLAG(VF);
+    else 
+        CLR_FLAG(VF);
 }
 
 /* test and set V for subtraction */
 
 void condevalVs(int32 op1, int32 op2)
 {
-    if (get_flag(CF)) {
-        COND_SET_FLAG_V(op1 & op2 & 0x80);
-    }
+    if (((op1 & 0x80) != (op2 & 0x80)) &&
+        (((op1 - op2) & 0x80) == (op2 & 0x80)))
+        SET_FLAG(VF);
+    else 
+        CLR_FLAG(VF);
+
+}
+
+/* test and set H for addition */
+void condevalHa(int32 op1, int32 op2)
+{
+    if (((op1 & 0x0f) + (op2 & 0x0f)) & 0x10) 
+        SET_FLAG(HF);
+    else 
+        CLR_FLAG(HF);
 }
 
 /* calls from the simulator */
@@ -1925,7 +1960,7 @@ t_stat m6800_reset (DEVICE *dptr)
 
 
 /* This is the dumper/loader. This command uses the -h to signify a
-    hex dump/load vice a binary one.  If no address is given to load, it 
+    hex dump/load vice a binary one.  If no address is given to load, it
     takes the address from the hex record or the current PC for binary.
 */
 
@@ -1939,7 +1974,7 @@ t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
         CPU_BD_put_mbyte(addr, i);
         addr++;
         cnt++;
-    }                                   // end while 
+    }                                   // end while
     printf ("%d Bytes loaded.\n", cnt);
     return (SCPE_OK);
 }
@@ -1995,7 +2030,7 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw)
         else if (inst1 == 0x70 || inst1 == 0xb0 || inst1 == 0xF0) // ext operand
             fprintf(of, " $%02X%02X", val[1], val[2]);
         return (-(oplen[inst] - 1));
-    } else 
+    } else
         return SCPE_ARG;
 }
 
