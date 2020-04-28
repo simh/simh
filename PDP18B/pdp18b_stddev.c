@@ -650,9 +650,11 @@ return ((TST_INT (PTR)? IOS_PTR: 0)
 t_stat ptr_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
+int32 saved_switches = sim_switches;
 
-sim_switches |= SWMASK ('R');
+sim_switches &= ~SWMASK ('A');
 reason = attach_unit (uptr, cptr);
+sim_switches = saved_switches;
 if (reason != SCPE_OK)
     return reason;
 ptr_err = 0;                                             /* attach clrs error */
@@ -969,10 +971,13 @@ return SCPE_OK;
 t_stat ptp_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
+int32 saved_switches = sim_switches;
 
+sim_switches |= SWMASK ('A');   /* Default to Append to existing file */
 reason = attach_unit (uptr, cptr);
 if (reason != SCPE_OK)
     return reason;
+sim_switches = saved_switches;
 ptp_err = 0;
 ptp_unit.flags = ptp_unit.flags & ~UNIT_PASCII;
 if (sim_switches & SWMASK ('A'))

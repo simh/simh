@@ -91,6 +91,7 @@ int32 lp62_66 (int32 dev, int32 pulse, int32 dat);
 int32 lp62_iors (void);
 t_stat lp62_svc (UNIT *uptr);
 t_stat lp62_reset (DEVICE *dptr);
+t_stat lp62_attach (UNIT *uptr, CONST char *cptr);
 
 /* Type 62 LPT data structures
 
@@ -130,7 +131,7 @@ DEVICE lp62_dev = {
     "LPT", &lp62_unit, lp62_reg, lp62_mod,
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &lp62_reset,
-    NULL, NULL, NULL,
+    NULL, &lp62_attach, NULL,
     &lp62_dib, DEV_DISABLE
     };
 
@@ -233,6 +234,14 @@ for (i = 0; i <= LP62_BSIZE; i++)                       /* clear buffer */
 lp62_spc = 0;                                           /* clear state */
 lp62_ovrpr = 0;                                         /* clear overprint */
 return SCPE_OK;
+}
+
+/* Attach routine */
+
+t_stat lp62_attach (UNIT *uptr, CONST char *cptr)
+{
+sim_switches |= SWMASK ('A');
+return attach_unit (uptr, cptr);
 }
 
 /* IORS routine */
@@ -482,6 +491,7 @@ t_stat lp647_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
 
+sim_switches |= SWMASK ('A');
 reason = attach_unit (uptr, cptr);
 lp647_err = (lp647_unit.flags & UNIT_ATT)? 0: 1;        /* clr/set error */
 return reason;
@@ -646,6 +656,7 @@ t_stat lp09_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
 
+sim_switches |= SWMASK ('A');
 reason = attach_unit (uptr, cptr);
 lp09_err = (lp09_unit.flags & UNIT_ATT)? 0: 1;          /* clr/set error */
 return reason;
@@ -694,6 +705,7 @@ int32 lp15_66 (int32 dev, int32 pulse, int32 dat);
 int32 lp15_iors (void);
 t_stat lp15_svc (UNIT *uptr);
 t_stat lp15_reset (DEVICE *dptr);
+t_stat lp15_attach (UNIT *uptr, CONST char *cptr);
 
 int32 lp15_updsta (int32 New);
 
@@ -736,7 +748,7 @@ DEVICE lp15_dev = {
     "LPT", &lp15_unit, lp15_reg, lp15_mod,
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &lp15_reset,
-    NULL, NULL, NULL,
+    NULL, &lp15_attach, NULL,
     &lp15_dib, DEV_DISABLE
     };
 
@@ -876,6 +888,14 @@ lp15_sta = 0;                                           /* clear status */
 lp15_ie = 1;                                            /* enable interrupts */
 lp15_updsta (0);                                        /* update status */
 return SCPE_OK;
+}
+
+/* Attach routine */
+
+t_stat lp15_attach (UNIT *uptr, CONST char *cptr)
+{
+sim_switches |= SWMASK ('A');
+return attach_unit (uptr, cptr);
 }
 
 /* IORS routine */
