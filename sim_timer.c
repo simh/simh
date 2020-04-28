@@ -312,7 +312,7 @@ if (!timedout) {
     AIO_UPDATE_QUEUE;
     }
 sim_timespec_diff (&delta_time, &done_time, &start_time);
-delta_ms = (uint32)((delta_time.tv_sec * 1000) + (delta_time.tv_nsec / 1000000));
+delta_ms = (uint32)((delta_time.tv_sec * 1000) + ((delta_time.tv_nsec + 500000) / 1000000));
 return delta_ms;
 }
 #else
