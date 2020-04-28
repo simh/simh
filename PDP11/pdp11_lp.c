@@ -189,6 +189,7 @@ t_stat lpt_attach (UNIT *uptr, CONST char *cptr)
 t_stat reason;
 
 lpt_csr = lpt_csr & ~CSR_ERR;
+sim_switches |= SWMASK('A');
 reason = attach_unit (uptr, cptr);
 if ((lpt_unit.flags & UNIT_ATT) == 0)
     lpt_csr = lpt_csr | CSR_ERR;
@@ -206,7 +207,9 @@ t_stat lpt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cpt
 fprintf (st, "Line Printer (LPT)\n\n");
 fprintf (st, "The line printer (LPT) writes data to a disk file.  The POS register specifies\n");
 fprintf (st, "the number of the next data item to be written.  Thus, by changing POS, the\n");
-fprintf (st, "user can backspace or advance the printer.\n");
+fprintf (st, "user can backspace or advance the printer.\n\n");
+fprintf (st, "The default position after ATTACH is to position at the end of an existing file.\n");
+fprintf (st, "A new file can be created if you attach with the -N switch.\n\n");
 fprint_set_help (st, dptr);
 fprint_show_help (st, dptr);
 fprint_reg_help (st, dptr);

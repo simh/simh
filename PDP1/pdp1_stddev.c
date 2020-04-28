@@ -106,6 +106,10 @@ t_stat tty_reset (DEVICE *dptr);
 t_stat ptr_boot (int32 unitno, DEVICE *dptr);
 t_stat ptr_attach (UNIT *uptr, CONST char *cptr);
 t_stat ptp_attach (UNIT *uptr, CONST char *cptr);
+t_stat ptr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+t_stat ptp_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *ptr_description (DEVICE *dptr);
+const char *ptp_description (DEVICE *dptr);
 
 /* Character translation tables */
 
@@ -161,7 +165,7 @@ UNIT ptr_unit = {
 
 REG ptr_reg[] = {
     { ORDATAD (BUF, ptr_unit.buf, 18, "last data item processed") },
-    { FLDATA (UC, ptr_uc, UC_V) },
+    { FLDATAD (UC, ptr_uc, UC_V, "upper case/lower case state (shared)") },
     { FLDATAD (DONE, iosta, IOS_V_PTR, "device done flag") },
     { FLDATAD (RPLS, cpls, CPLS_V_PTR, "return restart pulse flag") },
     { ORDATA (HOLD, ptr_hold, 9), REG_HRO },
@@ -188,7 +192,8 @@ DEVICE ptr_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &ptr_reset,
     &ptr_boot, &ptr_attach, NULL,
-    NULL, 0
+    NULL, 0, 0, NULL,
+    NULL, NULL, &ptr_help, NULL, NULL, &ptr_description
     };
 
 /* PTP data structures
@@ -226,7 +231,8 @@ DEVICE ptp_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &ptp_reset,
     NULL, &ptp_attach, NULL,
-    NULL, 0
+    NULL, 0, 0, NULL,
+    NULL, NULL, &ptp_help, NULL, NULL, &ptp_description
     };
 
 /* TTI data structures
@@ -458,7 +464,7 @@ ptr_leader = PTR_LEADER;                                /* set up leader */
 if (sim_switches & SWMASK ('A'))
     uptr->flags = uptr->flags | UNIT_ASCII;
 else uptr->flags = uptr->flags & ~UNIT_ASCII;
-sim_switches |= SWMASK ('R');
+sim_switches &= ~SWMASK ('A');      /* Turn off A switch to avoid Append mode ambiguity */
 return attach_unit (uptr, cptr);
 }
 
@@ -503,6 +509,29 @@ for (;;) {
     }
 return SCPE_OK;                                         /* done */
 }
+
+t_stat ptr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+fprintf (st, "Paper Tape Reader (PTR)\n\n");
+fprintf (st, "The paper tape reader (PTR) reads data from a disk file.  The POS register\n");
+fprintf (st, "specifies the number of the next data item to be read.  Thus, by changing\n");
+fprintf (st, "The paper tape reader supports the BOOT command.  BOOT PTR copies the RIM\n");
+fprintf (st, "loader into memory and starts it running.  BOOT PTR loads into the field\n");
+fprintf (st, "selected by TA<0:3> (the high order four bits of the address switches).\n\n");
+fprintf (st, "The paper tape reader recognizes one switch at ATTACH time:\n\n");
+fprintf (st, "    ATT -A PTP <file>       convert input characters from ASCII\n\n");
+fprintf (st, "By default, the paper tape reader does no conversions on input characters.\n\n");
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprint_reg_help (st, dptr);
+return SCPE_OK;
+}
+
+const char *ptr_description (DEVICE *dptr)
+{
+return "Paper Tape Reader";
+}
+
 
 /* Paper tape punch: IOT routine */
 
@@ -582,7 +611,29 @@ t_stat ptp_attach (UNIT *uptr, CONST char *cptr)
 if (sim_switches & SWMASK ('A'))
     uptr->flags = uptr->flags | UNIT_ASCII;
 else uptr->flags = uptr->flags & ~UNIT_ASCII;
+sim_switches |= SWMASK ('A');       /* Default to Append to existing file */
 return attach_unit (uptr, cptr);
+}
+
+t_stat ptp_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+fprintf (st, "Paper Tape Punch (PTP)\n\n");
+fprintf (st, "The paper tape punch (PTP) writes data to a disk file.  The POS register\n");
+fprintf (st, "specifies the number of the next data item to be written.  Thus, by changing\n");
+fprintf (st, "POS, the user can backspace or advance the punch.\n\n");
+fprintf (st, "The paper tape punch recognizes two switches at ATTACH time:\n\n");
+fprintf (st, "    ATT -A PTP <file>       output characters as ASCII text\n");
+fprintf (st, "    ATT -N PTP <file>       create a new (empty) output file\n\n");
+fprintf (st, "By default, the paper tape punch punches files with no conversions.\n\n");
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprint_reg_help (st, dptr);
+return SCPE_OK;
+}
+
+const char *ptp_description (DEVICE *dptr)
+{
+return "Paper Tape Punch";
 }
 
 /* Typewriter IOT routines */

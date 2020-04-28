@@ -285,6 +285,7 @@ return SCPE_OK;
 t_stat lpt_attach (UNIT *uptr, CONST char *cptr)
 {
 lpt_vfup = 0;                                           /* top of form */
+sim_switches |= SWMASK ('A');                           /* position to EOF */
 return attach_unit (uptr, cptr);
 }
 

@@ -59,6 +59,10 @@ extern int32 stop_inst;
 
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
+t_stat lpt_attach (UNIT *uptr, CONST char *ptr);
+t_stat lpt_detach (UNIT *uptr);
+t_stat lpt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+const char *lpt_description (DEVICE *dptr);
 
 /* LPT data structures
 
@@ -82,7 +86,7 @@ REG lpt_reg[] = {
     { DRDATAD (POS, lpt_unit.pos, T_ADDR_W, "position in the output file"), PV_LEFT },
     { DRDATAD (TIME, lpt_unit.wait, 24, "time from I/O initiation to interrupt"), PV_LEFT },
     { FLDATAD (STOP_IOE, lpt_stopioe, 0, "stop on I/O error") },
-{ BRDATAD (LBUF, lpt_buf, 8, 8, LPT_BSIZE, "line buffer") },
+    { BRDATAD (LBUF, lpt_buf, 8, 8, LPT_BSIZE, "line buffer") },
     { DRDATA (SBSLVL, lpt_sbs, 4), REG_HRO },
     { NULL }
     };
@@ -97,8 +101,10 @@ DEVICE lpt_dev = {
     "LPT", &lpt_unit, lpt_reg, lpt_mod,
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &lpt_reset,
-    NULL, NULL, NULL,
-    NULL, DEV_DISABLE
+    NULL, &lpt_attach, &lpt_detach,
+    NULL, DEV_DISABLE, 0,
+    NULL, NULL, NULL, &lpt_help, NULL, NULL, 
+    &lpt_description
     };
 
 /* Line printer IOT routine */
@@ -211,4 +217,42 @@ cpls = cpls & ~CPLS_LPT;
 iosta = iosta & ~(IOS_PNT | IOS_SPC);                   /* clear flags */
 sim_cancel (&lpt_unit);                                 /* deactivate unit */
 return SCPE_OK;
+}
+
+t_stat lpt_attach (UNIT *uptr, CONST char *cptr)
+{
+t_stat reason;
+
+sim_switches |= SWMASK('A');            /* position to EOF */
+reason = attach_unit (uptr, cptr);
+return reason;
+}
+
+t_stat lpt_detach (UNIT *uptr)
+{
+return detach_unit (uptr);
+}
+
+t_stat lpt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+fprintf (st, "Line Printer (LPT)\n\n");
+fprintf (st, "The line printer (LPT) writes data to a disk file.  The POS register specifies\n");
+fprintf (st, "the number of the next data item to be written.  Thus, by changing POS, the\n");
+fprintf (st, "user can backspace or advance the printer.\n\n");
+fprintf (st, "The default position after ATTACH is to position at the end of an existing file.\n");
+fprintf (st, "A new file can be created if you attach with the -N switch.\n\n");
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprint_reg_help (st, dptr);
+fprintf (st, "\nError handling is as follows:\n\n");
+fprintf (st, "    error         STOP_IOE   processed as\n");
+fprintf (st, "    not attached  1          out of paper\n");
+fprintf (st, "                  0          disk not ready\n\n");
+fprintf (st, "    OS I/O error  x          report error and stop\n");
+return SCPE_OK;
+}
+
+const char *lpt_description (DEVICE *dptr)
+{
+return "Type 62 Line Printer";
 }

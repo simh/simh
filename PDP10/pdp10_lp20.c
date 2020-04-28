@@ -949,7 +949,8 @@ return SCPE_OK;
 static t_stat lp20_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
-    
+
+sim_switches |= SWMASK ('A');                           /* position to EOF */
 reason = attach_unit (uptr, cptr);                      /* attach file */
 if (reason == SCPE_OK) {
     sim_fseek (uptr->fileref, 0, SEEK_END);
