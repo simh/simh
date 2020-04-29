@@ -50,6 +50,7 @@
 
 #define SETFLAG(f,c)    AF = (c) ? AF | FLAG_ ## f : AF & ~FLAG_ ## f
 #define TSTFLAG(f)      ((AF & FLAG_ ## f) != 0)
+#define TSTFLAG2(a, f)	((a & FLAG_ ## f) != 0)
 
 #define LOW_DIGIT(x)     ((x) & 0xf)
 #define HIGH_DIGIT(x)    (((x) >> 4) & 0xf)
@@ -158,6 +159,8 @@ static t_stat cpu_set_ramtype       (UNIT *uptr, int32 value, CONST char *cptr, 
 static t_stat cpu_set_chiptype      (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat cpu_set_size          (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat cpu_set_memory        (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat cpu_set_hist          (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat cpu_show_hist         (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat cpu_clear_command     (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static void cpu_clear(void);
 static t_stat cpu_show              (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
@@ -245,6 +248,30 @@ static  uint32 executedTStates  = 0;                /* executed t-states        
 static  uint16 pcq[PCQ_SIZE]    = { 0 };            /* PC queue                                     */
 static  int32 pcq_p             = 0;                /* PC queue ptr                                 */
 static  REG *pcq_r              = NULL;             /* PC queue reg ptr                             */
+
+#define HIST_MIN        16
+#define HIST_MAX        8192
+
+typedef struct {
+    uint8 valid;
+    uint16 af;
+    uint16 bc;
+    uint16 de;
+    uint16 hl;
+    t_addr pc;
+    t_addr sp;
+    uint16 af1;
+    uint16 bc1;
+    uint16 de1;
+    uint16 hl1;
+    uint16 ix;
+    uint16 iy;
+    t_value op[3];
+} insthist_t;
+
+static	uint32 hst_p = 0;                           /* history pointer				    */
+static	uint32 hst_lnt = 0;                         /* history length				    */
+static	insthist_t *hst = NULL;                     /* instruction history			    */
 
 uint32 m68k_registers[M68K_REG_CPU_TYPE + 1];       /* M68K CPU registers                           */
 
@@ -523,6 +550,8 @@ static MTAB cpu_mod[] = {
         NULL, NULL, "Sets the RAM size to 60KB for 8080 / Z80 / 8086"       },
     { MTAB_VDV,             64,                 NULL,           "64KB",         &cpu_set_size,
         NULL, NULL, "Sets the RAM size to 64KB for 8080 / Z80 / 8086"       },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_VALO|MTAB_SHP, 0, "HISTORY", "HISTORY",   &cpu_set_hist, &cpu_show_hist,
+      NULL, "CPU instruction history buffer"},
     { 0 }
 };
 
@@ -2047,6 +2076,7 @@ static t_stat sim_instr_mmu (void) {
     extern int32 keyboardInterrupt;
     extern uint32 keyboardInterruptHandler;
     int32 reason = SCPE_OK;
+    int i;
     register uint32 specialProcessing;
     register uint32 AF;
     register uint32 BC;
@@ -6128,8 +6158,34 @@ static t_stat sim_instr_mmu (void) {
             PC = 0x38;
         }
 
-        sim_interval--;
+	/*
+	** Save in instruction history ring buffer?
+	*/
+	if (hst_lnt && ((chiptype == CHIP_TYPE_8080) || (chiptype == CHIP_TYPE_Z80))) {
+		hst[hst_p].valid = 1;
+		hst[hst_p].pc = PCX;
+		hst[hst_p].sp = SP;
+		hst[hst_p].af = AF;
+		hst[hst_p].bc = BC;
+		hst[hst_p].de = DE;
+		hst[hst_p].hl = HL;
+		hst[hst_p].af1 = AF1_S;
+		hst[hst_p].bc1 = BC1_S;
+		hst[hst_p].de1 = DE1_S;
+		hst[hst_p].hl1 = HL1_S;
+		hst[hst_p].ix = IX;
+		hst[hst_p].iy = IY;
 
+		for (i=0; i < 3; i++) {
+		    hst[hst_p].op[i] = GetBYTE(PCX+i);
+		}
+
+		if (++hst_p == hst_lnt) {
+			hst_p = 0;
+		}
+	}
+
+        sim_interval--;
     }
 
     /* It we stopped processing instructions because of a switch to the other
@@ -6792,6 +6848,144 @@ static t_stat cpu_set_memory(UNIT *uptr, int32 value, CONST char *cptr, void *de
             ((cptr[i + 1] == 'B') && (cptr[i + 2] == 0))))
         return set_size(size);
     return SCPE_ARG;
+}
+
+static t_stat cpu_set_hist(UNIT *uptr, int32 val, CONST char *cptr, void *desc) {
+   uint32 i, lnt;
+   t_stat r;
+
+    if ((chiptype != CHIP_TYPE_8080) && (chiptype != CHIP_TYPE_Z80)) {
+        sim_printf("History not supported for chiptype: %s\n",
+               (chiptype < NUM_CHIP_TYPE) ? cpu_mod[chiptype].mstring : "????");
+        return SCPE_NOFNC;
+    }
+
+    /*
+    ** If cptr is NULL, reset ring buffer ("SET HISTORY")
+    */
+    if (cptr == NULL) {
+        if (hst==NULL) {
+            sim_printf("History buffer not enabled.\n");
+            return SCPE_NOFNC;
+        }
+
+        for (i = 0; i < hst_lnt; i++) {
+            hst[i].valid = 0;
+        }
+
+        hst_p = 0;
+
+        return SCPE_OK;
+    }
+
+    /*
+    ** Enable/Resize ring buffer ("SET HISTORY=<n>")
+    */
+    lnt = (uint32) get_uint (cptr, 10, HIST_MAX, &r);
+
+    if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) {
+        sim_printf("History buffer minimum/maximum size: %d/%d\n", HIST_MIN, HIST_MAX);
+        return SCPE_ARG;
+    }
+
+    /*
+    ** Delete old history buffer
+    */
+    if (hst!=NULL) {
+        free (hst);
+        hst_lnt = 0;
+        hst = NULL;
+    }
+
+    hst_p = 0;
+
+    /*
+    ** If a length was specified, allocate new buffer ("SET HISTORY=<n>" where n>0)
+    */
+    if (lnt) {
+        hst = (insthist_t *) calloc (lnt, sizeof (insthist_t));
+        if (hst == NULL) {
+            return SCPE_MEM;
+        }
+        hst_lnt = lnt;
+    }
+
+    return SCPE_OK;
+}
+
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    int32 k, di, lnt;
+    CONST char *cptr = (CONST char *) desc;
+    t_stat r;
+    insthist_t *h;
+
+    if ((chiptype != CHIP_TYPE_8080) && (chiptype != CHIP_TYPE_Z80)) {
+        sim_printf("History not supported for chiptype: %s\n",
+               (chiptype < NUM_CHIP_TYPE) ? cpu_mod[chiptype].mstring : "????");
+        return SCPE_NOFNC;
+    }
+
+    if (hst_lnt == 0) {
+        return SCPE_NOFNC;                    /* enabled? */
+    }
+
+    if (cptr) {
+        lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
+
+        if ((r != SCPE_OK) || (lnt == 0)) {
+            return SCPE_ARG;
+        }
+    }
+    else {
+        lnt = hst_lnt;
+    }
+
+    di = hst_p - lnt;
+
+    if (di < 0) di = di + hst_lnt;
+
+    for (k = 0; k < lnt; k++) {
+        h = &hst[(di++) % hst_lnt];
+
+        if (h->valid) {                              /* valid entry? */
+            if (chiptype == CHIP_TYPE_8080) {
+                /*
+                ** Use DDT output:
+                ** CfZfMfEfIf A=bb B=dddd D=dddd H=dddd S=dddd P=dddd inst
+                */
+                fprintf(st, "CPU: C%dZ%dM%dE%dI%d A=%02X B=%04X D=%04X H=%04X S=%04X P=%04X ",
+                    TSTFLAG2(h->af, C),
+                    TSTFLAG2(h->af, Z),
+                    TSTFLAG2(h->af, S),
+                    TSTFLAG2(h->af, P),
+                    TSTFLAG2(h->af, H),
+                    HIGH_REGISTER(h->af), h->bc, h->de, h->hl, h->sp, h->pc);
+                fprint_sym (st, h->pc, h->op, &cpu_unit, SWMASK ('M'));
+                fprintf(st, "\n");
+            }
+            else {    /* Z80 */
+                /*
+                ** Use DDT/Z output:
+                */
+                fprintf(st, "CPU: C%dZ%dS%dP%dH%dN%d A =%02X BC =%04X DE =%04X HL =%04X S =%04X P =%04X ",
+                    TSTFLAG2(h->af, C),
+                    TSTFLAG2(h->af, Z),
+                    TSTFLAG2(h->af, S),
+                    TSTFLAG2(h->af, P),
+                    TSTFLAG2(h->af, H),
+                    TSTFLAG2(h->af, N),
+                    HIGH_REGISTER(h->af), h->bc, h->de, h->hl, h->sp, h->pc);
+                fprint_sym (st, h->pc, h->op, &cpu_unit, SWMASK ('M'));
+                fprintf(st, "\n");
+                fprintf(st, "                  A'=%02X BC'=%04X DE'=%04X HL'=%04X IX=%04X IY=%04X ",
+                    HIGH_REGISTER(h->af1), h->bc1, h->de1, h->hl1, h->ix, h->iy);
+                fprintf(st, "\n");
+            }
+        }
+    }
+
+    return SCPE_OK;
 }
 
 t_value altairz80_pc_value (void) {
