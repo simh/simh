@@ -250,7 +250,7 @@ static  int32 pcq_p             = 0;                /* PC queue ptr             
 static  REG *pcq_r              = NULL;             /* PC queue reg ptr                             */
 
 #define HIST_MIN        16
-#define HIST_MAX        1024
+#define HIST_MAX        8192
 
 typedef struct {
     uint8 valid;
@@ -260,6 +260,12 @@ typedef struct {
     uint16 hl;
     t_addr pc;
     t_addr sp;
+    uint16 af1;
+    uint16 bc1;
+    uint16 de1;
+    uint16 hl1;
+    uint16 ix;
+    uint16 iy;
     t_value op[3];
 } insthist_t;
 
@@ -2070,6 +2076,7 @@ static t_stat sim_instr_mmu (void) {
     extern int32 keyboardInterrupt;
     extern uint32 keyboardInterruptHandler;
     int32 reason = SCPE_OK;
+    int i;
     register uint32 specialProcessing;
     register uint32 AF;
     register uint32 BC;
@@ -6162,8 +6169,14 @@ static t_stat sim_instr_mmu (void) {
 		hst[hst_p].bc = BC;
 		hst[hst_p].de = DE;
 		hst[hst_p].hl = HL;
+		hst[hst_p].af1 = AF1_S;
+		hst[hst_p].bc1 = BC1_S;
+		hst[hst_p].de1 = DE1_S;
+		hst[hst_p].hl1 = HL1_S;
+		hst[hst_p].ix = IX;
+		hst[hst_p].iy = IY;
 
-		for (int i=0; i < 3; i++) {
+		for (i=0; i < 3; i++) {
 		    hst[hst_p].op[i] = GetBYTE(PCX+i);
 		}
 
@@ -6871,7 +6884,7 @@ static t_stat cpu_set_hist(UNIT *uptr, int32 val, CONST char *cptr, void *desc) 
     lnt = (uint32) get_uint (cptr, 10, HIST_MAX, &r);
 
     if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) {
-        sim_printf("History buffer maximum size: %d\n", HIST_MAX);
+        sim_printf("History buffer minimum/maximum size: %d/%d\n", HIST_MIN, HIST_MAX);
         return SCPE_ARG;
     }
 
@@ -6936,19 +6949,39 @@ t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
         h = &hst[(di++) % hst_lnt];
 
         if (h->valid) {                              /* valid entry? */
-            /*
-            ** Use DDT output:
-            ** CfZfMfEfIf A=bb B=dddd D=dddd H=dddd S=dddd P=dddd inst
-            */
-            fprintf(st, "CPU: C%dZ%dM%dE%dI%d A=%02X B=%04X D=%04X H=%04X S=%04X P=%04X ",
-                TSTFLAG2(h->af, C),
-                TSTFLAG2(h->af, Z),
-                TSTFLAG2(h->af, S),
-                TSTFLAG2(h->af, P),
-                TSTFLAG2(h->af, H),
-                HIGH_REGISTER(h->af), h->bc, h->de, h->hl, h->sp, h->pc);
-            fprint_sym (st, h->pc, h->op, &cpu_unit, SWMASK ('M'));
-            fprintf(st, "\n");
+            if (chiptype == CHIP_TYPE_8080) {
+                /*
+                ** Use DDT output:
+                ** CfZfMfEfIf A=bb B=dddd D=dddd H=dddd S=dddd P=dddd inst
+                */
+                fprintf(st, "CPU: C%dZ%dM%dE%dI%d A=%02X B=%04X D=%04X H=%04X S=%04X P=%04X ",
+                    TSTFLAG2(h->af, C),
+                    TSTFLAG2(h->af, Z),
+                    TSTFLAG2(h->af, S),
+                    TSTFLAG2(h->af, P),
+                    TSTFLAG2(h->af, H),
+                    HIGH_REGISTER(h->af), h->bc, h->de, h->hl, h->sp, h->pc);
+                fprint_sym (st, h->pc, h->op, &cpu_unit, SWMASK ('M'));
+                fprintf(st, "\n");
+            }
+            else {    /* Z80 */
+                /*
+                ** Use DDT/Z output:
+                */
+                fprintf(st, "CPU: C%dZ%dS%dP%dH%dN%d A =%02X BC =%04X DE =%04X HL =%04X S =%04X P =%04X ",
+                    TSTFLAG2(h->af, C),
+                    TSTFLAG2(h->af, Z),
+                    TSTFLAG2(h->af, S),
+                    TSTFLAG2(h->af, P),
+                    TSTFLAG2(h->af, H),
+                    TSTFLAG2(h->af, N),
+                    HIGH_REGISTER(h->af), h->bc, h->de, h->hl, h->sp, h->pc);
+                fprint_sym (st, h->pc, h->op, &cpu_unit, SWMASK ('M'));
+                fprintf(st, "\n");
+                fprintf(st, "                  A'=%02X BC'=%04X DE'=%04X HL'=%04X IX=%04X IY=%04X ",
+                    HIGH_REGISTER(h->af1), h->bc1, h->de1, h->hl1, h->ix, h->iy);
+                fprintf(st, "\n");
+            }
         }
     }
 
