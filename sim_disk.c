@@ -2708,34 +2708,36 @@ if (container_size && (container_size != (t_offset)-1)) {
     if (dontchangecapac) {
         t_addr saved_capac = uptr->capac;
 
-        if (filesystem_size == (t_offset)-1)    /* No file system found? */
-            filesystem_size = container_size;   /* Assume full container */
         if (drivetypes != NULL) {
-            /* Walk through all potential drive types until we find one the right size */
-            while (*drivetypes != NULL) {
-                char cmd[CBUFSIZE];
-                t_stat st;
+            if (filesystem_size != (t_offset)-1) {  /* File System found? */
+                /* Walk through all potential drive types until we find one the right size */
+                while (*drivetypes != NULL) {
+                    char cmd[CBUFSIZE];
+                    t_stat st;
 
-                uptr->flags &= ~UNIT_ATT;   /* temporarily mark as un-attached */
-                sprintf (cmd, "%s %s", sim_uname (uptr), *drivetypes);
-                st = set_cmd (0, cmd);
-                uptr->flags |= UNIT_ATT;    /* restore attached indicator */
-                if (st == SCPE_OK)
-                    current_unit_size = ((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1);
-                if (current_unit_size >= filesystem_size)
-                    break;
-                ++drivetypes;
-                }
-            if (filesystem_size > current_unit_size) {
-                if (!sim_quiet) {
-                    uptr->capac = (t_addr)(filesystem_size/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
-                    sim_printf ("%s: The file system on the disk %s is larger than simulated device (%s > ", sim_uname (uptr), cptr, sprint_capac (dptr, uptr));
-                    uptr->capac = saved_capac;
-                    sim_printf ("%s)\n", sprint_capac (dptr, uptr));
+                    uptr->flags &= ~UNIT_ATT;   /* temporarily mark as un-attached */
+                    sprintf (cmd, "%s %s", sim_uname (uptr), *drivetypes);
+                    st = set_cmd (0, cmd);
+                    uptr->flags |= UNIT_ATT;    /* restore attached indicator */
+                    if (st == SCPE_OK)
+                        current_unit_size = ((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1);
+                    if (current_unit_size >= filesystem_size)
+                        break;
+                    ++drivetypes;
                     }
-                sim_disk_detach (uptr);
-                return SCPE_FSSIZE;
+                if (filesystem_size > current_unit_size) {
+                    if (!sim_quiet) {
+                        uptr->capac = (t_addr)(filesystem_size/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
+                        sim_printf ("%s: The file system on the disk %s is larger than simulated device (%s > ", sim_uname (uptr), cptr, sprint_capac (dptr, uptr));
+                        uptr->capac = saved_capac;
+                        sim_printf ("%s)\n", sprint_capac (dptr, uptr));
+                        }
+                    sim_disk_detach (uptr);
+                    return SCPE_FSSIZE;
+                    }
                 }
+            else
+                sim_messagef (SCPE_OK, "%s: No File System found on '%s', skipping autosizing\.n", sim_uname (uptr), cptr);
             }
         if ((container_size != current_unit_size) && 
             ((DKUF_F_VHD == DK_GET_FMT (uptr)) || (0 != (uptr->flags & UNIT_RO)) ||
@@ -5871,6 +5873,103 @@ struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 return WriteVirtualDiskSectors(hVHD, buf, sects, sectswritten, ctx->sector_size, lba);
 }
 #endif
+
+/*
+ * Zap Type command to remove incorrectly autosize information that
+ * may have been recorded at the end of a disk container file
+ */
+
+t_stat sim_disk_info_cmd (int32 flag, CONST char *cptr)
+{
+struct simh_disk_footer footer;
+struct simh_disk_footer *f = &footer;
+FILE *container;
+t_offset container_size;
+
+if (flag) {        /* zap type */
+    container = sim_vhd_disk_open (cptr, "r");
+    if (container != NULL) {
+        sim_vhd_disk_close (container);
+        return sim_messagef (SCPE_OPENERR, "Can't change the disk type of a VHD container file\n");
+        }
+    container = sim_fopen (cptr, "r+");
+    if (container == NULL)
+        return sim_messagef (SCPE_OPENERR, "Can't open container file '%s' - %s\n", cptr, strerror (errno));
+    container_size = sim_fsize_ex (container);
+    if ((container_size != (t_offset)-1) && (container_size > sizeof (*f)) &&
+        (sim_fseeko (container, container_size - sizeof (*f), SEEK_SET) == 0) &&
+        (sizeof (*f) == sim_fread (f, 1, sizeof (*f), container))) {
+        if (f->Checksum == NtoHl (eth_crc32 (0, f, sizeof (*f) - sizeof (f->Checksum)))) {
+            (void)sim_set_fsize (container, (t_addr)(container_size - sizeof (*f)));
+            fclose (container);
+            return sim_messagef (SCPE_OK, "Disk Type Removed from container '%s'\n", cptr);
+            }
+        }
+    fclose (container);
+    return sim_messagef (SCPE_ARG, "No footer found on disk container '%s'.\n", cptr);
+    }
+if (flag == 0) {
+    UNIT unit, *uptr = &unit;
+    struct disk_context disk_ctx;
+    struct disk_context *ctx = &disk_ctx;
+    t_offset (*size_function)(FILE *file);
+    int (*close_function)(FILE *f);
+    FILE *container;
+    t_offset container_size;
+
+    memset (&unit, 0, sizeof (unit));
+    memset (&disk_ctx, 0, sizeof (disk_ctx));
+    sim_switches |= SWMASK ('E') | SWMASK ('R');   /* Must exist, Read Only */
+    uptr->flags |= UNIT_ATTABLE;
+    uptr->disk_ctx = &disk_ctx;
+    sim_disk_set_fmt (uptr, 0, "VHD", NULL);
+    container = sim_vhd_disk_open (cptr, "r");
+    if (container == NULL) {
+        sim_disk_set_fmt (uptr, 0, "SIMH", NULL);
+        container = sim_fopen (cptr, "r+");
+        close_function = fclose;
+        size_function = sim_fsize_ex;
+        }
+    else {
+        close_function = sim_vhd_disk_close;
+        size_function = sim_vhd_disk_size;
+        }
+    if (container) {
+        container_size = size_function (container);
+        uptr->filename = strdup (cptr);
+        uptr->fileref = container;
+        uptr->flags |= UNIT_ATT;
+        get_disk_footer (uptr);
+        f = ctx->footer;
+        if (f) {
+            sim_printf ("Container:              %s\n"
+                        "   Simulator:           %s\n"
+                        "   DriveType:           %s\n"
+                        "   SectorSize:          %u\n"
+                        "   SectorCount:         %u\n"
+                        "   TransferElementSize: %u\n"
+                        "   AccessFormat:        %s\n"
+                        "   CreationTime:        %s",
+                        uptr->filename,
+                        f->CreatingSimulator, f->DriveType, NtoHl(f->SectorSize), NtoHl (f->SectorCount), 
+                        NtoHl (f->TransferElementSize), fmts[f->AccessFormat].name, f->CreationTime);
+            sim_printf ("Container Size: %s bytes\n", sim_fmt_numeric ((double)ctx->container_size));
+            }
+        else {
+            sim_printf ("Container Info for '%s' unavailable\n", uptr->filename);
+            sim_printf ("Container Size: %s bytes\n", sim_fmt_numeric ((double)container_size));
+            }
+        free (f);
+        free (uptr->filename);
+        close_function (container);
+        return SCPE_OK;
+        }
+    else
+        return sim_messagef (SCPE_OPENERR, "Can't open container file '%s' - %s\n", cptr, strerror (errno));
+    }
+return SCPE_NOFNC;
+}
+
 
 /* disk testing */
 
