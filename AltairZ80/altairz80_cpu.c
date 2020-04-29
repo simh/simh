@@ -50,6 +50,7 @@
 
 #define SETFLAG(f,c)    AF = (c) ? AF | FLAG_ ## f : AF & ~FLAG_ ## f
 #define TSTFLAG(f)      ((AF & FLAG_ ## f) != 0)
+#define	TSTFLAG2(a, f)	((a & FLAG_ ## f) != 0)
 
 #define LOW_DIGIT(x)     ((x) & 0xf)
 #define HIGH_DIGIT(x)    (((x) >> 4) & 0xf)
@@ -144,6 +145,7 @@ extern t_stat sim_instr_8086(void);
 extern void cpu8086reset(void);
 
 /* function prototypes */
+static t_stat cpu_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 static t_stat cpu_set_switcher  (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat cpu_reset_switcher(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat cpu_show_switcher (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
@@ -158,6 +160,8 @@ static t_stat cpu_set_ramtype       (UNIT *uptr, int32 value, CONST char *cptr, 
 static t_stat cpu_set_chiptype      (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat cpu_set_size          (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static t_stat cpu_set_memory        (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
+static t_stat cpu_set_hist	    (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat cpu_show_hist	    (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat cpu_clear_command     (UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static void cpu_clear(void);
 static t_stat cpu_show              (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
@@ -245,6 +249,24 @@ static  uint32 executedTStates  = 0;                /* executed t-states        
 static  uint16 pcq[PCQ_SIZE]    = { 0 };            /* PC queue                                     */
 static  int32 pcq_p             = 0;                /* PC queue ptr                                 */
 static  REG *pcq_r              = NULL;             /* PC queue reg ptr                             */
+
+#define HIST_MIN        16
+#define HIST_MAX        1024
+
+typedef struct {
+    uint8 valid;
+    uint16 af;
+    uint16 bc;
+    uint16 de;
+    uint16 hl;
+    t_addr pc;
+    t_addr sp;
+    t_value op[3];
+} insthist_t;
+
+static	uint32 hst_p = 0;                           /* history pointer				    */
+static	uint32 hst_lnt = 0;                         /* history length				    */
+static	insthist_t *hst = NULL;                     /* instruction history			    */
 
 uint32 m68k_registers[M68K_REG_CPU_TYPE + 1];       /* M68K CPU registers                           */
 
@@ -523,6 +545,8 @@ static MTAB cpu_mod[] = {
         NULL, NULL, "Sets the RAM size to 60KB for 8080 / Z80 / 8086"       },
     { MTAB_VDV,             64,                 NULL,           "64KB",         &cpu_set_size,
         NULL, NULL, "Sets the RAM size to 64KB for 8080 / Z80 / 8086"       },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
+      &cpu_set_hist, &cpu_show_hist },
     { 0 }
 };
 
@@ -539,7 +563,7 @@ DEVICE cpu_dev = {
     &cpu_ex, &cpu_dep, &cpu_reset,
     NULL, NULL, NULL,
     NULL, DEV_DEBUG, 0,
-    cpu_dt, NULL, NULL, NULL, NULL, NULL, &cpu_description
+    cpu_dt, NULL, NULL, &cpu_help, NULL, NULL, &cpu_description
 };
 
 /*  This is the I/O configuration table. There are 255 possible
@@ -1448,6 +1472,63 @@ static const uint8 cpTable[256] = {
     128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,128,
 };
 
+
+static t_stat cpu_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+    fprintf(st, "AltairZ80 CPU Help\n\n");
+
+    fprintf(st, "There are four CPU options available:\n\n");
+
+    fprintf(st, "   sim> SET CPU 8080             simulates the 8080 CPU (default)\n");
+    fprintf(st, "   sim> SET CPU Z80              simulates the Z80 CPU\n");
+    fprintf(st, "   sim> SET CPU 8086             simulates the 8086 CPU which also\n");
+    fprintf(st, "                                 enables 1024 KB of memory by default\n");
+    fprintf(st, "   sim> SET CPU M68K             simulates the Motorola M68000 CPU which\n");
+    fprintf(st, "                                 also enables 1024 KB of memory by default\n\n");
+
+    fprintf(st, "Memory configuration:\n\n");
+
+    fprintf(st, "   sim> SET CPU 4K\n");
+    fprintf(st, "   sim> SET CPU 8K\n");
+    fprintf(st, "   sim> SET CPU 12K\n");
+    fprintf(st, "   ...(in 4K steps)\n");
+    fprintf(st, "   sim> SET CPU 60K\n");
+    fprintf(st, "   sim> SET CPU 64K\n\n");
+
+    fprintf(st, "   sim> SET CPU MEMORY=<nnn>K    sets the memory to <nnn> kilo bytes\n\n");
+
+    fprintf(st, "   sim> SET CPU BANKED           enables the banked memory support\n");
+    fprintf(st, "   sim> SET CPU NONBANKED        disables the banked memory support\n\n");
+
+    fprintf(st, "   sim> SET CPU CLEARMEMORY      resets all internal memory to 0\n\n");
+
+    fprintf(st, "   sim> SET CPU ALTAIRROM        enables Altair boot ROM at 0FF00 to 0FFFF\n");
+    fprintf(st, "   sim> SET CPU NOALTAIRROM      disables standard Altair ROM behavior\n\n");
+
+    fprintf(st, "   sim> SET CPU MMU              enables Memory Management Unit and clock\n");
+    fprintf(st, "                                 frequency support\n");
+    fprintf(st, "   sim> SET CPU NOMMU            disables Memory Management Unit and clock\n");
+    fprintf(st, "                                 frequency support\n\n");
+
+    fprintf(st, "The CPU can maintain a history of the most recently executed instructions.\n");
+    fprintf(st, "This is controlled by the SET CPU HISTORY and SHOW CPU HISTORY commands:\n\n");
+
+    fprintf(st, "   sim> SET CPU HISTORY          clear history buffer\n");
+    fprintf(st, "   sim> SET CPU HISTORY=0        disable history\n");
+    fprintf(st, "   sim> SET CPU HISTORY=<n>      enable history, length = <n>\n");
+    fprintf(st, "   sim> SHOW CPU HISTORY         print CPU history\n");
+    fprintf(st, "   sim> SHOW CPU HISTORY=<n>     print last <n> entries of CPU history\n\n");
+
+    fprintf(st, "Other CPU options:\n\n");
+
+    fprintf(st, "   sim> SET CPU VEBOSE           enable warning messages\n");
+    fprintf(st, "   sim> SET CPU QUIER            disable warning messages\n\n");
+
+    fprintf(st, "   sim> SET CPU STOPONHALT       Z80 or 8080 stops on HALT instruction\n");
+    fprintf(st, "   sim> SET CPU LOOPONHALT       Z80 or 8080 waits for interrupt on HALT instruction\n");
+
+    return SCPE_OK;
+}
 /* remove comments to generate table contents and add a call to
  altairz80_print_tables in the altairz80_init
 static void altairz80_print_tables(void) {
@@ -6128,8 +6209,28 @@ static t_stat sim_instr_mmu (void) {
             PC = 0x38;
         }
 
-        sim_interval--;
+	/*
+	** Save in instruction history ring buffer?
+	*/
+	if (hst_lnt && ((chiptype == CHIP_TYPE_8080) || (chiptype == CHIP_TYPE_Z80))) {
+		hst[hst_p].valid = 1;
+		hst[hst_p].pc = PCX;
+		hst[hst_p].sp = SP;
+		hst[hst_p].af = AF;
+		hst[hst_p].bc = BC;
+		hst[hst_p].de = DE;
+		hst[hst_p].hl = HL;
 
+		for (int i=0; i < 3; i++) {
+		    hst[hst_p].op[i] = GetBYTE(PCX+i);
+		}
+
+		if (++hst_p == hst_lnt) {
+			hst_p = 0;
+		}
+	}
+
+        sim_interval--;
     }
 
     /* It we stopped processing instructions because of a switch to the other
@@ -6792,6 +6893,124 @@ static t_stat cpu_set_memory(UNIT *uptr, int32 value, CONST char *cptr, void *de
             ((cptr[i + 1] == 'B') && (cptr[i + 2] == 0))))
         return set_size(size);
     return SCPE_ARG;
+}
+
+static t_stat cpu_set_hist(UNIT *uptr, int32 val, CONST char *cptr, void *desc) {
+   uint32 i, lnt;
+   t_stat r;
+
+    if ((chiptype != CHIP_TYPE_8080) && (chiptype != CHIP_TYPE_Z80)) {
+        sim_printf("History not supported for chiptype: %s\n",
+               (chiptype < NUM_CHIP_TYPE) ? cpu_mod[chiptype].mstring : "????");
+        return SCPE_NOFNC;
+    }
+
+    /*
+    ** If cptr is NULL, reset ring buffer ("SET HISTORY")
+    */
+    if (cptr == NULL) {
+        if (hst==NULL) {
+            sim_printf("History buffer not enabled.\n");
+            return SCPE_NOFNC;
+        }
+
+        for (i = 0; i < hst_lnt; i++) {
+            hst[i].valid = 0;
+        }
+
+        hst_p = 0;
+
+        return SCPE_OK;
+    }
+
+    /*
+    ** Enable/Resize ring buffer ("SET HISTORY=<n>")
+    */
+    lnt = (uint32) get_uint (cptr, 10, HIST_MAX, &r);
+
+    if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) {
+        sim_printf("History buffer maximum size: %d\n", HIST_MAX);
+        return SCPE_ARG;
+    }
+
+    /*
+    ** Delete old history buffer
+    */
+    if (hst!=NULL) {
+        free (hst);
+        hst_lnt = 0;
+        hst = NULL;
+    }
+
+    hst_p = 0;
+
+    /*
+    ** If a length was specified, allocate new buffer ("SET HISTORY=<n>" where n>0)
+    */
+    if (lnt) {
+        hst = (insthist_t *) calloc (lnt, sizeof (insthist_t));
+        if (hst == NULL) {
+            return SCPE_MEM;
+        }
+        hst_lnt = lnt;
+    }
+
+    return SCPE_OK;
+}
+
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    int32 k, di, lnt;
+    CONST char *cptr = (CONST char *) desc;
+    t_stat r;
+    insthist_t *h;
+
+    if ((chiptype != CHIP_TYPE_8080) && (chiptype != CHIP_TYPE_Z80)) {
+        sim_printf("History not supported for chiptype: %s\n",
+               (chiptype < NUM_CHIP_TYPE) ? cpu_mod[chiptype].mstring : "????");
+        return SCPE_NOFNC;
+    }
+
+    if (hst_lnt == 0) {
+        return SCPE_NOFNC;                    /* enabled? */
+    }
+
+    if (cptr) {
+        lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
+
+        if ((r != SCPE_OK) || (lnt == 0)) {
+            return SCPE_ARG;
+        }
+    }
+    else {
+        lnt = hst_lnt;
+    }
+
+    di = hst_p - lnt;
+
+    if (di < 0) di = di + hst_lnt;
+
+    for (k = 0; k < lnt; k++) {
+        h = &hst[(di++) % hst_lnt];
+
+        if (h->valid) {                              /* valid entry? */
+            /*
+            ** Use DDT output:
+            ** CfZfMfEfIf A=bb B=dddd D=dddd H=dddd S=dddd P=dddd inst
+            */
+            fprintf(st, "CPU: C%dZ%dM%dE%dI%d A=%02X B=%04X D=%04X H=%04X S=%04X P=%04X ",
+                TSTFLAG2(h->af, C),
+                TSTFLAG2(h->af, Z),
+                TSTFLAG2(h->af, S),
+                TSTFLAG2(h->af, P),
+                TSTFLAG2(h->af, H),
+                HIGH_REGISTER(h->af), h->bc, h->de, h->hl, h->sp, h->pc);
+            fprint_sym (st, h->pc, h->op, &cpu_unit, SWMASK ('M'));
+            fprintf(st, "\n");
+        }
+    }
+
+    return SCPE_OK;
 }
 
 t_value altairz80_pc_value (void) {
