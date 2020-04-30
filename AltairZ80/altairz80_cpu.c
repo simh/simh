@@ -271,11 +271,11 @@ typedef struct {
     t_value op[INST_MAX_BYTES];
 } insthist_t;
 
-static	uint32 hst_p = 0;                           /* history pointer				    */
-static	uint32 hst_lnt = 0;                         /* history length				    */
-static	insthist_t *hst = NULL;                     /* instruction history			    */
+static	uint32 hst_p = 0;                           /* history pointer      */
+static	uint32 hst_lnt = 0;                         /* history length       */
+static	insthist_t *hst = NULL;                     /* instruction history  */
 
-uint32 m68k_registers[M68K_REG_CPU_TYPE + 1];       /* M68K CPU registers                           */
+uint32 m68k_registers[M68K_REG_CPU_TYPE + 1];       /* M68K CPU registers   */
 
 
 /* data structure for IN/OUT instructions */
@@ -438,31 +438,31 @@ REG cpu_reg[] = {
         REG_RO }, /* 68 M68K, CPU_TYPE             */
 
     // Pseudo registers
-    { FLDATAD (OPSTOP,   cpu_unit.flags,     UNIT_CPU_V_OPSTOP, "Stop on invalid operation pseudo register"),
+    { FLDATAD (OPSTOP,  cpu_unit.flags,     UNIT_CPU_V_OPSTOP, "Stop on invalid operation pseudo register"),
         REG_HRO         }, /* 69 */
-    { HRDATAD (SR,       SR,                 8, "Front panel switches pseudo register"),
+    { HRDATAD (SR,      SR,                 8, "Front panel switches pseudo register"),
     }, /* 70 */
-    { HRDATAD (BANK,     bankSelect,         MAXBANKSLOG2, "Active bank pseudo register"),
+    { HRDATAD (BANK,    bankSelect,         MAXBANKSLOG2, "Active bank pseudo register"),
     }, /* 71 */
-    { HRDATAD (COMMON,   common,             32, "Starting address of common memory pseudo register"),
+    { HRDATAD (COMMON,  common,             32, "Starting address of common memory pseudo register"),
     }, /* 72 */
-    { HRDATAD (SWITCHERPORT, switcherPort,   8, "I/O port for CPU switcher pseudo register"),
+    { HRDATAD (SWITCHERPORT, switcherPort,  8, "I/O port for CPU switcher pseudo register"),
     }, /* 73 */
-    { DRDATAD (CLOCK,    clockFrequency,     32, "Clock frequency in kHz for 8080 / Z80 pseudo register"),
+    { DRDATAD (CLOCK,   clockFrequency,     32, "Clock frequency in kHz for 8080 / Z80 pseudo register"),
     }, /* 74 */
-    { DRDATAD (SLICE,    sliceLength,        16, "Length of time slice for 8080 / Z80 pseudo register"),
+    { DRDATAD (SLICE,   sliceLength,        16, "Length of time slice for 8080 / Z80 pseudo register"),
     }, /* 75 */
-    { DRDATAD (TSTATES,  executedTStates,    32, "Executed t-states for 8080 / Z80 pseudo register"),
+    { DRDATAD (TSTATES, executedTStates,    32, "Executed t-states for 8080 / Z80 pseudo register"),
         REG_RO              }, /* 76 */
-    { HRDATAD (CAPACITY, cpu_unit.capac,     32, "Size of RAM pseudo register"),
+    { HRDATAD (CAPACITY,cpu_unit.capac,     32, "Size of RAM pseudo register"),
         REG_RO              }, /* 77 */
-    { HRDATAD (PREVCAP,  previousCapacity,   32, "Previous size of RAM pseudo register"),
+    { HRDATAD (PREVCAP, previousCapacity,   32, "Previous size of RAM pseudo register"),
         REG_RO              }, /* 78 */
-    { BRDATAD (PCQ,      pcq, 16, 16, PCQ_SIZE, "Program counter circular buffer for 8080 /Z80 pseudo register"),
+    { BRDATAD (PCQ,     pcq, 16, 16,        PCQ_SIZE, "Program counter circular buffer for 8080 /Z80 pseudo register"),
         REG_RO + REG_CIRC   }, /* 79 */
-    { DRDATAD (PCQP,     pcq_p,          PCQ_SIZE_LOG2, "Circular buffer head for 8080 / Z80 pseudo register"),
+    { DRDATAD (PCQP,    pcq_p, PCQ_SIZE_LOG2, "Circular buffer head for 8080 / Z80 pseudo register"),
         REG_HRO             }, /* 80 */
-    { HRDATAD (WRU,      sim_int_char,        8, "Interrupt character pseudo register"),
+    { HRDATAD (WRU,     sim_int_char,       8, "Interrupt character pseudo register"),
     }, /* 81 */
     { NULL }
 };
@@ -2078,7 +2078,7 @@ static t_stat sim_instr_mmu (void) {
     extern int32 keyboardInterrupt;
     extern uint32 keyboardInterruptHandler;
     int32 reason = SCPE_OK;
-    int i;
+    uint32 i;
     register uint32 specialProcessing;
     register uint32 AF;
     register uint32 BC;
@@ -6178,8 +6178,8 @@ static t_stat sim_instr_mmu (void) {
 		hst[hst_p].ix = IX;
 		hst[hst_p].iy = IY;
 
-		for (i=0; i < INST_MAX_BYTES; i++) {
-		    hst[hst_p].op[i] = GetBYTE(PCX+i);
+		for (i = 0; i < INST_MAX_BYTES; i++) {
+		    hst[hst_p].op[i] = GetBYTE(PCX + i);
 		}
 
 		if (++hst_p == hst_lnt) {
@@ -6373,7 +6373,7 @@ typedef struct {
 const static CPUFLAG cpuflags8080[] = {
     {1 << 7,    "S"},
     {1 << 6,    "Z"},
-    {1 << 4,    "A"},
+    {1 << 4,    "H"},
     {1 << 3,    "P"},
     {1 << 1,    "N"},
     {1 << 0,    "C"},
@@ -6383,7 +6383,7 @@ const static CPUFLAG cpuflags8080[] = {
 const static CPUFLAG cpuflagsZ80[] = {
     {1 << 7,    "S"},
     {1 << 6,    "Z"},
-    {1 << 4,    "A"},
+    {1 << 4,    "H"},
     {1 << 3,    "V"},
     {1 << 1,    "N"},
     {1 << 0,    "C"},
@@ -6866,7 +6866,7 @@ static t_stat cpu_set_hist(UNIT *uptr, int32 val, CONST char *cptr, void *desc) 
     ** If cptr is NULL, reset ring buffer ("SET HISTORY")
     */
     if (cptr == NULL) {
-        if (hst==NULL) {
+        if (hst == NULL) {
             sim_printf("History buffer not enabled.\n");
             return SCPE_NOFNC;
         }
@@ -6970,7 +6970,7 @@ t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
                 /*
                 ** Use DDT/Z output:
                 */
-                fprintf(st, "CPU: C%dZ%dS%dP%dH%dN%d A =%02X BC =%04X DE =%04X HL =%04X S =%04X P =%04X ",
+                fprintf(st, "CPU: C%dZ%dS%dV%dH%dN%d A =%02X BC =%04X DE =%04X HL =%04X S =%04X P =%04X ",
                     TSTFLAG2(h->af, C),
                     TSTFLAG2(h->af, Z),
                     TSTFLAG2(h->af, S),
