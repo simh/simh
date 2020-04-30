@@ -2737,7 +2737,7 @@ if (container_size && (container_size != (t_offset)-1)) {
                     }
                 }
             else
-                sim_messagef (SCPE_OK, "%s: No File System found on '%s', skipping autosizing\.n", sim_uname (uptr), cptr);
+                sim_messagef (SCPE_OK, "%s: No File System found on '%s', skipping autosizing\n", sim_uname (uptr), cptr);
             }
         if ((container_size != current_unit_size) && 
             ((DKUF_F_VHD == DK_GET_FMT (uptr)) || (0 != (uptr->flags & UNIT_RO)) ||
@@ -4400,7 +4400,7 @@ typedef struct _VHD_DynamicDiskHeader {
 
 typedef struct VHD_IOData *VHDHANDLE;
 
-static t_stat ReadFilePosition(FILE *File, void *buf, size_t bufsize, size_t *bytesread, uint64 position)
+static t_stat ReadFilePosition(FILE *File, void *buf, size_t bufsize, uint32 *bytesread, uint64 position)
 {
 uint32 err = sim_fseeko (File, (t_offset)position, SEEK_SET);
 size_t i;
@@ -4410,13 +4410,13 @@ if (bytesread)
 if (!err) {
     i = fread (buf, 1, bufsize, File);
     if (bytesread)
-        *bytesread = i;
+        *bytesread = (uint32)i;
     err = ferror (File);
     }
 return (err ? SCPE_IOERR : SCPE_OK);
 }
 
-static t_stat WriteFilePosition(FILE *File, void *buf, size_t bufsize, size_t *byteswritten, uint64 position)
+static t_stat WriteFilePosition(FILE *File, void *buf, size_t bufsize, uint32 *byteswritten, uint64 position)
 {
 uint32 err = sim_fseeko (File, (t_offset)position, SEEK_SET);
 size_t i;
@@ -4426,7 +4426,7 @@ if (byteswritten)
 if (!err) {
     i = fwrite (buf, 1, bufsize, File);
     if (byteswritten)
-        *byteswritten = i;
+        *byteswritten = (uint32)i;
     err = ferror (File);
     }
 return (err ? SCPE_IOERR : SCPE_OK);
@@ -4884,7 +4884,7 @@ static FILE *sim_vhd_disk_merge (const char *szVHDPath, char **ParentVHD)
     int Status;
     uint32 SectorSize, SectorsPerBlock, BlockSize, BlockNumber, BitMapBytes, BitMapSectors, BlocksToMerge, NeededBlock;
     uint64 BlockOffset;
-    size_t BytesRead;
+    uint32 BytesRead;
     t_seccnt SectorsWritten;
     void *BlockData = NULL;
 
