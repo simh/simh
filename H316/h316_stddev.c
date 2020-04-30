@@ -421,13 +421,16 @@ return SCPE_OK;
 t_stat pt_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat r;
+int32 saved_switches = sim_switches;
 
 if (!(uptr->flags & UNIT_ATTABLE))                      /* not tti,tto */
     return SCPE_NOFNC;
-if (strcmp ("PTR", sim_uname (uptr)) == 0)              /* PTR is read only */
-    sim_switches |= SWMASK ('R');
-if ((r = attach_unit (uptr, cptr)))
+sim_switches &= ~SWMASK ('A');
+if (strcmp ("PTP", sim_uname (uptr)) == 0)              /* PTP is append default */
+    sim_switches |= SWMASK ('A');
+if ((r = attach_unit (uptr, cptr)) != SCPE_OK)
     return r;
+sim_switches = saved_switches;
 if (sim_switches & SWMASK ('A'))                        /* -a? ASCII */
     uptr->flags |= UNIT_ASC;
 else if (sim_switches & SWMASK ('U'))                   /* -u? Unix ASCII */
