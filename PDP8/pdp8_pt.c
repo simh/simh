@@ -46,6 +46,7 @@ t_stat ptr_svc (UNIT *uptr);
 t_stat ptp_svc (UNIT *uptr);
 t_stat ptr_reset (DEVICE *dptr);
 t_stat ptp_reset (DEVICE *dptr);
+t_stat ptp_attach (UNIT *uptr, CONST char *cptr);
 t_stat ptr_boot (int32 unitno, DEVICE *dptr);
 const char *ptr_description (DEVICE *dptr);
 const char *ptp_description (DEVICE *dptr);
@@ -123,7 +124,7 @@ DEVICE ptp_dev = {
     "PTP", &ptp_unit, ptp_reg, ptp_mod,
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &ptp_reset,
-    NULL, NULL, NULL,
+    NULL, &ptp_attach, NULL,
     &ptp_dib, 0, 0,
     NULL, NULL, NULL, NULL, NULL, NULL,
     &ptp_description
@@ -258,6 +259,14 @@ int_req = int_req & ~INT_PTP;
 int_enable = int_enable | INT_PTP;                      /* set enable */
 sim_cancel (&ptp_unit);                                 /* deactivate unit */
 return SCPE_OK;
+}
+
+/* Attach routine */
+
+t_stat ptp_attach (UNIT *uptr, CONST char *cptr)
+{
+sim_switches |= SWMASK ('A');   /* Default to Append to existing file */
+return attach_unit (uptr, cptr);
 }
 
 /* Bootstrap routine */

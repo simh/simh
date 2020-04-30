@@ -177,6 +177,7 @@ t_stat lpt_attach (UNIT *uptr, CONST char *cptr)
 {
 t_stat reason;
 
+sim_switches |= SWMASK ('A');   /* Default to Append to existing file */
 reason = attach_unit (uptr, cptr);
 lpt_err = (lpt_unit.flags & UNIT_ATT) == 0;
 return reason;
