@@ -139,8 +139,10 @@
 #define ID_V_DTYPE         (DKUF_V_UF + 0)
 #define ID_M_DTYPE         3
 #define ID_DTYPE           (ID_M_DTYPE << ID_V_DTYPE)
+#define ID_V_AUTOSIZE      (ID_V_DTYPE + 2)
+#define ID_AUTOSIZE        (1 << ID_V_AUTOSIZE)
 #define ID_GET_DTYPE(x)    (((x) >> ID_V_DTYPE) & ID_M_DTYPE)
-#define ID_DRV(d)          { ID_##d##_HEADS, ID_##d##_LBN }
+#define ID_DRV(d)          { ID_##d##_HEADS, ID_##d##_LBN, #d }
 
 #define ID_DSK_SIZE(d)     ID_##d##_LBN
 
@@ -162,6 +164,7 @@ t_stat id_ctlr_svc(UNIT *uptr);
 t_stat id_unit_svc(UNIT *uptr);
 t_stat id_reset(DEVICE *dptr);
 t_stat id_set_type(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat id_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat id_attach(UNIT *uptr, CONST char *cptr);
 t_stat id_detach(UNIT *uptr);
 uint32 id_read(uint32 pa, size_t size);

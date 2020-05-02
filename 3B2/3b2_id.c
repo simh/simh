@@ -114,6 +114,7 @@ int8     id_seek_state[ID_NUM_UNITS] = {ID_SEEK_NONE};
 struct id_dtype {
     uint8  hd;    /* Number of heads */
     uint32 capac; /* Capacity (in sectors) */
+    const char *name;
 };
 
 static struct id_dtype id_dtab[] = {
@@ -126,9 +127,9 @@ static struct id_dtype id_dtab[] = {
 };
 
 UNIT id_unit[] = {
-    { UDATA (&id_unit_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BINK+
+    { UDATA (&id_unit_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BINK+ID_AUTOSIZE+
              (ID_HD72_DTYPE << ID_V_DTYPE), ID_DSK_SIZE(HD72)), 0, ID0, 0 },
-    { UDATA (&id_unit_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BINK+
+    { UDATA (&id_unit_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BINK+ID_AUTOSIZE+
              (ID_HD72_DTYPE << ID_V_DTYPE), ID_DSK_SIZE(HD72)), 0, ID1, 0 },
     { UDATA (&id_ctlr_svc, 0, 0) },
     { NULL }
@@ -161,6 +162,12 @@ MTAB id_mod[] = {
       &id_set_type, NULL, NULL, "Set HD135 Disk Type" },
     { MTAB_XTD|MTAB_VUN, ID_HD161_DTYPE, NULL, "HD161",
       &id_set_type, NULL, NULL, "Set HD161 Disk Type" },
+    { MTAB_XTD|MTAB_VUN, 0, "TYPE", NULL,
+      NULL, &id_show_type, NULL, "Display device type" },
+    { ID_AUTOSIZE, ID_AUTOSIZE, "autosize", "AUTOSIZE", 
+      NULL, NULL, NULL, "Set type based on file size at attach" },
+    { ID_AUTOSIZE,           0, "noautosize",   "NOAUTOSIZE",   
+      NULL, NULL, NULL, "Disable disk autosize on attach" },
     { 0 }
 };
 
@@ -353,6 +360,12 @@ t_stat id_set_type(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     return SCPE_OK;
 }
 
+t_stat id_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    fprintf (st, "%s", id_dtab[ID_GET_DTYPE(uptr->flags)].name);
+    return SCPE_OK;
+}
+
 t_stat id_reset(DEVICE *dptr)
 {
     id_clear_fifo();
@@ -361,7 +374,10 @@ t_stat id_reset(DEVICE *dptr)
 
 t_stat id_attach(UNIT *uptr, CONST char *cptr)
 {
-    return sim_disk_attach(uptr, cptr, 512, 1, TRUE, 0, "HD72", 0, 0);
+    static const char *drives[] = {"HD30", "HD72", "HD72C", "HD135", "HD161", NULL};
+
+    return sim_disk_attach_ex(uptr, cptr, 512, 1, TRUE, 0, id_dtab[ID_GET_DTYPE(uptr->flags)].name, 
+                              0, 0, (uptr->flags & ID_AUTOSIZE) ? drives : NULL);
 }
 
 t_stat id_detach(UNIT *uptr)
