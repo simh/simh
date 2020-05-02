@@ -2541,14 +2541,16 @@ if ((DK_GET_FMT (uptr) == DKUF_F_VHD) || (ctx->footer)) {
 
         if (((sector_size == 0) || (sector_size == ctx->sector_size)) &&
             ((xfer_element_size == 0) || (xfer_element_size == ctx->xfer_element_size))) {
-            if ((strcmp (container_dtype, dtype) != 0) && (drivetypes == NULL)) /* No Autosize */
-                r = sim_messagef (SCPE_OPENERR, "%s: Can't attach %s container to %s unit - Autosizing disk disabled\n", sim_uname (uptr), container_dtype, dtype);
-            else {
-                cmd[sizeof (cmd) - 1] = '\0';
-                snprintf (cmd, sizeof (cmd) - 1, "%s %s", sim_uname (uptr), container_dtype);
-                r = set_cmd (0, cmd);
-                if (r != SCPE_OK)
-                    r = sim_messagef (r, "Can't set %s to drive type %s\n", sim_uname (uptr), container_dtype);
+            if (strcmp (container_dtype, dtype) != 0) {
+                if (drivetypes == NULL) /* No Autosize */
+                    r = sim_messagef (SCPE_OPENERR, "%s: Can't attach %s container to %s unit - Autosizing disk disabled\n", sim_uname (uptr), container_dtype, dtype);
+                else {
+                    cmd[sizeof (cmd) - 1] = '\0';
+                    snprintf (cmd, sizeof (cmd) - 1, "%s %s", sim_uname (uptr), container_dtype);
+                    r = set_cmd (0, cmd);
+                    if (r != SCPE_OK)
+                        r = sim_messagef (r, "Can't set %s to drive type %s\n", sim_uname (uptr), container_dtype);
+                    }
                 }
             }
         else
@@ -2736,8 +2738,10 @@ if (container_size && (container_size != (t_offset)-1)) {
                     return SCPE_FSSIZE;
                     }
                 }
-            else
-                sim_messagef (SCPE_OK, "%s: No File System found on '%s', skipping autosizing\n", sim_uname (uptr), cptr);
+            else {
+                if (!created)
+                    sim_messagef (SCPE_OK, "%s: No File System found on '%s', skipping autosizing\n", sim_uname (uptr), cptr);
+                }
             }
         if ((container_size != current_unit_size) && 
             ((DKUF_F_VHD == DK_GET_FMT (uptr)) || (0 != (uptr->flags & UNIT_RO)) ||
@@ -5899,7 +5903,8 @@ if (flag) {        /* zap type */
     if ((container_size != (t_offset)-1) && (container_size > sizeof (*f)) &&
         (sim_fseeko (container, container_size - sizeof (*f), SEEK_SET) == 0) &&
         (sizeof (*f) == sim_fread (f, 1, sizeof (*f), container))) {
-        if (f->Checksum == NtoHl (eth_crc32 (0, f, sizeof (*f) - sizeof (f->Checksum)))) {
+        if ((memcmp (f->Signature, "simh", 4) == 0) && 
+            (f->Checksum == NtoHl (eth_crc32 (0, f, sizeof (*f) - sizeof (f->Checksum))))) {
             (void)sim_set_fsize (container, (t_addr)(container_size - sizeof (*f)));
             fclose (container);
             return sim_messagef (SCPE_OK, "Disk Type Removed from container '%s'\n", cptr);
