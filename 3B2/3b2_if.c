@@ -162,7 +162,7 @@ t_stat if_reset(DEVICE *dptr)
 
 t_stat if_attach(UNIT *uptr, CONST char *cptr)
 {
-    return sim_disk_attach(uptr, cptr, 512, 1, TRUE, 0, "IF", 0, 0);
+    return sim_disk_attach(uptr, cptr, 512, 1, TRUE, 0, NULL, 0, 0);
 }
 
 t_stat if_detach(UNIT *uptr)
