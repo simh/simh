@@ -876,7 +876,6 @@ static void _sim_rem_log_out (TMLN *lp)
 {
 char cbuf[4*CBUFSIZE];
 REMOTE *rem = &sim_rem_consoles[(int)(lp - sim_rem_con_tmxr.ldsc)];
-int line = rem->line;
 
 if ((!sim_oline) && (sim_log)) {
     fflush (sim_log);
