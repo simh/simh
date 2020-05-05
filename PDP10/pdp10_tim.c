@@ -321,7 +321,7 @@ int32 old_tick_in_usecs = tick_in_usecs;
  * millisecond counter runs continuously at 4.1 MHz and represents an
  * elapsed time of just under 1 ms at each overflow. Whenever the counter is
  * read, its two least significant bits are ignored, so its contents effectively
- * represent a count in lllicroseconds (1/1025th ms).
+ * represent a count in microseconds (1/1025th ms).
  * The time base is a double length number kept in a pair of registers in
  * the workspace. It is a 71-bit unsigned quantity in which the entire first
  * word comprises the high order thirty-six bits, and the low order thirty-five
@@ -385,7 +385,7 @@ static t_stat tim_svc (UNIT *uptr)
 {
 if (cpu_unit.flags & UNIT_KLAD) {                       /* diags? */
     tmr_poll = uptr->wait;                              /* fixed clock */
-    sim_activate (uptr, tmr_poll);                          /* reactivate unit */
+    sim_activate (uptr, tmr_poll);                      /* reactivate unit */
     }
 else {
     sim_activate_after (uptr, tick_in_usecs);           /* reactivate unit */
