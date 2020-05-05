@@ -85,11 +85,11 @@
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_WLK      (DKUF_V_UF + 0)                 /* write locked */
-#define UNIT_V_DTYPE    (DKUF_V_UF + 1)                 /* disk type */
+#define UNIT_V_WLK      DKUF_V_WLK                      /* write locked */
+#define UNIT_V_DTYPE    (DKUF_V_UF + 0)                 /* disk type */
 #define UNIT_M_DTYPE    7
-#define UNIT_V_AUTO     (DKUF_V_UF + 4)                 /* autosize */
-#define UNIT_V_DUMMY    (DKUF_V_UF + 5)                 /* dummy flag */
+#define UNIT_V_AUTO     (DKUF_V_UF + 3)                 /* autosize */
+#define UNIT_V_DUMMY    (DKUF_V_UF + 4)                 /* dummy flag */
 #define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
 #define UNIT_AUTO       (1 << UNIT_V_AUTO)

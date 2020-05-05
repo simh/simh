@@ -84,11 +84,12 @@
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_WLK      (DKUF_V_UF + 0)                 /* write locked */
-#define UNIT_V_DTYPE    (DKUF_V_UF + 1)                 /* disk type */
+#define UNIT_V_WLK      DKUF_V_WLK                      /* write locked */
+#define UNIT_V_DTYPE    (DKUF_V_UF + 0)                 /* disk type */
+#define UNIT_W_DTYPE    3                               /* 3b disk type */
 #define UNIT_M_DTYPE    7
-#define UNIT_V_AUTO     (DKUF_V_UF + 4)                 /* autosize */
-#define UNIT_V_UTS      (DKUF_V_UF + 5)                 /* Up to speed */
+#define UNIT_V_AUTO     (UNIT_V_DTYPE + UNIT_W_DTYPE)   /* autosize */
+#define UNIT_V_UTS      (UNIT_V_AUTO + 1)               /* Up to speed */
 #define UNIT_UTS        (1u << UNIT_V_UTS)
 #define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)

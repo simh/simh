@@ -98,10 +98,10 @@ static struct drvtyp drv_tab[] = {
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
+#define UNIT_V_WLK      DKUF_V_WLK                      /* write locked */
 #define UNIT_V_DTYPE    (DKUF_V_UF + 0)                 /* disk type */
-#define UNIT_V_AUTO     (DKUF_V_UF + 1)                 /* autosize */
-#define UNIT_V_DUMMY    (DKUF_V_UF + 2)                 /* dummy flag */
+#define UNIT_V_AUTO     (UNIT_V_DTYPE + 1)              /* autosize */
+#define UNIT_V_DUMMY    (UNIT_V_AUTO + 1)               /* dummy flag */
 #define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_DTYPE      (1 << UNIT_V_DTYPE)
 #define  UNIT_RK06      (0 << UNIT_V_DTYPE)
@@ -1557,8 +1557,6 @@ return sim_disk_detach (uptr);
 
 t_stat hk_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-int32 dtype = GET_DTYPE (val);
-
 if ((val < 0) || (cptr && *cptr))
     return SCPE_ARG;
 if (uptr->flags & UNIT_ATT)

@@ -156,11 +156,12 @@ extern int32 MMR2;
 #define RQ_M_PFN        0x1FFFFF                        /* map entry PFN */
 
 #define UNIT_V_ONL      (DKUF_V_UF + 0)                 /* online */
-#define UNIT_V_WLK      (DKUF_V_UF + 1)                 /* hwre write lock */
-#define UNIT_V_ATP      (DKUF_V_UF + 2)                 /* attn pending */
-#define UNIT_V_DTYPE    (DKUF_V_UF + 3)                 /* drive type */
-#define UNIT_M_DTYPE    0x1F
-#define UNIT_V_NOAUTO   (DKUF_V_UF + 8)                 /* noautosize */
+#define UNIT_V_WLK      DKUF_V_WLK                      /* hwre write lock */
+#define UNIT_V_ATP      (UNIT_V_ONL + 1)                /* attn pending */
+#define UNIT_V_DTYPE    (UNIT_V_ATP + 1)                /* drive type */
+#define UNIT_W_DTYPE    5                               /* 5b drive type encode */
+#define UNIT_M_DTYPE    ((1u << UNIT_W_DTYPE) - 1)
+#define UNIT_V_NOAUTO   (UNIT_V_DTYPE + UNIT_W_DTYPE)   /* noautosize */
 #define UNIT_ONL        (1 << UNIT_V_ONL)
 #define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_ATP        (1 << UNIT_V_ATP)
