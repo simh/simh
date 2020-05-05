@@ -104,8 +104,9 @@ OpenBSD (OpenBSD 4.6)
 
     # Run simulator and "attach xq tap:tun0"
     
-FreeBSD (FreeBSD 8.0)
+FreeBSD (FreeBSD 11.3)
 
+    /sbin/sysctl net.link.tap.up_on_open=1 
     /sbin/ifconfig tap0 create
     /sbin/ifconfig tap0 up
 
@@ -114,9 +115,6 @@ FreeBSD (FreeBSD 8.0)
     /sbin/ifconfig bridge0 up
 
     # Run simulator and "attach xq tap:tap0"
-    # Note: it seems that on FreeBSD you may have to 
-    #       "/sbin/ifconfig tap0 up" and "/sbin/ifconfig bridge0 up" prior to each 
-    #       time simh "attach"es the tap:tap0 device
 
 NetBSD (NetBSD 5.0.2)
 
