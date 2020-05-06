@@ -414,7 +414,7 @@ t_stat sim_instr (void)
                 }
                 DAR = (A >> 4) & 0x0F;
                 if ((DAR > 9) || get_flag(CF)) {
-                    DAR =+ 6;
+                    DAR += 6;
                     A = (A & 0x0F) | (DAR << 4) | 0x100;
                 }
                 COND_SET_FLAG_C(A);
