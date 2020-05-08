@@ -2475,7 +2475,7 @@ return SCPE_OK;
 const char *eth_version (void)
 {
 #if defined(HAVE_PCAP_NETWORK)
-static char version[256];
+static char version[300];
 
 if (!version[0]) {
   strlcpy(version, pcap_lib_version(), sizeof(version));
