@@ -10825,7 +10825,7 @@ for (; (i>=0) && (i<(int32)schptr->count) && ret; i += updown) {
             break;
 
         case SCH_N: case SCH_NE:
-            if (val[i] != schptr->comp[i])
+            if (val[i] == schptr->comp[i])
                 ret = 0;
             break;
 
