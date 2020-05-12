@@ -6598,6 +6598,7 @@ if (sim_is_running)
     return SCPE_INVREM;
 if ((!cptr) || (*cptr == 0))
     return SCPE_2FARG;
+GET_SWITCHES (cptr);                                    /* get switches */
 gbuf[sizeof(gbuf)-1] = '\0';
 strlcpy (gbuf, cptr, sizeof(gbuf));
 sim_trim_endspc(gbuf);
@@ -6683,6 +6684,7 @@ t_stat r;
 char WildName[PATH_MAX + 1];
 struct stat filestat;
 
+GET_SWITCHES (cptr);                                    /* get switches */
 memset (&dir_state, 0, sizeof (dir_state));
 strlcpy (WildName, cptr, sizeof(WildName));
 cptr = WildName;
@@ -6742,6 +6744,7 @@ t_stat type_cmd (int32 flg, CONST char *cptr)
 FILE *file;
 char lbuf[4*CBUFSIZE];
 
+GET_SWITCHES (cptr);                                    /* get switches */
 if ((!cptr) || (*cptr == 0))
     return SCPE_2FARG;
 lbuf[sizeof(lbuf)-1] = '\0';
@@ -6792,6 +6795,7 @@ t_stat stat;
 
 if ((!cptr) || (*cptr == 0))
     return SCPE_2FARG;
+GET_SWITCHES (cptr);                                    /* get switches */
 memset (&del_state, 0, sizeof (del_state));
 stat = sim_dir_scan (cptr, sim_delete_entry, &del_state);
 if (stat == SCPE_OK)
@@ -6845,6 +6849,7 @@ t_stat stat;
 memset (&copy_state, 0, sizeof (copy_state));
 if ((!cptr) || (*cptr == 0))
     return SCPE_2FARG;
+GET_SWITCHES (cptr);                                    /* get switches */
 cptr = get_glyph_quoted (cptr, sname, 0);
 if ((!cptr) || (*cptr == 0))
     return SCPE_2FARG;
@@ -6861,6 +6866,7 @@ char sname[CBUFSIZE], dname[CBUFSIZE];
 
 if ((!cptr) || (*cptr == 0))
     return SCPE_2FARG;
+GET_SWITCHES (cptr);                                    /* get switches */
 cptr = get_glyph_quoted (cptr, sname, 0);
 if ((!cptr) || (*cptr == 0))
     return SCPE_2FARG;
