@@ -15046,8 +15046,16 @@ if (sim_isalpha (*data) || (*data == '_')) {
             rptr = find_reg (data, &gptr, dptr);
             }
         }
-    else
+    else {
         rptr = find_reg_glob (data, &gptr, &dptr);
+        if (!rptr) {                    /* Register not found? */
+            char tbuf[CBUFSIZE];
+
+            get_glyph (data, tbuf, 0);  /* try using the upcased name */
+            if (strcmp (data, tbuf))    /* upcase different? */
+                rptr = find_reg_glob (tbuf, &gptr, &dptr);/* lookup the upcase name */
+            }
+        }
     if (rptr) {
         *svalue = (t_svalue)get_rval (rptr, 0);
         sprint_val (string, *svalue, 10, string_size - 1, PV_LEFTSIGN);
