@@ -1240,9 +1240,13 @@ static const char simh_help1[] =
 #define HLP_DELETE       "*Commands Removing_Files DEL"
       "3DELETE\n"
       "++DEL{ete} file             deletes a file\n"
+      "4Switches\n"
+      " The -Q switch will suppress file not found warning messages\n\n"
 #define HLP_RM          "*Commands Removing_Files RM"
       "3RM\n"
       "++RM file                   deletes a file\n"
+      "4Switches\n"
+      " The -Q switch will suppress file not found warning messages\n\n"
       "2Copying Files\n"
 #define HLP_COPY        "*Commands Copying_Files COPY"
       "3COPY\n"
@@ -6800,7 +6804,7 @@ memset (&del_state, 0, sizeof (del_state));
 stat = sim_dir_scan (cptr, sim_delete_entry, &del_state);
 if (stat == SCPE_OK)
     return del_state.stat;
-return sim_messagef (SCPE_ARG, "No such file or directory: %s\n", cptr);
+return sim_messagef (SCPE_OK, "No such file or directory: %s\n", cptr);
 }
 
 typedef struct {
