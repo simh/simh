@@ -76,6 +76,7 @@ extern DEVICE wdi2_dev;
 extern DEVICE scp300f_dev;
 
 extern long disasm (unsigned char *data, char *output, int segsize, long offset);
+extern t_stat parse_sym_m68k(char* c, t_addr a, UNIT* u, t_value* val, int32 sw);
 
 void prepareMemoryAccessMessage(const t_addr loc);
 void prepareInstructionMessage(const t_addr loc, const uint32 op);
@@ -788,18 +789,10 @@ static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, const ch
 */
 t_stat parse_sym(CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw) {
     static t_bool symbolicInputNotImplementedMessage8086 = FALSE;
-    static t_bool symbolicInputNotImplementedMessageM68K = FALSE;
     if ((sw & (SWMASK('M'))) && (chiptype == CHIP_TYPE_8086)) {
         if (!symbolicInputNotImplementedMessage8086) {
             sim_printf("Symbolic input is not supported for the 8086.\n");
             symbolicInputNotImplementedMessage8086 = TRUE;
-        }
-        return SCPE_NOFNC;
-    }
-    if ((sw & (SWMASK('M'))) && (chiptype == CHIP_TYPE_M68K)) {
-        if (!symbolicInputNotImplementedMessageM68K) {
-            sim_printf("Symbolic input is not supported for the M68K.\n");
-            symbolicInputNotImplementedMessageM68K = TRUE;
         }
         return SCPE_NOFNC;
     }
@@ -811,7 +804,8 @@ t_stat parse_sym(CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 
         val[0] = (uint32) cptr[0];
         return SCPE_OK;
     }
-    return parse_X80(cptr, addr, val, chiptype == CHIP_TYPE_Z80 ? MnemonicsZ80 : Mnemonics8080);
+    return (chiptype == CHIP_TYPE_M68K ? parse_sym_m68k((char *)cptr, addr, uptr, val, sw) :
+            parse_X80(cptr, addr, val, chiptype == CHIP_TYPE_Z80 ? MnemonicsZ80 : Mnemonics8080));
 }
 
 /* Set Memory Base Address routine */

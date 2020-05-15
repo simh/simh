@@ -259,6 +259,10 @@
 				RelativePath="..\AltairZ80\m68kdasm.c"
 				>
 			</File>
+            <File
+                RelativePath="..\AltairZ80\m68kasm.c"
+                >
+            </File>
 			<File
 				RelativePath="..\AltairZ80\m68kopac.c"
 				>
