@@ -81,6 +81,24 @@
      - Floating Point support
      - Synchronizers 2 & 3
 
+   Memory Map
+
+   0000-1999 Drum Locations (0000-3999 on Model4)
+   2000-3999 Location indexed with IRA
+   4000-5999 Location indexed with IRB
+   6000-7999 Location indexed with IRC
+   8000      Console Switch Register
+   8001      Distributor Register
+   8002      Lower Accumulator Register
+   8003      Upper Accumulator Register
+   8005      Index Register A (IRA)
+   8006      Index Register B (IRB)
+   8007      Index Register C (IRC)
+   9000-9059 IAS Storage
+   9200-9259 Location indexed with IRA
+   9400-9459 Location indexed with IRB
+   9600-9659 Location indexed with IRC
+
 
 */
 
@@ -97,6 +115,8 @@
 #define OPTION_CNTRL    (1 << (UNIT_V_CPUMODEL + 2))
 #define OPTION_SOAPMNE  (1 << (UNIT_V_CPUMODEL + 3))
 #define OPTION_FAST     (1 << (UNIT_V_CPUMODEL + 4))
+#define OPTION_TLE      (1 << (UNIT_V_CPUMODEL + 5))
+#define OPTION_1DSKARM  (1 << (UNIT_V_CPUMODEL + 6))
 
 t_stat              cpu_ex(t_value * vptr, t_addr addr, UNIT * uptr, int32 sw);
 t_stat              cpu_dep(t_value val, t_addr addr, UNIT * uptr, int32 sw);
@@ -110,6 +130,7 @@ const char          *cpu_description (DEVICE *dptr);
 t_int64             DRUM[MAXDRUMSIZE]                        = {0};
 int                 DRUM_NegativeZeroFlag[MAXDRUMSIZE]       = {0};
 char                DRUM_Symbolic_Buffer[MAXDRUMSIZE * 80]   = {0}; // does not exists on real hw. Used to keep symbolic info 
+char                IAS_Symbolic_Buffer[60 * 80]             = {0}; // does not exists on real hw. Used to keep symbolic info 
 
 // IO Synchronizer for card read-punch buffer
 t_int64             IOSync[10]                               = {0};
@@ -121,10 +142,14 @@ int                 IAS_NegativeZeroFlag[60]                 = {0};
 int                 IAS_TimingRing                           = 0;
 
 // interlock counters
-int InterLockCount[IL_array]                                 = {0};                   
+int InterLockCount[8]                                        = {0};                   
 
 // address where rotating drum is currently positioned (0-49)
 int DrumAddr;                                   
+
+// increment umber of word counts elapsed from starting of simulator -> this is the global time measurement
+t_int64 GlobalWordTimeCount=1;
+
 
 // cpu registers
 uint16              IC;                          // Added register not part of cpu. Has addr of current intr in execution, just for displaying purposes. IBM 650 has no program counter
@@ -142,7 +167,6 @@ int ProgStopFlag         = 0;                    // set to 1 if programmed stop 
 int AccNegativeZeroFlag  = 0;                    // set to 1 if acc has a negative zero
 int DistNegativeZeroFlag = 0;                    // set to 1 if distributor has a negative zero
 int16               IR[3];                       // Index registers. Are 4 digits as AR register, but signed
-
 
 /* CPU data structures
 
@@ -176,14 +200,18 @@ MTAB                cpu_mod[] = {
     {UNIT_MSIZE,     MEMAMOUNT(0),    "1K", "1K", &cpu_set_size},
     {UNIT_MSIZE,     MEMAMOUNT(1),    "2K", "2K", &cpu_set_size},
     {UNIT_MSIZE,     MEMAMOUNT(2),    "4K", "4K", &cpu_set_size},
-    {OPTION_STOR,    0,               NULL,                   "NOSTORAGEUNIT", NULL},
-    {OPTION_STOR,    OPTION_STOR,     "Storage Unit",         "STORAGEUNIT",   NULL},
-    {OPTION_CNTRL,   0,               NULL,                   "NOCNTRLUNIT",   NULL},   
-    {OPTION_CNTRL,   OPTION_CNTRL,    "Control Unit",         "CNTRLUNIT",     NULL},
-    {OPTION_SOAPMNE, 0,               NULL,                   "DEFAULTMNE",    NULL},
-    {OPTION_SOAPMNE, OPTION_SOAPMNE,  "Using SOAP Mnemonics", "SOAPMNE",       NULL},
-    {OPTION_FAST,    0,               NULL,                   "REALTIME",      NULL},
-    {OPTION_FAST,    OPTION_FAST,     "Fast Execution",       "FAST",          NULL},
+    {OPTION_STOR,    0,               NULL,                    "NOSTORAGEUNIT", NULL},
+    {OPTION_STOR,    OPTION_STOR,     "Storage Unit",          "STORAGEUNIT",   NULL},
+    {OPTION_CNTRL,   0,               NULL,                    "NOCNTRLUNIT",   NULL},   
+    {OPTION_CNTRL,   OPTION_CNTRL,    "Control Unit",          "CNTRLUNIT",     NULL},
+    {OPTION_SOAPMNE, 0,               NULL,                    "DEFAULTMNE",    NULL},
+    {OPTION_SOAPMNE, OPTION_SOAPMNE,  "Using SOAP Mnemonics",  "SOAPMNE",       NULL},
+    {OPTION_FAST,    0,               NULL,                    "REALTIME",      NULL},
+    {OPTION_FAST,    OPTION_FAST,     "Fast Execution",        "FAST",          NULL},
+    {OPTION_TLE,     0,               NULL,                    "NOTLE",         NULL},
+    {OPTION_TLE,     OPTION_TLE,      "Table Lookup on Equal", "TLE",           NULL},
+    {OPTION_1DSKARM, 0,               NULL,                    "NOTLE",         NULL},
+    {OPTION_1DSKARM, OPTION_1DSKARM,  "Enable 1 ARM RAMAC",    "1DSKARM",       NULL},
     {0}
 };
 
@@ -194,6 +222,7 @@ DEVICE              cpu_dev = {
     NULL, DEV_DEBUG, 0, dev_debug,
     NULL, NULL, &cpu_help, NULL, NULL, &cpu_description
 };
+
 
 t_stat cpu_svc (UNIT *uptr)
 {
@@ -214,7 +243,7 @@ int IsDrumAddrOk(int AR, int ValidDA)
     // Drum address
     if ((AR >= 0) && (AR < DRUMSIZE)) 
         return (ValidDA & vda_D) ? 1:0; 
-    // cpu registers: acc (lo&hi), distibutor, console swithc reg: ok to check for Addr validity, ok to read, cannot write to it
+    // cpu registers: acc (lo&hi), distibutor, console switch reg: ok to check for Addr validity, ok to read, cannot write to it
     if ((AR >= 8000) && (AR <= 8003)) 
         return (ValidDA & vda_A) ? 1:0; 
     // index registers (ir) present if Storage Unit is enabled: ok to check for Addr validity, ok to read, cannot write to it
@@ -404,7 +433,7 @@ int AddFloatToAcc(int bSubstractFlag, int bAbsFlag, int bNormalizeFlag)
     int n, neg;
     t_int64 d;
 
-    OV = 0; AccNegativeZeroFlag = 0; 
+    AccNegativeZeroFlag = 0; 
     nSteps = 0;
 
     n = GetExp(ACC[1]) - GetExp(DIST);
@@ -485,7 +514,7 @@ int bAccNegComplement; // flag to signals acc has complemented a negative ass (=
 // add to accumulator, set Overflow
 void AddToAcc(t_int64 a1, t_int64 a0, int bSetOverflow) 
 {
-    OV = 0; AccNegativeZeroFlag = 0; 
+    AccNegativeZeroFlag = 0; 
     bAccNegComplement = 0;
     
     ACC[0] += a0;
@@ -563,10 +592,14 @@ t_int64 SetIA2(t_int64 d, int n)
 }
 
 // normalize to 4 digits, 10 complements
-void NormalizeAddr(int * addr)
+void NormalizeAddr(int * addr, int bAllowNegativeValue)
 {
     while (*addr >= 10000) *addr -= 10000; 
-    while (*addr < 0) *addr += 10000; 
+       if (bAllowNegativeValue) {
+          while (*addr <= -10000) *addr += 10000; 
+       } else {
+          while (*addr < 0) *addr += 10000; 
+       }
 }
 
 // apply index register to a tagged address
@@ -575,21 +608,62 @@ void NormalizeAddr(int * addr)
 int ApplyIndexRegister(int * addr)
 {
     int n = 0;
-    int norm = 0;
 
     // check for tag and untag
-    if ((*addr >= 2000) && (*addr < 4000)) {n = 1; norm = 2000; } else
-    if ((*addr >= 4000) && (*addr < 6000)) {n = 2; norm = 4000; } else
-    if ((*addr >= 6000) && (*addr < 8000)) {n = 3; norm = 6000; } else
-    if ((*addr >= 9200) && (*addr < 9260)) {n = 1; norm = 200; } else
-    if ((*addr >= 9400) && (*addr < 9460)) {n = 2; norm = 400; } else
-    if ((*addr >= 9600) && (*addr < 9660)) {n = 3; norm = 600; } else
+    if ((*addr >= 2000) && (*addr < 4000)) {n = 1; *addr -= 2000; } else
+    if ((*addr >= 4000) && (*addr < 6000)) {n = 2; *addr -= 4000; } else
+    if ((*addr >= 6000) && (*addr < 8000)) {n = 3; *addr -= 6000; } else
+    if ((*addr >= 9200) && (*addr < 9400)) {n = 1; *addr -= 200; } else
+    if ((*addr >= 9400) && (*addr < 9600)) {n = 2; *addr -= 400; } else
+    if ((*addr >= 9600) && (*addr < 9800)) {n = 3; *addr -= 600; } else
     return 0;   // address not tagged
 
-    *addr = *addr + IR[n-1] - norm;
-    NormalizeAddr(addr);
+    *addr = *addr + IR[n-1];
+    NormalizeAddr(addr, 0);
 
     return 1;
+}
+
+// apply index register to a tagged address for Model 4
+// removes tag, replace value with developed address
+// return 1 if address was tagged, and has been replaced by developed addr
+int ApplyIndexRegisterModel4(int * DA, int * IA)
+{
+    int n, tagDA, tagIA, nIndexApplied;
+    
+    tagDA = tagIA = 0;
+
+    nIndexApplied = 0;
+    if ((*DA >= 9200) && (*DA < 9800)) {
+        nIndexApplied += ApplyIndexRegister(DA);
+        if ((*IA >= 9200) && (*IA < 9800)) {
+            nIndexApplied += ApplyIndexRegister(IA);
+        }
+        return nIndexApplied;
+    } 
+    if ((*DA >= 4000) && (*DA < 8000)) {
+        *DA -= 4000; // remove tag on DA address
+        tagIA = 1;
+    }
+    if ((*IA >= 4000) && (*IA < 8000)) {
+        *IA -= 4000; // remove tag on IA address
+        tagDA = 1;
+    } else if (  ((*IA >= 8800) && (*IA < 8900)) || ((*IA >= 9800) && (*IA < 9900))  ) {
+        *IA -= 800; // remove tag on IA address
+        tagDA = 1;
+    }
+
+    n = tagDA + 2 * tagIA;
+    if (n) {
+        *DA = *DA + IR[n-1];
+        NormalizeAddr(DA, 0);
+        nIndexApplied++;
+    }
+    if ((*IA >= 9200) && (*IA < 9800)) {
+        nIndexApplied += ApplyIndexRegister(IA);
+    }
+
+    return nIndexApplied;
 }
 
 // opcode decode 
@@ -599,18 +673,23 @@ int ApplyIndexRegister(int * addr)
 CONST char * DecodeOpcode(t_int64 d, int * opcode, int * DA, int * IA)
 {
     CONST char * opname;
+    int opt;
 
     *opcode = Shift_Digits(&d, 2);          // current inste opcode
     *DA     = Shift_Digits(&d, 4);          // addr of data used by current instr
     *IA     = Shift_Digits(&d, 4);          // addr of next instr
 
     opname  = (cpu_unit.flags & OPTION_SOAPMNE) ? base_ops[*opcode].name2 : base_ops[*opcode].name1;
-    if (base_ops[*opcode].option == opStorUnit) {
+    opt     = base_ops[*opcode].option;     // cpu option needed to have the opcode available
+    if (opt == opStorUnit) {
         // opcode available if IBM 653 Storage Unit is present
         if (STOR == 0) return NULL;
-    } else if (base_ops[*opcode].option == opCntrlUnit) {
+    } else if (opt == opCntrlUnit) {
         // opcode available if IBM 652 Control Unit is present
         if (CNTRL == 0) return NULL;
+    } else if (opt == opTLE) {
+        // opcode available if Table LookUo Feature is present
+        if ((cpu_unit.flags & OPTION_TLE) == 0) return NULL;
     } 
     return opname;
 }
@@ -621,24 +700,39 @@ CONST char * DecodeOpcode(t_int64 d, int * opcode, int * DA, int * IA)
 // return number of words transfered
 int TransferIAS(CONST char * dir, int bEOB)
 {
-    int n, f0, t0, f1, t1, ec;
+    int n, f0, t0, f1, t1, ec, ZeroNeg;
+    t_int64 d;
+    char s[6];
 
     n = f0 = t0 = f1 = t1 = ec = 0;
     while (1) {
-        if (dir[0] == 'D') {
-            IAS[IAS_TimingRing] = DRUM[AR];
-            IAS_NegativeZeroFlag[IAS_TimingRing] = DRUM_NegativeZeroFlag[AR];
-            if (n==0) {f0=AR; t0=IAS_TimingRing;}
-            f1=AR; t1=IAS_TimingRing;
+        if (dir[0] == 'D') { 
+            // copy drum to ias
+            d = IAS[IAS_TimingRing] = DRUM[AR];
+            ZeroNeg = IAS_NegativeZeroFlag[IAS_TimingRing] = DRUM_NegativeZeroFlag[AR];
+            sim_debug(DEBUG_DETAIL, &cpu_dev, "... DRUM %04d to IAS %04d: %06d%04d%c '%s'\n", 
+                        AR, IAS_TimingRing+9000, printfw(d,ZeroNeg), 
+                        word_to_ascii(s, 1, 5, d));
+            if (n==0) {f0=AR; t0=IAS_TimingRing+9000;}
+            f1=AR; t1=IAS_TimingRing+9000;
+            // copy symbolic info from drum to ias (so code copies to ias to be executed faster
+            // keeps its symbolic info)
+            memset(&IAS_Symbolic_Buffer[IAS_TimingRing * 80], 0, 80);            // clear ias symbolic info
+            sim_strlcpy(&IAS_Symbolic_Buffer[IAS_TimingRing * 80], 
+                        &DRUM_Symbolic_Buffer[AR * 80], 80);
         } else {
-            DRUM[AR] = IAS[IAS_TimingRing];
-            DRUM_NegativeZeroFlag[AR] = IAS_NegativeZeroFlag[IAS_TimingRing];
-            if (n==0) {t0=AR; f0=IAS_TimingRing;}
-            t1=AR; f1=IAS_TimingRing;
+            // copy ias to drum
+            d = DRUM[AR] = IAS[IAS_TimingRing];
+            ZeroNeg = DRUM_NegativeZeroFlag[AR] = IAS_NegativeZeroFlag[IAS_TimingRing];
+            sim_debug(DEBUG_DETAIL, &cpu_dev, "... IAS %04d to DRUM %04d: %06d%04d%c '%s'\n", 
+                        IAS_TimingRing+9000, AR, printfw(d,ZeroNeg), 
+                        word_to_ascii(s, 1, 5, d));
+            if (n==0) {t0=AR; f0=IAS_TimingRing+9000;}
+            t1=AR; f1=IAS_TimingRing+9000;
         }
         n++;
         if ((AR % 50) == 49)                        { ec = 0; break; }
-        if (IAS_TimingRing == 9059)                 { ec = 1; break; }
+        if (IAS_TimingRing == 59)                   { ec = 1; break; }
         if ((bEOB) && ((IAS_TimingRing % 10) == 9)) { ec = 2; break; }
         AR++; IAS_TimingRing++;
     }
@@ -646,7 +740,7 @@ int TransferIAS(CONST char * dir, int bEOB)
                                                f0, f1, t0, t1, n);
     sim_debug(DEBUG_DATA, &cpu_dev, "     ended by end of %s condition\n",
                                                (ec == 0) ? "Drum band" : (ec == 1) ? "IAS" : "IAS Block");
-    IAS_TimingRing = (IAS_TimingRing + 1) % 60; // incr timing ring at end of pch
+    IAS_TimingRing = (IAS_TimingRing + 1) % 60; // incr timing ring at end of transfer
     return n; 
 }
 
@@ -663,7 +757,7 @@ t_stat ExecOpcode(int opcode, int DA,
 {
     t_stat reason = 0;
     t_int64 d;
-    int i, n, neg; 
+    int i, n, neg, SvOV; 
     int bUsingIAS;
 
     *bBranchToDA  = 0; 
@@ -690,7 +784,7 @@ t_stat ExecOpcode(int opcode, int DA,
             d = DIST;
             if ((opcode == OP_RAABL) || (opcode == OP_RSABL)) d = AbsWord(d);
             if ((opcode == OP_RSL)   || (opcode == OP_RSABL)) d = -d;
-            OV = 0; AccNegativeZeroFlag = 0;
+            AccNegativeZeroFlag = 0;
             ACC[1] = 0;
             ACC[0] = d;
             sim_debug(DEBUG_DETAIL, &cpu_dev, "... ACC: %06d%04d %06d%04d%c, OV: %d\n", 
@@ -716,7 +810,6 @@ t_stat ExecOpcode(int opcode, int DA,
                 // special case as stated in Operation manual 22(22-6060-2_650_OperMan.pdf), page 95
                 // Acc result on minus zero if acc contains minus zero and AU or AL with a drum 
                 // location that contains minus zero
-                OV=0;
                 sim_debug(DEBUG_DETAIL, &cpu_dev, "... ACC: 0000000000 0000000000- (Minus Zero), OV: 0\n");
                 // acc keeps the minus zero it already has
                 break; 
@@ -741,7 +834,6 @@ t_stat ExecOpcode(int opcode, int DA,
                 // special case as stated in Operation manual 22(22-6060-2_650_OperMan.pdf), page 95
                 // Acc result on minus zero if acc contains minus zero and AU or AL with a drum 
                 // location that contains minus zero
-                OV=0;
                 sim_debug(DEBUG_DETAIL, &cpu_dev, "... ACC: 0000000000 0000000000- (Minus Zero), OV: 0\n");
                 // acc keeps the minus zero it already has
                 break; 
@@ -768,7 +860,6 @@ t_stat ExecOpcode(int opcode, int DA,
                 // special case as stated in Operation manual 22(22-6060-2_650_OperMan.pdf), page 95
                 // Acc result on minus zero if a drum location that contains minus zero
                 // is multiplied by +1
-                OV = 0;
                 sim_debug(DEBUG_DETAIL, &cpu_dev, "... Mult result ACC: 0000000000 0000000000- (Minus Zero), OV: 0\n");
                 // acc set to minus zero 
                 ACC[1] = ACC[0] = 0;
@@ -776,7 +867,7 @@ t_stat ExecOpcode(int opcode, int DA,
                 break; 
             }
             *CpuStepsUsed = 0;
-            OV = 0;
+            SvOV=OV; OV=0;
             neg = (DIST < 0) ? 1:0; if (AccNegative) neg = 1-neg;
             d      = AbsWord(DIST); 
             ACC[0] = AbsWord(ACC[0]); 
@@ -795,6 +886,7 @@ t_stat ExecOpcode(int opcode, int DA,
                 ACC[0] = -ACC[0]; 
                 ACC[1] = -ACC[1]; 
             }
+            if (SvOV==1) OV=1; // if overflow was set at beginning of opcode execution, keeps its state
             sim_debug(DEBUG_DETAIL, &cpu_dev, "... ACC: %06d%04d %06d%04d%c, OV: %d\n", 
                 printfa, 
                 OV);
@@ -816,13 +908,14 @@ t_stat ExecOpcode(int opcode, int DA,
                 OV);
             sim_debug(DEBUG_DETAIL, &cpu_dev, "... by DIST: %06d%04d%c\n", 
                                                                printfd);
+            SvOV=OV;
             if (DIST == 0) {
                 OV = 1;
-                sim_debug(DEBUG_DETAIL, &cpu_dev, "Divide By Zero -> OV set\n");
+                sim_debug(DEBUG_EXP, &cpu_dev, "Divide By Zero -> OV set and ERROR\n");
                 reason = STOP_OV; // divisor zero allways stops the machine
             } else if (AbsWord(DIST) <= AbsWord(ACC[1])) {
                 OV = 1;
-                sim_debug(DEBUG_DETAIL, &cpu_dev, "Quotient Overflow -> OV set and ERROR\n");
+                sim_debug(DEBUG_EXP, &cpu_dev, "Quotient Overflow -> OV set and ERROR\n");
                 reason = STOP_OV; // quotient overfow allways stops the machine
             } else {
                 *CpuStepsUsed = 0;
@@ -852,6 +945,7 @@ t_stat ExecOpcode(int opcode, int DA,
                                 +(DrumAddr % 2)                 // wait for even 
                                 +*CpuStepsUsed + 40;            // i holds the number of loops done
             }
+            if (SvOV==1) OV=1; // if overflow was set at beginning of opcode execution, keeps its state
             sim_debug(DEBUG_DETAIL, &cpu_dev, "... Div result ACC: %06d%04d %06d%04d%c, OV: %d\n", 
                 printfa,
                 OV);
@@ -867,9 +961,8 @@ t_stat ExecOpcode(int opcode, int DA,
                 d = ShiftAcc((opcode == OP_SLT) ? 1:-1);
             }
             if (opcode == OP_SRD) {
-                if (d <= - 5) AddToAcc(0,-1,1);
-                if (d >=   5) AddToAcc(0,+1,1);
-                OV = 0;
+                if (d <= - 5) AddToAcc(0,-1,0);
+                if (d >=   5) AddToAcc(0,+1,0);
             }
             sim_debug(DEBUG_DETAIL, &cpu_dev, "... ACC: %06d%04d %06d%04d%c, OV: %d\n", 
                 printfa,
@@ -887,33 +980,26 @@ t_stat ExecOpcode(int opcode, int DA,
                             + ((opcode == OP_SRD) ? 1:0);
             break;
         case OP_SCT    :   // Shift accumulator left and count 
-            n = 10 - DA % 10;  // shift count (nine's complement of unit digit of DA)
+            n = DA % 10;  
+            if (n>0) n=10-n; // shift count (ten's complement of unit digit of DA, or zero if digit is zero)
             neg = AccNegative; // save acc sign
             ACC[0] = AbsWord(ACC[0]);
             ACC[1] = AbsWord(ACC[1]);
-            if (n==10) n=0;
-            if (ACC[1] == 0) {  
-                // upper acc is zero -> will have 10 or more shifts
-                ACC[1] = ACC[0];
-                ACC[0] = 10;
-                if (n) {
-                    OV = 1; // overflow because n <> 0 
-                } else {
-                    if (Get_HiDigit(ACC[1]) == 0) OV = 1; // overflow because not just 10 shifts
-                }
-            } else if (Get_HiDigit(ACC[1]) != 0) {  
-                // no shift will be done
+            i=0;
+            if (Get_HiDigit(ACC[1]) > 0) {
+                // no shift, two low orfer digits replaced by zero
                 ACC[0] = SetIA2(ACC[0], 0); // replace last two digits by 00
             } else {
                 while (Get_HiDigit(ACC[1]) == 0)  {
-                    ShiftAcc(1); // shift left
                     if (n==10) {
                         OV = 1;
                         break;
                     }
-                    n++;
+                    ShiftAcc(1); // shift left
+                    i++;         // number of shift
+                    n++;         // count
                 }
-                ACC[0] = SetIA2(ACC[0], n); // replace last two digits by 00                
+                ACC[0] = SetIA2(ACC[0], n); // replace last two digits by count n
             }
             AccNegativeZeroFlag = 0;
             if (neg) {ACC[0] = -ACC[0]; ACC[1] = -ACC[1]; }
@@ -922,7 +1008,7 @@ t_stat ExecOpcode(int opcode, int DA,
                 OV);
             *CpuStepsUsed = 1+1+1
                             +(DrumAddr % 2)                 // wait for even 
-                            + 2*(DA % 10);                  // number of shifts done 
+                            + 2*i;                  // number of shifts done 
             break;
         // load and store
         case OP_STL: // Store Lower in Mem
@@ -974,8 +1060,9 @@ t_stat ExecOpcode(int opcode, int DA,
                             +(DrumAddr % 2);                 // wait for even 
             break;
         case OP_LD:  // Load Distributor
-            *CpuStepsUsed = 1+1+1+1;                    
+            *CpuStepsUsed = 1+1+1+1;      
             break;
+        case OP_TLE:   // Table lookup on equal
         case OP_TLU:   // Table lookup 
             {
                 char s[6];
@@ -993,13 +1080,16 @@ t_stat ExecOpcode(int opcode, int DA,
                 while (1) {
                     AR++; n++;
                     if (0==IsDrumAddrOk(AR, vda_DS)) {
-                        sim_debug(DEBUG_DETAIL, &cpu_dev, "Invalid AR addr %d ERROR\n", AR);
+                        sim_debug(DEBUG_EXP, &cpu_dev, "Invalid AR addr %d ERROR\n", AR);
                         reason = STOP_ADDR;
                         break;
                     }
                     if ((bUsingIAS == 0) && ((AR % 50) > 47)) continue; // skip addr 48 & 49 of band that cannot be used for tables
                     ReadAddr(AR, &d, NULL);       // read table argument
-                    if (AbsWord(d) >= AbsWord(DIST)) {
+                    if ( (opcode == OP_TLU) ? 
+                              (AbsWord(d) >= AbsWord(DIST)) : 
+                              (AbsWord(d) == AbsWord(DIST))
+                        ) {
                         sim_debug(DEBUG_DETAIL, &cpu_dev, "...  Found %04d: %06d%04d%c '%s'\n", 
                             AR, printfw(d,0), 
                             word_to_ascii(s, 1, 5, d));
@@ -1023,7 +1113,7 @@ t_stat ExecOpcode(int opcode, int DA,
         case OP_BRD6: case OP_BRD7: case OP_BRD8: case OP_BRD9: case OP_BRD10:
             sim_debug(DEBUG_DETAIL, &cpu_dev, "... Check DIST: %06d%04d%c\n", 
                                                               printfd);
-            d = DIST; 
+            d = AbsWord(DIST); 
             n = opcode - OP_BRD10; if (n == 0) n = 10;
             while (--n > 0) d = d / 10;
             d = d % 10;
@@ -1035,7 +1125,7 @@ t_stat ExecOpcode(int opcode, int DA,
                sim_debug(DEBUG_DETAIL, &cpu_dev, "Digit is %d -> Branch Not Taken\n", (int32) d);
             } else {
                // any other value for tested digit -> stop
-               sim_debug(DEBUG_DETAIL, &cpu_dev, "Digit is %d -> Branch ERROR\n", (int32) d);
+               sim_debug(DEBUG_EXP, &cpu_dev, "Digit is %d -> Branch ERROR\n", (int32) d);
                reason = STOP_ERRO;
                break;
             }
@@ -1085,25 +1175,42 @@ t_stat ExecOpcode(int opcode, int DA,
             }
             *CpuStepsUsed = 1+1                    
                             + ((*bBranchToDA) ? 1:0);   // one extra step needed if branch taken
+            // BOV resets overflow
+            OV=0;
             break;
         // Card I/O
         case OP_RD:   // Read a card 
+        case OP_RD2:
+        case OP_RD3:
+        case OP_RC1:
+        case OP_RC2:
+        case OP_RC3:
             bUsingIAS = (AR >= 9000) ? 1:0;
             {
                 char s[6];
+                int nUnit, area, nIL;
+
+                if ((opcode == OP_RD2) || (opcode == OP_RC2)) {
+                    nUnit = 2; nIL = IL_RD23; area = 13;
+                } else if ((opcode == OP_RD3) || (opcode == OP_RC3)) {
+                    nUnit = 3; nIL = IL_RD23; area = 13;
+                } else {
+                    nUnit = 1; nIL = IL_RD1; area = 1;
+                } 
 
                 if (bUsingIAS == 0) {
-                    AR = (DA / 50) * 50 + 1; // Drum Read Band is XX01 to XX10 or XX51 to XX60
+                    AR = (DA / 50) * 50 + area; // Drum Read Band is XX01 to XX10 or XX51 to XX60
                 }
 
-                reason = cdr_cmd(&cdr_unit[1], IO_RDS, AR);
+                reason = cdr_cmd(&cdr_unit[nUnit], 0, AR);
                 if (reason == SCPE_NOCARDS) {
-                    reason = STOP_CARD;
+                    reason = STOP_IO;
                     break;
                 } else if (reason != SCPE_OK) {
                     break;
                 }
                 // copy card data from IO Sync buffer to drum/ias
+                sim_debug(DEBUG_DETAIL, &cpu_dev, "... Read Card Unit CDR%d\n", nUnit);
                 for (i=0;i<10;i++) {
                     sim_debug(DEBUG_DETAIL, &cpu_dev, "... Read Card %04d: %06d%04d%c '%s'\n", 
                         AR+i, printfw(IOSync[i],IOSync_NegativeZeroFlag[i]), 
@@ -1123,23 +1230,35 @@ t_stat ExecOpcode(int opcode, int DA,
                     sim_debug(DEBUG_DETAIL, &cpu_dev, "... Is a LOAD Card\n");
                     *bBranchToDA = 1;      // load card -> next instr is taken from DA
                 }
+                // 300 msec read cycle, 270 available for computing
+                *CpuStepsUsed = msec_to_wordtime(30); // 30 msec div 0.096 msec word time;                    
+                InterLockCount[nIL] = msec_to_wordtime(300); // set interlock 300 msec for card read processing
             }
-            // 300 msec read cycle, 270 available for computing
-            *CpuStepsUsed = 312; // 30 msec div 0.096 msec word time;                    
-            InterLockCount[IL_RD1] = 3120; // 300 msec for read card processing
             break;
         case OP_PCH:   // Punch a card 
+        case OP_WR2:
+        case OP_WR3:
             bUsingIAS = (AR >= 9000) ? 1:0;
             {
                 char s[6];
+                int nUnit, area, nIL;
+
+                if (opcode == OP_WR2) {
+                    nUnit = 2; nIL = IL_WR23; area = 39;
+                } else if (opcode == OP_WR3) {
+                    nUnit = 3; nIL = IL_WR23; area = 39;
+                } else {
+                    nUnit = 1; nIL = IL_RD1; area = 27;
+                } 
 
                 if (bUsingIAS == 0) {
-                    AR = (DA / 50) * 50 + 27; // Drum Read Band is XX27 to XX36 or XX77 to XX86
+                    AR = (DA / 50) * 50 + area; // Drum Read Band is XX27 to XX36 or XX77 to XX86
                 }
 
                 // clear IO Sync buffer
                 for (i=0;i<10;i++) IOSync[i] = IOSync_NegativeZeroFlag[i] = 0;
                 // copy card data to IO Sync buffer from drum/ias
+                sim_debug(DEBUG_DETAIL, &cpu_dev, "... Punch Card Unit CDP%d\n", nUnit);
                 for (i=0;i<10;i++) {
                     if (bUsingIAS == 0) {
                         IOSync[i] = DRUM[AR + i];
@@ -1148,26 +1267,30 @@ t_stat ExecOpcode(int opcode, int DA,
                         n = AR - 9000 + i;
                         IOSync[i] = IAS[n];
                         IOSync_NegativeZeroFlag[i] = IAS_NegativeZeroFlag[n];
-                        IAS_TimingRing = i;
-                        if ((n % 10) == 9) break; // hit ias end of block, terminate even if transfered less than 10 words
+                        IAS_TimingRing = n;
                     }                   
                     sim_debug(DEBUG_DETAIL, &cpu_dev, "... Punch Card %04d: %06d%04d%c '%s'\n", 
                         AR+i, printfw(IOSync[i],IOSync_NegativeZeroFlag[i]), 
                         word_to_ascii(s, 1, 5, IOSync[i]));
+                    if (bUsingIAS) {
+                        // punching from IAS. If hit ias end of block, terminate even 
+                        // if transfered less than 10 words (rest of words were filled with zeroes)
+                        if ((n % 10) == 9) break; 
+                    }
                 }
 
-                reason = cdp_cmd(&cdp_unit[1], IO_WRS,AR);
+                reason = cdp_cmd(&cdp_unit[nUnit], 0,AR);
                 if (reason == SCPE_NOCARDS) {
-                    reason = STOP_CARD;
+                    reason = STOP_IO;
                     break;
                 } else if (reason != SCPE_OK) {
                     break;
                 }
                 if (bUsingIAS) IAS_TimingRing = (IAS_TimingRing + 1) % 60; // incr timing ring at end of pch
+                // 600 msec punch cycle, 565 available for computing
+                *CpuStepsUsed = msec_to_wordtime(35); // 35 msec div 0.096 msec word time;                    
+                InterLockCount[nIL] = msec_to_wordtime(600); // set interlock 600 msec for card punch processing 
             }
-            // 600 msec punch cycle, 565 available for computing
-            *CpuStepsUsed = 365; // 35 msec div 0.096 msec word time;                    
-            InterLockCount[IL_WR1] = 6250; // 600 msec for punch card processing
             break;
         // IAS - Immediate Access Storage
         case OP_SET: // Set IAS Timing Ring
@@ -1182,11 +1305,11 @@ t_stat ExecOpcode(int opcode, int DA,
             *CpuStepsUsed = 1+1+1+n;                    
             break;
         case OP_LIB: // Load IAS Block (from Drum)
-            n = TransferIAS("D->I", 1); // transfer drum to ias, end of ias block does not terminate transfer
+            n = TransferIAS("D->I", 1); // transfer drum to ias, end of ias block does terminate transfer
             *CpuStepsUsed = 1+1+1+n;                    
             break;
         case OP_SIB: // Store IAS Block (to Drum)
-            n = TransferIAS("I->D", 1); // transfer ias to drum, end of ias block does not terminate transfer
+            n = TransferIAS("I->D", 1); // transfer ias to drum, end of ias block does terminate transfer
             *CpuStepsUsed = 1+1+1+n;                    
             break;
         // Index Register
@@ -1198,14 +1321,16 @@ t_stat ExecOpcode(int opcode, int DA,
             if  ((opcode == OP_RAA) || (opcode == OP_RSA)) n = 0;
             if (DA >= 8000) {
                ReadAddr(DA, &d, NULL);
+               DIST=d; DistNegativeZeroFlag=0;
+               sim_debug(DEBUG_DATA, &cpu_dev, "... Read %04d: %06d%04d%c\n", DA, printfd);
                i = (int) (d % D4); 
             } else {
                i = DA;
             }
             n = n + (((opcode == OP_AXA) || (opcode == OP_RAA)) ? i : -i);
-            NormalizeAddr(&n);
-            sim_debug(DEBUG_DETAIL, &cpu_dev, "... IRA: %04d\n", 
-                                                        n);
+            NormalizeAddr(&n, 1);
+            sim_debug(DEBUG_DETAIL, &cpu_dev, "... IRA: %04d%c\n", 
+                                                        abs(n), n<0?'-':'+');
             IR[0] = n;
             *CpuStepsUsed = 1+1+1;                    
             break;
@@ -1217,14 +1342,16 @@ t_stat ExecOpcode(int opcode, int DA,
             if  ((opcode == OP_RAB) || (opcode == OP_RSB)) n = 0;
             if (DA >= 8000) {
                ReadAddr(DA, &d, NULL);
+               DIST=d; DistNegativeZeroFlag=0;
+               sim_debug(DEBUG_DATA, &cpu_dev, "... Read %04d: %06d%04d%c\n", DA, printfd);
                i = (int) (d % D4); 
             } else {
                i = DA;
             }
             n = n + (((opcode == OP_AXB) || (opcode == OP_RAB)) ? i : -i);
-            NormalizeAddr(&n);
-            sim_debug(DEBUG_DETAIL, &cpu_dev, "... IRB: %04d\n", 
-                                                        n);
+            NormalizeAddr(&n, 1);
+            sim_debug(DEBUG_DETAIL, &cpu_dev, "... IRB: %04d%c\n", 
+                                                        abs(n), n<0?'-':'+');
             IR[1] = n;
             *CpuStepsUsed = 1+1+1;                    
             break;
@@ -1236,14 +1363,16 @@ t_stat ExecOpcode(int opcode, int DA,
             if  ((opcode == OP_RAC) || (opcode == OP_RSC)) n = 0;
             if (DA >= 8000) {
                ReadAddr(DA, &d, NULL);
+               DIST=d; DistNegativeZeroFlag=0;
+               sim_debug(DEBUG_DATA, &cpu_dev, "... Read %04d: %06d%04d%c\n", DA, printfd);
                i = (int) (d % D4); 
             } else {
                i = DA;
             }
             n = n + (((opcode == OP_AXC) || (opcode == OP_RAC)) ? i : -i);
-            NormalizeAddr(&n);
-            sim_debug(DEBUG_DETAIL, &cpu_dev, "... IRC: %04d\n", 
-                                                        n);
+            NormalizeAddr(&n, 1);
+            sim_debug(DEBUG_DETAIL, &cpu_dev, "... IRC: %04d%c\n", 
+                                                        abs(n), n<0?'-':'+');
             IR[2] = n;
             *CpuStepsUsed = 1+1+1;                    
             break;
@@ -1252,8 +1381,8 @@ t_stat ExecOpcode(int opcode, int DA,
         case OP_BMC:
             i = ((opcode == OP_BMA) ? 0 : (opcode == OP_BMB) ? 1 : 2);
             n = IR[i];
-            sim_debug(DEBUG_DETAIL, &cpu_dev, "... IR%c: %04d\n", 
-                                                      i+'A', n);
+            sim_debug(DEBUG_DETAIL, &cpu_dev, "... IR%c: %04d%c\n", 
+                                                      i+'A', abs(n), n<0?'-':'+');
             if (n<0) {
                 sim_debug(DEBUG_DETAIL, &cpu_dev, "Is Negative -> Branch Taken\n");
                 *bBranchToDA = 1; 
@@ -1266,10 +1395,10 @@ t_stat ExecOpcode(int opcode, int DA,
         case OP_NZC:
             i = ((opcode == OP_NZA) ? 0 : (opcode == OP_NZB) ? 1 : 2);
             n = IR[i];
-            sim_debug(DEBUG_DETAIL, &cpu_dev, "... IR%c: %04d\n", 
-                                                      i+'A', n);
-            if (n==0) {
-                sim_debug(DEBUG_DETAIL, &cpu_dev, "Is Zero -> Branch Taken\n");
+            sim_debug(DEBUG_DETAIL, &cpu_dev, "... IR%c: %04d%c\n",                                                       
+                                                      i+'A', abs(n), n<0?'-':'+');
+            if (n!=0) {
+                sim_debug(DEBUG_DETAIL, &cpu_dev, "Is Non Zero -> Branch Taken\n");
                 *bBranchToDA = 1; 
             }
             *CpuStepsUsed = 1+1                    
@@ -1298,7 +1427,7 @@ t_stat ExecOpcode(int opcode, int DA,
                 OV);
             sim_debug(DEBUG_DETAIL, &cpu_dev,   "...  by DIST: %06d%04d%c\n", 
                                                                printfd);
-            OV = 0;
+            SvOV=OV; OV = 0;
             if (((ACC[1] / 100) == 0) || ((DIST / 100) == 0)) {
                 // if any mantissa is zero -> multiply by zero -> result = 0
                 ACC[1] = ACC[0] = 0;
@@ -1321,6 +1450,7 @@ t_stat ExecOpcode(int opcode, int DA,
                 }
                 MantissaRoundAndNormalizeToFloat(CpuStepsUsed, neg, exp);
             }
+            if (SvOV==1) OV=1; // if overflow was set at beginning of opcode execution, keeps its state
             sim_debug(DEBUG_DETAIL, &cpu_dev, "... FP Mult result ACC: %06d%04d %06d%04d%c, OV: %d\n", 
                 printfa, 
                 OV);
@@ -1332,8 +1462,8 @@ t_stat ExecOpcode(int opcode, int DA,
                 printfa,
                 OV);
             sim_debug(DEBUG_DETAIL, &cpu_dev, "... by DIST: %06d%04d%c\n", 
-                                                               printfd);
-            OV = 0;
+                                                               printfd);            
+            SvOV=OV; OV = 0;
             if ((DIST / 100) == 0) {    // check mantissa for zero, not exponent
                 OV = 1;
                 sim_debug(DEBUG_DETAIL, &cpu_dev, "Divide By Zero -> OV set and ERROR\n");
@@ -1342,8 +1472,7 @@ t_stat ExecOpcode(int opcode, int DA,
                 // if dividend is zero -> result = 0
                 ACC[1] = ACC[0] = 0;
             } else {
-                int exp = GetExp(ACC[1]) - GetExp(DIST) + 50;
-
+                int exp = GetExp(ACC[1]) - GetExp(DIST) + 50;                
                 neg = (DIST < 0) ? -1:1; if (AccNegative) neg = -neg;
 
                 ACC[1] = AbsWord(ACC[1]) / 100; 
@@ -1362,13 +1491,116 @@ t_stat ExecOpcode(int opcode, int DA,
                     *CpuStepsUsed = *CpuStepsUsed + 2;
                 }
                 ACC[1] = ACC[0];
-                MantissaRoundAndNormalizeToFloat(CpuStepsUsed, neg, exp);
+                MantissaRoundAndNormalizeToFloat(CpuStepsUsed, neg, exp);                
             }
+            if (SvOV==1) OV=1; // if overflow was set at beginning of opcode execution, keeps its state
             sim_debug(DEBUG_DETAIL, &cpu_dev, "... FP Div result ACC: %06d%04d %06d%04d%c, OV: %d\n", 
                 printfa,
                 OV);
             *CpuStepsUsed = 1+1+2+2+16+2+1+ *CpuStepsUsed 
                             +(DrumAddr % 2);                // wait for even 
+            break;
+        // tape opcodes
+        case OP_RTC: // Read Tape Check
+            sim_debug(DEBUG_DETAIL, &cpu_dev, "... Tape %d read check\n", DA % 10);
+            goto tape_opcode;
+        case OP_RTA: // Read Tape Alphanumeric
+        case OP_RTN: // Read Tape Numeric
+            sim_debug(DEBUG_DETAIL, &cpu_dev, "... Tape %d read at IAS: %04d\n", DA % 10, IAS_TimingRing + 9000);
+            goto tape_opcode;
+        case OP_WTN: // Write Tape Numeric
+        case OP_WTA: // Write Tape Alphabetic
+            sim_debug(DEBUG_DETAIL, &cpu_dev, "... Tape %d write from IAS: %04d\n", DA % 10, IAS_TimingRing + 9000);
+            goto tape_opcode;
+        case OP_WTM: // Write Tape Mark
+            sim_debug(DEBUG_DETAIL, &cpu_dev, "... Tape %d write tape mark\n", DA % 10);
+            goto tape_opcode;
+        case OP_BST: // BackStep Tape 
+            sim_debug(DEBUG_DETAIL, &cpu_dev, "... Tape %d backspace record\n", DA % 10);
+            goto tape_opcode;
+        case OP_RWD: // rewind
+            sim_debug(DEBUG_DETAIL, &cpu_dev, "... Tape %d rewind\n", DA % 10);
+        tape_opcode:
+            n = (DA % 10);
+            if ((n < 0) || (n > 5)) {
+               sim_debug(DEBUG_EXP, &cpu_dev, "Invalid Tape addr %d ERROR\n", AR);
+               reason = STOP_ADDR;
+               break;
+            }
+            reason = mt_cmd(&mt_unit[n], opcode, FAST);
+            if (reason == SCPE_OK) {
+                // tape command terminated
+            } else if (reason == SCPE_OK_INPROGRESS) {
+                // tape command in progress. 
+                // Set interlock on Control Unit. Will be removed by mt_svr when tape operation terminates
+                InterLockCount[IL_Tape]    = msec_to_wordtime(5*60*1000); 
+                // Set interlock on IAS if read/write from/to IAS. Will be removed by mt_svr when tape operation terminates
+                if ((opcode == OP_RTN) ||  (opcode == OP_RTA) || (opcode == OP_WTN) || (opcode == OP_WTA)){
+                    InterLockCount[IL_IAS]  = msec_to_wordtime(5*60*1000); ; 
+                }
+                reason = SCPE_OK;
+            } else {
+                // other reason are unexpected errors and terminates the opcode execution
+                break;
+            }
+            *CpuStepsUsed = 1+1+1+1+1;
+            break;
+        case OP_NTS: // Branch on No Tape Signal
+        case OP_NEF: // Branch on No End of File
+            sim_debug(DEBUG_DETAIL, &cpu_dev, "... Tape Signal is %s\n", TapeIndicatorStr[LastTapeIndicator]); 
+            if ((opcode == OP_NTS) && (LastTapeIndicator == 0)) {
+                sim_debug(DEBUG_DETAIL, &cpu_dev, "No Tape Signal -> Branch Taken\n");
+                *bBranchToDA = 1; 
+            } 
+            if ((opcode == OP_NEF) && (LastTapeIndicator != MT_IND_EOF)) {
+                sim_debug(DEBUG_DETAIL, &cpu_dev, "No End of File -> Branch Taken\n");
+                *bBranchToDA = 1; 
+            } 
+            *CpuStepsUsed = 1+1                    
+                            + ((*bBranchToDA) ? 1:0);   // one extra step needed if branch taken
+            break;
+        // disk opcodes
+        case OP_SDS: // seek
+        case OP_RDS: // seek
+        case OP_WDS: // seek
+            sim_debug(DEBUG_DETAIL, &cpu_dev, "... DIST: %06d%04d%c\n", printfd);
+            n = abs((int)(DIST % D8)) % 1000000; // ramac operation address
+            sim_debug(DEBUG_DETAIL, &cpu_dev, "... RAMAC %s on Unit %d, Disk %d, Track %d, Arm %d started\n", 
+                     (opcode == OP_SDS) ? "SEEK" : (opcode == OP_RDS) ? "READ" : "WRITE",
+                     i=(n / 100000) % 10,  // unit
+                     (n / 1000) % 100,     // disk
+                     (n /   10) % 100,     // track
+                     neg=(n % 10)          // arm
+                     );
+            if (neg > 2) {
+               sim_debug(DEBUG_EXP, &cpu_dev, "Arm out of range (should be 0..2)\n");
+               reason = STOP_IO; // selected arm or unit out of range
+            }
+            if (i > 3) {
+               sim_debug(DEBUG_EXP, &cpu_dev, "Unit out of range (should be 0..3)\n");
+               reason = STOP_IO; // selected arm or unit out of range
+            }
+            if (cpu_unit.flags & OPTION_1DSKARM) {
+                // if 1 arm per disk enabled, alisase all disck comands to be executed on arm 0
+                n = (n / 10)*10;
+            }
+            reason = dsk_cmd(opcode, n, FAST);
+            if (reason == SCPE_OK) {
+                // disk command terminated
+            } else if (reason == SCPE_OK_INPROGRESS) {
+                // disk command in progress. 
+                // Set interlock on Ramac Disk Control Unit. Will be removed by dsk_svr when disk operation terminates
+                InterLockCount[IL_RamacUnit]    = msec_to_wordtime(75); 
+                // Set interlock on IAS if read/write from/to IAS. Will be removed by dsk_svr when disk operation terminates
+                if ((opcode == OP_RDS) || (opcode == OP_WDS)){
+                    InterLockCount[IL_IAS]  = msec_to_wordtime(5*60*1000); ; 
+                }
+                reason = SCPE_OK;
+            } else {
+                // other reason are unexpected errors and terminates the opcode execution
+                break;
+            }
+            *CpuStepsUsed = 1+1+1+1+1;
             break;
         default:
             reason = STOP_UUO;
@@ -1379,30 +1611,81 @@ t_stat ExecOpcode(int opcode, int DA,
     return reason;
 }
 
-// return 1 if must wait for storage 
+// return 2 if must wait for drum rotation, return 1 if must wait for IAS interlock release
 int WaitForStorage(int AR)
 {
    if ((AR >= 0) && (AR < DRUMSIZE)) {
-       if ((AR % 50) != DrumAddr) return 1; // yes, must wait for drum 
+       if ((AR % 50) != DrumAddr) return 2; // yes, must wait for drum 
    } else if ((STOR) && (AR >= 9000) && (AR < 9060)) {
        if (InterLockCount[IL_IAS] > 0) return 1; // yes, IAS was interlocked. Must wait until interlock is released
    }
    return 0;
 }
 
+// return 1 if must wait for interlock release
+int WaitForInterlock(int nInterlock)
+{
+    int n, arm; 
+
+    // handle combined interlocks
+    if (nInterlock == IL_Tape_and_Unit_and_IAS) {
+       if (WaitForInterlock(IL_IAS)) return 1;
+       if (WaitForInterlock(IL_Tape)) return 1;
+       if (WaitForInterlock(-1)) return 1; // check for interlock on tape unit
+       return 0;
+    } else if (nInterlock == IL_Tape_and_Unit) {
+       if (WaitForInterlock(IL_Tape)) return 1;
+       if (WaitForInterlock(-1)) return 1; // check for interlock on tape unit
+       return 0;
+    } else if (nInterlock == IL_RamacUnit_and_Arm_and_IAS) {
+       if (WaitForInterlock(IL_IAS)) return 1;
+       if (WaitForInterlock(IL_RamacUnit)) return 1;
+       if (WaitForInterlock(-2)) return 1; // check for interlock on disk unit
+       return 0;
+    } else if (nInterlock == IL_RamacUnit_and_Arm) {
+       if (WaitForInterlock(IL_RamacUnit)) return 1;
+       if (WaitForInterlock(-2)) return 1; // check for interlock on ramac disk unit arm
+       return 0;
+    }
+    // handle interlock on tape unit
+    if (nInterlock == -1) {
+        // get tape unit referenced by current opcode from intruction DA 
+        n = (PR / D4) % 10;
+        if ((n < 0) || (n > 5)) return 0; // invalid tape addr -> no interlock wait
+        return mt_ready(n) ? 0:1;  // if tape ready -> return 0 -> no need to wait for tape unit 
+    }     
+    // handle interlock on disk unit arm
+    if (nInterlock == -2) {
+        // get disk unit and arm referenced by current DIST (distributor) value
+        n = abs((int)(DIST % D8));
+        arm = n % 10;
+        n   = n / 100000;
+        if ((arm > 2) || (n > 3)) return 0; // invalid arm/disk unit -> no interlock wait
+          if (cpu_unit.flags & OPTION_1DSKARM) {
+            // if 1 arm per disk enabled, alisase all disck comands to be executed on arm 0
+            arm=0;
+        }
+        return dsk_ready(n, arm) ? 0:1;  // if disk unit arm ready -> return 0 -> no need to wait  
+    }
+
+    // handle single interlock
+    return InterLockCount[nInterlock];
+}
+
 t_stat
 sim_instr(void)
 {
     t_stat              reason;
-    int                 opcode, halt_cpu;
+    int                 opcode, halt_cpu_requested;
     int                 bReadData, bWriteDrum, bBranchToDA;
     int                 instr_count = 0; /* Number of instructions to execute */
     const char *        opname;          /* points to opcode name */               
+    char *                Symbolic_Buffer;
 
     int IA = 0;                                         // Instr Address: addr of next inst 
     int DA = 0;                                         // Data Address; addr of data to be used by current inst
 
-    int MachineCycle, CpuStepsUsed, il, WaitForInterlock;
+    int MachineCycle, CpuStepsUsed, il, nInterlock, bInterLockWaitMsg, bFastMode; 
 
     /* How CPU execution is simulated
 
@@ -1447,7 +1730,7 @@ sim_instr(void)
         sim_cancel_step();
     }
 
-    reason = halt_cpu = 0;
+    reason = halt_cpu_requested = 0;
 
     MachineCycle = CpuStepsUsed = 0;
     DrumAddr = 0;
@@ -1463,19 +1746,23 @@ sim_instr(void)
         ProgStopFlag = 0;
     }
 
-    WaitForInterlock = 0; // clear interlocks
-    for (il=0;il<IL_array;il++) InterLockCount[il] = 0;
+    nInterlock = 0; // clear interlocks
+    memset(&InterLockCount[0], 0, sizeof(InterLockCount));
+    bInterLockWaitMsg = 0; 
 
     sim_cancel (&cpu_unit);
-    sim_activate (&cpu_unit, 1);     
+    sim_activate (&cpu_unit, 1);   
+
+    bFastMode = FAST; 
 
     while (reason == 0) {       /* loop until halted */
 
         if (sim_interval <= 0) {        /* event queue? */
             reason = sim_process_event();
             if (reason == SCPE_STOP) {
-                reason = 0;    // if stop cpu requested, does not do it inmediatelly
-                halt_cpu = 1;  // signal it so cpu is halted on end of current intr execution cycle
+                reason = 0;                 // if stop cpu requested, does not do it inmediatelly
+                halt_cpu_requested = 1;     // signal it so cpu is halted on end of current intr execution cycle
+                bFastMode = 1;              // also set fast mode to avoid wait on Interlocks, thus finishing the current inst asap
             }
             if (reason != SCPE_OK) {
                 break;      
@@ -1492,8 +1779,8 @@ sim_instr(void)
                 reason = STOP_IBKPT;
                 break;
             }
-            // only check for ^E on fetch
-            if (halt_cpu) {
+            // only check for ^E on fetch and on interlock wait
+            if (halt_cpu_requested) {
                 reason = SCPE_STOP; 
                 break;
             }
@@ -1504,8 +1791,14 @@ sim_instr(void)
 
         // simulate the rotating drum: incr current drum position
         DrumAddr = (DrumAddr+1) % 50;
+
+        // increment umber of word counts elapsed from starting of simulator -> this is the global time measurement
+        GlobalWordTimeCount++;
+
         // if any interlock set, decrease it 
-        for (il=0;il<IL_array;il++) if (InterLockCount[il] > 0) InterLockCount[il]--;
+        for (il=0;il < sizeof(InterLockCount)/ sizeof(InterLockCount[0]) ;il++) {
+            if (InterLockCount[il] > 0) InterLockCount[il]--;
+        }
         // decrease pending to execute step intruction count
         if (CpuStepsUsed > 0) CpuStepsUsed--;
 
@@ -1518,7 +1811,14 @@ sim_instr(void)
                 continue;
             }
             // should wait for storage to fetch inst?
-            if (FAST == 0) if (WaitForStorage(AR)) continue; // yes
+            if (bFastMode == 0) {
+                il=WaitForStorage(AR);
+                if ((il==1) && (bInterLockWaitMsg == 0)) {
+                    bInterLockWaitMsg = 1; 
+                    sim_debug(DEBUG_DETAIL, &cpu_dev, "Wait for interlock on IAS to fetch opcode at %04d\n", AR);
+                }
+                if (il>0) continue; // yes, wait for storage to fetch inst
+            }
             // init inst execution
             CpuStepsUsed = 0; 
 
@@ -1534,10 +1834,20 @@ sim_instr(void)
             }
             // decode inst
             opname = DecodeOpcode(PR, &opcode, &DA, &IA);
+            // get symbolic info if any
+            if ((AR < MAXDRUMSIZE) && (DRUM_Symbolic_Buffer[AR * 80] > 0)) {
+                // drum symb info
+                Symbolic_Buffer = &DRUM_Symbolic_Buffer[AR * 80];
+            } else if ((AR >= 9000) && (AR < 9060)) {
+                // ias symb info
+                Symbolic_Buffer = &IAS_Symbolic_Buffer[(AR - 9000) * 80];
+            } else {
+                Symbolic_Buffer = 0;
+            }
             sim_debug(DEBUG_CMD, &cpu_dev, "Exec %04d: %02d %-6s %04d %04d %s%s\n", 
                                            IC, opcode, (opname == NULL) ? "???":opname, DA, IA,
-                                           ((AR >= MAXDRUMSIZE) || (DRUM_Symbolic_Buffer[AR * 80] == 0)) ? "" : "            symb: ", 
-                                           (AR >= MAXDRUMSIZE) ? "" : &DRUM_Symbolic_Buffer[AR * 80]);
+                                           (Symbolic_Buffer) ? "            symb: ": "", 
+                                           (Symbolic_Buffer) ? Symbolic_Buffer     : "");
             PROP = (uint16) opcode;
             if (opname == NULL) {
                 reason = STOP_UUO; 
@@ -1546,7 +1856,11 @@ sim_instr(void)
             // if DA or IA tagged, modify DA or IA to remove tag and set the developed address in PR
             if (STOR) {
                 int nIndexsApplied; 
-                nIndexsApplied = ApplyIndexRegister(&DA) + ApplyIndexRegister(&IA);
+                if (DRUM4K) {
+                    nIndexsApplied = ApplyIndexRegisterModel4(&DA, &IA);
+                } else {
+                    nIndexsApplied = ApplyIndexRegister(&DA) + ApplyIndexRegister(&IA);
+                }
                 if (nIndexsApplied > 0) {
                     CpuStepsUsed += nIndexsApplied;
                     PR = (t_int64) opcode * D8 + (t_int64) DA * D4 + (t_int64) IA;
@@ -1562,31 +1876,55 @@ sim_instr(void)
     
             // simulates the machine working on half cycles
             if (HalfCycle == 1) {      // if I-Half finished, about to exec D-Half
-                HalfCycle = 2;                                   // bump half cycle to exec D-Half on next scp step
-                reason = SCPE_STEP;                              // then break beacuse I-Half finished
+                HalfCycle = 2;         // bump half cycle to exec D-Half on next scp step
+                reason = SCPE_STEP;    // then break beacuse I-Half finished
                 break; 
             } 
 
             bReadData = (base_ops[opcode].opRW & opReadDA) ? 1:0;
 
             // check if opcode should wait for and already set interlock
-            WaitForInterlock = base_ops[opcode].opInterLock;
+            nInterlock = base_ops[opcode].opInterLock;
+            bInterLockWaitMsg = 0; 
 
             MachineCycle = 2; 
         }
         // WAIT FOR DATA READ
         if (MachineCycle == 2) {
-            // should wait to exec the inst (the address untagging) ?
-            if (FAST == 0) if (CpuStepsUsed > 0) continue; // yes
+            // should wait before exec the inst (time for address untagging) ?
+            if (bFastMode == 0) if (CpuStepsUsed > 0) continue; // yes
             // should wait for interlock release for opcode execution?
-            if (WaitForInterlock) {
-                if (FAST == 0) if (InterLockCount[WaitForInterlock] > 0) continue; // interlock makes execution wait
-                InterLockCount[WaitForInterlock] = 0; // clear interlock
-                WaitForInterlock = 0;
+            if (nInterlock) {
+                if (bFastMode == 0) if (WaitForInterlock(nInterlock)) {
+                    if (bInterLockWaitMsg == 0) {
+                        bInterLockWaitMsg = 1; 
+                        sim_debug(DEBUG_DETAIL, &cpu_dev, "Wait for interlock on %s\n", 
+                            (nInterlock==IL_RD1)  ? "RD1" : 
+                            (nInterlock==IL_WR1)  ? "WR1" : 
+                            (nInterlock==IL_RD23) ? "RD23" : 
+                            (nInterlock==IL_WR23) ? "WR23" : 
+                            (nInterlock==IL_IAS)  ? "IAS" : 
+                            (nInterlock==IL_Tape) ? "TCI" : 
+                            (nInterlock==IL_Tape_and_Unit_and_IAS) ? "IAS+TCI+Tape Unit ready" : 
+                            (nInterlock==IL_Tape_and_Unit) ? "TCI+Tape Unit ready" : 
+                            (nInterlock==IL_RamacUnit) ? "RAMAC Unit" : 
+                            (nInterlock==IL_RamacUnit_and_Arm) ? "RAMAC Unit+Arm" : 
+                            (nInterlock==IL_RamacUnit_and_Arm_and_IAS) ? "IAS+RAMAC Unit+Arm" : 
+                             "???");
+                    }
+                    continue; // yes, wait for interlock
+                }
             }
             // should wait for storage to fetch data?
             if (bReadData) {
-                if (FAST == 0) if (WaitForStorage(AR)) continue; // yes
+                if (bFastMode == 0) {
+                    il=WaitForStorage(AR);
+                    if ((il==1) && (bInterLockWaitMsg == 0)) {
+                       bInterLockWaitMsg = 1; 
+                       sim_debug(DEBUG_DETAIL, &cpu_dev, "Wait for interlock on IAS to read at %04d\n",AR);
+                    }
+                    if (il>0) continue; // yes, wait for drum rotation/IAS ready
+                }
             }
 
             MachineCycle = 3;             
@@ -1627,10 +1965,17 @@ sim_instr(void)
         // WAIT FOR DATA WRITE
         if (MachineCycle == 4) {
             // should wait to exec the inst (opcode execution) ?
-            if (FAST == 0) if (CpuStepsUsed > 0) continue; // yes
+            if (bFastMode == 0) if (CpuStepsUsed > 0) continue; // yes
             // should wait for storage to store data?
             if (bWriteDrum) {
-               if (FAST == 0) if (WaitForStorage(AR)) continue; // yes
+                if (bFastMode == 0) {
+                    il=WaitForStorage(AR);
+                    if ((il==1) && (bInterLockWaitMsg == 0)) {
+                        bInterLockWaitMsg = 1; 
+                        sim_debug(DEBUG_DETAIL, &cpu_dev, "Wait for interlock on IAS to write at %04d\n", AR);
+                    }
+                    if (il>0) continue; // yes
+                }
             }
 
             MachineCycle = 5; 
@@ -1661,7 +2006,11 @@ end_of_cycle:
                 break;
             }
         }
-        MachineCycle = 0; // ready to process to next instr
+        // ready to process to next instr
+        MachineCycle = 0; 
+
+        // reset the message for interlock wait
+        bInterLockWaitMsg = 0; 
 
     } /* end while */
 
@@ -1738,7 +2087,7 @@ cpu_dep(t_value val, t_addr addr, UNIT * uptr, int32 sw)
     }
     return SCPE_OK;
 }
-
+
 t_stat
 cpu_set_size(UNIT * uptr, int32 val, CONST char *cptr, void *desc)
 {
@@ -1760,8 +2109,6 @@ cpu_set_size(UNIT * uptr, int32 val, CONST char *cptr, void *desc)
             }
         }
     }
-    if ((mc != 0) && (!get_yn("Really truncate memory [N]? ", FALSE)))
-        return SCPE_OK;
     cpu_unit.flags &= ~UNIT_MSIZE;
     cpu_unit.flags |= val;
     cpu_unit.capac = 9990 + (v / 1000);
@@ -1772,7 +2119,6 @@ cpu_set_size(UNIT * uptr, int32 val, CONST char *cptr, void *desc)
     for(i = 0; i < 60; i++) IAS[i] = IAS_NegativeZeroFlag[i] = 0;
     return SCPE_OK;
 }
-
 
 t_stat
 cpu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr) {

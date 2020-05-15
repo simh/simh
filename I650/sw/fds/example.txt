@@ -1,0 +1,63 @@
+ +                      A accumulator is address 0037
+ +                      B accumulator is address 0089
+ +                      K accumulator is address 0057
+ +                      branch to address 0026 to resume execution of FDS operations on next address
+ +                      
+ +                      Floating point format EE mmmm mmmm
+ +                      FDS instruction:      + AAAA OP AAAA BBBB-
+ +                      IBM 650 instruction:  + AAAA OP (DA) (IA)
+ +                      
+ +                      constants
+ + 0500  50 0000 0000    0.0 floating point                         
+ + 0501  50 1000 0000    1.0 floating point                         
+ + 0502  00 0000 0001    decimal 1
+ + 0503  00 0000 0010    decimal 10 max number of results
+ + 0504  00 0000 0000    decimal zero
+ + 0505  00 1100 0000    start of interpretive FDS program
+ +
+ +                      variables
+ + 0510  00 0000 0000    N float                      
+ + 0511  00 0000 0000    sqrt(n)
+ + 0512  00 0000 0000    iteration count
+ +
+ +                      Main FDS program
+ + 
+ + 1100  01 0510 0501-   FDS A(N=0510) + B(1.0=0501) -> K
+ + 1101  69 0057 1201    ld dist<-K
+ + 1201  24 0510 1202    std 0510 N<-K
+ + 1202  60 0512 1203    rau 0512 acc=iteration count
+ + 1203  10 0502 1204    au  0502 acc=acc+1
+ + 1204  21 0512 1205    stu 0512 interation count=acc
+ + 1205  11 0503 1206    su  0503 compare with max num of iterations
+ + 1206  46 0026 9999    brmin continue interpretation, else stop
+ + 1102  16 0510 0511-   FDS sqrt(A(N=0510)) -> B (0511)
+ + 1103  69 0512 1210    ld iteration count
+ + 1210  24 0977 1211    std word1 punch area
+ + 1211  69 0510 1212    ld N float
+ + 1212  24 0978 1213    std word2 punch area
+ + 1213  69 0511 1214    ld sqrt(N) float
+ + 1214  24 0979 1215    std word3 punch area
+ + 1215  71 0977 0026    pch  Iteration num    N float  sqrt(N) float, then continue interpretation
+ + 1104  12 1100 0000-   FDS BR A(=1100)
+ +
+ + 1000  69 0504 1001    ld dist=0 decimal
+ + 1001  24 0512 1002    std iteration count
+ + 1002  69 0500 1003    ld dist=0 float
+ + 1003  24 0510 1004    std N
+ + 1004  65 0505 0420    ral acc=start of interpretive program, start interpretation
+ +
+ +                       should print
+ +
+ +                       00 0000 0001  50 1000 0000  50 1000 0000
+ +                       00 0000 0002  50 2000 0000  50 1414 2135
+ +                       00 0000 0003  50 3000 0000  50 1732 0508
+ +                       00 0000 0004  50 4000 0000  50 2000 0000
+ +                       00 0000 0005  50 5000 0000  50 2236 0679
+ +                       00 0000 0006  50 6000 0000  50 2449 4897
+ +                       00 0000 0007  50 7000 0000  50 2645 7513
+ +                       00 0000 0008  50 8000 0000  50 2828 4271
+ +                       00 0000 0009  50 9000 0000  50 3000 0000
+ +
+ +                       iteration num N=1..9 float  sqrt(N) float
+ +
+ +g1000                  transfer card. Start execution at addr 1000

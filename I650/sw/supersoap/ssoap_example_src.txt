@@ -1,0 +1,22 @@
+                                        1 example calculate f of x
+                                        
+                                               blr 1951  1960 read area
+                                          p0001blr 27   p0002 punch area
+                                          startrauone   1f    set x
+                                          1    stup0001       to 1
+                                               mpya           calculate
+                                               alob           f
+                                               rau 8002
+                                               mpyp0001
+                                               aloc
+                                               stlp0002
+                                               wr1p0001       punch
+                                               raup0001
+                                               supxmax        is x max 
+                                               nzu       9876
+                                               aup101   1b    increase x
+                                        
+                                          one   00 0000  0001 constants
+                                          xmax  00 0000  0100
+                                          101   00 0000  0101
+                                               end

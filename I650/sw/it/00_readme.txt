@@ -1,5 +1,6 @@
 
 Restoration comments May/2018
+By Roberto Sancho
 
 Internal Translator (IT Compiler)
 

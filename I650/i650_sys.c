@@ -45,15 +45,17 @@ DEVICE             *sim_devices[] = {
     &cpu_dev,
     &cdr_dev,
     &cdp_dev,
-//XXX    &mta_dev,
+    &mt_dev,
+    &dsk_dev,
     NULL
 };
 
 /* Device addressing words */
 
-DIB  cdr_dib = { 1, &cdr_cmd, NULL };
+DIB  cdr_dib = { 3, &cdr_cmd, NULL };
 DIB  cdp_dib = { 3, &cdp_cmd, NULL };
-//XXX DIB  mt_dib = { CH_TYP_76XX, NUM_UNITS_MT, 0000, 0000, &mt_cmd, &mt_ini };
+DIB  mt_dib  = { 5, &mt_cmd, &mt_ini };
+DIB  dsk_dib = { 4, &mt_cmd, &dsk_ini };
 
 /* Simulator stop codes */
 const char         *sim_stop_messages[] = {
@@ -61,7 +63,7 @@ const char         *sim_stop_messages[] = {
     "HALT instruction",
     "Breakpoint",
     "Unknown Opcode",
-    "Card Read/Punch Error",
+    "I/O Error",
     "Programmed Stop",
     "Overflow",
     "Opcode Execution Error",
@@ -99,7 +101,11 @@ DEBTAB              crd_debug[] = {
 // simulator available IBM 533 wirings
 struct card_wirings wirings[] = {
     {WIRING_8WORD,       "8WORD"},
+    {WIRING_RA,          "RA"},
+    {WIRING_FDS,         "FDS"},
     {WIRING_SOAP,        "SOAP"}, 
+    {WIRING_SOAPA,       "SOAPA"}, 
+    {WIRING_SUPERSOAP,   "SUPERSOAP"}, 
     {WIRING_IS,          "IS"}, 
     {WIRING_IT,          "IT"}, 
     {WIRING_FORTRANSIT,  "FORTRANSIT"}, 
@@ -169,19 +175,40 @@ uint16          ascii_to_hol[128] = {
     0xC04, 0xC02, 0xC01, 0x680, 0x640, 0x620, 0x610, 0x608,
    /*   x      y      z      {      |      }      ~    del */
    /*                     Y78     X78    78     79         */
-    0x604, 0x602, 0x601, 0x406, 0x806,0x0006,0x0005,0xf000
+    0x604, 0x602, 0x601, 0x406, 0x806, 0x006, 0x005,0xf000
 };
+
+uint16   sim_ascii_to_hol(char c)
+{
+    return ascii_to_hol[c & 127];
+}
+
+char     sim_hol_to_ascii(uint16 hol)
+{
+    int c;
+    hol = hol & 0x0fff; // ignore extra high bits, if any
+    if (hol == 0xa00) return '?'; // +0
+    if (hol == 0x600) return '!'; // -0
+    for (c=31;c<127;c++) {
+        if (ascii_to_hol[c] == hol) {
+            // take in consideration the aliases between hol and ascii to return 
+            // char as for 026 FORT charset
+            // hol = 0x022   -> 8-4   punches -> "-" or "'" or "@".   Must be "-"
+            // hol = 0x222   -> 0-8-4 punches -> "(" or "%".          Must be "("  
+            if (c == '%') {c = '(';} else
+            if (c == '@') {c = '-';} else
+            if (c == '\'') {c = '-';};
+            return c;
+        }
+    }
+    return '~';
+}
 
 
 /* Initialize vm  */
 void
 vm_init(void) {
     int i;
-    static int initialized = 0;
-
-    if (initialized)
-        return;
-    initialized = 1;
     // Initialize vm memory to all plus zero 
     for(i = 0; i < MAXDRUMSIZE; i++) DRUM[i] = DRUM_NegativeZeroFlag[i] = 0;
     for(i = 0; i < 60; i++) IAS[i] = IAS_NegativeZeroFlag[i] = 0;
@@ -190,6 +217,8 @@ vm_init(void) {
     sim_vm_cmd = aux_cmds;                       /* set up the auxiliary command table */
 }
 
+
+void (*sim_vm_init) (void) = &vm_init;
 
 /* Load a card image file into memory.  */
 
@@ -203,17 +232,17 @@ sim_load(FILE * fileref, CONST char *cptr, CONST char *fnam, int flag)
 
 /* Opcodes */
 t_opcode  base_ops[100] = {
-        // opcode     name    soap name      R/W? option         Valid Data Address
+        // opcode     name    soap name      R/W? option Valid Data Address Interlock 
         {OP_NOOP,     "NOOP",  "NOP",          0, 0,             vda_DAITS},
         {OP_STOP,     "STOP",  "HLT",          0, 0,             vda_DAITS},
         {OP_UFA,      "FASN",  "UFA",   opReadDA, opStorUnit,    vda_DAIS},
-        {OP_RTC,      "RCT",   "RTC",          0, opCntrlUnit,   vda_T},
-        {OP_RTN,      "RT",    "RTN",          0, opCntrlUnit,   vda_T},
-        {OP_RTA,      "RTA",   "RTA",          0, opCntrlUnit,   vda_T},
-        {OP_WTN,      "WT",    "WTN",          0, opCntrlUnit,   vda_T},
-        {OP_WTA,      "WTA",   "WTA",          0, opCntrlUnit,   vda_T},
-        {OP_LIB,      "LBB",   "LIB",   opReadDA, opStorUnit,    vda_D,     IL_IAS},
-        {OP_LDI,      "LB",    "LDI",   opReadDA, opStorUnit,    vda_D,     IL_IAS},
+        {OP_RTC,      "RCT",   "RTC",          0, opCntrlUnit,   vda_T,     IL_Tape_and_Unit},
+        {OP_RTN,      "RT",    "RTN",          0, opCntrlUnit,   vda_T,     IL_Tape_and_Unit_and_IAS},
+        {OP_RTA,      "RAT",   "RTA",          0, opCntrlUnit,   vda_T,     IL_Tape_and_Unit_and_IAS},
+        {OP_WTN,      "WT",    "WTN",          0, opCntrlUnit,   vda_T,     IL_Tape_and_Unit_and_IAS},
+        {OP_WTA,      "WAT",   "WTA",          0, opCntrlUnit,   vda_T,     IL_Tape_and_Unit_and_IAS},
+        {OP_LIB,      "LBB",   "LIB",           0, opStorUnit,    vda_D,     IL_IAS},
+        {OP_LDI,      "LB",    "LDI",          0, opStorUnit,    vda_D,     IL_IAS},
 
         {OP_AU,       "AU",    "AUP",   opReadDA, 0,             vda_DAIS},
         {OP_SU,       "SU",    "SUP",   opReadDA, 0,             vda_DAIS},
@@ -231,7 +260,7 @@ t_opcode  base_ops[100] = {
         {OP_STDA,     "STDA",  "SDA",  opWriteDA, 0,             vda_DS},
         {OP_STIA,     "STIA",  "SIA",  opWriteDA, 0,             vda_DS},
         {OP_STD,      "STD",   "STD",  opWriteDA, 0,             vda_DS},
-        {OP_NTS,      "BNTS",  "NTS",          0, opCntrlUnit,   vda_DAIS},
+        {OP_NTS,      "BNTS",  "NTS",          0, opCntrlUnit,   vda_DAIS,  IL_Tape},
         {OP_BIN,      "BIN",   "BIN",          0, opCntrlUnit,   vda_D},
         {OP_SET,      "SET",   "SET",          0, opStorUnit,    vda_S,     IL_IAS},
         {OP_SIB,      "STBB",  "SIB",          0, opStorUnit,    vda_D,     IL_IAS},
@@ -263,17 +292,17 @@ t_opcode  base_ops[100] = {
         {OP_SXA,      "SA",    "SXA",          0, opStorUnit,    vda_DAS},
         {OP_AXB,      "AB",    "AXB",          0, opStorUnit,    vda_DAS},
         {OP_SXB,      "SB",    "SXB",          0, opStorUnit,    vda_DAS},
-        {OP_NEF,      "BRNEF", "NEF",          0, opCntrlUnit,   vda_DAIS},
-        {OP_RWD,      "RWD",   "RWD",          0, opCntrlUnit,   vda_T},
-        {OP_WTM,      "WTM",   "WTM",          0, opCntrlUnit,   vda_T},
-        {OP_BST,      "BSP",   "BST",          0, opCntrlUnit,   vda_T},
+        {OP_NEF,      "BRNEF", "NEF",          0, opCntrlUnit,   vda_DAIS,   IL_Tape},
+        {OP_RWD,      "RWD",   "RWD",          0, opCntrlUnit,   vda_T,      IL_Tape_and_Unit},
+        {OP_WTM,      "WTM",   "WTM",          0, opCntrlUnit,   vda_T,      IL_Tape_and_Unit},
+        {OP_BST,      "BSP",   "BST",          0, opCntrlUnit,   vda_T,      IL_Tape_and_Unit},
         {OP_AXC,      "AC",    "AXC",          0, opStorUnit,    vda_DAS},
         {OP_SXC,      "SC",    "SXC",          0, opStorUnit,    vda_DAS},
 
         {OP_RAU,      "RAU",   "RAU",   opReadDA, 0,             vda_DAIS},
         {OP_RSU,      "RSU",   "RSU",   opReadDA, 0,             vda_DAIS},
         {62,          NULL,    NULL,           0, 0,             0},     
-        {63,          NULL,    NULL,           0, 0,             0},     
+        {OP_TLE,      "TLE",   "TLE",          0, opTLE,         vda_DS},
         {OP_DIVRU,    "DIVRU", "DVR",   opReadDA, 0,             vda_DAIS},
         {OP_RAL,      "RAL",   "RAL",   opReadDA, 0,             vda_DAIS},
         {OP_RSL,      "RSL",   "RSL",   opReadDA, 0,             vda_DAIS},
@@ -287,9 +316,9 @@ t_opcode  base_ops[100] = {
         {OP_RD2,      "RD2",   "RD2",          0, opStorUnit,    vda_DS,    IL_RD23},
         {OP_WR2,      "WR2",   "WR2",          0, opStorUnit,    vda_DS,    IL_WR23},
         {OP_RC2,      "RC2",   "RC2",          0, opStorUnit,    vda_DS,    IL_RD23},
-        {OP_RD3,      "RD3",   "RD3",          0, opStorUnit,    vda_DS,    IL_RD23},
-        {OP_WR3,      "WR3",   "WR3",          0, opStorUnit,    vda_DS,    IL_WR23},
-        {OP_RC3,      "RC3",   "RC3",          0, opStorUnit,    vda_DS,    IL_RD23},
+        {OP_RD3,      "RDPRT", "RD3",          0, opStorUnit,    vda_DS,    IL_RD23},
+        {OP_WR3,      "PRT",   "WR3",          0, opStorUnit,    vda_DS,    IL_WR23},
+        {OP_RC3,      "RCPRT", "RC3",          0, opStorUnit,    vda_DS,    IL_RD23},
         {OP_RPY,      "RPY",   "RPY",          0, opCntrlUnit,   vda_D},
 
         {OP_RAA,      "RAA",   "RAA",          0, opStorUnit,    vda_DAS},
@@ -297,9 +326,9 @@ t_opcode  base_ops[100] = {
         {OP_RAB,      "RAB",   "RAB",          0, opStorUnit,    vda_DAS},
         {OP_RSB,      "RSB",   "RSB",          0, opStorUnit,    vda_DAS},
         {OP_TLU,      "TLU",   "TLU",          0, 0,             vda_DS},
-        {OP_SDS,      "SDS",   "SDS",          0, opCntrlUnit,   vda_9000},
-        {OP_RDS,      "RDS",   "RDS",          0, opCntrlUnit,   vda_9000},
-        {OP_WDS,      "WDS",   "WDS",          0, opCntrlUnit,   vda_9000},
+        {OP_SDS,      "SDS",   "SDS",          0, opCntrlUnit,   vda_9000,  IL_RamacUnit_and_Arm},
+        {OP_RDS,      "RDS",   "RDS",          0, opCntrlUnit,   vda_9000,  IL_RamacUnit_and_Arm_and_IAS},
+        {OP_WDS,      "WDS",   "WDS",          0, opCntrlUnit,   vda_9000,  IL_RamacUnit_and_Arm_and_IAS},
         {OP_RAC,      "RAC",   "RAC",          0, opStorUnit,    vda_DAS},
         {OP_RSC,      "RSC",   "RSC",          0, opStorUnit,    vda_DAS},
 
@@ -626,6 +655,8 @@ int Shift_Digits(t_int64 * d, int nDigits)
                                                remaining cards go to the second destination deck
                                  If count < 0, indicates the cards on second destination deck file 
                                                (so deck 2 contains lasts count cards from source)
+                                 if cound is 5cd, file2 received 5 words-per-load-card deck
+                                               if file2 has no cards, it is deleted.
 
                         <file1>  first destination deck file
                         <file2>  second destination deck file
@@ -677,17 +708,10 @@ int Shift_Digits(t_int64 * d, int nDigits)
 t_stat deck_load(CONST char *fn, uint16 * DeckImage, int * nCards)
 {
     UNIT *              uptr = &cdr_unit[0];
-    struct _card_data   *data;
+    uint16 image[80];    
     t_stat              r, r2;
-    int i, convert_to_ascii;
+    int i;
     uint16 c;
-
-    if (*nCards < 0) {
-        *nCards = 0;
-        convert_to_ascii = 1;
-    } else {
-        convert_to_ascii = 0;
-    }
 
     // set flags for read only
     uptr->flags |= UNIT_RO; 
@@ -698,20 +722,21 @@ t_stat deck_load(CONST char *fn, uint16 * DeckImage, int * nCards)
 
     // read all cards from file
     while (1) {
+
         if (*nCards >= MAX_CARDS_IN_DECK) {
             r = sim_messagef (SCPE_IERR, "Too many cards\n");
             break;
         }
-        r = sim_read_card(uptr);
-        if (r == SCPE_EOF) {
-            r = SCPE_OK; break;            // normal termination on card file read finished
-        } else if (r != SCPE_OK) break;    // abnormal termination on error
-        data = (struct _card_data *)uptr->up7;
+        r = sim_read_card(uptr, image);
+        if ((r == CDSE_EOF) || (r == CDSE_EMPTY)) {
+            r = SCPE_OK; break;             // normal termination on card file read finished
+        } else if (r != CDSE_OK) {
+            break;                          // abnormal termination on error
+        }
         // add card read to deck
         for (i=0; i<80; i++) {
-            c = data->image[i];
-            if (convert_to_ascii) c = data->hol_to_ascii[c];
-            DeckImage[*nCards * 80 + i] = c;
+            c = image[i];
+            DeckImage[*nCards * 80 + i] = c & 0xFFF;
         }
         *nCards = *nCards + 1;
     }
@@ -729,7 +754,7 @@ t_stat deck_load(CONST char *fn, uint16 * DeckImage, int * nCards)
 t_stat deck_save(CONST char *fn, uint16 * DeckImage, int card, int nCards)
 {
     UNIT *              uptr = &cdr_unit[0];
-    struct _card_data   *data;
+    uint16 image[80];
     t_stat              r;
     int i,nc;
 
@@ -748,12 +773,11 @@ t_stat deck_save(CONST char *fn, uint16 * DeckImage, int card, int nCards)
             break;
         }
 
-        data = (struct _card_data *)uptr->up7;
         // read card from deck
-        for (i=0; i<80; i++) data->image[i] = DeckImage[(nc + card) * 80 + i];
+        for (i=0; i<80; i++) image[i] = DeckImage[(nc + card) * 80 + i];
 
-        r = sim_punch_card(uptr, NULL);
-        if (r != SCPE_OK) break;    // abnormal termination on error
+        r = sim_punch_card(uptr, image);
+        if (r != CDSE_OK) break;    // abnormal termination on error
     }
 
     // deattach file from cdr unit 0
@@ -768,11 +792,13 @@ void deck_print_echo(uint16 * DeckImage, int nCards, int bPrint, int bEcho)
 {
     char line[81]; 
     int i,c,nc;
+    uint16 hol;
 
     for (nc=0; nc<nCards; nc++) {
         // read card, check and, store in line
         for (i=0;i<80;i++) {
-            c = DeckImage[nc * 80 + i];
+            hol = DeckImage[nc * 80 + i];
+            c = sim_hol_to_ascii(hol);
             c = toupper(c);                             // IBM 407 can only print uppercase
             if ((c == '?') || (c == '!')) c = '0';      // remove Y(12) or X(11) punch on zero 
             if (strchr(mem_to_ascii, c) == 0) c = ' ';  // space if not in IBM 650 character set
@@ -795,6 +821,8 @@ void deck_print_echo(uint16 * DeckImage, int nCards, int bPrint, int bEcho)
 }
 
 // carddeck split <count> <dev|file0> <file1> <file2>
+// carddeck split   5CD   <dev|file0> <file1> <file2>
+// carddeck split   PAT   <dev|file0> <file1> <file2>
 static t_stat deck_split_cmd(CONST char *cptr)
 {
     char fn0[4*CBUFSIZE];
@@ -805,6 +833,8 @@ static t_stat deck_split_cmd(CONST char *cptr)
     DEVICE *dptr;
     UNIT *uptr;
     t_stat r;
+    int bSplit5CD = 0;
+    int bSplitPAT = 0;
 
     uint16 DeckImage[80 * MAX_CARDS_IN_DECK];
     int nCards, nCards1, tail; 
@@ -816,10 +846,20 @@ static t_stat deck_split_cmd(CONST char *cptr)
     } else {
         tail = 0;
     }
+    nCards1 = 0;
     cptr = get_glyph (cptr, gbuf, 0);                       // get cards count param    
-    nCards1 = (int32) get_uint (gbuf, 10, 10000, &r);
-    if (r != SCPE_OK) return sim_messagef (SCPE_ARG, "Invalid count value\n");
-    if (nCards1 == 0) return sim_messagef (SCPE_ARG, "Count cannot be zero\n");
+    if ((tail == 0) && (strlen(gbuf) == 3) && (strncmp(gbuf, "5CD", 3) == 0)) {
+        // split 5-words per card load cards fron deck
+        bSplit5CD = 1;
+    } else if ((tail == 0) && (strlen(gbuf) == 3) && (strncmp(gbuf, "PAT", 3) == 0)) {
+        // split availability table load cards fron deck
+        bSplitPAT = 1;
+    } else {
+        // 
+        nCards1 = (int32) get_uint (gbuf, 10, 10000, &r);
+        if (r != SCPE_OK) return sim_messagef (SCPE_ARG, "Invalid count value\n");
+        if (nCards1 == 0) return sim_messagef (SCPE_ARG, "Count cannot be zero\n");
+    }
 
     get_glyph (cptr, gbuf, 0);                              // get dev param 
     cptr = get_glyph_quoted (cptr, fn0, 0);                 // re-read using get_glyph_quoted to do not 
@@ -861,6 +901,104 @@ static t_stat deck_split_cmd(CONST char *cptr)
     cptr = get_glyph_quoted (cptr, fn2, 0);                 // get next param: filename 2
     if (fn2[0] == 0) return sim_messagef (SCPE_ARG, "Missing second filename\n");
     
+    if (bSplit5CD ) {
+        // separate 5cd deck 
+        uint16 DeckImage1[80 * MAX_CARDS_IN_DECK];
+        uint16 DeckImage2[80 * MAX_CARDS_IN_DECK]; 
+        int i, nc, nc1, nc2, bFound;
+        uint16 hol;
+
+        nc1 = nc2 = 0;
+        for (nc=0; nc<nCards; nc++) {
+            // determnine type of load card: is regular 1 word per card or 5 words per card
+            bFound = 0;                         // soap4 5cd cards have non blanks cols 11 to 17
+            for (i=10;i<16;i++) {               // soap4 5cd also col 1 = "0" and col2 = "1"
+                hol = DeckImage[nc * 80 + i];   
+                if (hol != 0) bFound++; 
+            }
+            if (bSplit5CD) {
+                if ((DeckImage[nc * 80 + 0] != 0x200) || (DeckImage[nc * 80 + 1] != 0x100)) bFound = 0; 
+            } else {
+                if ((DeckImage[nc * 80 + 0] != 0x200) || (DeckImage[nc * 80 + 1] != 0x200)) bFound = 0; 
+            }
+            hol=0;
+            for (i=0;i<6;i++) {
+                if (DeckImage[nc * 80 + i] == 0x002) hol++;
+            }
+            if (hol==6) bFound = 6; // supersoap fiv cards starts with six 8's
+
+            bFound = (bFound == 6) ? 1:0; // is a 5 words-per-card load card?
+            // store in appropiate output deck
+            for (i=0;i<80;i++) {
+                hol = DeckImage[nc * 80 + i];
+                if (bFound==0) {
+                    DeckImage1[nc1 * 80 + i] = hol;
+                } else {
+                    DeckImage2[nc2 * 80 + i] = hol;
+                }
+            }
+            if (bFound==0) {
+                nc1++;
+            } else {
+                nc2++;
+            }
+        }
+        // save output decks
+        r = deck_save(fn1, DeckImage1, 0, nc1);
+        if (r != SCPE_OK) return sim_messagef (r, "Cannot write destination deck1 (%s)\n", fn0);
+        r = deck_save(fn2, DeckImage2, 0, nc2);
+        if (r != SCPE_OK) return sim_messagef (r, "Cannot write destination deck2 (%s)\n", fn0);
+        if (nc2 == 0) remove(fn2);  // delete file2 if empty
+        if ((sim_switches & SWMASK ('Q')) == 0) {
+           sim_messagef (SCPE_OK, "Deck with 5 words-per-card splitted %d/%d cards\n", nc1, nc2);
+        }
+        return SCPE_OK;
+    }
+
+    if (bSplitPAT)  {
+        // separate pat deck 
+        uint16 DeckImage1[80 * MAX_CARDS_IN_DECK];
+        uint16 DeckImage2[80 * MAX_CARDS_IN_DECK]; 
+        int i, nc, nc1, nc2, bFound;
+        uint16 hol;
+
+        nc1 = nc2 = 0;
+        for (nc=0; nc<nCards; nc++) {
+            // PAT table has 8 words with hi punch on last digit
+            bFound = 0;                         
+            for (i=1;i<=8;i++) {    
+                hol = DeckImage[nc * 80 + i*10-1]; 
+                if (hol & 0x800) bFound++; 
+            }
+            bFound = (bFound == 8) ? 1:0; // is an availability table load card?
+            // store in appropiate output deck
+            for (i=0;i<80;i++) {
+                hol = DeckImage[nc * 80 + i];
+                if (bFound==0) {
+                    DeckImage1[nc1 * 80 + i] = hol;
+                } else {
+                    DeckImage2[nc2 * 80 + i] = hol;
+                }
+            }
+            if (bFound==0) {
+                nc1++;
+            } else {
+                nc2++;
+            }
+        }
+        // save output decks
+        r = deck_save(fn1, DeckImage1, 0, nc1);
+        if (r != SCPE_OK) return sim_messagef (r, "Cannot write destination deck1 (%s)\n", fn0);
+        r = deck_save(fn2, DeckImage2, 0, nc2);
+        if (r != SCPE_OK) return sim_messagef (r, "Cannot write destination deck2 (%s)\n", fn0);
+        if (nc2 == 0) remove(fn2);  // delete file2 if empty
+        if ((sim_switches & SWMASK ('Q')) == 0) {
+           sim_messagef (SCPE_OK, "Deck with availability-card splitted %d/%d cards\n", nc1, nc2);
+        }
+        return SCPE_OK;
+    }
+
+    // split based on card count
     r = deck_save(fn1, DeckImage, 0, nCards1);
     if (r != SCPE_OK) return sim_messagef (r, "Cannot write destination deck1 (%s)\n", fn0);
 
@@ -948,7 +1086,7 @@ static t_stat deck_print_cmd(CONST char *cptr)
     if (*cptr) return sim_messagef (SCPE_ARG, "Extra unknown parameters after filename\n");
 
     // read deck to be printed (-1 to convert to ascii value, not hol)
-    nCards = -1;
+    nCards = 0;
     r = deck_load(fn, DeckImage, &nCards);
     if (r != SCPE_OK) return sim_messagef (r, "Cannot read deck to print (%s)\n", fn);
 
@@ -973,7 +1111,7 @@ static t_stat deck_echolast_cmd(CONST char *cptr)
     while (sim_isspace (*cptr)) cptr++;                     // trim leading spc 
 
     cptr = get_glyph (cptr, gbuf, 0);                       // get cards count param    
-    nCards = (int32) get_uint (gbuf, 10, MAX_CARDS_IN_READ_TAKE_HOPPER, &r);
+    nCards = (int32) get_uint (gbuf, 10, MAX_CARDS_IN_READ_STAKER_HOPPER, &r);
     if (r != SCPE_OK) return sim_messagef (SCPE_ARG, "Invalid count value\n");
     if (nCards == 0) return sim_messagef (SCPE_ARG, "Count cannot be zero\n");
 
@@ -996,14 +1134,14 @@ static t_stat deck_echolast_cmd(CONST char *cptr)
 
     // get last nCards cards, so
     // first card to echo is count ones before last one
-    nh = ReadHopperLast[ncdr] - (nCards-1);                 
-    nh = nh % MAX_CARDS_IN_READ_TAKE_HOPPER;
+    nh = ReadStakerLast[ncdr] - (nCards-1);                 
+    nh = nh % MAX_CARDS_IN_READ_STAKER_HOPPER;
     for (nc=0; nc<nCards; nc++) {
         // copy card form read hopper buf to deck image
-        ic = (ncdr * MAX_CARDS_IN_READ_TAKE_HOPPER + nh) * 80;
-        for (i=0;i<80;i++) DeckImage[nc * 80 + i] = ReadHopper[ic + i];
+        ic = (ncdr * MAX_CARDS_IN_READ_STAKER_HOPPER + nh) * 80;
+        for (i=0;i<80;i++) DeckImage[nc * 80 + i] = ReadStaker[ic + i];
         // get previous read card
-        nh = (nh + 1) % MAX_CARDS_IN_READ_TAKE_HOPPER;
+        nh = (nh + 1) % MAX_CARDS_IN_READ_STAKER_HOPPER;
     }
 
     deck_print_echo(DeckImage, nCards, 0,1);

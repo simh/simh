@@ -1,0 +1,198 @@
+                                        1              soap 4000                      
+                                        1                                                  
+                                        1    symbolic optimal assembly prog           
+                                        1                                             
+                                        1              for   the                      
+                                        1                                                  
+                                        1            ibm 650 model 4                  
+                                        1                                                  
+                                        1        data processing system               
+                                        1                                                  
+                                        1              librarian                                    
+                                        1              
+                                        1      written by Roberto Sancho
+                                        1               March 2020                   
+                                        1                                                  
+                                        0      blr 1000  1000 entry                
+                                        0      regh1100  1109 tap header
+                                        0      synzero  h0001
+                                        0      synreadc  1950                      
+                                        0      blr 1951  1967  17wd buffr          
+                                        0      regp1977  1986 punch area                                  
+                                        0      blr 1998  1999                                             
+                                        1                                     
+                                        1      check library tape                
+                                        1      first record             
+                                        1                                     
+                                           1000rwd 8012       read tape
+                                               set 9050        first
+                                               rtn 8012        record
+                                               nts      initp jmp if err
+                                               rau 9050       check                                         
+                                               aup 9051        header
+                                               suph0002        record
+                                               aup 9052       if record
+                                               suph0003        not match
+                                               aup 9053        then
+                                               suph0004        jump to     
+                                               nzuinitp        inittp
+                                               rtn 8012       if not eof
+                                               ntsinitp        then initp
+                                               nefinitp r1ok   else r1ok
+                                        1 soap tape library   
+                                        1 header card 
+                                        1 as read with rd1
+                                          h0001 00 0000  0000
+                                          h0002 77 0083  6177
+                                          h0003 00 7369  6279
+                                          h0004 82 7661  6561
+                                          h0005 79 8800  0000
+                                          h0006 00 0000  0000
+                                          h0007 00 0000  9999
+                                          h0008 00 0000  9999
+                                          h0009 00 0000  9999
+                                          h0010 09 9800  0000 
+                                        1                                     
+                                        1      library tape first record                
+                                        1      does not match expected
+                                        1      create a new lib tape
+                                        1      with expected first recod
+                                        1      (the library header)
+                                        1              
+                                          initprwd 8012       wrt header
+                                               set 9050       rec in tap
+                                               ldih0001 
+                                               set 9050
+                                               wtn 8012       
+                                               ntswhok        
+                                          wrhlthlt 0999  9999 hlt if wr err 
+                                          whok wtm 8012       write double
+                                               wtm 8012       tape mark
+                                               ntsr1ok  wrhlt
+                                        1                                     
+                                        1      read first card and
+                                        1      scan tape lib for routine
+                                        1              
+                                          r1ok rwd 8012
+                                               rd1 1999 bb817
+                                          bb817lddh0010       init empty
+                                               stdemflg       file flag
+                                               rau      set   test 1st        
+                                               ral 1951       al is rdc loc
+                                               stuemflg       file not empry
+                                               slo 9050       cmp with tap loc            
+                                               nzepass  found  no     yes      
+                                          setblset 9050       trsfr tape      
+                                               sib 1951  1998 to cd area      
+                                          set  set 9050        read tape      
+                                               rtn 8012 nts                   
+                                          nts  nts 8001                       
+                                               nef      exit                  
+                                               nze      halt
+                                               slt 0001       reread          
+                                               bst 8012 set    routine        
+                                          halt hlt 0888  9999                 
+                                          pass rau       8001  bypass         
+                                               rtc 8012 nts    routine        
+                                          exit ralemflg       if file not empty
+                                               nze      bb817  try next file 
+                                               bst 8012 nfnd       
+                                          emflg 00 0000  0000 empty file flag
+                                        1                                     
+                                        1      card routine found into
+                                        1      library tape
+                                        1              
+                                          foundhlt 0777  9999
+                                        1                                     
+                                        1      card routine not found
+                                        1      add it to library tape
+                                        1              
+                                          nfnd set 9050
+                                               ldi 1951 
+                                               set 9050
+                                               wtn 8012       wrt crd
+                                               nts      wrhlt  to tape
+                                               rd1 1998 nfnd
+                                           1998wtm 8012       load card 
+                                               wtm 8012        is eof
+                                               ntsr1ok  wrhlt
+                                        1                                     
+                                        1      if first card is load card
+                                        1      then willprint list of
+                                        1      routines in tape.
+                                        1      punch routine location 
+                                        1      (first record of file)
+                                        1      and number of routine
+                                        1
+                                          i1xxx 00 0001  0000
+                                          pchfm 80 0000  0000 pch format
+                                           1999rwd 8012       rewind tape
+                                               lddzero
+                                               stdp0002
+                                               stdp0003
+                                               stdp0004
+                                               stdp0005
+                                               stdp0006
+                                               stdp0007
+                                               stdp0008
+                                               stdp0009
+                                               raupchfm
+                                               stup0010 set2 
+                                          set2 set 9050       read tape      
+                                               rtn 8012       1st rec
+                                               ntsrdok2                       
+                                               nef      endf                  
+                                               nze      halt
+                                               slt 0001       reread          
+                                               bst 8012 set2  routine        
+                                          rdok2ldd 9050       routine 
+                                               stdp0001        location
+                                               wr1 1977 skp2   punch
+                                          skp2 rtc 8012       skip routine
+                                               ntsskp2
+                                               nefhalt  
+                                               ralp0008       incr 
+                                               aloi1xxx        routine
+                                               stlp0008 set2   number
+                                               wr1 1977 set2
+                                          endf rwd 8012 
+                                               hlt 0000 r1ok
+                                        1                                     
+                                        1 Librarian program adds routines from
+                                        1 cards to library tape so they can be
+                                        1 used with TAP presudo command available
+                                        1 with SOAP-IIA 4000
+                                        1                                     
+                                        1 entry points                                    
+                                        1    1000 input 
+                                        1         routine 1 deck card 
+                                        1         blank card with HiPunch 
+                                        1           (a load card)
+                                        1         routine 2 deck card 
+                                        1         blank card with HiPunch 
+                                        1           (a load card)
+                                        1         ...
+                                        1         routine n deck card 
+                                        1         blank card with HiPunch 
+                                        1           (a load card)
+                                        1         blank card with HiPunch 
+                                        1           (a second load card)
+                                        1      add routines to library tape                        
+                                        1      then print list of routines 
+                                        1      in library tape
+                                        1      if last repeated load card is
+                                        1      removed, no printout is issued
+                                        1
+                                        1    1998 
+                                        1      put a double Tape Mark (end of
+                                        1      file) to close the lib tape
+                                        1
+                                        1    1999 
+                                        1      print list of routines 
+                                        1      in library tape
+                                        1
+                                        1 stops
+                                        1    0999 write error
+                                        1    0888 read error
+                                        1    0777 routine already in library
+                                        1

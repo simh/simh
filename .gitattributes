@@ -10,5 +10,6 @@
 *.tap binary
 *.dsk binary
 *.vhd binary
+*.crd binary
 sim_rev.h export-subst
 

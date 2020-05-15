@@ -1,5 +1,7 @@
 
 Restoration comments May/2018
+By Roberto Sancho
+
 
 Floating Point Interpretive System (BELL interpreter)
 From Bitsavers Manual 28-4024_FltDecIntrpSys.pdf 

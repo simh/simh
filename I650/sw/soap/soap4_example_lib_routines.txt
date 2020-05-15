@@ -1,0 +1,12 @@
+                                        1 sub1 soap tape library   
+                                        1      routine 
+                                        1                   
+                                        0 sub1 nop 0000       comment
+                                        0      hlt 0001
+                                        1
+                                               ?
+                                          sub2 nop 0002       comment
+                                        0      hlt 0002
+                                        1
+                                               ?
+                                               ?

@@ -1,0 +1,18 @@
+  +                                                             
+  +                                                                             regional assembler sample control cards
+  +                                                             
+  +                                                                             this is a five-field card because the '+' in column 3
+  +                                                                             stores 0 at word 0, so no worries. allow comments past col 80
+  +                                                             
+  +                                                                             regions are defined by letter a-h plus digit 0-9
+  +                                                                             first region is empty (00) used to define absolute addresses
+  +                                                                             region start address and len is given
+  +                                                                             regions should be stored on addr 1000 onwards, on ascending order
+  +                                                             
+  +                                                                                   region     start 
+  +                                                                             Addr  name len   addr  comment
+  ?       1000a020000000                                                        1000  a0    2000 0000  region for all drum absolute address
+  ?       1001c001000900                                                        1001  c0    0100 0900  region for program code
+  ?       1002d000100990                                                        1002  d0    0010 0990  region for program data (variables)
+  ?       1003h000100977                                                        1003  h0    0010 0977  punch area
+  ?       1004h100110401                                                        1004  h1    0011 0401  read area

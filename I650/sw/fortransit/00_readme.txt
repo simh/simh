@@ -1,5 +1,6 @@
 
 Restoration comments May/2018
+By Roberto Sancho
 
 Fortransit
 From Bitsavers Manual CarnegieInternalTranslator.pdf (listings)
@@ -46,16 +47,16 @@ The PACKAGE provides the subroutines stated in fortransit.pdf
 in page 36, and also provides a set of functions to be 
 used in fortransit source code:
 
-   A=LOGF(B)		base 10 Logarithm: log 10
-   A=EXPF(B)  		base 10 exponent: 10^(B)
-   A=LNF(B)		base e logarithm: neperian log e
-   A=EXPNF(B)		base e exponent: e^(float)
-   A=COSF(B)		cosine
-   A=SINF(B) 		sine
-   A=SQRT(B)		square root
-   A=ABSF(B)		absolute value
-   A=INTF(B)		integer part
-   A=MAXF(B,C,...)	returns maximum value of argument list
+   A=LOGF(B)         base 10 Logarithm: log 10
+   A=EXPF(B)         base 10 exponent: 10^(B)
+   A=LNF(B)          base e logarithm: neperian log e
+   A=EXPNF(B)        base e exponent: e^(float)
+   A=COSF(B)         cosine
+   A=SINF(B)         sine
+   A=SQRT(B)         square root
+   A=ABSF(B)         absolute value
+   A=INTF(B)         integer part
+   A=MAXF(B,C,...)   returns maximum value of argument list
 
 All functions has FLOAT arguments and returns FLOAT value.
 If a FIXED argument is given, the program will stop with AR=9099

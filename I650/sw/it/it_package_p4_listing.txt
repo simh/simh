@@ -1,4 +1,4 @@
-       5                        PACKAGE 4   IS	                                             
+       5                        PACKAGE 4   IS                                             
        5                        PACKAGE 2                                                  
        5                            PLUS                                                    
        5                   LOG AND EXPONENTIAL                                             

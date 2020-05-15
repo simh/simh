@@ -1,0 +1,8 @@
+                                        1      soap test tap   
+                                        1
+                                        0      equsub1   1000                      
+                                        1                   
+                                        0 sub1 nop 0000 sub2      comment
+                                        0 sub2 tap
+                                        0      hlt 0001
+                                        0      pst                            

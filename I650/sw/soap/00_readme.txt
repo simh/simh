@@ -1,5 +1,6 @@
 
 Restoration comments May/2018
+By Roberto Sancho
 
 SOAP II 
 From Bitsavers Manual 24-4000-0_SOAPII.pdf 

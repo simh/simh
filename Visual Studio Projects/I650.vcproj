@@ -204,6 +204,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\I650\i650_dsk.c"
+				>
+			</File>
+			<File
+				RelativePath="..\I650\i650_mt.c"
+				>
+			</File>
+			<File
 				RelativePath="..\I650\i650_sys.c"
 				>
 			</File>

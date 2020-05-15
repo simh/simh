@@ -1,0 +1,209 @@
+                                        1 builds supersoap in ramac
+                                        1 using ssoap_loader.dck and
+                                        1       ssoap_main.dck as input
+                                        1       ssoap_core.dck as input
+                                        1 print disc-track saved
+
+                                               syn 1961
+                                               syn 1962
+                                               syn 1963
+
+                                           1000lodrdld  clias   start: call clear ias, then jmp to read loader deck
+                                        
+                                        1 save main deck in ramac, starting at disk 38, track 00
+
+                                          dskad 00 0003  8000   
+
+                                        1 clear ias routine
+
+                                          cliasstdexit0         save exit word
+                                               raa 59           ira = 59
+                                               ralzero  1f      clear acc
+                                          1    stu 9000a        store in 9000+ira
+                                               sxa 1
+                                               bmaexit0 1b
+
+                                        1 process ssoap loader deck 
+                                        1 loader deck will be stored in core in 9000-9039 
+                                        1 last instr of loader deck should have loc 1999
+
+                                          rdld rd1 1961  1961   read loader deck card
+                                           1961ral 1951         get word1 (sets card type)
+                                               slotyc
+                                               nzerdld          skip non type c cards
+                                               
+                                               rau 1953         get word3 (location in da)
+                                               slt 2
+                                               srt 6
+                                               stuloc           save location
+                                               sup9k            if >= 9000 jmp to 1f
+                                               bmi      1f
+                                               
+                                               ralloc           add core offset so loc 1966
+                                               alocofs           becomes 9006 (in core)
+                                               stlloc   1f
+
+                                          1    ralloc
+                                               raa 8002         ira=loc in core
+                                               lod 1954         get word4 (instruction word) 
+                                               std 0000a        store at loc
+                                               
+                                               sloldend         if loc!=9039 then
+                                               nzerdld  cl2      jmp to read next card
+                                       
+
+                                          tyc   69 1954  1953   first word on type c cards
+                                          loc   00 0000  0000   soap deck card location
+                                          9k    00 0000  9000
+                                          cofs  00 0000  7040   core offset = 9000 minus 1960
+                                          ldend 00 0000  9039   last addr of loader routine in core
+
+                                        1 ssoap loader deck processed
+                                        1 loader deck is now stored in core in 9000-9039 
+
+                                        1 process ssoap main deck 
+                                        1 loader deck will be stored in core starting at 9040
+                                        1 when core filled, track is written
+                                        1 main deck should be sorted in location ascending order
+                                        1 last instr of main deck should have loc 1999
+
+                                          cl2  raa 0            next main dec loc to store
+                                               rab 40   rdma    first addr free in core 
+
+                                          rdma rd1 1962  1962   read main deck card
+                                           1962ral 1951         get word1 (sets card type)
+                                               slotyc
+                                               nzerdma          skip non type c cards
+                                               
+                                               rau 1953         get word3 (location in da)
+                                               slt 2
+                                               srt 6
+                                               stuloc           save location
+                                               sup9k            if >= 9000 jmp to error halt
+                                               bmi      hlt2
+                                               
+                                               ralloc           if card location < last card          
+                                               slo 8005         jmp to error halt
+                                               bmihlt2
+                                               nze      2f      jmp to 2f if ira=loc
+
+                                               rac 8002         irc=number of zero cards to save to core to arrive to last card location
+                                               lodzero          store zero in core 
+                                               stdsvw   1f      word to save in core
+                                          1    lod      svcor   call store in core, B++, A++, write track if core full
+                                               sxc 1
+                                               nzc1b    2f      jmp to 2f when loc=IRA
+
+                                          2    lod 1954         get word4 (instruction word) 
+                                               stdsvw           word to save in core
+                                               lod      svcor   call store in core, B++, A++, write track if core full
+
+                                               ralloc
+                                               slomaend         if loc!=1999 then
+                                               nzerdma  cl3      jmp to read next card
+
+
+                                        1 ssoap main deck processed
+                                        1 main supersoap program is now stored in ramac 
+                                        1 tracks 00-33
+
+                                        1 process ssoap core deck 
+                                        1 these decks goes to tracks 34-66. deck loads to
+                                        1 9000-9059, final cdd pseudo op stores it to given track
+
+                                          cl3  lddrdco  clias   clear ias
+                                          
+                                          rdco rd1 1963  1963   read core deck card
+                                           1963ral 1951         get word1 (sets card type)
+                                               slotya           is type-a card
+                                               nze1f              if not, then jmp to type-c check
+
+                                               ral 1955         get word5 (loc+opcode, as digits) 
+                                               srt 5
+                                               sloii38          is 00038xxxxx
+                                               nze1f              if not, then jmp to type-c check
+
+                                               ral 1955         is cdd, so get track
+                                               srt 3            
+                                               slt 1
+                                               stldskad     
+                                               lod      svtr    call save track routine
+                                               
+                                               rau 1955         if saved disk 38, track 66 
+                                               supii38b           then jmp to cl4 (load core finished)
+                                               nzucl3   cl4       else jmp to clear ias to read next track
+                                               
+                                          1    ral 1951
+                                               slotyc
+                                               nzerdco          skip non type c cards
+                                               
+                                               rau 1953         get word3 (location in da)
+                                               slt 2
+                                               srt 6
+                                               stuloc           save location
+                                               sup9k            if < 9000 jmp to read next card
+                                               bmirdco
+                                                    
+                                               ralloc           is 9000 word, store in ias
+                                               raa 8002         ira=loc in core
+                                               lod 1954         get word4 (instruction word) 
+                                               std 0000ardco    store at loc, jmp to read next card
+
+                                          tya   00 0000  8000   first word on type a cards
+                                          ii38  00 0000  0038
+                                          ii38b 00 0386  6000
+
+                                        1 finish ok. main deck loaded in ramac, with load routine
+
+                                          cl4  ral 9000         read from ias to force the cpu to wait on ias 
+                                                                interlock up to last write pending in ramac has 
+                                                                finished before halting the cpu
+                                               hlt 0000  9898   finish ok 
+
+                                          hlt1 hlt 1111  9999   cards at loc 90XX not allowd in main deck
+                                          hlt2 hlt 2222  9999   last card is not in ascending order
+                                               
+                                          zero  00 0000  0000     
+                                          maend 00 0000  1999   last addr of main deck in drum
+
+                                        1 call store in core, incr irb, incr ira, write track if core full
+                                          
+                                          svcorstdexit0         save exit word
+                                               lodsvw           load word
+                                               std 9000b        and save in core
+                                               axa 1            incr ira
+                                               axb 1            incr irb
+                                               ral 8006         if irb<60 
+                                               slocoful          then exit
+                                               nzeexit0 1f
+                                               
+                                          svtr stdexit0 1f      save core to track
+                                          1    loddskad         core full. seek ramac address to save core
+                                               sds 9000
+                                               wds 9000         write core in ramac at address dskad
+
+                                               raldskad         punch track saved
+                                               slt 5            as dd tt00 0000
+                                               stl 1977         where dd=disk number=38
+                                               rauzero          tt=track number from 00 to 33
+                                               std 1978
+                                               std 1979
+                                               std 1980
+                                               std 1981
+                                               std 1982
+                                               std 1983
+                                               std 1984
+                                               wr1 1977 
+                                               
+                                               raldskad         increment track number for next write
+                                               alonxtr
+                                               stldskad
+                                               rab 0    exit0   core saved. reset irb (core empty again) and exit
+                                                                   
+
+                                          exit0 00 0000  0000   routine return jmp to saved exit word
+                                          svw   00 0000  0000   word to save in core
+                                          coful 00 0000  0060   core is full
+                                          nxtr  00 0000  0010   to increment track number
+                                               
+                                               end

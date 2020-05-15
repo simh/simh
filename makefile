@@ -1586,7 +1586,7 @@ I7094_OPT = -DUSE_INT64 -I ${I7094D}
 
 I650D = ${SIMHD}/I650
 I650 = ${I650D}/i650_cpu.c ${I650D}/i650_cdr.c ${I650D}/i650_cdp.c \
-	${I650D}/i650_sys.c
+	${I650D}/i650_dsk.c ${I650D}/i650_mt.c ${I650D}/i650_sys.c
 I650_OPT = -I ${I650D} -DUSE_INT64 -DUSE_SIM_CARD
 
 
@@ -2099,7 +2099,7 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 isys8010 isys8020 \
 	isys8030 isys8024 imds-210 imds-220 imds-225 imds-230 imds-800 imds-810 \
 	scelbi 3b2 i701 i704 i7010 i7070 i7080 i7090 \
-	sigma uc15 pdp10-ka pdp10-ki pdp10-kl pdp6
+	sigma uc15 pdp10-ka pdp10-ki pdp10-kl pdp6 i650
 
 all : ${ALL}
 
@@ -2862,7 +2862,6 @@ endif
 i650 : ${BIN}i650${EXE}
 
 ${BIN}i650${EXE} : ${I650} ${SIM} 
-	#cmake:ignore-target
 	${MKDIRBIN}
 	${CC} ${I650} ${SIM} ${I650_OPT} ${CC_OUTSPEC} ${LDFLAGS}
 ifneq (,$(call find_test,${I650D},i650))

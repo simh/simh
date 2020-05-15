@@ -1,0 +1,59 @@
+                                        1                                 
+                                        1 dsk output from 0000 1999     
+                                        1 loads supersoap from dsk to drum                                        
+                                        1 page 52 of supersoap manual
+
+                                        1 this routine loads tracks 00-33 from ramac 
+                                        1 to drum addr 0000-1999
+
+                                        1 this routine is stored in disk 38, track 00
+                                        1 when track is read to core, the routine
+                                        1 uses words 9000-9039. 
+                                        1 this routine starts al 9000 and is called 
+                                        1 by ssoap_calling_card. 
+
+                                        1 when called distributor should have the disk 
+                                        1 addr of this loader (000 03800 0)
+
+                                        1 loads words 9040-9059 to drum 0000-0019
+                                        1 then read next track and stores it in drum 0020-0080
+                                        1 and so on up to track 33. then routine jumps 
+                                        1 to transfer intruction
+                                        1   
+                                               blr 0     1999
+                                               bla 1966  1999
+                                          rd   syn 9004
+                                          j0001blr 1971 j0006
+
+                                           9000rau 8001  9001
+                                           9001rsa 1700  9002
+                                           9002alord     9003
+                                           9003rab 0     9005                                                                         
+
+                                           9005sti 1965 2f 
+                                          2    aup10i
+                                               lod 8003                                           
+                                               sds 9000 j0001b
+                                          j0001sti 1700a 8002
+                                          rd   rds 9000 
+                                               axb 1    2b
+                                          j0002sti 1720a
+                                               sti 1750a 8002    
+                                          j0003sti 1780a
+                                               sti 1800a 8002    
+                                          j0004sti 1840a
+                                               bma      9f
+                                               sti 1850a 8002
+                                          j0005sti 1900a
+                                               sti 1950a 8002    
+                                          j0006sti 1960a
+                                               axa 300
+                                               rab 0    j0001
+                                          9    lod1f
+                                               sti 1950  8001
+                                          10i   00 0     10
+
+                                        1 transfer instruction                                
+                                          1    rd1 1999  1998
+ 
+                                               end  

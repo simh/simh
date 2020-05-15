@@ -1,0 +1,73 @@
+          c0000070h10010c00001    c0.0000 rd    h1.0010          read card at addr 0401, jmp to 0410 if load card
+          c0000165h10000c00002            ral   h1.0000          ral 0401 addr word 1
+          c0000220h00000c00003            stl   h0.0000          stl 0777 addr word 1 for punch out
+          c0000365h10001c00004            ral   h1.0001          ral 0402 word 1 contents
+          c0000420h00001c00005            stl   h0.0001          stl 0778 word 1 for punch
+          c0000571h00000c00006            pch   h0.0000          punch 0777
+          c0000665h10002c00007            ral   h1.0002          ral 0403 addr word 2
+          c0000720h00000c00008            stl   h0.0000          stl 0777 addr word 2 for punch out
+          c0000865h10003c00009            ral   h1.0003          ral 0404 word 2 contents
+          c0000920h00001c00010            stl   h0.0001          stl 0778 word 2 for punch
+          c0001071h00000c00011            pch   h0.0000          punch 0777
+          c0001165h10004c00012            ral   h1.0004          ral 0405 addr word 3
+          c0001220h00000c00013            stl   h0.0000          stl 0777 addr word 3 for punch out
+          c0001365h10005c00014            ral   h1.0005          ral 0406 word 3 contents
+          c0001420h00001c00015            stl   h0.0001          stl 0778 word 3 for punch
+          c0001571h00000c00016            pch   h0.0000          punch 0777
+          c0001665h10006c00017            ral   h1.0006          ral 0407 addr word 4
+          c0001720h00000c00018            stl   h0.0000          stl 0777 addr word 4 for punch out
+          c0001865h10007c00019            ral   h1.0007          ral 0408 word 4 contents
+          c0001920h00001c00020            stl   h0.0001          stl 0778 word 4 for punch
+          c0002071h00000c00021            pch   h0.0000          punch 0777
+          c0002165h10008c00022            ral   h1.0008          ral 0408 addr word 5
+          c0002220h00000c00023            stl   h0.0000          stl 0777 addr word 5 for punch out
+          c0002365h10009c00024            ral   h1.0009          ral 0409 word 5 contents
+          c0002420h00001c00025            stl   h0.0001          stl 0778 word 5 for punch
+          c0002571h00000c00000            pch   h0.0000 c0.0000  punch 0777 goto start
+          d0   0                          variables for program
+          h1   000a00000a00000            initialize punch area
+          h1   200a00000a00000            initialize punch area
+          h1   300a00000a00000            initialize punch area
+          h1   400a00000a00000            initialize punch area
+          h1   500a00000a00000            initialize punch area
+          h1   600a00000a00000            initialize punch area
+          h1   700a00000a00000            initialize punch area
+          h1   800a00000a00000            initialize punch area
+          h1   900a00000a00000            initialize punch area
+          h1  1000a00000c00000            nop 0000 c0.0000       jmp back to read next card if this card is a load card (thus ignore reads cards)
+          i0                              end of program
+  
+          RRaaaaOOrrAAAArraaaa comment
+          
+          RRaaaa = regional addr for location
+          OO     = opcode
+          rrAAAA = regional addr for DA
+          RRaaaa = regional addr for IA
+          
+          rr is A0-H9 and mst match with a control card
+          
+          
+regional assembly sample program
+
+prints contents of input deck (in five-filed card format)
+load cards are skiped
+
+regional formatted source code card are indetified because the 'a'..'i' char in col 11
+allow comments past col 31
+
+this program needs the following regions, defined by control cards
+
+region     start 
+Addr  name len   addr  comment
+1000  a0    2000 0000  region for all drum absolute address
+1001  c0    0100 0900  region for program code
+1002  d0    0010 0990  region for program data (variables)
+1003  h0    0010 0977  punch area
+1004  h1    0010 0401  read area
+
+program starts at c0.0000 (gives absolute address 0900)
+no mnemonics! it is not a symbolic assembler!
+
+i0 marks the end of source program. assembler stops with (stop 0000 0500)
+put next deck on read hopper (mount deck file on cdr1), and press start to
+assemble it (sim> go)

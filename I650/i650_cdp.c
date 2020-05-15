@@ -139,6 +139,7 @@ void encode_lpt_num(t_int64 d, int l)
 #define     wf_nnnnnnnnnNs      5
 #define     wf_nnnnnnnnnH       6       
 #define     wf_NNNNNNNNNN       7
+#define     wf_sNNNNNNNNNN      8
 
 void encode_lpt_word(t_int64 d, int NegZero, int wFormat)
 {
@@ -174,6 +175,9 @@ void encode_lpt_word(t_int64 d, int NegZero, int wFormat)
         n = d % 10;
         encode_char(0, (n==0) ? '+':'A'+n-1);   // hi punch on last digit
     } else if (wFormat == wf_NNNNNNNNNN) {
+        encode_lpt_num(d,10);
+    } else if (wFormat == wf_sNNNNNNNNNN) {
+        encode_char(0, neg ? '-':'+'); 
         encode_lpt_num(d,10);
     } else { // default: wFormat == wf_NNNNNNNNNNs
         encode_lpt_num(d,10);
@@ -247,7 +251,7 @@ void encode_8word_wiring(void)
     }
 }
 
-void encode_soap_wiring(void) 
+void encode_soap_wiring(int bMultiPass) 
 {
     // encode soap card simulating soap control panel wiring for 533 
     // from SOAP II manual at http://www.bitsavers.org/pdf/ibm/650/24-4000-0_SOAPII.pdf
@@ -265,7 +269,8 @@ void encode_soap_wiring(void)
     //                +-+-|-+-+-+-|-+-+-|-|
     //         1984:  |   |N N N N|     |T| N N N N=Location, T=Type (0 if Blank)
     //         1985:  |           |N N N N| N N N N=Card Number
-    //         1986:  |a|b|c|d|e|f|g|h|i|j| a = 0/8 (for non blank type)
+    //         1986:  |a|b|c|d|e|f|g|h|i|j| punch control word
+    //                                      a = 0/8 (for non blank type)    =0 -> bank LOC,OP etc
     //                                      b = 0/8 (negative)
     //                                      c = 0/8 (bypass)
     //                                      d = 0/8 (punch a)               =8 -> do not print Loc op da ir
@@ -275,22 +280,39 @@ void encode_soap_wiring(void)
     //                                      h = 0/8 (blank out D)
     //                                      i = 0/8 (blank out I)
     //                                      j = 0/8 (blank out OP)
-    //                              
+    //    
     // SOAP printout format
     //    | Sg |    Location    |  OpCode  |   Data Addr    | Tg |  Instr Addr    | Tg | Remarks  | Drum Addr | NN NNNN NNNN[-] (signed word value at this drum addr)
     // SOAP punch format (load card, 1 word per card)
     // simulates punching over prepunched 1-word load card
-    //    |    word1   |       nnnn |  24 addr 800? | NNNNNNNNNN[-] | source soap line
+    //    |    word1   |       nnnn |  24 addr 800? | NNNNNNNNNN | source soap line
     //    nnnn=card number
     //    addr=drum address where the word is loaded
-    //    NNNNNNNNNN=word to be loaded at addr, with sign
+    //    NNNNNNNNNN=word to be loaded at addr, with sign in last digit
+    //
+    // If MultiPass flag set, 
+    //                                      e = 0/8 (punch b)               =8 ->  punch availability table OR punch 5/CD card 
+    //                                                                             if word1 start by 01 is 5/CD card
+    //                                                                             if word1 start by 00 is an availability card
+    //                              
+    // SOAPIIA 5 word per card (5/CD) punch format 
+    //    |    word 1    |    word 2    |    word 3    |    word 4    |    word 5    |    word 6    |    word 7    |    word 8   |
+    //    | 01 AAAA NNNN |     first    |    second    |    third     |    fourth    |    fifth     |   location of intructions  |
+    //                   |  instruction | instruction  | instruction  | instruction  |  instruction |  1    2    3 |   4    5    |
+    //      AAAA=ident                                                                              |  NNNN NNNN NN|NN NNNN NNNN |
+    //      NNNN=card num
+    //
+    // SOAPIIA 5 word per card printout format 
+    //    | 01 | AAAA | NNNN | word 1 | word 2 | word 3 | word 4 | word 5 | NNNN | NNNN | NNNN | NNNN | NNNN | 
+    //                                                                      word1  word2 word3   word4  word5 location 
+    //
 
     char loc[6], data_addr[6], inst_addr[6], OpCode[6], Data_Tag[6], Instr_Tag[6], rem1[6], rem2[6];
     char pch_word[20];
     t_int64 d, instr;
     int location, CardNum, ty;
-    int b_non_blank, neg, b_blk_op, b_blk_i, b_blk_d, b_blk_l, b_800X, b_pch_b, b_pch_a, b_bypass; // punch control flags
-    int i, sv_card_nbuf, n;
+    int b_non_blank, neg, b_blk_op, b_blk_i, b_blk_d, b_blk_l, b_800X, b_pch_b, b_pch_a, b_bypass, b_5cd; // punch control flags
+    int i, sv_card_nbuf, n, NegZero;
     int pat1, pat2;
 
     word_to_ascii(loc,       1, 5, IOSync[0]);
@@ -319,8 +341,17 @@ void encode_soap_wiring(void)
 
     // printf("bits %06d%04d%c ", printfw(IOSync[9]));    // to echo the control word of punched card
 
+    if ((bMultiPass) && (b_pch_b) && (IOSync[0] / D8 == 01)) {
+        b_5cd = 1; 
+    } else {
+        b_5cd = 0; 
+    }
+
+    if ((ty==1) || (ty==2)) b_pch_a=1; // card types 1 or 2 punch non generating code card
+
     // generate card
     if (b_pch_b) {
+        // punch 5 words per card format or 
         // punch availability table (pat pseudo-op output)
         for(i=0;i<8;i++) {
             sprintf_word(pch_word, IOSync[i], 0, 1);
@@ -334,7 +365,6 @@ void encode_soap_wiring(void)
             encode_pch_str(pch_word);    
             encode_pch_str("          ");             // two blank words
             encode_pch_str("          ");
-            if (b_non_blank) encode_pch_str("1"); else encode_pch_str(" ");
         } else {
             // punch generating code card  
             if (b_800X) {
@@ -348,9 +378,9 @@ void encode_soap_wiring(void)
             encode_pch_str(pch_word);    
             sprintf_word(pch_word, AbsWord(instr) * (neg ? -1:1), ((neg) && (instr == 0)) ? 1:0, 1);
             encode_pch_str(pch_word);    
-            encode_char(ty == 0 ? ' ' : '0'+ty, 0); 
         }
-        encode_pch_str(" ");
+        encode_char(ty == 0 ? ' ' : '0'+ty, 0); 
+        encode_char(neg ? '-' : ' ', 0); 
         sv_card_nbuf = card_nbuf;  // save pch bufer current pos
         encode_pch_str(loc);       encode_pch_str(OpCode); 
         encode_pch_str(data_addr); encode_pch_str(Data_Tag); 
@@ -365,21 +395,50 @@ void encode_soap_wiring(void)
 
     // generate printout
     if (b_pch_b) {
-        // print availability table (pat pseudo-op output)
-        for(i=0; i<4; i++) {
-            d = IOSync[i*2];
+        if (b_5cd) {
+            // print 5 words per card format or 
+            d = IOSync[0];
             pat1 = (int) ((d / D4) % D4);
             pat2 = (int) ( d       % D4);
-            d = IOSync[i*2 + 1];
-            encode_lpt_num(pat1, 4);
-            encode_lpt_spc(2);
-            encode_lpt_num(d, 10);
-            encode_lpt_spc(2);
-            encode_lpt_num(pat2, 4);
-            encode_lpt_spc(5);
+            encode_lpt_num(01, 2);      // print 01
+            encode_lpt_spc(1);
+            encode_lpt_num(pat1, 4);    // print AAAA
+            encode_lpt_spc(1);
+            encode_lpt_num(pat2, 4);    // print NNNN
+            encode_lpt_spc(1);
+            for(i=1;i<=5;i++) {         // print 5 words as NNNNNNNNNs
+                d = IOSync[i];
+                NegZero = IOSync_NegativeZeroFlag[i];
+                encode_lpt_word(d, NegZero, wf_NNNNNNNNNNs);
+            }
+            encode_lpt_spc(1);          // print locations of words as NNNN NNNN NNNN NNNN NNNN
+            d = IOSync[6];
+            for(i=1;i<=5;i++) {
+                n = Shift_Digits(&d, 4); 
+                if (i==3) {
+                    d = IOSync[7];
+                    n = n + Shift_Digits(&d, 2); 
+                }
+                encode_lpt_num(n, 4);    
+                encode_lpt_spc(1);
+            }
+        } else {
+            // print availability table (pat pseudo-op output)
+            for(i=0; i<4; i++) {
+                d = IOSync[i*2];
+                pat1 = (int) ((d / D4) % D4);
+                pat2 = (int) ( d       % D4);
+                d = IOSync[i*2 + 1];
+                encode_lpt_num(pat1, 4);
+                encode_lpt_spc(2);
+                encode_lpt_num(d, 10);
+                encode_lpt_spc(2);
+                encode_lpt_num(pat2, 4);
+                encode_lpt_spc(5);
+            }
         }
     } else if ((ty == 1) || (ty == 5)) {
-        // print coment for card type 1 (SOAP II) or type 5 (SOAP modified for IT)
+        // print comment for card type 1 (SOAP II) or type 5 (SOAP modified for IT)
         encode_char(0, '0' + ty);
         encode_lpt_spc(14);
         encode_lpt_str(loc); encode_lpt_str(OpCode); 
@@ -422,6 +481,265 @@ void encode_soap_wiring(void)
             if (b_blk_op) encode_lpt_str("BLANK OP"); else
             if (b_blk_d)  encode_lpt_str("BLANK D"); else
             if (b_blk_i)  encode_lpt_str("BLANK I");
+        }
+    }
+}
+
+void encode_supersoap_wiring() 
+{
+    // encode soap card simulating soap control panel wiring for 533 
+    // storage in output block (one card format)
+    //                +-------------------+ 
+    //    Word 9040:  | <-  Location   -> | Alphabetic
+    //         9041:  | <-  Data Addr  -> | Alphabetic
+    //         9042:  | <-  Inst Addr  -> | Alphabetic
+    //                +-+-+-|-+-+-|-+-|-+-|
+    //         9043:  |   Op Code |DTg|ITg| Alphabetic
+    //                +-+-+-|-+-+-|-+-|-+-|
+    //         9044:  | <- Remarks     -> | Alphabetic
+    //         9045:  | <- Remarks     -> | Alphabetic
+    //         9046:  |<-Assembled Instr->|
+    //                +-+-|-+-+-+-|-+-+-|-|
+    //         9047:  |   |N N N N|     |T| N N N N=Location, T=Type (0 if Blank)
+    //         9048:  |  n n n n  |N N N N| N N N N=Card Number, n n n n = location2
+    //         9049:  |a| | |d|e| |g| | |j| punch control word
+    //                                      a =8 -> bank LOC OP etc, =0 -> punch  LOC2 LOC1 OP etc =7 -> PAT card
+    //                                      b 
+    //                                      c =8 -> 8 words
+    //                                      d =8 -> five words per card
+    //                                      e =9 -> positive, =8 -> negative
+    //                                      f 
+    //                                      g =8 -> ???
+    //                                      h 
+    //                                      i 
+    //                                      j =4 -> punch 8004
+    //    
+    // SOAP printout format
+    //    | Sg |    Location    |  OpCode  |   Data Addr    | Tg |  Instr Addr    | Tg | Remarks  | Drum Addr | NN NNNN NNNN[-] (signed word value at this drum addr)
+    // SOAP punch format (load card, 1 word per card)
+    // simulates punching over prepunched 1-word load card
+    //    |    word1   |       nnnn |  24 addr 800? | NNNNNNNNNN | source soap line
+    //    nnnn=card number
+    //    addr=drum address where the word is loaded
+    //    NNNNNNNNNN=word to be loaded at addr, with sign in last digit
+    //
+    // SuperSoap five word per card (FIV) punch format 
+    //    |    word 1    |    word 2    |    word 3    |    word 4    |    word 5    |    word 6    |    word 7    |    word 8   |
+    //    | 888888  NNNN |     fifth    |    fourth    |    third     |    second    |    first     |   location of intructions  |
+    //                   |  instruction | instruction  | instruction  | instruction  |  instruction |  5    4    3 |   2    1    |
+    //     NNNN=card num                                                                            |  NNNN NNNN NN|NN NNNN NNNN |
+    //      
+    //
+    // SuperSoap five word per card printout format 
+    //    | 88888 | NNNN | word 5 | word 4 | word 3 | word 2 | word 1 | NNNN | NNNN | NNNN | NNNN | NNNN | 
+    //                                                                  word5  word4 word3   word2  word1 location 
+    //
+
+    char loc[6], data_addr[6], inst_addr[6], OpCode[6], Data_Tag[6], Instr_Tag[6], rem1[6], rem2[6];
+    char pch_word[20];
+    t_int64 d, instr;
+    int location, location2, CardNum, ty, opcodeNum;
+    int b_blank, neg, b4, fiv, b_8word; // punch control flags
+    int i, sv_card_nbuf, n, NegZero;
+    int pat1, pat2;
+    char cardtype;
+
+    word_to_ascii(loc,       1, 5, IOSync[0]);
+    word_to_ascii(data_addr, 1, 5, IOSync[1]);
+    word_to_ascii(inst_addr, 1, 5, IOSync[2]);
+    word_to_ascii(OpCode,    1, 3, IOSync[3]);
+    word_to_ascii(Data_Tag,  4, 1, IOSync[3]);
+    word_to_ascii(Instr_Tag, 5, 1, IOSync[3]);
+    word_to_ascii(rem1,      1, 5, IOSync[4]);
+    word_to_ascii(rem2,      1, 5, IOSync[5]);
+    instr     = IOSync[6];
+    location  = (int) ((IOSync[7] / D4) % D4);
+    ty        = (int) ( IOSync[7]       % 10);
+    CardNum   = (int) ( IOSync[8]       % D4);
+    location2 = (int) ( (IOSync[8] / (10*D4)) % D4);
+    d         =  IOSync[9];
+
+    b4      = ((int) (d % 10) == 8) ? 1:0; d = d / 10;
+    i       = ((int) (d % 10) == 8) ? 1:0; d = d / 10;
+    i       = ((int) (d % 10) == 8) ? 1:0; d = d / 10;
+    i       = ((int) (d % 10) == 8) ? 1:0; d = d / 10;
+    i       = ((int) (d % 10) == 8) ? 1:0; d = d / 10;
+    neg     = ((int) (d % 10) == 8) ? 1:0; d = d / 10;
+    fiv     = ((int) (d % 10) == 8) ? 1:0; d = d / 10;
+    b_8word = ((int) (d % 10) == 8) ? 1:0; d = d / 10;
+    i       = ((int) (d % 10) == 8) ? 1:0; d = d / 10;    
+    b_blank = (int) (d % 10); d = d / 10;
+
+    opcodeNum = (int) (IOSync[3] / D4); // origina ibm650 char opcode
+
+    if (b_blank==7) {
+        cardtype = 'P'; // punch availability table card PAT
+    } else if (fiv) {
+        cardtype = '5'; // punch five words per card
+    } else if (b_8word) {
+        cardtype = '8'; // punch 8-words load binary card
+    } else if ((b_blank) || (ty==1) || (ty==3)) {
+        //XXX missing PAL output, 
+        cardtype = 'A'; // comment card
+    } else if ((ty==2) || (ty==4) || ((location >= 8000) && (location <= 8009))) {
+        cardtype = 'B'; // 800X card
+    } else {
+        //XXX missing  PLR, FIL in one-per-card form, FIL in five-per-card form, DEK
+        cardtype = 'C'; // regular code card
+    }
+
+    // generate card
+    if (cardtype=='P') {
+        // punch availability table (pat pseudo-op output)
+        for(i=0;i<8;i++) {
+            sprintf_word(pch_word, IOSync[i], 0, 1);
+            encode_pch_str(pch_word);     
+        }
+    } else if (cardtype=='8') {
+        // punch 8-words load binary card
+        for(i=0;i<8;i++) {
+            d = IOSync[i];
+            NegZero = IOSync_NegativeZeroFlag[i];
+            sprintf_word(pch_word, d, NegZero, 1);
+            encode_pch_str(pch_word);   
+        }
+    } else if (cardtype=='5') {
+        // punch five-per-card per card format 
+        sprintf(pch_word, "888888%04d", (int)(IOSync[8] % D4)); // punch six 8's, then the card number
+        encode_pch_str(pch_word);    
+        for(i=1;i<6;i++) {
+            sprintf_word(pch_word, IOSync[i], 0, 1); // sign on units
+            encode_pch_str(pch_word);     
+        }
+        sprintf_word(pch_word, IOSync[6], 0, 0); // locations -> no sign
+        encode_pch_str(pch_word);     
+        sprintf_word(pch_word, IOSync[7], 0, 0);
+        encode_pch_str(pch_word);     
+    } else {
+        // cardtype A, B or C
+        if (cardtype=='A') {
+            encode_pch_str("?000008000");  // punch non generating code card
+        } else if (cardtype=='B') {
+            encode_pch_str("F919548000");  // punch for 800X locations
+        } else {
+            encode_pch_str("F919541953"); // punch for load card
+        }
+        if ((ty!=1) && (ty!=3) && ((opcodeNum==647963) || (opcodeNum==637664))) {
+            sprintf(pch_word, " %s%04d", loc, CardNum);  // card DRC or COD
+        } else {
+            sprintf(pch_word, "      %04d", CardNum);    // consecutive card count
+        }
+        encode_pch_str(pch_word);  
+        if   (cardtype=='A') {
+            encode_pch_str("          ");
+            encode_pch_str("          ");
+        } else {
+            sprintf(pch_word, "24%04d800?", location);// addr to place the loaded word
+            encode_pch_str(pch_word);    
+            sprintf_word(pch_word, AbsWord(instr) * (neg ? -1:1), ((neg) && (instr == 0)) ? 1:0, 1);
+            encode_pch_str(pch_word);    
+        }
+        // input reproduced
+        encode_char(ty == 0 ? ' ' : '0'+ty, 0); 
+        encode_char(neg ? '-' : ' ', 0); 
+        sv_card_nbuf = card_nbuf;  // save pch bufer current pos
+        encode_pch_str(loc);       encode_pch_str(OpCode); 
+        encode_pch_str(data_addr); encode_pch_str(Data_Tag); 
+        encode_pch_str(inst_addr); encode_pch_str(Instr_Tag); 
+        encode_pch_str(rem1);      encode_pch_str(rem2); 
+        // convert to lowercase for punching
+        for (i=sv_card_nbuf;i<card_nbuf;i++) 
+            if ((card_buf[i] >= 'A') && (card_buf[i] <= 'Z')) 
+                card_buf[i] = card_buf[i] - 'A' + 'a';
+    }
+    card_buf[card_nbuf] = 0;
+
+    // generate printout
+    if (cardtype=='5') {
+        // print five words per card format 
+        encode_lpt_str("888888 ");
+        encode_lpt_num((int)(IOSync[8] % D4), 4); // card number
+        encode_lpt_spc(1);
+        for(i=1;i<=5;i++) {         // print 5 words as NNNNNNNNNs
+            d = IOSync[i];
+            NegZero = IOSync_NegativeZeroFlag[i];
+            encode_lpt_word(d, NegZero, wf_NNNNNNNNNNs);
+        }
+        encode_lpt_spc(1);          // print locations of words as NNNN NNNN NNNN NNNN NNNN
+        d = IOSync[6];
+        for(i=1;i<=5;i++) {
+            n = Shift_Digits(&d, 4); 
+            if (i==3) {
+                 d = IOSync[7];
+                 n = n + Shift_Digits(&d, 2); 
+            }
+            encode_lpt_num(n, 4);    
+            encode_lpt_spc(1);
+        }
+    } else if (cardtype=='8') {
+        // punch 8-words load binary card
+        // print out card contents 8 words in format NN NNNN NNNN+
+        for(i=0;i<8;i++) {
+           d = IOSync[i];
+           NegZero = IOSync_NegativeZeroFlag[i];
+           encode_lpt_word(d, NegZero, wf_sNNNNNNNNNN);
+           encode_lpt_spc(2);
+        }
+    } else if (cardtype=='P') {
+        // print availability table (pat pseudo-op output)
+        for(i=0; i<4; i++) {
+            d = IOSync[i*2];
+            pat1 = (int) ((d / D4) % D4);
+            pat2 = (int) ( d       % D4);
+            d = IOSync[i*2 + 1];
+            encode_lpt_num(pat1, 4);
+            encode_lpt_spc(2);
+            encode_lpt_num(d, 10);
+            encode_lpt_spc(2);
+            encode_lpt_num(pat2, 4);
+            encode_lpt_spc(5);
+        }
+    } else {
+        encode_lpt_num(CardNum, 4); 
+        encode_lpt_spc(3);
+        if (ty == 1) {
+            // print comment card type 1 
+            encode_lpt_str("1    ");
+            encode_lpt_str(loc); encode_lpt_str(OpCode); 
+            encode_lpt_str(data_addr); encode_lpt_str(Data_Tag); 
+            encode_lpt_str(inst_addr); encode_lpt_str(Instr_Tag); 
+            encode_lpt_str(rem1); encode_lpt_str(rem2); 
+        } else {
+            if (ty == 0) {
+                encode_lpt_spc(1);
+            } else {
+                encode_char(0, '0' + ty);
+            }
+            encode_lpt_spc(2); encode_char(0, neg ? '-':' '); encode_lpt_spc(1);
+            encode_lpt_str(loc); encode_lpt_spc(2); 
+            encode_lpt_str(OpCode); encode_lpt_spc(2); 
+            encode_lpt_str(data_addr); encode_lpt_str(Data_Tag); encode_lpt_spc(1); 
+            encode_lpt_str(inst_addr); encode_lpt_str(Instr_Tag); encode_lpt_spc(3); 
+            encode_lpt_str(rem1); encode_lpt_str(rem2); encode_lpt_spc(4); 
+            if (b_blank) {
+                // blank loc opcode data_addr instr_addr
+            } else {
+                if (location2!=location) {
+                    encode_lpt_num(location2, 4);
+                } else {
+                    encode_lpt_spc(4); 
+                }
+                encode_lpt_spc(1); 
+                encode_lpt_num(location, 4); encode_lpt_spc(2); 
+                encode_char(0, neg ? '-':'+'); 
+                d = instr;
+                n = Shift_Digits(&d, 2); // operation code (2 digits)
+                encode_lpt_num(n, 2); encode_lpt_spc(1);
+                n = Shift_Digits(&d, 4); // data addr (4 digits)
+                encode_lpt_num(n, 4); encode_lpt_spc(1); 
+                n = Shift_Digits(&d, 4); // instr addr (4 digits)
+                encode_lpt_num(n, 4); 
+            }
         }
     }
 }
@@ -702,6 +1020,113 @@ void encode_it_wiring(void)
     }
 }
 
+void encode_ra_wiring(void) 
+{
+    // encode card for Missile Systems Division, Lockheed Aircraft Corporation
+    // regional assembly card - five load cards
+    // storage in output block 
+    //                +-------------------+ 
+    //    Word 0977:  | XX AAAA XXXX      | Address A1 (X=don't care)
+    //         0978:  | NN NNNN NNNN      | word 1
+    //         0979:  | XX AAAA XXXX      | Address A2
+    //         0980:  | NN NNNN NNNN      | word 2
+    //         0981:  | XX AAAA XXXX      | Address A3
+    //         0982:  | NN NNNN NNNN      | word 3
+    //         0983:  | XX AAAA XXXX      | Address A4
+    //         0984:  | NN NNNN NNNN      | word 4
+    //         0985:  | XX AAAA XXXX      | Address A5
+    //         0986:  | NN NNNN NNNN      | word 5
+    //                +-------------------+
+    //     
+    // punch card format 
+    //
+    //    Column: | 1 2 3 4 - 10 | 11 - 14 | 15 16 | 17 - 20 | 21 - 24 | 25 - 28 | 29 30 | 31 - 34 | 35 - 38 | 39 - 42 | 43 44 | 45 - 48 | 49 - 52 | 53 - 56 | 57 58 | 59 - 62 | 63 - 66 | 67 - 70 | 71 72 | 73 - 76 | 77 - 80 |
+    //            |     +        | N N N N | N  N  | N N N N | N N N N | N N N N | N  N  | N N N N | N N N N | N N N N | N  N  | N N N N | N N N N | N N N N | N  N  | N N N N | N N N N | N N N N | N  N  | N N N N | N N N N | 
+    //                           | Addr    | Op    | Data    | Instr   | Addr    | Op    | Data    | Instr   | Addr    | Op    | Data    | Instr   | Addr    | Op    | Data    | Instr   | Addr    | Op    | Data    | Instr   | 
+    //                           | Location| Code  | Addr    | Addr    | Location| Code  | Addr    | Addr    | Location| Code  | Addr    | Addr    | Location| Code  | Addr    | Addr    | Location| Code  | Addr    | Addr    | 
+    //                           |   (A1)     (O1)    (D1)     (I1)    |   (A2)     (O2)    (D2)     (I2)    |   (A3)     (O3)    (D3)     (I3)    |   (A4)     (O4)    (D4)     (I4)    |   (A5)     (O5)    (D5)     (I5)    | 
+    //                           |               Word 1                |               Word 2                |               Word 3                |               Word 4                |               Word 5                | 
+    //                         
+    // printout of five load card (only prints words 1, 2 and 3)
+    //
+    //    Column: | 1   2 | 3 - 6   | 7 8 | 9 10 | 11 | 12 - 15 | 16 | 17 - 20 | 21 | 22 - 25 | 26 - 29 | 30 31 | 32 33 | 34 | 35 - 38 | 39 | 40 - 43 | 44 | 45 - 48 | 49 - 52 | 53 54 | 55 56 | 57 | 58 - 61 | 62 | 63 - 66 | 67 |
+    //            |       | N N N N |     | N  N |    | N N N N |    | N N N N | s  |         | N N N N |       | N  N  |    | N N N N |    | N N N N | s  |         | N N N N |       | N  N  |    | N N N N |    | N N N N | s  |
+    //                    | Addr    |     | Op   |    | Data    |    | Instr   | sign         | Addr    |       | Op    |    | Data    |    | Instr   | sign         | Addr    |       | Op    |    | Data    |    | Instr   | sign
+    //                    | Location|     | Code |    | Addr    |    | Addr    |              | Location|       | Code  |    | Addr    |    | Addr    |              | Location|       | Code  |    | Addr    |    | Addr    |
+    //                    |   (A1)        | (O1) |    | (D1)    |    | (I1)    |              |  (A2)           | (O2)  |    | (D2)    |    | (I2)    |              |  (A3)           | (O3)  |    | (D3)    |    | (I3)    |
+    //                    |                    Word 1                          |              |                       Word 2                          |              |                       Word 3                          |
+   
+    char pch_word[20];
+    t_int64 d; 
+    int n; 
+
+    encode_pch_str("  +       "); 
+
+    d = IOSync[0]; Shift_Digits(&d, 2); n=Shift_Digits(&d, 4);
+    sprintf_word(pch_word,     n, 0, 0);    // A1
+    encode_pch_str(&pch_word[6]);   
+    sprintf_word(pch_word,     IOSync[1], 0, 0);    // word 1
+    encode_pch_str(pch_word);   
+
+    d = IOSync[2]; Shift_Digits(&d, 2); n=Shift_Digits(&d, 4);
+    sprintf_word(pch_word,     n, 0, 0);    // A2
+    encode_pch_str(&pch_word[6]);   
+    sprintf_word(pch_word,     IOSync[3], 0, 0);    // word 2
+    encode_pch_str(pch_word);   
+
+    d = IOSync[4]; Shift_Digits(&d, 2); n=Shift_Digits(&d, 4);
+    sprintf_word(pch_word,     n, 0, 0);    // A3
+    encode_pch_str(&pch_word[6]);   
+    sprintf_word(pch_word,     IOSync[5], 0, 0);    // word 3
+    encode_pch_str(pch_word);   
+
+    d = IOSync[6]; Shift_Digits(&d, 2); n=Shift_Digits(&d, 4);
+    sprintf_word(pch_word,     n, 0, 0);    // A4
+    encode_pch_str(&pch_word[6]);   
+    sprintf_word(pch_word,     IOSync[7], 0, 0);    // word 4
+    encode_pch_str(pch_word);   
+
+    d = IOSync[8]; Shift_Digits(&d, 2); n=Shift_Digits(&d, 4);
+    sprintf_word(pch_word,     n, 0, 0);    // A5
+    encode_pch_str(&pch_word[6]);   
+    sprintf_word(pch_word,     IOSync[9], 0, 0);    // word 5
+    encode_pch_str(pch_word);   
+
+    encode_lpt_str("  ");
+
+    d = IOSync[0];
+    Shift_Digits(&d, 2); n = Shift_Digits(&d, 4);
+    encode_lpt_num(n, 4); 
+    encode_lpt_spc(2);
+    d = IOSync[1];
+    encode_lpt_word(d, 0, wf_NN_NNNN_NNNNs); 
+    encode_lpt_spc(4);
+    
+    d = IOSync[2];
+    Shift_Digits(&d, 2); n = Shift_Digits(&d, 4);
+    d = IOSync[3];
+    if ((n==0) && (d==0)) {
+       encode_lpt_spc(4+2+13+4);
+    } else {
+       encode_lpt_num(n, 4); 
+       encode_lpt_spc(2);
+       encode_lpt_word(d, 0, wf_NN_NNNN_NNNNs); 
+       encode_lpt_spc(4);
+    }
+
+    d = IOSync[4];
+    Shift_Digits(&d, 2); n = Shift_Digits(&d, 4);
+    d = IOSync[5];
+    if ((n==0) && (d==0)) {
+       encode_lpt_spc(4+2+13+4);
+    } else {
+       encode_lpt_num(n, 4); 
+       encode_lpt_spc(2);
+       encode_lpt_word(d, 0, wf_NN_NNNN_NNNNs); 
+       encode_lpt_spc(4);
+    }
+}
+
 void encode_fortransit_wiring(void) 
 {
     // encode card for FORTRANSIT modified IT compiler
@@ -897,7 +1322,7 @@ void encode_fortransit_wiring(void)
 uint32 cdp_cmd(UNIT * uptr, uint16 cmd, uint16 addr)
 {
     int i,c,h;
-    struct _card_data   *data;
+    uint16 image[80];
     uint32              wiring;
 
     /* Are we currently tranfering? */
@@ -906,7 +1331,7 @@ uint32 cdp_cmd(UNIT * uptr, uint16 cmd, uint16 addr)
 
     /* Test ready */
     if ((uptr->flags & UNIT_ATT) == 0) {
-        sim_debug(DEBUG_CMD, &cdp_dev, "No cards (no file attached)\n");
+        sim_debug(DEBUG_EXP, &cdp_dev, "No cards (no file attached)\n");
         return SCPE_NOCARDS;
     }
 
@@ -918,13 +1343,22 @@ uint32 cdp_cmd(UNIT * uptr, uint16 cmd, uint16 addr)
 
     if (wiring == WIRING_SOAP) {
         // encode soap card simulating soap control panel wiring for 533 (gasp!)
-        encode_soap_wiring();
+        encode_soap_wiring(0);
+    } else if (wiring == WIRING_SOAPA) {
+        // encode soap card for multipass sopa IIA
+        encode_soap_wiring(1);
+    } else if (wiring == WIRING_SUPERSOAP) {
+        // encode super soap card 
+        encode_supersoap_wiring();
     } else if (wiring == WIRING_IS) {
         // encode floating point interpretive system (bell interpreter) card 
         encode_is_wiring();
     } else if (wiring == WIRING_IT) {
         // encode Carnegie Internal Translator compiler card 
         encode_it_wiring();
+    } else if (wiring == WIRING_RA) {
+        // endecode Missile Systems Division Lockheed Aircraft Corporation - regional assembly card
+        encode_ra_wiring();
     } else if (wiring == WIRING_FORTRANSIT) {
         // encode Fortransit translator card 
         encode_fortransit_wiring();
@@ -958,7 +1392,6 @@ uint32 cdp_cmd(UNIT * uptr, uint16 cmd, uint16 addr)
     sim_debug(DEBUG_DETAIL, &cpu_dev, "Punch Card: %s\n", card_buf);
 
     /* punch the cards */
-    data = (struct _card_data *)uptr->up7;
     for (i=0; i<80; i++) {
         if (i >= card_nbuf) {
             c = 32;
@@ -967,14 +1400,14 @@ uint32 cdp_cmd(UNIT * uptr, uint16 cmd, uint16 addr)
         }
         if (c == 32) {
             // no punch
-            data->image[i] = 0;
+            image[i] = 0;
         } else {
             // punch char
-            h = ascii_to_hol[c & 127];
-            data->image[i] = h;
+            h = sim_ascii_to_hol(c);
+            image[i] = h;
         }
     }
-    sim_punch_card(uptr, NULL);
+    sim_punch_card(uptr, image);
     sim_debug(DEBUG_CMD, &cdp_dev, "PUNCH\n");
     uptr->u5 |= URCSTA_BUSY;
     uptr->u6++; // incr number of punched cards 
