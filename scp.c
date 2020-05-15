@@ -2281,7 +2281,6 @@ static const char simh_help2[] =
       " The IF and ASSERT commands evaluate five different forms of conditional\n"
       " expressions.:\n\n"
       "5C Style Simulator State Expressions\n"
-
       " Comparisons can optionally be done with complete C style computational\n"
       " expressions which leverage the C operations in the below table and can\n"
       " optionally reference any combination of values that are constants or\n"
@@ -2364,6 +2363,19 @@ static const char simh_help2[] =
       "++-F {NOT} \"<filespec1>\" == \"<filespec2>\" \n\n"
       " Specifies a true (false {NOT}) condition if the indicated files\n"
       " have the same contents.\n\n"
+      "5Debugging Expression Evaluation\n"
+      " Debug output can be produced which will walk through the details\n"
+      " involved during expression evaluation.  This output can, for example,\n"
+      " be enabled as follows:\n\n"
+      "++sim> SET DEBUG STDOUT\n"
+      "++sim> SET SCP-PROCESS DEBUG=EXPSTACK  - Expression Stack Activities\n"
+      "++sim> SET SCP-PROCESS DEBUG=EXPEVAL   - Expression Evaluation Activities\n"
+      "3Debugging Do File Processing\n"
+      " Debug output can be produced which will walk through the details\n"
+      " involved during DO file proccessing.  This output can, for example,\n"
+      " be enabled as follows:\n\n"
+      "++sim> SET DEBUG STDOUT\n"
+      "++sim> SET SCP-PROCESS DEBUG=DO  - Debug Output DO processing\n"
        /***************** 80 character line width template *************************/
 #define HLP_EXIT        "*Commands Exiting_The_Simulator"
       "2Exiting The Simulator\n"
@@ -7303,8 +7315,6 @@ int32 old_sw = sim_switches;
 sim_switches = SWMASK ('P');
 r = reset_all (start);
 sim_switches = old_sw;
-if (sim_dflt_dev)   /* Make sure that SCP debug options are available */
-    sim_add_debug_flags (sim_dflt_dev, scp_debug);
 return r;
 }
 
