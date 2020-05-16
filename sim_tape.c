@@ -420,7 +420,7 @@ typedef struct HDR2 {       /* Also EOF2, EOV2 */
 
 typedef struct HDR3 {       /* Also EOF3, EOV3 */
     char type[3];               /* HDR  */
-    char num;                   /* 2    */
+    char num;                   /* 3    */
     char record_format;         /* F(fixed)|D(variable)|S(spanned) */
     char block_length[5];       /* label ident */
     char record_length[5];      /*  */
@@ -500,7 +500,7 @@ static struct ansi_tape_parameters {
     t_bool              zero_record_length;
     char                record_format;
     char                carriage_control;
-    } ansi_args[] = {     /* code       nohdr2 nohdr3 fixed_text lvl hdr3 fir fuxed    hdr3 fir lf      hdr3 for crlf  skLF CRLF Y2KDT  0RecLnt RFM  CC*/
+    } ansi_args[] = {     /* code       nohdr2 nohdr3 fixed_text lvl hdr3 for fixed    hdr3 for lf      hdr3 for crlf  skLF CRLF Y2KDT  0RecLnt RFM  CC*/
         {"ANSI-VMS"      , "DECFILE11A", FALSE, FALSE, FALSE,    '3', HDR3_RMS_FIXED,  HDR3_RMS_STMLF,  HDR3_RMS_STREAM, 0,   0, FALSE, FALSE,   0,   0},
         {"ANSI-RSX11"    , "DECFILE11A", FALSE, FALSE, FALSE,    '4', HDR3_RMS_FIXRSX, HDR3_RMS_VARRSX, HDR3_RMS_VARRSX, 1,   2, FALSE, FALSE,   0,   0},
         {"ANSI-RT11"     , "DECRT11A",   TRUE,  TRUE,  TRUE,     '3', NULL,            NULL,            NULL,            0,   0, FALSE, FALSE,   0,   0},
