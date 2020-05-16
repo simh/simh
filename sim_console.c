@@ -3454,8 +3454,8 @@ if ((sim_ttisatty ()) &&
 if ((std_output) &&                                     /* If Not Background process? */
     (std_output != INVALID_HANDLE_VALUE)) {
     if (GetConsoleMode(std_output, &saved_output_mode))
-        if (!SetConsoleMode(std_output, ENABLE_VIRTUAL_TERMINAL_PROCESSING|ENABLE_PROCESSED_OUTPUT))
-            SetConsoleMode(std_output, ENABLE_PROCESSED_OUTPUT);
+        if (!SetConsoleMode(std_output, ENABLE_VIRTUAL_TERMINAL_PROCESSING|ENABLE_PROCESSED_OUTPUT|ENABLE_WRAP_AT_EOL_OUTPUT))
+            SetConsoleMode(std_output, ENABLE_PROCESSED_OUTPUT|ENABLE_WRAP_AT_EOL_OUTPUT);
     }
 if (sim_log) {
     fflush (sim_log);
