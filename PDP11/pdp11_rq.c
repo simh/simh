@@ -767,6 +767,35 @@ static struct drvtyp drv_tab[] = {
     { 0 }
     };
 
+#undef RQ_DRV
+#define RQ_DRV(d) #d
+
+static const char *drv_types[] = {
+    RQ_DRV (RX50),
+    RQ_DRV (RX33),
+    RQ_DRV (RD51),
+    RQ_DRV (RD31),
+    RQ_DRV (RD52),
+    RQ_DRV (RD53),
+    RQ_DRV (RD54),
+    RQ_DRV (RA82),
+    RQ_DRV (RRD40),
+    RQ_DRV (RA72),
+    RQ_DRV (RA90),
+    RQ_DRV (RA92),
+    RQ_DRV (RA8U),
+    RQ_DRV (RA60),
+    RQ_DRV (RA81),
+    RQ_DRV (RA71),
+    RQ_DRV (RD32),
+    RQ_DRV (RC25),
+    RQ_DRV (RCF25),
+    RQ_DRV (RA80),
+    RQ_DRV (RA70),
+    RQ_DRV (RA73),
+    NULL
+    };
+
 struct ctlrtyp {
     uint32      uqpm;                                   /* port model */
     uint16      model;                                  /* controller model */
@@ -2938,7 +2967,8 @@ t_stat rq_attach (UNIT *uptr, CONST char *cptr)
 MSC *cp = rq_ctxmap[uptr->cnum];
 t_stat r;
 
-r = sim_disk_attach (uptr, cptr, RQ_NUMBY, sizeof (uint16), (uptr->flags & UNIT_NOAUTO), DBG_DSK, drv_tab[GET_DTYPE (uptr->flags)].name, 0, 0);
+r = sim_disk_attach_ex (uptr, cptr, RQ_NUMBY, sizeof (uint16), (uptr->flags & UNIT_NOAUTO), DBG_DSK, 
+                        drv_tab[GET_DTYPE (uptr->flags)].name, 0, 0, (uptr->flags & UNIT_NOAUTO) ? NULL : drv_types);
 if (r != SCPE_OK)
     return r;
 
