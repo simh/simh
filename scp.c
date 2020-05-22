@@ -13562,7 +13562,7 @@ int Fprintf (FILE *f, const char* fmt, ...)
 int ret = 0;
 va_list args;
 
-if (sim_mfile || (f == sim_deb)) {
+if (sim_mfile || (sim_deb && (f == sim_deb))) {
     char stackbuf[STACKBUFSIZE];
     int32 bufsize = sizeof(stackbuf);
     char *buf = stackbuf;
