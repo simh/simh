@@ -91,7 +91,6 @@ typedef struct {
 /* Unit flags */
 
 #define MTUF_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
-#define MTUF_V_FMT      (UNIT_V_UF + 2)                 /* tape file format */
 #define MTUF_F_STD      0                               /* SIMH format */
 #define MTUF_F_E11      1                               /* E11 format */
 #define MTUF_F_TPC      2                               /* TPC format */

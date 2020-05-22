@@ -28,6 +28,8 @@
 #define _SIM_SCSI_H_     0
 
 #include "sim_defs.h"
+#include "sim_disk.h"
+#include "sim_tape.h"
 
 /* SCSI device states */
 
@@ -64,9 +66,9 @@
 #define SCSI_DBG_BUS    0x04000000                      /* bus activity */
 #define SCSI_DBG_DSK    0x08000000                      /* disk activity */
 
-#define SCSI_V_WLK      (UNIT_V_UF + 5)                 /* hwre write lock */
-#define SCSI_V_NOAUTO   (UNIT_V_UF + 6)                 /* noautosize */
-#define SCSI_V_UF       (UNIT_V_UF + 7)
+#define SCSI_V_WLK      DKUF_V_WLK                      /* hwre write lock */
+#define SCSI_V_NOAUTO   ((DKUF_V_UF > MTUF_V_UF) ? DKUF_V_UF : MTUF_V_UF)/* noautosize */
+#define SCSI_V_UF       (SCSI_V_NOAUTO + 1)
 #define SCSI_WLK        (1 << SCSI_V_WLK)
 #define SCSI_NOAUTO     (1 << SCSI_V_NOAUTO)
 
