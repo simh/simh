@@ -364,6 +364,7 @@ extern UNIT *sim_dfunit;
 extern int32 sim_interval;
 extern int32 sim_switches;
 extern int32 sim_switch_number;
+extern int32 sim_show_message;
 extern int32 sim_quiet;
 extern int32 sim_step;
 extern t_stat sim_last_cmd_stat;                        /* Command Status */
