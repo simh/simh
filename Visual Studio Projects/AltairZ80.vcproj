@@ -252,6 +252,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\AltairZ80\m68kasm.c"
+				>
+			</File>
+			<File
 				RelativePath="..\AltairZ80\m68kcpu.c"
 				>
 			</File>
@@ -259,10 +263,6 @@
 				RelativePath="..\AltairZ80\m68kdasm.c"
 				>
 			</File>
-            <File
-                RelativePath="..\AltairZ80\m68kasm.c"
-                >
-            </File>
 			<File
 				RelativePath="..\AltairZ80\m68kopac.c"
 				>
@@ -321,6 +321,10 @@
 			</File>
 			<File
 				RelativePath="..\AltairZ80\s100_if3.c"
+				>
+			</File>
+			<File
+				RelativePath="..\AltairZ80\s100_jadedd.c"
 				>
 			</File>
 			<File
