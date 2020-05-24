@@ -9516,13 +9516,16 @@ if (prompt) {                                           /* interactive? */
         }
     else {
         printf ("%s", prompt);                          /* display prompt */
+        fflush (stdout);
         cptr = fgets (cptr, size, stream);              /* get cmd line */
         }
     }
 else cptr = fgets (cptr, size, stream);                 /* get cmd line */
 #else
-if (prompt)                                             /* interactive? */
+if (prompt) {                                           /* interactive? */
     printf ("%s", prompt);                              /* display prompt */
+    fflush (stdout);
+    }
 cptr = fgets (cptr, size, stream);                      /* get cmd line */
 #endif
 
