@@ -870,7 +870,6 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
     int32 rtn;
 
     cData = 0;
-    rtn=0;
     statusUpdate = TRUE;
 
     if (uptr == NULL) {

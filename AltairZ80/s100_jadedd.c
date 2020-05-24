@@ -251,15 +251,15 @@ typedef struct {
     UNIT *uptr[JADE_MAX_DRIVES];
 } JADE_INFO;
 
-static JADE_INFO jade_info_data = { JADE_BANK_BASE, JADE_BANK_SIZE,
-                                    JADE_IO_BASE, JADE_IO_SIZE,
-                                    JADE_PROM_BASE, JADE_PROM_SIZE,
-                                    TRUE, 0, FALSE, 0,
-                                    { JADE_SPT_SD, DF_T1D,
-                                      JADE_SPT_SD, DF_T1D,
-                                      JADE_SPT_SD, DF_T1D,
-                                      JADE_SPT_SD, DF_T1D }
-                                  };
+static JADE_INFO jade_info_data =   {   JADE_BANK_BASE, JADE_BANK_SIZE,
+                                        JADE_IO_BASE, JADE_IO_SIZE,
+                                        JADE_PROM_BASE, JADE_PROM_SIZE,
+                                        TRUE, 0, FALSE, 0,
+                                        {   { JADE_SPT_SD, DF_T1D },
+                                            { JADE_SPT_SD, DF_T1D },
+                                            { JADE_SPT_SD, DF_T1D },
+                                            { JADE_SPT_SD, DF_T1D } }
+                                    };
 
 static JADE_INFO *jade_info = &jade_info_data;
 
@@ -404,13 +404,13 @@ static t_stat jade_show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *des
 static t_stat jade_set_prom(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
 static uint32 calculate_jade_sec_offset(uint8 track, uint8 sector, uint8 flg);
 static void showsector(uint8 drive, uint8 isRead, uint8 *buf);
-static void showcb();
+static void showcb(void);
 static uint8 JADE_In(uint32 Addr);
 static uint8 JADE_Out(uint32 Addr, int32 data);
 static uint8 PROM_Boot(JADE_INFO *info);
-static void DCM_Init();
-static void DCM_DBSLdr();
-static uint8 DCM_Execute();
+static void DCM_Init(void);
+static void DCM_DBSLdr(void);
+static uint8 DCM_Execute(void);
 static uint8 DCM_Logon(uint8 drive);
 static uint8 DCM_ReadSector(uint8 drive, uint8 track, uint8 sector, uint8 *buffer);
 static uint8 DCM_WriteSector(uint8 drive, uint8 track, uint8 sector, uint8 *buffer);
@@ -864,10 +864,10 @@ static uint8 JADE_In(uint32 Addr)
 {
     uint8 cData;
 
-    sim_debug(CMD_MSG, &jade_dev, JADE_SNAME ": IN %02x Data %02x" NLP, Addr & 0xFF, cData & 0xFF);
-
     cData = JADE_STAT_HALT;     /* Assume processor is in HALT* state */
     cData |= (jade_info->mem_base >> 9) & JADE_STAT_MEM_MSK;
+
+    sim_debug(CMD_MSG, &jade_dev, JADE_SNAME ": IN %02x Data %02x" NLP, Addr & 0xFF, cData & 0xFF);
 
     return (cData);
 }
@@ -1195,7 +1195,7 @@ static uint8 DCM_Format(uint8 drive, uint8 track)
 {
     uint8 sbuf[JADE_SECTOR_SIZE];
     uint8 sector;
-    uint8 sts;
+    uint8 sts = 0;
 
     memset(sbuf, 0xe5, sizeof(sbuf));
 
