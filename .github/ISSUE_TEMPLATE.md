@@ -11,7 +11,7 @@
 - #### the output of "sim> SHOW VERSION" while running the simulator which is having the issue
 
 - #### how you built the simulator or that you're using prebuilt binaries
-<!--- This should include the output produced by while building just the simulator that is exhibiting the problem  -->
+<!--- This should include ALL the output produced by make while building just the simulator that is exhibiting the problem  -->
 
 - #### the simulator configuration file (or commands) which were used when the problem occurred.
 <!--- The simulator configuration file, and any other relatively small files can be attached to this issue now or after it is created -->
