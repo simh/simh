@@ -2039,6 +2039,9 @@ cpu_reset(DEVICE * dptr)
     IR[0] = IR[1] = IR[2] = 0;
 
     sim_brk_types = sim_brk_dflt = SWMASK('E');
+
+    vm_init ();
+
     return SCPE_OK;
 }
 

@@ -934,3 +934,5 @@ extern void   hp_initialize_trace (uint32 device_max, uint32 flag_max);
 extern void   hp_trace            (DEVICE *dptr, uint32 flag, ...);
 extern void   hp_enbdis_pair      (DEVICE *ccptr, DEVICE *dcptr);
 extern int32  hp_sync_poll        (POLLMODE poll_mode);
+
+extern void hp_one_time_init (void);    /* One time initialization activities now called in cpu_reset() */

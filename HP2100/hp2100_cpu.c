@@ -3504,6 +3504,9 @@ static t_stat cpu_reset (DEVICE *dptr)
 t_stat status;
 
 if (sim_PC == NULL) {                                   /* if this is the first call after simulator start */
+
+    hp_one_time_init();                                 /* perform one time initializations (previously defined as sim_vm_init() */
+
     status = mem_initialize (PA_MAX);                   /*   then allocate main memory */
 
     if (status == SCPE_OK) {                            /* if memory initialization succeeds */

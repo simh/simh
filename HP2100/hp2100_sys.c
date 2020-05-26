@@ -117,8 +117,8 @@
 
 /* Global release string */
 
-const char *sim_vm_release = "29";              /* HP 2100 simulator release number */
-const char *sim_vm_release_message =
+const char *hp_vm_release = "29";               /* HP 2100 simulator release number */
+const char *hp_vm_release_message =
    "This is the last version of this simulator which is API compatible\n"
    "with the 4.x version of the simh framework.  A supported version of\n"
    "this simulator can be found at: http://simh.trailing-edge.com/hp\n";
@@ -1868,7 +1868,7 @@ static DEVICE poll_dev = {
 
 /* System interface local SCP support routines */
 
-static void   one_time_init  (void);
+void   hp_one_time_init  (void);
 static t_bool fprint_stopped (FILE *st, t_stat reason);
 static void   fprint_addr    (FILE *st, DEVICE *dptr, t_addr addr);
 static t_addr parse_addr     (DEVICE *dptr, CONST char *cptr, CONST char **tptr);
@@ -1933,8 +1933,6 @@ const HP_WORD odd_parity [256] = {                      /* odd parity table */
 char sim_name [] = "HP 2100";                   /* the simulator name */
 
 int32 sim_emax = MAX_INSTR_LENGTH;              /* the maximum number of words in any instruction */
-
-void (*sim_vm_init) (void) = &one_time_init;    /* a pointer to the one-time initializer */
 
 DEVICE *sim_devices [] = {                      /* an array of pointers to the simulated devices */
     &cpu_dev,                                   /*   CPU (must be first) */
@@ -3503,9 +3501,17 @@ return;
    breakpoint types.
 */
 
-static void one_time_init (void)
+void hp_one_time_init (void)
 {
 CTAB *systab, *auxtab = aux_cmds;
+static int inited = 0;
+
+if (inited == 1)    /* Be sure to only do these things once */
+    return;
+inited = 1;
+
+sim_vm_release = hp_vm_release;
+sim_vm_release_message = hp_vm_release_message;
 
 while (auxtab->name != NULL) {                          /* loop through the auxiliary command table */
     systab = find_cmd (auxtab->name);                   /* find the corresponding system command table entry */

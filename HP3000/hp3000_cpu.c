@@ -3431,6 +3431,9 @@ return SCPE_OK;                                         /* return the success of
 static t_stat cpu_reset (DEVICE *dptr)
 {
 if (sim_PC == NULL) {                                   /* if this is the first call after simulator start */
+
+    hp_one_time_init();                                 /* perform one time initializations (previously defined as sim_vm_init() */
+
     if (mem_initialize (PA_MAX)) {
         set_model (&cpu_unit [0], UNIT_SERIES_III,      /*   so establish the initial CPU model */
                    NULL, NULL);

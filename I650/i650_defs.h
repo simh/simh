@@ -371,5 +371,6 @@ extern int Get_HiDigit(t_int64 d);
 extern int Shift_Digits(t_int64 * d, int nDigits);
 extern char * word_to_ascii(char * buf, int CharStart, int CharLen, t_int64 d);
 
+extern void vm_init(void);  /* One time initialization activities now called in cpu_reset() */
 
 
