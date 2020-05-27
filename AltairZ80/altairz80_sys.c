@@ -420,8 +420,7 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
                     Offset = val[B++];
                     J = 1;
                     T = MnemonicsXCB[val[B++]];
-                }
-                else
+                } else
                     T = MnemonicsXX[val[B++]];
                 break;
 
@@ -437,8 +436,7 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
         printHex2(H, val[B++]);
         strlcat(R, H, sizeof (R));
         strlcat(R, T1 + 1, sizeof (R)); /* ok, since T1 is a short sub-string coming from one of the tables */
-    }
-    else
+    } else
         strlcpy(R, T, sizeof (R)); /* ok, since T is a short string coming from one of the tables */
     if ( (P = strchr(R, '%')) ) {
         *P = C;
@@ -452,8 +450,7 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
         printHex2(H, val[B++]);
         strcat(S, H);
         strcat(S, P + 1);
-    }
-    else if ( (P = strchr(R, '@')) ) {
+    } else if ( (P = strchr(R, '@')) ) {
         strncpy(S, R, P - R);
         S[P - R] = '\0';
         if (!J)
@@ -463,24 +460,21 @@ static int32 DAsm(char *S, const uint32 *val, const int32 useZ80Mnemonics, const
         printHex2(H, J);
         strcat(S, H);
         strcat(S, P + 1);
-    }
-    else if ( (P = strchr(R, '$')) ) {
+    } else if ( (P = strchr(R, '$')) ) {
         strncpy(S, R, P - R);
         S[P - R] = '\0';
         Offset = val[B++];
         printHex4(H, (addr + 2 + (Offset & 0x80 ? (Offset - 256) : Offset)) & 0xFFFF);
         strcat(S, H);
         strcat(S, P + 1);
-    }
-    else if ( (P = strchr(R, '#')) ) {
+    } else if ( (P = strchr(R, '#')) ) {
         strncpy(S, R, P - R);
         S[P - R] = '\0';
         printHex4(H, val[B] + 256 * val[B + 1]);
         strcat(S, H);
         strcat(S, P + 1);
         B += 2;
-    }
-    else
+    } else
         strcpy(S, R);
     return(B);
 }
@@ -557,8 +551,7 @@ static int32 numok(char ch, const char **numString, const int32 minvalue,
         else if (ch == '-') {
             sign = -1;
             ch = *(*numString)++;
-        }
-        else
+        } else
             return FALSE;
     }
     if (!(base = checkbase(ch, *numString)))
@@ -676,28 +669,23 @@ static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, const ch
                 val[1] = (0xff) & number;
                 val[2] = (0xff) & (number >> 8);
                 return -2;              /* two additional bytes returned    */
-            }
-            else if (star >= 0) {
+            } else if (star >= 0) {
                 val[1] = (0xff) & star;
                 return -1;              /* one additional byte returned     */
-            }
-            else if (at > -129)
+            } else if (at > -129)
                 if ((-128 <= at) && (at <= 127)) {
                     val[1] = (int8)(at);
                     return -1;          /* one additional byte returned     */
-                }
-                else
+                } else
                     return SCPE_ARG;
             else if (dollar >= 0) {
                 dollar -= addr + 2;     /* relative translation             */
                 if ((-128 <= dollar) && (dollar <= 127)) {
                     val[1] = (int8)(dollar);
                     return -1;          /* one additional byte returned     */
-                }
-                else
+                } else
                     return SCPE_ARG;
-            }
-            else
+            } else
                 return SCPE_OK;
         }
     }
@@ -720,8 +708,7 @@ static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, const ch
                 val[2] = (0xff) & number;
                 val[3] = (0xff) & (number >> 8);
                 return -3;              /* three additional bytes returned  */
-            }
-            else
+            } else
                 return -1;              /* one additional byte returned     */
         }
     }
@@ -738,21 +725,17 @@ static int32 parse_X80(const char *cptr, const int32 addr, uint32 *val, const ch
                 val[2] = (0xff) & number;
                 val[3] = (0xff) & (number >> 8);
                 return -3;              /* three additional bytes returned  */
-            }
-            else if ((star >= 0) && (hat >= 0)) {
+            } else if ((star >= 0) && (hat >= 0)) {
                 val[2] = (0xff) & hat;
                 val[3] = (0xff) & star;
                 return -3;              /* three additional bytes returned  */
-            }
-            else if (star >= 0) {
+            } else if (star >= 0) {
                 val[2] = (0xff) & star;
                 return -2;              /* two additional bytes returned    */
-            }
-            else if (hat >= 0) {
+            } else if (hat >= 0) {
                 val[2] = (0xff) & hat;
                 return -2;              /* two additional bytes returned    */
-            }
-            else
+            } else
                 return -1;              /* one additional byte returned     */
         }
     }

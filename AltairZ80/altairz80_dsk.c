@@ -170,7 +170,7 @@ extern uint32 PCX;
 
 extern t_stat install_bootrom(const int32 bootrom[], const int32 size, const int32 addr, const int32 makeROM);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
-                               int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
+                               int32 (*routine)(const int32, const int32, const int32), const char* name, uint8 unmap);
 void install_ALTAIRbootROM(void);
 extern int32 find_unit_index(UNIT *uptr);
 
@@ -391,9 +391,9 @@ static t_stat dsk_reset(DEVICE *dptr) {
     current_disk    = NUM_OF_DSK;
     in9_count       = 0;
     in9_message     = FALSE;
-    sim_map_resource(0x08, 1, RESOURCE_TYPE_IO, &dsk10, dptr->flags & DEV_DIS);
-    sim_map_resource(0x09, 1, RESOURCE_TYPE_IO, &dsk11, dptr->flags & DEV_DIS);
-    sim_map_resource(0x0A, 1, RESOURCE_TYPE_IO, &dsk12, dptr->flags & DEV_DIS);
+    sim_map_resource(0x08, 1, RESOURCE_TYPE_IO, &dsk10, "dsk10", dptr->flags & DEV_DIS);
+    sim_map_resource(0x09, 1, RESOURCE_TYPE_IO, &dsk11, "dsk11", dptr->flags & DEV_DIS);
+    sim_map_resource(0x0A, 1, RESOURCE_TYPE_IO, &dsk12, "dsk12", dptr->flags & DEV_DIS);
     return SCPE_OK;
 }
 /* dsk_attach - determine type of drive attached based on disk image size */
@@ -440,8 +440,7 @@ static t_stat dsk_boot(int32 unitno, DEVICE *dptr) {
                 (bootrom_dsk[UNIT_NO_OFFSET_2 - 1] == LDA_INSTRUCTION)) {
             bootrom_dsk[UNIT_NO_OFFSET_1] = unitno & 0xff;             /* LD A,<unitno>        */
             bootrom_dsk[UNIT_NO_OFFSET_2] = 0x80 | (unitno & 0xff);    /* LD a,80h | <unitno>  */
-        }
-        else { /* Attempt to modify non LD A,<> instructions is refused. */
+        } else { /* Attempt to modify non LD A,<> instructions is refused. */
                 sim_printf("Incorrect boot ROM offsets detected.\n");
             return SCPE_IERR;
         }
@@ -483,8 +482,7 @@ static void writebuf(void) {
                       current_disk, PCX, current_track[current_disk],
                       current_sector[current_disk], rtn);
         }
-    }
-    else if ( (dsk_dev.dctrl & VERBOSE_MSG) && (warnLock[current_disk] < warnLevelDSK) ) {
+    } else if ( (dsk_dev.dctrl & VERBOSE_MSG) && (warnLock[current_disk] < warnLevelDSK) ) {
         /* write locked - print warning message if required */
         warnLock[current_disk]++;
         sim_debug(VERBOSE_MSG, &dsk_dev,
@@ -547,8 +545,7 @@ int32 dsk10(const int32 port, const int32 io, const int32 data) {
                       current_disk, PCX, current_disk);
         }
         current_disk = NUM_OF_DSK;
-    }
-    else {
+    } else {
         current_sector[current_disk]    = 0xff; /* reset internal counters */
         current_byte[current_disk]      = 0xff;
         if (data & 0x80)                            /* disable drive? */
@@ -716,8 +713,7 @@ int32 dsk12(const int32 port, const int32 io, const int32 data) {
             current_byte[current_disk] = 0;
         }
         return dskbuf[current_byte[current_disk]++] & 0xff;
-    }
-    else {
+    } else {
         if (current_byte[current_disk] >= DSK_SECTSIZE)
             writebuf();     /* from above we have that current_disk < NUM_OF_DSK */
         else {

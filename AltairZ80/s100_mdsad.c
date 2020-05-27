@@ -65,7 +65,7 @@ extern uint32 PCX;
 extern t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
-        int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
+                               int32 (*routine)(const int32, const int32, const int32), const char* name, uint8 unmap);
 
 #define MDSAD_MAX_DRIVES        4
 #define MDSAD_SECTOR_LEN        512
@@ -274,11 +274,11 @@ static t_stat mdsad_reset(DEVICE *dptr)
 
     if(dptr->flags & DEV_DIS) {
         sim_map_resource(pnp->mem_base, pnp->mem_size,
-            RESOURCE_TYPE_MEMORY, &mdsaddev, TRUE);
+            RESOURCE_TYPE_MEMORY, &mdsaddev, "mdsaddev", TRUE);
     } else {
         /* Connect MDSAD at base address */
         if(sim_map_resource(pnp->mem_base, pnp->mem_size,
-            RESOURCE_TYPE_MEMORY, &mdsaddev, FALSE) != 0) {
+            RESOURCE_TYPE_MEMORY, &mdsaddev, "mdsaddev", FALSE) != 0) {
             sim_printf("%s: error mapping resource at 0x%04x\n",
                 __FUNCTION__, pnp->mem_base);
             dptr->flags |= DEV_DIS;

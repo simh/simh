@@ -163,7 +163,7 @@ static void doWrite(const int32 port, const int32 data, const uint32 command);
 static t_stat dsk_reset(DEVICE *dptr);
 static const char* cmdTranslate(const int32 cmd);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
-                               int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
+                               int32 (*routine)(const int32, const int32, const int32), const char* name, uint8 unmap);
 static const char* mhdsk_description(DEVICE *dptr);
 
 /* 88DSK Standard I/O Data Structures */
@@ -267,14 +267,14 @@ static const char* cmdTranslate(const int32 cmd) {
  ----------------------------------------------------------------------------------*/
 
 static t_stat dsk_reset(DEVICE *dptr) {
-    sim_map_resource(0xA0, 1, RESOURCE_TYPE_IO, &hdReturnReady, dptr->flags & DEV_DIS);
-    sim_map_resource(0xA1, 1, RESOURCE_TYPE_IO, &hdCstat, dptr->flags & DEV_DIS);
-    sim_map_resource(0xA2, 1, RESOURCE_TYPE_IO, &hdReturnReady, dptr->flags & DEV_DIS);
-    sim_map_resource(0xA3, 1, RESOURCE_TYPE_IO, &hdAcmd, dptr->flags & DEV_DIS);
-    sim_map_resource(0xA4, 1, RESOURCE_TYPE_IO, &hdReturnReady, dptr->flags & DEV_DIS);
-    sim_map_resource(0xA5, 1, RESOURCE_TYPE_IO, &hdCdata, dptr->flags & DEV_DIS);
-    sim_map_resource(0xA6, 1, RESOURCE_TYPE_IO, &hdReturnReady, dptr->flags & DEV_DIS);
-    sim_map_resource(0xA7, 1, RESOURCE_TYPE_IO, &hdAdata, dptr->flags & DEV_DIS);
+    sim_map_resource(0xA0, 1, RESOURCE_TYPE_IO, &hdReturnReady, "hdReturnReady", dptr->flags & DEV_DIS);
+    sim_map_resource(0xA1, 1, RESOURCE_TYPE_IO, &hdCstat, "hdCstat", dptr->flags & DEV_DIS);
+    sim_map_resource(0xA2, 1, RESOURCE_TYPE_IO, &hdReturnReady, "hdReturnReady", dptr->flags & DEV_DIS);
+    sim_map_resource(0xA3, 1, RESOURCE_TYPE_IO, &hdAcmd, "hdAcmd", dptr->flags & DEV_DIS);
+    sim_map_resource(0xA4, 1, RESOURCE_TYPE_IO, &hdReturnReady, "hdReturnReady", dptr->flags & DEV_DIS);
+    sim_map_resource(0xA5, 1, RESOURCE_TYPE_IO, &hdCdata, "hdCdata", dptr->flags & DEV_DIS);
+    sim_map_resource(0xA6, 1, RESOURCE_TYPE_IO, &hdReturnReady, "hdReturnReady", dptr->flags & DEV_DIS);
+    sim_map_resource(0xA7, 1, RESOURCE_TYPE_IO, &hdAdata, "hdAdata", dptr->flags & DEV_DIS);
 
     selectedSector = 0;         // current sector
     selectedTrack = 0;          // current track
@@ -388,7 +388,7 @@ static int32 hdAcmd(const int32 port, const int32 io, const int32 data)
                       "Track = %i. Sector = %i. Head = %i. Buffer = %i. "
                       "No file attached.\n", selectedDisk, PCX, port, data, cmdTranslate(command),
                       selectedTrack, selectedSector, selectedHead, selectedBuffer);
-        } else  if (command == CMD_WRITE_SEC)
+        } else if (command == CMD_WRITE_SEC)
             doWrite(port, data, command);
         else // CMD_READ_SEC or CMD_READ_UNFMT
             doRead(port, data, command);
@@ -548,8 +548,7 @@ static void doWrite(const int32 port, const int32 data, const uint32 command)
         else if (sim_fwrite(diskBuf[selectedBuffer], 1, HDSK_SECTOR_SIZE, uptr->fileref) !=
                  HDSK_SECTOR_SIZE)
             cstat = CSTAT_NOT_READY;                    /* write error */
-    }
-    else
+    } else
         cstat = CSTAT_WRITE_PROTECT;
     sim_debug(WRITE_MSG, &mhdsk_dev, "MHDSK%i: " ADDRESS_FORMAT
               " OUT(%02X = ACMD) = %02x. CMD = %s. "

@@ -50,7 +50,7 @@ int32 netData               (const int32 port, const int32 io, const int32 data)
 static const char* net_description(DEVICE *dptr);
 
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
-                               int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
+                               int32 (*routine)(const int32, const int32, const int32), const char* name, uint8 unmap);
 
 #define MAX_CONNECTIONS 2   /* maximal number of server connections */
 #define BUFFER_LENGTH   512 /* length of input and output buffer    */
@@ -147,9 +147,9 @@ static t_stat net_reset(DEVICE *dptr) {
     for (i = 0; i <= MAX_CONNECTIONS; i++) {
         serviceDescriptor_reset(i);
         sim_map_resource(serviceDescriptor[i].Z80StatusPort, 1,
-                         RESOURCE_TYPE_IO, &netStatus, dptr->flags & DEV_DIS);
+                         RESOURCE_TYPE_IO, &netStatus, "netStatus", dptr->flags & DEV_DIS);
         sim_map_resource(serviceDescriptor[i].Z80DataPort, 1,
-                         RESOURCE_TYPE_IO, &netData, dptr->flags & DEV_DIS);
+                         RESOURCE_TYPE_IO, &netData, "netData", dptr->flags & DEV_DIS);
     }
     return SCPE_OK;
 }
@@ -168,8 +168,7 @@ static t_stat net_attach(UNIT *uptr, CONST char *cptr) {
         serviceDescriptor[1].masterSocket = sim_master_sock(cptr, NULL);
         if (serviceDescriptor[1].masterSocket == INVALID_SOCKET)
             return SCPE_IOERR;
-    }
-    else {
+    } else {
         net_unit.wait = NET_INIT_POLL_CLIENT;
         serviceDescriptor[0].ioSocket = sim_connect_sock_ex(NULL, cptr, "localhost", "3000", SIM_SOCK_OPT_NODELAY);
         if (serviceDescriptor[0].ioSocket == INVALID_SOCKET)
@@ -214,8 +213,7 @@ static t_stat net_svc(UNIT *uptr) {
                         sim_debug(ACCEPT_MSG, &net_dev, "NET: " ADDRESS_FORMAT " Accepted connection %i with socket %i.\n", PCX, i, s);
                     }
                 }
-        }
-        else if (serviceDescriptor[0].ioSocket == 0) {
+        } else if (serviceDescriptor[0].ioSocket == 0) {
             serviceDescriptor[0].ioSocket = sim_connect_sock(net_unit.filename, "localhost", "3000");
             if (serviceDescriptor[0].ioSocket == INVALID_SOCKET)
                 return SCPE_IOERR;
@@ -233,8 +231,7 @@ static t_stat net_svc(UNIT *uptr) {
                         serviceDescriptor[i].ioSocket = 0;
                         serviceDescriptor_reset(i);
                         continue;
-                    }
-                    else {
+                    } else {
                         for (j = 0; j < r; j++) {
                             serviceDescriptor[i].inputBuffer[serviceDescriptor[i].inputPosWrite++] = svcBuffer[j];
                             if (serviceDescriptor[i].inputPosWrite == BUFFER_LENGTH)
@@ -256,8 +253,7 @@ static t_stat net_svc(UNIT *uptr) {
                         serviceDescriptor[i].outputPosRead += r;
                         if (serviceDescriptor[i].outputPosRead >= BUFFER_LENGTH)
                             serviceDescriptor[i].outputPosRead -= BUFFER_LENGTH;
-                    }
-                    else
+                    } else
                         sim_printf("write %i" NLP, r);
                 }
             }
@@ -291,8 +287,7 @@ int32 netData(const int32 port, const int32 io, const int32 data) {
                     sim_printf("re-read from %i" NLP, port);
                     result = serviceDescriptor[i].inputBuffer[serviceDescriptor[i].inputPosRead > 0 ?
                         serviceDescriptor[i].inputPosRead - 1 : BUFFER_LENGTH - 1];
-                }
-                else {
+                } else {
                     result = serviceDescriptor[i].inputBuffer[serviceDescriptor[i].inputPosRead++];
                     if (serviceDescriptor[i].inputPosRead == BUFFER_LENGTH)
                         serviceDescriptor[i].inputPosRead = 0;
@@ -300,14 +295,12 @@ int32 netData(const int32 port, const int32 io, const int32 data) {
                 }
                 sim_debug(IN_MSG, &net_dev, "NET: " ADDRESS_FORMAT "  IN(%i)=%03xh (%c)\n", PCX, port, (result & 0xff), (32 <= (result & 0xff)) && ((result & 0xff) <= 127) ? (result & 0xff) : '?');
                 return result;
-            }
-            else {          /* OUT  */
+            } else {          /* OUT  */
                 if (serviceDescriptor[i].outputSize == BUFFER_LENGTH) {
                     sim_printf("over-write %i to %i" NLP, data, port);
                     serviceDescriptor[i].outputBuffer[serviceDescriptor[i].outputPosWrite > 0 ?
                         serviceDescriptor[i].outputPosWrite - 1 : BUFFER_LENGTH - 1] = data;
-                }
-                else {
+                } else {
                     serviceDescriptor[i].outputBuffer[serviceDescriptor[i].outputPosWrite++] = data;
                     if (serviceDescriptor[i].outputPosWrite== BUFFER_LENGTH)
                         serviceDescriptor[i].outputPosWrite = 0;

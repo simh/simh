@@ -195,7 +195,7 @@ extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
-        int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
+                               int32 (*routine)(const int32, const int32, const int32), const char* name, uint8 unmap);
 extern int32 find_unit_index(UNIT *uptr);
 
 #define JADE_MAX_ADAPTERS       1
@@ -534,22 +534,22 @@ t_stat jade_reset(DEVICE *dptr)
     JADE_INFO *pInfo = (JADE_INFO *)dptr->ctxt;
 
     if(dptr->flags & DEV_DIS) { /* Disconnect I/O Ports */
-        sim_map_resource(pInfo->prom_base, pInfo->prom_size, RESOURCE_TYPE_MEMORY, &jadeprom, TRUE);
-        sim_map_resource(pInfo->mem_base, pInfo->mem_size, RESOURCE_TYPE_MEMORY, &jademem, TRUE);
-        sim_map_resource(pInfo->io_base, pInfo->io_size, RESOURCE_TYPE_IO, &jadedev, TRUE);
+        sim_map_resource(pInfo->prom_base, pInfo->prom_size, RESOURCE_TYPE_MEMORY, &jadeprom, "jadeprom", TRUE);
+        sim_map_resource(pInfo->mem_base, pInfo->mem_size, RESOURCE_TYPE_MEMORY, &jademem, "jademem", TRUE);
+        sim_map_resource(pInfo->io_base, pInfo->io_size, RESOURCE_TYPE_IO, &jadedev, "jadedev", TRUE);
     } else {
         if(pInfo->pe) {
-            if(sim_map_resource(pInfo->prom_base, pInfo->prom_size, RESOURCE_TYPE_MEMORY, &jadeprom, FALSE) != 0) {
+            if(sim_map_resource(pInfo->prom_base, pInfo->prom_size, RESOURCE_TYPE_MEMORY, &jadeprom, "jadeprom", FALSE) != 0) {
                 sim_debug(ERROR_MSG, &jade_dev, JADE_SNAME ": Error mapping MEM resource at 0x%04x" NLP, pInfo->prom_base);
                 return SCPE_ARG;
             }
         }
-        if(sim_map_resource(pInfo->mem_base, pInfo->mem_size, RESOURCE_TYPE_MEMORY, &jademem, FALSE) != 0) {
+        if(sim_map_resource(pInfo->mem_base, pInfo->mem_size, RESOURCE_TYPE_MEMORY, &jademem, "jademem", FALSE) != 0) {
             sim_debug(ERROR_MSG, &jade_dev, JADE_SNAME ": Error mapping MEM resource at 0x%04x" NLP, pInfo->mem_base);
             return SCPE_ARG;
         }
         /* Connect I/O Ports at base address */
-        if(sim_map_resource(pInfo->io_base, pInfo->io_size, RESOURCE_TYPE_IO, &jadedev, FALSE) != 0) {
+        if(sim_map_resource(pInfo->io_base, pInfo->io_size, RESOURCE_TYPE_IO, &jadedev, "jadedev", FALSE) != 0) {
             sim_debug(ERROR_MSG, &jade_dev, JADE_SNAME ": Error mapping I/O resource at 0x%02x" NLP, pInfo->io_base);
             return SCPE_ARG;
         }
@@ -739,7 +739,7 @@ static t_stat jade_set_prom(UNIT *uptr, int32 value, CONST char *cptr, void *des
     /*
     ** Map/Unmap PROM
     */
-    sim_map_resource(pInfo->prom_base, pInfo->prom_size, RESOURCE_TYPE_MEMORY, &jadeprom, !value);
+    sim_map_resource(pInfo->prom_base, pInfo->prom_size, RESOURCE_TYPE_MEMORY, &jadeprom, "jadeprom", !value);
 
     if (uptr->flags & UNIT_JADE_VERBOSE) {
         sim_printf(JADE_SNAME ": PROM %s" NLP, (value) ? "enabled" : "disabled");

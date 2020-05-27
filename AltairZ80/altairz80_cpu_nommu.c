@@ -84,8 +84,7 @@
 #define JPC(cond) {                             \
     if (cond) {                                 \
         PC = GET_WORD(PC);                      \
-    }                                           \
-    else {                                      \
+    } else {                                    \
         PC += 2;                                \
     }                                           \
 }
@@ -95,8 +94,7 @@
         register uint32 adrr = GET_WORD(PC);    \
         PUSH(PC + 2);                           \
         PC = adrr;                              \
-    }                                           \
-    else {                                      \
+    } else {                                    \
         PC += 2;                                \
     }                                           \
 }
@@ -1256,8 +1254,7 @@ t_stat sim_instr_nommu(void) {
                     }
                     if (hd)
                         acu -= 0x160;   /* adjust high digit */
-                }
-                else {          /* last operation was an add */
+                } else {          /* last operation was an add */
                     if (TSTFLAG(H) || (temp > 9)) { /* adjust low digit */
                         SETFLAG(H, (temp > 9));
                         acu += 6;
