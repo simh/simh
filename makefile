@@ -1939,13 +1939,11 @@ ifneq (,$(BESM6_BUILD))
           endif
         else
           ifneq (,$(and $(findstring Linux,$(OSTYPE)),$(call find_exe,apt-get)))
-            $(info *** Info *** Install the development components of libSDL-ttf or libSDL2-ttf)
+            $(info *** Info *** Install the development components of libSDL2-ttf)
             $(info *** Info *** packaged for your Linux operating system distribution:)
             $(info *** Info ***        $$ sudo apt-get install libsdl2-ttf-dev)
-            $(info *** Info ***    or)
-            $(info *** Info ***        $$ sudo apt-get install libsdl-ttf-dev)
           else
-            $(info *** Info *** Install the development components of libSDL-ttf packaged by your)
+            $(info *** Info *** Install the development components of libSDL2-ttf packaged by your)
             $(info *** Info *** operating system distribution and rebuild your simulator to)
             $(info *** Info *** enable this extra functionality.)
           endif
@@ -1955,10 +1953,6 @@ ifneq (,$(BESM6_BUILD))
         $(info using libSDL2_ttf: $(call find_lib,SDL2_ttf) $(call find_include,SDL2/SDL_ttf))
         $(info ***)
         BESM6_PANEL_OPT = -DFONTFILE=${FONTFILE} ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL2_ttf
-    else ifneq (,$(and $(call find_include,SDL/SDL_ttf),$(call find_lib,SDL_ttf)))
-        $(info using libSDL_ttf: $(call find_lib,SDL_ttf) $(call find_include,SDL/SDL_ttf))
-        $(info ***)
-        BESM6_PANEL_OPT = -DFONTFILE=${FONTFILE} ${VIDEO_CCDEFS} ${VIDEO_LDFLAGS} -lSDL_ttf
     endif
 endif
 
