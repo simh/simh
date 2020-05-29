@@ -23,27 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   This module is based on Bernhard Baehr's PDP-8/E simulator
-
-        PDP-8/E Simulator Source Code
-
-        Copyright ) 2001-2003 Bernhard Baehr
-
-        TSC8iots.c - IOTs for the TSC8-75 Board plugin
-
-        This program is free software; you can redistribute it and/or modify
-        it under the terms of the GNU General Public License as published by
-        the Free Software Foundation; either version 2 of the License, or
-        (at your option) any later version.
-
-        This program is distributed in the hope that it will be useful,
-        but WITHOUT ANY WARRANTY; without even the implied warranty of
-        MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-        GNU General Public License for more details.
-
-        You should have received a copy of the GNU General Public License
-        along with this program; if not, write to the Free Software
-        Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+   This module is based on Bernhard Baehr's description of the TSC8-75's
+   operation. Many thanks to Bernhard for figuring out the behavior of this
+   undocumented device.
 
    tsc          TSC8-75 option board
 */
