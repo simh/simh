@@ -1,6 +1,6 @@
 /* pdp1_stddev.c: PDP-1 standard devices
 
-   Copyright (c) 1993-2016, Robert M. Supnik
+   Copyright (c) 1993-2020, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    tti          keyboard
    tto          teleprinter
 
+   21-Mar-20    RMS     Generalized PTR EOL and EOF handling
    13-Jul-16    RMS     Added Expensive Typewriter ribbon color support
    18-May-16    RMS     Added FIODEC-to-ASCII mode for paper tape punch
    28-Mar-15    RMS     Revised to use sim_printf
@@ -55,6 +56,7 @@
 
 #include "pdp1_defs.h"
 
+#define FIODEC_SPACE    000                             /* space */
 #define FIODEC_STOP     013                             /* stop code */
 #define FIODEC_BLACK    034                             /* TTY black ribbon */
 #define FIODEC_RED      035                             /* TTY red ribbon */
@@ -80,6 +82,7 @@ int32 ptr_uc = 0;                                       /* upper/lower case */
 int32 ptp_uc = 0;
 int32 ptr_hold = 0;                                     /* holding buffer */
 int32 ptr_leader = PTR_LEADER;                          /* leader count */
+int32 ptr_last = 0;                                     /* prev character*/
 int32 ptr_sbs = 0;                                      /* SBS level */
 int32 ptp_stopioe = 0;
 int32 ptp_sbs = 0;                                      /* SBS level */
@@ -129,10 +132,10 @@ int32 fiodec_to_ascii[128] = {
 
 int32 ascii_to_fiodec[128] = {
     0, 0, 0, 0, 0, 0, 0, 0,
-    BOTH+075, BOTH+036, 0, 0, BOTH+FIODEC_STOP, BOTH+FIODEC_CR, 0, 0,
+    BOTH+075, BOTH+036, BOTH+FIODEC_CR, 0, BOTH+FIODEC_STOP, BOTH+FIODEC_CR, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0,
-    BOTH+0, UC+005, UC+001, UC+004, 0, 0, UC+006, UC+002,
+    BOTH+FIODEC_SPACE, UC+005, UC+001, UC+004, 0, 0, UC+006, UC+002,
     057, 055, UC+073, UC+054, 033, 054, 073, 021,
     020, 001, 002, 003, 004, 005, 006, 007,
     010, 011, 0, 0, UC+007, UC+033, UC+010, UC+021,
@@ -164,6 +167,7 @@ REG ptr_reg[] = {
     { FLDATA (DONE, iosta, IOS_V_PTR) },
     { FLDATA (RPLS, cpls, CPLS_V_PTR) },
     { ORDATA (HOLD, ptr_hold, 9), REG_HRO },
+    { ORDATA (LAST, ptr_last, 8), REG_HRO },
     { ORDATA (STATE, ptr_state, 5), REG_HRO },
     { FLDATA (WAIT, ptr_wait, 0), REG_HRO },
     { DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
@@ -388,7 +392,17 @@ else sim_activate (uptr, uptr->wait);                   /* get next char */
 return SCPE_OK;
 }
 
-/* Read next ASCII character */
+/* Read next ASCII character
+
+   This handles all three styles of end of line.
+   1a. Old Mac style - only CRs. CRs are converted to FIODEC_CR.
+   1b. Linux style - only LFs. LFs are converted to FIODEC_CR.
+   1c. Windows syle - CR+LF. CRs are converted to FIODEC_CR; next LF is ignored.
+
+   On end of file, the routine returns a FIODEC_STOP, unless the
+   previous character was the ASCII equivalent, FF. On the next end of file,
+   or if the previous character was FF, the routine returns EOF.
+*/
 
 int ptr_get_ascii (UNIT *uptr)
 {
@@ -406,18 +420,27 @@ if (ptr_hold & CW) {                                    /* char waiting? */
 else {
     for (;;) {                                          /* until valid char */
         if ((c = getc (uptr->fileref)) == EOF) {        /* get next char, EOF? */
-            ptr_leader = PTR_LEADER;                    /* set up for trailer */
-            return FIODEC_STOP;                         /* return STOP */
+            if (ptr_last == '\f')                       /* already returned FIO_STOP? */
+                return EOF;                             /* then EOF */
+            ptr_last = '\f';                            /* pretend read FIO_STOP */
+            return FIODEC_STOP;                         /* return FIO_STOP */
             }
         uptr->pos = uptr->pos + 1;                      /* count char */
         c = c & 0177;                                   /* cut to 7b */
-        if (c == '\n')                                  /* NL -> CR */
-            c = '\r';
-        else if (c == '\r')                             /* ignore CR */
-            continue;
-        in = ascii_to_fiodec[c];                        /* convert char */
-        if ((in == 0) && (c != ' '))                    /* ignore unknowns */   
-            continue;    
+        if ((c == '\n') && (ptr_last == '\r')) {        /* LF after CR? */
+            ptr_last = 0;                               /* defang test */
+            continue;                                   /* ignore char */
+            }
+        ptr_last = c;                                   /* save char */
+        if ((c == '\n') || (c == '\r'))                 /* CR, LF -> FIO_CR*/
+            in = BOTH | FIODEC_CR;
+        else if (c == ' ')                              /* space -> FIO_SPC */
+            in = BOTH | FIODEC_SPACE;
+        else {                                          /* other */
+            in = ascii_to_fiodec[c];                    /* convert */
+            if (in == 0)                                /* ignore invalid char */
+                continue;
+            }
         if ((in & BOTH) || ((in & UC) == ptr_uc))       /* case match? */
             in = in & TT_WIDTH;                         /* cut to 6b */
         else {                                          /* no, case shift */
@@ -441,6 +464,7 @@ t_stat ptr_reset (DEVICE *dptr)
 ptr_state = 0;                                          /* clear state */
 ptr_wait = 0;
 ptr_hold = 0;
+ptr_last = 0;
 ptr_uc = 0;
 ptr_unit.buf = 0;
 cpls = cpls & ~CPLS_PTR;
