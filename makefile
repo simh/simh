@@ -36,6 +36,10 @@
 # simulators without networking support, invoking GNU make with 
 # NONETWORK=1 will do the trick.
 #
+# By default, video support is enabled if the SDL/SDL2 development
+# headers and libraries are available.  To force a build without video
+# support, invoke GNU make with NOVIDEO=1.
+#
 # The default build will build compiler optimized binaries.
 # If debugging is desired, then GNU make can be invoked with
 # DEBUG=1 on the command line.
@@ -144,6 +148,10 @@ endif
 # someone may want to explicitly build simulators without network support
 ifneq ($(NONETWORK),)
   NETWORK_USEFUL =
+endif
+# ... or without video support
+ifneq ($(NOVIDEO),)
+  VIDEO_USEFUL =
 endif
 find_exe = $(abspath $(strip $(firstword $(foreach dir,$(strip $(subst :, ,${PATH})),$(wildcard $(dir)/$(1))))))
 find_lib = $(abspath $(strip $(firstword $(foreach dir,$(strip ${LIBPATH}),$(wildcard $(dir)/lib$(1).${LIBEXT})))))
