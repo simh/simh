@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   28-May-20    RMS     Flush stdout after prompting (Mark Pizzolato)
+   23-Mar-20    RMS     Added SET <dev|unit> APPEND command
    13-Feb-20    RMS     Spelled out CONTINUE in command table (Dave Bryan)
    09-Jan-20    JDB     Added "sim_vm_unit_name" extension hook
    26-Oct-19    RMS     Removed commented out MTAB_VAL code
@@ -297,6 +299,7 @@ t_bool (*sim_vm_is_subroutine_call) (t_addr **ret_addrs) = NULL;
 t_stat set_dev_radix (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat set_dev_enbdis (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat set_dev_debug (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat set_dev_unit_append (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat set_unit_enbdis (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat ssh_break (FILE *st, char *cptr, int32 flg);
 t_stat show_cmd_fi (FILE *ofile, int32 flag, char *cptr);
@@ -574,9 +577,11 @@ static CTAB cmd_table[] = {
       "set <dev> DISABLED       disable device\n"
       "set <dev> DEBUG{=arg}    set device debug flags\n"
       "set <dev> NODEBUG={arg}  clear device debug flags\n"
+      "set <dev> APPEND         set first unit's position for appending\n"
       "set <dev> arg{,arg...}   set device parameters (see show modifiers)\n"
       "set <unit> ENABLED       enable unit\n"
       "set <unit> DISABLED      disable unit\n"
+      "set <unit> APPEND        set unit's position for appending\n"
       "set <unit> arg{,arg...}  set unit parameters (see show modifiers)\n"
       },
     { "SHOW", &show_cmd, 0,
@@ -636,6 +641,7 @@ static C1TAB set_dev_tab[] = {
     { "HEX", &set_dev_radix, 16 },
     { "ENABLED", &set_dev_enbdis, 1 },
     { "DISABLED", &set_dev_enbdis, 0 },
+    { "APPEND", &set_dev_unit_append, 0 },
     { "DEBUG", &set_dev_debug, 1 },
     { "NODEBUG", &set_dev_debug, 0 },
     { NULL, NULL, 0 }
@@ -644,6 +650,7 @@ static C1TAB set_dev_tab[] = {
 static C1TAB set_unit_tab[] = {
     { "ENABLED", &set_unit_enbdis, 1 },
     { "DISABLED", &set_unit_enbdis, 0 },
+    { "APPEND", &set_dev_unit_append, 0 },
     { NULL, NULL, 0 }
     };
 
@@ -1352,6 +1359,25 @@ else {
 return SCPE_OK;
 }
 
+/* Set unit position to end for appending */
+
+t_stat set_dev_unit_append (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+if (cptr)
+    return SCPE_ARG;
+if (uptr == NULL)
+    return SCPE_NOFNC;
+if (((uptr->flags & UNIT_SEQ) == 0) ||                  /* must be sequential, */
+    ((uptr->flags & UNIT_ROABLE) != 0) ||               /* not RO settable */
+    ((uptr->flags & UNIT_MUSTBUF) != 0))                /* not buffered */
+    return SCPE_NOFNC;
+if ((uptr->flags & UNIT_ATT) == 0)                      /* must be attached */
+    return SCPE_UNATT;
+if (sim_fseek (uptr->fileref, 0, SEEK_END) != 0)        /* seek to end */
+   return SCPE_IOERR;
+uptr->pos = (t_addr) sim_ftell (uptr->fileref);         /* set at EOF */
+return SCPE_OK;
+}
 /* Set device debug enabled/disabled routine */
 
 t_stat set_dev_debug (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
@@ -3636,13 +3662,16 @@ if (prompt) {                                           /* interactive? */
         }
     else {
         printf ("%s", prompt);                          /* display prompt */
+        fflush (stdout);
         cptr = fgets (cptr, size, stream);              /* get cmd line */
         }
     }
 else cptr = fgets (cptr, size, stream);                 /* get cmd line */
 #else
-if (prompt)                                             /* interactive? */
+if (prompt) {                                           /* interactive? */
     printf ("%s", prompt);                              /* display prompt */
+    fflush (stdout);
+    }
 cptr = fgets (cptr, size, stream);                      /* get cmd line */
 #endif
 
