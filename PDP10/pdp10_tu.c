@@ -1,6 +1,6 @@
 /* pdp10_tu.c - PDP-10 RH11/TM03/TU45 magnetic tape simulator
 
-   Copyright (c) 1993-2018, Robert M Supnik
+   Copyright (c) 1993-2020, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tu           RH11/TM03/TU45 magtape
 
+   23-Mar-20    RMS     Unload should call sim_tape_detach (Mark Pizzolato)
    12-Jan-18    RMS     Fixed missing () in logical test (Mark Pizzolato)
    29-Dec-17    RMS     Read tape mark must set Massbus EXC (TRE)
    28-Mar-17    RMS     Documented switch fall through case (COVERITY)
@@ -697,7 +698,7 @@ switch (fnc) {                                          /* case on function */
             set_tuer (ER_UNS);
             break;
             }
-        detach_unit (uptr);
+        sim_tape_detach (uptr);
         uptr->USTAT = FS_REW;
         sim_activate (uptr, tu_time);
         tucs1 = tucs1 & ~CS1_GO;

@@ -1,6 +1,6 @@
 /* pdp11_tm.c: PDP-11 magnetic tape simulator
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2020, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tm           TM11/TU10 magtape
 
+   23-Mar-20    RMS     Unload should call sim_tape_detach (Mark Pizzolato)
    23-Oct-13    RMS     Revised for new boot setup routine
    16-Feb-06    RMS     Added tape capacity checking
    31-Oct-05    RMS     Fixed address width for large files
@@ -372,7 +373,7 @@ uptr->USTAT = uptr->USTAT & (STA_WLK | STA_ONL);        /* clear status */
 tm_sta = 0;                                             /* clear errors */
 if (f == MTC_UNLOAD) {                                  /* unload? */
     uptr->USTAT = (uptr->USTAT | STA_REW) & ~STA_ONL;
-    detach_unit (uptr);                                 /* set offline */
+    sim_tape_detach (uptr);                             /* set offline */
     }
 else if (f == MTC_REWIND)                               /* rewind */
     uptr->USTAT = uptr->USTAT | STA_REW;                /* rewinding */

@@ -1,6 +1,6 @@
 /* pdp11_tu.c - PDP-11 TM02/TU16 TM03/TU45/TU77 Massbus magnetic tape controller
 
-   Copyright (c) 1993-2017, Robert M Supnik
+   Copyright (c) 1993-2020, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tu           TM02/TM03 magtape
 
+   23-Mar-20    RMS     Unload should call sim_tape_detach (Mark Pizzolato)
    28-Dec-17    RMS     Read tape mark must set Massbus EXC
    13-Mar-17    RMS     Annotated fall through in switch
    23-Oct-13    RMS     Revised for new boot setup routine
@@ -508,7 +509,7 @@ switch (fnc) {                                          /* case on function */
             tu_set_er (ER_UNS);
             break;
             }
-        detach_unit (uptr);
+        sim_tape_detach (uptr);
         uptr->USTAT = FS_REW;
         sim_activate (uptr, tu_time);
         tucs1 = tucs1 & ~CS1_GO;

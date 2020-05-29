@@ -1,6 +1,6 @@
 /* sigma_mt.c: Sigma 732X 9-track magnetic tape
 
-   Copyright (c) 2007-2017, Robert M. Supnik
+   Copyright (c) 2007-2020, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt           7320 and 7322/7323 magnetic tape
 
+   23-Mar-20    RMS     Unload should call sim_tape_detach (Mark Pizzolato)
    13-Mar-17    RMS     Annotated fall through in switch
 
    Magnetic tapes are represented as a series of variable records
@@ -366,7 +367,7 @@ switch (cmd) {                                          /* case on command */
         break;
 
     case MCM_RWU:                                       /* rewind unload */
-        r = detach_unit (uptr);
+        r = sim_tape_detach (uptr);
         break;
 
     case MCM_REW:                                       /* rewind */
