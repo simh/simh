@@ -86,7 +86,7 @@ DEVICE sio_dev = {
     NULL, NULL, NULL
 };
 
-UNIT ptr_unit = { UDATA (&ptr_svc, UNIT_SEQ + UNIT_ATTABLE, 0), KBD_POLL_WAIT };
+UNIT ptr_unit = { UDATA (&ptr_svc, UNIT_SEQ + UNIT_ATTABLE + UNIT_ROABLE, 0), KBD_POLL_WAIT };
 
 REG ptr_reg[] = {
     { ORDATA (DATA, ptr_unit.buf, 8) },
