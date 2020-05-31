@@ -75,7 +75,7 @@ if (autcon_enb == 0) {
     sim_messagef (SCPE_OK, "Device auto configuration is now disabled.\n");
     sim_messagef (SCPE_OK, "Explicitly setting any address or vector value tells the system\n");
     sim_messagef (SCPE_OK, "that you are planning a specific configuration that may not use\n");
-    sim_messagef (SCPE_OK, "use standard values.  You must explcitly specify bus address and\n");
+    sim_messagef (SCPE_OK, "use standard values.  You must explicitly specify bus address and\n");
     sim_messagef (SCPE_OK, "vector values for any device you enable or otherwise add to the\n");
     sim_messagef (SCPE_OK, "system configuration after this message is issued.  Changing the\n");
     sim_messagef (SCPE_OK, "number of lines on a terminal multiplexer is such a change.\n");
