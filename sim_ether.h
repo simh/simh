@@ -381,7 +381,7 @@ t_stat ethq_destroy(ETH_QUE* que);                      /* release FIFO queue */
 const char *eth_capabilities(void);
 t_stat sim_ether_test (DEVICE *dptr);                   /* unit test routine */
 
-#if !defined(SIM_TEST_INIT)    	/* Need stubs for test APIs */
+#if !defined(SIM_TEST_INIT)     /* Need stubs for test APIs */
 #define SIM_TEST_INIT
 #define SIM_TEST(xxx)
 #endif
