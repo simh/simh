@@ -68,7 +68,21 @@ t_stat set_autocon (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr != NULL)
     return SCPE_ARG;
+if (autcon_enb == val)
+    return SCPE_OK;
 autcon_enb = val;
+if (autcon_enb == 0) {
+    sim_messagef (SCPE_OK, "Device auto configuration is now disabled.\n");
+    sim_messagef (SCPE_OK, "Explicitly setting any address or vector value tells the system\n");
+    sim_messagef (SCPE_OK, "that you are planning a specific configuration that may not use\n");
+    sim_messagef (SCPE_OK, "use standard values.  You must explcitly specify bus address and\n");
+    sim_messagef (SCPE_OK, "vector values for any device you enable or otherwise add to the\n");
+    sim_messagef (SCPE_OK, "system configuration after this message is issued.  Changing the\n");
+    sim_messagef (SCPE_OK, "number of lines on a terminal multiplexer is such a change.\n");
+    sim_messagef (SCPE_OK, "To avoid complexities dealing with this, it is recommended that\n");
+    sim_messagef (SCPE_OK, "you configure all devices which can use standard addresses before\n");
+    sim_messagef (SCPE_OK, "changing the address or vector for an unusual device situation.\n");
+    }
 return auto_config (NULL, 0);
 }
 
@@ -107,7 +121,7 @@ if ((newba <= IOPAGEBASE) ||                            /* > IO page base? */
     (newba % ((uint32) val)))                           /* check modulus */
     return SCPE_ARG;
 dibp->ba = newba;                                       /* store */
-autcon_enb = 0;                                         /* autoconfig off */
+set_autocon (NULL, 0, NULL, NULL);                      /* autoconfig off */
 return SCPE_OK;
 }
 
@@ -201,7 +215,7 @@ if ((r != SCPE_OK) ||
     (newvec & ((dibp->vnum > 1)? 07: 03)))              /* properly aligned value? */
     return SCPE_ARG;
 dibp->vec = newvec;
-autcon_enb = 0;                                         /* autoconfig off */
+set_autocon (NULL, 0, NULL, NULL);                      /* autoconfig off */
 return SCPE_OK;
 }
 
