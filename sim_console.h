@@ -126,6 +126,7 @@ int32 sim_tt_inpcvt (int32 c, uint32 mode);
 int32 sim_tt_outcvt (int32 c, uint32 mode);
 t_stat sim_tt_settabs (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat sim_tt_showtabs (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_bool sim_is_remote_console_master_line (void *lp);
 
 extern int32 sim_rem_cmd_active_line;   /* command in progress on line # */
 

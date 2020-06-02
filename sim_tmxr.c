@@ -2205,7 +2205,8 @@ if ((lp->txbfd && !lp->notelnet) || (TXBUF_AVAIL(lp) > 1)) {/* room for char (+ 
         sim_oline = save_oline;                         /* resture output socket */
         }
     sim_exp_check (&lp->expect, chr);                   /* process expect rules as needed */
-    if (!sim_is_running) {                              /* attach message or other non simulation time message? */
+    if (!sim_is_running &&                              /* attach message or other non simulation time message? */
+        !sim_is_remote_console_master_line (lp)) {                              
         tmxr_send_buffered_data (lp);                   /* put data on wire */
         sim_os_ms_sleep(((lp->txbps) && (lp->txdeltausecs > 1000)) ? /* rate limiting output slower than 1000 cps */
                         (lp->txdeltausecs - 1000) / 1000 : 

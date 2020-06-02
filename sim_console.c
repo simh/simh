@@ -2007,6 +2007,13 @@ sprintf(cmdbuf, "BUFFERED=%d", bufsize);
 return tmxr_open_master (&sim_rem_con_tmxr, cmdbuf);        /* open master socket */
 }
 
+t_bool sim_is_remote_console_master_line (void *lp)
+{
+return sim_rem_master_mode &&                                           /* master mode */
+       (((TMLN *)lp) >= sim_rem_con_tmxr.ldsc) &&                       /* And it is one of the Remote Console Lines */
+       (((TMLN *)lp) < sim_rem_con_tmxr.ldsc + sim_rem_con_tmxr.lines);
+}
+
 /* Enable or disable Remote Console master mode */
 
 /* In master mode, commands are subsequently processed from the
