@@ -244,8 +244,12 @@ return SCPE_IERR;
 
 t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
-if ((*cptr != 0) || (flag != 0))
+if (*cptr != 0)
     return SCPE_ARG;
+if (flag != 0)
+    return sim_messagef (SCPE_UNK, "DUMP command not implemented in this simulator\n"
+                                    "You can capture memory contents into a file via:\n"
+                                    "EXAMINE @outputfile.txt 0-7777\n");
 if ((sim_switches & SWMASK ('R')) ||                    /* RIM format? */
     (match_ext (fnam, "RIM") && !(sim_switches & SWMASK ('B'))))
     return sim_load_rim (fileref);
