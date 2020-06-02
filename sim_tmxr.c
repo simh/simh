@@ -2209,7 +2209,7 @@ if ((lp->txbfd && !lp->notelnet) || (TXBUF_AVAIL(lp) > 1)) {/* room for char (+ 
         tmxr_send_buffered_data (lp);                   /* put data on wire */
         sim_os_ms_sleep(((lp->txbps) && (lp->txdeltausecs > 1000)) ? /* rate limiting output slower than 1000 cps */
                         (lp->txdeltausecs - 1000) / 1000 : 
-                        10);                           /* wait an approximate character delay */
+                        1);                             /* wait an approximate character delay */
         }
     return SCPE_OK;                                     /* char sent */
     }
