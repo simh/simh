@@ -47,12 +47,12 @@ Delete/Instruction 12A55 = 'BBC     #26,(R9),00012A5C'
 !     Interval Timer Patch
 !     In operational environments, Test 52 subtests 17 and 20 have been observed
 !     to occasionally fail. Disable the timer portion of the interval timer tests.
-! Subsequent changes to vax_sysdev.c and scp timer services no longer require
-! this test to be disabled.
+! Subsequent changes to vax_sysdev.c and scp timer services should no longer 
+! require this test to be disabled.  Occasionally this test still fails.
 !	2004e7c1/	brw 2004e870
-!Replace/Instruction 0e7c1 = 'MOVB    #10,B^76(R9)'
-!'BRW	0000E870'
-!Exit
+Replace/Instruction 0e7c1 = 'MOVB    #10,B^76(R9)'
+'BRW	0000E870'
+Exit
 ! 31. Test 53 [2004e918] - toy clock - ok
 ! 30. Test C1 [2004f8f1] - SSC RAM - ok
 ! 29. Test 34 [2004d4a0] - ROM - checksum off due to other patches - patch
