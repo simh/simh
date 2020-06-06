@@ -8510,12 +8510,8 @@ if (signal (SIGTERM, int_handler) == SIG_ERR) {         /* set WRU */
     sim_ttcmd ();
     return r;
     }
-if (sim_step) {                                         /* set step timer */
-    if (sim_switches & SWMASK ('T'))                    /* stepping for elapsed time? */
-        sim_activate_after (&sim_step_unit, (uint32)sim_step);/* wall clock based step */
-    else
-        sim_activate (&sim_step_unit, sim_step);        /* instruction based step */
-    }
+if (sim_step)                                           /* set step timer */
+    sim_sched_step ();
 sim_activate_after (&sim_flush_unit, FLUSH_INTERVAL);   /* Enable periodic buffer flushing */
 stop_cpu = FALSE;
 sim_is_running = TRUE;                                  /* flag running */
@@ -8565,7 +8561,7 @@ do {
     else
         sim_step = 1;
     if (sim_step)                                       /* set step timer */
-        sim_activate (&sim_step_unit, sim_step);
+        sim_sched_step ();
     } while (1);
 
 if ((SCPE_BARE_STATUS(r) == SCPE_STOP) &&
@@ -8593,7 +8589,7 @@ signal (SIGHUP, SIG_DFL);                               /* cancel WRU */
 signal (SIGTERM, SIG_DFL);                              /* cancel WRU */
 sim_flush_buffered_files();
 sim_cancel (&sim_flush_unit);                           /* cancel flush timer */
-sim_cancel (&sim_step_unit);                            /* cancel step timer */
+sim_cancel_step ();                                     /* cancel step timer */
 sim_throt_cancel ();                                    /* cancel throttle */
 AIO_UPDATE_QUEUE;
 UPDATE_SIM_TIME;                                        /* update sim time */
@@ -8730,6 +8726,16 @@ return SCPE_EXPECT | (sim_do_echo ? 0 : SCPE_NOMESSAGE);
 t_stat sim_cancel_step (void)
 {
 return sim_cancel (&sim_step_unit);
+}
+
+/* schedule step service */
+
+t_stat sim_sched_step (void)
+{
+if (sim_switches & SWMASK ('T'))                    /* stepping for elapsed time? */
+    return sim_activate_after_abs (&sim_step_unit, (uint32)sim_step);/* wall clock based step */
+else
+    return sim_activate_abs (&sim_step_unit, sim_step);    /* instruction based step */
 }
 
 /* Signal handler for ^C signal - set stop simulation flag */

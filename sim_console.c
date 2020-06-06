@@ -1405,7 +1405,8 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
             sim_rem_cmd_active_line = -1;           /* Done with active command */
             if (!sim_rem_active_command) {          /* STEP command? */
                 stat = SCPE_STEP;
-                _sim_rem_message ("STEP", stat);    /* produce a STEP complete message */
+                if (sim_con_stable_registers || !sim_rem_master_mode)
+                    _sim_rem_message ("STEP", stat);/* produce a STEP complete message */
                 }
             _sim_rem_log_out (lp);
             sim_rem_active_command = NULL;          /* Restart loop to process available input */
@@ -1840,8 +1841,14 @@ if (sim_rem_master_was_connected &&                         /* Master mode ever 
     !sim_rem_con_tmxr.ldsc[0].sock)                         /* Master Connection lost? */
     return sim_messagef (SCPE_EXIT, "Master Session Disconnect");/* simulator has been 'unplugged' */
 if (sim_rem_cmd_active_line != -1) {
-    if (steps)
-        sim_activate(uptr, steps);                          /* check again after 'steps' instructions */
+    if (steps) {
+        if (!sim_con_stable_registers && sim_rem_master_mode) {
+            sim_step = steps;
+            sim_sched_step ();
+            }
+        else
+            sim_activate(uptr, steps);                      /* check again after 'steps' instructions */
+        }
     else
         return SCPE_REMOTE;                                 /* force sim_instr() to exit to process command */
     }
@@ -2065,8 +2072,11 @@ if (sim_rem_master_mode) {
             }
         sim_rem_cmd_active_line = 0;                    /* Make it look like */
         sim_rem_consoles[0].single_mode = FALSE;
+        sim_cancel_step ();
         if (stat != SCPE_STEP)
             sim_rem_active_command = &allowed_single_remote_cmds[0];/* Dummy */
+        else
+            sim_activate_abs (rem_con_data_unit, 0);    /* force step completion processing */
         sim_last_cmd_stat = SCPE_BARE_STATUS(stat);     /* make exit status available to remote console */
         }
     sim_rem_master_was_enabled = FALSE;

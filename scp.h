@@ -318,6 +318,7 @@ t_stat show_dev_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST cha
 t_stat sim_add_debug_flags (DEVICE *dptr, DEBTAB *debflags);
 const char *sim_error_text (t_stat stat);
 t_stat sim_string_to_stat (const char *cptr, t_stat *cond);
+t_stat sim_sched_step (void);
 t_stat sim_cancel_step (void);
 void sim_printf (const char *fmt, ...) GCC_FMT_ATTR(1, 2);
 void sim_perror (const char *msg);
