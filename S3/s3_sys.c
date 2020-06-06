@@ -1,6 +1,6 @@
 /* s3_sys.c: IBM System/3 system interface
 
-   Copyright (c) 2001-2012, Charles E. Owen
+   Copyright (c) 2001-2020, Charles E. Owen
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Charles E. Owen.
 
+   06-Jun-20    RMS     Fixed declaration of bldaddr (Mark Pizzolato)
    19-Mar-12    RMS     Fixed declaration of conversion tables (Mark Pizzolato)
 */
 
@@ -272,7 +273,7 @@ t_stat printf_sym (FILE *of, char *strg, t_addr addr, uint32 *val,
 {
 int32 c1, c2, group, len1, len2, inst, aaddr, baddr;
 int32 oplen, groupno, i, j, vpos, qbyte, da, m, n;
-char bld[128], bldaddr[32], boperand[32], aoperand[32];
+char bld[128], bldaddr[160], boperand[32], aoperand[32];
 int32 blk[16], blt[16];
 int32 blkadd;
 
