@@ -610,10 +610,8 @@ fprintf (st, "has no registers.  The boot ROM can be loaded with a binary byte s
 fprintf (st, "using the LOAD -r command:\n\n");
 fprintf (st, "    LOAD -r KA655X.BIN        load ROM image KA655X.BIN\n\n");
 fprintf (st, "When the simulator starts running (via the BOOT command), if the ROM has\n");
-fprintf (st, "not yet been loaded, an attempt will be made to automatically load the\n");
-fprintf (st, "ROM image from the file ka655x.bin in the current working directory.\n");
-fprintf (st, "If that load attempt fails, then a copy of the missing ROM file is\n");
-fprintf (st, "written to the current directory and the load attempt is retried.\n\n");
+fprintf (st, "not yet been loaded, an internal 'buit-in' copy of the KA655X.BIN image\n");
+fprintf (st, "will be loaded into the ROM address space and execution will be started.\n\n");
 fprintf (st, "ROM accesses a use a calibrated delay that slows ROM-based execution to\n");
 fprintf (st, "about 500K instructions per second.  This delay is required to make the\n");
 fprintf (st, "power-up self-test routines run correctly on very fast hosts.\n");
