@@ -14,6 +14,7 @@ simulation work and for Dave Bryan's HP simulators.
 1.1 SCP and libraries
 
 - -n added in ATTACH, meaning "force empty file".
+- SET <device|unit> APPEND.
 
 1.2 1401
 

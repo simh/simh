@@ -1357,7 +1357,7 @@ ARx = AR;                                               /* default */
 jamkn = (MB & (m12+m16)) != 0;                          /* m12+m16 */
 easbm = (MB & (m9+m11)) != 0;                           /* m9+m11 */
 eastl = jamkn || easbm;                                 /* m9+m11+m12+m16 */
-setaz = (MB & (m8+m15)) == (m8+m15);                    /* m8xm15*/
+setaz = (MB & (m8+m15)) == (m8+m15);                    /* m8xm15 */
 eiki7 = (MB & m15) && (C || !(MB & m13));               /* cin */
 aleg = eastl? AR: 0;                                    /* a input */
 bleg = easbm? 0: DMASK;                                 /* b input */

@@ -594,7 +594,6 @@ typedef struct sim_debtab DEBTAB;
    when compiling for SIMH 3.x.
 */
 
-
 #if defined (__STDC__) || defined (_WIN32)
 #define ORDATAD(nm,loc,wd,desc) #nm, &(loc), 8, (wd), 0, 1
 #define DRDATAD(nm,loc,wd,desc) #nm, &(loc), 10, (wd), 0, 1
