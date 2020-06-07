@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   04-Jun-20    JDB     Call of "sim_vm_init" is now conditional on USE_VM_INIT
    28-May-20    RMS     Flush stdout after prompting (Mark Pizzolato)
    23-Mar-20    RMS     Added SET <dev|unit> APPEND command
    13-Feb-20    RMS     Spelled out CONTINUE in command table (Dave Bryan)
@@ -280,10 +281,8 @@
 #define GET_RADIX(val,dft) \
     val = sim_get_radix (NULL, sim_switches, dft);
 
-/* The per-simulator init routine is a weak global that defaults to NULL
-   The other per-simulator pointers can be overrriden by the init routine */
+/* The per-simulator pointers can be overrriden by a VM init routine */
 
-void (*sim_vm_init) (void);
 char* (*sim_vm_read) (char *ptr, int32 size, FILE *stream) = NULL;
 void (*sim_vm_post) (t_bool from_scp) = NULL;
 CTAB *sim_vm_cmd = NULL;
@@ -733,9 +732,10 @@ sim_quiet = sim_switches & SWMASK ('Q');                /* -q means quiet */
 
 sim_init_sock ();                                       /* init socket capabilities */
 
-if (sim_vm_init != NULL)                                /* call once only */
-    (*sim_vm_init)();
-sim_finit ();                                           /* init fio package */
+#if defined (USE_VM_INIT)
+(*sim_vm_init)();                                       /* call once only */
+#endif
+sim_finit();                                            /* init fio package */
 stop_cpu = 0;
 sim_interval = 0;
 sim_time = sim_rtime = 0;

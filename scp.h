@@ -1,6 +1,6 @@
 /* scp.h: simulator control program headers
 
-   Copyright (c) 1993-2019, Robert M Supnik
+   Copyright (c) 1993-2020, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   04-Jun-20    JDB     Declaration of "sim_vm_init" is now conditional on USE_VM_INIT
    08-Dec-19    JDB     Added "sim_vm_unit_name" extension hook
    09-Oct-19    JDB     Added "detach_all" global declaration
    19-Jul-19    JDB     Added "sim_get_radix" extension hook
@@ -228,10 +229,14 @@ extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
 extern t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val,
     int32 sw);
 
-/* The per-simulator init routine is a weak global that defaults to NULL
-   The other per-simulator pointers can be overrriden by the init routine */
+/* The per-simulator init routine is declared (and called) only if the
+   compilation defines the USE_VM_INIT symbol.  The other per-simulator pointers
+   can be overrriden by the init routine or by the CPU reset routine that is
+   called during simulator startup, whichever is preferred. */
 
-extern void (*sim_vm_init) (void);
+#if defined (USE_VM_INIT)
+extern void(*sim_vm_init) (void);
+#endif
 extern char* (*sim_vm_read) (char *ptr, int32 size, FILE *stream);
 extern void (*sim_vm_post) (t_bool from_scp);
 extern CTAB *sim_vm_cmd;
