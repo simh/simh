@@ -41,7 +41,7 @@
 #define PCQ_MASK        (PCQ_SIZE - 1)
 #define PCQ_ENTRY(PC)   if (pcq[pcq_p] != (PC)) { pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = (PC); }
 
-#define	INST_MAX_BYTES	4                       /* instruction max bytes */
+#define INST_MAX_BYTES  4                       /* instruction max bytes */
 
 #define FLAG_C  1
 #define FLAG_N  2
@@ -52,7 +52,7 @@
 
 #define SETFLAG(f,c)    AF = (c) ? AF | FLAG_ ## f : AF & ~FLAG_ ## f
 #define TSTFLAG(f)      ((AF & FLAG_ ## f) != 0)
-#define TSTFLAG2(a, f)	((a & FLAG_ ## f) != 0)
+#define TSTFLAG2(a, f)  ((a & FLAG_ ## f) != 0)
 
 #define LOW_DIGIT(x)     ((x) & 0xf)
 #define HIGH_DIGIT(x)    (((x) >> 4) & 0xf)
@@ -271,9 +271,9 @@ typedef struct {
     t_value op[INST_MAX_BYTES];
 } insthist_t;
 
-static	uint32 hst_p = 0;                           /* history pointer      */
-static	uint32 hst_lnt = 0;                         /* history length       */
-static	insthist_t *hst = NULL;                     /* instruction history  */
+static  uint32 hst_p = 0;                           /* history pointer      */
+static  uint32 hst_lnt = 0;                         /* history length       */
+static  insthist_t *hst = NULL;                     /* instruction history  */
 
 uint32 m68k_registers[M68K_REG_CPU_TYPE + 1];       /* M68K CPU registers   */
 
@@ -6124,32 +6124,32 @@ static t_stat sim_instr_mmu (void) {
             PC = 0x38;
         }
 
-	/*
-	** Save in instruction history ring buffer?
-	*/
-	if (hst_lnt && ((chiptype == CHIP_TYPE_8080) || (chiptype == CHIP_TYPE_Z80))) {
-		hst[hst_p].valid = 1;
-		hst[hst_p].pc = PCX;
-		hst[hst_p].sp = SP;
-		hst[hst_p].af = AF;
-		hst[hst_p].bc = BC;
-		hst[hst_p].de = DE;
-		hst[hst_p].hl = HL;
-		hst[hst_p].af1 = AF1_S;
-		hst[hst_p].bc1 = BC1_S;
-		hst[hst_p].de1 = DE1_S;
-		hst[hst_p].hl1 = HL1_S;
-		hst[hst_p].ix = IX;
-		hst[hst_p].iy = IY;
+    /*
+    ** Save in instruction history ring buffer?
+    */
+    if (hst_lnt && ((chiptype == CHIP_TYPE_8080) || (chiptype == CHIP_TYPE_Z80))) {
+        hst[hst_p].valid = 1;
+        hst[hst_p].pc = PCX;
+        hst[hst_p].sp = SP;
+        hst[hst_p].af = AF;
+        hst[hst_p].bc = BC;
+        hst[hst_p].de = DE;
+        hst[hst_p].hl = HL;
+        hst[hst_p].af1 = AF1_S;
+        hst[hst_p].bc1 = BC1_S;
+        hst[hst_p].de1 = DE1_S;
+        hst[hst_p].hl1 = HL1_S;
+        hst[hst_p].ix = IX;
+        hst[hst_p].iy = IY;
 
-		for (i = 0; i < INST_MAX_BYTES; i++) {
-		    hst[hst_p].op[i] = GetBYTE(PCX + i);
-		}
+        for (i = 0; i < INST_MAX_BYTES; i++) {
+            hst[hst_p].op[i] = GetBYTE(PCX + i);
+        }
 
-		if (++hst_p == hst_lnt) {
-			hst_p = 0;
-		}
-	}
+        if (++hst_p == hst_lnt) {
+            hst_p = 0;
+        }
+    }
 
         sim_interval--;
     }

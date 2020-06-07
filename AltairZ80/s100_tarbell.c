@@ -51,7 +51,7 @@ extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_typ
 #define TARBELL_BYTES_PER_TRACK   ((TARBELL_SECTORS_PER_TRACK * 186) + 73 + 247)
 #define TARBELL_TRACKS            77
 #define TARBELL_CAPACITY          (256256)      /* Default Tarbell Disk Capacity */
-#define TARBELL_ROTATION_MS       (166)	        /* 166 milliseconds per revolution */
+#define TARBELL_ROTATION_MS       (166)         /* 166 milliseconds per revolution */
 #define TARBELL_HEAD_TIMEOUT      (TARBELL_ROTATION_MS * 1000 * 2)   /* usec * 2 revolutions */
 
 #define TARBELL_PROM_SIZE         32

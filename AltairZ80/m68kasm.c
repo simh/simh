@@ -142,35 +142,35 @@
 
 struct _ea {
 
-	int ea;
+    int ea;
 
-	int cnt;
+    int cnt;
 
-	t_value arg[10];
+    t_value arg[10];
 
 };
 
 struct _rea {
 
-	int reg;
+    int reg;
 
-	struct _ea ea;
+    struct _ea ea;
 
 };
 
 struct _mask {
 
-	int x;
+    int x;
 
-	int d;
+    int d;
 
 };
 
 struct _brop {
 
-	int opc;
+    int opc;
 
-	int len;
+    int len;
 
 };
 
@@ -401,23 +401,23 @@ union YYSTYPE
 #line 71 "m68kasm.y"
 
 
-	int rc;
+    int rc;
 
-	int reg;
+    int reg;
 
-	int wl;
+    int wl;
 
-	int opc;
+    int opc;
 
-	struct _ea ea;
+    struct _ea ea;
 
-	t_value num;
+    t_value num;
 
-	struct _rea rea;
+    struct _rea rea;
 
-	struct _mask mask;
+    struct _mask mask;
 
-	struct _brop brop;
+    struct _brop brop;
 
 
 #line 346 "m68kasm.c"
@@ -2066,7 +2066,7 @@ yyreduce:
 #line 114 "m68kasm.y"
                               { _genop((yyvsp[-4].opc) | (yyvsp[0].ea).ea); if (oplen==0) { _genop((yyvsp[-2].num) & 0xff); yyrc = _genea((yyvsp[0].ea)) - 3; }
 
-		else if (oplen==1) { _genop((yyvsp[-2].num)); yyrc = _genea((yyvsp[0].ea)) - 3; } else { _genop((yyvsp[-2].num)>>16); _genop((yyvsp[-2].num) & 0xffff); yyrc = _genea((yyvsp[0].ea))-5; } }
+        else if (oplen==1) { _genop((yyvsp[-2].num)); yyrc = _genea((yyvsp[0].ea)) - 3; } else { _genop((yyvsp[-2].num)>>16); _genop((yyvsp[-2].num) & 0xffff); yyrc = _genea((yyvsp[0].ea))-5; } }
 #line 1992 "m68kasm.c"
     break;
 
@@ -2080,7 +2080,7 @@ yyreduce:
 #line 117 "m68kasm.y"
                                 { _genop((yyvsp[-4].opc) | (yyvsp[0].ea).ea); if (oplen==0) { _genop((yyvsp[-2].num) & 0xff); yyrc = _genea((yyvsp[0].ea)) - 3; }
 
-		else if (oplen==1) { _genop((yyvsp[-2].num)); yyrc = _genea((yyvsp[0].ea)) - 3; } else { _genop((yyvsp[-2].num)>>16); _genop((yyvsp[-2].num) & 0xffff); yyrc = _genea((yyvsp[0].ea))-5; } }
+        else if (oplen==1) { _genop((yyvsp[-2].num)); yyrc = _genea((yyvsp[0].ea)) - 3; } else { _genop((yyvsp[-2].num)>>16); _genop((yyvsp[-2].num) & 0xffff); yyrc = _genea((yyvsp[0].ea))-5; } }
 #line 2005 "m68kasm.c"
     break;
 
@@ -2214,9 +2214,9 @@ yyreduce:
 #line 140 "m68kasm.y"
                                   { if ((yyvsp[0].ea).ea==074) { _genop(0x44c0 | ((yyvsp[0].ea).cnt==1?0x0200:0x0000) | (yyvsp[-2].ea).ea); yyrc = _genea((yyvsp[-2].ea)) - 1; }
 
-							    else { int tmp = (((yyvsp[0].ea).ea&070)>>3)|(((yyvsp[0].ea).ea&7)<<3); _genop(0x0000 | ((yyvsp[-3].wl)<<12) | (tmp<<6) | (yyvsp[-2].ea).ea);
+                                else { int tmp = (((yyvsp[0].ea).ea&070)>>3)|(((yyvsp[0].ea).ea&7)<<3); _genop(0x0000 | ((yyvsp[-3].wl)<<12) | (tmp<<6) | (yyvsp[-2].ea).ea);
 
-    	                           	   yyrc = _genea((yyvsp[-2].ea)) - 1; yyrc += _genea((yyvsp[0].ea)); } }
+                                       yyrc = _genea((yyvsp[-2].ea)) - 1; yyrc += _genea((yyvsp[0].ea)); } }
 #line 2139 "m68kasm.c"
     break;
 
@@ -3070,9 +3070,9 @@ yyreduce:
 #line 331 "m68kasm.y"
                       { if (((yyvsp[0].ea).ea & 070)==0) { /* dx,dy must be swapped */
 
-						(yyval.rea).reg = ((yyvsp[0].ea).ea & 7)<<9; (yyvsp[0].ea).ea = (yyvsp[-2].reg) & 7; (yyval.rea).ea = (yyvsp[0].ea); }
+                        (yyval.rea).reg = ((yyvsp[0].ea).ea & 7)<<9; (yyvsp[0].ea).ea = (yyvsp[-2].reg) & 7; (yyval.rea).ea = (yyvsp[0].ea); }
 
-					else { (yyval.rea).reg = ((yyvsp[-2].reg)<<9) | 0x100; (yyval.rea).ea = (yyvsp[0].ea); } }
+                    else { (yyval.rea).reg = ((yyvsp[-2].reg)<<9) | 0x100; (yyval.rea).ea = (yyvsp[0].ea); } }
 #line 2993 "m68kasm.c"
     break;
 
@@ -3272,7 +3272,7 @@ yyreduce:
 #line 384 "m68kasm.y"
                       { int i,l=(yyvsp[-2].reg),h=(yyvsp[0].reg); if (l>h) { l=(yyvsp[0].reg); h=(yyvsp[-2].reg); } (yyval.mask).x = (yyval.mask).d = 0; 
 
-					for (i=l; i<=h; i++) { (yyval.mask).d |= movemx[i]; (yyval.mask).d |= movemd[i]; } }
+                    for (i=l; i<=h; i++) { (yyval.mask).d |= movemx[i]; (yyval.mask).d |= movemd[i]; } }
 #line 3192 "m68kasm.c"
     break;
 
@@ -3280,7 +3280,7 @@ yyreduce:
 #line 386 "m68kasm.y"
                       { int i,l=(yyvsp[-2].reg),h=(yyvsp[0].reg); if (l>h) { l=(yyvsp[0].reg); h=(yyvsp[-2].reg); } (yyval.mask).x = (yyval.mask).d = 0; 
 
-					for (i=l; i<=h; i++) { (yyval.mask).x |= movemx[i+8]; (yyval.mask).d |= movemd[i+8]; } }
+                    for (i=l; i<=h; i++) { (yyval.mask).x |= movemx[i+8]; (yyval.mask).d |= movemd[i+8]; } }
 #line 3199 "m68kasm.c"
     break;
 
@@ -3336,7 +3336,7 @@ yyreduce:
 #line 418 "m68kasm.y"
                             { if ((yyvsp[0].wl)==0) { (yyval.ea).ea = 070; (yyval.ea).cnt = 1; (yyval.ea).arg[0] = (yyvsp[-2].num); } 
 
-				          else {       (yyval.ea).ea = 071; (yyval.ea).cnt = 2; (yyval.ea).arg[0] = (yyvsp[-2].num) >> 16; (yyval.ea).arg[1] = (yyvsp[-2].num) & 0xffff; } }
+                          else {       (yyval.ea).ea = 071; (yyval.ea).cnt = 2; (yyval.ea).arg[0] = (yyvsp[-2].num) >> 16; (yyval.ea).arg[1] = (yyvsp[-2].num) & 0xffff; } }
 #line 3254 "m68kasm.c"
     break;
 
@@ -3344,7 +3344,7 @@ yyreduce:
 #line 420 "m68kasm.y"
                    { int tmp = ((yyvsp[-1].num)>>15) & 0x1ffff; if (tmp==0 || tmp==0x1ffff) { (yyval.ea).ea = 070; (yyval.ea).cnt = 1; (yyval.ea).arg[0] = (yyvsp[-1].num); }
 
-			 else { (yyval.ea).ea = 070; (yyval.ea).cnt = 2;  (yyval.ea).arg[0] = (yyvsp[-1].num) >> 16; (yyval.ea).arg[1] = (yyvsp[-1].num) & 0xffff; } }
+             else { (yyval.ea).ea = 070; (yyval.ea).cnt = 2;  (yyval.ea).arg[0] = (yyvsp[-1].num) >> 16; (yyval.ea).arg[1] = (yyvsp[-1].num) & 0xffff; } }
 #line 3261 "m68kasm.c"
     break;
 
@@ -3376,9 +3376,9 @@ yyreduce:
 #line 431 "m68kasm.y"
                    { (yyval.ea).ea = 074; if (oplen==0) { (yyval.ea).cnt = 1; (yyval.ea).arg[0] = (yyvsp[0].num) & 0xff; }
 
-				 else if (oplen==1) { (yyval.ea).cnt = 1; (yyval.ea).arg[0] = (yyvsp[0].num) & 0xffff; }
+                 else if (oplen==1) { (yyval.ea).cnt = 1; (yyval.ea).arg[0] = (yyvsp[0].num) & 0xffff; }
 
-				 else { (yyval.ea).cnt = 2; (yyval.ea).arg[0] = (yyvsp[0].num) >> 16; (yyval.ea).arg[1] = (yyvsp[0].num) & 0xffff; } }
+                 else { (yyval.ea).cnt = 2; (yyval.ea).arg[0] = (yyvsp[0].num) >> 16; (yyval.ea).arg[1] = (yyvsp[0].num) & 0xffff; } }
 #line 3293 "m68kasm.c"
     break;
 
@@ -3598,9 +3598,9 @@ static void yyerror(char* s)
 
 {
 
-	/* do not emit anything, but set error flag */
+    /* do not emit anything, but set error flag */
 
-	yyerrc = 1;
+    yyerrc = 1;
 
 }
 
@@ -3608,9 +3608,9 @@ static void yyerror(char* s)
 
 struct _optable {
 
-	char* mnem;
+    char* mnem;
 
-	int token;
+    int token;
 
 };
 
@@ -3618,77 +3618,77 @@ struct _optable {
 
 static struct _optable ops[] = {
 
-	{ "abcd",	ABCD },		{ "add",	ADD },		{ "adda",	ADDA },		{ "addi",	ADDI },
+    { "abcd",   ABCD },     { "add",    ADD },      { "adda",   ADDA },     { "addi",   ADDI },
 
-	{ "addq",	ADDQ },		{ "addx",	ADDX },		{ "and",	AND },		{ "andi",	ANDI },
+    { "addq",   ADDQ },     { "addx",   ADDX },     { "and",    AND },      { "andi",   ANDI },
 
-	{ "asl",	ASL }, 		{ "asr",	ASR },		{ "bcc",	BCC },		{ "bcs",	BCS },
+    { "asl",    ASL },      { "asr",    ASR },      { "bcc",    BCC },      { "bcs",    BCS },
 
-	{ "beq",	BEQ },		{ "bge",	BGE },		{ "bgt",	BGT },		{ "bhi",	BHI },
+    { "beq",    BEQ },      { "bge",    BGE },      { "bgt",    BGT },      { "bhi",    BHI },
 
-	{ "ble",	BLE },		{ "bls",	BLS },		{ "blt",	BLT },		{ "bmi",	BMI },
+    { "ble",    BLE },      { "bls",    BLS },      { "blt",    BLT },      { "bmi",    BMI },
 
-	{ "bne",	BNE },		{ "bpl",	BPL },		{ "bvc",	BVC },		{ "bvs",	BVS },
+    { "bne",    BNE },      { "bpl",    BPL },      { "bvc",    BVC },      { "bvs",    BVS },
 
-	{ "bchg",	BCHG },		{ "bclr",	BCLR },		{ "bra",	BRA },		{ "bset",	BSET },
+    { "bchg",   BCHG },     { "bclr",   BCLR },     { "bra",    BRA },      { "bset",   BSET },
 
-	{ "bsr",	BSR },		{ "btst",	BTST },		{ "chk",	CHK },		{ "clr",	CLR },
+    { "bsr",    BSR },      { "btst",   BTST },     { "chk",    CHK },      { "clr",    CLR },
 
-	{ "cmp",	CMP },		{ "cmpa",	CMPA },		{ "cmpi",	CMPI },		{ "cmpm",	CMPM },
+    { "cmp",    CMP },      { "cmpa",   CMPA },     { "cmpi",   CMPI },     { "cmpm",   CMPM },
 
-	{ "dbcc",	DBCC },		{ "dbcs",	DBCS },		{ "dbeq",	DBEQ },		{ "dbf",	DBF },
+    { "dbcc",   DBCC },     { "dbcs",   DBCS },     { "dbeq",   DBEQ },     { "dbf",    DBF },
 
-	{ "dbge",	DBGE },		{ "dbgt",	DBGT },		{ "dbhi",	DBHI },		{ "dble",	DBLE },
+    { "dbge",   DBGE },     { "dbgt",   DBGT },     { "dbhi",   DBHI },     { "dble",   DBLE },
 
-	{ "dbls",	DBLS },		{ "dblt",	DBLT },		{ "dbmi",	DBMI },		{ "dbne",	DBNE },
+    { "dbls",   DBLS },     { "dblt",   DBLT },     { "dbmi",   DBMI },     { "dbne",   DBNE },
 
-	{ "dbpl",	DBPL },		{ "dbt",	DBT },		{ "dbvc",	DBVC },		{ "dbvs",	DBVS },
+    { "dbpl",   DBPL },     { "dbt",    DBT },      { "dbvc",   DBVC },     { "dbvs",   DBVS },
 
-	{ "divs",	DIVS },		{ "divu",	DIVU },		{ "eor",	EOR },		{ "eori",	EORI },
+    { "divs",   DIVS },     { "divu",   DIVU },     { "eor",    EOR },      { "eori",   EORI },
 
-	{ "exg",	EXG },		{ "ext",	EXT },		{ "illegal",ILLEGAL },	{ "jmp",	JMP },
+    { "exg",    EXG },      { "ext",    EXT },      { "illegal",ILLEGAL },  { "jmp",    JMP },
 
-	{ "jsr",	JSR },		{ "lea",	LEA },		{ "link",	LINK },		{ "lsl",	LSL },
+    { "jsr",    JSR },      { "lea",    LEA },      { "link",   LINK },     { "lsl",    LSL },
 
-	{ "lsr",	LSR }, 		{ "move",	MOVE },		{ "movea",	MOVEA },	{ "movem",	MOVEM },
+    { "lsr",    LSR },      { "move",   MOVE },     { "movea",  MOVEA },    { "movem",  MOVEM },
 
-	{ "movep",	MOVEP },	{ "moveq",	MOVEQ },	{ "muls",	MULS },		{ "mulu",	MULU },
+    { "movep",  MOVEP },    { "moveq",  MOVEQ },    { "muls",   MULS },     { "mulu",   MULU },
 
-	{ "nbcd",	NBCD },		{ "neg",	NEG },		{ "negx",	NEGX },		{ "nop",	NOP },
+    { "nbcd",   NBCD },     { "neg",    NEG },      { "negx",   NEGX },     { "nop",    NOP },
 
-	{ "not",	NOT },		{ "or",		OR },		{ "ori",	ORI },		{ "pea",	PEA },
+    { "not",    NOT },      { "or",     OR },       { "ori",    ORI },      { "pea",    PEA },
 
-	{ "reset",	RESET },	{ "rol",	ROL },		{ "ror",	ROR },		{ "roxl",	ROXL },
+    { "reset",  RESET },    { "rol",    ROL },      { "ror",    ROR },      { "roxl",   ROXL },
 
-	{ "roxr",	ROXR },		{ "rte",	RTE },		{ "rtr",	RTR },
+    { "roxr",   ROXR },     { "rte",    RTE },      { "rtr",    RTR },
 
-	{ "rts",	RTS },		{ "scc",	SCC },		{ "scs",	SCS },		{ "seq",	SEQ },
+    { "rts",    RTS },      { "scc",    SCC },      { "scs",    SCS },      { "seq",    SEQ },
 
-	{ "sf",		SF },		{ "sge",	SGE },		{ "sgt",	SGT },		{ "shi",	SHI },
+    { "sf",     SF },       { "sge",    SGE },      { "sgt",    SGT },      { "shi",    SHI },
 
-	{ "sle",	SLE },		{ "sls",	SLS },		{ "slt",	SLT },		{ "smi",	SMI },
+    { "sle",    SLE },      { "sls",    SLS },      { "slt",    SLT },      { "smi",    SMI },
 
-	{ "sne",	SNE },		{ "spl",	SPL },		{ "st",		ST },		{ "svc",	SVC },
+    { "sne",    SNE },      { "spl",    SPL },      { "st",     ST },       { "svc",    SVC },
 
-	{ "svs",	SVS },		{ "stop",	STOP },		{ "sub",	SUB },		{ "suba",	SUBA },
+    { "svs",    SVS },      { "stop",   STOP },     { "sub",    SUB },      { "suba",   SUBA },
 
-	{ "subi",	SUBI },		{ "subq",	SUBQ },		{ "subx",	SUBX },		{ "swap",	SWAP },
+    { "subi",   SUBI },     { "subq",   SUBQ },     { "subx",   SUBX },     { "swap",   SWAP },
 
-	{ "tas",	TAS },		{ "trap",	TRAP },		{ "trapv",	TRAPV },	{ "tst",	TST },
+    { "tas",    TAS },      { "trap",   TRAP },     { "trapv",  TRAPV },    { "tst",    TST },
 
-	{ "unlk",	UNLK },		{ "a0",		A0 },		{ "a1",		A1 },		{ "a2",		A2 },
+    { "unlk",   UNLK },     { "a0",     A0 },       { "a1",     A1 },       { "a2",     A2 },
 
-	{ "a3",		A3 },		{ "a4",		A4 },		{ "a5",		A5 },		{ "a6",		A6 },
+    { "a3",     A3 },       { "a4",     A4 },       { "a5",     A5 },       { "a6",     A6 },
 
-	{ "a7",		A7 },		{ "d0",		D0 },		{ "d1",		D1 },		{ "d2",		D2 },
+    { "a7",     A7 },       { "d0",     D0 },       { "d1",     D1 },       { "d2",     D2 },
 
-	{ "d3",		D3 },		{ "d4",		D4 },		{ "d5",		D5 },		{ "d6",		D6 },
+    { "d3",     D3 },       { "d4",     D4 },       { "d5",     D5 },       { "d6",     D6 },
 
-	{ "d7",		D7 },		{ "ccr",	CCR },		{ "sr",		SR },		{ "usp",	USP },
+    { "d7",     D7 },       { "ccr",    CCR },      { "sr",     SR },       { "usp",    USP },
 
-	{ "pc",		PC },		
+    { "pc",     PC },       
 
-	{ 0, 		0 }
+    { 0,        0 }
 
 };
 
@@ -3696,9 +3696,9 @@ static struct _optable ops[] = {
 
 typedef struct _ophash {
 
-	struct _ophash* next;
+    struct _ophash* next;
 
-	struct _optable* op;
+    struct _optable* op;
 
 } OPHASH;
 
@@ -3714,11 +3714,11 @@ static int getophash(const char* s)
 
 {
 
-	int h = 0;
+    int h = 0;
 
-	while (*s++) h += (int)*s;
+    while (*s++) h += (int)*s;
 
-	return h % OPHASHSIZE;
+    return h % OPHASHSIZE;
 
 }
 
@@ -3728,31 +3728,31 @@ static int oplookup(const char* s)
 
 {
 
-	int idx = getophash(s);
+    int idx = getophash(s);
 
-	OPHASH* oph = ophash[idx];
+    OPHASH* oph = ophash[idx];
 
-	if (oph) {
+    if (oph) {
 
-		if (oph->next) {
+        if (oph->next) {
 
-			while (oph) {
+            while (oph) {
 
-				if (!strcmp(s,oph->op->mnem)) return oph->op->token;
+                if (!strcmp(s,oph->op->mnem)) return oph->op->token;
 
-				oph = oph->next;
+                oph = oph->next;
 
-			}
+            }
 
-			return 0;
+            return 0;
 
-		}
+        }
 
-		return oph->op->token;
+        return oph->op->token;
 
-	}
+    }
 
-	return 0;
+    return 0;
 
 }
 
@@ -3762,27 +3762,27 @@ static void init_ophash()
 
 {
 
-	struct _optable* op = ops;
+    struct _optable* op = ops;
 
-	OPHASH* oph;
+    OPHASH* oph;
 
-	ophash = (OPHASH**)calloc(sizeof(OPHASH*),OPHASHSIZE);
+    ophash = (OPHASH**)calloc(sizeof(OPHASH*),OPHASHSIZE);
 
-	while (op->mnem) {
+    while (op->mnem) {
 
-		int idx = getophash(op->mnem);
+        int idx = getophash(op->mnem);
 
-		oph = (OPHASH*)malloc(sizeof(OPHASH));
+        oph = (OPHASH*)malloc(sizeof(OPHASH));
 
-		oph->next = ophash[idx];
+        oph->next = ophash[idx];
 
-		oph->op = op;
+        oph->op = op;
 
-		ophash[idx] = oph;
+        ophash[idx] = oph;
 
-		op++;
+        op++;
 
-	}
+    }
 
 }
 
@@ -3796,107 +3796,107 @@ static int yylex()
 
 {
 
-	char ident[30];
+    char ident[30];
 
-	char *p = ident;
+    char *p = ident;
 
-	char c = yystream[0];
+    char c = yystream[0];
 
-	
+    
 
-	while (c != 0 && (c=='\t' || c==' ')) {
+    while (c != 0 && (c=='\t' || c==' ')) {
 
-		c = *++yystream;
+        c = *++yystream;
 
-	}
+    }
 
-	if (c==0) return EOF;
+    if (c==0) return EOF;
 
-	
+    
 
-	if (isalpha(c)) {
+    if (isalpha(c)) {
 
-		while (isalnum(c) && (p-ident)<28) {
+        while (isalnum(c) && (p-ident)<28) {
 
-			*p++ = tolower(c); c = *++yystream;
+            *p++ = tolower(c); c = *++yystream;
 
-		}
+        }
 
-		*p = 0;
+        *p = 0;
 
-		if (p>ident) { return oplookup(ident); }
+        if (p>ident) { return oplookup(ident); }
 
-		return EOF;
+        return EOF;
 
-	} else if (isdigit(c)) {
+    } else if (isdigit(c)) {
 
-		*p++ = c; 
+        *p++ = c; 
 
-		if (yystream[1]=='x' || yystream[1]=='X') { *p++ = 'x'; yystream++; }
+        if (yystream[1]=='x' || yystream[1]=='X') { *p++ = 'x'; yystream++; }
 
-		c = *++yystream;
+        c = *++yystream;
 
-		while ((isdigit(c) || isxdigit(c)) && (p-ident)<28) {
+        while ((isdigit(c) || isxdigit(c)) && (p-ident)<28) {
 
-			*p++ = c; c = *++yystream;
+            *p++ = c; c = *++yystream;
 
-		}
+        }
 
-		*p = 0;
+        *p = 0;
 
-		yylval.num = strtol(ident,0,0);
+        yylval.num = strtol(ident,0,0);
 
-		return NUMBER;
+        return NUMBER;
 
     } else if (c=='$') {
 
-    	if (isdigit(yystream[1]) || isxdigit(yystream[1])) {
+        if (isdigit(yystream[1]) || isxdigit(yystream[1])) {
 
-			c = *++yystream;
+            c = *++yystream;
 
-			while ((isdigit(c) || isxdigit(c)) && (p-ident)<28) {
+            while ((isdigit(c) || isxdigit(c)) && (p-ident)<28) {
 
-				*p++ = c; c = *++yystream;
+                *p++ = c; c = *++yystream;
 
-			}
+            }
 
-			*p = 0;
+            *p = 0;
 
-			yylval.num = strtol(ident,0,16);
+            yylval.num = strtol(ident,0,16);
 
-			return NUMBER;
+            return NUMBER;
 
-		} else return '$';
+        } else return '$';
 
-	} else if (c == '-' && yystream[1] == '(') {
+    } else if (c == '-' && yystream[1] == '(') {
 
-		yystream += 2; return PREDEC;
+        yystream += 2; return PREDEC;
 
-	} else if (c == ')' && yystream[1] == '+') {
+    } else if (c == ')' && yystream[1] == '+') {
 
-		yystream += 2; return POSTINC;
+        yystream += 2; return POSTINC;
 
-	} else if (c == '.') {
+    } else if (c == '.') {
 
-		switch (yystream[1]) {
+        switch (yystream[1]) {
 
-		case 'b': yystream += 2; return BSIZE;
+        case 'b': yystream += 2; return BSIZE;
 
-		case 'w': yystream += 2; return WSIZE;
+        case 'w': yystream += 2; return WSIZE;
 
-		case 'l': yystream += 2; return LSIZE;
+        case 'l': yystream += 2; return LSIZE;
 
-		case 's': yystream += 2; return SSIZE;
+        case 's': yystream += 2; return SSIZE;
 
-		default: yystream++; return '.';
+        default: yystream++; return '.';
 
-		}
+        }
 
-	} else {
+    } else {
 
-		++yystream; return c;
+        ++yystream; return c;
 
-	}
+    }
 
 }
 
@@ -3912,73 +3912,73 @@ t_stat parse_sym_m68k(char* c, t_addr a, UNIT* u, t_value* val, int32 sw)
 
 {
 
-	char ch;
+    char ch;
 
-	
+    
 
-	if (!ophash) init_ophash();
-
-
-
-	yyvalptr = val;
-
-	yyaddr = a;
+    if (!ophash) init_ophash();
 
 
 
-	yystream = c;
+    yyvalptr = val;
 
-	yyerrc = 0;
-
-	
-
-	ch = *yystream;
-
-	while (ch != 0 && (ch=='\t' || ch==' ')) {
-
-		ch = *++yystream;
-
-	}
-
-	if (ch == 0) return 0;
+    yyaddr = a;
 
 
 
-	if (sw & SWMASK('Y')) yydebug = 1 - yydebug;
+    yystream = c;
 
-	if ((sw & SWMASK('A')) || ch=='\'') {
+    yyerrc = 0;
 
-		if ((ch = yystream[1])) {
+    
 
-			val[0] = (uint32)ch;
+    ch = *yystream;
 
-			return SCPE_OK;
+    while (ch != 0 && (ch=='\t' || ch==' ')) {
 
-		} else return SCPE_ARG;
+        ch = *++yystream;
 
-	}
+    }
 
-	if ((sw & SWMASK('C')) || ch=='"') {
+    if (ch == 0) return 0;
 
-		if ((ch = yystream[1])) {
 
-			val[0] = ((uint32)ch << 8) | (uint32)yystream[1];
 
-			return SCPE_OK;
+    if (sw & SWMASK('Y')) yydebug = 1 - yydebug;
 
-		} else return SCPE_ARG;
+    if ((sw & SWMASK('A')) || ch=='\'') {
 
-	}
+        if ((ch = yystream[1])) {
 
-	
+            val[0] = (uint32)ch;
 
-	yyparse();
+            return SCPE_OK;
+
+        } else return SCPE_ARG;
+
+    }
+
+    if ((sw & SWMASK('C')) || ch=='"') {
+
+        if ((ch = yystream[1])) {
+
+            val[0] = ((uint32)ch << 8) | (uint32)yystream[1];
+
+            return SCPE_OK;
+
+        } else return SCPE_ARG;
+
+    }
+
+    
+
+    yyparse();
 
 //    sim_printf("rc=%d\n",yyrc);
 
-	if (yyerrc) return SCPE_ARG;
+    if (yyerrc) return SCPE_ARG;
 
-	return yyrc;
+    return yyrc;
 
 }
 
@@ -4008,11 +4008,11 @@ static int _genea(struct _ea arg)
 
 {
 
-	int i;
+    int i;
 
-	for (i=0; i<arg.cnt; i++) _genop(arg.arg[i]);
+    for (i=0; i<arg.cnt; i++) _genop(arg.arg[i]);
 
-	return -(arg.cnt*2)-1;
+    return -(arg.cnt*2)-1;
 
 }
 
@@ -4022,31 +4022,31 @@ static int _genbr(t_value arg,t_addr tgt,int len)
 
 {
 
-	t_addr a = tgt - yyaddr -2;
+    t_addr a = tgt - yyaddr -2;
 
-	if (len==1) {
+    if (len==1) {
 
-		_genop(arg);
+        _genop(arg);
 
-		_genop(a & 0xffff);
+        _genop(a & 0xffff);
 
-		a &= 0xffff8000;
+        a &= 0xffff8000;
 
-		if (a != 0x00000000 && a != 0xffff8000) return SCPE_ARG;
+        if (a != 0x00000000 && a != 0xffff8000) return SCPE_ARG;
 
-		return -3;
+        return -3;
 
-	} else {
+    } else {
 
-		_genop(arg | (a&0xff));
+        _genop(arg | (a&0xff));
 
-		a &= 0xffffff80;
+        a &= 0xffffff80;
 
-		if (a != 0x00000000 && a != 0xffffff80) return SCPE_ARG;
+        if (a != 0x00000000 && a != 0xffffff80) return SCPE_ARG;
 
-		return -1;
+        return -1;
 
-	}
+    }
 
 }
 
