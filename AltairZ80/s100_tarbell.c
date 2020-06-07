@@ -320,12 +320,12 @@ t_stat tarbell_reset(DEVICE *dptr)
         sim_map_resource(pInfo->pnp.io_base, pInfo->pnp.io_size, RESOURCE_TYPE_IO, &tarbelldev, "tarbelldev", TRUE);
     } else {
         if(sim_map_resource(pInfo->pnp.mem_base, pInfo->pnp.mem_size, RESOURCE_TYPE_MEMORY, &tarbellprom, "tarbellprom", FALSE) != 0) {
-            sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": Error mapping MEM resource at 0x%04x" NLP, pInfo->pnp.mem_base);
+            sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": Error mapping MEM resource at 0x%04x\n", pInfo->pnp.mem_base);
             return SCPE_ARG;
         }
         /* Connect I/O Ports at base address */
         if(sim_map_resource(pInfo->pnp.io_base, pInfo->pnp.io_size, RESOURCE_TYPE_IO, &tarbelldev, "tarbelldev", FALSE) != 0) {
-            sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": Error mapping I/O resource at 0x%02x" NLP, pInfo->pnp.io_base);
+            sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": Error mapping I/O resource at 0x%02x\n", pInfo->pnp.io_base);
             return SCPE_ARG;
         }
     }
@@ -371,7 +371,7 @@ t_stat tarbell_reset(DEVICE *dptr)
         pInfo->headTimeout = TARBELL_ROTATION_MS * 2 * 3; /* compensate for 1ms SIO sleep */
     }
 
-    sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": reset controller." NLP);
+    sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": reset controller.\n");
 
     return SCPE_OK;
 }
@@ -398,7 +398,7 @@ t_stat tarbell_attach(UNIT *uptr, CONST char *cptr)
 
     r = attach_unit(uptr, cptr);    /* attach unit  */
     if(r != SCPE_OK) {              /* error?       */
-        sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": ATTACH error=%d" NLP, r);
+        sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": ATTACH error=%d\n", r);
         return r;
     }
 
@@ -409,7 +409,7 @@ t_stat tarbell_attach(UNIT *uptr, CONST char *cptr)
         uptr->capac = TARBELL_CAPACITY;
     }
 
-    DBG_PRINT(("TARBELL: ATTACH uptr->capac=%d" NLP, uptr->capac));
+    DBG_PRINT(("TARBELL: ATTACH uptr->capac=%d\n", uptr->capac));
 
     for (i = 0; i < TARBELL_MAX_DRIVES; i++) {
         if(tarbell_dev.units[i].fileref == uptr->fileref) {
@@ -427,7 +427,7 @@ t_stat tarbell_attach(UNIT *uptr, CONST char *cptr)
     if(uptr->capac > 0) {
         char *rtn = fgets(header, 4, uptr->fileref);
         if((rtn != NULL) && (strncmp(header, "CPT", 3) == 0)) {
-            sim_printf("CPT images not yet supported" NLP);
+            sim_printf("CPT images not yet supported\n");
             uptr->u3 = IMAGE_TYPE_CPT;
             tarbell_detach(uptr);
             return SCPE_OPENERR;
@@ -437,7 +437,7 @@ t_stat tarbell_attach(UNIT *uptr, CONST char *cptr)
     }
 
     if (uptr->flags & UNIT_TARBELL_VERBOSE) {
-        sim_printf(TARBELL_SNAME "%d, attached to '%s', type=%s, len=%d" NLP, i, cptr,
+        sim_printf(TARBELL_SNAME "%d, attached to '%s', type=%s, len=%d\n", i, cptr,
             uptr->u3 == IMAGE_TYPE_CPT ? "CPT" : "DSK",
             uptr->capac);
     }
@@ -478,7 +478,7 @@ t_stat tarbell_detach(UNIT *uptr)
     tarbell_dev.units[i].fileref = NULL;
 
     if (uptr->flags & UNIT_TARBELL_VERBOSE) {
-        sim_printf(TARBELL_SNAME "%d detached." NLP, i);
+        sim_printf(TARBELL_SNAME "%d detached.\n", i);
     }
 
     /*
@@ -501,7 +501,7 @@ static t_stat tarbell_boot(int32 unitno, DEVICE *dptr)
 
     PNP_INFO *pnp = (PNP_INFO *)dptr->ctxt;
 
-    sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": Booting Controller at 0x%04x" NLP, pnp->mem_base);
+    sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": Booting Controller at 0x%04x\n", pnp->mem_base);
 
     *((int32 *) sim_PC->loc) = pnp->mem_base;
 
@@ -519,19 +519,19 @@ static int32 tarbelldev(int32 Addr, int32 rw, int32 data)
 
 static void showdata(int32 isRead) {
     int32 i;
-    sim_debug(RD_DATA_DETAIL_MSG|WR_DATA_DETAIL_MSG, &tarbell_dev, TARBELL_SNAME ": %s sector:" NLP "\t", isRead ? "Read" : "Write");
+    sim_debug(RD_DATA_DETAIL_MSG|WR_DATA_DETAIL_MSG, &tarbell_dev, TARBELL_SNAME ": %s sector:\n\t", isRead ? "Read" : "Write");
     for (i=0; i < TARBELL_SECTOR_LEN; i++) {
         sim_debug(RD_DATA_DETAIL_MSG|WR_DATA_DETAIL_MSG, &tarbell_dev, "%02X ", sdata[i]);
         if (((i+1) & 0xf) == 0) {
-            sim_debug(RD_DATA_DETAIL_MSG|WR_DATA_DETAIL_MSG, &tarbell_dev, NLP "\t");
+            sim_debug(RD_DATA_DETAIL_MSG|WR_DATA_DETAIL_MSG, &tarbell_dev, "\n\t");
         }
     }
-    sim_debug(RD_DATA_DETAIL_MSG|WR_DATA_DETAIL_MSG, &tarbell_dev, NLP); 
+    sim_debug(RD_DATA_DETAIL_MSG|WR_DATA_DETAIL_MSG, &tarbell_dev, "\n"); 
 }
 
 static void showregs(FD1771_REG *pFD1771)
 {
-    DBG_PRINT(("TARBELL: DRV=%d PE=%d AA=%d RA=%d WA=%d DC=%03d CMD=%02Xh DATA=%02Xh TRK=%03d SEC=%03d STAT=%02X" NLP,
+    DBG_PRINT(("TARBELL: DRV=%d PE=%d AA=%d RA=%d WA=%d DC=%03d CMD=%02Xh DATA=%02Xh TRK=%03d SEC=%03d STAT=%02X\n",
         tarbell_info->currentDrive, tarbell_info->promEnabled, pFD1771->addrActive, pFD1771->readActive, pFD1771->writeActive, pFD1771->dataCount,
         pFD1771->command, pFD1771->data, pFD1771->track, pFD1771->sector, pFD1771->status));
 }
@@ -543,7 +543,7 @@ static uint32 calculate_tarbell_sec_offset(uint8 track, uint8 sector)
 
     offset = ((track * (TARBELL_SECTOR_LEN * TARBELL_SECTORS_PER_TRACK)) + ((sector-1) * TARBELL_SECTOR_LEN));
 
-    DBG_PRINT(("TARBELL: CALC track=%d sector=%d offset=%04X" NLP, track, sector, offset));
+    DBG_PRINT(("TARBELL: CALC track=%d sector=%d offset=%04X\n", track, sector, offset));
 
     return (offset);
 }
@@ -561,13 +561,13 @@ static void TARBELL_HeadLoad(UNIT *uptr, FD1771_REG *pFD1771, uint8 load)
         sim_activate_after_abs(uptr, tarbell_info->headTimeout);  /* activate timer */
 
         if (pFD1771->headLoaded == FALSE) {
-            sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": Drive %d head Loaded." NLP, tarbell_info->currentDrive);
+            sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": Drive %d head Loaded.\n", tarbell_info->currentDrive);
         }
     }
 
     if (load == FALSE && pFD1771->headLoaded == TRUE) {
         sim_cancel(uptr);            /* cancel timer */
-        sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": Drive %d head Unloaded." NLP, tarbell_info->currentDrive);
+        sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": Drive %d head Unloaded.\n", tarbell_info->currentDrive);
     }
 
     pFD1771->headLoaded = load;
@@ -638,7 +638,7 @@ static uint8 TARBELL_Read(uint32 Addr)
                 /* Store byte in DATA register */
                 pFD1771->data = sdata[pFD1771->dataCount++];
 
-                DBG_PRINT(("TARBELL: READ ADDR data=%03d" NLP, pFD1771->data));
+                DBG_PRINT(("TARBELL: READ ADDR data=%03d\n", pFD1771->data));
 
                 /* If we reached the end of the address data, terminate command and set INTRQ */
                 if (pFD1771->dataCount > TARBELL_ADDR_CRC2) {
@@ -667,7 +667,7 @@ static uint8 TARBELL_Read(uint32 Addr)
             break;
 
         default:
-            sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": READ Invalid I/O Address %02x (%02x)" NLP, Addr & 0xFF, Addr & 0x07);
+            sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": READ Invalid I/O Address %02x (%02x)\n", Addr & 0xFF, Addr & 0x07);
             cData = 0xff;
             break;
     }
@@ -683,7 +683,7 @@ static uint8 TARBELL_Write(uint32 Addr, int32 Data)
     UNIT *uptr;
     FD1771_REG *pFD1771;
 
-    sim_debug(CMD_MSG, &tarbell_dev, TARBELL_SNAME ": OUT %02x Data %02x" NLP, Addr & 0xFF, Data & 0xFF);
+    sim_debug(CMD_MSG, &tarbell_dev, TARBELL_SNAME ": OUT %02x Data %02x\n", Addr & 0xFF, Data & 0xFF);
 
     cData = 0;
     driveNum = tarbell_info->currentDrive;
@@ -744,7 +744,7 @@ static uint8 TARBELL_Write(uint32 Addr, int32 Data)
 
                         if (rtn != TARBELL_SECTOR_LEN) {
                             pFD1771->status |= FD1771_STAT_WRITEFAULT;
-                            sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": WRITE ERROR could not write track %03d sector %03d" NLP, pFD1771->track, pFD1771->sector);
+                            sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": WRITE ERROR could not write track %03d sector %03d\n", pFD1771->track, pFD1771->sector);
                         }
 
                         if(pFD1771->sector < TARBELL_SECTORS_PER_TRACK) {
@@ -753,7 +753,7 @@ static uint8 TARBELL_Write(uint32 Addr, int32 Data)
                         pFD1771->dataCount = 0;
                         pFD1771->status &= ~FD1771_STAT_BUSY;  /* Clear BUSY Bit */
 
-                        DBG_PRINT(("TARBELL: WRITE TRACK track=%03d sector=%03d trkcount=%d datacount=%d data=%02X status=%02X" NLP, pFD1771->track, pFD1771->sector, pFD1771->trkCount, pFD1771->dataCount, pFD1771->data, pFD1771->status));
+                        DBG_PRINT(("TARBELL: WRITE TRACK track=%03d sector=%03d trkcount=%d datacount=%d data=%02X status=%02X\n", pFD1771->track, pFD1771->sector, pFD1771->trkCount, pFD1771->dataCount, pFD1771->data, pFD1771->status));
 
                         showregs(pFD1771);
                     }
@@ -765,18 +765,18 @@ static uint8 TARBELL_Write(uint32 Addr, int32 Data)
                 else {
                     pFD1771->status = 0x00;  /* Clear Status Bits */
                     pFD1771->intrq = TRUE;   /* Simulate reaching index hole */
-                    sim_debug(WR_DATA_MSG, &tarbell_dev, TARBELL_SNAME ": WRITE TRACK COMPLETE track=%03d sector=%03d trkcount=%d datacount=%d data=%02X status=%02X" NLP, pFD1771->track, pFD1771->sector, pFD1771->trkCount, pFD1771->dataCount, pFD1771->data, pFD1771->status);
+                    sim_debug(WR_DATA_MSG, &tarbell_dev, TARBELL_SNAME ": WRITE TRACK COMPLETE track=%03d sector=%03d trkcount=%d datacount=%d data=%02X status=%02X\n", pFD1771->track, pFD1771->sector, pFD1771->trkCount, pFD1771->dataCount, pFD1771->data, pFD1771->status);
                 }
 
                 TARBELL_HeadLoad(uptr, pFD1771, TRUE);
             }
 
-            DBG_PRINT(("TARBELL: WRITE DATA REG %02X" NLP, Data));
+            DBG_PRINT(("TARBELL: WRITE DATA REG %02X\n", Data));
             break;
 
         case TARBELL_REG_TRACK:
             pFD1771->track = Data;
-            DBG_PRINT(("TARBELL: TRACK REG=%d" NLP, pFD1771->track));
+            DBG_PRINT(("TARBELL: TRACK REG=%d\n", pFD1771->track));
             break;
 
         case TARBELL_REG_SECTOR:
@@ -786,7 +786,7 @@ static uint8 TARBELL_Write(uint32 Addr, int32 Data)
 
             pFD1771->sector = Data;
 
-            DBG_PRINT(("TARBELL: SECTOR REG=%d" NLP, pFD1771->sector));
+            DBG_PRINT(("TARBELL: SECTOR REG=%d\n", pFD1771->sector));
 
             break;
 
@@ -794,20 +794,20 @@ static uint8 TARBELL_Write(uint32 Addr, int32 Data)
             cData = ~(Data >> 4) & 0x03;
             if (cData < TARBELL_MAX_DRIVES) {
                 tarbell_info->currentDrive = cData;
-                sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": Current drive now %d" NLP, tarbell_info->currentDrive);
+                sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": Current drive now %d\n", tarbell_info->currentDrive);
             }
             else {
-              sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": Invalid Drive Number drive=%02x (%02x)" NLP, Data, cData);
+              sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": Invalid Drive Number drive=%02x (%02x)\n", Data, cData);
             }
             break;
 
         default:
-            sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": WRITE Invalid I/O Address %02x (%02x)" NLP, Addr & 0xFF, Addr & 0x07);
+            sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": WRITE Invalid I/O Address %02x (%02x)\n", Addr & 0xFF, Addr & 0x07);
             cData = 0xff;
             break;
     }
 
-    DBG_PRINT(("TARBELL: COMPLETE currentDrive=%d sector=%02x data=%02x" NLP, tarbell_info->currentDrive, pFD1771->sector, pFD1771->data));
+    DBG_PRINT(("TARBELL: COMPLETE currentDrive=%d sector=%02x data=%02x\n", tarbell_info->currentDrive, pFD1771->sector, pFD1771->data));
 
     return(cData);
 }
@@ -818,16 +818,16 @@ static uint32 TARBELL_ReadSector(UNIT *uptr, uint8 track, uint8 sector, uint8 *b
     uint32 rtn = 0;
 
     if (uptr->fileref == NULL) {
-        sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": READSEC uptr.fileref is NULL!" NLP);
+        sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": READSEC uptr.fileref is NULL!\n");
         return 0;
     }
 
     sec_offset = calculate_tarbell_sec_offset(track, sector);
 
-    sim_debug(RD_DATA_MSG, &tarbell_dev, TARBELL_SNAME ": READSEC track %03d sector %03d at offset %04X" NLP, track, sector, sec_offset);
+    sim_debug(RD_DATA_MSG, &tarbell_dev, TARBELL_SNAME ": READSEC track %03d sector %03d at offset %04X\n", track, sector, sec_offset);
 
     if (sim_fseek(uptr->fileref, sec_offset, SEEK_SET) != 0) {
-        sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": READSEC sim_fseek error." NLP);
+        sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": READSEC sim_fseek error.\n");
         return 0;
     }
 
@@ -843,16 +843,16 @@ static uint32 TARBELL_WriteSector(UNIT *uptr, uint8 track, uint8 sector, uint8 *
     uint32 rtn = 0;
 
     if (uptr->fileref == NULL) {
-        sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": READSEC uptr.fileref is NULL!" NLP);
+        sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": READSEC uptr.fileref is NULL!\n");
         return 0;
     }
 
     sec_offset = calculate_tarbell_sec_offset(track, sector);
 
-    sim_debug(WR_DATA_MSG, &tarbell_dev, TARBELL_SNAME ": WRITESEC track %03d sector %03d at offset %04X" NLP, track, sector, sec_offset);
+    sim_debug(WR_DATA_MSG, &tarbell_dev, TARBELL_SNAME ": WRITESEC track %03d sector %03d at offset %04X\n", track, sector, sec_offset);
 
     if (sim_fseek(uptr->fileref, sec_offset, SEEK_SET) != 0) {
-        sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": WRITESEC sim_fseek error." NLP);
+        sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": WRITESEC sim_fseek error.\n");
         return 0;
     }
 
@@ -905,7 +905,7 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
         case TARBELL_CMD_RESTORE:
             pFD1771->track = 0;
 
-            sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": RESTORE track=%03d" NLP, pFD1771->track);
+            sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": RESTORE track=%03d\n", pFD1771->track);
 
             TARBELL_HeadLoad(uptr, pFD1771, (Data & TARBELL_FLAG_H) ? TRUE : FALSE);
 
@@ -918,7 +918,7 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
         case TARBELL_CMD_SEEK:
             newTrack = pFD1771->data;
 
-            DBG_PRINT(("TARBELL: TRACK DATA=%d (SEEK)" NLP, newTrack));
+            DBG_PRINT(("TARBELL: TRACK DATA=%d (SEEK)\n", newTrack));
 
             pFD1771->status &= ~FD1771_STAT_SEEKERROR;
 
@@ -927,11 +927,11 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
 
                 TARBELL_HeadLoad(uptr, pFD1771, (Data & TARBELL_FLAG_H) ? TRUE : FALSE);
 
-                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": SEEK       track=%03d" NLP, pFD1771->track);
+                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": SEEK       track=%03d\n", pFD1771->track);
             }
             else {
                 pFD1771->status |= FD1771_STAT_SEEKERROR;
-                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": SEEK ERR   track=%03d" NLP, newTrack);
+                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": SEEK ERR   track=%03d\n", newTrack);
             }
 
             pFD1771->status &= ~FD1771_STAT_BUSY;
@@ -949,11 +949,11 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
                 if (Data & TARBELL_FLAG_U) {
                     pFD1771->track = newTrack;
                 }
-                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEP        track=%03d" NLP, pFD1771->track);
+                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEP        track=%03d\n", pFD1771->track);
             }
             else {
                 pFD1771->status |= FD1771_STAT_SEEKERROR;
-                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEP ERR    track=%03d" NLP, newTrack);
+                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEP ERR    track=%03d\n", newTrack);
             }
 
             TARBELL_HeadLoad(uptr, pFD1771, (Data & TARBELL_FLAG_H) ? TRUE : FALSE);
@@ -974,11 +974,11 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
 
                 TARBELL_HeadLoad(uptr, pFD1771, (Data & TARBELL_FLAG_H) ? TRUE : FALSE);
 
-                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPIN      track=%03d" NLP, pFD1771->track);
+                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPIN      track=%03d\n", pFD1771->track);
             }
             else {
                 pFD1771->status |= FD1771_STAT_SEEKERROR;
-                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPIN ERR  track=%03d" NLP, pFD1771->track+1);
+                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPIN ERR  track=%03d\n", pFD1771->track+1);
             }
 
             pFD1771->stepDir = 1;
@@ -998,11 +998,11 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
 
                 TARBELL_HeadLoad(uptr, pFD1771, (Data & TARBELL_FLAG_H) ? TRUE : FALSE);
 
-                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPOUT     track=%03d" NLP, pFD1771->track);
+                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPOUT     track=%03d\n", pFD1771->track);
             }
             else {
                 pFD1771->status |= FD1771_STAT_SEEKERROR;
-                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPOUT ERR track=%03d" NLP, pFD1771->track-1);
+                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPOUT ERR track=%03d\n", pFD1771->track-1);
             }
 
             pFD1771->stepDir = -1;
@@ -1015,7 +1015,7 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
 
             if ((uptr == NULL) || (uptr->fileref == NULL)) {
                 sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": " ADDRESS_FORMAT
-                          " Drive: %d not attached - read ignored." NLP,
+                          " Drive: %d not attached - read ignored.\n",
                           PCX, tarbell_info->currentDrive);
 
                 pFD1771->status &= ~FD1771_STAT_BUSY;
@@ -1031,7 +1031,7 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
                 showdata(TRUE);
             }
             else {
-                DBG_PRINT(("TARBELL: " ADDRESS_FORMAT " READ: sim_fread error." NLP, PCX));
+                DBG_PRINT(("TARBELL: " ADDRESS_FORMAT " READ: sim_fread error.\n", PCX));
 
                 pFD1771->status |= FD1771_STAT_NOTFOUND;
                 pFD1771->intrq = TRUE;
@@ -1045,14 +1045,14 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
             */
             if ((uptr == NULL) || (uptr->fileref == NULL)) {
                 sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": " ADDRESS_FORMAT
-                          " Drive: %d not attached - write ignored." NLP,
+                          " Drive: %d not attached - write ignored.\n",
                           PCX, tarbell_info->currentDrive);
 
                 pFD1771->status &= ~FD1771_STAT_BUSY;
             }
 
             if ((uptr->flags & UNIT_TARBELL_WPROTECT) || tarbell_info->writeProtect) {
-                DBG_PRINT((TARBELL_SNAME ": Disk write protected. uptr->flags=%04x writeProtect=%04x" NLP, uptr->flags & UNIT_TARBELL_WPROTECT, tarbell_info->writeProtect));
+                DBG_PRINT((TARBELL_SNAME ": Disk write protected. uptr->flags=%04x writeProtect=%04x\n", uptr->flags & UNIT_TARBELL_WPROTECT, tarbell_info->writeProtect));
                 pFD1771->intrq = TRUE;
             }
             else {
@@ -1086,7 +1086,7 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
 
         case TARBELL_CMD_WRITE_TRACK:
             if ((uptr->flags & UNIT_TARBELL_WPROTECT) || tarbell_info->writeProtect) {
-                DBG_PRINT((TARBELL_SNAME ": Disk write protected. uptr->flags=%04x writeProtect=%04x" NLP, uptr->flags & UNIT_TARBELL_WPROTECT, tarbell_info->writeProtect));
+                DBG_PRINT((TARBELL_SNAME ": Disk write protected. uptr->flags=%04x writeProtect=%04x\n", uptr->flags & UNIT_TARBELL_WPROTECT, tarbell_info->writeProtect));
                 pFD1771->intrq = TRUE;
             }
             else {
@@ -1117,7 +1117,7 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
 
         default:
             cData=0xFF;
-            sim_debug(ERROR_MSG, &tarbell_dev, "TARBELL: UNRECOGNIZED CMD %02X" NLP, pFD1771->command);
+            sim_debug(ERROR_MSG, &tarbell_dev, "TARBELL: UNRECOGNIZED CMD %02X\n", pFD1771->command);
             pFD1771->intrq = TRUE;
             break;
     }
@@ -1189,7 +1189,7 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
             break;
     }
 
-    sim_debug(CMD_MSG, &tarbell_dev, TARBELL_SNAME ": CMD drive=%d cmd=%02X track=%03d sector=%03d status=%02X" NLP,
+    sim_debug(CMD_MSG, &tarbell_dev, TARBELL_SNAME ": CMD drive=%d cmd=%02X track=%03d sector=%03d status=%02X\n",
         tarbell_info->currentDrive, pFD1771->command, pFD1771->track, pFD1771->sector, pFD1771->status);
 
     return(cData);
@@ -1217,7 +1217,7 @@ static int32 tarbellprom(int32 Addr, int32 rw, int32 Data)
     } else {
         if (Addr >= 0x0025 && tarbell_info->promEnabled == TRUE) {
             tarbell_info->promEnabled = FALSE;
-            sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": Boot PROM disabled." NLP);
+            sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": Boot PROM disabled.\n");
         }
 
         if (tarbell_info->promEnabled == TRUE && Addr < TARBELL_PROM_SIZE) {

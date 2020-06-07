@@ -124,10 +124,6 @@ extern int32 HL1_S; /* alternate HL register                        */
 extern int32 IFF_S; /* Interrupt Flip Flop                          */
 extern int32 IR_S;  /* Interrupt (upper) / Refresh (lower) register */
 
-#if !UNIX_PLATFORM
-extern void pollForCPUStop(void);
-#endif
-
 /* the following tables precompute some common subexpressions
     parityTable[i]          0..255  (number of 1's in i is odd) ? 0 : 4
     incTable[i]             0..256! (i & 0xa8) | (((i & 0xff) == 0) << 6) | (((i & 0xf) == 0) << 4)
@@ -1019,10 +1015,6 @@ t_stat sim_instr_nommu(void) {
     /* main instruction fetch/decode loop */
     while (TRUE) {                                  /* loop until halted    */
         if (sim_interval <= 0) {                    /* check clock queue    */
-#if !UNIX_PLATFORM
-            /* poll on platforms without reliable signalling but not too often */
-            pollForCPUStop(); /* following sim_process_event will check for stop */
-#endif
             if ((reason = sim_process_event()))
                 break;
         }

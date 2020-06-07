@@ -442,7 +442,7 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                                   " READ_DATA: (C:%d/H:%d/S:%d)\n", PCX, disk2_info->cyl, disk2_info->head, disk2_info->sector);
                         if(disk2_info->head_sel != disk2_info->head) {
                             sim_printf("DISK2: " ADDRESS_FORMAT
-                                   " READ_DATA: head_sel != head" NLP, PCX);
+                                   " READ_DATA: head_sel != head\n", PCX);
                         }
                         /* See FIXME above... that might be why this does not work properly... */
                         if(disk2_info->cyl != pDrive->track) { /* problem, should not happen, see above */
@@ -461,12 +461,12 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                                 if(sdata.u.header[2] == disk2_info->sector) {
                                     if(sdata.u.header[0] != disk2_info->cyl) { /*pDrive->track) { */
                                         sim_printf("DISK2: " ADDRESS_FORMAT
-                                                   " READ_DATA Incorrect header: track" NLP, PCX);
+                                                   " READ_DATA Incorrect header: track\n", PCX);
                                         disk2_info->timeout = 1;
                                     }
                                     if(sdata.u.header[1] != disk2_info->head) {
                                         sim_printf("DISK2: " ADDRESS_FORMAT
-                                                   " READ_DATA Incorrect header: head" NLP, PCX);
+                                                   " READ_DATA Incorrect header: head\n", PCX);
                                         disk2_info->timeout = 1;
                                     }
 
@@ -475,7 +475,7 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                                 }
                                 if(i == pDrive->nsectors) {
                                     sim_printf("DISK2: " ADDRESS_FORMAT
-                                               " Sector not found" NLP, PCX);
+                                               " Sector not found\n", PCX);
                                     disk2_info->timeout = 1;
                                 }
                             }
@@ -489,7 +489,7 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                         sim_debug(WR_DATA_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
                                   " WRITE_DATA: (C:%d/H:%d/S:%d)\n", PCX, disk2_info->cyl, disk2_info->head, disk2_info->sector);
                         if(disk2_info->head_sel != disk2_info->head) {
-                            sim_printf("DISK2: " ADDRESS_FORMAT " WRITE_DATA: head_sel != head" NLP, PCX);
+                            sim_printf("DISK2: " ADDRESS_FORMAT " WRITE_DATA: head_sel != head\n", PCX);
                         }
                         if(disk2_info->cyl != pDrive->track) { /* problem, should not happen, see above */
                             sim_debug(ERROR_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
@@ -509,12 +509,12 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                                 if(sdata.u.header[2] == disk2_info->sector) {
                                     if(sdata.u.header[0] != disk2_info->cyl) {
                                         sim_printf("DISK2: " ADDRESS_FORMAT
-                                                   " WRITE_DATA Incorrect header: track" NLP, PCX);
+                                                   " WRITE_DATA Incorrect header: track\n", PCX);
                                         disk2_info->timeout = 1;
                                     }
                                     if(sdata.u.header[1] != disk2_info->head) {
                                         sim_printf("DISK2: " ADDRESS_FORMAT
-                                                   " WRITE_DATA Incorrect header: head" NLP, PCX);
+                                                   " WRITE_DATA Incorrect header: head\n", PCX);
                                         disk2_info->timeout = 1;
                                     }
 
@@ -533,7 +533,7 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                                               " WRITE_DATA: sim_fread error.\n", PCX);
                                 }
                                 if(i == pDrive->nsectors) {
-                                    sim_printf("DISK2: " ADDRESS_FORMAT " Sector not found" NLP, PCX);
+                                    sim_printf("DISK2: " ADDRESS_FORMAT " Sector not found\n", PCX);
                                     disk2_info->timeout = 1;
                                 }
                             }
@@ -582,7 +582,7 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                         
                         break;
                     default:
-                        sim_printf("DISK2: " ADDRESS_FORMAT " Unknown CMD=%d" NLP, PCX, disk2_info->ctl_op);
+                        sim_printf("DISK2: " ADDRESS_FORMAT " Unknown CMD=%d\n", PCX, disk2_info->ctl_op);
                         break;
                 }
 
@@ -609,7 +609,7 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                             break;
                         default:
                             sim_printf("DISK2: " ADDRESS_FORMAT
-                                   " Error, invalid drive select=0x%x" NLP, PCX, cData >> 4);
+                                   " Error, invalid drive select=0x%x\n", PCX, cData >> 4);
                             break;
                     }
 

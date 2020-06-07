@@ -373,7 +373,7 @@ t_stat i8272_detach(UNIT *uptr)
 
 static int32 i8272dev(const int32 port, const int32 io, const int32 data)
 {
-    DBG_PRINT(("I8272: " ADDRESS_FORMAT " %s, Port 0x%02x Data 0x%02x" NLP,
+    DBG_PRINT(("I8272: " ADDRESS_FORMAT " %s, Port 0x%02x Data 0x%02x\n",
         PCX, io ? "OUT" : " IN", port, data));
     if(io) {
         I8272_Write(port, data);
@@ -777,7 +777,7 @@ uint8 I8272_Write(const uint32 Addr, uint8 cData)
                 if(i8272_info->fdc_phase == EXEC_PHASE) {
                     switch(i8272_info->cmd[0] & 0x1F) {
                         case I8272_READ_TRACK:
-                            sim_printf("I8272: " ADDRESS_FORMAT " Read a track (untested.)" NLP, PCX);
+                            sim_printf("I8272: " ADDRESS_FORMAT " Read a track (untested.)\n", PCX);
                             i8272_info->fdc_sector = 1; /* Read entire track from sector 1...eot */
                             /* fall through */
 
@@ -798,7 +798,7 @@ uint8 I8272_Write(const uint32 Addr, uint8 cData)
                                           128 << i8272_info->fdc_sec_len);
 
                                 if(pDrive->imd == NULL) {
-                                    sim_printf(".imd is NULL!" NLP);
+                                    sim_printf(".imd is NULL!\n");
                                 }
                                 if(disk_read) { /* Read sector */
                                     sectRead(pDrive->imd,

@@ -323,7 +323,7 @@ static t_stat n8vem_detach(UNIT *uptr)
  */
  static int32 n8vem_mem(const int32 Addr, const int32 write, const int32 data)
 {
-/*  DBG_PRINT(("N8VEM: ROM %s, Addr %04x" NLP, write ? "WR" : "RD", Addr)); */
+/*  DBG_PRINT(("N8VEM: ROM %s, Addr %04x\n", write ? "WR" : "RD", Addr)); */
     if(write) {
         if(n8vem_info->mpcl_rom & N8VEM_RAM_SELECT)
         {

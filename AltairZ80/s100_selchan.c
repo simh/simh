@@ -144,7 +144,7 @@ static t_stat selchan_reset(DEVICE *dptr)
 
 static int32 selchandev(const int32 port, const int32 io, const int32 data)
 {
-    DBG_PRINT(("SELCHAN: IO %s, Port %02x" NLP, io ? "WR" : "RD", port));
+    DBG_PRINT(("SELCHAN: IO %s, Port %02x\n", io ? "WR" : "RD", port));
     if(io) {
         selchan_info->selchan <<= 8;
         selchan_info->selchan &= 0xFFFFFF00;
@@ -172,14 +172,14 @@ int32 selchan_dma(uint8 *buf, uint32 len)
     uint32 i;
 
     if(selchan_info->reg_cnt != 4) {
-        sim_printf("SELCHAN: " ADDRESS_FORMAT " Programming error: selector channel disabled." NLP,
+        sim_printf("SELCHAN: " ADDRESS_FORMAT " Programming error: selector channel disabled.\n",
             PCX);
         return (-1);
     }
 
     if(selchan_info->dma_mode & SELCHAN_MODE_IO)
     {
-        sim_printf("SELCHAN: " ADDRESS_FORMAT " I/O Not supported" NLP, PCX);
+        sim_printf("SELCHAN: " ADDRESS_FORMAT " I/O Not supported\n", PCX);
         return (-1);
     } else {
         sim_debug(DMA_MSG, &selchan_dev, "SELCHAN: " ADDRESS_FORMAT " DMA %s Transfer, len=%d\n", PCX, (selchan_info->dma_mode & SELCHAN_MODE_WRITE) ? "WR" : "RD", len);

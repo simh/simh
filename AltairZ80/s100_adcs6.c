@@ -453,7 +453,7 @@ static t_stat adcs6_reset(DEVICE *dptr)
 
 static t_stat adcs6_boot(int32 unitno, DEVICE *dptr)
 {
-    DBG_PRINT(("Booting ADCS6 Controller" NLP));
+    DBG_PRINT(("Booting ADCS6 Controller\n"));
 
     /* Re-enable the ROM in case it was disabled */
     adcs6_info->rom_disabled = FALSE;
@@ -484,7 +484,7 @@ static t_stat adcs6_detach(UNIT *uptr)
 
 static int32 adcs6rom(const int32 Addr, const int32 write, const int32 data)
 {
-/*  DBG_PRINT(("ADCS6: ROM %s, Addr %04x" NLP, write ? "WR" : "RD", Addr)); */
+/*  DBG_PRINT(("ADCS6: ROM %s, Addr %04x\n", write ? "WR" : "RD", Addr)); */
     if(write) {
         if(adcs6_info->rom_disabled == FALSE) {
             sim_debug(ERROR_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT

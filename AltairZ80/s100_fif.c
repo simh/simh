@@ -221,7 +221,7 @@ static int DoDiskOperation(desc_t *dsc, uint8 val)
     if (current_disk >= NUM_OF_DSK) {
         if (hasVerbose() && (warnDSK11 < warnLevelDSK)) {
             warnDSK11++;
-/*03*/      sim_printf("FIF%i: " ADDRESS_FORMAT " Attempt disk io on illegal disk %d - ignored." NLP, current_disk, PCX, current_disk);
+/*03*/      sim_printf("FIF%i: " ADDRESS_FORMAT " Attempt disk io on illegal disk %d - ignored.\n", current_disk, PCX, current_disk);
         }
         return 0;               /* no drive selected - can do nothing */
     }
@@ -229,7 +229,7 @@ static int DoDiskOperation(desc_t *dsc, uint8 val)
     if ((current_disk_flags & UNIT_ATT) == 0) { /* nothing attached? */
         if ((current_disk_flags & UNIT_DSK_VERBOSE) && (warnAttached[current_disk] < warnLevelDSK)) {
             warnAttached[current_disk]++;
-/*02*/sim_printf("FIF%i: " ADDRESS_FORMAT " Attempt to select unattached FIF%d - ignored." NLP, current_disk, PCX, current_disk);
+/*02*/sim_printf("FIF%i: " ADDRESS_FORMAT " Attempt to select unattached FIF%d - ignored.\n", current_disk, PCX, current_disk);
         }
         current_disk = NUM_OF_DSK;
         return 2;
@@ -254,7 +254,7 @@ static int DoDiskOperation(desc_t *dsc, uint8 val)
                 if ((current_disk_flags & UNIT_DSK_VERBOSE) &&
                     (warnAttached[current_disk] < warnLevelDSK)) {
                     warnAttached[current_disk]++;
-                    sim_printf("FIF%i: " ADDRESS_FORMAT " sim_fseek error." NLP, current_disk, PCX);
+                    sim_printf("FIF%i: " ADDRESS_FORMAT " sim_fseek error.\n", current_disk, PCX);
                 }
             }
             break;
@@ -266,7 +266,7 @@ static int DoDiskOperation(desc_t *dsc, uint8 val)
                 if ((rtn != SEC_SZ) && (current_disk_flags & UNIT_DSK_VERBOSE) &&
                     (warnAttached[current_disk] < warnLevelDSK)) {
                 warnAttached[current_disk]++;
-                sim_printf("FIF%i: " ADDRESS_FORMAT " sim_fread error." NLP, current_disk, PCX);
+                sim_printf("FIF%i: " ADDRESS_FORMAT " sim_fread error.\n", current_disk, PCX);
             }
             addr = dsc->addr_l + (dsc->addr_h << 8); /* no assumption on endianness */
             for (kt = 0; kt < SEC_SZ; kt++) {
@@ -276,7 +276,7 @@ static int DoDiskOperation(desc_t *dsc, uint8 val)
                 if ((current_disk_flags & UNIT_DSK_VERBOSE) &&
                     (warnAttached[current_disk] < warnLevelDSK)) {
                     warnAttached[current_disk]++;
-                    sim_printf("FIF%i: " ADDRESS_FORMAT " sim_fseek error." NLP, current_disk, PCX);
+                    sim_printf("FIF%i: " ADDRESS_FORMAT " sim_fseek error.\n", current_disk, PCX);
                 }
             }
             break;
@@ -293,7 +293,7 @@ static int DoDiskOperation(desc_t *dsc, uint8 val)
                 if ((current_disk_flags & UNIT_DSK_VERBOSE) &&
                     (warnAttached[current_disk] < warnLevelDSK)) {
                     warnAttached[current_disk]++;
-                    sim_printf("FIF%i: " ADDRESS_FORMAT " sim_fseek error." NLP, current_disk, PCX);
+                    sim_printf("FIF%i: " ADDRESS_FORMAT " sim_fseek error.\n", current_disk, PCX);
                 }
             }
             break;

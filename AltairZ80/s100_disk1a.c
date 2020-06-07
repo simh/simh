@@ -741,7 +741,7 @@ static t_stat disk1a_reset(DEVICE *dptr)
 static t_stat disk1a_boot(int32 unitno, DEVICE *dptr)
 {
     bootstrap &= 0xF;
-    DBG_PRINT(("Booting DISK1A Controller, bootstrap=%d" NLP, bootstrap));
+    DBG_PRINT(("Booting DISK1A Controller, bootstrap=%d\n", bootstrap));
 
     /* Re-enable the ROM in case it was disabled */
     disk1a_info->rom_disabled = FALSE;
@@ -772,7 +772,7 @@ static t_stat disk1a_detach(UNIT *uptr)
 
 static int32 disk1arom(const int32 Addr, const int32 write, const int32 data)
 {
-/*  DBG_PRINT(("DISK1A: ROM %s, Addr %04x" NLP, write ? "WR" : "RD", Addr)); */
+/*  DBG_PRINT(("DISK1A: ROM %s, Addr %04x\n", write ? "WR" : "RD", Addr)); */
     if(write) {
         disk1aram[Addr & 0x1FF] = data;
         return 0;

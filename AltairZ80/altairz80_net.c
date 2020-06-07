@@ -217,7 +217,7 @@ static t_stat net_svc(UNIT *uptr) {
             serviceDescriptor[0].ioSocket = sim_connect_sock(net_unit.filename, "localhost", "3000");
             if (serviceDescriptor[0].ioSocket == INVALID_SOCKET)
                 return SCPE_IOERR;
-            sim_printf("\rWaiting for server ... Type g<return> (possibly twice) when ready" NLP);
+            sim_printf("\rWaiting for server ... Type g<return> (possibly twice) when ready\n");
             return SCPE_STOP;
         }
         for (i = 0; i <= MAX_CONNECTIONS; i++)
@@ -254,7 +254,7 @@ static t_stat net_svc(UNIT *uptr) {
                         if (serviceDescriptor[i].outputPosRead >= BUFFER_LENGTH)
                             serviceDescriptor[i].outputPosRead -= BUFFER_LENGTH;
                     } else
-                        sim_printf("write %i" NLP, r);
+                        sim_printf("write %i\n", r);
                 }
             }
     }
@@ -284,7 +284,7 @@ int32 netData(const int32 port, const int32 io, const int32 data) {
         if (serviceDescriptor[i].Z80DataPort == port) {
             if (io == 0) {  /* IN   */
                 if (serviceDescriptor[i].inputSize == 0) {
-                    sim_printf("re-read from %i" NLP, port);
+                    sim_printf("re-read from %i\n", port);
                     result = serviceDescriptor[i].inputBuffer[serviceDescriptor[i].inputPosRead > 0 ?
                         serviceDescriptor[i].inputPosRead - 1 : BUFFER_LENGTH - 1];
                 } else {
@@ -297,7 +297,7 @@ int32 netData(const int32 port, const int32 io, const int32 data) {
                 return result;
             } else {          /* OUT  */
                 if (serviceDescriptor[i].outputSize == BUFFER_LENGTH) {
-                    sim_printf("over-write %i to %i" NLP, data, port);
+                    sim_printf("over-write %i to %i\n", data, port);
                     serviceDescriptor[i].outputBuffer[serviceDescriptor[i].outputPosWrite > 0 ?
                         serviceDescriptor[i].outputPosWrite - 1 : BUFFER_LENGTH - 1] = data;
                 } else {

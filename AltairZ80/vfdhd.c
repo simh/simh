@@ -364,7 +364,7 @@ static uint8 adc(uint8 sum, uint8 a1)
 
 static int32 vfdhddev(const int32 port, const int32 io, const int32 data)
 {
-    DBG_PRINT(("VFDHD: " ADDRESS_FORMAT " IO %s, Port %02x" NLP, PCX, io ? "WR" : "RD", port));
+    DBG_PRINT(("VFDHD: " ADDRESS_FORMAT " IO %s, Port %02x\n", PCX, io ? "WR" : "RD", port));
     if(io) {
         VFDHD_Write(port, data);
         return 0;
@@ -414,7 +414,7 @@ static uint8 VFDHD_Read(const uint32 Addr)
             sim_debug(STATUS_MSG, &vfdhd_dev, "VFDHD: " ADDRESS_FORMAT " RD S1 = 0x%02x\n", PCX, cData);
             break;
         case FDHD_DATA:
-/*          DBG_PRINT(("VFDHD: " ADDRESS_FORMAT " RD Data" NLP, PCX)); */
+/*          DBG_PRINT(("VFDHD: " ADDRESS_FORMAT " RD Data\n", PCX)); */
             if(vfdhd_info->datacount+40 >= VFDHD_RAW_LEN) {
                 sim_debug(ERROR_MSG, &vfdhd_dev, "VFDHD: " ADDRESS_FORMAT " Illegal data count %d.\n", PCX, vfdhd_info->datacount);
                 vfdhd_info->datacount = 0;
@@ -423,7 +423,7 @@ static uint8 VFDHD_Read(const uint32 Addr)
 
             vfdhd_info->datacount++;
 
-/*          DBG_PRINT(("VFDHD: " ADDRESS_FORMAT " RD Data Sector %d[%03d]: 0x%02x" NLP, PCX, pDrive->sector, vfdhd_info->datacount, cData)); */
+/*          DBG_PRINT(("VFDHD: " ADDRESS_FORMAT " RD Data Sector %d[%03d]: 0x%02x\n", PCX, pDrive->sector, vfdhd_info->datacount, cData)); */
             break;
         case FDHD_RESET_START:      /* Reset */
             sim_debug(CMD_MSG, &vfdhd_dev, "VFDHD: " ADDRESS_FORMAT " Reset\n", PCX);
@@ -472,7 +472,7 @@ static uint8 VFDHD_Write(const uint32 Addr, uint8 cData)
                 sim_debug(SEEK_MSG, &vfdhd_dev, "VFDHD: " ADDRESS_FORMAT " Home Disk %d\n", PCX, vfdhd_info->sel_drive);
                 pDrive->track = 0;
             }
-            DBG_PRINT(("VFDHD: " ADDRESS_FORMAT " WR C1=%02x: sector=%d, read=%d, ecc_en=%d, precomp=%d" NLP,
+            DBG_PRINT(("VFDHD: " ADDRESS_FORMAT " WR C1=%02x: sector=%d, read=%d, ecc_en=%d, precomp=%d\n",
                 PCX,
                 cData,
                 vfdhd_info->sector,
@@ -481,7 +481,7 @@ static uint8 VFDHD_Write(const uint32 Addr, uint8 cData)
                 vfdhd_info->precomp));
             break;
         case FDHD_DATA:     /* Data Port */
-            DBG_PRINT(("VFDHD: " ADDRESS_FORMAT " WR Data" NLP, PCX));
+            DBG_PRINT(("VFDHD: " ADDRESS_FORMAT " WR Data\n", PCX));
 #ifdef USE_VGI
             if(vfdhd_info->sel_drive > 0) { /* Floppy */
                 if(vfdhd_info->datacount >= VFDHD_RAW_LEN) {
@@ -557,9 +557,9 @@ static void VFDHD_Command(void)
         {
             case IMAGE_TYPE_IMD:
                 if(pDrive->imd == NULL) {
-                    sim_printf(".imd is NULL!" NLP);
+                    sim_printf(".imd is NULL!\n");
                 }
-                sim_printf("%s: Read: imd=%p" NLP, __FUNCTION__, pDrive->imd);
+                sim_printf("%s: Read: imd=%p\n", __FUNCTION__, pDrive->imd);
                 sectRead(pDrive->imd,
                     pDrive->track,
                     vfdhd_info->head,
@@ -582,7 +582,7 @@ static void VFDHD_Command(void)
                 break;
             case IMAGE_TYPE_DSK:
                 if(pDrive->uptr->fileref == NULL) {
-                    sim_printf(".fileref is NULL!" NLP);
+                    sim_printf(".fileref is NULL!\n");
                 } else if(sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET) == 0) {
                     rtn = sim_fread(&sdata.u.sync, 1, 274, /*VFDHD_SECTOR_LEN,*/ (pDrive->uptr)->fileref);
                     if (rtn != 274) {
@@ -595,16 +595,16 @@ static void VFDHD_Command(void)
                     for(vfdhd_info->datacount = 0; sdata.raw[vfdhd_info->datacount] == 0x00; vfdhd_info->datacount++) {
                     }
 
-                    DBG_PRINT(("VFDHD: " ADDRESS_FORMAT " READ: Sync found at offset %d" NLP, PCX, vfdhd_info->datacount));
+                    DBG_PRINT(("VFDHD: " ADDRESS_FORMAT " READ: Sync found at offset %d\n", PCX, vfdhd_info->datacount));
                 } else {
                     sim_debug(ERROR_MSG, &vfdhd_dev, "VFDHD: " ADDRESS_FORMAT " READ: sim_fseek error.\n", PCX);
                 }
                 break;
             case IMAGE_TYPE_CPT:
-                sim_printf("%s: CPT Format not supported" NLP, __FUNCTION__);
+                sim_printf("%s: CPT Format not supported\n", __FUNCTION__);
                 break;
             default:
-                sim_printf("%s: Unknown image Format" NLP, __FUNCTION__);
+                sim_printf("%s: Unknown image Format\n", __FUNCTION__);
                 break;
         }
 
@@ -626,7 +626,7 @@ static void VFDHD_Command(void)
         {
             case IMAGE_TYPE_IMD:
                 if(pDrive->imd == NULL) {
-                    sim_printf(".imd is NULL!" NLP);
+                    sim_printf(".imd is NULL!\n");
                 }
                 sectWrite(pDrive->imd,
                     pDrive->track,
@@ -639,9 +639,9 @@ static void VFDHD_Command(void)
                 break;
             case IMAGE_TYPE_DSK:
                 if(pDrive->uptr->fileref == NULL) {
-                    sim_printf(".fileref is NULL!" NLP);
+                    sim_printf(".fileref is NULL!\n");
                 } else {
-                    DBG_PRINT(("VFDHD: " ADDRESS_FORMAT " WR drive=%d, track=%d, head=%d, sector=%d" NLP,
+                    DBG_PRINT(("VFDHD: " ADDRESS_FORMAT " WR drive=%d, track=%d, head=%d, sector=%d\n",
                                PCX,
                                vfdhd_info->sel_drive,
                                pDrive->track,
@@ -654,15 +654,15 @@ static void VFDHD_Command(void)
                         sim_fwrite(sdata.u.data, 1, 256, (pDrive->uptr)->fileref);
 #endif /* USE_VGI */
                     } else {
-                        sim_printf("%s: sim_fseek error" NLP, __FUNCTION__);
+                        sim_printf("%s: sim_fseek error\n", __FUNCTION__);
                     }
                 }
                 break;
             case IMAGE_TYPE_CPT:
-                sim_printf("%s: CPT Format not supported" NLP, __FUNCTION__);
+                sim_printf("%s: CPT Format not supported\n", __FUNCTION__);
                 break;
             default:
-                sim_printf("%s: Unknown image Format" NLP, __FUNCTION__);
+                sim_printf("%s: Unknown image Format\n", __FUNCTION__);
                 break;
         }
     }

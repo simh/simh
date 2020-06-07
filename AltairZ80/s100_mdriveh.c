@@ -187,7 +187,7 @@ static t_stat mdriveh_reset(DEVICE *dptr)
 
 static int32 mdrivehdev(const int32 port, const int32 io, const int32 data)
 {
-    DBG_PRINT(("MDRIVEH: " ADDRESS_FORMAT " IO %s, Port %02x" NLP, PCX, io ? "WR" : "RD", port));
+    DBG_PRINT(("MDRIVEH: " ADDRESS_FORMAT " IO %s, Port %02x\n", PCX, io ? "WR" : "RD", port));
     if(io) {
         MDRIVEH_Write(port, data);
         return 0;

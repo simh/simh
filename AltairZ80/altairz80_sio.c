@@ -1731,7 +1731,7 @@ static int32 simh_out(const int32 port, const int32 data) {
 
                 case printTimeCmd:  /* print time */
                     if (rtc_avail)
-                        sim_printf("SIMH: " ADDRESS_FORMAT " Current time in milliseconds = %d." NLP, PCX, sim_os_msec());
+                        sim_printf("SIMH: " ADDRESS_FORMAT " Current time in milliseconds = %d.\n", PCX, sim_os_msec());
                     else
                         warnNoRealTimeClock();
                     break;
@@ -1741,7 +1741,7 @@ static int32 simh_out(const int32 port, const int32 data) {
                         if (markTimeSP < TIMER_STACK_LIMIT)
                             markTime[markTimeSP++] = sim_os_msec();
                         else
-                            sim_printf("SIMH: " ADDRESS_FORMAT " Timer stack overflow." NLP, PCX);
+                            sim_printf("SIMH: " ADDRESS_FORMAT " Timer stack overflow.\n", PCX);
                     else
                         warnNoRealTimeClock();
                     break;
@@ -1750,9 +1750,9 @@ static int32 simh_out(const int32 port, const int32 data) {
                     if (rtc_avail)
                         if (markTimeSP > 0) {
                             uint32 delta = sim_os_msec() - markTime[--markTimeSP];
-                            sim_printf("SIMH: " ADDRESS_FORMAT " Timer stopped. Elapsed time in milliseconds = %d." NLP, PCX, delta);
+                            sim_printf("SIMH: " ADDRESS_FORMAT " Timer stopped. Elapsed time in milliseconds = %d.\n", PCX, delta);
                         } else
-                            sim_printf("SIMH: " ADDRESS_FORMAT " No timer active." NLP, PCX);
+                            sim_printf("SIMH: " ADDRESS_FORMAT " No timer active.\n", PCX);
                     else
                         warnNoRealTimeClock();
                     break;
@@ -1826,9 +1826,9 @@ static int32 simh_out(const int32 port, const int32 data) {
                     if (rtc_avail)
                         if (markTimeSP > 0) {
                             uint32 delta = sim_os_msec() - markTime[markTimeSP - 1];
-                            sim_printf("SIMH: " ADDRESS_FORMAT " Timer running. Elapsed in milliseconds = %d." NLP, PCX, delta);
+                            sim_printf("SIMH: " ADDRESS_FORMAT " Timer running. Elapsed in milliseconds = %d.\n", PCX, delta);
                         } else
-                            sim_printf("SIMH: " ADDRESS_FORMAT " No timer active." NLP, PCX);
+                            sim_printf("SIMH: " ADDRESS_FORMAT " No timer active.\n", PCX);
                     else
                         warnNoRealTimeClock();
                     break;

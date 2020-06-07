@@ -414,7 +414,7 @@ t_stat wd179x_detach(UNIT *uptr)
 
 static int32 wd179xdev(const int32 port, const int32 io, const int32 data)
 {
-    DBG_PRINT(("WD179X: " ADDRESS_FORMAT " %s, Port 0x%02x Data 0x%02x" NLP,
+    DBG_PRINT(("WD179X: " ADDRESS_FORMAT " %s, Port 0x%02x Data 0x%02x\n",
         PCX, io ? "OUT" : " IN", port, data));
     if(io) {
         WD179X_Write(port, data);

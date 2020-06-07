@@ -540,17 +540,17 @@ t_stat jade_reset(DEVICE *dptr)
     } else {
         if(pInfo->pe) {
             if(sim_map_resource(pInfo->prom_base, pInfo->prom_size, RESOURCE_TYPE_MEMORY, &jadeprom, "jadeprom", FALSE) != 0) {
-                sim_debug(ERROR_MSG, &jade_dev, JADE_SNAME ": Error mapping MEM resource at 0x%04x" NLP, pInfo->prom_base);
+                sim_debug(ERROR_MSG, &jade_dev, JADE_SNAME ": Error mapping MEM resource at 0x%04x\n", pInfo->prom_base);
                 return SCPE_ARG;
             }
         }
         if(sim_map_resource(pInfo->mem_base, pInfo->mem_size, RESOURCE_TYPE_MEMORY, &jademem, "jademem", FALSE) != 0) {
-            sim_debug(ERROR_MSG, &jade_dev, JADE_SNAME ": Error mapping MEM resource at 0x%04x" NLP, pInfo->mem_base);
+            sim_debug(ERROR_MSG, &jade_dev, JADE_SNAME ": Error mapping MEM resource at 0x%04x\n", pInfo->mem_base);
             return SCPE_ARG;
         }
         /* Connect I/O Ports at base address */
         if(sim_map_resource(pInfo->io_base, pInfo->io_size, RESOURCE_TYPE_IO, &jadedev, "jadedev", FALSE) != 0) {
-            sim_debug(ERROR_MSG, &jade_dev, JADE_SNAME ": Error mapping I/O resource at 0x%02x" NLP, pInfo->io_base);
+            sim_debug(ERROR_MSG, &jade_dev, JADE_SNAME ": Error mapping I/O resource at 0x%02x\n", pInfo->io_base);
             return SCPE_ARG;
         }
     }
@@ -564,7 +564,7 @@ t_stat jade_reset(DEVICE *dptr)
         }
     }
 
-    sim_debug(STATUS_MSG, &jade_dev, JADE_SNAME ": reset controller." NLP);
+    sim_debug(STATUS_MSG, &jade_dev, JADE_SNAME ": reset controller.\n");
 
     return SCPE_OK;
 }
@@ -579,7 +579,7 @@ t_stat jade_attach(UNIT *uptr, CONST char *cptr)
     r = attach_unit(uptr, cptr);    /* attach unit  */
 
     if(r != SCPE_OK) {              /* error?       */
-        sim_debug(ERROR_MSG, &jade_dev, JADE_SNAME ": ATTACH error=%d" NLP, r);
+        sim_debug(ERROR_MSG, &jade_dev, JADE_SNAME ": ATTACH error=%d\n", r);
         return r;
     }
 
@@ -590,7 +590,7 @@ t_stat jade_attach(UNIT *uptr, CONST char *cptr)
         uptr->capac = JADE_CAPACITY;
     }
 
-    DBG_PRINT(("JADE: ATTACH uptr->capac=%d" NLP, uptr->capac));
+    DBG_PRINT(("JADE: ATTACH uptr->capac=%d\n", uptr->capac));
 
     for (i = 0; i < JADE_MAX_DRIVES; i++) {
         if(jade_dev.units[i].fileref == uptr->fileref) {
@@ -608,7 +608,7 @@ t_stat jade_attach(UNIT *uptr, CONST char *cptr)
     if(uptr->capac > 0) {
         char *rtn = fgets(header, 4, uptr->fileref);
         if((rtn != NULL) && (strncmp(header, "CPT", 3) == 0)) {
-            sim_printf(JADE_SNAME ": CPT images not yet supported" NLP);
+            sim_printf(JADE_SNAME ": CPT images not yet supported\n");
             uptr->u3 = IMAGE_TYPE_CPT;
             jade_detach(uptr);
             return SCPE_OPENERR;
@@ -618,7 +618,7 @@ t_stat jade_attach(UNIT *uptr, CONST char *cptr)
     }
 
     if (uptr->flags & UNIT_JADE_VERBOSE) {
-        sim_printf(JADE_SNAME "%d: attached to '%s', type=%s, len=%d" NLP, i, cptr,
+        sim_printf(JADE_SNAME "%d: attached to '%s', type=%s, len=%d\n", i, cptr,
             uptr->u3 == IMAGE_TYPE_CPT ? "CPT" : "DSK",
             uptr->capac);
     }
@@ -643,7 +643,7 @@ t_stat jade_detach(UNIT *uptr)
         return SCPE_ARG;
     }
 
-    DBG_PRINT(("Detach JADE%d" NLP, i));
+    DBG_PRINT(("Detach JADE%d\n", i));
 
     r = detach_unit(uptr);  /* detach unit */
 
@@ -654,7 +654,7 @@ t_stat jade_detach(UNIT *uptr)
     jade_dev.units[i].fileref = NULL;
 
     if (uptr->flags & UNIT_JADE_VERBOSE) {
-        sim_printf(JADE_SNAME "%d: detached." NLP, i);
+        sim_printf(JADE_SNAME "%d: detached.\n", i);
     }
 
     return SCPE_OK;
@@ -677,7 +677,7 @@ static t_stat jade_set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *des
         return r;
 
     if ((newba > 0x43) || (newba < 0x40)) {
-        sim_printf(JADE_SNAME ": Valid options are 40,41,42,43" NLP);
+        sim_printf(JADE_SNAME ": Valid options are 40,41,42,43\n");
         return SCPE_ARG;
     }
 
@@ -701,7 +701,7 @@ static t_stat jade_set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *de
         return r;
 
     if ((newba > 0xFC00) || (newba < 0xE000) || (newba % jade_info->mem_size)) {
-        sim_printf(JADE_SNAME ": Valid options are E000,E400,E800,EC00,F000,F400,F800,FC00" NLP);
+        sim_printf(JADE_SNAME ": Valid options are E000,E400,E800,EC00,F000,F400,F800,FC00\n");
         return SCPE_ARG;
     }
 
@@ -742,7 +742,7 @@ static t_stat jade_set_prom(UNIT *uptr, int32 value, CONST char *cptr, void *des
     sim_map_resource(pInfo->prom_base, pInfo->prom_size, RESOURCE_TYPE_MEMORY, &jadeprom, "jadeprom", !value);
 
     if (uptr->flags & UNIT_JADE_VERBOSE) {
-        sim_printf(JADE_SNAME ": PROM %s" NLP, (value) ? "enabled" : "disabled");
+        sim_printf(JADE_SNAME ": PROM %s\n", (value) ? "enabled" : "disabled");
     }
 
     return SCPE_OK;
@@ -754,7 +754,7 @@ static t_stat jade_boot(int32 unitno, DEVICE *dptr)
     JADE_INFO *pInfo = (JADE_INFO *)dptr->ctxt;
 
     if (pInfo->uptr[0]->flags & UNIT_JADE_VERBOSE) {
-        sim_printf(JADE_SNAME ": Booting Controller at 0x%04x" NLP, pInfo->prom_base);
+        sim_printf(JADE_SNAME ": Booting Controller at 0x%04x\n", pInfo->prom_base);
     }
 
     *((int32 *) sim_PC->loc) = pInfo->prom_base;
@@ -770,20 +770,20 @@ static t_stat jade_svc(UNIT *uptr)
 static void showsector(uint8 drive, uint8 isRead, uint8 *buf) {
     int32 i;
 
-    sim_debug(RD_DATA_DETAIL_MSG|WR_DATA_DETAIL_MSG, &jade_dev, JADE_SNAME "%d: %s sector:" NLP "\t", drive, (isRead) ? "Read" : "Write");
+    sim_debug(RD_DATA_DETAIL_MSG|WR_DATA_DETAIL_MSG, &jade_dev, JADE_SNAME "%d: %s sector:\n\t", drive, (isRead) ? "Read" : "Write");
     for (i=0; i < JADE_SECTOR_SIZE; i++) {
         sim_debug(RD_DATA_DETAIL_MSG|WR_DATA_DETAIL_MSG, &jade_dev, "%02X ", *(buf+i));
         if (((i+1) & 0xf) == 0) {
-            sim_debug(RD_DATA_DETAIL_MSG|WR_DATA_DETAIL_MSG, &jade_dev, NLP "\t");
+            sim_debug(RD_DATA_DETAIL_MSG|WR_DATA_DETAIL_MSG, &jade_dev, "\n\t");
         }
     }
-    sim_debug(RD_DATA_DETAIL_MSG|WR_DATA_DETAIL_MSG, &jade_dev, NLP);
+    sim_debug(RD_DATA_DETAIL_MSG|WR_DATA_DETAIL_MSG, &jade_dev, "\n");
 }
 
 static void showcb()
 {
     DBG_PRINT((JADE_SNAME
-        " cmd=0x%02X drv=%d trk=%02d sec=%02d mod=0x%02X sts=0x%02X lad=%04X lng=%04X" NLP,
+        " cmd=0x%02X drv=%d trk=%02d sec=%02d mod=0x%02X sts=0x%02X lad=%04X lng=%04X\n",
         cb[CB_CMD], cb[CB_DRV], cb[CB_TRK], cb[CB_SEC], cb[CB_MOD], cb[CB_STS], cb[CB_LAD] + (cb[CB_LAD+1] << 8), cb[CB_LNG] + (cb[CB_LNG+1] << 8)));
 }
 
@@ -867,35 +867,35 @@ static uint8 JADE_In(uint32 Addr)
     cData = JADE_STAT_HALT;     /* Assume processor is in HALT* state */
     cData |= (jade_info->mem_base >> 9) & JADE_STAT_MEM_MSK;
 
-    sim_debug(CMD_MSG, &jade_dev, JADE_SNAME ": IN %02x Data %02x" NLP, Addr & 0xFF, cData & 0xFF);
+    sim_debug(CMD_MSG, &jade_dev, JADE_SNAME ": IN %02x Data %02x\n", Addr & 0xFF, cData & 0xFF);
 
     return (cData);
 }
 
 static uint8 JADE_Out(uint32 Addr, int32 Data)
 {
-    sim_debug(CMD_MSG, &jade_dev, JADE_SNAME ": OUT %02x Data %02x" NLP, Addr & 0xFF, Data & 0xFF);
+    sim_debug(CMD_MSG, &jade_dev, JADE_SNAME ": OUT %02x Data %02x\n", Addr & 0xFF, Data & 0xFF);
 
     switch (Data) {
         case CMD_SOT:    /* Bank 0 out of system */
-            sim_debug(CMD_MSG, &jade_dev, JADE_SNAME ": Z80 system memory out" NLP);
+            sim_debug(CMD_MSG, &jade_dev, JADE_SNAME ": Z80 system memory out\n");
             jade_info->mem_sys = FALSE;
             break;
 
         case CMD_SIN|CMD_MD0:    /* Request memory bank 0 */
-            sim_debug(CMD_MSG, &jade_dev, JADE_SNAME ": Z80 system memory in" NLP);
+            sim_debug(CMD_MSG, &jade_dev, JADE_SNAME ": Z80 system memory in\n");
             jade_info->mem_sys = TRUE;
-            sim_debug(CMD_MSG, &jade_dev, JADE_SNAME ": selected memory bank 0" NLP);
+            sim_debug(CMD_MSG, &jade_dev, JADE_SNAME ": selected memory bank 0\n");
             jade_info->mem_bank = 0;
             break;
 
         case CMD_MD1:    /* Select memory bank 1 */
-            sim_debug(CMD_MSG, &jade_dev, JADE_SNAME ": selected memory bank 1" NLP);
+            sim_debug(CMD_MSG, &jade_dev, JADE_SNAME ": selected memory bank 1\n");
             jade_info->mem_bank = 1;
             break;
 
         case CMD_INT:    /* Interrupt Z80 */
-            sim_debug(CMD_MSG, &jade_dev, JADE_SNAME ": Z80 interrupt" NLP);
+            sim_debug(CMD_MSG, &jade_dev, JADE_SNAME ": Z80 interrupt\n");
             cb[CB_STS] = DCM_Execute();    /* Save status in command block */
             break;
 
@@ -1080,14 +1080,14 @@ static uint8 DCM_Logon(uint8 drive)
        jade_info->dt[drive].spt = sbuf[ID_SPT];
        jade_info->dt[drive].flg = sbuf[ID_FLG];
        if (jade_info->uptr[drive]->flags & UNIT_JADE_VERBOSE) {
-           sim_printf(JADE_SNAME "%d: JADE ID Found: '%.32s' SPT=%0d FLG=0x%02X" NLP, drive, sbuf, jade_info->dt[drive].spt, jade_info->dt[drive].flg);
+           sim_printf(JADE_SNAME "%d: JADE ID Found: '%.32s' SPT=%0d FLG=0x%02X\n", drive, sbuf, jade_info->dt[drive].spt, jade_info->dt[drive].flg);
        }
     }
     else {
        jade_info->dt[drive].spt = JADE_SPT_SD;
        jade_info->dt[drive].flg = ID_FLD;
        if (jade_info->uptr[drive]->flags & UNIT_JADE_VERBOSE) {
-           sim_printf(JADE_SNAME "%d: JADE ID Not Found: SPT=%0d FLG=0x%02X" NLP, drive, jade_info->dt[drive].spt, jade_info->dt[drive].flg);
+           sim_printf(JADE_SNAME "%d: JADE ID Not Found: SPT=%0d FLG=0x%02X\n", drive, jade_info->dt[drive].spt, jade_info->dt[drive].flg);
        }
     }
 
@@ -1116,7 +1116,7 @@ static uint8 DCM_ReadSector(uint8 drive, uint8 track, uint8 sector, uint8 *buffe
     */
     if (jade_info->uptr[drive]->fileref == NULL) {
         if (jade_info->uptr[drive]->flags & UNIT_JADE_VERBOSE) {
-            sim_printf(JADE_SNAME "%d: Drive Not Ready" NLP, drive);
+            sim_printf(JADE_SNAME "%d: Drive Not Ready\n", drive);
         }
         return CS_DNR;
     }
@@ -1124,12 +1124,12 @@ static uint8 DCM_ReadSector(uint8 drive, uint8 track, uint8 sector, uint8 *buffe
     offset = calculate_jade_sec_offset(track, sector, jade_info->dt[drive].flg);
 
     if (sim_fseek(jade_info->uptr[drive]->fileref, offset, SEEK_SET) != 0) {
-        sim_debug(ERROR_MSG, &jade_dev, JADE_SNAME "%d: RDSEC sim_fseek error." NLP, drive);
+        sim_debug(ERROR_MSG, &jade_dev, JADE_SNAME "%d: RDSEC sim_fseek error.\n", drive);
         return CS_RNF;
     }
 
     if (sim_fread(buffer, 1, JADE_SECTOR_SIZE, jade_info->uptr[drive]->fileref) != JADE_SECTOR_SIZE) {
-        sim_debug(ERROR_MSG, &jade_dev, JADE_SNAME "%d: RDSEC sim_fread error." NLP, drive);
+        sim_debug(ERROR_MSG, &jade_dev, JADE_SNAME "%d: RDSEC sim_fread error.\n", drive);
         return CS_CRC;
     }
 
@@ -1171,12 +1171,12 @@ static uint8 DCM_WriteSector(uint8 drive, uint8 track, uint8 sector, uint8 *buff
     offset = calculate_jade_sec_offset(track, sector, jade_info->dt[drive].flg);
 
     if (sim_fseek(jade_info->uptr[drive]->fileref, offset, SEEK_SET) != 0) {
-        sim_debug(ERROR_MSG, &jade_dev, JADE_SNAME "%d: WRSEC sim_fseek error." NLP, drive);
+        sim_debug(ERROR_MSG, &jade_dev, JADE_SNAME "%d: WRSEC sim_fseek error.\n", drive);
         return CS_RNF;
     }
 
     if (sim_fwrite(buffer, 1, JADE_SECTOR_SIZE, jade_info->uptr[drive]->fileref) != JADE_SECTOR_SIZE) {
-        sim_debug(ERROR_MSG, &jade_dev, JADE_SNAME "%d: WRSEC sim_fwrite error." NLP, drive);
+        sim_debug(ERROR_MSG, &jade_dev, JADE_SNAME "%d: WRSEC sim_fwrite error.\n", drive);
         return CS_CRC;
     }
 

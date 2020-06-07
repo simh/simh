@@ -301,7 +301,7 @@ static uint8 scp300f_rom[SCP300F_ROM_SIZE] = {
 
  static int32 scp300f_mem(const int32 Addr, const int32 write, const int32 data)
 {
-/*  DBG_PRINT(("SCP300F: ROM %s, Addr %04x" NLP, write ? "WR" : "RD", Addr)); */
+/*  DBG_PRINT(("SCP300F: ROM %s, Addr %04x\n", write ? "WR" : "RD", Addr)); */
     if(write) {
         if(scp300f_info->rom_enabled)
         {

@@ -4118,28 +4118,12 @@ static void i86op_opcD3_word_RM_CL(PC_ENV *m)
    DECODE_CLEAR_SEGOVR(m);
 }
 
-static void sys_fatal(int error, const char *fmt, ...)
-{
-  va_list   p;
-  va_start(p, fmt);
-  fprintf(stderr, "Fatal error: ");
-  if (error != 0)
-      {
-    fprintf(stderr, "<%d>",error);
-    fprintf(stderr,"%s",strerror(error));
-      }
-  vfprintf(stderr, fmt, p);
-  va_end(p);
-  fprintf(stderr, NLP "Exiting..." NLP);
-  exit(1);
-}
-
 /* opcode=0xd4*/
 static void i86op_aam(PC_ENV *m)
 {   uint8 a;
     a = fetch_byte_imm(m);  /* this is a stupid encoding. */
     if (a != 10)
-        sys_fatal(0,"error decoding aam" NLP);
+        sim_printf("CPU: " ADDRESS_FORMAT " Error decoding AAM: Expected 0x0a but got 0x%2x.\n", m->Sp_regs.IP.I16_reg.x_reg, a);
     /* note the type change here --- returning AL and AH in AX. */
     m->R_AX = aam_word(m,m->R_AL);
     DECODE_CLEAR_SEGOVR(m);

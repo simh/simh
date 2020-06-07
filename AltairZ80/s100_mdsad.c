@@ -372,7 +372,7 @@ static t_stat mdsad_boot(int32 unitno, DEVICE *dptr)
 
     PNP_INFO *pnp = (PNP_INFO *)dptr->ctxt;
 
-    DBG_PRINT(("Booting MDSAD Controller at 0x%04x, unit %d" NLP,
+    DBG_PRINT(("Booting MDSAD Controller at 0x%04x, unit %d\n",
         pnp->mem_base+1+(unitno&3), unitno & 3));
 
     /* Unit 3 can't be booted yet.  This involves modifying the A register. */
@@ -385,7 +385,7 @@ static int32 mdsaddev(const int32 Addr, const int32 rw, const int32 data)
     if(rw == 0) { /* Read */
         return(MDSAD_Read(Addr));
     } else {    /* Write */
-        DBG_PRINT(("MDSAD: write attempt at 0x%04x ignored." NLP, Addr));
+        DBG_PRINT(("MDSAD: write attempt at 0x%04x ignored.\n", Addr));
         return (-1);
     }
 }
@@ -419,13 +419,13 @@ static uint8 mdsad_rom[] = {
 
 static void showdata(int32 isRead) {
     int32 i;
-    sim_printf("MDSAD: " ADDRESS_FORMAT " %s Sector =" NLP "\t", PCX, isRead ? "Read" : "Write");
+    sim_printf("MDSAD: " ADDRESS_FORMAT " %s Sector =\n\t", PCX, isRead ? "Read" : "Write");
     for(i=0; i < MDSAD_SECTOR_LEN; i++) {
         sim_printf("%02X ", sdata.u.data[i]);
         if(((i+1) & 0xf) == 0)
-            sim_printf(NLP "\t");
+            sim_printf("\n\t");
     }
-    sim_printf(NLP);
+    sim_printf("\n");
 }
 
 static int checksum;
@@ -472,7 +472,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
             }
 
             DBG_PRINT(("MDSAD: " ADDRESS_FORMAT
-                " WRITE-DATA[offset:%06x+%03x]=%02x" NLP,
+                " WRITE-DATA[offset:%06x+%03x]=%02x\n",
                 PCX, sec_offset, mdsad_info->datacount, Addr & 0xFF));
             mdsad_info->datacount++;
             if(mdsad_info->datacount < MDSAD_RAW_LEN)
@@ -493,21 +493,21 @@ static uint8 MDSAD_Read(const uint32 Addr)
                 {
                     case IMAGE_TYPE_DSK:
                         if(pDrive->uptr->fileref == NULL) {
-                            sim_printf(".fileref is NULL!" NLP);
+                            sim_printf(".fileref is NULL!\n");
                         } else {
                             if (sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET) == 0) {
                                 sim_fwrite(sdata.u.data, 1, MDSAD_SECTOR_LEN,
                                            (pDrive->uptr)->fileref);
                             } else {
-                                sim_printf("%s: sim_fseek error" NLP, __FUNCTION__);
+                                sim_printf("%s: sim_fseek error\n", __FUNCTION__);
                             }
                         }
                         break;
                     case IMAGE_TYPE_CPT:
-                        sim_printf("%s: CPT Format not supported" NLP, __FUNCTION__);
+                        sim_printf("%s: CPT Format not supported\n", __FUNCTION__);
                         break;
                     default:
-                        sim_printf("%s: Unknown image Format" NLP, __FUNCTION__);
+                        sim_printf("%s: Unknown image Format\n", __FUNCTION__);
                         break;
                 }
             }
@@ -730,7 +730,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
                             {
                                 case IMAGE_TYPE_DSK:
                                     if(pDrive->uptr->fileref == NULL) {
-                                        sim_printf(".fileref is NULL!" NLP);
+                                        sim_printf(".fileref is NULL!\n");
                                     } else {
                                         if (sim_fseek((pDrive->uptr)->fileref,
                                                       sec_offset, SEEK_SET) == 0) {
@@ -747,12 +747,10 @@ static uint8 MDSAD_Read(const uint32 Addr)
                                     }
                                     break;
                                 case IMAGE_TYPE_CPT:
-                                    sim_printf("%s: CPT Format not supported"
-                                        NLP, __FUNCTION__);
+                                    sim_printf("%s: CPT Format not supported\n", __FUNCTION__);
                                     break;
                                 default:
-                                    sim_printf("%s: Unknown image Format"
-                                        NLP, __FUNCTION__);
+                                    sim_printf("%s: Unknown image Format\n", __FUNCTION__);
                                     break;
                             }
                             if(mdsad_dev.dctrl & RD_DATA_DETAIL_MSG)
@@ -768,7 +766,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
                         checksum = ((checksum << 1) | ((checksum & 0x80) != 0)) & 0xff;
 
                         DBG_PRINT(("MDSAD: " ADDRESS_FORMAT
-                            " READ-DATA[offset:%06x+%03x]=%02x" NLP,
+                            " READ-DATA[offset:%06x+%03x]=%02x\n",
                             PCX, sec_offset, mdsad_info->datacount, cData));
                     } else { /* checksum */
                         cData = checksum;
@@ -782,7 +780,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
                 }
                 default:
                     DBG_PRINT(("MDSAD: " ADDRESS_FORMAT
-                        " Invalid DM=%x" NLP, PCX, Addr & 0xF));
+                        " Invalid DM=%x\n", PCX, Addr & 0xF));
                     break;
             }
 
