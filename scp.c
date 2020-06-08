@@ -6221,8 +6221,12 @@ if (flag) {
 #if defined(SIM_GIT_COMMIT_ID)
 #define S_xstr(a) S_str(a)
 #define S_str(a) #a
-fprintf (st, "%sgit commit id: %8.8s", flag ? "\n        " : "        ", S_xstr(SIM_GIT_COMMIT_ID));
-setenv ("SIM_GIT_COMMIT_ID", S_xstr(SIM_GIT_COMMIT_ID), 1);
+if (1) {
+    const char *extras = strchr (S_xstr(SIM_GIT_COMMIT_ID), '+');
+
+    fprintf (st, "%sgit commit id: %8.8s%s", flag ? "\n        " : "        ", S_xstr(SIM_GIT_COMMIT_ID), extras ? extras : "");
+    setenv ("SIM_GIT_COMMIT_ID", S_xstr(SIM_GIT_COMMIT_ID), 1);
+    }
 #if defined(SIM_GIT_COMMIT_TIME)
 setenv ("SIM_GIT_COMMIT_TIME", S_xstr(SIM_GIT_COMMIT_TIME), 1);
 if (flag)
