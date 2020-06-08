@@ -284,8 +284,8 @@ struct idev {
     const char* name;
 };
 
-static  int32 switcherPort      = SWITCHCPU_DEFAULT;
-static struct idev oldSwitcherDevice = { NULL, NULL };
+static  int32 switcherPort            = SWITCHCPU_DEFAULT;
+static  struct idev oldSwitcherDevice = { NULL, NULL };
 
 // CPU_INDEX_8080 is defined in altairz80_defs.h
 #define CPU_INDEX_8086  26
@@ -321,7 +321,7 @@ REG cpu_reg[] = {
     }, /* 13 */
     { GRDATAD (IFF,     IFF_S, 2, 2, 0,         "Z80 Interrupt Flip Flop register")
     }, /*  6 */
-    { HRDATAD (IR,      IR_S,               16,  "Z80 Interrupt (upper) / Refresh (lower) register")
+    { HRDATAD (IR,      IR_S,               16, "Z80 Interrupt (upper) / Refresh (lower) register")
     }, /*  7 */
 
     // 8086 registers
@@ -431,11 +431,11 @@ REG cpu_reg[] = {
     }, /* 64 M68K, PREF_ADDR            */
     { HRDATAD (M68K_PREF_DATA,  m68k_registers[M68K_REG_PREF_DATA], 32, "M68K Last Prefetch Data register"),
     }, /* 65 M68K, PREF_DATA            */
-    { HRDATAD (M68K_PPC,         m68k_registers[M68K_REG_PPC],       32, "M68K Previous Proram Counter register"),
+    { HRDATAD (M68K_PPC,         m68k_registers[M68K_REG_PPC],      32, "M68K Previous Proram Counter register"),
     }, /* 66 M68K, PPC                  */
-    { HRDATAD (M68K_IR,          m68k_registers[M68K_REG_IR],        32, "M68K Instruction Register"),
+    { HRDATAD (M68K_IR,          m68k_registers[M68K_REG_IR],       32, "M68K Instruction Register"),
     }, /* 67 M68K, IR                   */
-    { HRDATAD (M68K_CPU_TYPE,    m68k_registers[M68K_REG_CPU_TYPE],  32, "M68K CPU Type register"),
+    { HRDATAD (M68K_CPU_TYPE,    m68k_registers[M68K_REG_CPU_TYPE], 32, "M68K CPU Type register"),
         REG_RO }, /* 68 M68K, CPU_TYPE             */
 
     // Pseudo registers
@@ -642,14 +642,14 @@ static struct idev dev_table[256] = {
     {&nulldev, "nulldev"}, {&nulldev, "nulldev"}, {&nulldev, "nulldev"}, {&nulldev, "nulldev"},         /* F0 */
     {&nulldev, "nulldev"}, {&nulldev, "nulldev"}, {&nulldev, "nulldev"}, {&nulldev, "nulldev"},         /* F4 */
     {&nulldev, "nulldev"}, {&nulldev, "nulldev"}, {&nulldev, "nulldev"}, {&nulldev, "nulldev"},         /* F8 */
-    {&nulldev, "nulldev"}, {&hdsk_io, "hdsk_io"}, {&simh_dev,"simh_dev"},{&sr_dev, "sr_dev"}          /* FC */
+    {&nulldev, "nulldev"}, {&hdsk_io, "hdsk_io"}, {&simh_dev,"simh_dev"},{&sr_dev, "sr_dev"}            /* FC */
 };
 
 const char* handlerNameForPort(const int32 port) {
     return dev_table[port & 0xff].name;
 }
 
-static int32 ramtype = 0;
+static int32 ramtype =  0;
 #define MAX_RAM_TYPE    3
 
 ChipType chiptype = CHIP_TYPE_8080;
@@ -6124,33 +6124,34 @@ static t_stat sim_instr_mmu (void) {
             PC = 0x38;
         }
 
-    /*
-    ** Save in instruction history ring buffer?
-    */
-    if (hst_lnt && ((chiptype == CHIP_TYPE_8080) || (chiptype == CHIP_TYPE_Z80))) {
-        hst[hst_p].valid = 1;
-        hst[hst_p].pc = PCX;
-        hst[hst_p].sp = SP;
-        hst[hst_p].af = AF;
-        hst[hst_p].bc = BC;
-        hst[hst_p].de = DE;
-        hst[hst_p].hl = HL;
-        hst[hst_p].af1 = AF1_S;
-        hst[hst_p].bc1 = BC1_S;
-        hst[hst_p].de1 = DE1_S;
-        hst[hst_p].hl1 = HL1_S;
-        hst[hst_p].ix = IX;
-        hst[hst_p].iy = IY;
+        /*
+        ** Save in instruction history ring buffer
+        */
+        if (hst_lnt && ((chiptype == CHIP_TYPE_8080) || (chiptype == CHIP_TYPE_Z80))) {
+            hst[hst_p].valid = 1;
+            hst[hst_p].pc = PCX;
+            hst[hst_p].sp = SP;
+            hst[hst_p].af = AF;
+            hst[hst_p].bc = BC;
+            hst[hst_p].de = DE;
+            hst[hst_p].hl = HL;
+            hst[hst_p].af1 = AF1_S;
+            hst[hst_p].bc1 = BC1_S;
+            hst[hst_p].de1 = DE1_S;
+            hst[hst_p].hl1 = HL1_S;
+            hst[hst_p].ix = IX;
+            hst[hst_p].iy = IY;
 
-        for (i = 0; i < INST_MAX_BYTES; i++) {
-            hst[hst_p].op[i] = GetBYTE(PCX + i);
+            for (i = 0; i < INST_MAX_BYTES; i++) {
+                hst[hst_p].op[i] = GetBYTE(PCX + i);
+            }
+
+            if (++hst_p == hst_lnt) {
+                hst_p = 0;
+            }
         }
 
-        if (++hst_p == hst_lnt) {
-            hst_p = 0;
-        }
-    }
-
+        PC &= ADDRMASK; /* reestablish invariant */
         sim_interval--;
     }
 
