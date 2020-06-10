@@ -3990,26 +3990,31 @@ return FALSE;
 
 static t_stat sim_os_disk_rdsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread, t_seccnt sects)
 {
+*sectsread = 0;
 return SCPE_NOFNC;
 }
 
 static t_stat sim_os_disk_read (UNIT *uptr, t_offset addr, uint8 *buf, uint32 *bytesread, uint32 bytes)
 {
+*bytesread = 0;
 return SCPE_NOFNC;
 }
 
 static t_stat sim_os_disk_wrsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectswritten, t_seccnt sects)
 {
+*sectswritten = 0;
 return SCPE_NOFNC;
 }
 
 static t_stat sim_os_disk_write (UNIT *uptr, t_offset addr, uint8 *buf, uint32 *byteswritten, uint32 bytes)
 {
+*byteswritten = 0;
 return SCPE_NOFNC;
 }
 
 static t_stat sim_os_disk_info_raw (FILE *f, uint32 *sector_size, uint32 *removable, uint32 *is_cdrom)
 {
+*sector_size = *removable = *is_cdrom = 0;
 return SCPE_NOFNC;
 }
 
@@ -4069,6 +4074,7 @@ return (t_offset)-1;
 
 static t_stat sim_vhd_disk_rdsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread, t_seccnt sects)
 {
+*sectsread = 0;
 return SCPE_IOERR;
 }
 
@@ -4079,6 +4085,7 @@ return SCPE_IOERR;
 
 static t_stat sim_vhd_disk_wrsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectswritten, t_seccnt sects)
 {
+*sectswritten = 0;
 return SCPE_IOERR;
 }
 
@@ -4089,6 +4096,7 @@ return SCPE_NOFNC;
 
 static const char *sim_vhd_disk_get_dtype (FILE *f, uint32 *SectorSize, uint32 *xfer_element_size, char sim_name[64], time_t *creation_time)
 {
+*SectorSize = *xfer_element_size = 0;
 return NULL;
 }
 
