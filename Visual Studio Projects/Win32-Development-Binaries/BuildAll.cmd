@@ -99,8 +99,12 @@ cd %~p0
 SET GIT_COMMIT_ID=
 SET GIT_COMMIT_TIME=
 pushd ..\..
-git checkout -q master
-git fetch -q origin master
+git update-index --refresh -- | findstr update > NUL
+if not ERRORLEVEL 1 echo **** ERROR **** the local repo has uncommitted files & popd & goto :EOF
+git remote | findstr origin > NUL
+if ERRORLEVEL 1 echo **** ERROR **** missing 'origin' remote in this repo & popd & goto :EOF
+git checkout --quiet master
+git fetch origin master
 git log -1 --pretty="SIM_GIT_COMMIT_ID %%H%%nSIM_GIT_COMMIT_TIME %%aI" >.git-commit-id
 popd
 pushd ..
@@ -136,11 +140,11 @@ git add README.md
 git commit -m "Initializing the Windows Binary repository"
 git remote add origin "%REMOTE_REPO%"
 git branch -m master %BIN_REPO%
-git push -u origin %BIN_REPO%
+git push --force -u origin %BIN_REPO%
 
 :GitAddNew
 if not exist .git git clone "%REMOTE_REPO%" ./
-git pull
+git pull 
 set _BINARIES_ALREADY_BUILT=
 for /F "usebackq" %%i in (`git log ^| findstr %GIT_COMMIT_ID%`) do set _BINARIES_ALREADY_BUILT=1
 if "%_BINARIES_ALREADY_BUILT%" == "" goto DoBuild
