@@ -2194,6 +2194,7 @@ if (!vid_beep_data) {
     int i;
     SDL_AudioSpec desiredSpec;
 
+    SDL_InitSubSystem (SDL_INIT_AUDIO);
     memset (&desiredSpec, 0, sizeof(desiredSpec));
     desiredSpec.freq = SAMPLE_FREQUENCY;
     desiredSpec.format = AUDIO_S16SYS;
@@ -2216,6 +2217,7 @@ static void vid_beep_cleanup (void)
 SDL_CloseAudio();
 free (vid_beep_data);
 vid_beep_data = NULL;
+SDL_QuitSubSystem (SDL_INIT_AUDIO);
 }
 
 void vid_beep_event (void)
