@@ -354,6 +354,8 @@ t_bool vid_ready;
 char vid_title[128];
 static void vid_beep_setup (int duration_ms, int tone_frequency);
 static void vid_beep_cleanup (void);
+static void vid_init_controllers (void);
+static void vid_cleanup_controllers (void);
 t_bool vid_key_state[SDL_NUM_SCANCODES];
 SDL_Texture *vid_texture;                               /* video buffer in GPU */
 SDL_Renderer *vid_renderer;
@@ -508,67 +510,81 @@ return SCPE_OK;
 }
 #endif
 
-static t_stat vid_init_controllers (void)
+static void vid_init_controllers (void)
 {
-    SDL_Joystick *y;
-    SDL_version ver;
-    int i, n;
+SDL_Joystick *y;
+SDL_version ver;
+int i, n;
 
-    if (vid_gamepad_inited)
-        return SCPE_OK;
+if (vid_gamepad_inited)
+    return;
 
-    /* Chech that the SDL_GameControllerFromInstanceID function is
-       available at run time. */
-    SDL_GetVersion(&ver);
-    vid_gamepad_ok = (ver.major > 2 ||
-                      (ver.major == 2 && (ver.minor > 0 || ver.patch >= 4)));
+/* Chech that the SDL_GameControllerFromInstanceID function is
+   available at run time. */
+SDL_GetVersion(&ver);
+vid_gamepad_ok = (ver.major > 2 ||
+                  (ver.major == 2 && (ver.minor > 0 || ver.patch >= 4)));
 
+if (vid_gamepad_ok)
+    SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER);
+else
+    SDL_InitSubSystem(SDL_INIT_JOYSTICK);
+
+if (SDL_JoystickEventState (SDL_ENABLE) < 0) {
     if (vid_gamepad_ok)
-        SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER);
+        SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
     else
-        SDL_InitSubSystem(SDL_INIT_JOYSTICK);
+        SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
+    sim_printf ("%s: vid_init_controllers(): SDL_JoystickEventState error: %s\n", vid_dname(vid_dev), SDL_GetError());
+    return;
+    }
 
-    if (SDL_JoystickEventState (SDL_ENABLE) < 0) {
-        if (vid_gamepad_ok)
-            SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
-        else
-            SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
-        return SCPE_IOERR;
-        }
+if (vid_gamepad_ok && SDL_GameControllerEventState (SDL_ENABLE) < 0) {
+    if (vid_gamepad_ok)
+        SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
+    else
+        SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
+    sim_printf ("%s: vid_init_controllers(): SDL_GameControllerEventState error: %s\n", vid_dname(vid_dev), SDL_GetError());
+    return;
+    }
 
-    if (vid_gamepad_ok && SDL_GameControllerEventState (SDL_ENABLE) < 0) {
-        if (vid_gamepad_ok)
-            SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
-        else
-            SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
-        return SCPE_IOERR;
-        }
+n = SDL_NumJoysticks();
 
-    n = SDL_NumJoysticks();
-
-    for (i = 0; i < n; i++) {
-        if (vid_gamepad_ok && SDL_IsGameController (i)) {
-            SDL_GameController *x = SDL_GameControllerOpen (i);
-            if (x != NULL) {
-                sim_debug (SIM_VID_DBG_VIDEO, vid_dev,
-                "Game controller: %s\n", SDL_GameControllerNameForIndex(i));
-                }
-            }
-        else {
-            y = SDL_JoystickOpen (i);
-            if (y != NULL) {
-                sim_debug (SIM_VID_DBG_VIDEO, vid_dev,
-                "Joystick: %s\n", SDL_JoystickNameForIndex(i));
-                sim_debug (SIM_VID_DBG_VIDEO, vid_dev,
-                "Number of axes: %d, buttons: %d\n",
-                SDL_JoystickNumAxes(y),
-                SDL_JoystickNumButtons(y));
-                }
+for (i = 0; i < n; i++) {
+    if (vid_gamepad_ok && SDL_IsGameController (i)) {
+        SDL_GameController *x = SDL_GameControllerOpen (i);
+        if (x != NULL) {
+            sim_debug (SIM_VID_DBG_VIDEO, vid_dev,
+            "Game controller: %s\n", SDL_GameControllerNameForIndex(i));
             }
         }
+    else {
+        y = SDL_JoystickOpen (i);
+        if (y != NULL) {
+            sim_debug (SIM_VID_DBG_VIDEO, vid_dev,
+            "Joystick: %s\n", SDL_JoystickNameForIndex(i));
+            sim_debug (SIM_VID_DBG_VIDEO, vid_dev,
+            "Number of axes: %d, buttons: %d\n",
+            SDL_JoystickNumAxes(y),
+            SDL_JoystickNumButtons(y));
+            }
+        }
+    }
 
-    vid_gamepad_inited = 1;
-    return SCPE_OK;
+vid_gamepad_inited = 1;
+}
+
+static void vid_cleanup_controllers (void)
+{
+if (vid_gamepad_inited) {
+    vid_gamepad_inited = 0;
+    memset (motion_callback, 0, sizeof motion_callback);
+    memset (button_callback, 0, sizeof button_callback);
+    if (vid_gamepad_ok)
+        SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
+    else
+        SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
+    }
 }
 
 t_stat vid_open (DEVICE *dptr, const char *title, uint32 width, uint32 height, int flags)
@@ -606,10 +622,7 @@ if (!vid_active) {
     if (stat != SCPE_OK)
         return stat;
 
-    if (vid_init_controllers () != SCPE_OK) {
-        sim_debug (SIM_VID_DBG_VIDEO, vid_dev,
-                   "vid_open() - Failed initializing game controllers\n");
-        }
+    vid_init_controllers ();
 
     sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE, vid_dev, "vid_open() - Success\n");
     }
@@ -641,14 +654,6 @@ if (vid_active) {
     while (vid_ready)
         sim_os_ms_sleep (10);
 
-    vid_gamepad_inited = 0;
-    memset (motion_callback, 0, sizeof motion_callback);
-    memset (button_callback, 0, sizeof button_callback);
-    if (vid_gamepad_ok)
-        SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
-    else
-        SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
-
     if (vid_mouse_events.sem) {
         SDL_DestroySemaphore(vid_mouse_events.sem);
         vid_mouse_events.sem = NULL;
@@ -657,6 +662,7 @@ if (vid_active) {
         SDL_DestroySemaphore(vid_key_events.sem);
         vid_key_events.sem = NULL;
         }
+    vid_cleanup_controllers ();
     }
 return SCPE_OK;
 }
