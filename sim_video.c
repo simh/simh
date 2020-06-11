@@ -356,6 +356,7 @@ SDL_Window *vid_window;                                 /* window handle */
 SDL_PixelFormat *vid_format;
 uint32 vid_windowID;
 SDL_Thread *vid_thread_handle = NULL;                   /* event thread handle */
+SDL_mutex *vid_draw_mutex = NULL;                       /* window update mutex */
 SDL_Cursor *vid_cursor = NULL;                          /* current cursor */
 t_bool vid_cursor_visible = FALSE;                      /* cursor visibility state */
 KEY_EVENT_QUEUE vid_key_events;                         /* keyboard events */
@@ -398,10 +399,22 @@ SDL_SetHint (SDL_HINT_RENDER_DRIVER, "software");
 
 status = SDL_Init (SDL_INIT_VIDEO);
 
+if (status) {
+    fprintf (stderr, "SDL Video subsystem can't initialize: %s\n", SDL_GetError ());
+    exit (1);
+    }
+
+vid_draw_mutex = SDL_CreateMutex();
+
+if (vid_draw_mutex == NULL) {
+    fprintf (stderr, "SDL_CreateMutex failed: %s\n", SDL_GetError ());
+    exit (1);
+    }
+
 vid_main_thread_handle = SDL_CreateThread (main_thread , "simh-main", NULL);
 
-if (status) {
-    fprintf (stderr, "SDL Video subsystem can't initialize\n");
+if (vid_main_thread_handle == NULL) {
+    fprintf (stderr, "SDL_CreateThread failed: %s\n", SDL_GetError ());
     exit (1);
     }
 
@@ -445,6 +458,7 @@ while (1) {
     }
 SDL_WaitThread (vid_main_thread_handle, &status);
 vid_beep_cleanup ();
+SDL_DestroyMutex (vid_draw_mutex);
 SDL_Quit ();
 return status;
 }
@@ -694,6 +708,9 @@ uint32 vid_map_rgb (uint8 r, uint8 g, uint8 b)
 return SDL_MapRGB (vid_format, r, g, b);
 }
 
+static SDL_Rect *vid_dst_last;
+static uint32 *vid_data_last;
+
 void vid_draw (int32 x, int32 y, int32 w, int32 h, uint32 *buf)
 {
 SDL_Event user_event;
@@ -701,6 +718,16 @@ SDL_Rect *vid_dst;
 uint32 *vid_data;
 
 sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "vid_draw(%d, %d, %d, %d)\n", x, y, w, h);
+
+SDL_LockMutex (vid_draw_mutex);                         /* Synchronize to check region dimensions */
+if (vid_dst_last                                     && /* As yet unprocessed draw rectangle? */
+    (vid_dst_last->x == x) && (vid_dst_last->y == y) && /* AND identical position? */
+    (vid_dst_last->w == w) && (vid_dst_last->h == h)) { /* AND identical dimensions? */
+    memcpy (vid_data_last, buf, w*h*sizeof(*buf));      /* Replace region contents */
+    SDL_UnlockMutex (vid_draw_mutex);                   /* Done */
+    return;
+    }
+SDL_UnlockMutex (vid_draw_mutex);
 
 vid_dst = (SDL_Rect *)malloc (sizeof(*vid_dst));
 if (!vid_dst) {
@@ -722,6 +749,8 @@ user_event.type = SDL_USEREVENT;
 user_event.user.code = EVENT_DRAW;
 user_event.user.data1 = (void *)vid_dst;
 user_event.user.data2 = (void *)vid_data;
+vid_dst_last = vid_dst;
+vid_data_last = vid_data;
 if (SDL_PushEvent (&user_event) < 0) {
     sim_printf ("%s: vid_draw() SDL_PushEvent error: %s\n", vid_dev ? sim_dname(vid_dev) : "Video Device", SDL_GetError());
     free (vid_dst);
@@ -1431,6 +1460,13 @@ SDL_Rect *vid_dst = (SDL_Rect *)event->data1;
 uint32 *buf = (uint32 *)event->data2;
 
 sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "Draw Region Event: (%d,%d,%d,%d)\n", vid_dst->x, vid_dst->x, vid_dst->w, vid_dst->h);
+
+SDL_LockMutex (vid_draw_mutex);
+if (vid_dst == vid_dst_last) {
+    vid_dst_last = NULL;
+    vid_data_last = NULL;
+    }
+SDL_UnlockMutex (vid_draw_mutex);
 
 if (SDL_UpdateTexture(vid_texture, vid_dst, buf, vid_dst->w*sizeof(*buf)))
     sim_printf ("%s: vid_draw() - SDL_UpdateTexture error: %s\n", sim_dname(vid_dev), SDL_GetError());
