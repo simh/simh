@@ -125,7 +125,7 @@ struct color color_p29 = { p29, ELEMENTS(p29), 25000 };
 
 /* green phosphor for Tek 611 */
 static struct phosphor p31[] = {{0.0, 1.0, 0.77, 0.5, .1}};
-struct color color_p31 = { p31, ELEMENTS(p31), 25000 };
+struct color color_p31 = { p31, ELEMENTS(p31), 100000 };
 
 /* green phosphor for III */
 static struct phosphor p39[] = {{0.2, 1.0, 0.0, 0.5, 0.01}};
@@ -251,7 +251,15 @@ static struct display displays[] = {
      * III display
      * on PDP-10
      */
-    { DIS_III, "III Display", &color_p39, NULL, 1024, 1024 }
+    { DIS_III, "III Display", &color_p39, NULL, 1024, 1024 },
+
+    /*
+     * Imlac display
+     * 1024x1024 addressable points.
+     * P31 phosphor according to "Heads-Up Display for Flight
+     * Simulator for Advanced Aircraft"
+     */
+    { DIS_IMLAC, "Imlac Display", &color_p31, NULL, 1024, 1024 }
 };
 
 /*

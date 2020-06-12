@@ -42,6 +42,7 @@ enum display_type {
      * of the PDP-1, and thus all DEC machines.
      */
     DIS_TX0 = 0,
+    DIS_IMLAC = 1,
     DIS_VR14 = 14,
     DIS_VR17 = 17,
     DIS_VR20 = 20,
