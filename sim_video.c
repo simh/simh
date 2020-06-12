@@ -354,8 +354,8 @@ t_bool vid_ready;
 char vid_title[128];
 static void vid_beep_setup (int duration_ms, int tone_frequency);
 static void vid_beep_cleanup (void);
-static void vid_init_controllers (void);
-static void vid_cleanup_controllers (void);
+static void vid_controllers_setup (void);
+static void vid_controllers_cleanup (void);
 t_bool vid_key_state[SDL_NUM_SCANCODES];
 SDL_Texture *vid_texture;                               /* video buffer in GPU */
 SDL_Renderer *vid_renderer;
@@ -411,13 +411,6 @@ if (status) {
     exit (1);
     }
 
-vid_draw_mutex = SDL_CreateMutex();
-
-if (vid_draw_mutex == NULL) {
-    fprintf (stderr, "SDL_CreateMutex failed: %s\n", SDL_GetError ());
-    exit (1);
-    }
-
 vid_main_thread_handle = SDL_CreateThread (main_thread , "simh-main", NULL);
 
 if (vid_main_thread_handle == NULL) {
@@ -465,7 +458,6 @@ while (1) {
     }
 SDL_WaitThread (vid_main_thread_handle, &status);
 vid_beep_cleanup ();
-SDL_DestroyMutex (vid_draw_mutex);
 SDL_Quit ();
 return status;
 }
@@ -510,7 +502,7 @@ return SCPE_OK;
 }
 #endif
 
-static void vid_init_controllers (void)
+static void vid_controllers_setup (void)
 {
 SDL_Joystick *y;
 SDL_version ver;
@@ -535,7 +527,7 @@ if (SDL_JoystickEventState (SDL_ENABLE) < 0) {
         SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
     else
         SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
-    sim_printf ("%s: vid_init_controllers(): SDL_JoystickEventState error: %s\n", vid_dname(vid_dev), SDL_GetError());
+    sim_printf ("%s: vid_controllers_setup(): SDL_JoystickEventState error: %s\n", vid_dname(vid_dev), SDL_GetError());
     return;
     }
 
@@ -544,7 +536,7 @@ if (vid_gamepad_ok && SDL_GameControllerEventState (SDL_ENABLE) < 0) {
         SDL_QuitSubSystem(SDL_INIT_GAMECONTROLLER);
     else
         SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
-    sim_printf ("%s: vid_init_controllers(): SDL_GameControllerEventState error: %s\n", vid_dname(vid_dev), SDL_GetError());
+    sim_printf ("%s: vid_controllers_setup(): SDL_GameControllerEventState error: %s\n", vid_dname(vid_dev), SDL_GetError());
     return;
     }
 
@@ -574,7 +566,7 @@ for (i = 0; i < n; i++) {
 vid_gamepad_inited = 1;
 }
 
-static void vid_cleanup_controllers (void)
+static void vid_controllers_cleanup (void)
 {
 if (vid_gamepad_inited) {
     vid_gamepad_inited = 0;
@@ -622,7 +614,7 @@ if (!vid_active) {
     if (stat != SCPE_OK)
         return stat;
 
-    vid_init_controllers ();
+    vid_controllers_setup ();
 
     sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE, vid_dev, "vid_open() - Success\n");
     }
@@ -662,7 +654,7 @@ if (vid_active) {
         SDL_DestroySemaphore(vid_key_events.sem);
         vid_key_events.sem = NULL;
         }
-    vid_cleanup_controllers ();
+    vid_controllers_cleanup ();
     }
 return SCPE_OK;
 }
@@ -1625,6 +1617,14 @@ if ((vid_window == NULL) || (vid_renderer == NULL)) {
     return 0;
     }
 
+vid_draw_mutex = SDL_CreateMutex();
+
+if (vid_draw_mutex == NULL) {
+    fprintf (stderr, "%s: SDL_CreateMutex failed: %s\n", vid_dname(vid_dev), SDL_GetError ());
+    SDL_Quit ();
+    return 0;
+    }
+
 SDL_SetRenderDrawColor (vid_renderer, 0, 0, 0, 255);
 SDL_RenderClear (vid_renderer);
 SDL_RenderPresent (vid_renderer);
@@ -1800,6 +1800,8 @@ SDL_DestroyRenderer(vid_renderer);
 vid_renderer = NULL;
 SDL_DestroyWindow(vid_window);
 vid_window = NULL;
+SDL_DestroyMutex (vid_draw_mutex);
+vid_draw_mutex = NULL;
 sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE|SIM_VID_DBG_CURSOR, vid_dev, "vid_thread() - Exiting\n");
 return 0;
 }
