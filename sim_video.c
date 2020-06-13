@@ -437,12 +437,8 @@ while (1) {
                     if (event.user.code == EVENT_SCREENSHOT)
                         vid_screenshot_event ();
                     else {
-                        if (event.user.code == EVENT_BEEP)
-                            vid_beep_event ();
-                        else {
-                            sim_printf ("main(): Unexpected User event: %d\n", event.user.code);
-                            break;
-                            }
+                        sim_printf ("main(): Unexpected User event: %d\n", event.user.code);
+                        break;
                         }
                     }
                 }
@@ -508,7 +504,7 @@ SDL_Joystick *y;
 SDL_version ver;
 int i, n;
 
-if (vid_gamepad_inited)
+if (vid_gamepad_inited++)
     return;
 
 /* Chech that the SDL_GameControllerFromInstanceID function is
@@ -562,14 +558,11 @@ for (i = 0; i < n; i++) {
             }
         }
     }
-
-vid_gamepad_inited = 1;
 }
 
 static void vid_controllers_cleanup (void)
 {
-if (vid_gamepad_inited) {
-    vid_gamepad_inited = 0;
+if (0 == (--vid_gamepad_inited)) {
     memset (motion_callback, 0, sizeof motion_callback);
     memset (button_callback, 0, sizeof button_callback);
     if (vid_gamepad_ok)
@@ -614,8 +607,6 @@ if (!vid_active) {
     if (stat != SCPE_OK)
         return stat;
 
-    vid_controllers_setup ();
-
     sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE, vid_dev, "vid_open() - Success\n");
     }
 return SCPE_OK;
@@ -654,7 +645,6 @@ if (vid_active) {
         SDL_DestroySemaphore(vid_key_events.sem);
         vid_key_events.sem = NULL;
         }
-    vid_controllers_cleanup ();
     }
 return SCPE_OK;
 }
@@ -1661,6 +1651,9 @@ if (vid_flags & SIM_VID_INPUTCAPTURED) {
 else
     SDL_SetWindowTitle (vid_window, vid_title);
 
+vid_beep_setup (400, 660);
+vid_controllers_setup ();
+
 vid_ready = TRUE;
 
 sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE|SIM_VID_DBG_CURSOR, vid_dev, "vid_thread() - Started\n");
@@ -1802,6 +1795,8 @@ SDL_DestroyWindow(vid_window);
 vid_window = NULL;
 SDL_DestroyMutex (vid_draw_mutex);
 vid_draw_mutex = NULL;
+vid_controllers_cleanup ();
+vid_beep_cleanup ();
 sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE|SIM_VID_DBG_CURSOR, vid_dev, "vid_thread() - Exiting\n");
 return 0;
 }
@@ -1818,9 +1813,7 @@ if (stat) {
     sim_printf ("SDL Video subsystem can't initialize\n");
     return 0;
     }
-vid_beep_setup (400, 660);
 vid_video_events ();
-vid_beep_cleanup ();
 SDL_Quit ();
 return 0;
 }
