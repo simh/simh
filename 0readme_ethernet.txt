@@ -216,19 +216,19 @@ Note: As mentioned above, NAT networking is specifically capable of providing
 -------------------------------------------------------------------------------
 
 Windows notes:
- 1. The Windows-specific code uses the WinPCAP 4.1.3 package from
-    https://www.winpcap.org/install/bin/WinPcap_4_1_3.exe. This package 
-    for windows simulates the libpcap package that is freely available for 
-    un*x systems.  The Npcap package does not currently allow simulators
-    to exchange packets with the host system while WinPcap does.  
+ 1. The Npcap package available from https://nmap.org/npcap is the preferred
+    interface for Windows 7 onward since the original WinPCAP 4.1.3 package 
+    from https://www.winpcap.org/install/bin/WinPcap_4_1_3.exe is no longer
+    developed or supported. These packages for windows simulate the libpcap 
+    package that is freely available for un*x systems.  
 
  2. You must *install* the WinPCAP runtime package.
 
  3. The first time the WinPCAP driver is used, it will be dynamically loaded,
     and the user must be an Administrator on the machine to do so. If you need
     to run as an unprivileged user, you must set the "npf" driver to autostart. 
-    Current WinPcap installers provide an option to configure this at 
-    installation time, so if that choice is made, then there is no need for
+    Current Npcap and WinPcap installers provide an option to configure this 
+    at installation time, so if that choice is made, then there is no need for
     administrator privileged to run simulators with network support.
 
 
@@ -238,10 +238,11 @@ Building on Windows:
  Express 2008 or 2010 interactive development environments, read the file 
  ".\Visual Studio Projects\0ReadMe_Projects.txt" for details about the
  required dependencies.  Alternatively, you can build simh with networking
- support using the MinGW GCC compiler environment or the cygwin environment.
- Each of these Visual C++, MinGW and cygwin build environments require 
- WinPcap and Posix packages being available.  These should be located in a 
- directory structure parallel to the current simulator source directory.
+ support using the MinGW GCC compiler environment (32 bit) or the cygwin 
+ environment.  Each of these Visual C++, MinGW and cygwin build environments 
+ require Npcap or WinPcap and Posix threading packages being available.  
+ These should be located in a directory structure parallel to the current 
+ simulator source directory.
  
  For Example, the directory structure should look like:
 
@@ -268,8 +269,8 @@ Building on Windows:
  file is invoked with.
  
  The current windows network built binaries will run on any system without 
- regard to whether or not WinPcap is installed, and will provide 
- Network functionality when WinPcap is available.
+ regard to whether or not Npcap or WinPcap is installed, and will provide 
+ Network functionality when Npcap or WinPcap is available.
 
 -------------------------------------------------------------------------------
 

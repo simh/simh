@@ -56,7 +56,7 @@
 
   Supported/Tested Platforms:
 
-  Windows(NT,2K,XP,2K3,Vista,Win7)     WinPcap         V3.0+
+  Windows(NT,2K,XP,2K3,Vista,Win7)     WinPcap-4.1.3 Npcap-V0.9994
   Linux                     libpcap at least 0.9
   OpenBSD,FreeBSD,NetBSD    libpcap at least 0.9
   MAC OS/X                  libpcap at least 0.9
@@ -67,8 +67,11 @@
   Compaq Tru64 Unix         ??
   VMS                       Alpha/Itanium VMS only, needs VMS libpcap
   
-  WinPcap is available from: 
+  WinPcap is no longer developed or supported by was available from: 
                         http://winpcap.polito.it/
+  Npcap is a complete replacement for systems running Windows7 and later
+  and is available from:
+                        https://nmap.org/npcap
   libpcap for VMS is available from: 
                         http://simh.trailing-edge.com/sources/vms-pcap.zip
   libpcap for other Unix platforms is available at: 
@@ -82,8 +85,9 @@
         Current Version:  http://www.tcpdump.org/daily/libpcap-current.tar.gz
         Released Version: http://www.tcpdump.org/release/
 
-        When necessary (see NOTE above about vendor supplied libpcap), 
-        we've gotten the tarball, unpacked, built and installed it with:
+        When absolutely necessary (see NOTE above about vendor supplied 
+        libpcap), we've gotten the tarball, unpacked, built and installed 
+        it with:
             gzip -dc libpcap-current.tar.gz | tar xvf -
             cd libpcap-directory-name
             ./configure
