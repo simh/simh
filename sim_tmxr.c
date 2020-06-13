@@ -1620,9 +1620,9 @@ if ((lp->modembits != before_modem_bits) && (sim_deb && lp->mp && dptr)) {
     sim_debug (TMXR_DBG_MDM, dptr, " - Line %d - %p\n", (int)(lp-lp->mp->ldsc), lp->txb);
     }
 if (incoming_bits)
-    *incoming_bits = lp->modembits;
+    *incoming_bits = (lp->modembits & TMXR_MDM_INCOMING);
 if (lp->mp && lp->modem_control) {                  /* This API ONLY works on modem_control enabled multiplexer lines */
-    if (bits_to_set | bits_to_clear) {              /* Anything to do? */
+    if ((bits_to_set | bits_to_clear) || incoming_bits) {/* Anything to do? */
         if (lp->loopback) {
             if ((lp->modembits ^ before_modem_bits) & TMXR_MDM_DTR) { /* DTR changed? */
                 lp->ser_connect_pending = (lp->modembits & TMXR_MDM_DTR);
@@ -1630,8 +1630,12 @@ if (lp->mp && lp->modem_control) {                  /* This API ONLY works on mo
                 }
             return SCPE_OK;
             }
-        if (lp->serport)
-            return sim_control_serial (lp->serport, bits_to_set, bits_to_clear, incoming_bits);
+        if (lp->serport) {
+            t_stat r = sim_control_serial (lp->serport, bits_to_set, bits_to_clear, incoming_bits);
+            if (incoming_bits && (r == SCPE_OK))
+                lp->modembits = (lp->modembits & ~TMXR_MDM_INCOMING) | *incoming_bits;
+            return r;
+            }
         if ((lp->sock) || (lp->connecting)) {
             if ((before_modem_bits & bits_to_clear & TMXR_MDM_DTR) != 0) { /* drop DTR? */
                 if (lp->sock)
