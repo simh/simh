@@ -418,8 +418,6 @@ if (vid_main_thread_handle == NULL) {
     exit (1);
     }
 
-sim_os_set_thread_priority (PRIORITY_ABOVE_NORMAL);
-
 vid_beep_setup (400, 660);
 
 while (1) {
@@ -1596,6 +1594,8 @@ if (!initialized) {
     }
 
 sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE, vid_dev, "vid_thread() - Starting\n");
+
+sim_os_set_thread_priority (PRIORITY_ABOVE_NORMAL);
 
 memset (&vid_key_state, 0, sizeof(vid_key_state));
 
