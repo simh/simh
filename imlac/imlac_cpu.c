@@ -214,17 +214,17 @@ static void cpu_class2 (uint16 insn)
   if (insn & 0000100) /* DON */
     dp_on (1);
 
-  switch (insn & 0000600) {
+  switch (insn & 0000060) {
   case 0000000: /* RAL */
     cpu_ral (n);
     break;
-  case 0000200: /* RAR */
+  case 0000020: /* RAR */
     cpu_rar (n);
     break;
-  case 0000400: /* SAL */
+  case 0000040: /* SAL */
     AC = (AC & 0100000) | ((AC & 037777) << n);
     break;
-  case 0000600: /* SAR */
+  case 0000060: /* SAR */
     if (AC & 0100000)
       x = 01600000 >> n;
     else
