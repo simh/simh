@@ -383,11 +383,11 @@ dp_dlvh (uint16 insn1, uint16 insn2, uint16 insn3)
   m = insn2 & 07777;
   n = insn3 & 07777;
   if (insn3 & 010000) {
-    dx = m;
-    dy = n;
-  } else {
     dx = n;
     dy = m;
+  } else {
+    dx = m;
+    dy = n;
   }
   if (insn3 & 040000)
     XA -= SCALE * dx;
