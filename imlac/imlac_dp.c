@@ -30,7 +30,8 @@
 #define DBG             0001
 
 static t_addr DPC;
-static t_addr DT;
+static t_addr DT[8];
+static uint16 SP = 0;
 static uint16 ON = 0;
 static uint16 HALT = 0;
 static uint16 MODE = 0;
@@ -63,7 +64,8 @@ static REG dp_reg[] = {
   { ORDATAD (ON, ON, 1, "Display on") },
   { ORDATAD (HALT, HALT, 1, "Display halted") },
   { ORDATAD (MODE, MODE, 1, "Display mode") },
-  { ORDATAD (DT, DT, 16, "Return address") },
+  { BRDATAD (DT, DT, 8, 16, 8, "Return address stack") },
+  { ORDATAD (SP, SP, 3, "Stack pointer") },
   { ORDATAD (XA, XA, 11, "X accumulator") },
   { ORDATAD (YA, YA, 11, "Y accumulator") },
   { ORDATAD (SCALE, SCALE, 3, "Scale") },
@@ -118,6 +120,7 @@ void
 dp_on (int flag)
 {
   if (!ON && flag) {
+    SP = 0;
     MIT8K = 0;
     sim_activate_abs (&dp_unit, 0);
     sim_debug (DBG, &dp_dev, "Display on\n");
@@ -201,7 +204,10 @@ dp_opr(uint16 insn)
   }
   if (insn & 00040) { /* DRJM */
     sim_debug (DBG, &dp_dev, "DRJM ");
-    DPC = DT;
+    if (SP > 0)
+      DPC = DT[--SP];
+    else
+      sim_debug (DBG, &dp_dev, "stack underflow");
   }
   if (insn & 00100) { /* DDYM */
     sim_debug (DBG, &dp_dev, "DDYM ");
@@ -330,8 +336,12 @@ dp_inc_escape (uint16 byte)
 
   if (byte & 0100)
     MODE = 0;
-  if (byte & 040)
-    DPC = DT;
+  if (byte & 040) {
+    if (SP > 0)
+      DPC = DT[--SP];
+    else
+      sim_debug (DBG, &dp_dev, "stack underflow");
+  }
   if (byte & 020)
     XA += 040;
   if (byte & 010)
@@ -417,7 +427,10 @@ dp_insn (uint16 insn)
     break;
   case 5: /* DJMS */
     sim_debug (DBG, &dp_dev, "DJMS\n");
-    DT = DPC;
+    if (SP < 7)
+      DT[SP++] = DPC;
+    else
+      sim_debug (DBG, &dp_dev, "stack overflow");
     /* Fall through. */
   case 6: /* DJMP */
     sim_debug (DBG, &dp_dev, "DJMP\n");
