@@ -200,6 +200,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\imlac\imlac_bel.c"
+				>
+			</File>
+			<File
 				RelativePath="..\imlac\imlac_cpu.c"
 				>
 			</File>

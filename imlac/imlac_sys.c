@@ -49,7 +49,7 @@ DEVICE *sim_devices[] = {
   /* &pen_dev, / * 13 */
   &ptp_dev,   /* 27 */
   /* &mse_dev, / * 70, 73 */
-  /* &bel_dev, / * 71 */
+  &bel_dev,   /* 71 */
   NULL
 };
   

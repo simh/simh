@@ -1,4 +1,4 @@
-/* imlac_defs.h: Imlac simulator definitions
+/* imlac_bel.c: MIT bell device.
 
    Copyright (c) 2020, Lars Brinkhoff
 
@@ -22,57 +22,45 @@
    Except as contained in this notice, the name of Lars Brinkhoff shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Lars Brinkhoff.
-
-   21-Apr-20    LB      New simulator.
 */
 
-#ifndef IMLAC_DEFS_H_
-#define IMLAC_DEFS_H_  0
+#include "imlac_defs.h"
+#include "sim_video.h"
 
-#include "sim_defs.h"
+/* Debug */
+#define DBG             0001
 
-#define STOP_HALT       1
-#define STOP_IBKPT      2
-#define STOP_ACCESS     3
+/* Function declaration. */
+static uint16 bel_iot (uint16, uint16);
 
-#define FLAG_PTR     010000
-#define FLAG_PTP     000400
-#define FLAG_TTY_T   000040
-#define FLAG_KBD     000020
-#define FLAG_TTY_R   000010
-#define FLAG_SYNC    000002
+static IMDEV bel_imdev = {
+  1,
+  { { 0071, bel_iot, { "BEL" } } }
+};
 
-typedef struct {
-  uint16 num;
-  uint16 (*iot)(uint16 insn, uint16 AC);
-  const char *mnemonics[8];
-} SUBDEV;
+static DEBTAB bel_deb[] = {
+  { "DBG", DBG },
+  { NULL, 0 }
+};
 
-typedef struct {
-  int codes;
-  SUBDEV subdev[4];
-} IMDEV;
+DEVICE bel_dev = {
+  "BEL", NULL, NULL, NULL,
+  0, 8, 16, 1, 8, 16,
+  NULL, NULL, NULL,
+  NULL, NULL, NULL,
+  &bel_imdev, DEV_DISABLE | DEV_DEBUG | DEV_DIS, 0, bel_deb,
+  NULL, NULL, NULL, NULL, NULL, NULL
+};
 
-extern t_bool build_dev_tab (void);
-extern void flag_on (uint16 flag);
-extern void flag_off (uint16 flag);
-extern void dp_on (int flag);
-extern uint16 dp_is_on (void);
-extern void crt_point (uint16 x, uint16 y);
-extern void crt_line (uint16 x1, uint16 y1, uint16 x2, uint16 y2);
-extern void crt_idle (void);
-extern void crt_hvc (void);
-extern void rom_data (uint16 *data);
-extern void rom_tty (void);
-extern void rom_stty (void);
-extern void rom_ptr (void);
-
-extern REG cpu_reg[];
-extern uint16 M[];
-extern uint16 memmask;
-extern SUBDEV *dev_tab[0100];
-extern DEVICE cpu_dev, irq_dev, rom_dev, dp_dev, crt_dev, kbd_dev;
-extern DEVICE tty_dev, ptr_dev, ptp_dev, sync_dev;
-extern DEVICE bel_dev;
-
-#endif /* IMLAC_DEFS_H_ */
+static uint16
+bel_iot (uint16 insn, uint16 AC)
+{
+  sim_debug (DBG, &bel_dev, "IOT\n");
+  if ((insn & 0771) == 0711) { /* BEL */
+    sim_debug (DBG, &bel_dev, "Dong!\n");
+#ifdef HAVE_LIBSDL
+    vid_beep ();
+#endif
+  }
+  return AC;
+}

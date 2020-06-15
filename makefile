@@ -1496,7 +1496,7 @@ PDP10_OPT = -DVM_PDP10 -DUSE_INT64 -I ${PDP10D} -I ${PDP11D} ${NETWORK_OPT}
 IMLACD = ${SIMHD}/imlac
 IMLAC = ${IMLACD}/imlac_sys.c ${IMLACD}/imlac_cpu.c \
 	${IMLACD}/imlac_dp.c ${IMLACD}/imlac_crt.c ${IMLACD}/imlac_kbd.c \
-	${IMLACD}/imlac_tty.c ${IMLACD}/imlac_pt.c \
+	${IMLACD}/imlac_tty.c ${IMLACD}/imlac_pt.c ${IMLACD}/imlac_bel.c \
 	${DISPLAYL} ${DISPLAYIMLAC}
 IMLAC_OPT = -I ${IMLACD} ${DISPLAY_OPT}
 
