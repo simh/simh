@@ -288,7 +288,7 @@
         AIO_UNLOCK;                                             \
         }                                                       \
     else                                                        \
-        (void)0                                                 \
+        (void)0
 
 #define SZ_D(dp) (size_map[((dp)->dwidth + CHAR_BIT - 1) / CHAR_BIT])
 #define SZ_R(rp) \
@@ -11309,6 +11309,7 @@ do {
     uptr = sim_clock_queue;                             /* get first */
     sim_clock_queue = uptr->next;                       /* remove first */
     uptr->next = NULL;                                  /* hygiene */
+    sim_interval -= uptr->time;
     uptr->time = 0;
     if (sim_clock_queue != QUEUE_LIST_END)
         sim_interval += sim_clock_queue->time;
@@ -11515,9 +11516,9 @@ AIO_CANCEL(uptr);
 AIO_UPDATE_QUEUE;
 if (sim_clock_queue == QUEUE_LIST_END)
     return SCPE_OK;
-UPDATE_SIM_TIME;                                        /* update sim time */
 if (!sim_is_active (uptr))
     return SCPE_OK;
+UPDATE_SIM_TIME;                                        /* update sim time */
 sim_debug (SIM_DBG_EVENT, &sim_scp_dev, "Canceling Event for %s\n", sim_uname(uptr));
 nptr = QUEUE_LIST_END;
 
@@ -12054,14 +12055,16 @@ if (sim_brk_summ & BRK_TYP_DYN_ALL)
     btyp |= BRK_TYP_DYN_ALL;
 
 if ((bp = sim_brk_fnd_ex (loc, btyp, TRUE, spc))) {     /* in table, and type match? */
-    if (bp->time_fired[spc] == sim_time)                /* already taken?  */
+    double s_gtime = sim_gtime ();                      /* get time now */
+
+    if (bp->time_fired[spc] == s_gtime)                 /* already taken?  */
         return 0;
-    bp->time_fired[spc] = sim_time;                     /* remember match time */
+    bp->time_fired[spc] = s_gtime;                      /* remember match time */
     if (--bp->cnt > 0)                                  /* count > 0? */
         return 0;
     bp->cnt = 0;                                        /* reset count */
     sim_brk_setact (bp->act);                           /* set up actions */
-    sim_brk_match_type = btyp & bp->typ;                               /* set return value */
+    sim_brk_match_type = btyp & bp->typ;                /* set return value */
     if (bp->typ & BRK_TYP_TEMP)
         sim_brk_clr (loc, bp->typ);                     /* delete one-shot breakpoint */
     sim_brk_match_addr = loc;
