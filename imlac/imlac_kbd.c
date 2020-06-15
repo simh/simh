@@ -613,14 +613,13 @@ kbd_iot (uint16 insn, uint16 AC)
 static t_stat
 kbd_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-  t_stat r = SCPE_OK;
   if (strcmp (cptr, "DISPLAY") == 0)
     kbd_type = KBD_DISPLAY;
   else if (strcmp (cptr, "CONSOLE") == 0)
     kbd_type = KBD_CONSOLE;
   else
-    r = SCPE_ARG;
-  return r;
+    return SCPE_ARG;
+  return kbd_reset (&kbd_dev);
 }
 
 static t_stat
