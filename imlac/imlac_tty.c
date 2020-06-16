@@ -124,7 +124,7 @@ tty_r_svc(UNIT *uptr)
     return SCPE_OK;
 
   if (uptr->fileref != NULL) {
-    char buf;
+    unsigned char buf;
     if (sim_fread (&buf, 1, 1, uptr->fileref) == 1) {
       sim_debug (DBG, &tty_dev, "Received character %03o\n", buf);
       RBUF = buf;

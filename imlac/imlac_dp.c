@@ -148,8 +148,8 @@ dp_iot (uint16 insn, uint16 AC)
     DPC = 0;
   }
   if ((insn & 0772) == 0002) { /* DLA */
-    sim_debug (DBG, &dp_dev, "DPC set to %06o\n", AC);
-    DPC |= AC;
+    sim_debug (DBG, &dp_dev, "DPC set to %06o\n", AC & memmask);
+    DPC |= AC & memmask;
   }
   if ((insn & 0771) == 0011) { /* CTB */
     ;
