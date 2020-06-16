@@ -126,11 +126,3 @@ void
 crt_hvc (void)
 {
 }
-
-void cpu_get_switches (unsigned long *p1, unsigned long *p2)
-{
-}
-
-void cpu_set_switches (unsigned long p1, unsigned long p2)
-{
-}

@@ -25,6 +25,10 @@
 */
 
 #include "imlac_defs.h"
+#ifdef HAVE_LIBSDL
+#include "display/display.h"
+#endif
+
 
 /* Debug */
 #define DBG_CPU         0001
@@ -45,7 +49,6 @@ static uint16 DS;
 static uint16 IR;
 static uint16 MA;
 static uint16 MB;
-static uint16 SWITCHES;
 static int ion_delay = 0;
 
 /* IRQ state. */
@@ -77,7 +80,6 @@ REG cpu_reg[] = {
   { ORDATAD (IR, IR, 16, "Instruction") },
   { ORDATAD (MA, MA, 13, "Memory Address") },
   { ORDATAD (MB, MB, 16, "Memory Buffer") },
-  { ORDATAD (SWITCHES, SWITCHES, 16, "Toggle switches") },
   { NULL }
 };
 
@@ -574,3 +576,20 @@ rom_show_type (FILE *st, UNIT *up, int32 v, CONST void *dp)
   }
   return SCPE_OK;
 }
+
+#ifdef HAVE_LIBSDL
+/* Called from display library to get data switches. */
+void
+cpu_get_switches (unsigned long *p1, unsigned long *p2)
+{
+  *p1 = DS;
+  *p2 = 0;
+}
+
+/* Called from display library to set data switches. */
+void
+cpu_set_switches (unsigned long p1, unsigned long p2)
+{
+  DS = p1 & 0177777;
+}
+#endif /* HAVE_LIBSDL */
