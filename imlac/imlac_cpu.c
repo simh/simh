@@ -506,6 +506,12 @@ flag_off (uint16 flag)
   sim_debug (DBG_IRQ, &irq_dev, "Flag off %06o -> %06o\n", flag, FLAGS);
 }
 
+uint16
+flag_check (uint16 flag)
+{
+  return FLAGS & flag;
+}
+
 static uint16
 irq_iot (uint16 insn, uint16 AC)
 {

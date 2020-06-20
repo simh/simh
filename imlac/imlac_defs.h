@@ -56,6 +56,7 @@ typedef struct {
 extern t_bool build_dev_tab (void);
 extern void flag_on (uint16 flag);
 extern void flag_off (uint16 flag);
+extern uint16 flag_check (uint16 flag);
 extern void dp_on (int flag);
 extern uint16 dp_is_on (void);
 extern void crt_point (uint16 x, uint16 y);
