@@ -146,6 +146,7 @@ struct tmln {
     int32               xmte;                           /* xmt enable */
     int32               dstb;                           /* disable Telnet binary mode */
     t_bool              notelnet;                       /* raw binary data (no telnet interpretation) */
+    t_bool              nomessage;                      /* no connect/disconnect message on line even if telnet */
     uint8               *telnet_sent_opts;              /* Telnet Options which we have sent a DON'T/WON'T */
     int32               rxbpr;                          /* rcv buf remove */
     int32               rxbpi;                          /* rcv buf insert */
@@ -225,6 +226,7 @@ struct tmxr {
     char                *ring_ipad;                     /* incoming connection address awaiting DTR */
     SOCKET              ring_sock;                      /* incoming connection socket awaiting DTR */
     t_bool              notelnet;                       /* default telnet capability for incoming connections */
+    t_bool              nomessage;                      /* no connect/disconnect message on line even if telnet */
     t_bool              modem_control;                  /* multiplexer supports modem control behaviors */
     t_bool              port_speed_control;             /* multiplexer programmatically sets port speed */
     t_bool              packet;                         /* Lines are packet oriented */
@@ -255,6 +257,8 @@ t_stat tmxr_set_modem_control_passthru (TMXR *mp);
 t_stat tmxr_clear_modem_control_passthru (TMXR *mp);
 t_stat tmxr_set_notelnet (TMXR *mp);
 t_stat tmxr_clear_notelnet (TMXR *mp);
+t_stat tmxr_set_nomessage (TMXR *mp);
+t_stat tmxr_clear_nomessage (TMXR *mp);
 t_stat tmxr_set_port_speed_control (TMXR *mp);
 t_stat tmxr_clear_port_speed_control (TMXR *mp);
 t_stat tmxr_set_line_port_speed_control (TMXR *mp, int line);
