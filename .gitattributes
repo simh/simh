@@ -11,5 +11,6 @@
 *.dsk binary
 *.vhd binary
 *.crd binary
+*.dck binary
 sim_rev.h export-subst
 
