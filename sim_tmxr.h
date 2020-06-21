@@ -253,6 +253,8 @@ t_stat tmxr_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
 char *tmxr_line_attach_string(TMLN *lp);
 t_stat tmxr_set_modem_control_passthru (TMXR *mp);
 t_stat tmxr_clear_modem_control_passthru (TMXR *mp);
+t_stat tmxr_set_notelnet (TMXR *mp);
+t_stat tmxr_clear_notelnet (TMXR *mp);
 t_stat tmxr_set_port_speed_control (TMXR *mp);
 t_stat tmxr_clear_port_speed_control (TMXR *mp);
 t_stat tmxr_set_line_port_speed_control (TMXR *mp, int line);

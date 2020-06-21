@@ -1449,6 +1449,64 @@ t_stat tmxr_clear_modem_control_passthru (TMXR *mp)
 return tmxr_clear_modem_control_passthru_state (mp, FALSE);
 }
 
+/* Declare that all lines on a mux have telnet disabled or enabled.
+
+   This would best be called in a device reset routine and left.
+
+   If the device implementor wants to make this behavior a user option
+   we've got to reject the attempt to set or clear this mode if any 
+   ports on the MUX are attached.
+*/
+static t_stat tmxr_set_notelnet_state (TMXR *mp, t_bool state)
+{
+int i;
+
+if (mp->master)
+    return SCPE_ALATT;
+for (i=0; i<mp->lines; ++i) {
+    TMLN *lp;
+
+    lp = mp->ldsc + i;
+    if ((lp->master)     || 
+        (lp->sock)       || 
+        (lp->connecting) ||
+        (lp->serport))
+        return SCPE_ALATT;
+    }
+mp->notelnet = state;
+for (i=0; i<mp->lines; ++i)
+    mp->ldsc[i].notelnet = state;
+return SCPE_OK;
+}
+
+/* Disable Telnet on lines in a mux
+
+   Inputs:
+        none
+        
+   Output:
+        SCPE_OK or SCPE_ALATT
+
+*/
+t_stat tmxr_set_notelnet (TMXR *mp)
+{
+return tmxr_set_notelnet_state (mp, TRUE);
+}
+
+/* Enable Telnet on lines in a mux
+
+   Inputs:
+        none
+        
+   Output:
+        SCPE_OK or SCPE_ALATT
+
+*/
+t_stat tmxr_clear_notelnet (TMXR *mp)
+{
+return tmxr_set_notelnet_state (mp, FALSE);
+}
+
 /* Declare that tmxr_set_config_line is used.
 
    This would best be called in a device reset routine and left set.
