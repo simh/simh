@@ -340,6 +340,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\AltairZ80\s100_pmmi.c"
+				>
+			</File>
+			<File
 				RelativePath="..\AltairZ80\s100_scp300f.c"
 				>
 			</File>
