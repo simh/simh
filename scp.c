@@ -15396,6 +15396,10 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
             Bad = TRUE;
             Mprintf (f, "%u bits at offset %u is wider than the maximum allowed width of %u bits\n", rptr->width, rptr->offset, (uint32)(8 * sizeof(t_value)));
             }
+        if (rptr->width == 0) {
+            Bad = TRUE;
+            Mprintf (f, "a 0 bit wide register is meaningless\n");
+            }
         if ((rptr->obj_size != 0) && (rptr->ele_size != 0) && (rptr->depth != 0) && (rptr->macro != NULL)) {
             if (rptr->flags & REG_UNIT) {
                 if (udptr == NULL) {
