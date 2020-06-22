@@ -292,6 +292,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\AltairZ80\s100_2sio.c"
+				>
+			</File>
+			<File
 				RelativePath="..\AltairZ80\s100_64fdc.c"
 				>
 			</File>

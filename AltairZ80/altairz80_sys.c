@@ -68,6 +68,8 @@ extern DEVICE hdc1001_dev;
 
 extern DEVICE jade_dev;
 extern DEVICE tarbell_dev;
+extern DEVICE m2sio0_dev;
+extern DEVICE m2sio1_dev;
 
 extern DEVICE cromfdc_dev;
 extern DEVICE wd179x_dev;
@@ -123,6 +125,9 @@ DEVICE      *sim_devices[]  = {
     &jade_dev,
     /* Tarbell Devices */
     &tarbell_dev,
+    /* MITS 88-2SIO */
+    &m2sio0_dev,
+    &m2sio1_dev,
     /* Vector Graphic Devices */
     &fw2_dev, &vfdhd_dev,
     /* Single-Board Computers */
