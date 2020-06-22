@@ -304,7 +304,8 @@ static t_stat pmmi_reset(DEVICE *dptr)
 static t_stat pmmi_svc(UNIT *uptr)
 {
     PMMI_CTX *xptr;
-    int32 c,r,s,ireg2;
+    int32 c,s,ireg2;
+    t_stat r;
     uint32 ms;
 
     xptr = uptr->dptr->ctxt;
@@ -442,13 +443,13 @@ static t_stat pmmi_svc(UNIT *uptr)
 static t_stat pmmi_attach(UNIT *uptr, CONST char *cptr)
 {
     PMMI_CTX *xptr;
-    int32 status;
+    t_stat r;
 
     xptr = uptr->dptr->ctxt;
 
     sim_debug(VERBOSE_MSG, uptr->dptr, "attach (%s).\n", cptr);
 
-    if ((status = tmxr_attach(xptr->tmxr, uptr, cptr)) == SCPE_OK) {
+    if ((r = tmxr_attach(xptr->tmxr, uptr, cptr)) == SCPE_OK) {
 
         xptr->flags = uptr->flags;     /* Save Flags */
 
@@ -463,7 +464,7 @@ static t_stat pmmi_attach(UNIT *uptr, CONST char *cptr)
         sim_debug(VERBOSE_MSG, uptr->dptr, "activated service.\n");
     }
 
-    return (status);
+    return r;
 }
 
 
@@ -490,7 +491,8 @@ static t_stat pmmi_detach(UNIT *uptr)
 static t_stat pmmi_set_baud(UNIT *uptr, int32 value, const char *cptr, void *desc)
 {
     PMMI_CTX *xptr;
-    int32 baud,r;
+    int32 baud;
+    t_stat r = SCPE_ARG;
     char config[20];
 
     xptr = uptr->dptr->ctxt;
@@ -504,12 +506,11 @@ static t_stat pmmi_set_baud(UNIT *uptr, int32 value, const char *cptr, void *des
             if (baud >= 61 && baud <=600) {
                     xptr->baud = baud;
                     r = pmmi_config_line(uptr);
-                    return r;
             }
         }
     }
 
-    return SCPE_ARG;
+    return r;
 }
 
 static t_stat pmmi_show_baud(FILE *st, UNIT *uptr, int32 value, const void *desc)
@@ -529,7 +530,8 @@ static t_stat pmmi_config_line(UNIT *uptr)
 {
     PMMI_CTX *xptr;
     char config[20];
-    char r,b,p,s;
+    char b,p,s;
+    t_stat r = SCPE_IERR;
 
     xptr = uptr->dptr->ctxt;
 
