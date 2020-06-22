@@ -399,7 +399,8 @@ static t_stat m2sio_reset(DEVICE *dptr, int32 (*routine)(const int32, const int3
 static t_stat m2sio_svc(UNIT *uptr)
 {
     M2SIO_CTX *xptr;
-    int32 c,r,s,stb;
+    int32 c,s,stb;
+    t_stat r;
 
     xptr = uptr->dptr->ctxt;
 
@@ -497,13 +498,13 @@ static t_stat m2sio_svc(UNIT *uptr)
 static t_stat m2sio_attach(UNIT *uptr, CONST char *cptr)
 {
     M2SIO_CTX *xptr;
-    int32 status;
+    t_stat r;
 
     xptr = uptr->dptr->ctxt;
 
     sim_debug(VERBOSE_MSG, uptr->dptr, "attach (%s).\n", cptr);
 
-    if ((status = tmxr_attach(xptr->tmxr, uptr, cptr)) == SCPE_OK) {
+    if ((r = tmxr_attach(xptr->tmxr, uptr, cptr)) == SCPE_OK) {
 
         xptr->tmln->rcve = 1;
 
@@ -512,7 +513,7 @@ static t_stat m2sio_attach(UNIT *uptr, CONST char *cptr)
         sim_debug(VERBOSE_MSG, uptr->dptr, "activated service.\n");
     }
 
-    return (status);
+    return r;
 }
 
 
@@ -537,7 +538,8 @@ static t_stat m2sio_detach(UNIT *uptr)
 static t_stat m2sio_set_baud(UNIT *uptr, int32 value, const char *cptr, void *desc)
 {
     M2SIO_CTX *xptr;
-    int32 baud,r;
+    int32 baud;
+    t_stat r = SCPE_ARG;
     char config[20];
 
     xptr = uptr->dptr->ctxt;
@@ -568,7 +570,7 @@ static t_stat m2sio_set_baud(UNIT *uptr, int32 value, const char *cptr, void *de
         }
     }
 
-    return SCPE_ARG;
+    return r;
 }
 
 static t_stat m2sio_show_baud(FILE *st, UNIT *uptr, int32 value, const void *desc)
@@ -589,7 +591,7 @@ static t_stat m2sio_config_line(UNIT *uptr)
     M2SIO_CTX *xptr;
     char config[20];
     char *fmt;
-    int32 r;
+    t_stat r = SCPE_IERR;
 
     xptr = uptr->dptr->ctxt;
 
@@ -645,11 +647,9 @@ static t_stat m2sio_config_line(UNIT *uptr)
         */
         xptr->tmln->txbps = 0;   /* Get TMXR's timing out of our way */
         xptr->tmln->rxbps = 0;   /* Get TMXR's timing out of our way */
-
-        return r;
     }
 
-    return SCPE_ARG;
+    return r;
 }
 
 static int32 m2sio0_io(int32 addr, int32 io, int32 data)
