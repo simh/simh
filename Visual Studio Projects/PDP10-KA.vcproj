@@ -230,6 +230,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP10\ka10_pclk.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP10\ka10_pmp.c"
 				>
 			</File>
