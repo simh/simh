@@ -381,9 +381,6 @@ uint32 mt_cmd(UNIT * uptr, uint16 cmd, uint16 dev)
     uptr += unit;
     /* If unit disabled return error */
     if (uptr->flags & UNIT_DIS) {
-        /*
-        fprintf(stderr, "Attempt to access disconnected unit %s%d\n",
-                dptr->name, unit); */
         return SCPE_NODEV;
     }
 
@@ -396,8 +393,7 @@ uint32 mt_cmd(UNIT * uptr, uint16 cmd, uint16 dev)
     /* If drive is offline or not attached return not ready */
     if ((uptr->flags & (UNIT_ATT | MTUF_ONLINE)) !=
         (UNIT_ATT | MTUF_ONLINE)) {
-        fprintf(stderr, "Attempt to access offline unit %s%d\n\r",
-                dptr->name, unit);
+        sim_printf("Attempt to access offline unit %s%d\n\r", dptr->name, unit);
         return SCPE_IOERR;
     }
     /* Check if drive is ready to recieve a command */

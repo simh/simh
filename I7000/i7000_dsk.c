@@ -1391,8 +1391,8 @@ disk_write(UNIT * uptr, uint8 data, int chan, int eor)
     data &= (sense[schan] & STAT_SIXBIT)?077:0277;
     if (uptr->u5 & DSKSTA_CHECK) {
         if (dbuffer[u][uptr->u6++] != data) {
-        fprintf(stderr, "Mismatch %d %03o != %03o\n\r",
-                uptr->u6-1, dbuffer[u][uptr->u6-1], data);
+            sim_printf("Mismatch %d %03o != %03o\n\r",
+                   uptr->u6-1, dbuffer[u][uptr->u6-1], data);
             disk_posterr(uptr, DATA_CHECK);
         }
     } else {

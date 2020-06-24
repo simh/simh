@@ -4126,8 +4126,7 @@ prottrap:
 #endif
 
             default:
-                fprintf(stderr, "Invalid opcode %o IC=%o %012llo\n",
-                        opcode, IC, temp);
+                sim_printf("Invalid opcode %o IC=%o %012llo\n", opcode, IC, temp);
                 reason = STOP_UUO;
                 break;
             }

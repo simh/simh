@@ -475,6 +475,7 @@ lpr_attach(UNIT * uptr, CONST char *file)
 {
     t_stat              r;
 
+    sim_switches |= SWMASK ('A');   /* Position to EOF */
     if ((r = attach_unit(uptr, file)) != SCPE_OK)
         return r;
     uptr->u5 = 0;

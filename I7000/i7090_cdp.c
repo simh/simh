@@ -255,6 +255,7 @@ cdp_attach(UNIT * uptr, CONST char *file)
 {
     t_stat              r;
 
+    sim_switches |= SWMASK ('A');   /* Position to EOF */
     if ((r = sim_card_attach(uptr, file)) != SCPE_OK)
         return r;
     if (uptr->up7 == 0) {
