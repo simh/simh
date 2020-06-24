@@ -246,6 +246,7 @@ cp_srv(UNIT *uptr) {
 t_stat
 cp_attach(UNIT * uptr, CONST char *file)
 {
+    sim_switches |= SWMASK ('A');   /* Position to EOF */
     return sim_card_attach(uptr, file);
 }
 

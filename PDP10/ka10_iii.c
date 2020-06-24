@@ -92,7 +92,7 @@
 #define POS_Y      00000377700
 #define CBRT       00000000070       /* Current brightness */
 #define CSIZE      00000000007       /* Current char size */
-#define POS_X_V    16
+#define POS_X_V    17
 #define POS_Y_V    6
 #define CBRT_V     3
 #define CSIZE_V    0

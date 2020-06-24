@@ -43,9 +43,10 @@
 #define MARGIN   6
 
 #define UNIT_V_CT    (UNIT_V_UF + 0)
+#define UNIT_CT      (3 << UNIT_V_CT)
 #define UNIT_UC      (1 << UNIT_V_CT)
 #define UNIT_UTF8    (2 << UNIT_V_CT)
-#define UNIT_CT      (3 << UNIT_V_CT)
+#define UNIT_WA      (3 << UNIT_V_CT)
 
 #define PI_DONE  000007
 #define PI_ERROR 000070
@@ -98,8 +99,9 @@ REG lpt_reg[] = {
 
 MTAB lpt_mod[] = {
     {UNIT_CT, 0, "Lower case", "LC", NULL},
-    {UNIT_CT, UNIT_UC, "Upper case", "UC", NULL},
-    {UNIT_CT, UNIT_UTF8, "UTF8 ouput", "UTF8", NULL},
+    {UNIT_CT, UNIT_UC, "Upper case", "UC", NULL, NULL, NULL, "Fold lower to upper case"},
+    {UNIT_CT, UNIT_UTF8, "UTF8 ouput", "UTF8", NULL, NULL, NULL, "Extended character set"},
+    {UNIT_CT, UNIT_WA, "WAITS ouput", "WAITS", NULL, NULL, NULL, "Waits character set"},
     {MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "LINESPERPAGE", "LINESPERPAGE",
         &lpt_setlpp, &lpt_getlpp, NULL, "Number of lines per page"},
     {MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "DEV", "DEV",
@@ -210,37 +212,73 @@ lpt_printline(UNIT *uptr, int nl) {
 }
 
 uint16 utf_code[32] = {
-      0x0000,           /* Dot */
-      0x2193,           /* Down arrow */
-      0x237a,           /* APL Alpha */
-      0x03b2,           /* Beta */
-      0x039b,           /* Lambda */
-      0x2510,           /* Box light down and left */
-      0x03b5,           /* Epsilon */
-      0x03d6,           /* Pi */
-      0x03bb,           /* Lambda */
-      0x221d,           /* proportional */
-      0x222b,           /* Integral */
-      0x00b1,           /* Plus minus */
-      0x2295,           /* Circle plus */
-      0x221e,           /* Infinity */
-      0x2202,           /* Partial derivitive */
-      0x2282,           /* Subset of */
-      0x2283,           /* Superset of */
-      0x2229,           /* Intersection */
-      0x222a,           /* union */
-      0x2200,           /* For all */
-      0x2203,           /* Exists */
-      0x2295,           /* Circle plus */
-      0x2194,           /* Left right arrow */
-      0x2227,           /* Logical and */
-      0x2192,           /* Rightwards arror */
-      0x2014,           /* Em dash */
-      0x2260,           /* Not equal */
-      0x2264,           /* Less than or equal */
-      0x2265,           /* Greater than or equal */
-      0x2261,           /* Identical too */
-      0x2228            /* Logical or */
+      0x00b7,           /* 000 - Dot */
+      0x2193,           /* 001 - Down arrow */
+      0x03b1,           /* 002 - Alpha */
+      0x03b2,           /* 003 - Beta */
+      0x039b,           /* 004 - Lambda */
+      0x2510,           /* 005 - Box light down and left */
+      0x03b5,           /* 006 - Epsilon */
+      0x03d6,           /* 007 - Pi */
+      0x03bb,           /* 010 - Lambda */
+      0x03b3,           /* 011 - small gamma */
+      0x221d,           /* 012 - proportional */
+      0x222b,           /* 013 - Integral */
+      0x00b1,           /* 014 - Plus minus */
+      0x2295,           /* 015 - Circle plus */
+      0x221e,           /* 016 - Infinity */
+      0x2202,           /* 017 - Partial derivitive */
+      0x2282,           /* 020 - Subset of */
+      0x2283,           /* 021 - Superset of */
+      0x2229,           /* 022 - Intersection */
+      0x222a,           /* 023 - union */
+      0x2200,           /* 024 - For all */
+      0x2203,           /* 025 - Exists */
+      0x2295,           /* 026 - Circle plus */
+      0x2194,           /* 027 - Left right arrow */
+      0x2227,           /* 030 - Logical and */
+      0x2192,           /* 031 - Rightwards arror */
+      0x2014,           /* 032 - Em dash */
+      0x2260,           /* 033 - Not equal */
+      0x2264,           /* 034 - Less than or equal */
+      0x2265,           /* 035 - Greater than or equal */
+      0x2261,           /* 036 - Identical too */
+      0x2228            /* 037 - Logical or */
+ };
+
+uint16 waits_code[32] = {
+      0x00b7,           /* 000 - Dot */
+      0x2193,           /* 001 - Down arrow */
+      0x03b1,           /* 002 - Alpha */
+      0x03b2,           /* 003 - Beta */
+      0x2227,           /* 004 - Boolean AND */
+      0x00ac,           /* 005 - Boolean NOT */
+      0x03b5,           /* 006 - Epsilon */
+      0x03d6,           /* 007 - Pi */
+      0x03bb,           /* 010 - Lambda */
+      0x03b3,           /* 011 - small gamma */
+      0x03b4,           /* 012 - small delta */
+      0x222b,           /* 013 - Integral */
+      0x00b1,           /* 014 - Plus minus */
+      0x2295,           /* 015 - Circle plus */
+      0x221e,           /* 016 - Infinity */
+      0x2202,           /* 017 - Partial derivitive */
+      0x2282,           /* 020 - Subset of */
+      0x2283,           /* 021 - Superset of */
+      0x2229,           /* 022 - Intersection */
+      0x222a,           /* 023 - union */
+      0x2200,           /* 024 - For all */
+      0x2203,           /* 025 - Exists */
+      0x2295,           /* 026 - Circle plus */
+      0x2194,           /* 027 - Left right arrow */
+      0x2190,           /* 030 - underscore */
+      0x2192,           /* 031 - Rightwards arror */
+      0x2191,           /* 032 - Tilde */
+      0x2260,           /* 033 - Not equal */
+      0x2264,           /* 034 - Less than or equal */
+      0x2265,           /* 035 - Greater than or equal */
+      0x2261,           /* 036 - Identical too */
+      0x2228            /* 037 - Logical or */
  };
 
 /* Unit service */
@@ -251,10 +289,27 @@ lpt_output(UNIT *uptr, char c) {
        return;
     if (uptr->COL == 132)
         lpt_printline(uptr, 1);
-    if ((uptr->flags & UNIT_UC) && (c & 0140) == 0140)
+    if (((uptr->flags & UNIT_CT) == UNIT_UC) && (c & 0140) == 0140)
         c &= 0137;
-    if ((uptr->flags & UNIT_UTF8) && c < 040) {
+    if (((uptr->flags & UNIT_CT) == UNIT_UTF8) && c < 040) {
         uint16 u = utf_code[c & 0x1f];
+        if (u > 0x7ff) {
+            lpt_buffer[uptr->POS++] = 0xe0 + ((u >> 12) & 0xf);
+            lpt_buffer[uptr->POS++] = 0x80 + ((u >> 6) & 0x3f);
+            lpt_buffer[uptr->POS++] = 0x80 + (u & 0x3f);
+        } else if (u > 0x7f) {
+            lpt_buffer[uptr->POS++] = 0xc0 + ((u >> 6) & 0x3f);
+            lpt_buffer[uptr->POS++] = 0x80 + (u & 0x3f);
+        } else {
+            lpt_buffer[uptr->POS++] = u & 0x7f;
+        }
+        uptr->COL++;
+    } else if ((uptr->flags & UNIT_CT) == UNIT_WA) {
+        uint16 u = c & 0x7f;
+        if (c < 040) 
+             u = waits_code[c & 0x1f];
+        else if (c == 0136) /* up arrow */
+             u = 0x2191;
         if (u > 0x7ff) {
             lpt_buffer[uptr->POS++] = 0xe0 + ((u >> 12) & 0xf);
             lpt_buffer[uptr->POS++] = 0x80 + ((u >> 6) & 0x3f);

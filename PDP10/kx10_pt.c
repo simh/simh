@@ -209,7 +209,7 @@ t_stat ptp_attach (UNIT *uptr, CONST char *cptr)
 {
     t_stat reason;
 
-    sim_switches |= SWMASK ('A');       /* Default to Append to existing file */
+    sim_switches |= SWMASK ('A');   /* Position to EOF */
     reason = attach_unit (uptr, cptr);
     uptr->STATUS &= ~NO_TAPE_PP;
     return reason;

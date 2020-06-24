@@ -412,8 +412,8 @@ REG cpu_reg[] = {
 #endif
     { FLDATA (PIPEND, pi_pending, 0), REG_HRO},
     { FLDATA (PARITY, parity_irq, 0) },
-    { ORDATAD (APRIRQ, apr_irq, 0, "APR Interrupt number") },
-    { ORDATAD (CLKIRQ, clk_irq, 0, "CLK Interrupt number") },
+    { ORDATAD (APRIRQ, apr_irq, 3, "APR Interrupt number") },
+    { ORDATAD (CLKIRQ, clk_irq, 3, "CLK Interrupt number") },
     { FLDATA (CLKEN, clk_en, 0), REG_HRO},
     { FLDATA (XCT, xct_flag, 0), REG_HRO},
     { BRDATA (IRQV, dev_irq, 8, 16, 128 ), REG_HRO},
@@ -4273,6 +4273,8 @@ in_loop:
               }
          }
     } while (ind & !pi_rq);
+
+    /* If not a JRST clear the upper half of AR. */
     if (IR != 0254) {
        AR &= RMASK;
     }
@@ -5776,7 +5778,7 @@ dpnorm:
                       hst[hst_p].mb = AR;
                   }
                   MQ = 0;
-                  AR = SWAP_AR;
+                  AR = AR << 18;  /* Move to upper half */
                   goto ufa;
               }
 #endif
@@ -6223,7 +6225,7 @@ fnorm:
                   if (((SC & 0400) != 0) ^ ((SC & 0200) != 0))
                        fxu_hold_set = 1;
 #endif
-                  if (IR != 0130) {   /* !UFA */
+                  if (IR != 0130 && IR != 0247) {   /* !UFA and WAITS FIX */
 fnormx:
                       while (AR != 0 && ((AR & FPSBIT) != 0) == ((AR & FPNBIT) != 0) &&
                              ((AR & FPNBIT) != 0) == ((AR & FP1BIT) != 0)) {
@@ -6293,6 +6295,18 @@ fnormx:
                   check_apr_irq();
               }
 #endif
+#if WAITS
+              /* WAITS FIX Instruction. This can't occur if WAITS not set */
+              if (IR == 0247) {
+                  /* Extend sign if negative */
+                  if (flag1)
+                     AR |= EMASK;
+                  set_reg(AC, AR);
+                  break;
+              }
+#endif
+
+              /* Set exponent */
               SCAD = SC ^ ((AR & SMASK) ? 0377 : 0);
               AR &= SMASK|MMASK;
               AR |= ((uint64)(SCAD & 0377)) << 27;
@@ -6304,6 +6318,7 @@ fnormx:
                      MQ |= SMASK;
               }
 #else
+
               /* FADL FSBL FMPL */
               if ((IR & 07) == 1) {
                   SC = (SC + (0777 ^  26)) & 0777;
@@ -6316,14 +6331,13 @@ fnormx:
                   }
               }
 #endif
+              /* Kill exponent if 0 */
               if ((AR & MMASK) == 0)
                  AR = 0;
-
 
               /* Handle UFA */
               if (IR == 0130) {
                   set_reg(AC + 1, AR);
-                  break;
               }
               break;
 

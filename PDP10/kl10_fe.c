@@ -2163,6 +2163,7 @@ t_stat lp20_reset (DEVICE *dptr)
 
 t_stat lp20_attach (UNIT *uptr, CONST char *cptr)
 {
+    sim_switches |= SWMASK ('A');   /* Position to EOF */
     return attach_unit (uptr, cptr);
 }
 
