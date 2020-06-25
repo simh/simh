@@ -107,6 +107,9 @@ void dlo_clr_int (int32 ln);
 void dlo_set_int (int32 ln);
 int32 dlo_iack (void);
 void dlx_reset_ln (int32 ln);
+t_stat dl_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat dl_show_mode (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat dlx_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *dlx_description (DEVICE *dptr);
 
 /* DLI data structures
@@ -185,7 +188,7 @@ DEVICE dli_dev = {
     NULL, NULL, &dlx_reset,
     NULL, &dlx_attach, &dlx_detach,
     &dli_dib, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS | DEV_MUX | DEV_DEBUG,
-    0, dl_debug, NULL, NULL, NULL, NULL, NULL, &dlx_description};
+    0, dl_debug, NULL, NULL, &dlx_help, NULL, &dlx_desc, &dlx_description};
 
 /* DLO data structures
 
@@ -223,18 +226,16 @@ REG dlo_reg[] = {
     };
 
 MTAB dlo_mod[] = {
-    { TT_MODE, TT_MODE_UC, "UC", "UC", NULL },
-    { TT_MODE, TT_MODE_7B, "7b", "7B", NULL },
-    { TT_MODE, TT_MODE_8B, "8b", "8B", NULL },
-    { TT_MODE, TT_MODE_7P, "7p", "7P", NULL },
-    { DLX_MDM, 0,       "no dataset", "NODATASET", NULL },
-    { DLX_MDM, DLX_MDM, "dataset",    "DATASET",   NULL },
-    { MTAB_XTD|MTAB_VUN, 0, NULL, "DISCONNECT",
-      &tmxr_dscln, NULL, &dlx_desc },
-    { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, "LOG", "LOG",
-      &tmxr_set_log, &tmxr_show_log, &dlx_desc },
-    { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, NULL, "NOLOG",
-      &tmxr_set_nolog, NULL, &dlx_desc },
+    { MTAB_XTD|MTAB_VUN, TT_MODE_UC, NULL, "UC", &dl_set_mode, NULL, NULL, "Set upper case mode" },
+    { MTAB_XTD|MTAB_VUN, TT_MODE_7B, NULL, "7B", &dl_set_mode, NULL, NULL, "Set 7 bit mode" },
+    { MTAB_XTD|MTAB_VUN, TT_MODE_8B, NULL, "8B", &dl_set_mode, NULL, NULL, "Set 8 bit mode" },
+    { MTAB_XTD|MTAB_VUN, TT_MODE_7P, NULL, "7P", &dl_set_mode, NULL, NULL, "Set 7 bit mode - non printing suppressed" },
+    { MTAB_XTD|MTAB_VUN, 0,          "MODE", NULL, NULL, &dl_show_mode, NULL, "Show character mode" },
+    { DLX_MDM,           0,          "no dataset", "NODATASET", NULL, NULL, NULL, "Set modem signals disabled" },
+    { DLX_MDM,           DLX_MDM,    "dataset",    "DATASET",   NULL, NULL, NULL, "Set modem signals enabled" },
+    { MTAB_XTD|MTAB_VUN, 0,          NULL,    "DISCONNECT", &tmxr_dscln, NULL, &dlx_desc, "Disconnect line" },
+    { MTAB_XTD|MTAB_VUN|MTAB_NC, 0,  "LOG", "LOG=file", &tmxr_set_log, &tmxr_show_log, &dlx_desc, "Set Logging to file" },
+    { MTAB_XTD|MTAB_VUN|MTAB_NC, 0,  NULL, "NOLOG", &tmxr_set_nolog, NULL, &dlx_desc, "Disable logging on line n" },
     { 0 }
     };
 
@@ -244,7 +245,7 @@ DEVICE dlo_dev = {
     NULL, NULL, &dlx_reset,
     NULL, NULL, NULL,
     NULL, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS | DEV_DEBUG,
-    0, dl_debug, NULL, NULL, NULL, NULL, NULL, &dlx_description};
+    0, dl_debug, NULL, NULL, &dlx_help, NULL, &dlx_desc, &dlx_description};
 
 /* Register names for Debug tracing */
 static const char *dl_regs[] =
@@ -669,6 +670,68 @@ else {
 dlx_desc.lines = newln;
 dli_dib.lnt = newln * 010;                             /* upd IO page lnt */
 return auto_config (dli_dev.name, newln);              /* auto config */
+}
+
+/* SET character MODE processor */
+
+t_stat dl_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+uptr->flags &= ~TT_MODE;
+uptr->flags |= val;
+return SCPE_OK;
+}
+
+/* SHOW character MODE processor */
+
+t_stat dl_show_mode (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+static const char *modes[] = {"7B", "8B", "UC", "7P"};
+
+fprintf (st, "%s", modes[(uptr->flags & TT_MODE) >> TTUF_V_MODE]);
+return SCPE_OK;
+}
+
+t_stat dlx_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+{
+fprintf (st, "DLI/DLO Terminal Multiplexer (KL11/DL11)\n\n");
+fprintf (st, "The DLI/DLO implements up to %d KL11/DL11 terminal lines.\n", DLX_LINES);
+fprintf (st, "The default number of lines is %d.  The number of lines can\n", DLX_LINES);
+fprintf (st, "be changed with the command\n\n");
+fprintf (st, "   sim> SET DLI LINES=n            set line count to n\n\n");
+fprintf (st, "The DLI/DLO supports four character processing modes, UC, 7P, 7B, and 8B:\n\n");
+fprintf (st, "  mode    input characters     output characters\n");
+fprintf (st, "  ===========================================================\n");
+fprintf (st, "  UC  lower case converted to  lower case converted to upper case,\n");
+fprintf (st, "      upper case, high-order   case, high-order bit cleared,\n");
+fprintf (st, "      bit cleared\n");
+fprintf (st, "  7P  high-order bit cleared   high-order bit cleared,\n");
+fprintf (st, "                               non-printing characters suppressed\n");
+fprintf (st, "  7B  high-order bit cleared   high-order bit cleared\n");
+fprintf (st, "  8B  no changes               no changes\n\n");
+fprintf (st, "The default is UC.  To change the character processing mode, use\n");
+fprintf (st, "the command:\n\n");
+fprintf (st, "   sim> SET DLOn {UC|7P|7B|8B}\n\n");
+fprintf (st, "The DLO supports logging on a per-line basis.  The command\n\n");
+fprintf (st, "   sim> SET DLOn LOG=filename\n\n");
+fprintf (st, "enables logging for the specified line(n) to the indicated file.\n");
+fprintf (st, "The command:\n\n");
+fprintf (st, "   sim> SET DLOn NOLOG=line\n\n");
+fprintf (st, "disables logging for the specified line and closes any open log file.\n");
+fprintf (st, "Finally, the command:\n\n");
+fprintf (st, "   sim> SHOW DLOn LOG\n\n");
+fprintf (st, "displays logging information for line n.\n\n");
+fprintf (st, "Once the DLI is attached and the simulator is running, the DLI will listen\n");
+fprintf (st, "for connections on the specified port.  It assumes that the incoming\n");
+fprintf (st, "connections are Telnet connections.  The connection remains open until\n");
+fprintf (st, "disconnected by the simulated program, the Telnet client, a\n");
+fprintf (st, "SET DLOn DISCONNECT command, or a DETACH DLI command.\n\n");
+fprintf (st, "Other special DLI/DLO commands:\n\n");
+fprintf (st, "   sim> SHOW DLI CONNECTIONS           show current connections\n");
+fprintf (st, "   sim> SHOW DLI STATISTICS            show statistics for active connections\n");
+fprintf (st, "   sim> SET DLI DISCONNECT=linenumber  disconnects the specified line.\n\n");
+fprintf (st, "All open connections are lost when the simulator shuts down or the DLI is\n");
+fprintf (st, "detached.\n\n");
+return SCPE_OK;
 }
 
 const char *dlx_description (DEVICE *dptr)
