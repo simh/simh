@@ -62,7 +62,19 @@ static int rom_type = ROM_NONE;
 static int halt;
 uint16 memmask = 017777;
 
+static struct {
+  uint16 PC;
+  uint16 IR;
+  uint16 MA;
+  uint16 MB;
+  uint16 AC;
+  uint16 L;
+} *history = NULL;
+static uint32 history_i, history_j, history_m, history_n;
+
 /* Function declaration. */
+static t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static t_stat cpu_ex (t_value *vptr, t_addr ea, UNIT *uptr, int32 sw);
 static t_stat cpu_dep (t_value val, t_addr ea, UNIT *uptr, int32 sw);
 static t_stat cpu_reset (DEVICE *dptr);
@@ -86,6 +98,8 @@ REG cpu_reg[] = {
 static MTAB cpu_mod[] = {
   { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &sim_set_idle, &sim_show_idle },
   { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL },
+  { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
+    &cpu_set_hist, &cpu_show_hist },
   { 0 }
 };
 
@@ -325,6 +339,12 @@ cpu_insn (void)
     }
   }
 
+  if (history) {
+    history[history_i].PC = PC;
+    history[history_i].IR = IR;
+    history[history_i].MA = MA;
+  }
+
   pcinc (1);
 
   /* Execute cycle. */
@@ -404,6 +424,15 @@ cpu_insn (void)
     sim_debug (DBG_CPU, &cpu_dev, "Unknown instruction: %06o\n", IR);
     break;
   }
+
+  if (history) {
+    history[history_i].MB = MB;
+    history[history_i].AC = AC;
+    history[history_i].L = L;
+    history_i = (history_i + 1) % history_m;
+    if (history_n < history_m)
+      history_n++;
+  }
 }
 
 t_stat sim_instr (void)
@@ -447,6 +476,59 @@ t_stat sim_instr (void)
       sim_debug (DBG_IRQ, &irq_dev, "Interrupts on\n");
       ION = 1;
     }
+  }
+
+  return SCPE_OK;
+}
+
+static t_stat
+cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+  t_stat r;
+  uint32 x;
+
+  if (cptr == NULL)
+    return SCPE_ARG;
+
+  x = get_uint (cptr, 10, 1000000, &r);
+  if (r != SCPE_OK)
+    return r;
+
+  history = calloc (x, sizeof (*history));
+  if (history == NULL)
+    return SCPE_MEM;
+
+  history_m = x;
+  history_n = 0;
+  history_i = 0;
+  return SCPE_OK;
+}
+
+static t_stat
+cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+  t_value insn;
+  uint32 i, j;
+
+  fprintf (st, "PC____ IR____ MA____ MB____ AC____ L\n");
+
+  if (history_i >= history_n)
+    j = history_i - history_n;
+  else
+    j = history_m + history_i - history_n;
+
+  for (i = 0; i < history_n; i++) {
+    fprintf (st, "%06o %06o %06o %06o %06o %d  ",
+             history[j].PC,
+             history[j].IR,
+             history[j].MA,
+             history[j].MB,
+             history[j].AC,
+             history[j].L);
+    insn = history[j].IR;
+    fprint_sym (st, history[j].PC, &insn, NULL, SWMASK ('M'));
+    fputc ('\n', st);
+    j = (j + 1) % history_m;
   }
 
   return SCPE_OK;
