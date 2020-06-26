@@ -92,7 +92,6 @@ static t_stat
 ptr_svc (UNIT *uptr)
 {
   unsigned char ch;
-  uint16 flag;
 
   /* This function is called when the motor is on.  The data ready
      flag toggles on and off when the tape goes past the read head. */
