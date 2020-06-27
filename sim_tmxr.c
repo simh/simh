@@ -868,9 +868,10 @@ if (tptr == NULL)                                       /* no more mem? */
     return tptr;
 
 if (mp->port)                                           /* copy port */
-    sprintf (growstring(&tptr, 13 + strlen (mp->port)), "%s%s%s", mp->port, 
-                                                                  mp->notelnet ? ";notelnet" : "", 
-                                                                  mp->nomessage ? ";nomessage" : "");
+    sprintf (growstring(&tptr, 33 + strlen (mp->port)), "%s%s", mp->port, 
+                                                                mp->notelnet ? ";notelnet" : 
+                                                                               (mp->nomessage ? ";nomessage" : 
+                                                                                                ""));
 if (mp->logfiletmpl[0])                                 /* logfile info */
     sprintf (growstring(&tptr, 7 + strlen (mp->logfiletmpl)), ",Log=%s", mp->logfiletmpl);
 if (mp->buffered)
@@ -940,7 +941,7 @@ if (lp->destination || lp->port || lp->txlogname || (lp->conn == TMXR_LINE_DISAB
     if (lp->mp->packet != lp->packet)
         sprintf (growstring(&tptr, 8), ",Packet");
     if (lp->port)
-        sprintf (growstring(&tptr, 12 + strlen (lp->port)), ",%s%s%s", lp->port, 
+        sprintf (growstring(&tptr, 32 + strlen (lp->port)), ",%s%s%s", lp->port, 
                                                                        ((lp->mp->notelnet != lp->notelnet) && (!lp->datagram)) ? (lp->notelnet ? ";notelnet" : ";telnet") : "", 
                                                                        ((lp->mp->nomessage != lp->nomessage) && (!lp->datagram)) ? (lp->nomessage ? ";nomessage" : ";message") : "");
     if (lp->destination) {
@@ -2734,6 +2735,8 @@ for (i = 0; i < mp->lines; i++) {               /* initialize lines */
     if (lp->bpsfactor == 0.0)
         lp->bpsfactor = 1.0;
     }
+notelnet = listennotelnet = mp->notelnet;
+nomessage = listennomessage = mp->nomessage;
 mp->ring_sock = INVALID_SOCKET;
 free (mp->ring_ipad);
 mp->ring_ipad = NULL;
@@ -2748,7 +2751,7 @@ while (*tptr) {
     memset(port,        '\0', sizeof(port));
     memset(option,      '\0', sizeof(option));
     memset(speed,       '\0', sizeof(speed));
-    nolog = notelnet = listennotelnet = nomessage = listennomessage = loopback = disabled = FALSE;
+    nolog = loopback = disabled = FALSE;
     datagram = mp->datagram;
     packet = mp->packet;
     if (mp->buffered)
