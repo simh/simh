@@ -5871,22 +5871,63 @@ return NULL;
 
 /* Show device and unit */
 
+static size_t dev_name_len;
+
+const char *_sim_name_prefix (const char *name, const char *prefix)
+{
+static char nambuf[CBUFSIZE];
+size_t prefix_len = prefix ? strlen (prefix) : 0;
+size_t name_len = name ? strlen (name) : 0;
+size_t string_len = prefix_len + name_len;
+
+snprintf (nambuf, sizeof (nambuf), "%s%*s", prefix ? prefix : "", 
+                                           ((string_len <= 6) && (dev_name_len <= 6)) ? -((int)(8 - prefix_len)) : 
+                                                                                        -((int)(dev_name_len + 2)), 
+                                           name ? name : "");
+return nambuf;
+}
+
+const char *_sim_dname_prefix (DEVICE *dptr, const char *prefix)
+{
+return _sim_name_prefix (sim_dname (dptr), prefix);
+}
+
+const char *_sim_uname_prefix (UNIT *uptr, const char *prefix)
+{
+return _sim_name_prefix (sim_uname (uptr), prefix);
+}
+
+const char *_sim_dname (DEVICE *dptr)
+{
+return _sim_dname_prefix (dptr, "");
+}
+
+const char *_sim_uname (UNIT *uptr)
+{
+return _sim_uname_prefix (uptr, "");
+}
+
+const char *_sim_dname_space ()
+{
+return _sim_dname_prefix (NULL, "");
+}
+
 t_stat show_device (FILE *st, DEVICE *dptr, int32 flag)
 {
 uint32 j, udbl, ucnt;
 UNIT *uptr;
-int32 toks = 0;
+int32 toks = -1;
 
-fprintf (st, "%s", sim_dname (dptr));                   /* print dev name */
+fprintf (st, "%s", _sim_dname (dptr));                   /* print dev name */
 if ((flag == 2) && dptr->description) {
-    fprintf (st, "\t%s\n", dptr->description(dptr));
+    fprintf (st, "%s\n", dptr->description(dptr));
     }
 else {
     if ((sim_switches & SWMASK ('D')) && dptr->description)
-        fprintf (st, "\t%s\n", dptr->description(dptr));
+        fprintf (st, "%s\n", dptr->description(dptr));
     }
 if (qdisable (dptr)) {                                  /* disabled? */
-    fprintf (st, "\tdisabled\n");
+    fprintf (st, "%s\n", "disabled");
     return SCPE_OK;
     }
 for (j = ucnt = udbl = 0; j < dptr->numunits; j++) {    /* count units */
@@ -5927,19 +5968,23 @@ return SCPE_OK;
 
 void fprint_sep (FILE *st, int32 *tokens)
 {
-fprintf (st, (*tokens > 0) ? ", " : "\t");
+fprintf (st, (*tokens > 0) ? ", " : ((*tokens < 0) ? "" : _sim_dname_space ()));
 *tokens += 1;
+if (*tokens == 0)
+    *tokens = 1;
 }
 
 t_stat show_unit (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag)
 {
-int32 u = (int32)(uptr - dptr->units);
-int32 toks = 0;
+int32 toks = -1;
 
 if (flag > 1)
-    fprintf (st, "  %s%d", sim_dname (dptr), u);
-else if (flag < 0)
-    fprintf (st, "%s%d", sim_dname (dptr), u);
+    fprintf (st, "%s", _sim_uname_prefix (uptr, "  "));
+else 
+    if (flag < 0)
+        fprintf (st, "%s", _sim_uname (uptr));
+    else
+        toks = 0;
 if (uptr->flags & UNIT_FIX) {
     fprint_sep (st, &toks);
     fprint_capac (st, dptr, uptr);
@@ -6257,15 +6302,24 @@ t_bool only_enabled = (sim_switches & SWMASK ('E'));
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 fprintf (st, "%s simulator configuration%s\n\n", sim_name, only_enabled ? " (enabled devices)" : "");
+for (i = dev_name_len = 0; (dptr = sim_devices[i]) != NULL; i++)
+    if (!only_enabled || !qdisable (dptr))
+        if (dev_name_len < strlen (dptr->name))
+            dev_name_len = strlen (dptr->name);
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++)
     if (!only_enabled || !qdisable (dptr))
         show_device (st, dptr, flag);
 if (sim_switches & SWMASK ('I')) {
+    for (i = dev_name_len = 0; sim_internal_device_count && (dptr = sim_internal_devices[i]); ++i)
+        if (!only_enabled || !qdisable (dptr))
+            if (dev_name_len < strlen (dptr->name))
+                dev_name_len = strlen (dptr->name);
     fprintf (st, "\nInternal Devices%s\n\n", only_enabled ? " (enabled devices)" : "");
     for (i = 0; sim_internal_device_count && (dptr = sim_internal_devices[i]); ++i)
         if (!only_enabled || !qdisable (dptr))
             show_device (st, dptr, flag);
     }
+dev_name_len = 0;
 return SCPE_OK;
 }
 
