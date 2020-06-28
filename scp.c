@@ -5968,7 +5968,7 @@ return SCPE_OK;
 
 void fprint_sep (FILE *st, int32 *tokens)
 {
-fprintf (st, (*tokens > 0) ? ", " : ((*tokens < 0) ? "" : _sim_dname_space ()));
+fprintf (st, "%s", (*tokens > 0) ? ", " : ((*tokens < 0) ? "" : _sim_dname_space ()));
 *tokens += 1;
 if (*tokens == 0)
     *tokens = 1;
