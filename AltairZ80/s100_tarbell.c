@@ -1,7 +1,7 @@
-/*  s100_tarbell.c: Tarbell 1011 SSSD Disk Controller
+/*  s100_tarbell.c: Tarbell 1011/2022 Disk Controller
   
     Created by Patrick Linstruth (patrick@deltecent.com)
-    Based on s100_mdsa.c written by Mike Douglas
+    Based on s100_tarbell.c
   
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,16 @@
     Except as contained in this notice, the name of Patrick Linstruth shall not
     be used in advertising or otherwise to promote the sale, use or other dealings
     in this Software without prior written authorization from Patrick Linstruth.
+
+
+    These functions support simulated Tarbell model 1011 single density and
+    and model 2022 double density floppy disk controllers.
+
+    The model is selected using the "SET TARBELL MODEL={SD|DD}" command.
+
+    This device does not support the DMA feature of the double density
+    controller. All software using this simulator must use programmed
+    I/O.
 */
 
 /* #define DBG_MSG */
@@ -44,15 +54,23 @@ extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
                                int32 (*routine)(const int32, const int32, const int32), const char* name, uint8 unmap);
 
+/* These are needed for DMA. */
+extern void PutByteDMA(const uint32 addr, const uint32 val);
+extern uint8 GetByteDMA(const uint32 addr);
+
 #define TARBELL_MAX_ADAPTERS      1
 #define TARBELL_MAX_DRIVES        4
 #define TARBELL_SECTOR_LEN        128
-#define TARBELL_SECTORS_PER_TRACK 26
-#define TARBELL_BYTES_PER_TRACK   ((TARBELL_SECTORS_PER_TRACK * 186) + 73 + 247)
+#define TARBELL_SPT_SD            26
+#define TARBELL_SPT_DD            51
 #define TARBELL_TRACKS            77
-#define TARBELL_CAPACITY          (256256)      /* Default Tarbell Disk Capacity */
+#define TARBELL_CAPACITY          (256256)      /* Default Tarbell Single Density Disk Capacity */
 #define TARBELL_ROTATION_MS       (166)         /* 166 milliseconds per revolution */
 #define TARBELL_HEAD_TIMEOUT      (TARBELL_ROTATION_MS * 1000 * 2)   /* usec * 2 revolutions */
+
+#define IBM3740_TRK_HDR_LEN       73
+#define IBM3740_SD_SEC_LEN        186
+#define IBM3740_DD_SEC_LEN        196
 
 #define TARBELL_PROM_SIZE         32
 #define TARBELL_PROM_MASK         (TARBELL_PROM_SIZE-1)
@@ -60,6 +78,14 @@ extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_typ
 #define TARBELL_RAM_MASK          (TARBELL_RAM_SIZE-1)
 #define TARBELL_PROM_READ         FALSE
 #define TARBELL_PROM_WRITE        TRUE
+
+#define TARBELL_MEMBASE     0x0000
+#define TARBELL_MEMSIZE     TARBELL_RAM_SIZE
+#define TARBELL_IOBASE      0xF8
+#define TARBELL_IOSIZE_SD   5
+#define TARBELL_IOSIZE_DD   6
+#define TARBELL_DMABASE     0xE0
+#define TARBELL_DMASIZE     16
 
 /* Tarbell PROM is 32 bytes */
 static uint8 tarbell_prom[TARBELL_PROM_SIZE] = {
@@ -72,7 +98,7 @@ static uint8 tarbell_prom[TARBELL_PROM_SIZE] = {
 static uint8 tarbell_ram[TARBELL_RAM_SIZE];
 
 /*
-** Western Digital FD1771 Registers and Interface Controls
+** Western Digital FD17XX Registers and Interface Controls
 */
 typedef struct {
     uint8   track;          /* Track Register */
@@ -88,42 +114,47 @@ typedef struct {
     uint8   readTrkActive;  /* Read Track Active */
     uint8   writeActive;    /* Write Active */
     uint8   writeTrkActive; /* Write Track Active */
+    uint8   dataAddrMrk;    /* Data Addr Mark Flag */
     uint8   addrActive;     /* Address Active */
-    uint8   driveNotReady;  /* Drive Not Ready */
-    uint8   headLoaded;     /* Head Loaded */
-} FD1771_REG;
+} FD17XX_REG;
 
-#define FD1771_STAT_NOTREADY   0x80
-#define FD1771_STAT_WRITEPROT  0x40
-#define FD1771_STAT_RTYPEMSB   0x40
-#define FD1771_STAT_HEADLOAD   0x20
-#define FD1771_STAT_RTYPELSB   0x20
-#define FD1771_STAT_WRITEFAULT 0x20
-#define FD1771_STAT_SEEKERROR  0x10
-#define FD1771_STAT_NOTFOUND   0x10
-#define FD1771_STAT_CRCERROR   0x08
-#define FD1771_STAT_TRACK0     0x04
-#define FD1771_STAT_LOSTDATA   0x04
-#define FD1771_STAT_INDEX      0x02
-#define FD1771_STAT_DRQ        0x02
-#define FD1771_STAT_BUSY       0x01
+#define FD17XX_STAT_NOTREADY   0x80
+#define FD17XX_STAT_WRITEPROT  0x40
+#define FD17XX_STAT_RTYPEMSB   0x40
+#define FD17XX_STAT_HEADLOAD   0x20
+#define FD17XX_STAT_RTYPELSB   0x20
+#define FD17XX_STAT_WRITEFAULT 0x20
+#define FD17XX_STAT_SEEKERROR  0x10
+#define FD17XX_STAT_NOTFOUND   0x10
+#define FD17XX_STAT_CRCERROR   0x08
+#define FD17XX_STAT_TRACK0     0x04
+#define FD17XX_STAT_LOSTDATA   0x04
+#define FD17XX_STAT_INDEX      0x02
+#define FD17XX_STAT_DRQ        0x02
+#define FD17XX_STAT_BUSY       0x01
 
 typedef struct {
     PNP_INFO  pnp;            /* Plug and Play */
+    uint32    dma_base;       /* DMA base I/O address */
+    uint32    dma_size;       /* DMA I/O size */
+    uint32    ddEnabled;      /* 0=SD,1=DD */
     uint32    headTimeout;    /* Head unload timer value */
     uint8     promEnabled;    /* PROM is enabled */
     uint8     writeProtect;   /* Write Protect is enabled */
     uint8     currentDrive;   /* currently selected drive */
-    FD1771_REG FD1771[TARBELL_MAX_DRIVES];   /* FD1771 Registers and Data */
+    uint8     secsPerTrack;   /* sectors per track */
+    uint16    bytesPerTrack;  /* bytes per track */
+    uint8     headLoaded[TARBELL_MAX_DRIVES];     /* Head Loaded */
+    uint8     doubleDensity[TARBELL_MAX_DRIVES];  /* true if double density */
+    uint8     side[TARBELL_MAX_DRIVES];           /* side 0 or side 1 */
+    FD17XX_REG FD17XX;        /* FD17XX Registers and Data */
     UNIT *uptr[TARBELL_MAX_DRIVES];
 } TARBELL_INFO;
 
-#define TARBELL_PNP_MEMBASE     0x0000
-#define TARBELL_PNP_MEMSIZE     TARBELL_RAM_SIZE
-#define TARBELL_PNP_IOBASE      0xF8
-#define TARBELL_PNP_IOSIZE      5
+static TARBELL_INFO tarbell_info_data = {
+    { TARBELL_MEMBASE, TARBELL_MEMSIZE, TARBELL_IOBASE, TARBELL_IOSIZE_SD }, TARBELL_DMABASE, TARBELL_DMASIZE
+};
 
-static TARBELL_INFO tarbell_info_data = { { TARBELL_PNP_MEMBASE, TARBELL_PNP_MEMSIZE, TARBELL_PNP_IOBASE, TARBELL_PNP_IOSIZE } };
 static TARBELL_INFO *tarbell_info = &tarbell_info_data;
 
 static uint8 sdata[TARBELL_SECTOR_LEN];
@@ -134,7 +165,10 @@ static uint8 sdata[TARBELL_SECTOR_LEN];
 #define TARBELL_REG_TRACK          0x01
 #define TARBELL_REG_SECTOR         0x02
 #define TARBELL_REG_DATA           0x03
-#define TARBELL_REG_EXT            0x04
+#define TARBELL_REG_WAIT           0x04
+#define TARBELL_REG_DRVSEL         0x04
+#define TARBELL_REG_DMASTAT        0x05
+#define TARBELL_REG_EXTADDR        0x05
 
 /* Tarbell Commands */
 #define TARBELL_CMD_RESTORE        0x00
@@ -183,24 +217,36 @@ static uint8 sdata[TARBELL_SECTOR_LEN];
 #define TARBELL_ADDR_CRC1          0x04
 #define TARBELL_ADDR_CRC2          0x05
 
+#define TARBELL_DENS_MASK          0x08
+#define TARBELL_DSEL_MASK          0x30
+#define TARBELL_SIDE_MASK          0x40
+
 /* Local function prototypes */
 static t_stat tarbell_reset(DEVICE *tarbell_dev);
 static t_stat tarbell_svc(UNIT *uptr);
 static t_stat tarbell_attach(UNIT *uptr, CONST char *cptr);
 static t_stat tarbell_detach(UNIT *uptr);
 static t_stat tarbell_boot(int32 unitno, DEVICE *dptr);
-static t_stat tarbell_set_prom(UNIT *uptr, int32 value, CONST char *cptr, void *desc);
-static void TARBELL_HeadLoad(UNIT *uptr, FD1771_REG *pFD1771, uint8 load);
+static t_stat tarbell_set_dmabase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat tarbell_show_dmabase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat tarbell_set_prom(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat tarbell_show_prom(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static t_stat tarbell_set_model(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+static t_stat tarbell_show_model(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+static uint32 secs_per_track(uint8 track);
+static uint32 bytes_per_track(uint8 track);
+static uint32 calculate_tarbell_sec_offset(uint8 track, uint8 sector);
+static void TARBELL_HeadLoad(UNIT *uptr, FD17XX_REG *pFD17XX, uint8 load);
 static uint8 TARBELL_Read(uint32 Addr);
 static uint8 TARBELL_Write(uint32 Addr, int32 data);
-static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 data);
+static uint8 TARBELL_Command(UNIT *uptr, FD17XX_REG *pFD17XX, int32 data);
 static uint32 TARBELL_ReadSector(UNIT *uptr, uint8 track, uint8 sector, uint8 *buffer);
 static uint32 TARBELL_WriteSector(UNIT *uptr, uint8 track, uint8 sector, uint8 *buffer);
 static const char* tarbell_description(DEVICE *dptr);
 static void showdata(int32 isRead);
-static void showregs(FD1771_REG *pFD1771);
 
 static int32 tarbelldev(int32 Addr, int32 rw, int32 data);
+static int32 tarbelldma(int32 Addr, int32 rw, int32 data);
 static int32 tarbellprom(int32 Addr, int32 rw, int32 data);
 
 static UNIT tarbell_unit[TARBELL_MAX_DRIVES] = {
@@ -211,47 +257,60 @@ static UNIT tarbell_unit[TARBELL_MAX_DRIVES] = {
 };
 
 static REG tarbell_reg[] = {
+    { DRDATAD (DRIVE, tarbell_info_data.currentDrive, 8, "Current drive register"), },
+    { HRDATAD (STATUS, tarbell_info_data.FD17XX.status, 8, "Status register"), },
+    { HRDATAD (COMMAND, tarbell_info_data.FD17XX.command, 8, "Command register"), },
+    { HRDATAD (DATA, tarbell_info_data.FD17XX.data, 8, "Data register"), },
+    { DRDATAD (TRACK, tarbell_info_data.FD17XX.track, 8, "Track register"), },
+    { DRDATAD (SECTOR, tarbell_info_data.FD17XX.sector, 8, "Sector register"), },
+    { DRDATAD (SPT, tarbell_info_data.secsPerTrack, 8, "Sectors per track register"), },
+    { DRDATAD (BPT, tarbell_info_data.bytesPerTrack, 16, "Bytes per track register"), },
+    { DRDATAD (STEPDIR, tarbell_info_data.FD17XX.stepDir, 8, "Last step direction register"), },
+    { DRDATAD (SECCNT, tarbell_info_data.FD17XX.dataCount, 16, "Sector byte count register"), },
+    { DRDATAD (TRKCNT, tarbell_info_data.FD17XX.trkCount, 16, "Track byte count register"), },
+    { FLDATAD (RDACT, tarbell_info_data.FD17XX.readActive, 0, "Read sector active status bit"), },
+    { FLDATAD (WRACT, tarbell_info_data.FD17XX.writeActive, 0, "Write sector active status bit"), },
+    { FLDATAD (RDTACT, tarbell_info_data.FD17XX.readTrkActive, 0, "Read track active status bit"), },
+    { FLDATAD (WRTACT, tarbell_info_data.FD17XX.writeTrkActive, 0, "Write track active status bit"), },
+    { FLDATAD (INTRQ, tarbell_info_data.FD17XX.intrq, 0, "INTRQ status bit"), },
+    { FLDATAD (PROM, tarbell_info_data.promEnabled, 0, "PROM enabled bit"), },
+    { FLDATAD (WRTPROT, tarbell_info_data.writeProtect, 0, "Write protect enabled bit"), },
+    { DRDATAD (HDUNLD, tarbell_info_data.headTimeout, 32, "Head unload timeout"), },
     { NULL }
 };
 
-#define TARBELL_NAME  "Tarbell 1011 Single Density Controller"
+#define TARBELL_NAME  "Tarbell SD/DD Floppy Disk Interface"
 #define TARBELL_SNAME "TARBELL"
 
 static const char* tarbell_description(DEVICE *dptr) {
     return TARBELL_NAME;
 }
 
-/*
-** These definitions should probably be in s100_tarbell.h
-** so they can be included in other modules.
-*/
-#define UNIT_V_TARBELL_VERBOSE      (UNIT_V_UF + 0)                      /* VERBOSE / QUIET */
+#define UNIT_V_TARBELL_VERBOSE      (UNIT_V_UF + 0)                      /* VERBOSE / QUIET  */
 #define UNIT_TARBELL_VERBOSE        (1 << UNIT_V_TARBELL_VERBOSE)
 #define UNIT_V_TARBELL_WPROTECT     (UNIT_V_UF + 1)                      /* WRTENB / WRTPROT */
 #define UNIT_TARBELL_WPROTECT       (1 << UNIT_V_TARBELL_WPROTECT)
 
-/*
-** These definitions should probably be in altairz80_sio.h
-** so they can be included in other modules, like this one.
-*/
 #define UNIT_V_SIO_SLEEP    (UNIT_V_UF + 7)     /* sleep after keyboard status check            */
 #define UNIT_SIO_SLEEP      (1 << UNIT_V_SIO_SLEEP)
 
 static MTAB tarbell_mod[] = {
-    { MTAB_XTD|MTAB_VDV,    0,                      "IOBASE",  "IOBASE",
-        &set_iobase, &show_iobase, NULL, "Sets disk controller IO base address"   },
-    { MTAB_XTD | MTAB_VDV,  1,     NULL,           "PROM",         &tarbell_set_prom,
-        NULL, NULL, "Enable Tarbell boot PROM"},
-    { MTAB_XTD | MTAB_VDV,  0,      NULL,           "NOPROM",          &tarbell_set_prom,
-        NULL, NULL, "Disable Tarbell boot PROM"   },
+    { MTAB_XTD|MTAB_VDV,    0,        "IOBASE",  "IOBASE",
+        &set_iobase, &show_iobase, NULL, "Sets disk controller I/O base address"   },
+    { MTAB_XTD|MTAB_VDV,    0,        "DMABASE",  "DMABASE",
+        &tarbell_set_dmabase, &tarbell_show_dmabase, NULL, "Sets disk controller DMA base address"   },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "PROM", "PROM={ENABLE|DISABLE}",
+        &tarbell_set_prom, &tarbell_show_prom, NULL, "Set/Show PROM enabled/disabled status"},
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "MODEL", "MODEL={SD|DD}",
+        &tarbell_set_model, &tarbell_show_model, NULL, "Set/Show the current controller model" },
     { UNIT_TARBELL_VERBOSE,   0,                    "QUIET",    "QUIET",
-        NULL, NULL, NULL, "No verbose messages for unit " TARBELL_NAME "n"                 },
+        NULL, NULL, NULL, "No verbose messages for unit " TARBELL_SNAME "n"                 },
     { UNIT_TARBELL_VERBOSE,   UNIT_TARBELL_VERBOSE, "VERBOSE",  "VERBOSE",
-        NULL, NULL, NULL, "Verbose messages for unit " TARBELL_NAME "n"                    },
+        NULL, NULL, NULL, "Verbose messages for unit " TARBELL_SNAME "n"                    },
     { UNIT_TARBELL_WPROTECT,  0,                      "WRTENB",    "WRTENB",  NULL, NULL, NULL,
-        "Enables " TARBELL_NAME "n for writing"                 },
+        "Enables " TARBELL_SNAME "n for writing"                 },
     { UNIT_TARBELL_WPROTECT,  UNIT_TARBELL_WPROTECT,  "WRTPROT",    "WRTPROT",  NULL, NULL, NULL,
-        "Protects " TARBELL_NAME "n from writing"                },
+        "Protects " TARBELL_SNAME "n from writing"                },
     { 0 }
 };
 
@@ -279,7 +338,7 @@ static DEBTAB tarbell_dt[] = {
 };
 
 DEVICE tarbell_dev = {
-    "TARBELL",                            /* name */
+    TARBELL_SNAME,                        /* name */
     tarbell_unit,                         /* unit */
     tarbell_reg,                          /* registers */
     tarbell_mod,                          /* modifiers */
@@ -308,25 +367,34 @@ DEVICE tarbell_dev = {
 };
 
 /* Reset routine */
-t_stat tarbell_reset(DEVICE *dptr)
+static t_stat tarbell_reset(DEVICE *dptr)
 {
     uint8 i;
     TARBELL_INFO *pInfo = (TARBELL_INFO *)dptr->ctxt;
     DEVICE *sio_dptr;
     UNIT *sio_uptr;
 
-    if(dptr->flags & DEV_DIS) { /* Disconnect I/O Ports */
+    if (dptr->flags & DEV_DIS) { /* Disconnect I/O Ports */
         sim_map_resource(pInfo->pnp.mem_base, pInfo->pnp.mem_size, RESOURCE_TYPE_MEMORY, &tarbellprom, "tarbellprom", TRUE);
         sim_map_resource(pInfo->pnp.io_base, pInfo->pnp.io_size, RESOURCE_TYPE_IO, &tarbelldev, "tarbelldev", TRUE);
+        sim_map_resource(pInfo->dma_base, pInfo->dma_size, RESOURCE_TYPE_IO, &tarbelldma, "tarbelldma", TRUE);
     } else {
-        if(sim_map_resource(pInfo->pnp.mem_base, pInfo->pnp.mem_size, RESOURCE_TYPE_MEMORY, &tarbellprom, "tarbellprom", FALSE) != 0) {
+        if (sim_map_resource(pInfo->pnp.mem_base, pInfo->pnp.mem_size, RESOURCE_TYPE_MEMORY, &tarbellprom, "tarbellprom", FALSE) != 0) {
             sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": Error mapping MEM resource at 0x%04x\n", pInfo->pnp.mem_base);
             return SCPE_ARG;
         }
         /* Connect I/O Ports at base address */
-        if(sim_map_resource(pInfo->pnp.io_base, pInfo->pnp.io_size, RESOURCE_TYPE_IO, &tarbelldev, "tarbelldev", FALSE) != 0) {
+        if (sim_map_resource(pInfo->pnp.io_base, pInfo->pnp.io_size, RESOURCE_TYPE_IO, &tarbelldev, "tarbelldev", FALSE) != 0) {
             sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": Error mapping I/O resource at 0x%02x\n", pInfo->pnp.io_base);
             return SCPE_ARG;
+        }
+
+        /* If simulating a DD, connect DMA ports */
+        if (tarbell_info->ddEnabled) {
+            if (sim_map_resource(pInfo->dma_base, pInfo->dma_size, RESOURCE_TYPE_IO, &tarbelldma, "tarbelldma", FALSE) != 0) {
+                sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": Error mapping DMA resource at 0x%02x\n", pInfo->dma_base);
+                return SCPE_ARG;
+            }
         }
     }
 
@@ -340,23 +408,25 @@ t_stat tarbell_reset(DEVICE *dptr)
             tarbell_info->uptr[i] = &tarbell_dev.units[i];
         }
 
-        pInfo->FD1771[i].track = 0;
-        pInfo->FD1771[i].sector = 1;
-        pInfo->FD1771[i].command = 0;
-        pInfo->FD1771[i].status = 0;
-        pInfo->FD1771[i].data = 0;
-        pInfo->FD1771[i].intrq = 0;
-        pInfo->FD1771[i].stepDir = 1;
-        pInfo->FD1771[i].dataCount = 0;
-        pInfo->FD1771[i].trkCount = 0;
-        pInfo->FD1771[i].addrActive = FALSE;
-        pInfo->FD1771[i].readActive = FALSE;
-        pInfo->FD1771[i].readTrkActive = FALSE;
-        pInfo->FD1771[i].writeActive = FALSE;
-        pInfo->FD1771[i].writeTrkActive = FALSE;
-        pInfo->FD1771[i].addrActive = FALSE;
-        pInfo->FD1771[i].headLoaded = FALSE;
-        pInfo->FD1771[i].driveNotReady = ((pInfo->uptr[i] == NULL) || (pInfo->uptr[i]->fileref == NULL)) ? TRUE : FALSE;
+        pInfo->FD17XX.track = 0;
+        pInfo->FD17XX.sector = 1;
+        pInfo->FD17XX.command = 0;
+        pInfo->FD17XX.status = 0;
+        pInfo->FD17XX.data = 0;
+        pInfo->FD17XX.intrq = 0;
+        pInfo->FD17XX.stepDir = 1;
+        pInfo->FD17XX.dataCount = 0;
+        pInfo->FD17XX.trkCount = 0;
+        pInfo->FD17XX.addrActive = FALSE;
+        pInfo->FD17XX.readActive = FALSE;
+        pInfo->FD17XX.readTrkActive = FALSE;
+        pInfo->FD17XX.writeActive = FALSE;
+        pInfo->FD17XX.writeTrkActive = FALSE;
+        pInfo->FD17XX.addrActive = FALSE;
+
+        tarbell_info->headLoaded[i] = FALSE;
+        tarbell_info->doubleDensity[i] = FALSE;
+        tarbell_info->side[i] = 0;
     }
 
     /*
@@ -365,12 +435,6 @@ t_stat tarbell_reset(DEVICE *dptr)
     */
     pInfo->headTimeout = TARBELL_HEAD_TIMEOUT; /* usec timeout */
 
-    sio_dptr = find_unit("SIO0", &sio_uptr);
-
-    if(sio_uptr != NULL && sio_uptr->flags & UNIT_SIO_SLEEP) {
-        pInfo->headTimeout = TARBELL_ROTATION_MS * 2 * 3; /* compensate for 1ms SIO sleep */
-    }
-
     sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": reset controller.\n");
 
     return SCPE_OK;
@@ -378,32 +442,32 @@ t_stat tarbell_reset(DEVICE *dptr)
 
 static t_stat tarbell_svc(UNIT *uptr)
 {
-    FD1771_REG *pFD1771;
+    FD17XX_REG *pFD17XX;
 
-    pFD1771 = &tarbell_info->FD1771[tarbell_info->currentDrive];
+    pFD17XX = &tarbell_info->FD17XX;
 
-    if (pFD1771->headLoaded == TRUE) {
-        TARBELL_HeadLoad(uptr, pFD1771, FALSE);
+    if (tarbell_info->headLoaded[tarbell_info->currentDrive] == TRUE) {
+        TARBELL_HeadLoad(uptr, pFD17XX, FALSE);
     }
 
     return SCPE_OK;
 }
 
 /* Attach routine */
-t_stat tarbell_attach(UNIT *uptr, CONST char *cptr)
+static t_stat tarbell_attach(UNIT *uptr, CONST char *cptr)
 {
     char header[4];
     t_stat r;
     unsigned int i = 0;
 
     r = attach_unit(uptr, cptr);    /* attach unit  */
-    if(r != SCPE_OK) {              /* error?       */
+    if (r != SCPE_OK) {              /* error?       */
         sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": ATTACH error=%d\n", r);
         return r;
     }
 
     /* Determine length of this disk */
-    if(sim_fsize(uptr->fileref) != 0) {
+    if (sim_fsize(uptr->fileref) != 0) {
         uptr->capac = sim_fsize(uptr->fileref);
     } else {
         uptr->capac = TARBELL_CAPACITY;
@@ -412,7 +476,7 @@ t_stat tarbell_attach(UNIT *uptr, CONST char *cptr)
     DBG_PRINT(("TARBELL: ATTACH uptr->capac=%d\n", uptr->capac));
 
     for (i = 0; i < TARBELL_MAX_DRIVES; i++) {
-        if(tarbell_dev.units[i].fileref == uptr->fileref) {
+        if (tarbell_dev.units[i].fileref == uptr->fileref) {
             break;
         }
     }
@@ -424,9 +488,9 @@ t_stat tarbell_attach(UNIT *uptr, CONST char *cptr)
     /* Default for new file is DSK */
     uptr->u3 = IMAGE_TYPE_DSK;
 
-    if(uptr->capac > 0) {
+    if (uptr->capac > 0) {
         char *rtn = fgets(header, 4, uptr->fileref);
-        if((rtn != NULL) && (strncmp(header, "CPT", 3) == 0)) {
+        if ((rtn != NULL) && (strncmp(header, "CPT", 3) == 0)) {
             sim_printf("CPT images not yet supported\n");
             uptr->u3 = IMAGE_TYPE_CPT;
             tarbell_detach(uptr);
@@ -442,23 +506,18 @@ t_stat tarbell_attach(UNIT *uptr, CONST char *cptr)
             uptr->capac);
     }
 
-    /*
-    ** Clear Not Ready Flag
-    */
-    tarbell_info->FD1771[i].driveNotReady = FALSE;
-
     return SCPE_OK;
 }
 
 
 /* Detach routine */
-t_stat tarbell_detach(UNIT *uptr)
+static t_stat tarbell_detach(UNIT *uptr)
 {
     t_stat r;
     int8 i;
 
     for (i = 0; i < TARBELL_MAX_DRIVES; i++) {
-        if(tarbell_dev.units[i].fileref == uptr->fileref) {
+        if (tarbell_dev.units[i].fileref == uptr->fileref) {
             break;
         }
     }
@@ -481,17 +540,107 @@ t_stat tarbell_detach(UNIT *uptr)
         sim_printf(TARBELL_SNAME "%d detached.\n", i);
     }
 
-    /*
-    ** Set Not Ready Flag
-    */
-    tarbell_info->FD1771[i].driveNotReady = TRUE;
+    return SCPE_OK;
+}
+
+static t_stat tarbell_set_dmabase(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+    uint32 newba;
+    t_stat r;
+
+    if (cptr == NULL || !(tarbell_info->ddEnabled)) {
+        return SCPE_ARG;
+    }
+
+    newba = get_uint (cptr, 16, 0xFF, &r);
+
+    if (r != SCPE_OK) {
+        return r;
+    }
+
+    if ((newba > 0xFF) || (newba % tarbell_info->dma_size)) {
+        return SCPE_ARG;
+    }
+
+    if (tarbell_dev.flags & DEV_DIS) {
+        sim_printf("device not enabled yet.\n");
+        tarbell_info->dma_base = newba & ~(tarbell_info->dma_size-1);
+    } else {
+        tarbell_dev.flags |= DEV_DIS;
+        tarbell_reset(&tarbell_dev);
+        tarbell_info->dma_base = newba & ~(tarbell_info->dma_size-1);
+        tarbell_dev.flags &= ~DEV_DIS;
+        tarbell_reset(&tarbell_dev);
+    }
 
     return SCPE_OK;
 }
 
-static t_stat tarbell_set_prom(UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+static t_stat tarbell_show_dmabase(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
-    tarbell_info->promEnabled = (uint8) value;
+    if (tarbell_info->ddEnabled) {
+        fprintf(st, "DMA=0x%02X-0x%02X", tarbell_info->dma_base, tarbell_info->dma_base+tarbell_info->dma_size-1);
+    } else {
+        fprintf(st, "DMA=N/A");
+    }
+
+    return SCPE_OK;
+}
+
+static t_stat tarbell_set_model(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+    if (!cptr) return SCPE_IERR;
+
+    /* this assumes that the parameter has already been upcased */
+    if (!strcmp(cptr, "DD")) {
+        tarbell_info->ddEnabled = TRUE;
+        tarbell_info->pnp.io_size = TARBELL_IOSIZE_DD;
+    } else if (!strcmp(cptr, "SD")) {
+        tarbell_info->ddEnabled = FALSE;
+        tarbell_info->pnp.io_size = TARBELL_IOSIZE_SD;
+    } else {
+        return SCPE_ARG;
+    }
+
+    /* Reset the device if enabled */
+    if (!(tarbell_dev.flags & DEV_DIS)) {
+        tarbell_dev.flags |= DEV_DIS;
+        tarbell_reset(&tarbell_dev);
+        tarbell_dev.flags &= ~DEV_DIS;
+        tarbell_reset(&tarbell_dev);
+    }
+
+
+    return SCPE_OK;
+}
+
+static t_stat tarbell_show_model(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    fprintf(st, "MODEL=%s", (tarbell_info->ddEnabled) ? "DD" : "SD");
+
+    return SCPE_OK;
+}
+
+static t_stat tarbell_set_prom(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+    if (!cptr) return SCPE_IERR;
+    if (!strlen(cptr)) return SCPE_ARG;
+
+    /* this assumes that the parameter has already been upcased */
+    if (!strncmp(cptr, "ENABLE", strlen(cptr))) {
+        tarbell_info->promEnabled = TRUE;
+    } else if (!strncmp(cptr, "DISABLE", strlen(cptr))) {
+        tarbell_info->promEnabled = FALSE;
+    } else {
+        return SCPE_ARG;
+    }
+
+    return SCPE_OK;
+}
+
+static t_stat tarbell_show_prom(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    fprintf(st, "%s", (tarbell_info->promEnabled) ? "PROM" : "NOPROM");
 
     return SCPE_OK;
 }
@@ -519,36 +668,83 @@ static int32 tarbelldev(int32 Addr, int32 rw, int32 data)
 
 static void showdata(int32 isRead) {
     int32 i;
-    sim_debug(RD_DATA_DETAIL_MSG|WR_DATA_DETAIL_MSG, &tarbell_dev, TARBELL_SNAME ": %s sector:\n\t", isRead ? "Read" : "Write");
+    sim_debug(isRead ? RD_DATA_DETAIL_MSG : WR_DATA_DETAIL_MSG, &tarbell_dev, TARBELL_SNAME ": %s track/sector %02d/%03d:\n\t", isRead ? "Read" : "Write", tarbell_info->FD17XX.track, tarbell_info->FD17XX.sector);
     for (i=0; i < TARBELL_SECTOR_LEN; i++) {
-        sim_debug(RD_DATA_DETAIL_MSG|WR_DATA_DETAIL_MSG, &tarbell_dev, "%02X ", sdata[i]);
+        sim_debug(isRead ? RD_DATA_DETAIL_MSG : WR_DATA_DETAIL_MSG, &tarbell_dev, "%02X ", sdata[i]);
         if (((i+1) & 0xf) == 0) {
-            sim_debug(RD_DATA_DETAIL_MSG|WR_DATA_DETAIL_MSG, &tarbell_dev, "\n\t");
+            sim_debug(isRead ? RD_DATA_DETAIL_MSG : WR_DATA_DETAIL_MSG, &tarbell_dev, "\n\t");
         }
     }
     sim_debug(RD_DATA_DETAIL_MSG|WR_DATA_DETAIL_MSG, &tarbell_dev, "\n"); 
 }
 
-static void showregs(FD1771_REG *pFD1771)
+static uint32 secs_per_track(uint8 track)
 {
-    DBG_PRINT(("TARBELL: DRV=%d PE=%d AA=%d RA=%d WA=%d DC=%03d CMD=%02Xh DATA=%02Xh TRK=%03d SEC=%03d STAT=%02X\n",
-        tarbell_info->currentDrive, tarbell_info->promEnabled, pFD1771->addrActive, pFD1771->readActive, pFD1771->writeActive, pFD1771->dataCount,
-        pFD1771->command, pFD1771->data, pFD1771->track, pFD1771->sector, pFD1771->status));
+    /* Track 0 / side 0 is always single density */
+    int32 secs = (tarbell_info->doubleDensity[tarbell_info->currentDrive] &&
+        (tarbell_info->side[tarbell_info->currentDrive] || track > 0)) ? TARBELL_SPT_DD : TARBELL_SPT_SD;
+
+    tarbell_info->secsPerTrack = secs;
+
+    return secs;
 }
 
+static uint32 bytes_per_track(uint8 track)
+{
+    int32 bytes;
+    int32 dd;
+
+    dd = tarbell_info->doubleDensity[tarbell_info->currentDrive];
+
+    if (dd) {
+        bytes = IBM3740_TRK_HDR_LEN + 247 + (TARBELL_SPT_DD * IBM3740_DD_SEC_LEN);
+    } else {
+        bytes = IBM3740_TRK_HDR_LEN + 247 + (TARBELL_SPT_SD * IBM3740_SD_SEC_LEN);
+    }
+
+    tarbell_info->bytesPerTrack = bytes;
+
+    return bytes;
+}
 
 static uint32 calculate_tarbell_sec_offset(uint8 track, uint8 sector)
 {
     uint32 offset;
+    uint8 dd,ds;
 
-    offset = ((track * (TARBELL_SECTOR_LEN * TARBELL_SECTORS_PER_TRACK)) + ((sector-1) * TARBELL_SECTOR_LEN));
+    dd = tarbell_info->doubleDensity[tarbell_info->currentDrive];
+    ds = tarbell_info->side[tarbell_info->currentDrive];
 
-    DBG_PRINT(("TARBELL: CALC track=%d sector=%d offset=%04X\n", track, sector, offset));
+    /*
+    ** Side 0: tracks 0-76
+    ** Side 1: tracks 77-153
+    */
+    if (ds) {
+        track += 77;
+    }
+
+    /*
+    ** Calculate track offset
+    */
+    if (track==0) {
+        offset=0;
+    }
+    else {
+        offset=TARBELL_SPT_SD * TARBELL_SECTOR_LEN; /* Track 0 / Side 0 always SD */
+        offset+=(track-1) * secs_per_track(track) * TARBELL_SECTOR_LEN; /* Track 1-153 */
+    }
+
+    /*
+    ** Add sector offset to track offset
+    */
+    offset += (sector-1)*TARBELL_SECTOR_LEN;
+
+    DBG_PRINT(("TARBELL: OFFSET drive=%d side=%d den=%d track=%03d sector=%03d\n", tarbell_info->currentDrive, ds, dd, track, sector));
 
     return (offset);
 }
 
-static void TARBELL_HeadLoad(UNIT *uptr, FD1771_REG *pFD1771, uint8 load)
+static void TARBELL_HeadLoad(UNIT *uptr, FD17XX_REG *pFD17XX, uint8 load)
 {
     /*
     ** If no disk has been attached, uptr will be NULL - return
@@ -560,110 +756,110 @@ static void TARBELL_HeadLoad(UNIT *uptr, FD1771_REG *pFD1771, uint8 load)
     if (load) {
         sim_activate_after_abs(uptr, tarbell_info->headTimeout);  /* activate timer */
 
-        if (pFD1771->headLoaded == FALSE) {
+        if (tarbell_info->headLoaded[tarbell_info->currentDrive] == FALSE) {
             sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": Drive %d head Loaded.\n", tarbell_info->currentDrive);
         }
     }
 
-    if (load == FALSE && pFD1771->headLoaded == TRUE) {
+    if (load == FALSE && tarbell_info->headLoaded[tarbell_info->currentDrive] == TRUE) {
         sim_cancel(uptr);            /* cancel timer */
         sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": Drive %d head Unloaded.\n", tarbell_info->currentDrive);
     }
 
-    pFD1771->headLoaded = load;
+    tarbell_info->headLoaded[tarbell_info->currentDrive] = load;
 }
 
 static uint8 TARBELL_Read(uint32 Addr)
 {
     uint8 cData;
     uint8 driveNum;
-    FD1771_REG *pFD1771;
+    uint8 dd;
+    FD17XX_REG *pFD17XX;
     UNIT *uptr;
 
     cData = 0;
     driveNum = tarbell_info->currentDrive;
+//    dd = tarbell_info->doubleDensity[driveNum];
     uptr = tarbell_info->uptr[driveNum];
-    pFD1771 = &tarbell_info->FD1771[driveNum];
+    pFD17XX = &tarbell_info->FD17XX;
 
     switch(Addr & 0x07) {
         case TARBELL_REG_STATUS:
-            cData = pFD1771->status;
+            cData = pFD17XX->status;
             break;
 
         case TARBELL_REG_TRACK:
-            cData = pFD1771->track;
+            cData = pFD17XX->track;
             break;
 
         case TARBELL_REG_DATA:
             /*
             ** If a READ operation is currently active, get the next byte
             */
-            if (pFD1771->readActive) {
+            if (pFD17XX->readActive) {
                 /* Store byte in DATA register */
-                pFD1771->data = sdata[pFD1771->dataCount++];
+                pFD17XX->data = sdata[pFD17XX->dataCount++];
 
                 /* If we reached the end of the sector, terminate command and set INTRQ */
-                if (pFD1771->dataCount == TARBELL_SECTOR_LEN) {
-                    pFD1771->readActive = FALSE;
-                    pFD1771->dataCount = 0;
-                    pFD1771->status = 0x00;
-                    pFD1771->intrq = TRUE;
-
-                    showregs(pFD1771);
+                if (pFD17XX->dataCount == TARBELL_SECTOR_LEN) {
+                    pFD17XX->readActive = FALSE;
+                    pFD17XX->dataCount = 0;
+                    pFD17XX->status = 0x00;
+                    pFD17XX->intrq = TRUE;
                 }
                 else {
-                    pFD1771->status |= FD1771_STAT_DRQ; /* Another byte is ready */
+                    pFD17XX->status |= FD17XX_STAT_DRQ; /* Another byte is ready */
                 }
 
-                TARBELL_HeadLoad(uptr, pFD1771, TRUE);
+                TARBELL_HeadLoad(uptr, pFD17XX, TRUE);
             }
-            else if (pFD1771->readTrkActive) {
+            else if (pFD17XX->readTrkActive) {
                 /* If we reached the end of the track data, terminate command and set INTRQ */
-                if (pFD1771->trkCount == TARBELL_BYTES_PER_TRACK) {
-                    pFD1771->readTrkActive = FALSE;
-                    pFD1771->status = 0x00;
-                    pFD1771->intrq = TRUE;
-
-                    showregs(pFD1771);
+                if (pFD17XX->trkCount == bytes_per_track(pFD17XX->track)) {
+                    pFD17XX->readTrkActive = FALSE;
+                    pFD17XX->status = 0x00;
+                    pFD17XX->intrq = TRUE;
                 }
                 else {
-                    pFD1771->trkCount++;
+                    pFD17XX->trkCount++;
 
-                    pFD1771->status |= FD1771_STAT_DRQ; /* Another byte is ready */
+                    pFD17XX->status |= FD17XX_STAT_DRQ; /* Another byte is ready */
                 }
 
-                TARBELL_HeadLoad(uptr, pFD1771, TRUE);
+                TARBELL_HeadLoad(uptr, pFD17XX, TRUE);
             }
-            else if (pFD1771->addrActive) {
+            else if (pFD17XX->addrActive) {
                 /* Store byte in DATA register */
-                pFD1771->data = sdata[pFD1771->dataCount++];
+                pFD17XX->data = sdata[pFD17XX->dataCount++];
 
-                DBG_PRINT(("TARBELL: READ ADDR data=%03d\n", pFD1771->data));
+                DBG_PRINT(("TARBELL: READ ADDR data=%03d\n", pFD17XX->data));
 
                 /* If we reached the end of the address data, terminate command and set INTRQ */
-                if (pFD1771->dataCount > TARBELL_ADDR_CRC2) {
-                    pFD1771->addrActive = FALSE;
-                    pFD1771->status = 0x00;
-                    pFD1771->intrq = TRUE;
-
-                    showregs(pFD1771);
+                if (pFD17XX->dataCount > TARBELL_ADDR_CRC2) {
+                    pFD17XX->addrActive = FALSE;
+                    pFD17XX->status = 0x00;
+                    pFD17XX->intrq = TRUE;
                 }
                 else {
-                    pFD1771->status |= FD1771_STAT_DRQ; /* Another byte is ready */
+                    pFD17XX->status |= FD17XX_STAT_DRQ; /* Another byte is ready */
                 }
 
-                TARBELL_HeadLoad(uptr, pFD1771, TRUE);
+                TARBELL_HeadLoad(uptr, pFD17XX, TRUE);
             }
 
-            cData = pFD1771->data;
+            cData = pFD17XX->data;
             break;
 
         case TARBELL_REG_SECTOR:
-            cData = pFD1771->sector;
+            cData = pFD17XX->sector;
             break;
 
-        case TARBELL_REG_EXT:
-            cData = (pFD1771->intrq) ? 0x00 : 0x80;   /* Bit 7 True if DRQ */
+        case TARBELL_REG_WAIT:
+            cData = (pFD17XX->intrq) ? 0x00 : 0x80;   /* Bit 7 True if DRQ */
+            break;
+
+        case TARBELL_REG_DMASTAT:
+            cData = 0x00;    /* Always show DMA is complete */
             break;
 
         default:
@@ -672,6 +868,8 @@ static uint8 TARBELL_Read(uint32 Addr)
             break;
     }
 
+//    DBG_PRINT(("TARBELL: READ COMPLETE currentDrive=%d doubleDensity=%d sector=%03d track=%02d data=%02x\n", tarbell_info->currentDrive, tarbell_info->doubleDensity[tarbell_info->currentDrive], pFD17XX->track, pFD17XX->sector, pFD17XX->data));
+
     return (cData);
 }
 
@@ -679,126 +877,148 @@ static uint8 TARBELL_Write(uint32 Addr, int32 Data)
 {
     uint8 cData;
     uint8 driveNum;
+    uint8 dd;
     int32 rtn;
+    int32 secOffset;
     UNIT *uptr;
-    FD1771_REG *pFD1771;
+    FD17XX_REG *pFD17XX;
 
     sim_debug(CMD_MSG, &tarbell_dev, TARBELL_SNAME ": OUT %02x Data %02x\n", Addr & 0xFF, Data & 0xFF);
 
     cData = 0;
     driveNum = tarbell_info->currentDrive;
+//    dd = tarbell_info->doubleDensity[driveNum];
     uptr = tarbell_info->uptr[driveNum];
-    pFD1771 = &tarbell_info->FD1771[driveNum];
+    pFD17XX = &tarbell_info->FD17XX;
 
     switch(Addr & 0x07) {
         case TARBELL_REG_COMMAND:
-            cData = TARBELL_Command(uptr, pFD1771, Data);
+            cData = TARBELL_Command(uptr, pFD17XX, Data);
             break;
 
         case TARBELL_REG_DATA:
-            pFD1771->data = Data;   /* Store byte in DATA register */
+            pFD17XX->data = Data;   /* Store byte in DATA register */
 
-            if (pFD1771->writeActive) {
+            if (pFD17XX->writeActive) {
 
                 /* Store DATA register in Sector Buffer */
-                sdata[pFD1771->dataCount++] = pFD1771->data;
+                sdata[pFD17XX->dataCount++] = pFD17XX->data;
 
                 /* If we reached the end of the sector, write sector, terminate command and set INTRQ */
-                if (pFD1771->dataCount == TARBELL_SECTOR_LEN) {
-                    pFD1771->status = 0x00;  /* Clear Status Bits */
+                if (pFD17XX->dataCount == TARBELL_SECTOR_LEN) {
+                    pFD17XX->status = 0x00;  /* Clear Status Bits */
 
-                    rtn = TARBELL_WriteSector(uptr, pFD1771->track, pFD1771->sector, sdata);
+                    rtn = TARBELL_WriteSector(uptr, pFD17XX->track, pFD17XX->sector, sdata);
+
+                    showdata(FALSE);
 
                     if (rtn != TARBELL_SECTOR_LEN) {
-                        pFD1771->status |= FD1771_STAT_WRITEFAULT;
-                    }
-                    pFD1771->writeActive = FALSE;
-                    pFD1771->dataCount = 0;
-                    pFD1771->intrq = TRUE;
+                        sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": sim_fwrite errno=%d\n", errno);
 
-                    showregs(pFD1771);
+                        pFD17XX->status |= FD17XX_STAT_WRITEFAULT;
+                    }
+                    pFD17XX->writeActive = FALSE;
+                    pFD17XX->dataCount = 0;
+                    pFD17XX->intrq = TRUE;
                 }
                 else {
-                    pFD1771->status |= FD1771_STAT_DRQ; /* Ready for another byte */
+                    pFD17XX->status |= FD17XX_STAT_DRQ; /* Ready for another byte */
                 }
 
-                TARBELL_HeadLoad(uptr, pFD1771, TRUE);
+                TARBELL_HeadLoad(uptr, pFD17XX, TRUE);
             }
-            else if (pFD1771->writeTrkActive) {
+            else if (pFD17XX->writeTrkActive) {
+
+                if (pFD17XX->dataAddrMrk) {
+                    /* Store DATA register in Sector Buffer */
+                    sdata[pFD17XX->dataCount++] = pFD17XX->data;
+
+                    /* If we reached the end of the sector, write sector */
+                    if (pFD17XX->dataCount == TARBELL_SECTOR_LEN) {
+                        pFD17XX->status &= ~FD17XX_STAT_WRITEFAULT;  /* Clear Status Bit */
+
+                        rtn = TARBELL_WriteSector(uptr, pFD17XX->track, pFD17XX->sector, sdata);
+
+                        if (rtn != TARBELL_SECTOR_LEN) {
+                            pFD17XX->status |= FD17XX_STAT_WRITEFAULT;
+                            sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": WRITE ERROR could not write track %03d sector %03d\n", pFD17XX->track, pFD17XX->sector);
+                        }
+
+                        DBG_PRINT(("TARBELL: WRITE TRACK drive=%d track=%03d sector=%03d trkcount=%d datacount=%d data=%02X status=%02X\n", driveNum, pFD17XX->track, pFD17XX->sector, pFD17XX->trkCount, pFD17XX->dataCount, pFD17XX->data, pFD17XX->status));
+
+                        pFD17XX->dataCount = 0;
+                        pFD17XX->dataAddrMrk = 0;
+
+                        if (pFD17XX->sector < secs_per_track(pFD17XX->track)) {
+                            pFD17XX->sector++;
+                        }
+                    }
+                } else if (pFD17XX->data == 0xFB) {
+                        pFD17XX->dataAddrMrk = 1;
+                        DBG_PRINT(("TARBELL: 0xFB Address Mark Found\n"));
+                }
 
                 /*
                 ** Increment number for bytes written to track
                 */
-                pFD1771->trkCount++;
+                pFD17XX->trkCount++;
 
-                if (pFD1771->data == 0xE5) {
-
-                    /* Store DATA register in Sector Buffer */
-                    sdata[pFD1771->dataCount++] = pFD1771->data;
-
-                    /* If we reached the end of the sector, write sector, terminate command and set INTRQ */
-                    if (pFD1771->dataCount == TARBELL_SECTOR_LEN) {
-                        pFD1771->status &= ~FD1771_STAT_WRITEFAULT;  /* Clear Status Bit */
-
-                        rtn = TARBELL_WriteSector(uptr, pFD1771->track, pFD1771->sector, sdata);
-
-                        if (rtn != TARBELL_SECTOR_LEN) {
-                            pFD1771->status |= FD1771_STAT_WRITEFAULT;
-                            sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": WRITE ERROR could not write track %03d sector %03d\n", pFD1771->track, pFD1771->sector);
-                        }
-
-                        if(pFD1771->sector < TARBELL_SECTORS_PER_TRACK) {
-                            pFD1771->sector++;
-                        }
-                        pFD1771->dataCount = 0;
-                        pFD1771->status &= ~FD1771_STAT_BUSY;  /* Clear BUSY Bit */
-
-                        DBG_PRINT(("TARBELL: WRITE TRACK track=%03d sector=%03d trkcount=%d datacount=%d data=%02X status=%02X\n", pFD1771->track, pFD1771->sector, pFD1771->trkCount, pFD1771->dataCount, pFD1771->data, pFD1771->status));
-
-                        showregs(pFD1771);
-                    }
-                }
-
-                if (pFD1771->trkCount < TARBELL_BYTES_PER_TRACK) {
-                    pFD1771->status |= FD1771_STAT_DRQ; /* Ready for another byte */
+                if (pFD17XX->trkCount < bytes_per_track(pFD17XX->track)) {
+                    pFD17XX->status |= FD17XX_STAT_DRQ; /* Ready for another byte */
                 }
                 else {
-                    pFD1771->status = 0x00;  /* Clear Status Bits */
-                    pFD1771->intrq = TRUE;   /* Simulate reaching index hole */
-                    sim_debug(WR_DATA_MSG, &tarbell_dev, TARBELL_SNAME ": WRITE TRACK COMPLETE track=%03d sector=%03d trkcount=%d datacount=%d data=%02X status=%02X\n", pFD1771->track, pFD1771->sector, pFD1771->trkCount, pFD1771->dataCount, pFD1771->data, pFD1771->status);
+                    pFD17XX->status = 0x00;  /* Clear Status Bits */
+                    pFD17XX->intrq = TRUE;
+                    pFD17XX->status &= ~FD17XX_STAT_BUSY;  /* Clear BUSY Bit */
+                    pFD17XX->writeTrkActive = FALSE;
+                    sim_debug(WR_DATA_MSG, &tarbell_dev, TARBELL_SNAME ": WRITE TRACK COMPLETE track=%03d sector=%03d trkcount=%d datacount=%d data=%02X status=%02X\n", pFD17XX->track, pFD17XX->sector, pFD17XX->trkCount, pFD17XX->dataCount, pFD17XX->data, pFD17XX->status);
                 }
 
-                TARBELL_HeadLoad(uptr, pFD1771, TRUE);
+                TARBELL_HeadLoad(uptr, pFD17XX, TRUE);
             }
 
-            DBG_PRINT(("TARBELL: WRITE DATA REG %02X\n", Data));
+//            DBG_PRINT(("TARBELL: WRITE DATA REG %02X\n", Data));
             break;
 
         case TARBELL_REG_TRACK:
-            pFD1771->track = Data;
-            DBG_PRINT(("TARBELL: TRACK REG=%d\n", pFD1771->track));
+            pFD17XX->track = Data;
+            DBG_PRINT(("TARBELL: TRACK REG=%d\n", pFD17XX->track));
             break;
 
         case TARBELL_REG_SECTOR:
-            if (Data > TARBELL_SECTORS_PER_TRACK) {
-                pFD1771->sector = 1;
-            }
+            pFD17XX->sector = Data;
 
-            pFD1771->sector = Data;
-
-            DBG_PRINT(("TARBELL: SECTOR REG=%d\n", pFD1771->sector));
+            DBG_PRINT(("TARBELL: SECTOR REG=%d\n", pFD17XX->sector));
 
             break;
 
-        case TARBELL_REG_EXT:
-            cData = ~(Data >> 4) & 0x03;
-            if (cData < TARBELL_MAX_DRIVES) {
-                tarbell_info->currentDrive = cData;
-                sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": Current drive now %d\n", tarbell_info->currentDrive);
+        case TARBELL_REG_DRVSEL:
+            /* Drive Select */
+            if (tarbell_info->ddEnabled) {    /* Tarbell DD Controller */
+                cData = (Data & TARBELL_DSEL_MASK) >> 4;
+
+                /* Density */
+                tarbell_info->doubleDensity[cData] = (Data & TARBELL_DENS_MASK) != 0x00;
+
+                /* Side */
+                tarbell_info->side[cData] = (Data & TARBELL_SIDE_MASK) != 0x00;
+
+                DBG_PRINT(("REG_DRVSEL=%02X\n", Data));
+
+            } else {
+                cData = ~(Data >> 4) & 0x03;    /* Tarbell SD drive bits inverted */
             }
-            else {
-              sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": Invalid Drive Number drive=%02x (%02x)\n", Data, cData);
+
+            if (tarbell_info->currentDrive != cData) {
+                sim_debug(STATUS_MSG, &tarbell_dev, TARBELL_SNAME ": Current drive now %d\n", cData);
             }
+
+            tarbell_info->currentDrive = cData;
+
+            break;
+
+        case TARBELL_REG_EXTADDR:
+            cData = 0x00;
             break;
 
         default:
@@ -807,7 +1027,7 @@ static uint8 TARBELL_Write(uint32 Addr, int32 Data)
             break;
     }
 
-    DBG_PRINT(("TARBELL: COMPLETE currentDrive=%d sector=%02x data=%02x\n", tarbell_info->currentDrive, pFD1771->sector, pFD1771->data));
+//    DBG_PRINT(("TARBELL: WRITE COMPLETE currentDrive=%d doubleDensity=%d sector=%03d track=%02d data=%02x\n", tarbell_info->currentDrive, tarbell_info->doubleDensity[tarbell_info->currentDrive], pFD17XX->track, pFD17XX->sector, pFD17XX->data));
 
     return(cData);
 }
@@ -862,7 +1082,7 @@ static uint32 TARBELL_WriteSector(UNIT *uptr, uint8 track, uint8 sector, uint8 *
 }
 
 
-static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
+static uint8 TARBELL_Command(UNIT *uptr, FD17XX_REG *pFD17XX, int32 Data)
 {
     uint8 cData;
     uint8 newTrack;
@@ -876,139 +1096,139 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
         return cData;
     }
 
-    pFD1771->command = Data;
+    pFD17XX->command = Data;
 
     /*
     ** Type II-IV Command
     */
-    if (pFD1771->command & 0x80) {
-        pFD1771->readActive = FALSE;
-        pFD1771->writeActive = FALSE;
-        pFD1771->readTrkActive = FALSE;
-        pFD1771->writeTrkActive = FALSE;
-        pFD1771->addrActive = FALSE;
-        pFD1771->dataCount = 0;
+    if (pFD17XX->command & 0x80) {
+        pFD17XX->readActive = FALSE;
+        pFD17XX->writeActive = FALSE;
+        pFD17XX->readTrkActive = FALSE;
+        pFD17XX->writeTrkActive = FALSE;
+        pFD17XX->addrActive = FALSE;
+        pFD17XX->dataCount = 0;
 
-        pFD1771->status &= ~FD1771_STAT_DRQ;    /* Reset DRQ */
+        pFD17XX->status &= ~FD17XX_STAT_DRQ;    /* Reset DRQ */
     }
 
     /*
     ** Set BUSY for all but Force Interrupt
     */
-    if ((pFD1771->command & TARBELL_CMD_FORCE_INTR) != TARBELL_CMD_FORCE_INTR) {
-        pFD1771->status |= FD1771_STAT_BUSY;
+    if ((pFD17XX->command & TARBELL_CMD_FORCE_INTR) != TARBELL_CMD_FORCE_INTR) {
+        pFD17XX->status |= FD17XX_STAT_BUSY;
     }
 
-    pFD1771->intrq = FALSE;
+    pFD17XX->intrq = FALSE;
 
-    switch(pFD1771->command & 0xf0) {
+    switch(pFD17XX->command & 0xf0) {
         case TARBELL_CMD_RESTORE:
-            pFD1771->track = 0;
+            pFD17XX->track = 0;
 
-            sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": RESTORE track=%03d\n", pFD1771->track);
+            sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": RESTORE track=%03d\n", pFD17XX->track);
 
-            TARBELL_HeadLoad(uptr, pFD1771, (Data & TARBELL_FLAG_H) ? TRUE : FALSE);
+            TARBELL_HeadLoad(uptr, pFD17XX, (Data & TARBELL_FLAG_H) ? TRUE : FALSE);
 
-            pFD1771->status &= ~FD1771_STAT_SEEKERROR;
-            pFD1771->status &= ~FD1771_STAT_BUSY;
-            pFD1771->status &= ~FD1771_STAT_DRQ;
-            pFD1771->intrq = TRUE;
+            pFD17XX->status &= ~FD17XX_STAT_SEEKERROR;
+            pFD17XX->status &= ~FD17XX_STAT_BUSY;
+            pFD17XX->status &= ~FD17XX_STAT_DRQ;
+            pFD17XX->intrq = TRUE;
             break;
 
         case TARBELL_CMD_SEEK:
-            newTrack = pFD1771->data;
+            newTrack = pFD17XX->data;
 
             DBG_PRINT(("TARBELL: TRACK DATA=%d (SEEK)\n", newTrack));
 
-            pFD1771->status &= ~FD1771_STAT_SEEKERROR;
+            pFD17XX->status &= ~FD17XX_STAT_SEEKERROR;
 
             if (newTrack < TARBELL_TRACKS) {
-                pFD1771->track = newTrack;
+                pFD17XX->track = newTrack;
 
-                TARBELL_HeadLoad(uptr, pFD1771, (Data & TARBELL_FLAG_H) ? TRUE : FALSE);
+                TARBELL_HeadLoad(uptr, pFD17XX, (Data & TARBELL_FLAG_H) ? TRUE : FALSE);
 
-                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": SEEK       track=%03d\n", pFD1771->track);
+                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": SEEK       track=%03d\n", pFD17XX->track);
             }
             else {
-                pFD1771->status |= FD1771_STAT_SEEKERROR;
+                pFD17XX->status |= FD17XX_STAT_SEEKERROR;
                 sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": SEEK ERR   track=%03d\n", newTrack);
             }
 
-            pFD1771->status &= ~FD1771_STAT_BUSY;
-            pFD1771->status &= ~FD1771_STAT_DRQ;
-            pFD1771->intrq = TRUE;
+            pFD17XX->status &= ~FD17XX_STAT_BUSY;
+            pFD17XX->status &= ~FD17XX_STAT_DRQ;
+            pFD17XX->intrq = TRUE;
             break;
 
         case TARBELL_CMD_STEP:
         case TARBELL_CMD_STEPU:
-            pFD1771->status &= ~FD1771_STAT_SEEKERROR;
+            pFD17XX->status &= ~FD17XX_STAT_SEEKERROR;
 
-            newTrack = pFD1771->track + pFD1771->stepDir;
+            newTrack = pFD17XX->track + pFD17XX->stepDir;
 
             if (newTrack < TARBELL_TRACKS) {
                 if (Data & TARBELL_FLAG_U) {
-                    pFD1771->track = newTrack;
+                    pFD17XX->track = newTrack;
                 }
-                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEP        track=%03d\n", pFD1771->track);
+                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEP        track=%03d\n", pFD17XX->track);
             }
             else {
-                pFD1771->status |= FD1771_STAT_SEEKERROR;
+                pFD17XX->status |= FD17XX_STAT_SEEKERROR;
                 sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEP ERR    track=%03d\n", newTrack);
             }
 
-            TARBELL_HeadLoad(uptr, pFD1771, (Data & TARBELL_FLAG_H) ? TRUE : FALSE);
+            TARBELL_HeadLoad(uptr, pFD17XX, (Data & TARBELL_FLAG_H) ? TRUE : FALSE);
 
-            pFD1771->status &= ~FD1771_STAT_BUSY;
-            pFD1771->status &= ~FD1771_STAT_DRQ;
-            pFD1771->intrq = TRUE;
+            pFD17XX->status &= ~FD17XX_STAT_BUSY;
+            pFD17XX->status &= ~FD17XX_STAT_DRQ;
+            pFD17XX->intrq = TRUE;
             break;
 
         case TARBELL_CMD_STEPIN:
         case TARBELL_CMD_STEPINU:
-            pFD1771->status &= ~FD1771_STAT_SEEKERROR;
+            pFD17XX->status &= ~FD17XX_STAT_SEEKERROR;
 
-            if (pFD1771->track < TARBELL_TRACKS-1) {
+            if (pFD17XX->track < TARBELL_TRACKS-1) {
                 if (Data & TARBELL_FLAG_U) {
-                    pFD1771->track++;
+                    pFD17XX->track++;
                 }
 
-                TARBELL_HeadLoad(uptr, pFD1771, (Data & TARBELL_FLAG_H) ? TRUE : FALSE);
+                TARBELL_HeadLoad(uptr, pFD17XX, (Data & TARBELL_FLAG_H) ? TRUE : FALSE);
 
-                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPIN      track=%03d\n", pFD1771->track);
+                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPIN      track=%03d\n", pFD17XX->track);
             }
             else {
-                pFD1771->status |= FD1771_STAT_SEEKERROR;
-                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPIN ERR  track=%03d\n", pFD1771->track+1);
+                pFD17XX->status |= FD17XX_STAT_SEEKERROR;
+                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPIN ERR  track=%03d\n", pFD17XX->track+1);
             }
 
-            pFD1771->stepDir = 1;
-            pFD1771->status &= ~FD1771_STAT_BUSY;
-            pFD1771->status &= ~FD1771_STAT_DRQ;
-            pFD1771->intrq = TRUE;
+            pFD17XX->stepDir = 1;
+            pFD17XX->status &= ~FD17XX_STAT_BUSY;
+            pFD17XX->status &= ~FD17XX_STAT_DRQ;
+            pFD17XX->intrq = TRUE;
             break;
 
         case TARBELL_CMD_STEPOUT:
         case TARBELL_CMD_STEPOUTU:
-            pFD1771->status &= ~FD1771_STAT_SEEKERROR;
+            pFD17XX->status &= ~FD17XX_STAT_SEEKERROR;
 
-            if (pFD1771->track > 0) {
+            if (pFD17XX->track > 0) {
                 if (Data & TARBELL_FLAG_U) {
-                    pFD1771->track--;
+                    pFD17XX->track--;
                 }
 
-                TARBELL_HeadLoad(uptr, pFD1771, (Data & TARBELL_FLAG_H) ? TRUE : FALSE);
+                TARBELL_HeadLoad(uptr, pFD17XX, (Data & TARBELL_FLAG_H) ? TRUE : FALSE);
 
-                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPOUT     track=%03d\n", pFD1771->track);
+                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPOUT     track=%03d\n", pFD17XX->track);
             }
             else {
-                pFD1771->status |= FD1771_STAT_SEEKERROR;
-                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPOUT ERR track=%03d\n", pFD1771->track-1);
+                pFD17XX->status |= FD17XX_STAT_SEEKERROR;
+                sim_debug(SEEK_MSG, &tarbell_dev, TARBELL_SNAME ": STEPOUT ERR track=%03d\n", pFD17XX->track-1);
             }
 
-            pFD1771->stepDir = -1;
-            pFD1771->status &= ~FD1771_STAT_BUSY;
-            pFD1771->status &= ~FD1771_STAT_DRQ;
-            pFD1771->intrq = TRUE;
+            pFD17XX->stepDir = -1;
+            pFD17XX->status &= ~FD17XX_STAT_BUSY;
+            pFD17XX->status &= ~FD17XX_STAT_DRQ;
+            pFD17XX->intrq = TRUE;
             break;
 
         case TARBELL_CMD_READ:
@@ -1018,23 +1238,23 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
                           " Drive: %d not attached - read ignored.\n",
                           PCX, tarbell_info->currentDrive);
 
-                pFD1771->status &= ~FD1771_STAT_BUSY;
+                pFD17XX->status &= ~FD17XX_STAT_BUSY;
 
                 return cData;
             }
 
-            rtn = TARBELL_ReadSector(uptr, pFD1771->track, pFD1771->sector, sdata);
+            rtn = TARBELL_ReadSector(uptr, pFD17XX->track, pFD17XX->sector, sdata);
 
             if (rtn == TARBELL_SECTOR_LEN) {
-                pFD1771->readActive = TRUE;
+                pFD17XX->readActive = TRUE;
 
                 showdata(TRUE);
             }
             else {
-                DBG_PRINT(("TARBELL: " ADDRESS_FORMAT " READ: sim_fread error.\n", PCX));
+                sim_debug(ERROR_MSG, &tarbell_dev, TARBELL_SNAME ": sim_fread errno=%d\n", errno);
 
-                pFD1771->status |= FD1771_STAT_NOTFOUND;
-                pFD1771->intrq = TRUE;
+                pFD17XX->status |= FD17XX_STAT_NOTFOUND;
+                pFD17XX->intrq = TRUE;
             }
 
             break;
@@ -1048,77 +1268,78 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
                           " Drive: %d not attached - write ignored.\n",
                           PCX, tarbell_info->currentDrive);
 
-                pFD1771->status &= ~FD1771_STAT_BUSY;
+                pFD17XX->status &= ~FD17XX_STAT_BUSY;
             }
 
             if ((uptr->flags & UNIT_TARBELL_WPROTECT) || tarbell_info->writeProtect) {
                 DBG_PRINT((TARBELL_SNAME ": Disk write protected. uptr->flags=%04x writeProtect=%04x\n", uptr->flags & UNIT_TARBELL_WPROTECT, tarbell_info->writeProtect));
-                pFD1771->intrq = TRUE;
+                pFD17XX->intrq = TRUE;
             }
             else {
-                pFD1771->writeActive = TRUE;
-                pFD1771->dataCount = 0;
-                pFD1771->status |= FD1771_STAT_DRQ;    /* Set DRQ */
+                pFD17XX->writeActive = TRUE;
+                pFD17XX->dataCount = 0;
+                pFD17XX->status |= FD17XX_STAT_DRQ;    /* Set DRQ */
             }
 
             break;
 
         case TARBELL_CMD_READ_ADDRESS:
-            sdata[TARBELL_ADDR_TRACK]=pFD1771->track;
+            sdata[TARBELL_ADDR_TRACK]=pFD17XX->track;
             sdata[TARBELL_ADDR_ZEROS]=0;
-            sdata[TARBELL_ADDR_SECTOR]=pFD1771->sector;
+            sdata[TARBELL_ADDR_SECTOR]=pFD17XX->sector;
             sdata[TARBELL_ADDR_LENGTH]=TARBELL_SECTOR_LEN;
             sdata[TARBELL_ADDR_CRC1]=0;
             sdata[TARBELL_ADDR_CRC2]=0;
 
-            pFD1771->addrActive = TRUE;
-            pFD1771->status |= FD1771_STAT_DRQ;    /* Set DRQ */
+            pFD17XX->addrActive = TRUE;
+            pFD17XX->status |= FD17XX_STAT_DRQ;    /* Set DRQ */
 
             break;
 
         case TARBELL_CMD_READ_TRACK:
-            pFD1771->readTrkActive = TRUE;
-            pFD1771->trkCount=0;
-            pFD1771->dataCount=0;
-            pFD1771->sector=1;
-            pFD1771->status |= FD1771_STAT_DRQ;    /* Set DRQ */
+            pFD17XX->readTrkActive = TRUE;
+            pFD17XX->trkCount=0;
+            pFD17XX->dataCount=0;
+            pFD17XX->sector=1;
+            pFD17XX->status |= FD17XX_STAT_DRQ;    /* Set DRQ */
             break;
 
         case TARBELL_CMD_WRITE_TRACK:
             if ((uptr->flags & UNIT_TARBELL_WPROTECT) || tarbell_info->writeProtect) {
                 DBG_PRINT((TARBELL_SNAME ": Disk write protected. uptr->flags=%04x writeProtect=%04x\n", uptr->flags & UNIT_TARBELL_WPROTECT, tarbell_info->writeProtect));
-                pFD1771->intrq = TRUE;
+                pFD17XX->intrq = TRUE;
             }
             else {
-                pFD1771->writeTrkActive = TRUE;
-                pFD1771->trkCount=0;
-                pFD1771->dataCount=0;
-                pFD1771->sector=1;
-                pFD1771->status |= FD1771_STAT_DRQ;    /* Set DRQ */
+                pFD17XX->writeTrkActive = TRUE;
+                pFD17XX->trkCount=0;
+                pFD17XX->dataCount=0;
+                pFD17XX->sector=1;
+                pFD17XX->dataAddrMrk=0;
+                pFD17XX->status |= FD17XX_STAT_DRQ;    /* Set DRQ */
             }
             break;
 
         case TARBELL_CMD_FORCE_INTR:
-            if (pFD1771->status & FD1771_STAT_BUSY) {
-                pFD1771->status &= ~FD1771_STAT_BUSY;
+            if (pFD17XX->status & FD17XX_STAT_BUSY) {
+                pFD17XX->status &= ~FD17XX_STAT_BUSY;
                 statusUpdate = FALSE;
             }
 
             /* Reset Status */
-            pFD1771->dataCount = 0;
-            pFD1771->trkCount = 0;
-            pFD1771->readActive = FALSE;
-            pFD1771->readTrkActive = FALSE;
-            pFD1771->writeActive = FALSE;
-            pFD1771->writeTrkActive = FALSE;
-            pFD1771->addrActive = FALSE;
+            pFD17XX->dataCount = 0;
+            pFD17XX->trkCount = 0;
+            pFD17XX->readActive = FALSE;
+            pFD17XX->readTrkActive = FALSE;
+            pFD17XX->writeActive = FALSE;
+            pFD17XX->writeTrkActive = FALSE;
+            pFD17XX->addrActive = FALSE;
 
             break;
 
         default:
             cData=0xFF;
-            sim_debug(ERROR_MSG, &tarbell_dev, "TARBELL: UNRECOGNIZED CMD %02X\n", pFD1771->command);
-            pFD1771->intrq = TRUE;
+            sim_debug(ERROR_MSG, &tarbell_dev, "TARBELL: UNRECOGNIZED CMD %02X\n", pFD17XX->command);
+            pFD17XX->intrq = TRUE;
             break;
     }
 
@@ -1126,9 +1347,11 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
     /* Update Status Register */
     /**************************/
 
-    pFD1771->status |= (pFD1771->driveNotReady) ? FD1771_STAT_NOTREADY : 0x00;
+    /* drive not ready bit */
+    pFD17XX->status &= ~FD17XX_STAT_NOTREADY;
+    pFD17XX->status |= (uptr->fileref == NULL) ? FD17XX_STAT_NOTREADY : 0x00;
 
-    switch(pFD1771->command & 0xf0) {
+    switch(pFD17XX->command & 0xf0) {
         case TARBELL_CMD_RESTORE:
         case TARBELL_CMD_SEEK:
         case TARBELL_CMD_STEP:
@@ -1139,58 +1362,63 @@ static uint8 TARBELL_Command(UNIT *uptr, FD1771_REG *pFD1771, int32 Data)
         case TARBELL_CMD_STEPOUTU:
         case TARBELL_CMD_FORCE_INTR:
             if (statusUpdate) {
-                pFD1771->status &= ~FD1771_STAT_HEADLOAD;
-                pFD1771->status &= ~FD1771_STAT_WRITEPROT;
-                pFD1771->status &= ~FD1771_STAT_CRCERROR;
-                pFD1771->status &= ~FD1771_STAT_TRACK0;
-                pFD1771->status |= ((uptr->flags & UNIT_TARBELL_WPROTECT) || tarbell_info->writeProtect) ? FD1771_STAT_WRITEPROT : 0x00;
-                pFD1771->status |= (pFD1771->track) ? 0x00 : FD1771_STAT_TRACK0;
-                pFD1771->status |= (pFD1771->headLoaded) ? FD1771_STAT_HEADLOAD : 0x00;
-                pFD1771->status |= (pFD1771->driveNotReady) ? 0x00 : FD1771_STAT_INDEX;    /* Always set Index Flag if Drive Ready */
+                pFD17XX->status &= ~FD17XX_STAT_HEADLOAD;
+                pFD17XX->status &= ~FD17XX_STAT_WRITEPROT;
+                pFD17XX->status &= ~FD17XX_STAT_CRCERROR;
+                pFD17XX->status &= ~FD17XX_STAT_TRACK0;
+                pFD17XX->status |= ((uptr->flags & UNIT_TARBELL_WPROTECT) || tarbell_info->writeProtect) ? FD17XX_STAT_WRITEPROT : 0x00;
+                pFD17XX->status |= (pFD17XX->track) ? 0x00 : FD17XX_STAT_TRACK0;
+                pFD17XX->status |= (tarbell_info->headLoaded[tarbell_info->currentDrive]) ? FD17XX_STAT_HEADLOAD : 0x00;
+                pFD17XX->status |= (pFD17XX->status & FD17XX_STAT_NOTREADY) ? 0x00 : FD17XX_STAT_INDEX;    /* Always set Index Flag if Drive Ready */
             }
             break;
 
         case TARBELL_CMD_READ:
-            pFD1771->status &= ~FD1771_STAT_LOSTDATA;
-            pFD1771->status &= ~FD1771_STAT_NOTFOUND;
-            pFD1771->status &= ~FD1771_STAT_CRCERROR;
+            pFD17XX->status &= ~FD17XX_STAT_LOSTDATA;
+            pFD17XX->status &= ~FD17XX_STAT_NOTFOUND;
+            pFD17XX->status &= ~FD17XX_STAT_CRCERROR;
+            pFD17XX->status &= ~FD17XX_STAT_RTYPELSB;
             break;
 
         case TARBELL_CMD_WRITE:
-            pFD1771->status &= ~FD1771_STAT_WRITEPROT;
-            pFD1771->status &= ~FD1771_STAT_LOSTDATA;
-            pFD1771->status &= ~FD1771_STAT_NOTFOUND;
-            pFD1771->status &= ~FD1771_STAT_CRCERROR;
-            pFD1771->status |= ((uptr->flags & UNIT_TARBELL_WPROTECT) || tarbell_info->writeProtect) ? FD1771_STAT_WRITEPROT : 0x00;
+            pFD17XX->status &= ~FD17XX_STAT_WRITEPROT;
+            pFD17XX->status &= ~FD17XX_STAT_LOSTDATA;
+            pFD17XX->status &= ~FD17XX_STAT_NOTFOUND;
+            pFD17XX->status &= ~FD17XX_STAT_CRCERROR;
+            pFD17XX->status &= ~FD17XX_STAT_RTYPELSB;
+            pFD17XX->status |= ((uptr->flags & UNIT_TARBELL_WPROTECT) || tarbell_info->writeProtect) ? FD17XX_STAT_WRITEPROT : 0x00;
             break;
 
         case TARBELL_CMD_READ_ADDRESS:
-            pFD1771->status &= ~0x20;
-            pFD1771->status &= ~0x40;
-            pFD1771->status &= ~FD1771_STAT_LOSTDATA;
-            pFD1771->status &= ~FD1771_STAT_NOTFOUND;
-            pFD1771->status &= ~FD1771_STAT_CRCERROR;
+            pFD17XX->status &= ~0x20;
+            pFD17XX->status &= ~0x40;
+            pFD17XX->status &= ~FD17XX_STAT_LOSTDATA;
+            pFD17XX->status &= ~FD17XX_STAT_NOTFOUND;
+            pFD17XX->status &= ~FD17XX_STAT_CRCERROR;
             break;
 
         case TARBELL_CMD_READ_TRACK:
-            pFD1771->status &= ~0x08;
-            pFD1771->status &= ~0x10;
-            pFD1771->status &= ~0x20;
-            pFD1771->status &= ~0x40;
-            pFD1771->status &= ~FD1771_STAT_LOSTDATA;
+            pFD17XX->status &= ~0x08;
+            pFD17XX->status &= ~0x10;
+            pFD17XX->status &= ~0x20;
+            pFD17XX->status &= ~0x40;
+            pFD17XX->status &= ~FD17XX_STAT_LOSTDATA;
             break;
 
         case TARBELL_CMD_WRITE_TRACK:
-            pFD1771->status &= ~0x08;
-            pFD1771->status &= ~0x10;
-            pFD1771->status &= ~FD1771_STAT_WRITEPROT;
-            pFD1771->status &= ~FD1771_STAT_LOSTDATA;
-            pFD1771->status |= ((uptr->flags & UNIT_TARBELL_WPROTECT) || tarbell_info->writeProtect) ? FD1771_STAT_WRITEPROT : 0x00;
+            pFD17XX->status &= ~0x08;
+            pFD17XX->status &= ~0x10;
+            pFD17XX->status &= ~FD17XX_STAT_WRITEPROT;
+            pFD17XX->status &= ~FD17XX_STAT_LOSTDATA;
+            pFD17XX->status |= ((uptr->flags & UNIT_TARBELL_WPROTECT) || tarbell_info->writeProtect) ? FD17XX_STAT_WRITEPROT : 0x00;
             break;
     }
 
-    sim_debug(CMD_MSG, &tarbell_dev, TARBELL_SNAME ": CMD drive=%d cmd=%02X track=%03d sector=%03d status=%02X\n",
-        tarbell_info->currentDrive, pFD1771->command, pFD1771->track, pFD1771->sector, pFD1771->status);
+    sim_debug(CMD_MSG, &tarbell_dev,
+            TARBELL_SNAME ": CMD cmd=%02X drive=%d side=%d track=%03d sector=%03d status=%02X\n",
+            pFD17XX->command, tarbell_info->currentDrive,
+            tarbell_info->side[tarbell_info->currentDrive],
+            pFD17XX->track, pFD17XX->sector, pFD17XX->status);
 
     return(cData);
 }
@@ -1226,5 +1454,10 @@ static int32 tarbellprom(int32 Addr, int32 rw, int32 Data)
             return(tarbell_ram[Addr & TARBELL_RAM_MASK]);
         }
     }
+}
+
+static int32 tarbelldma(int32 Addr, int32 rw, int32 data)
+{
+    return 0x00;    /* DMA is not implemented */
 }
 
