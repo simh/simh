@@ -219,21 +219,27 @@ static TMXR m2sio1_tmxr = {                     /* multiplexer descriptor */
 };
 
 
-#define UNIT_V_M2SIO_DTR      (UNIT_V_UF + 0)     /* DTR follows RTS                */
+#define UNIT_V_M2SIO_CONSOLE  (UNIT_V_UF + 0)     /* Port checks console for input */
+#define UNIT_M2SIO_CONSOLE    (1 << UNIT_V_M2SIO_CONSOLE)
+#define UNIT_V_M2SIO_DTR      (UNIT_V_UF + 1)     /* DTR follows RTS               */
 #define UNIT_M2SIO_DTR        (1 << UNIT_V_M2SIO_DTR)
-#define UNIT_V_M2SIO_DCD      (UNIT_V_UF + 1)     /* Force DCD active low           */
+#define UNIT_V_M2SIO_DCD      (UNIT_V_UF + 2)     /* Force DCD active low          */
 #define UNIT_M2SIO_DCD        (1 << UNIT_V_M2SIO_DCD)
 
 static MTAB m2sio_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                      "IOBASE",  "IOBASE",
         &set_iobase, &show_iobase, NULL, "Sets MITS 2SIO base I/O address"   },
-    { UNIT_M2SIO_DTR,       UNIT_M2SIO_DTR,     "DTR",    "DTR",    NULL, NULL, NULL,
+    { UNIT_M2SIO_CONSOLE,   UNIT_M2SIO_CONSOLE, "CONSOLE",   "CONSOLE",   NULL, NULL, NULL,
+        "Port checks for console input" },
+    { UNIT_M2SIO_CONSOLE,   0,                  "NOCONSOLE", "NOCONSOLE", NULL, NULL, NULL,
+        "Port does not check for console input" },
+    { UNIT_M2SIO_DTR,       UNIT_M2SIO_DTR,     "DTR",       "DTR",       NULL, NULL, NULL,
         "DTR follows RTS" },
-    { UNIT_M2SIO_DTR,       0,                  "NODTR",  "NODTR",  NULL, NULL, NULL,
+    { UNIT_M2SIO_DTR,       0,                  "NODTR",     "NODTR",     NULL, NULL, NULL,
         "DTR does not follow RTS (default)" },
-    { UNIT_M2SIO_DCD,       UNIT_M2SIO_DCD,     "DCD",    "DCD",    NULL, NULL, NULL,
+    { UNIT_M2SIO_DCD,       UNIT_M2SIO_DCD,     "DCD",       "DCD",       NULL, NULL, NULL,
         "Force DCD active low" },
-    { UNIT_M2SIO_DCD,       0,                  "NODCD",  "NODCD",  NULL, NULL, NULL,
+    { UNIT_M2SIO_DCD,       0,                  "NODCD",     "NODCD",     NULL, NULL, NULL,
         "DCD follows status line (default)" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR,  0,   "BAUD",  "BAUD",  &m2sio_set_baud, &m2sio_show_baud,
         NULL, "Set baud rate (default=9600)" },
@@ -244,7 +250,7 @@ static M2SIO_CTX m2sio0_ctx = {0, 0, M2SIO0_IOBASE, M2SIO0_IOSIZE, 0, 0, m2sio0_
 static M2SIO_CTX m2sio1_ctx = {0, 0, M2SIO1_IOBASE, M2SIO1_IOSIZE, 1, 0, m2sio1_tmln, &m2sio1_tmxr, M2SIO_BAUD, 1};
 
 static UNIT m2sio0_unit[] = {
-        { UDATA (&m2sio_svc, UNIT_ATTABLE | UNIT_DISABLE, 0), M2SIO_WAIT },
+        { UDATA (&m2sio_svc, UNIT_ATTABLE | UNIT_DISABLE | UNIT_M2SIO_CONSOLE, 0), M2SIO_WAIT },
 };
 static UNIT m2sio1_unit[] = {
         { UDATA (&m2sio_svc, UNIT_ATTABLE | UNIT_DISABLE, 0), M2SIO_WAIT },
@@ -474,8 +480,10 @@ static t_stat m2sio_svc(UNIT *uptr)
             tmxr_poll_rx(xptr->tmxr);
 
             c = tmxr_getc_ln(xptr->tmln);
-        } else {
+        } else if (uptr->flags & UNIT_M2SIO_CONSOLE) {
             c = sim_poll_kbd();
+        } else {
+            c = 0;
         }
 
         if (c & (TMXR_VALID | SCPE_KFLAG)) {
