@@ -5921,10 +5921,13 @@ int32 toks = -1;
 fprintf (st, "%s", _sim_dname (dptr));                   /* print dev name */
 if ((flag == 2) && dptr->description) {
     fprintf (st, "%s\n", dptr->description(dptr));
+    fprintf (st, "%s", _sim_dname_space ());
     }
 else {
-    if ((sim_switches & SWMASK ('D')) && dptr->description)
+    if ((sim_switches & SWMASK ('D')) && dptr->description) {
         fprintf (st, "%s\n", dptr->description(dptr));
+        fprintf (st, "%s", _sim_dname_space ());
+        }
     }
 if (qdisable (dptr)) {                                  /* disabled? */
     fprintf (st, "%s\n", "disabled");
