@@ -226,6 +226,9 @@ kbd_both (uint32 key)
   case SIM_KEY_DELETE:
     code = 0177;
     break;
+  case SIM_KEY_F11:
+    vid_set_fullscreen (!vid_is_fullscreen ());
+    break;
   default:
     return 0;
   }
