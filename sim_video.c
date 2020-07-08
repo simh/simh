@@ -1404,6 +1404,20 @@ if (SDL_SemWait (vid_mouse_events.sem) == 0) {
     }
 }
 
+t_bool vid_is_fullscreen (void)
+{
+    return SDL_GetWindowFlags (vid_window) & SDL_WINDOW_FULLSCREEN_DESKTOP;
+}
+
+t_stat vid_set_fullscreen (t_bool flag)
+{
+if (flag)
+    SDL_SetWindowFullscreen (vid_window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+else
+    SDL_SetWindowFullscreen (vid_window, 0);
+return SCPE_OK;
+}
+
 void vid_update (void)
 {
 SDL_Rect vid_dst;
@@ -2367,5 +2381,17 @@ t_stat vid_screenshot (const char *filename)
 {
 sim_printf ("video support unavailable\n");
 return SCPE_NOFNC|SCPE_NOMESSAGE;
+}
+
+t_bool vid_is_fullscreen (void)
+{
+sim_printf ("video support unavailable\n");
+return FALSE;
+}
+
+t_stat vid_set_fullscreen (t_bool flag)
+{
+sim_printf ("video support unavailable\n");
+return SCPE_OK;
 }
 #endif /* defined(USE_SIM_VIDEO) */

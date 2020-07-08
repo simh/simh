@@ -198,6 +198,8 @@ t_stat vid_show_release_key (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
 t_stat vid_show_video (FILE* st, UNIT* uptr, int32 val, CONST void* desc);
 t_stat vid_show (FILE* st, DEVICE *dptr,  UNIT* uptr, int32 val, CONST char* desc);
 t_stat vid_screenshot (const char *filename);
+t_bool vid_is_fullscreen (void);
+t_stat vid_set_fullscreen (t_bool flag);
 
 extern t_bool vid_active;
 void vid_set_cursor_position (int32 x, int32 y);        /* cursor position (set by calling code) */
