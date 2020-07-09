@@ -77,6 +77,8 @@
 #define RK_DIS  0
 #endif
 
+#include "sim_disk.h"
+
 /* Constants */
 
 #if defined (UC15)
@@ -108,13 +110,29 @@
 #define RK_SCPI(x)      (2u << (x))                     /* drive int */
 #define RK_MAXFR        (1 << 16)                       /* max transfer */
 
+
+struct drvtyp {
+    int32       sect;                                   /* sectors */
+    int32       surf;                                   /* surfaces */
+    int32       cyl;                                    /* cylinders */
+    int32       size;                                   /* #blocks */
+    const char  *name;                                  /* device type name */
+    };
+
+static struct drvtyp drv_tab[] = {
+    { RK_NUMSC, RK_NUMSF, RK_NUMCY*2, RK_SIZE, "RK05" },
+    { 0 }
+    };
+
+
 /* Flags in the unit flags word */
 
-#define UNIT_V_HWLK     (UNIT_V_UF + 0)                 /* hwre write lock */
-#define UNIT_V_SWLK     (UNIT_V_UF + 1)                 /* swre write lock */
+#define UNIT_V_HWLK     (DKUF_V_WLK + 0)                /* hwre write lock */
+#define UNIT_V_SWLK     (DKUF_V_WLK + 1)                /* swre write lock */
 #define UNIT_HWLK       (1u << UNIT_V_HWLK)
 #define UNIT_SWLK       (1u << UNIT_V_SWLK)
 #define UNIT_WPRT       (UNIT_HWLK|UNIT_SWLK|UNIT_RO)   /* write prot */
+#define GET_DTYPE(x)    (0)
 
 /* Parameters in the unit descriptor */
 
@@ -285,7 +303,7 @@ BITFIELD *rk_reg_bits[] = {
 #define RKDEB_RWR       004                             /* reg writes */
 #define RKDEB_TRC       010                             /* trace */
 #define RKDEB_INT       020                             /* interrupts */
-
+#define RKDEB_DAT      0100                             /* transfer data */
 
 
 #define RK_MIN          10
@@ -336,6 +354,9 @@ void rk_set_done (int32 error);
 void rk_clr_done (void);
 t_stat rk_boot (int32 unitno, DEVICE *dptr);
 t_stat rk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
+t_stat rk_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat rk_attach (UNIT *uptr, CONST char *cptr);
+t_stat rk_detach (UNIT *uptr);
 const char *rk_description (DEVICE *dptr);
 
 DEBTAB rk_deb[] = {
@@ -407,6 +428,10 @@ MTAB rk_mod[] = {
         NULL, NULL, NULL, "Write enable disk drive" },
     { UNIT_HWLK, UNIT_HWLK, "write locked",  "LOCKED", 
         NULL, NULL, NULL, "Write lock disk drive"  },
+    { MTAB_XTD|MTAB_VUN, 0, "TYPE", NULL,
+      NULL, &rk_show_type, NULL, "Display device type" },
+    { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0, "FORMAT", "FORMAT={AUTO|SIMH|VHD|RAW}",
+      &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Set/Display disk format" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 010, "ADDRESS", "ADDRESS",
         &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
@@ -418,8 +443,8 @@ DEVICE rk_dev = {
     "RK", rk_unit, rk_reg, rk_mod,
     RK_NUMDR, 8, 24, 1, 8, RKWRDSZ,
     NULL, NULL, &rk_reset,
-    &rk_boot, NULL, NULL,
-    &rk_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG | RK_DIS, 0,
+    &rk_boot, &rk_attach, &rk_detach,
+    &rk_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG | RK_DIS | DEV_DISK, 0,
     rk_deb, NULL, NULL, &rk_help, NULL, NULL,
     &rk_description 
     };
@@ -644,9 +669,11 @@ return;
 t_stat rk_svc (UNIT *uptr)
 {
 int32 i, drv, err, awc, wc, cma, cda, t;
+t_seccnt sectsread;
 int32 da, cyl, track, sect;
 uint32 ma;
 RKCONTR comp;
+DEVICE *dptr = find_dev_from_unit (uptr);
 
 drv = (int32) (uptr - rk_dev.units);                    /* get drv number */
 if (uptr->FUNC == RKCS_SEEK) {                          /* seek */
@@ -688,7 +715,7 @@ if ((da + wc) > (int32) uptr->capac) {                  /* overrun? */
     rker = rker | RKER_OVR;                             /* set overrun err */
     }
 
-err = fseek (uptr->fileref, da * sizeof (RKCONTR), SEEK_SET);
+err = 0;
 if (wc && (err == 0)) {                                 /* seek ok? */
     switch (uptr->FUNC) {                               /* case on function */
 
@@ -705,10 +732,8 @@ if (wc && (err == 0)) {                                 /* seek ok? */
                 }                                       /* end for wc */
             }                                           /* end if format */
         else {                                          /* normal read */
-            i = fxread (rkxb, sizeof (RKCONTR), wc, uptr->fileref);
-            err = ferror (uptr->fileref);               /* read file */
-            for ( ; i < wc; i++)                        /* fill buf */
-                rkxb[i] = 0;
+            err = sim_disk_rdsect (uptr, da/RK_NUMWD, (uint8 *)rkxb, &sectsread, (wc + RK_NUMWD - 1)/RK_NUMWD);
+            sim_disk_data_trace (uptr, (uint8 *)rkxb, da/RK_NUMWD, sectsread*RK_NUMWD*sizeof(*rkxb), "sim_disk_rdsect", RKDEB_DAT & dptr->dctrl, RKDEB_OPS);
             }
         if (rkcs & RKCS_INH) {                          /* incr inhibit? */
             if ((t = MAP_WRW (ma, 2, &rkxb[wc - 1]))) { /* store last */
@@ -743,19 +768,18 @@ if (wc && (err == 0)) {                                 /* seek ok? */
             awc = (wc + (RK_NUMWD - 1)) & ~(RK_NUMWD - 1); /* clr to */
             for (i = wc; i < awc; i++)                  /* end of blk */
                 rkxb[i] = 0;
-            fxwrite (rkxb, sizeof (RKCONTR), awc, uptr->fileref);
-            err = ferror (uptr->fileref);
+            sim_disk_data_trace (uptr, (uint8 *)rkxb, da/RK_NUMWD, awc, "sim_disk_wrsect", RKDEB_DAT & dptr->dctrl, RKDEB_OPS);
+            err = sim_disk_wrsect (uptr, da/RK_NUMWD, (uint8 *)rkxb, NULL, awc/RK_NUMWD);
             }
         break;                                          /* end write */
 
     case RKCS_WCHK:                                     /* write check */
-        i = fxread (rkxb, sizeof (RKCONTR), wc, uptr->fileref);
-        if ((err = ferror (uptr->fileref))) {           /* read error? */
+        err = sim_disk_rdsect (uptr, da/RK_NUMWD, (uint8 *)rkxb, &sectsread, (wc + RK_NUMWD - 1)/RK_NUMWD);
+        sim_disk_data_trace (uptr, (uint8 *)rkxb, da/RK_NUMWD, sectsread*RK_NUMWD*sizeof(*rkxb), "sim_disk_rdsect", RKDEB_DAT & dptr->dctrl, RKDEB_OPS);
+        if (err) {                                      /* read error? */
             wc = 0;                                     /* no transfer */
             break;
             }
-        for ( ; i < wc; i++)                            /* fill buf */
-            rkxb[i] = 0;
         awc = wc;                                       /* save wc */
         for (wc = 0, cma = ma; wc < awc; wc++)  {       /* loop thru buf */
             if (MAP_RDW (cma, 2, &comp)) {              /* mem wd */
@@ -792,7 +816,6 @@ rk_set_done (0);
 
 if (err != 0) {                                         /* error? */
     sim_perror ("RK I/O error");
-    clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
 return SCPE_OK;
@@ -881,6 +904,35 @@ if (rkxb == NULL)
 if (rkxb == NULL)
     return SCPE_MEM;
 return auto_config (0, 0);
+}
+
+
+/* Attach routine */
+
+t_stat rk_attach (UNIT *uptr, CONST char *cptr)
+{
+t_stat r;
+
+r = sim_disk_attach_ex (uptr, cptr, RK_NUMWD * sizeof (uint16), 
+                        sizeof (uint16), TRUE, 0, 
+                        "RK05", 0, 0, NULL);
+if (r != SCPE_OK)                                       /* error? */
+    return r;
+return SCPE_OK;
+}
+
+t_stat rk_detach (UNIT *uptr)
+{
+sim_cancel (uptr);
+return sim_disk_detach (uptr);
+}
+
+/* Show unit type */
+
+t_stat rk_show_type (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+fprintf (st, "%s", drv_tab[GET_DTYPE (uptr->flags)].name);
+return SCPE_OK;
 }
 
 /* Device bootstrap */
