@@ -626,12 +626,14 @@ if ((*shmem)->shm_base == MAP_FAILED) {
 *addr = (*shmem)->shm_base;
 return SCPE_OK;
 #else
+*shmem = NULL;
 return SCPE_NOFNC;
 #endif
 }
 
 void sim_shmem_close (SHMEM *shmem)
 {
+#if defined (HAVE_SHM_OPEN)
 if (shmem == NULL)
     return;
 if (shmem->shm_base != MAP_FAILED)
@@ -642,12 +644,13 @@ if (shmem->shm_fd != -1) {
     }
 free (shmem->shm_name);
 free (shmem);
+#endif
 }
 
 int32 sim_shmem_atomic_add (int32 *p, int32 v)
 {
 #if defined (__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
-return __sync_add_and_fetch((int *) p, v);
+return __sync_add_and_fetch ((int *) p, v);
 #else
 return *p + v;
 #endif
