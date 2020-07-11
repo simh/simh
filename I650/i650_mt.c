@@ -9,7 +9,7 @@
    and/or sell copies of the Software, and to permit persons to whom the
    Software is furnished to do so, subject to the following conditions:
 
-   The above copyright notice and this permission notice shall be included in
+   The above copyright notice and this permission notice shall be included ni
    all copies or substantial portions of the Software.
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
@@ -442,7 +442,8 @@ uint32 mt_cmd(UNIT * uptr, uint16 cmd, uint16 fast)
         if (cmd == OP_WTM) {
             r = sim_tape_wrtmk(uptr);
             // calc tape pos:
-            uptr->u3 += (int32) ((1 * 0.005 + 0.75) * 1000);
+            uptr->u3 += (int32) ((1 * 0.005 + 0.75) * 1000); // Tape Mark is 1 word long
+            reclen=1;
             sim_debug(DEBUG_DETAIL, dptr, "Write Tape Mark\n");
         } else {
             sim_debug(DEBUG_DETAIL, dptr, "IAS TimingRing is %d\n", IAS_TimingRing+9000);
