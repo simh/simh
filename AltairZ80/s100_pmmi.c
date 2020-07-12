@@ -183,9 +183,9 @@ static MTAB pmmi_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                      "IOBASE",  "IOBASE",
         &set_iobase, &show_iobase, NULL, "Sets MITS 2SIO base I/O address"   },
     { UNIT_PMMI_RTS,       UNIT_PMMI_RTS,     "RTS",    "RTS",    NULL, NULL, NULL,
-        "RTS follows DTR" },
+        "RTS follows DTR (default)" },
     { UNIT_PMMI_RTS,       0,                  "NORTS",  "NORTS",  NULL, NULL, NULL,
-        "RTS does not follow DTR (default)" },
+        "RTS does not follow DTR" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR,  0,   "BAUD",  "BAUD",  &pmmi_set_baud, &pmmi_show_baud,
         NULL, "Set baud rate (default=300)" },
     { 0 }
@@ -194,7 +194,7 @@ static MTAB pmmi_mod[] = {
 static PMMI_CTX pmmi_ctx = {0, 0, PMMI_IOBASE, PMMI_IOSIZE, 0, pmmi_tmln, &pmmi_tmxr, PMMI_BAUD, 1};
 
 static UNIT pmmi_unit[] = {
-        { UDATA (&pmmi_svc, UNIT_ATTABLE | UNIT_DISABLE, 0), PMMI_WAIT },
+        { UDATA (&pmmi_svc, UNIT_ATTABLE | UNIT_DISABLE | UNIT_PMMI_RTS, 0), PMMI_WAIT },
 };
 
 static REG pmmi_reg[] = {
@@ -358,6 +358,11 @@ static t_stat pmmi_svc(UNIT *uptr)
 
         /* Enable receiver if CTS is active low */
         xptr->tmln->rcve = !(xptr->ireg2 & PMMI_CTS);
+
+        /* If socket, connection status follows CTS */
+        if (!xptr->tmln->serport) {
+            xptr->conn = !(xptr->ireg2 & PMMI_CTS);
+        }
     }
 
     /* TX data */
@@ -746,11 +751,11 @@ static int32 pmmi_reg3(int32 io, int32 data)
             if (xptr->oreg0 & PMMI_SH) {
                 xptr->ireg2 &= ~PMMI_AP;   /* Answer Phone Bit (active low) */
             }
-            sim_debug(STATUS_MSG, &pmmi_dev, "set DTR HIGH s=%04X.\n", s);
+            sim_debug(STATUS_MSG, &pmmi_dev, "set DTR HIGH.\n");
         } else {
             tmxr_set_get_modem_bits(xptr->tmln, 0, s, NULL);
             xptr->ireg2 |= PMMI_AP;
-            sim_debug(STATUS_MSG, &pmmi_dev, "set DTR LOW. s=%04X\n", s);
+            sim_debug(STATUS_MSG, &pmmi_dev, "set DTR LOW.\n");
         }
     }
 
