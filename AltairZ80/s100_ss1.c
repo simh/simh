@@ -386,10 +386,10 @@ static uint8 SS1_Read(const uint32 Addr)
                 cData = (toBCD(currentTime.tm_mon+1) >> 4) & 0xF;
                 break;
             case 11:
-                cData = toBCD(currentTime.tm_year-22) & 0xF;
+                cData = toBCD(currentTime.tm_year % 100) & 0xF;
                 break;
             case 12:
-                cData = (toBCD(currentTime.tm_year-22) >> 4) & 0xF;
+                cData = (toBCD(currentTime.tm_year % 100) >> 4) & 0xF;
                 break;
             default:
                 cData = 0;
