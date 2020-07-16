@@ -13072,7 +13072,7 @@ while ((eol = strchr (debug_line_buf, '\n')) || flush) {
             else {
                 _debug_fwrite (debug_line_buf_last, strlen (debug_line_buf_last));
                 if (debug_line_count > 1) {
-                    char countstr[32];
+                    char countstr[40];
 
                     sprintf (countstr, "same as above (%d time%s)\r\n", (int)(debug_line_count - 1), ((debug_line_count - 1) != 1) ? "s" : "");
                     _debug_fwrite (debug_line_last_prefix, strlen (debug_line_last_prefix));
