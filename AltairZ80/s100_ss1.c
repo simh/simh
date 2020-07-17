@@ -82,6 +82,7 @@ static uint8 SS1_Write(const uint32 Addr, uint8 cData);
 static int32 ss1dev(const int32 port, const int32 io, const int32 data);
 void raise_ss1_interrupt(uint8 isr_index);
 static const char* ss1_description(DEVICE *dptr);
+static void setClockSS1(void);
 
 /* SS1 Interrupt Controller notes:
  *
@@ -158,12 +159,28 @@ I8253_REGS ss1_tc[1];
 #define I8253_CTL_MODE_MASK 0x0E
 #define I8253_CTL_BCD       0x01
 
+#define RTS_SECONDS_1_DIGIT     0
+#define RTS_SECONDS_10_DIGIT    1
+#define RTS_MINUTES_1_DIGIT     2
+#define RTS_MINUTES_10_DIGIT    3
+#define RTS_HOURS_1_DIGIT       4
+#define RTS_HOURS_10_DIGIT      5
+#define RTS_DAY_OF_WEEK_DIGIT   6
+#define RTS_DAYS_1_DIGIT        7
+#define RTS_DAYS_10_DIGIT       8
+#define RTS_MONTHS_1_DIGIT      9
+#define RTS_MONTHS_10_DIGIT     10
+#define RTS_YEARS_1_DIGIT       11
+#define RTS_YEARS_10_DIGIT      12
+
 typedef struct {
     uint8 digit_sel;
     uint8 flags;
+    uint8 digits[RTS_YEARS_10_DIGIT + 1];
+    int32 clockDelta; /* delta between real clock and SS1 clock */
 } RTC_REGS;
 
-RTC_REGS ss1_rtc[1];
+RTC_REGS ss1_rtc[1] = { { 0 } };
 
 static UNIT ss1_unit[] = {
     { UDATA (&ss1_svc, UNIT_FIX | UNIT_DISABLE | UNIT_ROABLE, 0) },
@@ -173,27 +190,42 @@ static UNIT ss1_unit[] = {
 };
 
 static REG ss1_reg[] = {
-    { HRDATAD (MPIC_IMR,   ss1_pic[MASTER_PIC].IMR,     8,  "Master IMR register"),     },
-    { HRDATAD (MPIC_IRR,   ss1_pic[MASTER_PIC].IRR,     8,  "Master IRR register"),     },
-    { HRDATAD (MPIC_ISR,   ss1_pic[MASTER_PIC].ISR,     8,  "Master ISR register"),     },
-    { HRDATAD (MPIC_OCW2,  ss1_pic[MASTER_PIC].OCW2,    8,  "Master OCW2 register"),    },
-    { HRDATAD (MPIC_OCW3,  ss1_pic[MASTER_PIC].OCW3,    8,  "Master OCW3 register"),    },
+    { HRDATAD (MPIC_IMR,    ss1_pic[MASTER_PIC].IMR,     8,  "Master IMR register"),     },
+    { HRDATAD (MPIC_IRR,    ss1_pic[MASTER_PIC].IRR,     8,  "Master IRR register"),     },
+    { HRDATAD (MPIC_ISR,    ss1_pic[MASTER_PIC].ISR,     8,  "Master ISR register"),     },
+    { HRDATAD (MPIC_OCW2,   ss1_pic[MASTER_PIC].OCW2,    8,  "Master OCW2 register"),    },
+    { HRDATAD (MPIC_OCW3,   ss1_pic[MASTER_PIC].OCW3,    8,  "Master OCW3 register"),    },
 
-    { HRDATAD (SPIC_IMR,   ss1_pic[SLAVE_PIC].IMR,      8,  "Slave IMR register"),      },
-    { HRDATAD (SPIC_IRR,   ss1_pic[SLAVE_PIC].IRR,      8,  "Slave IRR register"),      },
-    { HRDATAD (SPIC_ISR,   ss1_pic[SLAVE_PIC].ISR,      8,  "Slave ISR register"),      },
-    { HRDATAD (SPIC_OCW2,  ss1_pic[SLAVE_PIC].OCW2,     8,  "Slave OCW2 register"),     },
-    { HRDATAD (SPIC_OCW3,  ss1_pic[SLAVE_PIC].OCW3,     8,  "Slave OCW3 register"),     },
+    { HRDATAD (SPIC_IMR,    ss1_pic[SLAVE_PIC].IMR,      8,  "Slave IMR register"),      },
+    { HRDATAD (SPIC_IRR,    ss1_pic[SLAVE_PIC].IRR,      8,  "Slave IRR register"),      },
+    { HRDATAD (SPIC_ISR,    ss1_pic[SLAVE_PIC].ISR,      8,  "Slave ISR register"),      },
+    { HRDATAD (SPIC_OCW2,   ss1_pic[SLAVE_PIC].OCW2,     8,  "Slave OCW2 register"),     },
+    { HRDATAD (SPIC_OCW3,   ss1_pic[SLAVE_PIC].OCW3,     8,  "Slave OCW3 register"),     },
 
-    { HRDATAD (T0_MODE,    ss1_tc[0].mode[0],           3,  "Timer 0 mode register"),   },
-    { HRDATAD (T0_COUNT,   ss1_tc[0].count[0],          16, "Timer 0 count register"),  },
-    { HRDATAD (T1_MODE,    ss1_tc[0].mode[1],           3,  "Timer 1 mode register"),   },
-    { HRDATAD (T1_COUNT,   ss1_tc[0].count[1],          16, "Timer 1 count register"),  },
-    { HRDATAD (T2_MODE,    ss1_tc[0].mode[2],           3,  "Timer 2 mode register"),   },
-    { HRDATAD (T2_COUNT,   ss1_tc[0].count[2],          16, "Timer 2 count register"),  },
+    { HRDATAD (T0_MODE,     ss1_tc[0].mode[0],           3,  "Timer 0 mode register"),   },
+    { HRDATAD (T0_COUNT,    ss1_tc[0].count[0],          16, "Timer 0 count register"),  },
+    { HRDATAD (T1_MODE,     ss1_tc[0].mode[1],           3,  "Timer 1 mode register"),   },
+    { HRDATAD (T1_COUNT,    ss1_tc[0].count[1],          16, "Timer 1 count register"),  },
+    { HRDATAD (T2_MODE,     ss1_tc[0].mode[2],           3,  "Timer 2 mode register"),   },
+    { HRDATAD (T2_COUNT,    ss1_tc[0].count[2],          16, "Timer 2 count register"),  },
 
-    { HRDATAD (RTC_DIGIT,  ss1_rtc[0].digit_sel,        4,  "Digit selector register"), },
-    { HRDATAD (RTC_FLAGS,  ss1_rtc[0].flags,            4,  "Flags register"),          },
+    { HRDATAD (RTC_DIGIT,   ss1_rtc[0].digit_sel,        4,  "Digit selector register"), },
+    { HRDATAD (RTC_FLAGS,   ss1_rtc[0].flags,            4,  "Flags register"),          },
+    { DRDATAD (RTC_DELTA,   ss1_rtc[0].clockDelta,      32,
+               "SS1 Clock - Delta between real clock and SS1 clock")                        },
+    { HRDATAD (RTC_DIGIT_SEC_1, ss1_rtc[0].digits[RTS_SECONDS_1_DIGIT],     4,  "Seconds 1 digit"),     },
+    { HRDATAD (RTC_DIGIT_SEC_10,ss1_rtc[0].digits[RTS_SECONDS_10_DIGIT],    4,  "Seconds 10 digit"),    },
+    { HRDATAD (RTC_DIGIT_MIN_1, ss1_rtc[0].digits[RTS_MINUTES_1_DIGIT],     4,  "Minutes 1 digit"),     },
+    { HRDATAD (RTC_DIGIT_MIN_10,ss1_rtc[0].digits[RTS_MINUTES_10_DIGIT],    4,  "Minutes 10 digit"),    },
+    { HRDATAD (RTC_DIGIT_HR_1,  ss1_rtc[0].digits[RTS_HOURS_1_DIGIT],       4,  "Hours 1 digit"),       },
+    { HRDATAD (RTC_DIGIT_HR_10, ss1_rtc[0].digits[RTS_HOURS_10_DIGIT],      4,  "Hours 10 digit"),      },
+    { HRDATAD (RTC_DIGIT_DAY,   ss1_rtc[0].digits[RTS_DAY_OF_WEEK_DIGIT],   4,  "Day of week digit"),   },
+    { HRDATAD (RTC_DIGIT_DAY_1, ss1_rtc[0].digits[RTS_DAYS_1_DIGIT],        4,  "Days 1 digit"),        },
+    { HRDATAD (RTC_DIGIT_DAY_10,ss1_rtc[0].digits[RTS_DAYS_10_DIGIT],       4,  "Days 10 digit"),       },
+    { HRDATAD (RTC_DIGIT_MO_1,  ss1_rtc[0].digits[RTS_MONTHS_1_DIGIT],      4,  "Months 1 digit"),      },
+    { HRDATAD (RTC_DIGIT_MO_10, ss1_rtc[0].digits[RTS_MONTHS_10_DIGIT],     4,  "Months 10 digit"),     },
+    { HRDATAD (RTC_DIGIT_YR_1,  ss1_rtc[0].digits[RTS_YEARS_1_DIGIT],       4,  "Years 1 digit"),       },
+    { HRDATAD (RTC_DIGIT_YR_10, ss1_rtc[0].digits[RTS_YEARS_10_DIGIT],      4,  "Years 10 digit"),      },
 
     { NULL }
 };
@@ -287,7 +319,6 @@ extern int32 sio0d(const int32 port, const int32 io, const int32 data);
 extern int32 sio0s(const int32 port, const int32 io, const int32 data);
 
 static struct tm currentTime;
-static int32 toBCD(const int32 x);
 
 static uint8 SS1_Read(const uint32 Addr)
 {
@@ -347,49 +378,50 @@ static uint8 SS1_Read(const uint32 Addr)
                       " RD: RTC  Cmd=0x%02x.\n", PCX, cData);
             break;
         case SS1_RTC_DATA:
-                time(&now);
-                currentTime = *localtime(&now);
+            time(&now);
+            now += ss1_rtc[0].clockDelta;
+            currentTime = *localtime(&now);
 
             switch(ss1_rtc[0].digit_sel) {
             case 0:
-                cData = toBCD(currentTime.tm_sec) & 0xF;
+                cData = currentTime.tm_sec % 10;
                 break;
             case 1:
-                cData = (toBCD(currentTime.tm_sec) >> 4) & 0xF;
+                cData = currentTime.tm_sec / 10;
                 break;
             case 2:
-                cData = toBCD(currentTime.tm_min) & 0xF;
+                cData = currentTime.tm_min % 10;
                 break;
             case 3:
-                cData = (toBCD(currentTime.tm_min) >> 4) & 0xF;
+                cData = currentTime.tm_min / 10;
                 break;
             case 4:
-                cData = toBCD(currentTime.tm_hour) & 0xF;
+                cData = currentTime.tm_hour % 10;
                 break;
             case 5:
-                cData = (toBCD(currentTime.tm_hour) >> 4) & 0x3;
+                cData = currentTime.tm_hour / 10;
                 cData |= 0x08;  /* Set to 24-hour format */
                 break;
             case 6:
-                cData = toBCD(currentTime.tm_wday) & 0xF;
+                cData = currentTime.tm_wday;
                 break;
             case 7:
-                cData = toBCD(currentTime.tm_mday) & 0xF;
+                cData = currentTime.tm_mday % 10;
                 break;
             case 8:
-                cData = (toBCD(currentTime.tm_mday) >> 4) & 0xF;
+                cData = currentTime.tm_mday / 10;
                 break;
             case 9:
-                cData = toBCD(currentTime.tm_mon+1) & 0xF;
+                cData = (currentTime.tm_mon + 1) % 10;
                 break;
             case 10:
-                cData = (toBCD(currentTime.tm_mon+1) >> 4) & 0xF;
+                cData = (currentTime.tm_mon + 1) / 10;
                 break;
             case 11:
-                cData = toBCD(currentTime.tm_year-22) & 0xF;
+                cData = currentTime.tm_year % 10;
                 break;
             case 12:
-                cData = (toBCD(currentTime.tm_year-22) >> 4) & 0xF;
+                cData = (currentTime.tm_year % 100) / 10;
                 break;
             default:
                 cData = 0;
@@ -422,6 +454,23 @@ static uint8 SS1_Read(const uint32 Addr)
 
 uint16 newcount = 0;
 uint8 bc;
+
+/* setClockSS1 sets the new ClockSS1Delta based on the provided digits */
+static void setClockSS1(void) {
+    struct tm newTime;
+    time_t newTime_t;
+    int32 year = 10 * ss1_rtc[0].digits[RTS_YEARS_10_DIGIT] + ss1_rtc[0].digits[RTS_YEARS_1_DIGIT];
+    newTime.tm_year = year < 50 ? year + 100 : year;
+    newTime.tm_mon  = 10 * ss1_rtc[0].digits[RTS_MONTHS_10_DIGIT] + ss1_rtc[0].digits[RTS_MONTHS_1_DIGIT] - 1;
+    newTime.tm_mday = 10 * (ss1_rtc[0].digits[RTS_DAYS_10_DIGIT] & 3) + ss1_rtc[0].digits[RTS_DAYS_1_DIGIT]; // remove leap year information in days 10 digit
+    newTime.tm_hour = 10 * (ss1_rtc[0].digits[RTS_HOURS_10_DIGIT] & 3) + ss1_rtc[0].digits[RTS_HOURS_1_DIGIT]; // also remove AM/PM- and 12/24-information in hours 10 digit
+    newTime.tm_min  = 10 * ss1_rtc[0].digits[RTS_MINUTES_10_DIGIT] + ss1_rtc[0].digits[RTS_MINUTES_1_DIGIT];
+    newTime.tm_sec  = 10 * ss1_rtc[0].digits[RTS_SECONDS_10_DIGIT] + ss1_rtc[0].digits[RTS_SECONDS_1_DIGIT];
+    newTime.tm_isdst = -1;
+    newTime_t = mktime(&newTime);
+    if (newTime_t != (time_t)-1)
+        ss1_rtc[0].clockDelta = (int32)(newTime_t - time(NULL));
+}
 
 static void generate_ss1_interrupt(void);
 
@@ -534,14 +583,18 @@ static uint8 SS1_Write(const uint32 Addr, uint8 cData)
             sim_debug(RTC_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
                       " WR: RTC  Cmd=0x%02x (%s%s%s SEL=%x)\n",
                       PCX, cData,
-                      ss1_rtc[0].flags & 0x4 ? "HOLD " :"",
-                      ss1_rtc[0].flags & 0x2 ? "WR" :"",
-                      ss1_rtc[0].flags & 0x1 ? "RD" :"",
+                      ss1_rtc[0].flags & 0x4 ? "HOLD"   :"",
+                      ss1_rtc[0].flags & 0x2 ? "WR"     :"",
+                      ss1_rtc[0].flags & 0x1 ? "RD"     :"",
                       ss1_rtc[0].digit_sel);
+            if (cData == 0) // set clock delta
+                setClockSS1();
             break;
         case SS1_RTC_DATA:
             sim_debug(RTC_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
                       " WR: RTC Data=0x%02x\n", PCX, cData);
+            if (ss1_rtc[0].digit_sel <= RTS_YEARS_10_DIGIT)
+                ss1_rtc[0].digits[ss1_rtc[0].digit_sel] = cData;
             break;
         case SS1_UART_DATA:
             sim_debug(UART_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
@@ -660,9 +713,5 @@ static t_stat ss1_svc (UNIT *uptr)
     sim_activate(&ss1_unit[3], 1000000);  // requeue, because more interrupts are pending.
 
     return SCPE_OK;
-}
-
-static int32 toBCD(const int32 x) {
-    return (x / 10) * 16 + (x % 10);
 }
 

@@ -191,7 +191,7 @@ static MTAB pmmi_mod[] = {
     { 0 }
 };
 
-static PMMI_CTX pmmi_ctx = {0, 0, PMMI_IOBASE, PMMI_IOSIZE, 0, pmmi_tmln, &pmmi_tmxr, PMMI_BAUD, 1};
+static PMMI_CTX pmmi_ctx = {{0, 0, PMMI_IOBASE, PMMI_IOSIZE}, 0, pmmi_tmln, &pmmi_tmxr, PMMI_BAUD, 1};
 
 static UNIT pmmi_unit[] = {
         { UDATA (&pmmi_svc, UNIT_ATTABLE | UNIT_DISABLE, 0), PMMI_WAIT },
@@ -260,7 +260,6 @@ static const char* pmmi_description(DEVICE *dptr)
 static t_stat pmmi_reset(DEVICE *dptr)
 {
     PMMI_CTX *xptr;
-    int32 i,c;
 
     xptr = dptr->ctxt;
 
@@ -493,7 +492,6 @@ static t_stat pmmi_set_baud(UNIT *uptr, int32 value, const char *cptr, void *des
     PMMI_CTX *xptr;
     int32 baud;
     t_stat r = SCPE_ARG;
-    char config[20];
 
     xptr = uptr->dptr->ctxt;
 

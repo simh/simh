@@ -240,8 +240,8 @@ static MTAB m2sio_mod[] = {
     { 0 }
 };
 
-static M2SIO_CTX m2sio0_ctx = {0, 0, M2SIO0_IOBASE, M2SIO0_IOSIZE, 0, 0, m2sio0_tmln, &m2sio0_tmxr, M2SIO_BAUD, 1};
-static M2SIO_CTX m2sio1_ctx = {0, 0, M2SIO1_IOBASE, M2SIO1_IOSIZE, 1, 0, m2sio1_tmln, &m2sio1_tmxr, M2SIO_BAUD, 1};
+static M2SIO_CTX m2sio0_ctx = {{0, 0, M2SIO0_IOBASE, M2SIO0_IOSIZE}, 0, 0, m2sio0_tmln, &m2sio0_tmxr, M2SIO_BAUD, 1};
+static M2SIO_CTX m2sio1_ctx = {{0, 0, M2SIO1_IOBASE, M2SIO1_IOSIZE}, 1, 0, m2sio1_tmln, &m2sio1_tmxr, M2SIO_BAUD, 1};
 
 static UNIT m2sio0_unit[] = {
         { UDATA (&m2sio_svc, UNIT_ATTABLE | UNIT_DISABLE, 0), M2SIO_WAIT },
@@ -363,7 +363,7 @@ static t_stat m2sio1_reset(DEVICE *dptr)
 static t_stat m2sio_reset(DEVICE *dptr, int32 (*routine)(const int32, const int32, const int32))
 {
     M2SIO_CTX *xptr;
-    int32 i,c;
+    int32 c;
 
     xptr = dptr->ctxt;
 
@@ -540,7 +540,6 @@ static t_stat m2sio_set_baud(UNIT *uptr, int32 value, const char *cptr, void *de
     M2SIO_CTX *xptr;
     int32 baud;
     t_stat r = SCPE_ARG;
-    char config[20];
 
     xptr = uptr->dptr->ctxt;
 
@@ -686,7 +685,7 @@ static int32 m2sio_io(DEVICE *dptr, int32 addr, int32 io, int32 data)
 static int32 m2sio_stat(DEVICE *dptr, int32 io, int32 data)
 {
     M2SIO_CTX *xptr;
-    int32 r,s,stb;
+    int32 r,s;
 
     xptr = dptr->ctxt;
 
