@@ -132,7 +132,7 @@ REG tti_reg[] = {
 
 MTAB tti_mod[] = {
     { MTAB_XTD|MTAB_VDV, TT_MODE_KSR,   NULL, "KSR",   &tty_set_mode,   NULL, NULL, "KSR teletype mode" },
-    { MTAB_XTD|MTAB_VDV, TT_MODE_KSR,   NULL, "KSR",   &tty_set_mode,   NULL, NULL, "Upper Case mode" },
+    { MTAB_XTD|MTAB_VDV, TT_MODE_UC,    NULL, "UC",    &tty_set_mode,   NULL, NULL, "Upper Case mode" },
     { MTAB_XTD|MTAB_VDV, TT_MODE_7B,    NULL, "7B",    &tty_set_mode,   NULL, NULL, "7 bit mode" },
     { MTAB_XTD|MTAB_VDV, TT_MODE_8B,    NULL, "8B",    &tty_set_mode,   NULL, NULL, "8 bit mode" },
     { MTAB_XTD|MTAB_VDV, TT_MODE_7P,    NULL, "7P",    &tty_set_mode,   NULL, NULL, "7 bit mode - non printing suppressed" },
