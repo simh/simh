@@ -2950,14 +2950,14 @@ uint32 md = mode & TTUF_M_MODE;
 
 if (md != TTUF_MODE_8B) {
     uint32 par_mode = (mode >> TTUF_W_MODE) & TTUF_M_PAR;
-    static int32 nibble_even_parity = 0x699600;   /* bit array indicating the even parity for each index (offset by 8) */
+    static int32 nibble_even_parity = 0x699600;     /* bit array indicating the even parity for each index (offset by 8) */
 
     c = c & 0177;
     if (md == TTUF_MODE_UC) {
         if (islower (c))
             c = toupper (c);
         if (mode & TTUF_KSR)
-            c = c | 0200;
+            c = c | 0200;                           /* Force MARK parity */
         }
     switch (par_mode) {
         case TTUF_PAR_EVEN:
@@ -2971,7 +2971,8 @@ if (md != TTUF_MODE_8B) {
             break;
         }
     }
-else c = c & 0377;
+else
+    c = c & 0377;
 return c;
 }
 
@@ -3048,6 +3049,43 @@ for (i = any = 0; i < val; i++) {
         }
     }
 fprintf (st, (any? "\n": "no tabs set\n"));
+return SCPE_OK;
+}
+
+t_stat sim_tt_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+uint32 par_mode = (TT_GET_MODE (uptr->flags) >> TTUF_W_MODE) & TTUF_M_PAR;
+
+uptr->flags = uptr->flags & ~((TTUF_M_MODE << TTUF_V_MODE) | (TTUF_M_PAR << TTUF_V_PAR) | TTUF_KSR);
+uptr->flags |= val;
+if (val != TT_MODE_8B)
+    uptr->flags |= (par_mode << TTUF_V_PAR);
+return SCPE_OK;
+}
+
+t_stat sim_tt_set_parity (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+uptr->flags = uptr->flags & ~(TTUF_M_MODE | TTUF_M_PAR);
+uptr->flags |= TT_MODE_7B | val;
+return SCPE_OK;
+}
+
+t_stat sim_tt_show_modepar (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+uint32 md = (TT_GET_MODE (uptr->flags) & TTUF_M_MODE);
+static const char *modes[] = {"7b", "8b", "UC", "7p"};
+uint32 par_mode = (TT_GET_MODE (uptr->flags) >> TTUF_W_MODE) & TTUF_M_PAR;
+static const char *parity[] = {"SPACE", "MARK", "EVEN", "ODD"};
+
+if ((md == TTUF_MODE_UC) && (par_mode == TTUF_PAR_MARK))
+    fprintf (st, "KSR (UC, MARK parity)");
+else
+    fprintf (st, "%s", modes[md]);
+if ((md != TTUF_MODE_8B) && 
+    ((md != TTUF_MODE_UC) || (par_mode != TTUF_PAR_MARK))) {
+    if (par_mode != 0)
+        fprintf (st, ", %s parity", parity[par_mode]);
+    }
 return SCPE_OK;
 }
 

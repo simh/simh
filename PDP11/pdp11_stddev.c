@@ -95,6 +95,7 @@ t_stat tto_wr (int32 data, int32 PA, int32 access);
 t_stat tto_svc (UNIT *uptr);
 t_stat tto_reset (DEVICE *dptr);
 t_stat tty_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat tty_set_parity (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat clk_rd (int32 *data, int32 PA, int32 access);
 t_stat clk_wr (int32 data, int32 PA, int32 access);
 t_stat clk_svc (UNIT *uptr);
@@ -115,7 +116,7 @@ DIB tti_dib = {
     1, IVCL (TTI), VEC_TTI, { NULL }
     };
 
-UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE, 0), TMLN_SPD_9600_BPS };
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_7P, 0), TMLN_SPD_9600_BPS };
 
 REG tti_reg[] = {
     { HRDATAD (BUF,       tti_unit.buf,          8, "last data item processed") },
@@ -130,10 +131,16 @@ REG tti_reg[] = {
     };
 
 MTAB tti_mod[] = {
-    { TT_MODE, TT_MODE_UC, "UC", "UC", &tty_set_mode },
-    { TT_MODE, TT_MODE_7B, "7b", "7B", &tty_set_mode },
-    { TT_MODE, TT_MODE_8B, "8b", "8B", &tty_set_mode },
-    { TT_MODE, TT_MODE_7P, "7b", NULL, NULL },
+    { MTAB_XTD|MTAB_VDV, TT_MODE_KSR,   NULL, "KSR",   &tty_set_mode,   NULL, NULL, "KSR teletype mode" },
+    { MTAB_XTD|MTAB_VDV, TT_MODE_KSR,   NULL, "KSR",   &tty_set_mode,   NULL, NULL, "Upper Case mode" },
+    { MTAB_XTD|MTAB_VDV, TT_MODE_7B,    NULL, "7B",    &tty_set_mode,   NULL, NULL, "7 bit mode" },
+    { MTAB_XTD|MTAB_VDV, TT_MODE_8B,    NULL, "8B",    &tty_set_mode,   NULL, NULL, "8 bit mode" },
+    { MTAB_XTD|MTAB_VDV, TT_MODE_7P,    NULL, "7P",    &tty_set_mode,   NULL, NULL, "7 bit mode - non printing suppressed" },
+    { MTAB_XTD|MTAB_VDV, TT_PAR_SPACE,  NULL, "SPACE", &tty_set_parity, NULL, NULL, "Space Parity" },
+    { MTAB_XTD|MTAB_VDV, TT_PAR_MARK,   NULL, "MARK",  &tty_set_parity, NULL, NULL, "Mark Parity" },
+    { MTAB_XTD|MTAB_VDV, TT_PAR_EVEN,   NULL, "EVEN",  &tty_set_parity, NULL, NULL, "Even Parity" },
+    { MTAB_XTD|MTAB_VDV, TT_PAR_ODD,    NULL, "ODD",   &tty_set_parity, NULL, NULL, "Odd Parity" },
+    { MTAB_XTD|MTAB_VDV, 0, "MODE", NULL, NULL, &sim_tt_show_modepar, NULL, "Mode and Parity" },
     { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
       NULL, &show_addr, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
@@ -190,10 +197,16 @@ REG tto_reg[] = {
     };
 
 MTAB tto_mod[] = {
-    { TT_MODE, TT_MODE_UC, "UC", "UC", &tty_set_mode },
-    { TT_MODE, TT_MODE_7B, "7b", "7B", &tty_set_mode },
-    { TT_MODE, TT_MODE_8B, "8b", "8B", &tty_set_mode },
-    { TT_MODE, TT_MODE_7P, "7p", "7P", &tty_set_mode },
+    { MTAB_XTD|MTAB_VDV, TT_MODE_KSR,   NULL, "KSR",   &tty_set_mode,   NULL, NULL, "KSR teletype mode" },
+    { MTAB_XTD|MTAB_VDV, TT_MODE_UC,    NULL, "UC",    &tty_set_mode,   NULL, NULL, "Upper Case mode" },
+    { MTAB_XTD|MTAB_VDV, TT_MODE_7B,    NULL, "7B",    &tty_set_mode,   NULL, NULL, "7 bit mode" },
+    { MTAB_XTD|MTAB_VDV, TT_MODE_8B,    NULL, "8B",    &tty_set_mode,   NULL, NULL, "8 bit mode" },
+    { MTAB_XTD|MTAB_VDV, TT_MODE_7P,    NULL, "7P",    &tty_set_mode,   NULL, NULL, "7 bit mode - non printing suppressed" },
+    { MTAB_XTD|MTAB_VDV, TT_PAR_SPACE,  NULL, "SPACE", &tty_set_parity, NULL, NULL, "Space Parity" },
+    { MTAB_XTD|MTAB_VDV, TT_PAR_MARK,   NULL, "MARK",  &tty_set_parity, NULL, NULL, "Mark Parity" },
+    { MTAB_XTD|MTAB_VDV, TT_PAR_EVEN,   NULL, "EVEN",  &tty_set_parity, NULL, NULL, "Even Parity" },
+    { MTAB_XTD|MTAB_VDV, TT_PAR_ODD,    NULL, "ODD",   &tty_set_parity, NULL, NULL, "Odd Parity" },
+    { MTAB_XTD|MTAB_VDV, 0, "MODE", NULL, NULL, &sim_tt_show_modepar, NULL, "Mode and Parity" },
     { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
       NULL, &show_addr, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
@@ -456,8 +469,17 @@ return SCPE_OK;
 
 t_stat tty_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-tti_unit.flags = (tti_unit.flags & ~TT_MODE) | val;
-tto_unit.flags = (tto_unit.flags & ~TT_MODE) | val;
+sim_tt_set_mode (&tti_unit, val, cptr, desc);
+sim_tt_set_mode (&tto_unit, val, cptr, desc);
+return SCPE_OK;
+}
+
+t_stat tty_set_parity (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+sim_tt_set_parity (&tti_unit, val, cptr, desc);
+sim_tt_set_parity (&tto_unit, val, cptr, desc);
+tti_unit.flags = (tti_unit.flags & ~TT_PAR) | val;
+tto_unit.flags = (tto_unit.flags & ~TT_PAR) | val;
 return SCPE_OK;
 }
 
