@@ -33,6 +33,8 @@
 #define IPC     0
 #define SET_XACK(VAL)   (xack = VAL)
 
+#define I3214_NUM       0
+
 /* set the base for the DBB ports */
 #define DBB_BASE        0xC0
 

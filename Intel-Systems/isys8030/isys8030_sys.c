@@ -51,7 +51,7 @@ extern DEVICE isbc064_dev;
    sim_stop_messages    array of pointers to stop messages
 */
 
-char sim_name[] = "Intel System 80/10";
+char sim_name[] = "Intel System 80/30";
 
 REG *sim_PC = &i8080_reg[0];
 
@@ -66,10 +66,18 @@ DEVICE *sim_devices[] = {
     &EPROM_dev,
     &RAM_dev,
     &multibus_dev,
+#if defined (SBC064_NUM) && (SBC064_NUM > 0)
     &isbc064_dev,
+#endif
+#if defined (SBC201_NUM) && (SBC201_NUM > 0)
     &isbc201_dev,
+#endif
+#if defined (SBC202_NUM) && (SBC202_NUM > 0)
     &isbc202_dev,
+#endif
+#if defined (ZX200A_NUM) && (ZX200A_NUM > 0)
     &zx200a_dev,
+#endif
     NULL
 };
 

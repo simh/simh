@@ -34,24 +34,20 @@
 /* function prototypes */
 
 t_stat fp_reset (void);
-t_stat fp_cfg(void);
+t_stat fp_cfg (void);
 
 /* external function prototypes */
 
-extern uint8 EPROM_get_mbyte(uint16 addr);
-extern t_stat EPROM_reset(DEVICE *dptr);
+extern t_stat EPROM_reset(DEVICE *dptr, uint8 devnum);
 extern t_stat EPROM_cfg(uint16 base, uint16 size, uint8 devnum);
 
-// external globals
+/* external globals */
 
-extern UNIT EPROM_unit;                 //1702 EPROM
-extern uint16 PCX;                    /* program counter */
-
-// fp configuration
+extern DEVICE EPROM_dev;
 
 t_stat fp_cfg(void)
 {
-    sim_printf("Configuring MDS-800 Front Panel Module\n  Onboard Devices:\n");
+    sim_printf("Configuring MDS-800 Front Panel Card\n  Onboard Devices:\n");
     EPROM_cfg(ROM_BASE_0, ROM_SIZE_0, 0);
     return SCPE_OK;
 }
@@ -61,8 +57,8 @@ t_stat fp_cfg(void)
 
 t_stat fp_reset (void)
 {    
+    EPROM_reset(&EPROM_dev, 0);
     return SCPE_OK;
 }
-
 
 /* end of front_panel.c */

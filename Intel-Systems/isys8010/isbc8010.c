@@ -53,7 +53,7 @@ extern DEVICE i8080_dev;
 extern DEVICE i8251_dev;
 extern DEVICE i8255_dev;
 extern DEVICE EPROM_dev;
-extern UNIT EPROM_unit;
+extern UNIT EPROM_unit[];
 extern DEVICE RAM_dev;
 extern UNIT RAM_unit;
 
@@ -61,7 +61,7 @@ extern UNIT RAM_unit;
 
 extern uint8 multibus_get_mbyte(uint16 addr);
 extern void  multibus_put_mbyte(uint16 addr, uint8 val);
-extern uint8 EPROM_get_mbyte(uint16 addr);
+extern uint8 EPROM_get_mbyte(uint16 addr, uint8 devnum);
 extern uint8 RAM_get_mbyte(uint16 addr);
 extern void RAM_put_mbyte(uint16 addr, uint8 val);
 extern t_stat i8080_reset (DEVICE *dptr);   /* reset the 8080 emulator */
@@ -73,7 +73,7 @@ extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
 extern t_stat i8251_cfg(uint8 base, uint8 devnum);
 extern t_stat i8255_cfg(uint8 base, uint8 devnum);
 extern t_stat RAM_cfg(uint16 base, uint16 size);
-extern t_stat EPROM_cfg(uint16 base, uint16 size);
+extern t_stat EPROM_cfg(uint16 base, uint16 size, uint8 devnum);
 extern t_stat multibus_cfg();   
 
 /* globals */
@@ -86,7 +86,7 @@ t_stat SBC_config(void)
     i8251_cfg(I8251_BASE, 0);
     i8255_cfg(I8255_BASE_0, 0);
     i8255_cfg(I8255_BASE_1, 1);
-    EPROM_cfg(ROM_BASE, ROM_SIZE);
+    EPROM_cfg(ROM_BASE, ROM_SIZE, 0);
     RAM_cfg(RAM_BASE, RAM_SIZE);
     return SCPE_OK;
 }
@@ -112,8 +112,8 @@ uint8 get_mbyte(uint16 addr)
 {
     /* if local EPROM handle it */
     if ((ROM_DISABLE && (i8255_C[0] & 0x80)) || (ROM_DISABLE == 0)) { /* EPROM enabled */
-        if ((addr >= EPROM_unit.u3) && ((uint16)addr <= (EPROM_unit.u3 + EPROM_unit.capac))) {
-            return EPROM_get_mbyte(addr);
+        if ((addr >= EPROM_unit->u3) && ((uint16)addr <= (EPROM_unit->u3 + EPROM_unit->capac))) {
+            return EPROM_get_mbyte(addr, 0);
         }
     } /* if local RAM handle it */
     if ((RAM_DISABLE && (i8255_C[0] & 0x20)) || (RAM_DISABLE == 0)) { /* RAM enabled */
@@ -141,7 +141,7 @@ void put_mbyte(uint16 addr, uint8 val)
 {
     /* if local EPROM handle it */
     if ((ROM_DISABLE && (i8255_C[0] & 0x80)) || (ROM_DISABLE == 0)) { /* EPROM enabled */
-        if ((addr >= EPROM_unit.u3) && ((uint16)addr <= (EPROM_unit.u3 + EPROM_unit.capac))) {
+        if ((addr >= EPROM_unit->u3) && ((uint16)addr <= (EPROM_unit->u3 + EPROM_unit->capac))) {
             sim_printf("Write to R/O memory address %04X from PC=%04X - ignored\n", addr, PCX);
             return;
         }

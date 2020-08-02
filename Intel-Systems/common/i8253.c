@@ -35,6 +35,8 @@
 
 #include "system_defs.h"
 
+#if defined (I8253_NUM) && (I8253_NUM > 0)
+
 /* external globals */
 
 /* external function prototypes */
@@ -205,5 +207,7 @@ uint8 i8253c(t_bool io, uint8 data, uint8 devnum)
     }
     return 0;
 }
+
+#endif /* I8253_NUM > 0 */
 
 /* end of i8253.c */

@@ -77,6 +77,8 @@
 
 #include "system_defs.h"                /* system header in system dir */
 
+#if defined (I8255_NUM) && (I8255_NUM > 0)
+
 /* internal function prototypes */
 
 t_stat i8255_cfg(uint8 base, uint8 devnum);
@@ -267,5 +269,7 @@ uint8 i8255c(t_bool io, uint8 data, uint8 devnum)
     }
     return 0;
 }
+
+#endif /* I8255_NUM > 0 */
 
 /* end of i8255.c */

@@ -1,6 +1,6 @@
-/*  sys-8010_sys.c: multibus system interface
+/*  isdk80_sys.c: SDK 80 system interface
 
-    Copyright (c) 2010, William A. Beech
+    Copyright (c) 2020, William A. Beech
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -23,8 +23,7 @@
     used in advertising or otherwise to promote the sale, use or other dealings
     in this Software without prior written authorization from William A. Beech.
 
-    ?? ??? 10 - Original file.
-    16 Dec 12 - Modified to use isbc_80_10.cfg file to set base and size.
+    08 Jun 20 - Original file.
 */
 
 #include "system_defs.h"
@@ -32,15 +31,10 @@
 extern DEVICE i8080_dev;
 extern REG i8080_reg[];
 extern DEVICE i8251_dev;
-extern DEVICE i8253_dev;
 extern DEVICE i8255_dev;
-extern DEVICE i8259_dev;
 extern DEVICE EPROM_dev;
 extern DEVICE RAM_dev;
 extern DEVICE multibus_dev;
-extern DEVICE isbc201_dev;
-extern DEVICE isbc202_dev;
-extern DEVICE isbc064_dev;
 
 /* SCP data structures
 
@@ -51,7 +45,7 @@ extern DEVICE isbc064_dev;
    sim_stop_messages    array of pointers to stop messages
 */
 
-char sim_name[] = "Intel System 80/24";
+char sim_name[] = "Intel SDK-80";
 
 REG *sim_PC = &i8080_reg[0];
 
@@ -59,22 +53,11 @@ int32 sim_emax = 4;
 
 DEVICE *sim_devices[] = {
     &i8080_dev,
-    &i8251_dev,
-    &i8253_dev,
-    &i8255_dev,
-    &i8259_dev,
     &EPROM_dev,
     &RAM_dev,
+    &i8251_dev,
+    &i8255_dev,
     &multibus_dev,
-#if defined (SBC064_NUM) && (SBC064_NUM > 0)
-    &isbc064_dev,
-#endif
-#if defined (SBC201_NUM) && (SBC201_NUM > 0)
-    &isbc201_dev,
-#endif
-#if defined (SBC202_NUM) && (SBC202_NUM > 0)
-    &isbc202_dev,
-#endif
     NULL
 };
 

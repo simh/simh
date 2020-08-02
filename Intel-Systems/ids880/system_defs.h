@@ -23,63 +23,45 @@
         used in advertising or otherwise to promote the sale, use or other dealings
         in this Software without prior written authorization from William A. Beech.
 
-    ?? ??? 10 - Original file.
+    5 October 2017 - Original file.
 */
 
 #include <stdio.h>
 #include <ctype.h>
 #include "sim_defs.h"                   /* simulator defns */
 
-#define SET_XACK(VAL)   (xack = VAL)
+#define SET_XACK(VAL)       (xack = VAL)
 
+/* set the base I/O address for the imm8-60 */
+#define IO_BASE_0    0x00            //TTY
+#define IO_NUM       1
+#define PTR_NUM     1
+
+// set the base I/O address for the 3214
+#define I3214_BASE      0xFC
 #define I3214_NUM       0
 
-/* set the base for the DBB ports */
-#define DBB_BASE        0xC0
-
-/* set the base I/O address for the 8255 */
-#define I8255_BASE_0    0xE4
-#define I8255_BASE_1    0xE8
-#define I8255_NUM       2
-
-/* set the base I/O address for the 8253 */
-#define I8253_BASE      0xF0
-#define I8253_NUM       1
-
-/* set the base I/O address for the 8251 */
-#define I8251_BASE_0    0xF4
-#define I8251_BASE_1    0xF6
-#define I8251_NUM       2
-
-/* set the base I/O address for the 8259 */
-#define I8259_BASE_0    0xFA
-#define I8259_BASE_1    0xFC
-#define I8259_NUM       2
-
-/* set the base I/O address for the IPC control port */
-#define ICONT_BASE      0xFF
-
-/* set the base and size for the EPROM on the MDS 225 */
-#define ROM_BASE        0x0000
-#define ROM_SIZE        0x0FFF
-#define ROM_DISABLE     1
+/* set the base and size for the EPROM0 on the Monitor Module */
+#define ROM_BASE        0x3800
+#define ROM_SIZE        0x07ff
+#define ROM_DISABLE     0
 #define EPROM_NUM       1
 
 /* set the base and size for the RAM on the MDS 225 */
 #define RAM_BASE        0x0000
-#define RAM_SIZE        0xFFFF
+#define RAM_SIZE        0x37ff
 #define RAM_DISABLE     0
 
 //board definitions for the multibus
-/* set the base I/O address for the iSBC 202 */
-#define SBC202_BASE     0x78
-#define SBC202_INT      INT_2
-#define SBC202_NUM      1
-
 /* set the base I/O address for the iSBC 201 */
 #define SBC201_BASE     0x88
-#define SBC201_INT      INT_2
-#define SBC201_NUM      1
+#define SBC201_INT      INT_3
+#define SBC201_NUM      0
+
+/* set the base I/O address for the iSBC 202 */
+#define SBC202_BASE     0x78
+#define SBC202_INT      INT_3
+#define SBC202_NUM      0
 
 /* set the base I/O address for the iSBC 206 */
 #define SBC206_BASE     0x68
@@ -88,17 +70,17 @@
 
 /* set the base I/O address for the iSBC 208 */
 #define SBC208_BASE     0x40
-#define SBC208_INT      INT_2
+#define SBC208_INT      INT_1
 #define SBC208_NUM      0
 
-/* set the base for the zx-200a disk controller */
+/* set the base for the ZX-200a disk controller */
 #define ZX200A_BASE     0x78
 #define ZX200A_INT      INT_2
 #define ZX200A_NUM      0
 
-/* set the base and size for the iSBC 064 RAM*/
+/* set the base and size for the iSBC 064 */
 #define SBC064_BASE     0x0000
-#define SBC064_SIZE     0xFFFF
+#define SBC064_SIZE     0xF7FF
 #define SBC064_NUM      0
 
 /* set the base and size for the iSBC 464 ROM */
@@ -120,7 +102,7 @@
 #define INT_6   0x40
 #define INT_7   0x80
 
-/* CPU interrupts definitions */
+/* CPU interrupt definitions */
 
 #define INT_R   0x200
 #define I75     0x40
@@ -129,7 +111,7 @@
 
 /* Memory */
 
-#define MAXMEMSIZE          0x0FFFF             /* 8080 max memory size */
+#define MAXMEMSIZE          0xFFFF             /* 8080 max memory size */
 #define MEMSIZE             (i8080_unit.capac)  /* 8080 actual memory size */
 #define ADDRMASK            (MAXMEMSIZE)        /* 8080 address mask */
 #define MEM_ADDR_OK(x)      (((uint16) (x)) <= MEMSIZE)
@@ -156,3 +138,4 @@
 #define STOP_MEM        6                           /* Memory error */
 #define STOP_XACK       7                           /* XACK error */
 
+/* end of system_defs.h */

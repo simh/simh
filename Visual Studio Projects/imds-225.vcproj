@@ -232,10 +232,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\Intel-Systems\common\multibus.c"
-				>
-			</File>
-			<File
 				RelativePath="..\Intel-Systems\common\iram8.c"
 				>
 			</File>
@@ -256,11 +252,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\Intel-Systems\common\isbc208.c"
+				RelativePath="..\Intel-Systems\common\isbc464.c"
 				>
 			</File>
 			<File
-				RelativePath="..\Intel-Systems\common\isbc464.c"
+				RelativePath="..\Intel-Systems\common\multibus.c"
 				>
 			</File>
 			<File

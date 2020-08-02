@@ -42,20 +42,21 @@
 #define I3214_NUM       1
 
 /* set the base and size for the EPROM0 on the Monitor Module */
-#define ROM0_BASE       0x0000
-#define ROM0_SIZE       0x00FF
-#define ROM0_DISABLE    1
+#define ROM_BASE_0       0x0000
+#define ROM_SIZE_0       0x00FF
+#define ROM_DISABLE_0    1
 
 /* set the base and size for the EPROM1 on the Front Panel Module */
-#define ROM1_BASE       0xF800
-#define ROM1_SIZE       0x07FF
-#define ROM1_DISABLE    0
+#define ROM_BASE_1       0xF800
+#define ROM_SIZE_1       0x07FF
+#define ROM_DISABLE_1    0
+#define EPROM_NUM        2
 
 //board definitions for the multibus
 /* set the base I/O address for the iSBC 201 */
 #define SBC201_BASE     0x88
 #define SBC201_INT      INT_3
-#define SBC201_NUM      1
+#define SBC201_NUM      0
 
 /* set the base I/O address for the iSBC 202 */
 #define SBC202_BASE     0x78

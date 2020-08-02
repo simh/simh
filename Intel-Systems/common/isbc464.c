@@ -33,9 +33,11 @@
 
 #include "system_defs.h"
 
+#if defined (SBC464_NUM) && (SBC464_NUM > 0)
+
 /* prototypes */
 
-t_stat isbc064_cfg(uint16 base, uint16 size);
+t_stat isbc464_cfg(uint16 base, uint16 size);
 t_stat isbc464_reset (DEVICE *dptr);
 t_stat isbc464_attach (UNIT *uptr, CONST char *cptr);
 uint8 isbc464_get_mbyte(uint16 addr);
@@ -100,6 +102,13 @@ t_stat isbc464_cfg(uint16 base, uint16 size)
         size, base);
     isbc464_unit.capac = size;          //set size
     isbc464_unit.u3 = base;             //and base
+    isbc464_unit.filebuf = (uint8 *)calloc(size, sizeof(uint8));
+    if (isbc464_unit.filebuf == NULL) {
+        sim_printf ("    sbc464: Calloc error\n");
+        return SCPE_MEM;
+    }
+//    sim_printf("    sbc464: 0%04XH bytes at base 0%04XH\n",
+//        isbc464_unit.capac, isbc464_unit.u3);
     return SCPE_OK;
 }
 
@@ -137,5 +146,7 @@ uint8 isbc464_get_mbyte(uint16 addr)
     val = *(fbuf + (addr - org));
     return (val & 0xFF);
 }
+
+#endif /* SBC464_NUM > 0 */
 
 /* end of isbc464.c */

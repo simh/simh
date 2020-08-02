@@ -67,10 +67,18 @@ DEVICE *sim_devices[] = {
     &i8253_dev,
     &i8255_dev,
     &multibus_dev,
+#if defined (SBC064_NUM) && (SBC064_NUM > 0)
     &isbc064_dev,
+#endif
+#if defined (SBC201_NUM) && (SBC201_NUM > 0)
     &isbc201_dev,
+#endif
+#if defined (SBC202_NUM) && (SBC202_NUM > 0)
     &isbc202_dev,
+#endif
+#if defined (SBC208_NUM) && (SBC208_NUM > 0)
     &isbc208_dev,
+#endif
     NULL
 };
 

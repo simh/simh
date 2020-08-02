@@ -213,10 +213,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\Intel-Systems\common\ieprom1.c"
-				>
-			</File>
-			<File
 				RelativePath="..\Intel-Systems\imds-810\imds-810_sys.c"
 				>
 			</File>
@@ -245,11 +241,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\Intel-Systems\common\multibus.c"
+				RelativePath="..\Intel-Systems\imds-810\monitor.c"
 				>
 			</File>
 			<File
-				RelativePath="..\Intel-Systems\imds-810\monitor.c"
+				RelativePath="..\Intel-Systems\common\multibus.c"
 				>
 			</File>
 			<File

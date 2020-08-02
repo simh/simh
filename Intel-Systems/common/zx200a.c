@@ -139,6 +139,7 @@
 
 #include "system_defs.h"                /* system header in system dir */
 
+#if defined (ZX200A_NUM) && (ZX200A_NUM > 0)
 
 #define UNIT_V_WPMODE   (UNIT_V_UF)     /* Write protect */
 #define UNIT_WPMODE     (1 << UNIT_V_WPMODE)
@@ -788,5 +789,7 @@ void zx200a_diskio(void)
             break;
     }
 }
+
+#endif /* ZX200A_NUM > 0 */
 
 /* end of zx-200a.c */

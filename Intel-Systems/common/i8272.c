@@ -36,6 +36,8 @@
 
 #include "system_defs.h"
 
+#if defined (I8272_NUM) && (I8272_NUM > 0)
+
 #define UNIT_V_WPMODE   (UNIT_V_UF)     /* Write protect */
 #define UNIT_WPMODE     (1 << UNIT_V_WPMODE)
 
@@ -890,5 +892,7 @@ uint8 i8272_r01(t_bool io, uint8 data)
     }
     return 0;
 }
+
+#endif /* I8272_NUM > 0 */
 
 /* end of i8272.c */

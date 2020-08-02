@@ -32,6 +32,8 @@
 
 #define SET_XACK(VAL)   (xack = VAL)
 
+#define I3214_NUM       0
+
 /* set the base for the DBB ports */
 #define DBB_BASE        0xC0
 
@@ -76,7 +78,7 @@
 /* set the base I/O address for the iSBC 202 */
 #define SBC202_BASE     0x78
 #define SBC202_INT      INT_2
-#define SBC202_NUM      0
+#define SBC202_NUM      1
 
 /* set the base I/O address for the iSBC 206 */
 #define SBC206_BASE     0x68

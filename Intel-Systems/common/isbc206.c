@@ -128,6 +128,8 @@
 
 #include "system_defs.h"                /* system header in system dir */
 
+#if defined (SBC206_NUM) && (SBC206_NUM > 0)
+
 #define UNIT_V_WPMODE   (UNIT_V_UF)     /* Write protect */
 #define UNIT_WPMODE     (1 << UNIT_V_WPMODE)
 
@@ -596,5 +598,7 @@ void isbc206_diskio(void)
             break;
     }
 }
+
+#endif /* SBC206_NUM > 0 */
 
 /* end of isbc206.c */

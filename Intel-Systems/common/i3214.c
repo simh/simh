@@ -40,6 +40,8 @@
 
 #include "system_defs.h"
 
+#if defined (I3214_NUM) && (I3214_NUM > 0)
+
 // 3214 status bits
 
 /* external globals */
@@ -206,5 +208,7 @@ uint8 i3214_monitor_do_boot(t_bool io, uint8 data, uint8 devnum)
         monitor_boot = data;
     return 0;
 }
+
+#endif /* I3214_NUM > 0 */
 
 /* end of i3214.c */

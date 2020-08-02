@@ -50,8 +50,7 @@ extern t_stat monitor_reset (void);
 extern t_stat fp_reset (void);
 extern t_stat i3214_reset (DEVICE *dptr);
 extern t_stat i8080_reset (DEVICE *dptr);   /* reset the 8080 emulator */
-extern uint8 EPROM_get_mbyte(uint16 addr);
-extern uint8 EPROM1_get_mbyte(uint16 addr);
+extern uint8 EPROM_get_mbyte(uint16 addr, uint8 devnum);
 extern uint8 multibus_get_mbyte(uint16 addr);
 extern void  multibus_put_mbyte(uint16 addr, uint8 val);
 extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
@@ -104,10 +103,10 @@ uint8 get_mbyte(uint16 addr)
 {
     uint8 val;
 
-    if (EPROM_enable && (addr >= ROM0_BASE && addr <= ROM0_BASE + ROM0_SIZE)) 
-        val = EPROM_get_mbyte(addr); 
-    else if (ROM1_SIZE && addr >= ROM1_BASE && addr <= ROM1_BASE + ROM1_SIZE)
-        val = EPROM1_get_mbyte(addr);
+    if (EPROM_enable && (addr >= ROM_BASE_0 && addr <= ROM_BASE_0 + ROM_SIZE_0)) 
+        val = EPROM_get_mbyte(addr, 0); 
+    else if (ROM_SIZE_1 && addr >= ROM_BASE_1 && addr <= ROM_BASE_1 + ROM_SIZE_1)
+        val = EPROM_get_mbyte(addr, 1);
     else val = multibus_get_mbyte(addr);
     val &= 0xFF;
     return(val);

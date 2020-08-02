@@ -38,21 +38,19 @@ t_stat monitor_reset (void);
 
 /* external function prototypes */
 
-extern uint8 monitor_do_boot(t_bool io, uint8 data);
-extern uint8 EPROM1_get_mbyte(uint16 addr);
-extern t_stat i3214_reset(DEVICE *dptr);
-extern t_stat EPROM1_reset(DEVICE *dptr);
+extern t_stat i8251_reset(DEVICE *dptr);
+extern t_stat i8251_cfg(uint8 base, uint8 devnum);
+extern t_stat EPROM_reset(DEVICE *dptr);
+extern t_stat EPROM_cfg(uint16 base, uint16 size, uint8 devnum);
 extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
-extern t_stat EPROM1_cfg(uint16 base, uint16 size);
-extern t_stat i8251_reset (DEVICE *dptr);
-extern t_stat i8251_cfg(uint8 base, uint8 size);
+extern uint8 i3214_monitor_do_boot(t_bool io, uint8 data, uint8 devnum);
 
 // external globals
 
 extern uint16 PCX;                    /* program counter */
-extern UNIT EPROM1_unit;                 //8316 PROM
+extern UNIT EPROM_unit[];                 //8316 PROM
 extern DEVICE i8251_dev;
-extern DEVICE EPROM1_dev;
+extern DEVICE EPROM_dev;
 
 // globals
 
@@ -63,7 +61,7 @@ extern uint8 monitor_boot;
 t_stat monitor_cfg(void)
 {
     sim_printf("Initializing MDS-800 Monitor Module\n  Onboard Devices:\n");
-    EPROM1_cfg(ROM1_BASE, ROM1_SIZE);
+    EPROM_cfg(ROM_BASE_1, ROM_SIZE_1, 1);
     i8251_cfg(I8251_BASE_0, 0);
     i8251_cfg(I8251_BASE_1, 1);
     return SCPE_OK;
@@ -76,7 +74,7 @@ t_stat monitor_reset (void)
 {    
     monitor_boot = 0x00;
     i8251_reset(&i8251_dev);
-    EPROM1_reset(&EPROM1_dev);
+    EPROM_reset(&EPROM_dev);
     return SCPE_OK;
 }
 

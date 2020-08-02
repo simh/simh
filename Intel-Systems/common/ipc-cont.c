@@ -96,7 +96,7 @@ DEVICE ipc_cont_dev = {
 
 t_stat ipc_cont_cfg(uint8 base, uint8 devnum)
 {
-    sim_printf("    ipc-cont[%d]: at base 0%02XH\n",
+    sim_printf("    ipc-cont[%d]: at port 0%02XH\n",
         devnum, base & 0xFF);
     reg_dev(ipc_cont, base, devnum); 
     return SCPE_OK;

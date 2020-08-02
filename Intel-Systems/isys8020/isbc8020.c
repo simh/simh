@@ -71,8 +71,8 @@ extern t_stat i8259_reset (DEVICE *dptr);
 extern uint8 i8259a(t_bool io, uint8 data, uint8 devnum);
 extern uint8 i8259b(t_bool io, uint8 data, uint8 devnum);
 extern DEVICE i8259_dev;
-extern uint8 EPROM_get_mbyte(uint16 addr);
-extern UNIT EPROM_unit;
+extern uint8 EPROM_get_mbyte(uint16 addr, uint8 devnum);
+extern UNIT EPROM_unit[];
 extern t_stat EPROM_reset (DEVICE *dptr);
 extern uint8 RAM_get_mbyte(uint16 addr);
 extern void RAM_put_mbyte(uint16 addr, uint8 val);
@@ -83,7 +83,7 @@ extern t_stat i8253_cfg(uint8 base, uint8 devnum);
 extern t_stat i8255_cfg(uint8 base, uint8 devnum);
 extern t_stat i8259_cfg(uint8 base, uint8 devnum);
 extern t_stat RAM_cfg(uint16 base, uint16 size);
-extern t_stat EPROM_cfg(uint16 base, uint16 size);
+extern t_stat EPROM_cfg(uint16 base, uint16 size, uint8 devnum);
 extern t_stat multibus_cfg();   
 extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
 
@@ -99,7 +99,7 @@ t_stat SBC_config(void)
     i8255_cfg(I8255_BASE_0, 0);
     i8255_cfg(I8255_BASE_1, 1);
     i8259_cfg(I8259_BASE, 0);
-    EPROM_cfg(ROM_BASE, ROM_SIZE);
+    EPROM_cfg(ROM_BASE, ROM_SIZE, 0);
     RAM_cfg(RAM_BASE, RAM_SIZE);
     return SCPE_OK;
 }
@@ -129,8 +129,8 @@ uint8 get_mbyte(uint16 addr)
 {
     /* if local EPROM handle it */
     if ((ROM_DISABLE && (i8255_C[0] & 0x20)) || (ROM_DISABLE == 0)) { /* EPROM enabled */
-        if ((addr >= EPROM_unit.u3) && ((uint16)addr <= (EPROM_unit.u3 + EPROM_unit.capac)))
-            return EPROM_get_mbyte(addr);
+        if ((addr >= EPROM_unit->u3) && ((uint16)addr <= (EPROM_unit->u3 + EPROM_unit->capac)))
+            return EPROM_get_mbyte(addr, 0);
     } /* if local RAM handle it */
     if ((RAM_DISABLE && (i8255_C[0] & 0x20)) || (RAM_DISABLE == 0)) { /* RAM enabled */
         if ((addr >= RAM_unit.u3) && ((uint16)addr <= (RAM_unit.u3 + RAM_unit.capac)))
@@ -156,7 +156,7 @@ void put_mbyte(uint16 addr, uint8 val)
 {
     /* if local EPROM handle it */
     if ((ROM_DISABLE && (i8255_C[0] & 0x20)) || (ROM_DISABLE == 0)) { /* EPROM enabled */
-        if ((addr >= EPROM_unit.u3) && ((uint16)addr <= (EPROM_unit.u3 + EPROM_unit.capac))) {
+        if ((addr >= EPROM_unit->u3) && ((uint16)addr <= (EPROM_unit->u3 + EPROM_unit->capac))) {
             sim_printf("Write to R/O memory address %04X from PC=%04X - ignored\n", addr, PCX);
             return;
         }

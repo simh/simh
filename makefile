@@ -1718,144 +1718,100 @@ SWTP6800MP-A2 = ${SWTP6800C}/mp-a2.c ${SWTP6800C}/m6800.c ${SWTP6800C}/m6810.c \
 SWTP6800_OPT = -I ${SWTP6800D}
 
 INTELSYSD = ${SIMHD}/Intel-Systems
+INTELSYSC = ${SIMHD}/Intel-Systems/common
+
+INTEL_PARTS = \
+	${INTELSYSC}/i3214.c \
+	${INTELSYSC}/i8251.c \
+	${INTELSYSC}/i8253.c \
+	${INTELSYSC}/i8255.c \
+	${INTELSYSC}/i8259.c \
+	${INTELSYSC}/ieprom.c \
+	${INTELSYSC}/ioc-cont.c \
+	${INTELSYSC}/ipc-cont.c \
+	${INTELSYSC}/iram8.c \
+	${INTELSYSC}/io.c \
+	${INTELSYSC}/isbc064.c \
+	${INTELSYSC}/isbc202.c \
+	${INTELSYSC}/isbc201.c \
+	${INTELSYSC}/isbc206.c \
+	${INTELSYSC}/isbc464.c \
+	${INTELSYSC}/isbc208.c \
+	${INTELSYSC}/multibus.c \
+	${INTELSYSC}/zx200a.c 
+
+
+ISDK80D = ${INTELSYSD}/isdk80
+ISDK80 = ${INTELSYSC}/i8080.c ${ISDK80D}/isdk80_sys.c \
+	${ISDK80D}/isdk80.c ${INTEL_PARTS}
+ISDK80_OPT = -I ${ISDK80D}
+
+
+IDS880D = ${INTELSYSD}/ids880
+IDS880 = ${INTELSYSC}/i8080.c ${IDS880D}/ids880_sys.c \
+	${IDS880D}/ids880.c ${INTEL_PARTS}
+IDS880_OPT = -I ${IDS880D}
+
+
 ISYS8010D = ${INTELSYSD}/isys8010
-ISYS8010C = ${INTELSYSD}/common
-ISYS8010 = ${ISYS8010C}/i8080.c ${ISYS8010D}/isys8010_sys.c \
-	${ISYS8010C}/i8251.c ${ISYS8010C}/i8255.c \
-	${ISYS8010C}/ieprom.c ${ISYS8010C}/iram8.c \
-	${ISYS8010C}/multibus.c ${ISYS8010D}/isbc8010.c \
-	${ISYS8010C}/isbc064.c ${ISYS8010C}/isbc202.c \
-	${ISYS8010C}/isbc201.c ${ISYS8010C}/zx200a.c \
-	${ISYS8010C}/isbc206.c ${ISYS8010C}/isbc464.c \
-	${ISYS8010C}/isbc208.c
+ISYS8010 = ${INTELSYSC}/i8080.c ${ISYS8010D}/isys8010_sys.c \
+	${ISYS8010D}/isbc8010.c ${INTEL_PARTS}
 ISYS8010_OPT = -I ${ISYS8010D}
 
 
 ISYS8020D = ${INTELSYSD}/isys8020
-ISYS8020C = ${INTELSYSD}/common
-ISYS8020 = ${ISYS8020C}/i8080.c ${ISYS8020D}/isys8020_sys.c \
-	${ISYS8020C}/i8251.c ${ISYS8020C}/i8255.c \
-	${ISYS8020C}/ieprom.c ${ISYS8020C}/iram8.c \
-	${ISYS8020C}/multibus.c ${ISYS8020D}/isbc8020.c \
-	${ISYS8020C}/isbc064.c ${ISYS8020C}/i8259.c \
-	${ISYS8020C}/isbc202.c ${ISYS8020C}/isbc201.c \
-	${ISYS8020C}/isbc206.c ${ISYS8020C}/isbc464.c \
-	${ISYS8020C}/zx200a.c ${ISYS8020C}/i8253.c \
-	${ISYS8020C}/isbc208.c
+ISYS8020 = ${INTELSYSC}/i8080.c ${ISYS8020D}/isys8020_sys.c \
+	${ISYS8020D}/isbc8020.c ${INTEL_PARTS}
 ISYS8020_OPT = -I ${ISYS8020D}
 
 
 ISYS8024D = ${INTELSYSD}/isys8024
-ISYS8024C = ${INTELSYSD}/common
-ISYS8024 = ${ISYS8024C}/i8080.c ${ISYS8024D}/isys8024_sys.c \
-	${ISYS8024C}/i8251.c ${ISYS8024C}/i8253.c \
-	${ISYS8024C}/i8255.c ${ISYS8024C}/i8259.c \
-	${ISYS8024C}/ieprom.c ${ISYS8024C}/iram8.c \
-	${ISYS8024C}/multibus.c ${ISYS8024D}/isbc8024.c \
-	${ISYS8024C}/isbc064.c ${ISYS8024C}/isbc208.c \
-	${ISYS8024C}/isbc202.c ${ISYS8024C}/isbc201.c \
-	${ISYS8024C}/isbc206.c ${ISYS8024C}/isbc464.c \
-	${ISYS8024C}/zx200a.c
+ISYS8024 = ${INTELSYSC}/i8080.c ${ISYS8024D}/isys8024_sys.c \
+	${ISYS8024D}/isbc8024.c ${INTEL_PARTS}
 ISYS8024_OPT = -I ${ISYS8024D}
 
 
 ISYS8030D = ${INTELSYSD}/isys8030
-ISYS8030C = ${INTELSYSD}/common
-ISYS8030 = ${ISYS8030C}/i8080.c ${ISYS8030D}/isys8030_sys.c \
-	${ISYS8030C}/i8251.c ${ISYS8030C}/i8255.c \
-	${ISYS8030C}/i8259.c ${ISYS8030C}/i8253.c \
-	${ISYS8030C}/ieprom.c ${ISYS8030C}/iram8.c \
-	${ISYS8030C}/multibus.c ${ISYS8030D}/isbc8030.c \
-	${ISYS8030C}/isbc202.c ${ISYS8030C}/isbc201.c \
-	${ISYS8030C}/isbc206.c ${ISYS8030C}/isbc464.c \
-	${ISYS8030C}/isbc064.c ${ISYS8030C}/zx200a.c \
-	${ISYS8010C}/isbc208.c
+ISYS8030 = ${INTELSYSC}/i8080.c ${ISYS8030D}/isys8030_sys.c \
+	${ISYS8030D}/isbc8030.c ${INTEL_PARTS}
 ISYS8030_OPT = -I ${ISYS8030D}
 
 
 IMDS210D = ${INTELSYSD}/imds-210
-IMDS210C = ${INTELSYSD}/common
-IMDS210 = ${IMDS210C}/i8080.c ${IMDS210D}/imds-210_sys.c \
-	${IMDS210C}/i8251.c ${IMDS210C}/i8255.c \
-	${IMDS210C}/i8259.c ${IMDS210C}/i8253.c \
-	${IMDS210C}/ieprom.c ${IMDS210C}/iram8.c \
-	${IMDS210C}/multibus.c ${IMDS210C}/ipb.c \
-	${IMDS210C}/ipc-cont.c ${IMDS210C}/ioc-cont.c \
-	${IMDS210C}/isbc202.c ${IMDS210C}/isbc201.c \
-	${IMDS210C}/isbc206.c ${IMDS210C}/isbc208.c \
-	${IMDS210C}/isbc464.c ${IMDS210C}/zx200a.c \
-	${IMDS210C}/isbc064.c
+IMDS210 = ${INTELSYSC}/i8080.c ${IMDS210D}/imds-210_sys.c \
+	${INTELSYSC}/ipb.c ${INTEL_PARTS}
 IMDS210_OPT = -I ${IMDS210D}
 
 
 IMDS220D = ${INTELSYSD}/imds-220
-IMDS220C = ${INTELSYSD}/common
-IMDS220 = ${IMDS220C}/i8080.c ${IMDS220D}/imds-220_sys.c \
-	${IMDS220C}/i8251.c ${IMDS220C}/i8255.c \
-	${IMDS220C}/i8259.c ${IMDS220C}/i8253.c \
-	${IMDS220C}/ieprom.c ${IMDS220C}/iram8.c \
-	${IMDS220C}/multibus.c ${IMDS220C}/ipb.c \
-	${IMDS220C}/ipc-cont.c ${IMDS220C}/ioc-cont.c \
-	${IMDS220C}/isbc202.c ${IMDS220C}/isbc201.c \
-	${IMDS220C}/isbc206.c ${IMDS210C}/isbc208.c \
-	${IMDS220C}/isbc464.c ${IMDS220C}/zx200a.c \
-	${IMDS220C}/isbc064.c
+IMDS220 = ${INTELSYSC}/i8080.c ${IMDS220D}/imds-220_sys.c \
+	${INTELSYSC}/ipb.c ${INTEL_PARTS}
 IMDS220_OPT = -I ${IMDS220D}
 
 
 IMDS225D = ${INTELSYSD}/imds-225
-IMDS225C = ${INTELSYSD}/common
-IMDS225 = ${IMDS225C}/i8080.c ${IMDS225D}/imds-225_sys.c \
-	${IMDS225C}/i8251.c ${IMDS225C}/i8255.c \
-	${IMDS225C}/i8259.c ${IMDS225C}/i8253.c \
-	${IMDS225C}/ieprom.c ${IMDS225C}/iram8.c \
-	${IMDS225C}/multibus.c ${IMDS225C}/ipc.c \
-	${IMDS225C}/ipc-cont.c ${IMDS225C}/ioc-cont.c \
-	${IMDS225C}/isbc202.c ${IMDS225C}/isbc201.c \
-	${IMDS225C}/zx200a.c ${IMDS225C}/isbc464.c \
-	${IMDS225C}/isbc206.c ${IMDS225C}/isbc208.c \
-	${IMDS220C}/isbc064.c
+IMDS225 = ${INTELSYSC}/i8080.c ${IMDS225D}/imds-225_sys.c \
+	${INTELSYSC}/ipc.c ${INTEL_PARTS}
 IMDS225_OPT = -I ${IMDS225D}
 
 
 IMDS230D = ${INTELSYSD}/imds-230
-IMDS230C = ${INTELSYSD}/common
-IMDS230 = ${IMDS230C}/i8080.c ${IMDS230D}/imds-230_sys.c \
-	${IMDS230C}/i8251.c ${IMDS230C}/i8255.c \
-	${IMDS230C}/i8259.c ${IMDS230C}/i8253.c \
-	${IMDS230C}/ieprom.c ${IMDS230C}/iram8.c \
-	${IMDS230C}/multibus.c ${IMDS230C}/ipb.c \
-	${IMDS230C}/ipc-cont.c ${IMDS230C}/ioc-cont.c \
-	${IMDS230C}/isbc202.c ${IMDS230C}/isbc201.c \
-	${IMDS230C}/isbc206.c ${IMDS230C}/isbc208.c \
-	${IMDS230C}/isbc464.c ${IMDS230C}/zx200a.c \
-	${IMDS230C}/isbc064.c
+IMDS230 = ${INTELSYSC}/i8080.c ${IMDS230D}/imds-230_sys.c \
+	${INTELSYSC}/ipb.c ${INTEL_PARTS}
 IMDS230_OPT = -I ${IMDS230D}
 
 
 IMDS800D = ${INTELSYSD}/imds-800
-IMDS800C = ${INTELSYSD}/common
-IMDS800 = ${IMDS800C}/i8080.c ${IMDS800D}/imds-800_sys.c \
+IMDS800 = ${INTELSYSC}/i8080.c ${IMDS800D}/imds-800_sys.c \
         ${IMDS800D}/cpu.c ${IMDS800D}/front_panel.c \
-        ${IMDS800D}/monitor.c ${IMDS800C}/ieprom1.c \
-	${IMDS800C}/i8251.c ${IMDS800C}/ieprom.c \
-	${IMDS800C}/multibus.c ${IMDS800C}/isbc064.c \
-	${IMDS800C}/isbc202.c ${IMDS800C}/isbc201.c \
-	${IMDS800C}/zx200a.c ${IMDS800C}/isbc464.c \
-	${IMDS800C}/isbc206.c ${IMDS800C}/i3214.c
+        ${IMDS800D}/monitor.c ${INTEL_PARTS}
 IMDS800_OPT = -I ${IMDS800D}
 
 
 IMDS810D = ${INTELSYSD}/imds-810
-IMDS810C = ${INTELSYSD}/common
-IMDS810 = ${IMDS800C}/i8080.c ${IMDS810D}/imds-810_sys.c \
+IMDS810 = ${INTELSYSC}/i8080.c ${IMDS810D}/imds-810_sys.c \
         ${IMDS810D}/cpu.c ${IMDS810D}/front_panel.c \
-        ${IMDS810D}/monitor.c ${IMDS810C}/ieprom1.c \
-	${IMDS810C}/i8251.c ${IMDS810C}/ieprom.c \
-	${IMDS810C}/multibus.c ${IMDS810C}/isbc064.c \
-	${IMDS810C}/isbc202.c ${IMDS810C}/isbc201.c \
-	${IMDS810C}/zx200a.c ${IMDS810C}/isbc464.c \
-	${IMDS810C}/isbc206.c ${IMDS800C}/i3214.c
+        ${IMDS810D}/monitor.c ${INTEL_PARTS}
 IMDS810_OPT = -I ${IMDS810D}
 
 
@@ -2627,6 +2583,24 @@ ${BIN}swtp6800mp-a2${EXE} : ${SWTP6800MP-A2} ${SIM} ${BUILD_ROMS}
 	${CC} ${SWTP6800MP-A2} ${SIM} ${SWTP6800_OPT} ${CC_OUTSPEC} ${LDFLAGS}
 ifneq (,$(call find_test,${SWTP6800D},swtp6800mp-a2))
 	$@ $(call find_test,${SWTP6800D},swtp6800mp-a2) ${TEST_ARG}
+endif
+
+isdk80: ${BIN}isdk80${EXE}
+
+${BIN}isdk80${EXE} : ${ISDK80} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${ISDK80} ${SIM} ${ISDK80_OPT} ${CC_OUTSPEC} ${LDFLAGS}
+ifneq (,$(call find_test,${ISDK80D},isdk80))
+	$@ $(call find_test,${ISDK80D},isdk80) ${TEST_ARG}
+endif
+
+ids880: ${BIN}ids880${EXE}
+
+${BIN}ids880${EXE} : ${IDS880} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${IDS880} ${SIM} ${IDS880_OPT} ${CC_OUTSPEC} ${LDFLAGS}
+ifneq (,$(call find_test,${IDS880D},ids880))
+	$@ $(call find_test,${IDS880D},ids880) ${TEST_ARG}
 endif
 
 isys8010: ${BIN}isys8010${EXE}

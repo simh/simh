@@ -37,6 +37,8 @@
 
 #include "system_defs.h"
 
+#if defined (SBC064_NUM) && (SBC064_NUM > 0)
+
 #define UNIT_V_MSIZE    (UNIT_V_UF+2)                   /* Memory Size */
 #define UNIT_MSIZE      (1 << UNIT_V_MSIZE)
 
@@ -160,5 +162,7 @@ void isbc064_put_mbyte(uint16 addr, uint8 val)
     *((uint8 *)isbc064_unit.filebuf + (addr - isbc064_unit.u3)) = val & 0xFF;
     return;
 }
+
+#endif /* SBC064_NUM > 0 */
 
 /* end of isbc064.c */

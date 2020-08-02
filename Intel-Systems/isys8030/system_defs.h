@@ -33,7 +33,7 @@
 #define SET_XACK(VAL)       (xack = VAL)
 
 //chip definitions for the iSBC-80/30
-/* set the base I/O address for the 8253/8254 */
+/* set the base I/O address for the 8041/8741 */
 #define I8041_BASE      0xDC
 #define I8041_NUM       1
 

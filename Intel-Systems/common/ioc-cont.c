@@ -142,7 +142,7 @@ DEVICE ioc_cont_dev = {
 
 t_stat ioc_cont_cfg(uint8 base, uint8 devnum)
 {
-    sim_printf("    ioc-cont[%d]: at base 0%02XH\n",
+    sim_printf("    ioc-cont[%d]: at base port 0%02XH\n",
         devnum, base & 0xFF);
     reg_dev(ioc_cont0, base, devnum); 
     reg_dev(ioc_cont1, base + 1, devnum); 

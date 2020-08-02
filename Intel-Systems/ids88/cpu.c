@@ -1,4 +1,4 @@
-/*  cpu.c: Intel MDS-800 CPU Module simulator
+/*  cpu.c: Intel Intellec 8/80 CPU Module simulator
 
     Copyright (c) 2010, William A. Beech
 
@@ -26,7 +26,7 @@
         This software was written by Bill Beech, Dec 2010, to allow emulation of Multibus
         Computer Systems.
 
-    5 October 2017 - Original file.
+    15 July 2020 - Original file.
 */
 
 #include "system_defs.h"
@@ -70,7 +70,7 @@ extern uint8 BUS_OVERRIDE;
 
 t_stat SBC_config(void)
 {
-    sim_printf("Configuring MDS-800 CPU Card\n  Onboard Devices:\n");
+    sim_printf("Configuring Intellec 8/MOD 80 CPU Card\n  Onboard Devices:\n");
     i3214_cfg(I3214_BASE, 0);
     fp_cfg();
     monitor_cfg();

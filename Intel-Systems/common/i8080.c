@@ -403,10 +403,10 @@ int32 sim_instr(void)
 
     if (onetime++ == 0) {
         if (uptr->flags & UNIT_8085)
-            sim_printf("CPU = 8085\n");
+            sim_printf("    CPU = 8085\n");
         else
-            sim_printf("CPU = 8080\n");
-        sim_printf("    i8080:\n");
+            sim_printf("    CPU = 8080\n");
+//        sim_printf("    i8080:\n");
     }
     
     /* Main instruction fetch/decode loop */

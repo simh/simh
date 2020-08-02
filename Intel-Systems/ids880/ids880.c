@@ -46,34 +46,30 @@ int onetime = 0;
 
 /* external function prototypes */
 
-extern t_stat monitor_reset (void);
-extern t_stat monitor_cfg(void);
-extern t_stat fp_reset (void);
-extern t_stat fp_cfg(void);
 extern t_stat i8080_reset (DEVICE *dptr);   /* reset the 8080 emulator */
 extern uint8 EPROM_get_mbyte(uint16 addr, uint8 devnum);
+extern uint8 RAM_get_mbyte (uint16 addr);
+extern void RAM_put_mbyte (uint16 addr, uint8 val);
 extern t_stat multibus_cfg(void);   
-extern uint8 multibus_get_mbyte(uint16 addr);
-extern void multibus_put_mbyte(uint16 addr, uint8 val);
 extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
-extern t_stat i3214_cfg(uint8 base, uint8 devnum);
+extern t_stat EPROM_cfg (uint16 base, uint16 size, uint8 devnum);
+extern t_stat RAM_cfg(uint16 base, uint16 size);
+extern t_stat IO_cfg(uint8 base, uint8 devnum);
 
 // external globals
 
-extern uint8 monitor_boot;
 extern DEVICE i8080_dev;
-extern uint8 i3214_mask;
-extern uint8 EPROM_enable;
-extern uint8 i3214_cnt;
-extern uint8 i3214_ram[16];
-extern uint8 BUS_OVERRIDE;
 
 t_stat SBC_config(void)
 {
-    sim_printf("Configuring MDS-800 CPU Card\n  Onboard Devices:\n");
-    i3214_cfg(I3214_BASE, 0);
-    fp_cfg();
-    monitor_cfg();
+    sim_printf("Configuring IDS-8/MOD 80 CPU Card\n  Onboard Devices:\n");
+    EPROM_cfg(ROM_BASE, ROM_SIZE, 0);
+    RAM_cfg(RAM_BASE, RAM_SIZE);
+    IO_cfg(IO_BASE_0, 0);
+//    IO_cfg(IO_BASE_1, 1);
+    put_mbyte(0, 0xc3);
+    put_mbyte(1, 0x00);
+    put_mbyte(2, 0x38);
     return SCPE_OK;
 }
 
@@ -84,14 +80,9 @@ t_stat SBC_reset (DEVICE *dptr)
 {    
     if (onetime == 0) {
         SBC_config();
-        multibus_cfg();   
         onetime++;
     }
     i8080_reset(&i8080_dev);
-    EPROM_enable = 1;
-    BUS_OVERRIDE = 0;
-    fp_reset();
-    monitor_reset();
     return SCPE_OK;
 }
 
@@ -103,12 +94,12 @@ uint8 get_mbyte(uint16 addr)
 {
     uint8 val;
 
-    if (((monitor_boot & 0x04) == 0) && (addr >= ROM_BASE_0) && (addr <= (ROM_BASE_0 + ROM_SIZE_0)))
+    if ((addr >= ROM_BASE) && (addr <= (ROM_BASE + ROM_SIZE)))
         val = EPROM_get_mbyte(addr, 0); 
-    else if ((addr >= ROM_BASE_1) && (addr <= (ROM_BASE_1 + ROM_SIZE_1)))
-        val = EPROM_get_mbyte(addr, 1); 
+    else if ((addr >= RAM_BASE) && (addr <= (RAM_BASE + RAM_SIZE)))
+        val = RAM_get_mbyte(addr); 
     else 
-        val = multibus_get_mbyte(addr);
+        val = 0xff;
     val &= 0xFF;
     return val;
 }
@@ -128,7 +119,8 @@ uint16 get_mword(uint16 addr)
 
 void put_mbyte(uint16 addr, uint8 val)
 {
-    multibus_put_mbyte(addr, val);
+    if ((addr >= RAM_BASE) && (addr <= (RAM_BASE + RAM_SIZE)))
+        RAM_put_mbyte(addr, val); 
 }
 
 /*  put a word to memory */

@@ -397,6 +397,8 @@
  
 #include "system_defs.h"
  
+#if defined (SBC208_NUM) && (SBC208_NUM > 0)
+
 #define UNIT_V_WPMODE   (UNIT_V_UF)     /* Write protect */
 #define UNIT_WPMODE     (1 << UNIT_V_WPMODE)
  
@@ -1486,4 +1488,6 @@ uint8 isbc208_r15(t_bool io, uint8 data, uint8 devnum)
     }
 }
  
+#endif /* SBC208_NUM > 0 */
+
 /* end of isbc208.c */

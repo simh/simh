@@ -1,4 +1,4 @@
-/*  multibus.c: Multibus I simulator
+/* sdkmultibus.c: Multibus I simulator
 
     Copyright (c) 2010, William A. Beech
 
@@ -142,27 +142,6 @@ DEVICE multibus_dev = {
 t_stat multibus_cfg(void)
 {
     sim_printf("Configuring Multibus Devices\n");
-    #if defined (SBC064_NUM) && (SBC064_NUM > 0)
-    isbc064_cfg(SBC064_BASE, SBC064_SIZE);
-    #endif
-    #if defined (SBC464_NUM) && (SBC464_NUM > 0)
-    isbc464_cfg(SBC464_BASE, SBC464_SIZE);
-    #endif
-    #if defined (SBC201_NUM) && (SBC201_NUM > 0)
-    isbc201_cfg(SBC201_BASE);
-    #endif
-    #if defined (SBC202_NUM) && (SBC202_NUM > 0)
-    isbc202_cfg(SBC202_BASE);
-    #endif
-    #if defined (SBC206_NUM) && (SBC206_NUM > 0)
-    isbc206_cfg(SBC206_BASE);
-    #endif
-    #if defined (SBC208_NUM) && (SBC208_NUM > 0)
-    isbc208_cfg(SBC208_BASE);
-    #endif
-    #if defined (ZX200A_NUM) && (ZX200A_NUM > 0)
-    zx200a_cfg(ZX200A_BASE);
-    #endif
     return SCPE_OK;
 }
 
@@ -172,34 +151,6 @@ t_stat multibus_reset(DEVICE *dptr)
 {
     if (SBC_reset(NULL) == 0) { 
         sim_printf("  Multibus: Reset\n");
-        #if defined (SBC064_NUM) && (SBC064_NUM > 0)
-        isbc064_reset(&isbc064_dev);
-        sim_printf("    Multibus: SBC064 reset\n");
-        #endif
-        #if defined (SBC464_NUM) && (SBC464_NUM > 0)
-        isbc464_reset(&isbc464_dev);
-        sim_printf("    Multibus: SBC464 reset\n");
-        #endif
-        #if defined (SBC201_NUM) && (SBC201_NUM > 0)
-        isbc201_reset(&isbc201_dev);
-        sim_printf("    Multibus: SBC201 reset\n");
-        #endif
-        #if defined (SBC202_NUM) && (SBC202_NUM > 0)
-        isbc202_reset(&isbc202_dev);
-        sim_printf("    Multibus: SBC202 reset\n");
-        #endif
-        #if defined (SBC208_NUM) && (SBC208_NUM > 0)
-        isbc206_reset(&isbc206_dev);
-        sim_printf("    Multibus: SBC206 reset\n");
-        #endif
-        #if defined (SBC208_NUM) && (SBC208_NUM > 0)
-        isbc208_reset(&isbc208_dev);
-        sim_printf("    Multibus: SBC208 reset\n");
-        #endif
-        #if defined (ZX200A_NUM) && (ZX200A_NUM > 0)
-        zx200a_reset(&zx200a_dev);
-        sim_printf("    Multibus: ZX200A reset\n");
-        #endif
         sim_activate (&multibus_unit, multibus_unit.wait); /* activate unit */
         return SCPE_OK;
     } else {
@@ -333,30 +284,12 @@ uint8 reg_dev(uint8 (*routine)(t_bool io, uint8 data, uint8 devnum), uint8 port,
 uint8 multibus_get_mbyte(uint16 addr)
 {
     SET_XACK(0);                        /* set no XACK */
-    #if defined (SBC464_NUM) && (SBC464_NUM > 0)
-    if ((isbc464_dev.flags & DEV_DIS) == 0) { //ROM is enabled
-        if (addr >= isbc464_unit.u3 && addr < (isbc464_unit.u3 + isbc464_unit.capac))
-            return(isbc464_get_mbyte(addr));
-    }
-    #endif
-    #if defined (SBC064_NUM) && (SBC064_NUM > 0)
-    if ((isbc064_dev.flags & DEV_DIS) == 0) { //RAM is enabled
-        if (addr >= isbc064_unit.u3 && addr < (isbc064_unit.u3 + isbc064_unit.capac))
-            return (isbc064_get_mbyte(addr));
-    }
-    #endif
-    return 0;
+    return 0xff;
 }
 
 void multibus_put_mbyte(uint16 addr, uint8 val)
 {
     SET_XACK(0);                        /* set no XACK */
-    #if defined (SBC064_NUM) && (SBC064_NUM > 0)
-    if ((isbc064_dev.flags & DEV_DIS) == 0) { //device is enabled
-        if ((addr >= SBC064_BASE) && (addr <= (SBC064_BASE + SBC064_SIZE - 1)))
-            isbc064_put_mbyte(addr, val);
-    }
-    #endif
 }
 
 /* end of multibus.c */

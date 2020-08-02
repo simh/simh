@@ -209,15 +209,35 @@
 				>
 			</File>
 			<File
+				RelativePath="..\Intel-Systems\common\i8253.c"
+				>
+			</File>
+			<File
+				RelativePath="..\Intel-Systems\common\i8255.c"
+				>
+			</File>
+			<File
+				RelativePath="..\Intel-Systems\common\i8259.c"
+				>
+			</File>
+			<File
 				RelativePath="..\Intel-Systems\common\ieprom.c"
 				>
 			</File>
 			<File
-				RelativePath="..\Intel-Systems\common\ieprom1.c"
+				RelativePath="..\Intel-Systems\imds-800\imds-800_sys.c"
 				>
 			</File>
 			<File
-				RelativePath="..\Intel-Systems\imds-800\imds-800_sys.c"
+				RelativePath="..\Intel-Systems\common\ioc-cont.c"
+				>
+			</File>
+			<File
+				RelativePath="..\Intel-Systems\common\ipc-cont.c"
+				>
+			</File>
+			<File
+				RelativePath="..\Intel-Systems\common\iram8.c"
 				>
 			</File>
 			<File
@@ -245,11 +265,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\Intel-Systems\common\multibus.c"
+				RelativePath="..\Intel-Systems\imds-800\monitor.c"
 				>
 			</File>
 			<File
-				RelativePath="..\Intel-Systems\imds-800\monitor.c"
+				RelativePath="..\Intel-Systems\common\multibus.c"
 				>
 			</File>
 			<File

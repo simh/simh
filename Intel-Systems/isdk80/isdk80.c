@@ -1,6 +1,6 @@
-/*  cpu.c: Intel MDS-800 CPU Module simulator
+/*  iSDK80.c: Intel iSDK 80 Processor simulator
 
-    Copyright (c) 2010, William A. Beech
+    Copyright (c) 2020, William A. Beech
 
         Permission is hereby granted, free of charge, to any person obtaining a
         copy of this software and associated documentation files (the "Software"),
@@ -23,10 +23,10 @@
         used in advertising or otherwise to promote the sale, use or other dealings
         in this Software without prior written authorization from William A. Beech.
 
-        This software was written by Bill Beech, Dec 2010, to allow emulation of Multibus
-        Computer Systems.
+    MODIFICATIONS:
 
-    5 October 2017 - Original file.
+        08 Jun 20 - Original file.
+
 */
 
 #include "system_defs.h"
@@ -40,77 +40,77 @@ uint16 get_mword(uint16 addr);
 void put_mbyte(uint16 addr, uint8 val);
 void put_mword(uint16 addr, uint16 val);
 
-// globals
-
-int onetime = 0;
+/* external globals */
+ 
+extern uint8 i8255_C[4];                    //port C byte I/O
+extern uint16 PCX;                          /* External view of PC */
+extern DEVICE i8080_dev;
+extern DEVICE i8251_dev;
+extern DEVICE i8255_dev;
+extern DEVICE EPROM_dev;
+extern UNIT EPROM_unit[];
+extern DEVICE RAM_dev;
+extern UNIT RAM_unit;
 
 /* external function prototypes */
 
-extern t_stat monitor_reset (void);
-extern t_stat monitor_cfg(void);
-extern t_stat fp_reset (void);
-extern t_stat fp_cfg(void);
-extern t_stat i8080_reset (DEVICE *dptr);   /* reset the 8080 emulator */
 extern uint8 EPROM_get_mbyte(uint16 addr, uint8 devnum);
-extern t_stat multibus_cfg(void);   
-extern uint8 multibus_get_mbyte(uint16 addr);
-extern void multibus_put_mbyte(uint16 addr, uint8 val);
+extern uint8 RAM_get_mbyte(uint16 addr);
+extern void RAM_put_mbyte(uint16 addr, uint8 val);
+extern t_stat i8080_reset (DEVICE *dptr);   /* reset the 8080 emulator */
+extern t_stat i8251_reset (DEVICE *dptr);
+extern t_stat i8255_reset (DEVICE *dptr);
+extern t_stat EPROM_reset (DEVICE *dptr);
+extern t_stat RAM_reset (DEVICE *dptr);
 extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
-extern t_stat i3214_cfg(uint8 base, uint8 devnum);
+extern t_stat i8251_cfg(uint8 base, uint8 devnum);
+extern t_stat i8255_cfg(uint8 base, uint8 devnum);
+extern t_stat RAM_cfg(uint16 base, uint16 size);
+extern t_stat EPROM_cfg(uint16 base, uint16 size, uint8 devnum);
+extern t_stat multibus_cfg();   
 
-// external globals
+/* globals */
 
-extern uint8 monitor_boot;
-extern DEVICE i8080_dev;
-extern uint8 i3214_mask;
-extern uint8 EPROM_enable;
-extern uint8 i3214_cnt;
-extern uint8 i3214_ram[16];
-extern uint8 BUS_OVERRIDE;
+int onetime = 0;
 
 t_stat SBC_config(void)
 {
-    sim_printf("Configuring MDS-800 CPU Card\n  Onboard Devices:\n");
-    i3214_cfg(I3214_BASE, 0);
-    fp_cfg();
-    monitor_cfg();
+    sim_printf("Configuring iSDK-80 SBC\n  Onboard Devices:\n");
+    i8251_cfg(I8251_BASE, 0);
+    i8255_cfg(I8255_BASE_0, 0);
+    i8255_cfg(I8255_BASE_1, 1);
+    EPROM_cfg(ROM_BASE, ROM_SIZE, 0);
+    RAM_cfg(RAM_BASE, RAM_SIZE);
     return SCPE_OK;
 }
 
-/*  SBC reset routine 
-    put here to cause a reset of the entire MDS-800 system */
+/*  SBC reset routine */
 
 t_stat SBC_reset (DEVICE *dptr)
-{    
+{
     if (onetime == 0) {
         SBC_config();
         multibus_cfg();   
         onetime++;
     }
     i8080_reset(&i8080_dev);
-    EPROM_enable = 1;
-    BUS_OVERRIDE = 0;
-    fp_reset();
-    monitor_reset();
+    i8251_reset(&i8251_dev);
+    i8255_reset(&i8255_dev);
     return SCPE_OK;
 }
 
-// memory operations
-
-/*  get a byte from memory - handle RAM, ROM and Multibus memory */
+/*  get a byte from memory - handle RAM, ROM, I/O, and Multibus memory */
 
 uint8 get_mbyte(uint16 addr)
 {
-    uint8 val;
-
-    if (((monitor_boot & 0x04) == 0) && (addr >= ROM_BASE_0) && (addr <= (ROM_BASE_0 + ROM_SIZE_0)))
-        val = EPROM_get_mbyte(addr, 0); 
-    else if ((addr >= ROM_BASE_1) && (addr <= (ROM_BASE_1 + ROM_SIZE_1)))
-        val = EPROM_get_mbyte(addr, 1); 
-    else 
-        val = multibus_get_mbyte(addr);
-    val &= 0xFF;
-    return val;
+    /* if local EPROM handle it */
+    if ((addr >= EPROM_unit->u3) && ((uint16)addr <= (EPROM_unit->u3 + EPROM_unit->capac))) {
+        return EPROM_get_mbyte(addr, 0);
+    } /* if local RAM handle it */
+    if ((addr >= RAM_unit.u3) && ((uint16)addr <= (RAM_unit.u3 + RAM_unit.capac))) {
+        return RAM_get_mbyte(addr);
+    } 
+    return 0xff;
 }
 
 /*  get a word from memory */
@@ -124,19 +124,26 @@ uint16 get_mword(uint16 addr)
     return val;
 }
 
-/*  put a byte to memory - handle RAM, ROM and Multibus memory */
+/*  put a byte to memory - handle RAM, ROM, I/O, and Multibus memory */
 
 void put_mbyte(uint16 addr, uint8 val)
 {
-    multibus_put_mbyte(addr, val);
+    /* if local EPROM handle it */
+    if ((addr >= EPROM_unit->u3) && ((uint16)addr <= (EPROM_unit->u3 + EPROM_unit->capac))) {
+        sim_printf("Write to R/O memory address %04X from PC=%04X - ignored\n", addr, PCX);
+        return;
+    } /* if local RAM handle it */
+    if ((addr >= RAM_unit.u3) && ((uint16)addr <= (RAM_unit.u3 + RAM_unit.capac))) {
+        RAM_put_mbyte(addr, val);
+        return;
+    }
 }
 
 /*  put a word to memory */
-
 void put_mword(uint16 addr, uint16 val)
 {
     put_mbyte(addr, val & 0xff);
     put_mbyte(addr+1, val >> 8);
 }
 
-/* end of cpu.c */
+/* end of iSDK80.c */
