@@ -2080,7 +2080,7 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	microvax3100m80 vaxstation4000vlc infoserver1000 \
 	nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 cdc1700 \
-	swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 isys8010 isys8020 \
+	swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 isdk80 ids880 isys8010 isys8020 \
 	isys8030 isys8024 imds-210 imds-220 imds-225 imds-230 imds-800 imds-810 \
 	scelbi 3b2 i701 i704 i7010 i7070 i7080 i7090 \
 	sigma uc15 pdp10-ka pdp10-ki pdp10-kl pdp6 i650

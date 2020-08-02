@@ -413,6 +413,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "imlac", "imlac.vcproj", "{7
 		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "isdk80", "isdk80.vcproj", "{6641B210-6A57-4A74-A484-042D7E10EA14}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ids880", "ids880.vcproj", "{7544004D-B821-4577-BA3A-24C38CE27AFA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -751,6 +755,14 @@ Global
 		{7AB92E01-D278-4A8F-8493-ED58187AF3A1}.Debug|Win32.Build.0 = Debug|Win32
 		{7AB92E01-D278-4A8F-8493-ED58187AF3A1}.Release|Win32.ActiveCfg = Release|Win32
 		{7AB92E01-D278-4A8F-8493-ED58187AF3A1}.Release|Win32.Build.0 = Release|Win32
+		{6641B210-6A57-4A74-A484-042D7E10EA14}.Debug|Win32.ActiveCfg = Debug|Win32
+		{6641B210-6A57-4A74-A484-042D7E10EA14}.Debug|Win32.Build.0 = Debug|Win32
+		{6641B210-6A57-4A74-A484-042D7E10EA14}.Release|Win32.ActiveCfg = Release|Win32
+		{6641B210-6A57-4A74-A484-042D7E10EA14}.Release|Win32.Build.0 = Release|Win32
+		{7544004D-B821-4577-BA3A-24C38CE27AFA}.Debug|Win32.ActiveCfg = Debug|Win32
+		{7544004D-B821-4577-BA3A-24C38CE27AFA}.Debug|Win32.Build.0 = Debug|Win32
+		{7544004D-B821-4577-BA3A-24C38CE27AFA}.Release|Win32.ActiveCfg = Release|Win32
+		{7544004D-B821-4577-BA3A-24C38CE27AFA}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
