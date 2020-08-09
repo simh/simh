@@ -1687,7 +1687,7 @@ if (f) {
 
   read_size = fread (buf, 1, buf_size - 1, f);
   buf[read_size] = '\0';
-  fclose (f);
+  pclose (f);
   }
 while ((strlen (buf) > 0) && sim_isspace(buf[strlen (buf) - 1]))
   buf[strlen (buf) - 1] = '\0';
@@ -3440,7 +3440,7 @@ response.msg[15] = (offset >> 8) & 0xFF;
 /* send response packet */
 eth_write(dev, &response, NULL);
 
-eth_packet_trace(dev, response.msg, response.len, ((function == 1) ? "loopbackreply" : "loopbackforward"));
+eth_packet_trace(dev, response.msg, response.len, "loopbackforward");
 
 ++dev->loopback_packets_processed;
 
@@ -3887,6 +3887,9 @@ if (dev->dptr->dctrl & dev->dbit) {
     sim_debug(dev->dbit, dev->dptr, "Promiscuous\n");
     }
   }
+#ifdef USE_READER_THREAD
+  pthread_mutex_lock (&dev->self_lock);
+#endif
 /* Set the desired physical address */
 memset(dev->physical_addr, 0, sizeof(ETH_MAC));
 dev->loopback_self_sent = 0;
@@ -3900,6 +3903,9 @@ for (i = 0; i < addr_count; i++) {
     break;
     }
   }
+#ifdef USE_READER_THREAD
+  pthread_mutex_unlock (&dev->self_lock);
+#endif
 
 /* setup BPF filters and other fields to minimize packet delivery */
 eth_bpf_filter (dev, dev->addr_count, dev->filter_address, 
