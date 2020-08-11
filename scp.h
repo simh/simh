@@ -365,6 +365,14 @@ extern UNIT *sim_dfunit;
 extern int32 sim_interval;
 extern int32 sim_switches;
 extern int32 sim_switch_number;
+#define GET_SWITCHES(cp) \
+    if ((cp = get_sim_sw (cp)) == NULL) return SCPE_INVSW
+#define GET_RADIX(val,dft) \
+    if (sim_switches & SWMASK ('O')) val = 8; \
+    else if (sim_switches & SWMASK ('D')) val = 10; \
+    else if (sim_switches & SWMASK ('H')) val = 16; \
+    else if ((sim_switch_number >= 2) && (sim_switch_number <= 36)) val = sim_switch_number; \
+    else val = dft;
 extern int32 sim_show_message;
 extern int32 sim_quiet;
 extern int32 sim_step;

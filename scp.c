@@ -314,14 +314,6 @@
     else if (sz == sizeof (uint16)) *(((uint16 *) mb) + ((uint32) j)) = (uint16) v; \
     else *(((uint32 *) mb) + ((uint32) j)) = v;
 #endif
-#define GET_SWITCHES(cp) \
-    if ((cp = get_sim_sw (cp)) == NULL) return SCPE_INVSW
-#define GET_RADIX(val,dft) \
-    if (sim_switches & SWMASK ('O')) val = 8; \
-    else if (sim_switches & SWMASK ('D')) val = 10; \
-    else if (sim_switches & SWMASK ('H')) val = 16; \
-    else if ((sim_switch_number >= 2) && (sim_switch_number <= 36)) val = sim_switch_number; \
-    else val = dft;
 
 #define SIM_DBG_EVENT       0x02000000      /* event dispatch activities */
 #define SIM_DBG_ACTIVATE    0x04000000      /* queue insertion activities */
