@@ -5891,22 +5891,38 @@ return WriteVirtualDiskSectors(hVHD, buf, sects, sectswritten, ctx->sector_size,
  * may have been recorded at the end of a disk container file
  */
 
-t_stat sim_disk_info_cmd (int32 flag, CONST char *cptr)
+typedef struct {
+    t_stat stat;
+    int32 flag;
+    } DISK_INFO_CTX;
+
+static void sim_disk_info_entry (const char *directory, 
+                                 const char *filename,
+                                 t_offset FileSize,
+                                 const struct stat *filestat,
+                                 void *context)
 {
+DISK_INFO_CTX *info = (DISK_INFO_CTX *)context;
+char FullPath[PATH_MAX + 1];
 struct simh_disk_footer footer;
 struct simh_disk_footer *f = &footer;
 FILE *container;
 t_offset container_size;
 
-if (flag) {        /* zap type */
-    container = sim_vhd_disk_open (cptr, "r");
+sprintf (FullPath, "%s%s", directory, filename);
+
+if (info->flag) {        /* zap type */
+    container = sim_vhd_disk_open (FullPath, "r");
     if (container != NULL) {
         sim_vhd_disk_close (container);
-        return sim_messagef (SCPE_OPENERR, "Can't change the disk type of a VHD container file\n");
+        info->stat = sim_messagef (SCPE_OPENERR, "Can't change the disk type of a VHD container file\n");
+        return;
         }
-    container = sim_fopen (cptr, "r+");
-    if (container == NULL)
-        return sim_messagef (SCPE_OPENERR, "Can't open container file '%s' - %s\n", cptr, strerror (errno));
+    container = sim_fopen (FullPath, "r+");
+    if (container == NULL) {
+        info->stat = sim_messagef (SCPE_OPENERR, "Can't open container file '%s' - %s\n", FullPath, strerror (errno));
+        return;
+        }
     container_size = sim_fsize_ex (container);
     if ((container_size != (t_offset)-1) && (container_size > sizeof (*f)) &&
         (sim_fseeko (container, container_size - sizeof (*f), SEEK_SET) == 0) &&
@@ -5915,13 +5931,15 @@ if (flag) {        /* zap type */
             (f->Checksum == NtoHl (eth_crc32 (0, f, sizeof (*f) - sizeof (f->Checksum))))) {
             (void)sim_set_fsize (container, (t_addr)(container_size - sizeof (*f)));
             fclose (container);
-            return sim_messagef (SCPE_OK, "Disk Type Removed from container '%s'\n", cptr);
+            info->stat = sim_messagef (SCPE_OK, "Disk Type Removed from container '%s'\n", FullPath);
+            return;
             }
         }
     fclose (container);
-    return sim_messagef (SCPE_ARG, "No footer found on disk container '%s'.\n", cptr);
+    info->stat = sim_messagef (SCPE_ARG, "No footer found on disk container '%s'.\n", FullPath);
+    return;
     }
-if (flag == 0) {
+if (info->flag == 0) {
     UNIT unit, *uptr = &unit;
     struct disk_context disk_ctx;
     struct disk_context *ctx = &disk_ctx;
@@ -5936,10 +5954,10 @@ if (flag == 0) {
     uptr->flags |= UNIT_ATTABLE;
     uptr->disk_ctx = &disk_ctx;
     sim_disk_set_fmt (uptr, 0, "VHD", NULL);
-    container = sim_vhd_disk_open (cptr, "r");
+    container = sim_vhd_disk_open (FullPath, "r");
     if (container == NULL) {
         sim_disk_set_fmt (uptr, 0, "SIMH", NULL);
-        container = sim_fopen (cptr, "r+");
+        container = sim_fopen (FullPath, "r+");
         close_function = fclose;
         size_function = sim_fsize_ex;
         }
@@ -5949,7 +5967,7 @@ if (flag == 0) {
         }
     if (container) {
         container_size = size_function (container);
-        uptr->filename = strdup (cptr);
+        uptr->filename = strdup (FullPath);
         uptr->fileref = container;
         uptr->flags |= UNIT_ATT;
         get_disk_footer (uptr);
@@ -5975,14 +5993,31 @@ if (flag == 0) {
         free (f);
         free (uptr->filename);
         close_function (container);
-        return SCPE_OK;
+        info->stat = SCPE_OK;
+        return;
         }
-    else
-        return sim_messagef (SCPE_OPENERR, "Can't open container file '%s' - %s\n", cptr, strerror (errno));
+    else {
+        info->stat = sim_messagef (SCPE_OPENERR, "Can't open container file '%s' - %s\n", FullPath, strerror (errno));
+        return;
+        }
     }
-return SCPE_NOFNC;
 }
 
+t_stat sim_disk_info_cmd (int32 flag, CONST char *cptr)
+{
+DISK_INFO_CTX disk_info_state;
+t_stat stat;
+
+if ((!cptr) || (*cptr == 0))
+    return SCPE_2FARG;
+GET_SWITCHES (cptr);                                    /* get switches */
+memset (&disk_info_state, 0, sizeof (disk_info_state));
+disk_info_state.flag = flag;
+stat = sim_dir_scan (cptr, sim_disk_info_entry, &disk_info_state);
+if (stat == SCPE_OK)
+    return disk_info_state.stat;
+return sim_messagef (SCPE_OK, "No such file or directory: %s\n", cptr);
+}
 
 /* disk testing */
 
