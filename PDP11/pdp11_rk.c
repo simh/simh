@@ -128,7 +128,7 @@ static struct drvtyp drv_tab[] = {
 /* Flags in the unit flags word */
 
 #define UNIT_V_HWLK     (DKUF_V_WLK + 0)                /* hwre write lock */
-#define UNIT_V_SWLK     (DKUF_V_WLK + 1)                /* swre write lock */
+#define UNIT_V_SWLK     (DKUF_V_UF + 0)                 /* swre write lock */
 #define UNIT_HWLK       (1u << UNIT_V_HWLK)
 #define UNIT_SWLK       (1u << UNIT_V_SWLK)
 #define UNIT_WPRT       (UNIT_HWLK|UNIT_SWLK|UNIT_RO)   /* write prot */
@@ -360,11 +360,12 @@ t_stat rk_detach (UNIT *uptr);
 const char *rk_description (DEVICE *dptr);
 
 DEBTAB rk_deb[] = {
-    { "OPS", RKDEB_OPS },
-    { "RRD", RKDEB_RRD },
-    { "RWR", RKDEB_RWR },
-    { "INTERRUPT", RKDEB_INT },
-    { "TRACE", RKDEB_TRC },
+    { "OPS",        RKDEB_OPS, "transactions" },
+    { "RRD",        RKDEB_RRD, "register reads" },
+    { "RWR",        RKDEB_RWR, "register writes" },
+    { "INTERRUPT",  RKDEB_INT, "interrupts" },
+    { "TRACE",      RKDEB_TRC, "trace" },
+    { "DATA",       RKDEB_DAT, "transfer data" },
     { NULL, 0 }
     };
 
