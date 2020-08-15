@@ -456,13 +456,13 @@ extern const char *sim_vm_step_unit;                    /* Simulator can change 
    These defines help implement consistent unit test functionality */
 
 #define SIM_TEST_INIT                                           \
-        int test_stat;                                          \
-        const char *sim_test;                                   \
+        volatile int test_stat;                                 \
+        const char *volatile sim_test;                          \
         jmp_buf sim_test_env;                                   \
         if ((test_stat = setjmp (sim_test_env))) {              \
             sim_printf ("Error: %d - '%s' processing: %s\n",    \
-                        test_stat, sim_error_text(test_stat),   \
-                        sim_test);                              \
+                        SCPE_BARE_STATUS(test_stat),            \
+                        sim_error_text(test_stat), sim_test);   \
             return test_stat;                                   \
             }
 #define SIM_TEST(_stat)                                         \

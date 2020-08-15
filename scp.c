@@ -15563,9 +15563,9 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
         tstat = SCPE_OK;        /* can't enable, just skip device */
     if (tstat != SCPE_OK) {
         stat = tstat;
-        sim_printf ("%s device tests returned: %d - %s\n", dptr->name, tstat, sim_error_text (tstat));
+        sim_printf ("%s device tests returned: %d - %s\n", dptr->name, SCPE_BARE_STATUS (tstat), sim_error_text (tstat));
         if (sim_ttisatty()) {
-            if (get_yn ("Continue with additional tests? [N]", SCPE_STOP) == SCPE_STOP)
+            if (get_yn ("Continue with additional tests? [N] ", SCPE_STOP) == SCPE_STOP)
                 break;
             }
         else
