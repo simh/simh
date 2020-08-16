@@ -3830,7 +3830,7 @@ t_awslnt awsrec_typ = AWS_REC;
 char name[256];
 t_stat stat = SCPE_OPENERR;
 uint8 *buf = NULL;
-t_stat aws_stat;
+t_stat aws_stat = MTSE_UNATT;
 int32 saved_switches = sim_switches;
 
 srand (0);                      /* All devices use the same random sequence for file data */
