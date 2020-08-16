@@ -6166,6 +6166,8 @@ static t_stat sim_instr_mmu (void) {
 
     /* simulation halted */
     PC_S = ((reason == STOP_OPCODE) || (reason == STOP_MEM)) ? PCX : (PC & ADDRMASK);
+    if ((cpu_unit.flags & UNIT_CPU_BANKED) && (PC_S < common))
+        PC_S |= bankSelect << MAXBANKSIZELOG2;
     pcq_r -> qptr = pcq_p;  /* update pc q ptr */
     AF_S = AF;
     BC_S = BC;
