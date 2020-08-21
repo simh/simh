@@ -2874,23 +2874,22 @@ while (*tptr) {
             while (cptr && *cptr) {
                 char *tptr = gbuf + (cptr - gbuf);
 
-                get_glyph (cptr, tptr, 0);                  /* upcase this string */
-                if (0 == MATCH_CMD (cptr, "NOTELNET"))
+                cptr = get_glyph (cptr, tptr, ';');
+                if (0 == MATCH_CMD (tptr, "NOTELNET"))
                     listennotelnet = TRUE;
                 else
-                    if (0 == MATCH_CMD (cptr, "TELNET"))
+                    if (0 == MATCH_CMD (tptr, "TELNET"))
                         listennotelnet = FALSE;
                     else
-                        if (0 == MATCH_CMD (cptr, "NOMESSAGE"))
+                        if (0 == MATCH_CMD (tptr, "NOMESSAGE"))
                             listennomessage = TRUE;
                         else
-                            if (0 == MATCH_CMD (cptr, "MESSAGE"))
+                            if (0 == MATCH_CMD (tptr, "MESSAGE"))
                                 listennomessage = FALSE;
                             else {
                                 if (*tptr)
                                     return sim_messagef (SCPE_ARG, "Invalid Specifier: %s\n", tptr);
                                 }
-                cptr = get_glyph (gbuf, port, ';');
                 }
             cptr = init_cptr;
             }
@@ -5633,6 +5632,11 @@ SIM_TEST((sim_parse_addr ("localhost:telnet", host, sizeof(host), "localhost", p
 SIM_TEST((sim_parse_addr ("telnet", host, sizeof(host), "localhost", port, sizeof(port), "1234", NULL) == -1) || (strcmp(host, "localhost")) || (strcmp(port,"telnet")));
 dptr->dctrl = 0xFFFFFFFF;
 dptr->dctrl &= ~TMXR_DBG_TRC;
+sprintf (cmd, "%s -u localhost:65500;telnet;nomessage", dptr->name);
+SIM_TEST(attach_cmd (0, cmd));
+tmxr = (TMXR *)dptr->units->tmxr;
+ln = &tmxr->ldsc[tmxr->lines - 1];
+SIM_TEST(detach_cmd (0, dptr->name));
 sprintf (cmd, "%s -u localhost:65500;notelnet", dptr->name);
 SIM_TEST(attach_cmd (0, cmd));
 tmxr = (TMXR *)dptr->units->tmxr;
