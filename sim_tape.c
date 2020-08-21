@@ -3889,7 +3889,6 @@ fAWS3 = fopen (name, "wb");
 if (fAWS3  == NULL)
     goto Done_Files;
 sprintf (name, "aws %s.aws.tape", filename);
-(void)remove (name);
 sim_switches = SWMASK ('F') | (sim_switches & SWMASK ('D')) | SWMASK ('N');
 if (sim_switches & SWMASK ('D'))
     uptr->dctrl = MTSE_DBG_STR | MTSE_DBG_DAT;
@@ -4100,6 +4099,8 @@ sprintf (name, "%s.2.tar", filename);
 (void)remove (name);
 sprintf (name, "%s.3.tar", filename);
 (void)remove (name);
+sprintf (name, "%s.aws.tape", filename);
+(void)remove (name);
 return SCPE_OK;
 }
 
@@ -4143,10 +4144,10 @@ int32 saved_switches = sim_switches;
 SIM_TEST_INIT;
 
 if (dptr->units->flags & UNIT_ATT)
-    return sim_messagef (SCPE_ALATT, "The %s device must be detached to run the tests\n",
+    return sim_messagef (SCPE_ALATT, "The %s device must be detached to run the sim_tape library API tests.\n",
                                      sim_uname(dptr->units));
 
-sim_printf ("\nTesting %s device sim_tape APIs\n", sim_uname(dptr->units));
+sim_printf ("\nTesting %s device sim_tape library APIs\n", sim_uname(dptr->units));
 
 SIM_TEST(sim_tape_test_density_string ());
 
