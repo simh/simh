@@ -15509,9 +15509,13 @@ int32 saved_switches = sim_switches & ~SWMASK ('T');
 t_stat stat = SCPE_OK;
 char gbuf[CBUFSIZE];
 
+GET_SWITCHES (cptr);                        /* get switches */
+saved_switches |= sim_switches;
 if (sim_time != 0.0)
     return sim_messagef (SCPE_UNK, "Library tests can not be performed after instructions have been executed.\n");
+sim_switches = 0;
 detach_all (0, 0);                          /* Assure that all units are unattached */
+sim_switches = saved_switches;
 
 cptr = get_glyph (cptr, gbuf, 0);
 if (gbuf[0] == '\0')
