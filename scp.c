@@ -9676,10 +9676,10 @@ while ((*iptr != 0) && (!got_quoted) &&
     else *optr = *iptr;
     iptr++; optr++;
     }
-*optr = 0;
-if (mchar && (*iptr == mchar))                          /* skip terminator */
+if (mchar && (*iptr == mchar))              /* skip input terminator */
     iptr++;
-while (sim_isspace (*iptr))                             /* absorb spaces */
+*optr = 0;                                  /* terminate result string */
+while (sim_isspace (*iptr))                 /* absorb additional input spaces */
     iptr++;
 return iptr;
 }
