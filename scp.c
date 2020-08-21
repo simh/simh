@@ -15516,7 +15516,7 @@ detach_all (0, 0);                          /* Assure that all units are unattac
 cptr = get_glyph (cptr, gbuf, 0);
 if (gbuf[0] == '\0')
     strcpy (gbuf, "ALL");
-else {
+if (strcmp (gbuf, "ALL") != 0) {
     if (!find_dev (gbuf))
         return sim_messagef (SCPE_ARG, "No such device: %s\n", gbuf);
     }
