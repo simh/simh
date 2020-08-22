@@ -76,6 +76,7 @@ typedef uint16          t_tpclnt;                       /* magtape rec lnt */
 #define P7B_EOF         0x0F                            /* eof character */
 
 /* AWS tape format */
+
 typedef uint16          t_awslnt;                       /* magtape rec lnt */
 typedef struct {
     t_awslnt    nxtlen;
@@ -86,6 +87,7 @@ typedef struct {
     } t_awshdr;
 
 /* TAR tape format */
+
 #define TAR_DFLT_RECSIZE     10240                      /* Default Fixed record size */
 
 /* Unit flags */
@@ -97,14 +99,16 @@ typedef struct {
 #define MTUF_F_P7B      3                               /* P7B format */
 #define MTUF_F_AWS      4                               /* AWS format */
 #define MTUF_F_TAR      5                               /* TAR format */
+/* MT_GET_FMT() >= MTUF_F_ANSI is a MEMORY_TAPE image */
 #define MTUF_F_ANSI     6                               /* ANSI format */
 #define MTUF_F_FIXED    7                               /* FIXED format */
 #define MTUF_F_DOS11    8                               /* DOS11 format */
 
 #define MTAT_F_VMS      0                               /* VMS ANSI type */
 #define MTAT_F_RSX11    1                               /* RSX-11 ANSI type */
-#define MTAT_F_RSTS     2                               /* RSTS ANSI type */
-#define MTAT_F_RT11     3                               /* RT-11 ANSI type */
+#define MTAT_F_RT11     2                               /* RT-11 ANSI type */
+#define MTAT_F_RSTS     3                               /* RSTS ANSI type */
+#define MTAT_F_VAR      4                               /* RSTS VAR ANSI type */
 
 #define MTUF_V_UF       (MTUF_V_WLK + 1)
 #define MTUF_WLK        (1u << MTUF_V_WLK)
@@ -120,6 +124,7 @@ typedef struct {
 #define MT_GET_ANSI_TYP(u)   (((u)->dynflags >> UNIT_V_TAPE_ANSI) & ((1 << UNIT_S_TAPE_ANSI) - 1))
 
 /* sim_tape_position Position Flags */
+
 #define MTPOS_V_REW     3
 #define MTPOS_M_REW     (1u << MTPOS_V_REW)            /* Rewind First */
 #define MTPOS_V_REV     2
