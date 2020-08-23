@@ -15524,6 +15524,8 @@ if (strcmp (gbuf, "ALL") != 0) {
     if (!find_dev (gbuf))
         return sim_messagef (SCPE_ARG, "No such device: %s\n", gbuf);
     }
+GET_SWITCHES (cptr);                        /* get extra switches after a device specifier */
+saved_switches |= sim_switches;
 if (sim_switches & SWMASK ('D')) {
     sim_switches &= ~(SWMASK ('D') | SWMASK ('R') | SWMASK ('F') | SWMASK ('T'));
     sim_set_debon (0, "STDOUT");
