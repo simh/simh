@@ -197,10 +197,8 @@ void uba_adap_clr_int ();
 void uba_set_dpr (uint32 ua, t_bool wr);
 void uba_ubpdn (int32 time);
 t_bool uba_map_addr (uint32 ua, uint32 *ma);
-t_stat set_autocon (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
-t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat uba_show_virt (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat uba_show_map (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 extern int32 eval_int (void);
 extern t_stat build_dib_tab (void);
@@ -273,6 +271,8 @@ MTAB uba_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "VIRTUAL", NULL,
       NULL, &uba_show_virt, NULL, "Show physical address translation for Unibus\n"
   "                                address arg" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "MAP", NULL,
+      NULL, &uba_show_map, NULL, "Display Unibus Map Register(s)" },
     { 0 }
     };
 
@@ -1002,4 +1002,11 @@ if (cptr) {
     }
 fprintf (of, "Invalid argument\n");
 return SCPE_OK;
+}
+
+/* Show UBA map register(s) */
+
+t_stat uba_show_map (FILE *of, UNIT *uptr, int32 val, CONST void *desc)
+{
+return show_bus_map (of, (const char *)desc, uba_map, UBA_NMAPR, "Unibus", UBAMAP_VLD);
 }

@@ -572,6 +572,63 @@ for (i = 0, dibp = NULL; i < (IOPAGESIZE >> 1); i++) {  /* loop thru entries */
 return SCPE_OK;
 }
 
+static t_bool _map_description (char *buf, size_t buf_size, uint32 val, uint32 index, uint32 valid_mask)
+{
+t_bool ind_eq = (index == (val & ~valid_mask));
+const char *desc = ind_eq ? "Value == Index" : "";
+const char *valid = (val & valid_mask) ? "Valid" : "";
+
+*buf = '\0';
+if (*desc || *valid)
+    snprintf (buf, buf_size, " (%s%s%s)", valid, (*valid && *desc) ? ", " : "", desc);
+return ind_eq;
+}
+
+/* Display bus map registers */
+
+t_stat show_bus_map (FILE *st, const char *cptr, uint32 *busmap, uint32 nmapregs, const char *busname, uint32 mapvalid)
+{
+t_stat r;
+uint32 mr;
+uint32 mstart = 0;
+uint32 mend = nmapregs - 1;
+uint32 same_val;
+uint32 same_start;
+t_bool ind_eq;
+char same_desc[32];
+char desc[32];
+
+if (cptr) {
+    mstart = mend = (uint32) get_uint (cptr, 16, nmapregs - 1, &r);
+    if (r != SCPE_OK)
+        return sim_messagef (SCPE_ARG, "Invalid %s Map Register: %s\n", busname, cptr);
+    }
+_map_description (desc, sizeof (desc), busmap[mstart], mstart, mapvalid);
+fprintf (st, "%s-MAP[%04X] = %08X%s\n", busname, mstart, busmap[mstart], desc);
+same_start = mstart;
+same_val = busmap[mstart];
+strcpy (same_desc, desc);
+for (mr = mstart + 1; mr <= mend; mr++) {
+    ind_eq = _map_description (desc, sizeof (desc), busmap[mr], mr, mapvalid);
+    if (((same_val == busmap[mr]) && (0 == strcmp (desc, same_desc))) ||
+        (ind_eq && (0 == strcmp (desc, same_desc)))) {
+        same_val = busmap[mr];
+        strcpy (same_desc, desc);
+        continue;
+        }
+    if (same_start != mr - 1)
+        fprintf (st, "%s-MAP[%04X thru %04X] same as above\n", busname, same_start + 1, mr - 1);
+    fprintf (st, "%s-MAP[%04X] = %08X%s\n", busname, mr, busmap[mr], desc);
+    same_start = mr;
+    same_val = busmap[mr];
+    strcpy (same_desc, desc);
+    }
+if ((same_start != mend) ||
+    (0 != strcmp (same_desc, desc)))
+    fprintf (st, "%s-MAP[%04X thru %04X] same as above\n", busname, same_start + 1, mend);
+return SCPE_OK;
+}
+
 /* Autoconfiguration
 
    The table reflects the MicroVAX 3900 microcode, with one field 

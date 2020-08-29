@@ -37,6 +37,7 @@ t_stat set_vec (UNIT *uptr, int32 arg, CONST char *cptr, void *desc);
 t_stat show_vec (FILE *st, UNIT *uptr, int32 arg, CONST void *desc);
 t_stat show_vec_mux (FILE *st, UNIT *uptr, int32 arg, CONST void *desc);
 t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat show_bus_map (FILE *st, const char *cptr, uint32 *busmap, uint32 nmapregs, const char *busname, uint32 mapvalid);
 t_stat auto_config (const char *name, int32 nctrl);
 t_stat pdp11_bad_block (UNIT *uptr, int32 sec, int32 wds);
 void init_ubus_tab (void);

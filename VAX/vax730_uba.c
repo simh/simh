@@ -103,10 +103,8 @@ int32 uba_get_ubvector (int32 lvl);
 t_bool uba_eval_int (int32 lvl);
 void uba_ubpdn (int32 time);
 t_bool uba_map_addr (uint32 ua, uint32 *ma);
-t_stat set_autocon (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
-t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat uba_show_virt (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat uba_show_map (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 extern int32 eval_int (void);
 extern t_stat build_dib_tab (void);
@@ -160,6 +158,8 @@ MTAB uba_mod[] = {
       &set_autocon, NULL, NULL, "Disable autoconfiguration" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "VIRTUAL", NULL,
       NULL, &uba_show_virt, NULL, "Display translation for Unibus address arg" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "MAP", NULL,
+      NULL, &uba_show_map, NULL, "Display Unibus Map Register(s)" },
     { 0 }
     };
 
@@ -670,4 +670,11 @@ return SCPE_OK;
 const char *uba_description (DEVICE *dptr)
 {
 return "Unibus adapter";
+}
+
+/* Show UBA map register(s) */
+
+t_stat uba_show_map (FILE *of, UNIT *uptr, int32 val, CONST void *desc)
+{
+return show_bus_map (of, (const char *)desc, uba_map, UBA_NMAPR, "Unibus", UBAMAP_VLD);
 }

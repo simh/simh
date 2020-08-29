@@ -87,10 +87,8 @@ t_stat qba_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat qba_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_bool qba_map_addr (uint32 qa, uint32 *ma);
 t_bool qba_map_addr_c (uint32 qa, uint32 *ma);
-t_stat set_autocon (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
-t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat qba_show_virt (FILE *of, UNIT *uptr, int32 val, CONST void *desc);
+t_stat qba_show_map (FILE *of, UNIT *uptr, int32 val, CONST void *desc);
 t_stat qba_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *qba_description (DEVICE *dptr);
 
@@ -132,6 +130,8 @@ MTAB qba_mod[] = {
       &set_autocon, NULL, NULL, "Disable autoconfiguration" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "VIRTUAL", NULL,
       NULL, &qba_show_virt, NULL, "Display translation for Qbus address arg" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "MAP", NULL,
+      NULL, &qba_show_map, NULL, "Display Qbus map register(s)" },
     { 0 }
     };
 
@@ -812,6 +812,13 @@ if (cptr) {
     }
 fprintf (of, "Invalid argument\n");
 return SCPE_OK;
+}
+
+/* Show QBA map register(s) */
+
+t_stat qba_show_map (FILE *of, UNIT *uptr, int32 val, CONST void *desc)
+{
+return show_bus_map (of, (const char *)desc, (uint32 *)qb_map, QBNMAPR, "Qbus", QBMAP_VLD);
 }
 
 t_stat qba_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
