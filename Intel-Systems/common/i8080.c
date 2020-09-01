@@ -169,8 +169,8 @@ uint32 IM = 0;                          /* Interrupt Mask Register */
 uint8  xack = 0;                        /* XACK signal */
 uint32 int_req = 0;                     /* Interrupt request */
 uint8 INTA = 0;                         // interrupt acknowledge
-uint16 PCX;                              /* External view of PC */
-uint16 PCY;                              /* Internal view of PC */
+uint16 PCX;                             /* External view of PC */
+uint16 PCY;                             /* Internal view of PC */
 uint16 PC;
 UNIT *uptr;
 uint16 port;                            //port used in any IN/OUT
@@ -294,7 +294,11 @@ DEVICE i8080_dev = {
     0,                                  //dctrl 
     i8080_debug,                        //debflags
     NULL,                               //msize
-    NULL                                //lname
+    NULL,                               //lname
+    NULL,                               //help routine
+    NULL,                               //attach help routine
+    NULL,                               //help context
+    NULL                                //device description
 };
 
 /* tables for the disassembler */
@@ -406,7 +410,6 @@ int32 sim_instr(void)
             sim_printf("    CPU = 8085\n");
         else
             sim_printf("    CPU = 8080\n");
-//        sim_printf("    i8080:\n");
     }
     
     /* Main instruction fetch/decode loop */
@@ -443,7 +446,7 @@ int32 sim_instr(void)
                         PC = 0x002C;
                         int_req &= ~I55;
                     } else if (int_req & INT_R) { /* intr */
-                        push_word(PC);      /* do an RST 7 */
+                        push_word(PC);  /* do an RST 7 */
                         PC = 0x0038;
                         int_req &= ~INT_R;
                     }

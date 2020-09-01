@@ -96,9 +96,9 @@ extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
 
 /* these bytes represent the input and output to/from a port instance */
 
-uint8 i8255_A[4];                       //port A byte I/O
-uint8 i8255_B[4];                       //port B byte I/O
-uint8 i8255_C[4];                       //port C byte I/O
+uint8 i8255_A[I8255_NUM];               //port A byte I/O
+uint8 i8255_B[I8255_NUM];               //port B byte I/O
+uint8 i8255_C[I8255_NUM];               //port C byte I/O
 
 /* external globals */
 
@@ -173,12 +173,12 @@ DEVICE i8255_dev = {
 
 t_stat i8255_cfg(uint8 base, uint8 devnum)
 {
+    sim_printf("    i8255[%d]: at base port 0%02XH\n",
+        devnum, base & 0xFF);
     reg_dev(i8255a, base, devnum); 
     reg_dev(i8255b, base + 1, devnum); 
     reg_dev(i8255c, base + 2, devnum); 
     reg_dev(i8255s, base + 3, devnum); 
-    sim_printf("    i8255[%d]: at base port 0%02XH\n",
-        devnum, base & 0xFF);
     return SCPE_OK;
 }
 

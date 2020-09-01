@@ -84,7 +84,7 @@
 /* set the base I/O address for the iSBC 206 */
 #define SBC206_BASE     0x68
 #define SBC206_INT      INT_1
-#define SBC206_NUM      0
+#define SBC206_NUM      1
 
 /* set the base I/O address for the iSBC 208 */
 #define SBC208_BASE     0x40

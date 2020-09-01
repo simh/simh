@@ -27,34 +27,37 @@
 */
 
 #include <stdio.h>
+#include <string.h>
 #include <ctype.h>
 #include "sim_defs.h"                   /* simulator defns */
 
 #define SET_XACK(VAL)   (xack = VAL)
 
+// This file sets the initial stats of devices and units
+
 #define I3214_NUM       0
-
-/* set the base for the DBB ports */
-#define DBB_BASE        0xC0
-
-/* set the base I/O address for the 8255 */
-#define I8255_BASE_0    0xE4
-#define I8255_BASE_1    0xE8
-#define I8255_NUM       2
-
-/* set the base I/O address for the 8253 */
-#define I8253_BASE      0xF0
-#define I8253_NUM       1
 
 /* set the base I/O address for the 8251 */
 #define I8251_BASE_0    0xF4
 #define I8251_BASE_1    0xF6
 #define I8251_NUM       2
 
+/* set the base I/O address for the 8253 */
+#define I8253_BASE      0xF0
+#define I8253_NUM       1
+
+/* set the base I/O address for the 8255 */
+#define I8255_BASE_0    0xE4
+#define I8255_BASE_1    0xE8
+#define I8255_NUM       2
+
 /* set the base I/O address for the 8259 */
 #define I8259_BASE_0    0xFA
 #define I8259_BASE_1    0xFC
 #define I8259_NUM       2
+
+/* set the base for the DBB ports */
+#define DBB_BASE        0xC0
 
 /* set the base I/O address for the IPC control port */
 #define ICONT_BASE      0xFF
@@ -71,9 +74,9 @@
 
 //board definitions for the multibus
 /* set the base I/O address for the iSBC 201 */
-#define SBC201_BASE     0x78
+#define SBC201_BASE     0x88
 #define SBC201_INT      INT_2
-#define SBC201_NUM      0
+#define SBC201_NUM      1
 
 /* set the base I/O address for the iSBC 202 */
 #define SBC202_BASE     0x78
@@ -93,7 +96,7 @@
 /* set the base for the zx-200a disk controller */
 #define ZX200A_BASE     0x78
 #define ZX200A_INT      INT_2
-#define ZX200A_NUM      0
+#define ZX200A_NUM      1
 
 /* set the base and size for the iSBC 464 ROM */
 #define SBC464_BASE     0xA800
@@ -101,7 +104,7 @@
 #define SBC464_NUM      0
 
 /* set the base and size for the iSBC 064 RAM */
-#define SBC064_BASE     0x08000
+#define SBC064_BASE     0x8000
 #define SBC064_SIZE     0x7FFF
 #define SBC064_NUM      1
 

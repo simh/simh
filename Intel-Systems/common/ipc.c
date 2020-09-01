@@ -65,7 +65,6 @@ extern t_stat ioc_cont_cfg(uint8 base, uint8 devnum);
 extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
 extern t_stat EPROM_cfg(uint16 base, uint16 size, uint8 devnum);
 extern t_stat RAM_cfg(uint16 base, uint16 size);
-extern t_stat multibus_cfg();   
 
 /* external globals */
 
@@ -112,7 +111,6 @@ t_stat SBC_reset (DEVICE *dptr)
 { 
     if (onetime == 0) {
         SBC_config();   
-        multibus_cfg();   
         onetime++;
     }
     i8080_reset(&i8080_dev);

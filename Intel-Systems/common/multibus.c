@@ -34,15 +34,17 @@
 
 #include "system_defs.h"
 
+#define BASE_ADDR       u3    
+
 /* function prototypes */
 
-t_stat multibus_cfg(void);
 t_stat multibus_svc(UNIT *uptr);
 t_stat multibus_reset(DEVICE *dptr);
 void set_irq(int32 int_num);
 void clr_irq(int32 int_num);
 uint8 nulldev(t_bool io, uint8 port, uint8 devnum);
 uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
+uint8 unreg_dev(uint8 port);
 t_stat multibus_reset (DEVICE *dptr);
 uint8 multibus_get_mbyte(uint16 addr);
 void multibus_put_mbyte(uint16 addr, uint8 val);
@@ -54,20 +56,6 @@ extern uint8 isbc064_get_mbyte(uint16 addr);
 extern void isbc064_put_mbyte(uint16 addr, uint8 val);
 extern uint8 isbc464_get_mbyte(uint16 addr);
 extern void set_cpuint(int32 int_num);
-extern t_stat isbc064_reset (DEVICE *);
-extern t_stat isbc464_reset (DEVICE *);
-extern t_stat isbc201_reset (DEVICE *);
-extern t_stat isbc202_reset (DEVICE *);
-extern t_stat isbc206_reset (DEVICE *);
-extern t_stat isbc208_reset (DEVICE *);
-extern t_stat zx200a_reset(DEVICE *);
-extern t_stat isbc064_cfg(uint16 base, uint16 size);
-extern t_stat isbc464_cfg(uint16 base, uint16 size);
-extern t_stat isbc201_cfg(uint8 base);
-extern t_stat isbc202_cfg(uint8 base);
-extern t_stat isbc206_cfg(uint8 base);
-extern t_stat isbc208_cfg(uint8 base);
-extern t_stat zx200a_cfg(uint8 base);
 
 /* local globals */
 
@@ -80,18 +68,11 @@ extern int32 int_req;                   /* i8080 INT signal */
 extern uint16 PCX;
 extern DEVICE isbc064_dev;
 extern DEVICE isbc464_dev;
-extern DEVICE isbc201_dev;
-extern DEVICE isbc202_dev;
-extern DEVICE isbc206_dev;
-extern DEVICE isbc208_dev;
-extern DEVICE zx200a_dev;
-extern UNIT isbc064_unit;
-extern UNIT isbc464_unit;
 
 /* multibus Standard SIMH Device Data Structures */
 
 UNIT multibus_unit = { 
-    UDATA (&multibus_svc, 0, 0), 20 
+    UDATA (&multibus_svc, 0, 0), 1
 };
 
 REG multibus_reg[] = { 
@@ -111,60 +92,35 @@ DEBTAB multibus_debug[] = {
 };
 
 DEVICE multibus_dev = {
-    "MBIRQ",                    //name 
-    &multibus_unit,             //units 
-    multibus_reg,               //registers 
-    NULL,                       //modifiers
-    1,                          //numunits 
-    16,                         //aradix  
-    16,                         //awidth  
-    1,                          //aincr  
-    16,                         //dradix  
-    8,                          //dwidth
-    NULL,                       //examine  
-    NULL,                       //deposit  
-    &multibus_reset,            //reset 
-    NULL,                       //boot
-    NULL,                       //attach  
-    NULL,                       //detach
-    NULL,                       //ctxt     
-    DEV_DEBUG,                  //flags 
-    0,                          //dctrl 
-    multibus_debug,             //debflags
-    NULL,                       //msize
-    NULL                        //lname
+    "MBIRQ",            //name 
+    &multibus_unit,     //units 
+    multibus_reg,       //registers 
+    NULL,               //modifiers
+    1,                  //numunits 
+    16,                 //aradix  
+    16,                 //awidth  
+    1,                  //aincr  
+    16,                 //dradix  
+    8,                  //dwidth
+    NULL,               //examine  
+    NULL,               //deposit  
+    &multibus_reset,    //reset 
+    NULL,               //boot
+    NULL,               //attach  
+    NULL,               //detach
+    NULL,               //ctxt     
+    DEV_DEBUG,          //flags 
+    0,                  //dctrl 
+    multibus_debug,     //debflags
+    NULL,               //msize
+    NULL,               //lname
+    NULL,               //help routine
+    NULL,               //attach help routine
+    NULL,               //help context
+    NULL                //device description
 };
 
 /* Service routines to handle simulator functions */
-
-// multibus_cfg
-
-t_stat multibus_cfg(void)
-{
-    sim_printf("Configuring Multibus Devices\n");
-    #if defined (SBC064_NUM) && (SBC064_NUM > 0)
-    isbc064_cfg(SBC064_BASE, SBC064_SIZE);
-    #endif
-    #if defined (SBC464_NUM) && (SBC464_NUM > 0)
-    isbc464_cfg(SBC464_BASE, SBC464_SIZE);
-    #endif
-    #if defined (SBC201_NUM) && (SBC201_NUM > 0)
-    isbc201_cfg(SBC201_BASE);
-    #endif
-    #if defined (SBC202_NUM) && (SBC202_NUM > 0)
-    isbc202_cfg(SBC202_BASE);
-    #endif
-    #if defined (SBC206_NUM) && (SBC206_NUM > 0)
-    isbc206_cfg(SBC206_BASE);
-    #endif
-    #if defined (SBC208_NUM) && (SBC208_NUM > 0)
-    isbc208_cfg(SBC208_BASE);
-    #endif
-    #if defined (ZX200A_NUM) && (ZX200A_NUM > 0)
-    zx200a_cfg(ZX200A_BASE);
-    #endif
-    return SCPE_OK;
-}
 
 /* Reset routine */
 
@@ -172,34 +128,6 @@ t_stat multibus_reset(DEVICE *dptr)
 {
     if (SBC_reset(NULL) == 0) { 
         sim_printf("  Multibus: Reset\n");
-        #if defined (SBC064_NUM) && (SBC064_NUM > 0)
-        isbc064_reset(&isbc064_dev);
-        sim_printf("    Multibus: SBC064 reset\n");
-        #endif
-        #if defined (SBC464_NUM) && (SBC464_NUM > 0)
-        isbc464_reset(&isbc464_dev);
-        sim_printf("    Multibus: SBC464 reset\n");
-        #endif
-        #if defined (SBC201_NUM) && (SBC201_NUM > 0)
-        isbc201_reset(&isbc201_dev);
-        sim_printf("    Multibus: SBC201 reset\n");
-        #endif
-        #if defined (SBC202_NUM) && (SBC202_NUM > 0)
-        isbc202_reset(&isbc202_dev);
-        sim_printf("    Multibus: SBC202 reset\n");
-        #endif
-        #if defined (SBC208_NUM) && (SBC208_NUM > 0)
-        isbc206_reset(&isbc206_dev);
-        sim_printf("    Multibus: SBC206 reset\n");
-        #endif
-        #if defined (SBC208_NUM) && (SBC208_NUM > 0)
-        isbc208_reset(&isbc208_dev);
-        sim_printf("    Multibus: SBC208 reset\n");
-        #endif
-        #if defined (ZX200A_NUM) && (ZX200A_NUM > 0)
-        zx200a_reset(&zx200a_dev);
-        sim_printf("    Multibus: ZX200A reset\n");
-        #endif
         sim_activate (&multibus_unit, multibus_unit.wait); /* activate unit */
         return SCPE_OK;
     } else {
@@ -313,17 +241,31 @@ struct idev dev_table[256] = {
 uint8 nulldev(t_bool io, uint8 data, uint8 devnum)
 {
     SET_XACK(0);                        /* set no XACK */
-    return 0xff;                        /* multibus has active high pullups and inversion */
+//    return 0xff;                        /* multibus has active high pullups and inversion */
+    return 0;                           //corrects "illegal disk at port X8H" error in ISIS
 }
 
 uint8 reg_dev(uint8 (*routine)(t_bool io, uint8 data, uint8 devnum), uint8 port, uint8 devnum)
 {
     if (dev_table[port].routine != &nulldev) { /* port already assigned */
         if (dev_table[port].routine != routine)
-            sim_printf("         I/O Port %02X is already assigned\n", port);
+            sim_printf("    I/O Port %02X is already assigned\n", port);
     } else {
         dev_table[port].routine = routine;
         dev_table[port].devnum = devnum;
+        sim_printf("    I/O Port %02X has been assigned\n", port);
+    }
+    return 0;
+}
+
+uint8 unreg_dev(uint8 port)
+{
+    if (dev_table[port].routine == &nulldev) { /* port already free */
+        sim_printf("    I/O Port %02X is already free\n", port);
+    } else {
+        dev_table[port].routine = &nulldev;
+        dev_table[port].devnum = 0;
+        sim_printf("    I/O Port %02X is free\n", port);
     }
     return 0;
 }
@@ -334,16 +276,18 @@ uint8 multibus_get_mbyte(uint16 addr)
 {
     SET_XACK(0);                        /* set no XACK */
     #if defined (SBC464_NUM) && (SBC464_NUM > 0)
-    if ((isbc464_dev.flags & DEV_DIS) == 0) { //ROM is enabled
-        if (addr >= isbc464_unit.u3 && addr < (isbc464_unit.u3 + isbc464_unit.capac))
-            return(isbc464_get_mbyte(addr));
-    }
+        if ((isbc464_dev.flags & DEV_DIS) == 0) { //ROM is enabled
+            if (addr >= isbc464_dev.units->BASE_ADDR && addr < 
+                (isbc464_dev.units->BASE_ADDR + isbc464_dev.units->capac))
+                return(isbc464_get_mbyte(addr));
+        }
     #endif
     #if defined (SBC064_NUM) && (SBC064_NUM > 0)
-    if ((isbc064_dev.flags & DEV_DIS) == 0) { //RAM is enabled
-        if (addr >= isbc064_unit.u3 && addr < (isbc064_unit.u3 + isbc064_unit.capac))
-            return (isbc064_get_mbyte(addr));
-    }
+        if ((isbc064_dev.flags & DEV_DIS) == 0) { //RAM is enabled
+            if (addr >= isbc064_dev.units->BASE_ADDR && addr < 
+                (isbc064_dev.units->BASE_ADDR + isbc064_dev.units->capac))
+                return (isbc064_get_mbyte(addr));
+        }
     #endif
     return 0;
 }
@@ -352,10 +296,11 @@ void multibus_put_mbyte(uint16 addr, uint8 val)
 {
     SET_XACK(0);                        /* set no XACK */
     #if defined (SBC064_NUM) && (SBC064_NUM > 0)
-    if ((isbc064_dev.flags & DEV_DIS) == 0) { //device is enabled
-        if ((addr >= SBC064_BASE) && (addr <= (SBC064_BASE + SBC064_SIZE - 1)))
-            isbc064_put_mbyte(addr, val);
-    }
+        if ((isbc064_dev.flags & DEV_DIS) == 0) { //device is enabled
+            if (addr >= isbc064_dev.units->BASE_ADDR && addr < 
+                (isbc064_dev.units->BASE_ADDR + isbc064_dev.units->capac))
+                isbc064_put_mbyte(addr, val);
+        }
     #endif
 }
 

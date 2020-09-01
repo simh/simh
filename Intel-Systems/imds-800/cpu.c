@@ -52,7 +52,6 @@ extern t_stat fp_reset (void);
 extern t_stat fp_cfg(void);
 extern t_stat i8080_reset (DEVICE *dptr);   /* reset the 8080 emulator */
 extern uint8 EPROM_get_mbyte(uint16 addr, uint8 devnum);
-extern t_stat multibus_cfg(void);   
 extern uint8 multibus_get_mbyte(uint16 addr);
 extern void multibus_put_mbyte(uint16 addr, uint8 val);
 extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
@@ -84,7 +83,6 @@ t_stat SBC_reset (DEVICE *dptr)
 {    
     if (onetime == 0) {
         SBC_config();
-        multibus_cfg();   
         onetime++;
     }
     i8080_reset(&i8080_dev);

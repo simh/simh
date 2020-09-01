@@ -27,11 +27,6 @@
 
         27 Jun 16 - Original file.
 
-    NOTES:
-
-        This controller will mount 4 DD disk images on drives :F0: thru :F3: addressed
-        at ports 078H to 07FH.  
-
     Registers:
 
         078H - Read - Subsystem status
@@ -128,7 +123,24 @@
         u4 -
         u5 - 
         u6 - fdd number.
+        
+    NOTES:
 
+        This iSBC 202 device simulator (DEVICES) supports 4 floppy disk drives 
+        (UNITS).  It uses the SBC202_BASE and SBC202_INT from system_defs.h to 
+        set the default base port and interrupt.
+        
+        The default base port can be changed by "sim> set sbc202 port=88".  The
+        default interrupt can be changed by "sim> set sbc202 int=5".  Current 
+        settings can be shown by "sim> show sbc202 param".
+        
+        This device simulator can be enabled or disabled if SBC202_NUM in
+        system_defs.h is set to 1.  Only one board can be simulated.  It is 
+        enabled by "sim> Sset sbc202 ena" and disabled by "sim> set sbc202 dis".
+        
+        The disk images in each FDD can be set to RW or WP.  They default to WP
+        
+        
 */
 
 #include "system_defs.h"                /* system header in system dir */
@@ -184,6 +196,8 @@
 #define MAXSECDD        52              //double density last sector
 #define MAXTRK          76              //last track
 
+#define isbc202_NAME    "Intel iSBC 202 Floppy Disk Controller Board"
+
 /* external globals */
 
 extern uint16    PCX;
@@ -191,12 +205,16 @@ extern uint16    PCX;
 /* external function prototypes */
 
 extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
+extern uint8 unreg_dev(uint8);
 extern uint8 get_mbyte(uint16 addr);
 extern void put_mbyte(uint16 addr, uint8 val);
 
 /* function prototypes */
 
-t_stat isbc202_cfg(uint8 base);
+t_stat isbc202_set_port(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat isbc202_set_int(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat isbc202_set_verb(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat isbc202_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat isbc202_reset(DEVICE *dptr);
 void isbc202_reset_dev(void);
 t_stat isbc202_attach (UNIT *uptr, CONST char *cptr);
@@ -210,13 +228,21 @@ void isbc202_diskio(void);      //do actual disk i/o
 
 /* globals */
 
+int isbc202_onetime = 1;
+
+static const char* isbc202_desc(DEVICE *dptr) {
+    return isbc202_NAME;
+}
+
 typedef    struct    {                  //FDD definition
     uint8   sec;
     uint8   cyl;
     }    FDDDEF;
 
 typedef    struct    {                  //FDC definition
-//    uint16  baseport;                   //FDC base port
+    uint8   baseport;                   //FDC base port
+    uint8   intnum;                     //interrupt number
+    uint8   verb;                       //verbose flag
     uint16  iopb;                       //FDC IOPB
     uint8   stat;                       //FDC status
     uint8   rdychg;                     //FDC ready change
@@ -227,15 +253,15 @@ typedef    struct    {                  //FDC definition
     FDDDEF  fdd[FDD_NUM];               //indexed by the FDD number
     }    FDCDEF;
 
-FDCDEF    fdc202;              //indexed by the isbc-202 instance number
+FDCDEF    fdc202;                       //indexed by the isbc-202 instance number
 
 /* isbc202 Standard I/O Data Structures */
 
 UNIT isbc202_unit[] = { // 4 FDDs
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSDD), 20 }, 
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSDD), 20 }, 
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSDD), 20 }, 
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSDD), 20 }, 
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSDD) }, 
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSDD) }, 
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSDD) }, 
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF+UNIT_FIX, MDSDD) }, 
     { NULL }
 };
 
@@ -251,6 +277,14 @@ REG isbc202_reg[] = {
 MTAB isbc202_mod[] = {
     { UNIT_WPMODE, 0, "RW", "RW", &isbc202_set_mode },
     { UNIT_WPMODE, UNIT_WPMODE, "WP", "WP", &isbc202_set_mode },
+    { MTAB_XTD | MTAB_VDV, 0, NULL, "VERB", &isbc202_set_verb,
+        NULL, NULL, "Sets the verbose mode for iSBC202"},
+    { MTAB_XTD | MTAB_VDV, 0, NULL, "PORT", &isbc202_set_port,
+        NULL, NULL, "Sets the base port for iSBC202"},
+    { MTAB_XTD | MTAB_VDV, 0, NULL, "INT", &isbc202_set_int,
+        NULL, NULL, "Sets the interrupt number for iSBC202"},
+    { MTAB_XTD | MTAB_VDV, 0, "PARAM", NULL, NULL, &isbc202_show_param, NULL, 
+        "show configured parametes for iSBC202" },
     { 0 }
 };
 
@@ -289,28 +323,93 @@ DEVICE isbc202_dev = {
     0,                  //dctrl 
     isbc202_debug,      //debflags
     NULL,               //msize
-    NULL                //lname
+    NULL,               //lname
+    NULL,               //help routine
+    NULL,               //attach help routine
+    NULL,               //help context
+    &isbc202_desc       //device description
 };
 
-// configuration routine
+/* isbc202 set mode = Write protect */
 
-t_stat isbc202_cfg(uint8 base)
+t_stat isbc202_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-    int32 i;
-    UNIT *uptr;
-
-    sim_printf("    sbc202: at base 0%02XH\n",
-        base);
-    reg_dev(isbc202r0, base, 0);         //read status
-    reg_dev(isbc202r1, base + 1, 0);     //read rslt type/write IOPB addr-l
-    reg_dev(isbc202r2, base + 2, 0);     //write IOPB addr-h and start 
-    reg_dev(isbc202r3, base + 3, 0);     //read rstl byte 
-    reg_dev(isbc202r7, base + 7, 0);     //write reset fdc201
-    // one-time initialization for all FDDs for this FDC instance
-    for (i = 0; i < FDD_NUM; i++) { 
-        uptr = isbc202_dev.units + i;
-        uptr->u6 = i;               //fdd unit number
+    if (uptr == NULL)
+        return SCPE_ARG;
+    if (uptr->flags & UNIT_ATT)
+        return sim_messagef (SCPE_ALATT, "%s is already attached to %s\n", sim_uname(uptr), 
+            uptr->filename);
+    if (val & UNIT_WPMODE) {            /* write protect */
+        uptr->flags |= val;
+        if (fdc202.verb)
+            sim_printf("    sbc202: WP\n");
+    } else {                            /* read write */
+        uptr->flags &= ~val;
+        if (fdc202.verb)
+            sim_printf("    sbc202: RW\n");
     }
+    return SCPE_OK;
+}
+
+// set base address parameter
+
+t_stat isbc202_set_port(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+    uint32 size, result;
+    
+    if (uptr == NULL)
+        return SCPE_ARG;
+    result = sscanf(cptr, "%02x", &size);
+    fdc202.baseport = size;
+    if (fdc202.verb)
+        sim_printf("SBC202: Base port=%04X\n", fdc202.baseport);
+    return SCPE_OK;
+}
+
+// set interrupt parameter
+
+t_stat isbc202_set_int(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+    uint32 size, result;
+    
+    if (uptr == NULL)
+        return SCPE_ARG;
+    result = sscanf(cptr, "%02x", &size);
+    fdc202.intnum = size;
+    if (fdc202.verb)
+        sim_printf("SBC202: Interrupt number=%04X\n", fdc202.intnum);
+    return SCPE_OK;
+}
+
+t_stat isbc202_set_verb(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+    if (uptr == NULL)
+        return SCPE_ARG;
+    if (cptr == NULL)
+        return SCPE_ARG;
+    if (strncasecmp(cptr, "OFF", 4) == 0) {
+        fdc202.verb = 0;
+        return SCPE_OK;
+    }
+    if (strncasecmp(cptr, "ON", 3) == 0) {
+        fdc202.verb = 1;
+        sim_printf("   SBC202: fdc202.verb=%d\n", fdc202.verb);
+        return SCPE_OK;
+    }
+    return SCPE_ARG;
+}
+
+// show configuration parameters
+
+t_stat isbc202_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    if (uptr == NULL)
+        return SCPE_ARG;
+    fprintf(st, "%s Base port at %04X  Interrupt # is %i  %s", 
+        ((isbc202_dev.flags & DEV_DIS) == 0) ? "Enabled" : "Disabled", 
+        fdc202.baseport, fdc202.intnum,
+        fdc202.verb ? "Verbose" : "Quiet"
+        );
     return SCPE_OK;
 }
 
@@ -318,7 +417,41 @@ t_stat isbc202_cfg(uint8 base)
 
 t_stat isbc202_reset(DEVICE *dptr)
 {
-    isbc202_reset_dev(); //software reset
+    int i;
+    UNIT *uptr;
+    
+    if (dptr == NULL)
+        return SCPE_ARG;
+    if (isbc202_onetime) {
+        fdc202.baseport = SBC202_BASE;  //set default base
+        fdc202.intnum = SBC202_INT;     //set default interrupt
+        fdc202.verb = 0;                //set verb = off
+        isbc202_onetime = 0;
+        // one-time initialization for all FDDs for this FDC instance
+        for (i = 0; i < FDD_NUM; i++) { 
+            uptr = isbc202_dev.units + i;
+            uptr->u6 = i;               //fdd unit number
+        }
+    }
+    if ((dptr->flags & DEV_DIS) == 0) { // enabled
+        reg_dev(isbc202r0, fdc202.baseport, 0);         //read status
+        reg_dev(isbc202r1, fdc202.baseport + 1, 0);     //read rslt type/write IOPB addr-l
+        reg_dev(isbc202r2, fdc202.baseport + 2, 0);     //write IOPB addr-h and start 
+        reg_dev(isbc202r3, fdc202.baseport + 3, 0);     //read rstl byte 
+        reg_dev(isbc202r7, fdc202.baseport + 7, 0);     //write reset fdc201
+        isbc202_reset_dev(); //software reset
+//        if (fdc202.verb)
+            sim_printf("    sbc202: Enabled base port at 0%02XH  Interrupt #=%02X  %s\n",
+                fdc202.baseport, fdc202.intnum, fdc202.verb ? "Verbose" : "Quiet" );
+    } else {
+        unreg_dev(fdc202.baseport);         //read status
+        unreg_dev(fdc202.baseport + 1);     //read rslt type/write IOPB addr-l
+        unreg_dev(fdc202.baseport + 2);     //write IOPB addr-h and start 
+        unreg_dev(fdc202.baseport + 3);     //read rstl byte 
+        unreg_dev(fdc202.baseport + 7);     //write reset fdc201
+//        if (fdc202.verb)
+            sim_printf("    sbc202: Disabled\n");
+    }
     return SCPE_OK;
 }
 
@@ -391,20 +524,6 @@ t_stat isbc202_attach (UNIT *uptr, CONST char *cptr)
     }
     fdc202.rtype = ROK;
     fdc202.rbyte0 = 0;              //set no error
-    return SCPE_OK;
-}
-
-/* isbc202 set mode = Write protect */
-
-t_stat isbc202_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
-{
-    if (uptr->flags & UNIT_ATT)
-        return sim_messagef (SCPE_ALATT, "%s is already attached to %s\n", sim_uname(uptr), uptr->filename);
-    if (val & UNIT_WPMODE) {            /* write protect */
-        uptr->flags |= val;
-    } else {                            /* read write */
-        uptr->flags &= ~val;
-    }
     return SCPE_OK;
 }
 
@@ -638,7 +757,8 @@ void isbc202_diskio(void)
             fdc202.intff = 1;           //set interrupt FF
             break;
         default:
-            sim_printf("\n   SBC202: FDD %d - isbc202_diskio bad di=%02X", fddnum, di & 0x07);
+            sim_printf("\n   SBC202: FDD %d - isbc202_diskio bad command di=%02X",
+                fddnum, di & 0x07);
             break;
     }
 }

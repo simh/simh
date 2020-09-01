@@ -36,14 +36,12 @@
 
 /* function prototypes */
 
-t_stat multibus_cfg(void);
 t_stat multibus_svc(UNIT *uptr);
 t_stat multibus_reset(DEVICE *dptr);
 void set_irq(int32 int_num);
 void clr_irq(int32 int_num);
 uint8 nulldev(t_bool io, uint8 port, uint8 devnum);
 uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
-t_stat multibus_reset (DEVICE *dptr);
 uint8 multibus_get_mbyte(uint16 addr);
 void multibus_put_mbyte(uint16 addr, uint8 val);
 
@@ -136,14 +134,6 @@ DEVICE multibus_dev = {
 };
 
 /* Service routines to handle simulator functions */
-
-// multibus_cfg
-
-t_stat multibus_cfg(void)
-{
-    sim_printf("Configuring Multibus Devices\n");
-    return SCPE_OK;
-}
 
 /* Reset routine */
 

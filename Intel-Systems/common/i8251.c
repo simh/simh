@@ -207,11 +207,15 @@ DEVICE i8251_dev = {
     NULL,               //attach
     NULL,               //detach
     NULL,               //ctxt
-    0,                  //flags
+    DEV_DISABLE,        //flags
     0,                  //dctrl
     i8251_debug,        //debflags
-    NULL,               //msize
-    NULL                //lname
+    NULL,               //memeory size change
+    NULL,               //lname
+    NULL,               //help routine
+    NULL,               //attach help routine
+    NULL,               //help context
+    NULL                //device description
 };
 
 // i8251 configuration

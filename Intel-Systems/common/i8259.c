@@ -140,10 +140,10 @@ DEVICE i8259_dev = {
 
 t_stat i8259_cfg(uint8 base, uint8 devnum)
 {
-    reg_dev(i8259a, base, devnum); 
-    reg_dev(i8259b, base + 1, devnum); 
     sim_printf("    i8259[%d]: at base port 0%02XH\n",
         devnum, base & 0xFF);
+    reg_dev(i8259a, base, devnum); 
+    reg_dev(i8259b, base + 1, devnum); 
     return SCPE_OK;
 }
 

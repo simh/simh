@@ -57,7 +57,6 @@ extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
 extern t_stat i3214_cfg(uint8 base, uint8 devnum);
 extern t_stat fp_cfg(void);
 extern t_stat monitor_cfg(void);
-extern t_stat multibus_cfg(void);
 
 // external globals
 
@@ -83,7 +82,6 @@ t_stat SBC_reset (DEVICE *dptr)
 {    
     if (onetime == 0) {
         SBC_config();
-        multibus_cfg();   
         onetime++;
     }
     EPROM_enable = 1;

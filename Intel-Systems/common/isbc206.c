@@ -133,7 +133,7 @@
 #define UNIT_V_WPMODE   (UNIT_V_UF)     /* Write protect */
 #define UNIT_WPMODE     (1 << UNIT_V_WPMODE)
 
-#define HD_NUM          2               //one fixed and one removable
+#define HDD_NUM          2               //one fixed and one removable
 
 //disk controller operations
 #define DNOP            0x00            //HDC no operation
@@ -174,6 +174,8 @@
 #define MAXSECHD        144             //hard disk last sector (2 heads/2 tracks)
 #define MAXTRKHD        206             //hard disk last track
 
+#define isbc206_NAME    "Intel iSBC 206 Hard Disk Controller Board"
+
 /* external globals */
 
 extern uint16    PCX;
@@ -181,16 +183,18 @@ extern uint16    PCX;
 /* external function prototypes */
 
 extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
-extern uint8 multibus_get_mbyte(uint16 addr);
-extern uint16 multibus_get_mword(uint16 addr);
-extern void multibus_put_mbyte(uint16 addr, uint8 val);
-extern uint8 multibus_put_mword(uint16 addr, uint16 val);
+extern uint8 unreg_dev(uint8);
+extern uint8 get_mbyte(uint16 addr);
+extern void put_mbyte(uint16 addr, uint8 val);
 
 /* function prototypes */
 
-t_stat isbc206_cfg(uint8 base);
+t_stat isbc206_set_port(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat isbc206_set_int(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat isbc206_set_verb(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat isbc206_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat isbc206_reset(DEVICE *dptr);
-void isbc206_reset1(void);
+void isbc206_reset_dev(void);
 t_stat isbc206_attach (UNIT *uptr, CONST char *cptr);
 t_stat isbc206_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 uint8 isbc206r0(t_bool io, uint8 data, uint8 devnum);  /* isbc206 port 0 */
@@ -202,6 +206,11 @@ void isbc206_diskio(void);       //do actual disk i/o
 
 /* globals */
 
+int isbc206_onetime = 1;
+
+static const char* isbc206_desc(DEVICE *dptr) {
+    return isbc206_NAME;
+}
 typedef    struct    {                  //HDD definition
     int     t0;
     int     rdy;
@@ -210,7 +219,9 @@ typedef    struct    {                  //HDD definition
     }    HDDDEF;
 
 typedef    struct    {                  //HDC definition
-    uint16  baseport;                   //HDC base port
+    uint8  baseport;                    //HDC base port
+    uint8   intnum;                     //interrupt number
+    uint8   verb;                       //verbose flag
     uint16  iopb;                       //HDC IOPB
     uint8   stat;                       //HDC status
     uint8   rdychg;                     //HDC ready change
@@ -218,14 +229,15 @@ typedef    struct    {                  //HDC definition
     uint8   rbyte0;                     //HDC result byte for type 00
     uint8   rbyte1;                     //HDC result byte for type 10
     uint8   intff;                      //HDC interrupt FF
-    HDDDEF  hd[HD_NUM];                 //indexed by the HDD number
+    HDDDEF  hd[HDD_NUM];                //indexed by the HDD number
     }    HDCDEF;
 
-HDCDEF    hdc206;
+HDCDEF    hdc206;                       //indexed by the isbc-206 instance number
 
-UNIT isbc206_unit[] = {
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF|UNIT_FIX, MDSHD), 20 }, 
-    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF|UNIT_FIX, MDSHD), 20 }, 
+
+UNIT isbc206_unit[] = {                 // 2 HDDs
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF|UNIT_FIX, MDSHD) }, 
+    { UDATA (0, UNIT_ATTABLE+UNIT_DISABLE+UNIT_BUFABLE+UNIT_MUSTBUF|UNIT_FIX, MDSHD) }, 
     { NULL }
 };
 
@@ -241,6 +253,14 @@ REG isbc206_reg[] = {
 MTAB isbc206_mod[] = {
     { UNIT_WPMODE, 0, "RW", "RW", &isbc206_set_mode },
     { UNIT_WPMODE, UNIT_WPMODE, "WP", "WP", &isbc206_set_mode },
+    { MTAB_XTD | MTAB_VDV, 0, NULL, "VERB", &isbc206_set_verb,
+        NULL, NULL, "Sets the verbose mode for iSBC206"},
+    { MTAB_XTD | MTAB_VDV, 0, NULL, "PORT", &isbc206_set_port,
+        NULL, NULL, "Sets the base port for iSBC206"},
+    { MTAB_XTD | MTAB_VDV, 0, NULL, "INT", &isbc206_set_int,
+        NULL, NULL, "Sets the interrupt number for iSBC206"},
+    { MTAB_XTD | MTAB_VDV, 0, "PARAM", NULL, NULL, &isbc206_show_param, NULL, 
+        "show configured parametes for iSBC206" },
     { 0 }
 };
 
@@ -262,7 +282,7 @@ DEVICE isbc206_dev = {
     isbc206_unit,       //units
     isbc206_reg,        //registers
     isbc206_mod,        //modifiers
-    HD_NUM,             //numunits 
+    HDD_NUM,             //numunits 
     16,                 //aradix
     16,                 //awidth
     1,                  //aincr
@@ -282,25 +302,85 @@ DEVICE isbc206_dev = {
     NULL                //lname
 };
 
-// configuration routine
+/* isbc206 set mode = Write protect */
 
-t_stat isbc206_cfg(uint8 base)
+t_stat isbc206_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-    int32 i;
-    UNIT *uptr;
-
-    sim_printf("    sbc206: at base 0%02XH\n",
-        base);
-    reg_dev(isbc206r0, base, 0);         //read status
-    reg_dev(isbc206r1, base + 1, 0);     //read rslt type/write IOPB addr-l
-    reg_dev(isbc206r2, base + 2, 0);     //write IOPB addr-h and start 
-    reg_dev(isbc206r3, base + 3, 0);     //read rstl byte 
-    reg_dev(isbc206r7, base + 7, 0);     //write reset fdc201
-    // one-time initialization for all FDDs for this FDC instance
-    for (i = 0; i < HD_NUM; i++) { 
-        uptr = isbc206_dev.units + i;
-        uptr->u6 = i;               //fdd unit number
+    if (uptr == NULL)
+        return SCPE_ARG;
+    if (uptr->flags & UNIT_ATT)
+        return sim_messagef (SCPE_ALATT, "%s is already attached to %s\n", sim_uname(uptr), uptr->filename);
+    if (val & UNIT_WPMODE) {            /* write protect */
+        uptr->flags |= val;
+        if (hdc206.verb)
+            sim_printf("    sbc206: WP\n");
+    } else {                            /* read write */
+        uptr->flags &= ~val;
+        if (hdc206.verb)
+            sim_printf("    sbc206: RW\n");
     }
+    return SCPE_OK;
+}
+
+// set base address parameter
+
+t_stat isbc206_set_port(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+    uint32 size, result;
+    
+    if (uptr == NULL)
+        return SCPE_ARG;
+    result = sscanf(cptr, "%02x", &size);
+    hdc206.baseport = size;
+    if (hdc206.verb)
+        sim_printf("SBC206: Base port=%04X\n", hdc206.baseport);
+    return SCPE_OK;
+}
+
+// set interrupt parameter
+
+t_stat isbc206_set_int(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+    uint32 size, result;
+    
+    if (uptr == NULL)
+        return SCPE_ARG;
+    result = sscanf(cptr, "%02x", &size);
+    hdc206.intnum = size;
+    if (hdc206.verb)
+        sim_printf("SBC206: Interrupt number=%04X\n", hdc206.intnum);
+    return SCPE_OK;
+}
+
+t_stat isbc206_set_verb(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+    if (uptr == NULL)
+        return SCPE_ARG;
+    if (cptr == NULL)
+        return SCPE_ARG;
+    if (strncasecmp(cptr, "OFF", 4) == 0) {
+        hdc206.verb = 0;
+        return SCPE_OK;
+    }
+    if (strncasecmp(cptr, "ON", 3) == 0) {
+        hdc206.verb = 1;
+        sim_printf("   SBC206: hdc206.verb=%d\n", hdc206.verb);
+        return SCPE_OK;
+    }
+    return SCPE_ARG;
+}
+
+// show configuration parameters
+
+t_stat isbc206_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    if (uptr == NULL)
+        return SCPE_ARG;
+    fprintf(st, "%s Base port at %04X  Interrupt # is %i  %s", 
+        ((isbc206_dev.flags & DEV_DIS) == 0) ? "Enabled" : "Disabled", 
+        hdc206.baseport, hdc206.intnum,
+        hdc206.verb ? "Verbose" : "Quiet"
+        );
     return SCPE_OK;
 }
 
@@ -308,19 +388,53 @@ t_stat isbc206_cfg(uint8 base)
 
 t_stat isbc206_reset(DEVICE *dptr)
 {
-    isbc206_reset1(); //software reset
+    int i;
+    UNIT *uptr;
+    
+    if (dptr == NULL)
+        return SCPE_ARG;
+    if (isbc206_onetime) {
+        hdc206.baseport = SBC206_BASE;  //set default base
+        hdc206.intnum = SBC206_INT;     //set default interrupt
+        hdc206.verb = 0;                //set verb = 0
+        isbc206_onetime = 0;
+        // one-time initialization for all FDDs for this FDC instance
+        for (i = 0; i < HDD_NUM; i++) { 
+            uptr = isbc206_dev.units + i;
+            uptr->u6 = i;               //fdd unit number
+        }
+    }
+    if ((dptr->flags & DEV_DIS) == 0) { // enabled
+        reg_dev(isbc206r0, hdc206.baseport, 0);         //read status
+        reg_dev(isbc206r1, hdc206.baseport + 1, 0);     //read rslt type/write IOPB addr-l
+        reg_dev(isbc206r2, hdc206.baseport + 2, 0);     //write IOPB addr-h and start 
+        reg_dev(isbc206r3, hdc206.baseport + 3, 0);     //read rstl byte 
+        reg_dev(isbc206r7, hdc206.baseport + 7, 0);     //write reset fdc201
+        isbc206_reset_dev(); //software reset
+        if (hdc206.verb)
+            sim_printf("    sbc206: Enabled base port at 0%02XH  Interrupt #=%02X  %s\n",
+            hdc206.baseport, hdc206.intnum, hdc206.verb ? "Verbose" : "Quiet" );
+    } else {
+        unreg_dev(hdc206.baseport);         //read status
+        unreg_dev(hdc206.baseport + 1);     //read rslt type/write IOPB addr-l
+        unreg_dev(hdc206.baseport + 2);     //write IOPB addr-h and start 
+        unreg_dev(hdc206.baseport + 3);     //read rstl byte 
+        unreg_dev(hdc206.baseport + 7);     //write reset fdc201
+        if (hdc206.verb)
+            sim_printf("    sbc206: Disabled\n");
+    }
     return SCPE_OK;
 }
 
 /* Software reset routine */
 
-void isbc206_reset1(void)
+void isbc206_reset_dev(void)
 {
     int32 i;
     UNIT *uptr;
 
     hdc206.stat = 0;            //clear status
-    for (i = 0; i < HD_NUM; i++) {      /* handle all units */
+    for (i = 0; i < HDD_NUM; i++) {      /* handle all units */
         uptr = isbc206_dev.units + i;
         hdc206.stat |= (HDCPRE + 0x80);  //set the HDC status
         hdc206.rtype = ROK;
@@ -365,20 +479,6 @@ t_stat isbc206_attach (UNIT *uptr, CONST char *cptr)
     }
     hdc206.rtype = ROK;
     hdc206.rbyte0 = 0;              //set no error
-    return SCPE_OK;
-}
-
-/* isbc206 set mode = Write protect */
-
-t_stat isbc206_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
-{
-    if (uptr->flags & UNIT_ATT)
-        return sim_messagef (SCPE_ALATT, "%s is already attached to %s\n", sim_uname(uptr), uptr->filename);
-    if (val & UNIT_WPMODE) {            /* write protect */
-        uptr->flags |= val;
-    } else {                            /* read write */
-        uptr->flags &= ~val;
-    }
     return SCPE_OK;
 }
 
@@ -442,7 +542,7 @@ uint8 isbc206r7(t_bool io, uint8 data, uint8 devnum)
     if (io == 0) {                  /* read data port */
         ;
     } else {                        /* write data port */
-        isbc206_reset1();
+        isbc206_reset_dev();
     }
     return 0;
 }
@@ -460,12 +560,12 @@ void isbc206_diskio(void)
     uint8 *fbuf;
 
     //parse the IOPB 
-    cw = multibus_get_mbyte(hdc206.iopb);
-    di = multibus_get_mbyte(hdc206.iopb + 1);
-    nr = multibus_get_mbyte(hdc206.iopb + 2);
-    ta = multibus_get_mbyte(hdc206.iopb + 3);
-    sa = multibus_get_mbyte(hdc206.iopb + 4);
-    ba = multibus_get_mbyte(hdc206.iopb + 5);
+    cw = get_mbyte(hdc206.iopb);
+    di = get_mbyte(hdc206.iopb + 1);
+    nr = get_mbyte(hdc206.iopb + 2);
+    ta = get_mbyte(hdc206.iopb + 3);
+    sa = get_mbyte(hdc206.iopb + 4);
+    ba = get_mbyte(hdc206.iopb + 5);
     hddnum = (di & 0x30) >> 4;
     uptr = isbc206_dev.units + hddnum;
     fbuf = (uint8 *) (isbc206_dev.units + hddnum)->filebuf;
@@ -539,7 +639,7 @@ void isbc206_diskio(void)
                 sim_printf("\n   SBC206: HDD %d - Write protect error DFMT", hddnum);
                 return;
             }
-            fmtb = multibus_get_mbyte(ba); //get the format byte
+            fmtb = get_mbyte(ba); //get the format byte
             //calculate offset into disk image
             dskoff = ((ta * MAXSECHD) + (sa - 1)) * 128;
             for(i=0; i<=((uint32)(MAXSECHD) * 128); i++) {
@@ -557,7 +657,7 @@ void isbc206_diskio(void)
                 //copy sector from image to RAM
                 for (i=0; i<128; i++) { 
                     data = *(fbuf + (dskoff + i));
-                    multibus_put_mbyte(ba + i, data);
+                    put_mbyte(ba + i, data);
                 }
                 sa++;
                 ba+=0x80;
@@ -582,7 +682,7 @@ void isbc206_diskio(void)
                 dskoff = ((ta * MAXSECHD) + (sa - 1)) * 128;
                 //copy sector from image to RAM
                 for (i=0; i<128; i++) { 
-                    data = multibus_get_mbyte(ba + i);
+                    data = get_mbyte(ba + i);
                     *(fbuf + (dskoff + i)) = data;
                 }
                 sa++;
