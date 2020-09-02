@@ -82,7 +82,7 @@ DIB   mt_dib = { CH_TYP_PIO, NUM_UNITS_MT, 0400, 07770, &mt_cmd, &mt_ini };
 
 
 /* Simulator stop codes */
-const char         *sim_stop_messages[] = {
+const char         *sim_stop_messages[SCPE_BASE] = {
     "Unknown error",
     "IO device not ready",
     "HALT instruction",

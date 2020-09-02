@@ -284,7 +284,7 @@ DEVICE *sim_devices[] = {
     0
 };
 
-const char *sim_stop_messages[] = {
+const char *sim_stop_messages[SCPE_BASE] = {
     "Неизвестная ошибка",                 /* Unknown error */
     "Останов",                            /* STOP */
     "Точка останова",                     /* Emulator breakpoint */

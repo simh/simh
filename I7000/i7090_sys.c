@@ -143,7 +143,7 @@ DIB  hsdrm_dib = { CH_TYP_SPEC, 1, 0330, 0777, &hsdrm_cmd, &hsdrm_ini };
 
 
 /* Simulator stop codes */
-const char         *sim_stop_messages[] = {
+const char         *sim_stop_messages[SCPE_BASE] = {
     "Unknown error",
     "IO device not ready",
     "HALT instruction",

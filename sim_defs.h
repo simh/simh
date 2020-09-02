@@ -93,7 +93,8 @@
         sim_devices[]           array of pointers to simulated devices
         sim_PC                  pointer to saved PC register descriptor
         sim_interval            simulator interval to next event
-        sim_stop_messages[]     array of pointers to stop messages
+        sim_stop_messages[SCPE_BASE]     
+                                array of pointers to stop messages
         sim_instr()             instruction execution routine
         sim_load()              binary loader routine
         sim_emax                maximum number of words in an instruction

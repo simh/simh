@@ -95,7 +95,7 @@ DEVICE *sim_devices[] = {
 
 char ch_bkpt_msg[] = "Channel A breakpoint, CLC: xxxxxx";
 
-const char *sim_stop_messages[] = {
+const char *sim_stop_messages[SCPE_BASE] = {
     "Unknown error",
     "HALT instruction",
     "Breakpoint",

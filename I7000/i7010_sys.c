@@ -115,7 +115,7 @@ DIB  com_dib = { CH_TYP_79XX|CH_TYP_UREC, 0, 04200, 07700, &com_cmd, NULL };
 
 
 /* Simulator stop codes */
-const char         *sim_stop_messages[] = {
+const char         *sim_stop_messages[SCPE_BASE] = {
     "Unknown error",
     "IO device not ready",
     "HALT instruction",

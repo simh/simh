@@ -60,7 +60,7 @@ DEVICE *sim_devices[] = {
     NULL
 };
 
-const char *sim_stop_messages[] = {
+const char *sim_stop_messages[SCPE_BASE] = {
     "Unknown error",
     "Reserved Instruction",
     "Breakpoint",

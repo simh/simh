@@ -85,7 +85,7 @@ DEVICE *sim_devices[] = {
   NULL
 };
 
-const char *sim_stop_messages[] = {
+const char *sim_stop_messages[SCPE_BASE] = {
   "OK",
   "Indirect addressing loop count exceeded",
   "Selective Stop",

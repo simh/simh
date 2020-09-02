@@ -58,7 +58,7 @@ DIB  mt_dib  = { 5, &mt_cmd, &mt_ini };
 DIB  dsk_dib = { 4, &mt_cmd, &dsk_ini };
 
 /* Simulator stop codes */
-const char         *sim_stop_messages[] = {
+const char         *sim_stop_messages[SCPE_BASE] = {
     "Unknown error",
     "HALT instruction",
     "Breakpoint",

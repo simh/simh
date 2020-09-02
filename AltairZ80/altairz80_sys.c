@@ -145,7 +145,7 @@ DEVICE      *sim_devices[]  = {
 
 static char memoryAccessMessage[256];
 static char instructionMessage[256];
-const char *sim_stop_messages[] = {
+const char *sim_stop_messages[SCPE_BASE] = {
     "HALT instruction",
     "Breakpoint",
     memoryAccessMessage,

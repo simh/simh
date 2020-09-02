@@ -272,7 +272,7 @@ t_stat sim_load(FILE* fptr, CONST char* cptr, CONST char* fnam, t_bool flag)
     return SCPE_OK;
 }
 
-const char *sim_stop_messages[] = {
+const char *sim_stop_messages[SCPE_BASE] = {
     "---",
     "PC Breakpoint",
     "MEM Breakpoint",

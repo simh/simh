@@ -69,7 +69,7 @@ DEVICE *sim_devices[] = {
     &tim_dev,
     NULL
     };
-const char *sim_stop_messages[] = {
+const char *sim_stop_messages[SCPE_BASE] = {
   "---",
   "PC Breakpoint",
   "MEM Breakpoint",

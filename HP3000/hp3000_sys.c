@@ -1099,7 +1099,7 @@ DEVICE *sim_devices [] = {                      /* an array of pointers to the s
 #define DEVICE_COUNT        (sizeof sim_devices / sizeof sim_devices [0] - 1)
 
 
-const char *sim_stop_messages [] = {            /* an array of pointers to the stop messages in STOP_nnn order */
+const char *sim_stop_messages [SCPE_BASE] = {   /* an array of pointers to the stop messages in STOP_nnn order */
     "Impossible error",                         /*   0 (never returned) */
     "System halt",                              /*   STOP_SYSHALT */
     "Unimplemented instruction",                /*   STOP_UNIMPL */

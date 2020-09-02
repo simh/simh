@@ -86,7 +86,7 @@ REG *sim_PC = &cpu_reg[0];
 
 int32 sim_emax = 60;
 
-const char *sim_stop_messages[] = {
+const char *sim_stop_messages[SCPE_BASE] = {
     "Unknown error",
     "HALT instruction",
     "Breakpoint",
