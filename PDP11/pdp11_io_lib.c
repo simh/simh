@@ -616,11 +616,12 @@ for (mr = mstart + 1; mr <= mend; mr++) {
         strcpy (same_desc, desc);
         continue;
         }
-    if (same_start != mr - 1)
+    if (same_start != mr - 1) {
         if (same_start + 1 == mr - 1)
             fprintf (st, "%s-MAP[%04X] same as above\n", busname, same_start + 1);
         else
             fprintf (st, "%s-MAP[%04X thru %04X] same as above\n", busname, same_start + 1, mr - 1);
+        }
     fprintf (st, "%s-MAP[%04X] = %08X%s\n", busname, mr, busmap[mr], desc);
     same_start = mr;
     same_val = busmap[mr];
