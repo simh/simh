@@ -944,7 +944,8 @@ static uint32 round_pack_int(t_bool sign, t_uint64 frac, RM rounding_mode)
 
     round_bits = frac & 0x7f;
     frac = (frac + round_increment) >> 7;
-    frac &= ~(((round_bits ^ 0x40) == 0) & (rounding_mode == ROUND_NEAREST));
+    frac &= ~((t_uint64)((round_bits ^ 0x40) == 0) &
+              (t_uint64)(rounding_mode == ROUND_NEAREST));
 
     result = (int32)frac;
 
@@ -999,7 +1000,8 @@ static t_int64 round_pack_int64(t_bool sign,
             mau_exc(MAU_ASR_OS, MAU_ASR_OM);
             return sign ? 0x8000000000000000ull : 0x7fffffffffffffffull;
         }
-        abs_0 &= ~(((t_uint64)(abs_1 << 1) == 0) & (rounding_mode == ROUND_NEAREST));
+        abs_0 &= ~((t_uint64)((abs_1 << 1) == 0) &
+                   (t_uint64)(rounding_mode == ROUND_NEAREST));
     }
 
     z = abs_0;
@@ -1076,7 +1078,8 @@ static SFP round_pack_sfp(t_bool sign, int16 exp, uint32 frac, RM rounding_mode)
     }
 
     frac = (frac + round_increment) >> 7;
-    frac &= ~(((round_bits ^ 0x40) == 0) & (rounding_mode == ROUND_NEAREST));
+    frac &= ~((t_uint64)((round_bits ^ 0x40) == 0) &
+              (t_uint64)(rounding_mode == ROUND_NEAREST));
     if (frac == 0) {
         exp = 0;
     }
