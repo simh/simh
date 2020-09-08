@@ -25,6 +25,7 @@
 
    tu           RH11/TM03/TU45 magtape
 
+   07-Sep-20    RMS     Fixed || -> | in macro (Mark Pizzolato)
    12-Jan-18    RMS     Fixed missing () in logical test (Mark Pizzolato)
    29-Dec-17    RMS     Read tape mark must set Massbus EXC (TRE)
    28-Mar-17    RMS     Documented switch fall through case (COVERITY)
@@ -265,7 +266,7 @@
 #define TC_ACC          0100000                         /* accelerating NI */
 #define TC_RW           0013777
 #define TC_MBZ          0004000
-#define TC_RIP          ((TC_800 << TC_V_DEN) || (TC_10C << TC_V_FMT))
+#define TC_RIP          ((TC_800 << TC_V_DEN) | (TC_10C << TC_V_FMT))
 #define GET_DEN(x)      (((x) >> TC_V_DEN) & TC_M_DEN)
 #define GET_FMT(x)      (((x) >> TC_V_FMT) & TC_M_FMT)
 #define GET_DRV(x)      (((x) >> TC_V_UNIT) & TC_M_UNIT)
