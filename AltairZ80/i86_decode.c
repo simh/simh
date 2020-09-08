@@ -262,7 +262,7 @@ t_stat sim_instr_8086(void) {
         PCX += 2;
         PCX_S = PCX;
     } else {
-        PCX_S = (reason == STOP_HALT) | (reason == STOP_OPCODE) ? PCX : getFullPC();
+        PCX_S = ((reason == STOP_HALT) || (reason == STOP_OPCODE)) ? PCX : getFullPC();
     }
 
     setViewRegisters();
