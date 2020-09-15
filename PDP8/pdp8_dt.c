@@ -1,6 +1,6 @@
 /* pdp8_dt.c: PDP-8 DECtape simulator
 
-   Copyright (c) 1993-2017, Robert M Supnik
+   Copyright (c) 1993-2020, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dt           TC08/TU56 DECtape
 
+   01-Jul-20    RMS     Fixed comments in bootstrap (Bernhard Baehr)
    15-Mar-17    RMS     Fixed dt_seterr to clear successor states
    17-Sep-13    RMS     Changed to use central set_bootpc routine
    23-Jun-06    RMS     Fixed switch conflict in ATTACH
@@ -1165,7 +1166,7 @@ return SCPE_OK;
 #define BOOT_LEN        (sizeof (boot_rom) / sizeof (int16))
 
 static const uint16 boot_rom[] = {
-    07600,                      /* 200, CLA CLL */
+    07600,                      /* 200, CLA             ; group 2 */
     01216,                      /*      TAD MVB         ; move back */
     04210,                      /*      JMS DO          ; action */
     01217,                      /*      TAD K7577       ; addr */
@@ -1180,7 +1181,7 @@ static const uint16 boot_rom[] = {
     05213,                      /*      JMP .-1 */
     05610,                      /*      JMP I DO */
     00600,                      /* MVB, 0600 */
-    07577,                      /* K7577, 7757 */
+    07577,                      /* K7577, 7577 */
     07755,                      /* CA,  7755 */
     07754,                      /* WC,  7754 */
     00220                       /* RF,  0220 */
