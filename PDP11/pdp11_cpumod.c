@@ -1023,18 +1023,22 @@ return SCPE_NXM;
 
 int32 toy_read (void)
 {
-time_t curr;
-struct tm *ctm;
 int32 bit;
 
 if (toy_state == 0) {
-    curr = time (NULL);                                 /* get curr time */
+    struct timespec now;
+    time_t curr;
+    struct tm *ctm;
+
+    sim_rtcn_get_time (&now, 0);
+    curr = (time_t)now.tv_sec;
+
     if (curr == (time_t) -1)                            /* error? */
         return 0;
     ctm = localtime (&curr);                            /* decompose */
     if (ctm == NULL)                                    /* error? */
         return 0;
-    toy_data[TOY_HSEC] = 0x50;
+    toy_data[TOY_HSEC] = toy_set ((now.tv_nsec + 5000000) / 10000000);
     toy_data[TOY_SEC] = toy_set (ctm->tm_sec);
     toy_data[TOY_MIN] = toy_set (ctm->tm_min);
     toy_data[TOY_HR] = toy_set (ctm->tm_hour);
