@@ -103,6 +103,8 @@ int32 clk_inta (void);
 t_stat clk_reset (DEVICE *dptr);
 t_stat clk_set_freq (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+const char *clk_description (DEVICE *dptr);
+
 
 /* TTI data structures
 
@@ -286,7 +288,8 @@ DEVICE clk_dev = {
     NULL, NULL, &clk_reset,
     NULL, NULL, NULL,
     &clk_dib, DEV_DEBUG | DEV_UBUS | DEV_QBUS, 0,
-    clk_debug
+    clk_debug, NULL, NULL, NULL, NULL, NULL, &clk_description
+
     };
 
 /* Terminal input address routines */
@@ -593,3 +596,9 @@ t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 fprintf (st, "%dHz", clk_tps);
 return SCPE_OK;
 }
+
+const char *clk_description (DEVICE *dptr)
+{
+return "KW11-L line frequency clock";
+}
+
