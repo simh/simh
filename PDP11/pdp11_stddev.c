@@ -1,6 +1,6 @@
 /* pdp11_stddev.c: PDP-11 standard I/O devices simulator
 
-   Copyright (c) 1993-2016, Robert M Supnik
+   Copyright (c) 1993-2020, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    tti,tto      DL11 terminal input/output
    clk          KW11L (and other) line frequency clock
 
+   24-Jul-20    RMS     Added KSR mode to TTI/TTO
    25-Sep-16    RMS     Added Dave Gesswein's fix to prevent data loss
    02-Jan-16    RMS     Changed TTO default to 7B
    30-Dec-15    RMS     Added NOBEVENT support
@@ -134,6 +135,7 @@ MTAB tti_mod[] = {
     { TT_MODE, TT_MODE_7B, "7b", "7B", &tty_set_mode },
     { TT_MODE, TT_MODE_8B, "8b", "8B", &tty_set_mode },
     { TT_MODE, TT_MODE_7P, "7b", NULL, NULL },
+    { TT_MODE, TT_MODE_KSR, "KSR", "KSR", &tty_set_mode },
     { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
       NULL, &show_addr, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
@@ -180,6 +182,7 @@ MTAB tto_mod[] = {
     { TT_MODE, TT_MODE_7B, "7b", "7B", &tty_set_mode },
     { TT_MODE, TT_MODE_8B, "8b", "8B", &tty_set_mode },
     { TT_MODE, TT_MODE_7P, "7p", "7P", &tty_set_mode },
+    { TT_MODE, TT_MODE_KSR, "KSR", "KSR", &tty_set_mode },
     { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
       NULL, &show_addr, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
