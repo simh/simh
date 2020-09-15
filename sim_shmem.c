@@ -1,6 +1,6 @@
 /* sim_shmem.c: simulator shared memory library
 
-   Copyright (c) 2015-2016, Robert M Supnik
+   Copyright (c) 2015-2020, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -134,7 +134,7 @@ struct SHMEM {
 
 t_stat sim_shmem_open (const char *name, size_t size, SHMEM **shmem, void **addr)
 {
-#ifdef HAVE_SHM_OPEN
+#if defined (HAVE_SHM_OPEN) && defined (__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
 *shmem = (SHMEM *)calloc (1, sizeof(**shmem));
 mode_t orig_mask;
 
@@ -191,25 +191,30 @@ if ((*shmem)->shm_base == MAP_FAILED) {
 *addr = (*shmem)->shm_base;
 return SCPE_OK;
 #else
+*shmem = NULL;
 return SCPE_NOFNC;
 #endif
 }
 
 void sim_shmem_close (SHMEM *shmem)
 {
+#if defined (HAVE_SHM_OPEN)
 if (shmem == NULL)
     return;
 if (shmem->shm_base != MAP_FAILED)
     munmap (shmem->shm_base, shmem->shm_size);
-if (shmem->shm_fd != -1)
+if (shmem->shm_fd != -1) {
+    shm_unlink (shmem->shm_name);
     close (shmem->shm_fd);
+    }
 free (shmem->shm_name);
 free (shmem);
+#endif
 }
 
 int32 sim_shmem_atomic_add (int32 *p, int32 v)
 {
-#if defined (HAVE_GCC_SYNC_BUILTINS)
+#if defined (__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
 return __sync_add_and_fetch((int *) p, v);
 #else
 return *p + v;
@@ -218,7 +223,7 @@ return *p + v;
 
 t_bool sim_shmem_atomic_cas (int32 *ptr, int32 oldv, int32 newv)
 {
-#if defined (HAVE_GCC_SYNC_BUILTINS)
+#if defined (__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
 return __sync_bool_compare_and_swap (ptr, oldv, newv);
 #else
 if (*ptr == oldv) {
