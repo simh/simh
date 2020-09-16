@@ -1,6 +1,6 @@
 /* pdp18b_dr15.c: DR15C simulator
 
-   Copyright (c) 2016, Robert M Supnik
+   Copyright (c) 2016-2020, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    dr           PDP-15 DR15C interface for UC15 system
+
+   04-Jul 20    RMS     Zero out shared state on first allocation
 
    The DR15C provides control communications with the DR11Cs in the UC15.
    Its state consists of an 18b register (the Task Control Block Pointer),
@@ -280,6 +282,9 @@ if (uc15_shmem == NULL) {                               /* allocate shared state
     if (r != SCPE_OK)
         return r;
     uc15_shstate = (int32 *) basead;
+    for (i = 0; i < UC15_STATE_SIZE; i++) {             /* zero out shared state region */
+        UC15_SHARED_WR (i, 0);
+        }
     }
 if (pdp15_shmem == NULL) {                              /* allocate shared memory */
     r = sim_shmem_open ("PDP15MainMemory", MAXMEMSIZE * sizeof (int32), &pdp15_shmem, &basead);
