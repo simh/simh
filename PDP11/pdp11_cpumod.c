@@ -1,6 +1,6 @@
 /* pdp11_cpumod.c: PDP-11 CPU model-specific features
 
-   Copyright (c) 2004-2016, Robert M Supnik
+   Copyright (c) 2004-2020, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    system       PDP-11 model-specific registers
 
+   15-Sep-20    RMS     Fixed problem in KDJ11E programmable clock (Paul Koning)
    04-Mar-16    RMS     Fixed maximum memory sizes to exclude IO page
    14-Mar-16    RMS     Modified to keep cpu_memsize in sync with MEMSIZE
    06-Jun-13    RMS     Fixed change model to set memory size last
@@ -83,7 +84,7 @@ int32 uba_last = 0;                                     /* UBA last mapped */
 int32 ub_map[UBM_LNT_LW] = { 0 };                       /* UBA map array */
 int32 toy_state = 0;
 uint8 toy_data[TOY_LNT] = { 0 };
-static int32 clk_tps_map[4] = { 60, 60, 50, 800 };
+static int32 clk_tps_map[4] = { 0, 50, 60, 800 };       /* 0 = use BEVENT */
 
 extern uint16 *M;
 extern int32 R[8];
@@ -830,7 +831,7 @@ switch ((pa >> 1) & 03) {                               /* decode pa<2:1> */
             clk_fnxm = 1;
         else clk_fnxm = 0;
         t = CSRJ_LTCSEL (JCSR);                         /* get freq sel */
-        if (t)
+        if (t != 0)
             clk_tps = clk_tps_map[t];
         else clk_tps = clk_default;
         return SCPE_OK;
@@ -921,7 +922,7 @@ switch ((pa >> 1) & 03) {                               /* decode pa<2:1> */
             clk_fnxm = 1;
         else clk_fnxm = 0;
         t = CSRJ_LTCSEL (JCSR);                         /* get freq sel */
-        if (t)
+        if (t != 0)
             clk_tps = clk_tps_map[t];
         else clk_tps = clk_default;
         return SCPE_OK;
