@@ -8640,9 +8640,9 @@ sim_stop_timer_services ();                             /* disable wall clock ti
 sim_ttcmd ();                                           /* restore console */
 sim_brk_clrall (BRK_TYP_DYN_STEPOVER);                  /* cancel any step/over subroutine breakpoints */
 #ifdef SIGHUP
-signal (SIGHUP, SIG_DFL);                               /* cancel WRU */
+signal (SIGHUP, sigterm_received ? SIG_IGN : SIG_DFL);  /* cancel WRU */
 #endif
-signal (SIGTERM, SIG_DFL);                              /* cancel WRU */
+signal (SIGTERM, sigterm_received ? SIG_IGN : SIG_DFL); /* cancel WRU */
 sim_flush_buffered_files();
 sim_cancel (&sim_flush_unit);                           /* cancel flush timer */
 sim_cancel_step ();                                     /* cancel step timer */
