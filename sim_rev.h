@@ -46,6 +46,18 @@ patch   date            module(s) and fix(es)
                         - changed sim_vm_init to build time option (Dave Bryan)
                         - flush stdout after prompt (Mark Pizzolato)
 
+                        pdp10_tu.c
+                        - fixed bad macro (Mark Pizzolata)
+
+                        pdp11_cpumod.c
+                        - fixed KDJ11E programmable rate select (Paul Koning)
+
+                        pdp11_stddev.c
+                        - added KSR option for TTI/TTO
+
+                        pdp18b_dr15.c
+                        - zero out shared section on initial allocate (Dave Bryan)
+
                         s3_sys.c
                         - fixed bldaddr length (Mark Pizzolatto)
 
