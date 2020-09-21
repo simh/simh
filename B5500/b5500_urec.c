@@ -32,8 +32,8 @@
 #include "sim_console.h"
 
 #define UNIT_CDR        UNIT_ATTABLE | UNIT_RO | UNIT_DISABLE | MODE_029
-#define UNIT_CDP        UNIT_ATTABLE | UNIT_DISABLE | MODE_029
-#define UNIT_LPR        UNIT_ATTABLE | UNIT_DISABLE
+#define UNIT_CDP        UNIT_ATTABLE | UNIT_SEQ | UNIT_DISABLE | MODE_029
+#define UNIT_LPR        UNIT_ATTABLE | UNIT_SEQ | UNIT_DISABLE
 
 #define TMR_RTC         0
 
