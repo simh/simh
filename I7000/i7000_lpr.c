@@ -34,7 +34,7 @@
 #include "sim_defs.h"
 #ifdef NUM_DEVS_LPR
 
-#define UNIT_LPR        UNIT_ATTABLE | UNIT_DISABLE
+#define UNIT_LPR        UNIT_ATTABLE | UNIT_DISABLE | UNIT_SEQ
 
 
 /* Flags for line printer. */
