@@ -713,7 +713,7 @@ int opflags[] = {
         /* JRST */        /* JFCL */        /* XCT */       /* MAP */
         0,                0,                0,              0,
         /* PUSHJ */       /* PUSH */        /* POP */       /* POPJ */
-        FAC|SAC,          FAC|FCE|SAC,      FAC|SAC,        FAC|SAC,
+        FAC|SAC,          FAC|FCE|SAC,      FAC,            FAC|SAC,
         /* JSR */         /* JSP */         /* JSA */       /* JRA */
         0,                SAC,              FBR|SCE,        0,
         /* ADD */         /* ADDI */        /* ADDM */      /* ADDB */
@@ -7783,8 +7783,21 @@ jrstf:
                   glb_sect = flag1;
               }
 #endif
-              if (Mem_write(0, 0))
+
+#if KA | KI
+              /* On KA or KI the AC is stored before Memory */
+              MQ = AR;
+              AR = SOB(AR);
+              set_reg(AC, AR & FMASK);
+#endif
+
+              if (Mem_write(0, 0)) {
+#if KA | KI
+                  /* Restore AC if fault */
+                  set_reg(AC, MQ);
+#endif
                   goto last;
+              }
 #if KL
               /* Determine if we had globabl stack pointer or not */
               sect = pc_sect;
@@ -7797,7 +7810,11 @@ jrstf:
                   }
               }
 #endif
+#if PDP6 | KL
+              /* This has to before the check for KL10 B extended check */
+              i_flags |= SAC;
               AR = SOB(AR);
+#endif
               if ((AR & C1) == 0) {
 #if KI | KL
                   if (!pi_cycle)
