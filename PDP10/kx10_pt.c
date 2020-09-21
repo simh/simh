@@ -73,7 +73,7 @@ const char    *ptr_description (DEVICE *dptr);
 DIB ptp_dib = { PP_DEVNUM, 1, &ptp_devio, NULL };
 
 UNIT ptp_unit = {
-    UDATA (&ptp_svc, UNIT_ATTABLE+UNIT_TEXT, 0), 10000
+    UDATA (&ptp_svc, UNIT_ATTABLE+UNIT_TEXT+UNIT_SEQ, 0), 10000
     };
 
 REG ptp_reg[] = {
