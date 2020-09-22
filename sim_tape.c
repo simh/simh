@@ -376,6 +376,9 @@ return FALSE;
         (_callback) (uptr, r);
 #endif
 
+#define MIN_RECORD_SIZE    14   /* Mag tape records <14 bytes are considered noise */
+#define MAX_RECORD_SIZE 65535   /* DEC tape controllers have a 16-bit byte count reg */
+
 typedef struct VOL1 {
     char type[3];               /* VOL  */
     char num;                   /* 1    */
@@ -637,7 +640,6 @@ uint32 objc;
 DEVICE *dptr;
 char gbuf[CBUFSIZE];
 char export_file[CBUFSIZE] = "";
-uint32 recsize = 0;
 t_stat r;
 t_bool auto_format = FALSE;
 t_bool had_debug = (sim_deb != NULL);
@@ -660,21 +662,28 @@ if (sim_switches & SWMASK ('B')) {                      /* Record Size (blocking
     cptr = get_glyph (cptr, gbuf, 0);                   /* get spec */
     if (*cptr == 0)                                     /* must be more */
         return sim_messagef (SCPE_2FARG, "Missing Record Size and/or filename to attach\n");
-    recsize = (uint32) get_uint (gbuf, 10, 65536, &r);
-    if ((r != SCPE_OK) || (recsize == 0))
-        return sim_messagef (SCPE_ARG, "Invalid Tape Record Size: %s\n", gbuf);
-    uptr->recsize = recsize;
+    if ((MT_GET_FMT (uptr) != MTUF_F_TAR) &&            /* -B is honored for TAR, */
+        (MT_GET_FMT (uptr) != MTUF_F_FIXED) &&          /*     FIXED, */
+        ((MT_GET_FMT (uptr) == MTUF_F_ANSI) &&
+         ((MT_GET_ANSI_TYP (uptr) != MTAT_F_VMS) &&     /*     ANSI-VMS, */
+          (MT_GET_ANSI_TYP (uptr) != MTAT_F_RSX11) &&   /*     ANSI-RSX11, */
+          (MT_GET_ANSI_TYP (uptr) != MTAT_F_VAR)))) {   /*     and ANSI-VAR only */
+        sim_messagef (SCPE_ARG, "The -B option is ignored for %s format\n", _sim_tape_format_name (uptr));
+        }
+    else {
+        uint32 recsize = (uint32) get_uint (gbuf, 10, MAX_RECORD_SIZE, &r);
+        if ((r != SCPE_OK) || (recsize < MIN_RECORD_SIZE))
+            return sim_messagef (SCPE_ARG, "Invalid Tape Record Size: %s\n", gbuf);
+        uptr->recsize = recsize;
+        }
     sim_switches = sim_switches & ~(SWMASK ('B'));      /* Record Blocking Factor */
     }
-else {
-    if ((MT_GET_FMT (uptr) == MTUF_F_TAR) && (uptr->recsize == 0))
-        uptr->recsize = TAR_DFLT_RECSIZE;
-    }
-if ((MT_GET_FMT (uptr) == MTUF_F_TPC) ||
-    (MT_GET_FMT (uptr) == MTUF_F_TAR) ||
-    (MT_GET_FMT (uptr) >= MTUF_F_ANSI))
-    sim_switches |= SWMASK ('R');                       /* Force ReadOnly attach for TPC, TAR and ANSI tapes */
-if (sim_switches & SWMASK ('X'))
+if (sim_switches & SWMASK ('E'))                        /* On-disk tape image file must exist? */
+    if (MT_GET_FMT (uptr) >= MTUF_F_ANSI)               /* Does not apply to MEMORY_TAPE images */
+        sim_messagef (SCPE_ARG, "The -E option is ignored for %s format\n", _sim_tape_format_name (uptr));
+if (fmts[MT_GET_FMT (uptr)].uflags & UNIT_RO)           /* Force ReadOnly attach for TPC, */
+    sim_switches |= SWMASK ('R');                       /*     TAR, ANSI, FIXED and DOS11 */
+if (sim_switches & SWMASK ('X'))                        /* Export as SIMH? */
     cptr = get_glyph_nc (cptr, export_file, 0);         /* get export file spec */
 
 switch (MT_GET_FMT (uptr)) {
@@ -710,6 +719,9 @@ switch (MT_GET_FMT (uptr)) {
                 }
             if ((tape->file_count > 0) && (file_errors == 0)) {
                 r = SCPE_OK;
+                memory_tape_add_block (tape, NULL, 0);  /* Tape Mark */
+                /* RT-11 and RSTS write three tape marks at the end of an ANSI volume */
+                /* RSX-11 and VMS do not, but there is no harm in the extra tape mark */
                 memory_tape_add_block (tape, NULL, 0);  /* Tape Mark */
                 uptr->flags |= UNIT_ATT;
                 uptr->filename = (char *)malloc (strlen (ocptr) + 1);
@@ -844,6 +856,8 @@ switch (MT_GET_FMT (uptr)) {
             if ((tape->file_count > 0) && (file_errors == 0)) {
                 r = SCPE_OK;
                 memory_tape_add_block (tape, NULL, 0); /* Tape Mark */
+                /* RSX-11 and RSTS write three tape marks at the end of a DOS volume */
+                /* VMS does not, but there is no harm in the extra tape mark         */
                 memory_tape_add_block (tape, NULL, 0); /* Tape Mark */
                 uptr->flags |= UNIT_ATT;
                 uptr->filename = (char *)malloc (strlen (ocptr) + 1);
@@ -861,24 +875,20 @@ switch (MT_GET_FMT (uptr)) {
 
     case MTUF_F_TAR:
         if (uptr->recsize == 0)
-            uptr->recsize = TAR_DFLT_RECSIZE;       /* Apply default block size */
+            uptr->recsize = TAR_DFLT_RECSIZE;           /* Apply default block size */
+        if ((uptr->recsize % 512) != 0)
+            return sim_messagef (SCPE_ARG, "TAR format block size of %u is not a multiple of 512\n", uptr->recsize); 
+        sim_switches |= SWMASK ('E');                   /* The TAR file must exist */
         /* fall through */
     default:
-        r = attach_unit (uptr, (CONST char *)cptr);         /* attach unit */
+        r = attach_unit (uptr, (CONST char *)cptr);     /* attach unit */
         break;
     }
 if (r != SCPE_OK) {                                     /* error? */
-    switch (MT_GET_FMT (uptr)) {
-        case MTUF_F_ANSI:
-        case MTUF_F_TAR:
-        case MTUF_F_FIXED:
-        case MTUF_F_DOS11:
-            r = sim_messagef (r, "Error opening %s format internal tape image generated from: %s\n", _sim_tape_format_name (uptr), cptr);
-            break;
-        default:
-            r = sim_messagef (r, "Error opening %s format tape image: %s - %s\n", _sim_tape_format_name (uptr), cptr, strerror(errno));
-            break;
-        }
+    if (MT_GET_FMT (uptr) >= MTUF_F_ANSI)
+        r = sim_messagef (r, "Error opening %s format internal tape image generated from: '%s'\n", _sim_tape_format_name (uptr), cptr);
+    else
+        r = sim_messagef (r, "Error opening %s format tape image: '%s' - %s\n", _sim_tape_format_name (uptr), cptr, strerror(errno));
     if (auto_format)    /* format was specified at attach time? */
         sim_tape_set_fmt (uptr, 0, "SIMH", NULL);   /* restore default format */
     uptr->recsize = 0;
@@ -3567,32 +3577,37 @@ while (r == SCPE_OK) {
         }
     }
 uptr->tape_eom = uptr->pos;
-if ((!stop_cpu) &&
-    ((r != MTSE_EOM) || (sim_switches & SWMASK ('V')) || (sim_switches & SWMASK ('L')) ||
-     ((uint32)(sim_tape_size (uptr) - (t_offset)uptr->pos) > fmts[MT_GET_FMT (uptr)].eom_remnant) ||
-     (unique_record_sizes > 2 * tapemark_total))) {
+if (!stop_cpu) {            /* if SIGINT didn't interrupt the scan */
+    sim_messagef (SCPE_OK, "%s: Tape Image %s'%s' scanned as %s format\n", sim_uname (uptr),
+                           ((MT_GET_FMT (uptr) >= MTUF_F_ANSI) ? "made from " : ""), uptr->filename,
+                           _sim_tape_format_name (uptr));
     remaining_data = (uint32)(sim_tape_size (uptr) - (t_offset)uptr->tape_eom);
-    sim_messagef (SCPE_OK, "Tape Image %s'%s' scanned as %s format.\n", ((MT_GET_FMT (uptr) == MTUF_F_ANSI) ? "made from " : ""), uptr->filename, (MT_GET_FMT (uptr) == MTUF_F_ANSI) ? ansi_args[MT_GET_ANSI_TYP (uptr)].name : fmts[MT_GET_FMT (uptr)].name);
-    sim_messagef (SCPE_OK, "%s %u bytes of tape data (%u records, %u tapemarks)\n",
-                           (r != MTSE_EOM) ? "After processing" : "contains", data_total, record_total, tapemark_total);
-    if ((record_total > 0) && (sim_switches & SWMASK ('L'))) {
-        sim_messagef (SCPE_OK, "Comprising %d different sized records (in record size order):\n", unique_record_sizes);
-        for (bc = 0; bc <= max; bc++) {
-            if (rec_sizes[bc])
-                sim_messagef (SCPE_OK, "%8u %u byte record%s\n", rec_sizes[bc], (uint32)bc, (rec_sizes[bc] != 1) ? "s" : "");
+    if ((r != MTSE_EOM) || (sim_switches & SWMASK ('V')) || (sim_switches & SWMASK ('L')) ||
+        (remaining_data > 0) ||
+        (unique_record_sizes > 2 * tapemark_total)) {
+        sim_messagef (SCPE_OK, "%s %u bytes of tape data (%u record%s, %u tapemark%s)\n",
+                               (r != MTSE_EOM) ? "After processing" : "contains", data_total,
+                               record_total, (record_total == 1) ? "" : "s",
+                               tapemark_total, (tapemark_total == 1) ? "" : "s");
+        if ((record_total > 0) && (sim_switches & SWMASK ('L'))) {
+            sim_messagef (SCPE_OK, "Comprising %d different sized records (in record size order):\n", unique_record_sizes);
+            for (bc = 0; bc <= max; bc++) {
+                if (rec_sizes[bc])
+                    sim_messagef (SCPE_OK, "%8u %u byte record%s\n", rec_sizes[bc], (uint32)bc, (rec_sizes[bc] != 1) ? "s" : "");
+                }
+            if (gaps)
+                sim_messagef (SCPE_OK, "%8u gap%s totalling %u bytes %s seen\n", gaps, (gaps != 1) ? "s" : "", gap_bytes, (gaps != 1) ? "were" : "was");
             }
-        if (gaps)
-            sim_messagef (SCPE_OK, "%8u gap%s totalling %u bytes %s seen\n", gaps, (gaps != 1) ? "s" : "", gap_bytes, (gaps != 1) ? "were" : "was");
+        if (r != MTSE_EOM)
+            sim_messagef (SCPE_OK, "Read Tape Record Returned Unexpected Status: %s\n", sim_tape_error_text (r));
+        if (remaining_data > fmts[MT_GET_FMT (uptr)].eom_remnant)
+            sim_messagef (SCPE_OK, "%u %s of unexamined data remain in the tape image file\n",
+                                   remaining_data, (MT_GET_FMT (uptr) < MTUF_F_ANSI) ? "bytes" : "records");
         }
-    if (r != MTSE_EOM)
-        sim_messagef (SCPE_OK, "Read Tape Record Returned Unexpected Status: %s\n", sim_tape_error_text (r));
-    if (remaining_data > fmts[MT_GET_FMT (uptr)].eom_remnant)
-        sim_messagef (SCPE_OK, "%u bytes of unexamined data remain in the tape image file\n", remaining_data);
-    }
-if ((!stop_cpu) && 
-    (unique_record_sizes > 2 * tapemark_total)) {
-    sim_messagef (SCPE_OK, "A potentially unreasonable number of record sizes(%u) vs tape marks (%u) have been found\n", unique_record_sizes, tapemark_total);
-    sim_messagef (SCPE_OK, "The tape format (%s) might not be correct for the '%s' tape image\n", fmts[MT_GET_FMT (uptr)].name, uptr->filename);
+    if (unique_record_sizes > 2 * tapemark_total) {
+        sim_messagef (SCPE_OK, "A potentially unreasonable number of record sizes(%u) vs tape marks (%u) have been found\n", unique_record_sizes, tapemark_total);
+        sim_messagef (SCPE_OK, "The tape format (%s) might not be correct for the '%s' tape image\n", _sim_tape_format_name (uptr), uptr->filename);
+        }
     }
 
 free (buf_f);
@@ -3827,7 +3842,7 @@ int32 saved_switches = sim_switches;
 
 srand (0);                      /* All devices use the same random sequence for file data */
 if (max_size == 0)
-    max_size = 65535;
+    max_size = MAX_RECORD_SIZE;
 if (!p7b_parity_inited) {
     for (i=0; i < 64; i++) {
         int bit_count = 0;
@@ -4457,8 +4472,6 @@ t_bool crlast = FALSE;
 int error = 0;
 size_t i, data_read, offset = 0;
 
-memset (buf, 0, bufSize);
-
 while (!feof (f) && !error) {
     data_read = fread (tmp, 1, sizeof (tmp), f);
     if (data_read > 0)
@@ -4470,14 +4483,12 @@ while (!feof (f) && !error) {
                     if (offset == bufSize) {
                         error = memory_tape_add_block (tape, (uint8 *)buf, bufSize);
                         offset = 0;
-                        memset (buf, 0, bufSize);
                         }
                     }
                 buf[offset++] = ch;
                 if (offset == bufSize) {
                     error = memory_tape_add_block (tape, (uint8 *)buf, bufSize);
                     offset = 0;
-                    memset (buf, 0, bufSize);
                     }
                 crlast = FALSE;
                 }
@@ -4488,13 +4499,18 @@ while (!feof (f) && !error) {
                 if (offset == bufSize) {
                     error = memory_tape_add_block (tape, (uint8 *)buf, bufSize);
                     offset = 0;
-                    memset (buf, 0, bufSize);
                     }
                 }
             }
     }
-    if (offset != 0)
+    if (offset > 0) {
+        /* RSTS COPY to a DOS volume pads the last block with zeros     */
+        /* VMS EXCHANGE COPY /RECORD_FORMAT=STREAM and RSX-11 FLX /FA   */
+        /* output to a DOS volume do not                                */
+        /* DOS-11 ignores NULs in ASCII data transfer modes             */
+        memset (buf + offset, 0, bufSize - offset);
         error = memory_tape_add_block (tape, (uint8 *)buf, bufSize);
+        }
 
 return error;
 }
@@ -4517,8 +4533,8 @@ DOS11_HDR hdr;
 char fname[9], ext[3];
 const char *ptr;
 struct tm *tm;
-time_t now = time (NULL);
-uint16 today;
+time_t filetime;
+uint16 fileday;
 int year;
 
 /*
@@ -4526,12 +4542,13 @@ int year;
  * same calendar as the current year but will be in the 20th century so that
  * DOS/BATCH-11 will be able to interpret it correctly.
  */
-tm = localtime (&now);
+filetime = (time_t)filestat->st_ctime;
+tm = localtime (&filetime);
 year = tm->tm_year + 1900;
 while (year >= 2000)
     year -= 28;
 
-today = ((year - 70) * 1000) + tm->tm_yday + 1;
+fileday = 1000 * ((year - 70) % 100) + tm->tm_yday + 1;
 
 sprintf (FullPath, "%s%s", directory, filename);
 f = tape_open_and_check_file (FullPath);
@@ -4566,7 +4583,7 @@ hdr.ext = dos11_ascR50 (&ext[0]);
 hdr.prog = 1;
 hdr.proj = 1;
 hdr.prot = DOS11_PROT;
-hdr.date = today;
+hdr.date = fileday;
 hdr.fname3 = dos11_ascR50 (&fname[6]);
 
 memory_tape_add_block (tape, (uint8 *)&hdr, sizeof (hdr));
