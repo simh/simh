@@ -52,6 +52,19 @@
                 Bit 5-0 of second character are lower 6 bits
                         of card.
 
+    ASCII mode recognizes some additional forms of input which allows the
+    intermixing of binary cards with text cards. 
+
+    Lines beginning with ~raw are taken as a number of 4 digit octal values
+    with represent each column of the card from 12 row down to 9 row. If there
+    is not enough octal numbers to span a full card the remainder of the 
+    card will not be punched.
+
+    Also ~eor, will generate a 7/8/9 punch card. An ~eof will gernerate a
+    6/7/9 punch card, and a ~eoi will generate a 6/7/8/9 punch.
+
+    A single line of ~ will set the EOF flag when that card is read.
+
     For autodetection of card format, there can be no parity errors.
     All undeterminate formats are treated as ASCII.
 
@@ -1380,7 +1393,7 @@ t_stat sim_card_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, cons
         fprintf (st, "  sim> ATTACH {switches} %s carddeck\n\n", sim_uname (uptr));
     fprintf (st, "Attach command switches\n");
     fprintf (st, "    -F          Open the indicated card deck in a specific format (default\n");
-    fprintf (st, "                is AUTO, alternatives are BIN, TEXT, BCD and CBN)\n");
+    fprintf (st, "                is AUTO, alternatives are BIN, TEXT, BCD, CBN and EBCDIC)\n");
     if (punches != 0) {
         fprintf (st, "    -N          Create a new punch output file (default is to append to\n");
         fprintf (st, "                an existing file if it exists)\n");
