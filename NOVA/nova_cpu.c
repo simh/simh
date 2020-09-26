@@ -1316,7 +1316,7 @@ if ( hist )
     hist_ptr->ac1   = AC[ 1 ] ;
     hist_ptr->ac2   = AC[ 2 ] ;
     hist_ptr->ac3   = AC[ 3 ] ;
-    hist_ptr->carry = C ;
+    hist_ptr->carry = C >> 16 ;
     hist_ptr->fp    = FP ;
     hist_ptr->sp    = SP ;
     hist_ptr->devBusy    = dev_busy ;
@@ -1386,7 +1386,7 @@ if ( hptr )
         (hptr->ac1 & 0xFFFF),
         (hptr->ac2 & 0xFFFF),
         (hptr->ac3 & 0xFFFF),
-        ((hptr->carry) ? 1 : 0)
+        (hptr->carry & 1)
         ) ;
     if ( cpu_unit.flags & UNIT_STK  /* Nova 3 or Nova 4 */ ) 
         {
