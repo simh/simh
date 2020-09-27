@@ -1752,11 +1752,15 @@ for (i=(was_active_command ? sim_rem_cmd_active_line : 0);
                                             stat = sim_rem_collect_cmd_setup (i, &cptr);
                                             }
                                         else {
-                                            if (sim_con_stable_registers && 
-                                                sim_rem_master_mode) {  /* can we process command now? */
+                                            if ((sim_con_stable_registers &&    /* can we process command now? */
+                                                 sim_rem_master_mode) ||
+                                                (cmdp->action == &x_help_cmd)) {
                                                 sim_debug (DBG_CMD, &sim_remote_console, "Processing Command directly\n");
                                                 sim_oline = lp;         /* specify output socket */
-                                                sim_remote_process_command ();
+                                                if (cmdp->action == &x_help_cmd)
+                                                    x_help_cmd (0, cptr);
+                                                else
+                                                    sim_remote_process_command ();
                                                 stat = SCPE_OK;         /* any message has already been emitted */
                                                 }
                                             else {
