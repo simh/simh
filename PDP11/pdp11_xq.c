@@ -3373,9 +3373,10 @@ const char helpString[] =
      /****************************************************************************/
     "1 Dependencies\n"
 #if defined(_WIN32)
-    " The WinPcap package must be installed in order to enable\n"
+    " The NPcap or WinPcap package must be installed in order to enable\n"
     " communication with other computers on the local LAN.\n"
     "\n"
+    " The NPcap package is available from https://github.com/nmap/npcap\n"
     " The WinPcap package is available from http://www.winpcap.org/\n"
 #else
     " To build simulators with the ability to communicate to other computers\n"
@@ -3421,6 +3422,9 @@ const char helpString[] =
     " The other simulated Ethernet devices include:\n"
     "\n"
     "++DEUNA/DELUA  Unibus PDP11 and VAX simulators\n"
+    "++XS           VAX simulators\n"
+    "++NI           AT&T 3b2 simulator\n"
+    "++NIA-20       KL10 simulator\n"
     "\n"
     ;
 return scp_help (st, dptr, uptr, flag, helpString, cptr);
