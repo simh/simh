@@ -2318,7 +2318,8 @@ tmxr_debug_trace_line (lp, "tmxr_putc_ln()");
 if ((lp->xmte == 0) && (TXBUF_AVAIL(lp) > 1) &&
     ((lp->txbps == 0) || (lp->txnexttime <= sim_gtime ())))
     lp->xmte = 1;                                       /* enable line transmit */
-if ((lp->txbfd && !lp->notelnet) || (TXBUF_AVAIL(lp) > 1)) {/* room for char (+ IAC)? */
+if ((lp->conn && (TXBUF_AVAIL(lp) > 1)) ||              /* connected and room for char (+ IAC)? OR */
+    (!lp->conn && !lp->notelnet && lp->txbfd)) {        /* not connected and buffered ? */
     if ((TN_IAC == (u_char) chr) && (!lp->notelnet))    /* char == IAC in telnet session? */
         TXBUF_CHAR (lp, TN_IAC);                        /* stuff extra IAC char */
     TXBUF_CHAR (lp, chr);                               /* buffer char & adv pointer */
