@@ -3455,12 +3455,12 @@ t_stat help_cmd_output (int32 flag, const char *help, const char *help_base)
 switch (help[0]) {
     case '*':
         scp_help (stdout, NULL, NULL, flag, help_base ? help_base : simh_help, help+1);
-        if (sim_log)
+        if (sim_log && (!sim_oline))
             scp_help (sim_log, NULL, NULL, flag | SCP_HELP_FLAT, help_base ? help_base : simh_help, help+1);
         break;
     default:
         fputs (help, stdout);
-        if (sim_log)
+        if (sim_log && (!sim_oline))
             fputs (help, sim_log);
         break;
     }
@@ -3511,7 +3511,7 @@ if (*cptr) {
                         dptr = find_dev (gbuf);
                     if (dptr != NULL) {
                         r = help_dev_help (stdout, dptr, uptr, flag, (cmdp->action == &set_cmd) ? "SET" : "SHOW");
-                        if (sim_log)
+                        if (sim_log && (!sim_oline))
                             help_dev_help (sim_log, dptr, uptr, flag | SCP_HELP_FLAT, (cmdp->action == &set_cmd) ? "SET" : "SHOW");
                         return r;
                         }
@@ -3564,7 +3564,7 @@ if (*cptr) {
                     if (((cmdp->action == &exdep_cmd) || (0 == strcmp(cmdp->name, "BOOT"))) &&
                         sim_dflt_dev->help) {
                             sim_dflt_dev->help (stdout, sim_dflt_dev, sim_dflt_dev->units, 0, cmdp->name);
-                            if (sim_log)
+                            if (sim_log && (!sim_oline))
                                 sim_dflt_dev->help (sim_log, sim_dflt_dev, sim_dflt_dev->units, 0, cmdp->name);
                         }
                     }
@@ -3596,14 +3596,14 @@ if (*cptr) {
         if (dptr->flags & DEV_DIS)
             sim_printf ("Device %s is currently disabled\n", dptr->name);
         r = help_dev_help (stdout, dptr, uptr, flag, cptr);
-        if (sim_log)
+        if (sim_log && (!sim_oline))
             help_dev_help (sim_log, dptr, uptr, flag | SCP_HELP_FLAT, cptr);
         return r;
         }
     }
 else {
     fprint_help (stdout);
-    if (sim_log)
+    if (sim_log && (!sim_oline))
         fprint_help (sim_log);
     }
 return SCPE_OK;
@@ -9498,7 +9498,7 @@ for (i = a = 0; a < lim; ) {
     sim_printf ("%d:\t", a);
     if ((r = fprint_sym (stdout, a, &sim_eval[i], dptr->units, sim_switches)) > 0)
         r = fprint_val (stdout, sim_eval[i], rdx, dptr->dwidth, PV_RZRO);
-    if (sim_log) {
+    if (sim_log && (!sim_oline)) {
         if ((r = fprint_sym (sim_log, a, &sim_eval[i], dptr->units, sim_switches)) > 0)
             r = fprint_val (sim_log, sim_eval[i], rdx, dptr->dwidth, PV_RZRO);
         }
@@ -13692,9 +13692,9 @@ if (sim_mfile || (sim_deb && (f == sim_deb))) {
     }
 else {
     va_start (args, fmt);
-    if (sim_oline)
+    if (sim_oline)  /* output to tmxr socket if it is defined */
         tmxr_linemsgvf (sim_oline, fmt, args);
-    else
+    else            /* otherwise, output to provided file stream */
         ret = vfprintf (f, fmt, args);
     va_end (args);
     }
@@ -14276,7 +14276,7 @@ flat_help = flat_help || !sim_ttisatty() || (flag & SCP_HELP_FLAT);
 
 if (flat_help) {
     flag |= SCP_HELP_FLAT;
-    if (sim_ttisatty())
+    if (sim_ttisatty() && (!sim_oline))
         fprintf (st, "%s help.\nThis help is also available in hierarchical form.\n", top.title);
     else
         fprintf (st, "%s help.\n", top.title);
