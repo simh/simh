@@ -1,6 +1,6 @@
 /* nova_cpu.c: NOVA CPU simulator
 
-   Copyright (c) 1993-2017, Robert M. Supnik
+   Copyright (c) 1993-2020, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          Nova central processor
 
+   03-Oct-20    RMS     Fixed bug in history handling of C bit (Samuel Deutsch)
    07-Sep-17    RMS     Fixed sim_eval declaration in history routine (COVERITY)
    17-Mar-13    RMS     Added clarifying brances to IND_STEP macro (Dave Bryan)
    04-Jul-07    BKR     DEV_SET/CLR macros now used,
@@ -1316,7 +1317,7 @@ if ( hist )
     hist_ptr->ac1   = AC[ 1 ] ;
     hist_ptr->ac2   = AC[ 2 ] ;
     hist_ptr->ac3   = AC[ 3 ] ;
-    hist_ptr->carry = C ;
+    hist_ptr->carry = C >> 16 ;
     hist_ptr->fp    = FP ;
     hist_ptr->sp    = SP ;
     hist_ptr->devBusy    = dev_busy ;
@@ -1388,7 +1389,7 @@ if ( hptr )
         (hptr->ac1 & 0xFFFF),
         (hptr->ac2 & 0xFFFF),
         (hptr->ac3 & 0xFFFF),
-        ((hptr->carry) ? 1 : 0)
+        (hptr->carry & 1)
         ) ;
     if ( cpu_unit.flags & UNIT_STK  /* Nova 3 or Nova 4 */ ) 
         {
