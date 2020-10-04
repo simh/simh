@@ -1,6 +1,6 @@
 /* sim_rev.h: simulator revisions and current rev level
 
-   Copyright (c) 1993-2012, Robert M Supnik
+   Copyright (c) 1993-2020, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -46,8 +46,11 @@ patch   date            module(s) and fix(es)
                         - changed sim_vm_init to build time option (Dave Bryan)
                         - flush stdout after prompt (Mark Pizzolato)
 
+                        nova_cpu.c
+                        - fixed bug in history handling of C bit (Samuel Deutsch)
+
                         pdp10_tu.c
-                        - fixed bad macro (Mark Pizzolata)
+                        - fixed bad macro (Mark Pizzolato)
 
                         pdp11_cpumod.c
                         - fixed KDJ11E programmable rate select (Paul Koning)
