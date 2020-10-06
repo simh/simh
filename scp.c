@@ -654,6 +654,7 @@ static t_bool sim_if_cmd_last[MAX_DO_NEST_LVL+1];
 static t_bool sim_if_result[MAX_DO_NEST_LVL+1];
 static t_bool sim_if_result_last[MAX_DO_NEST_LVL+1];
 static t_bool sim_cptr_is_action[MAX_DO_NEST_LVL+1];
+static DEVICE *sim_failed_reset_dptr = NULL;
 
 t_stat sim_last_cmd_stat;                               /* Command Status */
 struct timespec cmd_time;                               /*  */
@@ -2764,8 +2765,8 @@ if ((sim_eval = (t_value *) calloc (sim_emax, sizeof (t_value))) == NULL) {
 if (sim_dflt_dev == NULL)                               /* if no default */
     sim_dflt_dev = sim_devices[0];
 if ((stat = reset_all_p (0)) != SCPE_OK) {
-    fprintf (stderr, "Fatal simulator initialization error\n%s\n",
-        sim_error_text (stat));
+    fprintf (stderr, "Fatal simulator initialization error\nDevice %s initial reset call returned: %s\n",
+        sim_failed_reset_dptr->name, sim_error_text (stat));
     if (sim_ttisatty())
         read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
     return EXIT_FAILURE;
@@ -7303,8 +7304,10 @@ for (i = start; (dptr = sim_devices[i]) != NULL; i++) {
         }
     if (dptr->reset != NULL) {
         reason = dptr->reset (dptr);
-        if (reason != SCPE_OK)
+        if (reason != SCPE_OK) {
+            sim_failed_reset_dptr = dptr;
             return reason;
+            }
         }
     }
 for (i = 0; sim_internal_device_count && (dptr = sim_internal_devices[i]); ++i) {
