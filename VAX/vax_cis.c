@@ -1,6 +1,6 @@
 /* vax_cis.c: VAX CIS instructions
 
-   Copyright (c) 2004-2019, Robert M Supnik
+   Copyright (c) 2004-2020, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    On a full VAX, this module simulates the VAX commercial instruction set (CIS).
    On a subset VAX, this module implements the emulated instruction fault.
 
+   07-Oct-20    RMS     Silence bogus gcc warnings (Mark Pizzolato)
    03-May-19    RMS     Documnted fall through cases (COVERITY)
    30-May-16    RMS     Fixed WordLshift FOR REAL
    16-Oct-08    RMS     Fixed bug in ASHP left overflow calc (Word/NibbleLshift)
@@ -1046,6 +1047,7 @@ switch (opc) {                                          /* case on opcode */
                     RSVD_OPND_FAULT;
                 pop = pop & ~EO_RPT_MASK;               /* isolate op */
                 }
+            else rpt = 1;
             switch (pop) {                              /* case on op */
 
             case EO_END_FLOAT:                          /* end float */
@@ -1214,7 +1216,7 @@ return cc;
 
 int32 ReadDstr (int32 lnt, int32 adr, DSTR *src, int32 acc)
 {
-int32 c, i, end, t;
+int32 c, i, end, t = 0;
 
 *src = Dstr_zero;                                       /* clear result */
 end = lnt / 2;                                          /* last byte */
