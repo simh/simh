@@ -2689,7 +2689,7 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
         if (get_switches (argv[i], &sw, NULL) == SW_ERROR) {
             fprintf (stderr, "Invalid switch %s\n", argv[i]);
             free (targv);
-            return 0;
+            return EXIT_FAILURE;
             }
         sim_switches = sim_switches | sw;
         }
@@ -2697,7 +2697,7 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
         if ((strlen (argv[i]) + strlen (cbuf) + 3) >= sizeof(cbuf)) {
             fprintf (stderr, "Argument string too long\n");
             free (targv);
-            return 0;
+            return EXIT_FAILURE;
             }
         if (*cbuf)                                      /* concat args */
             strlcat (cbuf, " ", sizeof (cbuf)); 
@@ -2741,6 +2741,7 @@ if (sim_timer_init ()) {
     fprintf (stderr, "Fatal timer initialization error\n");
     if (sim_ttisatty())
         read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
+    free (targv);
     return EXIT_FAILURE;
     }
 sim_register_internal_device (&sim_scp_dev);
@@ -2754,12 +2755,14 @@ if ((stat = sim_ttinit ()) != SCPE_OK) {
         sim_error_text (stat));
     if (sim_ttisatty())
         read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
+    free (targv);
     return EXIT_FAILURE;
     }
 if ((sim_eval = (t_value *) calloc (sim_emax, sizeof (t_value))) == NULL) {
     fprintf (stderr, "Unable to allocate examine buffer\n");
     if (sim_ttisatty())
         read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
+    free (targv);
     return EXIT_FAILURE;
     };
 if (sim_dflt_dev == NULL)                               /* if no default */
@@ -2769,6 +2772,7 @@ if ((stat = reset_all_p (0)) != SCPE_OK) {
         sim_failed_reset_dptr->name, sim_error_text (stat));
     if (sim_ttisatty())
         read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
+    free (targv);
     return EXIT_FAILURE;
     }
 if (register_check) {
@@ -2779,17 +2783,21 @@ if (register_check) {
         sim_printf ("Simulator device register sanity check error\n");
         if (sim_ttisatty())
             read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
+        free (targv);
         return EXIT_FAILURE;
         }
     sim_printf ("*** Good Registers in %s simulator.\n", sim_name);
-    if (argc < 2)                                   /* No remaining command arguments? */
+    if (argc < 2) {                                 /* No remaining command arguments? */
+        free (targv);
         return EXIT_SUCCESS;                        /* then we're done */
+        }
     }
 if ((stat = sim_brk_init ()) != SCPE_OK) {
     fprintf (stderr, "Fatal breakpoint table initialization error\n%s\n",
         sim_error_text (stat));
     if (sim_ttisatty())
         read_line_p ("Hit Return to exit: ", cbuf, sizeof (cbuf) - 1, stdin);
+    free (targv);
     return EXIT_FAILURE;
     }
 /* always check for register definition problems */
@@ -2867,7 +2875,7 @@ return sim_exit_status;
 t_stat process_stdin_commands (t_stat stat, char *argv[], t_bool do_called)
 {
 char cbuf[4*CBUFSIZE], gbuf[CBUFSIZE];
-CONST char *cptr;
+CONST char *cptr = NULL;
 t_stat stat_nomessage;
 CTAB *cmdp = NULL;
 
@@ -4639,12 +4647,12 @@ t_stat assert_cmd (int32 flag, CONST char *cptr)
 char gbuf[CBUFSIZE], gbuf2[CBUFSIZE];
 CONST char *tptr, *gptr;
 REG *rptr;
-uint32 idx;
+uint32 idx = 0;
 t_stat r;
 t_bool Not = FALSE;
 t_bool Exist = FALSE;
 t_bool result;
-t_addr addr;
+t_addr addr = 0;
 t_stat reason;
 
 cptr = (CONST char *)get_sim_opt (CMD_OPT_SW|CMD_OPT_DFT, (CONST char *)cptr, &r);  
@@ -4771,7 +4779,8 @@ else {
                     return SCPE_ARG;
                 gptr = tptr;                                /* update */
                 }
-            else idx = 0;                                   /* not array */
+            else
+                idx = 0;                                    /* not array */
             if (idx >= rptr->depth)                         /* validate subscript */
                 return SCPE_SUB;
             }
@@ -10797,7 +10806,7 @@ SCHTAB *get_asearch (CONST char *cptr, int32 radix, SCHTAB *schptr)
 {
 int32 c, logop, cmpop;
 t_value *logval, *cmpval;
-t_stat reason;
+t_stat reason = SCPE_OK;
 CONST char *ocptr = cptr;
 const char *sptr;
 char gbuf[CBUFSIZE];
@@ -12656,7 +12665,7 @@ return SCPE_OK;
 t_stat sim_exp_check (EXPECT *exp, uint8 data)
 {
 int32 i;
-EXPTAB *ep;
+EXPTAB *ep = NULL;
 int regex_checks = 0;
 char *tstr = NULL;
 

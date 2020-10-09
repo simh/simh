@@ -1908,7 +1908,7 @@ static void *
 _eth_writer(void *arg)
 {
 ETH_DEV* volatile dev = (ETH_DEV*)arg;
-ETH_WRITE_REQUEST *request;
+ETH_WRITE_REQUEST *request = NULL;
 
 /* Boost Priority for this I/O thread vs the CPU instruction execution 
    thread which in general won't be readily yielding the processor when 
@@ -4272,7 +4272,6 @@ ETH_MAC filter_address[3] = {
     {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
   };
 int addr_count;
-ETH_MAC physical_addr = {0x04, 0x05, 0x06, 0x07, 0x08, 0x09};
 ETH_MAC host_nic_phy_hw_addr = {0x02, 0x03, 0x04, 0x05, 0x06, 0x07};
 ETH_MAC *host_phy_addr_list[2] = {&host_nic_phy_hw_addr, NULL};
 int host_phy_addr_listindex;

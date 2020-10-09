@@ -1671,7 +1671,6 @@ return SCPE_IOERR;
 
 static t_stat rstsLoadAndScanSATT(rstsContext *context, uint16 uaa, uint16 uar, t_offset *result)
 {
-t_offset blocks = 0;
 uint8 bitmap[8192];
 int i, j;
 RSTS_ACNT acnt;
@@ -2080,6 +2079,7 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
 
             /* Construct a pseudo simh disk footer*/
             memcpy (f->Signature, "simh", 4);
+            f->DriveType[sizeof (f->DriveType) - 1] = '\0'; /* Force NUL termination */
             strncpy ((char *)f->DriveType, sim_vhd_disk_get_dtype (uptr->fileref, &f->SectorSize, &f->TransferElementSize, (char *)f->CreatingSimulator, &creation_time), sizeof (f->DriveType) - 1);
             f->SectorSize = NtoHl (f->SectorSize);
             f->TransferElementSize = NtoHl (f->TransferElementSize);
@@ -2146,6 +2146,7 @@ f = (struct simh_disk_footer *)calloc (1, sizeof (*f));
 f->AccessFormat = DK_GET_FMT (uptr);
 total_sectors = (((t_offset)uptr->capac) * ctx->capac_factor * ((dptr->flags & DEV_SECTORS) ? 512 : 1)) / ctx->sector_size;
 memcpy (f->Signature, "simh", 4);
+f->CreatingSimulator[sizeof (f->CreatingSimulator) - 1] = '\0';  /* Force NUL termination */
 strncpy ((char *)f->CreatingSimulator, sim_name, sizeof (f->CreatingSimulator) - 1);
 strncpy ((char *)f->DriveType, dtype, sizeof (f->DriveType) - 1);
 f->SectorSize = NtoHl (ctx->sector_size);
@@ -4736,6 +4737,7 @@ memset (hVHD->Footer.DriveType, '\0', sizeof hVHD->Footer.DriveType);
 memcpy (hVHD->Footer.DriveType, dtype, ((1+strlen (dtype)) < sizeof (hVHD->Footer.DriveType)) ? (1+strlen (dtype)) : sizeof (hVHD->Footer.DriveType));
 hVHD->Footer.DriveSectorSize = NtoHl (SectorSize);
 hVHD->Footer.DriveTransferElementSize = NtoHl (xfer_element_size);
+hVHD->Footer.CreatingSimulator[sizeof (hVHD->Footer.CreatingSimulator) - 1] = '\0';  /* Force NUL termination */
 strncpy ((char *)hVHD->Footer.CreatingSimulator, sim_name, sizeof (hVHD->Footer.CreatingSimulator) - 1);
 hVHD->Footer.Checksum = 0;
 hVHD->Footer.Checksum = NtoHl (CalculateVhdFooterChecksum (&hVHD->Footer, sizeof(hVHD->Footer)));
