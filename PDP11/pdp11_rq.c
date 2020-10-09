@@ -2874,7 +2874,6 @@ return SCPE_OK;
 
 t_stat rq_set_plug (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-MSC *cp = rq_ctxmap[uptr->cnum];
 int32 plug;
 uint32 i;
 t_stat r;

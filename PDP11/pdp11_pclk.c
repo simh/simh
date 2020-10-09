@@ -371,10 +371,7 @@ return val;
 
 t_stat pclk_svc (UNIT *uptr)
 {
-int32 rv;
-
 sim_debug (DBG_TICK, &pclk_dev, "pclk_svc()\n");
-rv = CSR_GETRATE (pclk_csr);                            /* get rate */
 if (pclk_csr & CSR_DONE)                                /* done already set? */
     pclk_csr = pclk_csr | CSR_ERR;                      /* set error */
 else

@@ -1049,6 +1049,8 @@ switch (opc) {                                          /* case on opcode */
                     RSVD_OPND_FAULT(EDITPC);
                 pop = pop & ~EO_RPT_MASK;               /* isolate op */
                 }
+            else
+                rpt = 1;
             switch (pop) {                              /* case on op */
 
             case EO_END_FLOAT:                          /* end float */
@@ -1217,7 +1219,7 @@ return cc;
 
 int32 ReadDstr (int32 lnt, int32 adr, DSTR *src, int32 acc)
 {
-int32 c, i, end, t;
+int32 c, i, end, t = 0;
 
 *src = Dstr_zero;                                       /* clear result */
 end = lnt / 2;                                          /* last byte */

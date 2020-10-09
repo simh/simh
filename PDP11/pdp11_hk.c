@@ -1073,7 +1073,7 @@ t_stat hk_svc (UNIT *uptr)
 {
 int32 i, t, dc, fnc;
 t_seccnt sectsread;
-t_stat err;
+t_stat err = 0;
 int32 wc, awc, da;
 uint32 drv, ba;
 uint16 comp;

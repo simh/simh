@@ -1069,8 +1069,6 @@ return SCPE_OK;
 
 t_stat rl_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-int32 dtype = GET_DTYPE (val);
-
 if ((val < 0) || (cptr && *cptr))
     return SCPE_ARG;
 if (uptr->flags & UNIT_ATT)

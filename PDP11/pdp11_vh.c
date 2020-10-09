@@ -835,8 +835,6 @@ return TX_FIFO_SIZE - lp->txfifo_cnt;
 static int32 tx_fifo_put ( TMLX    *lp,
             int32   data    )
 {
-    int32   status = 0;
-
     if (tx_fifo_free_count (lp) == 0)
         return -1;
     lp->txfifo[(lp->txfifo_idx + lp->txfifo_cnt) % TX_FIFO_SIZE] = data;

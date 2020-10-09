@@ -1313,7 +1313,7 @@ t_stat xq_process_mop(CTLR* xq)
     return SCPE_NOFNC;
 
   while ((meb->type != 0) && (meb < limit)) {
-    address = (meb->add_hi << 16) || (meb->add_mi << 8) || meb->add_lo;
+    address = (meb->add_hi << 16) | (meb->add_mi << 8) | meb->add_lo;
 
     /* MOP stuff here - NOT YET FULLY IMPLEMENTED */
     sim_debug (DBG_WRN, xq->dev, "Processing MEB type: %d\n", meb->type);
@@ -3147,7 +3147,6 @@ t_stat xq_boot (int32 unitno, DEVICE *dptr)
 {
 #ifdef VM_PDP11
 size_t i;
-DIB *dib = (DIB *)dptr->ctxt;
 extern int32 REGFILE[6][2];                 /* R0-R5, two sets */
 
 for (i = 0; i < BOOT_LEN; i++)

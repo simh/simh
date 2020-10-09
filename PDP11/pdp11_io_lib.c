@@ -879,11 +879,9 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
 
 static void build_vector_tab (void)
 {
-int32 ilvl, ibit;
 static t_bool done = FALSE;
 AUTO_CON *autp;
 DEVICE *dptr;
-DIB *dibp;
 uint32 j, k;
 
 if (done)
@@ -895,10 +893,13 @@ for (j = 0; (dptr = sim_devices[j]) != NULL; j++) {
     for (autp = auto_tab; autp->valid >= 0; autp++) {
         for (k=0; autp->dnam[k]; k++) {
             if (!strcmp(dptr->name, autp->dnam[k])) {
+#if (VEC_SET != 0)
+                int32 ilvl, ibit;
+                DIB *dibp;
+
                 dibp = (DIB *)dptr->ctxt;
                 ilvl = dibp->vloc / 32;
                 ibit = dibp->vloc % 32;
-#if (VEC_SET != 0)
                 if (1) {
                     int v;
                     
@@ -918,7 +919,7 @@ t_stat auto_config (const char *name, int32 nctrl)
 {
 uint32 csr = IOPAGEBASE + AUTO_CSRBASE;
 uint32 vec = AUTO_VECBASE;
-int32 ilvl, ibit, numc;
+int32 numc;
 AUTO_CON *autp;
 DEVICE *dptr;
 DIB *dibp;
@@ -962,8 +963,6 @@ for (autp = auto_tab; autp->valid >= 0; autp++) {       /* loop thru table */
         if (dibp == NULL)                               /* not there??? */
             return SCPE_IERR;
         numc = dibp->numc ? dibp->numc : 1;
-        ilvl = dibp->vloc / 32;
-        ibit = dibp->vloc % 32;
         /* Identify how many devices earlier in the device list are 
            enabled and use that info to determine fixed address assignments */
         for (k=jena=0; k<j; k++) {
