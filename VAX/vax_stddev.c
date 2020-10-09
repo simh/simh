@@ -499,7 +499,7 @@ if (val.tv_sec >= TOY_MAX_SECS) {                       /* todr overflowed? */
     }
 
 sim_debug (DBG_REG, &clk_dev, "todr_rd() - TODR=0x%X\n", (int32)(val.tv_sec*100 + val.tv_nsec/10000000));
-return (int32)(val.tv_sec*100 + val.tv_nsec/10000000);  /* 100hz Clock Ticks */
+return (int32)(val.tv_sec*100 + (val.tv_nsec + 5000000)/10000000);  /* 100hz Clock rounded Ticks */
 }
 
 
@@ -518,11 +518,16 @@ if (data) {
     val.tv_nsec = (((uint32)data) % 100) * 10000000;
     sim_timespec_diff (&base, &now, &val);                  /* base = now - data */
     toy->toy_gmtbase = (uint32)base.tv_sec;
-    toy->toy_gmtbasemsec = base.tv_nsec/1000000;
+    toy->toy_gmtbasemsec = (base.tv_nsec + 500000)/1000000;
     }
 else {                                                      /* stop the clock */
     toy->toy_gmtbase = 0;
     toy->toy_gmtbasemsec = 0;
+    }
+if (clk_unit.flags & UNIT_ATT) {                            /* OS Agnostic mode? */
+    rewind (clk_unit.fileref);
+    fwrite (toy, sizeof (*toy), 1, clk_unit.fileref);       /* Save sync time info */
+    fflush (clk_unit.fileref);
     }
 todr_reg = data;
 sim_debug (DBG_REG, &clk_dev, "todr_wr(0x%X) - TODR=0x%X blow=%d\n", data, todr_reg, todr_blow);
@@ -556,7 +561,7 @@ else {                                                  /* Not-Attached means */
             ctm->tm_min) * 60) +
             ctm->tm_sec;
     todr_wr ((base * 100) + 0x10000000 +                /* use VMS form */
-             (int32)(now.tv_nsec / 10000000));
+             (int32)((now.tv_nsec + 5000000)/ 10000000));
     }
 return SCPE_OK;
 }
