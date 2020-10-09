@@ -727,33 +727,26 @@ static int32 pmmi_reg2(int32 io, int32 data)
 static int32 pmmi_reg3(int32 io, int32 data)
 {
     PMMI_CTX *xptr;
-    int32 r,s;
-
+    int32 s;
     xptr = pmmi_dev.ctxt;
-
     if (io == IO_RD) {
-        r = xptr->intmsk = xptr->oreg2;
+        xptr->intmsk = xptr->oreg2;  /* Load int mask from rate generator */
     } else {
         xptr->oreg3 = data;
-
         /* Set/Clear DTR */
         s = TMXR_MDM_DTR | ((pmmi_dev.units[0].flags & UNIT_PMMI_RTS) ? TMXR_MDM_RTS : 0);
-
         if (data & PMMI_DTR) {
             tmxr_set_get_modem_bits(xptr->tmln, s, 0, NULL);
             if (xptr->oreg0 & PMMI_SH) {
                 xptr->ireg2 &= ~PMMI_AP;   /* Answer Phone Bit (active low) */
             }
-            sim_debug(STATUS_MSG, &pmmi_dev, "set DTR HIGH s=%04X.\n", s);
+            sim_debug(STATUS_MSG, &pmmi_dev, "set DTR HIGH.\n");
         } else {
             tmxr_set_get_modem_bits(xptr->tmln, 0, s, NULL);
             xptr->ireg2 |= PMMI_AP;
-            sim_debug(STATUS_MSG, &pmmi_dev, "set DTR LOW. s=%04X\n", s);
+            sim_debug(STATUS_MSG, &pmmi_dev, "set DTR LOW.\n");
         }
     }
-
-    r = 0x00;
-
-    return(r);
+    return 0x00;
 }
 
