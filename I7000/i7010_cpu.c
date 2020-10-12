@@ -562,12 +562,12 @@ sim_instr(void)
     t_stat              reason;
     uint16              t;
     int                 temp;
-    int32               STAR;
+    int32               STAR = 0;
     uint8               op, op_info;
     int                 state;
-    uint8               ix;
+    uint8               ix = 0;
     uint8               br;
-    uint8               ar;
+    uint8               ar = 0;
     int                 sign, qsign;
     uint8               ch;
     int                 cy;
@@ -3759,9 +3759,7 @@ do_divide()
 t_stat
 rtc_srv(UNIT * uptr)
 {
-    int32         t;
-
-    t = sim_rtcn_calb (rtc_tps, TMR_RTC);
+    (void)sim_rtcn_calb (rtc_tps, TMR_RTC);
     sim_activate_after(uptr, 1000000/rtc_tps);
 
     if (timer_enable) {

@@ -218,7 +218,7 @@ uint16              stop_flags = 0;             /* Stop on error */
 uint16              selreg;                     /* Last select address */
 uint16              selreg2;                    /* RWW select address */
 int                 chwait;                     /* Channel wait register */
-uint8               ioflags[5000/8] = {0};      /* IO Error flags */
+uint8               ioflags[6200/8] = {0};      /* IO Error flags */
 uint16              irqflags;                   /* IRQ Flags */
 uint8               lpr_chan9[NUM_CHAN];        /* Line printer Channel 9 flag */
 uint8               bkcmp = 0;                  /* Backwords compare */

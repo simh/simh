@@ -184,6 +184,8 @@ set_chan(UNIT * uptr, int32 val, CONST char *cptr, void *desc)
         return SCPE_IERR;
 
     chan = UNIT_G_CHAN(uptr->flags);
+    if (chan >= NUM_CHAN)
+       chan = 0;
     dibp = (DIB *) dptr->ctxt;
 
     if (dibp == NULL)

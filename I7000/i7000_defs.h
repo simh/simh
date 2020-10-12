@@ -272,9 +272,9 @@ extern DEBTAB crd_debug[];
 /* I/O routine functions */
 /* Channel half of controls */
 /* Channel status */
-extern uint32   chan_flags[NUM_CHAN];           /* Channel flags */
-extern const char *chname[11];                  /* Channel names */
-extern int      num_devs[NUM_CHAN];             /* Number devices per channel*/
+extern uint32   chan_flags[NUM_CHAN];         /* Channel flags */
+extern const char *chname[11];                /* Channel names */
+extern int      num_devs[NUM_CHAN];           /* Number devices per channel*/
 extern uint8    lpr_chan9[NUM_CHAN];
 #ifdef I7010
 extern uint8    lpr_chan12[NUM_CHAN];
