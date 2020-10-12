@@ -100,8 +100,6 @@ DEVICE mty_dev = {
 
 static t_stat mty_devio(uint32 dev, uint64 *data)
 {
-    DEVICE *dptr = &mty_dev;
-    TMLN *lp;
     int line;
     uint64 word;
 
@@ -134,7 +132,6 @@ static t_stat mty_devio(uint32 dev, uint64 *data)
         word = *data;
         sim_debug(DEBUG_DATAIO, &mty_dev, "DATAO line %d -> %012llo\n",
                   line, word);
-        lp = &mty_ldsc[line];
         mty_output_word[line] = word | MTY_FIRST;
         mty_active_bitmask |= 1 << line;
         sim_activate_abs (&mty_unit[1], 0);
@@ -142,7 +139,6 @@ static t_stat mty_devio(uint32 dev, uint64 *data)
         break;
     case DATAI:
         line = (status & MTY_LINE) >> 12;
-        lp = &mty_ldsc[line];
         *data = mty_input_character;
         sim_debug(DEBUG_DATAIO, &mty_dev, "DATAI line %d -> %012llo\n",
                   line, *data);

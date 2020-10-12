@@ -171,8 +171,6 @@ t_stat imx_reset (DEVICE *dptr)
 
 t_stat imx_devio(uint32 dev, uint64 *data)
 {
-    DEVICE *dptr = &imx_dev;
-
     switch(dev & 07) {
     case CONO|4:
         sim_debug(DEBUG_CONO, &imx_dev, "%06llo\n", *data);

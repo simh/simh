@@ -743,7 +743,6 @@ imp_devirq(uint32 dev, t_addr addr) {
 
 t_stat imp_srv(UNIT * uptr)
 {
-    DEVICE *dptr = find_dev_from_unit(uptr);
     int     i;
     int     l;
 
@@ -1017,7 +1016,6 @@ imp_packet_in(struct imp_device *imp)
            if (ip_hdr->ip_dst == imp_data.ip && imp_data.hostip != 0) {
                uint8   *payload = (uint8 *)(&imp->rbuffer[pad +
                                            (ip_hdr->ip_v_hl & 0xf) * 4]);
-               uint16   chk = ip_hdr->ip_sum;
                /* If TCP packet update the TCP checksum */
                if (ip_hdr->ip_p == TCP_PROTO) {
                    struct tcp *tcp_hdr = (struct tcp *)payload;

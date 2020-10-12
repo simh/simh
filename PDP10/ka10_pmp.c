@@ -968,7 +968,6 @@ pmp_startcmd() {
 void
 pmp_adjpos(UNIT * uptr)
 {
-    uint16              addr = GET_UADDR(uptr->flags);
     struct pmp_t      *data = (struct pmp_t *)(uptr->DATAPTR);
     uint8               *rec;
     int                 pos;
@@ -2138,7 +2137,6 @@ int
 pmp_format(UNIT * uptr, int flag) {
     struct pmp_header  hdr;
     struct pmp_t       *data;
-    uint16              addr = GET_UADDR(uptr->flags);
     int                 type = GET_TYPE(uptr->flags);
     int                 tsize;
     int                 cyl;
@@ -2295,7 +2293,6 @@ pmp_detach(UNIT * uptr)
 {
     struct pmp_t       *data = (struct pmp_t *)uptr->DATAPTR;
     int                 type = GET_TYPE(uptr->flags);
-    uint16              addr = GET_UADDR(uptr->flags);
     int                 cmd = uptr->CMD & 0x7f;
 
     if (uptr->CMD & DK_CYL_DIRTY) {
@@ -2403,7 +2400,6 @@ pmp_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag,
     fprintf (st, ".\nEach drive has the following storage capacity:\n\n");
     for (i = 0; disk_type[i].name != 0; i++) {
         int32 size = disk_type[i].bpt * disk_type[i].heads * disk_type[i].cyl;
-        char  sm = 'K';
         size /= 1024;
         size = (10 * size) / 1024;
         fprintf(st, "      %-8s %4d.%1dMB\n", disk_type[i].name, size/10, size%10);
