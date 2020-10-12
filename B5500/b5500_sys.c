@@ -179,163 +179,163 @@ sim_load(FILE * fileref, CONST char *cptr, CONST char *fnam, int flag)
 /* Opcodes */
 t_opcode  word_ops[] = {
 /* Word mode opcodes */
-        WMOP_LITC,      TYPE_D, "LITC", /* Load literal */
-        WMOP_OPDC,      TYPE_D, "OPDC", /* Load operand */
-        WMOP_DESC,      TYPE_D, "DESC", /* Load Descriptor */
-        WMOP_DEL,       TYPE_A, "DEL",  /* Delete top of stack */
-        WMOP_NOP,       TYPE_A, "NOP",  /* Nop operation */
-        WMOP_XRT,       TYPE_A, "XRT",  /* Set Variant */
-        WMOP_ADD,       TYPE_A, "ADD",  /* Add */
-        WMOP_DLA,       TYPE_A, "DLA",  /* Double Precision Add */
-        WMOP_PRL,       TYPE_A, "PRL",  /* Program Release */
-        WMOP_LNG,       TYPE_A, "LNG",  /* Logical Negate */
-        WMOP_CID,       TYPE_A, "CID",  /* Conditional Integer Store Destructive */
-        WMOP_GEQ,       TYPE_A, "GEQ",  /* B greater than or equal to A */
-        WMOP_BBC,       TYPE_A, "BBC",  /* Branch Backward Conditional */
-        WMOP_BRT,       TYPE_A, "BRT",  /* Branch Return */
-        WMOP_INX,       TYPE_A, "INX",  /* Index */
-        WMOP_ITI,       TYPE_A, "ITI",  /* Interrogate interrupt */
-        WMOP_LOR,       TYPE_A, "LOR",  /* Logical Or */
-        WMOP_CIN,       TYPE_A, "CIN",  /* Conditional Integer Store non-destructive */
-        WMOP_GTR,       TYPE_A, "GTR",  /* B Greater than A */
-        WMOP_BFC,       TYPE_A, "BFC",  /* Branch Forward Conditional */
-        WMOP_RTN,       TYPE_A, "RTN",  /* Return normal */
-        WMOP_COC,       TYPE_A, "COC",  /* Construct Operand Call */
-        WMOP_SUB,       TYPE_A, "SUB",  /* Subtract */
-        WMOP_DLS,       TYPE_A, "DLS",  /* Double Precision Subtract */
-        WMOP_MUL,       TYPE_A, "MUL",  /* Multiply */
-        WMOP_DLM,       TYPE_A, "DLM",  /* Double Precision Multiply */
-        WMOP_RTR,       TYPE_A, "RTR",  /* Read Timer */
-        WMOP_LND,       TYPE_A, "LND",  /* Logical And */
-        WMOP_STD,       TYPE_A, "STD",  /* B Store Destructive */
-        WMOP_NEQ,       TYPE_A, "NEQ",  /* B Not equal to A */
-        WMOP_SSN,       TYPE_A, "SSN",  /* Set Sign Bit */
-        WMOP_XIT,       TYPE_A, "XIT",  /* Exit */
-        WMOP_MKS,       TYPE_A, "MKS",  /* Mark Stack */
-        WMOP_DIV,       TYPE_A, "DIV",  /* Divide */
-        WMOP_DLD,       TYPE_A, "DLD",  /* Double Precision Divide */
-        WMOP_COM,       TYPE_A, "COM",  /* Communication operator */
-        WMOP_LQV,       TYPE_A, "LQV",  /* Logical Equivalence */
-        WMOP_SND,       TYPE_A, "SND",  /* B Store Non-destructive */
-        WMOP_XCH,       TYPE_A, "XCH",  /* Exchange */
-        WMOP_CHS,       TYPE_A, "CHS",  /* Change sign bit */
-        WMOP_RTS,       TYPE_A, "RTS",  /* Return Special */
-        WMOP_CDC,       TYPE_A, "CDC",  /* Construct descriptor call */
-        WMOP_FTC,       TYPE_A, "FTC",  /* Transfer F Field to Core Field */
-        WMOP_MOP,       TYPE_A, "MOP",  /* Reset Flag bit */
-        WMOP_LOD,       TYPE_A, "LOD",  /* Load */
-        WMOP_DUP,       TYPE_A, "DUP",  /* Duplicate */
-        WMOP_TOP,       TYPE_A, "TOP",  /* Test Flag Bit */
-        WMOP_IOR,       TYPE_A, "IOR",  /* I/O Release */
-        WMOP_LBC,       TYPE_A, "LBC",  /* Word Branch Backward Conditional */
-        WMOP_SSF,       TYPE_A, "SSF",  /* Set or Store S or F registers */
-        WMOP_HP2,       TYPE_A, "HP2",  /* Halt P2 */
-        WMOP_LFC,       TYPE_A, "LFC",  /* Word Branch Forward Conditional */
-        WMOP_ZP1,       TYPE_A, "ZP1",  /* Conditional Halt */
-        WMOP_TUS,       TYPE_A, "TUS",  /* Interrogate Peripheral Status */
-        WMOP_LLL,       TYPE_A, "LLL",  /* Link List Look-up */
-        WMOP_IDV,       TYPE_A, "IDV",  /* Integer Divide Integer */
-        WMOP_SFI,       TYPE_A, "SFI",  /* Store for Interrupt */
-        WMOP_SFT,       TYPE_A, "SFT",  /* Store for Test */
-        WMOP_FTF,       TYPE_A, "FTF",  /* Transfer F Field to F Field */
-        WMOP_MDS,       TYPE_A, "MDS",  /* Set Flag Bit */
-        WMOP_IP1,       TYPE_A, "IP1",  /* Initiate P1 */
-        WMOP_ISD,       TYPE_A, "ISD",  /* Interger Store Destructive */
-        WMOP_LEQ,       TYPE_A, "LEQ",  /* B Less Than or Equal to A */
-        WMOP_BBW,       TYPE_A, "BBW",  /* Banch Backward Conditional */
-        WMOP_IP2,       TYPE_A, "IP2",  /* Initiate P2 */
-        WMOP_ISN,       TYPE_A, "ISN",  /* Integer Store Non-Destructive */
-        WMOP_LSS,       TYPE_A, "LSS",  /* B Less Than A */
-        WMOP_BFW,       TYPE_A, "BFW",  /* Branch Forward Unconditional */
-        WMOP_IIO,       TYPE_A, "IIO",  /* Initiate I/O */
-        WMOP_EQL,       TYPE_A, "EQL",  /* B Equal A */
-        WMOP_SSP,       TYPE_A, "SSP",  /* Reset Sign Bit */
-        WMOP_CMN,       TYPE_A, "CMN",  /* Enter Character Mode In Line */
-        WMOP_IFT,       TYPE_A, "IFT",  /* Test Initiate */
-        WMOP_CTC,       TYPE_A, "CTC",  /* Transfer Core Field to Core Field */
-        WMOP_LBU,       TYPE_A, "LBU",  /* Word Branch Backward Unconditional */
-        WMOP_LFU,       TYPE_A, "LFU",  /* Word Branch Forward Unconditional */
-        WMOP_TIO,       TYPE_A, "TIO",  /* Interrogate I/O Channels */
-        WMOP_RDV,       TYPE_A, "RDV",  /* Remainder Divide */
-        WMOP_FBS,       TYPE_A, "FBS",  /* Flag Bit Search */
-        WMOP_CTF,       TYPE_A, "CTF",  /* Transfer Core Field to F Field */
-        WMOP_ISO,       TYPE_B, "ISO",  /* Variable Field Isolate XX */
-        WMOP_CBD,       TYPE_C, "CBD",  /* Non-Zero Field Branch Backward Destructive Xy */
-        WMOP_CBN,       TYPE_C, "CBN",  /* Non-Zero Field Branch Backward Non-Destructive Xy */
-        WMOP_CFD,       TYPE_C, "CFD",  /* Non-Zero Field Branch Forward Destructive Xy */
-        WMOP_CFN,       TYPE_B, "CFN",  /* Non-Zero Field Branch Forward Non-Destructive Xy */
-        WMOP_DIA,       TYPE_B, "DIA",  /* Dial A XX */
-        WMOP_DIB,       TYPE_B, "DIB",  /* Dial B XX Upper 6 not Zero */
-        WMOP_TRB,       TYPE_B, "TRB",  /* Transfer Bits XX */
-        WMOP_FCL,       TYPE_B, "FCL",  /* Compare Field Low XX */
-        WMOP_FCE,       TYPE_B, "FCE",  /* Compare Field Equal XX */
-        {0,     0,      NULL},
+       { WMOP_LITC,      TYPE_D, "LITC",},  /* Load literal */
+       { WMOP_OPDC,      TYPE_D, "OPDC",},  /* Load operand */
+       { WMOP_DESC,      TYPE_D, "DESC",},  /* Load Descriptor */
+       { WMOP_DEL,       TYPE_A, "DEL", },  /* Delete top of stack */
+       { WMOP_NOP,       TYPE_A, "NOP", },  /* Nop operation */
+       { WMOP_XRT,       TYPE_A, "XRT", },  /* Set Variant */
+       { WMOP_ADD,       TYPE_A, "ADD", },  /* Add */
+       { WMOP_DLA,       TYPE_A, "DLA", },  /* Double Precision Add */
+       { WMOP_PRL,       TYPE_A, "PRL", },  /* Program Release */
+       { WMOP_LNG,       TYPE_A, "LNG", },  /* Logical Negate */
+       { WMOP_CID,       TYPE_A, "CID", },  /* Conditional Integer Store Destructive */
+       { WMOP_GEQ,       TYPE_A, "GEQ", },  /* B greater than or equal to A */
+       { WMOP_BBC,       TYPE_A, "BBC", },  /* Branch Backward Conditional */
+       { WMOP_BRT,       TYPE_A, "BRT", },  /* Branch Return */
+       { WMOP_INX,       TYPE_A, "INX", },  /* Index */
+       { WMOP_ITI,       TYPE_A, "ITI", },  /* Interrogate interrupt */
+       { WMOP_LOR,       TYPE_A, "LOR", },  /* Logical Or */
+       { WMOP_CIN,       TYPE_A, "CIN", },  /* Conditional Integer Store non-destructive */
+       { WMOP_GTR,       TYPE_A, "GTR", },  /* B Greater than A */
+       { WMOP_BFC,       TYPE_A, "BFC", },  /* Branch Forward Conditional */
+       { WMOP_RTN,       TYPE_A, "RTN", },  /* Return normal */
+       { WMOP_COC,       TYPE_A, "COC", },  /* Construct Operand Call */
+       { WMOP_SUB,       TYPE_A, "SUB", },  /* Subtract */
+       { WMOP_DLS,       TYPE_A, "DLS", },  /* Double Precision Subtract */
+       { WMOP_MUL,       TYPE_A, "MUL", },  /* Multiply */
+       { WMOP_DLM,       TYPE_A, "DLM", },  /* Double Precision Multiply */
+       { WMOP_RTR,       TYPE_A, "RTR", },  /* Read Timer */
+       { WMOP_LND,       TYPE_A, "LND", },  /* Logical And */
+       { WMOP_STD,       TYPE_A, "STD", },  /* B Store Destructive */
+       { WMOP_NEQ,       TYPE_A, "NEQ", },  /* B Not equal to A */
+       { WMOP_SSN,       TYPE_A, "SSN", },  /* Set Sign Bit */
+       { WMOP_XIT,       TYPE_A, "XIT", },  /* Exit */
+       { WMOP_MKS,       TYPE_A, "MKS", },  /* Mark Stack */
+       { WMOP_DIV,       TYPE_A, "DIV", },  /* Divide */
+       { WMOP_DLD,       TYPE_A, "DLD", },  /* Double Precision Divide */
+       { WMOP_COM,       TYPE_A, "COM", },  /* Communication operator */
+       { WMOP_LQV,       TYPE_A, "LQV", },  /* Logical Equivalence */
+       { WMOP_SND,       TYPE_A, "SND", },  /* B Store Non-destructive */
+       { WMOP_XCH,       TYPE_A, "XCH", },  /* Exchange */
+       { WMOP_CHS,       TYPE_A, "CHS", },  /* Change sign bit */
+       { WMOP_RTS,       TYPE_A, "RTS", },  /* Return Special */
+       { WMOP_CDC,       TYPE_A, "CDC", },  /* Construct descriptor call */
+       { WMOP_FTC,       TYPE_A, "FTC", },  /* Transfer F Field to Core Field */
+       { WMOP_MOP,       TYPE_A, "MOP", },  /* Reset Flag bit */
+       { WMOP_LOD,       TYPE_A, "LOD", },  /* Load */
+       { WMOP_DUP,       TYPE_A, "DUP", },  /* Duplicate */
+       { WMOP_TOP,       TYPE_A, "TOP", },  /* Test Flag Bit */
+       { WMOP_IOR,       TYPE_A, "IOR", },  /* I/O Release */
+       { WMOP_LBC,       TYPE_A, "LBC", },  /* Word Branch Backward Conditional */
+       { WMOP_SSF,       TYPE_A, "SSF", },  /* Set or Store S or F registers */
+       { WMOP_HP2,       TYPE_A, "HP2", },  /* Halt P2 */
+       { WMOP_LFC,       TYPE_A, "LFC", },  /* Word Branch Forward Conditional */
+       { WMOP_ZP1,       TYPE_A, "ZP1", },  /* Conditional Halt */
+       { WMOP_TUS,       TYPE_A, "TUS", },  /* Interrogate Peripheral Status */
+       { WMOP_LLL,       TYPE_A, "LLL", },  /* Link List Look-up */
+       { WMOP_IDV,       TYPE_A, "IDV", },  /* Integer Divide Integer */
+       { WMOP_SFI,       TYPE_A, "SFI", },  /* Store for Interrupt */
+       { WMOP_SFT,       TYPE_A, "SFT", },  /* Store for Test */
+       { WMOP_FTF,       TYPE_A, "FTF", },  /* Transfer F Field to F Field */
+       { WMOP_MDS,       TYPE_A, "MDS", },  /* Set Flag Bit */
+       { WMOP_IP1,       TYPE_A, "IP1", },  /* Initiate P1 */
+       { WMOP_ISD,       TYPE_A, "ISD", },  /* Interger Store Destructive */
+       { WMOP_LEQ,       TYPE_A, "LEQ", },  /* B Less Than or Equal to A */
+       { WMOP_BBW,       TYPE_A, "BBW", },  /* Banch Backward Conditional */
+       { WMOP_IP2,       TYPE_A, "IP2", },  /* Initiate P2 */
+       { WMOP_ISN,       TYPE_A, "ISN", },  /* Integer Store Non-Destructive */
+       { WMOP_LSS,       TYPE_A, "LSS", },  /* B Less Than A */
+       { WMOP_BFW,       TYPE_A, "BFW", },  /* Branch Forward Unconditional */
+       { WMOP_IIO,       TYPE_A, "IIO", },  /* Initiate I/O */
+       { WMOP_EQL,       TYPE_A, "EQL", },  /* B Equal A */
+       { WMOP_SSP,       TYPE_A, "SSP", },  /* Reset Sign Bit */
+       { WMOP_CMN,       TYPE_A, "CMN", },  /* Enter Character Mode In Line */
+       { WMOP_IFT,       TYPE_A, "IFT", },  /* Test Initiate */
+       { WMOP_CTC,       TYPE_A, "CTC", },  /* Transfer Core Field to Core Field */
+       { WMOP_LBU,       TYPE_A, "LBU", },  /* Word Branch Backward Unconditional */
+       { WMOP_LFU,       TYPE_A, "LFU", },  /* Word Branch Forward Unconditional */
+       { WMOP_TIO,       TYPE_A, "TIO", },  /* Interrogate I/O Channels */
+       { WMOP_RDV,       TYPE_A, "RDV", },  /* Remainder Divide */
+       { WMOP_FBS,       TYPE_A, "FBS", },  /* Flag Bit Search */
+       { WMOP_CTF,       TYPE_A, "CTF", },  /* Transfer Core Field to F Field */
+       { WMOP_ISO,       TYPE_B, "ISO", },  /* Variable Field Isolate XX */
+       { WMOP_CBD,       TYPE_C, "CBD", },  /* Non-Zero Field Branch Backward Destructive Xy */
+       { WMOP_CBN,       TYPE_C, "CBN", },  /* Non-Zero Field Branch Backward Non-Destructive Xy */
+       { WMOP_CFD,       TYPE_C, "CFD", },  /* Non-Zero Field Branch Forward Destructive Xy */
+       { WMOP_CFN,       TYPE_B, "CFN", },  /* Non-Zero Field Branch Forward Non-Destructive Xy */
+       { WMOP_DIA,       TYPE_B, "DIA", },  /* Dial A XX */
+       { WMOP_DIB,       TYPE_B, "DIB", },  /* Dial B XX Upper 6 not Zero */
+       { WMOP_TRB,       TYPE_B, "TRB", },  /* Transfer Bits XX */
+       { WMOP_FCL,       TYPE_B, "FCL", },  /* Compare Field Low XX */
+       { WMOP_FCE,       TYPE_B, "FCE", },  /* Compare Field Equal XX */
+       { 0,              0,      NULL,  }
 };
 
 t_opcode  char_ops[] = {
 /* Character Mode */
-        CMOP_EXC,       TYPE_A, "EXC",  /* Exit Character Mode */
-        CMOP_CMX,       TYPE_A, "CMX",  /* Exit Character Mode In Line */
-        CMOP_BSD,       TYPE_B, "BSD",  /* Skip Bit Destiniation */
-        CMOP_BSS,       TYPE_B, "BSS",  /* SKip Bit Source */
-        CMOP_RDA,       TYPE_B, "RDA",  /* Recall Destination Address */
-        CMOP_TRW,       TYPE_B, "TRW",  /* Transfer Words */
-        CMOP_SED,       TYPE_B, "SED",  /* Set Destination Address */
-        CMOP_TDA,       TYPE_B, "TDA",  /* Transfer Destination Address */
-        CMOP_TBN,       TYPE_B, "TBN",  /* Transfer Blanks for Non-Numerics */
-        WMOP_ITI,       TYPE_A, "ITI",  /* Interrogate interrupt */
-        WMOP_SFI,       TYPE_A, "SFI",  /* Store for Interrupt */
-        WMOP_SFT,       TYPE_A, "SFT",  /* Store for Test */
-        WMOP_ZP1,       TYPE_A, "ZP1",  /* Conditional Halt */
-        WMOP_HP2,       TYPE_A, "HP2",  /* Halt P2 */
-        CMOP_SDA,       TYPE_B, "SDA",  /* Store Destination Address */
-        CMOP_SSA,       TYPE_B, "SSA",  /* Store Source Address */
-        CMOP_SFD,       TYPE_B, "SFD",  /* Skip Forward Destination */
-        CMOP_SRD,       TYPE_B, "SRD",  /* Skip Reverse Destination */
-        CMOP_SES,       TYPE_B, "SES",  /* Set Source Address */
-        CMOP_TEQ,       TYPE_B, "TEQ",  /* Test for Equal */
-        CMOP_TNE,       TYPE_B, "TNE",  /* Test for Not-Equal */
-        CMOP_TEG,       TYPE_B, "TEG",  /* Test for Greater Or Equal */
-        CMOP_TGR,       TYPE_B, "TGR",  /* Test For Greater */
-        CMOP_SRS,       TYPE_B, "SRS",  /* Skip Reverse Source */
-        CMOP_SFS,       TYPE_B, "SFS",  /* Skip Forward Source */
-        CMOP_TEL,       TYPE_B, "TEL",  /* Test For Equal or Less */
-        CMOP_TLS,       TYPE_B, "TLS",  /* Test For Less */
-        CMOP_TAN,       TYPE_B, "TAN",  /* Test for Alphanumeric */
-        CMOP_BIT,       TYPE_B, "BIT",  /* Test Bit */
-        CMOP_INC,       TYPE_B, "INC",  /* Increase Tally */
-        CMOP_STC,       TYPE_B, "STC",  /* Store Tally */
-        CMOP_SEC,       TYPE_B, "SEC",  /* Set Tally */
-        CMOP_CRF,       TYPE_B, "CRF",  /* Call repeat Field */
-        CMOP_JNC,       TYPE_B, "JNC",  /* Jump Out Of Loop Conditional */
-        CMOP_JFC,       TYPE_B, "JFC",  /* Jump Forward Conditional */
-        CMOP_JNS,       TYPE_B, "JNS",  /* Jump out of loop unconditional */
-        CMOP_JFW,       TYPE_B, "JFW",  /* Jump Forward Unconditional */
-        CMOP_RCA,       TYPE_B, "RCA",  /* Recall Control Address */
-        CMOP_ENS,       TYPE_B, "ENS",  /* End Loop */
-        CMOP_BNS,       TYPE_B, "BNS",  /* Begin Loop */
-        CMOP_RSA,       TYPE_B, "RSA",  /* Recall Source Address */
-        CMOP_SCA,       TYPE_B, "SCA",  /* Store Control Address */
-        CMOP_JRC,       TYPE_B, "JRC",  /* Jump Reverse Conditional */
-        CMOP_TSA,       TYPE_B, "TSA",  /* Transfer Source Address */
-        CMOP_JRV,       TYPE_B, "JRV",  /* Jump Reverse Unconditional */
-        CMOP_CEQ,       TYPE_B, "CEQ",  /* Compare Equal */
-        CMOP_CNE,       TYPE_B, "CNE",  /* COmpare for Not Equal */
-        CMOP_CEG,       TYPE_B, "CEG",  /* Compare For Greater Or Equal */
-        CMOP_CGR,       TYPE_B, "CGR",  /* Compare For Greater */
-        CMOP_BIS,       TYPE_B, "BIS",  /* Set Bit */
-        CMOP_BIR,       TYPE_B, "BIR",  /* Reet Bit */
-        CMOP_OCV,       TYPE_B, "OCV",  /* Output Convert */
-        CMOP_ICV,       TYPE_B, "ICV",  /* Input Convert */
-        CMOP_CEL,       TYPE_B, "CEL",  /* Compare For Equal or Less */
-        CMOP_CLS,       TYPE_B, "CLS",  /* Compare for Less */
-        CMOP_FSU,       TYPE_B, "FSU",  /* Field Subtract */
-        CMOP_FAD,       TYPE_B, "FAD",  /* Field Add */
-        CMOP_TRP,       TYPE_B, "TRP",  /* Transfer Program Characters */
-        CMOP_TRN,       TYPE_B, "TRN",  /* Transfer Numeric */
-        CMOP_TRZ,       TYPE_B, "TRZ",  /* Transfer Zones */
-        CMOP_TRS,       TYPE_B, "TRS",  /* Transfer Source Characters */
-        {0,     0,      NULL},
+       { CMOP_EXC,       TYPE_A, "EXC", },  /* Exit Character Mode */
+       { CMOP_CMX,       TYPE_A, "CMX", },  /* Exit Character Mode In Line */
+       { CMOP_BSD,       TYPE_B, "BSD", },  /* Skip Bit Destiniation */
+       { CMOP_BSS,       TYPE_B, "BSS", },  /* SKip Bit Source */
+       { CMOP_RDA,       TYPE_B, "RDA", },  /* Recall Destination Address */
+       { CMOP_TRW,       TYPE_B, "TRW", },  /* Transfer Words */
+       { CMOP_SED,       TYPE_B, "SED", },  /* Set Destination Address */
+       { CMOP_TDA,       TYPE_B, "TDA", },  /* Transfer Destination Address */
+       { CMOP_TBN,       TYPE_B, "TBN", },  /* Transfer Blanks for Non-Numerics */
+       { WMOP_ITI,       TYPE_A, "ITI", },  /* Interrogate interrupt */
+       { WMOP_SFI,       TYPE_A, "SFI", },  /* Store for Interrupt */
+       { WMOP_SFT,       TYPE_A, "SFT", },  /* Store for Test */
+       { WMOP_ZP1,       TYPE_A, "ZP1", },  /* Conditional Halt */
+       { WMOP_HP2,       TYPE_A, "HP2", },  /* Halt P2 */
+       { CMOP_SDA,       TYPE_B, "SDA", },  /* Store Destination Address */
+       { CMOP_SSA,       TYPE_B, "SSA", },  /* Store Source Address */
+       { CMOP_SFD,       TYPE_B, "SFD", },  /* Skip Forward Destination */
+       { CMOP_SRD,       TYPE_B, "SRD", },  /* Skip Reverse Destination */
+       { CMOP_SES,       TYPE_B, "SES", },  /* Set Source Address */
+       { CMOP_TEQ,       TYPE_B, "TEQ", },  /* Test for Equal */
+       { CMOP_TNE,       TYPE_B, "TNE", },  /* Test for Not-Equal */
+       { CMOP_TEG,       TYPE_B, "TEG", },  /* Test for Greater Or Equal */
+       { CMOP_TGR,       TYPE_B, "TGR", },  /* Test For Greater */
+       { CMOP_SRS,       TYPE_B, "SRS", },  /* Skip Reverse Source */
+       { CMOP_SFS,       TYPE_B, "SFS", },  /* Skip Forward Source */
+       { CMOP_TEL,       TYPE_B, "TEL", },  /* Test For Equal or Less */
+       { CMOP_TLS,       TYPE_B, "TLS", },  /* Test For Less */
+       { CMOP_TAN,       TYPE_B, "TAN", },  /* Test for Alphanumeric */
+       { CMOP_BIT,       TYPE_B, "BIT", },  /* Test Bit */
+       { CMOP_INC,       TYPE_B, "INC", },  /* Increase Tally */
+       { CMOP_STC,       TYPE_B, "STC", },  /* Store Tally */
+       { CMOP_SEC,       TYPE_B, "SEC", },  /* Set Tally */
+       { CMOP_CRF,       TYPE_B, "CRF", },  /* Call repeat Field */
+       { CMOP_JNC,       TYPE_B, "JNC", },  /* Jump Out Of Loop Conditional */
+       { CMOP_JFC,       TYPE_B, "JFC", },  /* Jump Forward Conditional */
+       { CMOP_JNS,       TYPE_B, "JNS", },  /* Jump out of loop unconditional */
+       { CMOP_JFW,       TYPE_B, "JFW", },  /* Jump Forward Unconditional */
+       { CMOP_RCA,       TYPE_B, "RCA", },  /* Recall Control Address */
+       { CMOP_ENS,       TYPE_B, "ENS", },  /* End Loop */
+       { CMOP_BNS,       TYPE_B, "BNS", },  /* Begin Loop */
+       { CMOP_RSA,       TYPE_B, "RSA", },  /* Recall Source Address */
+       { CMOP_SCA,       TYPE_B, "SCA", },  /* Store Control Address */
+       { CMOP_JRC,       TYPE_B, "JRC", },  /* Jump Reverse Conditional */
+       { CMOP_TSA,       TYPE_B, "TSA", },  /* Transfer Source Address */
+       { CMOP_JRV,       TYPE_B, "JRV", },  /* Jump Reverse Unconditional */
+       { CMOP_CEQ,       TYPE_B, "CEQ", },  /* Compare Equal */
+       { CMOP_CNE,       TYPE_B, "CNE", },  /* COmpare for Not Equal */
+       { CMOP_CEG,       TYPE_B, "CEG", },  /* Compare For Greater Or Equal */
+       { CMOP_CGR,       TYPE_B, "CGR", },  /* Compare For Greater */
+       { CMOP_BIS,       TYPE_B, "BIS", },  /* Set Bit */
+       { CMOP_BIR,       TYPE_B, "BIR", },  /* Reet Bit */
+       { CMOP_OCV,       TYPE_B, "OCV", },  /* Output Convert */
+       { CMOP_ICV,       TYPE_B, "ICV", },  /* Input Convert */
+       { CMOP_CEL,       TYPE_B, "CEL", },  /* Compare For Equal or Less */
+       { CMOP_CLS,       TYPE_B, "CLS", },  /* Compare for Less */
+       { CMOP_FSU,       TYPE_B, "FSU", },  /* Field Subtract */
+       { CMOP_FAD,       TYPE_B, "FAD", },  /* Field Add */
+       { CMOP_TRP,       TYPE_B, "TRP", },  /* Transfer Program Characters */
+       { CMOP_TRN,       TYPE_B, "TRN", },  /* Transfer Numeric */
+       { CMOP_TRZ,       TYPE_B, "TRZ", },  /* Transfer Zones */
+       { CMOP_TRS,       TYPE_B, "TRS", },  /* Transfer Source Characters */
+       { 0,              0,      NULL,  }
 };
 
 

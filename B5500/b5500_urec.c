@@ -709,7 +709,6 @@ print_line(UNIT * uptr, int unit)
 
     char                out[150];       /* Temp conversion buffer */
     int                 i;
-    int                 chan = uptr->CMD & URCSTA_CHMASK;
 
     if ((uptr->flags & (UNIT_ATT)) == 0)
         return; /* attached? */
