@@ -1912,7 +1912,7 @@ saved_capac = uptr->capac;
 uptr->capac = temp_capac;
 
 for (part = 0; part < RT11_MAXPARTITIONS; part++) {
-    uint16 seg_highest;
+    uint16 seg_highest = 0;
     int type;
 
     base = part << 16;
