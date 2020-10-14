@@ -277,7 +277,7 @@ t_stat load_dmp (FILE *fileref)
    char    *p;
    uint32  addr = 074;
    uint64  data;
-   int     high = 0;
+   uint32  high = 0;
 
    while (fgets((char *)buffer, 80, fileref) != 0) {
         p = (char *)buffer;
@@ -774,6 +774,7 @@ t_stat load_exb (FILE *fileref, int ftype)
             return SCPE_OK;
         }
         pos = 0;
+        word = 0;
         for (; wc > 0; wc--, pos++) {
             if (get_exb_byte(fileref, &byt, ftype))
                 return SCPE_FMT;
@@ -1124,11 +1125,10 @@ static const char *devnam[NUMDEV] = {
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw)
 {
-int32 i, j, c, cflag, ac, xr, y, dev;
+int32 i, j, c, ac, xr, y, dev;
 uint64 inst;
 
 inst = val[0];
-cflag = (uptr == NULL) || (uptr == &cpu_unit[0]);
 if (sw & SWMASK ('A')) {                                /* ASCII? */
     if (inst > 0377)
         return SCPE_ARG;
@@ -1250,12 +1250,11 @@ return (ind | (xr << 18) | val);
 
 t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
-int32 cflag, i, j;
+int32 i, j;
 t_value ac, dev;
 t_stat r;
 char gbuf[CBUFSIZE], cbuf[2*CBUFSIZE];
 
-cflag = (uptr == NULL) || (uptr == &cpu_unit[0]);
 while (isspace (*cptr)) cptr++;
 memset (cbuf, '\0', sizeof(cbuf));
 strncpy (cbuf, cptr, sizeof(cbuf)-7);

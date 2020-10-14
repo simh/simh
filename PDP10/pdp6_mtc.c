@@ -388,7 +388,7 @@ t_stat
 mtc_srv(UNIT * uptr)
 {
     DEVICE             *dptr = find_dev_from_unit(uptr);
-    int                 unit = (uptr - dptr->units) & 7;
+    unsigned int        unit = (uptr - dptr->units) & 7;
     int                 cmd = (uptr->CNTRL & FUNCTION) >> 8;
     t_mtrlnt            reclen;
     t_stat              r = SCPE_ARG;   /* Force error if not set */
@@ -416,7 +416,7 @@ mtc_srv(UNIT * uptr)
  
         /* Check if command pending */
         if ((mtc_hold_cmd & CMD_FULL) != 0) {
-            int u = (mtc_hold_cmd >> 4) & 07;
+            unsigned int u = (mtc_hold_cmd >> 4) & 07;
             sim_debug(DEBUG_DETAIL, dptr, "MTC%o New command %o\n", unit, u);
             /* Is it for me? */
             if (u == unit) {

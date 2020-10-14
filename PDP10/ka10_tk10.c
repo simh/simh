@@ -98,7 +98,6 @@ DEVICE tk10_dev = {
 
 static t_stat tk10_devio(uint32 dev, uint64 *data)
 {
-    DEVICE *dptr = &tk10_dev;
     TMLN *lp;
     int port;
     int ch;

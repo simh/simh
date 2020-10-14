@@ -345,7 +345,6 @@ static int auxcpu_interrupt (void)
 
 t_stat auxcpu_devio(uint32 dev, uint64 *data)
 {
-    DEVICE *dptr = &auxcpu_dev;
     UNIT   *uptr = &auxcpu_unit[0];
 
     switch(dev & 07) {

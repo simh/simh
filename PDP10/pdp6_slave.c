@@ -291,7 +291,6 @@ static const char *slave_description (DEVICE *dptr)
 
 t_stat slave_devio(uint32 dev, uint64 *data)
 {
-    DEVICE *dptr = &slave_dev;
     UNIT   *uptr = &slave_unit[0];
 
     switch(dev & 03) {

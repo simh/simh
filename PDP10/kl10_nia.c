@@ -713,9 +713,12 @@ uint8 *nia_cpy_from(t_addr addr, uint8 *data, int len)
         case 1:
                 word =  (uint64)(*data++) << 28;
                 break;
+        default:
+                word = 0;
+                break;
         }
+        M[addr++] = word;
     }
-    M[addr++] = word;
     return data;
 }
 
@@ -1200,7 +1203,6 @@ int nia_send_pkt(uint64 cmd)
  */
 t_stat nia_cmd_srv(UNIT * uptr)
 {
-    t_addr free_q = nia_data.unk_hdr;
     uint64    word1, word2;
     uint32    cmd;
     int       len, i;

@@ -491,7 +491,6 @@ t_stat rh_devio(uint32 dev, uint64 *data) {
 /* Handle KI and KL style interrupt vectors */
 t_addr
 rh_devirq(uint32 dev, t_addr addr) {
-    DEVICE        *dptr = NULL;
     struct rh_if  *rhc = NULL;
     int            drive;
 

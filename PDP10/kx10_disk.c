@@ -55,7 +55,7 @@
 
 
 struct disk_formats {
-    uint32      mode;
+    int         mode;
     const char  *name;
 };
 

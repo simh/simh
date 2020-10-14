@@ -1062,7 +1062,7 @@ dt_boot(int32 unit_num, DEVICE * dptr)
 {
     UNIT               *uptr = &dptr->units[unit_num];
     uint32             *fbuf = (uint32 *) uptr->filebuf;    /* file buffer */
-    uint64              word;
+    uint64              word = 0;
     int                 off;
     int                 wc, addr;
 
@@ -1232,7 +1232,6 @@ void dt_flush (UNIT* uptr)
     uint16 pdp8b[D8_NBSIZE];
     uint16 pdp11b[D18_BSIZE];
     uint32 ba, k, *fbuf;
-    int32 u = uptr - dt_dev.units;
 
     if (uptr->WRITTEN && uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */
         rewind (uptr->fileref);                             /* start of file */

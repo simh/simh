@@ -627,7 +627,7 @@ t_stat tu_srv(UNIT * uptr)
                  uptr->CPOS = 0;
                  if (GET_FNC(uptr->CMD) == FNC_READ && rh_write(rhc) == 0) {
                      tu_error(uptr, MTSE_OK);
-                     if (uptr->DATAPTR == uptr->hwmark)
+                     if ((uint32)uptr->DATAPTR == uptr->hwmark)
                          (void)rh_blkend(rhc);
                      rh_finish_op(rhc, 0);
                      return SCPE_OK;

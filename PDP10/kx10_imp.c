@@ -405,7 +405,7 @@ struct imp_device {
     struct imp_map    port_map[64];            /* Ports to adjust */
     in_addr_T         dhcpip;                  /* DHCP server address */
     uint8             dhcp_state;              /* State of DHCP */
-    int               dhcp_lease;              /* DHCP lease time */
+    uint32            dhcp_lease;              /* DHCP lease time */
     int               dhcp_renew;              /* DHCP renew time */
     int               dhcp_rebind;             /* DHCP rebind time */
     int               dhcp_wait_time;          /* seconds waiting for response */
@@ -743,7 +743,6 @@ imp_devirq(uint32 dev, t_addr addr) {
 
 t_stat imp_srv(UNIT * uptr)
 {
-    DEVICE *dptr = find_dev_from_unit(uptr);
     int     i;
     int     l;
 
@@ -1017,7 +1016,6 @@ imp_packet_in(struct imp_device *imp)
            if (ip_hdr->ip_dst == imp_data.ip && imp_data.hostip != 0) {
                uint8   *payload = (uint8 *)(&imp->rbuffer[pad +
                                            (ip_hdr->ip_v_hl & 0xf) * 4]);
-               uint16   chk = ip_hdr->ip_sum;
                /* If TCP packet update the TCP checksum */
                if (ip_hdr->ip_p == TCP_PROTO) {
                    struct tcp *tcp_hdr = (struct tcp *)payload;
@@ -2641,7 +2639,7 @@ t_stat imp_reset (DEVICE *dptr)
     imp_data.sendq = NULL;
     /* Set up free queue */
     p = NULL;
-    for (i = 0; i < (sizeof(imp_buffer)/sizeof(struct imp_packet)); i++) {
+    for (i = 0; i < (int)(sizeof(imp_buffer)/sizeof(struct imp_packet)); i++) {
         imp_buffer[i].next = p;
         p = &imp_buffer[i];
     }

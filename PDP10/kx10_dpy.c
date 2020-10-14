@@ -341,7 +341,6 @@ static int joy_buttons[JOY_MAX_UNITS * JOY_MAX_BUTTONS];
 
 static void dpy_joy_motion(int which, int axis, int value)
 {
-  int result = FALSE;
   if (which < JOY_MAX_UNITS && axis < JOY_MAX_AXES) {
     joy_axes[which * JOY_MAX_AXES + axis] = value;
   }
@@ -349,7 +348,6 @@ static void dpy_joy_motion(int which, int axis, int value)
 
 static void dpy_joy_button(int which, int button, int state)
 {
-  int result = FALSE;
   if (which < JOY_MAX_UNITS && button < JOY_MAX_BUTTONS) {
     joy_buttons[which * JOY_MAX_UNITS + button] = state;
   }

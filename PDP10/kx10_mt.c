@@ -725,7 +725,7 @@ t_stat mt_srv(UNIT * uptr)
             }
             uptr->BPOS++;
             uptr->CPOS++;
-            if (uptr->BPOS == uptr->hwmark)
+            if (uptr->BPOS == (int32)uptr->hwmark)
                 uptr->CNTRL |= MT_LASTWD;
             if (uptr->CPOS == cc_max) {
                uptr->CPOS = 0;

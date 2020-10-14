@@ -1072,7 +1072,7 @@ dtc_boot(int32 unit_num, DEVICE * dptr)
 {
     UNIT               *uptr = &dptr->units[unit_num];
     uint32             *fbuf = (uint32 *) uptr->filebuf;    /* file buffer */
-    uint64              word;
+    uint64              word = 0;
     int                 off;
     int                 wc, addr;
 

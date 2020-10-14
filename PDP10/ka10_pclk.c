@@ -70,7 +70,6 @@ DEVICE pclk_dev = {
 */
 t_stat pclk_devio(uint32 dev, uint64 *data)
 {
-    DEVICE *dptr = &pclk_dev;
     time_t t=time(NULL);
     struct tm *dt;
     uint64 hour=12, minute=1, seconds=2, milliseconds=3;
