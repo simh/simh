@@ -514,7 +514,7 @@ t_stat com_svc(UNIT * uptr)
                 /* Grab next entry. */
                 in_head++;
                 /* Wrap around end of ring */
-                if (in_head >= (sizeof(in_buff)/sizeof(uint16)))
+                if (in_head >= (int)((sizeof(in_buff)/sizeof(uint16))))
                     in_head = 0;
                 com_data = in_buff[in_head];
                 /* Check if end of current transfer */
@@ -1097,7 +1097,7 @@ com_post_eom()
          sim_debug(DEBUG_EXP, &com_dev, "inserting eom %d %d %d\n",
                 in_head, in_tail, in_count);
          ent = in_tail + 1;
-         if (ent >= (sizeof(in_buff)/sizeof(uint16))) /* Wrap around */
+         if (ent >= (int)((sizeof(in_buff)/sizeof(uint16)))) /* Wrap around */
              ent = 0;
          if (ent != in_head) { /* If next element would be head, queue is full */
             /* If we can't put one on, handler will do it for us */
@@ -1120,12 +1120,12 @@ com_inp_msg(uint32 ln, uint16 msg)
     sim_debug(DEBUG_EXP, &com_dev, "inserting %d %04o %d %d %d\n", ln, msg,
                 in_head, in_tail, in_count);
     ent1 = in_tail + 1;
-    if (ent1 >= (sizeof(in_buff)/sizeof(uint16))) /* Wrap around */
+    if (ent1 >= (int)((sizeof(in_buff)/sizeof(uint16)))) /* Wrap around */
         ent1 = 0;
     if (ent1 == in_head) /* If next element would be head, queue is full */
         return TRUE;
     ent2 = ent1 + 1;
-    if (ent2 >= (sizeof(in_buff)/sizeof(uint16))) /* Wrap around */
+    if (ent2 >= (int)((sizeof(in_buff)/sizeof(uint16)))) /* Wrap around */
         ent2 = 0;
     if (ent2 == in_head) /* If next element would be head, queue is full */
         return TRUE;

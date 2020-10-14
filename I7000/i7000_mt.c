@@ -849,7 +849,7 @@ t_stat mt_srv(UNIT * uptr)
             return mt_error(uptr, chan, MTSE_TMK, dptr);
         }
         /* If at end of record, fill buffer */
-        if (uptr->u6 == uptr->hwmark) {
+        if (uptr->u6 == (int32)uptr->hwmark) {
             sim_debug(DEBUG_DETAIL, dptr, "Read unit=%d ", unit);
             uptr->u3 += GAP_LEN;
             if ((r = sim_tape_rdrecf(uptr, &mt_buffer[bufnum][0], &reclen,
@@ -1044,7 +1044,7 @@ t_stat mt_srv(UNIT * uptr)
             return mt_error(uptr, chan, MTSE_TMK, dptr);
         }
         /* If at end of record, fill buffer */
-        if (uptr->u6 == uptr->hwmark) {
+        if (uptr->u6 == (int32)uptr->hwmark) {
             sim_debug(DEBUG_DETAIL, dptr, "Read unit=%d ", unit);
             if ((r = sim_tape_rdrecr(uptr, &mt_buffer[bufnum][0], &reclen,
                                 BUFFSIZE)) != MTSE_OK) {

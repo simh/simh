@@ -297,14 +297,12 @@ DEVICE              dsk_dev = {
 
 uint32 dsk_cmd(UNIT * uptr, uint16 cmd, uint16 dev)
 {
-    int                chan;
     int                 u = (uptr->u3 >> 8) & 0xf;
-    UNIT               *base = &dsk_unit[u];
+    int                chan = UNIT_G_CHAN(dsk_unit[u].flags);
+#ifdef I7010
     int                 sel;
 
-    chan = UNIT_G_CHAN(dsk_unit[u].flags);
-    sel = (base->flags & UNIT_SELECT) ? 1 : 0;
-#ifdef I7010
+    sel = (dsk_unit[u].flags & UNIT_SELECT) ? 1 : 0;
     if (cmd & 0x100)
         sense[(chan * 2) + sel] |= STAT_SIXBIT;
     else

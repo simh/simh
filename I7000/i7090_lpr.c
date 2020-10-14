@@ -168,7 +168,6 @@ print_line(UNIT * uptr, int chan, int unit)
     uint16              buff[80];       /* Temp conversion buffer */
     int                 i, j;
     int                 outsel = uptr->u3;
-    int                 prt_flg = 1;
 
     if ((uptr->flags & (UNIT_ATT | ECHO)) == 0)
         return SCPE_UNATT;      /* attached? */
@@ -670,8 +669,6 @@ lpr_attach(UNIT * uptr, CONST char *file)
 t_stat
 lpr_detach(UNIT * uptr)
 {
-    int                 u = (uptr - lpr_unit);
-
     return detach_unit(uptr);
 }
 

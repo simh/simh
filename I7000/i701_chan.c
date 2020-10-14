@@ -151,7 +151,7 @@ int
 chan_cmd(uint16 dev, uint16 dcmd)
 {
     UNIT               *uptr;
-    uint32              chan;
+    int32               chan;
     DEVICE            **dptr;
     DIB                *dibp;
     int                 j;

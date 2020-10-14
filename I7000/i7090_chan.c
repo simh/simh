@@ -79,7 +79,7 @@ uint8               cmd[NUM_CHAN];            /* Current command */
 uint16              wcount[NUM_CHAN];         /* Word count */
 t_uint64            assembly[NUM_CHAN];       /* Assembly register */
 uint16              location[NUM_CHAN];       /* Pointer to next opcode */
-uint32              chan_flags[NUM_CHAN];    /* Unit status */
+uint32              chan_flags[NUM_CHAN];     /* Unit status */
 uint16              chan_info[NUM_CHAN];      /* Private channel info */
 uint8               counter[NUM_CHAN];        /* Channel counter */
 uint8               sms[NUM_CHAN];            /* Channel mode infomation */
@@ -329,7 +329,9 @@ void
 chan_proc()
 {
     int                 chan;
+#ifdef I7090
     int                 cmask;
+#endif
 
     /* Scan channels looking for work */
     for (chan = 0; chan < NUM_CHAN; chan++) {
@@ -341,7 +343,9 @@ chan_proc()
         if (chan_flags[chan] & DEV_DISCO)
             continue;
 
+#ifdef I7090
         cmask = 0x0100 << chan;
+#endif
         switch (CHAN_G_TYPE(chan_unit[chan].flags)) {
         case CHAN_PIO:
             if ((chan_flags[chan] & (DEV_REOR|DEV_SEL|DEV_FULL)) ==
@@ -810,8 +814,7 @@ chan_proc()
                             uptr = (*dptr)->units;
                             for (j = 0; j < num; j++, uptr++) {
                                 if ((uptr->flags & UNIT_DIS) == 0 &&
-                                    UNIT_G_CHAN(uptr->flags) ==
-                                          (unsigned int)chan &&
+                                    UNIT_G_CHAN(uptr->flags) == chan &&
                                     (sms[chan] & 1) ==
                                           ((UNIT_SELECT & uptr->flags) != 0)) {
                                     goto found;
@@ -1243,7 +1246,7 @@ int
 chan_cmd(uint16 dev, uint16 dcmd)
 {
     UNIT               *uptr;
-    uint32              chan;
+    int32               chan;
     DEVICE            **dptr;
     DIB                *dibp;
     int                 j;

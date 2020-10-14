@@ -28,7 +28,7 @@
 /* Memory */
 #define AMASK  0x1ffff
 #define BBIT   0x80000000
-#define MEM_ADDR_OK(x)  ((uint32)(x & AMASK) < MEMSIZE)
+#define MEM_ADDR_OK(x)  ((uint32)((x) & AMASK) < MEMSIZE)
 extern uint8            M[MAXMEMSIZE];
 #define WM      0200    /* Word mark in memory */
 

@@ -262,10 +262,6 @@ drm_detach(UNIT * uptr)
 t_stat
 drm_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
-   const char *cpu = cpu_description(&cpu_dev);
-   DIB        *dibp = (DIB *) dptr->ctxt;
-   int        ctype = dibp->ctype;
-
    fprintf (st, "%s\n\n", drm_description(dptr));
    fprintf (st, "Up to %d units of drum could be used\n", NUM_UNITS_DR);
    fprintf (st, "    sim> set %s UNITS=n  to set number of units\n", dptr->name);

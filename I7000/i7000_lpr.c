@@ -134,7 +134,7 @@ lpr_setlpp(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     }
     if (i < 20 || i > 100)
         return SCPE_ARG;
-    uptr->capac = i;
+    uptr->u6 = i;
     uptr->u4 = 0;
     return SCPE_OK;
 }
@@ -144,7 +144,7 @@ lpr_getlpp(FILE *st, UNIT *uptr, int32 v, CONST void *desc)
 {
     if (uptr == NULL)
         return SCPE_IERR;
-    fprintf(st, "linesperpage=%d", uptr->capac);
+    fprintf(st, "linesperpage=%d", uptr->u6);
     return SCPE_OK;
 }
 
@@ -185,7 +185,7 @@ print_line(UNIT * uptr, int chan, int unit)
              case 1:
              case 9:    if (uptr->u4 == 1)
                             break;
-                        i = uptr->capac - uptr->u4 + 1; break;
+                        i = uptr->u6 - uptr->u4 + 1; break;
              }
              if (i == 0)
                 break;
@@ -231,7 +231,7 @@ print_line(UNIT * uptr, int chan, int unit)
             sim_putchar(out[j++]);
     }
     uptr->u4++;
-    if (uptr->u4 > (int32)uptr->capac) {
+    if (uptr->u4 > (int32)uptr->u6) {
         uptr->u4 = 1;
     }
 
@@ -255,7 +255,7 @@ print_line(UNIT * uptr, int chan, int unit)
                     sim_putchar('\n');
                 }
                 uptr->u4++;
-                if (uptr->u4 > (int32)uptr->capac) {
+                if (uptr->u4 > (int32)uptr->u6) {
                     uptr->u4 = 1;
                 }
             }
@@ -266,7 +266,7 @@ print_line(UNIT * uptr, int chan, int unit)
     if (uptr->u4 == 1)
         lpr_chan9[chan] = 1;
 #ifdef I7010
-    if (uptr->u4 == uptr->capac)
+    if (uptr->u4 == uptr->u6)
         lpr_chan12[chan] = 1;
 #endif
 
@@ -356,8 +356,8 @@ uint32 lpr_cmd(UNIT * uptr, uint16 cmd, uint16 dev)
              case 1:
              case 9:    if (uptr->u4 == 1)
                             break;
-                        i = uptr->capac - uptr->u4 + 1; break;
-             case 12:   i = (uptr->capac/2) - uptr->u4; break;
+                        i = uptr->u6 - uptr->u4 + 1; break;
+             case 12:   i = (uptr->u6/2) - uptr->u4; break;
              }
              if (i == 0)
                 break;
@@ -377,7 +377,7 @@ uint32 lpr_cmd(UNIT * uptr, uint16 cmd, uint16 dev)
              }
              break;
         }
-        if (uptr->u4 == uptr->capac)
+        if (uptr->u4 == uptr->u6)
             lpr_chan12[chan] = 1;
 #endif
         if (uptr->u4 == 1)
