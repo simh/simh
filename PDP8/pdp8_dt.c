@@ -979,7 +979,7 @@ switch (fnc) {                                          /* at speed, check fnc *
                 dt_substate = DTO_WCO;
             if (((dtsa & DTA_MODE) == 0) || (M[DT_WC] == 0))
                 dtsb = dtsb | DTB_DTF;                  /* set DTF */
-                break;
+            break;
 
         case DTO_WCO: case DTO_WCO | DTO_SOB:           /* all done */
             dt_schedez (uptr, dir);                     /* sched end zone */

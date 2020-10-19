@@ -412,7 +412,7 @@ return FALSE;
 t_bool td_setpos (UNIT *uptr)
 {
 uint32 new_time, ut, ulin, udelt;
-int32 delta;
+int32 delta = 0;
 
 new_time = sim_grtime ();                               /* current time */
 ut = new_time - uptr->LASTT;                            /* elapsed time */
