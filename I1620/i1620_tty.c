@@ -420,8 +420,8 @@ switch (cpuio_opc) {                                    /* decode op */
             ind[IN_WRCHK] = 1;                          /* set write check */
             if (io_stop)                                /* set return status */
                 sta = STOP_INVCHR;
-                break;
-                }
+            break;
+            }
         tto_write (ttc & 0x7F);                         /* write */
         PAR = ADDR_A (PAR, 2);                          /* incr mem addr */
         cpuio_cnt = cpuio_cnt + 2;
