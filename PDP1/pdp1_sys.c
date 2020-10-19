@@ -443,7 +443,7 @@ return sp;
 
 #define FMTASC(x) ((x) < 040)? "<%03o>": "%c", (x)
 #define SIXTOASC(x) fiodec_to_ascii[x]
-#define ASCTOSIX(x) (ascii_to_fiodec[x] & 077)
+#define ASCTOSIX(x) (ascii_to_fiodec[(x) & 0177] & 077)
 
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw)
