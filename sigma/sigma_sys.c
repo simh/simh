@@ -495,7 +495,7 @@ if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* chars? */
         sc = 24 - (i * 8);
         c = (sw & SWMASK ('A'))?
              cptr[i] & 0x7F:
-             ascii_to_ebcdic[cptr[i]];
+             ascii_to_ebcdic[cptr[i] & 0177];
         val[0] = (val[0] & ~(BMASK << sc)) | (c << sc);
         }
     return 0;
@@ -511,7 +511,7 @@ if ((sw & SWMASK ('E')) || ((*cptr == '\'') && cptr++)) { /* EBCDIC char? */
     if (cptr[0] == 0)                                   /* must have 1 char */
         return SCPE_ARG;
     sc = 24 - (addr & 0x3) * 8;                         /* shift count */
-    val[0] = (val[0] & ~(BMASK << sc)) | (ascii_to_ebcdic[cptr[0]] << sc);
+    val[0] = (val[0] & ~(BMASK << sc)) | (ascii_to_ebcdic[cptr[0] & 0177] << sc);
     return 0;
     }
 if (sw & SWMASK ('B')) {                                /* byte? */
