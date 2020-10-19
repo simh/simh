@@ -1078,7 +1078,7 @@ void scsi_space (SCSI_BUS *bus, uint8 *data, uint32 len)
 UNIT *uptr = bus->dev[bus->target];
 uint32 code, skipped;
 t_seccnt sects;
-t_stat r;
+t_stat r = 0;
 
 code = data[1] & 0x7;
 sects = GETW (data, 3) | (data[2] << 16);
