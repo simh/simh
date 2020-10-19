@@ -619,7 +619,7 @@ const uint8 op_flags[1024] = {
 t_stat sim_instr (void)
 {
 t_stat reason = SCPE_OK;
-t_uint64 IR, SR, t, t1, t2, sr1;
+t_uint64 IR, SR, t, t1, t2, sr1 = 0;
 uint32 op, fl, tag, tagi, addr, ea;
 uint32 ch, dec, xr, xec_cnt, trp;
 uint32 i, j, sc, s1, s2, spill;

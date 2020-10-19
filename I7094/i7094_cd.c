@@ -231,7 +231,7 @@ switch (cdr_sta) {                                      /* case on state */
             if (uptr->flags & UNIT_CBN)                 /* column binary? */
                 colbin = (((uint32) cdr_cbuf[2 * col]) << 6) |
                 ((uint32) cdr_cbuf[(2 * col) + 1]);     /* 2 chars -> col bin */
-            else colbin = bcd_to_colbin[cdr_cbuf[col]]; /* cvt to col binary */
+            else colbin = bcd_to_colbin[cdr_cbuf[col] & 077]; /* cvt to col binary */
             dat = bit_masks[35 - (col % 36)];           /* mask for column */
             for (row = 0; row < 12; row++) {            /* rows 9..0, 11, 12 */
                 bufw = (row * 2) + (col / 36);          /* index to buffer */
@@ -440,7 +440,7 @@ for (col = 0; col < 72; col++) {                        /* process 72 columns */
         }
     else {                                              /* text */
         bcd = colbin_to_bcd (colbin);                   /* column bin -> BCD */
-        cdp_cbuf[col] = pch[bcd];                       /* -> ASCII */
+        cdp_cbuf[col] = pch[bcd & 077];                 /* -> ASCII */
         }
     }
 for (i = ((2 * CD_CHRLNT) + 1); (i > 0) &&
