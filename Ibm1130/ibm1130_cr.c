@@ -1565,12 +1565,12 @@ static t_stat cr_attach (UNIT *uptr, CONST char *iptr)
 {
     t_stat rval;
     t_bool use_decklist, old_quiet;
-        char gbuf[4*CBUFSIZE], *cptr = gbuf;
+    char gbuf[4*CBUFSIZE], *cptr = gbuf;
     char *c, *arg, quote;
 
     gbuf[sizeof(gbuf)-1] = '\0';
-    strncpy(gbuf, iptr, sizeof(gbuf)-1);
-        cr_detach(uptr);                                /* detach file and possibly deck file */
+    strlcpy(gbuf, iptr, sizeof gbuf);
+    cr_detach(uptr);                                /* detach file and possibly deck file */
 
     CLRBIT(uptr->flags, UNIT_SCRATCH|UNIT_QUIET|UNIT_DEBUG|UNIT_PHYSICAL|UNIT_LOWERCASE);   /* set options */
 
@@ -1620,7 +1620,7 @@ static t_stat cr_attach (UNIT *uptr, CONST char *iptr)
             *c++ = 0;                               /* term arg at space or closing quote */
 
         list_arg[list_nargs] = list_save[list_nargs];   /* set pointer to permanent storage location */
-        strncpy(list_arg[list_nargs], arg, MAXARGLEN);  /* store copy */
+        strlcpy(list_arg[list_nargs], arg, sizeof list_arg[list_nargs]);  /* store copy */
     }
     list_arg[list_nargs] = NULL;                    /* NULL terminate the end of the argument list */
 
@@ -1643,7 +1643,7 @@ static t_stat cr_attach (UNIT *uptr, CONST char *iptr)
     if (list_nargs > 1 && ! use_decklist)           /* if not using deck file, there should have been only one name */
         return SCPE_2MARG;
 
-    if (strcmp(cptr, "(stdin)") == 0 && ! use_decklist) {           /* standard input */
+    if (strcmp(cptr, "(stdin)") == 0 && ! use_decklist) {   /* standard input */
         if (uptr->flags & UNIT_DIS) return SCPE_UDIS;       /* disabled? */
         uptr->filename = (char *)calloc(CBUFSIZE, sizeof(char));
         strcpy(uptr->filename, "(stdin)");

@@ -63,6 +63,7 @@
 #include <ctype.h>
 #include <string.h>
 #include "ibm1130_fmt.h"
+#include "sim_defs.h"
 
 #define MAXLINE     81                                  /* maximum output line size */
 #define WORKSZ      256                                 /* size for tab work area */
@@ -154,7 +155,7 @@ char*   pszX;                                               /* work pointer */
     memset(p_szOut, 0, p_iLen);                             /* zero out output area */
 
     if (iI > 0)                                             /* q. any chars? */
-        strncpy(p_szOut, *p_pszToken, MIN(iI, p_iLen-1));   /* a. yes.. copy max of p_iLen-1 */
+        memcpy(p_szOut, *p_pszToken, MIN(iI, p_iLen-1));    /* a. yes.. copy max of p_iLen-1 */
 
     *p_pszToken += iI;                                      /* point beyond token */
     return p_szOut;                                         /* .. return token pointer */
@@ -179,15 +180,15 @@ size_t  iI;                                                 /* work integer */
 
     if (*p_pszEdit == '*')                                  /* q. comment line? */
     {                                                       /* a. yes..  */
-        strncpy(pszWork, EditToWhitespace(p_pszEdit, width), MAXLINE);      /* .. convert any tabs */
+        strlcpy(pszWork, EditToWhitespace(p_pszEdit, width), sizeof pszWork);/* .. convert any tabs */
         sprintf(gszOutput, ACOMMENTFMT, pszWork);           /* .. put the comment out there in the opcode column */
         return gszOutput;                                   /* .. and return it */
     }
 
-    strncpy(pszLine, p_pszEdit, MAXLINE-1);                 /* copy the line local */
+    strlcpy(pszLine, p_pszEdit, sizeof pszLine);            /* copy the line local */
     
     ExpandTabs(pszLine, pszWork, gaiAsmTabs);               /* expand the tabs */
-    strncpy(pszLine, pszWork, MAXLINE-1);                   /* copy the line back */
+    strlcpy(pszLine, pszWork, sizeof pszLine);              /* copy the line back */
     
     for (iI = strlen(pszLine); iI--;)                       /* trim trailing whitespace */
     {
@@ -248,7 +249,7 @@ int     bContinue;                                          /* true if continue 
         return EditToWhitespace(p_pszEdit, width);
     }
 
-    strncpy(pszLine, p_pszEdit, MAXLINE-1);                 /* copy the line local */
+    strlcpy(pszLine, p_pszEdit, sizeof pszLine);            /* copy the line local */
 
     for (iI = strlen(pszLine); iI--;)                       /* trim trailing whitespace */
     {
@@ -313,7 +314,7 @@ char    pszWork[WORKSZ];                                    /* work buffer */
     }
     
     ExpandTabs(pszLine, pszWork, gaiPlainTabs);             /* expand the tabs */
-    strncpy(gszOutput, pszWork, MAXLINE-1);                 /* copy the line back  */
+    strlcpy(gszOutput, pszWork, sizeof gszOutput);          /* copy the line back  */
     
     for (iI = strlen(gszOutput); iI--;)                     /* look at each character */
     {

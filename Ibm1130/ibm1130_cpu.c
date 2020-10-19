@@ -495,7 +495,7 @@ static int32 ibm1130_qcount ()
 
 t_stat sim_instr (void)
 {
-    int32 i, eaddr, INDIR, IR, F, DSPLC, word2, oldval, newval, src, src2, dst, abit, xbit;
+    int32 i, eaddr, INDIR, IR, F, DSPLC, word2 = 0, oldval, newval, src, src2, dst, abit, xbit;
     int32 iocc_addr, iocc_op, iocc_dev, iocc_func, iocc_mod, result;
     char msg[50];
     int cwincount = 0, status;
