@@ -141,8 +141,6 @@ DEVICE dr15_dev = {
 
 int32 dr60 (int32 dev, int32 pulse, int32 AC)
 {
-int32 subdev = (pulse >> 4) & 03;
-
 if (((pulse & 01) != 0) && (dr15_tcb_ack != 0))         /* SIOA */
     AC |= IOT_SKP;
 if ((pulse & 02) != 0)                                  /* CIOP */
