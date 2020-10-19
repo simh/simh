@@ -8813,6 +8813,7 @@ void int_handler (int sig)
 stop_cpu = TRUE;
 if (sig == SIGTERM)
     sigterm_received = TRUE;
+sim_interval = 0;               /* Minimize when stop_cpu gets noticed */
 }
 
 /* Examine/deposit commands
