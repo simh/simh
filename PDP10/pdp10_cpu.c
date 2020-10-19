@@ -969,9 +969,9 @@ case 0127:  RD; AC(ac) = fltr (mb); break;              /* FLTR */
 /* case 0130:   MUUO                                  *//* UFA */
 /* case 0131:   MUUO                                  *//* DFN */
 case 0132:  AC(ac) = fsc (AC(ac), ea); break;           /* FSC */
-case 0133:  if (!ac)                                    /* IBP */
-                ibp (ea, pflgs);
-            else adjbp (ac, ea, pflgs); break;
+case 0133:  if (!ac) ibp (ea, pflgs);                   /* IBP */
+            else adjbp (ac, ea, pflgs); 
+            break;
 case 0134:  CIBP; LDB; CLRF (F_FPD); break;             /* ILBP */
 case 0135:  LDB; break;                                 /* LDB */
 case 0136:  CIBP; DPB; CLRF (F_FPD); break;             /* IDBP */
