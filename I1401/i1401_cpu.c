@@ -522,7 +522,7 @@ static const int32 mtf_mod[] = {
 t_stat sim_instr (void)
 {
 int32 IS, ilnt, flags;
-int32 op, xa, t, wm, ioind, dev, unit;
+int32 op, xa, t, wm, ioind = 0, dev = 0, unit = 0;
 int32 a, b, i, k, asave, bsave;
 int32 carry, lowprd, sign, ps;
 int32 quo, qs;
@@ -1160,7 +1160,7 @@ CHECK_LENGTH:
             reason = STOP_INVL;
             break;
             }
-      if (ioind != BCD_PERCNT) {                        /* valid dev addr? */
+        if (ioind != BCD_PERCNT) {                      /* valid dev addr? */
             reason = STOP_INVA;
             break;
             }
