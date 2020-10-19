@@ -102,7 +102,7 @@ extern void cpu_start (int32 cpu, uint32 addr);
    kax_reg      KAx register list
 */
 
-DIB ka0_dib[] = { TR_KA0, 0, &ka_rdreg, &ka_wrreg, 0 };
+DIB ka0_dib[] = { { TR_KA0, 0, &ka_rdreg, &ka_wrreg, 0 } };
 
 UNIT ka0_unit = { UDATA (&ka_svc, 0, 0) };
 
@@ -116,7 +116,7 @@ MTAB ka0_mod[] = {
     { 0 }
     };
 
-DIB ka1_dib[] = { TR_KA1, 0, &ka_rdreg, &ka_wrreg, 0 };
+DIB ka1_dib[] = { { TR_KA1, 0, &ka_rdreg, &ka_wrreg, 0 } };
 
 UNIT ka1_unit = { UDATA (&ka_svc, 0, 0) };
 
@@ -296,10 +296,11 @@ switch (ch) {
         rxcd_ibuf[rxcd_iptr++] = '\0';                  /* terminator */
         printf (">>> %s\n", &rxcd_ibuf[0]);
         if (rxcd_ibuf[0] == 'D') {                      /* DEPOSIT */
-            snprintf (&conv[0], 2, "%s", &rxcd_ibuf[4]);
-            rg = (int32)get_uint (&conv[0], 16, 0xF, &r); /* get register number */
-            snprintf (&conv[0], 9, "%s", &rxcd_ibuf[6]);
-            rval = (int32)get_uint (&conv[0], 16, 0xFFFFFFFF, &r); /* get deposit value */
+            conv[0] = rxcd_ibuf[4];
+            conv[1] = '\0';
+            rg = (int32)get_uint (conv, 16, 0xF, &r); /* get register number */
+            strlcpy (conv, &rxcd_ibuf[6], 9);
+            rval = (int32)get_uint (conv, 16, 0xFFFFFFFF, &r); /* get deposit value */
 #if defined (VAX_MP)
             cpu_setreg (cpu, rg, rval);
 #endif
@@ -313,8 +314,8 @@ switch (ch) {
             rxcd_optr = 0;
             }
         else if (rxcd_ibuf[0] == 'S') {                 /* START */
-            snprintf (&conv[0], 9, "%s", &rxcd_ibuf[2]);
-            rval = (int32)get_uint (&conv[0], 16, 0xFFFFFFFF, &r);
+            strlcpy (conv, &rxcd_ibuf[2], 9);
+            rval = (int32)get_uint (conv, 16, 0xFFFFFFFF, &r);
 #if defined (VAX_MP)
             cpu_start (cpu, rval);
 #endif

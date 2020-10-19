@@ -56,7 +56,7 @@ t_stat mctl_wrreg (int32 val, int32 pa, int32 mode);
    mctlx_reg    MCTLx register list
 */
 
-DIB mctl0_dib[] = { TR_MCTL0, 0, &mctl_rdreg, &mctl_wrreg, 0 };
+DIB mctl0_dib[] = { { TR_MCTL0, 0, &mctl_rdreg, &mctl_wrreg, 0 } };
 
 UNIT mctl0_unit = { UDATA (NULL, 0, 0) };
 
@@ -72,7 +72,7 @@ MTAB mctl0_mod[] = {
     { 0 }
     };
 
-DIB mctl1_dib[] = { TR_MCTL1, 0, &mctl_rdreg, &mctl_wrreg, 0 };
+DIB mctl1_dib[] = { { TR_MCTL1, 0, &mctl_rdreg, &mctl_wrreg, 0 } };
 
 UNIT mctl1_unit = { UDATA (NULL, 0, 0) };
 
