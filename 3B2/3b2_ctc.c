@@ -272,6 +272,7 @@ static void ctc_cmd(uint8 cid,
 
     uint32 lba;   /* Logical Block Address */
 
+    maxpass = 0;
     dev = rqe->subdevice & 1;  /* Tape or Floppy device */
 
     capp_data[7] = rqe->opcode;

@@ -882,6 +882,7 @@ t_stat fprint_sym_m(FILE *of, t_addr addr, t_value *val)
     mnemonic *mn;
     char reg_name[8];
 
+    desc = 0;
     mn = NULL;
     vp = 0;
     etype = -1;
