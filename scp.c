@@ -8378,6 +8378,7 @@ for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* flush attached files 
             }
         }
     }
+tmxr_flush_log_files ();
 }
 
 t_stat

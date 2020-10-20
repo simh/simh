@@ -4276,6 +4276,19 @@ else {
 return SCPE_OK;
 }
 
+t_stat tmxr_flush_log_files (void)
+{
+int i, j;
+
+for (i=0; i<tmxr_open_device_count; ++i) {
+    TMXR *mp = tmxr_open_devices[i];
+
+    for (j=0; j<mp->lines; ++j)
+        if (mp->ldsc[j].txlog)
+            fflush (mp->ldsc[j].txlog);
+    }
+return SCPE_OK;
+}
 
 /* Close a master listening socket.
 
