@@ -483,6 +483,14 @@ switch (rg) {
         val = VAX410_SID | VAX410_UREV;
         break;
 
+    case MT_ICR:                                        /* for NetBSD */
+        val = 0;
+        break;
+
+    case MT_TXCS:                                       /* for Ultrix */
+        val = 0;
+        break;
+
     default:
         RSVD_OPND_FAULT(ReadIPR);
         }
@@ -513,6 +521,9 @@ switch (rg) {
 
     case MT_CONPSL:                                     /* console PSL */
         conpsl = val;
+        break;
+
+    case MT_TXCS:                                       /* for Ultrix */
         break;
 
     default:
