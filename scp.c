@@ -2428,6 +2428,23 @@ static const char simh_help2[] =
       "4-d\n"
       " Many tests are capable of producing various amounts of debug output\n"
       " during their execution.  The -d switch enables that output\n"
+      "2File Tools\n"
+      " Tools to manipulate file containers and to tranfer files/data into or\n"
+      " out of a simulated environment are provided.\n\n"
+      " In general, these are tools natively found on the host operating system.\n"
+      " They are explicitly supported directly from SCP to allow for platform\n"
+      " neutral scripts that either test or build running environments for simh\n"
+      " users.\n\n"
+#define HLP_TAR         "*Commands File_Tools Tar_Tool"
+      "3Tar Tool\n"
+      " tar is an archiving utility\n\n"
+      " The quick and dirty help for the TAR command can be viewed with:\n\n"
+      "++sim> tar --help\n\n"
+#define HLP_CURL        "*Commands File_Tools Curl_Tool"
+      "3Curl Tool\n"
+      " curl is a utility to transfer a URL\n\n"
+      " The quick and dirty help for the TAR command can be viewed with:\n\n"
+      "++sim> curl --help\n\n"
 #define HLP_DISKINFO    "*Commands DISKINFO"
       "2Disk Container Information\n"
       " Information about a Disk Container can be displayed with the DISKINFO command:\n\n"
@@ -2503,6 +2520,8 @@ static CTAB cmd_table[] = {
 #if defined(USE_SIM_VIDEO)
     { "SCREENSHOT", &screenshot_cmd,0,          HLP_SCREENSHOT, NULL, NULL },
 #endif
+    { "TAR",        &tar_cmd,       0,          HLP_TAR,        NULL, NULL },
+    { "CURL",       &curl_cmd,      0,          HLP_CURL,       NULL, NULL },
     { "RUNLIMIT",   &runlimit_cmd,  1,          HLP_RUNLIMIT,   NULL, NULL },
     { "NORUNLIMIT", &runlimit_cmd,  0,          HLP_RUNLIMIT,   NULL, NULL },
     { "TESTLIB",    &test_lib_cmd,  0,          HLP_TESTLIB,    NULL, NULL },
@@ -6063,6 +6082,47 @@ void fprint_capac (FILE *st, DEVICE *dptr, UNIT *uptr)
 fprintf (st, "%s", sprint_capac (dptr, uptr));
 }
 
+static const char *_get_tool_version (const char *tool)
+{
+char findcmd[PATH_MAX+1];
+char toolpath[PATH_MAX+1];
+char versioncmd[PATH_MAX+1];
+static char toolversion[PATH_MAX+1];
+FILE *f;
+
+#if defined(_WIN32)
+#define FIND_CMD "where"
+#define popen _popen
+#define pclose _pclose
+#else
+#define FIND_CMD "which"
+#endif
+toolversion[0] = '\0';
+snprintf (findcmd, sizeof (findcmd), "%s %s", FIND_CMD, tool);
+if ((f = popen (findcmd, "r"))) {
+    memset (toolpath, 0, sizeof(toolpath));
+    do {
+        if (NULL == fgets (toolpath, sizeof(toolpath)-1, f))
+            break;
+        sim_trim_endspc (toolpath);
+        } while (toolpath[0] == '\0');
+    pclose (f);
+    if (toolpath[0]) {
+        snprintf (versioncmd, sizeof (versioncmd), "%s --version", tool);
+        if ((f = popen (versioncmd, "r"))) {
+            memset (toolversion, 0, sizeof(toolversion));
+            do {
+                if (NULL == fgets (toolversion, sizeof(toolversion)-1, f))
+                    break;
+                sim_trim_endspc (toolversion);
+                } while (toolversion[0] == '\0');
+            pclose (f);
+            }
+        }
+    }
+return toolversion;
+}
+
 /* Show <global name> processors  */
 
 t_stat show_version (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, CONST char *cptr)
@@ -6222,6 +6282,8 @@ if (flag) {
         char *proc_rev = getenv ("PROCESSOR_REVISION");
         char *proc_arch3264 = getenv ("PROCESSOR_ARCHITEW6432");
         char osversion[PATH_MAX+1] = "";
+        char tarversion[PATH_MAX+1] = "";
+        char curlversion[PATH_MAX+1] = "";
         FILE *f;
 
         if ((f = _popen ("ver", "r"))) {
@@ -6237,10 +6299,18 @@ if (flag) {
         fprintf (st, "\n        Architecture: %s%s%s, Processors: %s", arch, proc_arch3264 ? " on " : "", proc_arch3264 ? proc_arch3264  : "", procs);
         fprintf (st, "\n        Processor Id: %s, Level: %s, Revision: %s", proc_id ? proc_id : "", proc_level ? proc_level : "", proc_rev ? proc_rev : "");
         strlcpy (os_type, "Windows", sizeof (os_type));
+        strlcpy (tarversion, _get_tool_version ("tar"), sizeof (tarversion));
+        if (tarversion[0])
+            fprintf (st, "\n        tar tool: %s", tarversion);
+        strlcpy (curlversion, _get_tool_version ("curl"), sizeof (curlversion));
+        if (curlversion[0])
+            fprintf (st, "\n        curl tool: %s", curlversion);
         }
 #else
     if (1) {
         char osversion[2*PATH_MAX+1] = "";
+        char tarversion[PATH_MAX+1] = "";
+        char curlversion[PATH_MAX+1] = "";
         FILE *f;
         
         if ((f = popen ("uname -a", "r"))) {
@@ -6262,6 +6332,12 @@ if (flag) {
                 } while (os_type[0] == '\0');
             pclose (f);
             }
+        strlcpy (tarversion, _get_tool_version ("tar"), sizeof (tarversion));
+        if (tarversion[0])
+            fprintf (st, "\n        tar tool: %s", tarversion);
+        strlcpy (curlversion, _get_tool_version ("curl"), sizeof (curlversion));
+        if (curlversion[0])
+            fprintf (st, "\n        curl tool: %s", curlversion);
         }
 #endif
     if ((!strcmp (os_type, "Unknown")) && (getenv ("OSTYPE")))
@@ -13714,6 +13790,35 @@ else {
     }
 return ret;
 }
+
+/* Command interfaces to external tools
+ * tar
+ * curl
+ */
+
+
+static t_stat _process_cmd (const char *cmd, CONST char *cptr)
+{
+char gbuf[CBUFSIZE*2];
+
+if (_get_tool_version (cmd)[0]) {
+    snprintf (gbuf, sizeof (gbuf), "%s %s", cmd, cptr);
+    return spawn_cmd (0, gbuf);
+    }
+else
+    return SCPE_NOFNC;
+}
+
+t_stat tar_cmd (int32 flag, CONST char *cptr)
+{
+return _process_cmd ("tar", cptr);
+}
+
+t_stat curl_cmd (int32 flag, CONST char *cptr)
+{
+return _process_cmd ("curl", cptr);
+}
+
 
 /* Hierarchical help presentation
  *
