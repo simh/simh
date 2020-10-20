@@ -1844,7 +1844,7 @@ else return 0;
 uint32 int_auto (uint32 dev, uint32 cc)
 {
 uint32 addr, vec, by, ccw, ccwa, ccwb;
-uint32 i, hw, tblad, tblen, bufe, st, t;
+uint32 i, hw, tblad, tblen, bufe, st = 0, t;
 int32 bufc;
 uint32 oldPSW = BUILD_PSW (cc);
 

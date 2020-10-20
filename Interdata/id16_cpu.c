@@ -596,7 +596,7 @@ while (reason == 0) {                                   /* loop until halted */
     uint32 dev, drom, inc, lim, opnd;
     uint32 op, r1, r1p1, r2, ea = 0, oPC;
     uint32 rslt, t, map;
-    uint32 ir1, ir2, ityp;
+    uint32 ir1, ir2 = 0, ityp;
     int32 sr, st;
 
     if (sim_interval <= 0) {                            /* check clock queue */
