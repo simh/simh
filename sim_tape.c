@@ -773,18 +773,26 @@ switch (MT_GET_FMT (uptr)) {
                 break;
                 }
             tape_classify_file_contents (f, &max_record_size, &lf_line_endings, &crlf_line_endings);
-            if (!lf_line_endings && !crlf_line_endings) {   /* binary file? */
+            if (!lf_line_endings && !crlf_line_endings) {       /* binary file? */
                 if (uptr->recsize == 0) {
                     r = sim_messagef (SCPE_ARG, "Binary file %s must specify a record size with -B\n", cptr);
                     fclose (f);
                     break;
                     }
-                block = (uint8 *)malloc (uptr->recsize);
+                block = (uint8 *)malloc (tape->block_size);
                 tape->block_size = uptr->recsize;
                 while (!feof (f) && !error) {
                     size_t data_read = fread (block, 1, tape->block_size, f);
+                    if (data_read == tape->block_size)
+                        error = memory_tape_add_block (tape, block, tape->block_size);
+                    else {
+                        if (data_read != 0) {
+                            r = sim_messagef (SCPE_ARG, "Read %u bytes of data when expecting %u bytes\n", (uint32)data_read, (uint32)tape->block_size);
+                            error = TRUE;
+                            }
+                        }
                     if (data_read > 0)
-                        error = memory_tape_add_block (tape, block, data_read);
+                        error = memory_tape_add_block (tape, block, tape->block_size);
                     }
                 }
             else {                                              /* text file */
@@ -796,22 +804,22 @@ switch (MT_GET_FMT (uptr)) {
                     break;
                     }
                 tape->block_size = uptr->recsize;
-                block = (uint8 *)calloc (1, uptr->recsize + 3);
+                block = (uint8 *)calloc (1, tape->block_size + 3);
                 while (!feof (f) && !error) {
-                    if (fgets ((char *)block, uptr->recsize + 3, f)) {
+                    if (fgets ((char *)block, tape->block_size + 3, f)) {
                         size_t len = strlen ((char *)block);
 
                         while ((len > 0) && 
                                ((block[len - 1] == '\r') || (block[len - 1] == '\n')))
                             --len;
-                        memset (block + len, ' ', uptr->recsize - len);
+                        memset (block + len, ' ', tape->block_size - len);
                         if (sim_switches & SWMASK ('C')) {
                             uint32 i;
 
-                            for (i = 0; i < uptr->recsize; i++)
+                            for (i = 0; i < tape->block_size; i++)
                                 block[i] = ascii2ebcdic[block[i]];
                             }
-                        error = memory_tape_add_block (tape, block, uptr->recsize);
+                        error = memory_tape_add_block (tape, block, tape->block_size);
                         }
                     else
                         error = ferror (f);
@@ -4418,6 +4426,8 @@ static void memory_free_tape (void *vtape)
 uint32 i;
 MEMORY_TAPE *tape = (MEMORY_TAPE *)vtape;
 
+if (tape == NULL)
+    return;
 for (i = 0; i < tape->record_count; i++) {
     free (tape->records[i]);
     tape->records[i] = NULL;
@@ -4663,14 +4673,14 @@ while (EOF != (chr = fgetc (f))) {
 
         if (last_cr == (pos - 1)) {
             ++crlf_lines;
-            line_size = (pos - (line_start - 2));
+            line_size = pos - line_start - 1;
             }
         else {
             ++lf_lines;
-            line_size = (pos - (line_start - 1));
+            line_size = pos - line_start;
             }
-        if ((line_size + 4) > (long)(*max_record_size + 4))
-            *max_record_size = line_size + 4;
+        if (line_size > (long)(*max_record_size))
+            *max_record_size = line_size;
         line_start = pos + 1;
         last_lf = pos;
         }
@@ -4717,9 +4727,8 @@ static int ansi_add_file_to_tape (MEMORY_TAPE *tape, const char *filename)
 FILE *f;
 struct ansi_tape_parameters *ansi = &ansi_args[tape->ansi_type];
 uint8 *block = NULL;
-size_t max_record_size;
-t_bool lf_line_endings;
-t_bool crlf_line_endings;
+size_t rms_record_size, max_record_size;
+t_bool lf_line_endings, crlf_line_endings;
 char file_sequence[5];
 int block_count = 0;
 char block_count_string[17];
@@ -4733,15 +4742,49 @@ f = tape_open_and_check_file (filename);
 if (f == NULL)
     return TRUE;
 
-tape_classify_file_contents (f, &max_record_size, &lf_line_endings, &crlf_line_endings);
+tape_classify_file_contents (f, &rms_record_size, &lf_line_endings, &crlf_line_endings);
+if (!lf_line_endings && !crlf_line_endings) {           /* Binary File? */
+    max_record_size = rms_record_size;
+    }
+else {                                                  /* Text file */
+    if (ansi->fixed_text) {
+        /* ANSI-RT11 and ANSI-RSTS text files are unformatted, i.e., a stream of bytes */
+        max_record_size = rms_record_size = 512;
+        /* max_record_size must fit */
+        ASSURE((tape->block_size == 512));              /* ANSI-RT11 and ANSI-RSTS are forced to use -B 512, above */
+        }
+    else {
+        /* All other ANSI formats use D Record Format */
+        /* Add the 4-character ANSI RCW and the length of the line endings to rms_record_size */
+        max_record_size = 4 + rms_record_size +
+                          (crlf_line_endings ? 2 - ansi->skip_crlf_line_endings :
+                                               1 - ansi->skip_lf_line_endings);
+        /* max_record_size must fit in the 4-character ANSI RCW */
+        if (max_record_size > 9999) {
+            size_t max_allowed = 9999 - 4 - 
+                                 (crlf_line_endings ? 2 - ansi->skip_crlf_line_endings :
+                                                      1 - ansi->skip_lf_line_endings);
+            sim_messagef (SCPE_ARG, "Text file: %s has lines longer (%d) than %s format allows (%d)\n",
+                                    filename, (int)rms_record_size, ansi->name, (int)max_allowed);
+            fclose (f);
+            return TRUE;
+            }
+        }
+    }
+/* max_record_size must be no greater than the block size */
+if (max_record_size > tape->block_size) {
+    sim_messagef (SCPE_ARG, "%s file: %s requires a minimum block size of %d\n",
+                            (lf_line_endings || crlf_line_endings) ? "Text" : "Binary", filename, (int)max_record_size);
+    fclose (f);
+    return TRUE;
+    }
 ansi_make_HDR1 (&hdr1, &tape->vol1, &hdr4, filename, tape->ansi_type);
 sprintf (file_sequence, "%04d", 1 + tape->file_count);
 memcpy (hdr1.file_sequence, file_sequence, sizeof (hdr1.file_sequence));
-if (ansi->fixed_text)
-    max_record_size = 512;
 ansi_make_HDR2 (&hdr2, !lf_line_endings && !crlf_line_endings, tape->block_size, max_record_size, tape->ansi_type);
 
 if (!(ansi->nohdr3)) {               /* Need HDR3? */
+    char size[5];
     if (!lf_line_endings && !crlf_line_endings)         /* Binary File? */
         memcpy (&hdr3, ansi->hdr3_fixed, sizeof (hdr3));
     else {                                              /* Text file */
@@ -4750,6 +4793,8 @@ if (!(ansi->nohdr3)) {               /* Need HDR3? */
         else
             memcpy (&hdr3, ansi->hdr3_crlf_line_endings, sizeof (hdr3));
         }
+    sprintf (size, "%04x", (uint16)rms_record_size);
+    memcpy (hdr3.rms_attributes, size, 4);
     }
 memory_tape_add_block (tape, (uint8 *)&hdr1, sizeof (hdr1));
 if (!(ansi->nohdr2))
@@ -4769,8 +4814,18 @@ while (!feof (f) && !error) {
                                crlf_line_endings ? ansi->skip_crlf_line_endings : ansi->skip_lf_line_endings, 
                                ansi->fixed_text);
 
-    else                                                /* Binary file */
+    else {                                              /* Binary file */
+        size_t runt;
         data_read = fread (block, 1, tape->block_size, f);
+        runt = data_read % max_record_size; /* data_read (=0) % 0 == 0 */
+        /* Pad short records with zeros */
+        if (runt > 0) {
+            size_t nPad = max_record_size - runt;
+            memset (block + data_read, 0, nPad);
+            data_read += nPad;
+            }
+        }
+
     if (data_read > 0) {
         error = memory_tape_add_block (tape, block, data_read);
         if (!error)
