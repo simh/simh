@@ -474,6 +474,8 @@ if (tbc_fifo[id].count < FIFO_LEN) {
         tbc_fifo[id].get_ptr = 0;
     tbc_fifo[id].count = tbc_fifo[id].count + 4;
     }
+else
+    *data = 0;
 }
 
 void ve_clear_fifo (uint32 id)

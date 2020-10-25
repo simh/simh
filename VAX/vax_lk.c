@@ -277,8 +277,10 @@ if (fifo->count > 0) {
     fifo->count--;
     return SCPE_OK;
     }
-else
+else {
+    *data = 0;
     return SCPE_EOF;
+    }
 }
 
 void lk_clear_fifo (LK_FIFO *fifo)

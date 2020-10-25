@@ -1696,7 +1696,7 @@ sim_debug (DBG_ROP, gpx_dev, "\n");
 
 t_stat va_ptb (UNIT *uptr, t_bool zmode)
 {
-uint32 val, sc;
+uint32 val = 0, sc;
 t_bool clip;
 
 if ((uptr->CMD != CMD_PTBX) && (uptr->CMD != CMD_PTBZ))
@@ -1768,6 +1768,7 @@ if ((va_adp[ADP_STAT] & ADPSTAT_RC) && (va_adp_fifo_sz == 0)) {
     va_adpstat (ADPSTAT_AC, 0);
     return SCPE_OK;
     }
+sc = 0;
 for (val = 0;;) {
     if (zmode) {
         if ((va_adp[ADP_STAT] & ADPSTAT_ITR) == 0)      /* no space in FIFO? */
