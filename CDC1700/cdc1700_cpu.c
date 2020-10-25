@@ -1608,6 +1608,9 @@ t_stat executeAnInstruction(void)
             case MOD_O_M | MOD_O_Q:
               operand2 = Qreg | Mreg;
               break;
+
+            default:
+              ASSURE(0);
           }
 
           switch (instr & (MOD_LP | MOD_XR)) {

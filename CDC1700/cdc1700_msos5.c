@@ -225,7 +225,6 @@ static uint16 luabs(uint16 param, uint16 lu, uint16 a)
 static uint16 spabs(uint16 param)
 {
   uint16 sa = M[param + 5];
-  uint16 sl = param + 5;
 
   /*
    * If the D bit is set, the starting address must be absolute.

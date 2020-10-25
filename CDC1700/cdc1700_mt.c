@@ -168,6 +168,7 @@ static uint16 mtbootstrap9[] = {
 };
 #define MTBOOTLEN9      (sizeof(mtbootstrap9) / sizeof(uint16))
 
+#if 0
 /*
  * Seven-track magnetic tape bootstrap
  */
@@ -213,6 +214,7 @@ static uint16 mtbootstrap7[] = {
   0x0000                        /* 26:              */
 };
 #define MTBOOTLEN7      (sizeof(mtbootstrap7) / sizeof(uint16))
+#endif
 
 /*
  * SMM17 bootstraps
@@ -239,6 +241,7 @@ static uint16 smm17boot9[] = {
 };
 #define SMM17BOOTLEN9   (sizeof(smm17boot9) / sizeof(uint16))
 
+#if 0
 static uint16 smm17boot7[] = {
   0x68FE,                       /* xFE0: MTBOOT STA*    *-1             */
   0xE000,                       /* xFE1:        LDQ     =N$WESD         */
@@ -271,6 +274,7 @@ static uint16 smm17boot7[] = {
   0x1007                        /* xFFC:        JMP-    QL ENTRY        */
 };
 #define SMM17BOOTLEN7   (sizeof(smm17boot7) / sizeof(uint16))
+#endif
 
 /*
  * Shared I/O buffer. Note that this is larger than the max possible memory
@@ -1321,6 +1325,7 @@ t_stat mt_svc(UNIT *uptr)
       break;
 
     case IO_1732_SFWD:
+      status = MTSE_OK;
       while (!sim_tape_eot(uptr)) {
         status = sim_tape_sprecf(uptr, &temp);
         
@@ -1342,6 +1347,7 @@ t_stat mt_svc(UNIT *uptr)
       break;
 
      case IO_1732_SBACK:
+       status = MTSE_OK;
        while (!sim_tape_bot(uptr)) {
          status = sim_tape_sprecr(uptr, &temp);
 
@@ -1720,7 +1726,6 @@ enum IOstatus doMTFunction(DEVICE *dev)
 {
   UNIT *uptr;
   t_stat st;
-  t_mtrlnt count = 1;
 
   /*
    * Handle commands in the following order:
@@ -1883,6 +1888,12 @@ enum IOstatus MTout(IO_DEVICE *iod, uint8 reg)
 
     case 0x02:
       /*
+       * Get the unit number for select
+       */
+      unit = MTdev.iod_type == DEVTYPE_1732_3 ? IO_1732_UNIT : IO_1732A_UNIT;
+      unit = (unit & Areg) >> 7;
+
+      /*
        * Check for invalid bit combinations.
        */
       if ((Areg & IO_1732_PARITY) == IO_1732_PARITY)
@@ -1896,9 +1907,6 @@ enum IOstatus MTout(IO_DEVICE *iod, uint8 reg)
         /*
          * Check for illegal unit select.
          */
-        unit = MTdev.iod_type == DEVTYPE_1732_3 ? IO_1732_UNIT : IO_1732A_UNIT;
-        unit = (unit & Areg) >> 7;
-
         if (unit >= mt_dev.numunits)
           return IO_REJECT;
       }

@@ -1078,7 +1078,6 @@ t_stat cd_reset(DEVICE *dptr)
 t_stat cd_attach(UNIT *uptr, CONST char *cptr)
 {
   struct cdio_unit *iou = (struct cdio_unit *)uptr->up7;
-  const char *drivetype = ((uptr->flags & UNIT_856_4) != 0) ? "856-4" : "856-2";
   t_addr capac = ((uptr->flags & UNIT_856_4) != 0) ? CD856_4_SIZE : CD856_2_SIZE;
   t_stat r;
 
@@ -1115,7 +1114,7 @@ t_stat cd_detach(UNIT *uptr)
 {
   struct cdio_unit *iou = (struct cdio_unit *)uptr->up7;
   t_stat stat;
-
+  
   sim_cancel(uptr);
   stat = detach_unit(uptr);
 
@@ -1124,15 +1123,13 @@ t_stat cd_detach(UNIT *uptr)
     if (iou->ondrive[iou->disk] == uptr)
       iou->disk = CD_NONE;
 
-  return SCPE_OK;
+  return stat;
 }
 
 /* Check if I/O should be rejected */
 
 t_bool CDreject(IO_DEVICE *iod, t_bool output, uint8 reg)
 {
-  struct cdio_unit *iou = (struct cdio_unit *)iod->iod_drive;
-
   if (output) {
     switch (reg) {
       /*

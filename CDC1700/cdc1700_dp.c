@@ -837,7 +837,6 @@ t_stat dp_reset(DEVICE *dptr)
 t_stat dp_attach(UNIT *uptr, CONST char *cptr)
 {
   struct dpio_unit *iou = (struct dpio_unit *)uptr->up7;
-  const char *drivetype = ((uptr->flags & UNIT_854) != 0) ? "854" : "853";
   t_addr capac = ((uptr->flags & UNIT_854) != 0) ? DP854_SIZE : DP853_SIZE;
   t_stat r;
 
