@@ -7800,14 +7800,15 @@ jrstf:
                      sect = prev_sect;
                   if (sect != 0 && (AR & SMASK) == 0 && (AR & SECTM) != 0) {
                      AR = (AR - 1) & FMASK;
+                     set_reg(AC, AR & FMASK);
                      break;
                   }
               }
 #endif
 #if PDP6 | KL
               /* This has to before the check for KL10 B extended check */
-              i_flags |= SAC;
               AR = SOB(AR);
+              set_reg(AC, AR & FMASK);
 #endif
               if ((AR & C1) == 0) {
 #if KI | KL

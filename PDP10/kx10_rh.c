@@ -505,6 +505,8 @@ rh_devirq(uint32 dev, t_addr addr) {
            addr = RSIGN | rhc->ivect;
         else if (rhc->imode == 2) /* RH20 style */
            addr = rhc->ivect;
+    } else {
+       sim_printf("Unable to find device %03o\n\r", dev);
     }
     return  addr;
 }
