@@ -315,6 +315,7 @@
     else *(((uint32 *) mb) + ((uint32) j)) = v;
 #endif
 
+#define SIM_DBG_EVENT_NEG   0x01000000      /* negative event dispatch activities */
 #define SIM_DBG_EVENT       0x02000000      /* event dispatch activities */
 #define SIM_DBG_ACTIVATE    0x04000000      /* queue insertion activities */
 #define SIM_DBG_AIO_QUEUE   0x08000000      /* asynch event queue activities */
@@ -325,6 +326,7 @@
 
 static DEBTAB scp_debug[] = {
   {"EVENT",     SIM_DBG_EVENT,      "Event Dispatch Activities"},
+  {"NEGATIVE",  SIM_DBG_EVENT_NEG,  "Negative Event Dispatch Activities"},
   {"ACTIVATE",  SIM_DBG_ACTIVATE,   "Event Queue Insertion Activities"},
   {"QUEUE",     SIM_DBG_AIO_QUEUE,  "Asynch Event Queue Activities"},
   {"EXPSTACK",  SIM_DBG_EXP_STACK,  "Expression Stack Activities"},
@@ -336,14 +338,14 @@ static DEBTAB scp_debug[] = {
 
 static const char *sim_scp_description (DEVICE *dptr)
 {
-return "SCP Event and Internal Command Processing";
+return "SCP Event and Internal Command Processing and Testing";
 }
 
-static UNIT scp_unit;
+static UNIT scp_test_units[4];
 
 DEVICE sim_scp_dev = {
-    "SCP-PROCESS", &scp_unit, NULL, NULL, 
-    1, 0, 0, 0, 0, 0, 
+    "SCP-PROCESS", scp_test_units, NULL, NULL, 
+    4, 0, 0, 0, 0, 0, 
     NULL, NULL, NULL, NULL, NULL, NULL, 
     NULL, DEV_NOSAVE|DEV_DEBUG, 0, 
     scp_debug, NULL, NULL, NULL, NULL, NULL,
@@ -11433,6 +11435,7 @@ t_stat sim_process_event (void)
 {
 UNIT *uptr;
 t_stat reason, bare_reason;
+int32 sim_interval_catchup;
 
 if (stop_cpu) {                                         /* stop CPU? */
     stop_cpu = 0;
@@ -11440,21 +11443,45 @@ if (stop_cpu) {                                         /* stop CPU? */
     }
 AIO_UPDATE_QUEUE;
 UPDATE_SIM_TIME;                                        /* update sim time */
-
+if (sim_interval > 0) {
+    sim_debug (SIM_DBG_EVENT, &sim_scp_dev, "Interval not yet expired: %d\n", sim_interval);
+    return SCPE_OK;
+    }
 if (sim_clock_queue == QUEUE_LIST_END) {                /* queue empty? */
     sim_interval = noqueue_time = NOQUEUE_WAIT;         /* flag queue empty */
     sim_debug (SIM_DBG_EVENT, &sim_scp_dev, "Queue Empty New Interval = %d\n", sim_interval);
     return SCPE_OK;
     }
 sim_processing_event = TRUE;
+/* If sim_interval is negative, we've missed the opportunity to  */
+/* dispatch one or more events when they were scheduled to fire. */
+/* To accomodate this, we backup time to when the first event    */
+/* was supposed to fire and advance it from there until things   */
+/* have caught up.                                               */
+if (sim_interval < 0) {
+    sim_interval_catchup = sim_interval;
+    sim_interval = 0;
+    UPDATE_SIM_TIME;                          /* update sim time */
+    sim_debug (SIM_DBG_EVENT_NEG, &sim_scp_dev, "Processing event for %s with sim_interval = %d, event time = %.0f\n", 
+        sim_uname (sim_clock_queue), sim_interval_catchup, sim_gtime ());
+    if (sim_clock_queue->next != QUEUE_LIST_END)
+        sim_debug (SIM_DBG_EVENT_NEG, &sim_scp_dev, "- Next event for %s after = %d\n", 
+            sim_uname (sim_clock_queue->next), sim_clock_queue->next->time);
+    sim_time -= sim_clock_queue->time;
+    sim_rtime -= sim_clock_queue->time;
+    }
+else
+    sim_interval_catchup = 0;
 do {
     uptr = sim_clock_queue;                             /* get first */
     sim_clock_queue = uptr->next;                       /* remove first */
     uptr->next = NULL;                                  /* hygiene */
-    sim_interval -= uptr->time;
     uptr->time = 0;
-    if (sim_clock_queue != QUEUE_LIST_END)
-        sim_interval += sim_clock_queue->time;
+    if (sim_clock_queue != QUEUE_LIST_END) {
+        if (sim_interval_catchup < 0)
+            sim_interval = -sim_interval_catchup;
+        sim_interval += sim_interval_catchup + sim_clock_queue->time;
+        }
     else
         sim_interval = noqueue_time = NOQUEUE_WAIT;
     AIO_EVENT_BEGIN(uptr);
@@ -11470,6 +11497,13 @@ do {
             reason = SCPE_OK;
         }
     AIO_EVENT_COMPLETE(uptr, reason);
+    if (sim_interval_catchup < -1) {
+        sim_interval_catchup += sim_clock_queue->time;
+        sim_time += sim_clock_queue->time;
+        sim_rtime += sim_clock_queue->time;
+        }
+    else
+        sim_interval_catchup = 0;
     bare_reason = SCPE_BARE_STATUS (reason);
     if ((bare_reason != SCPE_OK)      && /* Provide context for unexpected errors */
         (bare_reason >= SCPE_BASE)    &&
@@ -11482,7 +11516,7 @@ do {
         (bare_reason != SCPE_EXIT))
         sim_messagef (reason, "\nUnexpected internal error while processing event for %s which returned %d - %s\n", sim_uname (uptr), reason, sim_error_text (reason));
     } while ((reason == SCPE_OK) && 
-             (sim_interval <= 0) && 
+             ((sim_interval + sim_interval_catchup) <= 0) && 
              (sim_clock_queue != QUEUE_LIST_END) &&
              (!stop_cpu));
 
@@ -15617,6 +15651,108 @@ MClose (f);
 return stat;
 }
 
+static t_stat sim_scp_svc (UNIT *uptr)
+{
+DEVICE *dptr = find_dev_from_unit (uptr);
+sim_printf ("Unit %s fired at %.0f\n", sim_uname (uptr), sim_gtime ());
+return SCPE_OK;
+}
+
+static t_stat test_scp_event_sequencing ()
+{
+DEVICE *dptr = &sim_scp_dev;
+uint32 i;
+int active;
+t_stat r = SCPE_OK;
+int32 start_deb_switches = sim_set_deb_switches (0);
+
+sim_set_deb_switches (SWMASK ('F'));
+sim_scp_dev.dctrl = 0xFFFFFFFF;
+
+/* reset queue */
+while (sim_clock_queue != QUEUE_LIST_END)
+    sim_cancel (sim_clock_queue);
+sim_time = sim_rtime = 0;
+noqueue_time = sim_interval = 0;
+
+/* queue test unit events */
+for (i = 0; i < dptr->numunits; i++) {
+    dptr->units[i].action = sim_scp_svc;    /* connect the action routine to the unit */
+    r = sim_activate (&dptr->units[i], i);
+    if (SCPE_OK != r)
+        return sim_messagef (SCPE_IERR, "sim_activate() unexpected result: %s\n", sim_error_text (r));
+    }
+/* check test unit events */
+for (i = 0; i < dptr->numunits; i++) {
+    int32 t = sim_activate_time (&dptr->units[i]);
+
+    if (t != i + 1)
+        return sim_messagef (SCPE_IERR, "sim_activate_time() unexpected result for unit %d: %d\n", i, t);
+    }
+sim_printf ("sim_interval = %d, sim_gtime = %.0f\n", sim_interval, sim_gtime ());
+/* check test unit events with negative sim_interval */
+sim_interval = -((int32)dptr->numunits);
+sim_printf ("sim_interval = %d, sim_gtime = %.0f\n", sim_interval, sim_gtime ());
+for (i = 0; i < dptr->numunits; i++) {
+    int32 t = sim_activate_time (&dptr->units[i]);
+
+    if (t != i + 1)
+        return sim_messagef (SCPE_IERR, "sim_activate_time() unexpected result for unit %d: %d\n", i, t);
+    }
+r = sim_process_event ();
+if (r != SCPE_OK)
+    return sim_messagef (SCPE_IERR, "sim_process_event() unexpected result: %s\n", sim_error_text (r));
+sim_printf ("after sim_process_event() sim_interval = %d, sim_gtime = %.0f\n", sim_interval, sim_gtime ());
+/* check to make sure that all units have fired */
+for (i = 0; i < dptr->numunits; i++) {
+    int32 t = sim_activate_time (&dptr->units[i]);
+
+    if (t != 0)
+        return sim_messagef (SCPE_IERR, "sim_activate_time() unexpected result for unit %d: %d\n", i, t);
+    }
+/* queue test unit events again with an offset of 1 */
+for (i = 0; i < dptr->numunits; i++) {
+    r = sim_activate (&dptr->units[i], i + 1);
+    if (SCPE_OK != r)
+        return sim_messagef (SCPE_IERR, "sim_activate() unexpected result: %s\n", sim_error_text (r));
+    }
+/* try to process events without advancing sim_interval */
+r = sim_process_event ();
+if (r != SCPE_OK)
+    return sim_messagef (SCPE_IERR, "sim_process_event() unexpected result: %s\n", sim_error_text (r));
+for (i = 0, active = 0; i < dptr->numunits; i++) {
+    if (sim_is_active (&dptr->units[i]))
+        ++active;
+    }
+if (active != dptr->numunits)
+    return sim_messagef (SCPE_IERR, "unexpected count %d of active/queued units - expected %d\n", active, (int)dptr->numunits);
+/* advance sim_interval by an amount that should leave one event queued next time */
+sim_interval = -((int32)dptr->numunits - 1);
+r = sim_process_event ();
+if (r != SCPE_OK)
+    return sim_messagef (SCPE_IERR, "sim_process_event() unexpected result: %s\n", sim_error_text (r));
+for (i = 0, active = 0; i < dptr->numunits; i++) {
+    if (sim_is_active (&dptr->units[i]))
+        ++active;
+    }
+if (active != 1)
+    return sim_messagef (SCPE_IERR, "unexpected count %d of active/queued units - expected %d\n", active, 1);
+r = sim_activate_after (dptr->units, 10);
+if (r != SCPE_OK)
+    return sim_messagef (SCPE_IERR, "sim_activate_after() unexpected result: %s\n", sim_error_text (r));
+sim_interval = -1;  /* This should cover the remaining event on the last unit from above and leave the timer based one */
+r = sim_process_event ();
+if (r != SCPE_OK)
+    return sim_messagef (SCPE_IERR, "sim_process_event() unexpected result: %s\n", sim_error_text (r));
+for (i = 0, active = 0; i < dptr->numunits; i++) {
+    if (sim_is_active (&dptr->units[i]))
+        ++active;
+    }
+if (active != 1)
+    return sim_messagef (SCPE_IERR, "unexpected count %d of active/queued units - expected %d\n", active, 1);
+sim_set_deb_switches (start_deb_switches);
+return r;
+}
 
 /*
  * Compiled in unit tests for the various device oriented library 
@@ -15653,6 +15789,8 @@ if (sim_switches & SWMASK ('D')) {
     sim_set_debon (0, "STDOUT");
     sim_switches = saved_switches;
     }
+if (test_scp_event_sequencing () != SCPE_OK)
+    return sim_messagef (SCPE_IERR, "SCP event sequencing test failed\n");
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
     t_stat tstat = SCPE_OK;
     t_bool was_disabled = ((dptr->flags & DEV_DIS) != 0);
