@@ -15653,7 +15653,6 @@ return stat;
 
 static t_stat sim_scp_svc (UNIT *uptr)
 {
-DEVICE *dptr = find_dev_from_unit (uptr);
 sim_printf ("Unit %s fired at %.0f\n", sim_uname (uptr), sim_gtime ());
 return SCPE_OK;
 }
