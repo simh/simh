@@ -223,6 +223,7 @@ sim_instr(void)
                 else
                     break;      /* process */
             }
+            sim_interval--;
         }
 
         if (iowait == 0 && sim_brk_summ && sim_brk_test(IC, SWMASK('E'))) {
