@@ -188,7 +188,7 @@ t_stat dsk_cmd(uint16 cmd, uint16 dev, uint8 chan, uint16 *wc)
     } else {
         uptr->CMD |= DK_ADDR;
     }
-    sim_activate(uptr, 100);
+    sim_activate(uptr, 90);
     return SCPE_OK;
 }
         
@@ -292,7 +292,7 @@ t_stat dsk_srv(UNIT * uptr)
             sim_activate(eptr, 8000);
             return SCPE_OK;
         }
-        sim_activate(uptr, 100);
+        sim_activate(uptr, 90);
     }
     return SCPE_OK;
 }

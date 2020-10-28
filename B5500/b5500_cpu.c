@@ -2001,6 +2001,7 @@ sim_instr(void)
             reason = sim_process_event();
             if (reason != SCPE_OK)
                  break; /* process */
+            sim_interval--;
         }
         /* Passed time quantum */
         if (sim_interval <= 0) {        /* event queue? */
