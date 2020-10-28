@@ -4259,7 +4259,7 @@ in_loop:
          }
          /* Handle events during a indirect loop */
          AIO_CHECK_EVENT;                                   /* queue async events */
-         if (sim_interval-- <= 0) {
+         if (--sim_interval <= 0) {
               if ((reason = sim_process_event()) != SCPE_OK) {
                   return reason;
               }
@@ -9049,14 +9049,6 @@ do_byte_setup(int n, int wr, int *pos, int *sz)
                 AB = MB & RMASK;
              }
          }
-#if 0
-         /* Handle events during a indirect loop */
-         if (sim_interval-- <= 0) {
-              if (sim_process_event() != SCPE_OK) {
-                  return -1;
-              }
-         }
-#endif
     };
     /* Update pointer */
     val1 &= PMASK;

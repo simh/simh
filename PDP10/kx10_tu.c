@@ -556,7 +556,7 @@ t_stat tu_srv(UNIT * uptr)
                  uptr->DATAPTR = uptr->hwmark-1;
                  uptr->CPOS = cc_max;
                  rhc->buf = 0;
-                 sim_activate(uptr, 100);
+                 sim_activate(uptr, 120);
              }
              return SCPE_OK;
          }
@@ -609,7 +609,7 @@ t_stat tu_srv(UNIT * uptr)
                  uptr->DATAPTR = 0;
                  uptr->CPOS = 0;
                  rhc->buf = 0;
-                 sim_activate(uptr, 100);
+                 sim_activate(uptr, 120);
              }
              return SCPE_OK;
          }
@@ -779,11 +779,11 @@ t_stat tu_srv(UNIT * uptr)
             return SCPE_OK;
          } else {
             tu_tcr[ctlr] &= ~(TC_FCS);
-            sim_activate(uptr, reclen * 50);
+            sim_activate(uptr, reclen * 100);
          }
          return SCPE_OK;
     }
-    sim_activate(uptr, 20);
+    sim_activate(uptr, 50);
     return SCPE_OK;
 }
 

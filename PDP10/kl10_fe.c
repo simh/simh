@@ -1797,7 +1797,7 @@ t_stat dteo_svc (UNIT *uptr)
     while(not_empty(&cty_out)) {
         char ch = cty_out.buff[cty_out.out_ptr];
         if (ch != 0) {
-            if (sim_putchar(ch) != SCPE_OK) {
+            if (sim_putchar_s(ch) != SCPE_OK) {
                 sim_activate(uptr, 1000);
                 return SCPE_OK;;
             }
