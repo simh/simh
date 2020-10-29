@@ -379,7 +379,7 @@ unsigned int m68k_cpu_read_long(unsigned int address) {
         case DISK_STATUS:
             return hdsk_getStatus();
         case M68K_GET_TIME:
-            return (unsigned int)(time(NULL));
+            return (unsigned int)(sim_get_time(NULL));
         default:
             break;
     }

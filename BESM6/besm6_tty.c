@@ -239,7 +239,7 @@ t_stat vt_clk (UNIT * this)
         }
         tmxr_linemsg (t, buf);
         tty_idle_count[num] = 0;
-        tty_last_time[num] = time (0);
+        tty_last_time[num] = sim_get_time (0);
         sprintf (buf, "%.24s from %s\r\n",
                  ctime (&tty_last_time[num]),
                  t->ipad);
@@ -1061,7 +1061,7 @@ int vt_getc (int num)
         /* A telnet line. */
         c = tmxr_getc_ln (t);
         if (! (c & TMXR_VALID)) {
-            now = time (0);
+            now = sim_get_time (0);
             if (now > tty_last_time[num] + 5*60) {
                 ++tty_idle_count[num];
                 if (tty_idle_count[num] > 3) {
@@ -1075,7 +1075,7 @@ int vt_getc (int num)
             return -1;
         }
         tty_idle_count[num] = 0;
-        tty_last_time[num] = time (0);
+        tty_last_time[num] = sim_get_time (0);
 
         if (tty_unit[num].flags & TTY_CMDLINE_MASK) {
             /* Continuing CLI mode. */

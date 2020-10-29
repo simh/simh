@@ -1774,7 +1774,7 @@ static int32 simh_out(const int32 port, const int32 data) {
                     break;
 
                 case getClockZSDOSCmd:
-                    time(&now);
+                    sim_get_time(&now);
                     now += ClockZSDOSDelta;
                     currentTime = *localtime(&now);
                     currentTimeValid = TRUE;
@@ -1786,7 +1786,7 @@ static int32 simh_out(const int32 port, const int32 data) {
                     break;
 
                 case getClockCPM3Cmd:
-                    time(&now);
+                    sim_get_time(&now);
                     now += ClockCPM3Delta;
                     currentTime = *localtime(&now);
                     currentTimeValid = TRUE;

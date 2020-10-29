@@ -378,7 +378,7 @@ static uint8 SS1_Read(const uint32 Addr)
                       " RD: RTC  Cmd=0x%02x.\n", PCX, cData);
             break;
         case SS1_RTC_DATA:
-            time(&now);
+            sim_get_time(&now);
             now += ss1_rtc[0].clockDelta;
             currentTime = *localtime(&now);
 

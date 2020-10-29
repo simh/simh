@@ -90,7 +90,7 @@ struct tm *tptr;
 
 if (bufsiz < 12)
     return 0;
-curtim = time (NULL);                                   /* get time */
+curtim = sim_get_time (NULL);                           /* get time */
 tptr = localtime (&curtim);                             /* decompose */
 if (tptr == NULL)                                       /* error? */
     return 0;
