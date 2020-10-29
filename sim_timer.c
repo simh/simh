@@ -2188,6 +2188,17 @@ sim_debug (DBG_GET, &sim_timer_dev, "sim_rtcn_get_time(tmr=%d)\n", tmr);
 clock_gettime (CLOCK_REALTIME, now);
 }
 
+time_t sim_get_time (time_t *now)
+{
+struct timespec ts_now;
+
+sim_debug (DBG_GET, &sim_timer_dev, "sim_get_time()\n");
+sim_rtcn_get_time (&ts_now, 0);
+if (now)
+    *now = ts_now.tv_sec;
+return ts_now.tv_sec;
+}
+
 /* 
  * If the host system has a relatively large clock tick (as compared to
  * the desired simulated hz) ticks will naturally be scheduled late and
