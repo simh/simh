@@ -2315,7 +2315,7 @@ if (sim_deb_switches & SWMASK ('R')) {
     struct tm loc_tm, gmt_tm;
     time_t time_t_now;
 
-    clock_gettime(CLOCK_REALTIME, &sim_deb_basetime);
+    sim_rtcn_get_time(&sim_deb_basetime, 0);
     time_t_now = (time_t)sim_deb_basetime.tv_sec;
     /* Adjust the relative timebase to reflect the localtime GMT offset */
     loc_tm = *localtime (&time_t_now);

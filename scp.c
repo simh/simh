@@ -1127,12 +1127,12 @@ static const char simh_help1[] =
       "++RUNLIMIT n {%C|MICROSECONDS|SECONDS|MINUTES|HOURS}\n"
       "++NORUNLIMIT\n\n"
       "  Equivalently:\n\n"
-      "++SET RUNLIMIT n {CYCLES|MICROSECONDS|SECONDS|MINUTES|HOURS}\n"
+      "++SET RUNLIMIT n {%C|MICROSECONDS|SECONDS|MINUTES|HOURS}\n"
       "++SET NORUNLIMIT\n\n"
       " The run limit state can be examined with:\n\n"
       "++SHOW RUNLIMIT\n\n"
       " If the units of the run limit are not specified, the default units are\n"
-      " %C.  Once an execution run limit has beenn reached, any subsequent\n"
+      " %C.  Once an execution run limit has been reached, any subsequent\n"
       " GO, RUN, CONTINUE, STEP or BOOT commands will cause the simulator to\n"
       " exit.  A previously defined RUNLIMIT can be cleared with the NORUNLIMIT\n"
       " command or the establishment of a new run limit.\n"
@@ -4405,7 +4405,7 @@ int i;
 size_t outstr_off = 0;
 
 sim_exp_argv = do_arg;
-clock_gettime(CLOCK_REALTIME, &cmd_time);
+sim_rtcn_get_time (&cmd_time, 0);
 tmpbuf = (char *)malloc(instr_size);
 op = tmpbuf;
 oend = tmpbuf + instr_size - 2;
@@ -13287,7 +13287,7 @@ char pc_s[64] = "";
 struct timespec time_now;
 
 if (sim_deb_switches & (SWMASK ('T') | SWMASK ('R') | SWMASK ('A'))) {
-    clock_gettime(CLOCK_REALTIME, &time_now);
+    sim_rtcn_get_time(&time_now, 0);
     if (sim_deb_switches & SWMASK ('R'))
         sim_timespec_diff (&time_now, &time_now, &sim_deb_basetime);
     if (sim_deb_switches & SWMASK ('T')) {
