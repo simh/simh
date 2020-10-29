@@ -1528,7 +1528,7 @@ sim_instr(void)
                          struct tm    *tptr;
 
                              temp = 99999;
-                             curtim = time(NULL);        /* get time */
+                             curtim = sim_get_time(NULL);/* get time */
                              tptr = localtime(&curtim);  /* decompose */
                              if (tptr != NULL && tptr->tm_sec != 59) {
                                   /* Convert minutes to 100th hour */

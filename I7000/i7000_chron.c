@@ -155,7 +155,7 @@ chron_read_buff(UNIT * uptr, int cmd)
 
     uptr->u6 = 0;               /* Set to no data */
 
-    curtim = time(NULL);        /* get time */
+    curtim = sim_get_time(NULL);/* get time */
     tptr = localtime(&curtim);  /* decompose */
     if (tptr == NULL)
         return;                 /* error? */
