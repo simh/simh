@@ -70,7 +70,7 @@ DEVICE pclk_dev = {
 */
 t_stat pclk_devio(uint32 dev, uint64 *data)
 {
-    time_t t=time(NULL);
+    time_t t=sim_get_time(NULL);
     struct tm *dt;
     uint64 hour=12, minute=1, seconds=2, milliseconds=3;
     uint64 coni_word = ((minute&0xF)<<26) | (seconds<<20) | milliseconds;

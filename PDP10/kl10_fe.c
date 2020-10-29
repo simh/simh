@@ -1026,7 +1026,7 @@ dte_function(UNIT *uptr)
 
         case PRI_EMRDT:            /* Request Date/Time */
                {
-                   time_t t = time(NULL);
+                   time_t t = sim_get_time(NULL);
                    struct tm *tm = localtime(&t);
                    int yr = tm->tm_year + 1900;
                    int tim = (((tm->tm_hour * 60) + tm->tm_min) * 60) +

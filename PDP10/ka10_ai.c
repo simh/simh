@@ -809,7 +809,7 @@ static void channel_command (uint64 data)
         if (check_nxm (data, &n, &data2, &n2))
             break;
 
-        (void)clock_gettime(CLOCK_REALTIME, &ts);
+        (void)sim_rtcn_get_time (&ts, 0);
         latency_timer = ts.tv_nsec / 100000;
         latency_timer %= 254;
         M[data & ADDR] = latency_timer & 0377;
@@ -938,7 +938,7 @@ t_stat ai_devio(uint32 dev, uint64 *data) {
 
     case CONI|4:
         /* Latency timer, timer unit, attention unit. */
-        (void)clock_gettime(CLOCK_REALTIME, &ts);
+        (void)sim_rtcn_get_time (&ts, 0);
         latency_timer = ts.tv_nsec / 100000;
         latency_timer %= 254;
         *data = (latency_timer << 022)

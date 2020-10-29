@@ -77,7 +77,7 @@ DEVICE              pd_dev = {
 
 static uint64 pd_ticks (void)
 {
-    time_t t = time(NULL);
+    time_t t = sim_get_time(NULL);
     struct tm *x = localtime(&t);
     uint64 seconds;
     seconds = 86400ULL * x->tm_yday;
