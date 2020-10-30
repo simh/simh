@@ -43,7 +43,6 @@
 /*#define DBG_MSG */
 
 #include "altairz80_defs.h"
-#include <time.h>
 
 #ifdef DBG_MSG
 #define DBG_PRINT(args) sim_printf args
@@ -469,7 +468,7 @@ static void setClockSS1(void) {
     newTime.tm_isdst = -1;
     newTime_t = mktime(&newTime);
     if (newTime_t != (time_t)-1)
-        ss1_rtc[0].clockDelta = (int32)(newTime_t - time(NULL));
+        ss1_rtc[0].clockDelta = (int32)(newTime_t - sim_get_time(NULL));
 }
 
 static void generate_ss1_interrupt(void);

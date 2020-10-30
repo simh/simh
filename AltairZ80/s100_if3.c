@@ -43,7 +43,6 @@
 /*#define DBG_MSG */
 
 #include "altairz80_defs.h"
-#include <time.h>
 
 #ifdef DBG_MSG
 #define DBG_PRINT(args) sim_printf args
