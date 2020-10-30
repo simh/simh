@@ -32,7 +32,6 @@
 */
 
 #include "vax_defs.h"
-#include <time.h>
 
 /* control/status registers */
 

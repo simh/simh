@@ -30,7 +30,6 @@
 */
 
 #include "vax_defs.h"
-#include <time.h>
 
 #ifdef DONT_USE_INTERNAL_ROM
 #define BOOT_CODE_FILENAME "ka410.bin"

@@ -32,7 +32,6 @@
 #include "vax_defs.h"
 #include "sim_tmxr.h"
 #include "sim_ether.h"
-#include <time.h>
 
 #ifdef DONT_USE_INTERNAL_ROM
 #define BOOT_CODE_FILENAME "is1000.bin"

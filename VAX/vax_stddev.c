@@ -78,7 +78,6 @@
 
 #include "vax_defs.h"
 #include "sim_tmxr.h"
-#include <time.h>
 
 #define TTICSR_IMP      (CSR_DONE + CSR_IE)             /* terminal input */
 #define TTICSR_RW       (CSR_IE)

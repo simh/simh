@@ -31,7 +31,6 @@
 
 #include "vax_defs.h"
 #include "sim_ether.h"
-#include <time.h>
 
 #ifdef DONT_USE_INTERNAL_ROM
 #if defined (VAX_411)

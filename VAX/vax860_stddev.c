@@ -35,7 +35,6 @@
 
 #include "vax_defs.h"
 #include "sim_tmxr.h"
-#include <time.h>
 
 /* Terminal definitions */
 
