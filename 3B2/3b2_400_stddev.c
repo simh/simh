@@ -38,8 +38,6 @@
    - tod         MM58174A Real-Time-Clock
 */
 
-#include <time.h>
-
 #include "3b2_defs.h"
 #include "3b2_400_stddev.h"
 

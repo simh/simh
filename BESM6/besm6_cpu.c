@@ -53,7 +53,6 @@
 #include "besm6_defs.h"
 #include <math.h>
 #include <float.h>
-#include <time.h>
 
 
 t_value memory [MEMSIZE];

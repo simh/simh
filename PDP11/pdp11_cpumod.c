@@ -48,7 +48,6 @@
 
 #include "pdp11_defs.h"
 #include "pdp11_cpumod.h"
-#include <time.h>
 
 /* Byte write macros for system registers */
 

@@ -30,7 +30,6 @@
 #include "besm6_defs.h"
 #include "sim_sock.h"
 #include "sim_tmxr.h"
-#include <time.h>
 
 #define TTY_MAX         24              /* Serial TTY lines */
 #define LINES_MAX       TTY_MAX + 2     /* Including parallel "Consul" typewriters */

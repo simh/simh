@@ -41,7 +41,6 @@
 
 #include "pdp10_defs.h"
 #include <math.h>
-#include <time.h>
 
 /* The KS timer works off a 4.100 MHz (243.9024 nsec) oscillator that
  * is independent of all other system timing.
