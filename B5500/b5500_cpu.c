@@ -95,7 +95,6 @@
 #include "b5500_defs.h"
 #include "sim_timer.h"
 #include <math.h>
-#include <time.h>
 
 #define UNIT_V_MSIZE    (UNIT_V_UF + 0)
 #define UNIT_MSIZE      (7 << UNIT_V_MSIZE)
