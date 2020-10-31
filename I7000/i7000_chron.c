@@ -23,7 +23,6 @@
 */
 
 #include "i7000_defs.h"
-#include <time.h>
 
 #ifdef NUM_DEVS_CHRON
 #define BUFFSIZE        (12)

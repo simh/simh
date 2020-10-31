@@ -46,7 +46,6 @@
 
 #include "i7010_defs.h"
 #include "sim_card.h"
-#include <time.h>
 
 #define UNIT_V_MSIZE    (UNIT_V_UF + 0)
 #define UNIT_MSIZE      (017 << UNIT_V_MSIZE)

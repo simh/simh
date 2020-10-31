@@ -158,7 +158,6 @@
 #include "i7090_defs.h"
 #include "sim_timer.h"
 #include <math.h>
-#include <time.h>
 #ifdef CPANEL
 #include "cpanel.h"
 #endif
