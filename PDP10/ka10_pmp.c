@@ -1407,7 +1407,7 @@ sense_end:
          sim_debug(DEBUG_DETAIL, dptr, "seek unit=%d %d %d\n", unit, trk, buf[5]);
 
          /* Check if seek valid */
-         if ((buf[0] | buf[1] | buf[4]) != 0 || trk > disk_type[type].cyl
+         if ((buf[0] | buf[1] | buf[4]) != 0 || trk >= disk_type[type].cyl
                   || buf[5] >= disk_type[type].heads)  {
              uptr->LASTCMD = cmd;
              uptr->CMD &= ~(0xff);
@@ -2161,7 +2161,7 @@ pmp_format(UNIT * uptr, int flag) {
         data->tsize = hdr.tracksize;
         if ((data->cbuf = (uint8 *)calloc(tsize, sizeof(uint8))) == 0)
             return 1;
-        for (cyl = 0; cyl <= disk_type[type].cyl; cyl++) {
+        for (cyl = 0; cyl < disk_type[type].cyl; cyl++) {
             pos = 0;
             for (hd = 0; hd < disk_type[type].heads; hd++) {
                 uint32 cpos = pos;

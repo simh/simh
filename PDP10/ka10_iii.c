@@ -40,6 +40,7 @@
 #define MAR               u4
 #define PIA               u5
 #define POS               u6
+#define CYCLE             us9
 
 /* CONO Bits */
 #define SET_PIA    000000010    /* Set if this bit is zero */
@@ -307,7 +308,7 @@ const char *iii_description (DEVICE *dptr);
 DIB iii_dib = { III_DEVNUM, 1, iii_devio, NULL};
 
 UNIT iii_unit[] = {
-    {UDATA (&iii_svc, UNIT_IDLE, 0) },
+    {UDATA (&iii_svc, 0, 0) },
     { 0 }
     };
 
@@ -396,7 +397,12 @@ iii_svc (UNIT *uptr)
      int       i, j, ch;
      float     ch_sz;
 
-     iii_cycle(10, 0);
+     if (uptr->CYCLE > 20) {
+         iii_cycle(300, 0);
+         uptr->CYCLE = 0;
+     } else {
+         uptr->CYCLE++;
+     }
 
      /* Extract X,Y,Bright and Size */
      sz = (uptr->POS & CSIZE) >> CSIZE_V;
@@ -615,7 +621,7 @@ skip_up:
                       uptr->MAR, iii_instr);
          uptr->MAR++;
          uptr->MAR &= RMASK;
-         sim_activate(uptr, 50);
+         sim_activate_after(uptr, 60);
      }
 
      if (((uptr->STATUS >> 3) & (uptr->STATUS & (WRAP_MSK|EDGE_MSK|LIGH_MSK))) != 0)
