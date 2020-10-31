@@ -23,7 +23,6 @@
    AI lab and Dynamic Modeling PDP-10s.
 */
 
-#include <time.h>
 #include "sim_defs.h"
 #include "sim_tmxr.h"
 #include "kx10_defs.h"

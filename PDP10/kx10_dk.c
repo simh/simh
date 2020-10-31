@@ -26,7 +26,6 @@
 */
 
 #include "kx10_defs.h"
-#include <time.h>
 
 #ifndef NUM_DEVS_DK
 #define NUM_DEVS_DK 0

@@ -23,7 +23,6 @@
    AI lab PDP-10.
 */
 
-#include <time.h>
 #include "kx10_defs.h"
 #include "sim_video.h"
 

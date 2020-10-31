@@ -30,7 +30,6 @@
 
 */
 
-#include <time.h>
 #include "kx10_defs.h"
 
 #ifndef NUM_DEVS_PD

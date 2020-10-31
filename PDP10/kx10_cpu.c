@@ -96,7 +96,6 @@
 
 #include "kx10_defs.h"
 #include "sim_timer.h"
-#include <time.h>
 
 #define HIST_PC         0x40000000
 #define HIST_PC2        0x80000000
