@@ -190,6 +190,7 @@ t_bool sim_signaled_int_char                            /* WRU character detecte
 #endif
 uint32 sim_last_poll_kbd_time;                          /* time when sim_poll_kbd was called */
 extern TMLN *sim_oline;                                 /* global output socket */
+static uint32 sim_con_pos;                              /* console character output count */
 
 static t_stat sim_con_poll_svc (UNIT *uptr);                /* console connection poll routine */
 static t_stat sim_con_reset (DEVICE *dptr);                 /* console reset routine */
@@ -222,10 +223,11 @@ static DEBTAB sim_con_debug[] = {
 };
 
 static REG sim_con_reg[] = {
-    { ORDATAD (WRU,   sim_int_char,  8, "interrupt character") },
-    { ORDATAD (BRK,   sim_brk_char,  8, "break character") },
-    { ORDATAD (DEL,   sim_del_char,  8, "delete character ") },
-    { ORDATAD (PCHAR, sim_tt_pchar, 32, "printable character mask") },
+    { ORDATAD (WRU,         sim_int_char,  8, "interrupt character") },
+    { ORDATAD (BRK,         sim_brk_char,  8, "break character") },
+    { ORDATAD (DEL,         sim_del_char,  8, "delete character ") },
+    { ORDATAD (PCHAR,       sim_tt_pchar, 32, "printable character mask") },
+    { DRDATAD (CONSOLE_POS, sim_con_pos,  32, "character output count") },
   { 0 },
 };
 
@@ -2907,6 +2909,7 @@ t_stat sim_putchar (int32 c)
 sim_exp_check (&sim_con_expect, c);
 if ((sim_con_tmxr.master == 0) &&                       /* not Telnet? */
     (sim_con_ldsc.serport == 0)) {                      /* and not serial port */
+    ++sim_con_pos;                                      /* bookkeeping */
     if (sim_log)                                        /* log file? */
         fputc (c, sim_log);
     sim_debug (DBG_XMT, &sim_con_telnet, "sim_putchar('%c' (0x%02X)\n", sim_isprint (c) ? c : '.', c);
@@ -2919,6 +2922,7 @@ if (!sim_con_ldsc.conn) {                               /* no Telnet or serial c
         sim_con_ldsc.rcve = 1;                          /* rcv enabled */
     }
 tmxr_putc_ln (&sim_con_ldsc, c);                        /* output char */
+++sim_con_pos;                                          /* bookkeeping */
 tmxr_poll_tx (&sim_con_tmxr);                           /* poll xmt */
 return SCPE_OK;
 }
@@ -2930,6 +2934,7 @@ t_stat r;
 sim_exp_check (&sim_con_expect, c);
 if ((sim_con_tmxr.master == 0) &&                       /* not Telnet? */
     (sim_con_ldsc.serport == 0)) {                      /* and not serial port */
+    ++sim_con_pos;                                      /* bookkeeping */
     if (sim_log)                                        /* log file? */
         fputc (c, sim_log);
     sim_debug (DBG_XMT, &sim_con_telnet, "sim_putchar('%c' (0x%02X)\n", sim_isprint (c) ? c : '.', c);
@@ -2942,6 +2947,8 @@ if (!sim_con_ldsc.conn) {                               /* no Telnet or serial c
         sim_con_ldsc.rcve = 1;                          /* rcv enabled */
     }
 r = tmxr_putc_ln (&sim_con_ldsc, c);                    /* Telnet output */
+if (r == SCPE_OK)
+    ++sim_con_pos;                                      /* bookkeeping */
 tmxr_poll_tx (&sim_con_tmxr);                           /* poll xmt */
 return r;                                               /* return status */
 }
