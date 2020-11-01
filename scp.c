@@ -2379,6 +2379,9 @@ static const char simh_help2[] =
       "++-F {NOT} \"<filespec1>\" == \"<filespec2>\" \n\n"
       " Specifies a true (false {NOT}) condition if the indicated files\n"
       " have the same contents.\n\n"
+      " When a file comparison determines that files are different, the environment\n"
+      " variable _FILE_COMPARE_DIFF_OFFSET is set to the file offset where the first\n"
+      " difference in the files was observed\n\n"
       "5Debugging Expression Evaluation\n"
       " Debug output can be produced which will walk through the details\n"
       " involved during expression evaluation.  This output can, for example,\n"
@@ -4580,6 +4583,7 @@ char *ep1, *ep2;
 if (sim_switches & SWMASK ('F')) {      /* File Compare? */
     FILE *f1, *f2;
     int c1, c2;
+    size_t diff_offset = 0;
     char *filename1, *filename2;
 
     filename1 = (char *)malloc (strlen (s1));
@@ -4589,6 +4593,7 @@ if (sim_switches & SWMASK ('F')) {      /* File Compare? */
     strcpy (filename2, s2 + 1);
     filename2[strlen (filename2) - 1] = '\0';
 
+    setenv ("_FILE_COMPARE_DIFF_OFFSET", "", 1);    /* Remove previous environment variable */
     f1 = fopen (filename1, "rb");
     f2 = fopen (filename2, "rb");
     free (filename1);
@@ -4604,9 +4609,16 @@ if (sim_switches & SWMASK ('F')) {      /* File Compare? */
         return 1;
         }
     while (((c1 = fgetc (f1)) == (c2 = fgetc (f2))) &&
-           (c1 != EOF)) ;
+           (c1 != EOF))
+        ++diff_offset;
     fclose (f1);
     fclose (f2);
+    if (c1 != c2) {
+        char offset_buf[32];
+
+        snprintf (offset_buf, sizeof (offset_buf), "%u", (uint32)diff_offset);
+        setenv ("_FILE_COMPARE_DIFF_OFFSET", offset_buf, 1);
+        }
     return c1 - c2;
     }
 v1 = strtol(s1+1, &ep1, 0);
