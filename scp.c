@@ -1333,7 +1333,9 @@ static const char simh_help1[] =
       "+SET NOLOG                   disables any currently active logging\n"
       "4Switches\n"
       " By default, log output is written at the end of the specified log file.\n"
-      " A new log file can created if the -N switch is used on the command line.\n"
+      " A new log file can created if the -N switch is used on the command line.\n\n"
+      " By default, log output is written in text mode.  The log file can be\n"
+      " opened for binary mode writing if the -B switch is used on the command line.\n"
 #define HLP_SET_DEBUG  "*Commands SET Debug"
        /***************** 80 character line width template *************************/
       "3Debug\n"

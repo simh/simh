@@ -2227,7 +2227,8 @@ cptr = get_glyph_nc (cptr, gbuf, 0);                    /* get file name */
 if (*cptr != 0)                                         /* now eol? */
     return SCPE_2MARG;
 sim_set_logoff (0, NULL);                               /* close cur log */
-r = sim_open_logfile (gbuf, FALSE, &sim_log, &sim_log_ref); /* open log */
+r = sim_open_logfile (gbuf, (sim_switches & SWMASK ('B')) == SWMASK ('B'), 
+                            &sim_log, &sim_log_ref);    /* open log */
 if (r != SCPE_OK)                                       /* error? */
     return r;
 if ((!sim_quiet) && (!(sim_switches & SWMASK ('Q'))))
