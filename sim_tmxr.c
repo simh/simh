@@ -1746,7 +1746,7 @@ if ((lp->modembits != before_modem_bits) && (sim_deb && lp->mp && dptr)) {
     sim_debug (TMXR_DBG_MDM, dptr, " - Line %d - %p\n", (int)(lp-lp->mp->ldsc), lp->txb);
     }
 if (incoming_bits)
-    *incoming_bits = (lp->modembits & TMXR_MDM_INCOMING);
+    *incoming_bits = (lp->modembits & (TMXR_MDM_INCOMING | TMXR_MDM_DTR | TMXR_MDM_RTS));
 if (lp->mp && lp->modem_control) {                  /* This API ONLY works on modem_control enabled multiplexer lines */
     if ((bits_to_set | bits_to_clear) || incoming_bits) {/* Anything to do? */
         if (lp->loopback) {
