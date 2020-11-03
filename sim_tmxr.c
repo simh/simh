@@ -1654,9 +1654,9 @@ return SCPE_OK;
         bits_to_clear   TMXR_MDM_DTR and/or TMXR_MDM_RTS as desired
         
    Output:
-        incoming_bits   if non NULL, returns the current stat of DCD, 
-                        RNG, CTS and DSR along with the current state
-                        of DTR and RTS
+        status_bits     if non NULL, returns all of the current signal
+                        state bits (incoming: DCD, RNG, CTS, DSR) along
+                        with the specifically settable bits (DTR, RTS)
 
    Implementation note:
 
@@ -1665,7 +1665,7 @@ return SCPE_OK;
        to a network socket (or could be) then the network session state is
        set, cleared and/or returned.
 */
-t_stat tmxr_set_get_modem_bits (TMLN *lp, int32 bits_to_set, int32 bits_to_clear, int32 *incoming_bits)
+t_stat tmxr_set_get_modem_bits (TMLN *lp, int32 bits_to_set, int32 bits_to_clear, int32 *status_bits)
 {
 int32 before_modem_bits, incoming_state;
 DEVICE *dptr;
@@ -1745,10 +1745,10 @@ if ((lp->modembits != before_modem_bits) && (sim_deb && lp->mp && dptr)) {
     sim_debug_bits (TMXR_DBG_MDM, dptr, tmxr_modem_bits, before_modem_bits, lp->modembits, FALSE);
     sim_debug (TMXR_DBG_MDM, dptr, " - Line %d - %p\n", (int)(lp-lp->mp->ldsc), lp->txb);
     }
-if (incoming_bits)
-    *incoming_bits = (lp->modembits & (TMXR_MDM_INCOMING | TMXR_MDM_DTR | TMXR_MDM_RTS));
+if (status_bits)
+    *status_bits = (lp->modembits & (TMXR_MDM_INCOMING | TMXR_MDM_OUTGOING));
 if (lp->mp && lp->modem_control) {                  /* This API ONLY works on modem_control enabled multiplexer lines */
-    if ((bits_to_set | bits_to_clear) || incoming_bits) {/* Anything to do? */
+    if ((bits_to_set | bits_to_clear) || status_bits) {/* Anything to do? */
         if (lp->loopback) {
             if ((lp->modembits ^ before_modem_bits) & TMXR_MDM_DTR) { /* DTR changed? */
                 lp->ser_connect_pending = (lp->modembits & TMXR_MDM_DTR);
@@ -1757,9 +1757,9 @@ if (lp->mp && lp->modem_control) {                  /* This API ONLY works on mo
             return SCPE_OK;
             }
         if (lp->serport) {
-            t_stat r = sim_control_serial (lp->serport, bits_to_set, bits_to_clear, incoming_bits);
-            if (incoming_bits && (r == SCPE_OK))
-                lp->modembits = (lp->modembits & ~TMXR_MDM_INCOMING) | *incoming_bits;
+            t_stat r = sim_control_serial (lp->serport, bits_to_set, bits_to_clear, status_bits);
+            if (status_bits && (r == SCPE_OK))
+                lp->modembits = (lp->modembits & ~TMXR_MDM_INCOMING) | *status_bits;
             return r;
             }
         if ((lp->sock) || (lp->connecting)) {
@@ -1792,7 +1792,7 @@ if ((lp->sock) || (lp->connecting)) {
         }
     }
 if ((lp->serport) && (!lp->loopback))
-    sim_control_serial (lp->serport, 0, 0, incoming_bits);
+    sim_control_serial (lp->serport, 0, 0, status_bits);
 return SCPE_INCOMP;
 }
 
