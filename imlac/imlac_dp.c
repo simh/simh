@@ -432,7 +432,8 @@ dp_insn (uint16 insn)
       DT[SP++] = DPC;
     else
       sim_debug (DBG, &dp_dev, "stack overflow");
-    /* Fall through. */
+    jump (insn);
+    break;
   case 6: /* DJMP */
     sim_debug (DBG, &dp_dev, "DJMP\n");
     jump (insn);

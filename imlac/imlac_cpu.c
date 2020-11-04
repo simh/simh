@@ -196,8 +196,10 @@ static void cpu_class1 (uint16 insn)
     L = !L;
   if (insn & 0000004) /* T3: IAC */
     AC++;
-  if (insn & 0000040) /* T3: ODA */
+  if (insn & 0000040) { /* T3: ODA */
+    sim_debug (DBG_CPU, &cpu_dev, "Read data switches: %06o\n", DS);
     AC |= DS;
+  }
 
   halt = !(insn & 0100000);
 }
@@ -283,7 +285,7 @@ static void cpu_iot (uint16 insn)
 {
   SUBDEV *dev = dev_tab[(insn >> 3) & 077];
   if (dev == NULL) {
-    sim_debug (DBG_CPU, &cpu_dev, "Unknown device IOT: %06o\n", IR);
+    sim_debug (DBG_CPU, &cpu_dev, "Unknown device IOT @ %06o: %06o\n", PC, IR);
     return;
   }
   AC = dev->iot (insn, AC);
