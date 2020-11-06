@@ -1383,14 +1383,14 @@ t_stat sim_card_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, cons
 
             for (i=0; i < dptr->numunits; ++i)
                 if (dptr->units[i].flags & UNIT_ATTABLE)
-                    fprintf (st, "  sim> ATTACH {switches} %s carddeck{,extra-cards,...}\n", sim_uname (&dptr->units[i]));
+                    fprintf (st, "  sim> ATTACH {switches} %s carddeck%s\n", sim_uname (&dptr->units[i]), ((dptr->units[i].flags & UNIT_RO) != 0) ? "{,extra-cards,...}" : "");
             fprintf (st, "\n");
             }
         else
-            fprintf (st, "  sim> ATTACH {switches} %s carddeck{,extra-cards,...}\n\n", sim_uname (uptr));
+            fprintf (st, "  sim> ATTACH {switches} %s carddeck%s\n\n", sim_uname (uptr), ((dptr->units[0].flags & UNIT_RO) != 0) ? "{,extra-cards,...}" : "");
         }
     else
-        fprintf (st, "  sim> ATTACH {switches} %s carddeck{,extra-cards,...}\n\n", sim_uname (uptr));
+        fprintf (st, "  sim> ATTACH {switches} %s carddeck%s\n\n", sim_uname (uptr), (readers > 0) ? "{,extra-cards,...}" : "");
     fprintf (st, "Attach command switches\n");
     fprintf (st, "    -F          Open the indicated card deck in a specific format (default\n");
     fprintf (st, "                is AUTO, alternatives are BIN, TEXT, BCD, CBN and EBCDIC)\n");
