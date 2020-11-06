@@ -139,9 +139,9 @@ t_stat   sim_card_show_fmt (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat   sim_card_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 
 /* Translation tables */
-extern CONST char      sim_six_to_ascii[64];        /* Map BCD to ASCII */
-extern CONST char      sim_ascii_to_six[128];       /* Map 7 bit ASCII to BCD */
-extern CONST uint8     sim_parity_table[64];        /* 64 entry odd parity table */
+extern const char      sim_six_to_ascii[64];        /* Map BCD to ASCII */
+extern const char      sim_ascii_to_six[128];       /* Map 7 bit ASCII to BCD */
+extern const uint8     sim_parity_table[64];        /* 64 entry odd parity table */
 
 /* Unit test routine */
 extern t_stat sim_card_test (DEVICE *dptr);
