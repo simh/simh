@@ -1383,14 +1383,14 @@ t_stat sim_card_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, cons
 
             for (i=0; i < dptr->numunits; ++i)
                 if (dptr->units[i].flags & UNIT_ATTABLE)
-                    fprintf (st, "  sim> ATTACH {switches} %s carddeck\n", sim_uname (&dptr->units[i]));
+                    fprintf (st, "  sim> ATTACH {switches} %s carddeck{,extra-cards,...}\n", sim_uname (&dptr->units[i]));
             fprintf (st, "\n");
             }
         else
-            fprintf (st, "  sim> ATTACH {switches} %s carddeck\n\n", sim_uname (uptr));
+            fprintf (st, "  sim> ATTACH {switches} %s carddeck{,extra-cards,...}\n\n", sim_uname (uptr));
         }
     else
-        fprintf (st, "  sim> ATTACH {switches} %s carddeck\n\n", sim_uname (uptr));
+        fprintf (st, "  sim> ATTACH {switches} %s carddeck{,extra-cards,...}\n\n", sim_uname (uptr));
     fprintf (st, "Attach command switches\n");
     fprintf (st, "    -F          Open the indicated card deck in a specific format (default\n");
     fprintf (st, "                is AUTO, alternatives are BIN, TEXT, BCD, CBN and EBCDIC)\n");
