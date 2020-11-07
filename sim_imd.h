@@ -1,9 +1,7 @@
 /*************************************************************************
  *                                                                       *
- * $Id: sim_imd.h 1987 2008-07-08 03:25:57Z hharte $                     *
- *                                                                       *
- * Copyright (c) 2007-2008 Howard M. Harte.                              *
- * http://www.hartetec.com                                               *
+ * Copyright (c) 2007-2020 Howard M. Harte.                              *
+ * https://github.com/hharte                                             *
  *                                                                       *
  * Permission is hereby granted, free of charge, to any person obtaining *
  * a copy of this software and associated documentation files (the       *
@@ -35,9 +33,6 @@
  *     ImageDisk Disk Image File access module for SIMH, definitions.    *
  *     See: http://www.classiccmp.org/dunfield/img/index.htm             *
  *     for details on the ImageDisk format and other utilities.          *
- *                                                                       *
- * Environment:                                                          *
- *     User mode only                                                    *
  *                                                                       *
  *************************************************************************/
 

@@ -1,9 +1,7 @@
 /*************************************************************************
  *                                                                       *
- * $Id: sim_imd.c 1999 2008-07-22 04:25:28Z hharte $                     *
- *                                                                       *
- * Copyright (c) 2007-2008 Howard M. Harte.                              *
- * http://www.hartetec.com                                               *
+ * Copyright (c) 2007-2020 Howard M. Harte.                              *
+ * https://github.com/hharte                                             *
  *                                                                       *
  * Permission is hereby granted, free of charge, to any person obtaining *
  * a copy of this software and associated documentation files (the       *
@@ -35,9 +33,6 @@
  *     ImageDisk (IMD) Disk Image File access module for SIMH.           *
  *     see: http://www.classiccmp.org/dunfield/img/index.htm             *
  *     for details on the ImageDisk format and other utilities.          *
- *                                                                       *
- * Environment:                                                          *
- *     User mode only                                                    *
  *                                                                       *
  *************************************************************************/
 
@@ -240,7 +235,7 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
         /* Now read each sector */
         for(i=0;i<imd.nsects;i++) {
             TotalSectorCount++;
-            sim_debug(myDisk->debugmask, myDisk->device, "Sector Phys: %d/Logical: %d: %d bytes: ", i, sectorMap[i], sectorSize);
+            sim_debug(myDisk->debugmask, myDisk->device, "Sector Phys: %2d/Logical: %2d: %4d bytes, offset: 0x%05x: ", i, sectorMap[i], sectorSize, ftell(myDisk->file));
             sectRecordType = fgetc(myDisk->file);
             /* AGN Logical head mapping */
             myDisk->track[imd.cyl][imd.head].logicalHead[i] = sectorHeadMap[i];
@@ -279,7 +274,7 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
                         if (1) {
                             uint8 cdata = fgetc(myDisk->file);
 
-                            sim_debug(myDisk->debugmask, myDisk->device, "Compressed Data = 0x%02x\n", cdata);
+                            sim_debug(myDisk->debugmask, myDisk->device, "Compressed Data = 0x%02x", cdata);
                             }
                     }
                     else {
@@ -296,15 +291,16 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
         }
 
         myDisk->ntracks++;
+
     } while (!feof(myDisk->file));
 
     sim_debug(myDisk->debugmask, myDisk->device, "Processed %d sectors\n", TotalSectorCount);
 
     for(i=0;i<myDisk->ntracks;i++) {
         uint8 j;
-        sim_debug(myDisk->verbosedebugmask, myDisk->device, "Track %02d: ", i);
-        for(j=0;j<imd.nsects;j++) {
-            sim_debug(myDisk->verbosedebugmask, myDisk->device, "0x%06x ", myDisk->track[i][0].sectorOffsetMap[j]);
+        sim_debug(myDisk->verbosedebugmask, myDisk->device, "Track %3d: ", i);
+        for(j=0;j<myDisk->track[i >> 1][i & 1].nsects;j++) {
+            sim_debug(myDisk->verbosedebugmask, myDisk->device, "0x%05x ", myDisk->track[i >> 1][i & 1].sectorOffsetMap[j]);
         }
         sim_debug(myDisk->verbosedebugmask, myDisk->device, "\n");
     }
