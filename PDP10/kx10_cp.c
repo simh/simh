@@ -173,20 +173,20 @@ t_stat cp_devio(uint32 dev, uint64 *data) {
     case DATAO:
          col = *data & 0xfff;
          switch(col) {
-         case 04006: col = 03000; break; /* ! - */
-         case 01022: col = 00006; break; /* " - */
-         case 01012: col = 01202; break; /* # - */
-         case 01006: col = 01042; break; /* % - */
-         case 02006: col = 05000; break; /* & - */
-         case 00012: col = 00042; break; /* ' - */
-         case 03000: col = 00022; break; /* : - */
-         case 01202: col = 02012; break; /* ; - */
-         case 02012: col = 00012; break; /* > - */
-         case 05000: col = 04202; break; /* ? - */
-         case 02022: col = 04022; break; /* [ - */
-         case 00006: col = 01012; break; /* \ - */
-         case 04022: col = 02022; break; /* ] - */
-         case 00022: col = 00202; break; /* ^ - */
+         case 0x806: col = 0x482; break; /* ! - */
+         case 0x212: col = 0x006; break; /* " - */
+         case 0x20A: col = 0x042; break; /* # - */
+         case 0x206: col = 0x222; break; /* % - */
+         case 0x406: col = 0x800; break; /* & - */
+         case 0x00A: col = 0x012; break; /* ' - */
+         case 0xC00: col = 0x082; break; /* : - */
+         case 0x282: col = 0x40A; break; /* ; - */
+         case 0x40A: col = 0x20A; break; /* > - */
+         case 0xA00: col = 0x206; break; /* ? - */
+         case 0x412: col = 0xE82; break; /* [ - */
+         case 0x006: col = 0x282; break; /* \ - */
+         case 0x812: col = 0xE42; break; /* ] - */
+         case 0x012: col = 0x406; break; /* ^ - */
          }
          cp_buffer[uptr->COL++] = col;
          uptr->STATUS &= ~DATA_REQ;

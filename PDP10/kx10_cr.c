@@ -254,12 +254,13 @@ cr_srv(UNIT *uptr) {
         data = cr_buffer[uptr->COL++];
         switch(data) {
         case 0x482: data = 0x806; break;  /* ! - 12 8 7 */
-        case 0xA00: data = 0x882; break;  /* [ - 12 8 2 */
-        case 0x882: data = 0x482; break;  /* ] - 11 8 2 */
-        case 0x405: data = 0xa00; break;  /* { - 12 0   */
-        case 0x600: data = 0xc00; break;  /* | - 12 11  */
+        case 0x006: data = 0x212; break;  /* " - */
+        case 0xE82: data = 0x882; break;  /* [ - 12 8 2 */
+        case 0xE42: data = 0x482; break;  /* ] - 11 8 2 */
+        case 0x406: data = 0xa00; break;  /* { - 12 0   */
+        case 0x806: data = 0xc00; break;  /* | - 12 11  */
         case 0x805: data = 0x600; break;  /* } - 11 0   */
-        case 0x806: data = 0x700; break;  /* ~ - 11 0 1 */
+        case 0xF02: data = 0x700; break;  /* ~ - 11 0 1 */
         }
         uptr->DATA = data;
         /* Generate upper 18 bits of data */
