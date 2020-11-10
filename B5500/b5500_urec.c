@@ -406,29 +406,26 @@ cdr_srv(UNIT *uptr) {
                             ch = 015;
                         break;
             case 016:   ch = 035; break; /* Translate = */
-            case 017:   if (image[uptr->POS] == 0x006) /* Translate " */
-                           ch = 037;
-                        break;
+            case 017:   ch = 037; break; /* Translate " */
             case 036:   ch = 016; break;
             case 037:   ch = 0;          /* Handle ? */
                         if (uptr->POS == 0)
                             chan_set_parity(chan);
                         break;
-            case 052:   if (image[uptr->POS] == 0x482) /* Translate ! not equal */
-                            ch = 032; 
+            case 052:   ch = 032;        /* Translate ! not equal */
                         break;
-            case 072:   if (image[uptr->POS] == 0xA00) /* Translate [ */
-                            ch = 074;
-                        else
-                            ch = 036;
-                        break; /* Translate */
             case 074:   ch = 076; break; /* Translate < */
             case 076:   ch = 072; break; /* Translate + */
+            case 077:   ch = 052; break; /* Translate | */
             case 0177:
-                        if (image[uptr->POS] == 0x405) /* Translate { */
-                            ch = 057;
-                        else if (image[uptr->POS] == 0x805) /* Translate } */
+                        if (image[uptr->POS] == 0x805)      /* Translate } */
                             ch = 017;
+                        else if (image[uptr->POS] == 0xE42) /* Translate ] */
+                            ch = 036;
+                        else if (image[uptr->POS] == 0xE82) /* Translate [ */
+                            ch = 074;
+                        else if (image[uptr->POS] == 0xF02) /* Translate ~ */
+                            ch = 077;
                         else {
                             ch = 0;
                             /* Handle invalid punch */
@@ -588,12 +585,13 @@ cdp_srv(UNIT *uptr) {
             case 017:  hol = 0x805; break;  /* } */
             case 032:  hol = 0x482; break;  /* ! */
             case 035:  hol = 0X00A; break;  /* = */
-            case 036:  hol = 0x882; break;  /* ] */
+            case 036:  hol = 0xE42; break;  /* ] */
             case 037:  hol = 0x006; break;  /* " */
-            case 057:  hol = 0x405; break;  /* { */
+            case 052:  hol = 0x806; break;  /* | */
             case 072:  hol = 0x80A; break;  /* + */
-            case 074:  hol = 0xA00; break;  /* [ */
+            case 074:  hol = 0xE82; break;  /* [ */
             case 076:  hol = 0x822; break;  /* < */
+            case 077:  hol = 0xF02; break;  /* ~ */
             default:
                        hol = sim_bcd_to_hol(ch & 077);
             }
