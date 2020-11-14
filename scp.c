@@ -13258,16 +13258,28 @@ size_t debug_line_bufsize = 0;
 size_t debug_line_offset = 0;
 size_t debug_line_count = 0;
 
+static void _debug_fwrite_all (const char *buf, size_t len, FILE *f)
+{
+size_t len_written;
+
+while (len > 0) {
+    len_written = fwrite (buf, 1, len, f);
+    len -= len_written;
+    buf += len_written;
+    errno = 0;
+    }
+}
+
 static void _debug_fwrite (const char *buf, size_t len)
 {
 size_t move_size;
 
 if (sim_deb_buffer == NULL) {
-    fwrite (buf, 1, len, sim_deb);              /* output now. */
+    _debug_fwrite_all (buf, len, sim_deb);  /* output now. */
     return;
     }
 if ((sim_deb == stdout) && (!sim_is_running))
-    fwrite (buf, 1, len, stdout);               /* output now. */
+    _debug_fwrite_all (buf, len, stdout);   /* output now. */
 while (len > 0) {
     if (sim_debug_buffer_offset + len <= sim_deb_buffer_size)
         move_size = len;
