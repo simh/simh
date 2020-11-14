@@ -235,7 +235,7 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
         /* Now read each sector */
         for(i=0;i<imd.nsects;i++) {
             TotalSectorCount++;
-            sim_debug(myDisk->debugmask, myDisk->device, "Sector Phys: %2d/Logical: %2d: %4d bytes, offset: 0x%05x: ", i, sectorMap[i], sectorSize, ftell(myDisk->file));
+            sim_debug(myDisk->debugmask, myDisk->device, "Sector Phys: %2d/Logical: %2d: %4d bytes, offset: 0x%05x: ", i, sectorMap[i], sectorSize, (unsigned int)ftell(myDisk->file));
             sectRecordType = fgetc(myDisk->file);
             /* AGN Logical head mapping */
             myDisk->track[imd.cyl][imd.head].logicalHead[i] = sectorHeadMap[i];
