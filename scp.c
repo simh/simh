@@ -708,7 +708,6 @@ static const char *sim_int_expect_description (DEVICE *dptr)
 return "Expect facility";
 }
 
-#define FLUSH_INTERVAL 30*1000000           /* Flush I/O buffers every 30 seconds */
 static UNIT sim_expect_unit = { UDATA (&expect_svc, 0, 0) };
 DEVICE sim_expect_dev = {
     "INT-EXPECT", &sim_expect_unit, NULL, NULL, 
@@ -720,12 +719,18 @@ DEVICE sim_expect_dev = {
 
 static const char *sim_int_flush_description (DEVICE *dptr)
 {
-return "Flush facility";
+return "Open File Flush facility";
 }
+
+static uint32 sim_flush_interval = 30;  /* Flush I/O buffers every 30 seconds */
+static REG sim_flush_reg[] = {
+    { DRDATAD(FLUSH_INTERVAL, sim_flush_interval, 32, "Periodic Buffer Flush Interval (seconds)") },
+    { NULL}
+    };
 
 static UNIT sim_flush_unit = { UDATA (&flush_svc, UNIT_IDLE, 0) };
 DEVICE sim_flush_dev = {
-    "INT-FLUSH", &sim_flush_unit, NULL, NULL, 
+    "INT-FLUSH", &sim_flush_unit, sim_flush_reg, NULL, 
     1, 0, 0, 0, 0, 0, 
     NULL, NULL, NULL, NULL, NULL, NULL, 
     NULL, DEV_NOSAVE, 0, 
@@ -8560,7 +8565,7 @@ tmxr_flush_log_files ();
 t_stat
 flush_svc (UNIT *uptr)
 {
-sim_activate_after (uptr, FLUSH_INTERVAL);
+sim_activate_after (uptr, sim_flush_interval * 1000000);
 sim_flush_buffered_files ();
 return SCPE_OK;
 }
@@ -8757,7 +8762,7 @@ if (signal (SIGTERM, int_handler) == SIG_ERR) {         /* set WRU */
     }
 if (sim_step)                                           /* set step timer */
     sim_sched_step ();
-sim_activate_after (&sim_flush_unit, FLUSH_INTERVAL);   /* Enable periodic buffer flushing */
+sim_activate_after (&sim_flush_unit, sim_flush_interval * 1000000);/* Enable periodic buffer flushing */
 stop_cpu = FALSE;
 sim_is_running = TRUE;                                  /* flag running */
 fflush(stdout);                                         /* flush stdout */
