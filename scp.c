@@ -13271,6 +13271,8 @@ while (len > 0) {
     len_written = fwrite (buf, 1, len, f);
     len -= len_written;
     buf += len_written;
+    if (errno == EAGAIN)    /* Non blocking file descriptor buffer full? */
+        sim_os_ms_sleep(10);/* wait a bit to retry */
     errno = 0;
     }
 }
