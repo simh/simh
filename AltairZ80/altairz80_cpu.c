@@ -6180,12 +6180,28 @@ static t_stat sim_instr_mmu (void) {
     return reason;
 }
 
+/*
+ * This sequence of instructions is a mix that mimics
+ * a resonable instruction set that is a close estimate
+ * to the normal calibrated result.
+ */
+
+static const char *cpu_clock_precalibrate_commands[] = {
+    "-m 100 IN 08H",
+    "-m 102 ANI 01H",
+    "-m 104 XRA A",
+    "-m 105 JMP 0100H",
+    "PC 100",
+    NULL};
+
 /* reset routine */
 
 static t_stat cpu_reset(DEVICE *dptr) {
     int32 i;
     if (sim_vm_is_subroutine_call == NULL) { /* First time reset? */
         sim_vm_is_subroutine_call = cpu_is_pc_a_subroutine_call;
+        sim_clock_precalibrate_commands = cpu_clock_precalibrate_commands;
+        sim_vm_initial_ips = SIM_INITIAL_IPS * 4;
         altairz80_init();
     }
     AF_S = AF1_S = 0;
