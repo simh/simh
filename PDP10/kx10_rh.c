@@ -243,6 +243,7 @@ t_stat rh_devio(uint32 dev, uint64 *data) {
               }
               if (rhc->reg < 040) {
                   int parity;
+                  drdat = 0;
                   if (rhc->dev_read(dptr, rhc, rhc->reg, &drdat))
                       rhc->status |= RH20_DR_RESP;
                   *data = (uint64)(drdat & 0177777);
@@ -401,6 +402,7 @@ t_stat rh_devio(uint32 dev, uint64 *data) {
                 *data = (uint64)(rhc->rae);
         } else if ((rhc->reg & 040) == 0) {
               int parity;
+              drdat = 0;
               if (rhc->dev_read(dptr, rhc, rhc->reg, &drdat)) {
                   rhc->rae |= 1 << rhc->drive;
                   rhc->status |= CR_DRE;
