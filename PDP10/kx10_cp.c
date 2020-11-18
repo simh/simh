@@ -34,7 +34,7 @@
 #include "sim_defs.h"
 #if (NUM_DEVS_CP > 0)
 
-#define UNIT_CDP        UNIT_ATTABLE | UNIT_DISABLE | UNIT_SEQ | MODE_026 
+#define UNIT_CDP        UNIT_ATTABLE | UNIT_DISABLE | UNIT_SEQ | MODE_DEC29 
 
 #define CP_DEVNUM        0110
 
@@ -95,6 +95,12 @@ DIB cp_dib = { CP_DEVNUM, 1, cp_devio, NULL};
 UNIT                cp_unit = {UDATA(cp_srv, UNIT_CDP, 0), 2000 };
 
 MTAB                cp_mod[] = {
+    { MODE_CHAR, MODE_026, "IBM026", "IBM026", NULL, NULL, NULL,
+              "IBM 026 punch encoding"},
+    { MODE_CHAR, MODE_029, "IBM029", "IBM029", NULL, NULL, NULL,
+              "IBM 029 punch encoding"},
+    { MODE_CHAR, MODE_DEC29, "DEC029", "DEC029", NULL, NULL, NULL,
+              "DEC 029 punch encoding"},
     {MTAB_XTD | MTAB_VUN, 0, "FORMAT", "FORMAT",
                &sim_card_set_fmt, &sim_card_show_fmt, NULL},
     {0}
@@ -172,22 +178,6 @@ t_stat cp_devio(uint32 dev, uint64 *data) {
          break;
     case DATAO:
          col = *data & 0xfff;
-         switch(col) {
-         case 0x806: col = 0x482; break; /* ! - */
-         case 0x212: col = 0x006; break; /* " - */
-         case 0x20A: col = 0x042; break; /* # - */
-         case 0x206: col = 0x222; break; /* % - */
-         case 0x406: col = 0x800; break; /* & - */
-         case 0x00A: col = 0x012; break; /* ' - */
-         case 0xC00: col = 0x082; break; /* : - */
-         case 0x282: col = 0x40A; break; /* ; - */
-         case 0x40A: col = 0x20A; break; /* > - */
-         case 0xA00: col = 0x206; break; /* ? - */
-         case 0x412: col = 0xE82; break; /* [ - */
-         case 0x006: col = 0x282; break; /* \ - */
-         case 0x812: col = 0xE42; break; /* ] - */
-         case 0x012: col = 0x406; break; /* ^ - */
-         }
          cp_buffer[uptr->COL++] = col;
          uptr->STATUS &= ~DATA_REQ;
          clr_interrupt(dev);

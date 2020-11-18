@@ -34,7 +34,7 @@
 #include "sim_defs.h"
 #if (NUM_DEVS_CR > 0)
 
-#define UNIT_CDR        UNIT_ATTABLE | UNIT_RO | UNIT_DISABLE | MODE_029 | MODE_LOWER
+#define UNIT_CDR        UNIT_ATTABLE | UNIT_RO | UNIT_DISABLE | MODE_DEC29 | MODE_LOWER
 
 #define CR_DEVNUM        0150
 
@@ -98,6 +98,12 @@ UNIT                cr_unit = {
 };
 
 MTAB                cr_mod[] = {
+    { MODE_CHAR, MODE_026, "IBM026", "IBM026", NULL, NULL, NULL,
+              "IBM 026 punch encoding"},
+    { MODE_CHAR, MODE_029, "IBM029", "IBM029", NULL, NULL, NULL,
+              "IBM 029 punch encoding"},
+    { MODE_CHAR, MODE_DEC29, "DEC029", "DEC029", NULL, NULL, NULL,
+              "DEC 029 punch encoding"},
     {MTAB_XTD | MTAB_VUN, 0, "FORMAT", "FORMAT",
                &sim_card_set_fmt, &sim_card_show_fmt, NULL},
     {0}
@@ -252,16 +258,6 @@ cr_srv(UNIT *uptr) {
              return SCPE_OK;
         }
         data = cr_buffer[uptr->COL++];
-        switch(data) {
-        case 0x482: data = 0x806; break;  /* ! - 12 8 7 */
-        case 0x006: data = 0x212; break;  /* " - */
-        case 0xE82: data = 0x882; break;  /* [ - 12 8 2 */
-        case 0xE42: data = 0x482; break;  /* ] - 11 8 2 */
-        case 0x406: data = 0xa00; break;  /* { - 12 0   */
-        case 0x806: data = 0xc00; break;  /* | - 12 11  */
-        case 0x805: data = 0x600; break;  /* } - 11 0   */
-        case 0xF02: data = 0x700; break;  /* ~ - 11 0 1 */
-        }
         uptr->DATA = data;
         /* Generate upper 18 bits of data */
         uptr->DATA |= ((data & 0x001) << 25) |
