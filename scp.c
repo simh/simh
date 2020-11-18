@@ -2996,6 +2996,13 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
             if (stat >= SCPE_BASE)                      /* error? */
                 sim_printf ("%s\n", sim_error_text (stat));
         }
+    if ((sim_on_check[sim_do_depth]) && 
+        (stat != SCPE_OK)) {
+        if ((stat <= SCPE_MAX_ERR) && sim_on_actions[sim_do_depth][stat])
+            sim_brk_setact (sim_on_actions[sim_do_depth][stat]);
+        else
+            sim_brk_setact (sim_on_actions[sim_do_depth][0]);
+        }
     if (sim_vm_post != NULL)
         (*sim_vm_post) (TRUE);
     }                                                   /* end while */
@@ -4007,8 +4014,7 @@ do {
         stat = SCPE_OK;                                 /* so adjust it to SCPE_OK */
     if (staying &&
         (sim_on_check[sim_do_depth]) && 
-        (stat != SCPE_OK) &&
-        (stat != SCPE_STEP)) {
+        (stat != SCPE_OK)) {
         if ((stat <= SCPE_MAX_ERR) && sim_on_actions[sim_do_depth][stat])
             sim_brk_setact (sim_on_actions[sim_do_depth][stat]);
         else
