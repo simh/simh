@@ -78,6 +78,7 @@ int clock_gettime(int clock_id, struct timespec *tp);
 
 #define SIM_INITIAL_IPS 5000000                     /* uncalibrated assumption */
                                                     /* about instructions per second */
+#define SIM_PRE_CALIBRATE_MIN_MS    100             /* minimum time to run precalibration activities */
 
 #define SIM_IDLE_CAL    10                          /* ms to calibrate */
 #define SIM_IDLE_STMIN  2                           /* min sec for stability */
