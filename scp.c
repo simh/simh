@@ -451,6 +451,7 @@ void (*sim_vm_fprint_addr) (FILE *st, DEVICE *dptr, t_addr addr) = NULL;
 t_addr (*sim_vm_parse_addr) (DEVICE *dptr, CONST char *cptr, CONST char **tptr) = NULL;
 t_value (*sim_vm_pc_value) (void) = NULL;
 t_bool (*sim_vm_is_subroutine_call) (t_addr **ret_addrs) = NULL;
+t_bool (*sim_vm_fprint_stopped_gen) (FILE *st, t_stat v, REG *pc, DEVICE *dptr) = NULL;
 t_bool (*sim_vm_fprint_stopped) (FILE *st, t_stat reason) = NULL;
 const char *sim_vm_release = NULL;
 const char *sim_vm_release_message = NULL;
@@ -8909,6 +8910,10 @@ int32 i;
 t_stat r = 0;
 t_addr k;
 t_value pcval;
+
+if ((sim_vm_fprint_stopped_gen != NULL) &&              /* if a VM-specific handler is defined */
+    (!sim_vm_fprint_stopped_gen (st, v, pc, dptr)))     /*   call it; if it returned FALSE, */
+    return;                                             /*     we're done */
 
 fputc ('\n', st);                                       /* start on a new line */
 
