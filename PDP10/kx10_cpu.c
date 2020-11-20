@@ -573,7 +573,7 @@ MTAB cpu_mod[] = {
 DEBTAB              cpu_debug[] = {
     {"IRQ", DEBUG_IRQ, "Debug IRQ requests"},
     {"CONI", DEBUG_CONI, "Show coni instructions"},
-    {"CONO", DEBUG_CONO, "Show coni instructions"},
+    {"CONO", DEBUG_CONO, "Show cono instructions"},
     {"DATAIO", DEBUG_DATAIO, "Show datai and datao instructions"},
     {0, 0}
 };

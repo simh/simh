@@ -536,7 +536,7 @@ DEBTAB              imp_debug[] = {
     {"DETAIL", DEBUG_DETAIL, "Show details about device"},
     {"EXP", DEBUG_EXP, "Show exception information"},
     {"CONI", DEBUG_CONI, "Show coni instructions"},
-    {"CONO", DEBUG_CONO, "Show coni instructions"},
+    {"CONO", DEBUG_CONO, "Show cono instructions"},
     {"DATAIO", DEBUG_DATAIO, "Show datai and datao instructions"},
     {"IRQ", DEBUG_IRQ, "Show IRQ requests"},
 #define DEBUG_DHCP (DEBUG_IRQ<<1)
