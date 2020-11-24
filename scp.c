@@ -2470,7 +2470,7 @@ static const char simh_help2[] =
 #define HLP_CURL        "*Commands File_Tools Curl_Tool"
       "3Curl Tool\n"
       " curl is a utility to transfer a URL\n\n"
-      " The quick and dirty help for the TAR command can be viewed with:\n\n"
+      " The quick and dirty help for the CURL command can be viewed with:\n\n"
       "++sim> curl --help\n\n"
 #define HLP_DISKINFO    "*Commands DISKINFO"
       "2Disk Container Information\n"
