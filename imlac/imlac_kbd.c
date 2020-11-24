@@ -228,7 +228,7 @@ kbd_both (uint32 key)
     break;
   case SIM_KEY_F11:
     vid_set_fullscreen (!vid_is_fullscreen ());
-    break;
+    return 0;
   default:
     return 0;
   }
