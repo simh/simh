@@ -495,6 +495,12 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
         ifneq (,$(findstring Haiku,$(OSTYPE)))
           OS_CCDEFS += -DUSE_READER_THREAD -DSIM_ASYNCH_IO 
           $(info using libpthread: $(call find_include,pthread))
+        else
+          ifeq (Darwin,$(OSTYPE))
+            OS_CCDEFS += -DUSE_READER_THREAD -DSIM_ASYNCH_IO 
+            OS_LDFLAGS += -lpthread
+            $(info using macOS libpthread: $(call find_include,pthread))
+          endif
         endif
       endif
       LIBEXT = $(LIBEXTSAVE)
