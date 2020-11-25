@@ -365,7 +365,7 @@ static t_stat m2sio_reset(DEVICE *dptr, int32 (*routine)(const int32, const int3
     M2SIO_CTX *xptr;
     int32 c;
 
-    xptr = dptr->ctxt;
+    xptr = (M2SIO_CTX *) dptr->ctxt;
 
     /* Connect/Disconnect I/O Ports at base address */
     if(sim_map_resource(xptr->pnp.io_base, xptr->pnp.io_size, RESOURCE_TYPE_IO, routine, dptr->name, dptr->flags & DEV_DIS) != 0) {
@@ -402,7 +402,7 @@ static t_stat m2sio_svc(UNIT *uptr)
     int32 c,s,stb;
     t_stat r;
 
-    xptr = uptr->dptr->ctxt;
+    xptr = (M2SIO_CTX *) uptr->dptr->ctxt;
 
     /* Check for new incoming connection */
     if (uptr->flags & UNIT_ATT) {
@@ -500,7 +500,7 @@ static t_stat m2sio_attach(UNIT *uptr, CONST char *cptr)
     M2SIO_CTX *xptr;
     t_stat r;
 
-    xptr = uptr->dptr->ctxt;
+    xptr = (M2SIO_CTX *) uptr->dptr->ctxt;
 
     sim_debug(VERBOSE_MSG, uptr->dptr, "attach (%s).\n", cptr);
 
@@ -525,7 +525,7 @@ static t_stat m2sio_detach(UNIT *uptr)
     sim_debug(VERBOSE_MSG, uptr->dptr, "detach.\n");
 
     if (uptr->flags & UNIT_ATT) {
-        xptr = uptr->dptr->ctxt;
+        xptr = (M2SIO_CTX *) uptr->dptr->ctxt;
 
         sim_cancel(uptr);
 
@@ -541,7 +541,7 @@ static t_stat m2sio_set_baud(UNIT *uptr, int32 value, const char *cptr, void *de
     int32 baud;
     t_stat r = SCPE_ARG;
 
-    xptr = uptr->dptr->ctxt;
+    xptr = (M2SIO_CTX *) uptr->dptr->ctxt;
 
     if (!(uptr->flags & UNIT_ATT)) {
         return SCPE_UNATT;
@@ -576,7 +576,7 @@ static t_stat m2sio_show_baud(FILE *st, UNIT *uptr, int32 value, const void *des
 {
     M2SIO_CTX *xptr;
 
-    xptr = uptr->dptr->ctxt;
+    xptr = (M2SIO_CTX *) uptr->dptr->ctxt;
 
     if (uptr->flags & UNIT_ATT) {
         fprintf(st, "Baud rate: %d", xptr->baud);
@@ -589,10 +589,10 @@ static t_stat m2sio_config_line(UNIT *uptr)
 {
     M2SIO_CTX *xptr;
     char config[20];
-    char *fmt;
+    const char *fmt;
     t_stat r = SCPE_IERR;
 
-    xptr = uptr->dptr->ctxt;
+    xptr = (M2SIO_CTX *) uptr->dptr->ctxt;
 
     if (xptr != NULL) {
         switch (xptr->ctb & M2SIO_FMTMSK) {
@@ -687,7 +687,7 @@ static int32 m2sio_stat(DEVICE *dptr, int32 io, int32 data)
     M2SIO_CTX *xptr;
     int32 r,s;
 
-    xptr = dptr->ctxt;
+    xptr = (M2SIO_CTX *) dptr->ctxt;
 
     if (io == IO_RD) {
         r = xptr->stb;
@@ -748,7 +748,7 @@ static int32 m2sio_data(DEVICE *dptr, int32 io, int32 data)
     M2SIO_CTX *xptr;
     int32 r;
 
-    xptr = dptr->ctxt;
+    xptr = (M2SIO_CTX *) dptr->ctxt;
 
     if (io == IO_RD) {
         r = xptr->rxb;
