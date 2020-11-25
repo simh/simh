@@ -58,9 +58,7 @@ bel_iot (uint16 insn, uint16 AC)
   sim_debug (DBG, &bel_dev, "IOT\n");
   if ((insn & 0771) == 0711) { /* BEL */
     sim_debug (DBG, &bel_dev, "Dong!\n");
-#ifdef HAVE_LIBSDL
     vid_beep ();
-#endif
   }
   return AC;
 }

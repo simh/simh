@@ -25,9 +25,7 @@
 */
 
 #include "imlac_defs.h"
-#ifdef HAVE_LIBSDL
 #include "display/display.h"
-#endif
 
 
 /* Debug */
@@ -668,7 +666,6 @@ rom_show_type (FILE *st, UNIT *up, int32 v, CONST void *dp)
   return SCPE_OK;
 }
 
-#ifdef HAVE_LIBSDL
 /* Called from display library to get data switches. */
 void
 cpu_get_switches (unsigned long *p1, unsigned long *p2)
@@ -683,4 +680,3 @@ cpu_set_switches (unsigned long p1, unsigned long p2)
 {
   DS = p1 & 0177777;
 }
-#endif /* HAVE_LIBSDL */

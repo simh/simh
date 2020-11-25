@@ -47,12 +47,18 @@ static DEBTAB crt_deb[] = {
   { NULL, 0 }
 };
 
+#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
+#define CRT_DIS  0
+#else
+#define CRT_DIS  DEV_DIS
+#endif
+
 DEVICE crt_dev = {
   "CRT", &crt_unit, NULL, NULL,
   1, 8, 16, 1, 8, 16,
   NULL, NULL, &crt_reset,
   NULL, NULL, NULL,
-  NULL, DEV_DISABLE | DEV_DEBUG | DEV_DIS, 0, crt_deb,
+  NULL, DEV_DISABLE | DEV_DEBUG | CRT_DIS, 0, crt_deb,
   NULL, NULL, NULL, NULL, NULL, NULL
 };
 
