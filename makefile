@@ -543,6 +543,11 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
           OS_CCDEFS += -DHAVE_DLOPEN=${LIBEXT}
           OS_LDFLAGS += -ldld
           $(info using libdld: $(call find_lib,dld) $(call find_include,dlfcn))
+        else
+          ifeq (Darwin,$(OSTYPE))
+            OS_CCDEFS += -DHAVE_DLOPEN=dylib
+            $(info using macOS dlopen with .dylib)
+          endif
         endif
       endif
     endif
@@ -703,7 +708,12 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
           NETWORK_FEATURES = - static networking support using $(OSNAME) provided libpcap components
           $(info using libpcap: $(call find_lib,$(PCAPLIB)) $(call find_include,pcap))
         endif
-        LIBEXT = $(LIBEXTSAVE)        
+        LIBEXT = $(LIBEXTSAVE)
+        ifeq (Darwin,$(OSTYPE)$(findstring USE_,$(NETWORK_CCDEFS)))
+          NETWORK_CCDEFS += -DUSE_SHARED
+          NETWORK_FEATURES = - dynamic networking support using $(OSNAME) provided libpcap components
+          $(info using macOS dynamic libpcap: $(call find_include,pcap))
+        endif
       endif
     else
       # On non-Linux platforms, we'll still try to provide deprecated support for libpcap in /usr/local
