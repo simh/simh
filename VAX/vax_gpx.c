@@ -188,8 +188,6 @@ void va_erase (uint32 x0, uint32 x1, uint32 y0, uint32 y1);
 
 void va_adpstat (uint32 set, uint32 clr)
 {
-uint32 chg = (va_adp[ADP_STAT] ^ set) & set;
-
 if (va_adp[ADP_INT] & set)                              /* unmasked ints 0->1? */
     va_setint (INT_ADP);
 va_adp[ADP_STAT] = va_adp[ADP_STAT] | set;

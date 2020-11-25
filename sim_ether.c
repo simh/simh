@@ -751,12 +751,12 @@ void eth_zero(ETH_DEV* dev)
   dev->reflections = -1;                          /* not established yet */
 }
 
-static char*   (*p_pcap_lib_version) (void);
-
 static ETH_DEV **eth_open_devices = NULL;
 static int eth_open_device_count = 0;
 
 #if defined (USE_NETWORK) || defined (USE_SHARED)
+static char*   (*p_pcap_lib_version) (void);
+
 static void _eth_add_to_open_list (ETH_DEV* dev)
 {
 eth_open_devices = (ETH_DEV**)realloc(eth_open_devices, (eth_open_device_count+1)*sizeof(*eth_open_devices));

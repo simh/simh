@@ -40,7 +40,6 @@ static VID_QUIT_CALLBACK vid_quit_callback = NULL;
 static VID_GAMEPAD_CALLBACK motion_callback[10];
 static VID_GAMEPAD_CALLBACK button_callback[10];
 static int vid_gamepad_inited = 0;
-static int vid_gamepad_ok = 0; /* Or else just joysticks. */
 
 t_stat vid_register_quit_callback (VID_QUIT_CALLBACK callback)
 {
@@ -94,6 +93,8 @@ return dev ? sim_dname(dev) : "Video Device";
 }
 
 #if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
+
+static int vid_gamepad_ok = 0; /* Or else just joysticks. */
 
 char vid_release_key[64] = "Ctrl-Right-Shift";
 
@@ -610,7 +611,6 @@ if (0 == (--vid_gamepad_inited)) {
 
 static t_stat vid_init_window (VID_DISPLAY *vptr, DEVICE *dptr, const char *title, uint32 width, uint32 height, int flags)
 {
-int wait_count = 0;
 t_stat stat;
 
 if ((strlen(sim_name) + 7 + (dptr ? strlen (dptr->name) : 0) + (title ? strlen (title) : 0)) < sizeof (vptr->vid_title))
@@ -2446,7 +2446,6 @@ static int vid_beep_samples;
 
 static void vid_audio_callback(void *ctx, Uint8 *stream, int length)
 {
-int16 *data = (int16 *)stream;
 int i, sum, remnant = ((vid_beep_samples - vid_beep_offset) * sizeof (*vid_beep_data));
 
 if (length > remnant) {

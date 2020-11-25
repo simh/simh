@@ -329,7 +329,6 @@ int32 rz_rd (int32 pa)
 int32 ctlr = (pa >> 8) & 1;
 CTLR *rz = rz_ctxmap[ctlr];
 DEVICE *dptr = rz_devmap[ctlr];
-UNIT *uptr = dptr->units + RZ_CTLR;
 int32 rg = (pa >> 2) & 0x1F;
 int32 data = 0;
 int32 len;
