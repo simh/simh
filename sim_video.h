@@ -217,7 +217,6 @@ uint32 vid_map_rgb_window (VID_DISPLAY *vptr, uint8 r, uint8 g, uint8 b);
 void vid_draw_window (VID_DISPLAY *vptr, int32 x, int32 y, int32 w, int32 h, uint32 *buf);
 void vid_refresh_window (VID_DISPLAY *vptr);
 t_stat vid_set_cursor_window (VID_DISPLAY *vptr, t_bool visible, uint32 width, uint32 height, uint8 *data, uint8 *mask, uint32 hot_x, uint32 hot_y);
-t_stat vid_show_video_window (VID_DISPLAY *vptr, FILE* st, UNIT* uptr, int32 val, CONST void* desc);
 t_bool vid_is_fullscreen_window (VID_DISPLAY *vptr);
 t_stat vid_set_fullscreen_window (VID_DISPLAY *vptr, t_bool flag);
 void vid_set_cursor_position_window (VID_DISPLAY *vptr, int32 x, int32 y);        /* cursor position (set by calling code) */

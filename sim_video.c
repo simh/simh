@@ -2616,4 +2616,57 @@ sim_printf ("video support unavailable\n");
 return SCPE_OK;
 }
 
+t_stat vid_open_window (VID_DISPLAY **vptr, DEVICE *dptr, const char *title, uint32 width, uint32 height, int flags)
+{
+*vptr = NULL;
+return SCPE_NOFNC;
+}
+
+t_stat vid_close_window (VID_DISPLAY *vptr)
+{
+return SCPE_OK;
+}
+
+uint32 vid_map_rgb_window (VID_DISPLAY *vptr, uint8 r, uint8 g, uint8 b)
+{
+return 0;
+}
+
+void vid_draw_window (VID_DISPLAY *vptr, int32 x, int32 y, int32 w, int32 h, uint32 *buf)
+{
+return;
+}
+
+void vid_refresh_window (VID_DISPLAY *vptr)
+{
+return;
+}
+
+t_stat vid_set_cursor_window (VID_DISPLAY *vptr, t_bool visible, uint32 width, uint32 height, uint8 *data, uint8 *mask, uint32 hot_x, uint32 hot_y)
+{
+return SCPE_NOFNC;
+}
+
+t_bool vid_is_fullscreen_window (VID_DISPLAY *vptr)
+{
+sim_printf ("video support unavailable\n");
+return FALSE;
+}
+
+t_stat vid_set_fullscreen_window (VID_DISPLAY *vptr, t_bool flag)
+{
+sim_printf ("video support unavailable\n");
+return SCPE_OK;
+}
+
+void vid_set_cursor_position_window (VID_DISPLAY *vptr, int32 x, int32 y)
+{
+return;
+}
+
+const char *vid_key_name (int32 key)
+{
+return "";
+}
+
 #endif /* defined(USE_SIM_VIDEO) */
