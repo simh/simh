@@ -47,7 +47,7 @@ static DEBTAB crt_deb[] = {
   { NULL, 0 }
 };
 
-#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
+#ifdef USE_DISPLAY
 #define CRT_DIS  0
 #else
 #define CRT_DIS  DEV_DIS
@@ -65,7 +65,7 @@ DEVICE crt_dev = {
 static t_stat
 crt_svc(UNIT *uptr)
 {
-#ifdef HAVE_LIBSDL
+#ifdef USE_DISPLAY
   imlac_cycle (100, 0);
   sim_activate_after (uptr, 100);
   if (crt_quit) {
@@ -84,8 +84,8 @@ static void crt_quit_callback (void)
 static t_stat
 crt_reset (DEVICE *dptr)
 {
-#ifdef HAVE_LIBSDL
-  if (dptr->flags & DEV_DIS) {
+#ifdef USE_DISPLAY
+  if (dptr->flags & DEV_DIS || (sim_switches & SWMASK('P')) != 0) {
     display_close (dptr);
     sim_cancel (&crt_unit);
   } else {
@@ -102,7 +102,7 @@ void
 crt_point (uint16 x, uint16 y)
 {
   sim_debug (DBG, &crt_dev, "Point %d,%d\n", x, y);
-#ifdef HAVE_LIBSDL
+#ifdef USE_DISPLAY
   if (crt_dev.flags & DEV_DIS)
     return;
   imlac_point ((x & 03777) >> 1, (y & 03777) >> 1);
@@ -113,7 +113,7 @@ void
 crt_line (uint16 x1, uint16 y1, uint16 x2, uint16 y2)
 {
   sim_debug (DBG, &crt_dev, "Line %d,%d - %d,%d\n", x1, y1, x2, y2);
-#ifdef HAVE_LIBSDL
+#ifdef USE_DISPLAY
   if (crt_dev.flags & DEV_DIS)
     return;
   imlac_line ((x1 & 03777) >> 1, (y1 & 03777) >> 1,
