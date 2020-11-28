@@ -145,7 +145,7 @@
 #define UNIT_DSK_WLK        (1 << UNIT_V_DSK_WLK)
 #define DSK_SECTSIZE        137                     /* size of sector                           */
 #define DSK_SECT            32                      /* sectors per track                        */
-#define MAX_TRACKS          254                     /* number of tracks,
+#define MAX_TRACKS          2048                    /* number of tracks,
                                                     original Altair has 77 tracks only          */
 #define DSK_TRACSIZE        (DSK_SECTSIZE * DSK_SECT)
 #define MAX_DSK_SIZE        (DSK_TRACSIZE * MAX_TRACKS)

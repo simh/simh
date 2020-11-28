@@ -2084,14 +2084,31 @@ static t_stat sim_instr_mmu (void) {
     register uint32 cbits;
     register uint32 op;
     register uint32 adr;
-    /*  tStates contains the number of t-states executed. One t-state is executed
-        in one microsecond on a 1MHz CPU. tStates is used for real-time simulations.    */
-    register uint32 tStates;
-    uint32 tStatesInSlice; /* number of t-states in 10 mSec time-slice */
+
+    /*  The clock frequency simulation works as follows:
+     For each 8080 or Z80 instruction one can determine the number of t-states
+     needed for its execution. One t-state is executed in one microsecond on a
+     1MHz CPU. The variable sliceLength defines a time interval of typically
+     10 ms. When the clock frequency (clockFrequency) is known one can compute
+     the number of t-states which need to be completed in this slice:
+     tStatesInSlice = sliceLength * clockFrequency. The variable tStates counts
+     how many t-states have already been completed. startTime is initialized
+     with the current time when tStates is 0 at the beginning.
+
+     Periodically there is a check whether tStates >= tStatesInSlice.
+     If this is true case three things happen:
+
+     1. startTime is incremented by sliceLength giving the new expected current time.
+     2. tStates is decremented by tStatesInSlice.
+     3. In case startTime is in the future there is a sleep until startTime
+        is equal to the current time.
+     */
+    register uint32 tStates;    /* number of t-states executed in the current time-slice */
+    uint32 tStatesInSlice;      /* number of t-states in a 10 mSec time-slice */
     uint32 startTime, now;
     int32 tStateModifier = FALSE;
 
-    switch_cpu_now = TRUE; /* hharte */
+    switch_cpu_now = TRUE;
 
     AF = AF_S;
     BC = BC_S;
@@ -2127,11 +2144,13 @@ static t_stat sim_instr_mmu (void) {
         }
 
         if (specialProcessing) { /* quick check for special processing */
+
+            /* check for CPU clock frequency simulation + enough t-states executed */
             if (clockFrequency && (tStates >= tStatesInSlice)) {
                 /* clockFrequency != 0 implies that real time clock is available */
-                startTime += sliceLength;
-                tStates -= tStatesInSlice;
-                if (startTime > (now = sim_os_msec()))
+                startTime += sliceLength;   /* advance start time to new expected current time */
+                tStates -= tStatesInSlice;  /* reduce by t-states executed in a slice */
+                if (startTime > (now = sim_os_msec())) /* if expected time is in the future, sleep */
                     sim_os_ms_sleep(startTime - now);
             }
 

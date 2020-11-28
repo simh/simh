@@ -187,6 +187,102 @@ static int32 mits[SPT32]                = { 0,  17, 2,  19, 4,  21, 6,  23,
  measured in CP/M sectors of size 128 bytes. Standard format "HDSK" must be
  first as index 0 is used as default in some cases.
  */
+
+/*
+ The structure of a Disk Parameter Block in CP/M is as follows:
+
+      +---+---+---+---+---+---+---+---+---+---+
+      |SPT|BSH|BLM|EXM|DSM|DRM|AL0|AL1|CKS|OFF|
+      +---+---+---+---+---+---+---+---+---+---+
+       16B 8B  8B  8B  16B 16B 8B  8B  16B 16B
+
+where each is a byte or word value, as shown by the 8b or 16b indicator
+below the field.
+
+The following field abbreviations are used in the figure above:
+      SPT     is the total number of sectors per track.
+      BSH     is the data allocation block shift factor, determined by
+              the data block allocation size.
+      BLM     is the data allocation block mask (2[BSH-1]).
+      EXM     is the extent mask, determined by the data block
+              allocation size and the number of disk blocks.
+      DSM     determines the total storage capacity of the disk drive.
+      DRM     determines the total number of directory entries that
+              can be stored on this drive.
+      AL0, AL1        determine reserved directory blocks.
+      CKS     is the size of the directory check vector.
+
+      OFF     is the number of reserved tracks at the beginning of the
+              (logical) disk.
+
+The values of BSH and BLM determine the data allocation size BLS, which is
+not an entry in the DPB. Given that the designer has selected a value for
+BLS, the values of BSH and BLM are shown in the following table.
+
+         BLS  BSH     BLM
+       1,024    3       7
+       2,048    4      15
+       4,096    5      31
+       8,192    6      63
+      16,384    7     127
+
+where all values are in decimal. The value of EXM depends upon both the BLS
+and whether the DSM value is less than 256 or greater than 255, as shown in
+the table below.
+
+      EXM values
+         BLS  DSM<256         DSM>255
+       1,024     0            N/A
+       2,048     1            0
+       4,096     3            1
+       8,192     7            3
+      16,384    15            7
+
+The value of DSM is the maximum data block number supported by this
+particular drive, measured in BLS units. The product (DSM + 1) is the total
+number of bytes held by the drive and must be within the capacity of the
+physical disk, not counting the reserved operating system tracks.
+
+The DRM entry is the one less than the total number of directory entries
+that can take on a 16-bit value. The values of AL0 and AL1, however, are
+determined by DRM. The values AL0 and AL1 can together be considered a
+string of 16-bits, as shown below.
+
+     |--------- AL0 ---------|-------- AL1 ----------|
+      00 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15
+
+Position 00 corresponds to the high-order bit of the byte labeled AL0 and
+15 corresponds to the low-order bit of the byte labeled AL1. Each bit
+position reserves a data block for number of directory entries, thus
+allowing a total of 16 data blocks to be assigned for directory entries
+(bits are assigned starting at 00 and filled to the right until position
+15). Each directory entry occupies 32 bytes, resulting in the following
+tabulation:
+
+         BLS          Directory Entries
+       1,024          32 times # bits
+       2,048          64 times # bits
+       4,096          128 times # bits
+       8,192          256 times # bits
+      16,384          512 times # bits
+
+Thus, if DRM = 127 (128 directory entries) and BLS = 1024, there are 32
+directory entries per block, requiring 4 reserved blocks. In this case, the
+4 high-order bits of AL0 are set, resulting in the values AL0 = 0F0H and
+AL1 = 00H.
+
+The CKS value is determined as follows: if the disk drive media is
+removable, then CKS = (DRM + 1)/4, where DRM is the last directory entry
+number. If the media are fixed, then set CKS = 0 (no directory records are
+checked in this case).
+
+Finally, the OFF field determines the number of tracks that are skipped at
+the beginning of the physical disk. This value is automatically added
+whenever SETTRK is called and can be used as a mechanism for skipping
+reserved operating system tracks or for partitioning a large disk into
+smaller segmented sections.
+
+ */
 static DPB dpb[] = {
 /*      name    capac           spt     bsh     blm     exm     dsm     drm
         al0     al1     cks     off     psh     phm     ss      off skew                                                */
@@ -241,7 +337,10 @@ static DPB dpb[] = {
     { "SSDD8S", 512512,         SPT52,  0x04,   0x0F,   0x01,   242,    0x007F,
         0xC0,   0x00,   0x0000, 0x0002, 0x01,   0x01,   0,      0,  standard8 },        /* Standard 8" SS DD with skew  */
 
-    { "DSDD8",  1025024,        SPT52,  0x04,   0x0F,   0x00,   493,    0x007F,
+    { "DSSD8S",  512512,        SPT26,  0x03,   0x07,   0x00,   487,    0x007F,
+        0xF0,   0x00,   0x0000, 0x0004, 0x00,   0x00,   0,      0,  standard8 },        /* Standard 8" DS SD with skew  */
+
+    { "DSDD8",  1025024,        SPT52,  0x04,   0x0F,   0x00,   493,    0x007F,         // psco test
         0xC0,   0x00,   0x0000, 0x0002, 0x01,   0x01,   0,      0,  NULL },             /* Standard 8" DS DD            */
 
     { "DSDD8S", 1025024,        SPT52,  0x04,   0x0F,   0x00,   493,    0x007F,

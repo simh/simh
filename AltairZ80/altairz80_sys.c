@@ -68,6 +68,7 @@ extern DEVICE hdc1001_dev;
 
 extern DEVICE jade_dev;
 extern DEVICE tarbell_dev;
+extern DEVICE icom_dev;
 extern DEVICE m2sio0_dev;
 extern DEVICE m2sio1_dev;
 extern DEVICE pmmi_dev;
@@ -127,6 +128,8 @@ DEVICE      *sim_devices[]  = {
     &jade_dev,
     /* Tarbell Devices */
     &tarbell_dev,
+    /* iCOM Devices */
+    &icom_dev,
     /* MITS 88-2SIO */
     &m2sio0_dev,
     &m2sio1_dev,

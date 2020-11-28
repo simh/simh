@@ -236,13 +236,9 @@ static const char* hayes_description(DEVICE *dptr)
 
 static t_stat hayes_reset(DEVICE *dptr)
 {
-    HAYES_CTX *xptr;
-
-    xptr = dptr->ctxt;
-
     /* Connect/Disconnect I/O Ports at base address */
-    if(sim_map_resource(xptr->pnp.io_base, xptr->pnp.io_size, RESOURCE_TYPE_IO, &hayes_io, dptr->name, dptr->flags & DEV_DIS) != 0) {
-        sim_debug(ERROR_MSG, dptr, "error mapping I/O resource at 0x%02x.\n", xptr->pnp.io_base);
+    if (sim_map_resource(hayes_ctx.pnp.io_base, hayes_ctx.pnp.io_size, RESOURCE_TYPE_IO, &hayes_io, dptr->name, dptr->flags & DEV_DIS) != 0) {
+        sim_debug(ERROR_MSG, dptr, "error mapping I/O resource at 0x%02x.\n", hayes_ctx.pnp.io_base);
         return SCPE_ARG;
     }
 
@@ -250,19 +246,19 @@ static t_stat hayes_reset(DEVICE *dptr)
     dptr->units[0].dptr = dptr;
 
     /* Enable TMXR modem control passthru */
-    tmxr_set_modem_control_passthru(xptr->tmxr);
+    tmxr_set_modem_control_passthru(hayes_ctx.tmxr);
 
     /* Reset status registers */
-    xptr->ireg0 = 0;
-    xptr->ireg1 = HAYES_RI;
-    xptr->oreg1 = HAYES_8BIT | HAYES_PI;
-    xptr->oreg2 = 0;
-    xptr->oreg3 = 0;
-    xptr->txp = 0;
-    xptr->dtr = 0;
-    xptr->intmsk = 0;
-    xptr->timer = 0;
-    xptr->baud = HAYES_BAUD;
+    hayes_ctx.ireg0 = 0;
+    hayes_ctx.ireg1 = HAYES_RI;
+    hayes_ctx.oreg1 = HAYES_8BIT | HAYES_PI;
+    hayes_ctx.oreg2 = 0;
+    hayes_ctx.oreg3 = 0;
+    hayes_ctx.txp = 0;
+    hayes_ctx.dtr = 0;
+    hayes_ctx.intmsk = 0;
+    hayes_ctx.timer = 0;
+    hayes_ctx.baud = HAYES_BAUD;
 
     if (!(dptr->flags & DEV_DIS)) {
         sim_activate(&dptr->units[0], dptr->units[0].wait);
@@ -277,32 +273,29 @@ static t_stat hayes_reset(DEVICE *dptr)
 
 static t_stat hayes_svc(UNIT *uptr)
 {
-    HAYES_CTX *xptr;
     int32 c,s,ireg1;
     t_stat r;
     uint32 ms;
 
-    xptr = uptr->dptr->ctxt;
-
     /* Check for new incoming connection */
     if (uptr->flags & UNIT_ATT) {
-        if (tmxr_poll_conn(xptr->tmxr) >= 0) {      /* poll connection */
+        if (tmxr_poll_conn(hayes_ctx.tmxr) >= 0) {      /* poll connection */
             sim_debug(STATUS_MSG, uptr->dptr, "new connection.\n");
         }
     }
 
     /* Update incoming modem status bits */
     if (uptr->flags & UNIT_ATT) {
-        tmxr_set_get_modem_bits(xptr->tmln, 0, 0, &s);
+        tmxr_set_get_modem_bits(hayes_ctx.tmln, 0, 0, &s);
 
-        ireg1 = xptr->ireg1;
+        ireg1 = hayes_ctx.ireg1;
 
-        xptr->ireg1 &= ~HAYES_RI;
-        xptr->ireg1 |= (s & TMXR_MDM_RNG) ? 0 : HAYES_RI;     /* Active Low */
+        hayes_ctx.ireg1 &= ~HAYES_RI;
+        hayes_ctx.ireg1 |= (s & TMXR_MDM_RNG) ? 0 : HAYES_RI;     /* Active Low */
 
         /* RI status changed */
-        if ((ireg1 ^ xptr->ireg1) & HAYES_RI) {
-            sim_debug(STATUS_MSG, uptr->dptr, "RI state changed to %s.\n", (xptr->ireg1 & HAYES_RI) ? "LOW" : "HIGH");
+        if ((ireg1 ^ hayes_ctx.ireg1) & HAYES_RI) {
+            sim_debug(STATUS_MSG, uptr->dptr, "RI state changed to %s.\n", (hayes_ctx.ireg1 & HAYES_RI) ? "LOW" : "HIGH");
 
             /*
             ** The Hayes does not have DTR or RTS control signals.
@@ -310,17 +303,17 @@ static t_stat hayes_svc(UNIT *uptr)
             ** is active and there is no way to tell TMXR to ignore
             ** them, so we raise DTR here on RI.
             */
-            if (!(xptr->ireg1 & HAYES_RI)) {    /* RI is active low */
+            if (!(hayes_ctx.ireg1 & HAYES_RI)) {    /* RI is active low */
                 hayes_set_dtr(uptr, 1);
             }
         }
 
-        xptr->ireg1 &= ~HAYES_CD;
-        xptr->ireg1 |= (s & TMXR_MDM_DCD) ? HAYES_CD : 0;    /* Active High */
+        hayes_ctx.ireg1 &= ~HAYES_CD;
+        hayes_ctx.ireg1 |= (s & TMXR_MDM_DCD) ? HAYES_CD : 0;    /* Active High */
 
         /* CD status changed */
-        if ((ireg1 ^ xptr->ireg1) & HAYES_CD) {
-            sim_debug(STATUS_MSG, uptr->dptr, "CD state changed to %s.\n", (xptr->ireg1 & HAYES_CD) ? "HIGH" : "LOW");
+        if ((ireg1 ^ hayes_ctx.ireg1) & HAYES_CD) {
+            sim_debug(STATUS_MSG, uptr->dptr, "CD state changed to %s.\n", (hayes_ctx.ireg1 & HAYES_CD) ? "HIGH" : "LOW");
 
             /*
             ** The Hayes does not have DTR or RTS control signals.
@@ -328,21 +321,21 @@ static t_stat hayes_svc(UNIT *uptr)
             ** is active and there is no way to tell TMXR to
             ** ignore them, so we drop DTR here on loss of CD.
             */
-            if (!(xptr->ireg1 & HAYES_CD)) {
+            if (!(hayes_ctx.ireg1 & HAYES_CD)) {
                 hayes_set_dtr(uptr, 0);
             }
         }
     }
 
     /* TX data */
-    if (xptr->txp && xptr->oreg2 & HAYES_TXE) {
+    if (hayes_ctx.txp && hayes_ctx.oreg2 & HAYES_TXE) {
         if (uptr->flags & UNIT_ATT) {
-            r = tmxr_putc_ln(xptr->tmln, xptr->oreg0);
+            r = tmxr_putc_ln(hayes_ctx.tmln, hayes_ctx.oreg0);
         } else {
-            r = sim_putchar(xptr->oreg0);
+            r = sim_putchar(hayes_ctx.oreg0);
         }
 
-        xptr->txp = 0;               /* Reset TX Pending */
+        hayes_ctx.txp = 0;               /* Reset TX Pending */
 
         if (r == SCPE_LOST) {
             sim_debug(STATUS_MSG, uptr->dptr, "lost connection.\n");
@@ -350,41 +343,41 @@ static t_stat hayes_svc(UNIT *uptr)
     }
 
     /* Update TRE if not set and no character pending */
-    if (!xptr->txp && !(xptr->ireg1 & HAYES_TRE)) {
+    if (!hayes_ctx.txp && !(hayes_ctx.ireg1 & HAYES_TRE)) {
         if (uptr->flags & UNIT_ATT) {
-            tmxr_poll_tx(xptr->tmxr);
-            xptr->ireg1 |= (tmxr_txdone_ln(xptr->tmln)) ? HAYES_TRE : 0;
+            tmxr_poll_tx(hayes_ctx.tmxr);
+            hayes_ctx.ireg1 |= (tmxr_txdone_ln(hayes_ctx.tmln)) ? HAYES_TRE : 0;
         } else {
-            xptr->ireg1 |= HAYES_TRE;
+            hayes_ctx.ireg1 |= HAYES_TRE;
         }
     }
 
     /* Check for Data if RX buffer empty */
-    if (!(xptr->ireg1 & HAYES_RRF)) {
+    if (!(hayes_ctx.ireg1 & HAYES_RRF)) {
         if (uptr->flags & UNIT_ATT) {
-            tmxr_poll_rx(xptr->tmxr);
+            tmxr_poll_rx(hayes_ctx.tmxr);
 
-            c = tmxr_getc_ln(xptr->tmln);
+            c = tmxr_getc_ln(hayes_ctx.tmln);
         } else {
             c = sim_poll_kbd();
         }
 
         if (c & (TMXR_VALID | SCPE_KFLAG)) {
-            xptr->ireg0 = c & 0xff;
-            xptr->ireg1 |= HAYES_RRF;
-            xptr->ireg1 &= ~(HAYES_FE | HAYES_OE | HAYES_PE);
+            hayes_ctx.ireg0 = c & 0xff;
+            hayes_ctx.ireg1 |= HAYES_RRF;
+            hayes_ctx.ireg1 &= ~(HAYES_FE | HAYES_OE | HAYES_PE);
         }
     }
 
     /* Timer */
     ms = sim_os_msec();
 
-    if (xptr->timer && ms > xptr->timer) {
-        if (!(xptr->ireg1 & HAYES_TMR)) {
+    if (hayes_ctx.timer && ms > hayes_ctx.timer) {
+        if (!(hayes_ctx.ireg1 & HAYES_TMR)) {
             sim_debug(VERBOSE_MSG, uptr->dptr, "50ms timer triggered.\n");
         }
 
-        xptr->ireg1 |= HAYES_TMR;
+        hayes_ctx.ireg1 |= HAYES_TMR;
     }
 
     /* Don't let TMXR clobber our wait time */
@@ -399,18 +392,15 @@ static t_stat hayes_svc(UNIT *uptr)
 /* Attach routine */
 static t_stat hayes_attach(UNIT *uptr, CONST char *cptr)
 {
-    HAYES_CTX *xptr;
     t_stat r;
-
-    xptr = uptr->dptr->ctxt;
 
     sim_debug(VERBOSE_MSG, uptr->dptr, "attach (%s).\n", cptr);
 
-    if ((r = tmxr_attach(xptr->tmxr, uptr, cptr)) == SCPE_OK) {
+    if ((r = tmxr_attach(hayes_ctx.tmxr, uptr, cptr)) == SCPE_OK) {
 
-        xptr->flags = uptr->flags;     /* Save Flags */
+        hayes_ctx.flags = uptr->flags;     /* Save Flags */
 
-        xptr->tmln->rcve = 1;
+        hayes_ctx.tmln->rcve = 1;
 
         hayes_config_line(uptr);
 
@@ -419,8 +409,8 @@ static t_stat hayes_attach(UNIT *uptr, CONST char *cptr)
         ** We raise RTS here for use to provide DCD/RI signals.
         ** We drop DTR as that is tied to the other functions.
         */
-        tmxr_set_get_modem_bits(xptr->tmln, TMXR_MDM_RTS, TMXR_MDM_DTR, NULL);
-        xptr->dtr = 0;
+        tmxr_set_get_modem_bits(hayes_ctx.tmln, TMXR_MDM_RTS, TMXR_MDM_DTR, NULL);
+        hayes_ctx.dtr = 0;
         sim_debug(STATUS_MSG, uptr->dptr, "Raising RTS. Dropping DTR.\n");
 
         sim_activate(uptr, uptr->wait);
@@ -435,18 +425,14 @@ static t_stat hayes_attach(UNIT *uptr, CONST char *cptr)
 /* Detach routine */
 static t_stat hayes_detach(UNIT *uptr)
 {
-    HAYES_CTX *xptr;
-
     sim_debug(VERBOSE_MSG, uptr->dptr, "detach.\n");
 
     if (uptr->flags & UNIT_ATT) {
-        xptr = uptr->dptr->ctxt;
-
-        uptr->flags = xptr->flags;     /* Restore Flags */
+        uptr->flags = hayes_ctx.flags;     /* Restore Flags */
 
         sim_cancel(uptr);
 
-        return (tmxr_detach(xptr->tmxr, uptr));
+        return (tmxr_detach(hayes_ctx.tmxr, uptr));
     }
 
     return SCPE_UNATT;
@@ -454,112 +440,102 @@ static t_stat hayes_detach(UNIT *uptr)
 
 static t_stat hayes_config_line(UNIT *uptr)
 {
-    HAYES_CTX *xptr;
     char config[20];
     char b,p,s;
     t_stat r = SCPE_IERR;
 
-    xptr = uptr->dptr->ctxt;
+    switch (hayes_ctx.oreg1 & HAYES_BMSK) {
+        case HAYES_5BIT:
+            b = '5';
+            break;
 
-    if (xptr != NULL) {
-        switch (xptr->oreg1 & HAYES_BMSK) {
-            case HAYES_5BIT:
-                b = '5';
-                break;
+        case HAYES_6BIT:
+            b = '6';
+            break;
 
-            case HAYES_6BIT:
-                b = '6';
-                break;
+        case HAYES_7BIT:
+            b = '7';
+            break;
 
-            case HAYES_7BIT:
-                b = '7';
-                break;
-
-            case HAYES_8BIT:
-            default:
-                b = '8';
-                break;
-        }
-
-        switch (xptr->oreg1 & HAYES_PMSK) {
-            case HAYES_OPAR:
-                p = 'O';
-                break;
-
-            case HAYES_EPAR:
-                p = 'E';
-                break;
-
-            default:
-                p = 'N';
-                break;
-        }
-
-        switch (xptr->oreg1 & HAYES_SMSK) {
-            case HAYES_2SB:
-                s = '2';
-                break;
-
-            case HAYES_1SB:
-            default:
-                s = '1';
-                break;
-        }
-
-        sprintf(config, "%d-%c%c%c", xptr->baud, b,p,s);
-
-        r = tmxr_set_config_line(xptr->tmln, config);
-
-	if (r) {
-            sim_debug(ERROR_MSG, uptr->dptr, "error %d setting port configuration to '%s'.\n", r, config);
-        } else {
-            sim_debug(STATUS_MSG, uptr->dptr, "port configuration set to '%s'.\n", config);
-        }
-
-        /*
-        ** AltairZ80 and TMXR refuse to want to play together 
-        ** nicely when the CLOCK register is set to anything
-        ** other than 0.
-        **
-        ** This work-around is for those of us that may wish
-        ** to run irrelevant, old software, that use TMXR and
-        ** rely on some semblance of timing (Remote CP/M, BYE,
-        ** RBBS, PCGET/PUT, Xmodem, MEX, Modem7, or most
-        ** other communications software), on contemprary
-        ** hardware.
-        **
-        ** Serial ports are self-limiting and sockets will run
-        ** at the clocked CPU speed.
-        */
-        xptr->tmln->txbps = 0;   /* Get TMXR's rate-limiting out of our way */
-        xptr->tmln->rxbps = 0;   /* Get TMXR's rate-limiting out of our way */
+        case HAYES_8BIT:
+        default:
+            b = '8';
+            break;
     }
+
+    switch (hayes_ctx.oreg1 & HAYES_PMSK) {
+        case HAYES_OPAR:
+            p = 'O';
+            break;
+
+        case HAYES_EPAR:
+            p = 'E';
+            break;
+
+        default:
+            p = 'N';
+            break;
+    }
+
+    switch (hayes_ctx.oreg1 & HAYES_SMSK) {
+        case HAYES_2SB:
+            s = '2';
+            break;
+
+        case HAYES_1SB:
+        default:
+            s = '1';
+            break;
+    }
+
+    sprintf(config, "%d-%c%c%c", hayes_ctx.baud, b,p,s);
+
+    r = tmxr_set_config_line(hayes_ctx.tmln, config);
+
+    if (r) {
+        sim_debug(ERROR_MSG, uptr->dptr, "error %d setting port configuration to '%s'.\n", r, config);
+    } else {
+        sim_debug(STATUS_MSG, uptr->dptr, "port configuration set to '%s'.\n", config);
+    }
+
+    /*
+    ** AltairZ80 and TMXR refuse to want to play together 
+    ** nicely when the CLOCK register is set to anything
+    ** other than 0.
+    **
+    ** This work-around is for those of us that may wish
+    ** to run irrelevant, old software, that use TMXR and
+    ** rely on some semblance of timing (Remote CP/M, BYE,
+    ** RBBS, PCGET/PUT, Xmodem, MEX, Modem7, or most
+    ** other communications software), on contemprary
+    ** hardware.
+    **
+    ** Serial ports are self-limiting and sockets will run
+    ** at the clocked CPU speed.
+    */
+    hayes_ctx.tmln->txbps = 0;   /* Get TMXR's rate-limiting out of our way */
+    hayes_ctx.tmln->rxbps = 0;   /* Get TMXR's rate-limiting out of our way */
 
     return r;
 }
 
 static t_stat hayes_set_dtr(UNIT *uptr, int32 flag)
 {
-    HAYES_CTX *xptr;
     t_stat r = SCPE_IERR;
 
-    xptr = uptr->dptr->ctxt;
-
-    if (xptr != NULL) {
-        if (xptr->dtr && !flag) {
-            r = tmxr_set_get_modem_bits(xptr->tmln, 0, TMXR_MDM_DTR, NULL);
-            sim_debug(STATUS_MSG, uptr->dptr, "Dropping DTR.\n");
-        } else if (!xptr->dtr && flag) {
-            r = tmxr_set_get_modem_bits(xptr->tmln, TMXR_MDM_DTR, 0, NULL);
-            sim_debug(STATUS_MSG, uptr->dptr, "Raising DTR.\n");
-        }
-
-        xptr->dtr = flag;
+    if (hayes_ctx.dtr && !flag) {
+        r = tmxr_set_get_modem_bits(hayes_ctx.tmln, 0, TMXR_MDM_DTR, NULL);
+        sim_debug(STATUS_MSG, uptr->dptr, "Dropping DTR.\n");
+    } else if (!hayes_ctx.dtr && flag) {
+        r = tmxr_set_get_modem_bits(hayes_ctx.tmln, TMXR_MDM_DTR, 0, NULL);
+        sim_debug(STATUS_MSG, uptr->dptr, "Raising DTR.\n");
     }
 
+    hayes_ctx.dtr = flag;
 
     return r;
 }
+
 static int32 hayes_io(int32 addr, int32 io, int32 data)
 {
     int32 r;
@@ -602,18 +578,15 @@ static int32 hayes_io(int32 addr, int32 io, int32 data)
 */
 static int32 hayes_reg0(int32 io, int32 data)
 {
-    HAYES_CTX *xptr;
     int32 r;
 
-    xptr = hayes_dev.ctxt;
-
     if (io == IO_RD) {
-        r = xptr->ireg0;
-        xptr->ireg1 &= ~(HAYES_RRF);
+        r = hayes_ctx.ireg0;
+        hayes_ctx.ireg1 &= ~(HAYES_RRF);
     } else {
-        xptr->oreg0 = data;
-        xptr->ireg1 &= ~(HAYES_TRE);
-        xptr->txp = 1;
+        hayes_ctx.oreg0 = data;
+        hayes_ctx.ireg1 &= ~(HAYES_TRE);
+        hayes_ctx.txp = 1;
 
         r = 0x00;
     }
@@ -629,16 +602,13 @@ static int32 hayes_reg0(int32 io, int32 data)
 */
 static int32 hayes_reg1(int32 io, int32 data)
 {
-    HAYES_CTX *xptr;
     int32 r;
 
-    xptr = hayes_dev.ctxt;
-
     if (io == IO_RD) {
-        r = xptr->ireg1;
-        xptr->ireg1 &= ~(HAYES_FE | HAYES_OE | HAYES_PE);
+        r = hayes_ctx.ireg1;
+        hayes_ctx.ireg1 &= ~(HAYES_FE | HAYES_OE | HAYES_PE);
     } else {
-        xptr->oreg1 = data; /* Set UART configuration */
+        hayes_ctx.oreg1 = data; /* Set UART configuration */
 
         hayes_config_line(&hayes_dev.units[0]);
 
@@ -656,14 +626,11 @@ static int32 hayes_reg1(int32 io, int32 data)
 */
 static int32 hayes_reg2(int32 io, int32 data)
 {
-    HAYES_CTX *xptr;
     int32 oreg2;
 
-    xptr = hayes_dev.ctxt;
-
     if (io == IO_WR) {
-        oreg2 = xptr->oreg2;   /* Save previous value */
-        xptr->oreg2 = data;    /* Set new value */
+        oreg2 = hayes_ctx.oreg2;   /* Save previous value */
+        hayes_ctx.oreg2 = data;    /* Set new value */
 
         sim_debug(DEBUG_MSG, &hayes_dev, "oreg2 %02X -> %02X\n", oreg2, data);
 
@@ -685,7 +652,7 @@ static int32 hayes_reg2(int32 io, int32 data)
 
         /* Did the line configuration change? */
         if ((oreg2 & HAYES_LMSK) != (data & HAYES_LMSK)) {
-            xptr->baud = (data & HAYES_BRS) ? 300 : 110;
+            hayes_ctx.baud = (data & HAYES_BRS) ? 300 : 110;
 
             hayes_config_line(&hayes_dev.units[0]);
         }
@@ -702,13 +669,9 @@ static int32 hayes_reg2(int32 io, int32 data)
 */
 static int32 hayes_reg3(int32 io, int32 data)
 {
-    HAYES_CTX *xptr;
-
-    xptr = hayes_dev.ctxt;
-
     if (io == IO_WR) {
-        xptr->timer = sim_os_msec() + 50;    /* Set timeout to 50ms */
-        xptr->ireg1 &= ~(HAYES_TMR);	     /* Clear timer status */
+        hayes_ctx.timer = sim_os_msec() + 50;    /* Set timeout to 50ms */
+        hayes_ctx.ireg1 &= ~(HAYES_TMR);         /* Clear timer status */
     }
 
     return(0x00);
