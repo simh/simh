@@ -1,0 +1,9 @@
+# Attach to a server.  If the remote port isn't telnet, append ;notelnet.
+attach tty 12345,connect=localhost:23
+# Configure a bootstrap ROM; some programs require this.
+set rom type=stty
+# Load SSV version 22.
+load -s ssv22.iml
+# Reset and run.
+reset
+go
