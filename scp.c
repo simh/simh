@@ -8591,7 +8591,7 @@ CONST char *tptr;
 uint32 i, j;
 int32 sim_next = 0;
 int32 unitno;
-t_value pcv, orig_pcv;
+t_value new_pcv, orig_pcv;
 t_stat r;
 DEVICE *dptr;
 UNIT *uptr;
@@ -8604,17 +8604,17 @@ if (sim_runlimit_enabled &&                             /* If the run limit has 
 GET_SWITCHES (cptr);                                    /* get switches */
 sim_step = 0;
 if ((flag == RU_RUN) || (flag == RU_GO)) {              /* run or go */
-    orig_pcv = get_rval (sim_PC, 0);                    /* get current PC value */
+    new_pcv = orig_pcv = get_rval (sim_PC, 0);          /* get current PC value */
     if (*cptr != 0) {                                   /* argument? */
         cptr = get_glyph (cptr, gbuf, 0);               /* get next glyph */
         if (MATCH_CMD (gbuf, "UNTIL") != 0) {
             if (sim_vm_parse_addr)                      /* address parser? */
-                pcv = sim_vm_parse_addr (sim_dflt_dev, gbuf, &tptr);
-            else pcv = strtotv (gbuf, &tptr, sim_PC->radix);/* parse PC */
+                new_pcv = sim_vm_parse_addr (sim_dflt_dev, gbuf, &tptr);
+            else
+                new_pcv = strtotv (gbuf, &tptr, sim_PC->radix);/* parse PC */
             if ((tptr == gbuf) || (*tptr != 0) ||       /* error? */
-                (pcv > width_mask[sim_PC->width]))
+                (new_pcv > width_mask[sim_PC->width]))
                 return SCPE_ARG;
-            put_rval (sim_PC, 0, pcv);                  /* Save in PC */
             }
         }
     if ((flag == RU_RUN) &&                             /* run? */
@@ -8649,6 +8649,7 @@ if ((flag == RU_RUN) || (flag == RU_GO)) {              /* run or go */
             }
         sim_switches = saved_switches;
         }
+    put_rval (sim_PC, 0, new_pcv);                      /* Save in PC */
     }
 
 else if ((flag == RU_STEP) ||
