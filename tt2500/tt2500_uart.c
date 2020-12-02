@@ -31,10 +31,10 @@
 #define DBG_TX          0001
 #define DBG_RX          0002
 
-#define UART_FILE     1  /* Attached to a file. */
-#define UART_PORT     2  /* Attached to a network port. */
-#define UART_TYPE     3  /* File or port. */
-#define UART_REVERSE  4  /* Transmit bits in reverse order. */
+#define UART_FILE     (1 << TTUF_V_UF)  /* Attached to a file. */
+#define UART_PORT     (2 << TTUF_V_UF)  /* Attached to a network port. */
+#define UART_TYPE     (3 << TTUF_V_UF)  /* File or port. */
+#define UART_REVERSE  (4 << TTUF_V_UF)  /* Transmit bits in reverse order. */
 
 static uint16 RBUF, TBUF;
 
@@ -51,8 +51,8 @@ static TMLN uart_ldsc = { 0 };
 static TMXR uart_desc = { 1, 0, 0, &uart_ldsc };
 
 static UNIT uart_unit[] = {
-  { UDATA (&uart_r_svc, UNIT_IDLE+UNIT_ATTABLE, 0) },
-  { UDATA (&uart_t_svc, UNIT_IDLE+UNIT_ATTABLE, 0) }
+  { UDATA (&uart_r_svc, UNIT_IDLE+UNIT_ATTABLE+UART_PORT, 0) },
+  { UDATA (&uart_t_svc, UNIT_IDLE+UNIT_ATTABLE+UART_PORT, 0) }
 };
 
 static REG uart_reg[] = {
@@ -166,9 +166,6 @@ uart_t_svc(UNIT *uptr)
 static t_stat
 uart_reset (DEVICE *dptr)
 {
-  if ((uart_unit[0].flags & UART_TYPE) == 0)
-    uart_unit[0].flags |= UART_PORT;
-
   flag_off (INT_RRD);
   flag_on (FLAG_RSD);
   return SCPE_OK;

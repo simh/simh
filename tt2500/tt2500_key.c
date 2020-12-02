@@ -30,9 +30,9 @@
 /* Debug */
 #define DBG             0001
 
-#define KEY_DISPLAY  1
-#define KEY_CONSOLE  2
-#define KEY_TYPE     3
+#define KEY_DISPLAY  (1 << UNIT_V_UF)
+#define KEY_CONSOLE  (2 << UNIT_V_UF)
+#define KEY_TYPE     (3 << UNIT_V_UF)
 
 #define SHFT  01000
 #define CTRL  02000
@@ -50,8 +50,14 @@ static t_stat key_reset (DEVICE *dptr);
 static uint16 key_read (uint16 reg);
 static void key_write (uint16 reg, uint16 data);
 
+#if defined(USE_DISPLAY) || (defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL))
+#define KBD_FLAGS KEY_DISPLAY
+#else
+#define KBD_FLAGS KEY_CONSOLE
+#endif
+
 static UNIT key_unit = {
-  UDATA (&key_svc, UNIT_IDLE, 0)
+  UDATA (&key_svc, UNIT_IDLE+KBD_FLAGS, 0)
 };
 
 static REG key_reg[] = {
@@ -508,14 +514,6 @@ key_reset (DEVICE *dptr)
 #endif
   if (dptr->flags & DEV_DIS)
     return SCPE_OK;
-
-  if ((key_unit.flags & KEY_TYPE) == 0) {
-#if defined(USE_DISPLAY) || (defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL))
-    key_unit.flags |= KEY_DISPLAY;
-#else
-    key_unit.flags |= KEY_CONSOLE;
-#endif
-  }
 
   if (key_unit.flags & KEY_DISPLAY)
 #ifdef USE_DISPLAY
