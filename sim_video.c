@@ -87,12 +87,12 @@ t_stat vid_show (FILE* st, DEVICE *dptr,  UNIT* uptr, int32 val, CONST char* des
 return vid_show_video (st, uptr, val, desc);
 }
 
+#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
+
 static const char *vid_dname (DEVICE *dev)
 {
 return dev ? sim_dname(dev) : "Video Device";
 }
-
-#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
 
 static int vid_gamepad_ok = 0; /* Or else just joysticks. */
 
