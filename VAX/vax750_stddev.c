@@ -222,8 +222,8 @@ extern int32 con_halt (int32 code, int32 cc);
 UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_8B, 0), TMLN_SPD_9600_BPS };
 
 REG tti_reg[] = {
-    { HRDATAD (RXDB,       tti_buf,         16, "last data item processed") },
-    { HRDATAD (RXCS,       tti_csr,         16, "control/status register") },
+    { HRDATADF (RXDB,      tti_buf,         16, "last data item processed", rx_csr_bits) },
+    { HRDATADF (RXCS,      tti_csr,         16, "control/status register",  rx_buf_bits) },
     { FLDATAD (INT,        tti_int,          0, "interrupt pending flag") },
     { FLDATAD (DONE,       tti_csr, CSR_V_DONE, "device done flag (CSR<7>)") },
     { FLDATAD (IE,         tti_csr,   CSR_V_IE, "interrupt enable flag (CSR<6>)") },
@@ -257,8 +257,8 @@ DEVICE tti_dev = {
 UNIT tto_unit = { UDATA (&tto_svc, TT_MODE_8B, 0), SERIAL_OUT_WAIT };
 
 REG tto_reg[] = {
-    { HRDATAD (TXDB,       tto_buf,         16, "last data item processed") },
-    { HRDATAD (TXCS,       tto_csr,         16, "control/status register") },
+    { HRDATADF (TXDB,      tto_buf,         16, "last data item processed", tx_buf_bits) },
+    { HRDATADF (TXCS,      tto_csr,         16, "control/status register",  tx_csr_bits) },
     { FLDATAD (INT,        tto_int,          0, "interrupt pending flag") },
     { FLDATAD (DONE,       tto_csr, CSR_V_DONE, "device done flag (CSR<7>)") },
     { FLDATAD (IE,         tto_csr,   CSR_V_IE, "interrupt enable flag (CSR<6>)") },
