@@ -3015,7 +3015,10 @@ if (cp->ctype == DEFAULT_CTYPE)
     cp->ctype = (UNIBUS? UDA50_CTYPE : RQDX3_CTYPE);
 
 if (!plugs_inited ) {
-    uint32 d, u = 0;
+#if !defined (VM_VAX)
+    uint32 u = 0;
+#endif
+    uint32 d;
     char uname[16];
 
     plugs_inited  = TRUE;

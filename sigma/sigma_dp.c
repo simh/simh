@@ -930,7 +930,6 @@ t_bool dp_end_sec (UNIT *uptr, uint32 lnt, uint32 exp, uint32 st)
 {
 uint32 cidx = uptr->UCTX;
 uint32 dva = dp_dib[cidx].dva;
-uint32 dtype = GET_DTYPE (uptr->flags);
 DP_CTX *ctx = &dp_ctx[cidx];
 
 if (st != CHS_ZBC) {                                    /* end record? */
@@ -978,7 +977,6 @@ return DVS_AUTO;
 uint32 dp_tdv_status (uint32 cidx, uint32 un)
 {
 uint32 st;
-DP_CTX *ctx = &dp_ctx[cidx];
 UNIT *dp_unit = dp_dev[cidx].units;
 t_bool on_cyl;
 
@@ -996,7 +994,6 @@ return st;
 uint32 dp_aio_status (uint32 cidx, uint32 un)
 {
 uint32 st;
-DP_CTX *ctx = &dp_ctx[cidx];
 UNIT *dp_unit = dp_dev[cidx].units;
 t_bool on_cyl;
 

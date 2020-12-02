@@ -151,7 +151,6 @@ DEVICE ka_dev[] = {
 t_stat ka_rdreg (int32 *val, int32 pa, int32 lnt)
 {
 int32 ka, ofs;
-t_bool extmem = MEMSIZE > MAXMEMSIZE;
 
 ka = NEXUS_GETNEX (pa) - TR_KA0;                        /* get CPU num */
 ofs = NEXUS_GETOFS (pa);                                /* get offset */
@@ -194,7 +193,6 @@ return SCPE_OK;
 t_stat ka_wrreg (int32 val, int32 pa, int32 lnt)
 {
 int32 ka, ofs;
-t_bool extmem = MEMSIZE > MAXMEMSIZE;
 
 ka = NEXUS_GETNEX (pa) - TR_KA0;                        /* get CPU num */
 ofs = NEXUS_GETOFS (pa);                                /* get offset */

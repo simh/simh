@@ -113,7 +113,6 @@ DEVICE mctl_dev[] = {
 t_stat mctl_rdreg (int32 *val, int32 pa, int32 lnt)
 {
 int32 mctl, ofs;
-t_bool extmem = MEMSIZE > MAXMEMSIZE;
 
 mctl = NEXUS_GETNEX (pa) - TR_MCTL0;                    /* get mctl num */
 ofs = NEXUS_GETOFS (pa);                                /* get offset */
@@ -158,7 +157,6 @@ return SCPE_OK;
 t_stat mctl_wrreg (int32 val, int32 pa, int32 lnt)
 {
 int32 mctl, ofs;
-t_bool extmem = MEMSIZE > MAXMEMSIZE;
 
 mctl = NEXUS_GETNEX (pa) - TR_MCTL0;                    /* get mctl num */
 ofs = NEXUS_GETOFS (pa);                                /* get offset */

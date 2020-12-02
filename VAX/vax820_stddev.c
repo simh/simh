@@ -1212,8 +1212,6 @@ return FALSE;
 
 t_stat fl_reset (DEVICE *dptr)
 {
-extern int32 sys_model;
-
 fl_ecode = 0;                                           /* clear error */
 fl_sector = 0;                                          /* clear addr */
 fl_track = 0;

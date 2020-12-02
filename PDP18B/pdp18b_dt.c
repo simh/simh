@@ -221,6 +221,12 @@
                         else CLR_INT (DTA);
 
 #else                                                   /* Type 550 */
+
+static const int32 map_unit[16] = {                     /* Type 550 unit map */
+    -1, 1,  2,  3,  4,  5,  6,  7,
+    0, -1, -1, -1, -1, -1, -1, -1
+    };
+
 #define DTA_V_UNIT      12                              /* unit select */
 #define DTA_M_UNIT      017
 #define DTA_UNIT        (DTA_M_UNIT << DTA_V_UNIT)
@@ -344,10 +350,6 @@ int32 dt_dctime = 40000;                                /* decel time */
 int32 dt_substate = 0;
 int32 dt_logblk = 0;
 int32 dt_stopoffr = 0;                                  /* stop on off reel */
-static const int32 map_unit[16] = {                     /* Type 550 unit map */
-    -1, 1,  2,  3,  4,  5,  6,  7,
-    0, -1, -1, -1, -1, -1, -1, -1
-    };
 
 int32 dt75 (int32 dev, int32 pulse, int32 dat);
 int32 dt76 (int32 dev, int32 pulse, int32 dat);
