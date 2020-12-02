@@ -83,40 +83,6 @@
 #define TXDB_SEL        (TXDB_M_SEL << TXDB_V_SEL)      /* non-terminal */
 #define TXDB_GETSEL(x)  (((x) >> TXDB_V_SEL) & TXDB_M_SEL)
 
-static BITFIELD rx_csr_bits[] = {
-    BITNCF(6),                          /* unused */
-    BIT(IE),                            /* Interrupt Enable */
-    BIT(DONE),                          /* Xmit Ready */
-    BITNCF(8),                          /* unused */
-    ENDBITS
-};
-
-static BITFIELD rx_buf_bits[] = {
-    BITF(DAT,8),                        /* data buffer */
-    BITNCF(5),                          /* unused */
-    BIT(RBRK),
-    BIT(OVR),
-    BIT(ERR),
-    ENDBITS
-};
-
-static BITFIELD tx_csr_bits[] = {
-    BIT(XBR),                           /* Break */
-    BITNC,                              /* unused */
-    BIT(MAINT),                         /* Maint */
-    BITNCF(3),                          /* unused */
-    BIT(IE),                            /* Interrupt Enable */
-    BIT(DONE),                          /* Xmit Ready */
-    BITNCF(8),                          /* unused */
-    ENDBITS
-};
-
-static BITFIELD tx_buf_bits[] = {
-    BITF(DAT,8),                        /* data buffer */
-    BITNCF(8),                          /* unused */
-    ENDBITS
-};
-
 
 /* Clock definitions */
 

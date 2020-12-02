@@ -470,8 +470,6 @@ return SCPE_OK;
 
 t_stat mt_map_err (UNIT *uptr, t_stat st)
 {
-int32 u = uptr - mt_dev.units;
-
 switch (st) {
 
     case MTSE_FMT:                                      /* illegal fmt */
@@ -639,8 +637,6 @@ return r;
 
 t_stat mt_detach (UNIT* uptr)
 {
-uint32 un = uptr - mt_dev.units;
-
 if (!(uptr->flags & UNIT_ATTABLE))
     return SCPE_NOATT;
 uptr->UST = 0;

@@ -481,7 +481,6 @@ return data;
 void va_dga_wr (int32 pa, int32 val, int32 lnt)
 {
 int32 rg = (pa >> 1) & 0xFF;
-uint32 addr = VA_FFO_OF;
 
 if (rg <= DGA_MAXREG)
     sim_debug (DBG_DGA, &va_dev, "dga_wr: %s, %X from PC %08X\n", va_dga_rgd[rg], val, fault_PC);
@@ -552,7 +551,6 @@ int32 va_mem_rd (int32 pa)
 {
 int32 rg = (pa >> 1) & 0x7FFF;
 int32 data;
-UNIT *uptr = &va_dev.units[0];
 uint16 *qr = (uint16*) vax_vcb02_bin;
 
 if (rg >= VA_RSV_OF) {

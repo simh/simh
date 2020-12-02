@@ -5,12 +5,8 @@
 
 #include "ibm1130_defs.h"
 #include "sim_sock.h"
-#include "sim_tmxr.h"
 
 #define DEBUG_T2741
-
-static TMLN t2741_ldsc = { 0 };                         /* line descr for telnet attachment */
-static TMXR t2741_tmxr = { 1, 0, 0, &t2741_ldsc };      /* line mux for telnet attachment */
 
 #define T2741_DSW_TRANSMIT_NOT_READY            0x4000
 #define T2741_DSW_READ_RESPONSE                 0x1000

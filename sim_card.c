@@ -248,6 +248,7 @@ static const uint16          ascii_to_dec_029[128] = {
 };
 
 
+#if 0 /* Unused for now. */
 static const uint16          ascii_to_hol_ebcdic[128] = {
    /* Control                              */
     0xf000,0xf000,0xf000,0xf000,0xf000,0xf000,0xf000,0xf000,    /*0-37*/
@@ -291,6 +292,7 @@ static const uint16          ascii_to_hol_ebcdic[128] = {
    /*                     X18     X78    Y18  XYT18        */
     0x604, 0x602, 0x601, 0x902, 0x806, 0x502, 0xF02,0xf000
 };
+#endif
 
 const char          sim_ascii_to_six[128] = {
    /* Control                              */

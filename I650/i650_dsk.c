@@ -453,8 +453,6 @@ t_stat dsk_reset(DEVICE * dptr)
 
 t_stat dsk_attach(UNIT * uptr, CONST char *file)
 {
-    DEVICE             *dptr = find_dev_from_unit(uptr);
-    int                 unit = (uptr - dptr->units);
     t_stat              r;
     int                    flen;
 
