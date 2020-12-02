@@ -115,6 +115,10 @@ endif
 ifneq (,$(findstring imlac,${MAKECMDGOALS}))
   VIDEO_USEFUL = true
 endif
+# building the TT2500 needs video support
+ifneq (,$(findstring tt2500,${MAKECMDGOALS}))
+  VIDEO_USEFUL = true
+endif
 # building the PDP6, KA10 or KI10 needs video support
 ifneq (,$(or $(findstring pdp6,${MAKECMDGOALS}),$(findstring pdp10-ka,${MAKECMDGOALS}),$(findstring pdp10-ki,${MAKECMDGOALS})))
   VIDEO_USEFUL = true
@@ -642,6 +646,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
           DISPLAYNG = ${DISPLAYD}/ng.c
           DISPLAYIII = ${DISPLAYD}/iii.c
           DISPLAYIMLAC = ${DISPLAYD}/imlac.c
+          DISPLAYTT2500 = ${DISPLAYD}/tt2500.c
           DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
           $(info using libSDL2: $(call find_include,SDL2/SDL))
           ifeq (Darwin,$(OSTYPE))
@@ -1561,6 +1566,14 @@ IMLAC = ${IMLACD}/imlac_sys.c ${IMLACD}/imlac_cpu.c \
 IMLAC_OPT = -I ${IMLACD} ${DISPLAY_OPT}
 
 
+TT2500D = ${SIMHD}/tt2500
+TT2500 = ${TT2500D}/tt2500_sys.c ${TT2500D}/tt2500_cpu.c \
+	${TT2500D}/tt2500_dpy.c ${TT2500D}/tt2500_crt.c ${TT2500D}/tt2500_tv.c \
+	${TT2500D}/tt2500_key.c ${TT2500D}/tt2500_uart.c ${TT2500D}/tt2500_rom.c \
+	${DISPLAYL} ${DISPLAYTT2500}
+TT2500_OPT = -I ${TT2500D} ${DISPLAY_OPT}
+
+
 PDP8D = ${SIMHD}/PDP8
 PDP8 = ${PDP8D}/pdp8_cpu.c ${PDP8D}/pdp8_clk.c ${PDP8D}/pdp8_df.c \
 	${PDP8D}/pdp8_dt.c ${PDP8D}/pdp8_lp.c ${PDP8D}/pdp8_mt.c \
@@ -2245,6 +2258,15 @@ ${BIN}imlac${EXE} : ${IMLAC} ${SIM}
 	${CC} ${IMLAC} ${SIM} ${IMLAC_OPT} ${CC_OUTSPEC} ${LDFLAGS}
 ifneq (,$(call find_test,${IMLAC},imlac))
 	$@ $(call find_test,${IMLACD},imlac) ${TEST_ARG}
+endif
+
+tt2500 : ${BIN}tt2500${EXE}
+
+${BIN}tt2500${EXE} : ${TT2500} ${SIM}
+	${MKDIRBIN}
+	${CC} ${TT2500} ${SIM} ${TT2500_OPT} ${CC_OUTSPEC} ${LDFLAGS}
+ifneq (,$(call find_test,${TT2500},tt2500))
+	$@ $(call find_test,${TT2500D},tt2500) ${TEST_ARG}
 endif
 
 pdp11 : ${BIN}pdp11${EXE}

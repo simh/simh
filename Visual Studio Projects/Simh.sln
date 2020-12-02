@@ -414,8 +414,19 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "imlac", "imlac.vcproj", "{7
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "isdk80", "isdk80.vcproj", "{6641B210-6A57-4A74-A484-042D7E10EA14}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ids880", "ids880.vcproj", "{7544004D-B821-4577-BA3A-24C38CE27AFA}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tt2500", "tt2500.vcproj", "{5CC55A0C-32F3-429F-8661-2E82BF999217}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -763,6 +774,10 @@ Global
 		{7544004D-B821-4577-BA3A-24C38CE27AFA}.Debug|Win32.Build.0 = Debug|Win32
 		{7544004D-B821-4577-BA3A-24C38CE27AFA}.Release|Win32.ActiveCfg = Release|Win32
 		{7544004D-B821-4577-BA3A-24C38CE27AFA}.Release|Win32.Build.0 = Release|Win32
+		{5CC55A0C-32F3-429F-8661-2E82BF999217}.Debug|Win32.ActiveCfg = Debug|Win32
+		{5CC55A0C-32F3-429F-8661-2E82BF999217}.Debug|Win32.Build.0 = Debug|Win32
+		{5CC55A0C-32F3-429F-8661-2E82BF999217}.Release|Win32.ActiveCfg = Release|Win32
+		{5CC55A0C-32F3-429F-8661-2E82BF999217}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

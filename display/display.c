@@ -259,7 +259,15 @@ static struct display displays[] = {
      * P31 phosphor according to "Heads-Up Display for Flight
      * Simulator for Advanced Aircraft"
      */
-    { DIS_IMLAC, "Imlac Display", &color_p31, NULL, 1024, 1024 }
+    { DIS_IMLAC, "Imlac Display", &color_p31, NULL, 1024, 1024 },
+
+    /*
+     * TT2500 display
+     * 512x512 addressable points.
+     * P31 phosphor according to "Heads-Up Display for Flight
+     * Simulator for Advanced Aircraft"
+     */
+    { DIS_TT2500, "TT2500 Display", &color_p31, NULL, 512, 512 }
 };
 
 /*

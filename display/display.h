@@ -51,6 +51,7 @@ enum display_type {
     DIS_III = 111,
     DIS_TYPE340 = 340,
     DIS_NG = 999,
+    DIS_TT2500 = 2500,
 };
 
 /*
