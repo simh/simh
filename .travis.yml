@@ -2,6 +2,7 @@ os:
   - linux
   - osx
 language: c
+osx_image: xcode12
 env:
   # These are supposed to match ALL in makefile.
   # Each job builds 15 simulators.
