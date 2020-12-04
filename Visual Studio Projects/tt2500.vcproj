@@ -3,7 +3,7 @@
 	ProjectType="Visual C++"
 	Version="9.00"
 	Name="tt2500"
-	ProjectGUID="{7AB92E01-D278-4A8F-8493-ED58187AF3A1}"
+	ProjectGUID="{5CC55A0C-32F3-429F-8661-2E82BF999217}"
 	RootNamespace="tt2500"
 	Keyword="Win32Proj"
 	TargetFrameworkVersion="131072"
@@ -196,42 +196,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\display\tt2500.c"
-				>
-			</File>
-			<File
-				RelativePath="..\tt2500\tt2500_cpu.c"
-				>
-			</File>
-			<File
-				RelativePath="..\tt2500\tt2500_crt.c"
-				>
-			</File>
-			<File
-				RelativePath="..\tt2500\tt2500_dpy.c"
-				>
-			</File>
-			<File
-				RelativePath="..\tt2500\tt2500_key.c"
-				>
-			</File>
-			<File
-				RelativePath="..\tt2500\tt2500_rom.c"
-				>
-			</File>
-			<File
-				RelativePath="..\tt2500\tt2500_sys.c"
-				>
-			</File>
-			<File
-				RelativePath="..\tt2500\tt2500_tv.c"
-				>
-			</File>
-			<File
-				RelativePath="..\tt2500\tt2500_uart.c"
-				>
-			</File>
-			<File
 				RelativePath="..\..\windows-build\pthreads\pthread.c"
 				>
 				<FileConfiguration
@@ -302,6 +266,42 @@
 				RelativePath="..\display\sim_ws.c"
 				>
 			</File>
+			<File
+				RelativePath="..\display\tt2500.c"
+				>
+			</File>
+			<File
+				RelativePath="..\tt2500\tt2500_cpu.c"
+				>
+			</File>
+			<File
+				RelativePath="..\tt2500\tt2500_crt.c"
+				>
+			</File>
+			<File
+				RelativePath="..\tt2500\tt2500_dpy.c"
+				>
+			</File>
+			<File
+				RelativePath="..\tt2500\tt2500_key.c"
+				>
+			</File>
+			<File
+				RelativePath="..\tt2500\tt2500_rom.c"
+				>
+			</File>
+			<File
+				RelativePath="..\tt2500\tt2500_sys.c"
+				>
+			</File>
+			<File
+				RelativePath="..\tt2500\tt2500_tv.c"
+				>
+			</File>
+			<File
+				RelativePath="..\tt2500\tt2500_uart.c"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
@@ -309,14 +309,6 @@
 			>
 			<File
 				RelativePath="..\display\display.h"
-				>
-			</File>
-			<File
-				RelativePath="..\display\tt2500.h"
-				>
-			</File>
-			<File
-				RelativePath="..\tt2500\tt2500_defs.h"
 				>
 			</File>
 			<File
@@ -369,6 +361,14 @@
 			</File>
 			<File
 				RelativePath="..\sim_video.h"
+				>
+			</File>
+			<File
+				RelativePath="..\display\tt2500.h"
+				>
+			</File>
+			<File
+				RelativePath="..\tt2500\tt2500_defs.h"
 				>
 			</File>
 			<File
