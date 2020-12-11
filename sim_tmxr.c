@@ -5079,6 +5079,7 @@ t_stat tmxr_set_log (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 TMXR *mp = (TMXR *) desc;
 TMLN *lp;
+t_stat r;
 
 if (cptr == NULL)                                       /* no file name? */
     return SCPE_2FARG;
@@ -5091,8 +5092,8 @@ lp->txlogname = (char *) calloc (CBUFSIZE, sizeof (char)); /* alloc namebuf */
 if (lp->txlogname == NULL)                              /* can't? */
     return SCPE_MEM;
 strlcpy (lp->txlogname, cptr, CBUFSIZE);                /* save file name */
-sim_open_logfile (cptr, TRUE, &lp->txlog, &lp->txlogref);/* open log */
-if (lp->txlog == NULL) {                                /* error? */
+r = sim_open_logfile (cptr, TRUE, &lp->txlog, &lp->txlogref);/* open log */
+if ((r != SCPE_OK) || (lp->txlog == NULL)) {            /* error? */
     free (lp->txlogname);                               /* free buffer */
     return SCPE_OPENERR;
     }
