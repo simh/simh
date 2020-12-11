@@ -381,9 +381,8 @@
 
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 
-/* Internal routines - forward declarations */
+/* Internal routine - forward declaration */
 static int _eth_get_system_id (char *buf, size_t buf_size);
-static int _eth_devices (int max, ETH_LIST* dev);   /* get ethernet devices on host */
 
 /*============================================================================*/
 /*                  OS-independant ethernet routines                          */
@@ -662,161 +661,11 @@ void eth_packet_trace_detail(ETH_DEV* dev, const uint8 *msg, int len, const char
   eth_packet_trace_ex(dev, msg, len, txt, 1     , dev->dbit);
 }
 
-static const char* _eth_getname(int number, char* name, char *desc)
-{
-  ETH_LIST  list[ETH_MAX_DEVICE];
-  int count = _eth_devices(ETH_MAX_DEVICE, list);
-
-  if ((number < 0) || (count <= number))
-      return NULL;
-  if (list[number].eth_api != ETH_API_PCAP) {
-    sim_printf ("Eth: Pcap capable device not found.  You may need to run as root\n");
-    return NULL;
-    }
-
-  strcpy(name, list[number].name);
-  strcpy(desc, list[number].desc);
-  return name;
-}
-
-const char* eth_getname_bydesc(const char* desc, char* name, char *ndesc)
-{
-  ETH_LIST  list[ETH_MAX_DEVICE];
-  int count = _eth_devices(ETH_MAX_DEVICE, list);
-  int i;
-  size_t j=strlen(desc);
-
-  for (i=0; i<count; i++) {
-    int found = 1;
-    size_t k = strlen(list[i].desc);
-
-    if (j != k) continue;
-    for (k=0; k<j; k++)
-      if (tolower(list[i].desc[k]) != tolower(desc[k]))
-        found = 0;
-    if (found == 0) continue;
-
-    /* found a case-insensitive description match */
-    strcpy(name, list[i].name);
-    strcpy(ndesc, list[i].desc);
-    return name;
-  }
-  /* not found */
-  return NULL;
-}
-
-char* eth_getname_byname(const char* name, char* temp, char *desc)
-{
-  ETH_LIST  list[ETH_MAX_DEVICE];
-  int count = _eth_devices(ETH_MAX_DEVICE, list);
-  size_t n;
-  int i, found;
-
-  found = 0;
-  n = strlen(name);
-  for (i=0; i<count && !found; i++) {
-    if ((n == strlen(list[i].name)) &&
-        (strncasecmp(name, list[i].name, n) == 0)) {
-      found = 1;
-      strcpy(temp, list[i].name); /* only case might be different */
-      strcpy(desc, list[i].desc);
-    }
-  }
-  return (found ? temp : NULL);
-}
-
-char* eth_getdesc_byname(char* name, char* temp)
-{
-  ETH_LIST  list[ETH_MAX_DEVICE];
-  int count = _eth_devices(ETH_MAX_DEVICE, list);
-  size_t n;
-  int i, found;
-
-  found = 0;
-  n = strlen(name);
-  for (i=0; i<count && !found; i++) {
-    if ((n == strlen(list[i].name)) &&
-        (strncasecmp(name, list[i].name, n) == 0)) {
-      found = 1;
-      strcpy(temp, list[i].desc);
-    }
-  }
-  return (found ? temp : NULL);
-}
-
 void eth_zero(ETH_DEV* dev)
 {
   /* set all members to NULL OR 0 */
   memset(dev, 0, sizeof(ETH_DEV));
   dev->reflections = -1;                          /* not established yet */
-}
-
-static ETH_DEV **eth_open_devices = NULL;
-static int eth_open_device_count = 0;
-
-#if defined (USE_NETWORK) || defined (USE_SHARED)
-static char*   (*p_pcap_lib_version) (void);
-
-static void _eth_add_to_open_list (ETH_DEV* dev)
-{
-eth_open_devices = (ETH_DEV**)realloc(eth_open_devices, (eth_open_device_count+1)*sizeof(*eth_open_devices));
-eth_open_devices[eth_open_device_count++] = dev;
-}
-
-static void _eth_remove_from_open_list (ETH_DEV* dev)
-{
-int i, j;
-
-for (i=0; i<eth_open_device_count; ++i)
-    if (eth_open_devices[i] == dev) {
-        for (j=i+1; j<eth_open_device_count; ++j)
-            eth_open_devices[j-1] = eth_open_devices[j];
-        --eth_open_device_count;
-        break;
-        }
-}
-#endif
-
-t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
-{
-  ETH_LIST  list[ETH_MAX_DEVICE];
-  int number;
-
-  number = _eth_devices(ETH_MAX_DEVICE, list);
-  fprintf(st, "ETH devices:\n");
-  if (number == -1)
-    fprintf(st, "  network support not available in simulator\n");
-  else
-    if (number == 0)
-      fprintf(st, "  no network devices are available\n");
-    else {
-      size_t min, len;
-      int i;
-      for (i=0, min=0; i<number; i++)
-        if ((len = strlen(list[i].name)) > min) min = len;
-      for (i=0; i<number; i++)
-        fprintf(st," eth%d\t%-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
-    }
-  if (eth_open_device_count) {
-    int i;
-    char desc[ETH_DEV_DESC_MAX], *d;
-
-    fprintf(st,"Open ETH Devices:\n");
-    for (i=0; i<eth_open_device_count; i++) {
-      d = eth_getdesc_byname(eth_open_devices[i]->name, desc);
-      if (d)
-        fprintf(st, " %-7s%s (%s)\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->dptr->units[0].filename, d);
-      else
-        fprintf(st, " %-7s%s\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->dptr->units[0].filename);
-      eth_show_dev (st, eth_open_devices[i]);
-      }
-    }
-  return SCPE_OK;
-}
-
-t_stat eth_show_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST char *desc)
-{
-return eth_show (st, uptr, val, NULL);
 }
 
 t_stat ethq_init(ETH_QUE* que, int max)
@@ -925,6 +774,159 @@ void ethq_insert(ETH_QUE* que, int32 type, ETH_PACK* pack, int32 status)
 ethq_insert_data(que, type, pack->oversize ? pack->oversize : pack->msg, pack->used, pack->len, pack->crc_len, NULL, status);
 }
 
+t_stat eth_show_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, CONST char *desc)
+{
+return eth_show (st, uptr, val, NULL);
+}
+
+#if defined (USE_NETWORK) || defined (USE_SHARED)
+/* Internal routine - forward declaration */
+static int _eth_devices (int max, ETH_LIST* dev);   /* get ethernet devices on host */
+
+static const char* _eth_getname(int number, char* name, char *desc)
+{
+  ETH_LIST  list[ETH_MAX_DEVICE];
+  int count = _eth_devices(ETH_MAX_DEVICE, list);
+
+  if ((number < 0) || (count <= number))
+      return NULL;
+  if (list[number].eth_api != ETH_API_PCAP) {
+    sim_printf ("Eth: Pcap capable device not found.  You may need to run as root\n");
+    return NULL;
+    }
+
+  strcpy(name, list[number].name);
+  strcpy(desc, list[number].desc);
+  return name;
+}
+
+const char* eth_getname_bydesc(const char* desc, char* name, char *ndesc)
+{
+  ETH_LIST  list[ETH_MAX_DEVICE];
+  int count = _eth_devices(ETH_MAX_DEVICE, list);
+  int i;
+  size_t j=strlen(desc);
+
+  for (i=0; i<count; i++) {
+    int found = 1;
+    size_t k = strlen(list[i].desc);
+
+    if (j != k) continue;
+    for (k=0; k<j; k++)
+      if (tolower(list[i].desc[k]) != tolower(desc[k]))
+        found = 0;
+    if (found == 0) continue;
+
+    /* found a case-insensitive description match */
+    strcpy(name, list[i].name);
+    strcpy(ndesc, list[i].desc);
+    return name;
+  }
+  /* not found */
+  return NULL;
+}
+
+char* eth_getname_byname(const char* name, char* temp, char *desc)
+{
+  ETH_LIST  list[ETH_MAX_DEVICE];
+  int count = _eth_devices(ETH_MAX_DEVICE, list);
+  size_t n;
+  int i, found;
+
+  found = 0;
+  n = strlen(name);
+  for (i=0; i<count && !found; i++) {
+    if ((n == strlen(list[i].name)) &&
+        (strncasecmp(name, list[i].name, n) == 0)) {
+      found = 1;
+      strcpy(temp, list[i].name); /* only case might be different */
+      strcpy(desc, list[i].desc);
+    }
+  }
+  return (found ? temp : NULL);
+}
+
+char* eth_getdesc_byname(char* name, char* temp)
+{
+  ETH_LIST  list[ETH_MAX_DEVICE];
+  int count = _eth_devices(ETH_MAX_DEVICE, list);
+  size_t n;
+  int i, found;
+
+  found = 0;
+  n = strlen(name);
+  for (i=0; i<count && !found; i++) {
+    if ((n == strlen(list[i].name)) &&
+        (strncasecmp(name, list[i].name, n) == 0)) {
+      found = 1;
+      strcpy(temp, list[i].desc);
+    }
+  }
+  return (found ? temp : NULL);
+}
+
+static ETH_DEV **eth_open_devices = NULL;
+static int eth_open_device_count = 0;
+
+static char*   (*p_pcap_lib_version) (void);
+
+static void _eth_add_to_open_list (ETH_DEV* dev)
+{
+eth_open_devices = (ETH_DEV**)realloc(eth_open_devices, (eth_open_device_count+1)*sizeof(*eth_open_devices));
+eth_open_devices[eth_open_device_count++] = dev;
+}
+
+static void _eth_remove_from_open_list (ETH_DEV* dev)
+{
+int i, j;
+
+for (i=0; i<eth_open_device_count; ++i)
+    if (eth_open_devices[i] == dev) {
+        for (j=i+1; j<eth_open_device_count; ++j)
+            eth_open_devices[j-1] = eth_open_devices[j];
+        --eth_open_device_count;
+        break;
+        }
+}
+
+t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
+{
+  ETH_LIST  list[ETH_MAX_DEVICE];
+  int number;
+
+  number = _eth_devices(ETH_MAX_DEVICE, list);
+  fprintf(st, "ETH devices:\n");
+  if (number == -1)
+    fprintf(st, "  network support not available in simulator\n");
+  else
+    if (number == 0)
+      fprintf(st, "  no network devices are available\n");
+    else {
+      size_t min, len;
+      int i;
+      for (i=0, min=0; i<number; i++)
+        if ((len = strlen(list[i].name)) > min) min = len;
+      for (i=0; i<number; i++)
+        fprintf(st," eth%d\t%-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
+    }
+  if (eth_open_device_count) {
+    int i;
+    char desc[ETH_DEV_DESC_MAX], *d;
+
+    fprintf(st,"Open ETH Devices:\n");
+    for (i=0; i<eth_open_device_count; i++) {
+      d = eth_getdesc_byname(eth_open_devices[i]->name, desc);
+      if (d)
+        fprintf(st, " %-7s%s (%s)\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->dptr->units[0].filename, d);
+      else
+        fprintf(st, " %-7s%s\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->dptr->units[0].filename);
+      eth_show_dev (st, eth_open_devices[i]);
+      }
+    }
+  return SCPE_OK;
+}
+
+#endif
 /*============================================================================*/
 /*                        Non-implemented versions                            */
 /*============================================================================*/
@@ -961,12 +963,16 @@ t_stat eth_filter (ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
 t_stat eth_filter_hash (ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
                    ETH_BOOL all_multicast, ETH_BOOL promiscuous, ETH_MULTIHASH* const hash)
   {return SCPE_NOFNC;}
-int _eth_devices (int max, ETH_LIST* dev)
-  {return -1;}
 const char *eth_version (void)
   {return NULL;}
 void eth_show_dev (FILE* st, ETH_DEV* dev)
   {}
+t_stat eth_show (FILE* st, UNIT* uptr, int32 val, CONST void* desc)
+  {
+  fprintf(st, "ETH devices:\n");
+  fprintf(st, "  network support not available in simulator\n");
+  return SCPE_OK;
+  }
 static int _eth_get_system_id (char *buf, size_t buf_size)
   {memset (buf, 0, buf_size); return 0;}
 t_stat sim_ether_test (DEVICE *dptr)
@@ -1009,6 +1015,172 @@ const char *eth_capabilities(void)
 
 #include <pcap.h>
 #include <string.h>
+
+/*
+     The libpcap provided API pcap_findalldevs() on most platforms, will 
+     leverage the getifaddrs() API if it is available in preference to 
+     alternate platform specific methods of determining the interface list.
+
+     A limitation of getifaddrs() is that it returns only interfaces which
+     have associated addresses.  This may not include all of the interesting
+     interfaces that we are interested in since a host may have dedicated
+     interfaces for a simulator, which is otherwise unused by the host.
+
+     One could hand craft the the build of libpcap to specifically use 
+     alternate methods to implement pcap_findalldevs().  However, this can 
+     get tricky, and would then result in a sort of deviant libpcap.
+
+     This routine exists to allow platform specific code to validate and/or 
+     extend the set of available interfaces to include any that are not
+     returned by pcap_findalldevs.
+
+*/
+static int eth_host_devices(int used, int max, ETH_LIST* list)
+{
+pcap_t* conn = NULL;
+int i, j, datalink = 0;
+
+for (i=0; i<used; ++i) {
+  /* Cull any non-ethernet interface types */
+#if defined(HAVE_PCAP_NETWORK)
+  char errbuf[PCAP_ERRBUF_SIZE];
+
+  conn = pcap_open_live(list[i].name, ETH_MAX_PACKET, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
+  if (NULL != conn)
+    datalink = pcap_datalink(conn), pcap_close(conn);
+  list[i].eth_api = ETH_API_PCAP;
+#endif
+  if ((NULL == conn) || (datalink != DLT_EN10MB)) {
+    for (j=i; j<used-1; ++j)
+      list[j] = list[j+1];
+    --used;
+    --i;
+    }
+  } /* for */
+
+#if defined(_WIN32)
+/* replace device description with user-defined adapter name (if defined) */
+for (i=0; i<used; i++) {
+  char regkey[2048];
+  unsigned char regval[2048];
+  LONG status;
+  DWORD reglen, regtype;
+  HKEY reghnd;
+
+  /* These registry keys don't seem to exist for all devices, so we simply ignore errors. */
+  /* Windows XP x64 registry uses wide characters by default,
+     so we force use of narrow characters by using the 'A'(ANSI) version of RegOpenKeyEx.
+     This could cause some problems later, if this code is internationalized. Ideally,
+     the pcap lookup will return wide characters, and we should use them to build a wide
+     registry key, rather than hardcoding the string as we do here. */
+  if (list[i].name[strlen( "\\Device\\NPF_" )] == '{') {
+    sprintf( regkey, "SYSTEM\\CurrentControlSet\\Control\\Network\\"
+             "{4D36E972-E325-11CE-BFC1-08002BE10318}\\%s\\Connection", list[i].name+
+             strlen( "\\Device\\NPF_" ) );
+    if ((status = RegOpenKeyExA (HKEY_LOCAL_MACHINE, regkey, 0, KEY_QUERY_VALUE, &reghnd)) != ERROR_SUCCESS)
+      continue;
+    reglen = sizeof(regval);
+
+    /* look for user-defined adapter name, bail if not found */  
+    /* same comment about Windows XP x64 (above) using RegQueryValueEx */
+    if ((status = RegQueryValueExA (reghnd, "Name", NULL, &regtype, regval, &reglen)) != ERROR_SUCCESS) {
+      RegCloseKey (reghnd);
+      continue;
+      }
+    /* make sure value is the right type, bail if not acceptable */
+    if ((regtype != REG_SZ) || (reglen > sizeof(regval))) {
+      RegCloseKey (reghnd);
+      continue;
+      }
+    /* registry value seems OK, finish up and replace description */
+    RegCloseKey (reghnd );
+    sprintf (list[i].desc, "%s", regval);
+    }
+  } /* for */
+#endif
+
+#ifdef HAVE_TAP_NETWORK
+if (used < max) {
+#if defined(__OpenBSD__)
+  sprintf(list[used].name, "%s", "tap:tunN");
+#else
+  sprintf(list[used].name, "%s", "tap:tapN");
+#endif
+  sprintf(list[used].desc, "%s", "Integrated Tun/Tap support");
+  list[used].eth_api = ETH_API_TAP;
+  ++used;
+  }
+#endif
+#ifdef HAVE_VDE_NETWORK
+if (used < max) {
+  sprintf(list[used].name, "%s", "vde:device{:switch-port-number}");
+  sprintf(list[used].desc, "%s", "Integrated VDE support");
+  list[used].eth_api = ETH_API_VDE;
+  ++used;
+  }
+#endif
+#ifdef HAVE_SLIRP_NETWORK
+if (used < max) {
+  sprintf(list[used].name, "%s", "nat:{optional-nat-parameters}");
+  sprintf(list[used].desc, "%s", "Integrated NAT (SLiRP) support");
+  list[used].eth_api = ETH_API_NAT;
+  ++used;
+  }
+#endif
+
+if (used < max) {
+  sprintf(list[used].name, "%s", "udp:sourceport:remotehost:remoteport");
+  sprintf(list[used].desc, "%s", "Integrated UDP bridge support");
+  list[used].eth_api = ETH_API_UDP;
+  ++used;
+  }
+
+return used;
+}
+
+static int _eth_devices(int max, ETH_LIST* list)
+{
+int i = 0;
+char errbuf[PCAP_ERRBUF_SIZE] = "";
+#ifndef DONT_USE_PCAP_FINDALLDEVS
+pcap_if_t* alldevs;
+pcap_if_t* dev;
+
+memset(list, 0, max*sizeof(*list));
+errbuf[0] = '\0';
+/* retrieve the device list */
+if (pcap_findalldevs(&alldevs, errbuf) == -1) {
+  if (errbuf[0])
+    sim_printf ("Eth: %s\n", errbuf);
+  }
+else {
+  /* copy device list into the passed structure */
+  for (i=0, dev=alldevs; dev && (i < max); dev=dev->next, ++i) {
+    if ((dev->flags & PCAP_IF_LOOPBACK) || (!strcmp("any", dev->name))) continue;
+    strlcpy(list[i].name, dev->name, sizeof(list[i].name));
+    if (dev->description)
+      strlcpy(list[i].desc, dev->description, sizeof(list[i].desc));
+    else
+      strlcpy(list[i].desc, "No description available", sizeof(list[i].desc));
+    }
+
+  /* free device list */
+  pcap_freealldevs(alldevs);
+  }
+#endif
+
+/* Add any host specific devices and/or validate those already found */
+i = eth_host_devices(i, max, list);
+
+/* If no devices were found and an error message was left in the buffer, display it */
+if ((i == 0) && (errbuf[0])) {
+    sim_printf ("Eth: pcap_findalldevs warning: %s\n", errbuf);
+    }
+
+/* return device count */
+return i;
+}
+
 #else
 struct pcap_pkthdr {
     uint32 caplen;  /* length of portion present */
@@ -3985,171 +4157,6 @@ if (dev->eth_api == ETH_API_PCAP) {
 #endif /* USE_BPF */
 
 return SCPE_OK;
-}
-
-/*
-     The libpcap provided API pcap_findalldevs() on most platforms, will 
-     leverage the getifaddrs() API if it is available in preference to 
-     alternate platform specific methods of determining the interface list.
-
-     A limitation of getifaddrs() is that it returns only interfaces which
-     have associated addresses.  This may not include all of the interesting
-     interfaces that we are interested in since a host may have dedicated
-     interfaces for a simulator, which is otherwise unused by the host.
-
-     One could hand craft the the build of libpcap to specifically use 
-     alternate methods to implement pcap_findalldevs().  However, this can 
-     get tricky, and would then result in a sort of deviant libpcap.
-
-     This routine exists to allow platform specific code to validate and/or 
-     extend the set of available interfaces to include any that are not
-     returned by pcap_findalldevs.
-
-*/
-static int eth_host_devices(int used, int max, ETH_LIST* list)
-{
-pcap_t* conn = NULL;
-int i, j, datalink = 0;
-
-for (i=0; i<used; ++i) {
-  /* Cull any non-ethernet interface types */
-#if defined(HAVE_PCAP_NETWORK)
-  char errbuf[PCAP_ERRBUF_SIZE];
-
-  conn = pcap_open_live(list[i].name, ETH_MAX_PACKET, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
-  if (NULL != conn)
-    datalink = pcap_datalink(conn), pcap_close(conn);
-  list[i].eth_api = ETH_API_PCAP;
-#endif
-  if ((NULL == conn) || (datalink != DLT_EN10MB)) {
-    for (j=i; j<used-1; ++j)
-      list[j] = list[j+1];
-    --used;
-    --i;
-    }
-  } /* for */
-
-#if defined(_WIN32)
-/* replace device description with user-defined adapter name (if defined) */
-for (i=0; i<used; i++) {
-  char regkey[2048];
-  unsigned char regval[2048];
-  LONG status;
-  DWORD reglen, regtype;
-  HKEY reghnd;
-
-  /* These registry keys don't seem to exist for all devices, so we simply ignore errors. */
-  /* Windows XP x64 registry uses wide characters by default,
-     so we force use of narrow characters by using the 'A'(ANSI) version of RegOpenKeyEx.
-     This could cause some problems later, if this code is internationalized. Ideally,
-     the pcap lookup will return wide characters, and we should use them to build a wide
-     registry key, rather than hardcoding the string as we do here. */
-  if (list[i].name[strlen( "\\Device\\NPF_" )] == '{') {
-    sprintf( regkey, "SYSTEM\\CurrentControlSet\\Control\\Network\\"
-             "{4D36E972-E325-11CE-BFC1-08002BE10318}\\%s\\Connection", list[i].name+
-             strlen( "\\Device\\NPF_" ) );
-    if ((status = RegOpenKeyExA (HKEY_LOCAL_MACHINE, regkey, 0, KEY_QUERY_VALUE, &reghnd)) != ERROR_SUCCESS)
-      continue;
-    reglen = sizeof(regval);
-
-    /* look for user-defined adapter name, bail if not found */  
-    /* same comment about Windows XP x64 (above) using RegQueryValueEx */
-    if ((status = RegQueryValueExA (reghnd, "Name", NULL, &regtype, regval, &reglen)) != ERROR_SUCCESS) {
-      RegCloseKey (reghnd);
-      continue;
-      }
-    /* make sure value is the right type, bail if not acceptable */
-    if ((regtype != REG_SZ) || (reglen > sizeof(regval))) {
-      RegCloseKey (reghnd);
-      continue;
-      }
-    /* registry value seems OK, finish up and replace description */
-    RegCloseKey (reghnd );
-    sprintf (list[i].desc, "%s", regval);
-    }
-  } /* for */
-#endif
-
-#ifdef HAVE_TAP_NETWORK
-if (used < max) {
-#if defined(__OpenBSD__)
-  sprintf(list[used].name, "%s", "tap:tunN");
-#else
-  sprintf(list[used].name, "%s", "tap:tapN");
-#endif
-  sprintf(list[used].desc, "%s", "Integrated Tun/Tap support");
-  list[used].eth_api = ETH_API_TAP;
-  ++used;
-  }
-#endif
-#ifdef HAVE_VDE_NETWORK
-if (used < max) {
-  sprintf(list[used].name, "%s", "vde:device{:switch-port-number}");
-  sprintf(list[used].desc, "%s", "Integrated VDE support");
-  list[used].eth_api = ETH_API_VDE;
-  ++used;
-  }
-#endif
-#ifdef HAVE_SLIRP_NETWORK
-if (used < max) {
-  sprintf(list[used].name, "%s", "nat:{optional-nat-parameters}");
-  sprintf(list[used].desc, "%s", "Integrated NAT (SLiRP) support");
-  list[used].eth_api = ETH_API_NAT;
-  ++used;
-  }
-#endif
-
-if (used < max) {
-  sprintf(list[used].name, "%s", "udp:sourceport:remotehost:remoteport");
-  sprintf(list[used].desc, "%s", "Integrated UDP bridge support");
-  list[used].eth_api = ETH_API_UDP;
-  ++used;
-  }
-
-return used;
-}
-
-static int _eth_devices(int max, ETH_LIST* list)
-{
-int i = 0;
-char errbuf[PCAP_ERRBUF_SIZE] = "";
-#ifndef DONT_USE_PCAP_FINDALLDEVS
-pcap_if_t* alldevs;
-pcap_if_t* dev;
-
-memset(list, 0, max*sizeof(*list));
-errbuf[0] = '\0';
-/* retrieve the device list */
-if (pcap_findalldevs(&alldevs, errbuf) == -1) {
-  if (errbuf[0])
-    sim_printf ("Eth: %s\n", errbuf);
-  }
-else {
-  /* copy device list into the passed structure */
-  for (i=0, dev=alldevs; dev && (i < max); dev=dev->next, ++i) {
-    if ((dev->flags & PCAP_IF_LOOPBACK) || (!strcmp("any", dev->name))) continue;
-    strlcpy(list[i].name, dev->name, sizeof(list[i].name));
-    if (dev->description)
-      strlcpy(list[i].desc, dev->description, sizeof(list[i].desc));
-    else
-      strlcpy(list[i].desc, "No description available", sizeof(list[i].desc));
-    }
-
-  /* free device list */
-  pcap_freealldevs(alldevs);
-  }
-#endif
-
-/* Add any host specific devices and/or validate those already found */
-i = eth_host_devices(i, max, list);
-
-/* If no devices were found and an error message was left in the buffer, display it */
-if ((i == 0) && (errbuf[0])) {
-    sim_printf ("Eth: pcap_findalldevs warning: %s\n", errbuf);
-    }
-
-/* return device count */
-return i;
 }
 
 void eth_show_dev (FILE *st, ETH_DEV* dev)
