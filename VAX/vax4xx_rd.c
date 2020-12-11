@@ -681,7 +681,7 @@ if (hd <= 2) {
     rd_xb[255] = c;                                     /* checksum */
     }
 else
-    memset (&rd_xb[0], 0, RD_NUMBY);
+    memset (rd_xb, 0, RD_NUMBY);
 return SCPE_OK;
 }
 
