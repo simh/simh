@@ -1,0 +1,35 @@
+name: Build
+
+on: [pull_request]
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-10.15, ubuntu-18.04]
+        simulators:
+          # These are supposed to match ALL in makefile.
+          # Each job builds 15 simulators.
+          - pdp1 pdp4 pdp6 pdp7 pdp8 pdp9 pdp10 pdp10-ka pdp10-ki pdp10-kl pdp11 pdp15 vax microvax3900 microvax1 rtvax1000
+          - microvax2 vax730 vax750 vax780 vax8200 vax8600 microvax2000 infoserver100 infoserver150vxt microvax3100 microvax3100e vaxstation3100m30 vaxstation3100m38 vaxstation3100m76 vaxstation4000m60
+          - microvax3100m80 vaxstation4000vlc infoserver1000 nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altairz80 gri i7094 ibm1130
+          - id16 id32 sds lgp h316 cdc1700 swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 isys8010 isys8020 isys8030 isys8024
+          - besm6 imds-210 imds-220 imds-225 imds-230 imds-800 imds-810 imlac tt2500
+          - scelbi 3b2 i701 i704 i7010 i7070 i7080 i7090 sigma uc15 i650
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies
+        if: ${{runner.os == 'macOS'}}
+        run: sh -ex .travis/deps.sh osx
+      - name: Install dependencies
+        if: ${{runner.os == 'Linux'}}
+        run: sh -ex .travis/deps.sh linux
+      - name: Build
+        env:
+          SIM: ${{matrix.simulators}}
+        run: make $SIM

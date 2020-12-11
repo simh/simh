@@ -14,4 +14,4 @@ install_linux() {
     sudo apt-get install -ym libsdl2-ttf-dev
 }
 
-install_"$TRAVIS_OS_NAME"
+install_"$1"

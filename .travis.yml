@@ -13,7 +13,7 @@ env:
   - SIM="besm6 imds-210 imds-220 imds-225 imds-230 imds-800 imds-810 imlac tt2500"
   - SIM="scelbi 3b2 i701 i704 i7010 i7070 i7080 i7090 sigma uc15 i650"
 sudo: required
-install: sh -ex .travis/deps.sh
+install: sh -ex .travis/deps.sh "$TRAVIS_OS_NAME"
 script: make $SIM
 notifications:
   email:
