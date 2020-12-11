@@ -1676,18 +1676,24 @@ static int _eth_get_system_id (char *buf, size_t buf_size)
 static int _eth_get_system_id (char *buf, size_t buf_size)
 {
 FILE *f;
+t_bool popened = FALSE;
 
 memset (buf, 0, buf_size);
 if (buf_size < 37)
     return -1;
-if ((f = fopen ("/etc/machine-id", "r")) == NULL)
+if ((f = fopen ("/etc/machine-id", "r")) == NULL) {
   f = popen ("hostname", "r");
+  popened = TRUE;
+  }
 if (f) {
   size_t read_size;
 
   read_size = fread (buf, 1, buf_size - 1, f);
   buf[read_size] = '\0';
-  pclose (f);
+  if (popened)
+    pclose (f);
+  else
+    fclose (f);
   }
 while ((strlen (buf) > 0) && sim_isspace(buf[strlen (buf) - 1]))
   buf[strlen (buf) - 1] = '\0';
