@@ -1,9 +1,7 @@
 /*************************************************************************
  *                                                                       *
- * $Id: wd179x.h 1907 2008-05-21 07:04:17Z hharte $                      *
- *                                                                       *
- * Copyright (c) 2007-2008 Howard M. Harte.                              *
- * http://www.hartetec.com                                               *
+ * Copyright (c) 2007-2020 Howard M. Harte.                              *
+ * https://github.com/hharte                                             *
  *                                                                       *
  * Permission is hereby granted, free of charge, to any person obtaining *
  * a copy of this software and associated documentation files (the       *
@@ -34,9 +32,6 @@
  * Module Description:                                                   *
  *     Generic Intel 8272 Disk Controller module for SIMH.               *
  *                                                                       *
- * Environment:                                                          *
- *     User mode only                                                    *
- *                                                                       *
  *************************************************************************/
 
 extern t_stat wd179x_attach(UNIT *uptr, CONST char *cptr);
@@ -46,6 +41,7 @@ extern uint8 WD179X_Read(const uint32 Addr);
 extern uint8 WD179X_Write(const uint32 Addr, uint8 cData);
 
 extern void wd179x_external_restore(void);
+extern uint8 wd179x_get_nheads(void);
 
 #define WD179X_FDC_MSR       0   /* R=FDC Main Status Register, W=Drive Select Register */
 #define WD179X_FDC_DATA      1   /* R/W FDC Data Register */
