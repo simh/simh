@@ -1,9 +1,7 @@
 /*************************************************************************
  *                                                                       *
- * $Id: s100_hdc1001.c 1995 2008-07-15 03:59:13Z hharte $                *
- *                                                                       *
- * Copyright (c) 2007-2008 Howard M. Harte.                              *
- * http://www.hartetec.com                                               *
+ * Copyright (c) 2007-2020 Howard M. Harte.                              *
+ * https://github.com/hharte                                             *
  *                                                                       *
  * Permission is hereby granted, free of charge, to any person obtaining *
  * a copy of this software and associated documentation files (the       *
@@ -37,9 +35,6 @@
  * task-file, so this controller should be compatible with other con-    *
  * trollers that use IDE, like the GIDE interface.                       *
  *                                                                       *
- * Environment:                                                          *
- *     User mode only                                                    *
- *                                                                       *
  *************************************************************************/
 
 #include "altairz80_defs.h"
@@ -53,20 +48,81 @@
 #define WR_DATA_MSG (1 << 4)
 #define VERBOSE_MSG (1 << 5)
 
-#define HDC1001_MAX_DRIVES    4
+#define HDC1001_MAX_DRIVES          4       /* Maximum number of drives supported */
+#define HDC1001_MAX_SECLEN          512     /* Maximum of 512 bytes per sector */
+#define HDC1001_FORMAT_FILL_BYTE    0xe5    /* Real controller uses 0, but we
+                                               choose 0xe5 so the disk shows
+                                               up as blank under CP/M. */
+#define HDC1001_MAX_CYLS            1024
+#define HDC1001_MAX_HEADS           8
+#define HDC1001_MAX_SPT             256
+
+#define DEV_NAME    "ADCHD"
+
+/* Task File Register Offsets */
+#define TF_DATA     0
+#define TF_ERROR    1   /* Read */
+#define TF_PRECOMP  1   /* Write */
+#define TF_SECNT    2
+#define TF_SECNO    3
+#define TF_CYLLO    4
+#define TF_CYLHI    5
+#define TF_SDH      6
+#define TF_STATUS   7   /* Read */
+#define TF_CMD      7   /* Write */
+
+#define HDC1001_STATUS_BUSY         (1 << 7)
+#define HDC1001_STATUS_READY        (1 << 6)
+#define HDC1001_STATUS_WRITE_FAULT  (1 << 5)
+#define HDC1001_STATUS_SEEK_COMPL   (1 << 4)
+#define HDC1001_STATUS_DRQ          (1 << 3)
+#define HDC1001_STATUS_ERROR        (1 << 0)
+
+#define HDC1001_ERROR_ID_NOT_FOUND  (1 << 4)
+
+#define HDC1001_CMD_RESTORE         0x10
+#define HDC1001_CMD_READ_SECT       0x20
+#define HDC1001_CMD_WRITE_SECT      0x30
+#define HDC1001_CMD_FORMAT_TRK      0x50
+#define HDC1001_CMD_SEEK            0x70
+
+#define HDC1001_RWOPT_DMA           (1 << 3)
+#define HDC1001_RWOPT_MULTI         (1 << 2)
+#define HDC1001_RWOPT_LONG          (1 << 3)
+
+static char* hdc1001_reg_rd_str[] = {
+    "DATA    ",
+    "ERROR   ",
+    "SECNT   ",
+    "SECNO   ",
+    "CYLLO   ",
+    "CYLHI   ",
+    "SDH     ",
+    "STATUS  "
+};
+
+static char* hdc1001_reg_wr_str[] = {
+    "DATA   ",
+    "PRECOMP",
+    "SECNT  ",
+    "SECNO  ",
+    "CYLLO  ",
+    "CYLHI  ",
+    "SDH    ",
+    "COMMAND"
+};
 
 typedef struct {
     UNIT *uptr;
-    DISK_INFO *imd;
-    uint16 sectsize;    /* sector size, not including pre/postamble */
+    uint8  readonly;    /* Drive is read-only? */
+    uint16 sectsize;    /* sector size */
     uint16 nsectors;    /* number of sectors/track */
     uint16 nheads;      /* number of heads */
-    uint16 ntracks;     /* number of tracks */
-    uint16 res_tracks;  /* Number of reserved tracks on drive. */
-    uint16 track;       /* Current Track */
-
-    uint16 cur_sect;    /* current starting sector of transfer */
-    uint16 cur_track;   /* Current Track */
+    uint16 ncyls;       /* number of cylinders */
+    uint16 cur_cyl;     /* Current cylinder */
+    uint8  cur_head;    /* Current Head */
+    uint8  cur_sect;    /* current starting sector of transfer */
+    uint16 cur_sectsize;/* Current sector size in SDH register */
     uint16 xfr_nsects;  /* Number of sectors to transfer */
     uint8 ready;        /* Is drive ready? */
 } HDC1001_DRIVE_INFO;
@@ -75,18 +131,16 @@ typedef struct {
     PNP_INFO    pnp;    /* Plug and Play */
     uint8   sel_drive;  /* Currently selected drive */
     uint8   taskfile[8]; /* ATA Task File Registers */
-    uint8   mode;       /* mode (0xFF=absolute, 0x00=logical) */
+    uint8   status_reg; /* HDC-1001 Status Register */
+    uint8   error_reg;  /* HDC-1001 Status Register */
     uint8   retries;    /* Number of retries to attempt */
     uint8   ndrives;    /* Number of drives attached to the controller */
-
-    uint32  link_addr;  /* Link Address for next IOPB */
-    uint32  dma_addr;   /* DMA Address for the current IOPB */
-
+    uint8   sectbuf[HDC1001_MAX_SECLEN];
+    uint16  secbuf_index;
     HDC1001_DRIVE_INFO drive[HDC1001_MAX_DRIVES];
-    uint8   iopb[16];
 } HDC1001_INFO;
 
-static HDC1001_INFO hdc1001_info_data = { { 0x0, 0, 0xC8, 8 } };
+static HDC1001_INFO hdc1001_info_data = { { 0x0, 0, 0xE0, 8 } };
 static HDC1001_INFO *hdc1001_info = &hdc1001_info_data;
 
 extern uint32 PCX;
@@ -96,22 +150,20 @@ extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_typ
                                int32 (*routine)(const int32, const int32, const int32), const char* name, uint8 unmap);
 extern int32 find_unit_index(UNIT *uptr);
 
-/* These are needed for DMA. */
-extern void PutBYTEWrapper(const uint32 Addr, CONST uint32 Value);
-extern uint8 GetBYTEWrapper(const uint32 Addr);
-
 #define UNIT_V_HDC1001_VERBOSE    (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
 #define UNIT_HDC1001_VERBOSE      (1 << UNIT_V_HDC1001_VERBOSE)
-#define HDC1001_CAPACITY          (77*2*16*256)   /* Default Micropolis Disk Capacity         */
+#define HDC1001_CAPACITY          (512*4*16*512)   /* Default Disk Capacity Quantum 2020 */
 
 static t_stat hdc1001_reset(DEVICE *hdc1001_dev);
 static t_stat hdc1001_attach(UNIT *uptr, CONST char *cptr);
 static t_stat hdc1001_detach(UNIT *uptr);
-
+static t_stat hdc1001_unit_set_geometry(UNIT* uptr, int32 value, CONST char* cptr, void* desc);
+static t_stat hdc1001_unit_show_geometry(FILE* st, UNIT* uptr, int32 val, CONST void* desc);
 static int32 hdc1001dev(const int32 port, const int32 io, const int32 data);
 
 static uint8 HDC1001_Read(const uint32 Addr);
 static uint8 HDC1001_Write(const uint32 Addr, uint8 cData);
+static t_stat HDC1001_doCommand(void);
 static const char* hdc1001_description(DEVICE *dptr);
 
 static UNIT hdc1001_unit[] = {
@@ -122,10 +174,20 @@ static UNIT hdc1001_unit[] = {
 };
 
 static REG hdc1001_reg[] = {
+    { HRDATAD (TF_ERROR,    hdc1001_info_data.error_reg,            8, "Taskfile Error Register"), },
+    { HRDATAD (TF_STATUS,   hdc1001_info_data.status_reg,           8, "Taskfile Status Register"), },
+    { HRDATAD (TF_DATA,     hdc1001_info_data.taskfile[TF_DATA],    8, "Taskfile Data Register"), },
+    { HRDATAD (TF_PRECOMP,  hdc1001_info_data.taskfile[TF_PRECOMP], 8, "Taskfile Precomp Register"), },
+    { HRDATAD (TF_SECNT,    hdc1001_info_data.taskfile[TF_SECNT],   8, "Taskfile Sector Count Register"), },
+    { HRDATAD (TF_SECNO,    hdc1001_info_data.taskfile[TF_SECNO],   8, "Taskfile Sector Number Register"), },
+    { HRDATAD (TF_CYLLO,    hdc1001_info_data.taskfile[TF_CYLLO],   8, "Taskfile Cylinder Low Register"), },
+    { HRDATAD (TF_CYLHI,    hdc1001_info_data.taskfile[TF_CYLHI],   8, "Taskfile Cylinder High Register"), },
+    { HRDATAD (TF_SDH,      hdc1001_info_data.taskfile[TF_SDH],     8, "Taskfile SDH Register"), },
+    { HRDATAD (TF_CMD,      hdc1001_info_data.taskfile[TF_CMD],     8, "Taskfile Command Register"), },
     { NULL }
 };
 
-#define HDC1001_NAME    "ADC Hard Disk Controller"
+#define HDC1001_NAME    "ADC HDC-1001 Hard Disk Controller"
 
 static const char* hdc1001_description(DEVICE *dptr) {
     return HDC1001_NAME;
@@ -134,12 +196,9 @@ static const char* hdc1001_description(DEVICE *dptr) {
 static MTAB hdc1001_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                      "IOBASE",   "IOBASE",
         &set_iobase, &show_iobase, NULL, "Sets disk controller I/O base address"    },
-    /* quiet, no warning messages       */
-    { UNIT_HDC1001_VERBOSE, 0,                      "QUIET",    "QUIET",
-        NULL, NULL, NULL, "No verbose messages for unit " HDC1001_NAME "n"          },
-    /* verbose, show warning messages   */
-    { UNIT_HDC1001_VERBOSE, UNIT_HDC1001_VERBOSE,   "VERBOSE",  "VERBOSE",
-        NULL, NULL, NULL, "Verbose messages for unit " HDC1001_NAME "n"             },
+    { MTAB_XTD|MTAB_VUN|MTAB_VALR,    0,                  "GEOMETRY",     "GEOMETRY",
+        &hdc1001_unit_set_geometry, &hdc1001_unit_show_geometry, NULL,
+        "Set disk geometry C:nnnn/H:n/S:nnn/N:nnnn" },
     { 0 }
 };
 
@@ -155,7 +214,7 @@ static DEBTAB hdc1001_dt[] = {
 };
 
 DEVICE hdc1001_dev = {
-    "HDC1001", hdc1001_unit, hdc1001_reg, hdc1001_mod,
+    DEV_NAME, hdc1001_unit, hdc1001_reg, hdc1001_mod,
     HDC1001_MAX_DRIVES, 10, 31, 1, HDC1001_MAX_DRIVES, HDC1001_MAX_DRIVES,
     NULL, NULL, &hdc1001_reset,
     NULL, &hdc1001_attach, &hdc1001_detach,
@@ -178,8 +237,9 @@ static t_stat hdc1001_reset(DEVICE *dptr)
         }
     }
 
-    hdc1001_info->link_addr = 0x50; /* After RESET, the link pointer is at 0x50. */
-
+    hdc1001_info->status_reg = 0;
+    hdc1001_info->error_reg = 0;
+    hdc1001_info->sel_drive = 0;
     return SCPE_OK;
 }
 
@@ -197,12 +257,15 @@ static t_stat hdc1001_attach(UNIT *uptr, CONST char *cptr)
     }
     pDrive = &hdc1001_info->drive[i];
 
-    pDrive->ready = 1;
-    pDrive->track = 5;
-    pDrive->ntracks = 243;
-    pDrive->nheads = 8;
-    pDrive->nsectors = 11;
-    pDrive->sectsize = 1024;
+    /* Defaults for the Quantum 2020 Drive */
+    pDrive->ready = 0;
+    if (pDrive->ncyls == 0) {
+        /* If geometry was not specified, default to Quantun 2020 */
+        pDrive->ncyls = 512;
+        pDrive->nheads = 4;
+        pDrive->nsectors = 16;
+        pDrive->sectsize = 512;
+    }
 
     r = attach_unit(uptr, cptr);    /* attach unit  */
     if ( r != SCPE_OK)              /* error?       */
@@ -212,7 +275,7 @@ static t_stat hdc1001_attach(UNIT *uptr, CONST char *cptr)
     if(sim_fsize(uptr->fileref) != 0) {
         uptr->capac = sim_fsize(uptr->fileref);
     } else {
-        uptr->capac = (pDrive->ntracks * pDrive->nsectors * pDrive->nheads * pDrive->sectsize);
+        uptr->capac = (pDrive->ncyls * pDrive->nsectors * pDrive->nheads * pDrive->sectsize);
     }
 
     pDrive->uptr = uptr;
@@ -228,27 +291,12 @@ static t_stat hdc1001_attach(UNIT *uptr, CONST char *cptr)
         }
     }
 
-    if (uptr->flags & UNIT_HDC1001_VERBOSE)
-        sim_printf("HDC1001%d, attached to '%s', type=%s, len=%d\n", i, cptr,
-            uptr->u3 == IMAGE_TYPE_IMD ? "IMD" : uptr->u3 == IMAGE_TYPE_CPT ? "CPT" : "DSK",
-            uptr->capac);
+    sim_debug(VERBOSE_MSG, &hdc1001_dev, DEV_NAME "%d, attached to '%s', type=DSK, len=%d\n",
+        i, cptr, uptr->capac);
 
-    if(uptr->u3 == IMAGE_TYPE_IMD) {
-        if(uptr->capac < 318000) {
-            sim_printf("Cannot create IMD files with SIMH.\nCopy an existing file and format it with CP/M.\n");
-            hdc1001_detach(uptr);
-            return SCPE_OPENERR;
-        }
-
-        if (uptr->flags & UNIT_HDC1001_VERBOSE)
-            sim_printf("--------------------------------------------------------\n");
-        hdc1001_info->drive[i].imd = diskOpenEx((uptr->fileref), (uptr->flags & UNIT_HDC1001_VERBOSE),
-                                                &hdc1001_dev, VERBOSE_MSG, VERBOSE_MSG);
-        if (uptr->flags & UNIT_HDC1001_VERBOSE)
-            sim_printf("\n");
-    } else {
-        hdc1001_info->drive[i].imd = NULL;
-    }
+    pDrive->readonly = (uptr->flags & UNIT_RO) ? 1 : 0;
+    hdc1001_info->error_reg = 0;
+    pDrive->ready = 1;
 
     return SCPE_OK;
 }
@@ -271,8 +319,7 @@ static t_stat hdc1001_detach(UNIT *uptr)
 
     pDrive->ready = 0;
 
-    if (uptr->flags & UNIT_HDC1001_VERBOSE)
-        sim_printf("Detach HDC1001%d\n", i);
+    sim_debug(VERBOSE_MSG, &hdc1001_dev, "Detach " DEV_NAME "%d\n", i);
 
     r = detach_unit(uptr);  /* detach unit */
     if ( r != SCPE_OK)
@@ -281,10 +328,81 @@ static t_stat hdc1001_detach(UNIT *uptr)
     return SCPE_OK;
 }
 
+/* Set geometry of the disk drive */
+static t_stat hdc1001_unit_set_geometry(UNIT* uptr, int32 value, CONST char* cptr, void* desc)
+{
+    HDC1001_DRIVE_INFO* pDrive;
+    int8 i;
+    int32 result;
+    uint16 newCyls, newHeads, newSPT, newSecLen;
 
+    i = find_unit_index(uptr);
+
+    if (i == -1) {
+        return (SCPE_IERR);
+    }
+
+    pDrive = &hdc1001_info->drive[i];
+
+    if (cptr == NULL)
+        return SCPE_ARG;
+
+    result = sscanf(cptr, "C:%hd/H:%hd/S:%hd/N:%hd", &newCyls, &newHeads, &newSPT, &newSecLen);
+
+    /* Validate Cyl, Heads, Sector, Length are valid for the HDC-1001 */
+    if (newCyls < 1 || newCyls > HDC1001_MAX_CYLS) {
+        sim_debug(ERROR_MSG, &hdc1001_dev, DEV_NAME "%d: Number of cylinders must be 1-%d.\n",
+            hdc1001_info->sel_drive, HDC1001_MAX_CYLS);
+        return SCPE_ARG;
+    }
+    if (newHeads < 1 || newHeads > HDC1001_MAX_HEADS) {
+        sim_debug(ERROR_MSG, &hdc1001_dev, DEV_NAME "%d: Number of heads must be 1-%d.\n",
+            hdc1001_info->sel_drive, HDC1001_MAX_HEADS);
+        return SCPE_ARG;
+    }
+    if (newSPT < 1 || newSPT > HDC1001_MAX_SPT) {
+        sim_debug(ERROR_MSG, &hdc1001_dev, DEV_NAME "%d: Number of sectors per track must be 1-%d.\n",
+            hdc1001_info->sel_drive, HDC1001_MAX_SPT);
+        return SCPE_ARG;
+    }
+    if (newSecLen != 512 && newSecLen != 256 && newSecLen != 128) {
+        sim_debug(ERROR_MSG, &hdc1001_dev,DEV_NAME "%d: Sector length must be 128, 256, or 512.\n",
+            hdc1001_info->sel_drive);
+        return SCPE_ARG;
+    }
+
+    pDrive->ncyls = newCyls;
+    pDrive->nheads = newHeads;
+    pDrive->nsectors = newSPT;
+    pDrive->sectsize = newSecLen;
+
+    return SCPE_OK;
+}
+
+/* Show geometry of the disk drive */
+static t_stat hdc1001_unit_show_geometry(FILE* st, UNIT* uptr, int32 val, CONST void* desc)
+{
+    HDC1001_DRIVE_INFO* pDrive;
+    int8 i;
+
+    i = find_unit_index(uptr);
+
+    if (i == -1) {
+        return (SCPE_IERR);
+    }
+
+    pDrive = &hdc1001_info->drive[i];
+
+    fprintf(st, "C:%d/H:%d/S:%d/N:%d",
+        pDrive->ncyls, pDrive->nheads, pDrive->nsectors, pDrive->sectsize);
+
+    return SCPE_OK;
+}
+
+
+/* HDC-1001 I/O Dispatch */
 static int32 hdc1001dev(const int32 port, const int32 io, const int32 data)
 {
-/*    sim_debug(VERBOSE_MSG, &hdc1001_dev, "HDC1001: " ADDRESS_FORMAT " IO %s, Port %02x\n", PCX, io ? "WR" : "RD", port); */
     if(io) {
         HDC1001_Write(port, data);
         return 0;
@@ -293,287 +411,323 @@ static int32 hdc1001dev(const int32 port, const int32 io, const int32 data)
     }
 }
 
-#define HDC1001_CSR   0   /* R=HDC1001 Status / W=HDC1001 Control Register */
-#define HDC1001_DATA  1   /* R=Step Pulse / W=Write Data Register */
 
-#define HDC1001_OP_DRIVE  0x00
-#define HDC1001_OP_CYL    0x01
-#define HDC1001_OP_HEAD   0x02
-#define HDC1001_OP_SECTOR 0x03
-
-#define HDC1001_CMD_NULL            0x00
-#define HDC1001_CMD_READ_DATA       0x01
-#define HDC1001_CMD_WRITE_DATA      0x02
-#define HDC1001_CMD_WRITE_HEADER    0x03
-#define HDC1001_CMD_READ_HEADER     0x04
-
-#define HDC1001_STATUS_BUSY         0
-#define HDC1001_STATUS_RANGE        1
-#define HDC1001_STATUS_NOT_READY    2
-#define HDC1001_STATUS_TIMEOUT      3
-#define HDC1001_STATUS_DAT_CRC      4
-#define HDC1001_STATUS_WR_FAULT     5
-#define HDC1001_STATUS_OVERRUN      6
-#define HDC1001_STATUS_HDR_CRC      7
-#define HDC1001_STATUS_MAP_FULL     8
-#define HDC1001_STATUS_COMPLETE     0xFF    /* Complete with No Error */
-
-#define HDC1001_CODE_NOOP           0x00
-#define HDC1001_CODE_VERSION        0x01
-#define HDC1001_CODE_GLOBAL         0x02
-#define HDC1001_CODE_SPECIFY        0x03
-#define HDC1001_CODE_SET_MAP        0x04
-#define HDC1001_CODE_HOME           0x05
-#define HDC1001_CODE_SEEK           0x06
-#define HDC1001_CODE_READ_HDR       0x07
-#define HDC1001_CODE_READWRITE      0x08
-#define HDC1001_CODE_RELOCATE       0x09
-#define HDC1001_CODE_FORMAT         0x0A
-#define HDC1001_CODE_FORMAT_BAD     0x0B
-#define HDC1001_CODE_STATUS         0x0C
-#define HDC1001_CODE_SELECT         0x0D
-#define HDC1001_CODE_EXAMINE        0x0E
-#define HDC1001_CODE_MODIFY         0x0F
-
-#define HDC1001_IOPB_LEN            16
-
-#define TF_DATA     0
-#define TF_ERROR    1
-#define TF_SECNT    2
-#define TF_SECNO    3
-#define TF_CYLLO    4
-#define TF_CYLHI    5
-#define TF_SDH      6
-#define TF_CMD      7
-
+/* I/O Write to HDC-1001 Task File */
 static uint8 HDC1001_Write(const uint32 Addr, uint8 cData)
 {
-/*    uint8 result = HDC1001_STATUS_COMPLETE; */
-
     HDC1001_DRIVE_INFO *pDrive;
+    uint8 cmd;
 
     pDrive = &hdc1001_info->drive[hdc1001_info->sel_drive];
 
     switch(Addr & 0x07) {
+    case TF_DATA:   /* Data FIFO */
+        hdc1001_info->sectbuf[hdc1001_info->secbuf_index] = cData;
+        sim_debug(VERBOSE_MSG, &hdc1001_dev,DEV_NAME ": " ADDRESS_FORMAT
+            " WR TF[DATA 0x%03x]=0x%02x\n", PCX, hdc1001_info->secbuf_index, cData);
+        hdc1001_info->secbuf_index++;
+        if (hdc1001_info->secbuf_index == (pDrive->xfr_nsects * pDrive->sectsize)) HDC1001_doCommand();
+        break;
         case TF_SDH:
             hdc1001_info->sel_drive = (cData >> 3) & 0x03;
+        pDrive = &hdc1001_info->drive[hdc1001_info->sel_drive];
+        switch ((cData >> 5) & 0x03) {  /* Sector Size */
+            case 0:
+                pDrive->cur_sectsize = 256;
+                break;
+            case 1:
+                pDrive->cur_sectsize = 512;
+                break;
+            case 2:
+                sim_debug(ERROR_MSG, &hdc1001_dev,DEV_NAME "%d: " ADDRESS_FORMAT
+                    " Invalid sector size specified in SDH registrer.\n", hdc1001_info->sel_drive, PCX);
+                pDrive->cur_sectsize = 512;
+                break;
+            case 3:
+                pDrive->cur_sectsize = 128;
+                break;
+            }
+
+        if (pDrive->sectsize != pDrive->cur_sectsize) {
+            sim_debug(ERROR_MSG, &hdc1001_dev,DEV_NAME "%d: " ADDRESS_FORMAT
+                " Sector size specified in SDH registrer (0x%x) does not match disk geometry (0x%x.)\n",
+                hdc1001_info->sel_drive, PCX, pDrive->cur_sectsize, pDrive->sectsize);
+        }
             /* fall through */
-        case TF_DATA:
-        case TF_ERROR:
+        case TF_PRECOMP:
         case TF_SECNT:
         case TF_SECNO:
         case TF_CYLLO:
         case TF_CYLHI:
             hdc1001_info->taskfile[Addr & 0x07] = cData;
-            sim_debug(VERBOSE_MSG, &hdc1001_dev, "HDC1001: " ADDRESS_FORMAT
-                      " WR TF[%d]=0x%02x\n", PCX, Addr & 7, cData);
+            sim_debug(VERBOSE_MSG, &hdc1001_dev,DEV_NAME ": " ADDRESS_FORMAT
+                      " WR TF[%s]=0x%02x\n", PCX, hdc1001_reg_wr_str[Addr & 0x7], cData);
             break;
         case TF_CMD:
-            pDrive->track = hdc1001_info->taskfile[TF_CYLLO] | (hdc1001_info->taskfile[TF_CYLHI] << 8);
-            pDrive->xfr_nsects = hdc1001_info->taskfile[TF_SECNT];
+        {
+            uint8 rwopts;
 
-            sim_debug(CMD_MSG, &hdc1001_dev, "HDC1001[%d]: Command=%d, T:%d/H:%d/S:%d N=%d\n",
-                      hdc1001_info->sel_drive,
-                      hdc1001_info->taskfile[TF_CMD],
-                      pDrive->track, hdc1001_info->taskfile[TF_SDH] & 0x07,
-                      hdc1001_info->taskfile[TF_SECNO], pDrive->xfr_nsects);
-            break;
-        default:
-            break;
+            hdc1001_info->secbuf_index = 0;
+            hdc1001_info->taskfile[TF_CMD] = cData;
+            hdc1001_info->status_reg &= ~HDC1001_STATUS_ERROR;  /* Clear error bit in status register. */
+            pDrive->cur_cyl = hdc1001_info->taskfile[TF_CYLLO] | (hdc1001_info->taskfile[TF_CYLHI] << 8);
+
+            cmd = hdc1001_info->taskfile[TF_CMD] & 0x70;
+
+            rwopts = hdc1001_info->taskfile[TF_CMD] & 0xE;
+            if (rwopts & HDC1001_RWOPT_MULTI) {
+            pDrive->xfr_nsects = hdc1001_info->taskfile[TF_SECNT];
+                sim_debug(ERROR_MSG, &hdc1001_dev, DEV_NAME "%d: " ADDRESS_FORMAT
+                    " Multi-sector Read/Write have not been verified.\n", hdc1001_info->sel_drive, PCX);
+            }
+            else {
+                pDrive->xfr_nsects = 1;
+            }
+
+
+            /* Everything except Write commands are executed immediately. */
+            if (cmd != HDC1001_CMD_WRITE_SECT) {
+                HDC1001_doCommand();
+            }
+            else {
+                /* Writes will be executed once the proper number of bytes
+                   are written to the DATA FIFO. */
+                hdc1001_info->secbuf_index = 0;
+            }
+        }
     }
     return 0;
 }
 
+
+/* I/O Read from HDC-1001 Task File */
 static uint8 HDC1001_Read(const uint32 Addr)
 {
-    uint8 cData;
+    HDC1001_DRIVE_INFO* pDrive;
+    uint8 cData = 0xFF;
 
+    pDrive = &hdc1001_info->drive[hdc1001_info->sel_drive];
+
+    cData = hdc1001_info->status_reg |= (pDrive->ready ? HDC1001_STATUS_READY : 0);
+
+    switch (Addr & 0x07) {
+    case TF_DATA:   /* Data FIFO */
+        cData = hdc1001_info->sectbuf[hdc1001_info->secbuf_index];
+        sim_debug(VERBOSE_MSG, &hdc1001_dev,DEV_NAME ": " ADDRESS_FORMAT
+            " RD TF[DATA 0x%03x]=0x%02x\n", PCX, hdc1001_info->secbuf_index, cData);
+        hdc1001_info->secbuf_index++;
+        if (hdc1001_info->secbuf_index > HDC1001_MAX_SECLEN) hdc1001_info->secbuf_index = 0;
+        break;
+    case TF_SDH:
+    case TF_SECNT:
+    case TF_SECNO:
+    case TF_CYLLO:
+    case TF_CYLHI:
     cData = hdc1001_info->taskfile[Addr & 0x07];
-    sim_debug(VERBOSE_MSG, &hdc1001_dev, "HDC1001: " ADDRESS_FORMAT
-              " RD TF[%d]=0x%02x\n", PCX, Addr & 7, cData);
+        sim_debug(VERBOSE_MSG, &hdc1001_dev,DEV_NAME ": " ADDRESS_FORMAT
+            " RD TF[%s]=0x%02x\n", PCX, hdc1001_reg_rd_str[Addr & 0x7], cData);
+        break;
+    case TF_ERROR:
+        cData = hdc1001_info->error_reg;
+        sim_debug(VERBOSE_MSG, &hdc1001_dev,DEV_NAME ": " ADDRESS_FORMAT
+            " RD TF[ERROR]=0x%02x\n", PCX, cData);
+        break;
+    case TF_STATUS:
+        cData = hdc1001_info->status_reg;
+        sim_debug(VERBOSE_MSG, &hdc1001_dev,DEV_NAME ": " ADDRESS_FORMAT
+            " RD TF[STATUS]=0x%02x\n", PCX, cData);
+        break;
+    default:
+        break;
+    }
 
     return (cData);
 }
 
-#if 0
-    for(i = 0; i < HDC1001_IOPB_LEN; i++) {
-        hdc1001_info->iopb[i] = GetBYTEWrapper(hdc1001_info->link_addr + i);
+/* Validate that Cyl, Head, Sector, Sector Length are valid for the current
+ * disk drive geometry.
+ */
+static int HDC1001_Validate_CHSN(HDC1001_DRIVE_INFO* pDrive)
+{
+    int status = SCPE_OK;
+
+    /* Check to make sure we're operating on a valid C/H/S/N. */
+    if ((pDrive->cur_cyl >= pDrive->ncyls) ||
+        (pDrive->cur_head >= pDrive->nheads) ||
+        (pDrive->cur_sect >= pDrive->nsectors) ||
+        (pDrive->cur_sectsize != pDrive->sectsize))
+    {
+        /* Set error bit in status register. */
+        hdc1001_info->status_reg |= HDC1001_STATUS_ERROR;
+
+        /* Set ID_NOT_FOUND bit in error register. */
+        hdc1001_info->error_reg |= HDC1001_ERROR_ID_NOT_FOUND;
+
+        sim_debug(ERROR_MSG, &hdc1001_dev,DEV_NAME "%d: " ADDRESS_FORMAT
+            " ID Not Found (check disk geometry.)\n", hdc1001_info->sel_drive, PCX);
+
+        status = SCPE_IOERR;
+    }
+    else {
+        /* Clear ID_NOT_FOUND bit in error register. */
+        hdc1001_info->error_reg &= ~HDC1001_ERROR_ID_NOT_FOUND;
     }
 
-    cmd = hdc1001_info->iopb[0];
-    hdc1001_info->sel_drive = hdc1001_info->iopb[2];
-
-    hdc1001_info->dma_addr = hdc1001_info->iopb[0x0A];
-    hdc1001_info->dma_addr |= hdc1001_info->iopb[0x0B] << 8;
-    hdc1001_info->dma_addr |= hdc1001_info->iopb[0x0C] << 16;
-
-    next_link = hdc1001_info->iopb[0x0D];
-    next_link |= hdc1001_info->iopb[0x0E] << 8;
-    next_link |= hdc1001_info->iopb[0x0F] << 16;
-
-    sim_debug(VERBOSE_MSG, &hdc1001_dev, "HDC1001[%d]: LINK=0x%05x, NEXT=0x%05x, CMD=%x, DMA@0x%05x\n", hdc1001_info->sel_drive, hdc1001_info->link_addr, next_link, hdc1001_info->iopb[0], hdc1001_info->dma_addr);
+    return (status);
+}
 
 
+/* Perform HDC-1001 Command */
+static t_stat HDC1001_doCommand(void)
+{
+    HDC1001_DRIVE_INFO* pDrive;
+    uint8 cmd;
+
+    cmd = hdc1001_info->taskfile[TF_CMD] & 0x70;
+
+    pDrive = &hdc1001_info->drive[hdc1001_info->sel_drive];
+
+    pDrive->cur_head = hdc1001_info->taskfile[TF_SDH] & 0x07;
+    pDrive->cur_sect = hdc1001_info->taskfile[TF_SECNO];
 
     if(pDrive->ready) {
 
         /* Perform command */
         switch(cmd) {
-            case HDC1001_CODE_NOOP:
-                sim_debug(VERBOSE_MSG, &hdc1001_dev, "HDC1001[%d]: " ADDRESS_FORMAT " NOOP\n", hdc1001_info->sel_drive, PCX);
+            case HDC1001_CMD_RESTORE:
+                pDrive->cur_cyl = 0;
+                sim_debug(SEEK_MSG, &hdc1001_dev,DEV_NAME "%d: " ADDRESS_FORMAT
+                    " RESTORE\n", hdc1001_info->sel_drive, PCX);
+                hdc1001_info->status_reg |= HDC1001_STATUS_SEEK_COMPL;
                 break;
-            case HDC1001_CODE_VERSION:
-                break;
-            case HDC1001_CODE_GLOBAL:
-                sim_debug(CMD_MSG, &hdc1001_dev, "HDC1001[%d]: " ADDRESS_FORMAT " GLOBAL\n", hdc1001_info->sel_drive, PCX);
-
-                hdc1001_info->mode = hdc1001_info->iopb[3];
-                hdc1001_info->retries = hdc1001_info->iopb[4];
-                hdc1001_info->ndrives = hdc1001_info->iopb[5];
-
-                sim_debug(VERBOSE_MSG, &hdc1001_dev, "        Mode: 0x%02x\n", hdc1001_info->mode);
-                sim_debug(VERBOSE_MSG, &hdc1001_dev, "   # Retries: 0x%02x\n", hdc1001_info->retries);
-                sim_debug(VERBOSE_MSG, &hdc1001_dev, "    # Drives: 0x%02x\n", hdc1001_info->ndrives);
-
-                break;
-            case HDC1001_CODE_SPECIFY:
-                {
-                    uint8 specify_data[22];
-                    sim_debug(CMD_MSG, &hdc1001_dev, "HDC1001[%d]: " ADDRESS_FORMAT " SPECIFY\n", hdc1001_info->sel_drive, PCX);
-
-                    for(i = 0; i < 22; i++) {
-                        specify_data[i] = GetBYTEWrapper(hdc1001_info->dma_addr + i);
+            case HDC1001_CMD_SEEK:
+                if (pDrive->cur_cyl >= pDrive->ncyls) {
+                    sim_debug(ERROR_MSG, &hdc1001_dev,DEV_NAME "%d: " ADDRESS_FORMAT
+                        " SEEK ERROR %d not found\n", hdc1001_info->sel_drive, PCX, pDrive->cur_cyl);
+                    pDrive->cur_cyl = pDrive->ncyls - 1;
+                }
+                else {
+                    sim_debug(SEEK_MSG, &hdc1001_dev,DEV_NAME "%d: " ADDRESS_FORMAT
+                        " SEEK %d\n", hdc1001_info->sel_drive, PCX, pDrive->cur_cyl);
                     }
-
-                    pDrive->sectsize = specify_data[4] | (specify_data[5] << 8);
-                    pDrive->nsectors = specify_data[6] | (specify_data[7] << 8);
-                    pDrive->nheads = specify_data[8] | (specify_data[9] << 8);
-                    pDrive->ntracks = specify_data[10] | (specify_data[11] << 8);
-                    pDrive->res_tracks = specify_data[18] | (specify_data[19] << 8);
-
-                    sim_debug(VERBOSE_MSG, &hdc1001_dev, "    Sectsize: %d\n", pDrive->sectsize);
-                    sim_debug(VERBOSE_MSG, &hdc1001_dev, "     Sectors: %d\n", pDrive->nsectors);
-                    sim_debug(VERBOSE_MSG, &hdc1001_dev, "       Heads: %d\n", pDrive->nheads);
-                    sim_debug(VERBOSE_MSG, &hdc1001_dev, "      Tracks: %d\n", pDrive->ntracks);
-                    sim_debug(VERBOSE_MSG, &hdc1001_dev, "    Reserved: %d\n", pDrive->res_tracks);
-                    break;
-                }
-            case HDC1001_CODE_HOME:
-                pDrive->track = 0;
-                sim_debug(SEEK_MSG, &hdc1001_dev, "HDC1001[%d]: " ADDRESS_FORMAT " HOME\n", hdc1001_info->sel_drive, PCX);
+                hdc1001_info->status_reg |= HDC1001_STATUS_SEEK_COMPL;
                 break;
-            case HDC1001_CODE_SEEK:
-                pDrive->track = hdc1001_info->iopb[3];
-                pDrive->track |= (hdc1001_info->iopb[4] << 8);
-
-                if(pDrive->track > pDrive->ntracks) {
-                    sim_debug(ERROR_MSG, &hdc1001_dev, "HDC1001[%d]: " ADDRESS_FORMAT " SEEK ERROR %d not found\n", hdc1001_info->sel_drive, PCX, pDrive->track);
-                    pDrive->track = pDrive->ntracks - 1;
-                    result = HDC1001_STATUS_TIMEOUT;
+            case HDC1001_CMD_WRITE_SECT:
+                /* If drive is read-only, signal a write fault. */
+                if (pDrive->readonly) {
+                    hdc1001_info->status_reg |= HDC1001_STATUS_ERROR;
+                    hdc1001_info->status_reg |= HDC1001_STATUS_WRITE_FAULT;
+                break;
                 } else {
-                    sim_debug(SEEK_MSG, &hdc1001_dev, "HDC1001[%d]: " ADDRESS_FORMAT " SEEK %d\n", hdc1001_info->sel_drive, PCX, pDrive->track);
-                }
-                break;
-            case HDC1001_CODE_READ_HDR:
-            {
-                sim_debug(CMD_MSG, &hdc1001_dev, "HDC1001[%d]: " ADDRESS_FORMAT " READ HEADER: %d\n", pDrive->track, PCX);
-                PutBYTEWrapper(hdc1001_info->dma_addr + 0, pDrive->track & 0xFF);
-                PutBYTEWrapper(hdc1001_info->dma_addr + 1, (pDrive->track >> 8) & 0xFF);
-                PutBYTEWrapper(hdc1001_info->dma_addr + 2, 0);
-                PutBYTEWrapper(hdc1001_info->dma_addr + 3, 1);
-
-                break;
+                    hdc1001_info->status_reg &= ~HDC1001_STATUS_WRITE_FAULT;
             }
-            case HDC1001_CODE_READWRITE:
+                /* Fall through */
+            case HDC1001_CMD_READ_SECT:
             {
                 uint32 track_len;
                 uint32 xfr_len;
                 uint32 file_offset;
                 uint32 xfr_count = 0;
-                uint8 *dataBuffer;
+                uint8 rwopts;   /* Options specified in the command: DMA, Multi-sector, long. */
 
-                pDrive->cur_sect = hdc1001_info->iopb[4] | (hdc1001_info->iopb[5] << 8);
-                pDrive->cur_track = hdc1001_info->iopb[6] | (hdc1001_info->iopb[7] << 8);
-                pDrive->xfr_nsects = hdc1001_info->iopb[8] | (hdc1001_info->iopb[9] << 8);
+                /* Abort the read/write operation if C/H/S/N is not valid. */
+                if (HDC1001_Validate_CHSN(pDrive) != SCPE_OK) break;
 
                 track_len = pDrive->nsectors * pDrive->sectsize;
 
-                file_offset = (pDrive->cur_track * track_len); /* Calculate offset based on current track */
-                file_offset += pDrive->cur_sect + pDrive->sectsize;
+                /* Calculate file offset */
+                file_offset  = (pDrive->cur_cyl * pDrive->nheads * pDrive->nsectors);   /* Full cylinders */
+                file_offset += (pDrive->cur_head * pDrive->nsectors);   /* Add full heads */
+                file_offset += (pDrive->cur_sect);  /* Add sectors for current request */
+                file_offset *= pDrive->sectsize;    /* Convert #sectors to byte offset */
+
+                rwopts = hdc1001_info->taskfile[TF_CMD] & 0xE;
+
+                if (rwopts & HDC1001_RWOPT_LONG) {
+                    sim_debug(ERROR_MSG, &hdc1001_dev,DEV_NAME "%d: " ADDRESS_FORMAT
+                        " LONG Read/Write not supported.\n", hdc1001_info->sel_drive, PCX);
+                }
 
                 xfr_len = pDrive->xfr_nsects * pDrive->sectsize;
 
-                dataBuffer = malloc(xfr_len);
-
                 sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET);
 
-                if(hdc1001_info->iopb[3] == 1) { /* Read */
-                    sim_debug(RD_DATA_MSG, &hdc1001_dev, "HDC1001[%d]: " ADDRESS_FORMAT "  READ @0x%05x T:%04d/S:%04d/#:%d\n", hdc1001_info->sel_drive, PCX, hdc1001_info->dma_addr, pDrive->cur_track, pDrive->cur_sect, pDrive->xfr_nsects );
-
-                    sim_fread(dataBuffer, 1, xfr_len, (pDrive->uptr)->fileref);
-
-                    /* Perform DMA Transfer */
-                    for(xfr_count = 0;xfr_count < xfr_len; xfr_count++) {
-                        PutBYTEWrapper(hdc1001_info->dma_addr + xfr_count, dataBuffer[xfr_count]);
+                if(cmd == HDC1001_CMD_READ_SECT) { /* Read */
+                    if (rwopts & HDC1001_RWOPT_DMA) {
+                        sim_debug(ERROR_MSG, &hdc1001_dev,DEV_NAME "%d: " ADDRESS_FORMAT
+                            " DMA Read not supported.\n", hdc1001_info->sel_drive, PCX);
                     }
+                    sim_debug(RD_DATA_MSG, &hdc1001_dev, DEV_NAME "%d: " ADDRESS_FORMAT
+                        " %s SECTOR  C:%04d/H:%d/S:%04d/#:%d, offset=%5x, len=%d\n",
+                        hdc1001_info->sel_drive, PCX,
+                        (cmd == HDC1001_CMD_READ_SECT) ? "READ" : "WRITE",
+                        pDrive->cur_cyl, pDrive->cur_head,
+                        pDrive->cur_sect, pDrive->xfr_nsects, file_offset, xfr_len);
+                    sim_fread(hdc1001_info->sectbuf, 1, xfr_len, (pDrive->uptr)->fileref);
                 } else { /* Write */
-                    sim_debug(WR_DATA_MSG, &hdc1001_dev, "HDC1001[%d]: " ADDRESS_FORMAT " WRITE @0x%05x T:%04d/S:%04d/#:%d\n", hdc1001_info->sel_drive, PCX, hdc1001_info->dma_addr, pDrive->cur_track, pDrive->cur_sect, pDrive->xfr_nsects );
-
-                    /* Perform DMA Transfer */
-                    for(xfr_count = 0;xfr_count < xfr_len; xfr_count++) {
-                        dataBuffer[xfr_count] = GetBYTEWrapper(hdc1001_info->dma_addr + xfr_count);
-                    }
-
-                    sim_fwrite(dataBuffer, 1, xfr_len, (pDrive->uptr)->fileref);
+                    sim_debug(WR_DATA_MSG, &hdc1001_dev, DEV_NAME "%d: " ADDRESS_FORMAT
+                        " %s SECTOR  C:%04d/H:%d/S:%04d/#:%d, offset=%5x, len=%d\n",
+                        hdc1001_info->sel_drive, PCX,
+                        (cmd == HDC1001_CMD_READ_SECT) ? "READ" : "WRITE",
+                        pDrive->cur_cyl, pDrive->cur_head,
+                        pDrive->cur_sect, pDrive->xfr_nsects, file_offset, xfr_len);
+                    sim_fwrite(hdc1001_info->sectbuf, 1, xfr_len, (pDrive->uptr)->fileref);
                 }
-
-                free(dataBuffer);
-
+                hdc1001_info->status_reg |= HDC1001_STATUS_DRQ;
                 break;
                 }
-            case HDC1001_CODE_FORMAT:
+            case HDC1001_CMD_FORMAT_TRK:
             {
                 uint32 data_len;
                 uint32 file_offset;
                 uint8 *fmtBuffer;
 
+                /* If drive is read-only, signal a write fault. */
+                if (pDrive->readonly) {
+                    hdc1001_info->status_reg |= HDC1001_STATUS_ERROR;
+                    hdc1001_info->status_reg |= HDC1001_STATUS_WRITE_FAULT;
+                    hdc1001_info->status_reg |= HDC1001_STATUS_DRQ;
+                    break;
+                }
+                else {
+                    hdc1001_info->status_reg &= ~HDC1001_STATUS_WRITE_FAULT;
+                }
+
                 data_len = pDrive->nsectors * pDrive->sectsize;
 
-                sim_debug(WR_DATA_MSG, &hdc1001_dev, "HDC1001[%d]: " ADDRESS_FORMAT " FORMAT T:%d/H:%d/Fill=0x%02x/Len=%d\n", hdc1001_info->sel_drive, PCX, pDrive->track, hdc1001_info->iopb[5], hdc1001_info->iopb[4], data_len );
+                /* Abort the read/write operation if C/H/S/N is not valid. */
+                if (HDC1001_Validate_CHSN(pDrive) != SCPE_OK) break;
 
-                file_offset = (pDrive->track * (pDrive->nheads) * data_len); /* Calculate offset based on current track */
-                file_offset += (hdc1001_info->iopb[5] * data_len);
+                sim_debug(WR_DATA_MSG, &hdc1001_dev,DEV_NAME "%d: " ADDRESS_FORMAT
+                    " FORMAT TRACK: C:%d/H:%d/Fill=0x%02x/Len=%d\n",
+                    hdc1001_info->sel_drive, PCX, pDrive->cur_cyl,
+                    pDrive->cur_head, HDC1001_FORMAT_FILL_BYTE, data_len);
 
-                fmtBuffer = malloc(data_len);
-                memset(fmtBuffer, hdc1001_info->iopb[4], data_len);
+                /* Calculate file offset, formatting always handles a full track at a time. */
+                file_offset = (pDrive->cur_cyl * pDrive->nheads * pDrive->nsectors);   /* Full cylinders */
+                file_offset += (pDrive->cur_head * pDrive->nsectors);   /* Add full heads */
+                file_offset *= pDrive->sectsize;    /* Convert #sectors to byte offset */
+
+                fmtBuffer = calloc(data_len, sizeof(uint8));
+                if (HDC1001_FORMAT_FILL_BYTE != 0) {
+                    memset(fmtBuffer, HDC1001_FORMAT_FILL_BYTE, data_len);
+                }
 
                 sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET);
                 sim_fwrite(fmtBuffer, 1, data_len, (pDrive->uptr)->fileref);
 
                 free(fmtBuffer);
+                hdc1001_info->status_reg |= HDC1001_STATUS_DRQ;
 
                 break;
             }
-            case HDC1001_CODE_SET_MAP:
-            case HDC1001_CODE_RELOCATE:
-            case HDC1001_CODE_FORMAT_BAD:
-            case HDC1001_CODE_STATUS:
-            case HDC1001_CODE_SELECT:
-            case HDC1001_CODE_EXAMINE:
-            case HDC1001_CODE_MODIFY:
             default:
-                sim_debug(ERROR_MSG, &hdc1001_dev, "HDC1001[%d]: " ADDRESS_FORMAT " CMD=%x Unsupported\n", hdc1001_info->sel_drive, PCX, cmd);
+                sim_debug(ERROR_MSG, &hdc1001_dev,DEV_NAME "%d: " ADDRESS_FORMAT
+                    " CMD=%x Unsupported\n",
+                    hdc1001_info->sel_drive, PCX, cmd);
                 break;
         }
-    } else { /* Drive not ready */
-        result = HDC1001_STATUS_NOT_READY;
     }
 
-    /* Return status */
-    PutBYTEWrapper(hdc1001_info->link_addr + 1, result);
-
-    hdc1001_info->link_addr = next_link;
-
-    return 0;
+    return SCPE_OK;
 }
-#endif /* 0 */
