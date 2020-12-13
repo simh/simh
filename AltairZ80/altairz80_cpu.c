@@ -242,6 +242,7 @@ UNIT cpu_unit = {
         int32 SR                = 0;                /* switch register                              */
 static  int32 bankSelect        = 0;                /* determines selected memory bank              */
 static  uint32 common           = 0xc000;           /* addresses >= 'common' are in common memory   */
+static  uint32 common_low       = 0;                /* Common area is in low memory                 */
 static  uint32 previousCapacity = MAXBANKSIZE;      /* safe for previous memory capacity            */
 static  uint32 clockFrequency   = 0;                /* in kHz, 0 means as fast as possible          */
 static  uint32 sliceLength      = 10;               /* length of time-slice for CPU speed           */
@@ -465,6 +466,8 @@ REG cpu_reg[] = {
         REG_HRO             }, /* 80 */
     { HRDATAD (WRU,     sim_int_char,       8, "Interrupt character pseudo register"),
     }, /* 81 */
+    { HRDATAD(COMMONLOW,common_low,         1, "If set, use low memory for common area"),
+    }, /* 82 */
     { NULL }
 };
 
@@ -521,6 +524,8 @@ static MTAB cpu_mod[] = {
         NULL, NULL, "Sets the RAM type to Vector RAM for 8080 / Z80 / 8086"    },
     { MTAB_XTD | MTAB_VDV,  3,                  NULL,           "CRAM",         &cpu_set_ramtype,
         NULL, NULL, "Sets the RAM type to Cromemco RAM for 8080 / Z80 / 8086"   },
+    { MTAB_XTD | MTAB_VDV,  4,                  NULL,           "B810",         &cpu_set_ramtype,
+        NULL, NULL, "Sets the RAM type AB Digital Design B810 8080 / Z80 / 8086"},
     { MTAB_VDV,             4,                  NULL,           "4KB",          &cpu_set_size,
         NULL, NULL, "Sets the RAM size to 4KB for 8080 / Z80 / 8086"        },
     { MTAB_VDV,             8,                  NULL,           "8KB",          &cpu_set_size,
@@ -649,8 +654,15 @@ const char* handlerNameForPort(const int32 port) {
     return dev_table[port & 0xff].name;
 }
 
-static int32 ramtype =  0;
-#define MAX_RAM_TYPE    3
+
+#define RAM_TYPE_AZ80   0       /* Altair-Z80 RAM card */
+#define RAM_TYPE_HRAM   1       /* North Start Horizon RAM card */
+#define RAM_TYPE_VRAM   2       /* Vector Graphic RAM card */
+#define RAM_TYPE_CRAM   3       /* Cromemco RAM card */
+#define RAM_TYPE_B810   4       /* AB Digital Design B810 RAM card */
+#define MAX_RAM_TYPE    RAM_TYPE_B810
+
+static int32 ramtype = RAM_TYPE_AZ80;
 
 ChipType chiptype = CHIP_TYPE_8080;
 
@@ -1787,7 +1799,7 @@ uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
     if (resource_type == RESOURCE_TYPE_MEMORY) {
         for (i = 0; i < (size >> LOG2PAGESIZE); i++) {
             addr = (baseaddr & 0xfff00) + (i << LOG2PAGESIZE);
-            if ((cpu_unit.flags & UNIT_CPU_BANKED) && (addr < common))
+            if ((cpu_unit.flags & UNIT_CPU_BANKED) && (((common_low == 0) && (addr < common)) || ((common_low == 1) && (addr >= common))))
                 addr |= bankSelect << MAXBANKSIZELOG2;
             page = addr >> LOG2PAGESIZE;
             if (cpu_unit.flags & UNIT_CPU_VERBOSE)
@@ -1835,8 +1847,9 @@ static void PutBYTE(register uint32 Addr, const register uint32 Value) {
     MDEV m;
 
     Addr &= ADDRMASK;   /* registers are NOT guaranteed to be always 16-bit values */
-    if ((cpu_unit.flags & UNIT_CPU_BANKED) && (Addr < common))
+    if ((cpu_unit.flags & UNIT_CPU_BANKED) && (((common_low == 0) && (Addr < common)) || ((common_low == 1) && (Addr >= common))))
         Addr |= bankSelect << MAXBANKSIZELOG2;
+
     m = mmu_table[Addr >> LOG2PAGESIZE];
 
     if (m.isRAM)
@@ -1878,7 +1891,7 @@ static uint32 GetBYTE(register uint32 Addr) {
     MDEV m;
 
     Addr &= ADDRMASK;   /* registers are NOT guaranteed to be always 16-bit values */
-    if ((cpu_unit.flags & UNIT_CPU_BANKED) && (Addr < common))
+    if ((cpu_unit.flags & UNIT_CPU_BANKED) && (((common_low == 0) && (Addr < common)) || ((common_low == 1) && (Addr >= common))))
         Addr |= bankSelect << MAXBANKSIZELOG2;
     m = mmu_table[Addr >> LOG2PAGESIZE];
 
@@ -6185,7 +6198,8 @@ static t_stat sim_instr_mmu (void) {
 
     /* simulation halted */
     PC_S = ((reason == STOP_OPCODE) || (reason == STOP_MEM)) ? PCX : (PC & ADDRMASK);
-    if ((cpu_unit.flags & UNIT_CPU_BANKED) && ((uint32)PC_S < common))
+    if ((cpu_unit.flags & UNIT_CPU_BANKED) && ((((common_low == 0) && ((uint32)PC_S < common))) || (((common_low == 1) && ((uint32)PC_S >= common)))))
+
         PC_S |= bankSelect << MAXBANKSIZELOG2;
     pcq_r -> qptr = pcq_p;  /* update pc q ptr */
     AF_S = AF;
@@ -6412,7 +6426,7 @@ const static CPUFLAG *cpuflags[NUM_CHIP_TYPE] = { cpuflags8080, cpuflagsZ80,
     cpuflags8086, cpuflagsM68K, };
 
 /* needs to be set for each ramtype <= MAX_RAM_TYPE */
-static const char *ramTypeToString[] = { "AZ80", "HRAM", "VRAM", "CRAM" };
+static const char *ramTypeToString[] = { "AZ80", "HRAM", "VRAM", "CRAM", "B810" };
 
 static t_stat chip_show(FILE *st, UNIT *uptr, int32 val, CONST void *desc) {
     fprintf(st, cpu_unit.flags & UNIT_CPU_OPSTOP ? "ITRAP, " : "NOITRAP, ");
@@ -6549,14 +6563,14 @@ static t_stat cpu_set_nonbanked(UNIT *uptr, int32 value, CONST char *cptr, void 
 static int32 bankseldev(const int32 port, const int32 io, const int32 data) {
     if (io) {
         switch(ramtype) {
-            case 1:
+            case RAM_TYPE_HRAM:
                 if (data & 0x40) {
                     sim_printf("HRAM: Parity %s\n", data & 1 ? "ON" : "OFF");
                 } else {
                     sim_printf("HRAM BANKSEL=%02x\n", data);
                 }
                 break;
-            case 2:
+            case RAM_TYPE_VRAM:
 /*              sim_printf("VRAM BANKSEL=%02x\n", data);*/
                 switch(data & 0xFF) {
                     case 0x01:
@@ -6590,7 +6604,7 @@ static int32 bankseldev(const int32 port, const int32 io, const int32 data) {
                         break;
                 }
                 break;
-            case 3:
+            case RAM_TYPE_CRAM:
 /*                sim_printf(ADDRESS_FORMAT " CRAM BANKSEL=%02x\n", PCX, data); */
                 switch(data & 0x7F) {
                     case 0x01:
@@ -6621,9 +6635,14 @@ static int32 bankseldev(const int32 port, const int32 io, const int32 data) {
                         sim_printf("Invalid bank select 0x%02x for CRAM\n", data);
                         break;
                 }
-
+            case RAM_TYPE_B810:
+                if (data < 16) {
+                    setBankSelect(data);
+                } else {
+                    sim_printf("Invalid bank select 0x%02x for B810\n", data);
+                }
                 break;
-            case 0:
+            case RAM_TYPE_AZ80:
             default:
                 break;
         }
@@ -6746,19 +6765,24 @@ static t_stat cpu_set_ramtype(UNIT *uptr, int32 value, CONST char *cptr, void *d
     }
 
     switch(ramtype) {
-        case 1:
+        case RAM_TYPE_HRAM:
             if (cpu_unit.flags & UNIT_CPU_VERBOSE)
                 sim_printf("Unmapping NorthStar HRAM\n");
             sim_map_resource(0xC0, 1, RESOURCE_TYPE_IO, &bankseldev, "bankseldev", TRUE);
             break;
-        case 2:
+        case RAM_TYPE_VRAM:
             if (cpu_unit.flags & UNIT_CPU_VERBOSE)
                 sim_printf("Unmapping Vector RAM\n");
             sim_map_resource(0x40, 1, RESOURCE_TYPE_IO, &bankseldev, "bankseldev", TRUE);
             break;
-        case 3:
+        case RAM_TYPE_CRAM:
             if (cpu_unit.flags & UNIT_CPU_VERBOSE)
                 sim_printf("Unmapping Cromemco RAM\n");
+            sim_map_resource(0x40, 1, RESOURCE_TYPE_IO, &bankseldev, "bankseldev", TRUE);
+            break;
+        case RAM_TYPE_B810:
+            if (cpu_unit.flags & UNIT_CPU_VERBOSE)
+                sim_printf("Unmapping AB Digital Design B810 RAM\n");
             sim_map_resource(0x40, 1, RESOURCE_TYPE_IO, &bankseldev, "bankseldev", TRUE);
             break;
         case 0:
@@ -6769,19 +6793,24 @@ static t_stat cpu_set_ramtype(UNIT *uptr, int32 value, CONST char *cptr, void *d
     }
 
     switch(value) {
-        case 1:
+        case RAM_TYPE_HRAM:
             if (cpu_unit.flags & UNIT_CPU_VERBOSE)
                 sim_printf("NorthStar HRAM Selected\n");
             sim_map_resource(0xC0, 1, RESOURCE_TYPE_IO, &bankseldev, "bankseldev", FALSE);
             break;
-        case 2:
+        case RAM_TYPE_VRAM:
             if (cpu_unit.flags & UNIT_CPU_VERBOSE)
                 sim_printf("Vector RAM Selected\n");
             sim_map_resource(0x40, 1, RESOURCE_TYPE_IO, &bankseldev, "bankseldev", FALSE);
             break;
-        case 3:
+        case RAM_TYPE_CRAM:
             if (cpu_unit.flags & UNIT_CPU_VERBOSE)
                 sim_printf("Cromemco RAM Selected\n");
+            sim_map_resource(0x40, 1, RESOURCE_TYPE_IO, &bankseldev, "bankseldev", FALSE);
+            break;
+        case RAM_TYPE_B810:
+            if (cpu_unit.flags & UNIT_CPU_VERBOSE)
+                sim_printf("AB Digital Design B810 RAM Selected\n");
             sim_map_resource(0x40, 1, RESOURCE_TYPE_IO, &bankseldev, "bankseldev", FALSE);
             break;
         case 0:
