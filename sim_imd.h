@@ -86,6 +86,8 @@ typedef struct {
 #define IMD_MODE_300K_MFM       4
 #define IMD_MODE_250K_MFM       5
 
+#define IMD_MAX_SECTSIZE        6
+
 #define IMD_MODE_FM(x)      (x <= IMD_MODE_250K_FM)
 #define IMD_MODE_MFM(x)     (x >= IMD_MODE_500K_MFM)
 

@@ -655,7 +655,11 @@ t_stat sectWrite(DISK_INFO *myDisk,
  * Cromemco CDOS "INIT.COM"
  * ADC Super-Six (CP/M-80) "FMT8.COM"
  * 86-DOS "INIT.COM"
- *
+ * MS-DOS 1.25 "FORMAT.COM" - SSSD 8"
+ * MS-DOS 1.25 "FORMAT.COM /D" - DSDD 8"
+ * OASIS-80 v5.6 "INITDISK A (FORMAT,SECTOR 13)" - SSSD 8"
+ * OASIS-80 v5.6 "INITDISK A (FORMAT)" - SSDD 8"
+ * OASIS-80 v5.6 "INITDISK A (FORMAT,HEAD 2)" - DSDD 8"
  */
 t_stat trackWrite(DISK_INFO *myDisk,
                uint32 Cyl,
@@ -668,10 +672,11 @@ t_stat trackWrite(DISK_INFO *myDisk,
                uint32 *flags)
 {
     FILE *fileref;
-    IMD_HEADER track_header;
+    IMD_HEADER track_header = { 0 };
     uint8 *sectorData;
     unsigned long i;
     unsigned long dataLen;
+    uint8 sectsize = 0;
 
     *flags = 0;
 
@@ -719,7 +724,16 @@ t_stat trackWrite(DISK_INFO *myDisk,
     track_header.cyl = Cyl;
     track_header.head = Head;
     track_header.nsects = numSectors;
-    track_header.sectsize = sectorLen;
+
+    for (i = (sectorLen >> 8); i; i >>= 1) {
+        sectsize++;
+    }
+
+    if (sectsize > IMD_MAX_SECTSIZE) {
+        sim_printf("SIM_IMD: ERROR: Invalid sectsize %d\n", sectsize);
+        return(SCPE_IERR);
+    }
+    track_header.sectsize = sectsize;
 
     /* Forward to end of the file, write track header and sector map. */
     sim_fseek(myDisk->file, 0, SEEK_END);
