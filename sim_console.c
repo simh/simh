@@ -151,7 +151,7 @@ static t_stat sim_os_ttinit (void);
 static t_stat sim_os_ttrun (void);
 static t_stat sim_os_ttcmd (void);
 static t_stat sim_os_ttclose (void);
-static t_bool sim_os_ttisatty (void);
+static t_bool sim_os_fd_isatty (int fd);
 
 static t_stat sim_set_rem_telnet (int32 flag, CONST char *cptr);
 static t_stat sim_set_rem_bufsize (int32 flag, CONST char *cptr);
@@ -3256,10 +3256,14 @@ t_bool sim_ttisatty (void)
 static int answer = -1;
 
 if (answer == -1)
-    answer = sim_os_ttisatty ();
+    answer = sim_os_fd_isatty (0);
 return (t_bool)answer;
 }
 
+t_bool sim_fd_isatty (int fd)
+{
+return sim_os_fd_isatty (fd);
+}
 
 /* Platform specific routine definitions */
 
@@ -3356,9 +3360,9 @@ sys$dassgn (tty_chan);
 return SCPE_OK;
 }
 
-static t_bool sim_os_ttisatty (void)
+static t_bool sim_os_fd_isatty (int fd)
 {
-return isatty (fileno (stdin));
+return isatty (fd);
 }
 
 static t_stat sim_os_poll_kbd_data (void)
@@ -3446,8 +3450,10 @@ return SCPE_OK;
 #define RAW_MODE 0
 static HANDLE std_input;
 static HANDLE std_output;
+static HANDLE std_error;
 static DWORD saved_input_mode;
 static DWORD saved_output_mode;
+static DWORD saved_error_mode;
 #ifndef ENABLE_VIRTUAL_TERMINAL_INPUT
 #define ENABLE_VIRTUAL_TERMINAL_INPUT 0x0200
 #endif
@@ -3495,12 +3501,16 @@ sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_ttinit()\n");
 SetConsoleCtrlHandler( ControlHandler, TRUE );
 std_input = GetStdHandle (STD_INPUT_HANDLE);
 std_output = GetStdHandle (STD_OUTPUT_HANDLE);
+std_error = GetStdHandle (STD_ERROR_HANDLE);
 if ((std_input) &&                                      /* Not Background process? */
     (std_input != INVALID_HANDLE_VALUE))
     GetConsoleMode (std_input, &saved_input_mode);      /* Save Input Mode */
 if ((std_output) &&                                     /* Not Background process? */
     (std_output != INVALID_HANDLE_VALUE))
     GetConsoleMode (std_output, &saved_output_mode);    /* Save Output Mode */
+if ((std_error) &&                                      /* Not Background process? */
+    (std_error != INVALID_HANDLE_VALUE))
+    GetConsoleMode (std_error, &saved_error_mode);      /* Save Output Mode */
 return SCPE_OK;
 }
 
@@ -3557,11 +3567,26 @@ static t_stat sim_os_ttclose (void)
 return SCPE_OK;
 }
 
-static t_bool sim_os_ttisatty (void)
+static t_bool sim_os_fd_isatty (int fd)
 {
 DWORD Mode;
+HANDLE handle;
 
-return (std_input) && (std_input != INVALID_HANDLE_VALUE) && GetConsoleMode (std_input, &Mode);
+switch (fd) {
+    case 0:
+        handle = std_input;
+        break;
+    case 1:
+        handle = std_output;
+        break;
+    case 2:
+        handle = std_error;
+        break;
+    default:
+        handle = NULL;
+    }
+
+return (handle) && (handle != INVALID_HANDLE_VALUE) && GetConsoleMode (handle, &Mode);
 }
 
 static t_stat sim_os_poll_kbd (void)
@@ -3712,7 +3737,7 @@ static t_stat sim_os_ttclose (void)
 return SCPE_OK;
 }
 
-static t_bool sim_os_ttisatty (void)
+static t_bool sim_os_fd_isatty (int fd)
 {
 return 1;
 }
@@ -3924,7 +3949,7 @@ static t_stat sim_os_ttclose (void)
 return SCPE_OK;
 }
 
-static t_bool sim_os_ttisatty (void)
+static t_bool sim_os_fd_isatty (int fd)
 {
 return 1;
 }
@@ -4067,9 +4092,9 @@ static t_stat sim_os_ttclose (void)
 return sim_ttcmd ();
 }
 
-static t_bool sim_os_ttisatty (void)
+static t_bool sim_os_fd_isatty (int fd)
 {
-return isatty (fileno (stdin));
+return isatty (fd);
 }
 
 static t_stat sim_os_poll_kbd (void)
@@ -4241,9 +4266,9 @@ static t_stat sim_os_ttclose (void)
 return sim_ttcmd ();
 }
 
-static t_bool sim_os_ttisatty (void)
+static t_bool sim_os_fd_isatty (int fd)
 {
-return isatty (fileno (stdin));
+return isatty (fd);
 }
 
 static t_stat sim_os_poll_kbd (void)

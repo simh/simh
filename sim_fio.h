@@ -60,6 +60,7 @@ typedef int32        t_offset;
 FILE *sim_fopen (const char *file, const char *mode);
 int sim_fseek (FILE *st, t_addr offset, int whence);
 int sim_fseeko (FILE *st, t_offset offset, int whence);
+t_bool sim_can_seek (FILE *st);
 int sim_set_fsize (FILE *fptr, t_addr size);
 int sim_set_fifo_nonblock (FILE *fptr);
 size_t sim_fread (void *bptr, size_t size, size_t count, FILE *fptr);

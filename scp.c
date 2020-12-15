@@ -8736,7 +8736,8 @@ for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* reposition all */
     for (j = 0; j < dptr->numunits; j++) {              /* seq devices */
         uptr = dptr->units + j;
         if ((uptr->flags & (UNIT_ATT + UNIT_SEQ)) == (UNIT_ATT + UNIT_SEQ))
-            if (sim_fseek (uptr->fileref, uptr->pos, SEEK_SET))
+            if (sim_can_seek (uptr->fileref) &&
+                (0 != sim_fseek (uptr->fileref, uptr->pos, SEEK_SET)))
                 return sim_messagef (SCPE_IERR, "Can't seek to %u in %s for %s\n", (unsigned)uptr->pos, uptr->filename, sim_uname (uptr));
         }
     }

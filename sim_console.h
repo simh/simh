@@ -122,6 +122,7 @@ t_stat sim_ttrun (void);
 t_stat sim_ttcmd (void);
 t_stat sim_ttclose (void);
 t_bool sim_ttisatty (void);
+t_bool sim_fd_isatty (int fd);
 int32 sim_tt_inpcvt (int32 c, uint32 mode);
 int32 sim_tt_outcvt (int32 c, uint32 mode);
 t_stat sim_tt_set_mode (UNIT *uptr, int32 val, CONST char *cptr, void *desc);

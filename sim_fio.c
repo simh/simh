@@ -44,6 +44,7 @@
    sim_fwrite        -       endian independent write (formerly fxwrite)
    sim_fseek         -       conditionally extended (>32b) seek (
    sim_fseeko        -       extended seek (>32b if available)
+   sim_can_seek      -       test for seekable (regular file)
    sim_fsize         -       get file size
    sim_fsize_name    -       get file size of named file
    sim_fsize_ex      -       get file size as a t_offset
@@ -233,6 +234,16 @@ return (uint32)(sim_fsize_name_ex (fname));
 uint32 sim_fsize (FILE *fp)
 {
 return (uint32)(sim_fsize_ex (fp));
+}
+
+t_bool sim_can_seek (FILE *fp)
+{
+struct stat statb;
+
+if ((0 != fstat (fileno (fp), &statb)) ||
+    (0 == (statb.st_mode & S_IFREG)))
+    return FALSE;
+return TRUE;
 }
 
 /* OS-dependent routines */
