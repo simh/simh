@@ -176,6 +176,7 @@ static t_stat m2sio_detach(UNIT *uptr);
 static t_stat m2sio_set_baud(UNIT *uptr, int32 value, const char *cptr, void *desc);
 static t_stat m2sio_show_baud(FILE *st, UNIT *uptr, int32 value, const void *desc);
 static t_stat m2sio_config_line(UNIT *uptr);
+static t_stat m2sio_config_rts(DEVICE *dptr, char rts);
 static int32 m2sio0_io(int32 addr, int32 io, int32 data);
 static int32 m2sio1_io(int32 addr, int32 io, int32 data);
 static int32 m2sio_io(DEVICE *dptr, int32 addr, int32 io, int32 data);
@@ -384,6 +385,9 @@ static t_stat m2sio_reset(DEVICE *dptr, int32 (*routine)(const int32, const int3
     /* Reset status registers */
     xptr->stb = 0;
     xptr->txp = 0;
+    if (dptr->units[0].flags & UNIT_ATT) {
+        m2sio_config_rts(dptr, 1);    /* disable RTS */
+    }
 
     if (!(dptr->flags & DEV_DIS)) {
         sim_activate(&dptr->units[0], dptr->units[0].wait);
@@ -407,11 +411,6 @@ static t_stat m2sio_svc(UNIT *uptr)
     /* Check for new incoming connection */
     if (uptr->flags & UNIT_ATT) {
         if (tmxr_poll_conn(xptr->tmxr) >= 0) {      /* poll connection */
-
-            /* Clear DTR and RTS if serial port */
-            if (xptr->tmln->serport) {
-                tmxr_set_get_modem_bits(xptr->tmln, 0, TMXR_MDM_DTR | TMXR_MDM_RTS, NULL);
-            }
 
             xptr->conn = 1;          /* set connected   */
 
@@ -506,11 +505,11 @@ static t_stat m2sio_attach(UNIT *uptr, CONST char *cptr)
 
     if ((r = tmxr_attach(xptr->tmxr, uptr, cptr)) == SCPE_OK) {
 
+        if (xptr->tmln->serport) {
+            r = m2sio_config_rts(uptr->dptr, xptr->rts);    /* update RTS */
+        }
+
         xptr->tmln->rcve = 1;
-
-        sim_activate(uptr, uptr->wait);
-
-        sim_debug(VERBOSE_MSG, uptr->dptr, "activated service.\n");
     }
 
     return r;
@@ -558,11 +557,12 @@ static t_stat m2sio_set_baud(UNIT *uptr, int32 value, const char *cptr, void *de
                 case 2400:
                 case 4800:
                 case 9600:
+                case 19200:
                     xptr->baud = baud;
                     r = m2sio_config_line(uptr);
 
                     return r;
- 
+
                 default:
                     break;
             }
@@ -630,7 +630,7 @@ static t_stat m2sio_config_line(UNIT *uptr)
         sim_debug(STATUS_MSG, uptr->dptr, "port configuration set to '%s'.\n", config);
 
         /*
-        ** AltairZ80 and TMXR refuse to want to play together 
+        ** AltairZ80 and TMXR refuse to want to play together
         ** nicely when the CLOCK register is set to anything
         ** other than 0.
         **
@@ -647,6 +647,44 @@ static t_stat m2sio_config_line(UNIT *uptr)
         xptr->tmln->txbps = 0;   /* Get TMXR's timing out of our way */
         xptr->tmln->rxbps = 0;   /* Get TMXR's timing out of our way */
     }
+
+    return r;
+}
+
+/*
+** RTS is active low
+** 0 = RTS active
+** 1 = RTS inactive
+*/
+static t_stat m2sio_config_rts(DEVICE *dptr, char rts)
+{
+    M2SIO_CTX *xptr;
+    t_stat r = SCPE_OK;
+    int32 s;
+
+    xptr = (M2SIO_CTX *) dptr->ctxt;
+
+    if (dptr->units[0].flags & UNIT_ATT) {
+        /* RTS Control */
+        s = TMXR_MDM_RTS;
+        if (dptr->units[0].flags & UNIT_M2SIO_DTR) {
+            s |= TMXR_MDM_DTR;
+        }
+
+        if (!rts) {
+            r = tmxr_set_get_modem_bits(xptr->tmln, s, 0, NULL);
+            if (xptr->rts) {
+                sim_debug(STATUS_MSG, dptr, "RTS state changed to HIGH.\n");
+            }
+        } else {
+            r = tmxr_set_get_modem_bits(xptr->tmln, 0, s, NULL);
+            if (!xptr->rts) {
+                sim_debug(STATUS_MSG, dptr, "RTS state changed to LOW.\n");
+            }
+        }
+    }
+
+    xptr->rts = rts;    /* Active low */
 
     return r;
 }
@@ -685,7 +723,7 @@ static int32 m2sio_io(DEVICE *dptr, int32 addr, int32 io, int32 data)
 static int32 m2sio_stat(DEVICE *dptr, int32 io, int32 data)
 {
     M2SIO_CTX *xptr;
-    int32 r,s;
+    int32 r;
 
     xptr = (M2SIO_CTX *) dptr->ctxt;
 
@@ -696,37 +734,25 @@ static int32 m2sio_stat(DEVICE *dptr, int32 io, int32 data)
 
         /* Master Reset */
         if ((data & M2SIO_RESET) == M2SIO_RESET) {
-            xptr->stb &= (M2SIO_CTS | M2SIO_DCD);           /* Reset status register */
-            xptr->txp = 0;
             sim_debug(STATUS_MSG, dptr, "MC6850 master reset.\n");
+            xptr->stb &= (M2SIO_CTS | M2SIO_DCD);           /* Reset status register */
+            xptr->rxb = 0;
+            xptr->txp = 0;
+            m2sio_config_rts(dptr, 1);    /* disable RTS */
         } else if (dptr->units[0].flags & UNIT_ATT) {
             /* Interrupt Enable */
             xptr->tie = (data & M2SIO_RIE) == M2SIO_RIE;           /* Receive enable  */
             xptr->rie = (data & M2SIO_RTSMSK) == M2SIO_RTSLTIE;    /* Transmit enable */
 
-            /* RTS Control */
-            s = TMXR_MDM_RTS;
-            if (dptr->units[0].flags & UNIT_M2SIO_DTR) {
-                s |= TMXR_MDM_DTR;
-            }
-
             switch (data & M2SIO_RTSMSK) {
                 case M2SIO_RTSLTIE:
                 case M2SIO_RTSLTID:
-                    tmxr_set_get_modem_bits(xptr->tmln, s, 0, NULL);
-                    if (xptr->rts) {
-                        sim_debug(STATUS_MSG, dptr, "RTS state changed to HIGH.\n");
-                    }
-                    xptr->rts = 0;    /* Active low */
+                    r = m2sio_config_rts(dptr, 0);    /* enable RTS */
                     break;
 
                 case M2SIO_RTSHTID:
                 case M2SIO_RTSHTBR:
-                    tmxr_set_get_modem_bits(xptr->tmln, 0, s, NULL);
-                    if (!xptr->rts) {
-                        sim_debug(STATUS_MSG, dptr, "RTS state changed to LOW.\n");
-                    }
-                    xptr->rts = 1;    /* Active low */
+                    r = m2sio_config_rts(dptr, 1);    /* disable RTS */
                     break;
 
                 default:

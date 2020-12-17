@@ -842,7 +842,7 @@ static t_stat icom_set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *de
     }
 
     if (newba) {
-    r = set_membase(uptr, val, cptr, desc);
+        r = set_membase(uptr, val, cptr, desc);
         if (r) {
             sim_debug(ERROR_MSG, &icom_dev, "Error setting MEM resource at 0x%04x\n", icom_info->mem_base);
             icom_info->mem_base = 0;

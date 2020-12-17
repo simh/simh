@@ -627,7 +627,6 @@ static t_stat HDC1001_doCommand(void)
                 uint32 track_len;
                 uint32 xfr_len;
                 uint32 file_offset;
-                uint32 xfr_count = 0;
                 uint8 rwopts;   /* Options specified in the command: DMA, Multi-sector, long. */
 
                 /* Abort the read/write operation if C/H/S/N is not valid. */
