@@ -1798,7 +1798,7 @@ if ((acc || QCPU_S567)?                                 /* virt or S5-7? */
     (EaP20 (IR, &bva, lnt) != 0))                       /* get real addr */
     return TR_NESTED;
 
-    switch (lnt) {
+switch (lnt) {
     case BY:
         if (ReadB (bva, &wd, acc) != 0)                 /* read byte */
             return TR_NESTED;

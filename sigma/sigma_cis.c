@@ -68,7 +68,7 @@ typedef struct {
 #define ReadDecA(src)   for (i = 0; i < DSTRLNT; i++) \
                             src.val[DSTRLNT - 1 - i] = R[DECA + i];
 
-static dstr_t Dstr_zero = { 0, 0, 0, 0, 0 };
+static dstr_t Dstr_zero = { 0, { 0, 0, 0, 0 } };
 
 extern uint32 *R;
 extern uint32 CC;
