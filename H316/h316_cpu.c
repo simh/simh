@@ -1105,11 +1105,11 @@ if (((addr == 0) || (addr >= 020)) && MEM_ADDR_OK (addr))
     M[addr] = val;
 if (addr == M_XR)                                       /* write XR loc? */
     XR = val;
-    // [RLA] Implement "break on memory write" ...
-    if (sim_brk_summ && sim_brk_test (addr, SWMASK ('W')))
-        return STOP_IBKPT;
-    else
-        return SCPE_OK;
+// [RLA] Implement "break on memory write" ...
+if (sim_brk_summ && sim_brk_test (addr, SWMASK ('W')))
+    return STOP_IBKPT;
+else
+    return SCPE_OK;
 }
 
 /* Add */
