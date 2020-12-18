@@ -1,6 +1,6 @@
 /* sim_defs.h: simulator definitions
 
-   Copyright (c) 1993-2019, Robert M Supnik
+   Copyright (c) 1993-2020, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   09-Nov-20    RMS     More V4.X compatibility hooks (Mark Pizzolato)
    26-Oct-19    RMS     Removed MTAB_VAL definition
    23-Jun-17    RMS     Added #include sim_rev.h (Mark Pizzolato)
    25-Sep-16    RMS     Removed KBD_WAIT and friends
@@ -353,6 +354,7 @@ struct sim_device {
 #define DEV_MUX         (DEV_NET)                       /* (4.0 dummy) */
 #define DEV_DISPLAY     0                               /* (4.0 dummy) */
 #define DEV_ETHER       0                               /* (4.0 dummy) */
+#define DEV_CARD        0                               /* (4.0 dummy) */
 
 #define DEV_UFMASK_31   (((1u << DEV_V_RSV) - 1) & ~((1u << DEV_V_UF_31) - 1))
 #define DEV_UFMASK      (((1u << DEV_V_RSV) - 1) & ~((1u << DEV_V_UF) - 1))
@@ -415,12 +417,12 @@ struct sim_unit {
 #define UNIT_UFMASK     (((1u << UNIT_V_RSV) - 1) & ~((1u << UNIT_V_UF) - 1))
 #define UNIT_RFLAGS     (UNIT_UFMASK|UNIT_DIS)          /* restored flags */
 
-/* Unit dynamic flags (dynflags) (from 4.0) */
+/* Unit dynamic flags (dynflags) (from 4.0) 
+   These flags are only set dynamically */
 
-/* These flags are only set dynamically */
-
-#define UNIT_V_DF_TAPE  3               /* Bit offset for Tape Density reservation */
-#define UNIT_W_DF_TAPE  3               /* Bits Reserved for Tape Density */
+#define UNIT_ATTMULT    000001                          /* allow multiple ATT cmd */
+#define UNIT_V_DF_TAPE  3                               /* tape density reservation */
+#define UNIT_W_DF_TAPE  3
 
 /* Register data structure */
 

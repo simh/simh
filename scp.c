@@ -2096,9 +2096,13 @@ if (dptr == NULL)                                       /* found dev? */
 if (uptr == NULL)                                       /* valid unit? */
     return SCPE_NXUN;
 if (uptr->flags & UNIT_ATT) {                           /* already attached? */
-    r = scp_detach_unit (dptr, uptr);                   /* detach it */
-    if (r != SCPE_OK)                                   /* error? */
-        return r;
+    if (!(uptr->dynflags & UNIT_ATTMULT)) {
+        r = scp_detach_unit (dptr, uptr);               /* detach it */
+        if (r != SCPE_OK)                               /* error? */
+            return r;
+        }
+    else
+        return SCPE_ALATT;
     }
 sim_trim_endspc (cptr);                                 /* trim trailing spc */
 return scp_attach_unit (dptr, uptr, cptr);              /* attach */
