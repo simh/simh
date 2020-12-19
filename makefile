@@ -1777,8 +1777,8 @@ LGP_OPT = -I ${LGPD}
 SDSD = ${SIMHD}/SDS
 SDS = ${SDSD}/sds_cpu.c ${SDSD}/sds_drm.c ${SDSD}/sds_dsk.c ${SDSD}/sds_io.c \
 	${SDSD}/sds_lp.c ${SDSD}/sds_mt.c ${SDSD}/sds_mux.c ${SDSD}/sds_rad.c \
-	${SDSD}/sds_stddev.c ${SDSD}/sds_sys.c
-SDS_OPT = -I ${SDSD}
+	${SDSD}/sds_stddev.c ${SDSD}/sds_sys.c ${SDSD}/sds_cp.c ${SDSD}/sds_cr.c
+SDS_OPT = -I ${SDSD} -DUSE_SIM_CARD
 
 
 SWTP6800D = ${SIMHD}/swtp6800/swtp6800

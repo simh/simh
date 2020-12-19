@@ -1,6 +1,6 @@
 /* sds_defs.h: SDS 940 simulator definitions
 
-   Copyright (c) 2001-2010, Robert M. Supnik
+   Copyright (c) 2001-2020, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   09-Nov-20    RMS     Added definitions for card reader/punch (Ken Rector)
    22-May-10    RMS     Added check for 64b definitions
    25-Apr-03    RMS     Revised for extended file support
 */
@@ -350,11 +351,13 @@ typedef struct sdsdib DIB;
 #define DEV_MASK        077                             /* device mask */
 #define DEV_TTI         001                             /* teletype */
 #define DEV_PTR         004                             /* paper tape rdr */
+#define DEV_CR          006                             /* card punch */
 #define DEV_MT          010                             /* magtape */
 #define DEV_RAD         026                             /* fixed head disk */
 #define DEV_DSK         026                             /* moving head disk */
 #define DEV_TTO         041                             /* teletype */
 #define DEV_PTP         044                             /* paper tape punch */
+#define DEV_CP          046                             /* card punch */
 #define DEV_LPT         060                             /* line printer */
 #define DEV_MTS         020                             /* MT scan/erase */
 #define DEV_OUT         040                             /* output flag */
@@ -375,6 +378,8 @@ typedef struct sdsdib DIB;
 #define XFR_V_RAD       6                               /* fixed hd disk */
 #define XFR_V_DSK       7                               /* mving hd disk */
 #define XFR_V_MT0       8                               /* magtape */
+#define XFR_V_CR        9                               /* card reader  */
+#define XFR_V_CP        10                              /* card punch   */
 
 #define XFR_TTI         (1 << XFR_V_TTI)
 #define XFR_TTO         (1 << XFR_V_TTO)
@@ -384,6 +389,8 @@ typedef struct sdsdib DIB;
 #define XFR_RAD         (1 << XFR_V_RAD)
 #define XFR_DSK         (1 << XFR_V_DSK)
 #define XFR_MT0         (1 << XFR_V_MT0)
+#define XFR_CR          (1 << XFR_V_CR)
+#define XFR_CP          (1 << XFR_V_CP)
 
 /* PIN/POT ordinals (0 is reserved) */
 

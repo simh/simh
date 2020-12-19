@@ -1,6 +1,6 @@
 /* sds_io.c: SDS 940 I/O simulator
 
-   Copyright (c) 2001-2012, Robert M. Supnik
+   Copyright (c) 2001-2020, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   01-Nov-2020  RMS     Fixed overrun/underrun handling in single-word IO
+   23-Oct-2020  RMS     TOP disconnects the channel rather than setting CHF_EOR
    19-Mar-2012  RMS     Fixed various declarations (Mark Pizzolato)
 */
 
@@ -389,7 +391,7 @@ switch (mod) {
                 if (ch_dev & DEV_OUT) {                 /* to output dev? */
                     if (chan_cnt[ch] || (chan_flag[ch] & CHF_ILCE)) /* busy, DMA? */
                         chan_flag[ch] = chan_flag[ch] | CHF_TOP;    /* TOP pending */
-                    else return dev_wreor (ch, ch_dev); /* idle, write EOR */
+                    else return dev_disc (ch, ch_dev);  /* idle, disconnect */
                     }                                   /* end else TOP */
                 else if (ch_dev & DEV_MT) {             /* change to scan? */
                     chan_uar[ch] = chan_uar[ch] | DEV_MTS;    /* change dev addr */
@@ -577,7 +579,7 @@ return SCPE_OK;
                         IORD, IORP, IOSP: ZWC interrupt
                         IOSD: ZWC interrupt, EOR interrupt, disconnect
 
-   Note that the channel can be disconnected if CHN_EOR is set, but must
+   Note that the channel can be disconnected if CHF_EOR is set, but must
    not be if XFR_REQ is set */
 
 t_stat chan_read (int32 ch)
@@ -587,20 +589,23 @@ uint32 dev = chan_uar[ch] & DEV_MASK;
 uint32 tfnc = CHM_GETFNC (chan_mode[ch]);
 t_stat r = SCPE_OK;
 
-if (dev && TST_XFR (dev, ch)) {                         /* ready to xfr? */
-    if (INV_DEV (dev, ch)) CRETIOP;                     /* can't read? */
+if ((dev != 0) && TST_XFR (dev, ch)) {                  /* ready to xfr? */
+    if (INV_DEV (dev, ch))                              /* can't read? */
+        CRETIOP;
     r = dev_dsp[dev][ch] (IO_READ, dev, &dat);          /* read data */
-    if (r)                                              /* error? */
+    if ((r != 0) || (chan_cnt[ch] > chan_cpw[ch]))      /* error or overrun? */
         chan_flag[ch] = chan_flag[ch] | CHF_ERR;
-    if (chan_flag[ch] & CHF_24B)                        /* 24B? */
-        chan_war[ch] = dat;
-    else if (chan_flag[ch] & CHF_12B)                   /* 12B? */
-        chan_war[ch] = ((chan_war[ch] << 12) | (dat & 07777)) & DMASK;
-    else chan_war[ch] = ((chan_war[ch] << 6) | (dat & 077)) & DMASK;
+    else {                                              /* no, precess data */
+        if (chan_flag[ch] & CHF_24B)                    /* 24B? */
+            chan_war[ch] = dat;
+        else if (chan_flag[ch] & CHF_12B)               /* 12B? */
+            chan_war[ch] = ((chan_war[ch] << 12) | (dat & 07777)) & DMASK;
+        else chan_war[ch] = ((chan_war[ch] << 6) | (dat & 077)) & DMASK;
+        }
     if (chan_flag[ch] & CHF_SCAN)                       /* scanning? */
         chan_cnt[ch] = chan_cpw[ch];                    /* never full */
     else chan_cnt[ch] = chan_cnt[ch] + 1;               /* insert char */
-    if (chan_cnt[ch] > chan_cpw[ch]) {                  /* full? */
+    if (chan_cnt[ch] > chan_cpw[ch]) {                  /* full now? */
         if (chan_flag[ch] & CHF_ILCE) {                 /* interlace on? */
             chan_write_mem (ch);                        /* write to mem */
             if (chan_wcr[ch] == 0) {                    /* wc zero? */
@@ -697,26 +702,26 @@ if (dev && TST_XFR (dev, ch)) {                         /* ready to xfr? */
             chan_cnt[ch] = chan_cpw[ch] + 1;            /* set cnt */
             }
         else {                                          /* ilce off */
-            CLR_XFR (dev, ch);                          /* cant xfr */
-            if (TST_EOR (dev))                          /* EOR? */
+             if (TST_EOR (dev))                         /* EOR? */
                 return chan_eor (ch);
             chan_flag[ch] = chan_flag[ch] | CHF_ERR;    /* rate err */
-            return SCPE_OK;
             }                                           /* end else ilce */
         }                                               /* end if cnt */
-    chan_cnt[ch] = chan_cnt[ch] - 1;                    /* decr cnt */
-    if (chan_flag[ch] & CHF_24B)                        /* 24B? */
-        dat = chan_war[ch];
-    else if (chan_flag[ch] & CHF_12B) {                 /* 12B? */
-        dat = (chan_war[ch] >> 12) & 07777;             /* get halfword */
-        chan_war[ch] = (chan_war[ch] << 12) & DMASK;    /* remove from war */
-        }
-    else {                                              /* 6B */
-        dat = (chan_war[ch] >> 18) & 077;               /* get char */
-        chan_war[ch] = (chan_war[ch] << 6) & DMASK;     /* remove from war */
-        }
+    if (chan_cnt[ch] != 0) {                            /* if not underrun */
+        chan_cnt[ch] = chan_cnt[ch] - 1;                /* decr cnt */
+        if (chan_flag[ch] & CHF_24B)                    /* 24B? */
+            dat = chan_war[ch];
+        else if (chan_flag[ch] & CHF_12B) {             /* 12B? */
+            dat = (chan_war[ch] >> 12) & 07777;         /* get halfword */
+            chan_war[ch] = (chan_war[ch] << 12) & DMASK;/* remove from war */
+            }
+        else {                                          /* 6B */
+            dat = (chan_war[ch] >> 18) & 077;           /* get char */
+            chan_war[ch] = (chan_war[ch] << 6) & DMASK; /* remove from war */
+            }
+        }                                               /* end no underrun */
     r = dev_dsp[dev][ch] (IO_WRITE, dev, &dat);         /* write */
-    if (r)                                              /* error? */
+    if (r != 0)                                         /* error? */
         chan_flag[ch] = chan_flag[ch] | CHF_ERR;
     if (chan_cnt[ch] == 0) {                            /* buf empty? */
         if (chan_flag[ch] & CHF_ILCE) {                 /* ilce on? */
@@ -737,14 +742,14 @@ if (dev && TST_XFR (dev, ch)) {                         /* ready to xfr? */
                         }                               /* end if SD */
                     else if (!(tfnc && CHM_SGNL) ||     /* IORx or IOSP TOP? */
                         (chan_flag[ch] & CHF_TOP))
-                        dev_wreor (ch, dev);            /* R: write EOR */
+                        dev_disc (ch, dev);             /* R: disconnect */
                     chan_flag[ch] = chan_flag[ch] & ~CHF_TOP;
                     }                                   /* end else comp */
                 }                                       /* end if wcr */
             }                                           /* end if ilce */
         else if (chan_flag[ch] & CHF_TOP) {             /* off, TOP pending? */
             chan_flag[ch] = chan_flag[ch] & ~CHF_TOP;   /* clear TOP */
-            dev_wreor (ch, dev);                        /* write EOR */
+            dev_disc (ch, dev);                         /* disconnect */
             }
         else if (ion)                                   /* no TOP, EOW intr */
             int_req = int_req | int_zc[ch];

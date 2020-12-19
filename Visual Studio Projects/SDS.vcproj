@@ -41,7 +41,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="../SDS/;./;../;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include;../../windows-build/include;;../../windows-build/include/SDL2"
-				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;SIM_BUILD_TOOL=simh-Visual-Studio-Project;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;HAVE_PCRE_H;PCRE_STATIC"
+				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;SIM_BUILD_TOOL=simh-Visual-Studio-Project;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;HAVE_PCRE_H;PCRE_STATIC;USE_SIM_CARD"
 				KeepComments="false"
 				BasicRuntimeChecks="0"
 				RuntimeLibrary="1"
@@ -125,7 +125,7 @@
 				OmitFramePointers="true"
 				WholeProgramOptimization="true"
 				AdditionalIncludeDirectories="../SDS/;./;../;../slirp;../slirp_glue;../slirp_glue/qemu;../slirp_glue/qemu/win32/include;../../windows-build/include;;../../windows-build/include/SDL2"
-				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;SIM_BUILD_TOOL=simh-Visual-Studio-Project;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;HAVE_PCRE_H;PCRE_STATIC"
+				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;SIM_BUILD_TOOL=simh-Visual-Studio-Project;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_WINSOCK_DEPRECATED_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;HAVE_PCRE_H;PCRE_STATIC;USE_SIM_CARD"
 				StringPooling="true"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"
@@ -196,7 +196,15 @@
 				>
 			</File>
 			<File
+				RelativePath="..\SDS\sds_cp.c"
+				>
+			</File>
+			<File
 				RelativePath="..\SDS\sds_cpu.c"
+				>
+			</File>
+			<File
+				RelativePath="..\SDS\sds_cr.c"
 				>
 			</File>
 			<File
@@ -233,6 +241,10 @@
 			</File>
 			<File
 				RelativePath="..\SDS\sds_sys.c"
+				>
+			</File>
+			<File
+				RelativePath="..\sim_card.c"
 				>
 			</File>
 			<File
@@ -286,6 +298,10 @@
 			</File>
 			<File
 				RelativePath="..\SDS\sds_defs.h"
+				>
+			</File>
+			<File
+				RelativePath="..\sim_card.h"
 				>
 			</File>
 			<File

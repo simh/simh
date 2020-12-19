@@ -244,7 +244,7 @@ if (uptr->flags & UNIT_ATT) {                           /* attached? */
     uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* I/O error? */
         lpt_end_op (CHF_EOR | CHF_ERR);                 /* set err, disc */
-        sim_perror ("LPT I/O error");                       /* print msg */
+        sim_perror ("LPT I/O error");                   /* print msg */
         clearerr (uptr->fileref);
         return SCPE_IOERR;                              /* ret error */
         }
