@@ -106,7 +106,6 @@ int32 drm_ftime = 3;                                    /* time to fetch */
 int32 drm_xtime = 1;                                    /* time to xfr */
 int32 drm_stopioe = 1;                                  /* stop on error */
 
-DEVICE drm_dev;
 t_stat drm (uint32 fnc, uint32 inst, uint32 *dat);
 t_stat drm_svc (UNIT *uptr);
 t_stat drm_reset (DEVICE *dptr);
@@ -238,7 +237,7 @@ if (drm_sta != DRM_SXFR) {                              /* fetch drum prog? */
         case DRM_EIE:                                   /* end, int if err */
             if (!drm_err)
                 return SCPE_OK;
-                                                        /* fall through */
+            /* fall through */
         case DRM_EIU:                                   /* end, int uncond */
             int_req = int_req | INT_DRM;
             return SCPE_OK;

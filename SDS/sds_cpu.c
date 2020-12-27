@@ -200,10 +200,11 @@ int32 rtc_tps = 60;                                     /* rtc ticks/sec */
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_type (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs);
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat Ea (uint32 wd, uint32 *va);
 t_stat EaSh (uint32 wd, uint32 *va);
 t_stat Read (uint32 va, uint32 *dat);
@@ -222,8 +223,8 @@ void inst_hist (uint32 inst, uint32 pc, uint32 typ);
 t_stat rtc_inst (uint32 inst);
 t_stat rtc_svc (UNIT *uptr);
 t_stat rtc_reset (DEVICE *dptr);
-t_stat rtc_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat rtc_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat rtc_set_freq (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat rtc_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 
 extern t_bool io_init (void);
 extern t_stat op_wyim (uint32 inst, uint32 *dat);
@@ -440,8 +441,8 @@ while (reason == 0) {                                   /* loop until halted */
             if (btyp) {
                 if (btyp & SWMASK ('E'))                /* unqualified breakpoint? */
                     reason = STOP_IBKPT;                /* stop simulation */
- //               else if (btyp & BRK_TYP_DYN_STEPOVER)   /* stepover breakpoint? */
- //                   reason = STOP_DBKPT;                /* stop simulation */
+                else if (btyp & BRK_TYP_DYN_STEPOVER)   /* stepover breakpoint? */
+                    reason = STOP_DBKPT;                /* stop simulation */
                 else switch (btyp) {                    /* qualified breakpoint */
                     case SWMASK ('M'):                  /* monitor mode */
                         reason = STOP_MBKPT;            /* stop simulation */
@@ -453,6 +454,7 @@ while (reason == 0) {                                   /* loop until halted */
                         reason = STOP_UBKPT;            /* stop simulation */
                         break;
                     }
+                sim_interval++;                         /* don't count non-executed instruction */
                 break;
                 }
             }
@@ -1531,7 +1533,124 @@ if (pcq_r)
 else return SCPE_IERR;
 sim_brk_dflt = SWMASK ('E');
 sim_brk_types = SWMASK ('E') | SWMASK ('M') | SWMASK ('N') | SWMASK ('U');
+sim_vm_is_subroutine_call = cpu_is_pc_a_subroutine_call;
 return SCPE_OK;
+}
+
+/* For Next command, determine if should use breakpoints
+   to step over a subroutine branch or POP or SYSPOP.  Return
+   TRUE if so with a list of addresses where dynamic (temporary)
+   breakpoints should be set.
+*/
+typedef enum Next_Case {      /*    Next            Next Atomic         Next Forward */
+    Next_BadOp  = 0,          /*    FALSE           FALSE               FALSE        */
+    Next_Branch,              /*    FALSE           EA                  FALSE        */
+    Next_BRM,                 /*    P+1,P+2,P+3     EA+1,P+1,P+2,P+3    P+1,P+2,P+3  */
+    Next_BRX,                 /*    FALSE           EA,P+1              P+1          */
+    Next_Simple,              /*    FALSE           P+1                 P+1          */
+    Next_POP,                 /*    P+1,P+2         100+OP,P+1,P+2      P+1,P+2      */
+    Next_Skip,                /*    P+1,P+2         P+1,P+2             P+1,P+2      */
+    Next_EXU                  /*      ??              ??                  ??         */
+} Next_Case;
+
+Next_Case Op_Cases[64] = {
+ Next_BadOp,    Next_Branch,    Next_Simple,    Next_BadOp,     /*  HLT BRU EOM ...  */
+ Next_BadOp,    Next_BadOp,     Next_Simple,    Next_BadOp,     /*  ... ... EOD ...  */
+ Next_Simple,   Next_Branch,    Next_Simple,    Next_Simple,    /*  MIY BRI MIW POT  */
+ Next_Simple,   Next_BadOp,     Next_Simple,    Next_Simple,    /*  ETR ... MRG EOR  */
+ Next_Simple,   Next_BadOp,     Next_Simple,    Next_EXU,       /*  NOP ... ROV EXU  */
+ Next_BadOp,    Next_BadOp,     Next_BadOp,     Next_BadOp,     /*  ... ... ... ...  */
+ Next_Simple,   Next_BadOp,     Next_Simple,    Next_Simple,    /*  YIM ... WIM PIN  */
+ Next_BadOp,    Next_Simple,    Next_Simple,    Next_Simple,    /*  ... STA STB STX  */
+ Next_Skip,     Next_BRX,       Next_BadOp,     Next_BRM,       /*  SKS BRX ... BRM  */
+ Next_BadOp,    Next_BadOp,     Next_Simple,    Next_BadOp,     /*  ... ... RCH ...  */
+ Next_Skip,     Next_Branch,    Next_Skip,      Next_Skip,      /*  SKE BRR SKB SKN  */
+ Next_Simple,   Next_Simple,    Next_Simple,    Next_Simple,    /*  SUB ADD SUC ADC  */
+ Next_Skip,     Next_Simple,    Next_Simple,    Next_Simple,    /*  SKR MIN XMA ADM  */
+ Next_Simple,   Next_Simple,    Next_Simple,    Next_Simple,    /*  MUL DIV RSH LSH  */
+ Next_Skip,     Next_Simple,    Next_Skip,      Next_Skip,      /*  SKM LDX SKA SKG  */
+ Next_Skip,     Next_Simple,    Next_Simple,    Next_Simple };  /*  SKD LDB LDA EAX  */
+
+t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs)
+{
+static t_addr returns[10];
+uint32 inst;
+Next_Case op_case;
+int32 atomic, forward;
+t_addr *return_p;
+uint32 va;
+int32 exu_cnt = 0;
+
+*ret_addrs = return_p = returns;
+atomic = sim_switches & SWMASK('A');
+forward = sim_switches & SWMASK('F');
+
+if (Read (P, &inst) != SCPE_OK)         /* get instruction */
+    return FALSE;
+
+Exu_Loop:
+if (I_POP & inst) {                     /* determine inst case */
+    if ((inst & ((I_M_OP << I_V_OP) | I_USR)) == 047000000)
+        op_case = Next_BRM;             /* Treat SBRM like BRM */
+    else
+        op_case = Next_POP;
+    }
+else
+    op_case = Op_Cases[I_GETOP(inst)];
+
+switch (op_case) {
+    case Next_BadOp:
+        break;
+    case Next_BRM:  
+        *return_p++ = (P + 1) & VA_MASK;
+        *return_p++ = (P + 2) & VA_MASK;
+        *return_p++ = (P + 3) & VA_MASK;
+        if (atomic) {
+            if (Ea (inst, &va) != SCPE_OK)
+                return FALSE;
+            *return_p++ = (va + 1) & VA_MASK;
+        }
+        break;
+    case Next_Branch:
+        if (atomic) {
+            if (Ea (inst, &va) != SCPE_OK)
+                return FALSE;
+            *return_p++ = va & VA_MASK;
+        }
+        break;
+    case Next_BRX:
+        if (atomic) {
+            if (Ea (inst, &va) != SCPE_OK)
+                return FALSE;
+            *return_p++ = va & VA_MASK;
+        }
+        /* -- fall through to Next_Simple case -- */
+    case Next_Simple:
+        if (atomic || forward)
+            *return_p++ = (P + 1) & VA_MASK;
+        break;
+    case Next_POP:  
+        if (atomic)
+            *return_p++ = 0100 + I_GETOP(inst);
+        /* -- fall through to Next_Skip case -- */
+    case Next_Skip: 
+        *return_p++ = (P + 1) & VA_MASK;
+        *return_p++ = (P + 2) & VA_MASK;
+        break;
+    case Next_EXU:                          /* execute inst at EA */
+        if (++exu_cnt > exu_lim)            /* too many? */
+            return FALSE;
+        if (Ea (inst, &va) != SCPE_OK)      /* decode eff addr */
+            return FALSE;
+        if (Read (va, &inst) != SCPE_OK)    /* get operand */
+            return FALSE;
+        goto Exu_Loop;
+    }
+if (return_p == returns)            /* if no cases added, */
+    return FALSE;                   /*  return FALSE      */
+else
+    *return_p = (t_addr)0;          /* else append terminator */
+return TRUE;                        /*  and return TRUE       */
 }
 
 /* Memory examine */
@@ -1567,7 +1686,7 @@ return SCPE_OK;
 
 /* Set memory size */
 
-t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_size (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 mc = 0;
 uint32 i;
@@ -1586,7 +1705,7 @@ return SCPE_OK;
 
 /* Set system type (1 = Genie, 0 = standard) */
 
-t_stat cpu_set_type (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 extern t_stat drm_reset (DEVICE *dptr);
 extern DEVICE drm_dev, mux_dev, muxl_dev;
@@ -1664,7 +1783,7 @@ return SCPE_OK;
 
 /* Set frequency */
 
-t_stat rtc_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat rtc_set_freq (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 if (cptr)
     return SCPE_ARG;
@@ -1676,7 +1795,7 @@ return SCPE_OK;
 
 /* Show frequency */
 
-t_stat rtc_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat rtc_show_freq (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, (rtc_tps == 50)? "50Hz": "60Hz");
 return SCPE_OK;
@@ -1703,7 +1822,7 @@ return;
 
 /* Set history */
 
-t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 int32 i, lnt;
 t_stat r;
@@ -1742,15 +1861,14 @@ return SCPE_OK;
 
 /* Show history */
 
-t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 int32 ov, k, di, lnt;
-char *cptr = (char *) desc;
+CONST char *cptr = (CONST char *) desc;
 t_stat r;
-extern t_value *sim_eval;
 InstHistory *h;
-static char *cyc[] = { "   ", "   ", "INT", "TRP" };
-static char *modes = "NMU?";
+static const char *cyc[] = { "   ", "   ", "INT", "TRP" };
+static const char *modes = "NMU?";
 
 if (hst_lnt == 0)                                       /* enabled? */
     return SCPE_NOFNC;

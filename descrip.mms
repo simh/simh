@@ -33,7 +33,6 @@
 #            PDP10           Just Build The DEC PDP-10.
 #            PDP11           Just Build The DEC PDP-11.
 #            PDP15           Just Build The DEC PDP-15.
-#            S3              Just Build The IBM System 3.
 #            SDS             Just Build The SDS 940.
 #            VAX             Just Build The DEC VAX.
 #            VAX780          Just Build The DEC VAX780.
@@ -471,15 +470,6 @@ PDP10_OPTIONS = /INCL=($(SIMH_DIR),$(PDP10_DIR),$(PDP11_DIR))\
                 /DEF=($(CC_DEFS),"USE_INT64=1","VM_PDP10=1"$(PCAP_DEFS))
 
 #
-# IBM System 3 Simulator Definitions.
-#
-S3_DIR = SYS$DISK:[.S3]
-S3_LIB = $(LIB_DIR)S3-$(ARCH).OLB
-S3_SOURCE = $(S3_DIR)S3_CD.C,$(S3_DIR)S3_CPU.C,$(S3_DIR)S3_DISK.C,\
-            $(S3_DIR)S3_LP.C,$(S3_DIR)S3_PKB.C,$(S3_DIR)S3_SYS.C
-S3_OPTIONS = /INCL=($(SIMH_DIR),$(S3_DIR))/DEF=($(CC_DEFS))
-
-#
 # SDS 940
 #
 SDS_DIR = SYS$DISK:[.SDS]
@@ -565,7 +555,7 @@ I7094_OPTIONS = /INCL=($(SIMH_DIR),$(I7094_DIR))/DEF=($(CC_DEFS))
 #
 .IFDEF ALPHA_OR_IA64
 ALL : ALTAIR ECLIPSE GRI LGP H316 I1401 I1620 ID16 \
-      ID32 NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP10 PDP11 PDP15 S3 \
+      ID32 NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP10 PDP11 PDP15 \
       VAX VAX780 SDS I7094
         $! No further actions necessary
 .ELSE
@@ -573,7 +563,7 @@ ALL : ALTAIR ECLIPSE GRI LGP H316 I1401 I1620 ID16 \
 # Else We Are On VAX And Build Everything EXCEPT the 64b simulators
 #
 ALL : ALTAIR GRI H316 I1401 I1620 ID16 ID32 \
-      NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP11 PDP15 S3 VAX VAX780 \
+      NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP11 PDP15 VAX VAX780 \
       SDS
         $! No further actions necessary
 .ENDIF
@@ -869,17 +859,6 @@ $(PDP15_LIB) : $(PDP18B_SOURCE)
         $! Building The $(PDP15_LIB) Library.
         $!
         $ $(CC)$(PDP15_OPTIONS) -
-               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-             LIBRARY/CREATE $(MMS$TARGET)
-        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
-
-$(S3_LIB) : $(S3_SOURCE)
-        $!
-        $! Building The $(S3_LIB) Library.
-        $!
-        $ $(CC)$(S3_OPTIONS) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
         $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
              LIBRARY/CREATE $(MMS$TARGET)
@@ -1233,18 +1212,6 @@ $(BIN_DIR)PDP15-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(PDP15_LIB)
         $ $(CC)$(PDP15_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
         $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)PDP15-$(ARCH).EXE -
                $(BLD_DIR)SCP.OBJ,$(PDP15_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
-        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
-
-S3 : $(BIN_DIR)S3-$(ARCH).EXE
-        $! S3 done
-
-$(BIN_DIR)S3-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(S3_LIB)
-        $!
-        $! Building The $(BIN_DIR)S3-$(ARCH).EXE Simulator.
-        $!
-        $ $(CC)$(S3_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)S3-$(ARCH).EXE -
-               $(BLD_DIR)SCP.OBJ,$(S3_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 SDS : $(BIN_DIR)SDS-$(ARCH).EXE

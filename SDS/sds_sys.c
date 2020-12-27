@@ -1,6 +1,6 @@
 /* sds_sys.c: SDS 940 simulator interface
 
-   Copyright (c) 2001-2016, Robert M Supnik
+   Copyright (c) 2001-2020, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   01-Nov-20    RMS     Fixed sds930-to-ascii entry 060 (Ken Rector)
    05-May-16    RMS     Fixed ascii-to-sds940 data (Mark Pizzolato)
    19-Mar-12    RMS     Fixed declarations of CCT arrays (Mark Pizzolato)
 */
@@ -35,6 +36,8 @@ extern DEVICE cpu_dev;
 extern DEVICE chan_dev;
 extern DEVICE ptr_dev;
 extern DEVICE ptp_dev;
+extern DEVICE cr_dev;
+extern DEVICE cp_dev;
 extern DEVICE tti_dev;
 extern DEVICE tto_dev;
 extern DEVICE lpt_dev;
@@ -73,6 +76,8 @@ DEVICE *sim_devices[] = {
     &tti_dev,
     &tto_dev,
     &lpt_dev,
+    &cr_dev,
+    &cp_dev,
     &rtc_dev,
     &drm_dev,
     &rad_dev,
@@ -83,7 +88,7 @@ DEVICE *sim_devices[] = {
     NULL
     };
 
-const char *sim_stop_messages[] = {
+const char *sim_stop_messages[SCPE_BASE] = {
     "Unknown error",
     "IO device not ready",
     "HALT instruction",
@@ -114,7 +119,7 @@ const int8 sds930_to_ascii[64] = {
     'H', 'I', '?', '.', ')', '[', '<', '@',             /* 37 = stop code */
     '-', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
     'Q', 'R', '!', '$', '*', ']', ';', '^',             /* 57 = triangle */
-    '_', '/', 'S', 'T', 'U', 'V', 'W', 'X',
+    ' ', '/', 'S', 'T', 'U', 'V', 'W', 'X',
     'Y', 'Z', '?', ',', '(', '~', '\\', '#'             /* 72 = rec mark */
      };                                                 /* 75 = squiggle, 77 = del */
 
@@ -196,7 +201,8 @@ int32 col, rpt, ptr, mask, cctbuf[CCT_LNT];
 t_stat r;
 extern int32 lpt_ccl, lpt_ccp;
 extern uint8 lpt_cct[CCT_LNT];
-char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE];
+CONST char *cptr;
+char cbuf[CBUFSIZE], gbuf[CBUFSIZE];
 
 ptr = 0;
 for ( ; (cptr = fgets (cbuf, CBUFSIZE, fileref)) != NULL; ) { /* until eof */
@@ -251,7 +257,7 @@ for (i = wd = 0; i < 4; ) {
 return wd;
 }
 
-t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 int32 i, wd, buf[8];
 int32 ldr = 1;
@@ -491,7 +497,8 @@ return;
 }
 
 /* Convert from SDS internal character code to ASCII depending upon cpu mode. */
-int8 sds_to_ascii(int8 ch)
+
+int8 sds_to_ascii (int8 ch)
 {
   ch &= 077;
   if (cpu_mode == NML_MODE)
@@ -501,7 +508,8 @@ int8 sds_to_ascii(int8 ch)
 }
 
 /* Convert from ASCII to SDS internal character code depending upon cpu mode. */
-int8 ascii_to_sds(int8 ch)
+
+int8 ascii_to_sds (int8 ch)
 {
   ch &= 0177;
   if (cpu_mode == NML_MODE)
@@ -632,9 +640,10 @@ return SCPE_ARG;
         cptr  = updated pointer to input string
 */
 
-char *get_tag (char *cptr, t_value *tag)
+CONST char *get_tag (CONST char *cptr, t_value *tag)
 {
-char *tptr, gbuf[CBUFSIZE];
+CONST char *tptr;
+char gbuf[CBUFSIZE];
 t_stat r;
 
 tptr = get_glyph (cptr, gbuf, 0);                       /* get next field */
@@ -657,20 +666,17 @@ return cptr;                                            /* no change */
         status  =       error status
 */
 
-t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
+t_stat parse_sym (CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 i, j, k, ch;
 t_value d, tag;
 t_stat r;
-char gbuf[CBUFSIZE];
+char gbuf[CBUFSIZE], cbuf[2*CBUFSIZE];
 
 while (isspace (*cptr)) cptr++;
-for (i = 1; (i < 4) && (cptr[i] != 0); i++) {
-    if (cptr[i] == 0) {
-        for (j = i + 1; j <= 4; j++)
-            cptr[j] = 0;
-        }
-    }
+memset (cbuf, '\0', sizeof(cbuf));
+strncpy (cbuf, cptr, sizeof(cbuf)-5);
+cptr = cbuf;
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
     if (cptr[0] == 0)                                   /* must have 1 char */
         return SCPE_ARG;

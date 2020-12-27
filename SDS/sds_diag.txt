@@ -111,3 +111,6 @@ Bugs
 36. CPU: EOD 20000 used by diagnostic (EM change is NOP)
 37. CPU: SKD sets all 24b of X, not just exponent
 38. CPU: reset should not clear A, B, X
+39. LPT: carriage control position lost on spacing operation
+40. IO: TOP disconnects the channel rather than setting CHF_EOR
+41. TTY: TTO was outputing spurious extra character, even if no leader set

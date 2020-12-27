@@ -34,13 +34,16 @@
 				Name="VCXMLDataGeneratorTool"
 			/>
 			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
 				Name="VCMIDLTool"
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="./;../;../SDS/"
-				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS"
+				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;USE_SIM_CARD"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -110,6 +113,9 @@
 				Name="VCXMLDataGeneratorTool"
 			/>
 			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
 				Name="VCMIDLTool"
 			/>
 			<Tool
@@ -118,7 +124,7 @@
 				InlineFunctionExpansion="1"
 				OmitFramePointers="true"
 				AdditionalIncludeDirectories="./;../;../SDS/"
-				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS"
+				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;USE_SIM_CARD"
 				StringPooling="true"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"
@@ -184,7 +190,15 @@
 				>
 			</File>
 			<File
+				RelativePath="..\SDS\sds_cp.c"
+				>
+			</File>
+			<File
 				RelativePath="..\SDS\sds_cpu.c"
+				>
+			</File>
+			<File
+				RelativePath="..\SDS\sds_cr.c"
 				>
 			</File>
 			<File
@@ -221,6 +235,10 @@
 			</File>
 			<File
 				RelativePath="..\SDS\sds_sys.c"
+				>
+			</File>
+			<File
+				RelativePath="..\sim_card.c"
 				>
 			</File>
 			<File
@@ -262,6 +280,10 @@
 			</File>
 			<File
 				RelativePath="..\SDS\sds_defs.h"
+				>
+			</File>
+			<File
+				RelativePath="..\sim_card.h"
 				>
 			</File>
 			<File

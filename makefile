@@ -570,7 +570,7 @@ LDFLAGS = $(OS_LDFLAGS) $(NETWORK_LDFLAGS) $(LDFLAGS_O)
 #
 BIN = BIN/
 SIM = scp.c sim_console.c sim_fio.c sim_timer.c sim_sock.c \
-	sim_tmxr.c sim_ether.c sim_tape.c sim_shmem.c
+	sim_tmxr.c sim_ether.c sim_tape.c sim_shmem.c sim_card.c
 
 
 #
@@ -730,12 +730,6 @@ ID32 = ${ID32D}/id32_cpu.c ${ID32D}/id32_sys.c ${ID32D}/id_dp.c \
 ID32_OPT = -I ${ID32D}
 
 
-S3D = S3
-S3 = ${S3D}/s3_cd.c ${S3D}/s3_cpu.c ${S3D}/s3_disk.c ${S3D}/s3_lp.c \
-	${S3D}/s3_pkb.c ${S3D}/s3_sys.c
-S3_OPT = -I ${S3D}
-
-
 ALTAIRD = ALTAIR
 ALTAIR = ${ALTAIRD}/altair_sio.c ${ALTAIRD}/altair_cpu.c ${ALTAIRD}/altair_dsk.c \
 	${ALTAIRD}/altair_sys.c
@@ -755,8 +749,8 @@ LGP_OPT = -I ${LGPD}
 SDSD = SDS
 SDS = ${SDSD}/sds_cpu.c ${SDSD}/sds_drm.c ${SDSD}/sds_dsk.c ${SDSD}/sds_io.c \
 	${SDSD}/sds_lp.c ${SDSD}/sds_mt.c ${SDSD}/sds_mux.c ${SDSD}/sds_rad.c \
-	${SDSD}/sds_stddev.c ${SDSD}/sds_sys.c
-SDS_OPT = -I ${SDSD}
+	${SDSD}/sds_stddev.c ${SDSD}/sds_sys.c ${SDSD}/sds_cp.c ${SDSD}/sds_cr.c
+SDS_OPT = -I ${SDSD} -DUSE_SIM_CARD
 
 SIGMAD = sigma
 SIGMA = ${SIGMAD}/sigma_cpu.c ${SIGMAD}/sigma_sys.c ${SIGMAD}/sigma_cis.c \
@@ -782,7 +776,7 @@ ALPHA_OPT = -I ${ALPHAD} -DUSE_ADDR64 -DUSE_INT64
 # Build everything
 #
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
-	vax vax780 nova eclipse i1401 i1620 s3 \
+	vax vax780 nova eclipse i1401 i1620 \
 	altair gri i7094 id16 uc15 \
 	id32 sds lgp h316 sigma
 
@@ -900,12 +894,6 @@ i7094 : ${BIN}i7094${EXE}
 ${BIN}i7094${EXE} : ${I7094} ${SIM}
 	${MKDIRBIN}
 	${CC} ${I7094} ${SIM} ${I7094_OPT} $(CC_OUTSPEC) ${LDFLAGS}
-
-s3 : ${BIN}s3${EXE}
-
-${BIN}s3${EXE} : ${S3} ${SIM}
-	${MKDIRBIN}
-	${CC} ${S3} ${SIM} ${S3_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
 altair : ${BIN}altair${EXE}
 
