@@ -45,6 +45,12 @@ patch   date            module(s) and fix(es)
                         scp.c
                         - changed sim_vm_init to build time option (Dave Bryan)
                         - flush stdout after prompt (Mark Pizzolato)
+                        - flush terminal line logs at return from simulation (Dave Bryan)
+                        - close terminal line logs at exit from simulator (Dave Bryan)
+                        - fixed RUN problem if CPU reset clears PC (Mark Pizzolato)
+
+                        sim_tmxr.h, sim_tmxr.c
+                        - added capability to flush/close log files (Dave Bryan)
 
                         nova_cpu.c
                         - fixed bug in history handling of C bit (Samuel Deutsch)
@@ -63,6 +69,23 @@ patch   date            module(s) and fix(es)
 
                         s3_sys.c
                         - fixed bldaddr length (Mark Pizzolatto)
+
+                        sds_defs.h
+                        - Added card reader and punch (Ken Rector)
+
+                        sds_cr.c, sds_cp.c
+                        - New devices (Ken Rector)
+
+                        sds_io.c
+                        - TOP disconnects the channel rather than setting CHF_EOR
+                        - Fixed overrun/underrun handling in single-word IO
+
+                        sds_stddev.c
+                        - TTO recognizes no leader flag (Ken Rector)
+
+                        sds_sys.c
+                        - Fixed handling of SDS character value 060 (Ken Rector)
+                        - Addec card reader and punch (Ken Rector)
 
                         vax_cpu.c
                         - added idle test for VMS 5.0/5.1 (Mark Pizzolato)

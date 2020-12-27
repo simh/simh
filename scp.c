@@ -23,6 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   30-Nov-20    RMS     Fixed RUN problem if CPU reset clears PC (Mark Pizzolato)
+   09-Nov-20    RMS     Added hack for sim_card multiple attach (Mark Pizzolato)
+   23-Oct-20    JDB     Added tmxr_post_logs calls to flush and close log files
    04-Jun-20    JDB     Call of "sim_vm_init" is now conditional on USE_VM_INIT
    28-May-20    RMS     Flush stdout after prompting (Mark Pizzolato)
    23-Mar-20    RMS     Added SET <dev|unit> APPEND command
@@ -61,7 +64,7 @@
                         Modified ex_reg and dep_reg to pass VM-specific register flags
    08-May-12    RMS     Fixed memory leaks in save/restore (Peter Schorn)
    20-Mar-12    MP      Fixes to "SHOW <x> SHOW" commands
-   06-Jan-12    JDB     Fixed "SHOW DEVICE" with only one enabled unit (Dave Bryan)  
+   06-Jan-12    JDB     Fixed "SHOW DEVICE" with only one enabled unit (Dave Bryan)
    13-Jan-11    MP      Added "SHOW SHOW" and "SHOW <dev> SHOW" commands
    05-Jan-11    RMS     Fixed bug in deposit stride for numeric input (John Dundas)
    23-Dec-10    RMS     Clarified some help messages (Mark Pizzolato)
@@ -223,6 +226,7 @@
 /* Macros and data structures */
 
 #include "sim_defs.h"
+#include "sim_tmxr.h"
 #include <signal.h>
 #include <ctype.h>
 
@@ -533,7 +537,7 @@ static CTAB cmd_table[] = {
     { "RUN", &run_cmd, RU_RUN,
       "ru{n} {new PC}           reset and start simulation\n" },
     { "GO", &run_cmd, RU_GO,
-      "go {new PC}              start simulation\n" }, 
+      "go {new PC}              start simulation\n" },
     { "STEP", &run_cmd, RU_STEP,
       "s{tep} {n}               simulate n instructions\n" },
     { "CONTINUE", &run_cmd, RU_CONT,
@@ -587,14 +591,14 @@ static CTAB cmd_table[] = {
       "sh{ow} br{eak} <list>    show breakpoints\n"
       "sh{ow} con{figuration}   show configuration\n"
       "sh{ow} cons{ole} {arg}   show console options\n"
-      "sh{ow} dev{ices}         show devices\n"  
-      "sh{ow} m{odifiers}       show modifiers for all devices\n" 
-      "sh{ow} s{how}            show SHOW commands for all devices\n" 
-      "sh{ow} n{ames}           show logical names\n" 
-      "sh{ow} q{ueue}           show event queue\n"  
+      "sh{ow} dev{ices}         show devices\n"
+      "sh{ow} m{odifiers}       show modifiers for all devices\n"
+      "sh{ow} s{how}            show SHOW commands for all devices\n"
+      "sh{ow} n{ames}           show logical names\n"
+      "sh{ow} q{ueue}           show event queue\n"
       "sh{ow} ti{me}            show simulated time\n"
-      "sh{ow} th{rottle}        show simulation rate\n" 
-      "sh{ow} ve{rsion}         show simulator version\n" 
+      "sh{ow} th{rottle}        show simulation rate\n"
+      "sh{ow} ve{rsion}         show simulator version\n"
       "sh{ow} <dev> RADIX       show device display radix\n"
       "sh{ow} <dev> DEBUG       show device debug flags\n"
       "sh{ow} <dev> MODIFIERS   show device modifiers\n"
@@ -723,7 +727,7 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
             return 0;
             }
         if (*cbuf)                                      /* concat args */
-            strcat (cbuf, " "); 
+            strcat (cbuf, " ");
         strcat (cbuf, argv[i]);
         lookswitch = FALSE;                             /* no more switches */
         }
@@ -811,7 +815,8 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         (*sim_vm_post) (TRUE);
     }                                                   /* end while */
 
-detach_all (0, TRUE);                                   /* close files */
+detach_all (0, TRUE);                                   /* close device files */
+tmxr_post_logs (TRUE);                                  /* close all mux log files */
 sim_set_deboff (0, NULL);                               /* close debug */
 sim_set_logoff (0, NULL);                               /* close log */
 sim_set_notelnet (0, NULL);                             /* close Telnet */
@@ -920,7 +925,7 @@ return SCPE_OK;
 
    Note that SCPE_STEP ("Step expired") is considered a note and not an error
    and so does not abort command execution when using -E.
-   
+
    Inputs:
         flag    =   caller and nesting level indicator
         fcptr   =   filename and optional arguments, space-separated
@@ -1088,10 +1093,10 @@ return;
 }
 
 /* ASSERT command.
-   
+
    The ASSERT command tests the value of a device register or memory location.
    The syntax is:
-   
+
      ASSERT {<dev>} <reg/addr>{<logical-op><value>}<conditional-op><value>
 
    If <dev> is not specified, CPU is assumed.  If a register is specified, the
@@ -1478,7 +1483,7 @@ while (*cptr != 0) {                                    /* do all mods */
         *cvptr++ = 0;
     for (mptr = dptr->modifiers; mptr && (mptr->mask != 0); mptr++) {
         if (((mptr->mask & MTAB_XTD)?                   /* right level? */
-            (mptr->mask & lvl): (MTAB_VUN & lvl)) && 
+            (mptr->mask & lvl): (MTAB_VUN & lvl)) &&
             ((mptr->disp && mptr->pstring &&            /* named disp? */
             (MATCH_CMD (gbuf, mptr->pstring) == 0)))) {
             if (cvptr && !(mptr->mask & MTAB_SHP))
@@ -1570,7 +1575,7 @@ if (uptr->flags & UNIT_ATT) {
     }
 else if (uptr->flags & UNIT_ATTABLE)
     fprintf (st, ", not attached");
-show_all_mods (st, dptr, uptr, MTAB_VUN);               /* show unit mods */ 
+show_all_mods (st, dptr, uptr, MTAB_VUN);               /* show unit mods */
 fprintf (st, "\n");
 return SCPE_OK;
 }
@@ -1749,7 +1754,7 @@ DEVICE *dptr;
 
 if (cptr && (*cptr != 0))                               /* now eol? */
     return SCPE_2MARG;
-for (i = 0; (dptr = sim_devices[i]) != NULL; i++) 
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++)
     show_dev_modifiers (st, dptr, NULL, flag, cptr);
 return SCPE_OK;
 }
@@ -1803,7 +1808,7 @@ if (dptr->modifiers == NULL)
     return SCPE_OK;
 for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
     if (mptr->pstring && ((mptr->mask & MTAB_XTD)?
-        ((mptr->mask & flag) && !(mptr->mask & MTAB_NMO)): 
+        ((mptr->mask & flag) && !(mptr->mask & MTAB_NMO)):
         ((MTAB_VUN & flag) && ((uptr->flags & mptr->mask) == mptr->match)))) {
         fputs (", ", st);
         show_one_mod (st, dptr, uptr, mptr, NULL, 0);
@@ -1841,7 +1846,7 @@ DEVICE *dptr;
 
 if (cptr && (*cptr != 0))                               /* now eol? */
     return SCPE_2MARG;
-for (i = 0; (dptr = sim_devices[i]) != NULL; i++) 
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++)
     show_dev_show_commands (st, dptr, NULL, flag, cptr);
 return SCPE_OK;
 }
@@ -1901,7 +1906,7 @@ t_stat r;
 t_addr lo, hi, max;
 int32 cnt;
 
-if (sim_brk_types == 0) 
+if (sim_brk_types == 0)
     return SCPE_NOFNC;
 if (dptr == NULL)                                       /* sanity checks */
     return SCPE_IERR;
@@ -1939,7 +1944,7 @@ while (*cptr) {
             sim_brk_showall (st, sim_switches);
         else return SCPE_ARG;
         }
-    else {      
+    else {
         for ( ; lo <= hi; lo = lo + 1) {
             r = ssh_break_one (st, flg, lo, cnt, aptr);
             if (r != SCPE_OK)
@@ -2571,7 +2576,7 @@ sim_ref_type = REF_NONE;                                /* use no references */
 READ_S (buf);                                           /* [V2.5+] read version */
 v35 = v32 = FALSE;
 if (strcmp (buf, save_vercur) == 0)                     /* version 3.5? */
-    v35 = v32 = TRUE;  
+    v35 = v32 = TRUE;
 else if (strcmp (buf, save_ver32) == 0)                 /* version 3.2? */
     v32 = TRUE;
 else if (strcmp (buf, save_ver30) != 0) {               /* version 3.0? */
@@ -2613,7 +2618,7 @@ for ( ;; ) {                                            /* device loop */
         }
     READ_S (buf);                                       /* [V3.0+] logical name */
     deassign_device (dptr);                             /* delete old name */
-    if ((buf[0] != 0) && 
+    if ((buf[0] != 0) &&
         ((r = assign_device (dptr, buf)) != SCPE_OK))
         return r;
     READ_I (flg);                                       /* [V2.10+] ctlr flags */
@@ -2762,7 +2767,8 @@ void int_handler (int signal);
 GET_SWITCHES (cptr);                                    /* get switches */
 sim_step = 0;
 if ((flag == RU_RUN) || (flag == RU_GO)) {              /* run or go */
-    if (*cptr != 0) {                                   /* argument? */
+    t_bool new_pcv = (*cptr != 0);                      /* new PC value? */
+    if (new_pcv) {                                      /* argument? */
         cptr = get_glyph (cptr, gbuf, 0);               /* get next glyph */
         if (*cptr != 0)                                 /* should be end */
             return SCPE_2MARG;
@@ -2772,11 +2778,12 @@ if ((flag == RU_RUN) || (flag == RU_GO)) {              /* run or go */
         if ((tptr == gbuf) || (*tptr != 0) ||           /* error? */
             (pcv > width_mask[sim_PC->width]))
             return SCPE_ARG;
-        put_rval (sim_PC, 0, pcv);
         }
     if ((flag == RU_RUN) &&                             /* run? */
         ((r = run_boot_prep ()) != SCPE_OK))            /* reset sim */
         return r;
+    if (new_pcv)                                        /* new PC value? */
+        put_rval (sim_PC, 0, pcv);
     }
 
 else if (flag == RU_STEP) {                             /* step */
@@ -2872,6 +2879,7 @@ for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* flush attached files 
             fflush (uptr->fileref);
         }
     }
+tmxr_post_logs (FALSE);                                 /* flush all mux log files */
 #if defined (VMS)
 sim_printf ("\n");
 #endif
@@ -2909,7 +2917,7 @@ t_stat r = 0;
 t_addr k;
 t_value pcval;
 
-fputc ('\n', st);                                       /* skip a line */    
+fputc ('\n', st);                                       /* skip a line */
 
 if (v >= SCPE_BASE)                                     /* SCP error? */
     fputs (sim_error_text (v), st);                     /* print it from the SCP list */
@@ -3042,7 +3050,7 @@ for (gptr = gbuf, reason = SCPE_OK;
     tdptr = sim_dfdev;                                  /* working dptr */
     if (strncmp (gptr, "STATE", strlen ("STATE")) == 0) {
         tptr = gptr + strlen ("STATE");
-        if (*tptr && (*tptr++ != ',')) 
+        if (*tptr && (*tptr++ != ','))
             return SCPE_ARG;
         if ((lowr = sim_dfdev->registers) == NULL)
             return SCPE_NXREG;
@@ -3101,7 +3109,7 @@ return reason;
    exdep_addr_loop      examine/deposit range of addresses
 */
 
-t_stat exdep_reg_loop (FILE *ofile, SCHTAB *schptr, int32 flag, char *cptr, 
+t_stat exdep_reg_loop (FILE *ofile, SCHTAB *schptr, int32 flag, char *cptr,
     REG *lowr, REG *highr, uint32 lows, uint32 highs)
 {
 t_stat reason;
@@ -3347,13 +3355,13 @@ if ((rptr->depth > 1) && (rptr->flags & REG_UNIT)) {
 #if defined (USE_INT64)
     if (sz <= sizeof (uint32))
         *((uint32 *) uptr) = (*((uint32 *) uptr) &
-        ~(((uint32) mask) << rptr->offset)) | 
+        ~(((uint32) mask) << rptr->offset)) |
         (((uint32) val) << rptr->offset);
     else *((t_uint64 *) uptr) = (*((t_uint64 *) uptr)
         & ~(mask << rptr->offset)) | (val << rptr->offset);
 #else
     *((uint32 *) uptr) = (*((uint32 *) uptr) &
-        ~(((uint32) mask) << rptr->offset)) | 
+        ~(((uint32) mask) << rptr->offset)) |
         (((uint32) val) << rptr->offset);
 #endif
     }
@@ -3535,7 +3543,7 @@ for (i = 0, j = addr; i < count; i++, j = j + dptr->aincr) {
     else {
         if (!(uptr->flags & UNIT_ATT))
             return SCPE_UNATT;
-        if (uptr->flags & UNIT_RAW) 
+        if (uptr->flags & UNIT_RAW)
             return SCPE_NOFNC;
         if ((uptr->flags & UNIT_FIX) && (j >= uptr->capac))
             return SCPE_NXM;
@@ -3543,7 +3551,7 @@ for (i = 0, j = addr; i < count; i++, j = j + dptr->aincr) {
         loc = j / dptr->aincr;
         if (uptr->flags & UNIT_BUF) {
             SZ_STORE (sz, sim_eval[i], uptr->filebuf, loc);
-            if (loc >= uptr->hwmark) 
+            if (loc >= uptr->hwmark)
                 uptr->hwmark = (uint32) loc + 1;
             }
         else {
@@ -4274,7 +4282,7 @@ while (*cptr) {                                         /* loop through modifier
         cptr = get_glyph_nc (cptr + 1, gbuf, 0);
         sim_ofile = sim_fopen (gbuf, "a");              /* open for append */
         if (sim_ofile == NULL) {                        /* open failed? */
-            *st = SCPE_OPENERR;                        
+            *st = SCPE_OPENERR;
             return NULL;
             }
         sim_opt_out |= CMD_OPT_OF;                      /* got output file */

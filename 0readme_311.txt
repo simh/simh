@@ -15,6 +15,8 @@ simulation work and for Dave Bryan's HP simulators.
 
 - -n added in ATTACH, meaning "force empty file".
 - SET <device|unit> APPEND.
+- terminal mux log files are flushed at simulator stop
+  and closed at simulator exit
 
 1.2 1401
 
@@ -33,6 +35,7 @@ simulation work and for Dave Bryan's HP simulators.
 1.5 PDP11
 
 - Added RS03/RS04 Massbus fixed head disk support.
+- Added KSR option for console terminal.
 
 1.6 PDP10
 
@@ -56,11 +59,15 @@ simulation work and for Dave Bryan's HP simulators.
 
 1.9 AltairZ80, IBM 1130, SWTP 6800
 
-- Removed.
+- Removed; V4.X only.
 
 1.10 Sigma
 
 - New simulator (moved out of beta).
+
+1.11 VAX
+
+- Idle support added for VMS 5.0/5.1.
 
 
 2. Bugs Fixed

@@ -23,6 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   25-Aug-20    JDB     Added __FreeBSD__ define to Unix implementation guard
+   01-Jul-20    JDB     Added __CYGWIN__ define to Unix implementation guard
+
    This library includes:
 
    sim_shmem_open           create or attach to a shared memory region
@@ -119,7 +122,7 @@ t_bool sim_shmem_atomic_cas (int32 *ptr, int32 oldv, int32 newv)
 return (InterlockedCompareExchange ((LONG volatile *) ptr, newv, oldv) == oldv);
 }
 
-#elif defined (__linux__) || defined (__APPLE__)
+#elif defined (__linux__) || defined (__APPLE__) || defined (__CYGWIN__) || defined (__FreeBSD__)
 #include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>

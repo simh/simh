@@ -1,6 +1,6 @@
 /* sim_tmxr.h: terminal multiplexor definitions
 
-   Copyright (c) 2001-2019, Robert M Supnik
+   Copyright (c) 2001-2020, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   23-Oct-20    JDB     Added tmxr_post_logs global routine
    19-Dec-19    JDB     Added tmxr_is_extended global hook
    19-Mar-19    JDB     Added extension pointer to TMLN structure;
                         added tmxr_read, tmxr_write, tmxr_show, tmxr_close global hooks;
@@ -123,6 +124,7 @@ void tmxr_fconns (FILE *st, TMLN *lp, int32 ln);
 void tmxr_fstats (FILE *st, TMLN *lp, int32 ln);
 t_stat tmxr_set_log (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat tmxr_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc);
+void tmxr_post_logs (t_bool close_logs);
 t_stat tmxr_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_dscln (UNIT *uptr, int32 val, char *cptr, void *desc);
 int32 tmxr_rqln (TMLN *lp);
