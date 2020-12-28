@@ -275,7 +275,7 @@
                   the registry on Windows XP x64
   10-Jul-06  RMS  Fixed linux conditionalization (from Chaskiel Grundman)
   02-Jun-06  JDB  Fixed compiler warning for incompatible sscanf parameter
-  15-Dec-05  DTH  Patched eth_host_devices [remove non-ethernet devices]
+  15-Dec-05  DTH  Patched eth_host_pcap_devices [remove non-ethernet devices]
                   (from Mark Pizzolato and Galen Tackett, 08-Jun-05)
                   Patched eth_open [tun fix](from Antal Ritter, 06-Oct-05)
   30-Nov-05  DTH  Added option to regenerate CRC on received packets; some
@@ -1015,6 +1015,15 @@ const char *eth_capabilities(void)
 
 #include <pcap.h>
 #include <string.h>
+#else
+struct pcap_pkthdr {
+    uint32 caplen;  /* length of portion present */
+    uint32 len;     /* length this packet (off wire) */
+};
+#define PCAP_ERRBUF_SIZE 256
+typedef void * pcap_t;  /* Pseudo Type to avoid compiler errors */
+#define DLT_EN10MB 1    /* Dummy Value to avoid compiler errors */
+#endif /* HAVE_PCAP_NETWORK */
 
 /*
      The libpcap provided API pcap_findalldevs() on most platforms, will 
@@ -1035,7 +1044,7 @@ const char *eth_capabilities(void)
      returned by pcap_findalldevs.
 
 */
-static int eth_host_devices(int used, int max, ETH_LIST* list)
+static int eth_host_pcap_devices(int used, int max, ETH_LIST* list)
 {
 pcap_t* conn = NULL;
 int i, j, datalink = 0;
@@ -1049,13 +1058,13 @@ for (i=0; i<used; ++i) {
   if (NULL != conn)
     datalink = pcap_datalink(conn), pcap_close(conn);
   list[i].eth_api = ETH_API_PCAP;
-#endif
   if ((NULL == conn) || (datalink != DLT_EN10MB)) {
     for (j=i; j<used-1; ++j)
       list[j] = list[j+1];
     --used;
     --i;
     }
+#endif
   } /* for */
 
 #if defined(_WIN32)
@@ -1099,6 +1108,49 @@ for (i=0; i<used; i++) {
   } /* for */
 #endif
 
+return used;
+}
+
+static int _eth_devices(int max, ETH_LIST* list)
+{
+int used = 0;
+char errbuf[PCAP_ERRBUF_SIZE] = "";
+#ifndef DONT_USE_PCAP_FINDALLDEVS
+pcap_if_t* alldevs;
+pcap_if_t* dev;
+
+memset(list, 0, max*sizeof(*list));
+errbuf[0] = '\0';
+/* retrieve the device list */
+if (pcap_findalldevs(&alldevs, errbuf) == -1) {
+  if (errbuf[0])
+    sim_printf ("Eth: %s\n", errbuf);
+  }
+else {
+  /* copy device list into the passed structure */
+  for (used=0, dev=alldevs; dev && (used < max); dev=dev->next, ++used) {
+    if ((dev->flags & PCAP_IF_LOOPBACK) || (!strcmp("any", dev->name)))
+      continue;
+    strlcpy(list[used].name, dev->name, sizeof(list[used].name));
+    if (dev->description)
+      strlcpy(list[used].desc, dev->description, sizeof(list[used].desc));
+    else
+      strlcpy(list[used].desc, "No description available", sizeof(list[used].desc));
+    }
+
+  /* free device list */
+  pcap_freealldevs(alldevs);
+  }
+#endif
+
+/* Add any host specific devices and/or validate those already found */
+used = eth_host_pcap_devices(used, max, list);
+
+/* If no devices were found and an error message was left in the buffer, display it */
+if ((used == 0) && (errbuf[0])) {
+    sim_printf ("Eth: pcap_findalldevs warning: %s\n", errbuf);
+    }
+
 #ifdef HAVE_TAP_NETWORK
 if (used < max) {
 #if defined(__OpenBSD__)
@@ -1135,61 +1187,9 @@ if (used < max) {
   ++used;
   }
 
+/* return device count */
 return used;
 }
-
-static int _eth_devices(int max, ETH_LIST* list)
-{
-int i = 0;
-char errbuf[PCAP_ERRBUF_SIZE] = "";
-#ifndef DONT_USE_PCAP_FINDALLDEVS
-pcap_if_t* alldevs;
-pcap_if_t* dev;
-
-memset(list, 0, max*sizeof(*list));
-errbuf[0] = '\0';
-/* retrieve the device list */
-if (pcap_findalldevs(&alldevs, errbuf) == -1) {
-  if (errbuf[0])
-    sim_printf ("Eth: %s\n", errbuf);
-  }
-else {
-  /* copy device list into the passed structure */
-  for (i=0, dev=alldevs; dev && (i < max); dev=dev->next, ++i) {
-    if ((dev->flags & PCAP_IF_LOOPBACK) || (!strcmp("any", dev->name))) continue;
-    strlcpy(list[i].name, dev->name, sizeof(list[i].name));
-    if (dev->description)
-      strlcpy(list[i].desc, dev->description, sizeof(list[i].desc));
-    else
-      strlcpy(list[i].desc, "No description available", sizeof(list[i].desc));
-    }
-
-  /* free device list */
-  pcap_freealldevs(alldevs);
-  }
-#endif
-
-/* Add any host specific devices and/or validate those already found */
-i = eth_host_devices(i, max, list);
-
-/* If no devices were found and an error message was left in the buffer, display it */
-if ((i == 0) && (errbuf[0])) {
-    sim_printf ("Eth: pcap_findalldevs warning: %s\n", errbuf);
-    }
-
-/* return device count */
-return i;
-}
-
-#else
-struct pcap_pkthdr {
-    uint32 caplen;  /* length of portion present */
-    uint32 len;     /* length this packet (off wire) */
-};
-#define PCAP_ERRBUF_SIZE 256
-typedef void * pcap_t;  /* Pseudo Type to avoid compiler errors */
-#define DLT_EN10MB 1    /* Dummy Value to avoid compiler errors */
-#endif /* HAVE_PCAP_NETWORK */
 
 #ifdef HAVE_TAP_NETWORK
 #if defined(__linux) || defined(__linux__)
