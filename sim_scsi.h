@@ -129,6 +129,7 @@ t_stat scsi_set_wlk (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat scsi_show_fmt (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat scsi_show_wlk (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat scsi_attach (UNIT *uptr, CONST char *cptr);
+t_stat scsi_attach_ex (UNIT *uptr, CONST char *cptr, const char **drivetypes);
 t_stat scsi_detach (UNIT *uptr);
 t_stat scsi_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 

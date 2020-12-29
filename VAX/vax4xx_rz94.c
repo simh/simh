@@ -111,6 +111,7 @@ DEBTAB rz_debug[] = {
 
 t_stat rz_svc (UNIT *uptr);
 t_stat rz_reset (DEVICE *dptr);
+t_stat rz_attach (UNIT *uptr, CONST char *cptr);
 void rz_sw_reset (void);
 t_stat rz_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 void rz_cmd (uint32 cmd);
@@ -203,11 +204,32 @@ MTAB rz_mod[] = {
     { 0 }
     };
 
+static const char *drv_types[] = {
+    "RZ23",
+    "RZ23L",
+    "RZ24",
+    "RZ24L",
+    "RZ25",
+    "RZ25L",
+    "RZ26",
+    "RZ26L",
+    "RZ55",
+    "CDROM",
+    "RRD40",
+    "RRD42",
+    "RRW11",
+    "CDW900",
+    "XR1001",
+    "TZK50",
+    "TZ30",
+    "RZUSER"
+    };
+
 DEVICE rz_dev = {
     "RZ", rz_unit, rz_reg, rz_mod,
     9, DEV_RDX, 8, 1, DEV_RDX, 8,
     NULL, NULL, &rz_reset,
-    NULL, &scsi_attach, &scsi_detach,
+    NULL, &rz_attach, &scsi_detach,
     NULL, DEV_DISABLE | DEV_DEBUG | DEV_DISK | DEV_SECTORS,
     0, rz_debug, NULL, NULL, &rz_help, NULL, NULL,
     &rz_description
@@ -864,6 +886,11 @@ fprint_show_help (st, dptr);
 fprint_reg_help (st, dptr);
 scsi_help (st, dptr, uptr, flag, cptr);
 return SCPE_OK;
+}
+
+t_stat rz_attach (UNIT *uptr, CONST char *cptr)
+{
+return scsi_attach_ex (uptr, cptr, drv_types);
 }
 
 const char *rz_description (DEVICE *dptr)

@@ -2043,6 +2043,8 @@ for (i = 0; checks[i] != NULL; i++) {
 return ret_val;
 }
 
+static t_stat store_disk_footer (UNIT *uptr, const char *dtype);
+
 static t_stat get_disk_footer (UNIT *uptr)
 {
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
@@ -2109,6 +2111,13 @@ if (f) {
         f = NULL;
         }
     else {
+        /* We've got a valid footer, but it may need to be corrected */
+        if ((NtoHl (f->TransferElementSize) == 1) && 
+            (0 == memcmp (f->DriveType, "RZ", 2))) {
+            f->TransferElementSize = NtoHl (2);
+            f->Checksum = NtoHl (eth_crc32 (0, f, sizeof (*f) - sizeof (f->Checksum)));
+            store_disk_footer (uptr, (char *)f->DriveType);
+            }
         free (ctx->footer);
         ctx->footer = f;
         container_size -= sizeof (*f);
@@ -2161,8 +2170,10 @@ free (ctx->footer);
 ctx->footer = f;
 switch (f->AccessFormat) {
     case DKUF_F_STD:                                    /* SIMH format */
-        if (sim_fseeko ((FILE *)uptr->fileref, total_sectors * ctx->sector_size, SEEK_SET) == 0)
+        if (sim_fseeko ((FILE *)uptr->fileref, total_sectors * ctx->sector_size, SEEK_SET) == 0) {
             sim_fwrite (f, sizeof (*f), 1, (FILE *)uptr->fileref);
+            fflush ((FILE *)uptr->fileref);
+            }
         break;
     case DKUF_F_VHD:                                    /* VHD format */
         break;
@@ -2189,7 +2200,6 @@ DEVICE *dptr;
 char tbuf[4*CBUFSIZE];
 FILE *(*open_function)(const char *filename, const char *mode) = sim_fopen;
 FILE *(*create_function)(const char *filename, t_offset desiredsize) = NULL;
-t_offset (*size_function)(FILE *file);
 t_stat (*storage_function)(FILE *file, uint32 *sector_size, uint32 *removable, uint32 *is_cdrom) = NULL;
 t_bool created = FALSE, copied = FALSE;
 t_bool auto_format = FALSE;
@@ -2416,7 +2426,6 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
             sim_vhd_disk_close (uptr->fileref);         /* close vhd file*/
             uptr->fileref = NULL;
             open_function = sim_vhd_disk_open;
-            size_function = sim_vhd_disk_size;
             break;
             }
         while (tmp_size < sector_size)
@@ -2426,7 +2435,6 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
                 sim_disk_set_fmt (uptr, 0, "RAW", NULL);    /* set file format to RAW */
                 sim_os_disk_close_raw (uptr->fileref);      /* close raw file*/
                 open_function = sim_os_disk_open_raw;
-                size_function = sim_os_disk_size_raw;
                 storage_function = sim_os_disk_info_raw;
                 uptr->fileref = NULL;
                 break;
@@ -2434,7 +2442,6 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
             }
         sim_disk_set_fmt (uptr, 0, "SIMH", NULL);       /* set file format to SIMH */
         open_function = sim_fopen;
-        size_function = sim_fsize_ex;
         break;
     case DKUF_F_STD:                                    /* SIMH format */
         if (NULL != (uptr->fileref = sim_vhd_disk_open (cptr, "rb"))) { /* Try VHD first */
@@ -2442,17 +2449,14 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
             sim_vhd_disk_close (uptr->fileref);         /* close vhd file*/
             uptr->fileref = NULL;
             open_function = sim_vhd_disk_open;
-            size_function = sim_vhd_disk_size;
             auto_format = TRUE;
             break;
             }
         open_function = sim_fopen;
-        size_function = sim_fsize_ex;
         break;
     case DKUF_F_VHD:                                    /* VHD format */
         open_function = sim_vhd_disk_open;
         create_function = sim_vhd_disk_create;
-        size_function = sim_vhd_disk_size;
         storage_function = sim_os_disk_info_raw;
         break;
     case DKUF_F_RAW:                                    /* Raw Physical Disk Access */
@@ -2461,12 +2465,10 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
             sim_vhd_disk_close (uptr->fileref);         /* close vhd file*/
             uptr->fileref = NULL;
             open_function = sim_vhd_disk_open;
-            size_function = sim_vhd_disk_size;
             auto_format = TRUE;
             break;
             }
         open_function = sim_os_disk_open_raw;
-        size_function = sim_os_disk_size_raw;
         storage_function = sim_os_disk_info_raw;
         break;
     default:
@@ -2552,8 +2554,13 @@ if ((DK_GET_FMT (uptr) == DKUF_F_VHD) || (ctx->footer)) {
                     cmd[sizeof (cmd) - 1] = '\0';
                     snprintf (cmd, sizeof (cmd) - 1, "%s %s", sim_uname (uptr), container_dtype);
                     r = set_cmd (0, cmd);
-                    if (r != SCPE_OK)
-                        r = sim_messagef (r, "Can't set %s to drive type %s\n", sim_uname (uptr), container_dtype);
+                    if (r != SCPE_OK) {
+                        r = sim_messagef (r, "%s: Can't set to drive type %s\n", sim_uname (uptr), container_dtype);
+                        if ((uptr->flags & UNIT_RO) != 0)                   /* Not Opening read only? */
+                            r = sim_messagef (SCPE_OK, "%s: Read Only access to inconsistent drive type allowed\n", sim_uname (uptr));
+                        else
+                            sim_messagef (SCPE_OK, "'%s' can only be attached Read Only to %s\n", cptr, sim_uname (uptr));
+                        }
                     }
                 }
             }
