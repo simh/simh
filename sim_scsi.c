@@ -1689,7 +1689,7 @@ return SCPE_OK;
 
 /* Attach device */
 
-t_stat scsi_attach (UNIT *uptr, CONST char *cptr)
+t_stat scsi_attach_ex (UNIT *uptr, CONST char *cptr, const char **drivetypes)
 {
 SCSI_DEV *dev = (SCSI_DEV *)uptr->up7;
 
@@ -1700,12 +1700,17 @@ switch (dev->devtype) {
     case SCSI_DISK:
     case SCSI_WORM:
     case SCSI_CDROM:
-        return sim_disk_attach (uptr, cptr, dev->block_size, sizeof (uint8), (uptr->flags & SCSI_NOAUTO), SCSI_DBG_DSK, dev->name, 0, 0);
+        return sim_disk_attach_ex (uptr, cptr, dev->block_size, sizeof (uint16), (uptr->flags & SCSI_NOAUTO), SCSI_DBG_DSK, dev->name, 0, 0, drivetypes);
     case SCSI_TAPE:
         return sim_tape_attach (uptr, cptr);
     default:
         return SCPE_NOFNC;
         }
+}
+
+t_stat scsi_attach (UNIT *uptr, CONST char *cptr)
+{
+return scsi_attach_ex (uptr, cptr, NULL);
 }
 
 /* Dettach device */
