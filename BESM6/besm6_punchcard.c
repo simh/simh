@@ -28,17 +28,6 @@
  */
 #include "besm6_defs.h"
 
-#if 0
-/*
- * Punchcard input not yet implemented.
- */
-t_stat uvvk_event (UNIT *u);    /* punched card reader */
-UNIT uvvk_unit [] = {
-    { UDATA (uvvk_event, UNIT_SEQ+UNIT_ATTABLE, 0) },
-    { UDATA (uvvk_event, UNIT_SEQ+UNIT_ATTABLE, 0) },
-};
-#endif
-
 t_stat pi_event (UNIT *u);      /* punched card writer */
 UNIT pi_unit [] = {
     { UDATA (pi_event, UNIT_SEQ+UNIT_ATTABLE, 0) },
