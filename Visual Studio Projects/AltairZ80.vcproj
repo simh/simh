@@ -316,6 +316,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\AltairZ80\s100_dj2d.c"
+				>
+			</File>
+			<File
 				RelativePath="..\AltairZ80\s100_fif.c"
 				>
 			</File>
