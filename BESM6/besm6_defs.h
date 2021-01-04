@@ -146,6 +146,8 @@ extern DEVICE clock_dev;
 extern DEVICE printer_dev;
 extern DEVICE tty_dev;
 extern DEVICE fs_dev;
+extern DEVICE pl_dev;
+extern DEVICE vu_dev;
 extern DEVICE pi_dev;
 extern jmp_buf cpu_halt;
 
@@ -356,6 +358,17 @@ void fs_control (int num, uint32 cmd);
 int fs_read (int num);
 
 /*
+ * Punchtape output.
+ */
+void pl_control (int num, uint32 cmd);
+
+/*
+ * Punchcard input.
+ */
+void vu_control (int num, uint32 cmd);
+int vu_read (int num);
+
+/*
  * Вывод на перфокарты.
  */
 void pi_control (int num, uint32 cmd);
@@ -399,8 +412,8 @@ t_value besm6_unpack (t_value val, t_value mask);
 #define GRP_PRN2_SYNC   02000000000000000LL     /* 47 */
 #define GRP_DRUM1_FREE  01000000000000000LL     /* 46 */
 #define GRP_DRUM2_FREE  00400000000000000LL     /* 45 */
-#define GRP_UVVK1_SYNC  00200000000000000LL     /* 44 */
-#define GRP_UVVK2_SYNC  00100000000000000LL     /* 43 */
+#define GRP_VU1_SYNC    00200000000000000LL     /* 44 */
+#define GRP_VU2_SYNC    00100000000000000LL     /* 43 */
 #define GRP_FS1_SYNC    00040000000000000LL     /* 42 */
 #define GRP_FS2_SYNC    00020000000000000LL     /* 41 */
 #define GRP_TIMER       00010000000000000LL     /* 40 */
@@ -443,8 +456,8 @@ t_value besm6_unpack (t_value val, t_value mask);
 /*
  * Bits of the peripheral interrupt register ПРП (PRP)
  */
-#define PRP_UVVK1_END     010000000             /* 22 */
-#define PRP_UVVK2_END     004000000             /* 21 */
+#define PRP_VU1_END       010000000             /* 22 */
+#define PRP_VU2_END       004000000             /* 21 */
 #define PRP_PCARD1_CHECK  002000000             /* 20 */
 #define PRP_PCARD2_CHECK  001000000             /* 19 */
 #define PRP_PCARD1_PUNCH  000400000             /* 18 */

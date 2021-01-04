@@ -208,7 +208,7 @@ static unsigned char unicode_to_upp (unsigned short ch) {
     return (ch & 1) ? ret : ret | 0x80;
 }
 
-static int utf8_getc (FILE *fin);
+int utf8_getc (FILE *fin);
 
 /*
  * Событие: читаем очередной символ с перфоленты в регистр.
@@ -461,7 +461,7 @@ unicode_to_gost (unsigned short val)
  * Read Unicode symbol from file.
  * Convert from UTF-8 encoding.
  */
-static int
+int
 utf8_getc (FILE *fin)
 {
     int c1, c2, c3;

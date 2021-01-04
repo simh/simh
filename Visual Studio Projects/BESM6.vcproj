@@ -216,6 +216,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\BESM6\besm6_pl.c"
+				>
+			</File>
+			<File
 				RelativePath="..\BESM6\besm6_printer.c"
 				>
 			</File>
@@ -233,6 +237,10 @@
 			</File>
 			<File
 				RelativePath="..\BESM6\besm6_tty.c"
+				>
+			</File>
+			<File
+				RelativePath="..\BESM6\besm6_vu.c"
 				>
 			</File>
 			<File
