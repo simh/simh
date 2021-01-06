@@ -975,15 +975,19 @@ DIR *dir;
 int found_count = 0;
 struct stat filestat;
 char *c;
-char DirName[PATH_MAX + 1], WholeName[PATH_MAX + 1], WildName[PATH_MAX + 1];
+char DirName[PATH_MAX + 1], WholeName[PATH_MAX + 1], WildName[PATH_MAX + 1], MatchName[PATH_MAX + 1];
 
 memset (DirName, 0, sizeof(DirName));
 memset (WholeName, 0, sizeof(WholeName));
+memset (MatchName, 0, sizeof(MatchName));
 strlcpy (WildName, cptr, sizeof(WildName));
 cptr = WildName;
 sim_trim_endspc (WildName);
 c = sim_filepath_parts (cptr, "f");
 strlcpy (WholeName, c, sizeof (WholeName));
+free (c);
+c = sim_filepath_parts (cptr, "nx");
+strlcpy (MatchName, c, sizeof (MatchName));
 free (c);
 c = strrchr (WholeName, '/');
 if (c) {
