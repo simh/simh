@@ -1887,8 +1887,7 @@ if (sim_rem_con_tmxr.lines) {
         if (rem->smp_reg_count)
             sim_activate (&rem_con_smp_smpl_units[rem->line], rem->smp_sample_interval);    /* schedule */
         }
-    if (i != sim_rem_con_tmxr.lines)
-        sim_activate_after (rem_con_data_unit, 100000);     /* continue polling for open sessions */
+    sim_activate_after (rem_con_data_unit, 100000);         /* continue polling for open sessions */
     return sim_rem_con_poll_svc (rem_con_poll_unit);        /* establish polling for new sessions */
     }
 return SCPE_OK;
@@ -1903,7 +1902,7 @@ if (flag) {
     if (r == SCPE_OK) {
         if (sim_rem_con_tmxr.master)                        /* already open? */
             sim_set_rem_telnet (0, NULL);                   /* close first */
-        if (sim_rem_con_tmxr.lines == 0)                    /* Ir no connection limit set */
+        if (sim_rem_con_tmxr.lines == 0)                    /* if no connection limit set */
             sim_set_rem_connections (0, "1");               /* use 1 */
         sim_rem_con_tmxr.buffered = 8192;                   /* Use big enough buffers */
         sim_register_internal_device (&sim_remote_console);
