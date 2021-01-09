@@ -208,6 +208,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\BESM6\besm6_mg.c"
+				>
+			</File>
+			<File
 				RelativePath="..\BESM6\besm6_mmu.c"
 				>
 			</File>
