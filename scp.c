@@ -7878,11 +7878,11 @@ if ((dptr = find_dev_from_unit (uptr)) == NULL)
 if ((uptr->flags & UNIT_BUF) && (uptr->filebuf)) {
     uint32 cap = (uptr->hwmark + dptr->aincr - 1) / dptr->aincr;
     if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {
-        sim_messagef (SCPE_OK, "%s: writing buffer to file\n", sim_dname (dptr));
+        sim_messagef (SCPE_OK, "%s: writing buffer to file: %s\n", sim_uname (dptr), uptr->filename);
         rewind (uptr->fileref);
         sim_fwrite (uptr->filebuf, SZ_D (dptr), cap, uptr->fileref);
         if (ferror (uptr->fileref))
-            sim_printf ("%s: I/O error - %s", sim_dname (dptr), strerror (errno));
+            sim_printf ("%s: I/O error - %s", sim_uname (dptr), strerror (errno));
         }
     if (uptr->flags & UNIT_MUSTBUF) {                   /* dyn alloc? */
         free (uptr->filebuf);                           /* free buf */
