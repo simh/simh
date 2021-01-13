@@ -171,6 +171,7 @@ size_t sim_strlcpy (char *dst, const char *src, size_t size);
 #ifndef strcasecmp
 #define strcasecmp(str1, str2) sim_strcasecmp ((str1), (str2))
 #endif
+int sim_strwhitecasecmp (const char *string1, const char *string2, t_bool casecmp);
 
 
 #ifdef  __cplusplus
