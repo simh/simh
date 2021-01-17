@@ -177,7 +177,7 @@ static const uint16          ascii_to_hol_029[128] = {
    /* T      1      2      3      4      5      6      7   */
     0x200, 0x100, 0x080, 0x040, 0x020, 0x010, 0x008, 0x004,
    /*   8      9      :      ;      <      =      >      ? */
-   /* 8      9      28     Y68    X48     68    T68     28 */
+   /* 8      9      28     Y68    X48     68    T68    T78 */
     0x002, 0x001, 0x082, 0x40A, 0x822, 0x00A, 0x20A, 0x206,
    /*   @      A      B      C      D      E      F      G */
    /*  48    X1     X2     X3     X4     X5     X6     X7  */
@@ -201,6 +201,52 @@ static const uint16          ascii_to_hol_029[128] = {
    /*                      Y78    X78    X79  XTY18        */
     0x604, 0x602, 0x601, 0x406, 0x806, 0x805, 0xF02,0xf000
 };
+
+/* Set for DEC 029 codes */
+static const uint16          ascii_to_dec_029[128] = {
+   /* Control                              */
+    0xf000,0xf000,0xf000,0xf000,0xf000,0xf000,0xf000,0xf000,    /*0-37*/
+   /*Control*/
+    0xf000,0xf000,0xf000,0xf000,0xf000,0xf000,0xf000,0xf000,
+   /*Control*/
+    0xf000,0xf000,0xf000,0xf000,0xf000,0xf000,0xf000,0xf000,
+   /*Control*/
+    0xf000,0xf000,0xf000,0xf000,0xf000,0xf000,0xf000,0xf000,
+   /*  sp      !      "      #      $      %      &      ' */
+   /* none   Y28    78      38    Y38    T48    X      58  */
+    0x000, 0x482, 0x006, 0x042, 0x442, 0x222, 0x800, 0x012,     /* 40 - 77 */
+   /*   (      )      *      +      ,      -      .      / */
+   /* X58    Y58    Y48    X68    T38    Y      X38    T1  */
+    0x812, 0x412, 0x422, 0x80A, 0x242, 0x400, 0x842, 0x300,
+   /*   0      1      2      3      4      5      6      7 */
+   /* T      1      2      3      4      5      6      7   */
+    0x200, 0x100, 0x080, 0x040, 0x020, 0x010, 0x008, 0x004,
+   /*   8      9      :      ;      <      =      >      ? */
+   /* 8      9      28     Y68    X48     68    T68    T78 */
+    0x002, 0x001, 0x082, 0x40A, 0x822, 0x00A, 0x20A, 0x206,
+   /*   @      A      B      C      D      E      F      G */
+   /*  48    X1     X2     X3     X4     X5     X6     X7  */
+    0x022, 0x900, 0x880, 0x840, 0x820, 0x810, 0x808, 0x804,     /* 100 - 137 */
+   /*   H      I      J      K      L      M      N      O */
+   /* X8     X9     Y1     Y2     Y3     Y4     Y5     Y6  */
+    0x802, 0x801, 0x500, 0x480, 0x440, 0x420, 0x410, 0x408,
+   /*   P      Q      R      S      T      U      V      W */
+   /* Y7     Y8     Y9     T2     T3     T4     T5     T6  */
+    0x404, 0x402, 0x401, 0x280, 0x240, 0x220, 0x210, 0x208,
+   /*   X      Y      Z      [      \      ]      ^      _ */
+   /* T7     T8     T9     X28    Y78    T28    X78    T58 */
+    0x204, 0x202, 0x201, 0x882, 0x406, 0x282, 0x806, 0x212,
+   /*   `      a      b      c      d      e      f      g */
+    0x102 ,0xB00, 0xA80, 0xA40, 0xA20, 0xA10, 0xA08, 0xA04,     /* 140 - 177 */
+   /*   h      i      j      k      l      m      n      o */
+    0xA02, 0xA01, 0xD00, 0xC80, 0xC40, 0xC20, 0xC10, 0xC08,
+   /*   p      q      r      s      t      u      v      w */
+    0xC04, 0xC02, 0xC01, 0x680, 0x640, 0x620, 0x610, 0x608,
+   /*   x      y      z      {      |      }      ~    del */
+   /*                       XT     XY     YT    YT1        */
+    0x604, 0x602, 0x601, 0xA00, 0xC00, 0x600, 0x700,0xf000
+};
+
 
 static const uint16          ascii_to_hol_ebcdic[128] = {
    /* Control                              */
@@ -769,8 +815,8 @@ _sim_parse_card(UNIT *uptr, DEVICE *dptr, struct _card_buffer *buf, uint16 (*ima
                     case MODE_029:
                            temp = ascii_to_hol_029[(int)c];
                            break;
-                    case MODE_EBCDIC:
-                           temp = ascii_to_hol_ebcdic[(int)c];
+                    case MODE_DEC29:
+                           temp = ascii_to_dec_029[(int)c];
                            break;
                     }
                     if (temp & 0xf000)
@@ -1279,6 +1325,9 @@ sim_card_attach(UNIT * uptr, CONST char *cptr)
               break;
          case MODE_029:
               temp = ascii_to_hol_029[i];
+              break;
+         case MODE_DEC29:
+              temp = ascii_to_dec_029[i];
               break;
          }
          if ((temp & 0xf000) == 0) {

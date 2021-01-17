@@ -97,6 +97,7 @@ extern "C" {
 #define MODE_LOWER      (8 << UNIT_V_CARD_MODE)
 #define MODE_026        (0x10 << UNIT_V_CARD_MODE)
 #define MODE_029        (0x20 << UNIT_V_CARD_MODE)
+#define MODE_DEC29      (0x30 << UNIT_V_CARD_MODE)
 #define MODE_CHAR       (0x70 << UNIT_V_CARD_MODE)
 
 
