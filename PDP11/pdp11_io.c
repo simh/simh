@@ -277,6 +277,7 @@ if (cpu_bme) {                                          /* map enabled? */
         if (!ADDR_IS_MEM (ma))                          /* NXM? err */
             return (lim - ba);
         *buf++ = (uint8) RdMemB (ma);                   /* get byte */
+        setHITMISS (HIT);                               /* set chache hit */
         }
     return 0;
     }
@@ -288,6 +289,7 @@ else {                                                  /* physical */
     else return bc;                                     /* no, err */
     for ( ; ba < alim; ba++) {                          /* by bytes */
         *buf++ = (uint8) RdMemB (ba);                   /* get byte */
+        setHITMISS (HIT);                               /* set chache hit */
         }
     return (lim - alim);
     }
@@ -320,6 +322,7 @@ if (cpu_bme) {                                          /* map enabled? */
         if (!ADDR_IS_MEM (ma))                          /* NXM? err */
             return (lim - ba);
         *buf++ = (uint16) RdMemW (ma);
+        setHITMISS (HIT);
         }
     return 0;
     }
@@ -331,6 +334,7 @@ else {                                                  /* physical */
     else return bc;                                     /* no, err */
     for ( ; ba < alim; ba = ba + 2) {                   /* by words */
         *buf++ = (uint16) RdMemW (ba);
+        setHITMISS (HIT);
         }
     return (lim - alim);
     }
@@ -400,6 +404,7 @@ if (cpu_bme) {                                          /* map enabled? */
         if (!ADDR_IS_MEM (ma))                          /* NXM? err */
             return (lim - ba);
         WrMemW (ma, *buf++);
+        setHITMISS (MISS);
         }
     return 0;
     }
@@ -411,6 +416,7 @@ else {                                                  /* physical */
     else return bc;                                     /* no, err */
     for ( ; ba < alim; ba = ba + 2) {                   /* by words */
         WrMemW (ba, *buf++);
+        setHITMISS (MISS);
         }
     return (lim - alim);
     }

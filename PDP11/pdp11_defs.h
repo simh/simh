@@ -317,6 +317,10 @@
 
 #define STKLIM_RW       0177400
 
+/* Hit/Miss register values */
+#define MISS            0
+#define HIT             1
+
 /* MMR0 */
 
 #define MMR0_MME        0000001                         /* mem mgt enable */

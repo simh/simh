@@ -564,6 +564,7 @@ for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
         pbc = bc - i;
     for (j = 0; j < pbc; j = j + 2) {                   /* loop by words */
         *buf++ = RdMemW (pa);                           /* fetch word */
+        setHITMISS (HIT);                               /* set cache hit */
         if (!(massbus[mb].cs2 & CS2_UAI)) {             /* if not inhb */
             ba = ba + 2;                                /* incr ba, pa */
             pa = pa + 2;
@@ -603,6 +604,7 @@ for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
         pbc = bc - i;
     for (j = 0; j < pbc; j = j + 2) {                   /* loop by words */
         WrMemW (pa, *buf++);                            /* put word */
+        setHITMISS (MISS);                              /* set cache miss */
         if (!(massbus[mb].cs2 & CS2_UAI)) {             /* if not inhb */
             ba = ba + 2;                                /* incr ba, pa */
             pa = pa + 2;
@@ -647,6 +649,7 @@ for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
                 ((pa & 1)? CS3_WCO: CS3_WCE);
             break;
             }
+        setHITMISS (HIT);                               /* set cache hit */
         if (!(massbus[mb].cs2 & CS2_UAI)) {             /* if not inhb */
             ba = ba + 2;                                /* incr ba, pa */
             pa = pa + 2;
