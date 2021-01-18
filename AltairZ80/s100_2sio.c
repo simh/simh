@@ -747,12 +747,12 @@ static int32 m2sio_stat(DEVICE *dptr, int32 io, int32 data)
             switch (data & M2SIO_RTSMSK) {
                 case M2SIO_RTSLTIE:
                 case M2SIO_RTSLTID:
-                    r = m2sio_config_rts(dptr, 0);    /* enable RTS */
+                    m2sio_config_rts(dptr, 0);    /* enable RTS */
                     break;
 
                 case M2SIO_RTSHTID:
                 case M2SIO_RTSHTBR:
-                    r = m2sio_config_rts(dptr, 1);    /* disable RTS */
+                    m2sio_config_rts(dptr, 1);    /* disable RTS */
                     break;
 
                 default:
