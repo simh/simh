@@ -75,7 +75,7 @@
 #define PDR_1140        0077516
 #define MM0_1140        0160557
 
-#define SOP_1144        (BUS_U|OPT_EIS|OPT_FPP|OPT_MMU|OPT_UBM)
+#define SOP_1144        (BUS_U|OPT_EIS|OPT_FPP|OPT_MMU|OPT_UBM|OPT_CACHE)
 #define OPT_1144        (OPT_FPP|OPT_CIS)
 #define PSW_1144        0170777
 #define PAR_1144        0177777
@@ -91,14 +91,14 @@
 #define MM0_1145        0171777
 #define MM3_1145        0000007
 
-#define SOP_1160        (BUS_U|OPT_EIS|OPT_FPP|OPT_MMU)
+#define SOP_1160        (BUS_U|OPT_EIS|OPT_FPP|OPT_MMU|OPT_CACHE)
 #define OPT_1160        0
 #define PSW_1160        0170377
 #define PAR_1160        0007777
 #define PDR_1160        0077516
 #define MM0_1160        0160557
 
-#define SOP_1170        (BUS_U|OPT_EIS|OPT_FPP|OPT_MMU|OPT_UBM)
+#define SOP_1170        (BUS_U|OPT_EIS|OPT_FPP|OPT_MMU|OPT_UBM|OPT_CACHE)
 #define OPT_1170        (OPT_FPP|OPT_RH11)
 #define PSW_1170        0174377
 #define PAR_1170        0177777

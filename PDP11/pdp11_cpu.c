@@ -2612,7 +2612,7 @@ if (BPT_SUMM_RD &&
      sim_brk_test (pa, BPT_RDPHY)))                     /* read breakpoint? */
     ABORT (ABRT_BKPT);                                  /* stop simulation */
 if (ADDR_IS_MEM (pa)) {                                 /* memory address? */
-    setHITMISS (HIT);
+    if (CPUO (OPT_CACHE)) setHITMISS (HIT);
     return RdMemW (pa);
 }
 if ((pa < IOPAGEBASE) ||                                /* not I/O address */
@@ -2703,7 +2703,7 @@ int32 PReadW (int32 pa)
 int32 data;
 
 if (ADDR_IS_MEM (pa)) {                                 /* memory address? */
-    setHITMISS (HIT);
+    if (CPUO (OPT_CACHE)) setHITMISS (HIT);
     return RdMemW (pa);
 }
 if (pa < IOPAGEBASE) {                                  /* not I/O address? */
@@ -2722,7 +2722,7 @@ int32 PReadB (int32 pa)
 int32 data;
 
 if (ADDR_IS_MEM (pa)) {                                 /* memory address? */
-    setHITMISS (HIT);
+    if (CPUO (OPT_CACHE)) setHITMISS (HIT);
     return RdMemB (pa);
 }
 
@@ -2797,7 +2797,7 @@ void PWriteW (int32 data, int32 pa)
 {
 if (ADDR_IS_MEM (pa)) {                                 /* memory address? */
     WrMemW (pa, data);
-    setHITMISS (MISS);
+    if (CPUO (OPT_CACHE)) setHITMISS (MISS);
     return;
     }
 if (pa < IOPAGEBASE) {                                  /* not I/O address? */
@@ -2815,7 +2815,7 @@ void PWriteB (int32 data, int32 pa)
 {
 if (ADDR_IS_MEM (pa)) {                                 /* memory address? */
     WrMemB (pa, data);
-    setHITMISS (MISS);
+    if (CPUO (OPT_CACHE)) setHITMISS (MISS);
     return;
     }             
 if (pa < IOPAGEBASE) {                                  /* not I/O address? */
@@ -3487,7 +3487,7 @@ if (sw & SWMASK ('V')) {                                /* -v */
         return SCPE_REL;
     }
 if (ADDR_IS_MEM (addr)) {
-    setHITMISS (HIT);
+    if (CPUO (OPT_CACHE)) setHITMISS (HIT);
     *vptr = RdMemW (addr) & 0177777;
     return SCPE_OK;
     }
@@ -3510,7 +3510,7 @@ if (sw & SWMASK ('V')) {                                /* -v */
         return SCPE_REL;
     }
 if (ADDR_IS_MEM (addr)) {
-    setHITMISS (MISS);
+    if (CPUO (OPT_CACHE)) setHITMISS (MISS);
     WrMemW (addr, val & 0177777);
     return SCPE_OK;
     }
