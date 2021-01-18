@@ -46,6 +46,8 @@
 extern "C" {
 #endif
 
+#include "sim_sock.h"
+
 #include "sim_frontpanel.h"
 
 #include <stdio.h>
@@ -57,8 +59,6 @@ extern "C" {
 #include <errno.h>
 #include <signal.h>
 #include <pthread.h>
-
-#include "sim_sock.h"
 
 #if defined(_WIN32)
 #include <process.h>

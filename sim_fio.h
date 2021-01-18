@@ -94,6 +94,86 @@ extern t_bool sim_taddr_64;         /* t_addr is > 32b and Large File Support av
 extern t_bool sim_toffset_64;       /* Large File (>2GB) file I/O support */
 extern t_bool sim_end;              /* TRUE = little endian, FALSE = big endian */
 
+char *sim_trim_endspc (char *cptr);
+int sim_isspace (int c);
+#ifdef isspace
+#undef isspace
+#endif
+#ifndef IN_SIM_FIO_C
+#define isspace(chr) sim_isspace (chr)
+#endif
+int sim_islower (int c);
+#ifdef islower
+#undef islower
+#endif
+#define islower(chr) sim_islower (chr)
+int sim_isupper (int c);
+#ifdef isupper
+#undef isupper
+#endif
+#define isupper(chr) sim_isupper (chr)
+int sim_isalpha (int c);
+#ifdef isalpha
+#undef isalpha
+#endif
+#ifndef IN_SIM_FIO_C
+#define isalpha(chr) sim_isalpha (chr)
+#endif
+int sim_isprint (int c);
+#ifdef isprint
+#undef isprint
+#endif
+#ifndef IN_SIM_FIO_C
+#define isprint(chr) sim_isprint (chr)
+#endif
+int sim_isdigit (int c);
+#ifdef isdigit
+#undef isdigit
+#endif
+#define isdigit(chr) sim_isdigit (chr)
+int sim_isgraph (int c);
+#ifdef isgraph
+#undef isgraph
+#endif
+#ifndef IN_SIM_FIO_C
+#define isgraph(chr) sim_isgraph (chr)
+#endif
+int sim_isalnum (int c);
+#ifdef isalnum
+#undef isalnum
+#endif
+#ifndef IN_SIM_FIO_C
+#define isalnum(chr) sim_isalnum (chr)
+#endif
+int sim_toupper (int c);
+int sim_tolower (int c);
+#ifdef toupper
+#undef toupper
+#endif
+#define toupper(chr) sim_toupper(chr)
+#ifdef tolower
+#undef tolower
+#endif
+#define tolower(chr) sim_tolower(chr)
+int sim_strncasecmp (const char *string1, const char *string2, size_t len);
+int sim_strcasecmp (const char *string1, const char *string2);
+size_t sim_strlcat (char *dst, const char *src, size_t size);
+size_t sim_strlcpy (char *dst, const char *src, size_t size);
+#ifndef strlcpy
+#define strlcpy(dst, src, size) sim_strlcpy((dst), (src), (size))
+#endif
+#ifndef strlcat
+#define strlcat(dst, src, size) sim_strlcat((dst), (src), (size))
+#endif
+#ifndef strncasecmp
+#define strncasecmp(str1, str2, len) sim_strncasecmp((str1), (str2), (len))
+#endif
+#ifndef strcasecmp
+#define strcasecmp(str1, str2) sim_strcasecmp ((str1), (str2))
+#endif
+int sim_strwhitecasecmp (const char *string1, const char *string2, t_bool casecmp);
+
+
 #ifdef  __cplusplus
 }
 #endif
