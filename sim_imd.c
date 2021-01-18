@@ -41,14 +41,8 @@
                     Cylinder maps in the .IMD image file (AGN)
 */
 
-#if defined(USE_SIM_IMD)
-
 #include "sim_defs.h"
 #include "sim_imd.h"
-
-#if (defined (__MWERKS__) && defined (macintosh)) || defined(__DECC)
-#define __FUNCTION__ __FILE__
-#endif
 
 static t_stat commentParse(DISK_INFO *myDisk, uint8 comment[], uint32 buffLen);
 static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose);
@@ -85,7 +79,7 @@ DISK_INFO *diskOpen(FILE *fileref, uint32 isVerbose)
  * After this function returns, the file pointer is placed after the comment and
  * the 0x1A "EOF" marker.
  *
- * The comment parameter is optional, and if NULL, then the ocmment will not
+ * The comment parameter is optional, and if NULL, then the comment will not
  * be extracted from the IMD file, but the file position will still be advanced
  * to the end of the comment.
  */
@@ -788,5 +782,3 @@ t_stat assignDiskType(UNIT *uptr) {
     sim_fseeko(uptr->fileref, pos, SEEK_SET);
     return result;
 }
-
-#endif /* USE_SIM_IMD */
