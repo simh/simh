@@ -299,6 +299,7 @@ do {                                                    /* block loop */
         if (!ADDR_IS_MEM (org))                         /* invalid addr? */
             return SCPE_NXM;
         WrMemB (org, ((uint16) d));
+        if (CPUO (OPT_CACHE)) setHITMISS (MISS);        /* set cache miss */
         org = (org + 1) & 0177777;                      /* inc origin */
         }
     if ((d = Fgetc (fileref)) == EOF)                    /* get csum */
