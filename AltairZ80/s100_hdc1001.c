@@ -348,6 +348,8 @@ static t_stat hdc1001_unit_set_geometry(UNIT* uptr, int32 value, CONST char* cpt
         return SCPE_ARG;
 
     result = sscanf(cptr, "C:%hd/H:%hd/S:%hd/N:%hd", &newCyls, &newHeads, &newSPT, &newSecLen);
+    if (result != 4)
+        return SCPE_ARG;
 
     /* Validate Cyl, Heads, Sector, Length are valid for the HDC-1001 */
     if (newCyls < 1 || newCyls > HDC1001_MAX_CYLS) {
@@ -624,15 +626,12 @@ static t_stat HDC1001_doCommand(void)
                 /* Fall through */
             case HDC1001_CMD_READ_SECT:
             {
-                uint32 track_len;
                 uint32 xfr_len;
                 uint32 file_offset;
                 uint8 rwopts;   /* Options specified in the command: DMA, Multi-sector, long. */
 
                 /* Abort the read/write operation if C/H/S/N is not valid. */
                 if (HDC1001_Validate_CHSN(pDrive) != SCPE_OK) break;
-
-                track_len = pDrive->nsectors * pDrive->sectsize;
 
                 /* Calculate file offset */
                 file_offset  = (pDrive->cur_cyl * pDrive->nheads * pDrive->nsectors);   /* Full cylinders */

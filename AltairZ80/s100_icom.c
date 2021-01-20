@@ -1040,7 +1040,6 @@ static uint8 ICOM_Read(uint32 Addr)
     ICOM_REG *pICOM;
     UNIT *uptr;
 
-    cData = 0;
     driveNum = icom_info->currentDrive;
     uptr = icom_info->uptr[driveNum];
     pICOM = &icom_info->ICOM;
@@ -1250,7 +1249,6 @@ static uint8 ICOM_Command(UNIT *uptr, ICOM_REG *pICOM, int32 Data)
 {
     uint8 cData;
     uint8 newTrack;
-    uint8 drive;
     int32 rtn;
 
     cData = 0;
@@ -1260,8 +1258,6 @@ static uint8 ICOM_Command(UNIT *uptr, ICOM_REG *pICOM, int32 Data)
     }
 
     pICOM->command = Data;
-
-    drive = icom_info->currentDrive;
 
     switch(pICOM->command) {
         case ICOM_CMD_STATUS:

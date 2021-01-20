@@ -582,7 +582,7 @@ static t_stat pmmi_config_line(UNIT *uptr)
 
 static int32 pmmi_io(int32 addr, int32 io, int32 data)
 {
-    int32 r;
+    int32 r = 0;
 
     addr &= 0xff;
     data &= 0xff;

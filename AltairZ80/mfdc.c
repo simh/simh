@@ -235,7 +235,7 @@ static t_stat mfdc_attach(UNIT *uptr, CONST char *cptr)
     int32 i = 0;
 
     r = attach_unit(uptr, cptr);    /* attach unit  */
-    if ( r != SCPE_OK)              /* error?       */
+    if (r != SCPE_OK)               /* error?       */
         return r;
 
     /* Determine length of this disk */
@@ -290,7 +290,6 @@ static t_stat mfdc_attach(UNIT *uptr, CONST char *cptr)
 /* Detach routine */
 static t_stat mfdc_detach(UNIT *uptr)
 {
-    t_stat r;
     int8 i;
 
     for(i = 0; i < MFDC_MAX_DRIVES; i++) {
@@ -307,8 +306,7 @@ static t_stat mfdc_detach(UNIT *uptr)
         diskClose(&mfdc_info->drive[i].imd);
     }
 
-    r = detach_unit(uptr);  /* detach unit */
-    return r;
+    return detach_unit(uptr);  /* detach unit */
 }
 
 

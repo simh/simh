@@ -951,7 +951,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
       GIT_COMMIT_TIME=$(shell grep 'define SIM_GIT_COMMIT_TIME' sim_rev.h | awk '{ print $$3 }')
     else
       ifeq (git-submodule,$(if $(shell cd .. ; git rev-parse --git-dir 2>/dev/null),git-submodule))
-        GIT_COMMIT_ID=$(shell cd .. ; git submodule status | grep "$(notdir $(realpath .))" | awk '{ print $$1 }')
+        GIT_COMMIT_ID=$(shell cd .. ; git submodule status | grep " $(notdir $(realpath .)) " | awk '{ print $$1 }')
         GIT_COMMIT_TIME=$(shell git --git-dir=$(realpath .)/.git log $(GIT_COMMIT_ID) -1 --pretty="%aI")
       else
         $(info *** Error ***)
@@ -1762,7 +1762,7 @@ ALTAIRZ80 = ${ALTAIRZ80D}/altairz80_cpu.c ${ALTAIRZ80D}/altairz80_cpu_nommu.c \
 	${ALTAIRZ80D}/m68kcpu.c ${ALTAIRZ80D}/m68kdasm.c ${ALTAIRZ80D}/m68kasm.c \
 	${ALTAIRZ80D}/m68kopac.c ${ALTAIRZ80D}/m68kopdm.c \
 	${ALTAIRZ80D}/m68kopnz.c ${ALTAIRZ80D}/m68kops.c ${ALTAIRZ80D}/m68ksim.c
-ALTAIRZ80_OPT = -I ${ALTAIRZ80D} -DUSE_SIM_IMD
+ALTAIRZ80_OPT = -I ${ALTAIRZ80D}
 
 
 GRID = ${SIMHD}/GRI
@@ -2142,12 +2142,12 @@ SAGE = ${SAGED}/sage_cpu.c ${SAGED}/sage_sys.c ${SAGED}/sage_stddev.c \
     ${SAGED}/m68k_cpu.c ${SAGED}/m68k_mem.c ${SAGED}/m68k_scp.c \
     ${SAGED}/m68k_parse.tab.c ${SAGED}/m68k_sys.c \
     ${SAGED}/i8251.c ${SAGED}/i8253.c ${SAGED}/i8255.c ${SAGED}/i8259.c ${SAGED}/i8272.c 
-SAGE_OPT = -I ${SAGED} -DHAVE_INT64 -DUSE_SIM_IMD
+SAGE_OPT = -I ${SAGED} -DHAVE_INT64
 
 PDQ3D = ${SIMHD}/PDQ-3
 PDQ3 = ${PDQ3D}/pdq3_cpu.c ${PDQ3D}/pdq3_sys.c ${PDQ3D}/pdq3_stddev.c \
     ${PDQ3D}/pdq3_mem.c ${PDQ3D}/pdq3_debug.c ${PDQ3D}/pdq3_fdc.c 
-PDQ3_OPT = -I ${PDQ3D} -DUSE_SIM_IMD
+PDQ3_OPT = -I ${PDQ3D}
 
 #
 # Build everything (not the unsupported/incomplete or experimental simulators)

@@ -152,6 +152,10 @@ extern int sim_vax_snprintf(char *buf, size_t buf_size, const char *fmt, ...);
 #define USE_REGEX 1
 #endif
 
+#if (defined (__MWERKS__) && defined (macintosh)) || defined(__DECC)
+#define __FUNCTION__ __FILE__
+#endif
+
 #ifdef  __cplusplus
 extern "C" {
 #endif
@@ -592,6 +596,7 @@ struct UNIT {
     void                *up8;                           /* device specific */
     uint16              us9;                            /* device specific */
     uint16              us10;                           /* device specific */
+    uint32              disk_type;                      /* Disk specific info */
     void                *tmxr;                          /* TMXR linkage */
     uint32              recsize;                        /* Tape specific info */
     t_addr              tape_eom;                       /* Tape specific info */
