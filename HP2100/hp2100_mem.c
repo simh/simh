@@ -1,7 +1,7 @@
 /* hp2100_mem.c: HP 21xx/1000 Main Memory/Memory Expansion Module/Memory Protect simulator
 
    Copyright (c) 1993-2016, Robert M. Supnik
-   Copyright (c) 2017-2019, J. David Bryan
+   Copyright (c) 2017-2020, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -29,6 +29,7 @@
    MEM          12731A Memory Expansion Module
    MP           12581A/12892B Memory Protect
 
+   26-Aug-20    JDB     Consolidated "mem_trace_registers" E/O/I output
    27-Mar-19    JDB     "dm_violation" now correctly freezes the violation register
    02-Aug-18    JDB     Added MEM device
    30-Jul-18    JDB     Renamed "iop_sp" to "SPR" (stack pointer register)
@@ -321,25 +322,29 @@ static const uint32 tbg  = 0001674u;            /* (RTE) TBG address */
 
 /* Main memory tracing constants */
 
-static const char * const register_values [] = {    /* register values, indexed by EOI concatenation */
-    "e o i",                                        /*   E = 0, O = 0, interrupt_system = off */
-    "e o I",                                        /*   E = 0, O = 0, interrupt_system = on */
-    "e O i",                                        /*   E = 0, O = 1, interrupt_system = off */
-    "e O I",                                        /*   E = 0, O = 1, interrupt_system = on */
-    "E o i",                                        /*   E = 1, O = 0, interrupt_system = off */
-    "E o I",                                        /*   E = 1, O = 0, interrupt_system = on */
-    "E O i",                                        /*   E = 1, O = 1, interrupt_system = off */
-    "E O I"                                         /*   E = 1, O = 1, interrupt_system = on */
-    };
-
 static const char mp_value [] = {               /* memory protection value, indexed by mp_control */
     '-',                                        /*   MP is off */
     'P'                                         /*   MP is on */
     };
 
-static const char * const register_formats [] = {       /* CPU register formats, indexed by is_1000 */
-    REGA_FORMAT "  A %06o, B %06o, ",                   /*   is_1000 = FALSE format */
-    REGA_FORMAT "  A %06o, B %06o, X %06o, Y %06o, "    /*   is_1000 = TRUE  format */
+static const char e_value [] = {                /* extend register value */
+    'e',                                        /*   E is 0 */
+    'E'                                         /*   E is 1 */
+    };
+
+static const char o_value [] = {                /* overflow register value */
+    'o',                                        /*   O is 0 */
+    'O'                                         /*   O is 1 */
+    };
+
+static const char i_value [] = {                /* interrupt system value */
+    'i',                                        /*   interrupt system is off */
+    'I'                                         /*   interrupt system is on */
+    };
+
+static const char * const register_formats [] = {               /* CPU register formats, indexed by is_1000 */
+    REGA_FORMAT "  A %06o, B %06o, %.0u%.0u%c %c %c\n",         /*   is_1000 = FALSE format */
+    REGA_FORMAT "  A %06o, B %06o, X %06o, Y %06o, %c %c %c\n"  /*   is_1000 = TRUE  format */
     };
 
 static const char * const mp_mem_formats [] = {                 /* MP/MEM register formats, indexed by is_1000 */
@@ -1252,6 +1257,9 @@ else                                                    /* otherwise */
     1. The "is_1000" flag is used to include or omit, based on the CPU model,
        the X and Y registers from the working register trace and the MEVR and
        MESR from the memory protection trace.
+
+    2. The "%.0u" print specifications in the trace call absorb the zero X and Y
+       register values without printing them when the CPU is not a 1000.
 */
 
 void mem_trace_registers (FLIP_FLOP interrupt_system)
@@ -1260,10 +1268,9 @@ hp_trace (&cpu_dev, TRACE_REG,              /* output the working registers */
           register_formats [is_1000],       /*   using a format appropriate for the CPU model */
           mp_value [mp_control],
           meu_status & MEST_FENCE_MASK,
-          SR, AR, BR, XR, YR);
-
-fputs (register_values [E << 2 | O << 1 | interrupt_system], sim_deb);  /* output E, O, and interrupt system */
-fputc ('\n', sim_deb);
+          SR, AR, BR, XR, YR,
+          e_value [E], o_value [O],
+          i_value [interrupt_system]);
 
 if (mp_mem_changed) {                       /* if the MP/MEM registers have been altered */
     hp_trace (&cpu_dev, TRACE_REG,          /*   then output the register values */

@@ -1,7 +1,7 @@
 /* hp2100_defs.h: HP 2100 simulator architectural declarations
 
    Copyright (c) 1993-2016, Robert M. Supnik
-   Copyright (c) 2017-2019, J. David Bryan
+   Copyright (c) 2017-2020, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   17-Aug-20    JDB     Corrected "cputc" definition
    08-Dec-19    JDB     Added "hp_reset_poll" routine declaration
    28-Mar-19    JDB     Added extensions
    18-Mar-19    JDB     Added include for SCP extensions
@@ -308,7 +309,7 @@
 
 #define cputc(ch) \
           do { \
-              putc (ch); \
+              putchar (ch); \
               if (sim_log) \
                   fputc (ch, sim_log); \
               } \

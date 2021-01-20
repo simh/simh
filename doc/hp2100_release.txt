@@ -1,7 +1,7 @@
                            SIMH/HP 2100 RELEASE NOTES
                         ================================
                         J. David Bryan <jdbryan@acm.org>
-                             Last update: 2020-02-14
+                             Last update: 2020-11-07
 
 
 This file documents the release history of the simulator for the Hewlett-Packard
@@ -173,7 +173,7 @@ Manuals describing the operation of HP software are available from Bitsavers at:
 
 ...and from the HP Computer Museum at:
 
-  http://www.hpmuseum.net/collection_document.php
+  http://www.hpmuseum.net/collection_document.php#CS
 
 
 ----------------
@@ -218,6 +218,306 @@ Revision 5010:
    include Table Area II in the user map.  Note that ACCTS requires SSGA access,
    so use "OP,BGSS" for online loading or specify "ACCTS,19,90" in the Parameter
    Input Phase of a system generation.
+
+
+
+======================
+Release 30, 2020-11-07
+======================
+
+This release of the HP 2100 simulator adds the following features:
+
+ - A new concurrent-mode FLUSH command has been added to flush terminal logs and
+   attached device files that otherwise would be flushed only when the simulator
+   is stopped.  This allows external examination of these files while the
+   simulator continues to run.
+
+ - Terminal multiplexer line logs are now flushed each time the simulator stops.
+   Prior to this, closing and then reopening a line log was the only way to post
+   buffered writes to disc.
+
+ - The -N (new file) option has been added to the SET BACI LOG, SET MPX LOG, and
+   SET MUXL LOG commands to create new, blank log files.  Without the option,
+   the commands will append to existing log files.
+
+ - The HP 12972C 8-channel terminal multiplexer (MPX) and 12920A 16-channel
+   terminal multiplexer (MUX) now allow channels to be omitted from the
+   connection order.  For example, a SET MPX LINEORDER=0-3 command permits
+   connections to channels 0 through 3.  Additional Telnet connection attempts
+   will be rejected with an "All connections busy" message, and attempting to
+   attach a serial port to a line not in the connection order will be rejected
+   with a "Unit not attachable" message.
+
+ - A new INTERLOCK option has been added to the IPL device.  This provides a
+   more precise way of synchronizing the two simulator processes running the HP
+   2000 Time-Shared BASIC operating system.  Entering a SET IPL INTERLOCK=<n>
+   command restricts each process to executing <n> machine instructions before
+   performing a rendezvous with the other process.  In this way, both processes
+   remain in approximate lock-step, which substantially improves system startup
+   reliability, even when one process is preempted during initialization by the
+   host operating system.  An associated SHOW IPL INTERLOCK command displays the
+   current interlock value.
+
+ - The IPL device now works on FreeBSD and Cygwin host platforms, as well as the
+   Windows and Linux platforms that were previously supported.
+
+ - A new -E switch has been added to the ATTACH IPL command.  This enables
+   falling back to timed waits if the host platform does not support the
+   synchronization routines necessary for the SET IPL WAIT and SET IPL SIGNAL
+   commands.
+
+ - The CMD trace option for the IPL device now decodes and reports all TSB
+   commands that pass between the System Processor and the I/O Processor.
+
+ - The PSERV and STATE trace options have been added to the IPLO device.
+   Enabling the PSERV option traces the periodic calls to the new process
+   synchronizer.  Enabling the STATE option traces calls to the host platform
+   event routines, as well as internal synchronizer states during rendezvous.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - The terminal multiplexer LINEORDER option now omits unspecified lines from
+   the connection order.  Prior versions appended unspecified lines to the end
+   of the specified order.  To obtain the prior behavior, append the keyword ALL
+   as the last parameter to the connection order list.
+
+ - New releases of the HP 2000F and 2000 Access software kits use the SET IPL
+   INTERLOCK command instead of the prior SET IPL WAIT/SIGNAL commands to
+   synchronize the two simulator instances and provide more reliable system
+   startup under a wider variety of host system conditions.
+
+ - The 2000 Access software kit now includes a command file to run the
+   program that converts files between Access and 2000 C/F systems.
+
+ - The "Running HP 2000 Time-Shared BASIC on SIMH" monograph has been
+   extensively revised to cover the application of the new SET IPL INTERLOCK
+   command to the TSB startup command files.
+
+ - The previous method of sleeping for a few milliseconds during 2000 Access
+   startup to avoid IOP initialization errors is no longer required when the
+   new IPL interlock is used.  The capability has been retained, however, and
+   will be used if the host platform does not support synchronization events.
+
+ - The size of the shared memory area that simulates the processor
+   interconnection cables of the IPL device has been changed.  On Linux and
+   macOS systems, this area is implemented by a file named "HP 2100-MEM-<code>",
+   where <code> is he code number supplied to the ATTACH IPL command.  The file
+   is located in the "/dev/shm" directory.  If the file is present, it must be
+   removed before running the simulator, or a "File open error" will result when
+   an ATTACH IPL is attempted.  The new release of the simulator removes the
+   file automatically when a DETACH IPL is performed, so manual removal must be
+   done only once.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  Breakpoint actions after an included true IF are discarded.
+
+     VERSION:  Release 29.
+
+     OBSERVATION:  If a breakpoint has actions that include an IF command
+     followed by additional actions, and the IF command evaluates to TRUE, then
+     the IF actions executed, but the remaining breakpoint actions are
+     discarded.  For example:
+
+       sim> set environment X=0
+       sim> break 10 ; if "%X%" == "0" echo X is 0 ; echo Done
+       sim> go
+
+     One would expect to see:
+
+       Breakpoint, P: 00010 (NOP)
+       sim> if "0" == "0" echo X is 0
+       sim> echo X is 0
+       X is 0
+       sim> echo Done
+       Done
+       sim>
+
+     Instead, only the first ECHO is performed.  The second one is discarded.
+     However, execution is correct if the IF condition is false:
+
+       sim> set environment X=1
+       sim> break 10 ; if "%X%" == "0" echo X is 0 ; echo Done
+       sim> go
+
+       Breakpoint, P: 00010 (NOP)
+       sim> if "1" == "0" echo X is 0
+       sim> echo Done
+       Done
+       sim>
+
+     CAUSE:  IF actions are executed by setting the breakpoint action pointer to
+     the action list and returning to the command loop.  While the IF command is
+     executing, the pointer is pointing at the "echo Done" part of the
+     breakpoint action list.  However, if the IF condition is true, the pointer
+     is changed to point at the "echo X is 0" command, and the remaining
+     breakpoint actions are lost.
+
+     RESOLUTION:  Modify "if_cmd" (sim_extension.c) to append the remaining
+     breakpoint actions to the actions specified by the IF command, so that the
+     former are not lost.
+
+     STATUS:  Fixed in Release 30.
+
+
+  2. PROBLEM:  Linking with recent compilers results in duplicate symbol errors.
+
+     VERSION:  Releases 29.
+
+     OBSERVATION:  If the simulator is compiled with a recent compiler version,
+     the link step fails with duplicate symbol errors.  The symbols reported are
+     "sim_vm_release", "vm_sim_vm_init", "vm_console_input_unit", and
+     "vm_console_output_unit".
+
+     CAUSE:  The VM hook extension mechanism is implemented with "tentative
+     definitions" of the hook variables.  The C standard says:
+
+       "If a translation unit contains one or more tentative definitions for an
+        identifier, and the translation unit contains no external definition for
+        that identifier, then the behavior is exactly as if the translation unit
+        contains a file scope declaration of that identifier, with the composite
+        type as of the end of the translation unit, with an initializer equal to
+        0."
+
+     This behavior is such that if no module contains a definition with an
+     initializer, the hook will have a zero value.  However, if a module
+     contains a definition with an initializer, the hook is assigned that value.
+     This allows hooks to be set without changing the hook's tentative
+     definition simply by including a VM module that declares it with an
+     initializer.
+
+     This mechanism relies on the linker to resolve the multiple definitions of
+     a given hook to a single reference.  For this to occur, the compiler must
+     mark tentative definitions as "common" allocations, e.g., with the
+     "-fcommon" option to gcc.  Traditionally, gcc (and clang, etc.) defaults to
+     common allocations for tentative definitions.  However, the gcc manual
+     claims that, "This behavior is not required by ISO C, and on some targets
+     may carry a speed or code size penalty on variable references."
+
+     Newer versions (starting with gcc 10) default to data allocations instead
+     ("-fno-common"), and multiple tentative definitions now result in duplicate
+     symbol errors rather than merged accesses.
+
+     RESOLUTION:  Modify sim_extension.h to declare "vm_sim_vm_init" only if the
+     USE_VM_INIT symbol is defined.  Modify "ex_initialize" (sim_extension.c) to
+     remove the tentative definition and to make the external "vm_sim_vm_init"
+     call conditional on USE_VM_INIT.  Modify "one_time_init" (hp2100_sys.c) to
+     set the "sim_vm_release" hook directly.  Modify "tty_reset" (hp2100_tty.c)
+     to set the console unit hooks directly.  This removes all tentative
+     definitions from the simulators.
+
+     STATUS:  Fixed in Releases 30.
+
+
+  3. PROBLEM:  Trace output to stdout on Unix results in stair-step output.
+
+     VERSION:  Release 29.
+
+     OBSERVATION:  Directing the trace output to "stdout" on a Unix system
+     results in lines stair-stepping across the screen.  For example:
+
+       sim> set console debug=stdout
+       sim> set cpu debug=instr
+       sim> step 2
+
+     ...produces this output:
+
+       >>CPU instr: - 0000 00000  000000  NOP
+                                             >>CPU instr: - 0000 00001  000000  NOP
+
+     CAUSE:  Trace statements are output with LF ('\n') line ends and depend on
+     host-system translation to the proper line-end convention when the lines
+     are written to the trace log.  However, while the simulator is executing
+     instructions, the console is placed in "raw" mode so that output
+     translation, which would interfere with the output from the target
+     operating system, is not done.  As there are no carriage returns in the
+     trace output stream when writing to stdout, the console cursor simply drops
+     in place to the next line, so that each line begins at the same column
+     where the previous line ended.
+
+     RESOLUTION:  Modify "hp_trace" (hp2100_sys.c) to convert a terminating LF
+     to a CR LF sequence if output is to stdout.  Also modify "sim_instr"
+     (hp2100_cpu.c) to add CR characters to the stdout stream where line
+     termination is done explicitly.
+
+     STATUS:  Fixed in Release 30.
+
+
+  4. PROBLEM:  The trace line for an I/O error simulation stop is incomplete.
+
+     VERSION:  Release 29.
+
+     OBSERVATION:  With simulation stops on I/O errors enabled, a CPU trace
+     correctly records the stop, but the stop description is incomplete.  For
+     example:
+
+       sim> set ipl enabled
+       sim> attach -s ipl 1
+       sim> set cpu stop=ioerr
+       sim> set cpu debug=instr
+       sim> set console debug=stdout
+       sim> go
+
+     ...produces trace output that ends with:
+
+       >>CPU instr: - 0000 00061  000000  simulation stop: Cable not connected to
+
+     ...while the simulation console reports the full message, "Cable not
+     connected to the IPLI device."
+
+     CAUSE:  The trace statement printer for the stop calls "sim_error_text" to
+     obtain the description of the stop status, but that routine does not handle
+     VM-specific additions.  Upon returning to SCP, the "run_cmd" routine prints
+     the "sim_error_text" but then calls a VM-specified "sim_vm_fprint_stopped"
+     routine to handle additions to VM stops.
+
+     RESOLUTION:  Modify "sim_instr" (hp2100_cpu.c) to call the VM-specific
+     simulation stop handler via the "sim_vm_fprint_stopped" hook if an I/O
+     error stop occurred.
+
+     STATUS:  Fixed in Release 30.
+
+
+  5. PROBLEM:  ATTACH/DETACH MUXL <network-port> succeeds but should not.
+
+     VERSION:  Release 29.
+
+     OBSERVATION:  The HP 12920A multiplexer simulator defines two devices: the
+     MUX device that contains the polling unit, and the MUXL device that
+     contains the terminal line units.  The poll unit is attached with the:
+
+       ATTACH MUX <network-port>
+
+     ...command.  Line units are attached to serial ports with the:
+
+       ATTACH MUXL <serial-port>
+
+     ...command.  These behave as expected.  However, the:
+
+       ATTACH MUXL <network-port>
+
+     ...command succeeds but attaches the port to the MUX device.  This is
+     incorrect and should be prohibited.
+
+     CAUSE:  The "muxl_attach" routine passes a poll unit pointer to the
+     "tmxr_attach_unit" routine.  The latter routine attaches the poll unit
+     instead of the passed line unit when a device is referenced.  However, the
+     poll unit belongs to a different device, and so the mux line routine
+     attaches the port to the mux poll device.
+
+     RESOLUTION:  Modify "muxl_attach" and "muxl_detach" (hp2100_mux.c) to pass
+     NULL for the poll unit in the "tmxr_attach_unit" calls.  Modify the
+     "ex_tmxr_attach_unit" and "ex_tmxr_detach_unit" routines (sim_extension.c)
+     to reject the call if a device was referenced and a NULL poll unit pointer
+     was passed.
+
+     STATUS:  Fixed in Release 30.
 
 
 

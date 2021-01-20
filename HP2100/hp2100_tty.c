@@ -1,7 +1,7 @@
 /* hp2100_tty.c: HP 12531C Buffered Teleprinter Interface simulator
 
    Copyright (c) 1993-2016, Robert M. Supnik
-   Copyright (c) 2017-2019, J. David Bryan
+   Copyright (c) 2017-2020, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +26,7 @@
 
    TTY          12531C Buffered Teleprinter Interface
 
+   25-Aug-20    JDB     Reset routine now sets up VM unit pointer hooks
    03-May-19    JDB     Output stall now doubles rescheduling wait
    26-Apr-19    JDB     Added "vm_console_[in/out]put_unit" declarations
    22-Sep-18    JDB     RESET -P now resets to original FASTTIME timing
@@ -275,9 +276,6 @@ static UNIT tty_unit [] = {
 #define key_unit            tty_unit [keyboard] /* teleprinter keyboard unit  */
 #define print_unit          tty_unit [printer]  /* teleprinter printer unit */
 #define punch_unit          tty_unit [punch]    /* teleprinter punch unit */
-
-UNIT *vm_console_input_unit  = &key_unit;       /* console input unit pointer */
-UNIT *vm_console_output_unit = &print_unit;     /* console output unit pointer */
 
 
 /* Device information block */
@@ -576,7 +574,7 @@ return outbound;                                        /* return the outbound s
 /* TTY local SCP support routines */
 
 
-/* Set the keyboad input and print output filters.
+/* Set the keyboard input and print output filters.
 
    This validation routine is called to configure the character input filter for
    the keyboard unit and the output filter for the print unit.  The "value"
@@ -664,7 +662,7 @@ return SCPE_OK;                                         /* mode changes always s
    rejected; the unit must be detached first.  Otherwise, the device is disabled
    by setting the DEV_DIS flag.
 
-   In either case, the device is reset, which will restart or cancel the keyboad
+   In either case, the device is reset, which will restart or cancel the keyboard
    poll, as appropriate.
 */
 
@@ -728,6 +726,9 @@ if (sim_switches & SWMASK ('P')) {                      /* if this is a power-on
     tty.shift_in_data = MARK;                           /*     and preset the input shift register */
 
     fast_data_time = TTY_FAST_TIME;                     /* restore the initial fast data time */
+
+    vm_console_input_unit  = &key_unit;                 /* set up the console input */
+    vm_console_output_unit = &print_unit;               /*   and console output unit pointers */
     }
 
 if (tty_dev.flags & DEV_DIS)                            /* if the device is disabled */
@@ -843,7 +844,7 @@ if (tty.mode & CN_INPUT) {                              /* if the card is set fo
     io_assert (&tty_dev, ioa_ENF);                      /*   and the flag */
 
     if (tty.mode & (CN_PRINT | CN_PUNCH))               /* if the printer or punch is enabled */
-        status = output ((int32) input);                /*   then scho the received character */
+        status = output ((int32) input);                /*   then echo the received character */
     else                                                /* otherwise */
         status = SCPE_OK;                               /*    silently indicate success */
     }

@@ -1,7 +1,7 @@
 /* hp2100_lpt.c: HP 2100 12845B Line Printer Interface simulator
 
    Copyright (c) 1993-2016, Robert M. Supnik
-   Copyright (c) 2017-2019, J. David Bryan
+   Copyright (c) 2017-2020, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +26,7 @@
 
    LPT          HP 12845B Line Printer Interface
 
+   16-Mar-20    JDB     Corrected introductory comments.
    09-Dec-19    JDB     Removed redundant SIM_SW_REST check in "lp_attach"
    01-Oct-19    JDB     DETACH -F now flushes the print buffer if not empty
    26-Jun-18    JDB     Revised I/O model
@@ -221,6 +222,7 @@
    The format commands recognized by the printers are:
 
      0 0 0 0 0 0 0 -- slew 0 lines (suppress spacing) after printing *
+     0 0 0 0 0 0 1 -- slew 1 line after printing
           ...
      0 0 0 1 1 1 1 -- slew 15 lines after printing
 
@@ -228,7 +230,7 @@
           ...
      0 1 1 1 1 1 1 -- slew 63 lines after printing **
 
-      * slew 1 line on the 2607A, which cannot suppress printing.
+      * slew 1 line on the 2607A, which cannot suppress spacing after printing
      ** available only on the 2610A and 2614A
 
    and:

@@ -1,7 +1,7 @@
 /* hp2100_cpu.c: HP 21xx/1000 Central Processing Unit simulator
 
    Copyright (c) 1993-2016, Robert M. Supnik
-   Copyright (c) 2017-2019, J. David Bryan
+   Copyright (c) 2017-2020, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -28,6 +28,10 @@
                 I/O subsystem
                 Power Fail Recovery System
 
+   26-Aug-20    JDB     Fixed tracing for I/O error simulation stops
+                        Corrected line ends for trace to stdout
+                        "set_model" now clears the X and Y registers for 21xx CPUs
+   04-Jul-20    JDB     Postlude trace now calls "sim_error_text" unconditionally
    08-Dec-19    JDB     Added "hp_reset_poll" call to "cpu_reset"
    03-Jul-19    JDB     Substituted BP_EXEC for explicit 'E' switch in sim_brk_test
    08-Apr-19    JDB     Suppress stop messages for step and breakpoints in DO files
@@ -2140,6 +2144,9 @@ while (status == SCPE_OK) {                             /* execute until simulat
             fprint_val (sim_deb, sim_eval [0], cpu_dev.dradix,          /*   then print the numeric */
                         cpu_dev.dwidth, PV_RZRO);                       /*     value again */
 
+        if (sim_deb == stdout)                          /* if debug output is to the (raw) console */
+            fputc ('\r', sim_deb);                      /*   then insert a carriage return */
+
         fputc ('\n', sim_deb);                          /* end the trace with a newline */
         }
 
@@ -2190,12 +2197,20 @@ pcq_r->qptr = pcq_p;                                    /* update the PC queue p
 sim_brk_dflt = meu_breakpoint_type (FALSE);             /* base the default breakpoint type on the current MEM state */
 
 if (TRACING (cpu_dev, cpu_dev.dctrl)                    /* if instruction tracing is enabled */
-  && status <= SCPE_LAST)                               /*   and the status is valid */
+  && status <= SCPE_LAST) {                             /*   and the status is valid */
     hp_trace (&cpu_dev, cpu_dev.dctrl,                  /*     then output the simulation stop reason */
-              DMS_FORMAT "simulation stop: %s\n",
+              DMS_FORMAT "simulation stop: %s",
               meu_indicator, meu_page, MR, TR,
-              status >= SCPE_BASE ? sim_error_text (status)
-                                  : sim_stop_messages [status]);
+              sim_error_text (status));
+
+    if (cpu_ioerr_uptr)                                 /* if this is an I/O error stop */
+        sim_vm_fprint_stopped (sim_deb, status);        /*   then add additional information */
+
+    if (sim_deb == stdout)                              /* if debug output is to the (raw) console */
+        fputc ('\r', sim_deb);                          /*   then insert a carriage return */
+
+    fputc ('\n', sim_deb);                              /* tie off the line */
+    }
 
 if (sim_switches & SIM_SW_HIDE                          /* if executing in a non-echoing command file */
   && (status == SCPE_STEP || status == STOP_BRKPNT))    /*   and a step or breakpoint stop occurs */
@@ -3795,6 +3810,10 @@ return SCPE_OK;
        For logical tests that depend on this, it is faster (by one x86 machine
        instruction) to test the "cpu_configuration" variable for the presence of
        one of the three 1000 model flags.
+
+    3. The index registers (X and Y) are cleared when the model is set to a 21xx
+       CPU, which does not have index registers.  This is required for the
+       "mem_trace_registers" routine to omit the registers from the trace.
 */
 
 static t_stat set_model (UNIT *uptr, int32 new_model, char *cptr, void *desc)
@@ -3836,6 +3855,8 @@ if (result == SCPE_OK) {                                /* if the change succeed
     else {                                              /* otherwise this is a 2100 or 211x */
         is_1000 = FALSE;                                /*   so set the model index */
         mem_end = mem_size - IBL_SIZE;                  /*     and reserve memory for the loader */
+
+        XR = YR = 0;                                    /* clear the (non-existent) index registers */
         }
     }
 

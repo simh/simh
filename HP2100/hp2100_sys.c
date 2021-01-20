@@ -1,7 +1,7 @@
 /* hp2100_sys.c: HP 2100 system common interface
 
    Copyright (c) 1993-2016, Robert M. Supnik
-   Copyright (c) 2017-2019, J. David Bryan
+   Copyright (c) 2017-2020, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   26-Aug-20    JDB     Modified "hp_trace" to output CR LFs to stdout
+   25-Aug-20    JDB     Now sets SCP hooks in "one_time_init" routine
    08-Dec-19    JDB     Added "hp_reset_poll" and "poll_name" routines
    04-Mar-19    JDB     Added "sim_vm_release" character string declaration
    04-Oct-18    JDB     Reordered the device list alphabetically
@@ -117,9 +119,9 @@
 
 
 
-/* Global release string */
+/* Release string */
 
-char *sim_vm_release = "29";                    /* HP 2100 simulator release number */
+static char *hp_release = "30";                 /* HP 2100 simulator release number */
 
 
 /* Command-line switch parsing from scp.c */
@@ -3395,6 +3397,11 @@ return;
    name among the devices enabled for tracing to ensure that all trace lines
    will align for easier reading.
 
+   Because the prefix is output only once, embedded newlines should not be
+   present in the format string.  If multiple output lines are desired, then
+   this routine should be called multiple times, so that each line receives an
+   identifying trace prefix.
+
 
    Implementation notes:
 
@@ -3403,6 +3410,23 @@ return;
        the latter, we must allocate "sufficiently large" arrays for the flag
        name and format, rather than arrays of the exact size required by the
        call parameters.
+
+    2. If the trace output is being written to stdout, a terminating LF must
+       be translated to CR LF.  This is because the console is in "raw" mode
+       while the CPU is executing instructions.  Output to a file does not need
+       this processing, as text mode handles the host line-end convention.
+
+    3. Handling embedded newlines properly would require multiple calls to
+       "vfprintf", each preceded by the prefix, and each having a format string
+       consisting of the next segment that ends with an embedded newline.
+       However, multiple calls are not allowed.  The C standard says:
+
+         "As the functions vfprintf [etc.] invoke the va_arg macro, the value of
+          arg after the return is indeterminate."
+
+       So there is no way to have the second (e.g.) call start with those
+       (variable) parameters not consumed by the prior call.  Consequently, the
+       terminating LF check need only be done at the end of the format string.
 */
 
 #define FLAG_SIZE           32                          /* sufficiently large to accommodate all flag names */
@@ -3434,15 +3458,25 @@ if (sim_deb != NULL && dptr != NULL) {                  /* if the output stream 
                          (int) device_size, sim_dname (dptr),   /*   while padding the device and flag names */
                          (int) flag_size, flag_name);           /*     as needed for proper alignment */
 
-                va_start (argptr, flag);                        /* set up the argument list */
+                va_start (argptr, flag);                /* set up the argument list */
 
-                format = va_arg (argptr, char *);               /* get the format string parameter */
-                strcat (header_fmt, format);                    /* append the supplied format */
+                format = va_arg (argptr, char *);       /* get the format string parameter */
+                strcat (header_fmt, format);            /* append the supplied format */
 
-                vfprintf (sim_deb, header_fmt, argptr);         /* format and print to the debug stream */
+                if (sim_deb == stdout) {                            /* if debug output is to the (raw) console */
+                    fptr = header_fmt + strlen (header_fmt) - 1;    /*   then find the end of the string */
 
-                va_end (argptr);                                /* clean up the argument list */
-                break;                                          /*   and exit with the job complete */
+                    if (*fptr == '\n') {                /* if the format ends with a LF */
+                        *fptr++ = '\r';                 /*   then replace it */
+                        *fptr++ = '\n';                 /*     with a CR LF sequence */
+                        *fptr   = '\0';                 /*       and terminate with a NUL */
+                        }
+                    }
+
+                vfprintf (sim_deb, header_fmt, argptr); /* format and print to the debug stream */
+
+                va_end (argptr);                        /* clean up the argument list */
+                break;                                  /*   and exit with the job complete */
                 }
 
             else                                        /* otherwise */
@@ -3453,14 +3487,22 @@ return;
 }
 
 
-/* Make a pair of devices consistent */
+/* Make a pair of devices consistent.
+
+   Most of the disc and tape devices use two interface cards, designated the
+   command channel and the data channel.  These are simulated with two DEVICE
+   structures.  When a SET <dev> ENABLE or DISABLE command is directed to one of
+   the cards, the other chard wants to be set to the same state.  Calling this
+   routine with the target card as the first parameter and the other card as the
+   second parameter will do it.
+*/
 
 void hp_enbdis_pair (DEVICE *ccptr, DEVICE *dcptr)
 {
-if (ccptr->flags & DEV_DIS)
-    dcptr->flags |= DEV_DIS;
-else
-    dcptr->flags &= ~DEV_DIS;
+if (ccptr->flags & DEV_DIS)                             /* if the target device is disabled */
+    dcptr->flags |= DEV_DIS;                            /*   then disable the other device */
+else                                                    /* otherwise */
+    dcptr->flags &= ~DEV_DIS;                           /*   enable the other device */
 
 return;
 }
@@ -3547,12 +3589,13 @@ run_handler   = find_cmd ("RUN")->action;               /*   and the RUN/GO comm
 break_handler = find_cmd ("BREAK")->action;             /*     and the BREAK/NOBREAK command handler */
 load_handler  = find_cmd ("LOAD")->action;              /*       and the LOAD command handler */
 
+sim_vm_release        = hp_release;                     /* set up the release string */
 sim_vm_cmd            = aux_cmds;                       /* set up the auxiliary command table */
-sim_vm_fprint_stopped = fprint_stopped;                /* set up the simulation-stop printer */
-sim_vm_fprint_addr    = fprint_addr;                   /* set up the address printer */
-sim_vm_parse_addr     = parse_addr;                    /* set up the address parser */
-sim_vm_post           = cpu_post_cmd;                  /* set up the command post-processor */
-sim_vm_unit_name      = poll_name;                     /* set up the custom unit name handler */
+sim_vm_fprint_stopped = fprint_stopped;                 /* set up the simulation-stop printer */
+sim_vm_fprint_addr    = fprint_addr;                    /* set up the address printer */
+sim_vm_parse_addr     = parse_addr;                     /* set up the address parser */
+sim_vm_post           = cpu_post_cmd;                   /* set up the command post-processor */
+sim_vm_unit_name      = poll_name;                      /* set up the custom unit name handler */
 
 sim_brk_types = BP_SUPPORTED;                           /* register the supported breakpoint types */
 sim_brk_dflt  = BP_ENONE;                               /* the default breakpoint type is "execution" */

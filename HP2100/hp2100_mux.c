@@ -26,6 +26,7 @@
 
    MUX,MUXL,MUXC        12920A Asynchronous Multiplexer Interface
 
+   21-Oct-20    JDB     ATTACH/DETACH MUXL <port> command is now rejected
    03-Jan-20    JDB     Revised modem control operation, added "muxc_reset"
    23-Oct-19    JDB     Fixed "muxl_ibuf" value for send interrupts
                         Fixed "lower_input_format" starting bit number
@@ -1985,7 +1986,7 @@ static t_stat muxl_attach (UNIT *uptr, char *cptr)
 {
 t_stat status;
 
-status = tmxr_attach_unit (&mux_desc, &mux_poll, uptr, cptr);   /* try to attach to the serial port */
+status = tmxr_attach_unit (&mux_desc, NULL, uptr, cptr);   /* try to attach to the serial port */
 
 if (status == SCPE_OK) {                                /* if the attach succeeded */
     muxu_unit [0].wait = POLL_FIRST;                    /*   then set up the poll */
@@ -2003,7 +2004,7 @@ static t_stat muxl_detach (UNIT *uptr)
 t_stat status;
 int32  line;
 
-status = tmxr_detach_unit (&mux_desc, &mux_poll, uptr); /* try to detach the serial port */
+status = tmxr_detach_unit (&mux_desc, NULL, uptr); /* try to detach the serial port */
 
 if (status == SCPE_OK) {                                /* if the detach succeeded */
     line = uptr - muxl_unit;                            /*   then determine the line number */
