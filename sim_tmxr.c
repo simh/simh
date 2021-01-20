@@ -1,6 +1,6 @@
 /* sim_tmxr.c: Telnet terminal multiplexor library
 
-   Copyright (c) 2001-2019, Robert M Supnik
+   Copyright (c) 2001-2020, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,9 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   26-Oct-20    JDB     Line order now supports partial connection lists
+   23-Oct-20    JDB     Added tmxr_table and tmxr_post_logs
+                        tmxr_set_log now takes -N switch for new file
    19-Dec-19    JDB     Added tmxr_is_extended global hook
    19-Mar-19    JDB     Added tmxr_read, tmxr_write, tmxr_show, tmxr_close
                         global hooks and associated local hook routines;
@@ -79,16 +82,25 @@
    tmxr_dep     -       (null) deposit
    tmxr_msg     -       send message to socket
    tmxr_linemsg -       send message to line
-   tmxr_fconns  -       output connection status
-   tmxr_fstats  -       output connection statistics
+   tmxr_fconns  -       output line connection status
+   tmxr_fstats  -       output line connection statistics
+   tmxr_set_log -       open a log file for a terminal line
+   tmxr_set_nolog -     close a log file for a terminal line
+   tmxr_post_logs -     flush and optionally close all log files
+   tmxr_show_log -      output log file status
    tmxr_dscln   -       disconnect line (SET routine)
    tmxr_rqln    -       number of available characters for line
    tmxr_tqln    -       number of buffered characters for line
    tmxr_set_lnorder -   set line connection order
    tmxr_show_lnorder -  show line connection order
-   tmxr_init_line -     initialize the line data
-   tmxr_report_connection - report a line connection to the port
-   tmxr_disconnect_line - disconnect a line
+   tmxr_show_summ -     output the number of connections
+   tmxr_show_cstat -    output device connection status or statistics
+   tmxr_show_lines -    output the number of lines
+   tmxr_find_ldsc -     find a line descriptor
+   tmxr_send_buffered_data -    write the line data
+   tmxr_init_line -             initialize the line data
+   tmxr_report_connection -     report a line connection to the port
+   tmxr_disconnect_line -       disconnect a line
 
    All routines are OS-independent.
 */
@@ -139,6 +151,21 @@
 #define TNS_CRPAD       005                             /* CR padding */
 #define TNS_DO          006                             /* DO request pending rejection */
 
+/* Multiplexer-descriptor table.
+
+   Each device multiplexer declares a multiplexer descriptor (TMXR) structure to
+   identify the mux and its terminal lines.  The structure is local to the
+   device simulator, and nothing in the DEVICE structure points to it, so there
+   is no external way of accessing the line (TMLN) structures.  Access is needed
+   if the associated terminal line logs are to be flushed when a simulator stop
+   occurs and closed when the simulator exits.  This is provided by a global
+   table of TMXR structures that is filled in when line logs are opened.
+*/
+
+#define TABLE_COUNT     10                              /* the number of table entries provided */
+
+static TMXR *tmxr_table [TABLE_COUNT] = { NULL };       /* the table of multiplexer descriptors */
+
 void tmxr_rmvrc (TMLN *lp, int32 p);
 
 extern char sim_name[];
@@ -165,15 +192,22 @@ t_bool (*tmxr_is_extended) (TMLN *lp)               = NULL;
         line number activated, -1 if none
 
    If a connection order is defined for the descriptor, and the first value is
-   not -1 (indicating default order), then the order array is used to find an
-   open line.  Otherwise, a search is made of all lines in numerical sequence.
+   not < 0 to indicate the default order, then the order array is used to find
+   an open line.  Otherwise, a search is made of all lines in numerical
+   sequence.
+
+   If some valid lines are to be omitted from the connection order, a value < 0
+   will appear after the last allowed line value.  For example, specifying
+   connection order values of 1, 0, 2, and -1 will allow connections to lines 1,
+   0, and 2 in that order.  Additional connection attempts will fail with "All
+   connections busy," even though more lines are available in the device.
 */
 
 int32 tmxr_poll_conn (TMXR *mp)
 {
 SOCKET newsock;
 TMLN *lp;
-int32 *op;
+int32 *op, *fop;
 int32 i, j;
 char *ipaddr = NULL;
 
@@ -187,14 +221,20 @@ static char mantra[] = {
 
 newsock = sim_accept_conn (mp->master, &ipaddr);        /* poll connect */
 if (newsock != INVALID_SOCKET) {                        /* got a live one? */
-    op = mp->lnorder;                                   /* get line connection order list pointer */
+    fop = op = mp->lnorder;                             /* get line connection order list pointer */
     i = mp->lines;                                      /* play it safe in case lines == 0 */
 
-    for (j = 0; j < mp->lines; j++, i++) {              /* find next avail line */
-        if (op && (*op >= 0) && (*op < mp->lines))      /* order list present and valid? */
-            i = *op++;                                  /* get next line in list to try */
-        else                                            /* no list or not used or range error */
-            i = j;                                      /* get next sequential line */
+    for (j = 0; j < mp->lines; j++, i++) {              /* find the next available line */
+        if (fop == NULL || *fop < 0)                    /* if the first list entry is undefined or defaulted */
+            i = j;                                      /*   then use the next sequential line */
+
+        else if (*op >= 0 && *op < mp->lines)           /* otherwise if the line number is legal */
+            i = *op++;                                  /*   then use the next listed line */
+
+        else {                                          /* otherwise the list entry is invalid */
+            i = mp->lines;                              /*   so abandon the search now */
+            break;                                      /*     and report that no lines are free */
+            }
 
         lp = mp->ldsc + i;                              /* get pointer to line descriptor */
         if (lp->conn == 0)                              /* is the line available? */
@@ -422,9 +462,9 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
                     lp->tsta = TNS_SKIP;                /* IAC + other */
                     break;
                 case TN_GA: case TN_EL:                 /* IAC + other 2 byte types */
-                case TN_EC: case TN_AYT:                
+                case TN_EC: case TN_AYT:
                 case TN_AO: case TN_IP:
-                case TN_NOP: 
+                case TN_NOP:
                     lp->tsta = TNS_NORM;                /* ignore */
                     break;
                 case TN_SB:                             /* IAC + SB sub-opt negotiation */
@@ -811,12 +851,28 @@ if (lp->conn) {
 return SCPE_OK;
 }
 
-/* Enable logging for line */
+/* Enable logging for line.
+
+   This routine opens the log file whose name is specified by "cptr" for the
+   multiplexer line associated with "uptr" or, if NULL, for the line number
+   specified by "val".  "desc" contains a pointer to the multiplexer descriptor.
+
+   If opening is successful, the routine then adds the descriptor pointer to the
+   table of descriptors, which is used to flush and eventually close the log
+   files.
+
+
+   Implementation notes:
+
+    1. Table entries are not removed, so a NULL entry indicates both the end of
+       the active list and the first available space.
+*/
 
 t_stat tmxr_set_log (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 TMXR *mp = (TMXR *) desc;
 TMLN *lp;
+uint32 index;
 
 if (cptr == NULL)                                       /* no file name? */
     return SCPE_2FARG;
@@ -829,12 +885,29 @@ lp->txlogname = (char *) calloc (CBUFSIZE, sizeof (char)); /* alloc namebuf */
 if (lp->txlogname == NULL)                              /* can't? */
     return SCPE_MEM;
 strncpy (lp->txlogname, cptr, CBUFSIZE);                /* save file name */
-lp->txlog = fopen (cptr, "ab");                         /* open log */
+if (sim_switches & SWMASK ('N'))                        /* if a new log file is requested */
+    lp->txlog = fopen (cptr, "wb");                     /*   then open an empty file for writing */
+else                                                    /* otherwise */
+    lp->txlog = fopen (cptr, "ab");                     /*   open an existing file for appending */
 if (lp->txlog == NULL) {                                /* error? */
     free (lp->txlogname);                               /* free buffer */
     return SCPE_OPENERR;
     }
-return SCPE_OK;
+else {                                                  /* otherwise if the open succeeded */
+    for (index = 0; index < TABLE_COUNT; index++)       /* loop through the table entries */
+        if (tmxr_table [index] == mp)                   /* if the mux descriptor is already present */
+            break;                                      /*   then we're done */
+
+        else if (tmxr_table [index] == NULL) {          /* otherwise if the entry is empty */
+            tmxr_table [index] = mp;                    /*   then store the new descriptor */
+            break;                                      /*     and we're done */
+            }
+
+    if (index == TABLE_COUNT)                           /* if there are no empty entries */
+        return SCPE_IERR;                               /*   then report an internal error */
+    else                                                /* otherwise the descriptor was */
+        return SCPE_OK;                                 /*   either already present or added */
+    }
 }
 
 /* Disable logging for line */
@@ -856,6 +929,52 @@ if (lp->txlog) {                                        /* logging? */
     lp->txlogname = NULL;
     }
 return SCPE_OK;
+}
+
+/* Flush and optionally close all log files.
+
+   This routine flushes or closes all active terminal multiplexer line logs,
+   depending on the value of the boolean parameter.  The routine uses the table
+   of multiplexer descriptors constructed by the "tmxr_set_log" routine to
+   identify the active lines.  The line structure array associated with each
+   descriptor is examined in sequence for active logs.  Each one that is found
+   is flushed to post the contents to disc and left open, or closed and marked
+   inactive, as directed by the supplied parameter.
+
+
+   Implementation notes:
+
+    1. The table is organized so that a NULL entry indicates that no additional
+       descriptors will be found.  That is, descriptors always appear at the
+       beginning of the table.
+*/
+
+void tmxr_post_logs (t_bool close_logs)
+{
+uint32 index;
+int32  line, line_count;
+TMXR   *mptr;
+TMLN   *lptr;
+
+for (index = 0; index < TABLE_COUNT; index++)           /* look through the descriptor list */
+    if (tmxr_table [index] == NULL)                     /*   until all entries */
+        break;                                          /*     have been seen */
+
+    else {                                              /* for each active entry */
+        mptr = tmxr_table [index];                      /*   get the entry */
+        lptr = mptr->ldsc;                              /*     and the line array */
+        line_count = mptr->lines;                       /*       and the number of lines */
+
+        for (line = 0; line < line_count; line++, lptr++)   /* for all lines in the array */
+            if (lptr->txlog != NULL)                        /*   if the current line's log is active */
+                if (close_logs)                             /*     then if closing is requested */
+                    tmxr_set_nolog (NULL, line, NULL,       /*        then close the log */
+                                    (void *) mptr);
+                else                                        /* otherwise */
+                    fflush (lptr->txlog);                   /*   flush the log and leave it open */
+        }
+
+return;
 }
 
 /* Show logging status for line */
@@ -880,7 +999,7 @@ return SCPE_OK;
    device indicated in the TMXR structure.  That is, the multiplexer lines may
    belong to a device other than the one attached to the socket (the HP 2100 MUX
    device is one example).  Therefore, we must look up the device from the unit
-   at each call, rather than depending on the DPTR stored in the TMXR.
+   at each call, rather than depending on the dptr stored in the TMXR.
 */
 
 TMLN *tmxr_find_ldsc (UNIT *uptr, int32 val, TMXR *mp)
@@ -898,110 +1017,146 @@ return mp->ldsc + val;                                  /* line descriptor */
 
 /* Set the line connection order.
 
-   Example command for eight-line multiplexer:
+   This validation routine is called to set the connection order for the
+   multiplexer whose TMXR pointer is passed in the "desc" parameter.  It parses
+   the line order list, specified by the "cptr" parameter, of commands such as:
 
-      SET <dev> LINEORDER=1;5;2-4;7
+      SET <dev> LINEORDER=4-7
+      SET <dev> LINEORDER=1;5;2-4;7;ALL
+      SET <dev> LINEORDER=ALL
 
-   Resulting connection order: 1,5,2,3,4,7,0,6.
+   Assuming an 8-channel multiplexer, the first form sets the connection order
+   to line numbers 4, 5, 6, and 7.  The remaining lines will not be connected; a
+   connection attempt will be refused with "All connections busy."  The second
+   form sets the connection order to line 1, 5, 2, 3, 4, 7, 0, and 6.  The
+   trailing "ALL" parameter causes any unspecified lines to be added to the
+   connection order in ascending value.  The third form sets the order to lines
+   0-7, which is the default order in the absence of a line connection order
+   array.
 
-   Parameters:
-    - uptr = (not used)
-    - val  = (not used)
-    - cptr = pointer to first character of range specification
-    - desc = pointer to multiplexer's TMXR structure
+   The range of accepted line numbers, including those implied by "ALL", can be
+   restricted by specifying a non-zero "val" parameter, with the upper 16 bits
+   specifying the maximum line number, and the lower 16 bits specifying the
+   minimum line number.  If a minimum is specified but a maximum is not (i.e.,
+   is zero), the maximum is the last line number defined by the multiplexer
+   descriptor.
 
-   On entry, cptr points to the value portion of the command string, which may
-   be either a semicolon-separated list of line ranges or the keyword ALL.
+   The "uptr" parameter is not used.
+
+   On entry, "cptr" points to the value portion of the command string, which may
+   be either a semicolon-separated list of line ranges or the keyword "ALL".  If
+   "ALL" is specified, it must be the last (or only) item in the list.
 
    If a line connection order array is not defined in the multiplexer
-   descriptor, the command is rejected.  If the specified range encompasses all
-   of the lines, the first value of the connection order array is set to -1 to
+   descriptor, or a line range string is not present, or the optional minimum
+   and maximum restrictions in the "val" parameter are not valid, the command is
+   rejected.  If the specified range encompasses all of the lines defined by the
+   multiplexer, the first value of the connection order array is set to -1 to
    indicate sequential connection order.  Otherwise, the line values in the
-   array are set to the order specified by the command string.  All values are
-   populated, first with those explicitly specified in the command string, and
-   then in ascending sequence with those not specified.
+   array are set to the order specified by the command string.  If fewer values
+   are supplied than there are lines supported by the device, and the final
+   parameter is not ALL, the remaining lines will be inaccessible and are
+   indicated by a -1 value after the last specified value.
 
    If an error occurs, the original line order is not disturbed.
 */
 
 t_stat tmxr_set_lnorder (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-TMXR *mp = (TMXR *) desc;
-char *tptr;
-t_addr low, high, max = (t_addr) mp->lines - 1;
-int32 *list;
+TMXR   *mp = (TMXR *) desc;
+char   *tptr;
+t_addr low, high, min, max;
+int32  *list;
 t_bool *set;
-uint32 line, idx = 0;
+uint32 line, idx;
+t_addr lncount = (t_addr) (mp->lines - 1);
 t_stat result = SCPE_OK;
 
-if (mp->lnorder == NULL)                                /* line connection order undefined? */
-    return SCPE_NXPAR;                                  /* "Non-existent parameter" error */
+if (mp->lnorder == NULL)                                /* if the connection order array is not defined */
+    return SCPE_NXPAR;                                  /*   then report a "Non-existent parameter" error */
 
-else if ((cptr == NULL) || (*cptr == '\0'))             /* line range not supplied? */
-    return SCPE_MISVAL;                                 /* "Missing value" error */
+else if ((cptr == NULL) || (*cptr == '\0'))             /* otherwise if a line range was not supplied */
+    return SCPE_MISVAL;                                 /*   then report a "Missing value" error */
 
-list = (int32 *) calloc (mp->lines, sizeof (int32));    /* allocate new line order array */
+else {                                                  /* otherwise */
+    min = (t_addr) (val & 0xFFFF);                      /*   split the restriction into */
+    max = (t_addr) ((val >> 16) & 0xFFFF);              /*     minimum and maximum line numbers */
 
-if (list == NULL)                                       /* allocation failed? */
-    return SCPE_MEM;                                    /* report it */
+    if (max == 0)                                       /* if the maximum line number isn't specified */
+        max = lncount;                                  /*   then use the defined maximum */
 
-set = (t_bool *) calloc (mp->lines, sizeof (t_bool));   /* allocate line set tracking array */
+    if (min > lncount || max > lncount || min > max)    /* if the restriction isn't valid */
+        return SCPE_IERR;                               /*   then report an "Internal error" */
+    }
 
-if (set == NULL) {                                      /* allocation failed? */
-    free (list);                                        /* free successful list allocation */
-    return SCPE_MEM;                                    /* report it */
+list = (int32 *) calloc (mp->lines, sizeof (int32));    /* allocate the new line order array */
+
+if (list == NULL)                                       /* if the allocation failed */
+    return SCPE_MEM;                                    /*   then report a "Memory exhausted" error */
+
+set = (t_bool *) calloc (mp->lines, sizeof (t_bool));   /* allocate the line set tracking array */
+
+if (set == NULL) {                                      /* if the allocation failed */
+    free (list);                                        /*   then free the successful list allocation */
+    return SCPE_MEM;                                    /*      and report a "Memory exhausted" error */
     }
 
 tptr = cptr + strlen (cptr);                            /* append a semicolon */
 *tptr++ = ';';                                          /*   to the command string */
-*tptr = '\0';                                           /*   to make parsing easier for get_range */
+*tptr = '\0';                                           /*     to make parsing easier */
 
-while (*cptr) {                                                 /* parse command string */
+idx = 0;                                                /* initialize the index of ordered values */
+
+while (*cptr != '\0') {                                 /* while characters remain in the command string */
+    if (strncmp (cptr, "ALL;", 4) == 0) {               /*   if the parameter is "ALL" */
+        if (val != 0 || idx > 0 && idx <= max)          /*     then if some lines are restrictied or unspecified */
+            for (line = min; line <= max; line++)       /*       then fill them in sequentially */
+                if (set [line] == FALSE)                /*         setting each unspecified line */
+                    list [idx++] = line;                /*           into the line order */
+
+        cptr = cptr + 4;                                /* advance past "ALL" and the trailing semicolon */
+
+        if (*cptr != '\0')                              /* if "ALL" is not the last parameter */
+            result = SCPE_2MARG;                        /*   then report extraneous items */
+
+        break;                                          /* "ALL" terminates the order list */
+        }
+
     cptr = get_range (NULL, cptr, &low, &high, 10, max, ';');   /* get a line range */
 
-    if (cptr == NULL) {                                 /* parsing error? */
-        result = SCPE_ARG;                              /* "Invalid argument" error */
-        break;
+    if (cptr == NULL) {                                 /* if a parsing error occurred */
+        result = SCPE_ARG;                              /*   then report an invalid argument */
+        break;                                          /*     and terminate the parse */
         }
 
-    else if ((low > max) || (high > max)) {             /* line out of range? */
-        result = SCPE_SUB;                              /* "Subscript out of range" error */
-        break;
+    else if (low < min || low > max || high > max) {    /* otherwise if the line number is invalid */
+        result = SCPE_SUB;                              /*   then report the subscript is out of range */
+        break;                                          /*     and terminate the parse */
         }
 
-    else if ((low == 0) && (high == max)) {             /* entire line range specified? */
-        list [0] = -1;                                  /* set sequential order flag */
-        idx = (uint32) max + 1;                         /* indicate no fill-in needed */
-        break;
-        }
-
-    else
-        for (line = (uint32) low; line <= (uint32) high; line++) /* see if previously specified */
-            if (set [line] == FALSE) {                  /* not already specified? */
-                set [line] = TRUE;                      /* now it is */
-                list [idx] = line;                      /* add line to connection order */
-                idx = idx + 1;                          /* bump "specified" count */
+    else                                                            /* otherwise it's a valid range */
+        for (line = (uint32) low; line <= (uint32) high; line++)    /*   so add the line(s) to the order */
+            if (set [line] == FALSE) {                              /* if the line number has not been specified */
+                set [line] = TRUE;                                  /*   then now it is */
+                list [idx++] = line;                                /*     and add it to the connection order */
                 }
     }
 
-if (result == SCPE_OK) {                                /* assignment successful? */
-    if (idx <= max)                                     /* any lines not specified? */
-        for (line = 0; line <= max; line++)             /* fill them in sequentially */
-            if (set [line] == FALSE) {                  /* specified? */
-                list [idx] = line;                      /* no, so add it */
-                idx = idx + 1;
-                }
+if (result == SCPE_OK) {                                /* if the assignment succeeded */
+    if (idx <= max)                                     /*   then if any lines were not specified */
+        list [idx] = -1;                                /*     then terminate the order list after the last one */
 
-    memcpy (mp->lnorder, list, mp->lines * sizeof (int32)); /* copy working array to connection array */
+    memcpy (mp->lnorder, list,                          /* copy the working array to the connection array */
+            mp->lines * sizeof (int32));
     }
 
-free (list);                                            /* free list allocation */
-free (set);                                             /* free set allocation */
+free (list);                                            /* free the list allocation */
+free (set);                                             /*   and the set allocation */
 
-return result;
+return result;                                          /* return the status */
 }
 
-/* Show line connection order.
+/* Show the line connection order.
 
    Parameters:
     - st   = stream on which output is to be written
@@ -1013,7 +1168,8 @@ return result;
    command is rejected.  If the first value of the connection order array is set
    to -1, then the connection order is sequential.  Otherwise, the line values
    in the array are printed as a semicolon-separated list.  Ranges are printed
-   where possible to shorten the output.
+   where possible to shorten the output.  A -1 value within the array indicates
+   the end of the order list.
 */
 
 t_stat tmxr_show_lnorder (FILE *st, UNIT *uptr, int32 val, void *desc)
@@ -1032,7 +1188,7 @@ if (*iptr < 0)                                          /* sequential order indi
 else {
     low = last = *iptr++;                               /* set first line value */
 
-    for (j = 1; j <= mp->lines; j++) {                  /* print remaining lines in order list */
+    for (j = 1; last != -1; j++) {                      /* print the remaining lines in the order list */
         if (j < mp->lines)                              /* more lines to process? */
             i = *iptr++;                                /* get next line in list */
         else                                            /* final iteration */

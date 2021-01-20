@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the author.
 
+   25-Aug-20    JDB     Declaration of "vm_sim_vm_init" is now conditional on USE_VM_INIT
    31-Dec-19    JDB     First release version
    18-Mar-19    JDB     Created file
 */
@@ -91,19 +92,27 @@ t_stat ex_sim_putchar_s (int32 c);
 t_stat ex_sim_poll_kbd  (void);
 uint32 ex_sim_brk_test  (t_addr location, uint32 type);
 
-t_stat ex_tmxr_attach_unit   (TMXR *mp, UNIT *pptr, UNIT *uptr, char *cptr);
-t_stat ex_tmxr_detach_unit   (TMXR *mp, UNIT *pptr, UNIT *uptr);
-t_stat ex_tmxr_detach_line   (TMXR *mp, UNIT *uptr);
-t_stat ex_tmxr_control_line  (TMLN *lp, TMCKT control);
-TMCKT  ex_tmxr_line_status   (TMLN *lp);
-int32  ex_tmxr_poll_conn     (TMXR *mp);
-t_bool ex_tmxr_line_free     (TMLN *lp);
-t_bool ex_tmxr_mux_free      (TMXR *mp);
+t_stat ex_tmxr_attach_unit  (TMXR *mp, UNIT *pptr, UNIT *uptr, char *cptr);
+t_stat ex_tmxr_detach_unit  (TMXR *mp, UNIT *pptr, UNIT *uptr);
+t_stat ex_tmxr_detach_line  (TMXR *mp, UNIT *uptr);
+t_stat ex_tmxr_control_line (TMLN *lp, TMCKT control);
+TMCKT  ex_tmxr_line_status  (TMLN *lp);
+int32  ex_tmxr_poll_conn    (TMXR *mp);
+t_bool ex_tmxr_line_free    (TMLN *lp);
+t_bool ex_tmxr_mux_free     (TMXR *mp);
 
 
-extern void   (*vm_sim_vm_init) (void);
-extern CTAB   *vm_sim_vm_cmd;
-extern t_stat vm_sim_instr      (void);
+/* The per-simulator init routine is declared (and called) only if the
+   compilation defines the USE_VM_INIT symbol.  The other per-simulator pointers
+   can be overrriden by the init routine or by the CPU reset routine that is
+   called during simulator startup, whichever is preferred.
+*/
 
-extern UNIT *vm_console_input_unit;             /* console input unit pointer */
-extern UNIT *vm_console_output_unit;            /* console output unit pointer */
+#if defined (USE_VM_INIT)
+extern void (*vm_sim_vm_init) (void);
+#endif
+
+extern t_stat vm_sim_instr (void);
+extern CTAB   *vm_sim_vm_cmd;                   /* VM-specific command table pointer */
+extern UNIT   *vm_console_input_unit;           /* console input unit pointer */
+extern UNIT   *vm_console_output_unit;          /* console output unit pointer */

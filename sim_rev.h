@@ -29,7 +29,7 @@
 
 #define SIM_MAJOR       3
 #define SIM_MINOR       11
-#define SIM_PATCH       0
+#define SIM_PATCH       2
 #define SIM_DELTA       0
 
 /* V3.11 revision history
@@ -39,11 +39,79 @@
 
 patch   date            module(s) and fix(es)
 
+  2     tbd             scp.h
+                        - changed sim_vm_init to build time option (Dave Bryan)
+
+                        scp.c
+                        - changed sim_vm_init to build time option (Dave Bryan)
+                        - flush stdout after prompt (Mark Pizzolato)
+
+                        pdp10_tu.c
+                        - fixed bad macro (Mark Pizzolata)
+
+                        pdp11_cpumod.c
+                        - fixed KDJ11E programmable rate select (Paul Koning)
+
+                        pdp11_stddev.c
+                        - added KSR option for TTI/TTO
+
+                        pdp18b_dr15.c
+                        - zero out shared section on initial allocate (Dave Bryan)
+
+                        s3_sys.c
+                        - fixed bldaddr length (Mark Pizzolatto)
+
+                        vax_cpu.c
+                        - added idle test for VMS 5.0/5.1 (Mark Pizzolato)
+
+  1     31-Mar-2020     scp.c and sim_tmxr_c
+                        - new extensions to support HP simulators
+                        - added SET <dev|unit> APPEND command
+
+                        sim_ether library
+                        - imported latest V4 revision
+
+                        Alpha
+                        - fixed DMAPEN register definition
+
+                        Interdata
+                        - fixed DP xTIME register definitions
+
+                        NOVA
+                        - fixed processing of tape UNLOAD
+
+                        PDP-1
+                        - generalized PTR ASCII mode handling of end-of-line and end-of-tape
+
+                        PDP-10
+                        - fixed processing of tape UNLOAD
+
+                        PDP-11
+                        - fixed PT INT definition
+                        - disabled VH11 (temporarily) because of multiline race condition
+                        - fixed processing of tape UNLOAD in TM, TU
+
+                        PDP-8
+                        - fixed processing of tape UNLOAD
+
+                        Sigma
+                        - fixed incorrect 550 interrupt register array declaration
+                        - fixed processing of tape UNLOAD
+
+                        VAX
+                        - disabled VH11 (temporarily) because of multiline race condition
+
+patch   date            module(s) and fix(es)
+
   0     01-Dec-2019     scp.c and supporting libraries
                         - new features and extensions to support the HP simulators
+                        - lengthened CONT to CONTNIUE for V4.x compatibility
 
                         sim_sock.c
                         - latest bug fixes from V4.x
+
+                        PDP-11
+                        - fixed race condition in DZ11 (Mark Pizzolato)
 
                         VAX
                         - added hook for unpredictable indexed immediate in .aw flows

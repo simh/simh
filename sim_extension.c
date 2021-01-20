@@ -23,6 +23,11 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the author.
 
+   21-Oct-20    JDB     A NULL poll pointer is now valid for MUX attach and detach
+   20-Oct-20    JDB     Added FLUSH command to post file contents to disc
+   25-Aug-20    JDB     Call of "vm_sim_vm_init" is now conditional on USE_VM_INIT
+   03-Aug-20    JDB     IF now retains remainder of breakpoint command list
+   06-Jul-20    JDB     Silence spurious compiler warning in "ex_if_cmd"
    14-Feb-20    JDB     First release version
    18-Mar-19    JDB     Created
 
@@ -274,14 +279,11 @@ static void ex_initialize (void);
 void (*sim_vm_init) (void) = ex_initialize;     /* use our one-time initializer */
 
 
-/* Hooks provided by us for the back end virtual machine */
+/* Hooks provided by us for use by the back end virtual machine */
 
-CTAB *vm_sim_vm_cmd = NULL;
-
-void (*vm_sim_vm_init) (void);
-
-UNIT *vm_console_input_unit;                    /* console input unit pointer */
-UNIT *vm_console_output_unit;                   /* console output unit pointer */
+CTAB *vm_sim_vm_cmd          = NULL;            /* VM command extension table */
+UNIT *vm_console_input_unit  = NULL;            /* console input unit pointer */
+UNIT *vm_console_output_unit = NULL;            /* console output unit pointer */
 
 
 /* Pointer to the VM handler for unit names */
@@ -519,6 +521,7 @@ static t_stat ex_run_cmd        (int32 flag, char *cptr);
 static t_stat ex_do_cmd         (int32 flag, char *cptr);
 static t_stat ex_if_cmd         (int32 flag, char *cptr);
 static t_stat ex_delete_cmd     (int32 flag, char *cptr);
+static t_stat ex_flush_cmd      (int32 flag, char *cptr);
 static t_stat ex_restricted_cmd (int32 flag, char *cptr);
 static t_stat ex_set_cmd        (int32 flag, char *cptr);
 static t_stat ex_show_cmd       (int32 flag, char *cptr);
@@ -605,6 +608,7 @@ static CTAB ex_cmds [] = {
 
     { "IF",       ex_if_cmd,          0,          "if <cond> <cmd>;...      execute commands if condition TRUE\n"   },
     { "DELETE",   ex_delete_cmd,      0,          "del{ete} <file>          delete a file\n"                        },
+    { "FLUSH",    ex_flush_cmd,       0,          "f{lush}                  flush all open files to disc\n"         },
 
     { "GOTO",     ex_restricted_cmd,  EX_GOTO,    "goto <label>             transfer control to the labeled line\n" },
     { "CALL",     ex_restricted_cmd,  EX_CALL,    "call <label> {<par>...}  call the labeled subroutine\n"          },
@@ -739,8 +743,10 @@ sim_vm_cmd    = ex_cmds;                                /* set up the extension 
 sub_args      = ex_substitute_args;                     /*   and argument substituter */
 sim_get_radix = ex_get_radix;                           /*     and EX/DEP/SET radix configuration */
 
+#if defined (USE_VM_INIT)
 if (vm_sim_vm_init != NULL)                             /* if the VM has a one-time initializer */
     vm_sim_vm_init ();                                  /*   then call it now */
+#endif
 
 vm_unit_name_handler = sim_vm_unit_name;                /* save the unit name hook in case the VM set it */
 sim_vm_unit_name = breakpoint_name;                     /*   and substitute our own */
@@ -955,7 +961,8 @@ return;
    If a device is referenced, the poll unit specified by the "pptr" parameter is
    attached instead of the referenced unit.  This is because a device reference
    passes a pointer to unit 0 (i.e., ATTACH MUX and ATTACH MUX0 both set "uptr"
-   to point at unit 0).
+   to point at unit 0).  If the poll unit is not defined, then the device attach
+   is rejected.
 
    An attempt to attach the poll unit directly via a unit reference will be
    rejected by the "ex_tmxr_attach_line" routine because the unit does not
@@ -967,9 +974,12 @@ t_stat ex_tmxr_attach_unit (TMXR *mp, UNIT *pptr, UNIT *uptr, char *cptr)
 t_stat status;
 
 if (sim_ref_type == REF_DEVICE)                         /* if this is a device reference */
-    uptr = pptr;                                        /*   then substitute the poll unit */
+    if (pptr == NULL)                                   /*   then if the poll unit is not defined */
+        return SCPE_NOATT;                              /*     then report that the attach failed */
+    else                                                /*   otherwise */
+        uptr = pptr;                                    /*     substitute the poll unit */
 
-if (mp == NULL || pptr == NULL || uptr == NULL)         /* if the descriptor, poll, or unit pointer is null */
+if (mp == NULL || uptr == NULL)                         /* if the descriptor or unit pointer is null */
     status = SCPE_IERR;                                 /*   then report an internal error */
 
 else if (sim_ref_type != REF_UNIT                       /* otherwise if this is a device or null reference */
@@ -1000,7 +1010,8 @@ return status;                                          /* return the status of 
    If a device is referenced, the poll unit specified by the "pptr" parameter is
    detached instead of the referenced unit.  This is because a device reference
    passes a pointer to unit 0 (i.e., DETACH MUX and DETACH MUX0 both set "uptr"
-   to point at unit 0).
+   to point at unit 0).  If the poll unit is not defined, then the device detach
+   is rejected.
 
    An attempt to detach the poll unit directly via a unit reference will be
    rejected by the "ex_tmxr_detach_line" routine because the unit does not
@@ -1012,9 +1023,12 @@ t_stat ex_tmxr_detach_unit (TMXR *mp, UNIT *pptr, UNIT *uptr)
 t_stat status;
 
 if (sim_ref_type == REF_DEVICE)                         /* if this is a device reference */
-    uptr = pptr;                                        /*   then substitute the poll unit */
+    if (pptr == NULL)                                   /*   then if the poll unit is not defined */
+        return SCPE_NOATT;                              /*     then report that the attach failed */
+    else                                                /*   otherwise */
+        uptr = pptr;                                    /*     substitute the poll unit */
 
-if (mp == NULL || pptr == NULL || uptr == NULL)         /* if the descriptor, poll, or unit pointer is null */
+if (mp == NULL || uptr == NULL)                         /* if the descriptor or unit pointer is null */
     status = SCPE_IERR;                                 /*   then report an internal error */
 
 else if (sim_ref_type != REF_UNIT                       /* otherwise if this is a device or null reference */
@@ -1322,6 +1336,7 @@ for (line = 0; line < mp->lines; line++, lp++)          /* check each line for a
 
 return TRUE;                                            /* the mux is free, as there are no connections */
 }
+
 
 
 /* Hooked terminal multiplexer replacement extension routines */
@@ -2762,6 +2777,7 @@ static const char allowed_cmds [] = " "                         /* the list of u
     "DO "       "ECHO "     "ASSERT "   "HELP "
 
     "REPLY "    "NOREPLY "  "IF "       "DELETE "   "ABORT "    /*   extended commands */
+    "FLUSH "
 
     "POWER ";                                                   /*   simulator-specific commands */
 
@@ -2819,6 +2835,7 @@ return status;                                          /* return the search res
      CALL    -- call the labeled subroutine
      RETURN  -- return control from a subroutine
      ABORT   -- abort nested command files
+     FLUSH   -- flush all buffered files
 
    The RUN and GO commands are enhanced to add an UNTIL option that sets a
    temporary breakpoint, and all of the simulated execution commands are
@@ -3521,6 +3538,17 @@ return status;                                          /* return the command st
        results if the buffers overlap ("cptr" points into the command buffer, so
        "sim_brk_act" would be copying a command within the buffer to the start
        of the same buffer).
+
+    2. An IF command may appear as an action within a breakpoint command or
+       another IF command.  To support this, any actions of a true IF command
+       are prefixed to any remaining breakpoint or IF actions by concatenating
+       the two sets of actions in a temporary buffer.  Were this not done, the
+       remaining actions would be lost when "sim_brk_act" is pointed at the new
+       IF actions.
+
+    3. Any unexecuted actions must be copied to a separate buffer before
+       prefixing, as they will reside in the same buffer that will hold the
+       prefix if they are the result of a prior IF command.
 */
 
 typedef enum {                                  /* test operators */
@@ -3539,8 +3567,9 @@ static t_stat ex_if_cmd (int32 flag, char *cptr)
 {
 static char tempbuf [CBUFSIZE];
 struct stat statbuf;
-int         result, condition;
-char        abuf [CBUFSIZE], bbuf [CBUFSIZE];
+int         result, condition = 0;                      /* silence spurious gcc-9.2.0 compiler warning */
+char        abuf [CBUFSIZE], bbuf [CBUFSIZE], *tptr;
+int32       bufsize;
 t_bool      upshift, invert;
 TEST_OP     test;
 LOGICAL_OP  logical = Assign;
@@ -3675,7 +3704,26 @@ do {                                                    /* loop until all condit
 while (not_done);                                       /* continue to process logical comparisons until done */
 
 if (condition)                                          /* if the comparison is true */
-    sim_brk_act = strcpy (tempbuf, cptr);               /*   then copy the action string and execute the commands */
+    if (sim_brk_act == NULL)                            /*   then if no unexecuted actions remain */
+        sim_brk_act = strcpy (tempbuf, cptr);           /*     then copy our action string to a buffer */
+
+    else {                                              /* otherwise */
+        strcpy (abuf, sim_brk_act);                     /*   save the unexecuted actions in a separate buffer */
+
+        tptr = tempbuf;                                 /* point at the action buffer */
+        bufsize = CBUFSIZE;                             /*   and initialize the remaining size */
+
+        copy_string (&tptr, &bufsize, cptr, 0);         /* copy the current actions as a prefix */
+
+        if (bufsize > 1) {                              /* if space remains */
+            *tptr++ = ';';                              /*   then append the action separator */
+            bufsize = bufsize - 1;                      /*     and account for the space */
+
+            copy_string (&tptr, &bufsize, abuf, 0);     /* copy the unexecuted actions */
+            }
+
+        sim_brk_act = tempbuf;                          /* point at the concatenated action list */
+        }
 
 return SCPE_OK;                                         /* either way, the command succeeded */
 }
@@ -3702,6 +3750,36 @@ else if (remove (cptr) == 0)                            /* otherwise if the dele
 
 else                                                    /* otherwise */
     return SCPE_OPENERR;                                /*   report that the file could not be opened */
+}
+
+
+/* Execute the FLUSH command.
+
+   This command processing routine adds a new FLUSH command to flush all
+   buffered files to disc.  The routine processes commands of the form:
+
+     FLUSH
+
+   For files that are open, the command flushes the console and debug log files,
+   the files attached to all of the units of all devices, and log files
+   associated with terminal multiplexer lines.
+
+   The command provides a way to flush buffered file contents to disc without
+   having to stop and restart simulated execution.  As such, it is useful when
+   the console is in concurrent mode.  In nonconcurrent mode, stopping the
+   simulator to enter the FLUSH command will automatically flush all open files,
+   so the command is redundant in that case.
+*/
+
+static t_stat ex_flush_cmd (int32 flag, char *cptr)
+{
+if (*cptr != '\0')                                      /* if something follows */
+    return SCPE_2MARG;                                  /*   then report extraneous characters */
+
+else {                                                  /* otherwise */
+    fflush (NULL);                                      /*   flush all open files */
+    return SCPE_OK;
+    }
 }
 
 
