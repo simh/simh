@@ -26,6 +26,9 @@
 
    ATCD,ATCC    HP 30032B Asynchronous Terminal Controller
 
+   27-Oct-20    JDB     Added the SET LINEORDER option
+   26-Oct-20    JDB     Line order now leaves out channel 0
+   25-Aug-20    JDB     Reset routine now sets up VM unit pointer hooks
    08-Jan-20    JDB     Revised modem control operation
    09-Dec-19    JDB     Replaced debugging macros with tracing macros
    17-Jun-19    JDB     Now detaches all TDI lines when entering DIAGNOSTIC mode
@@ -817,13 +820,11 @@ DEVICE atcc_dev;                                /* incomplete device structure *
    dedicated to the system console.  For convenience, the system console is
    connected to the simulation console.  As such, it calls the console I/O
    routines instead of the terminal multiplexer routines.
-
-   User-defined line order is not supported.
 */
 
 static int32 atcd_order [TERM_COUNT] = {        /* line connection order */
-    1,  1,  2,  3,  4,  5,  6,  7,
-    8,  9, 10, 11, 12, 13, 14, 15 };
+    1,  2,  3,  4,  5,  6,  7,  8,
+    9, 10, 11, 12, 13, 14, 15, -1 };
 
 static TMLN atcd_ldsc [TERM_COUNT] = {          /* line descriptors */
     { 0 }
@@ -915,10 +916,6 @@ static UNIT atcd_unit [UNIT_COUNT] = {
     { UDATA (&poll_service, UNIT_ATTABLE | UNIT_DIS | UNIT_IDLE,         0), POLL_TIME }  /* multiplexer poll unit */
     };
 
-UNIT *vm_console_input_unit  = &atcd_unit [0];  /* console input unit pointer */
-UNIT *vm_console_output_unit = &atcd_unit [0];  /* console output unit pointer */
-
-
 static UNIT atcc_unit [] = {                    /* a dummy unit to satisfy SCP requirements */
     { UDATA (NULL, 0, 0) }
     };
@@ -987,7 +984,16 @@ static REG atcc_reg [] = {
     };
 
 
-/* Modifier lists */
+/* Modifier lists.
+
+
+   Implementation notes:
+
+    1. User-specified line connection orders are supported, but the LINEORDER
+       modifier entry "value" field restricts the minimum allowed line number
+       to 1, so that line 0 (the system console) cannot be included in the
+       connection list.
+*/
 
 typedef enum {
     Fast_Time,
@@ -1014,28 +1020,29 @@ static MTAB atcd_mod [] = {
     { TT_MODE,       TT_MODE_7P,    "7p output",      "7P",         NULL,       NULL,    NULL       },
     { TT_MODE,       TT_MODE_8B,    "8b output",      "8B",         NULL,       NULL,    NULL       },
 
-/*    Entry Flags           Value        Print String   Match String  Validation       Display           Descriptor          */
-/*    --------------------  -----------  -------------  ------------  ---------------  ----------------  ------------------- */
-    { MTAB_XUN | MTAB_NC,   0,           "LOG",         "LOG",        &tmxr_set_log,   &tmxr_show_log,   (void *) &atcd_mdsc },
-    { MTAB_XUN | MTAB_NC,   0,           NULL,          "NOLOG",      &tmxr_set_nolog, NULL,             (void *) &atcd_mdsc },
-    { MTAB_XUN,             0,           NULL,          "DISCONNECT", &tmxr_dscln,     NULL,             (void *) &atcd_mdsc },
+/*    Entry Flags           Value        Print String   Match String  Validation         Display             Descriptor          */
+/*    --------------------  -----------  -------------  ------------  -----------------  ------------------  ------------------- */
+    { MTAB_XUN | MTAB_NC,   0,           "LOG",         "LOG",        &tmxr_set_log,     &tmxr_show_log,     (void *) &atcd_mdsc },
+    { MTAB_XUN | MTAB_NC,   0,           NULL,          "NOLOG",      &tmxr_set_nolog,   NULL,               (void *) &atcd_mdsc },
+    { MTAB_XUN,             0,           NULL,          "DISCONNECT", &tmxr_dscln,       NULL,               (void *) &atcd_mdsc },
 
-    { MTAB_XDV,             Fast_Time,   NULL,          "FASTTIME",   &atc_set_mode,   NULL,             (void *) &atcd_dev  },
-    { MTAB_XDV,             Real_Time,   NULL,          "REALTIME",   &atc_set_mode,   NULL,             (void *) &atcd_dev  },
-    { MTAB_XDV,             Terminal,    NULL,          "TERMINAL",   &atc_set_mode,   NULL,             (void *) &atcd_dev  },
-    { MTAB_XDV,             Diagnostic,  NULL,          "DIAGNOSTIC", &atc_set_mode,   NULL,             (void *) &atcd_dev  },
-    { MTAB_XDV,             0,           "MODES",       NULL,         NULL,            &atc_show_mode,   (void *) &atcd_dev  },
+    { MTAB_XDV,             Fast_Time,   NULL,          "FASTTIME",   &atc_set_mode,     NULL,               (void *) &atcd_dev  },
+    { MTAB_XDV,             Real_Time,   NULL,          "REALTIME",   &atc_set_mode,     NULL,               (void *) &atcd_dev  },
+    { MTAB_XDV,             Terminal,    NULL,          "TERMINAL",   &atc_set_mode,     NULL,               (void *) &atcd_dev  },
+    { MTAB_XDV,             Diagnostic,  NULL,          "DIAGNOSTIC", &atc_set_mode,     NULL,               (void *) &atcd_dev  },
+    { MTAB_XDV,             0,           "MODES",       NULL,         NULL,              &atc_show_mode,     (void *) &atcd_dev  },
 
-    { MTAB_XDV,             0,           "",            NULL,         NULL,            &atc_show_status, (void *) &atcd_mdsc },
-    { MTAB_XDV | MTAB_NMO,  1,           "CONNECTIONS", NULL,         NULL,            &tmxr_show_cstat, (void *) &atcd_mdsc },
-    { MTAB_XDV | MTAB_NMO,  0,           "STATISTICS",  NULL,         NULL,            &tmxr_show_cstat, (void *) &atcd_mdsc },
+    { MTAB_XDV,             0,           "",            NULL,         NULL,              &atc_show_status,   (void *) &atcd_mdsc },
+    { MTAB_XDV | MTAB_NMO,  1,           "CONNECTIONS", NULL,         NULL,              &tmxr_show_cstat,   (void *) &atcd_mdsc },
+    { MTAB_XDV | MTAB_NMO,  0,           "STATISTICS",  NULL,         NULL,              &tmxr_show_cstat,   (void *) &atcd_mdsc },
+    { MTAB_XDV | MTAB_NMO,  1,           "LINEORDER",   "LINEORDER",  &tmxr_set_lnorder, &tmxr_show_lnorder, (void *) &atcd_mdsc },
 
-    { MTAB_XDV,             VAL_DEVNO,   "DEVNO",       "DEVNO",      &hp_set_dib,     &hp_show_dib,     (void *) &atcd_dib  },
-    { MTAB_XDV,             VAL_INTMASK, "INTMASK",     "INTMASK",    &hp_set_dib,     &hp_show_dib,     (void *) &atcd_dib  },
-    { MTAB_XDV,             VAL_INTPRI,  "INTPRI",      "INTPRI",     &hp_set_dib,     &hp_show_dib,     (void *) &atcd_dib  },
+    { MTAB_XDV,             VAL_DEVNO,   "DEVNO",       "DEVNO",      &hp_set_dib,       &hp_show_dib,       (void *) &atcd_dib  },
+    { MTAB_XDV,             VAL_INTMASK, "INTMASK",     "INTMASK",    &hp_set_dib,       &hp_show_dib,       (void *) &atcd_dib  },
+    { MTAB_XDV,             VAL_INTPRI,  "INTPRI",      "INTPRI",     &hp_set_dib,       &hp_show_dib,       (void *) &atcd_dib  },
 
-    { MTAB_XDV | MTAB_NMO,  1,           NULL,          "ENABLED",    &atc_set_endis,  NULL,             NULL                },
-    { MTAB_XDV | MTAB_NMO,  0,           NULL,          "DISABLED",   &atc_set_endis,  NULL,             NULL                },
+    { MTAB_XDV | MTAB_NMO,  1,           NULL,          "ENABLED",    &atc_set_endis,    NULL,               NULL                },
+    { MTAB_XDV | MTAB_NMO,  0,           NULL,          "DISABLED",   &atc_set_endis,    NULL,               NULL                },
     { 0 }
     };
 
@@ -1745,6 +1752,9 @@ if (sim_switches & SWMASK ('P')) {                      /* if this is a power-on
     sim_rtcn_init (poll_unit.wait, TMR_ATC);            /*   then initialize the poll timer */
     fast_data_time = FAST_IO_TIME;                      /* restore the initial fast data time */
     atcd_ldsc [0].xmte = 1;                             /* enable transmission on the system console port */
+
+    vm_console_input_unit  = &atcd_unit [0];            /* set up the console input */
+    vm_console_output_unit = &atcd_unit [0];            /*   and console output unit pointers */
     }
 
 if (atc_is_polling) {                                       /* if we're polling for the simulation console */

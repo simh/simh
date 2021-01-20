@@ -1,6 +1,6 @@
 /* hp3000_cpu.c: HP 3000 Central Processing Unit simulator
 
-   Copyright (c) 2016-2019, J. David Bryan
+   Copyright (c) 2016-2020, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +25,11 @@
 
    CPU          HP 3000 Series III Central Processing Unit
 
+   11-Oct-20    JDB     Moved UNIT_OPTS to hp3000_cpu.h for updating ease
+   24-Sep-20    JDB     Traps now trace the register set
+   05-Sep-20    JDB     Enabled EIS option
+   26-Aug-20    JDB     Corrected line ends for trace to stdout
+   04-Jul-20    JDB     Postlude trace now calls "sim_error_text" unconditionally
    09-Dec-19    JDB     Replaced debugging macros with tracing macros
    20-Jun-19    JDB     Added wait time to process clock trace
    08-Apr-19    JDB     Suppress stop messages for step and breakpoints in DO files
@@ -744,8 +749,6 @@
 #define PCLK_MULTIPLIER     10                          /* number of hardware process clock ticks per service */
 #define PCLK_RATE           (1000 / PCLK_MULTIPLIER)    /* process clock rate in ticks per second */
 
-#define UNIT_OPTS           (UNIT_EIS)                  /* the standard equipment feature set */
-
 #define CPU_IO_RESET        0                           /* reset CPU and all I/O devices */
 #define IO_RESET            1                           /* reset just the I/O devices */
 
@@ -958,10 +961,9 @@ static const char *const trap_name [] = {       /* trap names, indexed by TRAP_C
 
    Implementation notes:
 
-    1. The EIS was standard equipment for the Series II and III, so UNIT_EIS
-       should appear in their "typ" fields.  However, the EIS instructions are
-       not currently implemented, so the value is omitted below.
-*/
+    1. The EIS was standard equipment for the Series II and III, althought it
+       was an option on the 3000 CX and Series I.
+ */
 
 struct FEATURE_TABLE {
     uint32      typ;                            /* standard features plus typically configured options */
@@ -970,11 +972,11 @@ struct FEATURE_TABLE {
     };
 
 static const struct FEATURE_TABLE cpu_features [] = {   /* features indexed by CPU_MODEL */
-  { 0,                                                  /*   UNIT_SERIES_III */
-    UNIT_CIS,
+  { UNIT_EIS,                                           /*   UNIT_SERIES_III */
+    UNIT_EIS | UNIT_CIS,
     1024 * 1024 },
-  { 0,                                                  /*   UNIT_SERIES_II */
-    0,
+  { UNIT_EIS,                                           /*   UNIT_SERIES_II */
+    UNIT_EIS,
     256 * 1024 }
   };
 
@@ -1002,6 +1004,7 @@ static t_stat show_speed (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 static t_stat halt_mode_interrupt (HP_WORD device_number);
 static t_stat machine_instruction (void);
+static void   trace_registers     (void);
 
 
 /* CPU SCP data structures */
@@ -1095,7 +1098,7 @@ static MTAB cpu_mod [] = {
     { UNIT_MODEL,   UNIT_SERIES_II,  "Series II",         NULL,         &set_model,  NULL,    NULL       },
     { UNIT_MODEL,   UNIT_SERIES_III, "Series III",        "III",        &set_model,  NULL,    NULL       },
 
-    { UNIT_EIS,     UNIT_EIS,        "EIS",               NULL,         &set_option, NULL,    NULL       },
+    { UNIT_EIS,     UNIT_EIS,        "EIS",               "EIS",        &set_option, NULL,    NULL       },
     { UNIT_EIS,     0,               "no EIS",            "NOEIS",      NULL,        NULL,    NULL       },
 
     { UNIT_CIS,     UNIT_CIS,        "CIS",               "CIS",        &set_option, NULL,    NULL       },
@@ -1399,14 +1402,6 @@ DEVICE cpu_dev = {
 
 t_stat sim_instr (void)
 {
-static const char *const stack_formats [] = {           /* stack register display formats, indexed by SR */
-    BOV_FORMAT "  ",                                    /*   SR = 0 format */
-    BOV_FORMAT "  A %06o, ",                            /*   SR = 1 format */
-    BOV_FORMAT "  A %06o, B %06o, ",                    /*   SR = 2 format */
-    BOV_FORMAT "  A %06o, B %06o, C %06o, ",            /*   SR = 3 format */
-    BOV_FORMAT "  A %06o, B %06o, C %06o, D %06o, "     /*   SR = 4 format */
-    };
-
 int        abortval;
 HP_WORD    label, parameter;
 TRAP_CLASS trap;
@@ -1450,6 +1445,9 @@ if (abortval) {                                         /* if a microcode abort 
     parameter = PARAM (abortval);                       /*     and the optional parameter */
 
     label = TO_LABEL (LABEL_IRQ, trap);                 /* form the label from the STT number */
+
+    if (cpu_dev.dctrl & DEB_REG)                        /* if register tracing is enabled */
+        trace_registers ();                             /*   then show the registers just before the trap */
 
     tprintf (cpu_dev, DEB_INSTR, BOV_FORMAT "%s trap%s\n",
              PBANK, P - 1 & R_MASK, parameter, trap_name [trap],
@@ -1627,23 +1625,8 @@ while (status == SCPE_OK) {                             /* execute until simulat
                     cpu_dev.dctrl = DEB_ALL;                /*         and turn on full tracing */
                     }
 
-                if (cpu_dev.dctrl & DEB_REG) {              /* if register tracing is enabled */
-                    hp_trace (&cpu_dev, DEB_REG,            /*   then output the active TOS registers */
-                              stack_formats [SR],
-                              SBANK, SM, SR, RA, RB, RC, RD);
-
-                    fprintf (sim_deb, "X %06o, %s\n",       /* output the index and status registers */
-                             X, fmt_status (STA));
-
-                    if (cpu_base_changed) {                 /* if the base registers have been altered */
-                        hp_trace (&cpu_dev, DEB_REG,        /*   then output the base register values */
-                                  BOV_FORMAT "  PB %06o, PL %06o, DL %06o, DB %06o, Q %06o, Z %06o\n",
-                                  DBANK, 0, STATUS_CS (STA),
-                                  PB, PL, DL, DB, Q, Z);
-
-                        cpu_base_changed = FALSE;           /* clear the base registers changed flag */
-                        }
-                    }
+                if (cpu_dev.dctrl & DEB_REG)                /* if register tracing is enabled */
+                    trace_registers ();                     /*   then print the registers */
 
                 if (cpu_dev.dctrl & DEB_EXEC                /* if execution tracing is enabled */
                   && cpu_dev.dctrl == DEB_ALL               /*   and is currently active */
@@ -1671,6 +1654,9 @@ while (status == SCPE_OK) {                             /* execute until simulat
                 if (fprint_cpu (sim_deb, sim_eval, 0, SIM_SW_STOP) == SCPE_ARG) /* print the mnemonic; if that fails */
                     fprint_val (sim_deb, sim_eval [0], cpu_dev.dradix,          /*   then print the numeric */
                                 cpu_dev.dwidth, PV_RZRO);                       /*     value again */
+
+                if (sim_deb == stdout)                      /* if debug output is to the (raw) console */
+                    fputc ('\r', sim_deb);                  /*   then insert a carriage return */
 
                 fputc ('\n', sim_deb);                      /* end the trace with a newline */
                 }
@@ -1723,8 +1709,7 @@ if (TRACING (cpu_dev, cpu_dev.dctrl)                    /* if instruction tracin
     hp_trace (&cpu_dev, cpu_dev.dctrl,                  /*     then output the simulation stop reason */
               BOV_FORMAT "simulation stop: %s\n",
               PBANK, P, STA,
-              status >= SCPE_BASE ? sim_error_text (status)
-                                  : sim_stop_messages [status]);
+              sim_error_text (status));
 
 if (sim_switches & SIM_SW_HIDE                          /* if executing in a non-echoing command file */
   && (status == SCPE_STEP || status == STOP_BRKPNT))    /*   and a step or breakpoint stop occurs */
@@ -4662,4 +4647,43 @@ if (status == STOP_UNIMPL                               /* if the instruction is
     MICRO_ABORT (trap_Unimplemented);                   /*     then trap to handle it */
 
 return status;
+}
+
+
+/* Trace the register set.
+
+   This routine outputs the current values of the machine registers to the
+   debug log.  The first output line consists of the SBANK, SM, SR, TOS, index,
+   and status register values.  If the "cpu_base_changed" flag is set, a second
+   line consisting of the DBANK register, code segment number, and code, data,
+   and stack base and limit registers is also output.
+
+   The routine must not be called unless the debug log is defined, and should
+   not be called unless the register trace flag is set.
+*/
+
+static void trace_registers (void)
+{
+static const char *const stack_formats [] = {           /* stack register display formats, indexed by SR */
+    BOV_FORMAT "  ",                                    /*   SR = 0 format */
+    BOV_FORMAT "  A %06o, ",                            /*   SR = 1 format */
+    BOV_FORMAT "  A %06o, B %06o, ",                    /*   SR = 2 format */
+    BOV_FORMAT "  A %06o, B %06o, C %06o, ",            /*   SR = 3 format */
+    BOV_FORMAT "  A %06o, B %06o, C %06o, D %06o, "     /*   SR = 4 format */
+    };
+
+hp_trace (&cpu_dev, DEB_REG, stack_formats [SR],        /* output the active TOS registers */
+          SBANK, SM, SR, RA, RB, RC, RD);
+
+fprintf (sim_deb, "X %06o, %s\n", X, fmt_status (STA)); /* output the index and status registers */
+
+if (cpu_base_changed) {                                 /* if the base registers have been altered */
+    hp_trace (&cpu_dev, DEB_REG,                        /*   then output the base register values */
+              BOV_FORMAT "  PB %06o, PL %06o, DL %06o, DB %06o, Q %06o, Z %06o\n",
+              DBANK, 0, STATUS_CS (STA), PB, PL, DL, DB, Q, Z);
+
+    cpu_base_changed = FALSE;                           /* clear the base registers changed flag */
+    }
+
+return;
 }

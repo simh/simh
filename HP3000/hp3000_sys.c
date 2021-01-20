@@ -1,6 +1,6 @@
 /* hp3000_sys.c: HP 3000 system common interface
 
-   Copyright (c) 2016-2019, J. David Bryan
+   Copyright (c) 2016-2020, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -23,6 +23,8 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   26-Aug-20    JDB     Modified "hp_trace" to output CR LFs to stdout
+   25-Aug-20    JDB     Now sets SCP hooks in "one_time_init" routine
    09-Dec-19    JDB     Renamed "hp_debug" to "hp_trace"
    07-Apr-19    JDB     Added command handler pointers
    04-Mar-19    JDB     Added "sim_vm_release" character string declaration
@@ -85,9 +87,9 @@
 
 
 
-/* Global release string */
+/* Release string */
 
-char *sim_vm_release = "8";                     /* HP 3000 simulator release number */
+static char *hp_release = "9";                  /* HP 3000 simulator release number */
 
 
 /* External I/O data structures */
@@ -2410,29 +2412,34 @@ return fmtptr;                                          /* return a pointer to t
 }
 
 
-/* Format and print a debugging trace line to the debug log.
+/* Format and print a trace line to the debug log file.
 
    A formatted line is assembled and sent to the previously opened debug output
    stream.  On entry, "dptr" points to the device issuing the trace, "flag" is
-   the debug flag that has enabled the trace, and the remaining parameters
+   the trace flag that has enabled the trace, and the remaining parameters
    consist of the format string and associated values.
 
    This routine is usually not called directly but rather via the "tprintf"
-   macro, which tests that debugging is enabled for the specified flag before
-   calling this function.  This eliminates the calling overhead if debugging is
+   macro, which tests that tracing is enabled for the specified flag before
+   calling this function.  This eliminates the calling overhead if tracing is
    disabled.
 
    This routine prints a prefix before the supplied format string consisting of
-   the device name (in upper case) and the debug flag name (in lower case),
+   the device name (in upper case) and the trace flag name (in lower case),
    e.g.:
 
      >>MPX state: Channel SR 3 entered State A
      ~~~~~~~~~~~~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         prefix       supplied format string
 
-   The names are padded to the lengths of the largest device name and debug flag
-   name among the devices enabled for debugging to ensure that all trace lines
+   The names are padded to the lengths of the largest device name and trace flag
+   name among the devices enabled for tracing to ensure that all trace lines
    will align for easier reading.
+
+   Because the prefix is output only once, embedded newlines should not be
+   present in the format string.  If multiple output lines are desired, then
+   this routine should be called multiple times, so that each line receives an
+   identifying trace prefix.
 
 
    Implementation notes:
@@ -2442,6 +2449,23 @@ return fmtptr;                                          /* return a pointer to t
        the latter, we must allocate "sufficiently large" arrays for the flag
        name and format, rather than arrays of the exact size required by the
        call parameters.
+
+    2. If the trace output is being written to stdout, a terminating LF must
+       be translated to CR LF.  This is because the console is in "raw" mode
+       while the CPU is executing instructions.  Output to a file does not need
+       this processing, as text mode handles the host line-end convention.
+
+    3. Handling embedded newlines properly would require multiple calls to
+       "vfprintf", each preceded by the prefix, and each having a format string
+       consisting of the next segment that ends with an embedded newline.
+       However, multiple calls are not allowed.  The C standard says:
+
+         "As the functions vfprintf [etc.] invoke the va_arg macro, the value of
+          arg after the return is indeterminate."
+
+       So there is no way to have the second (e.g.) call start with those
+       (variable) parameters not consumed by the prior call.  Consequently, the
+       terminating LF check need only be done at the end of the format string.
 */
 
 #define FLAG_SIZE           32                          /* sufficiently large to accommodate all flag names */
@@ -2449,17 +2473,17 @@ return fmtptr;                                          /* return a pointer to t
 
 void hp_trace (DEVICE *dptr, uint32 flag, ...)
 {
-va_list argptr;
-DEBTAB  *debptr;
-char    *format, *fptr;
 const char *nptr;
-char    flag_name [FLAG_SIZE];                          /* desired size is [flag_size + 1] */
-char    header_fmt [FORMAT_SIZE];                       /* desired size is [device_size + flag_size + format_size + 6] */
+va_list    argptr;
+DEBTAB     *debptr;
+char       *format, *fptr;
+char       flag_name [FLAG_SIZE];                       /* desired size is [flag_size + 1] */
+char       header_fmt [FORMAT_SIZE];                    /* desired size is [device_size + flag_size + format_size + 6] */
 
 if (sim_deb != NULL && dptr != NULL) {                  /* if the output stream and device pointer are valid */
-    debptr = dptr->debflags;                            /*   then get a pointer to the debug flags table */
+    debptr = dptr->debflags;                            /*   then get a pointer to the trace flags table */
 
-    if (debptr != NULL)                                 /* if the debug table exists */
+    if (debptr != NULL)                                 /* if the trace table exists */
         while (debptr->name != NULL)                    /*   then search it for an entry with the supplied flag */
             if (debptr->mask & flag) {                  /* if the flag matches this entry */
                 nptr = debptr->name;                    /*   then get a pointer to the flag name */
@@ -2473,19 +2497,29 @@ if (sim_deb != NULL && dptr != NULL) {                  /* if the output stream 
                          (int) device_size, sim_dname (dptr),   /*   while padding the device and flag names */
                          (int) flag_size, flag_name);           /*     as needed for proper alignment */
 
-                va_start (argptr, flag);                        /* set up the argument list */
+                va_start (argptr, flag);                /* set up the argument list */
 
-                format = va_arg (argptr, char *);               /* get the format string parameter */
-                strcat (header_fmt, format);                    /* append the supplied format */
+                format = va_arg (argptr, char *);       /* get the format string parameter */
+                strcat (header_fmt, format);            /* append the supplied format */
 
-                vfprintf (sim_deb, header_fmt, argptr);         /* format and print to the debug stream */
+                if (sim_deb == stdout) {                            /* if debug output is to the (raw) console */
+                    fptr = header_fmt + strlen (header_fmt) - 1;    /*   then find the end of the string */
 
-                va_end (argptr);                                /* clean up the argument list */
-                break;                                          /*   and exit with the job complete */
+                    if (*fptr == '\n') {                /* if the format ends with a LF */
+                        *fptr++ = '\r';                 /*   then replace it */
+                        *fptr++ = '\n';                 /*     with a CR LF sequence */
+                        *fptr   = '\0';                 /*       and terminate with a NUL */
+                        }
+                    }
+
+                vfprintf (sim_deb, header_fmt, argptr); /* format and print to the debug stream */
+
+                va_end (argptr);                        /* clean up the argument list */
+                break;                                  /*   and exit with the job complete */
                 }
 
             else                                        /* otherwise */
-                debptr++;                               /*   look at the next debug table entry */
+                debptr++;                               /*   look at the next trace table entry */
     }
 
 return;
@@ -2713,10 +2747,11 @@ exdep_handler = find_cmd ("EXAMINE")->action;           /* set the EXAMINE/DEPOS
 run_handler   = find_cmd ("RUN")->action;               /*   and the RUN/GO command handler */
 break_handler = find_cmd ("BREAK")->action;             /*     and the BREAK/NOBREAK command handler */
 
+sim_vm_release        = hp_release;                     /* set up the release string */
 sim_vm_cmd            = aux_cmds;                       /* set up the auxiliary command table */
-sim_vm_fprint_stopped = &fprint_stopped;                /* set up the simulation-stop printer */
-sim_vm_fprint_addr    = &fprint_addr;                   /* set up the address printer */
-sim_vm_parse_addr     = &parse_addr;                    /* set up the address parser */
+sim_vm_fprint_stopped = fprint_stopped;                 /* set up the simulation-stop printer */
+sim_vm_fprint_addr    = fprint_addr;                    /* set up the address printer */
+sim_vm_parse_addr     = parse_addr;                     /* set up the address parser */
 
 sim_brk_types = BP_SUPPORTED;                           /* register the supported breakpoint types */
 sim_brk_dflt = BP_EXEC;                                 /* the default breakpoint type is "execution" */

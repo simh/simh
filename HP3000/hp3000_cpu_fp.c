@@ -1,6 +1,6 @@
 /* hp3000_cpu_fp.c: HP 3000 floating-point arithmetic simulator
 
-   Copyright (c) 2016, J. David Bryan
+   Copyright (c) 2016-2020, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -23,6 +23,10 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   09-Oct-20    JDB     Modified to return Ext_Float traps for extended operands
+   30-Sep-20    JDB     Cleaned up QWORD assembly in "norm_round_pack"
+   14-Sep-20    JDB     Added a guard bit to 56-bit calculations for rounding
+                        "divide" now renormalizes divisors to reduce calculation
    11-Jun-16    JDB     Bit mask constants are now unsigned
    03-Feb-16    JDB     First release version
    25-Aug-15    JDB     Fixed FSUB zero subtrahend bug (from Norwin Malmberg)
@@ -96,6 +100,18 @@
    representation and the precision, along with a value that indicates whether
    or not the operation resulted in an arithmetic trap.  It is the
    responsibility of the caller to take the trap if it is indicated.
+
+   Seven user trap values are returned:
+
+     Parameter  Description
+     ---------  ------------------------------------------------
+      000001    Integer Overflow
+      000002    Float Overflow
+      000003    Float Underflow
+      000005    Float Zero Divide
+      000010    Extended Precision Floating Point Overflow
+      000011    Extended Precision Floating Point Underflow
+      000012    Extended Precision Floating Point Divide by Zero
 */
 
 
@@ -120,11 +136,10 @@
 #define MANTISSA_SHIFT      0                   /* the mantissa alignment shift */
 
 #define UNPACKED_BITS       54                  /* the number of significant bits in the unpacked mantissa */
+#define GUARD_BITS          1                   /* the number of guard bits in the mantissa used for rounding */
 
-#define IMPLIED_BIT         ((t_uint64) 1uL << UNPACKED_BITS)       /* the implied MSB in the mantissa */
-#define CARRY_BIT           ((t_uint64) 1uL << UNPACKED_BITS + 1)   /* the carry from the MSB in the mantissa */
-
-#define DELTA_ALIGNMENT     (D64_WIDTH - UNPACKED_BITS)             /* net shift to align the binary point */
+#define IMPLIED_BIT         ((t_uint64) 1uL << UNPACKED_BITS + GUARD_BITS)  /* the implied MSB in the mantissa */
+#define CARRY_BIT           (IMPLIED_BIT << 1)                              /* the carry from the MSB in the mantissa */
 
 
 /* Floating-point accessors */
@@ -134,7 +149,7 @@
 
 #define TO_EXPONENT(w)      ((w) + EXPONENT_BIAS << EXPONENT_SHIFT & EXPONENT_MASK)
 
-#define DENORMALIZED(m)     (((m) & IMPLIED_BIT) == 0)
+#define DENORMALIZED(m)     ((m) > 0 && ((m) & IMPLIED_BIT) == 0)
 
 
 /* Floating-point unpacked representation */
@@ -160,20 +175,20 @@ static const int32 mantissa_bits [] = {         /* the number of mantissa bits, 
     };
 
 static const t_uint64 mantissa_mask [] = {      /* the mask to the mantissa bits, indexed by FP_OPSIZE */
-    ((t_uint64) 1 << 16) - 1 <<  0,             /*   in_s 16-bit mantissa */
-    ((t_uint64) 1 << 32) - 1 <<  0,             /*   in_d 32-bit mantissa */
-    ((t_uint64) 1 << 22) - 1 << 32,             /*   fp_f 22-bit mantissa */
-    ((t_uint64) 1 << 38) - 1 << 16,             /*   fp_x 38-bit mantissa */
-    ((t_uint64) 1 << 54) - 1 <<  0              /*   fp_e 54-bit mantissa */
+    ((t_uint64) 1uL << 16) - 1 <<  0,           /*   in_s 16-bit mantissa */
+    ((t_uint64) 1uL << 32) - 1 <<  0,           /*   in_d 32-bit mantissa */
+    ((t_uint64) 1uL << 22) - 1 << 32,           /*   fp_f 22-bit mantissa */
+    ((t_uint64) 1uL << 38) - 1 << 16,           /*   fp_x 38-bit mantissa */
+    ((t_uint64) 1uL << 54) - 1 <<  0            /*   fp_e 54-bit mantissa */
     };
 
 
 static const t_uint64 half_lsb [] = {           /* half of the LSB for rounding, indexed by FP_OPSIZE */
     0,                                          /*   in_s not used */
-    0,                                          /*   in_d not used */
-    (t_uint64) 1 << 31,                         /*   fp_f word 2 LSB */
-    (t_uint64) 1 << 15,                         /*   fp_x word 3 LSB */
-    (t_uint64) 1 <<  0                          /*   fp_e word 4 LSB */
+    (t_uint64) 1uL << 54,                       /*   in_d LSB when shifted right by exponent value */
+    (t_uint64) 1uL << 32,                       /*   fp_f word 2 LSB */
+    (t_uint64) 1uL << 16,                       /*   fp_x word 3 LSB */
+    (t_uint64) 1uL <<  0                        /*   fp_e word 4 LSB */
     };
 
 
@@ -275,7 +290,8 @@ return result_op;                                       /* return the result */
    A packed integer or floating-point value is split into separate mantissa and
    exponent variables.  The multiple words of the mantissa are concatenated into
    a single 64-bit unsigned value, and the exponent is shifted with recovery of
-   the sign.
+   the sign.  The mantissa is then shifted left one additional position to add a
+   guard bit that will be used for rounding.
 
    The absolute values of single and double integers are unpacked into the
    mantissas and preshifted by 32 or 16 bits, respectively, to reduce the
@@ -300,10 +316,10 @@ return result_op;                                       /* return the result */
     1. Integers could have been copied directly to the mantissa with the
        exponents set to the appropriate values (54 in this case).  However, the
        current implementation unpacks integers only in preparation for repacking
-       as floating-point numbers i.e., to implement the "float" operator.  This
-       would require a larger number of shifts to normalize the values -- as
-       many as 54 to normalize the value 1.  Preshifting reduces the number of
-       normalizing shifts needed to between 6 and 22.
+       as single-precision floating-point numbers i.e., to implement the "float"
+       operator.  This would require a larger number of shifts to normalize the
+       values -- as many as 54 to normalize the value 1.  Preshifting reduces
+       the number of normalizing shifts needed to between 6 and 22.
 */
 
 static FPU unpack (FP_OPND packed)
@@ -324,9 +340,9 @@ switch (packed.precision) {                             /* dispatch based on the
         else                                            /* otherwise the value is positive */
             unpacked.negative = FALSE;                  /*   so clear the sign flag */
 
-        unpacked.mantissa = (t_uint64) word << 32;      /* store the preshifted value as the mantissa */
-        unpacked.exponent = UNPACKED_BITS - 32;         /*   and set the exponent to account for the shift */
-        unpacked.precision = fp_f;                      /* set the precision */
+        unpacked.mantissa = (t_uint64) word << 32 + GUARD_BITS; /* store the preshifted value as the mantissa */
+        unpacked.exponent = UNPACKED_BITS - 32;                 /*   and set the exponent to account for the shift */
+        unpacked.precision = fp_f;                              /* set the precision */
         break;
 
 
@@ -341,9 +357,9 @@ switch (packed.precision) {                             /* dispatch based on the
         else                                            /* otherwise the value is positive */
             unpacked.negative = FALSE;                  /*   so clear the sign flag */
 
-        unpacked.mantissa = (t_uint64) word << 16;      /* store the preshifted value as the mantissa */
-        unpacked.exponent = UNPACKED_BITS - 16;         /*   and set the exponent to account for the shift */
-        unpacked.precision = fp_f;                      /* set the precision */
+        unpacked.mantissa = (t_uint64) word << 16 + GUARD_BITS; /* store the preshifted value as the mantissa */
+        unpacked.exponent = UNPACKED_BITS - 16;                 /*   and set the exponent to account for the shift */
+        unpacked.precision = fp_f;                              /* set the precision */
         break;
 
 
@@ -353,11 +369,13 @@ switch (packed.precision) {                             /* dispatch based on the
         unpacked.mantissa = MANTISSA (packed.words [0]);    /*       starting with the first word */
 
         for (word = 1; word <= 3; word++) {                 /* unpack from one to three more words */
-            unpacked.mantissa <<= 16;                       /* shift the accumulated value */
+            unpacked.mantissa <<= D16_WIDTH;                /* shift the accumulated value */
 
             if (word < TO_COUNT (packed.precision))         /* if all words are not included yet */
                 unpacked.mantissa |= packed.words [word];   /*   then merge the next word into value */
             }
+
+        unpacked.mantissa <<= GUARD_BITS;                   /* add the guard bits */
 
         unpacked.exponent =                                 /* store the exponent */
            EXPONENT (packed.words [0]) - EXPONENT_BIAS;     /*   after removing the bias */
@@ -439,10 +457,10 @@ else if (unpacked.precision <= in_d)                                /* if packin
         packed.trap = trap_Integer_Overflow;                        /*         and an overflow trap */
         }
 
-    else {                                                          /* otherwise */
-        integer = (int32)                                           /*   convert the value to an integer */
-           (unpacked.mantissa >> UNPACKED_BITS - unpacked.exponent  /*     by shifting right to align */
-           & mantissa_mask [unpacked.precision]);                   /*       and masking to the desired precision */
+    else {                                                                      /* otherwise */
+        integer = (int32)                                                       /*   convert the value to an integer */
+          (unpacked.mantissa >> UNPACKED_BITS + GUARD_BITS - unpacked.exponent  /*     by shifting right to align */
+          & mantissa_mask [unpacked.precision]);                                /*       and masking to the precision */
 
         if (unpacked.negative)                          /* if the value is negative */
             integer = - integer;                        /*   then negate the result */
@@ -465,29 +483,35 @@ else {                                                  /* otherwise a real numb
             unpacked.exponent -=  1;                    /*       and decrement the exponent to compensate */
             }
 
-
     unpacked.mantissa += half_lsb [unpacked.precision]; /* round the mantissa by adding one-half of the LSB */
 
     if (unpacked.mantissa & CARRY_BIT)                  /* if rounding caused a carry out of the MSB */
         unpacked.exponent = unpacked.exponent + 1;      /*   then increment the exponent to compensate */
 
+    unpacked.mantissa >>= GUARD_BITS;                   /* remove the guard bits */
 
     unpacked.mantissa &= mantissa_mask [unpacked.precision];    /* mask the mantissa to the specified precision */
 
-    packed.words [0] = (HP_WORD) (unpacked.mantissa >> 48) & DV_MASK    /* pack the first word of the mantissa */
-                       | TO_EXPONENT (unpacked.exponent)                /*   with the exponent */
-                       | (unpacked.negative ? D16_SIGN : 0);            /*     and the sign bit */
+    packed.words [0] = HIGH_UPPER_WORD (unpacked.mantissa)      /* pack the first word of the mantissa */
+                       | TO_EXPONENT (unpacked.exponent)        /*   with the exponent */
+                       | (unpacked.negative ? D16_SIGN : 0);    /*     and the sign bit */
 
-    packed.words [1] = (HP_WORD) (unpacked.mantissa >> 32) & DV_MASK;   /* pack the second */
-    packed.words [2] = (HP_WORD) (unpacked.mantissa >> 16) & DV_MASK;   /*   and third */
-    packed.words [3] = (HP_WORD) (unpacked.mantissa >>  0) & DV_MASK;   /*     and fourth words */
+    packed.words [1] = LOW_UPPER_WORD (unpacked.mantissa);      /* pack the second */
+    packed.words [2] = UPPER_WORD (unpacked.mantissa);          /*   and third */
+    packed.words [3] = LOWER_WORD (unpacked.mantissa);          /*     and fourth words */
 
     if (unpacked.exponent < MIN_EXPONENT                                /* if the exponent is too small */
       || unpacked.exponent == MIN_EXPONENT && unpacked.mantissa == 0)   /*   or the result would be all zeros */
-        packed.trap = trap_Float_Underflow;                             /*     then report an underflow trap */
+        if (packed.precision == fp_f)                                   /*     then if this is a standard operand */
+            packed.trap = trap_Float_Underflow;                         /*       then report a standard underflow trap */
+        else                                                            /*     otherwise */
+            packed.trap = trap_Ext_Float_Underflow;                     /*       report an extended underflow trap */
 
     else if (unpacked.exponent > MAX_EXPONENT)                          /* otherwise if the exponent is too large */
-        packed.trap = trap_Float_Overflow;                              /*   then report an overflow trap */
+        if (packed.precision == fp_f)                                   /*   then if this is a standard operand */
+            packed.trap = trap_Float_Overflow;                          /*     then report a standard overflow trap */
+        else                                                            /*   otherwise */
+            packed.trap = trap_Ext_Float_Overflow;                      /*     report an extended overflow trap */
 
     else                                                                /* otherwise */
         packed.trap = trap_None;                                        /*   report that packing succeeded */
@@ -642,10 +666,11 @@ return trap_None;                                       /* report that the subtr
    64 bits, which are summed to produce the product.  The product mantissa is
    aligned, and the product sign is set negative if the operand signs differ.
 
-   Mantissas are represented internally as fixed-point numbers with 54 bits to
-   the right of the binary point.  That is, the real number represented is the
-   integer mantissa value * (2 ** -54), where the right-hand term represents the
-   delta for a change of one bit.  Multiplication is therefore:
+   Mantissas are represented internally as fixed-point numbers with 54 data bits
+   plus one guard bit to the right of the binary point.  That is, the real
+   number represented is the integer mantissa value * (2 ** -55), where the
+   right-hand term represents the delta for a change of one bit.  Multiplication
+   is therefore:
 
      (product * delta) = (multiplicand * delta) * (multiplier * delta)
 
@@ -657,9 +682,9 @@ return trap_None;                                       /* report that the subtr
 
      product = multiplicand * multiplier * delta
 
-   Multiplying the product by (2 ** -54) is equivalent to right-shifting by 54.
+   Multiplying the product by (2 ** -55) is equivalent to right-shifting by 55.
    However, using only the top 64 bits of the 128-bit product is equivalent to
-   right-shifting by 64, so the net correction is a left-shift by 10.
+   right-shifting by 64, so the net correction is a left-shift by 9.
 
 
    Implementation notes:
@@ -670,8 +695,10 @@ return trap_None;                                       /* report that the subtr
 
 static TRAP_CLASS multiply (FPU *product, FPU multiplicand, FPU multiplier)
 {
-uint32   ah, al, bh, bl;
-t_uint64 hh, hl, lh, ll, carry;
+const uint32 delta_shift = D64_WIDTH - (UNPACKED_BITS + GUARD_BITS);
+const uint32 carry_shift = D32_WIDTH - delta_shift;
+uint32       ah, al, bh, bl;
+t_uint64     hh, hl, lh, ll, carry;
 
 if (multiplicand.mantissa == 0 || multiplier.mantissa == 0) {   /* if either operand is zero */
     *product = zero;                                            /*   then the product is (positive) zero */
@@ -684,24 +711,26 @@ else {                                                  /* otherwise both operan
     product->exponent = multiplicand.exponent           /* the product exponent */
                           + multiplier.exponent;        /*   is the sum of the operand exponents */
 
-    ah = (uint32) (multiplicand.mantissa >> D32_WIDTH); /* split the multiplicand */
-    al = (uint32) (multiplicand.mantissa &  D32_MASK);  /*   into high and low double-words */
+    ah = UPPER_DWORD (multiplicand.mantissa);           /* split the multiplicand */
+    al = LOWER_DWORD (multiplicand.mantissa);           /*   into high and low double-words */
 
-    bh = (uint32) (multiplier.mantissa   >> D32_WIDTH); /* split the multiplier */
-    bl = (uint32) (multiplier.mantissa   &  D32_MASK);  /*   into high and low double-words */
+    bh = UPPER_DWORD (multiplier.mantissa);             /* split the multiplier */
+    bl = LOWER_DWORD (multiplier.mantissa);             /*   into high and low double-words */
 
-    hh = ((t_uint64) ah * bh);                          /* form the */
-    hl = ((t_uint64) ah * bl);                          /*   four cross products */
-    lh = ((t_uint64) al * bh);                          /*     using 32 x 32 = 64-bit multiplies */
-    ll = ((t_uint64) al * bl);                          /*       for efficiency */
+    hh = (t_uint64) ah * (t_uint64) bh;                 /* form the */
+    hl = (t_uint64) ah * (t_uint64) bl;                 /*   four cross products */
+    lh = (t_uint64) al * (t_uint64) bh;                 /*     using 32 x 32 = 64-bit multiplies */
+    ll = (t_uint64) al * (t_uint64) bl;                 /*       for efficiency */
 
-    carry = ((ll >> D32_WIDTH) + (hl & D32_MASK)        /* add the upper half of "ll" to the lower halves of "hl" */
-              + (lh & D32_MASK)) >> D32_WIDTH;          /*   and "lh" and shift to leave just the carry bit */
+    carry = ((t_uint64) UPPER_DWORD (ll)                    /* do a 64-bit add of the upper half of "ll" */
+                      + LOWER_DWORD (hl)                    /*   to the lower halves of "hl" */
+                      + LOWER_DWORD (lh)) >> carry_shift;   /*     and "lh" and shift to leave just the carry bits */
 
-    product->mantissa = hh + (hl >> D32_WIDTH)          /* add "hh" to the upper halves of "hl" and "lh" */
-                          + (lh >> D32_WIDTH) + carry;  /*   and the carry bit */
+    product->mantissa = hh + UPPER_DWORD (hl)           /* add "hh" to the upper halves of "hl" and "lh" */
+                           + UPPER_DWORD (lh);
 
-    product->mantissa <<= DELTA_ALIGNMENT;              /* align the result */
+    product->mantissa <<= delta_shift;                  /* align the result to the binary point */
+    product->mantissa += carry;                         /*   and add the carry from the discarded bits */
 
     product->negative =                                 /* set the product sign negative */
        (multiplicand.negative != multiplier.negative);  /*   if the operand signs differ */
@@ -724,22 +753,22 @@ return trap_None;                                       /* report that the multi
    This method considers the 64-bit dividend and divisor each to consist of two
    32-bit "digits."  The 64-bit dividend "ah,al" is divided by the first 32-bit
    digit "bh" of the 64-bit divisor "bh,bl", yielding a 64-bit trial quotient
-   and a 64-bit remainder.  A correction is developed by subtracting the product
-   of the second 32-bit digit "bl" of the divisor and the trial quotient from
-   the remainder.  If the remainder is negative, the trial quotient is too
-   large, so it is decremented, and the (full 64-bit) divisor is added to the
-   correction.  This is repeated until the correction is non-negative,
-   indicating that the first quotient digit is correct.  The process is then
-   repeated using the corrected remainder as the dividend to develop the second
-   64-bit trial quotient and second quotient digit.  The first quotient digit is
+   and a 64-bit remainder.  A correction is developed by multiplying the second
+   32-bit digit "bl" of the divisor and the trial quotient.  If the remainder is
+   smaller than the correction, the trial quotient is too large, so it is
+   decremented, and the (full 64-bit) divisor is added to the remainder.  The
+   correction is then subtracted from the remainder, and the process is repeated
+   using the corrected remainder as the dividend to develop the second 64-bit
+   trial quotient and second quotient digit.  The first quotient digit is
    positioned, and the two quotient digits are then added to produce the final
-   64-bit quotient.  The quotient mantissa is aligned, and the quotient sign is
-   set negative if the operand signs differ.
+   64-bit quotient.  The quotient sign is set negative if the operand signs
+   differ.
 
-   Mantissas are represented internally as fixed-point numbers with 54 bits to
-   the right of the binary point.  That is, the real number represented is the
-   integer mantissa value * (2 ** -54), where the right-hand term represents the
-   delta for a change of one bit.  Division is therefore:
+   Mantissas are represented internally as fixed-point numbers with 54 data bits
+   plus one guard bit to the right of the binary point.  That is, the real
+   number represented is the integer mantissa value * (2 ** -55), where the
+   right-hand term represents the delta for a change of one bit.  Division is
+   therefore:
 
      (quotient * delta) = (dividend * delta) / (divisor * delta)
 
@@ -751,12 +780,33 @@ return trap_None;                                       /* report that the multi
 
      quotient = (dividend / divisor) / delta
 
-   Dividing the quotient by (2 ** -54) is equivalent to left-shifting by 54.
+   Dividing the quotient by (2 ** -55) is equivalent to left-shifting by 55.
    However, using only the top 64 bits of the 128-bit product is equivalent to
-   right-shifting by 64, so the net correction is a right-shift by 10.
+   right-shifting by 64, so the net correction is a right-shift by 9.
+
+   Care must be taken to ensure that the correction product does not overflow.
+   In hardware, this is detected by examining the ALU carry bit after the
+   correction multiplication.  In simulation, there is no portable way of
+   determining if the 64 x 32 multiply overflowed.  However, we can take
+   advantage of the fact that the upper eight bits of the mantissa are always
+   zero (54 data bits plus one guard bit plus one implied bit = 56 significant
+   bits).  By shifting the divisor left by eight bits, we ensure that the
+   quotient will be eight bits shorter, and so guarantee that the correction
+   product will not overflow.  Moreover, because the divisor is now at least
+   one-half of the maximum value (because of the implied bit), it ensures that
+   the trial quotient will either be correct or off by one, so at most a single
+   correction will be needed.
+
+   The final quotient would require a left-shift of 8 to account for the
+   renormalized divisor, but from the above calculations, we also need a right
+   shift of 9 to align it.  The net result needs only a right shift of one to
+   correct, which we handle by decrementing the exponent in lieu of additional
+   shifting.
 
    See "Divide-and-Correct Methods for Multiple Precision Division" by Marvin L.
-   Stein, Communications of the ACM, August 1964 for background.
+   Stein, Communications of the ACM, August 1964 and "Multiple-Length Division
+   Revisited: a Tour of the Minefield" by Per Brinch Hansen, Software Practice
+   and Experience, June 1994 for background.
 
 
    Implementation notes:
@@ -769,20 +819,20 @@ return trap_None;                                       /* report that the multi
 
     2. "bh" is guaranteed to be non-zero because the divisor mantissa is
        normalized on entry.  Therefore, no division-by-zero check is needed.
-
-    3. The quotient alignment shift logically expresses ((q1 << 32) + q2) >> 10,
-       but it must be implemented as (q1 << 22) + (q2 >> 10) as otherwise the
-       left-shift would lose significant bits.
 */
 
 static TRAP_CLASS divide (FPU *quotient, FPU dividend, FPU divisor)
 {
-t_uint64 bh, bl, q1, q2, r1, r2;
-t_int64  c1, c2;
+const uint32 renorm_shift = D64_WIDTH - (UNPACKED_BITS + GUARD_BITS + 1);
+t_uint64     bh, bl, q1, q2, r1, r2, c1, c2;
 
 if (divisor.mantissa == 0) {                            /* if the divisor is zero */
     *quotient = dividend;                               /*   then return the dividend */
-    return trap_Float_Zero_Divide;                      /*     and report the error */
+
+    if (dividend.precision == fp_f)                     /* if this is a standard operand */
+        return trap_Float_Zero_Divide;                  /*   then report a standard zero-divide trap */
+    else                                                /* otherwise */
+        return trap_Ext_Float_Zero_Divide;              /*   report an extended zero-divide trap */
     }
 
 else if (dividend.mantissa == 0) {                      /* otherwise if the dividend is zero */
@@ -793,34 +843,39 @@ else if (dividend.mantissa == 0) {                      /* otherwise if the divi
 else {                                                  /* otherwise both operands are non-zero */
     quotient->precision = dividend.precision;           /*   so set the precision to that of the operands */
 
-    quotient->exponent = dividend.exponent              /* the quotient exponent */
-                          - divisor.exponent;           /*   is the difference of the operand exponents */
+    quotient->exponent = dividend.exponent              /* the quotient exponent is the difference of the */
+                          - divisor.exponent - 1;       /*   operand exponents (with alignment correction) */
 
-    bh = divisor.mantissa >> D32_WIDTH;                 /* split the divisor */
-    bl = divisor.mantissa &  D32_MASK;                  /*   into high and low halves */
+    divisor.mantissa <<= renorm_shift;                  /* renormalize the divisor */
+
+    bh = (t_uint64) UPPER_DWORD (divisor.mantissa);     /* split the divisor */
+    bl = (t_uint64) LOWER_DWORD (divisor.mantissa);     /*   into high and low halves */
 
     q1 = dividend.mantissa / bh;                        /* form the first trial quotient */
     r1 = dividend.mantissa % bh;                        /*   and remainder */
 
-    c1 = r1 - bl * q1;                                  /* form the first corrected remainder */
+    c1 = bl * q1;                                       /* form the first remainder correction */
+    r1 = r1 << D32_WIDTH;                               /*   and scale the remainder to match */
 
-    while (c1 < 0) {                                    /* while a correction is required */
-        q1 = q1 - 1;                                    /*   the first trial quotient is too large */
-        c1 = c1 + divisor.mantissa;                     /*     so reduce it and increase the remainder */
+    if (r1 < c1) {                                      /* if a correction is required */
+        q1 = q1 - 1;                                    /*   then the first trial quotient is too large */
+        r1 = r1 + divisor.mantissa;                     /*     so reduce it and increase the remainder */
         }
 
-    q2 = c1 / bh;                                       /* form the second trial quotient */
-    r2 = c1 % bh;                                       /*   and remainder */
+    r1 = r1 - c1;                                       /* correct the first remainder */
 
-    c2 = r2 - bl * q2;                                  /* form the second corrected remainder */
+    q2 = r1 / bh;                                       /* form the second trial quotient */
+    r2 = r1 % bh;                                       /*   and remainder */
 
-    while (c2 < 0) {                                    /* while a correction is required */
-        q2 = q2 - 1;                                    /*   the second trial quotient is too large */
-        c2 = c2 + divisor.mantissa;                     /*     so reduce it and increase the remainder */
+    c2 = bl * q2;                                       /* form the second remainder correction */
+    r2 = r2 << D32_WIDTH;                               /*   and scale the remainder to match */
+
+    if (r2 < c2) {                                      /* if a correction is required */
+        q2 = q2 - 1;                                    /*   then the second trial quotient is too large */
+        r2 = r2 + divisor.mantissa;                     /*     so reduce it and increase the remainder */
         }
 
-    quotient->mantissa = (q1 << D32_WIDTH - DELTA_ALIGNMENT)    /* sum the quotient digits */
-                           + (q2 >> DELTA_ALIGNMENT);           /*   and align the result */
+    quotient->mantissa = (q1 << D32_WIDTH) + q2;        /* position and sum the quotient digits */
 
     quotient->negative =                                /* set the quotient sign negative */
        (dividend.negative != divisor.negative);         /*   if the operand signs differ */
@@ -879,9 +934,8 @@ if (real.exponent < -1)                                 /* if the real value is 
 else {                                                  /* otherwise the value is convertible */
     integer->mantissa = real.mantissa;                  /*   so set the mantissa */
 
-    if (round && real.exponent < UNPACKED_BITS)         /* if rounding is requested and the value won't overflow */
-        integer->mantissa +=                            /*   then add one-half of the LSB to the value */
-           (t_uint64) 1 << (UNPACKED_BITS - real.exponent - 1);
+    if (round && real.exponent < UNPACKED_BITS)                 /* if rounding is requested and won't overflow */
+        integer->mantissa += half_lsb [in_d] >> real.exponent;  /*   then add one-half of the LSB to the value */
     }
 
 integer->exponent = real.exponent;                      /* copy the exponent */

@@ -1,6 +1,6 @@
 /* hp3000_mem.h: HP 3000 memory subsystem interface declarations
 
-   Copyright (c) 2016, J. David Bryan
+   Copyright (c) 2016-2020, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -23,6 +23,8 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   25-Sep-20    JDB     Added initial_word_address and mem_reset_byte declarations
+   23-Sep-20    JDB     Changed uint8 uses to HP_BYTE
    10-Oct-16    JDB     Created
 
 
@@ -105,9 +107,10 @@ typedef struct {                                        /* byte access descripto
     uint32        word_address;                         /*   logical word address containing the next byte */
     t_bool        write_needed;                         /*   TRUE if the data word must be written to memory */
     uint32        count;                                /*   current count of bytes accessed */
-    uint32        length;                               /*   (trace) length of extent of access */
+    uint32        initial_word_address;                 /*   initial word address containing the first byte */
+    uint32        initial_byte_offset;                  /*   initial relative byte offset */
+    uint32        length;                               /*   (trace) length of the block of bytes accessed */
     uint32        initial_byte_address;                 /*   (trace) initial absolute byte address */
-    uint32        initial_byte_offset;                  /*   (trace) initial relative byte offset */
     uint32        first_byte_address;                   /*   (trace) lowest absolute byte address accessed */
     uint32        first_byte_offset;                    /*   (trace) lowest relative byte offset accessed */
     } BYTE_ACCESS;
@@ -130,6 +133,7 @@ t_stat mem_deposit (t_value value,       t_addr address, UNIT *uptr, int32 switc
 
    mem_init_byte    : initialize a memory byte access structure
    mem_set_byte     : set the access structure to a new byte offset
+   mem_reset_byte   : reset to the start of the byte access
    mem_lookup_byte  : return a byte at a specified index in a table
    mem_read_byte    : read the next byte from memory
    mem_write_byte   : write the next byte to memory
@@ -148,15 +152,16 @@ extern void   mem_fill       (uint32 starting_address, HP_WORD fill_value);
 extern t_bool mem_read  (DEVICE *dptr, ACCESS_CLASS classification, uint32 offset, HP_WORD *value);
 extern t_bool mem_write (DEVICE *dptr, ACCESS_CLASS classification, uint32 offset, HP_WORD  value);
 
-extern void   mem_init_byte   (BYTE_ACCESS *bap, ACCESS_CLASS class, HP_WORD *byte_offset, uint32 block_length);
-extern void   mem_set_byte    (BYTE_ACCESS *bap);
-extern uint8  mem_lookup_byte (BYTE_ACCESS *bap, uint8 index);
-extern uint8  mem_read_byte   (BYTE_ACCESS *bap);
-extern void   mem_write_byte  (BYTE_ACCESS *bap, uint8 byte);
-extern void   mem_modify_byte (BYTE_ACCESS *bap, uint8 byte);
-extern void   mem_post_byte   (BYTE_ACCESS *bap);
-extern void   mem_update_byte (BYTE_ACCESS *bap);
+extern void    mem_init_byte   (BYTE_ACCESS *bap, ACCESS_CLASS class, HP_WORD *byte_offset, uint32 block_length);
+extern void    mem_set_byte    (BYTE_ACCESS *bap);
+extern void    mem_reset_byte  (BYTE_ACCESS *bap);
+extern HP_BYTE mem_lookup_byte (BYTE_ACCESS *bap, uint8 index);
+extern HP_BYTE mem_read_byte   (BYTE_ACCESS *bap);
+extern void    mem_write_byte  (BYTE_ACCESS *bap, HP_BYTE byte);
+extern void    mem_modify_byte (BYTE_ACCESS *bap, HP_BYTE byte);
+extern void    mem_post_byte   (BYTE_ACCESS *bap);
+extern void    mem_update_byte (BYTE_ACCESS *bap);
 
-extern char   *fmt_byte_operand            (uint32 byte_address, uint32 byte_count);
-extern char   *fmt_translated_byte_operand (uint32 byte_address, uint32 byte_count, uint32 table_address);
-extern char   *fmt_bcd_operand             (uint32 byte_address, uint32 digit_count);
+extern char *fmt_byte_operand            (uint32 byte_address, uint32 byte_count);
+extern char *fmt_translated_byte_operand (uint32 byte_address, uint32 byte_count, uint32 table_address);
+extern char *fmt_bcd_operand             (uint32 byte_address, uint32 digit_count);

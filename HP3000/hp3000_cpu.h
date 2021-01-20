@@ -1,6 +1,6 @@
 /* hp3000_cpu.h: HP 3000 CPU declarations
 
-   Copyright (c) 2016-2019, J. David Bryan
+   Copyright (c) 2016-2020, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -23,10 +23,14 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   11-Oct-20    JDB     Moved UNIT_OPTS here from hp3000_cpu.c for updating ease
+   09-Oct-20    JDB     Renamed trap_Word_Count_Overflow to trap_Invalid_Decimal_Length
+   07-Oct-20    JDB     Corrected EXEC trace to omit PSERV events
+   05-Sep-20    JDB     Added the EIS dispatcher, corrected EIS_SDEC_MASK value
    18-Feb-19    JDB     Added SS_PAUSE_RESUMED simulation stop condition
    25-Jul-18    JDB     Fixed typo in "cpu_setup_code_segment" declaration
-   07-Nov-16    JDB     Added SETR and SETR_X for SETR executor use;
-                        renamed cpu_byte_to_word_ea to cpu_byte_ea
+   07-Nov-16    JDB     Added SETR and SETR_X for SETR executor use
+                        Renamed cpu_byte_to_word_ea to cpu_byte_ea
    03-Nov-16    JDB     Added LABEL_LOCAL for PARC/XBR/ENDP executor use
    01-Nov-16    JDB     Added debug flag for per-instruction trace capability
    22-Oct-16    JDB     Added "cpu_interrupt_pending" global from cpu_base.c
@@ -82,6 +86,9 @@
 #define UNIT_PFARS          (1u << UNIT_PFARS_SHIFT)    /* the system will auto-restart after a power failure */
 #define UNIT_CIS            (1u << UNIT_CIS_SHIFT)      /* the COBOL II Extended Instruction Set is installed */
 
+#define UNIT_OPTS           (UNIT_EIS | UNIT_CIS)       /* set of optional features */
+
+
 #define UNIT_CPU_MODEL      (cpu_unit [0].flags & UNIT_MODEL)
 
 #define CPU_MODEL(f)        ((f) >> UNIT_MODEL_SHIFT & UNIT_MODEL_MASK)
@@ -91,12 +98,12 @@
 
 /* CPU debug flags */
 
-#define DEB_ALL             ~0u                 /* trace everything */
-
 #define DEB_INSTR           (1u << 0)           /* trace instructions */
 #define DEB_REG             (1u << 1)           /* trace register values */
 #define DEB_PSERV           (1u << 2)           /* trace PCLK service events */
 #define DEB_EXEC            (1u << 3)           /* trace matched instruction executions */
+
+#define DEB_ALL             (~DEB_PSERV)        /* trace everything except PCLK service events */
 
 #define BOV_FORMAT          "%02o.%06o  %06o  " /* bank-offset-value trace format string */
 
@@ -320,7 +327,7 @@ typedef enum {
 #define trap_Invalid_ASCII_Digit    TO_DWORD (014, trap_User)
 #define trap_Invalid_Decimal_Digit  TO_DWORD (015, trap_User)
 #define trap_Invalid_Word_Count     TO_DWORD (016, trap_User)
-#define trap_Word_Count_Overflow    TO_DWORD (017, trap_User)
+#define trap_Invalid_Decimal_Length TO_DWORD (017, trap_User)
 #define trap_Decimal_Zero_Divide    TO_DWORD (020, trap_User)
 
 #define trap_SysHalt_STTV_1         TO_DWORD ( 1, trap_System_Halt)
@@ -847,6 +854,7 @@ typedef enum {
 #define SDEC2_MASK          0000003u            /* two-bit S-decrement mask for move instructions */
 #define SDEC3_MASK          0000007u            /* three-bit S-decrement mask for move instructions */
 #define SDEC_SHIFT          0                   /* S-decrement alignment shift */
+
 #define SDEC2(v)            (((v) & SDEC2_MASK) >> SDEC_SHIFT)
 #define SDEC3(v)            (((v) & SDEC3_MASK) >> SDEC_SHIFT)
 
@@ -910,8 +918,11 @@ typedef enum {
 #define CVND_SC_MASK        0000016u            /* CVND sign-control mask */
 #define CVND_SC_SHIFT       1                   /* CVND sign-control field alignment shift */
 
-#define EIS_SDEC_MASK       0000020u            /* EIS S-decrement mask */
+#define EIS_SDEC_FLAG       0000020u            /* EIS S-decrement bit 11 */
+#define EIS_SDEC_MASK       0000060u            /* EIS S-decrement mask */
 #define EIS_SDEC_SHIFT      4                   /* EIS S-decrement alignment shift */
+
+#define EIS_SDEC(v)         (((v) & EIS_SDEC_MASK) >> EIS_SDEC_SHIFT)
 
 #define CIS_SDEC_MASK       0000001u            /* CIS S-decrement mask */
 #define CIS_SDEC_SHIFT      0                   /* CIS S-decrement alignment shift */
@@ -1117,4 +1128,6 @@ extern t_stat cpu_stack_op                      (void);
 extern t_stat cpu_shift_branch_bit_op           (void);
 extern t_stat cpu_move_spec_fw_imm_field_reg_op (void);
 extern t_stat cpu_io_cntl_prog_imm_mem_op       (void);
+extern t_stat cpu_eis_fp_op                     (void);
+extern t_stat cpu_eis_dec_op                    (void);
 extern t_stat cpu_cis_op                        (void);

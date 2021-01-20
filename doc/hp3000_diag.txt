@@ -1,6 +1,6 @@
                       SIMH/HP 3000 DIAGNOSTICS PERFORMANCE
                       ====================================
-                             Last update: 2016-12-01
+                             Last update: 2020-10-22
 
 
 The HP 32230 diagnostic suite has been run against the SIMH HP 3000 simulation.
@@ -52,7 +52,7 @@ The results of the diagnostic runs are summarized below:
   PD429A    Selector Channel Maintenance Board       01.01  Passed
   PD430A    Error Correction Memory Series II        01.01  No simulation
   PD430B    Error Correction Memory Series III       00.00  No simulation
-  PD431A    Extended Instruction Set                 01.00  No simulation
+  PD431A    Extended Instruction Set                 01.00  Passed
   PD432A    Hardwired Serial Interface               01.00  No simulation
   PD433A    7970B/E Nine-Track Magnetic Tape         01.04  Partial
   PD434A    Synchronous Line Controller              01.03  No simulation
@@ -1130,6 +1130,57 @@ TEST RESULT:    Passed.
 
 
 
+-----------------------------------------
+D431A - Extended Instruction Set Firmware
+-----------------------------------------
+
+TESTED DEVICE:  CPU (hp3000_cpu_eis.c)
+
+CONFIGURATION:  sim> set cpu eis
+                sim> go
+
+TEST REPORT:    [CR entered]
+
+                D01 HP30012A EXTENDED-INSTRUCTION SET DIAGNOSTIC (D431.01.00)
+                (C)COPYRIGHT HEWLETT PACKARD COMPANY 1976.
+
+
+                Q01 SELECT SWREG OPTIONS
+
+                Programmed halt, CIR: 030366 (HALT 6), P: 010117 (RSW)
+
+                sim> deposit SWCH 140000
+                sim> go
+
+                Q02 SELECT SECTION SWREG. OPTIONS
+
+                Programmed halt, CIR: 030365 (HALT 5), P: 010165 (RSW)
+
+                sim> deposit SWCH 160000
+                sim> go
+
+                Q03 RESTORE SWREG OPTIONS
+
+                Programmed halt, CIR: 030367 (HALT 7), P: 010203 (RSW)
+
+                sim> deposit SWCH 100011
+                sim> go
+
+                Q04 ENTER MAXIMUM ERROR COUNT# = 50
+                Q05 ENTER PASS NUMBER =1
+
+                D02   1 PASS COMPLETED
+
+                Programmed halt, CIR: 030375 (HALT 15), P: 046030 (BR P+1,I)
+
+TEST RESULT:    Passed.
+
+TEST NOTES:     The diagnostic nominally executes 200 passes per program cycle.
+                It is reconfigured to execute a single pass, as multiple passes
+                are not relevant under simulation.
+
+
+
 ----------------------------------------------------
 D433A - 7970B Nine-Track Magnetic Tape (single unit)
 ----------------------------------------------------
@@ -1858,7 +1909,7 @@ TEST RESULT:    Passed.
 D441A - COBOL-II A Firmware
 ---------------------------
 
-TESTED DEVICE:  CPU (hp3000_cpu.c)
+TESTED DEVICE:  CPU (hp3000_cpu_cis.c)
 
 CONFIGURATION:  sim> set cpu cis
                 sim> go
@@ -1987,7 +2038,7 @@ TEST RESULT:    Passed.
 D442A - COBOL-II B Firmware
 ---------------------------
 
-TESTED DEVICE:  CPU (hp3000_cpu.c)
+TESTED DEVICE:  CPU (hp3000_cpu_cis.c)
 
 CONFIGURATION:  sim> set cpu cis
                 sim> go

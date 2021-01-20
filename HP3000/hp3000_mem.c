@@ -1,6 +1,6 @@
 /* hp3000_mem.c: HP 3000 main memory simulator
 
-   Copyright (c) 2016-2019, J. David Bryan
+   Copyright (c) 2016-2020, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -25,6 +25,8 @@
 
    MEM          HP 3000 Series III Main Memory
 
+   25-Sep-20    JDB     Added "mem_reset_byte" routine
+   23-Sep-20    JDB     Changed uint8 uses to HP_BYTE
    09-Dec-19    JDB     Replaced debugging macros with tracing macros
    27-Dec-18    JDB     Revised fall through comments to comply with gcc 7
    21-May-18    JDB     Changed "access" to "mem_access" to avoid clashing
@@ -623,6 +625,8 @@ bap->initial_byte_address = 0;                          /*     in an initializat
 
 mem_set_byte (bap);                                     /* set up the access from the initial byte offset */
 
+bap->initial_word_address = bap->word_address;          /* save the starting word address */
+
 bap->first_byte_address = bap->initial_byte_address;    /* save the lowest byte address */
 bap->count = 0;                                         /*   and clear the byte access count */
 
@@ -703,6 +707,32 @@ return;
 }
 
 
+/* Reset a byte accessor.
+
+   The supplied byte accessor is reset to access the original address specified
+   in the "mem_init_byte" call.  It is used to "rewind" a byte accessor, e.g.,
+   in preparation to reread the bytes or to rewrite after reading the bytes.
+
+   The routine does not alter the address and offset of the lowest byte
+   accessed, so these values are retained across a reset.
+
+   On return, the byte accessor is ready for use with the other byte access
+   routines.
+*/
+
+void mem_reset_byte (BYTE_ACCESS *bap)
+{
+mem_update_byte (bap);                                  /* flush the last byte if written */
+
+*bap->byte_offset = bap->initial_byte_offset;           /* restore the original byte offset */
+bap->word_address = bap->initial_word_address;          /*   and word address */
+
+bap->count = 0;                                         /* clear the byte access count */
+
+return;
+}
+
+
 /* Look up a byte in a table.
 
    The byte located in the table designated by the byte accessor pointer "bap"
@@ -717,7 +747,7 @@ return;
        penalty.
 */
 
-uint8 mem_lookup_byte (BYTE_ACCESS *bap, uint8 index)
+HP_BYTE mem_lookup_byte (BYTE_ACCESS *bap, uint8 index)
 {
 uint32 byte_offset, word_address;
 
@@ -756,9 +786,9 @@ else                                                    /* otherwise */
        accessed.
 */
 
-uint8 mem_read_byte (BYTE_ACCESS *bap)
+HP_BYTE mem_read_byte (BYTE_ACCESS *bap)
 {
-uint8 byte;
+HP_BYTE byte;
 
 if (*bap->byte_offset & 1) {                            /* if the byte offset is odd */
     if (bap->count == 0)                                /*   then if this is the first access */
@@ -805,7 +835,7 @@ return byte;
        accessed.
 */
 
-void mem_write_byte (BYTE_ACCESS *bap, uint8 byte)
+void mem_write_byte (BYTE_ACCESS *bap, HP_BYTE byte)
 {
 if (*bap->byte_offset & 1) {                                /* if the byte offset is odd */
     if (bap->count == 0)                                    /*   then if this is the first access */
@@ -840,7 +870,7 @@ return;
    offset is not changed by this routine.
 */
 
-void mem_modify_byte (BYTE_ACCESS *bap, uint8 byte)
+void mem_modify_byte (BYTE_ACCESS *bap, HP_BYTE byte)
 {
 if (*bap->byte_offset & 1) {                                /* if the last byte offset was even */
     bap->data_word = REPLACE_UPPER (bap->data_word, byte);  /*   then replace the upper byte */

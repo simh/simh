@@ -1,6 +1,6 @@
 /* hp3000_defs.h: HP 3000 simulator general declarations
 
-   Copyright (c) 2016-2019, J. David Bryan
+   Copyright (c) 2016-2020, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -23,6 +23,9 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   30-Sep-20    JDB     Added HIGH_UPPER_WORD, LOW_UPPER_WORD for EIS
+   23-Sep-20    JDB     Added HP_BYTE type for EIS
+   17-Aug-20    JDB     Corrected "cputc" definition
    09-Dec-19    JDB     Replaced debugging macros with tracing macros
    28-Mar-19    JDB     Added extensions
    16-Oct-17    JDB     Suppressed logical-not-parentheses warning on clang
@@ -268,7 +271,7 @@
 
 #define cputc(ch) \
           do { \
-              putc (ch); \
+              putchar (ch); \
               if (sim_log) \
                   fputc (ch, sim_log); \
               } \
@@ -387,6 +390,7 @@
 */
 
 typedef uint32              HP_WORD;                    /* HP 16-bit data word representation */
+typedef uint8               HP_BYTE;                    /* HP 8-bit data word representation */
 
 #define R_MASK              0177777u                    /* 16-bit register mask */
 
@@ -582,7 +586,8 @@ typedef enum {
 /* Half-byte accessors */
 
 #define UPPER_HALF(b)       ((b) >> D4_WIDTH & D4_MASK)
-#define LOWER_HALF(b)       ((b) & D4_MASK)
+#define LOWER_HALF(b)       ((b) &  D4_MASK)
+#define TO_BYTE(u,l)        (HP_BYTE) (((u) & D4_MASK) << D4_WIDTH | (l) & D4_MASK)
 
 
 /* Byte accessors.
@@ -607,8 +612,8 @@ typedef enum {
     lower                                       /* lower byte selected */
     } BYTE_SELECTOR;
 
-#define UPPER_BYTE(w)       (uint8)   ((w) >> D8_WIDTH & D8_MASK)
-#define LOWER_BYTE(w)       (uint8)   ((w) &  D8_MASK)
+#define UPPER_BYTE(w)       (HP_BYTE) ((w) >> D8_WIDTH & D8_MASK)
+#define LOWER_BYTE(w)       (HP_BYTE) ((w) &  D8_MASK)
 #define TO_WORD(u,l)        (HP_WORD) (((u) & D8_MASK) << D8_WIDTH | (l) & D8_MASK)
 
 #define REPLACE_UPPER(w,b)  ((w) & D8_MASK | ((b) & D8_MASK) << D8_WIDTH)
@@ -619,8 +624,18 @@ typedef enum {
 
 #define UPPER_WORD(d)       (HP_WORD) ((d) >> D16_WIDTH & D16_MASK)
 #define LOWER_WORD(d)       (HP_WORD) ((d) &  D16_MASK)
-
 #define TO_DWORD(u,l)       ((uint32) (u) << D16_WIDTH | (l))
+
+
+/* Quad-word accessors */
+
+#define UPPER_DWORD(q)      (uint32) ((q) >> D32_WIDTH & D32_MASK)
+#define LOWER_DWORD(q)      (uint32) ((q) &  D32_MASK)
+
+#define HIGH_UPPER_WORD(q)  (HP_WORD) ((q) >> D48_WIDTH & D16_MASK)
+#define LOW_UPPER_WORD(q)   (HP_WORD) ((q) >> D32_WIDTH & D16_MASK)
+#define TO_QWORD(h,a,b,l)   ((t_uint64) (h) << D48_WIDTH | (t_uint64) (a) << D32_WIDTH \
+                              | (uint32) (b) << D16_WIDTH | (l))
 
 
 /* Flip-flops */

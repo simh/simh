@@ -1,6 +1,6 @@
 /* hp3000_cpu_base.c: HP 3000 CPU base set instruction simulator
 
-   Copyright (c) 2016-2019, J. David Bryan
+   Copyright (c) 2016-2020, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -23,6 +23,8 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   30-Sep-20    JDB     Cleaned up QWORD assembly and disassembly in "shift_48_64"
+   05-Sep-20    JDB     Added EIS decoding and "cpu_eis_[fp|dec]_op" calls
    09-Dec-19    JDB     Replaced debugging macros with tracing macros
    27-Dec-18    JDB     Revised fall through comments to comply with gcc 7
    08-Jan-17    JDB     Fixed bug in SCAL 0/PCAL 0 if a stack overflow occurs
@@ -2196,10 +2198,10 @@ static const PROPERTY prop [4] = {
 uint32   count;
 t_uint64 operand, fill, result;
 
-operand = (t_uint64) RC << D32_WIDTH | TO_DWORD (RB, RA);   /* merge the first three words of the operand */
-
-if (op_size == size_64)                                 /* if the operand size is 64 bits */
-    operand = (t_uint64) RD << D48_WIDTH | operand;     /*   then merge the fourth word of the operand */
+if (op_size == size_48)                                 /* if the operand size is 48 bits */
+    operand = TO_QWORD (0, RC, RB, RA);                 /*   then merge the three words of the operand */
+else                                                    /* otherwise the operand size is 64 bits */
+    operand = TO_QWORD (RD, RC, RB, RA);                /*   so merge all four operand words */
 
 if (shift == arithmetic) {                              /* if this is an arithmetic shift */
     count = SHIFT_COUNT (opcode);                       /*   then the instruction contains the shift count */
@@ -2256,13 +2258,13 @@ else                                                    /* otherwise the shift t
 
 RA = LOWER_WORD (result);                               /* restore the */
 RB = UPPER_WORD (result);                               /*   lower three words */
-RC = LOWER_WORD (result >> D32_WIDTH);                  /*     to the stack */
+RC = LOW_UPPER_WORD (result);                           /*     to the stack */
 
 if (op_size == size_48)                                 /* if the operand size is 48 bits */
     SET_CCA (RC, RB | RA);                              /*   then set the condition code */
 
 else {                                                  /* otherwise the size is 64 bits */
-    RD = LOWER_WORD (result >> D48_WIDTH);              /*   so merge the upper word */
+    RD = HIGH_UPPER_WORD (result);                      /*   so restore the upper word */
     SET_CCA (RD, RC | RB | RA);                         /*     and then set the condition code */
     }
 
@@ -3412,11 +3414,11 @@ return status;                                          /* return the execution 
 
        0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-     | 0   0   1   0 | 0   0   0   1 | 0   1   1   1 | 1   0   0 | x |  DMUL/DDIV
+     | 0   0   1   0 | 0   0   0   1 | 0   0   0   0 | 1 | EIS FP op |  EIS FP
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-     | 0   0   1   0 | 0   0   0   1 | 0   0   0   0 | 1 | ext fp op |  Extended FP
+     | 0   0   1   0 | 0   0   0   1 | 0   0   0   1 |    APL op     |  APL
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
@@ -3424,7 +3426,11 @@ return status;                                          /* return the execution 
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-     | 0   0   1   0 | 0   0   0   1 | 1 |  options  |  decimal op   |  Decimal
+     | 0   0   1   0 | 0   0   0   1 | 0   1   1   1 | 1   0   0 | x |  DMUL/DDIV
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     | 0   0   1   0 | 0   0   0   1 | 1 |  options  |  decimal op   |  EIS Decimal
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
    In hardware, optional instructions depend on the presence of the microcode
@@ -3472,6 +3478,14 @@ t_stat   status = SCPE_OK;
 operation = FIRMEXTOP (CIR);                            /* get the operation from the instruction */
 
 switch (operation) {                                    /* dispatch the operation */
+
+    case 000:                                           /* Extended Instruction Set (floating point) */
+        if (cpu_unit [0].flags & UNIT_EIS)              /* if the firmware is installed */
+            status = cpu_eis_fp_op ();                  /*   then call the EIS dispatcher */
+        else                                            /* otherwise */
+            status = STOP_UNIMPL;                       /*   the instruction range decodes as unimplemented */
+        break;
+
 
     case 003:                                           /* COBOL II Extended Instruction Set */
         if (cpu_unit [0].flags & UNIT_CIS)              /* if the firmware is installed */
@@ -3534,6 +3548,21 @@ switch (operation) {                                    /* dispatch the operatio
             default:
                 status = STOP_UNIMPL;                   /* the rest of the base set codes are unimplemented */
             }
+        break;
+
+
+    case 010:                                           /* Extended Instruction Set (decimal) */
+    case 011:                                           /* Extended Instruction Set (decimal) */
+    case 012:                                           /* Extended Instruction Set (decimal) */
+    case 013:                                           /* Extended Instruction Set (decimal) */
+    case 014:                                           /* Extended Instruction Set (decimal) */
+    case 015:                                           /* Extended Instruction Set (decimal) */
+    case 016:                                           /* Extended Instruction Set (decimal) */
+    case 017:                                           /* Extended Instruction Set (decimal) */
+        if (cpu_unit [0].flags & UNIT_EIS)              /* if the firmware is installed */
+            status = cpu_eis_dec_op ();                 /*   then call the EIS dispatcher */
+        else                                            /* otherwise */
+            status = STOP_UNIMPL;                       /*   the instruction range decodes as unimplemented */
         break;
 
 

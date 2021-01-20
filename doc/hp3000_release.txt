@@ -1,7 +1,7 @@
                            SIMH/HP 3000 RELEASE NOTES
                         ================================
                         J. David Bryan <jdbryan@acm.org>
-                             Last update: 2020-02-14
+                             Last update: 2020-11-07
 
 
 This file documents the release history of the simulator for the Hewlett-Packard
@@ -246,6 +246,294 @@ the MPE version used:
    is done by the "mpe-3-sysdump.sim" simulator command file provided with the
    MPE-V/R Operating System Software Kit mentioned above, and the supplied disc
    image contains the increased limit.
+
+
+
+=====================
+Release 9, 2020-11-07
+=====================
+
+This release of the HP 3000 simulator adds the following features:
+
+ - A new concurrent-mode FLUSH command has been added to flush terminal logs and
+   attached device files that otherwise would be flushed only when the simulator
+   is stopped.  This allows external examination of these files while the
+   simulator continues to run.
+
+ - Terminal multiplexer line logs are now flushed each time the simulator stops.
+   Prior to this, closing and then reopening a line log was the only way to post
+   all buffered writes to disc.
+
+ - The Extended Instruction Set firmware is now available.  The new SET CPU EIS
+   option enables the firmware.
+
+ - A new LINEORDER option has been added to the ATCD device to allow a
+   user-specified connection order or to restrict connections to a subset of the
+   available lines.
+
+ - The -N (new file) option has been added to the SET ATCD LOG command to create
+   a new, blank log file.  Without the option, the command will append to an
+   existing log file.
+
+ - Microcode traps, such as bounds violations, now print the register values if
+   the REG trace option is enabled.
+
+
+--------------------
+Implementation Notes
+--------------------
+
+ - Prior releases relied upon MPE to trap and simulate EIS instructions.  Those
+   instructions are now implemented directly, resulting in a large reduction in
+   execution time for the individual instructions.  Programs that made heavy use
+   of double-precision floating-point calculations or decimal (BCD) arithmetic
+   may see an increase in performance.
+
+ - The HP 30012A Extended Instruction Set was standard equipment on the Series
+   II and III.  As such, the simulator should reject a SET CPU NOEIS command
+   with the "Command not allowed" message.  However, the NOEIS option is allowed
+   to enable performance comparisons between hardware and software instruction
+   emulations.  Executing SET CPU NOEIS will revert to emulation of the EIS
+   instructions by MPE.
+
+
+----------
+Bugs Fixed
+----------
+
+  1. PROBLEM:  Breakpoint actions after an included true IF are discarded.
+
+     VERSION:  Release 8.
+
+     OBSERVATION:  If a breakpoint has actions that include an IF command
+     followed by additional actions, and the IF command evaluates to TRUE, then
+     the IF actions executed, but the remaining breakpoint actions are
+     discarded.  For example:
+
+       sim> set environment X=0
+       sim> break 10 ; if "%X%" == "0" echo X is 0 ; echo Done
+       sim> go
+
+     One would expect to see:
+
+       Breakpoint, P: 000010 (NOP,NOP)
+       sim> if "0" == "0" echo X is 0
+       sim> echo X is 0
+       X is 0
+       sim> echo Done
+       Done
+       sim>
+
+     Instead, only the first ECHO is performed.  The second one is discarded.
+     However, execution is correct if the IF condition is false:
+
+       sim> set environment X=1
+       sim> break 10 ; if "%X%" == "0" echo X is 0 ; echo Done
+       sim> go
+
+       Breakpoint, P: 000010 (NOP,NOP)
+       sim> if "1" == "0" echo X is 0
+       sim> echo Done
+       Done
+       sim>
+
+     CAUSE:  IF actions are executed by setting the breakpoint action pointer to
+     the action list and returning to the command loop.  While the IF command is
+     executing, the pointer is pointing at the "echo Done" part of the
+     breakpoint action list.  However, if the IF condition is true, the pointer
+     is changed to point at the "echo X is 0" command, and the remaining
+     breakpoint actions are lost.
+
+     RESOLUTION:  Modify "if_cmd" (sim_extension.c) to append the remaining
+     breakpoint actions to the actions specified by the IF command, so that the
+     former are not lost.
+
+     STATUS:  Fixed in Release 9.
+
+
+  2. PROBLEM:  Linking with recent compilers results in duplicate symbol errors.
+
+     VERSION:  Release 8.
+
+     OBSERVATION:  If the simulator is compiled with a recent compiler version,
+     the link step fails with duplicate symbol errors.  The symbols reported are
+     "sim_vm_release", "vm_sim_vm_init", "vm_console_input_unit", and
+     "vm_console_output_unit".
+
+     CAUSE:  The VM hook extension mechanism is implemented with "tentative
+     definitions" of the hook variables.  The C standard says:
+
+       "If a translation unit contains one or more tentative definitions for an
+        identifier, and the translation unit contains no external definition for
+        that identifier, then the behavior is exactly as if the translation unit
+        contains a file scope declaration of that identifier, with the composite
+        type as of the end of the translation unit, with an initializer equal to
+        0."
+
+     This behavior is such that if no module contains a definition with an
+     initializer, the hook will have a zero value.  However, if a module
+     contains a definition with an initializer, the hook is assigned that value.
+     This allows hooks to be set without changing the hook's tentative
+     definition simply by including a VM module that declares it with an
+     initializer.
+
+     This mechanism relies on the linker to resolve the multiple definitions of
+     a given hook to a single reference.  For this to occur, the compiler must
+     mark tentative definitions as "common" allocations, e.g., with the
+     "-fcommon" option to gcc.  Traditionally, gcc (and clang, etc.) defaults to
+     common allocations for tentative definitions.  However, the gcc manual
+     claims that, "This behavior is not required by ISO C, and on some targets
+     may carry a speed or code size penalty on variable references."
+
+     Newer versions (starting with gcc 10) default to data allocations instead
+     ("-fno-common"), and multiple tentative definitions now result in duplicate
+     symbol errors rather than merged accesses.
+
+     RESOLUTION:  Modify sim_extension.h to declare "vm_sim_vm_init" only if the
+     USE_VM_INIT symbol is defined.  Modify "ex_initialize" (sim_extension.c) to
+     remove the tentative definition and to make the external "vm_sim_vm_init"
+     call conditional on USE_VM_INIT.  Modify "one_time_init" (hp3000_sys.c) to
+     set the "sim_vm_release" hook directly.  Modify "atcd_reset" (hp3000_atc.c)
+     to set the console unit hooks directly.  This removes all tentative
+     definitions from the simulators.
+
+     STATUS:  Fixed in Release 9.
+
+
+  3. PROBLEM:  Trace output to stdout on Unix results in stair-step output.
+
+     VERSION:  Release 8.
+
+     OBSERVATION:  Directing the trace output to "stdout" on a Unix system
+     results in lines stair-stepping across the screen.  For example:
+
+       sim> set console debug=stdout
+       sim> set cpu debug=instr
+       sim> step 2
+
+     ...produces this output:
+
+       >>CPU instr: 00.000000  000000  NOP,NOP
+                                              >>CPU instr: 00.000001  000000  NOP,NOP
+
+     CAUSE:  Trace statements are output with LF ('\n') line ends and depend on
+     host-system translation to the proper line-end convention when the lines
+     are written to the trace log.  However, while the simulator is executing
+     instructions, the console is placed in "raw" mode so that output
+     translation, which would interfere with the output from the target
+     operating system, is not done.  As there are no carriage returns in the
+     trace output stream when writing to stdout, the console cursor simply drops
+     in place to the next line, so that each line begins at the same column
+     where the previous line ended.
+
+     RESOLUTION:  Modify "hp_trace" (hp3000_sys.c) to convert a terminating LF
+     to a CR LF sequence if output is to stdout.  Also modify "sim_instr"
+     (hp3000_cpu.c) and "edit" (hp3000_cpu_cis.c) to add CR characters to the
+     stdout stream where line termination is done explicitly.
+
+     STATUS:  Fixed in Release 9.
+
+
+  4. PROBLEM:  CPU EXEC traces can include unrelated process clock events.
+
+     VERSION:  Release 8.
+
+     OBSERVATION:  When the SET CPU DEBUG=EXEC command is used to trace specific
+     CPU instruction executions, process clock event traces may be embedded.
+     For example, tracing the ABSD instruction is seen to produce:
+
+       >>CPU  exec: *****************
+       >>CPU   reg: 00.045172  000002    A 000005, B 000316, X 000001, M i t r o C CCG
+       >>CPU fetch: 00.042440  000047    instruction fetch
+       >>CPU instr: 00.042437  020477  ABSD 1
+       >>CPU  data: 00.045172  020040    stack read
+       >>CPU  data: 00.045171  020040    stack read
+       >>CPU fetch: 00.042441  140003    instruction fetch
+       >>CPU  opnd: 00.045113  000316    source 5,"12345D"
+       >>CPU  data: 00.045114  056400    data read
+       >>CPU  data: 00.045114  057400    data write
+       >>CPU  opnd: 00.045113  000316    target 5,"12345F"
+       >>CPU pserv: Process clock delay 3890 service entered on the user stack
+       >>CPU pserv: Simulation rate 1x
+       >>CPU   reg: 00.045170  000002    A 020040, B 020040, X 000001, M i t r o C CCL
+       >>CPU  exec: *****************
+
+     The PSERV trace is unrelated to instruction execution.
+
+     CAUSE:  EXEC tracing works by enabling all trace options when the target
+     instruction is present in the CIR.  However, it should enable just the
+     trace options relevant to execution.
+
+     RESOLUTION:  Modify the definition of DEB_ALL (hp3000_cpu.h) to exclude the
+     DEB_PSERV trace option.
+
+     STATUS:  Fixed in Release 9.
+
+
+  5. PROBLEM:  A bounds violation can occur with valid CVND operands.
+
+     VERSION:  Release 8.
+
+     OBSERVATION:  The following valid SPL program:
+
+       BEGIN
+         BYTE ARRAY X (0:5) := "-31416";
+
+         PROCEDURE CVND (DISPLAY);
+           BYTE ARRAY DISPLAY;
+
+         BEGIN
+           BYTE ARRAY ASCII (0:5);
+
+           TOS := @ASCII;
+           TOS := DISPLAY;
+           TOS := 6;
+           ASSEMBLE (CON %020477;  << CVND LS,1 >>
+                     CON %000021);
+         END;
+
+         CVND (X);
+       END.
+
+     ...produces this error:
+
+       PROGRAM ERROR #24 :BOUNDS VIOLATION
+
+     CAUSE:  Tracing the instruction execution shows:
+
+       >>CPU   reg: 01.042453  000003    A 000006, B 000002, C 000042, X 000000, m I T r o c CCG
+       >>CPU   reg: 01.000000  000301    PB 177630, PL 177653, DL 042274, DB 042430, Q 042447, Z 044714
+       >>CPU fetch: 04.177644  000021    instruction fetch
+       >>CPU instr: 04.177643  020477  CVND LS,1
+       >>CPU  data: 01.042453  042430    stack read
+       >>CPU fetch: 04.177645  031401    instruction fetch
+       >>CPU   reg: 01.042452  000004    A 000006, B 000002, C 000042, D 042430, X 000000, m I T r o c CCG
+       >>CPU instr: 04.177645  000000  bounds violation trap
+
+     The HP 3000 microcode preloads four top-of-stack registers before calling
+     any of the firmware extension instruction routines.  However, only three
+     TOS values are pushed for the CVND instruction, so the fourth register
+     actually contains a word from whatever was on the stack before the
+     instruction was executed.  If the source or target buffer resides on the
+     stack immediately below the three CVND parameters, preloading the fourth
+     TOS register sets SM to point below the last word of the buffer, and a
+     bounds violation results.
+
+     In the above trace, the stack preload shows the fourth TOS register is read
+     from location 042453.  This increments SR and decrements SM to point at
+     042452, as shown in the REG trace two lines later.  The C register contains
+     the relative byte address of the target array -- in this case, 42 (octal)
+     relative to the DB register contents.  The starting word address is
+     therefore 42 / 2 + 042430 = 042451.  The buffer is 6 bytes or 3 words long,
+     so the ending address is 042453.  But because the preload pulled in a
+     fourth stack word (that was never pushed), the end of the buffer is under
+     SM, and a bounds violation occurs.
+
+     RESOLUTION:  Modify the CVND executor in "cpu_cis_op" (hp3000_cpu_cis.c) to
+     queue down (i.e., transfer from a register back to memory) the fourth TOS
+     register value before checking the buffer legality.
+
+     STATUS:  Fixed in Release 9.
 
 
 

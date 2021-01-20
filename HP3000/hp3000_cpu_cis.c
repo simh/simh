@@ -1,6 +1,6 @@
 /* hp3000_cpu_cis.c: HP 32234A COBOL II Instruction Set simulator
 
-   Copyright (c) 2016-2019, J. David Bryan
+   Copyright (c) 2016-2020, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -23,6 +23,10 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   22-Oct-20    JDB     Improved the comments describing the instructions
+   20-Oct-20    JDB     CVND now queues down until 3 TOS registers are left
+   09-Oct-20    JDB     Renamed trap_Word_Count_Overflow to trap_Invalid_Decimal_Length
+   26-Aug-20    JDB     Corrected line ends for trace to stdout
    09-Dec-19    JDB     Replaced debugging macros with tracing macros
    22-Apr-17    JDB     Corrected the significance flag setting in "edit"
    29-Dec-16    JDB     Disabled interrupt checks pending test generation
@@ -39,36 +43,111 @@
 
    This module implements the HP 32234A COBOL II Extended Instruction
    Set firmware, also known as the Language Extension Instructions.  The set
-   contains these instructions in the firmware extension range 020460-020477:
+   contains these instructions:
+
+     Name  Description
+     ----  ---------------------------
+     ABSD  Absolute decimal
+     ABSN  Absolute numeric
+     ALGN  Align numeric
+     CMPS  Compare strings
+     CMPT  Compare translated strings
+     CVND  Convert numeric display
+     EDIT  Edited move
+     ENDP  End of paragraph
+     LDDW  Load double-word
+     LDW   Load word
+     NEGD  Negate decimal
+     PARC  Paragraph procedure call
+     TCCS  Test condition code and set
+     TR    Translate
+     XBR   External branch
+
+   The instructions occupy the the firmware extension range 020460-020477 and
+   are encoded as follows:
 
        0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      | 0   0   1   0 | 0   0   0   1 | 0   0   1   1 | 0   0   0 | S |  ALGN
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
+     S-Decrement:
+
+       0 = delete 3 words
+       1 = delete 4 words
+
+   Transfer the external decimal number designated by RA (digit and fraction
+   count) and RB (address) to an external decimal number designated by RC
+   (digit and fraction count) and RD (address) while aligning the source number
+   with the target decimal point.
+
+
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      | 0   0   1   0 | 0   0   0   1 | 0   0   1   1 | 0   0   1 | S |  ABSN
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+     S-Decrement:
+
+       0 = delete 1 word
+       1 = delete 2 words
+
+   Convert in place the external decimal number RA (count) and RB (address) to
+   an unsigned value.
+
 
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      | 0   0   1   0 | 0   0   0   1 | 0   0   1   1 | 1   0   0 | B |  EDIT
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
+     Buffer Location:
+
+       0 = edit program address is relative to PB
+       1 = edit program address is relative to DB
+
+   Move a string of characters from the source buffer address contained in RB to
+   the target buffer address contained in RC under the control of the edit
+   program addressed by RD.  RA contains a zero word used to resume after an
+   interrupt.
+
+
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      | 0   0   1   0 | 0   0   0   1 | 0   0   1   1 | 1   0   1 | B |  CMPS
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+     Buffer Location:
+
+       0 = second string address is relative to PB
+       1 = second string address is relative to DB
+
+   Compare the string of characters designated by RA (count) and RB (address) to
+   the string of characters designated by RC (count) and RD (address) and set
+   the condition code appropriately.
+
 
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      | 0   0   1   0 | 0   0   0   1 | 0   0   1   1 | 1   1   0   0 |  XBR
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
+   Jump to the location indicated by the segment number contained in RA and the
+   PB-relative address contained in RB.
+
+
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      | 0   0   1   0 | 0   0   0   1 | 0   0   1   1 | 1   1   0   1 |  PARC
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
+   Call the location indicated by the paragraph number contained in RA, the
+   segment number contained in RB, and the PB-relative address contained in RC.
+
+
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      | 0   0   1   0 | 0   0   0   1 | 0   0   1   1 | 1   1   1   0 |  ENDP
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Return to the location indicated by the segment number contained in RC and
+   the PB-relative address contained in RD if the paragraph numbers contained in
+   RA and RB are identical.
+
 
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      | 0   0   1   0 | 0   0   0   1 | 0   0   1   1 | 1   1   1   1 |  CMPT
@@ -76,11 +155,26 @@
      | 0   0   0   0   0   0   0   0   0   0 | 0   0   0   1   1 | B |
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
+     Buffer Location:
+
+       0 = second string address is relative to PB
+       1 = second string address is relative to DB
+
+   Compare the string of characters designated by RA (count) and RB (address) to
+   the string of characters designated by RC (count) and RD (address) using the
+   translation table addressed by SM and set the condition code appropriately.
+
+
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      | 0   0   1   0 | 0   0   0   1 | 0   0   1   1 | 1   1   1   1 |  TCCS
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      | 0   0   0   0   0   0   0   0   0   0 | 0   0   1 | > | = | < |
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Test the condition code in the status register against the set of conditions
+   specified in bits 13-15 and load -1 to the TOS if the condition matches and 0
+   if it does not.
+
 
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      | 0   0   1   0 | 0   0   0   1 | 0   0   1   1 | 1   1   1   1 |  CVND
@@ -88,11 +182,36 @@
      | 0   0   0   0   0   0   0   0   0   0 | 0   1 |  sign op  | S |
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
+     Sign Conversion:
+
+       000 = source sign is leading separate
+       001 = source sign is trailing separate
+       010 = source sign is leading overpunch
+       011 = source sign is trailing overpunch
+       1xx = source is unsigned
+
+     S-Decrement:
+
+       0 = delete 2 words
+       1 = delete 3 words
+
+   Convert the display decimal number designated by RA (count) and RB (address)
+   to the external decimal number designated by RC (address).
+
+
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      | 0   0   1   0 | 0   0   0   1 | 0   0   1   1 | 1   1   1   1 |  LDW
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      | 0   0   0   0   0   0   0   0   0   0 | 1   0   0   0   0 | S |
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+     S-Decrement:
+
+       0 = delete no words
+       1 = delete 1 word
+
+   Load two bytes from the byte address contained in RA to the TOS.
+
 
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      | 0   0   1   0 | 0   0   0   1 | 0   0   1   1 | 1   1   1   1 |  LDDW
@@ -100,11 +219,29 @@
      | 0   0   0   0   0   0   0   0   0   0 | 1   0   0   0   1 | S |
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
+     S-Decrement:
+
+       0 = delete delete no words
+       1 = delete 1 word
+
+   Load four bytes from the byte address contained in RA to the TOS.
+
+
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      | 0   0   1   0 | 0   0   0   1 | 0   0   1   1 | 1   1   1   1 |  TR
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      | 0   0   0   0   0   0   0   0   0   0 | 1   0   0   1   0 | B |
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+     Buffer Location:
+
+       0 = translation table address is relative to PB
+       1 = translation table address is relative to DB
+
+   Convert the string of characters designated by RA (count) and RC (address) to
+   the target string designated by RB (address) using the translation table
+   addressed by RD.
+
 
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      | 0   0   1   0 | 0   0   0   1 | 0   0   1   1 | 1   1   1   1 |  ABSD
@@ -112,16 +249,30 @@
      | 0   0   0   0   0   0   0   0   0   0 | 1   0   0   1   1 | S |
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
+     S-Decrement:
+
+       0 = delete 1 word
+       1 = delete 2 words
+
+   Convert in place the packed decimal number designated by RA (count) and RB
+   (address) to an unsigned value.
+
+
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      | 0   0   1   0 | 0   0   0   1 | 0   0   1   1 | 1   1   1   1 |  NEGD
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      | 0   0   0   0   0   0   0   0   0   0 | 1   0   1   0   0 | S |
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
-   Where:
+     S-Decrement:
 
-     S = S-decrement
-     B = Bank select (0/1 = PB-relative/DB-relative)
+       0 = delete 1 word
+       1 = delete 2 words
+
+   Negate in place the packed decimal number designated by RA (count) and RB
+   (address) to an unsigned value.
+
+
 
    The PARC, ENDP, and XBR instructions implement the COBOL "PERFORM" statement.
    ABSD and NEGD manipulate packed decimal numbers.  ALGN, ABSN, EDIT, and CVND
@@ -169,31 +320,36 @@
 
    Numbers may begin at an even or odd byte address, and the size of the number
    (in digits) may be even or odd, so there are four possible cases of packing
-   into 16-bit words:
+   the starting digits into 16-bit words:
+
+       0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15    addr/size
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |    unused     |     digit     |      ...      |      ...      |  even/even
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |     digit     |     digit     |      ...      |      ...      |  even/odd
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |      ...      |      ...      |    unused     |     digit     |  odd/even
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |              ...              |     digit     |     digit     |  odd/odd
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+   Numbers always end with the sign in the lower half of the byte, so there are
+   two possible cases of packing the ending digits into 16-bit words, depending
+   on the total number of digits:
 
        0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-     | unused/digit  |     digit     |     digit     |     digit     |  addr even
-     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-     |     digit     |     digit     |     digit     |     sign      |  size even
-     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-
-     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-     | unused/digit  |     digit     |     digit     |     digit     |  addr even
-     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-     |     digit     |     sign      |              ...              |  size odd
-     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-
-     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-     |              ...              | unused/digit  |     digit     |  addr odd
-     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-     |     digit     |     digit     |     digit     |     sign      |  size ?...
-     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-
-     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-     |              ...              | unused/digit  |     digit     |  addr odd
-     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      |     digit     |     sign      |              ...              |
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+
+     +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     |      ...      |      ...      |     digit     |     sign      |
      +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
 
 
@@ -416,10 +572,12 @@
    Two user traps may be taken by these instructions if the T bit is on in the
    status register:
 
-     - Word Count Overflow (parameter 17)
-     - Invalid ASCII Digit (parameter 14)
+     Parameter  Description
+     ---------  ------------------------------------------------
+      000014    Invalid ASCII Digit
+      000017    Invalid Decimal Length
 
-   The Word Count Overflow trap is taken when an instruction is given an
+   The Invalid Decimal Length trap is taken when an instruction is given an
    external decimal number with more than 28 digits.  The Invalid ASCII Digit
    trap occurs when an external decimal number contains characters other than
    "0"-"9", a "+" or "-" sign in any position other than the first or last
@@ -435,14 +593,14 @@
     1. In several cases noted below, the hardware microcode implementations
        differ from the descriptions in the Machine Instruction Set manual.
        Also, the comments in the microcode source sometimes do not correctly
-       described the microcode actions.  In all cases of conflict, the simulator
+       describe the microcode actions.  In all cases of conflict, the simulator
        follows the microcode implementation.
 
     2. The Machine Instruction Set manual references trap conditions (Invalid
        Alphabetic Character, Invalid Operand Length, Invalid Source Character
        Count, and Invalid Digit Count) that are not defined in the Series II/III
        System Reference Manual.  Examination of the microcode indicates that
-       only the Invalid ASCII Digit and Word Count Overflow traps are taken.
+       only the Invalid ASCII Digit and Invalid Decimal Length traps are taken.
 
     3. Target operand tracing is not done if a trap occurred, as the result will
        be invalid.
@@ -630,7 +788,7 @@ switch (opcode) {                                       /* dispatch the opcode *
           || source_length > MAX_DIGITS                 /*   or the source digit count is too large */
           || target_fraction > target_length            /*     or the target fraction count is invalid */
           || target_length > MAX_DIGITS)                /*       or the target digit count is too large */
-            trap = trap_Word_Count_Overflow;            /*         then trap for a count overflow */
+            trap = trap_Invalid_Decimal_Length;         /*         then trap for a count overflow */
 
         else if (source_length > 0 && target_length > 0) {  /* otherwise if there is an alignment to do */
             sign = Unsigned;                                /*   then assume the source is unsigned */
@@ -720,8 +878,11 @@ switch (opcode) {                                       /* dispatch the opcode *
 
     case 002:                                           /* ABSN (CCA, O; INV DIG, WC OVF, STOV, STUN, BNDV) */
     case 003:
+        while (SR > 2)                                  /* if more than two TOS registers are valid */
+            cpu_queue_down ();                          /*   then queue them down until exactly two are left */
+
         if (RA > MAX_DIGITS)                            /* if the digit count is too large */
-            trap = trap_Word_Count_Overflow;            /*   then trap for a count overflow */
+            trap = trap_Invalid_Decimal_Length;         /*   then trap for a count overflow */
 
         else if (RA > 0) {                              /* otherwise if there are digits to process */
             source_rba = RB;                            /*   then use a working source byte address pointer */
@@ -907,8 +1068,11 @@ switch (opcode) {                                       /* dispatch the opcode *
             case 035:
             case 036:
             case 037:
+                while (SR > 3)                          /* if more than three TOS registers are valid */
+                    cpu_queue_down ();                  /*   then queue them down until exactly three are left */
+
                 if (RA > MAX_DIGITS)                    /* if the digit count is too large */
-                    trap = trap_Word_Count_Overflow;    /*   then trap for a count overflow */
+                    trap = trap_Invalid_Decimal_Length; /*   then trap for a count overflow */
 
                 else if (RA > 0) {                      /* otherwise if there are digits to convert */
                     sign_cntl = (opcode & CVND_SC_MASK) /*   then get the sign control code */
@@ -935,6 +1099,9 @@ switch (opcode) {                                       /* dispatch the opcode *
 
             case 040:                                   /* LDW (none; STOV, STUN, BNDV) */
             case 041:
+                while (SR > 1)                          /* if more than one TOS register is valid */
+                    cpu_queue_down ();                  /*   then queue them down until exactly one is left */
+
                 source_rba = RA;                        /* use a working source byte address pointer */
 
                 if ((opcode & CIS_SDEC_MASK) == 0)      /* if the S-decrement bit is clear */
@@ -952,6 +1119,9 @@ switch (opcode) {                                       /* dispatch the opcode *
 
             case 042:                                   /* LDDW (none; STOV, STUN, BNDV) */
             case 043:
+                while (SR > 1)                          /* if more than one TOS register is valid */
+                    cpu_queue_down ();                  /*   then queue them down until exactly one is left */
+
                 source_rba = RA;                        /* use a working source byte address pointer */
 
                 if ((opcode & CIS_SDEC_MASK) == 0)      /* if the S-decrement bit is clear */
@@ -1010,8 +1180,11 @@ switch (opcode) {                                       /* dispatch the opcode *
             case 047:
             case 050:                                   /* NEGD (CCA, O; WC OVF, STOV, STUN, BNDV) */
             case 051:
+                while (SR > 2)                          /* if more than two TOS registers are valid */
+                    cpu_queue_down ();                  /*   then queue them down until exactly two are left */
+
                 if (RA > MAX_DIGITS)                    /* if the digit count is too large */
-                    trap = trap_Word_Count_Overflow;    /*   then trap for a count overflow */
+                    trap = trap_Invalid_Decimal_Length; /*   then trap for a count overflow */
 
                 else {                                      /* otherwise */
                     mem_init_byte (&source, data, &RB, RA); /*   set up a byte accessor for the operand */
@@ -1022,7 +1195,7 @@ switch (opcode) {                                       /* dispatch the opcode *
                     if (TRACING (cpu_dev, DEB_MOPND))
                         fprint_operand (&source, "source", &fmt_bcd_operand);
 
-                    byte = mem_read_byte (&target);     /* get the sign byte */
+                    byte = mem_read_byte (&target);     /* get the sign byte and check the bounds */
 
                     if (opcode < 050) {                 /* if this is an ABSD instruction */
                         if (IS_NEG (byte))              /*   then if the number is negative */
@@ -1044,7 +1217,7 @@ switch (opcode) {                                       /* dispatch the opcode *
                             SET_CCL;                                /*       and set the less-than condition code */
                             }
 
-                    mem_modify_byte (&target, byte);    /* rewrite the digit */
+                    mem_modify_byte (&target, byte);    /* rewrite the digit and check the bounds */
                     mem_post_byte (&target);            /*   and post it */
 
                     if (TRACING (cpu_dev, DEB_MOPND))
@@ -1457,6 +1630,9 @@ do {                                                    /* process operations wh
         fprint_edit (sim_deb, NULL, 0,                  /* print the operation mnemonic */
                      prog.initial_byte_address          /*   at the current physical byte address */
                        + prog.count - 1);
+
+        if (sim_deb == stdout)                          /* if debug output is to the (raw) console */
+            fputc ('\r', sim_deb);                      /*   then insert a carriage return */
 
         fputc ('\n', sim_deb);                          /* end the trace with a newline */
         }
