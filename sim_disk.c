@@ -649,7 +649,7 @@ t_seccnt sread = 0;
 sim_debug_unit (ctx->dbit, uptr, "sim_disk_rdsect(unit=%d, lba=0x%X, sects=%d)\n", (int)(uptr - ctx->dptr->units), lba, sects);
 
 if ((sects == 1) &&                                     /* Single sector reads */
-    (lba >= (uptr->capac*ctx->capac_factor)/(ctx->sector_size/((ctx->dptr->flags & DEV_SECTORS) ? 512 : 1)))) {/* beyond the end of the disk */
+    (lba >= (uptr->capac*ctx->capac_factor)/(ctx->sector_size/((ctx->dptr->flags & DEV_SECTORS) ? ctx->sector_size : 1)))) {/* beyond the end of the disk */
     memset (buf, '\0', ctx->sector_size);               /* are bad block management efforts - zero buffer */
     if (sectsread)
         *sectsread = 1;
@@ -902,6 +902,59 @@ uptr->disk_ctx = NULL;
 return stat;
 }
 
+static t_stat _sim_disk_rdsect_interleave (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread, t_seccnt sects, uint16 sectpertrack, uint16 interleave, uint16 skew, uint16 offset)
+{
+struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
+t_lba sectno = lba, psa;
+t_stat status;
+ 
+if (sectsread)
+    *sectsread = 0;
+
+do {
+    uint16 i, track, sector;
+    
+    /*
+     * Map an LBA address into a physical sector address
+     */
+    track = sectno / sectpertrack;
+    i = (sectno % sectpertrack) * interleave;
+    if (i >= sectpertrack)
+        i++;
+    sector = (i + (track * skew)) % sectpertrack;
+
+    psa = sector + (track * sectpertrack) + offset;
+
+    status = sim_disk_rdsect(uptr, psa, buf, NULL, 1);
+    sects--;
+    buf += ctx->sector_size;
+    sectno++;
+    if (sectsread)
+        *sectsread += 1;
+    } while ((sects != 0) && (status == SCPE_OK));
+
+return status;
+}
+
+/*
+ * Version of sim_disk_rdsect() specifically for filesystem detection of DEC
+ * file systems. The routine handles regular DEC disks (physsectsz == 0) and
+ * RX01/RX02 disks (physsectsz == 128 or == 256) which ignore track 0,
+ * interleave physical sectors 2:1 for the remaining tracks and have a skew
+ * 6 sectors at the end of a track.
+ */
+#define RX0xNSECT               26                      /* 26 sectors/track */
+#define RX0xINTER               2                       /* 2 sector interleave */
+#define RX0xISKEW               6                       /* 6 sectors interleave per track */
+
+static t_stat _DEC_rdsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread, t_seccnt sects, uint32 physsectsz)
+{
+if (physsectsz == 0)            /* Use device natural sector size */
+    return sim_disk_rdsect(uptr, lba, buf, sectsread, sects);
+
+return _sim_disk_rdsect_interleave(uptr, lba, buf, sectsread, sects, RX0xNSECT, RX0xINTER, RX0xISKEW, RX0xNSECT);
+}
+
 #pragma pack(push,1)
 typedef struct _ODS1_HomeBlock
     {
@@ -1126,7 +1179,7 @@ ODSChecksum (void *Buffer, uint16 WordCount)
     }
 
 
-static t_offset get_ods2_filesystem_size (UNIT *uptr)
+static t_offset get_ods2_filesystem_size (UNIT *uptr, uint32 physsectsz)
 {
 DEVICE *dptr;
 t_addr saved_capac;
@@ -1145,7 +1198,7 @@ if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return ret_val;
 saved_capac = uptr->capac;
 uptr->capac = (t_addr)temp_capac;
-if ((sim_disk_rdsect (uptr, 512 / ctx->sector_size, (uint8 *)&Home, &sects_read, sizeof (Home) / ctx->sector_size)) ||
+if ((_DEC_rdsect (uptr, 512 / ctx->sector_size, (uint8 *)&Home, &sects_read, sizeof (Home) / ctx->sector_size, physsectsz)) ||
     (sects_read != (sizeof (Home) / ctx->sector_size)))
     goto Return_Cleanup;
 CheckSum1 = ODSChecksum (&Home, (uint16)((((char *)&Home.hm2_w_checksum1)-((char *)&Home.hm2_l_homelbn))/2));
@@ -1166,8 +1219,8 @@ if ((Home.hm2_l_homelbn == 0) ||
     (Home.hm2_w_checksum1 != CheckSum1) ||
     (Home.hm2_w_checksum2 != CheckSum2))
     goto Return_Cleanup;
-if ((sim_disk_rdsect (uptr, (Home.hm2_l_ibmaplbn+Home.hm2_w_ibmapsize+1) * (512 / ctx->sector_size), 
-                            (uint8 *)&Header, &sects_read, sizeof (Header) / ctx->sector_size)) || 
+if ((_DEC_rdsect (uptr, (Home.hm2_l_ibmaplbn+Home.hm2_w_ibmapsize+1) * (512 / ctx->sector_size), 
+                  (uint8 *)&Header, &sects_read, sizeof (Header) / ctx->sector_size, physsectsz)) || 
     (sects_read != (sizeof (Header) / ctx->sector_size)))
     goto Return_Cleanup;
 CheckSum1 = ODSChecksum (&Header, 255);
@@ -1190,7 +1243,7 @@ switch (Retr->fm2_r_word0_bits.fm2_v_format)
         break;
     }
 Retr = (ODS2_Retreval *)(((uint16 *)Retr)+Retr->fm2_r_word0_bits.fm2_v_format+1);
-if ((sim_disk_rdsect (uptr, ScbLbn * (512 / ctx->sector_size), (uint8 *)&Scb, &sects_read, sizeof (Scb) / ctx->sector_size)) ||
+if ((_DEC_rdsect (uptr, ScbLbn * (512 / ctx->sector_size), (uint8 *)&Scb, &sects_read, sizeof (Scb) / ctx->sector_size, physsectsz)) ||
     (sects_read != (sizeof (Scb) / ctx->sector_size)))
     goto Return_Cleanup;
 CheckSum1 = ODSChecksum (&Scb, 255);
@@ -1211,7 +1264,7 @@ uptr->capac = saved_capac;
 return ret_val;
 }
 
-static t_offset get_ods1_filesystem_size (UNIT *uptr)
+static t_offset get_ods1_filesystem_size (UNIT *uptr, uint32 physsectsz)
 {
 DEVICE *dptr;
 t_addr saved_capac;
@@ -1231,7 +1284,7 @@ if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return ret_val;
 saved_capac = uptr->capac;
 uptr->capac = temp_capac;
-if ((sim_disk_rdsect (uptr, 512 / ctx->sector_size, (uint8 *)&Home, &sects_read, sizeof (Home) / ctx->sector_size)) ||
+if ((_DEC_rdsect (uptr, 512 / ctx->sector_size, (uint8 *)&Home, &sects_read, sizeof (Home) / ctx->sector_size, physsectsz)) ||
     (sects_read != (sizeof (Home) / ctx->sector_size)))
     goto Return_Cleanup;
 CheckSum1 = ODSChecksum (&Home, (uint16)((((char *)&Home.hm1_w_checksum1)-((char *)&Home.hm1_w_ibmapsize))/2));
@@ -1245,8 +1298,8 @@ if ((Home.hm1_w_ibmapsize == 0) ||
     (Home.hm1_w_checksum1 != CheckSum1) ||
     (Home.hm1_w_checksum2 != CheckSum2))
     goto Return_Cleanup;
-if ((sim_disk_rdsect (uptr, (((Home.hm1_l_ibmaplbn << 16) + ((Home.hm1_l_ibmaplbn >> 16) & 0xFFFF)) + Home.hm1_w_ibmapsize + 1) * (512 / ctx->sector_size),
-                            (uint8 *)&Header, &sects_read, sizeof (Header) / ctx->sector_size)) ||
+if ((_DEC_rdsect (uptr, (((Home.hm1_l_ibmaplbn << 16) + ((Home.hm1_l_ibmaplbn >> 16) & 0xFFFF)) + Home.hm1_w_ibmapsize + 1) * (512 / ctx->sector_size),
+                  (uint8 *)&Header, &sects_read, sizeof (Header) / ctx->sector_size, physsectsz)) ||
     (sects_read != (sizeof (Header) / ctx->sector_size)))
     goto Return_Cleanup;
 CheckSum1 = ODSChecksum (&Header, 255);
@@ -1255,7 +1308,7 @@ if (CheckSum1 != *(((uint16 *)&Header)+255)) /* Verify Checksum on BITMAP.SYS fi
 
 Retr = (ODS1_Retreval *)(((uint16*)(&Header))+Header.fh1_b_mpoffset);
 ScbLbn = (Retr->fm1_pointers[0].fm1_s_fm1def1.fm1_b_highlbn<<16)+Retr->fm1_pointers[0].fm1_s_fm1def1.fm1_w_lowlbn;
-if ((sim_disk_rdsect (uptr, ScbLbn * (512 / ctx->sector_size), (uint8 *)Scb, &sects_read, 512 / ctx->sector_size)) ||
+if ((_DEC_rdsect (uptr, ScbLbn * (512 / ctx->sector_size), (uint8 *)Scb, &sects_read, 512 / ctx->sector_size, physsectsz)) ||
     (sects_read != (512 / ctx->sector_size)))
     goto Return_Cleanup;
 if (Scb->scb_b_bitmapblks < 127)
@@ -1284,7 +1337,7 @@ typedef struct ultrix_disklabel {
 #define PT_MAGIC        0x032957        /* Partition magic number */
 #define PT_VALID        1               /* Indicates if struct is valid */
 
-static t_offset get_ultrix_filesystem_size (UNIT *uptr)
+static t_offset get_ultrix_filesystem_size (UNIT *uptr, uint32 physsectsz)
 {
 DEVICE *dptr;
 t_addr saved_capac;
@@ -1301,7 +1354,7 @@ if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return ret_val;
 saved_capac = uptr->capac;
 uptr->capac = temp_capac;
-if ((sim_disk_rdsect (uptr, 31 * (512 / ctx->sector_size), sector_buf, &sects_read, 512 / ctx->sector_size)) ||
+if ((_DEC_rdsect (uptr, 31 * (512 / ctx->sector_size), sector_buf, &sects_read, 512 / ctx->sector_size, physsectsz)) ||
     (sects_read != (512 / ctx->sector_size)))
     goto Return_Cleanup;
 
@@ -1731,7 +1784,7 @@ if (uar != 0) {
 return SCPE_IOERR;
 }
 
-static t_offset get_rsts_filesystem_size (UNIT *uptr)
+static t_offset get_rsts_filesystem_size (UNIT *uptr, uint32 physsectsz)
 {
 DEVICE *dptr;
 t_addr saved_capac;
@@ -1743,6 +1796,7 @@ rstsContext context;
 
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return ret_val;
+
 saved_capac = uptr->capac;
 uptr->capac = temp_capac;
 
@@ -1834,6 +1888,7 @@ typedef struct _RT11_HomeBlock {
     uint8   hb_b_owner[12];
     uint8   hb_b_sysid[12];
 #define HB_C_SYSID      "DECRT11A    "
+#define HB_C_VMSSYSID   "DECVMSEXCHNG"
     uint8   hb_b_unused4[2];
     uint16  hb_w_checksum;
     } RT11_HomeBlock;
@@ -1885,10 +1940,14 @@ if (strncmp((char *)&home->hb_b_sysid, HB_C_SYSID, strlen(HB_C_SYSID)) == 0) {
     if (type == HB_C_SYSVER_V05)
         return RT11_MULTIPART;
     }
+
+if (strncmp((char *)&home->hb_b_sysid, HB_C_VMSSYSID, strlen(HB_C_VMSSYSID)) == 0)
+    return RT11_SINGLEPART;
+ 
 return RT11_NOPART;
 }
 
-static t_offset get_rt11_filesystem_size (UNIT *uptr)
+static t_offset get_rt11_filesystem_size (UNIT *uptr, uint32 physsectsz)
 {
 DEVICE *dptr;
 t_addr saved_capac;
@@ -1915,9 +1974,15 @@ for (part = 0; part < RT11_MAXPARTITIONS; part++) {
     uint16 seg_highest = 0;
     int type;
 
+    /*
+     * RX01/RX02 media can only have a single partition
+     */
+    if ((part != 0) && (physsectsz != 0))
+      break;
+    
     base = part << 16;
 
-    if (sim_disk_rdsect(uptr, (base + RT11_HOME) * (512 / ctx->sector_size), (uint8 *)&Home, &sects_read, 512 / ctx->sector_size) ||
+    if (_DEC_rdsect(uptr, (base + RT11_HOME) * (512 / ctx->sector_size), (uint8 *)&Home, &sects_read, 512 / ctx->sector_size, physsectsz) ||
         (sects_read != (512 / ctx->sector_size)))
         goto Return_Cleanup;
 
@@ -1942,7 +2007,7 @@ for (part = 0; part < RT11_MAXPARTITIONS; part++) {
 
             dir_sec = Home.hb_w_firstdir + ((dir_seg - 1) * 2);
 
-            if ((sim_disk_rdsect(uptr, (base + dir_sec) * (512 / ctx->sector_size), sector_buf, &sects_read, 1024 / ctx->sector_size)) ||
+            if ((_DEC_rdsect(uptr, (base + dir_sec) * (512 / ctx->sector_size), sector_buf, &sects_read, 1024 / ctx->sector_size, physsectsz)) ||
                 (sects_read != (1024 / ctx->sector_size)))
                 goto Return_Cleanup;
 
@@ -2016,7 +2081,7 @@ uptr->capac = saved_capac;
 return ret_val;
 }
 
-typedef t_offset (*FILESYSTEM_CHECK)(UNIT *uptr);
+typedef t_offset (*FILESYSTEM_CHECK)(UNIT *uptr, uint32);
 
 static t_offset get_filesystem_size (UNIT *uptr)
 {
@@ -2032,14 +2097,33 @@ static FILESYSTEM_CHECK checks[] = {
                                            filesystem */
     NULL
     };
+struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
+uint32 saved_sector_size = ctx->sector_size;
 t_offset ret_val = (t_offset)-1;
 int i;
 
+for (i = 0; checks[i] != NULL; i++)
+    if ((ret_val = checks[i] (uptr, 0)) != (t_offset)-1)
+        return ret_val;
+/* 
+ * The only known interleaved disk devices have either 256 byte 
+ * or 128 byte sector sizes.  If additional interleaved file 
+ * system scenarios with different sector sizes come up they
+ * should be added here.
+ */
+   
 for (i = 0; checks[i] != NULL; i++) {
-    ret_val = checks[i] (uptr);
-    if (ret_val != (t_offset)-1)
+    ctx->sector_size = 256;
+    if ((ret_val = checks[i] (uptr, ctx->sector_size)) != (t_offset)-1)
+        break;
+    ctx->sector_size = 128;
+    if ((ret_val = checks[i] (uptr, ctx->sector_size)) != (t_offset)-1)
         break;
     }
+if ((ret_val != (t_offset)-1) && (ctx->sector_size != saved_sector_size ))
+    sim_messagef (SCPE_OK, "%s: with an unexpected sector size of %u bytes instead of %u bytes\n", 
+                           sim_uname (uptr), ctx->sector_size, saved_sector_size);
+ctx->sector_size = saved_sector_size;
 return ret_val;
 }
 
