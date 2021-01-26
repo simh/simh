@@ -118,6 +118,7 @@ extern DEVICE kmc_dev;
 extern DEVICE uca_dev, ucb_dev;
 extern DEVICE rom_dev;
 extern DEVICE ch_dev;
+extern DEVICE m9312_dev;
 #ifdef USE_DISPLAY
 extern DEVICE ng_dev;
 extern DEVICE daz_dev;
@@ -201,6 +202,7 @@ DEVICE *sim_devices[] = {
     &ke_dev,
     &rom_dev,
     &ch_dev,
+    &m9312_dev,
 #ifdef USE_DISPLAY
     &ng_dev,
     &daz_dev,
