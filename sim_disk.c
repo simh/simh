@@ -624,9 +624,11 @@ while (tbc) {
     i = sim_fread (buf, 1, tbc, uptr->fileref);
     if (i < tbc)                 /* fill */
         memset (&buf[i], 0, tbc-i);
-    if (sectsread)
-        *sectsread += i / ctx->sector_size;
     sectbytes = (i / ctx->sector_size) * ctx->sector_size;
+    if (i > sectbytes)
+        sectbytes += ctx->sector_size;
+    if (sectsread)
+        *sectsread += sectbytes / ctx->sector_size;
     err = ferror (uptr->fileref);
     if (err)
         return SCPE_IOERR;
@@ -3737,7 +3739,11 @@ while (bytestoread) {
         _set_errno_from_status (GetLastError ());
         return SCPE_IOERR;
         }
-    sectorbytes = (bytesread / ctx->sector_size) * ctx->sector_size; 
+    sectorbytes = (bytesread / ctx->sector_size) * ctx->sector_size;
+    if (bytesread > sectorbytes) {
+        memset (buf + bytesread, 0, bytestoread - bytesread);
+        sectorbytes += ctx->sector_size;
+        }
     if (sectsread)
         *sectsread += sectorbytes / ctx->sector_size;
     bytestoread -= sectorbytes;
@@ -3933,15 +3939,17 @@ while (bytestoread) {
     if (bytesread < 0) {
         return SCPE_IOERR;
         }
-    if (bytesread == 0) {   /* read zeros at/past EOF */
+    if (bytesread < bytestoread) {      /* read zeros at/past EOF */
+        memset (buf + bytesread, 0, bytestoread - bytesread);
         bytesread = bytestoread;
-        memset (buf, 0, bytesread);
         }
     sectorbytes = (bytesread / ctx->sector_size) * ctx->sector_size;
+    if (bytesread > sectorbytes)
+        sectorbytes += ctx->sector_size;
     if (sectsread)
         *sectsread += sectorbytes / ctx->sector_size;
     bytestoread -= sectorbytes;
-    if (bytestoread == 0)
+    if ((bytestoread == 0) || (bytesread == 0))
         break;
     buf += sectorbytes;
     addr += sectorbytes;
