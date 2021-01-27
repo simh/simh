@@ -27,7 +27,6 @@
 t_stat m9312_ex (t_value* vptr, t_addr addr, UNIT* uptr, int32 sw);
 t_stat m9312_rd (int32* data, int32 PA, int32 access);
 t_stat m9312_reset (DEVICE* dptr);
-t_stat m9312_boot (int32 u, DEVICE* dptr);
 t_stat m9312_set_rom0 (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
 t_stat m9312_set_rom2_4 (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
 t_stat m9312_show_rom (FILE* f, UNIT* uptr, int32 val, CONST void* desc);
@@ -78,30 +77,30 @@ DIB m9312_dib[M9312_UNITS];
 // Define modifiers for the device
 MTAB m9312_mod[] =
 {
-	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 0, NULL, "ROM0",
+	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 0, "ROM0", "ROM0",
 		&m9312_set_rom0, &m9312_show_rom, NULL, "ROM 0 Function" },
-	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 1, NULL, "ROM1",
-		&m9312_set_rom2_4, &m9312_show_rom, NULL, "ROM 1 Function" },
-	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 2, NULL, "ROM2",
-		&m9312_set_rom2_4, &m9312_show_rom, NULL, "ROM 2 Function" },
-	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 3, NULL, "ROM3",
-		&m9312_set_rom2_4, &m9312_show_rom, NULL, "ROM 3 Function" },
-	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 4, NULL, "ROM4",
-		&m9312_set_rom2_4, &m9312_show_rom, NULL, "ROM 4 Function" },
+	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 1, "ROM1", "ROM1",
+		&m9312_set_rom2_4,& m9312_show_rom, NULL, "ROM 1 Function" },
+	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 2, "ROM2", "ROM2",
+		&m9312_set_rom2_4,& m9312_show_rom, NULL, "ROM 2 Function" },
+	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 3, "ROM3", "ROM3",
+		&m9312_set_rom2_4,& m9312_show_rom, NULL, "ROM 3 Function" },
+	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 4, "ROM4", "ROM4",
+		&m9312_set_rom2_4,& m9312_show_rom, NULL, "ROM 4 Function" },
 	{ 0 }
 };
 
 // Define unit structures
 UNIT m9312_unit[M9312_UNITS];
 
-// Define unit names (pointed to by uname)
-char unit_name[M9312_UNITS][20] =
+// Define used ROM in unit
+char unit_use[M9312_UNITS][20] =
 {
-	"ROM0 (EMPTY) ",
-	"ROM1 (EMPTY) ",
-	"ROM2 (EMPTY) ",
-	"ROM3 (EMPTY) ",
-	"ROM4 (EMPTY) ",
+	"EMPTY",
+	"EMPTY",
+	"EMPTY",
+	"EMPTY",
+	"EMPTY",
 };
 
 // Device definition
@@ -186,8 +185,6 @@ t_stat m9312_reset (DEVICE* dptr)
 		m9312_unit[i].top_addr = m9312_memory_map[i].base_address +
 			m9312_memory_map[i].size - 2;
 		m9312_unit[i].capac = m9312_memory_map[i].size;
-		m9312_unit[i].uname = unit_name[i];
-		// m9312_unit[i].filebuf = (void*) NULL;
 
 		// From m9312_make_dib
 		m9312_dib[i].ba = m9312_memory_map[i].base_address;
@@ -197,6 +194,13 @@ t_stat m9312_reset (DEVICE* dptr)
 		build_ubus_tab (&m9312_dev, &m9312_dib[i]);
 	}
 	m9312_dib[M9312_UNITS - 1].next = NULL;
+
+	// Set unit names
+	sim_set_uname (&m9312_unit[0], "ROM0");
+	sim_set_uname (&m9312_unit[1], "ROM1");
+	sim_set_uname (&m9312_unit[2], "ROM2");
+	sim_set_uname (&m9312_unit[3], "ROM3");
+	sim_set_uname (&m9312_unit[4], "ROM4");
 	return SCPE_OK;
 }
 
@@ -218,7 +222,7 @@ t_stat m9312_set_rom0 (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 		{
 			m9312_unit[val].filebuf = console_roms[i].image;
 			m9312_unit[val].dev_mnemonic = console_roms[i].device_mnemonic;
-			snprintf (unit_name[val], sizeof (unit_name[val]), "ROM%d (%s) ", val, console_roms[i].device_mnemonic);
+			strncpy (unit_use[val], console_roms[i].device_mnemonic, sizeof (unit_use[val]));
 			return SCPE_OK;
 		}
 	}
@@ -244,7 +248,7 @@ t_stat m9312_set_rom2_4 (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 		{
 			m9312_unit[val].filebuf = boot_roms[i].image;
 			m9312_unit[val].dev_mnemonic = boot_roms[i].device_mnemonic;
-			snprintf (unit_name[val], sizeof (unit_name[val]), "ROM%d (%s)", val, console_roms[i].device_mnemonic);
+			strncpy (unit_use[val], boot_roms[i].device_mnemonic, sizeof (unit_use[val]));
 			return SCPE_OK;
 		}
 	}
@@ -253,13 +257,13 @@ t_stat m9312_set_rom2_4 (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 	return SCPE_ARG;
 }
 
+
 t_stat m9312_show_rom (FILE* f, UNIT* uptr, int32 val, CONST void* desc)
 {
 	if (uptr == NULL)
 		return SCPE_IERR;
 
-	// fprintf (f, "function: %s", uptr->dev_mnemonic);
-
+	fprintf (f, "ROM%d: %s", val, unit_use[val]);
 	return SCPE_OK;
 }
 
