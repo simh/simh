@@ -120,7 +120,7 @@ DEVICE m9312_dev =
 	m9312_ex,							// Examine routine
 	NULL,								// No deposit routine available
 	m9312_reset,						// Reset routine
-	&m9312_boot,						// Boot routine
+	NULL,								// The device is not bootable
 	NULL,								// No attach routine available
 	NULL,								// No detach routine available
 	&m9312_dib[0],						// Pointer to device information blocks
@@ -200,13 +200,6 @@ t_stat m9312_reset (DEVICE* dptr)
 	return SCPE_OK;
 }
 
-// *** To be deleted?
-t_stat m9312_boot (int32 u, DEVICE* dptr)
-{
-	cpu_set_boot (m9312_unit[u].base_addr);
-	return SCPE_OK;
-}
-
 
 /* m9312_set_rom0 - Set the function for ROM 0 */
 
@@ -269,56 +262,6 @@ t_stat m9312_show_rom (FILE* f, UNIT* uptr, int32 val, CONST void* desc)
 
 	return SCPE_OK;
 }
-
-#if 0
-t_stat m9312_make_dib (UNIT* uptr)
-{
-	DIB* dib = &m9312_dib[uptr - m9312_unit];
-
-	dib->ba = uptr->unit_base;
-	dib->lnt = uptr->capac;
-	dib->rd = &m9312_rd;
-	return build_ubus_tab (&m9312_dev, dib);
-}
-
-t_stat m9312_attach (UNIT* uptr, CONST char* cptr)
-{
-	t_stat r;
-
-	if (uptr->flags & UNIT_ATT)
-		return SCPE_ALATT;
-	if (uptr->unit_base == 0)
-		return sim_messagef (SCPE_ARG, "Set address first.\n");
-	sim_switches |= SWMASK ('Q');
-	uptr->capac = sim_fsize_name (cptr);
-	if (uptr->capac == 0)
-		return SCPE_OPENERR;
-	r = attach_unit (uptr, cptr);
-	if (r != SCPE_OK)
-		return r;
-	r = m9312_make_dib (uptr);
-	if (r != SCPE_OK)
-		return m9312_detach (uptr);
-	uptr->unit_end = uptr->unit_base + uptr->capac;
-	return SCPE_OK;
-}
-
-/* Detach */
-
-t_stat m9312_detach (UNIT* uptr)
-{
-	t_stat r;
-	DIB* dib = &m9312_dib[uptr - m9312_unit];
-
-	dib->rd = NULL;
-	r = build_ubus_tab (&m9312_dev, dib);
-	if (r != SCPE_OK)
-		return r;
-	uptr->unit_end = uptr->unit_base;
-	dib->lnt = uptr->capac = 0;
-	return detach_unit (uptr);
-}
-#endif
 
 t_stat m9312_help (FILE* st, DEVICE* dptr, UNIT* uptr, int32 flag, const char* cptr)
 {
