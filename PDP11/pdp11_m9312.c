@@ -31,7 +31,6 @@ t_stat m9312_set_rom0 (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
 t_stat m9312_set_rom2_4 (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
 t_stat m9312_show_rom (FILE* f, UNIT* uptr, int32 val, CONST void* desc);
 t_stat m9312_help (FILE* st, DEVICE* dptr, UNIT* uptr, int32 flag, const char* cptr);
-t_stat m9312_help_attach (FILE* st, DEVICE* dptr, UNIT* uptr, int32 flag, const char* cptr);
 const char* m9312_description (DEVICE* dptr);
 
 
@@ -68,8 +67,6 @@ struct m9312_rom
 /* Define use of device specific fields in struct UNIT */
 #define base_addr		u3
 #define top_addr		u4
-#define dev_mnemonic	u5
-
 
 // Define Device information blocks 
 DIB m9312_dib[M9312_UNITS];
@@ -78,15 +75,15 @@ DIB m9312_dib[M9312_UNITS];
 MTAB m9312_mod[] =
 {
 	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 0, "ROM0", "ROM0",
-		&m9312_set_rom0, &m9312_show_rom, NULL, "ROM 0 Function" },
+		&m9312_set_rom0, &m9312_show_rom, NULL, "ROM identifier (DIAG, CONS, UBI or MEM)" },
 	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 1, "ROM1", "ROM1",
-		&m9312_set_rom2_4,& m9312_show_rom, NULL, "ROM 1 Function" },
+		&m9312_set_rom2_4,& m9312_show_rom, NULL, "ROM device identifier" },
 	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 2, "ROM2", "ROM2",
-		&m9312_set_rom2_4,& m9312_show_rom, NULL, "ROM 2 Function" },
+		&m9312_set_rom2_4,& m9312_show_rom, NULL, "ROM device identifier" },
 	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 3, "ROM3", "ROM3",
-		&m9312_set_rom2_4,& m9312_show_rom, NULL, "ROM 3 Function" },
+		&m9312_set_rom2_4,& m9312_show_rom, NULL, "ROM device identifier" },
 	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 4, "ROM4", "ROM4",
-		&m9312_set_rom2_4,& m9312_show_rom, NULL, "ROM 4 Function" },
+		&m9312_set_rom2_4,& m9312_show_rom, NULL, "ROM device identifier" },
 	{ 0 }
 };
 
@@ -129,7 +126,7 @@ DEVICE m9312_dev =
 	NULL,								// Memory size routine
 	NULL,								// Logical name
 	&m9312_help,						// Help routine
-	&m9312_help_attach,					// Help attach routine
+	NULL,								// No help attach routine availavle
 	NULL,								// Context for help routines
 	&m9312_description                  // Description routine
 };
@@ -180,13 +177,14 @@ t_stat m9312_reset (DEVICE* dptr)
 
 	for (i = 0; i < M9312_UNITS; i++)
 	{
+		// Initialize unit structure
 		m9312_unit[i].flags |= M9312_UNIT_FLAGS;
 		m9312_unit[i].base_addr = m9312_memory_map[i].base_address;
 		m9312_unit[i].top_addr = m9312_memory_map[i].base_address +
 			m9312_memory_map[i].size - 2;
 		m9312_unit[i].capac = m9312_memory_map[i].size;
 
-		// From m9312_make_dib
+		// Initialize device information block
 		m9312_dib[i].ba = m9312_memory_map[i].base_address;
 		m9312_dib[i].lnt = m9312_memory_map[i].size;
 		m9312_dib[i].rd = &m9312_rd;
@@ -221,7 +219,6 @@ t_stat m9312_set_rom0 (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 		if (strcmp (cptr, console_roms[i].device_mnemonic) == 0)
 		{
 			m9312_unit[val].filebuf = console_roms[i].image;
-			m9312_unit[val].dev_mnemonic = console_roms[i].device_mnemonic;
 			strncpy (unit_use[val], console_roms[i].device_mnemonic, sizeof (unit_use[val]));
 			return SCPE_OK;
 		}
@@ -230,6 +227,7 @@ t_stat m9312_set_rom0 (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 	// Mnemonic not found
 	return SCPE_ARG;
 }
+
 
 /* m9312_set_rom2_4 - Set the function for ROMs 2 to 4 */
 
@@ -247,7 +245,6 @@ t_stat m9312_set_rom2_4 (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 		if (strcmp (cptr, boot_roms[i].device_mnemonic) == 0)
 		{
 			m9312_unit[val].filebuf = boot_roms[i].image;
-			m9312_unit[val].dev_mnemonic = boot_roms[i].device_mnemonic;
 			strncpy (unit_use[val], boot_roms[i].device_mnemonic, sizeof (unit_use[val]));
 			return SCPE_OK;
 		}
@@ -258,6 +255,8 @@ t_stat m9312_set_rom2_4 (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 }
 
 
+/* m9312_show_rom - text displayed on the show_one_mod() call for the device modifiers */
+
 t_stat m9312_show_rom (FILE* f, UNIT* uptr, int32 val, CONST void* desc)
 {
 	if (uptr == NULL)
@@ -267,19 +266,22 @@ t_stat m9312_show_rom (FILE* f, UNIT* uptr, int32 val, CONST void* desc)
 	return SCPE_OK;
 }
 
+
+/* m9312_help - text displayed for the HELP M9312 command */
+
 t_stat m9312_help (FILE* st, DEVICE* dptr, UNIT* uptr, int32 flag, const char* cptr)
 {
 	fprintf (st, "M9312, Diagnostics/Console emulator and bootstrap ROMS.\n\n");
-	fprintf (st, "The M9312 has four boot ROMS available to boot from a specific device type.\n");
-	fprintf (st, "The ROM contents can be selected by means of modifiers.\n");
+	fprintf (st, "The M9312 has five ROM slots available, slot 0 is used for a Diagnostics/Console Emulator ROM,\n");
+	fprintf (st, "slots 1 - 4 are used for boot proms for specific devices.\n");
+	fprintf (st, "The ROMS can be 'seated' in a slot by means of the SET command,\n");
+	fprintf (st, "The command 'SET M9312 ROM0=DIAG' for example puts the diagnostics ROM in slot 0.\n\n");
+	fprintf (st, "Available ROMS for slot 0 are DIAG, CONS, UBI and MEM, available ROMS for slots 1-4 are:\n");
+	fprintf (st, "DL, ... .\n");
 	return SCPE_OK;
 }
 
-t_stat m9312_help_attach (FILE* st, DEVICE* dptr, UNIT* uptr, int32 flag, const char* cptr)
-{
-	fprintf (st, "The ATTACH command is not supported.\n");
-	return SCPE_OK;
-}
+/* m9312_description - is not used? */
 
 const char* m9312_description (DEVICE* dptr)
 {
