@@ -28,7 +28,7 @@ t_stat m9312_ex (t_value* vptr, t_addr addr, UNIT* uptr, int32 sw);
 t_stat m9312_rd (int32* data, int32 PA, int32 access);
 t_stat m9312_reset (DEVICE* dptr);
 t_stat m9312_place_rom_in_socket0 (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
-t_stat m9312_place_rom_in_socket2_4 (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat m9312_place_rom_in_socket1_4 (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
 t_stat m9312_show_rom (FILE* f, UNIT* uptr, int32 val, CONST void* desc);
 t_stat m9312_help (FILE* st, DEVICE* dptr, UNIT* uptr, int32 flag, const char* cptr);
 const char* m9312_description (DEVICE* dptr);
@@ -78,16 +78,16 @@ MTAB m9312_mod[] =
 		&m9312_place_rom_in_socket0, &m9312_show_rom, NULL,
 		"ROM identifier (A0, B0, UBI or MEM)" },
 	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 1, "SOCKET1", "SOCKET1",
-		&m9312_place_rom_in_socket2_4,& m9312_show_rom, NULL,
+		&m9312_place_rom_in_socket1_4,& m9312_show_rom, NULL,
 		"ROM device identifier" },
 	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 2, "SOCKET2", "SOCKET2",
-		&m9312_place_rom_in_socket2_4,& m9312_show_rom, NULL,
+		&m9312_place_rom_in_socket1_4,& m9312_show_rom, NULL,
 		"ROM device identifier" },
 	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 3, "SOCKET3", "SOCKET3",
-		&m9312_place_rom_in_socket2_4,& m9312_show_rom, NULL,
+		&m9312_place_rom_in_socket1_4,& m9312_show_rom, NULL,
 		"ROM device identifier" },
 	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 4, "SOCKET4", "SOCKET4",
-		&m9312_place_rom_in_socket2_4,& m9312_show_rom, NULL,
+		&m9312_place_rom_in_socket1_4,& m9312_show_rom, NULL,
 		"ROM device identifier" },
 	{ 0 }
 };
@@ -208,7 +208,7 @@ t_stat m9312_reset (DEVICE* dptr)
 }
 
 
-/* m9312_place_rom_in_socket0 - Set the function for ROM 0 */
+/* m9312_place_rom_in_socket0 - Place the specified ROM in socket 0 */
 
 t_stat m9312_place_rom_in_socket0 (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
@@ -234,9 +234,9 @@ t_stat m9312_place_rom_in_socket0 (UNIT* uptr, int32 val, CONST char* cptr, void
 }
 
 
-/* m9312_place_rom_in_socket2_4 - Set the function for ROMs 2 to 4 */
+/* m9312_place_rom_in_socket1_4 - Place the specified ROM in socket 1-4 */
 
-t_stat m9312_place_rom_in_socket2_4 (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
+t_stat m9312_place_rom_in_socket1_4 (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
 	int i;
 
@@ -277,12 +277,13 @@ t_stat m9312_show_rom (FILE* f, UNIT* uptr, int32 val, CONST void* desc)
 t_stat m9312_help (FILE* st, DEVICE* dptr, UNIT* uptr, int32 flag, const char* cptr)
 {
 	fprintf (st, "M9312, Diagnostics/Console emulator and bootstrap ROMS.\n\n");
-	fprintf (st, "The M9312 has five ROM slots available, slot 0 is used for a Diagnostics/Console Emulator ROM,\n");
-	fprintf (st, "slots 1 - 4 are used for boot proms for specific devices.\n");
-	fprintf (st, "The ROMS can be 'seated' in a slot by means of the SET command,\n");
-	fprintf (st, "The command 'SET M9312 ROM0=DIAG' for example puts the diagnostics ROM in slot 0.\n\n");
-	fprintf (st, "Available ROMS for slot 0 are DIAG, CONS, UBI and MEM, available ROMS for slots 1-4 are:\n");
-	fprintf (st, "DL, ... .\n");
+	fprintf (st, "The M9312 has five ROM sockets available, socket 0 is used for a\n");
+	fprintf (st, "Diagnostics/Console Emulator ROM, sockets 1-4 are used for boot ROMs\n");
+	fprintf (st, "for specific devices. The ROMs can be socketed by means of the SET command.\n");
+	fprintf (st, "The command 'SET M9312 SOCKET0=B0' for example, puts the ROM B0 in\n");
+	fprintf (st, "socket 0.\n\n");
+	fprintf (st, "Available ROMs for socket 0 are A0, B0, UBI and MEM, available ROMs for\n");
+	fprintf (st, "sockets 1-4 are identified by their device mnemonic.\n");
 	return SCPE_OK;
 }
 
