@@ -27,8 +27,8 @@
 t_stat m9312_ex (t_value* vptr, t_addr addr, UNIT* uptr, int32 sw);
 t_stat m9312_rd (int32* data, int32 PA, int32 access);
 t_stat m9312_reset (DEVICE* dptr);
-t_stat m9312_set_rom0 (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
-t_stat m9312_set_rom2_4 (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat m9312_place_rom_in_socket0 (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
+t_stat m9312_place_rom_in_socket2_4 (UNIT* uptr, int32 val, CONST char* cptr, void* desc);
 t_stat m9312_show_rom (FILE* f, UNIT* uptr, int32 val, CONST void* desc);
 t_stat m9312_help (FILE* st, DEVICE* dptr, UNIT* uptr, int32 flag, const char* cptr);
 const char* m9312_description (DEVICE* dptr);
@@ -74,16 +74,21 @@ DIB m9312_dib[M9312_UNITS];
 // Define modifiers for the device
 MTAB m9312_mod[] =
 {
-	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 0, "ROM0", "ROM0",
-		&m9312_set_rom0, &m9312_show_rom, NULL, "ROM identifier (DIAG, CONS, UBI or MEM)" },
-	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 1, "ROM1", "ROM1",
-		&m9312_set_rom2_4,& m9312_show_rom, NULL, "ROM device identifier" },
-	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 2, "ROM2", "ROM2",
-		&m9312_set_rom2_4,& m9312_show_rom, NULL, "ROM device identifier" },
-	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 3, "ROM3", "ROM3",
-		&m9312_set_rom2_4,& m9312_show_rom, NULL, "ROM device identifier" },
-	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 4, "ROM4", "ROM4",
-		&m9312_set_rom2_4,& m9312_show_rom, NULL, "ROM device identifier" },
+	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 0, "SOCKET0", "SOCKET0",
+		&m9312_place_rom_in_socket0, &m9312_show_rom, NULL,
+		"ROM identifier (A0, B0, UBI or MEM)" },
+	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 1, "SOCKET1", "SOCKET1",
+		&m9312_place_rom_in_socket2_4,& m9312_show_rom, NULL,
+		"ROM device identifier" },
+	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 2, "SOCKET2", "SOCKET2",
+		&m9312_place_rom_in_socket2_4,& m9312_show_rom, NULL,
+		"ROM device identifier" },
+	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 3, "SOCKET3", "SOCKET3",
+		&m9312_place_rom_in_socket2_4,& m9312_show_rom, NULL,
+		"ROM device identifier" },
+	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 4, "SOCKET4", "SOCKET4",
+		&m9312_place_rom_in_socket2_4,& m9312_show_rom, NULL,
+		"ROM device identifier" },
 	{ 0 }
 };
 
@@ -194,18 +199,18 @@ t_stat m9312_reset (DEVICE* dptr)
 	m9312_dib[M9312_UNITS - 1].next = NULL;
 
 	// Set unit names
-	sim_set_uname (&m9312_unit[0], "ROM0");
-	sim_set_uname (&m9312_unit[1], "ROM1");
-	sim_set_uname (&m9312_unit[2], "ROM2");
-	sim_set_uname (&m9312_unit[3], "ROM3");
-	sim_set_uname (&m9312_unit[4], "ROM4");
+	sim_set_uname (&m9312_unit[0], "SOCKET0: Address 017765000 ROM size ");
+	sim_set_uname (&m9312_unit[1], "SOCKET1: Address 017773000 ROM size ");
+	sim_set_uname (&m9312_unit[2], "SOCKET2: Address 017773200 ROM size ");
+	sim_set_uname (&m9312_unit[3], "SOCKET3: Address 017773400 ROM size ");
+	sim_set_uname (&m9312_unit[4], "SOCKET4: Address 017773600 ROM size ");
 	return SCPE_OK;
 }
 
 
-/* m9312_set_rom0 - Set the function for ROM 0 */
+/* m9312_place_rom_in_socket0 - Set the function for ROM 0 */
 
-t_stat m9312_set_rom0 (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
+t_stat m9312_place_rom_in_socket0 (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
 	int i;
 
@@ -229,9 +234,9 @@ t_stat m9312_set_rom0 (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 }
 
 
-/* m9312_set_rom2_4 - Set the function for ROMs 2 to 4 */
+/* m9312_place_rom_in_socket2_4 - Set the function for ROMs 2 to 4 */
 
-t_stat m9312_set_rom2_4 (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
+t_stat m9312_place_rom_in_socket2_4 (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
 	int i;
 
@@ -262,7 +267,7 @@ t_stat m9312_show_rom (FILE* f, UNIT* uptr, int32 val, CONST void* desc)
 	if (uptr == NULL)
 		return SCPE_IERR;
 
-	fprintf (f, "ROM%d: %s", val, unit_use[val]);
+	fprintf (f, "SOCKET%d: %s", val, unit_use[val]);
 	return SCPE_OK;
 }
 
