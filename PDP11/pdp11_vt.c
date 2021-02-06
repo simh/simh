@@ -81,6 +81,9 @@
  */
 #define CYCLE_US (MEMORY_CYCLE*(VT11_DELAY*2+1))
 
+#define UNIT_V_NOSPACEWAR  (UNIT_V_UF + 0)
+#define UNIT_NOSPACEWAR    (1 << UNIT_V_NOSPACEWAR)
+
 extern int32 int_vec[IPL_HLVL][32];
 
 t_stat vt_rd(int32 *data, int32 PA, int32 access);
@@ -96,6 +99,8 @@ t_stat vt_set_hspace(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat vt_show_hspace(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat vt_set_vspace(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat vt_show_vspace(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
+t_stat vt_set_kb(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat vt_show_kb(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat vt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *vt_description (DEVICE *dptr);
 
@@ -136,6 +141,8 @@ MTAB vt_mod[] = {
                 &set_vec,       &show_vec,       NULL, "Interrupt vector" },
     { MTAB_XTD|MTAB_VDV,             0, NULL,      "AUTOCONFIGURE",
                 &set_addr_flt,  NULL,            NULL, "Enable autoconfiguration of address & vector" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR,   0, "KEYBOARD","KEYBOARD={SPACEWAR|NOSPACEWAR}",
+                &vt_set_kb,     &vt_show_kb,     NULL, "Disable or Enable Spacewar switches" },
     { 0 }  };
 
 
@@ -942,17 +949,43 @@ extern int32 SR;                        /* switch register */
 int32 SR;                               /* switch register */
 #endif
 
+t_stat vt_set_kb(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+char gbuf[CBUFSIZE];
+
+if (cptr == NULL || *cptr == 0)
+    return SCPE_ARG;
+get_glyph(cptr, gbuf, 0);
+if (MATCH_CMD(gbuf, "SPACEWAR") == 0)
+    uptr->flags &= ~UNIT_NOSPACEWAR;
+else if (MATCH_CMD(gbuf, "NOSPACEWAR") == 0)
+    uptr->flags |= UNIT_NOSPACEWAR;
+else
+    return sim_messagef (SCPE_ARG, "Unexpected Keyboard setting: %s\n", gbuf);
+return SCPE_OK;
+}
+
+t_stat vt_show_kb(FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+fprintf(st, "keyboard=%s",
+        (uptr->flags & UNIT_NOSPACEWAR) ? "nospacewar" : "spacewar");
+return SCPE_OK;
+}
+
 void
 cpu_set_switches(unsigned long v1, unsigned long v2)
 {
+if ((vt_unit.flags & UNIT_NOSPACEWAR) == 0)
     SR = v1 ^ v2;
 }
 
 void
 cpu_get_switches(unsigned long *p1, unsigned long *p2)
 {
+if ((vt_unit.flags & UNIT_NOSPACEWAR) == 0) {
     *p1 = SR;
     *p2 = 0;
+    }
 }
 
 t_stat vt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
