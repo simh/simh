@@ -28,7 +28,10 @@
     These functions support simulated iCOM FD3712 and FD3812
     floppy disk systems. The FD3712 supports IBM Diskette type 1
     single-density and the FD3812 also supports IBM Diskette
-    type 2D double-density.
+    type 2D double-density. The density of the media attached
+    is determined by file size. If a read or write is made
+    where the media doesn't match the density setting of the
+    controller, a CRC error status will be set.
 
     The interface board provides 2 I/O ports:
 
@@ -53,12 +56,14 @@
     | WRITE DEL DATA MARK | 0 0 0 0 1 1 1 1 | Yes  |    0F    |
     | LOAD TRACK ADDRESS  | 0 0 0 1 0 0 0 1 | No   |    11    |
     | LOAD UNIT/SECTOR    | 0 0 1 0 0 0 0 1 | No   |    21    |
-    | LOAD WRITE BUFFER   | 0 0 1 1 0 0 0 1 | No   |    31    |
+    | LOAD WRITE BUFFER*  | 0 0 1 1 0 0 0 1 | No   |    30    |
+    | LOAD WRITE BUFFER+  | 0 0 1 1 0 0 0 1 | No   |    31    |
     | EXAMINE READ BUFFER | 0 1 0 0 0 0 0 0 | No   |    40    |
     | SHIFT READ BUFFER   | 0 1 0 0 0 0 0 1 | No   |    41    |
     | CLEAR CONTROLLER    | 1 0 0 0 0 0 0 1 | No   |    81    |
     | LOAD CONFIGURATION* | 0 0 0 1 1 0 0 1 | No   |    15    |
     +---------------------------------------------------------+
+    | + FD3712 Only                                           |
     | * FD3812 Only                                           |
     +---------------------------------------------------------+
 
@@ -165,15 +170,12 @@
 #define DBG_PRINT(args)
 #endif
 
-extern uint32 PCX;
 extern t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern t_stat set_iobase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
                                int32 (*routine)(const int32, const int32, const int32), const char* name, uint8 unmap);
-extern DEVICE *find_dev (const char *cptr);
-extern uint32 getClockFrequency(void);
 
 #define ICOM_MAX_DRIVES        4
 #define ICOM_SD_SECTOR_LEN     128
@@ -459,7 +461,7 @@ static uint8 icom_3812_prom[ICOM_PROM_SIZE] = {
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff 
 };
 
-static uint8 *icom_prom = icom_3712_prom;
+static uint8 *icom_prom = icom_3812_prom;  /* default is 3812 */
 
 /*
 ** ICOM Registers and Interface Controls
@@ -528,6 +530,7 @@ typedef struct {
     uint8     seekMs;         /* Seek ms                             */
     uint8     currentDrive;   /* Currently selected drive            */
     uint8     currentTrack[ICOM_MAX_DRIVES];
+    uint8     mediaDen[ICOM_MAX_DRIVES];
     uint32    msTime;         /* MS time for BUSY                    */
     ICOM_REG  ICOM;           /* ICOM Registers and Data             */
     UNIT *uptr[ICOM_MAX_DRIVES];
@@ -562,6 +565,7 @@ static t_stat icom_set_type(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 static t_stat icom_show_type(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 static uint32 calculate_icom_sec_offset(ICOM_REG *pICOM, uint8 track, uint8 sector);
 static void icom_set_busy(uint32 msec);
+static int icom_set_crc(uint8 drive);
 static uint8 ICOM_Read(uint32 Addr);
 static uint8 ICOM_Write(uint32 Addr, int32 data);
 static const char * ICOM_CommandString(uint8 command);
@@ -602,7 +606,7 @@ static REG icom_reg[] = {
     { NULL }
 };
 
-#define ICOM_NAME  "iCOM 3712/3812 Floppy Disk Interface"
+#define ICOM_NAME  "iCOM 3712/3812 Floppy Disk System"
 #define ICOM_SNAME "ICOM"
 
 static const char* icom_description(DEVICE *dptr) {
@@ -661,13 +665,13 @@ DEVICE icom_dev = {
     icom_reg,                          /* registers */
     icom_mod,                          /* modifiers */
     ICOM_MAX_DRIVES,                   /* # units */
-    10,                                   /* address radix */
-    31,                                   /* address width */
-    1,                                    /* addr increment */
+    10,                                /* address radix */
+    31,                                /* address width */
+    1,                                 /* addr increment */
     ICOM_MAX_DRIVES,                   /* data radix */
     ICOM_MAX_DRIVES,                   /* data width */
-    NULL,                                 /* examine routine */
-    NULL,                                 /* deposit routine */
+    NULL,                              /* examine routine */
+    NULL,                              /* deposit routine */
     &icom_reset,                       /* reset routine */
     &icom_boot,                        /* boot routine */
     &icom_attach,                      /* attach routine */
@@ -676,11 +680,11 @@ DEVICE icom_dev = {
     (DEV_DISABLE | DEV_DIS | DEV_DEBUG),  /* flags */
     ERROR_MSG,                            /* debug control */
     icom_dt,                           /* debug flags */
-    NULL,                                 /* mem size routine */
-    NULL,                                 /* logical name */
-    NULL,                                 /* help */
-    NULL,                                 /* attach help */
-    NULL,                                 /* context for help */
+    NULL,                              /* mem size routine */
+    NULL,                              /* logical name */
+    NULL,                              /* help */
+    NULL,                              /* attach help */
+    NULL,                              /* context for help */
     &icom_description                  /* description */
 };
 
@@ -739,12 +743,7 @@ static t_stat icom_reset(DEVICE *dptr)
 /* Service routine */
 static t_stat icom_svc(UNIT *uptr)
 {
-//    if (icom_info->msTime != sim_os_msec()) {
-        icom_info->ICOM.status &= ~ICOM_STAT_BUSY;
-//    }
-//    else {
-//        sim_activate_after_abs(icom_info->uptr[icom_info->currentDrive], 1000);  /* Try another 1ms */
-//    }
+    icom_info->ICOM.status &= ~ICOM_STAT_BUSY;
 
     return SCPE_OK;
 }
@@ -756,7 +755,7 @@ static t_stat icom_attach(UNIT *uptr, CONST char *cptr)
     unsigned int i = 0;
 
     r = attach_unit(uptr, cptr);    /* attach unit  */
-    if (r != SCPE_OK) {              /* error?       */
+    if (r != SCPE_OK) {             /* error?       */
         sim_debug(ERROR_MSG, &icom_dev, "ATTACH error=%d\n", r);
         return r;
     }
@@ -779,6 +778,9 @@ static t_stat icom_attach(UNIT *uptr, CONST char *cptr)
 
         return SCPE_ARG;
     }
+
+    /* used for the generation of CRC errors */
+    icom_info->mediaDen[i] = (uptr->capac == ICOM_DD_CAPACITY);
 
     /* Default for new file is DSK */
     uptr->u3 = IMAGE_TYPE_DSK;
@@ -954,6 +956,34 @@ static void icom_set_busy(uint32 msec)
     icom_info->msTime = sim_os_msec();
 
     sim_activate_after_abs(icom_info->uptr[icom_info->currentDrive], msec * 1000);  /* activate timer */
+}
+
+/* Set CRC flag if trying to read/write wrong density */
+static int icom_set_crc(uint8 drive)
+{
+    uint8 track;
+
+    track = icom_info->currentTrack[drive];
+
+    icom_info->ICOM.status &= ~ICOM_STAT_CRC;
+
+    /* If formatting, CRC is always good */
+    if (icom_info->ICOM.formatMode) {
+        return 0;
+    }
+
+    /* If reading double density from track 0, set CRC error */
+    /* Else, if reading a density different than attached disk, set CRC error */
+    if (track == 0 && icom_info->ICOM.bytesPerSec != ICOM_SD_SECTOR_LEN) {
+        icom_info->ICOM.status |= ICOM_STAT_CRC;
+    } else if (track > 0) {
+        if ((icom_info->mediaDen[drive] && icom_info->ICOM.bytesPerSec != ICOM_DD_SECTOR_LEN) ||
+                (!icom_info->mediaDen[drive] && icom_info->ICOM.bytesPerSec != ICOM_SD_SECTOR_LEN)) {
+            icom_info->ICOM.status |= ICOM_STAT_CRC;
+        }
+    }
+
+    return (icom_info->ICOM.status & ICOM_STAT_CRC);
 }
 
 static int32 icomdev(int32 Addr, int32 rw, int32 data)
@@ -1172,6 +1202,9 @@ static uint32 ICOM_FormatTrack(UNIT *uptr, uint8 track, uint8 *buffer)
         sim_debug(WR_DATA_MSG, &icom_dev, "FORMAT track %d sector %d\n", track, sector);
     }
 
+    /* update disk density when formatting */
+    icom_info->mediaDen[icom_info->currentDrive] = (icom_info->ICOM.bytesPerSec == ICOM_DD_SECTOR_LEN);
+
     return rtn;
 }
 
@@ -1259,13 +1292,15 @@ static uint8 ICOM_Command(UNIT *uptr, ICOM_REG *pICOM, int32 Data)
 
     pICOM->command = Data;
 
+    ICOM_DriveNotReady(uptr, pICOM);  /* Update not ready status */
+
     switch(pICOM->command) {
         case ICOM_CMD_STATUS:
             pICOM->rData = pICOM->status;
             break;
 
         case ICOM_CMD_READ:
-            if (ICOM_DriveNotReady(uptr, pICOM)) {
+            if (pICOM->status & ICOM_STAT_DRVFAIL || icom_set_crc(icom_info->currentDrive)) {
                 break;
             }
 
@@ -1291,12 +1326,12 @@ static uint8 ICOM_Command(UNIT *uptr, ICOM_REG *pICOM, int32 Data)
             /* fall into ICOM_CMD_WRITE */
 
         case ICOM_CMD_WRITE:
-            if (ICOM_DriveNotReady(uptr, pICOM)) {
+            if (uptr->flags & UNIT_ICOM_WPROTECT) {
+                sim_debug(ERROR_MSG, &icom_dev, "Disk '%s' write protected.\n", uptr->filename);
                 break;
             }
 
-            if (uptr->flags & UNIT_ICOM_WPROTECT) {
-                sim_debug(ERROR_MSG, &icom_dev, "Disk '%s' write protected.\n", uptr->filename);
+            if (pICOM->status & ICOM_STAT_DRVFAIL || icom_set_crc(icom_info->currentDrive)) {
                 break;
             }
 
@@ -1324,14 +1359,15 @@ static uint8 ICOM_Command(UNIT *uptr, ICOM_REG *pICOM, int32 Data)
             break;
 
         case ICOM_CMD_READCRC:
-            if (ICOM_DriveNotReady(uptr, pICOM)) {
+            if (pICOM->status & ICOM_STAT_DRVFAIL) {
                 break;
             }
+            icom_set_crc(icom_info->currentDrive);
             icom_set_busy(icom_info->rwsMs);
             break;
 
         case ICOM_CMD_SEEK:
-            if (ICOM_DriveNotReady(uptr, pICOM)) {
+            if (pICOM->status & ICOM_STAT_DRVFAIL) {
                 break;
             }
 
@@ -1346,7 +1382,7 @@ static uint8 ICOM_Command(UNIT *uptr, ICOM_REG *pICOM, int32 Data)
             break;
 
         case ICOM_CMD_TRACK0:
-            if (ICOM_DriveNotReady(uptr, pICOM)) {
+            if (pICOM->status & ICOM_STAT_DRVFAIL) {
                 break;
             }
 
@@ -1425,10 +1461,11 @@ static uint8 ICOM_Command(UNIT *uptr, ICOM_REG *pICOM, int32 Data)
     pICOM->command &= ~ICOM_CMD_CMDMSK;
 
     sim_debug(CMD_MSG, &icom_dev,
-            "%-13.13s (%02Xh) unit=%d trk=%02d sec=%02d stat=%02Xh density=%d formatMode=%s\n",
+            "%-13.13s (%02Xh) unit=%d trk=%02d sec=%02d stat=%02Xh mediaDen=%d density=%d formatMode=%s\n",
             ICOM_CommandString(Data),
             Data, icom_info->currentDrive,
             pICOM->track, pICOM->sector, pICOM->status,
+            icom_info->mediaDen[icom_info->currentDrive],
             pICOM->bytesPerSec, (pICOM->formatMode) ? "TRUE" : "FALSE");
 
     return(cData);
