@@ -31,7 +31,8 @@
  *                                                                       *
  * Module Description:                                                   *
  *     Northstar MDS-AD Disk Controller module for SIMH                  *
- * Only Double-Density is supported for now.                             *
+ * Single- and Double-density disks are supported, but the entire disk   *
+ * must be the same density.                                             *
  *                                                                       *
  *************************************************************************/
 
@@ -56,6 +57,7 @@
 #define RD_DATA_DETAIL_MSG  (1 << 7)
 #define WR_DATA_DETAIL_MSG  (1 << 8)
 
+
 extern uint32 PCX;
 extern t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
@@ -63,19 +65,37 @@ extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_typ
                                int32 (*routine)(const int32, const int32, const int32), const char* name, uint8 unmap);
 
 #define MDSAD_MAX_DRIVES        4
-#define MDSAD_SECTOR_LEN        512
+#define MDSAD_SECTOR_LEN_DD     512
+#define MDSAD_SECTOR_LEN_SD     256
 #define MDSAD_SECTORS_PER_TRACK 10
 #define MDSAD_TRACKS            35
-#define MDSAD_RAW_LEN           (32 + 2 + MDSAD_SECTOR_LEN + 1)
+#define MDSAD_ZEROS_LEN_DD      32
+#define MDSAD_ZEROS_LEN_SD      16
+#define MDSAD_SYNC_LEN_DD       2
+#define MDSAD_SYNC_LEN_SD       1
+#define MDSAD_CHECKSUM_LEN      1
+#define MDSAD_RAW_LEN_DD        (MDSAD_ZEROS_LEN_DD + MDSAD_SYNC_LEN_DD + MDSAD_SECTOR_LEN_DD + MDSAD_CHECKSUM_LEN)
+#define MDSAD_RAW_LEN_SD        (MDSAD_ZEROS_LEN_SD + MDSAD_SYNC_LEN_SD + MDSAD_SECTOR_LEN_SD + MDSAD_CHECKSUM_LEN)
+
+#define IS_DOUBLE_DENSITY       (pDrive->sector_len == MDSAD_SECTOR_LEN_DD)
+#define MDSAD_SECTOR_DATA       (IS_DOUBLE_DENSITY ? sdata.u_dd.data : sdata.u_sd.data)
+#define MDSAD_RAW_LEN           (IS_DOUBLE_DENSITY ? MDSAD_RAW_LEN_DD : MDSAD_RAW_LEN_SD)
+#define MDSAD_SECTOR_LEN        (pDrive->sector_len)
 
 typedef union {
     struct {
-        uint8 zeros[32];
-        uint8 sync[2];
-        uint8 data[MDSAD_SECTOR_LEN];
+        uint8 zeros[MDSAD_ZEROS_LEN_DD];
+        uint8 sync[MDSAD_SYNC_LEN_DD];
+        uint8 data[MDSAD_SECTOR_LEN_DD];
         uint8 checksum;
-    } u;
-    uint8 raw[MDSAD_RAW_LEN];
+    } u_dd;
+    struct {
+        uint8 zeros[MDSAD_ZEROS_LEN_SD];
+        uint8 sync[MDSAD_SYNC_LEN_SD];
+        uint8 data[MDSAD_SECTOR_LEN_SD];
+        uint8 checksum;
+    } u_sd;
+    uint8 raw[MDSAD_RAW_LEN_DD];
 
 } SECTOR_FORMAT;
 
@@ -85,6 +105,7 @@ typedef struct {
     uint8 wp;       /* Disk write protected */
     uint8 sector;   /* Current Sector number */
     uint32 sector_wait_count;
+    uint16 sector_len;
 } MDSAD_DRIVE_INFO;
 
 typedef struct {
@@ -148,7 +169,7 @@ static SECTOR_FORMAT sdata;
 
 #define UNIT_V_MDSAD_VERBOSE    (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages       */
 #define UNIT_MDSAD_VERBOSE      (1 << UNIT_V_MDSAD_VERBOSE)
-#define MDSAD_CAPACITY          (70*10*MDSAD_SECTOR_LEN)    /* Default North Star Disk Capacity */
+#define MDSAD_CAPACITY          (70*10*MDSAD_SECTOR_LEN_DD)    /* Default North Star Disk Capacity */
 
 /* MDS-AD Controller Subcases */
 #define MDSAD_READ_ROM      0
@@ -307,10 +328,15 @@ static t_stat mdsad_attach(UNIT *uptr, CONST char *cptr)
 
     for(i = 0; i < MDSAD_MAX_DRIVES; i++) {
         if(mdsad_dev.units[i].fileref == uptr->fileref) {
+            mdsad_info->orders.st = 0;      /* ensure valid state */
+
+            if (uptr->capac > 89600) {      /* Double-density */
+                mdsad_info->drive[i].sector_len = MDSAD_SECTOR_LEN_DD;
+            } else {      /* Single-density */
+                mdsad_info->drive[i].sector_len = MDSAD_SECTOR_LEN_SD;
+            }
             break;
         }
-
-    mdsad_info->orders.st = 0;      /* ensure valid state */
     }
 
     /* Default for new file is DSK */
@@ -414,9 +440,12 @@ static uint8 mdsad_rom[] = {
 
 static void showdata(int32 isRead) {
     int32 i;
+    MDSAD_DRIVE_INFO* pDrive;
+
+    pDrive = &mdsad_info->drive[mdsad_info->orders.ds];
     sim_printf("MDSAD: " ADDRESS_FORMAT " %s Sector =\n\t", PCX, isRead ? "Read" : "Write");
     for(i=0; i < MDSAD_SECTOR_LEN; i++) {
-        sim_printf("%02X ", sdata.u.data[i]);
+        sim_printf("%02X ", MDSAD_SECTOR_DATA);
         if(((i+1) & 0xf) == 0)
             sim_printf("\n\t");
     }
@@ -428,9 +457,13 @@ static uint32 sec_offset;
 
 static uint32 calculate_mdsad_sec_offset(uint8 track, uint8 head, uint8 sector)
 {
-    if(mdsad_info->orders.ss == 0) {
+    MDSAD_DRIVE_INFO* pDrive;
+
+    pDrive = &mdsad_info->drive[mdsad_info->orders.ds];
+
+    if(mdsad_info->orders.ss == 0) { /* Side 0 */
         return ((track * (MDSAD_SECTOR_LEN * MDSAD_SECTORS_PER_TRACK)) + (sector * MDSAD_SECTOR_LEN));
-    } else {
+    } else { /* Side 1 */
         return ((((MDSAD_TRACKS-1) - track) * (MDSAD_SECTOR_LEN * MDSAD_SECTORS_PER_TRACK)) +
                  ((MDSAD_SECTOR_LEN * MDSAD_SECTORS_PER_TRACK) * MDSAD_TRACKS) + /* Skip over side 0 */
                  (sector * MDSAD_SECTOR_LEN)); /* Sector offset from beginning of track. */
@@ -454,6 +487,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
             break;
         case MDSAD_WRITE_DATA:
         {
+            pDrive->sector_len = (mdsad_info->orders.dd == 1) ? MDSAD_SECTOR_LEN_DD : MDSAD_SECTOR_LEN_SD;
             if(mdsad_info->datacount == 0) {
                 sim_debug(WR_DATA_MSG, &mdsad_dev, "MDSAD: " ADDRESS_FORMAT
                           " WRITE Start:  Drive: %d, Track=%d, Head=%d, Sector=%d\n",
@@ -491,7 +525,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
                             sim_printf(".fileref is NULL!\n");
                         } else {
                             if (sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET) == 0) {
-                                sim_fwrite(sdata.u.data, 1, MDSAD_SECTOR_LEN,
+                                sim_fwrite(MDSAD_SECTOR_DATA, 1, MDSAD_SECTOR_LEN,
                                            (pDrive->uptr)->fileref);
                             } else {
                                 sim_printf("%s: sim_fseek error\n", __FUNCTION__);
@@ -514,10 +548,9 @@ static uint8 MDSAD_Read(const uint32 Addr)
             mdsad_info->orders.dp = (Addr & 0x20) >> 5;
             mdsad_info->orders.pst = mdsad_info->orders.st;     /* save previous state of st */
             mdsad_info->orders.st = (Addr & 0x10) >> 4;
-            mdsad_info->orders.ds = (Addr & 0x0F);
+            ds = Addr & 0x0F;
 
-            ds = mdsad_info->orders.ds;
-            switch(mdsad_info->orders.ds) {
+            switch(ds) {
                 case 0:
                 case 1:
                     mdsad_info->orders.ds = 0;
@@ -640,8 +673,8 @@ static uint8 MDSAD_Read(const uint32 Addr)
                     break;
             }
 
-            /* Always Double-Density for now... */
-            mdsad_info->com_status.dd = 1;
+            /* Set density based on sector length. */
+            mdsad_info->com_status.dd = (MDSAD_SECTOR_LEN == MDSAD_SECTOR_LEN_DD) ? 1 : 0;
 
             cData  = (mdsad_info->com_status.sf & 1) << 7;
             cData |= (mdsad_info->com_status.ix & 1) << 6;
@@ -661,7 +694,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
                               PCX,
                               cData & MDSAD_A_SF ? "SF" : "  ",
                               cData & MDSAD_A_IX ? "IX" : "  ",
-                              cData & MDSAD_A_DD ? "DD" : "  ",
+                              cData & MDSAD_A_DD ? "DD" : "SD",
                               cData & MDSAD_A_MO ? "MO" : "  ",
                               cData & MDSAD_A_WI ? "WI" : "  ",
                               cData & MDSAD_A_RE ? "RE" : "  ",
@@ -678,7 +711,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
                               PCX,
                               cData & MDSAD_B_SF ? "SF" : "  ",
                               cData & MDSAD_B_IX ? "IX" : "  ",
-                              cData & MDSAD_B_DD ? "DD" : "  ",
+                              cData & MDSAD_B_DD ? "DD" : "SD",
                               cData & MDSAD_B_MO ? "MO" : "  ",
                               cData & MDSAD_B_WR ? "WR" : "  ",
                               cData & MDSAD_B_SP ? "SP" : "  ",
@@ -692,7 +725,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
                               PCX,
                               cData & MDSAD_C_SF ? "SF" : "  ",
                               cData & MDSAD_C_IX ? "IX" : "  ",
-                              cData & MDSAD_C_DD ? "DD" : "  ",
+                              cData & MDSAD_C_DD ? "DD" : "SD",
                               cData & MDSAD_C_MO ? "MO" : "  ",
                               cData & MDSAD_C_SC);
                     break;
@@ -729,7 +762,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
                                     } else {
                                         if (sim_fseek((pDrive->uptr)->fileref,
                                                       sec_offset, SEEK_SET) == 0) {
-                                            rtn = sim_fread(&sdata.u.data[0], 1, MDSAD_SECTOR_LEN,
+                                            rtn = sim_fread(MDSAD_SECTOR_DATA, 1, MDSAD_SECTOR_LEN,
                                                             (pDrive->uptr)->fileref);
                                             if (rtn != MDSAD_SECTOR_LEN) {
                                                 sim_debug(ERROR_MSG, &mdsad_dev, "MDSAD: " ADDRESS_FORMAT
@@ -753,7 +786,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
                     }
 
                     if(mdsad_info->datacount < MDSAD_SECTOR_LEN) {
-                        cData = sdata.u.data[mdsad_info->datacount];
+                        cData = MDSAD_SECTOR_DATA[mdsad_info->datacount];
 
                         /* Exclusive OR */
                         checksum ^= cData;
