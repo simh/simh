@@ -1,9 +1,7 @@
 /*************************************************************************
  *                                                                       *
- * $Id: s100_mdsad.c 1995 2008-07-15 03:59:13Z hharte $                  *
- *                                                                       *
- * Copyright (c) 2007-2008 Howard M. Harte.                              *
- * http://www.hartetec.com                                               *
+ * Copyright (c) 2007-2021 Howard M. Harte.                              *
+ * https://github.com/hharte                                             *
  *                                                                       *
  * Permission is hereby granted, free of charge, to any person obtaining *
  * a copy of this software and associated documentation files (the       *
@@ -34,9 +32,6 @@
  * Module Description:                                                   *
  *     Northstar MDS-AD Disk Controller module for SIMH                  *
  * Only Double-Density is supported for now.                             *
- *                                                                       *
- * Environment:                                                          *
- *     User mode only                                                    *
  *                                                                       *
  *************************************************************************/
 
@@ -479,7 +474,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
                 sdata.raw[mdsad_info->datacount] = Addr & 0xFF;
 
             if(mdsad_info->datacount == (MDSAD_RAW_LEN - 1)) {
-                sim_debug(WR_DATA_MSG, &mdsad_dev, "MDSAD: " ADDRESS_FORMAT
+                sim_debug(WR_DATA_DETAIL_MSG, &mdsad_dev, "MDSAD: " ADDRESS_FORMAT
                           " Write Complete\n", PCX);
 
                 if ((pDrive->uptr == NULL) || (pDrive->uptr->fileref == NULL)) {
@@ -586,7 +581,6 @@ static uint8 MDSAD_Read(const uint32 Addr)
                         case 10:
                         {
                             mdsad_info->com_status.sf = 1;
-                            mdsad_info->a_status.wi = 0;
                             mdsad_info->a_status.re = 0;
                             mdsad_info->a_status.bd = 0;
                             pDrive->sector_wait_count = 0;
@@ -603,6 +597,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
                             mdsad_info->a_status.wi = 1;
                             break;
                         case 3:
+                            mdsad_info->a_status.wi = 0;
                             mdsad_info->a_status.re = 1;
                             mdsad_info->a_status.bd = 1;
                             break;
@@ -770,7 +765,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
                             PCX, sec_offset, mdsad_info->datacount, cData));
                     } else { /* checksum */
                         cData = checksum;
-                        sim_debug(RD_DATA_MSG, &mdsad_dev, "MDSAD: " ADDRESS_FORMAT
+                        sim_debug(RD_DATA_DETAIL_MSG, &mdsad_dev, "MDSAD: " ADDRESS_FORMAT
                                   " READ-DATA: Checksum is: 0x%02x\n",
                                   PCX, cData);
                     }
