@@ -22,7 +22,7 @@
 */
 
 #include "pdp11_defs.h"
-#include "pdp_m9312.h"
+#include "pdp11_m9312.h"
 
 t_stat m9312_ex (t_value* vptr, t_addr addr, UNIT* uptr, int32 sw);
 t_stat m9312_rd (int32* data, int32 PA, int32 access);
