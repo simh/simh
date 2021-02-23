@@ -219,12 +219,12 @@ t_stat m9312_place_rom_in_socket0 (UNIT* uptr, int32 val, CONST char* cptr, void
 		return SCPE_ARG;
 
 	// Search the console rom tables for the specified device mnemonic
-	for (i = 0; i < sizeof (console_roms) / sizeof (struct rom_tab); i++)
+	for (i = 0; i < sizeof (diag_roms) / sizeof (struct diag_rom_tab); i++)
 	{
-		if (strcmp (cptr, console_roms[i].device_mnemonic) == 0)
+		if (strcmp (cptr, diag_roms[i].device_mnemonic) == 0)
 		{
-			m9312_unit[val].filebuf = console_roms[i].image;
-			strncpy (unit_use[val], console_roms[i].device_mnemonic, sizeof (unit_use[val]));
+			m9312_unit[val].filebuf = diag_roms[i].image;
+			strncpy (unit_use[val], diag_roms[i].device_mnemonic, sizeof (unit_use[val]));
 			return SCPE_OK;
 		}
 	}
@@ -245,7 +245,7 @@ t_stat m9312_place_rom_in_socket1_4 (UNIT* uptr, int32 val, CONST char* cptr, vo
 		return SCPE_ARG;
 
 	// Search the boot rom tables for the specified mnemonic
-	for (i = 0; i < sizeof (boot_roms) / sizeof (struct rom_tab); i++)
+	for (i = 0; i < sizeof (boot_roms) / sizeof (struct boot_rom_tab); i++)
 	{
 		if (strcmp (cptr, boot_roms[i].device_mnemonic) == 0)
 		{

@@ -35,7 +35,7 @@
 #include "pdp11_defs.h"
 
 /* (A0) 11/04,34 Diagnostic/Console (M9312 E20) */
-uint16 rom_23_248F1[512] =
+uint16 rom_23_248F1[256] =
 {
 	0xEA00,0xEA00,0x8000,0xFFFF,0xEA06,0xEA06,0x0140,0x0141,	/* 000000 */
 	0x0A03,0x0A83,0x0A43,0x0C83,0x0CC3,0x0C03,0x0BC3,0x0B03,	/* 000020 */
@@ -72,7 +72,7 @@ uint16 rom_23_248F1[512] =
 };
 
 /* 11/44 Diagnostic/Console (UBI; M7098 E58) */
-uint16 rom_23_446F1[512] =
+uint16 rom_23_446F1[256] =
 {
 	0x15DF,0xFFFF,0x01C6,0x0105,0x0A1F,0x01C6,0x0102,0x00A0,	/* 000000 */
 	0x01FB,0x101F,0x01C0,0x105F,0x01C2,0x111F,0x01C4,0x15DF,	/* 000020 */
@@ -109,7 +109,7 @@ uint16 rom_23_446F1[512] =
 };
 
 /* (B0) 11/60,70 Diagnostic (M9312 E20) */
-uint16 rom_23_616F1[512] =
+uint16 rom_23_616F1[256] =
 {
 	0x101F,0x01C0,0x105F,0x01C2,0x111F,0x01C4,0x0A1F,0x01C6,	/* 000000 */
 	0x55DF,0x8000,0xFFFE,0x35DF,0x4000,0xFFFE,0x0302,0x0A9F,	/* 000020 */
@@ -146,7 +146,7 @@ uint16 rom_23_616F1[512] =
 };
 
 /* 11/24 Diagnostic/Console (MEM; M7134 E74) */
-uint16 rom_23_774F1[512] =
+uint16 rom_23_774F1[256] =
 {
 	0x007F,0x0C10,0x0000,0x15C4,0xEA02,0x15DF,0x0003,0xFF78,	/* 000000 */
 	0x15DF,0xEA64,0x0004,0x0A1F,0x0006,0x101F,0xFFA0,0x105F,	/* 000020 */
@@ -183,7 +183,7 @@ uint16 rom_23_774F1[512] =
 };
 
  /* (DL) RL01/02 cartridge disk boot ROM */
-uint16 rom_23_751A9[128] =
+uint16 rom_23_751A9[64] =
 {
 	0x444C,0x007E,0x00B1,0x15C0,0x0000,0x15C1,0xF900,0x11C4,	/* 000000 */
 	0x8634,0x0102,0xF600,0x00E0,0x1003,0x00C3,0x10C9,0x15F1,	/* 000020 */
@@ -196,7 +196,7 @@ uint16 rom_23_751A9[128] =
 };
 
 /* (DM) RK06/07 cartridge disk */
-uint16 rom_23_752A9[128] =
+uint16 rom_23_752A9[64] =
 {
 	0x444D,0x007E,0x00B1,0x15C0,0x0000,0x15C1,0xFF20,0x11C4,	/* 000000 */
 	0x862D,0x0102,0xF600,0x00E0,0x1031,0x0008,0x15C9,0x0003,	/* 000020 */
@@ -209,7 +209,7 @@ uint16 rom_23_752A9[128] =
 };
 
 /* (DX) RX01 floppy disk, single density */
-uint16 rom_23_753A9[128] =
+uint16 rom_23_753A9[64] =
 {
 	0x4458,0x007E,0x00B1,0x15C0,0x0000,0x15C1,0xFE78,0x11C4,	/* 000000 */
 	0x862E,0x0102,0xF600,0x00E0,0x00A1,0x15C3,0x0307,0xB5C0,	/* 000020 */
@@ -223,7 +223,7 @@ uint16 rom_23_753A9[128] =
 
 /* (DP) RP02/03 cartridge disk */
 /* (DB) RP04/05/06,RM02/03/05 cartridge disk */
-uint16 rom_23_755A9[128] =
+uint16 rom_23_755A9[64] =
 {
 	0x4450,0x0022,0x00B1,0x15C0,0x0000,0x15C1,0xFDCC,0x11C4,	/* 000000 */
 	0x8630,0x0102,0xF600,0x00E0,0x1003,0x00C3,0x10C9,0x15C2,	/* 000020 */
@@ -237,7 +237,7 @@ uint16 rom_23_755A9[128] =
 
 /* (DK) RK03/05 DECdisk */
 /* (DT) TU55/56 DECtape */
-uint16 rom_23_756A9[128] =
+uint16 rom_23_756A9[64] =
 {
 	0x444B,0x0016,0x00B1,0x15C0,0x0000,0x15C1,0xFF04,0x11C4,	/* 000000 */
 	0x862F,0x0116,0xF600,0x00E0,0x4454,0x0066,0x00B1,0x15C0,	/* 000020 */
@@ -250,7 +250,7 @@ uint16 rom_23_756A9[128] =
 };
 
 /* (MM) TU16/45/77,TE16 magtape */
-uint16 rom_23_757A9[128] =
+uint16 rom_23_757A9[64] =
 {
 	0x4D4D,0x007E,0x00B1,0x15C0,0x0000,0x15C1,0xF520,0x11C4,	/* 000000 */
 	0x8634,0x0102,0xF600,0x00E0,0x0005,0x1003,0x55C3,0x02C0,	/* 000020 */
@@ -263,7 +263,7 @@ uint16 rom_23_757A9[128] =
 };
 
 /* (MT) TS03,TU10,TE10 magtape */
-uint16 rom_23_758A9[128] =
+uint16 rom_23_758A9[64] =
 {
 	0x4D54,0x007E,0x00B1,0x15C0,0x0000,0x15C1,0xF552,0x11C4,	/* 000000 */
 	0x862C,0x0109,0xF600,0x00E0,0x15C0,0x0001,0x01F6,0x15C0,	/* 000020 */
@@ -276,7 +276,7 @@ uint16 rom_23_758A9[128] =
 };
 
 /* (DS) RS03/04 fixed disk */
-uint16 rom_23_759A9[128] =
+uint16 rom_23_759A9[64] =
 {
 	0x4453,0x007E,0x00B1,0x15C0,0x0000,0x15C1,0xF420,0x11C4,	/* 000000 */
 	0x8616,0x0102,0xF600,0x00E0,0x1003,0x10F1,0x0008,0x1C71,	/* 000020 */
@@ -290,7 +290,7 @@ uint16 rom_23_759A9[128] =
 
 /* (TT) ASR33 lowspeed reader */
 /* (PR) PC05 hispeed reader */
-uint16 rom_23_760A9[128] =
+uint16 rom_23_760A9[64] =
 {
 	0x5052,0x0016,0x00B1,0x15C0,0x0000,0x15C1,0xFF68,0x11C4,	/* 000000 */
 	0x8634,0x010A,0xF600,0x00E0,0x5454,0x0066,0x00B1,0x15C0,	/* 000020 */
@@ -303,7 +303,7 @@ uint16 rom_23_760A9[128] =
 };
 
 /* (CT) TU60 DECcassette */
-uint16 rom_23_761A9[128] =
+uint16 rom_23_761A9[64] =
 {
 	0x4354,0x007E,0x00B1,0x15C0,0x0000,0x15C1,0xFF40,0x11C4,	/* 000000 */
 	0x8622,0x0102,0xF600,0x00E0,0x1003,0x45C3,0xFFFE,0x00C3,	/* 000020 */
@@ -316,7 +316,7 @@ uint16 rom_23_761A9[128] =
 };
 
 /* (MS) TS04/11,TU80,TSU05 tape */
-uint16 rom_23_764A9[128] =
+uint16 rom_23_764A9[64] =
 {
 	0x4D53,0x007E,0x00B1,0x15C0,0x0000,0x15C1,0xF552,0x11C4,	/* 000000 */
 	0x8633,0x0109,0xF600,0x00E0,0xC408,0x0000,0x0000,0x0200,	/* 000020 */
@@ -329,7 +329,7 @@ uint16 rom_23_764A9[128] =
 };
 
 /* (DD) TU58 DECtape II; fixes non-std CSR access */
-uint16 rom_23_765B9[128] =
+uint16 rom_23_765B9[64] =
 {
 	0x4444,0x007E,0x00B1,0x15C0,0x0000,0x15C1,0xFD40,0x11C4,	/* 000000 */
 	0x862D,0x0102,0xF600,0x00E0,0x15C6,0x0400,0x0A04,0x0AB1,	/* 000020 */
@@ -342,7 +342,7 @@ uint16 rom_23_765B9[128] =
 };
 
 /* (DU) MSCP UDA50(RAxx) disk */
-uint16 rom_23_767A9[128] =
+uint16 rom_23_767A9[64] =
 {
 	0x4455,0x007E,0x00B1,0x15C0,0x0000,0x15C1,0xF468,0x11C4,	/* 000000 */
 	0x8603,0x0104,0xF600,0x00E0,0x005F,0xEB74,0x1011,0x15C5,	/* 000020 */
@@ -355,7 +355,7 @@ uint16 rom_23_767A9[128] =
 };
 
 /* (DY) RX02 floppy disk, double density */
-uint16 rom_23_811A9[128] =
+uint16 rom_23_811A9[64] =
 {
 	0x4459,0x007E,0x00B1,0x15C0,0x0000,0x15C1,0xFE78,0x11C4,	/* 000000 */
 	0x8634,0x0102,0xF600,0x00E0,0x0A43,0x0005,0x15C4,0x0101,	/* 000020 */
@@ -368,7 +368,7 @@ uint16 rom_23_811A9[128] =
 };
 
 /* (XM) DECnet DDCMP DMC11 / DMR11 - ROM0 */
-uint16 rom_23_862A9[128] =
+uint16 rom_23_862A9[64] =
 {
 	0x584D,0x017E,0x00B1,0x15C0,0x0000,0x15C1,0xE008,0x11C4,	/* 000000 */
 	0x860D,0x010E,0xF600,0x00E0,0x00B1,0x15C0,0x0001,0x01F5,	/* 000020 */
@@ -381,7 +381,7 @@ uint16 rom_23_862A9[128] =
 };
 
 /* (XM) DECnet DDCMP DMC11 / DMR11 - ROM1 */
-uint16 rom_23_863A9[128] =
+uint16 rom_23_863A9[64] =
 {
 	0xFFFE,0x15C4,0x0008,0x0005,0x11C2,0x0131,0x0023,0x1EF8,	/* 000000 */
 	0x0000,0x0102,0xF600,0x00E0,0x11C2,0x0129,0x0021,0x0000,	/* 000020 */
@@ -394,7 +394,7 @@ uint16 rom_23_863A9[128] =
 };
 
 /* (XM) DECnet DDCMP DMC11 / DMR11 - ROM2 */
-uint16 rom_23_864A9[128] =
+uint16 rom_23_864A9[64] =
 {
 	0xFFFE,0x80F8,0x11C3,0x010D,0x01F5,0x14B1,0x0004,0x14B1,	/* 000000 */
 	0x0006,0x0102,0xF600,0x00E0,0x45C9,0x0020,0x8BC9,0x81FE,	/* 000020 */
@@ -407,7 +407,7 @@ uint16 rom_23_864A9[128] =
 };
 
 /* (XE) Ethernet DEUNA/DELUA Net Boot (v2) ROM0 */
-uint16 rom_23_E32A9[128] =
+uint16 rom_23_E32A9[64] =
 {
 	0x5845,0x00FE,0x00B1,0x15C0,0x0000,0x15C1,0xF948,0x11C4,	/* 000000 */
 	0x8631,0x0105,0xF600,0x00E0,0x0801,0x0802,0x0000,0x11C2,	/* 000020 */
@@ -420,7 +420,7 @@ uint16 rom_23_E32A9[128] =
 };
 
 /* (XE) Ethernet DEUNA/DELUA Net Boot (v2) ROM1 */
-uint16 rom_23_E33A9[128] =
+uint16 rom_23_E33A9[64] =
 {
 	0xFFFE,0x94DF,0xFF76,0x8BDF,0xFF74,0x80FD,0x0AC4,0x02F9,	/* 000000 */
 	0x0106,0x95DF,0x002D,0xFF76,0x8BDF,0xFF74,0x80FD,0x9543,	/* 000020 */
@@ -433,7 +433,7 @@ uint16 rom_23_E33A9[128] =
 };
 
 /* (MU) TMSCP TK50,TU81 magtape */
-uint16 rom_23_E39A9[128] =
+uint16 rom_23_E39A9[64] =
 {
 	0x4D55,0x007E,0x00B1,0x15C0,0x0000,0x15C1,0xF940,0x11C4,	/* 000000 */
 	0x8603,0x010B,0xF600,0x00E0,0x005F,0xEB74,0x2102,0x213E,	/* 000020 */
@@ -446,7 +446,7 @@ uint16 rom_23_E39A9[128] =
 };
 
 /* (ZZ) Test ROM; runs diagnostics continuously */
-uint16 rom_23_ZZZA9[128] =
+uint16 rom_23_ZZZA9[64] =
 {
 	0x5A5A,0x007E,0x00B1,0x15C0,0x0000,0x15C1,0x0000,0x11C4,	/* 000000 */
 	0x8634,0x0102,0xF600,0x00E0,0x11C1,0x012D,0x0A03,0x0A83,	/* 000020 */
@@ -458,15 +458,22 @@ uint16 rom_23_ZZZA9[128] =
 	0xEB60,0x005F,0xEB18,0x005F,0xEB40,0x005F,0xEB74,0xD5DF,	/* 000160 */
 };
 
-struct rom_tab
+struct diag_rom_tab
 {
 	char device_mnemonic[5];
-	uint16 *image;
+	uint16 (*image)[256];
 };
 
-typedef struct rom_tab ROMTAB;
+struct boot_rom_tab
+{
+	char device_mnemonic[5];
+	uint16 (*image)[64];
+};
 
-ROMTAB console_roms[] =
+typedef struct diag_rom_tab DIAGROMTAB;
+typedef struct boot_rom_tab BOOTROMTAB;
+
+DIAGROMTAB diag_roms[] =
 {
 	"A0",	&rom_23_248F1,
 	"UBI",	&rom_23_446F1,
@@ -474,7 +481,7 @@ ROMTAB console_roms[] =
 	"MEM",	&rom_23_774F1,
 };
 
-ROMTAB boot_roms[] =
+BOOTROMTAB boot_roms[] =
 {
 	"DL",	&rom_23_751A9,
 	"DM",	&rom_23_752A9,
