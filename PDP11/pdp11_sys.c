@@ -126,6 +126,8 @@ extern DEVICE daz_dev;
 extern REG cpu_reg[];
 extern int32 saved_PC;
 
+extern void setHITMISS (int);
+
 /* SCP data structures and interface routines
 
    sim_name             simulator name string
