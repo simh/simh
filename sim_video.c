@@ -448,6 +448,8 @@ if (vid_main_thread_handle == NULL) {
 
 vid_beep_setup (400, 660);
 
+memset (&event, 0, sizeof (event));
+
 while (1) {
     int status = SDL_WaitEvent (&event);
     if (status == 1) {
