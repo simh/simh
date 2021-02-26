@@ -651,6 +651,8 @@ static SIO_PORT_INFO port_table[PORT_TABLE_SIZE] = {
     {0x01, 0, 0,                0,      0, FALSE, 0, FALSE, TRUE                        },
     {0x02, 0, VGSIO_CAN_READ,   0,      VGSIO_CAN_WRITE, FALSE, 0, TRUE, TRUE           },
     {0x03, 0, VGSIO_CAN_READ,   0,      VGSIO_CAN_WRITE, FALSE, 0, FALSE, TRUE          },
+    {0x04, 0, VGSIO_CAN_READ,   0,      VGSIO_CAN_WRITE, FALSE, 0, TRUE, TRUE           },
+    {0x05, 0, VGSIO_CAN_READ,   0,      VGSIO_CAN_WRITE, FALSE, 0, FALSE, TRUE          },
     {0x10, 0, SIO_CAN_READ,     0,      SIO_CAN_WRITE, TRUE, SIO_RESET, FALSE, TRUE     },
     {0x11, 0, SIO_CAN_READ,     0,      SIO_CAN_WRITE, TRUE, SIO_RESET, TRUE, TRUE      },
     {0x14, 1, SIO_CAN_READ,     0,      SIO_CAN_WRITE, TRUE, SIO_RESET, FALSE, TRUE     },
@@ -1634,7 +1636,9 @@ void do_SIMH_sleep(void) {
      Otherwise there is the possibility that such interrupts are skipped. */
     if ((simh_unit.flags & UNIT_SIMH_TIMERON) && rtc_avail && (sim_os_msec() + 1 >= timeOfNextInterrupt))
         return;
-    if (SIMHSleep && !sio_unit.u4)  /* time to sleep and SIO not attached to a file */
+    if (SIMHSleep && !sio_unit.u4)
+        /* time to sleep and SIO not attached to a file.
+         Use 'D SLEEP 0' to disable this functionality when not needed. */
         sim_os_ms_sleep(SIMHSleep);
 }
 

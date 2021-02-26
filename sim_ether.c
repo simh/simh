@@ -1753,18 +1753,21 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname)
     FILE *f;
     int i;
     const char *patterns[] = {
-        "grep [0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]",
-        "egrep [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]",
+        "ip link show %.*s | grep [0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]",
+        "ip link show %.*s | egrep [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]",
+        "ifconfig %.*s | grep [0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]",
+        "ifconfig %.*s | egrep [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]",
         NULL};
 
     memset(command, 0, sizeof(command));
     /* try to force an otherwise unused interface to be turned on */
+    snprintf(command, sizeof(command)-1, "ip link set dev %.*s up", (int)(sizeof(command) - 21), devname);
+    if (system(command)) {};
     snprintf(command, sizeof(command)-1, "ifconfig %.*s up", (int)(sizeof(command) - 14), devname);
     if (system(command)) {};
     for (i=0; patterns[i] && (0 == dev->have_host_nic_phy_addr); ++i) {
-      snprintf(command, sizeof(command)-1, "ifconfig %.*s | %s  >NIC.hwaddr", (int)(sizeof(command) - (26 + strlen(patterns[i]))), devname, patterns[i]);
-      if (system(command)) {};
-      if (NULL != (f = fopen("NIC.hwaddr", "r"))) {
+      snprintf(command, sizeof(command)-1, patterns[i], (int)(sizeof(command) - (2 + strlen(patterns[i]))), devname);
+      if (NULL != (f = popen(command, "r"))) {
         while (0 == dev->have_host_nic_phy_addr) {
           if (fgets(command, sizeof(command)-1, f)) {
             char *p1, *p2;
@@ -1791,8 +1794,7 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, const char *devname)
           else
             break;
           }
-        fclose(f);
-        (void)remove("NIC.hwaddr");
+        pclose(f);
         }
       }
     }

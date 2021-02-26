@@ -60,6 +60,8 @@
    access devices like fixed head disks and DECtapes).
 */
 
+#define IN_SIM_FIO_C 1              /* Include from sim_fio.c */
+
 #include "sim_defs.h"
 
 t_bool sim_end;                     /* TRUE = little endian, FALSE = big endian */
@@ -1052,3 +1054,241 @@ else
     return SCPE_ARG;
 }
 #endif /* !defined(_WIN32) */
+
+/* Trim trailing spaces from a string
+
+    Inputs:
+        cptr    =       pointer to string
+    Outputs:
+        cptr    =       pointer to string
+*/
+
+char *sim_trim_endspc (char *cptr)
+{
+char *tptr;
+
+tptr = cptr + strlen (cptr);
+while ((--tptr >= cptr) && sim_isspace (*tptr))
+    *tptr = 0;
+return cptr;
+}
+
+int sim_isspace (int c)
+{
+return ((c < 0) || (c >= 128)) ? 0 : isspace (c);
+}
+
+int sim_islower (int c)
+{
+return (c >= 'a') && (c <= 'z');
+}
+
+int sim_isupper (int c)
+{
+return (c >= 'A') && (c <= 'Z');
+}
+
+int sim_toupper (int c)
+{
+return ((c >= 'a') && (c <= 'z')) ? ((c - 'a') + 'A') : c;
+}
+
+int sim_tolower (int c)
+{
+return ((c >= 'A') && (c <= 'Z')) ? ((c - 'A') + 'a') : c;
+}
+
+int sim_isalpha (int c)
+{
+return ((c < 0) || (c >= 128)) ? 0 : isalpha (c);
+}
+
+int sim_isprint (int c)
+{
+return ((c < 0) || (c >= 128)) ? 0 : isprint (c);
+}
+
+int sim_isdigit (int c)
+{
+return ((c >= '0') && (c <= '9'));
+}
+
+int sim_isgraph (int c)
+{
+return ((c < 0) || (c >= 128)) ? 0 : isgraph (c);
+}
+
+int sim_isalnum (int c)
+{
+return ((c < 0) || (c >= 128)) ? 0 : isalnum (c);
+}
+
+/* strncasecmp() is not available on all platforms */
+int sim_strncasecmp (const char* string1, const char* string2, size_t len)
+{
+size_t i;
+unsigned char s1, s2;
+
+for (i=0; i<len; i++) {
+    s1 = (unsigned char)string1[i];
+    s2 = (unsigned char)string2[i];
+    s1 = (unsigned char)sim_toupper (s1);
+    s2 = (unsigned char)sim_toupper (s2);
+    if (s1 < s2)
+        return -1;
+    if (s1 > s2)
+        return 1;
+    if (s1 == 0)
+        return 0;
+    }
+return 0;
+}
+
+/* strcasecmp() is not available on all platforms */
+int sim_strcasecmp (const char *string1, const char *string2)
+{
+size_t i = 0;
+unsigned char s1, s2;
+
+while (1) {
+    s1 = (unsigned char)string1[i];
+    s2 = (unsigned char)string2[i];
+    s1 = (unsigned char)sim_toupper (s1);
+    s2 = (unsigned char)sim_toupper (s2);
+    if (s1 == s2) {
+        if (s1 == 0)
+            return 0;
+        i++;
+        continue;
+        }
+    if (s1 < s2)
+        return -1;
+    if (s1 > s2)
+        return 1;
+    }
+return 0;
+}
+
+int sim_strwhitecasecmp (const char *string1, const char *string2, t_bool casecmp)
+{
+unsigned char s1 = 1, s2 = 1;   /* start with equal, but not space */
+
+while ((s1 == s2) && (s1 != '\0')) {
+    if (s1 == ' ') {            /* last character was space? */
+        while (s1 == ' ') {     /* read until not a space */
+            s1 = *string1++;
+            if (sim_isspace (s1))
+                s1 = ' ';       /* all whitespace is a space */
+            else {
+                if (casecmp)
+                    s1 = (unsigned char)sim_toupper (s1);
+                }
+            }
+        }
+    else {                      /* get new character */
+        s1 = *string1++;
+        if (sim_isspace (s1))
+            s1 = ' ';           /* all whitespace is a space */
+        else {
+            if (casecmp)
+                s1 = (unsigned char)sim_toupper (s1);
+            }
+        }
+    if (s2 == ' ') {            /* last character was space? */
+        while (s2 == ' ') {     /* read until not a space */
+            s2 = *string2++;
+            if (sim_isspace (s2))
+                s2 = ' ';       /* all whitespace is a space */
+            else {
+                if (casecmp)
+                    s2 = (unsigned char)sim_toupper (s2);
+                }
+            }
+        }
+    else {                      /* get new character */
+        s2 = *string2++;
+        if (sim_isspace (s2))
+            s2 = ' ';           /* all whitespace is a space */
+        else {
+            if (casecmp)
+                s2 = (unsigned char)sim_toupper (s2);
+            }
+        }
+    if (s1 == s2) {
+        if (s1 == 0)
+            return 0;
+        continue;
+        }
+    if (s1 < s2)
+        return -1;
+    if (s1 > s2)
+        return 1;
+    }
+return 0;
+}
+
+/* strlcat() and strlcpy() are not available on all platforms */
+/* Copyright (c) 1998 Todd C. Miller <Todd.Miller@courtesan.com> */
+/*
+ * Appends src to string dst of size siz (unlike strncat, siz is the
+ * full size of dst, not space left).  At most siz-1 characters
+ * will be copied.  Always NUL terminates (unless siz <= strlen(dst)).
+ * Returns strlen(src) + MIN(siz, strlen(initial dst)).
+ * If retval >= siz, truncation occurred.
+ */
+size_t sim_strlcat(char *dst, const char *src, size_t size)
+{
+char *d = dst;
+const char *s = src;
+size_t n = size;
+size_t dlen;
+
+/* Find the end of dst and adjust bytes left but don't go past end */
+while (n-- != 0 && *d != '\0')
+    d++;
+dlen = d - dst;
+n = size - dlen;
+
+if (n == 0)
+    return (dlen + strlen(s));
+while (*s != '\0') {
+    if (n != 1) {
+        *d++ = *s;
+        n--;
+        }
+    s++;
+    }
+*d = '\0';
+
+return (dlen + (s - src));          /* count does not include NUL */
+}
+
+/*
+ * Copy src to string dst of size siz.  At most siz-1 characters
+ * will be copied.  Always NUL terminates (unless siz == 0).
+ * Returns strlen(src); if retval >= siz, truncation occurred.
+ */
+size_t sim_strlcpy (char *dst, const char *src, size_t size)
+{
+char *d = dst;
+const char *s = src;
+size_t n = size;
+
+/* Copy as many bytes as will fit */
+if (n != 0) {
+    while (--n != 0) {
+        if ((*d++ = *s++) == '\0')
+            break;
+        }
+    }
+
+    /* Not enough room in dst, add NUL and traverse rest of src */
+    if (n == 0) {
+        if (size != 0)
+            *d = '\0';              /* NUL-terminate dst */
+        while (*s++)
+            ;
+        }
+return (s - src - 1);               /* count does not include NUL */
+}
+

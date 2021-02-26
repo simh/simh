@@ -1,9 +1,7 @@
 /*************************************************************************
  *                                                                       *
- * $Id: mfdc.c 1995 2008-07-15 03:59:13Z hharte $                        *
- *                                                                       *
- * Copyright (c) 2007-2015 Howard M. Harte.                              *
- * hharte@magicandroidapps.com                                           *
+ * Copyright (c) 2007-2021 Howard M. Harte.                              *
+ * https://github.com/hharte                                             *
  *                                                                       *
  * Permission is hereby granted, free of charge, to any person obtaining *
  * a copy of this software and associated documentation files (the       *
@@ -36,9 +34,6 @@
  * See the "Vector Using MDOS Revision 8.4" manual at:                   *
  * www.hartetechnologies.com/manuals in the Vector Graphic section       *
  * for details of the on-disk sector format and programming information. *
- *                                                                       *
- * Environment:                                                          *
- *     User mode only                                                    *
  *                                                                       *
  *************************************************************************/
 
@@ -240,7 +235,7 @@ static t_stat mfdc_attach(UNIT *uptr, CONST char *cptr)
     int32 i = 0;
 
     r = attach_unit(uptr, cptr);    /* attach unit  */
-    if ( r != SCPE_OK)              /* error?       */
+    if (r != SCPE_OK)               /* error?       */
         return r;
 
     /* Determine length of this disk */
@@ -295,7 +290,6 @@ static t_stat mfdc_attach(UNIT *uptr, CONST char *cptr)
 /* Detach routine */
 static t_stat mfdc_detach(UNIT *uptr)
 {
-    t_stat r;
     int8 i;
 
     for(i = 0; i < MFDC_MAX_DRIVES; i++) {
@@ -308,15 +302,11 @@ static t_stat mfdc_detach(UNIT *uptr)
         return SCPE_ARG;
 
     DBG_PRINT(("Detach MFDC%d\n", i));
-    r = diskClose(&mfdc_info->drive[i].imd);
-    if (r != SCPE_OK)
-        return r;
+    if (uptr->u3 == IMAGE_TYPE_IMD) {
+        diskClose(&mfdc_info->drive[i].imd);
+    }
 
-    r = detach_unit(uptr);  /* detach unit */
-    if (r != SCPE_OK)
-        return r;
-
-    return SCPE_OK;
+    return detach_unit(uptr);  /* detach unit */
 }
 
 

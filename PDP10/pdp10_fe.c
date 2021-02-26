@@ -191,8 +191,12 @@ t_stat fei_svc (UNIT *uptr)
 {
 int32 temp;
 
-temp = sim_poll_kbd ();                                 /* get possible char or error? */
 sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
+
+if (M[FE_CTYIN] & FE_CVALID)                            /* previous character still pending? */
+    return SCPE_OK;                                     /* wait until it gets digested */
+
+temp = sim_poll_kbd ();                                 /* get possible char or error? */
 if (temp < SCPE_KFLAG)                                  /* no char or error? */
     return temp;
 if (temp & SCPE_BREAK)                                  /* ignore break */

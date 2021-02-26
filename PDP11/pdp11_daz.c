@@ -154,6 +154,10 @@ int daz_keyboard (SIM_KEY_EVENT *kev)
   case SIM_KEY_N: n = 3; mask = TURN_RIGHT; break;
   case SIM_KEY_M: n = 3; mask = FIRE; break;
   case SIM_KEY_COMMA: n = 3; mask = PASS; break;
+  case SIM_KEY_F11:
+    if (kev->state == SIM_KEYPRESS_UP)
+      vid_set_fullscreen (!vid_is_fullscreen ());
+    return 0;
   default: return 0;
   }
 

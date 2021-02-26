@@ -46,6 +46,8 @@
 extern "C" {
 #endif
 
+#include "sim_sock.h"
+
 #include "sim_frontpanel.h"
 
 #include <stdio.h>
@@ -57,8 +59,6 @@ extern "C" {
 #include <errno.h>
 #include <signal.h>
 #include <pthread.h>
-
-#include "sim_sock.h"
 
 #if defined(_WIN32)
 #include <process.h>
@@ -589,7 +589,7 @@ return 0;
 static int
 _panel_establish_register_bits_collection (PANEL *panel)
 {
-size_t i, buf_data, buf_needed = 0, reg_count = 0, bit_reg_count = 0;
+size_t i, buf_data, buf_needed = 1, reg_count = 0, bit_reg_count = 0;
 int cmd_stat, bits_count = 0;
 char *buf, *response = NULL;
 

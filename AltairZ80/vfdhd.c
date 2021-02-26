@@ -1,9 +1,7 @@
 /*************************************************************************
  *                                                                       *
- * $Id: vfdhd.c 1995 2008-07-15 03:59:13Z hharte $                       *
- *                                                                       *
- * Copyright (c) 2007-2008 Howard M. Harte.                              *
- * http://www.hartetec.com                                               *
+ * Copyright (c) 2007-2021 Howard M. Harte.                              *
+ * https://github.com/hharte                                             *
  *                                                                       *
  * Permission is hereby granted, free of charge, to any person obtaining *
  * a copy of this software and associated documentation files (the       *
@@ -32,10 +30,10 @@
  * SIMH Interface based on altairz80_hdsk.c, by Peter Schorn.            *
  *                                                                       *
  * Module Description:                                                   *
- *     Micropolis FDC module for SIMH                                    *
+ *     Micropolis FD/HD Controller module for SIMH                       *
  *                                                                       *
- * Environment:                                                          *
- *     User mode only                                                    *
+ * Controller Documentation:                                             *
+ * http://bitsavers.org/pdf/vectorGraphic/hardware/7200-1200-01-1_Dual-Mode_Disk_Controller_Board_Rev_2.0_Feb81.pdf
  *                                                                       *
  *************************************************************************/
 
@@ -321,28 +319,23 @@ static t_stat vfdhd_attach(UNIT *uptr, CONST char *cptr)
 /* Detach routine */
 static t_stat vfdhd_detach(UNIT *uptr)
 {
-    t_stat r;
     int8 i;
 
-    for(i = 0; i < VFDHD_MAX_DRIVES; i++) {
+    for (i = 0; i < VFDHD_MAX_DRIVES; i++) {
         if(vfdhd_dev.units[i].fileref == uptr->fileref) {
             break;
         }
     }
-    if(i == VFDHD_MAX_DRIVES) {
+    if (i == VFDHD_MAX_DRIVES) {
         return (SCPE_IERR);
     }
 
     DBG_PRINT(("Detach VFDHD%d\n", i));
-    r = diskClose(&vfdhd_info->drive[i].imd);
-    if (r != SCPE_OK)
-        return r;
+    if (uptr->u3 == IMAGE_TYPE_IMD) {
+        diskClose(&vfdhd_info->drive[i].imd);
+    }
 
-    r = detach_unit(uptr);  /* detach unit */
-    if (r != SCPE_OK)
-        return r;
-
-    return SCPE_OK;
+    return detach_unit(uptr);  /* detach unit */
 }
 
 

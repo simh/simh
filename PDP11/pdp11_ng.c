@@ -234,9 +234,9 @@ ng_set_type(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
   //if ((uptr->flags & DEV_DIS) == 0)
   //return SCPE_ALATT;
-  if (strcasecmp (cptr, "dazzle") == 0)
+  if (MATCH_CMD (cptr, "DAZZLE"))
     ng_type = TYPE_DAZZLE;
-  else if (strcasecmp (cptr, "logo") == 0)
+  else if (MATCH_CMD (cptr, "LOGO"))
     ng_type = TYPE_LOGO;
   else
     return SCPE_ARG;

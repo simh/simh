@@ -538,7 +538,7 @@ static t_stat hayes_set_dtr(UNIT *uptr, int32 flag)
 
 static int32 hayes_io(int32 addr, int32 io, int32 data)
 {
-    int32 r;
+    int32 r = 0;
 
     addr &= 0xff;
     data &= 0xff;

@@ -39,10 +39,6 @@
 #ifndef SIM_IMD_H_
 #define SIM_IMD_H_     0
 
-#if !defined(USE_SIM_IMD)
-#error This simulator must be compiled with USE_SIM_IMD defined
-#else
-
 #include "sim_defs.h"
 
 typedef struct {
@@ -136,7 +132,5 @@ extern t_stat trackWrite(DISK_INFO *myDisk,
                uint8 fillbyte,
                uint32 *flags);
 extern t_stat assignDiskType(UNIT *uptr);
-
-#endif /* USE_SIM_IMD */
 
 #endif
