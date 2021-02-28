@@ -57,7 +57,6 @@
 #define RD_DATA_DETAIL_MSG  (1 << 7)
 #define WR_DATA_DETAIL_MSG  (1 << 8)
 
-
 extern uint32 PCX;
 extern t_stat set_membase(UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 extern t_stat show_membase(FILE *st, UNIT *uptr, int32 val, CONST void *desc);
@@ -445,7 +444,7 @@ static void showdata(int32 isRead) {
     pDrive = &mdsad_info->drive[mdsad_info->orders.ds];
     sim_printf("MDSAD: " ADDRESS_FORMAT " %s Sector =\n\t", PCX, isRead ? "Read" : "Write");
     for(i=0; i < MDSAD_SECTOR_LEN; i++) {
-        sim_printf("%02X ", MDSAD_SECTOR_DATA);
+        sim_printf("%02X ", MDSAD_SECTOR_DATA[i]);
         if(((i+1) & 0xf) == 0)
             sim_printf("\n\t");
     }
@@ -504,7 +503,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
                 " WRITE-DATA[offset:%06x+%03x]=%02x\n",
                 PCX, sec_offset, mdsad_info->datacount, Addr & 0xFF));
             mdsad_info->datacount++;
-            if(mdsad_info->datacount < MDSAD_RAW_LEN)
+            if(mdsad_info->datacount < (uint32)MDSAD_RAW_LEN)
                 sdata.raw[mdsad_info->datacount] = Addr & 0xFF;
 
             if(mdsad_info->datacount == (MDSAD_RAW_LEN - 1)) {
