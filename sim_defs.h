@@ -710,6 +710,7 @@ struct REG {
 #define REG_VMIO        00400                           /* use VM data print/parse */
 #define REG_VMAD        01000                           /* use VM addr print/parse */
 #define REG_FIT         02000                           /* fit access to size */
+#define REG_DEPOSIT     04000                           /* call VM routine after update */
 #define REG_HRO         (REG_RO | REG_HIDDEN)           /* hidden, read only */
 
 #define REG_V_UF        16                              /* device specific */

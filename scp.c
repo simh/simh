@@ -451,6 +451,7 @@ void (*sim_vm_fprint_addr) (FILE *st, DEVICE *dptr, t_addr addr) = NULL;
 t_addr (*sim_vm_parse_addr) (DEVICE *dptr, CONST char *cptr, CONST char **tptr) = NULL;
 t_value (*sim_vm_pc_value) (void) = NULL;
 t_bool (*sim_vm_is_subroutine_call) (t_addr **ret_addrs) = NULL;
+void (*sim_vm_reg_update) (REG *rptr, uint32 idx, t_value prev_val, t_value new_val) = NULL;
 t_bool (*sim_vm_fprint_stopped) (FILE *st, t_stat reason) = NULL;
 const char *sim_vm_release = NULL;
 const char *sim_vm_release_message = NULL;
@@ -3148,11 +3149,13 @@ DEVICE *tdptr;
 CONST char *tptr;
 char *namebuf;
 char rangebuf[32];
+int side_effects = 0;
 
 if (dptr->registers)
     for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
         if (rptr->flags & REG_HIDDEN)
             continue;
+        side_effects += ((rptr->flags & REG_DEPOSIT) != 0);
         if (rptr->depth > 1)
             sprintf (rangebuf, "[%d:%d]", 0, rptr->depth-1);
         else
@@ -3172,8 +3175,11 @@ else {
     namebuf = (char *)calloc (max_namelen + 1, sizeof (*namebuf));
     fprintf (st, "\nThe %s device implements these registers:\n\n", dptr->name);
     for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
+        char note[2];
+
         if (rptr->flags & REG_HIDDEN)
             continue;
+        strlcpy (note, (side_effects != 0) ? ((rptr->flags & REG_DEPOSIT) ? "+" : " ") : "", sizeof (note));
         if (rptr->depth <= 1)
             sprintf (namebuf, "%*s", -((int)max_namelen), rptr->name);
         else {
@@ -3181,16 +3187,22 @@ else {
             sprintf (namebuf, "%s%*s", rptr->name, (int)(strlen(rptr->name))-((int)max_namelen), rangebuf);
             }
         if (all_unique) {
-            fprintf (st, "  %s %4d  %s\n", namebuf, rptr->width, rptr->desc ? rptr->desc : "");
+            fprintf (st, "  %s %4d %s %s\n", namebuf, rptr->width, note, rptr->desc ? rptr->desc : "");
             continue;
             }
         trptr = find_reg_glob (rptr->name, &tptr, &tdptr);
         if ((trptr == NULL) || (tdptr != dptr))
-            fprintf (st, "  %s %s %4d  %s\n", dptr->name, namebuf, rptr->width, rptr->desc ? rptr->desc : "");
+            fprintf (st, "  %s %s %4d %s %s\n", dptr->name, namebuf, rptr->width, note, rptr->desc ? rptr->desc : "");
         else
-            fprintf (st, "  %*s %s %4d  %s\n", (int)strlen(dptr->name), "", namebuf, rptr->width, rptr->desc ? rptr->desc : "");
+            fprintf (st, "  %*s %s %4d %s %s\n", (int)strlen(dptr->name), "", namebuf, rptr->width, note, rptr->desc ? rptr->desc : "");
         }
     free (namebuf);
+    if (side_effects)
+        fprintf (st, "\n  +  Deposits to %s register%s will have some additional\n"
+                       "     side effects which can be suppressed if the deposit is\n"
+                       "     done with the -Z switch specified\n", 
+                                 (side_effects == 1) ? "this" : "these", 
+                                 (side_effects == 1) ? "" : "s");
     }
 }
 
@@ -3248,12 +3260,19 @@ t_bool found = FALSE;
 t_bool deb_desc_available = FALSE;
 char buf[CBUFSIZE], header[CBUFSIZE];
 uint32 enabled_units = dptr->numunits;
-uint32 unit;
+char unit_spec[50];
+uint32 unit, found_unit = 0;
 
 sprintf (header, "\n%s device SET commands:\n\n", dptr->name);
 for (unit=0; unit < dptr->numunits; unit++)
     if (dptr->units[unit].flags & UNIT_DIS)
         --enabled_units;
+    else
+        found_unit = unit;
+if (enabled_units == 1)
+    snprintf (unit_spec, sizeof (unit_spec), "%s%u", sim_dname (dptr), found_unit);
+else
+    snprintf (unit_spec, sizeof (unit_spec), "%sn", sim_dname (dptr));
 if (dptr->modifiers) {
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
         if (!MODMASK(mptr,MTAB_VDV) && MODMASK(mptr,MTAB_VUN) && (dptr->numunits != 1))
@@ -3299,34 +3318,33 @@ if ((dptr->flags & DEV_DEBUG) || (dptr->debflags)) {
         fprintf (st,  "%-30s\tDisables specific debugging for device %s\n", buf, sim_dname (dptr));
         }
     }
-if ((dptr->modifiers) && (dptr->units) && (enabled_units != 1)) {
+if ((dptr->modifiers) && (dptr->units)) {   /* handle unit specific modifiers */
     if (dptr->units->flags & UNIT_DISABLE) {
         fprint_header (st, &found, header);
-        sprintf (buf, "set %sn ENABLE", sim_dname (dptr));
-        fprintf (st,  "%-30s\tEnables unit %sn\n", buf, sim_dname (dptr));
-        sprintf (buf, "set %sn DISABLE", sim_dname (dptr));
-        fprintf (st,  "%-30s\tDisables unit %sn\n", buf, sim_dname (dptr));
+        sprintf (buf, "set %s ENABLE", unit_spec);
+        fprintf (st,  "%-30s\tEnables unit %s\n", buf, unit_spec);
+        sprintf (buf, "set %s DISABLE", unit_spec);
+        fprintf (st,  "%-30s\tDisables unit %sn\n", buf, unit_spec);
         }
     if (((dptr->flags & DEV_DEBUG) || (dptr->debflags)) &&
         ((DEV_TYPE(dptr) == DEV_DISK) || (DEV_TYPE(dptr) == DEV_TAPE))) {
-        sprintf (buf, "set %sn DEBUG", sim_dname (dptr));
-        fprintf (st,  "%-30s\tEnables debugging for device unit %sn\n", buf, sim_dname (dptr));
-        sprintf (buf, "set %sn NODEBUG", sim_dname (dptr));
-        fprintf (st,  "%-30s\tDisables debugging for device unit %sn\n", buf, sim_dname (dptr));
+        sprintf (buf, "set %s DEBUG", unit_spec);
+        fprintf (st,  "%-30s\tEnables debugging for device unit %s\n", buf, unit_spec);
+        sprintf (buf, "set %s NODEBUG", unit_spec);
+        fprintf (st,  "%-30s\tDisables debugging for device unit %s\n", buf, unit_spec);
         if (dptr->debflags) {
             strcpy (buf, "");
-            fprintf (st, "set %sn DEBUG=", sim_dname (dptr));
+            fprintf (st, "set %s DEBUG=", unit_spec);
             for (dep = dptr->debflags; dep->name != NULL; dep++)
                 fprintf (st, "%s%s", ((dep == dptr->debflags) ? "" : ";"), dep->name);
             fprintf (st, "\n");
-            fprintf (st,  "%-30s\tEnables specific debugging for device unit %sn\n", buf, sim_dname (dptr));
-            fprintf (st, "set %sn NODEBUG=", sim_dname (dptr));
+            fprintf (st,  "%-30s\tEnables specific debugging for device unit %s\n", buf, unit_spec);
+            fprintf (st, "set %s NODEBUG=", unit_spec);
             for (dep = dptr->debflags; dep->name != NULL; dep++)
                 fprintf (st, "%s%s", ((dep == dptr->debflags) ? "" : ";"), dep->name);
             fprintf (st, "\n");
-            fprintf (st,  "%-30s\tDisables specific debugging for device unit %sn\n", buf, sim_dname (dptr));
+            fprintf (st,  "%-30s\tDisables specific debugging for device unit %s\n", buf, unit_spec);
             }
-
         }
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
         if ((!MODMASK(mptr,MTAB_VUN)) && MODMASK(mptr,MTAB_XTD))
@@ -3335,7 +3353,7 @@ if ((dptr->modifiers) && (dptr->units) && (enabled_units != 1)) {
             continue;                                           /* skip show only modifiers */
         if (mptr->mstring) {
             fprint_header (st, &found, header);
-            sprintf (buf, "set %s%s %s%s", sim_dname (dptr), (dptr->numunits > 1) ? "n" : "0", mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : (MODMASK(mptr,MTAB_VALR) ? "=val" : (MODMASK(mptr,MTAB_VALO) ? "{=val}": "")));
+            sprintf (buf, "set %s %s%s", unit_spec, mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : (MODMASK(mptr,MTAB_VALR) ? "=val" : (MODMASK(mptr,MTAB_VALO) ? "{=val}": "")));
             fprintf (st, "%-30s\t%s\n", buf, (strchr (mptr->mstring, '=')) ? ((strlen (buf) > 30) ? "" : mptr->help) : (mptr->help ? mptr->help : ""));
             if ((strchr (mptr->mstring, '=')) && (strlen (buf) > 30))
                 fprintf (st,  "%-30s\t%s\n", "", mptr->help);
@@ -3372,12 +3390,21 @@ MTAB *mptr;
 t_bool found = FALSE;
 char buf[CBUFSIZE], header[CBUFSIZE];
 uint32 enabled_units = dptr->numunits;
-uint32 unit;
+char unit_spec[50];
+uint32 unit, found_unit = 0;
 
 sprintf (header, "\n%s device SHOW commands:\n\n", dptr->name);
 for (unit=0; unit < dptr->numunits; unit++)
     if (dptr->units[unit].flags & UNIT_DIS)
         --enabled_units;
+    else
+        found_unit = unit;
+if (enabled_units == 1)
+    snprintf (unit_spec, sizeof (unit_spec), "%s%u", sim_dname (dptr), found_unit);
+else
+    snprintf (unit_spec, sizeof (unit_spec), "%sn", sim_dname (dptr));
+snprintf (unit_spec, sizeof (unit_spec), "%s%s", sim_dname (dptr), 
+                  ((enabled_units == 1) && ((dptr->units[0].flags & UNIT_DIS) == 0)) ? "0" : "n");
 if (dptr->modifiers) {
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
         if (!MODMASK(mptr,MTAB_VDV) && MODMASK(mptr,MTAB_VUN) && (dptr->numunits != 1))
@@ -3396,14 +3423,20 @@ if ((dptr->flags & DEV_DEBUG) || (dptr->debflags)) {
     sprintf (buf, "show %s DEBUG", sim_dname (dptr));
     fprintf (st, "%-30s\tDisplays debugging status for device %s\n", buf, sim_dname (dptr));
     }
-if ((dptr->modifiers) && (dptr->units) && (enabled_units != 1)) {
+if (((dptr->flags & DEV_DEBUG) || (dptr->debflags)) &&
+    ((DEV_TYPE(dptr) == DEV_DISK) || (DEV_TYPE(dptr) == DEV_TAPE))) {
+    sprintf (buf, "show %s DEBUG", unit_spec);
+    fprintf (st, "%-30s\tDisplays debugging status for device unit %s\n", buf, unit_spec);
+    }
+
+if ((dptr->modifiers) && (dptr->units)) {   /* handle unit specific modifiers */
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
         if ((!MODMASK(mptr,MTAB_VUN)) && MODMASK(mptr,MTAB_XTD))
             continue;                                           /* skip device only modifiers */
         if ((!mptr->disp) || (!mptr->pstring))
             continue;
         fprint_header (st, &found, header);
-        sprintf (buf, "show %s%s %s%s", sim_dname (dptr), (dptr->numunits > 1) ? "n" : "0", mptr->pstring, MODMASK(mptr,MTAB_SHP) ? "=arg" : "");
+        sprintf (buf, "show %s %s%s", unit_spec, mptr->pstring, MODMASK(mptr,MTAB_SHP) ? "=arg" : "");
         fprintf (st, "%-30s\t%s\n", buf, mptr->help ? mptr->help : "");
         }
     }
@@ -9420,6 +9453,11 @@ void put_rval_pcchk (REG *rptr, uint32 idx, t_value val, t_bool pc_chk)
 size_t sz;
 t_value mask;
 uint32 *ptr;
+t_value prev_val;
+
+if ((!(sim_switches & SWMASK ('Z'))) && 
+    (rptr->flags & REG_DEPOSIT) && sim_vm_reg_update)
+    prev_val = get_rval (rptr, idx);
 
 #define PUT_RVAL(sz,rp,id,v,m) \
     *(((sz *) rp->loc) + id) = \
@@ -9478,6 +9516,9 @@ else PUT_RVAL (t_uint64, rptr, idx, val, mask);
 #else
 else PUT_RVAL (uint32, rptr, idx, val, mask);
 #endif
+if ((!(sim_switches & SWMASK ('Z'))) && 
+    (rptr->flags & REG_DEPOSIT) && sim_vm_reg_update)
+    sim_vm_reg_update (rptr, idx, prev_val, val);
 }
 
 void put_rval (REG *rptr, uint32 idx, t_value val)

@@ -370,6 +370,7 @@ t_bool vid_cursor_visible;                              /* cursor visibility sta
 DEVICE *vid_dev;
 t_bool vid_key_state[SDL_NUM_SCANCODES];
 VID_DISPLAY *next;
+t_bool vid_blending;
 };
 
 SDL_Thread *vid_thread_handle = NULL;                   /* event thread handle */
@@ -447,6 +448,8 @@ if (vid_main_thread_handle == NULL) {
     }
 
 vid_beep_setup (400, 660);
+
+memset (&event, 0, sizeof (event));
 
 while (1) {
     int status = SDL_WaitEvent (&event);
@@ -623,6 +626,7 @@ vptr->vid_width = width;
 vptr->vid_height = height;
 vptr->vid_mouse_captured = FALSE;
 vptr->vid_cursor_visible = (vptr->vid_flags & SIM_VID_INPUTCAPTURED);
+vptr->vid_blending = FALSE;
 
 if (!vid_active) {
     vid_key_events.head = 0;
@@ -782,6 +786,11 @@ return SDL_MapRGB (vptr->vid_format, r, g, b);
 uint32 vid_map_rgb (uint8 r, uint8 g, uint8 b)
 {
 return vid_map_rgb_window (&vid_first, r, g, b);
+}
+
+uint32 vid_map_rgba_window (VID_DISPLAY *vptr, uint8 r, uint8 g, uint8 b, uint8 a)
+{
+return SDL_MapRGBA (vptr->vid_format, r, g, b, a);
 }
 
 static SDL_Rect *vid_dst_last;
@@ -1572,11 +1581,15 @@ vid_stretch(vptr, &vid_dst);
 sim_debug (SIM_VID_DBG_VIDEO, vptr->vid_dev, "Video Update Event: \n");
 if (sim_deb)
     fflush (sim_deb);
-if (SDL_RenderClear (vptr->vid_renderer))
-    sim_printf ("%s: Video Update Event: SDL_RenderClear error: %s\n", vid_dname(vptr->vid_dev), SDL_GetError());
-if (SDL_RenderCopy (vptr->vid_renderer, vptr->vid_texture, NULL, &vid_dst))
-    sim_printf ("%s: Video Update Event: SDL_RenderCopy error: %s\n", vid_dname(vptr->vid_dev), SDL_GetError());
-SDL_RenderPresent (vptr->vid_renderer);
+if (vptr->vid_blending)
+    SDL_RenderPresent (vptr->vid_renderer);
+else {
+    if (SDL_RenderClear (vptr->vid_renderer))
+        sim_printf ("%s: Video Update Event: SDL_RenderClear error: %s\n", vid_dname(vptr->vid_dev), SDL_GetError());
+    if (SDL_RenderCopy (vptr->vid_renderer, vptr->vid_texture, NULL, &vid_dst))
+        sim_printf ("%s: Video Update Event: SDL_RenderCopy error: %s\n", vid_dname(vptr->vid_dev), SDL_GetError());
+    SDL_RenderPresent (vptr->vid_renderer);
+    }
 }
 
 void vid_update_cursor (VID_DISPLAY *vptr, SDL_Cursor *cursor, t_bool visible)
@@ -1618,8 +1631,13 @@ if (vid_dst == vid_dst_last) {
     }
 SDL_UnlockMutex (vptr->vid_draw_mutex);
 
-if (SDL_UpdateTexture(vptr->vid_texture, vid_dst, buf, vid_dst->w*sizeof(*buf)))
-    sim_printf ("%s: vid_draw_region() - SDL_UpdateTexture error: %s\n", vid_dname(vptr->vid_dev), SDL_GetError());
+if (vptr->vid_blending) {
+    SDL_UpdateTexture(vptr->vid_texture, vid_dst, buf, vid_dst->w*sizeof(*buf));
+    SDL_RenderCopy (vptr->vid_renderer, vptr->vid_texture, vid_dst, vid_dst); 
+    }
+else
+    if (SDL_UpdateTexture(vptr->vid_texture, vid_dst, buf, vid_dst->w*sizeof(*buf)))
+        sim_printf ("%s: vid_draw_region() - SDL_UpdateTexture error: %s\n", vid_dname(vptr->vid_dev), SDL_GetError());
 
 free (vid_dst);
 free (buf);
@@ -1684,6 +1702,36 @@ memset (&vptr->vid_key_state, 0, sizeof(vptr->vid_key_state));
 
 vid_active++;
 return 1;
+}
+
+t_stat vid_set_alpha_mode (VID_DISPLAY *vptr, int mode)
+{
+SDL_BlendMode x;
+switch (mode) {
+    case SIM_ALPHA_NONE:
+        vptr->vid_blending = FALSE;
+        x = SDL_BLENDMODE_NONE;
+        break;
+    case SIM_ALPHA_BLEND:
+        vptr->vid_blending = TRUE;
+        x = SDL_BLENDMODE_BLEND;
+        break;
+    case SIM_ALPHA_ADD:
+        vptr->vid_blending = TRUE;
+        x = SDL_BLENDMODE_ADD;
+        break;
+    case SIM_ALPHA_MOD:
+        vptr->vid_blending = TRUE;
+        x = SDL_BLENDMODE_MOD;
+        break;
+    default:
+        return SCPE_ARG;
+    }
+if (SDL_SetTextureBlendMode (vptr->vid_texture, x))
+    return SCPE_IERR;
+if (SDL_SetRenderDrawBlendMode (vptr->vid_renderer, x))
+    return SCPE_IERR;
+return SCPE_OK;
 }
 
 static void vid_destroy (VID_DISPLAY *vptr)

@@ -424,7 +424,7 @@ REG cpu_reg[] = {
 MTAB cpu_mod[] = {
     { UNIT_CONH, 0, "HALT to SIMH", "SIMHALT", NULL, NULL, NULL, "Set HALT to trap to simulator" },
     { UNIT_CONH, UNIT_CONH, "HALT to console", "CONHALT", NULL, NULL, NULL, "Set HALT to trap to console ROM" },
-    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE={VMS|ULTRIX|ULTRIX-1.X|ULTRIXOLD|NETBSD|NETBSDOLD|OPENBSD|OPENBSDOLD|QUASIJARUS|32V|ELN|MDM}{:n}", &cpu_set_idle, &cpu_show_idle, NULL, "Display idle detection mode" },
+    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE{=VMS|ULTRIX|ULTRIX-1.X|ULTRIXOLD|NETBSD|NETBSDOLD|OPENBSD|OPENBSDOLD|QUASIJARUS|32V|ELN|MDM}{:n}", &cpu_set_idle, &cpu_show_idle, NULL, "Display idle detection mode" },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL, NULL,  "Disables idle detection" },
     MEM_MODIFIERS,   /* Model specific memory modifiers from vaxXXX_defs.h */
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP|MTAB_NC, 0, "HISTORY", "HISTORY",
