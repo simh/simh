@@ -3873,10 +3873,10 @@ for (nargs = 0; nargs < 10; ) {                         /* extract arguments */
 if (do_arg [0] == NULL)                                 /* need at least 1 */
     return SCPE_2FARG;
 if ((strcasecmp (do_arg[0], "<stdin>") != 0) &&
-    ((fpin = fopen (do_arg[0], "r")) == NULL)) {        /* file failed to open? */
+    ((fpin = sim_fopen (do_arg[0], "r")) == NULL)) {    /* file failed to open? */
     strlcpy (cbuf, do_arg[0], sizeof (cbuf));           /* try again with .sim extension */
     strlcat (cbuf, ".sim", sizeof (cbuf));
-    if ((fpin = fopen (cbuf, "r")) == NULL) {           /* failed a second time? */
+    if ((fpin = sim_fopen (cbuf, "r")) == NULL) {       /* failed a second time? */
         if (flag == 0)                                  /* cmd line file? */
              fprintf (stderr, "Can't open file %s\n", do_arg[0]);
         return SCPE_OPENERR;                            /* return failure */
@@ -4636,8 +4636,8 @@ if (sim_switches & SWMASK ('F')) {      /* File Compare? */
     filename2[strlen (filename2) - 1] = '\0';
 
     setenv ("_FILE_COMPARE_DIFF_OFFSET", "", 1);    /* Remove previous environment variable */
-    f1 = fopen (filename1, "rb");
-    f2 = fopen (filename2, "rb");
+    f1 = sim_fopen (filename1, "rb");
+    f2 = sim_fopen (filename2, "rb");
     free (filename1);
     free (filename2);
     if ((f1 == NULL) && (f2 == NULL))   /* Both can't open? */
@@ -4860,7 +4860,7 @@ if (Exist || (*gbuf == '"') || (*gbuf == '\'')) {       /* quoted string compari
             result = !result;
         }
     else {
-        FILE *f = fopen (gbuf, "r");
+        FILE *f = sim_fopen (gbuf, "r");
 
         if (!f) {
             if (((gbuf[0] == '"') || (gbuf[0] == '\'')) &&      /* quoted? */
@@ -4868,7 +4868,7 @@ if (Exist || (*gbuf == '"') || (*gbuf == '\'')) {       /* quoted string compari
                 char *without_quotes = sim_filepath_parts (gbuf, "f");
 
                 if (without_quotes) {
-                    f = fopen (without_quotes, "r");
+                    f = sim_fopen (without_quotes, "r");
                     free (without_quotes);
                     }
                 }
