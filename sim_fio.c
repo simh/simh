@@ -248,19 +248,90 @@ if ((0 != fstat (fileno (fp), &statb)) ||
 return TRUE;
 }
 
+static void _sim_expand_homedir (const char *file, char *dest, size_t dest_size)
+{
+if (memcmp (file, "~/", 2) != 0)
+    strlcpy (dest, file, dest_size);
+else {
+    char *cptr = getenv("HOME");
+    char *cptr2;
+
+    if (cptr == NULL) {
+        cptr = getenv("HOMEPATH");
+        cptr2 = getenv("HOMEDRIVE");
+        }
+    else
+        cptr2 = NULL;
+    if (cptr && (dest_size > strlen (cptr) + strlen (file) + 3))
+        snprintf(dest, dest_size, "%s%s%s%s", cptr2 ? cptr2 : "", cptr, strchr (cptr, '/') ? "/" : "\\", file + 2);
+    else
+        strlcpy (dest, file, dest_size);
+    while ((strchr (dest, '\\') != NULL) && ((cptr = strchr (dest, '/')) != NULL))
+        *cptr = '\\';
+    }
+}
+
+#if defined(_WIN32)
+#include <direct.h>
+#include <io.h>
+#include <fcntl.h>
+#else
+#include <unistd.h>
+#endif
+
+int sim_stat (const char *fname, struct stat *stat_str)
+{
+char namebuf[PATH_MAX + 1];
+
+_sim_expand_homedir (fname, namebuf, sizeof (namebuf));
+return stat (namebuf, stat_str);
+}
+
+int sim_chdir(const char *path)
+{
+char pathbuf[PATH_MAX + 1];
+
+_sim_expand_homedir (path, pathbuf, sizeof (pathbuf));
+return chdir (pathbuf);
+}
+
+int sim_mkdir(const char *path)
+{
+char pathbuf[PATH_MAX + 1];
+
+_sim_expand_homedir (path, pathbuf, sizeof (pathbuf));
+#if defined(_WIN32)
+return mkdir (pathbuf);
+#else
+return mkdir (pathbuf, 0777);
+#endif
+}
+
+int sim_rmdir(const char *path)
+{
+char pathbuf[PATH_MAX + 1];
+
+_sim_expand_homedir (path, pathbuf, sizeof (pathbuf));
+return rmdir (pathbuf);
+}
+
+
 /* OS-dependent routines */
 
 /* Optimized file open */
 
 FILE *sim_fopen (const char *file, const char *mode)
 {
+char namebuf[PATH_MAX + 1];
+
+_sim_expand_homedir (file, namebuf, sizeof (namebuf));
 #if defined (VMS)
-return fopen (file, mode, "ALQ=32", "DEQ=4096",
+return fopen (namebuf, mode, "ALQ=32", "DEQ=4096",
         "MBF=6", "MBC=127", "FOP=cbt,tef", "ROP=rah,wbh", "CTX=stm");
 #elif (defined (__linux) || defined (__linux__) || defined (__hpux) || defined (_AIX)) && !defined (DONT_DO_LARGEFILE)
-return fopen64 (file, mode);
+return fopen64 (namebuf, mode);
 #else
-return fopen (file, mode);
+return fopen (namebuf, mode);
 #endif
 }
 
@@ -392,7 +463,11 @@ return szMsgBuffer;
 
 t_stat sim_copyfile (const char *source_file, const char *dest_file, t_bool overwrite_existing)
 {
-if (CopyFileA (source_file, dest_file, !overwrite_existing))
+char sourcename[PATH_MAX + 1], destname[PATH_MAX + 1];
+
+_sim_expand_homedir (source_file, sourcename, sizeof (sourcename));
+_sim_expand_homedir (dest_file, destname, sizeof (destname));
+if (CopyFileA (sourcename, destname, !overwrite_existing))
     return SCPE_OK;
 return sim_messagef (SCPE_ARG, "Error Copying '%s' to '%s': %s\n", source_file, dest_file, sim_get_os_error_text (GetLastError ()));
 }
@@ -540,7 +615,7 @@ if (fOut)
 if (st == SCPE_OK) {
     struct stat statb;
 
-    if (!stat (source_file, &statb)) {
+    if (!sim_stat (source_file, &statb)) {
         struct utimbuf utim;
 
         utim.actime = statb.st_atime;
@@ -762,7 +837,9 @@ char chr;
 const char *p;
 char filesizebuf[32] = "";
 char filedatetimebuf[32] = "";
+char namebuf[PATH_MAX + 1];
 
+/* Remove quotes if they're present */
 if (((*filepath == '\'') || (*filepath == '"')) &&
     (filepath[strlen (filepath) - 1] == *filepath)) {
     size_t temp_size = 1 + strlen (filepath);
@@ -774,6 +851,12 @@ if (((*filepath == '\'') || (*filepath == '"')) &&
     tempfilepath[strlen (tempfilepath) - 1] = '\0';
     filepath = tempfilepath;
     }
+
+/* Expand ~/ home directory */
+_sim_expand_homedir (filepath, namebuf, sizeof (namebuf));
+filepath = namebuf;
+
+/* Check for full or current directory relative path */
 if ((filepath[1] == ':')  ||
     (filepath[0] == '/')  || 
     (filepath[0] == '\\')){
@@ -785,7 +868,7 @@ if ((filepath[1] == ':')  ||
             }
         strcpy (fullpath, filepath);
     }
-else {
+else {          /* Need to prepend current directory */
     char dir[PATH_MAX+1] = "";
     char *wd = sim_getcwd(dir, sizeof (dir));
 
@@ -837,7 +920,8 @@ if (ext == NULL)
 tot_size = 0;
 if (*parts == '\0')             /* empty part specifier means strip only quotes */
     tot_size = strlen (tempfilepath);
-if (strchr (parts, 't') || strchr (parts, 'z')) {
+if (strchr (parts, 't') ||      /* modification time or */
+    strchr (parts, 'z')) {      /* or size requested? */
     struct stat filestat;
     struct tm *tm;
 
@@ -919,7 +1003,7 @@ WIN32_FIND_DATAA File;
 struct stat filestat;
 char WildName[PATH_MAX + 1];
 
-strlcpy (WildName, cptr, sizeof(WildName));
+_sim_expand_homedir (cptr, WildName, sizeof (WildName));
 cptr = WildName;
 sim_trim_endspc (WildName);
 if ((hFind =  FindFirstFileA (cptr, &File)) != INVALID_HANDLE_VALUE) {
@@ -982,7 +1066,7 @@ char DirName[PATH_MAX + 1], WholeName[PATH_MAX + 1], WildName[PATH_MAX + 1], Mat
 memset (DirName, 0, sizeof(DirName));
 memset (WholeName, 0, sizeof(WholeName));
 memset (MatchName, 0, sizeof(MatchName));
-strlcpy (WildName, cptr, sizeof(WildName));
+_sim_expand_homedir (cptr, WildName, sizeof (WildName));
 cptr = WildName;
 sim_trim_endspc (WildName);
 c = sim_filepath_parts (cptr, "f");

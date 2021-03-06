@@ -233,13 +233,9 @@
 #include <time.h>
 #include <math.h>
 #if defined(_WIN32)
-#include <direct.h>
 #include <io.h>
 #include <fcntl.h>
-#else
-#include <unistd.h>
 #endif
-#include <sys/stat.h>
 #include <setjmp.h>
 
 #if defined(HAVE_DLOPEN)                                /* Dynamic Readline support */
@@ -6870,7 +6866,7 @@ GET_SWITCHES (cptr);                                    /* get switches */
 gbuf[sizeof(gbuf)-1] = '\0';
 strlcpy (gbuf, cptr, sizeof(gbuf));
 sim_trim_endspc(gbuf);
-if (chdir(gbuf) != 0)
+if (sim_chdir(gbuf) != 0)
     return sim_messagef(SCPE_IOERR, "Unable to directory change to: %s\n", gbuf);
 return SCPE_OK;
 }
@@ -6962,9 +6958,9 @@ if (*cptr == '\0')
 else {
     if ((WildName[strlen (WildName) - 1] == '/') ||
         (WildName[strlen (WildName) - 1] == '\\'))
-        WildName[strlen (WildName) - 1] = '\0';
+        strlcat (WildName, ".", sizeof (WildName));
     }
-if ((!stat (WildName, &filestat)) && (filestat.st_mode & S_IFDIR))
+if ((!sim_stat (WildName, &filestat)) && (filestat.st_mode & S_IFDIR))
     strlcat (WildName, "/*", sizeof (WildName));
 r = sim_dir_scan (cptr, sim_dir_entry, &dir_state);
 sim_dir_entry (NULL, NULL, 0, NULL, &dir_state);    /* output summary */
@@ -7129,7 +7125,7 @@ sprintf (FullPath, "%s%s", directory, filename);
 
 if ((dname[strlen (dname) - 1] == '/') || (dname[strlen (dname) - 1] == '\\'))
     dname[strlen (dname) - 1] = '\0';
-if ((!stat (dname, &deststat)) && (deststat.st_mode & S_IFDIR)) {
+if ((!sim_stat (dname, &deststat)) && (deststat.st_mode & S_IFDIR)) {
     const char *dslash = (strrchr (dname, '/') ? "/" : (strrchr (dname, '\\') ? "\\" : "/"));
 
     dname[sizeof (dname) - 1] = '\0';
@@ -7194,12 +7190,12 @@ if (path[strlen (path) - 1] == '/')     /* trim any trailing / from the path */
     path[strlen (path) - 1] = '\0';
 while ((c = strstr (path, "//")))        
     memmove (c, c + 1, strlen (c + 1) + 1); /* clean out any empty directories // */
-if ((!stat (path, &filestat)) && (filestat.st_mode & S_IFDIR))
+if ((!sim_stat (path, &filestat)) && (filestat.st_mode & S_IFDIR))
     return sim_messagef (SCPE_OK, "directory %s already exists\n", path);
 c = path;
 while ((c = strchr (c, '/'))) {
     *c = '\0';
-    if (!stat (path, &filestat)) {
+    if (!sim_stat (path, &filestat)) {
         if (filestat.st_mode & S_IFDIR) {
             *c = '/';   /* restore / */
             ++c;
@@ -7207,24 +7203,12 @@ while ((c = strchr (c, '/'))) {
             }
         return sim_messagef (SCPE_ARG, "%s is not a directory\n", path);
         }
-    if (
-#if defined(_WIN32)
-        mkdir (path)
-#else
-        mkdir (path, 0777)
-#endif
-                          )
+    if (sim_mkdir (path))
         return sim_messagef (SCPE_ARG, "Can't create directory: %s - %s\n", path, strerror (errno));
     *c = '/';   /* restore / */
     ++c;
     }
-if (
-#if defined(_WIN32)
-    mkdir (path)
-#else
-    mkdir (path, 0777)
-#endif
-                      )
+if (sim_mkdir (path))
     return sim_messagef (SCPE_ARG, "Can't create directory: %s - %s\n", path, strerror (errno));
 return SCPE_OK;
 }
@@ -7234,7 +7218,7 @@ t_stat rmdir_cmd (int32 flg, CONST char *cptr)
 GET_SWITCHES (cptr);                                    /* get switches */
 if ((!cptr) || (*cptr == '\0'))
     return sim_messagef (SCPE_2FARG, "Must specify a directory\n");
-if (rmdir (cptr))
+if (sim_rmdir (cptr))
     return sim_messagef (SCPE_ARG, "Can't remove directory: %s - %s\n", cptr, strerror (errno));
 return SCPE_OK;
 }
