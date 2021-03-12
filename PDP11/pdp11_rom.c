@@ -21,6 +21,9 @@
 */
 
 #include "pdp11_defs.h"
+#include "pdp11_m9312.h"
+
+/* Forward references */
 
 t_stat rom_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat rom_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
@@ -29,6 +32,8 @@ t_stat rom_reset (DEVICE *dptr);
 t_stat rom_boot (int32 u, DEVICE *dptr);
 t_stat rom_set_addr (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_addr (FILE *, UNIT *, int32, CONST void *);
+t_stat rom_set_type (UNIT *, int32, CONST char *, void *);
+t_stat rom_show_type (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_attach (UNIT *uptr, CONST char *cptr);
 t_stat rom_detach (UNIT *uptr);
 t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
@@ -50,6 +55,8 @@ const char *rom_description (DEVICE *dptr);
 DIB rom_dib[ROM_UNITS];
 
 MTAB rom_mod[] = {
+	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 010, "TYPE", "TYPE",
+		&rom_set_type, &rom_show_type, NULL, "Module type" },
 	{ MTAB_XTD | MTAB_VUN | MTAB_VALR, 010, "ADDRESS", "ADDRESS",
 		&rom_set_addr, &rom_show_addr, NULL, "Bus address" },
 	{ 0 }
@@ -62,7 +69,7 @@ DEVICE rom_dev =
 {
 	"ROM",								// Device name
 	rom_unit,							// Pointer to device unit structures
-	NULL,								// The M9312 board has no registers
+	NULL,								// A ROM module has no registers
 	rom_mod,							// Pointer to modifier table
 	ROM_UNITS,							// Number of units
 	8,									// Address radix
@@ -87,6 +94,46 @@ DEVICE rom_dev =
 	NULL,								// Context for help routines
 	&rom_description	                // Description routine
 };
+
+#define NUM_MODULES 1
+
+module *module_list[NUM_MODULES] =
+{
+	&m9312,
+};
+
+module *selected_module = &m9312;
+
+/* Set ROM module type */
+
+t_stat rom_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+	// Is a module type specified? 
+	if (cptr == NULL)
+		return SCPE_ARG;
+
+	// Search the module list for the specified module type
+	for (int i = 0; i < NUM_MODULES; i++)
+	{
+		if (strcasecmp (cptr, module_list[i]->name) == 0)
+		{
+			// Module type found
+			selected_module = module_list[i];
+			return SCPE_OK;
+		}
+	}
+
+	// Module type not found
+	return SCPE_ARG;
+}
+
+/* Show ROM module type */
+
+t_stat rom_show_type (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
+{
+	fprintf (f, "ROM module type %s", selected_module->name);
+	return SCPE_OK;
+}
 
 t_stat rom_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
