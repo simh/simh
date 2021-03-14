@@ -34,6 +34,11 @@
 
 #include "pdp11_defs.h"
 
+/*
+ * A socket on a ROM module provides an address space in the IOPAGE with
+ * a base address and size. In a socket a number of pre-defined ROMs can
+ * be placed.
+ */
 typedef struct
 {
 	t_addr base_address;				/* ROM code base address */
@@ -42,14 +47,36 @@ typedef struct
 }
 rom_socket;
 
-
+/*
+ * A ROM module has a name and comprises a number of sockets in which
+ * ROMs can be placed.
+ * 
+ * ToDo: num_sockets is obsolete?
+ */
 typedef struct
 {
 	const char *name;					/* Module name */
+	const int num_sockets;				/* Number of sockets for the module*/
+	t_stat (*reset)(DEVICE *dp);		/* Reset function for the module */
 	rom_socket (*socket)[];				/* Sockets for this module */
 }
 module;
 
+/*
+ * Definitions for the BLANK ROM module, i.e. a ROM module for which
+ * the sockets have no fixed base address and the image for the ROM
+ * has to be attached.
+ */
+
+#define NUM_BLANK_SOCKETS	4
+
+rom_socket blank_sockets[NUM_BLANK_SOCKETS] =
+{
+	{0, 0, (uint16 (*)[]) NULL},		// ROM 0
+	{0, 0, (uint16 (*)[]) NULL},		// ROM 1
+	{0, 0, (uint16 (*)[]) NULL},		// ROM 2
+	{0, 0, (uint16 (*)[]) NULL},		// ROM 3
+};
 
 #endif PDP11_ROM_H
 

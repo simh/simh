@@ -28,7 +28,8 @@
 t_stat rom_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat rom_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat rom_rd (int32 *data, int32 PA, int32 access);
-t_stat rom_reset (DEVICE *dptr);
+t_stat blank_rom_reset (DEVICE *dptr);
+t_stat m9312_rom_reset (DEVICE *dptr);
 t_stat rom_boot (int32 u, DEVICE *dptr);
 t_stat rom_set_addr (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_addr (FILE *, UNIT *, int32, CONST void *);
@@ -49,10 +50,11 @@ const char *rom_description (DEVICE *dptr);
 #define unit_base u3
 #define unit_end u4
 
-#define ROM_UNITS 4
-#define ROM_UNIT_FLAGS UNIT_RO|UNIT_MUSTBUF|UNIT_BUFABLE|UNIT_ATTABLE
+// Define the maximum number of units (sockets) any supported module can have
+#define MAX_ROM_UNITS 5
 
-DIB rom_dib[ROM_UNITS];
+
+DIB rom_dib[MAX_ROM_UNITS];
 
 MTAB rom_mod[] = {
 	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 010, "TYPE", "TYPE",
@@ -62,7 +64,11 @@ MTAB rom_mod[] = {
 	{ 0 }
 };
 
-UNIT rom_unit[ROM_UNITS];
+#define BLANK_UNIT_FLAGS	UNIT_RO | UNIT_MUSTBUF |UNIT_BUFABLE |UNIT_ATTABLE
+#define M9312_UNIT_FLAGS	UNIT_RO | UNIT_FIX | UNIT_MUSTBUF | UNIT_BUFABLE
+#define CONFIG_UNIT_FLAGS   (BLANK_UNIT_FLAGS | M9312_UNIT_FLAGS)
+
+UNIT rom_unit[MAX_ROM_UNITS];
 
 // Device definition
 DEVICE rom_dev =
@@ -71,7 +77,7 @@ DEVICE rom_dev =
 	rom_unit,							// Pointer to device unit structures
 	NULL,								// A ROM module has no registers
 	rom_mod,							// Pointer to modifier table
-	ROM_UNITS,							// Number of units
+	MAX_ROM_UNITS,						// Number of units
 	8,									// Address radix
 	9,									// Address width
 	2,									// Address increment
@@ -79,7 +85,7 @@ DEVICE rom_dev =
 	16,									// Data width
 	rom_ex,								// Examine routine
 	rom_dep,							// Deposit routine
-	rom_reset,							// Reset routine
+	blank_rom_reset,							// Reset routine
 	&rom_boot,							// Boot routine
 	&rom_attach,						// Attach routine
 	&rom_detach,						// Detach routine
@@ -95,14 +101,37 @@ DEVICE rom_dev =
 	&rom_description	                // Description routine
 };
 
-#define NUM_MODULES 1
+// Define the default "blank" ROM module
+module blank =
+{
+	"BLANK",
+	NUM_BLANK_SOCKETS,
+	&blank_rom_reset,
+	(rom_socket (*)[]) &blank_sockets
+};
 
+// Define the M9312 module
+module m9312 =
+{
+	"M9312",
+	NUM_M9312_SOCKETS,
+	&m9312_rom_reset,
+	(rom_socket (*)[]) &m9312_sockets
+};
+
+#define NUM_MODULES 2
+
+// The list of available ROM modules
 module *module_list[NUM_MODULES] =
 {
+	&blank,
 	&m9312,
 };
 
-module *selected_module = &m9312;
+// Define the currently selected module
+//
+// ToDo: The selected_module can be made obsolete?
+module *selected_module = &blank;
 
 /* Set ROM module type */
 
@@ -117,8 +146,11 @@ t_stat rom_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 	{
 		if (strcasecmp (cptr, module_list[i]->name) == 0)
 		{
-			// Module type found
+			// Module type found. Fill the device structure with
+			// the module-specific reset function and reset the module.
 			selected_module = module_list[i];
+			rom_dev.reset = module_list[i]->reset;
+			(*rom_dev.reset)(&rom_dev);
 			return SCPE_OK;
 		}
 	}
@@ -135,6 +167,9 @@ t_stat rom_show_type (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 	return SCPE_OK;
 }
 
+
+/* Examine routine */
+
 t_stat rom_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
 	int32 data;
@@ -147,6 +182,9 @@ t_stat rom_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 	return SCPE_OK;
 }
 
+
+/* Deposit routine */
+
 t_stat rom_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
 	uint16 *image = (uint16 *) uptr->filebuf;
@@ -155,10 +193,14 @@ t_stat rom_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 	return SCPE_OK;
 }
 
+
+/* ROM read routine */
+
 t_stat rom_rd (int32 *data, int32 PA, int32 access)
 {
-	int i;
-	for (i = 0; i < ROM_UNITS; i++) {
+	uint32 i;
+	for (i = 0; i < rom_dev.numunits; i++)
+	{
 		if (PA >= rom_unit[i].unit_base && PA < rom_unit[i].unit_end) {
 			uint16 *image = (uint16 *) rom_unit[i].filebuf;
 			*data = image[(PA - rom_unit[i].unit_base) >> 1];
@@ -168,17 +210,74 @@ t_stat rom_rd (int32 *data, int32 PA, int32 access)
 	return SCPE_NXM;
 }
 
-t_stat rom_reset (DEVICE *dptr)
+/*
+ * Reset function for the BLANK ROM module.
+ * This functions is called (several times) at simh start and
+ * when the user issues a RESET command.
+ */
+t_stat blank_rom_reset (DEVICE *dptr)
+{
+	uint32 i;
+
+	// Intialize the device context
+	dptr->ctxt = &rom_dib[0];
+	dptr->numunits = NUM_BLANK_SOCKETS;
+
+	// Initialize all ROM units
+	for (i = 0; i < NUM_BLANK_SOCKETS; i++)
+	{
+		rom_unit[i].flags = 0 | (rom_unit[i].flags & ~CONFIG_UNIT_FLAGS) | BLANK_UNIT_FLAGS;
+		rom_dib[i].next = &rom_dib[i + 1];
+	}
+	rom_dib[NUM_BLANK_SOCKETS -1].next = NULL;
+
+	// Set unit names
+	sim_set_uname (&rom_unit[0], "Socket0: ");
+	sim_set_uname (&rom_unit[1], "Socket1: ");
+	sim_set_uname (&rom_unit[2], "Socket2: ");
+	sim_set_uname (&rom_unit[3], "Socket3: ");
+
+	return SCPE_OK;
+}
+
+/*
+ * Reset function for the M9312 ROM module.
+ * This functions is called (several times) at simh start and
+ * when the user issues a RESET command.
+ */
+t_stat m9312_rom_reset (DEVICE *dptr)
 {
 	int i;
 	dptr->ctxt = &rom_dib[0];
-	for (i = 0; i < ROM_UNITS; i++) {
-		rom_unit[i].flags |= ROM_UNIT_FLAGS;
+	dptr->numunits = NUM_M9312_SOCKETS;
+
+	for (i = 0; i < NUM_M9312_SOCKETS; i++) {
+		// Initialize unit structure
+		rom_unit[i].flags = 0 | (rom_unit[i].flags & ~CONFIG_UNIT_FLAGS) | M9312_UNIT_FLAGS;
+		rom_unit[i].unit_base =  m9312_sockets[i].base_address;
+		rom_unit[i].unit_end = m9312_sockets[i].base_address +
+			m9312_sockets[i].size - 2;
+		rom_unit[i].capac = m9312_sockets[i].size;
+
+		// Initialize device information block
+		rom_dib[i].ba = m9312_sockets[i].base_address;
+		rom_dib[i].lnt = m9312_sockets[i].size;
+		rom_dib[i].rd = &rom_rd;
 		rom_dib[i].next = &rom_dib[i + 1];
+		build_ubus_tab (&rom_dev, &rom_dib[i]);
 	}
-	rom_dib[ROM_UNITS - 1].next = NULL;
+	rom_dib[NUM_M9312_SOCKETS - 1].next = NULL;
+
+	// Set unit names
+	sim_set_uname (&rom_unit[0], "Socket0: ROM size ");
+	sim_set_uname (&rom_unit[1], "Socket1: ROM size ");
+	sim_set_uname (&rom_unit[2], "Socket2: ROM size ");
+	sim_set_uname (&rom_unit[3], "Socket3: ROM size ");
+	sim_set_uname (&rom_unit[4], "Socket4: ROM size ");
 	return SCPE_OK;
 }
+
+/* Boot routine */
 
 t_stat rom_boot (int32 u, DEVICE *dptr)
 {
@@ -186,29 +285,48 @@ t_stat rom_boot (int32 u, DEVICE *dptr)
 	return SCPE_OK;
 }
 
+
+/* Set ROM base address */
+
 t_stat rom_set_addr (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 	int32 addr;
 	t_stat r;
 
+	// Check if the unit is not already attached
 	if (uptr->flags & UNIT_ATT)
 		return SCPE_ALATT;
+
+	// Check if an address is specified
 	if (cptr == NULL)
 		return SCPE_ARG;
+
+	// Convert the adress string and check if produced a valid value
 	addr = (int32) get_uint (cptr, 8, IOPAGEBASE + IOPAGEMASK, &r);
 	if (r != SCPE_OK)
 		return r;
+
+	// Check if a valid adress is specified
 	if (addr < IOPAGEBASE)
 		return sim_messagef (SCPE_ARG, "ROM must be in I/O page, at or above 0%o\n",
 		IOPAGEBASE);
+
+	// Set the base adress
 	uptr->unit_base = uptr->unit_end = addr;
 	return SCPE_OK;
 }
 
+
+/* Show ROM base address */
+
 t_stat rom_show_addr (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 {
+	// Check that we got a valid unit pointer
 	if (uptr == NULL)
 		return SCPE_IERR;
+
+	// If the unit has an address range print the range, otherwise print
+	// just the base address
 	if (uptr->unit_base != uptr->unit_end)
 		fprintf (f, "address=%o-%o", uptr->unit_base, uptr->unit_end - 1);
 	else
@@ -225,6 +343,9 @@ t_stat rom_make_dib (UNIT *uptr)
 	dib->rd = &rom_rd;
 	return build_ubus_tab (&rom_dev, dib);
 }
+
+
+/* Attach an image to a socket in the BLANK module */
 
 t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 {
@@ -264,6 +385,9 @@ t_stat rom_detach (UNIT *uptr)
 	return detach_unit (uptr);
 }
 
+
+/* Print help */
+
 t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 	fprintf (st, "ROM, Read-Only Memory\n\n");
@@ -274,6 +398,9 @@ t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cpt
 	return SCPE_OK;
 }
 
+
+/* Print attach command help */
+
 t_stat rom_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 	fprintf (st, "The ATTACH command is used to specify the contents of a ROM unit.\n");
@@ -281,6 +408,9 @@ t_stat rom_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
 	fprintf (st, "The unit ADDRESS must be set first.\n");
 	return SCPE_OK;
 }
+
+
+/* Return the ROM description */
 
 const char *rom_description (DEVICE *dptr)
 {

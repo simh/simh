@@ -500,7 +500,9 @@ rom boot_roms[] =
 	"ZZ",	(uint16 (*)[]) &rom_23_ZZZA9,
 };
 
-rom_socket m9312_sockets[] =
+#define NUM_M9312_SOCKETS	5
+
+rom_socket m9312_sockets[NUM_M9312_SOCKETS] =
 {
 	{017765000, 512, (uint16 (*)[]) & diag_roms},		// ROM 0
 	{017773000, 128, (uint16 (*)[]) & boot_roms},		// ROM 1
@@ -509,10 +511,7 @@ rom_socket m9312_sockets[] =
 	{017773600, 128, (uint16 (*)[]) & boot_roms},		// ROM 4
 };
 
-module m9312 =
-{
-	"M9312", (rom_socket (*)[]) & m9312_sockets,
-};
+
 
 #endif
 
