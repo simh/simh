@@ -458,18 +458,13 @@ uint16 rom_23_ZZZA9[64] =
 	0xEB60,0x005F,0xEB18,0x005F,0xEB40,0x005F,0xEB74,0xD5DF,	/* 000160 */
 };
 
-typedef struct
-{
-	char device_mnemonic[5];
-	uint16 (*image)[];
-} rom;
-
 rom diag_roms[] =
 {
 	"A0",  (uint16 (*)[]) &rom_23_248F1,
 	"UBI", (uint16 (*)[]) &rom_23_446F1,
 	"B0",  (uint16 (*)[]) &rom_23_616F1,
 	"MEM", (uint16 (*)[]) &rom_23_774F1,
+	"",		NULL,
 };
 
 rom boot_roms[] =
@@ -498,17 +493,18 @@ rom boot_roms[] =
 	"XE1",	(uint16 (*)[]) &rom_23_E33A9,
 	"MU",	(uint16 (*)[]) &rom_23_E39A9,
 	"ZZ",	(uint16 (*)[]) &rom_23_ZZZA9,
+	"",		NULL,
 };
 
 #define NUM_M9312_SOCKETS	5
 
 rom_socket m9312_sockets[NUM_M9312_SOCKETS] =
 {
-	{017765000, 512, (uint16 (*)[]) & diag_roms},		// ROM 0
-	{017773000, 128, (uint16 (*)[]) & boot_roms},		// ROM 1
-	{017773200, 128, (uint16 (*)[]) & boot_roms},		// ROM 2
-	{017773400, 128, (uint16 (*)[]) & boot_roms},		// ROM 3
-	{017773600, 128, (uint16 (*)[]) & boot_roms},		// ROM 4
+	{017765000, 512, (rom (*)[]) &diag_roms},		// ROM 0
+	{017773000, 128, (rom (*)[]) &boot_roms},		// ROM 1
+	{017773200, 128, (rom (*)[]) &boot_roms},		// ROM 2
+	{017773400, 128, (rom (*)[]) &boot_roms},		// ROM 3
+	{017773600, 128, (rom (*)[]) &boot_roms},		// ROM 4
 };
 
 

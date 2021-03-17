@@ -33,8 +33,10 @@ t_stat m9312_rom_reset (DEVICE *dptr);
 t_stat rom_boot (int32 u, DEVICE *dptr);
 t_stat rom_set_addr (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_addr (FILE *, UNIT *, int32, CONST void *);
-t_stat rom_set_type (UNIT *, int32, CONST char *, void *);
-t_stat rom_show_type (FILE *, UNIT *, int32, CONST void *);
+t_stat rom_set_module (UNIT *, int32, CONST char *, void *);
+t_stat rom_show_module (FILE *, UNIT *, int32, CONST void *);
+t_stat rom_set_function (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat rom_show_function (FILE *f, UNIT *uptr, int32 val, CONST void *desc);
 t_stat rom_attach (UNIT *uptr, CONST char *cptr);
 t_stat rom_detach (UNIT *uptr);
 t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
@@ -62,10 +64,12 @@ DIB blank_rom_dib[NUM_BLANK_SOCKETS];
 DIB m9312_rom_dib[NUM_M9312_SOCKETS];
 
 MTAB rom_mod[] = {
-	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 010, "TYPE", "TYPE",
-		&rom_set_type, &rom_show_type, NULL, "Module type" },
+	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 010, "MODULE", "MODULE",
+		&rom_set_module, &rom_show_module, NULL, "Module type" },
 	{ MTAB_XTD | MTAB_VUN | MTAB_VALR, 010, "ADDRESS", "ADDRESS",
 		&rom_set_addr, &rom_show_addr, NULL, "Bus address" },
+	{ MTAB_XTD | MTAB_VUN | MTAB_VALR, 010, "FUNCTION", "FUNCTION",
+		&rom_set_function, &rom_show_function, NULL, "ROM Function" },
 	{ 0 }
 };
 
@@ -112,8 +116,8 @@ module blank =
 {
 	"BLANK",							// Module name
 	NUM_BLANK_SOCKETS,					// Number of sockets (units)
-	&blank_rom_unit,					// Pointer to UNIT structs
-	&blank_rom_dib,						// Pointer to DIB structs
+	(UNIT (*)[]) &blank_rom_unit,		// Pointer to UNIT structs
+	(DIB (*)[]) &blank_rom_dib,			// Pointer to DIB structs
 	&blank_rom_reset,					// Pointer to reset function
 	(rom_socket (*)[]) &blank_sockets	// Pointer to rom_socket structs
 };
@@ -123,8 +127,8 @@ module m9312 =
 {
 	"M9312",							// Module name
 	NUM_M9312_SOCKETS,					// Number of sockets (units)
-	&m9312_rom_unit,					// Pointer to UNIT structs
-	&m9312_rom_dib,						// Pointer to DIB structs
+	(UNIT (*)[])  &m9312_rom_unit,		// Pointer to UNIT structs
+	(DIB (*)[]) &m9312_rom_dib,			// Pointer to DIB structs
 	&m9312_rom_reset,					// Pointer to reset function
 	(rom_socket (*)[]) &m9312_sockets	// Pointer to rom_socket structs
 };
@@ -145,7 +149,7 @@ module *selected_module = &blank;
 
 /* Set ROM module type */
 
-t_stat rom_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+t_stat rom_set_module (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 	// Is a module type specified? 
 	if (cptr == NULL)
@@ -160,7 +164,7 @@ t_stat rom_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 			// the module-specific data and reset the module.
 			selected_module = module_list[i];
 			rom_dev.numunits = module_list[i]->num_sockets;
-			rom_dev.units = module_list[i]->units;
+			rom_dev.units = (UNIT*) module_list[i]->units;
 			rom_dev.ctxt = module_list[i]->dibs;
 			rom_dev.reset = module_list[i]->reset;
 			(*rom_dev.reset)(&rom_dev);
@@ -174,7 +178,7 @@ t_stat rom_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 
 /* Show ROM module type */
 
-t_stat rom_show_type (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
+t_stat rom_show_module (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 {
 	fprintf (f, "ROM module type %s", selected_module->name);
 	return SCPE_OK;
@@ -212,14 +216,19 @@ t_stat rom_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 t_stat rom_rd (int32 *data, int32 PA, int32 access)
 {
 	uint32 i;
-	for (i = 0; i < rom_dev.numunits; i++)
+	UNIT *uptr;
+
+	for (i = 0, uptr = rom_dev.units; i < rom_dev.numunits; i++, uptr++)
 	{
-		if (PA >= blank_rom_unit[i].unit_base && PA < blank_rom_unit[i].unit_end) {
-			uint16 *image = (uint16 *) blank_rom_unit[i].filebuf;
-			*data = image[(PA - blank_rom_unit[i].unit_base) >> 1];
+		// if (PA >= blank_rom_unit[i].unit_base && PA < blank_rom_unit[i].unit_end)
+		if (PA >= uptr->unit_base && PA <= uptr->unit_end)
+		{
+			uint16 *image = (uint16 *) uptr->filebuf;
+			*data = image[(PA - uptr->unit_base) >> 1];
 			return SCPE_OK;
 		}
 	}
+
 	return SCPE_NXM;
 }
 
@@ -270,18 +279,8 @@ t_stat m9312_rom_reset (DEVICE *dptr)
 	for (i = 0; i < NUM_M9312_SOCKETS; i++)
 	{
 		// Initialize unit structure
-		m9312_rom_unit[i].flags = 0 | (m9312_rom_unit[i].flags & ~CONFIG_UNIT_FLAGS) | M9312_UNIT_FLAGS;
-		m9312_rom_unit[i].unit_base =  m9312_sockets[i].base_address;
-		m9312_rom_unit[i].unit_end = m9312_sockets[i].base_address +
-			m9312_sockets[i].size - 2;
-		m9312_rom_unit[i].capac = m9312_sockets[i].size;
-
-		// Initialize device information block
-		m9312_rom_dib[i].ba = m9312_sockets[i].base_address;
-		m9312_rom_dib[i].lnt = m9312_sockets[i].size;
-		m9312_rom_dib[i].rd = &rom_rd;
+		m9312_rom_unit[i].flags |= M9312_UNIT_FLAGS;
 		m9312_rom_dib[i].next = &m9312_rom_dib[i + 1];
-		build_ubus_tab (&rom_dev, &m9312_rom_dib[i]);
 	}
 	m9312_rom_dib[NUM_M9312_SOCKETS - 1].next = NULL;
 
@@ -359,6 +358,9 @@ t_stat rom_show_addr (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 	return SCPE_OK;
 }
 
+
+/* Fill the DIB for the specified unit */
+
 t_stat rom_make_dib (UNIT *uptr)
 {
 	DIB *dib = &blank_rom_dib[uptr - blank_rom_unit];
@@ -367,6 +369,53 @@ t_stat rom_make_dib (UNIT *uptr)
 	dib->lnt = uptr->capac;
 	dib->rd = &rom_rd;
 	return build_ubus_tab (&rom_dev, dib);
+}
+
+
+/* Set M9312 ROM function */
+
+t_stat rom_set_function (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+	int unit_number = uptr - m9312_rom_unit;
+
+	// Is the FUNCTION modifier supported on this module type? 
+	// ToDo: Find better way to discriminate module type
+	if (uptr->flags & UNIT_ATTABLE)
+		return SCPE_NOFNC;
+
+	// Is function specified? 
+	if (cptr == NULL)
+		return SCPE_ARG;
+
+	// Search the rom table for the specified function
+	for (rom *romptr = (rom *) m9312_sockets[unit_number].rom_list;
+			romptr->image != NULL; romptr++)
+	{
+		if (strcasecmp (cptr, romptr->device_mnemonic) == 0)
+		{
+			// Set the adresses and capacity for the specified unit
+			uptr->filebuf = romptr->image;
+			uptr->unit_base = m9312_sockets[unit_number].base_address;
+			uptr->unit_end = m9312_sockets[unit_number].base_address +
+				m9312_sockets[unit_number].size - 2;
+			uptr->capac = m9312_sockets[unit_number].size;
+			// strncpy (unit_use[val], diag_roms[i].device_mnemonic, sizeof (unit_use[val]));
+
+			// Fill the DIB for this unit
+			rom_make_dib (uptr);
+			return SCPE_OK;
+		}
+	}
+
+	// Mnemonic not found
+	return SCPE_ARG;
+}
+
+/* Show M9312 ROM function */
+
+t_stat rom_show_function (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
+{
+
 }
 
 

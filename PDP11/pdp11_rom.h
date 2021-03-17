@@ -34,6 +34,18 @@
 
 #include "pdp11_defs.h"
 
+
+/*
+ * The rom structure contains the image for the rom plus an
+ * identifying device mnemonic.
+ */
+typedef struct
+{
+	char device_mnemonic[5];
+	uint16 (*image)[];
+}
+rom;
+
 /*
  * A socket on a ROM module provides an address space in the IOPAGE with
  * a base address and size. In a socket a number of pre-defined ROMs can
@@ -43,7 +55,7 @@ typedef struct
 {
 	t_addr base_address;				/* ROM code base address */
 	int16 size;							/* Address space size */
-	uint16 (*rom_list)[];				/* ROMs available for this socket */
+	rom (*rom_list)[];					/* ROMs available for this socket */
 }
 rom_socket;
 
@@ -57,8 +69,8 @@ typedef struct
 {
 	const char *name;					/* Module name */
 	const int num_sockets;				/* Number of sockets for the module*/
-	UNIT *units;						/* Pointer to UNIT structures for the module */
-	DIB *dibs;							/* Pointer to DIB structures for the module */
+	UNIT (*units)[];					/* Pointer to UNIT structures for the module */
+	DIB  (*dibs)[];						/* Pointer to DIB structures for the module */
 	t_stat (*reset)(DEVICE *dp);		/* Reset function for the module */
 	rom_socket (*socket)[];				/* Sockets for this module */
 }
@@ -74,10 +86,10 @@ module;
 
 rom_socket blank_sockets[NUM_BLANK_SOCKETS] =
 {
-	{0, 0, (uint16 (*)[]) NULL},		// ROM 0
-	{0, 0, (uint16 (*)[]) NULL},		// ROM 1
-	{0, 0, (uint16 (*)[]) NULL},		// ROM 2
-	{0, 0, (uint16 (*)[]) NULL},		// ROM 3
+	{0, 0, (rom (*)[]) NULL},		// ROM 0
+	{0, 0, (rom (*)[]) NULL},		// ROM 1
+	{0, 0, (rom (*)[]) NULL},		// ROM 2
+	{0, 0, (rom (*)[]) NULL},		// ROM 3
 };
 
 #endif PDP11_ROM_H
