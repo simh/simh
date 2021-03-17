@@ -75,7 +75,7 @@ MTAB rom_mod[] = {
 	{ 0 }
 };
 
-#define BLANK_UNIT_FLAGS	UNIT_RO | UNIT_MUSTBUF |UNIT_BUFABLE |UNIT_ATTABLE
+#define BLANK_UNIT_FLAGS	UNIT_RO | UNIT_MUSTBUF |UNIT_BUFABLE | UNIT_ATTABLE
 #define M9312_UNIT_FLAGS	UNIT_RO | UNIT_FIX | UNIT_MUSTBUF | UNIT_BUFABLE
 #define CONFIG_UNIT_FLAGS   (BLANK_UNIT_FLAGS | M9312_UNIT_FLAGS)
 
@@ -382,7 +382,6 @@ t_stat rom_make_dib (UNIT *uptr)
 
 t_stat rom_set_function (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-	t_stat result;
 	int unit_number = uptr - m9312_rom_unit;
 
 	// Is the FUNCTION modifier supported on this module type? 
@@ -432,12 +431,16 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 	t_stat r;
 
 	// Check the unit is attachable
+	if (!(uptr->flags & UNIT_ATT))
+	return SCPE_NOATT;
+
+	// Check the unit is attached
 	if (uptr->flags & UNIT_ATT)
 		return SCPE_ALATT;
 
 	// Check the ROM base address is set
 	if (uptr->unit_base == 0)
-		return sim_messagef (SCPE_ARG, "Set address first.\n");
+		return sim_messagef (SCPE_ARG, "Set address first\n");
 
 	// Set quiet mode
 	// ToDo: Find out use of this switch
