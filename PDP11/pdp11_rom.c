@@ -57,8 +57,10 @@ const char *rom_description (DEVICE *dptr);
  * pointers are set to UNITs and DIBs of the specified module type.
  */
 
-#define unit_base u3
-#define unit_end u4
+/* Use some device specific fields in the UNIT structure */
+#define unit_base u3		/* Base adress of the ROM unit */
+#define unit_end  u4		/* End adress of the ROM unit */
+#define dib_ptr   up7		/* Pointer to the DIB for this unit */
 
 DIB blank_rom_dib[NUM_BLANK_SOCKETS];
 DIB m9312_rom_dib[NUM_M9312_SOCKETS];
@@ -246,11 +248,12 @@ t_stat blank_rom_reset (DEVICE *dptr)
 	dptr->ctxt = &blank_rom_dib[0];
 	dptr->numunits = NUM_BLANK_SOCKETS;
 
-	// Initialize all ROM units
+	// Initialize all the BLANK ROM UNIT and DIB structs for all units
 	for (i = 0; i < NUM_BLANK_SOCKETS; i++)
 	{
 		// blank_rom_unit[i].flags = 0 | (blank_rom_unit[i].flags & ~CONFIG_UNIT_FLAGS) | BLANK_UNIT_FLAGS;
 		blank_rom_unit[i].flags |= BLANK_UNIT_FLAGS;
+		blank_rom_unit[i].dib_ptr = &blank_rom_dib[i];
 		blank_rom_dib[i].next = &blank_rom_dib[i + 1];
 	}
 	blank_rom_dib[NUM_BLANK_SOCKETS -1].next = NULL;
@@ -276,10 +279,12 @@ t_stat m9312_rom_reset (DEVICE *dptr)
 	dptr->ctxt = &m9312_rom_dib[0];
 	dptr->numunits = NUM_M9312_SOCKETS;
 
+	// Initialize all the M9312 ROM UNIT and DIB structs for all units
 	for (i = 0; i < NUM_M9312_SOCKETS; i++)
 	{
 		// Initialize unit structure
 		m9312_rom_unit[i].flags |= M9312_UNIT_FLAGS;
+		m9312_rom_unit[i].dib_ptr = &m9312_rom_dib[i];
 		m9312_rom_dib[i].next = &m9312_rom_dib[i + 1];
 	}
 	m9312_rom_dib[NUM_M9312_SOCKETS - 1].next = NULL;
@@ -363,7 +368,8 @@ t_stat rom_show_addr (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 
 t_stat rom_make_dib (UNIT *uptr)
 {
-	DIB *dib = &blank_rom_dib[uptr - blank_rom_unit];
+	//DIB *dib = &blank_rom_dib[uptr - blank_rom_unit];
+	DIB *dib = uptr->dib_ptr;
 
 	dib->ba = uptr->unit_base;
 	dib->lnt = uptr->capac;
