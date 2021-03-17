@@ -382,6 +382,7 @@ t_stat rom_make_dib (UNIT *uptr)
 
 t_stat rom_set_function (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
+	t_stat result;
 	int unit_number = uptr - m9312_rom_unit;
 
 	// Is the FUNCTION modifier supported on this module type? 
@@ -408,8 +409,7 @@ t_stat rom_set_function (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 			// strncpy (unit_use[val], diag_roms[i].device_mnemonic, sizeof (unit_use[val]));
 
 			// Fill the DIB for this unit
-			rom_make_dib (uptr);
-			return SCPE_OK;
+			return rom_make_dib (uptr);
 		}
 	}
 
@@ -431,20 +431,34 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 {
 	t_stat r;
 
+	// Check the unit is attachable
 	if (uptr->flags & UNIT_ATT)
 		return SCPE_ALATT;
+
+	// Check the ROM base address is set
 	if (uptr->unit_base == 0)
 		return sim_messagef (SCPE_ARG, "Set address first.\n");
+
+	// Set quiet mode
+	// ToDo: Find out use of this switch
 	sim_switches |= SWMASK ('Q');
+
+	// Check and set unit capacity
 	uptr->capac = sim_fsize_name (cptr);
 	if (uptr->capac == 0)
 		return SCPE_OPENERR;
+
+	// Attach unit and check the result
 	r = attach_unit (uptr, cptr);
 	if (r != SCPE_OK)
 		return r;
+
+	// Fill the DIB for the unit
 	r = rom_make_dib (uptr);
 	if (r != SCPE_OK)
 		return rom_detach (uptr);
+
+	// Set end adress 
 	uptr->unit_end = uptr->unit_base + uptr->capac;
 	return SCPE_OK;
 }
