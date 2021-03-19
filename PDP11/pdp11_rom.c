@@ -61,6 +61,7 @@ const char *rom_description (DEVICE *dptr);
 #define unit_base u3		/* Base adress of the ROM unit */
 #define unit_end  u4		/* End adress of the ROM unit */
 #define dib_ptr   up7		/* Pointer to the DIB for this unit */
+#define usage	  up8		/* Function usage of the unit */
 
 DIB blank_rom_dib[NUM_BLANK_SOCKETS];
 DIB m9312_rom_dib[NUM_M9312_SOCKETS];
@@ -75,7 +76,7 @@ MTAB rom_mod[] = {
 	{ 0 }
 };
 
-#define BLANK_UNIT_FLAGS	UNIT_RO | UNIT_MUSTBUF |UNIT_BUFABLE | UNIT_ATTABLE
+#define BLANK_UNIT_FLAGS	UNIT_RO | UNIT_MUSTBUF | UNIT_BUFABLE | UNIT_ATTABLE
 #define M9312_UNIT_FLAGS	UNIT_RO | UNIT_FIX | UNIT_MUSTBUF | UNIT_BUFABLE
 #define CONFIG_UNIT_FLAGS   (BLANK_UNIT_FLAGS | M9312_UNIT_FLAGS)
 
@@ -235,6 +236,20 @@ t_stat rom_rd (int32 *data, int32 PA, int32 access)
 }
 
 /*
+ * Set name of the specified ROM unit. For units of fixed size, show_unit()
+ * displays the unit's capacity after the unit's name.
+ */
+rom_set_unit_name (UNIT *uptr, int unit_number)
+{
+	int needed_size = snprintf (NULL, 0, (uptr->flags & UNIT_FIX) ? "ROM%d: size=" : "ROM%d: ", unit_number);
+	char *buffer = malloc (needed_size);
+	if (buffer != NULL) {
+		sprintf (buffer, (uptr->flags & UNIT_FIX) ? "ROM%d: size=" : "ROM%d: ", unit_number);
+		uptr->uname = buffer;
+	}
+}
+
+/*
  * Reset function for the BLANK ROM module.
  * This functions is called (several times) at simh start and
  * when the user issues a RESET command.
@@ -255,17 +270,13 @@ t_stat blank_rom_reset (DEVICE *dptr)
 		blank_rom_unit[i].flags |= BLANK_UNIT_FLAGS;
 		blank_rom_unit[i].dib_ptr = &blank_rom_dib[i];
 		blank_rom_dib[i].next = &blank_rom_dib[i + 1];
+
+		rom_set_unit_name (&blank_rom_unit[i], i);
 	}
 	blank_rom_dib[NUM_BLANK_SOCKETS -1].next = NULL;
-
-	// Set unit names
-	sim_set_uname (&blank_rom_unit[0], "Socket0: ");
-	sim_set_uname (&blank_rom_unit[1], "Socket1: ");
-	sim_set_uname (&blank_rom_unit[2], "Socket2: ");
-	sim_set_uname (&blank_rom_unit[3], "Socket3: ");
-
 	return SCPE_OK;
 }
+
 
 /*
  * Reset function for the M9312 ROM module.
@@ -286,16 +297,10 @@ t_stat m9312_rom_reset (DEVICE *dptr)
 		m9312_rom_unit[i].flags |= M9312_UNIT_FLAGS;
 		m9312_rom_unit[i].dib_ptr = &m9312_rom_dib[i];
 		m9312_rom_dib[i].next = &m9312_rom_dib[i + 1];
+
+		rom_set_unit_name (&m9312_rom_unit[i], i);
 	}
 	m9312_rom_dib[NUM_M9312_SOCKETS - 1].next = NULL;
-
-	// Set unit names. As the M9312 units are of fixed size, show_unit()
-	// displays the unit's capacity.
-	sim_set_uname (&m9312_rom_unit[0], "Socket0: ROM size ");
-	sim_set_uname (&m9312_rom_unit[1], "Socket1: ROM size ");
-	sim_set_uname (&m9312_rom_unit[2], "Socket2: ROM size ");
-	sim_set_uname (&m9312_rom_unit[3], "Socket3: ROM size ");
-	sim_set_uname (&m9312_rom_unit[4], "Socket4: ROM size ");
 	return SCPE_OK;
 }
 
@@ -399,13 +404,13 @@ t_stat rom_set_function (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 	{
 		if (strcasecmp (cptr, romptr->device_mnemonic) == 0)
 		{
-			// Set the adresses and capacity for the specified unit
+			// Set usage, image, adresses and capacity for the specified unit
+			uptr->usage = romptr->device_mnemonic;
 			uptr->filebuf = romptr->image;
 			uptr->unit_base = m9312_sockets[unit_number].base_address;
 			uptr->unit_end = m9312_sockets[unit_number].base_address +
 				m9312_sockets[unit_number].size - 2;
 			uptr->capac = m9312_sockets[unit_number].size;
-			// strncpy (unit_use[val], diag_roms[i].device_mnemonic, sizeof (unit_use[val]));
 
 			// Fill the DIB for this unit
 			return rom_make_dib (uptr);
@@ -420,7 +425,14 @@ t_stat rom_set_function (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 
 t_stat rom_show_function (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 {
+	if (uptr == NULL)
+		return SCPE_IERR;
 
+	if (uptr->flags & UNIT_ATTABLE)
+		fprintf (f, "function not supported");
+	else 
+		fprintf (f, "function=%s", (uptr->usage)? uptr->usage : "none");
+	return SCPE_OK;
 }
 
 
@@ -431,7 +443,7 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 	t_stat r;
 
 	// Check the unit is attachable
-	if (!(uptr->flags & UNIT_ATT))
+	if (!(uptr->flags & UNIT_ATTABLE))
 	return SCPE_NOATT;
 
 	// Check the unit is attached
