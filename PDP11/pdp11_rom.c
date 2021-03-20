@@ -487,10 +487,20 @@ t_stat rom_detach (UNIT *uptr)
 t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 	fprintf (st, "ROM, Read-Only Memory\n\n");
-	fprintf (st, "The ROM device can be used to add ROM modules to the I/O page.\n");
-	fprintf (st, "First the ROM unit ADDRESS has to be set, and then the ATTACH command\n");
-	fprintf (st, "can be used to fill the ROM with contents.  The BOOT command is supported\n");
-	fprintf (st, "for starting from the ROM.\n");
+	fprintf (st, "The ROM device can be used to add ROM modules to the I/O page. Two module\n");
+	fprintf (st, "types are available, the BLANK and the M9312 module. The contents\n");
+	fprintf (st, "of the BLANK ROM module have to specified by setting the ROM's base address\n");
+	fprintf (st, "and ROM image. The contents of the M9312 ROM's are built in and can be set\n");
+	fprintf (st, "by specifying its function.\n\n");
+	fprintf (st, "For the BLANK module first the ROM unit ADDRESS has to be set, and then\n");
+	fprintf (st, "the ATTACH command can be used to fill the ROM with contents.\n\n");
+	fprintf (st, "The M9312 has five ROM sockets available, ROM0 is used for a Diagnostics/Console Emulator ROM,\n");
+	fprintf (st, "ROMs 1-4 are used for boot ROMs for specific devices. The function of the ROMs\n");
+	fprintf (st, "is specified by means of the FUNCTION modifier. The command 'SET ROM0 FUNCTION=B0'\n");
+	fprintf (st, "for example, puts the ROM B0 in socket 0.\n\n");
+	fprintf (st, "Available ROMs for socket 0 are A0, B0, UBI and MEM, available ROMs for\n");
+	fprintf (st, "sockets 1-4 are identified by their device mnemonic.\n");
+	fprintf (st, "The BOOT command is supported for starting from the ROM.\n");
 	return SCPE_OK;
 }
 
@@ -499,8 +509,8 @@ t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cpt
 
 t_stat rom_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
-	fprintf (st, "The ATTACH command is used to specify the contents of a ROM unit.\n");
-	fprintf (st, "Any file can be used.  The file contents must be a flat binary image.\n");
+	fprintf (st, "The ATTACH command is only available for the BLANK ROM module and is used to specify\n");
+	fprintf (st, "the contents of a ROM unit. The file contents must be a flat binary image.\n");
 	fprintf (st, "The unit ADDRESS must be set first.\n");
 	return SCPE_OK;
 }
