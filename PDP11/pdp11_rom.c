@@ -57,6 +57,13 @@ const char *rom_description (DEVICE *dptr);
  * pointers are set to UNITs and DIBs of the specified module type.
  */
 
+#define BLANK_UNIT_FLAGS	UNIT_RO | UNIT_MUSTBUF | UNIT_BUFABLE | UNIT_ATTABLE
+#define M9312_UNIT_FLAGS	UNIT_RO | UNIT_FIX | UNIT_MUSTBUF | UNIT_BUFABLE
+#define CONFIG_UNIT_FLAGS   (BLANK_UNIT_FLAGS | M9312_UNIT_FLAGS)
+
+UNIT blank_rom_unit[NUM_BLANK_SOCKETS];
+UNIT m9312_rom_unit[NUM_M9312_SOCKETS];
+
 /* Use some device specific fields in the UNIT structure */
 #define unit_base u3		/* Base adress of the ROM unit */
 #define unit_end  u4		/* End adress of the ROM unit */
@@ -66,53 +73,6 @@ const char *rom_description (DEVICE *dptr);
 DIB blank_rom_dib[NUM_BLANK_SOCKETS];
 DIB m9312_rom_dib[NUM_M9312_SOCKETS];
 
-MTAB rom_mod[] = {
-	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 010, "MODULE", "MODULE",
-		&rom_set_module, &rom_show_module, NULL, "Module type" },
-	{ MTAB_XTD | MTAB_VUN | MTAB_VALR, 010, "ADDRESS", "ADDRESS",
-		&rom_set_addr, &rom_show_addr, NULL, "Bus address" },
-	{ MTAB_XTD | MTAB_VUN | MTAB_VALR, 010, "FUNCTION", "FUNCTION",
-		&rom_set_function, &rom_show_function, NULL, "ROM Function" },
-	{ 0 }
-};
-
-#define BLANK_UNIT_FLAGS	UNIT_RO | UNIT_MUSTBUF | UNIT_BUFABLE | UNIT_ATTABLE
-#define M9312_UNIT_FLAGS	UNIT_RO | UNIT_FIX | UNIT_MUSTBUF | UNIT_BUFABLE
-#define CONFIG_UNIT_FLAGS   (BLANK_UNIT_FLAGS | M9312_UNIT_FLAGS)
-
-UNIT blank_rom_unit[NUM_BLANK_SOCKETS];
-UNIT m9312_rom_unit[NUM_M9312_SOCKETS];
-
-// Device definition
-DEVICE rom_dev =
-{
-	"ROM",								// Device name
-	blank_rom_unit,						// Pointer to device unit structures
-	NULL,								// A ROM module has no registers
-	rom_mod,							// Pointer to modifier table
-	NUM_BLANK_SOCKETS,					// Number of units
-	8,									// Address radix
-	9,									// Address width
-	2,									// Address increment
-	8,									// Data radix
-	16,									// Data width
-	rom_ex,								// Examine routine
-	rom_dep,							// Deposit routine
-	blank_rom_reset,					// Reset routine
-	&rom_boot,							// Boot routine
-	&rom_attach,						// Attach routine
-	&rom_detach,						// Detach routine
-	&blank_rom_dib[0],					// Pointer to device information blocks
-	DEV_DISABLE | DEV_UBUS | DEV_QBUS,	// Flags
-	0,									// Debug control
-	NULL,								// Debug flags
-	NULL,								// Memory size routine
-	NULL,								// Logical name
-	&rom_help,							// Help routine
-	&rom_help_attach,					// Help attach routine
-	NULL,								// Context for help routines
-	&rom_description	                // Description routine
-};
 
 // Define the default "blank" ROM module
 module blank =
@@ -145,10 +105,55 @@ module *module_list[NUM_MODULES] =
 	&m9312,
 };
 
-// Define the currently selected module
-//
-// ToDo: The selected_module can be made obsolete?
-module *selected_module = &blank;
+/*
+ * Define the ROM device and units modifiers.
+ * The modifier indicated by MODULE_MODIFIER must be the MODULE
+ *  modifier as the description field of that modifier is dynamically 
+ * set to the selected module.
+ */
+#define MODULE_MODIFIER		0
+
+MTAB rom_mod[] = {
+	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 010, "MODULE", "MODULE",
+		&rom_set_module, &rom_show_module, (void *) &blank, "Module type" },
+	{ MTAB_XTD | MTAB_VUN | MTAB_VALR, 010, "ADDRESS", "ADDRESS",
+		&rom_set_addr, &rom_show_addr, NULL, "Bus address" },
+	{ MTAB_XTD | MTAB_VUN | MTAB_VALR, 010, "FUNCTION", "FUNCTION",
+		&rom_set_function, &rom_show_function, NULL, "ROM Function" },
+	{ 0 }
+};
+
+// Device definition
+DEVICE rom_dev =
+{
+	"ROM",								// Device name
+	blank_rom_unit,						// Pointer to device unit structures
+	NULL,								// A ROM module has no registers
+	rom_mod,							// Pointer to modifier table
+	NUM_BLANK_SOCKETS,					// Number of units
+	8,									// Address radix
+	9,									// Address width
+	2,									// Address increment
+	8,									// Data radix
+	16,									// Data width
+	rom_ex,								// Examine routine
+	rom_dep,							// Deposit routine
+	blank_rom_reset,					// Reset routine
+	&rom_boot,							// Boot routine
+	&rom_attach,						// Attach routine
+	&rom_detach,						// Detach routine
+	&blank_rom_dib[0],					// Pointer to device information blocks
+	DEV_DISABLE | DEV_UBUS | DEV_QBUS,	// Flags
+	0,									// Debug control
+	NULL,								// Debug flags
+	NULL,								// Memory size routine
+	NULL,								// Logical name
+	&rom_help,							// Help routine
+	&rom_help_attach,					// Help attach routine
+	NULL,								// Context for help routines
+	&rom_description	                // Description routine
+};
+
 
 /* Set ROM module type */
 
@@ -163,13 +168,17 @@ t_stat rom_set_module (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 	{
 		if (strcasecmp (cptr, module_list[i]->name) == 0)
 		{
-			// Module type found. Fill the device structure with
-			// the module-specific data and reset the module.
-			selected_module = module_list[i];
+			// Module type found. Set the modifier description 
+			// field to the selected modifier
+			rom_mod[MODULE_MODIFIER].desc = module_list[i];
+
+			// Fill the device structure with the module-specific data
 			rom_dev.numunits = module_list[i]->num_sockets;
 			rom_dev.units = (UNIT*) module_list[i]->units;
 			rom_dev.ctxt = module_list[i]->dibs;
 			rom_dev.reset = module_list[i]->reset;
+
+			// Reset the device
 			(*rom_dev.reset)(&rom_dev);
 			return SCPE_OK;
 		}
@@ -183,7 +192,7 @@ t_stat rom_set_module (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 
 t_stat rom_show_module (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 {
-	fprintf (f, "ROM module type %s", selected_module->name);
+	fprintf (f, "module type %s", ((module*) desc)->name);
 	return SCPE_OK;
 }
 
