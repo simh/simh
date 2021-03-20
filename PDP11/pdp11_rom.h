@@ -71,7 +71,7 @@ typedef struct
 	const int num_sockets;				/* Number of sockets for the module*/
 	UNIT (*units)[];					/* Pointer to UNIT structures for the module */
 	DIB  (*dibs)[];						/* Pointer to DIB structures for the module */
-	t_stat (*reset)(DEVICE *dp);		/* Reset function for the module */
+	uint32 flags;						/* Flags for initialization of the UNIT flag field*/
 	rom_socket (*socket)[];				/* Sockets for this module */
 }
 module;

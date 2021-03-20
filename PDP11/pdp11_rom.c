@@ -28,8 +28,7 @@
 t_stat rom_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat rom_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat rom_rd (int32 *data, int32 PA, int32 access);
-t_stat blank_rom_reset (DEVICE *dptr);
-t_stat m9312_rom_reset (DEVICE *dptr);
+t_stat rom_reset (DEVICE *dptr);
 t_stat rom_boot (int32 u, DEVICE *dptr);
 t_stat rom_set_addr (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_addr (FILE *, UNIT *, int32, CONST void *);
@@ -81,7 +80,7 @@ module blank =
 	NUM_BLANK_SOCKETS,					// Number of sockets (units)
 	(UNIT (*)[]) &blank_rom_unit,		// Pointer to UNIT structs
 	(DIB (*)[]) &blank_rom_dib,			// Pointer to DIB structs
-	&blank_rom_reset,					// Pointer to reset function
+	BLANK_UNIT_FLAGS,					// UNIT flags
 	(rom_socket (*)[]) &blank_sockets	// Pointer to rom_socket structs
 };
 
@@ -92,7 +91,7 @@ module m9312 =
 	NUM_M9312_SOCKETS,					// Number of sockets (units)
 	(UNIT (*)[])  &m9312_rom_unit,		// Pointer to UNIT structs
 	(DIB (*)[]) &m9312_rom_dib,			// Pointer to DIB structs
-	&m9312_rom_reset,					// Pointer to reset function
+	M9312_UNIT_FLAGS,					// UNIT flags
 	(rom_socket (*)[]) &m9312_sockets	// Pointer to rom_socket structs
 };
 
@@ -138,7 +137,7 @@ DEVICE rom_dev =
 	16,									// Data width
 	rom_ex,								// Examine routine
 	rom_dep,							// Deposit routine
-	blank_rom_reset,					// Reset routine
+	rom_reset,							// Reset routine
 	&rom_boot,							// Boot routine
 	&rom_attach,						// Attach routine
 	&rom_detach,						// Detach routine
@@ -176,10 +175,11 @@ t_stat rom_set_module (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 			rom_dev.numunits = module_list[i]->num_sockets;
 			rom_dev.units = (UNIT*) module_list[i]->units;
 			rom_dev.ctxt = module_list[i]->dibs;
-			rom_dev.reset = module_list[i]->reset;
+			// rom_dev.reset = module_list[i]->reset;
 
 			// Reset the device
-			(*rom_dev.reset)(&rom_dev);
+			// (*rom_dev.reset)(&rom_dev);
+			rom_reset (&rom_dev);
 			return SCPE_OK;
 		}
 	}
@@ -259,59 +259,37 @@ rom_set_unit_name (UNIT *uptr, int unit_number)
 }
 
 /*
- * Reset function for the BLANK ROM module.
- * This functions is called (several times) at simh start and
- * when the user issues a RESET command.
+ * Reset function for the ROM modules.
+ * The function is independ of the selected module. It is called
+ * (several times) at simh start and when the user issues a RESET command.
  */
-t_stat blank_rom_reset (DEVICE *dptr)
+t_stat rom_reset (DEVICE *dptr)
 {
 	uint32 i;
+	UNIT* uptr = dptr->units;
+	DIB* dibptr = dptr->ctxt;
+	module* modptr = (module*) rom_mod[MODULE_MODIFIER].desc;
 
-	// Intialize the device context
-	// ToDo: Setting the context and num units here is superfluous?!
-	dptr->ctxt = &blank_rom_dib[0];
-	dptr->numunits = NUM_BLANK_SOCKETS;
-
-	// Initialize all the BLANK ROM UNIT and DIB structs for all units
-	for (i = 0; i < NUM_BLANK_SOCKETS; i++)
+	// Initialize the UNIT and DIB structs 
+	for (i = 0; i < dptr->numunits; i++, uptr++, dptr++)
 	{
-		// blank_rom_unit[i].flags = 0 | (blank_rom_unit[i].flags & ~CONFIG_UNIT_FLAGS) | BLANK_UNIT_FLAGS;
-		blank_rom_unit[i].flags |= BLANK_UNIT_FLAGS;
-		blank_rom_unit[i].dib_ptr = &blank_rom_dib[i];
-		blank_rom_dib[i].next = &blank_rom_dib[i + 1];
+		// Set the flags as specified in the module struct for the selected module
+		uptr->flags = modptr->flags;
 
-		rom_set_unit_name (&blank_rom_unit[i], i);
+		// Set pointer to DIB for this unit
+		uptr->dib_ptr = dibptr;
+
+		// Create the linked list of DIBs
+		dibptr->next = (i < dptr->numunits) ? dibptr + 1 : NULL;
+
+		// Set the name for this unit
+		rom_set_unit_name (uptr, i);
 	}
-	blank_rom_dib[NUM_BLANK_SOCKETS -1].next = NULL;
+
 	return SCPE_OK;
 }
 
 
-/*
- * Reset function for the M9312 ROM module.
- * This functions is called (several times) at simh start and
- * when the user issues a RESET command.
- */
-t_stat m9312_rom_reset (DEVICE *dptr)
-{
-	int i;
-	// ToDo: Setting the context and num units here is superfluous?!
-	dptr->ctxt = &m9312_rom_dib[0];
-	dptr->numunits = NUM_M9312_SOCKETS;
-
-	// Initialize all the M9312 ROM UNIT and DIB structs for all units
-	for (i = 0; i < NUM_M9312_SOCKETS; i++)
-	{
-		// Initialize unit structure
-		m9312_rom_unit[i].flags |= M9312_UNIT_FLAGS;
-		m9312_rom_unit[i].dib_ptr = &m9312_rom_dib[i];
-		m9312_rom_dib[i].next = &m9312_rom_dib[i + 1];
-
-		rom_set_unit_name (&m9312_rom_unit[i], i);
-	}
-	m9312_rom_dib[NUM_M9312_SOCKETS - 1].next = NULL;
-	return SCPE_OK;
-}
 
 /* Boot routine */
 
