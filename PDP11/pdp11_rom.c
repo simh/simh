@@ -57,8 +57,7 @@ const char *rom_description (DEVICE *dptr);
  */
 
 #define BLANK_UNIT_FLAGS	UNIT_RO | UNIT_MUSTBUF | UNIT_BUFABLE | UNIT_ATTABLE
-#define M9312_UNIT_FLAGS	UNIT_RO | UNIT_FIX | UNIT_MUSTBUF | UNIT_BUFABLE
-#define CONFIG_UNIT_FLAGS   (BLANK_UNIT_FLAGS | M9312_UNIT_FLAGS)
+#define M9312_UNIT_FLAGS	UNIT_RO | UNIT_MUSTBUF | UNIT_BUFABLE
 
 UNIT blank_rom_unit[NUM_BLANK_SOCKETS];
 UNIT m9312_rom_unit[NUM_M9312_SOCKETS];
@@ -66,8 +65,8 @@ UNIT m9312_rom_unit[NUM_M9312_SOCKETS];
 /* Use some device specific fields in the UNIT structure */
 #define unit_base u3		/* Base adress of the ROM unit */
 #define unit_end  u4		/* End adress of the ROM unit */
-#define dib_ptr   up7		/* Pointer to the DIB for this unit */
-#define usage	  up8		/* Function usage of the unit */
+#define dib_ptr   u5		/* Pointer to the DIB for this unit */
+#define usage	  u6		/* Function usage of the unit */
 
 DIB blank_rom_dib[NUM_BLANK_SOCKETS];
 DIB m9312_rom_dib[NUM_M9312_SOCKETS];
@@ -271,16 +270,16 @@ t_stat rom_reset (DEVICE *dptr)
 	module* modptr = (module*) rom_mod[MODULE_MODIFIER].desc;
 
 	// Initialize the UNIT and DIB structs 
-	for (i = 0; i < dptr->numunits; i++, uptr++, dptr++)
+	for (i = 0; i < dptr->numunits; i++, uptr++, dibptr++)
 	{
 		// Set the flags as specified in the module struct for the selected module
-		uptr->flags = modptr->flags;
+		uptr->flags |= modptr->flags;
 
 		// Set pointer to DIB for this unit
-		uptr->dib_ptr = dibptr;
+		uptr->dib_ptr = (int32) dibptr;
 
 		// Create the linked list of DIBs
-		dibptr->next = (i < dptr->numunits) ? dibptr + 1 : NULL;
+		dibptr->next = (i < dptr->numunits - 1) ? dibptr + 1 : NULL;
 
 		// Set the name for this unit
 		rom_set_unit_name (uptr, i);
@@ -361,7 +360,7 @@ t_stat rom_show_addr (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 t_stat rom_make_dib (UNIT *uptr)
 {
 	//DIB *dib = &blank_rom_dib[uptr - blank_rom_unit];
-	DIB *dib = uptr->dib_ptr;
+	DIB *dib = (DIB*) uptr->dib_ptr;
 
 	dib->ba = uptr->unit_base;
 	dib->lnt = uptr->capac;
@@ -392,7 +391,7 @@ t_stat rom_set_function (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 		if (strcasecmp (cptr, romptr->device_mnemonic) == 0)
 		{
 			// Set usage, image, adresses and capacity for the specified unit
-			uptr->usage = romptr->device_mnemonic;
+			uptr->usage = (int32) romptr->device_mnemonic;
 			uptr->filebuf = romptr->image;
 			uptr->unit_base = m9312_sockets[unit_number].base_address;
 			uptr->unit_end = m9312_sockets[unit_number].base_address +
@@ -418,7 +417,7 @@ t_stat rom_show_function (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 	if (uptr->flags & UNIT_ATTABLE)
 		fprintf (f, "function not supported");
 	else 
-		fprintf (f, "function=%s", (uptr->usage)? uptr->usage : "none");
+		fprintf (f, "function=%s", (uptr->usage)? (char*) uptr->usage : "none");
 	return SCPE_OK;
 }
 
