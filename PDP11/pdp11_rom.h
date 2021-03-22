@@ -62,15 +62,11 @@ rom_socket;
 /*
  * A ROM module has a name and comprises a number of sockets in which
  * ROMs can be placed.
- * 
- * ToDo: num_sockets is obsolete?
  */
 typedef struct
 {
 	const char *name;					/* Module name */
-	const int num_sockets;				/* Number of sockets for the module*/
-	UNIT (*units)[];					/* Pointer to UNIT structures for the module */
-	DIB  (*dibs)[];						/* Pointer to DIB structures for the module */
+	const uint32 num_sockets;			/* Number of sockets for the module*/
 	uint32 flags;						/* Flags for initialization of the UNIT flag field*/
 	rom_socket (*socket)[];				/* Sockets for this module */
 }

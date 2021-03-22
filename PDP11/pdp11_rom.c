@@ -59,17 +59,33 @@ const char *rom_description (DEVICE *dptr);
 #define BLANK_UNIT_FLAGS	UNIT_RO | UNIT_MUSTBUF | UNIT_BUFABLE | UNIT_ATTABLE
 #define M9312_UNIT_FLAGS	UNIT_RO | UNIT_MUSTBUF | UNIT_BUFABLE
 
-UNIT blank_rom_unit[NUM_BLANK_SOCKETS];
-UNIT m9312_rom_unit[NUM_M9312_SOCKETS];
+/*
+ * Use some device specific fields in the UNIT structure.
+ * 
+ * Remarks
+ * 1) The u5 and u6 fields are used as pointers. The use of the up7 and up8
+ * fields would be more appropriate, but these fields are not saved and restored
+ * in a SAVE/RESTORE cycle.
+ * 
+ * 2) The u5 (selected_module) field is just used in unit 0 to point to the
+ * selected module. It would be more appropriate to use a field in the DEVICE
+ * structure for that purpose, but there is no (device-specific) field in that
+ * structure that is saved and restored.
+ */
+#define unit_base			u3			/* Base adress of the ROM unit */
+#define unit_end			u4			/* End adress of the ROM unit */
+#define selected_module		u5			/* Pointer to the DIB for this unit */
+#define usage				u6			/* Function usage of the unit */
 
-/* Use some device specific fields in the UNIT structure */
-#define unit_base u3		/* Base adress of the ROM unit */
-#define unit_end  u4		/* End adress of the ROM unit */
-#define dib_ptr   u5		/* Pointer to the DIB for this unit */
-#define usage	  u6		/* Function usage of the unit */
+/*
+ * The maximum number of sockets is the number of sockets any module can have.
+ * For modules with a number of units less than this maximum the surplus
+ * units are disabled.
+ */ 
+#define MAX_NUMBER_SOCKETS	5
 
-DIB blank_rom_dib[NUM_BLANK_SOCKETS];
-DIB m9312_rom_dib[NUM_M9312_SOCKETS];
+UNIT rom_unit[MAX_NUMBER_SOCKETS];
+DIB rom_dib[MAX_NUMBER_SOCKETS];
 
 
 // Define the default "blank" ROM module
@@ -77,8 +93,6 @@ module blank =
 {
 	"BLANK",							// Module name
 	NUM_BLANK_SOCKETS,					// Number of sockets (units)
-	(UNIT (*)[]) &blank_rom_unit,		// Pointer to UNIT structs
-	(DIB (*)[]) &blank_rom_dib,			// Pointer to DIB structs
 	BLANK_UNIT_FLAGS,					// UNIT flags
 	(rom_socket (*)[]) &blank_sockets	// Pointer to rom_socket structs
 };
@@ -88,8 +102,6 @@ module m9312 =
 {
 	"M9312",							// Module name
 	NUM_M9312_SOCKETS,					// Number of sockets (units)
-	(UNIT (*)[])  &m9312_rom_unit,		// Pointer to UNIT structs
-	(DIB (*)[]) &m9312_rom_dib,			// Pointer to DIB structs
 	M9312_UNIT_FLAGS,					// UNIT flags
 	(rom_socket (*)[]) &m9312_sockets	// Pointer to rom_socket structs
 };
@@ -105,15 +117,10 @@ module *module_list[NUM_MODULES] =
 
 /*
  * Define the ROM device and units modifiers.
- * The modifier indicated by MODULE_MODIFIER must be the MODULE
- *  modifier as the description field of that modifier is dynamically 
- * set to the selected module.
  */
-#define MODULE_MODIFIER		0
-
 MTAB rom_mod[] = {
 	{ MTAB_XTD | MTAB_VDV | MTAB_VALR, 010, "MODULE", "MODULE",
-		&rom_set_module, &rom_show_module, (void *) &blank, "Module type" },
+		&rom_set_module, &rom_show_module, NULL, "Module type" },
 	{ MTAB_XTD | MTAB_VUN | MTAB_VALR, 010, "ADDRESS", "ADDRESS",
 		&rom_set_addr, &rom_show_addr, NULL, "Bus address" },
 	{ MTAB_XTD | MTAB_VUN | MTAB_VALR, 010, "FUNCTION", "FUNCTION",
@@ -125,10 +132,10 @@ MTAB rom_mod[] = {
 DEVICE rom_dev =
 {
 	"ROM",								// Device name
-	blank_rom_unit,						// Pointer to device unit structures
+	rom_unit,							// Pointer to device unit structures
 	NULL,								// A ROM module has no registers
 	rom_mod,							// Pointer to modifier table
-	NUM_BLANK_SOCKETS,					// Number of units
+	MAX_NUMBER_SOCKETS,					// Number of units
 	8,									// Address radix
 	9,									// Address width
 	2,									// Address increment
@@ -140,7 +147,7 @@ DEVICE rom_dev =
 	&rom_boot,							// Boot routine
 	&rom_attach,						// Attach routine
 	&rom_detach,						// Detach routine
-	&blank_rom_dib[0],					// Pointer to device information blocks
+	&rom_dib[0],						// Pointer to device information blocks
 	DEV_DISABLE | DEV_UBUS | DEV_QBUS,	// Flags
 	0,									// Debug control
 	NULL,								// Debug flags
@@ -162,23 +169,40 @@ t_stat rom_set_module (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 		return SCPE_ARG;
 
 	// Search the module list for the specified module type
-	for (int i = 0; i < NUM_MODULES; i++)
+	for (int module_number = 0; module_number < NUM_MODULES; module_number++)
 	{
-		if (strcasecmp (cptr, module_list[i]->name) == 0)
+		if (strcasecmp (cptr, module_list[module_number]->name) == 0)
 		{
-			// Module type found. Set the modifier description 
-			// field to the selected modifier
-			rom_mod[MODULE_MODIFIER].desc = module_list[i];
+			// Module type found. Check if the selected module differs from the
+			// currently selected module
+			if (rom_unit[0].selected_module != (int32) module_list[module_number])
+			{
+				// Set the currently selected module
+				rom_unit[0].selected_module = (int32) module_list[module_number];
 
-			// Fill the device structure with the module-specific data
-			rom_dev.numunits = module_list[i]->num_sockets;
-			rom_dev.units = (UNIT*) module_list[i]->units;
-			rom_dev.ctxt = module_list[i]->dibs;
-			// rom_dev.reset = module_list[i]->reset;
+				// Initialize the UNITs with values for this module
+				for (uint32 unit_number = 0; unit_number < MAX_NUMBER_SOCKETS; unit_number++)
+				{
+					// Check if an image is attached on an unattachable unit
+					if ((rom_unit[unit_number].flags & UNIT_ATT) &&
+						!(module_list[module_number]->flags & UNIT_ATTABLE))
+					{
+						// Detach the unit
+						if (rom_detach (uptr) != SCPE_OK)
+							return SCPE_IERR;
+					}
 
-			// Reset the device
-			// (*rom_dev.reset)(&rom_dev);
-			rom_reset (&rom_dev);
+					// Clear addressses and function and initialize flags
+					rom_unit[unit_number].unit_base = 0;
+					rom_unit[unit_number].unit_end = 0;
+					rom_unit[unit_number].flags = module_list[module_number]->flags;
+					rom_unit[unit_number].usage = (int32) NULL;
+
+					// Disable surplus ROMs for this module
+					if (unit_number >= module_list[module_number]->num_sockets)
+						rom_unit[unit_number].flags = UNIT_DIS;
+				}
+			}
 			return SCPE_OK;
 		}
 	}
@@ -191,7 +215,7 @@ t_stat rom_set_module (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 
 t_stat rom_show_module (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 {
-	fprintf (f, "module type %s", ((module*) desc)->name);
+	fprintf (f, "module type %s", ((module*) rom_unit[0].selected_module)->name);
 	return SCPE_OK;
 }
 
@@ -244,57 +268,61 @@ t_stat rom_rd (int32 *data, int32 PA, int32 access)
 }
 
 /*
- * Set name of the specified ROM unit. For units of fixed size, show_unit()
- * displays the unit's capacity after the unit's name.
+ * Set name of the specified ROM unit.
  */
-rom_set_unit_name (UNIT *uptr, int unit_number)
+rom_set_unit_name (int unit_number)
 {
-	int needed_size = snprintf (NULL, 0, (uptr->flags & UNIT_FIX) ? "ROM%d: size=" : "ROM%d: ", unit_number);
+	int needed_size = snprintf (NULL, 0, "ROM%d: ", unit_number);
 	char *buffer = malloc (needed_size);
-	if (buffer != NULL) {
-		sprintf (buffer, (uptr->flags & UNIT_FIX) ? "ROM%d: size=" : "ROM%d: ", unit_number);
-		uptr->uname = buffer;
+	if (buffer != NULL)
+	{
+		sprintf (buffer, "ROM%d: ", unit_number);
+		rom_unit[unit_number].uname = buffer;
 	}
 }
 
 /*
  * Reset function for the ROM modules.
- * The function is independ of the selected module. It is called
+ * The function is independent of the selected module. It is called
  * (several times) at simh start and when the user issues a RESET command.
  */
 t_stat rom_reset (DEVICE *dptr)
 {
-	uint32 i;
-	UNIT* uptr = dptr->units;
-	DIB* dibptr = dptr->ctxt;
-	module* modptr = (module*) rom_mod[MODULE_MODIFIER].desc;
+	uint32 unit_number;
+	module** mod_dptr = (module**) &rom_unit[0].selected_module;
+
+	// Initialize the selected module if not already initialized
+	// if (rom_unit[0].selected_module == 0)
+	//	rom_unit[0].selected_module = &blank;
+	if (*mod_dptr == 0)
+		*mod_dptr = &blank;
 
 	// Initialize the UNIT and DIB structs 
-	for (i = 0; i < dptr->numunits; i++, uptr++, dibptr++)
+	for (unit_number = 0; unit_number < MAX_NUMBER_SOCKETS; unit_number++)
 	{
 		// Set the flags as specified in the module struct for the selected module
-		uptr->flags |= modptr->flags;
-
-		// Set pointer to DIB for this unit
-		uptr->dib_ptr = (int32) dibptr;
+		rom_unit[unit_number].flags |= (*mod_dptr)->flags;
 
 		// Create the linked list of DIBs
-		dibptr->next = (i < dptr->numunits - 1) ? dibptr + 1 : NULL;
+		rom_dib[unit_number].next = (unit_number < dptr->numunits - 1) ? &rom_dib[unit_number + 1] : NULL;
 
 		// Set the name for this unit
-		rom_set_unit_name (uptr, i);
+		rom_set_unit_name (unit_number);
+
+		// Disable surplus ROMs for this module
+		if (unit_number >= (*mod_dptr)->num_sockets)
+			rom_unit[unit_number].flags = UNIT_DIS;
 	}
 
 	return SCPE_OK;
 }
 
 
-
 /* Boot routine */
 
 t_stat rom_boot (int32 u, DEVICE *dptr)
 {
-	cpu_set_boot (blank_rom_unit[u].unit_base);
+	cpu_set_boot (rom_unit[u].unit_base);
 	return SCPE_OK;
 }
 
@@ -359,8 +387,7 @@ t_stat rom_show_addr (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 
 t_stat rom_make_dib (UNIT *uptr)
 {
-	//DIB *dib = &blank_rom_dib[uptr - blank_rom_unit];
-	DIB *dib = (DIB*) uptr->dib_ptr;
+	DIB *dib = &rom_dib[uptr - rom_unit];
 
 	dib->ba = uptr->unit_base;
 	dib->lnt = uptr->capac;
@@ -373,7 +400,7 @@ t_stat rom_make_dib (UNIT *uptr)
 
 t_stat rom_set_function (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-	int unit_number = uptr - m9312_rom_unit;
+	int unit_number = uptr - rom_unit;
 
 	// Is the FUNCTION modifier supported on this module type? 
 	// ToDo: Find better way to discriminate module type
@@ -469,7 +496,7 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 t_stat rom_detach (UNIT *uptr)
 {
 	t_stat r;
-	DIB *dib = &blank_rom_dib[uptr - blank_rom_unit];
+	DIB *dib = &rom_dib[uptr - rom_unit];
 
 	dib->rd = NULL;
 	r = build_ubus_tab (&rom_dev, dib);
