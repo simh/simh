@@ -8642,6 +8642,7 @@ if ((flag == RU_RUN) || (flag == RU_GO)) {              /* run or go */
             new_pc = TRUE;
             }
         }
+    put_rval_pcchk (sim_PC, 0, new_pcv, new_pc);        /* Save in PC in case reset references PC */
     if ((flag == RU_RUN) &&                             /* run? */
         ((r = sim_run_boot_prep (flag)) != SCPE_OK)) {  /* reset sim */
         put_rval_pcchk (sim_PC, 0, orig_pcv, FALSE);    /* restore original PC */
@@ -8674,7 +8675,7 @@ if ((flag == RU_RUN) || (flag == RU_GO)) {              /* run or go */
             }
         sim_switches = saved_switches;
         }
-    put_rval_pcchk (sim_PC, 0, new_pcv, new_pc);        /* Save in PC */
+    put_rval_pcchk (sim_PC, 0, new_pcv, new_pc);        /* Save in PC again in case reset changed it */
     }
 
 else if ((flag == RU_STEP) ||
