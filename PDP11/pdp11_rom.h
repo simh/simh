@@ -60,12 +60,25 @@ typedef struct
 rom_socket;
 
 /*
+ * A module is either variable, i.e. a module for which socket addresses
+ * and images can freely be selected, or fixed, i.e. a module with
+ * built in addresses and images.
+ */
+typedef enum
+{
+	ROM_VARIABLE,
+	ROM_FIXED
+}
+module_type;
+
+/*
  * A ROM module has a name and comprises a number of sockets in which
  * ROMs can be placed.
  */
 typedef struct
 {
 	const char *name;					/* Module name */
+	module_type type;					/* Module type */
 	const uint32 num_sockets;			/* Number of sockets for the module*/
 	uint32 flags;						/* Flags for initialization of the UNIT flag field*/
 	rom_socket (*socket)[];				/* Sockets for this module */
