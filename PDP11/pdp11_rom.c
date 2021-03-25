@@ -59,6 +59,41 @@ const char *rom_description (DEVICE *dptr);
 #define BLANK_UNIT_FLAGS	UNIT_RO | UNIT_MUSTBUF | UNIT_BUFABLE | UNIT_ATTABLE
 #define M9312_UNIT_FLAGS	UNIT_RO | UNIT_MUSTBUF | UNIT_BUFABLE
 
+ // Define the default "blank" ROM module
+module blank =
+{
+	"BLANK",							// Module name
+	ROM_VARIABLE,						// Module type
+	NUM_BLANK_SOCKETS,					// Number of sockets (units)
+	BLANK_UNIT_FLAGS,					// UNIT flags
+	(rom_socket (*)[]) & blank_sockets	// Pointer to rom_socket structs
+};
+
+// Define the M9312 module
+module m9312 =
+{
+	"M9312",							// Module name
+	ROM_FIXED,							// Module type
+	NUM_M9312_SOCKETS,					// Number of sockets (units)
+	M9312_UNIT_FLAGS,					// UNIT flags
+	(rom_socket (*)[]) & m9312_sockets	// Pointer to rom_socket structs
+};
+
+/*
+ * De fine the number of modules and their order in the module list. 
+ */
+#define NUM_MODULES 2
+#define ROM_MODULE_BLANK		0
+#define ROM_MODULE_M9312		1
+
+// The list of available ROM modules
+module* module_list[NUM_MODULES] =
+{
+	&blank,
+	&m9312,
+};
+
+
 /*
  * Use some device specific fields in the UNIT structure.
  * 
@@ -84,38 +119,25 @@ const char *rom_description (DEVICE *dptr);
  */ 
 #define MAX_NUMBER_SOCKETS	5
 
-UNIT rom_unit[MAX_NUMBER_SOCKETS];
+/*
+ * Define and initialize the UNIT structs. 
+ */
+
+#define ROM_UNIT_INIT(flags,module) NULL,NULL,NULL,NULL,NULL,0,0,(flags),0,0,0,NULL,0,0,0,0,0,module
+
+UNIT rom_unit[MAX_NUMBER_SOCKETS] =
+{
+	{ ROM_UNIT_INIT (BLANK_UNIT_FLAGS, ROM_MODULE_BLANK) },
+	{ ROM_UNIT_INIT (BLANK_UNIT_FLAGS, ROM_MODULE_BLANK) },
+	{ ROM_UNIT_INIT (BLANK_UNIT_FLAGS, ROM_MODULE_BLANK) },
+	{ ROM_UNIT_INIT (BLANK_UNIT_FLAGS, ROM_MODULE_BLANK) },
+	{ ROM_UNIT_INIT (UNIT_DIS,ROM_MODULE_BLANK) },
+};
+
 DIB rom_dib[MAX_NUMBER_SOCKETS];
 
 
-// Define the default "blank" ROM module
-module blank =
-{
-	"BLANK",							// Module name
-	ROM_VARIABLE,						// Module type
-	NUM_BLANK_SOCKETS,					// Number of sockets (units)
-	BLANK_UNIT_FLAGS,					// UNIT flags
-	(rom_socket (*)[]) &blank_sockets	// Pointer to rom_socket structs
-};
 
-// Define the M9312 module
-module m9312 =
-{
-	"M9312",							// Module name
-	ROM_FIXED,							// Module type
-	NUM_M9312_SOCKETS,					// Number of sockets (units)
-	M9312_UNIT_FLAGS,					// UNIT flags
-	(rom_socket (*)[]) &m9312_sockets	// Pointer to rom_socket structs
-};
-
-#define NUM_MODULES 2
-
-// The list of available ROM modules
-module *module_list[NUM_MODULES] =
-{
-	&blank,
-	&m9312,
-};
 
 /*
  * Define the ROM device and units modifiers.
@@ -182,10 +204,10 @@ t_stat rom_set_module (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 			{
 				// Check if the selected module differs from the
 				// currently selected module
-				if (rom_unit[unit_number].selected_module != (int32) module_list[module_number])
+				if (rom_unit[unit_number].selected_module != module_number)
 				{
 					// Set the currently selected module
-					rom_unit[unit_number].selected_module = (int32) module_list[module_number];
+					rom_unit[unit_number].selected_module = module_number;
 				}
 
 				// Check if an image is attached on an unattachable unit
@@ -217,7 +239,7 @@ t_stat rom_set_module (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 
 void rom_repair_flags ()
 {
-	if (rom_unit[0].selected_module == &m9312)
+	if (rom_unit[0].selected_module == ROM_MODULE_M9312)
 	{
 		for (int unit_number = 0; unit_number < MAX_NUMBER_SOCKETS; unit_number++)
 		{
@@ -231,7 +253,8 @@ void rom_repair_flags ()
 t_stat rom_show_module (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 {
 	rom_repair_flags ();
-	fprintf (f, "module type %s", ((module*) rom_unit[0].selected_module)->name);
+	int selected_module = rom_unit[0].selected_module;
+	fprintf (f, "module type %s", (module*) module_list[selected_module]->name);
 	return SCPE_OK;
 }
 
@@ -318,11 +341,11 @@ t_stat rom_reset (DEVICE *dptr)
 	for (unit_number = 0; unit_number < MAX_NUMBER_SOCKETS; unit_number++)
 	{
 		// Initialize the selected module if not already initialized
-		if (rom_unit[unit_number].selected_module == (int32) NULL)
-			rom_unit[unit_number].selected_module = (int32) &blank;
+		//if (rom_unit[unit_number].selected_module == ROM_UNITIALIZED)
+		//	rom_unit[unit_number].selected_module = (int32) &blank;
 
 		// Set the flags as specified in the module struct for the selected module
-		rom_unit[unit_number].flags |= ((module*) rom_unit[unit_number].selected_module)->flags;
+		//rom_unit[unit_number].flags |= ((module*) rom_unit[unit_number].selected_module)->flags;
 
 		// Create the linked list of DIBs
 		rom_dib[unit_number].next = (unit_number < dptr->numunits - 1) ? &rom_dib[unit_number + 1] : NULL;
@@ -331,8 +354,8 @@ t_stat rom_reset (DEVICE *dptr)
 		rom_set_unit_name (unit_number);
 
 		// Disable surplus ROMs for this module
-		if (unit_number >= ((module*) rom_unit[unit_number].selected_module)->num_sockets)
-			rom_unit[unit_number].flags = UNIT_DIS;
+		//if (unit_number >= ((module*) rom_unit[unit_number].selected_module)->num_sockets)
+		//	rom_unit[unit_number].flags = UNIT_DIS;
 	}
 
 	return SCPE_OK;
@@ -357,9 +380,10 @@ t_stat rom_set_addr (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 	int32 addr;
 	t_stat r;
+	int32 selected_module = uptr->selected_module;
 
 	// Check if the command is allowed for the selected module
-	if (((module*) uptr->selected_module)->type != ROM_VARIABLE)
+	if (module_list[selected_module]->type != ROM_VARIABLE)
 		return SCPE_NOFNC;
 
 	// Check if the unit is not already attached
@@ -422,9 +446,10 @@ t_stat rom_make_dib (UNIT *uptr)
 t_stat rom_set_function (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
 	int unit_number = uptr - rom_unit;
+	int selected_module = uptr->selected_module;
 
 	// Is the FUNCTION modifier supported on this module type? 
-	if (((module*) uptr->selected_module)->type != ROM_FIXED)
+	if (module_list[selected_module]->type != ROM_FIXED)
 		return SCPE_NOFNC;
 
 	// Is function specified? 
@@ -458,10 +483,12 @@ t_stat rom_set_function (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 
 t_stat rom_show_function (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 {
+	int selected_module = uptr->selected_module;
+
 	if (uptr == NULL)
 		return SCPE_IERR;
 
-	if (((module*) uptr->selected_module)->type != ROM_FIXED)
+	if (module_list[selected_module]->type != ROM_FIXED)
 		fprintf (f, "function not supported");
 	else 
 		fprintf (f, "function=%s", (uptr->usage)? (char*) uptr->usage : "none");
@@ -473,10 +500,11 @@ t_stat rom_show_function (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 
 t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 {
+	int selected_module = uptr->selected_module;
 	t_stat r;
 
 	// Check the attach command is allowed on the selected module type
-	if (((module*) uptr->selected_module)->type != ROM_VARIABLE)
+	if (module_list[selected_module]->type != ROM_VARIABLE)
 		return SCPE_NOATT;
 
 	// Check the unit is attached
