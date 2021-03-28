@@ -371,6 +371,12 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
           endif
           ifeq (ldconfig,$(shell if ${TEST} -e /sbin/ldconfig; then echo ldconfig; fi))
             LIBPATH := $(sort $(foreach lib,$(shell /sbin/ldconfig -p | grep ' => /' | sed 's/^.* => //'),$(dir $(lib))))
+            ifeq (,$(filter /lib/,$(LIBPATH)))
+              LIBPATH += /lib/
+            endif
+            ifeq (,$(filter /usr/lib/,$(LIBPATH)))
+              LIBPATH += /usr/lib/
+            endif
           endif
         endif
         LIBEXT = so
