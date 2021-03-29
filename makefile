@@ -635,7 +635,6 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
           DISPLAY340 = ${DISPLAYD}/type340.c
           DISPLAYNG = ${DISPLAYD}/ng.c
           DISPLAYIII = ${DISPLAYD}/iii.c
-          DISPLAYIMLAC = ${DISPLAYD}/imlac.c
           DISPLAYTT2500 = ${DISPLAYD}/tt2500.c
           DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
           $(info using libSDL2: $(call find_include,SDL2/SDL))
@@ -1552,7 +1551,7 @@ IMLACD = ${SIMHD}/imlac
 IMLAC = ${IMLACD}/imlac_sys.c ${IMLACD}/imlac_cpu.c \
 	${IMLACD}/imlac_dp.c ${IMLACD}/imlac_crt.c ${IMLACD}/imlac_kbd.c \
 	${IMLACD}/imlac_tty.c ${IMLACD}/imlac_pt.c ${IMLACD}/imlac_bel.c \
-	${DISPLAYL} ${DISPLAYIMLAC}
+	${DISPLAYL}
 IMLAC_OPT = -I ${IMLACD} ${DISPLAY_OPT}
 
 
