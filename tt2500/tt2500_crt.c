@@ -26,7 +26,6 @@
 
 #include "tt2500_defs.h"
 #include "sim_video.h"
-#include "display/tt2500.h"
 #include "display/display.h"
 
 /* Function declaration. */
@@ -65,7 +64,7 @@ static t_stat
 crt_svc(UNIT *uptr)
 {
 #ifdef USE_DISPLAY
-  tt2500_cycle (100, 0);
+  display_age (100, 0);
   if (!display_is_blank ())
     sim_activate_after (uptr, 100);
   if (dpy_quit) {
@@ -85,7 +84,7 @@ crt_reset (DEVICE *dptr)
     sim_cancel (&crt_unit);
   } else {
     display_reset ();
-    tt2500_init (dptr, 1);
+    display_init (DIS_TT2500, 1, dptr);
     vid_register_quit_callback (&dpy_quit_callback);
   }
 #endif
@@ -101,6 +100,6 @@ crt_line (uint16 x1, uint16 y1, uint16 x2, uint16 y2, uint16 i)
     sim_activate_abs (&crt_unit, 0);
   if (crt_dev.flags & DEV_DIS)
     return;
-  tt2500_line (x1, y1, x2, y2, i);
+  display_line (x1, y1, x2, y2, DISPLAY_INT_MAX*(7-i)/7);
 #endif
 }
