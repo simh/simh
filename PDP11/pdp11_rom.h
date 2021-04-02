@@ -66,8 +66,8 @@ rom_socket;
  */
 typedef enum
 {
-	ROM_VARIABLE,
-	ROM_FIXED
+	ROM_FILE,
+	ROM_BUILTIN
 }
 module_type;
 

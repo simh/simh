@@ -57,13 +57,13 @@ const char *rom_description (DEVICE *dptr);
  */
 
 #define BLANK_UNIT_FLAGS	UNIT_RO | UNIT_MUSTBUF | UNIT_BUFABLE | UNIT_ATTABLE
-#define M9312_UNIT_FLAGS	UNIT_RO | UNIT_MUSTBUF | UNIT_BUFABLE
+#define M9312_UNIT_FLAGS	UNIT_RO | UNIT_MUSTBUF | UNIT_BUFABLE | UNIT_ATTABLE
 
  // Define the default "blank" ROM module
 module blank =
 {
 	"BLANK",							// Module name
-	ROM_VARIABLE,						// Module type
+	ROM_FILE,						// Module type
 	NUM_BLANK_SOCKETS,					// Number of sockets (units)
 	BLANK_UNIT_FLAGS,					// UNIT flags
 	(rom_socket (*)[]) & blank_sockets	// Pointer to rom_socket structs
@@ -73,7 +73,7 @@ module blank =
 module m9312 =
 {
 	"M9312",							// Module name
-	ROM_FIXED,							// Module type
+	ROM_BUILTIN,							// Module type
 	NUM_M9312_SOCKETS,					// Number of sockets (units)
 	M9312_UNIT_FLAGS,					// UNIT flags
 	(rom_socket (*)[]) & m9312_sockets	// Pointer to rom_socket structs
@@ -131,7 +131,7 @@ UNIT rom_unit[MAX_NUMBER_SOCKETS] =
 	{ ROM_UNIT_INIT (BLANK_UNIT_FLAGS, ROM_MODULE_BLANK) },
 	{ ROM_UNIT_INIT (BLANK_UNIT_FLAGS, ROM_MODULE_BLANK) },
 	{ ROM_UNIT_INIT (BLANK_UNIT_FLAGS, ROM_MODULE_BLANK) },
-	{ ROM_UNIT_INIT (UNIT_DIS,ROM_MODULE_BLANK) },
+	{ ROM_UNIT_INIT (BLANK_UNIT_FLAGS | UNIT_DIS, ROM_MODULE_BLANK) },
 };
 
 DIB rom_dib[MAX_NUMBER_SOCKETS];
@@ -227,7 +227,7 @@ t_stat rom_set_module (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 
 				// Disable surplus ROMs for this module
 				if (unit_number >= module_list[module_number]->num_sockets)
-					rom_unit[unit_number].flags = UNIT_DIS;
+					rom_unit[unit_number].flags |= UNIT_DIS;
 			}
 			return SCPE_OK;
 		}
@@ -252,7 +252,7 @@ void rom_repair_flags ()
 
 t_stat rom_show_module (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 {
-	rom_repair_flags ();
+	// rom_repair_flags ();
 	int selected_module = rom_unit[0].selected_module;
 	fprintf (f, "module type %s", (module*) module_list[selected_module]->name);
 	return SCPE_OK;
@@ -383,7 +383,7 @@ t_stat rom_set_addr (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 	int32 selected_module = uptr->selected_module;
 
 	// Check if the command is allowed for the selected module
-	if (module_list[selected_module]->type != ROM_VARIABLE)
+	if (module_list[selected_module]->type != ROM_FILE)
 		return SCPE_NOFNC;
 
 	// Check if the unit is not already attached
@@ -449,7 +449,7 @@ t_stat rom_set_function (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 	int selected_module = uptr->selected_module;
 
 	// Is the FUNCTION modifier supported on this module type? 
-	if (module_list[selected_module]->type != ROM_FIXED)
+	if (module_list[selected_module]->type != ROM_BUILTIN)
 		return SCPE_NOFNC;
 
 	// Is function specified? 
@@ -488,7 +488,7 @@ t_stat rom_show_function (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 	if (uptr == NULL)
 		return SCPE_IERR;
 
-	if (module_list[selected_module]->type != ROM_FIXED)
+	if (module_list[selected_module]->type != ROM_BUILTIN)
 		fprintf (f, "function not supported");
 	else 
 		fprintf (f, "function=%s", (uptr->usage)? (char*) uptr->usage : "none");
@@ -500,43 +500,77 @@ t_stat rom_show_function (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 
 t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 {
+	int unit_number = uptr - rom_unit;
 	int selected_module = uptr->selected_module;
 	t_stat r;
 
-	// Check the attach command is allowed on the selected module type
-	if (module_list[selected_module]->type != ROM_VARIABLE)
-		return SCPE_NOATT;
+	switch (module_list[selected_module]->type)
+	{
+		case ROM_FILE:
+			// Check the unit is not already attached
+			if (uptr->flags & UNIT_ATT)
+				return SCPE_ALATT;
 
-	// Check the unit is attached
-	if (uptr->flags & UNIT_ATT)
-		return SCPE_ALATT;
+			// Check the ROM base address is set
+			if (uptr->unit_base == 0)
+				return sim_messagef (SCPE_ARG, "Set address first\n");
 
-	// Check the ROM base address is set
-	if (uptr->unit_base == 0)
-		return sim_messagef (SCPE_ARG, "Set address first\n");
+			// Set quiet mode
+			// ToDo: Find out use of this switch
+			sim_switches |= SWMASK ('Q');
 
-	// Set quiet mode
-	// ToDo: Find out use of this switch
-	sim_switches |= SWMASK ('Q');
+			// Check and set unit capacity
+			uptr->capac = sim_fsize_name (cptr);
+			if (uptr->capac == 0)
+				return SCPE_OPENERR;
 
-	// Check and set unit capacity
-	uptr->capac = sim_fsize_name (cptr);
-	if (uptr->capac == 0)
-		return SCPE_OPENERR;
+			// Attach unit and check the result
+			r = attach_unit (uptr, cptr);
+			if (r != SCPE_OK)
+				return r;
 
-	// Attach unit and check the result
-	r = attach_unit (uptr, cptr);
-	if (r != SCPE_OK)
-		return r;
+			// Fill the DIB for the unit
+			r = rom_make_dib (uptr);
+			if (r != SCPE_OK)
+				return rom_detach (uptr);
 
-	// Fill the DIB for the unit
-	r = rom_make_dib (uptr);
-	if (r != SCPE_OK)
-		return rom_detach (uptr);
+			// Set end adress 
+			uptr->unit_end = uptr->unit_base + uptr->capac;
+			return SCPE_OK;
 
-	// Set end adress 
-	uptr->unit_end = uptr->unit_base + uptr->capac;
-	return SCPE_OK;
+		case ROM_BUILTIN:
+			// Is function specified? 
+			if (cptr == NULL)
+				return SCPE_ARG;
+
+			// Search the rom table for the specified function
+			for (rom* romptr = (rom*) m9312_sockets[unit_number].rom_list;
+				romptr->image != NULL; romptr++)
+			{
+				if (strcasecmp (cptr, romptr->device_mnemonic) == 0)
+				{
+					// Set usage, image, adresses and capacity for the specified unit
+					// ToDo: usage field is superfluous?
+					uptr->usage = (int32) romptr->device_mnemonic;
+					uptr->filename = romptr->device_mnemonic;
+					uptr->filebuf = romptr->image;
+					uptr->unit_base = m9312_sockets[unit_number].base_address;
+					uptr->unit_end = m9312_sockets[unit_number].base_address +
+						m9312_sockets[unit_number].size - 2;
+					uptr->capac = m9312_sockets[unit_number].size;
+					uptr->flags |= UNIT_ATT;
+
+					// Fill the DIB for this unit
+					return rom_make_dib (uptr);
+				}
+			}
+
+			// Mnemonic not found
+			return SCPE_ARG;
+
+		default:
+			return SCPE_IERR;
+	}	
 }
 
 /* Detach */
@@ -545,6 +579,7 @@ t_stat rom_detach (UNIT *uptr)
 {
 	t_stat r;
 	DIB *dib = &rom_dib[uptr - rom_unit];
+	int selected_module = uptr->selected_module;
 
 	dib->rd = NULL;
 	r = build_ubus_tab (&rom_dev, dib);
@@ -552,7 +587,15 @@ t_stat rom_detach (UNIT *uptr)
 		return r;
 	uptr->unit_end = uptr->unit_base;
 	dib->lnt = uptr->capac = 0;
-	return detach_unit (uptr);
+
+	if (module_list[selected_module]->type == ROM_FILE)
+		return detach_unit (uptr);
+	else
+	{
+		// Module type is ROM_BUILTIN
+		uptr->flags &= ~UNIT_ATT;
+		return SCPE_OK;
+	}
 }
 
 
