@@ -19,6 +19,7 @@
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
+#include <stdarg.h>
 
 #include "pdp11_defs.h"
 #include "pdp11_m9312.h"
@@ -34,8 +35,6 @@ t_stat rom_set_addr (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_addr (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_set_module (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_module (FILE *, UNIT *, int32, CONST void *);
-t_stat rom_set_function (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
-t_stat rom_show_function (FILE *f, UNIT *uptr, int32 val, CONST void *desc);
 t_stat rom_attach (UNIT *uptr, CONST char *cptr);
 t_stat rom_detach (UNIT *uptr);
 t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
@@ -50,10 +49,6 @@ const char *rom_description (DEVICE *dptr);
  *    and image.
  * 2. M9312 module. This module has built-in ROM images on fixed adresses.
  * 
- * Every module type gets its own UNIT and DIB structures to allow switching
- * of module types. The DEVICE structure by default points to the UNITs and DIBs
- * for the blank module. When the user issues a SET ROM TYPE command, the
- * pointers are set to UNITs and DIBs of the specified module type.
  */
 
 #define BLANK_UNIT_FLAGS	UNIT_RO | UNIT_MUSTBUF | UNIT_BUFABLE | UNIT_ATTABLE
@@ -63,7 +58,7 @@ const char *rom_description (DEVICE *dptr);
 module blank =
 {
 	"BLANK",							// Module name
-	ROM_FILE,						// Module type
+	ROM_FILE,							// Module type
 	NUM_BLANK_SOCKETS,					// Number of sockets (units)
 	BLANK_UNIT_FLAGS,					// UNIT flags
 	(rom_socket (*)[]) & blank_sockets	// Pointer to rom_socket structs
@@ -73,7 +68,7 @@ module blank =
 module m9312 =
 {
 	"M9312",							// Module name
-	ROM_BUILTIN,							// Module type
+	ROM_BUILTIN,						// Module type
 	NUM_M9312_SOCKETS,					// Number of sockets (units)
 	M9312_UNIT_FLAGS,					// UNIT flags
 	(rom_socket (*)[]) & m9312_sockets	// Pointer to rom_socket structs
@@ -136,9 +131,6 @@ UNIT rom_unit[MAX_NUMBER_SOCKETS] =
 
 DIB rom_dib[MAX_NUMBER_SOCKETS];
 
-
-
-
 /*
  * Define the ROM device and units modifiers.
  */
@@ -147,8 +139,6 @@ MTAB rom_mod[] = {
 		&rom_set_module, &rom_show_module, NULL, "Module type" },
 	{ MTAB_XTD | MTAB_VUN | MTAB_VALR, 010, "ADDRESS", "ADDRESS",
 		&rom_set_addr, &rom_show_addr, NULL, "Bus address" },
-	{ MTAB_XTD | MTAB_VUN | MTAB_VALR, 010, "FUNCTION", "FUNCTION",
-		&rom_set_function, &rom_show_function, NULL, "ROM Function" },
 	{ 0 }
 };
 
@@ -208,26 +198,25 @@ t_stat rom_set_module (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 				{
 					// Set the currently selected module
 					rom_unit[unit_number].selected_module = module_number;
+
+					// Check if an image is attached 
+					if (rom_unit[unit_number].flags & UNIT_ATT)
+					{
+						// Detach the unit
+						if (rom_detach (&rom_unit[unit_number]) != SCPE_OK)
+							return SCPE_IERR;
+					}
+
+					// Clear addressses and function and initialize flags
+					rom_unit[unit_number].unit_base = 0;
+					rom_unit[unit_number].unit_end = 0;
+					rom_unit[unit_number].flags = module_list[module_number]->flags;
+					rom_unit[unit_number].usage = (int32) NULL;
+
+					// Disable surplus ROMs for this module
+					if (unit_number >= module_list[module_number]->num_sockets)
+						rom_unit[unit_number].flags |= UNIT_DIS;
 				}
-
-				// Check if an image is attached on an unattachable unit
-				if ((rom_unit[unit_number].flags & UNIT_ATT) &&
-					!(module_list[module_number]->flags & UNIT_ATTABLE))
-				{
-					// Detach the unit
-					if (rom_detach (uptr) != SCPE_OK)
-						return SCPE_IERR;
-				}
-
-				// Clear addressses and function and initialize flags
-				rom_unit[unit_number].unit_base = 0;
-				rom_unit[unit_number].unit_end = 0;
-				rom_unit[unit_number].flags = module_list[module_number]->flags;
-				rom_unit[unit_number].usage = (int32) NULL;
-
-				// Disable surplus ROMs for this module
-				if (unit_number >= module_list[module_number]->num_sockets)
-					rom_unit[unit_number].flags |= UNIT_DIS;
 			}
 			return SCPE_OK;
 		}
@@ -237,16 +226,6 @@ t_stat rom_set_module (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 	return SCPE_ARG;
 }
 
-void rom_repair_flags ()
-{
-	if (rom_unit[0].selected_module == ROM_MODULE_M9312)
-	{
-		for (int unit_number = 0; unit_number < MAX_NUMBER_SOCKETS; unit_number++)
-		{
-			rom_unit[unit_number].flags &= ~UNIT_ATTABLE;
-		}
-	}
-}
 
 /* Show ROM module type */
 
@@ -285,8 +264,14 @@ t_stat rom_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 }
 
 
-/* ROM read routine */
-
+/*
+ * ROM read routine 
+ * 
+ * As the iodispR[] entries for the address range are not nullified when the
+ * when build_ubus_tab() is called with a nullified pointer to the read function,
+ * this function can be called while the image is detached. Therefore we have to
+ * check if the read access is valid.
+ */
 t_stat rom_rd (int32 *data, int32 PA, int32 access)
 {
 	uint32 i;
@@ -294,8 +279,7 @@ t_stat rom_rd (int32 *data, int32 PA, int32 access)
 
 	for (i = 0, uptr = rom_dev.units; i < rom_dev.numunits; i++, uptr++)
 	{
-		// if (PA >= blank_rom_unit[i].unit_base && PA < blank_rom_unit[i].unit_end)
-		if (PA >= uptr->unit_base && PA <= uptr->unit_end)
+		if (PA >= uptr->unit_base && PA <= uptr->unit_end && (uptr->flags & UNIT_ATT))
 		{
 			uint16 *image = (uint16 *) uptr->filebuf;
 			*data = image[(PA - uptr->unit_base) >> 1];
@@ -307,21 +291,28 @@ t_stat rom_rd (int32 *data, int32 PA, int32 access)
 }
 
 /*
- * Set name of the specified ROM unit.
+ * Format the parameters according to the specified format and 
+ * store the formatted string in an allocated buffer.
  */
-rom_set_unit_name (int unit_number)
+char* buffer_printf (char* format, ...)
 {
-	int needed_size = snprintf (NULL, 0, "ROM%d: ", unit_number);
-	char *buffer = malloc (needed_size);
+	va_list argp;
+	va_start (argp, format);
+
+	int needed_size = vsnprintf (NULL, 0, format, argp);
+
+	// Allocate a buffer with space for the terminating null character
+	char* buffer = malloc (needed_size + 1);
+
 	if (buffer != NULL)
-	{
-		sprintf (buffer, "ROM%d: ", unit_number);
-		rom_unit[unit_number].uname = buffer;
-	}
+		vsprintf (buffer, format, argp);
+	
+	return buffer;
 }
 
+
 /*
- * Reset function for the ROM modules.
+ * Reset the ROM device.
  * The function is independent of the selected module. It is called
  * (several times) at simh start and when the user issues a RESET command.
  */
@@ -350,8 +341,10 @@ t_stat rom_reset (DEVICE *dptr)
 		// Create the linked list of DIBs
 		rom_dib[unit_number].next = (unit_number < dptr->numunits - 1) ? &rom_dib[unit_number + 1] : NULL;
 
-		// Set the name for this unit
-		rom_set_unit_name (unit_number);
+		// Set the name for this unit if it has not been set already. The test prevents
+		// multiple buffer allocations.
+		if (rom_unit[unit_number].uname == NULL)
+			rom_unit[unit_number].uname = buffer_printf ("ROM%d: ", unit_number);
 
 		// Disable surplus ROMs for this module
 		//if (unit_number >= ((module*) rom_unit[unit_number].selected_module)->num_sockets)
@@ -428,7 +421,7 @@ t_stat rom_show_addr (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 }
 
 
-/* Fill the DIB for the specified unit */
+/* Fill the DIB and build the Unibus table for the specified unit */
 
 t_stat rom_make_dib (UNIT *uptr)
 {
@@ -441,63 +434,12 @@ t_stat rom_make_dib (UNIT *uptr)
 }
 
 
-/* Set M9312 ROM function */
-
-t_stat rom_set_function (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
-{
-	int unit_number = uptr - rom_unit;
-	int selected_module = uptr->selected_module;
-
-	// Is the FUNCTION modifier supported on this module type? 
-	if (module_list[selected_module]->type != ROM_BUILTIN)
-		return SCPE_NOFNC;
-
-	// Is function specified? 
-	if (cptr == NULL)
-		return SCPE_ARG;
-
-	// Search the rom table for the specified function
-	for (rom *romptr = (rom *) m9312_sockets[unit_number].rom_list;
-			romptr->image != NULL; romptr++)
-	{
-		if (strcasecmp (cptr, romptr->device_mnemonic) == 0)
-		{
-			// Set usage, image, adresses and capacity for the specified unit
-			uptr->usage = (int32) romptr->device_mnemonic;
-			uptr->filebuf = romptr->image;
-			uptr->unit_base = m9312_sockets[unit_number].base_address;
-			uptr->unit_end = m9312_sockets[unit_number].base_address +
-				m9312_sockets[unit_number].size - 2;
-			uptr->capac = m9312_sockets[unit_number].size;
-
-			// Fill the DIB for this unit
-			return rom_make_dib (uptr);
-		}
-	}
-
-	// Mnemonic not found
-	return SCPE_ARG;
-}
-
-/* Show M9312 ROM function */
-
-t_stat rom_show_function (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
-{
-	int selected_module = uptr->selected_module;
-
-	if (uptr == NULL)
-		return SCPE_IERR;
-
-	if (module_list[selected_module]->type != ROM_BUILTIN)
-		fprintf (f, "function not supported");
-	else 
-		fprintf (f, "function=%s", (uptr->usage)? (char*) uptr->usage : "none");
-	return SCPE_OK;
-}
-
-
-/* Attach an image to a socket in the BLANK module */
-
+/* 
+ * Attach either file or a built-in ROM image to a socket
+ * 
+ * As the DEV_DONTAUTO flag is not set, an already attached image
+ * is detached before rom_attach() is called.
+ */
 t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 {
 	int unit_number = uptr - rom_unit;
@@ -507,10 +449,6 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 	switch (module_list[selected_module]->type)
 	{
 		case ROM_FILE:
-			// Check the unit is not already attached
-			if (uptr->flags & UNIT_ATT)
-				return SCPE_ALATT;
-
 			// Check the ROM base address is set
 			if (uptr->unit_base == 0)
 				return sim_messagef (SCPE_ARG, "Set address first\n");
@@ -543,16 +481,18 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 			if (cptr == NULL)
 				return SCPE_ARG;
 
-			// Search the rom table for the specified function
+			// Search the rom table for the specified image
 			for (rom* romptr = (rom*) m9312_sockets[unit_number].rom_list;
 				romptr->image != NULL; romptr++)
 			{
 				if (strcasecmp (cptr, romptr->device_mnemonic) == 0)
 				{
 					// Set usage, image, adresses and capacity for the specified unit
+					// The filename string is stored in an allocated buffer as detach_unit()
+					// wants to free the filename.
 					// ToDo: usage field is superfluous?
 					uptr->usage = (int32) romptr->device_mnemonic;
-					uptr->filename = romptr->device_mnemonic;
+					uptr->filename = buffer_printf ("%s", romptr->device_mnemonic);
 					uptr->filebuf = romptr->image;
 					uptr->unit_base = m9312_sockets[unit_number].base_address;
 					uptr->unit_end = m9312_sockets[unit_number].base_address +
@@ -573,29 +513,33 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 	}	
 }
 
-/* Detach */
-
+/*
+ * Detach file or built in image from unit.
+ * Note that although the pointer to the read function in dib->rd is 
+ * nullified, build_ubus_tab() does not clear the iodispR[] entries.
+ */
 t_stat rom_detach (UNIT *uptr)
 {
 	t_stat r;
 	DIB *dib = &rom_dib[uptr - rom_unit];
 	int selected_module = uptr->selected_module;
 
+	// ToDo: Use rom_make_dib()
 	dib->rd = NULL;
 	r = build_ubus_tab (&rom_dev, dib);
 	if (r != SCPE_OK)
 		return r;
-	uptr->unit_end = uptr->unit_base;
+
+	// Leave address intact for modules with separate address
+	// and image specification (i.e. the BLANK module type).
+	if (module_list[selected_module]->type == ROM_FILE)
+		uptr->unit_end = uptr->unit_base;
+	else
+		uptr->unit_end = uptr->unit_base = 0;
+
 	dib->lnt = uptr->capac = 0;
 
-	if (module_list[selected_module]->type == ROM_FILE)
-		return detach_unit (uptr);
-	else
-	{
-		// Module type is ROM_BUILTIN
-		uptr->flags &= ~UNIT_ATT;
-		return SCPE_OK;
-	}
+	return detach_unit (uptr);
 }
 
 
@@ -612,9 +556,9 @@ t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cpt
 	fprintf (st, "For the BLANK module first the ROM unit ADDRESS has to be set, and then\n");
 	fprintf (st, "the ATTACH command can be used to fill the ROM with contents.\n\n");
 	fprintf (st, "The M9312 has five ROM sockets available, ROM0 is used for a Diagnostics/Console Emulator ROM,\n");
-	fprintf (st, "ROMs 1-4 are used for boot ROMs for specific devices. The function of the ROMs\n");
-	fprintf (st, "is specified by means of the FUNCTION modifier. The command 'SET ROM0 FUNCTION=B0'\n");
-	fprintf (st, "for example, puts the ROM B0 in socket 0.\n\n");
+	fprintf (st, "ROMs 1-4 are used for boot ROMs for specific devices. The ATTACH command is used\n");
+	fprintf (st, "to specify the function of the ROM. The command 'ATTACH ROM0 B0' for example\n");
+	fprintf (st, "puts the ROM B0 in socket 0.\n\n");
 	fprintf (st, "Available ROMs for socket 0 are A0, B0, UBI and MEM, available ROMs for\n");
 	fprintf (st, "sockets 1-4 are identified by their device mnemonic.\n");
 	fprintf (st, "The BOOT command is supported for starting from the ROM.\n");
@@ -626,9 +570,11 @@ t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cpt
 
 t_stat rom_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
-	fprintf (st, "The ATTACH command is only available for the BLANK ROM module and is used to specify\n");
-	fprintf (st, "the contents of a ROM unit. The file contents must be a flat binary image.\n");
-	fprintf (st, "The unit ADDRESS must be set first.\n");
+	fprintf (st, "The ATTACH command is used to specify the contents of a ROM unit. For the BLANK\n");
+	fprintf (st, "module a file must be specified. The file contents must be a flat binary image and\n");
+	fprintf (st, "the unit ADDRESS must be set first.\n\n");
+	fprintf (st, "For the M9312 module the function of the ROM must be specified. The units have");
+	fprintf (st, "fixed adresses in the I/O space.");
 	return SCPE_OK;
 }
 
