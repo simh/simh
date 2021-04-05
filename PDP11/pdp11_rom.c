@@ -27,7 +27,7 @@
 /* Forward references */
 
 t_stat rom_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
-t_stat rom_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
+t_stat rom_wr (int32 data, int32 PA, int32 access);
 t_stat rom_rd (int32 *data, int32 PA, int32 access);
 t_stat rom_reset (DEVICE *dptr);
 t_stat rom_boot (int32 u, DEVICE *dptr);
@@ -150,7 +150,7 @@ DEVICE rom_dev =
 	8,									// Data radix
 	16,									// Data width
 	rom_ex,								// Examine routine
-	rom_dep,							// Deposit routine
+	NULL,								// Deposit routine not available
 	rom_reset,							// Reset routine
 	&rom_boot,							// Boot routine
 	&rom_attach,						// Attach routine
@@ -247,14 +247,18 @@ t_stat rom_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 }
 
 
-/* Deposit routine */
-
-t_stat rom_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
+/* 
+ * ROM write routine 
+ * The sole purpose of this function to return a meaningful error message
+ * for a write operation to a ROM device. The standard error message "Address
+ * space exceeded" is inappropriate as the ROM addresses are within the
+ * address space. An SCPE_RO error would be a better fit but that error code
+ * results in an unclear message ("Read only argument"). We therefore chose to
+ * an I/O error. An attempt to write to a ROM device would yield that result.
+ */
+t_stat rom_wr (int32 data, int32 PA, int32 access)
 {
-	uint16 *image = (uint16 *) uptr->filebuf;
-
-	image[(addr - uptr->unit_base) >> 1] = val;
-	return SCPE_OK;
+	return SCPE_IOERR;
 }
 
 
@@ -398,13 +402,15 @@ t_stat rom_show_addr (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 
 /* (Re)set the DIB and build the Unibus table for the specified unit */
 
-t_stat reset_dib (UNIT *uptr, t_stat (reader (int32*, int32, int32)))
+t_stat reset_dib (UNIT *uptr, t_stat (reader (int32*, int32, int32)),
+	t_stat (writer (int32, int32, int32)))
 {
 	DIB *dib = &rom_dib[uptr - rom_unit];
 
 	dib->ba = uptr->unit_base;
 	dib->lnt = uptr->capac;
 	dib->rd = reader;
+	dib->wr = writer;
 	return build_ubus_tab (&rom_dev, dib);
 }
 
@@ -442,7 +448,7 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 				return r;
 
 			// Fill the DIB for the unit
-			r = reset_dib (uptr, &rom_rd);
+			r = reset_dib (uptr, &rom_rd, &rom_wr);
 			if (r != SCPE_OK)
 				return rom_detach (uptr);
 
@@ -473,7 +479,7 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 					uptr->flags |= UNIT_ATT;
 
 					// Fill the DIB for this unit
-					return reset_dib (uptr, &rom_rd);
+					return reset_dib (uptr, &rom_rd, &rom_wr);
 				}
 			}
 
@@ -503,7 +509,7 @@ t_stat rom_detach (UNIT *uptr)
 	else
 		uptr->unit_end = uptr->unit_base = 0;
 
-	r = reset_dib (uptr, NULL);
+	r = reset_dib (uptr, NULL, NULL);
 	if (r != SCPE_OK)
 		return r;
 
