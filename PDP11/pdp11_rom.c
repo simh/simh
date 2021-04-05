@@ -398,7 +398,7 @@ t_stat rom_show_addr (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 
 /* (Re)set the DIB and build the Unibus table for the specified unit */
 
-t_stat reset_dib (UNIT *uptr, t_stat* reader)
+t_stat reset_dib (UNIT *uptr, t_stat (reader (int32*, int32, int32)))
 {
 	DIB *dib = &rom_dib[uptr - rom_unit];
 
@@ -428,8 +428,7 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 			if (uptr->unit_base == 0)
 				return sim_messagef (SCPE_ARG, "Set address first\n");
 
-			// Set quiet mode
-			// ToDo: Find out use of this switch
+			// Set quiet mode to avoid a "buffering file in memory" message
 			sim_switches |= SWMASK ('Q');
 
 			// Check and set unit capacity
