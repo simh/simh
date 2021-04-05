@@ -92,20 +92,14 @@ module* module_list[NUM_MODULES] =
 /*
  * Use some device specific fields in the UNIT structure.
  * 
- * Remarks
- * 1) The u5 and u6 fields are used as pointers. The use of the up7 and up8
- * fields would be more appropriate, but these fields are not saved and restored
- * in a SAVE/RESTORE cycle.
- * 
- * 2) The u5 (selected_module) field is just used to point to the selected
+ * The u5 (selected_module) field is just used to indicate the selected
  * module. It would be more appropriate to use a field in the DEVICE structure 
  * for that purpose, but there is no (device-specific) field in that
  * structure that is saved and restored.
  */
 #define unit_base			u3			/* Base adress of the ROM unit */
 #define unit_end			u4			/* End adress of the ROM unit */
-#define selected_module		u5			/* Pointer to the DIB for this unit */
-#define usage				u6			/* Function usage of the unit */
+#define selected_module		u5			/* Index of module in module_list */
 
 /*
  * The maximum number of sockets is the number of sockets any module can have.
@@ -178,6 +172,8 @@ DEVICE rom_dev =
 
 t_stat rom_set_module (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
+	uint32 unit_number;
+
 	// Is a module type specified? 
 	if (cptr == NULL)
 		return SCPE_ARG;
@@ -189,33 +185,31 @@ t_stat rom_set_module (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 		{
 			// Module type found
 			// Initialize the UNITs with values for this module
-			// ToDo: pointer naar rom_unit[unit_number] zetten
-			for (uint32 unit_number = 0; unit_number < MAX_NUMBER_SOCKETS; unit_number++)
+			for (unit_number = 0, uptr = &rom_unit[0]; unit_number < MAX_NUMBER_SOCKETS; unit_number++, uptr++)
 			{
 				// Check if the selected module differs from the
 				// currently selected module
-				if (rom_unit[unit_number].selected_module != module_number)
+				if (uptr->selected_module != module_number)
 				{
 					// Set the currently selected module
-					rom_unit[unit_number].selected_module = module_number;
+					uptr->selected_module = module_number;
 
 					// Check if an image is attached 
-					if (rom_unit[unit_number].flags & UNIT_ATT)
+					if (uptr->flags & UNIT_ATT)
 					{
 						// Detach the unit
-						if (rom_detach (&rom_unit[unit_number]) != SCPE_OK)
+						if (rom_detach (uptr) != SCPE_OK)
 							return SCPE_IERR;
 					}
 
 					// Clear addressses and function and initialize flags
-					rom_unit[unit_number].unit_base = 0;
-					rom_unit[unit_number].unit_end = 0;
-					rom_unit[unit_number].flags = module_list[module_number]->flags;
-					rom_unit[unit_number].usage = (int32) NULL;
+					uptr->unit_base = 0;
+					uptr->unit_end = 0;
+					uptr->flags = module_list[module_number]->flags;
 
 					// Disable surplus ROMs for this module
 					if (unit_number >= module_list[module_number]->num_sockets)
-						rom_unit[unit_number].flags |= UNIT_DIS;
+						uptr->flags |= UNIT_DIS;
 				}
 			}
 			return SCPE_OK;
@@ -319,25 +313,10 @@ char* buffer_printf (char* format, ...)
 t_stat rom_reset (DEVICE *dptr)
 {
 	uint32 unit_number;
-	// module** mod_dptr = (module**) &rom_unit[0].selected_module;
-
-	// Initialize the selected module if not already initialized
-	// if (rom_unit[0].selected_module == 0)
-	//	rom_unit[0].selected_module = &blank;
-	// if (*mod_dptr == 0)
-	//	*mod_dptr = &blank;
 
 	// Initialize the UNIT and DIB structs 
-	// ToDo: pointer naar rom_unit[unit_number] zetten
 	for (unit_number = 0; unit_number < MAX_NUMBER_SOCKETS; unit_number++)
 	{
-		// Initialize the selected module if not already initialized
-		//if (rom_unit[unit_number].selected_module == ROM_UNITIALIZED)
-		//	rom_unit[unit_number].selected_module = (int32) &blank;
-
-		// Set the flags as specified in the module struct for the selected module
-		//rom_unit[unit_number].flags |= ((module*) rom_unit[unit_number].selected_module)->flags;
-
 		// Create the linked list of DIBs
 		rom_dib[unit_number].next = (unit_number < dptr->numunits - 1) ? &rom_dib[unit_number + 1] : NULL;
 
@@ -345,10 +324,6 @@ t_stat rom_reset (DEVICE *dptr)
 		// multiple buffer allocations.
 		if (rom_unit[unit_number].uname == NULL)
 			rom_unit[unit_number].uname = buffer_printf ("ROM%d: ", unit_number);
-
-		// Disable surplus ROMs for this module
-		//if (unit_number >= ((module*) rom_unit[unit_number].selected_module)->num_sockets)
-		//	rom_unit[unit_number].flags = UNIT_DIS;
 	}
 
 	return SCPE_OK;
@@ -421,15 +396,15 @@ t_stat rom_show_addr (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 }
 
 
-/* Fill the DIB and build the Unibus table for the specified unit */
+/* (Re)set the DIB and build the Unibus table for the specified unit */
 
-t_stat rom_make_dib (UNIT *uptr)
+t_stat reset_dib (UNIT *uptr, t_stat* reader)
 {
 	DIB *dib = &rom_dib[uptr - rom_unit];
 
 	dib->ba = uptr->unit_base;
 	dib->lnt = uptr->capac;
-	dib->rd = &rom_rd;
+	dib->rd = reader;
 	return build_ubus_tab (&rom_dev, dib);
 }
 
@@ -468,7 +443,7 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 				return r;
 
 			// Fill the DIB for the unit
-			r = rom_make_dib (uptr);
+			r = reset_dib (uptr, &rom_rd);
 			if (r != SCPE_OK)
 				return rom_detach (uptr);
 
@@ -487,11 +462,9 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 			{
 				if (strcasecmp (cptr, romptr->device_mnemonic) == 0)
 				{
-					// Set usage, image, adresses and capacity for the specified unit
+					// Set image, adresses and capacity for the specified unit
 					// The filename string is stored in an allocated buffer as detach_unit()
 					// wants to free the filename.
-					// ToDo: usage field is superfluous?
-					uptr->usage = (int32) romptr->device_mnemonic;
 					uptr->filename = buffer_printf ("%s", romptr->device_mnemonic);
 					uptr->filebuf = romptr->image;
 					uptr->unit_base = m9312_sockets[unit_number].base_address;
@@ -501,7 +474,7 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 					uptr->flags |= UNIT_ATT;
 
 					// Fill the DIB for this unit
-					return rom_make_dib (uptr);
+					return reset_dib (uptr, &rom_rd);
 				}
 			}
 
@@ -524,12 +497,6 @@ t_stat rom_detach (UNIT *uptr)
 	DIB *dib = &rom_dib[uptr - rom_unit];
 	int selected_module = uptr->selected_module;
 
-	// ToDo: Use rom_make_dib()
-	dib->rd = NULL;
-	r = build_ubus_tab (&rom_dev, dib);
-	if (r != SCPE_OK)
-		return r;
-
 	// Leave address intact for modules with separate address
 	// and image specification (i.e. the BLANK module type).
 	if (module_list[selected_module]->type == ROM_FILE)
@@ -537,7 +504,9 @@ t_stat rom_detach (UNIT *uptr)
 	else
 		uptr->unit_end = uptr->unit_base = 0;
 
-	dib->lnt = uptr->capac = 0;
+	r = reset_dib (uptr, NULL);
+	if (r != SCPE_OK)
+		return r;
 
 	return detach_unit (uptr);
 }
