@@ -319,20 +319,35 @@ return rmdir (pathbuf);
 /* OS-dependent routines */
 
 /* Optimized file open */
-
-FILE *sim_fopen (const char *file, const char *mode)
+FILE* sim_fopen (const char *file, const char *mode)
 {
+FILE *f;
 char namebuf[PATH_MAX + 1];
+uint8 *without_quotes = NULL;
+uint32 dsize = 0;
 
+if (((*file == '"') && (file[strlen (file) - 1] == '"')) ||
+    ((*file == '\'') && (file[strlen (file) - 1] == '\''))) {
+    without_quotes = (uint8*)malloc (strlen (file) + 1);
+    if (without_quotes == NULL)
+        return NULL;
+    if (SCPE_OK != sim_decode_quoted_string (file, without_quotes, &dsize)) {
+        errno = EINVAL;
+        return NULL;
+    }
+    file = (const char*)without_quotes;
+}
 _sim_expand_homedir (file, namebuf, sizeof (namebuf));
 #if defined (VMS)
-return fopen (namebuf, mode, "ALQ=32", "DEQ=4096",
-        "MBF=6", "MBC=127", "FOP=cbt,tef", "ROP=rah,wbh", "CTX=stm");
+f = fopen (namebuf, mode, "ALQ=32", "DEQ=4096",
+                          "MBF=6", "MBC=127", "FOP=cbt,tef", "ROP=rah,wbh", "CTX=stm");
 #elif (defined (__linux) || defined (__linux__) || defined (__hpux) || defined (_AIX)) && !defined (DONT_DO_LARGEFILE)
-return fopen64 (namebuf, mode);
+f = fopen64 (namebuf, mode);
 #else
-return fopen (namebuf, mode);
+f = fopen (namebuf, mode);
 #endif
+free (without_quotes);
+return f;
 }
 
 #if !defined (DONT_DO_LARGEFILE)
