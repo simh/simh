@@ -15648,6 +15648,127 @@ MClose (f);
 return stat;
 }
 
+typedef const char *(*parse_function)(const char *input, char *output, char end_char);
+struct function_test_data {
+    char end_char;
+    const char *expected_result;
+    const char *expected_remainder;
+    };
+static struct parse_function_test {
+    const char *function_name;
+    parse_function function;
+    const char *input;
+    struct function_test_data test_data[10];
+    } parse_function_tests[] = {
+        {"get_glyph",        get_glyph,         "AbcDe",   {
+            {0,    "ABCDE",   ""}    } },
+        {"get_glyph",        get_glyph,         "AbcDe",   {
+            {'c',  "AB",      "De"},
+            {'c',  "DE",      ""}    } },
+        {"get_glyph",        get_glyph,         "Ab cde",  {
+            {0,    "AB",      "cde"},
+            {0,    "CDE",     ""}    } },
+        {"get_glyph_nc",     get_glyph_nc,      "AbcDe",   {
+            {0,    "AbcDe",   ""}    } },
+        {"get_glyph_nc",     get_glyph_nc,      "AbcDe",   {
+            {'c',  "Ab",      "De"},
+            {'c',  "De",      ""}    } },
+        {"get_glyph_nc",     get_glyph_nc,      "Ab cde",  {
+            {0,    "Ab",      "cde"},
+            {0,    "cde",     ""}    } },
+        {"get_glyph_quoted", get_glyph_quoted,  "AbcDe",   {
+            {0,    "AbcDe",   ""}    } },
+        {"get_glyph_quoted", get_glyph_quoted,  "AbcDe",   {
+            {'c',  "Ab",      "De"},
+            {'c',  "De",      ""}    } },
+        {"get_glyph_quoted", get_glyph_quoted,  "Abc De",   {
+            {0,    "Abc",     "De"},
+            {0,    "De",      ""}    } },
+        {"get_glyph_quoted", get_glyph_quoted,  "\'AbcDe\'",{
+            {0,    "\'AbcDe\'",   ""}    } },
+        {"get_glyph_quoted", get_glyph_quoted,  "\'AbcDe\'",{
+            {'c',  "\'AbcDe\'", ""}    } },
+        {"get_glyph_quoted", get_glyph_quoted,  "\'Abc De\'",{
+            {0,    "\'Abc De\'", ""}    } },
+        {"get_glyph_quoted", get_glyph_quoted,  "\"AbcDe\"",{
+            {0,    "\"AbcDe\"", ""}    } },
+        {"get_glyph_quoted", get_glyph_quoted,  "\"AbcDe\"",{
+            {'c',  "\"AbcDe\"", ""}    } },
+        {"get_glyph_quoted", get_glyph_quoted,  "\"Abc De\"",{
+            {0,    "\"Abc De\"",  ""}    } },
+        {"get_glyph_quoted", get_glyph_quoted,  "\"Abc\" De",{
+            {0,    "\"Abc\"", "De"},
+            {0,    "De",      ""}    } },
+        {"get_glyph_quoted", get_glyph_quoted,  "\'Abc\' De",{
+            {'c',  "\'Abc\'", "De"},
+            {'c',  "De",      ""}    } },
+        {"get_glyph_quoted", get_glyph_quoted,  "\'Abc\' \"De\"",{
+            {0,    "\'Abc\'", "\"De\""},
+            {'c',  "\"De\"",  ""}    } },
+        {"get_glyph_quoted", get_glyph_quoted,  "\'Ab\\c\' \"D\\e\"",{
+            {0,    "\'Ab\\c\'", "\"D\\e\""},
+            {'c',  "\"D\\e\"",  ""}    } },
+        {NULL}
+    };
+
+static t_stat test_scp_parsing (void)
+{
+struct parse_function_test *t = parse_function_tests;
+t_stat result = SCPE_OK;
+
+if (sim_switches & SWMASK ('T'))
+    sim_messagef (SCPE_OK, "test_scp_parsing - starting\n");
+while (t->function_name) {
+    struct function_test_data *d = t->test_data;
+    char gbuf[CBUFSIZE + 1];
+    const char *input = t->input;
+    const char *remainder;
+
+    memset (gbuf, 0xFF, sizeof (gbuf));
+    gbuf[sizeof (gbuf) - 1] = '\0';
+    remainder = t->function ("", gbuf, 0);
+    if (*remainder != '\0')
+        return sim_messagef (SCPE_IERR, "function: %s (\"\", gbuf, 0); returned a non empty string: \"%s\"\n", t->function_name, remainder);
+
+    while (*input) {
+        char end_char_string[32];
+
+        if (sim_isprint (d->end_char))
+            sprintf (end_char_string, "\'%c\'", d->end_char);
+        else
+            if (d->end_char == '\0')
+                strcpy (end_char_string, "0");
+            else
+                sprintf (end_char_string, "'\\%d'", d->end_char);
+        memset (gbuf, 0xFF, sizeof (gbuf));
+        gbuf[sizeof (gbuf) - 1] = '\0';
+        remainder = t->function (input, gbuf, d->end_char);
+        if (sim_switches & SWMASK ('T'))
+            sim_messagef (SCPE_OK, "%s (\"%s\", gbuf, %s);\n", t->function_name, input, end_char_string);
+        if ((0 != strcmp (gbuf, d->expected_result)) || 
+            (remainder == NULL) || (0 != strcmp (remainder, d->expected_remainder))) {
+            if (0 != strcmp (gbuf, d->expected_result))
+                result = sim_messagef (SCPE_IERR, "function: %s (\"%s\", gbuf, %s); returned an unexpected result string: \"%s\" instead of \"%s\"\n", t->function_name, input, end_char_string, gbuf, d->expected_result);
+            if (remainder == NULL)
+                result = sim_messagef (SCPE_IERR, "function: %s (\"%s\", gbuf, %s); returned a NULL pointer for a remnant instead of \"%s\"\n", t->function_name, input, end_char_string, d->expected_result);
+            else {
+                if (0 != strcmp (remainder, d->expected_remainder))
+                    result = sim_messagef (SCPE_IERR, "function: %s (\"%s\", gbuf, %s); returned a remnant of \"%s\" instead of \"%s\"\n", t->function_name, input, end_char_string, remainder, d->expected_result);
+                }
+            remainder = d->expected_result;
+            }
+        input = remainder;
+        ++d;
+        if (((input == NULL) || (*input != '\0')) && (d->expected_result == NULL))
+            return sim_messagef (SCPE_IERR, "Invalid test configuration detected\n");
+        }
+    ++t;
+    }
+if (sim_switches & SWMASK ('T'))
+    sim_messagef (SCPE_OK, "test_scp_parsing - done\n");
+return result;
+}
+
 static t_stat sim_scp_svc (UNIT *uptr)
 {
 sim_printf ("Unit %s fired at %.0f\n", sim_uname (uptr), sim_gtime ());
@@ -15774,7 +15895,7 @@ sim_switches = saved_switches;
 cptr = get_glyph (cptr, gbuf, 0);
 if (gbuf[0] == '\0')
     strcpy (gbuf, "ALL");
-if (strcmp (gbuf, "ALL") != 0) {
+if ((strcmp (gbuf, "ALL") != 0) && (strcmp (gbuf, "SCP") != 0)) {
     if (!find_dev (gbuf))
         return sim_messagef (SCPE_ARG, "No such device: %s\n", gbuf);
     }
@@ -15785,8 +15906,12 @@ if (sim_switches & SWMASK ('D')) {
     sim_set_debon (0, "STDOUT");
     sim_switches = saved_switches;
     }
-if (test_scp_event_sequencing () != SCPE_OK)
-    return sim_messagef (SCPE_IERR, "SCP event sequencing test failed\n");
+if ((strcmp (gbuf, "ALL") == 0) || (strcmp (gbuf, "SCP") == 0)) {
+    if (test_scp_parsing () != SCPE_OK)
+        return sim_messagef (SCPE_IERR, "SCP parsing test failed\n");
+    if (test_scp_event_sequencing () != SCPE_OK)
+        return sim_messagef (SCPE_IERR, "SCP event sequencing test failed\n");
+}
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
     t_stat tstat = SCPE_OK;
     t_bool was_disabled = ((dptr->flags & DEV_DIS) != 0);
