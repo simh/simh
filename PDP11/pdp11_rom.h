@@ -81,7 +81,7 @@ typedef struct
 	module_type type;					/* Module type */
 	const uint32 num_sockets;			/* Number of sockets for the module*/
 	uint32 flags;						/* Flags for initialization of the UNIT flag field*/
-	rom_socket (*socket)[];				/* Sockets for this module */
+	rom_socket (*sockets)[];			/* Sockets for this module */
 }
 module;
 

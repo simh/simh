@@ -23,6 +23,7 @@
 
 #include "pdp11_defs.h"
 #include "pdp11_m9312.h"
+#include "pdp11_vt40boot.h"
 
 /* Forward references */
 
@@ -44,15 +45,27 @@ const char *rom_description (DEVICE *dptr);
 /*
  * ROM data structures
  *
- * The ROM device supports two types of modules:
- * 1. Blank module. This module is freely configurable with the ROM base address
+ * The ROM device is described by means of the following data structures:
+ * 1. A list of modules. The ROM device supports three modules:
+ *	  a) BLANK module. This module is freely configurable with the ROM base address
  *    and image.
- * 2. M9312 module. This module has built-in ROM images on fixed adresses.
+ *	  b) M9312 module. This module has built-in ROM images on fixed adresses is available
+ *    on all Unibus models.
+ *    c) VT40 module. This module is for use in the GT40 model.
+ * 
+ * 2. Every module comprises a number of sockets. Every socket has a base address and
+ *    a size in the I/O address space. Every socket is represented as a unit in
+ *    the ROM device.
+ * 
+ * 3. A socket points to a list of ROMs that are available for that socket. So, per
+ *    module and unit one or more ROMs are available.
+ * 
+ * 4. Every ROM comprises an identification of the ROM in the form of a mnemonic
+ *    and the image of the ROM.
  * 
  */
 
-#define BLANK_UNIT_FLAGS	UNIT_RO | UNIT_MUSTBUF | UNIT_BUFABLE | UNIT_ATTABLE
-#define M9312_UNIT_FLAGS	UNIT_RO | UNIT_MUSTBUF | UNIT_BUFABLE | UNIT_ATTABLE
+#define ROM_UNIT_FLAGS	UNIT_RO | UNIT_MUSTBUF | UNIT_BUFABLE | UNIT_ATTABLE
 
  // Define the default "blank" ROM module
 module blank =
@@ -60,7 +73,7 @@ module blank =
 	"BLANK",							// Module name
 	ROM_FILE,							// Module type
 	NUM_BLANK_SOCKETS,					// Number of sockets (units)
-	BLANK_UNIT_FLAGS,					// UNIT flags
+	ROM_UNIT_FLAGS,						// UNIT flags
 	(rom_socket (*)[]) & blank_sockets	// Pointer to rom_socket structs
 };
 
@@ -70,22 +83,33 @@ module m9312 =
 	"M9312",							// Module name
 	ROM_BUILTIN,						// Module type
 	NUM_M9312_SOCKETS,					// Number of sockets (units)
-	M9312_UNIT_FLAGS,					// UNIT flags
+	ROM_UNIT_FLAGS,						// UNIT flags
 	(rom_socket (*)[]) & m9312_sockets	// Pointer to rom_socket structs
 };
 
+// Define the VT40 module
+module vt40 =
+{
+	"VT40",								// Module name
+	ROM_BUILTIN,						// Module type
+	NUM_VT40_SOCKETS,					// Number of sockets (units)
+	ROM_UNIT_FLAGS,						// UNIT flags
+	(rom_socket (*)[]) & vt40_sockets	// Pointer to rom_socket structs
+};
+
 /*
- * De fine the number of modules and their order in the module list. 
+ * Define the number of modules. The BLANK module must be the
+ * module in the list.
  */
-#define NUM_MODULES 2
-#define ROM_MODULE_BLANK		0
-#define ROM_MODULE_M9312		1
+#define NUM_MODULES			3
+#define ROM_MODULE_BLANK	0
 
 // The list of available ROM modules
 module* module_list[NUM_MODULES] =
 {
 	&blank,
 	&m9312,
+	&vt40,
 };
 
 
@@ -116,11 +140,11 @@ module* module_list[NUM_MODULES] =
 
 UNIT rom_unit[MAX_NUMBER_SOCKETS] =
 {
-	{ ROM_UNIT_INIT (BLANK_UNIT_FLAGS, ROM_MODULE_BLANK) },
-	{ ROM_UNIT_INIT (BLANK_UNIT_FLAGS, ROM_MODULE_BLANK) },
-	{ ROM_UNIT_INIT (BLANK_UNIT_FLAGS, ROM_MODULE_BLANK) },
-	{ ROM_UNIT_INIT (BLANK_UNIT_FLAGS, ROM_MODULE_BLANK) },
-	{ ROM_UNIT_INIT (BLANK_UNIT_FLAGS | UNIT_DIS, ROM_MODULE_BLANK) },
+	{ ROM_UNIT_INIT (ROM_UNIT_FLAGS, ROM_MODULE_BLANK) },
+	{ ROM_UNIT_INIT (ROM_UNIT_FLAGS, ROM_MODULE_BLANK) },
+	{ ROM_UNIT_INIT (ROM_UNIT_FLAGS, ROM_MODULE_BLANK) },
+	{ ROM_UNIT_INIT (ROM_UNIT_FLAGS, ROM_MODULE_BLANK) },
+	{ ROM_UNIT_INIT (ROM_UNIT_FLAGS | UNIT_DIS, ROM_MODULE_BLANK) },
 };
 
 DIB rom_dib[MAX_NUMBER_SOCKETS];
@@ -423,11 +447,12 @@ t_stat reset_dib (UNIT *uptr, t_stat (reader (int32*, int32, int32)),
  */
 t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 {
+	// int unit_number = uptr - rom_unit;
+	int module_number = uptr->selected_module;
 	int unit_number = uptr - rom_unit;
-	int selected_module = uptr->selected_module;
 	t_stat r;
 
-	switch (module_list[selected_module]->type)
+	switch (module_list[module_number]->type)
 	{
 		case ROM_FILE:
 			// Check the ROM base address is set
@@ -461,9 +486,13 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 			if (cptr == NULL)
 				return SCPE_ARG;
 
-			// Search the rom table for the specified image
-			for (rom* romptr = (rom*) m9312_sockets[unit_number].rom_list;
-				romptr->image != NULL; romptr++)
+			// Get a pointer to the selected module and from that a pointer to
+			// socket for the unit
+			module* modptr = *(module_list + uptr->selected_module);
+			rom_socket* socketptr = *modptr->sockets + unit_number;
+		
+			// Search the list of ROMs for this socket for the specified image
+			for (rom* romptr = (rom*) socketptr->rom_list; romptr->image != NULL; romptr++)
 			{
 				if (strcasecmp (cptr, romptr->device_mnemonic) == 0)
 				{
@@ -472,10 +501,9 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 					// wants to free the filename.
 					uptr->filename = buffer_printf ("%s", romptr->device_mnemonic);
 					uptr->filebuf = romptr->image;
-					uptr->unit_base = m9312_sockets[unit_number].base_address;
-					uptr->unit_end = m9312_sockets[unit_number].base_address +
-						m9312_sockets[unit_number].size - 2;
-					uptr->capac = m9312_sockets[unit_number].size;
+					uptr->unit_base = socketptr->base_address;
+					uptr->unit_end = socketptr->base_address + socketptr->size;
+					uptr->capac = socketptr->size;
 					uptr->flags |= UNIT_ATT;
 
 					// Fill the DIB for this unit

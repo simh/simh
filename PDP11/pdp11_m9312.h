@@ -507,7 +507,5 @@ rom_socket m9312_sockets[NUM_M9312_SOCKETS] =
 	{017773600, 128, (rom (*)[]) &boot_roms},		// ROM 4
 };
 
-
-
 #endif
 
