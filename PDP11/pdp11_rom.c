@@ -236,6 +236,22 @@ t_stat rom_set_module (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 						uptr->flags |= UNIT_DIS;
 				}
 			}
+
+			// If this module has just one unit and that unit has just one possible
+			// image attach the image to the unit
+			if (module_list[module_number]->num_sockets == 1)
+			{
+				int num_roms = 0;
+				rom_socket* socketptr = *module_list[module_number]->sockets;
+				
+				// Count the number of ROMS for this socket
+				for (rom* romptr = (rom*) socketptr->rom_list; romptr->image != NULL; romptr++)
+					num_roms++;
+
+				if (num_roms == 1)
+					// Attach the first image to the first unit
+					rom_attach (&rom_unit[0], ((rom*) socketptr->rom_list)->device_mnemonic);
+			}
 			return SCPE_OK;
 		}
 	}
@@ -550,19 +566,22 @@ t_stat rom_detach (UNIT *uptr)
 t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
 	fprintf (st, "ROM, Read-Only Memory\n\n");
-	fprintf (st, "The ROM device can be used to add ROM modules to the I/O page. Two module\n");
-	fprintf (st, "types are available, the BLANK and the M9312 module. The contents\n");
-	fprintf (st, "of the BLANK ROM module have to specified by setting the ROM's base address\n");
-	fprintf (st, "and ROM image. The contents of the M9312 ROM's are built in and can be set\n");
-	fprintf (st, "by specifying its function.\n\n");
-	fprintf (st, "For the BLANK module first the ROM unit ADDRESS has to be set, and then\n");
+	fprintf (st, "The ROM device can be used to add ROM modules to the I/O page. Three module\n");
+	fprintf (st, "types are available, the BLANK, the M9312 and the VT40 module. The module\n");
+	fprintf (st, "is selected by means of the MODULE modifier.\n");
+	fprintf (st, "The contents of the BLANK ROM module have to be specified by setting the ROM's\n");
+	fprintf (st, "base address and ROM image. First the ROM unit ADDRESS has to be set, and then\n");
 	fprintf (st, "the ATTACH command can be used to fill the ROM with contents.\n\n");
-	fprintf (st, "The M9312 has five ROM sockets available, ROM0 is used for a Diagnostics/Console Emulator ROM,\n");
-	fprintf (st, "ROMs 1-4 are used for boot ROMs for specific devices. The ATTACH command is used\n");
-	fprintf (st, "to specify the function of the ROM. The command 'ATTACH ROM0 B0' for example\n");
-	fprintf (st, "puts the ROM B0 in socket 0.\n\n");
+	fprintf (st, "The contents of the M9312 ROM's are built in and can be set by specifying its\n");
+	fprintf (st, "function. The M9312 has five ROM sockets available, ROM0 is used for a\n");
+	fprintf (st, "Diagnostics/Console Emulator ROM and ROMs 1-4 are used for boot ROMs for specific\n");
+	fprintf (st, "devices. The ATTACH command is used to specify the function of the ROM. The command\n");
+	fprintf (st, "'ATTACH ROM0 B0' for example puts the ROM B0 in socket 0.\n");
 	fprintf (st, "Available ROMs for socket 0 are A0, B0, UBI and MEM, available ROMs for\n");
-	fprintf (st, "sockets 1-4 are identified by their device mnemonic.\n");
+	fprintf (st, "sockets 1-4 are identified by their device mnemonic.\n\n");
+	fprintf (st, "The VT40 module is meant for the GT-40 graphic terminal, based on a PDP-11/05. The VT40\n");
+	fprintf (st, "included a bootstrap ROM. The module has just one socket with one available ROM and a\n");
+	fprintf (st, "'SET ROM MODULE=VT40' command suffices to select this boot ROM.\n");
 	fprintf (st, "The BOOT command is supported for starting from the ROM.\n");
 	return SCPE_OK;
 }
@@ -575,8 +594,8 @@ t_stat rom_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
 	fprintf (st, "The ATTACH command is used to specify the contents of a ROM unit. For the BLANK\n");
 	fprintf (st, "module a file must be specified. The file contents must be a flat binary image and\n");
 	fprintf (st, "the unit ADDRESS must be set first.\n\n");
-	fprintf (st, "For the M9312 module the function of the ROM must be specified. The units have");
-	fprintf (st, "fixed adresses in the I/O space.");
+	fprintf (st, "For the M9312 module the function of the ROM must be specified. The units have\n");
+	fprintf (st, "fixed adresses in the I/O space.\n");
 	return SCPE_OK;
 }
 
