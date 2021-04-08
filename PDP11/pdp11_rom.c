@@ -42,6 +42,10 @@ t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cpt
 t_stat rom_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 const char *rom_description (DEVICE *dptr);
 
+/* External references */
+extern uint32 cpu_type;
+extern uint32 cpu_opt;
+
 /*
  * ROM data structures
  *
@@ -66,12 +70,16 @@ const char *rom_description (DEVICE *dptr);
  */
 
 #define ROM_UNIT_FLAGS	UNIT_RO | UNIT_MUSTBUF | UNIT_BUFABLE | UNIT_ATTABLE
+#define QBUS_MODEL		(1u << 0)
+#define UNIBUS_MODEL	(1u << 1)
 
  // Define the default "blank" ROM module
 module blank =
 {
 	"BLANK",							// Module name
 	ROM_FILE,							// Module type
+	CPUT_ALL,							// Required CPU types
+	QBUS_MODEL | UNIBUS_MODEL,			// Required CPU options
 	NUM_BLANK_SOCKETS,					// Number of sockets (units)
 	ROM_UNIT_FLAGS,						// UNIT flags
 	(rom_socket (*)[]) & blank_sockets	// Pointer to rom_socket structs
@@ -82,6 +90,8 @@ module m9312 =
 {
 	"M9312",							// Module name
 	ROM_BUILTIN,						// Module type
+	CPUT_ALL,							// Required CPU types
+	UNIBUS_MODEL,						// Required CPU options
 	NUM_M9312_SOCKETS,					// Number of sockets (units)
 	ROM_UNIT_FLAGS,						// UNIT flags
 	(rom_socket (*)[]) & m9312_sockets	// Pointer to rom_socket structs
@@ -92,6 +102,8 @@ module vt40 =
 {
 	"VT40",								// Module name
 	ROM_BUILTIN,						// Module type
+	CPUT_05,							// Required CPU types
+	UNIBUS_MODEL,						// Required CPU options
 	NUM_VT40_SOCKETS,					// Number of sockets (units)
 	ROM_UNIT_FLAGS,						// UNIT flags
 	(rom_socket (*)[]) & vt40_sockets	// Pointer to rom_socket structs
@@ -197,6 +209,7 @@ DEVICE rom_dev =
 t_stat rom_set_module (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
 	uint32 unit_number;
+	uint32 bus = UNIBUS ? UNIBUS_MODEL : QBUS_MODEL;
 
 	// Is a module type specified? 
 	if (cptr == NULL)
@@ -207,6 +220,11 @@ t_stat rom_set_module (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 	{
 		if (strcasecmp (cptr, module_list[module_number]->name) == 0)
 		{
+			// Check if the module is allowed on this cpu type and options
+			if (!(CPUT (module_list[module_number]->valid_cpu_types) &&
+				bus & module_list[module_number]->valid_cpu_opts))
+					return SCPE_INVSW;
+
 			// Module type found
 			// Initialize the UNITs with values for this module
 			for (unit_number = 0, uptr = &rom_unit[0]; unit_number < MAX_NUMBER_SOCKETS; unit_number++, uptr++)
