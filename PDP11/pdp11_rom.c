@@ -45,6 +45,7 @@ const char *rom_description (DEVICE *dptr);
 /* External references */
 extern uint32 cpu_type;
 extern uint32 cpu_opt;
+extern int32 HITMISS;
 
 /*
  * ROM data structures
@@ -472,6 +473,14 @@ t_stat reset_dib (UNIT *uptr, t_stat (reader (int32*, int32, int32)),
 	return build_ubus_tab (&rom_dev, dib);
 }
 
+/*
+ * Set the HITMISS register to 1 so the cache tests 16 and 17 of the
+ * B0 11/60,70 Diagnostic ROM will succeed and the system will boot.
+ */
+void setHITMISS ()
+{
+	HITMISS = 1;
+}
 
 /* 
  * Attach either file or a built-in ROM image to a socket
@@ -539,6 +548,10 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 					uptr->unit_end = socketptr->base_address + socketptr->size;
 					uptr->capac = socketptr->size;
 					uptr->flags |= UNIT_ATT;
+
+					// Execute rom specific function if available
+					if (romptr->rom_attached != NULL)
+						(*romptr->rom_attached)();
 
 					// Fill the DIB for this unit
 					return reset_dib (uptr, &rom_rd, &rom_wr);

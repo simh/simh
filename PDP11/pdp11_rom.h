@@ -37,12 +37,15 @@
 
 /*
  * The rom structure contains the image for the rom plus an
- * identifying device mnemonic.
+ * identifying device mnemonic. The structure also contains a
+ *  pointer to a function that is called when that specific ROM
+ *  is attached. 
  */
 typedef struct
 {
-	char device_mnemonic[5];
-	uint16 (*image)[];
+	char device_mnemonic[5];			/* ROM identifier */
+	void (*rom_attached)();				/* ROM specific function */
+	uint16 (*image)[];					/* ROM image */
 }
 rom;
 
