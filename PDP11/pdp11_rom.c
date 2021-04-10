@@ -362,26 +362,6 @@ t_stat rom_rd (int32 *data, int32 PA, int32 access)
 	return SCPE_NXM;
 }
 
-/*
- * Format the parameters according to the specified format and 
- * store the formatted string in an allocated buffer.
- */
-char* buffer_printf (char* format, ...)
-{
-	va_list argp;
-	va_start (argp, format);
-
-	int needed_size = vsnprintf (NULL, 0, format, argp);
-
-	// Allocate a buffer with space for the terminating null character
-	char* buffer = malloc (needed_size + 1);
-
-	if (buffer != NULL)
-		vsprintf (buffer, format, argp);
-	
-	return buffer;
-}
-
 
 /*
  * Reset the ROM device.
@@ -401,17 +381,9 @@ t_stat rom_reset (DEVICE *dptr)
 	if (cpu_type != cpu_type_on_selection)
 		rom_set_module (&rom_unit[0], 0, "BLANK", NULL);
 
-	// Initialize the UNIT and DIB structs 
+	// Initialize the UNIT and DIB structs and create the linked list of DIBs
 	for (unit_number = 0; unit_number < MAX_NUMBER_SOCKETS; unit_number++)
-	{
-		// Create the linked list of DIBs
 		rom_dib[unit_number].next = (unit_number < dptr->numunits - 1) ? &rom_dib[unit_number + 1] : NULL;
-
-		// Set the name for this unit if it has not been set already. The test prevents
-		// multiple buffer allocations.
-		if (rom_unit[unit_number].uname == NULL)
-			rom_unit[unit_number].uname = buffer_printf ("ROM%d: ", unit_number);
-	}
 
 	return SCPE_OK;
 }
@@ -566,7 +538,7 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 					// Set image, adresses and capacity for the specified unit
 					// The filename string is stored in an allocated buffer as detach_unit()
 					// wants to free the filename.
-					uptr->filename = buffer_printf ("%s", romptr->device_mnemonic);
+					uptr->filename = strdup (romptr->device_mnemonic);
 					uptr->filebuf = romptr->image;
 					uptr->unit_base = socketptr->base_address;
 					uptr->unit_end = socketptr->base_address + socketptr->size;
