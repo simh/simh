@@ -47,6 +47,9 @@ extern uint32 cpu_type;
 extern uint32 cpu_opt;
 extern int32 HITMISS;
 
+/* Static definitions */
+static uint32 cpu_type_on_selection;		/* cpu_type for which module type was selected */
+
 /*
  * ROM data structures
  *
@@ -204,13 +207,23 @@ DEVICE rom_dev =
 	&rom_description	                // Description routine
 };
 
+/*
+ * Check if the module type to be set is valid on the selected 
+ * cpu_opt and cpu_type
+ */
+int module_type_is_valid (int module_number)
+{
+	uint32 bus = UNIBUS ? UNIBUS_MODEL : QBUS_MODEL;
+
+	return CPUT (module_list[module_number]->valid_cpu_types) &&
+		bus & module_list[module_number]->valid_cpu_opts;
+}
 
 /* Set ROM module type */
 
 t_stat rom_set_module (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
 	uint32 unit_number;
-	uint32 bus = UNIBUS ? UNIBUS_MODEL : QBUS_MODEL;
 
 	// Is a module type specified? 
 	if (cptr == NULL)
@@ -221,10 +234,12 @@ t_stat rom_set_module (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 	{
 		if (strcasecmp (cptr, module_list[module_number]->name) == 0)
 		{
-			// Check if the module is allowed on this cpu type and options
-			if (!(CPUT (module_list[module_number]->valid_cpu_types) &&
-				bus & module_list[module_number]->valid_cpu_opts))
+			// Check if the module is allowed on this cpu and bus type
+			if (!module_type_is_valid (module_number))
 					return SCPE_INVSW;
+
+			// Save current cpu type for reference in rom_reset()
+			cpu_type_on_selection = cpu_type;
 
 			// Module type found
 			// Initialize the UNITs with values for this module
@@ -371,11 +386,20 @@ char* buffer_printf (char* format, ...)
 /*
  * Reset the ROM device.
  * The function is independent of the selected module. It is called
- * (several times) at simh start and when the user issues a RESET command.
+ * (several times) at simh start and when the user issues a RESET or
+ * a SET CPU command.
+ * Reset also tries to maintain a consistent CPU/ROM combination. It
+ * checks if the CPU type is changed and in that case selects the BLANK
+ * module type as that is a module type valid on all CPU's and busses.
  */
 t_stat rom_reset (DEVICE *dptr)
 {
 	uint32 unit_number;
+
+	// Check if the CPU opt and/or type has been changed since the module
+	// type was selected. If so, select the BLANK module.
+	if (cpu_type != cpu_type_on_selection)
+		rom_set_module (&rom_unit[0], 0, "BLANK", NULL);
 
 	// Initialize the UNIT and DIB structs 
 	for (unit_number = 0; unit_number < MAX_NUMBER_SOCKETS; unit_number++)
