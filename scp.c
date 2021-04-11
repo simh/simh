@@ -15730,7 +15730,7 @@ while (t->function_name) {
     if (*remainder != '\0')
         return sim_messagef (SCPE_IERR, "function: %s (\"\", gbuf, 0); returned a non empty string: \"%s\"\n", t->function_name, remainder);
 
-    while (*input) {
+    while ((input != NULL) && (*input != '\0')) {
         char end_char_string[32];
 
         if (sim_isprint (d->end_char))

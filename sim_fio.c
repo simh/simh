@@ -332,6 +332,7 @@ if (((*file == '"') && (file[strlen (file) - 1] == '"')) ||
     if (without_quotes == NULL)
         return NULL;
     if (SCPE_OK != sim_decode_quoted_string (file, without_quotes, &dsize)) {
+        free (without_quotes);
         errno = EINVAL;
         return NULL;
     }
