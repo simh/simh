@@ -235,8 +235,6 @@
 
 #include "system_defs.h"
 
-#if defined (I8237_NUM) && (I8237_NUM > 0)
-
 /* external globals */
 
 /* internal function prototypes */
@@ -842,7 +840,5 @@ uint8 i8237_rFx(t_bool io, uint8 data, uint8 devnum)
     }
     return 0;
 }
-
-#endif /* I8237_NUM > 0 */
 
 /* end of i8237.c */

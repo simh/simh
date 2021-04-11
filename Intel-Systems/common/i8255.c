@@ -26,7 +26,7 @@
     MODIFICATIONS:
 
         ?? ??? 10 - Original file.
-        16 Dec 12 - Modified to use isbc_80_10.cfg file to set baseport and size.
+        16 Dec 12 - Modified to use isbc_80_10.cfg file to set i8255_baseport and size.
         24 Apr 15 -- Modified to use simh_debug
 
     NOTES:
@@ -77,12 +77,15 @@
 
 #include "system_defs.h"                /* system header in system dir */
 
-#if defined (I8255_NUM) && (I8255_NUM > 0)
+#define i8255_NAME    "Intel i8255 PIA Chip"
 
 /* internal function prototypes */
 
-t_stat i8255_cfg(uint8 base, uint8 devnum);
+t_stat i8255_cfg(uint16 base, uint16 devnum, uint8 dummy);
+t_stat i8255_clr(void);
+t_stat i8255_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat i8255_reset (DEVICE *dptr);
+t_stat i8255_reset_dev ();
 uint8 i8255a(t_bool io, uint8 data, uint8 devnum);
 uint8 i8255b(t_bool io, uint8 data, uint8 devnum);
 uint8 i8255c(t_bool io, uint8 data, uint8 devnum);
@@ -90,15 +93,24 @@ uint8 i8255s(t_bool io, uint8 data, uint8 devnum);
 
 /* external function prototypes */
 
-extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint16, uint16, uint8);
+extern uint8 unreg_dev(uint16);
 
 /* globals */
 
+static const char* i8255_desc(DEVICE *dptr) {
+    return i8255_NAME;
+}
+int     i8255_num = 0;
+int     i8255_baseport[] = { -1, -1, -1, -1 }; //base port
+uint8   i8255_intnum[4] = { 0, 0, 0, 0 }; //interrupt number
+uint8   i8255_verb[4] = { 0, 0, 0, 0 }; //verbose flag
+
 /* these bytes represent the input and output to/from a port instance */
 
-uint8 i8255_A[I8255_NUM];               //port A byte I/O
-uint8 i8255_B[I8255_NUM];               //port B byte I/O
-uint8 i8255_C[I8255_NUM];               //port C byte I/O
+uint8 i8255_A[4];               //port A byte I/O
+uint8 i8255_B[4];               //port B byte I/O
+uint8 i8255_C[4];               //port C byte I/O
 
 /* external globals */
 
@@ -132,6 +144,18 @@ REG i8255_reg[] = {
     { NULL }
 };
 
+MTAB i8255_mod[] = {
+//    { MTAB_XTD | MTAB_VDV, 0, NULL, "VERB", &isbc202_set_verb,
+//        NULL, NULL, "Sets the verbose mode for i8255"},
+//    { MTAB_XTD | MTAB_VDV, 0, NULL, "PORT", &isbc202_set_port,
+//        NULL, NULL, "Sets the base port for i8255"},
+//    { MTAB_XTD | MTAB_VDV, 0, NULL, "INT", &isbc202_set_int,
+//        NULL, NULL, "Sets the interrupt number for i8255"},
+    { MTAB_XTD | MTAB_VDV, 0, "PARAM", NULL, NULL, i8255_show_param, NULL, 
+        "show configured parametes for i8255" },
+    { 0 }
+};
+
 DEBTAB i8255_debug[] = {
     { "ALL", DEBUG_all },
     { "FLOW", DEBUG_flow },
@@ -148,7 +172,7 @@ DEVICE i8255_dev = {
     "I8255",            //name
     i8255_unit,         //units
     i8255_reg,          //registers
-    NULL,               //modifiers
+    i8255_mod,          //modifiers
     I8255_NUM,          //numunits 
     16,                 //aradix
     16,                 //awidth
@@ -162,23 +186,70 @@ DEVICE i8255_dev = {
     NULL,               //attach
     NULL,               //detach
     NULL,               //ctxt
-    0,                  //flags
+    DEV_DEBUG+DEV_DISABLE+DEV_DIS, //flags 
     0,                  //dctrl
     i8255_debug,        //debflags
     NULL,               //msize
-    NULL                //lname
+    NULL,               //lname
+    NULL,               //help routine
+    NULL,               //attach help routine
+    NULL,               //help context
+    &i8255_desc         //device description
 };
 
 // i8255 configuration
 
-t_stat i8255_cfg(uint8 base, uint8 devnum)
+t_stat i8255_cfg(uint16 base, uint16 devnum, uint8 dummy)
 {
-    sim_printf("    i8255[%d]: at base port 0%02XH\n",
-        devnum, base & 0xFF);
-    reg_dev(i8255a, base, devnum); 
-    reg_dev(i8255b, base + 1, devnum); 
-    reg_dev(i8255c, base + 2, devnum); 
-    reg_dev(i8255s, base + 3, devnum); 
+    DEVICE *dptr;
+    
+    dptr = find_dev (i8255_dev.name);
+    i8255_baseport[devnum] = base & 0xff;
+    sim_printf("    i8255%d: installed at base port 0%02XH\n",
+        devnum, i8255_baseport[devnum]);
+    reg_dev(i8255a, i8255_baseport[devnum], devnum, 0); 
+    reg_dev(i8255b, i8255_baseport[devnum] + 1, devnum, 0); 
+    reg_dev(i8255c, i8255_baseport[devnum] + 2, devnum, 0); 
+    reg_dev(i8255s, i8255_baseport[devnum] + 3, devnum, 0);
+    i8255_num++;
+    return SCPE_OK;
+}
+
+t_stat i8255_clr(void)
+{
+    int i;
+    
+    for (i=0; i<i8255_num; i++) {
+        unreg_dev(i8255_baseport[i]); 
+        unreg_dev(i8255_baseport[i] + 1); 
+        unreg_dev(i8255_baseport[i] + 2); 
+        unreg_dev(i8255_baseport[i] + 3);
+        i8255_baseport[i] = -1;
+        i8255_intnum[i] = 0;
+        i8255_verb[i] = 0;
+    }
+    i8255_num = 0; 
+    return SCPE_OK;
+}
+
+// show configuration parameters
+
+t_stat i8255_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    int i;
+    
+    if (uptr == NULL)
+        return SCPE_ARG;
+    fprintf(st, "Device %s\n", ((i8255_dev.flags & DEV_DIS) == 0) ? "Enabled" : "Disabled");
+    for (i=0; i<i8255_num; i++) {
+        fprintf(st, "Unit %d at Base port ", i);
+        fprintf(st, "0%02X ", i8255_baseport[i]);
+        fprintf(st, "Interrupt # is ");
+        fprintf(st, "%d ", i8255_intnum[i]);
+        fprintf(st, "Mode ");
+        fprintf(st, "%s", i8255_verb[i] ? "Verbose" : "Quiet");
+        if (i<i8255_num && i8255_num != 1) fprintf(st, "\n");
+    }
     return SCPE_OK;
 }
 
@@ -186,9 +257,17 @@ t_stat i8255_cfg(uint8 base, uint8 devnum)
 
 t_stat i8255_reset (DEVICE *dptr)
 {
+//    if ((dptr->flags & DEV_DIS) == 0) { // enabled
+        i8255_reset_dev();              //software reset
+//    }
+    return SCPE_OK;
+}
+
+t_stat i8255_reset_dev ()
+{
     uint8 devnum;
     
-    for (devnum = 0; devnum < I8255_NUM; devnum++) {
+    for (devnum = 0; devnum < i8255_num+1; devnum++) {
         i8255_unit[devnum].u3 = 0x9B; /* control */
         i8255_A[devnum] = 0xFF; /* Port A */
         i8255_B[devnum] = 0xFF; /* Port B */
@@ -269,7 +348,5 @@ uint8 i8255c(t_bool io, uint8 data, uint8 devnum)
     }
     return 0;
 }
-
-#endif /* I8255_NUM > 0 */
 
 /* end of i8255.c */

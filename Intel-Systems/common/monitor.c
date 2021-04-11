@@ -1,4 +1,4 @@
-/*  front_panel.c: Intel MDS-800 Front Panel Module simulator
+/*  monitor.c: Intel MDS-800 Monitor Module simulator
 
     Copyright (c) 2010, William A. Beech
 
@@ -33,36 +33,40 @@
 
 /* function prototypes */
 
-t_stat fp_reset (void);
-t_stat fp_cfg(void);
+t_stat monitor_cfg(uint16 base, uint16 size, uint8 devnum);
+t_stat monitor_reset (DEVICE *dptr);
 
 /* external function prototypes */
 
-extern uint8 EPROM_get_mbyte(uint16 addr);
+extern t_stat i8251_reset(DEVICE *dptr);
+extern t_stat i8251_cfg(uint16 base, uint16 devnum, uint8 dummy);
 extern t_stat EPROM_reset(DEVICE *dptr);
 extern t_stat EPROM_cfg(uint16 base, uint16 size, uint8 devnum);
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint16, uint16, uint8);
+extern uint8 unreg_dev(uint16);
+extern uint8 i3214_monitor_do_boot(t_bool io, uint8 data, uint8 devnum);
 
 // external globals
 
-extern UNIT EPROM_unit;                 //1702 EPROM
-extern uint16 PCX;                    /* program counter */
+extern uint32 PCX;                    /* program counter */
+extern DEVICE i8251_dev;
+extern DEVICE EPROM_dev;
+extern uint8 monitor_boot;
 
-// fp configuration
+// globals
 
-t_stat fp_cfg(void)
+t_stat monitor_cfg(uint16 base, uint16 size, uint8 devnum)
 {
-    sim_printf("Configuring MDS-800 Front Panel Module\n  Onboard Devices:\n");
-    EPROM_cfg(ROM_BASE_0, ROM_SIZE_0, 0);
     return SCPE_OK;
 }
 
-/*  CPU reset routine 
+/*  Monitor reset routine 
     put here to cause a reset of the entire IPC system */
 
-t_stat fp_reset (void)
+t_stat monitor_reset (DEVICE *dptr)
 {    
+    monitor_boot = 0x00;
     return SCPE_OK;
 }
 
-
-/* end of front_panel.c */
+/* end of monitor.c */

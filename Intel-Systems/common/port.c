@@ -1,4 +1,4 @@
-/* sdkmultibus.c: Multibus I simulator
+/*  port.c: Intel Port Mapper
 
     Copyright (c) 2010, William A. Beech
 
@@ -25,8 +25,7 @@
 
     MODIFICATIONS:
 
-        ?? ??? 10 - Original file.
-        24 Apr 15 -- Modified to use simh_debug
+        20 Sep 20 - Original file.
 
     NOTES:
 
@@ -34,45 +33,43 @@
 
 #include "system_defs.h"
 
+#define port_NAME       "Intel Port Map Simulator"
+
 /* function prototypes */
 
-t_stat multibus_cfg(void);
-t_stat multibus_svc(UNIT *uptr);
-t_stat multibus_reset(DEVICE *dptr);
-void set_irq(int32 int_num);
-void clr_irq(int32 int_num);
+t_stat port_svc(UNIT *uptr);
+t_stat port_reset(DEVICE *dptr);
 uint8 nulldev(t_bool io, uint8 port, uint8 devnum);
-uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
-t_stat multibus_reset (DEVICE *dptr);
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint16, uint16, uint8);
+void clr_dev();
+uint8 unreg_dev(uint16 port);
 
 /* external function prototypes */
 
-extern t_stat SBC_reset(DEVICE *dptr);  /* reset the iSBC80/10 emulator */
-extern void set_cpuint(int32 int_num);
+//extern t_stat SBC_reset(DEVICE *dptr);
 
 /* local globals */
 
-int32   mbirq = 0;                      /* set no multibus interrupts */
+static const char* port_desc(DEVICE *dptr) {
+    return port_NAME;
+}
 
 /* external globals */
 
 extern uint8 xack;                      /* XACK signal */
-extern int32 int_req;                   /* i8080 INT signal */
 extern uint16 PCX;
 
 /* multibus Standard SIMH Device Data Structures */
 
-UNIT multibus_unit = { 
-    UDATA (&multibus_svc, 0, 0), 20 
+UNIT port_unit = { 
+    UDATA (&port_svc, 0, 0), 1
 };
 
-REG multibus_reg[] = { 
-    { HRDATA (MBIRQ, mbirq, 32) }, 
-    { HRDATA (XACK, xack, 8) },
+REG port_reg[] = { 
     { NULL }
 };
 
-DEBTAB multibus_debug[] = {
+DEBTAB port_debug[] = {
     { "ALL", DEBUG_all },
     { "FLOW", DEBUG_flow },
     { "READ", DEBUG_read },
@@ -82,78 +79,57 @@ DEBTAB multibus_debug[] = {
     { NULL }
 };
 
-DEVICE multibus_dev = {
-    "MBIRQ",                    //name 
-    &multibus_unit,             //units 
-    multibus_reg,               //registers 
-    NULL,                       //modifiers
-    1,                          //numunits 
-    16,                         //aradix  
-    16,                         //awidth  
-    1,                          //aincr  
-    16,                         //dradix  
-    8,                          //dwidth
-    NULL,                       //examine  
-    NULL,                       //deposit  
-    &multibus_reset,            //reset 
-    NULL,                       //boot
-    NULL,                       //attach  
-    NULL,                       //detach
-    NULL,                       //ctxt     
-    DEV_DEBUG,                  //flags 
-    0,                          //dctrl 
-    multibus_debug,             //debflags
-    NULL,                       //msize
-    NULL                        //lname
+DEVICE port_dev = {
+    "PORT",             //name 
+    &port_unit,         //units 
+    port_reg,           //registers 
+    NULL,               //modifiers
+    1,                  //numunits 
+    16,                 //aradix  
+    16,                 //awidth  
+    1,                  //aincr  
+    16,                 //dradix  
+    8,                  //dwidth
+    NULL,               //examine  
+    NULL,               //deposit  
+    &port_reset,        //reset 
+    NULL,               //boot
+    NULL,               //attach  
+    NULL,               //detach
+    NULL,               //ctxt     
+    DEV_DEBUG,          //flags 
+    0,                  //dctrl 
+    port_debug,         //debflags
+    NULL,               //msize
+    NULL,               //lname
+    NULL,               //help routine
+    NULL,               //attach help routine
+    NULL,               //help context
+    &port_desc          //device description
 };
 
 /* Service routines to handle simulator functions */
 
-// multibus_cfg
-
-t_stat multibus_cfg(void)
-{
-    sim_printf("Configuring Multibus Devices\n");
-    return SCPE_OK;
-}
-
 /* Reset routine */
 
-t_stat multibus_reset(DEVICE *dptr)
+t_stat port_reset(DEVICE *dptr)
 {
-    if (SBC_reset(NULL) == 0) { 
-        sim_printf("  Multibus: Reset\n");
-        sim_activate (&multibus_unit, multibus_unit.wait); /* activate unit */
+//    if (SBC_reset(NULL) == 0) { 
+        sim_printf("  Port: Reset\n");
+        sim_activate (&port_unit, port_unit.wait); /* activate unit */
         return SCPE_OK;
-    } else {
-        sim_printf("   Multibus: SBC not selected\n");
-        return SCPE_OK;
-    }
+//    } else {
+//        sim_printf("   Port: SBC not selected\n");
+//        return SCPE_OK;
+//    }
 }
 
 /* service routine - actually does the simulated interrupts */
 
-t_stat multibus_svc(UNIT *uptr)
+t_stat port_svc(UNIT *uptr)
 {
-    switch (mbirq) {
-        case INT_2:
-            set_cpuint(INT_R);
-            break;
-        default:
-            break;
-    }
-    sim_activate (&multibus_unit, multibus_unit.wait); /* continue poll */
+    sim_activate (&port_unit, port_unit.wait); /* continue poll */
     return SCPE_OK;
-}
-
-void set_irq(int32 int_num)
-{
-    mbirq |= int_num;
-}
-
-void clr_irq(int32 int_num)
-{
-    mbirq &= ~int_num;
 }
 
 /* This is the I/O configuration table.  There are 256 possible
@@ -162,8 +138,9 @@ address is here, 'nulldev' means no device has been registered.
 */
 struct idev {
     uint8 (*routine)(t_bool io, uint8 data, uint8 devnum); 
-    uint8 port;
-    uint8 devnum;
+    uint16 port;
+    uint16 devnum;
+    uint8 dummy;
 };
 
 struct idev dev_table[256] = {
@@ -235,20 +212,43 @@ struct idev dev_table[256] = {
 
 uint8 nulldev(t_bool io, uint8 data, uint8 devnum)
 {
-    SET_XACK(0);                        /* set no XACK */
-    return 0xff;                        /* multibus has active high pullups and inversion */
+    SET_XACK(0);                        //clear xack
+//    return 0xff;                        /* multibus has active high pullups and inversion */
+    return 0;                           //corrects "illegal disk at port X8H" error in ISIS
 }
 
-uint8 reg_dev(uint8 (*routine)(t_bool io, uint8 data, uint8 devnum), uint8 port, uint8 devnum)
+uint8 reg_dev(uint8 (*routine)(t_bool io, uint8 data, uint8 devnum),
+    uint16 port, uint16 devnum, uint8 dummy)
 {
     if (dev_table[port].routine != &nulldev) { /* port already assigned */
         if (dev_table[port].routine != routine)
-            sim_printf("         I/O Port %02X is already assigned\n", port);
+            sim_printf("    I/O Port %02X is already assigned\n", port);
     } else {
         dev_table[port].routine = routine;
         dev_table[port].devnum = devnum;
+        sim_printf("    I/O Port %02X has been assigned\n", port);
     }
     return 0;
 }
 
-/* end of multibus.c */
+void clr_dev()
+{
+    int i;
+    
+    for (i=0; i<256; i++)
+        unreg_dev(i);
+}
+
+uint8 unreg_dev(uint16 port)
+{
+    if (dev_table[port].routine == &nulldev) { /* port already free */
+        ;//sim_printf("    I/O Port %02X is already free\n", port);
+    } else {
+        dev_table[port].routine = &nulldev;
+        dev_table[port].devnum = 0;
+        sim_printf("    I/O Port %02X is free\n", port);
+    }
+    return 0;
+}
+
+/* end of port.c */

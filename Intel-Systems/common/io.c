@@ -168,11 +168,11 @@ MTAB IO_mod[] = {
 /* address width is set to 16 bits to use devices in 8086/8088 implementations */
 
 DEVICE IO_dev = {
-    "IO",            //name
-    IO_unit,         //units
-    IO_reg,          //registers
-    IO_mod,          //modifiers
-    IO_NUM,          //numunits
+    "IO",               //name
+    IO_unit,            //units
+    IO_reg,             //registers
+    IO_mod,             //modifiers
+    IO_NUM,             //numunits
     16,                 //aradix
     16,                 //awidth
     1,                  //aincr
@@ -180,14 +180,14 @@ DEVICE IO_dev = {
     8,                  //dwidth
     NULL,               //examine
     NULL,               //deposit
-    &IO_reset,       //reset
+    &IO_reset,          //reset
     NULL,               //boot
-    &IO_attach,               //attach
+    &IO_attach,         //attach
     NULL,               //detach
     NULL,               //ctxt
     0,                  //flags
     0,                  //dctrl
-    IO_debug,        //debflags
+    IO_debug,           //debflags
     NULL,               //msize
     NULL                //lname
 };

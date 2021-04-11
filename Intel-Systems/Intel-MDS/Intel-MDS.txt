@@ -1,0 +1,28 @@
+Data for the Intel OEM boards:
+
+            80/10       80/10A      80/10B      80/20       80/20-4     80/24       80/30
+CPU         8080A       8080A       8080A       8080A       8080A       8085        8085A
+PF          N/A         N/A         N/A         D4          D4          D4          N/A
+SBO         N/A         N/A         N/A         D5          D5          D5          N/A
+LED         N/A         N/A         N/A         D6          D6          D6          N/A
+8251        EC          EC          EC          EC          EC          EC          EC
+8253        N/A         N/A         N/A         DC          DC          DC          DC
+8255        E4/E8       E4/E8       E4/E8       E4/E8       E4/E8       E4/E8       E8
+8741        N/A         N/A         N/A         N/A         N/A         N/A         E4
+8259        N/A         N/A         N/A         D8          D8          D8          D8
+ROM-1K      0-03FF      0-03FF      0-03FF      0-03FF      0-03FF      0-03FF      0-03FF
+ROM-2K      0-07FF      0-07FF      0-07FF      0-07FF      0-07FF      0-07FF      0-07FF
+ROM-4K      0-0FFF      0-0FFF      0-0FFF      0-0FFF      0-0FFF      0-0FFF      0-0FFF
+ROM-8K      N/A         0-1FFF      0-1FFF      0-1FFF      0-1FFF      0-1FFF      0-1FFF
+ROM-16K     N/A         N/A         0-3FFF      N/A         N/A         0-3FFF      N/A
+ROM-32K     N/A         N/A         N/A         N/A         N/A         0-7FFF      N/A
+RAM-1K      3C00-3FFF   3C00-3FFF   3C00-3FFF   N/A         N/A         N/A         N/A
+RAM-2K      N/A         N/A         N/A         3800-3FFF   N/A         3800-3FFF   N/A
+RAM-4K      N/A         N/A         N/A         N/A         3000-3FFF   3000-3FFF   N/A
+RAM-8K      N/A         N/A         N/A         N/A         N/A         2000-3FFF   2000-3FFF
+RAM-16K     N/A         N/A         N/A         N/A         N/A         N/A         4000-7FFF
+MM1-MCS0    N/A         N/A         F0          C0          N/A         C0          N/A
+MM1-MCS1    N/A         N/A         F8          C8          N/A         C8          N/A
+MM2-MCS0    N/A         N/A         N/A         F0          N/A         F0          N/A
+MM2-MCS0    N/A         N/A         N/A         F8          N/A         FF          N/A
+
