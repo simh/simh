@@ -15759,7 +15759,7 @@ while (t->function_name) {
             }
         input = remainder;
         ++d;
-        if (((input == NULL) || (*input != '\0')) && (d->expected_result == NULL))
+        if ((*input != '\0') && (d->expected_result == NULL))
             return sim_messagef (SCPE_IERR, "Invalid test configuration detected\n");
         }
     ++t;
