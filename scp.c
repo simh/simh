@@ -3269,8 +3269,12 @@ for (unit=0; unit < dptr->numunits; unit++)
         --enabled_units;
     else
         found_unit = unit;
-if (enabled_units == 1)
-    snprintf (unit_spec, sizeof (unit_spec), "%s%u", sim_dname (dptr), found_unit);
+if (enabled_units == 1) {
+    if (found_unit == 0)
+        snprintf (unit_spec, sizeof (unit_spec), "%s", sim_dname (dptr));
+    else
+        snprintf (unit_spec, sizeof (unit_spec), "%s%u", sim_dname (dptr), found_unit);
+    }
 else
     snprintf (unit_spec, sizeof (unit_spec), "%sn", sim_dname (dptr));
 if (dptr->modifiers) {
@@ -3351,6 +3355,8 @@ if ((dptr->modifiers) && (dptr->units)) {   /* handle unit specific modifiers */
             continue;                                           /* skip device only modifiers */
         if ((!mptr->valid) && MODMASK(mptr,MTAB_XTD))
             continue;                                           /* skip show only modifiers */
+        if ((enabled_units == 1) && (found_unit == 0))
+            continue;
         if (mptr->mstring) {
             fprint_header (st, &found, header);
             sprintf (buf, "set %s %s%s", unit_spec, mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : (MODMASK(mptr,MTAB_VALR) ? "=val" : (MODMASK(mptr,MTAB_VALO) ? "{=val}": "")));
