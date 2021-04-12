@@ -60,6 +60,15 @@ The installer for Visual Studio 2008 SP1 is available from:
 
 http://download.microsoft.com/download/E/8/E/E8EEB394-7F42-4963-A2D8-29559B738298/VS2008ExpressWithSP1ENUX1504728.iso
 
+Then install Visual Studio Express Visual C++ by executing VCExpress\setup.exe 
+on that DVD image.  No need to install "Silverlight Runtime" or 
+"Microsoft SQL Server 2008 Express Edition".  Depending on your OS Version 
+you may be prompted to install an older version of .NET Framework which should 
+be installed.
+
+Note: VS2008 can readily coexist on Windows systems that also have later 
+versions of Visual Studio installed.
+
 If you are using a version of Visual Studio beyond Visual Studio 2008, then 
 your later version of Visual Studio will automatically convert the Visual 
 Studio 2008 project files.  You should ignore any warnings produced by the 
