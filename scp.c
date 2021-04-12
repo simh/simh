@@ -2475,7 +2475,7 @@ static const char simh_help2[] =
       " curl is a utility to transfer a URL\n\n"
       " The quick and dirty help for the CURL command can be viewed with:\n\n"
       "++sim> curl --help\n\n"
-#define HLP_DISKINFO    "*Commands DISKINFO"
+#define HLP_DISKINFO    "*Commands Disk_Container_Information"
       "2Disk Container Information\n"
       " Information about a Disk Container can be displayed with the DISKINFO command:\n\n"
       "++DISKINFO container-spec    show information about a disk container\n\n";
