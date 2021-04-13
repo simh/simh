@@ -224,13 +224,15 @@ int module_type_is_valid (int module_number)
 t_stat rom_set_module (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 {
 	uint32 unit_number;
+	int module_number;
+	rom* romptr;
 
 	// Is a module type specified? 
 	if (cptr == NULL)
 		return SCPE_ARG;
 
 	// Search the module list for the specified module type
-	for (int module_number = 0; module_number < NUM_MODULES; module_number++)
+	for (module_number = 0; module_number < NUM_MODULES; module_number++)
 	{
 		if (strcasecmp (cptr, module_list[module_number]->name) == 0)
 		{
@@ -279,7 +281,7 @@ t_stat rom_set_module (UNIT* uptr, int32 val, CONST char* cptr, void* desc)
 				rom_socket* socketptr = *module_list[module_number]->sockets;
 				
 				// Count the number of ROMS for this socket
-				for (rom* romptr = (rom*) socketptr->rom_list; romptr->image != NULL; romptr++)
+				for (romptr = (rom*) socketptr->rom_list; romptr->image != NULL; romptr++)
 					num_roms++;
 
 				if (num_roms == 1)
@@ -489,6 +491,9 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 	// int unit_number = uptr - rom_unit;
 	int module_number = uptr->selected_module;
 	int unit_number = uptr - rom_unit;
+	module* modptr;
+	rom_socket* socketptr;
+	rom* romptr;
 	t_stat r;
 
 	switch (module_list[module_number]->type)
@@ -527,11 +532,11 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 
 			// Get a pointer to the selected module and from that a pointer to
 			// socket for the unit
-			module* modptr = *(module_list + uptr->selected_module);
-			rom_socket* socketptr = *modptr->sockets + unit_number;
+			modptr = *(module_list + uptr->selected_module);
+			socketptr = *modptr->sockets + unit_number;
 		
 			// Search the list of ROMs for this socket for the specified image
-			for (rom* romptr = (rom*) socketptr->rom_list; romptr->image != NULL; romptr++)
+			for (romptr = (rom*) socketptr->rom_list; romptr->image != NULL; romptr++)
 			{
 				if (strcasecmp (cptr, romptr->device_mnemonic) == 0)
 				{
