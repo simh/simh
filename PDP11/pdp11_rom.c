@@ -303,7 +303,7 @@ t_stat rom_show_module (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 {
 	// rom_repair_flags ();
 	int selected_module = rom_unit[0].selected_module;
-	fprintf (f, "module type %s", (module*) module_list[selected_module]->name);
+	fprintf (f, "module type %s", module_list[selected_module]->name);
 	return SCPE_OK;
 }
 

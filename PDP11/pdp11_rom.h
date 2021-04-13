@@ -106,5 +106,5 @@ rom_socket blank_sockets[NUM_BLANK_SOCKETS] =
 	{0, 0, (rom (*)[]) NULL},		// ROM 3
 };
 
-#endif PDP11_ROM_H
+#endif /* PDP11_ROM_H */
 
