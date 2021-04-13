@@ -326,15 +326,11 @@ t_stat rom_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 /* 
  * ROM write routine 
  * The sole purpose of this function to return a meaningful error message
- * for a write operation to a ROM device. The standard error message "Address
- * space exceeded" is inappropriate as the ROM addresses are within the
- * address space. An SCPE_RO error would be a better fit but that error code
- * results in an unclear message ("Read only argument"). We therefore chose to
- * an I/O error. An attempt to write to a ROM device would yield that result.
+ * for a write operation to a ROM device.
  */
 t_stat rom_wr (int32 data, int32 PA, int32 access)
 {
-	return SCPE_IOERR;
+	return SCPE_NXM;
 }
 
 
