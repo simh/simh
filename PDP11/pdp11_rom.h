@@ -43,9 +43,9 @@
  */
 typedef struct
 {
-	char device_mnemonic[5];			/* ROM identifier */
-	void (*rom_attached)();				/* ROM specific function */
-	uint16 (*image)[];					/* ROM image */
+    char device_mnemonic[5];            /* ROM identifier */
+    void (*rom_attached)();             /* ROM specific function */
+    uint16 (*image)[];                  /* ROM image */
 }
 rom;
 
@@ -56,9 +56,9 @@ rom;
  */
 typedef struct
 {
-	t_addr base_address;				/* ROM code base address */
-	int16 size;							/* Address space size */
-	rom (*rom_list)[];					/* ROMs available for this socket */
+    t_addr base_address;                /* ROM code base address */
+    int16 size;                         /* Address space size */
+    rom (*rom_list)[];                  /* ROMs available for this socket */
 }
 rom_socket;
 
@@ -69,8 +69,8 @@ rom_socket;
  */
 typedef enum
 {
-	ROM_FILE,
-	ROM_BUILTIN
+    ROM_FILE,
+    ROM_BUILTIN
 }
 module_type;
 
@@ -80,13 +80,13 @@ module_type;
  */
 typedef struct
 {
-	const char *name;					/* Module name */
-	module_type type;					/* Module type */
-	const uint32 valid_cpu_types;		/* Valid CPU types */
-	const uint32 valid_cpu_opts;		/* Required CPU options */
-	const uint32 num_sockets;			/* Number of sockets for the module*/
-	uint32 flags;						/* Flags for initialization of the UNIT flag field*/
-	rom_socket (*sockets)[];			/* Sockets for this module */
+    const char *name;                    /* Module name */
+    module_type type;                    /* Module type */
+    const uint32 valid_cpu_types;        /* Valid CPU types */
+    const uint32 valid_cpu_opts;         /* Required CPU options */
+    const uint32 num_sockets;            /* Number of sockets for the module */
+    uint32 flags;                        /* Flags for initialization of the UNIT flag field */
+    rom_socket (*sockets)[];             /* Sockets for this module */
 }
 module;
 
@@ -96,14 +96,14 @@ module;
  * has to be attached.
  */
 
-#define NUM_BLANK_SOCKETS	4
+#define NUM_BLANK_SOCKETS    4
 
 rom_socket blank_sockets[NUM_BLANK_SOCKETS] =
 {
-	{0, 0, (rom (*)[]) NULL},		// ROM 0
-	{0, 0, (rom (*)[]) NULL},		// ROM 1
-	{0, 0, (rom (*)[]) NULL},		// ROM 2
-	{0, 0, (rom (*)[]) NULL},		// ROM 3
+    {0, 0, (rom (*)[]) NULL},        /* ROM 0 */
+    {0, 0, (rom (*)[]) NULL},        /* ROM 1 */
+    {0, 0, (rom (*)[]) NULL},        /* ROM 2 */
+    {0, 0, (rom (*)[]) NULL},        /* ROM 3 */
 };
 
 #endif /* PDP11_ROM_H */
