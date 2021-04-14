@@ -327,14 +327,9 @@ t_stat rom_wr (int32 data, int32 PA, int32 access)
 }
 
 
-/*
- * ROM read routine 
- * 
- * As the iodispR[] entries for the address range are not nullified when the
- * when build_ubus_tab() is called with a nullified pointer to the read function,
- * this function can be called while the image is detached. Therefore we have to
- * check if the read access is valid.
- */
+
+ /* ROM read routine */
+ 
 t_stat rom_rd (int32 *data, int32 PA, int32 access)
 {
     uint32 i;
@@ -552,8 +547,6 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 
 /*
  * Detach file or built in image from unit.
- * Note that although the pointer to the read function in dib->rd is 
- * nullified, build_ubus_tab() does not clear the iodispR[] entries.
  */
 t_stat rom_detach (UNIT *uptr)
 {
@@ -562,7 +555,7 @@ t_stat rom_detach (UNIT *uptr)
     int selected_module = uptr->selected_module;
 
     /* Leave address intact for modules with separate address
-       and image specification (i.e. the BLANK module type). */
+       and image specification (i.e. the BLANK module type) */
     if (module_list[selected_module]->type == ROM_FILE)
         uptr->unit_end = uptr->unit_base;
     else
