@@ -48,6 +48,7 @@ extern uint32 cpu_opt;
 extern int32 HITMISS;
 
 /* Static definitions */
+static t_bool rom_initialized = FALSE;      /* Initialize rom_unit on first reset call */
 static uint32 cpu_type_on_selection;        /* cpu_type for which module type was selected */
 
 /*
@@ -151,16 +152,13 @@ module* module_list[NUM_MODULES] =
 /*
  * Define and initialize the UNIT structs. 
  */
-
-#define ROM_UNIT_INIT(flags,module) NULL,NULL,NULL,NULL,NULL,0,0,(flags),0,0,0,NULL,0,0,0,0,0,module
-
 UNIT rom_unit[MAX_NUMBER_SOCKETS] =
 {
-    { ROM_UNIT_INIT (ROM_UNIT_FLAGS, ROM_MODULE_BLANK) },
-    { ROM_UNIT_INIT (ROM_UNIT_FLAGS, ROM_MODULE_BLANK) },
-    { ROM_UNIT_INIT (ROM_UNIT_FLAGS, ROM_MODULE_BLANK) },
-    { ROM_UNIT_INIT (ROM_UNIT_FLAGS, ROM_MODULE_BLANK) },
-    { ROM_UNIT_INIT (ROM_UNIT_FLAGS | UNIT_DIS, ROM_MODULE_BLANK) },
+    { UDATA (NULL, ROM_UNIT_FLAGS, 0) },
+    { UDATA (NULL, ROM_UNIT_FLAGS, 0) },
+    { UDATA (NULL, ROM_UNIT_FLAGS, 0) },
+    { UDATA (NULL, ROM_UNIT_FLAGS, 0) },
+    { UDATA (NULL, ROM_UNIT_FLAGS | UNIT_DIS, 0) },
 };
 
 DIB rom_dib[MAX_NUMBER_SOCKETS];
@@ -327,8 +325,7 @@ t_stat rom_wr (int32 data, int32 PA, int32 access)
 }
 
 
-
- /* ROM read routine */
+/* ROM read routine */
  
 t_stat rom_rd (int32 *data, int32 PA, int32 access)
 {
@@ -366,9 +363,16 @@ t_stat rom_reset (DEVICE *dptr)
         rom_set_module (&rom_unit[0], 0, "BLANK", NULL);
 
     /* Initialize the UNIT and DIB structs and create the linked list of DIBs */
-    for (unit_number = 0; unit_number < MAX_NUMBER_SOCKETS; unit_number++)
-        rom_dib[unit_number].next = (unit_number < dptr->numunits - 1) ? &rom_dib[unit_number + 1] : NULL;
+    for (unit_number = 0; unit_number < MAX_NUMBER_SOCKETS; unit_number++) {
 
+        /* Initialize selected_module on first reset call */
+        if ( !rom_initialized)
+            rom_unit[unit_number].selected_module = ROM_MODULE_BLANK;
+
+        rom_dib[unit_number].next = (unit_number < dptr->numunits - 1) ? &rom_dib[unit_number + 1] : NULL;
+    }
+
+    rom_initialized = TRUE;
     return SCPE_OK;
 }
 
