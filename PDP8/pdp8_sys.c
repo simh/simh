@@ -177,11 +177,12 @@ int32 c, rubout;
 
 rubout = 0;                                             /* clear toggle */
 while ((c = getc (fi)) != EOF) {                        /* read char */
-    if (rubout)                                         /* skipping chars */
+    if (rubout) {                                       /* skipping chars */
         if (c == 0377)                                  /* ending rubout? */
             rubout = 0;                                 /* clr, skip */
         else
             continue;                                   /* skip charactder */
+        }
     if (c == 0377)                                      /* rubout? */
         rubout = 1;                                     /* set, skip */
     else
