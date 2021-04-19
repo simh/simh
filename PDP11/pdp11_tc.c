@@ -118,16 +118,13 @@
 
 #define DT_NUMDR        8                               /* #drives */
 #define DT_M_NUMDR      (DT_NUMDR - 1)
-#define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
-#define UNIT_V_8FMT     (UNIT_V_UF + 1)                 /* 12b format */
-#define UNIT_V_11FMT    (UNIT_V_UF + 2)                 /* 16b format */
-#define UNIT_WLK        (1 << UNIT_V_WLK)
+#define UNIT_V_8FMT     (UNIT_V_UF + 0)                 /* 12b format */
+#define UNIT_V_11FMT    (UNIT_V_UF + 1)                 /* 16b format */
 #define UNIT_8FMT       (1 << UNIT_V_8FMT)
 #define UNIT_11FMT      (1 << UNIT_V_11FMT)
 #define STATE           u3                              /* unit state */
 #define LASTT           u4                              /* last time update */
 #define WRITTEN         u5                              /* device buffer is dirty and needs flushing */
-#define UNIT_WPRT       (UNIT_WLK)                      /* write protect */
 
 /* System independent DECtape constants */
 
@@ -384,9 +381,9 @@ REG dt_reg[] = {
 
 MTAB dt_mod[] = {
     { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
-        &dt_set_writelock, &dt_show_writelock,   NULL, "Write enable tape drive" },
+        &set_writelock, &show_writelock,   NULL, "Write enable drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
-        &dt_set_writelock, NULL,   NULL, "Write enable tape drive" },
+        &set_writelock, NULL,   NULL, "Write enable drive" },
     { UNIT_8FMT + UNIT_11FMT,          0, "18b", NULL },
     { UNIT_8FMT + UNIT_11FMT,  UNIT_8FMT, "12b", NULL },
     { UNIT_8FMT + UNIT_11FMT, UNIT_11FMT, "16b", NULL },
@@ -1357,8 +1354,8 @@ uint16 pdp11b[D18_BSIZE];
 int32 k;
 uint32 ba, *fbuf;
 
-if (uptr->WRITTEN && uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {    /* any data? */
-    sim_printf ("%s: writing buffer to file\n", sim_uname (uptr));
+if (uptr->WRITTEN && uptr->hwmark && ((uptr->flags & UNIT_WPRT)== 0)) {    /* any data? */
+    sim_printf ("%s: writing buffer to file: %s\n", sim_uname (uptr), uptr->filename);
     rewind (uptr->fileref);                             /* start of file */
     fbuf = (uint32 *) uptr->filebuf;                    /* file buffer */
     if (uptr->flags & UNIT_8FMT) {                      /* 12b? */
@@ -1410,7 +1407,7 @@ if (sim_is_active (uptr)) {                             /* active? cancel op */
         }
     uptr->STATE = 0, uptr->pos = 0;
     }
-if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0))     /* any data? */
+if (uptr->hwmark && ((uptr->flags & UNIT_WPRT) == 0))   /* any data? */
     dt_flush (uptr);                                    /* end if hwmark */
 free (uptr->filebuf);                                   /* release buf */
 uptr->flags = uptr->flags & ~(UNIT_BUF | UNIT_RO);      /* clear buf & read only flags */
@@ -1418,23 +1415,6 @@ uptr->filebuf = NULL;                                   /* clear buf ptr */
 uptr->flags = (uptr->flags | UNIT_11FMT) & ~UNIT_8FMT;  /* default fmt */
 uptr->capac = DT_CAPAC;                                 /* default size */
 return detach_unit (uptr);
-}
-
-t_stat dt_set_writelock (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
-{
-if ((uptr->flags & UNIT_ATT) != 0)
-    return sim_messagef (SCPE_ALATT, "%s: Already attached\n", sim_uname (uptr));
-if (val)
-    uptr->flags |= UNIT_WPRT;
-else
-    uptr->flags &= ~UNIT_WPRT;
-return SCPE_OK;
-}
-
-t_stat dt_show_writelock (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
-{
-fprintf (st, "write %s", (uptr->flags & (UNIT_WPRT | UNIT_RO)) ? "locked" : "enabled");
-return SCPE_OK;
 }
 
 t_stat dt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)

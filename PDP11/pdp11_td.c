@@ -524,10 +524,6 @@ static const char *tdc_regnam[] =
 
 #define TD_NUMCTLR      16                              /* #controllers */
 
-#define UNIT_V_WLK      (UNIT_V_UF)                     /* write locked */
-#define UNIT_WLK        (1u << UNIT_V_UF)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
-
 #define TD_NUMBLK       512                             /* blocks/tape */
 #define TD_NUMBY        512                             /* bytes/block */
 #define TD_SIZE         (TD_NUMBLK * TD_NUMBY)          /* bytes/tape */
@@ -707,11 +703,11 @@ static REG td_reg[] = {
     };
 
 static MTAB td_mod[] = {
-    { UNIT_WLK,            0, "write enabled",  "WRITEENABLED", NULL,          NULL,           NULL, "Write enable TU58 drive" },
-    { UNIT_WLK,     UNIT_WLK, "write locked",   "LOCKED",       NULL,          NULL,           NULL, "Write lock TU58 drive"  },
-    { MTAB_XTD | MTAB_VDV, 0, "CONTROLLERS",    "CONTROLLERS",  &td_set_ctrls, &td_show_ctlrs, NULL, "Number of Controllers" },
-    { MTAB_XTD|MTAB_VDV,   0, "ADDRESS",        NULL,           &set_addr,     &show_addr,     NULL, "Bus address" },
-    { MTAB_XTD|MTAB_VDV,   1, "VECTOR",         NULL,           &set_vec,      &show_vec,      NULL, "Interrupt vector" },
+    { MTAB_XTD|MTAB_VUN,   0, "write enabled", "WRITEENABLED",  &set_writelock, &show_writelock,   NULL, "Write enable TU58 drive" },
+    { MTAB_XTD|MTAB_VUN,   1, NULL,             "LOCKED",       &set_writelock, NULL,              NULL, "Write enable TU58 drive" },
+    { MTAB_XTD | MTAB_VDV, 0, "CONTROLLERS",    "CONTROLLERS",  &td_set_ctrls, &td_show_ctlrs,     NULL, "Number of Controllers" },
+    { MTAB_XTD|MTAB_VDV,   0, "ADDRESS",        NULL,           &set_addr,     &show_addr,         NULL, "Bus address" },
+    { MTAB_XTD|MTAB_VDV,   1, "VECTOR",         NULL,           &set_vec,      &show_vec,          NULL, "Interrupt vector" },
     { 0 }
     };
 

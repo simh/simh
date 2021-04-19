@@ -98,13 +98,10 @@
 
 
 
-#define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
 #define UNIT_V_UNLOAD   (UNIT_V_UF + 1)                 /* heads unloaded */
-#define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_UNLOAD     (1 << UNIT_V_UNLOAD)
 #define FNC             u3                              /* saved function */
 #define DRV             u4                              /* drive number (DC) */
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write prot */
 
 #define DQ_N_NUMWD      7
 #define DQ_NUMWD        (1 << DQ_N_NUMWD)               /* words/sector */

@@ -158,6 +158,8 @@ t_stat assign_device (DEVICE *dptr, const char *cptr);
 t_stat deassign_device (DEVICE *dptr);
 t_stat reset_all (uint32 start_device);
 t_stat reset_all_p (uint32 start_device);
+t_stat set_writelock (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat show_writelock (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 const char *sim_dname (DEVICE *dptr);
 const char *sim_uname (UNIT *dptr);
 const char *sim_set_uname (UNIT *uptr, const char *uname);

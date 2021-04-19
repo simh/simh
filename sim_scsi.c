@@ -1578,6 +1578,9 @@ bus->dev[id] = uptr;
 void scsi_set_unit (SCSI_BUS *bus, UNIT *uptr, SCSI_DEV *dev)
 {
 uptr->up7 = (void *)dev;
+
+if (dev->devtype == SCSI_CDROM)
+    set_writelock (uptr, 1, NULL, NULL);
 }
 
 /* Reset a unit */
@@ -1677,14 +1680,18 @@ switch (dev->devtype) {
 
 t_stat scsi_set_wlk (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-return SCPE_OK;
+SCSI_DEV *dev = (SCSI_DEV *)uptr->up7;
+
+if ((dev->devtype == SCSI_CDROM) && (val == 0))
+    return sim_messagef (SCPE_ARG, "%s: Can't write enable CDROM device\n", sim_uname (uptr));
+return set_writelock (uptr, val, cptr, desc);
 }
 
 /* Show write lock status */
 
 t_stat scsi_show_wlk (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
-return SCPE_OK;
+return show_writelock (st, uptr, val, desc);
 }
 
 /* Attach device */

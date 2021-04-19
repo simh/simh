@@ -474,10 +474,10 @@ REG tq_reg[] = {
     };
 
 MTAB tq_mod[] = {
-    { MTUF_WLK,         0, "write enabled",  "WRITEENABLED", 
-        NULL, NULL, NULL, "Write enable tape drive" },
-    { MTUF_WLK,  MTUF_WLK, "write locked",   "LOCKED", 
-        NULL, NULL, NULL, "Write lock tape drive"  },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable tape drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock tape drive" },
     { MTAB_XTD|MTAB_VDV,  TQ5_TYPE,           NULL,   "TK50",
         &tq_set_type, NULL, NULL, "Set TK50 Device Type" },
     { MTAB_XTD|MTAB_VDV,  TQ7_TYPE,           NULL,   "TK70",

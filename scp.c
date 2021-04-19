@@ -1556,7 +1556,7 @@ static const char simh_help2[] =
       "+sh{ow} q{ueue}              show event queue\n"
       "+sh{ow} ti{me}               show simulated time\n"
       "+sh{ow} th{rottle}           show simulation rate\n"
-      "+sh{ow} a{synch}             show asynchronouse I/O state\n" 
+      "+sh{ow} a{synch}             show asynchronous I/O state\n" 
       "+sh{ow} ve{rsion}            show simulator version\n"
       "+sh{ow} def{ault}            show current directory\n" 
       "+sh{ow} re{mote}             show remote console configuration\n" 
@@ -7601,6 +7601,31 @@ sim_switches = SWMASK ('P');
 r = reset_all (start);
 sim_switches = old_sw;
 return r;
+}
+
+/* Set Hardware Write Lock */
+
+t_stat set_writelock (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+if (((uptr->flags & UNIT_WPRT) != 0) == val)        /* Already set as desired? */
+    return SCPE_OK;                                 /* Do nothing */
+if (val)                                            /* Lock? */
+    uptr->flags |= UNIT_WLK;                        /* Do it. */
+else                                                /* Unlock */
+    if (((uptr->flags & UNIT_ATT) != 0) &&          /* Transition from Locked to Unlock while attached read-only? */
+        ((uptr->flags & UNIT_RO) != 0))
+        return sim_messagef (SCPE_ALATT, "%s: Can't enable write when attached read only\n", sim_uname (uptr));
+    else
+        uptr->flags &= ~UNIT_WLK;
+return SCPE_OK;
+}
+
+/* Show Write Lock */
+
+t_stat show_writelock (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+fprintf (st, "write %s", (uptr->flags & UNIT_WPRT) ? "locked" : "enabled");
+return SCPE_OK;
 }
 
 /* Load and dump commands
