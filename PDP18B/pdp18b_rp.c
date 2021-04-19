@@ -214,7 +214,7 @@ MTAB rp_mod[] = {
     { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
         &set_writelock, &show_writelock,   NULL, "Write enable disk drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
-        &set_writelock, NULL,   NULL, "Write enable disk drive" },
+        &set_writelock, NULL,   NULL, "Write lock disk drive" },
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO", &set_devno, &show_devno },
     { 0 }
     };

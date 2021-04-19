@@ -231,7 +231,7 @@ MTAB rl_mod[] = {
     { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
         &set_writelock, &show_writelock,   NULL, "Write enable drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
-        &set_writelock, NULL,   NULL, "Write enable drive" },
+        &set_writelock, NULL,   NULL, "Write lock drive" },
     { UNIT_DUMMY, 0, NULL, "BADBLOCK", &rl_set_bad },
     { (UNIT_RL02+UNIT_ATT), UNIT_ATT, "RL01", NULL, NULL },
     { (UNIT_RL02+UNIT_ATT), (UNIT_RL02+UNIT_ATT), "RL02", NULL, NULL },

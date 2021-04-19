@@ -426,7 +426,7 @@ MTAB fl_mod[] = {
     { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
         &set_writelock, &show_writelock,   NULL, "Write enable floppy drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
-        &set_writelock, NULL,   NULL, "Write enable floppy drive" },
+        &set_writelock, NULL,   NULL, "Write lock floppy drive" },
     { 0 }
     };
 

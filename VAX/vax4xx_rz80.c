@@ -203,7 +203,7 @@ MTAB rz_mod[] = {
     { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
         &scsi_set_wlk, &scsi_show_wlk,   NULL, "Write enable drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
-        &scsi_set_wlk, NULL,   NULL, "Write enable drive" },
+        &scsi_set_wlk, NULL,   NULL, "Write lock drive" },
     { MTAB_XTD|MTAB_VUN, RZ23_DTYPE, NULL, "RZ23",
       &rz_set_type, NULL, NULL, "Set RZ23 Disk Type" },
     { MTAB_XTD|MTAB_VUN, RZ23L_DTYPE, NULL, "RZ23L",

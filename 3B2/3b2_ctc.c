@@ -102,7 +102,7 @@ MTAB ctc_mod[] = {
     { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
         &set_writelock, &show_writelock,   NULL, "Write enable tape drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
-        &set_writelock, NULL,   NULL, "Write enable tape drive" },
+        &set_writelock, NULL,   NULL, "Write lock tape drive" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "RQUEUE=n", NULL,
       NULL, &ctc_show_rqueue, NULL, "Display Request Queue for card n" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "CQUEUE=n", NULL,

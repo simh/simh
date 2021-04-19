@@ -440,7 +440,7 @@ MTAB rlcs_mod[] = {
     { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
         &set_writelock, &show_writelock,   NULL, "Write enable console RL02 drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
-        &set_writelock, NULL,   NULL, "Write enable console RL02 drive" },
+        &set_writelock, NULL,   NULL, "Write lock console RL02 drive" },
     { 0 }
     };
 

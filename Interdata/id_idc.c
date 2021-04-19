@@ -291,7 +291,7 @@ MTAB idc_mod[] = {
     { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
         &set_writelock, &show_writelock,   NULL, "Write enable drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
-        &set_writelock, NULL,   NULL, "Write enable drive" },
+        &set_writelock, NULL,   NULL, "Write lock drive" },
     { (UNIT_DTYPE+UNIT_ATT), (TYPE_MCCDD16 << UNIT_V_DTYPE) + UNIT_ATT,
       "MCCDD16", NULL, NULL },
     { (UNIT_DTYPE+UNIT_ATT), (TYPE_MCCDD48 << UNIT_V_DTYPE) + UNIT_ATT,

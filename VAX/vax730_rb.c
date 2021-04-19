@@ -257,7 +257,7 @@ MTAB rb_mod[] = {
     { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
         &set_writelock, &show_writelock,   NULL, "Write enable disk drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
-        &set_writelock, NULL,   NULL, "Write enable disk drive" },
+        &set_writelock, NULL,   NULL, "Write lock disk drive" },
     { UNIT_DUMMY,      0, NULL,            "BADBLOCK", 
         &rb_set_bad, NULL, NULL, "write bad block table on last track" },
     { (UNIT_RB80+UNIT_ATT),             UNIT_ATT, "RB02", NULL, NULL },

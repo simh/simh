@@ -374,7 +374,7 @@ static const MTAB rl_mod[] = {
     { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
         &set_writelock, &show_writelock,   NULL, "Write enable disk drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
-        &set_writelock, NULL,   NULL, "Write enable disk drive" },
+        &set_writelock, NULL,   NULL, "Write lock disk drive" },
     { UNIT_DUMMY, 0, NULL, "BADBLOCK", 
         &rl_set_bad, NULL, NULL, "Write bad block table on last track" },
     { MTAB_XTD|MTAB_VUN, 0, NULL, "RL01",

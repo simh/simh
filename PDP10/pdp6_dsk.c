@@ -162,9 +162,9 @@ DIB dsk_dib[] = {
 
 MTAB                dsk_mod[] = {
     { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
-        &set_writelock, &show_writelock,   NULL, "Write enable tape drive" },
+        &set_writelock, &show_writelock,   NULL, "Write enable disk drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
-        &set_writelock, NULL,   NULL, "Write enable tape drive" },
+        &set_writelock, NULL,   NULL, "Write lock disk drive" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "DCT", "DCT",
        &dsk_set_dct, &dsk_show_dct, NULL},
     {0}

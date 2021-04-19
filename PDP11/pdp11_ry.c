@@ -216,7 +216,7 @@ MTAB ry_mod[] = {
     { MTAB_XTD|MTAB_VUN,                    0, "write enabled", "WRITEENABLED", 
         &set_writelock, &show_writelock,   NULL, "Write enable floppy drive" },
     { MTAB_XTD|MTAB_VUN,                    1, NULL, "LOCKED", 
-        &set_writelock, NULL,   NULL, "Write enable floppy drive" },
+        &set_writelock, NULL,   NULL, "Write lock floppy drive" },
     { (UNIT_DEN+UNIT_ATT),           UNIT_ATT, "single density",    NULL, NULL },
     { (UNIT_DEN+UNIT_ATT), (UNIT_DEN+UNIT_ATT), "double density",   NULL, NULL },
     { (UNIT_AUTO+UNIT_DEN+UNIT_ATT),         0, "single density",   NULL, NULL },

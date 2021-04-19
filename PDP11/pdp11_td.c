@@ -704,7 +704,7 @@ static REG td_reg[] = {
 
 static MTAB td_mod[] = {
     { MTAB_XTD|MTAB_VUN,   0, "write enabled", "WRITEENABLED",  &set_writelock, &show_writelock,   NULL, "Write enable TU58 drive" },
-    { MTAB_XTD|MTAB_VUN,   1, NULL,             "LOCKED",       &set_writelock, NULL,              NULL, "Write enable TU58 drive" },
+    { MTAB_XTD|MTAB_VUN,   1, NULL,             "LOCKED",       &set_writelock, NULL,              NULL, "Write lock TU58 drive" },
     { MTAB_XTD | MTAB_VDV, 0, "CONTROLLERS",    "CONTROLLERS",  &td_set_ctrls, &td_show_ctlrs,     NULL, "Number of Controllers" },
     { MTAB_XTD|MTAB_VDV,   0, "ADDRESS",        NULL,           &set_addr,     &show_addr,         NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV,   1, "VECTOR",         NULL,           &set_vec,      &show_vec,          NULL, "Interrupt vector" },

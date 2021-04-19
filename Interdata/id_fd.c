@@ -186,7 +186,7 @@ MTAB fd_mod[] = {
     { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
         &set_writelock, &show_writelock,   NULL, "Write enable drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
-        &set_writelock, NULL,   NULL, "Write enable drive" },
+        &set_writelock, NULL,   NULL, "Write lock drive" },
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
       &set_dev, &show_dev, NULL },
     { 0 }

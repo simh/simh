@@ -485,7 +485,7 @@ MTAB mt_mod[] = {
   { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
         &set_writelock, &show_writelock,   NULL, "Write enable tape drive" },
   { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
-        &set_writelock, NULL,   NULL, "Write enable tape drive" },
+        &set_writelock, NULL,   NULL, "Write lock tape drive" },
   { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
     &sim_tape_set_fmt, &sim_tape_show_fmt, NULL, "Define tape format" },
   { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", "CAPACITY",

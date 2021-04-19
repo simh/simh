@@ -449,7 +449,7 @@ MTAB rp_mod[] = {
     { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
         &set_writelock, &show_writelock,   NULL, "Write enable disk drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
-        &set_writelock, NULL,   NULL, "Write enable disk drive" },
+        &set_writelock, NULL,   NULL, "Write lock disk drive" },
     { MTAB_XTD|MTAB_VUN, RM03_DTYPE, NULL, "RM03",
       &rp_set_type, NULL, NULL, "Set RM03 Disk Type" },
     { MTAB_XTD|MTAB_VUN, RP04_DTYPE, NULL, "RP04",

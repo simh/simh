@@ -252,7 +252,7 @@ MTAB td_mod[] = {
     { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
         &set_writelock, &show_writelock,   NULL, "Write enable drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
-        &set_writelock, NULL,   NULL, "Write enable drive" },
+        &set_writelock, NULL,   NULL, "Write lock drive" },
     { UNIT_8FMT + UNIT_11FMT, 0, "18b", NULL, NULL },
     { UNIT_8FMT + UNIT_11FMT, UNIT_8FMT, "12b", NULL, NULL },
     { UNIT_8FMT + UNIT_11FMT, UNIT_11FMT, "16b", NULL, NULL },

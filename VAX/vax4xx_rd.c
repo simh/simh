@@ -354,7 +354,7 @@ MTAB rd_mod[] = {
     { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
         &set_writelock, &show_writelock,   NULL, "Write enable drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
-        &set_writelock, NULL,   NULL, "Write enable drive" },
+        &set_writelock, NULL,   NULL, "Write lock drive" },
     { MTAB_XTD|MTAB_VUN, RX33_DTYPE, NULL, "RX33",
       &rd_set_type, NULL, NULL, "Set RX33 Disk Type" },
     { MTAB_XTD|MTAB_VUN, RD31_DTYPE, NULL, "RD31",

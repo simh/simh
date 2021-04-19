@@ -191,9 +191,9 @@ REG rx_reg[] = {
 
 MTAB rx_mod[] = {
     { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
-        &set_writelock, &show_writelock,   NULL, "Write enable tape drive" },
+        &set_writelock, &show_writelock,   NULL, "Write enable floppy drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
-        &set_writelock, NULL,   NULL, "Write enable tape drive" },
+        &set_writelock, NULL,   NULL, "Write lock floppy drive" },
     { MTAB_XTD | MTAB_VDV, 1, NULL, "RX28", &rx_settype, NULL, NULL },
     { MTAB_XTD | MTAB_VDV, 0, NULL, "RX8E", &rx_settype, NULL, NULL },
     { MTAB_XTD | MTAB_VDV, 0, "TYPE", NULL, NULL, &rx_showtype, NULL },

@@ -664,7 +664,7 @@ MTAB hk_mod[] = {
     { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
         &set_writelock, &show_writelock,   NULL, "Write enable tape drive" },
     { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
-        &set_writelock, NULL,   NULL, "Write enable tape drive" },
+        &set_writelock, NULL,   NULL, "Write lock tape drive" },
     { UNIT_DUMMY,      0, NULL,            "BADBLOCK", 
         &hk_set_bad, NULL, NULL, "write bad block table on last track" },
     { MTAB_XTD|MTAB_VUN, 0, NULL, "RK06",
