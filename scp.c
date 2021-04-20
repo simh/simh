@@ -569,6 +569,7 @@ t_stat set_runlimit (int32 flag, CONST char *cptr);
 t_stat sim_set_asynch (int32 flag, CONST char *cptr);
 static const char *_get_dbg_verb (uint32 dbits, DEVICE* dptr, UNIT *uptr);
 static t_stat sim_sanity_check_register_declarations (void);
+static void fix_writelock_mtab (DEVICE *dptr);
 static t_stat _sim_debug_flush (void);
 
 /* Global data */
@@ -7520,6 +7521,7 @@ for (i = start; (dptr = sim_devices[i]) != NULL; i++) {
     if (sim_switches & SWMASK ('P')) {
         tmxr_add_debug (dptr);          /* Add TMXR debug to MUX devices */
         sim_tape_add_debug (dptr);      /* Add TAPE debug to TAPE devices */
+        fix_writelock_mtab (dptr);
         }
     if (dptr->reset != NULL) {
         reason = dptr->reset (dptr);
@@ -7626,6 +7628,16 @@ t_stat show_writelock (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
 {
 fprintf (st, "write %s", (uptr->flags & UNIT_WPRT) ? "locked" : "enabled");
 return SCPE_OK;
+}
+
+static void fix_writelock_mtab (DEVICE *dptr)
+{
+MTAB *mtab;
+
+for (mtab = dptr->modifiers; (mtab != NULL) && (mtab->mstring != NULL); ++mtab) {
+    if (mtab->disp == &show_writelock)
+        mtab->pstring = "WRITEENABLED";
+    }
 }
 
 /* Load and dump commands
