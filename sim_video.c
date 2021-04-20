@@ -380,11 +380,16 @@ static VID_DISPLAY vid_first;
 KEY_EVENT_QUEUE vid_key_events;                         /* keyboard events */
 MOUSE_EVENT_QUEUE vid_mouse_events;                     /* mouse events */
 
-static VID_DISPLAY *vid_window_from_id (Uint32 windowID)
+static VID_DISPLAY *vid_get_event_window (SDL_Event *ev, Uint32 windowID)
 {
 static Uint32 lastID = 0xffffffff;
 static VID_DISPLAY *last_display = NULL;
 VID_DISPLAY *vptr;
+SDL_KeyboardEvent *kev;
+SDL_MouseButtonEvent *bev;
+SDL_MouseMotionEvent *mev;
+SDL_WindowEvent *wev;
+SDL_UserEvent *uev;
 
 if (windowID == lastID)
     return last_display;
@@ -395,6 +400,76 @@ for (vptr = &vid_first; vptr != NULL; vptr = vptr->next) {
         return last_display = vptr;
         }
     }
+
+switch (ev->type) {
+    case SDL_KEYDOWN:
+    case SDL_KEYUP:
+        kev = (SDL_KeyboardEvent *)ev;
+        sim_messagef (SCPE_OK, "Unrecognized key event.\n");
+        sim_messagef (SCPE_OK, "  type = %u\n", kev->type);
+        sim_messagef (SCPE_OK, "  timestamp = %u\n", kev->timestamp);
+        sim_messagef (SCPE_OK, "  windowID = %u\n", kev->windowID);
+        sim_messagef (SCPE_OK, "  state = %u\n", kev->state);
+        sim_messagef (SCPE_OK, "  repeat = %u\n", kev->repeat);
+        sim_messagef (SCPE_OK, "  scancode = %d\n", kev->keysym.scancode);
+        sim_messagef (SCPE_OK, "  sym = %d\n", kev->keysym.sym);
+        sim_messagef (SCPE_OK, "  mod = %u\n", kev->keysym.mod);
+        break;
+    case SDL_MOUSEBUTTONDOWN:
+    case SDL_MOUSEBUTTONUP:
+        bev = (SDL_MouseButtonEvent *)ev;
+        sim_messagef (SCPE_OK, "Unrecognized mouse button event.\n");
+        sim_messagef (SCPE_OK, "  type = %u\n", bev->type);
+        sim_messagef (SCPE_OK, "  timestamp = %u\n", bev->timestamp);
+        sim_messagef (SCPE_OK, "  windowID = %u\n", bev->windowID);
+        sim_messagef (SCPE_OK, "  which = %u\n", bev->which);
+        sim_messagef (SCPE_OK, "  button = %u\n", bev->button);
+        sim_messagef (SCPE_OK, "  state = %u\n", bev->state);
+        sim_messagef (SCPE_OK, "  clicks = %u\n", bev->clicks);
+        sim_messagef (SCPE_OK, "  x = %d\n", bev->x);
+        sim_messagef (SCPE_OK, "  y = %d\n", bev->y);
+        break;
+    case SDL_MOUSEMOTION:
+        mev = (SDL_MouseMotionEvent *)ev;
+        sim_messagef (SCPE_OK, "Unrecognized mouse motion event.\n");
+        sim_messagef (SCPE_OK, "  type = %u\n", mev->type);
+        sim_messagef (SCPE_OK, "  timestamp = %u\n", mev->timestamp);
+        sim_messagef (SCPE_OK, "  windowID = %u\n", mev->windowID);
+        sim_messagef (SCPE_OK, "  which = %u\n", mev->which);
+        sim_messagef (SCPE_OK, "  state = %u\n", mev->state);
+        sim_messagef (SCPE_OK, "  x = %d\n", mev->x);
+        sim_messagef (SCPE_OK, "  y = %d\n", mev->y);
+        sim_messagef (SCPE_OK, "  xrel = %d\n", mev->xrel);
+        sim_messagef (SCPE_OK, "  yrel = %d\n", mev->yrel);
+        break;
+    case SDL_WINDOWEVENT:
+        wev = (SDL_WindowEvent *)ev;
+        sim_messagef (SCPE_OK, "Unrecognized window event.\n");
+        sim_messagef (SCPE_OK, "  type = %u\n", wev->type);
+        sim_messagef (SCPE_OK, "  timestamp = %u\n", wev->timestamp);
+        sim_messagef (SCPE_OK, "  windowID = %u\n", wev->windowID);
+        sim_messagef (SCPE_OK, "  event = %u\n", wev->event);
+        sim_messagef (SCPE_OK, "  data1 = %d\n", wev->data1);
+        sim_messagef (SCPE_OK, "  data2 = %d\n", wev->data2);
+        break;
+    case SDL_USEREVENT:
+        uev = (SDL_UserEvent *)ev;
+        sim_messagef (SCPE_OK, "Unrecognized user event.\n");
+        sim_messagef (SCPE_OK, "  type = %u\n", uev->type);
+        sim_messagef (SCPE_OK, "  timestamp = %u\n", uev->timestamp);
+        sim_messagef (SCPE_OK, "  windowID = %u\n", uev->windowID);
+        sim_messagef (SCPE_OK, "  code = %d\n", uev->code);
+        sim_messagef (SCPE_OK, "  data1 = %p\n", uev->data1);
+        sim_messagef (SCPE_OK, "  data2 = %p\n", uev->data2);
+        break;
+    default:
+        sim_messagef (SCPE_OK, "Unrecognized event type %u\n", ev->type);
+        break;
+    }
+
+sim_messagef (SCPE_OK,
+"\nSIMH has encountered a bug in SDL2.  An upgrade to SDL2\n"
+"version 2.0.14 should fix this problem.\n");
 
 return NULL;
 }
@@ -1345,7 +1420,9 @@ void vid_controller_button (SDL_ControllerButtonEvent *event)
 void vid_key (SDL_KeyboardEvent *event)
 {
 SIM_KEY_EVENT ev;
-VID_DISPLAY *vptr = vid_window_from_id (event->windowID);
+VID_DISPLAY *vptr = vid_get_event_window ((SDL_Event *)event, event->windowID);
+if (vptr == NULL)
+   return;
 
 if (vptr->vid_mouse_captured) {
     static const Uint8 *KeyStates = NULL;
@@ -1402,7 +1479,9 @@ void vid_mouse_move (SDL_MouseMotionEvent *event)
 SDL_Event dummy_event;
 SDL_MouseMotionEvent *dev = (SDL_MouseMotionEvent *)&dummy_event;
 SIM_MOUSE_EVENT ev;
-VID_DISPLAY *vptr = vid_window_from_id (event->windowID);
+VID_DISPLAY *vptr = vid_get_event_window ((SDL_Event *)event, event->windowID);
+if (vptr == NULL)
+   return;
 
 if ((!vptr->vid_mouse_captured) && (vptr->vid_flags & SIM_VID_INPUTCAPTURED))
     return;
@@ -1475,7 +1554,9 @@ void vid_mouse_button (SDL_MouseButtonEvent *event)
 SDL_Event dummy_event;
 SIM_MOUSE_EVENT ev;
 t_bool state;
-VID_DISPLAY *vptr = vid_window_from_id (event->windowID);
+VID_DISPLAY *vptr = vid_get_event_window ((SDL_Event *)event, event->windowID);
+if (vptr == NULL)
+   return;
 
 if ((!vptr->vid_mouse_captured) && (vptr->vid_flags & SIM_VID_INPUTCAPTURED)) {
     if ((event->state == SDL_PRESSED) &&
@@ -1933,7 +2014,7 @@ while (vid_active) {
                 break;
 
             case SDL_WINDOWEVENT:
-                vptr = vid_window_from_id (event.window.windowID);
+                vptr = vid_get_event_window (&event, event.window.windowID);
                 if (vptr != NULL) {
                     sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE|SIM_VID_DBG_CURSOR, vptr->vid_dev, "vid_thread() - Window Event: %d - %s\n", event.window.event, windoweventtypes[event.window.event]);
                     switch (event.window.event) {
@@ -1961,7 +2042,9 @@ while (vid_active) {
                 /* EVENT_SCREENSHOT to take a screenshot */
                 /* EVENT_BEEP   to emit a beep sound */
                 while (vid_active && event.user.code) {
-                    vptr = vid_window_from_id (event.user.windowID);
+                    vptr = vid_get_event_window (&event, event.user.windowID);
+                    if (vptr == NULL)
+                        continue;
                     if (event.user.code == EVENT_REDRAW) {
                         vid_update (vptr);
                         event.user.code = 0;    /* Mark as done */
