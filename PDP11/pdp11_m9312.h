@@ -460,42 +460,279 @@ uint16 rom_23_ZZZA9[64] =
 
 extern void setHITMISS ();
 
+#define A0_HEADER   "Function:              11/04, 11/34 Diagnostic/Console (M9312 E20)\n" \
+                    "DEC Part number:       23-248F1\n" \
+                    "Place in socket:       0\n\n"
+
+#define B0_HEADER   "Function:              11/60, 11/70 Diagnostic (M9312 E20)\n" \
+                    "DEC Part number:       23-616F1\n" \
+                    "Place in socket:       0\n\n"
+
+#define UBI_HEADER  "Function:              11/44 Diagnostic/Console (UBI; M7098 E58)\n" \
+                    "DEC Part number:       23-446F1\n" \
+                    "Place in socket:       0\n\n"
+
+#define MEM_HEADER  "Function:              11/24 Diagnostic/Console (MEM; M7134 E74)\n" \
+                    "DEC Part number:       23-774F1\n" \
+                    "Place in socket:       0\n\n"
+
+#define DL_HEADER   "Function:              RL01/02 cartridge disk bootstrap\n" \
+                    "DEC Part number:       23-751A9\n" \
+                    "Place in socket:       1-4\n\n"
+
+#define DM_HEADER   "Function:              RK06/07 cartridge disk bootstrap\n" \
+                    "DEC Part number:       23-752A9\n" \
+                    "Place in socket:       1-4\n\n"
+
+#define DX_HEADER  "Function:              RX01 floppy disk, single density bootstrap\n" \
+                    "DEC Part number:       23-753A9\n" \
+                    "Place in socket:       1-4\n\n"
+
+#define DP_HEADER   "Function:              RP02/03 cartridge disk bootstrap\n" \
+                    "DEC Part number:       23-755A9\n" \
+                    "Place in socket:       1-4\n\n"
+
+#define DB_HEADER   "Function:              RP04/05/06, RM02/03/05 cartridge disk bootstrap\n" \
+                    "DEC Part number:       23-755A9\n" \
+                    "Place in socket:       1-4\n\n"
+
+#define DK_HEADER   "Function:              RK03/05 DECdisk disk bootstrap\n" \
+                    "DEC Part number:       23-756A9\n" \
+                    "Place in socket:       1-4\n\n"
+
+#define DT_HEADER   "Function:              TU55/56 DECtape\n" \
+                    "DEC Part number:       23-756A9\n" \
+                    "Place in socket:       1-4\n\n"
+
+#define MM_HEADER   "Function:              TU16/45/77,TE16 magtape bootstrap\n" \
+                    "DEC Part number:       23-757A9\n" \
+                    "Place in socket:       1-4\n\n"
+
+#define MT_HEADER   "Function:              TS03,TU10,TE10 magtape bootstrap\n" \
+                    "DEC Part number:       23-758A9\n" \
+                    "Place in socket:       1-4\n\n"
+
+#define DS_HEADER   "Function:              RS03/04 fixed disk bootstrap\n" \
+                    "DEC Part number:       23-759A9\n" \
+                    "Place in socket:       1-4\n\n"
+
+#define TT_HEADER   "Function:              ASR33 lowspeed reader bootstrap\n" \
+                    "DEC Part number:       23-760A9\n" \
+                    "Place in socket:       1-4\n\n"
+
+#define PR_HEADER   "Function:              PC05 hispeed reader bootstrap\n" \
+                    "DEC Part number:       23-760A9\n" \
+                    "Place in socket:       1-4\n\n"
+
+#define CT_HEADER   "Function:              TU60 DECcassette bootstrap\n" \
+                    "DEC Part number:       23-761A9\n" \
+                    "Place in socket:       1-4\n\n"
+
+#define MS_HEADER   "Function:              TS04/11,TU80,TSU05 tape bootstrap\n" \
+                    "DEC Part number:       23-764A9\n" \
+                    "Place in socket:       1-4\n\n"
+
+#define DD_HEADER   "Function:              TU58 DECtapeII bootstrap\n" \
+                    "DEC Part number:       23-765B9\n" \
+                    "Place in socket:       1-4\n\n"
+
+#define DU_HEADER   "Function:              MSCP UDA50 (RAxx) disk bootstrap\n" \
+                    "DEC Part number:       23-767A9\n" \
+                    "Place in socket:       1-4\n\n"
+
+#define DY_HEADER   "Function:              RX02 floppy disk, double density bootstrap\n" \
+                    "DEC Part number:       23-811A9\n" \
+                    "Place in socket:       1-4\n\n"
+
+#define MU_HEADER   "Function:              TMSCP TK50,TU81 magtape bootstrap\n" \
+                    "DEC Part number:       23-E39A9\n" \
+                    "Place in socket:       1-4\n\n"
+
+#define XE0_HEADER  "Function:              Ethernet DEUNA/DELUA Net Boot (v2)\n" \
+                    "DEC Part number:       23-E32A9\n" \
+                    "Place in socket:       1-3\n\n"
+
+#define XE1_HEADER  "Function:              Ethernet DEUNA/DELUA Net Boot (v2)\n" \
+                    "DEC Part number:       23-E33A9\n" \
+                    "Place in socket:       2-4\n\n"
+
+#define XM0_HEADER  "Function:              DECnet DDCMP DMC11/DMR11 bootstrap\n" \
+                    "DEC Part number:       23-862A9\n" \
+                    "Place in socket:       1-2\n\n"
+
+#define XM1_HEADER  "Function:              DECnet DDCMP DMC11/DMR11 bootstrap\n" \
+                    "DEC Part number:       23-863A9\n" \
+                    "Place in socket:       2-3\n\n"
+
+#define XM2_HEADER  "Function:              DECnet DDCMP DMC11/DMR11 bootstrap\n" \
+                    "DEC Part number:       23-864A9\n" \
+                    "Place in socket:       3-4\n\n"
+
+#define ZZ_HEADER   "Function:              ROM diagnostics tests\n" \
+                    "DEC Part number:       23-ZZZA9\n" \
+                    "Place in socket:       1-4\n\n"
+
+#define A0_OFFSETS "Offsets\n" \
+                    "020 - Primary diagnostic entry point\n" \
+                    "144 - No diagnostic entry point\n" \
+                    "564 - Secondary diagnostic entry point\n\n"
+
+#define B0_OFFSETS  "Offsets\n" \
+                    "000 - Diagnostics entry point\n" \
+                    "744 - Boot device entry point\n\n"
+
+#define UBI_OFFSETS "Offsets\n" \
+                    "000 - Start entry point\n" \
+                    "020 - Diagnostics entry point\n" \
+                    "144 - No diagnostics entry point\n\n"
+
+#define MEM_OFFSETS "Offsets\n" \
+                    "020 - Diagnostics entry point\n\n"
+
+#define STD_OFFSETS "Offsets\n" \
+                    "004 - Boot without diagnostics, unit 0\n" \
+                    "006 - Boot with diagnostics, unit 0\n" \
+                    "012 - Boot with diagnostics, unit in R0\n" \
+                    "016 - Boot with diag, unit in R0, CSR in R1\n\n"
+
+#define DB_OFFSETS  "Offsets\n" \
+                    "050 - Boot without diagnostics, unit 0\n" \
+                    "052 - Boot with diagnostics, unit 0\n" \
+                    "056 - Boot with diagnostics, unit in R0\n" \
+                    "062 - Boot with diag, unit in R0, CSR in R1\n\n"
+
+#define DT_OFFSETS  "Offsets\n" \
+                    "034 - Boot without diagnostics, unit 0\n" \
+                    "036 - Boot with diagnostics, unit 0\n" \
+                    "042 - Boot with diagnostics, unit in R0\n" \
+                    "046 - Boot with diag, unit in R0, CSR in R1\n\n"
+
+#define ZZ_OFFSETS  "Offsets\n" \
+                    "004 - Boot without diagnostics, unit 0, standard CSR\n" \
+                    "006 - Boot with diagnostics, unit 0, standard CSR (Not used)\n" \
+                    "012 - Boot with unit in R0, standard CSR (Not used)\n" \
+                    "016 - Boot with unit in R0, CSR in R11\n\n"
+
+#define A0_REMARK   "Before execution of the console emulator routine, primary diagnostic tests are\n" \
+                    "executed. After completion of the primary diagnostic tests the contents of R0,\n" \
+                    "R4, R6, and R5 will be printed out on the terminal. An @ sign will be printed at\n" \
+                    "the beginning of the next line of the terminal, indicating that the console\n" \
+                    "emulator routine is waiting for input from the operator.\n\n" \
+                    "The following symbols are used in the text below:\n" \
+                    "<SB> : Space bar\n" \
+                    "<CR> : Carriage return key\n" \
+                    "X    : Any octal number 0-7\n\n" \
+                    "The console functions can be exercised by pressing keys, as follows:\n" \
+                    "Function        Keyboard Strokes\n" \
+                    "Load Address    L<SB> XXXXXX <CR>\n" \
+                    "Examine         E<SB>\n" \
+                    "Deposit         D<SB> XXXXXX <CR>\n" \
+                    "Start           S<CR>\n" \
+                    "Boot            <Boot command code><unit><CR>\n\n" \
+                    "The following boot command codes can be specified:\n" \
+                    "Code  Device               Interface       Description\n" \
+                    "DL    RL01                 RL11            Disk Memory\n" \
+                    "DX    RXO1                 RX11            Floppy disk system\n" \
+                    "DK    RK03, 05/05J         RK11C, D        DECpack disk\n" \
+                    "DT    TU55/56              TC11            DualDECtape\n" \
+                    "DY    RX02                 RX211           Double density floppy disk system\n" \
+                    "DM    RK06/07              RK611           Disk drive\n" \
+                    "MT    TS03, TU10           TM11/A11/B11    Magnetic tape (9 track, 800 bits/in, NRZ)\n" \
+                    "MM    TUI6, TM02           RH11/RH70       Magnetic tape\n" \
+                    "CT    TU60                 TA11            Dual magnetic tape\n" \
+                    "PR    PC11                                 High speed reader\n" \
+                    "TT    DL11-A                               Low speed reader\n" \
+                    "DP    RP02/03              RP11            Moving head disk\n" \
+                    "DB    RP04/05/06, RM02/03  RH11/RH70       Moving head disk\n" \
+                    "DS    RS03/04              RH11/RH70       Fixed head disk\n\n"
+
+#define B0_REMARK   "Booting from unit 0 is normally performed by starting one of the boot ROMs in\n" \
+                    "socket 1-4. Booting from other units than unit 0 can be performed via the B0\n" \
+                    "diagnostics ROM. That ROM can be started at address 165744. Via that entry point\n" \
+                    "the boot code starting address and the unit to boot from can be specified in the\n" \
+                    "console switch register. Bits 0-8 contain the starting address as an offset to\n" \
+                    "173000 and bits 9-11 contain the (octal) unit number. See the table below.\n\n" \
+                    "15  14  13  12 | 11 10  09         | 08  07  06  05  04  03  02  01  00\n" \
+                    "NA  NA  NA  NA | Octal unit number | Start address boot code as offset to 17300\n\n" \
+                    "The device is then booted as follows:\n" \
+                    "1. Load address 765744,\n" \
+                    "2. Set switch register according to the table above,\n" \
+                    "3. Start.\n\n" \
+                    "To boot for example from unit 2, for the device for which the boot ROM is\n" \
+                    "available in socket 1, the value 2012 has to be put in the console switch\n" \
+                    "register.\n\n"
+
+#define DD_REMARK   "This ROM replaces 23-765A9 and fixes non-standard CSR access.\n\n"
+#define XE_REMARK   "The Ethernet DEUNA/DELUA Net Boot comprises two ROM’s, XE0 and XE1. These\n" \
+                    "ROMs have to be placed in two subsequent sockets.\n\n"
+#define XM_REMARK   "The DECnet DDCMP DMC11/DMR11 bootstrap comprises three ROM’s, XM0, XM1 and\n" \
+                    "XM2. These ROMs have to be placed in three subsequent sockets.\n\n"
+
+#define A0_HELP     A0_HEADER  A0_OFFSETS  A0_REMARK
+#define B0_HELP     B0_HEADER  B0_OFFSETS  B0_REMARK
+#define UBI_HELP    UBI_HEADER UBI_OFFSETS
+#define MEM_HELP    MEM_HEADER MEM_OFFSETS
+#define DL_HELP     DL_HEADER  STD_OFFSETS
+#define DM_HELP     DM_HEADER  STD_OFFSETS
+#define DX_HELP     DX_HEADER  STD_OFFSETS
+#define DP_HELP     DP_HEADER  STD_OFFSETS
+#define DB_HELP     DB_HEADER  DB_OFFSETS
+#define DK_HELP     DK_HEADER  STD_OFFSETS
+#define DT_HELP     DT_HEADER  DT_OFFSETS
+#define MM_HELP     MM_HEADER  STD_OFFSETS
+#define MT_HELP     MT_HEADER  STD_OFFSETS
+#define DS_HELP     DS_HEADER  STD_OFFSETS
+#define TT_HELP     TT_HEADER  DT_OFFSETS
+#define PR_HELP     PR_HEADER  STD_OFFSETS
+#define CT_HELP     CT_HEADER  STD_OFFSETS
+#define MS_HELP     MS_HEADER  STD_OFFSETS
+#define DD_HELP     DD_HEADER  STD_OFFSETS DD_REMARK
+#define DU_HELP     DU_HEADER  STD_OFFSETS
+#define DY_HELP     DY_HEADER  STD_OFFSETS
+#define MU_HELP     MU_HEADER  STD_OFFSETS
+#define XE0_HELP    XE0_HEADER STD_OFFSETS XE_REMARK
+#define XE1_HELP    XE1_HEADER STD_OFFSETS XE_REMARK
+#define XM0_HELP    XM0_HEADER STD_OFFSETS XM_REMARK
+#define XM1_HELP    XM1_HEADER STD_OFFSETS XM_REMARK
+#define XM2_HELP    XM2_HEADER STD_OFFSETS XM_REMARK
+#define ZZ_HELP     ZZ_HEADER  STD_OFFSETS
+
 rom diag_roms[] =
 {
-    "A0",   NULL,         (uint16 (*)[]) &rom_23_248F1,
-    "UBI",  NULL,         (uint16 (*)[]) &rom_23_446F1,
-    "B0",   &setHITMISS,  (uint16 (*)[]) &rom_23_616F1,
-    "MEM",  NULL,         (uint16 (*)[]) &rom_23_774F1,
-    "",     NULL,         NULL,
+    "A0",   NULL,         (uint16 (*)[]) &rom_23_248F1, A0_HELP,
+    "UBI",  NULL,         (uint16 (*)[]) &rom_23_446F1, UBI_HELP,
+    "B0",   &setHITMISS,  (uint16 (*)[]) &rom_23_616F1, B0_HELP,
+    "MEM",  NULL,         (uint16 (*)[]) &rom_23_774F1, MEM_HELP,
+    "",     NULL,         NULL,                         "",
 };
 
 rom boot_roms[] =
 {
-    "DL",    NULL,        (uint16 (*)[]) &rom_23_751A9,
-    "DM",    NULL,        (uint16 (*)[]) &rom_23_752A9,
-    "DX",    NULL,        (uint16 (*)[]) &rom_23_753A9,
-    "DP",    NULL,        (uint16 (*)[]) &rom_23_755A9,
-    "DB",    NULL,        (uint16 (*)[]) &rom_23_755A9,
-    "DK",    NULL,        (uint16 (*)[]) &rom_23_756A9,
-    "DT",    NULL,        (uint16 (*)[]) &rom_23_756A9,
-    "MM",    NULL,        (uint16 (*)[]) &rom_23_757A9,
-    "MT",    NULL,        (uint16 (*)[]) &rom_23_758A9,
-    "DS",    NULL,        (uint16 (*)[]) &rom_23_759A9,
-    "TT",    NULL,        (uint16 (*)[]) &rom_23_760A9,
-    "PR",    NULL,        (uint16 (*)[]) &rom_23_760A9,
-    "CT",    NULL,        (uint16 (*)[]) &rom_23_761A9,
-    "MS",    NULL,        (uint16 (*)[]) &rom_23_764A9,
-    "DD",    NULL,        (uint16 (*)[]) &rom_23_765B9,
-    "DU",    NULL,        (uint16 (*)[]) &rom_23_767A9,
-    "DY",    NULL,        (uint16 (*)[]) &rom_23_811A9,
-    "XM0",   NULL,        (uint16 (*)[]) &rom_23_862A9,
-    "XM1",   NULL,        (uint16 (*)[]) &rom_23_863A9,
-    "XM2",   NULL,        (uint16 (*)[]) &rom_23_864A9,
-    "XE0",   NULL,        (uint16 (*)[]) &rom_23_E32A9,
-    "XE1",   NULL,        (uint16 (*)[]) &rom_23_E33A9,
-    "MU",    NULL,        (uint16 (*)[]) &rom_23_E39A9,
-    "ZZ",    NULL,        (uint16 (*)[]) &rom_23_ZZZA9,
-    "",      NULL,        NULL,
+    "DL",    NULL,        (uint16 (*)[]) &rom_23_751A9, DL_HELP,
+    "DM",    NULL,        (uint16 (*)[]) &rom_23_752A9, DM_HELP,
+    "DX",    NULL,        (uint16 (*)[]) &rom_23_753A9, DX_HELP,
+    "DP",    NULL,        (uint16 (*)[]) &rom_23_755A9, DP_HELP,
+    "DB",    NULL,        (uint16 (*)[]) &rom_23_755A9, DB_HELP,
+    "DK",    NULL,        (uint16 (*)[]) &rom_23_756A9, DK_HELP,
+    "DT",    NULL,        (uint16 (*)[]) &rom_23_756A9, DT_HELP,
+    "MM",    NULL,        (uint16 (*)[]) &rom_23_757A9, MM_HELP,
+    "MT",    NULL,        (uint16 (*)[]) &rom_23_758A9, MT_HELP,
+    "DS",    NULL,        (uint16 (*)[]) &rom_23_759A9, DS_HELP,
+    "TT",    NULL,        (uint16 (*)[]) &rom_23_760A9, TT_HELP,
+    "PR",    NULL,        (uint16 (*)[]) &rom_23_760A9, PR_HELP,
+    "CT",    NULL,        (uint16 (*)[]) &rom_23_761A9, CT_HELP,
+    "MS",    NULL,        (uint16 (*)[]) &rom_23_764A9, MS_HELP,
+    "DD",    NULL,        (uint16 (*)[]) &rom_23_765B9, DD_HELP,
+    "DU",    NULL,        (uint16 (*)[]) &rom_23_767A9, DU_HELP,
+    "DY",    NULL,        (uint16 (*)[]) &rom_23_811A9, DY_HELP,
+    "XM0",   NULL,        (uint16 (*)[]) &rom_23_862A9, XM0_HELP,
+    "XM1",   NULL,        (uint16 (*)[]) &rom_23_863A9, XM1_HELP,
+    "XM2",   NULL,        (uint16 (*)[]) &rom_23_864A9, XM2_HELP,
+    "XE0",   NULL,        (uint16 (*)[]) &rom_23_E32A9, XE0_HELP,
+    "XE1",   NULL,        (uint16 (*)[]) &rom_23_E33A9, XE1_HELP,
+    "MU",    NULL,        (uint16 (*)[]) &rom_23_E39A9, MU_HELP,
+    "ZZ",    NULL,        (uint16 (*)[]) &rom_23_ZZZA9, ZZ_HELP,
+    "",      NULL,        NULL,                         "",
 };
 
 #define NUM_M9312_SOCKETS    5

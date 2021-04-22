@@ -46,6 +46,7 @@ typedef struct
     char device_mnemonic[5];            /* ROM identifier */
     void (*rom_attached)();             /* ROM specific function */
     uint16 (*image)[];                  /* ROM image */
+    const char *help_text;              /* ROM help text */
 }
 rom;
 
@@ -80,13 +81,14 @@ module_type;
  */
 typedef struct
 {
-    const char *name;                    /* Module name */
-    module_type type;                    /* Module type */
-    const uint32 valid_cpu_types;        /* Valid CPU types */
-    const uint32 valid_cpu_opts;         /* Required CPU options */
-    const uint32 num_sockets;            /* Number of sockets for the module */
-    uint32 flags;                        /* Flags for initialization of the UNIT flag field */
-    rom_socket (*sockets)[];             /* Sockets for this module */
+    const char *name;                           /* Module name */
+    module_type type;                           /* Module type */
+    const uint32 valid_cpu_types;               /* Valid CPU types */
+    const uint32 valid_cpu_opts;                /* Required CPU options */
+    const uint32 num_sockets;                   /* Number of sockets for the module */
+    uint32 flags;                               /* Flags for initialization of the UNIT flag field */
+    rom_socket (*sockets)[];                    /* Sockets for this module */
+    t_stat (*help_func)(FILE *, const char *);  /* Help function for this module */
 }
 module;
 

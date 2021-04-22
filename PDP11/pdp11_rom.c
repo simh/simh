@@ -36,11 +36,14 @@ t_stat rom_set_addr (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_addr (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_set_module (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_module (FILE *, UNIT *, int32, CONST void *);
-t_stat rom_attach (UNIT *uptr, CONST char *cptr);
-t_stat rom_detach (UNIT *uptr);
-t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
-t_stat rom_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
-const char *rom_description (DEVICE *dptr);
+t_stat rom_attach (UNIT *, CONST char *);
+t_stat rom_detach (UNIT *);
+t_stat rom_blank_help (FILE *, const char *);
+t_stat rom_m9312_help (FILE *, const char *);
+t_stat rom_vt40_help (FILE *, const char *);
+t_stat rom_help (FILE *st, DEVICE *, UNIT *, int32, const char *);
+t_stat rom_help_attach (FILE *st, DEVICE *, UNIT *, int32, const char *);
+const char *rom_description (DEVICE *);
 
 /* External references */
 extern uint32 cpu_type;
@@ -50,6 +53,118 @@ extern int32 HITMISS;
 /* Static definitions */
 static t_bool rom_initialized = FALSE;      /* Initialize rom_unit on first reset call */
 static uint32 cpu_type_on_selection;        /* cpu_type for which module type was selected */
+
+static const char rom_helptext[] =
+/***************** 80 character line width template *************************/
+"ROM, Read-Only Memory\n\n"
+"A hardware PDP-11 comprises ROM code, containing console emulator, diagnostic\n"
+"and bootstrap functionality.The ROM device can be used to add ROM modules\n"
+"to the I/O page.Three module types are available, the BLANK, the M9312 and\n"
+"the VT40 module. The module is selected by means of the MODULE modifier, the\n"
+"command 'SET ROM MODULE=M9312' selects the M9312 module.\n\n"
+"The following commands are available:\n\n"
+"   SHOW ROM\n"
+"   SHOW ROM<unit>\n"
+"   SET ROM\n"
+"   ATTACH ROM<unit>\n"
+"   SHOW ROM<unit>\n"
+"   HELP ROM\n"
+"   HELP ROM SET\n"
+"   HELP ROM SHOW\n"
+"   HELP ROM ATTACH\n\n"
+"Help is available for the modules\n\n"
+"   HELP ROM BLANK\n"
+"   HELP ROM M9312\n"
+"   HELP ROM VT40\n\n";
+
+static const char rom_blank_helptext[] =
+/***************** 80 character line width template *************************/
+"The contents of the BLANK ROM module have to be specified by setting the\n"
+"ROM's base address and ROM image.First the ROM unit ADDRESS has to be set,\n"
+"and then the ATTACH command can be used to fill the ROM with contents.\n\n";
+
+static const char rom_vt40_helptext[] =
+/***************** 80 character line width template *************************/
+"The VT40 module is meant for the GT-40 graphic terminal, based on a\n"
+"PDP-11/05. The VT40 included a bootstrap ROM.The module has just one socket\n"
+"with one available ROM and a 'SET ROM MODULE=VT40' command suffices to\n"
+"select this boot ROM.\n\n";
+
+static const char rom_m9312_helptext[] =
+/***************** 80 character line width template *************************/
+"The M9312 module contains 512 words of read only memory (ROM) that can be\n"
+"used for diagnostic routines, the console emulator routine, and bootstrap\n"
+"programs. The module contains five sockets that allow the user to insert\n"
+"ROMs, enabling the module to be used with any Unibus PDP11 system and boot\n"
+"any peripheral device by simply adding or changing ROMs.\n\n"
+"Socket 0 is solely used for a diagnostic ROM (PDP-11/60 and 11/70 systems)\n"
+"or a ROM which contains the console emulator routine and diagnostics for all\n"
+"other PDP-11 systems. The other four sockets accept ROMs which contain\n"
+"bootstrap programs. In general one boot ROM contains the boot code for one\n"
+"device type. In some cases a boot rom contains the boot code for two device\n"
+"types and there are also cases where the boot code comprises two or three\n"
+"ROMs. In these cases these ROMs have to be placed in subsequent sockets.\n\n"
+"The M9312 module is in simh implemented as the M9312 device. In accordance\n"
+"with the hardware module, the M9312 device contains five units. Every unit\n"
+"can be supplied with a specific ROM. All ROMs are available in the device\n"
+"itself and can be seated in a socket by means of the ATTACH command.\n"
+"The 'ATTACH ROM0 B0' command for example puts the 11/70 diagnostics ROM in\n"
+"socket 0.\n\n"
+"The following ROMs are available:\n\n"
+"ROM code       Function\n"
+"A0             11/04, 11/34 Diagnostic/Console (M9312 E20)\n"
+"B0             11/60, 11/70 Diagnostic (M9312 E20)\n"
+"UBI            11/44 Diagnostic/Console (UBI; M7098 E58)\n"
+"MEM            11/24 Diagnostic/Console (MEM; M7134 E74)\n"
+"DL             RL01/RL02 cartridge disk\n"
+"DM             RK06/RK07 cartridge disk\n"
+"DX             RX01 floppy disk, single density\n"
+"DP             RP02/RP03 cartridge disk\n"
+"DB             RP04/RP05/RP06, RM02/RM03/RM05 cartridge disk\n"
+"DK             RK03/RK05 DECdisk\n"
+"DT             TU55/TU56 DECtape\n"
+"MM             TU16/TU45/TU77, TE16 magtape\n"
+"MT             TS03, TU10, TE10 magtape\n"
+"DS             RS03/RS04 fixed disk\n"
+"TT             ASR33 lowspeed reader\n"
+"PR             PC05 hispeed reader\n"
+"CT             TU60 DECcassette\n"
+"MS             TS04/TS11, TU80, TSU05 tape\n"
+"DD             TU58 DECtapeII\n"
+"DU             MSCP UDA50 (RAxx) disk\n"
+"DY             RX02 floppy disk, double density\n"
+"MU             TMSCP TK50, TU81 magtape\n"
+"XE0, XE1       Ethernet DEUNA / DELUA Net Boot (v2)\n"
+"XM0, XM1, XM2  DECnet DDCMP DMC11 / DMR11\n"
+"ZZ             Test ROM\n\n"
+"Help is available for each ROM with the 'HELP ROM M9312 <ROM code>' command.\n\n"
+/***************** 80 character line width template *************************/
+"The M9312 module has 512 words of read only memory.The lower 256 words\n"
+"(addresses 165000 through 165776) are used for the storage of ASCII console\n"
+"and diagnostic routines. The diagnostics are rudimentary CPU and memory\n"
+"diagnostics. The upper 256 words (addresses 173000 through 173776) are used\n"
+"for bootstrap programs. These upper words are divided further into four\n"
+"64-word segments. In principle each of the segments 0 to 4 contains the boot\n"
+"programs for one or two device types. If necessary however, more than one\n"
+"segment may be used for a boot program. The following table shows the ROM\n"
+"segmentation.\n\n"
+"ROM type                                           Base address\n"
+"256 word console emulator and diagnostics ROM #0   165000\n"
+"64 word boot ROM #1                                173000\n"
+"64 word boot ROM #2                                173200\n"
+"64 word boot ROM #3                                173400\n"
+"64 word boot ROM #4                                173600\n\n"
+"The system start adress can be determined in the following way:\n"
+"- Take the socket base address the ROM is placed in from the table above,\n"
+"- Add the ROM-specific offset of the entry point. The offsets are documented\n"
+"  in the ROM-specific help text wich can be displayed via the\n"
+"  'HELP ROM M9312 <ROM code>' command.\n\n"
+/***************** 80 character line width template *************************/
+"With a DL boot ROM in socket 1 e.g., a RL01 disk can be booted from unit 0,\n"
+"without performing the diagnostics, by starting at address 173004. With the\n"
+"same boot ROM placed in socket 2 that unit can be booted by starting at\n"
+"address 1732004. Note that the start address specifies whether or not the\n"
+"diagnostics code is executed.\n\n";
 
 /*
  * ROM data structures
@@ -87,7 +202,8 @@ module blank =
     QBUS_MODEL | UNIBUS_MODEL,              /* Required CPU options */
     NUM_BLANK_SOCKETS,                      /* Number of sockets (units) */
     ROM_UNIT_FLAGS,                         /* UNIT flags */
-    (rom_socket (*)[]) & blank_sockets      /* Pointer to rom_socket structs */
+    (rom_socket (*)[]) & blank_sockets,     /* Pointer to rom_socket structs */
+    &rom_blank_help                         /* Pointer to help function */
 };
 
 /* Define the M9312 module */
@@ -99,7 +215,8 @@ module m9312 =
     UNIBUS_MODEL,                           /* Required CPU options */
     NUM_M9312_SOCKETS,                      /* Number of sockets (units) */
     ROM_UNIT_FLAGS,                         /* UNIT flags */
-    (rom_socket (*)[]) & m9312_sockets      /* Pointer to rom_socket structs */
+    (rom_socket (*)[]) & m9312_sockets,     /* Pointer to rom_socket structs */
+    &rom_m9312_help                         /* Pointer to help function */
 };
 
 /* Define the VT40 module */
@@ -111,7 +228,8 @@ module vt40 =
     UNIBUS_MODEL,                           /* Required CPU options */
     NUM_VT40_SOCKETS,                       /* Number of sockets (units) */
     ROM_UNIT_FLAGS,                         /* UNIT flags */
-    (rom_socket (*)[]) & vt40_sockets       /* Pointer to rom_socket structs */
+    (rom_socket (*)[]) & vt40_sockets,      /* Pointer to rom_socket structs */
+    &rom_vt40_help                          /* Pointer to help function */
 };
 
 /*
@@ -572,29 +690,73 @@ t_stat rom_detach (UNIT *uptr)
     return detach_unit (uptr);
 }
 
+t_stat rom_blank_help (FILE *st, const char *cptr)
+{
+    fprintf (st, rom_blank_helptext);
+    return SCPE_OK;
+}
+
+t_stat rom_m9312_help (FILE *st, const char *cptr)
+{
+    rom *romptr;
+
+    /* If a 'HELP ROM M9312' is given print the help text for the module */
+    if (*cptr == '\0')
+        fprintf (st, rom_m9312_helptext);
+    else {
+        /* Search for the name in diag rom list */
+        for (romptr = diag_roms; romptr->image != NULL; romptr++) {
+            if (strcasecmp (cptr, romptr->device_mnemonic) == 0) {
+                fprintf (st, romptr->help_text);
+                return SCPE_OK;
+            }
+        }
+
+        /* Search for the name in boot rom list */
+        for (romptr = boot_roms; romptr->image != NULL; romptr++) {
+            if (strcasecmp (cptr, romptr->device_mnemonic) == 0) {
+                fprintf (st, romptr->help_text);
+                return SCPE_OK;
+            }
+        }
+
+        /* The name wasn't found in both lists */
+        fprintf (st, "Unknown ROM\n");
+    }
+
+    return SCPE_OK;
+}
+
+t_stat rom_vt40_help (FILE *st, const char *cptr)
+{
+    fprintf (st, rom_vt40_helptext);
+    return SCPE_OK;
+}
 
 /* Print help */
 
 t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
-    fprintf (st, "ROM, Read-Only Memory\n\n");
-    fprintf (st, "The ROM device can be used to add ROM modules to the I/O page. Three module\n");
-    fprintf (st, "types are available, the BLANK, the M9312 and the VT40 module. The module\n");
-    fprintf (st, "is selected by means of the MODULE modifier.\n");
-    fprintf (st, "The contents of the BLANK ROM module have to be specified by setting the ROM's\n");
-    fprintf (st, "base address and ROM image. First the ROM unit ADDRESS has to be set, and then\n");
-    fprintf (st, "the ATTACH command can be used to fill the ROM with contents.\n\n");
-    fprintf (st, "The contents of the M9312 ROM's are built in and can be set by specifying its\n");
-    fprintf (st, "function. The M9312 has five ROM sockets available, ROM0 is used for a\n");
-    fprintf (st, "Diagnostics/Console Emulator ROM and ROMs 1-4 are used for boot ROMs for specific\n");
-    fprintf (st, "devices. The ATTACH command is used to specify the function of the ROM. The command\n");
-    fprintf (st, "'ATTACH ROM0 B0' for example puts the ROM B0 in socket 0.\n");
-    fprintf (st, "Available ROMs for socket 0 are A0, B0, UBI and MEM, available ROMs for\n");
-    fprintf (st, "sockets 1-4 are identified by their device mnemonic.\n\n");
-    fprintf (st, "The VT40 module is meant for the GT-40 graphic terminal, based on a PDP-11/05. The VT40\n");
-    fprintf (st, "included a bootstrap ROM. The module has just one socket with one available ROM and a\n");
-    fprintf (st, "'SET ROM MODULE=VT40' command suffices to select this boot ROM.\n");
-    fprintf (st, "The BOOT command is supported for starting from the ROM.\n");
+    int module_number;
+    char gbuf[CBUFSIZE];
+
+    /* If no argument to 'HELP ROM' is given print the general help text */
+    if (*cptr == '\0')
+        fprintf (st, rom_helptext);
+    else {
+        /* The (first) HELP ROM argument must be a module name. Look it up
+           in the module list en call its help function. */
+        cptr = get_glyph (cptr, gbuf, 0);
+
+        for (module_number = 0; module_number < NUM_MODULES; module_number++) {
+            if (strcasecmp (gbuf, module_list[module_number]->name) == 0)
+                return (*module_list[module_number]->help_func) (st, cptr);
+        }
+
+        /* The module wasn't found in the module list */
+        fprintf (st, "Unknown ROM module\n");
+    }
+
     return SCPE_OK;
 }
 
