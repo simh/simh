@@ -28,7 +28,6 @@
 /* Forward references */
 
 t_stat rom_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
-t_stat rom_wr (int32 data, int32 PA, int32 access);
 t_stat rom_rd (int32 *data, int32 PA, int32 access);
 t_stat rom_reset (DEVICE *dptr);
 t_stat rom_boot (int32 u, DEVICE *dptr);
@@ -439,17 +438,6 @@ t_stat rom_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 }
 
 
-/* 
- * ROM write routine 
- * The sole purpose of this function to return a meaningful error message
- * for a write operation to a ROM device.
- */
-t_stat rom_wr (int32 data, int32 PA, int32 access)
-{
-    return SCPE_NXM;
-}
-
-
 /* ROM read routine */
  
 t_stat rom_rd (int32 *data, int32 PA, int32 access)
@@ -626,7 +614,7 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
                 return r;
 
             /* Fill the DIB for the unit */
-            r = reset_dib (uptr, &rom_rd, &rom_wr);
+            r = reset_dib (uptr, &rom_rd, NULL);
             if (r != SCPE_OK)
                 return rom_detach (uptr);
 
@@ -662,7 +650,7 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
                         (*romptr->rom_attached)();
 
                     /* Fill the DIB for this unit */
-                    return reset_dib (uptr, &rom_rd, &rom_wr);
+                    return reset_dib (uptr, &rom_rd, NULL);
                 }
             }
 
