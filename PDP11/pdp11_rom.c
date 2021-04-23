@@ -58,21 +58,28 @@ static const char rom_helptext[] =
 /***************** 80 character line width template *************************/
 "ROM, Read-Only Memory\n\n"
 "A hardware PDP-11 comprises ROM code, containing console emulator, diagnostic\n"
-"and bootstrap functionality.The ROM device can be used to add ROM modules\n"
-"to the I/O page.Three module types are available, the BLANK, the M9312 and\n"
-"the VT40 module. The module is selected by means of the MODULE modifier, the\n"
-"command 'SET ROM MODULE=M9312' selects the M9312 module.\n\n"
+"and bootstrap functionality. The ROM device can be used to add a ROM module\n"
+"to the I/O page. Each module has one or more ROMs available that can be\n"
+"attached to the module.\n\n"
+"Available modules are:\n"
+"   BLANK\n"
+"   M9312\n"
+"   VT40\n\n"
+"The module to be used is selected by means of the MODULE modifier, the\n"
+"'SET ROM MODULE=M9312'command e.g. selects the M9312 module. The ATTACH\n"
+"command can then be used to attach a specific ROM to the units of the ROM\n"
+"device.\n\n"
 "The following commands are available:\n\n"
 "   SHOW ROM\n"
 "   SHOW ROM<unit>\n"
-"   SET ROM\n"
-"   ATTACH ROM<unit>\n"
+"   SET ROM MODULE=<module>\n"
+"   ATTACH ROM<unit> <file> | <built-in ROM>\n"
 "   SHOW ROM<unit>\n"
 "   HELP ROM\n"
 "   HELP ROM SET\n"
 "   HELP ROM SHOW\n"
 "   HELP ROM ATTACH\n\n"
-"Help is available for the modules\n\n"
+"Help is available for the BLANK, M9312 and VT40 modules:\n\n"
 "   HELP ROM BLANK\n"
 "   HELP ROM M9312\n"
 "   HELP ROM VT40\n\n";
@@ -345,14 +352,14 @@ t_stat rom_set_module (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 
     /* Is a module type specified? */
     if (cptr == NULL)
-        return SCPE_ARG;
+        return sim_messagef (SCPE_ARG, "No module specified\n");
 
     /* Search the module list for the specified module type */
     for (module_number = 0; module_number < NUM_MODULES; module_number++) {
         if (strcasecmp (cptr, module_list[module_number]->name) == 0) {
             /* Check if the module is allowed on this cpu and bus type */
             if (!module_type_is_valid (module_number))
-                return SCPE_INVSW;
+                return sim_messagef (SCPE_ARG, "Module is not valid for current cpu and/or bus type\n");
 
             /* Save current cpu type for reference in rom_reset() */
             cpu_type_on_selection = cpu_type;
@@ -403,7 +410,7 @@ t_stat rom_set_module (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     }
 
     /* Module type not found */
-    return SCPE_ARG;
+    return sim_messagef (SCPE_ARG, "Unknown module\n");
 }
 
 
@@ -517,7 +524,7 @@ t_stat rom_set_addr (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 
     /* Check if the command is allowed for the selected module */
     if (module_list[selected_module]->type != ROM_FILE)
-        return SCPE_NOFNC;
+        return sim_messagef (SCPE_ARG, "Command not allowed for the selected module\n");
 
     /* Check if the unit is not already attached */
     if (uptr->flags & UNIT_ATT)
@@ -525,7 +532,7 @@ t_stat rom_set_addr (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 
     /* Check if an address is specified */
     if (cptr == NULL)
-        return SCPE_ARG;
+        return sim_messagef (SCPE_ARG, "No address specified\n");
 
     /* Convert the adress string and check if produced a valid value */
     addr = (int32) get_uint (cptr, 8, IOPAGEBASE + IOPAGEMASK, &r);
@@ -630,7 +637,7 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
         case ROM_BUILTIN:
             /* Is function specified? */
             if (cptr == NULL)
-                return SCPE_ARG;
+                return sim_messagef (SCPE_ARG, "No ROM type specified\n");
 
             /* Get a pointer to the selected module and from that a pointer to
                socket for the unit */
@@ -660,7 +667,7 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
             }
 
             /* Mnemonic not found */
-            return SCPE_ARG;
+            return sim_messagef (SCPE_ARG, "Unknown ROM type\n");
 
         default:
             return SCPE_IERR;
@@ -721,7 +728,7 @@ t_stat rom_m9312_help (FILE *st, const char *cptr)
         }
 
         /* The name wasn't found in both lists */
-        fprintf (st, "Unknown ROM\n");
+        fprintf (st, "Unknown ROM type\n");
     }
 
     return SCPE_OK;
