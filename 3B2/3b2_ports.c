@@ -626,7 +626,6 @@ t_stat ports_reset(DEVICE *dptr)
         ports_conf = TRUE;
 
         if (ports_ldsc == NULL) {
-            ports_desc.lines = DEF_PORTS_CARDS * PORTS_LINES;
             ports_desc.ldsc = ports_ldsc =
                 (TMLN *)calloc(ports_desc.lines, sizeof(*ports_ldsc));
         }
