@@ -267,10 +267,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\display\tt2500.c"
-				>
-			</File>
-			<File
 				RelativePath="..\tt2500\tt2500_cpu.c"
 				>
 			</File>
@@ -361,10 +357,6 @@
 			</File>
 			<File
 				RelativePath="..\sim_video.h"
-				>
-			</File>
-			<File
-				RelativePath="..\display\tt2500.h"
 				>
 			</File>
 			<File

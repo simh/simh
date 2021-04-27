@@ -524,10 +524,6 @@ static const char *tdc_regnam[] =
 
 #define TD_NUMCTLR      16                              /* #controllers */
 
-#define UNIT_V_WLK      (UNIT_V_UF)                     /* write locked */
-#define UNIT_WLK        (1u << UNIT_V_UF)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
-
 #define TD_NUMBLK       512                             /* blocks/tape */
 #define TD_NUMBY        512                             /* bytes/block */
 #define TD_SIZE         (TD_NUMBLK * TD_NUMBY)          /* bytes/tape */
@@ -636,7 +632,7 @@ struct CTLR {
     int32 ecode;                            /* end packet success code */
     };
 
-static CTLR td_ctlr[TD_NUMCTLR+1];                      /* one for each DL based TU58 plus console */
+static CTLR td_ctlr[TD_NUMCTLR+1];          /* one for each DL based TU58 plus console */
 
 static t_stat td_rd (int32 *data, int32 PA, int32 access);
 static t_stat td_wr (int32 data, int32 PA, int32 access);
@@ -684,33 +680,34 @@ static REG td_reg[] = {
 #define RDATA(nm,loc,wd,desc) STRDATAD(nm,td_ctlr[0].loc,16,wd,0,TD_NUMCTLR+1,sizeof(CTLR),REG_RO,desc)
 #define RDATAF(nm,loc,wd,desc,flds) STRDATADF(nm,td_ctlr[0].loc,16,wd,0,TD_NUMCTLR+1,sizeof(CTLR),REG_RO,desc,flds)
 
-    { RDATA  (ECODE,  ecode,  16, "end packet success code") },
-    { RDATA  (BLOCK,  block,  16, "current block number") },
+    { RDATA  (ECODE,  ecode,  32, "end packet success code") },
+    { RDATA  (BLOCK,  block,  32, "current block number") },
     { RDATAF (RX_CSR, rx_csr, 16, "input control/status register",  rx_csr_bits) },
     { RDATAF (RX_BUF, rx_buf, 16, "input buffer register",          rx_buf_bits) },
     { RDATAF (TX_CSR, tx_csr, 16, "output control/status register", tx_csr_bits) },
     { RDATAF (TX_BUF, tx_buf, 16, "output buffer register",         tx_buf_bits) },
-    { RDATA  (P_STATE,p_state, 4, "protocol state") },
-    { RDATA  (O_STATE,o_state, 4, "output state") },
-    { RDATA  (IBPTR,  ibptr,  16, "input buffer pointer") },
-    { RDATA  (OBPTR,  obptr,  16, "output buffer pointer") },
-    { RDATA  (ILEN,   ilen,   16, "input length") },
-    { RDATA  (OLEN,   olen,   16, "output length") },
-    { RDATA  (TXSIZE, txsize, 16, "remaining transfer size") },
-    { RDATA  (OFFSET, offset, 16, "offset into current transfer") },
-    { RDATA  (UNITNO, unitno, 16, "active unit number") },
-
-    { BRDATAD (IBUF,   td_ctlr[0].ibuf,16, 8, TD_NUMBY+1, "input buffer"), },
-    { BRDATAD (OBUF,   td_ctlr[0].obuf,16, 8, TD_NUMBY+1, "output buffer"), },
+    { RDATA  (P_STATE,p_state,32, "protocol state") },
+    { RDATA  (O_STATE,o_state,32, "output state") },
+    { RDATA  (IBPTR,  ibptr,  32, "input buffer pointer") },
+    { RDATA  (OBPTR,  obptr,  32, "output buffer pointer") },
+    { RDATA  (ILEN,   ilen,   32, "input length") },
+    { RDATA  (OLEN,   olen,   32, "output length") },
+    { RDATA  (TXSIZE, txsize, 32, "remaining transfer size") },
+    { RDATA  (OFFSET, offset, 32, "offset into current transfer") },
+    { RDATA  (UNITNO, unitno, 32, "active unit number") },
+/*
+  REG entries for each controller's IBUF and OBUF are dynamically established 
+  on first call to td_reset.
+*/
     { NULL }
     };
 
 static MTAB td_mod[] = {
-    { UNIT_WLK,            0, "write enabled",  "WRITEENABLED", NULL,          NULL,           NULL, "Write enable TU58 drive" },
-    { UNIT_WLK,     UNIT_WLK, "write locked",   "LOCKED",       NULL,          NULL,           NULL, "Write lock TU58 drive"  },
-    { MTAB_XTD | MTAB_VDV, 0, "CONTROLLERS",    "CONTROLLERS",  &td_set_ctrls, &td_show_ctlrs, NULL, "Number of Controllers" },
-    { MTAB_XTD|MTAB_VDV,   0, "ADDRESS",        NULL,           &set_addr,     &show_addr,     NULL, "Bus address" },
-    { MTAB_XTD|MTAB_VDV,   1, "VECTOR",         NULL,           &set_vec,      &show_vec,      NULL, "Interrupt vector" },
+    { MTAB_XTD|MTAB_VUN,   0, "write enabled", "WRITEENABLED",  &set_writelock, &show_writelock,   NULL, "Write enable TU58 drive" },
+    { MTAB_XTD|MTAB_VUN,   1, NULL,             "LOCKED",       &set_writelock, NULL,              NULL, "Write lock TU58 drive" },
+    { MTAB_XTD | MTAB_VDV, 0, "CONTROLLERS",    "CONTROLLERS",  &td_set_ctrls, &td_show_ctlrs,     NULL, "Number of Controllers" },
+    { MTAB_XTD|MTAB_VDV,   0, "ADDRESS",        NULL,           &set_addr,     &show_addr,         NULL, "Bus address" },
+    { MTAB_XTD|MTAB_VDV,   1, "VECTOR",         NULL,           &set_vec,      &show_vec,          NULL, "Interrupt vector" },
     { 0 }
     };
 
@@ -1325,8 +1322,6 @@ return 0;
 
 static t_stat td_reset_ctlr (CTLR *ctlr)
 {
-REG *reg;
-
 ctlr->tx_buf = 0;
 ctlr->tx_csr = CSR_DONE;
 CSI_CLR_INT;
@@ -1339,70 +1334,6 @@ ctlr->offset = 0;
 ctlr->txsize = 0;
 ctlr->p_state = 0;
 ctlr->ecode = 0;
-/* fixup/connect registers to actual data */
-reg = find_reg ("ECODE", NULL, ctlr->dptr);
-if (reg)
-    reg->loc = (void *)&ctlr->ecode;
-reg = find_reg ("BLOCK", NULL, ctlr->dptr);
-if (reg)
-    reg->loc = (void *)&ctlr->block;
-reg = find_reg ("P_STATE", NULL, ctlr->dptr);
-if (reg)
-    reg->loc = (void *)&ctlr->p_state;
-reg = find_reg ("O_STATE", NULL, ctlr->dptr);
-if (reg)
-    reg->loc = (void *)&ctlr->o_state;
-reg = find_reg ("IBPTR", NULL, ctlr->dptr);
-if (reg)
-    reg->loc = (void *)&ctlr->ibptr;
-reg = find_reg ("ILEN", NULL, ctlr->dptr);
-if (reg)
-    reg->loc = (void *)&ctlr->ilen;
-reg = find_reg ("OBPTR", NULL, ctlr->dptr);
-if (reg)
-    reg->loc = (void *)&ctlr->obptr;
-reg = find_reg ("OLEN", NULL, ctlr->dptr);
-if (reg)
-    reg->loc = (void *)&ctlr->olen;
-reg = find_reg ("TXSIZE", NULL, ctlr->dptr);
-if (reg)
-    reg->loc = (void *)&ctlr->txsize;
-reg = find_reg ("OFFSET", NULL, ctlr->dptr);
-if (reg)
-    reg->loc = (void *)&ctlr->offset;
-reg = find_reg ("IBUF", NULL, ctlr->dptr);
-if (reg)
-    reg->loc = (void *)&ctlr->ibuf;
-reg = find_reg ("OBUF", NULL, ctlr->dptr);
-if (reg)
-    reg->loc = (void *)&ctlr->obuf;
-reg = find_reg ("RX_CSR", NULL, ctlr->dptr);
-if (reg)
-    reg->loc = (void *)&ctlr->rx_csr;
-reg = find_reg ("RX_BUF", NULL, ctlr->dptr);
-if (reg)
-    reg->loc = (void *)&ctlr->rx_buf;
-reg = find_reg ("TX_CSR", NULL, ctlr->dptr);
-if (reg)
-    reg->loc = (void *)&ctlr->tx_csr;
-reg = find_reg ("TX_BUF", NULL, ctlr->dptr);
-if (reg)
-    reg->loc = (void *)&ctlr->tx_buf;
-reg = find_reg ("UNIT", NULL, ctlr->dptr);
-if (reg)
-    reg->loc = (void *)&ctlr->unitno;
-reg = find_reg ("CTIME", NULL, ctlr->dptr);
-if (reg)
-    reg->loc = (void *)&td_ctime;
-reg = find_reg ("STIME", NULL, ctlr->dptr);
-if (reg)
-    reg->loc = (void *)&td_stime;
-reg = find_reg ("XTIME", NULL, ctlr->dptr);
-if (reg)
-    reg->loc = (void *)&td_xtime;
-reg = find_reg ("ITIME", NULL, ctlr->dptr);
-if (reg)
-    reg->loc = (void *)&td_itime;
 return SCPE_OK;
 }
 
@@ -1413,6 +1344,52 @@ static t_stat td_reset (DEVICE *dptr)
 CTLR *ctlr;
 int ctl;
 static t_bool td_enabled_reset = FALSE;
+static t_bool td_regs_inited = FALSE;
+
+if (!td_regs_inited) {
+    int regs;
+    int reg;
+    REG *registers;
+
+    /* Count initial register array */
+    for (regs = 0; dptr->registers [regs].name != NULL; regs++)
+        ;
+    /* Allocate new register array with room for input and output buffer registers */
+    registers = (REG *)calloc (regs + 2 * (TD_NUMCTLR + 1) + 1, sizeof (*registers));
+    if (registers == NULL)
+        return SCPE_MEM;
+    /* Copy initial register array */
+    for (reg = 0; reg < regs; reg++)
+        registers[reg] = dptr->registers[reg];
+    /* For each controller add input and output buffer register entries */
+    for (ctl = 0; ctl < TD_NUMCTLR + 1; ctl++) {
+        char reg_name[32];
+        char reg_desc[64];
+        static REG reg_template[] = {
+            { BRDATAD(TBUF, td_ctlr[0].ibuf, 16, 8, TD_NUMBY + 1, "input buffer") },
+            { NULL } };
+
+        snprintf(reg_name, sizeof(reg_name), "IBUF_%d", ctl);
+        registers[reg] = reg_template[0];
+        registers[reg].name = (char *)calloc (strlen (reg_name) + 1, sizeof (char));
+        strcpy ((char *)registers[reg].name, reg_name);
+        snprintf(reg_desc, sizeof(reg_desc), "input buffer for %s%d", dptr->name, ctl);
+        registers[reg].desc = (char*)calloc(strlen(reg_desc) + 1, sizeof(char));
+        strcpy((char*)registers[reg].desc, reg_desc);
+        registers[reg].loc = td_ctlr[ctl].ibuf;
+        snprintf(reg_name, sizeof(reg_name), "OBUF_%d", ctl);
+        registers[reg + 1] = reg_template[0];
+        registers[reg + 1].name = (char*)calloc(strlen(reg_name) + 1, sizeof(char));
+        strcpy((char*)registers[reg + 1].name, reg_name);
+        snprintf(reg_desc, sizeof(reg_desc), "output buffer for %s%d", dptr->name, ctl);
+        registers[reg + 1].desc = (char*)calloc(strlen(reg_desc) + 1, sizeof(char));
+        strcpy((char*)registers[reg + 1].desc, reg_desc);
+        registers[reg + 1].loc = td_ctlr[ctl].obuf;
+        reg += 2;
+        }
+    dptr->registers = registers;
+    td_regs_inited = TRUE;
+    }
 
 if (dptr->flags & DEV_DIS)
     td_enabled_reset = FALSE;

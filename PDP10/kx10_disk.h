@@ -24,9 +24,6 @@
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
-#define UNIT_WLK        (1 << UNIT_V_WLK)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
 #define UNIT_V_FMT      (UNIT_V_UF + 8)
 #define UNIT_M_FMT      7
 #define GET_FMT(x)      (((x) >> UNIT_V_FMT) & UNIT_M_FMT)

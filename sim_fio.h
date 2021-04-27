@@ -37,6 +37,8 @@
 extern "C" {
 #endif
 
+#include <sys/stat.h>
+
 #define FLIP_SIZE       (1 << 16)                       /* flip buf size */
 #define fxread(a,b,c,d)         sim_fread (a, b, c, d)
 #define fxwrite(a,b,c,d)        sim_fwrite (a, b, c, d)
@@ -70,6 +72,10 @@ uint32 sim_fsize_name (const char *fname);
 t_offset sim_ftell (FILE *st);
 t_offset sim_fsize_ex (FILE *fptr);
 t_offset sim_fsize_name_ex (const char *fname);
+int sim_stat (const char *fname, struct stat *stat_str);
+int sim_chdir(const char *path);
+int sim_mkdir(const char *path);
+int sim_rmdir(const char *path);
 t_stat sim_copyfile (const char *source_file, const char *dest_file, t_bool overwrite_existing);
 char *sim_filepath_parts (const char *pathname, const char *parts);
 char *sim_getcwd (char *buf, size_t buf_size);

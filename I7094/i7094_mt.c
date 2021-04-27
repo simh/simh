@@ -96,8 +96,10 @@ extern uint32 chrono_rd (uint8 *buf, uint32 bufsiz);
 DIB mt_dib = { &mt_chsel, &mt_chwr };
 
 MTAB mt_mod[] = {
-    { MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write ring in place" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "no Write ring in place" },
     { MTUF_LDN, 0, "high density", "HIGH", NULL },
     { MTUF_LDN, MTUF_LDN, "low density", "LOW", NULL },
     { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",

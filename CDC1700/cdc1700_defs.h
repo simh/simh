@@ -110,14 +110,12 @@
  * Private unit flags
  */
 #define UNIT_V_7TRACK   (MTUF_V_UF + 0) /* 7-track tape transport */
-#define UNIT_V_WPROT    (MTUF_V_UF + 1) /* Write protected */
 
 #define UNIT_V_854      (UNIT_V_UF + 0) /* 854 vs. 853 disk pack drive */
 #define UNIT_V_856_4    (UNIT_V_UF + 0) /* 856_4 vs. 856_2 drive */
 #define UNIT_V_DRMSIZE  (UNIT_V_UF + 0) /* 1752 drum memory assignment */
 
 #define UNIT_7TRACK     (1 << UNIT_V_7TRACK)
-#define UNIT_WPROT      (1 << UNIT_V_WPROT)
 #define UNIT_854        (1 << UNIT_V_854)
 #define UNIT_856_4      (1 << UNIT_V_856_4)
 #define UNIT_DRMSIZE    (1 << UNIT_V_DRMSIZE)

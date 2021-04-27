@@ -31,9 +31,6 @@
 #include "sigma_io_defs.h"
 #include <math.h>
 
-#define UNIT_V_HWLK     (UNIT_V_UF + 0)                 /* hwre write lock */
-#define UNIT_HWLK       (1u << UNIT_V_HWLK)
-#define UNIT_WPRT       (UNIT_HWLK|UNIT_RO)             /* write prot */
 #define UTRK            u3                              /* current track */
 
 /* Constants */
@@ -130,8 +127,10 @@ REG dk_reg[] = {
     };
 
 MTAB dk_mod[] = {
-    { UNIT_HWLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { UNIT_HWLK, UNIT_HWLK, "write locked", "LOCKED", NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock drive" },
     { MTAB_XTD|MTAB_VDV, 0, "CHAN", "CHAN",
       &io_set_dvc, &io_show_dvc, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "DVA", "DVA",

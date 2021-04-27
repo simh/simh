@@ -92,7 +92,7 @@ typedef struct {
 
 /* Unit flags */
 
-#define MTUF_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
+#define MTUF_V_UF       (UNIT_V_UF + 0)
 #define MTUF_F_STD      0                               /* SIMH format */
 #define MTUF_F_E11      1                               /* E11 format */
 #define MTUF_F_TPC      2                               /* TPC format */
@@ -110,8 +110,7 @@ typedef struct {
 #define MTAT_F_RSTS     3                               /* RSTS ANSI type */
 #define MTAT_F_VAR      4                               /* RSTS VAR ANSI type */
 
-#define MTUF_V_UF       (MTUF_V_WLK + 1)
-#define MTUF_WLK        (1u << MTUF_V_WLK)
+#define MTUF_WLK        UNIT_WLK
 #define MTUF_WRP        (MTUF_WLK | UNIT_RO)
 
 #define MT_SET_PNU(u)   (u)->dynflags |= UNIT_TAPE_PNU

@@ -33,8 +33,8 @@
 
 /* function prototypes */
 
-t_stat fp_reset (void);
-t_stat fp_cfg (void);
+t_stat fp_reset (DEVICE *dptr);
+t_stat fp_cfg (uint16 base, uint16 size, uint8 devnum);
 
 /* external function prototypes */
 
@@ -45,19 +45,16 @@ extern t_stat EPROM_cfg(uint16 base, uint16 size, uint8 devnum);
 
 extern DEVICE EPROM_dev[];
 
-t_stat fp_cfg(void)
+t_stat fp_cfg(uint16 base, uint16 size, uint8 devnum)
 {
-    sim_printf("Configuring MDS-800 Front Panel Card\n  Onboard Devices:\n");
-    EPROM_cfg(ROM_BASE_0, ROM_SIZE_0, 0);
     return SCPE_OK;
 }
 
 /*  CPU reset routine 
     put here to cause a reset of the entire IPC system */
 
-t_stat fp_reset (void)
+t_stat fp_reset (DEVICE *dptr)
 {    
-    EPROM_reset(EPROM_dev);
     return SCPE_OK;
 }
 

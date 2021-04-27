@@ -158,6 +158,8 @@ t_stat assign_device (DEVICE *dptr, const char *cptr);
 t_stat deassign_device (DEVICE *dptr);
 t_stat reset_all (uint32 start_device);
 t_stat reset_all_p (uint32 start_device);
+t_stat set_writelock (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
+t_stat show_writelock (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 const char *sim_dname (DEVICE *dptr);
 const char *sim_uname (UNIT *dptr);
 const char *sim_set_uname (UNIT *uptr, const char *uname);
@@ -371,6 +373,7 @@ extern t_addr (*sim_vm_parse_addr) (DEVICE *dptr, CONST char *cptr, CONST char *
 extern t_bool (*sim_vm_fprint_stopped) (FILE *st, t_stat reason);
 extern t_value (*sim_vm_pc_value) (void);
 extern t_bool (*sim_vm_is_subroutine_call) (t_addr **ret_addrs);
+extern void (*sim_vm_reg_update) (REG *rptr, uint32 idx, t_value prev_val, t_value new_val);
 extern const char **sim_clock_precalibrate_commands;
 extern int32 sim_vm_initial_ips;                        /* base estimate of simulated instructions per second */
 extern const char *sim_vm_interval_units;               /* Simulator can change this - default "instructions" */

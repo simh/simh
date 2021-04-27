@@ -166,9 +166,6 @@ const char *fl_fncnames[] = {
 #define FL_NUMBY        512                             /* bytes/sector */
 #define FL_INTL         5                               /* interleave */
 #define FL_SIZE         (FL_NUMTR * FL_NUMSC * FL_NUMBY)/* bytes/disk */
-#define UNIT_V_WLK      (UNIT_V_UF)                     /* write locked */
-#define UNIT_WLK        (1u << UNIT_V_UF)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
 
 #define TRACK u3                                        /* current track */
 #define CALC_SC(t,s)    (fl_intl[((t) - 1) % FL_INTL][((s) - 1)])
@@ -424,8 +421,10 @@ REG fl_reg[] = {
     };
 
 MTAB fl_mod[] = {
-    { UNIT_WLK,         0, "write enabled",  "WRITEENABLED", NULL, NULL, NULL, "Write enable floppy drive" },
-    { UNIT_WLK,  UNIT_WLK, "write locked",   "LOCKED", NULL, NULL, NULL, "Write lock floppy drive"  },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable floppy drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock floppy drive" },
     { 0 }
     };
 

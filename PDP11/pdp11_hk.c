@@ -98,17 +98,14 @@ static struct drvtyp drv_tab[] = {
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_WLK      DKUF_V_WLK                      /* write locked */
 #define UNIT_V_DTYPE    (DKUF_V_UF + 0)                 /* disk type */
 #define UNIT_V_AUTO     (UNIT_V_DTYPE + 1)              /* autosize */
 #define UNIT_V_DUMMY    (UNIT_V_AUTO + 1)               /* dummy flag */
-#define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_DTYPE      (1 << UNIT_V_DTYPE)
 #define  UNIT_RK06      (0 << UNIT_V_DTYPE)
 #define  UNIT_RK07      (1 << UNIT_V_DTYPE)
 #define UNIT_AUTO       (1 << UNIT_V_AUTO)
 #define UNIT_DUMMY      (1 << UNIT_V_DUMMY)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write prot */
 #define GET_DTYPE(x)    (((x) >> UNIT_V_DTYPE) & 1)
 
 /* Parameters in the unit descriptor */
@@ -664,10 +661,10 @@ REG hk_reg[] = {
     };
 
 MTAB hk_mod[] = {
-    { UNIT_WLK,        0, "write enabled", "WRITEENABLED", 
-        NULL, NULL, NULL, "Write enable disk drive" },
-    { UNIT_WLK, UNIT_WLK, "write locked",  "LOCKED", 
-        NULL, NULL, NULL, "Write lock disk drive"  },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable tape drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock tape drive" },
     { UNIT_DUMMY,      0, NULL,            "BADBLOCK", 
         &hk_set_bad, NULL, NULL, "write bad block table on last track" },
     { MTAB_XTD|MTAB_VUN, 0, NULL, "RK06",

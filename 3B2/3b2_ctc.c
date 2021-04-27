@@ -99,10 +99,10 @@ UNIT ctc_unit = {
 };
 
 MTAB ctc_mod[] = {
-    { UNIT_WLK,         0, "write enabled", "WRITEENABLED",
-      NULL, NULL, NULL, "Write enabled tape drive" },
-    { UNIT_WLK,  UNIT_WLK, "write locked", "LOCKED",
-      NULL, NULL, NULL, "Write lock tape drive" },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable tape drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock tape drive" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "RQUEUE=n", NULL,
       NULL, &ctc_show_rqueue, NULL, "Display Request Queue for card n" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "CQUEUE=n", NULL,
@@ -365,7 +365,7 @@ static void ctc_cmd(uint8 cid,
             break;
         }
 
-        if (ctc_unit.flags & UNIT_WLK) {
+        if (ctc_unit.flags & UNIT_WPRT) {
             cqe->opcode = CTC_RDONLY;
             break;
         }
@@ -489,7 +489,7 @@ static void ctc_cmd(uint8 cid,
             break;
         }
 
-        if (ctc_unit.flags & UNIT_WLK) {
+        if (ctc_unit.flags & UNIT_WPRT) {
             cqe->opcode = CTC_RDONLY;
             break;
         }

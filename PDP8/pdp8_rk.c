@@ -51,11 +51,9 @@
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_HWLK     (UNIT_V_UF + 0)                 /* hwre write lock */
-#define UNIT_V_SWLK     (UNIT_V_UF + 1)                 /* swre write lock */
-#define UNIT_HWLK       (1 << UNIT_V_HWLK)
+#define UNIT_V_SWLK     (UNIT_V_UF + 0)                 /* swre write lock */
+#define UNIT_HWLK       UNIT_WPRT
 #define UNIT_SWLK       (1 << UNIT_V_SWLK)
-#define UNIT_WPRT       (UNIT_HWLK|UNIT_SWLK|UNIT_RO)   /* write protect */
 
 /* Parameters in the unit descriptor */
 
@@ -181,8 +179,10 @@ REG rk_reg[] = {
     };
 
 MTAB rk_mod[] = {
-    { UNIT_HWLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { UNIT_HWLK, UNIT_HWLK, "write locked", "LOCKED", NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock drive" },
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
       &set_dev, &show_dev, NULL },
     { 0 }
@@ -306,7 +306,7 @@ if (sim_is_active (uptr) || (cyl >= RK_NUMCY)) {        /* busy or bad cyl? */
     rk_sta = rk_sta | RKS_DONE | RKS_STAT;
     return;
     }
-if ((func == RKC_WRITE) && (uptr->flags & UNIT_WPRT)) {
+if ((func == RKC_WRITE) && (uptr->flags & (UNIT_HWLK|UNIT_SWLK))) {
     rk_sta = rk_sta | RKS_DONE | RKS_WLK;               /* write and locked? */
     return;
     }
@@ -362,7 +362,7 @@ if ((uptr->flags & UNIT_ATT) == 0) {                    /* not att? abort */
     return IORETURN (rk_stopioe, SCPE_UNATT);
     }
 
-if ((uptr->FUNC == RKC_WRITE) && (uptr->flags & UNIT_WPRT)) {
+if ((uptr->FUNC == RKC_WRITE) && (uptr->flags & (UNIT_HWLK|UNIT_SWLK))) {
     rk_sta = rk_sta | RKS_DONE | RKS_WLK;               /* write and locked? */
     rk_busy = 0;
     RK_INT_UPDATE;

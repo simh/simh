@@ -69,27 +69,36 @@
 #define RRSTS   0x1B    //Returns diskette result byte to master
 #define RDSTS   0x1C    //Returns diskette device status byte to master
 
+#define ioc_cont_NAME    "Intel IOC Controller"
+
 /* external globals */
 
 extern uint16    PCX;
 
 /* function prototypes */
 
-t_stat ioc_cont_cfg(uint8 base, uint8 devnum);
+t_stat ioc_cont_cfg(uint16 base, uint16 devnum, uint8 dummy);
+t_stat ioc_cont_clr(void);
+t_stat ioc_cont_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat ioc_cont_reset (DEVICE *dptr);
 uint8 ioc_cont0(t_bool io, uint8 data, uint8 devnum);    /* ioc_cont*/
 uint8 ioc_cont1(t_bool io, uint8 data, uint8 devnum);    /* ioc_cont*/
 
 /* external function prototypes */
 
-extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint16, uint16, uint8);
+extern uint8 unreg_dev(uint16);
 
 /* globals */
 
+static const char* ioc_cont_desc(DEVICE *dptr) {
+    return ioc_cont_NAME;
+}
 uint8   dbb_stat;
 uint8   dbb_cmd;
 uint8   dbb_in;
 uint8   dbb_out;
+uint8   ioc_cont_baseport = -1;         //base port
 
 UNIT ioc_cont_unit[] = {
     { UDATA (0, 0, 0) },                /* ioc_cont*/
@@ -111,13 +120,19 @@ DEBTAB ioc_cont_debug[] = {
     { NULL }
 };
 
+MTAB ioc_cont_mod[] = {
+    { MTAB_XTD | MTAB_VDV, 0, "PARAM", NULL, NULL, ioc_cont_show_param, NULL, 
+        "show configured parametes for ioc_cont" },
+    { 0 }
+};
+
 /* address width is set to 16 bits to use devices in 8086/8088 implementations */
 
 DEVICE ioc_cont_dev = {
     "IOC-CONT",             //name
     ioc_cont_unit,         //units
     ioc_cont_reg,          //registers
-    NULL,               //modifiers
+    ioc_cont_mod,       //modifiers
     1,                  //numunits
     16,                 //aradix
     16,                 //awidth
@@ -131,21 +146,42 @@ DEVICE ioc_cont_dev = {
     NULL,               //attach
     NULL,               //detach
     NULL,               //ctxt
-    0,                  //flags
+    DEV_DEBUG+DEV_DISABLE+DEV_DIS, //flags 
     0,                  //dctrl
     ioc_cont_debug,     //debflags
     NULL,               //msize
-    NULL                //lname
+    NULL//&ioc_cont_desc      //device description
 };
 
 // ioc_cont configuration
 
-t_stat ioc_cont_cfg(uint8 base, uint8 devnum)
+t_stat ioc_cont_cfg(uint16 base, uint16 devnum, uint8 dummy)
 {
-    sim_printf("    ioc-cont[%d]: at base port 0%02XH\n",
-        devnum, base & 0xFF);
-    reg_dev(ioc_cont0, base, devnum); 
-    reg_dev(ioc_cont1, base + 1, devnum); 
+    sim_printf("    ioc-cont: at base port 0%02XH\n",
+        base & 0xFF);
+    ioc_cont_baseport = base & 0xff;
+    reg_dev(ioc_cont0, base, 0, 0); 
+    reg_dev(ioc_cont1, base + 1, 0, 0); 
+    return SCPE_OK;
+}
+
+t_stat ioc_cont_clr(void)
+{
+    unreg_dev(ioc_cont_baseport); 
+    unreg_dev(ioc_cont_baseport + 1); 
+    ioc_cont_baseport = -1;
+    return SCPE_OK;
+}
+
+// show configuration parameters
+
+t_stat ioc_cont_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    if (uptr == NULL)
+        return SCPE_ARG;
+    fprintf(st, "%s, Base port 0%04XH", 
+        ((ioc_cont_dev.flags & DEV_DIS) == 0) ? "Enabled" : "Disabled", 
+        ioc_cont_baseport);
     return SCPE_OK;
 }
 

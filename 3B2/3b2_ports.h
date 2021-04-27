@@ -51,7 +51,6 @@
 #define PORTS_IPL       10
 #define PORTS_VERSION   1
 
-#define DEF_PORTS_CARDS 1
 #define MAX_PORTS_CARDS 12
 #define PORTS_LINES     4
 #define PORTS_RCV_QUEUE 5

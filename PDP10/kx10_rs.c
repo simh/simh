@@ -36,14 +36,11 @@
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
-#define UNIT_V_DTYPE    (UNIT_V_UF + 1)                 /* disk type */
+#define UNIT_V_DTYPE    (UNIT_V_UF + 0)                 /* disk type */
 #define UNIT_M_DTYPE    7
-#define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
 #define DTYPE(x)        (((x) & UNIT_M_DTYPE) << UNIT_V_DTYPE)
 #define GET_DTYPE(x)    (((x) >> UNIT_V_DTYPE) & UNIT_M_DTYPE)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
 
 /* Parameters in the unit descriptor */
 
@@ -223,8 +220,10 @@ MTAB                rs_mod[] = {
     {MTAB_XTD|MTAB_VDV, TYPE_RH20, "RH20", "RH20", &rh_set_type, &rh_show_type,
               NULL, "Sets controller to RH20"},
 #endif
-    {UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL},
-    {UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL},
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock drive" },
     {UNIT_DTYPE, (RS03_DTYPE << UNIT_V_DTYPE), "RS03", "RS03", &rs_set_type },
     {UNIT_DTYPE, (RS04_DTYPE << UNIT_V_DTYPE), "RS04", "RS04", &rs_set_type },
     {0}
@@ -289,7 +288,7 @@ rs_write(DEVICE *dptr, struct rh_if *rhc, int reg, uint32 data) {
     case  000:  /* control */
         sim_debug(DEBUG_DETAIL, dptr, "%s%o Status=%06o\n", dptr->name, unit, uptr->CMD);
         /* Set if drive not writable */
-        if (uptr->flags & UNIT_WLK)
+        if (uptr->flags & UNIT_WPRT)
            uptr->CMD |= DS_WRL;
         /* If drive not ready don't do anything */
         if ((uptr->CMD & DS_DRY) == 0) {
@@ -679,7 +678,7 @@ t_stat rs_attach (UNIT *uptr, CONST char *cptr)
         if (rh[ctlr].dev == rstr)
             break;
     }
-    if (uptr->flags & UNIT_WLK)
+    if (uptr->flags & UNIT_WPRT)
         uptr->CMD |= DS_WRL;
     if (sim_switches & SIM_SW_REST)
         return SCPE_OK;

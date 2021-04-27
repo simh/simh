@@ -45,9 +45,6 @@
 #define FD_NUMLRN       (FD_NUMTR * FD_NUMSC)           /* LRNs/disk */
 #define FD_SIZE         (FD_NUMLRN * FD_NUMBY)          /* bytes/disk */
 #define FD_NUMDR        4                               /* drives/controller */
-#define UNIT_V_WLK      (UNIT_V_UF)                     /* write locked */
-#define UNIT_WLK        (1u << UNIT_V_UF)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
 #define LRN             u3                              /* last LRN */
 #define FNC             u4                              /* last function */
 #define GET_DA(x)       (((x) - 1) * FD_NUMBY)
@@ -186,8 +183,10 @@ REG fd_reg[] = {
     };
 
 MTAB fd_mod[] = {
-    { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock drive" },
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
       &set_dev, &show_dev, NULL },
     { 0 }

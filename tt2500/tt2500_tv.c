@@ -26,7 +26,6 @@
 
 #include "tt2500_defs.h"
 #include "sim_video.h"
-#include "display/tt2500.h"
 #include "display/display.h"
 
 /* Function declaration. */

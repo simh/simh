@@ -1,6 +1,6 @@
-/*  sys-8010_sys.c: multibus system interface
+/*  mds210_sys.c: multibus system interface
 
-    Copyright (c) 2010, William A. Beech
+    Copyright (c) 2017, William A. Beech
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -23,24 +23,42 @@
     used in advertising or otherwise to promote the sale, use or other dealings
     in this Software without prior written authorization from William A. Beech.
 
-    ?? ??? 10 - Original file.
-    16 Dec 12 - Modified to use isbc_80_10.cfg file to set base and size.
+    28 Oct 17 - Original file.
+    
+    18 May 19 - Equipment Emulated:
+    Model 210 chassis.
+    Integrated processor board (IPB).
+    Parallel I/O board (PIO).
+    ROM-resident system monitor.
+    Auxiliary ROM board with MCS-80/MCS-85 assembler
+    and text editor.
+    
 */
 
 #include "system_defs.h"
 
 extern DEVICE i8080_dev;
 extern REG i8080_reg[];
+extern DEVICE i3214_dev;
 extern DEVICE i8251_dev;
 extern DEVICE i8253_dev;
 extern DEVICE i8255_dev;
 extern DEVICE i8259_dev;
 extern DEVICE EPROM_dev;
 extern DEVICE RAM_dev;
+extern DEVICE ipc_cont_dev;
+extern DEVICE ioc_cont_dev;
+extern DEVICE port_dev;
+extern DEVICE irq_dev;
 extern DEVICE multibus_dev;
+extern DEVICE sys_dev;
+extern DEVICE isbc064_dev;
+extern DEVICE isbc464_dev;
 extern DEVICE isbc201_dev;
 extern DEVICE isbc202_dev;
-extern DEVICE isbc064_dev;
+extern DEVICE isbc206_dev;
+extern DEVICE isbc208_dev;
+extern DEVICE zx200a_dev;
 
 /* SCP data structures
 
@@ -51,7 +69,7 @@ extern DEVICE isbc064_dev;
    sim_stop_messages    array of pointers to stop messages
 */
 
-char sim_name[] = "Intel System 80/24";
+char sim_name[] = "Intel-MDS";
 
 REG *sim_PC = &i8080_reg[0];
 
@@ -59,31 +77,36 @@ int32 sim_emax = 4;
 
 DEVICE *sim_devices[] = {
     &i8080_dev,
+    &i3214_dev,
     &i8251_dev,
     &i8253_dev,
     &i8255_dev,
     &i8259_dev,
     &EPROM_dev,
     &RAM_dev,
+    &ipc_cont_dev,
+    &ioc_cont_dev,
+    &port_dev,
+    &irq_dev,
     &multibus_dev,
-#if defined (SBC064_NUM) && (SBC064_NUM > 0)
+    &sys_dev,
     &isbc064_dev,
-#endif
-#if defined (SBC201_NUM) && (SBC201_NUM > 0)
+    &isbc464_dev,
     &isbc201_dev,
-#endif
-#if defined (SBC202_NUM) && (SBC202_NUM > 0)
     &isbc202_dev,
-#endif
+    &isbc206_dev,
+    &isbc208_dev,
+    &zx200a_dev,
     NULL
 };
 
-const char *sim_stop_messages[] = {
+const char *sim_stop_messages[SCPE_BASE] = {
     "Unknown error",
-    "Unknown I/O Instruction",
+    "Reserved Instruction",
     "HALT instruction",
     "Breakpoint",
     "Invalid Opcode",
+    "Unknown I/O Instruction",
     "Invalid Memory",
     "XACK Error"
 };

@@ -425,8 +425,11 @@ for (i = 0; i < (int32) dibp->lnt; i = i + 2) {         /* create entries */
                                         "Device %s address conflict with %s at 0%o\n",
                              sim_dname (dptr), cdname, (int)dibp->ba);
         }
-    if ((dibp->rd == NULL) && (dibp->wr == NULL) && (dibp->vnum == 0)) 
+    if ((dibp->rd == NULL) && (dibp->wr == NULL) && (dibp->vnum == 0)) {
         iodibp[idx] = NULL;                         /* deregister DIB */
+        iodispR[idx] = NULL;                        /* and related dispatches */
+        iodispW[idx] = NULL;
+        }
     else {
         if (dibp->rd)
             iodispR[idx] = dibp->rd;                /* set rd dispatch */

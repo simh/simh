@@ -291,7 +291,6 @@ t_stat mt_reset(DEVICE *);
 t_stat mt_boot(int32, DEVICE *);
 t_stat mt_attach(UNIT *, CONST char *);
 t_stat mt_detach(UNIT *);
-t_stat mt_vlock(UNIT *, int32 val, CONST char *cptr, void *desc);
 
 void MTstate(const char *, DEVICE *, IO_DEVICE *);
 void MTclear(DEVICE *);
@@ -483,10 +482,10 @@ MTAB mt_mod[] = {
     &mt_set_type, &mt_show_type, NULL, "Set/Display magtape controller type" },
   { MTAB_XTD|MTAB_VDV, 0, "EQUIPMENT", "EQUIPMENT=hexAddress",
     &set_equipment, &show_addr, NULL, "Set/Display equipment address" },
-  { MTUF_WLK, 0, "write enabled", "WRITEENABLED",
-    &mt_vlock, NULL, NULL, "Mark transport as write enabled" },
-  { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED",
-    &mt_vlock, NULL, NULL, "Mark transport as writed locked" },
+  { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable tape drive" },
+  { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock tape drive" },
   { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
     &sim_tape_set_fmt, &sim_tape_show_fmt, NULL, "Define tape format" },
   { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", "CAPACITY",
@@ -1490,9 +1489,9 @@ t_stat mt_attach(UNIT *uptr, CONST char *cptr)
   if (r != SCPE_OK)
     return r;
 
-  uptr->flags &= ~UNIT_WPROT;
+  uptr->flags &= ~UNIT_WPRT;
   if (sim_switches & SWMASK('R'))
-    uptr->flags |= UNIT_WPROT;
+    uptr->flags |= UNIT_WPRT;
 
   uptr->DENS = IO_ST2_800;
 
@@ -1501,7 +1500,7 @@ t_stat mt_attach(UNIT *uptr, CONST char *cptr)
    */
   if (MTdev.iod_unit == uptr) {
     MTdev.STATUS2 = uptr->DENS & (IO_ST2_556 | IO_ST2_800);
-    if ((uptr->flags & UNIT_WPROT) != 0)
+    if ((uptr->flags & UNIT_WPRT) != 0)
       MTdev.STATUS2 &= ~IO_ST2_WENABLE;
     else MTdev.STATUS2 |= IO_ST2_WENABLE;
     if ((uptr->flags & UNIT_7TRACK) != 0)
@@ -1531,17 +1530,6 @@ t_stat mt_detach(UNIT *uptr)
   return st;
 }
 
-/* Write lock/enable routine */
-
-t_stat mt_vlock(UNIT *uptr, int32 val, CONST char *cptr, void *desc)
-{
-  if (((uptr->flags & UNIT_ATT) != 0) && (val || sim_tape_wrp(uptr)))
-    uptr->flags |= UNIT_WPROT;
-  else uptr->flags &= ~UNIT_WPROT;
-
-  return SCPE_OK;
-}
-
 /*
  * Perform a "Clear Controller" operation. Basically this is similar to a
  * device reset except it does not forget the currently selected transport.
@@ -1564,7 +1552,7 @@ void MTclear(DEVICE *dptr)
     fw_setForced(&MTdev, IO_ST_READY);
 
     MTdev.STATUS2 = uptr->DENS & (IO_ST2_556 | IO_ST2_800);
-    if ((uptr->flags & UNIT_WPROT) != 0)
+    if ((uptr->flags & UNIT_WPRT) != 0)
       MTdev.STATUS2 &= ~IO_ST2_WENABLE;
     else MTdev.STATUS2 |= IO_ST2_WENABLE;
     if ((uptr->flags & UNIT_7TRACK) != 0)
@@ -1999,7 +1987,7 @@ enum IOstatus MTout(IO_DEVICE *iod, uint8 reg)
          * Make sure STATUS2 values are consistent with actual drive status.
          */
         MTdev.STATUS2 = uptr->DENS & (IO_ST2_556 | IO_ST2_800);
-        if ((uptr->flags & UNIT_WPROT) != 0)
+        if ((uptr->flags & UNIT_WPRT) != 0)
           MTdev.STATUS2 &= ~IO_ST2_WENABLE;
         else MTdev.STATUS2 |= IO_ST2_WENABLE;
         if ((uptr->flags & UNIT_7TRACK) != 0)
