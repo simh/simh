@@ -51,10 +51,14 @@ t_stat reset_dib (UNIT *uptr, t_stat (reader (int32 *, int32, int32)),
 static rom *find_rom (const char *cptr, rom (*rom_list)[]);
 static t_stat attach_rom_to_unit (rom *romptr, rom_socket *socketptr, UNIT *uptr);
 static t_stat m9312_auto_config ();
+static t_stat m9312_auto_config_diagroms ();
+static t_stat m9312_auto_config_bootroms ();
+static t_stat attach_m9312_rom (const char *rom_name, int unit_number);
 
 /* External references */
 extern uint32 cpu_type;
 extern uint32 cpu_opt;
+extern uint32 cpu_model;
 extern int32 HITMISS;
 
 /* Static definitions */
@@ -81,6 +85,7 @@ static const char rom_helptext[] =
 "   SHOW ROM\n"
 "   SHOW ROM<unit>\n"
 "   SET ROM MODULE=<module>\n"
+"   SET ROM CONFIGMODE=AUTO | MANUAL\n"
 "   ATTACH ROM<unit> <file> | <built-in ROM>\n"
 "   SHOW ROM<unit>\n"
 "   HELP ROM\n"
@@ -304,9 +309,9 @@ DIB rom_dib[MAX_NUMBER_SOCKETS];
  */
 MTAB rom_mod[] = {
     { MTAB_XTD | MTAB_VDV | MTAB_VALR, 010, "MODULE", "MODULE",
-        &rom_set_module, &rom_show_module, NULL, "Module type" },
+        &rom_set_module, &rom_show_module, NULL, "Module type (BLANK, M9312 or VT40)" },
     { MTAB_XTD | MTAB_VDV | MTAB_VALR, 010, "CONFIGMODE", "CONFIGMODE",
-        &rom_set_configmode, &rom_show_configmode, NULL, "Auto configuration" },
+        &rom_set_configmode, &rom_show_configmode, NULL, "Auto configuration (AUTO or MANUAL)" },
     { MTAB_XTD | MTAB_VUN | MTAB_VALR, 010, "ADDRESS", "ADDRESS",
         &rom_set_addr, &rom_show_addr, NULL, "Bus address" },
     { 0 }
@@ -343,6 +348,10 @@ DEVICE rom_dev =
     &rom_description                     /* Description routine */
 };
 
+/*
+ * The device_rom_map defines a mapping from simh device to a suitable
+ * boot ROM for the device.
+ */
 rom_for_device device_rom_map [] =
 {
     "RK",   "DK",
@@ -361,6 +370,25 @@ rom_for_device device_rom_map [] =
     "TM",   "MT",
     "TQ",   "MU",
     NULL,   NULL,
+};
+
+/*
+ * Define a mapping from CPU model to the console/diagnostic ROM for 
+ * the the model.
+ */
+
+rom_for_cpu_model cpu_rom_map[] =
+{
+    MOD_1104,           "A0",
+    MOD_1105,           "A0",
+    MOD_1124,           "MEM",
+    MOD_1134,           "A0",
+    MOD_1140,           "A0",
+    MOD_1144,           "UBI",
+    MOD_1145,           "A0",
+    MOD_1160,           "B0",
+    MOD_1170,           "B0",
+    0,                   NULL,
 };
 
 /*
@@ -824,23 +852,44 @@ t_stat rom_blank_help (FILE *st, const char *cptr)
     return SCPE_OK;
 }
 
-
-/* Auto configure the M9312 module */
-
 static t_stat m9312_auto_config ()
+{
+    t_stat result;
+
+    if ((result = m9312_auto_config_diagroms()) != SCPE_OK)
+        return result;
+    return m9312_auto_config_bootroms();
+}
+
+/* Auto configure the console/diagnostic ROM for the M9312 module */
+static t_stat m9312_auto_config_diagroms ()
+{
+    rom_for_cpu_model *mptr;
+
+    /* Search device_rom map for a suitable boot ROM for the device */
+    for (mptr = &cpu_rom_map[0]; mptr->rom_name != NULL; mptr++) {
+        if (mptr->cpu_model == cpu_model)
+            return attach_m9312_rom (mptr->rom_name, 0);
+    }
+
+    /* No ROM found for the CPU model */
+    return SCPE_OK;
+}
+
+/* Auto configure boot ROMs for the M9312 module */
+
+static t_stat m9312_auto_config_bootroms ()
 {
     int32 dev_index;
     DEVICE *dptr;
-    UNIT *uptr;
     rom_for_device *mptr;
-    rom_socket *socketptr;
-    rom *romptr;
     int unit_number;
     t_stat result;
 
-    /* Detach all units to avoid the possibility that on a subsequent m9312 auto configuration
-       with an altered device configuration a same ROM is present twice. */
-    for (unit_number = 0; unit_number < MAX_NUMBER_SOCKETS; unit_number++) {
+    /* Detach all units with boot ROMs (i.e. 1-4) to avoid the possibility that on a 
+       subsequent m9312 auto configuration with an altered device configuration
+       a same ROM is present twice. */
+    for (unit_number = 1; unit_number < NUM_M9312_SOCKETS; unit_number++) {
         detach_unit (&rom_unit[unit_number]);
     }
 
@@ -853,29 +902,34 @@ static t_stat m9312_auto_config ()
 
             /* Search device_rom map for a suitable boot ROM for the device */
             for (mptr = &device_rom_map[0]; mptr->device_name != NULL; mptr++) {
-
                 if (strcasecmp (dptr->name, mptr->device_name) == 0) {
-
-                    uptr = &rom_unit[unit_number];
-                    socketptr = &m9312_sockets[unit_number];
+                    if ((result = attach_m9312_rom (mptr->rom_name, unit_number)) != SCPE_OK)
+                        return result;
                     unit_number++;
-
-                    /* Try to find the ROM in the list of ROMs for this socket */
-                    romptr = find_rom (mptr->rom_name, socketptr->rom_list);
-                    if (romptr != NULL) {
-                        result = attach_rom_to_unit (romptr, socketptr, uptr);
-                        if (result != SCPE_OK)
-                            return result;
-                    }
-                    else
-                        /* ROM not found */
-                        return SCPE_IERR;
                     break;
                 }
             }
         }
     }
     return SCPE_OK;
+}
+
+static t_stat attach_m9312_rom (const char *rom_name, int unit_number)
+{
+    UNIT *uptr;
+    rom_socket *socketptr;
+    rom *romptr;
+
+    uptr = &rom_unit[unit_number];
+    socketptr = &m9312_sockets[unit_number];
+
+    /* Try to find the ROM in the list of ROMs for this socket */
+    romptr = find_rom (rom_name, socketptr->rom_list);
+    if (romptr != NULL) {
+        return attach_rom_to_unit (romptr, socketptr, uptr);
+    } else
+        /* ROM not found */
+        return SCPE_IERR;
 }
 
 t_stat rom_m9312_help (FILE *st, const char *cptr)

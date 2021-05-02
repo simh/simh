@@ -93,12 +93,23 @@ typedef struct
 }
 module;
 
+/* Define a device to ROM mapping */
+
 typedef struct
 {
     const char *device_name;                    /* Logical device name */
     const char *rom_name;                       /* Fitting ROM for the device */
 }
 rom_for_device;
+
+/* Define a cpu_type to ROM mapping */
+
+typedef struct
+{
+    const uint32 cpu_model;                     /* CPU model */
+    const char *rom_name;                       /* Fitting ROM for the model */
+}
+rom_for_cpu_model;
 
 /*
  * ROM device specific flags
