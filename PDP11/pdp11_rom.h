@@ -88,9 +88,22 @@ typedef struct
     const uint32 num_sockets;                   /* Number of sockets for the module */
     uint32 flags;                               /* Flags for initialization of the UNIT flag field */
     rom_socket (*sockets)[];                    /* Sockets for this module */
+    t_stat (*auto_config)();                    /* Auto-configuration function for the module */
     t_stat (*help_func)(FILE *, const char *);  /* Help function for this module */
 }
 module;
+
+typedef struct
+{
+    const char *device_name;                    /* Logical device name */
+    const char *rom_name;                       /* Fitting ROM for the device */
+}
+rom_for_device;
+
+/*
+ * ROM device specific flags
+ */
+#define ROM_CONFIG_AUTO     (1u << 1)           /* Automatic configuration enabled */
 
 /*
  * Definitions for the BLANK ROM module, i.e. a ROM module for which

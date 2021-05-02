@@ -35,6 +35,8 @@ t_stat rom_set_addr (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_addr (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_set_module (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_module (FILE *, UNIT *, int32, CONST void *);
+t_stat rom_set_configmode (UNIT *, int32, CONST char *, void *);
+t_stat rom_show_configmode (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_attach (UNIT *, CONST char *);
 t_stat rom_detach (UNIT *);
 t_stat rom_blank_help (FILE *, const char *);
@@ -43,6 +45,12 @@ t_stat rom_vt40_help (FILE *, const char *);
 t_stat rom_help (FILE *st, DEVICE *, UNIT *, int32, const char *);
 t_stat rom_help_attach (FILE *st, DEVICE *, UNIT *, int32, const char *);
 const char *rom_description (DEVICE *);
+t_stat reset_dib (UNIT *uptr, t_stat (reader (int32 *, int32, int32)),
+    t_stat (writer (int32, int32, int32)));
+
+static rom *find_rom (const char *cptr, rom (*rom_list)[]);
+static t_stat attach_rom_to_unit (rom *romptr, rom_socket *socketptr, UNIT *uptr);
+static t_stat m9312_auto_config ();
 
 /* External references */
 extern uint32 cpu_type;
@@ -52,6 +60,7 @@ extern int32 HITMISS;
 /* Static definitions */
 static t_bool rom_initialized = FALSE;      /* Initialize rom_unit on first reset call */
 static uint32 cpu_type_on_selection;        /* cpu_type for which module type was selected */
+static uint32 rom_device_flags = 0;         /* rom device specific flags */
 
 static const char rom_helptext[] =
 /***************** 80 character line width template *************************/
@@ -209,6 +218,7 @@ module blank =
     NUM_BLANK_SOCKETS,                      /* Number of sockets (units) */
     ROM_UNIT_FLAGS,                         /* UNIT flags */
     (rom_socket (*)[]) & blank_sockets,     /* Pointer to rom_socket structs */
+    NULL,                                   /* Auto configuration function */
     &rom_blank_help                         /* Pointer to help function */
 };
 
@@ -222,6 +232,7 @@ module m9312 =
     NUM_M9312_SOCKETS,                      /* Number of sockets (units) */
     ROM_UNIT_FLAGS,                         /* UNIT flags */
     (rom_socket (*)[]) & m9312_sockets,     /* Pointer to rom_socket structs */
+    &m9312_auto_config,                     /* Auto configuration function */
     &rom_m9312_help                         /* Pointer to help function */
 };
 
@@ -235,6 +246,7 @@ module vt40 =
     NUM_VT40_SOCKETS,                       /* Number of sockets (units) */
     ROM_UNIT_FLAGS,                         /* UNIT flags */
     (rom_socket (*)[]) & vt40_sockets,      /* Pointer to rom_socket structs */
+    NULL,                                   /* Auto configuration function */
     &rom_vt40_help                          /* Pointer to help function */
 };
 
@@ -293,6 +305,8 @@ DIB rom_dib[MAX_NUMBER_SOCKETS];
 MTAB rom_mod[] = {
     { MTAB_XTD | MTAB_VDV | MTAB_VALR, 010, "MODULE", "MODULE",
         &rom_set_module, &rom_show_module, NULL, "Module type" },
+    { MTAB_XTD | MTAB_VDV | MTAB_VALR, 010, "CONFIGMODE", "CONFIGMODE",
+        &rom_set_configmode, &rom_show_configmode, NULL, "Auto configuration" },
     { MTAB_XTD | MTAB_VUN | MTAB_VALR, 010, "ADDRESS", "ADDRESS",
         &rom_set_addr, &rom_show_addr, NULL, "Bus address" },
     { 0 }
@@ -327,6 +341,26 @@ DEVICE rom_dev =
     &rom_help_attach,                    /* Help attach routine */
     NULL,                                /* Context for help routines */
     &rom_description                     /* Description routine */
+};
+
+rom_for_device device_rom_map [] =
+{
+    "RK",   "DK",
+    "RL",   "DL",
+    "HK",   "DM",
+    "RY",   "DY",
+    "RP",   "DB",
+    "RQ",   "DU",
+    "RX",   "DX",
+    "RY",   "DY",
+    "RS",   "DS",
+    "TC",   "DT",
+    "TS",   "MS",
+    "TU",   "MU",
+    "TA",   "CT",
+    "TM",   "MT",
+    "TQ",   "MU",
+    NULL,   NULL,
 };
 
 /*
@@ -390,6 +424,9 @@ t_stat rom_set_module (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
                 }
             }
 
+            /* (Re)set the configuration mode to manual */
+            rom_device_flags &= ~ROM_CONFIG_AUTO;
+
             /* If this module has just one unit and that unit has just one possible
                image attach the image to the unit */
             if (module_list[module_number]->num_sockets == 1) {
@@ -422,6 +459,53 @@ t_stat rom_show_module (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
     return SCPE_OK;
 }
 
+
+/* Test for disabled device */
+
+static t_bool dev_disabled (DEVICE *dptr)
+{
+    return (dptr->flags & DEV_DIS ? TRUE : FALSE);
+}
+
+/* Set configuration mode MANUAL or AUTO */
+
+static t_stat rom_set_configmode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+    int32 selected_module = uptr->selected_module;
+
+    /* Is a configuration type specified? */
+    if (cptr == NULL)
+        return sim_messagef (SCPE_ARG, "Specify AUTO or MANUAL configuration mode\n");
+
+    if (strcasecmp (cptr, "MANUAL") == 0)
+        rom_device_flags &= ~ROM_CONFIG_AUTO;
+    else
+        if (strcasecmp (cptr, "AUTO") == 0) {
+            /* Check if auto config is available for the selected module */
+            if (module_list[selected_module]->auto_config != NULL) {
+
+                /* Set auto config mode */
+                rom_device_flags |= ROM_CONFIG_AUTO;
+
+                /* Perform auto-config */
+                (*module_list[selected_module]->auto_config)();
+            }
+            else 
+                return sim_messagef (SCPE_ARG, "Auto config is not available for the %s module\n",
+                module_list[selected_module]->name);
+        }
+        else
+            return sim_messagef (SCPE_ARG, "Unknown configuration mode, specify AUTO or MANUAL\n");
+ 
+    return SCPE_OK;
+}
+
+t_stat rom_show_configmode (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
+{
+   fprintf (f, "configuration mode %s", 
+       (rom_device_flags & ROM_CONFIG_AUTO) ? "AUTO" : "MANUAL");
+    return SCPE_OK;
+}
 
 /* Examine routine */
 
@@ -502,7 +586,7 @@ t_stat rom_boot (int32 u, DEVICE *dptr)
 /* 
  * Set ROM base address
  * This operation is only allowed on module types to which an image
- * can be attached, i.e. the BLANK ROM module.
+ * can be attached, dev_index.e. the BLANK ROM module.
  */
 t_stat rom_set_addr (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
@@ -632,35 +716,82 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
             modptr = *(module_list + uptr->selected_module);
             socketptr = *modptr->sockets + unit_number;
 
-            /* Search the list of ROMs for this socket for the specified image */
-            for (romptr = (rom *) socketptr->rom_list; romptr->image != NULL; romptr++) {
-                if (strcasecmp (cptr, romptr->device_mnemonic) == 0) {
-                    /* Set image, adresses and capacity for the specified unit.
-                       The filename string is stored in an allocated buffer as detach_unit()
-                       wants to free the filename. */
-                    uptr->filename = strdup (romptr->device_mnemonic);
-                    uptr->filebuf = romptr->image;
-                    uptr->unit_base = socketptr->base_address;
-                    uptr->unit_end = socketptr->base_address + socketptr->size;
-                    uptr->capac = socketptr->size;
-                    uptr->flags |= UNIT_ATT;
-
-                    /* Execute rom specific function if available */
-                    if (romptr->rom_attached != NULL)
-                        (*romptr->rom_attached)();
-
-                    /* Fill the DIB for this unit */
-                    return reset_dib (uptr, &rom_rd, NULL);
-                }
+            /* Try to find the ROM in the list of ROMs for this socket */
+            romptr = find_rom (cptr, socketptr->rom_list);
+            if (romptr != NULL) {
+                /* Reset config mode  to manual and attach the unit */
+                rom_device_flags &= ~ROM_CONFIG_AUTO;
+                return attach_rom_to_unit (romptr, socketptr, uptr);
             }
-
-            /* Mnemonic not found */
-            return sim_messagef (SCPE_ARG, "Unknown ROM type\n");
+            else
+                /* ROM not found */
+                return sim_messagef (SCPE_ARG, "Unknown ROM type\n");
 
         default:
             return SCPE_IERR;
     }
 }
+
+
+/*
+ * Find the ROM with the specified name in a list with ROMs
+ *
+ * Inputs:
+ *      cptr   = ROM name
+ *      romptr = Pointer to list of ROM's 
+ *
+ * Return value:
+ *      Pointer to ROM if found or NULL pointer if ROM is not
+ *      found in the list.
+ */
+static rom *find_rom (const char *cptr, rom (*rom_listptr)[])
+{
+    rom *romptr;
+
+    for (romptr = *rom_listptr; romptr->image != NULL; romptr++) {
+        if (strcasecmp (cptr, romptr->device_mnemonic) == 0) {
+            /* ROM found */
+            return romptr;
+        }
+    }
+
+    /* ROM not found*/
+    return NULL;
+}
+
+
+/*
+ * Attach the specified ROM with the information in the specified
+ * socket to the specified unit
+ * 
+ * Inputs:
+ *      romptr = Pointer to the ROM to attach
+ *      uptr   = unit to attach the specified ROM to
+ * 
+ * Return value:
+ *      Status code
+ */
+
+static t_stat attach_rom_to_unit (rom* romptr, rom_socket *socketptr, UNIT *uptr)
+{
+    /* Set image, adresses and capacity for the specified unit.
+       The filename string is stored in an allocated buffer as detach_unit()
+       wants to free the filename. */
+    uptr->filename = strdup (romptr->device_mnemonic);
+    uptr->filebuf = romptr->image;
+    uptr->unit_base = socketptr->base_address;
+    uptr->unit_end = socketptr->base_address + socketptr->size;
+    uptr->capac = socketptr->size;
+    uptr->flags |= UNIT_ATT;
+
+    /* Execute rom specific function if available */
+    if (romptr->rom_attached != NULL)
+        (*romptr->rom_attached)();
+
+    /* Fill the DIB for this unit */
+    return reset_dib (uptr, &rom_rd, NULL);
+}
+
 
 /*
  * Detach file or built in image from unit.
@@ -682,12 +813,68 @@ t_stat rom_detach (UNIT *uptr)
     if (r != SCPE_OK)
         return r;
 
+    /* Reset config mode to manual and detach the unit */
+    rom_device_flags &= ~ROM_CONFIG_AUTO;
     return detach_unit (uptr);
 }
 
 t_stat rom_blank_help (FILE *st, const char *cptr)
 {
     fprintf (st, rom_blank_helptext);
+    return SCPE_OK;
+}
+
+
+/* Auto configure the M9312 module */
+
+static t_stat m9312_auto_config ()
+{
+    int32 dev_index;
+    DEVICE *dptr;
+    UNIT *uptr;
+    rom_for_device *mptr;
+    rom_socket *socketptr;
+    rom *romptr;
+    int unit_number;
+    t_stat result;
+
+    /* Detach all units to avoid the possibility that on a subsequent m9312 auto configuration
+       with an altered device configuration a same ROM is present twice. */
+    for (unit_number = 0; unit_number < MAX_NUMBER_SOCKETS; unit_number++) {
+        detach_unit (&rom_unit[unit_number]);
+    }
+
+    /* For all devices */
+    for (dev_index = 0, unit_number = 1; 
+        ((dptr = sim_devices[dev_index]) != NULL) && (unit_number < NUM_M9312_SOCKETS); dev_index++) {
+
+        /* Is the device enabled? */
+        if (!dev_disabled (dptr)) {
+
+            /* Search device_rom map for a suitable boot ROM for the device */
+            for (mptr = &device_rom_map[0]; mptr->device_name != NULL; mptr++) {
+
+                if (strcasecmp (dptr->name, mptr->device_name) == 0) {
+
+                    uptr = &rom_unit[unit_number];
+                    socketptr = &m9312_sockets[unit_number];
+                    unit_number++;
+
+                    /* Try to find the ROM in the list of ROMs for this socket */
+                    romptr = find_rom (mptr->rom_name, socketptr->rom_list);
+                    if (romptr != NULL) {
+                        result = attach_rom_to_unit (romptr, socketptr, uptr);
+                        if (result != SCPE_OK)
+                            return result;
+                    }
+                    else
+                        /* ROM not found */
+                        return SCPE_IERR;
+                    break;
+                }
+            }
+        }
+    }
     return SCPE_OK;
 }
 
