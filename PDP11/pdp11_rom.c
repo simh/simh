@@ -51,7 +51,7 @@ t_stat reset_dib (UNIT *uptr, t_stat (reader (int32 *, int32, int32)),
 static rom *find_rom (const char *cptr, rom (*rom_list)[]);
 static t_stat attach_rom_to_unit (rom *romptr, rom_socket *socketptr, UNIT *uptr);
 static t_stat m9312_auto_config ();
-static t_stat m9312_auto_config_diagroms ();
+static t_stat m9312_auto_config_console_roms ();
 static t_stat m9312_auto_config_bootroms ();
 static t_stat attach_m9312_rom (const char *rom_name, int unit_number);
 
@@ -374,7 +374,7 @@ rom_for_device device_rom_map [] =
 
 /*
  * Define a mapping from CPU model to the console/diagnostic ROM for 
- * the the model.
+ * the model.
  */
 
 rom_for_cpu_model cpu_rom_map[] =
@@ -852,17 +852,19 @@ t_stat rom_blank_help (FILE *st, const char *cptr)
     return SCPE_OK;
 }
 
+/* Auto configure console emulator/diagnostics ROMs */
+
 static t_stat m9312_auto_config ()
 {
     t_stat result;
 
-    if ((result = m9312_auto_config_diagroms()) != SCPE_OK)
+    if ((result = m9312_auto_config_console_roms()) != SCPE_OK)
         return result;
     return m9312_auto_config_bootroms();
 }
 
 /* Auto configure the console/diagnostic ROM for the M9312 module */
-static t_stat m9312_auto_config_diagroms ()
+static t_stat m9312_auto_config_console_roms ()
 {
     rom_for_cpu_model *mptr;
 
