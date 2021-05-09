@@ -1,4 +1,4 @@
-/* 3b2_400_cpu.h: AT&T 3B2 Model 400 CPU (WE32100) Header
+/* 3b2_cpu.h: AT&T 3B2 CPU (WE32100 and WE32200) Header
 
    Copyright (c) 2017, Seth J. Morabito
 

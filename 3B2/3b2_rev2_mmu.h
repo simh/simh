@@ -1,4 +1,4 @@
-/* 3b2_400_mmu.c: AT&T 3B2 Model 400 MMU (WE32101) Header
+/* 3b2_rev2_mmu.c: AT&T 3B2 Rev 2 (Model 400) MMU (WE32101) Header
 
    Copyright (c) 2017, Seth J. Morabito
 
@@ -28,11 +28,11 @@
    from the author.
 */
 
-#ifndef _3B2_400_MMU_H_
-#define _3B2_400_MMU_H_
+#ifndef _3B2_REV2_MMU_H_
+#define _3B2_REV2_MMU_H_
 
 #include "sim_defs.h"
-#include "3b2_400_defs.h"
+#include "3b2_rev2_defs.h"
 
 /************************************************************************
  *
@@ -394,4 +394,4 @@ t_stat mmu_decode_va(uint32 va, uint8 r_acc, t_bool fc, uint32 *pa);
 void   mmu_enable();
 void   mmu_disable();
 
-#endif /* _3B2_400_MMU_H_ */
+#endif /* _3B2_REV2_MMU_H_ */

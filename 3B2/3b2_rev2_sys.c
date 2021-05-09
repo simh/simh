@@ -1,4 +1,4 @@
-/* 3b2_defs.h: AT&T 3B2 Model 400 system-specific logic implementation
+/* 3b2_rev2_defs.h: AT&T 3B2 Rev 2 (Model 400) system implementation
 
    Copyright (c) 2017, Seth J. Morabito
 
@@ -29,7 +29,7 @@
 */
 
 #include "3b2_defs.h"
-#include "3b2_400_sys.h"
+#include "3b2_rev2_sys.h"
 
 char sim_name[] = "AT&T 3B2 Model 400";
 

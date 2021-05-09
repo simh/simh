@@ -1,4 +1,4 @@
-/* 3b2_400_stddev.h: AT&T 3B2 Model 400 System Devices implementation
+/* 3b2_rev2_stddev.h: AT&T 3B2 Rev 2 (Model 400) System Devices Implementation
 
    Copyright (c) 2017, Seth J. Morabito
 
@@ -39,7 +39,7 @@
 */
 
 #include "3b2_defs.h"
-#include "3b2_400_stddev.h"
+#include "3b2_rev2_stddev.h"
 
 DEBTAB sys_deb_tab[] = {
     { "INIT",       INIT_MSG,       "Init"              },

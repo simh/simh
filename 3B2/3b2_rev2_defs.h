@@ -1,4 +1,4 @@
-/* 3b2_400_defs.h: AT&T 3B2 Model 400 Simulator Definitions
+/* 3b2_rev2_defs.h: AT&T 3B2 Rev 2 (Model 400) Simulator Definitions
 
    Copyright (c) 2017, Seth J. Morabito
 
@@ -28,8 +28,8 @@
    from the author.
  */
 
-#ifndef _3B2_400_DEFS_H_
-#define _3B2_400_DEFS_H_
+#ifndef _3B2_REV2_DEFS_H_
+#define _3B2_REV2_DEFS_H_
 
 #include "sim_defs.h"
 
@@ -108,4 +108,4 @@
 #define DMA_C           0x48
 #define DMA_IF          0x4E
 
-#endif /* _3B2_400_DEFS_H_  */
+#endif /* _3B2_REV2_DEFS_H_  */

@@ -1,5 +1,5 @@
-/* 3b2_400_mau.c: AT&T 3B2 Model 400 Math Acceleration Unit (WE32106 MAU)
-   Header
+/* 3b2_rev2_mau.c: AT&T 3B2 Rev 2 (Model 400) Math Acceleration
+   Unit (WE32106 MAU) Header
 
    Copyright (c) 2019, Seth J. Morabito
 
@@ -139,8 +139,8 @@
 
 */
 
-#ifndef _3B2_400_MAU_H_
-#define _3B2_400_MAU_H_
+#ifndef _3B2_REV2_MAU_H_
+#define _3B2_REV2_MAU_H_
 
 #include "sim_defs.h"
 
@@ -380,4 +380,4 @@ t_stat mau_broadcast(uint32 cmd, uint32 src, uint32 dst);
 CONST char *mau_description(DEVICE *dptr);
 t_stat mau_broadcast(uint32 cmd, uint32 src, uint32 dst);
 
-#endif /* _3B2_400_MAU_H_ */
+#endif /* _3B2_REV2_MAU_H_ */
