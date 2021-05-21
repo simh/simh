@@ -21,6 +21,7 @@
 */
 #include <stdarg.h>
 
+#include "sim_defs.h"
 #include "pdp11_defs.h"
 #include "pdp11_m9312.h"
 #include "pdp11_vt40boot.h"
@@ -33,8 +34,8 @@ t_stat rom_reset (DEVICE *dptr);
 t_stat rom_boot (int32 u, DEVICE *dptr);
 t_stat rom_set_addr (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_addr (FILE *, UNIT *, int32, CONST void *);
-t_stat rom_set_module (UNIT *, int32, CONST char *, void *);
-t_stat rom_show_module (FILE *, UNIT *, int32, CONST void *);
+t_stat rom_set_type (UNIT *, int32, CONST char *, void *);
+t_stat rom_show_type (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_set_configmode (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_configmode (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_attach (UNIT *, CONST char *);
@@ -77,14 +78,14 @@ static const char rom_helptext[] =
 "   BLANK\n"
 "   M9312\n"
 "   VT40\n\n"
-"The module to be used is selected by means of the MODULE modifier, the\n"
-"'SET ROM MODULE=M9312'command e.g. selects the M9312 module. The ATTACH\n"
+"The module to be used is selected by means of the TYPE modifier, the\n"
+"'SET ROM TYPE=M9312'command e.g. selects the M9312 module. The ATTACH\n"
 "command can then be used to attach a specific ROM to the units of the ROM\n"
 "device.\n\n"
 "The following commands are available:\n\n"
 "   SHOW ROM\n"
 "   SHOW ROM<unit>\n"
-"   SET ROM MODULE=<module>\n"
+"   SET ROM TYPE={BLANK|M9312|VT40}\n"
 "   SET ROM CONFIGMODE=AUTO | MANUAL\n"
 "   ATTACH ROM<unit> <file> | <built-in ROM>\n"
 "   SHOW ROM<unit>\n"
@@ -107,7 +108,7 @@ static const char rom_vt40_helptext[] =
 /***************** 80 character line width template *************************/
 "The VT40 module is meant for the GT-40 graphic terminal, based on a\n"
 "PDP-11/05. The VT40 included a bootstrap ROM.The module has just one socket\n"
-"with one available ROM and a 'SET ROM MODULE=VT40' command suffices to\n"
+"with one available ROM and a 'SET ROM TYPE=VT40' command suffices to\n"
 "select this boot ROM.\n\n";
 
 static const char rom_m9312_helptext[] =
@@ -257,7 +258,7 @@ module vt40 =
 
 /*
  * Define the number of modules. The BLANK module must be the
- * module in the list.
+ * first module in the list.
  */
 #define NUM_MODULES            3
 #define ROM_MODULE_BLANK       0
@@ -273,15 +274,9 @@ module* module_list[NUM_MODULES] =
 
 /*
  * Use some device specific fields in the UNIT structure.
- * 
- * The u5 (selected_module) field is just used to indicate the selected
- * module. It would be more appropriate to use a field in the DEVICE structure 
- * for that purpose, but there is no (device-specific) field in that
- * structure that is saved and restored.
  */
 #define unit_base           u3            /* Base adress of the ROM unit */
 #define unit_end            u4            /* End adress of the ROM unit */
-#define selected_module     u5            /* Index of module in module_list */
 
 /*
  * The maximum number of sockets is the number of sockets any module can have.
@@ -305,11 +300,22 @@ UNIT rom_unit[MAX_NUMBER_SOCKETS] =
 DIB rom_dib[MAX_NUMBER_SOCKETS];
 
 /*
+ * Define ROM device registers. All state is maintained in these registers
+ * to allow the state to be saved and restored by a SAVE/RESTORE cycle.
+ */
+static uint16 selected_type = ROM_MODULE_BLANK;     /* The module type as set by the user */
+
+REG rom_reg[] = {
+    { ORDATAD (TYPE,     selected_type, 16,     "Type"), REG_HIDDEN | REG_RO },
+    { NULL }
+};
+
+/*
  * Define the ROM device and units modifiers.
  */
 MTAB rom_mod[] = {
-    { MTAB_XTD | MTAB_VDV | MTAB_VALR, 010, "MODULE", "MODULE",
-        &rom_set_module, &rom_show_module, NULL, "Module type (BLANK, M9312 or VT40)" },
+    { MTAB_XTD | MTAB_VDV | MTAB_VALR, 010, "TYPE", "TYPE",
+        &rom_set_type, &rom_show_type, NULL, "ROM type (BLANK, M9312 or VT40)" },
     { MTAB_XTD | MTAB_VDV | MTAB_VALR, 010, "CONFIGMODE", "CONFIGMODE",
         &rom_set_configmode, &rom_show_configmode, NULL, "Auto configuration (AUTO or MANUAL)" },
     { MTAB_XTD | MTAB_VUN | MTAB_VALR, 010, "ADDRESS", "ADDRESS",
@@ -322,7 +328,7 @@ DEVICE rom_dev =
 {
     "ROM",                               /* Device name */
     rom_unit,                            /* Pointer to device unit structures */
-    NULL,                                /* A ROM module has no registers */
+    rom_reg,                             /* Pointer to ROM registers */
     rom_mod,                             /* Pointer to modifier table */
     MAX_NUMBER_SOCKETS,                  /* Number of units */
     8,                                   /* Address radix */
@@ -395,7 +401,7 @@ rom_for_cpu_model cpu_rom_map[] =
  * Check if the module type to be set is valid on the selected 
  * cpu_opt and cpu_type
  */
-int module_type_is_valid (int module_number)
+int module_type_is_valid (uint16 module_number)
 {
     uint32 bus = UNIBUS ? UNIBUS_MODEL : QBUS_MODEL;
 
@@ -405,10 +411,10 @@ int module_type_is_valid (int module_number)
 
 /* Set ROM module type */
 
-t_stat rom_set_module (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+t_stat rom_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     uint32 unit_number;
-    int module_number;
+    uint16 module_number;
     rom *romptr;
 
     /* Is a module type specified? */
@@ -425,16 +431,20 @@ t_stat rom_set_module (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
             /* Save current cpu type for reference in rom_reset() */
             cpu_type_on_selection = cpu_type;
 
-            /* Module type found 
-               Initialize the UNITs with values for this module */
-            for (unit_number = 0, uptr = &rom_unit[0]; unit_number < MAX_NUMBER_SOCKETS; unit_number++, uptr++) {
-                /* Check if the selected module differs from the 
-                   currently selected module */
-                if (uptr->selected_module != module_number) {
-                    /* Set the currently selected module */
-                    uptr->selected_module = module_number;
+            /* 
+             * Module type found. If the currently selected type differs
+             * from the previously selected type, initialize the UNITs
+             * with values for this type.
+             */
+            if (module_number != selected_type) {
+                
+                /* Set now selected module type */
+                selected_type = module_number;
 
-                    /* Check if an image is attached */
+                for (unit_number = 0, uptr = &rom_unit[0]; 
+                    unit_number < MAX_NUMBER_SOCKETS; unit_number++, uptr++) {
+
+                    /* Check if an image is attached to this unit */
                     if (uptr->flags & UNIT_ATT) {
                         /* Detach the unit */
                         if (rom_detach (uptr) != SCPE_OK)
@@ -449,6 +459,8 @@ t_stat rom_set_module (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
                     /* Disable surplus ROMs for this module */
                     if (unit_number >= module_list[module_number]->num_sockets)
                         uptr->flags |= UNIT_DIS;
+                    else
+                        uptr->flags &= ~UNIT_DIS;
                 }
             }
 
@@ -480,10 +492,9 @@ t_stat rom_set_module (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 
 /* Show ROM module type */
 
-t_stat rom_show_module (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
+t_stat rom_show_type (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 {
-    int selected_module = rom_unit[0].selected_module;
-    fprintf (f, "module type %s", module_list[selected_module]->name);
+    fprintf (f, "module type %s", module_list[selected_type]->name);
     return SCPE_OK;
 }
 
@@ -499,9 +510,7 @@ static t_bool dev_disabled (DEVICE *dptr)
 
 static t_stat rom_set_configmode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-    int32 selected_module = uptr->selected_module;
-
-    /* Is a configuration type specified? */
+     /* Is a configuration type specified? */
     if (cptr == NULL)
         return sim_messagef (SCPE_ARG, "Specify AUTO or MANUAL configuration mode\n");
 
@@ -510,17 +519,17 @@ static t_stat rom_set_configmode (UNIT *uptr, int32 val, CONST char *cptr, void 
     else
         if (strcasecmp (cptr, "AUTO") == 0) {
             /* Check if auto config is available for the selected module */
-            if (module_list[selected_module]->auto_config != NULL) {
+            if (module_list[selected_type]->auto_config != NULL) {
 
                 /* Set auto config mode */
                 rom_device_flags |= ROM_CONFIG_AUTO;
 
                 /* Perform auto-config */
-                (*module_list[selected_module]->auto_config)();
+                (*module_list[selected_type]->auto_config)();
             }
             else 
                 return sim_messagef (SCPE_ARG, "Auto config is not available for the %s module\n",
-                module_list[selected_module]->name);
+                module_list[selected_type]->name);
         }
         else
             return sim_messagef (SCPE_ARG, "Unknown configuration mode, specify AUTO or MANUAL\n");
@@ -585,15 +594,10 @@ t_stat rom_reset (DEVICE *dptr)
     /* Check if the CPU opt and/or type has been changed since the module
        type was selected. If so, select the BLANK module. */
     if (cpu_type != cpu_type_on_selection)
-        rom_set_module (&rom_unit[0], 0, "BLANK", NULL);
+        rom_set_type (&rom_unit[0], 0, "BLANK", NULL);
 
     /* Initialize the UNIT and DIB structs and create the linked list of DIBs */
     for (unit_number = 0; unit_number < MAX_NUMBER_SOCKETS; unit_number++) {
-
-        /* Initialize selected_module on first reset call */
-        if ( !rom_initialized)
-            rom_unit[unit_number].selected_module = ROM_MODULE_BLANK;
-
         rom_dib[unit_number].next = (unit_number < dptr->numunits - 1) ? &rom_dib[unit_number + 1] : NULL;
     }
 
@@ -620,10 +624,9 @@ t_stat rom_set_addr (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     int32 addr;
     t_stat r;
-    int32 selected_module = uptr->selected_module;
 
     /* Check if the command is allowed for the selected module */
-    if (module_list[selected_module]->type != ROM_FILE)
+    if (module_list[selected_type]->type != ROM_FILE)
         return sim_messagef (SCPE_ARG, "Command not allowed for the selected module\n");
 
     /* Check if the unit is not already attached */
@@ -699,14 +702,13 @@ void setHITMISS ()
  */
 t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 {
-    int module_number = uptr->selected_module;
     int unit_number = uptr - rom_unit;
     module *modptr;
     rom_socket *socketptr;
     rom *romptr;
     t_stat r;
 
-    switch (module_list[module_number]->type) {
+    switch (module_list[selected_type]->type) {
         case ROM_FILE:
             /* Check the ROM base address is set */
             if (uptr->unit_base == 0)
@@ -741,7 +743,7 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 
             /* Get a pointer to the selected module and from that a pointer to
                socket for the unit */
-            modptr = *(module_list + uptr->selected_module);
+            modptr = *(module_list + selected_type);
             socketptr = *modptr->sockets + unit_number;
 
             /* Try to find the ROM in the list of ROMs for this socket */
@@ -828,11 +830,10 @@ t_stat rom_detach (UNIT *uptr)
 {
     t_stat r;
     DIB *dib = &rom_dib[uptr - rom_unit];
-    int selected_module = uptr->selected_module;
-
+ 
     /* Leave address intact for modules with separate address
        and image specification (i.e. the BLANK module type) */
-    if (module_list[selected_module]->type == ROM_FILE)
+    if (module_list[selected_type]->type == ROM_FILE)
         uptr->unit_end = uptr->unit_base;
     else
         uptr->unit_end = uptr->unit_base = 0;
@@ -975,7 +976,7 @@ t_stat rom_vt40_help (FILE *st, const char *cptr)
 
 t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
-    int module_number;
+    uint16 module_number;
     char gbuf[CBUFSIZE];
 
     /* If no argument to 'HELP ROM' is given print the general help text */
