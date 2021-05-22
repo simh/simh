@@ -303,10 +303,10 @@ static int32 end_address[MAX_NUMBER_SOCKETS];       /* Socket end address */
 
 REG rom_reg[] = {
     { ORDATAD (TYPE,     selected_type, 16,     "Type"), REG_HIDDEN | REG_RO },
-    { BRDATAD (START,    base_address,  32,  8, sizeof (base_address), 
-        "Socket Base Addresses"), REG_HIDDEN | REG_RO},
-    { BRDATAD (END,      end_address,   32,  8, sizeof (end_address),
-        "Socket End Addresses"), REG_HIDDEN | REG_RO },
+    { BRDATAD (BASE,     base_address,  8,  22, MAX_NUMBER_SOCKETS, 
+        "Socket Base Addresses"),  REG_RO},
+    { BRDATAD (END,      end_address,   8,  22, MAX_NUMBER_SOCKETS,
+        "Socket End Addresses"), REG_RO },
     { NULL }
 };
 
@@ -318,8 +318,8 @@ MTAB rom_mod[] = {
         &rom_set_type, &rom_show_type, NULL, "ROM type (BLANK, M9312 or VT40)" },
     { MTAB_XTD | MTAB_VDV | MTAB_VALR, 010, "CONFIGMODE", "CONFIGMODE",
         &rom_set_configmode, &rom_show_configmode, NULL, "Auto configuration (AUTO or MANUAL)" },
-    { MTAB_XTD | MTAB_VUN | MTAB_VALR, 010, "ADDRESS", "ADDRESS",
-        &rom_set_addr, &rom_show_addr, NULL, "Bus address" },
+    { MTAB_XTD | MTAB_VDV | MTAB_VALR, 0,   "ADDRESS", "ADDRESS",
+        &rom_set_addr, &rom_show_addr, NULL, "Socket base address" },
     { 0 }
 };
 
@@ -618,11 +618,14 @@ t_stat rom_boot (int32 u, DEVICE *dptr)
 /* 
  * Set ROM base address
  * This operation is only allowed on module types to which an image
- * can be attached, dev_index.e. the BLANK ROM module.
+ * can be attached, i.e. the BLANK ROM module.
  */
 t_stat rom_set_addr (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-    int unit_number = uptr - rom_unit;
+    // *** int unit_number = uptr - rom_unit;
+    uint32 unit_number;
+    int32 specified_address[MAX_NUMBER_SOCKETS] = {0, 0, 0, 0, 0};
+    char glyph[CBUFSIZE];
     int32 addr;
     t_stat r;
 
@@ -630,26 +633,55 @@ t_stat rom_set_addr (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     if (module_list[selected_type]->type != ROM_FILE)
         return sim_messagef (SCPE_ARG, "Command not allowed for the selected module\n");
 
-    /* Check if the unit is not already attached */
-    if (uptr->flags & UNIT_ATT)
-        return SCPE_ALATT;
-
     /* Check if an address is specified */
     if (cptr == NULL)
         return sim_messagef (SCPE_ARG, "No address specified\n");
 
-    /* Convert the adress string and check if produced a valid value */
-    addr = (int32) get_uint (cptr, 8, IOPAGEBASE + IOPAGEMASK, &r);
-    if (r != SCPE_OK)
-        return r;
+    /* Go through the specified adress string */
+    for (unit_number = 0; 
+        (unit_number < module_list[selected_type]->num_sockets) && (*cptr != 0); 
+         unit_number++) {
 
-    /* Check if a valid adress is specified */
-    if (addr < IOPAGEBASE)
-        return sim_messagef (SCPE_ARG, "ROM must be in I/O page, at or above 0%o\n",
-        IOPAGEBASE);
+        /* Get current base addresses as default address */
+        specified_address[unit_number] = base_address[unit_number];
 
-    /* Set the base adress */
-    base_address[unit_number] = end_address[unit_number] = addr;
+        /* Get next glyph from string */
+        cptr = get_glyph (cptr, glyph, ';');
+
+        /* Check if an address was given for this unit number */
+        if (*glyph == 0)
+            continue;
+
+        /* Convert the adress glyph and check if produced a valid value */
+        addr = (int32) get_uint (glyph, 8, IOPAGEBASE + IOPAGEMASK, &r);
+        if (r != SCPE_OK)
+            return r;
+
+        /* Check if a valid adress is specified */
+        if (addr < IOPAGEBASE)
+            return sim_messagef (SCPE_ARG, "Address must be in I/O page, at or above 0%o\n",
+            IOPAGEBASE);
+
+        /* Check if the unit is not already attached */
+        // *** if (uptr->flags & UNIT_ATT)
+        if (rom_unit[unit_number].flags & UNIT_ATT)
+            return SCPE_ALATT;
+
+        /* Save the specified adress for the unit number */
+        specified_address[unit_number] = addr;
+    }
+
+    /* There shouldn't be any addresses left */
+    if (*cptr != 0)
+        return sim_messagef (SCPE_ARG, "Specify a maximum of %d addresses\n",
+        module_list[selected_type]->num_sockets);
+
+    // A valid address string has been specified, copy them to the registers */
+    for (unit_number = 0;
+        (unit_number < module_list[selected_type]->num_sockets); unit_number++) {
+        base_address[unit_number] = end_address[unit_number] = specified_address[unit_number];
+    }
+
     return SCPE_OK;
 }
 
