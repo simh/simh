@@ -33,7 +33,9 @@ t_stat rom_rd (int32 *data, int32 PA, int32 access);
 t_stat rom_reset (DEVICE *dptr);
 t_stat rom_boot (int32 u, DEVICE *dptr);
 t_stat rom_set_addr (UNIT *, int32, CONST char *, void *);
-t_stat rom_show_addr (FILE *, UNIT *, int32, CONST void *);
+t_stat rom_show_address (FILE *, UNIT *, int32, CONST void *);
+t_stat rom_set_contents (UNIT *, int32, CONST char *, void *);
+t_stat rom_show_contents (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_set_type (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_type (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_set_configmode (UNIT *, int32, CONST char *, void *);
@@ -46,7 +48,7 @@ t_stat rom_vt40_help (FILE *, const char *);
 t_stat rom_help (FILE *st, DEVICE *, UNIT *, int32, const char *);
 t_stat rom_help_attach (FILE *st, DEVICE *, UNIT *, int32, const char *);
 const char *rom_description (DEVICE *);
-t_stat reset_dib (UNIT *uptr, t_stat (reader (int32 *, int32, int32)),
+t_stat reset_dib (int unit_number, t_stat (reader (int32 *, int32, int32)),
     t_stat (writer (int32, int32, int32)));
 
 static rom *find_rom (const char *cptr, rom (*rom_list)[]);
@@ -62,10 +64,6 @@ extern uint32 cpu_opt;
 extern uint32 cpu_model;
 extern int32 HITMISS;
 
-/* Static definitions */
-static t_bool rom_initialized = FALSE;      /* Initialize rom_unit on first reset call */
-static uint32 cpu_type_on_selection;        /* cpu_type for which module type was selected */
-static uint32 rom_device_flags = 0;         /* rom device specific flags */
 
 static const char rom_helptext[] =
 /***************** 80 character line width template *************************/
@@ -87,12 +85,20 @@ static const char rom_helptext[] =
 "   SHOW ROM<unit>\n"
 "   SET ROM TYPE={BLANK|M9312|VT40}\n"
 "   SET ROM CONFIGMODE=AUTO | MANUAL\n"
+"   SET ROM ADDRESS=<address>{;<address>}\n"
 "   ATTACH ROM<unit> <file> | <built-in ROM>\n"
 "   SHOW ROM<unit>\n"
 "   HELP ROM\n"
 "   HELP ROM SET\n"
 "   HELP ROM SHOW\n"
 "   HELP ROM ATTACH\n\n"
+"The SET ROM ADDRESS command is only applicable to the BLANK module type. By\n"
+"means of this command the base address of the ROM's sockets can be\n"
+"specified. The command accepts a sequence of addresses, in order of socket\n"
+"number, separated by a semi-colon. Empty addresses are allowed and leave the\n"
+"socket base address unchanged. The command 'SET ADDRESS=17765000;;17773000'\n"
+"e.g. sets the base address for socket 0 to 17765000, leaves the base address\n"
+"for socket 1 unchanged and sets the base address for socket 2 to 17773000.\n\n"
 "Help is available for the BLANK, M9312 and VT40 modules:\n\n"
 "   HELP ROM BLANK\n"
 "   HELP ROM M9312\n"
@@ -293,6 +299,17 @@ UNIT rom_unit[MAX_NUMBER_SOCKETS] =
 
 DIB rom_dib[MAX_NUMBER_SOCKETS];
 
+/* Static definitions */
+static t_bool rom_initialized = FALSE;              /* Initialize rom_unit on first reset call */
+static uint32 cpu_type_on_selection;                /* cpu_type for which module type was selected */
+static uint32 rom_device_flags = 0;                 /* rom device specific flags */
+static FILE *rom_fileref[MAX_NUMBER_SOCKETS] = 
+    {NULL, NULL, NULL, NULL, NULL};                 /* File references for opened ROM files */
+// ToDo: Files can be closed after read in buffer?! So there is no need to keep file references?
+static void *rom_buffer[MAX_NUMBER_SOCKETS];        /* Buffered ROM contents */
+// ToDo: Use M9312 image pointer?
+static uint32 rom_size[MAX_NUMBER_SOCKETS];         /* ROM contents size */
+
 /*
  * Define ROM device registers. All state is maintained in these registers
  * to allow the state to be saved and restored by a SAVE/RESTORE cycle.
@@ -300,6 +317,8 @@ DIB rom_dib[MAX_NUMBER_SOCKETS];
 static uint16 selected_type = ROM_MODULE_BLANK;     /* The module type as set by the user */
 static int32 base_address[MAX_NUMBER_SOCKETS];      /* Socket base address */
 static int32 end_address[MAX_NUMBER_SOCKETS];       /* Socket end address */
+static char rom_name[MAX_NUMBER_SOCKETS][CBUFSIZE] 
+    = {"", "", "", "", ""};                         /* File name for each socket */
 
 REG rom_reg[] = {
     { ORDATAD (TYPE,     selected_type, 16,     "Type"), REG_HIDDEN | REG_RO },
@@ -307,19 +326,26 @@ REG rom_reg[] = {
         "Socket Base Addresses"),  REG_RO},
     { BRDATAD (END,      end_address,   8,  22, MAX_NUMBER_SOCKETS,
         "Socket End Addresses"), REG_RO },
+    { VBRDATA (ROM_NAMES, rom_name, 16, 8, CBUFSIZE * MAX_NUMBER_SOCKETS) },
     { NULL }
 };
 
 /*
  * Define the ROM device and units modifiers.
+ * 
+ * A number of modifiers are marked "named only" to prevent them showing
+ * up on the SHOW ROM output. The ROM SHOW CONTENTS command will print all
+ * relevant information for a socket.
  */
 MTAB rom_mod[] = {
-    { MTAB_XTD | MTAB_VDV | MTAB_VALR, 010, "TYPE", "TYPE",
+    { MTAB_XTD | MTAB_VDV | MTAB_VALR | MTAB_NMO, 0, "TYPE", "TYPE",
         &rom_set_type, &rom_show_type, NULL, "ROM type (BLANK, M9312 or VT40)" },
-    { MTAB_XTD | MTAB_VDV | MTAB_VALR, 010, "CONFIGMODE", "CONFIGMODE",
+    { MTAB_XTD | MTAB_VDV | MTAB_VALR | MTAB_NMO, 0, "CONFIGMODE", "CONFIGMODE",
         &rom_set_configmode, &rom_show_configmode, NULL, "Auto configuration (AUTO or MANUAL)" },
-    { MTAB_XTD | MTAB_VDV | MTAB_VALR, 0,   "ADDRESS", "ADDRESS",
-        &rom_set_addr, &rom_show_addr, NULL, "Socket base address" },
+    { MTAB_XTD | MTAB_VDV | MTAB_VALR | MTAB_NMO, 0,   "ADDRESS", "ADDRESS",
+        &rom_set_addr, &rom_show_address, NULL, "Socket base address" },
+    { MTAB_XTD | MTAB_VDV | MTAB_VALR | MTAB_NC,  0,   "CONTENTS", "CONTENTS",
+        &rom_set_contents, &rom_show_contents, NULL, "Socket ROM contents" },
     { 0 }
 };
 
@@ -494,7 +520,7 @@ t_stat rom_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 
 t_stat rom_show_type (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 {
-    fprintf (f, "module type %s", module_list[selected_type]->name);
+    fprintf (f, "module type %s\n", module_list[selected_type]->name);
     return SCPE_OK;
 }
 
@@ -539,7 +565,7 @@ static t_stat rom_set_configmode (UNIT *uptr, int32 val, CONST char *cptr, void 
 
 t_stat rom_show_configmode (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 {
-   fprintf (f, "configuration mode %s", 
+   fprintf (f, "configuration mode %s\n", 
        (rom_device_flags & ROM_CONFIG_AUTO) ? "AUTO" : "MANUAL");
     return SCPE_OK;
 }
@@ -560,15 +586,21 @@ t_stat rom_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 
 
 /* ROM read routine */
+// ToDo: Detect RESTORed condition
  
 t_stat rom_rd (int32 *data, int32 PA, int32 access)
 {
     uint32 unit_number;
     UNIT *uptr;
 
-    for (unit_number = 0, uptr = rom_dev.units; unit_number < rom_dev.numunits; unit_number++, uptr++) {
-        if (PA >= base_address[unit_number] && PA <= end_address[unit_number] && (uptr->flags & UNIT_ATT)) {
-            uint16 *image = (uint16 *) uptr->filebuf;
+    for (unit_number = 0, uptr = rom_dev.units; 
+         unit_number < rom_dev.numunits; unit_number++, uptr++) {
+        
+        // *** if (PA >= base_address[unit_number] && PA <= end_address[unit_number] && (uptr->flags & UNIT_ATT)) {
+        // *** uint16 *image = (uint16 *) uptr->filebuf;
+        if (PA >= base_address[unit_number] && PA <= end_address[unit_number] &&
+            (rom_buffer[unit_number] != NULL)) {
+            uint16 *image = (uint16 *) rom_buffer[unit_number];
             *data = image[(PA - base_address[unit_number]) >> 1];
             return SCPE_OK;
         }
@@ -622,7 +654,6 @@ t_stat rom_boot (int32 u, DEVICE *dptr)
  */
 t_stat rom_set_addr (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-    // *** int unit_number = uptr - rom_unit;
     uint32 unit_number;
     int32 specified_address[MAX_NUMBER_SOCKETS] = {0, 0, 0, 0, 0};
     char glyph[CBUFSIZE];
@@ -663,8 +694,7 @@ t_stat rom_set_addr (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
             IOPAGEBASE);
 
         /* Check if the unit is not already attached */
-        // *** if (uptr->flags & UNIT_ATT)
-        if (rom_unit[unit_number].flags & UNIT_ATT)
+         if (rom_unit[unit_number].flags & UNIT_ATT)
             return SCPE_ALATT;
 
         /* Save the specified adress for the unit number */
@@ -685,37 +715,157 @@ t_stat rom_set_addr (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
     return SCPE_OK;
 }
 
-
-/* Show ROM base address */
-
-t_stat rom_show_addr (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
+t_stat rom_show_address (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 {
-    int unit_number = uptr - rom_unit;
+    uint32 socket_number;
 
-    /* Check that we got a valid unit pointer */
-    if (uptr == NULL)
-        return SCPE_IERR;
+    /* For all sockets */
+    for (socket_number = 0;
+        (socket_number < module_list[selected_type]->num_sockets); socket_number++) {
+        fprintf (f, "Socket %1d: ", socket_number);
+            
+        /* If the unit has an address range print the range, otherwise print
+           just the base address */
+        if (end_address[socket_number] != base_address[socket_number])
+            fprintf (f, "address=%o-%o\n", base_address[socket_number],
+            end_address[socket_number] - 1);
+        else
+            fprintf (f, "address=%o\n", base_address[socket_number]);
+    }
+    return SCPE_OK;
+}
 
-    /* If the unit has an address range print the range, otherwise print
-       just the base address */
-    if (end_address[unit_number] != base_address[unit_number])
-        fprintf (f, "address=%o-%o", base_address[unit_number], end_address[unit_number] - 1);
-    else
-        fprintf (f, "address=%o", base_address[unit_number]);
+
+t_stat rom_set_contents (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
+{
+    uint32 socket_number;
+    char specified_name[MAX_NUMBER_SOCKETS][CBUFSIZE] = {"", "", "", "", ""};
+    FILE *fileref;
+
+    /* Go through the specified ROM name string */
+    for (socket_number = 0;
+        (socket_number < module_list[selected_type]->num_sockets) && (*cptr != 0);
+        socket_number++) {
+
+        /* Get next glyph without upper case conversion from string */
+        cptr = get_glyph_nc (cptr, specified_name[socket_number], ';');
+
+        /* Check if a ROM name was given for this socket number */
+        if (*specified_name[socket_number] == 0)
+            continue;
+
+        /* Check the ROM base address is set */
+        if (base_address[socket_number] == 0)
+            return sim_messagef (SCPE_ARG, "Set address for socket %d first\n", socket_number);
+
+        /* Check if an existing file is specified */
+        fileref = sim_fopen (specified_name[socket_number], "rb");
+        if (fileref == NULL)
+            return sim_messagef (SCPE_ARG, "File %s cannot be opened\n",
+                specified_name[socket_number]);
+        fclose (fileref);
+    }
+
+    /* There shouldn't be any ROM names left */
+    if (*cptr != 0)
+        return sim_messagef (SCPE_ARG, "Specify a maximum of %d ROMs\n",
+        module_list[selected_type]->num_sockets);
+
+    /* For all specified ROMs buffer the image */
+    for (socket_number = 0;
+        (socket_number < module_list[selected_type]->num_sockets); socket_number++) {
+
+        /* Check if a ROM has to be seated */
+        if (*specified_name[socket_number] != 0) {
+
+            /* Deallocate previously allocated buffer */
+            if (rom_buffer[socket_number] != NULL)
+                free (rom_buffer[socket_number]);
+
+            /* Copy the specified ROM name to the register */
+            strncpy (rom_name[socket_number], specified_name[socket_number], CBUFSIZE);
+
+            /* Open the file read-only */
+            rom_fileref[socket_number] = sim_fopen (rom_name[socket_number], "rb");
+            if (rom_fileref[socket_number] == NULL)
+                return sim_messagef (SCPE_IERR, "File %s cannot be opened\n",
+                rom_name[socket_number]);
+
+            /* Get the file size and allocate a buffer with the appropriate size */
+            // ToDo: Rename fileref to file pointer
+            rom_size[socket_number] = (uint32) sim_fsize_ex (rom_fileref[socket_number]);
+            rom_buffer[socket_number] = calloc (rom_size[socket_number], sizeof(char));
+
+            /* Read ROM contents into image */
+            // ToDo: Check return value against size?
+            rom_size[socket_number] = (uint32) sim_fread (rom_buffer[socket_number],
+                sizeof(char), rom_size[socket_number], rom_fileref[socket_number]);
+
+            /* The file can now be closed */
+            // ToDo: Just one fileref is needed?
+            fclose (rom_fileref[socket_number]);
+
+            /* Fill the DIB for the unit */
+            if (reset_dib (socket_number, &rom_rd, NULL) != SCPE_OK) {
+
+                // Remove ROM image
+                // ToDo: Create remove_rom() function
+                free (rom_buffer[socket_number]);
+                rom_buffer[socket_number] = NULL;
+                rom_fileref[socket_number] = NULL;
+                *rom_name[socket_number] = 0;
+                return SCPE_IERR;
+            }
+
+            /* Set end adress */
+            end_address[socket_number] = base_address[socket_number] + 
+                rom_size[socket_number];
+        }
+    }
+
+    return SCPE_OK;
+}
+
+
+/* Show ROM contents and addresses */
+
+t_stat rom_show_contents (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
+{
+    uint32 socket_number;
+
+    fprintf (f, "module type %s, ", module_list[selected_type]->name);
+    fprintf (f, "configuration mode %s,\n",
+        (rom_device_flags & ROM_CONFIG_AUTO) ? "AUTO" : "MANUAL");
+
+    /* For all sockets */
+    for (socket_number = 0;
+        (socket_number < module_list[selected_type]->num_sockets); socket_number++) {
+        fprintf (f, "Socket %1d: %s,\t", socket_number, 
+            (*rom_name[socket_number] != 0) ? rom_name[socket_number] : "empty");
+
+        /* If the unit has an address range print the range, otherwise print
+           just the base address */
+        if (end_address[socket_number] != base_address[socket_number])
+            fprintf (f, "address=%o-%o\n", base_address[socket_number],
+            end_address[socket_number] - 1);
+        else
+            fprintf (f, "address=%o\n", base_address[socket_number]);
+    }
     return SCPE_OK;
 }
 
 
 /* (Re)set the DIB and build the Unibus table for the specified unit */
 
-t_stat reset_dib (UNIT *uptr, t_stat (reader (int32 *, int32, int32)),
+t_stat reset_dib (int unit_number, t_stat (reader (int32 *, int32, int32)),
     t_stat (writer (int32, int32, int32)))
 {
-    DIB *dib = &rom_dib[uptr - rom_unit];
-    int unit_number = uptr - rom_unit;
+    // *** DIB *dib = &rom_dib[uptr - rom_unit];
+    // *** int unit_number = uptr - rom_unit;
+    DIB *dib = &rom_dib[unit_number];
 
     dib->ba = base_address[unit_number];
-    dib->lnt = uptr->capac;
+    dib->lnt = rom_size[unit_number];
     dib->rd = reader;
     dib->wr = writer;
     return build_ubus_tab (&rom_dev, dib);
@@ -764,7 +914,7 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
                 return r;
 
             /* Fill the DIB for the unit */
-            r = reset_dib (uptr, &rom_rd, NULL);
+            r = reset_dib (unit_number, &rom_rd, NULL);
             if (r != SCPE_OK)
                 return rom_detach (uptr);
 
@@ -857,7 +1007,7 @@ static t_stat attach_rom_to_unit (rom* romptr, rom_socket *socketptr, UNIT *uptr
         (*romptr->rom_attached)();
 
     /* Fill the DIB for this unit */
-    return reset_dib (uptr, &rom_rd, NULL);
+    return reset_dib (unit_number, &rom_rd, NULL);
 }
 
 
@@ -871,13 +1021,13 @@ t_stat rom_detach (UNIT *uptr)
     int unit_number = uptr - rom_unit;
  
     /* Leave address intact for modules with separate address
-       and image specification (unit_number.e. the BLANK module type) */
+       and image specification (socket_number.e. the BLANK module type) */
     if (module_list[selected_type]->type == ROM_FILE)
         end_address[unit_number] = base_address[unit_number];
     else
         end_address[unit_number] = base_address[unit_number] = 0;
 
-    r = reset_dib (uptr, NULL, NULL);
+    r = reset_dib (unit_number, NULL, NULL);
     if (r != SCPE_OK)
         return r;
 
@@ -928,7 +1078,7 @@ static t_stat m9312_auto_config_bootroms ()
     int unit_number;
     t_stat result;
 
-    /* Detach all units with boot ROMs (unit_number.e. 1-4) to avoid the possibility that on a 
+    /* Detach all units with boot ROMs (socket_number.e. 1-4) to avoid the possibility that on a 
        subsequent m9312 auto configuration with an altered device configuration
        a same ROM is present twice. */
     for (unit_number = 1; unit_number < NUM_M9312_SOCKETS; unit_number++) {
