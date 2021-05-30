@@ -326,6 +326,7 @@ extern CPUTAB cpu_tab[];
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
+t_stat cpu_boot (int32 unitno, DEVICE *dptr);
 t_bool cpu_is_pc_a_subroutine_call (t_addr **ret_addrs);
 t_stat cpu_set_hist (UNIT *uptr, int32 val, CONST char *cptr, void *desc);
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
@@ -681,7 +682,7 @@ DEVICE cpu_dev = {
     "CPU", &cpu_unit, cpu_reg, cpu_mod,
     1, 8, 22, 2, 8, 16,
     &cpu_ex, &cpu_dep, &cpu_reset,
-    NULL, NULL, NULL,
+    &cpu_boot, NULL, NULL,
     NULL, DEV_DYNM, 0,
     NULL, &cpu_set_size, NULL,
     NULL, NULL, NULL, NULL,
@@ -3348,6 +3349,45 @@ static const char *pdp11_clock_precalibrate_commands[] = {
     "PC 100",
     NULL};
 
+/* Special boot command - linked into SCP by initial reset
+
+   Syntax: BOOT {CPU}
+
+*/
+
+t_stat pdp11_boot (int32 flag, CONST char *ptr)
+{
+char gbuf[CBUFSIZE];
+
+if ((ptr = get_sim_sw (ptr)) == NULL)               /* get switches */
+    return SCPE_INVSW;
+get_glyph (ptr, gbuf, 0);                           /* get glyph */
+if (gbuf[0] && strcmp (gbuf, "CPU"))
+    return run_cmd (flag, gbuf);                    /* use specified device/unit */
+return run_cmd (flag, "CPU");
+}
+
+
+/* Special boot command, overrides regular boot */
+
+CTAB pdp11_cmd[] = {
+    { "BOOT", &pdp11_boot, RU_BOOT,
+      "bo{ot} {unit}            boot simulator\n", NULL, &run_cmd_message },
+    { NULL }
+    };
+
+
+t_stat cpu_boot (int32 unitno, DEVICE *dptr)
+{
+DEVICE *rom = find_dev ("ROM");
+
+if ((rom == NULL) || 
+    ((rom->flags & DEV_DIS) != 0) ||
+    (SCPE_NOFNC == rom->boot (unitno, rom)));
+    return SCPE_2FARG;
+return SCPE_OK;
+}
+
 /* Reset routine */
 
 t_stat cpu_reset (DEVICE *dptr)
@@ -3384,6 +3424,7 @@ if (pcq_r)
 else
     return SCPE_IERR;
 set_r_display (0, MD_KER);
+sim_vm_cmd = pdp11_cmd;
 return build_dib_tab ();            /* build, chk dib_tab */
 }
 
