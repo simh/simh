@@ -10439,6 +10439,8 @@ if ((dptr = find_dev (cptr))) {                         /* exact match? */
     }
 
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* base + unit#? */
+    if (qdisable (dptr))                                /* device disabled? */
+        continue;
     if (dptr->numunits &&                               /* any units? */
         (((nptr = dptr->name) &&
           (strncmp (cptr, nptr, strlen (nptr)) == 0)) ||
@@ -10451,7 +10453,14 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* base + unit#? */
             u = (uint32) get_uint (tptr, 10, dptr->numunits - 1, &r);
             if (r != SCPE_OK)                           /* error? */
                 *uptr = NULL;
-            else *uptr = dptr->units + u;
+            else
+                *uptr = dptr->units + u;
+            return dptr;
+            }
+        }
+    for (u = 0; u < dptr->numunits; u++) {
+        if (0 == strcmp (cptr, sim_uname (&dptr->units[u]))) {
+            *uptr = &dptr->units[u];
             return dptr;
             }
         }
