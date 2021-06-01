@@ -149,6 +149,7 @@ extern DEVICE fs_dev;
 extern DEVICE pl_dev;
 extern DEVICE vu_dev;
 extern DEVICE pi_dev;
+extern DEVICE mg_dev;
 extern jmp_buf cpu_halt;
 
 /*
@@ -332,6 +333,15 @@ void disk_io (int ctlr, uint32 cmd);
 void disk_ctl (int ctlr, uint32 cmd);
 int disk_state (int ctlr);
 int disk_errors (void);
+
+/*
+ * Magnetic tapes.
+ */
+void mg_io (int ctlr, uint32 cmd);
+void mg_ctl (int ctlr, uint32 cmd);
+int mg_state (int ctlr);
+void mg_format(uint32 cmd);
+int mg_errors (void);
 
 /*
  * Печать на АЦПУ.
