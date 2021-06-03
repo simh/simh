@@ -41,6 +41,9 @@ t_stat rom_show_type (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_set_configmode (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_configmode (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_attach (UNIT *, CONST char *);
+t_stat parse_params (CONST char *, cmd_parameter *);
+t_stat valid_params (cmd_parameter *);
+char *get_param_value (char *, cmd_parameter *);
 t_stat rom_detach (UNIT *);
 t_stat rom_blank_help (FILE *, const char *);
 t_stat rom_m9312_help (FILE *, const char *);
@@ -421,6 +424,17 @@ rom_for_cpu_model cpu_rom_map[] =
     MOD_1160,           "B0",
     MOD_1170,           "B0",
     0,                   NULL,
+};
+
+/*
+ * Define the allowed parameters for the ATTACH command 
+ */
+cmd_parameter attach_parameters[] =
+{
+    {"SOCKET",  1, 1},       /* SOCKET parameter should occur exactly once */
+    {"ADDRESS", 0, 1},       /* ADDRESS parameter is optional */
+    {"IMAGE",   0, 1},       /* IMAGE parameter is optional */
+    {NULL},
 };
 
 /*
@@ -894,6 +908,13 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
     rom *romptr;
     t_stat r;
 
+    /* Parse parameters and check validity */
+    if ((parse_params (cptr, attach_parameters) != SCPE_OK) ||
+        (valid_params (attach_parameters) != SCPE_OK))
+        return SCPE_ARG;
+
+    sim_printf ("socket %s\n", get_param_value ("SOCKET", attach_parameters));
+
     switch (module_list[selected_type]->type) {
         case ROM_FILE:
             /* Check the ROM base address is set */
@@ -948,6 +969,115 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
     }
 }
 
+
+/*
+ * Parse an ATTACH command string
+ * 
+ * Syntax: ATTACH ROM SOCKET=<socket>,ADDRESS=<address>,IMAGE=<image name>
+ * 
+ * The parameters can be abbreviated to one character, The SOCKET parameters is
+ * required; the ADDRESS and IMAGE parameters are optional, but at least one of
+ * them has to be specified. No specific ordering of the parameters is required.
+ * Every parameter must be specified just once.
+ * 
+ * In:  cptr            - The command to be parsed
+ * In:  valid_params    - The valid ATTACH command parameters
+ * Out: valid_params    - The value and occurence of the specified
+ *                        parameters
+ * 
+ * Result:
+ *      SCPE_OK         - A command was succesfully parsed
+ *      SCPE_ARG        - No meaningful command could be parsed
+ */
+t_stat parse_params (CONST char *cptr, cmd_parameter *valid_params)
+{
+    char glyph[CBUFSIZE];
+    char *param_value_ptr;
+    cmd_parameter *param;
+
+    /* Initialize dynamic part of valid_params*/
+    for (param = valid_params; param->name != NULL; param++) {
+        param->value = NULL;
+        param->occurence = 0;
+    }
+
+    while (*cptr != 0) {
+
+        /* Get next "glyph" (i.e. parameter plus value) */
+        cptr = get_glyph (cptr, glyph, ',');
+
+        /* Check if parameter has equal sign and parameter value. Then
+           terminate parameter name and point to value */
+        if ((param_value_ptr = strchr (glyph, '=')))
+            *param_value_ptr++ = 0;
+
+        /* Check if a parameter value has been specified */
+        if ((param_value_ptr == NULL) || (*param_value_ptr == 0))
+            return sim_messagef (SCPE_ARG, "Parameter %s requires value\n", glyph);
+
+        /* Check against valid parameters */
+        for (param = valid_params; param->name != NULL; param++) {
+
+            /* Check if this parameter matches a valid parameter */
+            if (MATCH_CMD (glyph, param->name) == 0) {
+
+                /* Save parameter value and indicate occurrence */
+                param->value = param_value_ptr;
+                param->occurence++;
+                break;
+            }
+        }
+
+        /* Check if parameter found */
+        if (param->name == NULL)
+            return sim_messagef (SCPE_ARG, "Unknown parameter %s\n", glyph);
+    }
+    return SCPE_OK;
+}
+
+/*
+ * Check validity of parameters
+ */
+t_stat valid_params (cmd_parameter *params)
+{
+    cmd_parameter *param;
+    int num_optional_params = 0;
+
+    /* For all parameters */
+    for (param = params; param->name != NULL; param++) {
+        
+        /* Check occurence */
+        if (param->occurence < param->min_occur)
+            return sim_messagef (SCPE_ARG, "Missing parameter %s is required\n",
+                param->name);
+
+        if (param->occurence > param->max_occur)
+            return sim_messagef (SCPE_ARG, "Parameter %s must be specified just once\n",
+                param->name);
+
+        if ((param->min_occur == 0) && (param->occurence == 1))
+            num_optional_params++;
+    }
+
+    /* Check at least one optional parameter is specified */
+    if (num_optional_params == 0)
+        return sim_messagef (SCPE_ARG, "Missing parameter\n");
+
+    return SCPE_OK;
+}
+
+/* Get value of the specified parameter */
+
+char *get_param_value (char *param, cmd_parameter *params)
+{
+    cmd_parameter *param_ptr;
+
+    for (param_ptr = params; param_ptr->name != NULL; param_ptr++) {
+        if (strcasecmp (param_ptr->name, param))
+            return param_ptr->value;
+    }
+    return NULL;
+}
 
 /*
  * Find the ROM with the specified name in a list with ROMs

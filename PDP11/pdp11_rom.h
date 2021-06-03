@@ -132,5 +132,18 @@ rom_socket blank_sockets[NUM_BLANK_SOCKETS] =
     {0, 0, (rom (*)[]) NULL},        /* ROM 3 */
 };
 
+/*
+ * Template for the ATTACH and DETACH parameter strings 
+ */
+typedef struct
+{
+    const char *name;               /* Parameter name */
+    const int min_occur;            /* Minimal occurence of parameter */
+    const int max_occur;            /* Maximal occurence of parameter */
+    int occurence;                  /* Actual occurence */
+    char *value;                    /* Actual parameter value */
+}
+cmd_parameter;
+
 #endif /* PDP11_ROM_H */
 
