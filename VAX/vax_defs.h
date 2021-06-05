@@ -837,6 +837,7 @@ enum opcodes {
 #define VAX_IDLE_BSDNEW     0x20
 #define VAX_IDLE_SYSV       0x40
 #define VAX_IDLE_ELN        0x40    /* VAXELN */
+#define VAX_IDLE_INFOSERVER 0x80    /* InfoServer */
 extern uint32 cpu_idle_mask;        /* idle mask */
 extern int32 extra_bytes;           /* bytes referenced by current string instruction */
 extern BITFIELD cpu_psl_bits[];
