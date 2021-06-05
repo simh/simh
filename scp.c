@@ -5644,12 +5644,14 @@ else {
     lvl = MTAB_VDV;                                     /* device match */
     uptr = dptr->units;                                 /* first unit */
     }
-if (*cptr == 0)                                         /* must be more */
+if ((*cptr == 0) || (*cptr == ';') || (*cptr == '#'))   /* must be more */
     return SCPE_2FARG;
 GET_SWITCHES (cptr);                                    /* get more switches */
 
 while (*cptr != 0) {                                    /* do all mods */
     cptr = get_glyph (svptr = cptr, gbuf, ',');         /* get modifier */
+    if (0 == strcmp (gbuf, ";"))
+        break;
     if ((cvptr = strchr (gbuf, '=')))                   /* = value? */
         *cvptr++ = 0;
     for (mptr = dptr->modifiers; mptr && (mptr->mask != 0); mptr++) {
@@ -5902,7 +5904,7 @@ MTAB *mptr;
 SHTAB *shtb = NULL, *shptr;
 
 GET_SWITCHES (cptr);                                    /* get switches */
-if (*cptr == 0)                                         /* must be more */
+if ((*cptr == 0) || (*cptr == ';') || (*cptr == '#'))   /* must be more */
     return SCPE_2FARG;
 cptr = get_glyph (svptr = cptr, gbuf, 0);               /* get next glyph */
 
@@ -5950,7 +5952,7 @@ else {
         }
     }
 
-if (*cptr == 0) {                                       /* now eol? */
+if ((*cptr == 0) || (*cptr == ';') || (*cptr == '#')) { /* now eol? */
     return (lvl == MTAB_VDV)?
         show_device (ofile, dptr, 0):
         show_unit (ofile, dptr, uptr, -1);
