@@ -34,6 +34,26 @@
 
 #include "pdp11_defs.h"
 
+/* Define command parameter */
+
+typedef struct
+{
+    const char *name;                           /* Parameter name */
+    t_stat (*set_parameter)(char *, void *);    /* Set parameter routine */
+    void *context;                              /* Context for the set parameter routine */
+}
+cmd_parameter;
+
+
+/* Define attach command parameter values */
+
+typedef struct
+{
+    int     socket_number;
+    int32   address;
+    char *image;
+}
+ATTACH_PARAM_VALUES;
 
 /*
  * The rom structure contains the image for the rom plus an
@@ -85,11 +105,12 @@ typedef struct
     module_type type;                           /* Module type */
     const uint32 valid_cpu_types;               /* Valid CPU types */
     const uint32 valid_cpu_opts;                /* Required CPU options */
-    const uint32 num_sockets;                   /* Number of sockets for the module */
+    const uint32 num_sockets;                   /* Number of sockets for the module type */
     uint32 flags;                               /* Flags for initialization of the UNIT flag field */
     rom_socket (*sockets)[];                    /* Sockets for this module */
-    t_stat (*auto_config)();                    /* Auto-configuration function for the module */
-    t_stat (*help_func)(FILE *, const char *);  /* Help function for this module */
+    t_stat (*auto_config)();                    /* Auto-configuration function for the module type */
+    t_stat (*help_func)(FILE *, const char *);  /* Help function for the module type */
+    t_stat (*attach)(ATTACH_PARAM_VALUES *);    /* Attach function for this module type */
 }
 module;
 
@@ -132,18 +153,19 @@ rom_socket blank_sockets[NUM_BLANK_SOCKETS] =
     {0, 0, (rom (*)[]) NULL},        /* ROM 3 */
 };
 
-/*
- * Template for the ATTACH and DETACH parameter strings 
- */
+/* Define socket information */
+
 typedef struct
 {
-    const char *name;               /* Parameter name */
-    const int min_occur;            /* Minimal occurence of parameter */
-    const int max_occur;            /* Maximal occurence of parameter */
-    int occurence;                  /* Actual occurence */
-    char *value;                    /* Actual parameter value */
+    int32 base_address;             /* Base address for the socket */
+    int32 end_address;              /* End address for the socket */
+    // ToDo: Either end_address or size should suffice
+    uint32 rom_size;                /* ROM size */
+    char rom_name[CBUFSIZE];        /* Name of the ROM image */
+    // ToDo: Rename rom_buffer to rom_image
+    void *rom_buffer;               /* ROM contents */
 }
-cmd_parameter;
+SOCKET_INFO;
 
 #endif /* PDP11_ROM_H */
 
