@@ -43,9 +43,9 @@ t_stat rom_attach (UNIT *, CONST char *);
 t_stat parse_cmd (CONST char *, cmd_parameter *);
 t_stat validate_attach_cmd (cmd_parameter *params, ATTACH_PARAM_VALUES *);
 t_stat exec_attach_cmd (ATTACH_PARAM_VALUES *);
-t_stat set_socket (char *, ATTACH_PARAM_VALUES *);
-t_stat set_address (char *, ATTACH_PARAM_VALUES *);
-t_stat set_image (char *, ATTACH_PARAM_VALUES *);
+t_stat set_socket_for_attach (char *, ATTACH_PARAM_VALUES *);
+t_stat set_address_for_attach (char *, ATTACH_PARAM_VALUES *);
+t_stat set_image_for_attach (char *, ATTACH_PARAM_VALUES *);
 t_stat attach_blank_rom (ATTACH_PARAM_VALUES *);
 t_stat attach_m9312_rom (ATTACH_PARAM_VALUES *);
 t_stat attach_vt40_rom (ATTACH_PARAM_VALUES *);
@@ -795,7 +795,7 @@ void setHITMISS ()
 /* 
  * Attach either file or a built-in ROM image to a socket
  * 
- * As the DEV_DONTAUTO flag is not set, an already attached image
+ * ToDo: As the DEV_DONTAUTO flag is not set, an already attached image
  * is detached before rom_attach() is called.
  */
 t_stat rom_attach (UNIT *uptr, CONST char *cptr)
@@ -810,9 +810,9 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
     /* Define the allowed parameters for the ATTACH command */
     cmd_parameter attach_parameters[] =
     {
-        {"SOCKET",  &set_socket, &attach_param_values },      /* SOCKET parameter should occur exactly once */
-        {"ADDRESS", &set_address, &attach_param_values },     /* ADDRESS parameter is optional */
-        {"IMAGE",   &set_image, &attach_param_values},        /* IMAGE parameter is optional */
+        {"SOCKET",  &set_socket_for_attach, &attach_param_values },      /* SOCKET parameter should occur exactly once */
+        {"ADDRESS", &set_address_for_attach, &attach_param_values },     /* ADDRESS parameter is optional */
+        {"IMAGE",   &set_image_for_attach, &attach_param_values},        /* IMAGE parameter is optional */
         {NULL},
     };
 
@@ -976,8 +976,9 @@ t_stat validate_attach_cmd (cmd_parameter *params, ATTACH_PARAM_VALUES *attach_c
     return SCPE_OK;
 }
 
+/* Set the socket number for the current ATTACH command */
 
-t_stat set_socket (char *value, ATTACH_PARAM_VALUES *context)
+t_stat set_socket_for_attach (char *value, ATTACH_PARAM_VALUES *context)
 {
     char *ptr;
     uint32 socket_number = strtol (value, &ptr, 0);
@@ -996,7 +997,10 @@ t_stat set_socket (char *value, ATTACH_PARAM_VALUES *context)
         module_list[selected_type]->num_sockets);
 }
 
-t_stat set_address (char *value, ATTACH_PARAM_VALUES *context)
+
+/* Set the address to attach the image on */
+
+t_stat set_address_for_attach (char *value, ATTACH_PARAM_VALUES *context)
 {
     t_value r;
     int32   address;
@@ -1026,7 +1030,10 @@ t_stat set_address (char *value, ATTACH_PARAM_VALUES *context)
     return SCPE_OK;
 }
 
-t_stat set_image (char *value, ATTACH_PARAM_VALUES *context)
+
+/* Set the ROM image name to attach on the socket */
+
+t_stat set_image_for_attach (char *value, ATTACH_PARAM_VALUES *context)
 {
     FILE *fileref;
 
@@ -1051,14 +1058,16 @@ t_stat set_image (char *value, ATTACH_PARAM_VALUES *context)
     return SCPE_OK;
 }
 
+/* Execute the ATTACH command */
+
 t_stat exec_attach_cmd (ATTACH_PARAM_VALUES *param_values)
 {
     t_stat r;
     int socket_number = param_values->socket_number;
 
-    /* Execute SOCKET, ADDRESS (if specified) and IMAGE (if specified)
+    /* Process ADDRESS (if specified) and IMAGE (if specified)
        parameters in that order. The ROM image is attached
-       on execution of the IMAGE parameter */
+       on processing of the IMAGE parameter */
 
     /* Set base and preliminary end address */
     socket_info[socket_number].base_address = 
@@ -1214,33 +1223,44 @@ static t_stat attach_rom_to_unit (rom* romptr, rom_socket *socketptr, UNIT *uptr
 
 
 /*
- * Detach file or built in image from unit.
+ * DETACH ROM routine
+ * 
+ * This function detaches the images from all sockets.
  */
 t_stat rom_detach (UNIT *uptr)
 {
+    int socket_number;
     t_stat r;
-    DIB *dib = &rom_dib[uptr - rom_unit];
-    int unit_number = uptr - rom_unit;
  
-    /* Leave address intact for modules with separate address
-       and image specification (socket_number.e. the BLANK module type) */
-    if (module_list[selected_type]->type == ROM_FILE)
-        socket_info[unit_number].end_address = socket_info[unit_number].base_address;
-    else
-        socket_info[unit_number].end_address = 
-            socket_info[unit_number].base_address = 0;
+    /* For all sockets */
+    for (socket_number = 0;
+        socket_number < module_list[selected_type]->num_sockets;
+        socket_number++) {
 
-    r = reset_dib (unit_number, NULL, NULL);
-    if (r != SCPE_OK)
-        return r;
+        /* Clear socket information */
+        // ToDo: Implemement detach_socket()
+        socket_info[socket_number].base_address = 0;
+        socket_info[socket_number].base_address = 0;
+        socket_info[socket_number].rom_size = 0;
+        if (socket_info[socket_number].rom_buffer != NULL) {
+            free (socket_info[socket_number].rom_buffer);
+            socket_info[socket_number].rom_buffer = NULL;
+        }
+        *socket_info[socket_number].rom_name = 0;
 
-    /* Reset config mode to manual and detach the unit */
-    rom_device_flags &= ~ROM_CONFIG_AUTO;
+        /* Clear Unibus map */
+        if ((r = reset_dib (socket_number, NULL, NULL) != SCPE_OK))
+            return r;
 
-    // return detach_unit (uptr);
-    rom_unit[0].flags &= ~UNIT_ATT;
+        /* Reset config mode to manual and detach the unit */
+        rom_device_flags &= ~ROM_CONFIG_AUTO;
+
+        // return detach_unit (uptr);
+        rom_unit[0].flags &= ~UNIT_ATT;
+    }
     return SCPE_OK;
 }
+
 
 t_stat rom_blank_help (FILE *st, const char *cptr)
 {
