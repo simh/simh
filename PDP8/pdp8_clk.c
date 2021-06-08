@@ -1,6 +1,6 @@
 /* pdp8_clk.c: PDP-8 real-time clock simulator
 
-   Copyright (c) 1993-2012, Robert M Supnik
+   Copyright (c) 1993-2021, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    clk          real time clock
 
+   01-May-21    RMS     Added diagnostic mode for TSS/8
    18-Apr-12    RMS     Added clock coscheduling
    18-Jun-07    RMS     Added UNIT_IDLE flag
    01-Mar-03    RMS     Aded SET/SHOW CLK FREQ support
@@ -39,10 +40,13 @@
 
 #include "pdp8_defs.h"
 
+#define UNIT_V_DIAG     (UNIT_V_UF + 0)                 /* diag mode */
+#define UNIT_DIAG       (1 << UNIT_V_DIAG)
+
 extern int32 int_req, int_enable, dev_done, stop_inst;
 
 int32 clk_tps = 60;                                     /* ticks/second */
-int32 tmxr_poll = 16000;                                /* term mux poll */
+int32 tmxr_poll = 8000;                                /* term mux poll */
 
 int32 clk (int32 IR, int32 AC);
 t_stat clk_svc (UNIT *uptr);
@@ -59,7 +63,7 @@ t_stat clk_show_freq (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 DIB clk_dib = { DEV_CLK, 1, { &clk } };
 
-UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE, 0), 16000 };
+UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE, 0), 8000 };
 
 REG clk_reg[] = {
     { FLDATA (DONE, dev_done, INT_V_CLK) },
@@ -78,6 +82,8 @@ MTAB clk_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "FREQUENCY", NULL,
       NULL, &clk_show_freq, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", NULL, NULL, &show_dev },
+    { UNIT_DIAG, UNIT_DIAG, "diagnostic mode", "DIAG", NULL },
+    { UNIT_DIAG, 0, NULL, "NORMAL", NULL },
     { 0 }
     };
 
@@ -145,9 +151,15 @@ int32 t;
 
 dev_done = dev_done | INT_CLK;                          /* set done */
 int_req = INT_UPDATE;                                   /* update interrupts */
-t = sim_rtcn_calb (clk_tps, TMR_CLK);                   /* calibrate clock */
+if ((uptr->flags & UNIT_DIAG) != 0) {                   /* diagnostic mode? */
+    t = uptr->wait;                                     /* fixed delay */
+    sim_activate (uptr, t);
+    }
+else {
+    t = sim_rtcn_calb (clk_tps, TMR_CLK);               /* calibrate clock */
+    sim_activate_after (uptr, 1000000/clk_tps);         /* calibrated delay */
+    }
 tmxr_poll = t;                                          /* set mux poll */
-sim_activate_after (uptr, 1000000/clk_tps);             /* reactivate unit */
 return SCPE_OK;
 }
 
