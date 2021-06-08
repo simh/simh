@@ -27,6 +27,7 @@
                 (PDP-9) TC02/TU55 DECtape
                 (PDP-15) TC15/TU56 DECtape
 
+   03-May-21    RMS     Fixed bug if read overwrites WC memory location
    15-Mar-17    RMS     Fixed dt_seterr to clear successor states
    09-Mar-17    RMS     Fixed dt_seterr to handle nx unit select (COVERITY)
    10-Mar-16    RMS     Added 3-cycle databreak set/show entries
@@ -959,10 +960,10 @@ switch (fnc) {                                          /* at speed, check fnc *
         sim_activate (uptr, DTU_LPERB (uptr) * dt_ltime);/* sched next block */
         M[DT_WC] = (M[DT_WC] + 1) & DMASK;              /* inc WC */
         ma = M[DT_CA] & AMASK;                          /* get mem addr */
-        if (MEM_ADDR_OK (ma))                           /* store block # */
-            M[ma] = blk;
         if (((dtsa & DTA_MODE) == 0) || (M[DT_WC] == 0))
                 dtsb = dtsb | DTB_DTF;                  /* set DTF */
+        if (MEM_ADDR_OK (ma))                           /* store block # */
+            M[ma] = blk;
         if (DEBUG_PRI (dt_dev, LOG_MS))
             fprintf (sim_deb, ">>DT%d: found block %d\n", unum, blk);
         break;
@@ -998,6 +999,8 @@ switch (fnc) {                                          /* at speed, check fnc *
         case 0:                                         /* normal read */
             M[DT_WC] = (M[DT_WC] + 1) & DMASK;          /* incr WC, CA */
             M[DT_CA] = (M[DT_CA] + 1) & DMASK;
+            if (M[DT_WC] == 0)                          /* wc ovf? */
+                dt_substate = DTO_WCO;
             ma = M[DT_CA] & AMASK;                      /* mem addr */
             ba = (blk * DTU_BSIZE (uptr)) + wrd;        /* buffer ptr */
             dtdb = fbuf[ba];                            /* get tape word */
@@ -1005,16 +1008,15 @@ switch (fnc) {                                          /* at speed, check fnc *
                 dtdb = dt_comobv (dtdb);
             if (MEM_ADDR_OK (ma))                       /* mem addr legal? */
                 M[ma] = dtdb;
-            if (M[DT_WC] == 0)                          /* wc ovf? */
-                dt_substate = DTO_WCO;
+                                                        /* fall through */
         case DTO_WCO:                                   /* wc ovf, not sob */
             if (wrd != (dir? 0: DTU_BSIZE (uptr) - 1))  /* not last? */
                 sim_activate (uptr, DT_WSIZE * dt_ltime);
             else {
-                dt_substate = dt_substate | DTO_SOB;
                 sim_activate (uptr, ((2 * DT_HTLIN) + DT_WSIZE) * dt_ltime);
-                if (((dtsa & DTA_MODE) == 0) || (M[DT_WC] == 0))
+                if (((dtsa & DTA_MODE) == 0) || (dt_substate == DTO_WCO))
                     dtsb = dtsb | DTB_DTF;              /* set DTF */
+                dt_substate = dt_substate | DTO_SOB;
                 }
             break;                      
 
@@ -1100,6 +1102,8 @@ switch (fnc) {                                          /* at speed, check fnc *
             relpos = DT_LIN2OF (uptr->pos, uptr);       /* cur pos in blk */
             M[DT_WC] = (M[DT_WC] + 1) & DMASK;          /* incr WC, CA */
             M[DT_CA] = (M[DT_CA] + 1) & DMASK;
+            if (M[DT_WC] == 0)
+                dt_substate = DTO_WCO;
             ma = M[DT_CA] & AMASK;                      /* mem addr */
             if ((relpos >= DT_HTLIN) &&                 /* in data zone? */
                 (relpos < (DTU_LPERB (uptr) - DT_HTLIN))) {
@@ -1113,9 +1117,7 @@ switch (fnc) {                                          /* at speed, check fnc *
             sim_activate (uptr, DT_WSIZE * dt_ltime);
             if (MEM_ADDR_OK (ma))                       /* mem addr legal? */
                 M[ma] = dtdb;
-            if (M[DT_WC] == 0)
-                dt_substate = DTO_WCO;
-            if (((dtsa & DTA_MODE) == 0) || (M[DT_WC] == 0))
+            if (((dtsa & DTA_MODE) == 0) || (dt_substate == DTO_WCO))
                 dtsb = dtsb | DTB_DTF;                  /* set DTF */
             break;
 
