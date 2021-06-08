@@ -1,6 +1,6 @@
 /* sds_cpu.c: SDS 940 CPU simulator
 
-   Copyright (c) 2001-2017, Robert M. Supnik
+   Copyright (c) 2001-2021, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    cpu          central processor
    rtc          real time clock
 
+   17-Feb-21    kenr    Added C register implementation to support console
    07-Sep-17    RMS     Fixed sim_eval declaration in history routine (COVERITY)
    09-Mar-17    RMS     trap_P not set if mem mgt trap during fetch (COVERITY)
    28-Apr-07    RMS     Removed clock initialization
@@ -38,6 +39,7 @@
 
    A<0:23>              A register
    B<0:23>              B register
+   C<0:23>              C register
    X<0:23>              X (index) register
    OV                   overflow indicator
    P<0:13>              program counter
@@ -152,7 +154,7 @@
 typedef struct {
     uint32              typ;
     uint32              pc;
-    uint32              ir;
+    uint32              c;
     uint32              a;
     uint32              b;
     uint32              x;
@@ -160,7 +162,7 @@ typedef struct {
     } InstHistory;
 
 uint32 M[MAXMEMSIZE] = { 0 };                           /* memory */
-uint32 A, B, X;                                         /* registers */
+uint32 A, B, C, X;                                      /* registers */
 uint32 P;                                               /* program counter */
 uint32 OV;                                              /* overflow */
 uint32 xfr_req = 0;                                     /* xfr req */
@@ -248,6 +250,7 @@ REG cpu_reg[] = {
     { ORDATA (P, P, 14) },
     { ORDATA (A, A, 24) },
     { ORDATA (B, B, 24) },
+    { ORDATA (C, C, 24) },
     { ORDATA (X, X, 24) },
     { FLDATA (OV, OV, 0) },
     { ORDATA (EM2, EM2, 3) },
@@ -411,6 +414,7 @@ while (reason == 0) {                                   /* loop until halted */
             inst_hist (tinst, P, HIST_INT);
         if (pa != VEC_RTCP) {                           /* normal intr? */
             tr = one_inst (tinst, P, save_mode, &tmp);  /* exec intr inst */
+            Read (P, &C);
             if (tr) {                                   /* stop code? */
                 cpu_mode = save_mode;                   /* restore mode */
                 reason = (tr > 0)? tr: STOP_MMINT;
@@ -464,11 +468,14 @@ while (reason == 0) {                                   /* loop until halted */
         if (reason == SCPE_OK) {                        /* fetch ok? */
             ion_defer = 0;                              /* clear ion */
             if (hst_lnt)
-                inst_hist (inst, save_P, HIST_XCT);
-            reason = one_inst (inst, save_P, cpu_mode, &trap_P); /* exec inst */
+                inst_hist (C, save_P, HIST_XCT);
+            reason = one_inst (C, save_P, cpu_mode, &trap_P); /* exec inst */
+            Read (P, &C);
             if (reason > 0) {                           /* stop code? */
-                if (reason != STOP_HALT)
+                if (reason != STOP_HALT) {
                     P = save_P;
+                    Read (P, &C);
+                }
                 if (reason == STOP_IONRDY)
                     reason = 0;
                 }
@@ -496,6 +503,7 @@ while (reason == 0) {                                   /* loop until halted */
             */
             tr = one_inst (tinst, (reason == MM_NOACC)?
                   trap_P: save_P, save_mode, &tmp);     /* trap address */
+            Read (P, &C);
             if (tr) {                                   /* stop code? */
                 cpu_mode = save_mode;                   /* restore mode */
                 P = save_P;                             /* restore PC */
@@ -1511,6 +1519,13 @@ int_reqhi = api_findreq ();                             /* recalc intreq */
 return;
 }
 
+/* Post command routine     */
+
+void cpu_post_cmd (t_bool from_scp)
+{
+    C = M[P];
+}
+
 /* Reset routine */
 
 t_stat cpu_reset (DEVICE *dptr)
@@ -1534,6 +1549,7 @@ else return SCPE_IERR;
 sim_brk_dflt = SWMASK ('E');
 sim_brk_types = SWMASK ('E') | SWMASK ('M') | SWMASK ('N') | SWMASK ('U');
 sim_vm_is_subroutine_call = cpu_is_pc_a_subroutine_call;
+sim_vm_post = cpu_post_cmd;
 return SCPE_OK;
 }
 
@@ -1803,7 +1819,7 @@ return SCPE_OK;
 
 /* Record history */
 
-void inst_hist (uint32 ir, uint32 pc, uint32 tp)
+void inst_hist (uint32 c, uint32 pc, uint32 tp)
 {
 if (cpu_mode == hst_exclude)
     return;
@@ -1812,7 +1828,7 @@ if (hst_p >= hst_lnt)
     hst_p = 0;
 hst[hst_p].typ = tp | (OV << 4) | (cpu_mode << 5);
 hst[hst_p].pc = pc;
-hst[hst_p].ir = ir;
+hst[hst_p].c = c;
 hst[hst_p].a = A;
 hst[hst_p].b = B;
 hst[hst_p].x = X;
@@ -1881,7 +1897,7 @@ else lnt = hst_lnt;
 di = hst_p - lnt;                                       /* work forward */
 if (di < 0)
     di = di + hst_lnt;
-fprintf (st, "CYC PC    MD OV A        B        X        EA      IR\n\n");
+fprintf (st, "CYC PC    MD OV A        B        X        EA      C\n\n");
 for (k = 0; k < lnt; k++) {                             /* print specified */
     h = &hst[(++di) % hst_lnt];                         /* entry pointer */
     if (h->typ) {                                       /* instruction? */
@@ -1891,9 +1907,9 @@ for (k = 0; k < lnt; k++) {                             /* print specified */
         if (h->ea & HIST_NOEA)
             fprintf (st, "      ");
         else fprintf (st, "%05o ", h->ea);
-        sim_eval[0] = h->ir;
+        sim_eval[0] = h->c;
         if ((fprint_sym (st, h->pc, sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
-            fprintf (st, "(undefined) %08o", h->ir);
+            fprintf (st, "(undefined) %08o", h->c);
         fputc ('\n', st);                               /* end line */
         }                                               /* end else instruction */
     }                                                   /* end for */

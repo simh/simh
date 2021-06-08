@@ -1,6 +1,6 @@
 /* sds_mt.c: SDS 940 magnetic tape simulator
 
-   Copyright (c) 2001-2016, Robert M. Supnik
+   Copyright (c) 2001-2021, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt           7 track magnetic tape
 
+   03-Mar-21    kenr    Added C register support to MT boot
    09-Oct-16    RMS     Added precise gap erase
    19-Mar-12    RMS     Fixed bug in scan function decode (Peter Schorn)
    16-Feb-06    RMS     Added tape capacity checking
@@ -499,7 +500,7 @@ return sim_tape_detach (uptr);
 
 t_stat mt_boot (int32 unitno, DEVICE *dptr)
 {
-extern uint32 P, M[];
+extern uint32 P, C, M[];
 
 if (unitno)                                             /* only unit 0 */
     return SCPE_ARG;
@@ -509,5 +510,6 @@ M[2] = 000203610;                                       /* EOM 3610B */
 M[3] = 003200002;                                       /* WIM 2 */
 M[4] = 000100002;                                       /* BRU 2 */
 P = 1;                                                  /* start at 1 */
+C = M[1];
 return SCPE_OK;
 }

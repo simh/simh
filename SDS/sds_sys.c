@@ -1,6 +1,6 @@
 /* sds_sys.c: SDS 940 simulator interface
 
-   Copyright (c) 2001-2020, Robert M Supnik
+   Copyright (c) 2001-2021, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,11 +23,12 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   12-Feb-21    kenr    Added C register support to loader
    01-Nov-20    RMS     Fixed sds930-to-ascii entry 060 (Ken Rector)
    05-May-16    RMS     Fixed ascii-to-sds940 data (Mark Pizzolato)
    19-Mar-12    RMS     Fixed declarations of CCT arrays (Mark Pizzolato)
 */
-
+  
 #include "sds_defs.h"
 #include <ctype.h>
 #define FMTASC(x) ((x) < 040)? "<%03o>": "%c", (x)
@@ -261,7 +262,7 @@ t_stat sim_load (FILE *fileref, CONST char *cptr, CONST char *fnam, int flag)
 {
 int32 i, wd, buf[8];
 int32 ldr = 1;
-extern uint32 P;
+extern uint32 P, C;
 
 if ((*cptr != 0) || (flag != 0))
     return SCPE_ARG;
@@ -283,6 +284,7 @@ for (i = 0; i < 8; i++)                                 /* copy boot */
     M[i + 2] = buf[i];
 if (I_GETOP (buf[6]) == BRU)
     P = buf[6] & VA_MASK;
+C = M[P];
 for (i = (buf[3]+buf[7]) & VA_MASK; i <= VA_MASK; i++) {/* load data */
     if ((wd = get_word (fileref, &ldr)) < 0)
         return SCPE_OK;

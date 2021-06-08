@@ -1,6 +1,6 @@
 /* sds_stddev.c: SDS 940 standard devices
 
-   Copyright (c) 2001-2020, Robert M. Supnik
+   Copyright (c) 2001-2021, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    tti          keyboard
    tto          teleprinter
 
+   12-Feb-21    kenr    Added C register support to PTR boot
    23-Oct-20    RMS     TTO recognizes no leader flag (Ken Rector)
    29-Dec-03    RMS     Added console backpressure support
    25-Apr-03    RMS     Revised for extended file support
@@ -327,7 +328,7 @@ return SCPE_OK;
 
 t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
-extern uint32 P, M[];
+extern uint32 P, C, M[];
 
 M[0] = 077777771;                                       /* -7B */
 M[1] = 007100000;                                       /* LDX 0 */
@@ -335,6 +336,7 @@ M[2] = 000203604;                                       /* EOM 3604B */
 M[3] = 003200002;                                       /* WIM 2 */
 M[4] = 000100002;                                       /* BRU 2 */
 P = 1;                                                  /* start at 1 */
+C = M[1];
 return SCPE_OK;
 }
 
