@@ -181,12 +181,12 @@ t_stat ptp_svc (UNIT *uptr)
         return SCPE_OK;
     }
     fputc (uptr->CHR, uptr->fileref);                       /* print char */
-    uptr->pos = ftell (uptr->fileref);
     if (ferror (uptr->fileref)) {                           /* error? */
         perror ("PTP I/O error");
         clearerr (uptr->fileref);
         return SCPE_IOERR;
     }
+    uptr->pos = uptr->pos + 1;
     return SCPE_OK;
 }
 

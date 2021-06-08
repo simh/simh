@@ -133,12 +133,12 @@ DEV_UPDATE_INTR ;
 if ((lpt_unit.flags & UNIT_ATT) == 0)                   /* attached? */
     return IORETURN (lpt_stopioe, SCPE_UNATT);
 fputc (uptr->buf, uptr->fileref);
-uptr->pos = ftell (uptr->fileref);
 if (ferror (uptr->fileref)) {
     sim_perror ("LPT I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
+uptr->pos = uptr->pos + 1;
 return SCPE_OK;
 }
 
