@@ -1,6 +1,6 @@
 /* i7094_mt.c: IBM 7094 magnetic tape simulator
 
-   Copyright (c) 2003-2012, Robert M Supnik
+   Copyright (c) 2003-2021, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt           magtape simulator
 
+   31-Jan-21    RMS     Replaced dynamic buffers with static (Mark Pizzolato)
    19-Mar-12    RMS     Fixed declaration of sel_name (Mark Pizzolato)
    16-Jul-10    RMS     Fixed handling of BSR, BSF (Dave Pitts)
 */
@@ -41,7 +42,7 @@
 #define QCHRONO(c,u)    ((cpu_model & I_CT) && \
                          ((c) == CHRONO_CH) && ((u) == CHRONO_UNIT))
 
-uint8 *mtxb[NUM_CHAN] = { NULL };                       /* xfer buffer */
+uint8 mtxb[NUM_CHAN][MT_MAXFR + 6];                     /* xfer buffer */
 uint32 mt_unit[NUM_CHAN];                               /* unit */
 uint32 mt_bptr[NUM_CHAN];
 uint32 mt_blnt[NUM_CHAN];
@@ -125,7 +126,7 @@ REG mta_reg[] = {
     { FLDATA (CHOBV, mt_chob_v[0], 0) },
     { DRDATA (BPTR, mt_bptr[0], 16), PV_LEFT },
     { DRDATA (BLNT, mt_blnt[0], 16), PV_LEFT },
-    { BRDATA (BUF, NULL, 8, 7, MT_MAXFR) },
+    { BRDATA (BUF, mtxb[0], 8, 7, sizeof (mtxb[0])) },
     { DRDATA (TWEF, mt_twef, 24), REG_NZ + PV_LEFT },
     { DRDATA (TSHORT, mt_tshort, 24), REG_NZ + PV_LEFT },
     { DRDATA (TSTART, mt_tstart, 24), REG_NZ + PV_LEFT },
@@ -157,7 +158,7 @@ REG mtb_reg[] = {
     { FLDATA (CHOBV, mt_chob_v[1], 0) },
     { DRDATA (BPTR, mt_bptr[1], 16), PV_LEFT },
     { DRDATA (BLNT, mt_blnt[1], 16), PV_LEFT },
-    { BRDATA (BUF, NULL, 8, 7, MT_MAXFR) },
+    { BRDATA (BUF, mtxb[1], 8, 7, sizeof (mtxb[1])) },
     { DRDATA (TWEF, mt_twef, 24), REG_NZ + PV_LEFT },
     { DRDATA (TSHORT, mt_tshort, 24), REG_NZ + PV_LEFT },
     { DRDATA (TSTART, mt_tstart, 24), REG_NZ + PV_LEFT },
@@ -189,7 +190,7 @@ REG mtc_reg[] = {
     { FLDATA (CHOBV, mt_chob_v[2], 0) },
     { DRDATA (BPTR, mt_bptr[2], 16), PV_LEFT },
     { DRDATA (BLNT, mt_blnt[2], 16), PV_LEFT },
-    { BRDATA (BUF, NULL, 8, 7, MT_MAXFR) },
+    { BRDATA (BUF, mtxb[2], 8, 7, sizeof (mtxb[2])) },
     { DRDATA (TWEF, mt_twef, 24), REG_NZ + PV_LEFT },
     { DRDATA (TSHORT, mt_tshort, 24), REG_NZ + PV_LEFT },
     { DRDATA (TSTART, mt_tstart, 24), REG_NZ + PV_LEFT },
@@ -221,7 +222,7 @@ REG mtd_reg[] = {
     { FLDATA (CHOBV, mt_chob_v[3], 0) },
     { DRDATA (BPTR, mt_bptr[3], 16), PV_LEFT },
     { DRDATA (BLNT, mt_blnt[3], 16), PV_LEFT },
-    { BRDATA (BUF, NULL, 8, 7, MT_MAXFR) },
+    { BRDATA (BUF, mtxb[3], 8, 7, sizeof (mtxb[3])) },
     { DRDATA (TWEF, mt_twef, 24), REG_NZ + PV_LEFT },
     { DRDATA (TSHORT, mt_tshort, 24), REG_NZ + PV_LEFT },
     { DRDATA (TSTART, mt_tstart, 24), REG_NZ + PV_LEFT },
@@ -253,7 +254,7 @@ REG mte_reg[] = {
     { FLDATA (CHOBV, mt_chob_v[4], 0) },
     { DRDATA (BPTR, mt_bptr[4], 16), PV_LEFT },
     { DRDATA (BLNT, mt_blnt[4], 16), PV_LEFT },
-    { BRDATA (BUF, NULL, 8, 7, MT_MAXFR) },
+    { BRDATA (BUF, mtxb[4], 8, 7, sizeof (mtxb[4])) },
     { DRDATA (TWEF, mt_twef, 24), REG_NZ + PV_LEFT },
     { DRDATA (TSHORT, mt_tshort, 24), REG_NZ + PV_LEFT },
     { DRDATA (TSTART, mt_tstart, 24), REG_NZ + PV_LEFT },
@@ -285,7 +286,7 @@ REG mtf_reg[] = {
     { FLDATA (CHOBV, mt_chob_v[5], 0) },
     { DRDATA (BPTR, mt_bptr[5], 16), PV_LEFT },
     { DRDATA (BLNT, mt_blnt[5], 16), PV_LEFT },
-    { BRDATA (BUF, NULL, 8, 7, MT_MAXFR) },
+    { BRDATA (BUF, mtxb[5], 8, 7, sizeof (mtxb[5])) },
     { DRDATA (TWEF, mt_twef, 24), REG_NZ + PV_LEFT },
     { DRDATA (TSHORT, mt_tshort, 24), REG_NZ + PV_LEFT },
     { DRDATA (TSTART, mt_tstart, 24), REG_NZ + PV_LEFT },
@@ -317,7 +318,7 @@ REG mtg_reg[] = {
     { FLDATA (CHOBV, mt_chob_v[6], 0) },
     { DRDATA (BPTR, mt_bptr[6], 16), PV_LEFT },
     { DRDATA (BLNT, mt_blnt[6], 16), PV_LEFT },
-    { BRDATA (BUF, NULL, 8, 7, MT_MAXFR) },
+    { BRDATA (BUF, mtxb[6], 8, 7, sizeof (mtxb[6])) },
     { DRDATA (TWEF, mt_twef, 24), REG_NZ + PV_LEFT },
     { DRDATA (TSHORT, mt_tshort, 24), REG_NZ + PV_LEFT },
     { DRDATA (TSTART, mt_tstart, 24), REG_NZ + PV_LEFT },
@@ -349,7 +350,7 @@ REG mth_reg[] = {
     { FLDATA (CHOBV, mt_chob_v[7], 0) },
     { DRDATA (BPTR, mt_bptr[7], 16), PV_LEFT },
     { DRDATA (BLNT, mt_blnt[7], 16), PV_LEFT },
-    { BRDATA (BUF, NULL, 8, 7, MT_MAXFR) },
+    { BRDATA (BUF, mtxb[7], 8, 7, sizeof (mtxb[7])) },
     { DRDATA (TWEF, mt_twef, 24), REG_NZ + PV_LEFT },
     { DRDATA (TSHORT, mt_tshort, 24), REG_NZ + PV_LEFT },
     { DRDATA (TSTART, mt_tstart, 24), REG_NZ + PV_LEFT },
@@ -809,10 +810,6 @@ uint32 j;
 REG *rptr;
 UNIT *uptr;
 
-if (mtxb[ch] == NULL)
-    mtxb[ch] = (uint8 *) calloc (MT_MAXFR + 6, sizeof (uint8));
-if (mtxb[ch] == NULL)                                   /* allocate buffer */
-    return SCPE_MEM;
 rptr = find_reg ("BUF", NULL, dptr);                    /* update reg ptr */
 if (rptr == NULL)
     return SCPE_IERR;
