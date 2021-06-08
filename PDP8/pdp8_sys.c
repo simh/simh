@@ -1,6 +1,6 @@
 /* pdp8_sys.c: PDP-8 simulator interface
 
-   Copyright (c) 1993-2016, Robert M Supnik
+   Copyright (c) 1993-2021, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -22,7 +22,8 @@
    Except as contained in this notice, the name of Robert M Supnik shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
-
+   
+   13-Mar-21    RMS     Fixed bug in binary loader (Mark Pizzolato)
    15-Dec-16    RMS     Added PKLF (Dave Gesswein)
    17-Sep-13    RMS     Fixed recognition of initial field change (Dave Gesswein)
    24-Mar-09    RMS     Added link to FPP
@@ -177,13 +178,13 @@ int32 c, rubout;
 
 rubout = 0;                                             /* clear toggle */
 while ((c = getc (fi)) != EOF) {                        /* read char */
-    if (rubout)                                         /* toggle set? */
-        rubout = 0;                                     /* clr, skip */
-    else if (c == 0377)                                 /* rubout? */
-        rubout = 1;                                     /* set, skip */
-    else if (c > 0200)                                  /* channel 8 set? */
-        *newf = (c & 070) << 9;                         /* change field */
-    else return c;                                      /* otherwise ok */
+    if (c == 0377)                                      /* rubout? */
+        rubout = rubout ^ 1;                            /* compl toggle, skip */
+    else if (rubout == 0) {                             /* toggle clr? */
+        if (c > 0200)                                   /* channel 8 set? */
+            *newf = (c & 070) << 9;                     /* change field */
+        else return c;                                  /* otherwise ok */
+        }
     }
 return EOF;
 }
