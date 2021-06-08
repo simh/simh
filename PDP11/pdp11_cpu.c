@@ -3383,7 +3383,7 @@ DEVICE *rom = find_dev ("ROM");
 
 if ((rom == NULL) || 
     ((rom->flags & DEV_DIS) != 0) ||
-    (SCPE_NOFNC == rom->boot (unitno, rom)));
+    (SCPE_NOFNC == rom->boot (unitno, rom)))
     return SCPE_2FARG;
 return SCPE_OK;
 }
