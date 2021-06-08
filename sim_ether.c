@@ -868,7 +868,7 @@ char* eth_getdesc_byname(char* name, char* temp)
 static ETH_DEV **eth_open_devices = NULL;
 static int eth_open_device_count = 0;
 
-static char*   (*p_pcap_lib_version) (void);
+static char *(*p_pcap_lib_version) (void);
 
 static void _eth_add_to_open_list (ETH_DEV* dev)
 {
@@ -1046,12 +1046,13 @@ typedef void * pcap_t;  /* Pseudo Type to avoid compiler errors */
 */
 static int eth_host_pcap_devices(int used, int max, ETH_LIST* list)
 {
-pcap_t* conn = NULL;
-int i, j, datalink = 0;
+int i;
 
 for (i=0; i<used; ++i) {
   /* Cull any non-ethernet interface types */
 #if defined(HAVE_PCAP_NETWORK)
+  int j, datalink = 0;
+  pcap_t* conn = NULL;
   char errbuf[PCAP_ERRBUF_SIZE];
 
   conn = pcap_open_live(list[i].name, ETH_MAX_PACKET, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);

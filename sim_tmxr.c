@@ -5247,8 +5247,8 @@ idx = 0;                                                /* initialize the index 
 
 while (*cptr != '\0') {                                     /* while characters remain in the command string */
     if (strncasecmp (cptr, "ALL;", 4) == 0) {               /*   if the parameter is "ALL" */
-        if (val != 0 || idx > 0 && idx <= max)              /*     then if some lines are restrictied or unspecified */
-            for (line = (uint32) min; line <= max; line++)  /*       then fill them in sequentially */
+        if ((val != 0) || ((idx > 0) && (idx <= max)))      /*     then if some lines are restrictied or unspecified */
+            for (line = (uint32)min; line <= (uint32)max; line++)/*  then fill them in sequentially */
                 if (set [line] == FALSE)                    /*         setting each unspecified line */
                     list [idx++] = line;                    /*           into the line order */
 
@@ -5268,13 +5268,15 @@ while (*cptr != '\0') {                                     /* while characters 
         break;                                          /*     and terminate the parse */
         }
 
-    else if (low < min || low > max || high > max) {    /* otherwise if the line number is invalid */
+    else if ((low < min) || 
+             (low > max) || 
+             (high > max)) {                            /* otherwise if the line number is invalid */
         result = SCPE_SUB;                              /*   then report the subscript is out of range */
         break;                                          /*     and terminate the parse */
         }
 
     else                                                /* otherwise it's a valid range */
-        for (line = (uint32) low; line <= high; line++) /*   so add the line(s) to the order */
+        for (line = (uint32)low; line <= (uint32)high; line++)/* so add the line(s) to the order */
             if (set [line] == FALSE) {                  /* if the line number has not been specified */
                 set [line] = TRUE;                      /*   then now it is */
                 list [idx++] = line;                    /*     and add it to the connection order */
