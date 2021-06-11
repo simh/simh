@@ -50,8 +50,7 @@ typedef struct
 {
     int     socket_number;
     int32   address;
-    char *image_name;
-    void *imageptr;
+    char    *image_name;
 }
 ATTACH_PARAM_VALUES;
 
