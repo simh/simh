@@ -40,7 +40,6 @@ typedef struct
 {
     const char *name;                           /* Parameter name */
     t_stat (*set_parameter)(char *, void *);    /* Set parameter routine */
-    void *context;                              /* Context for the set parameter routine */
 }
 cmd_parameter;
 
@@ -51,7 +50,8 @@ typedef struct
 {
     int     socket_number;
     int32   address;
-    char *image;
+    char *image_name;
+    void *imageptr;
 }
 ATTACH_PARAM_VALUES;
 
@@ -96,8 +96,7 @@ typedef enum
 module_type;
 
 /*
- * A ROM module has a name and comprises a number of sockets in which
- * ROMs can be placed.
+ * Define all relevant information for a module type
  */
 typedef struct
 {
@@ -110,9 +109,9 @@ typedef struct
     rom_socket (*sockets)[];                    /* Sockets for this module */
     t_stat (*auto_config)();                    /* Auto-configuration function for the module type */
     t_stat (*help_func)(FILE *, const char *);  /* Help function for the module type */
-    t_stat (*attach)(ATTACH_PARAM_VALUES *);    /* Attach function for this module type */
+    t_stat (*attach)(const char *);             /* Attach function for the module type */
 }
-module;
+module_type_definition;
 
 /* Define a device to ROM mapping */
 
