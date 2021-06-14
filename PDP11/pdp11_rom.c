@@ -38,13 +38,13 @@ t_stat rom_set_configmode (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_configmode (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_attach (UNIT *, CONST char *);
 t_stat attach_blank_rom (CONST char *);
-t_stat attach_enclosed_rom (CONST char *);
+t_stat attach_embedded_rom (CONST char *);
 t_stat parse_cmd (CONST char *, cmd_parameter *, ATTACH_PARAM_VALUES *);
-t_stat exec_attach_cmd (ATTACH_PARAM_VALUES *);
 t_stat set_socket_for_attach (char *, ATTACH_PARAM_VALUES *);
 t_stat set_address_for_attach (char *, ATTACH_PARAM_VALUES *);
 t_stat set_address_not_allowed (char *, ATTACH_PARAM_VALUES *);
 t_stat set_image_for_attach (char *, ATTACH_PARAM_VALUES *);
+static t_stat attach_rom_to_socket (char *, t_addr, void *, int16, void (*)(), int);
 t_stat rom_detach (UNIT *);
 t_stat detach_all_sockets ();
 t_stat rom_blank_help (FILE *, const char *);
@@ -59,7 +59,7 @@ static rom *find_rom (const char *cptr, rom (*rom_list)[]);
 static t_stat m9312_auto_config ();
 static t_stat m9312_auto_config_console_roms ();
 static t_stat m9312_auto_config_bootroms ();
-static t_stat attach_m9312_rom_TBD (const char *rom_name, int unit_number);
+static t_stat attach_m9312_rom (const char *rom_name, int unit_number);
 
 /* External references */
 extern uint32 cpu_type;
@@ -252,7 +252,7 @@ module_type_definition m9312 =
     (rom_socket (*)[]) & m9312_sockets,     /* Pointer to rom_socket structs */
     &m9312_auto_config,                     /* Auto configuration function */
     &rom_m9312_help,                        /* Pointer to help function */
-    attach_enclosed_rom,                       /* Attach function */
+    attach_embedded_rom,                       /* Attach function */
 };
 
 /* Define the VT40 module */
@@ -268,7 +268,7 @@ module_type_definition vt40 =
     (rom_socket (*)[]) & vt40_sockets,      /* Pointer to rom_socket structs */
     NULL,                                   /* Auto configuration function */
     &rom_vt40_help,                         /* Pointer to help function */
-    attach_enclosed_rom,                       /* Attach function */
+    attach_embedded_rom,                       /* Attach function */
 };
 
 /*
@@ -294,21 +294,11 @@ module_type_definition* module_list[NUM_MODULES] =
  */ 
 #define MAX_NUMBER_SOCKETS    5
 
-/*
- * Define and initialize the UNIT structs. 
- */
-UNIT rom_unit[MAX_NUMBER_SOCKETS] =
-{
-    { UDATA (NULL, ROM_UNIT_FLAGS, 0) },
-    { UDATA (NULL, ROM_UNIT_FLAGS, 0) },
-    { UDATA (NULL, ROM_UNIT_FLAGS, 0) },
-    { UDATA (NULL, ROM_UNIT_FLAGS, 0) },
-    { UDATA (NULL, ROM_UNIT_FLAGS | UNIT_DIS, 0) },
-};
+/* Define and initialize the UNIT struct */
+UNIT rom_unit = {UDATA (NULL, ROM_UNIT_FLAGS, 0)};
 
 /* Define device information blocks */
 DIB rom_dib[MAX_NUMBER_SOCKETS];
-
 
 /* Static definitions */
 static t_bool rom_initialized = FALSE;              /* Initialize rom_unit on first reset call */
@@ -331,14 +321,14 @@ REG rom_reg[] = {
 };
 
 /*
- * Define the ROM device and units modifiers.
+ * Define the ROM device modifiers.
  * 
  * A number of modifiers are marked "named only" to prevent them showing
  * up on the SHOW ROM output. The ROM SHOW CONTENTS command will print all
  * relevant information for a socket.
  */
 MTAB rom_mod[] = {
-    { MTAB_XTD | MTAB_VDV | MTAB_VALR | MTAB_NMO, 0, "TYPE", "TYPE",
+    { MTAB_XTD | MTAB_VDV | MTAB_VALR, 0, "TYPE", "TYPE",
         &rom_set_type, &rom_show_type, NULL, "ROM type (BLANK, M9312 or VT40)" },
     { MTAB_XTD | MTAB_VDV | MTAB_VALR | MTAB_NMO, 0, "CONFIGMODE", "CONFIGMODE",
         &rom_set_configmode, &rom_show_configmode, NULL, "Auto configuration (AUTO or MANUAL)" },
@@ -349,10 +339,10 @@ MTAB rom_mod[] = {
 DEVICE rom_dev =
 {
     "ROM",                               /* Device name */
-    rom_unit,                            /* Pointer to device unit structures */
+    &rom_unit,                           /* Pointer to device unit structures */
     rom_reg,                             /* Pointer to ROM registers */
     rom_mod,                             /* Pointer to modifier table */
-    MAX_NUMBER_SOCKETS,                  /* Number of units */
+    1,                                   /* Number of units */
     8,                                   /* Address radix */
     9,                                   /* Address width */
     2,                                   /* Address increment */
@@ -501,7 +491,24 @@ t_stat rom_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 
 t_stat rom_show_type (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 {
-    fprintf (f, "module type %s\n", module_list[selected_type]->name);
+    uint32 socket_number;
+
+    fprintf (f, "module type %s", module_list[selected_type]->name);
+#if 0
+    for (socket_number = 0;
+        socket_number < module_list[selected_type]->num_sockets; socket_number++) {
+        fprintf (f, "socket %d: ", socket_number);
+        if (socket_info[socket_number].rom_size > 0)
+            fprintf (f, "address=%o-%o, ", socket_info[socket_number].base_address,
+                socket_info[socket_number].base_address + 
+                socket_info[socket_number].rom_size - 1);
+        else
+            fprintf (f, "address=%o, ", socket_info[socket_number].base_address);
+        fprintf (f, "image=%s\n",
+            (*socket_info[socket_number].rom_name != 0) ?
+            socket_info[socket_number].rom_name : "none");
+    }
+#endif
     return SCPE_OK;
 }
 
@@ -572,7 +579,8 @@ t_stat rom_rd (int32 *data, int32 PA, int32 access)
 {
     uint32 socket_number;
 
-    for (socket_number = 0; socket_number < rom_dev.numunits; socket_number++) {
+    for (socket_number = 0; 
+        socket_number < module_list[selected_type]->num_sockets; socket_number++) {
         
         if (PA >= socket_info[socket_number].base_address && 
             PA <= socket_info[socket_number].end_address &&
@@ -598,16 +606,17 @@ t_stat rom_rd (int32 *data, int32 PA, int32 access)
  */
 t_stat rom_reset (DEVICE *dptr)
 {
-    uint32 unit_number;
+    uint32 socket_number;
 
     /* Check if the CPU opt and/or type has been changed since the module
        type was selected. If so, select the BLANK module. */
     if (cpu_type != cpu_type_on_selection)
-        rom_set_type (&rom_unit[0], 0, "BLANK", NULL);
+        rom_set_type (&rom_unit, 0, "BLANK", NULL);
 
     /* Initialize the UNIT and DIB structs and create the linked list of DIBs */
-    for (unit_number = 0; unit_number < MAX_NUMBER_SOCKETS; unit_number++) {
-        rom_dib[unit_number].next = (unit_number < dptr->numunits - 1) ? &rom_dib[unit_number + 1] : NULL;
+    for (socket_number = 0; socket_number < MAX_NUMBER_SOCKETS; socket_number++) {
+        rom_dib[socket_number].next = 
+            (socket_number < dptr->numunits - 1) ? &rom_dib[socket_number + 1] : NULL;
     }
 
     rom_initialized = TRUE;
@@ -672,8 +681,10 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 t_stat attach_blank_rom (CONST char *cptr)
 {
     int socket_number;
-    t_stat r;
+    t_stat r = SCPE_OK;
     FILE *fileptr;
+    void *rom_image = NULL;
+    uint32 rom_size;
     ATTACH_PARAM_VALUES param_values = {-1, -1, NULL};
 
     cmd_parameter attach_parameters[] =
@@ -719,57 +730,29 @@ t_stat attach_blank_rom (CONST char *cptr)
             return sim_messagef (SCPE_ARG, "File %s cannot be opened\n",
                 param_values.image_name);
 
-        /* Deallocate previously allocated buffer */
-        if (socket_info[socket_number].rom_buffer != NULL)
-            free (socket_info[socket_number].rom_buffer);
-
         /* Get the file size and allocate a buffer with the appropriate size */
-        socket_info[socket_number].rom_size =
-            (uint32) sim_fsize_ex (fileptr);
-        socket_info[socket_number].rom_buffer =
-            calloc (socket_info[socket_number].rom_size, sizeof (char));
+        rom_size = (uint32) sim_fsize_ex (fileptr);
+        rom_image = calloc (rom_size, sizeof (char));
 
         /* Read ROM contents into image */
-        socket_info[socket_number].rom_size =
-            (uint32) sim_fread (socket_info[socket_number].rom_buffer,
-            sizeof (char), socket_info[socket_number].rom_size, fileptr);
+        rom_size = (uint32) sim_fread (rom_image, sizeof (char), rom_size, fileptr);
 
         /* The file can now be closed */
         fclose (fileptr);
 
-        /* Fill the DIB for the socket */
-        if (reset_dib (socket_number, &rom_rd, NULL) != SCPE_OK) {
-
-            // Remove ROM image
-            // ToDo: Create remove_rom() function
-            free (socket_info[socket_number].rom_buffer);
-            socket_info[socket_number].rom_buffer = NULL;
-            return sim_messagef (SCPE_IERR, "reset_dib() failed\n");
-        }
-
-        /* Set end adress */
-        socket_info[socket_number].end_address =
-            socket_info[socket_number].base_address + 
-            socket_info[socket_number].rom_size - 1;
-
-        /* Save the specified ROM image  name in the register */
-        strncpy (socket_info[socket_number].rom_name, param_values.image_name, CBUFSIZE);
-
-        /* Create attachment information so attach is called during a restore */
-        // ToDo: Set meaningful uptr->filename
-        // ToDo: Reduce rom_unit
-        rom_unit[0].flags |= UNIT_ATT;
-        rom_unit[0].dynflags |= UNIT_ATTMULT;
-        rom_unit[0].filename = "BLANK";
+        /* Attach the created ROM to the socket */
+        r = attach_rom_to_socket (param_values.image_name,
+            socket_info[socket_number].base_address, rom_image, rom_size,
+            NULL, socket_number);
     }
     
-    /* Free resources */
+    /* Free allocated resources */
+    if (rom_image != NULL)
+        free (rom_image);
+    // ToDo: Replace allocated image_num by static def
     if (param_values.image_name != NULL)
         free (param_values.image_name);
-
     return r;
-
-    
 }
 
 /*
@@ -781,7 +764,7 @@ t_stat attach_blank_rom (CONST char *cptr)
  * This sequence is necessary to allow a free ordering of the parameters
  * and to check that every parameter is specified just once.
  */
-t_stat attach_enclosed_rom (CONST char *cptr)
+t_stat attach_embedded_rom (CONST char *cptr)
 {
     int socket_number;
     module_type_definition *modptr;
@@ -819,66 +802,12 @@ t_stat attach_enclosed_rom (CONST char *cptr)
     socketptr = *modptr->sockets + socket_number;
 
     /* Try to find the ROM in the list of ROMs for this socket */
-    romptr = find_rom (param_values.image_name, socketptr->rom_list);
-    if (romptr != NULL) {
-
-        /* Save ROM image name */
-        if ((param_values.image_name = 
-                malloc (strlen (param_values.image_name) + 1)) != NULL) {
-            strcpy (param_values.image_name, param_values.image_name);
-        }
-    } else
-        /* ROM not found */
+    if ((romptr = find_rom (param_values.image_name, socketptr->rom_list)) == NULL)
         return sim_messagef (SCPE_ARG, "Unknown ROM type\n");
 
-    /* Set the ROM size and pointer to the ROM image */
-    socket_info[socket_number].base_address = socketptr->base_address;
-    socket_info[socket_number].rom_size = socketptr->size;
-    socket_info[socket_number].end_address =
-        socket_info[socket_number].base_address + 
-        socket_info[socket_number].rom_size - 1;
-
-    /* Deallocate previously allocated buffer */
-    if (socket_info[socket_number].rom_buffer != NULL)
-        free (socket_info[socket_number].rom_buffer);
-
-    /*
-     * Allocate a buffer for the ROM image and copy the image into the
-     * buffer, allowing to overwrite the ROM image.
-     */
-    if ((socket_info[socket_number].rom_buffer =
-        malloc (socket_info[socket_number].rom_size)) == 0)
-        return sim_messagef (SCPE_IERR, "malloc() failed\n");
-
-    memcpy (socket_info[socket_number].rom_buffer,
-        romptr->image, socket_info[socket_number].rom_size);
-
-    /* Fill the DIB for the socket */
-    if (reset_dib (socket_number, &rom_rd, NULL) != SCPE_OK) {
-
-        // Remove ROM image
-        // ToDo: Create remove_rom() function
-        free (socket_info[socket_number].rom_buffer);
-        socket_info[socket_number].rom_buffer = NULL;
-        return sim_messagef (SCPE_IERR, "reset_dib() failed\n");
-    }
-
-    /* Save the specified ROM image  name in the register */
-    strncpy (socket_info[socket_number].rom_name,
-        param_values.image_name, CBUFSIZE);
-
-    /* Create attachment information so attach is called during a restore */
-    // ToDo: Set meaningful uptr->filename
-    // ToDo: Reduce rom_unit
-    rom_unit[0].flags |= UNIT_ATT;
-    rom_unit[0].dynflags |= UNIT_ATTMULT;
-    rom_unit[0].filename = "M9312";
-
-    /* Free resources */
-    if (param_values.image_name != NULL)
-        free (param_values.image_name);
-
-    return r;
+    /* Attach the ROM to the socket */
+    return attach_rom_to_socket (romptr->device_mnemonic, socketptr->base_address,
+        romptr->image, socketptr->size, romptr->rom_attached, socket_number);
 }
 
 /*
@@ -1055,37 +984,59 @@ static rom *find_rom (const char *cptr, rom (*rom_listptr)[])
 
 
 /*
- * Attach the specified ROM with the information in the specified
- * socket to the specified unit
- * 
- * Inputs:
- *      romptr = Pointer to the ROM to attach
- *      uptr   = unit to attach the specified ROM to
- * 
- * Return value:
- *      Status code
+ * Attach the specified ROM with the information to the specified
+ * socket.
  */
-
-static t_stat attach_rom_to_unit (rom* romptr, rom_socket *socketptr, UNIT *uptr)
+static t_stat attach_rom_to_socket (char* rom_name, t_addr base_address,
+    void *image, int16 size, void (*rom_attached)(), int socket_number)
 {
-    int unit_number = uptr - rom_unit;
+    
+    /* Set the ROM size and pointer to the ROM image */
+    socket_info[socket_number].base_address = base_address;
+    socket_info[socket_number].rom_size = size;
+    socket_info[socket_number].end_address = base_address + size - 1;
 
-    /* Set image, adresses and capacity for the specified unit.
-       The filename string is stored in an allocated buffer as detach_unit()
-       wants to free the filename. */
-    uptr->filename = strdup (romptr->device_mnemonic);
-    uptr->filebuf = romptr->image;
-    socket_info[unit_number].base_address = socketptr->base_address;
-    socket_info[unit_number].end_address = socketptr->base_address + socketptr->size;
-    uptr->capac = socketptr->size;
-    uptr->flags |= UNIT_ATT;
+    /* Deallocate previously allocated buffer */
+    if (socket_info[socket_number].rom_buffer != NULL)
+        free (socket_info[socket_number].rom_buffer);
+
+    /*
+     * Allocate a buffer for the ROM image and copy the image into the
+     * buffer, allowing to overwrite the ROM image.
+     */
+    if ((socket_info[socket_number].rom_buffer =
+        malloc (socket_info[socket_number].rom_size)) == 0)
+        return sim_messagef (SCPE_IERR, "malloc() failed\n");
+
+    memcpy (socket_info[socket_number].rom_buffer,
+        image, socket_info[socket_number].rom_size);
+
+    /* Fill the DIB for the socket */
+    if (reset_dib (socket_number, &rom_rd, NULL) != SCPE_OK) {
+
+        // Remove ROM image
+        // ToDo: Create remove_rom() function
+        free (socket_info[socket_number].rom_buffer);
+        socket_info[socket_number].rom_buffer = NULL;
+        return sim_messagef (SCPE_IERR, "reset_dib() failed\n");
+    }
+
+    /* Save the specified ROM image  name in the register */
+    strncpy (socket_info[socket_number].rom_name,
+        rom_name, CBUFSIZE);
 
     /* Execute rom specific function if available */
-    if (romptr->rom_attached != NULL)
-        (*romptr->rom_attached)();
+    if (rom_attached != NULL)
+        (*rom_attached)();
 
-    /* Fill the DIB for this unit */
-    return reset_dib (unit_number, &rom_rd, NULL);
+    /* Create attachment information so attach is called during a restore */
+    // ToDo: Set meaningful uptr->filename
+    // ToDo: Reduce rom_unit
+    rom_unit.flags |= UNIT_ATT;
+    rom_unit.dynflags |= UNIT_ATTMULT;
+    rom_unit.filename = "M9312";
+
+    return SCPE_OK;
 }
 
 
@@ -1128,7 +1079,7 @@ t_stat detach_all_sockets ()
         rom_device_flags &= ~ROM_CONFIG_AUTO;
 
         // return detach_unit (uptr);
-        rom_unit[0].flags &= ~UNIT_ATT;
+        rom_unit.flags &= ~UNIT_ATT;
     }
     return SCPE_OK;
 }
@@ -1159,7 +1110,7 @@ static t_stat m9312_auto_config_console_roms ()
     /* Search device_rom map for a suitable boot ROM for the device */
     for (mptr = &cpu_rom_map[0]; mptr->rom_name != NULL; mptr++) {
         if (mptr->cpu_model == cpu_model)
-            return attach_m9312_rom_TBD (mptr->rom_name, 0);
+            return attach_m9312_rom (mptr->rom_name, 0);
     }
 
     /* No ROM found for the CPU model */
@@ -1173,19 +1124,21 @@ static t_stat m9312_auto_config_bootroms ()
     int32 dev_index;
     DEVICE *dptr;
     rom_for_device *mptr;
-    int unit_number;
+    int socket_number;
     t_stat result;
 
     /* Detach all units with boot ROMs (socket_number.e. 1-4) to avoid the possibility that on a 
        subsequent m9312 auto configuration with an altered device configuration
        a same ROM is present twice. */
-    for (unit_number = 1; unit_number < NUM_M9312_SOCKETS; unit_number++) {
-        detach_unit (&rom_unit[unit_number]);
-    }
+    // *** for (unit_number = 1; unit_number < NUM_M9312_SOCKETS; unit_number++) {
+    // ***    detach_unit (&rom_unit[unit_number]);
+    // ***}
+    detach_all_sockets ();
+
 
     /* For all devices */
-    for (dev_index = 0, unit_number = 1; 
-        ((dptr = sim_devices[dev_index]) != NULL) && (unit_number < NUM_M9312_SOCKETS); dev_index++) {
+    for (dev_index = 0, socket_number = 1; 
+        ((dptr = sim_devices[dev_index]) != NULL) && (socket_number < NUM_M9312_SOCKETS); dev_index++) {
 
         /* Is the device enabled? */
         if (!dev_disabled (dptr)) {
@@ -1193,9 +1146,9 @@ static t_stat m9312_auto_config_bootroms ()
             /* Search device_rom map for a suitable boot ROM for the device */
             for (mptr = &device_rom_map[0]; mptr->device_name != NULL; mptr++) {
                 if (strcasecmp (dptr->name, mptr->device_name) == 0) {
-                    if ((result = attach_m9312_rom_TBD (mptr->rom_name, unit_number)) != SCPE_OK)
+                    if ((result = attach_m9312_rom (mptr->rom_name, socket_number)) != SCPE_OK)
                         return result;
-                    unit_number++;
+                    socket_number++;
                     break;
                 }
             }
@@ -1205,20 +1158,19 @@ static t_stat m9312_auto_config_bootroms ()
 }
 
 
-// ToDo: Move body to attach_m9312_rom
-static t_stat attach_m9312_rom_TBD (const char *rom_name, int unit_number)
+
+static t_stat attach_m9312_rom (const char *rom_name, int socket_number)
 {
-    UNIT *uptr;
     rom_socket *socketptr;
     rom *romptr;
 
-    uptr = &rom_unit[unit_number];
-    socketptr = &m9312_sockets[unit_number];
+    socketptr = &m9312_sockets[socket_number];
 
     /* Try to find the ROM in the list of ROMs for this socket */
     romptr = find_rom (rom_name, socketptr->rom_list);
     if (romptr != NULL) {
-        return attach_rom_to_unit (romptr, socketptr, uptr);
+        return attach_rom_to_socket (romptr->device_mnemonic, socketptr->base_address,
+            romptr->image, socketptr->size, romptr->rom_attached, socket_number);
     } else
         /* ROM not found */
         return SCPE_IERR;
