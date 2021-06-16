@@ -37,6 +37,7 @@ t_stat rom_show_type (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_set_configmode (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_configmode (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_show_sockets (FILE *, UNIT *, int32, CONST void *);
+void set_socket_addresses ();
 t_stat rom_attach (UNIT *, CONST char *);
 t_stat attach_blank_rom (CONST char *);
 t_stat attach_embedded_rom (CONST char *);
@@ -254,7 +255,7 @@ module_type_definition m9312 =
     (rom_socket (*)[]) & m9312_sockets,     /* Pointer to rom_socket structs */
     &m9312_auto_config,                     /* Auto configuration function */
     &rom_m9312_help,                        /* Pointer to help function */
-    attach_embedded_rom,                       /* Attach function */
+    attach_embedded_rom,                    /* Attach function */
 };
 
 /* Define the VT40 module */
@@ -270,7 +271,7 @@ module_type_definition vt40 =
     (rom_socket (*)[]) & vt40_sockets,      /* Pointer to rom_socket structs */
     NULL,                                   /* Auto configuration function */
     &rom_vt40_help,                         /* Pointer to help function */
-    attach_embedded_rom,                       /* Attach function */
+    attach_embedded_rom,                    /* Attach function */
 };
 
 /*
@@ -414,7 +415,6 @@ rom_for_cpu_model cpu_rom_map[] =
 };
 
 
-
 /*
  * Check if the module type to be set is valid on the selected 
  * cpu_opt and cpu_type
@@ -426,6 +426,7 @@ int module_type_is_valid (uint16 module_number)
     return CPUT (module_list[module_number]->valid_cpu_types) &&
         bus & module_list[module_number]->valid_cpu_opts;
 }
+
 
 /* Set ROM module type */
 
@@ -461,11 +462,13 @@ t_stat rom_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 
                 /* Detach the currently attached ROM's from their sockets */
                 detach_all_sockets ();
+
+                /* Set socket base and end address if available */
+                set_socket_addresses ();
+
+                /* (Re)set the configuration mode to manual */
+                rom_device_flags &= ~ROM_CONFIG_AUTO;
             }
-
-            /* (Re)set the configuration mode to manual */
-            rom_device_flags &= ~ROM_CONFIG_AUTO;
-
 #if 0
             /* If this module has just one unit and that unit has just one possible
                image attach the image to the unit */
@@ -497,6 +500,34 @@ t_stat rom_show_type (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 {
     fprintf (f, "module type %s", module_list[selected_type]->name);
     return SCPE_OK;
+}
+
+
+/* Set (if available) base and end addresses for the sockets */
+
+void set_socket_addresses ()
+{
+    module_type_definition *modptr;
+    rom_socket *socketptr;
+    uint32 socket_number;
+
+    /* Get a pointer to the selected module and from that a pointer to
+   socket for the unit */
+    modptr = *(module_list + selected_type);
+    socketptr = *modptr->sockets;
+
+    /* For all sockets on this module */
+    for (socket_number = 0; socket_number < modptr->num_sockets;
+        socket_number++, socketptr++) {
+        
+        /* Fill socket_info only if a valid address is given */
+        if (socketptr->base_address > 0) {
+            socket_info[socket_number].base_address = socketptr->base_address;
+            socket_info[socket_number].rom_size = socketptr->size;
+            socket_info[socket_number].end_address 
+                = socketptr->base_address + socketptr->size - 1;
+        }
+    }
 }
 
 /* Show socket addresses and contents */
@@ -1056,6 +1087,9 @@ t_stat rom_detach (UNIT *uptr)
 
     if ((r = detach_all_sockets ()) != SCPE_OK)
         return r;
+
+    /* Set socket base and end address if available */
+    set_socket_addresses ();
 
     /* (Re)set the configuration mode to manual */
     rom_device_flags &= ~ROM_CONFIG_AUTO;
