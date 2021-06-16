@@ -36,6 +36,7 @@ t_stat rom_set_type (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_type (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_set_configmode (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_configmode (FILE *, UNIT *, int32, CONST void *);
+t_stat rom_show_sockets (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_attach (UNIT *, CONST char *);
 t_stat attach_blank_rom (CONST char *);
 t_stat attach_embedded_rom (CONST char *);
@@ -47,6 +48,7 @@ t_stat set_image_for_attach (char *, ATTACH_PARAM_VALUES *);
 static t_stat attach_rom_to_socket (char *, t_addr, void *, int16, void (*)(), int);
 t_stat rom_detach (UNIT *);
 t_stat detach_all_sockets ();
+t_stat detach_socket (uint32);
 t_stat rom_blank_help (FILE *, const char *);
 t_stat rom_m9312_help (FILE *, const char *);
 t_stat rom_vt40_help (FILE *, const char *);
@@ -87,7 +89,7 @@ static const char rom_helptext[] =
 "   SHOW ROM\n"
 "   SHOW ROM<unit>\n"
 "   SET ROM TYPE={BLANK|M9312|VT40}\n"
-"   SET ROM CONFIGMODE=AUTO | MANUAL\n"
+"   SET ROM CONFIGURATION=AUTO | MANUAL\n"
 "   SET ROM ADDRESS=<address>{;<address>}\n"
 "   ATTACH ROM<unit> <file> | <built-in ROM>\n"
 "   SHOW ROM<unit>\n"
@@ -330,8 +332,10 @@ REG rom_reg[] = {
 MTAB rom_mod[] = {
     { MTAB_XTD | MTAB_VDV | MTAB_VALR, 0, "TYPE", "TYPE",
         &rom_set_type, &rom_show_type, NULL, "ROM type (BLANK, M9312 or VT40)" },
-    { MTAB_XTD | MTAB_VDV | MTAB_VALR | MTAB_NMO, 0, "CONFIGMODE", "CONFIGMODE",
+    { MTAB_XTD | MTAB_VDV | MTAB_VALR, 0, "CONFIGURATION", "CONFIGURATION",
         &rom_set_configmode, &rom_show_configmode, NULL, "Auto configuration (AUTO or MANUAL)" },
+    { MTAB_VDV | MTAB_NMO, 0, "SOCKETS", NULL,
+        NULL, &rom_show_sockets, NULL, "Socket addresses and ROM images" },
     { 0 }
 };
 
@@ -372,21 +376,21 @@ DEVICE rom_dev =
  */
 rom_for_device device_rom_map [] =
 {
-    "RK",   "DK",
-    "RL",   "DL",
-    "HK",   "DM",
-    "RY",   "DY",
-    "RP",   "DB",
-    "RQ",   "DU",
-    "RX",   "DX",
-    "RY",   "DY",
-    "RS",   "DS",
-    "TC",   "DT",
-    "TS",   "MS",
-    "TU",   "MU",
-    "TA",   "CT",
-    "TM",   "MT",
-    "TQ",   "MU",
+    "RK",   "DK",                       /* RK03/05 DECdisk disk bootstrap */
+    "RL",   "DL",                       /* RL01/02 cartridge disk bootstrap */
+    "HK",   "DM",                       /* RK06/07 cartridge disk bootstrap */
+    "RY",   "DY",                       /* RX02 floppy disk, double density bootstrap */
+    "RP",   "DB",                       /* RP04/05/06, RM02/03/05 cartridge disk bootstrap */
+    "RQ",   "DU",                       /* MSCP UDA50 (RAxx) disk bootstrap */
+    "RX",   "DX",                       /* RX01 floppy disk, single density bootstrap */
+    "RY",   "DY",                       /* RX02 floppy disk, double density bootstrap */
+    "RS",   "DS",                       /* RS03/04 fixed disk bootstrap */
+    "TC",   "DT",                       /* TU55/56 DECtape */
+    "TS",   "MS",                       /* TS04/11,TU80,TSU05 tape bootstrap */
+    "TU",   "MU",                       /* TMSCP TK50,TU81 magtape bootstrap */
+    "TA",   "CT",                       /* TU60 DECcassette bootstrap */
+    "TM",   "MT",                       /* TS03,TU10,TE10 magtape bootstrap */
+    "TQ",   "MU",                       /* TMSCP TK50,TU81 magtape bootstrap */
     NULL,   NULL,
 };
 
@@ -397,15 +401,15 @@ rom_for_device device_rom_map [] =
 
 rom_for_cpu_model cpu_rom_map[] =
 {
-    MOD_1104,           "A0",
-    MOD_1105,           "A0",
-    MOD_1124,           "MEM",
-    MOD_1134,           "A0",
-    MOD_1140,           "A0",
-    MOD_1144,           "UBI",
-    MOD_1145,           "A0",
-    MOD_1160,           "B0",
-    MOD_1170,           "B0",
+    MOD_1104,           "A0",           /* 11/04,34 Diagnostic/Console (M9312 E20) */
+    MOD_1105,           "A0",           /* 11/04,34 Diagnostic/Console (M9312 E20) */
+    MOD_1124,           "MEM",          /* 11/24 Diagnostic/Console (MEM; M7134 E74) */
+    MOD_1134,           "A0",           /* 11/04,34 Diagnostic/Console (M9312 E20) */
+    MOD_1140,           "A0",           /* 11/04,34 Diagnostic/Console (M9312 E20) */
+    MOD_1144,           "UBI",          /* 11/44 Diagnostic / Console (UBI; M7098 E58) */
+    MOD_1145,           "A0",           /* 11/04,34 Diagnostic/Console (M9312 E20) */
+    MOD_1160,           "B0",           /* 11/60,70 Diagnostic (M9312 E20) */
+    MOD_1170,           "B0",           /* 11/60,70 Diagnostic (M9312 E20) */
     0,                   NULL,
 };
 
@@ -491,24 +495,29 @@ t_stat rom_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 
 t_stat rom_show_type (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 {
+    fprintf (f, "module type %s", module_list[selected_type]->name);
+    return SCPE_OK;
+}
+
+/* Show socket addresses and contents */
+
+t_stat rom_show_sockets (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
+{
     uint32 socket_number;
 
-    fprintf (f, "module type %s", module_list[selected_type]->name);
-#if 0
     for (socket_number = 0;
         socket_number < module_list[selected_type]->num_sockets; socket_number++) {
         fprintf (f, "socket %d: ", socket_number);
         if (socket_info[socket_number].rom_size > 0)
             fprintf (f, "address=%o-%o, ", socket_info[socket_number].base_address,
-                socket_info[socket_number].base_address + 
-                socket_info[socket_number].rom_size - 1);
+            socket_info[socket_number].base_address +
+            socket_info[socket_number].rom_size - 1);
         else
             fprintf (f, "address=%o, ", socket_info[socket_number].base_address);
         fprintf (f, "image=%s\n",
             (*socket_info[socket_number].rom_name != 0) ?
             socket_info[socket_number].rom_name : "none");
     }
-#endif
     return SCPE_OK;
 }
 
@@ -526,7 +535,7 @@ static t_stat rom_set_configmode (UNIT *uptr, int32 val, CONST char *cptr, void 
 {
      /* Is a configuration type specified? */
     if (cptr == NULL)
-        return sim_messagef (SCPE_ARG, "Specify AUTO or MANUAL configuration mode\n");
+        return sim_messagef (SCPE_ARG, "Specify AUTO or MANUAL configuration\n");
 
     if (strcasecmp (cptr, "MANUAL") == 0)
         rom_device_flags &= ~ROM_CONFIG_AUTO;
@@ -542,7 +551,7 @@ static t_stat rom_set_configmode (UNIT *uptr, int32 val, CONST char *cptr, void 
                 (*module_list[selected_type]->auto_config)();
             }
             else 
-                return sim_messagef (SCPE_ARG, "Auto config is not available for the %s module\n",
+                return sim_messagef (SCPE_ARG, "Auto configuration is not available for the %s module\n",
                 module_list[selected_type]->name);
         }
         else
@@ -553,7 +562,7 @@ static t_stat rom_set_configmode (UNIT *uptr, int32 val, CONST char *cptr, void 
 
 t_stat rom_show_configmode (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 {
-   fprintf (f, "configuration mode %s\n", 
+   fprintf (f, "configuration mode %s", 
        (rom_device_flags & ROM_CONFIG_AUTO) ? "AUTO" : "MANUAL");
     return SCPE_OK;
 }
@@ -806,8 +815,15 @@ t_stat attach_embedded_rom (CONST char *cptr)
         return sim_messagef (SCPE_ARG, "Unknown ROM type\n");
 
     /* Attach the ROM to the socket */
-    return attach_rom_to_socket (romptr->device_mnemonic, socketptr->base_address,
-        romptr->image, socketptr->size, romptr->rom_attached, socket_number);
+    if ((r = attach_rom_to_socket (romptr->device_mnemonic, socketptr->base_address,
+        romptr->image, socketptr->size, romptr->rom_attached, socket_number)) != SCPE_OK) {
+        return r;
+    }
+
+    /* (Re)set the configuration mode to manual */
+    rom_device_flags &= ~ROM_CONFIG_AUTO;
+
+    return SCPE_OK;
 }
 
 /*
@@ -1044,7 +1060,15 @@ static t_stat attach_rom_to_socket (char* rom_name, t_addr base_address,
 
 t_stat rom_detach (UNIT *uptr)
 {
-    return detach_all_sockets ();
+    t_stat r;
+
+    if ((r = detach_all_sockets ()) != SCPE_OK)
+        return r;
+
+    /* (Re)set the configuration mode to manual */
+    rom_device_flags &= ~ROM_CONFIG_AUTO;
+
+    return SCPE_OK;
 }
 
 
@@ -1061,27 +1085,32 @@ t_stat detach_all_sockets ()
         socket_number++) {
 
         /* Clear socket information */
-        // ToDo: Implemement detach_socket()
-        socket_info[socket_number].base_address = 0;
-        socket_info[socket_number].base_address = 0;
-        socket_info[socket_number].rom_size = 0;
-        if (socket_info[socket_number].rom_buffer != NULL) {
-            free (socket_info[socket_number].rom_buffer);
-            socket_info[socket_number].rom_buffer = NULL;
-        }
-        *socket_info[socket_number].rom_name = 0;
-
-        /* Clear Unibus map */
-        if ((r = reset_dib (socket_number, NULL, NULL) != SCPE_OK))
+        if ((r = detach_socket (socket_number) != SCPE_OK))
             return r;
 
-        /* Reset config mode to manual and detach the unit */
-        rom_device_flags &= ~ROM_CONFIG_AUTO;
-
-        // return detach_unit (uptr);
+        // ToDo: The UNIT_ATT flag should be reset in detach_socket()
+        // if no sockets are attched anymore?
         rom_unit.flags &= ~UNIT_ATT;
     }
     return SCPE_OK;
+}
+
+/* Detach the image from the specified socket */
+
+t_stat detach_socket (uint32 socket_number)
+{
+    /* Clear socket information */
+    socket_info[socket_number].base_address = 0;
+    socket_info[socket_number].end_address = 0;
+    socket_info[socket_number].rom_size = 0;
+    if (socket_info[socket_number].rom_buffer != NULL) {
+        free (socket_info[socket_number].rom_buffer);
+        socket_info[socket_number].rom_buffer = NULL;
+    }
+    *socket_info[socket_number].rom_name = 0;
+
+    /* Clear Unibus map */
+    return reset_dib (socket_number, NULL, NULL);
 }
 
 
@@ -1130,11 +1159,9 @@ static t_stat m9312_auto_config_bootroms ()
     /* Detach all units with boot ROMs (socket_number.e. 1-4) to avoid the possibility that on a 
        subsequent m9312 auto configuration with an altered device configuration
        a same ROM is present twice. */
-    // *** for (unit_number = 1; unit_number < NUM_M9312_SOCKETS; unit_number++) {
-    // ***    detach_unit (&rom_unit[unit_number]);
-    // ***}
-    detach_all_sockets ();
-
+    for (socket_number = 1; socket_number < NUM_M9312_SOCKETS; socket_number++) {
+        detach_socket (socket_number);
+    }
 
     /* For all devices */
     for (dev_index = 0, socket_number = 1; 
