@@ -694,7 +694,7 @@ t_stat attach_blank_rom (CONST char *cptr)
     FILE *fileptr;
     void *rom_image = NULL;
     uint32 rom_size;
-    ATTACH_PARAM_VALUES param_values = {-1, -1, NULL};
+    ATTACH_PARAM_VALUES param_values = {-1, -1, ""};
 
     cmd_parameter attach_parameters[] =
     {
@@ -715,7 +715,7 @@ t_stat attach_blank_rom (CONST char *cptr)
         return sim_messagef (SCPE_ARG, "SOCKET specification is required\n");
     
     if ((param_values.address == -1) &&
-        (param_values.image_name == NULL))
+        (*param_values.image_name == 0))
         return sim_messagef (SCPE_ARG, "Either ADDRESS or IMAGE or both must be specified");
 
     if (param_values.address != -1) {
@@ -726,7 +726,7 @@ t_stat attach_blank_rom (CONST char *cptr)
     }
 
     /* If a ROM image is specified an attach can be performed */
-    if (param_values.image_name != NULL) {
+    if (*param_values.image_name != 0) {
 
         /* Check the ROM base address is set */
         // ToDo: Initialze attach_cmd_params.address to 0
@@ -758,9 +758,7 @@ t_stat attach_blank_rom (CONST char *cptr)
     /* Free allocated resources */
     if (rom_image != NULL)
         free (rom_image);
-    // ToDo: Replace allocated image_num by static def
-    if (param_values.image_name != NULL)
-        free (param_values.image_name);
+    
     return r;
 }
 
@@ -780,7 +778,7 @@ t_stat attach_embedded_rom (CONST char *cptr)
     rom_socket *socketptr;
     rom *romptr;
     t_stat r;
-    ATTACH_PARAM_VALUES param_values = {-1, -1, NULL};
+    ATTACH_PARAM_VALUES param_values = {-1, -1, ""};
 
     cmd_parameter attach_parameters[] =
     {
@@ -800,7 +798,7 @@ t_stat attach_embedded_rom (CONST char *cptr)
     if (socket_number == -1)
         return sim_messagef (SCPE_ARG, "SOCKET specification is required\n");
 
-    if (param_values.image_name == NULL)
+    if (*param_values.image_name == 0)
         return sim_messagef (SCPE_ARG, "A ROM IMAGE must be specified\n");
 
     /* Execute the command */
@@ -958,16 +956,10 @@ t_stat set_image_for_attach (char *value,
     ATTACH_PARAM_VALUES *attach_param_values)
 {
     /* Check if image is not already set */
-    if (attach_param_values->image_name != NULL)
+    if (*attach_param_values->image_name != 0)
         return sim_messagef (SCPE_ARG, "IMAGE must be specified just once\n");
-
-    /* Save file name */
-    if ((attach_param_values->image_name = malloc (strlen (value) + 1)) != NULL) {
-        strcpy (attach_param_values->image_name, value);
-    }
-    else
-        return sim_messagef (SCPE_IERR, "malloc() failed\n");
-
+        
+    strcpy (attach_param_values->image_name, value);
     return SCPE_OK;
 }
 
