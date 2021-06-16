@@ -109,6 +109,7 @@ typedef struct
     t_stat (*auto_config)();                    /* Auto-configuration function for the module type */
     t_stat (*help_func)(FILE *, const char *);  /* Help function for the module type */
     t_stat (*attach)(const char *);             /* Attach function for the module type */
+    t_stat (*auto_attach)();                    /* Auto attach on module type selection */
 }
 module_type_definition;
 

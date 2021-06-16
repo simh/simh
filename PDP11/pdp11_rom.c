@@ -37,6 +37,7 @@ t_stat rom_show_type (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_set_configmode (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_configmode (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_show_sockets (FILE *, UNIT *, int32, CONST void *);
+t_stat vt40_auto_attach ();
 void set_socket_addresses ();
 t_stat rom_attach (UNIT *, CONST char *);
 t_stat attach_blank_rom (CONST char *);
@@ -240,6 +241,7 @@ module_type_definition blank =
     NULL,                                   /* Auto configuration function */
     &rom_blank_help,                        /* Pointer to help function */
     attach_blank_rom,                       /* Attach function */
+    NULL,                                   /* Auto-attach function */
 };
 
 /* Define the M9312 module */
@@ -256,6 +258,7 @@ module_type_definition m9312 =
     &m9312_auto_config,                     /* Auto configuration function */
     &rom_m9312_help,                        /* Pointer to help function */
     attach_embedded_rom,                    /* Attach function */
+    NULL,                                   /* Auto-attach function */
 };
 
 /* Define the VT40 module */
@@ -272,6 +275,7 @@ module_type_definition vt40 =
     NULL,                                   /* Auto configuration function */
     &rom_vt40_help,                         /* Pointer to help function */
     attach_embedded_rom,                    /* Attach function */
+    &vt40_auto_attach,                      /* Auto-attach function */
 };
 
 /*
@@ -433,7 +437,6 @@ int module_type_is_valid (uint16 module_number)
 t_stat rom_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
     uint16 module_number;
-    rom *romptr;
 
     /* Is a module type specified? */
     if (cptr == NULL)
@@ -468,23 +471,11 @@ t_stat rom_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 
                 /* (Re)set the configuration mode to manual */
                 rom_device_flags &= ~ROM_CONFIG_AUTO;
-            }
-#if 0
-            /* If this module has just one unit and that unit has just one possible
-               image attach the image to the unit */
-            if (module_list[module_number]->num_sockets == 1) {
-                int num_roms = 0;
-                rom_socket *socketptr = *module_list[module_number]->sockets;
 
-                /* Count the number of ROMS for this socket */
-                for (romptr = (rom *) socketptr->rom_list; romptr->image != NULL; romptr++)
-                    num_roms++;
-
-                if (num_roms == 1)
-                    /* Attach the first image to the first unit */
-                    rom_attach (&rom_unit[0], ((rom *) socketptr->rom_list)->device_mnemonic);
+                /* Auto-attach ROM(s) if available */
+                if (module_list[selected_type]->auto_attach != NULL)
+                    (*module_list[selected_type]->auto_attach)();
             }
-#endif
             return SCPE_OK;
         }
     }
@@ -502,6 +493,23 @@ t_stat rom_show_type (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
     return SCPE_OK;
 }
 
+
+/* Auto-attach ROM for VT40 */
+
+t_stat vt40_auto_attach ()
+{
+    rom_socket *socketptr;
+    rom *romptr;
+    uint32 socket_number = 0;
+
+    /* A VT40 has just one socket */
+    socketptr = &vt40_sockets[socket_number];
+    romptr = *socketptr->rom_list;
+
+    /* Attach the ROM to the socket */
+    return attach_rom_to_socket (romptr->device_mnemonic, socketptr->base_address,
+        romptr->image, socketptr->size, romptr->rom_attached, socket_number);
+}
 
 /* Set (if available) base and end addresses for the sockets */
 
