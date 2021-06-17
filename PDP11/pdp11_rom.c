@@ -48,6 +48,7 @@ t_stat set_address_for_attach (char *, ATTACH_PARAM_VALUES *);
 t_stat set_address_not_allowed (char *, ATTACH_PARAM_VALUES *);
 t_stat set_image_for_attach (char *, ATTACH_PARAM_VALUES *);
 static t_stat attach_rom_to_socket (char *, t_addr, void *, int16, void (*)(), int);
+void create_filename (char *);
 t_stat rom_detach (UNIT *);
 t_stat detach_all_sockets ();
 t_stat detach_socket (uint32);
@@ -308,9 +309,10 @@ UNIT rom_unit = {UDATA (NULL, ROM_UNIT_FLAGS, 0)};
 DIB rom_dib[MAX_NUMBER_SOCKETS];
 
 /* Static definitions */
-static t_bool rom_initialized = FALSE;              /* Initialize rom_unit on first reset call */
-static uint32 cpu_type_on_selection;                /* cpu_type for which module type was selected */
-static uint32 rom_device_flags = 0;                 /* rom device specific flags */
+static t_bool rom_initialized = FALSE;                      /* Initialize rom_unit on first reset call */
+static uint32 cpu_type_on_selection;                        /* cpu_type for which module type was selected */
+static uint32 rom_device_flags = 0;                         /* rom device specific flags */
+static char unit_filename[NUM_M9312_SOCKETS * CBUFSIZE];    /* Composed file name for UNIT */
 
 /*
  * Define ROM device registers. All state is maintained in these registers
@@ -705,12 +707,9 @@ void setHITMISS ()
     HITMISS = 1;
 }
 
-/* 
- * Attach either file or a built-in ROM image to a socket
- * 
- * ToDo: As the DEV_DONTAUTO flag is not set, an already attached image
- * is detached before rom_attach() is called.
- */
+ 
+/* Attach either file or a built-in ROM image to a socket */
+ 
 t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 {
     /* Execute attach cmd for the selected module type */
@@ -800,6 +799,7 @@ t_stat attach_blank_rom (CONST char *cptr)
     
     return r;
 }
+
 
 /*
  * Processing the ATTACH command is performed in three steps:
@@ -1081,9 +1081,41 @@ static t_stat attach_rom_to_socket (char* rom_name, t_addr base_address,
     // ToDo: Reduce rom_unit
     rom_unit.flags |= UNIT_ATT;
     rom_unit.dynflags |= UNIT_ATTMULT;
-    rom_unit.filename = "M9312";
+    // rom_unit.filename = "M9312";
+    create_filename (unit_filename);
+    rom_unit.filename = unit_filename;
 
     return SCPE_OK;
+}
+
+/* 
+ * Create a meaningful filename 
+ *
+ * This filename is displayed in a SHOW ROM command and is used in
+ * rom_attach() to detect that images must be reattached in a
+ * RESTORE operation.
+ */
+void create_filename (char *filename)
+{
+    uint32 socket_number;
+    t_bool first_socket = TRUE;
+
+    filename += sprintf (filename, "<");
+
+    for (socket_number = 0; socket_number < module_list[selected_type]->num_sockets;
+        socket_number++) {
+
+        /* Only use filled sockets */
+        if (socket_info[socket_number].rom_size > 0) {
+            filename += sprintf (filename, "%s%d:%s",
+                first_socket ? "" : ", ",
+                socket_number, socket_info[socket_number].rom_name);
+            first_socket = FALSE;
+        }
+    }
+
+    sprintf (filename, ">");
+    return;
 }
 
 
