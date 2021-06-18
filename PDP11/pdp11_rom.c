@@ -47,6 +47,8 @@ t_stat set_socket_for_attach (char *, ATTACH_PARAM_VALUES *);
 t_stat set_address_for_attach (char *, ATTACH_PARAM_VALUES *);
 t_stat set_address_not_allowed (char *, ATTACH_PARAM_VALUES *);
 t_stat set_image_for_attach (char *, ATTACH_PARAM_VALUES *);
+t_stat exec_attach_blank_rom (ATTACH_PARAM_VALUES *);
+t_stat exec_attach_embedded_rom (ATTACH_PARAM_VALUES *);
 static t_stat attach_rom_to_socket (char *, t_addr, void *, int16, void (*)(), int);
 void create_filename (char *);
 t_stat rom_detach (UNIT *);
@@ -321,7 +323,7 @@ static char unit_filename[NUM_M9312_SOCKETS * CBUFSIZE];    /* Composed file nam
 static uint16 selected_type = ROM_MODULE_BLANK;                     /* The module type as set by the user */
 
 /* Define socket administration */
-SOCKET_INFO socket_info[MAX_NUMBER_SOCKETS];
+SOCKET_INFO socket_info[MAX_NUMBER_SOCKETS] = {0, 0, 0, "", NULL};
 
 REG rom_reg[] = {
     { ORDATAD (TYPE,     selected_type, 16,     "Type"), REG_RO },
@@ -513,7 +515,7 @@ t_stat vt40_auto_attach ()
         romptr->image, socketptr->size, romptr->rom_attached, socket_number);
 }
 
-/* Set (if available) base and end addresses for the sockets */
+/* Set (if available) base address for the sockets */
 
 void set_socket_addresses ()
 {
@@ -534,8 +536,6 @@ void set_socket_addresses ()
         if (socketptr->base_address > 0) {
             socket_info[socket_number].base_address = socketptr->base_address;
             socket_info[socket_number].rom_size = socketptr->size;
-            socket_info[socket_number].end_address 
-                = socketptr->base_address + socketptr->size - 1;
         }
     }
 }
@@ -628,15 +628,21 @@ t_stat rom_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 t_stat rom_rd (int32 *data, int32 PA, int32 access)
 {
     uint32 socket_number;
+    SOCKET_INFO *socket_infoptr = socket_info;
+    uint32 num_sockets = module_list[selected_type]->num_sockets;
 
-    for (socket_number = 0; 
-        socket_number < module_list[selected_type]->num_sockets; socket_number++) {
-        
-        if (PA >= socket_info[socket_number].base_address && 
-            PA <= socket_info[socket_number].end_address &&
-            (socket_info[socket_number].rom_buffer != NULL)) {
-            uint16 *image = (uint16 *) socket_info[socket_number].rom_buffer;
-            *data = image[(PA - socket_info[socket_number].base_address) >> 1];
+    /* For all sockets in socket_info */
+    for (socket_number = 0; socket_number < num_sockets; 
+        socket_number++, socket_infoptr++) {
+
+        /* Check if the address is in the range of this socket */
+        if (PA >= socket_infoptr->base_address &&
+            PA <= socket_infoptr->base_address + socket_infoptr->rom_size - 1 &&
+            (socket_infoptr->rom_buffer != NULL)) {
+
+            /* Get pointer to ROM image and data from that image*/
+            uint16 *image = (uint16 *) socket_infoptr->rom_buffer;
+            *data = image[(PA - socket_infoptr->base_address) >> 1];
             return SCPE_OK;
         }
     }
@@ -727,11 +733,8 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
  */
 t_stat attach_blank_rom (CONST char *cptr)
 {
-    int socket_number;
+    uint32 socket_number;
     t_stat r = SCPE_OK;
-    FILE *fileptr;
-    void *rom_image = NULL;
-    uint32 rom_size;
     ATTACH_PARAM_VALUES param_values = {-1, -1, ""};
 
     cmd_parameter attach_parameters[] =
@@ -742,29 +745,58 @@ t_stat attach_blank_rom (CONST char *cptr)
         {NULL},
     };
 
+    /* Check if we are called from a restore operation */
+    if (*cptr == '<') {
+
+        for (socket_number = 0;
+            socket_number < module_list[selected_type]->num_sockets;
+            socket_number++) {
+            if (socket_info[socket_number].rom_size > 0) {
+                param_values.address = socket_info[socket_number].base_address;
+                strcpy (param_values.image_name, socket_info[socket_number].rom_name);
+                param_values.socket_number = socket_number;
+
+                if ((r = exec_attach_blank_rom (&param_values)) != SCPE_OK)
+                    return r;
+            }   
+        }
+    }
+
     /* Parse the command */
     if ((r = parse_cmd (cptr, attach_parameters, &param_values)) != SCPE_OK)
         return r;
 
-    socket_number = param_values.socket_number;
-
     /* Validate the parameters */
-    if (socket_number == -1)
+    if (param_values.socket_number == -1)
         return sim_messagef (SCPE_ARG, "SOCKET specification is required\n");
     
     if ((param_values.address == -1) &&
         (*param_values.image_name == 0))
         return sim_messagef (SCPE_ARG, "Either ADDRESS or IMAGE or both must be specified");
 
-    if (param_values.address != -1) {
+    /* Execute the command */
+    return exec_attach_blank_rom (&param_values);
+}
 
-        /* Set base and preliminary end address */
-        socket_info[socket_number].base_address =
-            socket_info[socket_number].end_address = param_values.address;
+
+/* Execute the attach command for the BLANK module */
+
+t_stat exec_attach_blank_rom (ATTACH_PARAM_VALUES *param_values)
+{
+    t_stat r = SCPE_OK;
+    FILE *fileptr;
+    void *rom_image = NULL;
+    uint32 rom_size;
+    uint32 socket_number = param_values->socket_number;
+
+    if (param_values->address != -1) {
+
+        /* Set base address */
+        socket_info[socket_number].base_address = param_values->address;
     }
 
     /* If a ROM image is specified an attach can be performed */
-    if (*param_values.image_name != 0) {
+    if (*param_values->image_name != 0) {
 
         /* Check the ROM base address is set */
         // ToDo: Initialze attach_cmd_params.address to 0
@@ -772,10 +804,10 @@ t_stat attach_blank_rom (CONST char *cptr)
             return sim_messagef (SCPE_ARG, "Set address first\n", socket_number);
 
         /* Check if an existing file is specified */
-        fileptr = sim_fopen (param_values.image_name, "rb");
+        fileptr = sim_fopen (param_values->image_name, "rb");
         if (fileptr == NULL)
             return sim_messagef (SCPE_ARG, "File %s cannot be opened\n",
-                param_values.image_name);
+            param_values->image_name);
 
         /* Get the file size and allocate a buffer with the appropriate size */
         rom_size = (uint32) sim_fsize_ex (fileptr);
@@ -788,15 +820,15 @@ t_stat attach_blank_rom (CONST char *cptr)
         fclose (fileptr);
 
         /* Attach the created ROM to the socket */
-        r = attach_rom_to_socket (param_values.image_name,
+        r = attach_rom_to_socket (param_values->image_name,
             socket_info[socket_number].base_address, rom_image, rom_size,
             NULL, socket_number);
     }
-    
+
     /* Free allocated resources */
     if (rom_image != NULL)
         free (rom_image);
-    
+
     return r;
 }
 
@@ -812,10 +844,6 @@ t_stat attach_blank_rom (CONST char *cptr)
  */
 t_stat attach_embedded_rom (CONST char *cptr)
 {
-    int socket_number;
-    module_type_definition *modptr;
-    rom_socket *socketptr;
-    rom *romptr;
     t_stat r;
     ATTACH_PARAM_VALUES param_values = {-1, -1, ""};
 
@@ -831,24 +859,35 @@ t_stat attach_embedded_rom (CONST char *cptr)
     if ((r = parse_cmd (cptr, attach_parameters, &param_values)) != SCPE_OK)
         return r;
 
-    socket_number = param_values.socket_number;
-
     /* Validate the command */
-    if (socket_number == -1)
+    if (param_values.socket_number == -1)
         return sim_messagef (SCPE_ARG, "SOCKET specification is required\n");
 
     if (*param_values.image_name == 0)
         return sim_messagef (SCPE_ARG, "A ROM IMAGE must be specified\n");
 
     /* Execute the command */
+    return exec_attach_embedded_rom (&param_values);
+}
+
+
+/* Execute the attach command for an embedded module */
+
+t_stat exec_attach_embedded_rom (ATTACH_PARAM_VALUES *param_values)
+{
+    t_stat r;
+    module_type_definition *modptr;
+    rom_socket *socketptr;
+    rom *romptr;
+    uint32 socket_number = param_values->socket_number;
 
     /* Get a pointer to the selected module and from that a pointer to
-       socket for the unit */
+   socket for the unit */
     modptr = *(module_list + selected_type);
     socketptr = *modptr->sockets + socket_number;
 
     /* Try to find the ROM in the list of ROMs for this socket */
-    if ((romptr = find_rom (param_values.image_name, socketptr->rom_list)) == NULL)
+    if ((romptr = find_rom (param_values->image_name, socketptr->rom_list)) == NULL)
         return sim_messagef (SCPE_ARG, "Unknown ROM type\n");
 
     /* Attach the ROM to the socket */
@@ -1041,7 +1080,6 @@ static t_stat attach_rom_to_socket (char* rom_name, t_addr base_address,
     /* Set the ROM size and pointer to the ROM image */
     socket_info[socket_number].base_address = base_address;
     socket_info[socket_number].rom_size = size;
-    socket_info[socket_number].end_address = base_address + size - 1;
 
     /* Deallocate previously allocated buffer */
     if (socket_info[socket_number].rom_buffer != NULL)
@@ -1167,7 +1205,6 @@ t_stat detach_socket (uint32 socket_number)
 {
     /* Clear socket information */
     socket_info[socket_number].base_address = 0;
-    socket_info[socket_number].end_address = 0;
     socket_info[socket_number].rom_size = 0;
     if (socket_info[socket_number].rom_buffer != NULL) {
         free (socket_info[socket_number].rom_buffer);

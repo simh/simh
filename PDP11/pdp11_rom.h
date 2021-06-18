@@ -159,7 +159,7 @@ typedef struct
     int32 base_address;             /* Base address for the socket */
     int32 end_address;              /* End address for the socket */
     // ToDo: Either end_address or size should suffice
-    uint32 rom_size;                /* ROM size */
+    int32 rom_size;                /* ROM size */
     char rom_name[CBUFSIZE];        /* Name of the ROM image */
     // ToDo: Rename rom_buffer to rom_image
     void *rom_buffer;               /* ROM contents */
