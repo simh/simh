@@ -152,19 +152,5 @@ rom_socket blank_sockets[NUM_BLANK_SOCKETS] =
     {0, 0, (rom (*)[]) NULL},        /* ROM 3 */
 };
 
-/* Define socket information */
-
-typedef struct
-{
-    int32 base_address;             /* Base address for the socket */
-    int32 end_address;              /* End address for the socket */
-    // ToDo: Either end_address or size should suffice
-    int32 rom_size;                /* ROM size */
-    char rom_name[CBUFSIZE];        /* Name of the ROM image */
-    // ToDo: Rename rom_buffer to rom_image
-    void *rom_buffer;               /* ROM contents */
-}
-SOCKET_INFO;
-
 #endif /* PDP11_ROM_H */
 

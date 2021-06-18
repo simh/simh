@@ -320,14 +320,22 @@ static char unit_filename[NUM_M9312_SOCKETS * CBUFSIZE];    /* Composed file nam
  * Define ROM device registers. All state is maintained in these registers
  * to allow the state to be saved and restored by a SAVE/RESTORE cycle.
  */
-static uint16 selected_type = ROM_MODULE_BLANK;                     /* The module type as set by the user */
+static uint16 selected_type = ROM_MODULE_BLANK;             /* The module type as set by the user */
 
 /* Define socket administration */
-SOCKET_INFO socket_info[MAX_NUMBER_SOCKETS] = {0, 0, 0, "", NULL};
+int32 base_address[MAX_NUMBER_SOCKETS];                     /* Base address for the socket */
+int32 rom_size[MAX_NUMBER_SOCKETS];                         /* ROM size */
+char rom_name[MAX_NUMBER_SOCKETS][CBUFSIZE];                /* Name of the ROM image */
+void *rom_image[MAX_NUMBER_SOCKETS];                        /* ROM contents */
 
 REG rom_reg[] = {
-    { ORDATAD (TYPE,     selected_type, 16,     "Type"), REG_RO },
-    { VBRDATA (SOCKET_INFO, socket_info, 16, 8, sizeof(socket_info)), REG_RO },
+    { ORDATAD (TYPE,     selected_type, 16,     "Type"), REG_RO  },
+    { BRDATAD (BASE_ADDRESS,  base_address,  16,  8, sizeof base_address, 
+        "Socket base addresses"), REG_RO},
+     { BRDATAD (ROM_NAME,  rom_name,  16,  8, sizeof rom_name,
+        "ROM names"), REG_RO},
+// ***    { BRDATAD (RXBUF,  rx_buffer,  16,  8, sizeof rx_buffer, "Receive packet buffer"), 0},
+// ***    { VBRDATA (SOCKET_INFO, socket_info, 16, 8, sizeof(socket_info)), REG_RO },
     { NULL }
 };
 
@@ -534,8 +542,8 @@ void set_socket_addresses ()
         
         /* Fill socket_info only if a valid address is given */
         if (socketptr->base_address > 0) {
-            socket_info[socket_number].base_address = socketptr->base_address;
-            socket_info[socket_number].rom_size = socketptr->size;
+            base_address[socket_number] = socketptr->base_address;
+            rom_size[socket_number] = socketptr->size;
         }
     }
 }
@@ -549,15 +557,15 @@ t_stat rom_show_sockets (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
     for (socket_number = 0;
         socket_number < module_list[selected_type]->num_sockets; socket_number++) {
         fprintf (f, "socket %d: ", socket_number);
-        if (socket_info[socket_number].rom_size > 0)
-            fprintf (f, "address=%o-%o, ", socket_info[socket_number].base_address,
-            socket_info[socket_number].base_address +
-            socket_info[socket_number].rom_size - 1);
+        if (rom_size[socket_number] > 0)
+            fprintf (f, "address=%o-%o, ", base_address[socket_number],
+            base_address[socket_number] +
+            rom_size[socket_number] - 1);
         else
-            fprintf (f, "address=%o, ", socket_info[socket_number].base_address);
+            fprintf (f, "address=%o, ", base_address[socket_number]);
         fprintf (f, "image=%s\n",
-            (*socket_info[socket_number].rom_name != 0) ?
-            socket_info[socket_number].rom_name : "none");
+            (*rom_name[socket_number] != 0) ?
+            rom_name[socket_number] : "none");
     }
     return SCPE_OK;
 }
@@ -628,21 +636,19 @@ t_stat rom_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 t_stat rom_rd (int32 *data, int32 PA, int32 access)
 {
     uint32 socket_number;
-    SOCKET_INFO *socket_infoptr = socket_info;
     uint32 num_sockets = module_list[selected_type]->num_sockets;
 
     /* For all sockets in socket_info */
-    for (socket_number = 0; socket_number < num_sockets; 
-        socket_number++, socket_infoptr++) {
+    for (socket_number = 0; socket_number < num_sockets; socket_number++) {
 
         /* Check if the address is in the range of this socket */
-        if (PA >= socket_infoptr->base_address &&
-            PA <= socket_infoptr->base_address + socket_infoptr->rom_size - 1 &&
-            (socket_infoptr->rom_buffer != NULL)) {
+        if (PA >= base_address[socket_number] &&
+            PA <= base_address[socket_number] + rom_size[socket_number] - 1 &&
+            (rom_image[socket_number] != NULL)) {
 
             /* Get pointer to ROM image and data from that image*/
-            uint16 *image = (uint16 *) socket_infoptr->rom_buffer;
-            *data = image[(PA - socket_infoptr->base_address) >> 1];
+            uint16 *image = (uint16 *) rom_image[socket_number];
+            *data = image[(PA - base_address[socket_number]) >> 1];
             return SCPE_OK;
         }
     }
@@ -684,7 +690,7 @@ t_stat rom_reset (DEVICE *dptr)
 
 t_stat rom_boot (int32 u, DEVICE *dptr)
 {
-    cpu_set_boot (socket_info[u].base_address);
+    // cpu_set_boot (base_address[socket_number]);
     return SCPE_OK;
 }
 
@@ -697,8 +703,8 @@ t_stat reset_dib (int socket_number, t_stat (reader (int32 *, int32, int32)),
     DIB *dib = &rom_dib[socket_number];
 
     // ToDo: socket_info shouldn't be global?!
-    dib->ba = socket_info[socket_number].base_address;
-    dib->lnt = socket_info[socket_number].rom_size;
+    dib->ba = base_address[socket_number];
+    dib->lnt = rom_size[socket_number];
     dib->rd = reader;
     dib->wr = writer;
     return build_ubus_tab (&rom_dev, dib);
@@ -751,15 +757,17 @@ t_stat attach_blank_rom (CONST char *cptr)
         for (socket_number = 0;
             socket_number < module_list[selected_type]->num_sockets;
             socket_number++) {
-            if (socket_info[socket_number].rom_size > 0) {
-                param_values.address = socket_info[socket_number].base_address;
-                strcpy (param_values.image_name, socket_info[socket_number].rom_name);
+            if (base_address[socket_number] > 0) {
+                param_values.address = base_address[socket_number];
+                strcpy (param_values.image_name, rom_name[socket_number]);
                 param_values.socket_number = socket_number;
 
                 if ((r = exec_attach_blank_rom (&param_values)) != SCPE_OK)
                     return r;
             }   
         }
+
+        return SCPE_OK;
     }
 
     /* Parse the command */
@@ -792,7 +800,7 @@ t_stat exec_attach_blank_rom (ATTACH_PARAM_VALUES *param_values)
     if (param_values->address != -1) {
 
         /* Set base address */
-        socket_info[socket_number].base_address = param_values->address;
+        base_address[socket_number] = param_values->address;
     }
 
     /* If a ROM image is specified an attach can be performed */
@@ -800,7 +808,7 @@ t_stat exec_attach_blank_rom (ATTACH_PARAM_VALUES *param_values)
 
         /* Check the ROM base address is set */
         // ToDo: Initialze attach_cmd_params.address to 0
-        if (socket_info[socket_number].base_address == 0)
+        if (base_address[socket_number] == 0)
             return sim_messagef (SCPE_ARG, "Set address first\n", socket_number);
 
         /* Check if an existing file is specified */
@@ -821,7 +829,7 @@ t_stat exec_attach_blank_rom (ATTACH_PARAM_VALUES *param_values)
 
         /* Attach the created ROM to the socket */
         r = attach_rom_to_socket (param_values->image_name,
-            socket_info[socket_number].base_address, rom_image, rom_size,
+            base_address[socket_number], rom_image, rom_size,
             NULL, socket_number);
     }
 
@@ -967,6 +975,7 @@ t_stat parse_cmd (CONST char *cptr, cmd_parameter *valid_params,
 
 
 /* Set the socket number for the current ATTACH command */
+// ToDo: Rename context parameter
 
 t_stat set_socket_for_attach (char *value, ATTACH_PARAM_VALUES *context)
 {
@@ -1073,42 +1082,40 @@ static rom *find_rom (const char *cptr, rom (*rom_listptr)[])
  * Attach the specified ROM with the information to the specified
  * socket.
  */
-static t_stat attach_rom_to_socket (char* rom_name, t_addr base_address,
+static t_stat attach_rom_to_socket (char* name, t_addr address,
     void *image, int16 size, void (*rom_attached)(), int socket_number)
 {
     
     /* Set the ROM size and pointer to the ROM image */
-    socket_info[socket_number].base_address = base_address;
-    socket_info[socket_number].rom_size = size;
+    base_address[socket_number] = address;
+    rom_size[socket_number] = size;
 
     /* Deallocate previously allocated buffer */
-    if (socket_info[socket_number].rom_buffer != NULL)
-        free (socket_info[socket_number].rom_buffer);
+    if (rom_image[socket_number] != NULL)
+        free (rom_image[socket_number]);
 
     /*
      * Allocate a buffer for the ROM image and copy the image into the
      * buffer, allowing to overwrite the ROM image.
      */
-    if ((socket_info[socket_number].rom_buffer =
-        malloc (socket_info[socket_number].rom_size)) == 0)
+    if ((rom_image[socket_number] =
+        malloc (rom_size[socket_number])) == 0)
         return sim_messagef (SCPE_IERR, "malloc() failed\n");
 
-    memcpy (socket_info[socket_number].rom_buffer,
-        image, socket_info[socket_number].rom_size);
+    memcpy (rom_image[socket_number], image, rom_size[socket_number]);
 
     /* Fill the DIB for the socket */
     if (reset_dib (socket_number, &rom_rd, NULL) != SCPE_OK) {
 
         // Remove ROM image
         // ToDo: Create remove_rom() function
-        free (socket_info[socket_number].rom_buffer);
-        socket_info[socket_number].rom_buffer = NULL;
+        free (rom_image[socket_number]);
+        rom_image[socket_number] = NULL;
         return sim_messagef (SCPE_IERR, "reset_dib() failed\n");
     }
 
-    /* Save the specified ROM image  name in the register */
-    strncpy (socket_info[socket_number].rom_name,
-        rom_name, CBUFSIZE);
+    /* Save the specified ROM image name in the register */
+    strncpy (rom_name[socket_number], name, CBUFSIZE);
 
     /* Execute rom specific function if available */
     if (rom_attached != NULL)
@@ -1144,10 +1151,10 @@ void create_filename (char *filename)
         socket_number++) {
 
         /* Only use filled sockets */
-        if (socket_info[socket_number].rom_size > 0) {
+        if (rom_size[socket_number] > 0) {
             filename += sprintf (filename, "%s%d:%s",
                 first_socket ? "" : ", ",
-                socket_number, socket_info[socket_number].rom_name);
+                socket_number, rom_name[socket_number]);
             first_socket = FALSE;
         }
     }
@@ -1204,13 +1211,13 @@ t_stat detach_all_sockets ()
 t_stat detach_socket (uint32 socket_number)
 {
     /* Clear socket information */
-    socket_info[socket_number].base_address = 0;
-    socket_info[socket_number].rom_size = 0;
-    if (socket_info[socket_number].rom_buffer != NULL) {
-        free (socket_info[socket_number].rom_buffer);
-        socket_info[socket_number].rom_buffer = NULL;
+    base_address[socket_number] = 0;
+    rom_size[socket_number] = 0;
+    if (rom_image[socket_number] != NULL) {
+        free (rom_image[socket_number]);
+        rom_image[socket_number] = NULL;
     }
-    *socket_info[socket_number].rom_name = 0;
+    *rom_name[socket_number] = 0;
 
     /* Clear Unibus map */
     return reset_dib (socket_number, NULL, NULL);
