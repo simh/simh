@@ -334,8 +334,6 @@ REG rom_reg[] = {
         "Socket base addresses"), REG_RO},
      { BRDATAD (ROM_NAME,  rom_name,  16,  8, sizeof rom_name,
         "ROM names"), REG_RO},
-// ***    { BRDATAD (RXBUF,  rx_buffer,  16,  8, sizeof rx_buffer, "Receive packet buffer"), 0},
-// ***    { VBRDATA (SOCKET_INFO, socket_info, 16, 8, sizeof(socket_info)), REG_RO },
     { NULL }
 };
 
@@ -852,6 +850,7 @@ t_stat exec_attach_blank_rom (ATTACH_PARAM_VALUES *param_values)
  */
 t_stat attach_embedded_rom (CONST char *cptr)
 {
+    uint32 socket_number;
     t_stat r;
     ATTACH_PARAM_VALUES param_values = {-1, -1, ""};
 
@@ -862,6 +861,24 @@ t_stat attach_embedded_rom (CONST char *cptr)
         {"IMAGE",   &set_image_for_attach},         /* IMAGE parameter is optional */
         {NULL},
     };
+
+    /* Check if we are called from a restore operation */
+    if (*cptr == '<') {
+
+        for (socket_number = 0;
+            socket_number < module_list[selected_type]->num_sockets;
+            socket_number++) {
+            if (*rom_name[socket_number] > 0) {
+                strcpy (param_values.image_name, rom_name[socket_number]);
+                param_values.socket_number = socket_number;
+
+                if ((r = exec_attach_embedded_rom (&param_values)) != SCPE_OK)
+                    return r;
+            }
+        }
+
+        return SCPE_OK;
+    }
 
     /* Parse the command */
     if ((r = parse_cmd (cptr, attach_parameters, &param_values)) != SCPE_OK)
@@ -890,7 +907,7 @@ t_stat exec_attach_embedded_rom (ATTACH_PARAM_VALUES *param_values)
     uint32 socket_number = param_values->socket_number;
 
     /* Get a pointer to the selected module and from that a pointer to
-   socket for the unit */
+       socket for the unit */
     modptr = *(module_list + selected_type);
     socketptr = *modptr->sockets + socket_number;
 
@@ -1151,7 +1168,7 @@ void create_filename (char *filename)
         socket_number++) {
 
         /* Only use filled sockets */
-        if (rom_size[socket_number] > 0) {
+        if (*rom_name[socket_number] != 0) {
             filename += sprintf (filename, "%s%d:%s",
                 first_socket ? "" : ", ",
                 socket_number, rom_name[socket_number]);
