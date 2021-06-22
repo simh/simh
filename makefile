@@ -356,8 +356,8 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
         else
           HBPATH = /opt/homebrew
         endif
-        INCPATH += $(foreach dir,$(wildcard $(HBPATH)/Cellar/*/*),$(dir)/include)
-        LIBPATH += $(foreach dir,$(wildcard $(HBPATH)/Cellar/*/*),$(dir)/lib)
+        INCPATH += $(foreach dir,$(wildcard $(HBPATH)/Cellar/*/*),$(realpath $(dir)/include))
+        LIBPATH += $(foreach dir,$(wildcard $(HBPATH)/Cellar/*/*),$(realpath $(dir)/lib))
       endif
     else
       ifeq (Linux,$(OSTYPE))
@@ -492,6 +492,8 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
         LIBPATH += /usr/lib/
       endif
     endif
+    export CPATH = $(subst $() $(),:,$(INCPATH))
+    export LIBRARY_PATH = $(subst $() $(),:,$(LIBPATH))
     # Some gcc versions don't support LTO, so only use LTO when the compiler is known to support it
     ifeq (,$(NO_LTO))
       ifneq (,$(GCC_VERSION))
