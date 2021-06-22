@@ -1,4 +1,4 @@
-/* 3b2_400_stddev.h: AT&T 3B2 Model 400 System Devices (Header)
+/* 3b2_rev2_stddev.h: AT&T 3B2 Rev 2 (Model 400) System Devices Header
 
    Copyright (c) 2017, Seth J. Morabito
 
@@ -28,8 +28,8 @@
    from the author.
 */
 
-#ifndef _3B2_SYSDEV_H_
-#define _3B2_SYSDEV_H_
+#ifndef _3B2_REV2_SYSDEV_H_
+#define _3B2_REV2_SYSDEV_H_
 
 #include "sim_defs.h"
 
@@ -119,4 +119,5 @@ const char *tod_description(DEVICE *dptr);
 t_stat tod_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr);
 uint32 tod_read(uint32 pa, size_t size);
 void tod_write(uint32, uint32 val, size_t size);
-#endif
+
+#endif /* _3B2_REV2_SYSDEV_H_ */

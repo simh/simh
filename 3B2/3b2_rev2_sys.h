@@ -1,4 +1,4 @@
-/* 3b2_400_sys.h: AT&T 3B2 Model 400 system-specific logic headers
+/* 3b2_rev2_sys.h: AT&T 3B2 Rev 2 (Model 400) system header
 
    Copyright (c) 2017, Seth J. Morabito
 
@@ -28,8 +28,8 @@
    from the author.
 */
 
-#ifndef _3B2_400_SYS_H_
-#define _3B2_400_SYS_H_
+#ifndef _3B2_REV2_SYS_H_
+#define _3B2_REV2_SYS_H_
 
 #include "sim_defs.h"
 
@@ -39,4 +39,4 @@ t_stat parse_sym(CONST char *cptr, t_addr addr, UNIT *uptr, t_value *val,
                   int32 sw);
 t_stat fprint_sym(FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw);
 
-#endif /* _3B2_400_SYS_H_ */
+#endif /* _3B2_REV2_SYS_H_ */

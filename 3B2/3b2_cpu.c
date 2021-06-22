@@ -1,4 +1,4 @@
-/* 3b2_400_cpu.c: AT&T 3B2 Model 400 CPU (WE32100) Implementation
+/* 3b2_cpu.c: AT&T 3B2 CPU (WE32100 and WE32200) Implementation
 
    Copyright (c) 2017, Seth J. Morabito
 
@@ -29,8 +29,8 @@
 */
 
 #include "3b2_defs.h"
-#include "3b2_400_cpu.h"
-#include "rom_400_bin.h"
+#include "3b2_cpu.h"
+#include "rom_rev2_bin.h"
 #include <sim_defs.h>
 
 #define MAX_SUB_RETURN_SKIP 9

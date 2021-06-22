@@ -28,8 +28,12 @@ For Example, the directory structure should look like:
 
 If you have a command line version of git installed in your environment
 then the windows-build repository will be downloaded and updated 
-automatically.  If not, then the contents of the windows-build directory 
-can be downloaded from:
+automatically.  Git for windows can be downloaded from:
+
+    https://git-scm.com/download/win
+    
+If git isn't available, then the contents of the windows-build 
+directory can be downloaded from:
 
     https://github.com/simh/windows-build/archive/windows-build.zip
 

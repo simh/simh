@@ -70,8 +70,9 @@ struct ROM_File_Descriptor {
    {"PDP11/dazzledart/dazzle.lda",      "PDP11/pdp11_dazzle_dart_rom.h",             6096,            0xFFF83848,        "dazzle_lda"},
    {"PDP11/11logo/11logo.lda",          "PDP11/pdp11_11logo_rom.h",                 26009,            0xFFDD77F7,        "logo_lda"},
    {"swtp6800/swtp6800/swtbug.bin",     "swtp6800/swtp6800/swtp_swtbug_bin.h",       1024,            0xFFFE4FBC,        "swtp_swtbug_bin"},
-   {"3B2/rom_400.bin",                  "3B2/rom_400_bin.h",                        32768,            0xFFD55762,        "rom_400_bin"},
-   {"3B2/rom_1000.bin",                 "3B2/rom_1000_bin.h",                      131072,            0xFFDC0EB8,        "rom_1000_bin"},
+   {"3B2/rom_rev2.bin",                 "3B2/rom_rev2_bin.h",                       32768,            0xFFD55762,        "rom_rev2_bin"},
+   {"3B2/rom_rev2_demon.bin",           "3B2/rom_rev2_demon_bin.h",                 65536,            0xFFB345BB,        "rom_rev2_demon_bin"},
+   {"3B2/rom_rev3.bin",                 "3B2/rom_rev3_bin.h",                      131072,            0xFFDC0EB8,        "rom_rev3_bin"},
    };
 
 
@@ -320,7 +321,9 @@ if (0 == sim_read_ROM_include(include_filename,
         }
     }
 
-if (NULL == (iFile = fopen (include_filename, "w"))) {
+/* Open output file in binary mode for consistency with all simh 
+   source files that have CRLF line endings with explicit writes of \r\n */
+if (NULL == (iFile = fopen (include_filename, "wb"))) {
     printf ("Error Opening '%s' for output: %s\n", include_filename, strerror(errno));
     free (ROMData);
     return -1;
@@ -331,29 +334,29 @@ if (load_filename)
 else
     load_filename = rom_filename;
 time (&now);
-fprintf (iFile, "#ifndef ROM_%s_H\n", rom_array_name);
-fprintf (iFile, "#define ROM_%s_H 0\n", rom_array_name);
-fprintf (iFile, "/*\n");
+fprintf (iFile, "#ifndef ROM_%s_H\r\n", rom_array_name);
+fprintf (iFile, "#define ROM_%s_H 0\r\n", rom_array_name);
+fprintf (iFile, "/*\r\n");
 fprintf (iFile, "   %s         produced at %s", include_filename, ctime(&now));
 fprintf (iFile, "   from %s which was last modified at %s", rom_filename, ctime(&statb.st_mtime));
-fprintf (iFile, "   file size: %d (0x%X) - checksum: 0x%08X\n", (int)statb.st_size, (int)statb.st_size, checksum);
-fprintf (iFile, "   This file is a generated file and should NOT be edited or changed by hand.\n");
+fprintf (iFile, "   file size: %d (0x%X) - checksum: 0x%08X\r\n", (int)statb.st_size, (int)statb.st_size, checksum);
+fprintf (iFile, "   This file is a generated file and should NOT be edited or changed by hand.\r\n");
 if (Comments)
-    fprintf (iFile, "\n   %s\n\n", Comments);
-fprintf (iFile, "*/\n");
-fprintf (iFile, "#define BOOT_CODE_SIZE 0x%X\n", (int)statb.st_size);
-fprintf (iFile, "#define BOOT_CODE_FILENAME \"%s\"\n", load_filename);
-fprintf (iFile, "#define BOOT_CODE_ARRAY %s\n", rom_array_name);
+    fprintf (iFile, "\n   %s\r\n\r\n", Comments);
+fprintf (iFile, "*/\r\n");
+fprintf (iFile, "#define BOOT_CODE_SIZE 0x%X\r\n", (int)statb.st_size);
+fprintf (iFile, "#define BOOT_CODE_FILENAME \"%s\"\r\n", load_filename);
+fprintf (iFile, "#define BOOT_CODE_ARRAY %s\r\n", rom_array_name);
 fprintf (iFile, "unsigned char %s[] = {", rom_array_name);
 for (bytes_written=0;bytes_written<statb.st_size; ++bytes_written) {
     c = ROMData[bytes_written];
     if (0 == bytes_written%16)
-        fprintf (iFile,"\n");
+        fprintf (iFile, "\r\n");
     fprintf (iFile,"0x%02X,", c&0xFF);
     }
 free (ROMData);
-fprintf (iFile,"};\n");
-fprintf (iFile, "#endif /* ROM_%s_H */\n", rom_array_name);
+fprintf (iFile,"};\r\n");
+fprintf (iFile, "#endif /* ROM_%s_H */\r\n", rom_array_name);
 fclose (iFile);
 if (1) { /* Set Modification Time on the include file to be the modification time of the ROM file */
     struct utimbuf times;

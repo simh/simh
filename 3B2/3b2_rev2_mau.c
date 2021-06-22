@@ -1,5 +1,5 @@
-/* 3b2_400_mau.c: AT&T 3B2 Model 400 Math Acceleration Unit (WE32106 MAU)
-   Implementation
+/* 3b2_rev2_mau.c: AT&T 3B2 Rev 2 (Model 400) Math Acceleration
+   Unit (WE32106 MAU) Implementation
 
    Copyright (c) 2019, Seth J. Morabito
 
@@ -84,7 +84,7 @@
 #include <math.h>
 
 #include "3b2_defs.h"
-#include "3b2_400_mau.h"
+#include "3b2_rev2_mau.h"
 
 #define   MAU_ID   0        /* Coprocessor ID of MAU */
 

@@ -5644,12 +5644,14 @@ else {
     lvl = MTAB_VDV;                                     /* device match */
     uptr = dptr->units;                                 /* first unit */
     }
-if (*cptr == 0)                                         /* must be more */
+if ((*cptr == 0) || (*cptr == ';') || (*cptr == '#'))   /* must be more */
     return SCPE_2FARG;
 GET_SWITCHES (cptr);                                    /* get more switches */
 
 while (*cptr != 0) {                                    /* do all mods */
     cptr = get_glyph (svptr = cptr, gbuf, ',');         /* get modifier */
+    if (0 == strcmp (gbuf, ";"))
+        break;
     if ((cvptr = strchr (gbuf, '=')))                   /* = value? */
         *cvptr++ = 0;
     for (mptr = dptr->modifiers; mptr && (mptr->mask != 0); mptr++) {
@@ -5902,7 +5904,7 @@ MTAB *mptr;
 SHTAB *shtb = NULL, *shptr;
 
 GET_SWITCHES (cptr);                                    /* get switches */
-if (*cptr == 0)                                         /* must be more */
+if ((*cptr == 0) || (*cptr == ';') || (*cptr == '#'))   /* must be more */
     return SCPE_2FARG;
 cptr = get_glyph (svptr = cptr, gbuf, 0);               /* get next glyph */
 
@@ -5950,7 +5952,7 @@ else {
         }
     }
 
-if (*cptr == 0) {                                       /* now eol? */
+if ((*cptr == 0) || (*cptr == ';') || (*cptr == '#')) { /* now eol? */
     return (lvl == MTAB_VDV)?
         show_device (ofile, dptr, 0):
         show_unit (ofile, dptr, uptr, -1);
@@ -10439,6 +10441,8 @@ if ((dptr = find_dev (cptr))) {                         /* exact match? */
     }
 
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* base + unit#? */
+    if (qdisable (dptr))                                /* device disabled? */
+        continue;
     if (dptr->numunits &&                               /* any units? */
         (((nptr = dptr->name) &&
           (strncmp (cptr, nptr, strlen (nptr)) == 0)) ||
@@ -10451,7 +10455,14 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* base + unit#? */
             u = (uint32) get_uint (tptr, 10, dptr->numunits - 1, &r);
             if (r != SCPE_OK)                           /* error? */
                 *uptr = NULL;
-            else *uptr = dptr->units + u;
+            else
+                *uptr = dptr->units + u;
+            return dptr;
+            }
+        }
+    for (u = 0; u < dptr->numunits; u++) {
+        if (0 == strcmp (cptr, sim_uname (&dptr->units[u]))) {
+            *uptr = &dptr->units[u];
             return dptr;
             }
         }

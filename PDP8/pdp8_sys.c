@@ -1,6 +1,6 @@
 /* pdp8_sys.c: PDP-8 simulator interface
 
-   Copyright (c) 1993-2016, Robert M Supnik
+   Copyright (c) 1993-2021, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   11-May-21    RMS     Fixed RF/DF and LP decoding
    15-Dec-16    RMS     Added PKSTF (Dave Gesswein)
    17-Sep-13    RMS     Fixed recognition of initial field change (Dave Gesswein)
    24-Mar-09    RMS     Added link to FPP
@@ -412,12 +413,12 @@ static const int32 opc_val[] = {
  06774+I_IOA+AMB_TD, 06775+I_IOA+AMB_TD, 06776+I_IOA+AMB_TD, 06777+I_IOA+AMB_TD,
  06530+I_NPN, 06531+I_NPN, 06532+I_NPN, 06533+I_NPN,    /* AD */
  06534+I_NPN, 06535+I_NPN, 06536+I_NPN, 06537+I_NPN,
- 06660+I_NPN, 06601+I_NPN, 06603+I_NPN, 06605+I_NPN,                 /* DF/RF */
+ 06601+I_NPN, 06603+I_NPN, 06605+I_NPN,                 /* DF/RF */
  06611+I_NPN, 06612+I_NPN, 06615+I_NPN, 06616+I_NPN,
  06611+I_NPN,              06615+I_NPN, 06616+I_NPN,
  06621+I_NPN, 06622+I_NPN, 06623+I_NPN, 06626+I_NPN,
  06641+I_NPN, 06643+I_NPN, 06645+I_NPN,
- 06661+I_NPN, 06662+I_NPN, 06663+I_NPN,                 /* LPT */
+ 06660+I_NPN, 06661+I_NPN, 06662+I_NPN, 06663+I_NPN,    /* LPT */
  06664+I_NPN, 06665+I_NPN, 06666+I_NPN, 06667+I_NPN,
  06701+I_NPN, 06702+I_NPN, 06703+I_NPN,                 /* MT */
  06704+I_NPN, 06705+I_NPN, 06706+I_NPN, 06707+I_NPN,
