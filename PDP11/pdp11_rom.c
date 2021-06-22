@@ -27,7 +27,6 @@
 #include "pdp11_vt40boot.h"
 
 /* Forward references */
-
 t_stat rom_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat rom_rd (int32 *data, int32 PA, int32 access);
 t_stat rom_reset (DEVICE *dptr);
@@ -37,43 +36,45 @@ t_stat rom_show_type (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_set_configmode (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_configmode (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_show_sockets (FILE *, UNIT *, int32, CONST void *);
-t_stat vt40_auto_attach ();
-void set_socket_addresses ();
 t_stat rom_attach (UNIT *, CONST char *);
-t_stat attach_blank_rom (CONST char *);
-t_stat attach_embedded_rom (CONST char *);
-t_stat parse_cmd (CONST char *, cmd_parameter *, ATTACH_PARAM_VALUES *);
-t_stat set_socket_for_attach (char *, ATTACH_PARAM_VALUES *);
-t_stat set_address_for_attach (char *, ATTACH_PARAM_VALUES *);
-t_stat set_address_not_allowed (char *, ATTACH_PARAM_VALUES *);
-t_stat set_image_for_attach (char *, ATTACH_PARAM_VALUES *);
-t_stat exec_attach_blank_rom (ATTACH_PARAM_VALUES *);
-t_stat exec_attach_embedded_rom (ATTACH_PARAM_VALUES *);
-static t_stat attach_rom_to_socket (char *, t_addr, void *, int16, void (*)(), int);
-void create_filename (char *);
 t_stat rom_detach (UNIT *);
-t_stat detach_all_sockets ();
-t_stat detach_socket (uint32);
-t_stat rom_blank_help (FILE *, const char *);
-t_stat rom_m9312_help (FILE *, const char *);
-t_stat rom_vt40_help (FILE *, const char *);
-t_stat rom_help (FILE *st, DEVICE *, UNIT *, int32, const char *);
-t_stat rom_help_attach (FILE *st, DEVICE *, UNIT *, int32, const char *);
 const char *rom_description (DEVICE *);
-t_stat reset_dib (int unit_number, t_stat (reader (int32 *, int32, int32)),
-t_stat (writer (int32, int32, int32)));
+
+/* Forward references for helper functions */
+static void set_socket_addresses ();
+static int module_type_is_valid (uint16);
+static t_stat blank_attach (CONST char *);
+static t_stat embedded_attach (CONST char *);
+static t_stat parse_cmd (CONST char *, cmd_parameter *, ATTACH_PARAM_VALUES *);
+static t_stat set_socket_for_attach (char *, ATTACH_PARAM_VALUES *);
+static t_stat set_address_for_attach (char *, ATTACH_PARAM_VALUES *);
+static t_stat set_address_not_allowed (char *, ATTACH_PARAM_VALUES *);
+static t_stat set_image_for_attach (char *, ATTACH_PARAM_VALUES *);
+static t_stat exec_attach_blank_rom (ATTACH_PARAM_VALUES *);
+static t_stat exec_attach_embedded_rom (ATTACH_PARAM_VALUES *);
+static t_stat attach_rom_to_socket (char *, t_addr, void *, int16, void (*)(), int);
+static t_stat vt40_auto_attach ();
+static void create_filename (char *);
+static t_stat detach_all_sockets ();
+static t_stat detach_socket (uint32);
+static t_stat blank_help (FILE *, const char *);
+static t_stat m9312_help (FILE *, const char *);
+static t_stat vt40_help (FILE *, const char *);
+static t_stat rom_help (FILE *st, DEVICE *, UNIT *, int32, const char *);
+static t_stat rom_help_attach (FILE *st, DEVICE *, UNIT *, int32, const char *);
+static t_stat reset_dib (int, t_stat (reader (int32 *, int32, int32)),
+    t_stat (writer (int32, int32, int32)));
 static rom *find_rom (const char *cptr, rom (*rom_list)[]);
 static t_stat m9312_auto_config ();
 static t_stat m9312_auto_config_console_roms ();
 static t_stat m9312_auto_config_bootroms ();
-static t_stat attach_m9312_rom (const char *rom_name, int unit_number);
+static t_stat m9312_attach (const char *rom_name, int unit_number);
 
 /* External references */
 extern uint32 cpu_type;
 extern uint32 cpu_opt;
 extern uint32 cpu_model;
 extern int32 HITMISS;
-
 
 static const char rom_helptext[] =
 /***************** 80 character line width template *************************/
@@ -242,8 +243,8 @@ module_type_definition blank =
     ROM_UNIT_FLAGS,                         /* UNIT flags */
     (rom_socket (*)[]) & blank_sockets,     /* Pointer to rom_socket structs */
     NULL,                                   /* Auto configuration function */
-    &rom_blank_help,                        /* Pointer to help function */
-    attach_blank_rom,                       /* Attach function */
+    &blank_help,                            /* Pointer to help function */
+    blank_attach,                           /* Attach function */
     NULL,                                   /* Auto-attach function */
 };
 
@@ -259,8 +260,8 @@ module_type_definition m9312 =
     ROM_UNIT_FLAGS,                         /* UNIT flags */
     (rom_socket (*)[]) & m9312_sockets,     /* Pointer to rom_socket structs */
     &m9312_auto_config,                     /* Auto configuration function */
-    &rom_m9312_help,                        /* Pointer to help function */
-    attach_embedded_rom,                    /* Attach function */
+    &m9312_help,                            /* Pointer to help function */
+    embedded_attach,                        /* Attach function */
     NULL,                                   /* Auto-attach function */
 };
 
@@ -276,8 +277,8 @@ module_type_definition vt40 =
     ROM_UNIT_FLAGS,                         /* UNIT flags */
     (rom_socket (*)[]) & vt40_sockets,      /* Pointer to rom_socket structs */
     NULL,                                   /* Auto configuration function */
-    &rom_vt40_help,                         /* Pointer to help function */
-    attach_embedded_rom,                    /* Attach function */
+    &vt40_help,                             /* Pointer to help function */
+    embedded_attach,                        /* Attach function */
     &vt40_auto_attach,                      /* Auto-attach function */
 };
 
@@ -428,20 +429,6 @@ rom_for_cpu_model cpu_rom_map[] =
     0,                   NULL,
 };
 
-
-/*
- * Check if the module type to be set is valid on the selected 
- * cpu_opt and cpu_type
- */
-int module_type_is_valid (uint16 module_number)
-{
-    uint32 bus = UNIBUS ? UNIBUS_MODEL : QBUS_MODEL;
-
-    return CPUT (module_list[module_number]->valid_cpu_types) &&
-        bus & module_list[module_number]->valid_cpu_opts;
-}
-
-
 /* Set ROM module type */
 
 t_stat rom_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
@@ -495,6 +482,19 @@ t_stat rom_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 }
 
 
+/*
+ * Check if the module type to be set is valid on the selected
+ * cpu_opt and cpu_type
+ */
+static int module_type_is_valid (uint16 module_number)
+{
+    uint32 bus = UNIBUS ? UNIBUS_MODEL : QBUS_MODEL;
+
+    return CPUT (module_list[module_number]->valid_cpu_types) &&
+        bus & module_list[module_number]->valid_cpu_opts;
+}
+
+
 /* Show ROM module type */
 
 t_stat rom_show_type (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
@@ -504,26 +504,9 @@ t_stat rom_show_type (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 }
 
 
-/* Auto-attach ROM for VT40 */
-
-t_stat vt40_auto_attach ()
-{
-    rom_socket *socketptr;
-    rom *romptr;
-    uint32 socket_number = 0;
-
-    /* A VT40 has just one socket */
-    socketptr = &vt40_sockets[socket_number];
-    romptr = *socketptr->rom_list;
-
-    /* Attach the ROM to the socket */
-    return attach_rom_to_socket (romptr->device_mnemonic, socketptr->base_address,
-        romptr->image, socketptr->size, romptr->rom_attached, socket_number);
-}
-
 /* Set (if available) base address for the sockets */
 
-void set_socket_addresses ()
+static void set_socket_addresses ()
 {
     module_type_definition *modptr;
     rom_socket *socketptr;
@@ -695,7 +678,7 @@ t_stat rom_boot (int32 u, DEVICE *dptr)
 
 /* (Re)set the DIB and build the Unibus table for the specified socket */
 
-t_stat reset_dib (int socket_number, t_stat (reader (int32 *, int32, int32)),
+static t_stat reset_dib (int socket_number, t_stat (reader (int32 *, int32, int32)),
     t_stat (writer (int32, int32, int32)))
 {
     DIB *dib = &rom_dib[socket_number];
@@ -735,7 +718,7 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
  * This sequence is necessary to allow a free ordering of the parameters
  * and to check that every parameter is specified just once.
  */
-t_stat attach_blank_rom (CONST char *cptr)
+static t_stat blank_attach (CONST char *cptr)
 {
     uint32 socket_number;
     t_stat r = SCPE_OK;
@@ -787,7 +770,7 @@ t_stat attach_blank_rom (CONST char *cptr)
 
 /* Execute the attach command for the BLANK module */
 
-t_stat exec_attach_blank_rom (ATTACH_PARAM_VALUES *param_values)
+static t_stat exec_attach_blank_rom (ATTACH_PARAM_VALUES *param_values)
 {
     t_stat r = SCPE_OK;
     FILE *fileptr;
@@ -848,7 +831,7 @@ t_stat exec_attach_blank_rom (ATTACH_PARAM_VALUES *param_values)
  * This sequence is necessary to allow a free ordering of the parameters
  * and to check that every parameter is specified just once.
  */
-t_stat attach_embedded_rom (CONST char *cptr)
+static t_stat embedded_attach (CONST char *cptr)
 {
     uint32 socket_number;
     t_stat r;
@@ -898,7 +881,7 @@ t_stat attach_embedded_rom (CONST char *cptr)
 
 /* Execute the attach command for an embedded module */
 
-t_stat exec_attach_embedded_rom (ATTACH_PARAM_VALUES *param_values)
+static t_stat exec_attach_embedded_rom (ATTACH_PARAM_VALUES *param_values)
 {
     t_stat r;
     module_type_definition *modptr;
@@ -946,7 +929,7 @@ t_stat exec_attach_embedded_rom (ATTACH_PARAM_VALUES *param_values)
  *      SCPE_OK         - A command was succesfully parsed
  *      SCPE_ARG        - No meaningful command could be parsed
  */
-t_stat parse_cmd (CONST char *cptr, cmd_parameter *valid_params, 
+static t_stat parse_cmd (CONST char *cptr, cmd_parameter *valid_params, 
     ATTACH_PARAM_VALUES *attach_cmd_params)
 {
     char glyph[CBUFSIZE];
@@ -994,7 +977,7 @@ t_stat parse_cmd (CONST char *cptr, cmd_parameter *valid_params,
 /* Set the socket number for the current ATTACH command */
 // ToDo: Rename context parameter
 
-t_stat set_socket_for_attach (char *value, ATTACH_PARAM_VALUES *context)
+static t_stat set_socket_for_attach (char *value, ATTACH_PARAM_VALUES *context)
 {
     char *ptr;
     uint32 socket_number = strtol (value, &ptr, 0);
@@ -1018,7 +1001,7 @@ t_stat set_socket_for_attach (char *value, ATTACH_PARAM_VALUES *context)
  * Set the address to attach the image on. This only applies to the
  * BLANK module type.
  */
-t_stat set_address_for_attach (char *value, ATTACH_PARAM_VALUES *context)
+static t_stat set_address_for_attach (char *value, ATTACH_PARAM_VALUES *context)
 {
     t_value r;
     int32   address;
@@ -1046,7 +1029,7 @@ t_stat set_address_for_attach (char *value, ATTACH_PARAM_VALUES *context)
 
 /* Return an error on the ADDRESS parameter */
 
-t_stat set_address_not_allowed (char *value, ATTACH_PARAM_VALUES * context)
+static t_stat set_address_not_allowed (char *value, ATTACH_PARAM_VALUES * context)
 {
     return sim_messagef (SCPE_ARG,
         "ADDRESS parameter not allowed for the selected module type\n");
@@ -1056,7 +1039,7 @@ t_stat set_address_not_allowed (char *value, ATTACH_PARAM_VALUES * context)
 
 /* Set the ROM image name to attach on the socket */
 
-t_stat set_image_for_attach (char *value,
+static t_stat set_image_for_attach (char *value,
     ATTACH_PARAM_VALUES *attach_param_values)
 {
     /* Check if image is not already set */
@@ -1150,6 +1133,23 @@ static t_stat attach_rom_to_socket (char* name, t_addr address,
     return SCPE_OK;
 }
 
+/* Auto-attach ROM for VT40 */
+
+static t_stat vt40_auto_attach ()
+{
+    rom_socket *socketptr;
+    rom *romptr;
+    uint32 socket_number = 0;
+
+    /* A VT40 has just one socket */
+    socketptr = &vt40_sockets[socket_number];
+    romptr = *socketptr->rom_list;
+
+    /* Attach the ROM to the socket */
+    return attach_rom_to_socket (romptr->device_mnemonic, socketptr->base_address,
+        romptr->image, socketptr->size, romptr->rom_attached, socket_number);
+}
+
 /* 
  * Create a meaningful filename 
  *
@@ -1157,7 +1157,7 @@ static t_stat attach_rom_to_socket (char* name, t_addr address,
  * rom_attach() to detect that images must be reattached in a
  * RESTORE operation.
  */
-void create_filename (char *filename)
+static void create_filename (char *filename)
 {
     uint32 socket_number;
     t_bool first_socket = TRUE;
@@ -1202,7 +1202,7 @@ t_stat rom_detach (UNIT *uptr)
 
 /* Detach images from all sockets */
 
-t_stat detach_all_sockets ()
+static t_stat detach_all_sockets ()
 {
     uint32 socket_number;
     t_stat r;
@@ -1225,7 +1225,7 @@ t_stat detach_all_sockets ()
 
 /* Detach the image from the specified socket */
 
-t_stat detach_socket (uint32 socket_number)
+static t_stat detach_socket (uint32 socket_number)
 {
     /* Clear socket information */
     base_address[socket_number] = 0;
@@ -1241,7 +1241,7 @@ t_stat detach_socket (uint32 socket_number)
 }
 
 
-t_stat rom_blank_help (FILE *st, const char *cptr)
+static t_stat blank_help (FILE *st, const char *cptr)
 {
     fprintf (st, rom_blank_helptext);
     return SCPE_OK;
@@ -1266,7 +1266,7 @@ static t_stat m9312_auto_config_console_roms ()
     /* Search device_rom map for a suitable boot ROM for the device */
     for (mptr = &cpu_rom_map[0]; mptr->rom_name != NULL; mptr++) {
         if (mptr->cpu_model == cpu_model)
-            return attach_m9312_rom (mptr->rom_name, 0);
+            return m9312_attach (mptr->rom_name, 0);
     }
 
     /* No ROM found for the CPU model */
@@ -1300,7 +1300,7 @@ static t_stat m9312_auto_config_bootroms ()
             /* Search device_rom map for a suitable boot ROM for the device */
             for (mptr = &device_rom_map[0]; mptr->device_name != NULL; mptr++) {
                 if (strcasecmp (dptr->name, mptr->device_name) == 0) {
-                    if ((result = attach_m9312_rom (mptr->rom_name, socket_number)) != SCPE_OK)
+                    if ((result = m9312_attach (mptr->rom_name, socket_number)) != SCPE_OK)
                         return result;
                     socket_number++;
                     break;
@@ -1311,9 +1311,7 @@ static t_stat m9312_auto_config_bootroms ()
     return SCPE_OK;
 }
 
-
-
-static t_stat attach_m9312_rom (const char *rom_name, int socket_number)
+static t_stat m9312_attach (const char *rom_name, int socket_number)
 {
     rom_socket *socketptr;
     rom *romptr;
@@ -1330,7 +1328,7 @@ static t_stat attach_m9312_rom (const char *rom_name, int socket_number)
         return SCPE_IERR;
 }
 
-t_stat rom_m9312_help (FILE *st, const char *cptr)
+static t_stat m9312_help (FILE *st, const char *cptr)
 {
     rom *romptr;
 
@@ -1361,7 +1359,7 @@ t_stat rom_m9312_help (FILE *st, const char *cptr)
     return SCPE_OK;
 }
 
-t_stat rom_vt40_help (FILE *st, const char *cptr)
+static t_stat vt40_help (FILE *st, const char *cptr)
 {
     fprintf (st, rom_vt40_helptext);
     return SCPE_OK;
@@ -1369,7 +1367,7 @@ t_stat rom_vt40_help (FILE *st, const char *cptr)
 
 /* Print help */
 
-t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
     uint16 module_number;
     char gbuf[CBUFSIZE];
@@ -1397,7 +1395,7 @@ t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cpt
 
 /* Print attach command help */
 
-t_stat rom_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
+static t_stat rom_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
     fprintf (st, "The ATTACH command is used to specify the contents of a ROM unit. For the BLANK\n");
     fprintf (st, "module a file must be specified. The file contents must be a flat binary image and\n");
