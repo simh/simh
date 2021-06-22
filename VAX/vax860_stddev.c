@@ -137,9 +137,6 @@ static BITFIELD tmr_iccs_bits [] = {
 #define TRK             u3                              /* current track */
 #define STAT            u4                              /* status */
 
-#define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* hwre write lock */
-#define UNIT_WLK        (1u << UNIT_V_WLK)
-
 #define RLCS_DRDY       0000001                         /* drive ready */
 #define RLCS_M_DRIVE    03
 #define RLCS_V_DRIVE    8
@@ -440,8 +437,10 @@ REG rlcs_reg[] = {
     };
 
 MTAB rlcs_mod[] = {
-    { UNIT_WLK,         0, "write enabled",  "WRITEENABLED", NULL, NULL, NULL, "Write enable console RL02 drive" },
-    { UNIT_WLK,  UNIT_WLK, "write locked",   "LOCKED", NULL, NULL, NULL, "Write lock console RL02 drive"  },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable console RL02 drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock console RL02 drive" },
     { 0 }
     };
 

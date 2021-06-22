@@ -26,7 +26,7 @@
     MODIFICATIONS:
 
         ?? ??? 10 - Original file.
-        16 Dec 12 - Modified to use isbc_80_10.cfg file to set baseport and size.
+        16 Dec 12 - Modified to use isbc_80_10.cfg file to set i8251_baseport and size.
         24 Apr 15 -- Modified to use simh_debug
 
     NOTES:
@@ -111,8 +111,6 @@
 
 #include "system_defs.h"
 
-#if defined (I8251_NUM) && (I8251_NUM > 0)
-
 #define UNIT_V_ANSI (UNIT_V_UF + 0)     /* ANSI mode */
 #define UNIT_ANSI   (1 << UNIT_V_ANSI)
 
@@ -123,17 +121,30 @@
 #define TXE         0x04
 #define SD          0x40
 
+#define i8251_NAME    "Intel i8251 UART Chip"
+
 /* external globals */
 
 /* external function prototypes */
 
-extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint16, uint16, uint8);
+extern uint8 unreg_dev(uint16);
 
 /* globals */
 
+static const char* i8251_desc(DEVICE *dptr) {
+    return i8251_NAME;
+}
+int     i8251_num = 0;
+int     i8251_baseport[4] = { -1, -1, -1, -1 }; //base port
+uint8   i8251_intnum[4] = { 0, 0, 0, 0 }; //interrupt number
+uint8   i8251_verb[4] = { 0, 0, 0, 0 }; //verbose flag
+
 /* function prototypes */
 
-t_stat i8251_cfg(uint8 base, uint8 devnum);
+t_stat i8251_cfg(uint16 base, uint16 devnum, uint8 dummy);
+t_stat i8251_clr(void);
+t_stat i8251_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat i8251_svc (UNIT *uptr);
 t_stat i8251_reset (DEVICE *dptr);
 uint8 i8251s(t_bool io, uint8 data, uint8 devnum);
@@ -184,6 +195,8 @@ DEBTAB i8251_debug[] = {
 MTAB i8251_mod[] = {
     { UNIT_ANSI, 0, "ANSI", "ANSI", NULL },
     { UNIT_ANSI, UNIT_ANSI, "TTY", "TTY", NULL },
+    { MTAB_XTD | MTAB_VDV, 0, "PARAM", NULL, NULL, i8251_show_param, NULL, 
+        "show configured parametes for i8251" },
     { 0 }
 };
 
@@ -207,7 +220,7 @@ DEVICE i8251_dev = {
     NULL,               //attach
     NULL,               //detach
     NULL,               //ctxt
-    DEV_DISABLE,        //flags
+    DEV_DEBUG+DEV_DISABLE+DEV_DIS, //flags 
     0,                  //dctrl
     i8251_debug,        //debflags
     NULL,               //memeory size change
@@ -215,21 +228,59 @@ DEVICE i8251_dev = {
     NULL,               //help routine
     NULL,               //attach help routine
     NULL,               //help context
-    NULL                //device description
+    &i8251_desc         //device description
 };
 
 // i8251 configuration
 
-t_stat i8251_cfg(uint8 base, uint8 devnum)
+t_stat i8251_cfg(uint16 base, uint16 devnum, uint8 dummy)
 {
-    sim_printf("    i8251[%d]: at base port 0%02XH\n",
-        devnum, base & 0xFF);
-    reg_dev(i8251d, base, devnum); 
-    reg_dev(i8251s, base + 1, devnum); 
+    i8251_baseport[devnum] = base & 0xff;
+    sim_printf("    i8251%d: installed at base port 0%02XH\n",
+        devnum, i8251_baseport[devnum]);
+    reg_dev(i8251d, i8251_baseport[devnum], devnum, 0); 
+    reg_dev(i8251s, i8251_baseport[devnum] + 1, devnum, 0); 
+    i8251_num++;                    //next device
     return SCPE_OK;
 }
 
-/* Service routines to handle simulator functions */
+t_stat i8251_clr(void)
+{
+    int i;
+    
+    for (i=0; i<i8251_num; i++) {
+        unreg_dev(i8251_baseport[i]); 
+        unreg_dev(i8251_baseport[i] + 1); 
+        i8251_baseport[i] = -1;
+        i8251_intnum[i] = 0;
+        i8251_verb[i] = 0;
+    }
+    i8251_num = 0; 
+    return SCPE_OK;
+}
+
+// show configuration parameters
+
+t_stat i8251_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    int i;
+    
+    if (uptr == NULL)
+        return SCPE_ARG;
+    fprintf(st, "Device %s\n", ((i8251_dev.flags & DEV_DIS) == 0) ? "Enabled" : "Disabled");
+    for (i=0; i<i8251_num; i++) {
+        fprintf(st, "Unit %d at Base port ", i);
+        fprintf(st, "0%02XH, ", i8251_baseport[i]);
+        fprintf(st, "Interrupt # is ");
+        fprintf(st, "%d, ", i8251_intnum[i]);
+        fprintf(st, "Mode ");
+        fprintf(st, "%s", i8251_verb[i] ? "Verbose" : "Quiet");
+        if (i<i8251_num && i8251_num != 1) fprintf(st, "\n");
+    }
+    return SCPE_OK;
+}
+
+/* Service routines to handled simulator functions */
 
 /* i8251_svc - actually gets char & places in buffer */
 
@@ -255,7 +306,8 @@ t_stat i8251_reset (DEVICE *dptr)
     
     for (devnum=0; devnum<I8251_NUM; devnum++) {
         i8251_reset_dev(devnum);
-        sim_activate (&i8251_unit[devnum], i8251_unit[devnum].wait); /* activate unit */
+        if (devnum == 0)
+            sim_activate (&i8251_unit[devnum], i8251_unit[devnum].wait); /* activate unit */
     }
     return SCPE_OK;
 }
@@ -276,7 +328,7 @@ void i8251_reset_dev(uint8 devnum)
 
 uint8 i8251s(t_bool io, uint8 data, uint8 devnum)
 {
-    if (io == 0) {                      /* read status port */
+     if (io == 0) {                      /* read status port */
         return i8251_unit[devnum].u3;
     } else {                            /* write status port */
         if (i8251_unit[devnum].u4) {    /* if mode, set cmd */
@@ -301,7 +353,5 @@ uint8 i8251d(t_bool io, uint8 data, uint8 devnum)
     }
     return 0;
 }
-
-#endif /* I8251_NUM > 0 */
 
 /* end of i8251.c */

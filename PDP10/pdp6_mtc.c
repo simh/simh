@@ -205,8 +205,10 @@ UNIT                mtc_unit[] = {
 DIB mtc_dib = {MTC_DEVCTL, 3, &mtc_devio, NULL};
 
 MTAB                mtc_mod[] = {
-    {MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL},
-    {MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL},
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write ring in place" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "no Write ring in place" },
     {MTUF_7TRK, 0, "9T", "9T", NULL, NULL},
     {MTUF_7TRK, MTUF_7TRK, "7T", "7T", NULL, NULL},
     {MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
@@ -286,7 +288,7 @@ mtc_devio(uint32 dev, uint64 *data) {
           case CONI:
               uptr = &mtc_unit[mtc_sel_unit];
               res = mtc_status | (uint64)(uptr->STATUS);
-              if ((uptr->flags & MTUF_WLK) != 0)
+              if ((uptr->flags & MTUF_WRP) != 0)
                   res |= WRITE_LOCK;
               if (sim_tape_bot(uptr))
                   res |= BOT_FLAG;
@@ -668,7 +670,7 @@ mtc_srv(UNIT * uptr)
          /* Writing and Type A, request first data word */
          if (uptr->CNTRL & MTC_START) {
              uptr->CNTRL &= ~MTC_START;
-             if ((uptr->flags & MTUF_WLK) != 0) {
+             if ((uptr->flags & MTUF_WRP) != 0) {
                  uptr->STATUS |= ILL_OPR;
                  break;
              }
@@ -725,7 +727,7 @@ mtc_srv(UNIT * uptr)
          if (uptr->CNTRL & MTC_START) {
             sim_debug(DEBUG_DETAIL, dptr, "MTC%o WTM\n", unit);
             uptr->CNTRL &= ~MTC_START;
-            if ((uptr->flags & MTUF_WLK) != 0) {
+            if ((uptr->flags & MTUF_WRP) != 0) {
                 uptr->STATUS |= ILL_OPR;
                 mtc_status |= (EOR_FLAG);
                 break;
@@ -743,7 +745,7 @@ mtc_srv(UNIT * uptr)
          if (uptr->CNTRL & MTC_START) {
              sim_debug(DEBUG_DETAIL, dptr, "MTC%o ERG\n", unit);
              uptr->CNTRL &= ~MTC_START;
-             if ((uptr->flags & MTUF_WLK) != 0) {
+             if ((uptr->flags & MTUF_WRP) != 0) {
                  uptr->STATUS |= ILL_OPR;
                  mtc_status |= (EOR_FLAG);
                  break;

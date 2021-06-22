@@ -73,16 +73,14 @@
 /* Unit flags and accessors */
 
 #define UNIT_V_MODEL    (UNIT_V_UF + 0)                 /* bits 1-0: model ID */
-#define UNIT_V_WLK      (UNIT_V_UF + 2)                 /* bits 2-2: write locked (protect switch) */
-#define UNIT_V_UNLOAD   (UNIT_V_UF + 3)                 /* bits 3-3: heads unloaded */
-#define UNIT_V_FMT      (UNIT_V_UF + 4)                 /* bits 4-4: format enabled */
-#define UNIT_V_AUTO     (UNIT_V_UF + 5)                 /* bits 5-5: autosize */
-#define DL_V_UF         (UNIT_V_UF + 6)                 /* first free unit flag bit */
+#define UNIT_V_UNLOAD   (UNIT_V_UF + 2)                 /* bits 2-2: heads unloaded */
+#define UNIT_V_FMT      (UNIT_V_UF + 3)                 /* bits 3-3: format enabled */
+#define UNIT_V_AUTO     (UNIT_V_UF + 4)                 /* bits 4-4: autosize */
+#define DL_V_UF         (UNIT_V_UF + 5)                 /* first free unit flag bit */
 
 #define UNIT_M_MODEL    03                              /* model ID mask */
 
 #define UNIT_MODEL      (UNIT_M_MODEL << UNIT_V_MODEL)
-#define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_UNLOAD     (1 << UNIT_V_UNLOAD)
 #define UNIT_FMT        (1 << UNIT_V_FMT)
 #define UNIT_AUTO       (1 << UNIT_V_AUTO)

@@ -59,11 +59,8 @@
 
 /* Unit specific flags */
 
-#define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* hwre write lock */
-#define UNIT_V_RP03     (UNIT_V_UF + 1)                 /* RP03 */
-#define UNIT_WLK        (1u << UNIT_V_WLK)
+#define UNIT_V_RP03     (UNIT_V_UF + 0)                 /* RP03 */
 #define UNIT_RP03       (1u << UNIT_V_RP03)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
 
 /* Parameters in the unit descriptor */
 
@@ -214,8 +211,10 @@ REG rp_reg[] = {
 MTAB rp_mod[] = {
     { UNIT_RP03, 0,         "RP02", "RP02", &rp_set_size },
     { UNIT_RP03, UNIT_RP03, "RP03", "RP03", &rp_set_size },
-    { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable disk drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock disk drive" },
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO", &set_devno, &show_devno },
     { 0 }
     };

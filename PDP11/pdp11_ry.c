@@ -66,13 +66,10 @@
 #define RY_SIZE         (RX_NUMTR * RX_NUMSC * RY_NUMBY)
 #define RX_NUMDR        2                               /* drives/controller */
 #define RX_M_NUMDR      01
-#define UNIT_V_WLK      (UNIT_V_UF)                     /* write locked */
-#define UNIT_V_DEN      (UNIT_V_UF + 1)                 /* double density */
-#define UNIT_V_AUTO     (UNIT_V_UF + 2)                 /* autosize */
-#define UNIT_WLK        (1u << UNIT_V_WLK)
+#define UNIT_V_DEN      (UNIT_V_UF + 0)                 /* double density */
+#define UNIT_V_AUTO     (UNIT_V_UF + 1)                 /* autosize */
 #define UNIT_DEN        (1u << UNIT_V_DEN)
 #define UNIT_AUTO       (1u << UNIT_V_AUTO)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
 
 #define IDLE            0                               /* idle state */
 #define RWDS            1                               /* rw, sect next */
@@ -216,10 +213,10 @@ REG ry_reg[] = {
     };
 
 MTAB ry_mod[] = {
-    { UNIT_WLK,                             0, "write enabled",     "WRITEENABLED", 
-        NULL, NULL, NULL, "Write enable disk drive" },
-    { UNIT_WLK,                      UNIT_WLK, "write locked",      "LOCKED", 
-        NULL, NULL, NULL, "Write lock disk drive" },
+    { MTAB_XTD|MTAB_VUN,                    0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable floppy drive" },
+    { MTAB_XTD|MTAB_VUN,                    1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock floppy drive" },
     { (UNIT_DEN+UNIT_ATT),           UNIT_ATT, "single density",    NULL, NULL },
     { (UNIT_DEN+UNIT_ATT), (UNIT_DEN+UNIT_ATT), "double density",   NULL, NULL },
     { (UNIT_AUTO+UNIT_DEN+UNIT_ATT),         0, "single density",   NULL, NULL },

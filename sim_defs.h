@@ -642,6 +642,8 @@ struct UNIT {
 #define UNIT_DISABLE    0002000         /* disable-able */
 #define UNIT_DIS        0004000         /* disabled */
 #define UNIT_IDLE       0040000         /* idle eligible */
+#define UNIT_WLK        0100000         /* hardware write lock */
+#define UNIT_WPRT     (UNIT_WLK|UNIT_RO)/* write protect */
 
 /* Unused/meaningless flags */
 #define UNIT_TEXT       0000000         /* text mode - no effect */
@@ -710,6 +712,7 @@ struct REG {
 #define REG_VMIO        00400                           /* use VM data print/parse */
 #define REG_VMAD        01000                           /* use VM addr print/parse */
 #define REG_FIT         02000                           /* fit access to size */
+#define REG_DEPOSIT     04000                           /* call VM routine after update */
 #define REG_HRO         (REG_RO | REG_HIDDEN)           /* hidden, read only */
 
 #define REG_V_UF        16                              /* device specific */

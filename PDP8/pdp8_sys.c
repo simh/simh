@@ -1,6 +1,6 @@
 /* pdp8_sys.c: PDP-8 simulator interface
 
-   Copyright (c) 1993-2016, Robert M Supnik
+   Copyright (c) 1993-2021, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   11-May-21    RMS     Fixed RF/DF and LP decoding
    15-Dec-16    RMS     Added PKSTF (Dave Gesswein)
    17-Sep-13    RMS     Fixed recognition of initial field change (Dave Gesswein)
    24-Mar-09    RMS     Added link to FPP
@@ -177,50 +178,87 @@ int32 c, rubout;
 
 rubout = 0;                                             /* clear toggle */
 while ((c = getc (fi)) != EOF) {                        /* read char */
-    if (rubout)                                         /* toggle set? */
-        rubout = 0;                                     /* clr, skip */
-    else if (c == 0377)                                 /* rubout? */
+    if (rubout) {                                       /* skipping chars */
+        if (c == 0377)                                  /* ending rubout? */
+            rubout = 0;                                 /* clr, skip */
+        else
+            continue;                                   /* skip charactder */
+        }
+    if (c == 0377)                                      /* rubout? */
         rubout = 1;                                     /* set, skip */
-    else if (c > 0200)                                  /* channel 8 set? */
-        *newf = (c & 070) << 9;                         /* change field */
-    else return c;                                      /* otherwise ok */
+    else
+        if (c > 0200)                                   /* channel 8 set? */
+            *newf = (c & 070) << 9;                     /* change field */
+    else 
+        return c;                                       /* otherwise ok */
     }
 return EOF;
 }
 
-t_stat sim_load_bin (FILE *fi)
+t_stat sim_load_bin (FILE *fi, t_bool do_load)
 {
 int32 hi, lo, wd, csum, t;
-uint32 field, newf, origin;
+uint32 field, newf, origin, words;
 int32 sections_read = 0;
 
 for (;;) {
-    csum = origin = field = newf = 0;                   /* init */
+    csum = origin = field = newf = words = 0;           /* init */
     do {                                                /* skip leader */
         if ((hi = sim_bin_getc (fi, &newf)) == EOF) {
-            if (sections_read != 0) {
-                sim_printf ("%d sections sucessfully read\n\r", sections_read);
-                return SCPE_OK;
-                } 
+            if (sections_read != 0)
+                return sim_messagef (SCPE_OK, "%d section%s sucessfully read\n",
+                                              sections_read, (sections_read != 1) ? "s" : "");
             else
-                return SCPE_FMT;
+                return (!do_load) ? SCPE_ARG : sim_messagef (SCPE_FMT, "unexpected binary loader data format\n");
             }
         } while ((hi == 0) || (hi >= 0200));
     for (;;) {                                          /* data blocks */
-        if ((lo = sim_bin_getc (fi, &newf)) == EOF)     /* low char */
-            return SCPE_FMT;
+        if ((lo = sim_bin_getc (fi, &newf)) == EOF) {   /* low char */
+            if (sections_read != 0)
+                sim_messagef (SCPE_OK, "%d section%s sucessfully read\n",
+                                       sections_read, (sections_read != 1) ? "s" : "");
+            if (words != 0)
+                sim_messagef (SCPE_OK, "%d %swords stored\n", words, (sections_read != 0) ? "additional " : "");
+            return (!do_load) ? SCPE_FMT : sim_messagef (SCPE_FMT, "unexpected binary loader data format\n");
+            }
         wd = (hi << 6) | lo;                            /* form word */
         t = hi;                                         /* save for csum */
-        if ((hi = sim_bin_getc (fi, &newf)) == EOF)     /* next char */
-            return SCPE_FMT;
+        if ((hi = sim_bin_getc (fi, &newf)) == EOF) {   /* next char */
+            if (sections_read != 0)
+                sim_messagef (SCPE_OK, "%d section%s sucessfully read\n",
+                                       sections_read, (sections_read != 1) ? "s" : "");
+            if (words != 0)
+                sim_messagef (SCPE_OK, "%d %swords stored\n", words, (sections_read != 0) ? "additional " : "");
+            return (!do_load) ? SCPE_FMT : sim_messagef (SCPE_FMT, "unexpected binary loader data format\n");
+            }
         if (hi == 0200) {                               /* end of tape? */
             if ((csum - wd) & 07777) {                  /* valid csum? */
                 if (sections_read != 0)
-                    sim_printf ("%d sections sucessfully read\n\r", sections_read);
-                return SCPE_CSUM;
+                    sim_messagef (SCPE_OK, "%d section%s sucessfully read\n",
+                                           sections_read, (sections_read != 1) ? "s" : "");
+                if (words != 0)
+                    sim_messagef (SCPE_OK, "%d %swords stored\n", words, (sections_read != 0) ? "additional " : "");
+                return (!do_load) ? SCPE_CSUM : sim_messagef (SCPE_CSUM, "unexpected binary loader checksum\n");
                 }
-            if (!(sim_switches & SWMASK ('A')))        /* Load all sections? */
+            if (!(sim_switches & SWMASK ('A'))) {       /* Don't Load all sections? */
+                if (do_load) {                          /* Loaded initial section? */
+                    int32 saved_switches = sim_switches;
+                    t_stat extra;
+
+                    sim_switches |= SWMASK ('Q');
+                    extra = sim_load_bin (fi, FALSE);   /* Check for more sections */
+                    sim_switches = saved_switches;
+
+                    if (extra == SCPE_OK) {
+                        sim_messagef (SCPE_OK, "initial section loaded - more sections are available\n");
+                        sim_messagef (SCPE_OK, "use LOAD -A <filename> to load all sections\n");;
+                        }
+                    else
+                        if (extra != SCPE_ARG)
+                            sim_messagef (SCPE_OK, "initial section loaded - badly formatted additional binary data exists\n");
+                    }
                 return SCPE_OK;
+                }
             sections_read++;
             break;
             }
@@ -230,9 +268,11 @@ for (;;) {
         else {                                          /* no, data */
             if ((field | origin) >= MEMSIZE) 
                 return SCPE_NXM;
-            M[field | origin] = wd;
+            if (do_load)
+                M[field | origin] = wd;
             origin = (origin + 1) & 07777;
             }
+        ++words;
         field = newf;                                   /* update field */
         }
     }
@@ -253,7 +293,7 @@ if (flag != 0)
 if ((sim_switches & SWMASK ('R')) ||                    /* RIM format? */
     (match_ext (fnam, "RIM") && !(sim_switches & SWMASK ('B'))))
     return sim_load_rim (fileref);
-else return sim_load_bin (fileref);                     /* no, BIN */
+else return sim_load_bin (fileref, TRUE);               /* no, BIN */
 }
 
 /* Symbol tables */
@@ -373,12 +413,12 @@ static const int32 opc_val[] = {
  06774+I_IOA+AMB_TD, 06775+I_IOA+AMB_TD, 06776+I_IOA+AMB_TD, 06777+I_IOA+AMB_TD,
  06530+I_NPN, 06531+I_NPN, 06532+I_NPN, 06533+I_NPN,    /* AD */
  06534+I_NPN, 06535+I_NPN, 06536+I_NPN, 06537+I_NPN,
- 06660+I_NPN, 06601+I_NPN, 06603+I_NPN, 06605+I_NPN,                 /* DF/RF */
+ 06601+I_NPN, 06603+I_NPN, 06605+I_NPN,                 /* DF/RF */
  06611+I_NPN, 06612+I_NPN, 06615+I_NPN, 06616+I_NPN,
  06611+I_NPN,              06615+I_NPN, 06616+I_NPN,
  06621+I_NPN, 06622+I_NPN, 06623+I_NPN, 06626+I_NPN,
  06641+I_NPN, 06643+I_NPN, 06645+I_NPN,
- 06661+I_NPN, 06662+I_NPN, 06663+I_NPN,                 /* LPT */
+ 06660+I_NPN, 06661+I_NPN, 06662+I_NPN, 06663+I_NPN,    /* LPT */
  06664+I_NPN, 06665+I_NPN, 06666+I_NPN, 06667+I_NPN,
  06701+I_NPN, 06702+I_NPN, 06703+I_NPN,                 /* MT */
  06704+I_NPN, 06705+I_NPN, 06706+I_NPN, 06707+I_NPN,

@@ -114,10 +114,6 @@ static BITFIELD tmr_iccs_bits [] = {
 
 /* TU58 definitions */
 
-#define UNIT_V_WLK      (UNIT_V_UF)                     /* write locked */
-#define UNIT_WLK        (1u << UNIT_V_UF)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
-
 #define TD_NUMBLK       512                             /* blocks/tape */
 #define TD_NUMBY        512                             /* bytes/block */
 #define TD_SIZE         (TD_NUMBLK * TD_NUMBY)          /* bytes/tape */
@@ -390,8 +386,10 @@ REG td_reg[] = {
     };
 
 MTAB td_mod[] = {
-    { UNIT_WLK,         0, "write enabled",  "WRITEENABLED", NULL, NULL, NULL, "Write enable TU58 drive" },
-    { UNIT_WLK,  UNIT_WLK, "write locked",   "LOCKED", NULL, NULL, NULL, "Write lock TU58 drive"  },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable TU58 drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock TU58 drive" },
     { 0 }
     };
 

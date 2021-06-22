@@ -35,31 +35,27 @@
 #include "system_defs.h"
 
 #define BASE_ADDR       u3    
+#define multibus_NAME   "Intel Multibus Interface"
 
 /* function prototypes */
 
 t_stat multibus_svc(UNIT *uptr);
 t_stat multibus_reset(DEVICE *dptr);
-void set_irq(int32 int_num);
-void clr_irq(int32 int_num);
-uint8 nulldev(t_bool io, uint8 port, uint8 devnum);
-uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
-uint8 unreg_dev(uint8 port);
-t_stat multibus_reset (DEVICE *dptr);
 uint8 multibus_get_mbyte(uint16 addr);
 void multibus_put_mbyte(uint16 addr, uint8 val);
 
 /* external function prototypes */
 
-extern t_stat SBC_reset(DEVICE *dptr);  /* reset the iSBC80/10 emulator */
+//extern t_stat SBC_reset(DEVICE *dptr);  /* reset the iSBC80/10 emulator */
 extern uint8 isbc064_get_mbyte(uint16 addr);
 extern void isbc064_put_mbyte(uint16 addr, uint8 val);
 extern uint8 isbc464_get_mbyte(uint16 addr);
-extern void set_cpuint(int32 int_num);
 
 /* local globals */
 
-int32   mbirq = 0;                      /* set no multibus interrupts */
+static const char* multibus_desc(DEVICE *dptr) {
+    return multibus_NAME;
+}
 
 /* external globals */
 
@@ -76,7 +72,6 @@ UNIT multibus_unit = {
 };
 
 REG multibus_reg[] = { 
-    { HRDATA (MBIRQ, mbirq, 32) }, 
     { HRDATA (XACK, xack, 8) },
     { NULL }
 };
@@ -92,7 +87,7 @@ DEBTAB multibus_debug[] = {
 };
 
 DEVICE multibus_dev = {
-    "MBIRQ",            //name 
+    "MBI",              //name 
     &multibus_unit,     //units 
     multibus_reg,       //registers 
     NULL,               //modifiers
@@ -117,7 +112,7 @@ DEVICE multibus_dev = {
     NULL,               //help routine
     NULL,               //attach help routine
     NULL,               //help context
-    NULL                //device description
+    &multibus_desc      //device description
 };
 
 /* Service routines to handle simulator functions */
@@ -126,148 +121,22 @@ DEVICE multibus_dev = {
 
 t_stat multibus_reset(DEVICE *dptr)
 {
-    if (SBC_reset(NULL) == 0) { 
+//    if (SBC_reset(NULL) == 0) { 
         sim_printf("  Multibus: Reset\n");
         sim_activate (&multibus_unit, multibus_unit.wait); /* activate unit */
         return SCPE_OK;
-    } else {
-        sim_printf("   Multibus: SBC not selected\n");
-        return SCPE_OK;
-    }
+//    } else {
+//        sim_printf("   Multibus: SBC not selected\n");
+//        return SCPE_OK;
+//    }
 }
 
 /* service routine - actually does the simulated interrupts */
 
 t_stat multibus_svc(UNIT *uptr)
 {
-    switch (mbirq) {
-        case INT_2:
-            set_cpuint(INT_R);
-            break;
-        default:
-            break;
-    }
     sim_activate (&multibus_unit, multibus_unit.wait); /* continue poll */
     return SCPE_OK;
-}
-
-void set_irq(int32 int_num)
-{
-    mbirq |= int_num;
-}
-
-void clr_irq(int32 int_num)
-{
-    mbirq &= ~int_num;
-}
-
-/* This is the I/O configuration table.  There are 256 possible
-device addresses, if a device is plugged to a port it's routine
-address is here, 'nulldev' means no device has been registered.
-*/
-struct idev {
-    uint8 (*routine)(t_bool io, uint8 data, uint8 devnum); 
-    uint8 port;
-    uint8 devnum;
-};
-
-struct idev dev_table[256] = {
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 000H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 004H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 008H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 00CH */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 010H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 014H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 018H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 01CH */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 020H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 024H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 028H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 02CH */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 030H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 034H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 038H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 03CH */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 040H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 044H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 048H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 04CH */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 050H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 054H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 058H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 05CH */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 060H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 064H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 068H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 06CH */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 070H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 074H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 078H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 07CH */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 080H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 084H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 088H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 08CH */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 090H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 094H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 098H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 09CH */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0A0H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0A4H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0A8H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0A0H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0B0H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0B4H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0B8H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0B0H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0C0H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0C4H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0C8H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0CCH */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0D0H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0D4H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0D8H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0DCH */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0E0H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0E4H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0E8H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0ECH */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0F0H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0F4H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev},         /* 0F8H */
-{&nulldev}, {&nulldev}, {&nulldev}, {&nulldev}          /* 0FCH */
-};
-
-uint8 nulldev(t_bool io, uint8 data, uint8 devnum)
-{
-    SET_XACK(0);                        /* set no XACK */
-//    return 0xff;                        /* multibus has active high pullups and inversion */
-    return 0;                           //corrects "illegal disk at port X8H" error in ISIS
-}
-
-uint8 reg_dev(uint8 (*routine)(t_bool io, uint8 data, uint8 devnum), uint8 port, uint8 devnum)
-{
-    if (dev_table[port].routine != &nulldev) { /* port already assigned */
-        if (dev_table[port].routine != routine)
-            sim_printf("    I/O Port %02X is already assigned\n", port);
-    } else {
-        dev_table[port].routine = routine;
-        dev_table[port].devnum = devnum;
-        sim_printf("    I/O Port %02X has been assigned\n", port);
-    }
-    return 0;
-}
-
-uint8 unreg_dev(uint8 port)
-{
-    if (dev_table[port].routine == &nulldev) { /* port already free */
-        sim_printf("    I/O Port %02X is already free\n", port);
-    } else {
-        dev_table[port].routine = &nulldev;
-        dev_table[port].devnum = 0;
-        sim_printf("    I/O Port %02X is free\n", port);
-    }
-    return 0;
 }
 
 /*  get a byte from memory */
@@ -275,33 +144,33 @@ uint8 unreg_dev(uint8 port)
 uint8 multibus_get_mbyte(uint16 addr)
 {
     SET_XACK(0);                        /* set no XACK */
-    #if defined (SBC464_NUM) && (SBC464_NUM > 0)
-        if ((isbc464_dev.flags & DEV_DIS) == 0) { //ROM is enabled
-            if (addr >= isbc464_dev.units->BASE_ADDR && addr < 
-                (isbc464_dev.units->BASE_ADDR + isbc464_dev.units->capac))
-                return(isbc464_get_mbyte(addr));
+    if ((isbc464_dev.flags & DEV_DIS) == 0) { //ROM is enabled
+        if (addr >= isbc464_dev.units->BASE_ADDR && 
+        addr < (isbc464_dev.units->BASE_ADDR + isbc464_dev.units->capac)) {
+            SET_XACK(1);            //set xack
+            return(isbc464_get_mbyte(addr));
         }
-    #endif
-    #if defined (SBC064_NUM) && (SBC064_NUM > 0)
-        if ((isbc064_dev.flags & DEV_DIS) == 0) { //RAM is enabled
-            if (addr >= isbc064_dev.units->BASE_ADDR && addr < 
-                (isbc064_dev.units->BASE_ADDR + isbc064_dev.units->capac))
-                return (isbc064_get_mbyte(addr));
+    }
+    if ((isbc064_dev.flags & DEV_DIS) == 0) { //iSBC 064 is enabled
+        if (addr >= isbc064_dev.units->BASE_ADDR && 
+        addr < (isbc064_dev.units->BASE_ADDR + isbc064_dev.units->capac)) {
+            SET_XACK(1);            //set xack
+            return (isbc064_get_mbyte(addr));
         }
-    #endif
+    }
     return 0;
 }
 
 void multibus_put_mbyte(uint16 addr, uint8 val)
 {
     SET_XACK(0);                        /* set no XACK */
-    #if defined (SBC064_NUM) && (SBC064_NUM > 0)
-        if ((isbc064_dev.flags & DEV_DIS) == 0) { //device is enabled
-            if (addr >= isbc064_dev.units->BASE_ADDR && addr < 
-                (isbc064_dev.units->BASE_ADDR + isbc064_dev.units->capac))
-                isbc064_put_mbyte(addr, val);
+    if ((isbc064_dev.flags & DEV_DIS) == 0) { //device is enabled
+        if (addr >= isbc064_dev.units->BASE_ADDR && 
+        addr < (isbc064_dev.units->BASE_ADDR + isbc064_dev.units->capac)) {
+            SET_XACK(1);            //set xack
+            isbc064_put_mbyte(addr, val);
         }
-    #endif
+    }
 }
 
 /* end of multibus.c */

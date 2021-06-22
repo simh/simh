@@ -1,6 +1,6 @@
 /* pdp18b_rf.c: fixed head disk simulator
 
-   Copyright (c) 1993-2016, Robert M Supnik
+   Copyright (c) 1993-2021, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    rf           (PDP-9) RF09/RF09
                 (PDP-15) RF15/RS09
 
+   21-Apr-21    RMS     Fixed bug if read overwrites WC memory location
    10-Mar-16    RMS     Added 3-cycle databreak set/show entries
    07-Mar-16    RMS     Revised for dynamically allocated memory
    13-Sep-15    RMS     Added APIVEC register
@@ -270,6 +271,7 @@ return dat;
 t_stat rf_svc (UNIT *uptr)
 {
 int32 f, pa, d, t;
+int32 wc = 0;
 int32 *fbuf = (int32 *) uptr->filebuf;
 
 if ((uptr->flags & UNIT_BUF) == 0) {                    /* not buf? abort */
@@ -283,8 +285,8 @@ do {
         rf_updsta (RFS_NED);                            /* nx disk error */
         break;
         }
-    M[RF_WC] = (M[RF_WC] + 1) & DMASK;                  /* incr word count */
-        pa = M[RF_CA] = (M[RF_CA] + 1) & AMASK;         /* incr mem addr */
+    wc = M[RF_WC] = (M[RF_WC] + 1) & DMASK;             /* incr word count */
+    pa = M[RF_CA] = (M[RF_CA] + 1) & AMASK;             /* incr mem addr */
     if ((f == FN_READ) && MEM_ADDR_OK (pa))             /* read? */
         M[pa] = fbuf[rf_da];
     if ((f == FN_WCHK) && (M[pa] != fbuf[rf_da])) {     /* write check? */
@@ -305,9 +307,9 @@ do {
             }
         }
     rf_da = rf_da + 1;                                  /* incr disk addr */
-    } while ((M[RF_WC] != 0) && (rf_burst != 0));       /* brk if wc, no brst */
+    } while ((wc != 0) && (rf_burst != 0));             /* brk if wc, no brst */
 
-if ((M[RF_WC] != 0) && ((rf_sta & RFS_ERR) == 0))       /* more to do? */
+if ((wc != 0) && ((rf_sta & RFS_ERR) == 0))             /* more to do? */
     sim_activate (&rf_unit, rf_time);                   /* sched next */
 else rf_updsta (RFS_DON);
 return SCPE_OK;

@@ -35,19 +35,29 @@
 
 #include "system_defs.h"
 
-#if defined (I8253_NUM) && (I8253_NUM > 0)
+#define i8253_NAME    "Intel i8253 PIT Chip"
 
 /* external globals */
 
 /* external function prototypes */
 
-extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint16, uint16, uint8);
+extern uint8 unreg_dev(uint16);
 
 /* globals */
 
+static const char* i8253_desc(DEVICE *dptr) {
+    return i8253_NAME;
+}
+int     i8253_num = 0;
+int     i8253_baseport[] = { -1, -1, -1, -1 }; //base port
+uint8   i8253_intnum[4] = { 0, 0, 0, 0 }; //interrupt number
+uint8   i8253_verb[4] = { 0, 0, 0, 0 }; //verbose flag
 /* function prototypes */
 
-t_stat i8253_cfg(uint8 base, uint8 devnum);
+t_stat i8253_cfg(uint16 base, uint16 devnum, uint8 dummy);
+t_stat i8253_clr(void);
+t_stat i8253_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat i8253_svc (UNIT *uptr);
 t_stat i8253_reset (DEVICE *dptr);
 uint8 i8253t0(t_bool io, uint8 data, uint8 devnum);
@@ -88,6 +98,8 @@ DEBTAB i8253_debug[] = {
 };
 
 MTAB i8253_mod[] = {
+    { MTAB_XTD | MTAB_VDV, 0, "PARAM", NULL, NULL, i8253_show_param, NULL, 
+        "show configured parametes for i8253" },
     { 0 }
 };
 
@@ -98,7 +110,7 @@ DEVICE i8253_dev = {
     i8253_unit,         //units
     i8253_reg,          //registers
     i8253_mod,          //modifiers
-    I8253_NUM,          //numunits
+    I8253_NUM,         //numunits
     16,                 //aradix
     16,                 //awidth
     1,                  //aincr
@@ -111,25 +123,69 @@ DEVICE i8253_dev = {
     NULL,               //attach
     NULL,               //detach
     NULL,               //ctxt
-    0,                  //flags
+    DEV_DEBUG+DEV_DISABLE+DEV_DIS, //flags 
     0,                  //dctrl
     i8253_debug,        //debflags
     NULL,               //msize
-    NULL                //lname
+    NULL,               //lname
+    NULL,               //help routine
+    NULL,               //attach help routine
+    NULL,               //help context
+    &i8253_desc         //device description
 };
 
 /* Service routines to handle simulator functions */
 
 // i8253 configuration
 
-t_stat i8253_cfg(uint8 base, uint8 devnum)
+t_stat i8253_cfg(uint16 base, uint16 devnum, uint8 dummy)
 {
-    sim_printf("    i8253[%d]: at base port 0%02XH\n",
-        devnum, base & 0xFF);
-    reg_dev(i8253t0, base, devnum); 
-    reg_dev(i8253t1, base + 1, devnum); 
-    reg_dev(i8253t2, base + 2, devnum); 
-    reg_dev(i8253c, base + 3, devnum); 
+    i8253_baseport[devnum] = base & 0xff;
+    sim_printf("    i8253%d: installed at base port 0%02XH\n",
+        devnum, i8253_baseport[devnum]);
+    reg_dev(i8253t0, i8253_baseport[devnum], devnum, 0); 
+    reg_dev(i8253t1, i8253_baseport[devnum] + 1, devnum, 0); 
+    reg_dev(i8253t2, i8253_baseport[devnum] + 2, devnum, 0); 
+    reg_dev(i8253c, i8253_baseport[devnum] + 3, devnum, 0);
+    i8253_num++;
+    return SCPE_OK;
+}
+
+t_stat i8253_clr(void)
+{
+    int i;
+    
+    for (i=0; i<i8253_num; i++) {
+        unreg_dev(i8253_baseport[i]); 
+        unreg_dev(i8253_baseport[i] + 1); 
+        unreg_dev(i8253_baseport[i] + 2); 
+        unreg_dev(i8253_baseport[i] + 3);
+        i8253_baseport[i] = -1;
+        i8253_intnum[i] = 0;
+        i8253_verb[i] = 0;
+    }
+    i8253_num = 0; 
+    return SCPE_OK;
+}
+
+// show configuration parameters
+
+t_stat i8253_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    int i;
+    
+    if (uptr == NULL)
+        return SCPE_ARG;
+    fprintf(st, "Device %s\n", ((i8253_dev.flags & DEV_DIS) == 0) ? "Enabled" : "Disabled");
+    for (i=0; i<i8253_num; i++) {
+        fprintf(st, "Unit %d at Base port ", i);
+        fprintf(st, "0%02X ", i8253_baseport[i]);
+        fprintf(st, "Interrupt # is ");
+        fprintf(st, "%d ", i8253_intnum[i]);
+        fprintf(st, "Mode ");
+        fprintf(st, "%s", i8253_verb[i] ? "Verbose" : "Quiet");
+        if (i<i8253_num && i8253_num != 1) fprintf(st, "\n");
+    }
     return SCPE_OK;
 }
 
@@ -147,7 +203,7 @@ t_stat i8253_reset (DEVICE *dptr)
 {
     uint8 devnum;
     
-    for (devnum=0; devnum<I8253_NUM; devnum++) {
+    for (devnum=0; devnum<i8253_num+1; devnum++) {
         i8253_unit[devnum].u3 = 0;        /* status */
         i8253_unit[devnum].u4 = 0;        /* mode instruction */
         i8253_unit[devnum].u5 = 0;        /* command instruction */
@@ -207,7 +263,5 @@ uint8 i8253c(t_bool io, uint8 data, uint8 devnum)
     }
     return 0;
 }
-
-#endif /* I8253_NUM > 0 */
 
 /* end of i8253.c */

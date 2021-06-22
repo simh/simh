@@ -113,6 +113,13 @@ extern int display_is_blank(void);
 extern int display_point(int,int,int,int);
 
 /*
+ * plot a line; arguments are start and end x, y, intensity
+ *
+ * Display initialized on first call.
+ */
+extern void display_line(int,int,int,int,int);
+
+/*
  * force window system to output bits to screen;
  * call after adding points, or aging the screen
  * collect any window system input (mouse or keyboard)

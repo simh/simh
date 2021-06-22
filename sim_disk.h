@@ -41,8 +41,7 @@ typedef uint32          t_lba;                          /* disk logical block ad
 
 /* Unit flags */
 
-#define DKUF_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
-#define DKUF_V_FMT      (UNIT_V_UF + 1)                 /* disk file format */
+#define DKUF_V_FMT      (UNIT_V_UF + 0)                 /* disk file format */
 #define DKUF_W_FMT      2                               /* 2b of formats */
 #define DKUF_M_FMT      ((1u << DKUF_W_FMT) - 1)
 #define DKUF_F_AUTO      0                              /* Auto detect format format */
@@ -50,7 +49,7 @@ typedef uint32          t_lba;                          /* disk logical block ad
 #define DKUF_F_RAW       2                              /* Raw Physical Disk Access */
 #define DKUF_F_VHD       3                              /* VHD format */
 #define DKUF_V_UF       (DKUF_V_FMT + DKUF_W_FMT)
-#define DKUF_WLK        (1u << DKUF_V_WLK)
+#define DKUF_WLK        UNIT_WLK
 #define DKUF_FMT        (DKUF_M_FMT << DKUF_V_FMT)
 #define DKUF_WRP        (DKUF_WLK | UNIT_RO)
 

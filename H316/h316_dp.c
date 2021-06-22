@@ -73,11 +73,8 @@
 #include "h316_defs.h"
 #include <math.h>
 
-#define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
-#define UNIT_WLK        (1 << UNIT_V_WLK)
 #define FNC             u3                              /* saved function */
 #define CYL             u4                              /* actual cylinder */
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write prot */
 #define DP_TRKLEN       2048                            /* track length, words */
 #define DP_NUMDRV       8                               /* max # drives */
 #define DP_NUMTYP       3                               /* # controller types */
@@ -328,8 +325,10 @@ REG dp_reg[] = {
     };
 
 MTAB dp_mod[] = {
-    { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock drive" },
     { MTAB_XTD | MTAB_VDV, TYPE_4623, NULL, "4623",
       &dp_settype, NULL, NULL },
     { MTAB_XTD | MTAB_VDV, TYPE_4651, NULL, "4651",

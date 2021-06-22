@@ -37,18 +37,15 @@
 #define DP_NUMBY        256                             /* bytes/sector */
 #define DP_NUMSC        24                              /* sectors/track */
 
-#define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
-#define UNIT_V_DTYPE    (UNIT_V_UF + 1)                 /* disk type */
+#define UNIT_V_DTYPE    (UNIT_V_UF + 0)                 /* disk type */
 #define UNIT_M_DTYPE    0x1
 #define UNIT_V_AUTO     (UNIT_V_UF + 2)                 /* autosize */
-#define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
 #define UNIT_AUTO       (1 << UNIT_V_AUTO)
 #define GET_DTYPE(x)    (((x) >> UNIT_V_DTYPE) & UNIT_M_DTYPE)
 
 #define CYL             u3                              /* current cylinder */
 #define STD             u4                              /* drive status */
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
 
 /* Controller status */
 
@@ -220,8 +217,10 @@ REG dp_reg[] = {
     };
 
 MTAB dp_mod[] = {
-    { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock drive" },
     { (UNIT_DTYPE+UNIT_ATT), (TYPE_2315 << UNIT_V_DTYPE) + UNIT_ATT,
       "2315", NULL, NULL },
     { (UNIT_DTYPE+UNIT_ATT), (TYPE_5440 << UNIT_V_DTYPE) + UNIT_ATT,

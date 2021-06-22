@@ -35,17 +35,13 @@
 #include "sim_tmxr.h"
 #include <setjmp.h>
 
-#if defined(REV3)
-#include "3b2_1000_defs.h"
-#else
-#include "3b2_400_defs.h"
-#include "3b2_400_cpu.h"
-#include "3b2_400_mau.h"
-#include "3b2_400_mmu.h"
-#include "3b2_400_stddev.h"
-#include "3b2_400_sys.h"
+#include "3b2_cpu.h"
+#include "3b2_rev2_defs.h"
+#include "3b2_rev2_mau.h"
+#include "3b2_rev2_mmu.h"
+#include "3b2_rev2_stddev.h"
+#include "3b2_rev2_sys.h"
 #include "3b2_id.h"
-#endif
 
 #include "3b2_io.h"
 #include "3b2_dmac.h"

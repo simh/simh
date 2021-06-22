@@ -153,12 +153,10 @@ REG rz_reg[] = {
     };
 
 MTAB rz_mod[] = {
-    { SCSI_WLK,               0,  NULL, "WRITEENABLED", 
-      &scsi_set_wlk, NULL, NULL, "Write enable disk drive" },
-    { SCSI_WLK,        SCSI_WLK,  NULL, "LOCKED", 
-      &scsi_set_wlk, NULL, NULL, "Write lock disk drive"  },
-    { MTAB_XTD|MTAB_VUN, 0, "WRITE", NULL,
-      NULL, &scsi_show_wlk, NULL,  "Display drive writelock status" },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &scsi_set_wlk, &scsi_show_wlk,   NULL, "Write enable drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &scsi_set_wlk, NULL,   NULL, "Write lock drive" },
     { MTAB_XTD|MTAB_VUN, RZ23_DTYPE, NULL, "RZ23",
       &rz_set_type, NULL, NULL, "Set RZ23 Disk Type" },
     { MTAB_XTD|MTAB_VUN, RZ23L_DTYPE, NULL, "RZ23L",

@@ -72,8 +72,8 @@ UNIT                mt_unit[6] = {
 };
 
 MTAB                mt_mod[] = {
-    {MTUF_WLK,            0, "write enabled", "WRITEENABLED", NULL, NULL, NULL, "Write ring in place"},
-    {MTUF_WLK,     MTUF_WLK, "write locked", "LOCKED",        NULL, NULL, NULL, "No write ring in place"},
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED",  &set_writelock, &show_writelock,   NULL, "Write ring in place" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL,            "LOCKED",        &set_writelock, NULL,   NULL, "no Write ring in place" },
     {MTAB_XTD | MTAB_VUN, 0, "FORMAT", "FORMAT",              &sim_tape_set_fmt, &sim_tape_show_fmt, NULL, 
                                                                                 "Set/Display tape format (SIMH, E11, TPC, P7B)"},
     {MTAB_XTD | MTAB_VUN, 0, "LENGTH", "LENGTH",              &mt_set_len, &mt_show_len, NULL,

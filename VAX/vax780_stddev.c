@@ -156,10 +156,7 @@ static BITFIELD tmr_iccs_bits [] = {
 #define FL_NUMSC        26                              /* sectors/track */
 #define FL_M_SECTOR     0177
 #define FL_NUMBY        128                             /* bytes/sector */
-#define FL_SIZE         (FL_NUMTR * FL_NUMSC * FL_NUMBY)        /* bytes/disk */
-#define UNIT_V_WLK      (UNIT_V_UF)                     /* write locked */
-#define UNIT_WLK        (1u << UNIT_V_UF)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
+#define FL_SIZE         (FL_NUMTR * FL_NUMSC * FL_NUMBY)/* bytes/disk */
 
 #define FL_IDLE         0                               /* idle state */
 #define FL_RWDS         1                               /* rw, sect next */
@@ -426,8 +423,10 @@ REG fl_reg[] = {
     };
 
 MTAB fl_mod[] = {
-    { UNIT_WLK,         0, "write enabled",  "WRITEENABLED", NULL, NULL, NULL, "Write enable floppy drive" },
-    { UNIT_WLK,  UNIT_WLK, "write locked",   "LOCKED", NULL, NULL, NULL, "Write lock floppy drive"  },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable floppy drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock floppy drive" },
     { 0 }
     };
 

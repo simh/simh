@@ -63,10 +63,8 @@
 #define RS03_DTYPE       (0)
 #define RS04_DTYPE       (1)
 #define UNIT_V_AUTO     (UNIT_V_UF + 1)                 /* autosize */
-#define UNIT_V_WLK      (UNIT_V_UF + 2)                 /* write lock */
 #define UNIT_DTYPE      (1 << UNIT_V_DTYPE)
 #define UNIT_AUTO       (1 << UNIT_V_AUTO)
-#define UNIT_WLK        (1 << UNIT_V_WLK)
 #define GET_DTYPE(x)    (((x) >> UNIT_V_DTYPE) & 1)
 
 /* RSCS1 - control/status 1 - offset 0 */
@@ -237,8 +235,10 @@ REG rs_reg[] = {
 
 MTAB rs_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "MASSBUS", NULL, NULL, &mba_show_num, NULL, "Display Massbus Address" },
-    { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL, NULL, NULL, "Write enable disk drive"  },
-    { UNIT_WLK, UNIT_WLK, "write lockable", "LOCKED", NULL, NULL, NULL, "Write lock disk drive" },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable disk drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock disk drive" },
     { (UNIT_DTYPE|UNIT_ATT), (RS03_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
       "RS03", NULL, NULL },
     { (UNIT_DTYPE|UNIT_ATT), (RS04_DTYPE << UNIT_V_DTYPE) + UNIT_ATT,
@@ -476,7 +476,7 @@ switch (fnc) {                                          /* case on function */
         break;
 
     case FNC_WRITE:                                     /* write */
-        if ((uptr->flags & UNIT_WLK) &&                 /* write locked? */
+        if ((uptr->flags & UNIT_WPRT) &&                /* write locked? */
             (GET_TK (rsda[drv]) <= (int32) rswlk[drv])) {
             rs_set_er (ER_WLE, drv);                    /* set drive error */
             mba_set_exc (rs_dib.ba);                    /* set exception */
@@ -567,7 +567,7 @@ if (rs_unit[drv].flags & UNIT_DIS) {
 else rsds[drv] = (rsds[drv] | DS_DPR) & ~(DS_ERR | DS_WLK);
 if (rs_unit[drv].flags & UNIT_ATT) {
     rsds[drv] = rsds[drv] | DS_MOL;
-    if ((rs_unit[drv].flags & UNIT_WLK) &&
+    if ((rs_unit[drv].flags & UNIT_WPRT) &&
         (GET_TK (rsda[drv]) <= (int32) rswlk[drv]))
         rsds[drv] = rsds[drv] | DS_WLK;
     }

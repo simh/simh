@@ -59,9 +59,6 @@
 #define RX_SIZE         (RX_NUMTR * RX_NUMSC * RX_NUMBY)        /* bytes/disk */
 #define RX_NUMDR        2                               /* drives/controller */
 #define RX_M_NUMDR      01
-#define UNIT_V_WLK      (UNIT_V_UF)                     /* write locked */
-#define UNIT_WLK        (1u << UNIT_V_UF)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
 
 #define IDLE            0                               /* idle state */
 #define RWDS            1                               /* rw, sect next */
@@ -178,8 +175,10 @@ REG rx_reg[] = {
     };
 
 MTAB rx_mod[] = {
-    { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable floppy drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock floppy drive" },
 #if defined (VM_PDP11)
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 004, "ADDRESS", "ADDRESS",
       &set_addr, &show_addr, NULL },

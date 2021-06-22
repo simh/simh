@@ -39,16 +39,16 @@
 */
 
 #include "system_defs.h"
+#define IPC     0
 
-#if defined (I3214_NUM) && (I3214_NUM > 0)
-
-// 3214 status bits
+#define i3214_NAME    "Intel i3214 Perpherial Interrupt Contrlooer Chip"
 
 /* external globals */
 
 /* external function prototypes */
 
-extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint16, uint16, uint8);
+extern uint8 unreg_dev(uint16);
 
 /* globals */
 
@@ -58,10 +58,18 @@ uint8 i3214_ram[16];
 uint8 EPROM_enable = 1;
 uint8 BUS_OVERRIDE = 0;
 uint8 monitor_boot = 0x00;
+static const char* i3214_desc(DEVICE *dptr) {
+    return i3214_NAME;
+}
+int   i3214_baseport = -1;              //base port
+uint8   i3214_intnum = 0;               //interrupt number
+uint8   i3214_verb = 0;                 //verbose flag
 
 /* function prototypes */
 
-t_stat i3214_cfg(uint8 base, uint8 devnum);
+t_stat i3214_cfg(uint16 base, uint16 devnum, uint8 dummy);
+t_stat i3214_clr(void);
+t_stat i3214_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 t_stat i3214_reset (DEVICE *dptr);
 t_stat i3214_reset_dev (uint8 devnum);
 t_stat i3214_svc (UNIT *uptr);
@@ -96,6 +104,8 @@ DEBTAB i3214_debug[] = {
 };
 
 MTAB i3214_mod[] = {
+    { MTAB_XTD | MTAB_VDV, 0, "PARAM", NULL, NULL, i3214_show_param, NULL, 
+        "show configured parametes for i3214" },
     { 0 }
 };
 
@@ -119,23 +129,52 @@ DEVICE i3214_dev = {
     NULL,               //attach
     NULL,               //detach
     NULL,               //ctxt
-    0,                  //flags
+    DEV_DEBUG+DEV_DISABLE+DEV_DIS, //flags 
     0,                  //dctrl
     i3214_debug,        //debflags
     NULL,               //msize
-    NULL                //lname
+    NULL,               //lname
+    NULL,               //help routine
+    NULL,               //attach help routine
+    NULL,               //help context
+    &i3214_desc         //device description
 };
 
 // i3214 configuration
 
-t_stat i3214_cfg(uint8 base, uint8 devnum)
+t_stat i3214_cfg(uint16 base, uint16 devnum, uint8 dummy)
 {
-    sim_printf("    i3214[%d]: at base port 0%02XH\n",
-        devnum, base & 0xFF);
-    reg_dev(i3214_do_mask, base, devnum);
-    reg_dev(i3214_do_status, base + 1, devnum);
-    reg_dev(i3214_cpu_bus_override, base + 2, devnum);
-    reg_dev(i3214_monitor_do_boot, base + 3, devnum);
+    i3214_baseport = base & 0xff;
+    sim_printf("    i3214: at base port 0%02XH\n",
+        i3214_baseport);
+    reg_dev(i3214_do_mask, i3214_baseport, 0, 0);
+    reg_dev(i3214_do_status, i3214_baseport + 1, 0, 0);
+    reg_dev(i3214_cpu_bus_override, i3214_baseport + 2, 0, 0);
+    reg_dev(i3214_monitor_do_boot, i3214_baseport + 3, 0, 0);
+    return SCPE_OK;
+}
+
+t_stat i3214_clr(void)
+{
+    unreg_dev(i3214_baseport);
+    unreg_dev(i3214_baseport + 1);
+    unreg_dev(i3214_baseport + 2);
+    unreg_dev(i3214_baseport + 3);
+    i3214_baseport = -1;
+    i3214_intnum = 0;
+    i3214_verb = 0;
+    return SCPE_OK;
+}
+
+// show configuration parameters
+
+t_stat i3214_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    if (uptr == NULL)
+        return SCPE_ARG;
+    fprintf(st, "%s, Base port 0%04XH, Interrupt # %d, %s", 
+        ((i3214_dev.flags & DEV_DIS) == 0) ? "Enabled" : "Disabled", 
+        i3214_baseport, i3214_intnum, i3214_verb ? "Verbose" : "Quiet");
     return SCPE_OK;
 }
 
@@ -154,7 +193,7 @@ t_stat i3214_reset (DEVICE *dptr)
 {
     uint8 devnum;
     
-    for (devnum=0; devnum<I3214_NUM; devnum++) {
+    for (devnum=0; devnum<1; devnum++) {
         i3214_reset_dev(devnum);
         sim_activate (&i3214_unit[devnum], i3214_unit[devnum].wait); /* activate unit */
     }
@@ -208,7 +247,5 @@ uint8 i3214_monitor_do_boot(t_bool io, uint8 data, uint8 devnum)
         monitor_boot = data;
     return 0;
 }
-
-#endif /* I3214_NUM > 0 */
 
 /* end of i3214.c */

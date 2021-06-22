@@ -1,6 +1,6 @@
 /* pdp8_rf.c: RF08 fixed head disk simulator
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2021, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rf           RF08 fixed head disk
 
+   21-Apr-21    RMS     Fixed bug if read overwrites WC memory location
    17-Sep-13    RMS     Changed to use central set_bootpc routine
    03-Sep-13    RMS     Added explicit void * cast
    15-May-06    RMS     Fixed bug in autosize attach (Dave Gesswein)
@@ -308,6 +309,7 @@ t_stat rf_svc (UNIT *uptr)
 {
 int32 pa, t, mex;
 int16 *fbuf = (int16 *) uptr->filebuf;
+uint16 wc = 0;
 
 UPDATE_PCELL;                                           /* update photocell */
 if ((uptr->flags & UNIT_BUF) == 0) {                    /* not buf? abort */
@@ -323,7 +325,7 @@ do {
         rf_sta = rf_sta | RFS_NXD;
         break;
         }
-    M[RF_WC] = (M[RF_WC] + 1) & 07777;                  /* incr word count */
+    wc = M[RF_WC] = (M[RF_WC] + 1) & 07777;             /* incr word count */
     M[RF_MA] = (M[RF_MA] + 1) & 07777;                  /* incr mem addr */
     pa = mex | M[RF_MA];                                /* add extension */
     if (uptr->FUNC == RF_READ) {                        /* read? */
@@ -341,9 +343,9 @@ do {
             }
         }
     rf_da = (rf_da + 1) & 03777777;                     /* incr disk addr */
-    } while ((M[RF_WC] != 0) && (rf_burst != 0));       /* brk if wc, no brst */
+    } while ((wc != 0) && (rf_burst != 0));             /* brk if wc, no brst */
 
-if ((M[RF_WC] != 0) && ((rf_sta & RFS_ERR) == 0))       /* more to do? */
+if ((wc != 0) && ((rf_sta & RFS_ERR) == 0))             /* more to do? */
     sim_activate (&rf_unit, rf_time);                   /* sched next */
 else {
     rf_done = 1;                                        /* done */

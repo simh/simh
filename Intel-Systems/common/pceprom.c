@@ -101,7 +101,7 @@ t_stat EPROM_attach (UNIT *uptr, CONST char *cptr)
 
     sim_debug (DEBUG_flow, &EPROM_dev, "EPROM_attach: cptr=%s\n", cptr);
     if ((r = attach_unit (uptr, cptr)) != SCPE_OK) {
-        sim_debug (DEBUG_flow, &EPROM_dev, "EPROM_attach: Error\n");
+        sim_printf ("EPROM_attach: Error %d\n", r);
         return r;
     }
     sim_debug (DEBUG_read, &EPROM_dev, "\tAllocate buffer\n");

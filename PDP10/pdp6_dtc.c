@@ -93,13 +93,10 @@
 #if (NUM_DEVS_DTC > 0)
 #define DTC_DEVNUM      0210
 #define DTC_NUMDR       8                           /* #drives */
-#define UNIT_V_WLK      (UNIT_V_UF + 0)             /* write locked */
-#define UNIT_V_8FMT     (UNIT_V_UF + 1)             /* 12b format */
-#define UNIT_V_11FMT    (UNIT_V_UF + 2)             /* 16b format */
-#define UNIT_WLK        (1 << UNIT_V_WLK)
+#define UNIT_V_8FMT     (UNIT_V_UF + 0)             /* 12b format */
+#define UNIT_V_11FMT    (UNIT_V_UF + 1)             /* 16b format */
 #define UNIT_8FMT       (1 << UNIT_V_8FMT)
 #define UNIT_11FMT      (1 << UNIT_V_11FMT)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)        /* write protect */
 
 /* System independent DECtape constants */
 
@@ -295,8 +292,10 @@ REG dtc_reg[] = {
     };
 
 MTAB dtc_mod[] = {
-    { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable tape drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock tape drive" },
     { UNIT_8FMT + UNIT_11FMT, 0, "18b", NULL, NULL },
     { UNIT_8FMT + UNIT_11FMT, UNIT_8FMT, "12b", NULL, NULL },
     { UNIT_8FMT + UNIT_11FMT, UNIT_11FMT, "16b", NULL, NULL },
@@ -1247,6 +1246,7 @@ dtc_flush (UNIT* uptr)
     uint32 ba, k, *fbuf;
     
     if (uptr->WRITTEN && uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */
+        sim_printf ("%s: writing buffer to file: %s\n", sim_uname (uptr), uptr->filename);
         fbuf = (uint32 *) uptr->filebuf;                        /* file buffer */
         rewind (uptr->fileref);                             /* start of file */
         if (uptr->flags & UNIT_8FMT) {                      /* 12b? */
@@ -1289,10 +1289,8 @@ dtc_detach (UNIT* uptr)
         sim_cancel (uptr);
         uptr->CMD = uptr->pos = 0;
     }
-    if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */
-        sim_printf ("%s%d: writing buffer to file\n", sim_dname (&dtc_dev), u);
-        dtc_flush (uptr);
-    }                                                       /* end if hwmark */
+    if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0))     /* any data? */
+        dtc_flush (uptr);                                   /* end if hwmark */
     free (uptr->filebuf);                                   /* release buf */
     uptr->flags = uptr->flags & ~UNIT_BUF;                  /* clear buf flag */
     uptr->filebuf = NULL;                                   /* clear buf ptr */

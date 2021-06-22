@@ -28,8 +28,12 @@ For Example, the directory structure should look like:
 
 If you have a command line version of git installed in your environment
 then the windows-build repository will be downloaded and updated 
-automatically.  If not, then the contents of the windows-build directory 
-can be downloaded from:
+automatically.  Git for windows can be downloaded from:
+
+    https://git-scm.com/download/win
+    
+If git isn't available, then the contents of the windows-build 
+directory can be downloaded from:
 
     https://github.com/simh/windows-build/archive/windows-build.zip
 
@@ -59,6 +63,15 @@ in this directory.
 The installer for Visual Studio 2008 SP1 is available from:
 
 http://download.microsoft.com/download/E/8/E/E8EEB394-7F42-4963-A2D8-29559B738298/VS2008ExpressWithSP1ENUX1504728.iso
+
+Then install Visual Studio Express Visual C++ by executing VCExpress\setup.exe 
+on that DVD image.  No need to install "Silverlight Runtime" or 
+"Microsoft SQL Server 2008 Express Edition".  Depending on your OS Version 
+you may be prompted to install an older version of .NET Framework which should 
+be installed.
+
+Note: VS2008 can readily coexist on Windows systems that also have later 
+versions of Visual Studio installed.
 
 If you are using a version of Visual Studio beyond Visual Studio 2008, then 
 your later version of Visual Studio will automatically convert the Visual 

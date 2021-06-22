@@ -27,7 +27,7 @@
     MODIFICATIONS:
  
         ?? ??? 11 - Original file.
-        16 Dec 12 - Modified to use isbc_80_10.cfg file to set base and size.
+        16 Dec 12 - Modified to use isbc_80_10.cfg file to set baseport and size.
         24 Apr 15 -- Modified to use simh_debug
  
     NOTES:
@@ -84,17 +84,17 @@
  
         Read/Write DMAC Address Registers
  
-            Used to simultaneously load a channel's current-address register and base-address 
+            Used to simultaneously load a channel's current-address register and baseport-address 
             register with the memory address of the first byte to be transferred. (The Channel 
-            0 current/base address register must be loaded prior to initiating a diskette read 
+            0 current/baseport address register must be loaded prior to initiating a diskette read 
             or write operation.)  Since each channel's address registers are 16 bits in length
             (64K address range), two "write address register" commands must be executed in 
-            order to load the complete current/base address registers for any channel.
+            order to load the complete current/baseport address registers for any channel.
  
         Read/Write DMAC Word Count Registers
  
             The Write DMAC Word Count Register command is used to simultaneously load a 
-            channel's current and base word-count registers with the number of bytes 
+            channel's current and baseport word-count registers with the number of bytes 
             to be transferred during a subsequent DMA operation.  Since the word-count 
             registers are 16-bits in length, two commands must be executed to load both 
             halves of the registers.
@@ -397,8 +397,6 @@
  
 #include "system_defs.h"
  
-#if defined (SBC208_NUM) && (SBC208_NUM > 0)
-
 #define UNIT_V_WPMODE   (UNIT_V_UF)     /* Write protect */
 #define UNIT_WPMODE     (1 << UNIT_V_WPMODE)
  
@@ -471,9 +469,12 @@
  
 #define FDD_NUM          4
  
+#define isbc208_NAME    "Intel iSBC 208 Floppy Disk Controller Board"
+
 /* internal function prototypes */
  
-t_stat isbc208_cfg(uint8 base);
+t_stat isbc208_cfg(uint16 baseport, uint16 size, uint8 devnum);
+t_stat isbc208_clr(void);
 t_stat isbc208_reset (DEVICE *dptr);
 void isbc208_reset1 (void);
 t_stat isbc208_attach (UNIT *uptr, const char *cptr);
@@ -506,13 +507,21 @@ uint8 isbc208_r15(t_bool io, uint8 data, uint8 devnum);
  
 extern void set_irq(int32 int_num);
 extern void clr_irq(int32 int_num);
-extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint16, uint16, uint8);
+extern uint8 unreg_dev(uint16);
 extern void multibus_put_mbyte(uint16 addr, uint8 val);
 extern int32 multibus_get_mbyte(uint16 addr);
  
 /* external globals */
 
 extern uint16   PCX;
+
+/* globals */
+
+int isbc208_onetime = 1;
+static const char* isbc208_desc(DEVICE *dptr) {
+    return isbc208_NAME;
+}
 
 /* 8237 physical register definitions */
 uint16 i8237_r0;                        // 8237 ch 0 address register
@@ -662,46 +671,50 @@ DEVICE isbc208_dev = {
     &isbc208_attach,            //attach  
     NULL,                       //detach
     NULL,                       //ctxt     
-    DEV_DEBUG|DEV_DISABLE|DEV_DIS, //flags 
+    DEV_DEBUG+DEV_DISABLE+DEV_DIS, //flags 
     0,                          //dctrl 
     isbc208_debug,              //debflags
     NULL,                       //msize
-    NULL                        //lname
+    NULL,               //lname
+    NULL,               //help routine
+    NULL,               //attach help routine
+    NULL,               //help context
+    &isbc208_desc       //device description
 };
  
 /* Service routines to handle simulator functions */
  
 // configuration routine
 
-t_stat isbc208_cfg(uint8 base)
+t_stat isbc208_cfg(uint16 baseport, uint16 devnum, uint8 intnum)
 {
     int32 i;
     UNIT *uptr;
 
-    sim_printf("    sbc208: at base 0%02XH\n",
-        base);
-    reg_dev(isbc208_r0, base + 0, 0); //8237 registers 
-    reg_dev(isbc208_r1, base + 1, 0); 
-    reg_dev(isbc208_r2, base + 2, 0); 
-    reg_dev(isbc208_r3, base + 3, 0); 
-    reg_dev(isbc208_r4, base + 4, 0); 
-    reg_dev(isbc208_r5, base + 5, 0); 
-    reg_dev(isbc208_r6, base + 6, 0); 
-    reg_dev(isbc208_r7, base + 7, 0); 
-    reg_dev(isbc208_r8, base + 8, 0); 
-    reg_dev(isbc208_r9, base + 9, 0); 
-    reg_dev(isbc208_rA, base + 10, 0); 
-    reg_dev(isbc208_rB, base + 11, 0); 
-    reg_dev(isbc208_rC, base + 12, 0); 
-    reg_dev(isbc208_rD, base + 13, 0); 
-    reg_dev(isbc208_rE, base + 14, 0); 
-    reg_dev(isbc208_rF, base + 15, 0); 
-    reg_dev(isbc208_r10, base + 16, 0); //8272 registers
-    reg_dev(isbc208_r11, base + 17, 0); 
-    reg_dev(isbc208_r12, base + 18, 0); //devices on iSBC 208 
-    reg_dev(isbc208_r13, base + 19, 0); 
-    reg_dev(isbc208_r14, base + 20, 0); 
-    reg_dev(isbc208_r15, base + 21, 0); 
+    sim_printf("    sbc208: at baseport 0%02XH\n",
+        baseport);
+    reg_dev(isbc208_r0, baseport + 0, 0, 0); //8237 registers 
+    reg_dev(isbc208_r1, baseport + 1, 0, 0); 
+    reg_dev(isbc208_r2, baseport + 2, 0, 0); 
+    reg_dev(isbc208_r3, baseport + 3, 0, 0); 
+    reg_dev(isbc208_r4, baseport + 4, 0, 0); 
+    reg_dev(isbc208_r5, baseport + 5, 0, 0); 
+    reg_dev(isbc208_r6, baseport + 6, 0, 0); 
+    reg_dev(isbc208_r7, baseport + 7, 0, 0); 
+    reg_dev(isbc208_r8, baseport + 8, 0, 0); 
+    reg_dev(isbc208_r9, baseport + 9, 0, 0); 
+    reg_dev(isbc208_rA, baseport + 10, 0, 0); 
+    reg_dev(isbc208_rB, baseport + 11, 0, 0); 
+    reg_dev(isbc208_rC, baseport + 12, 0, 0); 
+    reg_dev(isbc208_rD, baseport + 13, 0, 0); 
+    reg_dev(isbc208_rE, baseport + 14, 0, 0); 
+    reg_dev(isbc208_rF, baseport + 15, 0, 0); 
+    reg_dev(isbc208_r10, baseport + 16, 0, 0); //8272 registers
+    reg_dev(isbc208_r11, baseport + 17, 0, 0); 
+    reg_dev(isbc208_r12, baseport + 18, 0, 0); //devices on iSBC 208 
+    reg_dev(isbc208_r13, baseport + 19, 0, 0); 
+    reg_dev(isbc208_r14, baseport + 20, 0, 0); 
+    reg_dev(isbc208_r15, baseport + 21, 0, 0); 
     // one-time initialization for all FDDs
     for (i = 0; i < FDD_NUM; i++) { 
         uptr = isbc208_dev.units + i;
@@ -712,6 +725,20 @@ t_stat isbc208_cfg(uint8 base)
         fddst[i] = WP | T0 | i;     /* initial drive status */
         uptr->flags |= UNIT_WPMODE; //set WP in unit flags
     }
+    return SCPE_OK;
+}
+
+t_stat isbc208_clr(void)
+{
+//    fdc208.intnum = -1;                 //set default interrupt
+//    fdc208.verb = 0;                    //set verb = 0
+//    unreg_dev(fdc208.baseport);         //read status
+//    unreg_dev(fdc208.baseport + 1);     //read rslt type/write IOPB addr-l
+//    unreg_dev(fdc208.baseport + 2);     //write IOPB addr-h and start 
+//    unreg_dev(fdc208.baseport + 3);     //read rstl byte 
+//    unreg_dev(fdc208.baseport + 7);     //write reset fdc201
+//    if (fdc202.verb)
+        sim_printf("    sbc208: Disabled\n");
     return SCPE_OK;
 }
 
@@ -1167,7 +1194,7 @@ uint8 isbc208_r0(t_bool io, uint8 data, uint8 devnum)
             i8237_rD++;
             return (i8237_r0 & 0xFF);
         }
-    } else {                            /* write base & current address CH 0 */
+    } else {                            /* write baseport & current address CH 0 */
         if (i8237_rD) {                 /* high byte */
             i8237_rD = 0;
             i8237_r0 |= (data << 8);
@@ -1189,7 +1216,7 @@ uint8 isbc208_r1(t_bool io, uint8 data, uint8 devnum)
             i8237_rD++;
             return (i8237_r1 & 0xFF);
         }
-    } else {                            /* write base & current address CH 0 */
+    } else {                            /* write baseport & current address CH 0 */
         if (i8237_rD) {                 /* high byte */
             i8237_rD = 0;
             i8237_r1 |= (data << 8);
@@ -1211,7 +1238,7 @@ uint8 isbc208_r2(t_bool io, uint8 data, uint8 devnum)
             i8237_rD++;
             return (i8237_r2 & 0xFF);
         }
-    } else {                            /* write base & current address CH 1 */
+    } else {                            /* write baseport & current address CH 1 */
         if (i8237_rD) {                 /* high byte */
             i8237_rD = 0;
             i8237_r2 |= (data << 8);
@@ -1233,7 +1260,7 @@ uint8 isbc208_r3(t_bool io, uint8 data, uint8 devnum)
             i8237_rD++;
             return (i8237_r3 & 0xFF);
         }
-    } else {                            /* write base & current address CH 1 */
+    } else {                            /* write baseport & current address CH 1 */
         if (i8237_rD) {                 /* high byte */
             i8237_rD = 0;
             i8237_r3 |= (data << 8);
@@ -1255,7 +1282,7 @@ uint8 isbc208_r4(t_bool io, uint8 data, uint8 devnum)
             i8237_rD++;
             return (i8237_r4 & 0xFF);
         }
-    } else {                            /* write base & current address CH 2 */
+    } else {                            /* write baseport & current address CH 2 */
         if (i8237_rD) {                 /* high byte */
             i8237_rD = 0;
             i8237_r4 |= (data << 8);
@@ -1277,7 +1304,7 @@ uint8 isbc208_r5(t_bool io, uint8 data, uint8 devnum)
             i8237_rD++;
             return (i8237_r5 & 0xFF);
         }
-    } else {                            /* write base & current address CH 2 */
+    } else {                            /* write baseport & current address CH 2 */
         if (i8237_rD) {                 /* high byte */
             i8237_rD = 0;
             i8237_r5 |= (data << 8);
@@ -1299,7 +1326,7 @@ uint8 isbc208_r6(t_bool io, uint8 data, uint8 devnum)
             i8237_rD++;
             return (i8237_r6 & 0xFF);
         }
-    } else {                            /* write base & current address CH 3 */
+    } else {                            /* write baseport & current address CH 3 */
         if (i8237_rD) {                 /* high byte */
             i8237_rD = 0;
             i8237_r6 |= (data << 8);
@@ -1321,7 +1348,7 @@ uint8 isbc208_r7(t_bool io, uint8 data, uint8 devnum)
             i8237_rD++;
             return (i8237_r7 & 0xFF);
         }
-    } else {                            /* write base & current address CH 3 */
+    } else {                            /* write baseport & current address CH 3 */
         if (i8237_rD) {                 /* high byte */
             i8237_rD = 0;
             i8237_r7 |= (data << 8);
@@ -1487,7 +1514,5 @@ uint8 isbc208_r15(t_bool io, uint8 data, uint8 devnum)
         return 0;
     }
 }
- 
-#endif /* SBC208_NUM > 0 */
 
 /* end of isbc208.c */

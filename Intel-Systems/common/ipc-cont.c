@@ -33,17 +33,27 @@
 
 #include "system_defs.h"                /* system header in system dir */
 
+#define ipc_cont_NAME    "Intel IPB/IPC Controller"
+
 /* function prototypes */
 
-t_stat ipc_cont_cfg(uint8 base, uint8 devnum);
+t_stat ipc_cont_cfg(uint16 base, uint16 devnum, uint8 dummy);
+t_stat ipc_cont_clr(void);
+t_stat ipc_cont_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc);
 uint8 ipc_cont(t_bool io, uint8 data, uint8 devnum);    /* ipc_cont*/
 t_stat ipc_cont_reset (DEVICE *dptr);
 
 /* external function prototypes */
 
-extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint8, uint8);
+extern uint8 reg_dev(uint8 (*routine)(t_bool, uint8, uint8), uint16, uint16, uint8);
+extern uint8 unreg_dev(uint16);
 
 /* globals */
+
+static const char* ipc_cont_desc(DEVICE *dptr) {
+    return ipc_cont_NAME;
+}
+uint8   ipc_cont_baseport = -1;         //base port
 
 UNIT ipc_cont_unit =
     { UDATA (0, 0, 0) };                /* ipc_cont*/
@@ -65,13 +75,19 @@ DEBTAB ipc_cont_debug[] = {
     { NULL }
 };
 
+MTAB ipc_cont_mod[] = {
+    { MTAB_XTD | MTAB_VDV, 0, "PARAM", NULL, NULL, ipc_cont_show_param, NULL, 
+        "show configured parametes for ipc_cont" },
+    { 0 }
+};
+
 /* address width is set to 16 bits to use devices in 8086/8088 implementations */
 
 DEVICE ipc_cont_dev = {
     "IPC-CONT",         //name
     &ipc_cont_unit,     //units
     ipc_cont_reg,       //registers
-    NULL,               //modifiers
+    ipc_cont_mod,       //modifiers
     1,                  //numunits
     16,                 //aradix
     16,                 //awidth
@@ -85,20 +101,40 @@ DEVICE ipc_cont_dev = {
     NULL,               //attach
     NULL,               //detach
     NULL,               //ctxt
-    0,                  //flags
+    DEV_DEBUG+DEV_DISABLE+DEV_DIS, //flags 
     0,                  //dctrl
     ipc_cont_debug,     //debflags
     NULL,               //msize
-    NULL                //lname
+    NULL//&ipc_cont_desc      //device description
 };
 
 // ipc_cont configuration
 
-t_stat ipc_cont_cfg(uint8 base, uint8 devnum)
+t_stat ipc_cont_cfg(uint16 base, uint16 devnum, uint8 dummy)
 {
-    sim_printf("    ipc-cont[%d]: at port 0%02XH\n",
-        devnum, base & 0xFF);
-    reg_dev(ipc_cont, base, devnum); 
+    sim_printf("    ipc-cont: at port 0%02XH\n",
+        base & 0xFF);
+    ipc_cont_baseport = base & 0xff;
+    reg_dev(ipc_cont, base, 0, 0); 
+    return SCPE_OK;
+}
+
+t_stat ipc_cont_clr(void)
+{
+    unreg_dev(ipc_cont_baseport); 
+    ipc_cont_baseport = -1;
+    return SCPE_OK;
+}
+
+// show configuration parameters
+
+t_stat ipc_cont_show_param (FILE *st, UNIT *uptr, int32 val, CONST void *desc)
+{
+    if (uptr == NULL)
+        return SCPE_ARG;
+    fprintf(st, "%s, Base port 0%04XH", 
+        ((ipc_cont_dev.flags & DEV_DIS) == 0) ? "Enabled" : "Disabled", 
+        ipc_cont_baseport);
     return SCPE_OK;
 }
 
@@ -122,7 +158,8 @@ uint8 ipc_cont(t_bool io, uint8 data, uint8 devnum)
         return ipc_cont_unit.u3;
     } else {                            /* write control port */
         //this simulates an 74LS259 register 
-        //d0-d2 address the reg(in reverse order!), d3 is the data to be latched (inverted)
+        //d0-d2 address the reg(in reverse order!)
+        //d3 is the data to be latched (inverted)
         switch(data & 0x07) {
             case 5:                     //interrupt enable 8085 INTR
                 if(data & 0x08)         //bit low

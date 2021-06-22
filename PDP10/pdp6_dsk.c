@@ -34,13 +34,10 @@
 
 /* Flags in the unit flags word */
 
-#define UNIT_V_WLK      (UNIT_V_UF + 0)                 /* write locked */
-#define UNIT_V_DTYPE    (UNIT_V_UF + 1)                 /* disk type */
+#define UNIT_V_DTYPE    (UNIT_V_UF + 0)                 /* disk type */
 #define UNIT_M_DTYPE    1
-#define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
 #define GET_DTYPE(x)    (((x) >> UNIT_V_DTYPE) & UNIT_M_DTYPE)
-#define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
 
 /* Parameters in the unit descriptor */
 
@@ -164,8 +161,10 @@ DIB dsk_dib[] = {
     };
 
 MTAB                dsk_mod[] = {
-    {UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL},
-    {UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL},
+    { MTAB_XTD|MTAB_VUN, 0, "write enabled", "WRITEENABLED", 
+        &set_writelock, &show_writelock,   NULL, "Write enable disk drive" },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "LOCKED", 
+        &set_writelock, NULL,   NULL, "Write lock disk drive" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "DCT", "DCT",
        &dsk_set_dct, &dsk_show_dct, NULL},
     {0}
@@ -197,7 +196,7 @@ dsk_devio(uint32 dev, uint64 *data) {
           res |= ((uint64)(dsk_status & RMASK));
           if ((uptr->flags & UNIT_ATT) == 0)
               res |= OPR;
-          if (uptr->flags & UNIT_WLK)
+          if (uptr->flags & UNIT_WPRT)
               res |= WLE;
           *data = res;
           sim_debug(DEBUG_CONI, &dsk_dev, "DSK %03o CONI %012llo PC=%o\n", dev,
@@ -270,7 +269,7 @@ dsk_svc (UNIT *uptr)
 
    /* Check if we need to seek */
    if (dsk_octflp == SCE) {
-       if ((dsk_cmd & CMD) == WR_CMD && (uptr->flags & UNIT_WLK) == 0) {
+       if ((dsk_cmd & CMD) == WR_CMD && (uptr->flags & UNIT_WPRT) == 0) {
            /* Write the block */
            int da;
            for (; uptr->DATAPTR < DSK_WDS; uptr->DATAPTR++)
@@ -313,7 +312,7 @@ dsk_svc (UNIT *uptr)
                } else {
                    sim_debug(DEBUG_DETAIL, dptr, "DSK %d Write %012llo %d\n",
                                ctlr, data, uptr->DATAPTR);
-                   if ((uptr->flags & UNIT_WLK) != 0)
+                   if ((uptr->flags & UNIT_WPRT) != 0)
                        dsk_status |= DCE|PER|FER;
                    dsk_buf[uptr->DATAPTR] = data;
                }
@@ -346,7 +345,7 @@ dsk_svc (UNIT *uptr)
                 dsk_buf[wc] = 0;
        } else if (dsk_cmd & WR_CMD) {
            /* Check if we can write disk */
-           if (uptr->flags & UNIT_WLK) {
+           if (uptr->flags & UNIT_WPRT) {
               dsk_status |= CME|FER;
            }
        }
@@ -393,7 +392,7 @@ dsk_svc (UNIT *uptr)
    if (dsk_octflp == SNA) {
        sim_debug(DEBUG_DETAIL, dptr, "DSK %d Sna\n", ctlr);
        dsk_octflp = ADT;
-       if (uptr->flags & UNIT_WLK)
+       if (uptr->flags & UNIT_WPRT)
            dsk_status |= WLE|FER;
    }
 

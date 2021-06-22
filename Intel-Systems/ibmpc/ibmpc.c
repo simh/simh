@@ -78,12 +78,12 @@ t_stat SBC_reset (DEVICE *dptr, uint16 base)
 {    
     sim_printf("Initializing IBM PC:\n");
     i8088_reset (NULL);
-    i8237_reset (NULL, I8237_BASE_0);
-    i8253_reset (NULL, I8253_BASE_0);
-    i8255_reset (NULL, I8255_BASE_0);
-    i8259_reset (NULL, I8259_BASE_0);
-    EPROM_reset (NULL, ROM_BASE, ROM_SIZE);
-    RAM_reset (NULL, RAM_BASE, RAM_SIZE);
+    i8237_reset (I8237_BASE_0);
+    i8253_reset (I8253_BASE_0);
+    i8255_reset (I8255_BASE_0);
+    i8259_reset (I8259_BASE_0);
+    EPROM_reset (ROM_BASE, ROM_SIZE);
+    RAM_reset (RAM_BASE, RAM_SIZE);
     reg_dev(enbnmi, NMI_BASE); 
     reg_dev(dmapag0, DMAPAG_BASE_0); 
     reg_dev(dmapag1, DMAPAG_BASE_1); 

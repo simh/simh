@@ -290,10 +290,10 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
     else
       NEED_COMMIT_ID = need-commit-id
     endif
-    ifeq (need-commit-id,$(NEED_COMMIT_ID))
-      ifneq (,$(shell git update-index --refresh --))
-        GIT_EXTRA_FILES=+uncommitted-changes
-      endif
+    ifneq (,$(shell git update-index --refresh --))
+      GIT_EXTRA_FILES=+uncommitted-changes
+    endif
+    ifneq (,$(or $(NEED_COMMIT_ID),$(GIT_EXTRA_FILES)))
       isodate=$(shell git log -1 --pretty="%ai"|sed -e 's/ /T/'|sed -e 's/ //')
       $(shell git log -1 --pretty="SIM_GIT_COMMIT_ID %H$(GIT_EXTRA_FILES)%nSIM_GIT_COMMIT_TIME $(isodate)" >.git-commit-id)
     endif
@@ -350,13 +350,14 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
         LIBPATH += /opt/local/lib
         OS_LDFLAGS += -L/opt/local/lib
       endif
-      ifeq (HomeBrew,$(shell if ${TEST} -d /usr/local/Cellar; then echo HomeBrew; fi))
-        INCPATH += $(foreach dir,$(wildcard /usr/local/Cellar/*/*),$(dir)/include)
-        LIBPATH += $(foreach dir,$(wildcard /usr/local/Cellar/*/*),$(dir)/lib)
-      endif
-      ifeq (libXt,$(shell if ${TEST} -d /usr/X11/lib; then echo libXt; fi))
-        LIBPATH += /usr/X11/lib
-        OS_LDFLAGS += -L/usr/X11/lib
+      ifeq (HomeBrew,$(or $(shell if ${TEST} -d /usr/local/Cellar; then echo HomeBrew; fi),$(shell if ${TEST} -d /opt/homebrew/Cellar; then echo HomeBrew; fi)))
+        ifeq (local,$(shell if $(TEST) -d /usr/local/Cellar; then echo local; fi))
+          HBPATH = /usr/local
+        else
+          HBPATH = /opt/homebrew
+        endif
+        INCPATH += $(foreach dir,$(wildcard $(HBPATH)/Cellar/*/*),$(dir)/include)
+        LIBPATH += $(foreach dir,$(wildcard $(HBPATH)/Cellar/*/*),$(dir)/lib)
       endif
     else
       ifeq (Linux,$(OSTYPE))
@@ -457,12 +458,6 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
               OS_LDFLAGS += -L/usr/pkg/lib -R/usr/pkg/lib
               OS_CCDEFS += -I/usr/pkg/include
             endif
-            ifeq (X11R7,$(shell if ${TEST} -d /usr/X11R7/lib; then echo X11R7; fi))
-              LIBPATH += /usr/X11R7/lib
-              INCPATH += /usr/X11R7/include
-              OS_LDFLAGS += -L/usr/X11R7/lib -R/usr/X11R7/lib
-              OS_CCDEFS += -I/usr/X11R7/include
-            endif
             ifeq (/usr/local/lib,$(findstring /usr/local/lib,${LIBPATH}))
               INCPATH += /usr/local/include
               OS_CCDEFS += -I/usr/local/include
@@ -485,6 +480,16 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
             endif
           endif
         endif
+      endif
+    endif
+    ifeq (,$(filter /lib/,$(LIBPATH)))
+      ifeq (existlib,$(shell if $(TEST) -d /lib/; then echo existlib; fi))
+        LIBPATH += /lib/
+      endif
+    endif
+    ifeq (,$(filter /usr/lib/,$(LIBPATH)))
+      ifeq (existusrlib,$(shell if $(TEST) -d /usr/lib/; then echo existusrlib; fi))
+        LIBPATH += /usr/lib/
       endif
     endif
     # Some gcc versions don't support LTO, so only use LTO when the compiler is known to support it
@@ -645,8 +650,6 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
           DISPLAY340 = ${DISPLAYD}/type340.c
           DISPLAYNG = ${DISPLAYD}/ng.c
           DISPLAYIII = ${DISPLAYD}/iii.c
-          DISPLAYIMLAC = ${DISPLAYD}/imlac.c
-          DISPLAYTT2500 = ${DISPLAYD}/tt2500.c
           DISPLAY_OPT += -DUSE_DISPLAY $(VIDEO_CCDEFS) $(VIDEO_LDFLAGS)
           $(info using libSDL2: $(call find_include,SDL2/SDL))
           ifeq (Darwin,$(OSTYPE))
@@ -1562,7 +1565,7 @@ IMLACD = ${SIMHD}/imlac
 IMLAC = ${IMLACD}/imlac_sys.c ${IMLACD}/imlac_cpu.c \
 	${IMLACD}/imlac_dp.c ${IMLACD}/imlac_crt.c ${IMLACD}/imlac_kbd.c \
 	${IMLACD}/imlac_tty.c ${IMLACD}/imlac_pt.c ${IMLACD}/imlac_bel.c \
-	${DISPLAYL} ${DISPLAYIMLAC}
+	${DISPLAYL}
 IMLAC_OPT = -I ${IMLACD} ${DISPLAY_OPT}
 
 
@@ -1570,7 +1573,7 @@ TT2500D = ${SIMHD}/tt2500
 TT2500 = ${TT2500D}/tt2500_sys.c ${TT2500D}/tt2500_cpu.c \
 	${TT2500D}/tt2500_dpy.c ${TT2500D}/tt2500_crt.c ${TT2500D}/tt2500_tv.c \
 	${TT2500D}/tt2500_key.c ${TT2500D}/tt2500_uart.c ${TT2500D}/tt2500_rom.c \
-	${DISPLAYL} ${DISPLAYTT2500}
+	${DISPLAYL}
 TT2500_OPT = -I ${TT2500D} ${DISPLAY_OPT}
 
 
@@ -1805,89 +1808,24 @@ INTEL_PARTS = \
 	${INTELSYSC}/ioc-cont.c \
 	${INTELSYSC}/ipc-cont.c \
 	${INTELSYSC}/iram8.c \
-	${INTELSYSC}/io.c \
 	${INTELSYSC}/isbc064.c \
 	${INTELSYSC}/isbc202.c \
 	${INTELSYSC}/isbc201.c \
 	${INTELSYSC}/isbc206.c \
 	${INTELSYSC}/isbc464.c \
 	${INTELSYSC}/isbc208.c \
+	${INTELSYSC}/port.c \
+	${INTELSYSC}/irq.c \
 	${INTELSYSC}/multibus.c \
+	${INTELSYSC}/mem.c \
+	${INTELSYSC}/sys.c \
 	${INTELSYSC}/zx200a.c 
 
 
-ISDK80D = ${INTELSYSD}/isdk80
-ISDK80 = ${INTELSYSC}/i8080.c ${ISDK80D}/isdk80_sys.c \
-	${ISDK80D}/isdk80.c ${INTEL_PARTS}
-ISDK80_OPT = -I ${ISDK80D}
-
-
-IDS880D = ${INTELSYSD}/ids880
-IDS880 = ${INTELSYSC}/i8080.c ${IDS880D}/ids880_sys.c \
-	${IDS880D}/ids880.c ${INTEL_PARTS}
-IDS880_OPT = -I ${IDS880D}
-
-
-ISYS8010D = ${INTELSYSD}/isys8010
-ISYS8010 = ${INTELSYSC}/i8080.c ${ISYS8010D}/isys8010_sys.c \
-	${ISYS8010D}/isbc8010.c ${INTEL_PARTS}
-ISYS8010_OPT = -I ${ISYS8010D}
-
-
-ISYS8020D = ${INTELSYSD}/isys8020
-ISYS8020 = ${INTELSYSC}/i8080.c ${ISYS8020D}/isys8020_sys.c \
-	${ISYS8020D}/isbc8020.c ${INTEL_PARTS}
-ISYS8020_OPT = -I ${ISYS8020D}
-
-
-ISYS8024D = ${INTELSYSD}/isys8024
-ISYS8024 = ${INTELSYSC}/i8080.c ${ISYS8024D}/isys8024_sys.c \
-	${ISYS8024D}/isbc8024.c ${INTEL_PARTS}
-ISYS8024_OPT = -I ${ISYS8024D}
-
-
-ISYS8030D = ${INTELSYSD}/isys8030
-ISYS8030 = ${INTELSYSC}/i8080.c ${ISYS8030D}/isys8030_sys.c \
-	${ISYS8030D}/isbc8030.c ${INTEL_PARTS}
-ISYS8030_OPT = -I ${ISYS8030D}
-
-
-IMDS210D = ${INTELSYSD}/imds-210
-IMDS210 = ${INTELSYSC}/i8080.c ${IMDS210D}/imds-210_sys.c \
-	${INTELSYSC}/ipb.c ${INTEL_PARTS}
-IMDS210_OPT = -I ${IMDS210D}
-
-
-IMDS220D = ${INTELSYSD}/imds-220
-IMDS220 = ${INTELSYSC}/i8080.c ${IMDS220D}/imds-220_sys.c \
-	${INTELSYSC}/ipb.c ${INTEL_PARTS}
-IMDS220_OPT = -I ${IMDS220D}
-
-
-IMDS225D = ${INTELSYSD}/imds-225
-IMDS225 = ${INTELSYSC}/i8080.c ${IMDS225D}/imds-225_sys.c \
-	${INTELSYSC}/ipc.c ${INTEL_PARTS}
-IMDS225_OPT = -I ${IMDS225D}
-
-
-IMDS230D = ${INTELSYSD}/imds-230
-IMDS230 = ${INTELSYSC}/i8080.c ${IMDS230D}/imds-230_sys.c \
-	${INTELSYSC}/ipb.c ${INTEL_PARTS}
-IMDS230_OPT = -I ${IMDS230D}
-
-
-IMDS800D = ${INTELSYSD}/imds-800
-IMDS800 = ${INTELSYSC}/i8080.c ${IMDS800D}/imds-800_sys.c \
-        ${IMDS800D}/cpu.c ${IMDS800D}/front_panel.c \
-        ${IMDS800D}/monitor.c ${INTEL_PARTS}
-IMDS800_OPT = -I ${IMDS800D}
-
-
-IMDS810D = ${INTELSYSD}/imds-810
-IMDS810 = ${INTELSYSC}/i8080.c ${IMDS810D}/imds-810_sys.c \
-        ${IMDS810D}/cpu.c ${IMDS810D}/front_panel.c \
-        ${IMDS810D}/monitor.c ${INTEL_PARTS}
-IMDS810_OPT = -I ${IMDS810D}
+INTEL_MDSD = ${INTELSYSD}/Intel-MDS
+INTEL_MDS = ${INTELSYSC}/i8080.c ${INTEL_MDSD}/imds_sys.c \
+	${INTEL_PARTS}
+INTEL_MDS_OPT = -I ${INTEL_MDSD}
 
 
 IBMPCD = ${INTELSYSD}/ibmpc
@@ -2092,9 +2030,9 @@ KL10 = ${KL10D}/kx10_cpu.c ${KL10D}/kx10_sys.c ${KL10D}/kx10_df.c \
 KL10_OPT = -DKL=1 -DUSE_INT64 -I $(KL10D) -DUSE_SIM_CARD ${NETWORK_OPT} 
 
 ATT3B2D = ${SIMHD}/3B2
-ATT3B2M400 = ${ATT3B2D}/3b2_400_cpu.c ${ATT3B2D}/3b2_400_sys.c \
-	${ATT3B2D}/3b2_400_stddev.c ${ATT3B2D}/3b2_400_mmu.c \
-	${ATT3B2D}/3b2_400_mau.c ${ATT3B2D}/3b2_iu.c \
+ATT3B2M400 = ${ATT3B2D}/3b2_cpu.c ${ATT3B2D}/3b2_rev2_sys.c \
+	${ATT3B2D}/3b2_rev2_stddev.c ${ATT3B2D}/3b2_rev2_mmu.c \
+	${ATT3B2D}/3b2_rev2_mau.c ${ATT3B2D}/3b2_iu.c \
 	${ATT3B2D}/3b2_if.c ${ATT3B2D}/3b2_id.c \
 	${ATT3B2D}/3b2_dmac.c ${ATT3B2D}/3b2_io.c \
 	${ATT3B2D}/3b2_ports.c ${ATT3B2D}/3b2_ctc.c \
@@ -2160,8 +2098,7 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	microvax3100m80 vaxstation4000vlc infoserver1000 \
 	nova eclipse hp2100 hp3000 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 cdc1700 \
-	swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 isdk80 ids880 isys8010 isys8020 \
-	isys8030 isys8024 imds-210 imds-220 imds-225 imds-230 imds-800 imds-810 \
+	swtp6800mp-a swtp6800mp-a2 tx-0 ssem b5500 intel-mds \
 	scelbi 3b2 i701 i704 i7010 i7070 i7080 i7090 \
 	sigma uc15 pdp10-ka pdp10-ki pdp10-kl pdp6 i650
 
@@ -2674,112 +2611,13 @@ ifneq (,$(call find_test,${SWTP6800D},swtp6800mp-a2))
 	$@ $(call find_test,${SWTP6800D},swtp6800mp-a2) ${TEST_ARG}
 endif
 
-isdk80: ${BIN}isdk80${EXE}
+intel-mds: ${BIN}intel-mds${EXE}
 
-${BIN}isdk80${EXE} : ${ISDK80} ${SIM} ${BUILD_ROMS}
+${BIN}intel-mds${EXE} : ${INTEL_MDS} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
-	${CC} ${ISDK80} ${SIM} ${ISDK80_OPT} ${CC_OUTSPEC} ${LDFLAGS}
-ifneq (,$(call find_test,${ISDK80D},isdk80))
-	$@ $(call find_test,${ISDK80D},isdk80) ${TEST_ARG}
-endif
-
-ids880: ${BIN}ids880${EXE}
-
-${BIN}ids880${EXE} : ${IDS880} ${SIM} ${BUILD_ROMS}
-	${MKDIRBIN}
-	${CC} ${IDS880} ${SIM} ${IDS880_OPT} ${CC_OUTSPEC} ${LDFLAGS}
-ifneq (,$(call find_test,${IDS880D},ids880))
-	$@ $(call find_test,${IDS880D},ids880) ${TEST_ARG}
-endif
-
-isys8010: ${BIN}isys8010${EXE}
-
-${BIN}isys8010${EXE} : ${ISYS8010} ${SIM} ${BUILD_ROMS}
-	${MKDIRBIN}
-	${CC} ${ISYS8010} ${SIM} ${ISYS8010_OPT} ${CC_OUTSPEC} ${LDFLAGS}
-ifneq (,$(call find_test,${ISYS8010D},isys8010))
-	$@ $(call find_test,${ISYS8010D},isys8010) ${TEST_ARG}
-endif
-
-isys8020: ${BIN}isys8020${EXE}
-
-${BIN}isys8020${EXE} : ${ISYS8020} ${SIM} ${BUILD_ROMS}
-	${MKDIRBIN}
-	${CC} ${ISYS8020} ${SIM} ${ISYS8020_OPT} ${CC_OUTSPEC} ${LDFLAGS}
-ifneq (,$(call find_test,${ISYS8020D},isys8020))
-	$@ $(call find_test,${ISYS8020D},isys8020) ${TEST_ARG}
-endif
-
-isys8024: ${BIN}isys8024${EXE}
-
-${BIN}isys8024${EXE} : ${ISYS8024} ${SIM} ${BUILD_ROMS}
-	${MKDIRBIN}
-	${CC} ${ISYS8024} ${SIM} ${ISYS8024_OPT} ${CC_OUTSPEC} ${LDFLAGS}
-ifneq (,$(call find_test,${ISYS8024D},isys8024))
-	$@ $(call find_test,${ISYS8024D},isys8024) ${TEST_ARG}
-endif
-
-isys8030: ${BIN}isys8030${EXE}
-
-${BIN}isys8030${EXE} : ${ISYS8030} ${SIM} ${BUILD_ROMS}
-	${MKDIRBIN}
-	${CC} ${ISYS8030} ${SIM} ${ISYS8030_OPT} ${CC_OUTSPEC} ${LDFLAGS}
-ifneq (,$(call find_test,${ISYS8030D},isys8030))
-	$@ $(call find_test,${ISYS8030D},isys8030) ${TEST_ARG}
-endif
-
-imds-210: ${BIN}imds-210${EXE}
-
-${BIN}imds-210${EXE} : ${IMDS210} ${SIM} ${BUILD_ROMS}
-	${MKDIRBIN}
-	${CC} ${IMDS210} ${SIM} ${IMDS210_OPT} ${CC_OUTSPEC} ${LDFLAGS}
-ifneq (,$(call find_test,${IMDS210D},imds-210))
-	$@ $(call find_test,${IMDS210D},imds-210) ${TEST_ARG}
-endif
-
-imds-220: ${BIN}imds-220${EXE}
-
-${BIN}imds-220${EXE} : ${IMDS220} ${SIM} ${BUILD_ROMS}
-	${MKDIRBIN}
-	${CC} ${IMDS220} ${SIM} ${IMDS220_OPT} ${CC_OUTSPEC} ${LDFLAGS}
-ifneq (,$(call find_test,${IMDS220D},imds-220))
-	$@ $(call find_test,${IMDS220D},imds-220) ${TEST_ARG}
-endif
-
-imds-225: ${BIN}imds-225${EXE}
-
-${BIN}imds-225${EXE} : ${IMDS225} ${SIM} ${BUILD_ROMS}
-	${MKDIRBIN}
-	${CC} ${IMDS225} ${SIM} ${IMDS225_OPT} ${CC_OUTSPEC} ${LDFLAGS}
-ifneq (,$(call find_test,${IMDS225D},imds-225))
-	$@ $(call find_test,${IMDS225D},imds-225) ${TEST_ARG}
-endif
-
-imds-230: ${BIN}imds-230${EXE}
-
-${BIN}imds-230${EXE} : ${IMDS230} ${SIM} ${BUILD_ROMS}
-	${MKDIRBIN}
-	${CC} ${IMDS230} ${SIM} ${IMDS230_OPT} ${CC_OUTSPEC} ${LDFLAGS}
-ifneq (,$(call find_test,${IMDS230D},imds-230))
-	$@ $(call find_test,${IMDS230D},imds-230) ${TEST_ARG}
-endif
-
-imds-800: ${BIN}imds-800${EXE}
-
-${BIN}imds-800${EXE} : ${IMDS800} ${SIM} ${BUILD_ROMS}
-	${MKDIRBIN}
-	${CC} ${IMDS800} ${SIM} ${IMDS800_OPT} ${CC_OUTSPEC} ${LDFLAGS}
-ifneq (,$(call find_test,${IMDS800D},imds-800))
-	$@ $(call find_test,${IMDS800D},imds-800) ${TEST_ARG}
-endif
-
-imds-810: ${BIN}imds-810${EXE}
-
-${BIN}imds-810${EXE} : ${IMDS810} ${SIM} ${BUILD_ROMS}
-	${MKDIRBIN}
-	${CC} ${IMDS810} ${SIM} ${IMDS810_OPT} ${CC_OUTSPEC} ${LDFLAGS}
-ifneq (,$(call find_test,${IMDS810D},imds-810))
-	$@ $(call find_test,${IMDS810D},imds-810) ${TEST_ARG}
+	${CC} ${INTEL_MDS} ${SIM} ${INTEL_MDS_OPT} ${CC_OUTSPEC} ${LDFLAGS}
+ifneq (,$(call find_test,${INTEL_MDSD},intel-mds))
+	$@ $(call find_test,${INTEL_MDSD},intel-mds) ${TEST_ARG}
 endif
 
 ibmpc: ${BIN}ibmpc${EXE}

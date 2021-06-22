@@ -44,14 +44,15 @@ t_stat xtbus_svc(UNIT *uptr);
 t_stat xtbus_reset(DEVICE *dptr);
 void set_irq(int32 int_num);
 void clr_irq(int32 int_num);
-uint8 nulldev(t_bool io, uint8 data);
-uint16 reg_dev(uint8 (*routine)(t_bool io, uint8 data), uint16 port);
+uint8 nulldev(t_bool io, uint8 data, uint8 devnum);
+uint16 reg_dev(uint8 (*routine)(t_bool io, uint8 data, uint8 devnum), uint16 port, uint8 devnum);
 void dump_dev_table(void);
 t_stat xtbus_reset (DEVICE *dptr);
 uint8 xtbus_get_mbyte(uint32 addr);
 void xtbus_put_mbyte(uint32 addr, uint8 val);
 
 /* external function prototypes */
+
 extern uint8 RAM_get_mbyte(uint32 addr);
 extern void RAM_put_mbyte(uint32 addr, uint8 val);
 extern t_stat SBC_reset(DEVICE *dptr);      /* reset the PC XT simulator */
@@ -84,8 +85,8 @@ DEBTAB xtbus_debug[] = {
 
 DEVICE xtbus_dev = {
     "PCBUS",                    //name 
-    &xtbus_unit,             //units 
-    xtbus_reg,               //registers 
+    &xtbus_unit,                //units 
+    xtbus_reg,                  //registers 
     NULL,                       //modifiers
     1,                          //numunits 
     16,                         //aradix  
@@ -95,14 +96,14 @@ DEVICE xtbus_dev = {
     8,                          //dwidth
     NULL,                       //examine  
     NULL,                       //deposit  
-    &xtbus_reset,            //reset 
+    &xtbus_reset,               //reset 
     NULL,                       //boot
     NULL,                       //attach  
     NULL,                       //detach
     NULL,                       //ctxt     
     DEV_DEBUG,                  //flags 
     0,                          //dctrl 
-    xtbus_debug,             //debflags
+    xtbus_debug,                //debflags
     NULL,                       //msize
     NULL                        //lname
 };
@@ -155,7 +156,9 @@ The actual 808X can address 65,536 I/O ports but the IBM only uses
 the first 1024. */
 
 struct idev {
-    uint8 (*routine)(t_bool io, uint8 data);
+    uint8 (*routine)(t_bool io, uint8 data, uint8 devnum); 
+    uint8 port;
+    uint8 devnum;
 };
 
 struct idev dev_table[1024] = {
@@ -417,16 +420,16 @@ struct idev dev_table[1024] = {
 {&nulldev}, {&nulldev}, {&nulldev}, {&nulldev}          /* 3FCH */
 };
 
-uint8 nulldev(t_bool flag, uint8 data)
+uint8 nulldev(t_bool io, uint8 data, uint8 devnum)
 {
     sim_printf("xtbus: I/O Port %03X is not assigned io=%d data=%02X\n",
-        port, flag, data);
-    if (flag == 0)                      /* if we got here, no valid I/O device */
+        port, io, data);
+    if (io == 0)                      /* if we got here, no valid I/O device */
         return 0xFF;
     return 0;
 }
 
-uint16 reg_dev(uint8 (*routine)(t_bool io, uint8 data), uint16 port)
+uint16 reg_dev(uint8 (*routine)(t_bool io, uint8 data, uint8 devnum), uint16 port, uint8 devnum)
 {
     if (dev_table[port].routine != &nulldev) {  /* port already assigned */
         sim_printf("xtbus: I/O Port %03X is already assigned\n", port);
