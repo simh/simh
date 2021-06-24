@@ -725,7 +725,7 @@ t_stat rom_reset (DEVICE *dptr)
     /* Initialize the UNIT and DIB structs and create the linked list of DIBs */
     for (socket_number = 0; socket_number < MAX_NUMBER_SOCKETS; socket_number++) {
         rom_dib[socket_number].next = 
-            (socket_number < dptr->numunits - 1) ? &rom_dib[socket_number + 1] : NULL;
+            (socket_number < MAX_NUMBER_SOCKETS - 1) ? &rom_dib[socket_number + 1] : NULL;
     }
 
     rom_initialized = TRUE;
@@ -737,6 +737,7 @@ t_stat rom_reset (DEVICE *dptr)
 
 t_stat rom_boot (int32 u, DEVICE *dptr)
 {
+    // ToDo: Check that a valid entry point is set 
     cpu_set_boot (rom_entry_point);
     return SCPE_OK;
 }
