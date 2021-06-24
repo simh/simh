@@ -35,12 +35,15 @@ t_stat rom_set_type (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_type (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_set_configmode (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_configmode (FILE *, UNIT *, int32, CONST void *);
+t_stat rom_set_entry_point (UNIT *, int32, CONST char *, void *);
+t_stat rom_show_entry_point (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_show_sockets (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_attach (UNIT *, CONST char *);
 t_stat rom_detach (UNIT *);
 const char *rom_description (DEVICE *);
 
 /* Forward references for helper functions */
+static t_bool address_available (int32);
 static void set_socket_addresses ();
 static int module_type_is_valid (uint16);
 static t_stat blank_attach (CONST char *);
@@ -322,6 +325,7 @@ static char unit_filename[NUM_M9312_SOCKETS * CBUFSIZE];    /* Composed file nam
  * to allow the state to be saved and restored by a SAVE/RESTORE cycle.
  */
 static uint16 selected_type = ROM_MODULE_BLANK;             /* The module type as set by the user */
+static int32 rom_entry_point = 0;                           /* ROM bootstrap entry point */
 
 /* Define socket administration */
 int32 base_address[MAX_NUMBER_SOCKETS];                     /* Base address for the socket */
@@ -333,23 +337,25 @@ REG rom_reg[] = {
     { ORDATAD (TYPE,     selected_type, 16,     "Type"), REG_RO  },
     { BRDATAD (BASE_ADDRESS,  base_address,  16,  8, sizeof base_address, 
         "Socket base addresses"), REG_RO},
-     { BRDATAD (ROM_NAME,  rom_name,  16,  8, sizeof rom_name,
+    { BRDATAD (ROM_NAME,  rom_name,  16,  8, sizeof rom_name,
         "ROM names"), REG_RO},
+    { ORDATAD (ENTRY_POINT,   rom_entry_point, 16,     "Entry point"), REG_RO  },
     { NULL }
 };
 
 /*
  * Define the ROM device modifiers.
  * 
- * A number of modifiers are marked "named only" to prevent them showing
- * up on the SHOW ROM output. The ROM SHOW CONTENTS command will print all
- * relevant information for a socket.
+ * The SOCKETS modifier is a view-only modifer and prints the relevant
+ * information for all sockets in a pretty format.
  */
 MTAB rom_mod[] = {
     { MTAB_XTD | MTAB_VDV | MTAB_VALR, 0, "TYPE", "TYPE",
         &rom_set_type, &rom_show_type, NULL, "ROM type (BLANK, M9312 or VT40)" },
     { MTAB_XTD | MTAB_VDV | MTAB_VALR, 0, "CONFIGURATION", "CONFIGURATION",
         &rom_set_configmode, &rom_show_configmode, NULL, "Auto configuration (AUTO or MANUAL)" },
+    { MTAB_XTD | MTAB_VDV | MTAB_VALR, 0, "ENTRY_POINT", "ENTRY_POINT",
+        &rom_set_entry_point, &rom_show_entry_point, NULL, "ROM bootstrap entry point (address)" },
     { MTAB_VDV | MTAB_NMO, 0, "SOCKETS", NULL,
         NULL, &rom_show_sockets, NULL, "Socket addresses and ROM images" },
     { 0 }
@@ -529,6 +535,7 @@ static void set_socket_addresses ()
     }
 }
 
+
 /* Show socket addresses and contents */
 
 t_stat rom_show_sockets (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
@@ -563,7 +570,7 @@ static t_bool dev_disabled (DEVICE *dptr)
 
 static t_stat rom_set_configmode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-     /* Is a configuration type specified? */
+    /* Is a configuration type specified? */
     if (cptr == NULL)
         return sim_messagef (SCPE_ARG, "Specify AUTO or MANUAL configuration\n");
 
@@ -579,23 +586,82 @@ static t_stat rom_set_configmode (UNIT *uptr, int32 val, CONST char *cptr, void 
 
                 /* Perform auto-config */
                 (*module_list[selected_type]->auto_config)();
-            }
-            else 
+            } else
                 return sim_messagef (SCPE_ARG, "Auto configuration is not available for the %s module\n",
                 module_list[selected_type]->name);
-        }
-        else
+        } else
             return sim_messagef (SCPE_ARG, "Unknown configuration mode, specify AUTO or MANUAL\n");
- 
-    return SCPE_OK;
+
+        return SCPE_OK;
 }
 
 t_stat rom_show_configmode (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 {
-   fprintf (f, "configuration mode %s", 
-       (rom_device_flags & ROM_CONFIG_AUTO) ? "AUTO" : "MANUAL");
+    fprintf (f, "configuration mode %s",
+        (rom_device_flags & ROM_CONFIG_AUTO) ? "AUTO" : "MANUAL");
     return SCPE_OK;
 }
+
+
+/* Set ROM bootstrap entry point */
+
+t_stat rom_set_entry_point (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+{
+    t_stat r;
+    int32 address;
+
+    /* Check a value is given */
+    if (cptr == NULL)
+        return sim_messagef (SCPE_ARG, "ENTRY_POINT requires a value\n");
+
+    /* Convert the adress glyph and check if produced a valid value */
+    address = (int32) get_uint (cptr, 8, IOPAGEBASE + IOPAGEMASK, &r);
+    if (r != SCPE_OK)
+        return r;
+
+     /* Check if the address is in the address space of an attached ROM */
+    if (!address_available (address))
+        return sim_messagef (SCPE_ARG, "Address must be in the address space of an attached ROM\n");
+
+    /* Check the address is even */
+    if (address & 0x1)
+        return sim_messagef (SCPE_ARG, "Specify an even address\n");
+
+    /* Save the entry point */
+    rom_entry_point = address;
+
+    return SCPE_OK;
+}
+
+t_stat rom_show_entry_point (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
+{
+    fprintf (f, "entry point ");
+    (rom_entry_point == 0) ? fprintf (f, "not specified") : 
+        fprintf (f, "%o", rom_entry_point);
+    return SCPE_OK;
+}
+
+
+/* Verify that given adress is within the address space of an attached ROM */
+
+static t_bool address_available (int32 address)
+{
+    int socket_number;
+    int32 num_sockets = module_list[selected_type]->num_sockets;
+
+    /* For all sockets */
+    for (socket_number = 0; socket_number < num_sockets; socket_number++) {
+        if ((address >= base_address[socket_number]) &&
+            (address < base_address[socket_number] + rom_size[socket_number]))
+
+            /* Availabe address found */
+            return TRUE;
+    }
+
+    /* No available address found */
+    return FALSE;
+}
+
 
 /* Examine routine */
 
@@ -671,7 +737,7 @@ t_stat rom_reset (DEVICE *dptr)
 
 t_stat rom_boot (int32 u, DEVICE *dptr)
 {
-    // cpu_set_boot (base_address[socket_number]);
+    cpu_set_boot (rom_entry_point);
     return SCPE_OK;
 }
 
