@@ -48,13 +48,15 @@ static void set_socket_addresses ();
 static int module_type_is_valid (uint16);
 static t_stat blank_attach (CONST char *);
 static t_stat embedded_attach (CONST char *);
-static t_stat parse_cmd (CONST char *, cmd_parameter *, ATTACH_PARAM_VALUES *);
-static t_stat set_socket_for_attach (char *, ATTACH_PARAM_VALUES *);
-static t_stat set_address_for_attach (char *, ATTACH_PARAM_VALUES *);
-static t_stat set_address_not_allowed (char *, ATTACH_PARAM_VALUES *);
-static t_stat set_image_for_attach (char *, ATTACH_PARAM_VALUES *);
-static t_stat exec_attach_blank_rom (ATTACH_PARAM_VALUES *);
-static t_stat exec_attach_embedded_rom (ATTACH_PARAM_VALUES *);
+static t_stat parse_attach_cmd (CONST char *, ATTACH_CMD *, uint32 *);
+static t_stat validate_attach_blank_rom (ATTACH_CMD *, uint32);
+static t_stat parse_cmd (CONST char *, cmd_parameter *, ATTACH_CMD *);
+static t_stat set_socket_for_attach (char *, ATTACH_CMD *);
+static t_stat set_address_for_attach (char *, ATTACH_CMD *);
+static t_stat set_address_not_allowed (char *, ATTACH_CMD *);
+static t_stat set_image_for_attach (char *, ATTACH_CMD *);
+static t_stat exec_attach_blank_rom (ATTACH_CMD *);
+static t_stat exec_attach_embedded_rom (ATTACH_CMD *);
 static t_stat attach_rom_to_socket (char *, t_addr, void *, int16, void (*)(), int);
 static t_stat vt40_auto_attach ();
 static void create_filename (char *);
@@ -785,11 +787,12 @@ t_stat rom_attach (UNIT *uptr, CONST char *cptr)
  * This sequence is necessary to allow a free ordering of the parameters
  * and to check that every parameter is specified just once.
  */
+#if 0
 static t_stat blank_attach (CONST char *cptr)
 {
     uint32 socket_number;
     t_stat r = SCPE_OK;
-    ATTACH_PARAM_VALUES param_values = {-1, -1, ""};
+    ATTACH_CMD param_values = {-1, -1, ""};
 
     cmd_parameter attach_parameters[] =
     {
@@ -833,53 +836,199 @@ static t_stat blank_attach (CONST char *cptr)
     /* Execute the command */
     return exec_attach_blank_rom (&param_values);
 }
+#endif
+
+static t_stat blank_attach (CONST char *cptr)
+{
+    char command[CBUFSIZE];
+    uint32 i;
+    uint32 num_commands = 0;
+    uint32 default_socket_number = 0;
+    t_stat r = SCPE_OK;
+    ATTACH_CMD attach_cmd[MAX_NUMBER_SOCKETS] =
+    {
+        {0, 0, ""},
+        {0, 0, ""},
+        {0, 0, ""},
+        {0, 0, ""},
+        {0, 0, ""}
+    };
+
+    /* While there is some string to parse */
+    while (*cptr != 0) {
+
+        /* A maximum of num_sockets ROM's can be specified */
+        if (num_commands >= module_list[selected_type]->num_sockets)
+            return sim_messagef (SCPE_ARG, "Specify a maximum of %d ROM's",
+                module_list[selected_type]->num_sockets);
+
+        /* Get next command in the command sequence */
+        cptr = get_glyph_nc (cptr, command, ',');
+
+        /* And parse that command */
+        if ((r = parse_attach_cmd (command, &attach_cmd[num_commands], &default_socket_number)) != SCPE_OK)
+            return r;
+
+        num_commands++;
+    }
+
+    for (i = 0; i < num_commands; i++) { 
+        sim_messagef (SCPE_OK, "ATTACH ROM socket %d: address %o, image %s\n",
+            attach_cmd[i].socket_number, attach_cmd[i].address, attach_cmd[i].image_name);
+    }
+
+    /* Validate the command sequence */
+    if ((r = validate_attach_blank_rom (&attach_cmd[0], num_commands)) != SCPE_OK)
+        return r;
+
+    /* Execute the commands in the command sequence */
+    for (i = 0; i < num_commands; i++) {
+        if ((r = exec_attach_blank_rom (&attach_cmd[i])) != SCPE_OK)
+            return r;
+    }
+
+    return SCPE_OK;
+}
+
+static t_stat parse_attach_cmd (CONST char *cptr, ATTACH_CMD *cmdptr, uint32 *default_socket_number)
+{
+    char value[CBUFSIZE];
+    char *ptr;
+    t_stat r;
+    uint32 socket_number;
+    int32 address;
+
+    /* See if a socket number is specified */
+    if (strchr (cptr, ':')) {
+
+        /* Get socket number */
+        cptr = get_glyph_nc (cptr, value, ':');
+        socket_number = strtol (value, &ptr, 0);
+
+        /* Check a valid number was specified */
+        if (*ptr != 0)
+            return sim_messagef (SCPE_ARG, "Specify a valid socket number\n");
+
+        /* Check valid socket number is specified */
+        if (socket_number >= module_list[selected_type]->num_sockets) 
+            return sim_messagef (SCPE_ARG, "SOCKET must be in range 0 to %d\n",
+            module_list[selected_type]->num_sockets - 1);
+
+        /* Save socket number and set default socket number for next command */
+        cmdptr->socket_number = socket_number;
+        (*default_socket_number) = socket_number + 1;
+    } 
+    else {
+        /* No socket specified use default */
+        /* Check default socket number is valid */
+        if (*default_socket_number >= module_list[selected_type]->num_sockets)
+            return sim_messagef (SCPE_ARG, "SOCKET must be in range 0 to %d\n",
+                module_list[selected_type]->num_sockets - 1);
+
+        cmdptr->socket_number = *default_socket_number;
+        (*default_socket_number)++;
+    }
+
+    /* See if an address and/or image is specified */
+    if (*cptr == 0)
+        return sim_messagef (SCPE_ARG, "Specify address and image\n");
+
+    /* Get adress */
+    cptr = get_glyph_nc (cptr, value, '/');
+ 
+    /* Convert the adress glyph and check if produced a valid value */
+    address = (int32) get_uint (value, 8, IOPAGEBASE + IOPAGEMASK, &r);
+    if (r != SCPE_OK)
+        return sim_messagef (r, "Specify a valid address\n");
+
+    /* Check if a valid adress is specified */
+    if (address < IOPAGEBASE)
+        return sim_messagef (SCPE_ARG, "ADDRESS must be in I/O page, at or above 0%o\n",
+        IOPAGEBASE);
+
+    cmdptr->address = address;
+
+    /* The remaining part of the command string should specify the image name */
+    if (*cptr == 0)
+        return sim_messagef (r, "Specify a ROM image\n");
+
+    strcpy (cmdptr->image_name, cptr);
+    return SCPE_OK;
+}
 
 
-/* Execute the attach command for the BLANK module */
+/* Validate all attach commands */
 
-static t_stat exec_attach_blank_rom (ATTACH_PARAM_VALUES *param_values)
+static t_stat validate_attach_blank_rom (ATTACH_CMD *cmdptr, uint32 num_commands)
+{
+    uint32 i, j;
+    FILE *fileptr;
+
+    /* For all commands in the command sequence */
+    for (i = 0; i < num_commands; i++) {
+        for (j = 0; j < num_commands; j++) {
+
+            /* Check that socket numbers are specified just once */
+            if ((cmdptr[j].socket_number == cmdptr[i].socket_number) && (j != i))
+                return sim_messagef (SCPE_ARG, "Socket %d used more than once\n",
+                    cmdptr[i].socket_number);
+
+            /* Check that addresses are specified just once */
+            if ((cmdptr[j].address == cmdptr[i].address) && (j != i))
+                return sim_messagef (SCPE_ARG, "Address %o used more than once\n",
+                    cmdptr[i].address);
+
+            /* Check that a valid file name has been specified */
+            fileptr = sim_fopen (cmdptr[i].image_name, "rb");
+            if (fileptr == NULL)
+                return sim_messagef (SCPE_ARG, "File %s cannot be opened\n",
+                    cmdptr->image_name);
+            fclose (fileptr);
+        }
+    }
+
+    return SCPE_OK;
+}
+
+
+/* Execute an attach command for the BLANK module */
+
+static t_stat exec_attach_blank_rom (ATTACH_CMD *cmdptr)
 {
     t_stat r = SCPE_OK;
     FILE *fileptr;
     void *rom_image = NULL;
     uint32 rom_size;
-    uint32 socket_number = param_values->socket_number;
+    uint32 socket_number = cmdptr->socket_number;
 
-    if (param_values->address != -1) {
+    /* Check no souble socket number is specified */
+    if (base_address[socket_number] != 0)
+        return sim_messagef (SCPE_ARG, "Double specification for socket number %d\n",
+            socket_number);
 
-        /* Set base address */
-        base_address[socket_number] = param_values->address;
-    }
+    /* Set base address */
+    base_address[socket_number] = cmdptr->address;
 
-    /* If a ROM image is specified an attach can be performed */
-    if (*param_values->image_name != 0) {
+    /* (Try to) open the image file */
+    fileptr = sim_fopen (cmdptr->image_name, "rb");
+    if (fileptr == NULL)
+        return sim_messagef (SCPE_ARG, "File %s cannot be opened\n",
+        cmdptr->image_name);
 
-        /* Check the ROM base address is set */
-        // ToDo: Initialze attach_cmd_params.address to 0
-        if (base_address[socket_number] == 0)
-            return sim_messagef (SCPE_ARG, "Set address first\n", socket_number);
+    /* Get the file size and allocate a buffer with the appropriate size */
+    rom_size = (uint32) sim_fsize_ex (fileptr);
+    rom_image = calloc (rom_size, sizeof (char));
 
-        /* Check if an existing file is specified */
-        fileptr = sim_fopen (param_values->image_name, "rb");
-        if (fileptr == NULL)
-            return sim_messagef (SCPE_ARG, "File %s cannot be opened\n",
-            param_values->image_name);
+    /* Read ROM contents into image */
+    rom_size = (uint32) sim_fread (rom_image, sizeof (char), rom_size, fileptr);
 
-        /* Get the file size and allocate a buffer with the appropriate size */
-        rom_size = (uint32) sim_fsize_ex (fileptr);
-        rom_image = calloc (rom_size, sizeof (char));
+    /* The file can now be closed */
+    fclose (fileptr);
 
-        /* Read ROM contents into image */
-        rom_size = (uint32) sim_fread (rom_image, sizeof (char), rom_size, fileptr);
-
-        /* The file can now be closed */
-        fclose (fileptr);
-
-        /* Attach the created ROM to the socket */
-        r = attach_rom_to_socket (param_values->image_name,
-            base_address[socket_number], rom_image, rom_size,
-            NULL, socket_number);
-    }
+    /* Attach the created ROM to the socket */
+    r = attach_rom_to_socket (cmdptr->image_name,
+        base_address[socket_number], rom_image, rom_size,
+        NULL, socket_number);
 
     /* Free allocated resources */
     if (rom_image != NULL)
@@ -902,7 +1051,7 @@ static t_stat embedded_attach (CONST char *cptr)
 {
     uint32 socket_number;
     t_stat r;
-    ATTACH_PARAM_VALUES param_values = {-1, -1, ""};
+    ATTACH_CMD param_values = {-1, -1, ""};
 
     cmd_parameter attach_parameters[] =
     {
@@ -948,7 +1097,7 @@ static t_stat embedded_attach (CONST char *cptr)
 
 /* Execute the attach command for an embedded module */
 
-static t_stat exec_attach_embedded_rom (ATTACH_PARAM_VALUES *param_values)
+static t_stat exec_attach_embedded_rom (ATTACH_CMD *param_values)
 {
     t_stat r;
     module_type_definition *modptr;
@@ -997,7 +1146,7 @@ static t_stat exec_attach_embedded_rom (ATTACH_PARAM_VALUES *param_values)
  *      SCPE_ARG        - No meaningful command could be parsed
  */
 static t_stat parse_cmd (CONST char *cptr, cmd_parameter *valid_params, 
-    ATTACH_PARAM_VALUES *attach_cmd_params)
+    ATTACH_CMD *attach_cmd_params)
 {
     char glyph[CBUFSIZE];
     char *param_value_ptr;
@@ -1044,7 +1193,7 @@ static t_stat parse_cmd (CONST char *cptr, cmd_parameter *valid_params,
 /* Set the socket number for the current ATTACH command */
 // ToDo: Rename context parameter
 
-static t_stat set_socket_for_attach (char *value, ATTACH_PARAM_VALUES *context)
+static t_stat set_socket_for_attach (char *value, ATTACH_CMD *context)
 {
     char *ptr;
     uint32 socket_number = strtol (value, &ptr, 0);
@@ -1068,7 +1217,7 @@ static t_stat set_socket_for_attach (char *value, ATTACH_PARAM_VALUES *context)
  * Set the address to attach the image on. This only applies to the
  * BLANK module type.
  */
-static t_stat set_address_for_attach (char *value, ATTACH_PARAM_VALUES *context)
+static t_stat set_address_for_attach (char *value, ATTACH_CMD *context)
 {
     t_value r;
     int32   address;
@@ -1096,7 +1245,7 @@ static t_stat set_address_for_attach (char *value, ATTACH_PARAM_VALUES *context)
 
 /* Return an error on the ADDRESS parameter */
 
-static t_stat set_address_not_allowed (char *value, ATTACH_PARAM_VALUES * context)
+static t_stat set_address_not_allowed (char *value, ATTACH_CMD * context)
 {
     return sim_messagef (SCPE_ARG,
         "ADDRESS parameter not allowed for the selected module type\n");
@@ -1107,7 +1256,7 @@ static t_stat set_address_not_allowed (char *value, ATTACH_PARAM_VALUES * contex
 /* Set the ROM image name to attach on the socket */
 
 static t_stat set_image_for_attach (char *value,
-    ATTACH_PARAM_VALUES *attach_param_values)
+    ATTACH_CMD *attach_param_values)
 {
     /* Check if image is not already set */
     if (*attach_param_values->image_name != 0)
@@ -1190,7 +1339,6 @@ static t_stat attach_rom_to_socket (char* name, t_addr address,
 
     /* Create attachment information so attach is called during a restore */
     // ToDo: Set meaningful uptr->filename
-    // ToDo: Reduce rom_unit
     rom_unit.flags |= UNIT_ATT;
     rom_unit.dynflags |= UNIT_ATTMULT;
     // rom_unit.filename = "M9312";
@@ -1223,6 +1371,8 @@ static t_stat vt40_auto_attach ()
  * This filename is displayed in a SHOW ROM command and is used in
  * rom_attach() to detect that images must be reattached in a
  * RESTORE operation.
+ * 
+ * ToDo: Fill filename with ATTACH command sequence
  */
 static void create_filename (char *filename)
 {

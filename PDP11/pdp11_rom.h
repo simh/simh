@@ -52,7 +52,7 @@ typedef struct
     int32   address;
     char    image_name[CBUFSIZE];
 }
-ATTACH_PARAM_VALUES;
+ATTACH_CMD;
 
 /*
  * The rom structure contains the image for the rom plus an
