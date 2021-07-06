@@ -33,7 +33,7 @@ t_stat rom_reset (DEVICE *dptr);
 t_stat rom_boot (int32 u, DEVICE *dptr);
 t_stat rom_set_type (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_type (FILE *, UNIT *, int32, CONST void *);
-t_stat rom_set_configmode (UNIT *, int32, CONST char *, void *);
+static t_stat rom_set_configmode(UNIT*, int32, CONST char*, void*);
 t_stat rom_show_configmode (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_set_entry_point (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_entry_point (FILE *, UNIT *, int32, CONST void *);
@@ -56,7 +56,8 @@ static t_stat exec_attach_blank_rom (ATTACH_CMD *);
 static t_stat exec_attach_embedded_rom (ATTACH_CMD *);
 static t_stat attach_rom_to_socket (char *, t_addr, void *, int16, void (*)(), int);
 static t_stat vt40_auto_attach ();
-static void create_filename (char *);
+static void create_filename_blank (char *);
+static void create_filename_embedded (char*);
 static t_stat detach_all_sockets ();
 static t_stat detach_socket (uint32);
 static t_stat blank_help (FILE *, const char *);
@@ -248,6 +249,7 @@ module_type_definition blank =
     &blank_help,                            /* Pointer to help function */
     blank_attach,                           /* Attach function */
     NULL,                                   /* Auto-attach function */
+    create_filename_blank,                  /* Create unit file name */
 };
 
 /* Define the M9312 module */
@@ -265,6 +267,7 @@ module_type_definition m9312 =
     &m9312_help,                            /* Pointer to help function */
     embedded_attach,                        /* Attach function */
     NULL,                                   /* Auto-attach function */
+    create_filename_embedded,               /* Create unit file name */
 };
 
 /* Define the VT40 module */
@@ -282,6 +285,7 @@ module_type_definition vt40 =
     &vt40_help,                             /* Pointer to help function */
     embedded_attach,                        /* Attach function */
     &vt40_auto_attach,                      /* Auto-attach function */
+    create_filename_embedded,               /* Create unit file name */
 };
 
 /*
@@ -1148,7 +1152,6 @@ static rom *find_rom (const char *cptr, rom (*rom_listptr)[])
 static t_stat attach_rom_to_socket (char* name, t_addr address,
     void *image, int16 size, void (*rom_attached)(), int socket_number)
 {
-    
     /* Set the ROM size and pointer to the ROM image */
     base_address[socket_number] = address;
     rom_size[socket_number] = size;
@@ -1189,7 +1192,8 @@ static t_stat attach_rom_to_socket (char* name, t_addr address,
     rom_unit.flags |= UNIT_ATT;
     rom_unit.dynflags |= UNIT_ATTMULT;
     // rom_unit.filename = "M9312";
-    create_filename (unit_filename);
+    // create_filename (unit_filename);
+    (*module_list[selected_type]->create_filename)(unit_filename);
     rom_unit.filename = unit_filename;
 
     return SCPE_OK;
@@ -1213,15 +1217,18 @@ static t_stat vt40_auto_attach ()
 }
 
 /* 
- * Create a meaningful filename 
+ * Create a meaningful filename for the UNIT structure.
  *
  * This filename is displayed in a SHOW ROM command and is used in
- * rom_attach() to detect that images must be reattached in a
+ * rom_attach() as a command sequence to reattached the ROMS during a
  * RESTORE operation.
- * 
- * ToDo: Fill filename with ATTACH command sequence
+ * As the commands to attach the ROMS differ per module type, the file name
+ * to be created also differs per module type. For the BLANK module type
+ * the socket address has to be included in the commands, while for
+ * embedded module types specification of the socket address isn't
+ * allowed.
  */
-static void create_filename (char *filename)
+static void create_filename_blank (char *filename)
 {
     uint32 socket_number;
     t_bool first_socket = TRUE;
@@ -1233,9 +1240,9 @@ static void create_filename (char *filename)
 
         /* Only use filled sockets */
         if (*rom_name[socket_number] != 0) {
-            filename += sprintf (filename, "%s%d:%s",
-                first_socket ? "" : ", ",
-                socket_number, rom_name[socket_number]);
+            filename += sprintf(filename, "%s%d:%o/%s",
+                first_socket ? "" : ", ", socket_number,
+                base_address[socket_number], rom_name[socket_number]);
             first_socket = FALSE;
         }
     }
@@ -1244,6 +1251,28 @@ static void create_filename (char *filename)
     return;
 }
 
+static void create_filename_embedded (char* filename)
+{
+    uint32 socket_number;
+    t_bool first_socket = TRUE;
+
+    filename += sprintf(filename, "<");
+
+    for (socket_number = 0; socket_number < module_list[selected_type]->num_sockets;
+        socket_number++) {
+
+        /* Only use filled sockets */
+        if (*rom_name[socket_number] != 0) {
+            filename += sprintf(filename, "%s%d:%s",
+                first_socket ? "" : ", ", socket_number,
+                rom_name[socket_number]);
+            first_socket = FALSE;
+        }
+    }
+
+    sprintf(filename, ">");
+    return;
+}
 
 /* DETACH ROM routine */
 

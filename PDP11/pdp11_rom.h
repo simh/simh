@@ -110,6 +110,7 @@ typedef struct
     t_stat (*help_func)(FILE *, const char *);  /* Help function for the module type */
     t_stat (*attach)(const char *);             /* Attach function for the module type */
     t_stat (*auto_attach)();                    /* Auto attach on module type selection */
+    void (*create_filename)(char *);            /* Function to create unit file name */
 }
 module_type_definition;
 
