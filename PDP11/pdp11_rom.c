@@ -806,11 +806,14 @@ static t_stat blank_attach (CONST char *cptr)
     if ((r = validate_attach_blank_rom (&attach_cmd[0], num_commands)) != SCPE_OK)
         return r;
 
+#if 0
     /* Print the attachments to be executed */
+    // ToDo: Print debug output?
     for (i = 0; i < num_commands; i++) {
         sim_messagef (SCPE_OK, "ATTACH ROM socket %d: address %o, image %s\n",
             attach_cmd[i].socket_number, attach_cmd[i].address, attach_cmd[i].image_name);
     }
+#endif
 
     /* Execute the commands in the command sequence */
     for (i = 0; i < num_commands; i++) {
@@ -928,7 +931,7 @@ static t_stat parse_attach_cmd (CONST char *cptr, t_bool address_required,
 
         /* Check valid socket number is specified */
         if (socket_number >= module_list[selected_type]->num_sockets) 
-            return sim_messagef (SCPE_ARG, "SOCKET must be in range 0 to %d\n",
+            return sim_messagef (SCPE_ARG, "Socket must be in range 0 to %d\n",
             module_list[selected_type]->num_sockets - 1);
 
         /* Save socket number and set default socket number for next command */
@@ -939,7 +942,7 @@ static t_stat parse_attach_cmd (CONST char *cptr, t_bool address_required,
         /* No socket specified use default */
         /* Check default socket number is valid */
         if (*default_socket_number >= module_list[selected_type]->num_sockets)
-            return sim_messagef (SCPE_ARG, "SOCKET must be in range 0 to %d\n",
+            return sim_messagef (SCPE_ARG, "Socket must be in range 0 to %d\n",
                 module_list[selected_type]->num_sockets - 1);
 
         cmdptr->socket_number = *default_socket_number;
@@ -962,7 +965,7 @@ static t_stat parse_attach_cmd (CONST char *cptr, t_bool address_required,
 
         /* Check if a valid adress is specified */
         if (address < IOPAGEBASE)
-            return sim_messagef (SCPE_ARG, "ADDRESS must be in I/O page, at or above 0%o\n",
+            return sim_messagef (SCPE_ARG, "Address must be in I/O page, at or above 0%o\n",
             IOPAGEBASE);
 
         cmdptr->address = address;
@@ -1174,7 +1177,6 @@ static t_stat attach_rom_to_socket (char* name, t_addr address,
     if (reset_dib (socket_number, &rom_rd, NULL) != SCPE_OK) {
 
         // Remove ROM image
-        // ToDo: Create remove_rom() function
         free (rom_image[socket_number]);
         rom_image[socket_number] = NULL;
         return sim_messagef (SCPE_IERR, "reset_dib() failed\n");
@@ -1188,11 +1190,13 @@ static t_stat attach_rom_to_socket (char* name, t_addr address,
         (*rom_attached)();
 
     /* Create attachment information so attach is called during a restore */
-    // ToDo: Set meaningful uptr->filename
     rom_unit.flags |= UNIT_ATT;
     rom_unit.dynflags |= UNIT_ATTMULT;
-    // rom_unit.filename = "M9312";
-    // create_filename (unit_filename);
+
+    /*
+     * Fill the unit file name with the ATTACH command sequence that
+     * will reproduce the current state of ROM attachments.
+     */
     (*module_list[selected_type]->create_filename)(unit_filename);
     rom_unit.filename = unit_filename;
 
