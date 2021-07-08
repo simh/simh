@@ -1330,9 +1330,11 @@ static t_stat detach_all_sockets ()
         if ((r = detach_socket (socket_number) != SCPE_OK))
             return r;
 
-        // ToDo: The UNIT_ATT flag should be reset in detach_socket()
-        // if no sockets are attched anymore?
+        /* Mark no units attached */
         rom_unit.flags &= ~UNIT_ATT;
+
+        /* Reset entry point */
+        rom_entry_point = 0;
     }
     return SCPE_OK;
 }
