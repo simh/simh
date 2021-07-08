@@ -83,24 +83,11 @@ typedef struct
 rom_socket;
 
 /*
- * A module is either variable, i.e. a module for which socket addresses
- * and images can freely be selected, or fixed, i.e. a module with
- * built in addresses and images.
- */
-typedef enum
-{
-    ROM_FILE,
-    ROM_BUILTIN
-}
-module_type;
-
-/*
  * Define all relevant information for a module type
  */
 typedef struct
 {
     const char *name;                           /* Module name */
-    module_type type;                           /* Module type */
     const uint32 valid_cpu_types;               /* Valid CPU types */
     const uint32 valid_cpu_opts;                /* Required CPU options */
     const uint32 num_sockets;                   /* Number of sockets for the module type */

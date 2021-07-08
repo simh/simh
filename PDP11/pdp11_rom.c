@@ -240,7 +240,6 @@ static const char rom_m9312_helptext[] =
 module_type_definition blank =
 {
     "BLANK",                                /* Module name */
-    ROM_FILE,                               /* Module type */
     CPUT_ALL,                               /* Required CPU types */
     QBUS_MODEL | UNIBUS_MODEL,              /* Required CPU options */
     NUM_BLANK_SOCKETS,                      /* Number of sockets (units) */
@@ -258,7 +257,6 @@ module_type_definition blank =
 module_type_definition m9312 =
 {
     "M9312",                                /* Module name */
-    ROM_BUILTIN,                            /* Module type */
     CPUT_ALL,                               /* Required CPU types */
     UNIBUS_MODEL,                           /* Required CPU options */
     NUM_M9312_SOCKETS,                      /* Number of sockets (units) */
@@ -276,7 +274,6 @@ module_type_definition m9312 =
 module_type_definition vt40 =
 {
     "VT40",                                 /* Module name */
-    ROM_BUILTIN,                            /* Module type */
     CPUT_05,                                /* Required CPU types */
     UNIBUS_MODEL,                           /* Required CPU options */
     NUM_VT40_SOCKETS,                       /* Number of sockets (units) */
@@ -319,7 +316,6 @@ UNIT rom_unit = {UDATA (NULL, ROM_UNIT_FLAGS, 0)};
 DIB rom_dib[MAX_NUMBER_SOCKETS];
 
 /* Static definitions */
-static t_bool rom_initialized = FALSE;                      /* Initialize rom_unit on first reset call */
 static uint32 cpu_type_on_selection;                        /* cpu_type for which module type was selected */
 static uint32 rom_device_flags = 0;                         /* rom device specific flags */
 static char unit_filename[NUM_M9312_SOCKETS * CBUFSIZE];    /* Composed file name for UNIT */
@@ -727,8 +723,6 @@ t_stat rom_reset (DEVICE *dptr)
         rom_dib[socket_number].next = 
             (socket_number < MAX_NUMBER_SOCKETS - 1) ? &rom_dib[socket_number + 1] : NULL;
     }
-
-    rom_initialized = TRUE;
     return SCPE_OK;
 }
 
