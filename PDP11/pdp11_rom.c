@@ -58,6 +58,7 @@ static t_stat attach_rom_to_socket (char *, t_addr, void *, int16, void (*)(), i
 static t_stat vt40_auto_attach ();
 static void create_filename_blank (char *);
 static void create_filename_embedded (char*);
+static void strclean(char *, CONST char *);
 static t_stat detach_all_sockets ();
 static t_stat detach_socket (uint32);
 static t_stat blank_help (FILE *, const char *);
@@ -337,11 +338,7 @@ char rom_name[MAX_NUMBER_SOCKETS][CBUFSIZE];                /* Name of the ROM i
 void *rom_image[MAX_NUMBER_SOCKETS];                        /* ROM contents */
 
 REG rom_reg[] = {
-    { ORDATAD (TYPE,     selected_type, 16,     "Type"), REG_RO  },
-    { BRDATAD (BASE_ADDRESS,  base_address,  16,  8, sizeof base_address, 
-        "Socket base addresses"), REG_RO},
-    { BRDATAD (ROM_NAME,  rom_name,  16,  8, sizeof rom_name,
-        "ROM names"), REG_RO},
+    { ORDATAD (TYPE,          selected_type,   16,     "Type"), REG_RO  },
     { ORDATAD (ENTRY_POINT,   rom_entry_point, 16,     "Entry point"), REG_RO  },
     { NULL }
 };
@@ -775,8 +772,28 @@ void setHITMISS ()
  
 t_stat rom_attach (UNIT *uptr, CONST char *cptr)
 {
+    char cmdstr[CBUFSIZE];
+
+    /* Remove any angled brackets from command sequence  */
+    strclean(cmdstr, cptr);
+
     /* Execute attach cmd for the selected module type */
-    return (*module_list[selected_type]->attach)(cptr);
+    return (*module_list[selected_type]->attach)(cmdstr);
+}
+
+
+/* Copy the source to destination string, removing any angled brackets */
+
+static void strclean (char *dest, CONST char *src)
+{
+    while (*src != 0) {
+
+        /* Check if this a character to be removed */
+        if ((*src != '<') && (*src != '>'))
+            *dest++ = *src;
+        src++;
+    }
+    *dest = 0;
 }
 
 /*
