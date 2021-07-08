@@ -68,7 +68,7 @@ static t_stat rom_help (FILE *st, DEVICE *, UNIT *, int32, const char *);
 static t_stat rom_help_attach (FILE *st, DEVICE *, UNIT *, int32, const char *);
 static t_stat reset_dib (int, t_stat (reader (int32 *, int32, int32)),
     t_stat (writer (int32, int32, int32)));
-static rom *find_rom (const char *cptr, rom (*rom_list)[]);
+static ROM_DEF *find_rom (const char *cptr, ROM_DEF (*rom_list)[]);
 static t_stat m9312_auto_config ();
 static t_stat m9312_auto_config_console_roms ();
 static t_stat m9312_auto_config_bootroms ();
@@ -237,14 +237,14 @@ static const char rom_m9312_helptext[] =
 
 
 /* Define the default "blank" ROM module */
-module_type_definition blank =
+MODULE_DEF blank =
 {
     "BLANK",                                /* Module name */
     CPUT_ALL,                               /* Required CPU types */
     QBUS_MODEL | UNIBUS_MODEL,              /* Required CPU options */
-    NUM_BLANK_SOCKETS,                      /* Number of sockets (units) */
+    BLANK_NUM_SOCKETS,                      /* Number of sockets (units) */
     ROM_UNIT_FLAGS,                         /* UNIT flags */
-    (rom_socket (*)[]) & blank_sockets,     /* Pointer to rom_socket structs */
+    (SOCKET_DEF (*)[]) & blank_sockets,     /* Pointer to SOCKET_DEF structs */
     NULL,                                   /* Auto configuration function */
     &blank_help,                            /* Pointer to help function */
     blank_attach,                           /* Attach function */
@@ -254,14 +254,14 @@ module_type_definition blank =
 
 /* Define the M9312 module */
 
-module_type_definition m9312 =
+MODULE_DEF m9312 =
 {
     "M9312",                                /* Module name */
     CPUT_ALL,                               /* Required CPU types */
     UNIBUS_MODEL,                           /* Required CPU options */
-    NUM_M9312_SOCKETS,                      /* Number of sockets (units) */
+    M9312_NUM_SOCKETS,                      /* Number of sockets (units) */
     ROM_UNIT_FLAGS,                         /* UNIT flags */
-    (rom_socket (*)[]) & m9312_sockets,     /* Pointer to rom_socket structs */
+    (SOCKET_DEF (*)[]) & m9312_sockets,     /* Pointer to SOCKET_DEF structs */
     &m9312_auto_config,                     /* Auto configuration function */
     &m9312_help,                            /* Pointer to help function */
     embedded_attach,                        /* Attach function */
@@ -271,14 +271,14 @@ module_type_definition m9312 =
 
 /* Define the VT40 module */
 
-module_type_definition vt40 =
+MODULE_DEF vt40 =
 {
     "VT40",                                 /* Module name */
     CPUT_05,                                /* Required CPU types */
     UNIBUS_MODEL,                           /* Required CPU options */
-    NUM_VT40_SOCKETS,                       /* Number of sockets (units) */
+    VT40_NUM_SOCKETS,                       /* Number of sockets (units) */
     ROM_UNIT_FLAGS,                         /* UNIT flags */
-    (rom_socket (*)[]) & vt40_sockets,      /* Pointer to rom_socket structs */
+    (SOCKET_DEF (*)[]) & vt40_sockets,      /* Pointer to SOCKET_DEF structs */
     NULL,                                   /* Auto configuration function */
     &vt40_help,                             /* Pointer to help function */
     embedded_attach,                        /* Attach function */
@@ -294,7 +294,7 @@ module_type_definition vt40 =
 #define ROM_MODULE_BLANK       0
 
 /* The list of available ROM modules */
-module_type_definition* module_list[NUM_MODULES] =
+MODULE_DEF* module_list[NUM_MODULES] =
 {
     &blank,
     &m9312,
@@ -304,21 +304,19 @@ module_type_definition* module_list[NUM_MODULES] =
 
 /*
  * The maximum number of sockets is the number of sockets any module can have.
- * For modules with a number of units less than this maximum the surplus
- * units are disabled.
  */ 
-#define MAX_NUMBER_SOCKETS    5
+#define ROM_MAX_SOCKETS    5
 
 /* Define and initialize the UNIT struct */
 UNIT rom_unit = {UDATA (NULL, ROM_UNIT_FLAGS, 0)};
 
 /* Define device information blocks */
-DIB rom_dib[MAX_NUMBER_SOCKETS];
+DIB rom_dib[ROM_MAX_SOCKETS];
 
 /* Static definitions */
 static uint32 cpu_type_on_selection;                        /* cpu_type for which module type was selected */
-static uint32 rom_device_flags = 0;                         /* rom device specific flags */
-static char unit_filename[NUM_M9312_SOCKETS * CBUFSIZE];    /* Composed file name for UNIT */
+static uint32 rom_device_flags = 0;                         /* ROM_DEF device specific flags */
+static char unit_filename[M9312_NUM_SOCKETS * CBUFSIZE];    /* Composed file name for UNIT */
 
 /*
  * Define ROM device registers. All state is maintained in these registers
@@ -328,10 +326,10 @@ static uint16 selected_type = ROM_MODULE_BLANK;             /* The module type a
 static int32 rom_entry_point = 0;                           /* ROM bootstrap entry point */
 
 /* Define socket administration */
-int32 base_address[MAX_NUMBER_SOCKETS];                     /* Base address for the socket */
-int32 rom_size[MAX_NUMBER_SOCKETS];                         /* ROM size */
-char rom_name[MAX_NUMBER_SOCKETS][CBUFSIZE];                /* Name of the ROM image */
-void *rom_image[MAX_NUMBER_SOCKETS];                        /* ROM contents */
+int32 base_address[ROM_MAX_SOCKETS];                     /* Base address for the socket */
+int32 rom_size[ROM_MAX_SOCKETS];                         /* ROM size */
+char rom_name[ROM_MAX_SOCKETS][CBUFSIZE];                /* Name of the ROM image */
+void *rom_image[ROM_MAX_SOCKETS];                        /* ROM contents */
 
 REG rom_reg[] = {
     { ORDATAD (TYPE,          selected_type,   16,     "Type"), REG_RO  },
@@ -510,8 +508,8 @@ t_stat rom_show_type (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 
 static void set_socket_addresses ()
 {
-    module_type_definition *modptr;
-    rom_socket *socketptr;
+    MODULE_DEF *modptr;
+    SOCKET_DEF *socketptr;
     uint32 socket_number;
 
     /* Get a pointer to the selected module and from that a pointer to
@@ -719,9 +717,9 @@ t_stat rom_reset (DEVICE *dptr)
         rom_set_type (&rom_unit, 0, "BLANK", NULL);
 
     /* Initialize the UNIT and DIB structs and create the linked list of DIBs */
-    for (socket_number = 0; socket_number < MAX_NUMBER_SOCKETS; socket_number++) {
+    for (socket_number = 0; socket_number < ROM_MAX_SOCKETS; socket_number++) {
         rom_dib[socket_number].next = 
-            (socket_number < MAX_NUMBER_SOCKETS - 1) ? &rom_dib[socket_number + 1] : NULL;
+            (socket_number < ROM_MAX_SOCKETS - 1) ? &rom_dib[socket_number + 1] : NULL;
     }
     return SCPE_OK;
 }
@@ -806,7 +804,7 @@ static t_stat blank_attach (CONST char *cptr)
     uint32 i;
     t_stat r = SCPE_OK;
     CONST t_bool address_required = TRUE;
-    ATTACH_CMD attach_cmd[MAX_NUMBER_SOCKETS] =
+    ATTACH_CMD attach_cmd[ROM_MAX_SOCKETS] =
         {{0, 0, ""}, {0, 0, ""}, {0, 0, ""}, {0, 0, ""}, {0, 0, ""}};
 
     /* Parse the command sequence */
@@ -841,7 +839,7 @@ static t_stat embedded_attach (CONST char *cptr)
     uint32 i;
     t_stat r = SCPE_OK;
     CONST t_bool address_required = FALSE;
-    ATTACH_CMD attach_cmd[MAX_NUMBER_SOCKETS] =
+    ATTACH_CMD attach_cmd[ROM_MAX_SOCKETS] =
         {{0, 0, ""}, {0, 0, ""}, {0, 0, ""}, {0, 0, ""}, {0, 0, ""}};
     
     /* Parse the command sequence */
@@ -1033,9 +1031,9 @@ static t_stat validate_attach_blank_rom (ATTACH_CMD *cmdptr, uint32 num_commands
 static t_stat validate_attach_embedded_rom (ATTACH_CMD *cmdptr, uint32 num_commands)
 {
     uint32 i, j;
-    module_type_definition *modptr;
-    rom_socket *socketptr;
-    rom *romptr;
+    MODULE_DEF *modptr;
+    SOCKET_DEF *socketptr;
+    ROM_DEF *romptr;
 
     /* For all commands in the command sequence */
     for (i = 0; i < num_commands; i++) {
@@ -1105,9 +1103,9 @@ static t_stat exec_attach_blank_rom (ATTACH_CMD *cmdptr)
 static t_stat exec_attach_embedded_rom (ATTACH_CMD *param_values)
 {
     t_stat r;
-    module_type_definition *modptr;
-    rom_socket *socketptr;
-    rom *romptr;
+    MODULE_DEF *modptr;
+    SOCKET_DEF *socketptr;
+    ROM_DEF *romptr;
     uint32 socket_number = param_values->socket_number;
 
     /* Get a pointer to the selected module and from that a pointer to
@@ -1143,9 +1141,9 @@ static t_stat exec_attach_embedded_rom (ATTACH_CMD *param_values)
  *      Pointer to ROM if found or NULL pointer if ROM is not
  *      found in the list.
  */
-static rom *find_rom (const char *cptr, rom (*rom_listptr)[])
+static ROM_DEF *find_rom (const char *cptr, ROM_DEF (*rom_listptr)[])
 {
-    rom *romptr;
+    ROM_DEF *romptr;
 
     for (romptr = *rom_listptr; romptr->image != NULL; romptr++) {
         if (strcasecmp (cptr, romptr->device_mnemonic) == 0) {
@@ -1196,7 +1194,7 @@ static t_stat attach_rom_to_socket (char* name, t_addr address,
     /* Save the specified ROM image name in the register */
     strncpy (rom_name[socket_number], name, CBUFSIZE);
 
-    /* Execute rom specific function if available */
+    /* Execute ROM_DEF specific function if available */
     if (rom_attached != NULL)
         (*rom_attached)();
 
@@ -1218,8 +1216,8 @@ static t_stat attach_rom_to_socket (char* name, t_addr address,
 
 static t_stat vt40_auto_attach ()
 {
-    rom_socket *socketptr;
-    rom *romptr;
+    SOCKET_DEF *socketptr;
+    ROM_DEF *romptr;
     uint32 socket_number = 0;
 
     /* A VT40 has just one socket */
@@ -1396,13 +1394,13 @@ static t_stat m9312_auto_config_bootroms ()
     /* Detach all units with boot ROMs (socket_number.e. 1-4) to avoid the possibility that on a 
        subsequent m9312 auto configuration with an altered device configuration
        a same ROM is present twice. */
-    for (socket_number = 1; socket_number < NUM_M9312_SOCKETS; socket_number++) {
+    for (socket_number = 1; socket_number < M9312_NUM_SOCKETS; socket_number++) {
         detach_socket (socket_number);
     }
 
     /* For all devices */
     for (dev_index = 0, socket_number = 1; 
-        ((dptr = sim_devices[dev_index]) != NULL) && (socket_number < NUM_M9312_SOCKETS); dev_index++) {
+        ((dptr = sim_devices[dev_index]) != NULL) && (socket_number < M9312_NUM_SOCKETS); dev_index++) {
 
         /* Is the device enabled? */
         if (!dev_disabled (dptr)) {
@@ -1423,8 +1421,8 @@ static t_stat m9312_auto_config_bootroms ()
 
 static t_stat m9312_attach (const char *rom_name, int socket_number)
 {
-    rom_socket *socketptr;
-    rom *romptr;
+    SOCKET_DEF *socketptr;
+    ROM_DEF *romptr;
 
     socketptr = &m9312_sockets[socket_number];
 
@@ -1440,13 +1438,13 @@ static t_stat m9312_attach (const char *rom_name, int socket_number)
 
 static t_stat m9312_help (FILE *st, const char *cptr)
 {
-    rom *romptr;
+    ROM_DEF *romptr;
 
     /* If a 'HELP ROM M9312' is given print the help text for the module */
     if (*cptr == '\0')
         fprintf (st, rom_m9312_helptext);
     else {
-        /* Search for the name in diag rom list */
+        /* Search for the name in diag ROM_DEF list */
         for (romptr = diag_roms; romptr->image != NULL; romptr++) {
             if (strcasecmp (cptr, romptr->device_mnemonic) == 0) {
                 fprintf (st, romptr->help_text);
@@ -1454,7 +1452,7 @@ static t_stat m9312_help (FILE *st, const char *cptr)
             }
         }
 
-        /* Search for the name in boot rom list */
+        /* Search for the name in boot ROM_DEF list */
         for (romptr = boot_roms; romptr->image != NULL; romptr++) {
             if (strcasecmp (cptr, romptr->device_mnemonic) == 0) {
                 fprintf (st, romptr->help_text);

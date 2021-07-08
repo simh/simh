@@ -697,7 +697,7 @@ extern void setHITMISS ();
 #define XM2_HELP    XM2_HEADER STD_OFFSETS XM_REMARK
 #define ZZ_HELP     ZZ_HEADER  STD_OFFSETS
 
-rom diag_roms[] =
+ROM_DEF diag_roms[] =
 {
     "A0",   NULL,         (uint16 (*)[]) &rom_23_248F1, A0_HELP,
     "UBI",  NULL,         (uint16 (*)[]) &rom_23_446F1, UBI_HELP,
@@ -706,7 +706,7 @@ rom diag_roms[] =
     "",     NULL,         NULL,                         "",
 };
 
-rom boot_roms[] =
+ROM_DEF boot_roms[] =
 {
     "DL",    NULL,        (uint16 (*)[]) &rom_23_751A9, DL_HELP,
     "DM",    NULL,        (uint16 (*)[]) &rom_23_752A9, DM_HELP,
@@ -735,15 +735,15 @@ rom boot_roms[] =
     "",      NULL,        NULL,                         "",
 };
 
-#define NUM_M9312_SOCKETS    5
+#define M9312_NUM_SOCKETS    5
 
-rom_socket m9312_sockets[NUM_M9312_SOCKETS] =
+SOCKET_DEF m9312_sockets[M9312_NUM_SOCKETS] =
 {
-    {017765000, 512, (rom (*)[]) &diag_roms},        /* ROM 0 */
-    {017773000, 128, (rom (*)[]) &boot_roms},        /* ROM 1 */
-    {017773200, 128, (rom (*)[]) &boot_roms},        /* ROM 2 */
-    {017773400, 128, (rom (*)[]) &boot_roms},        /* ROM 3 */
-    {017773600, 128, (rom (*)[]) &boot_roms},        /* ROM 4 */
+    {017765000, 512, (ROM_DEF (*)[]) &diag_roms},        /* ROM 0 */
+    {017773000, 128, (ROM_DEF (*)[]) &boot_roms},        /* ROM 1 */
+    {017773200, 128, (ROM_DEF (*)[]) &boot_roms},        /* ROM 2 */
+    {017773400, 128, (ROM_DEF (*)[]) &boot_roms},        /* ROM 3 */
+    {017773600, 128, (ROM_DEF (*)[]) &boot_roms},        /* ROM 4 */
 };
 
 #endif

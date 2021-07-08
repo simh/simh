@@ -34,16 +34,6 @@
 
 #include "pdp11_defs.h"
 
-/* Define command parameter */
-
-typedef struct
-{
-    const char *name;                           /* Parameter name */
-    t_stat (*set_parameter)(char *, void *);    /* Set parameter routine */
-}
-cmd_parameter;
-
-
 /* Define attach command parameter values */
 
 typedef struct
@@ -55,7 +45,7 @@ typedef struct
 ATTACH_CMD;
 
 /*
- * The rom structure contains the image for the rom plus an
+ * The ROM_DEF structure contains the image for the ROM_DEF plus an
  * identifying device mnemonic. The structure also contains a
  *  pointer to a function that is called when that specific ROM
  *  is attached. 
@@ -67,7 +57,7 @@ typedef struct
     uint16 (*image)[];                  /* ROM image */
     const char *help_text;              /* ROM help text */
 }
-rom;
+ROM_DEF;
 
 /*
  * A socket on a ROM module provides an address space in the IOPAGE with
@@ -78,9 +68,9 @@ typedef struct
 {
     t_addr base_address;                /* ROM code base address */
     int16 size;                         /* Address space size */
-    rom (*rom_list)[];                  /* ROMs available for this socket */
+    ROM_DEF (*rom_list)[];                  /* ROMs available for this socket */
 }
-rom_socket;
+SOCKET_DEF;
 
 /*
  * Define all relevant information for a module type
@@ -92,14 +82,25 @@ typedef struct
     const uint32 valid_cpu_opts;                /* Required CPU options */
     const uint32 num_sockets;                   /* Number of sockets for the module type */
     uint32 flags;                               /* Flags for initialization of the UNIT flag field */
-    rom_socket (*sockets)[];                    /* Sockets for this module */
+    SOCKET_DEF (*sockets)[];                    /* Sockets for this module */
     t_stat (*auto_config)();                    /* Auto-configuration function for the module type */
     t_stat (*help_func)(FILE *, const char *);  /* Help function for the module type */
     t_stat (*attach)(const char *);             /* Attach function for the module type */
     t_stat (*auto_attach)();                    /* Auto attach on module type selection */
     void (*create_filename)(char *);            /* Function to create unit file name */
 }
-module_type_definition;
+MODULE_DEF;
+
+/* Define the socket configuration as selected by the user */
+
+typedef struct
+{
+    int32 base_address;                         /* Base address for the socket */
+    int32 rom_size;                             /* ROM size */
+    char rom_name[CBUFSIZE];                    /* Name of the ROM image */
+    void* rom_image;                            /* ROM contents */
+}
+SOCKET_CONFIG;
 
 /* Define a device to ROM mapping */
 
@@ -130,14 +131,14 @@ rom_for_cpu_model;
  * has to be attached.
  */
 
-#define NUM_BLANK_SOCKETS    4
+#define BLANK_NUM_SOCKETS    4
 
-rom_socket blank_sockets[NUM_BLANK_SOCKETS] =
+SOCKET_DEF blank_sockets[BLANK_NUM_SOCKETS] =
 {
-    {0, 0, (rom (*)[]) NULL},        /* ROM 0 */
-    {0, 0, (rom (*)[]) NULL},        /* ROM 1 */
-    {0, 0, (rom (*)[]) NULL},        /* ROM 2 */
-    {0, 0, (rom (*)[]) NULL},        /* ROM 3 */
+    {0, 0, (ROM_DEF (*)[]) NULL},        /* ROM 0 */
+    {0, 0, (ROM_DEF (*)[]) NULL},        /* ROM 1 */
+    {0, 0, (ROM_DEF (*)[]) NULL},        /* ROM 2 */
+    {0, 0, (ROM_DEF (*)[]) NULL},        /* ROM 3 */
 };
 
 #endif /* PDP11_ROM_H */

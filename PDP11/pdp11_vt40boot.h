@@ -72,17 +72,17 @@ uint16 rom_vt40boot[508] =
     0x9A54,0x0000,0x02F0,0x8000,0xE000,0x0018,                  /* 000760 */
 };
 
-rom gt40_roms[] =
+ROM_DEF gt40_roms[] =
 {
     "VT40", NULL, (uint16 (*)[]) &rom_vt40boot, "",
     "",     NULL, NULL,                         "",
 };
 
-#define NUM_VT40_SOCKETS    1
+#define VT40_NUM_SOCKETS    1
 
-rom_socket vt40_sockets[NUM_VT40_SOCKETS] =
+SOCKET_DEF vt40_sockets[VT40_NUM_SOCKETS] =
 {
-    {017766000, 508, (rom (*)[]) &gt40_roms},        /* ROM 0 */
+    {017766000, 508, (ROM_DEF (*)[]) &gt40_roms},        /* ROM 0 */
 };
 
 #endif
