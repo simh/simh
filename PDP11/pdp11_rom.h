@@ -53,7 +53,7 @@ ATTACH_CMD;
 typedef struct
 {
     char device_mnemonic[5];            /* ROM identifier */
-    void (*rom_attached)();             /* ROM specific function */
+    void (*rom_init)();                 /* ROM specific init function */
     uint16 (*image)[];                  /* ROM image */
     const char *help_text;              /* ROM help text */
 }
@@ -66,9 +66,9 @@ ROM_DEF;
  */
 typedef struct
 {
-    t_addr base_address;                /* ROM code base address */
-    int16 size;                         /* Address space size */
-    ROM_DEF (*rom_list)[];                  /* ROMs available for this socket */
+    t_addr base_address;                        /* ROM code base address */
+    int16 size;                                 /* Address space size */
+    ROM_DEF (*rom_list)[];                      /* ROMs available for this socket */
 }
 SOCKET_DEF;
 
@@ -99,6 +99,7 @@ typedef struct
     int32 rom_size;                             /* ROM size */
     char rom_name[CBUFSIZE];                    /* Name of the ROM image */
     void* rom_image;                            /* ROM contents */
+    void (*rom_init)();                         /* ROM specific init function */
 }
 SOCKET_CONFIG;
 

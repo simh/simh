@@ -608,14 +608,20 @@ t_stat rom_set_entry_point (UNIT *uptr, int32 value, CONST char *cptr, void *des
     if (cptr == NULL)
         return sim_messagef (SCPE_ARG, "ENTRY_POINT requires a value\n");
 
-    /* Convert the adress glyph and check if produced a valid value */
-    address = (int32) get_uint (cptr, 8, IOPAGEBASE + IOPAGEMASK, &r);
+   /* 
+    * Convert the adress glyph and check if it produced a valid value.
+    * Note that the actual maximum value is VASIZE - 2, but accepting
+    * addresses between VASIZE -2 and MAXMEMSIZE -2 at this point
+    * produces more meaningful error messages.
+    */
+    address = (int32) get_uint (cptr, 8, MAXMEMSIZE - 2, &r);
     if (r != SCPE_OK)
         return r;
 
      /* Check if the address is in the address space of an attached ROM */
     if (!address_available (address))
-        return sim_messagef (SCPE_ARG, "Address must be in the address space of an attached ROM\n");
+        return sim_messagef (SCPE_ARG, 
+            "Specify a 16-bit physical address in the address space of an attached ROM\n");
 
     /* Check the address is even */
     if (address & 0x1)
@@ -636,12 +642,17 @@ t_stat rom_show_entry_point (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 }
 
 
-/* Verify that given adress is within the address space of an attached ROM */
-
+/*
+ * Verify that the given address is within the address space of an attached ROM.
+ * The address must be a 16-bit address that, with 16-bit mapping enabled, maps
+ * to an address in the I/O page.
+ */
 static t_bool address_available (int32 address)
 {
     int socket_number;
     int32 num_sockets = module_list[selected_type]->num_sockets;
+
+    address |= IOPAGEBASE;
 
     /* For all sockets */
     for (socket_number = 0; socket_number < num_sockets; socket_number++) {
@@ -733,7 +744,21 @@ t_stat rom_reset (DEVICE *dptr)
 
 t_stat rom_boot (int32 u, DEVICE *dptr)
 {
-    // ToDo: Check that a valid entry point is set 
+    uint32 socket_number;
+    void (*rom_init)();
+
+    /* Check that a valid entry point is set */
+    if (rom_entry_point == 0)
+        return SCPE_NOFNC;
+
+    /* Initialize ROMs */
+    for (socket_number = 0; socket_number < ROM_MAX_SOCKETS; socket_number++) {
+        if ((rom_init = socket_config[socket_number].rom_init) != NULL) 
+            (*rom_init)();
+    }
+
+    /* Set the boot address */
+    // ToDo: Use PSW from boot rom?!
     cpu_set_boot (rom_entry_point);
     return SCPE_OK;
 }
@@ -746,7 +771,6 @@ static t_stat reset_dib (int socket_number, t_stat (reader (int32 *, int32, int3
 {
     DIB *dib = &rom_dib[socket_number];
 
-    // ToDo: socket_info shouldn't be global?!
     dib->ba = socket_config[socket_number].base_address;
     dib->lnt = socket_config[socket_number].rom_size;
     dib->rd = reader;
@@ -1123,7 +1147,7 @@ static t_stat exec_attach_embedded_rom (ATTACH_CMD *param_values)
 
     /* Attach the ROM to the socket */
     if ((r = attach_rom_to_socket (romptr->device_mnemonic, socketptr->base_address,
-        romptr->image, socketptr->size, romptr->rom_attached, socket_number)) != SCPE_OK) {
+        romptr->image, socketptr->size, romptr->rom_init, socket_number)) != SCPE_OK) {
         return r;
     }
 
@@ -1166,7 +1190,7 @@ static ROM_DEF *find_rom (const char *cptr, ROM_DEF (*rom_listptr)[])
  * socket.
  */
 static t_stat attach_rom_to_socket (char* name, t_addr address,
-    void *image, int16 size, void (*rom_attached)(), int socket_number)
+    void *image, int16 size, void (*rom_init)(), int socket_number)
 {
     /* Set the ROM size and pointer to the ROM image */
     socket_config[socket_number].base_address = address;
@@ -1199,9 +1223,11 @@ static t_stat attach_rom_to_socket (char* name, t_addr address,
     /* Save the specified ROM image name in the register */
     strncpy (socket_config[socket_number].rom_name, name, CBUFSIZE);
     
-    /* Execute ROM_DEF specific function if available */
-    if (rom_attached != NULL)
-        (*rom_attached)();
+    /* Execute ROM init function if available and save pointer for re-use */
+    if (rom_init != NULL) {
+        (*rom_init)();
+        socket_config[socket_number].rom_init = rom_init;
+    }
 
     /* Create attachment information so attach is called during a restore */
     rom_unit.flags |= UNIT_ATT;
@@ -1231,7 +1257,7 @@ static t_stat vt40_auto_attach ()
 
     /* Attach the ROM to the socket */
     return attach_rom_to_socket (romptr->device_mnemonic, socketptr->base_address,
-        romptr->image, socketptr->size, romptr->rom_attached, socket_number);
+        romptr->image, socketptr->size, romptr->rom_init, socket_number);
 }
 
 /* 
@@ -1343,12 +1369,14 @@ static t_stat detach_socket (uint32 socket_number)
     /* Clear socket information */
     socket_config[socket_number].base_address = 0;
     socket_config[socket_number].rom_size = 0;
+    socket_config[socket_number].rom_init = NULL;
+    *socket_config[socket_number].rom_name = 0;
+
     if (socket_config[socket_number].rom_image != NULL) {
         free (socket_config[socket_number].rom_image);
         socket_config[socket_number].rom_image = NULL;
     }
-    *socket_config[socket_number].rom_name = 0;
-
+    
     /* Clear Unibus map */
     return reset_dib (socket_number, NULL, NULL);
 }
@@ -1435,7 +1463,7 @@ static t_stat m9312_attach (const char *rom_name, int socket_number)
     romptr = find_rom (rom_name, socketptr->rom_list);
     if (romptr != NULL) {
         return attach_rom_to_socket (romptr->device_mnemonic, socketptr->base_address,
-            romptr->image, socketptr->size, romptr->rom_attached, socket_number);
+            romptr->image, socketptr->size, romptr->rom_init, socket_number);
     } else
         /* ROM not found */
         return SCPE_IERR;
