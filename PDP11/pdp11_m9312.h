@@ -468,11 +468,11 @@ extern void setHITMISS ();
                     "DEC Part number:       23-616F1\n" \
                     "Place in socket:       0\n\n"
 
-#define UBI_HEADER  "Function:              11/44 Diagnostic/Console (UBI; M7098 E58)\n" \
+#define C0_HEADER  "Function:               11/44 Diagnostic/Console (UBI; M7098 E58)\n" \
                     "DEC Part number:       23-446F1\n" \
                     "Place in socket:       0\n\n"
 
-#define MEM_HEADER  "Function:              11/24 Diagnostic/Console (MEM; M7134 E74)\n" \
+#define D0_HEADER   "Function:              11/24 Diagnostic/Console (MEM; M7134 E74)\n" \
                     "DEC Part number:       23-774F1\n" \
                     "Place in socket:       0\n\n"
 
@@ -581,12 +581,12 @@ extern void setHITMISS ();
                     "000 - Diagnostics entry point\n" \
                     "744 - Boot device entry point\n\n"
 
-#define UBI_OFFSETS "Offsets\n" \
+#define C0_OFFSETS  "Offsets\n" \
                     "000 - Start entry point\n" \
                     "020 - Diagnostics entry point\n" \
                     "144 - No diagnostics entry point\n\n"
 
-#define MEM_OFFSETS "Offsets\n" \
+#define D0_OFFSETS  "Offsets\n" \
                     "020 - Diagnostics entry point\n\n"
 
 #define STD_OFFSETS "Offsets\n" \
@@ -670,8 +670,8 @@ extern void setHITMISS ();
 
 #define A0_HELP     A0_HEADER  A0_OFFSETS  A0_REMARK
 #define B0_HELP     B0_HEADER  B0_OFFSETS  B0_REMARK
-#define UBI_HELP    UBI_HEADER UBI_OFFSETS
-#define MEM_HELP    MEM_HEADER MEM_OFFSETS
+#define C0_HELP     C0_HEADER  C0_OFFSETS
+#define D0_HELP     D0_HEADER  D0_OFFSETS
 #define DL_HELP     DL_HEADER  STD_OFFSETS
 #define DM_HELP     DM_HEADER  STD_OFFSETS
 #define DX_HELP     DX_HEADER  STD_OFFSETS
@@ -700,9 +700,9 @@ extern void setHITMISS ();
 ROM_DEF diag_roms[] =
 {
     "A0",   NULL,         (uint16 (*)[]) &rom_23_248F1, A0_HELP,
-    "UBI",  NULL,         (uint16 (*)[]) &rom_23_446F1, UBI_HELP,
+    "C0",   NULL,         (uint16 (*)[]) &rom_23_446F1, C0_HELP,
     "B0",   &setHITMISS,  (uint16 (*)[]) &rom_23_616F1, B0_HELP,
-    "MEM",  NULL,         (uint16 (*)[]) &rom_23_774F1, MEM_HELP,
+    "D0",   NULL,         (uint16 (*)[]) &rom_23_774F1, D0_HELP,
     "",     NULL,         NULL,                         "",
 };
 

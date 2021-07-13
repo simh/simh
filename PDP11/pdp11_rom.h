@@ -88,6 +88,7 @@ typedef struct
     t_stat (*attach)(const char *);             /* Attach function for the module type */
     t_stat (*auto_attach)();                    /* Auto attach on module type selection */
     void (*create_filename)(char *);            /* Function to create unit file name */
+    t_stat (*read)(int32*, int32, int32);       /* ROM read function */
 }
 MODULE_DEF;
 

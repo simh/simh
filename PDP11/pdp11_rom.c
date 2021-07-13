@@ -61,6 +61,8 @@ static void create_filename_embedded (char*);
 static void strclean(char *, CONST char *);
 static t_stat detach_all_sockets ();
 static t_stat detach_socket (uint32);
+t_stat m9312_rd(int32* data, int32 PA, int32 access);
+t_stat blank_rom_rd(int32* data, int32 PA, int32 access);
 static t_stat blank_help (FILE *, const char *);
 static t_stat m9312_help (FILE *, const char *);
 static t_stat vt40_help (FILE *, const char *);
@@ -156,7 +158,7 @@ static const char rom_m9312_helptext[] =
 "ROM code       Function\n"
 "A0             11/04, 11/34 Diagnostic/Console (M9312 E20)\n"
 "B0             11/60, 11/70 Diagnostic (M9312 E20)\n"
-"UBI            11/44 Diagnostic/Console (UBI; M7098 E58)\n"
+"C0             11/44 Diagnostic/Console (UBI; M7098 E58)\n"
 "MEM            11/24 Diagnostic/Console (MEM; M7134 E74)\n"
 "DL             RL01/RL02 cartridge disk\n"
 "DM             RK06/RK07 cartridge disk\n"
@@ -250,6 +252,7 @@ MODULE_DEF blank =
     blank_attach,                           /* Attach function */
     NULL,                                   /* Auto-attach function */
     create_filename_blank,                  /* Create unit file name */
+    blank_rom_rd,                           /* ROM read function */
 };
 
 /* Define the M9312 module */
@@ -267,6 +270,7 @@ MODULE_DEF m9312 =
     embedded_attach,                        /* Attach function */
     NULL,                                   /* Auto-attach function */
     create_filename_embedded,               /* Create unit file name */
+    m9312_rd,                               /* ROM read function */
 };
 
 /* Define the VT40 module */
@@ -284,6 +288,7 @@ MODULE_DEF vt40 =
     embedded_attach,                        /* Attach function */
     &vt40_auto_attach,                      /* Auto-attach function */
     create_filename_embedded,               /* Create unit file name */
+    blank_rom_rd,                           /* ROM read function */
 };
 
 /*
@@ -306,6 +311,10 @@ MODULE_DEF* module_list[NUM_MODULES] =
  * The maximum number of sockets is the number of sockets any module can have.
  */ 
 #define ROM_MAX_SOCKETS    5
+
+#define SOCKET1             1
+#define SOCKET2             2
+#define TRAP_LOCATION       024
 
 /* Define and initialize the UNIT struct */
 UNIT rom_unit = {UDATA (NULL, ROM_UNIT_FLAGS, 0)};
@@ -418,10 +427,10 @@ rom_for_cpu_model cpu_rom_map[] =
 {
     MOD_1104,           "A0",           /* 11/04,34 Diagnostic/Console (M9312 E20) */
     MOD_1105,           "A0",           /* 11/04,34 Diagnostic/Console (M9312 E20) */
-    MOD_1124,           "MEM",          /* 11/24 Diagnostic/Console (MEM; M7134 E74) */
+    MOD_1124,           "D0",           /* 11/24 Diagnostic/Console (MEM; M7134 E74) */
     MOD_1134,           "A0",           /* 11/04,34 Diagnostic/Console (M9312 E20) */
     MOD_1140,           "A0",           /* 11/04,34 Diagnostic/Console (M9312 E20) */
-    MOD_1144,           "UBI",          /* 11/44 Diagnostic / Console (UBI; M7098 E58) */
+    MOD_1144,           "C0",           /* 11/44 Diagnostic / Console (UBI; M7098 E58) */
     MOD_1145,           "A0",           /* 11/04,34 Diagnostic/Console (M9312 E20) */
     MOD_1160,           "B0",           /* 11/60,70 Diagnostic (M9312 E20) */
     MOD_1170,           "B0",           /* 11/60,70 Diagnostic (M9312 E20) */
@@ -451,7 +460,7 @@ t_stat rom_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 
             /* 
              * Module type found. If the currently selected type differs
-             * from the previously selected type, initialize the UNITs
+             * from the previously selected type, initialize the sockets
              * with values for this type.
              */
             if (module_number != selected_type) {
@@ -511,8 +520,10 @@ static void set_socket_addresses ()
     SOCKET_DEF *socketptr;
     uint32 socket_number;
 
-    /* Get a pointer to the selected module and from that a pointer to
-   socket for the unit */
+   /* 
+    * Get a pointer to the selected module and from that a pointer to
+    * socket for the module.
+    */
     modptr = *(module_list + selected_type);
     socketptr = *modptr->sockets;
 
@@ -597,8 +608,28 @@ t_stat rom_show_configmode (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 }
 
 
-/* Set ROM bootstrap entry point */
-
+/*
+ * Set ROM bootstrap entry point 
+ * 
+ * The M9312 Technical Manual states:
+ * With an M93I2 Bootstrap/Terminator Module in the PDP-11 computer system,
+ * on power-up the user can optionally force the processor to read its new PC
+ * from a ROM memory location and the Offset Switch Bank on the M9312 (Unibus
+ * location 773024(8)). A switch (S1-2) on the M9312 or an external switch on 
+ * Faston tabs TP3 and TP4 can enable or disable this feature. The new PSW will
+ * be read from a location (Unibus location 773026(8)) in the M93I2 memory.
+ * This new PC and PSW will then direct the processor to a program (typically a
+ * bootstrap) in the M9312 ROM memory (Unibus memory locations 773000(8) through
+ * 773776(8), and 765000(8) through 765776(8)).
+ * 
+ * This translates to the following functionality of the ROM device:
+ * - The address specified in the Offset Switch Bank can be set via the 
+ *   "SET ROM ENTRY_POINT=<address>" command. For ease of use the address must be
+ *   a 16-bit physical address in the ROM address space instead of an offset.
+ * 
+ * - The entry point address is made available in the location 077732024 (or
+ *   07773224 for an 11/60)
+ */
 t_stat rom_set_entry_point (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
     t_stat r;
@@ -677,17 +708,25 @@ t_stat rom_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
     int32 data;
     t_stat r;
 
-    r = rom_rd (&data, addr, 0);
-    if (r != SCPE_OK)
+    if ((r = rom_rd (&data, addr, 0)) != SCPE_OK)
         return r;
     *vptr = (t_value) data;
     return SCPE_OK;
 }
 
 
+/*
+ * ROM read routine. This routine forwards the read request
+ * to the ROM-specific read function.
+ */
+t_stat rom_rd (int32* data, int32 PA, int32 access)
+{
+    return module_list[selected_type]->read (data, PA, access);
+}
+
 /* ROM read routine */
  
-t_stat rom_rd (int32 *data, int32 PA, int32 access)
+t_stat blank_rom_rd (int32 *data, int32 PA, int32 access)
 {
     uint32 socket_number;
     uint32 num_sockets = module_list[selected_type]->num_sockets;
@@ -713,6 +752,25 @@ t_stat rom_rd (int32 *data, int32 PA, int32 access)
 }
 
 
+/* M9312 specific ROM read routine */
+
+t_stat m9312_rd (int32* data, int32 PA, int32 access)
+{
+    int32 pwrup_boot_socket = (cpu_model == MOD_1160) ? SOCKET2 : SOCKET1;
+    int32 trap_location = 
+        m9312_sockets[pwrup_boot_socket].base_address + TRAP_LOCATION;
+
+    if ((PA == trap_location) && 
+        (socket_config[pwrup_boot_socket].rom_image != NULL) &&
+        (rom_entry_point != 0)) {
+            *data = rom_entry_point;
+            return SCPE_OK;
+    }
+    else
+        return blank_rom_rd (data, PA, access);
+}
+
+
 /*
  * Reset the ROM device.
  * The function is independent of the selected module. It is called
@@ -731,7 +789,7 @@ t_stat rom_reset (DEVICE *dptr)
     if (cpu_type != cpu_type_on_selection)
         rom_set_type (&rom_unit, 0, "BLANK", NULL);
 
-    /* Initialize the UNIT and DIB structs and create the linked list of DIBs */
+    /* Create the linked list of DIBs */
     for (socket_number = 0; socket_number < ROM_MAX_SOCKETS; socket_number++) {
         rom_dib[socket_number].next = 
             (socket_number < ROM_MAX_SOCKETS - 1) ? &rom_dib[socket_number + 1] : NULL;
@@ -1136,8 +1194,10 @@ static t_stat exec_attach_embedded_rom (ATTACH_CMD *param_values)
     ROM_DEF *romptr;
     uint32 socket_number = param_values->socket_number;
 
-    /* Get a pointer to the selected module and from that a pointer to
-       socket for the unit */
+   /*
+    * Get a pointer to the selected module and from that a pointer to
+    * socket for the module.
+    */
     modptr = *(module_list + selected_type);
     socketptr = *modptr->sockets + socket_number;
 
@@ -1424,9 +1484,11 @@ static t_stat m9312_auto_config_bootroms ()
     int socket_number;
     t_stat result;
 
-    /* Detach all units with boot ROMs (socket_number.e. 1-4) to avoid the possibility that on a 
-       subsequent m9312 auto configuration with an altered device configuration
-       a same ROM is present twice. */
+   /*
+    * Detach all sockets with boot ROMs (socket_number.e. 1-4) to avoid the
+    * possibility that on a subsequent m9312 auto configuration with an altered
+    * device configuration a same ROM is present twice.
+    */
     for (socket_number = 1; socket_number < M9312_NUM_SOCKETS; socket_number++) {
         detach_socket (socket_number);
     }
