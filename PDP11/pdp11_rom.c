@@ -43,6 +43,11 @@ t_stat rom_detach (UNIT *);
 const char *rom_description (DEVICE *);
 
 /* Forward references for helper functions */
+t_stat blank_rom_set_entry_point (UNIT*, int32, CONST char*, void*);
+t_stat m9312_set_entry_point (UNIT*, int32, CONST char*, void*);
+t_stat get_numerical_ep (const char*, int32*);
+t_stat get_symbolic_ep(const char*, int32*);
+t_bool digits_only (const char*);
 static t_bool address_available (int32);
 static void set_socket_addresses ();
 static int module_type_is_valid (uint16);
@@ -246,13 +251,14 @@ MODULE_DEF blank =
     QBUS_MODEL | UNIBUS_MODEL,              /* Required CPU options */
     BLANK_NUM_SOCKETS,                      /* Number of sockets (units) */
     ROM_UNIT_FLAGS,                         /* UNIT flags */
-    (SOCKET_DEF (*)[]) & blank_sockets,     /* Pointer to SOCKET_DEF structs */
+    (SOCKET_DEF(*)[]) & blank_sockets,     /* Pointer to SOCKET_DEF structs */
     NULL,                                   /* Auto configuration function */
     &blank_help,                            /* Pointer to help function */
     blank_attach,                           /* Attach function */
     NULL,                                   /* Auto-attach function */
     create_filename_blank,                  /* Create unit file name */
     blank_rom_rd,                           /* ROM read function */
+    blank_rom_set_entry_point,              /* ROM set entry point */
 };
 
 /* Define the M9312 module */
@@ -271,6 +277,7 @@ MODULE_DEF m9312 =
     NULL,                                   /* Auto-attach function */
     create_filename_embedded,               /* Create unit file name */
     m9312_rd,                               /* ROM read function */
+    m9312_set_entry_point,                  /* ROM set entry point */
 };
 
 /* Define the VT40 module */
@@ -289,6 +296,7 @@ MODULE_DEF vt40 =
     &vt40_auto_attach,                      /* Auto-attach function */
     create_filename_embedded,               /* Create unit file name */
     blank_rom_rd,                           /* ROM read function */
+    blank_rom_set_entry_point,              /* ROM set entry point */
 };
 
 /*
@@ -608,8 +616,35 @@ t_stat rom_show_configmode (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
 }
 
 
+/* Set ROM bootstrap entry point */
+
+t_stat rom_set_entry_point(UNIT* uptr, int32 value, CONST char* cptr, void* desc)
+{
+    /* Forward the command to the module-specific function */
+    return module_list[selected_type]->set_entry_point (uptr, value, cptr, desc);
+}
+
+t_stat blank_rom_set_entry_point (UNIT* uptr, int32 value, CONST char* cptr, void* desc)
+{
+    t_stat r;
+    int32 address = 0;
+
+    /* Check a value is given */
+    if (cptr == NULL)
+        return sim_messagef(SCPE_ARG, "ENTRY_POINT requires a value\n");
+
+    /* Get a numerical entry point */
+    if ((r = get_numerical_ep(cptr, &address)) != SCPE_OK)
+        return r;
+
+    /* Save the entry point */
+    rom_entry_point = address;
+    return SCPE_OK;
+}
+
+
 /*
- * Set ROM bootstrap entry point 
+ * Set M9312 bootstrap entry point 
  * 
  * The M9312 Technical Manual states:
  * With an M93I2 Bootstrap/Terminator Module in the PDP-11 computer system,
@@ -630,38 +665,110 @@ t_stat rom_show_configmode (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
  * - The entry point address is made available in the location 077732024 (or
  *   07773224 for an 11/60)
  */
-t_stat rom_set_entry_point (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
+t_stat m9312_set_entry_point (UNIT *uptr, int32 value, CONST char *cptr, void *desc)
 {
     t_stat r;
-    int32 address;
+    int32 address = 0;
 
     /* Check a value is given */
     if (cptr == NULL)
         return sim_messagef (SCPE_ARG, "ENTRY_POINT requires a value\n");
 
-   /* 
-    * Convert the adress glyph and check if it produced a valid value.
-    * Note that the actual maximum value is VASIZE - 2, but accepting
-    * addresses between VASIZE -2 and MAXMEMSIZE -2 at this point
-    * produces more meaningful error messages.
-    */
+    /* Check whether a numerical or symbolic address is given */
+    if (digits_only (cptr)) {
+
+        /* Get a numerical entry point */
+        if ((r = get_numerical_ep (cptr, &address)) != SCPE_OK)
+            return r;
+    }
+    else {
+        /* Get a symbolic entry point */
+        if ((r = get_symbolic_ep (cptr, &address)) != SCPE_OK)
+            return r;
+    }
+
+    /* Save the entry point */
+    rom_entry_point = address;
+    return SCPE_OK;
+}
+
+
+/* Get a numerical entry point */
+
+t_stat get_numerical_ep (const char *cptr, int32 *entry_point)
+{
+    t_stat r;
+    int32 address;
+
+    /*
+     * Convert the adress glyph and check if it produced a valid value.
+     * Note that the actual maximum value is VASIZE - 2, but accepting
+     * addresses between VASIZE -2 and MAXMEMSIZE -2 at this point
+     * produces more meaningful error messages.
+     */
     address = (int32) get_uint (cptr, 8, MAXMEMSIZE - 2, &r);
     if (r != SCPE_OK)
         return r;
 
-     /* Check if the address is in the address space of an attached ROM */
+    /* Check if the address is in the address space of an attached ROM */
     if (!address_available (address))
-        return sim_messagef (SCPE_ARG, 
+        return sim_messagef (SCPE_ARG,
             "Specify a 16-bit physical address in the address space of an attached ROM\n");
 
     /* Check the address is even */
     if (address & 0x1)
         return sim_messagef (SCPE_ARG, "Specify an even address\n");
 
-    /* Save the entry point */
-    rom_entry_point = address;
-
+    /* Return address */
+    *entry_point = address;
     return SCPE_OK;
+}
+
+/* Get a symbolic entry point if the form <ROM>+DIAG|<ROM>-DIAG */
+
+t_stat get_symbolic_ep(const char* cptr, int32* entry_point)
+{
+    char rom_name[4];
+    char plus_minus;
+    int num_chars = 0;
+    ROM_DEF* romptr;
+    int socket_number;
+
+   /*
+    * sscanf splits the symbolic address in three parts:
+    * 1. The ROM name, ended by a plus or minus,
+    * 2. The plus or minus,
+    * 3. The string "DIAG".
+    */
+    if ((sscanf (cptr, "%3[^+-]%cDIAG%n", rom_name, &plus_minus, &num_chars) != 2) ||
+        (num_chars == 0) || (cptr[num_chars] != '\0') ||
+        ((plus_minus != '+') && (plus_minus != '-')))
+            return sim_messagef (SCPE_ARG, "Specify entry point as <ROM>+DIAG|<ROM>-DIAG\n");
+
+    /* Try to find the ROM in the list of boot ROMs */
+    if ((romptr = find_rom (rom_name, (ROM_DEF(*)[]) & boot_roms)) == NULL)
+        return sim_messagef (SCPE_ARG, "Unknown ROM type %s\n", rom_name);
+
+    /*
+     * Find (if any) the socket the ROM is placed in. Boot roms are placed
+     * in sockets 1-4.
+     */
+    for (socket_number = 1; socket_number < M9312_NUM_SOCKETS; socket_number++) {
+        if (strcmp (socket_config[socket_number].rom_name, rom_name) == 0) {
+
+            /* Set entry point to the ROM in this socket */
+            *entry_point = (plus_minus == '+') ?
+                socket_config[socket_number].base_address + romptr->boot_with_diags :
+                socket_config[socket_number].base_address + romptr->boot_no_diags;
+
+            /* Transform to a 16-bit physical address */
+            *entry_point &= VAMASK;
+            return SCPE_OK;
+        }
+    }
+
+    /* No socket with a ROM for the specified entry point found */
+    return sim_messagef (SCPE_ARG, "ROM %s is not attached to a socket\n", rom_name);
 }
 
 t_stat rom_show_entry_point (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
@@ -672,6 +779,17 @@ t_stat rom_show_entry_point (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
     return SCPE_OK;
 }
 
+/* Check that a string contains digits only */
+
+t_bool digits_only (const char* cptr)
+{
+    while (*cptr) {
+        if (isdigit (*cptr++) == 0) 
+            return FALSE;
+    }
+
+    return TRUE;
+}
 
 /*
  * Verify that the given address is within the address space of an attached ROM.

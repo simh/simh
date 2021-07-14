@@ -74,8 +74,8 @@ uint16 rom_vt40boot[508] =
 
 ROM_DEF gt40_roms[] =
 {
-    "VT40", NULL, (uint16 (*)[]) &rom_vt40boot, "",
-    "",     NULL, NULL,                         "",
+    "VT40", NULL, (uint16 (*)[]) &rom_vt40boot, 0, 0, "",
+    "",     NULL, NULL,                         0, 0, "",
 };
 
 #define VT40_NUM_SOCKETS    1

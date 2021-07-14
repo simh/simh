@@ -55,6 +55,8 @@ typedef struct
     char device_mnemonic[5];            /* ROM identifier */
     void (*rom_init)();                 /* ROM specific init function */
     uint16 (*image)[];                  /* ROM image */
+    t_addr boot_no_diags;               /* Entry point to boot without diagnostics */
+    t_addr boot_with_diags;             /* Entry point to boot with diagnostics */
     const char *help_text;              /* ROM help text */
 }
 ROM_DEF;
@@ -77,18 +79,19 @@ SOCKET_DEF;
  */
 typedef struct
 {
-    const char *name;                           /* Module name */
-    const uint32 valid_cpu_types;               /* Valid CPU types */
-    const uint32 valid_cpu_opts;                /* Required CPU options */
-    const uint32 num_sockets;                   /* Number of sockets for the module type */
-    uint32 flags;                               /* Flags for initialization of the UNIT flag field */
-    SOCKET_DEF (*sockets)[];                    /* Sockets for this module */
-    t_stat (*auto_config)();                    /* Auto-configuration function for the module type */
-    t_stat (*help_func)(FILE *, const char *);  /* Help function for the module type */
-    t_stat (*attach)(const char *);             /* Attach function for the module type */
-    t_stat (*auto_attach)();                    /* Auto attach on module type selection */
-    void (*create_filename)(char *);            /* Function to create unit file name */
-    t_stat (*read)(int32*, int32, int32);       /* ROM read function */
+    const char *name;                                           /* Module name */
+    const uint32 valid_cpu_types;                               /* Valid CPU types */
+    const uint32 valid_cpu_opts;                                /* Required CPU options */
+    const uint32 num_sockets;                                   /* Number of sockets for the module type */
+    uint32 flags;                                               /* Flags for initialization of the UNIT flag field */
+    SOCKET_DEF (*sockets)[];                                    /* Sockets for this module */
+    t_stat (*auto_config)();                                    /* Auto-configuration function for the module type */
+    t_stat (*help_func)(FILE *, const char *);                  /* Help function for the module type */
+    t_stat (*attach)(const char *);                             /* Attach function for the module type */
+    t_stat (*auto_attach)();                                    /* Auto attach on module type selection */
+    void (*create_filename)(char *);                            /* Function to create unit file name */
+    t_stat (*read)(int32*, int32, int32);                       /* ROM read function */
+    t_stat(*set_entry_point)(UNIT*, int32, CONST char*, void*); /* Set entry point function */
 }
 MODULE_DEF;
 
