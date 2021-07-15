@@ -733,6 +733,7 @@ t_stat get_symbolic_ep(const char* cptr, int32* entry_point)
     int num_chars = 0;
     ROM_DEF* romptr;
     int socket_number;
+    int32 offset;
 
    /*
     * sscanf splits the symbolic address in three parts:
@@ -756,10 +757,15 @@ t_stat get_symbolic_ep(const char* cptr, int32* entry_point)
     for (socket_number = 1; socket_number < M9312_NUM_SOCKETS; socket_number++) {
         if (strcmp (socket_config[socket_number].rom_name, rom_name) == 0) {
 
+            /* ROM found, get address offset */
+            offset = (plus_minus == '+') ? romptr->boot_with_diags :romptr->boot_no_diags;
+
+            /* Check the specified entry point is available for the ROM */
+            if (offset == EP_NOT_AVAIL)
+                return sim_messagef(SCPE_ARG, "Entry point not available for %s\n", rom_name);
+
             /* Set entry point to the ROM in this socket */
-            *entry_point = (plus_minus == '+') ?
-                socket_config[socket_number].base_address + romptr->boot_with_diags :
-                socket_config[socket_number].base_address + romptr->boot_no_diags;
+            *entry_point = socket_config[socket_number].base_address + offset;
 
             /* Transform to a 16-bit physical address */
             *entry_point &= VAMASK;

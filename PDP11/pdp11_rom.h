@@ -55,11 +55,13 @@ typedef struct
     char device_mnemonic[5];            /* ROM identifier */
     void (*rom_init)();                 /* ROM specific init function */
     uint16 (*image)[];                  /* ROM image */
-    t_addr boot_no_diags;               /* Entry point to boot without diagnostics */
-    t_addr boot_with_diags;             /* Entry point to boot with diagnostics */
+    int boot_no_diags;                  /* Entry point to boot without diagnostics */
+    int boot_with_diags;                /* Entry point to boot with diagnostics */
     const char *help_text;              /* ROM help text */
 }
 ROM_DEF;
+
+#define EP_NOT_AVAIL    -1              /* Entry point not available */
 
 /*
  * A socket on a ROM module provides an address space in the IOPAGE with
