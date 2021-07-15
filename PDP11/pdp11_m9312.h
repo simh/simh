@@ -699,10 +699,10 @@ extern void setHITMISS ();
 
 ROM_DEF diag_roms[] =
 {
-    "A0",   NULL,         (uint16 (*)[]) &rom_23_248F1, EP_NOT_AVAIL, EP_NOT_AVAIL, A0_HELP,
-    "B0",   &setHITMISS,  (uint16 (*)[]) &rom_23_616F1, EP_NOT_AVAIL, EP_NOT_AVAIL, B0_HELP,
-    "C0",   NULL,         (uint16 (*)[]) &rom_23_446F1, EP_NOT_AVAIL, EP_NOT_AVAIL, C0_HELP,
-    "D0",   NULL,         (uint16 (*)[]) &rom_23_774F1, EP_NOT_AVAIL, EP_NOT_AVAIL, D0_HELP,
+    "A0",   NULL,         (uint16 (*)[]) &rom_23_248F1, 0144,         020,          A0_HELP,
+    "B0",   &setHITMISS,  (uint16 (*)[]) &rom_23_616F1, EP_NOT_AVAIL, 000, B0_HELP,
+    "C0",   NULL,         (uint16 (*)[]) &rom_23_446F1, 0144,         020, C0_HELP,
+    "D0",   NULL,         (uint16 (*)[]) &rom_23_774F1, EP_NOT_AVAIL, 020, D0_HELP,
     "",     NULL,         NULL,                         EP_NOT_AVAIL, EP_NOT_AVAIL, "",
 };
 

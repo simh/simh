@@ -746,19 +746,17 @@ t_stat get_symbolic_ep(const char* cptr, int32* entry_point)
         ((plus_minus != '+') && (plus_minus != '-')))
             return sim_messagef (SCPE_ARG, "Specify entry point as <ROM>+DIAG|<ROM>-DIAG\n");
 
-    /* Try to find the ROM in the list of boot ROMs */
-    if ((romptr = find_rom (rom_name, (ROM_DEF(*)[]) & boot_roms)) == NULL)
-        return sim_messagef (SCPE_ARG, "Unknown ROM type %s\n", rom_name);
+    /* Try to find the ROM in the list of boot and console/diag ROMs */
+    if (((romptr = find_rom (rom_name, (ROM_DEF(*)[]) &boot_roms)) == NULL) &&
+        ((romptr = find_rom (rom_name, (ROM_DEF(*)[]) &diag_roms)) == NULL))
+            return sim_messagef (SCPE_ARG, "Unknown ROM type %s\n", rom_name);
 
-    /*
-     * Find (if any) the socket the ROM is placed in. Boot roms are placed
-     * in sockets 1-4.
-     */
-    for (socket_number = 1; socket_number < M9312_NUM_SOCKETS; socket_number++) {
+    /* Find (if any) the socket the ROM is placed in */
+    for (socket_number = 0; socket_number < M9312_NUM_SOCKETS; socket_number++) {
         if (strcmp (socket_config[socket_number].rom_name, rom_name) == 0) {
 
             /* ROM found, get address offset */
-            offset = (plus_minus == '+') ? romptr->boot_with_diags :romptr->boot_no_diags;
+            offset = (plus_minus == '+') ? romptr->boot_with_diags : romptr->boot_no_diags;
 
             /* Check the specified entry point is available for the ROM */
             if (offset == EP_NOT_AVAIL)
