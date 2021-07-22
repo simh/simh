@@ -297,7 +297,7 @@ switch (op) {                                           /* case IO op */
             }
         u = (dp_svun - dp_dib.dno - o_DP0) / o_DP0;     /* get unit */
         uptr = dp_dev.units + u;                        /* ignore if busy */
-        if (!(dp_sta & STC_IDL) || sim_is_active (uptr))
+        if (!(dp_sta & STC_IDL) || (dp_svun && sim_is_active (uptr)))
             break;
         dp_cmd = f;                                     /* save cmd */
         if (dp_cmd == CMC_WR)                           /* write: bsy=0 else */
