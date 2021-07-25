@@ -57,7 +57,6 @@ typedef struct
     uint16 (*image)[];                  /* ROM image */
     int boot_no_diags;                  /* Entry point to boot without diagnostics */
     int boot_with_diags;                /* Entry point to boot with diagnostics */
-    const char *help_text;              /* ROM help text */
 }
 ROM_DEF;
 
@@ -88,7 +87,6 @@ typedef struct
     uint32 flags;                                               /* Flags for initialization of the UNIT flag field */
     SOCKET_DEF (*sockets)[];                                    /* Sockets for this module */
     t_stat (*auto_config)();                                    /* Auto-configuration function for the module type */
-    t_stat (*help_func)(FILE *, const char *);                  /* Help function for the module type */
     t_stat (*attach)(const char *);                             /* Attach function for the module type */
     t_stat (*auto_attach)();                                    /* Auto attach on module type selection */
     void (*create_filename)(char *);                            /* Function to create unit file name */

@@ -68,9 +68,6 @@ static t_stat detach_all_sockets ();
 static t_stat detach_socket (uint32);
 t_stat m9312_rd(int32* data, int32 PA, int32 access);
 t_stat blank_rom_rd(int32* data, int32 PA, int32 access);
-static t_stat blank_help (FILE *, const char *);
-static t_stat m9312_help (FILE *, const char *);
-static t_stat vt40_help (FILE *, const char *);
 static t_stat rom_help (FILE *st, DEVICE *, UNIT *, int32, const char *);
 static t_stat rom_help_attach (FILE *st, DEVICE *, UNIT *, int32, const char *);
 static t_stat reset_dib (int, t_stat (reader (int32 *, int32, int32)),
@@ -86,134 +83,6 @@ extern uint32 cpu_type;
 extern uint32 cpu_opt;
 extern uint32 cpu_model;
 extern int32 HITMISS;
-
-static const char rom_helptext[] =
-/***************** 80 character line width template *************************/
-"ROM, Read-Only Memory\n\n"
-"A hardware PDP-11 comprises ROM code, containing console emulator, diagnostic\n"
-"and bootstrap functionality. The ROM device can be used to add a ROM module\n"
-"to the I/O page. Each module has one or more ROMs available that can be\n"
-"attached to the module.\n\n"
-"Available modules are:\n"
-"   BLANK\n"
-"   M9312\n"
-"   VT40\n\n"
-"The module to be used is selected by means of the TYPE modifier, the\n"
-"'SET ROM TYPE=M9312'command e.g. selects the M9312 module. The ATTACH\n"
-"command can then be used to attach a specific ROM to the units of the ROM\n"
-"device.\n\n"
-"The following commands are available:\n\n"
-"   SHOW ROM\n"
-"   SHOW ROM<unit>\n"
-"   SET ROM TYPE={BLANK|M9312|VT40}\n"
-"   SET ROM CONFIGURATION=AUTO | MANUAL\n"
-"   SET ROM ADDRESS=<address>{;<address>}\n"
-"   ATTACH ROM<unit> <file> | <built-in ROM>\n"
-"   SHOW ROM<unit>\n"
-"   HELP ROM\n"
-"   HELP ROM SET\n"
-"   HELP ROM SHOW\n"
-"   HELP ROM ATTACH\n\n"
-"The SET ROM ADDRESS command is only applicable to the BLANK module type. By\n"
-"means of this command the base address of the ROM's sockets can be\n"
-"specified. The command accepts a sequence of addresses, in order of socket\n"
-"number, separated by a semi-colon. Empty addresses are allowed and leave the\n"
-"socket base address unchanged. The command 'SET ADDRESS=17765000;;17773000'\n"
-"e.g. sets the base address for socket 0 to 17765000, leaves the base address\n"
-"for socket 1 unchanged and sets the base address for socket 2 to 17773000.\n\n"
-"Help is available for the BLANK, M9312 and VT40 modules:\n\n"
-"   HELP ROM BLANK\n"
-"   HELP ROM M9312\n"
-"   HELP ROM VT40\n\n";
-
-static const char rom_blank_helptext[] =
-/***************** 80 character line width template *************************/
-"The contents of the BLANK ROM module have to be specified by setting the\n"
-"ROM's base address and ROM image.First the ROM unit ADDRESS has to be set,\n"
-"and then the ATTACH command can be used to fill the ROM with contents.\n\n";
-
-static const char rom_vt40_helptext[] =
-/***************** 80 character line width template *************************/
-"The VT40 module is meant for the GT-40 graphic terminal, based on a\n"
-"PDP-11/05. The VT40 included a bootstrap ROM.The module has just one socket\n"
-"with one available ROM and a 'SET ROM TYPE=VT40' command suffices to\n"
-"select this boot ROM.\n\n";
-
-static const char rom_m9312_helptext[] =
-/***************** 80 character line width template *************************/
-"The M9312 module contains 512 words of read only memory (ROM) that can be\n"
-"used for diagnostic routines, the console emulator routine, and bootstrap\n"
-"programs. The module contains five sockets that allow the user to insert\n"
-"ROMs, enabling the module to be used with any Unibus PDP11 system and boot\n"
-"any peripheral device by simply adding or changing ROMs.\n\n"
-"Socket 0 is solely used for a diagnostic ROM (PDP-11/60 and 11/70 systems)\n"
-"or a ROM which contains the console emulator routine and diagnostics for all\n"
-"other PDP-11 systems. The other four sockets accept ROMs which contain\n"
-"bootstrap programs. In general one boot ROM contains the boot code for one\n"
-"device type. In some cases a boot rom contains the boot code for two device\n"
-"types and there are also cases where the boot code comprises two or three\n"
-"ROMs. In these cases these ROMs have to be placed in subsequent sockets.\n\n"
-"The M9312 module is in simh implemented as the M9312 device. In accordance\n"
-"with the hardware module, the M9312 device contains five units. Every unit\n"
-"can be supplied with a specific ROM. All ROMs are available in the device\n"
-"itself and can be seated in a socket by means of the ATTACH command.\n"
-"The 'ATTACH ROM0 B0' command for example puts the 11/70 diagnostics ROM in\n"
-"socket 0.\n\n"
-"The following ROMs are available:\n\n"
-"ROM code       Function\n"
-"A0             11/04, 11/34 Diagnostic/Console (M9312 E20)\n"
-"B0             11/60, 11/70 Diagnostic (M9312 E20)\n"
-"C0             11/44 Diagnostic/Console (UBI; M7098 E58)\n"
-"MEM            11/24 Diagnostic/Console (MEM; M7134 E74)\n"
-"DL             RL01/RL02 cartridge disk\n"
-"DM             RK06/RK07 cartridge disk\n"
-"DX             RX01 floppy disk, single density\n"
-"DP             RP02/RP03 cartridge disk\n"
-"DB             RP04/RP05/RP06, RM02/RM03/RM05 cartridge disk\n"
-"DK             RK03/RK05 DECdisk\n"
-"DT             TU55/TU56 DECtape\n"
-"MM             TU16/TU45/TU77, TE16 magtape\n"
-"MT             TS03, TU10, TE10 magtape\n"
-"DS             RS03/RS04 fixed disk\n"
-"TT             ASR33 lowspeed reader\n"
-"PR             PC05 hispeed reader\n"
-"CT             TU60 DECcassette\n"
-"MS             TS04/TS11, TU80, TSU05 tape\n"
-"DD             TU58 DECtapeII\n"
-"DU             MSCP UDA50 (RAxx) disk\n"
-"DY             RX02 floppy disk, double density\n"
-"MU             TMSCP TK50, TU81 magtape\n"
-"XE0, XE1       Ethernet DEUNA / DELUA Net Boot (v2)\n"
-"XM0, XM1, XM2  DECnet DDCMP DMC11 / DMR11\n"
-"ZZ             Test ROM\n\n"
-"Help is available for each ROM with the 'HELP ROM M9312 <ROM code>' command.\n\n"
-/***************** 80 character line width template *************************/
-"The M9312 module has 512 words of read only memory.The lower 256 words\n"
-"(addresses 165000 through 165776) are used for the storage of ASCII console\n"
-"and diagnostic routines. The diagnostics are rudimentary CPU and memory\n"
-"diagnostics. The upper 256 words (addresses 173000 through 173776) are used\n"
-"for bootstrap programs. These upper words are divided further into four\n"
-"64-word segments. In principle each of the segments 0 to 4 contains the boot\n"
-"programs for one or two device types. If necessary however, more than one\n"
-"segment may be used for a boot program. The following table shows the ROM\n"
-"segmentation.\n\n"
-"ROM type                                           Base address\n"
-"256 word console emulator and diagnostics ROM #0   165000\n"
-"64 word boot ROM #1                                173000\n"
-"64 word boot ROM #2                                173200\n"
-"64 word boot ROM #3                                173400\n"
-"64 word boot ROM #4                                173600\n\n"
-"The system start adress can be determined in the following way:\n"
-"- Take the socket base address the ROM is placed in from the table above,\n"
-"- Add the ROM-specific offset of the entry point. The offsets are documented\n"
-"  in the ROM-specific help text wich can be displayed via the\n"
-"  'HELP ROM M9312 <ROM code>' command.\n\n"
-/***************** 80 character line width template *************************/
-"With a DL boot ROM in socket 1 e.g., a RL01 disk can be booted from unit 0,\n"
-"without performing the diagnostics, by starting at address 173004. With the\n"
-"same boot ROM placed in socket 2 that unit can be booted by starting at\n"
-"address 1732004. Note that the start address specifies whether or not the\n"
-"diagnostics code is executed.\n\n";
 
 /*
  * ROM data structures
@@ -253,7 +122,6 @@ MODULE_DEF blank =
     ROM_UNIT_FLAGS,                         /* UNIT flags */
     (SOCKET_DEF(*)[]) & blank_sockets,     /* Pointer to SOCKET_DEF structs */
     NULL,                                   /* Auto configuration function */
-    &blank_help,                            /* Pointer to help function */
     blank_attach,                           /* Attach function */
     NULL,                                   /* Auto-attach function */
     create_filename_blank,                  /* Create unit file name */
@@ -272,7 +140,6 @@ MODULE_DEF m9312 =
     ROM_UNIT_FLAGS,                         /* UNIT flags */
     (SOCKET_DEF (*)[]) & m9312_sockets,     /* Pointer to SOCKET_DEF structs */
     &m9312_auto_config,                     /* Auto configuration function */
-    &m9312_help,                            /* Pointer to help function */
     embedded_attach,                        /* Attach function */
     NULL,                                   /* Auto-attach function */
     create_filename_embedded,               /* Create unit file name */
@@ -291,7 +158,6 @@ MODULE_DEF vt40 =
     ROM_UNIT_FLAGS,                         /* UNIT flags */
     (SOCKET_DEF (*)[]) & vt40_sockets,      /* Pointer to SOCKET_DEF structs */
     NULL,                                   /* Auto configuration function */
-    &vt40_help,                             /* Pointer to help function */
     embedded_attach,                        /* Attach function */
     &vt40_auto_attach,                      /* Auto-attach function */
     create_filename_embedded,               /* Create unit file name */
@@ -1564,12 +1430,6 @@ static t_stat detach_socket (uint32 socket_number)
 }
 
 
-static t_stat blank_help (FILE *st, const char *cptr)
-{
-    fprintf (st, rom_blank_helptext);
-    return SCPE_OK;
-}
-
 /* Auto configure console emulator/diagnostics ROMs */
 
 static t_stat m9312_auto_config ()
@@ -1653,48 +1513,12 @@ static t_stat m9312_attach (const char *rom_name, int socket_number)
         return SCPE_IERR;
 }
 
-static t_stat m9312_help (FILE *st, const char *cptr)
-{
-    ROM_DEF *romptr;
-
-    /* If a 'HELP ROM M9312' is given print the help text for the module */
-    if (*cptr == '\0')
-        fprintf (st, rom_m9312_helptext);
-    else {
-        /* Search for the name in diag ROM_DEF list */
-        for (romptr = diag_roms; romptr->image != NULL; romptr++) {
-            if (strcasecmp (cptr, romptr->device_mnemonic) == 0) {
-                fprintf (st, romptr->help_text);
-                return SCPE_OK;
-            }
-        }
-
-        /* Search for the name in boot ROM_DEF list */
-        for (romptr = boot_roms; romptr->image != NULL; romptr++) {
-            if (strcasecmp (cptr, romptr->device_mnemonic) == 0) {
-                fprintf (st, romptr->help_text);
-                return SCPE_OK;
-            }
-        }
-
-        /* The name wasn't found in both lists */
-        fprintf (st, "Unknown ROM type\n");
-    }
-
-    return SCPE_OK;
-}
-
-static t_stat vt40_help (FILE *st, const char *cptr)
-{
-    fprintf (st, rom_vt40_helptext);
-    return SCPE_OK;
-}
 
 /* Print help */
 
 static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
-    const char rom_helptext1[] =
+    const char rom_helptext[] =
         /***************** 80 character line width template *************************/
         " A hardware PDP-11 comprises a module with Read Only Memory (ROM) code,\n"
         " containing console emulator, diagnostic and bootstrap functionality.\n"
@@ -1717,22 +1541,21 @@ static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
         " topic 'Commands' per module type.\n"
         /***************** 80 character line width template *************************/
         "1 Blank\n"
-        " The contents of the BLANK ROM module have to be specified by setting the\n"
-        " ROM's base address and ROM image. First the ROM unit ADDRESS has to be set,\n"
-        " and then the ATTACH command can be used to fill the ROM with contents.\n"
+        " The BLANK ROM module is a module with four sockets in each of which one ROM\n"
+        " can be placed, the contents of which are coming from a file.\n"
         "2 Configuration\n"
         " The BLANK module can be configured by means of the ATTACH command. For a\n"
-        " succesful ATTACH the following parameters have to be specified:\n"
-        " 1. The socket number to attach a ROM to,\n"
-        " 2. The address in the I/O space in which the ROM contents will be available,\n"
-        " 3. The file with the ROM contents in RAW format.\n\n"
+        " succesful ATTACH the following parameters have to be specified:\n\n"
+        "+1. The socket number to attach a ROM to,\n"
+        "+2. The address in the I/O space in which the ROM contents will be available,\n"
+        "+3. The file with the ROM contents in RAW format.\n\n"
         " A single attach specification has the following format:\n\n"
         "+ATTACH ROM {<socket>:}<address>/<file>\n\n"
         " The socket is a number between 0 and 3. The socket number is optional and\n"
         " the default number is 0. The address is a physical address in the I/O SPACE,\n"
-        " i.e.between ... and ... . The address must not collide with register\n"
-        " addresses used by other devices. The file is the name of a file with the\n"
-        " contents of the ROM in RAW format.\n\n"
+        " i.e.between addresses 17760100 and 17777777. The address must not collide\n"
+        " with register addresses used by other devices. The file is the name of a\n"
+        " file with the contents of the ROM in RAW format.\n\n"
         " An attach command can comprise more one to four attach specifications,\n"
         " seperated by a comma:\n\n"
         "+ATTACH ROM {<socket>:}<address>/<file>{,{<socket>:}<address>/<file>}+\n\n"
@@ -1746,9 +1569,9 @@ static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
         "+ATTACH ROM 0:17765000/23-616F1.IMG, 17773000/23-751A9.IMG\n\n"
         " The effect of the last command is equal to the two separate attach commands.\n"
         "2 Boot\n"
-        " There are two ways to boot from an attached ROM:\n"
-        " 1. By starting the simulator at an address in the ROM address space,\n"
-        " 2. By setting the starting address and subsequently issue a BOOT command.\n\n"
+        " There are two ways to boot from an attached ROM:\n\n"
+        "+1. By starting the simulator at an address in the ROM address space,\n"
+        "+2. By setting the starting address and subsequently issue a BOOT command.\n\n"
         " The simulator can be started at an address in the ROM address space via a GO\n"
         " or RUN command:\n\n"
         "+GO <address>\n"
@@ -1770,15 +1593,30 @@ static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
         "+BOOT ROM\n"
         /***************** 80 character line width template *************************/
         "1 M9312\n"
-        " The M9312 module contains 512 words of read only memory(ROM) that can be\n"
+        " The M9312 module contains 512 words of read only memory (ROM) that can be\n"
         " used for diagnostic routines, the console emulator routine, and bootstrap\n"
         " programs. The module contains five sockets that allow the user to insert\n"
         " ROMs, enabling the module to be used with any Unibus PDP11 system and boot\n"
         " any peripheral device by simply adding or changing ROMs.\n\n"
-        "2 Configuration\n"
         " The M9312 is configured by placing ROMs in the module's sockets with ATTACH\n"
-        " commands and with various SET commands\n"
-        "3 Available_ROMs\n"
+        " commands and with various SET commands.\n"
+        "2 Configuration\n"
+        " The M9312 module has 512 words of read only memory. The lower 256 words\n"
+        " (addresses 165000 through 165776) are used for the storage of ASCII console\n"
+        " and diagnostic routines. The diagnostics are rudimentary CPU and memory\n"
+        " diagnostics. The upper 256 words (addresses 173000 through 173776) are used\n"
+        " for bootstrap programs. These upper words are divided further into four\n"
+        " 64-word segments. In principle each of the segments 0 to 4 contains the boot\n"
+        " programs for one or two device types. If necessary however, more than one\n"
+        " segment may be used for a boot program. The following table shows the ROM\n"
+        " segmentation.\n\n"
+        "+ROM type                                           Base address\n"
+        "+256 word console emulator and diagnostics ROM #0   165000\n"
+        "+64 word boot ROM #1                                173000\n"
+        "+64 word boot ROM #2                                173200\n"
+        "+64 word boot ROM #3                                173400\n"
+        "+64 word boot ROM #4                                173600\n\n"
+        " For each segment a socket is available in which a ROM can be placed.\n"
         " Socket 0 is solely used for a diagnostic ROM (PDP-11/60 and 11/70 systems)\n"
         " or a ROM which contains the console emulator routine and diagnostics for all\n"
         " other PDP-11 systems. The other four sockets accept ROMs which contain\n"
@@ -1786,44 +1624,102 @@ static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
         " device type. In some cases a boot rom contains the boot code for two device\n"
         " types and there are also cases where the boot code comprises two or three\n"
         " ROMs. In these cases these ROMs have to be placed in subsequent sockets.\n\n"
-        " All ROMs are available in the ROM device and can be seated in a socket by\n"
-        " means of the ATTACH command. The 'ATTACH ROM 0:B0' command for example puts\n"
-        " the 11/70 diagnostics ROM in socket 0.\n\n"
-        " The following ROMs are available.\n\n"
-        " ROM code       Function\n"
-        " A0             11/04, 11/34 Diagnostic/Console (M9312 E20)\n"
-        " B0             11/60, 11/70 Diagnostic (M9312 E20)\n"
-        " C0             11/44 Diagnostic/Console (UBI; M7098 E58)\n"
-        " D0             11/24 Diagnostic/Console (MEM; M7134 E74)\n"
-        " DL             RL01/RL02 cartridge disk\n"
-        " DM             RK06/RK07 cartridge disk\n"
-        " DX             RX01 floppy disk, single density\n"
-        " DP             RP02/RP03 cartridge disk\n"
-        " DB             RP04/RP05/RP06, RM02/RM03/RM05 cartridge disk\n"
-        " DK             RK03/RK05 DECdisk\n"
-        " DT             TU55/TU56 DECtape\n"
-        " MM             TU16/TU45/TU77, TE16 magtape\n"
-        " MT             TS03, TU10, TE10 magtape\n"
-        " DS             RS03/RS04 fixed disk\n"
-        " TT             ASR33 lowspeed reader\n"
-        " PR             PC05 hispeed reader\n"
-        " CT             TU60 DECcassette\n"
-        " MS             TS04/TS11, TU80, TSU05 tape\n"
-        " DD             TU58 DECtapeII\n"
-        " DU             MSCP UDA50 (RAxx) disk\n"
-        " DY             RX02 floppy disk, double density\n"
-        " MU             TMSCP TK50, TU81 magtape\n"
-        " XE0, XE1       Ethernet DEUNA / DELUA Net Boot (v2)\n"
-        " XM0, XM1, XM2  DECnet DDCMP DMC11 / DMR11\n"
-        " ZZ             Test ROM\n\n"
-        "3 SET_commands\n"
+        " The system start adress can be determined in the following way:\n\n"
+        "+1. Take the socket base address the ROM is placed in from the table above,\n"
+        "+2. Add the ROM-specific offset of the entry point. The offsets are documented\n"
+        "+in the ROM-specific help text.\n\n"
+        /***************** 80 character line width template *************************/
+        " With a DL boot ROM in socket 1 e.g., a RL01 disk can be booted from unit 0,\n"
+        " without performing the diagnostics, by starting at address 173004. With the\n"
+        " same boot ROM placed in socket 2 that unit can be booted by starting at\n"
+        " address 1732004. Note that the start address specifies whether or not the\n"
+        " diagnostics code is executed.\n\n"
+        "2 ATTACH_command\n"
+        " The M9312 module can be configured by means of the ATTACH command. For a\n"
+        " succesful ATTACH the following parameters have to be specified:\n\n"
+        "+1. The socket number to attach a ROM to,\n"
+        "+2. The name of the ROM image.\n\n"
+        " A single attach specification has the following format:\n\n"
+        "+ATTACH ROM {<socket>:}<ROM>\n\n"
+        " The socket is a number between 0 and 4. The socket number is optional and\n"
+        " the default number is 0. The ROM is the name of one of the available ROMs.\n"
+        " An attach command can comprise more one to four attach specifications,\n"
+        " seperated by a comma:\n\n"
+        "+ATTACH ROM {<socket>:}<ROM>{,{<socket>:}<ROM>}+\n\n"
+        " The default socket number for the first attach specification in the attach\n"
+        " command is zero, for the following specifications it is the socket number of\n"
+        " the previous specification plus one. The following commands attach two ROMs,\n"
+        " at socket 0 and 1:\n\n"
+        "+ATTACH ROM 0:B0\n"
+        "+ATTACH ROM 1:DL\n\n"
+        " These commands can also be combined in one ATTACH command:\n\n"
+        "+ATTACH ROM B0,DL\n\n"
+        " The effect of this command is equal to the two separate attach commands.\n"
+        "2 SET_commands\n"
         " This module supports, apart from the common commands, the following type-\n"
         " specific commands:\n\n"
-        "+SET ROM CONFIGMODE\n"
+        "+SET ROM CONFIGURATION\n"
         "+SET ROM ENTRY_POINT\n"
-        "3 ATTACH_command\n"
-        "+ATTACH ROM\n"
-        "4 A0\n"
+        "3 CONFIGURATION\n"
+        " The M9312 implementation support an auto-configuration option which can be\n"
+        " enabled with the CONFIGURATION parameter:\n\n"
+        "+SET CONFIGURATION=AUTO|MANUAL\n\n"
+        " In the auto-configuration mode the sockets are filled with ROMs suited for\n"
+        " the current configuration. For socket 0 the ROM selected depends on the CPU\n"
+        " type, for sockets 1 to 4 the ROM lineup is determined by the available and\n"
+        " enabled devices. Usually the configuration will contain more usable devices\n"
+        " than the four sockets that are available for boot ROMs for these devices. In\n"
+        " that case boot ROMs are selected for the first four devices detected during\n"
+        " the device scan.\n\n"
+        " The auto-configured lineup of ROMs can be overriden by ATTACH commands for\n"
+        " the sockets. In that case the configuration mode is reset to MANUAL.\n"
+        "3 ENTRY_POINT\n"
+        " The system can be booted by starting it at one of the suitable boot\n"
+        " addresses in one of the ROMs. The boot address can be set by means of the\n"
+        " SET ENTRY_POINT command:\n\n"
+        "+SET ROM ENTRY_POINT=<address>\n\n"
+        " The address must be a 16-bit physical address in an attached ROM. The\n"
+        " address to be used is determined by a combination of the socket base address\n"
+        " and offset in the ROM. See 'HELP ROM M9312 Configuration' for an\n"
+        " explanation.\n\n"
+        " To make setting entry point more user-friendly, the address can also be\n"
+        " specified symbolically by naming the ROMand the entry point:\n\n"
+        "+SET ROM ENTRY_POINT=<ROM>+DIAG|<ROM>-DIAG\n\n"
+        " '<ROM>' must be the name of a ROM currently attached to a socket. Boot ROMs\n"
+        " useably provide two entry points for respectively booting without and with\n"
+        " performing diagnostics before the device is booted. '+DIAG' and '-DIAG'\n"
+        " refer to these entry points.\n\n"
+        " After setting the entry point the system can be started via a BOOT command:\n\n"
+        "+BOOT {ROM|CPU}\n"
+        "2 Available_ROMs\n"
+        " The following ROMs are available.\n\n"
+        "+ROM code       Function\n"
+        "+A0             11/04, 11/34 Diagnostic/Console (M9312 E20)\n"
+        "+B0             11/60, 11/70 Diagnostic (M9312 E20)\n"
+        "+C0             11/44 Diagnostic/Console (UBI; M7098 E58)\n"
+        "+D0             11/24 Diagnostic/Console (MEM; M7134 E74)\n"
+        "+DL             RL01/RL02 cartridge disk\n"
+        "+DM             RK06/RK07 cartridge disk\n"
+        "+DX             RX01 floppy disk, single density\n"
+        "+DP             RP02/RP03 cartridge disk\n"
+        "+DB             RP04/RP05/RP06, RM02/RM03/RM05 cartridge disk\n"
+        "+DK             RK03/RK05 DECdisk\n"
+        "+DT             TU55/TU56 DECtape\n"
+        "+MM             TU16/TU45/TU77, TE16 magtape\n"
+        "+MT             TS03, TU10, TE10 magtape\n"
+        "+DS             RS03/RS04 fixed disk\n"
+        "+TT             ASR33 lowspeed reader\n"
+        "+PR             PC05 hispeed reader\n"
+        "+CT             TU60 DECcassette\n"
+        "+MS             TS04/TS11, TU80, TSU05 tape\n"
+        "+DD             TU58 DECtapeII\n"
+        "+DU             MSCP UDA50 (RAxx) disk\n"
+        "+DY             RX02 floppy disk, double density\n"
+        "+MU             TMSCP TK50, TU81 magtape\n"
+        "+XE0, XE1       Ethernet DEUNA / DELUA Net Boot (v2)\n"
+        "+XM0, XM1, XM2  DECnet DDCMP DMC11 / DMR11\n"
+        "+ZZ             Test ROM\n\n"
+        "3 A0\n"
         " Function:              11/04, 11/34 Diagnostic/Console (M9312 E20)\n"
         " DEC Part number:       23-248F1\n"
         " Place in socket:       0\n\n"
@@ -1863,7 +1759,7 @@ static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
         " DP    RP02/03              RP11            Moving head disk\n"
         " DB    RP04/05/06, RM02/03  RH11/RH70       Moving head disk\n"
         " DS    RS03/04              RH11/RH70       Fixed head disk\n\n"
-        "4 B0\n"
+        "3 B0\n"
         " Function:              11/60, 11/70 Diagnostic (M9312 E20)\n"
         " DEC Part number:       23-616F1\n"
         " Place in socket:       0\n\n"
@@ -1885,7 +1781,7 @@ static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
         " To boot for example from unit 2, for the device for which the boot ROM is\n"
         " available in socket 1, the value 2012 has to be put in the console switch\n"
         " register.\n\n"
-        "4 C0\n"
+        "3 C0\n"
         " Function:              11/44 Diagnostic/Console (UBI; M7098 E58)\n"
         " DEC Part number:       23-446F1\n"
         " Place in socket:       0\n\n"
@@ -1893,33 +1789,33 @@ static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
         "+000 - Start entry point\n"
         "+020 - Diagnostics entry point\n"
         "+144 - No diagnostics entry point\n\n"
-        "4 D0\n"
+        "3 D0\n"
         " Function:              11/24 Diagnostic/Console (MEM; M7134 E74)\n"
         " DEC Part number:       23-774F1\n"
         " Place in socket:       0\n\n"
         " Offsets\n"
         "+020 - Diagnostics entry point\n\n"
-        "4 DL\n"
+        "3 DL\n"
         " Function:              RL01/02 cartridge disk bootstrap\n" 
         " DEC Part number:       23-751A9\n" 
         " Place in socket:       1-4\n\n"
         STD_OFFSETS
-        "4 DM\n"
+        "3 DM\n"
         " Function:              RK06/07 cartridge disk bootstrap\n"
         " DEC Part number:       23-752A9\n"
         " Place in socket:       1-4\n\n"
         STD_OFFSETS
-        "4 DX\n"
+        "3 DX\n"
         " Function:              RX01 floppy disk, single density bootstrap\n"
         " DEC Part number : 23 - 753A9\n"
         " Place in socket : 1 - 4\n\n"
         STD_OFFSETS
-        "4 DP\n"
+        "3 DP\n"
         " Function:              RP02/03 cartridge disk bootstrap\n"
         " DEC Part number:       23-755A9\n"
         " Place in socket:       1-4\n\n"
         STD_OFFSETS
-        "4 DB\n"
+        "3 DB\n"
         " Function:              RP04/05/06, RM02/03/05 cartridge disk bootstrap\n"
         " DEC Part number:       23-755A9\n"
         " Place in socket:       1-4\n\n"
@@ -1928,12 +1824,12 @@ static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
         "+052 - Boot with diagnostics, unit 0\n"
         "+056 - Boot with diagnostics, unit in R0\n"
         "+062 - Boot with diag, unit in R0, CSR in R1\n\n"
-        "4 DK\n"
+        "3 DK\n"
         " Function:              RK03/05 DECdisk disk bootstrap\n"
         " DEC Part number:       23-756A9\n"
         " Place in socket:       1-4\n\n"
         STD_OFFSETS
-        "4 DT\n"
+        "3 DT\n"
         " Function:              TU55/56 DECtape\n"
         " DEC Part number:       23-756A9\n"
         " Place in socket:       1-4\n\n"
@@ -1942,89 +1838,89 @@ static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
         "+036 - Boot with diagnostics, unit 0\n"
         "+042 - Boot with diagnostics, unit in R0\n"
         "+046 - Boot with diag, unit in R0, CSR in R1\n\n"
-        "4 MM\n"
+        "3 MM\n"
         " Function:              TU16/45/77,TE16 magtape bootstrap\n"
         " DEC Part number:       23-757A9\n"
         " Place in socket:       1-4\n\n"
         STD_OFFSETS
-        "4 MT\n"
+        "3 MT\n"
         " Function:              TS03,TU10,TE10 magtape bootstrap\n"
         " DEC Part number:       23-758A9\n"
         " Place in socket:       1-4\n\n"
         STD_OFFSETS
-        "4 DS\n"
+        "3 DS\n"
         " Function:              RS03/04 fixed disk bootstrap\n"
         " DEC Part number:       23-759A9\n"
         " Place in socket:       1-4\n\n"
         STD_OFFSETS
-        "4 TT\n"
+        "3 TT\n"
         " Function:              ASR33 lowspeed reader bootstrap\n"
         " DEC Part number:       23-760A9\n"
         " Place in socket:       1-4\n\n"
         STD_OFFSETS
-        "4 PR\n"
+        "3 PR\n"
         " Function:              PC05 hispeed reader bootstrap\n"
         " DEC Part number:       23-760A9\n"
         " Place in socket:       1-4\n\n"
         STD_OFFSETS
-        "4 CT\n"
+        "3 CT\n"
         " Function:              TU60 DECcassette bootstrap\n"
         " DEC Part number:       23-761A9\n"
         " Place in socket:       1-4\n\n"
         STD_OFFSETS
-        "4 MS\n"
+        "3 MS\n"
         " Function:              TS04/11,TU80,TSU05 tape bootstrap\n"
         " DEC Part number:       23-764A9\n"
         " Place in socket:       1-4\n\n"
         STD_OFFSETS
-        "4 DD\n"
+        "3 DD\n"
         " Function:              TU58 DECtapeII bootstrap\n"
         " DEC Part number:       23-765B9\n"
         " Place in socket:       1-4\n\n"
         STD_OFFSETS
         " This ROM replaces 23-765A9 and fixes non-standard CSR access.\n\n"
-        "4 DU\n"
+        "3 DU\n"
         " Function:              MSCP UDA50 (RAxx) disk bootstrap\n"
         " DEC Part number:       23-767A9\n"
         " Place in socket:       1-4\n\n"
         STD_OFFSETS
-        "4 DY\n"
+        "3 DY\n"
         " Function:              RX02 floppy disk, double density bootstrap\n"
         " DEC Part number:       23-811A9\n"
         " Place in socket:       1-4\n\n"
         STD_OFFSETS
-        "4 MU\n"
+        "3 MU\n"
         " Function:              TMSCP TK50,TU81 magtape bootstrap\n"
         " DEC Part number:       23-E39A9\n"
         " Place in socket:       1-4\n\n"
         STD_OFFSETS
-        "4 XE0\n"
+        "3 XE0\n"
         " Function:              Ethernet DEUNA/DELUA Net Boot (v2)\n"
         " DEC Part number:       23-E32A9\n"
         " Place in socket:       1-3\n\n"
         " The Ethernet DEUNA/DELUA Net Boot comprises two ROM’s, XE0 and XE1. These\n"
         " ROMs have to be placed in two subsequent sockets.\n\n"
         STD_OFFSETS
-        "4 XE1\n"
+        "3 XE1\n"
         " Function:              Ethernet DEUNA/DELUA Net Boot (v2)\n"
         " DEC Part number:       23-E33A9\n"
         " Place in socket:       2-4\n\n"
-        "4 XM0\n"
+        "3 XM0\n"
         " Function:              DECnet DDCMP DMC11/DMR11 bootstrap\n"
         " DEC Part number:       23-862A9\n"
         " Place in socket:       1-2\n\n"
         " The DECnet DDCMP DMC11/DMR11 bootstrap comprises three ROM’s, XM0, XM1 and\n"
         " XM2. These ROMs have to be placed in three subsequent sockets.\n\n"
         STD_OFFSETS
-        "4 XM1\n"
+        "3 XM1\n"
         " Function:              DECnet DDCMP DMC11/DMR11 bootstrap\n"
         " DEC Part number:       23-863A9\n"
         " Place in socket:       2-3\n\n"
-        "4 XM2\n"
+        "3 XM2\n"
         " Function:              DECnet DDCMP DMC11/DMR11 bootstrap\n"
         " DEC Part number:       23-864A9\n"
         " Place in socket:       3-4\n\n"
-        "4 ZZ\n"
+        "3 ZZ\n"
         " Function:              ROM diagnostics tests\n"
         " DEC Part number:       23-ZZZA9\n"
         " Place in socket:       1-4\n\n"
@@ -2080,30 +1976,7 @@ static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
         " The default value is OFF. After write-enabling the ROMs, the contents can be\n"
         " changed by means of DEPOSIT commands.\n";
 
-    return scp_help (st, dptr, uptr, flag, rom_helptext1, cptr);
-#if 0
-    uint16 module_number;
-    char gbuf[CBUFSIZE];
-
-    /* If no argument to 'HELP ROM' is given print the general help text */
-    if (*cptr == '\0')
-        fprintf (st, rom_helptext);
-    else {
-        /* The (first) HELP ROM argument must be a module name. Look it up
-           in the module list en call its help function. */
-        cptr = get_glyph (cptr, gbuf, 0);
-
-        for (module_number = 0; module_number < NUM_MODULES; module_number++) {
-            if (strcasecmp (gbuf, module_list[module_number]->name) == 0)
-                return (*module_list[module_number]->help_func) (st, cptr);
-        }
-
-        /* The module wasn't found in the module list */
-        fprintf (st, "Unknown ROM module\n");
-    }
-
-    return SCPE_OK;
-#endif
+    return scp_help (st, dptr, uptr, flag, rom_helptext, cptr);
 }
 
 
