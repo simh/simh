@@ -589,29 +589,29 @@ extern void setHITMISS ();
 #define D0_OFFSETS  "Offsets\n" \
                     "020 - Diagnostics entry point\n\n"
 
-#define STD_OFFSETS "Offsets\n" \
-                    "004 - Boot without diagnostics, unit 0\n" \
-                    "006 - Boot with diagnostics, unit 0\n" \
-                    "012 - Boot with diagnostics, unit in R0\n" \
-                    "016 - Boot with diag, unit in R0, CSR in R1\n\n"
+#define STD_OFFSETS " Offsets\n" \
+                    "+004 - Boot without diagnostics, unit 0\n" \
+                    "+006 - Boot with diagnostics, unit 0\n" \
+                    "+012 - Boot with diagnostics, unit in R0\n" \
+                    "+016 - Boot with diag, unit in R0, CSR in R1\n\n"
 
-#define DB_OFFSETS  "Offsets\n" \
-                    "050 - Boot without diagnostics, unit 0\n" \
-                    "052 - Boot with diagnostics, unit 0\n" \
-                    "056 - Boot with diagnostics, unit in R0\n" \
-                    "062 - Boot with diag, unit in R0, CSR in R1\n\n"
+#define DB_OFFSETS  " Offsets\n" \
+                    "+050 - Boot without diagnostics, unit 0\n" \
+                    "+052 - Boot with diagnostics, unit 0\n" \
+                    "+056 - Boot with diagnostics, unit in R0\n" \
+                    "+062 - Boot with diag, unit in R0, CSR in R1\n\n"
 
 #define DT_OFFSETS  "Offsets\n" \
-                    "034 - Boot without diagnostics, unit 0\n" \
-                    "036 - Boot with diagnostics, unit 0\n" \
-                    "042 - Boot with diagnostics, unit in R0\n" \
-                    "046 - Boot with diag, unit in R0, CSR in R1\n\n"
+                    "+034 - Boot without diagnostics, unit 0\n" \
+                    "+036 - Boot with diagnostics, unit 0\n" \
+                    "+042 - Boot with diagnostics, unit in R0\n" \
+                    "+046 - Boot with diag, unit in R0, CSR in R1\n\n"
 
-#define ZZ_OFFSETS  "Offsets\n" \
-                    "004 - Boot without diagnostics, unit 0, standard CSR\n" \
-                    "006 - Boot with diagnostics, unit 0, standard CSR (Not used)\n" \
-                    "012 - Boot with unit in R0, standard CSR (Not used)\n" \
-                    "016 - Boot with unit in R0, CSR in R11\n\n"
+#define ZZ_OFFSETS  "+Offsets\n" \
+                    "+004 - Boot without diagnostics, unit 0, standard CSR\n" \
+                    "+006 - Boot with diagnostics, unit 0, standard CSR (Not used)\n" \
+                    "+012 - Boot with unit in R0, standard CSR (Not used)\n" \
+                    "+016 - Boot with unit in R0, CSR in R11\n\n"
 
 #define A0_REMARK   "Before execution of the console emulator routine, primary diagnostic tests are\n" \
                     "executed. After completion of the primary diagnostic tests the contents of R0,\n" \
@@ -699,7 +699,7 @@ extern void setHITMISS ();
 
 ROM_DEF diag_roms[] =
 {
-    "A0",   NULL,         (uint16 (*)[]) &rom_23_248F1, 0144,         020,          A0_HELP,
+    "A0",   NULL,         (uint16 (*)[]) &rom_23_248F1, 0144,         020, A0_HELP,
     "B0",   &setHITMISS,  (uint16 (*)[]) &rom_23_616F1, EP_NOT_AVAIL, 000, B0_HELP,
     "C0",   NULL,         (uint16 (*)[]) &rom_23_446F1, 0144,         020, C0_HELP,
     "D0",   NULL,         (uint16 (*)[]) &rom_23_774F1, EP_NOT_AVAIL, 020, D0_HELP,
