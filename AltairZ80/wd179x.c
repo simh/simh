@@ -99,6 +99,7 @@ typedef struct {
 
 typedef struct {
     PNP_INFO pnp;       /* Plug-n-Play Information */
+    uint16 fdctype;     /* Default is 1793 */
     uint8 intrq;        /* WD179X Interrupt Request Output (EOJ) */
     uint8 hld;          /* WD179X Head Load Output */
     uint8 drq;          /* WD179X DMA Request Output */
@@ -182,7 +183,7 @@ uint8 floorlog2(unsigned int n);
 static uint8 computeSectorSize(const WD179X_DRIVE_INFO *pDrive);
 static uint8 testMode(const WD179X_DRIVE_INFO *pDrive);
 
-WD179X_INFO wd179x_info_data = { { 0x0, 0, 0x30, 4 } };
+WD179X_INFO wd179x_info_data = { { 0x0, 0, 0x30, 4 }, 1793 };
 WD179X_INFO *wd179x_info = &wd179x_info_data;
 WD179X_INFO_PUB *wd179x_infop = (WD179X_INFO_PUB *)&wd179x_info_data;
 
@@ -194,6 +195,7 @@ static UNIT wd179x_unit[] = {
 };
 
 static REG wd179x_reg[] = {
+    { DRDATAD(FDCTYPE,     wd179x_info_data.fdctype,      16, "Controller type"),          },
     { FLDATAD(INTRQ,       wd179x_info_data.intrq,         1, "Interrupt Request"),        },
     { FLDATAD(HLD,         wd179x_info_data.hld,           1, "Head Load"),                },
     { FLDATAD(DRQ,         wd179x_info_data.drq,           1, "DMA Request"),              },
@@ -674,6 +676,10 @@ static uint8 Do1793Command(uint8 cCommand)
             wd179x_info->intrq = 0;
             wd179x_info->hld = cCommand & 0x08;
             wd179x_info->verify = cCommand & 0x04;
+            if (wd179x_info->fdctype == 1795) {
+                /* WD1795 and WD1797 have a side select output. */
+                wd179x_info->fdc_head = (cCommand & 0x02) >> 1;
+            }
             break;
         /* Type II Commands */
         case WD179X_READ_REC:
@@ -684,6 +690,10 @@ static uint8 Do1793Command(uint8 cCommand)
             wd179x_info->fdc_status = WD179X_STAT_BUSY;     /* Set BUSY, clear all others */
             wd179x_info->intrq = 0;
             wd179x_info->hld = 1;   /* Load the head immediately, E Flag not checked. */
+            if (wd179x_info->fdctype == 1795) {
+                /* WD1795 and WD1797 have a side select output. */
+                wd179x_info->fdc_head = (cCommand & 0x02) >> 1;
+            }
             break;
         /* Type III Commands */
         case WD179X_READ_ADDR:
