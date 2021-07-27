@@ -437,7 +437,7 @@ ifeq (${WIN32},)  #*nix Environments (&& cygwin)
                   else
                     ifeq (,$(strip $(LPATH)))
                       $(info *** Warning ***)
-                      $(info *** Warning *** The library search path on your $(OSTYPE) platform can't be)
+                      $(info *** Warning *** The library search path on your $(OSTYPE) platform can not be)
                       $(info *** Warning *** determined.  This should be resolved before you can expect)
                       $(info *** Warning *** to have fully working simulators.)
                       $(info *** Warning ***)
@@ -1044,8 +1044,8 @@ else
       $(info ***********************************************************************)
       $(info ***********************************************************************)
       $(info **  This build could produce simulators with video capabilities.     **)
-      $(info **  However, the required files to achieve this can't be found on    **)
-      $(info **  this system.  Download the file:                                 **)
+      $(info **  However, the required files to achieve this can not be found on  **)
+      $(info **  on this system.  Download the file:                              **)
       $(info **  https://github.com/simh/windows-build/archive/windows-build.zip  **)
       $(info **  Extract the windows-build-windows-build folder it contains to    **)
       $(info **  $(abspath ..\)                                                   **)
@@ -2461,7 +2461,7 @@ ifneq (,$(call find_test,${HP2100D},hp2100))
 	$@ $(call find_test,${HP2100D},hp2100) ${TEST_ARG}
 endif
 else
-	$(info hp2100 can't be built using C++)
+	$(info hp2100 can not be built using C++)
 endif
 
 hp3000 : ${BIN}hp3000${EXE}
@@ -2474,7 +2474,7 @@ ifneq (,$(call find_test,${HP3000D},hp3000))
 	$@ $(call find_test,${HP3000D},hp3000) ${TEST_ARG}
 endif
 else
-	$(info hp3000 can't be built using C++)
+	$(info hp3000 can not be built using C++)
 endif
 
 i1401 : ${BIN}i1401${EXE}
@@ -2520,7 +2520,7 @@ ifneq (,$(call find_test,${IBM1130D},ibm1130))
 	$@ $(call find_test,${IBM1130D},ibm1130) ${TEST_ARG}
 endif
 else
-	$(info ibm1130 can't be built using C++)
+	$(info ibm1130 can not be built using C++)
 endif
 
 s3 : ${BIN}s3${EXE}
@@ -2688,7 +2688,7 @@ ifneq (,$(call find_test,${BESM6D},besm6))
 	$@ $(call find_test,${BESM6D},besm6) ${TEST_ARG}
 endif
 else
-	$(info besm6 can't be built using C++)
+	$(info besm6 can not be built using C++)
 endif
 
 sigma : ${BIN}sigma${EXE}
