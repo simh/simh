@@ -55,12 +55,12 @@ typedef struct
     char device_mnemonic[5];            /* ROM identifier */
     void (*rom_init)();                 /* ROM specific init function */
     uint16 (*image)[];                  /* ROM image */
-    int boot_no_diags;                  /* Entry point to boot without diagnostics */
-    int boot_with_diags;                /* Entry point to boot with diagnostics */
+    int boot_no_diags;                  /* Start address to boot without diagnostics */
+    int boot_with_diags;                /* Start address to boot with diagnostics */
 }
 ROM_DEF;
 
-#define EP_NOT_AVAIL    -1              /* Entry point not available */
+#define NO_START_ADDRESS    -1          /* Start address not available */
 
 /*
  * A socket on a ROM module provides an address space in the IOPAGE with
@@ -91,8 +91,8 @@ typedef struct
     t_stat (*auto_attach)();                                        /* Auto attach on module type selection */
     void (*create_filename)(char *);                                /* Function to create unit file name */
     t_stat (*read)(int32*, int32, int32);                           /* ROM read function */
-    t_stat (*set_entry_point)(UNIT*, int32, CONST char*, void*);    /* Set entry point function */
-    t_stat (*show_entry_point)(FILE*);                              /* Show entry point function */
+    t_stat (*set_start_address)(UNIT*, int32, CONST char*, void*);  /* Set start address function */
+    t_stat (*show_start_address)(FILE*);                            /* Show start address function */
 }
 MODULE_DEF;
 

@@ -470,40 +470,40 @@ extern void setHITMISS ();
 
 ROM_DEF diag_roms[] =
 {
-    "A0",   NULL,         (uint16 (*)[]) &rom_23_248F1, 0144,         020,
-    "B0",   &setHITMISS,  (uint16 (*)[]) &rom_23_616F1, EP_NOT_AVAIL, 000,
-    "C0",   NULL,         (uint16 (*)[]) &rom_23_446F1, 0144,         020,
-    "D0",   NULL,         (uint16 (*)[]) &rom_23_774F1, EP_NOT_AVAIL, 020,
-    "",     NULL,         NULL,                         EP_NOT_AVAIL, EP_NOT_AVAIL,
+    "A0",   NULL,         (uint16 (*)[]) &rom_23_248F1, 0144,             020,
+    "B0",   &setHITMISS,  (uint16 (*)[]) &rom_23_616F1, NO_START_ADDRESS, 000,
+    "C0",   NULL,         (uint16 (*)[]) &rom_23_446F1, 0144,             020,
+    "D0",   NULL,         (uint16 (*)[]) &rom_23_774F1, NO_START_ADDRESS, 020,
+    "",     NULL,         NULL,                         NO_START_ADDRESS, NO_START_ADDRESS,
 };
 
 ROM_DEF boot_roms[] =
 {
-    "DL",    NULL,        (uint16 (*)[]) &rom_23_751A9, 004,          006,
-    "DM",    NULL,        (uint16 (*)[]) &rom_23_752A9, 004,          006,
-    "DX",    NULL,        (uint16 (*)[]) &rom_23_753A9, 004,          006,
-    "DP",    NULL,        (uint16 (*)[]) &rom_23_755A9, 004,          006,
-    "DB",    NULL,        (uint16 (*)[]) &rom_23_755A9, 050,          052,
-    "DK",    NULL,        (uint16 (*)[]) &rom_23_756A9, 004,          006,
-    "DT",    NULL,        (uint16 (*)[]) &rom_23_756A9, 034,          036,
-    "MM",    NULL,        (uint16 (*)[]) &rom_23_757A9, 004,          006,
-    "MT",    NULL,        (uint16 (*)[]) &rom_23_758A9, 004,          006,
-    "DS",    NULL,        (uint16 (*)[]) &rom_23_759A9, 004,          006,
-    "TT",    NULL,        (uint16 (*)[]) &rom_23_760A9, 034,          036,
-    "PR",    NULL,        (uint16 (*)[]) &rom_23_760A9, 004,          006,
-    "CT",    NULL,        (uint16 (*)[]) &rom_23_761A9, 004,          006,
-    "MS",    NULL,        (uint16 (*)[]) &rom_23_764A9, 004,          006,
-    "DD",    NULL,        (uint16 (*)[]) &rom_23_765B9, 004,          006,
-    "DU",    NULL,        (uint16 (*)[]) &rom_23_767A9, 004,          006,
-    "DY",    NULL,        (uint16 (*)[]) &rom_23_811A9, 004,          006,
-    "XM0",   NULL,        (uint16 (*)[]) &rom_23_862A9, 004,          006,
-    "XM1",   NULL,        (uint16 (*)[]) &rom_23_863A9, EP_NOT_AVAIL, EP_NOT_AVAIL,
-    "XM2",   NULL,        (uint16 (*)[]) &rom_23_864A9, EP_NOT_AVAIL, EP_NOT_AVAIL,
-    "XE0",   NULL,        (uint16 (*)[]) &rom_23_E32A9, 004,          006,
-    "XE1",   NULL,        (uint16 (*)[]) &rom_23_E33A9, EP_NOT_AVAIL, EP_NOT_AVAIL,
-    "MU",    NULL,        (uint16 (*)[]) &rom_23_E39A9, 004,          006,
-    "ZZ",    NULL,        (uint16 (*)[]) &rom_23_ZZZA9, 004,          006,
-    "",      NULL,        NULL,                         EP_NOT_AVAIL, EP_NOT_AVAIL,
+    "DL",    NULL,        (uint16 (*)[]) &rom_23_751A9, 004,              006,
+    "DM",    NULL,        (uint16 (*)[]) &rom_23_752A9, 004,              006,
+    "DX",    NULL,        (uint16 (*)[]) &rom_23_753A9, 004,              006,
+    "DP",    NULL,        (uint16 (*)[]) &rom_23_755A9, 004,              006,
+    "DB",    NULL,        (uint16 (*)[]) &rom_23_755A9, 050,              052,
+    "DK",    NULL,        (uint16 (*)[]) &rom_23_756A9, 004,              006,
+    "DT",    NULL,        (uint16 (*)[]) &rom_23_756A9, 034,              036,
+    "MM",    NULL,        (uint16 (*)[]) &rom_23_757A9, 004,              006,
+    "MT",    NULL,        (uint16 (*)[]) &rom_23_758A9, 004,              006,
+    "DS",    NULL,        (uint16 (*)[]) &rom_23_759A9, 004,              006,
+    "TT",    NULL,        (uint16 (*)[]) &rom_23_760A9, 034,              036,
+    "PR",    NULL,        (uint16 (*)[]) &rom_23_760A9, 004,              006,
+    "CT",    NULL,        (uint16 (*)[]) &rom_23_761A9, 004,              006,
+    "MS",    NULL,        (uint16 (*)[]) &rom_23_764A9, 004,              006,
+    "DD",    NULL,        (uint16 (*)[]) &rom_23_765B9, 004,              006,
+    "DU",    NULL,        (uint16 (*)[]) &rom_23_767A9, 004,              006,
+    "DY",    NULL,        (uint16 (*)[]) &rom_23_811A9, 004,              006,
+    "XM0",   NULL,        (uint16 (*)[]) &rom_23_862A9, 004,              006,
+    "XM1",   NULL,        (uint16 (*)[]) &rom_23_863A9, NO_START_ADDRESS, NO_START_ADDRESS,
+    "XM2",   NULL,        (uint16 (*)[]) &rom_23_864A9, NO_START_ADDRESS, NO_START_ADDRESS,
+    "XE0",   NULL,        (uint16 (*)[]) &rom_23_E32A9, 004,              006,
+    "XE1",   NULL,        (uint16 (*)[]) &rom_23_E33A9, NO_START_ADDRESS, NO_START_ADDRESS,
+    "MU",    NULL,        (uint16 (*)[]) &rom_23_E39A9, 004,              006,
+    "ZZ",    NULL,        (uint16 (*)[]) &rom_23_ZZZA9, 004,              006,
+    "",      NULL,        NULL,                         NO_START_ADDRESS, NO_START_ADDRESS,
 };
 
 #define M9312_NUM_SOCKETS    5
@@ -518,4 +518,3 @@ SOCKET_DEF m9312_sockets[M9312_NUM_SOCKETS] =
 };
 
 #endif
-
