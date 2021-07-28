@@ -80,18 +80,19 @@ SOCKET_DEF;
  */
 typedef struct
 {
-    const char *name;                                           /* Module name */
-    const uint32 valid_cpu_types;                               /* Valid CPU types */
-    const uint32 valid_cpu_opts;                                /* Required CPU options */
-    const uint32 num_sockets;                                   /* Number of sockets for the module type */
-    uint32 flags;                                               /* Flags for initialization of the UNIT flag field */
-    SOCKET_DEF (*sockets)[];                                    /* Sockets for this module */
-    t_stat (*auto_config)();                                    /* Auto-configuration function for the module type */
-    t_stat (*attach)(const char *);                             /* Attach function for the module type */
-    t_stat (*auto_attach)();                                    /* Auto attach on module type selection */
-    void (*create_filename)(char *);                            /* Function to create unit file name */
-    t_stat (*read)(int32*, int32, int32);                       /* ROM read function */
-    t_stat(*set_entry_point)(UNIT*, int32, CONST char*, void*); /* Set entry point function */
+    const char *name;                                               /* Module name */
+    const uint32 valid_cpu_types;                                   /* Valid CPU types */
+    const uint32 valid_cpu_opts;                                    /* Required CPU options */
+    const uint32 num_sockets;                                       /* Number of sockets for the module type */
+    uint32 flags;                                                   /* Flags for initialization of the UNIT flag field */
+    SOCKET_DEF (*sockets)[];                                        /* Sockets for this module */
+    t_stat (*auto_config)();                                        /* Auto-configuration function for the module type */
+    t_stat (*attach)(const char *);                                 /* Attach function for the module type */
+    t_stat (*auto_attach)();                                        /* Auto attach on module type selection */
+    void (*create_filename)(char *);                                /* Function to create unit file name */
+    t_stat (*read)(int32*, int32, int32);                           /* ROM read function */
+    t_stat (*set_entry_point)(UNIT*, int32, CONST char*, void*);    /* Set entry point function */
+    t_stat (*show_entry_point)(FILE*);                              /* Show entry point function */
 }
 MODULE_DEF;
 

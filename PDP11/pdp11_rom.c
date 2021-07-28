@@ -43,10 +43,12 @@ t_stat rom_detach (UNIT *);
 const char *rom_description (DEVICE *);
 
 /* Forward references for helper functions */
-t_stat blank_rom_set_entry_point (UNIT*, int32, CONST char*, void*);
+t_stat blank_set_entry_point (UNIT*, int32, CONST char*, void*);
 t_stat m9312_set_entry_point (UNIT*, int32, CONST char*, void*);
+t_stat blank_show_entry_point (FILE*);
+t_stat m9312_show_entry_point (FILE*);
 t_stat get_numerical_ep (const char*, int32*);
-t_stat get_symbolic_ep(const char*, int32*);
+t_stat get_symbolic_ep (const char*, int32*);
 t_bool digits_only (const char*);
 static t_bool address_available (int32);
 static void set_socket_addresses ();
@@ -120,13 +122,14 @@ MODULE_DEF blank =
     QBUS_MODEL | UNIBUS_MODEL,              /* Required CPU options */
     BLANK_NUM_SOCKETS,                      /* Number of sockets (units) */
     ROM_UNIT_FLAGS,                         /* UNIT flags */
-    (SOCKET_DEF(*)[]) & blank_sockets,     /* Pointer to SOCKET_DEF structs */
+    (SOCKET_DEF(*)[]) &blank_sockets,       /* Pointer to SOCKET_DEF structs */
     NULL,                                   /* Auto configuration function */
     blank_attach,                           /* Attach function */
     NULL,                                   /* Auto-attach function */
     create_filename_blank,                  /* Create unit file name */
     blank_rom_rd,                           /* ROM read function */
-    blank_rom_set_entry_point,              /* ROM set entry point */
+    blank_set_entry_point,                  /* ROM set entry point */
+    blank_show_entry_point,                 /* ROM show entry point */
 };
 
 /* Define the M9312 module */
@@ -145,6 +148,7 @@ MODULE_DEF m9312 =
     create_filename_embedded,               /* Create unit file name */
     m9312_rd,                               /* ROM read function */
     m9312_set_entry_point,                  /* ROM set entry point */
+    m9312_show_entry_point,                 /* ROM show entry point */
 };
 
 /* Define the VT40 module */
@@ -162,7 +166,8 @@ MODULE_DEF vt40 =
     &vt40_auto_attach,                      /* Auto-attach function */
     create_filename_embedded,               /* Create unit file name */
     blank_rom_rd,                           /* ROM read function */
-    blank_rom_set_entry_point,              /* ROM set entry point */
+    blank_set_entry_point,                  /* ROM set entry point */
+    blank_show_entry_point,                 /* ROM show entry point */
 };
 
 /*
@@ -490,7 +495,7 @@ t_stat rom_set_entry_point(UNIT* uptr, int32 value, CONST char* cptr, void* desc
     return module_list[selected_type]->set_entry_point (uptr, value, cptr, desc);
 }
 
-t_stat blank_rom_set_entry_point (UNIT* uptr, int32 value, CONST char* cptr, void* desc)
+t_stat blank_set_entry_point (UNIT* uptr, int32 value, CONST char* cptr, void* desc)
 {
     t_stat r;
     int32 address = 0;
@@ -641,11 +646,73 @@ t_stat get_symbolic_ep(const char* cptr, int32* entry_point)
     return sim_messagef (SCPE_ARG, "ROM %s is not attached to a socket\n", rom_name);
 }
 
-t_stat rom_show_entry_point (FILE *f, UNIT *uptr, int32 val, CONST void *desc)
+
+/* Show ROM bootstrap entry point */
+
+t_stat rom_show_entry_point(FILE* f, UNIT* uptr, int32 val, CONST void* desc)
 {
+    /* Forward the command to the module-specific function */
+    return module_list[selected_type]->show_entry_point (f);
+}
+
+
+/* Show entry point for BLANK and VT40 modules */
+
+t_stat blank_show_entry_point (FILE* f)
+{
+    fprintf(f, "entry point ");
+    (rom_entry_point == 0) ? fprintf(f, "not specified") :
+        fprintf(f, "%o", rom_entry_point);
+
+    /* Search socket */
+    return SCPE_OK;
+}
+
+
+/* Show entry point for M9312 module */
+
+t_stat m9312_show_entry_point (FILE *f)
+{
+    uint32 base_address;
+    uint32 offset;
+    uint32 socket_number;
+    char *rom_name;
+    ROM_DEF* romptr;
+
     fprintf (f, "entry point ");
     (rom_entry_point == 0) ? fprintf (f, "not specified") : 
         fprintf (f, "%o", rom_entry_point);
+
+    base_address = rom_entry_point & 0177000;
+    offset = rom_entry_point & 0777;
+
+    /* For all M9312 sockets */
+    for (socket_number = 0; socket_number < M9312_NUM_SOCKETS; socket_number++) {
+
+        /* Is this the socket with the base address? */
+        if ((m9312_sockets[socket_number].base_address & VAMASK) == base_address) {
+
+            rom_name = socket_config[socket_number].rom_name;
+
+            /* Find the ROM in this socket */
+            if (((romptr = find_rom(rom_name, (ROM_DEF(*)[]) & boot_roms)) == NULL) &&
+                ((romptr = find_rom(rom_name, (ROM_DEF(*)[]) & diag_roms)) == NULL))
+                return sim_messagef(SCPE_IERR, "ROM %s in socket %d not found\n", 
+                    rom_name, socket_number);
+
+            /* 
+             * Check if the offset corresponds with one of the entry points
+             * of for the ROM.
+             */
+            if (offset == romptr->boot_no_diags)
+                fprintf (f, " (%s-DIAG)", rom_name);
+            else if (offset == romptr->boot_with_diags)
+                fprintf(f, " (%s+DIAG)", rom_name);
+            break;
+        }
+    }
+
+    /* Search socket */
     return SCPE_OK;
 }
 
@@ -1442,6 +1509,7 @@ static t_stat m9312_auto_config ()
 }
 
 /* Auto configure the console/diagnostic ROM for the M9312 module */
+
 static t_stat m9312_auto_config_console_roms ()
 {
     rom_for_cpu_model *mptr;
