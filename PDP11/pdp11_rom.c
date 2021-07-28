@@ -120,8 +120,7 @@ MODULE_DEF blank =
     "BLANK",                                /* Module name */
     CPUT_ALL,                               /* Required CPU types */
     QBUS_MODEL | UNIBUS_MODEL,              /* Required CPU options */
-    BLANK_NUM_SOCKETS,                      /* Number of sockets (units) */
-    ROM_UNIT_FLAGS,                         /* UNIT flags */
+    BLANK_NUM_SOCKETS,                      /* Number of sockets */
     (SOCKET_DEF(*)[]) &blank_sockets,       /* Pointer to SOCKET_DEF structs */
     NULL,                                   /* Auto configuration function */
     blank_attach,                           /* Attach function */
@@ -139,8 +138,7 @@ MODULE_DEF m9312 =
     "M9312",                                /* Module name */
     CPUT_ALL,                               /* Required CPU types */
     UNIBUS_MODEL,                           /* Required CPU options */
-    M9312_NUM_SOCKETS,                      /* Number of sockets (units) */
-    ROM_UNIT_FLAGS,                         /* UNIT flags */
+    M9312_NUM_SOCKETS,                      /* Number of sockets */
     (SOCKET_DEF (*)[]) & m9312_sockets,     /* Pointer to SOCKET_DEF structs */
     &m9312_auto_config,                     /* Auto configuration function */
     embedded_attach,                        /* Attach function */
@@ -158,8 +156,7 @@ MODULE_DEF vt40 =
     "VT40",                                 /* Module name */
     CPUT_05,                                /* Required CPU types */
     UNIBUS_MODEL,                           /* Required CPU options */
-    VT40_NUM_SOCKETS,                       /* Number of sockets (units) */
-    ROM_UNIT_FLAGS,                         /* UNIT flags */
+    VT40_NUM_SOCKETS,                       /* Number of sockets */
     (SOCKET_DEF (*)[]) & vt40_sockets,      /* Pointer to SOCKET_DEF structs */
     NULL,                                   /* Auto configuration function */
     embedded_attach,                        /* Attach function */

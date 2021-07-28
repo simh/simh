@@ -84,7 +84,6 @@ typedef struct
     const uint32 valid_cpu_types;                                   /* Valid CPU types */
     const uint32 valid_cpu_opts;                                    /* Required CPU options */
     const uint32 num_sockets;                                       /* Number of sockets for the module type */
-    uint32 flags;                                                   /* Flags for initialization of the UNIT flag field */
     SOCKET_DEF (*sockets)[];                                        /* Sockets for this module */
     t_stat (*auto_config)();                                        /* Auto-configuration function for the module type */
     t_stat (*attach)(const char *);                                 /* Attach function for the module type */
