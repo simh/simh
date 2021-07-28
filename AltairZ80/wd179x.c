@@ -107,6 +107,7 @@ typedef struct {
     uint8 fdc_head;     /* H Head Number */
     uint8 sel_drive;    /* Currently selected drive */
     uint8 drivetype;    /* 8 or 5 depending on disk type. */
+    /* Note: the fields above must be kept in sync with WD179X_INFO_PUB */
     uint8 fdc_status;   /* WD179X Status Register */
     uint8 verify;       /* WD179X Type 1 command Verify flag */
     uint8 fdc_data;     /* WD179X Data Register */
