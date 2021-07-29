@@ -2773,6 +2773,19 @@ sim_on_inherit = sim_switches & SWMASK ('O');           /* -o means inherit on s
 sim_init_sock ();                                       /* init socket capabilities */
 AIO_INIT;                                               /* init Asynch I/O */
 sim_finit ();                                           /* init fio package */
+for (i = 0; cmd_table[i].name; i++) {
+    size_t alias_len = strlen (cmd_table[i].name);
+    char *cmd_name = (char *)calloc (1 + alias_len, sizeof (*cmd_name));
+
+    strcpy (cmd_name, cmd_table[i].name);
+    while (alias_len > 1) {
+        cmd_name[alias_len] = '\0';                 /* Possible short form command name */
+        --alias_len;
+        if (getenv (cmd_name))                      /* Externally defined command alias? */
+            unsetenv (cmd_name);                    /* Remove it to protect against possibly malicious aliases */
+        }
+    free (cmd_name);
+    }
 setenv ("SIM_NAME", sim_name, 1);                       /* Publish simulator name */
 stop_cpu = FALSE;
 sim_interval = 0;
