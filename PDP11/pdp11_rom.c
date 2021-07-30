@@ -218,8 +218,8 @@ SOCKET_CONFIG socket_config[ROM_MAX_SOCKETS];
 /* Define variables to be saved and restored via registers */
 
 REG rom_reg[] = {
-    { ORDATAD (TYPE,          selected_type,     16,   "Type"), REG_RO  },
-    { ORDATAD (START_ADDRESS, rom_start_address, 16,   "Start address"), REG_RO  },
+    { ORDATAD (TYPE,          selected_type,     16,   "Type"), REG_HIDDEN  },
+    { ORDATAD (START_ADDRESS, rom_start_address, 16,   "Start address"), REG_HIDDEN },
     { NULL }
 };
 
