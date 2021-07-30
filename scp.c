@@ -660,6 +660,11 @@ static t_bool sim_if_result[MAX_DO_NEST_LVL+1];
 static t_bool sim_if_result_last[MAX_DO_NEST_LVL+1];
 static t_bool sim_cptr_is_action[MAX_DO_NEST_LVL+1];
 static DEVICE *sim_failed_reset_dptr = NULL;
+static struct deleted_env_var {
+    char *name;
+    char *value;
+    } *sim_external_env = NULL;
+static int sim_external_env_count = 0;
 
 t_stat sim_last_cmd_stat;                               /* Command Status */
 struct timespec cmd_time;                               /*  */
@@ -2781,8 +2786,15 @@ for (i = 0; cmd_table[i].name; i++) {
     while (alias_len > 1) {
         cmd_name[alias_len] = '\0';                 /* Possible short form command name */
         --alias_len;
-        if (getenv (cmd_name))                      /* Externally defined command alias? */
+        if (getenv (cmd_name)) {                    /* Externally defined command alias? */
+            ++sim_external_env_count;
+            sim_external_env = (struct deleted_env_var *)realloc (sim_external_env, sim_external_env_count * sizeof (*sim_external_env));
+            sim_external_env[sim_external_env_count - 1].name = (char *)malloc (1 + strlen (cmd_name));
+            strcpy (sim_external_env[sim_external_env_count - 1].name, cmd_name);
+            sim_external_env[sim_external_env_count - 1].value = (char *)malloc (1 + strlen (getenv (cmd_name)));
+            strcpy (sim_external_env[sim_external_env_count - 1].value, getenv (cmd_name));
             unsetenv (cmd_name);                    /* Remove it to protect against possibly malicious aliases */
+            }
         }
     free (cmd_name);
     }
@@ -4275,6 +4287,7 @@ free (tstr);
 static const char *
 _sim_get_env_special (const char *gbuf, char *rbuf, size_t rbuf_size)
 {
+int i;
 const char *ap;
 const char *fixup_needed = strchr (gbuf, ':');
 char *tgbuf = NULL;
@@ -4284,6 +4297,10 @@ if (fixup_needed) {
     tgbuf = (char *)calloc (tgbuf_size, 1);
     memcpy (tgbuf, gbuf, (fixup_needed - gbuf));
     gbuf = tgbuf;
+    }
+for (i = 0; i < sim_external_env_count; i++) {
+    if (0 == strcmp (gbuf, sim_external_env[i].name))
+        return sim_external_env[i].value;
     }
 ap = _sim_gen_env_uplowcase (gbuf, rbuf, rbuf_size);/* Look for environment variable */
 if (!ap) {                              /* no environment variable found? */
