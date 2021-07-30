@@ -467,14 +467,11 @@ static t_bool dev_disabled (DEVICE *dptr)
 
 static t_stat rom_set_configmode (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
 {
-    /* Is a configuration type specified? */
-    if (cptr == NULL)
-        return sim_messagef (SCPE_ARG, "Specify AUTO or MANUAL configuration\n");
-
-    if (strcasecmp (cptr, "MANUAL") == 0)
+    if (MATCH_CMD (cptr, "MANUAL") == 0)
         rom_device_flags &= ~ROM_CONFIG_AUTO;
     else
-        if (strcasecmp (cptr, "AUTO") == 0) {
+        if (MATCH_CMD (cptr, "AUTO") == 0) {
+
             /* Check if auto config is available for the selected module */
             if (module_list[selected_type]->auto_config != NULL) {
 
@@ -487,7 +484,7 @@ static t_stat rom_set_configmode (UNIT *uptr, int32 val, CONST char *cptr, void 
                 return sim_messagef (SCPE_ARG, "Auto configuration is not available for the %s module\n",
                 module_list[selected_type]->name);
         } else
-            return sim_messagef (SCPE_ARG, "Unknown configuration mode, specify AUTO or MANUAL\n");
+            return sim_messagef (SCPE_ARG, "Specify AUTO or MANUAL configuration mode\n\n");
 
         return SCPE_OK;
 }
@@ -734,13 +731,9 @@ t_stat m9312_show_start_address (FILE *f)
 
 t_stat rom_set_write_enable (UNIT* uptr, int32 value, CONST char* cptr, void* desc)
 {
-    /* Is a parameter specified? */
-    if (cptr == NULL)
-        return sim_messagef(SCPE_ARG, "Specify WRITE=ENABLED or WRITE=DISABLED\n");
-
-    if (strcasecmp(cptr, "ENABLED") == 0)
+    if (MATCH_CMD (cptr, "ENABLED") == 0)
         uptr->flags &= ~UNIT_RO;
-    else if (strcasecmp(cptr, "DISABLED") == 0)
+    else if (MATCH_CMD (cptr, "DISABLED") == 0)
         uptr->flags |= UNIT_RO;
     else
         return sim_messagef(SCPE_ARG, "Specify WRITE=ENABLED or WRITE=DISABLED\n");
