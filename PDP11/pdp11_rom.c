@@ -27,8 +27,8 @@
 #include "pdp11_vt40boot.h"
 
 /* Forward references */
-t_stat rom_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat rom_rd (int32 *data, int32 PA, int32 access);
+t_stat rom_wr (int32 data, int32 PA, int32 access);
 t_stat rom_reset (DEVICE *dptr);
 t_stat rom_boot (int32 u, DEVICE *dptr);
 t_stat rom_set_type (UNIT *, int32, CONST char *, void *);
@@ -37,6 +37,7 @@ static t_stat rom_set_configmode(UNIT*, int32, CONST char*, void*);
 t_stat rom_show_configmode (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_set_start_address (UNIT *, int32, CONST char *, void *);
 t_stat rom_show_start_address (FILE *, UNIT *, int32, CONST void *);
+t_stat rom_set_write_enable (UNIT*, int32, CONST char*, void*);
 t_stat rom_show_sockets (FILE *, UNIT *, int32, CONST void *);
 t_stat rom_attach (UNIT *, CONST char *);
 t_stat rom_detach (UNIT *);
@@ -53,6 +54,7 @@ t_bool digits_only (const char*);
 static t_bool address_available (int32);
 static void set_socket_addresses ();
 static int module_type_is_valid (uint16);
+uint16 *get_rom_loc_ptr (int32);
 static t_stat blank_attach (CONST char *);
 static t_stat embedded_attach (CONST char *);
 static t_stat parse_attach_cmd_seq (CONST char *, t_bool, ATTACH_CMD *, uint32 *);
@@ -224,6 +226,11 @@ REG rom_reg[] = {
 /*
  * Define the ROM device modifiers.
  * 
+ * The WRITE_ENABLE modifier is settable only modifier. To prevent the value
+ * of this parameter is shown twice in the SHOW ROM output, there is no
+ * SHOW ROM WRITE_ENABLE command and it's value is shown by the units
+ * read-only flag.
+ * 
  * The SOCKETS modifier is a view-only modifer and prints the relevant
  * information for all sockets in a pretty format.
  */
@@ -234,12 +241,20 @@ MTAB rom_mod[] = {
         &rom_set_configmode, &rom_show_configmode, NULL, "Auto configuration (AUTO or MANUAL)" },
     { MTAB_XTD | MTAB_VDV | MTAB_VALR, 0, "START_ADDRESS", "START_ADDRESS",
         &rom_set_start_address, &rom_show_start_address, NULL, "ROM bootstrap start address" },
+    { MTAB_XTD | MTAB_VDV | MTAB_VALR, 0, NULL, "WRITE_ENABLE",
+        &rom_set_write_enable, NULL, NULL, "Write-enable ROM" },
     { MTAB_VDV | MTAB_NMO, 0, "SOCKETS", NULL,
         NULL, &rom_show_sockets, NULL, "Socket addresses and ROM images" },
     { 0 }
 };
 
-/* Device definition */
+/* 
+ * ROM device definition
+ * 
+ * The device provide no examine address functionality as the device
+ * has just one unit while it has more than one socket with different
+ * address spaces. The ROM contents are accessed via the CPU device.
+ */
 DEVICE rom_dev =
 {
     "ROM",                               /* Device name */
@@ -247,12 +262,12 @@ DEVICE rom_dev =
     rom_reg,                             /* Pointer to ROM registers */
     rom_mod,                             /* Pointer to modifier table */
     1,                                   /* Number of units */
-    8,                                   /* Address radix */
-    9,                                   /* Address width */
-    2,                                   /* Address increment */
+    0,                                   /* Address radix */
+    0,                                   /* Address width */
+    0,                                   /* Address increment */
     8,                                   /* Data radix */
     16,                                  /* Data width */
-    rom_ex,                              /* Examine routine */
+    NULL,                                /* Examine routine not available */
     NULL,                                /* Deposit routine not available */
     rom_reset,                           /* Reset routine */
     &rom_boot,                           /* Boot routine */
@@ -446,6 +461,7 @@ static t_bool dev_disabled (DEVICE *dptr)
 {
     return (dptr->flags & DEV_DIS ? TRUE : FALSE);
 }
+
 
 /* Set configuration mode MANUAL or AUTO */
 
@@ -713,6 +729,26 @@ t_stat m9312_show_start_address (FILE *f)
     return SCPE_OK;
 }
 
+
+/* Set ROM write enabled */
+
+t_stat rom_set_write_enable (UNIT* uptr, int32 value, CONST char* cptr, void* desc)
+{
+    /* Is a parameter specified? */
+    if (cptr == NULL)
+        return sim_messagef(SCPE_ARG, "Specify WRITE=ENABLED or WRITE=DISABLED\n");
+
+    if (strcasecmp(cptr, "ENABLED") == 0)
+        uptr->flags &= ~UNIT_RO;
+    else if (strcasecmp(cptr, "DISABLED") == 0)
+        uptr->flags |= UNIT_RO;
+    else
+        return sim_messagef(SCPE_ARG, "Specify WRITE=ENABLED or WRITE=DISABLED\n");
+
+    return SCPE_OK;
+}
+
+
 /* Check that a string contains digits only */
 
 t_bool digits_only (const char* cptr)
@@ -753,20 +789,6 @@ static t_bool address_available (int32 address)
 }
 
 
-/* Examine routine */
-
-t_stat rom_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
-{
-    int32 data;
-    t_stat r;
-
-    if ((r = rom_rd (&data, addr, 0)) != SCPE_OK)
-        return r;
-    *vptr = (t_value) data;
-    return SCPE_OK;
-}
-
-
 /*
  * ROM read routine. This routine forwards the read request
  * to the ROM-specific read function.
@@ -780,27 +802,16 @@ t_stat rom_rd (int32* data, int32 PA, int32 access)
  
 t_stat blank_rom_rd (int32 *data, int32 PA, int32 access)
 {
-    uint32 socket_number;
-    uint32 num_sockets = module_list[selected_type]->num_sockets;
+    uint16* rom_location;
 
-    /* For all sockets in socket_info */
-    for (socket_number = 0; socket_number < num_sockets; socket_number++) {
+    /* Get pointer to ROM image and check an image is available */
+    rom_location = get_rom_loc_ptr (PA);
+    if (rom_location == NULL)
+        return SCPE_NXM;
 
-        /* Check if the address is in the range of this socket */
-        if (PA >= socket_config[socket_number].base_address &&
-            PA <= socket_config[socket_number].base_address + 
-                socket_config[socket_number].rom_size - 1 &&
-            (socket_config[socket_number].rom_image != NULL)) {
-
-            /* Get pointer to ROM image and data from that image*/
-            uint16* image = (uint16*) socket_config[socket_number].rom_image;
-            *data = image[(PA - socket_config[socket_number].base_address) >> 1];
-        
-            return SCPE_OK;
-        }
-    }
-
-    return SCPE_NXM;
+    /* Read data from the ROM */
+    *data = *rom_location;
+    return SCPE_OK;
 }
 
 
@@ -822,6 +833,57 @@ t_stat m9312_rd (int32* data, int32 PA, int32 access)
         return blank_rom_rd (data, PA, access);
 }
 
+
+/*
+ * ROM write routine
+ */
+t_stat rom_wr (int32 data, int32 PA, int32 access)
+{
+    uint16* rom_location;
+
+    /* Check the ROM's are writable */
+    if (rom_unit.flags & UNIT_RO)
+        return SCPE_NXM;
+
+    /* Get pointer to ROM image and check an image is available */
+    rom_location = get_rom_loc_ptr (PA);
+    if (rom_location == NULL)
+        return SCPE_NXM;
+
+    /* Write data to the ROM */
+    *rom_location = data;
+    return SCPE_OK;
+}
+
+
+/* Get a pointer to the location in the ROM image for the physical address */
+
+uint16 *get_rom_loc_ptr (int32 phys_addr)
+{
+    uint32 socket_number;
+    uint32 num_sockets = module_list[selected_type]->num_sockets;
+    uint16* image;
+
+    /* For all sockets in socket_info */
+    for (socket_number = 0; socket_number < num_sockets; socket_number++) {
+
+        /* Check if the address is in the range of this socket */
+        if (phys_addr >= socket_config[socket_number].base_address &&
+            phys_addr <= socket_config[socket_number].base_address +
+            socket_config[socket_number].rom_size - 1 &&
+            (socket_config[socket_number].rom_image != NULL)) {
+
+            /* Get pointer to ROM image and return address in that image*/
+            image = (uint16*)socket_config[socket_number].rom_image;
+            // image[(PA - socket_config[socket_number].base_address)] = data;
+            return (uint16*) socket_config[socket_number].rom_image + 
+                ((phys_addr - socket_config[socket_number].base_address) >> 1);
+        }
+    }
+
+    /* Image not found */
+    return NULL;
+}
 
 /*
  * Reset the ROM device.
@@ -1324,7 +1386,7 @@ static t_stat attach_rom_to_socket (char* name, t_addr address,
         socket_config[socket_number].rom_size);
 
     /* Fill the DIB for the socket */
-    if (reset_dib (socket_number, &rom_rd, NULL) != SCPE_OK) {
+    if (reset_dib (socket_number, &rom_rd, &rom_wr) != SCPE_OK) {
 
         // Remove ROM image
         free (socket_config[socket_number].rom_image);
@@ -2024,7 +2086,7 @@ static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
         "+socket 4: address=17773600-17773777, image=DX\n"
         "2 SET_commands\n"
         "+SET ROM TYPE\t\tSelect the module tye\n"
-        "+SET ROM WRITE_ENABLE\tWrite enable the ROMs\n\n"
+        "+SET ROM WRITE\tWrite enable the ROMs\n\n"
         "3 TYPE\n"
         " The module type can be selected by means of the SET ROM TYPE command:\n\n"
         "+SET ROM TYPE=BLANK|M9312|VT40\n\n"
@@ -2033,13 +2095,13 @@ static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
         " only available for the GT40 graphics terminal which contains an 11/05 CPU.\n"
         " If the CPU is set to a type not supported by the set ROM module type, the\n"
         " module type is reset to the BLANK module.\n\n"
-        "3 WRITE_ENABLE\n"
+        "3 WRITE\n"
         " As their name suggest, ROM's in principle are read-only. The simulator\n"
         " however provides a way to write-enable the ROMs. The SET ROM WRITE_ENABLE\n"
         " command can be used to enable changing the contents of a ROM:\n\n"
-        "+SET ROM WRITE_ENABLE=ON|OFF\n\n"
-        " The default value is OFF. After write-enabling the ROMs, the contents can be\n"
-        " changed by means of DEPOSIT commands.\n";
+        "+SET ROM WRITE=ENABLED|DISABLED\n\n"
+        " The default value is DISABLED. After write-enabling the ROMs, the contents\n"
+        " can be changed by means of DEPOSIT commands.\n";
 
     return scp_help (st, dptr, uptr, flag, rom_helptext, cptr);
 }
