@@ -344,7 +344,7 @@ t_stat rom_set_type (UNIT *uptr, int32 val, CONST char *cptr, void *desc)
             
             /* Check if the module is allowed on this cpu and bus type */
             if (!module_type_is_valid (module_number))
-                return sim_messagef (SCPE_ARG, "Module is not valid for current cpu and/or bus type\n");
+                return sim_messagef (SCPE_ARG, "Module is not compatible with current cpu and/or bus type\n");
 
             /* Save current cpu type for reference in rom_reset() */
             cpu_type_on_selection = cpu_type;
@@ -1638,34 +1638,56 @@ static t_stat m9312_attach (const char *rom_name, int socket_number)
 
 static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr)
 {
+#define ROM_HLP_WRITE_ENABLE \
+        " As their name suggest, ROM's in principle are read-only. The simulator\n" \
+        " however provides a way to write-enable the ROMs. The SET ROM WRITE_ENABLE\n" \
+        " command can be used to enable changing the contents of a ROM:\n\n" \
+        "+SET ROM WRITE=ENABLED|DISABLED\n\n" \
+        " The default value is DISABLED. After write-enabling the ROMs, the contents\n" \
+        " can be changed by means of DEPOSIT commands.\n"
+
+#define ROM_HLP_SET_TYPE \
+        " The module type can be selected by means of the SET ROM TYPE command:\n\n" \
+        "+SET ROM TYPE=BLANK|M9312|VT40\n\n" \
+        " The default type is BLANK. This module type is supported for all CPU and bus\n" \
+        " types. The M9312 module is only available for the UNIBUS models; the VT40 is\n" \
+        " only available for the GT40 graphics terminal which contains an 11/05 CPU.\n" \
+        " If the CPU is set to a type not supported by the set ROM module type, the\n" \
+        " module type is reset to the BLANK module.\n\n"
+
+#define ROM_HLP_SET_START_ADDRESS \
+        " The system can be booted by starting it at one of the suitable boot\n" \
+        " addresses in one of the ROMs. The boot address can be set by means of the\n" \
+        " SET START_ADDRESS command:\n\n" \
+        "+SET ROM START_ADDRESS=<address>\n\n" \
+        " The address must be a 16-bit physical address in an attached ROM. The\n" \
+        " address to be used is determined by a combination of the socket base address\n" \
+        " and offset in the ROM. See 'HELP ROM M9312 Configuration' for an\n" \
+        " explanation.\n\n" \
+        " After setting the start address the system can be started via a BOOT command:\n\n" \
+        "+BOOT {ROM|CPU}\n" \
+
     const char rom_helptext[] =
         /***************** 80 character line width template *************************/
         " A hardware PDP-11 comprises a module with Read Only Memory (ROM) code,\n"
         " containing console emulator, diagnostic and bootstrap functionality.\n"
         " Each module has one or more ROMs available, the contents of which can be\n"
         " accessed by a reserved address space in the I/O page.\n\n"
-        " Currently the following module types are supported:\n\n"
+        " Currently the ROM device supports the following module types:\n\n"
         "+1. BLANK\tProvides the contents of a file as a ROM\n"
         "+2. M9312\tEmulator, diagnostics and boot functionality for Unibus models\n"
-        "+3. VT40\tThis is the VT40 ROM for a GT40 graphical terminal\n\n"
-        " The module type can be selected by means of the SET ROM TYPE command:\n\n"
-        "+SET ROM TYPE=BLANK|M9312|VT40\n\n"
- //       " All ROM modules comprise one or more sockets. In each socket one ROM can be\n"
- //      " placed and each socket is associated with a base address at which the\n"
- //       " the contents of the ROMs can be read. The contents of the M9312 and VT40\n"
- //       " modules are embedded in simh, the BLANK module ROM contents have to be\n"
- //       " provided in a file per ROM.\n\n"
-        " All module types support the ATTACH and SHOW command and a number of SET\n"
-        " commands. The commands common to all module types are described in the topic\n"
-        " 'Common_commands'. The module-specific commands are described in the\n"
-        " topic 'Commands' per module type.\n"
+        "+3. VT40\t\tThe VT40 ROM for a GT40 graphical terminal\n"
         /***************** 80 character line width template *************************/
-        "1 Blank\n"
+        "1 Blank_Configuration\n"
         " The BLANK ROM module is a module with four sockets in each of which one ROM\n"
-        " can be placed, the contents of which are coming from a file.\n"
-        "2 Configuration\n"
-        " The BLANK module can be configured by means of the ATTACH command. For a\n"
-        " succesful ATTACH the following parameters have to be specified:\n\n"
+        " can be placed. The contents of the ROMs has to be provided in files.\n\n"
+        " First the BLANK module type must be selected:\n\n"
+        "+SET ROM TYPE=BLANK\n\n"
+        " Next, the BLANK module can be configured by the ATTACH and various SET\n"
+        " commands.\n"
+        "2 Attach_Command\n"
+        " ROMs can be placed in the module's sockets by means of the ATTACH command.\n"
+        " For a succesful ATTACH the following parameters have to be specified:\n\n"
         "+1. The socket number to attach a ROM to,\n"
         "+2. The address in the I/O space in which the ROM contents will be available,\n"
         "+3. The file with the ROM contents in RAW format.\n\n"
@@ -1688,31 +1710,19 @@ static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
         " These commands can also be combined in one ATTACH command:\n\n"
         "+ATTACH ROM 0:17765000/23-616F1.IMG, 17773000/23-751A9.IMG\n\n"
         " The effect of the last command is equal to the two separate attach commands.\n"
-        "2 Boot\n"
-        " There are two ways to boot from an attached ROM:\n\n"
-        "+1. By starting the simulator at an address in the ROM address space,\n"
-        "+2. By setting the starting address and subsequently issue a BOOT command.\n\n"
-        " The simulator can be started at an address in the ROM address space via a GO\n"
-        " or RUN command:\n\n"
-        "+GO <address>\n"
-        "+RUN <address>\n\n"
-        " For more information see the help for these commands.\n\n"
-        " The simulator can also be started by first setting the start address in the\n"
-        " ROM code and subsequently issue a BOOT command. The start address is set by\n"
-        " the following command:\n\n"
-        "+SET ROM START_ADDRESS=<address>\n\n"
-        " The address must be a 16-bit physical address in an attached ROM. The system\n"
-        " can then be started via a BOOT command:\n\n"
-        "+BOOT {ROM|CPU}\n"
-        "2 Examples\n"
-        " The following commands attach two ROMs to the sockets and use these ROMs to\n"
-        " boot the system:\n\n"
-        "+SET CPU 11/70\n"
-        "+ATTACH ROM 0:17765000/23-616F1.IMG, 17773000/23-751A9.IMG\n"
-        "+SET ROM START_ADDRESS=173006\n"
-        "+BOOT ROM\n"
+        "2 Set_Commands\n"
+        " The BLANK module type supports the following SET commands:\n\n"
+        "+SET ROM TYPE\t\t- Change the module type\n"
+        "+SET ROM START_ADDRESS\t- Set the start address for the ROMs\n"
+        "+SET ROM WRITE\t\t- Write enable the ROMs\n"
+        "3 Type\n"
+        ROM_HLP_SET_TYPE
+        "3 Start_Address\n"
+        ROM_HLP_SET_START_ADDRESS
+        "3 Write\n"
+        ROM_HLP_WRITE_ENABLE
         /***************** 80 character line width template *************************/
-        "1 M9312\n"
+        "1 M9312_Configuration\n"
         " The M9312 module contains 512 words of read only memory (ROM) that can be\n"
         " used for diagnostic routines, the console emulator routine, and bootstrap\n"
         " programs. The module contains five sockets that allow the user to insert\n"
@@ -1720,7 +1730,7 @@ static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
         " any peripheral device by simply adding or changing ROMs.\n\n"
         " The M9312 is configured by placing ROMs in the module's sockets with ATTACH\n"
         " commands and with various SET commands.\n"
-        "2 Configuration\n"
+        "2 Addressing\n"
         " The M9312 module has 512 words of read only memory. The lower 256 words\n"
         " (addresses 165000 through 165776) are used for the storage of ASCII console\n"
         " and diagnostic routines. The diagnostics are rudimentary CPU and memory\n"
@@ -1754,7 +1764,7 @@ static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
         " same boot ROM placed in socket 2 that unit can be booted by starting at\n"
         " address 1732004. Note that the start address specifies whether or not the\n"
         " diagnostics code is executed.\n\n"
-        "2 ATTACH_command\n"
+        "2 Attach_Command\n"
         " The M9312 module can be configured by means of the ATTACH command. For a\n"
         " succesful ATTACH the following parameters have to be specified:\n\n"
         "+1. The socket number to attach a ROM to,\n"
@@ -1775,12 +1785,16 @@ static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
         " These commands can also be combined in one ATTACH command:\n\n"
         "+ATTACH ROM B0,DL\n\n"
         " The effect of this command is equal to the two separate attach commands.\n"
-        "2 SET_commands\n"
+        "2 Set_Commands\n"
         " This module supports, apart from the common commands, the following type-\n"
         " specific commands:\n\n"
-        "+SET ROM CONFIGURATION\n"
-        "+SET ROM START_ADDRESS\n"
-        "3 CONFIGURATION\n"
+        "+SET ROM TYPE\t\t- Change the module type\n"
+        "+SET ROM CONFIGURATION\t- Auto-configure the ROM lineup\n"
+        "+SET ROM START_ADDRESS\t- Set the start address for the ROMs\n"
+        "+SET ROM WRITE\t\t- Write enable the ROMs\n"
+        "3 Type"
+        ROM_HLP_SET_TYPE
+        "3 Configuration\n"
         " The M9312 implementation support an auto-configuration option which can be\n"
         " enabled with the CONFIGURATION parameter:\n\n"
         "+SET CONFIGURATION=AUTO|MANUAL\n\n"
@@ -1793,7 +1807,7 @@ static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
         " the device scan.\n\n"
         " The auto-configured lineup of ROMs can be overriden by ATTACH commands for\n"
         " the sockets. In that case the configuration mode is reset to MANUAL.\n"
-        "3 START_ADDRESS\n"
+        "3 Start_Address\n"
         " The system can be booted by starting it at one of the suitable boot\n"
         " addresses in one of the ROMs. The boot address can be set by means of the\n"
         " SET START_ADDRESS command:\n\n"
@@ -1811,6 +1825,8 @@ static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
         " refer to these start addresses.\n\n"
         " After setting the start address the system can be started via a BOOT command:\n\n"
         "+BOOT {ROM|CPU}\n"
+        "3 Write\n"
+        ROM_HLP_WRITE_ENABLE
         "2 Available_ROMs\n"
         " The following ROMs are available.\n\n"
         "+ROM code       Function\n"
@@ -2050,17 +2066,32 @@ static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
         "+012 - Boot with unit in R0, standard CSR (Not used)\n"
         "+016 - Boot with unit in R0, CSR in R11\n\n"
         /***************** 80 character line width template *************************/
-        "1 VT40\n"
+        "1 VT40_Configuration\n"
         " The VT40 module is meant for the GT-40 graphic terminal, based on a\n"
         " PDP-11/05. The VT40 included a bootstrap ROM. The module has just one socket\n"
-        " with one available ROM and a 'SET ROM TYPE=VT40' command suffices to\n"
-        " select this boot ROM.\n"
-        "1 Common_commands\n"
-        " A number of commands is common to all modules types. This holds for the\n"
-        " SHOW and some SET commands.\n"
-        "2 SHOW_commands\n"
+        " with one available ROM (VT40). The module can be configured by means of the\n"
+        " ATTACH and various SET commands, but a 'SET ROM TYPE=VT40' command suffices\n"
+        " to configure this module.\n"
+        "2 Attach_Command\n"
+        " The VT40 ROM can be attached to the one socket in this module by means of the\n"
+        " following command:\n\n"
+        "+ATTACH ROM VT40\n"
+        "2 Set_Commands\n"
+        " The VT40 module type supports the following SET commands:\n\n"
+        "+SET ROM TYPE\t\t- Change the module type\n"
+        "+SET ROM START_ADDRESS\t- Set the start address for the ROMs\n"
+        "+SET ROM WRITE\t\t- Write enable the ROMs\n"
+        "3 Type\n"
+        ROM_HLP_SET_TYPE
+        "3 Start_Address\n"
+        ROM_HLP_SET_START_ADDRESS
+        "3 Write\n"
+        ROM_HLP_WRITE_ENABLE
+        "1 Monitoring\n"
         " The ROM configuration can be shown by means of the SHOW command:\n\n"
-        "+SHOW ROM\n\n"
+        "+SHOW ROM\t - Show ROM configuration and settings\n"
+        "+SHOW ROM SOCKETS - Show ROM addresses and occupation\n\n"
+        "2 ROM\n"
         " This command shows the current settings of the module and - between angled\n"
         " brackets - the ROMs attached to the sockets of the module:\n\n"
         "+ROM     module type M9312, configuration mode AUTO, start address not specified\n"
@@ -2068,8 +2099,9 @@ static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
         " Note that the string between angled brackets matches the parameters used in an\n"
         " ATTACH command. Using this string in an ATTACH command will result in the\n"
         " ROM configuration as shown in the SHOW ROM command.\n\n"
-        " A table-like view of the ROM configuration can be shown by adding the\n"
-        " SOCKETs parameter:\n\n"
+        "2 Sockets\n"
+        " A table-like view of the ROM configuration can be shown by the adding the\n"
+        " SOCKETS parameter to the SHOW ROM command:\n\n"
         "+SHOW ROM SOCKETS\n\n"
         " This commands shows a table in following format:\n\n"
         "+socket 0: address=17765000-17765777, image=B0\n"
@@ -2077,24 +2109,60 @@ static t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const ch
         "+socket 2: address=17773200-17773377, image=DL\n"
         "+socket 3: address=17773400-17773577, image=DM\n"
         "+socket 4: address=17773600-17773777, image=DX\n"
-        "2 SET_commands\n"
-        "+SET ROM TYPE\t\tSelect the module tye\n"
-        "+SET ROM WRITE\tWrite enable the ROMs\n\n"
-        "3 TYPE\n"
-        " The module type can be selected by means of the SET ROM TYPE command:\n\n"
-        "+SET ROM TYPE=BLANK|M9312|VT40\n\n"
-        " The default type is BLANK. This module type is supported for all CPU and bus\n"
-        " types. The M9312 module is only available for the UNIBUS models; the VT40 is\n"
-        " only available for the GT40 graphics terminal which contains an 11/05 CPU.\n"
-        " If the CPU is set to a type not supported by the set ROM module type, the\n"
-        " module type is reset to the BLANK module.\n\n"
-        "3 WRITE\n"
-        " As their name suggest, ROM's in principle are read-only. The simulator\n"
-        " however provides a way to write-enable the ROMs. The SET ROM WRITE_ENABLE\n"
-        " command can be used to enable changing the contents of a ROM:\n\n"
-        "+SET ROM WRITE=ENABLED|DISABLED\n\n"
-        " The default value is DISABLED. After write-enabling the ROMs, the contents\n"
-        " can be changed by means of DEPOSIT commands.\n";
+        "1 Booting_the_System\n"
+        " There are two ways to boot from an attached ROM:\n\n"
+        "+1. By starting the simulator at an address in the ROM address space,\n"
+        "+2. By setting the starting address and subsequently issue a BOOT command.\n\n"
+        " The simulator can be started at an address in the ROM address space via a GO\n"
+        " or RUN command:\n\n"
+        "+GO <address>\n"
+        "+RUN <address>\n\n"
+        " For more information see the help for these commands.\n\n"
+        " The simulator can also be started by first setting the start address in the\n"
+        " ROM code and subsequently issue a BOOT command. The start address is set by\n"
+        " the following command:\n\n"
+        "+SET ROM START_ADDRESS=<address>\n\n"
+        " The address must be a 16-bit physical address in an attached ROM. The M9312\n"
+        " supports a symbolic specification of the start address. Consult the\n"
+        " 'HELP ROM M9312 SET START_ADDRESS' help text for more information.\n\n"
+        " After setting the start address the system can be started via a BOOT\n"
+        " command:\n\n"
+        "+BOOT {ROM|CPU}\n"
+        "1 Examples\n"
+        "2 Blank_Example\n"
+        " The BLANK module type has four sockets in which ROMs can be placed, the\n"
+        " contents of which have to be provided in files.\n\n"
+        " The following commands attach two ROMs to the sockets and use these ROMs to\n"
+        " boot the system:\n\n"
+        "+SET CPU 11/70\n"
+        "+ATTACH ROM 0:17765000/23-616F1.IMG, 17773000/23-751A9.IMG\n"
+        "+SET ROM START_ADDRESS=173006\n"
+        "+BOOT ROM\n"
+        "2 M9312_Example\n"
+        " The M9312 supports an auto-configuration option for placing appropriate ROMs\n"
+        " in its sockets:\n\n"
+        "+SET CPU 11/70\n"
+        "+SET ROM TYPE=M9312\n"
+        "+SET ROM CONFIG=AUTO\n"
+        "+SHOW ROM\n"
+        "+ROM     module type M9312, configuration mode AUTO, start address not specified\n"
+        "+-       attached to <0:B0, 1:DK, 2:DL, 3:DM, 4:DX>, read only\n\n"
+        " The auto configuration takes into account the current CPU type and the enabled\n"
+        " devices as can be demonstrated by the following commands:\n\n"
+        "+SET RK DISABLED\n"
+        "+SET ROM CONFIG=AUTO\n"
+        "+SHOW ROM\n"
+        "+ROM     module type M9312, configuration mode AUTO, start address not specified\n"
+        "+-       attached to <0:B0, 1:DL, 2:DM, 3:DX, 4:DB>, read only\n"
+        "2 VT40_Example\n"
+        " Configuring the VT40 module type for use is quite simple as it has just one\n"
+        " socket and one availabe ROM. Setting the type suffices to be able to use the\n"
+        " module:\n\n"
+        "+SET CPU 11/05\n"
+        "+SET ROM TYPE=VT40\n"
+        "+SHOW ROM\n"
+        "+ROM     module type VT40, configuration mode MANUAL, start address not specified\n"
+        "+-       attached to <0:VT40>, read only\n";
 
     return scp_help (st, dptr, uptr, flag, rom_helptext, cptr);
 }
