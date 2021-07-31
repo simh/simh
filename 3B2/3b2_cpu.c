@@ -683,8 +683,11 @@ t_stat sys_boot(int32 flag, CONST char *ptr)
 {
     char gbuf[CBUFSIZE];
 
-    get_glyph(ptr, gbuf, 0);
+    if ((ptr = get_sim_sw(ptr)) == NULL) {
+        return SCPE_INVSW;
+    }
 
+    get_glyph(ptr, gbuf, 0);
     if (gbuf[0] && strcmp(gbuf, "CPU")) {
         return SCPE_ARG;
     }
