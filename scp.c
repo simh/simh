@@ -3741,6 +3741,7 @@ return SCPE_OK;
 t_stat spawn_cmd (int32 flag, CONST char *cptr)
 {
 t_stat status;
+int i;
 
 if ((cptr == NULL) || (strlen (cptr) == 0))
     cptr = getenv("SHELL");
@@ -3755,11 +3756,16 @@ if (sim_log)                                            /* flush log if enabled 
     fflush (sim_log);
 if (sim_deb)                                            /* flush debug if enabled */
     fflush (sim_deb);
+/* Pass along externally defined (command alias conflicting) environment variables */
+for (i = 0; i < sim_external_env_count; i++)
+    setenv (sim_external_env[i].name, sim_external_env[i].value, 1);
 status = system (cptr);
 #if defined (VMS)
 printf ("\n");
 #endif
-
+/* Remove the externally defined (command alias conflicting) environment variables again */
+for (i = 0; i < sim_external_env_count; i++)
+    unsetenv (sim_external_env[i].name);
 return status;
 }
 
@@ -5547,6 +5553,7 @@ return SCPE_OK;
 t_stat sim_set_environment (int32 flag, CONST char *cptr)
 {
 char varname[CBUFSIZE], prompt[CBUFSIZE], cbuf[CBUFSIZE];
+int i;
 
 if ((!cptr) || (*cptr == 0))                            /* now eol? */
     return SCPE_2FARG;
@@ -5616,6 +5623,18 @@ else {
         }
     }
 setenv(varname, cptr, 1);
+/* remove the newly set name from the collection of alias conflicting external names */
+for (i = 0; i < sim_external_env_count; i++) {
+    if (0 == strcmp (varname, sim_external_env[i].name)) {
+        int j;
+
+        free (sim_external_env[i].name);
+        free (sim_external_env[i].value);
+        for (j = 0; (i + j) < sim_external_env_count; j++)
+            sim_external_env[i + j] = sim_external_env[i + j + 1];
+        --sim_external_env_count;
+        }
+    }
 return SCPE_OK;
 }
 
