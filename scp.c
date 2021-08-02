@@ -3165,6 +3165,83 @@ if (!*pdone)
 *pdone = TRUE;
 }
 
+static void fprint_wrapped (FILE *st, const char *buf, size_t width, const char *gap, const char *extra, size_t max_width)
+{
+size_t line_pos = MAX (width, strlen (buf));
+const char *end;
+
+if ((strlen (buf) >= max_width) &&
+    (NULL != strchr (buf, '=')) &&
+    (NULL != strchr (strchr (buf, '='), ';')) ) {
+    int chunk_size;
+    const char *front_gap = strchr (buf, '=');
+    size_t front_gap_size = front_gap - buf + 1;
+
+    line_pos = 0;
+    end = buf + (buf ? strlen (buf) : 0);
+    while (1) {
+        chunk_size = (end - buf);
+        if (line_pos + chunk_size >= max_width)
+            chunk_size = max_width - line_pos - 1;
+        else
+            break;
+        while ((chunk_size > 0) &&
+               (buf[chunk_size - 1] != ';'))
+               --chunk_size;
+        if (chunk_size == 0)
+            chunk_size = strlen (buf);
+        fprintf (st, "%*s%*.*s\n", (int)(line_pos), "", chunk_size, chunk_size, buf);
+        buf += chunk_size;
+        while (isspace (buf[0]))
+            ++buf;
+        if (buf < end)
+            line_pos = front_gap_size;
+        }
+    fprintf (st, "%*s%*.*s", (int)(line_pos), "", chunk_size, chunk_size, buf);
+    line_pos = width + 1;
+    }
+else
+    fprintf (st, "%*s", -((int)width), buf);
+if (line_pos > width) {
+    fprintf (st, "\n");
+    if (extra == NULL)
+        return;
+    buf = "";
+    line_pos = width;
+    fprintf (st, "%*s", -((int)width), buf);
+    }
+end = extra + (extra ? strlen (extra) : 0);
+line_pos += (gap ? strlen (gap) : 0);
+if (line_pos + (end - extra) >= max_width) {
+    int chunk_size;
+
+    while (1) {
+        chunk_size = (end - extra);
+        if (line_pos + chunk_size >= max_width)
+            chunk_size = max_width - line_pos - 1;
+        else
+            break;
+        while ((chunk_size > 0) &&
+               (extra[chunk_size] != ' '))
+               --chunk_size;
+        if (chunk_size == 0)
+            chunk_size = strlen (extra);
+        fprintf (st, "%s%*.*s\n", gap ? gap : "", chunk_size, chunk_size, extra);
+        extra += chunk_size;
+        while (isspace (extra[0]))
+            ++extra;
+        if (extra < end) {
+            line_pos = width;
+            fprintf (st, "%*s", -((int)width), "");
+            line_pos += (gap ? strlen (gap) : 0);
+            }
+        else
+            return;
+        }
+    }
+fprintf (st, "%s%s\n", gap ? gap : "", extra ? extra : "");
+}
+
 void fprint_reg_help_ex (FILE *st, DEVICE *dptr, t_bool silent)
 {
 REG *rptr, *trptr;
@@ -3177,17 +3254,19 @@ char *namebuf;
 char rangebuf[32];
 int side_effects = 0;
 
+if (!silent)
+    fprintf (st, "\n");
 if (dptr->registers)
     for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
         if (rptr->flags & REG_HIDDEN)
             continue;
         side_effects += ((rptr->flags & REG_DEPOSIT) != 0);
         if (rptr->depth > 1)
-            sprintf (rangebuf, "[%d:%d]", 0, rptr->depth-1);
+            snprintf (rangebuf, sizeof (rangebuf), "[%d:%d]", 0, rptr->depth-1);
         else
             strcpy (rangebuf, "");
-        if (max_namelen < (strlen(rptr->name) + strlen (rangebuf)))
-            max_namelen = strlen(rptr->name) + strlen (rangebuf);
+        if (max_namelen < (strlen (rptr->name) + strlen (rangebuf)))
+            max_namelen = strlen (rptr->name) + strlen (rangebuf);
         found = TRUE;
         trptr = find_reg_glob (rptr->name, &tptr, &tdptr);
         if ((trptr == NULL) || (tdptr != dptr))
@@ -3198,29 +3277,39 @@ if (!found) {
         fprintf (st, "No register help is available for the %s device\n", dptr->name);
     }
 else {
+    int i, hdr_len = 13 + (int)(max_namelen + (all_unique ? 0 : (1 + strlen (dptr->name))) + ((side_effects > 0) ? 0 : 1));
+
     namebuf = (char *)calloc (max_namelen + 1, sizeof (*namebuf));
     fprintf (st, "\nThe %s device implements these registers:\n\n", dptr->name);
+    fprintf (st, "  %*s Size %*sPurpose\n", -((int)(max_namelen + (all_unique ? 0 : (1 + strlen (dptr->name))))), "Name", (side_effects > 0) ? 0 : 1, "");
+    fprintf (st, "  ");
+    for (i = 0; i < hdr_len; i++)
+        fprintf (st, "-");
+    fprintf (st, "\n");
     for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
         char note[2];
+        char buf[CBUFSIZE];
 
         if (rptr->flags & REG_HIDDEN)
             continue;
         strlcpy (note, (side_effects != 0) ? ((rptr->flags & REG_DEPOSIT) ? "+" : " ") : "", sizeof (note));
         if (rptr->depth <= 1)
-            sprintf (namebuf, "%*s", -((int)max_namelen), rptr->name);
+            snprintf (namebuf, max_namelen + 1, "%*s", -((int)max_namelen), rptr->name);
         else {
-            sprintf (rangebuf, "[%d:%d]", 0, rptr->depth-1);
-            sprintf (namebuf, "%s%*s", rptr->name, (int)(strlen(rptr->name))-((int)max_namelen), rangebuf);
+            snprintf (rangebuf, sizeof (rangebuf), "[%d:%d]", 0, rptr->depth-1);
+            snprintf (namebuf, max_namelen + 1, "%s%*s", rptr->name, (int)(strlen (rptr->name))-((int)max_namelen), rangebuf);
             }
         if (all_unique) {
-            fprintf (st, "  %s %4d %s %s\n", namebuf, rptr->width, note, rptr->desc ? rptr->desc : "");
+            snprintf (buf, sizeof (buf), "  %s %4d %s\n", namebuf, rptr->width, note);
+            fprint_wrapped (st, buf, strlen (buf), " ", rptr->desc, 80);
             continue;
             }
         trptr = find_reg_glob (rptr->name, &tptr, &tdptr);
         if ((trptr == NULL) || (tdptr != dptr))
-            fprintf (st, "  %s %s %4d %s %s\n", dptr->name, namebuf, rptr->width, note, rptr->desc ? rptr->desc : "");
+            snprintf (buf, sizeof (buf), "  %s %s %4d %s", dptr->name, namebuf, rptr->width, note);
         else
-            fprintf (st, "  %*s %s %4d %s %s\n", (int)strlen(dptr->name), "", namebuf, rptr->width, note, rptr->desc ? rptr->desc : "");
+            snprintf (buf, sizeof (buf), "  %*s %s %4d %s", (int)strlen (dptr->name), "", namebuf, rptr->width, note);
+        fprint_wrapped (st, buf, strlen (buf), " ", rptr->desc, 80);
         }
     free (namebuf);
     if (side_effects)
@@ -3272,7 +3361,7 @@ if (DEV_TYPE(dptr) == DEV_CARD) {
     }
 #endif
 if (!silent) {
-    fprintf (st, "No ATTACH help is available for the %s device\n", dptr->name);
+    fprintf (st, "\nNo ATTACH help is available for the %s device\n", dptr->name);
     if (dptr->help)
         dptr->help (st, dptr, NULL, 0, NULL);
     }
@@ -3284,10 +3373,11 @@ MTAB *mptr;
 DEBTAB *dep;
 t_bool found = FALSE;
 t_bool deb_desc_available = FALSE;
-char buf[CBUFSIZE], header[CBUFSIZE];
+char buf[CBUFSIZE], header[CBUFSIZE], extra[CBUFSIZE];
 uint32 enabled_units = dptr->numunits;
 char unit_spec[50];
 uint32 unit, found_unit = 0;
+const char *gap = "  ";
 
 sprintf (header, "\n%s device SET commands:\n\n", dptr->name);
 for (unit=0; unit < dptr->numunits; unit++)
@@ -3311,69 +3401,78 @@ if (dptr->modifiers) {
             continue;                                       /* skip unit only simple modifiers */
         if (mptr->mstring) {
             fprint_header (st, &found, header);
-            sprintf (buf, "set %s %s%s", sim_dname (dptr), mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : (MODMASK(mptr,MTAB_VALR) ? "=val" : (MODMASK(mptr,MTAB_VALO) ? "{=val}" : "")));
-            if ((strlen (buf) < 30) || (!mptr->help))
-                fprintf (st, "%-30s\t%s\n", buf, mptr->help ? mptr->help : "");
-            else
-                fprintf (st, "%s\n%-30s\t%s\n", buf, "", mptr->help);
+            snprintf (buf, sizeof (buf), "set %s %s%s", sim_dname (dptr), mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : (MODMASK(mptr,MTAB_VALR) ? "=val" : (MODMASK(mptr,MTAB_VALO) ? "{=val}" : "")));
+            fprint_wrapped (st, buf, 30, gap, mptr->help, 80);
             }
         }
     }
 if (dptr->flags & DEV_DISABLE) {
     fprint_header (st, &found, header);
-    sprintf (buf, "set %s ENABLE", sim_dname (dptr));
-    fprintf (st,  "%-30s\tEnables device %s\n", buf, sim_dname (dptr));
-    sprintf (buf, "set %s DISABLE", sim_dname (dptr));
-    fprintf (st,  "%-30s\tDisables device %s\n", buf, sim_dname (dptr));
+    snprintf (buf, sizeof (buf), "set %s ENABLE", sim_dname (dptr));
+    snprintf (extra, sizeof (extra), "Enables device %s", sim_dname (dptr));
+    fprint_wrapped (st, buf, 30, gap, extra, 80);
+    snprintf (buf, sizeof (buf), "set %s DISABLE", sim_dname (dptr));
+    snprintf (extra, sizeof (extra), "Disables device %s", sim_dname (dptr));
+    fprint_wrapped (st, buf, 30, gap, extra, 80);
     }
 if ((dptr->flags & DEV_DEBUG) || (dptr->debflags)) {
     fprint_header (st, &found, header);
-    sprintf (buf, "set %s DEBUG", sim_dname (dptr));
-    fprintf (st,  "%-30s\tEnables debugging for device %s\n", buf, sim_dname (dptr));
-    sprintf (buf, "set %s NODEBUG", sim_dname (dptr));
-    fprintf (st,  "%-30s\tDisables debugging for device %s\n", buf, sim_dname (dptr));
+    snprintf (buf, sizeof (buf), "set %s DEBUG", sim_dname (dptr));
+    snprintf (extra, sizeof (extra), "Enables debugging for device %s", sim_dname (dptr));
+    fprint_wrapped (st, buf, 30, gap, extra, 80);
+    snprintf (buf, sizeof (buf), "set %s NODEBUG", sim_dname (dptr));
+    snprintf (extra, sizeof (extra), "Disables debugging for device %s", sim_dname (dptr));
+    fprint_wrapped (st, buf, 30, gap, extra, 80);
     if (dptr->debflags) {
-        strcpy (buf, "");
-        fprintf (st, "set %s DEBUG=", sim_dname (dptr));
+        snprintf (buf, sizeof (buf), "set %s DEBUG=", sim_dname (dptr));
         for (dep = dptr->debflags; dep->name != NULL; dep++) {
-            fprintf (st, "%s%s", ((dep == dptr->debflags) ? "" : ";"), dep->name);
+            strlcat (buf, ((dep == dptr->debflags) ? "" : ";"), sizeof (buf));
+            strlcat (buf, dep->name, sizeof (buf));
             deb_desc_available |= ((dep->desc != NULL) && (dep->desc[0] != '\0'));
             }
-        fprintf (st, "\n");
-        fprintf (st,  "%-30s\tEnables specific debugging for device %s\n", buf, sim_dname (dptr));
-        fprintf (st, "set %s NODEBUG=", sim_dname (dptr));
-        for (dep = dptr->debflags; dep->name != NULL; dep++)
-            fprintf (st, "%s%s", ((dep == dptr->debflags) ? "" : ";"), dep->name);
-        fprintf (st, "\n");
-        fprintf (st,  "%-30s\tDisables specific debugging for device %s\n", buf, sim_dname (dptr));
+        snprintf (extra, sizeof (extra), "Enables specific debugging for device %s", sim_dname (dptr));
+        fprint_wrapped (st, buf, 30, gap, extra, 80);
+        snprintf (buf, sizeof (buf), "set %s NODEBUG=", sim_dname (dptr));
+        for (dep = dptr->debflags; dep->name != NULL; dep++) {
+            strlcat (buf, ((dep == dptr->debflags) ? "" : ";"), sizeof (buf));
+            strlcat (buf, dep->name, sizeof (buf));
+            }
+        snprintf (extra, sizeof (extra), "Disables specific debugging for device %s", sim_dname (dptr));
+        fprint_wrapped (st, buf, 30, gap, extra, 80);
         }
     }
 if ((dptr->modifiers) && (dptr->units)) {   /* handle unit specific modifiers */
     if (dptr->units->flags & UNIT_DISABLE) {
         fprint_header (st, &found, header);
-        sprintf (buf, "set %s ENABLE", unit_spec);
-        fprintf (st,  "%-30s\tEnables unit %s\n", buf, unit_spec);
-        sprintf (buf, "set %s DISABLE", unit_spec);
-        fprintf (st,  "%-30s\tDisables unit %sn\n", buf, unit_spec);
+        snprintf (buf, sizeof (buf), "set %s ENABLE", unit_spec);
+        snprintf (extra, sizeof (extra), "Enables unit %s", unit_spec);
+        fprint_wrapped (st, buf, 30, gap, extra, 80);
+        snprintf (buf, sizeof (buf), "set %s DISABLE", unit_spec);
+        snprintf (extra, sizeof (extra), "Disables unit %s", unit_spec);
+        fprint_wrapped (st, buf, 30, gap, extra, 80);
         }
     if (((dptr->flags & DEV_DEBUG) || (dptr->debflags)) &&
         ((DEV_TYPE(dptr) == DEV_DISK) || (DEV_TYPE(dptr) == DEV_TAPE))) {
-        sprintf (buf, "set %s DEBUG", unit_spec);
-        fprintf (st,  "%-30s\tEnables debugging for device unit %s\n", buf, unit_spec);
-        sprintf (buf, "set %s NODEBUG", unit_spec);
-        fprintf (st,  "%-30s\tDisables debugging for device unit %s\n", buf, unit_spec);
+        snprintf (buf, sizeof (buf), "set %s DEBUG", unit_spec);
+        snprintf (extra, sizeof (extra), "Enables debugging for device unit %s", unit_spec);
+        fprint_wrapped (st, buf, 30, gap, extra, 80);
+        snprintf (buf, sizeof (buf), "set %s NODEBUG", unit_spec);
+        snprintf (extra, sizeof (extra), "Disables debugging for device unit %s", unit_spec);
+        fprint_wrapped (st, buf, 30, gap, extra, 80);
         if (dptr->debflags) {
             strcpy (buf, "");
             fprintf (st, "set %s DEBUG=", unit_spec);
             for (dep = dptr->debflags; dep->name != NULL; dep++)
                 fprintf (st, "%s%s", ((dep == dptr->debflags) ? "" : ";"), dep->name);
             fprintf (st, "\n");
-            fprintf (st,  "%-30s\tEnables specific debugging for device unit %s\n", buf, unit_spec);
+            snprintf (extra, sizeof (extra), "Enables specific debugging for device unit %s", unit_spec);
+            fprint_wrapped (st, "", 30, gap, extra, 80);
             fprintf (st, "set %s NODEBUG=", unit_spec);
             for (dep = dptr->debflags; dep->name != NULL; dep++)
                 fprintf (st, "%s%s", ((dep == dptr->debflags) ? "" : ";"), dep->name);
             fprintf (st, "\n");
-            fprintf (st,  "%-30s\tDisables specific debugging for device unit %s\n", buf, unit_spec);
+            snprintf (extra, sizeof (extra), "Disables specific debugging for device unit %s", unit_spec);
+            fprint_wrapped (st, "", 30, gap, extra, 80);
             }
         }
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
@@ -3385,10 +3484,8 @@ if ((dptr->modifiers) && (dptr->units)) {   /* handle unit specific modifiers */
             continue;
         if (mptr->mstring) {
             fprint_header (st, &found, header);
-            sprintf (buf, "set %s %s%s", unit_spec, mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : (MODMASK(mptr,MTAB_VALR) ? "=val" : (MODMASK(mptr,MTAB_VALO) ? "{=val}": "")));
-            fprintf (st, "%-30s\t%s\n", buf, (strchr (mptr->mstring, '=')) ? ((strlen (buf) > 30) ? "" : mptr->help) : (mptr->help ? mptr->help : ""));
-            if ((strchr (mptr->mstring, '=')) && (strlen (buf) > 30))
-                fprintf (st,  "%-30s\t%s\n", "", mptr->help);
+            snprintf (buf, sizeof (buf), "set %s %s%s", unit_spec, mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : (MODMASK(mptr,MTAB_VALR) ? "=val" : (MODMASK(mptr,MTAB_VALO) ? "{=val}": "")));
+            fprint_wrapped (st, buf, 30, gap, mptr->help, 80);
             }
         }
     }
@@ -3397,8 +3494,9 @@ if (enabled_units) {
         if ((!(dptr->units[unit].flags & UNIT_DIS)) &&
             (dptr->units[unit].flags & UNIT_SEQ) && 
             (!(dptr->units[unit].flags & UNIT_MUSTBUF))) {
-            sprintf (buf, "set %s%s APPEND", sim_uname (&dptr->units[unit]), (enabled_units > 1) ? "n" : "");
-            fprintf (st,  "%-30s\tSets %s%s position to EOF\n", buf, sim_uname (&dptr->units[unit]), (enabled_units > 1) ? "n" : "");
+            snprintf (buf, sizeof (buf), "set %s%s APPEND", sim_uname (&dptr->units[unit]), (enabled_units > 1) ? "n" : "");
+            snprintf (extra, sizeof (extra), "Sets %s%s position to EOF", sim_uname (&dptr->units[unit]), (enabled_units > 1) ? "n" : "");
+            fprint_wrapped (st, buf, 30, gap, extra, 80);
             break;
             }
     }
@@ -3420,10 +3518,11 @@ void fprint_show_help_ex (FILE *st, DEVICE *dptr, t_bool silent)
 {
 MTAB *mptr;
 t_bool found = FALSE;
-char buf[CBUFSIZE], header[CBUFSIZE];
+char buf[CBUFSIZE], header[CBUFSIZE], extra[CBUFSIZE];
 uint32 enabled_units = dptr->numunits;
 char unit_spec[50];
 uint32 unit, found_unit = 0;
+const char *gap = "  ";
 
 sprintf (header, "\n%s device SHOW commands:\n\n", dptr->name);
 for (unit=0; unit < dptr->numunits; unit++)
@@ -3435,8 +3534,6 @@ if (enabled_units == 1)
     snprintf (unit_spec, sizeof (unit_spec), "%s%u", sim_dname (dptr), found_unit);
 else
     snprintf (unit_spec, sizeof (unit_spec), "%sn", sim_dname (dptr));
-snprintf (unit_spec, sizeof (unit_spec), "%s%s", sim_dname (dptr), 
-                  ((enabled_units == 1) && ((dptr->units[0].flags & UNIT_DIS) == 0)) ? "0" : "n");
 if (dptr->modifiers) {
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
         if (!MODMASK(mptr,MTAB_VDV) && MODMASK(mptr,MTAB_VUN) && (dptr->numunits != 1))
@@ -3447,18 +3544,20 @@ if (dptr->modifiers) {
             continue;
         fprint_header (st, &found, header);
         sprintf (buf, "show %s %s%s", sim_dname (dptr), mptr->pstring, MODMASK(mptr,MTAB_SHP) ? "{=arg}" : "");
-        fprintf (st, "%-30s\t%s\n", buf, mptr->help ? mptr->help : "");
+        fprint_wrapped (st, buf, 30, gap, mptr->help, 80);
         }
     }
 if ((dptr->flags & DEV_DEBUG) || (dptr->debflags)) {
     fprint_header (st, &found, header);
     sprintf (buf, "show %s DEBUG", sim_dname (dptr));
-    fprintf (st, "%-30s\tDisplays debugging status for device %s\n", buf, sim_dname (dptr));
+    sprintf (extra, "Displays debugging status for device %s", sim_dname (dptr));
+    fprint_wrapped (st, buf, 30, gap, extra, 80);
     }
 if (((dptr->flags & DEV_DEBUG) || (dptr->debflags)) &&
     ((DEV_TYPE(dptr) == DEV_DISK) || (DEV_TYPE(dptr) == DEV_TAPE))) {
     sprintf (buf, "show %s DEBUG", unit_spec);
-    fprintf (st, "%-30s\tDisplays debugging status for device unit %s\n", buf, unit_spec);
+    sprintf (extra, "Displays debugging status for device unit %s", unit_spec);
+    fprint_wrapped (st, buf, 30, gap, extra, 80);
     }
 
 if ((dptr->modifiers) && (dptr->units)) {   /* handle unit specific modifiers */
@@ -3469,7 +3568,7 @@ if ((dptr->modifiers) && (dptr->units)) {   /* handle unit specific modifiers */
             continue;
         fprint_header (st, &found, header);
         sprintf (buf, "show %s %s%s", unit_spec, mptr->pstring, MODMASK(mptr,MTAB_SHP) ? "=arg" : "");
-        fprintf (st, "%-30s\t%s\n", buf, mptr->help ? mptr->help : "");
+        fprint_wrapped (st, buf, 30, gap, mptr->help, 80);
         }
     }
 if (!found && !silent)
@@ -3486,6 +3585,7 @@ void fprint_brk_help_ex (FILE *st, DEVICE *dptr, t_bool silent)
 BRKTYPTAB *brkt = dptr->brk_types;
 char gbuf[CBUFSIZE];
 
+fprintf (st, "\n");
 if (sim_brk_types == 0) {
     if ((dptr != sim_dflt_dev) && (!silent)) {
         fprintf (st, "Breakpoints are not supported in the %s simulator\n", sim_name);
@@ -3526,10 +3626,10 @@ if (*cptr) {
     const char *gptr = get_glyph (cptr, gbuf, 0);
     if ((cmdp = find_cmd (gbuf))) {
         if (cmdp->action == &exdep_cmd) {
-            if (dptr->help) /* Shouldn't this pass cptr so the device knows which command invoked? */
-                return dptr->help (st, dptr, uptr, flag, gptr);
+            if (dptr->help)
+                return dptr->help (st, dptr, uptr, flag, cmdp->name);
             else
-                fprintf (st, "No help available for the %s %s command\n", cmdp->name, sim_dname(dptr));
+                fprintf (st, "No device specific help available for the %s %s command\n", cmdp->name, sim_dname(dptr));
             return SCPE_OK;
             }
         if (cmdp->action == &set_cmd) {
@@ -3616,15 +3716,26 @@ if (sim_switches & SWMASK ('F'))
 if (*cptr) {
     cptr = get_glyph (cptr, gbuf, 0);
 
-    if (0 == strcmp (gbuf, "DEVICE")) {
+    if ((0 == strncmp (gbuf, "DEV", 3)) &&
+        (0 == MATCH_CMD (gbuf, "DEVICE"))) {
         explicit_device = TRUE;
         cptr = get_glyph (cptr, gbuf, 0);
         }
     dptr = find_unit (gbuf, &uptr);
     if ((dptr == NULL) && 
         ((dptr = find_dev (gbuf)) == NULL)) {
-        if (explicit_device)
-            return sim_messagef (SCPE_ARG, "No such device %s\n", gbuf);
+        if (explicit_device) {
+            int i;
+
+            if (0 != strcmp (gbuf, "*"))
+                return sim_messagef (SCPE_ARG, "No such device %s\n", gbuf);
+            for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+                snprintf (gbuf, sizeof (gbuf), "DEVICE %s", dptr->name);
+                sim_printf ("\n%2d   ", i + 1);
+                help_cmd (SCP_HELP_FLAT, gbuf);
+                }
+            return SCPE_OK;
+            }
         if ((cmdp = find_cmd (gbuf))) {
             if (*cptr) {
                 if ((cmdp->action == &set_cmd) || (cmdp->action == &show_cmd)) {
