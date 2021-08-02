@@ -194,7 +194,7 @@ DEVICE vt_dev = {
     NULL, NULL, &vt_reset,
     &vt_boot, NULL, NULL,
     &vt_dib, DEV_DIS | DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG,
-    0, vt_deb, NULL, NULL, NULL, &vt_help, NULL, 
+    0, vt_deb, NULL, NULL, &vt_help, NULL, NULL, 
     &vt_description
 };
 
