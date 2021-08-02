@@ -74,7 +74,7 @@ uint16 rom_vt40boot[508] =
 
 ROM_DEF gt40_roms[] =
 {
-    "VT40", NULL, (uint16 (*)[]) &rom_vt40boot, NO_START_ADDRESS, NO_START_ADDRESS,
+    "VT40", NULL, (uint16 (*)[]) &rom_vt40boot, 000,              NO_START_ADDRESS,
     "",     NULL, NULL,                         NO_START_ADDRESS, NO_START_ADDRESS,
 };
 

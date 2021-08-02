@@ -874,7 +874,6 @@ uint16 *get_rom_loc_ptr (int32 phys_addr)
 
             /* Get pointer to ROM image and return address in that image*/
             image = (uint16*)socket_config[socket_number].rom_image;
-            // image[(PA - socket_config[socket_number].base_address)] = data;
             return (uint16*) socket_config[socket_number].rom_image + 
                 ((phys_addr - socket_config[socket_number].base_address) >> 1);
         }
@@ -928,8 +927,14 @@ t_stat rom_boot (int32 u, DEVICE *dptr)
             (*rom_init)();
     }
 
-    /* Set the boot address */
-    // ToDo: Use PSW from boot rom?!
+    /* 
+     * Set the boot address
+     * 
+     * During a hardware boot the PC and PSW are read from locations 173024 and
+     * 173026 respectively. The contents of address 173026 are provided in the
+     * ROMs. The value of the PSW in this address for all M9312 boot ROMS is 340.
+     * The cpu_set_boot function sets the PSW to this value.
+     */
     cpu_set_boot (rom_start_address);
     return SCPE_OK;
 }
@@ -1013,15 +1018,6 @@ static t_stat blank_attach (CONST char *cptr)
     /* Validate the command sequence */
     if ((r = validate_attach_blank_rom (&attach_cmd[0], num_commands)) != SCPE_OK)
         return r;
-
-#if 0
-    /* Print the attachments to be executed */
-    // ToDo: Print debug output?
-    for (i = 0; i < num_commands; i++) {
-        sim_messagef (SCPE_OK, "ATTACH ROM socket %d: address %o, image %s\n",
-            attach_cmd[i].socket_number, attach_cmd[i].address, attach_cmd[i].image_name);
-    }
-#endif
 
     /* Execute the commands in the command sequence */
     for (i = 0; i < num_commands; i++) {
@@ -1387,7 +1383,7 @@ static t_stat attach_rom_to_socket (char* name, t_addr address,
     /* Fill the DIB for the socket */
     if (reset_dib (socket_number, &rom_rd, &rom_wr) != SCPE_OK) {
 
-        // Remove ROM image
+        /* Remove ROM image */
         free (socket_config[socket_number].rom_image);
         socket_config[socket_number].rom_image = NULL;
         return sim_messagef (SCPE_IERR, "reset_dib() failed\n");
@@ -1423,14 +1419,21 @@ static t_stat vt40_auto_attach ()
     SOCKET_DEF *socketptr;
     ROM_DEF *romptr;
     uint32 socket_number = 0;
+    t_stat r;
 
     /* A VT40 has just one socket */
     socketptr = &vt40_sockets[socket_number];
     romptr = *socketptr->rom_list;
 
     /* Attach the ROM to the socket */
-    return attach_rom_to_socket (romptr->device_mnemonic, socketptr->base_address,
-        romptr->image, socketptr->size, romptr->rom_init, socket_number);
+    if ((r = attach_rom_to_socket(romptr->device_mnemonic, socketptr->base_address,
+        romptr->image, socketptr->size, romptr->rom_init, socket_number)) != SCPE_OK)
+        return r;
+
+    /* Compute the VT40 start adress and make it a 16-bit physical address */
+    rom_start_address = socket_config[socket_number].base_address + romptr->boot_no_diags;
+    rom_start_address &= VAMASK;
+    return SCPE_OK;
 }
 
 /* 
@@ -1647,15 +1650,18 @@ static t_stat m9312_attach (const char *rom_name, int socket_number)
     " command can be used to enable changing the contents of a ROM:\n\n" \
     "+SET ROM WRITE=ENABLED|DISABLED\n\n" \
     " The default value is DISABLED. After write-enabling the ROMs, the contents\n" \
-    " can be changed by means of DEPOSIT commands.\n"
+    " can be changed by means of DEPOSIT commands.\n\n" \
+    " Note that changing the contents of a ROM does not affect the original source\n" \
+    " of the ROMs. After re-attaching a ROM which has been changed, the original\n" \
+    " contents are available again.\n"
 
 #define ROM_HLP_SET_TYPE \
     " The module type can be selected by means of the SET ROM TYPE command:\n\n" \
     "+SET ROM TYPE=BLANK|M9312|VT40\n\n" \
     " The default type is BLANK. This module type is supported for all CPU and bus\n" \
-    " types. The M9312 module is only available for the UNIBUS models; the VT40 is\n" \
+    " types. The M9312 module is only available for the Unibus models; the VT40 is\n" \
     " only available for the GT40 graphics terminal which contains an 11/05 CPU.\n" \
-    " If the CPU is set to a type not supported by the set ROM module type, the\n" \
+    " If the CPU is set to a type not supported by the current module type, the\n" \
     " module type is reset to the BLANK module.\n\n"
 
 #define ROM_HLP_SET_START_ADDRESS \
@@ -1665,10 +1671,25 @@ static t_stat m9312_attach (const char *rom_name, int socket_number)
     "+SET ROM START_ADDRESS=<address>\n\n" \
     " The address must be a 16-bit physical address in an attached ROM. The\n" \
     " address to be used is determined by a combination of the socket base address\n" \
-    " and offset in the ROM. See 'HELP ROM M9312 Configuration' for an\n" \
-    " explanation.\n\n" \
+    " and offset in the ROM in the following way:\n" \
+    "+1. Determine the socket base address the ROM is placed in,\n" \
+    "+2. Determine the appropriate start address in the ROM and take that address\n" \
+    "+as an offset from the ROM base address,\n" \
+    "+3. Add the ROM-specific offset to the socket base address.\n\n" \
     " After setting the start address the system can be started via a BOOT command:\n\n" \
-    "+BOOT {ROM|CPU}\n" \
+    "+BOOT {ROM|CPU}\n"
+
+#define ROM_HLP_DETACH \
+    " The DETACH command detaches all ROMs from the sockets, clears the start address\n" \
+    " and resets the configuration mode to manual. The module type is not affected\n" \
+    " by this command.\n"
+
+#define STD_OFFSETS \
+    " Offsets\n" \
+    "+004 - Boot without diagnostics, unit 0\n" \
+    "+006 - Boot with diagnostics, unit 0\n" \
+    "+012 - Boot with diagnostics, unit in R0\n" \
+    "+016 - Boot with diagnostics, unit in R0, CSR in R1\n\n"
 
 const char rom_helptext[] =
     /***************** 80 character line width template *************************/
@@ -1682,7 +1703,7 @@ const char rom_helptext[] =
     "+3. VT40\t\tThe VT40 ROM for a GT40 graphical terminal\n"
     /***************** 80 character line width template *************************/
     "1 Blank_Configuration\n"
-    " The BLANK ROM module is a module with four sockets in each of which one ROM\n"
+    " The BLANK ROM module is a module with four sockets, in each of which one ROM\n"
     " can be placed. The contents of the ROMs has to be provided in files.\n\n"
     " First the BLANK module type must be selected:\n\n"
     "+SET ROM TYPE=BLANK\n\n"
@@ -1691,7 +1712,7 @@ const char rom_helptext[] =
     "2 Attach_Command\n"
 #define BLANK_HLP_ATTACH "Blank_Configuration Attach_Command"
     " ROMs can be placed in the module's sockets by means of the ATTACH command.\n"
-    " For a succesful ATTACH the following parameters have to be specified:\n\n"
+    " For a succesful attach the following parameters have to be specified:\n\n"
     "+1. The socket number to attach a ROM to,\n"
     "+2. The address in the I/O space in which the ROM contents will be available,\n"
     "+3. The file with the ROM contents in RAW format.\n\n"
@@ -1699,13 +1720,13 @@ const char rom_helptext[] =
     "+ATTACH ROM {<socket>:}<address>/<file>\n\n"
     " The socket is a number between 0 and 3. The socket number is optional and\n"
     " the default number is 0. The address is a physical address in the I/O SPACE,\n"
-    " i.e.between addresses 17760100 and 17777777. The address must not collide\n"
+    " i.e. between addresses 17760100 and 17777777. The address must not collide\n"
     " with register addresses used by other devices. The file is the name of a\n"
     " file with the contents of the ROM in RAW format.\n\n"
-    " An attach command can comprise more one to four attach specifications,\n"
-    " seperated by a comma:\n\n"
-    "+ATTACH ROM {<socket>:}<address>/<file>{,{<socket>:}<address>/<file>}+\n\n"
-    " The default socket number for the first attach specification in the attach\n"
+    " An attach command can comprise one to four attach specifications, separated\n"
+    " by a comma:\n\n"
+    "+ATTACH ROM {<socket>:}<address>/<file>{,{<socket>:}<address>/<file>}*\n\n"
+    " The default socket number for the first attach specification in the ATTACH\n"
     " command is zero, for the following specifications it is the socket number of\n"
     " the previous specification plus one.\n\n"
     " The following commands attach two ROMs, at socket 0 and 1:\n\n"
@@ -1714,6 +1735,10 @@ const char rom_helptext[] =
     " These commands can also be combined in one ATTACH command:\n\n"
     "+ATTACH ROM 0:17765000/23-616F1.IMG, 17773000/23-751A9.IMG\n\n"
     " The effect of the last command is equal to the two separate attach commands.\n"
+    "2 Detach_Command\n"
+    " The DETACH command detaches all ROMs from the sockets, clears the socket\n"
+    " addresses, clears the start address and resets the configuration mode to\n"
+    " manual. The module type is not affected by this command.\n"
     "2 Set_Commands\n"
     " The BLANK module type supports the following SET commands:\n\n"
     "+SET ROM TYPE\t\t- Change the module type\n"
@@ -1759,9 +1784,11 @@ const char rom_helptext[] =
     " types and there are also cases where the boot code comprises two or three\n"
     " ROMs. In these cases these ROMs have to be placed in subsequent sockets.\n\n"
     " The system start adress can be determined in the following way:\n\n"
-    "+1. Take the socket base address the ROM is placed in from the table above,\n"
-    "+2. Add the ROM-specific offset of the start address. The offsets are\n"
-    "+documented in the ROM-specific help text.\n\n"
+    "+1. Determine the socket base address the ROM is placed in,\n" \
+    "+2. Determine the appropriate start address in the ROM and take that address\n" \
+    "+as an offset from the ROM base address. The offsets are documented in the\n" \
+    "+ROM-specific help text.\n" \
+    "+3. Add the ROM-specific offset to the socket base address.\n\n" \
     /***************** 80 character line width template *************************/
     " With a DL boot ROM in socket 1 e.g., a RL01 disk can be booted from unit 0,\n"
     " without performing the diagnostics, by starting at address 173004. With the\n"
@@ -1771,16 +1798,16 @@ const char rom_helptext[] =
 #define M9312_HLP_ATTACH "M9312_Configuration Attach_Command"
     "2 Attach_Command\n"
     " The M9312 module can be configured by means of the ATTACH command. For a\n"
-    " succesful ATTACH the following parameters have to be specified:\n\n"
-    "+1. The socket number to attach a ROM to,\n"
+    " succesful attach the following parameters have to be specified:\n\n"
+    "+1. The socket number to attach the ROM to,\n"
     "+2. The name of the ROM image.\n\n"
     " A single attach specification has the following format:\n\n"
     "+ATTACH ROM {<socket>:}<ROM>\n\n"
     " The socket is a number between 0 and 4. The socket number is optional and\n"
     " the default number is 0. The ROM is the name of one of the available ROMs.\n"
-    " An attach command can comprise more one to four attach specifications,\n"
+    " An attach command can comprise one to four attach specifications,\n"
     " seperated by a comma:\n\n"
-    "+ATTACH ROM {<socket>:}<ROM>{,{<socket>:}<ROM>}+\n\n"
+    "+ATTACH ROM {<socket>:}<ROM>{,{<socket>:}<ROM>}*\n\n"
     " The default socket number for the first attach specification in the attach\n"
     " command is zero, for the following specifications it is the socket number of\n"
     " the previous specification plus one. The following commands attach two ROMs,\n"
@@ -1790,17 +1817,18 @@ const char rom_helptext[] =
     " These commands can also be combined in one ATTACH command:\n\n"
     "+ATTACH ROM B0,DL\n\n"
     " The effect of this command is equal to the two separate attach commands.\n"
+    "2 Detach_Command\n"
+    ROM_HLP_DETACH
     "2 Set_Commands\n"
-    " This module supports, apart from the common commands, the following type-\n"
-    " specific commands:\n\n"
+    " The M9312 module supports the following SET commands:\n\n"
     "+SET ROM TYPE\t\t- Change the module type\n"
     "+SET ROM CONFIGURATION\t- Auto-configure the ROM lineup\n"
     "+SET ROM START_ADDRESS\t- Set the start address for the ROMs\n"
     "+SET ROM WRITE\t\t- Write enable the ROMs\n"
-    "3 Type"
+    "3 Type\n"
     ROM_HLP_SET_TYPE
     "3 Configuration\n"
-    " The M9312 implementation support an auto-configuration option which can be\n"
+    " The M9312 implementation supports an auto-configuration option which can be\n"
     " enabled with the CONFIGURATION parameter:\n\n"
     "+SET CONFIGURATION=AUTO|MANUAL\n\n"
     " In the auto-configuration mode the sockets are filled with ROMs suited for\n"
@@ -1819,15 +1847,15 @@ const char rom_helptext[] =
     "+SET ROM START_ADDRESS=<address>\n\n"
     " The address must be a 16-bit physical address in an attached ROM. The\n"
     " address to be used is determined by a combination of the socket base address\n"
-    " and offset in the ROM. See 'HELP ROM M9312 Configuration' for an\n"
+    " and offset in the ROM. See 'HELP ROM M9312 Addresses' for an\n"
     " explanation.\n\n"
-    " To make setting the start address more user-friendly, the address can also\n"
-    " be specified symbolically by naming the ROM and the start address:\n\n"
+    " Boot ROMs usually provide two start address for respectively starting without\n"
+    " and with performing diagnostics before the device is booted. These addresses\n"
+    " have been given the symbolic names '<ROM>-DIAG' and '<ROM>+DIAG'. To make\n"
+    " setting the start address more user-friendly, these symbolic names can be used\n"
+    " to specify the start address:\n\n"
     "+SET ROM START_ADDRESS=<ROM>+DIAG|<ROM>-DIAG\n\n"
-    " '<ROM>' must be the name of a ROM currently attached to a socket. Boot ROMs\n"
-    " useably provide two start address for respectively starting without and with\n"
-    " performing diagnostics before the device is booted. '+DIAG' and '-DIAG'\n"
-    " refer to these start addresses.\n\n"
+    " '<ROM>' must be the name of a ROM currently attached to a socket.\n\n"
     " After setting the start address the system can be started via a BOOT command:\n\n"
     "+BOOT {ROM|CPU}\n"
     "3 Write\n"
@@ -1874,32 +1902,32 @@ const char rom_helptext[] =
     " the beginning of the next line of the terminal, indicating that the console\n"
     " emulator routine is waiting for input from the operator.\n\n"
     " The following symbols are used in the text below:\n"
-    " <SB> : Space bar\n"
-    " <CR> : Carriage return key\n"
-    " X    : Any octal number 0-7\n\n"
+    "+<SB> : Space bar\n"
+    "+<CR> : Carriage return key\n"
+    "+X    : Any octal number 0-7\n\n"
     " The console functions can be exercised by pressing keys, as follows:\n"
-    " Function        Keyboard Strokes\n"
-    " Load Address    L<SB> XXXXXX <CR>\n"
-    " Examine         E<SB>\n"
-    " Deposit         D<SB> XXXXXX <CR>\n"
-    " Start           S<CR>\n"
-    " Boot            <Boot command code><unit><CR>\n\n"
-    " The following boot command codes can be specified:\n"
-    " Code  Device               Interface       Description\n"
-    " DL    RL01                 RL11            Disk Memory\n"
-    " DX    RXO1                 RX11            Floppy disk system\n"
-    " DK    RK03, 05/05J         RK11C, D        DECpack disk\n"
-    " DT    TU55/56              TC11            DualDECtape\n"
-    " DY    RX02                 RX211           Double density floppy disk system\n"
-    " DM    RK06/07              RK611           Disk drive\n"
-    " MT    TS03, TU10           TM11/A11/B11    Magnetic tape (9 track, 800 bits/in, NRZ)\n"
-    " MM    TUI6, TM02           RH11/RH70       Magnetic tape\n"
-    " CT    TU60                 TA11            Dual magnetic tape\n"
-    " PR    PC11                                 High speed reader\n"
-    " TT    DL11-A                               Low speed reader\n"
-    " DP    RP02/03              RP11            Moving head disk\n"
-    " DB    RP04/05/06, RM02/03  RH11/RH70       Moving head disk\n"
-    " DS    RS03/04              RH11/RH70       Fixed head disk\n\n"
+    "+Function        Keyboard Strokes\n"
+    "+Load Address    L<SB> XXXXXX <CR>\n"
+    "+Examine         E<SB>\n"
+    "+Deposit         D<SB> XXXXXX <CR>\n"
+    "+Start           S<CR>\n"
+    "+Boot            <Boot command code><unit><CR>\n\n"
+    " The following boot command codes can be specified:\n\n"
+    "+Code  Device               Interface       Description\n"
+    "+DL    RL01                 RL11            Disk Memory\n"
+    "+DX    RXO1                 RX11            Floppy disk system\n"
+    "+DK    RK03, 05/05J         RK11C, D        DECpack disk\n"
+    "+DT    TU55/56              TC11            DualDECtape\n"
+    "+DY    RX02                 RX211           Double density floppy disk system\n"
+    "+DM    RK06/07              RK611           Disk drive\n"
+    "+MT    TS03, TU10           TM11/A11/B11    Magnetic tape (9 track, 800 bits/in, NRZ)\n"
+    "+MM    TUI6, TM02           RH11/RH70       Magnetic tape\n"
+    "+CT    TU60                 TA11            Dual magnetic tape\n"
+    "+PR    PC11                                 High speed reader\n"
+    "+TT    DL11-A                               Low speed reader\n"
+    "+DP    RP02/03              RP11            Moving head disk\n"
+    "+DB    RP04/05/06, RM02/03  RH11/RH70       Moving head disk\n"
+    "+DS    RS03/04              RH11/RH70       Fixed head disk\n\n"
     "3 B0\n"
     " Function:              11/60, 11/70 Diagnostic (M9312 E20)\n"
     " DEC Part number:       23-616F1\n"
@@ -1914,11 +1942,11 @@ const char rom_helptext[] =
     " console switch register. Bits 0-8 contain the starting address as an offset to\n"
     " 173000 and bits 9-11 contain the (octal) unit number. See the table below.\n\n"
     " 15  14  13  12 | 11 10  09         | 08  07  06  05  04  03  02  01  00\n"
-    " NA  NA  NA  NA | Octal unit number | Start address boot code as offset to 17300\n\n"
+    " NA  NA  NA  NA | Octal unit number | Start address boot code as offset to 173000\n\n"
     " The device is then booted as follows:\n"
-    " 1. Load address 765744,\n"
-    " 2. Set switch register according to the table above,\n"
-    " 3. Start.\n\n"
+    "+1. Load address 765744,\n"
+    "+2. Set switch register according to the table above,\n"
+    "+3. Start.\n\n"
     " To boot for example from unit 2, for the device for which the boot ROM is\n"
     " available in socket 1, the value 2012 has to be put in the console switch\n"
     " register.\n\n"
@@ -1964,7 +1992,7 @@ const char rom_helptext[] =
     "+050 - Boot without diagnostics, unit 0\n"
     "+052 - Boot with diagnostics, unit 0\n"
     "+056 - Boot with diagnostics, unit in R0\n"
-    "+062 - Boot with diag, unit in R0, CSR in R1\n\n"
+    "+062 - Boot with diagnostics, unit in R0, CSR in R1\n\n"
     "3 DK\n"
     " Function:              RK03/05 DECdisk disk bootstrap\n"
     " DEC Part number:       23-756A9\n"
@@ -1978,7 +2006,7 @@ const char rom_helptext[] =
     "+034 - Boot without diagnostics, unit 0\n"
     "+036 - Boot with diagnostics, unit 0\n"
     "+042 - Boot with diagnostics, unit in R0\n"
-    "+046 - Boot with diag, unit in R0, CSR in R1\n\n"
+    "+046 - Boot with diagnostics, unit in R0, CSR in R1\n\n"
     "3 MM\n"
     " Function:              TU16/45/77,TE16 magtape bootstrap\n"
     " DEC Part number:       23-757A9\n"
@@ -2082,6 +2110,8 @@ const char rom_helptext[] =
     " The VT40 ROM can be attached to the one socket in this module by means of the\n"
     " following command:\n\n"
     "+ATTACH ROM VT40\n"
+    "2 Detach_Command\n"
+    ROM_HLP_DETACH
     "2 Set_Commands\n"
     " The VT40 module type supports the following SET commands:\n\n"
     "+SET ROM TYPE\t\t- Change the module type\n"
@@ -2095,13 +2125,16 @@ const char rom_helptext[] =
     ROM_HLP_WRITE_ENABLE
     "1 Monitoring\n"
     " The ROM configuration can be shown by means of the SHOW command:\n\n"
-    "+SHOW ROM\t - Show ROM configuration and settings\n"
-    "+SHOW ROM SOCKETS - Show ROM addresses and occupation\n\n"
+    "+SHOW ROM\t\t- Show ROM configuration and settings\n"
+    "+SHOW ROM SOCKETS\t- Show ROM addresses and occupation\n"
+    "+SHOW ROM TYPE\t\t- Shows the selected module type\n"
+    "+SHOW ROM CONFIGURATION\t- Shows the configuration mode (AUTO or MANUAL)\n"
+    "+SHOW ROM START_ADDRESS\t- Shows the start address\n"
     "2 ROM\n"
     " This command shows the current settings of the module and - between angled\n"
     " brackets - the ROMs attached to the sockets of the module:\n\n"
     "+ROM     module type M9312, configuration mode AUTO, start address not specified\n"
-    "+-       attached to <0:B0, 1 : DK, 2 : DL, 3 : DM, 4 : DX>, read only\n\n"
+    "+-       attached to <0:B0, 1:DK, 2:DL, 3:DM, 4:DX>, read only\n\n"
     " Note that the string between angled brackets matches the parameters used in an\n"
     " ATTACH command. Using this string in an ATTACH command will result in the\n"
     " ROM configuration as shown in the SHOW ROM command.\n\n"
@@ -2115,17 +2148,26 @@ const char rom_helptext[] =
     "+socket 2: address=17773200-17773377, image=DL\n"
     "+socket 3: address=17773400-17773577, image=DM\n"
     "+socket 4: address=17773600-17773777, image=DX\n"
+    "2 Type\n"
+    " The SHOW ROM TYPE command shows the currently selected module type, either\n"
+    " BLANK, M9312 or VT40.\n"
+    "2 Configuration\n"
+    " The SHOW ROM CONFIGURATION commands shows the current configuration mode,\n"
+    " either AUTO or MANUAL.\n"
+    "2 Start_Address\n"
+    " The SHOW ROM START_ADDRESS command shows the set start address in the address\n"
+    " space of the attached ROMs or 'not specified' if the start address is not set.\n"
     "1 Booting_the_System\n"
     " There are two ways to boot from an attached ROM:\n\n"
     "+1. By starting the simulator at an address in the ROM address space,\n"
-    "+2. By setting the starting address and subsequently issue a BOOT command.\n\n"
+    "+2. By setting the starting address and subsequently issuing a BOOT command.\n\n"
     " The simulator can be started at an address in the ROM address space via a GO\n"
     " or RUN command:\n\n"
     "+GO <address>\n"
     "+RUN <address>\n\n"
     " For more information see the help for these commands.\n\n"
     " The simulator can also be started by first setting the start address in the\n"
-    " ROM code and subsequently issue a BOOT command. The start address is set by\n"
+    " ROM code and subsequently issuing a BOOT command. The start address is set by\n"
     " the following command:\n\n"
     "+SET ROM START_ADDRESS=<address>\n\n"
     " The address must be a 16-bit physical address in an attached ROM. The M9312\n"
@@ -2134,6 +2176,31 @@ const char rom_helptext[] =
     " After setting the start address the system can be started via a BOOT\n"
     " command:\n\n"
     "+BOOT {ROM|CPU}\n"
+    "1 Command_Summary\n"
+    " The ROM device accepts the following SET commands:\n\n"
+    "+SET ROM TYPE=BLANK|M9312|VT40\n"
+    "+SET ROM CONFIGURATION=AUTO|MANUAL - only for ROM type M9312\n"
+    "+SET ROM START_ADDRESS=<address> - only for ROM types BLANK and VT40\n"
+    "+SET ROM START_ADDRESS=<address>|<ROM>+DIAG|<ROM>-DIAG - only for ROM type M9312\n"
+    "+SET ROM WRITE=ENABLE|DISABLE\n\n"
+    " The ROM device accepts the following ATTACH and DETACH commands:\n\n"
+    "+ATTACH ROM {socket:}<address>/file - only for ROM type BLANK\n"
+    "+ATTACH ROM {socket:}<ROM> - only for ROM type M9312\n"
+    "+DETACH ROM\n\n"
+    " The ROM device accepts the following SHOW commands:\n\n"
+    "+SHOW ROM\n"
+    "+SHOW ROM SOCKETS\n"
+    "+SHOW ROM TYPE\n"
+    "+SHOW ROM CONFIGURATION\n"
+    "+SHOW ROM START_ADDRESS\n\n"
+    " The ROM device accepts the following HELP commands:\n\n"
+    "+HELP ROM\n"
+    "+HELP ROM SET\n"
+    "+HELP ROM SHOW\n"
+    "+HELP ROM ATTACH - help text is module-specific\n\n"
+    " The ROM device also accepts the following commands:\n\n"
+    "+RESET ROM\n"
+    "+BOOT ROM\n"
     "1 Examples\n"
     "2 Blank_Example\n"
     " The BLANK module type has four sockets in which ROMs can be placed, the\n"
@@ -2144,7 +2211,19 @@ const char rom_helptext[] =
     "+ATTACH ROM 0:17765000/23-616F1.IMG, 17773000/23-751A9.IMG\n"
     "+SET ROM START_ADDRESS=173006\n"
     "+BOOT ROM\n"
-    "2 M9312_Example\n"
+    "2 M9312_Examples\n"
+    "3 Attach_ROMs\n"
+    " The following commands show the different uses of the ATTACH command:\n\n"
+    "+ATTACH ROM 0:B0\n"
+    "+ATTACH ROM 2:DL\n\n"
+    " These commands attach the B0 rom to socket 0 and the DL rom to socket 2.\n\n"
+    "+ATTACH ROM 0:B0,2:DL\n\n"
+    " This command has the same effect as the two separate commands above.\n\n"
+    "+ATTACH ROM B0,DL,DK,DB\n\n"
+    " This command attaches the B0, DL, DK and DB ROMs to sockets 0 to 4.\n\n"
+    "+ATTACH ROM 2:DL,DK\n\n"
+    " This command attaches the DL ROM to socket 2 and the DK ROM to socket 3.\n"
+    "3 Auto-configuration\n"
     " The M9312 supports an auto-configuration option for placing appropriate ROMs\n"
     " in its sockets:\n\n"
     "+SET CPU 11/70\n"
@@ -2155,11 +2234,21 @@ const char rom_helptext[] =
     "+-       attached to <0:B0, 1:DK, 2:DL, 3:DM, 4:DX>, read only\n\n"
     " The auto configuration takes into account the current CPU type and the enabled\n"
     " devices as can be demonstrated by the following commands:\n\n"
+    "+SET CPU 11/34\n"
     "+SET RK DISABLED\n"
     "+SET ROM CONFIG=AUTO\n"
     "+SHOW ROM\n"
     "+ROM     module type M9312, configuration mode AUTO, start address not specified\n"
-    "+-       attached to <0:B0, 1:DL, 2:DM, 3:DX, 4:DB>, read only\n"
+    "+-       attached to <0:A0, 1:DL, 2:DM, 3:DX, 4:DB>, read only\n"
+    "3 Booting_the_system\n"
+    " By means of the auto-configuration and symbolic start addressing features of\n"
+    " the M9312 implementation, the system can be started simply via the ROMs. The\n"
+    " following commands suffice to boot the system, given the right boot media are\n"
+    " available in DL0:\n\n"
+    "+SET ROM TYPE=M9312\n"
+    "+SET ROM CONFIG=AUTO\n"
+    "+SET ROM START_ADDRESS=DL-DIAG\n"
+    "+BOOT\n"
     "2 VT40_Example\n"
     " Configuring the VT40 module type for use is quite simple as it has just one\n"
     " socket and one availabe ROM. Setting the type suffices to be able to use the\n"
@@ -2167,7 +2256,7 @@ const char rom_helptext[] =
     "+SET CPU 11/05\n"
     "+SET ROM TYPE=VT40\n"
     "+SHOW ROM\n"
-    "+ROM     module type VT40, configuration mode MANUAL, start address not specified\n"
+    "+ROM     module type VT40, configuration mode MANUAL, start address 166000\n"
     "+-       attached to <0:VT40>, read only\n";
 
 

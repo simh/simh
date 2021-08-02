@@ -460,14 +460,6 @@ uint16 rom_23_ZZZA9[64] =
 
 extern void setHITMISS ();
 
-
-#define STD_OFFSETS " Offsets\n" \
-                    "+004 - Boot without diagnostics, unit 0\n" \
-                    "+006 - Boot with diagnostics, unit 0\n" \
-                    "+012 - Boot with diagnostics, unit in R0\n" \
-                    "+016 - Boot with diag, unit in R0, CSR in R1\n\n"
-
-
 ROM_DEF diag_roms[] =
 {
     "A0",   NULL,         (uint16 (*)[]) &rom_23_248F1, 0144,             020,
