@@ -3300,7 +3300,7 @@ else {
             snprintf (namebuf, max_namelen + 1, "%s%*s", rptr->name, (int)(strlen (rptr->name))-((int)max_namelen), rangebuf);
             }
         if (all_unique) {
-            snprintf (buf, sizeof (buf), "  %s %4d %s\n", namebuf, rptr->width, note);
+            snprintf (buf, sizeof (buf), "  %s %4d %s", namebuf, rptr->width, note);
             fprint_wrapped (st, buf, strlen (buf), " ", rptr->desc, 80);
             continue;
             }
@@ -3623,7 +3623,7 @@ char gbuf[CBUFSIZE];
 CTAB *cmdp;
 
 if (*cptr) {
-    const char *gptr = get_glyph (cptr, gbuf, 0);
+    get_glyph (cptr, gbuf, 0);
     if ((cmdp = find_cmd (gbuf))) {
         if (cmdp->action == &exdep_cmd) {
             if (dptr->help)
