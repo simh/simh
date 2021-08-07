@@ -2352,9 +2352,9 @@ if (sim_switches & SWMASK ('C')) {                      /* create new disk conta
     sim_quiet = saved_sim_quiet;
     if (r != SCPE_OK) {
         sim_switches = saved_sim_switches;
-        return sim_messagef (r, "%s: Can't open copy source: %s - %s\n", sim_uname (uptr), cptr, sim_error_text (r));
+        return sim_messagef (r, "%s: Cannot open copy source: %s - %s\n", sim_uname (uptr), cptr, sim_error_text (r));
         }
-    sim_messagef (SCPE_OK, "%s: creating new %s '%s' disk container copied from '%s'\n", sim_uname (uptr), dest_fmt, gbuf, cptr);
+    sim_messagef (SCPE_OK, "%s: Creating new %s '%s' disk container copied from '%s'\n", sim_uname (uptr), dest_fmt, gbuf, cptr);
     capac_factor = ((dptr->dwidth / dptr->aincr) >= 32) ? 8 : ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* capacity units (quadword: 8, word: 2, byte: 1) */
     if (strcmp ("VHD", dest_fmt) == 0)
         dest = sim_vhd_disk_create (gbuf, ((t_offset)uptr->capac)*capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1));
@@ -2362,7 +2362,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create new disk conta
         dest = sim_fopen (gbuf, "wb+");
     if (!dest) {
         sim_disk_detach (uptr);
-        return sim_messagef (r, "%s: can't create %s disk container '%s'\n", sim_uname (uptr), dest_fmt, gbuf);
+        return sim_messagef (r, "%s: Cannot create %s disk container '%s'\n", sim_uname (uptr), dest_fmt, gbuf);
         }
     else {
         uint8 *copy_buf = (uint8*) malloc (1024*1024);
@@ -2583,7 +2583,7 @@ if ((sim_switches & SWMASK ('R')) ||                    /* read only? */
     if (uptr->fileref == NULL)                          /* open fail? */
         return _err_return (uptr, SCPE_OPENERR);        /* yes, error */
     uptr->flags = uptr->flags | UNIT_RO;                /* set rd only */
-    sim_messagef (SCPE_OK, "%s: unit is read only\n", sim_uname (uptr));
+    sim_messagef (SCPE_OK, "%s: Unit is read only\n", sim_uname (uptr));
     }
 else {                                                  /* normal */
     uptr->fileref = open_function (cptr, "rb+");        /* open r/w */
@@ -2595,18 +2595,20 @@ else {                                                  /* normal */
             if (uptr->fileref == NULL)                  /* open fail? */
                 return _err_return (uptr, SCPE_OPENERR);/* yes, error */
             uptr->flags = uptr->flags | UNIT_RO;        /* set rd only */
-            sim_messagef (SCPE_OK, "%s: unit is read only\n", sim_uname (uptr));
+            sim_messagef (SCPE_OK, "%s: Unit is read only\n", sim_uname (uptr));
             }
         else {                                          /* doesn't exist */
             if (sim_switches & SWMASK ('E'))            /* must exist? */
-                return sim_messagef (_err_return (uptr, SCPE_OPENERR), "%s: File not found: %s\n", sim_uname (uptr), cptr);
+                return sim_messagef (_err_return (uptr, SCPE_OPENERR), "%s: Cannot open '%s' - %s\n",
+                                     sim_uname (uptr), cptr, strerror (errno));
             if (create_function)
                 uptr->fileref = create_function (cptr, ((t_offset)uptr->capac)*ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1));/* create new file */
             else
                 uptr->fileref = open_function (cptr, "wb+");/* open new file */
             if (uptr->fileref == NULL)                  /* open fail? */
-                return sim_messagef (_err_return (uptr, SCPE_OPENERR), "%s: Can't create file: %s\n", sim_uname (uptr), cptr);
-            sim_messagef (SCPE_OK, "%s: creating new file: %s\n", sim_uname (uptr), cptr);
+                return sim_messagef (_err_return (uptr, SCPE_OPENERR), "%s: Cannot create '%s' - %s\n",
+                                     sim_uname (uptr), cptr, strerror (errno));
+            sim_messagef (SCPE_OK, "%s: Creating new file: %s\n", sim_uname (uptr), cptr);
             created = TRUE;
             }
         }                                               /* end if null */
@@ -2635,13 +2637,13 @@ if ((DK_GET_FMT (uptr) == DKUF_F_VHD) || (ctx->footer)) {
             ((xfer_element_size == 0) || (xfer_element_size == ctx->xfer_element_size))) {
             if (strcmp (container_dtype, dtype) != 0) {
                 if (drivetypes == NULL) /* No Autosize */
-                    r = sim_messagef (SCPE_OPENERR, "%s: Can't attach %s container to %s unit - Autosizing disk disabled\n", sim_uname (uptr), container_dtype, dtype);
+                    r = sim_messagef (SCPE_OPENERR, "%s: Cannot attach %s container to %s unit - Autosizing disk disabled\n", sim_uname (uptr), container_dtype, dtype);
                 else {
                     cmd[sizeof (cmd) - 1] = '\0';
                     snprintf (cmd, sizeof (cmd) - 1, "%s %s", sim_uname (uptr), container_dtype);
                     r = set_cmd (0, cmd);
                     if (r != SCPE_OK) {
-                        r = sim_messagef (r, "%s: Can't set to drive type %s\n", sim_uname (uptr), container_dtype);
+                        r = sim_messagef (r, "%s: Cannot set to drive type %s\n", sim_uname (uptr), container_dtype);
                         if ((uptr->flags & UNIT_RO) != 0)                   /* Not Opening read only? */
                             r = sim_messagef (SCPE_OK, "%s: Read Only access to inconsistent drive type allowed\n", sim_uname (uptr));
                         else
@@ -6020,12 +6022,12 @@ if (info->flag) {        /* zap type */
     container = sim_vhd_disk_open (FullPath, "r");
     if (container != NULL) {
         sim_vhd_disk_close (container);
-        info->stat = sim_messagef (SCPE_OPENERR, "Can't change the disk type of a VHD container file\n");
+        info->stat = sim_messagef (SCPE_OPENERR, "Cannot change the disk type of a VHD container file\n");
         return;
         }
     container = sim_fopen (FullPath, "r+");
     if (container == NULL) {
-        info->stat = sim_messagef (SCPE_OPENERR, "Can't open container file '%s' - %s\n", FullPath, strerror (errno));
+        info->stat = sim_messagef (SCPE_OPENERR, "Cannot open container file '%s' - %s\n", FullPath, strerror (errno));
         return;
         }
     container_size = sim_fsize_ex (container);
@@ -6102,7 +6104,7 @@ if (info->flag == 0) {
         return;
         }
     else {
-        info->stat = sim_messagef (SCPE_OPENERR, "Can't open container file '%s' - %s\n", FullPath, strerror (errno));
+        info->stat = sim_messagef (SCPE_OPENERR, "Cannot open container file '%s' - %s\n", FullPath, strerror (errno));
         return;
         }
     }
