@@ -1647,7 +1647,7 @@ t_stat hk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr
 fprintf (st, "RK611/RK06,RK07 Cartridge Disk (HK)\n\n");
 fprintf (st, "RK611  options include the ability to set units write enabled or write locked,\n");
 fprintf (st, "to set the drive type to RK06, RK07, or autosize, and to write a DEC standard\n");
-fprintf (st, "044 compliant bad block table on the last track:\n\n");
+fprintf (st, "144 compliant bad block table on the last track:\n\n");
 fprint_set_help (st, dptr);
 fprint_show_help (st, dptr);
 fprintf (st, "\nThe type options can be used only when a unit is not attached to a file.\n");

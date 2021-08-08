@@ -1269,7 +1269,7 @@ t_stat rl_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const char *cptr
 fprintf (st, "RL11/RL01/RL02 Cartridge Disk (RL)\n\n");
 fprintf (st, "RL11 options include the ability to set units write enabled or write locked,\n");
 fprintf (st, "to set the drive type to RL01, RL02, or autosize, and to write a DEC standard\n");
-fprintf (st, "044 compliant bad block table on the last track:\n\n");
+fprintf (st, "144 compliant bad block table on the last track:\n\n");
 fprint_set_help (st, dptr);
 fprint_show_help (st, dptr);
 fprintf (st, "\nThe type options can be used only when a unit is not attached to a file.\n");
