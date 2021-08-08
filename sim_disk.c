@@ -2598,7 +2598,8 @@ else {                                                  /* normal */
             sim_messagef (SCPE_OK, "%s: Unit is read only\n", sim_uname (uptr));
             }
         else {                                          /* doesn't exist */
-            if (sim_switches & SWMASK ('E'))            /* must exist? */
+            if ((sim_switches & SWMASK ('E')) ||        /* must exist? */
+                (errno != ENOENT))                      /* or other error? */
                 return sim_messagef (_err_return (uptr, SCPE_OPENERR), "%s: Cannot open '%s' - %s\n",
                                      sim_uname (uptr), cptr, strerror (errno));
             if (create_function)
@@ -2851,8 +2852,10 @@ if (container_size && (container_size != (t_offset)-1)) {
 
                 sim_switches = SWMASK ('R');
                 uptr->capac = (t_addr)(container_size/(ctx->capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1)));
-                sim_printf ("%s: non expandable %s disk container '%s' is %s than simulated device (%s %s ", 
-                            sim_uname (uptr), container_dtype, cptr, (container_size < current_unit_size) ? "smaller" : "larger", sprint_capac (dptr, uptr), (container_size < current_unit_size) ? "<" : ">");
+                sim_printf ("%s: non expandable %s%sdisk container '%s' is %s than simulated device (%s %s ", 
+                            sim_uname (uptr), container_dtype, (*container_dtype != '\0') ? " " : "", cptr, 
+                            (container_size < current_unit_size) ? "smaller" : "larger", sprint_capac (dptr, uptr), 
+                            (container_size < current_unit_size) ? "<" : ">");
                 uptr->capac = saved_capac;
                 sim_printf ("%s)\n", sprint_capac (dptr, uptr));
                 sim_switches = saved_switches;
