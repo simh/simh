@@ -2454,7 +2454,7 @@ static t_stat tq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, const cha
 const char *devtype = UNIBUS ? "TUK50" : "TQK50";
 
 fprintf (st, "%s (TQ)\n\n", tq_description (dptr));
-fprintf (st, "The TQ controller simulates the %s TMSCP disk controller.  TQ options\n", devtype);
+fprintf (st, "The TQ controller simulates the %s TMSCP tape controller.  TQ options\n", devtype);
 fprintf (st, "include the ability to set units write enabled or write locked, and to\n");
 fprintf (st, "specify the controller type and tape length:\n");
 fprint_set_help (st, dptr);
